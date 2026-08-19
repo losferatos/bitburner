@@ -184,14 +184,28 @@ if (terminalOk) {
 }
 
 // ---------------------------------------------------------------------------
-// 8. Wiederverbinden nach abgerissener Leitung
+// 8. Wiederverbinden nach abgerissener Leitung — nur auf Verlangen
 //
-// Steht bewusst ganz am Ende: die Pruefung kappt die Leitung, und ein neuer
-// Verbindungsaufbau kostet bei Opera bis zu zehn Sekunden. Alles Wichtige ist
-// zu diesem Zeitpunkt schon geprueft.
+// Warum nicht standardmaessig: Opera drosselt neue Debugging-Verbindungen. Wer
+// eine Leitung kappt und sofort eine neue aufmacht, kann den Endpunkt fuer
+// mehrere Minuten unbrauchbar machen. Genau das will man nicht unmittelbar vor
+// einem Nachtlauf. Deshalb steht die Pruefung hinter einem Schalter:
+//
+//   node nightshift/selftest.js --reconnect
+//
+// Danach am besten ein paar Minuten Ruhe geben, bevor der Dienst startet.
 // ---------------------------------------------------------------------------
 
-await step("8. Verbindung reisst ab und wird selbst wieder aufgebaut", async () => {
+const wantReconnectCheck = process.argv.includes("--reconnect");
+
+if (!wantReconnectCheck) {
+  console.log(
+    "  [SKIP] 8. Wiederverbinden — uebersprungen. Mit --reconnect ausdruecklich pruefen\n" +
+      "         (kappt die Leitung; Opera drosselt danach neue Verbindungen fuer einige Minuten).",
+  );
+}
+
+if (wantReconnectCheck) await step("8. Verbindung reisst ab und wird selbst wieder aufgebaut", async () => {
   const before = tab.sessionId;
   const started = Date.now();
   tab.ws.terminate(); // hart kappen, wie bei einem Browser-Neustart

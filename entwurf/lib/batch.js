@@ -18,7 +18,13 @@
  * Diese Datei rechnet nur - kein einziger ns-Aufruf, also 0 GB RAM.
  * Alle Spielformeln kommen aus lib/calc.js.
  */
-import * as calc from "calc";
+// ACHTUNG beim Importpfad: Bitburner loest Angaben OHNE fuehrenden Punkt vom
+// Wurzelverzeichnis des Rechners auf, nicht vom Ordner der importierenden
+// Datei. Aus lib/ heraus fuehrt "calc" ins Leere und das Skript laesst sich
+// nicht mehr auswerten ("Cannot calculate RAM usage of an invalid script").
+// Gemessen ueber den Diagnosedraht: "lib/calc", "/lib/calc" und "./calc"
+// gehen, "calc" und "calc.js" nicht.
+import * as calc from "lib/calc";
 
 /**
  * Rechnet einen vollstaendigen Stapel fuer ein vorbereitetes Ziel durch.
@@ -29,10 +35,27 @@ import * as calc from "calc";
  * Wer stattdessen mit dem Momentanzustand rechnet, bekommt bei jedem Stapel
  * andere Threadzahlen und damit eine Kette, die sich gegenseitig verschiebt.
  *
+ * ZWEI verschiedene Sicherheitsstufen gehen in diese Rechnung ein, und die
+ * Unterscheidung ist der wichtigste Punkt am ganzen Verfahren:
+ *
+ *   - Die THREADZAHLEN werden bei secMin gerechnet. Dort landen die Auftraege,
+ *     dort wirken sie.
+ *   - Die LAUFZEITEN werden bei secNow gerechnet, der Sicherheit im Moment des
+ *     Starts. Denn das Spiel bestimmt die Dauer einmalig beim Aufruf
+ *     (NetscriptFunctions.ts:277) aus der dann geltenden Sicherheit.
+ *
+ * Wer die Laufzeit bei secMin rechnet, waehrend die Sicherheit gerade um 0.2
+ * darueber steht, unterschaetzt eine weaken-Dauer um Prozente - bei einer
+ * Laufzeit von zweieinhalb Minuten sind das mehrere Sekunden. Der Auftrag
+ * landet zu spaet, die Sicherheit bleibt oben, der naechste Auftrag wird noch
+ * langsamer: eine Aufschaukelung, die das Ziel binnen Minuten leerraeumt.
+ * In der Simulation kostete genau dieser Fehler zwischen 16 und 98 % des
+ * Ertrags, je nach Ziel.
+ *
  * @param {{host: string, moneyMax: number, secMin: number, reqSkill: number, growth: number}} t
  * @param {object} player Ausgabe von playerFacts()
- * @param {{fraction: number, weakenMargin: number, ram: {hack: number, grow: number, weaken: number}, hackChunks?: number[]}} o
- * @returns {null | {hack: number, grow: number, weaken1: number, weaken2: number,
+ * @param {{fraction: number, secNow: number, weakenMargin: number, ram: {hackT: number, growT: number, weakenT: number}, hackChunks?: number[]}} o
+ * @returns {null | {hackT: number, growT: number, weaken1: number, weaken2: number,
  *                   fraction: number, ram: number, money: number,
  *                   tHack: number, tGrow: number, tWeaken: number}}
  */
@@ -50,7 +73,7 @@ export function batchPlan(t, player, o) {
 
   // Threadzahl fuer den gewuenschten Anteil. Abgerundet: lieber etwas weniger
   // wegnehmen als versehentlich mehr, denn grow muss multiplikativ zurueck.
-  const hack = Math.max(1, Math.floor(o.fraction / pct));
+  const hackT = Math.max(1, Math.floor(o.fraction / pct));
 
   // Der TATSAECHLICHE Anteil haengt davon ab, ob die hack-Threads in einem
   // Stueck laufen oder auf mehrere Rechner verteilt werden muessen. Bei einer
@@ -58,11 +81,11 @@ export function batchPlan(t, player, o) {
   // Guthaben - zwei Bloecke a 10 % nehmen zusammen 19 %, nicht 20 %.
   // Wer das ignoriert, laesst grow zu viel nachlegen; das ist zwar harmlos
   // (der Deckel greift), kostet aber Threads.
-  const fraction = realFraction(pct, o.hackChunks && o.hackChunks.length ? o.hackChunks : [hack]);
+  const fraction = realFraction(pct, o.hackChunks && o.hackChunks.length ? o.hackChunks : [hackT]);
   if (!(fraction > 0) || fraction >= 1) return null;
 
-  const grow = calc.growThreads(prepped, t.moneyMax, t.moneyMax * (1 - fraction), player, 1);
-  if (!Number.isFinite(grow) || grow < 0) return null;
+  const growT = calc.growThreads(prepped, t.moneyMax, t.moneyMax * (1 - fraction), player, 1);
+  if (!Number.isFinite(growT) || growT < 0) return null;
 
   // Beide Ausgleichsauftraege bewusst grosszuegig bemessen.
   //
@@ -74,18 +97,20 @@ export function batchPlan(t, player, o) {
   // des Stapels und kauft dafuer Unempfindlichkeit gegen Rundungsfehler,
   // verrutschte Landungen und den Kernbonus, den wir nicht kennen.
   const margin = o.weakenMargin ?? 1.5;
-  const weaken1 = calc.weakenThreads(hack * calc.SERVER_FORTIFY_AMOUNT * margin);
-  const weaken2 = calc.weakenThreads(grow * calc.GROW_FORTIFY_AMOUNT * margin);
+  const weaken1 = calc.weakenThreads(hackT * calc.SERVER_FORTIFY_AMOUNT * margin);
+  const weaken2 = calc.weakenThreads(growT * calc.GROW_FORTIFY_AMOUNT * margin);
 
-  const tHack = calc.hackTime(prepped, player) * 1000;
+  // Laufzeit bei der TATSAECHLICHEN Sicherheit, siehe Erlaeuterung oben.
+  const jetzt = { sec: Math.max(t.secMin, o.secNow ?? t.secMin), reqSkill: t.reqSkill };
+  const tHack = calc.hackTime(jetzt, player) * 1000;
   return {
-    hack,
-    grow,
+    hackT,
+    growT,
     weaken1: Math.max(1, weaken1),
     weaken2: Math.max(1, weaken2),
     fraction,
     money: fraction * t.moneyMax * chance,
-    ram: hack * o.ram.hack + grow * o.ram.grow + (Math.max(1, weaken1) + Math.max(1, weaken2)) * o.ram.weaken,
+    ram: hackT * o.ram.hackT + growT * o.ram.growT + (Math.max(1, weaken1) + Math.max(1, weaken2)) * o.ram.weakenT,
     tHack,
     tGrow: tHack * calc.GROW_TIME_FACTOR,
     tWeaken: tHack * calc.WEAKEN_TIME_FACTOR,
@@ -127,17 +152,18 @@ export function realFraction(pct, chunks) {
  * @returns {{fraction: number, plan: object} | null}
  */
 export function chooseFraction(t, player, ramBudget, o) {
-  const min = o.min ?? 0.005;
-  const max = o.max ?? 0.9;
-  const probe = (f) => batchPlan(t, player, { fraction: f, weakenMargin: o.weakenMargin, ram: o.ram });
+  const min = o.min ?? 0.01;
+  const max = o.max ?? 0.5;
+  const versuch = (f) =>
+    batchPlan(t, player, { fraction: f, secNow: o.secNow, weakenMargin: o.weakenMargin, ram: o.ram });
 
-  const klein = probe(min);
+  const klein = versuch(min);
   if (!klein) return null;
   const maxStapel = Math.max(1, Math.floor(klein.tWeaken / (4 * o.gapMs)));
   const wunsch = ramBudget / maxStapel; // so gross muss ein Stapel sein
 
   if (klein.ram >= wunsch) return { fraction: min, plan: klein };
-  const gross = probe(max);
+  const gross = versuch(max);
   if (!gross) return { fraction: min, plan: klein };
   if (gross.ram <= wunsch) return { fraction: max, plan: gross };
 
@@ -145,7 +171,7 @@ export function chooseFraction(t, player, ramBudget, o) {
   let lo = min, hi = max, best = gross;
   for (let i = 0; i < 24; i++) {
     const mid = (lo + hi) / 2;
-    const p = probe(mid);
+    const p = versuch(mid);
     if (!p) break;
     if (p.ram >= wunsch) { hi = mid; best = p; } else lo = mid;
   }
@@ -216,14 +242,14 @@ export function placeOps(hosts, ops) {
  * @param {string} host Zielrechner
  * @param {number} landHack Zeitpunkt (ms seit 1970), zu dem der hack landen soll
  * @param {number} gapMs
- * @param {{hack: string, grow: string, weaken: string}} scripts
- * @param {{hack: number, grow: number, weaken: number}} ram
+ * @param {{hackT: string, growT: string, weakenT: string}} scripts
+ * @param {{hackT: number, growT: number, weakenT: number}} ram
  */
 export function batchOps(plan, host, landHack, gapMs, scripts, ram) {
   return [
-    { kind: "hack", script: scripts.hack, threads: plan.hack, cost: ram.hack, landAt: landHack, opMs: plan.tHack, target: host },
-    { kind: "weaken1", script: scripts.weaken, threads: plan.weaken1, cost: ram.weaken, landAt: landHack + gapMs, opMs: plan.tWeaken, target: host },
-    { kind: "grow", script: scripts.grow, threads: plan.grow, cost: ram.grow, landAt: landHack + 2 * gapMs, opMs: plan.tGrow, target: host },
-    { kind: "weaken2", script: scripts.weaken, threads: plan.weaken2, cost: ram.weaken, landAt: landHack + 3 * gapMs, opMs: plan.tWeaken, target: host },
+    { kind: "hack", script: scripts.hackT, threads: plan.hackT, cost: ram.hackT, landAt: landHack, opMs: plan.tHack, target: host },
+    { kind: "weaken1", script: scripts.weakenT, threads: plan.weaken1, cost: ram.weakenT, landAt: landHack + gapMs, opMs: plan.tWeaken, target: host },
+    { kind: "grow", script: scripts.growT, threads: plan.growT, cost: ram.growT, landAt: landHack + 2 * gapMs, opMs: plan.tGrow, target: host },
+    { kind: "weaken2", script: scripts.weakenT, threads: plan.weaken2, cost: ram.weakenT, landAt: landHack + 3 * gapMs, opMs: plan.tWeaken, target: host },
   ];
 }

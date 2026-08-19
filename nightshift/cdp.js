@@ -123,9 +123,13 @@ export const DEFAULTS = {
    * Opera dafuer gemessene 1 bis 10 Sekunden braucht (siehe Kopfkommentar).
    */
   connectTimeoutMs: 30000,
-  /** Wiederverbinden: Wartezeit waechst von min bis max. Bewusst traege. */
-  reconnectMinMs: 2000,
-  reconnectMaxMs: 60000,
+  /**
+   * Wiederverbinden: Wartezeit waechst von min bis max. Bewusst traege —
+   * die Drosselung loest sich nur, wenn wirklich Ruhe ist. Jeder Versuch
+   * scheint sie neu anzustossen.
+   */
+  reconnectMinMs: 5000,
+  reconnectMaxMs: 300000,
   /**
    * Herzschlag, der die Leitung offen haelt und ein stilles Absterben
    * bemerkt. 0 schaltet ihn ab.
@@ -476,7 +480,7 @@ export class BitburnerTab {
     // Mehrere Anlaeufe mit wachsender Pause. Opera antwortet auf zu schnell
     // aufeinanderfolgende Verbindungsversuche erst mit 403 und dann gar nicht
     // mehr; wer stur weiterprobiert, haelt die Drosselung nur aufrecht.
-    const waits = [3000, 15000, 45000];
+    const waits = [5000, 30000, 90000];
     let lastError = null;
     for (let attempt = 0; attempt < Math.max(1, this.options.connectAttempts); attempt++) {
       if (attempt > 0) {
@@ -591,6 +595,9 @@ export class BitburnerTab {
    */
   _scheduleReconnect() {
     if (this._reconnectTimer || this._closedOnPurpose) return;
+    // Laeuft schon ein Verbindungsaufbau, nicht noch einen danebenstellen.
+    // Zwei parallele Versuche halten die Drosselung nur am Leben.
+    if (this._connectPromise) return;
     const delay = this._reconnectDelay;
     this._reconnectDelay = Math.min(this._reconnectDelay * 2, this.options.reconnectMaxMs);
     this._log("info", "reconnect", `neuer Versuch in ${delay} ms`);

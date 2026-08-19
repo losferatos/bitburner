@@ -41,13 +41,14 @@ export async function main(ns) {
   const HOME_RESERVE = 2;
   // So viele Ziele gleichzeitig in Stapeln abschoepfen. Ein einzelnes Ziel
   // kann nur eine begrenzte Menge Speicher binden (siehe chooseFraction) -
-  // waechst die Flotte, ist Breite der einzige Weg, sie auszulasten.
-  const MAX_TARGETS = 8;
-  // So viele Ziele gleichzeitig VORBEREITEN. Ein einziges laesst den Speicher
-  // brachliegen, sobald sein Bedarf gedeckt ist - denn Nachwachsen braucht
-  // Zeit, nicht Threads. Zu viele verzetteln alles, weil dann keines fertig
-  // wird. Vier ist der Mittelweg.
-  const PREP_TARGETS = 4;
+  // waechst die Flotte, ist Breite der einzige Weg, sie auszulasten. Werte
+  // von Argus uebernommen (Stand 07fa272); sie wirken faktisch als "alle
+  // lohnenden Ziele", was mit Stapelbetrieb genau richtig ist.
+  const MAX_TARGETS = 60;
+  // So viele Ziele gleichzeitig VORBEREITEN. Der Bedarf der Vorbereitung ist
+  // endlich, sie laeuft also nur einmal je Ziel voll auf und uebergibt danach
+  // an den Stapelbetrieb. Bei 164 TB freiem Speicher ist Breite hier billig.
+  const PREP_TARGETS = 40;
 
   // ---------------------------------------------------------------------
   // HWGW-Stapel
@@ -89,9 +90,15 @@ export async function main(ns) {
   // multiplikativ zurueckholen. Bei f=0.7 war der Ertrag in der Simulation
   // durchweg schlechter als bei f=0.4, bei doppeltem Speicherbedarf.
   const FRACTION_MAX = 0.5;
-  // Hoechstzahl Stapel, die ein Ziel in EINER Runde bekommt. Nur eine Bremse
-  // gegen Ausreisser, im Normalbetrieb werden ein bis drei erreicht.
-  const MAX_BATCHES_PER_ROUND = 40;
+  // Bremsen gegen Ausreisser. Im eingeschwungenen Zustand vergibt ein Ziel
+  // einen Stapel je 4*gap, also gut einen halben je Sekunde - die Grenzen
+  // greifen nur beim Anlaufen, wenn ein leerer Kalender auf einen Schlag
+  // gefuellt wuerde. Ohne sie kaeme man bei 60 Zielen auf mehrere tausend
+  // exec-Aufrufe in einer einzigen Runde, und die Runde ist eine Sekunde lang.
+  // Ein langsamer gefuellter Kalender kostet nichts ausser ein paar Sekunden
+  // Anlauf.
+  const MAX_BATCHES_PER_ROUND = 12;
+  const MAX_BATCHES_TOTAL = 80;
 
   // Drifterkennung. In einem gesunden Stapelbetrieb faellt die Sicherheit nach
   // jedem Stapel exakt auf secMin zurueck und das Guthaben auf das Maximum.
@@ -497,7 +504,11 @@ export async function main(ns) {
         let verbraucht = 0;
         let gestartet = 0;
 
-        while (gestartet < MAX_BATCHES_PER_ROUND && verbraucht + p.ram <= budget) {
+        while (
+          gestartet < MAX_BATCHES_PER_ROUND &&
+          stapelGesamt < MAX_BATCHES_TOTAL &&
+          verbraucht + p.ram <= budget
+        ) {
           // Sicherheit unmittelbar vor dem Start neu ablesen, nicht die zu
           // Rundenbeginn gemessene verwenden. Dazwischen liegen die Scans des
           // ganzen Netzes; in dieser Zeit kann ein Auftrag gelandet sein und

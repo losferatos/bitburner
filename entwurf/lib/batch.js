@@ -73,7 +73,14 @@ export function batchPlan(t, player, o) {
 
   // Threadzahl fuer den gewuenschten Anteil. Abgerundet: lieber etwas weniger
   // wegnehmen als versehentlich mehr, denn grow muss multiplikativ zurueck.
-  const hackT = Math.max(1, Math.floor(o.fraction / pct));
+  //
+  // Sind die tatsaechlich platzierten Bloecke bekannt, gilt deren Summe -
+  // sonst stuenden Threadzahl und Beuteanteil fuer verschiedene Stapel und
+  // grow wuerde fuer einen hack bemessen, den es so nicht gibt.
+  const chunks = o.hackChunks && o.hackChunks.length ? o.hackChunks : null;
+  const hackT = chunks
+    ? chunks.reduce((a, b) => a + b, 0)
+    : Math.max(1, Math.floor(o.fraction / pct));
 
   // Der TATSAECHLICHE Anteil haengt davon ab, ob die hack-Threads in einem
   // Stueck laufen oder auf mehrere Rechner verteilt werden muessen. Bei einer
@@ -81,7 +88,7 @@ export function batchPlan(t, player, o) {
   // Guthaben - zwei Bloecke a 10 % nehmen zusammen 19 %, nicht 20 %.
   // Wer das ignoriert, laesst grow zu viel nachlegen; das ist zwar harmlos
   // (der Deckel greift), kostet aber Threads.
-  const fraction = realFraction(pct, o.hackChunks && o.hackChunks.length ? o.hackChunks : [hackT]);
+  const fraction = realFraction(pct, chunks ?? [hackT]);
   if (!(fraction > 0) || fraction >= 1) return null;
 
   const growT = calc.growThreads(prepped, t.moneyMax, t.moneyMax * (1 - fraction), player, 1);

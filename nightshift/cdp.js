@@ -473,13 +473,15 @@ export class BitburnerTab {
       this.sessionId = null;
     }
 
-    const found = await discoverBrowserEndpoint(this.options);
-    this.endpoint = found.url;
-    await this._log("info", "discover", `${found.url} (Quelle: ${found.source})`);
-
     // Mehrere Anlaeufe mit wachsender Pause. Opera antwortet auf zu schnell
     // aufeinanderfolgende Verbindungsversuche erst mit 403 und dann gar nicht
     // mehr; wer stur weiterprobiert, haelt die Drosselung nur aufrecht.
+    //
+    // Die Adresse wird bei JEDEM Versuch neu ermittelt und nicht einmal oben
+    // gemerkt. Grund, in der Nacht vom 19.08. beobachtet: startet der
+    // Debugging-Dienst von Opera neu, bekommt das Browser-Ziel eine neue
+    // Kennung (`/devtools/browser/<uuid>`). Wer sich die alte Adresse merkt,
+    // versucht danach stundenlang, eine Leiche anzurufen.
     const waits = [5000, 30000, 90000];
     let lastError = null;
     for (let attempt = 0; attempt < Math.max(1, this.options.connectAttempts); attempt++) {
@@ -489,6 +491,15 @@ export class BitburnerTab {
         await sleep(wait);
       }
       try {
+        const found = await discoverBrowserEndpoint(this.options);
+        if (found.url !== this.endpoint) {
+          await this._log(
+            "info",
+            "discover",
+            `${found.url} (Quelle: ${found.source})${this.endpoint ? " — Adresse hat sich geaendert" : ""}`,
+          );
+        }
+        this.endpoint = found.url;
         this.ws = await this._openSocket(found.url);
         lastError = null;
         break;
@@ -584,7 +595,9 @@ export class BitburnerTab {
     this.ws = null;
     this.sessionId = null;
     this._rejectAllPending(new TransportError(reason));
-    this._log("warn", "socket", reason);
+    // Ein geplantes Schliessen ist keine Warnung. Sonst steht das Nachtprotokoll
+    // voller WARN-Zeilen, und die echten gehen darin unter.
+    this._log(this._closedOnPurpose ? "info" : "warn", "socket", reason);
     if (!this._closedOnPurpose) this._scheduleReconnect();
   }
 

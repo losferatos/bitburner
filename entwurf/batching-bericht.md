@@ -80,8 +80,8 @@ Die Skalierung mit dem Speicher (HWGW, jeweils bestes f):
 Man sieht die Saettigung: **ein einzelnes Ziel kann nur begrenzt viel Speicher
 binden.** Zwischen zwei Stapeln muessen vier Landungen Platz haben, in eine
 weaken-Zeit passen also nur `tWeaken/(4·gap)` Stapel. Bei 164 TB Flotte ist
-Breite (viele Ziele) daher genauso wichtig wie Tiefe — deshalb bleibt
-`MAX_TARGETS` bei 8 und es gibt zwei Vergabedurchgaenge.
+Breite (viele Ziele) daher genauso wichtig wie Tiefe — deshalb `MAX_TARGETS = 60`
+(Argus' Wert, uebernommen) und zwei Vergabedurchgaenge.
 
 ### Warum die "einfachere Zwischenstufe" ausscheidet
 
@@ -380,7 +380,19 @@ beenden sich von selbst. Alle Ziele starten in `prep`, der erste Stapel kommt
 also erst nach einer vollstaendigen Vorbereitung. **Fuer ein bis drei Minuten
 faellt der Ertrag daher ab, bevor er steigt.** Das ist normal, kein Fehler.
 
-### 5.7 Was noch nicht getestet ist
+### 5.7 Stand der Vorlage
+
+Der Entwurf ist ein vollstaendiger Ersatz fuer `src/autopilot.js` auf dem Stand
+von rund 20:55. Seither hat Argus dort drei Konstanten geaendert (Commits
+`d4b6a37` und `feedce1`): `MAX_TARGETS` 8 → 60, `PREP_TARGETS` 4 → 40,
+`HACK_FRACTION` 0.1 → 0.4. **Die ersten beiden sind uebernommen**, die dritte
+ist gegenstandslos — der Beuteanteil wird jetzt je Ziel aus dem Speicherbudget
+bestimmt (`chooseFraction`), nicht mehr fest vorgegeben. Andere Dateien
+(`invest.js`, `nightshift/`, `tools/reserve.js`) sind nicht beruehrt.
+**Vor der Uebernahme trotzdem `git log -- src/autopilot.js` pruefen**, ob
+seither noch etwas dazugekommen ist.
+
+### 5.8 Was noch nicht getestet ist
 
 Die Zahlen in diesem Bericht stammen aus einer Simulation, die aus
 `reference/v301` nachgebaut wurde — nicht aus einem Lauf im Spiel. Sie trifft
@@ -404,4 +416,5 @@ und 5.1 ist die erste Stelle zum Nachsehen.
 | `WEAKEN_MARGIN` | 1.5 | Aufschlag auf beide Ausgleichsauftraege. Siehe 5.4. |
 | `FRACTION_MIN/MAX` | 0.01 / 0.5 | Grenzen fuer den Beuteanteil. Ueber 0.5 wird es in jedem geprueften Fall schlechter. |
 | `DRIFT_WINDOW` / `DRIFT_SEC` | 30 / 1.0 | Empfindlichkeit der Drifterkennung. |
-| `MAX_TARGETS` / `PREP_TARGETS` | 8 / 4 | Breite. Bei weiter wachsender Flotte ist `MAX_TARGETS` die naechste Schraube. |
+| `MAX_TARGETS` / `PREP_TARGETS` | 60 / 40 | Breite. Von Argus' Stand `07fa272` uebernommen; wirkt als "alle lohnenden Ziele". |
+| `MAX_BATCHES_PER_ROUND` / `MAX_BATCHES_TOTAL` | 12 / 80 | Anlaufbremse. Ohne sie kaeme man bei 60 Zielen auf mehrere tausend `exec` in einer Sekunde. |

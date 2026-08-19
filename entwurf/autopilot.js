@@ -498,22 +498,48 @@ export async function main(ns) {
         let gestartet = 0;
 
         while (gestartet < MAX_BATCHES_PER_ROUND && verbraucht + p.ram <= budget) {
+          // Sicherheit unmittelbar vor dem Start neu ablesen, nicht die zu
+          // Rundenbeginn gemessene verwenden. Dazwischen liegen die Scans des
+          // ganzen Netzes; in dieser Zeit kann ein Auftrag gelandet sein und
+          // die Sicherheit angehoben haben. Aus einer veralteten Laufzeit wird
+          // eine negative additionalMsec, das Spiel deckelt sie auf 0, der
+          // Auftrag landet zu spaet - und der naechste noch spaeter.
+          const zeiten = batch.opTimes(t, player, ns.getServerSecurityLevel(t.host));
           const jetzt = Date.now();
           // Der zuletzt landende weaken hat die laengste Laufzeit. Frueher als
           // (jetzt + tWeaken) kann er nicht landen, also darf der hack - der
           // 3*gap vor ihm liegt - nicht frueher angesetzt werden.
-          const frueheste = jetzt + p.tWeaken - 3 * GAP_MS + SLACK_MS;
+          const frueheste = jetzt + zeiten.tWeaken - 3 * GAP_MS + SLACK_MS;
           const landHack = Math.max(kalender + GAP_MS, frueheste);
           // Gehoert dieser Stapel schon in diese Runde? Massgeblich ist, ob
           // sein letzter weaken jetzt startbar ist.
-          if (landHack + 3 * GAP_MS - p.tWeaken > jetzt + LEAD_MS) break;
+          if (landHack + 3 * GAP_MS - zeiten.tWeaken > jetzt + LEAD_MS) break;
 
-          const ops = batch.batchOps(p, t.host, landHack, GAP_MS, SCRIPTS, ramCost);
-          const belegung = batch.placeOps(
-            workforce.filter((s) => s.ramFree >= 1).map((s) => ({ host: s.host, frei: s.ramFree })),
-            ops,
-          );
+          const platz = () =>
+            workforce.filter((s) => s.ramFree >= 1).map((s) => ({ host: s.host, frei: s.ramFree }));
+          let pEff = p;
+          let ops = batch.batchOps(p, t.host, landHack, GAP_MS, SCRIPTS, ramCost, zeiten);
+          let belegung = batch.placeOps(platz(), ops);
           if (!belegung) break;
+
+          // Musste der hack auf mehrere Rechner aufgeteilt werden? Dann nehmen
+          // die Bloecke nacheinander vom bereits verkleinerten Guthaben und
+          // holen zusammen WENIGER als geplant. Einmal nachrechnen, sonst legt
+          // der grow blind zu viel nach - der Deckel frisst es, die Threads
+          // sind trotzdem bezahlt.
+          const stuecke = belegung.placements.filter((x) => x.op === ops[0]).map((x) => x.threads);
+          if (stuecke.length > 1) {
+            const p2 = batch.batchPlan(t, player, {
+              fraction: wahl.fraction,
+              secNow: t.secMin,
+              weakenMargin: WEAKEN_MARGIN,
+              ram: ramCost,
+              hackChunks: stuecke,
+            });
+            const ops2 = p2 ? batch.batchOps(p2, t.host, landHack, GAP_MS, SCRIPTS, ramCost, zeiten) : null;
+            const b2 = ops2 ? batch.placeOps(platz(), ops2) : null;
+            if (b2) { pEff = p2; ops = ops2; belegung = b2; }
+          }
 
           // Festschreiben - und zwar den hack ZULETZT. Sollte ein exec
           // scheitern (fremdes Skript belegt in derselben Millisekunde den
@@ -542,11 +568,11 @@ export async function main(ns) {
           }
 
           kalender = landHack + 3 * GAP_MS;
-          verbraucht += p.ram;
+          verbraucht += pEff.ram;
           gestartet++;
           stapelGesamt++;
           st.batches++;
-          if (!abbruch) geldGeplant += p.money;
+          if (!abbruch) geldGeplant += pEff.money;
           if (abbruch) break;
         }
 

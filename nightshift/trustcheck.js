@@ -31,9 +31,17 @@ const PROBE_ID = "nightshift-trustprobe";
 const COVER_ID = "nightshift-trustcover";
 
 const results = [];
+const unresolved = [];
+
 function record(name, ok, detail) {
   results.push({ name, ok, detail });
   console.log(`  [${ok ? "OK  " : "FEHL"}] ${name}${detail ? " — " + detail : ""}`);
+}
+
+/** Weder bestanden noch durchgefallen — die Messung war nicht aussagekraeftig. */
+function open(name, detail) {
+  unresolved.push({ name, detail });
+  console.log(`  [OFFEN] ${name}${detail ? " — " + detail : ""}`);
 }
 
 const tab = new BitburnerTab();
@@ -205,13 +213,24 @@ try {
     await tab._send("Target.detachFromTarget", { sessionId: otherSession }).catch(() => {});
 
     const wasBackground = state.vis === "hidden" || state.focus === false;
-    record(
-      "4. Klick kommt an, waehrend der Tab im Hintergrund liegt",
-      !!click && click.isTrusted === true,
-      `Tab war ${wasBackground ? "im Hintergrund" : "NICHT im Hintergrund (Messung nicht aussagekraeftig)"} ` +
-        `(Fokus=${state.focus}, Sichtbarkeit=${state.vis}) | ` +
-        (seen.length ? seen.map((e) => `${e.type}:${e.isTrusted}`).join(", ") : "KEIN Ereignis angekommen"),
-    );
+    const arrived = seen.length ? seen.map((e) => `${e.type}:${e.isTrusted}`).join(", ") : "KEIN Ereignis angekommen";
+    if (!wasBackground) {
+      // Ehrlich bleiben: der Tab liess sich nicht in den Hintergrund bringen
+      // (der Ausweichtab lag offenbar in einem anderen Fenster). Damit ist
+      // nichts widerlegt und nichts bewiesen — also auch nicht als gruen
+      // ausgeben.
+      open(
+        "4. Klick im Hintergrund",
+        `nicht messbar: der Tab blieb im Vordergrund (Fokus=${state.focus}, Sichtbarkeit=${state.vis}). ` +
+          `Der Klick kam an (${arrived}), aber das beweist nichts ueber den Hintergrundfall.`,
+      );
+    } else {
+      record(
+        "4. Klick kommt an, waehrend der Tab im Hintergrund liegt",
+        !!click && click.isTrusted === true,
+        `Fokus=${state.focus}, Sichtbarkeit=${state.vis} | ${arrived}`,
+      );
+    }
   } catch (e) {
     record("4. Klick kommt an, waehrend der Tab im Hintergrund liegt", false, `${e.name}: ${e.message}`);
   }
@@ -231,4 +250,8 @@ try {
 
 const failed = results.filter((r) => !r.ok);
 console.log(`\nErgebnis: ${results.length - failed.length} von ${results.length} Messungen wie erwartet.`);
+if (unresolved.length) {
+  console.log("Offen geblieben:");
+  for (const u of unresolved) console.log(`  - ${u.name}: ${u.detail}`);
+}
 process.exit(failed.length ? 1 : 0);

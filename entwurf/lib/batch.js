@@ -231,6 +231,24 @@ export function placeOps(hosts, ops) {
 }
 
 /**
+ * Laufzeiten der drei Aktionen bei einer FRISCH gemessenen Sicherheit.
+ *
+ * Wird unmittelbar vor jedem Stapel neu bestimmt. Die Sicherheit, die zu
+ * Rundenbeginn abgelesen wurde, ist zu diesem Zeitpunkt womoeglich schon
+ * veraltet - zwischen dem Ablesen und dem exec kann ein Auftrag eines anderen
+ * Stapels gelandet sein und sie angehoben haben. Und eine veraltete Laufzeit
+ * ist genau der Fehler, der die Kette zum Kippen bringt.
+ *
+ * @param {{secMin: number, reqSkill: number}} t
+ * @param {object} player
+ * @param {number} secNow
+ */
+export function opTimes(t, player, secNow) {
+  const tHack = calc.hackTime({ sec: Math.max(t.secMin, secNow), reqSkill: t.reqSkill }, player) * 1000;
+  return { tHack, tGrow: tHack * calc.GROW_TIME_FACTOR, tWeaken: tHack * calc.WEAKEN_TIME_FACTOR };
+}
+
+/**
  * Baut die vier Auftraege eines Stapels mit ihren Landezeitpunkten.
  *
  * Der Abstand gap zwischen den Landungen ist der einzige echte
@@ -245,11 +263,12 @@ export function placeOps(hosts, ops) {
  * @param {{hackT: string, growT: string, weakenT: string}} scripts
  * @param {{hackT: number, growT: number, weakenT: number}} ram
  */
-export function batchOps(plan, host, landHack, gapMs, scripts, ram) {
+export function batchOps(plan, host, landHack, gapMs, scripts, ram, times) {
+  const z = times ?? plan;
   return [
-    { kind: "hack", script: scripts.hackT, threads: plan.hackT, cost: ram.hackT, landAt: landHack, opMs: plan.tHack, target: host },
-    { kind: "weaken1", script: scripts.weakenT, threads: plan.weaken1, cost: ram.weakenT, landAt: landHack + gapMs, opMs: plan.tWeaken, target: host },
-    { kind: "grow", script: scripts.growT, threads: plan.growT, cost: ram.growT, landAt: landHack + 2 * gapMs, opMs: plan.tGrow, target: host },
-    { kind: "weaken2", script: scripts.weakenT, threads: plan.weaken2, cost: ram.weakenT, landAt: landHack + 3 * gapMs, opMs: plan.tWeaken, target: host },
+    { kind: "hack", script: scripts.hackT, threads: plan.hackT, cost: ram.hackT, landAt: landHack, opMs: z.tHack, target: host },
+    { kind: "weaken1", script: scripts.weakenT, threads: plan.weaken1, cost: ram.weakenT, landAt: landHack + gapMs, opMs: z.tWeaken, target: host },
+    { kind: "grow", script: scripts.growT, threads: plan.growT, cost: ram.growT, landAt: landHack + 2 * gapMs, opMs: z.tGrow, target: host },
+    { kind: "weaken2", script: scripts.weakenT, threads: plan.weaken2, cost: ram.weakenT, landAt: landHack + 3 * gapMs, opMs: z.tWeaken, target: host },
   ];
 }

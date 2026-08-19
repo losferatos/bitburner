@@ -41,14 +41,14 @@ export async function main(ns) {
   const MONEY_READY = 0.9;
   // So viele erntereife Ziele gleichzeitig abschoepfen. Das ist billig:
   // ein vorbereitetes Ziel braucht nur wenige Threads je Welle.
-  const MAX_TARGETS = 30;
+  const MAX_TARGETS = 60;
   // So viele Ziele gleichzeitig VORBEREITEN. Ein einziges laesst den Speicher
   // brachliegen, sobald sein Bedarf gedeckt ist - denn Nachwachsen braucht
   // Zeit, nicht Threads. Zu viele verzetteln alles, weil dann keines fertig
   // wird. Vier ist der Mittelweg; die Reihenfolge nach Ertrag je Thread sorgt
   // dafuer, dass die vorderen zuerst satt werden und die hinteren nur
   // bekommen, was uebrig bleibt.
-  const PREP_TARGETS = 15;
+  const PREP_TARGETS = 40;
   // Anteil des Guthabens, den eine Erntewelle abschoepfen soll.
   //
   // Der Wert ist der wichtigste Hebel im ganzen Bot, und er gehoert niedrig:

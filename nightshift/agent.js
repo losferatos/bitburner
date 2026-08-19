@@ -323,7 +323,14 @@
      *  foodnstuff hat 16 GB und null noetige Ports, ist also sofort da. */
     async wiederaufbau() {
       if (!(await this.amTerminal())) return;
-      await this.befehle(["home", "run autopilot.js"], 1200);
+      // Die Sperrkasse MUSS weg. Sie steht bei 4 Milliarden, damit das Geld vor
+      // dem Reset in Augmentations statt in brachliegenden Speicher fliesst -
+      // danach wuerde sie den Verwalter dauerhaft blockieren, denn mit 1262
+      // Dollar Startkapital wird diese Schwelle nie wieder erreicht. Fehlt die
+      // Datei, liest der Autopilot eine Sperre von null.
+      await this.befehle(["home", "rm data/reserve.txt"], 800);
+      this.note("Sperrkasse aufgehoben - der Verwalter darf wieder kaufen");
+      await this.befehle(["run autopilot.js"], 1200);
       this.note("Autopilot nach Reset gestartet");
       await schlaf(20000);
       await this.befehle(["home", "scp invest.js foodnstuff", "connect foodnstuff", "killall", "run invest.js", "home"], 900);

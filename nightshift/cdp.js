@@ -131,6 +131,12 @@ export const DEFAULTS = {
    * bemerkt. 0 schaltet ihn ab.
    */
   heartbeatMs: 30000,
+  /**
+   * Wie oft ein Verbindungsaufbau versucht wird, bevor aufgegeben wird.
+   * Zwischen den Versuchen wird laenger gewartet — die Drosselung loest sich
+   * gemessen nach etwa einer Minute Ruhe.
+   */
+  connectAttempts: 4,
   /** Tab beim Klicken nach vorn holen? Siehe Kopfkommentar — aus gutem Grund aus. */
   bringToFront: false,
   /** Protokollzeilen zusaetzlich auf stdout ausgeben. */
@@ -418,11 +424,32 @@ export class BitburnerTab {
     this._pending.clear();
   }
 
-  /** Sorgt dafuer, dass eine gueltige Sitzung existiert. Mehrfachaufrufe bündeln. */
+  /**
+   * Sorgt dafuer, dass eine gueltige Sitzung existiert. Gleichzeitige Aufrufe
+   * werden gebuendelt, damit nicht zwei Verbindungen zugleich aufgebaut werden.
+   *
+   * Zwei Stufen, weil sie sehr unterschiedlich teuer sind:
+   *   - Steht die Leitung und fehlt nur die Sitzung (Tab neu geladen, Sitzung
+   *     geloest), genuegt ein neues `Target.attachToTarget` — Bruchteile einer
+   *     Sekunde.
+   *   - Erst wenn die Leitung selbst weg ist, wird neu verbunden. Das kostet
+   *     hier bis zu zehn Sekunden und wird darum vermieden, wo es geht.
+   */
   async _ensureSession() {
     if (this.connected) return this.sessionId;
     if (!this._connectPromise) {
-      this._connectPromise = this._doConnect().finally(() => {
+      this._connectPromise = (async () => {
+        if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+          try {
+            return await this._attachToBitburner();
+          } catch (e) {
+            // Stimmt der Tab nicht, hilft kein Neuaufbau — durchreichen.
+            if (e instanceof TabGuardError) throw e;
+            await this._log("warn", "attach", `${e.message} — Leitung wird neu aufgebaut`);
+          }
+        }
+        return this._doConnect();
+      })().finally(() => {
         this._connectPromise = null;
       });
     }
@@ -446,10 +473,62 @@ export class BitburnerTab {
     this.endpoint = found.url;
     await this._log("info", "discover", `${found.url} (Quelle: ${found.source})`);
 
-    this.ws = await this._openSocket(found.url);
+    // Mehrere Anlaeufe mit wachsender Pause. Opera antwortet auf zu schnell
+    // aufeinanderfolgende Verbindungsversuche erst mit 403 und dann gar nicht
+    // mehr; wer stur weiterprobiert, haelt die Drosselung nur aufrecht.
+    const waits = [3000, 15000, 45000];
+    let lastError = null;
+    for (let attempt = 0; attempt < Math.max(1, this.options.connectAttempts); attempt++) {
+      if (attempt > 0) {
+        const wait = waits[Math.min(attempt - 1, waits.length - 1)];
+        await this._log("info", "connect", `Versuch ${attempt + 1} in ${wait} ms`);
+        await sleep(wait);
+      }
+      try {
+        this.ws = await this._openSocket(found.url);
+        lastError = null;
+        break;
+      } catch (e) {
+        lastError = e;
+        await this._log("warn", "connect", `Versuch ${attempt + 1} fehlgeschlagen: ${e.message}`);
+      }
+    }
+    if (lastError) throw lastError;
+
     await this._attachToBitburner();
     this._reconnectDelay = this.options.reconnectMinMs;
+    this._startHeartbeat();
     return this.sessionId;
+  }
+
+  /**
+   * Alle paar Sekunden ein billiges Kommando ans Browser-Ziel schicken.
+   * Zweck ist weniger das Wachhalten als das FRUEHE Bemerken: eine tote
+   * Leitung faellt so binnen einer halben Minute auf und nicht erst dann,
+   * wenn die Ablaufschicht nachts um drei etwas erledigen will. Weil ein
+   * neuer Verbindungsaufbau hier teuer ist, lohnt sich das doppelt.
+   */
+  _startHeartbeat() {
+    this._stopHeartbeat();
+    const every = this.options.heartbeatMs;
+    if (!every) return;
+    this._heartbeatTimer = setInterval(() => {
+      if (!this.ws || this.ws.readyState !== WebSocket.OPEN) return;
+      this._send("Browser.getVersion", {}, { timeoutMs: 10000 }).catch((e) => {
+        this._log("warn", "heartbeat", `keine Antwort: ${e.message}`);
+        try {
+          this.ws?.terminate();
+        } catch {}
+      });
+    }, every);
+    this._heartbeatTimer.unref?.();
+  }
+
+  _stopHeartbeat() {
+    if (this._heartbeatTimer) {
+      clearInterval(this._heartbeatTimer);
+      this._heartbeatTimer = null;
+    }
   }
 
   _openSocket(url) {
@@ -476,7 +555,14 @@ export class BitburnerTab {
       });
       ws.once("error", (err) => {
         clearTimeout(timer);
-        reject(new TransportError(`Verbindung zu ${url} fehlgeschlagen: ${err.message}`));
+        // 403 heisst hier nicht "verboten", sondern "zu schnell hintereinander".
+        // Opera drosselt neue Debugging-Verbindungen; nach etwa einer Minute
+        // Ruhe geht es wieder. Das gehoert in den Fehlertext, sonst sucht man
+        // nachts an der falschen Stelle.
+        const hint = /403/.test(err.message)
+          ? " — Opera drosselt neue Debugging-Verbindungen. Kein Rechtefehler, sondern zu viele Verbindungsversuche kurz hintereinander. Laenger warten."
+          : "";
+        reject(new TransportError(`Verbindung zu ${url} fehlgeschlagen: ${err.message}${hint}`));
       });
     });
   }
@@ -618,13 +704,20 @@ export class BitburnerTab {
     this.targetTitle = live.title;
     this.targetUrl = live.href;
 
-    if (!String(live.href).includes(this.options.urlMarker)) {
+    // Stimmt etwas nicht, wird die eben aufgebaute Sitzung wieder geloest.
+    // Sonst sammeln sich ueber eine lange Nacht tote Sitzungen im Browser an.
+    const refuse = async (message) => {
+      const stale = this.sessionId;
       this.sessionId = null;
-      throw new TabGuardError(`Angehaengter Tab hat die falsche URL: ${live.href}`);
+      if (stale) await this._send("Target.detachFromTarget", { sessionId: stale }).catch(() => {});
+      throw new TabGuardError(message);
+    };
+
+    if (!String(live.href).includes(this.options.urlMarker)) {
+      await refuse(`Angehaengter Tab hat die falsche URL: ${live.href}`);
     }
     if (!String(live.title).startsWith(this.options.titlePrefix)) {
-      this.sessionId = null;
-      throw new TabGuardError(
+      await refuse(
         `Angehaengter Tab hat den falschen Titel: "${live.title}" (erwartet: beginnt mit "${this.options.titlePrefix}"). Dienst verweigert.`,
       );
     }

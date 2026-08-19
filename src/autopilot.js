@@ -57,7 +57,7 @@ export async function main(ns) {
   // - also rund ein Sechstel bei einem Fuenftel Ertrag. Kleine Happen sind
   // damit deutlich speicherguenstiger, und der Server bleibt nahe am Maximum,
   // wo jeder einzelne Hack-Thread am meisten bringt.
-  const HACK_FRACTION = 0.1;
+  const HACK_FRACTION = 0.4;
 
   // Eigener Quelltext beim Start. Aendert er sich, ist eine neue Fassung
   // eingetroffen - dann beendet sich dieser Prozess, und der Verwalter auf

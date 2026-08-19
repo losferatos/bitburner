@@ -131,43 +131,34 @@ await step("5. Elementsuche findet den Seitenleisten-Eintrag (ohne Klick)", asyn
 // ---------------------------------------------------------------------------
 
 await step("6. Waechter verweigert bei falschem Titel den Dienst", async () => {
-  // Gleicher Tab, aber wir verlangen einen Titel, den er nicht hat. Wenn die
-  // Sicherung greift, kommt hier ein TabGuardError statt eines Ergebnisses.
-  const strict = new BitburnerTab({ titlePrefix: "NEONBREAK" });
+  // Derselbe Tab, dieselbe Leitung — nur die Erwartung an den Titel wird kurz
+  // verstellt. Absichtlich KEINE zweite Verbindung: Opera drosselt neue
+  // Debugging-Verbindungen hart (siehe Kopf von cdp.js).
+  const original = tab.options.titlePrefix;
+  tab.options.titlePrefix = "NEONBREAK";
   let thrown = null;
   try {
-    await strict.eval("document.title");
+    await tab.eval("document.title");
   } catch (e) {
     thrown = e;
   } finally {
-    await strict.close().catch(() => {});
+    tab.options.titlePrefix = original;
   }
   if (!thrown) throw new Error("der Waechter hat den falschen Tab durchgelassen");
   if (!(thrown instanceof TabGuardError)) {
     throw new Error(`falsche Fehlerart: ${thrown.name}: ${thrown.message}`);
   }
-  return "Dienst korrekt verweigert";
+  // Und danach muss der Dienst mit der richtigen Erwartung wieder laufen.
+  const back = await tab.eval("document.title");
+  if (!String(back).startsWith("Bitburner")) throw new Error("kam nach der Verweigerung nicht zurueck");
+  return "Dienst korrekt verweigert, danach wieder betriebsbereit";
 });
 
 // ---------------------------------------------------------------------------
-// 7. Wiederverbinden nach abgerissener Leitung
+// 7. Terminal: `help` absetzen und Ausgabe zurueckbekommen
 // ---------------------------------------------------------------------------
 
-await step("7. Verbindung reisst ab und wird selbst wieder aufgebaut", async () => {
-  const before = tab.sessionId;
-  tab.ws.terminate(); // Leitung hart kappen, wie bei einem Browser-Neustart
-  await new Promise((r) => setTimeout(r, 300));
-  const title = await tab.eval("document.title");
-  if (!title) throw new Error("nach dem Abriss kam nichts zurueck");
-  const after = tab.sessionId;
-  return `neue Sitzung ${after === before ? "(gleiche Kennung)" : "aufgebaut"}, eval liefert wieder "${title}"`;
-});
-
-// ---------------------------------------------------------------------------
-// 8. Terminal: `help` absetzen und Ausgabe zurueckbekommen
-// ---------------------------------------------------------------------------
-
-const terminalOk = await step("8. Terminalbefehl `help` liefert Ausgabe zurueck", async () => {
+const terminalOk = await step("7. Terminalbefehl `help` liefert Ausgabe zurueck", async () => {
   const state = await tab.terminalState();
   if (!state.present) {
     throw new Error(
@@ -189,7 +180,28 @@ if (terminalOk) {
   const tail = await tab.terminalTail(6);
   console.log("\n  Letzte Terminalzeilen zur Ansicht:");
   for (const line of tail.lines) console.log("    | " + line.replace(/\n/g, " "));
+  console.log("");
 }
+
+// ---------------------------------------------------------------------------
+// 8. Wiederverbinden nach abgerissener Leitung
+//
+// Steht bewusst ganz am Ende: die Pruefung kappt die Leitung, und ein neuer
+// Verbindungsaufbau kostet bei Opera bis zu zehn Sekunden. Alles Wichtige ist
+// zu diesem Zeitpunkt schon geprueft.
+// ---------------------------------------------------------------------------
+
+await step("8. Verbindung reisst ab und wird selbst wieder aufgebaut", async () => {
+  const before = tab.sessionId;
+  const started = Date.now();
+  tab.ws.terminate(); // hart kappen, wie bei einem Browser-Neustart
+  await new Promise((r) => setTimeout(r, 300));
+  const title = await tab.eval("document.title");
+  if (!title) throw new Error("nach dem Abriss kam nichts zurueck");
+  if (!String(title).startsWith("Bitburner")) throw new Error(`falscher Tab nach dem Abriss: ${title}`);
+  const same = tab.sessionId === before;
+  return `nach ${Date.now() - started} ms wieder da, Sitzung ${same ? "unveraendert" : "neu"}, eval liefert "${title}"`;
+});
 
 // ---------------------------------------------------------------------------
 // Abschluss

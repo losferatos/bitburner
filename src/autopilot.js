@@ -1,5 +1,8 @@
 import * as calc from "lib/calc";
 
+/** Ueber diesen Netscript-Port bekommt der Verwalter die Sperrkasse gemeldet. */
+const RESERVE_PORT = 1;
+
 /**
  * Der Autopilot.
  *
@@ -89,6 +92,17 @@ export async function main(ns) {
 
     const player = playerFacts(ns);
     const hosts = scanAll(ns);
+
+    // Sperrkasse an den Verwalter durchreichen. Er laeuft auf einem fremden
+    // Rechner und koennte die Datei auf home gar nicht lesen - Ports sind
+    // dagegen global und kosten nichts.
+    let reserve = 0;
+    if (ns.fileExists("data/reserve.txt", "home")) {
+      const roh = Number(ns.read("data/reserve.txt"));
+      if (Number.isFinite(roh) && roh >= 0) reserve = roh;
+    }
+    ns.clearPort(RESERVE_PORT);
+    ns.tryWritePort(RESERVE_PORT, reserve);
 
     // Das Spiel schiebt Programme und Nachrichten unangekuendigt auf home -
     // Story-Meilensteine wie fl1ght.exe, aber auch Hinweise auf freigeschaltete
@@ -208,6 +222,7 @@ export async function main(ns) {
         ns.scp("invest.js", wirt.host, "home");
         if (ns.exec("invest.js", wirt.host)) {
           wirt.ramFree -= investRam;
+          investLives = true;
           note("Einkaeufer laeuft jetzt auf " + wirt.host);
         }
       }
@@ -449,10 +464,19 @@ export async function main(ns) {
     // selbst schliessen - nach dem Beenden geht das nicht mehr, und tote
     // Fenster bleiben sonst als Muell auf dem Bildschirm liegen.
     if (ns.read("autopilot.js") !== ownSource) {
-      note("Neue Fassung erkannt - beende mich, der Verwalter startet sie");
-      writeBrain(ns, { ...view, phase: "neustart", reason: "Neue Fassung wird uebernommen." });
-      ns.ui.closeTail(ns.pid);
-      ns.exit();
+      // NUR beenden, wenn der Verwalter auch wirklich laeuft - er ist der
+      // einzige, der uns wieder hochfahren kann. Sonst liegen beide, und
+      // niemand merkt es: der Autopilot ist tot, der Verwalter wurde
+      // Sekunden vorher ausgetauscht und noch nicht gestartet. Genau so
+      // passiert. Lieber eine Runde spaeter erneuern als gar nicht mehr.
+      if (investLives) {
+        note("Neue Fassung erkannt - beende mich, der Verwalter startet sie");
+        writeBrain(ns, { ...view, phase: "neustart", reason: "Neue Fassung wird uebernommen." });
+        ns.ui.closeTail(ns.pid);
+        ns.exit();
+      } else {
+        note("Neue Fassung liegt bereit - warte auf einen laufenden Verwalter");
+      }
     }
     } catch (err) {
       // Ein einzelner Rechner, der sich unerwartet verhaelt, darf nicht den

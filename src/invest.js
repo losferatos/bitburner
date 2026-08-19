@@ -18,6 +18,9 @@
  *
  * @param {NS} ns
  */
+/** Ueber diesen Netscript-Port meldet der Autopilot die Sperrkasse. */
+const RESERVE_PORT = 1;
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -43,13 +46,15 @@ export async function main(ns) {
     // Sperrkasse: Was hier drinsteht, wird nicht angefasst. Der Verwalter
     // wuerde sonst jeden Dollar sofort in Speicher umsetzen - und genau dann
     // fehlt das Geld fuer die Dinge, die KEIN Skript kaufen kann: Portknacker
-    // im Darkweb, Augmentations, Reisen. Die Datei schreibt die Bruecke von
-    // aussen, damit sich das strategische Sparziel jederzeit aendern laesst.
+    // im Darkweb, Augmentations, Reisen.
+    //
+    // Der Betrag kommt ueber einen Netscript-Port, nicht aus einer Datei:
+    // ns.read wuerde vom Rechner lesen, auf dem dieses Skript laeuft, und
+    // dort liegt die Datei gar nicht. Ports dagegen sind global und kosten
+    // keinen Speicher. Der Autopilot auf home legt den Wert dort ab.
     let reserve = 0;
-    if (ns.fileExists("data/reserve.txt", "home")) {
-      const roh = Number(ns.read("data/reserve.txt"));
-      if (Number.isFinite(roh) && roh > 0) reserve = roh;
-    }
+    const rohWert = ns.peek(RESERVE_PORT);
+    if (typeof rohWert === "number" && rohWert > 0) reserve = rohWert;
 
     // Wachdienst: Der Autopilot beendet sich selbst, sobald eine neue Fassung
     // seines Quelltexts eintrifft. Ihn wieder hochzufahren ist Aufgabe dieses

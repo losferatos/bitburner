@@ -183,29 +183,43 @@ async function pushAll() {
  * fs.watch feuert auf Windows mehrfach pro Speichervorgang, daher entprellt.
  */
 function watchScripts() {
-  /** @type {Map<string, NodeJS.Timeout>} */
-  const pending = new Map();
+  /** @type {Set<string>} */
+  const geaendert = new Set();
+  /** @type {NodeJS.Timeout | null} */
+  let timer = null;
+
   try {
     watch(SCRIPT_DIR, { recursive: true }, (_event, filename) => {
       if (!filename) return;
       const name = filename.toString().split(path.sep).join("/");
       if (name.endsWith(".d.ts") || !SYNCABLE.test(name)) return;
 
-      clearTimeout(pending.get(name));
-      pending.set(
-        name,
-        setTimeout(async () => {
-          pending.delete(name);
-          if (!gameSocket) return;
+      // Alle Aenderungen eines Umbaus sammeln und ERST DANN gemeinsam
+      // schieben. Wer jede Datei einzeln nachschiebt, liefert Zwischenstaende
+      // aus: Der Autopilot erkennt seine neue Fassung, startet neu - und
+      // stuerzt ab, weil die Konstante, die er benutzt, noch in der Datei
+      // steckt, die erst 200 ms spaeter kommt. Genau so passiert.
+      geaendert.add(name);
+      if (timer) clearTimeout(timer);
+      timer = setTimeout(async () => {
+        timer = null;
+        const stapel = [...geaendert];
+        geaendert.clear();
+        if (!gameSocket) return;
+
+        const erledigt = [];
+        for (const datei of stapel) {
           try {
-            await pushFile(path.join(SCRIPT_DIR, name), name);
-            log("info", "Nachgeschoben: " + name);
+            await pushFile(path.join(SCRIPT_DIR, datei), datei);
+            erledigt.push(datei);
           } catch (err) {
             // Geloeschte Dateien landen auch hier, das ist kein echter Fehler.
-            log("warn", name + ": " + err.message);
+            log("warn", datei + ": " + err.message);
           }
-        }, 150),
-      );
+        }
+        if (erledigt.length === 1) log("info", "Nachgeschoben: " + erledigt[0]);
+        else if (erledigt.length > 1) log("info", erledigt.length + " Dateien zusammen nachgeschoben: " + erledigt.join(", "));
+      }, 400);
     });
     log("info", "Beobachte src/ auf Aenderungen");
   } catch (err) {
@@ -340,7 +354,10 @@ function startDashboard() {
     }
   });
 
-  server.listen(DASHBOARD_PORT, () => {
+  // Ausdruecklich nur auf die Loopback-Schnittstelle binden. Sonst haengt
+  // /api/rpc im ganzen Netz - und darueber kann jeder beliebige Remote-API-
+  // Aufrufe ins Spiel schicken, Spielstand auslesen inbegriffen.
+  server.listen(DASHBOARD_PORT, "127.0.0.1", () => {
     console.log("\n  Dashboard:  http://localhost:" + DASHBOARD_PORT + "/");
   });
   server.on("error", (err) => log("error", "Dashboard-Server: " + err.message));
@@ -351,7 +368,9 @@ function startDashboard() {
 // ---------------------------------------------------------------------------
 
 function startRfaServer() {
-  const wss = new WebSocketServer({ port: RFA_PORT });
+  // Ebenfalls nur Loopback: Das Spiel laeuft im Browser auf demselben Rechner,
+  // von aussen hat hier niemand etwas zu suchen.
+  const wss = new WebSocketServer({ port: RFA_PORT, host: "127.0.0.1" });
 
   wss.on("connection", (socket) => {
     if (gameSocket) {

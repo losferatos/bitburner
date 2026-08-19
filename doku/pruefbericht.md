@@ -1,323 +1,87 @@
 # Pruefbericht Bitburner-Autopilot
 
-**Stand:** 19.08.2026
+**Stand:** 19.08.2026, ca. 20:05
 **Geprueft gegen:** `reference\v301` (Tag v3.0.1, `src/Constants.ts` VersionString "3.0.1").
-Der dev-Branch unter `reference\bitburner-src` wurde bewusst nicht als Massstab benutzt.
-
-**Geprueft wurde:** `src/lib/calc.js`, `src/autopilot.js`, `src/invest.js`, `src/worker/*.js`,
-`src/telemetry.js`, `src/scan.js`, `sync/bridge.js` sowie die Dokumente in `doku/`.
+Der dev-Branch unter `reference\bitburner-src` wurde nicht als Massstab benutzt.
 
 **Am Code wurde nichts geaendert.** Der Bot laeuft live.
+
+## Vorbemerkung: der Pruefgegenstand hat sich waehrend der Pruefung zweimal geaendert
+
+`autopilot.js` wurde waehrend dieser Pruefung um 20:00 und um 20:01 neu geschrieben. Zwischen
+meinem ersten und meinem letzten Blick sind mehrere Befunde von selbst verschwunden - unter
+anderem die fehlende Buchhaltung ueber laufende Wellen, die Level-Pruefung in `tryCrack`, die
+wirkungslose `closeTail`-Schleife beim Start und der doppelt gezaehlte `HOME_RESERVE`. Ich habe
+alles Folgende deshalb gegen einen **festen Schnappschuss** geprueft:
+
+| Datei | Groesse | Geaendert | MD5 |
+|---|---|---|---|
+| `src/autopilot.js` | 27273 | 19.08.2026 20:01:30 | `473e50cde9cc761585cfcb076041db3b` |
+| `src/invest.js` | 5709 | 19.08.2026 19:32:15 | `3636fc998e7e66a14196dbfda8a5a47d` |
+| `src/lib/calc.js` | 10174 | 19.08.2026 18:58:31 | `b4bf10453e41b1ad484dc9a88cb6bb05` |
+| `sync/bridge.js` | 13327 | 19.08.2026 18:43:47 | `b244ed77a8933f1cc703bf3b31b2c620` |
+
+Weicht die Datei bei der Lektuere ab, gelten die Zeilenangaben nicht mehr; der Sachverhalt in
+der Begruendung bleibt jeweils pruefbar.
+
+**Ein Befund, den ich zwischenzeitlich hatte und wieder zurueckziehe**, weil er falsch war:
+`ns.getTotalScriptIncome()` misst NICHT an unseren Ein-Weg-Arbeitern vorbei.
+`src/NetscriptWorker.ts:160-166` uebertraegt die Einnahmen eines sterbenden Skripts an seinen
+ELTERNPROZESS, und `runScriptFromScript` setzt `runningScript.parent = workerScript.pid`, also
+den Autopiloten. Die Zahl stimmt. Der laufende Bot zeigt $2.783/s, was das bestaetigt. (Der
+Autopilot ist inzwischen ohnehin auf Element `[1]` umgestellt - beides waere richtig gewesen,
+`[1]` ist nur stabiler ueber Neustarts hinweg.)
+
+**Lagebild aus dem laufenden Bot** (ueber `http://localhost:8795/api/state`, Runde 88):
+95 Server im Netz, davon 38 gerootet, 500 GB Gesamtspeicher (475 belegt), Hacking-Level 132,
+25 gekaufte Server, `busy = {hack: 6, grow: 240, weaken: 15}`. Ich beziehe mich an mehreren
+Stellen darauf.
 
 ---
 
 ## Befundtabelle
 
-Sortiert nach Schwere. Die Nummer ist eine feste Kennung und verweist auf den gleichnamigen
-Abschnitt weiter unten - sie ist keine Rangfolge.
+Sortiert nach Schwere. Die Nummer ist eine Kennung, keine Rangfolge.
+`C` = Code, `D` = Dokumentation.
 
-| # | Schwere | Datei : Zeile | Befund | Sicherheit |
+| # | Schwere | Fundstelle | Befund | Sicherheit |
 |---|---|---|---|---|
-| 1 | KRITISCH | `autopilot.js:223-257`, `506-527` | Jede Sekunde wird eine volle neue Welle losgeschickt, ohne zu wissen, was noch fliegt. Ueberernte, Ueberweaken, Ziele werden leergeraeumt. | sehr sicher |
-| 2 | KRITISCH | `autopilot.js:249-251`, `234-237` | Die ausgleichenden weaken-Threads werden NACH hack/grow verteilt und verhungern systematisch, weil hack/grow den Speicher vorher aufbrauchen. | sehr sicher |
-| 3 | KRITISCH | `invest.js:32`, `85` | `ns.read("invest.js")` liest vom AUSFUEHRENDEN Rechner, nicht von home. invest.js kann eine neue Fassung darum nie erkennen. Die Selbstaktualisierung des Verwalters ist tot. | sehr sicher |
-| 4 | KRITISCH | `autopilot.js:120-122` | Arbeiter werden nur kopiert, wenn `worker/weaken.js` auf dem Ziel FEHLT. Geaenderter Arbeitercode erreicht die Flotte nie. | sehr sicher |
-| 8 | KRITISCH | `calc.js:270-276`, `autopilot.js:189` | `expectedYield` ist bis rund 1 TB Netzspeicher fuer alle Ziele ausser n00dles exakt 0. Die Zielauswahl faellt damit auf die Scan-Reihenfolge zurueck - nachgemessen. | sehr sicher (nachgerechnet) |
-| 5 | WICHTIG | `autopilot.js:25` | Der Aufraeum-Loop ist wirkungslos (`ns.ui.closeTail` greift bei toten Skripten nicht) und laeuft `ns.pid`-mal - nach Stunden Laufzeit sind das Hunderttausende NS-Aufrufe beim Start. | sehr sicher |
-| 6 | WICHTIG | `autopilot.js:486` | `tryCrack` verlangt zusaetzlich das Hacking-Level. `ns.nuke` verlangt das NICHT. Rechner mit Speicher bleiben unnoetig lange ungenutzt. | sehr sicher |
-| 7 | WICHTIG | `autopilot.js:313`, `telemetry.js:70` | `getTotalScriptIncome()[0]` misst nur LAUFENDE Skripte. Unsere Ein-Weg-Arbeiter buchen ihr Geld in der letzten Millisekunde ihres Lebens. Die Anzeige steht strukturell nahe null. Dasselbe gilt fuer `getTotalScriptExpGain()`. | sehr sicher |
-| 9 | WICHTIG | `calc.js:239`, `254` | `prepSeconds` rechnet je Ziel mit dem GESAMTEN Netzspeicher, obwohl bis zu 8 Ziele parallel bedient werden. Vorbereitungszeit bis zu 8x zu optimistisch. | sicher |
-| 10 | WICHTIG | `autopilot.js:281-299`, `137-142` | Zweimal `ns.ps()` ueber jeden Rechner pro Sekunde. Bei tausenden Arbeitern ist das eine spuerbare Dauerlast fuer das Spiel. | sicher |
-| 11 | WICHTIG | `autopilot.js:70-340` | Keine Fehlerbehandlung um die Hauptschleife. Ein einziger werfender Host (Hacknet-Server, verschwundener Rechner) toetet den Autopiloten; invest.js startet ihn alle 5 s neu - Dauerschleife. | sicher (Ausloeser BitNode-abhaengig) |
-| 12 | WICHTIG | `autopilot.js:209-215` | Abgewaehlte Ziele werden nie gestoppt. Faellt ein Ziel aus den Top 8, laufen seine hack-Threads weiter, waehrend niemand mehr nachwaechst. | sicher |
-| 13 | WICHTIG | `autopilot.js:33-34`, `107` | `HOME_RESERVE` wird zusaetzlich zum bereits belegten Speicher abgezogen - der Autopilot ist damit doppelt eingerechnet. Wirkt sich aus, sobald home aufgeruestet wird. | sehr sicher |
-| 14 | WICHTIG | `invest.js:97-107` | Der Kommentar rechnet $74.166 in "rund 13 hack-Threads" um. Richtig sind rund 0,8 Threads. Faktor ~17 daneben; die Begruendung der Hacknet-Regel steht auf einer falschen Zahl. | sehr sicher |
-| 15 | KLEINIGKEIT | `calc.js:169-176` | Die Rundungskorrektur in `growThreads` weicht vom Original ab (Original prueft den Abwaertsschritt nur im Grenzfall). Abweichung hoechstens 1 Thread. | sicher |
-| 16 | KLEINIGKEIT | `calc.js:185-188` | `weakenThreads` kennt `currentNodeMults.ServerWeakenRate` nicht (in BN1 = 1) und wird ueberall mit `cores = 1` aufgerufen, obwohl viele Rechner mehr Kerne haben. | sehr sicher |
-| 17 | KLEINIGKEIT | `autopilot.js:487-492` | `tryCrack` wertet den Rueckgabewert von `ns.nuke` nicht aus. `ns.nuke` wirft nicht, es gibt `false` zurueck. | sehr sicher |
-| 18 | KLEINIGKEIT | `worker/hack.js:9-11`, `autopilot.js:519` | Der Kommentar verspricht exakte Landezeitpunkte ueber `additionalMsec`. `deploy` uebergibt immer 0. Es gibt kein Timing. | sehr sicher |
-| 19 | KLEINIGKEIT | `telemetry.js:17`, `43` | `telemetry.js` ist verwaist: schreibt in dieselbe Datei wie `writeBrain` und liest `data/brain.txt`, das niemand schreibt. | sehr sicher |
-| 20 | KLEINIGKEIT | `autopilot.js:276` | "Verdient" ist der Kontostand-Delta und enthaelt die Ausgaben von invest.js. Nach einem Serverkauf steht dort ein Minus. | sehr sicher |
-| 21 | KLEINIGKEIT | `autopilot.js:554-566` | `writeBrain` verdrahtet `threads: 0` und `backdoored: 0` fest; `action` bekommt nur das eine `target`. | sehr sicher |
-| 22 | KLEINIGKEIT | `invest.js:131` | Der Hacknet-Zugewinn laesst `mults.hacknet_node_money` und den BitNode-Multiplikator weg. | sehr sicher |
-| 23 | KLEINIGKEIT | `calc.js:105-108` | `expPerThread` ist toter Code; `playerFacts` liefert gar kein `multExp`. | sehr sicher |
-| 24 | KLEINIGKEIT | `bridge.js:185-214` | Aenderungen an mehreren Dateien werden einzeln mit 150 ms Entprellung geschoben. Der Autopilot kann sich neu starten, bevor die uebrigen Dateien angekommen sind. | mittel |
-| 25 | KLEINIGKEIT | `bridge.js:354`, `343` | RFA-Server und Dashboard binden auf allen Netzwerkschnittstellen; `/api/rpc` erlaubt beliebige RFA-Methoden von aussen. | sicher |
+| C1 | KRITISCH | `calc.js:232-276`, `autopilot.js:216-219` | `expectedYield` ist fuer fast alle Ziele exakt 0, weil `prepSeconds` explodiert. Die Zielsortierung faellt auf die Scan-Reihenfolge zurueck. Im laufenden Bot nachweisbar. | sehr sicher (nachgerechnet + live) |
+| D1 | KRITISCH | `strategie.md:144` | Empfiehlt `ns.stock.hasWSEAccount()` und `has4SDataTIXAPI()` - beide in 3.0.0 ENTFERNT. Widerspricht `strategie.md:687`, wo dieselben Felder richtig stehen. | sehr sicher |
+| C2 | WICHTIG | `autopilot.js:163-166` | `ns.kill(laeuft.pid)` gibt den frei gewordenen Speicher nicht an `s.ramFree` zurueck. Folge: der Einkaeufer findet keinen Platz und raeumt per `ns.killall` einen fremden Rechner leer. Live beobachtet. | sehr sicher (live) |
+| C3 | WICHTIG | `autopilot.js:311-319`, `:331-337` | Der ausgleichende weaken wird weiterhin NACH grow/hack verteilt und bekommt nur die Reste. Live: 240 grow gegen 15 weaken, noetig waeren 20. | sicher |
+| C4 | WICHTIG | `autopilot.js:82`, `:403`, `:405` | Das neue `try/catch` faengt auch `ScriptDeath`. Dass `ns.exit()` trotzdem wirkt, haengt allein daran, dass `await ns.sleep(1000)` ausserhalb des `try` steht. Wer das verschiebt, friert das Spiel ein. | sehr sicher |
+| C5 | WICHTIG | `autopilot.js:47` gegen `:286-289` | `PREP_TARGETS = 4`, der Kommentar direkt darueber begruendet ausfuehrlich, warum nur EIN Ziel vorbereitet wird. Zwei Kommentare derselben Datei widersprechen einander. | sehr sicher |
+| C6 | WICHTIG | `autopilot.js:290-292` | Ziele, die aus der Auswahl fallen, werden nicht gestoppt. Ihre hack-Threads laufen weiter, ohne dass jemand nachwachsen laesst. | sicher |
+| C7 | WICHTIG | `invest.js:97-107` **und** `formeln-wirtschaft.md:414-416` | "$74 166 in Server-RAM → 1.34 GB, d. h. rund 13 `hack()`-Threads": 1,34 GB sind 0,79 Threads. Faktor ~17. Derselbe Fehler steht in Doku und Code. | sehr sicher |
+| C8 | WICHTIG | `autopilot.js` gesamt | Der Autopilot kostet rund 7,15 GB. Auf einem 8-GB-home bleiben 0,85 GB Luft. Eine weitere teure NS-Funktion macht ihn unstartbar - und `invest.js:48` wertet den Fehlschlag nicht aus. | sicher |
+| D2 | WICHTIG | `formeln-wirtschaft.md:135-137` | "ab ca. 64 GB Heim-RAM ist gekauftes RAM billiger" - der Kreuzungspunkt liegt bei 2,3 GB. Das Dokument widerlegt sich zwei Zeilen spaeter selbst; `strategie.md:422-425` hat es richtig. | sehr sicher |
+| D3 | WICHTIG | `formeln-wirtschaft.md:412` | "bis ungefaehr Node 6-7 ... ($21 670 bzw. $74 166)": $74.166 ist Node **8**, Node 7 kostet $40.089. Die 1-Stunden-Schwelle reisst schon bei Node 4. Widerspricht der eigenen Tabelle `:232-233`. | sehr sicher |
+| D4 | WICHTIG | `formeln-wirtschaft.md:628` | "$26 Mrd sind in unter vier Stunden drin" bei $300M/h. Mit Zinseszins sind es 12,6 h. `strategie.md:772-774` rechnet es bereits richtig vor. | sehr sicher |
+| D5 | WICHTIG | `api-aenderungen-v3.md:52-54` | Die Liste der Unter-APIs mit Streichungen nennt `stock` nicht (drei 3.0.0-Streichungen) und `sleeve` nicht. Genau diese Luecke hat D1 verursacht. | sehr sicher |
+| D6 | WICHTIG | `oberflaeche.md:40` | `CompanyLocation.tsx:62` ist `startInfiltration`, nicht "Job annehmen"; die Job-Bewerbung ist gar nicht `isTrusted`-geschuetzt. `strategie.md:830/838` hat es richtig. | sehr sicher |
+| D7 | WICHTIG | `strategie.md:623-629` | Die Spalte L=2500 der Reset-Beschleunigungstabelle ist durchgehend falsch (m=1,30: 2,5e8 statt 6,8e7). L=500 und L=1000 stimmen. | sicher |
+| C9 | KLEINIGKEIT | `calc.js:169-176` | Rundungskorrektur in `growThreads` weicht vom Original ab. Hoechstens ein Thread Unterschied. | sicher |
+| C10 | KLEINIGKEIT | `calc.js:185-188` | `weakenThreads` kennt `ServerWeakenRate` nicht (BN1 = 1) und wird ueberall mit `cores = 1` gerufen. | sehr sicher |
+| C11 | KLEINIGKEIT | `calc.js:215` | Der Faktor 400 in `targetScore` hat keine Entsprechung im Spielcode. | sehr sicher |
+| C12 | KLEINIGKEIT | `calc.js:105-108` | `expPerThread` ist toter Code; `playerFacts` liefert kein `multExp`. | sehr sicher |
+| C13 | KLEINIGKEIT | `autopilot.js:548-556` | `tryCrack` zaehlt `open++` auch im `catch`. Die Portknacker werfen gar nicht, sie geben `false` zurueck. | sehr sicher |
+| C14 | KLEINIGKEIT | `worker/hack.js:9-11`, `autopilot.js:594` | Der Kommentar verspricht exakte Landezeitpunkte ueber `additionalMsec`. `deploy` uebergibt immer 0. | sehr sicher |
+| C15 | KLEINIGKEIT | `autopilot.js:362` | "Verdient" ist der Kontostand-Delta und enthaelt die Ausgaben von invest.js. | sehr sicher |
+| C16 | KLEINIGKEIT | `autopilot.js:632-641` | `writeBrain` verdrahtet `threads: 0` und `backdoored: 0` fest; `action` bekommt nur das eine `target`. | sehr sicher |
+| C17 | KLEINIGKEIT | `invest.js:28-32`, `:85-88` | Die Selbstaktualisierung von invest.js ist toter Code, seit der Autopilot den Verwalter in Runde 1 abschiesst. Der Kommentar behauptet weiterhin, sie funktioniere. | sehr sicher |
+| C18 | KLEINIGKEIT | `invest.js:131` | Hacknet-Zugewinn ohne `mults.hacknet_node_money` und ohne BitNode-Multiplikator. | sehr sicher |
+| C19 | KLEINIGKEIT | `telemetry.js:17`, `:43` | Verwaist: schreibt in dieselbe Datei wie `writeBrain`, liest `data/brain.txt`, das niemand schreibt. | sehr sicher |
+| C20 | KLEINIGKEIT | `bridge.js:255` | `purchasedCount` zaehlt home mit - im Spiel ist `home.purchasedByPlayer === true`. Live zeigt das Dashboard 26 statt 25. | sehr sicher (live) |
+| C21 | KLEINIGKEIT | `bridge.js:185-214` | Mehrere gleichzeitig geaenderte Dateien werden einzeln geschoben; der Autopilot kann neu starten, bevor `lib/calc.js` da ist. | mittel |
+| C22 | KLEINIGKEIT | `bridge.js:343`, `:354` | RFA und Dashboard binden auf allen Schnittstellen; `/api/rpc` reicht beliebige RFA-Methoden durch, darunter `getSaveFile` und `deleteFile`. | sicher |
+| D8 | KLEINIGKEIT | diverse | Ein Dutzend Zeilennummern-Abweichungen und kleinere Rechenfehler in den Formelsammlungen - Sammelabschnitt. | sicher |
 
 ---
 
-## 1. KRITISCH - Keine Buchhaltung ueber laufende Auftraege
+# Teil A - Code
 
-`autopilot.js:223-257` schickt in JEDER Runde (`await ns.sleep(1000)`, Zeile 339) eine
-vollstaendige Welle los. `deploy()` (Zeile 506) fragt nur den freien Speicher ab, nie was
-bereits fliegt. Der `busy`-Zaehler (Zeile 281-299) wird erst NACH dem Verteilen gebildet und
-dient ausschliesslich der Anzeige.
-
-**Warum das falsch ist.** Die Laufzeiten stehen fest: `hack` dauert `hackTime`, `grow`
-`3.2 * hackTime`, `weaken` `4 * hackTime` (`src/Hacking.ts:60`, `:84`, `:91`). Ein Auftrag
-wirkt also erst Sekunden bis Minuten spaeter. Bis dahin sieht der Autopilot unveraenderte
-Werte und schickt dieselbe Welle noch einmal - so oft, wie Speicher da ist.
-
-**Auswirkung im Spiel, drei Formen:**
-
-*Ueberernte.* Zeile 248 bemisst `wanted = floor(0.5 / perThread)`, also genau eine halbe
-Abschoepfung. Dauert `hackTime` zum Beispiel 10 Sekunden und reicht der Speicher, werden
-10 solche Wellen gestartet, bevor die erste landet. Abgeschoepft wird dann nicht die
-Haelfte, sondern `1 - 0.5^10 = 99,9 %`. Der Server ist leer. Das ist exakt der Zustand, den
-der Kommentar in Zeile 42-45 ausdruecklich vermeiden will. Je mehr Speicher der Bot besitzt,
-desto schlimmer wird es - das Problem waechst mit dem Erfolg.
-
-*Ueberweaken.* Zeile 227 bemisst `weakenThreads(t.sec - t.secMin)`, also die volle Korrektur.
-Die weaken-Welle braucht `4 * hackTime`. In der Zwischenzeit werden bis zu 4*hackTime weitere
-volle Korrekturen gestartet. `Server.capDifficulty()` (`src/Server/Server.ts:91`) deckelt bei
-`minDifficulty`, es entsteht also kein Schaden - aber praktisch der gesamte Speicher wird in
-sinnlose weaken-Threads gesteckt, waehrend die anderen sieben Ziele leer ausgehen.
-
-*Ueberwachsen.* Zeile 233 bemisst jedes Mal die Threads bis `moneyMax`. Grow-Ueberschuss ist
-immerhin gratis: `processSingleServerGrowth` (`src/Server/ServerHelpers.ts:202-212`) erhoeht
-die Security nur, wenn sich das Guthaben tatsaechlich geaendert hat, und deckelt die
-gezaehlten Zyklen auf `numCycleForGrowthCorrected`. Es bleibt aber Speicherverschwendung.
-
-**Wie es richtig waere.** Entweder ein Ledger der offenen Auftraege je Ziel (Startzeit +
-Landezeit + Threads, aus `ns.ps` rekonstruierbar) und nur die Differenz nachbestellen; oder
-echtes Batching mit `additionalMsec`, das ohnehin schon in den Arbeitern vorgesehen ist
-(HWGW), mit einer Sperre je Ziel bis zum Landen des letzten Auftrags.
-
-**Sicherheit:** sehr sicher. Der Ablauf ist im Code eindeutig, die Laufzeiten sind belegt.
-
----
-
-## 2. KRITISCH - Der ausgleichende weaken verhungert systematisch
-
-```js
-const hStarted = deploy(ns, workforce, "worker/hack.js", wanted, t.host);      // 249
-const wNeed = calc.weakenThreads(hStarted * calc.SERVER_FORTIFY_AMOUNT);       // 250
-const wStarted = deploy(ns, workforce, "worker/weaken.js", wNeed, t.host);     // 251
-```
-
-Dasselbe Muster in der grow-Zweig (Zeile 234-237).
-
-**Warum das falsch ist.** `deploy` verteilt so viel, wie hineinpasst, und zieht den Speicher
-sofort von `s.ramFree` ab (Zeile 520). Der zweite `deploy`-Aufruf bekommt nur, was der erste
-uebrig gelassen hat.
-
-Fair betrachtet: solange der freie Speicher deutlich groesser ist als die angeforderte Welle,
-geht es gut - `wanted` liegt bei einem gut praeparierten Ziel bei rund `0.5 / (1/240) = 120`
-hack-Threads (204 GB), der Ausgleich braucht davon nur `ceil(120/25) = 5` Threads (8,75 GB).
-Der Fehler beisst in zwei Lagen, und beide sind der Normalfall:
-
-1. **Wenn die angeforderte Welle allein schon den Speicher fuellt.** Im grow-Zweig ist genau
-   das die Regel: `growThreads` bemisst die Threads bis `moneyMax`, und bei einem halb
-   geleerten grossen Ziel sind das tausende. Dann ist `gStarted` = alles, was da war, und
-   `wNeed` bekommt nichts.
-2. **Ab der zweiten Runde immer** - wegen Befund 1. Die erste Runde fuellt den Speicher mit
-   hack- oder grow-Threads; ab der zweiten Sekunde ist nichts mehr frei, und der jeweils
-   zuletzt angeforderte Ausgleich geht leer aus.
-
-**Auswirkung.** Die Security des Ziels steigt bei hack um `0.002 * threads`
-(`server.fortify(ServerConstants.ServerFortifyAmount * Math.min(threads, maxThreadNeeded))`,
-`src/Netscript/NetscriptHelpers.tsx`, hack-Erfolgszweig), bei grow um
-`2 * 0.002 * usedCycles` (`src/Server/ServerHelpers.ts:211`). Bei einer grow-Welle mit ein paar
-tausend wirksamen Threads sind das zweistellige Security-Spruenge auf einen Schlag, mehrfach
-hintereinander, ohne Gegenwehr - bis `capDifficulty()` (`src/Server/Server.ts:91-107`) bei 100
-deckelt. Bei Security 100 sind `hackPercent` und `hackChance` per Definition exakt 0
-(`src/Hacking.ts:13`, `:46`).
-
-Das Ziel ist dadurch nicht dauerhaft verloren: `targetScore` bewertet bewusst im praeparierten
-Zustand (`sec: s.secMin`, `calc.js:205`) und bleibt darum positiv, das Ziel faellt also nicht
-aus `active` heraus und wird in der naechsten Runde beruhigt. Aber der Bot verbringt einen
-grossen Teil seiner Zeit damit, selbstverursachte Security wieder abzubauen, statt zu ernten.
-
-Nebenwirkung auf die Bewertung: `prepSeconds` rechnet mit der AKTUELLEN Security
-(`calc.js:233`, `:237`), das Ziel rutscht also gleichzeitig in `expectedYield` nach hinten -
-und damit unter Umstaenden aus den ersten acht heraus, wo es dann laut Befund 12 auch nicht
-mehr aufgeraeumt wird.
-
-**Wie es richtig waere.** Den Bedarf VOR dem Verteilen komplett ausrechnen (`wanted` und
-`ceil(wanted/25)` fuer hack, `gNeed` und `ceil(gNeed/12.5)` fuer grow), dann den verfuegbaren
-Speicher im richtigen Verhaeltnis aufteilen, oder `wanted` von vornherein um den
-weaken-Anteil kuerzen.
-
-**Die Faktoren selbst stimmen.** `SERVER_FORTIFY_AMOUNT = 0.002` und `SERVER_WEAKEN_AMOUNT
-= 0.05` decken sich mit `src/Server/data/Constants.ts:9-10`. hack erhoeht um `0.002 * threads`,
-grow um `2 * 0.002 * threads` (`src/Server/ServerHelpers.ts:211`, `src/NetscriptFunctions.ts:340`).
-Ein weaken je 25 hack-Threads und ein weaken je 12,5 grow-Threads sind damit korrekt.
-Der Ausgleich ist sogar leicht zu grosszuegig, weil hack die Security bei einem Fehlversuch
-gar nicht erhoeht - `server.fortify` steht nur im Erfolgszweig.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 3. KRITISCH - invest.js kann seine eigene neue Fassung nie sehen
-
-```js
-const ownSource = ns.read("invest.js");            // invest.js:32
-...
-if (ns.read("invest.js") !== ownSource) { ... }    // invest.js:85
-```
-
-`ns.read` liest vom Rechner, auf dem das Skript LAEUFT:
-`const server = ctx.workerScript.getServer(); return server.getContentFile(path)?.content ?? "";`
-(`src/NetscriptFunctions.ts:1120-1139`).
-
-invest.js laeuft absichtlich nicht auf home (Zeile 5-7), sondern auf einem fremden Rechner.
-Dorthin gelangt die Datei nur durch `ns.scp` in `autopilot.js:164` - und das passiert
-ausschliesslich dann, wenn invest.js gerade NICHT laeuft (Zeile 143). Die Bruecke schiebt
-neue Fassungen nach home (`bridge.js:161`, `server: "home"`), nie auf den Arbeitsrechner.
-
-**Auswirkung.** Der Vergleich in Zeile 85 vergleicht die lokale Kopie mit sich selbst und ist
-immer gleich. Eine neue Fassung von invest.js wird nie uebernommen, solange der alte Prozess
-laeuft - und der laeuft, bis ihn jemand von Hand abschiesst. Der Kommentar in Zeile 28-31
-("trifft eine neue Fassung ein, macht dieser Prozess Platz") beschreibt etwas, das nicht
-stattfindet.
-
-**Wie es richtig waere.** Entweder invest.js liest den Vergleichstext ueber eine Textdatei,
-die der Autopilot von home aus nachschiebt, oder der Autopilot vergleicht selbst
-`ns.read("invest.js")` (auf home) mit einer Pruefsumme, die invest.js beim Start ablegt, und
-beendet den Verwalter bei Abweichung per `ns.kill`.
-
-**Sicherheit:** sehr sicher. Semantik von `ns.read` im Quellcode nachgelesen.
-
----
-
-## 4. KRITISCH - Arbeiter werden nie aktualisiert
-
-```js
-if (s.host !== "home" && !ns.fileExists("worker/weaken.js", s.host)) {
-  ns.scp(WORKERS, s.host, "home");
-}
-```
-(`autopilot.js:120-122`)
-
-Kopiert wird nur, wenn `worker/weaken.js` FEHLT. Ist die Datei einmal da, bleibt die alte
-Fassung auf dem Rechner - fuer immer.
-
-**Auswirkung.** Zwei Ebenen.
-
-Erstens: Aenderungen an `worker/hack.js`, `worker/grow.js`, `worker/weaken.js` erreichen die
-Flotte nicht. Nur home bekommt die neue Fassung von der Bruecke, und dort laufen keine
-Arbeiter (siehe Befund 13). Man aendert also den Arbeitercode und misst danach unveraendertes
-Verhalten - ein Fehlersuchfallenstrick erster Guete.
-
-Zweitens, schlimmer: `deploy` rechnet die Speicherkosten aus der Kopie auf HOME aus
-(`ns.getScriptRam(script, "home")`, Zeile 508), startet den Prozess aber auf `s.host`. Weichen
-die Fassungen ab, weicht auch der Speicherbedarf ab. Wird der neue Arbeiter teurer, schlagen
-`ns.exec`-Aufrufe fehl, ohne dass die Anzeige es erklaeren kann; wird er billiger, bleibt
-Speicher liegen.
-
-Dritter Punkt, gleiches Muster: `lib/calc.js`. Der laufende Autopilot hat das Modul beim Start
-importiert. `script.content = code` (`src/Server/BaseServer.ts:260`) verwirft nur den
-zwischengespeicherten Modulbau fuer den NAECHSTEN Start. Eine geaenderte Formel wirkt also
-erst, wenn der Autopilot aus einem anderen Grund neu startet - und der einzige Ausloeser dafuer
-ist eine Aenderung an `autopilot.js` selbst (Zeile 332). **Von fuenf Dateien im Spiel
-aktualisiert sich also genau eine selbst.**
-
-**Wie es richtig waere.** Beim Verteilen immer `ns.scp` aufrufen (das ist billig und
-idempotent), oder eine Versionsnummer in einer Textdatei je Rechner ablegen und vergleichen.
-Fuer `lib/calc.js`: den Selbsttest in Zeile 332 auf alle importierten Module ausdehnen.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 5. WICHTIG - Der Aufraeum-Loop beim Start ist wirkungslos und teuer
-
-```js
-for (let pid = 1; pid < ns.pid; pid++) ns.ui.closeTail(pid);   // autopilot.js:25
-```
-
-`ns.ui.closeTail` schlaegt den Prozess erst nach:
-```ts
-const runningScriptObj = helpers.getRunningScript(ctx, pid);
-if (runningScriptObj == null) { helpers.log(...); return; }
-LogBoxCloserEvents.emit(pid);
-```
-(`src/NetscriptFunctions/UserInterface.ts:69-80`). `getRunningScript` schaut in
-`workerScripts` nach (`src/Script/ScriptHelpers.ts:105-109`), und dort stehen nur LEBENDE
-Skripte. Fuer ein beendetes Skript passiert also nichts.
-
-**Das steht sogar in der eigenen Dokumentation:** `doku/api-aenderungen-v3.md:58` -
-"`ns.ui.closeTail(pid)` wirkt **nicht** auf bereits beendete Skripte." Der Kommentar in
-`autopilot.js:22-24` behauptet das Gegenteil und begruendet damit die Schleife.
-
-**Zweite Wirkung: Kosten.** `pidCounter` in `src/Netscript/Pid.ts:3` laeuft ueber die ganze
-Sitzung monoton hoch. Der Bot startet pro Sekunde etliche Arbeiter; nach ein paar Stunden ist
-`ns.pid` sechsstellig. Die Schleife macht dann Hunderttausende NS-Aufrufe am Stueck, ohne
-`await` - der Spielhauptthread steht so lange. Bei einer Neustartschleife (Befund 11)
-multipliziert sich das.
-
-**Wie es richtig waere.** Ersatzlos streichen. Wer die toten Fenster wirklich weg haben will,
-muss sie vor dem Beenden schliessen (das tut Zeile 335 fuer das eigene bereits richtig).
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 6. WICHTIG - `tryCrack` verlangt ein Hacking-Level, das `nuke` gar nicht verlangt
-
-```js
-if (open >= ns.getServerNumPortsRequired(host) && ns.getServerRequiredHackingLevel(host) <= ns.getHackingLevel()) {
-```
-(`autopilot.js:486`)
-
-`ns.nuke` prueft genau zwei Dinge: ob NUKE.exe vorhanden ist und ob genug Anschluesse offen
-sind (`src/NetscriptFunctions.ts:531-548`). Das Hacking-Level kommt darin nicht vor. Auch
-`grow` und `weaken` verlangen kein Level - `netscriptCanGrow`/`netscriptCanWeaken` rufen nur
-`baseCheck` (Root-Zugriff) auf; das Level prueft ausschliesslich `netscriptCanHack`
-(`src/Hacking/netscriptCanHack.ts:32-55`).
-
-**Auswirkung.** Rechner wie `phantasy`, `omega-net` oder `the-hub` haben 32-128 GB Speicher
-und ein hohes `requiredHackingSkill`. Sie waeren als ARBEITSPFERDE sofort verfuegbar, sobald
-die Anschluesse offen sind - der Bot laesst sie liegen, bis sein Level passt. Genau in der
-Phase, in der Speicher der Engpass ist, verschenkt er den groessten Teil davon.
-
-**Wie es richtig waere.** Die Level-Bedingung aus `tryCrack` streichen. Das Level gehoert
-allein in den Zielfilter (`autopilot.js:185`), wo es schon steht.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 7. WICHTIG - Einkommens- und Erfahrungsanzeige messen strukturell fast nichts
-
-`autopilot.js:313` und `telemetry.js:70` verwenden `ns.getTotalScriptIncome()[0]`,
-`autopilot.js:314` und `telemetry.js:71` `ns.getTotalScriptExpGain()`.
-
-```ts
-getTotalScriptIncome: () => () => {
-  // First element is total income of all currently running scripts
-  let total = 0;
-  for (const script of workerScripts.values()) {
-    total += script.scriptRef.onlineMoneyMade / script.scriptRef.onlineRunningTime;
-  }
-  let incomeFromScriptsSinceLastAug = Player.scriptProdSinceLastAug / (Player.playtimeSinceLastAug / 1000);
-  ...
-  return [total, incomeFromScriptsSinceLastAug];
-}
-```
-(`src/NetscriptFunctions.ts:1278-1290`)
-
-**Warum das hier falsch ist.** Element 0 summiert nur ueber `workerScripts`, also ueber
-LAUFENDE Skripte. Unsere Arbeiter sind Ein-Weg-Skripte: `worker/hack.js` bucht sein Geld in
-`ws.scriptRef.onlineMoneyMade` unmittelbar bevor `main` zurueckkehrt und der Prozess stirbt.
-Zwischen Buchung und Tod liegt ein Mikrotask. Die Wahrscheinlichkeit, dass die Sekundenabfrage
-genau dort hinfaellt, ist praktisch null. Element 0 zeigt darum dauerhaft nahe 0 an, obwohl
-der Bot verdient. Dasselbe gilt fuer `getTotalScriptExpGain` (`:1302-1308`), das ueber
-dieselbe Menge laeuft.
-
-**Auswirkung.** Die `$x/s`-Zahl im Skriptfenster, das `exp/s` daneben und `income.scriptIncome`
-im Dashboard sind unbrauchbar. Wer nach ihnen balanciert, balanciert nach Rauschen.
-
-**Wie es richtig waere.** Element 1 nehmen (`Player.scriptProdSinceLastAug` geteilt durch die
-Spielzeit seit dem letzten Aug-Reset) - das ist genau der Langzeitschnitt, den man hier will.
-Oder selbst messen: Kontostand-Delta pro Zeit, um die Ausgaben von invest.js bereinigt.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 8. KRITISCH - `expectedYield` ist fuer fast alle Ziele exakt 0
+## C1 (KRITISCH) - `expectedYield` ist fuer fast alle Ziele exakt 0
 
 ```js
 export function expectedYield(s, p, ramFree, horizon = 900) {
@@ -328,16 +92,14 @@ export function expectedYield(s, p, ramFree, horizon = 900) {
   return rate * harvestTime;
 }
 ```
-(`calc.js:270-276`)
+(`calc.js:270-276`, benutzt in `autopilot.js:216`, sortiert in `:219`)
 
-Sobald `prepSeconds >= 900`, ist das Ergebnis 0 - und zwar fuer jedes Ziel gleichermassen.
-Danach ist `candidates.sort((a, b) => b.yield - a.yield)` (`autopilot.js:192`) ein
-Vergleich lauter Nullen; `Array.prototype.sort` ist stabil, die Reihenfolge bleibt also die
-von `scanAll` - also die Tiefensuchreihenfolge des Netzes.
+Sobald `prepSeconds >= 900`, ist das Ergebnis 0 - fuer jedes betroffene Ziel gleichermassen.
+`Array.prototype.sort` ist stabil, die Reihenfolge unter lauter Nullen bleibt also die von
+`scanAll` (eine Tiefensuche mit `queue.pop()`).
 
-**Nachgemessen, nicht geschaetzt.** Ich habe `calc.js` unveraendert in node geladen und mit
-Startwerten aus `src/Server/data/servers.ts` (`moneyMax = 25 * moneyAvailable`) und
-Hacking-Level 50 durchgerechnet:
+**Nachgerechnet.** Ich habe `calc.js` unveraendert in node geladen, mit Startwerten aus
+`src/Server/data/servers.ts` (`moneyMax = 25 * moneyAvailable`) und Level 50:
 
 | Netz-RAM | n00dles | foodnstuff | joesguns | harakiri-sushi |
 |---|---|---|---|---|
@@ -346,526 +108,686 @@ Hacking-Level 50 durchgerechnet:
 | 512 GB | prep 101 s, **yield 54.893** | prep 6.720 s, yield 0 | prep 1.800 s, yield 0 | prep 3.600 s, yield 0 |
 | 2048 GB | prep 101 s, yield 54.893 | prep 1.785 s, yield 0 | prep 600 s, **yield 130.349** | prep 1.200 s, yield 0 |
 
-Bis rund 1 TB Netzspeicher hat **genau ein einziges Ziel** einen Wert ungleich 0 - n00dles,
-weil es mit `serverGrowth = 3000` (`src/Server/data/servers.ts:1171`) als einziges schnell
-genug auffuellt. Alle anderen liegen exakt gleichauf bei 0, und die Reihenfolge unter ihnen
-entscheidet allein `scanAll`. joesguns hat dabei mit `score = 434` den mehr als sechsfachen
-Dauerertrag von n00dles (`score = 69`) - der Bot sieht davon nichts, bis das Netz ueber
-1 TB waechst.
+Bis rund 1 TB Netzspeicher hat genau ein Ziel einen Wert ungleich 0: n00dles, weil es mit
+`serverGrowth = 3000` (`src/Server/data/servers.ts:1171`) als einziges schnell genug auffuellt.
 
-Der Grund ist strukturell: die Server starten bei `moneyAvailable`, ihr Maximum ist
-`25 * moneyAvailable` (`src/Server/Server.ts`, Konstruktor). Das erste Auffuellen ist also
-immer eine Verfuenfundzwanzigfachung, und die kostet in `prepSeconds` viele Wellen zu je
-`4 * hackTime`.
+**Und so sieht es im laufenden Bot aus** (Runde 88, `ramTotal` 500 GB). Die Reihenfolge ist die
+nach `yield` sortierte Kandidatenliste, `v/s` ist `targetScore`:
 
-**Auswirkung.** Genau in der Phase, in der die Zielwahl am meisten zaehlt, waehlt der Bot
-faktisch nach Scan-Reihenfolge. Die Anzeige "Bestes Ziel ist jetzt X" (Zeile 197) ist dann
-irrefuehrend. Immerhin: `active` sortiert danach noch einmal nach `score` (Zeile 212-215),
-die Arbeit innerhalb der Auswahl bleibt also sinnvoll - aber WELCHE acht Ziele in die Auswahl
-kommen, ist Zufall.
+| Rang | Ziel | valuePerSec |
+|---|---|---|
+| 1 | harakiri-sushi | 729,5 |
+| 2 | n00dles | 127,2 |
+| 3 | joesguns | 674,9 |
+| 4 | foodnstuff | 231,1 |
+| 5 | sigma-cosmetics | 449,2 |
 
-**Wie es richtig waere.** Statt hart abzuschneiden den erwarteten Ertrag als
-`rate * horizon / (1 + prep/horizon)` oder schlicht `rate / (1 + prep/horizon)` bewerten -
-monoton, nie exakt 0, und mit derselben Aussage.
+Die Reihenfolge ist in keiner Weise monoton im Ertrag. joesguns mit 675 $/s steht hinter
+n00dles mit 127 $/s. Das ist keine Theorie - das ist der Zustand, in dem der Bot gerade
+arbeitet. Frueher im selben Lauf stand im Verlauf sogar "Bestes Ziel ist jetzt n00dles
+($125.2/s)".
 
-**Sicherheit:** sehr sicher - mit dem echten `calc.js` nachgerechnet.
-
----
-
-## 9. WICHTIG - `prepSeconds` unterschaetzt die Vorbereitung um bis zu Faktor 8
-
+**Zweite, unabhaengige Ursache derselben Zahl** (`calc.js:239` und `:254`):
 ```js
 const perWave = Math.max(1, Math.floor(ramFree / 1.75));
 ```
-(`calc.js:239` und `:254`)
+Aufgerufen wird mit `ramTotal`, dem Speicher des GESAMTEN Netzes. Der Autopilot bedient aber
+bis zu `MAX_TARGETS + PREP_TARGETS = 12` Ziele gleichzeitig. Der Kommentar in `calc.js:222-225`
+("Gerechnet wird mit dem Speicher, der TATSAECHLICH zur Verfuegung steht - nicht mit
+Wunschdenken") beschreibt das Gegenteil dessen, was der Code tut. Richtig gerechnet waeren die
+Prep-Zeiten oben nochmal um Faktor 4 bis 12 groesser - dann waere auch n00dles bei 0 und die
+Sortierung vollstaendig zufaellig.
 
-Aufgerufen wird mit `ramTotal`, dem Speicher des GESAMTEN Netzes (`autopilot.js:183`, `190`).
-Der Autopilot bedient aber `MAX_TARGETS = 8` Ziele gleichzeitig (Zeile 41, 211). Jedes Ziel
-bekommt also hoechstens einen Bruchteil.
+**Warum das strukturell so ist.** Server starten bei `moneyAvailable`, ihr Maximum ist
+`25 * moneyAvailable` (`src/Server/Server.ts`, Konstruktor). Das erste Auffuellen ist immer eine
+Verfuenfundzwanzigfachung, und `prepSeconds` bewertet jede Welle mit `4 * hackTime`.
 
-**Auswirkung.** Die Vorbereitungszeit wird systematisch zu klein gerechnet, und zwar fuer
-teure Ziele staerker als fuer billige - genau die Ziele werden dadurch bevorzugt, die die
-Rechnung eigentlich bestrafen soll. Der Kommentar in Zeile 222-225 ("Gerechnet wird mit dem
-Speicher, der TATSAECHLICH zur Verfuegung steht - nicht mit Wunschdenken") beschreibt das
-Gegenteil dessen, was der Code tut.
+**Wie es richtig waere.** Nicht hart abschneiden, sondern daempfen: `rate / (1 + prep/horizon)`
+oder `rate * horizon / (horizon + prep)`. Monoton, nie exakt 0, gleiche Aussage. Und
+`prepSeconds` den Speicher **pro Ziel** uebergeben, nicht den des ganzen Netzes.
 
-**Wie es richtig waere.** `ramTotal / MAX_TARGETS` uebergeben, oder die Zahl der aktiven Ziele
-als Parameter mitgeben.
-
-**Nebenbei, kein Fehler:** dass Zeile 255 den Wachstumsteil mit `tW` statt mit
-`growTime = 3.2 * hackTime` bewertet, ist laut Kommentar Absicht (der Sicherheitsaufwuchs muss
-mit abgebaut werden) und liegt mit 25 % Aufschlag im vertretbaren Rahmen.
-
-**Sicherheit:** sicher.
+**Sicherheit:** sehr sicher - nachgerechnet und am laufenden Bot bestaetigt.
 
 ---
 
-## 10. WICHTIG - Zweimal `ns.ps()` ueber das ganze Netz, jede Sekunde
-
-`autopilot.js:137-142` durchsucht alle Arbeitsrechner nach invest.js, `autopilot.js:290-299`
-durchsucht dieselben Rechner noch einmal fuer die Beschaeftigungsanzeige.
-
-Bei 50-75 erreichbaren Rechnern und tausenden laufenden Ein-Weg-Arbeitern werden pro Sekunde
-zweimal alle Prozesslisten aufgebaut und in neue Objekte kopiert. Das ist dauerhafte Last auf
-dem Spiel-Hauptthread und verlangsamt die Simulation, die der Bot gleichzeitig ausnutzen will.
-
-**Wie es richtig waere.** Eine einzige Runde `ns.ps` je Rechner, aus deren Ergebnis beide
-Fragen beantwortet werden; und die Beschaeftigungsanzeige nicht jede Sekunde, sondern
-beispielsweise alle fuenf Runden neu bilden.
-
-**Sicherheit:** sicher (Groessenordnung haengt vom Netz ab, das Muster nicht).
-
----
-
-## 11. WICHTIG - Keine Fehlerbehandlung; ein werfender Host reisst alles mit
-
-Die Hauptschleife (`autopilot.js:70-340`) hat kein `try/catch`. Die Lageaufnahme in
-Zeile 99-115 ruft fuer JEDEN Host aus `scanAll` unter anderem `ns.getServerMaxMoney`,
-`ns.getServerGrowth` und `ns.getServerSecurityLevel` auf. Diese Funktionen gehen ueber
-`helpers.getNormalServer`, und das wirft, sobald der Host kein normaler `Server` ist:
-
-```ts
-if (!(server instanceof Server)) { ... throw helpers.errorMessage(ctx, errorMessage); }
-```
-(`src/Netscript/NetscriptHelpers.tsx`, `getNormalServer`)
-
-Betroffen sind Hacknet-SERVER (BitNode 9 beziehungsweise nach dem entsprechenden Kauf) - die
-stehen im Netz und kommen aus `ns.scan` zurueck. Darknet-Server sind ausgenommen, `ns.scan`
-filtert `DarknetServer` explizit heraus (`src/NetscriptFunctions.ts:184`); `darkweb` ist in
-v3.0.1 selbst ein `DarknetServer` geworden und faellt damit ebenfalls weg. In BN1 ohne
-Hacknet-Server ist die Lage also heute ruhig - der Bot haelt aber keinerlei Reserve vor.
-
-**Auswirkung, falls es doch eintritt.** Der Autopilot stirbt. invest.js startet ihn nach
-spaetestens 5 s neu (`invest.js:47-49`). Der neue Prozess stirbt an derselben Stelle. Ergebnis:
-eine Neustartschleife, bei der jeder Durchlauf zusaetzlich die `ns.pid`-Schleife aus Befund 5
-abarbeitet. Das ist die vom Auftrag vermutete "Dauerschleife" - sie existiert, nur nicht ueber
-den Quelltextvergleich, sondern ueber Ausnahmen.
-
-**Der umgekehrte Fall - beide tot - ist ebenfalls moeglich:** die beiden halten sich nur
-gegenseitig am Leben. Stirbt invest.js in einem Moment, in dem auch der Autopilot gerade
-beendet ist (zum Beispiel weil `ns.exec("autopilot.js", "home")` mangels Speicher 0
-zurueckgibt, `invest.js:48` prueft das nicht), holt niemand mehr jemanden zurueck.
-
-**Wie es richtig waere.** `try/catch` um den Rundenkoerper mit Protokollierung und
-`await ns.sleep(...)`, ausserdem die Lageaufnahme je Host absichern; und in `invest.js:48` den
-Rueckgabewert von `ns.exec` auswerten und bei 0 protokollieren.
-
-**Sicherheit:** sicher, was den fehlenden Schutz angeht; der konkrete Ausloeser ist
-BitNode-abhaengig.
-
----
-
-## 12. WICHTIG - Abgewaehlte Ziele werden nicht gestoppt
-
-`active` wird jede Runde neu gebildet (`autopilot.js:209-215`). Faellt ein Ziel aus den ersten
-acht heraus, hoert der Bot einfach auf, es zu bedienen. Die bereits laufenden hack-Threads auf
-diesem Ziel laufen aber weiter und landen ihren Schlag - nur wachsen laesst das Guthaben
-niemand mehr nach. Der Kommentar in Zeile 125-129 begruendet ausdruecklich, warum beim Start
-nicht aufgeraeumt wird; fuer den laufenden Betrieb ist die Frage nie gestellt worden.
-
-**Auswirkung.** Bei jedem Zielwechsel bleibt mindestens ein halb geleerter Server zurueck, der
-danach mit hoher Security und wenig Geld dasteht - und damit in der naechsten Bewertung noch
-schlechter abschneidet, also nicht zurueck in die Auswahl kommt. Ein sich selbst verstaerkender
-Effekt.
-
-**Wie es richtig waere.** Beim Zielwechsel die hack-Arbeiter des abgewaehlten Ziels gezielt
-beenden (`ns.ps` liefert Dateiname und `args[0]`), oder das Ziel so lange in der Liste halten,
-bis es wieder aufgefuellt ist.
-
-**Sicherheit:** sicher.
-
----
-
-## 13. WICHTIG - `HOME_RESERVE` wird doppelt gezaehlt
+## C2 (WICHTIG) - Der `kill` des Verwalters gibt seinen Speicher nicht zurueck
 
 ```js
-ramFree: Math.max(0, ram - ns.getServerUsedRam(host) - (host === "home" ? HOME_RESERVE : 0)),
-```
-(`autopilot.js:107`, Konstante in Zeile 34)
-
-`ns.getServerUsedRam("home")` enthaelt bereits den Autopiloten selbst. Der Kommentar in
-Zeile 33 ("Auf home muss Platz fuer den Autopiloten selbst bleiben") beschreibt genau das, was
-schon passiert ist. Der Reservewert wird also zusaetzlich abgezogen.
-
-Nach `src/Netscript/RamCostGenerator.ts` kostet `autopilot.js` rund 6,70 GB
-(1,60 Grundlast + `exec` 1,30 + `scp` 0,60 + `getPlayer` 0,50 + `killall` 0,50 +
-`ls`/`ps`/`scan` je 0,20 + acht Server-Abfragen + fuenf Portknacker + `nuke` + `fileExists` +
-`getScriptRam` + `getHackingLevel` + `getTotalScript*`). Auf dem Start-home mit 8 GB bleiben
-damit ohnehin nur 1,3 GB uebrig - weniger als ein Arbeiter (1,70 GB). Heute macht der Fehler
-also nichts.
-
-**Auswirkung, sobald home aufgeruestet wird.** Bei 64 GB home liegen dauerhaft 7 GB brach, die
-vier Arbeiter tragen koennten - und home ist wegen seiner mehreren Kerne fuer grow und weaken
-der WERTVOLLSTE Rechner im Netz (`coreBonus = 1 + (cores-1)/16`, `src/Server/ServerHelpers.ts:287`).
-
-**Wie es richtig waere.** Entweder `ramFree = ram - used` und den Reservewert weglassen, oder
-den Reservewert auf einen bewussten Sicherheitszuschlag (etwa 2 GB) setzen und den Kommentar
-korrigieren.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 14. WICHTIG - Die Rechnung in der Hacknet-Begruendung ist um Faktor ~17 falsch
-
-```
- * Node 1 hat sich nach 11 Minuten bezahlt, Node 8 kostet schon $74.166 fuer dieselben 1.50 $/s -
- * und dasselbe Geld in Server-RAM sind rund 13 hack-Threads.
-```
-(`invest.js:97-101`)
-
-Die ersten beiden Zahlen stimmen. `calculateNodeCost(n) = 1000 * 1.85^(n-1)`
-(`src/Hacknet/formulas/HacknetNodes.ts:87-92`), also Node 1 = $1.000 und
-$1.000 / 1,50 = 667 s = 11,1 min; Node 8 = 1000 * 1,85^7 = $74.166. Ein neuer Node liefert
-`1 * 1.5 * 1.035^0 * (1+5)/6 = 1,50 $/s` (`:4-11`). Alles korrekt.
-
-**Die dritte Zahl nicht.** `BaseCostFor1GBOfRamServer: 55000` (`src/Server/data/Constants.ts:4`),
-und unterhalb von 64 GB greift der Softcap nicht (`upg = max(0, log2(ram) - 6)`,
-`src/Server/ServerPurchases.ts:34`). $74.166 kaufen also 1,35 GB - das sind **0,79
-hack-Threads** (1,70 GB je Thread), nicht 13. Selbst mit dem home-Preis von $32.000/GB kaeme
-man nur auf 1,4 Threads.
-
-**Auswirkung.** Die Zahl steht als Begruendung fuer die harte Regel "Nodes nur, solange sie
-sich binnen einer Stunde bezahlt machen". Korrekt gerechnet faellt der Vergleich sogar
-FREUNDLICHER fuer Hacknet aus, nicht strenger. Die Regel mag trotzdem richtig sein - aber sie
-ist derzeit falsch begruendet, und wer die Politik spaeter nachjustiert, rechnet auf einer
-kaputten Grundlage weiter.
-
-**Sicherheit:** sehr sicher (nachgerechnet aus zwei Konstanten des Quellcodes).
-
----
-
-## 15. KLEINIGKEIT - Rundungskorrektur in `growThreads` weicht vom Original ab
-
-Original (`src/Server/ServerHelpers.ts:177-198`):
-```ts
-const ccycle = Math.ceil(x);
-if (ccycle - x > 0.999999) { /* nur im Grenzfall abwaerts pruefen */ }
-if (ccycle >= x + (|diff| + 0.000001)) return ccycle;   // Schnellweg
-if (targetMoney <= (startMoney + ccycle) * Math.exp(k * ccycle)) return ccycle;
-return ccycle + 1;
-```
-
-Unsere Fassung (`calc.js:169-176`) prueft den Abwaertsschritt IMMER und kennt weder den
-Grenzfall-Vorbehalt (`ccycle - x > 0.999999`) noch den Schnellweg. Mathematisch ist unser
-Ergebnis nicht zu klein - wir dekrementieren nur, wenn `(o+t-1)*exp(k*(t-1)) >= n` tatsaechlich
-gilt. Die Abweichung zum Spielwert betraegt hoechstens einen Thread.
-
-Alles davor ist Zeile fuer Zeile identisch: Eingabeklemmung (`:100-102` gegen `:151-153`),
-Startwert `(n-o)/(1 + (n/16 + 15o/16)*k)` (`:161` gegen `:159`), Iterationsschritt
-`(x - ox*log(ox/n)) / (1 + ox*k)` (`:168` gegen `:164`), Abbruch bei `|diff| <= 1` (`:171`
-gegen `:162`). Der zusaetzliche `guard < 60` in unserer Fassung ist eine reine
-Sicherheitsleine; das Verfahren konvergiert laut Kommentar im Original in hoechstens drei
-Schritten.
-
-**Wie es richtig waere.** Wenn Bit-Gleichheit mit `ns.formulas.hacking.growThreads` gewuenscht
-ist: die Originalreihenfolge uebernehmen. Fuer den Betrieb ist es egal.
-
-**Sicherheit:** sicher.
-
----
-
-## 16. KLEINIGKEIT - `weakenThreads`: fehlender BitNode-Faktor, immer `cores = 1`
-
-```js
-export function weakenThreads(secDelta, cores = 1) {
-  if (secDelta <= 0) return 0;
-  return Math.ceil(secDelta / (SERVER_WEAKEN_AMOUNT * coreBonus(cores)));
+for (const s of workforce) {
+  const laeuft = ns.ps(s.host).find((p) => p.filename === "invest.js");
+  if (!laeuft) continue;
+  if (round === 1) {
+    ns.kill(laeuft.pid);      // <-- s.ramFree bleibt unveraendert
+    continue;
+  }
+  ...
+}
+if (!investLives && investRam > 0) {
+  let wirt = workforce.filter((s) => s.host !== "home" && s.ramFree >= investRam)...
+  if (!wirt) {
+    wirt = ...;  ns.killall(wirt.host);   // Notfallweg
+  }
 }
 ```
-(`calc.js:185-188`)
+(`autopilot.js:156-197`)
 
-Das Original hat einen Faktor mehr:
-```ts
-export function getWeakenEffect(threads: number, cores: number): number {
-  return ServerConstants.ServerWeakenAmount * threads * coreBonus * currentNodeMults.ServerWeakenRate;
-}
-```
-(`src/Server/ServerHelpers.ts:292-295`)
+`s.ramFree` wird zu Rundenbeginn aus `ns.getServerUsedRam` gebildet (`:118`) und enthaelt zu
+diesem Zeitpunkt noch die 10,75 GB von invest.js. Nach `ns.kill` ist der Speicher im Spiel frei
+(`src/Netscript/killWorkerScript.ts:124` schreibt `server.updateRamUsed(...)` sofort), aber
+unsere Kopie weiss davon nichts.
 
-`ServerWeakenRate` ist in BN1 gleich 1, deshalb heute folgenlos. Anders als `hackChance`,
-`hackPercent` und `hackTime`, die alle einen `bn...`-Parameter haben, fehlt hier aber sogar die
-Moeglichkeit, ihn zu setzen - beim BitNode-Wechsel faellt das nicht auf.
+**Auswirkung, live beobachtet.** Das Netz ist zu 95 % belegt (475 von 500 GB). Nach dem `kill`
+findet die Filterzeile keinen einzigen Rechner mit `ramFree >= 10.75`, also greift der
+Notfallweg und raeumt mit `ns.killall` einen ganzen Rechner leer. Im Ereignisprotokoll des
+laufenden Bots steht genau das:
 
-Zweiter Punkt: alle drei Aufrufstellen (`autopilot.js:227`, `:236`, `:250`, `calc.js:237`)
-rechnen mit `cores = 1`. Fremde Server bekommen bei der Netzerzeugung
-`cpuCores = getRandomIntInclusive(ceil(layer/2), layer)` (`src/Server/ServerHelpers.ts:376`),
-haben also durchaus mehrere Kerne; home ebenfalls. Der Bedarf wird dadurch systematisch zu
-hoch angesetzt - die Richtung ist ungefaehrlich, aber es kostet Threads.
+> `Platz fuer den Einkaeufer geschaffen auf foodnstuff`
+> `Einkaeufer laeuft jetzt auf foodnstuff`
 
-**Sicherheit:** sehr sicher.
+foodnstuff hat 16 GB, das sind rund neun vernichtete Arbeiter - **bei jedem einzelnen Neustart
+des Autopiloten**, und der startet bei jeder Codeaenderung neu. Der frei geraeumte Rechner war
+ausserdem gar nicht noetig: der Rechner, auf dem der Verwalter gerade gestorben ist, haette
+gereicht.
+
+**Wie es richtig waere.** In der `kill`-Zeile den Speicher mitschreiben, etwa
+`s.ramFree += investRam`. Eine Zeile.
+
+**Sicherheit:** sehr sicher - Mechanismus im Quellcode nachgelesen, Wirkung im laufenden Bot im
+Protokoll sichtbar.
 
 ---
 
-## 17. KLEINIGKEIT - `ns.nuke` wirft nicht, es gibt `false` zurueck
+## C3 (WICHTIG) - Der ausgleichende weaken bekommt weiterhin nur die Reste
 
 ```js
-if (open >= ... ) {
-  try { ns.nuke(host); return true; } catch { return false; }
-}
+const gStarted = deploy(ns, workforce, "worker/grow.js", need, t.host);
+const wNeed = Math.max(0, calc.weakenThreads((t.busy.grow + gStarted) * calc.GROW_FORTIFY_AMOUNT) - t.busy.weaken);
+const wStarted = deploy(ns, workforce, "worker/weaken.js", wNeed, t.host);
 ```
-(`autopilot.js:487-492`)
+(`autopilot.js:313-319`, gleiches Muster im hack-Zweig `:332-337`)
 
-`ns.nuke` gibt bei fehlendem NUKE.exe oder zu wenigen offenen Anschluessen `false` zurueck und
-protokolliert nur (`src/NetscriptFunctions.ts:531-548`). Unsere Fassung meldet in diesen
-Faellen trotzdem Erfolg, `cracked.push(host)` und die Verlaufsmeldung "Zugriff auf X erlangt"
-laufen los. Weil `hasRootAccess` in der naechsten Runde erneut geprueft wird, entsteht kein
-Folgeschaden - aber der Verlauf luegt.
+Die Mengen sind seit dem Umbau Differenzen statt Vollbestellungen - das entschaerft das Problem
+erheblich, beseitigt es aber nicht. `deploy` schreibt `s.ramFree` sofort herunter (`:596`), der
+zweite Aufruf bekommt nur, was der erste uebrig laesst. Und im grow-Zweig ist `need`
+regelmaessig groesser als der freie Speicher: `growThreads` bemisst die Threads bis `moneyMax`,
+und bei einem zu 4 % gefuellten Ziel sind das tausende.
 
-Dasselbe Muster eine Zeile hoeher: `try { fn(host); open++ } catch { open++ }` (`:475-485`)
-zaehlt auch dann hoch, wenn der Aufruf aus einem ganz anderen Grund gescheitert ist. Die
-Portknacker geben ebenfalls `false` zurueck statt zu werfen (`:549-563`).
+**Live nachweisbar.** Der Bot fuehrt gerade 240 grow-Threads und 15 weaken-Threads. Der korrekte
+Ausgleich fuer 240 grow-Threads sind `ceil(240 * 0.004 / 0.05) = 20`. Es fehlt ein Viertel - bei
+einem Netz, das zu 95 % belegt ist und laut eigener Anzeige "3 Auftrag/Auftraege warten auf
+Platz" meldet. Die Sicherheitsstufen passen dazu: sigma-cosmetics steht bei 10,00 gegen ein
+Minimum von 3,00, foodnstuff bei 9,45 gegen 3,00.
 
-**Wie es richtig waere.** `if (ns.nuke(host)) return true; return false;` und bei den
-Portknackern den Rueckgabewert zaehlen statt den Aufruf.
+**Die Faktoren selbst stimmen.** `SERVER_FORTIFY_AMOUNT = 0.002` und `SERVER_WEAKEN_AMOUNT =
+0.05` decken sich mit `src/Server/data/Constants.ts:9-10`; hack erhoeht um `0.002 * threads`
+(nur im Erfolgsfall), grow um `2 * 0.002 * usedCycles` (`src/Server/ServerHelpers.ts:211`). Ein
+weaken je 25 hack-Threads und ein weaken je 12,5 grow-Threads sind damit korrekt hergeleitet.
 
-**Sicherheit:** sehr sicher.
+**Ein zweiter, kleinerer Rechenfehler an derselben Stelle:** im grow-Zweig deckt `wNeed` nur den
+eingehenden grow-Aufwuchs ab, nicht die bereits vorhandene Ueberschuss-Sicherheit von bis zu
+`SEC_TOLERANCE = 3`. Die bleibt dauerhaft stehen, weil der weaken-Zweig erst oberhalb der
+Toleranz greift.
 
----
-
-## 18. KLEINIGKEIT - Der Kommentar verspricht Timing, das es nicht gibt
-
-`worker/hack.js:9-11`:
-> Die Verzoegerung liegt bewusst INNERHALB der Aktion (additionalMsec) statt in einem sleep
-> davor: nur so ist der Landezeitpunkt exakt.
-
-Der Mechanismus stimmt (`validateHGWOptions` addiert `additionalMsec/1000` auf die Laufzeit,
-`src/Netscript/NetscriptHelpers.tsx`), aber `deploy` uebergibt an dieser Stelle immer die feste
-0:
-```js
-const pid = ns.exec(script, s.host, n, target, 0, Date.now() + "-" + started);
-```
-(`autopilot.js:519`). Es gibt also keinerlei Landezeitsteuerung. Wer den Kommentar liest,
-haelt den Bot fuer einen Batcher, der er nicht ist. (Das ist zugleich die Zutat, die fuer
-Befund 1 fehlt.)
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 19. KLEINIGKEIT - `telemetry.js` ist verwaist und kollidiert mit `writeBrain`
-
-`telemetry.js:17` schreibt nach `data/telemetry.txt` - genau die Datei, die auch
-`writeBrain` (`autopilot.js:568`) jede Sekunde ueberschreibt und die die Bruecke abholt
-(`bridge.js:31`, `:224`). Liefen beide, wuerden sie sich gegenseitig ueberschreiben.
-
-Zusaetzlich liest `telemetry.js:43-45` `data/brain.txt`, eine Datei, die im gesamten Projekt
-niemand schreibt. Die Felder `phase`, `action` und `reason` faenden also nie einen Wert.
-
-`telemetry.js` wird von nichts gestartet - aber die Bruecke schiebt es weiterhin ins Spiel
-(`bridge.js:135-157` nimmt alles unter `src/`). Es ist Altlast, die beim naechsten Lesen
-Verwirrung stiftet.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 20. KLEINIGKEIT - "Verdient" mischt Einnahmen und Ausgaben
-
-```js
-earned = ns.getServerMoneyAvailable("home") - moneyAtStart;
-```
-(`autopilot.js:276`, Startwert Zeile 60)
-
-`ns.getServerMoneyAvailable("home")` liefert das Spielerguthaben (Sonderfall in
-`src/NetscriptFunctions.ts:991-995`). invest.js kauft davon Server und Hacknet-Nodes. Nach
-einem Serverkauf zeigt die goldene "Verdient"-Zahl also ein Minus, obwohl gerade das
-Erwuenschte passiert ist.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 21. KLEINIGKEIT - `writeBrain` liefert dem Dashboard Platzhalter
-
-`autopilot.js:554-566`: `backdoored: 0` ist fest verdrahtet (der Bot setzt ohnehin keine
-Backdoors, dafuer braeuchte er Source File 4), `threads: 0` bei jedem Ziel ebenso, und
-`action` bekommt nur das eine `v.target` - die uebrigen sieben aktiven Ziele erscheinen im
-Dashboard ohne Taetigkeit, obwohl der Autopilot in seinem eigenen Fenster sehr wohl weiss, was
-sie tun (`t.doing`, `c.busy`).
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 22. KLEINIGKEIT - Hacknet-Zugewinn ohne Spieler- und BitNode-Multiplikator
-
-```js
-const zugewinn = 1.5 * Math.pow(1.035, node.ram - 1) * ((node.cores + 5) / 6);
-```
-(`invest.js:131`)
-
-Original: `levelMult * ramMult * coresMult * mult * currentNodeMults.HacknetNodeMoney`
-(`src/Hacknet/formulas/HacknetNodes.ts:4-11`), wobei `mult` der Spielermultiplikator
-`hacknet_node_money` ist. Ohne Augmentierungen und in BN1 sind beide 1. Mit den
-Hacknet-Augmentierungen (oder in BN-Varianten mit `HacknetNodeMoney != 1`) faellt die
-Amortisationsrechnung falsch aus - zu pessimistisch bei guten Multiplikatoren, zu optimistisch
-bei schlechten.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 23. KLEINIGKEIT - `expPerThread` ist toter Code
-
-`calc.js:105-108` bildet `calculateHackingExpGain` korrekt nach
-(`3 + 0.3 * baseDifficulty`, mal `mults.hacking_exp`, mal `HackExpGain`,
-`src/Hacking.ts:30-38`) - wird aber nirgends aufgerufen. `playerFacts`
-(`autopilot.js:433-444`) liefert auch gar kein `multExp`, das man hineingeben koennte. Wer die
-Erfahrungsausbeute in die Zielbewertung aufnehmen will (fuer den Levelaufbau in der Fruehphase
-durchaus sinnvoll), muss beides ergaenzen.
-
-**Sicherheit:** sehr sicher.
-
----
-
-## 24. KLEINIGKEIT - Die Bruecke schiebt Dateien einzeln nach
-
-`bridge.js:185-214` entprellt je Dateiname 150 ms und schiebt dann einzeln. Aendert man
-`autopilot.js` und `lib/calc.js` in einem Zug, koennen beide Uebertragungen einige hundert
-Millisekunden auseinanderliegen. Der Autopilot prueft seinen Quelltext einmal pro Sekunde
-(`autopilot.js:332`) und kann sich also beenden, bevor die neue `calc.js` angekommen ist -
-invest.js startet ihn dann mit der alten Formelbibliothek. Der Fehler heilt sich beim naechsten
-Neustart, ist aber genau die Art von Wackelkontakt, die bei einer Messreihe Stunden kostet.
-
-**Wie es richtig waere.** Alle Aenderungen einer Entprellungsrunde sammeln und gemeinsam
-schieben, danach erst freigeben.
-
-**Sicherheit:** mittel - Zeitfenster klein, aber real.
-
----
-
-## 25. KLEINIGKEIT - Bruecke und Dashboard lauschen auf allen Schnittstellen
-
-`new WebSocketServer({ port: RFA_PORT })` (`bridge.js:354`) und
-`server.listen(DASHBOARD_PORT, ...)` (`bridge.js:343`) binden ohne Host-Angabe, also auf
-0.0.0.0. Der Endpunkt `/api/rpc` (`bridge.js:306-326`) reicht beliebige RFA-Methoden
-durch - darunter `getSaveFile` und `deleteFile`. Im Heimnetz ist das kein akutes Problem, aber
-`listen(PORT, "127.0.0.1")` kostet nichts.
+**Wie es richtig waere.** Den Gesamtbedarf beider Auftragsarten VOR dem Verteilen bilden und den
+freien Speicher im Verhaeltnis 12,5 zu 1 beziehungsweise 25 zu 1 aufteilen - dann schrumpfen
+beide gemeinsam, statt dass einer alles bekommt.
 
 **Sicherheit:** sicher.
 
 ---
 
-## Wo ich nichts gefunden habe
+## C4 (WICHTIG) - Das neue `try/catch` faengt auch `ScriptDeath`
 
-Damit klar ist, was tatsaechlich angesehen wurde:
+```js
+while (true) {
+  round++;
+  try {
+    ...
+    if (ns.read("autopilot.js") !== ownSource) {
+      ...
+      ns.exit();                    // :403
+    }
+  } catch (err) {                   // :405
+    note("Fehler in Runde " + round + ": " + ...);
+  }
 
-**`lib/calc.js` - Formeln, Zeile fuer Zeile gegen den Quellcode gelegt:**
+  await ns.sleep(1000);             // :412 - AUSSERHALB des try
+}
+```
+
+`ns.exit()` ist kein `return`:
+```ts
+exit: (ctx) => () => {
+  helpers.log(ctx, () => "Exiting...");
+  killWorkerScript(ctx.workerScript);
+  throw new ScriptDeath(ctx.workerScript);
+},
+```
+(`src/NetscriptFunctions.ts:761-765`)
+
+Der geworfene `ScriptDeath` landet also im eigenen `catch` und wird verschluckt. Dass der
+Autopilot sich trotzdem beendet, liegt einzig daran, dass `await ns.sleep(1000)` **ausserhalb**
+des `try` steht: `killWorkerScript` hat `ws.env.stopFlag` gesetzt, und jeder weitere NS-Aufruf
+laeuft in `checkEnvFlags` (`src/Netscript/NetscriptHelpers.tsx`) und wirft erneut - diesmal
+ungefangen.
+
+**Was daran gefaehrlich ist.** Der Mechanismus haelt aus Versehen. Zoege jemand das `sleep` in
+den `try` - eine voellig naheliegende Aufraeumaktion -, saehe die Schleife so aus: NS-Aufruf
+wirft `ScriptDeath`, `catch` verschluckt, naechste Runde, wirft sofort wieder. Ein `try/catch`
+um eine `while(true)`-Schleife **ohne** funktionierendes `await` ist eine enge Endlosschleife
+ohne Yield - der Spiel-Hauptthread steht, und das Spiel laesst sich nur ueber einen
+Tab-Neustart retten. Denselben Effekt hat jeder externe `kill` des Autopiloten.
+
+Nebenwirkung heute schon: die Notiz "Fehler in Runde N: NS instance has already been killed
+(...)" wird bei jedem geplanten Neustart erzeugt. Sie erscheint nur nicht, weil `draw()` danach
+nicht mehr laeuft.
+
+**Wie es richtig waere.** Im `catch` `ScriptDeath` durchreichen:
+`if (err?.name === "ScriptDeath") throw err;` - der Name ist ausdruecklich dafuer vorgesehen
+(`src/Netscript/ScriptDeath.ts`, Kommentar: "users with error handling ... can more easily
+detect this error type"). Und den Versionsvergleich samt `ns.exit()` besser ganz aus dem `try`
+herausnehmen.
+
+**Sicherheit:** sehr sicher.
+
+---
+
+## C5 (WICHTIG) - Zwei Kommentare derselben Datei widersprechen einander
+
+`autopilot.js:42-47`:
+> So viele Ziele gleichzeitig VORBEREITEN. Ein einziges laesst den Speicher brachliegen ...
+> Acht dagegen verzetteln alles.
+> `const PREP_TARGETS = 4;`
+
+`autopilot.js:284-289`:
+> Alle erntereifen Ziele bedienen ... Vorbereitet wird dagegen **immer nur EINES**. Sieben Ziele
+> gleichzeitig aufzupaeppeln heisst, dass keines fertig wird: jedes bekommt ein Achtel des
+> Speichers und braucht das Achtfache der Zeit ... Konzentration schlaegt Breite.
+> `const naechstes = sortiert.filter((c) => !ready(c)).slice(0, PREP_TARGETS);`
+
+Der zweite Kommentar argumentiert ueber sechs Zeilen fuer genau ein Vorbereitungsziel, und die
+Codezeile direkt darunter nimmt vier. Der laufende Bot meldet dementsprechend "0 Ziel(e) werden
+abgeschoepft, 4 vorbereitet" - und bei vier gleichzeitigen Vorbereitungen auf 500 GB Netz gilt
+das Argument des Kommentars ("jedes bekommt ein Viertel und braucht das Vierfache der Zeit")
+tatsaechlich. Es ist nicht zu erkennen, welche der beiden Aussagen die gewollte ist.
+
+**Sicherheit:** sehr sicher.
+
+---
+
+## C6 (WICHTIG) - Abgewaehlte Ziele werden nicht gestoppt
+
+`erntereif` und `naechstes` werden jede Runde neu gebildet (`autopilot.js:290-292`). Faellt ein
+Ziel heraus, hoert der Bot einfach auf, es zu bedienen; die schon laufenden hack-Threads landen
+aber noch ihren Schlag, und danach laesst niemand mehr nachwachsen.
+
+Der Kommentar in `:144-148` begruendet ausdruecklich, warum beim START nicht aufgeraeumt wird -
+fuer den laufenden Betrieb ist die Frage nie gestellt worden. Der Effekt verstaerkt sich selbst:
+das zurueckgelassene Ziel hat danach wenig Geld und hohe Sicherheit, schneidet in `prepSeconds`
+noch schlechter ab und kommt darum nicht zurueck in die Auswahl. Im laufenden Bot sind gerade 6
+hack-Threads unterwegs, waehrend alle fuenf angezeigten Ziele im Vorbereitungszustand sind - die
+gehoeren also zu einem Ziel, das niemand mehr betreut.
+
+**Sicherheit:** sicher.
+
+---
+
+## C7 (WICHTIG) - Derselbe Rechenfehler in Doku und Code
+
+`invest.js:97-101`:
+> Node 1 hat sich nach 11 Minuten bezahlt, Node 8 kostet schon $74.166 fuer dieselben 1.50 $/s -
+> und dasselbe Geld in Server-RAM sind rund 13 hack-Threads.
+
+`formeln-wirtschaft.md:414-416`:
+> - $74 166 in Hacknet-Node #8 → +1.5 $/s
+> - $74 166 in Server-RAM → **1.34 GB**, d. h. rund **13** `hack()`-Threads.
+
+Das Dokument rechnet die Gigabyte selbst korrekt aus und zieht dann die falsche Folgerung.
+`BaseCostFor1GBOfRamServer: 55000` (`src/Server/data/Constants.ts:4`), unterhalb von 64 GB
+greift der Softcap nicht (`upg = max(0, log2(ram) - 6)`, `src/Server/ServerPurchases.ts:34`).
+$74.166 / $55.000 = 1,349 GB. Ein hack-Arbeiter kostet 1,70 GB (1,60 Grundlast + 0,10 fuer
+`hack`). Das sind **0,79 Threads**, nicht 13.
+
+Die uebrigen Zahlen der Passage stimmen: `calculateNodeCost(n) = 1000 * 1.85^(n-1)`
+(`src/Hacknet/formulas/HacknetNodes.ts:87-92`) ergibt $1.000 fuer Node 1 (→ 667 s = 11,1 min bei
+1,50 $/s) und $74.166 fuer Node 8; ein neuer Node produziert
+`1 * 1.5 * 1.035^0 * (1+5)/6 = 1,50 $/s` (`:4-11`).
+
+**Warum das zaehlt.** Auf dieser Zahl steht die Begruendung fuer die harte Hacknet-Regel in
+`invest.js`. Richtig gerechnet faellt der Vergleich **freundlicher** fuer Hacknet aus, nicht
+strenger. Die Regel mag trotzdem gut sein - aber wer sie spaeter nachjustiert, rechnet auf einer
+kaputten Grundlage weiter. Und weil der Fehler in beiden Dateien steht, faellt er beim
+Gegenlesen nicht auf.
+
+**Sicherheit:** sehr sicher.
+
+---
+
+## C8 (WICHTIG) - Der Autopilot sitzt bei 7,15 von 8 GB
+
+Aufsummiert aus `src/Netscript/RamCostGenerator.ts` ueber die tatsaechlich benutzten Funktionen:
+
+| Posten | GB |
+|---|---|
+| Grundlast | 1,60 |
+| `exec` | 1,30 |
+| `scp` | 0,60 |
+| `getPlayer` | 0,50 |
+| `kill` | 0,50 |
+| `killall` | 0,50 |
+| `ls` + `ps` + `scan` | 0,60 |
+| acht `getServer*`-Abfragen | 0,70 |
+| `getServerMaxRam` + `getServerUsedRam` + `hasRootAccess` | 0,15 |
+| fuenf Portknacker + `nuke` | 0,30 |
+| `getScriptRam` + `fileExists` + `getTotalScriptIncome` + `getTotalScriptExpGain` | 0,40 |
+| `ns.ui.*`, `read`, `write`, `print`, `clearLog`, `disableLog`, `sleep`, `exit`, `heart.break` | 0,00 |
+| **Summe** | **7,15** |
+
+Auf dem Start-home mit 8 GB bleiben 0,85 GB. Fuegt jemand `ns.getServer` (2 GB),
+`ns.hackAnalyze` (1 GB) oder auch nur `ns.getRunningScript` (0,3 GB) hinzu, passt der Autopilot
+nicht mehr auf home - und dann kann ihn auch invest.js nicht mehr starten:
+`ns.exec("autopilot.js", "home")` gibt einfach 0 zurueck, und `invest.js:48` wertet das nicht
+aus. Der Bot waere ohne sichtbare Fehlermeldung tot.
+
+`HOME_RESERVE` steht inzwischen richtig auf 2 (der Kommentar in `:31-33` benennt den frueheren
+Doppelzaehl-Fehler ausdruecklich). Damit ist `ramFree` auf home `max(0, 8 - 7,15 - 2) = 0` -
+home traegt heute also ohnehin keine Arbeiter, obwohl es wegen seiner mehreren Kerne
+(`coreBonus = 1 + (cores-1)/16`, `src/Server/ServerHelpers.ts:287`) fuer grow und weaken der
+wertvollste Rechner im Netz waere.
+
+**Wie es richtig waere.** Den Speicherbedarf als Pruefpunkt festhalten - die Bruecke kann ihn
+ueber die RFA-Methode `calculateRam` jederzeit abfragen
+(`src/RemoteFileAPI/MessageHandlers.ts:193`) - und in `invest.js:48` den Rueckgabewert von
+`ns.exec` protokollieren.
+
+**Sicherheit:** sicher (Handrechnung; die Summe kann um 0,05 GB abweichen, die Enge nicht).
+
+---
+
+## C9 bis C22 - Kleinigkeiten im Code
+
+**C9 - `growThreads`-Rundung** (`calc.js:169-176`). Das Original
+(`src/Server/ServerHelpers.ts:177-198`) prueft den Abwaertsschritt nur im Grenzfall
+(`ccycle - x > 0.999999`) und kennt einen Schnellweg ueber `|diff|`. Unsere Fassung prueft immer
+abwaerts. Mathematisch nie zu wenig - wir dekrementieren nur, wenn
+`(o+t-1)*exp(k*(t-1)) >= n` wirklich gilt -, aber das Ergebnis kann um einen Thread von
+`ns.formulas.hacking.growThreads` abweichen. Alles davor ist identisch: Eingabeklemmung,
+Startwert `(n-o)/(1 + (n/16 + 15o/16)*k)`, Iterationsschritt `(x - ox*log(ox/n))/(1 + ox*k)`,
+Abbruch bei `|diff| <= 1`.
+
+**C10 - `weakenThreads`** (`calc.js:185-188`). Das Original hat einen Faktor mehr:
+`ServerWeakenAmount * threads * coreBonus * currentNodeMults.ServerWeakenRate`
+(`src/Server/ServerHelpers.ts:292-295`). In BN1 ist der 1, aber anders als `hackChance`,
+`hackPercent` und `hackTime` hat diese Funktion nicht einmal einen Parameter dafuer - beim
+BitNode-Wechsel faellt es nicht auf. Ausserdem rechnen alle vier Aufrufstellen mit `cores = 1`,
+obwohl fremde Server per `cpuCores = getRandomIntInclusive(ceil(layer/2), layer)`
+(`src/Server/ServerHelpers.ts:376`) durchaus mehrere Kerne haben. Der Bedarf wird dadurch zu
+hoch angesetzt - ungefaehrliche Richtung, kostet aber Threads.
+
+**C11 - der Faktor 400** (`calc.js:215`).
+`growCost = 1 / Math.max(0.05, growthLogPerThread(...) * 400)` hat keine Entsprechung im
+Spielcode. Als Naeherung gekennzeichnet und nicht falsch, aber niemand kann sagen, warum 400 und
+nicht 200 oder 800. Bei `serverGrowth = 50` teilt er den Ertrag durch 2,4, bei
+`serverGrowth = 5` durch 15,3 - ein starker Hebel fuer eine frei gewaehlte Zahl.
+
+**C12 - `expPerThread` ist toter Code** (`calc.js:105-108`). Bildet `calculateHackingExpGain`
+korrekt nach (`3 + 0.3 * baseDifficulty`, mal `mults.hacking_exp`, mal `HackExpGain`,
+`src/Hacking.ts:30-38`), wird aber nirgends gerufen, und `playerFacts` liefert gar kein
+`multExp`. Fuer die Fruehphase waere die Erfahrungsausbeute ein sinnvolles zweites
+Bewertungskriterium - der Baustein liegt fertig da und ist nicht angeschlossen.
+
+**C13 - `tryCrack` zaehlt blind** (`autopilot.js:548-556`).
+`try { fn(host); open++ } catch { open++ }` - die Portknacker werfen gar nicht, sie geben
+`false` zurueck, wenn das Programm fehlt (`src/NetscriptFunctions.ts:549-563`). Da `fileExists`
+vorher prueft, stimmt das Ergebnis; die Konstruktion verdeckt aber echte Ausnahmen (etwa auf
+einem Hacknet-Server). Der `nuke`-Teil ist inzwischen richtig (`return ns.nuke(host) !== false`),
+und die Level-Pruefung ist mit einer korrekten Quellenangabe entfernt worden.
+
+**C14 - `additionalMsec` ist immer 0** (`worker/hack.js:9-11`, `autopilot.js:594`). Der
+Kommentar im Arbeiter erklaert, warum die Verzoegerung INNERHALB der Aktion liegt ("nur so ist
+der Landezeitpunkt exakt") - `deploy` uebergibt an dieser Stelle die feste 0. Es gibt keinerlei
+Landezeitsteuerung. Der Mechanismus stimmt (`validateHGWOptions` addiert `additionalMsec/1000`),
+er wird nur nicht benutzt.
+
+**C15 - "Verdient" mischt** (`autopilot.js:362`). `ns.getServerMoneyAvailable("home")` liefert
+das Spielerguthaben (Sonderfall in `src/NetscriptFunctions.ts:991-995`), und invest.js kauft
+davon Server und Nodes. Nach jedem Kauf steht in der goldenen Zahl ein Minus.
+
+**C16 - `writeBrain`-Platzhalter** (`autopilot.js:632-641`). `backdoored: 0` und `threads: 0`
+sind fest verdrahtet, `action` bekommt nur `v.target`. Der Autopilot weiss ueber `t.doing` und
+`c.busy` genau, was jedes Ziel tut - das Dashboard erfaehrt es nicht.
+
+**C17 - tote Selbstaktualisierung in invest.js** (`invest.js:28-32`, `:85-88`).
+`ns.read("invest.js")` liest vom AUSFUEHRENDEN Rechner
+(`src/NetscriptFunctions.ts:1120-1139`: `const server = ctx.workerScript.getServer()`), nicht
+von home - der Vergleich vergleicht die lokale Kopie mit sich selbst und schlaegt nie an. Der
+Autopilot loest das inzwischen richtig, indem er den Verwalter in Runde 1 abschiesst und den
+Grund im Kommentar (`autopilot.js:159-162`) korrekt benennt. In `invest.js` steht der alte
+Mechanismus samt Kommentar aber noch, und der Kommentar behauptet weiterhin, er funktioniere.
+
+**C18 - Hacknet-Zugewinn ohne Multiplikatoren** (`invest.js:131`).
+`1.5 * Math.pow(1.035, node.ram - 1) * ((node.cores + 5) / 6)` gegen das Original
+`levelMult * ramMult * coresMult * mult * currentNodeMults.HacknetNodeMoney`
+(`src/Hacknet/formulas/HacknetNodes.ts:4-11`). Ohne Hacknet-Augmentierungen in BN1 identisch,
+mit ihnen zu pessimistisch.
+
+**C19 - `telemetry.js` ist verwaist** (`telemetry.js:17`, `:43`). Schreibt nach
+`data/telemetry.txt` - genau die Datei, die `writeBrain` (`autopilot.js:643`) jede Sekunde
+ueberschreibt und die die Bruecke abholt (`bridge.js:31`, `:224`). Liefen beide, wuerden sie
+sich gegenseitig ueberschreiben. Ausserdem liest sie `data/brain.txt`, das im ganzen Projekt
+niemand schreibt. Gestartet wird sie von nichts, ins Spiel geschoben aber weiterhin
+(`bridge.js:135-157` nimmt alles unter `src/`).
+
+**C20 - `purchasedCount` zaehlt home mit** (`bridge.js:255`). Im Spiel ist
+`home.purchasedByPlayer === true` - `src/Server/ServerHelpers.ts:297-303` weist ausdruecklich
+darauf hin. Das Dashboard zeigt darum gerade 26 gekaufte Server, obwohl das Limit 25 ist
+(`ServerConstants.CloudServerLimit`). Wer danach entscheidet, ob noch ein Platz frei ist, irrt.
+
+**C21 - Einzelschuss-Uebertragung** (`bridge.js:185-214`). Je Dateiname 150 ms entprellt, dann
+einzeln geschoben. Wer `autopilot.js` und `lib/calc.js` zusammen aendert, riskiert, dass sich
+der Autopilot (Pruefung einmal pro Sekunde, `:399`) beendet, bevor die neue `calc.js` da ist -
+und mit der alten Formelbibliothek wieder hochkommt. Heilt sich beim naechsten Neustart, ist
+aber genau die Art Wackelkontakt, die eine Messreihe unbrauchbar macht.
+
+**C22 - offene Bindung** (`bridge.js:343`, `:354`). `WebSocketServer({ port })` und
+`server.listen(port)` binden auf 0.0.0.0. `/api/rpc` (`:306-326`) reicht beliebige RFA-Methoden
+durch, darunter `getSaveFile` und `deleteFile` (`src/RemoteFileAPI/MessageHandlers.ts:135`,
+`:223`). `listen(PORT, "127.0.0.1")` kostet nichts.
+
+---
+
+# Teil B - Dokumentation
+
+Die Formelsammlungen sind ueberwiegend sehr genau (siehe "Wo ich nichts gefunden habe"). Was
+standhaelt:
+
+## D1 (KRITISCH) - `strategie.md` empfiehlt entfernte Funktionen
+
+`strategie.md:144`, in der Tabelle "Skriptpruefbar":
+> `| Boersenzugang | ns.stock.hasWSEAccount() / has4SDataTIXAPI() | — |`
+
+Beide Namen sind seit 3.0.0 weg (`src/NetscriptFunctions/StockMarket.ts:348-352`):
+```ts
+setRemovedFunctions(stockFunctions, {
+  hasWSEAccount:   { version: "3.0.0", replacement: "stock.hasWseAccount()" },
+  hasTIXAPIAccess: { version: "3.0.0", replacement: "stock.hasTixApiAccess()" },
+  has4SDataTIXAPI: { version: "3.0.0", replacement: "stock.has4SDataTixApi()" },
+});
+```
+Richtig sind `hasWseAccount()`, `hasTixApiAccess()`, `has4SData()`, `has4SDataTixApi()`.
+
+Das ist die schwerste Art von Doku-Fehler, die dieses Projekt haben kann: Genau dieser
+Fehlertyp - `REMOVED FUNCTION ERROR` durch eine 2.x-Schreibweise - hat am selben Tag
+`api-aenderungen-v3.md` ueberhaupt erst ausgeloest. **`strategie.md:687` schreibt dieselben vier
+Felder korrekt.** Dasselbe Dokument widerspricht sich also selbst.
+
+## D5 (WICHTIG) - Die Ursache dafuer steht in `api-aenderungen-v3.md:52-54`
+
+> Weitere Streichungen gibt es in den Unter-APIs `corporation`, `gang`, `singularity` und
+> `formulas.work` - jeweils per `setRemovedFunctions` in der zugehoerigen Datei.
+
+`setRemovedFunctions` steht darueber hinaus in `src/NetscriptFunctions/StockMarket.ts:348`
+(drei 3.0.0-Streichungen) und in `src/NetscriptFunctions/Sleeve.ts:337` (`getSleeveStats`,
+`getInformation`, 2.2.0). Ausgerechnet `stock` fehlt - und ausgerechnet dort ist D1 entstanden.
+Wer die Liste als vollstaendig liest, prueft `ns.stock.*` gar nicht erst nach.
+
+## D2 (WICHTIG) - Der Heim-RAM-Kreuzungspunkt in `formeln-wirtschaft.md:135`
+
+> ab ca. 64 GB Heim-RAM ist gekauftes RAM billiger pro GB
+
+Der Grenzpreis fuer Heim-RAM ist `32.000 * ram^0,6601`
+(`src/PersonObjects/Player/PlayerObjectServerMethods.ts:30-40`); er erreicht die $55.000 des
+gekauften RAM bei ram ≈ **2,27 GB**, also unterhalb des Startwerts von 8 GB. Gekauftes RAM ist
+ab dem allerersten Upgrade billiger, nicht erst ab 64 GB.
+
+Das Dokument widerlegt sich zwei Zeilen spaeter selbst (`:137`: "Ab dem Sprung 64→128 GB ist
+gekauftes RAM also rund 9x guenstiger" - Faktor 9 heisst, der Kreuzungspunkt lag laengst
+dahinter), und `strategie.md:422-425` benennt den Fehler bereits ausdruecklich und rechnet 2,3
+GB vor. Zu korrigieren ist `formeln-wirtschaft.md`, nicht `strategie.md`.
+
+## D3 (WICHTIG) - Hacknet-Abbruchpunkt in `formeln-wirtschaft.md:412`
+
+> ... das ist bis ungefaehr **Node 6-7** der Fall ($21 670 bzw. $74 166)
+
+Drei Fehler in einem Satz. `calculateNodeCost(n) = 1000 * 1.85^(n-1)`
+(`src/Hacknet/formulas/HacknetNodes.ts:87-92`):
+- Node 6 = $21.670 (stimmt), **Node 7 = $40.089**. $74.166 ist Node **8** - was dasselbe
+  Dokument zwei Zeilen weiter (`:414`) und in seiner Tabelle (`:233`) selbst so schreibt.
+- Eine Stunde Rueckzahldauer bei 1,50 $/s bedeutet $5.400, also hoechstens **Node 4** ($6.331 →
+  1,17 h).
+- Die eigene Tabelle (`:232-233`) nennt fuer Node 5 bereits 2,2 h und fuer Node 8 13,7 h.
+
+`invest.js` setzt die Regel uebrigens richtig um (`AMORTISATION_MAX = 3600` gegen den
+tatsaechlichen Preis, was bei Node 4 abbricht) - der Code ist hier besser als die Doku.
+
+## D4 (WICHTIG) - 4S-Amortisation in `formeln-wirtschaft.md:628`
+
+> Bei einer Kapitalbasis von $1 Mrd ... sind das $300M/h - die $26 Mrd sind in unter vier
+> Stunden drin.
+
+4 h × $300M = $1,2 Mrd, nicht $26 Mrd. Selbst mit Zinseszins (1,3x/h ab $1 Mrd) braucht man
+`ln(27)/ln(1,3)` ≈ **12,6 Stunden**. `strategie.md:772-774` weist den Fehler bereits nach;
+`formeln-wirtschaft.md` ist unkorrigiert geblieben.
+
+## D6 (WICHTIG) - Falsche `isTrusted`-Zuordnung in `oberflaeche.md:40`
+
+Dort steht "`Locations/ui/CompanyLocation.tsx:62, 71` | Job annehmen / arbeiten". Im Code ist
+`:62` der Anfang von `startInfiltration` (Infiltrate Company) und `:71` der von `work`; die
+Job-**Bewerbung** ist ueberhaupt nicht `isTrusted`-geschuetzt. `strategie.md:830` (":62
+Infiltrate Company") und `:838` ("Nicht geschuetzt: ... Job-Bewerbung") haben es richtig.
+
+Das ist praktisch relevant: `oberflaeche.md` ist die Anleitung dafuer, was ein Agent per Browser
+klicken kann. Wer glaubt, die Bewerbung sei gesperrt, laesst einen offenen Weg liegen.
+
+## D7 (WICHTIG) - Reset-Beschleunigungstabelle, Spalte L=2500 (`strategie.md:623-629`)
+
+Faktor = `exp(L/32 * (1 - 1/m))`. Die Spalten L=500 und L=1000 stimmen exakt, L=2500 nicht:
+
+| m | Doku | nachgerechnet |
+|---|---|---|
+| 1,20 | 6,3e5x | 4,5e5x |
+| 1,30 | 2,5e8x | 6,8e7x |
+| 1,50 | 3,1e11x | 2,0e11x |
+| 2,00 | 3,5e16x | 9,2e16x (Doku zu **niedrig**) |
+
+Die qualitative Aussage haelt, die Zahlen nicht - und dass der Fehler in beide Richtungen geht,
+schliesst einen systematischen Rundungsgrund aus.
+
+## D8 - Sammelposten Kleinigkeiten in der Doku
+
+Rechnerisch:
+- `formeln-wirtschaft.md:270` - "12 Maximalnodes bei ~$5,7 Mrd": mit dem eigenen Vollausbaupreis
+  sind es $4,90 Mrd. Der Fehler ist nach `strategie.md:1099` durchgereicht.
+- `formeln-wirtschaft.md:748` - "heist, sobald die Stats ueber ~350 liegen": aus den eigenen
+  Zahlen liegt die Kreuzung bei X ≈ 219, und die eigene Tabelle `:728-729` zeigt das schon.
+- `formeln-progression.md:856`, `strategie.md:589` und `:1121` - "bei acht Augs kostet die letzte
+  das 170-fache": Off-by-one, bei acht Augs ist k=7 → 89,4x. 169,84x ist die neunte (steht so in
+  `formeln-progression.md:166`).
+- `strategie.md:345` - `e^((5000/6+200)/32)` ist 1,06e14, nicht 1,6e14.
+- `formeln-progression.md:91` - "`hacking: 1.2` ist ungefaehr `hacking_exp` mal 1000": gilt erst
+  ab Level ~1100; bei Level 500 entspricht es Faktor 22,8.
+- `strategie.md:902` - Ishima verlangt $30 Mio, nicht $20 Mio (`FactionInfo.tsx:521`).
+  `formeln-progression.md:611` hat es richtig.
+- `oberflaeche.md:319` - das Knopfbeispiel nennt "$1.032m"; `getUpgradeHomeRamCost` bei 8 GB
+  ergibt $1.009.744. `formeln-wirtschaft.md:123` und `strategie.md:413` haben es richtig.
+
+Sachlich:
+- `strategie.md:706`/`:1132` - `initStockMarket()` wird in `prestigeAugmentation` NICHT
+  unbedingt gerufen, sondern in `if (canAccessStockMarket())` (`src/Prestige.ts:170-172`). Die
+  praktische Folgerung (vor dem Install verkaufen) bleibt richtig.
+- `strategie.md:3` - "18 von 80 Servern gerootet": die statische Liste hat 70 Eintraege.
+  Vermutlich eine Live-Zaehlung inklusive home, darkweb und gekaufter Server - das gehoert
+  dazugeschrieben, sonst liest es sich als Widerspruch zu `bitnode-und-server.md`.
+
+Zeilendrift (Sachaussage jeweils richtig, Anker daneben): `strategie.md:1206-1208` (SF15-Zweig
+ist `:100-102`, nicht `:97-99`), `formeln-progression.md:338` (Red-Pill-Verknuepfung `:174-182`,
+nicht `:172-180` - `bitnode-und-server.md:528` und `strategie.md:377` haben es richtig),
+`rfa-protokoll.md:363`/`:504` (`Remote.ts:128`, nicht `:129`), `bitnode-und-server.md:178`
+(`BitNode.tsx:1129`, nicht `:1126`), `bitnode-und-server.md:886` (`servers.ts:54`, nicht `:63`),
+`bitnode-und-server.md:922-925` (vier Anker um 1-4 Zeilen verrutscht).
+
+Konvention: `formeln-hacking.md:1068ff` verankert Servereintraege auf der `hostname:`-Zeile,
+`bitnode-und-server.md:1040ff` auf der oeffnenden Klammer. Beides trifft denselben Eintrag, aber
+"The-Cave :1518" gegen ":1520" sieht wie ein Widerspruch aus.
+
+---
+
+# Wo ich nichts gefunden habe
+
+Damit klar ist, was ueberhaupt angesehen wurde.
+
+## `lib/calc.js` - jede Formel Zeile fuer Zeile gegen den Quellcode gelegt
 
 - `intBonus` (`:31`) - identisch mit `calculateIntelligenceBonus`
-  (`src/PersonObjects/formulas/intelligence.ts:1`), Gewicht 1 ist im gesamten Hacking-System
-  korrekt. Der `?? 0`-Schutz gegen fehlende Intelligence ist eine sinnvolle Ergaenzung.
+  (`src/PersonObjects/formulas/intelligence.ts:1`); Gewicht 1 ist im gesamten Hacking-System
+  korrekt, der `?? 0`-Schutz eine sinnvolle Ergaenzung.
 - `coreBonus` (`:40`) - identisch mit `getCoreBonus` (`src/Server/ServerHelpers.ts:287`).
 - `hackChance` (`:52`) - vollstaendig identisch mit `calculateHackingChance`
-  (`src/Hacking.ts:9-24`), einschliesslich beider Abbruchbedingungen (`!hasAdminRights`,
-  `hackDifficulty >= 100`), `clampNumber(1.75 * skill, 1)` als `Math.max(..., 1)` und der
-  Klemmung auf [0,1]. Ein BitNode-Faktor gehoert hier korrekterweise NICHT hinein.
+  (`src/Hacking.ts:9-24`): beide Abbruchbedingungen (`!hasAdminRights`, `hackDifficulty >= 100`),
+  `clampNumber(1.75 * skill, 1)` als `Math.max(..., 1)`, Klemmung auf [0,1]. Ein BitNode-Faktor
+  gehoert hier korrekterweise **nicht** hinein.
 - `hackPercent` (`:69`) - identisch mit `calculatePercentMoneyHacked` (`src/Hacking.ts:44-57`),
-  einschliesslich `balanceFactor = 240`, `skillMult = (skill - (reqSkill - 1)) / skill` und
-  `ScriptHackMoney`. Kein Intelligence-Bonus - korrekt, den gibt es hier tatsaechlich nicht.
-- `hackTime` (`:84`) - identisch mit `calculateHackingTime` (`src/Hacking.ts:60-80`):
-  `(2.5 * reqSkill * sec + 500) / (skill + 50)`, mal 5, geteilt durch
-  `hacking_speed * HackingSpeedMultiplier * intBonus`. Ergebnis in Sekunden, wie im Original.
-- `GROW_TIME_FACTOR = 3.2` und `WEAKEN_TIME_FACTOR = 4` (`:24-25`) - belegt in
-  `src/Hacking.ts:84` und `:91`.
+  einschliesslich `balanceFactor = 240` und `skillMult = (skill - (reqSkill - 1)) / skill`. Kein
+  Intelligence-Bonus - korrekt, den gibt es hier wirklich nicht.
+- `hackTime` (`:84`) - identisch mit `calculateHackingTime` (`src/Hacking.ts:60-80`), Ergebnis in
+  Sekunden wie im Original.
+- `GROW_TIME_FACTOR = 3.2`, `WEAKEN_TIME_FACTOR = 4` (`:24-25`) - `src/Hacking.ts:84`, `:91`.
 - Alle vier Konstanten in `:14-17` stimmen mit `src/Server/data/Constants.ts:7-10`.
-  `SERVER_MAX_GROWTH_LOG = 0.00349388925425578` ist tatsaechlich `log1p(0.0035)`, und die
+  `SERVER_MAX_GROWTH_LOG = 0.00349388925425578` ist wirklich `log1p(0.0035)`, und die
   Kommentarbehauptung "der Deckel greift ab sec <= 8.5714" ist nachgerechnet richtig
   (`0.03 / 0.0035 = 8,5714`).
-- `GROW_FORTIFY_AMOUNT = 2 * SERVER_FORTIFY_AMOUNT` (`:20`) - belegt in
-  `src/Server/ServerHelpers.ts:211` und `src/NetscriptFunctions.ts:340`.
+- `GROW_FORTIFY_AMOUNT = 2 * SERVER_FORTIFY_AMOUNT` (`:20`) - `src/Server/ServerHelpers.ts:211`
+  und `src/NetscriptFunctions.ts:340`.
 - `growthLogPerThread` (`:120`) - identisch mit `calculateServerGrowthLog`
   (`src/Server/formulas/grow.ts:8-29`) fuer `threads = 1`, einschliesslich `-Infinity` bei
   `serverGrowth = 0`, `log1p`, Deckel und Faktorenreihenfolge.
-- `growThreads` (`:147`) - Newton-Raphson identisch bis auf die Rundungskorrektur, siehe
-  Befund 15. Startwert, Iterationsschritt und Abbruchbedingung stimmen exakt.
-- `expPerThread` (`:105`) - formal korrekt, siehe Befund 23 (nur ungenutzt).
-- `targetScore` (`:201`) und `prepSeconds` (`:232`) sind eigene Heuristiken, keine
-  Spielformeln - dort ist nur zu pruefen, ob die verwendeten Bausteine richtig eingesetzt
-  werden. Der Faktor 400 in `:215` hat keine Entsprechung im Quellcode; das ist aber
-  ausdruecklich als Naeherung gekennzeichnet und nicht falsch, nur willkuerlich.
+- `growThreads` (`:147`) - Newton-Raphson identisch bis auf die Rundung (C9).
+- `expPerThread` (`:105`) - formal korrekt (nur ungenutzt, C12).
 
-**NS-Schnittstelle - jeder Aufruf gegen v3.0.1 geprueft:**
+## Autopilot-Logik, ausdruecklich geprueft und fuer richtig befunden
 
-- Kein einziger Aufruf aus `setRemovedFunctions` (`src/NetscriptFunctions.ts:1531-1610`) ist
-  im Code uebrig. Die Treffer von `grep` auf `ns.purchaseServer` in `autopilot.js:136` und
-  `invest.js:10` stehen beide in Kommentaren. `ns.getServer` in `scan.js:9` ebenfalls.
-- Der Umzug nach `ns.cloud` ist in `invest.js` vollstaendig und mit korrekten Signaturen
-  vollzogen: `getServerNames()`, `getServerLimit()`, `getRamLimit()`, `getServerCost(ram)`,
-  `purchaseServer(hostname, ram)` (gibt `""` bei Misserfolg, wird richtig geprueft),
-  `getServerUpgradeCost(host, ram)` (gibt `-1` bei Fehler, wird richtig geprueft),
-  `upgradeServer(host, ram)` (gibt `boolean`). Alles gegen
-  `src/NetscriptFunctions/Cloud.ts` geprueft.
-- Der Umzug nach `ns.ui` ist vollzogen: `openTail`, `moveTail`, `resizeTail`, `closeTail`,
-  `setTailTitle` existieren alle mit den benutzten Signaturen
-  (`src/NetscriptFunctions/UserInterface.ts:16-119`), und alle kosten 0 GB
-  (`src/Netscript/RamCostGenerator.ts`, Block `const ui`).
-- `ns.scp(files, destination, source)` - Reihenfolge korrekt. `ns.exec(script, host, threads,
-  ...args)` - korrekt; `preventDuplicates` ist standardmaessig aus
-  (`src/NetscriptWorker.ts:328`), das eindeutige dritte Argument in `autopilot.js:519` ist
-  also unnoetig, aber harmlos.
-- `ns.getPlayer()` liefert `skills` und `mults` wie in `playerFacts` angenommen;
-  `p.skills.intelligence` kann fehlen, der `?? 0` faengt das.
-- `ns.heart.break()` existiert (`src/NetscriptFunctions.ts:1526`) und kostet 0.
-- Der Import `import * as calc from "lib/calc"` ohne Endung funktioniert: die Modulaufloesung
-  haengt die Endung des importierenden Skripts an
-  (`src/utils/ScriptTransformer.ts:129-153`, `resolveScriptFilePath(moduleName, baseModule,
-  extension)`).
-- **RAM nachgerechnet** gegen `src/Netscript/RamCostGenerator.ts`:
-  `autopilot.js` ~6,70 GB, `invest.js` ~10,75 GB (davon 3,50 GB allein fuer sieben
-  hacknet-Funktionen und 2,25 GB fuer `cloud.purchaseServer`), `telemetry.js` 2,75 GB,
-  `scan.js` 2,65 GB, Arbeiter 1,70 / 1,75 / 1,75 GB. Alle Angaben in den Kopfkommentaren der
-  Arbeiter stimmen; die Behauptung in `autopilot.js:541-543` ("ein eigener Telemetrie-Prozess
-  haette 2.75 GB gefressen") stimmt ebenfalls; die Behauptung in `scan.js:9-10`
-  ("Einzelabfragen kosten 0.85 GB statt 2 GB fuer `ns.getServer`") stimmt exakt -
-  `getServer: 2` steht in `RamCostGenerator.ts:608`, die zehn Einzelabfragen summieren sich auf
-  genau 0,85 GB. Dass `invest.js` mit 10,75 GB einen 16-GB-Rechner braucht, ist mit
-  `foodnstuff` (16 GB, 0 Anschluesse, `requiredHackingSkill` 1) ab der ersten Minute erfuellbar.
-- `ns.scan` liefert keine Darknet-Server (`src/NetscriptFunctions.ts:184`), und `darkweb` ist
-  in v3.0.1 selbst ein `DarknetServer` - der frueher uebliche Absturz auf `darkweb` kann hier
-  also nicht auftreten.
-
-**Autopilot-Logik, ausdruecklich geprueft und fuer richtig befunden:**
-
-- Die Sicherheitsrechnung selbst (Befund 2, zweiter Teil): 1 weaken je 25 hack-Threads, 1
-  weaken je 12,5 grow-Threads - beides korrekt aus den Konstanten abgeleitet.
-- Die Reihenfolge innerhalb der Runde (erst knacken, dann Lage, dann Arbeiter ausliefern, dann
-  Einkaeufer sichern, dann verteilen) ist richtig gewaehlt: der Einkaeufer bekommt seinen
-  Speicher, BEVOR die Arbeiter alles belegen.
-- Die Speicherbuchhaltung INNERHALB einer Runde ist sauber: `s.ramFree` wird bei jedem
-  erfolgreichen `exec` heruntergeschrieben (`:520`), und `ramFree` wird zu Rundenbeginn aus
-  `ns.getServerUsedRam` neu gebildet - Arbeiter aus frueheren Runden sind also korrekt
-  eingerechnet. Es gibt hier KEINE Doppelvergabe.
-- **Fragmentierung ist kein Fehler.** `deploy` (`:513-524`) laeuft ueber ALLE Rechner absteigend
-  nach freiem Speicher und ueberspringt nur solche, auf die kein ganzer Thread mehr passt
-  (`fits < 1`). Reste unterhalb 1,75 GB sind physikalisch unbrauchbar, nicht verschenkt. Die
-  Anzeige benennt den Zustand sogar korrekt ("in zu kleinen Resten verteilt", `:272`). Dass
-  grosse Rechner zuerst gefuellt werden, ist hier zusaetzlich das Richtige: verteilt man eine
-  Erntewelle auf viele Rechner, wirken die Teilschlaege multiplikativ statt additiv
-  (`moneyDrained = moneyAvailable * percentHacked * threads` je `ns.hack`-Aufruf) und die
-  Gesamtabschoepfung faellt geringer aus als beabsichtigt.
-- Der Notfallweg fuer den Einkaeufer (`:152-161`, `ns.killall` auf dem kleinsten passenden
-  Rechner) kann invest.js nicht selbst treffen - er wird nur betreten, wenn invest.js
-  nachweislich nirgends laeuft.
-- Der Selbstbeendigungsweg (`:332-337`) schliesst korrekt zuerst das eigene Fenster und
-  beendet dann - in dieser Reihenfolge, weil `closeTail` auf tote Skripte nicht mehr wirkt.
-  Das ist die einzige Stelle, an der die Erkenntnis aus `doku/api-aenderungen-v3.md:58` richtig
-  angewandt wird.
-- Der Wachhund in `invest.js:47-49` prueft `ns.ps("home")` auf den Dateinamen - das ist der
-  richtige Weg, `ns.isRunning` waere teurer und braeuchte die Argumente.
+- **Die Buchhaltung ueber laufende Auftraege ist inzwischen richtig** und war der schwerste
+  Befund der ersten Fassung. `busy`/`busyPerTarget` wird VOR der Verteilung aus `ns.ps` gebildet
+  (`:238-255`), und alle drei Zweige bestellen nur die Differenz
+  (`need = Vollbedarf - t.busy.X`). Beim Ernten ergibt das sogar ein sauberes
+  Fliessgleichgewicht: es steht dauerhaft ein Vorrat von `floor(HACK_FRACTION/perThread)`
+  hack-Threads in der Luft, die mit `voll/hackTime` Threads je Sekunde landen - macht
+  `HACK_FRACTION` je `hackTime`, also genau die beabsichtigte Abschoepfungsrate.
+- Beim grow ist das Abziehen von `t.busy.grow` **exakt** richtig und nicht nur ungefaehr: der
+  Wachstumsexponent `k` je Thread haengt nicht vom Guthaben ab, die noetige Threadzahl ist also
+  in Logarithmen additiv.
+- Die Arbeiter werden in Runde 1 stumpf neu ausgeliefert (`:136-141`) - das schliesst die
+  Luecke, dass geaenderter Arbeitercode die Flotte nie erreicht. Der Kommentar `:126-132`
+  begruendet es richtig, auch die Feststellung, dass `ns.read` keinen Host-Parameter hat.
+- `tryCrack` verzichtet inzwischen korrekt auf die Hacking-Level-Pruefung und begruendet das mit
+  der richtigen Quelle: `ns.nuke` prueft nur NUKE.exe und offene Anschluesse
+  (`src/NetscriptFunctions.ts:531-548`), `netscriptCanGrow`/`netscriptCanWeaken` nur Root
+  (`src/Hacking/netscriptCanHack.ts:49-55`). Der Rueckgabewert von `ns.nuke` wird ausgewertet.
+- Die frueher vorhandene `for (let pid = 1; pid < ns.pid; pid++) ns.ui.closeTail(pid)`-Schleife
+  ist verschwunden. Sie war wirkungslos (`closeTail` greift bei toten Skripten nicht,
+  `src/NetscriptFunctions/UserInterface.ts:69-80` - genau wie `api-aenderungen-v3.md:58` es
+  bereits festhielt) und waere mit der Sitzungsdauer gewachsen.
+- Die Speicherbuchhaltung innerhalb einer Runde ist sauber: `s.ramFree` wird bei jedem
+  erfolgreichen `exec` heruntergeschrieben und zu Rundenbeginn aus `ns.getServerUsedRam` neu
+  gebildet. Arbeiter aus frueheren Runden sind korrekt eingerechnet, es gibt keine
+  Doppelvergabe. Einzige Ausnahme: C2.
+- **Fragmentierung ist kein Fehler.** `deploy` (`:588-601`) laeuft absteigend ueber ALLE Rechner
+  und ueberspringt nur, wo kein ganzer Thread mehr passt. Reste unter 1,75 GB sind physikalisch
+  unbrauchbar, und die Anzeige benennt den Zustand korrekt ("in zu kleinen Resten verteilt").
+  Dass grosse Rechner zuerst gefuellt werden, ist hier zusaetzlich richtig: eine ueber viele
+  Rechner verstreute Erntewelle wirkt multiplikativ statt additiv
+  (`moneyDrained = moneyAvailable * percentHacked * threads` je einzelnem `ns.hack`-Aufruf) und
+  schoepft dadurch weniger ab als beabsichtigt.
+- Die Rangfolge `score / rest` fuer noch nicht erntereife Ziele (`:277-283`) ist konzeptionell
+  richtig: Ertrag je investiertem Thread statt Ertrag allein.
+- Der Selbstbeendigungsweg schliesst das eigene Fenster VOR `ns.exit()` - in dieser Reihenfolge,
+  weil `closeTail` auf tote Skripte nicht mehr wirkt.
 - `invest.js` gibt nie das ganze Guthaben aus (`PUFFER = 2`, Hacknet `PUFFER = 4`), und die
   Annahme "Aufruesten kostet nur die Differenz" ist korrekt:
   `getCloudServerUpgradeCost = getCloudServerCost(neu) - getCloudServerCost(alt)`
   (`src/Server/ServerPurchases.ts:53`).
 
-**Bruecke:** Protokollrahmen (`jsonrpc`, `id`, `method`, `params`), die benutzten Methoden
-`pushFile`, `getFile`, `getAllServers` und deren Antwortformen stimmen mit
-`src/RemoteFileAPI/MessageHandlers.ts` ueberein. Zeitueberschreitungen werden aufgeraeumt,
-das Protokoll ist gedeckelt, der Wechsel auf eine zweite Spielverbindung ist korrekt behandelt
-(die alte `close`-Behandlung setzt den Zustand nicht faelschlich zurueck), und der
-Pfaddurchgriff im Dashboard-Server ist wirksam abgesichert.
+## NS-Schnittstelle - jeder Aufruf gegen v3.0.1 geprueft
 
-**Nicht geprueft:** die Inhalte von `dashboard/index.html` und `tools/ui.js` (Oberflaechen-
-Fahrplaene, kein NS-Code), sowie die Vollstaendigkeit der grossen Formelsammlungen in `doku/` -
-dazu siehe den folgenden Abschnitt.
+- Kein einziger Aufruf aus `setRemovedFunctions` (`src/NetscriptFunctions.ts:1531-1613`) ist im
+  Code uebrig. Die `grep`-Treffer auf `ns.purchaseServer` und `ns.getServer` stehen samt und
+  sonders in Kommentaren.
+- `ns.cloud` ist in `invest.js` vollstaendig und mit richtigen Signaturen umgesetzt:
+  `getServerNames()`, `getServerLimit()`, `getRamLimit()`, `getServerCost(ram)`,
+  `purchaseServer(hostname, ram)` (gibt `""` bei Misserfolg - wird geprueft),
+  `getServerUpgradeCost(host, ram)` (gibt `-1` bei Fehler - wird geprueft),
+  `upgradeServer(host, ram)` (`boolean`). Gegen `src/NetscriptFunctions/Cloud.ts` geprueft.
+- `ns.ui.*` inklusive des neuen `setTailMinimized` existieren mit den benutzten Signaturen
+  (`src/NetscriptFunctions/UserInterface.ts:16-119`) und kosten alle 0 GB.
+- `ns.scp(files, destination, source)`, `ns.exec(script, host, threads, ...args)`,
+  `ns.kill(pid)`, `ns.killall(host)`, `ns.ps(host)`, `ns.heart.break()` - alle vorhanden, alle
+  mit passender Signatur. `preventDuplicates` ist standardmaessig aus
+  (`src/NetscriptWorker.ts:328`), das eindeutige dritte `exec`-Argument ist also unnoetig, aber
+  harmlos.
+- `ns.getPlayer()` liefert `skills` und `mults` wie angenommen; `skills.intelligence` kann
+  fehlen, `?? 0` faengt das.
+- `import * as calc from "lib/calc"` ohne Endung funktioniert: die Modulaufloesung haengt die
+  Endung des importierenden Skripts an (`src/utils/ScriptTransformer.ts:129-153`).
+- `ns.scan` liefert keine Darknet-Server (`src/NetscriptFunctions.ts:184`), und `darkweb` ist in
+  v3.0.1 selbst ein `DarknetServer`. Der frueher uebliche Absturz auf `darkweb` kann hier also
+  nicht auftreten. Hacknet-**Server** (BN9) wuerden dagegen weiterhin durch
+  `helpers.getNormalServer` fliegen - das faengt jetzt aber das `try/catch` ab.
+- **RAM nachgerechnet:** `autopilot.js` ~7,15 GB, `invest.js` ~10,75 GB (davon 3,50 GB fuer
+  sieben hacknet-Funktionen und 2,25 GB fuer `cloud.purchaseServer`), `telemetry.js` 2,75 GB,
+  `scan.js` 2,65 GB, Arbeiter 1,70 / 1,75 / 1,75 GB. Die Angaben in den Kopfkommentaren der
+  Arbeiter stimmen alle. Die Behauptung in `scan.js:9-10` ("Einzelabfragen kosten 0,85 GB statt
+  2 GB fuer `ns.getServer`") stimmt exakt: `getServer: 2` steht in `RamCostGenerator.ts:608`,
+  und die zehn Einzelabfragen summieren sich auf genau 0,85 GB. Dass `invest.js` mit 10,75 GB
+  einen 16-GB-Rechner braucht, ist mit `foodnstuff` (16 GB, 0 Anschluesse,
+  `requiredHackingSkill` 1) ab der ersten Minute erfuellbar.
+
+## Bruecke
+
+Protokollrahmen (`jsonrpc`, `id`, `method`, `params`), die benutzten Methoden `pushFile`,
+`getFile`, `getAllServers` und deren Antwortformen decken sich mit
+`src/RemoteFileAPI/MessageHandlers.ts`. Zeitueberschreitungen werden aufgeraeumt, das Protokoll
+ist gedeckelt, der Wechsel auf eine zweite Spielverbindung ist richtig behandelt (die alte
+`close`-Behandlung setzt den Zustand nicht faelschlich zurueck), und der Pfaddurchgriff im
+Dashboard-Server ist wirksam abgesichert.
+
+## Dokumentation - was nachgeprueft und bestaetigt wurde
+
+Der weit ueberwiegende Teil ist exakt. Ausdruecklich nachgeschlagen und bestaetigt:
+
+- **`api-aenderungen-v3.md`**: alle 21 Eintraege von `setRemovedFunctions(ns, {...})`
+  (`src/NetscriptFunctions.ts:1531-1613`) stimmen wortgenau, inklusive Zeilenangabe und
+  Ersatznamen. Einzige Luecke ist D5.
+- **`formeln-hacking.md`**: saemtliche Konstanten und Zeilen in `src/Hacking.ts`; die
+  `ServerConstants` byte-genau; `grow.ts` inklusive des additiven `+threads`; die komplette
+  RAM-Kostentabelle; `getWeakenEffect`, `getCoreBonus`, `numCycleForGrowth*`,
+  `processSingleServerGrowth`; die Formulas-API-Tabelle mit allen zehn Hacking-Funktionen; der
+  Serverauszug.
+- **`formeln-progression.md`**: Skill-/Exp-Formeln inklusive der kompletten nachgerechneten
+  Exp-Tabelle; `favorToRep`/`repToFavor` inklusive `log1point02` und `MaxFavor = 35331`;
+  `getAugCost` mit NFG- und SoA-Sonderpfad; die NFG-Tabelle; alle stichprobenartig geprueften
+  Augmentation-Zeilennummern und -Werte; Spendenformel; Reset-Geld $1.262.
+- **`formeln-wirtschaft.md`** (ausser D2, D3, D4 und den Sammelposten): Serverpreistabelle;
+  Heim-RAM- und Kern-Kostentabellen; alle Hacknet-Konstanten und -Formeln; Hash-Upgrade-Preise;
+  saemtliche Stock-Konstanten inklusive 45-Prozent-Zyklus und Volatilitaetstabelle; die
+  komplette Verbrechenstabelle mit allen zwoelf Eintraegen; Sleeve-, Gang-, Corporation- und
+  Bladeburner-Konstanten; die DarkNet-Formeln inklusive der Intelligenz-Multiplikation.
+- **`bitnode-und-server.md`**: die vollstaendige BN1-Multiplikatorliste - alle 54 Felder mit
+  richtigen Zeilennummern, inklusive der beiden Abweichler `DaedalusAugsRequirement = 30` und
+  `StaneksGiftExtraSize = 0`; alle 15 `case n:`-Zeilen; die 64 Singularity-RAM-Eintraege mit
+  jeder einzelnen Zeilennummer; SF1/SF4/SF5/SF9/SF10 inklusive der Feinheit
+  `decMult = 1/incMult` gegen `1 - mult/100`; Serverzahl 70, davon 7 ohne Geld.
+- **`rfa-protokoll.md`**: alle elf Methoden mit Zeilenbereichen, die Settings-Zeilen, die
+  Dateiendungslisten, die `handleMessageEvent`-Logik.
+- **`oberflaeche.md`** (ausser D6 und dem Preisbeispiel): alle `isTrusted`-Fundstellen
+  vollstaendig, alle acht TechVendor mit RAM-Spannen, die Knopftexte und Sperrbedingungen, die
+  Darkweb-Preisliste.
+- **`strategie.md`** (ausser D1, D7 und den Sammelposten): alle Programm-Level; die
+  `CreateProgramWork`-Zeitformel; alle Rep-Schwellen; die Multiplikatorprodukte; die
+  Daedalus-Rep-Tabelle; der CyberSec-Kaufreihenfolgevergleich; `maxDif = 2*totalSFs+1`; alle
+  Serverleiter-Preise.
+
+## Nicht geprueft
+
+`dashboard/index.html` und `tools/ui.js` (Oberflaechen-Fahrplaene, kein NS-Code) sowie die
+Vollstaendigkeit der Formelsammlungen - dort wurde stichprobenartig, aber breit geprueft, nicht
+erschoepfend.

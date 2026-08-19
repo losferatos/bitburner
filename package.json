@@ -1,0 +1,13 @@
+{
+  "name": "bitburner-autopilot",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Autonomer Bitburner-Spieler: RFA-Sync, Telemetrie und Live-Dashboard",
+  "scripts": {
+    "start": "node sync/bridge.js"
+  },
+  "dependencies": {
+    "ws": "^8.18.0"
+  }
+}

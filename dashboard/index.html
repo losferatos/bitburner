@@ -1,0 +1,292 @@
+<!doctype html>
+<html lang="de">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Bitburner Autopilot</title>
+    <style>
+      :root {
+        --bg: #0a0e0a;
+        --panel: #10160f;
+        --line: #1e2a1c;
+        --fg: #b9f6ca;
+        --dim: #5c8c62;
+        --accent: #4ade80;
+        --warn: #fbbf24;
+        --bad: #f87171;
+        --money: #facc15;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        background: var(--bg);
+        color: var(--fg);
+        font: 13px/1.5 "Cascadia Mono", "Consolas", ui-monospace, monospace;
+        padding: 14px;
+      }
+      h1 {
+        font-size: 15px;
+        margin: 0 0 12px;
+        letter-spacing: 0.14em;
+        text-transform: uppercase;
+        color: var(--accent);
+        display: flex;
+        align-items: center;
+        gap: 12px;
+      }
+      .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
+      .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+      .grid {
+        display: grid;
+        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
+        gap: 10px;
+      }
+      .card {
+        background: var(--panel);
+        border: 1px solid var(--line);
+        border-radius: 4px;
+        padding: 10px 12px;
+        min-width: 0;
+      }
+      .card h2 {
+        font-size: 10px;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+        color: var(--dim);
+        margin: 0 0 8px;
+        font-weight: normal;
+      }
+      .kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
+      .kv span:first-child { color: var(--dim); }
+      .kv span:last-child { text-align: right; white-space: nowrap; }
+      .big { font-size: 22px; color: var(--money); line-height: 1.2; }
+      .sub { color: var(--dim); font-size: 11px; }
+      table { width: 100%; border-collapse: collapse; font-size: 12px; }
+      th {
+        text-align: left;
+        color: var(--dim);
+        font-weight: normal;
+        font-size: 10px;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+        border-bottom: 1px solid var(--line);
+        padding: 3px 6px 3px 0;
+      }
+      td { padding: 2px 6px 2px 0; white-space: nowrap; }
+      tr:hover td { background: #16211505; }
+      .bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 5px; }
+      .bar > i { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
+      #log {
+        max-height: 260px;
+        overflow-y: auto;
+        font-size: 11px;
+        display: flex;
+        flex-direction: column-reverse;
+      }
+      #log div { padding: 1px 0; border-bottom: 1px solid #131a12; }
+      #log .t { color: #3f6b45; margin-right: 7px; }
+      #log .warn { color: var(--warn); }
+      #log .error { color: var(--bad); }
+      .wide { grid-column: 1 / -1; }
+      .empty { color: var(--dim); font-style: italic; padding: 6px 0; }
+      .hint {
+        background: #1a1508;
+        border: 1px solid #3d2f0c;
+        color: var(--warn);
+        padding: 9px 12px;
+        border-radius: 4px;
+        margin-bottom: 10px;
+      }
+      .hint code { background: #00000040; padding: 1px 5px; border-radius: 3px; color: #fde68a; }
+      .hidden { display: none; }
+    </style>
+  </head>
+  <body>
+    <h1><span class="dot" id="dot"></span> Bitburner Autopilot <span class="sub" id="uptime"></span></h1>
+
+    <div class="hint" id="hint">
+      Warte auf das Spiel. Im Spiel oeffnen: <code>Options</code> &rarr; <code>Remote API</code>,
+      Hostname <code>localhost</code>, Port <code>12525</code>, dann <code>Connect</code>.
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h2>Vermoegen</h2>
+        <div class="big" id="money">--</div>
+        <div class="sub" id="income">Einkommen: --</div>
+      </div>
+
+      <div class="card">
+        <h2>Faehigkeiten</h2>
+        <div id="skills"><div class="empty">noch keine Daten</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Netzwerk</h2>
+        <div id="network"><div class="empty">noch keine Daten</div></div>
+      </div>
+
+      <div class="card">
+        <h2>Autopilot</h2>
+        <div id="autopilot"><div class="empty">laeuft noch nicht</div></div>
+      </div>
+
+      <div class="card wide">
+        <h2>Ziele</h2>
+        <div id="targets"><div class="empty">noch keine Ziele gewaehlt</div></div>
+      </div>
+
+      <div class="card wide">
+        <h2>Verlauf</h2>
+        <div id="log"></div>
+      </div>
+    </div>
+
+    <script>
+      const $ = (id) => document.getElementById(id);
+
+      function money(n) {
+        if (n === undefined || n === null || Number.isNaN(n)) return "--";
+        const neg = n < 0;
+        n = Math.abs(n);
+        const units = ["", "k", "m", "b", "t", "q", "Q", "s", "S"];
+        let i = 0;
+        while (n >= 1000 && i < units.length - 1) { n /= 1000; i++; }
+        const s = n < 10 ? n.toFixed(3) : n < 100 ? n.toFixed(2) : n.toFixed(1);
+        return (neg ? "-$" : "$") + s + units[i];
+      }
+
+      function num(n, digits = 0) {
+        if (n === undefined || n === null || Number.isNaN(n)) return "--";
+        return n.toLocaleString("de-DE", { maximumFractionDigits: digits });
+      }
+
+      function secs(s) {
+        if (!s || s < 0) return "--";
+        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
+        if (h) return h + "h " + m + "m";
+        if (m) return m + "m " + Math.floor(s % 60) + "s";
+        return Math.floor(s) + "s";
+      }
+
+      function rows(pairs) {
+        if (!pairs.length) return '<div class="empty">noch keine Daten</div>';
+        return pairs
+          .map((p) => '<div class="kv"><span>' + p[0] + "</span><span>" + p[1] + "</span></div>")
+          .join("");
+      }
+
+      function render(s) {
+        $("dot").className = "dot" + (s.connected ? " on" : "");
+        $("hint").className = s.connected ? "hint hidden" : "hint";
+
+        if (s.connectedSince) {
+          const up = (Date.now() - new Date(s.connectedSince).getTime()) / 1000;
+          $("uptime").textContent = "verbunden seit " + secs(up);
+        } else {
+          $("uptime").textContent = "";
+        }
+
+        const t = s.telemetry;
+
+        // --- Vermoegen ---
+        if (t && t.player) {
+          $("money").textContent = money(t.player.money);
+          const inc = t.income ? t.income.scriptIncome : null;
+          $("income").textContent =
+            "Einkommen: " + (inc != null ? money(inc) + "/s" : "--") +
+            (t.income && t.income.scriptExpGain != null
+              ? "   ·   " + num(t.income.scriptExpGain, 1) + " exp/s"
+              : "");
+        }
+
+        // --- Faehigkeiten ---
+        if (t && t.player) {
+          const p = t.player;
+          $("skills").innerHTML = rows([
+            ["Hacking", num(p.hackLevel)],
+            ["Strength", num(p.str)],
+            ["Defense", num(p.def)],
+            ["Dexterity", num(p.dex)],
+            ["Agility", num(p.agi)],
+            ["Charisma", num(p.cha)],
+            ["Karma", num(p.karma, 1)],
+          ]);
+        }
+
+        // --- Netzwerk ---
+        const netRows = [
+          ["Server gesamt", num(s.serverCount)],
+          ["mit Root", num(s.rootedCount)],
+          ["gekauft", num(s.purchasedCount)],
+        ];
+        if (t && t.network) {
+          if (t.network.backdoored != null) netRows.push(["Backdoors", num(t.network.backdoored)]);
+        }
+        if (t && t.ram) {
+          netRows.push(["RAM belegt", num(t.ram.used, 1) + " / " + num(t.ram.max, 1) + " GB"]);
+        }
+        $("network").innerHTML =
+          rows(netRows) +
+          (t && t.ram && t.ram.max
+            ? '<div class="bar"><i style="width:' +
+              Math.min(100, (t.ram.used / t.ram.max) * 100).toFixed(1) +
+              '%"></i></div>'
+            : "");
+
+        // --- Autopilot ---
+        if (t) {
+          const ap = [];
+          if (t.phase) ap.push(["Phase", t.phase]);
+          if (t.action) ap.push(["Aktion", t.action]);
+          if (t.uptime != null) ap.push(["Laufzeit", secs(t.uptime)]);
+          if (t.cycle != null) ap.push(["Zyklus", num(t.cycle)]);
+          let html = rows(ap);
+          if (t.reason) html += '<div class="sub" style="margin-top:8px">' + t.reason + "</div>";
+          $("autopilot").innerHTML = html;
+        }
+
+        // --- Ziele ---
+        if (t && Array.isArray(t.targets) && t.targets.length) {
+          let h = "<table><tr><th>Server</th><th>Aktion</th><th>Threads</th><th>Geld</th><th>Sicherheit</th><th>Wert/s</th></tr>";
+          for (const x of t.targets) {
+            h +=
+              "<tr><td>" + x.host + "</td>" +
+              "<td>" + (x.action ?? "--") + "</td>" +
+              "<td>" + num(x.threads) + "</td>" +
+              "<td>" + money(x.money) + (x.moneyPct != null ? ' <span class="sub">' + (x.moneyPct * 100).toFixed(0) + "%</span>" : "") + "</td>" +
+              "<td>" + num(x.sec, 2) + (x.minSec != null ? ' <span class="sub">/ ' + num(x.minSec, 2) + "</span>" : "") + "</td>" +
+              "<td>" + (x.valuePerSec != null ? money(x.valuePerSec) + "/s" : "--") + "</td></tr>";
+          }
+          $("targets").innerHTML = h + "</table>";
+        }
+      }
+
+      function addLog(e) {
+        const d = document.createElement("div");
+        d.className = e.level;
+        d.innerHTML = '<span class="t">' + e.at.slice(11, 19) + "</span>" + e.message.replace(/</g, "&lt;");
+        $("log").prepend(d);
+        while ($("log").childElementCount > 200) $("log").lastElementChild.remove();
+      }
+
+      let last = null;
+      function connect() {
+        const es = new EventSource("/events");
+        es.onmessage = (ev) => {
+          const msg = JSON.parse(ev.data);
+          if (msg.type === "state") { last = msg.state; render(msg.state); }
+          else if (msg.type === "log") addLog(msg.entry);
+        };
+        es.onerror = () => {
+          $("dot").className = "dot";
+          es.close();
+          setTimeout(connect, 2000);
+        };
+      }
+      connect();
+      // Laufzeitanzeige weiterlaufen lassen, auch ohne neue Daten.
+      setInterval(() => { if (last) render(last); }, 1000);
+    </script>
+  </body>
+</html>

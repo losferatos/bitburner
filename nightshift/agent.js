@@ -362,15 +362,46 @@
       return h >= 22 || h < 4;
     },
 
+    /** Stehen wir wirklich auf der Augmentationsliste einer Faktion? Ohne diese
+     *  Probe zaehlt offeneAugs() auf jeder beliebigen Seite null - und der
+     *  Automat wuerde mit halbem Satz installieren. Jede Augmentation
+     *  verteuert die naechste um Faktor 1.9; ein Reset mit zwei statt fuenf
+     *  Stueck verschenkt genau den Grund, warum man ueberhaupt sammelt. */
+    aufAugSeite() {
+      if (!/Augmentations|Purchased Augmentations/.test(this.text())) return false;
+      return [...document.querySelectorAll("button")].some((b) => /^(Buy|Owned)$/.test((b.innerText || "").trim()));
+    },
+
     async pruefeAugs() {
       const rep = await this.repStand();
       if ((rep.CyberSec || 0) < this.REP_ZIEL) return;
+
       const gekauft = await this.augsKaufen("CyberSec");
+      if (!this.aufAugSeite()) {
+        this.note("Nach dem Kaufdurchgang nicht auf der Augmentationsliste - Install verschoben");
+        return;
+      }
       const offen = this.offeneAugs();
       if (gekauft) this.note("Kaufdurchgang: " + gekauft + " Stueck, noch offen: " + offen);
       if (offen !== 0) return;
+
       await this.neurofluxKaufen();
-      if (!this.installFenster()) { this.note("Alles gekauft - Install wartet auf das Zeitfenster ab 22 Uhr"); return; }
+
+      // Zweite Sicherung: die Warteschlange muss wirklich gefuellt sein.
+      this.key("a");
+      await schlaf(900);
+      const t = this.text();
+      const ab = t.indexOf("Purchased Augmentations");
+      const bis = t.indexOf("Installed Augmentations");
+      const teil = ab >= 0 ? t.slice(ab, bis > ab ? bis : ab + 1200) : "";
+      if (/No Augmentations have been purchased yet/.test(teil)) {
+        this.note("Warteschlange leer - kein Install");
+        return;
+      }
+      if (!this.installFenster()) {
+        this.note("Alles gekauft - Install wartet auf das Zeitfenster (22 bis 4 Uhr)");
+        return;
+      }
       await this.installieren();
     },
 

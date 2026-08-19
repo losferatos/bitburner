@@ -1,0 +1,83 @@
+/**
+ * Erfahrungsmuehle.
+ *
+ * Warum das noetig ist: Nach dem Reset ist alles Geld und jeder Server weg -
+ * was bleibt, sind die installierten Augmentations. Der Engpass davor ist
+ * also nicht Geld, sondern **Reputation**, und die Reputationsrate der
+ * Faktionsarbeit haengt fast linear am Hacking-Level. Ein hoeheres Level
+ * bringt uns schneller an die 12.500 Reputation und damit frueher in den
+ * naechsten Zyklus.
+ *
+ * Gleichzeitig lag der Speicher brach: 153 von 168 TB frei, weil bei
+ * Hacking ~270 schlicht nicht genug Server hackbar sind, um so viel
+ * Kapazitaet in Ertrag umzusetzen. Dieses Skript macht aus dem Ueberschuss
+ * Erfahrung.
+ *
+ * `weaken` ist dafuer das richtige Werkzeug: es gibt Erfahrung unabhaengig
+ * davon, ob es etwas bewirkt, es kann nichts kaputtmachen (Sicherheit sinkt
+ * nur) und es braucht kein vorbereitetes Ziel.
+ *
+ * Es nimmt bewusst nur die HAELFTE des freien Speichers. Der Autopilot soll
+ * weiterarbeiten koennen - sein Ertrag zahlt die NeuroFlux-Stufen, die kurz
+ * vor dem Reset gekauft werden.
+ *
+ * @param {NS} ns
+ */
+export async function main(ns) {
+  ns.disableLog("ALL");
+  ns.ui.setTailMinimized?.(true);
+
+  const WORKER = "worker/weaken.js";
+  const ANTEIL = 0.5; // so viel vom freien Speicher darf diese Muehle nehmen
+  const HOME_FREI = 2; // home gehoert dem Autopiloten
+
+  while (true) {
+    const netz = erfasse(ns);
+    const kosten = ns.getScriptRam(WORKER, "home");
+
+    // Ziel: der gerootete Rechner mit der hoechsten Grundschwierigkeit. Die
+    // Erfahrung je weaken haengt daran, nicht am Guthaben des Servers.
+    let ziel = null;
+    for (const host of netz) {
+      if (!ns.hasRootAccess(host)) continue;
+      if (ns.getServerRequiredHackingLevel(host) > ns.getHackingLevel()) continue;
+      const schwer = ns.getServerBaseSecurityLevel(host);
+      if (!ziel || schwer > ziel.schwer) ziel = { host, schwer };
+    }
+    if (!ziel) { await ns.sleep(10000); continue; }
+
+    let gestartet = 0;
+    for (const host of netz) {
+      if (!ns.hasRootAccess(host)) continue;
+      const max = ns.getServerMaxRam(host);
+      if (max <= 0) continue;
+      const belegt = ns.getServerUsedRam(host) + (host === "home" ? HOME_FREI : 0);
+      // Obergrenze auf die GESAMTGROESSE beziehen, nicht auf den freien Rest:
+      // sonst nimmt die Muehle bei jedem Durchgang die Haelfte des Restes und
+      // laeuft gegen volle Belegung - der Autopilot wuerde verhungern.
+      const budget = max * ANTEIL - belegt;
+      const threads = Math.floor(budget / kosten);
+      if (threads < 1) continue;
+      if (!ns.fileExists(WORKER, host)) ns.scp(WORKER, host, "home");
+      if (ns.exec(WORKER, host, threads, ziel.host, 0, "xp-" + Date.now())) gestartet += threads;
+    }
+
+    ns.print("Muehle: " + gestartet + " weaken-Faeden auf " + ziel.host
+      + " (Grundschwierigkeit " + ziel.schwer + ")");
+    await ns.sleep(15000);
+  }
+}
+
+/** Das ganze Netz per Breitensuche ab home. */
+function erfasse(ns) {
+  const gesehen = new Set(["home"]);
+  const schlange = ["home"];
+  while (schlange.length) {
+    for (const nachbar of ns.scan(schlange.shift())) {
+      if (gesehen.has(nachbar)) continue;
+      gesehen.add(nachbar);
+      schlange.push(nachbar);
+    }
+  }
+  return [...gesehen];
+}

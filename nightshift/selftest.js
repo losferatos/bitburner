@@ -159,10 +159,22 @@ await step("6. Waechter verweigert bei falschem Titel den Dienst", async () => {
 // ---------------------------------------------------------------------------
 
 const terminalOk = await step("7. Terminalbefehl `help` liefert Ausgabe zurueck", async () => {
-  const state = await tab.terminalState();
+  // Das Spiel steht nicht immer auf der Terminalseite — waehrend der
+  // Entwicklung bedient noch jemand anders dieselbe Oberflaeche. Deshalb kurz
+  // abwarten, statt sofort durchzufallen. Umgeschaltet wird NICHT: die Seite
+  // zu wechseln waere ein Eingriff, und der ist dem Selbsttest verboten.
+  let state = await tab.terminalState();
+  if (!state.present) {
+    console.log("       (Terminal gerade nicht offen — bis zu 30 s abwarten)");
+    const deadline = Date.now() + 30000;
+    while (!state.present && Date.now() < deadline) {
+      await new Promise((r) => setTimeout(r, 2000));
+      state = await tab.terminalState();
+    }
+  }
   if (!state.present) {
     throw new Error(
-      "Terminal ist nicht offen (das Spiel steht auf einer anderen Seite). " +
+      "Terminal ist auch nach 30 s nicht offen (das Spiel steht auf einer anderen Seite). " +
         "Der Selbsttest wechselt absichtlich nicht die Seite — bitte im Spiel auf Terminal stellen.",
     );
   }

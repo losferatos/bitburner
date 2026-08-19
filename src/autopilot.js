@@ -61,6 +61,11 @@ export async function main(ns) {
   // dem Nachbarrechner startet die neue Fassung. Das macht die Entwicklung
   // unabhaengig davon, ob eine Terminaleingabe im richtigen Fenster landet.
   const ownSource = ns.read("autopilot.js");
+  // Auch den Quelltext des Verwalters mitverfolgen. Er selbst kann eine neue
+  // Fassung nicht erkennen (ns.read liest vom Rechner, auf dem man laeuft, und
+  // er laeuft woanders) - der Autopilot dagegen sitzt auf home, wo die
+  // massgebliche Fassung liegt. Also uebernimmt er das Nachhalten.
+  let investSource = ns.read("invest.js");
 
   const startedAt = Date.now();
   const events = [];
@@ -153,15 +158,21 @@ export async function main(ns) {
     // ns.purchaseServer 2.25 GB kostet und home damit gesprengt waere.
     // Nach jedem killall ist er tot, also hier jede Runde nachsehen.
     const investRam = ns.getScriptRam("invest.js", "home");
+    const investNeu = ns.read("invest.js");
+    const investVeraltet = round === 1 || investNeu !== investSource;
+    if (investNeu !== investSource) {
+      note("Neue Fassung des Verwalters - wird ausgetauscht");
+      investSource = investNeu;
+    }
+
     let investLives = false;
     for (const s of workforce) {
       const laeuft = ns.ps(s.host).find((p) => p.filename === "invest.js");
       if (!laeuft) continue;
-      // Beim ersten Durchlauf abraeumen: Der Autopilot startet sich bei jeder
-      // neuen Fassung selbst neu, also ist jetzt auch der Verwalter veraltet.
-      // Er selbst kann das nicht merken - ns.read liest immer vom eigenen
-      // Rechner, und dort liegt seine alte Kopie.
-      if (round === 1) {
+      // Veralteten Verwalter abraeumen. Er selbst kann das nicht merken -
+      // ns.read liest immer vom eigenen Rechner, und dort liegt seine alte
+      // Kopie, die sich nie aendert.
+      if (investVeraltet) {
         ns.kill(laeuft.pid);
         // Den frei gewordenen Speicher sofort mitschreiben. Ohne das haelt der
         // Autopilot den Rechner weiter fuer belegt, findet nirgends Platz fuer
@@ -420,7 +431,13 @@ export async function main(ns) {
         ramFree: workforce.reduce((a, s) => a + s.ramFree, 0),
         ramTotal: workforce.reduce((a, s) => a + s.ram, 0),
       },
-      candidates: candidates.slice(0, 5),
+      // Die Anzeige zeigt dieselbe Reihenfolge, in der auch gearbeitet wird.
+      // Vorher stand hier eine Sortierung nach expectedYield - die faellt in
+      // der Fruehphase fuer fast jedes Ziel auf glatt 0, und weil Array.sort
+      // stabil ist, war die angezeigte Rangfolge dann schlicht die
+      // Scan-Reihenfolge. Wer danach beurteilt, was der Bot tut, wird
+      // systematisch in die Irre gefuehrt.
+      candidates: active.slice(0, 6),
       active,
       events,
     };
@@ -441,7 +458,13 @@ export async function main(ns) {
       // Ein einzelner Rechner, der sich unerwartet verhaelt, darf nicht den
       // ganzen Autopiloten toeten - sonst startet ihn der Verwalter alle fuenf
       // Sekunden neu, und aus einem Schluckauf wird eine Dauerschleife.
-      note("Fehler in Runde " + round + ": " + (err?.message ?? String(err)));
+      //
+      // ACHTUNG: Bitburner beendet Skripte, indem es intern ein ScriptDeath
+      // wirft - das ist KEIN Error. Wer es hier verschluckt, baut sich eine
+      // Schleife, die sich nicht mehr beenden laesst und beim naechsten
+      // Verschieben des sleep das ganze Spiel einfriert. Also durchlassen.
+      if (!(err instanceof Error)) throw err;
+      note("Fehler in Runde " + round + ": " + err.message);
     }
 
     await ns.sleep(1000);

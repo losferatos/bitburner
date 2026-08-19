@@ -40,6 +40,17 @@ export async function main(ns) {
   };
 
   while (true) {
+    // Sperrkasse: Was hier drinsteht, wird nicht angefasst. Der Verwalter
+    // wuerde sonst jeden Dollar sofort in Speicher umsetzen - und genau dann
+    // fehlt das Geld fuer die Dinge, die KEIN Skript kaufen kann: Portknacker
+    // im Darkweb, Augmentations, Reisen. Die Datei schreibt die Bruecke von
+    // aussen, damit sich das strategische Sparziel jederzeit aendern laesst.
+    let reserve = 0;
+    if (ns.fileExists("data/reserve.txt", "home")) {
+      const roh = Number(ns.read("data/reserve.txt"));
+      if (Number.isFinite(roh) && roh > 0) reserve = roh;
+    }
+
     // Wachdienst: Der Autopilot beendet sich selbst, sobald eine neue Fassung
     // seines Quelltexts eintrifft. Ihn wieder hochzufahren ist Aufgabe dieses
     // Prozesses - er laeuft auf einem fremden Rechner und ist davon nicht
@@ -49,7 +60,7 @@ export async function main(ns) {
       if (ns.exec("autopilot.js", "home")) merken("Autopilot neu gestartet");
     }
 
-    const money = ns.getServerMoneyAvailable("home");
+    const money = Math.max(0, ns.getServerMoneyAvailable("home") - reserve);
     const owned = ns.cloud.getServerNames();
     const limit = ns.cloud.getServerLimit();
     const maxRam = ns.cloud.getRamLimit();
@@ -81,7 +92,7 @@ export async function main(ns) {
       }
     }
 
-    hacknet(ns, merken);
+    hacknet(ns, merken, reserve);
 
     await ns.sleep(5000);
   }
@@ -103,10 +114,10 @@ export async function main(ns) {
  * @param {NS} ns
  * @param {(text: string) => void} merken
  */
-function hacknet(ns, merken) {
+function hacknet(ns, merken, reserve = 0) {
   const AMORTISATION_MAX = 3600; // Sekunden
   const PUFFER = 4; // Hacknet ist Beiwerk, es darf den Serverkauf nicht stoeren
-  const money = ns.getServerMoneyAvailable("home");
+  const money = Math.max(0, ns.getServerMoneyAvailable("home") - reserve);
   const anzahl = ns.hacknet.numNodes();
 
   // Neuer Node? Nur wenn er sich schnell genug rechnet.

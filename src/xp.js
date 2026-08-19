@@ -28,21 +28,29 @@ export async function main(ns) {
   ns.ui.setTailMinimized?.(true);
 
   const WORKER = "worker/weaken.js";
-  const ANTEIL = 0.5; // so viel vom freien Speicher darf diese Muehle nehmen
+  const ANTEIL = 0.7; // Anteil der Gesamtgroesse je Rechner fuer die Muehle
   const HOME_FREI = 2; // home gehoert dem Autopiloten
 
   while (true) {
     const netz = erfasse(ns);
     const kosten = ns.getScriptRam(WORKER, "home");
 
-    // Ziel: der gerootete Rechner mit der hoechsten Grundschwierigkeit. Die
-    // Erfahrung je weaken haengt daran, nicht am Guthaben des Servers.
+    // Ziel ist NICHT der schwerste Rechner - das war ein teurer Denkfehler.
+    // Die Erfahrung je Aufruf ist `3 + Grundschwierigkeit * 0.3`
+    // (Hacking.ts:30-38), zwischen leichtestem und schwerstem Server also
+    // hoechstens Faktor zehn. Die DAUER dagegen waechst mit
+    // `benoetigtes Level * Schwierigkeit` - beim schwersten Rechner um das
+    // Zehntausendfache. Entscheidend ist der Quotient: Erfahrung je Sekunde.
     let ziel = null;
     for (const host of netz) {
       if (!ns.hasRootAccess(host)) continue;
       if (ns.getServerRequiredHackingLevel(host) > ns.getHackingLevel()) continue;
       const schwer = ns.getServerBaseSecurityLevel(host);
-      if (!ziel || schwer > ziel.schwer) ziel = { host, schwer };
+      if (!schwer) continue;
+      const dauer = ns.getWeakenTime(host);
+      if (!dauer || !Number.isFinite(dauer)) continue;
+      const wert = (3 + schwer * 0.3) / (dauer / 1000);
+      if (!ziel || wert > ziel.wert) ziel = { host, schwer, dauer, wert };
     }
     if (!ziel) { await ns.sleep(10000); continue; }
 
@@ -63,7 +71,8 @@ export async function main(ns) {
     }
 
     ns.print("Muehle: " + gestartet + " weaken-Faeden auf " + ziel.host
-      + " (Grundschwierigkeit " + ziel.schwer + ")");
+      + " (" + (ziel.wert).toFixed(2) + " Erfahrung je Sekunde und Faden, "
+      + Math.round(ziel.dauer / 1000) + "s Laufzeit)");
     await ns.sleep(15000);
   }
 }

@@ -19,11 +19,6 @@ import * as calc from "lib/calc";
 export async function main(ns) {
   ns.disableLog("ALL");
 
-  // Bitburner laesst das Fenster eines beendeten Skripts stehen. Nach ein
-  // paar Neustarts liegt der Bildschirm voller Leichen, also erst aufraeumen:
-  // alles unterhalb der eigenen Prozessnummer kann nur ein Vorgaenger sein.
-  for (let pid = 1; pid < ns.pid; pid++) ns.ui.closeTail(pid);
-
   ns.ui.openTail();
   ns.ui.setTailTitle?.("Autopilot");
   ns.ui.resizeTail(760, 520);
@@ -33,8 +28,10 @@ export async function main(ns) {
   ns.ui.setTailMinimized?.(true);
 
   const WORKERS = ["worker/hack.js", "worker/grow.js", "worker/weaken.js"];
-  // Auf home muss Platz fuer den Autopiloten selbst bleiben.
-  const HOME_RESERVE = 7;
+  // Kleiner Puffer auf home. Bewusst klein: Der Autopilot selbst steckt
+  // bereits in getServerUsedRam - wer hier nochmal seine vollen 7 GB abzieht,
+  // rechnet ihn doppelt und verschenkt den halben Heimrechner.
+  const HOME_RESERVE = 2;
   // Bis zu dieser Sicherheitsstufe ueber dem Minimum gilt ein Ziel als bereit.
   const SEC_TOLERANCE = 3;
   // Ab diesem Anteil des Maximalgeldes lohnt das Ernten.
@@ -48,11 +45,15 @@ export async function main(ns) {
   // Ertrag je Thread sorgt dafuer, dass die vorderen zuerst satt werden und
   // die hinteren nur bekommen, was uebrig bleibt.
   const PREP_TARGETS = 4;
-  // Anteil des Guthabens, den eine Erntewelle abschoepfen soll. Niedrig, weil
-  // grow multiplikativ skaliert: je naeher am Leerraeumen, desto teurer wird
-  // das Nachziehen. Ein halb geleerter Server ist RAM-effizienter als ein
-  // ausgeraeumter.
-  const HACK_FRACTION = 0.5;
+  // Anteil des Guthabens, den eine Erntewelle abschoepfen soll.
+  //
+  // Der Wert ist der wichtigste Hebel im ganzen Bot, und er gehoert niedrig:
+  // hack() nimmt linear weg, grow() muss multiplikativ zurueckholen. Wer 50 %
+  // abschoepft, braucht ln(2)/k Grow-Threads; wer 10 % nimmt, nur ln(1/0.9)/k
+  // - also rund ein Sechstel bei einem Fuenftel Ertrag. Kleine Happen sind
+  // damit deutlich speicherguenstiger, und der Server bleibt nahe am Maximum,
+  // wo jeder einzelne Hack-Thread am meisten bringt.
+  const HACK_FRACTION = 0.1;
 
   // Eigener Quelltext beim Start. Aendert er sich, ist eine neue Fassung
   // eingetroffen - dann beendet sich dieser Prozess, und der Verwalter auf
@@ -78,6 +79,7 @@ export async function main(ns) {
 
   while (true) {
     round++;
+    try {
 
     const player = playerFacts(ns);
     const hosts = scanAll(ns);
@@ -124,9 +126,17 @@ export async function main(ns) {
     }
 
     // --- 3. Arbeiter ausliefern -------------------------------------------
+    // Die Arbeiter werden bei JEDEM Start neu ausgeliefert, nicht nur wenn sie
+    // fehlen. Sonst erreicht geaenderter Arbeitercode die Flotte nie - die
+    // alte Fassung ist ja "vorhanden". Eine Fassung auf einem fremden Rechner
+    // laesst sich nicht pruefen (ns.read kennt keinen Host-Parameter), also
+    // wird stumpf ueberschrieben. Da der Autopilot sich bei jeder Aenderung
+    // seines Quelltexts selbst neu startet, sitzt danach ueberall der aktuelle
+    // Stand. In den Folgerunden nur noch neu hinzugekommene Rechner bedienen.
     const workforce = servers.filter((s) => s.root && s.ram > 0);
     for (const s of workforce) {
-      if (s.host !== "home" && !ns.fileExists("worker/weaken.js", s.host)) {
+      if (s.host === "home") continue;
+      if (round === 1 || !ns.fileExists("worker/weaken.js", s.host)) {
         ns.scp(WORKERS, s.host, "home");
       }
     }
@@ -144,10 +154,18 @@ export async function main(ns) {
     const investRam = ns.getScriptRam("invest.js", "home");
     let investLives = false;
     for (const s of workforce) {
-      if (ns.ps(s.host).some((p) => p.filename === "invest.js")) {
-        investLives = true;
-        break;
+      const laeuft = ns.ps(s.host).find((p) => p.filename === "invest.js");
+      if (!laeuft) continue;
+      // Beim ersten Durchlauf abraeumen: Der Autopilot startet sich bei jeder
+      // neuen Fassung selbst neu, also ist jetzt auch der Verwalter veraltet.
+      // Er selbst kann das nicht merken - ns.read liest immer vom eigenen
+      // Rechner, und dort liegt seine alte Kopie.
+      if (round === 1) {
+        ns.kill(laeuft.pid);
+        continue;
       }
+      investLives = true;
+      break;
     }
     if (!investLives && investRam > 0) {
       let wirt = workforce
@@ -355,7 +373,11 @@ export async function main(ns) {
       target,
       player,
       earned,
-      income: ns.getTotalScriptIncome()[0],
+      // [0] misst nur LAUFENDE Skripte - unsere Ein-Weg-Arbeiter buchen ihr
+      // Geld aber in der letzten Millisekunde ihres Lebens und sind dann weg.
+      // Diese Anzeige stuende strukturell nahe null. [1] ist der Schnitt seit
+      // dem letzten Reset und damit das, was wir wirklich wissen wollen.
+      income: ns.getTotalScriptIncome()[1],
       exp: ns.getTotalScriptExpGain(),
       net: {
         total: servers.length,
@@ -379,6 +401,12 @@ export async function main(ns) {
       writeBrain(ns, { ...view, phase: "neustart", reason: "Neue Fassung wird uebernommen." });
       ns.ui.closeTail(ns.pid);
       ns.exit();
+    }
+    } catch (err) {
+      // Ein einzelner Rechner, der sich unerwartet verhaelt, darf nicht den
+      // ganzen Autopiloten toeten - sonst startet ihn der Verwalter alle fuenf
+      // Sekunden neu, und aus einem Schluckauf wird eine Dauerschleife.
+      note("Fehler in Runde " + round + ": " + (err?.message ?? String(err)));
     }
 
     await ns.sleep(1000);
@@ -528,15 +556,17 @@ function tryCrack(ns, host) {
       }
     }
   }
-  if (open >= ns.getServerNumPortsRequired(host) && ns.getServerRequiredHackingLevel(host) <= ns.getHackingLevel()) {
-    try {
-      ns.nuke(host);
-      return true;
-    } catch {
-      return false;
-    }
+  // Bewusst OHNE Pruefung des Hacking-Levels: ns.nuke verlangt nur NUKE.exe
+  // und genug offene Anschluesse (src/NetscriptFunctions.ts:531). Auch grow
+  // und weaken brauchen kein Level, nur Root. Das Level entscheidet allein
+  // darueber, ob man einen Rechner HACKEN kann - als Arbeitspferd taugt er
+  // vorher schon, und genau davon haben wir zu wenig.
+  if (open < ns.getServerNumPortsRequired(host)) return false;
+  try {
+    return ns.nuke(host) !== false;
+  } catch {
+    return false;
   }
-  return false;
 }
 
 /**

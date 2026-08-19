@@ -25,11 +25,12 @@ export async function main(ns) {
   const LOG = "data/invest.txt";
   const history = [];
 
-  // Eigener Quelltext beim Start - gleiche Regel wie beim Autopiloten:
-  // trifft eine neue Fassung ein, macht dieser Prozess Platz. Der Autopilot
-  // merkt in seiner naechsten Runde, dass der Verwalter fehlt, und startet
-  // die neue Fassung. Die beiden halten sich also gegenseitig am Leben.
-  const ownSource = ns.read("invest.js");
+  // Kein eigener Abgleich des Quelltexts: ns.read liest immer vom Rechner,
+  // auf dem das Skript laeuft - und dort liegt die alte Kopie, die sich nie
+  // aendert. Der Verwalter koennte eine neue Fassung also gar nicht erkennen.
+  // Stattdessen beendet ihn der Autopilot in seiner ersten Runde und liefert
+  // ihn frisch aus; der Autopilot wiederum startet sich bei jeder Aenderung
+  // seines eigenen Quelltexts selbst neu. Damit ist beides abgedeckt.
 
   const merken = (text) => {
     history.push({ at: Date.now(), text });
@@ -81,11 +82,6 @@ export async function main(ns) {
     }
 
     hacknet(ns, merken);
-
-    if (ns.read("invest.js") !== ownSource) {
-      merken("Neue Fassung des Verwalters eingetroffen - mache Platz");
-      ns.exit();
-    }
 
     await ns.sleep(5000);
   }

@@ -53,6 +53,18 @@ const secTolerance = (s) => Math.max(1, s.secMin * 0.1);
 export async function main(ns) {
   ns.disableLog("ALL");
 
+  // Doppelstartschutz. `run` am Terminal uebergibt preventDuplicates: false
+  // (Terminal/commands/runScript.ts:61), die Sperre in NetscriptWorker.ts
+  // greift dort also nie - jeder Wiederbelebungsversuch von aussen kann einen
+  // ZWEITEN Autopiloten anwerfen. Und zwei Autopiloten arbeiten aktiv
+  // gegeneinander: sie erschlagen sich gegenseitig die Helfer, leeren einander
+  // die Auftragsdatei und schreiben beide auf den Sperrkassen-Port. Wer
+  // spaeter kommt, geht wieder.
+  if (ns.ps("home").filter((p) => p.filename === ns.getScriptName()).length > 1) {
+    ns.tprint("Autopilot laeuft bereits - dieser Start beendet sich.");
+    return;
+  }
+
   ns.ui.openTail();
   ns.ui.setTailTitle?.("Autopilot");
   ns.ui.resizeTail(760, 560);
@@ -99,6 +111,29 @@ export async function main(ns) {
   // bei fast gleichem Preis je Faden), 15 % Reserve sind also reichlich.
   const GROW_ORDER_SHARE = 0.85;
 
+  // Anteil des Netzes, der fuer die Faktionsreputation geteilt wird. Der
+  // Share-Bonus waechst mit ln(Faeden), also kauft man mit dem EINSTIEG fast
+  // alles und mit dem Rest fast nichts: 12 % bringen x1.46, 40 % x1.50,
+  // 100 % x1.54.
+  //
+  // Trotzdem 40 % und nicht 12 %, weil die Wirtschaft den Speicher gar nicht
+  // braucht: am 20.08. lagen 57 TB von 2952 TB in Benutzung, also 2 %. Der
+  // Engpass sind die ZIELE, nicht der Speicher. Was hier geteilt wird, fehlt
+  // nirgends - und 60 % Rest sind immer noch das Dreissigfache dessen, was
+  // die Stapel derzeit anfassen.
+  // 0,4 war der Wert aus der Zeit, als das Netz 8 PB gross war und niemand
+  // wusste, wie viel die Wirtschaft wirklich braucht. Gemessen am 20.08.:
+  // 61.409 Arbeiterfaeden belegen 107 TB von 18.418 TB - die Wirtschaft nutzt
+  // 0,6 % des Netzes, weil sie durch die Zahl der lohnenden Ziele begrenzt ist
+  // und nicht durch Speicher. Bei 0,4 lagen dauerhaft 10,8 PB brach, fuer die
+  // der Verwalter Milliarden bezahlt hatte.
+  //
+  // 0,75 laesst der Wirtschaft immer noch das 42-fache ihres heutigen Bedarfs.
+  // Hoeher zu gehen lohnt nicht: der Bonus ist logarithmisch, zwischen 0,75
+  // und 0,85 liegen 0,3 Prozentpunkte Reputation - der Sicherheitsabstand ist
+  // mehr wert.
+  const SHARE_ANTEIL = 0.75;
+
   // Preise der Darkweb-Programme (src/DarkWeb/DarkWebItems.ts). Kein Skript
   // kann sie kaufen - das erledigt der Nachtdienst am Terminal, aber nur wenn
   // das Geld dasteht. Der Autopilot haelt den Preis des naechsten fehlenden
@@ -112,6 +147,13 @@ export async function main(ns) {
     ["relaySMTP.exe", 5e6],
     ["HTTPWorm.exe", 30e6],
     ["SQLInject.exe", 250e6],
+    // Formulas.exe ist kein Portknacker, gehoert aber in dieselbe Liste: es
+    // wird ueber denselben Laden gekauft, und dieselbe Rueckhalte-Logik soll
+    // dafuer sparen. Es oeffnet ns.formulas und damit exakte Rechnungen statt
+    // Faustformeln (siehe darkweb.js). Ganz am Ende, weil die Schleife oben
+    // beim ersten fehlenden Posten stehenbleibt - vorne wuerde es nach einem
+    // Reset die 500.000 fuer BruteSSH blockieren, bis 5 Mrd zusammen sind.
+    ["Formulas.exe", 5e9],
   ];
   // Unterhalb dieses Guthabens wird eine gesetzte Sperrkasse ignoriert.
   //
@@ -267,6 +309,13 @@ export async function main(ns) {
   // Damit der Hinweis auf eine ignorierte Sperrkasse nicht jede Sekunde im
   // Verlauf steht.
   let reserveNoted = 0;
+  // Runde des letzten darkweb.js-Auftrags, damit ein gescheiterter Versuch
+  // sich nicht im Sekundentakt wiederholt.
+  let letzterDarkwebVersuch = -99;
+  // Dasselbe fuer die Faktions-Backdoors.
+  let letzterBackdoorVersuch = -99;
+  let letzterContractLauf = -99;
+  let letzterArbeitsLauf = -99;
   // Gleitender Schnitt ueber den erwarteten Geldwert der zuletzt eingeplanten
   // Stapel. Im eingeschwungenen Zustand ist die Einplanungsrate gleich der
   // Landerate, also ist das die erwartete Einnahme je Sekunde. Der Vergleich
@@ -295,6 +344,22 @@ export async function main(ns) {
   while (true) {
     round++;
     try {
+
+    // Herzschlag in den Seitenkontext. Kostet den Aufschlag von 25 GB auf den
+    // Bezeichner `document` (Netscript/RamCostGenerator.ts:12) - bei einem
+    // home mit Zehntausenden Gigabyte ist das nichts, und es kauft die einzige
+    // Auskunft, die von aussen sonst niemand bekommt.
+    //
+    // Der Anlass ist der 20.08.: Der Autopilot stand mit einem ReferenceError
+    // in einer verschluckten Ausnahme, der PROZESS lief weiter, und der
+    // Wiederanlauf-Waechter sah `ps` nach, fand ihn und meldete "alles in
+    // Ordnung". Ein lebender Prozess ohne Fortschritt ist aber genau der
+    // Zustand, der in der Nacht zuvor fuenf Stunden gekostet hat. Wer nur
+    // fragt, OB etwas laeuft, verpasst ihn zwangslaeufig - es muss jemand
+    // fragen, ob es auch etwas TUT.
+    try {
+      document.defaultView.__autopilotPuls = { at: Date.now(), round };
+    } catch (e) { /* ohne Seitenkontext laeuft der Rest trotzdem */ }
 
     const player = playerFacts(ns);
     const hosts = scanAll(ns);
@@ -340,16 +405,136 @@ export async function main(ns) {
       reserveNoted = 2;
     }
 
-    // Rueckhalt fuer das naechste fehlende Darkweb-Programm. Der Nachtdienst
-    // kauft es am Terminal, sobald das Anderthalbfache des Preises dasteht -
-    // also muss das Geld auch dastehen duerfen. Zurueckgehalten wird erst,
-    // wenn die Schwelle in Reichweite ist: sonst blockiert SQLInject mit
-    // seinen 375 Millionen schon in der ersten Stunde jeden Serverkauf.
+    // EIN Auftragsplatz, EIN Auftrag je Runde.
+    //
+    // data/task.txt ist ein einzelner Platz, kein Stapel. Am 20.08. haben in
+    // derselben Runde die Faktionsarbeit und der Contract-Suchlauf
+    // hineingeschrieben - beide meldeten Vollzug, gelaufen ist nur der
+    // zweite. Der erste verschwand spurlos, samt seiner Notiz im Protokoll,
+    // die weiter behauptete, er sei angesetzt worden.
+    //
+    // Deshalb vergibt jede Runde hoechstens einen Auftrag. Die Automatiken
+    // stehen in der Reihenfolge ihrer Dringlichkeit: ohne Portknacker kein
+    // Netz, ohne Faktionsarbeit keine Reputation, Vertraege und Backdoors
+    // koennen eine Runde warten. Wer zu kurz kommt, bekommt in der naechsten
+    // Runde den Platz - sie dauert eine Minute.
+    let auftragVergeben = ns.fileExists("data/task.txt", "home")
+      && ns.read("data/task.txt").trim() !== "";
+    const auftrag = (teile, meldung) => {
+      if (auftragVergeben) return false;
+      auftragVergeben = true;
+      ns.write("data/task.txt", JSON.stringify(teile), "w");
+      note(meldung);
+      return true;
+    };
+
+    // Rueckhalt fuer das naechste fehlende Darkweb-Programm. Zurueckgehalten
+    // wird erst, wenn die Schwelle in Reichweite ist: sonst blockiert
+    // SQLInject mit seinen 375 Millionen schon in der ersten Stunde jeden
+    // Serverkauf.
     let goalHold = 0;
+    let fehlendesProgramm = null;
     for (const [datei, preis] of DARKWEB) {
       if (homeFiles.has(datei)) continue;
+      fehlendesProgramm = [datei, preis];
       if (cash >= preis * 0.4) goalHold = preis * 1.5;
       break;
+    }
+
+    // ...und der Kauf selbst. Frueher stand hier "der Nachtdienst kauft es am
+    // Terminal" - der ist seit dem 20.08. stillgelegt, weil er nebenher
+    // Milliarden in NeuroFlux verbrannte. Seither hat NIEMAND mehr Programme
+    // gekauft, und das faellt erst nach einem Reset auf: ohne Portknacker sind
+    // von 96 Rechnern acht erreichbar, und daran haengt der ganze
+    // Wiederaufbau. Geld zurueckzuhalten, ohne es je auszugeben, ist die
+    // schlechteste aller Moeglichkeiten.
+    //
+    // darkweb.js besorgt TOR und alle bezahlbaren Programme in einem Lauf.
+    // Der Abstand von 20 Runden verhindert, dass ein gescheiterter Versuch
+    // sich im Sekundentakt wiederholt - der Kauf ist nicht dringend genug,
+    // um dafuer die Oberflaeche zu blockieren.
+    if (fehlendesProgramm && cash >= fehlendesProgramm[1] * 1.2
+        && ns.fileExists("darkweb.js", "home")
+        && round - letzterDarkwebVersuch > 20) {
+      // KEIN Blick in `workforce` an dieser Stelle: die Liste entsteht erst
+      // rund vierzig Zeilen weiter unten. Ein `const` vor seiner Definition zu
+      // lesen wirft einen ReferenceError - und der hat den Autopiloten am
+      // 20.08. prompt zum Stehen gebracht, bei lebendigem Prozess und ohne
+      // eine Zeile Fehlermeldung nach aussen. Ob darkweb.js schon laeuft,
+      // entscheidet ohnehin der Auftragslaeufer weiter unten; hier genuegt
+      // der Rundenabstand.
+      // Zaehler NUR bei erfolgreicher Vergabe stellen. Sonst wartet eine
+      // abgewiesene Automatik erneut 30 Runden auf einen Platz, den sie in
+      // der naechsten Runde bekommen haette.
+      if (auftrag(["darkweb.js"], "Darkweb-Programm fehlt (" + fehlendesProgramm[0] + ") und Geld ist da - darkweb.js beauftragt")) letzterDarkwebVersuch = round;
+    }
+
+    // --- Faktionsarbeit am Laufen halten -------------------------------------
+    // Der Autopilot hat work.js bis zum 20.08. NIRGENDS aufgerufen. Abschnitt 4
+    // weiter unten heisst zwar "Laufende Arbeit aufnehmen", meint damit aber
+    // die HWGW-Arbeiter. Faktionsarbeit wurde ausschliesslich von Hand
+    // gestartet - und nach einem Reset ist sie weg, weil die Mitgliedschaften
+    // weg sind. Ein Nachtlauf haette danach Geld verdient und keine einzige
+    // Reputation gesammelt.
+    //
+    // Welche Faktion, steht in data/workfaction.txt. Der Autopilot kann das
+    // nicht selbst entscheiden: Reputation und Favor der Faktionen sind ohne
+    // Singularity aus einem Skript nicht lesbar, und die Wahl haengt genau
+    // daran (hoechster Favor gewinnt, aber nur wenn es dort noch etwas zu
+    // kaufen gibt).
+    //
+    // Alle 30 Runden neu beauftragen, auch wenn schon gearbeitet wird. Das ist
+    // Absicht: work.js setzt dabei den Fokus neu, und der geht im laufenden
+    // Betrieb staendig verloren - jede Navigation ruft stopFocusing()
+    // (GameRoot.tsx:271-272). Faktionsreputation wird laufend gutgeschrieben
+    // (Work/FactionWork.tsx), ein Neuansetzen kostet also nichts.
+    if (round - letzterArbeitsLauf > 30 && ns.fileExists("work.js", "home")
+        && ns.fileExists("data/workfaction.txt", "home")) {
+      const wunsch = ns.read("data/workfaction.txt").trim();
+      if (wunsch) {
+        if (auftrag(["work.js", wunsch], "Faktionsarbeit fuer " + wunsch + " wird neu angesetzt")) letzterArbeitsLauf = round;
+      }
+    }
+
+    // --- Coding Contracts ---------------------------------------------------
+    // Vertraege erscheinen im ganzen Netz laufend neu - gemessen am 20.08.
+    // rund zwei je Stunde - und zahlen je 55 bis 833 Reputation, oft an ALLE
+    // Faktionen gleichzeitig, dazu 25 Mio $. contracts.js loest sie seit Tagen
+    // fehlerfrei (53 von 53, keine Ablehnung), wurde aber nur von Hand
+    // gestartet und lag deshalb meistens still.
+    //
+    // Fuer Tian Di Hui, wo wir arbeiten, faellt das kaum ins Gewicht. Fuer
+    // NiteSec und The Black Hand ist es der einzige nennenswerte Zufluss: dort
+    // stehen 0,1 Rep/s gegen 5,96 Rep/s bei der Faktion, fuer die gerade
+    // gearbeitet wird. Genau bei diesen beiden liegen die staerksten
+    // Hacking-Augmentations, die wir erreichen koennen.
+    //
+    // Alle 30 Runden - bei einer Minute je Runde also halbstuendlich. Oefter
+    // lohnt nicht, seltener laesst Vertraege liegen.
+    if (round - letzterContractLauf > 30 && ns.fileExists("contracts.js", "home")) {
+      if (auftrag(["contracts.js"], "Coding Contracts: Suchlauf beauftragt")) letzterContractLauf = round;
+    }
+
+    // --- Backdoors auf den Faktionsservern --------------------------------
+    // Jeder dieser vier Rechner schaltet eine Faktion frei, und jede Faktion
+    // bringt eigene Augmentations - fuer Daedalus brauchen wir 30
+    // verschiedene. Der Backdoor selbst dauert Sekunden; das Einzige, was ihn
+    // aufhaelt, ist das Hackniveau.
+    //
+    // Automatisch, weil es sonst niemand tut: Nach jedem Reset sind alle vier
+    // wieder offen, und wer darauf wartet, dass ein Mensch das Hackniveau im
+    // Auge behaelt, laesst Faktionen stundenlang liegen. Genau das ist am
+    // 20.08. passiert - avmnite-02h war seit Stunden erreichbar, ohne dass es
+    // jemand gemerkt hat.
+    if (round - letzterBackdoorVersuch > 30 && ns.fileExists("backdoor.js", "home")) {
+      for (const host of ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z"]) {
+        let s;
+        try { s = ns.getServer(host); } catch (e) { continue; }
+        if (!s || s.backdoorInstalled || !s.hasAdminRights) continue;
+        if (player.skill < s.requiredHackingSkill) continue;
+        if (auftrag(["backdoor.js", host], "Backdoor auf " + host + " ist faellig (Skill " + s.requiredHackingSkill + ") - beauftragt")) letzterBackdoorVersuch = round;
+        break;
+      }
     }
 
     ns.clearPort(RESERVE_PORT);
@@ -407,7 +592,8 @@ export async function main(ns) {
     // andere abhaengt. Er lebt auf einem fremden Rechner, weil allein
     // ns.cloud.purchaseServer 2.25 GB kostet und home damit gesprengt waere.
     // Nach jedem killall ist er tot, also hier jede Runde nachsehen.
-    const investRam = ns.getScriptRam("invest.js", "home");
+    const shareRam = ns.getScriptRam("share.js", "home") || 4;
+  const investRam = ns.getScriptRam("invest.js", "home");
     const investNeu = ns.read("invest.js");
     const investVeraltet = round === 1 || investNeu !== investSource;
     if (investNeu !== investSource) {
@@ -465,12 +651,28 @@ export async function main(ns) {
     }
 
     // --- 3b. Die Hand ------------------------------------------------------
-    // hand.js bedient das Terminal ueber das DOM. Das kostet pauschal 25 GB
-    // Aufschlag, ist aber der einzige Weg, Terminalbefehle abzusetzen, ohne
-    // von aussen auf den Browser zuzugreifen - und jeder solche Zugriff loest
-    // in Opera eine Freigabeabfrage aus, die den Nutzer bei der Arbeit
-    // lahmlegt. Ueber die Hand laufen Backdoors und Programmkaeufe.
-    if (ns.fileExists("hand.js", "home")) {
+    // hand.js ist ABGESCHALTET (20.08.). Sie bediente das Terminal ueber das
+    // DOM und war lange der einzige Weg, Befehle abzusetzen, ohne von aussen
+    // auf den Browser zuzugreifen. Der Auftragslaeufer weiter oben kann
+    // dasselbe besser: er startet Skripte direkt per ns.exec, ohne Terminal,
+    // ohne `connect`, ohne Befehlsdatei, die per scp herumgereicht wird.
+    //
+    // Abgeschaltet wurde sie aber aus einem anderen Grund: Sie navigiert zum
+    // Terminal, und JEDE Navigation weg von der Arbeitsseite ruft
+    // stopFocusing() (ui/GameRoot.tsx:271-272). Solange sie laeuft, faellt der
+    // Fokus im Minutentakt wieder aus - und mit ihm ein Fuenftel der
+    // Reputation. Das Skript meldete "laeuft FOKUSSIERT", der Spielstand sagte
+    // Sekunden spaeter `focus: false`, und beide hatten recht.
+    //
+    // Zum Wiederbeleben: HAND_AKTIV auf true setzen. Was sie kann und der
+    // Auftragslaeufer nicht, ist ein Terminalbefehl mit Laufzeit (`backdoor`) -
+    // dafuer gibt es aber inzwischen src/backdoor.js als eigenen Auftrag.
+    const HAND_AKTIV = false;
+    for (const s of workforce) {
+      if (HAND_AKTIV) break;
+      for (const pr of ns.ps(s.host)) if (pr.filename === "hand.js") ns.kill(pr.pid);
+    }
+    if (HAND_AKTIV && ns.fileExists("hand.js", "home")) {
       const handRam = ns.getScriptRam("hand.js", "home");
       // In der ERSTEN Runde die alte Fassung ueberall beenden. Anders als beim
       // Autopiloten selbst gibt es fuer die Hand keinen Weg, sich zu erneuern:
@@ -483,11 +685,18 @@ export async function main(ns) {
       }
       // Haengende Hand erschlagen. Ein toter Prozess wird unten ohnehin neu
       // gestartet, ein haengender bliebe fuer immer stehen - und mit ihm der
-      // einzige Steuerkanal, der ohne Browserzugriff funktioniert. Der Puls
-      // kommt aus hand.js selbst und wird alle drei Sekunden erneuert.
+      // einzige Steuerkanal, der ohne Browserzugriff funktioniert.
+      //
+      // Fuenf Minuten und nicht anderthalb: hand.js pulst zwar rechnerisch
+      // alle drei Sekunden, gemessen wurden am 20.08. aber 37 s Abstand. Bei
+      // 90 s Schwelle traf die Wache damit regelmaessig eine ARBEITENDE Hand,
+      // die gerade Befehle abarbeitete - die gingen dabei verloren, die Hand
+      // startete neu, und der naechste Befehl lief ins Leere. Eine Wache, die
+      // Gesunde erschlaegt, richtet mehr Schaden an als der Stillstand, den
+      // sie verhindern soll. Die eigentliche Ursache der 37 s ist noch offen.
       if (ns.fileExists("data/hand-puls.txt", "home")) {
         const puls = Number(ns.read("data/hand-puls.txt"));
-        if (Number.isFinite(puls) && Date.now() - puls > 90000) {
+        if (Number.isFinite(puls) && Date.now() - puls > 300000) {
           for (const s of workforce) {
             for (const pr of ns.ps(s.host)) if (pr.filename === "hand.js") ns.kill(pr.pid);
           }
@@ -515,6 +724,172 @@ export async function main(ns) {
             note("Start der Hand auf " + platz.host + " abgelehnt (" + handRam.toFixed(2)
               + " GB noetig, " + platz.ramFree.toFixed(2) + " GB frei)");
           }
+        }
+      }
+    }
+
+    // --- 3b. Auftragslaeufer ----------------------------------------------
+    // Steht in data/task.txt eine Zeile, wird das genannte Skript auf einem
+    // Rechner mit genug Platz gestartet und die Datei geleert.
+    //
+    // Der Grund ist ein Engpass, der den ganzen 20.08. gekostet hat: JEDES
+    // Werkzeug, das ins Spielfenster greift, kostet allein fuer den
+    // Bezeichner `document` 25 GB (RamCostGenerator.ts:12). home hat 16 GB.
+    // Also lassen sich diese Werkzeuge dort nicht starten, und der einzige
+    // Weg fuehrte ueber die Hand am Terminal - die dafuer erst `connect`
+    // schicken muss, deren Befehlsdatei nicht zuverlaessig bei ihr ankommt
+    // und die selbst staendig umzieht. Drei Fehlerquellen fuer ein `exec`.
+    //
+    // Der Autopilot kann dasselbe direkt. Er sieht die Rechner, kennt den
+    // freien Speicher und braucht kein Terminal. Damit haengt kein einziger
+    // Hebel mehr an der Hand.
+    if (ns.fileExists("data/task.txt", "home")) {
+      const zeile = ns.read("data/task.txt").trim();
+      if (zeile) {
+        // JSON-Liste, kein Trennen an Leerzeichen. Faktionsnamen wie
+        // "Tian Di Hui" oder "New Tokyo" waeren sonst in Stuecke zerfallen,
+        // und ein leeres Argument haette sich ganz aufgeloest - der Empfaenger
+        // haette den naechsten Schalter als Wert des vorigen gelesen. Die alte
+        // Fassung mit split(/\s+/) bleibt als Rueckfall, damit ein von Hand
+        // geschriebener Auftrag weiter funktioniert.
+        let teile;
+        try {
+          const geparst = JSON.parse(zeile);
+          teile = Array.isArray(geparst) ? geparst.map(String) : null;
+        } catch (e) {
+          teile = null;
+        }
+        if (!teile || !teile.length) teile = zeile.split(/\s+/);
+        const datei = teile[0];
+        const argumente = teile.slice(1);
+        ns.write("data/task.txt", "", "w");
+        if (!ns.fileExists(datei, "home")) {
+          note("Auftrag " + datei + " nicht auf home gefunden");
+        } else {
+          const braucht = ns.getScriptRam(datei, "home");
+          // home NICHT grundsaetzlich ausschliessen, sondern nur nachrangig
+          // behandeln.
+          //
+          // Der Ausschluss stand hier, damit die Auftraege dem Verwalter nicht
+          // den Platz auf seinem eigenen Rechner wegnehmen. Nach dem Reset am
+          // 20.08. war er der Grund, warum der Wiederaufbau STAND: Es gibt in
+          // diesem Moment nur ein paar Fremdserver mit 4 bis 32 GB - und home
+          // mit 131.072 GB. Jeder Auftrag meldete "nirgends Platz", und damit
+          // lief weder der Portknacker-Kauf noch die Faktionsarbeit noch ein
+          // Vertrag. Genau die drei Automatiken, die den Wiederaufbau tragen.
+          //
+          // Fremde Rechner zuerst, home nur wenn dort sonst nichts passt - und
+          // auch dann bleibt HOME_RESERVE unangetastet, weil ramFree das
+          // bereits abzieht (Zeile 559).
+          const platz = workforce
+            .filter((s) => s.ramFree >= braucht)
+            .sort((a, b) => (a.host === "home" ? 1 : 0) - (b.host === "home" ? 1 : 0)
+              || b.ramFree - a.ramFree)[0];
+          if (!platz) {
+            note("Fuer " + datei + " ist nirgends Platz (" + braucht.toFixed(2) + " GB)");
+          } else {
+            // Abhaengigkeiten mitnehmen. Netscript loest `import` beim
+            // Uebersetzen auf, und zwar gegen die Dateien auf DEM RECHNER, auf
+            // dem das Skript startet. Wer nur die Hauptdatei kopiert, bekommt
+            // ein Skript, das gar nicht erst uebersetzt - ohne Fehlermeldung,
+            // ohne Ausgabedatei, ohne Prozess. Genau so ist joinfac.js
+            // spurlos verschwunden.
+            const mit = new Set([datei]);
+            const quelle = ns.read(datei);
+            for (const m of quelle.matchAll(/(?:from|import)\s+["']([^"']+)["']/g)) {
+              const pfad = m[1].replace(/^\.\//, "");
+              if (ns.fileExists(pfad, "home")) mit.add(pfad);
+            }
+            ns.scp([...mit], platz.host, "home");
+            const pid = ns.exec(datei, platz.host, 1, ...argumente);
+            platz.ramFree -= braucht;
+            note(pid ? "Auftrag laeuft: " + zeile + " auf " + platz.host
+              : "Auftrag " + datei + " liess sich nicht starten");
+          }
+        }
+      }
+    }
+
+    const ramGesamt = workforce.reduce((a, s) => a + s.ram, 0);
+
+    // --- 3c. Speicher teilen fuer die Faktionsreputation -------------------
+    // Der Ertrag der Faktionsarbeit haengt direkt am Share-Bonus:
+    // getHackingWorkRepGain multipliziert mit calculateCurrentShareBonus()
+    // (PersonObjects/formulas/reputation.ts). Der Bonus ist 1 + ln(Faeden)/25
+    // (NetworkShare/Share.ts) - rein logarithmisch. Deshalb ein Deckel statt
+    // "so viel wie geht", und deshalb ist der Deckel trotzdem grosszuegig:
+    // die Wirtschaft benutzt gerade 2 % des Netzes, der Engpass sind die
+    // Ziele.
+    //
+    // Der geteilte Speicher gilt als belegt, weil ns.getServerUsedRam ihn
+    // mitzaehlt. Die HWGW-Planung sieht ihn also gar nicht erst - sie kann
+    // sich daran nicht ueberbuchen.
+    //
+    // KEINE Bedingung auf laufende Faktionsarbeit: ns.getPlayer() liefert
+    // currentWork gar nicht (NetscriptFunctions.ts:1371-1389). Eine Bedingung,
+    // die man nicht pruefen kann, gehoert nicht in eine Schleife, die jede
+    // Runde laeuft - sie waere entweder immer wahr oder immer falsch.
+    if (ramGesamt >= 10240) {
+      const zielFaeden = Math.floor((ramGesamt * SHARE_ANTEIL) / shareRam);
+      let laufend = 0;
+      for (const s of workforce) {
+        for (const pr of ns.ps(s.host)) if (pr.filename === "share.js") laufend += pr.threads;
+      }
+      // Erst ab einem Zehntel Abstand nachlegen. Sonst startet jede Runde ein
+      // Splitter-Prozess, und nach einer Stunde liegen hunderte davon herum.
+      // Rueckzug vor der Wirtschaft. Der Deckel oben ist auf den heutigen
+      // Betrieb gerechnet - steigt das Hackniveau, kommen Ziele dazu und die
+      // Stapel brauchen mehr. Ohne diese Sperre wuerde die Teilung ihnen den
+      // Platz wegnehmen, und der Ertrag faellt fuer ein paar Prozentpunkte
+      // Reputation. Was der Anlass fuer diese Zeilen ist: am 20.08. stand der
+      // Bot fuenf Stunden, weil Speicher verplant war, den es nicht gab.
+      const belegtGesamt = ramGesamt - workforce.reduce((a, s) => a + s.ramFree, 0);
+      const wirtschaft = belegtGesamt - laufend * shareRam;
+      // Die Notbremse muss unter dem Teilungsanteil liegen, sonst kann sie
+      // nie ausloesen: Wer 75 % belegt haelt, laesst der Wirtschaft gar nicht
+      // erst den Platz, auf 50 % zu wachsen - sie wuerde einfach verhungern,
+      // waehrend die Schwelle nie erreicht wird.
+      if (wirtschaft > ramGesamt * 0.2) {
+        let weg = 0;
+        for (const s of workforce) {
+          if (wirtschaft - weg <= ramGesamt * 0.2) break;
+          for (const pr of ns.ps(s.host)) {
+            if (pr.filename !== "share.js") continue;
+            ns.kill(pr.pid);
+            weg += pr.threads * shareRam;
+            s.ramFree += pr.threads * shareRam;
+          }
+        }
+        if (weg > 0) note("Speicherteilung weicht der Wirtschaft: " + Math.round(weg / 1024) + " TB geraeumt");
+      } else if (laufend < zielFaeden * 0.9) {
+        let offen = zielFaeden - laufend;
+        const investHost = workforce.find((s) => ns.ps(s.host).some((pr) => pr.filename === "invest.js"));
+        // Ein fester Sockel bleibt auf JEDEM Rechner frei, kein Prozentsatz.
+        // Zehn Prozent von 16 GB sind 1,6 GB - dort passt weder der Verwalter
+        // (4,7 GB) noch die Hand (28,75 GB) hinein. Genau daran ist die Hand
+        // am 20.08. im Minutentakt gestorben: der Verwalter fand nirgends
+        // Platz und raeumte reihum Rechner per killall frei, bis er einen
+        // erwischte, auf dem die Hand sass. Ein Sockel in GB skaliert richtig
+        // - auf einem 262-TB-Rechner kostet er nichts, auf einem 16-GB-
+        // Rechner verbietet er die Teilung ganz. Und das ist richtig so.
+        const SOCKEL = 48;
+        const kandidaten = workforce
+          .filter((s) => s.host !== "home" && s.ramFree >= SOCKEL + shareRam)
+          .filter((s) => !investHost || s.host !== investHost.host)
+          .sort((a, b) => b.ramFree - a.ramFree);
+        for (const s of kandidaten) {
+          if (offen <= 0) break;
+          const passt = Math.min(offen, Math.floor((s.ramFree - SOCKEL) / shareRam));
+          if (passt <= 0) continue;
+          if (!ns.fileExists("share.js", s.host)) ns.scp("share.js", s.host, "home");
+          if (ns.exec("share.js", s.host, passt)) {
+            s.ramFree -= passt * shareRam;
+            offen -= passt;
+          }
+        }
+        if (offen < zielFaeden - laufend) {
+          note("Speicherteilung: " + (zielFaeden - laufend - offen) + " Faeden nachgelegt (Ziel "
+            + zielFaeden + ", Bonus x" + (1 + Math.log(Math.max(1, zielFaeden)) / 25).toFixed(3) + ")");
         }
       }
     }

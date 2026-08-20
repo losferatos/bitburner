@@ -111,7 +111,12 @@ export async function main(ns) {
       puls();
 
       if (!ns.fileExists(EIN, "home")) continue;
-      if (HIER !== "home") ns.scp(EIN, HIER, "home");
+      // Das Herueberkopieren kann still scheitern. Dann liest die Hand ihre
+      // eigene alte Kopie, haelt sie fuer unveraendert und tut nie wieder
+      // etwas - bei lebendigem Puls, also ohne dass eine Wache anschlaegt.
+      let kopiert = true;
+      if (HIER !== "home") kopiert = ns.scp(EIN, HIER, "home");
+      if (!kopiert) { schreibe("FEHLER: scp von home nach " + HIER + " abgelehnt"); await ns.sleep(5000); continue; }
       var roh = ns.read(EIN).trim();
     } catch (e) {
       schreibe("FEHLER beim Lesen: " + (e && e.message ? e.message : String(e)));

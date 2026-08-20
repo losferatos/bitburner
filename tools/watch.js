@@ -97,8 +97,23 @@ async function main() {
       geldSeit = Date.now();
     } else {
       const still = Math.round((Date.now() - geldSeit) / 60000);
-      if (still >= STILL_MINUTEN) {
-        console.log(jetzt() + "  ALARM: Guthaben steht seit " + still + " Minuten bei " + geld(m) + ".");
+      // Ein stehendes Guthaben ist KEIN Stillstand, solange die Skripte
+      // verdienen. Am 20.08. um 14:11 schlug dieser Wecker Alarm, waehrend der
+      // Bot 123 Mio $/s einspielte - der Verwalter hatte den Ueberschuss nur
+      // sofort wieder in Server-RAM gesteckt, das Guthaben pendelte deshalb um
+      // dieselbe Zahl. Je erfolgreicher der Bot wird, desto blinder wird das
+      // Guthaben als Indikator: bei Billionen muessten 2 % Zuwachs erst
+      // zusammenkommen, damit sich die Anzeige ueberhaupt regt.
+      //
+      // Der ehrliche Beweis von Arbeit ist der Skriptertrag. Faellt der auf
+      // nahezu null, stehen die Arbeiter wirklich - und nur dann ist das das
+      // Muster der Ungluecksnacht.
+      const verdientNoch = Number.isFinite(b.income) && b.income > 1e5;
+      if (verdientNoch) {
+        geldSeit = Date.now();
+      } else if (still >= STILL_MINUTEN) {
+        console.log(jetzt() + "  ALARM: Guthaben steht seit " + still + " Minuten bei " + geld(m)
+          + " UND der Skriptertrag liegt bei " + geld(b.income) + "/s.");
         console.log("  Ziele geerntet: " + (b.harvesting ?? "?") + ", vorbereitet: " + (b.preparing ?? "?"));
         console.log("  Speicher: " + Math.round(b.ramUsed || 0) + " / " + Math.round(b.ramTotal || 0) + " GB");
         console.log("Das ist das Muster der Ungluecksnacht. Sofort nachsehen!");

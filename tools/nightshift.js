@@ -83,6 +83,11 @@ const GLAETTUNG = 0.25;
 // Faktionsseiten, das dauert; oefter als alle zehn Minuten hat es keinen Sinn.
 const KAUF_ABSTAND_MS = 10 * 60 * 1000;
 
+// Ab wann gilt ein Oberflaechenskript als haengend? Ein vollstaendiger
+// Kauflauf ueber fuenf Faktionsseiten braucht bis zu sieben Minuten - alles
+// darueber hinaus ist keine Arbeit mehr, sondern eine Leiche.
+const HAENGER_S = 10 * 60;
+
 const geld = (n) => {
   if (!Number.isFinite(n)) return "--";
   const u = ["", "k", "m", "b", "t"];
@@ -372,12 +377,36 @@ async function durchgang() {
   for (const sv of server) {
     for (const rs of (sv.runningScripts || [])) {
       const d = rs.data || rs;
-      if (OBERFLAECHE.test(d.filename || "")) laufend.push(d.filename + " auf " + sv.hostname);
+      if (OBERFLAECHE.test(d.filename || "")) {
+        const sekunden = Math.round(Number(d.onlineRunningTime) || 0);
+        laufend.push({ sekunden, text: d.filename + " auf " + sv.hostname + " seit " + sekunden + "s" });
+      }
     }
   }
   if (laufend.length) {
-    log("Oberflaechenskript laeuft (" + laufend.join(", ") + ") - nichts beauftragen,"
-      + " sonst reissen sie einander die Seite weg.");
+    // ...es sei denn, es haengt. Ein Oberflaechenskript, das nicht mehr
+    // weiterkommt, legt den ganzen Betrieb stil: Autopilot und Nachtsteuerung
+    // warten beide korrekt, und niemand raeumt die Leiche weg. In der Nacht
+    // zum 21.08. stand buyaugs.js dreizehn Minuten bei "Runde 1: Zustand
+    // lesen" - der Augmentierungskauf ruhte so lange vollstaendig.
+    //
+    // Zehn Minuten sind grosszuegig: Ein vollstaendiger Kauflauf ueber fuenf
+    // Faktionsseiten mit mehreren Kaufrunden braucht bis zu sieben.
+    const langlaeufer = laufend.filter((x) => x.sekunden > HAENGER_S);
+    if (langlaeufer.length) {
+      log("HAENGER: " + langlaeufer.map((x) => x.text).join(", ")
+        + " - wird beendet, sonst ruht der Betrieb bis zum Morgen.");
+      if (!DRY) {
+        await rpc("pushFile", {
+          filename: "data/task.txt",
+          content: JSON.stringify(["killui.js"]),
+          server: "home",
+        });
+      }
+      return;
+    }
+    log("Oberflaechenskript laeuft (" + laufend.map((x) => x.text).join(", ")
+      + ") - nichts beauftragen, sonst reissen sie einander die Seite weg.");
     return;
   }
 

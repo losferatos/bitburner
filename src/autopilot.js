@@ -57,7 +57,7 @@ export async function main(ns) {
   // - also rund ein Sechstel bei einem Fuenftel Ertrag. Kleine Happen sind
   // damit deutlich speicherguenstiger, und der Server bleibt nahe am Maximum,
   // wo jeder einzelne Hack-Thread am meisten bringt.
-  const HACK_FRACTION = 0.4;
+  const HACK_FRACTION = 0.1;
 
   // Eigener Quelltext beim Start. Aendert er sich, ist eine neue Fassung
   // eingetroffen - dann beendet sich dieser Prozess, und der Verwalter auf
@@ -379,11 +379,12 @@ export async function main(ns) {
         auftraege.push({
           t,
           grow,
-          // Ausgleich fuer die GEPLANTEN grow-Threads, nicht fuer die spaeter
-          // tatsaechlich gestarteten. Lieber ein weaken zu viel: ueberzaehlige
-          // Threads richten keinen Schaden an, die Sicherheit ist nach unten
-          // gedeckelt (Server.ts:91).
-          weaken: Math.max(0, calc.weakenThreads((t.busy.grow + grow) * calc.GROW_FORTIFY_AMOUNT) - t.busy.weaken),
+          // NUR der echte Ueberschuss ueber das Minimum. Der Ausgleich fuer
+          // grow wird weiter unten aus den TATSAECHLICH gestarteten Faeden
+          // bemessen - frueher stand hier der Bedarf der GEPLANTEN, und weil
+          // Sicherheit zuerst verteilt wird, band das den ganzen Speicher fuer
+          // Faeden, die es nie gab.
+          weaken: Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weaken),
         });
       } else {
         const prepped = { ...t, sec: t.secMin, root: true };
@@ -394,30 +395,43 @@ export async function main(ns) {
         auftraege.push({
           t,
           hack,
-          weaken: Math.max(0, calc.weakenThreads((t.busy.hack + hack) * calc.SERVER_FORTIFY_AMOUNT) - t.busy.weaken),
+          weaken: Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weaken),
         });
       }
     }
 
-    // Durchgang 1: Sicherheit sichern.
-    for (const a of auftraege) {
-      if (!a.weaken) continue;
-      const gestartet = deploy(ns, workforce, "worker/weaken.js", a.weaken, a.t.host);
-      plan.push({ host: a.t.host, what: "weaken", threads: gestartet, need: a.weaken });
-    }
+    // Die Ernte hat Vorrang vor der Vorbereitung. Vorher wurde streng nach
+    // Auftragsart verteilt - erst alle weaken, dann alles andere -, sodass der
+    // riesige Sicherheitsbedarf EINES Vorbereitungsziels den gesamten Speicher
+    // band, bevor auch nur ein Hack-Faden startete. Ernte bringt sofort Geld,
+    // Vorbereitung ist Investition und kann warten.
+    const ernteAuftraege = auftraege.filter((a) => a.t.doing === "ernten");
+    const restAuftraege = auftraege.filter((a) => a.t.doing !== "ernten");
+    const schicke = (a, datei, wieviele, was) => {
+      if (!wieviele) return 0;
+      const gestartet = deploy(ns, workforce, datei, wieviele, a.t.host);
+      plan.push({ host: a.t.host, what: was, threads: gestartet, need: wieviele });
+      return gestartet;
+    };
 
-    // Durchgang 2: Mit dem Rest ernten und aufpaeppeln.
+    // Durchgang 1: erntende Ziele vollstaendig - Sicherheit und Ernte.
+    for (const a of ernteAuftraege) {
+      schicke(a, "worker/weaken.js", a.weaken, "weaken");
+      a.hackGestartet = schicke(a, "worker/hack.js", a.hack, "hack");
+    }
+    // Durchgang 2: Sicherheit der Vorbereitungsziele.
+    for (const a of restAuftraege) schicke(a, "worker/weaken.js", a.weaken, "weaken");
+    // Durchgang 3: aufpaeppeln mit dem, was uebrig bleibt.
+    for (const a of restAuftraege) a.growGestartet = schicke(a, "worker/grow.js", a.grow, "grow");
+
+    // Durchgang 4: Sicherheitsausgleich - und zwar erst jetzt, fuer die
+    // TATSAECHLICH gestarteten Faeden. Was keinen Platz mehr findet, hebt die
+    // Sicherheit auch nicht an; ein Ausgleich dafuer waere reine Verschwendung
+    // und hat in der Nacht zum 20.08. das ganze Netz blockiert.
     for (const a of auftraege) {
-      if (a.grow) {
-        const gestartet = deploy(ns, workforce, "worker/grow.js", a.grow, a.t.host);
-        if (gestartet) preparing++;
-        plan.push({ host: a.t.host, what: "grow", threads: gestartet, need: a.grow });
-      }
-      if (a.hack) {
-        const gestartet = deploy(ns, workforce, "worker/hack.js", a.hack, a.t.host);
-        if (gestartet) harvesting++;
-        plan.push({ host: a.t.host, what: "hack", threads: gestartet, need: a.hack });
-      }
+      const erzeugt = (a.growGestartet || 0) * calc.GROW_FORTIFY_AMOUNT
+        + (a.hackGestartet || 0) * calc.SERVER_FORTIFY_AMOUNT;
+      if (erzeugt > 0) schicke(a, "worker/weaken.js", calc.weakenThreads(erzeugt), "weaken");
     }
 
     // Nach Zustand zaehlen, nicht nach neu gestarteten Threads: ein voll

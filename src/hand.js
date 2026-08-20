@@ -69,6 +69,15 @@ export async function main(ns) {
     if (d0 && d0.busy) { d0.busy = false; }
   } catch { /* kein Nachtdienst, auch gut */ }
 
+  // Puls SOFORT setzen, nicht erst nach dem ersten Schleifendurchlauf. Sonst
+  // sieht die Pulswache im Autopiloten noch den Zeitstempel der VORIGEN Hand
+  // und erschlaegt die frisch gestartete augenblicklich wieder.
+  const puls = () => {
+    ns.write("data/hand-puls.txt", String(Date.now()), "w");
+    if (HIER !== "home") ns.scp("data/hand-puls.txt", "home", HIER);
+  };
+  puls();
+
   schreibe("Hand bereit auf " + HIER + ".");
 
   // Eigener Quelltext beim Start. Aendert er sich, beendet sich die Hand -
@@ -99,8 +108,7 @@ export async function main(ns) {
       // erschlaegt sie. Ein toter Prozess wird ohnehin neu gestartet, ein
       // haengender bliebe sonst fuer immer stehen - und mit ihm der einzige
       // Steuerkanal, der ohne Browser funktioniert.
-      ns.write("data/hand-puls.txt", String(Date.now()), "w");
-      if (HIER !== "home") ns.scp("data/hand-puls.txt", "home", HIER);
+      puls();
 
       if (!ns.fileExists(EIN, "home")) continue;
       if (HIER !== "home") ns.scp(EIN, HIER, "home");
@@ -133,17 +141,53 @@ export async function main(ns) {
     // Ohne Terminalbildschirm gibt es kein Eingabefeld. Die Seitenleiste
     // haengt ihren Tastaturhandler an das Dokument und prueft die Echtheit
     // nicht - Alt+T bringt uns also hin.
-    if (!doc.getElementById("terminal-input")) {
-      doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
-      await ns.sleep(1200);
-    }
-    if (!doc.getElementById("terminal-input")) {
-      schreibe("FEHLER: Terminal nicht erreichbar - steht ein Fenster im Weg?");
-      continue;
+    // Nur ans Terminal gehen, wenn ueberhaupt Terminalbefehle dabei sind.
+    // Sonderbefehle wie !work bedienen die Oberflaeche und brauchen es nicht.
+    const brauchtTerminal = befehle.some((b) => !/^!/.test(b));
+    if (brauchtTerminal) {
+      if (!doc.getElementById("terminal-input")) {
+        doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
+        await ns.sleep(1200);
+      }
+      if (!doc.getElementById("terminal-input")) {
+        schreibe("FEHLER: Terminal nicht erreichbar - steht ein Fenster im Weg?");
+        continue;
+      }
     }
 
     try {
     for (const b of befehle) {
+      // Sonderbefehle, die nicht ins Terminal gehen, sondern die Oberflaeche
+      // bedienen. Faktionsarbeit zu starten prueft die Echtheit des Klicks
+      // NICHT - anders als der Join-Knopf. Ohne diesen Weg stuende die
+      // Reputation still, sobald der Nachtdienst mal aussetzt.
+      if (/^!work\s+/i.test(b)) {
+        const faktion = b.replace(/^!work\s+/i, "").trim();
+        protokoll.push("> Faktionsarbeit fuer " + faktion);
+        // Alt+F oeffnet die Faktionsseite. Der Handler haengt am Dokument und
+        // prueft die Echtheit nicht.
+        doc.dispatchEvent(new KeyboardEvent("keydown", { key: "f", altKey: true, bubbles: true }));
+        await ns.sleep(1200);
+        const details = [...doc.querySelectorAll("button")]
+          .filter((x) => (x.innerText || "").trim() === "Details")
+          .find((x) => new RegExp(faktion.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
+            .test((x.parentElement.parentElement || {}).innerText || ""));
+        if (!details) { protokoll.push("  Faktion nicht auf der Seite gefunden"); continue; }
+        details.click();
+        await ns.sleep(1200);
+        const hc = [...doc.querySelectorAll("button")]
+          .find((x) => /^Hacking Contracts$/.test((x.innerText || "").trim()) && !x.disabled);
+        if (!hc) { protokoll.push("  Kein Hacking-Contracts-Knopf"); continue; }
+        hc.click();
+        await ns.sleep(1500);
+        // Solange FOKUSSIERTE Arbeit laeuft, reagiert keine Taste mehr - der
+        // Automat waere danach handlungsunfaehig. Also sofort entfokussieren.
+        const raus = [...doc.querySelectorAll("button")]
+          .find((x) => /^Do something else simultaneously$/.test((x.innerText || "").trim()));
+        if (raus) raus.click();
+        protokoll.push("  gestartet" + (raus ? " und entfokussiert" : " (Fokus blieb an!)"));
+        continue;
+      }
       if (!terminal(b)) { protokoll.push("FEHLER bei: " + b); break; }
       protokoll.push("> " + b);
       if (/^backdoor$/i.test(b)) {

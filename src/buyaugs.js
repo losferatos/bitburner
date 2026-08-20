@@ -1168,8 +1168,27 @@ const onAugmentationsPage = (doc) =>
  * (canOpenAugmentations ist wahr, sobald queuedAugmentations.length > 0).
  * Dieser Fall ist also kein Fehler, sondern die Antwort q = 0.
  */
-async function goToAugmentationsPage(doc, sleep) {
+async function goToAugmentationsPage(doc, sleep, allowUnfocus = false) {
   if (onAugmentationsPage(doc)) return "";
+  // Denselben Ausweg wie goToFactionsPage: Steht die Arbeitsseite offen, gibt
+  // es keine Seitenleiste und damit keinen Eintrag "Augmentations".
+  //
+  // Dieser Fix fehlte hier, waehrend er in goToFactionsPage schon stand - und
+  // hat in der Nacht zum 21.08. jeden Kauflauf gekostet: Die fuenf
+  // Faktionsseiten wurden sauber gelesen, dann scheiterte der Griff nach der
+  // Warteschlangenlaenge, und ohne die bricht der Lauf ab ("ohne sie ist jeder
+  // Preis geraten"). Alle nachfolgenden Meldungen - NeuroFlux-Stufe falsch,
+  // Augmentierungen "gelten als gekauft" - waren blosse Folgefehler davon.
+  if (allowUnfocus && aufArbeitsseite(doc)) {
+    for (let i = 0; i < 4 && aufArbeitsseite(doc); i++) {
+      const raus = [...doc.querySelectorAll("button")].find(
+        (b) => labelOf(b) === "Do something else simultaneously",
+      );
+      if (!raus) break;
+      raus.click();
+      await sleep(700);
+    }
+  }
   const item = findSidebarItem(doc, "Augmentations");
   if (!item) {
     const why = detectBlockedPage(doc);
@@ -1495,7 +1514,7 @@ async function collectState(o) {
   let q = null;
   let queuedNfg = null;
   let queuedNames = [];
-  const navQueue = await goToAugmentationsPage(doc, sleep);
+  const navQueue = await goToAugmentationsPage(doc, sleep, allowUnfocus);
   if (navQueue) {
     problems.push(navQueue);
   } else {

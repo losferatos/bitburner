@@ -962,14 +962,25 @@ async function goToFactionsPage(doc, sleep, log, allowUnfocus) {
   // Seitenleiste aus, und daran haengt alles Weitere. Siehe aufArbeitsseite().
   if (aufArbeitsseite(doc)) {
     if (!allowUnfocus) return "Arbeitsseite offen, Verlassen ist hier nicht erlaubt (Trockenlauf)";
-    const raus = [...doc.querySelectorAll("button")].find(
-      (b) => labelOf(b) === "Do something else simultaneously",
-    );
-    if (raus) {
+    // Mehrfach versuchen und den Erfolg PRUEFEN, statt einmal zu klicken und
+    // das Beste zu hoffen. Am 20.08. brach ein Kauflauf in Runde 2 genau hier
+    // ab: Der Klick war erfolgt, 600 ms spaeter stand die Arbeitsseite immer
+    // noch - entweder war React langsamer, oder ein anderes Skript hatte
+    // inzwischen wieder dorthin navigiert. Ein einzelner Klick ohne
+    // Gegenprobe ist an dieser Stelle keine Handlung, sondern eine Hoffnung.
+    for (let i = 0; i < 4 && aufArbeitsseite(doc); i++) {
+      const raus = [...doc.querySelectorAll("button")].find(
+        (b) => labelOf(b) === "Do something else simultaneously",
+      );
+      if (!raus) break;
       raus.click();
-      log("Arbeitsseite verlassen (die Faktionsarbeit laeuft weiter).");
-      await sleep(600);
+      await sleep(700);
     }
+    if (aufArbeitsseite(doc)) {
+      return "Arbeitsseite laesst sich nicht verlassen - vermutlich navigiert"
+        + " ein anderes Oberflaechenskript staendig dorthin zurueck";
+    }
+    log("Arbeitsseite verlassen (die Faktionsarbeit laeuft weiter).");
   }
 
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "f", altKey: true, bubbles: true }));

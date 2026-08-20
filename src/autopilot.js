@@ -319,8 +319,17 @@ export async function main(ns) {
     // aufzupaeppeln heisst, dass keines fertig wird: jedes bekommt ein
     // Achtel des Speichers und braucht das Achtfache der Zeit, waehrend der
     // Ertrag die ganze Zeit ausbleibt. Konzentration schlaegt Breite.
-    const erntereif = sortiert.filter(ready).slice(0, MAX_TARGETS);
-    const naechstes = sortiert.filter((c) => !ready(c)).slice(0, PREP_TARGETS);
+    // Die Obergrenzen muessen sich am vorhandenen Speicher ausrichten, sonst
+    // sind sie fuer genau eine Ausbaustufe richtig. In der Nacht zum 20.08.
+    // hat genau das den Wiederaufbau nach dem ersten Reset abgewuergt: die
+    // Werte 60 und 40 stammten von einem Netz mit 274 TB, nach dem Reset
+    // standen noch 116 GB. Der Autopilot hat daraufhin fuenf Stunden lang
+    // sieben Ziele gleichzeitig vorbereitet, keines je fertig bekommen und
+    // in der ganzen Zeit keinen Dollar verdient.
+    const maxTargets = Math.max(2, Math.min(MAX_TARGETS, Math.floor(ramTotal / 2000)));
+    const prepTargets = Math.max(1, Math.min(PREP_TARGETS, Math.floor(ramTotal / 4000)));
+    const erntereif = sortiert.filter(ready).slice(0, maxTargets);
+    const naechstes = sortiert.filter((c) => !ready(c)).slice(0, prepTargets);
     const active = [...erntereif, ...naechstes];
 
     // Ziele, die aus der Rangfolge gefallen sind, aber noch Arbeiter haben,
@@ -357,7 +366,15 @@ export async function main(ns) {
         });
       } else if (anteil < MONEY_READY) {
         const voll = calc.growThreads(t, t.moneyMax, t.moneyNow, player, 1);
-        const grow = Number.isFinite(voll) ? Math.max(0, voll - t.busy.grow) : 0;
+        // Nie mehr bestellen, als ueberhaupt hineinpasst. Sonst wird der
+        // Sicherheitsausgleich unten fuer Tausende grow-Faeden berechnet, die
+        // es nie geben wird - und weil Sicherheit ZUERST verteilt wird,
+        // fressen diese weaken den ganzen Speicher, die grow kommen nie dran,
+        // und in der naechsten Runde beginnt dasselbe von vorn. Bei 274 TB
+        // faellt das nicht auf, bei 116 GB steht der Bot damit still. Genau
+        // das ist in der Nacht zum 20.08. fuenf Stunden lang passiert.
+        const passt = Math.floor(ramNow / 2);
+        const grow = Number.isFinite(voll) ? Math.max(0, Math.min(voll, passt) - t.busy.grow) : 0;
         t.doing = "aufpaeppeln";
         auftraege.push({
           t,

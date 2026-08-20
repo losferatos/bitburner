@@ -255,6 +255,9 @@ let letzteFaktion = null;
 let basisRate = null;      // Rep/s, normiert auf die Faktion, wo gemessen wurde
 let messungRep = null;     // { fac, rep, t }
 
+let rundeZuletzt = null;    // Rundenzaehler beim vorigen Durchgang
+let rundeZeit = null;
+
 async function durchgang() {
   const s = await stand();
   const p = JSON.parse(s.data.PlayerSave).data;
@@ -351,6 +354,25 @@ async function durchgang() {
     + rateHier.toFixed(1) + " Rep/s bei " + (arbeitAn || "-")
     + ". Naechste Augmentierung: " + (zeile || "nirgends"));
 
+  // --- Laeuft das Spiel ueberhaupt normal? --------------------------------
+  // Der Rundenzaehler des Autopiloten ist der ehrlichste Taktgeber, den wir
+  // von aussen haben. Bleibt er stehen, laeuft das Spiel gedrosselt - und dann
+  // sind lange Skriptlaufzeiten normal statt verdaechtig.
+  const rundeJetzt = Number((tele.telemetry || {}).cycle);
+  let rundenRate = null;
+  if (rundeZuletzt !== null && rundeZeit) {
+    const min = (Date.now() - rundeZeit) / 60000;
+    if (min > 0.5) rundenRate = (rundeJetzt - rundeZuletzt) / min;
+  }
+  if (rundeZuletzt === null || rundenRate !== null) {
+    rundeZuletzt = rundeJetzt;
+    rundeZeit = Date.now();
+  }
+  // Unter 10 Runden je Minute gilt als gedrosselt (normal sind rund 16).
+  // Solange nichts gemessen ist, wird NICHT von Drosselung ausgegangen - aber
+  // auch nicht gekillt, weil die Laufzeitschwelle ohnehin erst greift.
+  const gedrosselt = rundenRate !== null && rundenRate < 10;
+
   // --- Ist der Auftragsplatz frei? ----------------------------------------
   // data/task.txt ist EIN Platz. Der Autopilot leert ihn, sobald er den
   // Auftrag gestartet hat (autopilot.js:835). Steht dort etwas, wartet noch
@@ -392,7 +414,19 @@ async function durchgang() {
     //
     // Zehn Minuten sind grosszuegig: Ein vollstaendiger Kauflauf ueber fuenf
     // Faktionsseiten mit mehreren Kaufrunden braucht bis zu sieben.
-    const langlaeufer = laufend.filter((x) => x.sekunden > HAENGER_S);
+    // ...aber nur, wenn das Spiel ueberhaupt normal laeuft. Steht der
+    // Bitburner-Tab im Hintergrund, drosselt der Browser seine Timer: in der
+    // Nacht zum 21.08. gemessen als EINE Spielrunde pro Minute statt sechzehn.
+    // Skripte kriechen dann, und ein voellig gesunder Kauflauf braucht statt
+    // fuenf Minuten ueber eine Stunde. Wer in diesem Zustand aufraeumt, killt
+    // genau die Arbeit, die er schuetzen soll - und zwar immer wieder, denn
+    // der naechste Lauf ist genauso langsam.
+    const langlaeufer = gedrosselt ? [] : laufend.filter((x) => x.sekunden > HAENGER_S);
+    if (gedrosselt && laufend.some((x) => x.sekunden > HAENGER_S)) {
+      log("Langlaeufer vorhanden, aber das Spiel ist gedrosselt ("
+        + rundenRate.toFixed(1) + " Runden/min statt ~16) - das ist Langsamkeit,"
+        + " kein Haenger. Es wird nichts beendet.");
+    }
     if (langlaeufer.length) {
       log("HAENGER: " + langlaeufer.map((x) => x.text).join(", ")
         + " - wird beendet, sonst ruht der Betrieb bis zum Morgen.");

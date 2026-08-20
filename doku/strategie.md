@@ -1292,3 +1292,57 @@ Ausdruecklich gekennzeichnet, damit hier nichts geraten wird.
    Belohnungstypen. Das ist gegenueber Faction Work Rauschen. Als **Geld**quelle im Fruehspiel
    sind Contracts dagegen brauchbar (`CodingContractBaseMoneyGain = 75e6`,
    `src/Constants.ts:93`) und per `ns.codingcontract.attempt` voll skriptbar.
+
+---
+
+## Nachtrag 20.08.2026: Der Multiplikator ist der Hebel, nicht die Erfahrung
+
+Nachgerechnet an `PersonObjects/formulas/skill.ts:13`:
+
+    Level = floor( mult * (32 * ln(exp + 534.6) - 200) )
+
+Die Erfahrung geht **logarithmisch** ein, der Multiplikator **linear**. Was das
+in Zahlen heisst, gemessen am Stand von heute (Level 636, hacking-Mult 1,563,
+rueckgerechnete Erfahrung 1,7e8):
+
+| hacking-Mult | Erfahrung fuer Hacking 2500 | Verhaeltnis zu heute |
+|---|---|---|
+| 1,563 | 2,6e24 | das 10^16-fache - unmoeglich |
+| 3,0 | 1,1e14 | das 600.000-fache |
+| 4,0 | 1,6e11 | das 900-fache |
+| 6,0 | 2,3e8 | **das 1,4-fache** |
+
+Und andersherum: Mit dem heutigen Multiplikator bringt die *millionenfache*
+Erfahrung gerade Level 1326. Grinden ist praktisch wertlos - die Daedalus-Huerde
+Hacking 2500 faellt ueber den Multiplikator oder gar nicht.
+
+## Nachtrag 20.08.2026: Tian Di Hui ist als Arbeitsziel erschoepft
+
+`node tools/augplan.js` gleicht den Aug-Katalog aus dem Quelltext gegen den
+Spielstand ab. Befund: **Tian Di Hui und CyberSec bieten nichts mehr an, was uns
+fehlt** - dort ist alles gekauft. Der Lauf auf Favor 150 bei Tian Di Hui haette
+nur noch NeuroFlux-Stufen kaufbar gemacht, und deren Kosten wachsen mit 1,14 je
+Stufe (`Constants.ts:36`).
+
+Die 13 fuer Daedalus fehlenden Augmentierungen liegen bei NiteSec, The Black
+Hand und BitRunners - zusammen 19 verschiedene, also mehr als genug. Die
+Arbeitsfaktion steht seit dem 20.08. deshalb auf **NiteSec**: dort liegen vier
+Augmentierungen unter 20k Reputation, zusammen 1,19 Multiplikator-Nutzen.
+
+**Die Vorgabe "Keine Stadtfaktion beitreten" (P3) bleibt in Kraft.** Sie wurde
+am 20.08. ausdruecklich bestaetigt: Die Hacking-Faktionen decken den Bedarf, und
+ihre Augmentierungen bringen echte Multiplikatoren, waehrend die Stadt-Augs
+reine Zaehlkoepfe mit Nutzen 0,00 sind.
+
+## Nachtrag 20.08.2026: Der Fokus ist wirkungslos
+
+`focusPenalty()` (`PlayerObjectGeneralMethods.ts:622-628`) prueft zuerst auf das
+Neuroreceptor Management Implant und gibt bei vorhandenem Implant konstant 1
+zurueck. Es ist seit dem zweiten Reset installiert. Faktionsarbeit laeuft
+deshalb unfokussiert - gleiche Rate, aber die Oberflaeche bleibt bedienbar.
+
+`work.js` prueft das bei **jedem** Lauf frisch ueber die Augmentierungsseite
+(Alt+A), weil ein Skript die installierten Augmentierungen nicht abfragen kann
+und ein Reset das Implant jederzeit wegnehmen kann. Im Zweifel wird fokussiert:
+Ein ueberfluessiger Fokus kostet nur Bequemlichkeit, ein fehlender kostet
+lautlos ein Fuenftel jeder Arbeitsstunde.

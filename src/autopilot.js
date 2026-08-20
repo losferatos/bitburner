@@ -315,7 +315,11 @@ export async function main(ns) {
   // Dasselbe fuer die Faktions-Backdoors.
   let letzterBackdoorVersuch = -99;
   let letzterContractLauf = -99;
-  let letzterArbeitsLauf = -99;
+  // Weit genug in der Vergangenheit, dass der erste Lauf SOFORT faellig ist.
+  // Mit -99 und der Schwelle von 300 Runden haette die Faktionsarbeit nach
+  // einem Reset erst ab Runde 201 angesetzt - dreizehn Minuten, in denen der
+  // Bot Geld verdient und keine einzige Reputation sammelt.
+  let letzterArbeitsLauf = -100000;
   let letzterJoinLauf = -99;
   // Gleitender Schnitt ueber den erwarteten Geldwert der zuletzt eingeplanten
   // Stapel. Im eingeschwungenen Zustand ist die Einplanungsrate gleich der
@@ -519,12 +523,24 @@ export async function main(ns) {
     // daran (hoechster Favor gewinnt, aber nur wenn es dort noch etwas zu
     // kaufen gibt).
     //
-    // Alle 30 Runden neu beauftragen, auch wenn schon gearbeitet wird. Das ist
-    // Absicht: work.js setzt dabei den Fokus neu, und der geht im laufenden
-    // Betrieb staendig verloren - jede Navigation ruft stopFocusing()
-    // (GameRoot.tsx:271-272). Faktionsreputation wird laufend gutgeschrieben
-    // (Work/FactionWork.tsx), ein Neuansetzen kostet also nichts.
-    if (round - letzterArbeitsLauf > 30 && ns.fileExists("work.js", "home")
+    // Periodisch neu beauftragen, auch wenn schon gearbeitet wird - der
+    // Autopilot kann den Arbeitszustand nicht lesen (ns.getPlayer() liefert
+    // currentWork nicht), muss also blind ansetzen. Faktionsreputation wird
+    // laufend gutgeschrieben (Work/FactionWork.tsx), ein Neuansetzen kostet
+    // nichts.
+    //
+    // Bis zum 20.08. stand hier 30 Runden - bei rund 3,8 Sekunden je Runde
+    // also alle zwei Minuten. Die Begruendung dafuer war, dass work.js den
+    // staendig verlorengehenden Fokus neu setzt. Die ist seit dem
+    // Neuroreceptor-Implant hinfaellig: focusPenalty() gibt konstant 1
+    // zurueck, der Fokus ist wirkungslos (siehe Kopf von work.js).
+    //
+    // Uebrig blieb nur der Schaden: work.js navigiert bei jedem Lauf zur
+    // Faktionsseite und reisst dabei jedem anderen Oberflaechenskript die
+    // Seite weg. Genau daran ist der Wiederaufbau nach dem Reset gescheitert.
+    // 300 Runden (rund 19 Minuten) reichen fuer den einzigen verbliebenen
+    // Zweck: nach Reset oder Abbruch die Arbeit wieder aufnehmen.
+    if (round - letzterArbeitsLauf > 300 && ns.fileExists("work.js", "home")
         && ns.fileExists("data/workfaction.txt", "home")) {
       const wunsch = ns.read("data/workfaction.txt").trim();
       // Nur beauftragen, wenn wir in der Faktion ueberhaupt Mitglied sind.

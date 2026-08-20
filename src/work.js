@@ -1,32 +1,43 @@
 /**
- * Faktionsarbeit aufnehmen - und den Fokus dabei ANLASSEN.
+ * Faktionsarbeit aufnehmen - ohne Fokus, weil der uns nichts mehr kostet.
  *
- * Die Rep-Rate wird mit `focusPenalty()` multipliziert: ohne Fokus 0,8, mit
- * Fokus 1,0 (PersonObjects/Player/PlayerObjectGeneralMethods.ts:622-628,
- * Constants.ts:87). Wir haben den Fokus bisher immer sofort abgeschaltet und
- * damit ein Fuenftel jeder Arbeitsstunde verschenkt.
+ * WARUM OHNE FOKUS (Stand 20.08.2026)
  *
- * Der Grund dafuer stand in src/hand.js:186-188 und war richtig, solange jeder
- * Hebel ueber das Terminal lief: `Page.Work` blendet die Seitenleiste aus
- * (ui/GameRoot.tsx:328-330), damit sind die Alt-Tastenkuerzel nicht mehr
- * registriert - der Automat waere handlungsunfaehig.
+ * Die Rep-Rate wird mit `focusPenalty()` multipliziert, und die Funktion sieht
+ * so aus (PlayerObjectGeneralMethods.ts:622-628):
  *
- * Seit der Auftragslaeufer im Autopiloten Skripte per `ns.exec` startet,
- * braucht der Weg von aussen ins Spiel aber gar keine Oberflaeche mehr. Und
- * die Skripte, die eine brauchen (travel.js, homeram.js), erkennen den Zustand
- * an dem Knopf "Do something else simultaneously" und raeumen ihn selbst weg.
- * Der Fokus ist damit kein Risiko mehr, sondern nur noch ein Viertel mehr
- * Reputation.
+ *     if (!this.hasAugmentation(NeuroreceptorManager, true)) {
+ *       focus = this.focus ? 1 : CONSTANTS.BaseFocusBonus;
+ *     }
+ *
+ * Das Neuroreceptor Management Implant ist seit dem zweiten Reset installiert.
+ * Damit faellt die Abfrage ganz aus und `focusPenalty()` gibt konstant 1
+ * zurueck - fokussiert wie unfokussiert. Der Fokus ist fuer die Reputation
+ * seither ohne jede Wirkung.
+ *
+ * Und dann hat er nur noch Nachteile: `Page.Work` blendet die Seitenleiste
+ * aus (ui/GameRoot.tsx:328-330), und jedes Oberflaechenskript muss den Zustand
+ * erst wegraeumen, bevor es navigieren kann. Zwei davon gleichzeitig reissen
+ * einander die Seite weg. Unfokussierte Arbeit laeuft mit derselben Rate und
+ * laesst die Oberflache bedienbar.
+ *
+ * ACHTUNG BEIM NAECHSTEN RESET: Faellt das Implant weg, kostet unfokussierte
+ * Arbeit sofort wieder 20 % (Constants.ts:87 BaseFocusBonus = 0.8). Es gehoert
+ * deshalb zu den Pflichtkaeufen in doku/reset-plan.md. Bis es wieder steht:
+ * work.js mit --focus aufrufen.
  *
  * Aufruf:  node tools/task.js work.js "Tian Di Hui"
- *          node tools/task.js work.js "Tian Di Hui" --unfocus
+ *          node tools/task.js work.js "Tian Di Hui" --focus
  *
  * @param {NS} ns
  */
 export async function main(ns) {
   const doc = document;
   const argumente = ns.args.map(String);
-  const unfocus = argumente.includes("--unfocus");
+  // Ob fokussiert wird, entscheidet weiter unten der Befund am Implant - nicht
+  // eine Annahme hier oben. Diese beiden Schalter uebersteuern ihn nur.
+  const erzwingeFokus = argumente.includes("--focus");
+  const erzwingeOhne = argumente.includes("--unfocus");
   const faktion = argumente.filter((a) => !a.startsWith("--")).join(" ").trim();
   const zeilen = [];
   const sag = (t) => {
@@ -72,6 +83,47 @@ export async function main(ns) {
     sag("Laufende Arbeit entfokussiert, um an die Oberflaeche zu kommen.");
   }
 
+  // --- Hat der Fokus ueberhaupt noch eine Wirkung? --------------------------
+  //
+  // Nur mit dem Neuroreceptor Management Implant ist er wirkungslos
+  // (PlayerObjectGeneralMethods.ts:622-628). Ohne es kostet unfokussierte
+  // Arbeit 20 % Reputation, und zwar lautlos.
+  //
+  // Diese Frage MUSS bei jedem Lauf frisch beantwortet werden. Ein Reset kann
+  // das Implant jederzeit wegnehmen, und keine gemerkte Antwort ueberlebt das
+  // zuverlaessig: Dateien auf home ueberstehen prestigeAugmentation, eine
+  // veraltete Notiz wuerde also genau dann falsch liegen, wenn es teuer wird.
+  //
+  // Ein Skript kann die installierten Augmentierungen nicht abfragen -
+  // ns.getPlayer() setzt sein Objekt in NetscriptFunctions.ts Feld fuer Feld
+  // zusammen und laesst sie aus (mults, factions, skills, exp, jobs, entropy
+  // sind da, augmentations nicht). Der einzige Weg fuehrt ueber die
+  // Oberflaeche: Alt+A oeffnet die Augmentierungsseite
+  // (KeyBindingUtils.ts:128-134).
+  //
+  // Die Fehlerrichtung ist mit Absicht so gewaehlt: Im Zweifel wird
+  // FOKUSSIERT. Ein ueberfluessiger Fokus kostet nur Bequemlichkeit an der
+  // Oberflaeche, ein faelschlich weggelassener kostet ein Fuenftel jeder
+  // Arbeitsstunde - und man sieht es nirgends.
+  let nrmDa = false;
+  doc.dispatchEvent(new KeyboardEvent("keydown", { key: "a", altKey: true, bubbles: true }));
+  await ns.sleep(1300);
+  const seite = (doc.body.innerText || "");
+  const marke = seite.indexOf("Installed Augmentations");
+  // Ausschliesslich der Abschnitt UNTER dieser Ueberschrift zaehlt
+  // (InstalledAugmentations.tsx:60). Darueber steht "Purchased Augmentations"
+  // (AugmentationsRoot.tsx:114) - die Warteschlange. Was dort liegt, ist
+  // bezahlt, aber noch nicht wirksam; es wirkt erst nach dem Install. Wer
+  // einfach die ganze Seite durchsucht, verwechselt beides.
+  nrmDa = marke >= 0 && seite.slice(marke).includes("Neuroreceptor Management Implant");
+
+  const wantFocus = erzwingeOhne ? false : (erzwingeFokus || !nrmDa);
+  sag(nrmDa
+    ? "Neuroreceptor-Implant installiert - der Fokus ist wirkungslos."
+    : (marke >= 0
+      ? "KEIN Neuroreceptor-Implant - ohne Fokus kostet die Arbeit 20 %."
+      : "Augmentierungsseite nicht lesbar - im Zweifel wird fokussiert."));
+
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "f", altKey: true, bubbles: true }));
   await ns.sleep(1400);
 
@@ -90,7 +142,7 @@ export async function main(ns) {
   hc.click();
   await ns.sleep(1600);
 
-  if (unfocus) {
+  if (!wantFocus) {
     const weg = knoepfe().find((b) => text(b) === "Do something else simultaneously");
     if (weg) weg.click();
     await ns.sleep(600);
@@ -117,14 +169,24 @@ export async function main(ns) {
   // Das ist auch der einzige Weg zurueck: Es gibt im ganzen Spiel keinen
   // Pfad, der den Fokus im laufenden Betrieb von selbst wieder anschaltet.
   // Wer ihn einmal verliert, arbeitet bis zum naechsten Klick mit 80 %.
-  // Bei --unfocus hier NICHT weitermachen. Die Schleife unten klickt den
+  // Ohne --focus hier NICHT weitermachen. Die Schleife unten klickt den
   // Focus-Knopf, und genau der macht das Entfokussieren von eben rueckgaengig:
   // Das Skript hat sich selbst widersprochen und am Ende immer fokussiert
   // dagestanden - auch wenn der Aufrufer ausdruecklich das Gegenteil wollte.
   // Aufgefallen ist es, als buyaugs.js danach meldete, es koenne die
   // Augmentierungsseite wegen fokussierter Arbeit nicht erreichen.
-  if (unfocus) {
-    return sag("Arbeit fuer " + faktion + " laeuft OHNE Fokus (Faktor 0,8) - wie verlangt.");
+  if (!wantFocus) {
+    // Zurueck aufs Terminal. Die Arbeitsseite bleibt sonst offen stehen und
+    // meldet "You are currently carrying out hacking contracts for ..." - was
+    // wie fokussierte Arbeit aussieht, obwohl der Fokus laengst aus ist. Es
+    // gibt keinen Grund, die Oberflaeche dort zu parken: Faktionsarbeit laeuft
+    // unfokussiert weiter, egal welche Seite offen ist (genau das bedeutet
+    // "Do something else simultaneously"). Eine Navigation ruft zwar
+    // stopFocusing() (GameRoot.tsx:271-272) - das ist hier gerade erwuenscht.
+    await ns.sleep(400);
+    doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
+    return sag("Arbeit fuer " + faktion + " laeuft ohne Fokus - volle Rate dank"
+      + " Neuroreceptor-Implant. Oberflaeche zurueck aufs Terminal.");
   }
 
   for (let i = 0; i < 3; i++) {

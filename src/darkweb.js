@@ -128,13 +128,30 @@ export async function main(ns) {
     // spaeter trotzdem noch die alte Nachbarliste. Ein einziger Blick haette
     // also einen gelungenen Kauf als Fehlschlag gemeldet - und der Abbruch
     // haette die Portknacker gleich mit verhindert.
+    // NICHT ueber ns.scan pruefen. Am 20.08. nach dem Reset hat diese Schleife
+    // zehn Sekunden lang gewartet und dann abgebrochen - waehrend der Kauf
+    // laengst durch war. Die Diagnose zeigte es schwarz auf weiss: Der Knopf
+    // trug hinterher "Purchased", und von aussen stand darkweb in der
+    // Nachbarliste von home. `ns.scan` im LAUFENDEN Skript sah es trotzdem
+    // nicht - die Nachbarliste, die ein Skript sieht, aendert sich waehrend
+    // seiner Laufzeit nicht.
+    //
+    // Der Schaden war betraechtlich: Jeder Lauf kaufte TOR (oder stellte fest,
+    // dass es stand), meldete sich selbst als gescheitert und brach ab, BEVOR
+    // er die Portknacker holte. Das Netz blieb bei 33 von 96 Rechnern, keine
+    // Faktion war erreichbar, und der Autopilot beauftragte darkweb.js im
+    // Zwanzigrundentakt neu - jedes Mal mit demselben Ausgang.
+    //
+    // Der ehrliche Zeuge ist der Knopf selbst: nach dem Kauf steht dort
+    // "Purchased" statt eines Preises (Locations/ui/TorButton.tsx:47).
     let da = false;
-    for (let i = 0; i < 10 && !da; i++) {
-      await ns.sleep(1000);
-      da = ns.scan("home").includes("darkweb");
+    for (let i = 0; i < 6 && !da; i++) {
+      await ns.sleep(700);
+      const k = knoepfe().find((b) => /^Purchase TOR router/i.test(text(b)));
+      da = !k || /Purchased/i.test(text(k));
     }
-      if (!da) return sag("ABBRUCH: TOR-Knopf geklickt, aber darkweb bleibt unerreichbar.");
-      sag("TOR-Router gekauft - darkweb erreichbar.");
+      if (!da) return sag("ABBRUCH: TOR-Knopf geklickt, er zeigt aber weiter einen Preis.");
+      sag("TOR-Router gekauft (der Knopf zeigt \"Purchased\").");
     }
   }
 

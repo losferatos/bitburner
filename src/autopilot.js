@@ -316,6 +316,7 @@ export async function main(ns) {
   let letzterBackdoorVersuch = -99;
   let letzterContractLauf = -99;
   let letzterArbeitsLauf = -99;
+  let letzterJoinLauf = -99;
   // Gleitender Schnitt ueber den erwarteten Geldwert der zuletzt eingeplanten
   // Stapel. Im eingeschwungenen Zustand ist die Einplanungsrate gleich der
   // Landerate, also ist das die erwartete Einnahme je Sekunde. Der Vergleich
@@ -469,6 +470,41 @@ export async function main(ns) {
       if (auftrag(["darkweb.js"], "Darkweb-Programm fehlt (" + fehlendesProgramm[0] + ") und Geld ist da - darkweb.js beauftragt")) letzterDarkwebVersuch = round;
     }
 
+    // --- Einladungen annehmen ------------------------------------------------
+    // Der Beitritt lief bis zum 20.08. ausschliesslich von Hand. Nach dem
+    // Reset an diesem Abend lagen vier Einladungen offen - CyberSec, NiteSec,
+    // The Black Hand und BitRunners - und der Bot verdiente munter weiter,
+    // ohne in einer einzigen Faktion zu sein. Ohne Mitgliedschaft laeuft keine
+    // Reputation, und Reputation ist der Engpass, nicht Geld.
+    //
+    // Welche Einladungen offenstehen, verraet ns.getPlayer() nicht. Der
+    // Umweg ueber joinfac.js ist deshalb noetig: Es liest die Faktionsseite,
+    // klickt den Beitrittsknopf ueber die React-Props (ein gewoehnlicher
+    // Klick scheitert an der isTrusted-Sperre) und prueft danach am
+    // Spielerzustand, ob es geklappt hat.
+    //
+    // STADTFAKTIONEN BLEIBEN AUSSEN VOR. Die sechs Staedte schliessen einander
+    // aus: Wer Sector-12 beitritt, verbaut sich Chongqing, New Tokyo, Ishima
+    // und Volhaven auf Dauer. doku/strategie.md:53 sagt dazu seit jeher
+    // "Keine Stadtfaktion beitreten." Tian Di Hui ist die Ausnahme - sie
+    // gehoert beiden Lagern und hat kein enemies-Feld.
+    const STADTFAKTIONEN = ["Sector-12", "Aevum", "Chongqing", "New Tokyo", "Ishima", "Volhaven"];
+    const WUNSCHLISTE = ["CyberSec", "NiteSec", "The Black Hand", "BitRunners",
+      "Netburners", "Tian Di Hui", "Daedalus", "The Covenant", "Illuminati"];
+    if (round - letzterJoinLauf > 40 && ns.fileExists("joinfac.js", "home")) {
+      const offen = WUNSCHLISTE.find((f) => !STADTFAKTIONEN.includes(f)
+        && !player.factions.includes(f));
+      if (offen) {
+        // Es kostet nichts, es bei einer Faktion zu versuchen, in die man noch
+        // nicht eingeladen ist: joinfac.js findet den Knopf dann nicht und
+        // beendet sich. Teurer waere es, eine offene Einladung liegen zu
+        // lassen, weil niemand danach gesehen hat.
+        if (auftrag(["joinfac.js", offen], "Beitritt zu " + offen + " wird versucht")) {
+          letzterJoinLauf = round;
+        }
+      }
+    }
+
     // --- Faktionsarbeit am Laufen halten -------------------------------------
     // Der Autopilot hat work.js bis zum 20.08. NIRGENDS aufgerufen. Abschnitt 4
     // weiter unten heisst zwar "Laufende Arbeit aufnehmen", meint damit aber
@@ -491,7 +527,25 @@ export async function main(ns) {
     if (round - letzterArbeitsLauf > 30 && ns.fileExists("work.js", "home")
         && ns.fileExists("data/workfaction.txt", "home")) {
       const wunsch = ns.read("data/workfaction.txt").trim();
-      if (wunsch) {
+      // Nur beauftragen, wenn wir in der Faktion ueberhaupt Mitglied sind.
+      //
+      // ns.getPlayer() verschweigt zwar currentWork und focus, die
+      // Faktionsliste aber liefert es (NetscriptFunctions.ts:1371-1389). Ohne
+      // diese Pruefung navigiert work.js alle 30 Runden zur Faktionsseite,
+      // findet den Namen nicht - und reisst dabei jedem anderen
+      // Oberflaechenskript die Seite unter den Fuessen weg.
+      //
+      // Genau daran ist am 20.08. der Wiederaufbau nach dem Reset
+      // haengengeblieben: darkweb.js stand beim Haendler, klickte den
+      // TOR-Knopf, und in der Zwischenzeit hatte work.js laengst zur
+      // Faktionsseite gewechselt. Ergebnis: kein TOR, kein Portknacker,
+      // 33 von 96 Rechnern und keine einzige Faktion - waehrend beide
+      // Skripte brav ihren Vollzug meldeten.
+      const mitglied = wunsch && player.factions && player.factions.includes(wunsch);
+      if (wunsch && !mitglied && round % 300 === 0) {
+        note("Faktionsarbeit ausgesetzt: wir sind (noch) kein Mitglied bei " + wunsch);
+      }
+      if (mitglied) {
         if (auftrag(["work.js", wunsch], "Faktionsarbeit fuer " + wunsch + " wird neu angesetzt")) letzterArbeitsLauf = round;
       }
     }
@@ -1585,6 +1639,11 @@ function playerFacts(ns) {
     multChance: p.mults.hacking_chance,
     multSpeed: p.mults.hacking_speed,
     multGrow: p.mults.hacking_grow,
+    // Die Faktionsliste liefert ns.getPlayer() sehr wohl - anders als
+    // currentWork und focus, die dort Feld fuer Feld zusammengesetzt werden
+    // und schlicht fehlen (NetscriptFunctions.ts:1371-1389). Sie ist die
+    // billigste Art zu pruefen, ob eine Faktionsarbeit ueberhaupt Sinn hat.
+    factions: Array.isArray(p.factions) ? p.factions : [],
   };
 }
 

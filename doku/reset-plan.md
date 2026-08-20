@@ -97,8 +97,20 @@ ersatzlos.
    Offene Positionen sind beim Install ERSATZLOS weg (kein Erloes, keine
    Warnung). Das ist der einzige Schritt, dessen Versaeumnis echtes Geld
    kostet, und er gehoert deshalb an den Anfang.
-1. Warten, bis Tian Di Hui 75.000 Rep erreicht.
-2. **Eric prominent Bescheid geben.**
+1. **Warten, bis nichts mehr in Reichweite ist.** Das sagt
+   `node tools/augplan.js`: Solange dort "KAUFBAR" steht oder eine Schwelle in
+   weniger als einer Stunde faellt, lohnt Warten mehr als der Reset.
+
+   Bis zum 20.08. stand hier "warten, bis Tian Di Hui 75.000 Rep erreicht".
+   Das ist ueberholt: **Tian Di Hui und CyberSec haben keine Augmentierung
+   mehr, die uns fehlt** (siehe strategie.md). Reputation dort bringt nur noch
+   Favor - und Favor ist erst ab 150 etwas wert, wo Spenden moeglich werden.
+   Gearbeitet wird seither dort, wo der naechste fehlende Posten am fruehesten
+   faellt; nachts entscheidet das `tools/nightshift.js` selbst.
+2. **Die Nachtsteuerung beenden** (Fenster von `nacht.cmd`, Strg+C). Sie
+   beauftragt sonst mitten im Ablauf Kaeufe und Faktionswechsel und schreibt
+   dabei in denselben Auftragsplatz. Eine Vorwarnung an Eric braucht es seit
+   dem 20.08. nicht mehr.
 3. `node tools/task.js stopwork.js` — die Arbeit GANZ beenden, nicht nur
    entfokussieren. Der Unterschied ist entscheidend: Entfokussieren laesst die
    angezeigte Seite auf `Page.Work`, und solange sie das ist, blendet
@@ -106,8 +118,19 @@ ersatzlos.
    Probelauf deshalb vier von fuenf Faktionen nicht lesen, sah nur die
    Netburners und kaufte eine Hacknet-Augmentierung, die uns nichts nuetzt.
    Kostet rund zwei Minuten Reputation - vernachlaessigbar.
-4. `node tools/task.js buyaugs.js --allowunfocus --max 25`
-5. Warteschlange pruefen: `node /tmp/queue.mjs` bzw. Spielstand lesen.
+4. `node tools/task.js buyaugs.js --nfgdepth 0 --max 25` — alle echten
+   Augmentierungen. `--allowunfocus` braucht es seit dem 20.08. nicht mehr:
+   Die Arbeitsseite zu verlassen ist im Normalbetrieb immer erlaubt (nur der
+   Trockenlauf laesst es bleiben).
+5. Warteschlange pruefen: `node tools/lage.js --augs`. Sie zeigt die
+   Warteschlange samt Preisfaktor 1,9^n. **Erst wenn dort alles steht, was
+   erreichbar war**, geht es weiter - nach dem Install ist die Gelegenheit
+   vorbei, und die Reputation der Faktionen ist dann weg.
+5b. **NeuroFlux ZULETZT.** `node tools/task.js buyaugs.js --nfgdepth 25 --max 25`
+   erst jetzt, wenn alle echten Augmentierungen im Korb liegen. NeuroFlux
+   laesst sich unbegrenzt stapeln, und jede Stufe verteuert ueber den
+   Preisfaktor alles Nachfolgende - deshalb im Normalbetrieb `--nfgdepth 0`
+   und nur hier, am Ende, der volle Griff.
 6. `node tools/task.js install.js` — der Reset. Die Seite laedt dabei NICHT
    neu, `setInterval` ueberlebt, `keepalive.js` faengt den Wiederanlauf ab
    (zuletzt gemessen: 100 Sekunden).

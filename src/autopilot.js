@@ -228,6 +228,48 @@ export async function main(ns) {
       }
     }
 
+    // --- 3b. Die Hand ------------------------------------------------------
+    // hand.js bedient das Terminal ueber das DOM. Das kostet pauschal 25 GB
+    // Aufschlag, ist aber der einzige Weg, Terminalbefehle abzusetzen, ohne
+    // von aussen auf den Browser zuzugreifen - und jeder solche Zugriff loest
+    // in Opera eine Freigabeabfrage aus, die den Nutzer bei der Arbeit
+    // lahmlegt. Ueber die Hand laufen Backdoors und Programmkaeufe.
+    if (ns.fileExists("hand.js", "home")) {
+      const handRam = ns.getScriptRam("hand.js", "home");
+      // In der ERSTEN Runde die alte Fassung ueberall beenden. Anders als beim
+      // Autopiloten selbst gibt es fuer die Hand keinen Weg, sich zu erneuern:
+      // sie laeuft auf einem fremden Rechner, und ohne Browserzugriff kann
+      // niemand sie von aussen beenden.
+      if (round === 1) {
+        for (const s of workforce) {
+          for (const p of ns.ps(s.host)) if (p.filename === "hand.js") ns.kill(p.pid);
+        }
+      }
+      const laeuftSchon = workforce.some((s) => ns.ps(s.host).some((p) => p.filename === "hand.js"));
+      if (!laeuftSchon) {
+        // NICHT auf den Rechner des Einkaeufers: der raeumt sich bei Bedarf
+        // mit killall frei und wuerde die Hand jedes Mal mit erschlagen.
+        // Genau das ist am 20.08. passiert - beide landeten auf bot-3.
+        const investHost = workforce.find((s) => ns.ps(s.host).some((p) => p.filename === "invest.js"));
+        const platz = workforce
+          .filter((s) => s.host !== "home" && s.ramFree >= handRam)
+          .filter((s) => !investHost || s.host !== investHost.host)
+          .sort((a, b) => b.ramFree - a.ramFree)[0];
+        if (!platz) {
+          note("Fuer die Hand ist nirgends Platz (" + handRam.toFixed(2) + " GB noetig)");
+        } else {
+          ns.scp("hand.js", platz.host, "home");
+          if (ns.exec("hand.js", platz.host)) {
+            platz.ramFree -= handRam;
+            note("Die Hand laeuft jetzt auf " + platz.host);
+          } else {
+            note("Start der Hand auf " + platz.host + " abgelehnt (" + handRam.toFixed(2)
+              + " GB noetig, " + platz.ramFree.toFixed(2) + " GB frei)");
+          }
+        }
+      }
+    }
+
     // --- 4. Ziel bestimmen -------------------------------------------------
     // Sortiert wird nach erwartetem Ertrag der naechsten Viertelstunde,
     // NICHT nach Dauerertrag. Sonst gewinnt immer der fetteste Server, auch

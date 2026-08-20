@@ -1346,3 +1346,26 @@ deshalb unfokussiert - gleiche Rate, aber die Oberflaeche bleibt bedienbar.
 und ein Reset das Implant jederzeit wegnehmen kann. Im Zweifel wird fokussiert:
 Ein ueberfluessiger Fokus kostet nur Bequemlichkeit, ein fehlender kostet
 lautlos ein Fuenftel jeder Arbeitsstunde.
+
+## Nachtrag 20.08.2026: Aktienhandel abgeschaltet
+
+Eric hat den Handel am Abend des 20.08. gestoppt. Die Begruendung ist einfach
+und gilt weiter, solange Geld kein Engpass ist:
+
+Das Depot band zuletzt **2,39 Billionen** - gut ein Drittel des Vermoegens -
+und wuchs schneller als es Ertrag brachte. Es saugte damit nur den Ueberschuss
+auf, den der Bot ohnehin nicht ausgeben kann: Der Serverausbau steht am
+Anschlag (25 x 1.048.576 GB), und die fehlenden Augmentierungen kosten
+zusammen unter einer Billion. Dem stand ein Risiko gegenueber, das mit jeder
+Stunde wuchs - **offene Positionen sind beim Install ersatzlos weg**, und der
+Install ist der Kern unserer Strategie.
+
+Ohne Source-File 8 sind ausserdem keine Leerverkaeufe moeglich
+(`StockMarket.ts:160` prueft `checkSFAccess(ctx, 2)`), der Handel kann also nur
+auf steigende Kurse setzen.
+
+**Nicht wieder starten**, solange der Engpass Reputation heisst. Sollte sich
+das aendern - etwa in einem BitNode, in dem Geld knapp ist - steht das Werkzeug
+unter `src/stocks.js` bereit. `--liquidate` beendet dabei seit dem 20.08.
+zuerst alle laufenden Instanzen: Ohne das verkauft der Aufraeumlauf alles, und
+die noch laufende Instanz kauft in derselben Minute wieder ein.

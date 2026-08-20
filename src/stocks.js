@@ -86,6 +86,33 @@ export async function main(ns) {
   };
 
   if (liquidate) {
+    // ZUERST die Dauerinstanzen abschalten. Ohne das verkauft dieser Lauf
+    // alles, und die noch laufende Instanz kauft in derselben Minute wieder
+    // ein - das Depot waere nach dem "Liquidieren" so voll wie vorher. Genau
+    // darauf kommt es vor einem Reset an: Offene Positionen sind beim Install
+    // ersatzlos weg.
+    const gesehen = new Set(["home"]);
+    const schlange = ["home"];
+    while (schlange.length) {
+      for (const nachbar of ns.scan(schlange.shift())) {
+        if (gesehen.has(nachbar)) continue;
+        gesehen.add(nachbar);
+        schlange.push(nachbar);
+      }
+    }
+    let beendet = 0;
+    for (const host of gesehen) {
+      for (const proc of ns.ps(host)) {
+        if (proc.filename !== ns.getScriptName()) continue;
+        if (host === ns.getHostname() && proc.pid === ns.pid) continue;
+        ns.kill(proc.pid);
+        beendet++;
+      }
+    }
+    if (beendet) {
+      sag(beendet + " laufende Instanz(en) beendet - sonst kaufen sie sofort nach.");
+      await ns.sleep(500);
+    }
     const e = alleVerkaufen();
     return sag("Alles verkauft, Erloes rund $" + Math.round(e / 1e6) + " Mio. Positionen sind jetzt leer.");
   }

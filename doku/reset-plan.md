@@ -89,6 +89,11 @@ moeglich.
 ## Reihenfolge am Tag X — erprobt am 20.08.
 
 0. **`node tools/task.js stocks.js --liquidate`** - das Aktiendepot aufloesen.
+
+Seit dem 20.08.2026 ist der Aktienhandel abgeschaltet (siehe strategie.md),
+dieser Schritt sollte also nichts mehr finden. Er bleibt trotzdem stehen: Wer
+ihn ueberspringt und doch Positionen offen hat, verliert sie beim Install
+ersatzlos.
    Offene Positionen sind beim Install ERSATZLOS weg (kein Erloes, keine
    Warnung). Das ist der einzige Schritt, dessen Versaeumnis echtes Geld
    kostet, und er gehoert deshalb an den Anfang.

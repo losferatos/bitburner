@@ -524,7 +524,17 @@ export async function main(ns) {
     const STADTFAKTIONEN = ["Sector-12", "Aevum", "Chongqing", "New Tokyo", "Ishima", "Volhaven"];
     const WUNSCHLISTE = ["CyberSec", "NiteSec", "The Black Hand", "BitRunners",
       "Netburners", "Tian Di Hui", "Daedalus", "The Covenant", "Illuminati"];
-    if (round - letzterJoinLauf > 40 && ns.fileExists("joinfac.js", "home")) {
+    // Alle 300 Runden statt alle 40. Ein Beitrittsversuch ohne offene
+    // Einladung kostet nichts im Spiel - aber joinfac.js ist ein
+    // Oberflaechenskript, und jeder Lauf reisst einem gleichzeitig laufenden
+    // Kauflauf die Seite weg. In der Nacht zum 21.08. hat genau das einen
+    // Augmentierungskauf zerlegt: buyaugs.js hatte zwei Faktionsseiten
+    // gelesen, dann startete der turnusmaessige Netburners-Versuch, und
+    // danach fand der Kauflauf nur noch die Arbeitsseite vor.
+    //
+    // Alle zweieinhalb Minuten nach einer Einladung zu sehen, die seit
+    // Stunden nicht kommt, ist ohnehin Unfug.
+    if (round - letzterJoinLauf > 300 && ns.fileExists("joinfac.js", "home")) {
       const offen = WUNSCHLISTE.find((f) => !STADTFAKTIONEN.includes(f)
         && !player.factions.includes(f));
       if (offen) {

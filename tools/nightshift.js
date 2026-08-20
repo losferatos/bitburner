@@ -457,12 +457,55 @@ async function durchgang() {
 
 // --- Hauptschleife ---------------------------------------------------------
 
+/**
+ * Doppelstartschutz ueber eine Herzschlagdatei.
+ *
+ * Zwei Nachtsteuerungen wuerden sich um denselben Auftragsplatz streiten -
+ * `data/task.txt` ist ein einzelner Platz, und wer als Zweiter schreibt,
+ * loescht den Auftrag des Ersten. Der Fall ist heute Abend real: Eine
+ * Instanz laeuft aus meiner Sitzung, eine zweite startet Eric per nacht.cmd,
+ * bevor er schlafen geht.
+ *
+ * Die Datei traegt einen Zeitstempel, der bei jedem Durchgang erneuert wird.
+ * Ist sie juenger als zwei Takte, laeuft nachweislich noch jemand - dann
+ * beendet sich der Neuankoemmling. Ist sie aelter, war es eine Leiche (Fenster
+ * geschlossen, Rechner neu gestartet), und der Platz ist frei. Ein PID-Vergleich
+ * waere hier untauglich: Nach einem Neustart kann dieselbe Nummer laengst
+ * einem fremden Programm gehoeren.
+ */
+const HERZSCHLAG = path.join(HIER, "..", "data", "nightshift-heartbeat");
+
+function schonUnterwegs() {
+  try {
+    const alter = Date.now() - Number(fs.readFileSync(HERZSCHLAG, "utf8").trim());
+    if (Number.isFinite(alter) && alter < TAKT_MS * 2) return Math.round(alter / 1000);
+  } catch { /* keine Datei = niemand da, das ist der Normalfall */ }
+  return 0;
+}
+
+function herzschlag() {
+  try {
+    fs.mkdirSync(path.dirname(HERZSCHLAG), { recursive: true });
+    fs.writeFileSync(HERZSCHLAG, String(Date.now()), "utf8");
+  } catch { /* darf den Lauf nicht anhalten */ }
+}
+
 async function main() {
+  const laeuftSchon = schonUnterwegs();
+  if (laeuftSchon) {
+    log("Es laeuft bereits eine Nachtsteuerung (Herzschlag vor " + laeuftSchon
+      + " s). Diese hier beendet sich - zwei wuerden einander die Auftraege"
+      + " ueberschreiben.");
+    return;
+  }
+  herzschlag();
+
   log("Nachtsteuerung gestartet." + (DRY ? "  TROCKENLAUF - es wird nichts beauftragt." : "")
     + "  Takt " + (TAKT_MS / 60000) + " min, Wechsel ab Faktor " + WECHSEL_VORTEIL + ".");
   log("Sie loest KEINEN Reset aus und kauft KEIN NeuroFlux - beides von Hand.");
 
   for (;;) {
+    herzschlag();
     try {
       await durchgang();
     } catch (e) {

@@ -62,7 +62,14 @@ export async function main(ns) {
 
   const zeilen = () => [...doc.querySelectorAll("#terminal li, #terminal p")].map((e) => e.innerText);
 
-  schreibe("Hand bereit.");
+  // Nach einem Absturz kann der Nachtdienst stillgestellt zurueckgeblieben
+  // sein. Beim Start also aufraeumen, sonst arbeitet er nie wieder.
+  try {
+    const d0 = doc.defaultView.__nightshift;
+    if (d0 && d0.busy) { d0.busy = false; }
+  } catch { /* kein Nachtdienst, auch gut */ }
+
+  schreibe("Hand bereit auf " + HIER + ".");
 
   // Eigener Quelltext beim Start. Aendert er sich, beendet sich die Hand -
   // der Autopilot liefert sie in seiner naechsten Runde frisch aus. Ohne das
@@ -70,16 +77,39 @@ export async function main(ns) {
   ns.scp("hand.js", HIER, "home");
   const eigenerStand = ns.read("hand.js");
 
+  let takt = 0;
   while (true) {
     await ns.sleep(3000);
-    ns.scp("hand.js", HIER, "home");
-    if (ns.read("hand.js") !== eigenerStand) {
-      schreibe("Neue Fassung erkannt - beende mich, der Autopilot liefert sie aus.");
-      return;
+    takt++;
+
+    // Ohne diesen Fangarm stirbt die Hand stumm: ihr Fehlerfenster steht im
+    // Spiel, und genau dorthin habe ich keinen Blick. Jeder Fehler gehoert
+    // deshalb in die Ausgabedatei, die ich von aussen lesen kann.
+    try {
+      // Selbsterneuerung nur gelegentlich pruefen - ein scp je drei Sekunden
+      // waere unnoetige Last.
+      if (takt % 10 === 0) {
+        ns.scp("hand.js", HIER, "home");
+        if (ns.read("hand.js") !== eigenerStand) {
+          schreibe("Neue Fassung erkannt - beende mich, der Autopilot liefert sie aus.");
+          return;
+        }
+      }
+      // Herzschlag: Der Autopilot erkennt daran eine haengende Hand und
+      // erschlaegt sie. Ein toter Prozess wird ohnehin neu gestartet, ein
+      // haengender bliebe sonst fuer immer stehen - und mit ihm der einzige
+      // Steuerkanal, der ohne Browser funktioniert.
+      ns.write("data/hand-puls.txt", String(Date.now()), "w");
+      if (HIER !== "home") ns.scp("data/hand-puls.txt", "home", HIER);
+
+      if (!ns.fileExists(EIN, "home")) continue;
+      if (HIER !== "home") ns.scp(EIN, HIER, "home");
+      var roh = ns.read(EIN).trim();
+    } catch (e) {
+      schreibe("FEHLER beim Lesen: " + (e && e.message ? e.message : String(e)));
+      await ns.sleep(5000);
+      continue;
     }
-    if (!ns.fileExists(EIN, "home")) continue;
-    if (HIER !== "home") ns.scp(EIN, HIER, "home");
-    const roh = ns.read(EIN).trim();
     if (!roh || roh === zuletzt) continue;
     zuletzt = roh;
 
@@ -91,7 +121,14 @@ export async function main(ns) {
     // Aktion wie backdoor ab - genau daran sind heute frueh zwei Versuche
     // gescheitert. Sein busy-Flag ist die dafuer vorgesehene Bremse.
     const dienst = doc.defaultView.__nightshift;
-    if (dienst) dienst.busy = true;
+    if (dienst) {
+      dienst.busy = true;
+      // Selbstloesung: stirbt die Hand mitten im Befehl, bliebe der
+      // Nachtdienst sonst FUER IMMER blockiert - beide warten dann
+      // aufeinander. Genau das ist am 20.08. passiert.
+      if (dienst.handLoeser) doc.defaultView.clearTimeout(dienst.handLoeser);
+      dienst.handLoeser = doc.defaultView.setTimeout(() => { dienst.busy = false; }, 300000);
+    }
 
     // Ohne Terminalbildschirm gibt es kein Eingabefeld. Die Seitenleiste
     // haengt ihren Tastaturhandler an das Dokument und prueft die Echtheit
@@ -105,6 +142,7 @@ export async function main(ns) {
       continue;
     }
 
+    try {
     for (const b of befehle) {
       if (!terminal(b)) { protokoll.push("FEHLER bei: " + b); break; }
       protokoll.push("> " + b);
@@ -130,6 +168,12 @@ export async function main(ns) {
       await ns.sleep(800);
     }
 
+    } catch (e) {
+      // Ohne diesen Fangarm stirbt die Hand mitten im Befehl, und der
+      // Nachtdienst bliebe stillgestellt zurueck. Am 20.08. ist genau das
+      // mehrfach passiert - jedes Mal war danach der ganze Steuerkanal tot.
+      protokoll.push("FEHLER: " + (e && e.message ? e.message : String(e)));
+    }
     if (dienst) dienst.busy = false;
     schreibe(protokoll.join("\n") + "\n--- Terminal ---\n" + zeilen().slice(-8).join("\n"));
   }

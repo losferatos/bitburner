@@ -173,9 +173,21 @@ function tabelle(n, v) {
   if (fa && n.faktionen[fa]) {
     const d = n.faktionen[fa];
     const vd = v && v.faktionen && v.faktionen[fa];
-    const rate = vd && dt ? (d.rep - vd.rep) / dt : null;
+    // Nach einem Faktionswechsel ist die Rate wertlos: Der Zeitraum enthaelt
+    // dann Minuten, in denen woanders gearbeitet wurde, und die Hochrechnung
+    // "Rest bis Favor 150" wird absurd. Beim ersten Tick nach dem Wechsel
+    // lieber gar keine Zahl als eine falsche.
+    const gewechselt = v && v.arbeitAn && v.arbeitAn !== fa;
+    const rate = (vd && dt && !gewechselt) ? (d.rep - vd.rep) / dt : null;
+    // Die Rate haengt ausser am Hacking-Level auch am Favor der Faktion:
+    // favorMult = 1 + favor/100 (PersonObjects/formulas/reputation.ts:9).
+    // Eine frische Faktion arbeitet deshalb deutlich langsamer als eine
+    // eingesessene - das gehoert neben die Rate, sonst wirkt sie wie ein Fehler.
+    const favorFaktor = 1 + d.favor / 100;
     zeile("Rep " + fa, zahl(d.rep),
-      rate ? rate.toFixed(1) + " Rep/s" : "-",
+      rate ? rate.toFixed(1) + " Rep/s (Favor x" + favorFaktor.toFixed(2) + ")"
+        : gewechselt ? "gewechselt von " + v.arbeitAn
+          : "Favor x" + favorFaktor.toFixed(2),
       delta(d.rep, vd && vd.rep, zahl));
     zeile("  Favor n. Reset", d.favorNachReset.toFixed(1),
       ZIEL_FAVOR + " (Spenden)",

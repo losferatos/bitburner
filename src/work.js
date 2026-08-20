@@ -183,10 +183,31 @@ export async function main(ns) {
     // unfokussiert weiter, egal welche Seite offen ist (genau das bedeutet
     // "Do something else simultaneously"). Eine Navigation ruft zwar
     // stopFocusing() (GameRoot.tsx:271-272) - das ist hier gerade erwuenscht.
-    await ns.sleep(400);
+    // Erst warten, bis die Arbeitsseite tatsaechlich weg ist - DANN navigieren.
+    //
+    // Alt+T haengt am Tastaturhandler der Seitenleiste (SidebarRoot.tsx:303),
+    // und die wird auf Page.Work gar nicht gerendert (GameRoot.tsx:325-330).
+    // Solange die Arbeitsseite steht, ist die Taste also wirkungslos. Die alte
+    // Fassung wartete pauschal 400 ms nach dem Klick und feuerte dann - ohne
+    // je zu pruefen, ob sie ankam.
+    //
+    // Das hat in der Nacht zum 21.08. drei Kauflaeufe hintereinander gekostet:
+    // Die Arbeitsseite blieb stehen, und buyaugs.js fand deshalb weder
+    // Seitenleiste noch Augmentierungsseite. Der Fehler war nicht dort, wo er
+    // gemeldet wurde.
+    const arbeitsseiteOffen = () =>
+      knoepfe().some((b) => text(b) === "Do something else simultaneously");
+    for (let i = 0; i < 8 && arbeitsseiteOffen(); i++) await ns.sleep(400);
+
     doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
+    await ns.sleep(500);
+    const nochDrauf = arbeitsseiteOffen();
     return sag("Arbeit fuer " + faktion + " laeuft ohne Fokus - volle Rate dank"
-      + " Neuroreceptor-Implant. Oberflaeche zurueck aufs Terminal.");
+      + " Neuroreceptor-Implant."
+      + (nochDrauf
+        ? "  ACHTUNG: Die Arbeitsseite steht noch - der naechste Kauflauf wird"
+          + " daran scheitern."
+        : "  Oberflaeche zurueck aufs Terminal."));
   }
 
   for (let i = 0; i < 3; i++) {

@@ -1170,25 +1170,23 @@ const onAugmentationsPage = (doc) =>
  */
 async function goToAugmentationsPage(doc, sleep, allowUnfocus = false) {
   if (onAugmentationsPage(doc)) return "";
-  // Denselben Ausweg wie goToFactionsPage: Steht die Arbeitsseite offen, gibt
-  // es keine Seitenleiste und damit keinen Eintrag "Augmentations".
+  // HIER WIRD NICHT GEKLICKT - und das ist ein Befund, kein Versaeumnis.
   //
-  // Dieser Fix fehlte hier, waehrend er in goToFactionsPage schon stand - und
-  // hat in der Nacht zum 21.08. jeden Kauflauf gekostet: Die fuenf
-  // Faktionsseiten wurden sauber gelesen, dann scheiterte der Griff nach der
-  // Warteschlangenlaenge, und ohne die bricht der Lauf ab ("ohne sie ist jeder
-  // Preis geraten"). Alle nachfolgenden Meldungen - NeuroFlux-Stufe falsch,
-  // Augmentierungen "gelten als gekauft" - waren blosse Folgefehler davon.
-  if (allowUnfocus && aufArbeitsseite(doc)) {
-    for (let i = 0; i < 4 && aufArbeitsseite(doc); i++) {
-      const raus = [...doc.querySelectorAll("button")].find(
-        (b) => labelOf(b) === "Do something else simultaneously",
-      );
-      if (!raus) break;
-      raus.click();
-      await sleep(700);
-    }
-  }
+  // Der naheliegende Gedanke war, denselben Ausweg wie in goToFactionsPage
+  // einzubauen: Steht die Arbeitsseite offen, fehlt die Seitenleiste und damit
+  // der Eintrag "Augmentations". In der Nacht zum 21.08. wurde genau das
+  // versucht - und hat das Skript zuverlaessig zum HAENGEN gebracht. Zweimal
+  // hintereinander blieb buyaugs.js exakt hier stehen, jeweils ueber zehn
+  // Minuten, ohne eine weitere Zeile zu schreiben; davor und danach lief
+  // dieselbe Fassung ohne den Klick sauber durch.
+  //
+  // Woran es liegt, ist ohne Browserzugriff nicht zu klaeren - der Verdacht
+  // faellt auf ein modales Fenster, das der Klick an dieser Stelle oeffnet.
+  // Sicher ist nur die Wirkung, und ein Haenger ist schlimmer als ein
+  // Fehlschlag: Autopilot und Nachtsteuerung warten beide, solange ein
+  // Oberflaechenskript laeuft, also legt ein Haenger den ganzen Betrieb still.
+  // Ein Fehlschlag kostet nur diesen einen Lauf, und der naechste Takt
+  // versucht es in drei Minuten erneut.
   const item = findSidebarItem(doc, "Augmentations");
   if (!item) {
     const why = detectBlockedPage(doc);

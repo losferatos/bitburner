@@ -890,30 +890,31 @@ function modalTitle(m) {
 // ===========================================================================
 
 /**
- * Laeuft gerade FOKUSSIERTE Arbeit? Nur die blockiert die Oberflaeche.
+ * Steht die Oberflaeche auf der Arbeitsseite (Page.Work)?
  *
- * Der naheliegende Test ist falsch, und er hat am 20.08. den kompletten
- * Augmentierungskauf verhindert: Beide Stellen unten suchten den Knopf
- * "Do something else simultaneously" und schlossen aus seinem Dasein auf
- * Fokus. Den Knopf gibt es aber genauso bei UNfokussierter Arbeit, sobald die
- * Arbeitsseite offen steht - buyaugs.js meldete deshalb bei allen fuenf
- * Faktionen "fokussierte Arbeit laeuft", waehrend im Spielstand focus:false
- * stand, und kaufte nichts.
+ * DIESE FRAGE IST DIE RICHTIGE - "ist der Fokus an?" war es nicht.
  *
- * Der ehrliche Indikator ist der GEGENKNOPF: "Focus" im Uebersichtsfenster
- * wird ausschliesslich gerendert, wenn Arbeit laeuft UND der Fokus aus ist
- * (ui/React/CharacterOverview.tsx:293 kehrt sonst leer zurueck). Sein Dasein
- * beweist also das Gegenteil von Fokus.
+ * Am 20.08. wurde diese Stelle zweimal falsch verstanden. Erst hiess sie
+ * "fokussierte Arbeit laeuft", weil sie den Knopf "Do something else
+ * simultaneously" als Fokus-Beweis las - den gibt es aber auch bei
+ * UNfokussierter Arbeit. Dann wurde sie auf den Gegenknopf "Focus" umgestellt
+ * (CharacterOverview.tsx:293), was den Fokus zwar korrekt erkennt, aber am
+ * eigentlichen Problem vorbeigeht.
  *
- * Seit dem Neuroreceptor-Implant arbeitet der Bot dauerhaft unfokussiert
- * (focusPenalty() gibt dann konstant 1 zurueck), dieser Fall ist also der
- * Normalfall und nicht die Ausnahme.
+ * Das eigentliche Problem ist die SEITE, nicht der Fokus: `Page.Work` setzt
+ * `withSidebar = false` (GameRoot.tsx:325-330). Ohne Seitenleiste gibt es
+ * weder den Eintrag "Augmentations" noch die Alt-Tastenkuerzel, die daran
+ * haengen (SidebarRoot.tsx:303) - und zwar voellig unabhaengig davon, ob
+ * fokussiert wird. Steht die Oberflaeche auf dieser Seite, kommt buyaugs.js
+ * nirgendwohin.
+ *
+ * Der einzige Ausgang ist eben jener Knopf. Ihn zu klicken beendet die Arbeit
+ * NICHT (FactionWork laeuft weiter), und seit dem Neuroreceptor-Implant kostet
+ * es nicht einmal Reputation - focusPenalty() gibt dann konstant 1 zurueck.
  */
-function istFokussiert(doc) {
-  const knoepfe = [...doc.querySelectorAll("button")];
-  const arbeitOffen = knoepfe.some((b) => labelOf(b) === "Do something else simultaneously");
-  if (!arbeitOffen) return false;
-  return !knoepfe.some((b) => labelOf(b) === "Focus");
+function aufArbeitsseite(doc) {
+  return [...doc.querySelectorAll("button")]
+    .some((b) => labelOf(b) === "Do something else simultaneously");
 }
 
 /**
@@ -925,8 +926,8 @@ function istFokussiert(doc) {
 function detectBlockedPage(doc) {
   const body = (doc.body?.innerText || "").slice(0, 4000);
   const has = (s) => body.includes(s);
-  if (istFokussiert(doc)) {
-    return "fokussierte Arbeit (Page.Work)";
+  if (aufArbeitsseite(doc)) {
+    return "Arbeitsseite offen - ohne Seitenleiste kein Weg weiter (Page.Work)";
   }
   if (has("Recovery Mode") || has("RECOVERY MODE")) return "Recovery-Modus — der Spielstand hat ein Problem";
   if (has("Import Save") || has("Importing this save")) return "Speicherstand-Import wartet auf eine Entscheidung";
@@ -957,17 +958,16 @@ function findSidebarItem(doc, label) {
 async function goToFactionsPage(doc, sleep, log, allowUnfocus) {
   if (onFactionsPage(doc)) return "";
 
-  // Nur ECHT fokussierte Arbeit blockiert - siehe istFokussiert(). Steht die
-  // Arbeitsseite bloss offen, ohne dass fokussiert wird, ist die Seitenleiste
-  // da und Alt+F traegt; dann gibt es hier nichts wegzuraeumen.
-  if (istFokussiert(doc)) {
-    if (!allowUnfocus) return "fokussierte Arbeit laeuft, Entfokussieren ist hier nicht erlaubt";
-    const unfocus = [...doc.querySelectorAll("button")].find(
+  // Steht die Arbeitsseite offen, MUSS sie verlassen werden - sie blendet die
+  // Seitenleiste aus, und daran haengt alles Weitere. Siehe aufArbeitsseite().
+  if (aufArbeitsseite(doc)) {
+    if (!allowUnfocus) return "Arbeitsseite offen, Verlassen ist hier nicht erlaubt (Trockenlauf)";
+    const raus = [...doc.querySelectorAll("button")].find(
       (b) => labelOf(b) === "Do something else simultaneously",
     );
-    if (unfocus) {
-      unfocus.click();
-      log("Fokussierte Arbeit entfokussiert (die Arbeit laeuft weiter).");
+    if (raus) {
+      raus.click();
+      log("Arbeitsseite verlassen (die Faktionsarbeit laeuft weiter).");
       await sleep(600);
     }
   }
@@ -1655,7 +1655,16 @@ export async function main(ns) {
   const distinctBonus = Number(flags.distinct);
   // Im Trockenlauf wird fokussierte Arbeit NIE unterbrochen — das waere ein
   // Eingriff in den Spielzustand, und genau den verspricht --dry nicht zu tun.
-  const allowUnfocus = !!flags.allowunfocus && !dry;
+  // Frueher musste --allowunfocus ausdruecklich gesetzt werden. Das war eine
+  // Huerde ohne Gegenwert: Die Arbeitsseite zu verlassen beendet keine Arbeit
+  // und kostet dank Neuroreceptor-Implant keine Reputation - ohne diesen
+  // Schritt kauft buyaugs.js aber ueberhaupt nichts, sobald die Oberflaeche
+  // zufaellig auf Page.Work steht. Genau daran scheiterten am 20.08. abends
+  // zwei Kauflaeufe der Nachtsteuerung.
+  //
+  // Im Trockenlauf bleibt es verboten - der darf den Spielzustand nicht
+  // anfassen, auch nicht die angezeigte Seite.
+  const allowUnfocus = !dry;
 
   const doc = document; // einziger Ort mit diesem Bezeichner, siehe Kopf
   const sleep = (ms) => ns.sleep(ms);

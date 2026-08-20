@@ -425,8 +425,37 @@ export async function main(ns) {
     // Runde den Platz - sie dauert eine Minute.
     let auftragVergeben = ns.fileExists("data/task.txt", "home")
       && ns.read("data/task.txt").trim() !== "";
+    // Skripte, die die Spieloberflaeche bedienen. Zwei davon gleichzeitig
+    // reissen einander die Seite weg - jede Navigation wechselt die Seite fuer
+    // ALLE. Am 20.08. hatte buyaugs.js zwei von fuenf Faktionsseiten gelesen,
+    // als die Faktionsarbeit turnusmaessig neu angesetzt wurde; der Kauflauf
+    // brach mittendrin ab und kaufte nichts. Vorher war schon der Wiederaufbau
+    // nach dem Reset daran gescheitert (darkweb.js gegen work.js).
+    const OBERFLAECHE = /^(buyaugs|work|joinfac|darkweb|travel|homeram|buyone|stockaccess)\.js$/;
+    // `hosts` (Zeile 370) statt `workforce`: Letzteres wird erst weit unten
+    // gebildet, und ein Zugriff von hier aus liefe in die temporale Todeszone
+    // von const - der Autopilot waere beim ersten Auftrag abgestuerzt.
+    const oberflaecheLaeuft = () => {
+      for (const host of hosts) {
+        for (const proc of ns.ps(host)) {
+          if (OBERFLAECHE.test(proc.filename)) return proc.filename + " auf " + host;
+        }
+      }
+      return null;
+    };
+
     const auftrag = (teile, meldung) => {
       if (auftragVergeben) return false;
+      // Ein Oberflaechenskript wird nur beauftragt, wenn keins laeuft. Andere
+      // Auftraege (contracts.js, restart.js) beruehren die Oberflaeche nicht
+      // und duerfen jederzeit.
+      if (OBERFLAECHE.test(teile[0])) {
+        const belegt = oberflaecheLaeuft();
+        if (belegt) {
+          if (round % 100 === 0) note("Auftrag " + teile[0] + " zurueckgestellt: " + belegt + " laeuft noch");
+          return false;
+        }
+      }
       auftragVergeben = true;
       ns.write("data/task.txt", JSON.stringify(teile), "w");
       note(meldung);

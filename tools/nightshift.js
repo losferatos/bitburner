@@ -1,0 +1,478 @@
+/**
+ * Die Nachtsteuerung.
+ *
+ * WAS SIE TUT
+ *
+ * Sie haelt die Faktionsarbeit auf der Faktion, bei der die naechste noch
+ * fehlende Augmentierung am fruehesten faellt, und laesst kaufen, sobald welche
+ * in Reichweite kommt. Das ist alles - und genau das fehlt fuer einen
+ * Nachtlauf. Reputation sammelt der Bot von allein; was er nicht kann, ist
+ * merken, dass eine Faktion erschoepft ist.
+ *
+ * WARUM AUF DER NODE-SEITE
+ *
+ * Reputation und Augmentierungsbesitz sind aus einem Skript im Spiel nicht
+ * lesbar - dafuer braeuchte es ns.singularity.*, also Source-File 4. Von hier
+ * aus geht es: Die Bruecke liefert den vollstaendigen Spielstand. Und der Weg
+ * zurueck ins Spiel fuehrt ueber den Auftragslaeufer des Autopiloten, der
+ * Skripte per ns.exec startet. Kein Browserzugriff, keine Freigabeabfragen.
+ *
+ * WAS SIE AUSDRUECKLICH NICHT TUT
+ *
+ * Keinen Reset. Der Ablauf hat sieben Schritte, musste am 20.08. dreimal
+ * mitten in der Durchfuehrung repariert werden, und das Aktiendepot muss vorher
+ * liquidiert werden, sonst ist es ersatzlos weg. Das gehoert in eine Sitzung,
+ * die mitdenken kann. Die Nacht liefert die Vorarbeit - die ist der lange Teil.
+ *
+ * DIE LEHRE AUS DEM ALTEN NACHTDIENST
+ *
+ * Der lief bis zum 19.08. und "verbrannte nebenher Milliarden in NeuroFlux"
+ * (src/autopilot.js:449-452), weshalb er stillgelegt wurde. Der Grund steckt im
+ * Preisfaktor: Jeder Posten in der Kaufwarteschlange verteuert den naechsten um
+ * 1,9 (AugmentationHelpers.ts:29-37). Bei den 25 NeuroFlux-Stufen, die
+ * buyaugs.js von Haus aus betrachtet, waere der Faktor 1,9^25 - also gut vier
+ * Millionen. Danach ist keine einzige richtige Augmentierung mehr bezahlbar.
+ * Diese Steuerung ruft buyaugs.js deshalb immer mit --nfgdepth 0 auf.
+ * NeuroFlux wird zuletzt gekauft, unmittelbar vor dem Install, von Hand.
+ *
+ * Aufruf:  node tools/nightshift.js            laeuft bis Strg+C
+ *          node tools/nightshift.js --once     ein Durchgang, dann Schluss
+ *          node tools/nightshift.js --dry      entscheidet, beauftragt aber nicht
+ */
+
+import zlib from "node:zlib";
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const BASE = "http://localhost:8795";
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const QUELLE = path.join(HIER, "..", "reference", "bitburner-src", "src", "Augmentation");
+const LOGDIR = path.join(HIER, "..", "nightshift", "log");
+
+const ARGS = process.argv.slice(2);
+const EINMAL = ARGS.includes("--once");
+const DRY = ARGS.includes("--dry");
+
+// Takt. Drei Minuten reichen: Die Reputation waechst mit rund 8 pro Sekunde,
+// eine Kaufschwelle wird also nie um mehr als ein paar hundert Reputation
+// verpasst - und jeder Durchgang liest den kompletten Spielstand, das soll
+// nicht im Sekundentakt passieren.
+//
+// Nach unten begrenzt auf 70 Sekunden: Die Ratenmessung verlangt mehr als 60
+// Sekunden Abstand zwischen zwei Durchgaengen (siehe unten), sonst misst sie
+// nie und der Dienst bliebe fuer immer im "Rate noch nicht gemessen" haengen.
+const taktArg = Number((ARGS[ARGS.indexOf("--takt") + 1] || ""));
+const TAKT_MS = ARGS.includes("--takt") && Number.isFinite(taktArg) && taktArg > 0
+  ? Math.max(70000, taktArg * 60 * 1000)
+  : 3 * 60 * 1000;
+
+// Wie stark muss die Konkurrenz besser sein, damit gewechselt wird? Ein
+// Wechsel kostet keine Reputation - die bleibt stehen -, aber er wirft den
+// Vorsprung bei der bisherigen Faktion fuer die naechste Zeit weg. Er lohnt
+// erst, wenn die andere die naechste Augmentierung deutlich frueher liefert.
+const WECHSEL_VORTEIL = 1.6;
+
+// Glaettung der Ratenmessung. Ein Messfenster von einer Minute schwankt stark
+// (im Versuch am 20.08.: 8,6 und 18,3 Rep/s, waehrend die ehrliche
+// 20-Minuten-Messung 10,7 sagte). Ungeglaettet wuerde eine Ausreisser-Messung
+// eine Faktion doppelt so attraktiv aussehen lassen, wie sie ist.
+const GLAETTUNG = 0.25;
+
+// Mindestabstand zwischen zwei Kaufauftraegen. buyaugs.js navigiert durch alle
+// Faktionsseiten, das dauert; oefter als alle zehn Minuten hat es keinen Sinn.
+const KAUF_ABSTAND_MS = 10 * 60 * 1000;
+
+const geld = (n) => {
+  if (!Number.isFinite(n)) return "--";
+  const u = ["", "k", "m", "b", "t"];
+  let i = 0;
+  let x = n;
+  while (Math.abs(x) >= 1000 && i < u.length - 1) { x /= 1000; i++; }
+  return "$" + (Math.abs(x) < 10 ? x.toFixed(2) : x.toFixed(1)) + u[i];
+};
+
+const zahl = (n) => {
+  if (!Number.isFinite(n)) return "--";
+  if (Math.abs(n) >= 1e6) return (n / 1e6).toFixed(2) + "M";
+  if (Math.abs(n) >= 1e3) return (n / 1e3).toFixed(1) + "k";
+  return String(Math.round(n));
+};
+
+const uhr = () => new Date().toTimeString().slice(0, 8);
+
+let logDatei = null;
+function log(text) {
+  const zeile = uhr() + "  " + text;
+  console.log(zeile);
+  try {
+    if (!logDatei) {
+      fs.mkdirSync(LOGDIR, { recursive: true });
+      logDatei = path.join(LOGDIR, new Date().toISOString().slice(0, 10) + "-nightshift.log");
+    }
+    fs.appendFileSync(logDatei, new Date().toISOString() + "\t" + text + "\n", "utf8");
+  } catch { /* ein fehlendes Protokoll darf den Lauf nicht anhalten */ }
+}
+
+// --- Zugriff ---------------------------------------------------------------
+
+async function rpc(method, params = {}) {
+  const body = await (await fetch(BASE + "/api/rpc?" + new URLSearchParams({ method, ...params }))).json();
+  if (body.error) throw new Error(body.error);
+  return body.result;
+}
+
+async function stand() {
+  const r = await rpc("getSaveFile");
+  return JSON.parse(zlib.gunzipSync(Buffer.from(r.save, "latin1")).toString("utf8"));
+}
+
+/** Dateien eines Servers aus dem Spielstand. Sie liegen als JSONMap vor. */
+function dateien(sv) {
+  const tf = sv.textFiles;
+  const paare = (tf && tf.data) || [];
+  const m = new Map();
+  for (const [name, f] of paare) m.set(name, (f.data || f).text || "");
+  return m;
+}
+
+// --- Aug-Katalog aus dem Quelltext -----------------------------------------
+
+function enumTabelle(datei) {
+  const roh = fs.readFileSync(datei, "utf8");
+  const t = {};
+  for (const m of roh.matchAll(/^\s*(\w+)\s*=\s*"([^"]+)"/gm)) t[m[1]] = m[2];
+  return t;
+}
+
+function liesAugs() {
+  const augName = enumTabelle(path.join(QUELLE, "Enums.ts"));
+  const facName = enumTabelle(path.join(QUELLE, "..", "Faction", "Enums.ts"));
+  const roh = fs.readFileSync(path.join(QUELLE, "Augmentations.ts"), "utf8");
+  const bloecke = roh.split(/\[AugmentationName\.(\w+)\]:\s*\{/).slice(1);
+  const augs = [];
+  for (let i = 0; i < bloecke.length; i += 2) {
+    const body = bloecke[i + 1] || "";
+    const name = augName[bloecke[i]] || bloecke[i];
+    const rep = Number((body.match(/repCost:\s*([0-9.e+-]+)/) || [])[1]);
+    const money = Number((body.match(/moneyCost:\s*([0-9.e+-]+)/) || [])[1]);
+    const facRoh = (body.match(/factions:\s*\[([^\]]*)\]/s) || [])[1] || "";
+    const factions = [...facRoh.matchAll(/FactionName\.(\w+)/g)].map((m) => facName[m[1]] || m[1]);
+    const prereqs = [...(body.match(/prereqs:\s*\[([^\]]*)\]/s) || ["", ""])[1]
+      .matchAll(/AugmentationName\.(\w+)/g)].map((m) => augName[m[1]] || m[1]);
+    if (!Number.isFinite(rep) || !factions.length) continue;
+    augs.push({ name, rep, money, factions, prereqs });
+  }
+  return augs;
+}
+
+const KATALOG = liesAugs();
+const NFG = "NeuroFlux Governor";
+
+// --- Bewertung -------------------------------------------------------------
+
+/**
+ * Wie lange dauert es bei dieser Faktion bis zur naechsten neuen
+ * Augmentierung? Kleiner ist besser.
+ *
+ * WARUM NICHT "wie viele in vier Stunden"
+ *
+ * Genau so stand es im ersten Entwurf, und der Trockenlauf am 20.08. hat es
+ * widerlegt: Er wollte nach zwei Takten von NiteSec (8.100 Reputation) zu
+ * The Black Hand (1.600) wechseln, nur weil dort mehr Augmentierungen im
+ * Katalog stehen. Der Vorsprung von 6.500 Reputation waere weggeworfen worden,
+ * und die naechste Augmentierung haette sich dadurch nach HINTEN verschoben.
+ *
+ * Die Zahl der Kandidaten sagt nichts darueber, wann der naechste tatsaechlich
+ * faellt - und nur das entscheidet, wo die naechste Stunde am besten aufgehoben
+ * ist. Reputation geht bei einem Wechsel nicht verloren, die Faktion laesst
+ * sich also spaeter jederzeit nachholen.
+ *
+ * Die Rate haengt am Favor der Faktion: favorMult = 1 + favor/100
+ * (PersonObjects/formulas/reputation.ts:9). basisRate ist deshalb auf Favor 0
+ * normiert, sonst waere der Vergleich zweier Faktionen schief.
+ */
+function bewerte(fac, rep, favor, basisRate, habe, imKorb) {
+  const rate = basisRate * (1 + favor / 100);
+  const offen = KATALOG.filter((a) => a.name !== NFG
+    && a.factions.includes(fac)
+    && !habe.has(a.name) && !imKorb.has(a.name));
+  const jetzt = offen.filter((a) => a.rep <= rep);
+  const naechste = offen.filter((a) => a.rep > rep).sort((x, y) => x.rep - y.rep)[0] || null;
+  // Gemessen wird die Zeit bis zur naechsten NOCH NICHT erreichbaren
+  // Augmentierung - was schon erreichbar ist, zaehlt hier ausdruecklich nicht.
+  //
+  // Der erste Entwurf setzte die Wartezeit auf null, sobald irgendwo etwas
+  // kaufbar war, und wollte deshalb dorthin wechseln. Das ist falsch: Ein Kauf
+  // braucht nur die Reputation, nicht die Arbeit. Was gekauft werden kann,
+  // wird gekauft, egal wo gerade gearbeitet wird - fuer die Frage, wo die
+  // naechste Stunde am besten aufgehoben ist, zaehlt allein, wo der naechste
+  // noch fehlende Posten frueher faellt.
+  //
+  // Ist gar nichts mehr offen, ist die Faktion erschoepft: unendlich.
+  const wartet = naechste ? (naechste.rep - rep) / rate : Infinity;
+  return { fac, rep, favor, rate, jetzt, naechste, offen: offen.length, wartet };
+}
+
+/**
+ * Notfallwahl, wenn gar keine Arbeit laeuft und auch keine Wunschfaktion
+ * hinterlegt ist. Ohne Ratenmessung laesst sich nicht rechnen, deshalb die
+ * schlichte Regel: die Faktion mit der niedrigsten noch offenen Schwelle,
+ * gemessen am Abstand zur eigenen Reputation.
+ */
+function bevorzugteFaktion(mitglied, f, habe, korb) {
+  let beste = null;
+  let bestAbstand = Infinity;
+  for (const k of mitglied) {
+    const d = (f[k] && (f[k].data || f[k])) || {};
+    const rep = Number.isFinite(d.playerReputation) ? d.playerReputation : 0;
+    for (const a of KATALOG) {
+      if (a.name === NFG || !a.factions.includes(k)) continue;
+      if (habe.has(a.name) || korb.has(a.name)) continue;
+      const abstand = Math.max(0, a.rep - rep);
+      if (abstand < bestAbstand) { bestAbstand = abstand; beste = k; }
+    }
+  }
+  return beste;
+}
+
+const dauer = (s) => {
+  if (!Number.isFinite(s)) return "nie";
+  const h = s / 3600;
+  return h < 1 ? (s / 60).toFixed(0) + " min" : h.toFixed(1) + " h";
+};
+
+// --- Ein Durchgang ---------------------------------------------------------
+
+let letzterKauf = 0;
+let letzterWechsel = 0;
+let letzteFaktion = null;
+let basisRate = null;      // Rep/s, normiert auf die Faktion, wo gemessen wurde
+let messungRep = null;     // { fac, rep, t }
+
+async function durchgang() {
+  const s = await stand();
+  const p = JSON.parse(s.data.PlayerSave).data;
+  const f = JSON.parse(s.data.FactionsSave);
+  const server = Object.values(JSON.parse(s.data.AllServersSave)).map((x) => x.data);
+  const home = server.find((x) => x.hostname === "home");
+  const homeDateien = dateien(home);
+
+  const habe = new Set((p.augmentations || []).map((a) => a.name));
+  const korb = new Set((p.queuedAugmentations || []).map((a) => a.name));
+  const mitglied = p.factions || [];
+  const w = p.currentWork && (p.currentWork.data || p.currentWork);
+  const arbeitAn = w && w.factionName ? w.factionName : null;
+
+  const repVon = (k) => {
+    const d = (f[k] && (f[k].data || f[k])) || {};
+    return Number.isFinite(d.playerReputation) ? d.playerReputation : 0;
+  };
+  const favorVon = (k) => {
+    const d = (f[k] && (f[k].data || f[k])) || {};
+    return Number.isFinite(d.favor) ? d.favor : 0;
+  };
+
+  // --- Rate messen. Ohne eigene Messung waere jede Vorhersage geraten. ------
+  //
+  // Gespeichert wird die auf Favor 0 NORMIERTE Rate. Gemessen werden kann sie
+  // immer nur bei der Faktion, an der gerade gearbeitet wird, und deren Favor
+  // geht als Faktor 1 + favor/100 ein. Ohne die Normierung waere eine bei
+  // Tian Di Hui (Favor 89) gemessene Rate bei NiteSec (Favor 15) um zwei
+  // Drittel zu hoch angesetzt.
+  if (arbeitAn) {
+    const jetztRep = repVon(arbeitAn);
+    const favorHier = favorVon(arbeitAn);
+    if (messungRep && messungRep.fac === arbeitAn) {
+      const dt = (Date.now() - messungRep.t) / 1000;
+      const dr = jetztRep - messungRep.rep;
+      if (dt > 60 && dr > 0) {
+        const roh = (dr / dt) / (1 + favorHier / 100);
+        // Glaetten statt ersetzen - siehe GLAETTUNG. Beim allerersten Wert gibt
+        // es nichts zu glaetten, der wird uebernommen.
+        basisRate = basisRate === null ? roh : GLAETTUNG * roh + (1 - GLAETTUNG) * basisRate;
+        messungRep = { fac: arbeitAn, rep: jetztRep, t: Date.now() };
+      }
+    } else {
+      // Nach einem Wechsel neu ansetzen: Eine Messung ueber zwei Faktionen
+      // hinweg waere ein Mischwert aus zwei Favor-Faktoren.
+      messungRep = { fac: arbeitAn, rep: jetztRep, t: Date.now() };
+    }
+  }
+
+  // --- Laeuft ueberhaupt Arbeit? ------------------------------------------
+  //
+  // Wenn nicht, ist das der teuerste aller Zustaende: Der Bot verdient Geld,
+  // das er nicht braucht, und sammelt keine einzige Reputation. Es muss sofort
+  // etwas angesetzt werden - und zwar VOR jeder Ratenmessung, denn ohne Arbeit
+  // gibt es nichts zu messen, und der Dienst wuerde die ganze Nacht auf eine
+  // Rate warten, die nie kommt. (Genau diese Sackgasse stand im ersten
+  // Entwurf.)
+  if (!arbeitAn) {
+    const wunsch = (homeDateien.get("data/workfaction.txt") || "").trim()
+      || bevorzugteFaktion(mitglied, f, habe, korb)
+      || mitglied[0];
+    if (!wunsch) {
+      log("KEINE Faktionsarbeit und keine Mitgliedschaft - hier ist nichts zu retten.");
+      return;
+    }
+    const platzFrei0 = (homeDateien.get("data/task.txt") || "").trim() === "";
+    log("KEINE Faktionsarbeit - ohne sie laeuft keine Reputation. Setze " + wunsch + " an.");
+    if (!DRY && platzFrei0) {
+      await rpc("pushFile", {
+        filename: "data/task.txt",
+        content: JSON.stringify(["work.js", wunsch]),
+        server: "home",
+      });
+    }
+    messungRep = null;
+    return;
+  }
+
+  if (!basisRate) {
+    log("Rate noch nicht gemessen (braucht zwei Durchgaenge auf derselben Faktion) - warte.");
+    return;
+  }
+
+  // --- Faktionen bewerten --------------------------------------------------
+  const bewertet = mitglied
+    .map((k) => bewerte(k, repVon(k), favorVon(k), basisRate, habe, korb))
+    .sort((a, b) => a.wartet - b.wartet || b.offen - a.offen);
+
+  const zeile = bewertet.filter((b) => b.offen).map((b) => b.fac + " "
+    + (b.jetzt.length ? b.jetzt.length + " sofort" : dauer(b.wartet))).join(", ");
+  const rateHier = basisRate * (1 + (arbeitAn ? favorVon(arbeitAn) : 0) / 100);
+  log("Lage: " + habe.size + " Augs installiert, " + korb.size + " im Korb, "
+    + rateHier.toFixed(1) + " Rep/s bei " + (arbeitAn || "-")
+    + ". Naechste Augmentierung: " + (zeile || "nirgends"));
+
+  // --- Ist der Auftragsplatz frei? ----------------------------------------
+  // data/task.txt ist EIN Platz. Der Autopilot leert ihn, sobald er den
+  // Auftrag gestartet hat (autopilot.js:835). Steht dort etwas, wartet noch
+  // ein Auftrag - dann darf hier nichts geschrieben werden, sonst geht der
+  // andere verloren.
+  const platzFrei = (homeDateien.get("data/task.txt") || "").trim() === "";
+  if (!platzFrei) {
+    log("Auftragsplatz belegt - dieser Durchgang laesst ihn in Ruhe.");
+    return;
+  }
+
+  // --- Laeuft schon ein Oberflaechenskript? -------------------------------
+  //
+  // Ein freier Auftragsplatz heisst nur, dass kein Auftrag WARTET - nicht,
+  // dass keiner LAEUFT. Und zwei Skripte, die gleichzeitig navigieren, reissen
+  // einander die Seite weg. Genau das ist am 20.08. passiert: buyaugs.js hatte
+  // zwei von fuenf Faktionsseiten gelesen, als work.js dazwischenfuhr; der
+  // Kauflauf brach mittendrin ab und kaufte nichts.
+  //
+  // buyaugs.js braucht mehrere Minuten, weil es jede Faktionsseite einzeln
+  // ansteuert. In der Zeit darf hier gar nichts passieren.
+  const OBERFLAECHE = /^(buyaugs|work|joinfac|darkweb|travel|homeram|buyone|stockaccess)\.js$/;
+  const laufend = [];
+  for (const sv of server) {
+    for (const rs of (sv.runningScripts || [])) {
+      const d = rs.data || rs;
+      if (OBERFLAECHE.test(d.filename || "")) laufend.push(d.filename + " auf " + sv.hostname);
+    }
+  }
+  if (laufend.length) {
+    log("Oberflaechenskript laeuft (" + laufend.join(", ") + ") - nichts beauftragen,"
+      + " sonst reissen sie einander die Seite weg.");
+    return;
+  }
+
+  const beauftrage = async (teile, warum) => {
+    log("-> " + warum + "   " + JSON.stringify(teile));
+    if (DRY) return;
+    await rpc("pushFile", {
+      filename: "data/task.txt",
+      content: JSON.stringify(teile),
+      server: "home",
+    });
+  };
+
+  // --- 1. Kaufen, wenn etwas erreichbar ist -------------------------------
+  // Vor dem Wechsel: Was hier erreichbar ist, soll erst eingesammelt werden.
+  const hier = bewertet.find((b) => b.fac === arbeitAn);
+  const sofort = bewertet.flatMap((b) => b.jetzt);
+  if (sofort.length && Date.now() - letzterKauf > KAUF_ABSTAND_MS) {
+    letzterKauf = Date.now();
+    // --nfgdepth 0: siehe Kopf. NeuroFlux wuerde die Warteschlange fluten und
+    // ueber den Preisfaktor 1,9 je Posten alles andere unbezahlbar machen.
+    await beauftrage(["buyaugs.js", "--nfgdepth", "0", "--max", "8"],
+      sofort.length + " Augmentierung(en) erreichbar: "
+      + sofort.slice(0, 4).map((a) => a.name).join(", ")
+      + (sofort.length > 4 ? " ..." : ""));
+    return;
+  }
+
+  // --- 2. Faktion wechseln, wenn die naechste woanders deutlich frueher faellt
+  const beste = bewertet[0];
+  if (!beste || !Number.isFinite(beste.wartet)) {
+    log("Bei keiner Mitgliedsfaktion ist noch eine Augmentierung offen."
+      + "  Das ist der Punkt, an dem ein Reset faellig ist - der wird von Hand"
+      + " ausgeloest, nicht hier.");
+    return;
+  }
+  const wartetHier = hier ? hier.wartet : Infinity;
+  const lohntWechsel = beste.fac !== arbeitAn
+    // Erschoepft: dann sofort weg, egal wie gut die Alternative ist.
+    && (!Number.isFinite(wartetHier)
+      || beste.wartet * WECHSEL_VORTEIL < wartetHier);
+
+  if (lohntWechsel) {
+    // Flattern verhindern: nicht zweimal hintereinander dieselbe Faktion
+    // ansteuern, wenn wir gerade erst von dort kamen.
+    if (letzteFaktion === arbeitAn && Date.now() - letzterWechsel < KAUF_ABSTAND_MS) {
+      log("Wechsel nach " + beste.fac + " zurueckgestellt - der letzte liegt keine"
+        + " zehn Minuten zurueck.");
+      return;
+    }
+    letzteFaktion = arbeitAn;
+    letzterWechsel = Date.now();
+    // Auch DAS ist ein Eingriff ins Spiel und gehoert hinter die
+    // Trockenlauf-Sperre. Im ersten Entwurf stand es davor - der "Trockenlauf"
+    // am 20.08. hat die Arbeitsfaktion daraufhin tatsaechlich auf The Black
+    // Hand umgestellt, weil der Autopilot data/workfaction.txt naechste Runde
+    // gelesen hat. Ein Trockenlauf, der irgendetwas schreibt, ist keiner.
+    if (!DRY) {
+      await rpc("pushFile", { filename: "data/workfaction.txt", content: beste.fac, server: "home" });
+    }
+    await beauftrage(["work.js", beste.fac],
+      "Wechsel " + (arbeitAn || "-") + " -> " + beste.fac
+      + " (naechste Augmentierung dort in " + dauer(beste.wartet)
+      + " statt " + dauer(wartetHier) + " hier)");
+    // Die Messung gehoert zur alten Faktion und ist nach dem Wechsel wertlos.
+    messungRep = null;
+    return;
+  }
+
+  if (hier && hier.naechste) {
+    log("Bleibt bei " + arbeitAn + ". Naechstes Ziel " + hier.naechste.name
+      + " in " + dauer(hier.wartet) + " (" + zahl(hier.naechste.rep - hier.rep) + " Rep).");
+  } else {
+    log("Bleibt bei " + (arbeitAn || "-") + " - nichts zu tun.");
+  }
+}
+
+// --- Hauptschleife ---------------------------------------------------------
+
+async function main() {
+  log("Nachtsteuerung gestartet." + (DRY ? "  TROCKENLAUF - es wird nichts beauftragt." : "")
+    + "  Takt " + (TAKT_MS / 60000) + " min, Wechsel ab Faktor " + WECHSEL_VORTEIL + ".");
+  log("Sie loest KEINEN Reset aus und kauft KEIN NeuroFlux - beides von Hand.");
+
+  for (;;) {
+    try {
+      await durchgang();
+    } catch (e) {
+      // Ein einzelner Fehlschlag darf die Nacht nicht beenden. Die Bruecke
+      // kann kurz weg sein, ohne dass etwas kaputt ist.
+      log("FEHLER im Durchgang: " + e.message);
+    }
+    if (EINMAL) return;
+    await new Promise((ok) => setTimeout(ok, TAKT_MS));
+  }
+}
+
+main().catch((e) => log("ABGESTUERZT: " + e.message));

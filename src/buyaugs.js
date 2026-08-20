@@ -890,6 +890,33 @@ function modalTitle(m) {
 // ===========================================================================
 
 /**
+ * Laeuft gerade FOKUSSIERTE Arbeit? Nur die blockiert die Oberflaeche.
+ *
+ * Der naheliegende Test ist falsch, und er hat am 20.08. den kompletten
+ * Augmentierungskauf verhindert: Beide Stellen unten suchten den Knopf
+ * "Do something else simultaneously" und schlossen aus seinem Dasein auf
+ * Fokus. Den Knopf gibt es aber genauso bei UNfokussierter Arbeit, sobald die
+ * Arbeitsseite offen steht - buyaugs.js meldete deshalb bei allen fuenf
+ * Faktionen "fokussierte Arbeit laeuft", waehrend im Spielstand focus:false
+ * stand, und kaufte nichts.
+ *
+ * Der ehrliche Indikator ist der GEGENKNOPF: "Focus" im Uebersichtsfenster
+ * wird ausschliesslich gerendert, wenn Arbeit laeuft UND der Fokus aus ist
+ * (ui/React/CharacterOverview.tsx:293 kehrt sonst leer zurueck). Sein Dasein
+ * beweist also das Gegenteil von Fokus.
+ *
+ * Seit dem Neuroreceptor-Implant arbeitet der Bot dauerhaft unfokussiert
+ * (focusPenalty() gibt dann konstant 1 zurueck), dieser Fall ist also der
+ * Normalfall und nicht die Ausnahme.
+ */
+function istFokussiert(doc) {
+  const knoepfe = [...doc.querySelectorAll("button")];
+  const arbeitOffen = knoepfe.some((b) => labelOf(b) === "Do something else simultaneously");
+  if (!arbeitOffen) return false;
+  return !knoepfe.some((b) => labelOf(b) === "Focus");
+}
+
+/**
  * Benennt den Spielzustand, wenn die Faktionsseite unerreichbar ist.
  * Wortgleich uebernommen aus entwurf/join/join.js — dieselben sechs Seiten
  * rendern die Seitenleiste gar nicht (GameRoot.tsx:309-334 und :492-496), und
@@ -898,7 +925,7 @@ function modalTitle(m) {
 function detectBlockedPage(doc) {
   const body = (doc.body?.innerText || "").slice(0, 4000);
   const has = (s) => body.includes(s);
-  if ([...doc.querySelectorAll("button")].some((b) => labelOf(b) === "Do something else simultaneously")) {
+  if (istFokussiert(doc)) {
     return "fokussierte Arbeit (Page.Work)";
   }
   if (has("Recovery Mode") || has("RECOVERY MODE")) return "Recovery-Modus — der Spielstand hat ein Problem";
@@ -930,14 +957,19 @@ function findSidebarItem(doc, label) {
 async function goToFactionsPage(doc, sleep, log, allowUnfocus) {
   if (onFactionsPage(doc)) return "";
 
-  const unfocus = [...doc.querySelectorAll("button")].find(
-    (b) => labelOf(b) === "Do something else simultaneously",
-  );
-  if (unfocus) {
+  // Nur ECHT fokussierte Arbeit blockiert - siehe istFokussiert(). Steht die
+  // Arbeitsseite bloss offen, ohne dass fokussiert wird, ist die Seitenleiste
+  // da und Alt+F traegt; dann gibt es hier nichts wegzuraeumen.
+  if (istFokussiert(doc)) {
     if (!allowUnfocus) return "fokussierte Arbeit laeuft, Entfokussieren ist hier nicht erlaubt";
-    unfocus.click();
-    log("Fokussierte Arbeit entfokussiert (die Arbeit laeuft weiter).");
-    await sleep(600);
+    const unfocus = [...doc.querySelectorAll("button")].find(
+      (b) => labelOf(b) === "Do something else simultaneously",
+    );
+    if (unfocus) {
+      unfocus.click();
+      log("Fokussierte Arbeit entfokussiert (die Arbeit laeuft weiter).");
+      await sleep(600);
+    }
   }
 
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "f", altKey: true, bubbles: true }));
@@ -1317,7 +1349,20 @@ async function buyOne(o) {
     // die NeuroFlux-Stufe ist gestiegen. Der Guthaben-Abgleich ist nur die
     // Zusatzpruefung gegen ein falsches Preismodell, und die entfaellt, wenn
     // der laufende Ertrag den erwarteten Preis ueberhaupt erreichen kann.
-    const zeugeTaugt = expectedCost * 0.25 > (Number(o.incomePerSec) || 0) * 6;
+    // Zusaetzlich - und unabhaengig von jeder Ertragsmessung: Ein NEGATIVER
+    // Rueckgang widerlegt nicht den Kauf, er widerlegt den Zeugen. Ein Kauf
+    // kann ein Konto nicht erhoehen; steht es hinterher hoeher, hat der Zufluss
+    // den Abfluss vollstaendig ueberdeckt, und die Differenz sagt nichts mehr.
+    //
+    // Diese Zeile fehlte am 20.08., und sie hat den Kauflauf gekostet: Der
+    // Ertrag wurde in diesem Lauf mit $0,00/s gemessen (im Lauf davor mit
+    // 70,9 Mrd/s - die Messung ist nicht verlaesslich), damit galt der Zeuge
+    // als tauglich. Er meldete daraufhin zwei Fehlschlaege in Folge und brach
+    // ab, obwohl BEIDE Augmentierungen sauber in der Warteschlange standen.
+    // Sich auf die Ertragsmessung zu verlassen, heisst den Zeugen von einer
+    // zweiten unsicheren Messung abhaengig zu machen; das Vorzeichen dagegen
+    // ist ein Fakt.
+    const zeugeTaugt = drop > 0 && expectedCost * 0.25 > (Number(o.incomePerSec) || 0) * 6;
     if (!zeugeTaugt) {
       log(`  (Guthaben-Abgleich uebersprungen: Ertrag uebersteigt den Preis von $${fmtMoney(expectedCost)}`
         + ` - der Zustand bezeugt den Kauf.)`);
@@ -1683,7 +1728,14 @@ export async function main(ns) {
         installed: new Set(installedAugs.keys()),
         nfgLevel: state.nfgLevel,
         distinctBonus,
-        nfgDepth: Math.max(1, Math.floor(Number(flags.nfgdepth))),
+        // Untergrenze 0, nicht 1. Mit der 1 war "--nfgdepth 0" wirkungslos -
+        // der Planer betrachtete trotzdem eine NeuroFlux-Stufe und kaufte sie
+        // auch. Genau das sollte der Schalter verhindern: Jeder Posten in der
+        // Warteschlange verteuert den naechsten um 1,9, und NeuroFlux laesst
+        // sich unbegrenzt stapeln - der alte Nachtdienst hat auf diesem Weg
+        // "Milliarden verbrannt" und wurde deshalb stillgelegt. Wer 0 sagt,
+        // meint 0.
+        nfgDepth: Math.max(0, Math.floor(Number(flags.nfgdepth) || 0)),
       });
       for (const n of notes) say(`  Hinweis: ${n}`);
 

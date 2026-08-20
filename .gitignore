@@ -2,3 +2,5 @@ node_modules/
 reference/
 zustand/
 *.log
+data/tick-last.json
+nightshift/log/

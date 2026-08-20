@@ -131,7 +131,8 @@ async function main() {
     }
   } else {
     for (const f of p.factions) {
-      const d = (factions[f] || {}).data || {};
+      // Manche Eintraege sind in .data gewickelt, andere nicht - beides nehmen.
+      const d = (factions[f] || {}).data || factions[f] || {};
       const rep = Math.round(d.playerReputation || 0);
       const ziel = REP_ZIEL[f];
       const bar = ziel ? "  von " + ziel + "  (" + Math.round((rep / ziel) * 100) + "%)" : "";

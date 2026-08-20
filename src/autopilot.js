@@ -1,7 +1,26 @@
 import * as calc from "lib/calc";
+import * as batch from "lib/batch";
 
 /** Ueber diesen Netscript-Port bekommt der Verwalter die Sperrkasse gemeldet. */
 const RESERVE_PORT = 1;
+
+/**
+ * Bis zu welcher Sicherheitsstufe ueber dem Minimum gilt ein Ziel als bereit?
+ *
+ * Frueher stand hier die feste 3. Absolut ist der falsche Massstab: bei
+ * secMin 1 sind drei Punkte dreihundert Prozent Aufschlag, bei secMin 50
+ * ganze sechs. Sicherheit geht doppelt in den Ertrag ein - in den Beuteanteil
+ * ueber (100 - sec)/100 und in die Laufzeit ueber 2.5 * reqSkill * sec.
+ *
+ * Ein Zehntel des Minimums ist der ehrlichere Massstab. Das absolute Minimum
+ * von 1 verhindert, dass ein erntendes Ziel durch die Sicherheit seiner
+ * eigenen Erntewelle (0.002 je Faden) sofort wieder aus der Erntereife faellt
+ * und zwischen Ernte und Beruhigung pendelt.
+ *
+ * Steht hier oben, damit die Anzeige DIESELBE Schwelle benutzt wie die
+ * Entscheidung - sonst meldet sie gruen, was der Bot laengst anders behandelt.
+ */
+const secTolerance = (s) => Math.max(1, s.secMin * 0.1);
 
 /**
  * Der Autopilot.
@@ -14,8 +33,20 @@ const RESERVE_PORT = 1;
  * Aufbau einer Runde:
  *   1. Netz abgehen und alles knacken, was knackbar ist
  *   2. Arbeiter auf jeden Rechner mit Speicher kopieren
- *   3. Bestes Ziel bestimmen
- *   4. Eine Welle losschicken: erst vorbereiten, dann ernten
+ *   3. Ziele bewerten
+ *   4. Ernten - was reif ist, zahlt zuerst - und mit dem Rest vorbereiten
+ *
+ * ZWEI BETRIEBSARTEN, umgeschaltet allein nach vorhandenem Speicher:
+ *
+ *   - WELLEN (unter BATCH_MIN_RAM): je Ziel und Landung eine Welle, wie seit
+ *     jeher. Das ist der Zustand nach einem Reset.
+ *   - STAPEL (darueber): HWGW-Stapel, ineinander geschachtelt. Erst das
+ *     fuellt ein grosses Netz aus.
+ *
+ * Warum nicht immer Stapel: siehe die Tabelle bei BATCH_MIN_RAM. Jeder der
+ * vier Auftraege eines Stapels haelt seinen Speicher bis zu SEINER Landung,
+ * auch der Erntefaden, der fuer sich nur ein Viertel der Zeit braucht. Wo
+ * Speicher der Engpass ist, ist das der teuerste Fehler ueberhaupt.
  *
  * @param {NS} ns
  */
@@ -24,40 +55,179 @@ export async function main(ns) {
 
   ns.ui.openTail();
   ns.ui.setTailTitle?.("Autopilot");
-  ns.ui.resizeTail(760, 520);
+  ns.ui.resizeTail(760, 560);
   ns.ui.moveTail(20, 20);
   // Eingeklappt starten: Das Fenster soll da sein, wenn man hineinsehen will,
   // aber nicht bei jedem Neustart ungefragt den halben Bildschirm belegen.
   ns.ui.setTailMinimized?.(true);
 
   const WORKERS = ["worker/hack.js", "worker/grow.js", "worker/weaken.js"];
+  // Die Schluessel heissen hackT/growT/weakenT, nicht hack/grow/weaken.
+  // Grund ist kein Geschmack, sondern Speicher: Bitburners Speicherrechner
+  // laeuft ueber den Syntaxbaum und bucht JEDEN Bezeichner, dessen Name auf
+  // eine ns-Funktion passt - auch `busy.hack`, obwohl `busy` kein `ns` ist
+  // (Script/RamCalculations.ts, Besucher Identifier und MemberExpression).
+  // Ein einziges `.hack` im Quelltext kostet 0.10 GB, `.grow` und `.weaken`
+  // je 0.15 GB. Zusammen 0.40 GB von den 16 GB auf home - fuer nichts.
+  // Schluessel in Objektliteralen sind dagegen frei (acorn-walk besucht bei
+  // einer Property nur den Wert), deshalb darf die Telemetrie weiter
+  // `{ hack: ... }` schreiben und das Dashboard bleibt unveraendert.
+  const SCRIPTS = { hackT: "worker/hack.js", growT: "worker/grow.js", weakenT: "worker/weaken.js" };
   // Kleiner Puffer auf home. Bewusst klein: Der Autopilot selbst steckt
   // bereits in getServerUsedRam - wer hier nochmal seine vollen 7 GB abzieht,
   // rechnet ihn doppelt und verschenkt den halben Heimrechner.
   const HOME_RESERVE = 2;
-  // Bis zu dieser Sicherheitsstufe ueber dem Minimum gilt ein Ziel als bereit.
-  const SEC_TOLERANCE = 3;
-  // Ab diesem Anteil des Maximalgeldes lohnt das Ernten.
+  // Ab diesem Anteil des Maximalgeldes lohnt das Ernten (Wellenbetrieb).
   const MONEY_READY = 0.9;
-  // So viele erntereife Ziele gleichzeitig abschoepfen. Das ist billig:
-  // ein vorbereitetes Ziel braucht nur wenige Threads je Welle.
-  const MAX_TARGETS = 60;
-  // So viele Ziele gleichzeitig VORBEREITEN. Ein einziges laesst den Speicher
-  // brachliegen, sobald sein Bedarf gedeckt ist - denn Nachwachsen braucht
-  // Zeit, nicht Threads. Zu viele verzetteln alles, weil dann keines fertig
-  // wird. Vier ist der Mittelweg; die Reihenfolge nach Ertrag je Thread sorgt
-  // dafuer, dass die vorderen zuerst satt werden und die hinteren nur
-  // bekommen, was uebrig bleibt.
-  const PREP_TARGETS = 40;
-  // Anteil des Guthabens, den eine Erntewelle abschoepfen soll.
+  // OBERGRENZEN, keine festen Zahlen. Wie viele Ziele wirklich bedient werden,
+  // haengt am vorhandenen Speicher und wird jede Runde neu bestimmt.
   //
-  // Der Wert ist der wichtigste Hebel im ganzen Bot, und er gehoert niedrig:
-  // hack() nimmt linear weg, grow() muss multiplikativ zurueckholen. Wer 50 %
-  // abschoepft, braucht ln(2)/k Grow-Threads; wer 10 % nimmt, nur ln(1/0.9)/k
-  // - also rund ein Sechstel bei einem Fuenftel Ertrag. Kleine Happen sind
-  // damit deutlich speicherguenstiger, und der Server bleibt nahe am Maximum,
-  // wo jeder einzelne Hack-Thread am meisten bringt.
-  const HACK_FRACTION = 0.1;
+  // Feste Zahlen sind fuer genau eine Ausbaustufe richtig. In der Nacht zum
+  // 20.08. hat das den Wiederaufbau nach dem ersten Reset abgewuergt: die
+  // Werte 60/40 stammten von einem Netz mit 274 TB, nach dem Reset standen
+  // noch 116 GB. Der Autopilot hat daraufhin fuenf Stunden lang sieben Ziele
+  // gleichzeitig vorbereitet, keines je fertig bekommen und keinen Dollar
+  // verdient.
+  const MAX_TARGETS = 60;
+  const PREP_TARGETS = 40;
+  // Anteil des freien Speichers, den eine grow-Bestellung hoechstens binden
+  // darf. Nie mehr bestellen, als hineinpasst: sonst wird der Ausgleich unten
+  // fuer Tausende Faeden berechnet, die es nie geben wird.
+  //
+  // 85 % und nicht 50 %: der Ausgleich fuer die grow-Faeden kostet nur rund
+  // 8 % ihres Speichers (0.004 Sicherheit je grow gegen 0.05 Abbau je weaken,
+  // bei fast gleichem Preis je Faden), 15 % Reserve sind also reichlich.
+  const GROW_ORDER_SHARE = 0.85;
+
+  // Preise der Darkweb-Programme (src/DarkWeb/DarkWebItems.ts). Kein Skript
+  // kann sie kaufen - das erledigt der Nachtdienst am Terminal, aber nur wenn
+  // das Geld dasteht. Der Autopilot haelt den Preis des naechsten fehlenden
+  // Programms zurueck, sonst setzt der Verwalter jeden Dollar in Speicher um
+  // und die Schwelle wird nie erreicht. Der TOR-Router (200k) braucht keinen
+  // eigenen Eintrag: er ist Voraussetzung fuer BruteSSH und wird auf dem Weg
+  // zu dessen Schwelle ohnehin mitfinanziert.
+  const DARKWEB = [
+    ["BruteSSH.exe", 500e3],
+    ["FTPCrack.exe", 1.5e6],
+    ["relaySMTP.exe", 5e6],
+    ["HTTPWorm.exe", 30e6],
+    ["SQLInject.exe", 250e6],
+  ];
+  // Unterhalb dieses Guthabens wird eine gesetzte Sperrkasse ignoriert.
+  //
+  // Der Grund ist der Reset. data/reserve.txt ist eine Textdatei auf home;
+  // prestigeHomeComputer leert programs und messages, laesst scripts und
+  // textFiles aber stehen (Server/ServerHelpers.ts:224-237). Der Betrag darin
+  // stammt also aus einem Leben, in dem Milliarden herumlagen - mit 1262
+  // Dollar wird eine Milliardenschwelle nie wieder unterschritten, der
+  // Verwalter kauft nie wieder etwas, und das Netz waechst nie wieder.
+  //
+  // BEWUSST NICHT die urspruenglich vorgeschlagene Deckelung auf das halbe
+  // Guthaben: die haette die Sperrkasse als Werkzeug zerstoert. Sie ist keine
+  // Notbremse, sondern das Sparbuch fuer alles, was kein Skript kaufen kann
+  // (Augmentierungen, Portknacker, Reisen) - und beim Sparen auf 4 Milliarden
+  // steht der Betrag naturgemaess dauerhaft weit ueber dem halben Guthaben.
+  // Eine Halbierung haette den Verwalter die andere Haelfte verbauen lassen
+  // und das Sparziel nie erreichen lassen. Ebenso waere `node tools/reserve.js
+  // 1e12` als Messbremse wirkungslos geworden.
+  //
+  // Der Schwellenwert ist der Preis des TOR-Routers - das Billigste, was ein
+  // Skript nicht kaufen kann. Darunter hat eine Sperre schlicht keinen
+  // Gegenstand: es gibt nichts, wofuer sich zu sparen lohnte, und jeder
+  // Dollar gehoert in den Wiederaufbau.
+  const RESERVE_FLOOR = 200e3;
+
+  // ---------------------------------------------------------------------
+  // Stapelbetrieb (HWGW)
+  //
+  // Ein Stapel sind vier Auftraege, die nacheinander landen: ernten,
+  // ausgleichen, nachwachsen, ausgleichen. Der Erntefaden trifft dadurch
+  // IMMER ein Ziel auf Hoechstguthaben und Mindestsicherheit - genau dort, wo
+  // Beuteanteil, Erfolgswahrscheinlichkeit und Tempo am besten sind. Und weil
+  // die Stapel ineinander geschachtelt starten, sind Dutzende gleichzeitig
+  // unterwegs; erst das fuellt eine grosse Flotte aus.
+  // ---------------------------------------------------------------------
+
+  // Ab wie viel Gesamtspeicher ueberhaupt in Stapeln gearbeitet wird.
+  //
+  // Der Stapelbetrieb ist NICHT unter allen Umstaenden besser. Jeder der vier
+  // Auftraege belegt seinen Speicher von seinem Start bis zu SEINER Landung -
+  // also praktisch eine ganze weaken-Zeit, auch der Erntefaden, der fuer sich
+  // nur ein Viertel so lange braucht. Solange Speicher der Engpass ist, ist
+  // das teuer: eine Erntewelle alter Art holt dieselbe Beute mit einem Viertel
+  // der Speicherzeit.
+  //
+  // Nachgerechnet an harakiri-sushi (Level 219, ein Ziel, 90 Minuten,
+  // Landungen exakt nach Laufzeit), Ertrag in $/s:
+  //
+  //     Speicher     Wellen    Stapel   Faktor
+  //       64 GB       47 186    19 001    0.40
+  //      116 GB       84 951    50 568    0.60
+  //      200 GB      125 740    83 360    0.66
+  //      300 GB      152 164   137 453    0.90
+  //      400 GB      152 164   180 972    1.19
+  //      506 GB      153 579   233 838    1.52
+  //     1000 GB      154 982   402 244    2.60
+  //
+  // Die Wellen saettigen bei rund 155 k$/s je Ziel und lassen alles weitere
+  // brachliegen; die Stapel wachsen weiter, bis der Kalender voll ist. Der
+  // Schnittpunkt liegt bei etwa 350 GB. Unterhalb davon wird geerntet wie
+  // bisher - das ist genau der Zustand nach einem Reset, und dort haette der
+  // Stapelbetrieb Ertrag gekostet, nicht gebracht.
+  //
+  // Ein Hin- und Herspringen an der Schwelle ist nicht moeglich: der Speicher
+  // waechst nur (der Verwalter kauft und vergroessert, er verkleinert nie) und
+  // faellt ausschliesslich beim Augmentierungs-Reset. Der Uebergang findet
+  // also genau zweimal je Durchgang statt.
+  const BATCH_MIN_RAM = 400;
+  // Anteil des freien Speichers, der der Vorbereitung reserviert bleibt,
+  // solange ueberhaupt ein Ziel vorbereitet wird. Ohne ihn koennte der
+  // Stapelbetrieb - dessen Bedarf praktisch unbegrenzt ist - jede Runde allen
+  // Speicher wegnehmen, und der Bot bliebe fuer immer bei den Zielen, die
+  // zufaellig zuerst fertig geworden sind. Der Anteil kostet nichts, sobald
+  // nichts mehr vorzubereiten ist: dann ist er null.
+  const PREP_RESERVE = 0.25;
+  // Abstand zwischen zwei Landungen desselben Stapels.
+  //
+  // Der einzige wirklich heikle Wert. Zu klein, und schon eine um 300 ms
+  // verrutschte Landung dreht die Reihenfolge um - in der Simulation faellt
+  // das Guthaben dann binnen Minuten auf null, es ist KEIN sanfter Abfall.
+  // Zu gross, und der Kalender wird zum Engpass: jeder Stapel belegt 4*gap
+  // Kalenderzeit, in eine weaken-Zeit passen also nur tWeaken/(4*gap) Stapel.
+  // 400 ms hat in der Simulation 300 ms Streuung unbeschadet ueberstanden und
+  // kostet gegenueber dem Optimum (100 ms, aber ohne jede Reserve) rund 10 %.
+  //
+  // ACHTUNG: nie im Spiel gemessen, nur simuliert. Nicht senken, bevor die
+  // tatsaechliche Streuung der Landungen gemessen ist.
+  const GAP_MS = 400;
+  // Kleiner Vorlauf, damit der zuletzt landende Ausgleich beim Start nicht
+  // schon ueberfaellig ist. Ohne ihn waere seine additionalMsec negativ, das
+  // Spiel deckelt auf 0, und der Auftrag landet zu spaet.
+  const SLACK_MS = 200;
+  // Wie weit vor seinem Starttermin ein Stapel losgeschickt werden darf.
+  // Etwas mehr als eine Rundenlaenge - sonst faellt bei einer langsamen Runde
+  // ein Kalenderplatz ersatzlos aus.
+  const LEAD_MS = 1200;
+  // Aufschlag auf beide Ausgleichsauftraege. Ueberzaehlige Ausgleichsfaeden
+  // sind wirkungslos (die Sicherheit ist nach unten gedeckelt), zu wenige
+  // dagegen lassen nach jedem Stapel einen Rest stehen, der sich aufschaukelt.
+  const WEAKEN_MARGIN = 1.5;
+  const FRACTION_MIN = 0.01;
+  // Ueber 0.5 lohnt sich nichts mehr: abschoepfen nimmt linear weg,
+  // nachwachsen muss multiplikativ zurueckholen.
+  const FRACTION_MAX = 0.5;
+  // Bremsen gegen Ausreisser. Im eingeschwungenen Zustand vergibt ein Ziel
+  // einen Stapel je 4*gap - die Grenzen greifen nur beim Anlaufen, wenn ein
+  // leerer Kalender auf einen Schlag gefuellt wuerde.
+  const MAX_BATCHES_PER_ROUND = 12;
+  const MAX_BATCHES_TOTAL = 80;
+  // Drifterkennung. In einem gesunden Stapelbetrieb faellt die Sicherheit nach
+  // jedem Stapel exakt auf secMin zurueck. Beobachtet wird deshalb nicht der
+  // Mittelwert, sondern das MINIMUM ueber ein Zeitfenster: wenn selbst der
+  // beste Moment der letzten halben Minute daneben liegt, stimmt die Kette
+  // nicht mehr.
+  const DRIFT_WINDOW = 30;
+  const DRIFT_SEC = 1.0;
 
   // Eigener Quelltext beim Start. Aendert er sich, ist eine neue Fassung
   // eingetroffen - dann beendet sich dieser Prozess, und der Verwalter auf
@@ -73,7 +243,14 @@ export async function main(ns) {
   const startedAt = Date.now();
   const events = [];
   const knownFiles = new Set();
+  // Zustand je Ziel ueber Rundengrenzen hinweg: "prep" | "batch" | "drain".
+  // Wird nur im Stapelbetrieb wirklich gebraucht, aber auch im Wellenbetrieb
+  // gefuehrt - sonst stuende beim Ueberschreiten der Schwelle jedes Ziel ohne
+  // Vorgeschichte da.
+  const phases = new Map();
   let round = 0;
+  let lastTarget = null;
+  let earned = 0;
   // Die Wege zu den Faktionsservern sind teuer zu berechnen (Breitensuche
   // ueber das ganze Netz), aendern sich aber nur bei einem Reset. Also merken.
   let pathCache = null;
@@ -81,14 +258,36 @@ export async function main(ns) {
   // der Autopilot unbegrenzt auf einen Verwalter, den es vielleicht nicht mehr
   // gibt - und steht dabei still, ohne dass eine Wache es merkt.
   let neueFassungSeit = 0;
-  let lastTarget = null;
-  let earned = 0;
+  // Fortlaufende Kennung fuer die Arbeiter. ns.exec weist einen Start ab, der
+  // sich in Skript, Rechner UND Argumenten nicht von einem laufenden
+  // unterscheidet - ohne diese Kennung ginge in einer Runde jeder zweite
+  // Auftrag still verloren.
+  let marke = 0;
   let moneyAtStart = ns.getServerMoneyAvailable("home");
+  // Damit der Hinweis auf eine ignorierte Sperrkasse nicht jede Sekunde im
+  // Verlauf steht.
+  let reserveNoted = 0;
+  // Gleitender Schnitt ueber den erwarteten Geldwert der zuletzt eingeplanten
+  // Stapel. Im eingeschwungenen Zustand ist die Einplanungsrate gleich der
+  // Landerate, also ist das die erwartete Einnahme je Sekunde. Der Vergleich
+  // mit dem tatsaechlichen Zuwachs ist die schaerfste Betriebskontrolle, die
+  // wir haben: klaffen die beiden dauerhaft auseinander, landen Stapel in der
+  // falschen Reihenfolge, ohne dass es sonst irgendwo auffiele.
+  const moneyWindow = [];
 
   /** Merkt sich eine Entscheidung fuer die Anzeige. */
   const note = (text) => {
     events.push({ at: Date.now(), text });
     if (events.length > 12) events.shift();
+  };
+
+  const phaseOf = (host) => {
+    let st = phases.get(host);
+    if (!st) {
+      st = { phase: "prep", samples: [], fraction: FRACTION_MIN, batches: 0 };
+      phases.set(host, st);
+    }
+    return st;
   };
 
   note("Autopilot gestartet");
@@ -100,36 +299,66 @@ export async function main(ns) {
     const player = playerFacts(ns);
     const hosts = scanAll(ns);
 
-    // Sperrkasse an den Verwalter durchreichen. Er laeuft auf einem fremden
-    // Rechner und koennte die Datei auf home gar nicht lesen - Ports sind
-    // dagegen global und kosten nichts.
-    let reserve = 0;
-    if (ns.fileExists("data/reserve.txt", "home")) {
-      const roh = Number(ns.read("data/reserve.txt"));
-      if (Number.isFinite(roh) && roh >= 0) reserve = roh;
-    }
-    ns.clearPort(RESERVE_PORT);
-    ns.tryWritePort(RESERVE_PORT, reserve);
-
     // Das Spiel schiebt Programme und Nachrichten unangekuendigt auf home -
     // Story-Meilensteine wie fl1ght.exe, aber auch Hinweise auf freigeschaltete
     // Moeglichkeiten. Als Popup gehen sie leicht unter, deshalb landen sie hier
     // im Verlauf, wo sie stehen bleiben.
-    for (const f of ns.ls("home")) {
+    //
+    // Der Bestand wird jede Runde frisch aufgenommen, weil die Sperrkasse
+    // gleich wissen muss, welche Portknacker fehlen. Nach einem Reset sind sie
+    // alle weg: prestigeHomeComputer setzt programs.length = 0
+    // (Server/ServerHelpers.ts:227) - Skripte und Textdateien bleiben dagegen.
+    const homeFiles = new Set(ns.ls("home"));
+    for (const f of homeFiles) {
       if (knownFiles.has(f)) continue;
       knownFiles.add(f);
       if (round === 1) continue; // beim Start nur den Bestand merken
       if (/\.(exe|msg|lit|cct)$/.test(f)) note("Neu auf home: " + f);
     }
 
+    // Sperrkasse an den Verwalter durchreichen. Er laeuft auf einem fremden
+    // Rechner und koennte die Datei auf home gar nicht lesen - Ports sind
+    // dagegen global und kosten nichts.
+    const cash = ns.getServerMoneyAvailable("home");
+    let reserve = 0;
+    if (ns.fileExists("data/reserve.txt", "home")) {
+      const roh = Number(ns.read("data/reserve.txt"));
+      if (Number.isFinite(roh) && roh >= 0) reserve = roh;
+    }
+    // Sperre aus einem frueheren Leben unwirksam machen - Begruendung oben bei
+    // RESERVE_FLOOR.
+    if (reserve > 0 && cash < RESERVE_FLOOR) {
+      if (reserveNoted !== 1) {
+        note("Sperrkasse " + geld(reserve) + " bei " + geld(cash) + " Guthaben - im Wiederaufbau ausgesetzt");
+        reserveNoted = 1;
+      }
+      reserve = 0;
+    } else if (reserve > 0 && reserve >= cash && reserveNoted !== 2) {
+      // Kein Fehler, aber die haeufigste Ursache fuer "der Verwalter kauft
+      // nichts mehr". Einmal sagen, nicht raten lassen.
+      note("Sperrkasse " + geld(reserve) + " bindet das ganze Guthaben - der Einkauf ruht");
+      reserveNoted = 2;
+    }
+
+    // Rueckhalt fuer das naechste fehlende Darkweb-Programm. Der Nachtdienst
+    // kauft es am Terminal, sobald das Anderthalbfache des Preises dasteht -
+    // also muss das Geld auch dastehen duerfen. Zurueckgehalten wird erst,
+    // wenn die Schwelle in Reichweite ist: sonst blockiert SQLInject mit
+    // seinen 375 Millionen schon in der ersten Stunde jeden Serverkauf.
+    let goalHold = 0;
+    for (const [datei, preis] of DARKWEB) {
+      if (homeFiles.has(datei)) continue;
+      if (cash >= preis * 0.4) goalHold = preis * 1.5;
+      break;
+    }
+
+    ns.clearPort(RESERVE_PORT);
+    ns.tryWritePort(RESERVE_PORT, Math.max(reserve, goalHold));
+
     // --- 1. Zugriff verschaffen -------------------------------------------
-    const cracked = [];
     for (const host of hosts) {
       if (host === "home" || ns.hasRootAccess(host)) continue;
-      if (tryCrack(ns, host)) {
-        cracked.push(host);
-        note("Zugriff auf " + host + " erlangt");
-      }
+      if (tryCrack(ns, host)) note("Zugriff auf " + host + " erlangt");
     }
 
     // --- 2. Lage aufnehmen -------------------------------------------------
@@ -176,7 +405,7 @@ export async function main(ns) {
 
     // Der Einkaeufer muss laufen - er besorgt den Speicher, von dem alles
     // andere abhaengt. Er lebt auf einem fremden Rechner, weil allein
-    // ns.purchaseServer 2.25 GB kostet und home damit gesprengt waere.
+    // ns.cloud.purchaseServer 2.25 GB kostet und home damit gesprengt waere.
     // Nach jedem killall ist er tot, also hier jede Runde nachsehen.
     const investRam = ns.getScriptRam("invest.js", "home");
     const investNeu = ns.read("invest.js");
@@ -249,7 +478,7 @@ export async function main(ns) {
       // niemand sie von aussen beenden.
       if (round === 1) {
         for (const s of workforce) {
-          for (const p of ns.ps(s.host)) if (p.filename === "hand.js") ns.kill(p.pid);
+          for (const pr of ns.ps(s.host)) if (pr.filename === "hand.js") ns.kill(pr.pid);
         }
       }
       // Haengende Hand erschlagen. Ein toter Prozess wird unten ohnehin neu
@@ -265,12 +494,12 @@ export async function main(ns) {
           note("Die Hand hing seit " + Math.round((Date.now() - puls) / 1000) + "s - beendet");
         }
       }
-      const laeuftSchon = workforce.some((s) => ns.ps(s.host).some((p) => p.filename === "hand.js"));
+      const laeuftSchon = workforce.some((s) => ns.ps(s.host).some((pr) => pr.filename === "hand.js"));
       if (!laeuftSchon) {
         // NICHT auf den Rechner des Einkaeufers: der raeumt sich bei Bedarf
         // mit killall frei und wuerde die Hand jedes Mal mit erschlagen.
         // Genau das ist am 20.08. passiert - beide landeten auf bot-3.
-        const investHost = workforce.find((s) => ns.ps(s.host).some((p) => p.filename === "invest.js"));
+        const investHost = workforce.find((s) => ns.ps(s.host).some((pr) => pr.filename === "invest.js"));
         const platz = workforce
           .filter((s) => s.host !== "home" && s.ramFree >= handRam)
           .filter((s) => !investHost || s.host !== investHost.host)
@@ -290,7 +519,46 @@ export async function main(ns) {
       }
     }
 
-    // --- 4. Ziel bestimmen -------------------------------------------------
+    // --- 4. Laufende Arbeit aufnehmen -------------------------------------
+    // Erst nachsehen, wer schon fuer wen arbeitet - VOR jeder neuen
+    // Entscheidung. Wer das nicht tut, schickt jede Sekunde eine volle Welle
+    // los, obwohl die vorige noch laeuft, verstopft damit den eigenen Speicher
+    // und laesst alle anderen Ziele verhungern.
+    //
+    // Nebenbei entsteht dabei der KALENDER: der spaeteste bereits vergebene
+    // Landetermin je Ziel. Er liegt bewusst nirgendwo sonst. Er steht in den
+    // Argumenten der laufenden Arbeiter und wird jede Runde daraus neu
+    // gelesen. Damit uebersteht er einen Neustart des Autopiloten ohne jede
+    // Vorkehrung: die Arbeiter laufen weiter, ihre Termine stehen weiter in
+    // ns.ps, und die neue Fassung setzt die Kette genau dort fort. Eine Datei
+    // oder eine Variable im Speicher waere nach jedem Austausch verloren - und
+    // ein Stapel, der auf einen vergessenen Termin gesetzt wird, landet mitten
+    // in einen fremden Stapel hinein. Vorbereitungs- und Wellenauftraege
+    // tragen landeZeit = 0 und werden vom Kalender ignoriert.
+    const busy = { hackT: 0, growT: 0, weakenT: 0 };
+    const busyPerTarget = new Map();
+    const calendar = new Map();
+    const ART = {
+      "worker/hack.js": "hackT",
+      "worker/grow.js": "growT",
+      "worker/weaken.js": "weakenT",
+    };
+    for (const s of workforce) {
+      for (const proc of ns.ps(s.host)) {
+        const art = ART[proc.filename];
+        if (!art) continue;
+        busy[art] += proc.threads;
+        const ziel = String(proc.args[0] ?? "?");
+        if (!busyPerTarget.has(ziel)) busyPerTarget.set(ziel, { hackT: 0, growT: 0, weakenT: 0 });
+        busyPerTarget.get(ziel)[art] += proc.threads;
+        const landAt = Number(proc.args[2]);
+        if (Number.isFinite(landAt) && landAt > 0) {
+          calendar.set(ziel, Math.max(calendar.get(ziel) ?? 0, landAt));
+        }
+      }
+    }
+
+    // --- 5. Ziele bewerten -------------------------------------------------
     // Sortiert wird nach erwartetem Ertrag der naechsten Viertelstunde,
     // NICHT nach Dauerertrag. Sonst gewinnt immer der fetteste Server, auch
     // wenn er mit dem vorhandenen Speicher eine halbe Stunde Vorbereitung
@@ -302,13 +570,21 @@ export async function main(ns) {
     // unerreichbar, sobald das alte gut ausgelastet ist - und bleibt fuer
     // immer beim ersten Ziel haengen.
     const ramTotal = Math.max(2, workforce.reduce((a, s) => a + s.ram, 0) - HOME_RESERVE);
+    // Echte Arbeiterkosten statt fest verdrahteter 1.75 - sonst luegt jede
+    // Speicherrechnung still, sobald ein Arbeiter eine ns-Funktion dazubekommt.
+    const workerRam = {
+      hackT: ns.getScriptRam(SCRIPTS.hackT, "home"),
+      growT: ns.getScriptRam(SCRIPTS.growT, "home"),
+      weakenT: ns.getScriptRam(SCRIPTS.weakenT, "home"),
+    };
     const candidates = servers
       .filter((s) => s.root && s.moneyMax > 0 && s.reqSkill <= player.skill)
       .map((s) => ({
         ...s,
         score: calc.targetScore(s, player),
-        yield: calc.expectedYield(s, player, ramTotal),
-        prep: calc.prepSeconds(s, player, ramTotal),
+        yield: calc.expectedYield(s, player, ramTotal, 900, workerRam),
+        prep: calc.prepSeconds(s, player, ramTotal, workerRam),
+        busy: busyPerTarget.get(s.host) ?? { hackT: 0, growT: 0, weakenT: 0 },
       }))
       .sort((a, b) => b.yield - a.yield);
 
@@ -319,40 +595,74 @@ export async function main(ns) {
       lastTarget = target.host;
     }
 
-    // --- 5. Wellen losschicken --------------------------------------------
-    // Mehrere Ziele gleichzeitig. Ein einzelnes Ziel laesst spaetestens dann
-    // Speicher brachliegen, wenn es vorbereitet ist: gehackt werden kann nur,
-    // was nachgewachsen ist, und Nachwachsen braucht Zeit, nicht Threads.
-    // Reihenfolge: erntereife Ziele zuerst - die zahlen sofort. Was danach
-    // an Speicher uebrig ist, geht in die Vorbereitung des naechstbesten.
-    // Erst nachsehen, wer schon fuer wen arbeitet - VOR jeder neuen
-    // Entscheidung. Wer das nicht tut, schickt jede Sekunde eine volle Welle
-    // los, obwohl die vorige noch laeuft, verstopft damit den eigenen
-    // Speicher und laesst alle anderen Ziele verhungern.
-    const busy = { hack: 0, grow: 0, weaken: 0 };
-    const busyPerTarget = new Map();
-    const ART = {
-      "worker/hack.js": "hack",
-      "worker/grow.js": "grow",
-      "worker/weaken.js": "weaken",
-    };
-    for (const s of workforce) {
-      for (const proc of ns.ps(s.host)) {
-        const art = ART[proc.filename];
-        if (!art) continue;
-        busy[art] += proc.threads;
-        const ziel = String(proc.args[0] ?? "?");
-        if (!busyPerTarget.has(ziel)) busyPerTarget.set(ziel, { hack: 0, grow: 0, weaken: 0 });
-        busyPerTarget.get(ziel)[art] += proc.threads;
+    // --- 6. Betriebsart und Zustand je Ziel --------------------------------
+    const batchMode = ramTotal >= BATCH_MIN_RAM;
+    // Erntereife im Wellenbetrieb: die alte, lockere Schwelle. Exakt 100 %
+    // Guthaben zu verlangen kostet bei knappem Speicher eine Dreiviertelstunde,
+    // in der nichts hereinkommt.
+    const ready = (s) => s.sec <= s.secMin + secTolerance(s) && s.moneyNow >= s.moneyMax * MONEY_READY;
+
+    for (const c of candidates) {
+      const st = phaseOf(c.host);
+      const laeuft = c.busy.hackT + c.busy.growT + c.busy.weakenT;
+
+      if (!batchMode) {
+        // Kein Zustandsautomat, keine Drifterkennung: ein Ziel erntet, sobald
+        // es reif ist, und wird sonst vorbereitet. Genau wie bisher.
+        st.phase = ready(c) ? "batch" : "prep";
+        continue;
+      }
+
+      // Umgekehrter Wechsel: das Netz ist gerade ueber BATCH_MIN_RAM
+      // gewachsen, und ein Ziel steht noch aus dem Wellenbetrieb auf "batch",
+      // ohne je fuer Stapel vorbereitet worden zu sein. Einmal zurueck in die
+      // Vorbereitung - sonst erntet der erste Stapel in ein halb leeres Ziel.
+      if (st.phase === "batch" && st.batches === 0 && c.moneyNow < c.moneyMax * 0.999) {
+        st.phase = "prep";
+      }
+
+      if (st.phase === "batch") {
+        st.samples.push({ sec: c.sec, money: c.moneyMax > 0 ? c.moneyNow / c.moneyMax : 0 });
+        if (st.samples.length > DRIFT_WINDOW) st.samples.shift();
+        if (st.samples.length >= DRIFT_WINDOW) {
+          let secFloor = Infinity, moneyFloor = Infinity;
+          for (const pkt of st.samples) {
+            if (pkt.sec < secFloor) secFloor = pkt.sec;
+            if (pkt.money < moneyFloor) moneyFloor = pkt.money;
+          }
+          // Untergrenze fuer das Guthaben: im gesunden Betrieb faellt es nie
+          // unter (1 - f), denn genau so viel nimmt ein Stapel weg. Der Faktor
+          // 0.5 laesst Platz fuer zwei Stapel, die sich einmal ueberholen.
+          const grenze = Math.max(0.05, (1 - st.fraction) * 0.5);
+          if (secFloor > c.secMin + DRIFT_SEC || moneyFloor < grenze) {
+            st.phase = "drain";
+            st.samples.length = 0;
+            note(c.host + " laeuft aus der Reihe - Stapel werden angehalten");
+          }
+        }
+      }
+
+      if (st.phase === "drain" && laeuft === 0) st.phase = "prep";
+
+      // Aufstieg in den Stapelbetrieb nur aus dem Vollzustand heraus, und erst
+      // wenn kein grow mehr unterwegs ist: ein landender grow hebt die
+      // Sicherheit und wuerde die ersten Stapel verrutschen lassen.
+      if (
+        st.phase === "prep" &&
+        c.sec <= c.secMin + 0.001 &&
+        c.moneyNow >= c.moneyMax * 0.999 &&
+        c.busy.growT === 0
+      ) {
+        st.phase = "batch";
+        st.samples.length = 0;
+        note(c.host + " ist vorbereitet - Stapelbetrieb beginnt");
       }
     }
-    for (const c of candidates) c.busy = busyPerTarget.get(c.host) ?? { hack: 0, grow: 0, weaken: 0 };
 
-    const ready = (s) => s.sec <= s.secMin + SEC_TOLERANCE && s.moneyNow >= s.moneyMax * MONEY_READY;
-
+    // --- 7. Rangfolge ------------------------------------------------------
     // Wie viele Threads fehlen diesem Ziel noch bis zur Erntereife?
     const restBedarf = (s) => {
-      if (ready(s)) return 0;
+      if (phaseOf(s.host).phase === "batch") return 0;
       let n = calc.weakenThreads(Math.max(0, s.sec - s.secMin));
       if (s.moneyNow < s.moneyMax * MONEY_READY) {
         const g = calc.growThreads(s, s.moneyMax, Math.max(1, s.moneyNow), player, 1);
@@ -360,163 +670,343 @@ export async function main(ns) {
       }
       return Math.max(1, n);
     };
-
     for (const c of candidates) c.rest = restBedarf(c);
 
-    // Rangfolge nach Ertrag je investiertem Thread, nicht nach Ertrag allein.
-    // Sonst frisst der fetteste Server allen Speicher fuer eine halbe Stunde
-    // Vorbereitung, waehrend ein fast fertiges Ziel danebensteht, das mit
-    // dreissig Threads sofort zahlen wuerde. Erntereife Ziele zuerst: die
-    // kosten am wenigsten und bringen sofort.
-    const sortiert = candidates
-      .filter((c) => c.score > 0)
-      .sort((a, b) => {
-        if (ready(a) !== ready(b)) return ready(a) ? -1 : 1;
-        if (ready(a)) return b.score - a.score;
-        return b.score / b.rest - a.score / a.rest;
-      });
-
-    // Alle erntereifen Ziele bedienen - die kosten wenig und zahlen sofort.
-    // Vorbereitet wird dagegen immer nur EINES. Sieben Ziele gleichzeitig
-    // aufzupaeppeln heisst, dass keines fertig wird: jedes bekommt ein
-    // Achtel des Speichers und braucht das Achtfache der Zeit, waehrend der
-    // Ertrag die ganze Zeit ausbleibt. Konzentration schlaegt Breite.
     // Die Obergrenzen muessen sich am vorhandenen Speicher ausrichten, sonst
     // sind sie fuer genau eine Ausbaustufe richtig. In der Nacht zum 20.08.
     // hat genau das den Wiederaufbau nach dem ersten Reset abgewuergt: die
     // Werte 60 und 40 stammten von einem Netz mit 274 TB, nach dem Reset
     // standen noch 116 GB. Der Autopilot hat daraufhin fuenf Stunden lang
-    // sieben Ziele gleichzeitig vorbereitet, keines je fertig bekommen und
-    // in der ganzen Zeit keinen Dollar verdient.
+    // sieben Ziele gleichzeitig vorbereitet, keines je fertig bekommen und in
+    // der ganzen Zeit keinen Dollar verdient.
     const maxTargets = Math.max(2, Math.min(MAX_TARGETS, Math.floor(ramTotal / 2000)));
     const prepTargets = Math.max(1, Math.min(PREP_TARGETS, Math.floor(ramTotal / 4000)));
-    const erntereif = sortiert.filter(ready).slice(0, maxTargets);
-    const naechstes = sortiert.filter((c) => !ready(c)).slice(0, prepTargets);
-    const active = [...erntereif, ...naechstes];
+
+    // Erntende Ziele zuerst - die kosten am wenigsten und zahlen sofort.
+    // Vorbereitung wird nach Ertrag JE THREAD sortiert, nicht nach Ertrag
+    // allein: sonst frisst der fetteste Server allen Speicher fuer eine halbe
+    // Stunde Vorbereitung, waehrend ein fast fertiges Ziel danebensteht, das
+    // mit dreissig Threads sofort zahlen wuerde.
+    const lohnend = candidates.filter((c) => c.score > 0);
+    const harvesting = lohnend
+      .filter((c) => phaseOf(c.host).phase === "batch")
+      .sort((a, b) => b.score - a.score)
+      .slice(0, maxTargets);
+    // Ausdruecklich NUR "prep", nicht "alles ausser batch". Ein Ziel im
+    // Zustand "drain" wartet darauf, dass seine letzten Auftraege landen -
+    // erst wenn nichts mehr laeuft, darf es neu vorbereitet werden. Wer ihm
+    // hier weiter Arbeit gibt, haelt laeuft dauerhaft ueber null: das Ziel
+    // kaeme nie aus dem Auslaufen heraus und waere fuer immer verloren.
+    const preparing = lohnend
+      .filter((c) => phaseOf(c.host).phase === "prep")
+      .sort((a, b) => b.score / b.rest - a.score / a.rest)
+      .slice(0, prepTargets);
+    const active = [...harvesting, ...preparing];
 
     // Ziele, die aus der Rangfolge gefallen sind, aber noch Arbeiter haben,
-    // muessen mitbetreut werden. Sonst laufen dort hack-Threads weiter,
+    // muessen mitbetreut werden. Sonst laufen dort Erntefaeden weiter,
     // waehrend niemand mehr nachwachsen laesst - der Server wird leergeraeumt
     // und ist beim naechsten Aufstieg in die Rangfolge wertlos.
     for (const c of candidates) {
       if (active.includes(c)) continue;
-      if (c.busy.hack + c.busy.grow + c.busy.weaken > 0) active.push(c);
+      if (c.busy.hackT + c.busy.growT + c.busy.weakenT > 0) active.push(c);
     }
 
-    let phase = "warten";
-    let reason = "Kein erreichbares Ziel - das eigene Hacking-Level ist noch zu niedrig.";
+    // Speicher, der einem einzelnen Ziel zusteht. Damit wird im Wellenbetrieb
+    // der Erntanteil bemessen: ein Zyklus, der hier nicht hineinpasst, ist
+    // kein Zyklus, sondern eine halbe Ernte ohne Nachwuchs.
+    const ramShare = ramTotal / Math.max(1, active.length);
+
     const plan = [];
-    let harvesting = 0;
-    let preparing = 0;
+    let batchesTotal = 0;
+    let moneyPlanned = 0;
 
-    // Erst planen, dann verteilen - und zwar Sicherheit ZUERST.
-    //
-    // Wer weaken hinter grow/hack anstellt, laesst es systematisch verhungern:
-    // grow und hack raeumen den Speicher leer, fuer den Ausgleich bleibt
-    // nichts. Dann steigt die Sicherheit, und mit ihr sinken Ausbeute und
-    // Tempo jeder weiteren Aktion - eine Abwaertsspirale, die sich selbst
-    // antreibt. Sicherheit ist die Grundlage, nicht die Nachbereitung.
-    const auftraege = [];
-    for (const t of active) {
-      const anteil = t.moneyMax > 0 ? t.moneyNow / t.moneyMax : 0;
-
-      if (t.sec > t.secMin + SEC_TOLERANCE) {
-        t.doing = "beruhigen";
-        auftraege.push({
-          t,
-          weaken: Math.max(0, calc.weakenThreads(t.sec - t.secMin) - t.busy.weaken),
-        });
-      } else if (anteil < MONEY_READY) {
-        const voll = calc.growThreads(t, t.moneyMax, t.moneyNow, player, 1);
-        // Nie mehr bestellen, als ueberhaupt hineinpasst. Sonst wird der
-        // Sicherheitsausgleich unten fuer Tausende grow-Faeden berechnet, die
-        // es nie geben wird - und weil Sicherheit ZUERST verteilt wird,
-        // fressen diese weaken den ganzen Speicher, die grow kommen nie dran,
-        // und in der naechsten Runde beginnt dasselbe von vorn. Bei 274 TB
-        // faellt das nicht auf, bei 116 GB steht der Bot damit still. Genau
-        // das ist in der Nacht zum 20.08. fuenf Stunden lang passiert.
-        const passt = Math.floor(ramNow / 2);
-        const grow = Number.isFinite(voll) ? Math.max(0, Math.min(voll, passt) - t.busy.grow) : 0;
-        t.doing = "aufpaeppeln";
-        auftraege.push({
-          t,
-          grow,
-          // NUR der echte Ueberschuss ueber das Minimum. Der Ausgleich fuer
-          // grow wird weiter unten aus den TATSAECHLICH gestarteten Faeden
-          // bemessen - frueher stand hier der Bedarf der GEPLANTEN, und weil
-          // Sicherheit zuerst verteilt wird, band das den ganzen Speicher fuer
-          // Faeden, die es nie gab.
-          weaken: Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weaken),
-        });
-      } else {
-        const prepped = { ...t, sec: t.secMin, root: true };
-        const perThread = calc.hackPercent(prepped, player);
-        const voll = perThread > 0 ? Math.floor(HACK_FRACTION / perThread) : 0;
-        const hack = Math.max(0, voll - t.busy.hack);
-        t.doing = "ernten";
-        auftraege.push({
-          t,
-          hack,
-          weaken: Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weaken),
-        });
-      }
-    }
-
-    // Die Ernte hat Vorrang vor der Vorbereitung. Vorher wurde streng nach
-    // Auftragsart verteilt - erst alle weaken, dann alles andere -, sodass der
-    // riesige Sicherheitsbedarf EINES Vorbereitungsziels den gesamten Speicher
-    // band, bevor auch nur ein Hack-Faden startete. Ernte bringt sofort Geld,
-    // Vorbereitung ist Investition und kann warten.
-    const ernteAuftraege = auftraege.filter((a) => a.t.doing === "ernten");
-    const restAuftraege = auftraege.filter((a) => a.t.doing !== "ernten");
-    const schicke = (a, datei, wieviele, was) => {
-      if (!wieviele) return 0;
-      const gestartet = deploy(ns, workforce, datei, wieviele, a.t.host);
-      plan.push({ host: a.t.host, what: was, threads: gestartet, need: wieviele });
+    /**
+     * Schickt einen Auftrag los und schreibt mit, was davon wirklich
+     * gestartet ist. Der Rueckgabewert ist der Kern der Korrektur vom 20.08.:
+     * der Sicherheitsausgleich wird spaeter aus den TATSAECHLICH gestarteten
+     * Faeden bemessen, nicht aus den bestellten.
+     */
+    const schicke = (t, datei, wieviele, was) => {
+      if (!wieviele || wieviele < 1) return 0;
+      const gestartet = deploy(ns, workforce, datei, wieviele, t.host, marke++);
+      plan.push({ host: t.host, what: was, threads: gestartet, need: wieviele });
       return gestartet;
     };
 
-    // Durchgang 1: erntende Ziele vollstaendig - Sicherheit und Ernte.
-    for (const a of ernteAuftraege) {
-      schicke(a, "worker/weaken.js", a.weaken, "weaken");
-      a.hackGestartet = schicke(a, "worker/hack.js", a.hack, "hack");
-    }
-    // Durchgang 2: Sicherheit der Vorbereitungsziele.
-    for (const a of restAuftraege) schicke(a, "worker/weaken.js", a.weaken, "weaken");
-    // Durchgang 3: aufpaeppeln mit dem, was uebrig bleibt.
-    for (const a of restAuftraege) a.growGestartet = schicke(a, "worker/grow.js", a.grow, "grow");
+    // --- 8. Ernte ZUERST ---------------------------------------------------
+    //
+    // Reihenfolge der ganzen Runde:
+    //   (1) Ernte - sie zahlt sofort
+    //   (2) echter Sicherheitsueberschuss der Vorbereitungsziele
+    //   (3) nachwachsen, gedeckelt
+    //   (4) Ausgleich fuer die TATSAECHLICH gestarteten Faeden
+    //
+    // Vorher wurde streng nach Auftragsart verteilt - erst alle weaken, dann
+    // alles andere -, sodass der riesige Sicherheitsbedarf EINES
+    // Vorbereitungsziels den gesamten Speicher band, bevor auch nur ein
+    // Erntefaden startete. Ernte bringt sofort Geld, Vorbereitung ist
+    // Investition und kann warten.
+    //
+    // Damit die Vorbereitung im Stapelbetrieb trotzdem nicht verhungert,
+    // bleibt ihr dort ein fester Anteil des freien Speichers reserviert. Im
+    // Wellenbetrieb braucht es das nicht: eine Erntewelle bestellt nur den
+    // Fehlbetrag eines Zyklus und kann den Speicher gar nicht leerraeumen.
+    const prepReserve = batchMode && preparing.length ? ramNow * PREP_RESERVE : 0;
 
-    // Durchgang 4: Sicherheitsausgleich - und zwar erst jetzt, fuer die
-    // TATSAECHLICH gestarteten Faeden. Was keinen Platz mehr findet, hebt die
-    // Sicherheit auch nicht an; ein Ausgleich dafuer waere reine Verschwendung
-    // und hat in der Nacht zum 20.08. das ganze Netz blockiert.
-    for (const a of auftraege) {
-      const erzeugt = (a.growGestartet || 0) * calc.GROW_FORTIFY_AMOUNT
-        + (a.hackGestartet || 0) * calc.SERVER_FORTIFY_AMOUNT;
-      if (erzeugt > 0) schicke(a, "worker/weaken.js", calc.weakenThreads(erzeugt), "weaken");
+    if (batchMode) {
+      // Zwei Durchgaenge. Im ersten bekommt jedes Ziel seinen nach Ertrag
+      // gewichteten Anteil - so kommt auch das zweitbeste zum Zug. Im zweiten
+      // darf das beste Ziel den Rest nehmen, falls die anderen ihren Anteil
+      // nicht verbrauchen konnten. Denn ein Ziel kann nur begrenzt viel
+      // Speicher binden: mehr als tWeaken/(4*gap) Stapel passen nicht in
+      // seinen Kalender, egal wie viel frei ist.
+      for (const durchgang of [1, 2]) {
+        const freiZuBeginn = Math.max(0, workforce.reduce((a, s) => a + s.ramFree, 0) - prepReserve);
+        if (freiZuBeginn < 10) break;
+        const summe = harvesting.reduce((a, t) => a + Math.max(1e-9, t.score), 0);
+
+        for (const t of harvesting) {
+          const st = phaseOf(t.host);
+          // Im zweiten Durchgang wird der Rest jedes Mal neu ermittelt - sonst
+          // bekaeme das zweite Ziel ein Budget zugeteilt, das das erste laengst
+          // aufgebraucht hat, und die Platzierung liefe ins Leere.
+          const budget = durchgang === 1
+            ? freiZuBeginn * (Math.max(1e-9, t.score) / summe)
+            : Math.max(0, workforce.reduce((a, s) => a + s.ramFree, 0) - prepReserve);
+          if (budget < 10) continue;
+
+          const wahl = batch.chooseFraction(t, player, budget, {
+            gapMs: GAP_MS,
+            secNow: t.sec,
+            weakenMargin: WEAKEN_MARGIN,
+            ram: workerRam,
+            min: FRACTION_MIN,
+            max: FRACTION_MAX,
+          });
+          if (!wahl) continue;
+          st.fraction = wahl.fraction;
+          t.fraction = wahl.fraction;
+          t.fractionFits = true;
+          const p = wahl.plan;
+
+          let kalender = calendar.get(t.host) ?? 0;
+          let verbraucht = 0;
+          let gestartet = 0;
+
+          while (
+            gestartet < MAX_BATCHES_PER_ROUND &&
+            batchesTotal < MAX_BATCHES_TOTAL &&
+            verbraucht + p.ram <= budget
+          ) {
+            // Sicherheit unmittelbar vor dem Start neu ablesen, nicht die zu
+            // Rundenbeginn gemessene verwenden. Dazwischen liegen die Scans
+            // des ganzen Netzes; in dieser Zeit kann ein Auftrag gelandet sein
+            // und die Sicherheit angehoben haben. Aus einer veralteten
+            // Laufzeit wird eine negative additionalMsec, das Spiel deckelt
+            // sie auf 0, der Auftrag landet zu spaet - und der naechste noch
+            // spaeter. Das ist der Fehler, der eine Kette kippen laesst.
+            const zeiten = batch.opTimes(t, player, ns.getServerSecurityLevel(t.host));
+            const jetzt = Date.now();
+            // Der zuletzt landende Ausgleich hat die laengste Laufzeit.
+            // Frueher als (jetzt + tWeaken) kann er nicht landen, also darf
+            // die Ernte - die 3*gap vor ihm liegt - nicht frueher angesetzt
+            // werden.
+            const frueheste = jetzt + zeiten.tWeaken - 3 * GAP_MS + SLACK_MS;
+            const landHack = Math.max(kalender + GAP_MS, frueheste);
+            // Gehoert dieser Stapel schon in diese Runde? Massgeblich ist, ob
+            // sein letzter Ausgleich jetzt startbar ist.
+            if (landHack + 3 * GAP_MS - zeiten.tWeaken > jetzt + LEAD_MS) break;
+
+            const platz = () =>
+              workforce.filter((s) => s.ramFree >= 1).map((s) => ({ host: s.host, frei: s.ramFree }));
+            let pEff = p;
+            let ops = batch.batchOps(p, t.host, landHack, GAP_MS, SCRIPTS, workerRam, zeiten);
+            let belegung = batch.placeOps(platz(), ops);
+            if (!belegung) break;
+
+            // Musste die Ernte auf mehrere Rechner aufgeteilt werden? Dann
+            // nehmen die Bloecke nacheinander vom bereits verkleinerten
+            // Guthaben und holen zusammen WENIGER als geplant. Einmal
+            // nachrechnen, sonst legt das Nachwachsen blind zu viel nach.
+            const stuecke = belegung.placements.filter((x) => x.op === ops[0]).map((x) => x.threads);
+            if (stuecke.length > 1) {
+              const p2 = batch.batchPlan(t, player, {
+                fraction: wahl.fraction,
+                secNow: t.secMin,
+                weakenMargin: WEAKEN_MARGIN,
+                ram: workerRam,
+                hackChunks: stuecke,
+              });
+              const ops2 = p2 ? batch.batchOps(p2, t.host, landHack, GAP_MS, SCRIPTS, workerRam, zeiten) : null;
+              const b2 = ops2 ? batch.placeOps(platz(), ops2) : null;
+              if (b2) { pEff = p2; ops = ops2; belegung = b2; }
+            }
+
+            // Festschreiben - und zwar die Ernte ZULETZT. Sollte ein exec
+            // scheitern (fremdes Skript belegt in derselben Millisekunde den
+            // Platz), fehlt dann hoechstens die Beute. Waere die Ernte zuerst
+            // gestartet, koennte ihr das Nachwachsen fehlen - und genau daraus
+            // wird ein Ziel, das langsam ausblutet.
+            let abbruch = false;
+            for (const op of [ops[1], ops[2], ops[3], ops[0]]) {
+              for (const stueck of belegung.placements) {
+                if (stueck.op !== op) continue;
+                const pid = ns.exec(
+                  op.script,
+                  stueck.host,
+                  stueck.threads,
+                  t.host,
+                  0,
+                  Math.round(op.landAt),
+                  Math.round(op.opMs),
+                  "b" + marke++,
+                );
+                if (!pid) { abbruch = true; break; }
+                const w = workforce.find((s) => s.host === stueck.host);
+                if (w) w.ramFree -= stueck.threads * op.cost;
+              }
+              if (abbruch) break;
+            }
+
+            kalender = landHack + 3 * GAP_MS;
+            verbraucht += pEff.ram;
+            gestartet++;
+            batchesTotal++;
+            st.batches++;
+            if (!abbruch) moneyPlanned += pEff.money;
+            if (abbruch) break;
+          }
+
+          calendar.set(t.host, kalender);
+          t.doing = "stapeln";
+          if (gestartet > 0) {
+            plan.push({ host: t.host, what: "stapel", threads: gestartet, need: gestartet });
+          } else if (durchgang === 2 && p.ram > budget) {
+            // Nicht einmal EIN Stapel passt ins Budget. Das ist der einzige
+            // Fall, in dem ein Stapelziel stumm dasteht - er gehoert in die
+            // Engpassmeldung, sonst sucht man ihn im Dunkeln.
+            plan.push({ host: t.host, what: "stapel(" + fmt(p.ram, 0) + "GB)", threads: 0, need: 1 });
+          }
+        }
+      }
+    } else {
+      // Wellenbetrieb. Je Ziel und Landung eine Welle: erst der ECHTE
+      // Sicherheitsueberschuss, dann die Ernte. Der Ausgleich fuer die Ernte
+      // folgt weiter unten, aus den tatsaechlich gestarteten Faeden.
+      for (const t of harvesting) {
+        t.doing = "ernten";
+        schicke(t, SCRIPTS.weakenT,
+          Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weakenT), "weaken");
+
+        // Erntanteil je Ziel aus dem Speicherbudget bestimmen, nicht fest
+        // setzen. Genommen wird der groesste Anteil, dessen VOLLER Zyklus
+        // (abschoepfen, nachwachsen, Sicherheit abbauen) noch in ramShare
+        // passt. Passt nicht einmal der kleinste, wird trotzdem der kleinste
+        // genommen - ein winziger Happen ist immer noch besser als Stillstand.
+        //
+        // Die feste 0.1 war fuer ein Netz mit 274 TB gewaehlt. Nach einem
+        // Reset stehen 116 GB; dort passt der volle Zyklus eines
+        // 10-Prozent-Happens auf den meisten Zielen nicht mehr hinein - der
+        // Bot schoepft ab, bekommt das Ziel nicht wieder voll und faellt in
+        // eine Dauervorbereitung.
+        const wahl = calc.pickHackFraction(t, player, ramShare, workerRam);
+        t.fraction = wahl.fraction;
+        t.fractionFits = wahl.fits;
+        phaseOf(t.host).fraction = wahl.fraction;
+        const voll = wahl.cost ? wahl.cost.hackT : 0;
+        t.hackStarted = schicke(t, SCRIPTS.hackT, Math.max(0, voll - t.busy.hackT), "hack");
+      }
     }
 
+    // --- 9. Vorbereitung in drei Durchgaengen ------------------------------
+    //
+    // Die Aufteilung ist der Kern der Korrektur vom 20.08. Frueher stand hier
+    // EIN Durchgang, der den Sicherheitsausgleich fuer die GEPLANTEN
+    // grow-Faeden bemessen und VOR ihnen verteilt hat. Bei einem Ziel von 4 %
+    // auf 100 % sind das tausende Faeden; ihr Ausgleich allein braucht mehr
+    // Speicher als das ganze Netz. Er band also alles, grow kam nie dran, und
+    // in der naechsten Runde begann dasselbe von vorn.
+    for (const t of preparing) t.doing = "vorbereiten";
+
+    // Durchgang 1: NUR der echte Sicherheitsueberschuss. Was noch niemand
+    // erzeugt hat, muss auch niemand ausgleichen.
+    for (const t of preparing) {
+      schicke(t, SCRIPTS.weakenT,
+        Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weakenT), "weaken");
+    }
+
+    // Durchgang 2: nachwachsen mit dem, was uebrig ist - und GEDECKELT.
+    //
+    // Der Deckel ist die zweite Haelfte derselben Korrektur. Ohne ihn wird
+    // eine Bestellung ueber tausende Faeden aufgegeben, von denen nur ein
+    // Bruchteil startet; der Ausgleich in Durchgang 3 wuerde dann wieder fuer
+    // die Bestellung statt fuer die Wirklichkeit bemessen.
+    for (const t of preparing) {
+      if (t.moneyNow >= t.moneyMax) continue;
+      // Bei hoher Sicherheit erst beruhigen. Nachwachsen wirkt dann schwaecher
+      // (der Wachstumsexponent haengt an der Sicherheit) und erzeugt zugleich
+      // neue Sicherheit - in dieser Lage ist Beruhigen die guenstigere
+      // Reihenfolge. Der Ausgleich aus Durchgang 1 laeuft ohnehin schon.
+      if (t.sec > t.secMin + secTolerance(t)) {
+        t.doing = "beruhigen";
+        continue;
+      }
+      const voll = calc.growThreads(t, t.moneyMax, Math.max(1, t.moneyNow), player, 1);
+      if (!Number.isFinite(voll)) continue;
+      const frei = workforce.reduce((a, s) => a + s.ramFree, 0);
+      const passt = Math.floor((frei * GROW_ORDER_SHARE) / Math.max(0.01, workerRam.growT));
+      t.growStarted = schicke(t, SCRIPTS.growT, Math.max(0, Math.min(voll, passt) - t.busy.growT), "grow");
+    }
+
+    // Durchgang 3: Sicherheitsausgleich - und zwar erst jetzt, fuer die
+    // TATSAECHLICH gestarteten Faeden. Was keinen Platz mehr gefunden hat,
+    // hebt die Sicherheit auch nicht an; ein Ausgleich dafuer waere reine
+    // Verschwendung und hat in der Nacht zum 20.08. das ganze Netz blockiert.
+    // Gilt fuer Ernte und Vorbereitung gleichermassen - im Stapelbetrieb
+    // bringt jeder Stapel seinen Ausgleich selbst mit, dort ist beides null.
+    for (const t of active) {
+      const erzeugt = (t.growStarted || 0) * calc.GROW_FORTIFY_AMOUNT
+        + (t.hackStarted || 0) * calc.SERVER_FORTIFY_AMOUNT;
+      if (erzeugt > 0) schicke(t, SCRIPTS.weakenT, calc.weakenThreads(erzeugt), "weaken");
+    }
+
+    for (const c of active) {
+      if (!c.doing) c.doing = phaseOf(c.host).phase === "drain" ? "auslaufen" : "warten";
+    }
+
+    // Eine Runde dauert rund eine Sekunde, also ist der Mittelwert je Runde
+    // zugleich der erwartete Ertrag je Sekunde.
+    moneyWindow.push(moneyPlanned);
+    if (moneyWindow.length > 30) moneyWindow.shift();
+    const ertragErwartet = moneyWindow.reduce((a, b) => a + b, 0) / moneyWindow.length;
+
+    // --- 10. Lagebericht ---------------------------------------------------
     // Nach Zustand zaehlen, nicht nach neu gestarteten Threads: ein voll
     // ausgelastetes Netz startet naemlich genauso wenig Neues wie ein
     // stehendes, und beides duerfte nicht gleich aussehen.
-    harvesting = active.filter((t) => t.doing === "ernten").length;
-    preparing = active.filter((t) => t.doing && t.doing !== "ernten").length;
-
+    const ramFreiJetzt = workforce.reduce((a, s) => a + s.ramFree, 0);
+    let phase = "warten";
+    let reason = "Kein erreichbares Ziel - das eigene Hacking-Level ist noch zu niedrig.";
     if (active.length) {
-      phase = harvesting > 0 ? "ernten" : "vorbereiten";
+      phase = harvesting.length ? "ernten" : "vorbereiten";
       const wartend = plan.filter((p) => p.need > 0 && p.threads === 0).length;
       reason =
-        harvesting + " Ziel(e) werden abgeschoepft, " + preparing + " vorbereitet. " +
-        (ramNow < 4
+        (batchMode
+          ? harvesting.length + " Ziel(e) im Stapelbetrieb (" + batchesTotal + " neue Stapel diese Runde), "
+          : harvesting.length + " Ziel(e) werden abgeschoepft (Wellenbetrieb, Netz unter "
+            + BATCH_MIN_RAM + " GB), ") +
+        preparing.length + " vorbereitet. " +
+        (ramFreiJetzt < ramTotal * 0.05
           ? "Der Speicher ist voll ausgelastet."
-          : fmt(ramNow, 0) + " GB frei, aber in zu kleinen Resten verteilt.") +
+          : fmt(ramFreiJetzt, 0) + " GB frei - entweder passt kein weiterer Auftrag hinein, " +
+            "oder der Rest liegt in zu kleinen Stuecken.") +
         (wartend ? " " + wartend + " Auftrag/Auftraege warten auf Platz." : "");
     }
 
     earned = ns.getServerMoneyAvailable("home") - moneyAtStart;
 
-
-    // --- 6. Anzeigen -------------------------------------------------------
+    // --- 11. Anzeigen ------------------------------------------------------
     const view = {
       round,
       uptime: (Date.now() - startedAt) / 1000,
@@ -527,32 +1017,30 @@ export async function main(ns) {
       target,
       player,
       earned,
+      batchMode,
+      batches: batchesTotal,
+      erwartet: ertragErwartet,
       // [0] misst nur LAUFENDE Skripte - unsere Ein-Weg-Arbeiter buchen ihr
       // Geld aber in der letzten Millisekunde ihres Lebens und sind dann weg.
       // Diese Anzeige stuende strukturell nahe null. [1] ist der Schnitt seit
       // dem letzten Reset und damit das, was wir wirklich wissen wollen.
       income: ns.getTotalScriptIncome()[1],
       exp: ns.getTotalScriptExpGain(),
+      net: {
+        total: servers.length,
+        rooted: servers.filter((s) => s.root).length,
+        ramFree: ramFreiJetzt,
+        ramTotal: workforce.reduce((a, s) => a + s.ram, 0),
+      },
+      // Die Anzeige zeigt dieselbe Reihenfolge, in der auch gearbeitet wird.
+      candidates: active.slice(0, 6),
+      active,
+      events,
       // Nur alle zehn Runden neu berechnen - die Breitensuche laeuft ueber das
       // ganze Netz und aendert sich zwischen zwei Sekunden nicht. Den Wert
       // aber JEDE Runde mitschreiben, sonst faellt er aus der Telemetrie und
       // ist neun von zehn Runden lang nicht abrufbar.
       factionPaths: (pathCache = round % 10 === 1 || !pathCache ? factionPaths(ns) : pathCache),
-      net: {
-        total: servers.length,
-        rooted: servers.filter((s) => s.root).length,
-        ramFree: workforce.reduce((a, s) => a + s.ramFree, 0),
-        ramTotal: workforce.reduce((a, s) => a + s.ram, 0),
-      },
-      // Die Anzeige zeigt dieselbe Reihenfolge, in der auch gearbeitet wird.
-      // Vorher stand hier eine Sortierung nach expectedYield - die faellt in
-      // der Fruehphase fuer fast jedes Ziel auf glatt 0, und weil Array.sort
-      // stabil ist, war die angezeigte Rangfolge dann schlicht die
-      // Scan-Reihenfolge. Wer danach beurteilt, was der Bot tut, wird
-      // systematisch in die Irre gefuehrt.
-      candidates: active.slice(0, 6),
-      active,
-      events,
     };
 
     draw(ns, view);
@@ -585,8 +1073,8 @@ export async function main(ns) {
         ns.ui.closeTail(ns.pid);
         ns.exit();
       } else {
-        if (neueFassungSeit === 0) neueFassungSeit = round;
         note("Neue Fassung liegt bereit - warte auf einen laufenden Verwalter");
+        if (neueFassungSeit === 0) neueFassungSeit = round;
       }
     }
     } catch (err) {
@@ -644,6 +1132,11 @@ function draw(ns, v) {
   line("  " + C.dim + "Netz    " + C.off + v.net.rooted + " von " + v.net.total + " Rechnern offen" +
     C.dim + "   ·   Speicher " + C.off + fmt(v.net.ramTotal - v.net.ramFree, 0) + C.dim + " / " + fmt(v.net.ramTotal, 0) + " GB" +
     "   ·   Hacking " + C.off + C.hell + v.player.skill + C.off + C.dim + "   ·   " + fmt(v.exp, 1) + " exp/s" + C.off);
+  if (v.batchMode) {
+    line("  " + C.dim + "Stapel  " + C.off + v.batches + " neu in dieser Runde" +
+      C.dim + "   ·   rechnerisch " + C.off + C.gold + geld(v.erwartet) + "/s" + C.off +
+      C.dim + " bei dieser Taktung" + C.off);
+  }
   line("  " + C.dim + "Lage    " + C.off + umbruch(v.reason, 62, 10));
 
   line("");
@@ -653,21 +1146,32 @@ function draw(ns, v) {
     );
     for (const t of v.active) {
       const anteil = t.moneyMax > 0 ? t.moneyNow / t.moneyMax : 0;
-      const b = t.busy ?? { hack: 0, grow: 0, weaken: 0 };
+      const b = t.busy ?? { hackT: 0, growT: 0, weakenT: 0 };
       const arbeit = [];
-      if (b.hack) arbeit.push(C.gold + b.hack + "h" + C.off);
-      if (b.grow) arbeit.push(C.gruen + b.grow + "g" + C.off);
-      if (b.weaken) arbeit.push(C.blau + b.weaken + "w" + C.off);
+      if (b.hackT) arbeit.push(C.gold + b.hackT + "h" + C.off);
+      if (b.growT) arbeit.push(C.gruen + b.growT + "g" + C.off);
+      if (b.weakenT) arbeit.push(C.blau + b.weakenT + "w" + C.off);
 
-      const secOk = t.sec <= t.secMin + 3;
-      const farbe = t.doing === "ernten" ? C.gold : t.doing === "aufpaeppeln" ? C.gruen : C.blau;
+      // Dieselbe relative Schwelle wie in der Entscheidung. Frueher stand hier
+      // eine fest verdrahtete 3, die Anzeige haette also gruen gemeldet, was
+      // der Bot laengst als zu unruhig behandelt.
+      const secOk = t.sec <= t.secMin + secTolerance(t);
+      const farbe = t.doing === "ernten" || t.doing === "stapeln"
+        ? C.gold
+        : t.doing === "vorbereiten" ? C.gruen : C.blau;
+      // Der selbst gewaehlte Erntanteil - das ist die Zahl, an der man sieht,
+      // ob sich der Bot an die Groesse des Netzes anpasst. Ein "!" heisst:
+      // nicht einmal der kleinste volle Zyklus passt ins Budget.
+      const f = t.fraction
+        ? C.dim + " f" + pct(t.fraction) + (t.fractionFits === false ? "!" : "") + C.off
+        : "";
 
       line(
         "  " + farbe + pad(t.host, 18) + C.off +
         pad(geld(t.moneyNow), 9) + balken(anteil, 8) + pad(" " + pct(anteil), 8) +
         (secOk ? C.gruen : C.rot) + pad(fmt(t.sec, 1) + "/" + fmt(t.secMin, 1), 14) + C.off +
         pad(geld(t.score), 11) +
-        (arbeit.length ? arbeit.join(C.dim + "·" + C.off) : C.dim + "-" + C.off),
+        (arbeit.length ? arbeit.join(C.dim + "·" + C.off) : C.dim + "-" + C.off) + f,
       );
     }
   } else {
@@ -707,45 +1211,6 @@ function playerFacts(ns) {
     multSpeed: p.mults.hacking_speed,
     multGrow: p.mults.hacking_grow,
   };
-}
-
-/**
- * Wege zu den Faktionsservern, als Terminalkette.
- *
- * Das Netz wird bei JEDEM Reset neu verdrahtet - ein einmal notierter Weg ist
- * danach wertlos. Am 20.08. hat mich das Stunden gekostet: der Backdoor auf
- * CSEC scheiterte viermal, weil harakiri-sushi kein Nachbar mehr war. Deshalb
- * kommt der Weg jetzt aus dem laufenden Netz statt aus dem Gedaechtnis.
- *
- * @param {NS} ns
- */
-function factionPaths(ns) {
-  const ZIELE = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "The-Cave", "fulcrumassets"];
-  const vorgaenger = new Map([["home", null]]);
-  const schlange = ["home"];
-  while (schlange.length) {
-    const hier = schlange.shift();
-    for (const nachbar of ns.scan(hier)) {
-      if (vorgaenger.has(nachbar)) continue;
-      vorgaenger.set(nachbar, hier);
-      schlange.push(nachbar);
-    }
-  }
-  const raus = {};
-  for (const ziel of ZIELE) {
-    if (!vorgaenger.has(ziel)) continue;
-    const kette = [];
-    for (let h = ziel; h && h !== "home"; h = vorgaenger.get(h)) kette.unshift(h);
-    let bd = false;
-    try { bd = !!ns.getServer(ziel).backdoorInstalled; } catch { /* nicht erreichbar */ }
-    raus[ziel] = {
-      cmd: ["home", ...kette.map((h) => "connect " + h)].join("; "),
-      level: ns.getServerRequiredHackingLevel(ziel),
-      root: ns.hasRootAccess(ziel),
-      backdoor: bd,
-    };
-  }
-  return raus;
 }
 
 /** @param {NS} ns */
@@ -791,7 +1256,7 @@ function tryCrack(ns, host) {
   // Bewusst OHNE Pruefung des Hacking-Levels: ns.nuke verlangt nur NUKE.exe
   // und genug offene Anschluesse (src/NetscriptFunctions.ts:531). Auch grow
   // und weaken brauchen kein Level, nur Root. Das Level entscheidet allein
-  // darueber, ob man einen Rechner HACKEN kann - als Arbeitspferd taugt er
+  // darueber, ob man einen Rechner ERNTEN kann - als Arbeitspferd taugt er
   // vorher schon, und genau davon haben wir zu wenig.
   if (open < ns.getServerNumPortsRequired(host)) return false;
   try {
@@ -802,15 +1267,61 @@ function tryCrack(ns, host) {
 }
 
 /**
- * Verteilt Arbeiter ueber alle Rechner mit freiem Speicher.
+ * Wege zu den Faktionsservern, als Terminalkette.
+ *
+ * Das Netz wird bei JEDEM Reset neu verdrahtet - ein einmal notierter Weg ist
+ * danach wertlos. Am 20.08. hat mich das Stunden gekostet: der Backdoor auf
+ * CSEC scheiterte viermal, weil harakiri-sushi kein Nachbar mehr war. Deshalb
+ * kommt der Weg jetzt aus dem laufenden Netz statt aus dem Gedaechtnis.
+ *
+ * @param {NS} ns
+ */
+function factionPaths(ns) {
+  const ZIELE = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "The-Cave", "fulcrumassets"];
+  const vorgaenger = new Map([["home", null]]);
+  const schlange = ["home"];
+  while (schlange.length) {
+    const hier = schlange.shift();
+    for (const nachbar of ns.scan(hier)) {
+      if (vorgaenger.has(nachbar)) continue;
+      vorgaenger.set(nachbar, hier);
+      schlange.push(nachbar);
+    }
+  }
+  const raus = {};
+  for (const ziel of ZIELE) {
+    if (!vorgaenger.has(ziel)) continue;
+    const kette = [];
+    for (let h = ziel; h && h !== "home"; h = vorgaenger.get(h)) kette.unshift(h);
+    let bd = false;
+    try { bd = !!ns.getServer(ziel).backdoorInstalled; } catch { /* nicht erreichbar */ }
+    raus[ziel] = {
+      cmd: ["home", ...kette.map((h) => "connect " + h)].join("; "),
+      level: ns.getServerRequiredHackingLevel(ziel),
+      root: ns.hasRootAccess(ziel),
+      backdoor: bd,
+    };
+  }
+  return raus;
+}
+
+/**
+ * Verteilt Arbeiter ohne Zeitvorgabe ueber alle Rechner mit freiem Speicher.
+ * Das ist der Weg fuer Wellen und Vorbereitung - dort ist der Landezeitpunkt
+ * egal, es zaehlt nur, dass die Threads ueberhaupt laufen.
+ *
+ * landeZeit wird als 0 uebergeben. Damit erkennt der Kalender in Schritt 4
+ * diese Auftraege nicht als vergebene Termine - was richtig ist, denn sie
+ * gehoeren zu keinem Stapel.
+ *
  * Liefert die tatsaechlich gestartete Threadzahl zurueck - die kann kleiner
- * sein als gewuenscht, wenn der Speicher nicht reicht. Genau das will man
- * in der Anzeige sehen.
+ * sein als gewuenscht, wenn der Speicher nicht reicht. Genau das will man in
+ * der Anzeige sehen, und genau daraus wird der Sicherheitsausgleich bemessen.
  *
  * @param {NS} ns
  * @returns {number}
  */
-function deploy(ns, workforce, script, threads, target) {
+function deploy(ns, workforce, script, threads, target, marke) {
   if (!threads || threads < 1 || !Number.isFinite(threads)) return 0;
   const cost = ns.getScriptRam(script, "home");
   let left = Math.floor(threads);
@@ -823,7 +1334,7 @@ function deploy(ns, workforce, script, threads, target) {
     const fits = Math.floor(s.ramFree / cost);
     if (fits < 1) continue;
     const n = Math.min(fits, left);
-    const pid = ns.exec(script, s.host, n, target, 0, Date.now() + "-" + started);
+    const pid = ns.exec(script, s.host, n, target, 0, 0, 0, "p" + marke + "-" + started);
     if (pid) {
       s.ramFree -= n * cost;
       left -= n;
@@ -837,9 +1348,9 @@ function deploy(ns, workforce, script, threads, target) {
  * Legt den Zustand fuer die Bruecke nach draussen ab.
  *
  * Der Autopilot schreibt die Telemetrie selbst, statt sie einem zweiten
- * Skript zu ueberlassen: auf home sind nur 8 GB, und ein eigener
- * Telemetrie-Prozess haette 2.75 GB davon gefressen - mehr als ein
- * ganzer Arbeiter.
+ * Skript zu ueberlassen: auf home ist der Platz knapp, und ein eigener
+ * Telemetrie-Prozess haette 2.75 GB davon gefressen - mehr als ein ganzer
+ * Arbeiter.
  *
  * @param {NS} ns
  */
@@ -857,23 +1368,34 @@ function writeBrain(ns, v) {
       karma: ns.heart.break(),
     },
     income: { scriptIncome: v.income, scriptExpGain: v.exp },
+    // Was die Taktung rechnerisch hergeben sollte. Weicht das dauerhaft stark
+    // vom tatsaechlichen Zuwachs ab, stimmt mit den Stapeln etwas nicht.
+    batching: { active: v.batchMode, newBatches: v.batches, expectedPerSec: v.erwartet },
     ram: { used: v.net.ramTotal - v.net.ramFree, max: v.net.ramTotal },
     network: { total: v.net.total, rooted: v.net.rooted, backdoored: 0 },
-    // Wege zu den Faktionsservern. Das Netz wird bei JEDEM Reset neu
-    // verdrahtet, ein einmal notierter Weg ist danach wertlos.
-    factionPaths: v.factionPaths,
-    busy: v.busy,
+    // Die Schluessel heissen hier wieder hack/grow/weaken, damit die Bruecke
+    // und das Dashboard unveraendert weiterlesen koennen. Schluessel in einem
+    // Objektliteral kosten kein RAM, nur Zugriffe auf sie.
+    busy: { hack: v.busy.hackT, grow: v.busy.growT, weaken: v.busy.weakenT },
     events: v.events,
     targets: v.candidates.map((c) => ({
       host: c.host,
-      action: c.host === v.target?.host ? v.phase : "",
+      action: c.doing ?? "",
       threads: 0,
       money: c.moneyNow,
       moneyPct: c.moneyMax > 0 ? c.moneyNow / c.moneyMax : 0,
       sec: c.sec,
       minSec: c.secMin,
       valuePerSec: c.score,
+      // Der selbst bestimmte Erntanteil. Steht hier, damit sich von aussen
+      // messen laesst, ob er nach einem Reset wirklich faellt und mit dem
+      // Netz wieder steigt.
+      hackFraction: c.fraction ?? null,
+      hackFractionFits: c.fractionFits ?? null,
     })),
+    // Wege zu den Faktionsservern. Das Netz wird bei JEDEM Reset neu
+    // verdrahtet, ein einmal notierter Weg ist danach wertlos.
+    factionPaths: v.factionPaths,
   };
   ns.write("data/telemetry.txt", JSON.stringify(data), "w");
 }

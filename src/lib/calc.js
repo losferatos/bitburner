@@ -25,6 +25,89 @@ export const GROW_TIME_FACTOR = 3.2;
 export const WEAKEN_TIME_FACTOR = 4;
 
 /**
+ * Notnagel-Preise der Arbeiter, in GB. NUR als Vorgabewert gedacht - wer
+ * rechnen will, reicht die echten Kosten aus ns.getScriptRam durch. Sonst
+ * luegt jede Speicherrechnung still weiter, wenn ein Arbeiter sich aendert.
+ * 1.60 GB Grundlast (RamCostConstants.Base) + 0.10 hack / 0.15 grow / 0.15 weaken.
+ *
+ * Die Felder heissen hackT/growT/weakenT und nicht hack/grow/weaken, und das
+ * ist kein Schoenheitsfehler, sondern spart bares RAM: Bitburners
+ * Speicherrechner laeuft ueber den Syntaxbaum und bucht JEDEN Bezeichner,
+ * dessen Name auf eine ns-Funktion passt - auch `costs.hack`, obwohl `costs`
+ * kein `ns` ist (Script/RamCalculations.ts, Besucher Identifier und
+ * MemberExpression). Ein einziges `costs.hack` irgendwo im Importbaum kostet
+ * das Hauptskript 0.10 GB, `.grow` und `.weaken` je 0.15 GB. Schluessel in
+ * Objektliteralen sind dagegen frei (acorn-walk besucht bei Property nur den
+ * Wert, den Schluessel nur wenn er berechnet ist) - deshalb darf die
+ * Telemetrie weiterhin `{ hack: ... }` schreiben.
+ */
+export const WORKER_RAM = { hackT: 1.7, growT: 1.75, weakenT: 1.75 };
+
+/** Kandidaten fuer den Erntanteil, aufsteigend. */
+export const HACK_FRACTIONS = [0.02, 0.05, 0.1, 0.2, 0.4];
+
+/**
+ * Speicherbedarf eines VOLLSTAENDIGEN Zyklus fuer den Erntanteil f.
+ *
+ * Ein Zyklus ist: f des Guthabens abschoepfen, wieder auffuellen, die dabei
+ * entstandene Sicherheit abbauen. Nur wenn alle drei Teile zusammen in das
+ * Speicherbudget passen, ist f ueberhaupt durchfuehrbar - sonst hackt der Bot
+ * ein Ziel leer und bekommt es nie wieder voll.
+ *
+ * @param {{secMin: number, reqSkill: number, moneyMax: number, growth: number}} s
+ * @param {object} p Spielerwerte
+ * @param {number} f Anteil des Maximalguthabens
+ * @param {{hackT: number, growT: number, weakenT: number}} costs
+ * @returns {null | {hackT: number, growT: number, weakenT: number, ram: number}}
+ */
+export function cycleCost(s, p, f, costs = WORKER_RAM) {
+  const prepped = { sec: s.secMin, reqSkill: s.reqSkill, growth: s.growth, moneyMax: s.moneyMax, root: true };
+  const pct = hackPercent(prepped, p);
+  if (!(pct > 0) || !(f > 0) || f >= 1) return null;
+
+  const hackT = Math.ceil(f / pct);
+  // Nicht ln(1/(1-f))/k von Hand: growThreads loest dieselbe Gleichung wie das
+  // Spiel und rechnet den additiven $1-je-Faden mit. Die Handformel schaetzt
+  // den Bedarf zu hoch und wuerde f unnoetig klein halten.
+  const growT = growThreads(prepped, s.moneyMax, s.moneyMax * (1 - f), p, 1);
+  if (!Number.isFinite(growT)) return null;
+
+  // Sicherheit, die abschoepfen und nachwachsen erzeugen, wieder abbauen.
+  const weakenT = weakenThreads(hackT * SERVER_FORTIFY_AMOUNT + growT * GROW_FORTIFY_AMOUNT);
+  const ram = hackT * costs.hackT + growT * costs.growT + weakenT * costs.weakenT;
+  return { hackT, growT, weakenT, ram };
+}
+
+/**
+ * Groesster Erntanteil, dessen voller Zyklus noch ins Budget passt.
+ *
+ * Warum das kein fester Wert sein darf: 0.1 war fuer ein Netz mit 274 TB
+ * gewaehlt. Nach einem Reset stehen 116 GB - dort passt nicht einmal das
+ * Nachwachsen eines einzigen 10-Prozent-Happens hinein, der Bot schoepft ab
+ * und bekommt das Ziel nie wieder voll. Der Anteil muss also mit dem Netz
+ * mitwachsen und nach dem Reset von selbst auf 0.02 zurueckfallen.
+ *
+ * Passt gar nichts, wird der kleinste Anteil genommen: lieber ein winziger
+ * Happen als Stillstand.
+ *
+ * @param {object} s Server
+ * @param {object} p Spielerwerte
+ * @param {number} ramShare Speicher, der diesem Ziel zusteht, in GB
+ * @param {{hackT: number, growT: number, weakenT: number}} costs
+ * @returns {{fraction: number, cost: object|null, fits: boolean}}
+ */
+export function pickHackFraction(s, p, ramShare, costs = WORKER_RAM) {
+  let best = { fraction: HACK_FRACTIONS[0], cost: null, fits: false };
+  for (const f of HACK_FRACTIONS) {
+    const c = cycleCost(s, p, f, costs);
+    if (!c) continue;
+    if (!best.cost) best = { fraction: f, cost: c, fits: false };
+    if (c.ram <= ramShare) best = { fraction: f, cost: c, fits: true };
+  }
+  return best;
+}
+
+/**
  * Intelligence-Bonus. src/PersonObjects/formulas/intelligence.ts:1
  * @param {number} intelligence
  */
@@ -224,19 +307,28 @@ export function targetScore(s, p) {
  * schlechter als ein magerer, der sofort bereit ist. Gerechnet wird mit dem
  * Speicher, der TATSAECHLICH zur Verfuegung steht - nicht mit Wunschdenken.
  *
+ * Die Arbeiterkosten kommen von aussen. Frueher stand hier 1.75 fest im Code -
+ * das ist der heutige Preis von weaken.js und grow.js, aber niemand merkt es,
+ * wenn ein Arbeiter eine ns-Funktion dazubekommt: die Vorbereitungszeit wuerde
+ * dann still zu kurz gerechnet, und die Zielauswahl haenge an einer Luege.
+ * Der Aufrufer kennt die echten Kosten (ns.getScriptRam) und reicht sie durch.
+ *
  * @param {{sec: number, secMin: number, moneyNow: number, moneyMax: number, growth: number, reqSkill: number}} s
  * @param {object} p
  * @param {number} ramFree verfuegbarer Speicher im ganzen Netz, in GB
+ * @param {{weakenT: number, growT: number}} costs Speicherbedarf je Arbeiterfaden, in GB
  * @returns {number} Sekunden
  */
-export function prepSeconds(s, p, ramFree) {
+export function prepSeconds(s, p, ramFree, costs = WORKER_RAM) {
   const tW = weakenTime({ sec: s.sec, reqSkill: s.reqSkill }, p);
+  const costW = costs.weakenT > 0 ? costs.weakenT : WORKER_RAM.weakenT;
+  const costG = costs.growT > 0 ? costs.growT : WORKER_RAM.growT;
   let seconds = 0;
 
   // Schritt 1: Sicherheit auf das Minimum druecken.
   const wNeed = weakenThreads(s.sec - s.secMin);
   if (wNeed > 0) {
-    const perWave = Math.max(1, Math.floor(ramFree / 1.75));
+    const perWave = Math.max(1, Math.floor(ramFree / costW));
     seconds += Math.ceil(wNeed / perWave) * tW;
   }
 
@@ -251,7 +343,7 @@ export function prepSeconds(s, p, ramFree) {
       1,
     );
     if (Number.isFinite(gNeed) && gNeed > 0) {
-      const perWave = Math.max(1, Math.floor(ramFree / 1.75));
+      const perWave = Math.max(1, Math.floor(ramFree / costG));
       seconds += Math.ceil(gNeed / perWave) * tW;
     }
   }
@@ -266,11 +358,12 @@ export function prepSeconds(s, p, ramFree) {
  * @param {object} p Spieler
  * @param {number} ramFree
  * @param {number} horizon Betrachtungszeitraum in Sekunden
+ * @param {{weakenT: number, growT: number}} costs Speicherbedarf je Arbeiterfaden
  */
-export function expectedYield(s, p, ramFree, horizon = 900) {
+export function expectedYield(s, p, ramFree, horizon = 900, costs = WORKER_RAM) {
   const rate = targetScore(s, p);
   if (rate <= 0) return 0;
-  const prep = prepSeconds(s, p, ramFree);
+  const prep = prepSeconds(s, p, ramFree, costs);
   const harvestTime = Math.max(0, horizon - prep);
   return rate * harvestTime;
 }

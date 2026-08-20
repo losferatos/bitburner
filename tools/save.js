@@ -72,7 +72,7 @@ async function main() {
     console.log("    KEINE - ohne Mitgliedschaft laeuft keine Reputation!");
   } else {
     for (const f of p.factions) {
-      const d = factions[f] && factions[f].data;
+      const d = factions[f] && (factions[f].data || factions[f]);
       console.log("    " + f.padEnd(22) + (d ? Math.round(d.playerReputation) + " rep, "
         + (d.favor || 0).toFixed(1) + " favor" : "?"));
     }

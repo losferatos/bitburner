@@ -39,16 +39,67 @@ export async function main(ns) {
   // bereits in getServerUsedRam - wer hier nochmal seine vollen 7 GB abzieht,
   // rechnet ihn doppelt und verschenkt den halben Heimrechner.
   const HOME_RESERVE = 2;
-  // So viele Ziele gleichzeitig in Stapeln abschoepfen. Ein einzelnes Ziel
-  // kann nur eine begrenzte Menge Speicher binden (siehe chooseFraction) -
-  // waechst die Flotte, ist Breite der einzige Weg, sie auszulasten. Werte
-  // von Argus uebernommen (Stand 07fa272); sie wirken faktisch als "alle
-  // lohnenden Ziele", was mit Stapelbetrieb genau richtig ist.
+  // OBERGRENZEN, keine festen Zahlen. Wie viele Ziele wirklich bedient
+  // werden, haengt am vorhandenen Speicher und wird jede Runde neu bestimmt
+  // (siehe maxTargets/prepTargets in Schritt 7).
+  //
+  // Feste Zahlen waren fuer genau eine Ausbaustufe richtig. In der Nacht zum
+  // 20.08. hat das den Wiederaufbau nach dem ersten Reset abgewuergt: die
+  // Werte 60/40 stammten von einem Netz mit 274 TB, nach dem Reset standen
+  // noch 116 GB. Der Bot hat daraufhin sieben Ziele gleichzeitig vorbereitet,
+  // keines je fertig bekommen und fuenf Stunden lang nichts verdient. Fuer den
+  // Stapelbetrieb gilt das doppelt: ein Ziel zahlt erst, wenn es EXAKT auf
+  // Hoechstguthaben und Mindestsicherheit steht - halb vorbereitete Ziele
+  // bringen nicht halb so viel, sondern gar nichts.
   const MAX_TARGETS = 60;
-  // So viele Ziele gleichzeitig VORBEREITEN. Der Bedarf der Vorbereitung ist
-  // endlich, sie laeuft also nur einmal je Ziel voll auf und uebergibt danach
-  // an den Stapelbetrieb. Bei 164 TB freiem Speicher ist Breite hier billig.
   const PREP_TARGETS = 40;
+  // Anteil des freien Speichers, der der Vorbereitung reserviert bleibt,
+  // solange ueberhaupt ein Ziel vorbereitet wird. Ohne ihn koennte der
+  // Stapelbetrieb - dessen Bedarf praktisch unbegrenzt ist - jede Runde allen
+  // Speicher wegnehmen, und der Bot bliebe fuer immer bei den Zielen, die
+  // zufaellig zuerst fertig geworden sind. Der Anteil kostet nichts, sobald
+  // nichts mehr vorzubereiten ist: dann ist er null.
+  const PREP_RESERVE = 0.25;
+
+  // Ab wie viel Gesamtspeicher ueberhaupt in Stapeln gearbeitet wird.
+  //
+  // Der Stapelbetrieb ist NICHT unter allen Umstaenden besser. Jeder der vier
+  // Auftraege eines Stapels belegt seinen Speicher von seinem Start bis zu
+  // SEINER Landung - also praktisch eine ganze weaken-Zeit, auch der hack, der
+  // fuer sich nur ein Viertel so lange braucht. Solange Speicher der Engpass
+  // ist, ist das teuer: eine hack-Welle alter Art holt dieselbe Beute mit
+  // einem Viertel der Speicherzeit.
+  //
+  // Nachgerechnet an harakiri-sushi (Level 219, ein Ziel, 90 Minuten,
+  // Landungen exakt nach Laufzeit), Ertrag in $/s:
+  //
+  //     Speicher     Wellen    Stapel   Faktor
+  //       64 GB       47 186    19 001    0.40
+  //      116 GB       84 951    50 568    0.60
+  //      200 GB      125 740    83 360    0.66
+  //      300 GB      152 164   137 453    0.90
+  //      400 GB      152 164   180 972    1.19
+  //      506 GB      153 579   233 838    1.52
+  //     1000 GB      154 982   402 244    2.60
+  //
+  // Die Wellen saettigen bei rund 155 k$/s je Ziel und lassen alles weitere
+  // brachliegen; die Stapel wachsen weiter, bis der Kalender voll ist. Der
+  // Schnittpunkt liegt bei etwa 350 GB. Unterhalb davon wird geerntet wie
+  // bisher - das ist genau der Zustand nach einem Reset, und dort haette der
+  // Stapelbetrieb Ertrag gekostet, nicht gebracht.
+  //
+  // Ein Hin- und Herspringen an der Schwelle ist nicht moeglich: der Speicher
+  // waechst nur (der Verwalter kauft und vergroessert, er verkleinert nie) und
+  // faellt ausschliesslich beim Augmentierungs-Reset. Der Uebergang findet
+  // also genau zweimal je Durchgang statt.
+  const BATCH_MIN_RAM = 400;
+  // Nur fuer den Wellenbetrieb unterhalb von BATCH_MIN_RAM. 0.1 und nicht 0.4:
+  // hack nimmt linear weg, grow muss multiplikativ zurueckholen. Bei 0.4
+  // braucht schon n00dles 96 Faeden = 163 GB - mehr als das ganze Netz nach
+  // einem Reset hat.
+  const HACK_FRACTION = 0.1;
+  const SEC_TOLERANCE = 3;
+  const MONEY_READY = 0.9;
 
   // ---------------------------------------------------------------------
   // HWGW-Stapel
@@ -347,9 +398,33 @@ export async function main(ns) {
     // gerade aus, weil etwas nicht stimmt. Dazwischen gibt es nichts: ein
     // halb vorbereitetes Ziel zu hacken ist genau der Fehler, den die Stapel
     // vermeiden sollen.
+    //
+    // Ausnahme: bei kleinem Netz (siehe BATCH_MIN_RAM) wird geerntet wie
+    // frueher, in Wellen. Dann gilt auch wieder die alte, lockere Schwelle -
+    // exakt 100 % Guthaben zu verlangen kostet bei knappem Speicher eine
+    // Dreiviertelstunde, in der nichts hereinkommt.
+    const batchMode = ramTotal >= BATCH_MIN_RAM;
+    const readyClassic = (s) =>
+      s.sec <= s.secMin + SEC_TOLERANCE && s.moneyNow >= s.moneyMax * MONEY_READY;
+
     for (const c of candidates) {
       const st = phaseOf(c.host);
       const laeuft = c.busy.hackT + c.busy.growT + c.busy.weakenT;
+
+      if (!batchMode) {
+        // Kein Zustandsautomat, keine Drifterkennung: ein Ziel erntet, sobald
+        // es reif ist, und wird sonst vorbereitet. Genau wie bisher.
+        st.phase = readyClassic(c) ? "batch" : "prep";
+        continue;
+      }
+
+      // Umgekehrter Wechsel: das Netz ist gerade ueber BATCH_MIN_RAM
+      // gewachsen, und ein Ziel steht noch aus dem Wellenbetrieb auf "batch",
+      // ohne je fuer Stapel vorbereitet worden zu sein. Einmal zurueck in die
+      // Vorbereitung - sonst hackt der erste Stapel in ein halb leeres Ziel.
+      if (st.phase === "batch" && st.batches === 0 && c.moneyNow < c.moneyMax * 0.999) {
+        st.phase = "prep";
+      }
 
       if (st.phase === "batch") {
         st.samples.push({ sec: c.sec, money: c.moneyMax > 0 ? c.moneyNow / c.moneyMax : 0 });
@@ -406,14 +481,23 @@ export async function main(ns) {
     };
     for (const c of candidates) c.rest = restBedarf(c);
 
+    // Breite nach Speicher, nicht nach Wunsch. Die Teiler sind grob, aber sie
+    // treffen die Groessenordnung: unter 4 TB wird nur ein Ziel vorbereitet,
+    // unter 2 TB laufen hoechstens zwei im Stapelbetrieb. Nach einem Reset
+    // (116 GB) bleibt damit genau ein Vorbereitungsziel uebrig - das wird
+    // dann auch wirklich fertig, statt dass sich zwanzig gegenseitig den
+    // Speicher wegnehmen.
+    const maxTargets = Math.max(2, Math.min(MAX_TARGETS, Math.floor(ramTotal / 2000)));
+    const prepTargets = Math.max(1, Math.min(PREP_TARGETS, Math.floor(ramTotal / 4000)));
+
     const imStapel = candidates
       .filter((c) => phaseOf(c.host).phase === "batch")
       .sort((a, b) => b.score - a.score)
-      .slice(0, MAX_TARGETS);
+      .slice(0, maxTargets);
     const inVorbereitung = candidates
       .filter((c) => phaseOf(c.host).phase === "prep")
       .sort((a, b) => b.score / b.rest - a.score / a.rest)
-      .slice(0, PREP_TARGETS);
+      .slice(0, prepTargets);
     const active = [...imStapel, ...inVorbereitung];
     // Ziele, die aus der Rangfolge gefallen sind, aber noch Arbeiter haben,
     // muessen in der Anzeige mitlaufen - sonst sieht man nicht, wo der
@@ -424,48 +508,61 @@ export async function main(ns) {
     }
 
     const plan = [];
-
-    // --- 8. Vorbereitung ---------------------------------------------------
-    // Zuerst, und zwar bewusst: der Bedarf der Vorbereitung ist endlich (eine
-    // feste Threadzahl bis zum Vollzustand), der Bedarf der Stapel dagegen
-    // unbegrenzt. Wer die Stapel zuerst bedient, bereitet nie wieder ein Ziel
-    // vor. Umgekehrt kann die Vorbereitung die Stapel nicht aushungern.
-    //
-    // Anders als frueher wird bis EXAKT auf secMin und moneyMax vorbereitet,
-    // nicht nur auf "drei Punkte Toleranz und 90 %". Der Stapelbetrieb setzt
-    // den exakten Zustand voraus.
-    for (const t of inVorbereitung) {
-      t.doing = "vorbereiten";
-      let growT = 0;
-      if (t.moneyNow < t.moneyMax) {
-        const voll = calc.growThreads(t, t.moneyMax, Math.max(1, t.moneyNow), player, 1);
-        if (Number.isFinite(voll)) growT = Math.max(0, voll - t.busy.growT);
-      }
-      // Ausgleich fuer den vorhandenen UND den geplanten grow, plus die
-      // Sicherheit, die jetzt schon zu viel ist. Lieber ein weaken zu viel:
-      // ueberzaehlige Threads richten keinen Schaden an, die Sicherheit ist
-      // nach unten gedeckelt (Server.ts:91).
-      const secBedarf =
-        Math.max(0, t.sec - t.secMin) + (t.busy.growT + growT) * calc.GROW_FORTIFY_AMOUNT;
-      const weakenT = Math.max(0, calc.weakenThreads(secBedarf) - t.busy.weakenT);
-      if (weakenT > 0) {
-        const n = deploy(ns, workforce, SCRIPTS.weakenT, weakenT, t.host, marke++);
-        plan.push({ host: t.host, what: "weaken", threads: n, need: weakenT });
-      }
-      if (growT > 0) {
-        const n = deploy(ns, workforce, SCRIPTS.growT, growT, t.host, marke++);
-        plan.push({ host: t.host, what: "grow", threads: n, need: growT });
-      }
-    }
-
-    // --- 9. Stapel losschicken --------------------------------------------
     const ramCost = {
       hackT: ns.getScriptRam(SCRIPTS.hackT, "home"),
       growT: ns.getScriptRam(SCRIPTS.growT, "home"),
       weakenT: ns.getScriptRam(SCRIPTS.weakenT, "home"),
     };
+
+    // --- 8. Stapel losschicken (Ernte ZUERST) ------------------------------
+    //
+    // Reihenfolge der ganzen Runde:
+    //   (1) Stapel        - die zahlen sofort
+    //   (2) echter Sicherheitsueberschuss der Vorbereitungsziele
+    //   (3) grow, gedeckelt
+    //   (4) Ausgleich fuer die TATSAECHLICH gestarteten grow-Faeden
+    //
+    // Der Entwurf hatte die Vorbereitung nach vorn gestellt: ihr Bedarf sei
+    // endlich, der der Stapel unbegrenzt. Das Argument stimmt nur, solange der
+    // endliche Bedarf auch erfuellbar IST. Er ist es nicht: ein Ziel bei 4 %
+    // Guthaben verlangt tausende grow-Faeden, deren Sicherheitsausgleich
+    // allein mehr Speicher braucht als das ganze Netz hat. Genau daran hing
+    // der Stillstand in der Nacht zum 20.08. - fuenf Stunden, null Dollar.
+    //
+    // Damit die Vorbereitung trotzdem nicht dauerhaft verhungert, bleibt ihr
+    // ein fester Anteil des freien Speichers reserviert (PREP_RESERVE). Er
+    // faellt weg, sobald nichts mehr vorzubereiten ist.
+    const prepReserve = inVorbereitung.length
+      ? workforce.reduce((a, s) => a + s.ramFree, 0) * PREP_RESERVE
+      : 0;
     let stapelGesamt = 0;
     let geldGeplant = 0;
+
+    // Kleines Netz: Wellenbetrieb wie vor dem Stapelumbau. Eine Welle je Ziel
+    // und Landung. Reihenfolge auch hier: echter Sicherheitsueberschuss,
+    // Ernte, dann der Ausgleich fuer die TATSAECHLICH gestarteten hack-Faeden.
+    if (!batchMode) {
+      for (const t of imStapel) {
+        t.doing = "ernten";
+        const weakenWanted =
+          Math.max(0, calc.weakenThreads(Math.max(0, t.sec - t.secMin)) - t.busy.weakenT);
+        if (weakenWanted > 0) {
+          const n = deploy(ns, workforce, SCRIPTS.weakenT, weakenWanted, t.host, marke++);
+          plan.push({ host: t.host, what: "weaken", threads: n, need: weakenWanted });
+        }
+        // Threadzahl im VORBEREITETEN Zustand rechnen: dort landet die Welle.
+        const prepped = { ...t, sec: t.secMin, root: true };
+        const perThread = calc.hackPercent(prepped, player);
+        const voll = perThread > 0 ? Math.floor(HACK_FRACTION / perThread) : 0;
+        const hackWanted = Math.max(0, voll - t.busy.hackT);
+        if (hackWanted > 0) {
+          const n = deploy(ns, workforce, SCRIPTS.hackT, hackWanted, t.host, marke++);
+          plan.push({ host: t.host, what: "hack", threads: n, need: hackWanted });
+          const aus = calc.weakenThreads(n * calc.SERVER_FORTIFY_AMOUNT);
+          if (aus > 0) deploy(ns, workforce, SCRIPTS.weakenT, aus, t.host, marke++);
+        }
+      }
+    }
 
     // Zwei Durchgaenge. Im ersten bekommt jedes Ziel seinen nach Ertrag
     // gewichteten Anteil - so kommt auch das zweitbeste zum Zug. Im zweiten
@@ -473,8 +570,10 @@ export async function main(ns) {
     // nicht verbrauchen konnten. Denn ein Ziel kann nur begrenzt viel
     // Speicher binden: mehr als tWeaken/(4*gap) Stapel passen nicht in seinen
     // Kalender, egal wie viel frei ist.
-    for (const durchgang of [1, 2]) {
-      const freiZuBeginn = workforce.reduce((a, s) => a + s.ramFree, 0);
+    for (const durchgang of batchMode ? [1, 2] : []) {
+      // Was der Vorbereitung reserviert ist, steht den Stapeln nicht zur
+      // Verfuegung - in keinem der beiden Durchgaenge.
+      const freiZuBeginn = Math.max(0, workforce.reduce((a, s) => a + s.ramFree, 0) - prepReserve);
       if (freiZuBeginn < 10) break;
       const summe = imStapel.reduce((a, t) => a + Math.max(1e-9, t.score), 0);
 
@@ -485,7 +584,7 @@ export async function main(ns) {
         // aufgebraucht hat, und die Platzierung liefe ins Leere.
         const budget = durchgang === 1
           ? freiZuBeginn * (Math.max(1e-9, t.score) / summe)
-          : workforce.reduce((a, s) => a + s.ramFree, 0);
+          : Math.max(0, workforce.reduce((a, s) => a + s.ramFree, 0) - prepReserve);
         if (budget < 10) continue;
 
         const wahl = batch.chooseFraction(t, player, budget, {
@@ -592,8 +691,75 @@ export async function main(ns) {
         t.doing = "stapeln";
         if (gestartet > 0) {
           plan.push({ host: t.host, what: "stapel", threads: gestartet, need: gestartet });
+        } else if (durchgang === 2 && p.ram > budget) {
+          // Nicht einmal EIN Stapel passt ins Budget. Das ist der einzige
+          // Fall, in dem ein Stapelziel stumm dasteht - er gehoert in die
+          // Engpassmeldung, sonst sucht man ihn im Dunkeln.
+          plan.push({ host: t.host, what: "stapel(" + fmt(p.ram, 0) + "GB)", threads: 0, need: 1 });
         }
       }
+    }
+
+    // --- 9. Vorbereitung in drei Durchgaengen ------------------------------
+    //
+    // Vorbereitet wird bis EXAKT auf secMin und moneyMax - der Stapelbetrieb
+    // setzt den genauen Zustand voraus, "drei Punkte Toleranz und 90 %"
+    // reicht dafuer nicht.
+    //
+    // Die Aufteilung in drei Durchgaenge ist der Kern der Korrektur vom
+    // 20.08. Frueher stand hier EIN Durchgang, der den Sicherheitsausgleich
+    // fuer die GEPLANTEN grow-Faeden bemessen und VOR ihnen verteilt hat.
+    // Bei einem Ziel von 4 % auf 100 % sind das tausende Faeden; ihr
+    // Ausgleich allein braucht mehr Speicher als das ganze Netz. Er band also
+    // alles, grow kam nie dran, und in der naechsten Runde begann dasselbe.
+    for (const t of inVorbereitung) t.doing = "vorbereiten";
+
+    // Durchgang 1: NUR der echte Sicherheitsueberschuss. Was noch niemand
+    // erzeugt hat, muss auch niemand ausgleichen.
+    for (const t of inVorbereitung) {
+      const secExcess = Math.max(0, t.sec - t.secMin);
+      const weakenWanted = Math.max(0, calc.weakenThreads(secExcess) - t.busy.weakenT);
+      if (weakenWanted > 0) {
+        const n = deploy(ns, workforce, SCRIPTS.weakenT, weakenWanted, t.host, marke++);
+        plan.push({ host: t.host, what: "weaken", threads: n, need: weakenWanted });
+      }
+    }
+
+    // Durchgang 2: grow mit dem, was uebrig ist - und GEDECKELT.
+    //
+    // Der Deckel ist die zweite Haelfte derselben Korrektur. Ohne ihn wird
+    // eine Bestellung ueber tausende Faeden aufgegeben, von denen nur ein
+    // Bruchteil startet; der Ausgleich in Durchgang 3 wuerde dann wieder fuer
+    // die Bestellung statt fuer die Wirklichkeit bemessen.
+    //
+    // 85 % des freien Speichers, nicht 50 %: der Ausgleich fuer die grow-
+    // Faeden kostet nur rund 8 % ihres Speichers (0.004 Sicherheit je grow
+    // gegen 0.05 Abbau je weaken, bei gleichem Preis je Thread), 15 % Reserve
+    // sind also reichlich. Nachgerechnet an einem Ziel bei 4 % Guthaben mit
+    // 116 GB Netz: mit 50 % dauert die Vorbereitung 4500 s, mit 85 % noch
+    // 2760 s, ganz ohne Deckel 2460 s. Der Deckel kostet also 12 % Zeit und
+    // kauft dafuer, dass Durchgang 3 die Wirklichkeit trifft.
+    for (const t of inVorbereitung) {
+      if (t.moneyNow >= t.moneyMax) continue;
+      const voll = calc.growThreads(t, t.moneyMax, Math.max(1, t.moneyNow), player, 1);
+      if (!Number.isFinite(voll)) continue;
+      const frei = workforce.reduce((a, s) => a + s.ramFree, 0);
+      const passt = Math.floor((frei * 0.85) / ramCost.growT);
+      const growWanted = Math.max(0, Math.min(voll, passt) - t.busy.growT);
+      if (growWanted > 0) {
+        t.growStarted = deploy(ns, workforce, SCRIPTS.growT, growWanted, t.host, marke++);
+        plan.push({ host: t.host, what: "grow", threads: t.growStarted, need: growWanted });
+      }
+    }
+
+    // Durchgang 3: Ausgleich fuer die TATSAECHLICH gestarteten grow-Faeden.
+    // Was keinen Platz gefunden hat, hebt die Sicherheit auch nicht an.
+    for (const t of inVorbereitung) {
+      const erzeugt = (t.growStarted || 0) * calc.GROW_FORTIFY_AMOUNT;
+      if (erzeugt <= 0) continue;
+      const weakenWanted = calc.weakenThreads(erzeugt);
+      const n = deploy(ns, workforce, SCRIPTS.weakenT, weakenWanted, t.host, marke++);
+      plan.push({ host: t.host, what: "weaken", threads: n, need: weakenWanted });
     }
 
     for (const c of active) {
@@ -614,7 +780,9 @@ export async function main(ns) {
       phase = imStapel.length ? "ernten" : "vorbereiten";
       const wartend = plan.filter((p) => p.need > 0 && p.threads === 0).length;
       reason =
-        imStapel.length + " Ziel(e) im Stapelbetrieb (" + stapelGesamt + " neue Stapel diese Runde), " +
+        (batchMode
+          ? imStapel.length + " Ziel(e) im Stapelbetrieb (" + stapelGesamt + " neue Stapel diese Runde), "
+          : imStapel.length + " Ziel(e) im Wellenbetrieb (Netz unter " + BATCH_MIN_RAM + " GB), ") +
         inVorbereitung.length + " in Vorbereitung. " +
         (ramFreiJetzt < ramTotal * 0.05
           ? "Der Speicher ist voll ausgelastet."
@@ -750,7 +918,9 @@ function draw(ns, v) {
         ? "f=" + (st ? st.fraction.toFixed(2) : "?")
         : t.doing ?? "-";
       const secOk = t.sec <= t.secMin + 0.5;
-      const farbe = t.doing === "stapeln" ? C.gold : t.doing === "vorbereiten" ? C.gruen : C.rot;
+      const farbe = t.doing === "stapeln" || t.doing === "ernten"
+        ? C.gold
+        : t.doing === "vorbereiten" ? C.gruen : C.rot;
 
       line(
         "  " + farbe + pad(t.host, 18) + C.off +

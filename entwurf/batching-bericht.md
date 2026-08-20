@@ -418,3 +418,53 @@ und 5.1 ist die erste Stelle zum Nachsehen.
 | `DRIFT_WINDOW` / `DRIFT_SEC` | 30 / 1.0 | Empfindlichkeit der Drifterkennung. |
 | `MAX_TARGETS` / `PREP_TARGETS` | 60 / 40 | Breite. Von Argus' Stand `07fa272` uebernommen; wirkt als "alle lohnenden Ziele". |
 | `MAX_BATCHES_PER_ROUND` / `MAX_BATCHES_TOTAL` | 12 / 80 | Anlaufbremse. Ohne sie kaeme man bei 60 Zielen auf mehrere tausend `exec` in einer Sekunde. |
+
+---
+
+## 7. Nachtrag vom 20.08.2026 (Pruefung vor der Uebernahme)
+
+Der Entwurf ist geprueft und **veraendert** worden. Die Fassung in
+`entwurf/autopilot.js` entspricht ab jetzt nicht mehr Punkt fuer Punkt dem,
+was oben steht. Massgeblich ist `entwurf/uebernahme.md`.
+
+Was sich geaendert hat und warum:
+
+1. **Abschnitt 5.7 ist ueberholt.** `MAX_TARGETS = 60` und `PREP_TARGETS = 40`
+   sind seit der Nacht zum 20.08. keine festen Zahlen mehr, sondern
+   Obergrenzen; wirksam ist `floor(ramTotal/2000)` bzw. `floor(ramTotal/4000)`.
+   Der Entwurf hatte die alten festen Werte uebernommen und damit eine
+   Korrektur rueckgaengig gemacht, die fuenf Stunden Stillstand gekostet hat.
+   Ebenso `HACK_FRACTION`: der Wert steht wieder bei 0.1 und wird im
+   Wellenbetrieb (siehe 4.) auch wieder gebraucht.
+
+2. **Die Vorbereitung in Abschnitt 3.5 war die gefaehrlichste Stelle.** Sie
+   bemisst den Sicherheitsausgleich fuer die GEPLANTEN grow-Faeden und
+   verteilt ihn VOR ihnen. Bei einem Ziel bei 4 % Guthaben sind das 2303
+   grow-Faeden, deren Ausgleich 184 weaken-Faeden = 322 GB braucht - mehr als
+   ein Netz nach dem Reset ueberhaupt hat. Nachgerechnet mit den Formeln aus
+   `reference/v301`: bei 116 GB steht das Ziel nach 90 Minuten immer noch bei
+   4.0 %. Ersetzt durch drei Durchgaenge (echter Ueberschuss, gedeckeltes
+   grow, Ausgleich fuer die tatsaechlich gestarteten Faeden).
+
+3. **Die Reihenfolge "Vorbereitung vor Stapeln" ist umgedreht.** Das Argument
+   in 3.5 ("der Bedarf der Vorbereitung ist endlich") gilt nur, solange dieser
+   endliche Bedarf auch erfuellbar ist. Jetzt: Stapel zuerst, und die
+   Vorbereitung bekommt dafuer 25 % des freien Speichers reserviert.
+
+4. **Neu, und der wichtigste Befund der Pruefung: der Stapelbetrieb ist
+   unterhalb von rund 350 GB Gesamtspeicher SCHLECHTER als der alte
+   Wellenbetrieb** - bei 116 GB um den Faktor 0.6, bei 64 GB um 0.4. Grund ist
+   dieselbe Speicherbindung, mit der Abschnitt 2 den Verzicht auf JIT
+   begruendet: jeder Auftrag haelt seinen Speicher bis zu seiner Landung, auch
+   der hack, der nur ein Viertel der weaken-Zeit braucht. Bei 21 TB ist das
+   gleichgueltig, bei 116 GB ist es der Engpass. Der Autopilot schaltet
+   deshalb unter `BATCH_MIN_RAM = 400` selbsttaetig auf Wellen zurueck.
+
+5. **Die Faktorangabe "10 bis 20" gilt fuer grosse Flotten.** Auf dem Netz vom
+   20.08. (506 GB) sagt dieselbe Rechnung Faktor 1.5 bis 3.
+
+`lib/batch.js` und die drei Arbeiter sind unveraendert geblieben. Die
+Terminrechnung aus zwei Sicherheitsstufen (3.3 / 5.1), der Landekalender aus
+`ns.ps` (3.2), die Alles-oder-nichts-Platzierung (3.4) und `GAP_MS = 400`
+haben die Pruefung ohne Einwand bestanden - das ist der tragende Teil des
+Entwurfs, und er ist gut.

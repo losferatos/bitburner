@@ -88,6 +88,10 @@ moeglich.
 
 ## Reihenfolge am Tag X — erprobt am 20.08.
 
+0. **`node tools/task.js stocks.js --liquidate`** - das Aktiendepot aufloesen.
+   Offene Positionen sind beim Install ERSATZLOS weg (kein Erloes, keine
+   Warnung). Das ist der einzige Schritt, dessen Versaeumnis echtes Geld
+   kostet, und er gehoert deshalb an den Anfang.
 1. Warten, bis Tian Di Hui 75.000 Rep erreicht.
 2. **Eric prominent Bescheid geben.**
 3. `node tools/task.js stopwork.js` — die Arbeit GANZ beenden, nicht nur

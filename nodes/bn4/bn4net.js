@@ -304,7 +304,18 @@ export async function main(ns) {
       const shareBraucht = repModus ? ns.getScriptRam("worker/share.js", "home") : 0;
       // Netzweite Obergrenze. Jenseits davon kostet ein share-Faden mehr
       // Hacking-Erfahrung, als sein Reputationsbeitrag wert ist.
-      const SHARE_DECKEL = 600;
+      // Gemessen, nicht geschaetzt: Mit 600 Faeden fiel die Hacking-Rate von
+      // 1,07 auf 0,91 je Minute und die Reputationsrate von 100 auf 85. Der
+      // Grund ist die Groessenordnung - worker/share.js kostet 4 GB je Faden,
+      // 600 Faeden sind 2400 GB und damit mehr, als das ganze Netz hat. Share
+      // hatte die hack-Faeden schlicht verdraengt.
+      //
+      // Der Bonus ist logarithmisch (1 + ln(n)/25): 100 Faeden bringen +18,4 %,
+      // 600 nur +25,6 %. Die 500 Faeden dazwischen kosten 2000 GB fuer sieben
+      // Prozentpunkte. Bei 100 Faeden sind es 400 GB - ein Fuenftel des Netzes
+      // fuer knapp ein Fuenftel mehr Reputation, also etwa ein Nullsummen-
+      // geschaeft, das nur wegen der sofortigen Wirkung ueberhaupt lohnt.
+      const SHARE_DECKEL = 100;
       let shareGesamt = 0;
 
       for (const host of hosts) {

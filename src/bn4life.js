@@ -66,6 +66,7 @@ export async function main(ns) {
 
   let letzterFaktionsblick = 0;
   let letzterEinkauf = 0;
+  let letzteReise = 0;
   let letztesVerbrechen = "";
 
   // Wie in bn4net.js: eine Ausnahme darf nicht den halben Bot beenden.
@@ -122,12 +123,38 @@ export async function main(ns) {
     if (jetzt - letzterFaktionsblick > 30000) {
       letzterFaktionsblick = jetzt;
       for (const f of ns.singularity.checkFactionInvitations()) {
-        // Die Staedte-Faktionen schliessen einander aus. Wer Sector-12
-        // beitritt, kann Chongqing nie mehr betreten. Deshalb hier keine
-        // blinde Annahme - das entscheidet spaeter der Augmentierungsplan.
-        if (["Sector-12", "Chongqing", "New Tokyo", "Ishima", "Aevum",
-          "Volhaven"].includes(f)) continue;
+        // Von den sechs Staedte-Faktionen schliessen sich nur VIER wechselseitig
+        // aus. Sector-12 und Aevum fuehren einander NICHT in ihren
+        // enemies-Listen (FactionInfo.tsx:498-556) und sind zusammen
+        // spielbar; wer dagegen Chongqing, New Tokyo, Ishima oder Volhaven
+        // nimmt, verliert die beiden anderen dauerhaft (Factions.ts:57 bannt
+        // Feinde unwiderruflich).
+        //
+        // Sector-12 und Aevum bringen zusammen vier Augmentierungen mit
+        // Hacking-Multiplikator, die niedrigste ab 1.000 Reputation. Dass
+        // damit die Reputation aus Coding Contracts auf mehr Faktionen
+        // verteilt wird, ist kein Verlust: Sie faellt in Summe gleich aus, und
+        // gebraucht wird sie in beiden.
+        if (["Chongqing", "New Tokyo", "Ishima", "Volhaven"].includes(f)) continue;
         if (ns.singularity.joinFaction(f)) sag("Faktion beigetreten: " + f + ".");
+      }
+    }
+
+    // --- 1b. Nach Aevum reisen, wenn es sich lohnt -----------------------------
+    // Aevum verlangt neben der Anwesenheit 40 Millionen (FactionInfo.tsx:499)
+    // und ist die einzige Staedte-Faktion, die neben Sector-12 bestehen kann.
+    // Sie bringt drei Augmentierungen mit Hacking-Multiplikator, die
+    // guenstigste ab 1.000 Reputation - fuer eine Reise zu 200.000 ein guter
+    // Handel. Die Mitgliedschaft ueberlebt spaetere Reisen, nur die Einladung
+    // verlangt die Anwesenheit.
+    if (jetzt - letzteReise > 60000) {
+      letzteReise = jetzt;
+      const spieler = ns.getPlayer();
+      if (!spieler.factions.includes("Aevum") && geld > 45e6
+          && spieler.city !== "Aevum") {
+        if (ns.singularity.travelToCity("Aevum")) {
+          sag("Nach Aevum gereist (Guthaben " + Math.round(geld / 1e6) + "m).");
+        }
       }
     }
 

@@ -65,6 +65,23 @@ export async function main(ns) {
     const besitz = new Set(ns.singularity.getOwnedAugmentations(true));
     const geld = ns.getServerMoneyAvailable("home");
 
+    // Favor je Faktion mitzaehlen. Ab 150 (Constants.ts BaseFavorToDonate, in
+    // BitNode 4 mit Multiplikator 1) faellt die Trennung zwischen Geld und
+    // Reputation: Spenden bringt dann rep = betrag/1e6 * faction_rep, und Geld
+    // hat dieser Bot im Ueberfluss, waehrend Reputation der Engpass ist. Das
+    // ist der einzige Hebel, der die Preisspirale von 1,9 je wartendem Stueck
+    // dauerhaft durchbricht.
+    //
+    // Favor waechst nur beim Einbau, und zwar aus der gesammelten Reputation
+    // (favor.ts repToFavor). Entscheidend ist, dass EINE Faktion die Marke
+    // erreicht, nicht alle - deshalb wird je Faktion gezaehlt, nicht in Summe.
+    const favor = {};
+    let favorBeste = 0, favorBesteFaktion = null;
+    for (const f of spieler.factions) {
+      favor[f] = ns.singularity.getFactionFavor(f);
+      if (favor[f] > favorBeste) { favorBeste = favor[f]; favorBesteFaktion = f; }
+    }
+
     // --- 1. Alle erreichbaren Augmentierungen sammeln -------------------------
     const kandidaten = [];
     for (const faktion of spieler.factions) {
@@ -261,23 +278,6 @@ export async function main(ns) {
     // Fortschritt, kein Stillstand.
     const repGesamt = spieler.factions
       .reduce((n, f) => n + ns.singularity.getFactionRep(f), 0);
-
-    // Favor je Faktion mitzaehlen. Ab 150 (Constants.ts BaseFavorToDonate, in
-    // BitNode 4 mit Multiplikator 1) faellt die Trennung zwischen Geld und
-    // Reputation: Spenden bringt dann rep = betrag/1e6 * faction_rep, und Geld
-    // hat dieser Bot im Ueberfluss, waehrend Reputation der Engpass ist. Das
-    // ist der einzige Hebel, der die Preisspirale von 1,9 je wartendem Stueck
-    // dauerhaft durchbricht.
-    //
-    // Favor waechst nur beim Einbau, und zwar aus der gesammelten Reputation
-    // (favor.ts repToFavor). Entscheidend ist, dass EINE Faktion die Marke
-    // erreicht, nicht alle - deshalb wird je Faktion gezaehlt, nicht in Summe.
-    const favor = {};
-    let favorBeste = 0, favorBesteFaktion = null;
-    for (const f of spieler.factions) {
-      favor[f] = ns.singularity.getFactionFavor(f);
-      if (favor[f] > favorBeste) { favorBeste = favor[f]; favorBesteFaktion = f; }
-    }
 
     ns.write("data/bn4rep.json", JSON.stringify({
       zeit: Date.now(),

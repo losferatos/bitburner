@@ -317,11 +317,19 @@ async function durchgang() {
   // Rate warten, die nie kommt. (Genau diese Sackgasse stand im ersten
   // Entwurf.)
   if (!arbeitAn) {
-    const wunsch = (homeDateien.get("data/workfaction.txt") || "").trim()
+    // Nur Faktionen, in denen wir MITGLIED sind. data/workfaction.txt
+    // ueberlebt den Reset, die Mitgliedschaften nicht - unmittelbar nach dem
+    // Install stand dort noch "BitRunners", und die Steuerung setzte
+    // prompt work.js darauf an. Das scheitert an der Faktionsseite, kostet
+    // aber einen Auftragsplatz und blockiert die Oberflaeche fuer nichts.
+    const gemerkt = (homeDateien.get("data/workfaction.txt") || "").trim();
+    const wunsch = (mitglied.includes(gemerkt) ? gemerkt : null)
       || bevorzugteFaktion(mitglied, f, habe, korb)
       || mitglied[0];
     if (!wunsch) {
-      log("KEINE Faktionsarbeit und keine Mitgliedschaft - hier ist nichts zu retten.");
+      log("KEINE Faktionsarbeit und keine Mitgliedschaft - nach einem Reset ist"
+        + " das normal: Der Autopilot muss erst Backdoors setzen und Einladungen"
+        + " annehmen.");
       return;
     }
     const platzFrei0 = (homeDateien.get("data/task.txt") || "").trim() === "";

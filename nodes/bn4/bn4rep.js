@@ -188,6 +188,26 @@ export async function main(ns) {
     if (!offen.length) { await ns.sleep(20000); continue; }
 
     const ziel = offen[0];
+
+    // --- Spendenweg, sobald eine Faktion Favor 150 hat ------------------------
+    // Ab dieser Marke bringt Geld direkt Reputation:
+    //     rep = betrag / 1e6 * mults.faction_rep     (Faction/formulas/donation.ts)
+    // Fuer einen Bot, der Hunderttausende je Minute aus Coding Contracts zieht
+    // und dessen Engpass die Reputation ist, kehrt das die Wirtschaft um:
+    // Zeit wird durch Geld ersetzbar. Solange keine Faktion so weit ist, bleibt
+    // es bei der Arbeit - der Aufruf waere sonst nur ein teurer Fehlschlag.
+    if (favor[ziel.faktion] >= ns.getFavorToDonate()) {
+      const uebrig = ns.getServerMoneyAvailable("home") - teuerstesVerdiente;
+      if (uebrig > 1e9) {
+        if (ns.singularity.donateToFaction(ziel.faktion, uebrig)) {
+          sag("GESPENDET: " + Math.round(uebrig / 1e6) + "m an " + ziel.faktion
+            + " (Favor " + Math.round(favor[ziel.faktion]) + ").");
+          await ns.sleep(1000);
+          continue;
+        }
+      }
+    }
+
     const arbeit = ns.singularity.getCurrentWork();
     const arbeitetSchon = arbeit && arbeit.factionName === ziel.faktion;
 
@@ -242,9 +262,30 @@ export async function main(ns) {
     const repGesamt = spieler.factions
       .reduce((n, f) => n + ns.singularity.getFactionRep(f), 0);
 
+    // Favor je Faktion mitzaehlen. Ab 150 (Constants.ts BaseFavorToDonate, in
+    // BitNode 4 mit Multiplikator 1) faellt die Trennung zwischen Geld und
+    // Reputation: Spenden bringt dann rep = betrag/1e6 * faction_rep, und Geld
+    // hat dieser Bot im Ueberfluss, waehrend Reputation der Engpass ist. Das
+    // ist der einzige Hebel, der die Preisspirale von 1,9 je wartendem Stueck
+    // dauerhaft durchbricht.
+    //
+    // Favor waechst nur beim Einbau, und zwar aus der gesammelten Reputation
+    // (favor.ts repToFavor). Entscheidend ist, dass EINE Faktion die Marke
+    // erreicht, nicht alle - deshalb wird je Faktion gezaehlt, nicht in Summe.
+    const favor = {};
+    let favorBeste = 0, favorBesteFaktion = null;
+    for (const f of spieler.factions) {
+      favor[f] = ns.singularity.getFactionFavor(f);
+      if (favor[f] > favorBeste) { favorBeste = favor[f]; favorBesteFaktion = f; }
+    }
+
     ns.write("data/bn4rep.json", JSON.stringify({
       zeit: Date.now(),
       repGesamt,
+      favor,
+      favorBeste,
+      favorBesteFaktion,
+      spendenSchwelle: ns.getFavorToDonate(),
       faktionen: spieler.factions,
       ziel: ziel.aug,
       zielFaktion: ziel.faktion,

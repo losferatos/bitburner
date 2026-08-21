@@ -92,3 +92,26 @@ Drei Regeln, die den Unterschied machen:
 4. Davon home ausbauen und Rechner kaufen
 5. Backdoor auf CSEC (ab Hacking 51) → CyberSec
 6. Ab hier zählt Reputation, nicht Geld: Faktionsarbeit statt Verbrechen
+
+## Was die Rechnung über den ganzen Lauf sagt
+
+Aus einer Skeptiker-Prüfung am 21.08.2026, am Quelltext belegt:
+
+- **Der Deckel für den Hacking-Multiplikator liegt bei rund 25,2** — das
+  Produkt aller 26 Augmentierungen im Spiel, die überhaupt ein `hacking:`-Feld
+  haben. Damit braucht Level 9000 etwa **37 Millionen Hacking-Erfahrung**.
+- **Der Weg ist zirkulär:** Die stärksten davon (QLink 1,75×, SPTN-97,
+  nextSENS) kommen von Illuminati und Covenant — Faktionen, die erst *nach*
+  Daedalus erreichbar sind. Daedalus wiederum verlangt 30 verschiedene
+  Augmentierungen, $100 Mrd und Hacking 2500.
+- **Nur 26 Augmentierungen haben einen `hacking`-Multiplikator, Daedalus will
+  30 verschiedene.** Eine strikte „nur Hacking-Augs"-Regel läuft rechnerisch in
+  eine Sackgasse — der Fallback auf die übrigen ist keine Nachlässigkeit,
+  sondern notwendig.
+- **NeuroFlux-Stapeln ist eine Falle.** Um +30 % Hacking nachzubilden, bräuchte
+  es 26 Stufen am Stück, deren Preisfaktor 1,9²⁶ ≈ 2×10⁷ jede Einzel-Aug
+  übersteigt.
+- **Der Spendenweg ist der einzige, der die Preisspirale dauerhaft bricht.**
+  Ab Favor 150 wird Geld direkt zu Reputation. Favor 150 verlangt 462.500
+  kumulierte Reputation bei einer Faktion — nach dem ersten Einbau standen 18,6.
+  Das sind grob 30 Einbau-Zyklen, aber jeder Zyklus wird schneller.

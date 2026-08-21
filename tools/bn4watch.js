@@ -133,7 +133,20 @@ async function main() {
 
   const record = buildRecord(now, net, life, rep);
 
-  const history = await loadHistory();
+  let history = await loadHistory();
+
+  // Nach einem Augmentierungs-Einbau faellt das Hacking-Level auf 1 zurueck.
+  // Ein Verlauf, der ueber diesen Bruch hinweg vergleicht, liefert
+  // zwanzig Minuten lang unbrauchbare Raten - und genau in dieser Zeit waere
+  // ein echter Stillstand nicht zu erkennen. Faellt das Level um mehr als die
+  // Haelfte, beginnt die Messung deshalb neu.
+  const zuletzt = history.length ? history[history.length - 1] : null;
+  const levelJetzt = record && record.net ? record.net.hacking : null;
+  const levelVorher = zuletzt && zuletzt.net ? zuletzt.net.hacking : null;
+  if (levelJetzt != null && levelVorher != null && levelJetzt < levelVorher / 2) {
+    history = [];
+  }
+
   const baseline = findBaseline(history, now);
 
   history.push(record);

@@ -218,6 +218,16 @@ export async function main(ns) {
       const gb = ns.getServerMaxRam(host);
       if (gb >= WERKBANK_GB && gb > werkbankGb) { werkbank = host; werkbankGb = gb; }
     }
+    // Notfalls home. Nach einem Augmentierungs-Einbau sind alle gekauften
+    // Rechner weg, TOR und die Portprogramme ebenfalls - es dauert eine
+    // Stunde Shoplift, bis wieder ein 20-GB-Rechner offensteht. Solange liegt
+    // der Vertragsloeser brach, obwohl er auf home passt: 64 GB bleiben beim
+    // Einbau erhalten (nur der BitNode-Wechsel setzt sie zurueck). Das ist der
+    // Unterschied zwischen einer Stunde Anlauf und fuenf Minuten.
+    if (!werkbank) {
+      const freiHome = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
+      if (freiHome >= 18) werkbank = "home";
+    }
     werkbankMerker = werkbank;
 
     // --- 2. Ziel waehlen ------------------------------------------------------
@@ -279,6 +289,11 @@ export async function main(ns) {
       ["contracts.js", ["--loop", "300"]],
       ["bn4rep.js", []],
       ["bn4door.js", []],
+      // Der Tonanker gehoert dazu, nicht danebem: Ein verborgener Browsertab
+      // bekommt statt sechzehn Zeitgebern je Sekunde nur einen je Minute, und
+      // ohne ihn laeuft der ganze Bot dreifach langsamer. Er lag bisher auf
+      // einem gekauften Rechner - und die verschwinden bei jedem Einbau.
+      ["wakelock.js", []],
     ];
 
     let vertraege = 0;
@@ -293,7 +308,7 @@ export async function main(ns) {
       // erschlagen - und das alle zehn Sekunden erneut.
       const unsere = laufend.filter((d) => WERKZEUGE.some(([w]) => w === d)).length;
       const frei = () => ns.getServerMaxRam(werkbank) - ns.getServerUsedRam(werkbank);
-      if (fehlend.length && !unsere && frei() < 30) {
+      if (fehlend.length && !unsere && werkbank !== "home" && frei() < 30) {
         ns.killall(werkbank);
         sag("Werkbank " + werkbank + " geraeumt.");
       }

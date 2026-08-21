@@ -61,6 +61,7 @@ export async function main(ns) {
    try {
     const spieler = ns.getPlayer();
     const besitz = new Set(ns.singularity.getOwnedAugmentations(true));
+    const geld = ns.getServerMoneyAvailable("home");
 
     // --- 1. Alle erreichbaren Augmentierungen sammeln -------------------------
     const kandidaten = [];
@@ -111,11 +112,25 @@ export async function main(ns) {
       - ns.singularity.getOwnedAugmentations(false).length;
     const kleinsteLuecke = Math.min(Infinity, ...kandidaten
       .filter((k) => k.rep < k.repReq).map((k) => k.repReq - k.rep));
+    // Der zweite Weg kann genauso zu sein wie der erste. Jede gekaufte
+    // Augmentierung verteuert die naechste um Faktor 1,9
+    // (AugmentationHelpers: getAugCost), bei drei Stueck in der Warteschlange
+    // also fast das Siebenfache. Gemessen: Cranial Signal Processors Gen I war
+    // verdient und kostete 480 Millionen bei 9 Millionen Guthaben. Der Einbau
+    // setzt den Faktor zurueck, die Reputation bleibt - was jetzt unbezahlbar
+    // ist, ist danach der Normalpreis.
+    const teuerstesVerdiente = Math.max(0, ...kandidaten
+      .filter((k) => k.rep >= k.repReq).map((k) => k.preis));
+    const geldWegZu = teuerstesVerdiente > geld * 10;
+
     if (wartend >= MINDEST_WARTESCHLANGE
-        && kleinsteLuecke > LUECKE_ZU_GROSS
+        && (kleinsteLuecke > LUECKE_ZU_GROSS || geldWegZu)
         && ns.fileExists("data/install-frei.txt", "home")) {
-      sag("EINBAU: " + wartend + " Augmentierungen, naechste Huerde erst in "
-        + Math.round(kleinsteLuecke) + " Reputation. "
+      sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
+        + (geldWegZu ? "naechstes Stueck kostet "
+            + Math.round(teuerstesVerdiente / 1e6) + "m bei "
+            + Math.round(geld / 1e6) + "m Guthaben"
+          : "naechste Huerde erst in " + Math.round(kleinsteLuecke) + " Reputation") + ". "
         + "bn4life.js startet danach von selbst.");
       await ns.sleep(1500);
       ns.singularity.installAugmentations("bn4life.js");
@@ -123,7 +138,6 @@ export async function main(ns) {
     }
 
     // --- 2. Kaufen, was bezahlt und verdient ist ------------------------------
-    const geld = ns.getServerMoneyAvailable("home");
     let gekauft = 0;
     for (const k of kandidaten.slice().sort((a, b) => a.preis - b.preis)) {
       if (k.rep < k.repReq) continue;
@@ -148,11 +162,23 @@ export async function main(ns) {
     const arbeit = ns.singularity.getCurrentWork();
     const arbeitetSchon = arbeit && arbeit.factionName === ziel.faktion;
 
+    // Die Bremse in JEDER Runde erneuern, nicht nur beim Arbeitsbeginn. Sonst
+    // fehlt sie nach einem Neustart dieses Skripts genau dann, wenn die Arbeit
+    // schon laeuft - und bn4life.js schiebt wieder Verbrechen dazwischen.
+    ns.write("data/rep-modus.txt", ziel.faktion + "|" + Date.now(), "w");
+    if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
+
     if (!arbeitetSchon) {
       // Bremse VOR dem Arbeitsbeginn setzen, nicht danach: Zwischen Start und
       // Datei liegt sonst ein Fenster, in dem bn4life ein Verbrechen
       // dazwischenschiebt.
-      ns.write("data/rep-modus.txt", ziel.faktion, "w");
+      // ns.write schreibt LOKAL. Dieses Skript laeuft auf der Werkbank, die
+      // Bremse muss aber auf home liegen - dort sucht bn4life.js sie. Ohne das
+      // scp lag die Datei auf dem falschen Rechner, die Bremse griff nie, und
+      // jede Sekunde ersetzte ein commitCrime die Faktionsarbeit. Messbar an
+      // der Reputationsrate: 45 statt 190 je Minute.
+      ns.write("data/rep-modus.txt", ziel.faktion + "|" + Date.now(), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
       await ns.sleep(1200);
       const typen = ns.singularity.getFactionWorkTypes(ziel.faktion);
       const art = typen.includes("hacking") ? "hacking"
@@ -163,7 +189,7 @@ export async function main(ns) {
           + Math.round(ziel.repReq) + " Reputation.");
       } else {
         sag("workForFaction(" + ziel.faktion + ", " + art + ") abgelehnt.");
-        ns.rm("data/rep-modus.txt", "home");
+        try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
       }
     }
 

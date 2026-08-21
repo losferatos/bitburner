@@ -221,7 +221,16 @@ export async function main(ns) {
     // Faktionsarbeit ersetzen - lautlos, denn commitCrime beendet laufende
     // Arbeit ohne Fehlermeldung (Singularity.ts:1010-1012). Genau so sind in
     // BitNode 1 stundenlange Arbeitsblocke verschwunden.
-    const repModus = ns.fileExists("data/rep-modus.txt", "home");
+    // Die Bremse verfaellt. Sie stammt von bn4rep.js, das auf einem gekauften
+    // Rechner laeuft - und die verschwinden bei jedem Augmentierungs-Einbau
+    // (Prestige.ts:73). Bliebe die Datei dann liegen, verzichtete die Figur
+    // auf Verbrechen fuer eine Faktionsarbeit, die niemand mehr steuert: kein
+    // Geld, kein TOR, keine Ports, keine Werkbank, also auch nie wieder ein
+    // bn4rep. Ein Zeitstempel loest diesen Knoten.
+    const bremse = ns.fileExists("data/rep-modus.txt", "home")
+      ? ns.read("data/rep-modus.txt") : "";
+    const stempel = Number(String(bremse).split("|")[1]) || 0;
+    const repModus = bremse !== "" && Date.now() - stempel < 120000;
     if (!repModus && (!arbeit || arbeit.crimeType)) {
       if (!arbeit || arbeit.crimeType !== verbrechen) {
         ns.singularity.commitCrime(verbrechen, true);

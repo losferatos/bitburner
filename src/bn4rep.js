@@ -123,7 +123,14 @@ export async function main(ns) {
     // ist, ist danach der Normalpreis.
     const teuerstesVerdiente = Math.max(0, ...kandidaten
       .filter((k) => k.rep >= k.repReq).map((k) => k.preis));
-    const geldWegZu = teuerstesVerdiente > geld * 10;
+    // Faktor 4, nicht 10. Gemessen am laufenden Spiel: Eine verdiente
+    // Augmentierung kostete 483 Millionen bei 65 Millionen Guthaben und einem
+    // Zufluss von 557.000 je Minute - zwoelfeinhalb Stunden Warten. Ein
+    // Einbau kostet dagegen rund eine halbe Stunde Wiederaufbau und setzt den
+    // Preisfaktor 1,9 je wartendem Stueck auf eins zurueck, womit dieselbe
+    // Augmentierung wieder ihren Grundpreis kostet. Ab etwa dem Vierfachen
+    // des Guthabens ist Warten das schlechtere Geschaeft.
+    const geldWegZu = teuerstesVerdiente > geld * 4;
 
     if (wartend >= MINDEST_WARTESCHLANGE
         && (kleinsteLuecke > LUECKE_ZU_GROSS || geldWegZu)
@@ -237,6 +244,8 @@ export async function main(ns) {
       preis: ziel.preis,
       offen: offen.length,
       kaufbereit: kandidaten.filter((k) => k.rep >= k.repReq).length,
+      wartend,
+      teuerstesVerdiente,
       bedarf,
       geld,
     }), "w");

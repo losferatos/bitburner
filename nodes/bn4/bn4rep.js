@@ -31,6 +31,8 @@
  *
  * @param {NS} ns
  */
+import { hackNutzen } from "lib/hackaugs.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -152,9 +154,29 @@ export async function main(ns) {
     // --- 3. Sonst: an der naechsterreichbaren Huerde arbeiten -----------------
     // Die kleinste Luecke zuerst. Wer am teuersten Ziel arbeitet, hat lange
     // gar nichts; wer am naechsten arbeitet, kauft frueh und oft.
-    const offen = kandidaten
-      .filter((k) => k.rep < k.repReq)
-      .sort((a, b) => (a.repReq - a.rep) - (b.repReq - b.rep));
+    // Nach Nutzen je Aufwand, nicht nach blosser Erreichbarkeit. Die alte
+    // Regel "kleinste Luecke zuerst" hat den Bot fuenfundvierzig Minuten an
+    // "Augmented Targeting I" arbeiten lassen - einer Kampf-Augmentierung, die
+    // fuer Hacking 9000 nichts beitraegt.
+    //
+    // Der Summand 0.15 sorgt dafuer, dass nutzlose Stuecke nicht voellig
+    // liegenbleiben: Daedalus verlangt 30 VERSCHIEDENE Augmentierungen
+    // (BitNodeMultipliers.ts:61), und ohne Daedalus gibt es keine Red Pill und
+    // damit keinen Zugang zu w0r1d_d43m0n. Sie sind also nicht wertlos, nur
+    // nachrangig.
+    // Zweistufig statt gewichtet. Eine gemeinsame Guetezahl aus Nutzen und
+    // Luecke hat nicht getragen: Bei einer Luecke von 2.800 gegen 20.000
+    // gewinnt das nahe Ziel auch dann, wenn es nichts beitraegt. Deshalb eine
+    // klare Rangordnung - erst alles, was Hacking staerkt, und darunter nach
+    // Naehe; der Rest kommt nur dran, wenn nichts Nuetzliches erreichbar ist.
+    //
+    // Ganz weglassen darf man den Rest nicht: Daedalus verlangt 30
+    // VERSCHIEDENE Augmentierungen, und ohne Daedalus gibt es keine Red Pill
+    // und keinen Zugang zu w0r1d_d43m0n.
+    const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
+    const nachNaehe = (a, b) => (a.repReq - a.rep) - (b.repReq - b.rep);
+    const nuetzlich = alleOffenen.filter((k) => hackNutzen(k.aug) > 0).sort(nachNaehe);
+    const offen = nuetzlich.length ? nuetzlich : alleOffenen.sort(nachNaehe);
 
     if (!offen.length) { await ns.sleep(20000); continue; }
 
@@ -185,6 +207,7 @@ export async function main(ns) {
         : typen.includes("field") ? "field" : typen[0];
       if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
         sag("Arbeite fuer " + ziel.faktion + " (" + art + ") auf "
+          + "[Nutzen " + hackNutzen(ziel.aug).toFixed(2) + "] "
           + ziel.aug + ": " + Math.round(ziel.rep) + " von "
           + Math.round(ziel.repReq) + " Reputation.");
       } else {

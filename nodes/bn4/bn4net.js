@@ -162,10 +162,19 @@ export async function main(ns) {
       if (b.startsWith("WERKZEUG ")) {
         const name = b.slice(9).trim();
         ns.write("data/reload.txt", "", "w");
-        if (werkbankMerker && name) {
-          ns.scriptKill(name, werkbankMerker);
-          sag(name + " auf " + werkbankMerker + " beendet - startet gleich neu.");
-        } else sag("Kein Werkbank-Rechner bekannt, " + name + " nicht beendet.");
+        // Ueberall killen, nicht nur auf der aktuellen Werkbank. Die Werkbank
+        // ist der GROESSTE Rechner und wechselt, sobald ein groesserer gekauft
+        // wird - ein Werkzeug laeuft dann noch auf dem alten, waehrend hier
+        // schon der neue gemeint ist. Genau daran sind drei Neustarts
+        // wirkungslos verpufft: Der Befehl kam an, traf aber ins Leere.
+        let getroffen = 0;
+        for (const host of scanAll()) {
+          if (!ns.hasRootAccess(host)) continue;
+          if (!ns.ps(host).some((pr) => pr.filename === name)) continue;
+          ns.scriptKill(name, host);
+          getroffen++;
+        }
+        sag(name + ": " + getroffen + " Instanz(en) beendet, startet gleich neu.");
       }
     }
 
@@ -390,30 +399,70 @@ export async function main(ns) {
       // einem gekauften Rechner - und die verschwinden bei jedem Einbau.
       ["wakelock.js", []],
     ];
+    const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 
     let vertraege = 0;
     for (const host of hosts) vertraege += ns.ls(host, ".cct").length;
 
     if (werkbank) {
-      const laufend = ns.ps(werkbank).map((pr) => pr.filename);
+      // Netzweit pruefen. Nur auf der Werkbank nachzusehen hiesse: Sobald ein
+      // groesserer Rechner gekauft wird und die Werkbank wechselt, gilt jedes
+      // Werkzeug als fehlend und wird ein zweites Mal gestartet - waehrend die
+      // alte Instanz weiterlaeuft. Bei bn4rep.js waeren das zwei Steuerungen
+      // fuer dieselbe Spielfigur, also genau der Fehler, den die
+      // Aufgabenteilung verhindern soll.
+      const laufend = [];
+      for (const host of hosts) {
+        if (!ns.hasRootAccess(host)) continue;
+        for (const pr of ns.ps(host)) laufend.push(pr.filename);
+      }
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d));
 
       // Nur raeumen, wenn wirklich nichts von uns dort laeuft. Ein killall auf
       // eine belegte Werkbank wuerde den Vertragsloeser mitten im Durchlauf
       // erschlagen - und das alle zehn Sekunden erneut.
-      const unsere = laufend.filter((d) => WERKZEUGE.some(([w]) => w === d)).length;
       const frei = () => ns.getServerMaxRam(werkbank) - ns.getServerUsedRam(werkbank);
-      if (fehlend.length && !unsere && werkbank !== "home" && frei() < 30) {
-        ns.killall(werkbank);
-        sag("Werkbank " + werkbank + " geraeumt.");
+
+      // Gezielt die Arbeiter raeumen, nicht pauschal alles. Ein killall haette
+      // die laufenden Werkzeuge miterschlagen, ein Verzicht auf jede Raeumung
+      // dagegen laesst ein fehlendes Werkzeug ewig draussen stehen: Genau so
+      // lief bn4rep.js eine Zeitlang gar nicht mehr - gekillt, aber der Platz
+      // fuer den Neustart war von Arbeitern belegt, und weil daneben
+      // contracts.js lief, galt die Werkbank als "in Benutzung".
+      if (fehlend.length && werkbank !== "home") {
+        for (const [datei] of fehlend) {
+          const braucht = ns.getScriptRam(datei, "home");
+          if (!(braucht > 0) || frei() >= braucht) continue;
+          for (const w of WORKER) ns.scriptKill(w, werkbank);
+          sag("Arbeiter auf " + werkbank + " geraeumt, " + datei + " braucht "
+            + braucht.toFixed(1) + " GB.");
+          break;
+        }
       }
 
       for (const [datei, args] of fehlend) {
         const braucht = ns.getScriptRam(datei, "home");
-        if (!(braucht > 0) || frei() < braucht) continue;
-        ns.scp(datei, werkbank, "home");
+        // Nicht stillschweigend ueberspringen. Ein Werkzeug, das seit einer
+        // halben Stunde fehlt, ohne dass irgendwo steht warum, ist genau das
+        // Muster, das diesen Bot schon mehrfach stundenlang hat stillstehen
+        // lassen. Die Drosselung auf alle zehn Runden haelt das Log lesbar.
+        if (!(braucht > 0)) {
+          if (runde % 10 === 0) sag(datei + " nicht lesbar (getScriptRam gibt 0).");
+          continue;
+        }
+        if (frei() < braucht) {
+          if (runde % 10 === 0) sag(datei + " wartet: " + werkbank + " hat "
+            + frei().toFixed(1) + " von " + braucht.toFixed(1) + " GB frei.");
+          continue;
+        }
+        // Abhaengigkeiten mitkopieren. ns.scp nimmt nur, was man ihm nennt -
+        // fehlt eine importierte Datei auf dem Zielrechner, laesst sich das
+        // Skript dort nicht uebersetzen und ns.exec gibt still 0 zurueck. Kein
+        // Absturz, keine Meldung, das Werkzeug fehlt einfach.
+        ns.scp([datei, ...BIBLIOTHEKEN], werkbank, "home");
         const pid = ns.exec(datei, werkbank, 1, ...args);
-        if (pid) sag(datei + " laeuft auf " + werkbank + " (pid " + pid + ").");
+        sag(pid ? datei + " laeuft auf " + werkbank + " (pid " + pid + ")."
+          : datei + " liess sich auf " + werkbank + " nicht starten (exec gab 0).");
       }
     }
 

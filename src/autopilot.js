@@ -620,7 +620,14 @@ export async function main(ns) {
     //
     // Alle 30 Runden - bei einer Minute je Runde also halbstuendlich. Oefter
     // lohnt nicht, seltener laesst Vertraege liegen.
-    if (round - letzterContractLauf > 30 && ns.fileExists("contracts.js", "home")) {
+    // Alle 300 Runden statt 30. Die Zahl stammt aus einer Zeit, in der eine
+    // Runde rund 3,8 Sekunden dauerte - das waren zwei Minuten. Seit der
+    // Tonanker die Drosselung aufhebt, laufen 57 Runden je Minute, und aus den
+    // zwei Minuten wurden zweiunddreissig Sekunden. Der Auftragsplatz war
+    // dadurch praktisch dauerbelegt: Am 21.08. verschwand eine von aussen
+    // abgesetzte Spende spurlos, weil der Contract-Suchlauf sie in derselben
+    // Runde ueberschrieb.
+    if (round - letzterContractLauf > 300 && ns.fileExists("contracts.js", "home")) {
       if (auftrag(["contracts.js"], "Coding Contracts: Suchlauf beauftragt")) letzterContractLauf = round;
     }
 

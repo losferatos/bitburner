@@ -68,8 +68,8 @@ export async function main(ns) {
   const bar = ns.getServerMoneyAvailable("home");
   if (alles) betrag = Math.max(0, bar - reserve);
   if (!Number.isFinite(betrag) || betrag <= 0) return sag("Kein gueltiger Betrag.");
-  if (betrag > bar) return sag("Betrag " + ns.formatNumber(betrag) + " uebersteigt das Guthaben "
-    + ns.formatNumber(bar) + ".");
+  if (betrag > bar) return sag("Betrag " + ns.format.number(betrag) + " uebersteigt das Guthaben "
+    + ns.format.number(bar) + ".");
 
   // --- Zur Faktionsseite ----------------------------------------------------
   // Steht die Arbeitsseite offen, fehlt die Seitenleiste (GameRoot.tsx:325-330)
@@ -134,9 +134,9 @@ export async function main(ns) {
   }
 
   if (weg < betrag * 0.9) {
-    return sag("FEHLSCHLAG: Guthaben fiel nur um " + ns.formatNumber(weg)
-      + " statt " + ns.formatNumber(betrag) + ".");
+    return sag("FEHLSCHLAG: Guthaben fiel nur um " + ns.format.number(weg)
+      + " statt " + ns.format.number(betrag) + ".");
   }
-  sag("Gespendet: " + ns.formatNumber(betrag) + " an " + faktion
-    + ". Guthaben jetzt " + ns.formatNumber(nachher) + ".");
+  sag("Gespendet: " + ns.format.number(betrag) + " an " + faktion
+    + ". Guthaben jetzt " + ns.format.number(nachher) + ".");
 }

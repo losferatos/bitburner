@@ -144,13 +144,56 @@ export async function main(ns) {
     //
     // Der ehrliche Zeuge ist der Knopf selbst: nach dem Kauf steht dort
     // "Purchased" statt eines Preises (Locations/ui/TorButton.tsx:47).
+    //
+    // UND HIER WIRD GEKLICKT. Genau dieser Aufruf fehlte vom 20.08. bis zum
+    // 21.08.: Beim Umbau der Erfolgspruefung (weg von ns.scan, hin zum Knopf)
+    // ist er zwischen den Kommentaren verlorengegangen. Das Skript meldete
+    // danach zweiundzwanzigmal "TOR-Knopf geklickt, er zeigt aber weiter einen
+    // Preis" - und hatte nie geklickt. Der Wiederaufbau nach dem dritten Reset
+    // stand deshalb eine Stunde ohne Portknacker, ohne Root, ohne Faktion.
+    tor.click();
+
     let da = false;
     for (let i = 0; i < 6 && !da; i++) {
       await ns.sleep(700);
       const k = knoepfe().find((b) => /^Purchase TOR router/i.test(text(b)));
       da = !k || /Purchased/i.test(text(k));
     }
-      if (!da) return sag("ABBRUCH: TOR-Knopf geklickt, er zeigt aber weiter einen Preis.");
+
+      // Wirkt der gewoehnliche Klick nicht, den React-Handler direkt aufrufen -
+      // derselbe Weg, den join.js seit jeher fuer den Beitrittsknopf geht.
+      //
+      // Am 21.08. nach dem dritten Reset hat der Klick zweiundzwanzigmal in
+      // Folge nichts bewirkt: "geklickt, er zeigt aber weiter einen Preis".
+      // Ohne TOR gibt es keine Portknacker, ohne die keinen Root-Zugang, ohne
+      // den keine Backdoors und damit keine einzige Faktion - der komplette
+      // Wiederaufbau stand eine Stunde still.
+      //
+      // React 17 legt die Props eines Host-Elements als gewoehnliche
+      // Eigenschaft `__reactProps$<zufall>` ab, und MUI reicht `onClick`
+      // unveraendert an das native <button> durch. Aufgerufen wird damit exakt
+      // dieselbe Funktion wie beim echten Klick (TorButton.tsx:38-41 ruft
+      // purchaseTorRouter und rerender).
+      if (!da) {
+        const schluessel = Object.keys(tor).find((s) => s.startsWith("__reactProps$"));
+        const props = schluessel ? tor[schluessel] : null;
+        if (props && typeof props.onClick === "function") {
+          sag("Klick blieb wirkungslos - versuche den React-Handler.");
+          try {
+            props.onClick({ isTrusted: true, preventDefault() {}, stopPropagation() {} });
+          } catch (e) {
+            return sag("ABBRUCH: React-Handler warf " + e.message);
+          }
+          for (let i = 0; i < 6 && !da; i++) {
+            await ns.sleep(700);
+            const k = knoepfe().find((b) => /^Purchase TOR router/i.test(text(b)));
+            da = !k || /Purchased/i.test(text(k));
+          }
+        } else {
+          return sag("ABBRUCH: Klick wirkungslos und kein React-Handler am Knopf gefunden.");
+        }
+      }
+      if (!da) return sag("ABBRUCH: TOR-Knopf geklickt (auch ueber React), er zeigt weiter einen Preis.");
       sag("TOR-Router gekauft (der Knopf zeigt \"Purchased\").");
     }
   }

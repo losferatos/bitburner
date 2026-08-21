@@ -54,6 +54,21 @@ const ARGS = process.argv.slice(2);
 const EINMAL = ARGS.includes("--once");
 const DRY = ARGS.includes("--dry");
 
+// Eine festgenagelte Arbeitsfaktion. Die Zielfunktion dieser Steuerung kennt
+// nur Augmentierungen - sie wuerde eine Faktion mit leerem Katalog nie
+// waehlen, selbst wenn dort das Wertvollste ueberhaupt zu holen ist.
+//
+// Genau dieser Fall ist am 21.08. eingetreten: Tian Di Hui bietet uns keine
+// Augmentierung mehr, steht aber bei Favor 124. Ab Favor 150 darf man spenden,
+// und Spenden kauft Reputation zum 36,7-fachen der Arbeitsrate
+// (Faction/formulas/donation.ts). Das ist der eine Hebel, der Geld - wovon wir
+// zu viel haben - dauerhaft in Reputation verwandelt, den eigentlichen
+// Engpass. Keine Augmentierung wiegt das auf.
+//
+// Aufruf:  node tools/nightshift.js --fix "Tian Di Hui"
+const fixIndex = ARGS.indexOf("--fix");
+const FIX = fixIndex >= 0 ? (ARGS[fixIndex + 1] || "").trim() : "";
+
 // Takt. Drei Minuten reichen: Die Reputation waechst mit rund 8 pro Sekunde,
 // eine Kaufschwelle wird also nie um mehr als ein paar hundert Reputation
 // verpasst - und jeder Durchgang liest den kompletten Spielstand, das soll
@@ -260,6 +275,11 @@ let rundeZeit = null;
 
 async function durchgang() {
   const s = await stand();
+  // Die Telemetrie liegt NICHT im Spielstand - sie kommt getrennt von der
+  // Bruecke. Ohne diese Zeile lief die Drosselungserkennung weiter unten in
+  // ein "tele is not defined" und riss den ganzen Durchgang mit; das Protokoll
+  // meldete es brav, aber die Steuerung tat drei Takte lang nichts.
+  const tele = await (await fetch(BASE + "/api/state")).json();
   const p = JSON.parse(s.data.PlayerSave).data;
   const f = JSON.parse(s.data.FactionsSave);
   const server = Object.values(JSON.parse(s.data.AllServersSave)).map((x) => x.data);
@@ -478,6 +498,21 @@ async function durchgang() {
   }
 
   // --- 2. Faktion wechseln, wenn die naechste woanders deutlich frueher faellt
+  if (FIX) {
+    if (arbeitAn !== FIX) {
+      if (!mitglied.includes(FIX)) {
+        log("Festgelegte Faktion \"" + FIX + "\" - wir sind dort kein Mitglied.");
+        return;
+      }
+      await rpc("pushFile", { filename: "data/workfaction.txt", content: FIX, server: "home" });
+      await beauftrage(["work.js", FIX], "Festgelegte Faktion: zurueck zu " + FIX);
+      messungRep = null;
+      return;
+    }
+    log("Bleibt bei " + FIX + " (festgelegt). Kein Wechsel, egal was anderswo faellig waere.");
+    return;
+  }
+
   const beste = bewertet[0];
   if (!beste || !Number.isFinite(beste.wartet)) {
     log("Bei keiner Mitgliedsfaktion ist noch eine Augmentierung offen."

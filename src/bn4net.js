@@ -45,7 +45,7 @@ export async function main(ns) {
   // starten.
   let werkbankMerker = null;
   const reserveHome = () => Math.max(24, ns.getServerMaxRam("home") / 4);
-  const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js"];
+  const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
   const knacker = [
     ["BruteSSH.exe", ns.brutessh],
@@ -236,12 +236,36 @@ export async function main(ns) {
     // Schwelle 0,5, an der selbst n00dles scheitert. Dann gibt es kein Ziel,
     // keinen Arbeiter, keine Erfahrung - und weil das Level nicht steigt, wird
     // die Schranke nie milder. Genau daran stand der Bot heute zwanzig Minuten.
+    //
+    // Kriterium ist Erfahrung je Sekunde, nicht Geld. Geld kommt bei diesem
+    // Bot aus Coding Contracts (Abschnitt 1b), gebraucht wird ausschliesslich
+    // das Hacking-LEVEL - siehe Kopfkommentar "WOZU HACKING HIER UEBERHAUPT
+    // NOCH GUT IST". moneyMax/minDifficulty waere das richtige Kriterium fuer
+    // einen Geld-Bot, nicht fuer diesen.
+    //
+    //   expGain  = 3 + 0.3 * baseDifficulty          (Hacking.ts:30-38)
+    //   hackTime ~ (2.5 * requiredHackingSkill * minDifficulty + 500)
+    //              / (hackingLevel + 50)
+    //   wert     = expGain / hackTime
+    //
+    // minDifficulty statt hackDifficulty in der Dauer: Die Arbeiter schwaechen
+    // jeden Server ohnehin auf sein Minimum herunter (weiter unten waehlt der
+    // Skriptwaehler weaken.js, solange hackDifficulty > minDifficulty + 5) -
+    // im Dauerbetrieb naehert sich die tatsaechliche Dauer also minDifficulty
+    // an, nicht dem Startwert. baseDifficulty dagegen bleibt fuer die
+    // Erfahrung massgeblich: Es wird bei der Servererzeugung einmalig gesetzt
+    // und aendert sich durch weaken NICHT (Server.ts:82 this.baseDifficulty =
+    // this.hackDifficulty, danach ruehrt nur noch capDifficulty an
+    // hackDifficulty) - waehrend hackDifficulty sinkt und mit ihm die Dauer.
     let ziel = null, bester = 0;
     for (const host of hosts) {
       if (!ns.hasRootAccess(host)) continue;
       const s = ns.getServer(host);
       if (!s.moneyMax || s.requiredHackingSkill > ns.getHackingLevel()) continue;
-      const wert = s.moneyMax / s.minDifficulty;
+      const expGain = 3 + 0.3 * s.baseDifficulty;
+      const hackTime = (2.5 * s.requiredHackingSkill * s.minDifficulty + 500)
+        / (ns.getHackingLevel() + 50);
+      const wert = expGain / hackTime;
       if (wert > bester) { bester = wert; ziel = host; }
     }
 
@@ -258,14 +282,74 @@ export async function main(ns) {
       // Ausnahme - die diese Schleife und damit den halben Bot beenden wuerde.
       if (!(braucht > 0)) { sag("worker-Skript nicht lesbar, Runde uebersprungen."); await ns.sleep(10000); continue; }
 
+      // Reputationsmodus: laeuft Faktions- oder Firmenarbeit, lohnt es sich,
+      // einen Teil der Arbeiter statt zu hacken teilen zu lassen. ns.share()
+      // wirkt einzig ueber calculateCurrentShareBonus() in
+      // getHackingWorkRepGain()/getFactionFieldWorkRepGain()
+      // (PersonObjects/formulas/reputation.ts:16-23) - ohne eine solche
+      // Arbeit gerade laeuft, gibt es nichts, worauf der Bonus wirken
+      // koennte, und die Faeden waeren verschenkte Hacking-Erfahrung. Genau
+      // deshalb komplett aus, sobald keine Faktionsarbeit laeuft, statt einen
+      // festen Anteil zu reservieren.
+      // bn4rep.js schreibt data/rep-modus.txt bei jedem Arbeitsschritt neu
+      // (bn4rep.js:168, Rundentakt 15 Sekunden) und loescht sie, sobald keine
+      // offene Augmentierung mehr wartet (bn4rep.js:83-84). 120 Sekunden
+      // Toleranz ueberstehen mehrere Runden, ohne dass ein abgestuerztes
+      // bn4rep.js unbemerkt Faeden auf share bindet.
+      let repModus = false;
+      if (ns.fileExists("data/rep-modus.txt", "home")) {
+        const stempel = Number(ns.read("data/rep-modus.txt").split("|")[1]);
+        repModus = Number.isFinite(stempel) && Date.now() - stempel < 120000;
+      }
+      const shareBraucht = repModus ? ns.getScriptRam("worker/share.js", "home") : 0;
+      // Netzweite Obergrenze. Jenseits davon kostet ein share-Faden mehr
+      // Hacking-Erfahrung, als sein Reputationsbeitrag wert ist.
+      const SHARE_DECKEL = 600;
+      let shareGesamt = 0;
+
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
         if (host === werkbank) continue;   // bleibt fuer die Werkzeuge frei
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
           - (host === "home" ? reserveHome() : 0);
-        const faeden = Math.floor(frei / braucht);
-        if (faeden < 1) continue;
         if (host !== "home") ns.scp(WORKER, host, "home");
+
+        // Home bleibt verschont, genau wie die Werkbank oben: Es ist die
+        // Steuerung selbst und die Reserve dort ist schon knapp genug
+        // bemessen (siehe reserveHome oben). Auf jedem anderen Rechner geht
+        // ungefaehr die Haelfte der freien RAM an share, der Rest wie bisher
+        // an den Ziel-Arbeiter.
+        let freiFuerSkript = frei;
+        // Gedeckelt, nicht anteilig - und aufgeraeumt. Der Bonus ist
+        // 1 + ln(threads)/25 (NetworkShare/Share.ts:43), also logarithmisch:
+        // 400 Faeden bringen +24 %, 800 nur +26,7 %. Die zweiten 400 Faeden
+        // waeren als hack-Faeden das Doppelte an Hacking-Erfahrung wert, und
+        // die ist in diesem BitNode der einzige Zweck der Arbeiter. Ein halbes
+        // Netz an share zu haengen waere teuer bezahlte Bequemlichkeit.
+        //
+        // Zwei Fallen, die ohne ns.ps zuschlagen: worker/share.js laeuft
+        // endlos, ein neues exec je Runde stapelt also alle zehn Sekunden
+        // Faeden obendrauf - und wenn die Faktionsarbeit endet, laufen die
+        // alten fuer immer weiter und blockieren Speicher ohne jeden Nutzen.
+        const shareLaeuft = ns.ps(host)
+          .filter((pr) => pr.filename === "worker/share.js")
+          .reduce((n, pr) => n + pr.threads, 0);
+
+        if (!repModus) {
+          if (shareLaeuft) ns.scriptKill("worker/share.js", host);
+        } else if (shareBraucht > 0 && host !== "home") {
+          const nochOffen = Math.max(0, SHARE_DECKEL - shareGesamt - shareLaeuft);
+          const passt = Math.floor((frei * 0.5) / shareBraucht);
+          const shareFaeden = Math.min(nochOffen, passt);
+          if (shareFaeden >= 1) {
+            if (ns.exec("worker/share.js", host, shareFaeden) === 0) fehlstart++;
+            freiFuerSkript = frei - shareFaeden * shareBraucht;
+          }
+        }
+        shareGesamt += shareLaeuft;
+
+        const faeden = Math.floor(freiFuerSkript / braucht);
+        if (faeden < 1) continue;
         // Die Argumente muessen zum Protokoll der Arbeiter passen: args[1] ist
         // dort die Verzoegerung in Millisekunden (worker/hack.js:38-40). Die
         // Rundennummer stand vorher genau dort - jede Aktion waere um die

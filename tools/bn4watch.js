@@ -78,7 +78,7 @@ function buildRecord(now, net, life, rep) {
     } : null,
     rep: rep ? {
       zeit: rep.zeit ?? null,
-      rep: rep.rep ?? null,
+      rep: (rep.repGesamt ?? rep.rep) ?? null,
       repReq: rep.repReq ?? null,
       ziel: rep.ziel ?? null,
       zielFaktion: rep.zielFaktion ?? null,

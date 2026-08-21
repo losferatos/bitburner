@@ -234,8 +234,17 @@ export async function main(ns) {
     ns.write("data/geldbedarf.txt", String(Math.round(bedarf)), "w");
     if (ns.getHostname() !== "home") ns.scp("data/geldbedarf.txt", "home", ns.getHostname());
 
+    // Summe ueber alle Faktionen. Die Reputation des aktuellen Ziels taugt
+    // nicht zur Fortschrittsmessung: Sie springt bei jedem Zielwechsel zurueck,
+    // und die Ueberwachung meldete deshalb negative Raten, obwohl der Bot
+    // fleissig war. Die Summe faellt nur beim Einbau, und der ist ein
+    // Fortschritt, kein Stillstand.
+    const repGesamt = spieler.factions
+      .reduce((n, f) => n + ns.singularity.getFactionRep(f), 0);
+
     ns.write("data/bn4rep.json", JSON.stringify({
       zeit: Date.now(),
+      repGesamt,
       faktionen: spieler.factions,
       ziel: ziel.aug,
       zielFaktion: ziel.faktion,

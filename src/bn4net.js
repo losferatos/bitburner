@@ -239,23 +239,29 @@ export async function main(ns) {
     }
     werkbankMerker = werkbank;
 
-    // --- 2. Ziel waehlen ------------------------------------------------------
+    // --- 2. Ziele waehlen (Erfahrung und Geld getrennt) -----------------------
+    // War bisher EIN Ziel nach Erfahrung je Sekunde fuer ALLE Arbeiter - das
+    // liess das Geldeinkommen um Faktor 70 einbrechen (545.000 auf 8.000 je
+    // Minute), weil joesguns zwar der beste Erfahrungsserver ist, aber wenig
+    // Geld haelt. Gemessen: Erfahrung und Geld skalieren beide linear mit der
+    // Fadenzahl (keine Saettigung unter ~1300 Faeden je Ziel), aber schon
+    // ~180 Faeden auf dem Erfahrungsziel holen die volle Erfahrungsrate -
+    // joesguns liefert 0,262 Erfahrung je Faden und Sekunde (Bestwert im
+    // Netz), silver-helix nur 0,062, dafuer deutlich mehr Geld. Jeder Faden
+    // ueber 180 ist im Geld besser angelegt. Deshalb zwei Ziele mit festem
+    // Erfahrungsbudget, der Rest netzweit ans Geldziel.
+    //
     // Ohne den beruehmten Halbierungsfilter. "Nur Ziele bis zum halben Level"
     // ist eine Spaetspielregel; beim Neustart mit Hacking 1 ergibt sie die
     // Schwelle 0,5, an der selbst n00dles scheitert. Dann gibt es kein Ziel,
     // keinen Arbeiter, keine Erfahrung - und weil das Level nicht steigt, wird
     // die Schranke nie milder. Genau daran stand der Bot heute zwanzig Minuten.
     //
-    // Kriterium ist Erfahrung je Sekunde, nicht Geld. Geld kommt bei diesem
-    // Bot aus Coding Contracts (Abschnitt 1b), gebraucht wird ausschliesslich
-    // das Hacking-LEVEL - siehe Kopfkommentar "WOZU HACKING HIER UEBERHAUPT
-    // NOCH GUT IST". moneyMax/minDifficulty waere das richtige Kriterium fuer
-    // einen Geld-Bot, nicht fuer diesen.
-    //
-    //   expGain  = 3 + 0.3 * baseDifficulty          (Hacking.ts:30-38)
-    //   hackTime ~ (2.5 * requiredHackingSkill * minDifficulty + 500)
-    //              / (hackingLevel + 50)
-    //   wert     = expGain / hackTime
+    //   expGain   = 3 + 0.3 * baseDifficulty          (Hacking.ts:30-38)
+    //   hackTime  ~ (2.5 * requiredHackingSkill * minDifficulty + 500)
+    //               / (hackingLevel + 50)
+    //   expValue  = expGain / hackTime
+    //   moneyValue = moneyMax / hackTime
     //
     // minDifficulty statt hackDifficulty in der Dauer: Die Arbeiter schwaechen
     // jeden Server ohnehin auf sein Minimum herunter (weiter unten waehlt der
@@ -266,30 +272,68 @@ export async function main(ns) {
     // und aendert sich durch weaken NICHT (Server.ts:82 this.baseDifficulty =
     // this.hackDifficulty, danach ruehrt nur noch capDifficulty an
     // hackDifficulty) - waehrend hackDifficulty sinkt und mit ihm die Dauer.
-    let ziel = null, bester = 0;
+    //
+    // Geldziel bewusst NICHT nach moneyMax/minDifficulty: Ein hoeheres
+    // moneyMax bedeutet NICHT automatisch mehr Geld je Sekunde, weil die
+    // Zykluszeit mitwaechst. Gemessen: omega-net haelt mehr Maximalgeld als
+    // silver-helix, liefert aber weniger, weil seine Zykluszeit schneller
+    // waechst als seine Beute - moneyMax/minDifficulty wuerde omega-net
+    // trotzdem bevorzugen, moneyMax/hackTime nicht.
+    let expTarget = null, expBestValue = 0;
+    let moneyTarget = null, moneyBestValue = 0;
     for (const host of hosts) {
       if (!ns.hasRootAccess(host)) continue;
       const s = ns.getServer(host);
       if (!s.moneyMax || s.requiredHackingSkill > ns.getHackingLevel()) continue;
-      const expGain = 3 + 0.3 * s.baseDifficulty;
       const hackTime = (2.5 * s.requiredHackingSkill * s.minDifficulty + 500)
         / (ns.getHackingLevel() + 50);
-      const wert = expGain / hackTime;
-      if (wert > bester) { bester = wert; ziel = host; }
+
+      const expGain = 3 + 0.3 * s.baseDifficulty;
+      const expValue = expGain / hackTime;
+      if (expValue > expBestValue) { expBestValue = expValue; expTarget = host; }
+
+      // moneyMax allein ueberschaetzt Server, deren Anforderung knapp unter dem
+      // eigenen Level liegt. calculatePercentMoneyHacked (Hacking.ts:44-57)
+      // enthaelt den Faktor
+      //     skillMult = (level - (requiredHackingSkill - 1)) / level
+      // der gegen null geht, je naeher die Anforderung am eigenen Level liegt.
+      // Ohne ihn bekommt ein gerade erst erreichbarer Rechner den 310-fachen
+      // Wert dessen, was er wirklich einbringt.
+      const level = ns.getHackingLevel();
+      const skillMult = (level - (s.requiredHackingSkill - 1)) / level;
+      const difficultyMult = (100 - s.minDifficulty) / 100;
+      const moneyValue = s.moneyMax * Math.max(0, skillMult) * difficultyMult / hackTime;
+      if (moneyValue > moneyBestValue) { moneyBestValue = moneyValue; moneyTarget = host; }
     }
+    // Randbedingung: kein Geldziel gefunden (alle moneyMax null oder ausser
+    // Reichweite) - dann alles aufs Erfahrungsziel. Macht expTarget===moneyTarget
+    // und loest damit automatisch den Ein-Ziel-Fall unten aus.
+    if (!moneyTarget) moneyTarget = expTarget;
+    const sameTarget = expTarget !== null && expTarget === moneyTarget;
 
     let fehlstart = 0;
-    if (ziel) {
-      const s = ns.getServer(ziel);
-      const skript = s.hackDifficulty > s.minDifficulty + 5 ? "worker/weaken.js"
-        : s.moneyAvailable < s.moneyMax * 0.9 ? "worker/grow.js"
-          : "worker/hack.js";
-      const braucht = ns.getScriptRam(skript, "home");
+    if (expTarget || moneyTarget) {
+      // Aktionswahl je Ziel getrennt: weaken/grow/hack haengt vom Zustand
+      // DES ZIELS ab (hackDifficulty, moneyAvailable), nicht von seiner Rolle.
+      const pickScript = (host) => {
+        const s = ns.getServer(host);
+        return s.hackDifficulty > s.minDifficulty + 5 ? "worker/weaken.js"
+          : s.moneyAvailable < s.moneyMax * 0.9 ? "worker/grow.js"
+            : "worker/hack.js";
+      };
+      const expScript = expTarget ? pickScript(expTarget) : null;
+      const moneyScript = (moneyTarget && !sameTarget) ? pickScript(moneyTarget) : null;
+
+      const expRam = expScript ? ns.getScriptRam(expScript, "home") : 0;
+      const moneyRam = moneyScript ? ns.getScriptRam(moneyScript, "home") : 0;
       // getScriptRam gibt bei fehlender Datei still 0 zurueck
       // (NetscriptFunctions.ts:1179-1191). Ungeprueft ergaebe das
       // Math.floor(frei/0) = Infinity, und das Spiel wirft daraufhin eine
       // Ausnahme - die diese Schleife und damit den halben Bot beenden wuerde.
-      if (!(braucht > 0)) { sag("worker-Skript nicht lesbar, Runde uebersprungen."); await ns.sleep(10000); continue; }
+      if ((expScript && !(expRam > 0)) || (moneyScript && !(moneyRam > 0))) {
+        sag("worker-Skript nicht lesbar, Runde uebersprungen.");
+        await ns.sleep(10000); continue;
+      }
 
       // Reputationsmodus: laeuft Faktions- oder Firmenarbeit, lohnt es sich,
       // einen Teil der Arbeiter statt zu hacken teilen zu lassen. ns.share()
@@ -326,6 +370,34 @@ export async function main(ns) {
       // geschaeft, das nur wegen der sofortigen Wirkung ueberhaupt lohnt.
       const SHARE_DECKEL = 100;
       let shareGesamt = 0;
+
+      // Erfahrungsbudget netzweit, gleiches Muster wie SHARE_DECKEL/shareGesamt
+      // oben: ein Deckel, ein mitlaufender Zaehler ueber die Host-Schleife.
+      // Anders als worker/share.js sind die Hack-Arbeiter Einwegskripte (siehe
+      // Kopfkommentar worker/hack.js: "hackt einmal und beendet sich") - es
+      // gibt also keine dauerhaft laufenden Faeden, die per ns.ps() gegenzu-
+      // rechnen waeren. Der Zaehler summiert deshalb die in dieser Runde neu
+      // zugeteilten Faeden. 180 genuegen laut Messung fuer die volle
+      // Erfahrungsrate (joesguns: 0,262 Erfahrung je Faden und Sekunde), jeder
+      // Faden darueber ist im Geldziel mehr wert.
+      const EXP_THREAD_BUDGET = 180;
+      // Laufende Faeden mitzaehlen, nicht nur neu vergebene. hack, grow und
+      // weaken dauern deutlich laenger als eine Runde von zehn Sekunden - bei
+      // niedrigem Level sind es Minuten. Ein Zaehler, der jede Runde bei null
+      // beginnt, legt also Welle um Welle nach, bis Tausende Faeden auf dem
+      // Erfahrungsziel liegen und dem Geldziel den Speicher wegfressen.
+      // Genau dieser Fehler ist bei worker/share.js schon einmal passiert;
+      // dort loest ihn ns.ps, und hier tut es dasselbe. Das erste Argument der
+      // Arbeiter ist ihr Ziel, daran sind sie zu erkennen.
+      let expThreadsAssigned = 0;
+      for (const host of hosts) {
+        if (!ns.hasRootAccess(host)) continue;
+        for (const pr of ns.ps(host)) {
+          if (!WORKER.includes(pr.filename)) continue;
+          if (pr.args[0] !== expTarget) continue;
+          expThreadsAssigned += pr.threads;
+        }
+      }
 
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
@@ -368,16 +440,41 @@ export async function main(ns) {
         }
         shareGesamt += shareLaeuft;
 
-        const faeden = Math.floor(freiFuerSkript / braucht);
-        if (faeden < 1) continue;
         // Die Argumente muessen zum Protokoll der Arbeiter passen: args[1] ist
-        // dort die Verzoegerung in Millisekunden (worker/hack.js:38-40). Die
-        // Rundennummer stand vorher genau dort - jede Aktion waere um die
-        // Rundennummer verzoegert gestartet, nach einem Tag um 8,6 Sekunden,
-        // nach drei Monaten um dreizehn Minuten. Sie gehoert ans Ende, wo sie
-        // nur noch dazu dient, den Aufruf von seinem Vorgaenger zu
+        // dort die Verzoegerung in Millisekunden (worker/hack.js:38-40) und
+        // bleibt 0. Die Rundennummer gehoert ans Ende (args[4]) - stuende sie
+        // an Position 1, waere jede Aktion um sie verzoegert gestartet, nach
+        // einem Tag um 8,6 Sekunden, nach drei Monaten um dreizehn Minuten.
+        // Dort dient sie nur noch dazu, den Aufruf von seinem Vorgaenger zu
         // unterscheiden.
-        if (ns.exec(skript, host, faeden, ziel, 0, 0, 0, runde) === 0) fehlstart++;
+        if (sameTarget) {
+          // Beide Ziele sind derselbe Server - ein Aufruf genuegt, alle
+          // freien Faeden gehen an ihn.
+          const faeden = Math.floor(freiFuerSkript / expRam);
+          if (faeden < 1) continue;
+          if (ns.exec(expScript, host, faeden, expTarget, 0, 0, 0, runde) === 0) fehlstart++;
+          continue;
+        }
+
+        // Erfahrungsziel zuerst bis zum Netzbudget, der Rest ans Geldziel.
+        if (expScript) {
+          const nochOffenExp = Math.max(0, EXP_THREAD_BUDGET - expThreadsAssigned);
+          if (nochOffenExp > 0) {
+            const passtExp = Math.floor(freiFuerSkript / expRam);
+            const expFaeden = Math.min(nochOffenExp, passtExp);
+            if (expFaeden >= 1) {
+              if (ns.exec(expScript, host, expFaeden, expTarget, 0, 0, 0, runde) === 0) fehlstart++;
+              freiFuerSkript -= expFaeden * expRam;
+              expThreadsAssigned += expFaeden;
+            }
+          }
+        }
+        if (moneyScript) {
+          const moneyFaeden = Math.floor(freiFuerSkript / moneyRam);
+          if (moneyFaeden >= 1) {
+            if (ns.exec(moneyScript, host, moneyFaeden, moneyTarget, 0, 0, 0, runde) === 0) fehlstart++;
+          }
+        }
       }
     }
 
@@ -485,7 +582,10 @@ export async function main(ns) {
       runde,
       netz: hosts.length,
       gerootet: gerootet.length,
-      ziel,
+      // Feld "ziel" bedeutet jetzt das Geldziel (bisheriger Name bleibt, damit
+      // tools/bn4.js unveraendert lesbar ist), "expZiel" ist neu.
+      ziel: moneyTarget,
+      expZiel: expTarget,
       homeRam: ns.getServerMaxRam("home"),
       homeFrei: ns.getServerMaxRam("home") - ns.getServerUsedRam("home"),
       ausbauKosten: kosten,

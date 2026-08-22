@@ -432,12 +432,51 @@ export async function main(ns) {
         sag("Einbausperre war ueber fuenf Minuten alt - aufgehoben.");
       }
     }
+    // FAVOR-EINBAU (23.08.2026). Der Einbau ist nicht nur ein Preis, den man
+    // zahlt, um weiterzukommen - er ist selbst ein Ertrag. Beim Einbau wird
+    // die gesammelte Reputation zu Favor (Faction.ts:77-85), und Favor geht
+    // als (1 + favor/100) direkt in die Reputationsrate ein
+    // (PersonObjects/formulas/reputation.ts:8-13, mult()).
+    //
+    // Gerechnet am laufenden Spiel: BitRunners steht bei Favor 16,4 mit
+    // 50.000 Reputation. Ein Einbau jetzt hebt den Favor auf 61,6 und damit
+    // die Rate um 39 Prozent - dauerhaft. Bis zur Spendenschwelle 150
+    // braucht es in einem Zug 20,3 Stunden, ueber Zyklen nur 17,0.
+    //
+    // Dagegen steht der Levelverlust: die Rate haengt linear an
+    // (hacking + int/3)/975, und nach dem Einbau faengt das Level bei eins
+    // an. Gemessen am 22.08. dauerte die Erholung 4,5 Stunden bei etwa
+    // halber Rate, kostete also rund 44.500 Reputation - bei +2,1 rep/s ist
+    // das nach knapp sechs Stunden wieder eingespielt.
+    //
+    // Deshalb die Schwelle bei 25 Prozent Ratengewinn: darunter lohnt der
+    // Umweg ueber die Erholung nicht, darueber schon. Sie greift nur, wenn
+    // ohnehin genug in der Warteschlange liegt, damit der Einbau nicht wegen
+    // eines einzelnen Stuecks ausgeloest wird.
+    const RATEN_GEWINN_SCHWELLE = 1.25;
+    // Ueber alle Faktionen, nicht nur ueber das aktuelle Ziel: das Ziel steht
+    // an dieser Stelle noch nicht fest, und der Einbau hebt ohnehin den Favor
+    // JEDER Faktion, bei der Reputation liegt. Massgeblich ist die beste.
+    let favorGewinn = 1;
+    let favorFaktion = "";
+    for (const f of spieler.factions) {
+      const alt = favor[f] || 0;
+      const kumuliert = 25000 * Math.expm1(0.019802627296179712 * alt);
+      const jetzt = ns.singularity.getFactionRep(f);
+      if (jetzt < 1000) continue;   // unter tausend lohnt die Rechnung nicht
+      const neu = Math.log1p((kumuliert + jetzt) / 25000) / 0.019802627296179712;
+      const gewinn = (1 + neu / 100) / (1 + alt / 100);
+      if (gewinn > favorGewinn) { favorGewinn = gewinn; favorFaktion = f; }
+    }
+    const favorLohnt = favorGewinn >= RATEN_GEWINN_SCHWELLE;
     if (wartend >= MINDEST_WARTESCHLANGE
         && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
-            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar)
+            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt)
         && !gesperrt) {
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
-        + (geldWegZu ? "naechstes Stueck kostet "
+        + (favorLohnt ? "Favor bei " + favorFaktion + " hebt die Reputationsrate um "
+            + Math.round((favorGewinn - 1) * 100) + " Prozent"
+          : geldWegZu ? "naechstes Stueck kostet "
             + Math.round(teuerstesVerdiente / 1e6) + "m bei "
             + Math.round(geld / 1e6) + "m Guthaben"
           : naechstesUnbezahlbar ? "naechstes Stueck (" + naechstes.aug + ") kostet "

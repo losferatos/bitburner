@@ -57,6 +57,17 @@ export async function main(ns) {
   // Netzes binden, ohne dass es irgendwo auffiel.
   const anlaufSeit = new Map();     // Ziel -> Zeitstempel des Anlaufbeginns
   const gesperrtBis = new Map();    // Ziel -> Zeitstempel, ab dem es wieder darf
+  // Der mittlere Gleichgewichtsertrag der laufenden Geldziele in $/GB*s, aus
+  // der VORIGEN Runde. Die Serveraufruestung braucht ihn (Abschnitt 1a2), er
+  // entsteht aber erst in Abschnitt 2 - eine Runde Verzoegerung ist dabei
+  // unschaedlich, weil sich der Wert nur mit dem Hacking-Level und der
+  // Zielauswahl aendert, also langsam. Startwert 0 heisst "noch unbekannt"
+  // und laesst keinen Ausbau zu, bis einmal gerechnet wurde.
+  let effFlotteMerker = 0;
+  // Ungenutzter Speicher der letzten Runde. Die Serveraufruestung braucht ihn
+  // als Bremse: Wer Speicher kauft, obwohl der vorhandene brachliegt,
+  // verbrennt Geld.
+  let ueberschussMerker = 0;
   const reserveHome = () => Math.max(24, ns.getServerMaxRam("home") / 4);
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
@@ -183,6 +194,11 @@ export async function main(ns) {
     }
     if (neu) sag(neu + " Rechner gerootet.");
 
+    // Gerooteter Netzspeicher. Steht hier oben, weil ihn schon die
+    // Serveraufruestung (1a2) und spaeter das Erfahrungsbudget brauchen -
+    // und weil er erst NACH dem Rooten stimmt.
+    const ramTotal = hosts.reduce((a, h) => a + (ns.hasRootAccess(h) ? ns.getServerMaxRam(h) : 0), 0);
+
     // --- 0c. Werkzeug auf der Werkbank neu laden -------------------------------
     // Die Werkzeuge (Vertragsloeser, Reputationssteuerung, Backdoors) laufen
     // auf einem gekauften Rechner und koennen sich nicht selbst beenden - sie
@@ -235,6 +251,132 @@ export async function main(ns) {
         const name = ns.cloud.purchaseServer("werk-" + eigene.length, gb);
         if (name) sag("Rechner gekauft: " + name + " mit " + gb + " GB fuer "
           + (preis / 1e6).toFixed(2) + "m.");
+        break;
+      }
+    } else {
+      // --- 1a2. Serveraufruestung (HEBEL 2, 22.08.2026) ---------------------
+      // ns.cloud.upgradeServer wurde von dieser Kette NIE aufgerufen. Alle 25
+      // Plaetze sind seit langem belegt, gekauft wurde hoechstens bis 1024 GB
+      // und aufgeruestet gar nicht - der Park stand bei 2x128 und 23x64 GB,
+      // zusammen 1728 GB, waehrend das Guthaben ein Vielfaches hergab.
+      //
+      // WELCHER RECHNER. getCloudServerCost (Server/ServerPurchases.ts:22-40):
+      //   preis(r) = r * 55000 * CloudServerCost * CloudServerSoftcap^max(0, log2(r)-6)
+      // CloudServerCost ist in BitNode 4 nicht gesetzt und damit 1, der
+      // Softcap ist 1.2 (BitNode.tsx:632). Eine Verdopplung von r auf 2r
+      // kostet damit preis(r) * 1.4 und bringt r zusaetzliche GB; der Preis
+      // JE GB ist 1.4 * 55000 * 1.2^(log2 r - 6) und waechst mit der Groesse
+      // des Rechners. Der KLEINSTE Rechner liefert deshalb immer das
+      // billigste GB - darum wird der verdoppelt und nicht der groesste.
+      // Konkret: 64 -> 128 GB kostet 4.93 Mio fuer 64 GB, also 77 k$ je GB;
+      // 512 -> 1024 GB kostet 68.1 Mio fuer 512 GB, also 133 k$ je GB.
+      //
+      // WIEVIEL DARF DAS KOSTEN. Die Vermutung war, ein Rechnerpark kurz vor
+      // einem Augmentierungs-Einbau sei verbranntes Geld, weil der Einbau
+      // alle gekauften Rechner loescht (Prestige.ts:73). Das stimmt fuer die
+      // Rechner - aber das GUTHABEN faellt beim selben Einbau ebenfalls auf
+      // 1000 Dollar (PlayerObjectGeneralMethods.ts:102,
+      // this.money = 1000 + CONSTANTS.Donations, gerufen aus
+      // Prestige.ts:69). Nicht ausgegebenes Geld ist also genauso verloren
+      // wie ein aufgeruesteter Rechner. Fuer die Zeit nach dem Einbau laesst
+      // sich gar nicht sparen; das Einzige, was hinueberkommt, sind
+      // Augmentierungen. Daraus folgen genau zwei Grenzen:
+      //
+      //  (1) Was bn4rep.js fuer bereits verdiente Augmentierungen braucht,
+      //      ist tabu (reserviert, aus data/geldbedarf.txt). Augmentierungen
+      //      sind dauerhafter Fortschritt, Rechenzeit ist es nicht. Zusaetz-
+      //      lich wird nie mehr als die Haelfte des freien Guthabens auf
+      //      einmal ausgegeben, damit ein Preissprung nicht ins Leere faellt.
+      //  (2) Der Ausbau muss sich VOR dem naechsten Einbau bezahlt machen,
+      //      sonst waere das Geld in der naechsten Augmentierung besser
+      //      aufgehoben. Wie nah der Einbau ist, weiss bn4rep.js: Es baut ab
+      //      drei gekauften, noch nicht eingebauten Augmentierungen ein
+      //      (MINDEST_WARTESCHLANGE, bn4rep.js) und meldet diese Zahl als
+      //      "wartend" in data/bn4rep.json.
+      // Mehrere Schritte je Runde, nicht einer. Ein Schritt kostete anfangs
+      // 4.9 Millionen, waehrend in denselben zehn Sekunden 18 Millionen
+      // hereinkamen - bei einem Schritt je Runde waere das Guthaben schneller
+      // gewachsen als der Park, und der Ausbau haette Stunden gebraucht, fuer
+      // die es keinen Grund gibt. Die Schleife bricht von selbst ab, sobald
+      // eines der Kriterien nicht mehr traegt; die Obergrenze von 25 ist nur
+      // die Notbremse, damit eine Runde nicht beliebig lange laeuft.
+      const maxGb = ns.cloud.getRamLimit();
+      for (let schritt = 0; schritt < 25; schritt++) {
+        const smallest = eigene
+          .map((h) => ({ host: h, gb: ns.getServerMaxRam(h) }))
+          .sort((a, b) => a.gb - b.gb)[0];
+        // Nichts mehr aufzuruesten: kein gekaufter Rechner da, oder der
+        // kleinste ist schon am Maximum von 2^20 GB.
+        if (!smallest || !(smallest.gb > 0) || smallest.gb >= maxGb) break;
+        const zielGb = smallest.gb * 2;
+        const zusatzGb = zielGb - smallest.gb;
+        let kosten = 0;
+        try { kosten = ns.cloud.getServerUpgradeCost(smallest.host, zielGb); }
+        catch { kosten = 0; }   // wirft, wenn der Rechner kein gekaufter ist
+
+        // Ertrag je GB und Sekunde aus der letzten Runde. effFlotteMerker ist
+        // der mittlere Gleichgewichtsertrag der laufenden Geldziele. Gemessen
+        // stimmt dieses Modell auf 4 %: 320 $/GB*s tatsaechlich gegen 334
+        // $/GB*s berechnet (Messung vom 22.08.2026 mit vier Zielen). Es ist
+        // damit belastbar genug fuer eine Amortisationsrechnung - und es
+        // waechst und faellt automatisch mit Level, Zielen und BitNode,
+        // anders als eine eingetragene Zahl.
+        //
+        // ABER: Der Ertrag gilt nur fuer Speicher, den die Geldziele auch
+        // AUFNEHMEN. Seit der Kapazitaetsgrenze (siehe kennzahlen) ist das
+        // nicht mehr selbstverstaendlich - nach dem Ausbau auf 63.612 GB
+        // blieben in einer Runde 39.030 GB uebrig, weil die Summe der
+        // Kapazitaeten aller erreichbaren Ziele endlich ist. Weiteren
+        // Speicher zu kaufen, waehrend der vorhandene brachliegt, ist
+        // verbranntes Geld: Der Grenzertrag ist dort null, nicht effFlotte.
+        //
+        // Der Ueberschuss geht zwar an die Erfahrung und liegt damit nicht
+        // buchstaeblich brach - aber Erfahrung ist keine Rechtfertigung fuer
+        // eine Ausgabe, die sich in Dollar amortisieren soll. Deshalb: Sobald
+        // die Geldziele mehr als ein Zwanzigstel des Netzes nicht abnehmen,
+        // wird nicht mehr gekauft.
+        const ertrag = ueberschussMerker > ramTotal * 0.05 ? 0 : effFlotteMerker;
+        const amortSek = (ertrag > 0 && zusatzGb > 0)
+          ? kosten / (zusatzGb * ertrag) : Infinity;
+
+        // wartend aus bn4rep.js. Fehlt die Meldung oder ist sie alt, wird der
+        // Einbau als NAH angenommen - vorsichtig, nicht grosszuegig. Ein
+        // abgestuerztes bn4rep.js darf nicht dazu fuehren, dass eine veraltete
+        // Null teure Ausbauten freigibt, waehrend laengst drei Augmentierungen
+        // auf den Einbau warten.
+        let wartend = 99;
+        try {
+          if (ns.fileExists("data/bn4rep.json", "home")) {
+            const r = JSON.parse(ns.read("data/bn4rep.json"));
+            if (Number.isFinite(r.zeit) && Date.now() - r.zeit < 300000) {
+              wartend = r.wartend || 0;
+            }
+          }
+        } catch { /* kaputtes JSON - dann bleibt es bei "nah" */ }
+        // Zwei Stufen genuegen. Zehn Minuten sind auch dann noch reichlich:
+        // Die billigen Stufen amortisieren sich in drei bis fuenf Minuten,
+        // erst weit oben auf der Kostenkurve wird es eng - und genau dort
+        // soll die Bremse ja greifen.
+        const amortDeckel = wartend >= 2 ? 600 : 1800;
+        const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
+
+        if (kosten > 0 && amortSek <= amortDeckel && kosten * 2 <= geldFrei) {
+          if (!ns.cloud.upgradeServer(smallest.host, zielGb)) break;
+          sag(smallest.host + ": " + smallest.gb + " -> " + zielGb + " GB fuer "
+            + (kosten / 1e6).toFixed(1) + "m, amortisiert in "
+            + Math.round(amortSek) + " s.");
+          continue;
+        }
+        // Nicht stillschweigend nichts tun. Ein Ausbau, der seit einer Stunde
+        // nicht stattfindet, muss von aussen erklaerbar sein. Nur beim ersten
+        // Schritt melden - die spaeteren brechen normal ab, das ist kein
+        // Zustand, ueber den berichtet werden muesste.
+        if (schritt === 0 && runde % 60 === 0 && kosten > 0) {
+          sag("Ausbau wartet: " + smallest.host + " -> " + zielGb + " GB kostet "
+            + (kosten / 1e6).toFixed(1) + "m, amortisiert in "
+            + (Number.isFinite(amortSek) ? Math.round(amortSek) : "?") + " s (Deckel "
+            + amortDeckel + "), frei " + (geldFrei / 1e6).toFixed(0) + "m.");
+        }
         break;
       }
     }
@@ -336,31 +478,25 @@ export async function main(ns) {
     // autopilot.js:103 und :1173) und skaliert die Zielzahl am Netzspeicher
     // statt an einer festen Zahl - aus demselben Grund wie dort: eine feste
     // Zahl passt nur zu einer einzigen Ausbaustufe.
-    const ramTotal = hosts.reduce((a, h) => a + (ns.hasRootAccess(h) ? ns.getServerMaxRam(h) : 0), 0);
-    // HEBEL 3 (22.08.2026). Vorher: max(3, min(10, floor(ramTotal/400))).
-    // Der Deckel 10 war ab 4000 GB Netzspeicher dauerhaft angeschlagen, die
-    // RAM-Skalierung damit tot - und 10 Ziele sind zu viele.
+    // HEBEL 3 (22.08.2026), zweite Fassung. Erste Fassung war eine feste,
+    // logarithmisch am Netzspeicher haengende Zahl (vier Ziele bei 7276 GB)
+    // und hat gemessen +41 % gebracht. Sie ist trotzdem falsch, und der
+    // Serverausbau hat es sofort gezeigt: Bei 63.612 GB waren daraus sechs
+    // Ziele, jedes mit rund 7000 GB - das Fuenffache dessen, was ein Ziel
+    // aufnehmen kann. Die Server standen leergehackt bei 0 bis 11 % Guthaben
+    // und der Ertrag FIEL.
     //
-    // Nachgerechnet ueber den Gleichgewichtsertrag je Ziel (dieselbe Formel
-    // wie steadyEff weiter unten, gerechnet bei minDifficulty und Level 373):
-    //   phantasy 449, omega-net 374, max-hardware 328, silver-helix 288,
-    //   harakiri-sushi 242, the-hub 194, joesguns 168, zer0 166,
-    //   sigma-cosmetics 160, iron-gym 154, hong-fang-tea 142 $/GB*s.
-    // Die Spanne ist rund 3:1. Bei Gleichverteilung ergibt das als Schnitt:
-    //   1 Ziel 449, 2 Ziele 412, 3 Ziele 384, 4 Ziele 360, 5 Ziele 336,
-    //   8 Ziele 276, 10 Ziele 252. Von zehn auf vier sind das +43 %.
+    // Eine Zielanzahl ist die falsche Stellschraube. Richtig ist die
+    // KAPAZITAET je Ziel (siehe kennzahlen oben) und eine Zuteilung, die der
+    // Reihe nach auffuellt statt gleich zu verteilen. Die Zielanzahl ist
+    // damit nur noch eine Obergrenze gegen zu viele exec-Aufrufe und
+    // ns-Abfragen je Runde: Jedes zusaetzliche Ziel kostet drei Abfragen in
+    // planMix und bis zu drei Wuensche im Verteiler.
     //
-    // Warum dann nicht EIN Ziel? Weil der Gleichgewichtsertrag scale-free
-    // ist - die Mischung skaliert linear mit der Fadenzahl - der Betrieb
-    // aber nicht: Die Zuteilung laeuft in Runden von zehn Sekunden, waehrend
-    // eine hack-Welle zwanzig Sekunden bis Minuten fliegt. Je mehr Speicher
-    // auf einem Ziel liegt, desto weiter schiesst eine Welle ueber ihren
-    // Sollzustand hinaus, und desto oefter faellt das Ziel unter
-    // MIX_MONEY_LOW in die Anlaufphase. Diese Streuung gegen Ueberschwingen
-    // ist der einzige Grund fuer mehr als ein Ziel - und sie waechst nur
-    // langsam mit dem Netz. Deshalb LOGARITHMISCH statt linear: Bei 7276 GB
-    // sind das 4 Ziele, bei 30000 GB 6, bei 2000 GB 2.
-    const MONEY_TARGET_COUNT = Math.max(2, Math.min(8, Math.round(Math.log2(ramTotal / 512))));
+    // 25 als Deckel, sonst alle Kandidaten. Ein schwaches Ziel schadet
+    // nicht mehr: Der Wasserfall gibt ihm nur, was die besseren nicht
+    // aufnehmen konnten - und dieser Speicher laege sonst brach.
+    const MONEY_TARGET_COUNT = 25;
 
     // War bisher EIN Ziel nach Erfahrung je Sekunde fuer ALLE Arbeiter - das
     // liess das Geldeinkommen um Faktor 70 einbrechen (545.000 auf 8.000 je
@@ -401,6 +537,100 @@ export async function main(ns) {
     // silver-helix, liefert aber weniger, weil seine Zykluszeit schneller
     // waechst als seine Beute - moneyMax/minDifficulty wuerde omega-net
     // trotzdem bevorzugen, moneyMax/hackTime nicht.
+    // getScriptRam gibt bei fehlender Datei still 0 zurueck
+    // (NetscriptFunctions.ts:1179-1191). Ungeprueft ergaebe das
+    // Math.floor(frei/0) = Infinity, und das Spiel wirft daraufhin eine
+    // Ausnahme. Die Pruefung steht weiter unten bei den Arbeitern; hier oben
+    // werden die Werte gebraucht, weil die Kennzahlen je Ziel sie brauchen.
+    const ramHack = ns.getScriptRam("worker/hack.js", "home");
+    const ramGrow = ns.getScriptRam("worker/grow.js", "home");
+    const ramWeaken = ns.getScriptRam("worker/weaken.js", "home");
+
+    // --- Kennzahlen je Ziel ---------------------------------------------------
+    // Zwei Zahlen je Server, beide fuer den SAUBEREN Dauerbetrieb gerechnet
+    // (Sicherheit am Minimum), beide aus dem Spiel selbst statt aus
+    // nachgebauten Formeln:
+    //
+    //   steadyEff   Ertrag in Dollar je GB und Sekunde. Sagt, WIE GUT das Ziel
+    //               ist - danach wird sortiert und danach entscheidet das
+    //               Nutzen-Gate der Anlaufphase.
+    //   kapazitaet  Wieviel Arbeitsspeicher das Ziel ueberhaupt aufnehmen
+    //               kann, in GB. Sagt, WIEVIEL davon man haben kann.
+    //
+    // Die Kapazitaet ist der Befund vom 22.08.2026, der die Serveraufruestung
+    // zunaechst zu einem Rueckschritt gemacht hat. Der Gleichgewichtsertrag
+    // ist zwar skalenfrei - die Mischung aus hack, grow und weaken haelt jedes
+    // Verhaeltnis - aber der BETRIEB ist es nicht: Zugeteilt wird alle zehn
+    // Sekunden, eine Welle fliegt zwanzig Sekunden bis Minuten. Landen in
+    // einem hackTime-Fenster zu viele hack-Faeden, raeumen sie den Server
+    // vollstaendig leer, statt ihn bei 95 % zu halten. Genau das war messbar:
+    // Nach dem Ausbau von 7.276 auf 63.612 GB stand phantasy bei 0 %
+    // Guthaben, silver-helix bei 1 %, der grow-Anteil bei 77 % und der
+    // hack-Anteil bei 11 % - und der Ertrag FIEL von 1.83 auf 1.54 Mio/s.
+    //
+    // Herleitung der Grenze. Ein hack-Faden zieht den Anteil p*chance vom
+    // AKTUELLEN Guthaben ab. Werden je Sekunde n Faeden gestartet, landen in
+    // einem hackTime-Fenster n*hackTime davon, der Abzug ist also rund
+    // n*hackTime*p*chance. Damit die Rueckkopplung im linearen Bereich bleibt
+    // - MIX_MONEY_LOW 0.75 bis MIX_MONEY_HIGH 0.95, also 20 Prozentpunkte -
+    // darf dieser Abzug KAP_ABZUG nicht ueberschreiten:
+    //     n = KAP_ABZUG / (hackTime * p * chance)
+    // Der Speicher, den diese n Faeden je Sekunde belegen, ist n mal dem
+    // GB-Sekunden-Preis einer Mischeinheit. Daraus:
+    //     kapazitaet = KAP_ABZUG * gbSekProEinheit / (hackTime * p * chance)
+    // Fuer phantasy ergibt das rund 1400 GB - und genau in dieser
+    // Groessenordnung lief es vor dem Ausbau sauber (934 GB, 313 $/GB*s).
+    const KAP_ABZUG = 0.2;
+    const SERVER_MAX_GROWTH_LOG = 0.00349388925425578;
+    const wachstumsLog = (hd) => Math.min(Math.log1p(0.03 / hd), SERVER_MAX_GROWTH_LOG);
+    const FORTIFY_HACK = 0.002;
+    const FORTIFY_GROW = 0.004;
+    const WEAKEN_POWER = 0.05;
+    const MIX_MONEY_HIGH = 0.95;
+    const kennzahlen = (host, s) => {
+      const p = ns.hackAnalyze(host);
+      const chance = ns.hackAnalyzeChance(host);
+      const cycles = ns.growthAnalyze(host, 2);
+      const k = cycles > 0 ? Math.LN2 / cycles : 0;
+      // Alles auf minDifficulty hochrechnen. hackAnalyze & Co. liefern immer
+      // den IST-Wert; ein verschmutzter Server saehe sonst dauerhaft
+      // schlechter aus, als er nach dem Saeubern waere - und wuerde vom
+      // Nutzen-Gate aus dem falschen Grund verworfen. Jeder Faktor haengt
+      // bekannt von der Sicherheit ab:
+      //   p, chance  ~ (100 - hackDifficulty)      (Hacking.ts:50, :15)
+      //   hackTime   ~ 2.5*req*hackDifficulty+500  (Hacking.ts:64-70)
+      //   k          ~ min(log1p(0.03/hd), ServerMaxGrowthLog)
+      //                (grow.ts:16-19, Constants.ts:8)
+      // Der Deckel ServerMaxGrowthLog greift ab hackDifficulty <= 8.571;
+      // ohne ihn waere die Umrechnung fuer omega-net (min 9), silver-helix
+      // (10) und iron-gym (10) falsch.
+      const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
+      const sauber = (100 - hdIst) > 0 ? (100 - hdMin) / (100 - hdIst) : 1;
+      const pMin = Math.min(1, p * sauber);
+      const chanceMin = Math.min(1, chance * sauber);
+      const zeitIst = 2.5 * s.requiredHackingSkill * hdIst + 500;
+      const zeitMin = 2.5 * s.requiredHackingSkill * hdMin + 500;
+      const hackTimeMin = ns.getHackTime(host) * (zeitIst > 0 ? zeitMin / zeitIst : 1) / 1000;
+      const kMin = k * (wachstumsLog(hdIst) > 0 ? wachstumsLog(hdMin) / wachstumsLog(hdIst) : 1);
+      // grow dauert das 3,2-fache, weaken das 4-fache eines hack
+      // (Hacking.ts:81-95).
+      const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
+      const wphMin = (FORTIFY_HACK * chanceMin + FORTIFY_GROW * gphMin) / WEAKEN_POWER;
+      const gbSekProEinheit = hackTimeMin
+        * (ramHack + 3.2 * gphMin * ramGrow + 4 * wphMin * ramWeaken);
+      const beute = pMin * chanceMin;
+      // null statt 0, wenn sich nichts bestimmen laesst: Bei hackDifficulty
+      // >= 100 gibt hackAnalyze 0 zurueck (Hacking.ts:46). Ein Gate, das
+      // darauf mit "unrentabel" antwortet, wuerde genau diesen Server fuer
+      // immer ungesaeubert liegen lassen. Unbekannt heisst: durchlassen.
+      const brauchbar = p > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
+      return {
+        p, chance, k,
+        steadyEff: brauchbar ? (s.moneyMax * MIX_MONEY_HIGH * beute) / gbSekProEinheit : null,
+        kapazitaet: brauchbar ? (KAP_ABZUG * gbSekProEinheit) / (hackTimeMin * beute) : 0,
+      };
+    };
+
     let expTarget = null, expBestValue = 0;
     const moneyCandidates = [];
     for (const host of hosts) {
@@ -414,18 +644,18 @@ export async function main(ns) {
       const expValue = expGain / hackTime;
       if (expValue > expBestValue) { expBestValue = expValue; expTarget = host; }
 
-      // moneyMax allein ueberschaetzt Server, deren Anforderung knapp unter dem
-      // eigenen Level liegt. calculatePercentMoneyHacked (Hacking.ts:44-57)
-      // enthaelt den Faktor
-      //     skillMult = (level - (requiredHackingSkill - 1)) / level
-      // der gegen null geht, je naeher die Anforderung am eigenen Level liegt.
-      // Ohne ihn bekommt ein gerade erst erreichbarer Rechner den 310-fachen
-      // Wert dessen, was er wirklich einbringt.
-      const level = ns.getHackingLevel();
-      const skillMult = (level - (s.requiredHackingSkill - 1)) / level;
-      const difficultyMult = (100 - s.minDifficulty) / 100;
-      const moneyValue = s.moneyMax * Math.max(0, skillMult) * difficultyMult / hackTime;
-      if (moneyValue > 0) moneyCandidates.push({ host, moneyValue });
+      // Sortiert wird seit dem 22.08.2026 nach steadyEff statt nach der alten
+      // Naeherung moneyMax*skillMult*difficultyMult/hackTime. Die Naeherung
+      // liess den Wachstumsaufwand weg und hat deshalb Server bevorzugt, die
+      // viel Geld halten, es aber nur langsam nachwachsen lassen. Belegt:
+      // iron-gym stand darin auf Rang 5 und bekam nach dem Serverausbau
+      // 11.609 GB, obwohl es im Gleichgewicht nur 154 $/GB*s bringt - halb
+      // so viel wie phantasy.
+      let kz = null;
+      try { kz = kennzahlen(host, s); } catch { kz = null; }
+      if (kz && kz.steadyEff > 0) {
+        moneyCandidates.push({ host, moneyValue: kz.steadyEff, kapazitaet: kz.kapazitaet });
+      }
     }
     moneyCandidates.sort((a, b) => b.moneyValue - a.moneyValue);
 
@@ -453,6 +683,10 @@ export async function main(ns) {
 
     let fehlstart = 0;
     let mixStat = null;
+    // Speicher, den die Geldziele in dieser Runde nicht aufnehmen konnten und
+    // der deshalb an die Erfahrung ging. Gehoert nach draussen: Er ist das
+    // Mass dafuer, ob sich weiterer Serverausbau ueberhaupt noch lohnt.
+    let ueberschussGb = 0;
     if (expTarget || moneyTargets.length) {
       // Aktionswahl fuer das ERFAHRUNGSziel: hier bleibt es beim Dreifach-
       // Ternaer. Erfahrung haengt allein am Server und an der Fadenzahl -
@@ -486,11 +720,8 @@ export async function main(ns) {
       // (NetscriptFunctions.ts:1179-1191). Ungeprueft ergaebe das
       // Math.floor(frei/0) = Infinity, und das Spiel wirft daraufhin eine
       // Ausnahme - die diese Schleife und damit den halben Bot beenden wuerde.
-      // Alle drei Arbeiter werden jetzt in JEDER Runde gebraucht (Mischung
-      // weiter unten), also werden auch alle drei geprueft.
-      const ramHack = ns.getScriptRam("worker/hack.js", "home");
-      const ramGrow = ns.getScriptRam("worker/grow.js", "home");
-      const ramWeaken = ns.getScriptRam("worker/weaken.js", "home");
+      // weiter unten), also werden auch alle drei geprueft. Die Werte selbst
+      // stehen oben bei den Kennzahlen je Ziel, die sie ebenfalls brauchen.
       if ((expScript && !(expRam > 0))
           || !(ramHack > 0) || !(ramGrow > 0) || !(ramWeaken > 0)) {
         sag("worker-Skript nicht lesbar, Runde uebersprungen.");
@@ -639,15 +870,13 @@ export async function main(ns) {
       // (Level 339): p = 6.4e-4, chance = 0.94, k = 1.42e-3
       //   -> hack : grow : weaken = 1 : 0.42 : 0.072  (Faeden)
       //   -> 37 % : 52 % : 11 %                       (RAM-Sekunden)
-      const FORTIFY_HACK = 0.002;
-      const FORTIFY_GROW = 0.004;
-      const WEAKEN_POWER = 0.05;
+      // FORTIFY_HACK, FORTIFY_GROW, WEAKEN_POWER und MIX_MONEY_HIGH stehen
+      // oben bei den Kennzahlen je Ziel - dieselben Konstanten, eine Quelle.
       // Zielband. MIX_MONEY_HIGH ist der Fixpunkt der Regelung, nicht die
       // Obergrenze: darueber waere jeder grow-Faden verschenkt, weil
       // calculateGrowMoney (grow.ts:44-52) bei moneyMax abschneidet. Etwas
       // Luft nach oben zu lassen kostet 5 % Beute je Faden und spart mehr
       // als das an weggeworfenen grow-Faeden.
-      const MIX_MONEY_HIGH = 0.95;
       const MIX_MONEY_LOW = 0.75;   // darunter: Anlaufphase
       const MIX_SEC_OK = 1.0;       // bis hierher gilt die Sicherheit als am Minimum
       const MIX_SEC_BAD = 5.0;      // darueber: Anlaufphase
@@ -672,58 +901,13 @@ export async function main(ns) {
         const s = ns.getServer(host);
         const secOver = Math.max(0, s.hackDifficulty - s.minDifficulty);
         const moneyFrac = s.moneyMax > 0 ? clamp01(s.moneyAvailable / s.moneyMax) : 0;
-        const p = ns.hackAnalyze(host);
-        const chance = ns.hackAnalyzeChance(host);
-        const cycles = ns.growthAnalyze(host, 2);
-        const k = cycles > 0 ? Math.LN2 / cycles : 0;
+        // Dieselbe Rechnung wie bei der Zielauswahl - eine Quelle, kein
+        // zweiter Satz Formeln, der auseinanderlaufen kann. p, chance und k
+        // sind die IST-Werte (fuer die Mischung), steadyEff und kapazitaet
+        // sind auf minDifficulty hochgerechnet (fuer Gate und Deckel).
+        const kz = kennzahlen(host, s);
+        const p = kz.p, chance = kz.chance, k = kz.k;
         const f = flight.get(host) || { hack: 0, grow: 0, weaken: 0 };
-
-        // GLEICHGEWICHTSERTRAG in Dollar je GB und Sekunde - also die Zahl,
-        // die sagt, was dieses Ziel im SAUBEREN Dauerbetrieb wert ist. Sie
-        // ist die Grundlage des Nutzen-Gates weiter unten: Ein Ziel, das
-        // erst teuer gesaeubert werden muss und danach schlechter zahlt als
-        // die Flotte, ist den Anlauf nicht wert.
-        //
-        // Gerechnet wird bei minDifficulty, nicht beim IST-Zustand. ns.
-        // hackAnalyze & Co. liefern immer den Ist-Wert; the-hub steht bei
-        // Sicherheit 41 statt 14 und saehe damit dreimal schlechter aus, als
-        // es nach dem Saeubern waere - genau das Ziel wuerde das Gate dann
-        // aus dem falschen Grund verwerfen. Die Umrechnung nutzt, dass jeder
-        // Faktor bekannt von der Sicherheit abhaengt:
-        //   p, chance  ~ (100 - hackDifficulty)      (Hacking.ts:50, :15)
-        //   hackTime   ~ 2.5*req*hackDifficulty+500  (Hacking.ts:64-70)
-        //   k          ~ min(log1p(0.03/hd), ServerMaxGrowthLog)
-        //                (grow.ts:16-19, Constants.ts:8)
-        // Der Deckel ServerMaxGrowthLog greift ab hackDifficulty <= 8.571 -
-        // unterhalb davon ist k von der Sicherheit unabhaengig, darueber
-        // nicht. Ohne ihn waere die Umrechnung fuer omega-net (min 9),
-        // silver-helix (10) und iron-gym (10) falsch.
-        const SERVER_MAX_GROWTH_LOG = 0.00349388925425578;
-        const wachstumsLog = (hd) => Math.min(Math.log1p(0.03 / hd), SERVER_MAX_GROWTH_LOG);
-        const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
-        const sauber = (100 - hdIst) > 0 ? (100 - hdMin) / (100 - hdIst) : 1;
-        const pMin = Math.min(1, p * sauber);
-        const chanceMin = Math.min(1, chance * sauber);
-        const zeitIst = 2.5 * s.requiredHackingSkill * hdIst + 500;
-        const zeitMin = 2.5 * s.requiredHackingSkill * hdMin + 500;
-        const hackTimeMin = ns.getHackTime(host) * (zeitIst > 0 ? zeitMin / zeitIst : 1) / 1000;
-        const kMin = k * (wachstumsLog(hdIst) > 0 ? wachstumsLog(hdMin) / wachstumsLog(hdIst) : 1);
-        // Beute je hack-Faden im Gleichgewicht, und der RAM-Sekunden-Preis
-        // einer vollstaendigen Mischeinheit dazu. grow dauert das 3,2-fache,
-        // weaken das 4-fache eines hack (Hacking.ts:81-95).
-        const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
-        const wphMin = (FORTIFY_HACK * chanceMin + FORTIFY_GROW * gphMin) / WEAKEN_POWER;
-        const gbSekProEinheit = hackTimeMin
-          * (ramHack + 3.2 * gphMin * ramGrow + 4 * wphMin * ramWeaken);
-        // null statt 0, wenn sich der Wert nicht bestimmen laesst: Bei
-        // hackDifficulty >= 100 gibt hackAnalyze 0 zurueck (Hacking.ts:46),
-        // und die Hochrechnung auf minDifficulty bleibt dann ebenfalls 0 -
-        // obwohl der Server nach dem Saeubern durchaus gut sein kann. Ein
-        // Gate, das darauf mit "unrentabel" antwortet, wuerde genau diesen
-        // Server fuer immer ungesaeubert liegen lassen. Unbekannt heisst
-        // deshalb: durchlassen.
-        const steadyEff = (p > 0 && gbSekProEinheit > 0)
-          ? (s.moneyMax * MIX_MONEY_HIGH * pMin * chanceMin) / gbSekProEinheit : null;
 
         // ANLAUFPHASE, ausdruecklich und als eigener Zweig. Aus einem
         // beliebigen Ausgangszustand (Sicherheit hoch, Guthaben leer) fuehrt
@@ -769,7 +953,7 @@ export async function main(ns) {
           const nurSaeubern = secOver > MIX_SEC_OK;
           return {
             anlauf: true,
-            steadyEff,
+            steadyEff: kz.steadyEff, kapazitaet: kz.kapazitaet,
             bedarf: {
               hack: 0,
               grow: nurSaeubern ? 0 : Math.max(0, growNeed - f.grow),
@@ -797,7 +981,7 @@ export async function main(ns) {
         const secErr = clamp01((secOver - MIX_SEC_OK) / (MIX_SEC_BAD - MIX_SEC_OK));
         return {
           anlauf: false,
-          steadyEff,
+          steadyEff: kz.steadyEff, kapazitaet: kz.kapazitaet,
           ratio: {
             hack: (1 - moneyErr) * (1 - secErr),
             grow: growPerHack + moneyErr * einheit,
@@ -1015,13 +1199,37 @@ export async function main(ns) {
           const ziel = eintrag.ziel;
           const plan = eintrag.plan;
           if (restZiele <= 0) break;
-          // Gleicher Anteil je Ziel, Rest kaskadiert - wie bisher. Ein Ziel in
-          // der Anlaufphase nimmt nur, was es braucht; was es liegen laesst,
-          // kommt den folgenden Zielen zugute.
-          let anteil = budget / restZiele;
           restZiele--;
 
+          // WASSERFALL STATT GLEICHVERTEILUNG (22.08.2026). Bisher bekam jedes
+          // Ziel budget/restZiele, also gleich viel, und was ein Ziel liegen
+          // liess, kaskadierte nach unten. Das war richtig, solange alle Ziele
+          // ungefaehr gleich gut waren und keines gesaettigt werden konnte.
+          // Beides gilt nicht: Die Spanne betraegt 3:1, und jedes Ziel hat
+          // eine berechenbare Kapazitaet (siehe kennzahlen oben).
+          //
+          // Jetzt nimmt sich jedes Ziel der Reihe nach - und die Reihe ist
+          // nach steadyEff sortiert, also das beste zuerst - hoechstens so
+          // viel, wie es noch aufnehmen kann. Der Rest faellt an das naechste.
+          // Das ist die richtige Zuteilung fuer ungleiche Ziele mit endlicher
+          // Aufnahme: Die besten werden voll, die schlechten bekommen nur, was
+          // uebrig bleibt, und ist gar nichts uebrig, bekommen sie nichts.
+          //
+          // Was schon fliegt, wird gegengerechnet. Sonst legte jede Runde eine
+          // volle Kapazitaet obendrauf, obwohl die vorige noch unterwegs ist -
+          // derselbe Stapelfehler, der beim Erfahrungsziel und bei share schon
+          // zweimal zugeschlagen hat.
+          const fl = flight.get(ziel) || { hack: 0, grow: 0, weaken: 0 };
+          const belegt = fl.hack * ramHack + fl.grow * ramGrow + fl.weaken * ramWeaken;
+          let anteil = Math.min(budget, Math.max(0, (plan.kapazitaet || 0) - belegt));
+
           if (plan.anlauf) {
+            // Die Anlaufphase kennt keine Kapazitaetsgrenze: Ihr Bedarf ist
+            // endlich und in planMix ausgerechnet, und sie hackt nicht, kann
+            // den Server also gar nicht leerraeumen. Sie bekommt deshalb den
+            // vollen Rest angeboten - gebremst wird sie von ihren eigenen
+            // Deckeln weiter unten.
+            anteil = budget;
             // GATE. Ein Anlauf kostet Speicher, der sonst SOFORT Geld
             // brachte. Er lohnt nur, wenn das Ziel hinterher mindestens so
             // gut zahlt wie das, was man dafuer stehenlaesst. steadyEff ist
@@ -1130,6 +1338,37 @@ export async function main(ns) {
           if (plan.anlauf) anlaufDeckelRest = Math.max(0, anlaufDeckelRest - verbraucht);
         }
 
+        // --- Ueberschuss an die Erfahrung (22.08.2026) ---------------------
+        // Seit die Geldziele eine Kapazitaetsgrenze haben, kann Speicher
+        // uebrigbleiben - und nach dem Serverausbau bleibt sehr viel uebrig:
+        // gemessen 39.030 von 63.612 GB in einer Runde. Der Grund ist keine
+        // Panne, sondern eine Tatsache ueber dieses BitNode: Die Summe der
+        // Kapazitaeten aller erreichbaren Geldziele ist endlich, und das Netz
+        // hat sie ueberholt.
+        //
+        // Brachliegen ist die schlechteste aller Verwendungen. Die zweitbeste
+        // ist die Erfahrung, und in BitNode 4 ist sie sogar der eigentliche
+        // Zweck der Arbeiter: w0r1d_d43m0n verlangt hier Hacking 9000 statt
+        // 3000 (WorldDaemonDifficulty 3), und HackExpGain 0.4 macht jeden
+        // Punkt zweieinhalbmal so teuer wie sonst.
+        //
+        // Erfahrung saettigt nicht: calculateHackingExpGain (Hacking.ts:29-38)
+        // haengt allein an baseDifficulty und wird von hack, grow UND weaken
+        // gleichermassen vergeben - der Zustand des Servers ist ihr egal, ein
+        // leergehacktes Ziel liefert genauso viel wie ein volles. Deshalb
+        // braucht dieser Zweig keinen Deckel; er nimmt, was sonst niemand
+        // will.
+        if (budget >= expRam && expTarget && expScript && expRam > 0) {
+          const dauer = actionTime(expTarget, expScript);
+          wuensche.push({
+            ziel: expTarget, skript: expScript, ram: expRam,
+            offen: Math.floor(budget / expRam),
+            dauer: Math.round(dauer), landAt: Math.round(Date.now() + dauer),
+          });
+          ueberschussGb = Math.round(budget);
+          budget = 0;
+        }
+
         // Wuensche auf Rechner legen, groesster Rechner zuerst. So braucht ein
         // grosser Wunsch wenige exec-Aufrufe, und die kleinen Rechner bleiben
         // fuer die Reste uebrig.
@@ -1153,12 +1392,15 @@ export async function main(ns) {
 
         // Nur fuer die Beobachtung von aussen - die Verteilung ist die Zahl,
         // an der dieser Umbau gemessen wird.
+        effFlotteMerker = massstab;
+        ueberschussMerker = ueberschussGb;
         mixStat = {
           ...summeFaeden, anlaufZiele, restGb: Math.round(budget),
           // Der Massstab des Nutzen-Gates gehoert nach draussen: Er ist die
           // einzige Zahl, an der von aussen zu sehen ist, wie gut die Flotte
           // gerade laeuft - und wie streng das Gate deshalb ist.
           effFlotte: Math.round(massstab),
+          ueberschussGb,
           gesperrt: [...gesperrtBis.keys()],
         };
       }

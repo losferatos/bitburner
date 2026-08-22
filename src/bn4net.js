@@ -60,6 +60,25 @@ export async function main(ns) {
   const reserveHome = () => Math.max(24, ns.getServerMaxRam("home") / 4);
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
+  // Die Werkzeugliste steht hier oben statt unten bei ihrer Verwendung, weil
+  // seit dem 22.08.2026 schon die RAM-Verteilung sie braucht: Die Werkbank
+  // wird nur noch um den TATSAECHLICHEN Werkzeugbedarf freigehalten, und den
+  // kann man erst ausrechnen, wenn man die Liste kennt. Zugleich ist sie der
+  // Wiederaufbauplan nach einem Reset (Prestige.ts:73 loescht alle gekauften
+  // Rechner) - wer die Werkzeuge von Hand starten muesste, haette nach jedem
+  // Einbau einen toten Bot.
+  const WERKZEUGE = [
+    ["contracts.js", ["--loop", "300"]],
+    ["bn4rep.js", []],
+    ["bn4door.js", []],
+    // Der Tonanker gehoert dazu, nicht daneben: Ein verborgener Browsertab
+    // bekommt statt sechzehn Zeitgebern je Sekunde nur einen je Minute, und
+    // ohne ihn laeuft der ganze Bot dreifach langsamer. Er lag bisher auf
+    // einem gekauften Rechner - und die verschwinden bei jedem Einbau.
+    ["wakelock.js", []],
+  ];
+  const BIBLIOTHEKEN = ["lib/hackaugs.js"];
+
   const knacker = [
     ["BruteSSH.exe", ns.brutessh],
     ["FTPCrack.exe", ns.ftpcrack],
@@ -251,6 +270,63 @@ export async function main(ns) {
       if (freiHome >= 18) werkbank = "home";
     }
     werkbankMerker = werkbank;
+
+    // --- 1c. Wieviel die Werkbank wirklich freihalten muss ---------------------
+    // HEBEL 1 (22.08.2026). Bis hierher war die Werkbank PAUSCHAL von der
+    // Arbeiterverteilung ausgenommen ("if (host === werkbank) continue"). Das
+    // war gedacht fuer einen gekauften 20-GB-Rechner, auf dem gerade
+    // contracts.js Platz finden sollte. Inzwischen ist die Werkbank
+    // fulcrumtech mit 2048 GB - rund 28 % des gesamten Netzspeichers - und die
+    // Werkzeuge laufen alle auf home, weil sie dort schon liefen, als das Netz
+    // noch klein war. Die netzweite Laufpruefung weiter unten startet sie
+    // deshalb nie neu, und die Werkbank stand mit NULL Prozessen da: 2048 GB
+    // vollstaendig ungenutzt. Gemessen am 22.08.2026 im Spielstand.
+    //
+    // Jetzt wird nur noch der tatsaechliche Bedarf freigehalten:
+    //   - Werkzeuge, die HIER laufen (ihr Platz darf nicht wegverteilt werden;
+    //     genau genommen belegen sie ihn schon, aber getServerUsedRam zaehlt
+    //     sie mit - der Posten steht hier trotzdem, weil ein Werkzeug zwischen
+    //     zwei Runden abstuerzen kann und der Platz dann sofort wieder da sein
+    //     muss, statt erst von einer Raeumung zurueckgeholt zu werden).
+    //   - Werkzeuge, die NIRGENDS laufen und also hier gestartet werden.
+    //   - Ein Werkzeug, das auf einem ANDEREN Rechner laeuft, braucht hier
+    //     nichts. Genau das ist der Unterschied zu vorher.
+    // Dazu ein Puffer in Groesse des groessten Werkzeugs, damit ein Absturz
+    // sofort aufgefangen wird, ohne dass fliegende Arbeit weggeworfen werden
+    // muss.
+    //
+    // ACHTUNG, das darf NICHT dazu fuehren, dass ein Werkzeug doppelt laeuft:
+    // die Entscheidung, ob gestartet wird, faellt weiterhin allein in 2c ueber
+    // die netzweite Prozessliste. Hier wird nur Platz reserviert, nie gestartet.
+    // toolHosts und die Liste in 2c stammen aus demselben Rundenzustand -
+    // zwischen beiden Stellen wird kein Werkzeug gestartet oder beendet.
+    const toolHosts = new Map();
+    for (const host of hosts) {
+      if (!ns.hasRootAccess(host)) continue;
+      for (const pr of ns.ps(host)) {
+        if (WORKER.includes(pr.filename)) continue;
+        if (!toolHosts.has(pr.filename)) toolHosts.set(pr.filename, []);
+        toolHosts.get(pr.filename).push(host);
+      }
+    }
+    let werkbankReserve = 0;
+    // Auf home greift schon reserveHome(); zwei Reserven uebereinander wuerden
+    // dem Netz denselben Platz zweimal abziehen.
+    if (werkbank && werkbank !== "home") {
+      let groesstes = 0;
+      for (const [datei] of WERKZEUGE) {
+        // getScriptRam gibt bei fehlender Datei still 0 zurueck. Ein solches
+        // Werkzeug bekommt keine Reserve - es liesse sich ohnehin nicht
+        // starten, und 2c meldet den Fall.
+        const braucht = ns.getScriptRam(datei, "home");
+        if (!(braucht > 0)) continue;
+        if (braucht > groesstes) groesstes = braucht;
+        const wo = toolHosts.get(datei);
+        if (wo && wo.length && !wo.includes(werkbank)) continue;
+        werkbankReserve += braucht;
+      }
+      werkbankReserve += groesstes;
+    }
 
     // --- 2. Ziele waehlen (Erfahrung und mehrere Geldziele) --------------------
     // STUFE 2 (22.08.2026): frueher genau EIN Geldziel fuer das ganze Netz -
@@ -737,9 +813,11 @@ export async function main(ns) {
       const restFrei = new Map();
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
-        if (host === werkbank) continue;   // bleibt fuer die Werkzeuge frei
+        // Die Werkbank ist nicht mehr pauschal ausgenommen, sondern nur noch
+        // um ihren gemessenen Werkzeugbedarf gekuerzt (siehe 1c).
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
-          - (host === "home" ? reserveHome() : 0);
+          - (host === "home" ? reserveHome() : 0)
+          - (host === werkbank ? werkbankReserve : 0);
         if (host !== "home") ns.scp(WORKER, host, "home");
 
         // Home bleibt verschont, genau wie die Werkbank oben: Es ist die
@@ -1089,23 +1167,10 @@ export async function main(ns) {
     if (fehlstart) sag(fehlstart + " Arbeiter liessen sich nicht starten (Speicher?).");
 
     // --- 2c. Werkzeuge betreiben ----------------------------------------------
-    // Alles, was nicht Netz und nicht Spielfigur ist, laeuft auf der Werkbank.
-    // Diese Liste ist zugleich der Wiederaufbauplan nach einem Reset: Ein
-    // Augmentierungs-Einbau loescht saemtliche gekauften Rechner
-    // (Prestige.ts:73 prestigeAllServers), home ueberlebt. Wer die Werkzeuge
-    // von Hand starten muesste, haette nach jedem Reset einen toten Bot.
-    const WERKZEUGE = [
-      ["contracts.js", ["--loop", "300"]],
-      ["bn4rep.js", []],
-      ["bn4door.js", []],
-      // Der Tonanker gehoert dazu, nicht danebem: Ein verborgener Browsertab
-      // bekommt statt sechzehn Zeitgebern je Sekunde nur einen je Minute, und
-      // ohne ihn laeuft der ganze Bot dreifach langsamer. Er lag bisher auf
-      // einem gekauften Rechner - und die verschwinden bei jedem Einbau.
-      ["wakelock.js", []],
-    ];
-    const BIBLIOTHEKEN = ["lib/hackaugs.js"];
-
+    // Alles, was nicht Netz und nicht Spielfigur ist, laeuft auf der Werkbank -
+    // oder bleibt, wo es schon laeuft. Die Liste WERKZEUGE steht oben am
+    // Skriptanfang, weil die RAM-Verteilung sie frueher braucht als diese
+    // Stelle.
     let vertraege = 0;
     for (const host of hosts) vertraege += ns.ls(host, ".cct").length;
 
@@ -1134,13 +1199,30 @@ export async function main(ns) {
       // lief bn4rep.js eine Zeitlang gar nicht mehr - gekillt, aber der Platz
       // fuer den Neustart war von Arbeitern belegt, und weil daneben
       // contracts.js lief, galt die Werkbank als "in Benutzung".
+      //
+      // Seit Hebel 1 (22.08.2026) liegen auf der Werkbank Hunderte GB
+      // fliegende Arbeit statt gar nichts. Deshalb wird nicht mehr in einem
+      // Rutsch alles erschlagen, sondern eine Arbeiterart nach der anderen,
+      // und nur so lange, bis der Platz reicht. Die Reihenfolge ist nach
+      // Verlustwert sortiert: share bringt seinen Nutzen laufend und faengt
+      // beim Neustart ohne Verlust wieder an; ein abgebrochener weaken, grow
+      // oder hack dagegen wirft seine gesamte bisherige Laufzeit weg, und
+      // hack ist der einzige, der Geld bringt - er stirbt zuletzt.
       if (fehlend.length && werkbank !== "home") {
         for (const [datei] of fehlend) {
           const braucht = ns.getScriptRam(datei, "home");
           if (!(braucht > 0) || frei() >= braucht) continue;
-          for (const w of WORKER) ns.scriptKill(w, werkbank);
-          sag("Arbeiter auf " + werkbank + " geraeumt, " + datei + " braucht "
-            + braucht.toFixed(1) + " GB.");
+          let geraeumt = 0;
+          for (const w of ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"]) {
+            if (frei() >= braucht) break;
+            if (!ns.ps(werkbank).some((pr) => pr.filename === w)) continue;
+            ns.scriptKill(w, werkbank);
+            geraeumt++;
+          }
+          if (geraeumt) {
+            sag(geraeumt + " Arbeiterart(en) auf " + werkbank + " geraeumt, "
+              + datei + " braucht " + braucht.toFixed(1) + " GB.");
+          }
           break;
         }
       }
@@ -1209,6 +1291,10 @@ export async function main(ns) {
       reserve: reserveHome(),
       fehlstart,
       werkbank,
+      // Seit Hebel 1 kein pauschaler Ausschluss mehr, sondern eine Zahl - und
+      // eine Zahl gehoert nach draussen, sonst merkt niemand, wenn sie
+      // davonlaeuft.
+      werkbankReserve: Math.round(werkbankReserve),
       vertraege,
       geld: ns.getServerMoneyAvailable("home"),
       hacking: ns.getHackingLevel(),

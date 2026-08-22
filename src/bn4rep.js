@@ -219,6 +219,27 @@ export async function main(ns) {
       }
     }
 
+    // Keine Firmenphase heisst: keine Anstellung halten. Der Grund ist nicht
+    // Ordnungsliebe, sondern eine Umleitung: Eine der vier Belohnungsarten
+    // eines Codingvertrags ist Firmenreputation, und die faellt nur dann auf
+    // Faktionsreputation zurueck, wenn Player.jobs LEER ist
+    // (PlayerObjectGeneralMethods.ts:539-548). Eine liegengelassene Stelle
+    // schoepft also dauerhaft ein Viertel der Vertragsbelohnungen ab - in eine
+    // Firmenreputation, die erst Jahre spaeter gebraucht wird, waehrend
+    // Faktionsreputation der heutige Engpass ist.
+    // Verloren geht dabei nichts: quitJob loescht nur den Eintrag in
+    // Player.jobs, die bereits erarbeitete Firmenreputation bleibt stehen und
+    // wird beim naechsten Einbau wie gehabt in Firmen-Favor umgerechnet
+    // (Company.ts:77-80).
+    if (!companyTarget) {
+      for (const c of COMPANIES) {
+        if (!ns.getPlayer().jobs[c]) continue;
+        ns.singularity.quitJob(c);
+        sag("Gekuendigt bei " + c + " - keine Firmenphase, Vertragsreputation"
+          + " gehoert den Faktionen.");
+      }
+    }
+
     if (!kandidaten.length && !companyTarget) {
       // Nichts mehr zu holen: Bremse loesen, damit bn4life wieder Geld
       // verdienen darf, statt dass die Figur untaetig herumsteht.

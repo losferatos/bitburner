@@ -48,6 +48,24 @@ const MIX_MONEY_PANIK = 0.40;
 const MIX_SEC_BAD = 5.0;
 const RAM_HACK = 1.7, RAM_GROW = 1.75, RAM_WEAKEN = 1.75;
 
+// --- Bezugswerte des Stapelbetriebs -------------------------------------
+// FESTGESCHRIEBEN, wie KAP_ABZUG 0.2 weiter unten, und aus demselben Grund:
+// Die Obergrenze ist die Bezugsgroesse, gegen die jede Fassung des Bots
+// gemessen wird. Zoege sie mit jedem Drehen an einem Regler nach, vergliche
+// der Prozentsatz jede Fassung nur noch mit sich selbst.
+//
+// Was hier NICHT steht, ist Absicht: BATCH_ZIELE, F_NETZANTEIL, BATCH_ANTEIL
+// und MONEY_TARGET_COUNT sind die ZUTEILUNGSregler. Genau die soll die
+// Obergrenze ja bewerten - sie darf deshalb nicht von ihnen abhaengen. Die
+// hier aufgefuehrten Groessen beschreiben dagegen das VERFAHREN (wie ein
+// Stapel gebaut ist), und ein anderes Verfahren ist ein anderer Massstab.
+// Wer daran dreht, darf die Decke ueberschreiten - das ist dann das
+// Ergebnis, nicht ein Fehler der Messung.
+const GAP_MS = 400;            // src/bn4net.js, Abstand der Landungen
+const WEAKEN_MARGIN = 1.5;     // Aufschlag auf die Ausgleichsfaeden
+const GROW_MARGIN = 1.15;      // Aufschlag auf das Nachwachsen
+const F_LEITER = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5];
+
 async function fetchSave() {
   const res = await fetch(BASE + "/api/rpc?method=getSaveFile");
   const body = await res.json();
@@ -111,6 +129,103 @@ function kennzahlen(s, p) {
     kapProAbzug: gbSekProEinheit / (t * beute),        // je Einheit KAP_ABZUG
     hackTime: t, beute, gph, wph,
   };
+}
+
+/** Wie src/bn4net.js (dort ausserhalb von main, weil es 0 GB kosten muss). */
+function growFaeden(k, moneyMax, start, ziel) {
+  if (!(k > 0)) return 0;
+  const o = Math.max(0, start);
+  const n = Math.min(ziel, moneyMax);
+  if (!(n > o)) return 0;
+  let x = (n - o) / (1 + (n / 16 + (15 * o) / 16) * k);
+  let diff = Infinity, wache = 0;
+  while (Math.abs(diff) > 1 && wache++ < 60) {
+    const ox = o + x;
+    const neu = (x - ox * Math.log(ox / n)) / (1 + ox * k);
+    diff = neu - x;
+    x = neu;
+  }
+  if (!Number.isFinite(x) || x < 0) return 0;
+  let faeden = Math.ceil(x);
+  if (faeden > 0) {
+    const probe = (t) => (o + t) * Math.exp(k * t);
+    if (probe(faeden - 1) >= n) faeden--;
+    else if (probe(faeden) < n) faeden++;
+  }
+  return Math.max(0, faeden);
+}
+
+/**
+ * Was ein Ziel im STAPELBETRIEB leisten kann, je Erntanteil f.
+ *
+ * Nachbau von src/bn4net.js (stapelPlan). Gegen die Telemetrie geprueft am
+ * 22.08.2026: omega-net f=0.05 gemeldet 257 GB je Stapel / 81 Kalender-
+ * plaetze / $4.91m/s, hier gerechnet 250 / 80 / $4.91m/s; phantasy f=0.15
+ * 647/40/$6.31m gegen 629/39/$6.31m; the-hub f=0.02 134/184/$3.80m gegen
+ * 130/183/$3.80m. Abweichung unter 3 %, Ursache ist die Sicherheitsdrift
+ * zwischen Ablesung und Rechnung.
+ *
+ * Zwei Groessen je Sprosse:
+ *   uptake  wieviel Arbeitsspeicher ein voller Kalender bindet
+ *   rate    was er dann je Sekunde bringt (eine Landung je 4*GAP_MS)
+ */
+function batchOptions(s, p) {
+  const hd = s.minDifficulty;
+  const pM = percentHacked(s, p, hd);
+  const ch = hackChance(s, p, hd);
+  const k = growthLog(s, p, hd);
+  const t = hackTime(s, p, hd);
+  if (!(pM > 0) || !(ch > 0) || !(k > 0) || !(t > 0) || !s.moneyMax) return null;
+  // Ein Stapel belegt seinen Platz eine weaken-Dauer lang (4*hackTime), und
+  // alle 4*GAP_MS passt der naechste hinein.
+  const plaetze = Math.max(1, Math.floor((t * 4 * 1000) / (4 * GAP_MS)));
+  const opts = [];
+  for (const f of F_LEITER) {
+    const hackT = Math.max(1, Math.floor(f / pM));
+    const echt = Math.min(0.99, pM * hackT);
+    const growT = Math.max(1, Math.ceil(
+      growFaeden(k, s.moneyMax, s.moneyMax * (1 - echt), s.moneyMax) * GROW_MARGIN));
+    const w1 = Math.max(1, Math.ceil(hackT * FORTIFY_HACK * WEAKEN_MARGIN / WEAKEN_POWER));
+    const w2 = Math.max(1, Math.ceil(growT * FORTIFY_GROW * WEAKEN_MARGIN / WEAKEN_POWER));
+    const ram = hackT * RAM_HACK + growT * RAM_GROW + (w1 + w2) * RAM_WEAKEN;
+    opts.push({
+      f,
+      uptake: ram * plaetze,
+      rate: (echt * s.moneyMax * ch) / (4 * GAP_MS / 1000),
+    });
+  }
+  return { plaetze, opts };
+}
+
+/**
+ * Die Sprossen eines Ziels als GRENZschritte, auf der konkaven Huelle.
+ *
+ * Warum die Huelle noetig ist: Die Guete ist ueber f nicht monoton. Bei
+ * phantasy bringt f=0.02 248 $/GB*s und f=0.05 259 - die erste Sprosse ist
+ * SCHLECHTER als die zweite, weil hackT = floor(f/p) abrundet und bei
+ * kleinem f Rundungsverlust entsteht. Ein Greedy ueber die rohen Sprossen
+ * wuerde die schlechte erste Sprosse zuerst nehmen und danach nie wieder
+ * hergeben. Die konkave Huelle fasst solche Sprossen zusammen, und damit ist
+ * der Greedy exakt optimal statt nur ungefaehr.
+ */
+function grenzSchritte(name, b) {
+  const pts = [{ u: 0, r: 0 }, ...b.opts.map((o) => ({ u: o.uptake, r: o.rate }))];
+  const hull = [pts[0]];
+  for (let i = 1; i < pts.length; i++) {
+    const k = pts[i];
+    while (hull.length >= 2) {
+      const last = hull[hull.length - 1], vor = hull[hull.length - 2];
+      if ((k.r - last.r) / (k.u - last.u) >= (last.r - vor.r) / (last.u - vor.u)) hull.pop();
+      else break;
+    }
+    hull.push(k);
+  }
+  const out = [];
+  for (let i = 1; i < hull.length; i++) {
+    const gb = hull[i].u - hull[i - 1].u;
+    if (gb > 0) out.push({ name, gb, eff: (hull[i].r - hull[i - 1].r) / gb });
+  }
+  return out;
 }
 
 const fmt = (n) => {
@@ -210,7 +325,10 @@ async function main() {
   console.log("  " + "-".repeat(88));
   console.log("  Aufnahme aller Ziele      " + Math.round(kapSumme) + " GB");
   console.log("  davon belegt              " + Math.round(belegtSumme) + " GB");
-  console.log("  Modelldecke (alle voll)   $" + fmt(deckeSumme) + "/s");
+  // NICHT die Bezugsgroesse: Das Mischungsmodell ist nachweislich zu
+  // optimistisch (gemessen 110 gegen 208 $/GB*s). Es steht hier nur, weil
+  // die Zuteilung selbst danach sortiert. Der Nenner steht ganz unten.
+  console.log("  Modelldecke Mischung      $" + fmt(deckeSumme) + "/s  (unerreichbar, s. u.)");
   // Dieselbe Summe, aber nur ueber Ziele, die das Gate durchlaesst - das ist
   // die Decke, die der Bot HEUTE ohne weitere Aenderung erreichen koennte.
   const offen = zeilen.filter((z) => !z.anlauf || !(z.steadyEff < massstab && massstab > 0));
@@ -219,28 +337,68 @@ async function main() {
     + Math.round(offen.reduce((n, z) => n + z.kap, 0)) + " GB)");
 
   // --- Die Bezugsgroesse fuer jeden Umbau --------------------------------
-  // Gierig auffuellen in der Reihenfolge der Guete, begrenzt durch den
-  // Speicher, den es wirklich gibt. Das ist "was mit DIESEM Netz moeglich
-  // waere" - die Zahl, gegen die gemessen wird.
   //
-  // Gerechnet wird ausdruecklich mit dem FESTEN Bezugswert KAP_ABZUG 0.2,
-  // nicht mit dem, was gerade in bn4net.js steht. Sonst waechst die
-  // Obergrenze mit, sobald jemand an KAP_ABZUG dreht, und der Prozentsatz
-  // vergliche jede Fassung nur noch mit sich selbst. Wer KAP_ABZUG anhebt,
-  // darf diese Decke ueberschreiten - das ist dann das Ergebnis, nicht ein
-  // Fehler der Messung.
+  // WARUM SIE HIER IM CODE STEHT. Der Bericht zum Stapel-Umbau nannte eine
+  // Obergrenze von $28.31m/s und daraus "64 % erreicht". Die Zahl stand
+  // nirgends im Code, nur im Commit-Text, und war rekonstruierbar als
+  // "aktuelles Netz-RAM mal die Guete genau des besten Ziels". So eine
+  // Obergrenze wandert mit jedem Umbau mit und ist zugleich unerreichbar -
+  // das beste Ziel kann das Netz gar nicht allein aufnehmen, und die Ziele
+  // dahinter fallen steil ab. Eine Bezugsgroesse, die man im Fliesstext
+  // erfindet, ist keine.
+  //
+  // Deshalb: gierig auffuellen ueber die ECHTE Stapelguete, mit einer
+  // Aufnahmegrenze je Ziel. Das ist "was mit DIESEM Netz moeglich waere,
+  // wenn der Speicher ideal auf die Stapel verteilt waere" - erreichbar,
+  // nachrechenbar, und unabhaengig von den Zuteilungsreglern des Bots.
+  //
+  // Warum die STAPELguete und nicht steadyEff der Mischung: steadyEff ist
+  // nachweislich unerreichbar (gemessen 110 gegen 208 $/GB*s), weil die
+  // offene Steuerung ihre Wellen nicht taktet. Der Stapel ist geschlossen
+  // und liefert, was er verspricht - siehe die Telemetriepruefung bei
+  // batchOptions. Eine Obergrenze aus einem Modell, das der Bot beweisbar
+  // nicht erreicht, taugt nicht als Nenner.
+  const inkremente = [];
+  for (const [name, w] of Object.entries(servers)) {
+    const s = w.data;
+    if (!s.hasAdminRights || !s.moneyMax) continue;
+    if (s.requiredHackingSkill > p.skills.hacking) continue;
+    const b = batchOptions(s, p);
+    if (b) inkremente.push(...grenzSchritte(name, b));
+  }
+  inkremente.sort((a, b) => b.eff - a.eff);
   let rest = arbeiterRam, decke = 0, gefuellt = 0;
-  for (const z of zeilen) {
-    const nimm = Math.min(z.kap, rest);
+  const anteile = new Map();
+  for (const inc of inkremente) {
+    const nimm = Math.min(inc.gb, rest);
     if (nimm <= 0) break;
-    decke += z.steadyEff * nimm;
+    decke += inc.eff * nimm;
     gefuellt += nimm;
     rest -= nimm;
+    anteile.set(inc.name, (anteile.get(inc.name) || 0) + nimm);
+  }
+  // Dieselbe Decke auf den Speicher, der GERADE auf Zielen liegt. Nur so ist
+  // eine Messung ehrlich vergleichbar: Der Bot kann nichts dafuer, dass ein
+  // Teil des Netzes in zu kleinen Stuecken liegt - aber er kann etwas dafuer,
+  // was er aus dem macht, was er belegt hat.
+  let rest2 = belegtSumme, deckeBelegt = 0;
+  for (const inc of inkremente) {
+    const nimm = Math.min(inc.gb, rest2);
+    if (nimm <= 0) break;
+    deckeBelegt += inc.eff * nimm;
+    rest2 -= nimm;
   }
   console.log("  " + "-".repeat(88));
   console.log("  Arbeiterspeicher im Netz  " + Math.round(arbeiterRam) + " GB");
-  console.log("  OBERGRENZE mit diesem Netz $" + fmt(decke) + "/s  (bestes zuerst gefuellt, "
-    + Math.round(gefuellt) + " GB, Bezug KAP_ABZUG 0.2)");
+  console.log("  OBERGRENZE (Stapel-Greedy) $" + fmt(decke) + "/s  auf "
+    + Math.round(gefuellt) + " GB");
+  console.log("     ideale Verteilung:      "
+    + [...anteile.entries()].sort((a, b) => b[1] - a[1])
+      .map(([n, gb]) => n + " " + Math.round(gb) + " GB").join(", "));
+  console.log("  dieselbe Decke auf die tatsaechlich belegten "
+    + Math.round(belegtSumme) + " GB: $" + fmt(deckeBelegt) + "/s");
+  console.log("     <- DAS ist der Nenner. Zaehler ist der gemessene Ertrag"
+    + " (node tools/meter.js).");
   console.log("");
 }
 

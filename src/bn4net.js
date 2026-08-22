@@ -851,6 +851,8 @@ export async function main(ns) {
     let fehlstart = 0;
     let mixStat = null;
     let batchStat = null;
+    // Zugeteilte share-Faeden dieser Runde, nur zur Beobachtung.
+    let shareStand = 0;
     // Grenzertragskurve dieser Runde. Wird JEDE Runde neu aufgebaut, auch
     // wenn ein Zweig gar nicht laeuft - sonst rechnete die Serveraufruestung
     // mit den Abnehmern eines Zustands, den es nicht mehr gibt (Stapelbetrieb
@@ -935,7 +937,43 @@ export async function main(ns) {
       // Prozentpunkte. Bei 100 Faeden sind es 400 GB - ein Fuenftel des Netzes
       // fuer knapp ein Fuenftel mehr Reputation, also etwa ein Nullsummen-
       // geschaeft, das nur wegen der sofortigen Wirkung ueberhaupt lohnt.
-      const SHARE_DECKEL = 100;
+      //
+      // NEU AM 22.08.2026 - DIE ALTE MESSUNG GALT FUER EIN 50-MAL KLEINERES
+      // NETZ. Der Absatz darueber begruendet die 100 damit, dass 600 Faeden
+      // (2400 GB) "mehr sind, als das ganze Netz hat". Das Netz hat inzwischen
+      // rund 130.000 GB; 600 Faeden sind davon 1,8 %. Die Verdraengung, die
+      // damals gemessen wurde, gibt es in dieser Groessenordnung nicht mehr.
+      //
+      // Und der Engpass hat sich gedreht: Gemessen am laufenden Spiel liegen
+      // ueber 70 Milliarden ungenutzt herum, waehrend acht Augmentierungen auf
+      // Reputation warten. Geld hat gerade wenig Grenznutzen, Reputation ist
+      // der Fortschritt. RAM von Geld auf Reputation umzuschichten ist damit
+      // ein guter Handel - genau der umgekehrte Befund von damals.
+      //
+      // Die Rechnung (calculateShareBonus, NetworkShare/Share.ts:43-49:
+      // 1 + ln(n)/25, wobei n die EFFEKTIVEN Faeden sind, also inklusive
+      // Intelligenz- und Kernbonus):
+      //     n=100 -> 1,184    n=2000 -> 1,304
+      //     n=600 -> 1,256    n=3900 -> 1,331
+      // Von 100 auf rund 3900 Faeden sind das +12,4 % Reputationsrate fuer
+      // 15.600 GB.
+      //
+      // ANTEIL STATT FESTER ZAHL, gleiches Muster wie EXP_THREAD_BUDGET
+      // gleich darunter und aus demselben Grund: Direkt nach einem
+      // Augmentierungs-Einbau sind alle gekauften Rechner weg
+      // (Prestige.ts:73), und ein fester Deckel von ein paar tausend Faeden
+      // frisst dann das ganze Netz - dieselbe Falle, in die das
+      // Erfahrungsbudget schon einmal gelaufen ist.
+      //
+      // Die absolute Obergrenze bleibt trotzdem noetig, weil der Bonus
+      // logarithmisch ist: Von 4.000 auf 10.000 Faeden sind es noch +3,7 %
+      // fuer weitere 24.000 GB. Jenseits davon ist der Speicher im Geldziel
+      // mehr wert, auch bei niedrigem Grenznutzen des Geldes.
+      const SHARE_ANTEIL = 0.12;
+      const SHARE_MAX = 4000;
+      const SHARE_DECKEL = shareBraucht > 0
+        ? Math.max(1, Math.min(SHARE_MAX, Math.floor((ramTotal * SHARE_ANTEIL) / shareBraucht)))
+        : 0;
       let shareGesamt = 0;
 
       // Erfahrungsbudget netzweit, gleiches Muster wie SHARE_DECKEL/shareGesamt
@@ -1239,9 +1277,12 @@ export async function main(ns) {
         // +18.4 %, 250 geben +22.1 %. Die 150 Faeden dazwischen kosten 600 GB
         // - bei gemessenen 320 $/GB*s rund 192 k$/s - und bringen 3.1
         // Prozentpunkte Reputation. Das ist der schlechteste Teil einer
-        // ohnehin logarithmischen Kurve. Der Deckel selbst bleibt bei 100;
-        // ob 100 die richtige Zahl ist, ist eine Frage an die Reputations-
-        // rate und wird hier NICHT nebenbei mitentschieden.
+        // ohnehin logarithmischen Kurve.
+        // Die Frage nach der richtigen Zahl ist am 22.08.2026 beantwortet
+        // worden: Der Deckel ist jetzt ein Anteil des Netzes, siehe
+        // SHARE_ANTEIL oben. Der Mechanismus hier - Ueberhang raeumen, dann
+        // gedeckelt neu aufbauen - bleibt unveraendert richtig und traegt den
+        // groesseren Deckel unverandert.
         let shareHier = shareLaeuft;
         if (!repModus) {
           if (shareLaeuft) ns.scriptKill("worker/share.js", host);
@@ -1310,6 +1351,7 @@ export async function main(ns) {
 
         if (freiFuerSkript > 0) restFrei.set(host, freiFuerSkript);
       }
+      shareStand = shareGesamt;
 
       // --- Durchgang 1b: Stapelbetrieb HWGW (Stufe 4, 22.08.2026) ----------
       //
@@ -2209,6 +2251,10 @@ export async function main(ns) {
       // eine Zahl gehoert nach draussen, sonst merkt niemand, wenn sie
       // davonlaeuft.
       werkbankReserve: Math.round(werkbankReserve),
+      // Der Deckel ist seit dem 22.08.2026 kein fester Wert mehr, sondern
+      // haengt am Netz. Eine Groesse, die sich von selbst bewegt, gehoert
+      // nach draussen - sonst merkt niemand, wenn sie irgendwohin laeuft.
+      shareFaeden: shareStand,
       vertraege,
       geld: ns.getServerMoneyAvailable("home"),
       hacking: ns.getHackingLevel(),

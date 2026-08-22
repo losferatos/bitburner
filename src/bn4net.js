@@ -810,13 +810,28 @@ export async function main(ns) {
       // gestapelt hat. ns.isRunning mit Argumenten findet diese Prozesse
       // uebrigens NICHT, deshalb ns.ps.
       let expThreadsAssigned = 0;
+      // Nur zur Beobachtung: der Speicher, der gerade auf dem Erfahrungsziel
+      // liegt, JE SKRIPT gezaehlt. Faeden mal expRam waere falsch - expRam ist
+      // der Bedarf der Aktion, die das Erfahrungsziel in DIESER Runde
+      // bekaeme, waehrend dort Wellen aus frueheren Runden mit anderen
+      // Aktionen liegen. Ueber Faeden mal expRam kam die Bezugsgroesse auf
+      // 106.766 GB, obwohl das Netz nur 85.618 GB Arbeiterspeicher hatte.
+      const ramJeSkript = {
+        "worker/hack.js": ramHack, "worker/grow.js": ramGrow,
+        "worker/weaken.js": ramWeaken,
+      };
+      let expRamAssigned = 0;
       const flight = new Map();
       for (const h of moneyTargets) flight.set(h, { hack: 0, grow: 0, weaken: 0 });
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
         for (const pr of ns.ps(host)) {
           if (!WORKER.includes(pr.filename)) continue;
-          if (pr.args[0] === expTarget) { expThreadsAssigned += pr.threads; continue; }
+          if (pr.args[0] === expTarget) {
+            expThreadsAssigned += pr.threads;
+            expRamAssigned += pr.threads * (ramJeSkript[pr.filename] || 0);
+            continue;
+          }
           const f = flight.get(pr.args[0]);
           if (!f) continue;
           if (pr.filename === "worker/hack.js") f.hack += pr.threads;
@@ -1192,6 +1207,48 @@ export async function main(ns) {
         const massstab = laufende.length
           ? laufende.reduce((n, e) => n + e.plan.steadyEff, 0) / laufende.length : 0;
 
+        // --- Modellobergrenze, NUR ZUR BEOBACHTUNG (22.08.2026) ------------
+        // Die einzige ehrliche Bezugsgroesse fuer einen Umbau an der
+        // Zuteilung. "Besser als vorher" sagt nichts, solange Level und
+        // gekaufter Speicher gleichzeitig wachsen; "so viel Prozent des mit
+        // diesem Netz Moeglichen" schon. Diese Rechnung greift NICHT in die
+        // Zuteilung ein - sie zaehlt nur mit.
+        //
+        //   kapGesamt  Summe der Aufnahme aller Geldziele. Beantwortet die
+        //              Frage, an der die Ueberschuss-Praemisse haengt: Hat
+        //              das Netz die Ziele wirklich ueberholt (dann waere
+        //              kapGesamt kleiner als das Netz), oder findet die
+        //              Zuteilung die Aufnahme nur nicht? Gemessen am
+        //              22.08.2026: 137.860 GB Aufnahme gegen 77.803 GB
+        //              Arbeiterspeicher - die Praemisse war falsch.
+        //   deckeNetz  Was herauskaeme, wenn dieser Speicher gierig auf die
+        //              besten Ziele verteilt waere. Bezugsgroesse fuer den
+        //              Prozentsatz.
+        let deckeGesamt = 0, kapGesamt = 0, kapFrei = 0, moneyStandGb = 0;
+        for (const e of plaene) {
+          const kap = e.plan.kapazitaet || 0;
+          kapGesamt += kap;
+          deckeGesamt += (e.plan.steadyEff || 0) * kap;
+          const f0 = flight.get(e.ziel) || { hack: 0, grow: 0, weaken: 0 };
+          const b0 = f0.hack * ramHack + f0.grow * ramGrow + f0.weaken * ramWeaken;
+          moneyStandGb += b0;
+          kapFrei += Math.max(0, kap - b0);
+        }
+        // Der in DIESER Runde freie Speicher taugt nicht als Bezugsgroesse -
+        // er ist selbst das Ergebnis der Zuteilung: Was einmal ans
+        // Erfahrungsziel ging, liegt dort eine weaken-Dauer fest und taucht
+        // als "frei" nie wieder auf. Gezaehlt wird deshalb, was im
+        // Dauerbetrieb auf Geldzielen liegen KOENNTE.
+        const budgetStart = budget;
+        const verfuegbarGb = budgetStart + moneyStandGb
+          + Math.max(0, expRamAssigned - EXP_THREAD_BUDGET * expRam);
+        let deckeNetz = 0, restNetz = verfuegbarGb;
+        for (const e of plaene) {
+          const nimm = Math.min(e.plan.kapazitaet || 0, restNetz);
+          deckeNetz += (e.plan.steadyEff || 0) * nimm;
+          restNetz -= nimm;
+        }
+
         const anlaufDeckelZiel = budget * ANLAUF_ANTEIL_ZIEL;
         let anlaufDeckelRest = budget * ANLAUF_ANTEIL_GESAMT;
         let restZiele = plaene.length;
@@ -1401,6 +1458,14 @@ export async function main(ns) {
           // gerade laeuft - und wie streng das Gate deshalb ist.
           effFlotte: Math.round(massstab),
           ueberschussGb,
+          // Bezugsgroessen (siehe Modellobergrenze oben). Nur Beobachtung.
+          deckeDollarProS: Math.round(deckeGesamt),
+          deckeNetzDollarProS: Math.round(deckeNetz),
+          kapGesamtGb: Math.round(kapGesamt),
+          kapFreiGb: Math.round(kapFrei),
+          budgetGb: Math.round(budgetStart),
+          verfuegbarGb: Math.round(verfuegbarGb),
+          expStandGb: Math.round(expRamAssigned),
           gesperrt: [...gesperrtBis.keys()],
         };
       }

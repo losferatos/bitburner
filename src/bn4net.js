@@ -239,7 +239,21 @@ export async function main(ns) {
     }
     werkbankMerker = werkbank;
 
-    // --- 2. Ziele waehlen (Erfahrung und Geld getrennt) -----------------------
+    // --- 2. Ziele waehlen (Erfahrung und mehrere Geldziele) --------------------
+    // STUFE 2 (22.08.2026): frueher genau EIN Geldziel fuer das ganze Netz -
+    // jeder Faden, der nicht auf ihm oder dem Erfahrungsziel landete, blieb
+    // liegen, obwohl das Netz laengst mehr als ein Ziel gleichzeitig bedienen
+    // kann. autopilot.js macht das seit jeher so (MAX_TARGETS/maxTargets,
+    // autopilot.js:103 und :1173) und skaliert die Zielzahl am Netzspeicher
+    // statt an einer festen Zahl - aus demselben Grund wie dort: eine feste
+    // Zahl passt nur zu einer einzigen Ausbaustufe.
+    const ramTotal = hosts.reduce((a, h) => a + (ns.hasRootAccess(h) ? ns.getServerMaxRam(h) : 0), 0);
+    // Groessenordnung 3 bis 10, wie vorgegeben. 400 GB je Ziel ist eine
+    // Hausnummer, keine Messung hier im BitNode-4-Netz - aber vorsichtig
+    // gewaehlt: mehr Ziele als das Netz sinnvoll bedienen kann, verduennen
+    // nur die Faeden je Ziel, ohne dass ein einziges davon reif wird.
+    const MONEY_TARGET_COUNT = Math.max(3, Math.min(10, Math.floor(ramTotal / 400)));
+
     // War bisher EIN Ziel nach Erfahrung je Sekunde fuer ALLE Arbeiter - das
     // liess das Geldeinkommen um Faktor 70 einbrechen (545.000 auf 8.000 je
     // Minute), weil joesguns zwar der beste Erfahrungsserver ist, aber wenig
@@ -280,7 +294,7 @@ export async function main(ns) {
     // waechst als seine Beute - moneyMax/minDifficulty wuerde omega-net
     // trotzdem bevorzugen, moneyMax/hackTime nicht.
     let expTarget = null, expBestValue = 0;
-    let moneyTarget = null, moneyBestValue = 0;
+    const moneyCandidates = [];
     for (const host of hosts) {
       if (!ns.hasRootAccess(host)) continue;
       const s = ns.getServer(host);
@@ -303,16 +317,28 @@ export async function main(ns) {
       const skillMult = (level - (s.requiredHackingSkill - 1)) / level;
       const difficultyMult = (100 - s.minDifficulty) / 100;
       const moneyValue = s.moneyMax * Math.max(0, skillMult) * difficultyMult / hackTime;
-      if (moneyValue > moneyBestValue) { moneyBestValue = moneyValue; moneyTarget = host; }
+      if (moneyValue > 0) moneyCandidates.push({ host, moneyValue });
     }
-    // Randbedingung: kein Geldziel gefunden (alle moneyMax null oder ausser
-    // Reichweite) - dann alles aufs Erfahrungsziel. Macht expTarget===moneyTarget
-    // und loest damit automatisch den Ein-Ziel-Fall unten aus.
-    if (!moneyTarget) moneyTarget = expTarget;
-    const sameTarget = expTarget !== null && expTarget === moneyTarget;
+    moneyCandidates.sort((a, b) => b.moneyValue - a.moneyValue);
+
+    // Erfahrungsziel ausschliessen: es hat sein eigenes festes Fadenbudget
+    // (EXP_THREAD_BUDGET weiter unten) und soll nicht zusaetzlich als Geldziel
+    // zaehlen - sonst bekaeme derselbe Host zwei getrennte exec-Auftraege mit
+    // je eigener Fadenzaehlung, ohne jeden Nutzen.
+    let moneyTargets = moneyCandidates
+      .filter((c) => c.host !== expTarget)
+      .slice(0, MONEY_TARGET_COUNT)
+      .map((c) => c.host);
+
+    // Randbedingung: kein eigenstaendiges Geldziel gefunden (z. B. ganz am
+    // Anfang, wenn ausser dem Erfahrungsziel noch nichts erreichbar ist) -
+    // dann alles aufs Erfahrungsziel, wie zuvor. sameTarget loest den
+    // Ein-Ziel-Fall unten aus.
+    if (moneyTargets.length === 0 && expTarget) moneyTargets = [expTarget];
+    const sameTarget = moneyTargets.length === 1 && moneyTargets[0] === expTarget;
 
     let fehlstart = 0;
-    if (expTarget || moneyTarget) {
+    if (expTarget || moneyTargets.length) {
       // Aktionswahl je Ziel getrennt: weaken/grow/hack haengt vom Zustand
       // DES ZIELS ab (hackDifficulty, moneyAvailable), nicht von seiner Rolle.
       const pickScript = (host) => {
@@ -322,15 +348,37 @@ export async function main(ns) {
             : "worker/hack.js";
       };
       const expScript = expTarget ? pickScript(expTarget) : null;
-      const moneyScript = (moneyTarget && !sameTarget) ? pickScript(moneyTarget) : null;
-
       const expRam = expScript ? ns.getScriptRam(expScript, "home") : 0;
-      const moneyRam = moneyScript ? ns.getScriptRam(moneyScript, "home") : 0;
+
+      // STUFE 1 (22.08.2026): Landezeit und Aktionsdauer statt 0, 0, 0 an die
+      // Arbeiter uebergeben, genau wie autopilot.js es tut (autopilot.js:1346-
+      // 1355). Ohne echte Werte bleiben args[2]/args[3] leer und die
+      // Terminlogik in worker/hack.js:38-42 (identisch in grow.js/weaken.js)
+      // greift nie. Kostet 0,05 GB je Funktion (reference/bitburner-src/src/
+      // Netscript/RamCostGenerator.ts:48,649-651), zusammen 0,15 GB fuer alle
+      // drei - das ist die gesamte Mehrkosten dieses Umbaus.
+      const actionTime = (host, script) => {
+        if (script === "worker/hack.js") return ns.getHackTime(host);
+        if (script === "worker/grow.js") return ns.getGrowTime(host);
+        return ns.getWeakenTime(host);
+      };
+
+      // Geldziele: je Ziel eigene Aktionswahl UND eigene RAM-Kosten -
+      // weaken.js/grow.js kosten 1.75 GB, hack.js 1.70 GB (siehe Kopf-
+      // kommentare worker/*.js). Im sameTarget-Fall (unten) unnoetig, das
+      // eine Ziel laeuft dort ueber expScript/expRam.
+      const moneyPlans = sameTarget ? [] : moneyTargets
+        .map((host) => {
+          const script = pickScript(host);
+          return { host, script, ram: ns.getScriptRam(script, "home") };
+        })
+        .filter((p) => p.ram > 0);
+
       // getScriptRam gibt bei fehlender Datei still 0 zurueck
       // (NetscriptFunctions.ts:1179-1191). Ungeprueft ergaebe das
       // Math.floor(frei/0) = Infinity, und das Spiel wirft daraufhin eine
       // Ausnahme - die diese Schleife und damit den halben Bot beenden wuerde.
-      if ((expScript && !(expRam > 0)) || (moneyScript && !(moneyRam > 0))) {
+      if ((expScript && !(expRam > 0)) || (!sameTarget && moneyTargets.length && moneyPlans.length === 0)) {
         sag("worker-Skript nicht lesbar, Runde uebersprungen.");
         await ns.sleep(10000); continue;
       }
@@ -442,38 +490,67 @@ export async function main(ns) {
 
         // Die Argumente muessen zum Protokoll der Arbeiter passen: args[1] ist
         // dort die Verzoegerung in Millisekunden (worker/hack.js:38-40) und
-        // bleibt 0. Die Rundennummer gehoert ans Ende (args[4]) - stuende sie
-        // an Position 1, waere jede Aktion um sie verzoegert gestartet, nach
-        // einem Tag um 8,6 Sekunden, nach drei Monaten um dreizehn Minuten.
-        // Dort dient sie nur noch dazu, den Aufruf von seinem Vorgaenger zu
-        // unterscheiden.
+        // bleibt 0 - seit Stufe 1 tragen stattdessen args[2]/args[3] die
+        // echte Landezeit und Aktionsdauer (siehe actionTime oben). Die
+        // Rundennummer gehoert ans Ende (args[4]) - stuende sie an Position 1,
+        // waere jede Aktion um sie verzoegert gestartet, nach einem Tag um
+        // 8,6 Sekunden, nach drei Monaten um dreizehn Minuten. Dort dient sie
+        // nur noch dazu, den Aufruf von seinem Vorgaenger zu unterscheiden.
         if (sameTarget) {
           // Beide Ziele sind derselbe Server - ein Aufruf genuegt, alle
           // freien Faeden gehen an ihn.
           const faeden = Math.floor(freiFuerSkript / expRam);
           if (faeden < 1) continue;
-          if (ns.exec(expScript, host, faeden, expTarget, 0, 0, 0, runde) === 0) fehlstart++;
+          const dauer = actionTime(expTarget, expScript);
+          const landAt = Date.now() + dauer;
+          if (ns.exec(expScript, host, faeden, expTarget, 0, Math.round(landAt), Math.round(dauer), runde) === 0) {
+            fehlstart++;
+          }
           continue;
         }
 
-        // Erfahrungsziel zuerst bis zum Netzbudget, der Rest ans Geldziel.
+        // Erfahrungsziel zuerst bis zum Netzbudget, der Rest auf die
+        // Geldziele verteilt.
         if (expScript) {
           const nochOffenExp = Math.max(0, EXP_THREAD_BUDGET - expThreadsAssigned);
           if (nochOffenExp > 0) {
             const passtExp = Math.floor(freiFuerSkript / expRam);
             const expFaeden = Math.min(nochOffenExp, passtExp);
             if (expFaeden >= 1) {
-              if (ns.exec(expScript, host, expFaeden, expTarget, 0, 0, 0, runde) === 0) fehlstart++;
+              const dauer = actionTime(expTarget, expScript);
+              const landAt = Date.now() + dauer;
+              if (ns.exec(expScript, host, expFaeden, expTarget, 0, Math.round(landAt), Math.round(dauer), runde) === 0) {
+                fehlstart++;
+              }
               freiFuerSkript -= expFaeden * expRam;
               expThreadsAssigned += expFaeden;
             }
           }
         }
-        if (moneyScript) {
-          const moneyFaeden = Math.floor(freiFuerSkript / moneyRam);
+
+        // Geldziele: freien Speicher je Runde zu gleichen Teilen aufteilen,
+        // Rest kaskadiert an das naechste Ziel (falls ein Anteil zu klein
+        // fuer auch nur einen Faden ist). Anders als beim Erfahrungsbudget
+        // oben (expThreadsAssigned) braucht es hier KEINEN ns.ps-Zaehler:
+        // es gibt keinen festen Deckel, nur "was an freiem Speicher da ist" -
+        // und getServerUsedRam hat bereits alles abgezogen, was noch laeuft.
+        // Der Rundenzaehler-Fehler aus der Aufgabenstellung (ein Zaehler, der
+        // jede Runde bei null beginnt, legt Welle um Welle nach) trifft nur
+        // FESTE Budgets wie EXP_THREAD_BUDGET, nicht diese Aufteilung.
+        let restZiele = moneyPlans.length;
+        for (const mp of moneyPlans) {
+          if (restZiele <= 0) break;
+          const anteil = freiFuerSkript / restZiele;
+          const moneyFaeden = Math.floor(anteil / mp.ram);
           if (moneyFaeden >= 1) {
-            if (ns.exec(moneyScript, host, moneyFaeden, moneyTarget, 0, 0, 0, runde) === 0) fehlstart++;
+            const dauer = actionTime(mp.host, mp.script);
+            const landAt = Date.now() + dauer;
+            if (ns.exec(mp.script, host, moneyFaeden, mp.host, 0, Math.round(landAt), Math.round(dauer), runde) === 0) {
+              fehlstart++;
+            }
+            freiFuerSkript -= moneyFaeden * mp.ram;
           }
+          restZiele--;
         }
       }
     }
@@ -582,10 +659,17 @@ export async function main(ns) {
       runde,
       netz: hosts.length,
       gerootet: gerootet.length,
-      // Feld "ziel" bedeutet jetzt das Geldziel (bisheriger Name bleibt, damit
-      // tools/bn4.js unveraendert lesbar ist), "expZiel" ist neu.
-      ziel: moneyTarget,
+      // Feld "ziel" bedeutet weiterhin das BESTE Geldziel (bisheriger Name
+      // bleibt, damit tools/bn4.js unveraendert lesbar ist). Seit Stufe 2
+      // (22.08.2026) laufen mehrere Geldziele gleichzeitig - siehe zieleAnzahl.
+      ziel: moneyTargets[0] ?? null,
       expZiel: expTarget,
+      zieleAnzahl: moneyTargets.length,
+      // Stufe 3 (Wellen-Batches mit versetzter Landung von weaken/grow/hack)
+      // wurde bei diesem Umbau bewusst NICHT gebaut - siehe Antwort zum
+      // Umbau vom 22.08.2026. Das Feld liegt trotzdem schon bereit, damit
+      // tools/bn4.js es zeigen kann, sobald es einmal kommt.
+      batchModus: false,
       homeRam: ns.getServerMaxRam("home"),
       homeFrei: ns.getServerMaxRam("home") - ns.getServerUsedRam("home"),
       ausbauKosten: kosten,

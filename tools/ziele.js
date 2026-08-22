@@ -42,6 +42,9 @@ const WEAKEN_POWER = 0.05;                     // :10
 // Werkzeug etwas anderes als der Bot tut.
 const MIX_MONEY_HIGH = 0.95;
 const MIX_MONEY_LOW = 0.75;
+// Schwelle der Anlaufphase, seit 22.08.2026 vom Regelband entkoppelt
+// (src/bn4net.js, MIX_MONEY_PANIK).
+const MIX_MONEY_PANIK = 0.40;
 const MIX_SEC_BAD = 5.0;
 const RAM_HACK = 1.7, RAM_GROW = 1.75, RAM_WEAKEN = 1.75;
 
@@ -162,7 +165,7 @@ async function main() {
     if (!kz) continue;
     const frac = s.moneyAvailable / s.moneyMax;
     const secOver = s.hackDifficulty - s.minDifficulty;
-    const anlauf = secOver > MIX_SEC_BAD || frac < MIX_MONEY_LOW;
+    const anlauf = secOver > MIX_SEC_BAD || frac < MIX_MONEY_PANIK;
     zeilen.push({
       name, frac, secOver, anlauf,
       steadyEff: kz.steadyEff, kap: kz.kapazitaet, kapProAbzug: kz.kapProAbzug,

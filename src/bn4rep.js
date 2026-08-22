@@ -69,7 +69,7 @@ export async function main(ns) {
 
   // IT statt Software. Beide Leitern haben dieselbe zweite Sprosse
   // (repMultiplier 1,1 / hackingEffectiveness 85), aber die IT-Leiter ist
-  // billiger zu erklimmen: IT Intern verlangt hackingEffectiveness 90 statt 85
+  // billiger zu erklimmen: IT Intern hat hackingEffectiveness 90 statt 85
   // beim gleichen repMultiplier 0,9, und IT Analyst verlangt Hacking 26+224
   // und 7.000 Firmenreputation statt 51+224 und 8.000
   // (CompanyPositionsMetadata.ts:113-135 gegen :7-30, Aufschlag
@@ -93,27 +93,76 @@ export async function main(ns) {
   // (BitNode.tsx:1066). Fuer die Reputation ist BitNode 4 also ein normaler
   // Knoten; nur der Lohn und die Erfahrung sind gekuerzt.
   //
-  // Die Rate steigt LINEAR mit dem Hackinglevel
-  // (CompanyPosition.ts:156-172: hackRatio = 85 x hacking / 975, ohne Deckel).
-  // Bei Hacking 500 sind das 2,8 rep/s und damit 40 Stunden je Firma, bei
-  // Hacking 2.500 sind es 14 rep/s und 8 Stunden. Firmenarbeit ist deshalb
-  // ein SPAETER Posten - sie frueh zu beginnen kostet den Faktor fuenf.
-  // Dieselbe Schwelle steht im Abschlussplan als Reihenfolge M3 -> M4.
-  const COMPANY_AFTER_AUGS = 30;
-
-  // Und deshalb reicht der Aug-Zaehler allein NICHT als Bedingung: Der Einbau,
-  // der den Zaehler auf 30 hebt, setzt zugleich das Hackinglevel auf etwa den
-  // Multiplikator zurueck (Prestige.ts, setInitialExpForPlayer). Wer direkt
-  // danach in die Firma ginge, arbeitete bei Hacking 50 mit 0,28 rep/s - das
-  // waeren vierzig Tage je Firma. Gemessen am 22.08.2026: 2,44 rep/s bei
-  // Hacking 505 als IT Intern.
+  // WANN DIE FIRMENPHASE LAEUFT - und warum es KEINE Levelschwelle ist
   //
-  // 2.000 als Schwelle, weil es dieselbe Kurve ist, die ohnehin auf Hacking
-  // 2.500 fuer das Daedalus-Tor zulaeuft: Bei 2.000 sind es 11,2 rep/s und
-  // damit rund 10 Stunden je Firma, und die Backdoors auf clarkinc/omnitek
-  // (Hacking 950-1250) stehen zu diesem Zeitpunkt laengst - die senken die
-  // Huerde noch einmal von 400.000 auf 300.000.
-  const COMPANY_MIN_HACK = 2000;
+  // Die vollstaendige Rate ist (Work/Formulas.ts:124-158, CompanyPosition.ts:156-172):
+  //
+  //   rep/s = 5 x repMult x SUM(effectiveness x skill)/975/100
+  //           x mults.company_rep x (1 + Firmenfavor/100) x CompanyWorkRepGain
+  //           (+ intelligence/975 innerhalb der Klammer; hier 0, ohne SF5)
+  //
+  // Die Faktionsarbeit folgt derselben Bauart
+  // (PersonObjects/formulas/reputation.ts:16-24):
+  //
+  //   rep/s = 5 x (hacking + int/3)/975 x mults.faction_rep
+  //           x (1 + Favor/100) x FactionWorkRepGain(0,75) x shareBonus
+  //
+  // BEIDE sind exakt proportional zum Hackinglevel. Das Verhaeltnis ist
+  // deshalb KONSTANT und vom Level unabhaengig: als IT Intern
+  // (0,9 x 90/100)/0,75 = 1,08, als IT Analyst (1,1 x 85/100)/0,75 = 1,25 -
+  // je zum Faktor mults.company_rep/mults.faction_rep. Firmenarbeit ist in
+  // BitNode 4 auf JEDEM Level ertragreicher je Sekunde, weil hier
+  // FactionWorkRepGain auf 0,75 gedaempft ist und CompanyWorkRepGain gar
+  // nicht. Eine Hackingschwelle waere also schlicht das falsche Kriterium -
+  // eine frueher hier stehende Marke von 2.000 hat nach jedem Einbau die
+  // Firmenphase erneut fuer Stunden zugesperrt, ohne dafuer irgendetwas zu
+  // gewinnen.
+  //
+  // Das richtige Kriterium ist AUFZINSUNG, nicht Niveau. Faktionsreputation
+  // zahlt in Stufen aus: 15.000 hier, 45.000 dort, und jede gekaufte
+  // Augmentierung hebt den Multiplikator, der alles andere beschleunigt.
+  // Firmenreputation zahlt erst nach vollen 300.000-400.000 ueberhaupt etwas
+  // aus. Solange also noch eine hackingrelevante Augmentierung in Reichweite
+  // liegt, ist die Faktion trotz der schlechteren Sekundenrate das bessere
+  // Geschaeft. Erst wenn die naechste Huerde so weit weg ist, dass sie in
+  // diesem Zyklus ohnehin nicht faellt, lohnt der Umstieg.
+  //
+  // 150.000 als Reichweite: bei den heute gemessenen 2,9 rep/s sind das 14
+  // Stunden, bei Hacking 2.500 noch gut zwei. Alles darueber ist keine
+  // Zyklusarbeit mehr, sondern ein eigenes Vorhaben - und dann ist die Firma
+  // das naeherliegende, weil sie wenigstens abschliesst.
+  //
+  // Ein erwuenschter Nebeneffekt: Nach dem Beitritt zu Clarke sind deren
+  // eigene Augmentierungen (187.500 und 437.500 Faktionsreputation) allesamt
+  // ausserhalb der Reichweite, und der Bot geht zuerst die zweite Firma an,
+  // statt Clarkes Faktionsreputation zu erarbeiten. Das ist richtig herum:
+  // Die Faktionsreputation faellt bei jedem Einbau auf null, die einmal
+  // ausgesprochene EINLADUNG dagegen nicht (keepOnInstall). Was den Einbau
+  // ueberlebt, holt man zuerst.
+  const COMPANY_GAP = 150e3;
+
+  // Und die Phase laeuft NUR, wenn kein Einbau ansteht. Beides zugleich geht
+  // nicht: Der Einbau setzt company.playerReputation auf null
+  // (Company.ts:77-80) - bis zu 400.000 erarbeitete Firmenreputation waeren
+  // weg, umgerechnet in Favor zwar nicht ganz verloren, aber der Weg zur
+  // Einladung finge von vorn an. Deshalb zuerst einbauen, dann Firma; und
+  // waehrend der Phase wird der Einbau gesperrt (siehe INSTALL_LOCK_FILE).
+  const MINDEST_WARTESCHLANGE = 3;
+  const LUECKE_ZU_GROSS = 15000;   // Reputation; bei ~40/min ueber sechs Stunden
+
+  // Die Sperrdatei aus dem Tuerschloss von heute frueh, jetzt auch von diesem
+  // Skript selbst benutzt. Zwei Schreiber, eine Datei - unterscheidbar am
+  // Praefix: Was mit FIRMENPHASE beginnt, gehoert uns und wird von uns wieder
+  // weggeraeumt; alles andere ist von Hand gesetzt und wird nie angefasst.
+  //
+  // Der Zeitstempel ist die Lebensversicherung. Stirbt bn4rep mitten in der
+  // Firmenphase, bliebe die Sperre sonst liegen und der Bot koennte NIE mehr
+  // einbauen - also genau die Falle vom 20.08., nur in die andere Richtung.
+  // Eine Sperre ohne Zeitstempel gilt unbefristet (das ist der Handbetrieb),
+  // eine mit Zeitstempel nur fuenf Minuten; die Phase erneuert sie alle 15 s.
+  const INSTALL_LOCK_FILE = "data/install-sperre.txt";
+  const INSTALL_LOCK_TAG = "FIRMENPHASE";
+  const INSTALL_LOCK_MAX_AGE = 300000;
 
   // Der Aussenschalter. Inhalt:
   //   "off"                    - nie Firmenarbeit (Notbremse)
@@ -125,6 +174,34 @@ export async function main(ns) {
   // auf Faktionsarbeit zurueck, auch wenn niemand hinsieht.
   const COMPANY_ORDER_FILE = "data/company-order.txt";
 
+  // Dateien auf home lesen und schreiben, obwohl dieses Skript auf der
+  // Werkbank laeuft. ns.read und ns.write arbeiten LOKAL, ns.fileExists und
+  // ns.rm koennen jeden Rechner ansprechen - diese Asymmetrie hat schon
+  // einmal eine Bremse wirkungslos gemacht (45 statt 190 Reputation je
+  // Minute), deshalb steht sie hier genau einmal und nicht viermal verstreut.
+  const liesVonHome = (datei) => {
+    if (!ns.fileExists(datei, "home")) {
+      // Auf home geloescht heisst geloescht. Eine liegengebliebene Kopie auf
+      // der Werkbank wuerde den Befehl ueberdauern, den es nicht mehr gibt.
+      if (ns.getHostname() !== "home" && ns.fileExists(datei, ns.getHostname())) {
+        ns.rm(datei, ns.getHostname());
+      }
+      return "";
+    }
+    if (ns.getHostname() !== "home") ns.scp(datei, ns.getHostname(), "home");
+    return String(ns.read(datei)).trim();
+  };
+  const schreibNachHome = (datei, inhalt) => {
+    ns.write(datei, inhalt, "w");
+    if (ns.getHostname() !== "home") ns.scp(datei, "home", ns.getHostname());
+  };
+  const loeschAufHome = (datei) => {
+    try { ns.rm(datei, "home"); } catch { /* lag nie dort */ }
+    if (ns.getHostname() !== "home") {
+      try { ns.rm(datei, ns.getHostname()); } catch { /* auch gut */ }
+    }
+  };
+
   const geldText = (n) => {
     for (const [t, k] of [[1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
       if (Math.abs(n) >= t) return "$" + (n / t).toFixed(2) + k;
@@ -135,7 +212,14 @@ export async function main(ns) {
   for (;;) {
    try {
     const spieler = ns.getPlayer();
-    const besitz = new Set(ns.singularity.getOwnedAugmentations(true));
+    // Einmal abfragen, dreimal benutzt. Die Warteschlangenlaenge steht seit
+    // dem 22.08.2026 hier oben statt beim Einbaukriterium, weil schon die
+    // Entscheidung ueber die Firmenphase sie braucht: Solange genug Stuecke
+    // fuer einen Einbau warten, wird eingebaut und nicht gearbeitet.
+    const alleAugs = ns.singularity.getOwnedAugmentations(true);
+    const eingebauteAugs = ns.singularity.getOwnedAugmentations(false);
+    const besitz = new Set(alleAugs);
+    const wartend = alleAugs.length - eingebauteAugs.length;
     const geld = ns.getServerMoneyAvailable("home");
 
     // Favor je Faktion mitzaehlen. Ab 150 (Constants.ts BaseFavorToDonate, in
@@ -175,68 +259,68 @@ export async function main(ns) {
     // ueberspringt. Genau dieser Zustand ist der Normalfall am Ende eines
     // Zyklus: Alles aus den beigetretenen Faktionen ist gekauft, und die
     // einzige verbliebene Arbeit ist die Firma.
-    // ns.read liest LOKAL, ns.fileExists kann jeden Rechner fragen. Dieses
-    // Skript laeuft auf der Werkbank, die Bruecke schreibt aber nach home -
-    // ohne das scp waere der Schalter unsichtbar, und zwar lautlos. Das ist
-    // derselbe Fehler, der die Bremse rep-modus.txt einmal wirkungslos
-    // gemacht hat (45 statt 190 Reputation je Minute).
-    let companyOrder = "";
-    if (ns.fileExists(COMPANY_ORDER_FILE, "home")) {
-      if (ns.getHostname() !== "home") ns.scp(COMPANY_ORDER_FILE, ns.getHostname(), "home");
-      companyOrder = String(ns.read(COMPANY_ORDER_FILE)).trim();
-    } else if (ns.fileExists(COMPANY_ORDER_FILE, ns.getHostname())) {
-      // Auf home geloescht heisst geloescht. Eine liegengebliebene Kopie auf
-      // der Werkbank wuerde den Befehl ueberdauern, den es nicht mehr gibt.
-      ns.rm(COMPANY_ORDER_FILE, ns.getHostname());
-    }
+    const companyOrder = liesVonHome(COMPANY_ORDER_FILE);
     const [orderName, orderUntil] = companyOrder.split("|");
     const orderActive = !!orderName && orderName !== "off" && orderName !== "auto"
       && Date.now() < (Number(orderUntil) || 0);
 
+    // Wie weit ist die naechste Augmentierung, die den Hacking-Multiplikator
+    // hebt? Nur die zaehlt fuer diese Entscheidung - eine Kampfaugmentierung
+    // in Reichweite ist kein Grund, die Firma zu vertagen.
+    //
+    // Math.min OHNE den Startwert Infinity und mit ausdruecklicher
+    // Leerpruefung. Math.min(Infinity, ...[]) ergibt Infinity, und das las das
+    // Einbaukriterium als "die naechste Huerde ist unendlich weit" statt als
+    // "es gibt gar keine Huerde mehr" - dieselbe Zahl, zwei gegensaetzliche
+    // Bedeutungen. Hier wird der leere Fall benannt, statt ihn zu verkleiden.
+    const offeneNuetzliche = kandidaten
+      .filter((k) => k.rep < k.repReq && hackNutzen(k.aug) > 0)
+      .map((k) => k.repReq - k.rep);
+    const naechsteNuetzlicheLuecke = offeneNuetzliche.length
+      ? Math.min(...offeneNuetzliche) : null;      // null = nichts mehr offen
+
     let companyTarget = null;
     if (orderActive && COMPANIES.includes(orderName)) {
       companyTarget = orderName;
-    } else if (orderName !== "off") {
-      // Selbstaendige Wahl. Bedingung ist der Aug-Zaehler, nicht das
-      // Hackinglevel: Solange die 30 Stueck fuer Daedalus noch fehlen, ist
-      // jede Stunde in einer Faktion mehr wert als in einer Firma - die
-      // Firmenaugmentierungen zaehlen zwar mit, sind aber die teuersten
-      // Zaehlpunkte des ganzen Plans. Erst wenn der Zaehler steht, ist die
-      // Firma der letzte verbliebene Multiplikatorhebel.
-      const installiertZahl = ns.singularity.getOwnedAugmentations(false).length;
-      if (installiertZahl >= COMPANY_AFTER_AUGS
-          && spieler.skills.hacking >= COMPANY_MIN_HACK) {
-        for (const c of COMPANIES) {
-          // Ist die Einladung durch, ist die Firma erledigt: Die Faktion hat
-          // keepOnInstall (FactionInfo.tsx:282/301), die Einladung wird nach
-          // JEDEM Einbau neu ausgesprochen (Prestige.ts:61-66 und :118-120).
-          // Die 400.000 Firmenreputation sind also ein EINMALIGER Posten fuer
-          // den ganzen BitNode, kein Posten je Zyklus.
-          if (spieler.factions.includes(c)) continue;
-          companyTarget = c;
-          break;
-        }
+    } else if (orderName !== "off"
+        && (naechsteNuetzlicheLuecke === null || naechsteNuetzlicheLuecke > COMPANY_GAP)
+        && wartend < MINDEST_WARTESCHLANGE) {
+      for (const c of COMPANIES) {
+        // Ist die Einladung durch, ist die Firma erledigt: Die Faktion traegt
+        // keepOnInstall (FactionInfo.tsx:282/301), und Prestige.ts:59-66
+        // sammelt vor dem Reset alle Faktionen ein, die schon in
+        // Player.factions oder Player.factionInvitations stehen, und spricht
+        // die Einladung danach neu aus (:118-120). Ab dem ERSTEN Beitritt
+        // sind die 400.000 Firmenreputation damit ein einmaliger Posten fuer
+        // den ganzen BitNode; davor gilt die Zusage nicht.
+        if (spieler.factions.includes(c)) continue;
+        companyTarget = c;
+        break;
       }
     }
 
-    // Keine Firmenphase heisst: keine Anstellung halten. Der Grund ist nicht
-    // Ordnungsliebe, sondern eine Umleitung: Eine der vier Belohnungsarten
-    // eines Codingvertrags ist Firmenreputation, und die faellt nur dann auf
+    // Keine Firmenphase heisst: keine Anstellung halten und keine Sperre.
+    //
+    // Die Kuendigung ist Hygiene, kein Hebel. Eine der vier Belohnungsarten
+    // eines Codingvertrags ist Firmenreputation, und sie faellt nur dann auf
     // Faktionsreputation zurueck, wenn Player.jobs LEER ist
-    // (PlayerObjectGeneralMethods.ts:539-548). Eine liegengelassene Stelle
-    // schoepft also dauerhaft ein Viertel der Vertragsbelohnungen ab - in eine
-    // Firmenreputation, die erst Jahre spaeter gebraucht wird, waehrend
-    // Faktionsreputation der heutige Engpass ist.
-    // Verloren geht dabei nichts: quitJob loescht nur den Eintrag in
-    // Player.jobs, die bereits erarbeitete Firmenreputation bleibt stehen und
-    // wird beim naechsten Einbau wie gehabt in Firmen-Favor umgerechnet
-    // (Company.ts:77-80).
+    // (PlayerObjectGeneralMethods.ts:539-548). Wieviel das ausmacht, weiss
+    // ich nicht - in 42 Minuten Anstellung ist am 22.08. kein einziger
+    // solcher Vertrag aufgetreten. Der Eingriff kostet nichts (die
+    // Firmenreputation bleibt stehen, PlayerObjectGeneralMethods.ts:393), und
+    // eine Anstellung ohne Zweck ist kein Zustand, den man haelt.
     if (!companyTarget) {
       for (const c of COMPANIES) {
         if (!ns.getPlayer().jobs[c]) continue;
         ns.singularity.quitJob(c);
-        sag("Gekuendigt bei " + c + " - keine Firmenphase, Vertragsreputation"
-          + " gehoert den Faktionen.");
+        sag("Gekuendigt bei " + c + " - keine Firmenphase mehr.");
+      }
+      // Unsere eigene Einbausperre wieder wegraeumen. NUR unsere: Was nicht
+      // mit FIRMENPHASE beginnt, hat ein Mensch gesetzt und bleibt liegen.
+      const lock = liesVonHome(INSTALL_LOCK_FILE);
+      if (lock.startsWith(INSTALL_LOCK_TAG)) {
+        loeschAufHome(INSTALL_LOCK_FILE);
+        sag("Einbausperre der Firmenphase aufgehoben.");
       }
     }
 
@@ -269,12 +353,22 @@ export async function main(ns) {
     // das Hacking-Level. Der Wiederaufbau dauert eine gute Viertelstunde -
     // dafuer muessen genug Stuecke in der Warteschlange liegen UND darf
     // nichts Weiteres in Reichweite sein.
-    const MINDEST_WARTESCHLANGE = 3;
-    const LUECKE_ZU_GROSS = 15000;   // Reputation; bei ~40/min ueber sechs Stunden
-    const wartend = ns.singularity.getOwnedAugmentations(true).length
-      - ns.singularity.getOwnedAugmentations(false).length;
-    const kleinsteLuecke = Math.min(Infinity, ...kandidaten
-      .filter((k) => k.rep < k.repReq).map((k) => k.repReq - k.rep));
+    // Die offenen Luecken, und der leere Fall AUSDRUECKLICH. Vorher stand
+    // hier Math.min(Infinity, ...leer) - das ergibt Infinity, und die
+    // Bedingung darunter las das als "die naechste Huerde ist unendlich weit"
+    // und baute ein. Gemeint war aber "es gibt gar keine Huerde mehr", und
+    // das ist ein anderer Zustand: Er kann auch heissen, dass alles Erreichbare
+    // verdient und nur noch nicht bezahlt ist. Jetzt ist der leere Fall null
+    // und wird eigens behandelt.
+    const offeneLuecken = kandidaten
+      .filter((k) => k.rep < k.repReq).map((k) => k.repReq - k.rep);
+    const kleinsteLuecke = offeneLuecken.length ? Math.min(...offeneLuecken) : null;
+    // "Nichts mehr offen" ist nur dann ein Einbaugrund, wenn auch nichts mehr
+    // zu KAUFEN ist. Sonst baute der Bot ein, waehrend eine verdiente und
+    // bezahlbare Augmentierung noch im Regal liegt - und die waere nach dem
+    // Einbau wieder unerreichbar, weil die Faktionsreputation auf null faellt.
+    const kaufbarJetzt = kandidaten.some((k) => k.rep >= k.repReq && geld >= k.preis);
+    const nichtsMehrOffen = kleinsteLuecke === null && !kaufbarJetzt;
     // Der zweite Weg kann genauso zu sein wie der erste. Jede gekaufte
     // Augmentierung verteuert die naechste um Faktor 1,9
     // (AugmentationHelpers: getAugCost), bei drei Stueck in der Warteschlange
@@ -304,14 +398,33 @@ export async function main(ns) {
     // will, legt data/install-sperre.txt an. Ein vergessenes Schloss haelt
     // dann den Bot nicht mehr auf, sondern hoechstens eine Sperre offen,
     // und das faellt sofort auf.
-    const gesperrt = ns.fileExists("data/install-sperre.txt", "home");
+    // Zwei Sorten Sperre in einer Datei. Ein Mensch schreibt einen Text ohne
+    // Zeitstempel - der gilt, bis er sie loescht. Die Firmenphase schreibt
+    // "FIRMENPHASE <Firma>|<ms>" und erneuert das alle 15 Sekunden; stirbt
+    // sie, verfaellt die Sperre nach fuenf Minuten von selbst. Ohne diesen
+    // Verfall waere eine abgestuerzte Firmenphase gleichbedeutend mit einem
+    // Bot, der nie wieder einbaut - und der Einbau ist das einzige, was den
+    // Multiplikator hebt.
+    const lockInhalt = liesVonHome(INSTALL_LOCK_FILE);
+    let gesperrt = false;
+    if (lockInhalt) {
+      const lockStempel = Number(lockInhalt.split("|")[1]);
+      gesperrt = !Number.isFinite(lockStempel)
+        || Date.now() - lockStempel < INSTALL_LOCK_MAX_AGE;
+      if (!gesperrt) {
+        loeschAufHome(INSTALL_LOCK_FILE);
+        sag("Einbausperre war ueber fuenf Minuten alt - aufgehoben.");
+      }
+    }
     if (wartend >= MINDEST_WARTESCHLANGE
-        && (kleinsteLuecke > LUECKE_ZU_GROSS || geldWegZu)
+        && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
+            || nichtsMehrOffen || geldWegZu)
         && !gesperrt) {
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
         + (geldWegZu ? "naechstes Stueck kostet "
             + Math.round(teuerstesVerdiente / 1e6) + "m bei "
             + Math.round(geld / 1e6) + "m Guthaben"
+          : nichtsMehrOffen ? "nichts mehr offen in den beigetretenen Faktionen"
           : "naechste Huerde erst in " + Math.round(kleinsteLuecke) + " Reputation") + ". "
         + "bn4life.js startet danach von selbst.");
       await ns.sleep(1500);
@@ -362,27 +475,21 @@ export async function main(ns) {
     // eigenen Skript: Zwei Skripte, die beide die Figur an die Arbeit
     // schicken, sind derselbe Fehler wie ein commitCrime auf laufende Arbeit.
     if (companyTarget) {
-      // Die Bremse zuerst, wie bei der Faktionsarbeit: zwischen Arbeitsbeginn
-      // und Datei darf kein Fenster liegen, in dem bn4life ein Verbrechen
-      // dazwischenschiebt. Das Format ist dasselbe wie bei der Faktionsarbeit
-      // (Name|Zeitstempel), weil bn4life.js genau daraus den Zeitstempel liest
-      // und nichts weiter.
-      ns.write("data/rep-modus.txt", companyTarget + "|" + Date.now(), "w");
-      if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
+      // KEINE Bremse, bevor die Stelle steht. Genau andersherum stand es bis
+      // eben, und das war der schlimmere Fehler von beiden: Scheitert die
+      // Bewerbung (Hacking unter 225, der Normalzustand direkt nach einem
+      // Einbau), faellt die Phase durch, Abschnitt 3 findet nichts zu tun und
+      // schlaeft - waehrend die Bremse in jeder Runde erneuert wird und
+      // bn4life deshalb nie ein Verbrechen startet. Die Figur haette bei
+      // einem erzwungenen Auftrag bis zum Fristende voellig stillgestanden.
+      // Die Bremse wird jetzt erst gesetzt, wenn tatsaechlich gearbeitet wird.
 
-      // Nur EINE Anstellung halten. Codingvertraege haben vier gleich
-      // wahrscheinliche Belohnungsarten, und eine davon ist Firmenreputation:
-      // 4.000 x Schwierigkeit x Skalierung an eine ZUFAELLIG gewaehlte Firma
-      // aus Player.jobs (PlayerObjectGeneralMethods.ts:539-555,
-      // Constants.ts:92). Bei einer Anstellung landet dieser Posten
-      // vollstaendig auf dem Ziel, bei zweien nur zur Haelfte. Das ist kein
-      // Randposten - der Vertragsloeser laeuft dauerhaft mit.
-      //
-      // Kuendigen ist gefahrlos: quitJob loescht nur den Eintrag in
-      // Player.jobs (PlayerObjectGeneralMethods.ts:393), die Firmenreputation
-      // bleibt stehen, und die einmal ausgesprochene Faktionseinladung wird
-      // nicht zurueckgezogen (Factions.alreadyInvited bleibt gesetzt, und
-      // Prestige.ts:118-120 spricht sie nach jedem Einbau unbedingt neu aus).
+      // Nur EINE Anstellung halten - dieselbe Hygiene wie oben, und aus
+      // demselben Grund: Die Vertragsbelohnung "Firmenreputation" geht an eine
+      // ZUFAELLIG gewaehlte Firma aus Player.jobs
+      // (PlayerObjectGeneralMethods.ts:539-555). Wieviel das ausmacht, ist
+      // ungemessen; dass es sich nicht auf zwei Firmen verteilen soll, ist
+      // trotzdem klar.
       for (const c of COMPANIES) {
         if (c === companyTarget) continue;
         if (!ns.getPlayer().jobs[c]) continue;
@@ -396,11 +503,13 @@ export async function main(ns) {
       // eigene Abfrage waere 2 GB fuer nichts.
       let job = ns.getPlayer().jobs[companyTarget] || null;
 
-      // Bewerben. applyToCompany klettert die Leiter von SELBST so weit hoch,
-      // wie die Werte reichen (PlayerObjectGeneralMethods.ts:325-329), es ist
-      // also zugleich Bewerbung und Befoerderung. Ein Fehlschlag gibt null
-      // zurueck und wirft nicht (Singularity.ts:697-707), eine schon erreichte
-      // Hoechststelle ebenso - der Aufruf darf deshalb in jeder Runde stehen.
+      // Bewerben. applyForJob klettert die Leiter von SELBST so weit hoch,
+      // wie die Werte reichen (PlayerObjectGeneralMethods.ts:325-329) und gibt
+      // ein Result-Objekt zurueck (:304/342/347); erst der Singularity-Mantel
+      // macht daraus null statt einer Ausnahme (Singularity.ts:697-706). Der
+      // Aufruf ist damit zugleich Bewerbung und Befoerderung und darf in jeder
+      // Runde stehen - auch die schon erreichte Hoechststelle antwortet nur
+      // mit null.
       //
       // KEINE REISE. Weder applyForJob noch workForCompany pruefen die Stadt
       // (PlayerObjectGeneralMethods.ts:300-352, Singularity.ts:662-708). Der
@@ -425,7 +534,27 @@ export async function main(ns) {
         sag("Keine Stelle bei " + companyTarget + " (Hacking "
           + ns.getPlayer().skills.hacking + ", noetig 225) - zurueck zur Faktionsarbeit.");
         companyTarget = null;
+        // Aufraeumen, was die Phase gesetzt haben koennte. Ohne das bliebe
+        // eine Bremse aus einer frueheren Runde liegen und bn4life duerfte
+        // kein Verbrechen begehen, obwohl niemand arbeitet.
+        loeschAufHome("data/rep-modus.txt");
+        const lock = liesVonHome(INSTALL_LOCK_FILE);
+        if (lock.startsWith(INSTALL_LOCK_TAG)) loeschAufHome(INSTALL_LOCK_FILE);
       } else {
+        // Jetzt erst die Bremse - die Stelle steht, gearbeitet wird gleich.
+        // Format wie bei der Faktionsarbeit (Name|Zeitstempel), weil
+        // bn4life.js genau daraus den Zeitstempel liest und nichts weiter.
+        schreibNachHome("data/rep-modus.txt", companyTarget + "|" + Date.now());
+
+        // Und die Einbausperre. Ein Einbau mitten in der Firmenphase wuerde
+        // company.playerReputation auf null setzen (Company.ts:77-80) - bis zu
+        // 400.000 muehsam erarbeitete Firmenreputation, dazu die Anstellung
+        // selbst (Player.jobs = {}), und danach faengt die Phase bei Hacking
+        // ~m von vorn an. Der Zeitstempel laesst die Sperre verfallen, falls
+        // dieses Skript stirbt.
+        schreibNachHome(INSTALL_LOCK_FILE,
+          INSTALL_LOCK_TAG + " " + companyTarget + "|" + Date.now());
+
         const arbeitJetzt = ns.singularity.getCurrentWork();
         // Nicht ueber isBusy pruefen, sondern ueber das, was tatsaechlich
         // laeuft - dieselbe Falle wie beim Verbrechen in bn4life.js.

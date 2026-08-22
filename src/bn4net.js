@@ -261,11 +261,30 @@ export async function main(ns) {
     // statt an einer festen Zahl - aus demselben Grund wie dort: eine feste
     // Zahl passt nur zu einer einzigen Ausbaustufe.
     const ramTotal = hosts.reduce((a, h) => a + (ns.hasRootAccess(h) ? ns.getServerMaxRam(h) : 0), 0);
-    // Groessenordnung 3 bis 10, wie vorgegeben. 400 GB je Ziel ist eine
-    // Hausnummer, keine Messung hier im BitNode-4-Netz - aber vorsichtig
-    // gewaehlt: mehr Ziele als das Netz sinnvoll bedienen kann, verduennen
-    // nur die Faeden je Ziel, ohne dass ein einziges davon reif wird.
-    const MONEY_TARGET_COUNT = Math.max(3, Math.min(10, Math.floor(ramTotal / 400)));
+    // HEBEL 3 (22.08.2026). Vorher: max(3, min(10, floor(ramTotal/400))).
+    // Der Deckel 10 war ab 4000 GB Netzspeicher dauerhaft angeschlagen, die
+    // RAM-Skalierung damit tot - und 10 Ziele sind zu viele.
+    //
+    // Nachgerechnet ueber den Gleichgewichtsertrag je Ziel (dieselbe Formel
+    // wie steadyEff weiter unten, gerechnet bei minDifficulty und Level 373):
+    //   phantasy 449, omega-net 374, max-hardware 328, silver-helix 288,
+    //   harakiri-sushi 242, the-hub 194, joesguns 168, zer0 166,
+    //   sigma-cosmetics 160, iron-gym 154, hong-fang-tea 142 $/GB*s.
+    // Die Spanne ist rund 3:1. Bei Gleichverteilung ergibt das als Schnitt:
+    //   1 Ziel 449, 2 Ziele 412, 3 Ziele 384, 4 Ziele 360, 5 Ziele 336,
+    //   8 Ziele 276, 10 Ziele 252. Von zehn auf vier sind das +43 %.
+    //
+    // Warum dann nicht EIN Ziel? Weil der Gleichgewichtsertrag scale-free
+    // ist - die Mischung skaliert linear mit der Fadenzahl - der Betrieb
+    // aber nicht: Die Zuteilung laeuft in Runden von zehn Sekunden, waehrend
+    // eine hack-Welle zwanzig Sekunden bis Minuten fliegt. Je mehr Speicher
+    // auf einem Ziel liegt, desto weiter schiesst eine Welle ueber ihren
+    // Sollzustand hinaus, und desto oefter faellt das Ziel unter
+    // MIX_MONEY_LOW in die Anlaufphase. Diese Streuung gegen Ueberschwingen
+    // ist der einzige Grund fuer mehr als ein Ziel - und sie waechst nur
+    // langsam mit dem Netz. Deshalb LOGARITHMISCH statt linear: Bei 7276 GB
+    // sind das 4 Ziele, bei 30000 GB 6, bei 2000 GB 2.
+    const MONEY_TARGET_COUNT = Math.max(2, Math.min(8, Math.round(Math.log2(ramTotal / 512))));
 
     // War bisher EIN Ziel nach Erfahrung je Sekunde fuer ALLE Arbeiter - das
     // liess das Geldeinkommen um Faktor 70 einbrechen (545.000 auf 8.000 je

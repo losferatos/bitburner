@@ -1339,6 +1339,19 @@ export async function main(ns) {
           let neueStapel = 0, secBoden = null, geldBoden = null;
 
           // --- Drifterkennung, bevor irgendetwas Neues gestartet wird ------
+          //
+          // ACHTUNG BEIM LESEN VON geldBoden: Diese Runde taktet mit 10 s, ein
+          // Stapel mit 4*gap = 1,6 s. Die Probe ist also mit dem Vorgang
+          // verschraenkt (Aliasing) und trifft haeufig genau das Fenster, in
+          // dem das Guthaben wieder voll ist - gemessen am 22.08.2026 stand
+          // geldBoden fuer phantasy auf 1,00, waehrend eine Messung im
+          // 0,7-s-Takt sauber zwischen 85,00 % und 100,00 % pendeln sah.
+          // geldBoden ist deshalb KEINE Anzeige des echten Guthabenbodens.
+          // Als BREMSE taugt es trotzdem, und nur darum geht es hier: eine
+          // wirklich gerissene Kette laesst das Guthaben dauerhaft unten, dann
+          // ist auch die beste Probe schlecht. Der Sicherheitsboden ist der
+          // verlaesslichere der beiden Zeugen - in einer gesunden Kette steht
+          // die Sicherheit die meiste Zeit exakt auf minDifficulty.
           if (st.phase === "batch") {
             st.proben.push({ sec: secOver, geld: moneyFrac });
             if (st.proben.length > DRIFT_PROBEN) st.proben.shift();

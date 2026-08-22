@@ -95,6 +95,42 @@ export async function main(ns) {
       if (pid) sag("bn4net.js lag still und wurde neu gestartet (pid " + pid + ").");
     }
 
+    // --- 0a2. Mitgliedschaften nach einem Einbau zurueckholen ----------------
+    // Die billigen Augmentierungen - und damit der Weg zu den 30 Stueck, die
+    // Daedalus verlangt - liegen bei Faktionen mit "keepOnInstall: false".
+    // Ein Einbau wirft sie samt Reputation weg, und weil derselbe Einbau auch
+    // die Kampfwerte auf den Ausgangsstand zurueckstellt, sind die
+    // Beitrittsbedingungen danach ebenfalls wieder offen.
+    // Am 22.08.2026 kostete das eine Handanweisung je Zyklus: nach dem Einbau
+    // um 16:26 standen Netburners, Tetrads, Tian Di Hui und Slum Snakes
+    // wieder auf "nicht drin", mit ihnen 19 erreichbare Augmentierungen.
+    //
+    // joinrun.js trainiert und tritt bei, netburn.js baut das Hacknet auf die
+    // Netburners-Schwelle. Beide beenden sich von selbst; die Marke verhindert
+    // nur, dass sie in derselben Runde mehrfach anlaufen. Sie faellt beim
+    // naechsten Einbau mit dem Rest weg - genau dann sollen sie wieder ran.
+    const BEITRITT_MARKE = "data/beitritt-erledigt.txt";
+    if (!ns.fileExists("data/bn4-stop.txt", "home")
+        && !ns.fileExists(BEITRITT_MARKE, "home")
+        && !ns.isRunning("joinrun.js", "home")
+        && !ns.isRunning("netburn.js", "home")) {
+      const drin = ns.getPlayer().factions;
+      const fehlend = ["Netburners", "Tetrads", "Tian Di Hui", "Slum Snakes"]
+        .filter((f) => !drin.includes(f));
+      // Erst ab zwei fehlenden lohnt der Lauf: eine einzelne Faktion holt
+      // bn4rep beim naechsten Ziel ohnehin mit, und der Trainingslauf haelt
+      // die Faktionsarbeit an.
+      if (fehlend.length >= 2 && ns.fileExists("joinrun.js", "home")) {
+        const pid = ns.exec("joinrun.js", "home", 1, 80);
+        if (pid) {
+          sag("Nach Einbau: " + fehlend.length + " Faktionen fehlen ("
+            + fehlend.join(", ") + ") - joinrun.js gestartet (pid " + pid + ").");
+          if (ns.fileExists("netburn.js", "home")) ns.exec("netburn.js", "home");
+          ns.write(BEITRITT_MARKE, String(Date.now()), "w");
+        }
+      }
+    }
+
     // --- 0b. Selbstbeender ----------------------------------------------------
     // Die Fernschnittstelle kann Dateien schreiben, mehr nicht: pushFile ruft
     // writeToContentFile und sonst gar nichts (MessageHandlers.ts:92-101). Ein

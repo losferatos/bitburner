@@ -654,8 +654,28 @@ export async function main(ns) {
     // ungefaehr gleich wichtig sind.
     const NUTZEN_GEWICHT = 5;
     const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
-    const guete = (k) => (zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug))) / Math.max(1, k.repReq - k.rep);
+    const einzelWert = (k) => zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug));
+
+    // BESTAND, NICHT SUMME (22.08.2026). Reputation ist ein Bestand je
+    // Faktion, keine Zahl je Augmentierung. Wer bei Tetrads 9.994 Reputation
+    // erreicht, hat damit ALLE Tetrads-Stuecke unterhalb dieser Schwelle
+    // freigeschaltet, nicht nur das eine. Die vorige Fassung bewertete jedes
+    // Stueck einzeln und waehlte deshalb immer die kleinste Einzelluecke -
+    // sie sprang zwischen Faktionen hin und her und liess jedesmal den Rest
+    // liegen, obwohl er fast geschenkt gewesen waere.
+    //
+    // Der Ertrag eines Ziels ist deshalb die Summe ueber alles, was bei
+    // DERSELBEN Faktion mit dem Erreichen seiner Schwelle mit freikommt.
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
+    const guete = (k) => {
+      let ertrag = 0;
+      for (const m of kandidaten) {
+        if (m.faktion !== k.faktion) continue;
+        if (m.repReq > k.repReq) continue;   // liegt jenseits der Schwelle
+        ertrag += einzelWert(m);
+      }
+      return ertrag / Math.max(1, k.repReq - k.rep);
+    };
     const offen = alleOffenen.sort((a, b) => guete(b) - guete(a));
 
     if (!offen.length) { await ns.sleep(20000); continue; }

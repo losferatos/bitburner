@@ -31,8 +31,14 @@ export async function main(ns) {
   ns.disableLog("ALL");
 
   // Reserve auf home. ACHTUNG, hier lag der erste Fehler dieses BitNode: 12 GB
-  // reichen nicht. bn4net.js belegt selbst 11 GB, bn4life.js braucht 18,35 -
-  // zusammen 29,35 von 32. Wer nur 12 reserviert, laesst die Arbeiter die
+  // reichen nicht. bn4net.js belegt selbst 19,65 GB (gemessen am 22.08.2026,
+  // davon 3 GB fuer hackAnalyze/hackAnalyzeChance/growthAnalyze aus der
+  // Aktionsmischung), bn4life.js braucht 22,8 - zusammen 42,45. Auf einem
+  // 32-GB-home passen beide NICHT MEHR nebeneinander; das trifft nach einem
+  // BitNode-Wechsel zu (Prestige.ts:243-249 setzt home auf 32 GB zurueck),
+  // nicht nach einem Augmentierungs-Einbau. Wer dorthin geht, muss die
+  // Mischung vorher wieder auf die nachgebauten Formeln umstellen oder
+  // bn4net.js aufteilen. Wer nur 12 reserviert, laesst die Arbeiter die
   // restlichen 9 GB fressen, und bn4life.js startet nie. Genau die Falle, die
   // der Skeptiker vorhergesagt hatte: RAM-Aushungern von home durch die
   // eigenen Worker. Bei 20 bleibt auf einem 32-GB-home gar kein Arbeiter -
@@ -338,9 +344,14 @@ export async function main(ns) {
     const sameTarget = moneyTargets.length === 1 && moneyTargets[0] === expTarget;
 
     let fehlstart = 0;
+    let mixStat = null;
     if (expTarget || moneyTargets.length) {
-      // Aktionswahl je Ziel getrennt: weaken/grow/hack haengt vom Zustand
-      // DES ZIELS ab (hackDifficulty, moneyAvailable), nicht von seiner Rolle.
+      // Aktionswahl fuer das ERFAHRUNGSziel: hier bleibt es beim Dreifach-
+      // Ternaer. Erfahrung haengt allein am Server und an der Fadenzahl -
+      // calculateHackingExpGain (Hacking.ts:29-38) unterscheidet die drei
+      // Aktionen ueberhaupt nicht. Es gibt dort also nichts zu mischen; der
+      // Ternaer haelt den Server nebenbei entschaerft, damit die Aktionsdauer
+      // nicht davonlaeuft.
       const pickScript = (host) => {
         const s = ns.getServer(host);
         return s.hackDifficulty > s.minDifficulty + 5 ? "worker/weaken.js"
@@ -363,22 +374,17 @@ export async function main(ns) {
         return ns.getWeakenTime(host);
       };
 
-      // Geldziele: je Ziel eigene Aktionswahl UND eigene RAM-Kosten -
-      // weaken.js/grow.js kosten 1.75 GB, hack.js 1.70 GB (siehe Kopf-
-      // kommentare worker/*.js). Im sameTarget-Fall (unten) unnoetig, das
-      // eine Ziel laeuft dort ueber expScript/expRam.
-      const moneyPlans = sameTarget ? [] : moneyTargets
-        .map((host) => {
-          const script = pickScript(host);
-          return { host, script, ram: ns.getScriptRam(script, "home") };
-        })
-        .filter((p) => p.ram > 0);
-
       // getScriptRam gibt bei fehlender Datei still 0 zurueck
       // (NetscriptFunctions.ts:1179-1191). Ungeprueft ergaebe das
       // Math.floor(frei/0) = Infinity, und das Spiel wirft daraufhin eine
       // Ausnahme - die diese Schleife und damit den halben Bot beenden wuerde.
-      if ((expScript && !(expRam > 0)) || (!sameTarget && moneyTargets.length && moneyPlans.length === 0)) {
+      // Alle drei Arbeiter werden jetzt in JEDER Runde gebraucht (Mischung
+      // weiter unten), also werden auch alle drei geprueft.
+      const ramHack = ns.getScriptRam("worker/hack.js", "home");
+      const ramGrow = ns.getScriptRam("worker/grow.js", "home");
+      const ramWeaken = ns.getScriptRam("worker/weaken.js", "home");
+      if ((expScript && !(expRam > 0))
+          || !(ramHack > 0) || !(ramGrow > 0) || !(ramWeaken > 0)) {
         sag("worker-Skript nicht lesbar, Runde uebersprungen.");
         await ns.sleep(10000); continue;
       }
@@ -437,16 +443,184 @@ export async function main(ns) {
       // Genau dieser Fehler ist bei worker/share.js schon einmal passiert;
       // dort loest ihn ns.ps, und hier tut es dasselbe. Das erste Argument der
       // Arbeiter ist ihr Ziel, daran sind sie zu erkennen.
+      //
+      // Derselbe Durchgang zaehlt zusaetzlich, was je GELDZIEL und Aktion
+      // gerade unterwegs ist (flight). Das braucht die Anlaufphase weiter
+      // unten: Ohne diese Gegenrechnung legt jede Runde eine weitere volle
+      // Korrekturwelle obendrauf, obwohl die erste noch fliegt - genau der
+      // Fehler, der beim Erfahrungsziel schon einmal Tausende Faeden
+      // gestapelt hat. ns.isRunning mit Argumenten findet diese Prozesse
+      // uebrigens NICHT, deshalb ns.ps.
       let expThreadsAssigned = 0;
+      const flight = new Map();
+      for (const h of moneyTargets) flight.set(h, { hack: 0, grow: 0, weaken: 0 });
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
         for (const pr of ns.ps(host)) {
           if (!WORKER.includes(pr.filename)) continue;
-          if (pr.args[0] !== expTarget) continue;
-          expThreadsAssigned += pr.threads;
+          if (pr.args[0] === expTarget) { expThreadsAssigned += pr.threads; continue; }
+          const f = flight.get(pr.args[0]);
+          if (!f) continue;
+          if (pr.filename === "worker/hack.js") f.hack += pr.threads;
+          else if (pr.filename === "worker/grow.js") f.grow += pr.threads;
+          else if (pr.filename === "worker/weaken.js") f.weaken += pr.threads;
         }
       }
 
+      // --- Aktionsmischung je Geldziel (Stufe 3, 22.08.2026) ----------------
+      // Bis hierher machten ALLE Faeden eines Ziels DIESELBE Aktion (der
+      // Dreifach-Ternaer von pickScript). Gemessen ueber die Arbeiter-RAM-
+      // Sekunden ergab das rund 7-20 % hack, 47-57 % grow, 33-39 % weaken:
+      // Nach jeder Hackwelle faellt das Ziel unter die 90-Prozent-Schwelle
+      // und wird minutenlang nur noch gewachsen, waehrend gar nichts
+      // verdient wird. Und jede Welle schiesst weit ueber ihr Ziel hinaus -
+      // 2000 weaken-Faeden nehmen 100 Sicherheit weg, wo 5 zuviel sind.
+      //
+      // Jetzt bekommt jedes Ziel gleichzeitig hack-, grow- und weaken-Faeden
+      // im Gleichgewichtsverhaeltnis. Herleitung, alle Fundstellen in
+      // reference/bitburner-src/src:
+      //
+      //   GELD  Ein hack-Faden zieht den Anteil p ab - aber nur bei Erfolg.
+      //         Der Fehlschlagzweig (NetscriptHelpers.tsx:678-690) zieht kein
+      //         Geld ab UND erhoeht die Sicherheit nicht; beides steht im
+      //         Erfolgszweig (:629-643 bzw. :667). Also zaehlt p * chance.
+      //         Ein grow-Faden multipliziert das Guthaben mit e^k
+      //         (Server/formulas/grow.ts:8-29).
+      //         Gleichgewicht:  k * grow = p * chance * hack
+      //
+      //   SICHERHEIT  hack +0.002 je Faden (Server/data/Constants.ts:9,
+      //         angewandt NetscriptHelpers.tsx:667), grow +2*0.002 = 0.004
+      //         (Server/ServerHelpers.ts:213), weaken -0.05 (Constants.ts:10).
+      //         Gleichgewicht:  0.05 * weaken = 0.002*chance*hack + 0.004*grow
+      //
+      //   DAUER  grow = 3.2 * hack, weaken = 4 * hack (Hacking.ts:81-95).
+      //         Geht hier nicht in die Rechnung ein, weil das Verhaeltnis in
+      //         FADENSTARTS je Sekunde gilt - die Belegungsdauer kuerzt sich
+      //         heraus. Aus dem Fadenverhaeltnis wird der RAM-Sekunden-Anteil
+      //         erst durch Multiplikation mit RAM * Dauer.
+      //
+      // ENTSCHEIDEND FUER BITNODE 4: ScriptHackMoney 0.2 steckt bereits IN p
+      // (Hacking.ts:54 multipliziert es in calculatePercentMoneyHacked hinein).
+      // ScriptHackMoneyGain ist in diesem BitNode NICHT gesetzt
+      // (BitNode.tsx:628-655) und bleibt damit 1 (BitNodeMultipliers.ts:153).
+      // moneyGained = moneyDrained * 1 (NetscriptHelpers.tsx:648) - der Server
+      // verliert also GENAU das, was der Spieler bekommt. Der Wachstumsbedarf
+      // ist folglich nicht um den Faktor 5 hoeher, sondern genau umgekehrt:
+      // weil p durch die 0.2 gefuenftelt wurde und ServerGrowthRate in diesem
+      // BitNode bei 1.0 bleibt, braucht ein hack-Faden hier nur rund 0,42
+      // grow-Faden statt gut 2 wie in BitNode 1. Gerechnet fuer phantasy
+      // (Level 339): p = 6.4e-4, chance = 0.94, k = 1.42e-3
+      //   -> hack : grow : weaken = 1 : 0.42 : 0.072  (Faeden)
+      //   -> 37 % : 52 % : 11 %                       (RAM-Sekunden)
+      const FORTIFY_HACK = 0.002;
+      const FORTIFY_GROW = 0.004;
+      const WEAKEN_POWER = 0.05;
+      // Zielband. MIX_MONEY_HIGH ist der Fixpunkt der Regelung, nicht die
+      // Obergrenze: darueber waere jeder grow-Faden verschenkt, weil
+      // calculateGrowMoney (grow.ts:44-52) bei moneyMax abschneidet. Etwas
+      // Luft nach oben zu lassen kostet 5 % Beute je Faden und spart mehr
+      // als das an weggeworfenen grow-Faeden.
+      const MIX_MONEY_HIGH = 0.95;
+      const MIX_MONEY_LOW = 0.75;   // darunter: Anlaufphase
+      const MIX_SEC_OK = 1.0;       // bis hierher gilt die Sicherheit als am Minimum
+      const MIX_SEC_BAD = 5.0;      // darueber: Anlaufphase
+      const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
+
+      // p, chance und k kommen aus dem Spiel selbst statt aus nachgebauten
+      // Formeln. Das kostet 3 GB (hackAnalyze, hackAnalyzeChance,
+      // growthAnalyze je 1 GB, RamCostGenerator.ts:569-579) und ist dafuer
+      // gegen jeden Abschreibfehler immun und gegen jede Balance-Aenderung
+      // des Spiels.
+      //
+      // ns.growthAnalyze gilt in diesem Projekt als unbrauchbar - zu Recht,
+      // aber nur fuer die Frage "wieviele Faeden von HIER bis moneyMax".
+      // numCycleForGrowth (Server/ServerHelpers.ts:69-80) laesst den additiven
+      // +1-je-Faden-Term weg und liefert bei moneyAvailable 0 eine Division
+      // durch null. Hier wird es anders benutzt: growthAnalyze(host, 2) ist
+      // schlicht ln(2)/k und haengt weder am Guthaben noch am additiven Term.
+      // k faellt daraus exakt heraus. Der dritte Parameter (cores) ist 1 -
+      // richtig so, denn die Arbeiter laufen fast alle auf Fremdrechnern mit
+      // einem Kern.
+      const planMix = (host) => {
+        const s = ns.getServer(host);
+        const secOver = Math.max(0, s.hackDifficulty - s.minDifficulty);
+        const moneyFrac = s.moneyMax > 0 ? clamp01(s.moneyAvailable / s.moneyMax) : 0;
+        const p = ns.hackAnalyze(host);
+        const chance = ns.hackAnalyzeChance(host);
+        const cycles = ns.growthAnalyze(host, 2);
+        const k = cycles > 0 ? Math.LN2 / cycles : 0;
+        const f = flight.get(host) || { hack: 0, grow: 0, weaken: 0 };
+
+        // ANLAUFPHASE, ausdruecklich und als eigener Zweig. Aus einem
+        // beliebigen Ausgangszustand (Sicherheit hoch, Guthaben leer) fuehrt
+        // die Gleichgewichtsmischung allein nicht heraus - sie HAELT einen
+        // Zustand, sie stellt ihn nicht her. Hier stehen deshalb keine
+        // Verhaeltnisse, sondern der noch OFFENE BEDARF: soviele Faeden
+        // fehlen bis zum Gleichgewicht, abzueglich dessen, was schon fliegt.
+        // Der Verteiler unten arbeitet diesen Bedarf der Reihe nach ab -
+        // erst weaken, dann grow, kein hack.
+        //
+        // Warum weaken VORRANG hat und nicht parallel laeuft: k haengt ueber
+        // log1p(0.03/hackDifficulty) (grow.ts:17) am Kehrwert der Sicherheit.
+        // Fuer the-hub (minDifficulty 14, aktuell 41) heisst das k = 4.6e-4
+        // statt 1.35e-3 - Wachstum ist bei hoher Sicherheit fast dreimal so
+        // teuer. Nachgerechnet fuer diesen Server, von 27 % auf 95 %:
+        //   sofort wachsen  2737 grow + 758 weaken = 3495 Faeden
+        //   erst saeubern    540 weaken + 935 grow + 75 weaken = 1550 Faeden
+        // Die zusaetzliche Wartezeit einer weaken-Runde ist billig, weil der
+        // Speicher in der Zwischenzeit den anderen Zielen zufaellt.
+        const anlauf = secOver > MIX_SEC_BAD || moneyFrac < MIX_MONEY_LOW || !(p > 0);
+        if (anlauf) {
+          const growNeed = k > 0
+            ? Math.max(0, Math.log(MIX_MONEY_HIGH / Math.max(moneyFrac, 1e-9)) / k)
+            : 0;
+          // Nur die Sicherheit gegenrechnen, die WIRKLICH da ist, plus die,
+          // welche der schon fliegende grow noch erzeugen wird. Die Sicherheit
+          // eines erst geplanten grow gehoert nicht dazu - sonst schwaecht
+          // diese Runde auf Vorrat, und der Deckel waere wieder wirkungslos.
+          const weakenNeed = (secOver + FORTIFY_GROW * f.grow) / WEAKEN_POWER;
+          return {
+            anlauf: true,
+            bedarf: {
+              hack: 0,
+              grow: Math.max(0, growNeed - f.grow),
+              weaken: Math.max(0, weakenNeed - f.weaken),
+            },
+          };
+        }
+
+        // DAUERBETRIEB. Gleichgewichtsverhaeltnis plus proportionale
+        // Rueckkopplung. Die Rueckkopplung ist der Grund, warum hier keine
+        // harte Schwelle mehr steht: Ein Ternaer hat denselben Mittelwert,
+        // aber er pendelt - erst nur hacken, bis das Guthaben faellt, dann
+        // nur wachsen, bis es voll ist. Genau dieses Pendeln hat den
+        // hack-Anteil auf unter 20 % gedrueckt. Die lineare Drosselung hat
+        // ihren Fixpunkt bei MIX_MONEY_HIGH und regelt in beide Richtungen:
+        // zuviel Geld -> voller hack-Anteil, zuwenig -> hack faellt, grow
+        // steigt.
+        const growPerHack = k > 0 ? (p * chance) / k : 0;
+        const weakenPerHack = (FORTIFY_HACK * chance + FORTIFY_GROW * growPerHack) / WEAKEN_POWER;
+        // Die Verstaerkung der Korrektur wird an der Groesse einer
+        // Mischeinheit gemessen statt an einer geratenen Zahl - so bleibt sie
+        // richtig, wenn sich p, k oder chance mit dem Level aendern.
+        const einheit = 1 + growPerHack + weakenPerHack;
+        const moneyErr = clamp01((MIX_MONEY_HIGH - moneyFrac) / (MIX_MONEY_HIGH - MIX_MONEY_LOW));
+        const secErr = clamp01((secOver - MIX_SEC_OK) / (MIX_SEC_BAD - MIX_SEC_OK));
+        return {
+          anlauf: false,
+          ratio: {
+            hack: (1 - moneyErr) * (1 - secErr),
+            grow: growPerHack + moneyErr * einheit,
+            weaken: weakenPerHack + secErr * einheit,
+          },
+        };
+      };
+
+      // Durchgang 1: share und Erfahrungsziel je Rechner, wie bisher. Was
+      // danach frei bleibt, wird nur GEMERKT statt sofort vergeben - die
+      // Geldziele brauchen im Durchgang 2 den Gesamtbetrag, um ihre
+      // Fadenzahlen ueberhaupt ausrechnen zu koennen.
+      const restFrei = new Map();
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
         if (host === werkbank) continue;   // bleibt fuer die Werkzeuge frei
@@ -528,30 +702,144 @@ export async function main(ns) {
           }
         }
 
-        // Geldziele: freien Speicher je Runde zu gleichen Teilen aufteilen,
-        // Rest kaskadiert an das naechste Ziel (falls ein Anteil zu klein
-        // fuer auch nur einen Faden ist). Anders als beim Erfahrungsbudget
-        // oben (expThreadsAssigned) braucht es hier KEINEN ns.ps-Zaehler:
-        // es gibt keinen festen Deckel, nur "was an freiem Speicher da ist" -
-        // und getServerUsedRam hat bereits alles abgezogen, was noch laeuft.
-        // Der Rundenzaehler-Fehler aus der Aufgabenstellung (ein Zaehler, der
-        // jede Runde bei null beginnt, legt Welle um Welle nach) trifft nur
-        // FESTE Budgets wie EXP_THREAD_BUDGET, nicht diese Aufteilung.
-        let restZiele = moneyPlans.length;
-        for (const mp of moneyPlans) {
-          if (restZiele <= 0) break;
-          const anteil = freiFuerSkript / restZiele;
-          const moneyFaeden = Math.floor(anteil / mp.ram);
-          if (moneyFaeden >= 1) {
-            const dauer = actionTime(mp.host, mp.script);
-            const landAt = Date.now() + dauer;
-            if (ns.exec(mp.script, host, moneyFaeden, mp.host, 0, Math.round(landAt), Math.round(dauer), runde) === 0) {
-              fehlstart++;
-            }
-            freiFuerSkript -= moneyFaeden * mp.ram;
-          }
-          restZiele--;
+        if (freiFuerSkript > 0) restFrei.set(host, freiFuerSkript);
+      }
+
+      // --- Durchgang 2: Geldziele mit gemischten Aktionen -------------------
+      // Frueher lief die Verteilung IM Host-Durchgang: jeder Rechner teilte
+      // seinen Rest zu gleichen Teilen auf die Ziele auf. Mit drei Aktionen je
+      // Ziel waeren daraus bei 43 nennenswerten Rechnern und 10 Zielen bis zu
+      // 1290 exec-Aufrufe je Runde geworden, und auf einem 64-GB-Rechner
+      // haette ein Zieldrittel nicht einmal fuer einen weaken-Faden gereicht.
+      // Deshalb umgedreht: erst netzweit ausrechnen, WIEVIELE Faeden welcher
+      // Art gebraucht werden, dann diese Wuensche auf die groessten Rechner
+      // packen. Das sind rund 30 Wuensche und damit hoechstens etwa 70
+      // exec-Aufrufe - weniger als vorher, bei feinerer Aufteilung.
+      if (!sameTarget && moneyTargets.length) {
+        let budget = 0;
+        for (const gb of restFrei.values()) budget += gb;
+        // Melden, wenn fuer die Geldziele nichts uebrigbleibt. Das passiert
+        // nicht theoretisch: Direkt nach einem Augmentierungs-Einbau sind alle
+        // gekauften Rechner weg (Prestige.ts:73) und das Netz faellt auf
+        // wenige hundert GB - das Erfahrungsbudget allein belegt dann schon
+        // 180 * 1.75 = 315 GB, und Durchgang 2 bekommt gar nichts mehr. Ohne
+        // diese Zeile sieht das von aussen aus wie normaler Betrieb.
+        if (budget < 2 && runde % 10 === 0) {
+          sag("Geldziele bekommen nichts: nach share und Erfahrungsziel sind "
+            + budget.toFixed(1) + " GB frei.");
         }
+
+        const wuensche = [];
+        const summeFaeden = { hack: 0, grow: 0, weaken: 0 };
+        let anlaufZiele = 0;
+        let restZiele = moneyTargets.length;
+        for (const ziel of moneyTargets) {
+          if (restZiele <= 0) break;
+          // Gleicher Anteil je Ziel, Rest kaskadiert - wie bisher. Ein Ziel in
+          // der Anlaufphase nimmt nur, was es braucht; was es liegen laesst,
+          // kommt den folgenden Zielen zugute.
+          const anteil = budget / restZiele;
+          restZiele--;
+          let plan;
+          try {
+            plan = planMix(ziel);
+          } catch (e) {
+            // Nicht stillschweigend ueberspringen. Wirft hackAnalyze oder
+            // growthAnalyze fuer ein Ziel dauerhaft, faellt dieses Ziel sonst
+            // fuer immer aus, ohne dass irgendwo etwas davon steht - genau
+            // das Muster, das diesen Bot schon mehrfach stundenlang hat
+            // stillstehen lassen. Gedrosselt, damit das Log lesbar bleibt.
+            if (runde % 10 === 0) sag("planMix(" + ziel + ") warf: " + String(e));
+            continue;
+          }
+          const faeden = { hack: 0, grow: 0, weaken: 0 };
+          if (plan.anlauf) {
+            // Anlaufphase: der offene Bedarf wird der Reihe nach abgearbeitet,
+            // weaken vor grow (Begruendung in planMix). Der Deckel auf den
+            // Bedarf ist der eigentliche Gewinn dieser Fassung - bisher ging
+            // der GANZE freie Netzspeicher in eine Aktion, also nahm eine
+            // weaken-Welle hundert Sicherheitspunkte weg, wo fuenf zuviel
+            // waren. Alles darueber war ersatzlos verschenkt.
+            anlaufZiele++;
+            let rest = anteil;
+            faeden.weaken = Math.min(Math.ceil(plan.bedarf.weaken), Math.floor(rest / ramWeaken));
+            rest -= faeden.weaken * ramWeaken;
+            faeden.grow = Math.min(Math.ceil(plan.bedarf.grow), Math.floor(rest / ramGrow));
+          } else {
+            // Dauerbetrieb: GB je Mischeinheit. Eine Einheit besteht aus
+            // r.hack hack-Faeden, r.grow grow-Faeden und r.weaken
+            // weaken-Faeden; daraus faellt die Fadenzahl je Aktion direkt
+            // heraus, ohne Zwischenrundung.
+            const r = plan.ratio;
+            const gbProEinheit = r.hack * ramHack + r.grow * ramGrow + r.weaken * ramWeaken;
+            if (!(gbProEinheit > 0)) continue;
+            const einheiten = anteil / gbProEinheit;
+            faeden.hack = Math.floor(einheiten * r.hack);
+            faeden.grow = Math.floor(einheiten * r.grow);
+            faeden.weaken = Math.floor(einheiten * r.weaken);
+            // Der kleinste Anteil geht beim Abrunden systematisch unter:
+            // weaken hat im Gleichgewicht nur rund 7 % der Faeden, es braucht
+            // also 14 volle Mischeinheiten fuer den ERSTEN Faden. Bei knappem
+            // Budget - kleines Netz, viele Ziele, frisch nach einem Einbau -
+            // faellt weaken damit Runde um Runde aus, die Sicherheit steigt
+            // schleichend, und am Ende steht wieder das Pendeln, das dieser
+            // Umbau gerade abschafft. Deshalb: wer im Verhaeltnis ueberhaupt
+            // vorkommt, bekommt mindestens einen Faden, solange der Anteil
+            // dafuer reicht. Kostet hoechstens zwei Faeden je Ziel und Runde.
+            let uebrig = anteil - faeden.hack * ramHack - faeden.grow * ramGrow
+              - faeden.weaken * ramWeaken;
+            for (const [art, ram] of [["weaken", ramWeaken], ["grow", ramGrow], ["hack", ramHack]]) {
+              if (faeden[art] === 0 && r[art] > 0 && uebrig >= ram) {
+                faeden[art] = 1;
+                uebrig -= ram;
+              }
+            }
+          }
+          let verbraucht = 0;
+          for (const [art, skript, ram] of [
+            ["weaken", "worker/weaken.js", ramWeaken],
+            ["grow", "worker/grow.js", ramGrow],
+            ["hack", "worker/hack.js", ramHack],
+          ]) {
+            const n = faeden[art];
+            if (n < 1) continue;
+            verbraucht += n * ram;
+            summeFaeden[art] += n;
+            // Dauer und Landezeit einmal je Wunsch, nicht je Rechner: alle
+            // Teilwellen desselben Wunsches sollen gemeinsam landen.
+            const dauer = actionTime(ziel, skript);
+            wuensche.push({
+              ziel, skript, ram, offen: n,
+              dauer: Math.round(dauer), landAt: Math.round(Date.now() + dauer),
+            });
+          }
+          budget = Math.max(0, budget - verbraucht);
+        }
+
+        // Wuensche auf Rechner legen, groesster Rechner zuerst. So braucht ein
+        // grosser Wunsch wenige exec-Aufrufe, und die kleinen Rechner bleiben
+        // fuer die Reste uebrig.
+        const platz = [...restFrei.entries()].sort((a, b) => b[1] - a[1]);
+        for (const w of wuensche) {
+          for (const eintrag of platz) {
+            if (w.offen < 1) break;
+            const passt = Math.floor(eintrag[1] / w.ram);
+            if (passt < 1) continue;
+            const n = Math.min(w.offen, passt);
+            // Argumentreihenfolge unveraendert: (ziel, verzoegerung, landezeit,
+            // dauer, runde) - siehe worker/hack.js:38-42.
+            if (ns.exec(w.skript, eintrag[0], n, w.ziel, 0, w.landAt, w.dauer, runde) === 0) {
+              fehlstart++;
+              continue;
+            }
+            eintrag[1] -= n * w.ram;
+            w.offen -= n;
+          }
+        }
+
+        // Nur fuer die Beobachtung von aussen - die Verteilung ist die Zahl,
+        // an der dieser Umbau gemessen wird.
+        mixStat = { ...summeFaeden, anlaufZiele, restGb: Math.round(budget) };
       }
     }
 
@@ -665,11 +953,13 @@ export async function main(ns) {
       ziel: moneyTargets[0] ?? null,
       expZiel: expTarget,
       zieleAnzahl: moneyTargets.length,
-      // Stufe 3 (Wellen-Batches mit versetzter Landung von weaken/grow/hack)
-      // wurde bei diesem Umbau bewusst NICHT gebaut - siehe Antwort zum
-      // Umbau vom 22.08.2026. Das Feld liegt trotzdem schon bereit, damit
-      // tools/bn4.js es zeigen kann, sobald es einmal kommt.
+      // Echtes HWGW-Batching (versetzte Landung ganzer Wellen) ist weiterhin
+      // NICHT gebaut - Stufe 3 mischt die Aktionen nur im richtigen
+      // Verhaeltnis, ohne die Landezeitpunkte zu takten.
       batchModus: false,
+      // Was in dieser Runde je Aktion neu vergeben wurde, plus die Zahl der
+      // Ziele in der Anlaufphase und der nicht vergebene Netzspeicher.
+      mischung: mixStat,
       homeRam: ns.getServerMaxRam("home"),
       homeFrei: ns.getServerMaxRam("home") - ns.getServerUsedRam("home"),
       ausbauKosten: kosten,

@@ -52,6 +52,79 @@ export async function main(ns) {
   // alle anderen Augmentierungen um 1,9 je Stueck verteuern. Erst zum Schluss.
   const NFG = "NeuroFlux Governor";
 
+  // --- Firmenfaktionen (M4) ------------------------------------------------
+  // Clarke Incorporated und OmniTek Incorporated laden nicht ein, weil man
+  // etwas gehackt hat, sondern weil man bei IHNEN ANGESTELLT ist und
+  // 400.000 FIRMENreputation hat (FactionInfo.tsx:292-295 und :311-314,
+  // CONSTANTS.CorpFactionRepRequirement = 400e3 in Constants.ts:25). Das ist
+  // der einzige Weg zu nextSENS x1,2, Neuronal Densification x1,15,
+  // OmniTek InfoLoad x1,2 und PCDNI x1,08 - ohne sie endet der
+  // Hacking-Multiplikator bei etwa 4,6 statt bei 8,3.
+  //
+  // Firmenname und Faktionsname sind derselbe Text. Das ist kein Zufall,
+  // sondern die Datenstruktur des Spiels (CompanyName und FactionName tragen
+  // beide "Clarke Incorporated"), und es erspart eine Uebersetzungstabelle.
+  const COMPANIES = ["Clarke Incorporated", "OmniTek Incorporated"];
+  const COMPANY_REP_GOAL = 400e3;
+
+  // IT statt Software. Beide Leitern haben dieselbe zweite Sprosse
+  // (repMultiplier 1,1 / hackingEffectiveness 85), aber die IT-Leiter ist
+  // billiger zu erklimmen: IT Intern verlangt hackingEffectiveness 90 statt 85
+  // beim gleichen repMultiplier 0,9, und IT Analyst verlangt Hacking 26+224
+  // und 7.000 Firmenreputation statt 51+224 und 8.000
+  // (CompanyPositionsMetadata.ts:113-135 gegen :7-30, Aufschlag
+  // jobStatReqOffset 224 aus CompaniesMetadata.ts:67/75).
+  const COMPANY_FIELD = "IT";
+
+  // Ab hier ist Schluss ohne Charisma. IT Manager verlangt Charisma 51+224=275
+  // (CompanyPositionsMetadata.ts:137-149), und Charisma steht bei 1. Der
+  // Aufstieg auf IT Analyst bringt +22 % Rate, der weitere auf IT Manager
+  // noch einmal +11 % - und kostet an der Universitaet rund 12 Stunden
+  // (Leadership 4 chaExp/s x expMult 4 in Volhaven; e^((275/1,163+200)/32)
+  // = 837.000 Erfahrung). Zwoelf Stunden Training fuer elf Prozent auf einen
+  // sechzehnstuendigen Posten ist ein Verlustgeschaeft, deshalb wird Charisma
+  // NICHT trainiert. Nebenbefund: currentNodeMults.ClassGymExpGain wird in
+  // v3.0.2 nirgends angewandt (nur in BitNodeMultipliers.ts:28 definiert),
+  // die 0,5 aus BitNode 4 daempfen das Studium also gar nicht.
+  //
+  // Die Firmenreputation ist in BitNode 4 UNGEDAEMPFT: case 4
+  // (BitNode.tsx:627-655) setzt CompanyWorkMoney 0.1 und CompanyWorkExpGain
+  // 0.5, aber KEIN CompanyWorkRepGain - der steht nur in case 11
+  // (BitNode.tsx:1066). Fuer die Reputation ist BitNode 4 also ein normaler
+  // Knoten; nur der Lohn und die Erfahrung sind gekuerzt.
+  //
+  // Die Rate steigt LINEAR mit dem Hackinglevel
+  // (CompanyPosition.ts:156-172: hackRatio = 85 x hacking / 975, ohne Deckel).
+  // Bei Hacking 500 sind das 2,8 rep/s und damit 40 Stunden je Firma, bei
+  // Hacking 2.500 sind es 14 rep/s und 8 Stunden. Firmenarbeit ist deshalb
+  // ein SPAETER Posten - sie frueh zu beginnen kostet den Faktor fuenf.
+  // Dieselbe Schwelle steht im Abschlussplan als Reihenfolge M3 -> M4.
+  const COMPANY_AFTER_AUGS = 30;
+
+  // Und deshalb reicht der Aug-Zaehler allein NICHT als Bedingung: Der Einbau,
+  // der den Zaehler auf 30 hebt, setzt zugleich das Hackinglevel auf etwa den
+  // Multiplikator zurueck (Prestige.ts, setInitialExpForPlayer). Wer direkt
+  // danach in die Firma ginge, arbeitete bei Hacking 50 mit 0,28 rep/s - das
+  // waeren vierzig Tage je Firma. Gemessen am 22.08.2026: 2,44 rep/s bei
+  // Hacking 505 als IT Intern.
+  //
+  // 2.000 als Schwelle, weil es dieselbe Kurve ist, die ohnehin auf Hacking
+  // 2.500 fuer das Daedalus-Tor zulaeuft: Bei 2.000 sind es 11,2 rep/s und
+  // damit rund 10 Stunden je Firma, und die Backdoors auf clarkinc/omnitek
+  // (Hacking 950-1250) stehen zu diesem Zeitpunkt laengst - die senken die
+  // Huerde noch einmal von 400.000 auf 300.000.
+  const COMPANY_MIN_HACK = 2000;
+
+  // Der Aussenschalter. Inhalt:
+  //   "off"                    - nie Firmenarbeit (Notbremse)
+  //   "auto"                   - wie ohne Datei
+  //   "<Firmenname>|<bis-ms>"  - erzwingt diese Firma bis zu diesem Zeitpunkt
+  // Der Zeitpunkt ist Absicht und keine Bequemlichkeit: Ein erzwungener Modus
+  // ohne Verfallsdatum ist genau die Falle, die am 20.08. fuenf Stunden
+  // Stillstand gekostet hat. Laeuft die Frist ab, faellt der Bot von selbst
+  // auf Faktionsarbeit zurueck, auch wenn niemand hinsieht.
+  const COMPANY_ORDER_FILE = "data/company-order.txt";
+
   const geldText = (n) => {
     for (const [t, k] of [[1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
       if (Math.abs(n) >= t) return "$" + (n / t).toFixed(2) + k;
@@ -96,7 +169,57 @@ export async function main(ns) {
       }
     }
 
-    if (!kandidaten.length) {
+    // --- 1b. Steht eine Firmenphase an? --------------------------------------
+    // Die Entscheidung faellt HIER oben und nicht erst bei der Arbeit, weil
+    // der Ausstieg direkt darunter ("keine offenen Augmentierungen") sie sonst
+    // ueberspringt. Genau dieser Zustand ist der Normalfall am Ende eines
+    // Zyklus: Alles aus den beigetretenen Faktionen ist gekauft, und die
+    // einzige verbliebene Arbeit ist die Firma.
+    // ns.read liest LOKAL, ns.fileExists kann jeden Rechner fragen. Dieses
+    // Skript laeuft auf der Werkbank, die Bruecke schreibt aber nach home -
+    // ohne das scp waere der Schalter unsichtbar, und zwar lautlos. Das ist
+    // derselbe Fehler, der die Bremse rep-modus.txt einmal wirkungslos
+    // gemacht hat (45 statt 190 Reputation je Minute).
+    let companyOrder = "";
+    if (ns.fileExists(COMPANY_ORDER_FILE, "home")) {
+      if (ns.getHostname() !== "home") ns.scp(COMPANY_ORDER_FILE, ns.getHostname(), "home");
+      companyOrder = String(ns.read(COMPANY_ORDER_FILE)).trim();
+    } else if (ns.fileExists(COMPANY_ORDER_FILE, ns.getHostname())) {
+      // Auf home geloescht heisst geloescht. Eine liegengebliebene Kopie auf
+      // der Werkbank wuerde den Befehl ueberdauern, den es nicht mehr gibt.
+      ns.rm(COMPANY_ORDER_FILE, ns.getHostname());
+    }
+    const [orderName, orderUntil] = companyOrder.split("|");
+    const orderActive = !!orderName && orderName !== "off" && orderName !== "auto"
+      && Date.now() < (Number(orderUntil) || 0);
+
+    let companyTarget = null;
+    if (orderActive && COMPANIES.includes(orderName)) {
+      companyTarget = orderName;
+    } else if (orderName !== "off") {
+      // Selbstaendige Wahl. Bedingung ist der Aug-Zaehler, nicht das
+      // Hackinglevel: Solange die 30 Stueck fuer Daedalus noch fehlen, ist
+      // jede Stunde in einer Faktion mehr wert als in einer Firma - die
+      // Firmenaugmentierungen zaehlen zwar mit, sind aber die teuersten
+      // Zaehlpunkte des ganzen Plans. Erst wenn der Zaehler steht, ist die
+      // Firma der letzte verbliebene Multiplikatorhebel.
+      const installiertZahl = ns.singularity.getOwnedAugmentations(false).length;
+      if (installiertZahl >= COMPANY_AFTER_AUGS
+          && spieler.skills.hacking >= COMPANY_MIN_HACK) {
+        for (const c of COMPANIES) {
+          // Ist die Einladung durch, ist die Firma erledigt: Die Faktion hat
+          // keepOnInstall (FactionInfo.tsx:282/301), die Einladung wird nach
+          // JEDEM Einbau neu ausgesprochen (Prestige.ts:61-66 und :118-120).
+          // Die 400.000 Firmenreputation sind also ein EINMALIGER Posten fuer
+          // den ganzen BitNode, kein Posten je Zyklus.
+          if (spieler.factions.includes(c)) continue;
+          companyTarget = c;
+          break;
+        }
+      }
+    }
+
+    if (!kandidaten.length && !companyTarget) {
       // Nichts mehr zu holen: Bremse loesen, damit bn4life wieder Geld
       // verdienen darf, statt dass die Figur untaetig herumsteht.
       if (ns.fileExists("data/rep-modus.txt", "home")) {
@@ -196,6 +319,123 @@ export async function main(ns) {
     }
     if (gekauft) { await ns.sleep(2000); continue; }   // Preise haben sich verschoben
 
+    // Geldbedarf nach home melden. bn4net.js kauft sonst Rechner von dem Geld,
+    // das hier fuer eine bereits verdiente Augmentierung gebraucht wird - und
+    // Augmentierungen sind dauerhafter Fortschritt, Rechenzeit ist es nicht.
+    // Der Umweg ueber scp ist noetig, weil dieses Skript auf der Werkbank
+    // laeuft und ns.write nur lokal schreibt.
+    // Steht seit dem 22.08.2026 VOR der Arbeitsentscheidung statt danach: In
+    // der Firmenphase und bei leerer Zielliste wurde die Meldung sonst gar
+    // nicht mehr geschrieben, und bn4net haette das Kaufgeld verbaut.
+    const bedarf = kandidaten
+      .filter((k) => k.rep >= k.repReq)
+      .reduce((n, k) => n + k.preis, 0);
+    ns.write("data/geldbedarf.txt", String(Math.round(bedarf)), "w");
+    if (ns.getHostname() !== "home") ns.scp("data/geldbedarf.txt", "home", ns.getHostname());
+
+    // --- 2b. Firmenphase (M4) -------------------------------------------------
+    // Firmenarbeit und Faktionsarbeit schliessen einander aus: Player hat genau
+    // EINE laufende Arbeit, und workForCompany ersetzt eine laufende
+    // Faktionsarbeit kommentarlos. Deshalb ist das hier eine Weiche und kein
+    // Nebenlaeufer - und deshalb steht sie in bn4rep.js und nicht in einem
+    // eigenen Skript: Zwei Skripte, die beide die Figur an die Arbeit
+    // schicken, sind derselbe Fehler wie ein commitCrime auf laufende Arbeit.
+    if (companyTarget) {
+      // Die Bremse zuerst, wie bei der Faktionsarbeit: zwischen Arbeitsbeginn
+      // und Datei darf kein Fenster liegen, in dem bn4life ein Verbrechen
+      // dazwischenschiebt. Das Format ist dasselbe wie bei der Faktionsarbeit
+      // (Name|Zeitstempel), weil bn4life.js genau daraus den Zeitstempel liest
+      // und nichts weiter.
+      ns.write("data/rep-modus.txt", companyTarget + "|" + Date.now(), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
+
+      // Nur EINE Anstellung halten. Codingvertraege haben vier gleich
+      // wahrscheinliche Belohnungsarten, und eine davon ist Firmenreputation:
+      // 4.000 x Schwierigkeit x Skalierung an eine ZUFAELLIG gewaehlte Firma
+      // aus Player.jobs (PlayerObjectGeneralMethods.ts:539-555,
+      // Constants.ts:92). Bei einer Anstellung landet dieser Posten
+      // vollstaendig auf dem Ziel, bei zweien nur zur Haelfte. Das ist kein
+      // Randposten - der Vertragsloeser laeuft dauerhaft mit.
+      //
+      // Kuendigen ist gefahrlos: quitJob loescht nur den Eintrag in
+      // Player.jobs (PlayerObjectGeneralMethods.ts:393), die Firmenreputation
+      // bleibt stehen, und die einmal ausgesprochene Faktionseinladung wird
+      // nicht zurueckgezogen (Factions.alreadyInvited bleibt gesetzt, und
+      // Prestige.ts:118-120 spricht sie nach jedem Einbau unbedingt neu aus).
+      for (const c of COMPANIES) {
+        if (c === companyTarget) continue;
+        if (!ns.getPlayer().jobs[c]) continue;
+        ns.singularity.quitJob(c);
+        sag("Gekuendigt bei " + c + " - Vertragsreputation soll ganz auf "
+          + companyTarget + " gehen.");
+      }
+
+      const companyRep = ns.singularity.getCompanyRep(companyTarget);
+      // ns.getPlayer().jobs ist frei - der Aufruf ist ohnehin bezahlt. Eine
+      // eigene Abfrage waere 2 GB fuer nichts.
+      let job = ns.getPlayer().jobs[companyTarget] || null;
+
+      // Bewerben. applyToCompany klettert die Leiter von SELBST so weit hoch,
+      // wie die Werte reichen (PlayerObjectGeneralMethods.ts:325-329), es ist
+      // also zugleich Bewerbung und Befoerderung. Ein Fehlschlag gibt null
+      // zurueck und wirft nicht (Singularity.ts:697-707), eine schon erreichte
+      // Hoechststelle ebenso - der Aufruf darf deshalb in jeder Runde stehen.
+      //
+      // KEINE REISE. Weder applyForJob noch workForCompany pruefen die Stadt
+      // (PlayerObjectGeneralMethods.ts:300-352, Singularity.ts:662-708). Der
+      // Abschlussplan rechnet fuer OmniTek mit einer Reise nach Volhaven; die
+      // ist ueber Singularity nicht noetig, und sie zu unterlassen erspart
+      // zugleich das Risiko, die Aevum-Mitgliedschaft anzufassen.
+      const newJob = ns.singularity.applyToCompany(companyTarget, COMPANY_FIELD);
+      if (newJob && newJob !== job) {
+        sag("ANGESTELLT bei " + companyTarget + " als " + newJob
+          + " (Firmenreputation " + Math.round(companyRep) + ").");
+        job = newJob;
+      }
+
+      if (!job) {
+        // Das ist der Zustand direkt nach einem Augmentierungs-Einbau:
+        // Player.jobs wird geleert (PlayerObjectGeneralMethods.ts:107), und
+        // das Hackinglevel faellt auf etwa den Multiplikator zurueck - IT
+        // Intern verlangt aber 1+224 = 225. Bis das Level wieder da ist, gibt
+        // es keine Firmenarbeit; dann ist Faktionsarbeit besser als Nichtstun.
+        // Ohne diesen Ausgang haette der Bot nach jedem Einbau stundenlang
+        // vergeblich Bewerbungen geschrieben.
+        sag("Keine Stelle bei " + companyTarget + " (Hacking "
+          + ns.getPlayer().skills.hacking + ", noetig 225) - zurueck zur Faktionsarbeit.");
+        companyTarget = null;
+      } else {
+        const arbeitJetzt = ns.singularity.getCurrentWork();
+        // Nicht ueber isBusy pruefen, sondern ueber das, was tatsaechlich
+        // laeuft - dieselbe Falle wie beim Verbrechen in bn4life.js.
+        if (!arbeitJetzt || arbeitJetzt.companyName !== companyTarget) {
+          if (ns.singularity.workForCompany(companyTarget, true)) {
+            sag("Arbeite fuer " + companyTarget + " als " + job + ": "
+              + Math.round(companyRep) + " von " + COMPANY_REP_GOAL + " Firmenreputation.");
+          }
+        }
+
+        // Messfaden nach draussen. Firmenreputation ist die einzige Groesse
+        // dieses Plans, die nie gemessen wurde - deshalb wird hier nicht nur
+        // der Stand, sondern auch die Rate aus zwei Proben geschrieben.
+        ns.write("data/bn4job.json", JSON.stringify({
+          zeit: Date.now(),
+          company: companyTarget,
+          job,
+          companyRep,
+          companyFavor: ns.singularity.getCompanyFavor(companyTarget),
+          goal: COMPANY_REP_GOAL,
+          hacking: ns.getPlayer().skills.hacking,
+          charisma: ns.getPlayer().skills.charisma,
+          forced: orderActive,
+          forcedUntil: orderActive ? Number(orderUntil) : 0,
+        }), "w");
+        if (ns.getHostname() !== "home") ns.scp("data/bn4job.json", "home", ns.getHostname());
+        await ns.sleep(15000);
+        continue;
+      }
+    }
+
     // --- 3. Sonst: an der naechsterreichbaren Huerde arbeiten -----------------
     // Die kleinste Luecke zuerst. Wer am teuersten Ziel arbeitet, hat lange
     // gar nichts; wer am naechsten arbeitet, kauft frueh und oft.
@@ -280,17 +520,6 @@ export async function main(ns) {
         try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
       }
     }
-
-    // Geldbedarf nach home melden. bn4net.js kauft sonst Rechner von dem Geld,
-    // das hier fuer eine bereits verdiente Augmentierung gebraucht wird - und
-    // Augmentierungen sind dauerhafter Fortschritt, Rechenzeit ist es nicht.
-    // Der Umweg ueber scp ist noetig, weil dieses Skript auf der Werkbank
-    // laeuft und ns.write nur lokal schreibt.
-    const bedarf = kandidaten
-      .filter((k) => k.rep >= k.repReq)
-      .reduce((n, k) => n + k.preis, 0);
-    ns.write("data/geldbedarf.txt", String(Math.round(bedarf)), "w");
-    if (ns.getHostname() !== "home") ns.scp("data/geldbedarf.txt", "home", ns.getHostname());
 
     // Summe ueber alle Faktionen. Die Reputation des aktuellen Ziels taugt
     // nicht zur Fortschrittsmessung: Sie springt bei jedem Zielwechsel zurueck,

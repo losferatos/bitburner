@@ -32,8 +32,26 @@
 export async function main(ns) {
   ns.disableLog("ALL");
 
+  // clarkinc und omnitek stehen hier nicht wegen einer Faktionseinladung,
+  // sondern wegen eines Preisnachlasses. haveCompanyRep rechnet die verlangte
+  // FIRMENreputation durch calculateEffectiveRequiredReputation
+  // (FactionJoinCondition.ts:82-86, Company/utils.ts:15-19), und die
+  // multipliziert mit CONSTANTS.CompanyRequiredReputationMultiplier = 0,75
+  // (Constants.ts:110), sobald auf dem Firmenserver ein Backdoor steht -
+  // erkannt ueber specialName (ServerHelpers.ts:306-313, servers.ts:192/220).
+  //
+  // Das gilt fuer BEIDES: die 400.000 fuer die Faktionseinladung werden zu
+  // 300.000, und die 7.000 fuer die Befoerderung zum IT Analyst zu 5.250.
+  // Ein Viertel des zeitlich groessten Postens des ganzen BitNode fuer einen
+  // Backdoor, den der Bot ohnehin setzen kann - er verlangt nur Hacking
+  // 950-1250 und fuenf Ports (servers.ts:182-187, :211ff), beides ist auf dem
+  // Weg zu Daedalus (Hacking 2.500) ohnehin faellig.
+  //
+  // installBackdoor ist KEINE Spielerarbeit, sondern eine Wartezeit
+  // (Singularity.ts:491-498 ruft netscriptDelay und fasst Player.currentWork
+  // nicht an) - es reisst die laufende Firmenarbeit also nicht ab.
   const ZIELE = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "fulcrumassets",
-    "The-Cave", "w0r1d_d43m0n"];
+    "clarkinc", "omnitek", "The-Cave", "w0r1d_d43m0n"];
 
   const NL = String.fromCharCode(10);
   let log = [];

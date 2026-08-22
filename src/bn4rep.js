@@ -446,6 +446,42 @@ export async function main(ns) {
           : nichtsMehrOffen ? "nichts mehr offen in den beigetretenen Faktionen"
           : "naechste Huerde erst in " + Math.round(kleinsteLuecke) + " Reputation") + ". "
         + "bn4life.js startet danach von selbst.");
+      // NEUROFLUX ZULETZT (22.08.2026). NFG ist der einzige Multiplikator,
+      // der sich rein mit Geld kaufen laesst - jede Stufe gibt x1,01 auf
+      // hacking, und die Stufen sind unbegrenzt. Der Bot hat NFG bisher
+      // ueberall uebersprungen (Zeile 247), weil er fuer die 30er-Zaehlung
+      // nur einmal zaehlt.
+      //
+      // Fuer den Multiplikator zaehlt aber JEDE Stufe, und Geld ist gerade
+      // im Ueberfluss da (552 Mrd bei nichts Kaufbarem). Gemessen am
+      // laufenden Spiel ist der Multiplikator 1,745 - Level 2500 damit
+      // unerreichbar, bei 5,24 dagegen 13 Stunden. Jeder Zehntelpunkt zaehlt.
+      //
+      // WARUM ERST HIER, unmittelbar vor dem Einbau: getLevel() zaehlt jede
+      // gekaufte Stufe als eigenen Eintrag in queuedAugmentations
+      // (Augmentation.ts:238-246), und jeder Eintrag verteuert JEDEN weiteren
+      // Kauf um 1,9. Frueher gekauft wuerde NFG also alle anderen
+      // Augmentierungen des Zyklus mitverteuern. Nach dem letzten Kauf kostet
+      // es nichts mehr ausser Geld.
+      //
+      // Abbruch, sobald eine Stufe mehr kostet als vorhanden oder die
+      // Reputation der Faktion nicht reicht - beides steigt je Stufe, der
+      // Preis mit 1,14 mal dem 1,9-Aufschlag, die Reputation mit 1,14.
+      let nfgStufen = 0;
+      for (let i = 0; i < 40; i++) {
+        const geldJetzt = ns.getServerMoneyAvailable("home");
+        let gekauft = false;
+        for (const f of spieler.factions) {
+          if (!ns.singularity.getAugmentationsFromFaction(f).includes(NFG)) continue;
+          if (ns.singularity.getAugmentationRepReq(NFG) > ns.singularity.getFactionRep(f)) continue;
+          if (ns.singularity.getAugmentationPrice(NFG) > geldJetzt) continue;
+          if (ns.singularity.purchaseAugmentation(f, NFG)) { nfgStufen++; gekauft = true; break; }
+        }
+        if (!gekauft) break;
+        await ns.sleep(50);
+      }
+      if (nfgStufen) sag("NeuroFlux: " + nfgStufen + " Stufen vor dem Einbau gekauft.");
+
       await ns.sleep(1500);
       ns.singularity.installAugmentations("bn4life.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr

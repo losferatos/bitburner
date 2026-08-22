@@ -1,0 +1,120 @@
+/**
+ * Mitgliedschaften beschaffen - der eigentliche Engpass der 30er-Schwelle.
+ *
+ * 48 Augmentierungen liegen unter 25.000 Rep, aber fast alle bei Faktionen,
+ * in denen der Bot nicht ist. Karma (-277) und Geld (92 Mrd) reichen laengst;
+ * was fehlt, sind Kampfwerte und der richtige Aufenthaltsort.
+ *
+ *   Slum Snakes : Karma -9,  alle Kampfwerte 30
+ *   Tetrads     : Karma -18, alle Kampfwerte 75, Stadt Chongqing/NewTokyo/Ishima
+ *   Tian Di Hui : Geld 1m, Hacking 50, dieselben drei Staedte
+ *
+ * Ein Trainingslauf auf 80 deckt beide Kampfschwellen ab, eine Reise nach
+ * Ishima beide Stadtbedingungen. Tetrads bringt dabei den Power Recirculation
+ * Core (x1,05), der im Abschlussplan als fehlender Sockelposten steht.
+ *
+ * Der Lauf pausiert die Faktionsarbeit - das ist der Preis. Er bringt dafuer
+ * drei Mitgliedschaften mit zusammen fuenf Augmentierungen unter 22.500 Rep.
+ *
+ * Aufruf: node tools/task.js joinrun.js [zielwert]
+ *
+ * @param {NS} ns
+ */
+export async function main(ns) {
+  ns.disableLog("ALL");
+  const s = ns.singularity;
+  const ZIEL = Number(ns.args[0] || 80);
+  const FRIST_MS = 45 * 60 * 1000;
+  const start = Date.now();
+  const z = [];
+
+  const sag = (t) => {
+    z.push(`${new Date().toTimeString().slice(0, 8)} ${t}`);
+    ns.write("data/joinrun.txt", z.join("\n"), "w");
+    if (ns.getHostname() !== "home") ns.scp("data/joinrun.txt", "home", ns.getHostname());
+  };
+
+  try {
+    // Die Bremse fuer bn4life setzen, sonst schiebt es Verbrechen dazwischen
+    // und das Training bricht jede Sekunde ab. Gleiches Muster wie in
+    // bn4rep.js, dort steht die Begruendung ausfuehrlich.
+    const bremse = () => {
+      ns.write("data/rep-modus.txt", "JOINRUN|" + Date.now(), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
+    };
+
+    const werte = () => {
+      const k = ns.getPlayer().skills;
+      return { strength: k.strength, defense: k.defense, dexterity: k.dexterity, agility: k.agility };
+    };
+
+    sag(`Start. Werte ${JSON.stringify(werte())}, Ziel ${ZIEL}, Stadt ${ns.getPlayer().city}`);
+
+    // Sector-12 hat mit "Powerhouse Gym" das beste Studio. Von Aevum aus ist
+    // die Reise billig, und Sector-12 ist ohnehin schon Heimatfaktion.
+    if (ns.getPlayer().city !== "Sector-12") {
+      if (s.travelToCity("Sector-12")) sag("Nach Sector-12 gereist.");
+      else sag("Reise nach Sector-12 fehlgeschlagen.");
+    }
+
+    // gymWorkout erwartet die Kurzform ("str"/"def"/"dex"/"agi"), der
+    // Spielerdatensatz nennt die Werte ausgeschrieben. Deshalb beides.
+    const REIHE = [
+      { feld: "strength", kurz: "str" },
+      { feld: "defense", kurz: "def" },
+      { feld: "dexterity", kurz: "dex" },
+      { feld: "agility", kurz: "agi" },
+    ];
+    while (Date.now() - start < FRIST_MS) {
+      bremse();
+      const w = werte();
+      const offen = REIHE.filter((k) => w[k.feld] < ZIEL);
+      if (!offen.length) { sag(`Alle Kampfwerte >= ${ZIEL}: ${JSON.stringify(w)}`); break; }
+      const naechst = offen.sort((a, b) => w[a.feld] - w[b.feld])[0];
+      const arbeit = s.getCurrentWork();
+      const trainiertSchon = arbeit && arbeit.type === "CLASS" && String(arbeit.classType).toLowerCase().includes(naechst.kurz);
+      if (!trainiertSchon) {
+        if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
+        else sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
+      }
+      await ns.sleep(15000);
+    }
+
+    const w = werte();
+    sag(`Training beendet: ${JSON.stringify(w)}`);
+
+    // Ishima erfuellt die Stadtbedingung fuer Tetrads UND Tian Di Hui.
+    if (s.travelToCity("Ishima")) sag("Nach Ishima gereist.");
+
+    // Auf Einladungen warten. Die Pruefung laeuft im Spiel im Sekundentakt.
+    const wunsch = ["Slum Snakes", "Tetrads", "Tian Di Hui"];
+    for (let i = 0; i < 40; i++) {
+      const drin = ns.getPlayer().factions;
+      const fehlt = wunsch.filter((f) => !drin.includes(f));
+      if (!fehlt.length) break;
+      for (const f of s.checkFactionInvitations()) {
+        if (wunsch.includes(f) && s.joinFaction(f)) sag("BEIGETRETEN: " + f);
+      }
+      await ns.sleep(3000);
+    }
+
+    const drin = ns.getPlayer().factions;
+    sag("Faktionen: " + drin.join(", "));
+    const eigen = new Set(s.getOwnedAugmentations(true));
+    let neu = 0;
+    for (const f of wunsch) {
+      if (!drin.includes(f)) { sag(`${f}: NICHT drin.`); continue; }
+      for (const a of s.getAugmentationsFromFaction(f)) {
+        if (eigen.has(a)) continue;
+        neu++;
+        sag(`  ${f}: ${a} | Rep ${ns.format.number(s.getAugmentationRepReq(a))}`);
+      }
+    }
+    sag(`Neu erreichbar: ${neu} Augmentierungen.`);
+  } catch (e) {
+    sag("FEHLER: " + String(e && e.message ? e.message : e));
+  } finally {
+    // Bremse loesen, damit bn4rep die Faktionsarbeit zurueckbekommt.
+    try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
+  }
+}

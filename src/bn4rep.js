@@ -363,6 +363,22 @@ export async function main(ns) {
     const offeneLuecken = kandidaten
       .filter((k) => k.rep < k.repReq).map((k) => k.repReq - k.rep);
     const kleinsteLuecke = offeneLuecken.length ? Math.min(...offeneLuecken) : null;
+    // VORAUSSCHAU, 22.08.2026. teuerstesVerdiente unten sieht nur, was schon
+    // verdient ist - und genau deshalb sah der Bot am 22.08. keinen Grund
+    // einzubauen, obwohl kein einziges Stueck mehr bezahlbar war: verdient war
+    // nichts, also stand die Zahl auf null. Die kleinste Luecke betrug 1.494
+    // Reputation, was nach "gleich geschafft" aussieht; das Stueck dahinter
+    // kostete bei elf wartenden Augmentierungen aber 1,9^11 = 1.165 mal seinen
+    // Grundpreis, also 11 Billionen bei 104 Milliarden Guthaben.
+    // Der Bot haette acht Minuten Reputation erarbeitet, die der danach
+    // ohnehin faellige Einbau wieder auf null setzt - Faktionsreputation
+    // ueberlebt den Einbau nicht, nur Favor.
+    // Deshalb hier derselbe Test auf das NAECHSTE Stueck statt nur auf die
+    // schon verdienten. Fuer die Bewertung zaehlt der Preis, nicht die Naehe.
+    const naechstes = kandidaten
+      .filter((k) => k.rep < k.repReq)
+      .sort((a, b) => (a.repReq - a.rep) - (b.repReq - b.rep))[0];
+    const naechstesUnbezahlbar = !!naechstes && naechstes.preis > geld * 4;
     // "Nichts mehr offen" ist nur dann ein Einbaugrund, wenn auch nichts mehr
     // zu KAUFEN ist. Sonst baute der Bot ein, waehrend eine verdiente und
     // bezahlbare Augmentierung noch im Regal liegt - und die waere nach dem
@@ -418,12 +434,15 @@ export async function main(ns) {
     }
     if (wartend >= MINDEST_WARTESCHLANGE
         && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
-            || nichtsMehrOffen || geldWegZu)
+            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar)
         && !gesperrt) {
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
         + (geldWegZu ? "naechstes Stueck kostet "
             + Math.round(teuerstesVerdiente / 1e6) + "m bei "
             + Math.round(geld / 1e6) + "m Guthaben"
+          : naechstesUnbezahlbar ? "naechstes Stueck (" + naechstes.aug + ") kostet "
+              + Math.round(naechstes.preis / 1e6) + "m bei "
+              + Math.round(geld / 1e6) + "m Guthaben - Arbeit daran waere vergeblich"
           : nichtsMehrOffen ? "nichts mehr offen in den beigetretenen Faktionen"
           : "naechste Huerde erst in " + Math.round(kleinsteLuecke) + " Reputation") + ". "
         + "bn4life.js startet danach von selbst.");

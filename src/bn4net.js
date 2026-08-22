@@ -466,7 +466,26 @@ export async function main(ns) {
       // zugeteilten Faeden. 180 genuegen laut Messung fuer die volle
       // Erfahrungsrate (joesguns: 0,262 Erfahrung je Faden und Sekunde), jeder
       // Faden darueber ist im Geldziel mehr wert.
-      const EXP_THREAD_BUDGET = 180;
+      //
+      // ABER: 180 Faeden sind 315 GB, und das ist nur dann ein kleiner Posten,
+      // wenn das Netz gross ist. Direkt nach einem Augmentierungs-Einbau sind
+      // alle gekauften Rechner weg (Prestige.ts:73), home faellt auf seine
+      // Reserve zurueck, und vom Netz bleiben wenige hundert GB - das
+      // Erfahrungsbudget allein frass dann ALLES, und fuer die Geldziele blieb
+      // nichts. Belegt im Verlauf: nach dem Einbau um 21:55 stieg das
+      // Hacking-Level ueber vierzig Minuten von 36 auf 186, das Geld aber nur
+      // von 12,5 auf 13,9 Millionen - also praktisch kein Einkommen, genau in
+      // der Phase, in der es fuer den Wiederaufbau am noetigsten waere.
+      //
+      // Deshalb zusaetzlich am Netz gedeckelt: hoechstens ein Fuenftel des
+      // gerooteten Speichers geht an die Erfahrung. Ein Fuenftel, weil die
+      // Erfahrung in diesem BitNode zwar der eigentliche Zweck der Arbeiter
+      // ist (HackExpGain 0.4, Level 9000 fuer w0r1d_d43m0n), das Einkommen
+      // aber die Rechner bezahlt, auf denen die Erfahrung entsteht. Bei
+      // 7276 GB Netz greift der Deckel nicht (1455 GB Spielraum gegen 315 GB
+      // Bedarf); er greift genau dann, wenn das Netz klein ist.
+      const EXP_THREAD_BUDGET = Math.max(1, Math.min(180,
+        Math.floor((ramTotal * 0.2) / Math.max(expRam, 1))));
       // Laufende Faeden mitzaehlen, nicht nur neu vergebene. hack, grow und
       // weaken dauern deutlich laenger als eine Runde von zehn Sekunden - bei
       // niedrigem Level sind es Minuten. Ein Zaehler, der jede Runde bei null
@@ -744,18 +763,54 @@ export async function main(ns) {
           .filter((pr) => pr.filename === "worker/share.js")
           .reduce((n, pr) => n + pr.threads, 0);
 
+        // ZWEI FEHLER BIS 22.08.2026, beide im Deckel:
+        //
+        // (1) shareGesamt zaehlte nur die schon LAUFENDEN Faeden, nicht die
+        //     in derselben Runde neu gestarteten. In der ersten Runde des
+        //     repModus stand der Zaehler deshalb auf jedem Rechner bei null,
+        //     und jeder durfte den vollen Deckel ausschoepfen - der netzweite
+        //     Deckel wirkte faktisch pro Rechner.
+        // (2) Ein einmal entstandener Ueberhang wurde nie wieder abgebaut.
+        //     worker/share.js laeuft endlos und wurde nur beendet, wenn der
+        //     repModus ganz endete. Ohne (2) haette (1) allein nichts
+        //     geholfen: Die zuviel gestarteten Faeden waeren stehengeblieben.
+        //
+        // Gemessene Folge: 250 Faeden statt 100, also 1000 statt 400 GB - ein
+        // Fuenftel des Netzes.
+        //
+        // Der Handel dahinter, weil er nicht offensichtlich ist: Der Bonus
+        // ist 1 + ln(n)/25 (NetworkShare/Share.ts:44). 100 Faeden geben
+        // +18.4 %, 250 geben +22.1 %. Die 150 Faeden dazwischen kosten 600 GB
+        // - bei gemessenen 320 $/GB*s rund 192 k$/s - und bringen 3.1
+        // Prozentpunkte Reputation. Das ist der schlechteste Teil einer
+        // ohnehin logarithmischen Kurve. Der Deckel selbst bleibt bei 100;
+        // ob 100 die richtige Zahl ist, ist eine Frage an die Reputations-
+        // rate und wird hier NICHT nebenbei mitentschieden.
+        let shareHier = shareLaeuft;
         if (!repModus) {
           if (shareLaeuft) ns.scriptKill("worker/share.js", host);
+          shareHier = 0;
         } else if (shareBraucht > 0 && host !== "home") {
-          const nochOffen = Math.max(0, SHARE_DECKEL - shareGesamt - shareLaeuft);
-          const passt = Math.floor((frei * 0.5) / shareBraucht);
-          const shareFaeden = Math.min(nochOffen, passt);
-          if (shareFaeden >= 1) {
-            if (ns.exec("worker/share.js", host, shareFaeden) === 0) fehlstart++;
-            freiFuerSkript = frei - shareFaeden * shareBraucht;
+          const nochOffen = Math.max(0, SHARE_DECKEL - shareGesamt);
+          if (shareHier > nochOffen) {
+            // Ueberhang. Ganz raeumen und im naechsten Durchgang gedeckelt
+            // neu aufbauen, statt einzelne Prozesse zu suchen: share-Faeden
+            // sind gleichwertig und ihr Nutzen faengt beim Neustart ohne
+            // Verlust wieder an - anders als bei hack, grow und weaken, wo
+            // ein Abbruch die ganze Laufzeit wegwirft.
+            ns.scriptKill("worker/share.js", host);
+            shareHier = 0;
+          } else if (shareHier < nochOffen) {
+            const passt = Math.floor((frei * 0.5) / shareBraucht);
+            const shareFaeden = Math.min(nochOffen - shareHier, passt);
+            if (shareFaeden >= 1) {
+              if (ns.exec("worker/share.js", host, shareFaeden) === 0) fehlstart++;
+              freiFuerSkript = frei - shareFaeden * shareBraucht;
+              shareHier += shareFaeden;
+            }
           }
         }
-        shareGesamt += shareLaeuft;
+        shareGesamt += shareHier;
 
         // Die Argumente muessen zum Protokoll der Arbeiter passen: args[1] ist
         // dort die Verzoegerung in Millisekunden (worker/hack.js:38-40) und

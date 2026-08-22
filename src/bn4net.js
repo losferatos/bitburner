@@ -57,6 +57,19 @@ export async function main(ns) {
   // Netzes binden, ohne dass es irgendwo auffiel.
   const anlaufSeit = new Map();     // Ziel -> Zeitstempel des Anlaufbeginns
   const gesperrtBis = new Map();    // Ziel -> Zeitstempel, ab dem es wieder darf
+  // --- Stapelbetrieb (HWGW), Zustand ueber Rundengrenzen hinweg ------------
+  // batchStand: Ziel -> { phase, proben[], fraction, stapel, seitLeer }
+  //   phase "prep"  vorbereiten: Sicherheit auf das Minimum, Guthaben auf 100 %
+  //   phase "batch" Stapel takten
+  //   phase "drain" auslaufen lassen, weil die Kette aus der Reihe lief
+  // batchKalender: Ziel -> Zeitpunkt der ZULETZT eingeplanten Landung.
+  //   Das ist der Kern des ganzen Verfahrens. Er wird nur nach vorn gesetzt,
+  //   nie zurueck - deshalb kann ein neuer Stapel einen alten NIE ueberholen,
+  //   egal wie sehr das Hacking-Level zwischendurch steigt und die Laufzeiten
+  //   verkuerzt. Landezeiten sind absolute Wanduhrzeiten, keine relativen
+  //   Fristen; ein kuerzer gewordener Stapel startet einfach spaeter.
+  const batchStand = new Map();
+  const batchKalender = new Map();
   // Der mittlere Gleichgewichtsertrag der laufenden Geldziele in $/GB*s, aus
   // der VORIGEN Runde. Die Serveraufruestung braucht ihn (Abschnitt 1a2), er
   // entsteht aber erst in Abschnitt 2 - eine Runde Verzoegerung ist dabei
@@ -626,6 +639,12 @@ export async function main(ns) {
       const brauchbar = p > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
       return {
         p, chance, k,
+        // Dieselben Groessen im VORBEREITETEN Zustand. Der Stapelbetrieb
+        // braucht genau sie: seine Auftraege landen auf einem Server, der auf
+        // Mindestsicherheit steht, also gelten dort pMin/chanceMin/kMin - und
+        // zwar fuer jeden Stapel dieselben, sonst verschiebt sich die Kette
+        // mit jeder Ablesung der Momentansicherheit selbst.
+        pMin, chanceMin, kMin, hackTimeMin,
         steadyEff: brauchbar ? (s.moneyMax * MIX_MONEY_HIGH * beute) / gbSekProEinheit : null,
         kapazitaet: brauchbar ? (KAP_ABZUG * gbSekProEinheit) / (hackTimeMin * beute) : 0,
       };
@@ -681,13 +700,60 @@ export async function main(ns) {
     if (moneyTargets.length === 0 && expTarget) moneyTargets = [expTarget];
     const sameTarget = moneyTargets.length === 1 && moneyTargets[0] === expTarget;
 
+    // --- Stapelziele aussondern (Stufe 4, 22.08.2026) ---------------------
+    // Ein Stapelziel wird NICHT mehr von der offenen Steuerung bedient. Beide
+    // Verfahren auf demselben Server gleichzeitig waere das Schlechteste aus
+    // zwei Welten: die offenen hack-Wellen landen ungetaktet zwischen den
+    // Stapeln, heben die Sicherheit und verschieben deren Laufzeiten.
+    //
+    // Warum ueberhaupt zwei Verfahren nebeneinander bleiben: Der Stapel ist
+    // pro Gigabyte SCHLECHTER als die ideale Mischung - in ihm wartet jeder
+    // Faden bis zu einer weaken-Zeit auf seinen Landeplatz, statt nur seine
+    // eigene Aktionsdauer zu belegen. Gerechnet fuer omega-net: 4*tHack*(1.7
+    // + gph*1.75 + wph*1.75) statt tHack*(1.7 + 3.2*gph*1.75 + 4*wph*1.75),
+    // also gut das Doppelte an GB-Sekunden fuer dieselbe Beute. Sein Vorteil
+    // liegt woanders und ist groesser: er ist GESCHLOSSEN. Die offene
+    // Steuerung erreicht ihr Modell nachweislich nicht (gemessen 110 gegen
+    // 208 $/GB*s) und kann pro Ziel nur KAP_ABZUG aufnehmen, weil ungetaktete
+    // Wellen den Server sonst leerraeumen. Der Stapel nimmt statt 1.779 GB
+    // (omega-net, KAP_ABZUG 0.2) rund 8.100 GB auf und liefert dabei
+    // rechnerisch 237 $/GB*s - also mehr als das Doppelte des gemessenen
+    // Ist-Werts, auf ein Mehrfaches des Speichers.
+    //
+    // Deshalb: die besten Ziele in den Stapelbetrieb, der Rest bleibt bei der
+    // offenen Steuerung, die den uebrigen Speicher weiter aufnimmt.
+    const BATCH_ZIELE = Number(ns.read("data/batch-ziele.txt")) || 0;
+    // Unter dieser Netzgroesse gar kein Stapelbetrieb. Nach einem
+    // Augmentierungs-Einbau sind alle gekauften Rechner weg (Prestige.ts:73)
+    // und das Netz faellt auf wenige hundert GB - dann passt kein Stapel, und
+    // ein Ziel, das auf seinen ersten Stapel wartet, waere ein Ziel, das gar
+    // nichts tut. Unterhalb der Schwelle uebernimmt wieder die offene
+    // Steuerung, ohne dass irgendjemand eingreifen muss.
+    const BATCH_MIN_NETZ_GB = 3000;
+    // Das Erfahrungsziel bleibt aussen vor: Es hat sein eigenes Fadenbudget
+    // und bekommt zusaetzlich den Ueberschuss - beides wuerde ungetaktet
+    // zwischen den Stapeln landen. Der Fall tritt nur ueber den Notnagel
+    // "moneyTargets = [expTarget]" weiter oben ueberhaupt ein.
+    const batchTargets = (BATCH_ZIELE > 0 && ramTotal >= BATCH_MIN_NETZ_GB)
+      ? moneyTargets.filter((h) => h !== expTarget).slice(0, BATCH_ZIELE) : [];
+    if (batchTargets.length) {
+      moneyTargets = moneyTargets.filter((h) => !batchTargets.includes(h));
+    }
+    // Zustaende von Zielen aufraeumen, die nicht mehr Stapelziel sind - sonst
+    // kaeme ein Ziel nach Stunden mit einem uralten Kalender zurueck und
+    // wuerde Stapel in die Vergangenheit legen.
+    for (const h of [...batchStand.keys()]) {
+      if (!batchTargets.includes(h)) { batchStand.delete(h); batchKalender.delete(h); }
+    }
+
     let fehlstart = 0;
     let mixStat = null;
+    let batchStat = null;
     // Speicher, den die Geldziele in dieser Runde nicht aufnehmen konnten und
     // der deshalb an die Erfahrung ging. Gehoert nach draussen: Er ist das
     // Mass dafuer, ob sich weiterer Serverausbau ueberhaupt noch lohnt.
     let ueberschussGb = 0;
-    if (expTarget || moneyTargets.length) {
+    if (expTarget || moneyTargets.length || batchTargets.length) {
       // Aktionswahl fuer das ERFAHRUNGSziel: hier bleibt es beim Dreifach-
       // Ternaer. Erfahrung haengt allein am Server und an der Fadenzahl -
       // calculateHackingExpGain (Hacking.ts:29-38) unterscheidet die drei
@@ -823,6 +889,11 @@ export async function main(ns) {
       let expRamAssigned = 0;
       const flight = new Map();
       for (const h of moneyTargets) flight.set(h, { hack: 0, grow: 0, weaken: 0 });
+      // Stapelziele gehoeren mit in die Zaehlung. Die Vorbereitungsphase
+      // rechnet gegen, was schon fliegt (sonst legt sie jede Runde eine
+      // weitere volle Korrekturwelle obendrauf), und das Auslaufen erkennt
+      // ueber dieselbe Zahl, wann der letzte Stapel gelandet ist.
+      for (const h of batchTargets) flight.set(h, { hack: 0, grow: 0, weaken: 0 });
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
         for (const pr of ns.ps(host)) {
@@ -1130,6 +1201,362 @@ export async function main(ns) {
         }
 
         if (freiFuerSkript > 0) restFrei.set(host, freiFuerSkript);
+      }
+
+      // --- Durchgang 1b: Stapelbetrieb HWGW (Stufe 4, 22.08.2026) ----------
+      //
+      // Der strukturelle Unterschied zu allem darueber: Hier wird nicht mehr
+      // "der gerade freie Speicher" verteilt, sondern ein VOLLSTAENDIGER
+      // Stapel reserviert und nur gestartet, wenn er ganz passt. Vier
+      // Auftraege, feste Reihenfolge, feste Landeabstaende:
+      //
+      //   hack     nimmt den Anteil f vom vollen Guthaben
+      //   weaken   hebt die Sicherheit des hack wieder auf
+      //   grow     holt das Guthaben zurueck auf das Maximum
+      //   weaken   hebt die Sicherheit des grow wieder auf
+      //
+      // Das Verfahren beruht auf einer Asymmetrie im Spielcode: Die DAUER
+      // einer Aktion wird einmalig beim Aufruf festgelegt (NetscriptHelpers
+      // .tsx:598, netscriptDelay :469-482 ist ein einziges setTimeout, keine
+      // Neubewertung), die WIRKUNG dagegen erst beim Landen aus dem dann
+      // aktuellen Serverzustand (:616-629 fuer hack, ServerHelpers.ts:204-224
+      // fuer grow). Wer die Landezeitpunkte in der Hand hat, kann jeden hack
+      // auf ein Ziel treffen lassen, das genau auf Hoechstguthaben und
+      // Mindestsicherheit steht - dort ist Beuteanteil und Erfolgschance am
+      // groessten und die Laufzeit am kuerzesten.
+      //
+      // DAS UEBERHOL-PROBLEM bei steigendem Level: Bei jedem Levelaufstieg
+      // wird hackTime um 1/(Level+50) kuerzer, bei Level 501 also um 0,2 % je
+      // Punkt - auf eine weaken-Zeit von 134 s sind das 270 ms je Level, und
+      // das Level steigt hier mehrmals je Minute. Wer Stapel mit RELATIVEN
+      // Fristen plant ("dieser Stapel startet 1,6 s nach dem letzten"), laesst
+      // den neuen den alten einholen. Deshalb ist der Kalender (batchKalender)
+      // eine absolute Wanduhrzeit: Ein neuer Stapel bekommt seine Landung
+      // frueheste GAP_MS nach der letzten schon vergebenen Landung, und der
+      // Kalender wird nur nach vorn gesetzt. Wird ein Stapel durch ein
+      // hoeheres Level kuerzer, startet er einfach spaeter - seine Landung
+      // bleibt, wo sie im Kalender steht. Ueberholen ist damit nicht moeglich,
+      // ohne dass irgendwo eine Fallunterscheidung noetig waere.
+      // Die zweite Haelfte derselben Sache steckt in den Arbeitern: Sie messen
+      // ihre Dauer seit dem 22.08.2026 SELBST, unmittelbar vor dem Aufruf
+      // (worker/hack.js). Sonst ginge jede Sicherheitsaenderung zwischen
+      // Planung und Start ungefiltert in die Landezeit ein - fuer omega-net
+      // waeren das 4,5 s bei 400 ms Landeabstand.
+      if (batchTargets.length) {
+        // Abstand zwischen zwei Landungen desselben Stapels und zwischen den
+        // Stapeln. Der einzige wirklich heikle Wert: zu klein, und eine
+        // verrutschte Landung dreht die Reihenfolge um - dann faellt das
+        // Guthaben nicht sanft, sondern binnen Minuten auf null. Zu gross, und
+        // der Kalender wird zum Engpass, weil jeder Stapel 4*gap Kalenderzeit
+        // belegt und in eine weaken-Zeit nur tWeaken/(4*gap) Stapel passen.
+        // 400 ms stammen aus der Simulation des BitNode-1-Autopiloten (dort
+        // 300 ms Streuung unbeschadet ueberstanden) und sind hier zum ersten
+        // Mal am laufenden Spiel. Der Wert bestimmt NICHT den Ertrag je
+        // Gigabyte - nur, wieviel Speicher ein Ziel aufnehmen kann.
+        const GAP_MS = 400;
+        // Vorlauf, damit der zuletzt landende Ausgleich beim Start nicht schon
+        // ueberfaellig ist. Grosszuegig, weil zwischen dem exec und dem
+        // ersten Befehl des Arbeiters der REST DIESER RUNDE liegt - bei 95
+        // Rechnern sind das Sekunden, nicht Millisekunden.
+        const SLACK_MS = 5000;
+        // Wie weit vor seinem Starttermin ein Stapel losgeschickt werden darf.
+        // Muss ueber der Rundenlaenge von 10 s liegen, sonst faellt in jeder
+        // Runde ein Teil des Kalenders ersatzlos aus. Der Preis ist, dass die
+        // Faeden bis zu 14 s laenger Speicher binden als noetig - das steckt
+        // in additionalMsec und kostet nur Speicher, keine Genauigkeit.
+        const LEAD_MS = 14000;
+        // Aufschlag auf die Ausgleichsauftraege. Ueberzaehlige weaken-Faeden
+        // sind wirkungslos (die Sicherheit ist nach unten auf minDifficulty
+        // gedeckelt, Server.ts:91-104), zu wenige dagegen lassen nach jedem
+        // Stapel einen Rest stehen, der sich ueber hunderte Stapel aufschaukelt.
+        const WEAKEN_MARGIN = 1.5;
+        // Aufschlag auf das Nachwachsen. Er faengt genau den Fehler ab, den
+        // ein steigendes Level erzeugt: Die Fadenzahl eines Stapels wird beim
+        // Einplanen gerechnet, gelandet wird bis zu einer weaken-Zeit spaeter
+        // - und bis dahin ist p (Beute je Faden) mit dem Level gewachsen. Der
+        // hack nimmt dann etwas mehr, als sein grow zurueckholen sollte, und
+        // ueber hunderte Stapel sackt das Guthaben ab. Zuviel grow ist
+        // dagegen gratis: calculateGrowMoney schneidet bei moneyMax ab, und
+        // die verpuffenden Faeden erhoehen nicht einmal die Sicherheit
+        // (ServerHelpers.ts:210-213 deckelt usedCycles auf die genutzten).
+        // Derselbe Aufschlag deckt den Aufteilungsverlust, wenn die
+        // hack-Faeden auf mehrere Rechner mussten.
+        const GROW_MARGIN = 1.15;
+        const MAX_STAPEL_PRO_RUNDE = 80;
+        // Drifterkennung. In einem gesunden Stapelbetrieb faellt die
+        // Sicherheit nach jedem Stapel exakt auf das Minimum zurueck und das
+        // Guthaben auf hoechstens (1-f) unter das Maximum. Beobachtet wird
+        // deshalb nicht der Mittelwert, sondern das MINIMUM ueber ein Fenster:
+        // Wenn selbst der beste Moment der letzten zwei Minuten daneben liegt,
+        // stimmt die Kette nicht mehr - und dann muss der Betrieb ANHALTEN,
+        // nicht stillschweigend weiterrechnen.
+        const DRIFT_PROBEN = 12;
+        const DRIFT_SEC = 1.0;
+        // Anteil des noch freien Speichers, den ein Stapelziel je Runde
+        // hoechstens an sich ziehen darf. Ohne die Bremse fuellt ein einzelnes
+        // Ziel beim kalten Start seinen ganzen Kalender auf einen Schlag und
+        // laesst der offenen Steuerung eine Runde lang gar nichts.
+        const BATCH_ANTEIL = 0.6;
+        // Erntanteile, aufsteigend. Kleines f ist speichereffizienter (hack
+        // nimmt linear weg, grow muss multiplikativ zurueckholen), grosses f
+        // laesst ein Ziel mehr Speicher aufnehmen. Gerechnet fuer omega-net:
+        // f=0.02 gibt 237 $/GB*s bei 8.100 GB Aufnahme, f=0.5 nur noch
+        // 192 $/GB*s, dafuer 200.000 GB. Gesucht wird das KLEINSTE f, dessen
+        // voller Kalender ungefaehr den Anteil des Netzes fasst, der diesem
+        // Ziel zusteht.
+        const F_LEITER = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5];
+        const F_NETZANTEIL = 0.15;
+
+        const freiGesamt = () => {
+          let s = 0;
+          for (const gb of restFrei.values()) s += gb;
+          return s;
+        };
+        const batchInfo = [];
+
+        for (const ziel of batchTargets) {
+         // Je Ziel abgesichert. Wirft die Kennzahlenrechnung fuer EINEN
+         // Server, soll nicht die ganze Runde ausfallen - dann stuende auch
+         // die offene Steuerung fuer alle uebrigen Ziele still.
+         try {
+          const s = ns.getServer(ziel);
+          let st = batchStand.get(ziel);
+          if (!st) {
+            st = { phase: "prep", proben: [], fraction: F_LEITER[0], stapel: 0 };
+            batchStand.set(ziel, st);
+          }
+          const fl = flight.get(ziel) || { hack: 0, grow: 0, weaken: 0 };
+          const laeuft = fl.hack + fl.grow + fl.weaken;
+          const secOver = Math.max(0, s.hackDifficulty - s.minDifficulty);
+          const moneyFrac = s.moneyMax > 0 ? s.moneyAvailable / s.moneyMax : 0;
+          let neueStapel = 0, secBoden = null, geldBoden = null;
+
+          // --- Drifterkennung, bevor irgendetwas Neues gestartet wird ------
+          if (st.phase === "batch") {
+            st.proben.push({ sec: secOver, geld: moneyFrac });
+            if (st.proben.length > DRIFT_PROBEN) st.proben.shift();
+            if (st.proben.length >= DRIFT_PROBEN) {
+              secBoden = Infinity; geldBoden = Infinity;
+              for (const pr of st.proben) {
+                if (pr.sec < secBoden) secBoden = pr.sec;
+                if (pr.geld < geldBoden) geldBoden = pr.geld;
+              }
+              // Untergrenze fuers Guthaben: im gesunden Betrieb faellt es nie
+              // unter (1-f), denn genau so viel nimmt ein Stapel weg. Der
+              // Faktor 0.5 laesst Platz dafuer, dass sich zwei Stapel einmal
+              // ueberholen, ohne dass gleich alles angehalten wird.
+              const grenze = Math.max(0.05, (1 - st.fraction) * 0.5);
+              if (secBoden > DRIFT_SEC || geldBoden < grenze) {
+                st.phase = "drain";
+                st.proben = [];
+                sag(ziel + ": Stapel laufen aus der Reihe (Sicherheitsboden +"
+                  + secBoden.toFixed(2) + ", Guthabenboden "
+                  + Math.round(geldBoden * 100) + " %, Grenze "
+                  + Math.round(grenze * 100) + " %) - Kette wird angehalten.");
+              }
+            }
+          }
+          // Auslaufen: keine neuen Stapel, bis der letzte gelandet ist. Erst
+          // dann darf neu vorbereitet werden - wer schon waehrend des
+          // Auslaufens wieder Faeden schickt, kommt nie aus dem Zustand heraus.
+          if (st.phase === "drain" && laeuft === 0) {
+            st.phase = "prep";
+            batchKalender.delete(ziel);
+            st.stapel = 0;
+          }
+
+          // --- Vorbereiten -------------------------------------------------
+          // Erst die Sicherheit auf das Minimum, DANN das Guthaben auf 100 %.
+          // Die Reihenfolge ist nicht Geschmack: k haengt ueber log1p(0.03/hd)
+          // am Kehrwert der Sicherheit (grow.ts:17), Wachstum bei hoher
+          // Sicherheit ist also ein Vielfaches teurer.
+          // Diese Auftraege bekommen ausdruecklich KEINE Landezeit (0, 0) -
+          // sie sollen so schnell wie moeglich wirken, nicht getaktet.
+          if (st.phase === "prep") {
+            let budget = freiGesamt() * BATCH_ANTEIL;
+            const weakenNoetig = Math.ceil(
+              (secOver + FORTIFY_GROW * fl.grow) / WEAKEN_POWER) - fl.weaken;
+            if (weakenNoetig > 0) {
+              const n = Math.min(weakenNoetig, Math.floor(budget / ramWeaken));
+              if (n >= 1) {
+                const ops = [{ script: "worker/weaken.js", threads: n, cost: ramWeaken }];
+                const b = platziere(restFrei, ops);
+                if (b) {
+                  for (const stueck of b.belegung) {
+                    if (ns.exec("worker/weaken.js", stueck.host, stueck.threads,
+                      ziel, 0, 0, 0, "p" + runde) === 0) fehlstart++;
+                  }
+                  for (const [h, gb] of b.frei) restFrei.set(h, gb);
+                }
+              }
+            } else if (moneyFrac < 0.9999) {
+              const kz0 = kennzahlen(ziel, s);
+              const growNoetig = growFaeden(kz0.kMin, s.moneyMax,
+                s.moneyAvailable, s.moneyMax) - fl.grow;
+              const n = Math.min(Math.ceil(growNoetig), Math.floor(budget / ramGrow));
+              if (n >= 1) {
+                const ops = [{ script: "worker/grow.js", threads: n, cost: ramGrow }];
+                const b = platziere(restFrei, ops);
+                if (b) {
+                  for (const stueck of b.belegung) {
+                    if (ns.exec("worker/grow.js", stueck.host, stueck.threads,
+                      ziel, 0, 0, 0, "p" + runde) === 0) fehlstart++;
+                  }
+                  for (const [h, gb] of b.frei) restFrei.set(h, gb);
+                }
+              }
+            } else if (laeuft === 0) {
+              // Fertig - und zwar wirklich: kein Faden mehr unterwegs, der
+              // die Sicherheit noch heben oder das Guthaben noch bewegen
+              // koennte. Ein landender grow waehrend der ersten Stapel wuerde
+              // deren Laufzeiten verschieben.
+              st.phase = "batch";
+              st.proben = [];
+              st.stapel = 0;
+              batchKalender.set(ziel, 0);
+              sag(ziel + " ist vorbereitet - Stapelbetrieb beginnt.");
+            }
+          }
+
+          // --- Stapel takten -----------------------------------------------
+          if (st.phase === "batch") {
+            const kz = kennzahlen(ziel, s);
+            // Fadenzahlen im VORBEREITETEN Zustand rechnen (Sicherheit am
+            // Minimum), nicht im gerade abgelesenen. Genau dort landen die
+            // Auftraege, dort wirken sie - und nur so bekommt jeder Stapel
+            // dieselben Zahlen, statt dass sich die Kette selbst verschiebt.
+            const pMin = kz.pMin, chanceMin = kz.chanceMin, kMin = kz.kMin;
+            // Die LAUFZEIT dagegen bei der jetzigen Sicherheit - das Spiel
+            // bestimmt sie beim Aufruf. Sie geht nur in den fruehesten
+            // moeglichen Landetermin ein; die Feinkorrektur macht der Arbeiter
+            // selbst.
+            const tHack = ns.getHackTime(ziel);
+            const tWeaken = tHack * 4;
+            if (pMin > 0 && kMin > 0 && tHack > 0 && s.moneyMax > 0) {
+              const kalenderPlaetze = Math.max(1, Math.floor(tWeaken / (4 * GAP_MS)));
+              // f waehlen: das kleinste, dessen voller Kalender den Anteil des
+              // Netzes fasst, der diesem Ziel zusteht.
+              const wunschGb = ramTotal * F_NETZANTEIL;
+              let fraction = F_LEITER[F_LEITER.length - 1];
+              const stapelPlan = (f) => {
+                const hackT = Math.max(1, Math.floor(f / pMin));
+                // Ein Block mit n Faeden nimmt p*n vom AKTUELLEN Guthaben -
+                // linear, nicht multiplikativ (NetscriptHelpers.tsx:629).
+                const echt = Math.min(0.99, pMin * hackT);
+                const growT = Math.max(1, Math.ceil(
+                  growFaeden(kMin, s.moneyMax, s.moneyMax * (1 - echt), s.moneyMax)
+                  * GROW_MARGIN));
+                const w1 = Math.max(1, Math.ceil(hackT * FORTIFY_HACK * WEAKEN_MARGIN / WEAKEN_POWER));
+                const w2 = Math.max(1, Math.ceil(growT * FORTIFY_GROW * WEAKEN_MARGIN / WEAKEN_POWER));
+                return {
+                  hackT, growT, w1, w2, echt,
+                  ram: hackT * ramHack + growT * ramGrow + (w1 + w2) * ramWeaken,
+                  geld: echt * s.moneyMax * chanceMin,
+                };
+              };
+              for (const f of F_LEITER) {
+                const pl = stapelPlan(f);
+                fraction = f;
+                if (pl.ram * kalenderPlaetze >= wunschGb) break;
+              }
+              st.fraction = fraction;
+              const plan = stapelPlan(fraction);
+
+              let kalender = batchKalender.get(ziel) || 0;
+              let budget = freiGesamt() * BATCH_ANTEIL;
+              while (neueStapel < MAX_STAPEL_PRO_RUNDE && budget >= plan.ram) {
+                const jetzt = Date.now();
+                // Der zuletzt landende Ausgleich hat die laengste Laufzeit.
+                // Frueher als (jetzt + tWeaken) kann er nicht landen, also darf
+                // der hack - der 3*gap vor ihm liegt - nicht frueher stehen.
+                const frueheste = jetzt + tWeaken - 3 * GAP_MS + SLACK_MS;
+                const landHack = Math.max(kalender + GAP_MS, frueheste);
+                // Gehoert dieser Stapel schon in diese Runde? Massgeblich ist,
+                // ob sein zuletzt landender Ausgleich jetzt startbar waere.
+                if (landHack + 3 * GAP_MS - tWeaken > jetzt + LEAD_MS) break;
+
+                const ops = [
+                  { art: "hack", script: "worker/hack.js", threads: plan.hackT, cost: ramHack, landAt: landHack, dauer: tHack },
+                  { art: "weaken1", script: "worker/weaken.js", threads: plan.w1, cost: ramWeaken, landAt: landHack + GAP_MS, dauer: tWeaken },
+                  { art: "grow", script: "worker/grow.js", threads: plan.growT, cost: ramGrow, landAt: landHack + 2 * GAP_MS, dauer: tHack * 3.2 },
+                  { art: "weaken2", script: "worker/weaken.js", threads: plan.w2, cost: ramWeaken, landAt: landHack + 3 * GAP_MS, dauer: tWeaken },
+                ];
+                const b = platziere(restFrei, ops);
+                if (!b) break;
+
+                // Festschreiben - und die Ernte ZULETZT. Sollte ein exec
+                // scheitern, fehlt dann hoechstens die Beute. Waere sie zuerst
+                // gestartet, koennte ihr das Nachwachsen fehlen, und genau
+                // daraus wird ein Ziel, das langsam ausblutet.
+                let abbruch = false;
+                for (const op of [ops[1], ops[2], ops[3], ops[0]]) {
+                  for (const stueck of b.belegung) {
+                    if (stueck.op !== op) continue;
+                    const pid = ns.exec(op.script, stueck.host, stueck.threads,
+                      ziel, 0, Math.round(op.landAt), Math.round(op.dauer),
+                      "b" + runde + "-" + neueStapel);
+                    if (!pid) { abbruch = true; fehlstart++; break; }
+                  }
+                  if (abbruch) break;
+                }
+                for (const [h, gb] of b.frei) restFrei.set(h, gb);
+                budget -= plan.ram;
+                kalender = landHack + 3 * GAP_MS;
+                neueStapel++;
+                st.stapel++;
+                if (abbruch) break;
+              }
+              batchKalender.set(ziel, kalender);
+
+              // STILLSTANDSWACHE. Ein Ziel im Stapelbetrieb, das keinen
+              // einzigen Stapel mehr unterbringt und auch nichts mehr fliegen
+              // hat, verdient nichts und blockiert zugleich seinen Platz - die
+              // offene Steuerung fasst es ja nicht mehr an. Das kann jederzeit
+              // eintreten, wenn das Netz schrumpft: ein Augmentierungs-Einbau
+              // loescht alle gekauften Rechner (Prestige.ts:73). Fuer den
+              // grossen Fall greift BATCH_MIN_NETZ_GB, fuer den schleichenden
+              // diese Wache.
+              //
+              // Behandelt wird er ueber die schon vorhandene Sperrliste: Das
+              // Ziel faellt fuer eine Weile aus den Kandidaten, damit wird der
+              // naechstbeste Server zum Stapelziel, und nach Ablauf wird es
+              // mit dem dann gueltigen Netz neu versucht.
+              st.leer = neueStapel > 0 ? 0 : (st.leer || 0) + 1;
+              if (st.leer >= 30 && laeuft === 0) {
+                gesperrtBis.set(ziel, Date.now() + 10 * 60000);
+                batchStand.delete(ziel);
+                batchKalender.delete(ziel);
+                sag(ziel + ": Stapelbetrieb steht seit fuenf Minuten still (kein"
+                  + " Stapel passt, nichts unterwegs) - 10 min gesperrt, das"
+                  + " naechstbeste Ziel rueckt nach.");
+              }
+              batchInfo.push({
+                ziel, phase: st.phase, fraction, neueStapel,
+                gesamt: st.stapel,
+                stapelGb: Math.round(plan.ram),
+                kalenderPlaetze,
+                belegtGb: Math.round(fl.hack * ramHack + fl.grow * ramGrow + fl.weaken * ramWeaken),
+                erwartetProS: Math.round(plan.geld / (4 * GAP_MS / 1000)),
+                secBoden: secBoden === null ? null : Number(secBoden.toFixed(2)),
+                geldBoden: geldBoden === null ? null : Number(geldBoden.toFixed(3)),
+              });
+            }
+          }
+
+          if (st.phase !== "batch") {
+            batchInfo.push({
+              ziel, phase: st.phase, fraction: st.fraction, neueStapel: 0,
+              gesamt: st.stapel,
+              moneyFrac: Number(moneyFrac.toFixed(3)),
+              secOver: Number(secOver.toFixed(2)),
+              laeuft,
+            });
+          }
+         } catch (e) {
+          if (runde % 10 === 0) sag("Stapelbetrieb " + ziel + " warf: " + String(e));
+         }
+        }
+        batchStat = { gap: GAP_MS, ziele: batchInfo };
       }
 
       // --- Durchgang 2: Geldziele mit gemischten Aktionen -------------------
@@ -1585,10 +2012,14 @@ export async function main(ns) {
       ziel: moneyTargets[0] ?? null,
       expZiel: expTarget,
       zieleAnzahl: moneyTargets.length,
-      // Echtes HWGW-Batching (versetzte Landung ganzer Wellen) ist weiterhin
-      // NICHT gebaut - Stufe 3 mischt die Aktionen nur im richtigen
-      // Verhaeltnis, ohne die Landezeitpunkte zu takten.
-      batchModus: false,
+      // Seit Stufe 4 (22.08.2026) gibt es echtes HWGW-Batching: versetzte,
+      // absolut terminierte Landungen mit reserviertem Speicher. Wieviele
+      // Ziele so gefahren werden, steht in data/batch-ziele.txt und kann ohne
+      // Neustart geaendert werden - das ist die Voraussetzung dafuer, den
+      // Umbau ueberhaupt gegen den einfachen Betrieb messen zu koennen.
+      batchModus: batchTargets.length > 0,
+      batchZiele: batchTargets,
+      stapel: batchStat,
       // Was in dieser Runde je Aktion neu vergeben wurde, plus die Zahl der
       // Ziele in der Anlaufphase und der nicht vergebene Netzspeicher.
       mischung: mixStat,
@@ -1612,4 +2043,105 @@ export async function main(ns) {
    }
     await ns.sleep(10000);
   }
+}
+
+/**
+ * Wieviele grow-Faeden bringen ein Guthaben von start auf ziel?
+ *
+ * Loest n = (o + x) * exp(k*x) nach x auf - dieselbe Gleichung wie das Spiel
+ * (Server/ServerHelpers.ts:90), Newton-Raphson in Log-Form, mit demselben
+ * Startwert. Der additive Anteil von $1 je Faden ist mit drin.
+ *
+ * ns.growthAnalyze taugt dafuer NICHT: numCycleForGrowth laesst genau diesen
+ * additiven Term weg. Fuer growthAnalyze(host, 2) = ln2/k ist es dagegen
+ * zulaessig, denn dort faellt der Term heraus - so kommt k unten in den
+ * Stapelplan.
+ *
+ * Steht ausserhalb von main, weil es keine einzige ns-Funktion braucht und
+ * damit 0 GB kostet.
+ *
+ * @param {number} k Wachstumsexponent EINES Fadens
+ * @param {number} moneyMax Deckel
+ * @param {number} start Guthaben jetzt
+ * @param {number} ziel Wunschguthaben
+ * @returns {number} ganze Faeden, 0 wenn nichts noetig ist
+ */
+function growFaeden(k, moneyMax, start, ziel) {
+  if (!(k > 0)) return 0;
+  const o = Math.max(0, start);
+  const n = Math.min(ziel, moneyMax);
+  if (!(n > o)) return 0;
+  let x = (n - o) / (1 + (n / 16 + (15 * o) / 16) * k);
+  let diff = Infinity, wache = 0;
+  while (Math.abs(diff) > 1 && wache++ < 60) {
+    const ox = o + x;
+    const neu = (x - ox * Math.log(ox / n)) / (1 + ox * k);
+    diff = neu - x;
+    x = neu;
+  }
+  if (!Number.isFinite(x) || x < 0) return 0;
+  let faeden = Math.ceil(x);
+  if (faeden > 0) {
+    const probe = (t) => (o + t) * Math.exp(k * t);
+    if (probe(faeden - 1) >= n) faeden--;
+    else if (probe(faeden) < n) faeden++;
+  }
+  return Math.max(0, faeden);
+}
+
+/**
+ * Sucht Platz fuer eine Reihe von Auftraegen - oder liefert null, wenn auch
+ * nur EINER nicht vollstaendig unterkommt.
+ *
+ * Alles-oder-nichts ist hier keine Feinheit, sondern die zentrale Sicherung
+ * des ganzen Stapelbetriebs. Ein halber Stapel ist schlimmer als gar keiner:
+ * der hack landet, das Guthaben faellt, und der grow, der es zurueckholen
+ * sollte, wurde nie gestartet. Genau daraus entsteht ein Ziel, das langsam
+ * ausblutet - und genau das ist beim Anheben von KAP_ABZUG passiert.
+ *
+ * Herkunft: inhaltsgleich mit placeOps aus src/lib/batch.js. Bewusst kopiert
+ * statt importiert - lib/batch.js zieht lib/calc.js mit, und dessen Formeln
+ * rechnen ohne die BitNode-4-Multiplikatoren (ScriptHackMoney 0.2). Ein
+ * Import haette entweder eine stille Verfuenffachung der Beute je Faden
+ * bedeutet oder einen Umbau an der Datei, an der der BitNode-1-Autopilot
+ * haengt. Diese Funktion hier ist reine Behaelterpackerei und kennt weder
+ * Spielformeln noch BitNode.
+ *
+ * @param {Map<string, number>} frei Rechner -> freie GB. Wird NICHT veraendert.
+ * @param {{threads: number, cost: number}[]} ops
+ * @returns {null | {belegung: {host: string, op: object, threads: number}[], frei: Map<string, number>}}
+ */
+function platziere(frei, ops) {
+  const rest = new Map(frei);
+  const belegung = [];
+  for (const op of ops) {
+    let offen = op.threads;
+    if (offen < 1) continue;
+    // Erst versuchen, den ganzen Auftrag auf EINEN Rechner zu legen, und zwar
+    // auf den kleinsten, der ihn fasst. Das haelt die grossen Rechner fuer die
+    // grossen Auftraege frei und vermeidet beim hack den Aufteilungsverlust:
+    // zwei Bloecke a 10 % nehmen zusammen 19 %, nicht 20 %.
+    let bester = null;
+    for (const [host, platz] of rest) {
+      if (Math.floor(platz / op.cost) < offen) continue;
+      if (bester === null || platz < rest.get(bester)) bester = host;
+    }
+    if (bester !== null) {
+      rest.set(bester, rest.get(bester) - offen * op.cost);
+      belegung.push({ host: bester, op, threads: offen });
+      continue;
+    }
+    // Passt nirgends am Stueck: aufteilen, groesste Rechner zuerst.
+    for (const [host, platz] of [...rest.entries()].sort((a, b) => b[1] - a[1])) {
+      if (offen <= 0) break;
+      const passt = Math.floor(platz / op.cost);
+      if (passt < 1) continue;
+      const n = Math.min(passt, offen);
+      rest.set(host, platz - n * op.cost);
+      belegung.push({ host, op, threads: n });
+      offen -= n;
+    }
+    if (offen > 0) return null;
+  }
+  return { belegung, frei: rest };
 }

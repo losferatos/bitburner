@@ -149,9 +149,21 @@ export async function main(ns) {
     // des Guthabens ist Warten das schlechtere Geschaeft.
     const geldWegZu = teuerstesVerdiente > geld * 4;
 
+    // TUERSCHLOSS, 22.08.2026 umgedreht. Vorher stand hier
+    // fileExists("data/install-frei.txt") - eine Freigabedatei, die KEIN
+    // Skript je geschrieben hat. Der Einbau war damit dauerhaft gesperrt,
+    // und weil der Hacking-Multiplikator ausschliesslich aus eingebauten
+    // Augmentierungen kommt, stand das eigentliche Ziel des ganzen Laufs
+    // still: drei Stuecke lagen in der Warteschlange, m blieb bei 1,385,
+    // und Level 9000 braucht bei diesem m rund 10^91 Erfahrung.
+    // Jetzt sperrt eine Datei, statt freizugeben - wer den Einbau anhalten
+    // will, legt data/install-sperre.txt an. Ein vergessenes Schloss haelt
+    // dann den Bot nicht mehr auf, sondern hoechstens eine Sperre offen,
+    // und das faellt sofort auf.
+    const gesperrt = ns.fileExists("data/install-sperre.txt", "home");
     if (wartend >= MINDEST_WARTESCHLANGE
         && (kleinsteLuecke > LUECKE_ZU_GROSS || geldWegZu)
-        && ns.fileExists("data/install-frei.txt", "home")) {
+        && !gesperrt) {
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
         + (geldWegZu ? "naechstes Stueck kostet "
             + Math.round(teuerstesVerdiente / 1e6) + "m bei "

@@ -177,7 +177,16 @@ export async function main(ns) {
 
     // --- 2. Kaufen, was bezahlt und verdient ist ------------------------------
     let gekauft = 0;
-    for (const k of kandidaten.slice().sort((a, b) => a.preis - b.preis)) {
+    // ABSTEIGEND, nicht aufsteigend (22.08.2026). Jedes gekaufte Stueck
+    // verteuert JEDES weitere um Faktor 1,9 (AugmentationHelpers getAugCost) -
+    // der Aufschlag haengt an der Zahl der schon wartenden Stuecke, nicht am
+    // Stueck selbst. Wer zuerst billig kauft, zahlt das teure Stueck danach
+    // mit dem vollen Aufschlag; wer zuerst teuer kauft, zahlt den Aufschlag
+    // auf die billigen. Bei vier Stueck und Preisen wie 900m/475m/343m/100m
+    // sind das rund 1,2 Milliarden Unterschied fuer dieselbe Ausbeute.
+    // Der Rest der Schleife bleibt: was gerade nicht bezahlbar ist, wird
+    // uebersprungen und in der naechsten Runde erneut versucht.
+    for (const k of kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
       if (k.rep < k.repReq) continue;
       if (ns.getServerMoneyAvailable("home") < k.preis) continue;
       if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {

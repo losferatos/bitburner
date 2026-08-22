@@ -57,6 +57,13 @@ function sample(save) {
   const byScript = {};
   const byTarget = {};
   let ramTotal = 0, ramWorker = 0, ramTool = 0, ramFree = 0;
+  // Summe der Offline-Gutschriften aller gerade laufenden Skripte. Das ist der
+  // Zeuge fuer Falle 1 (siehe Kopfkommentar): ScriptHelpers.ts:67 erhoeht
+  // scriptProdSinceLastAug beim Laden der Engine um einen Klumpen und schreibt
+  // denselben Betrag zusaetzlich in runningScript.offlineMoneyMade. Solange
+  // irgendein Skript mit offlineMoneyMade > 0 laeuft, hat es in diesem Lauf
+  // einen Seitenneuladevorgang gegeben.
+  let offlineMoney = 0;
   const hostFree = {};
 
   for (const [name, wrapper] of Object.entries(servers)) {
@@ -69,6 +76,7 @@ function sample(save) {
       const r = entry.data;
       const ram = r.ramUsage * r.threads;
       used += ram;
+      offlineMoney += r.offlineMoneyMade || 0;
       if (r.filename.startsWith("worker/")) {
         ramWorker += ram;
         byScript[r.filename] = (byScript[r.filename] || 0) + ram;
@@ -91,6 +99,13 @@ function sample(save) {
     money: p.money,
     hackExp: p.exp ? p.exp.hacking : null,
     hackLevel: p.skills ? p.skills.hacking : null,
+    // Zeuge fuer Falle 2: PlayerObjectGeneralMethods.ts:127 setzt
+    // scriptProdSinceLastAug beim Einbau auf 0 - und lastAugReset auf die
+    // aktuelle Zeit. Der Zaehlerstand allein wuerde das nur als Ruecksprung
+    // zeigen; lastAugReset benennt die Ursache eindeutig.
+    lastAugReset: p.lastAugReset ?? null,
+    augCount: Array.isArray(p.augmentations) ? p.augmentations.length : null,
+    offlineMoney: +offlineMoney.toFixed(1),
     ramTotal, ramWorker: +ramWorker.toFixed(1), ramTool: +ramTool.toFixed(1),
     ramFree: +ramFree.toFixed(1),
     byScript, byTarget, hostFree,
@@ -122,14 +137,70 @@ function report(name, rows) {
     return;
   }
   const a = rows[0], b = rows[rows.length - 1];
-  // Spielzeit als Zeitbasis (siehe Kopfkommentar). Faellt sie aus - alter
-  // Spielstand, Feld fehlt - wird auf die Wanduhr zurueckgefallen, aber mit
-  // ausdruecklichem Hinweis, damit niemand die Zahl fuer sauber haelt.
-  let seconds = (b.playtime - a.playtime) / 1000;
-  let basis = "Spielzeit";
-  if (!(seconds > 0)) { seconds = (b.wall - a.wall) / 1000; basis = "Wanduhr (!)"; }
 
-  const prod = b.scriptProd - a.scriptProd;
+  // --- Zaehlerfallen erkennen (22.08.2026) ---------------------------------
+  // Zwei Stellen im Spiel schreiben scriptProdSinceLastAug, ohne dass ein
+  // Arbeiter etwas verdient haette. Bisher lief die Messung nur deshalb
+  // sauber, weil beide zufaellig nicht eintraten:
+  //
+  //   Falle 1  ScriptHelpers.ts:67. Beim Laden der Engine wird die
+  //            Offline-Produktion als KLUMPEN in den Zaehler gebucht -
+  //            errechnet aus dem LEBENSDURCHSCHNITT des Skripts
+  //            (onlineMoneyMade/playtimeSinceLastAug * offlineZeit * 0.75).
+  //            Heimtueckisch daran: engine.tsx:350 erhoeht im selben Zug
+  //            playtimeSinceLastAug um dieselbe Offline-Zeit. Die RATE bleibt
+  //            damit plausibel - sie ist nur nicht mehr die des Messfensters,
+  //            sondern der mit 0,75 gewichtete Lebensdurchschnitt. Ein
+  //            Ausreisserfilter auf die Rate wuerde das NICHT finden.
+  //            Zeuge ist deshalb offlineMoneyMade der laufenden Skripte.
+  //
+  //   Falle 2  PlayerObjectGeneralMethods.ts:127. Der Augmentierungs-Einbau
+  //            setzt den Zaehler auf 0. Zeuge ist lastAugReset.
+  //
+  // Betroffene Abschnitte werden herausgeschnitten statt den ganzen Lauf zu
+  // verwerfen: Bei zwanzig Proben ist eine kaputte Luecke kein Grund, die
+  // uebrigen neunzehn wegzuwerfen.
+  const warnungen = [];
+  let prod = 0, seconds = 0, verworfen = 0;
+  for (let i = 1; i < rows.length; i++) {
+    const x = rows[i - 1], y = rows[i];
+    const dt = (y.playtime - x.playtime) / 1000;
+    const dp = y.scriptProd - x.scriptProd;
+    let grund = null;
+    if (y.lastAugReset !== x.lastAugReset || y.augCount !== x.augCount) {
+      grund = "Augmentierungs-Einbau (Zaehler auf 0)";
+    } else if (dp < 0 || dt < 0) {
+      grund = "Zaehler ruecklaeufig";
+    } else if (y.offlineMoney > x.offlineMoney) {
+      grund = "Offline-Klumpen gebucht (+" + fmtMoney(y.offlineMoney - x.offlineMoney)
+        + ", Tab neu geladen)";
+    } else if (!(dt > 0)) {
+      grund = "Spielzeit steht (Tab gedrosselt oder pausiert)";
+    }
+    if (grund) {
+      warnungen.push("Probe " + i + "->" + (i + 1) + " verworfen: " + grund);
+      verworfen++;
+      continue;
+    }
+    prod += dp;
+    seconds += dt;
+  }
+  let basis = "Spielzeit";
+  if (!(seconds > 0)) {
+    // Notnagel wie bisher, aber ausdruecklich gekennzeichnet.
+    seconds = (b.wall - a.wall) / 1000;
+    prod = b.scriptProd - a.scriptProd;
+    basis = "Wanduhr (!)";
+  }
+  // Ein Neuladen faelscht auch alles VOR dem Fenster: Die Offline-Gutschrift
+  // haengt am Lebensdurchschnitt, nicht am Fenster. Steht beim Start schon
+  // ein Klumpen in den laufenden Skripten, ist zwar keine Probe kaputt, aber
+  // der Lauf hat einen Neuladevorgang gesehen - das gehoert gesagt.
+  if (a.offlineMoney > 0) {
+    warnungen.push("Zum Messbeginn standen bereits " + fmtMoney(a.offlineMoney)
+      + " Offline-Gutschrift in laufenden Skripten - der Lauf hat ein Neuladen gesehen.");
+  }
+
   const exp = (b.hackExp != null && a.hackExp != null) ? b.hackExp - a.hackExp : null;
 
   // RAM-Verteilung ueber alle Proben mitteln. Jede Probe steht fuer denselben
@@ -153,7 +224,12 @@ function report(name, rows) {
   console.log("  MESSUNG  " + name + "   " + rows.length + " Proben, "
     + (seconds / 60).toFixed(1) + " min " + basis);
   console.log("  " + "-".repeat(66));
+  if (warnungen.length) {
+    for (const w of warnungen) console.log("  ACHTUNG  " + w);
+    console.log("  " + "-".repeat(66));
+  }
   console.log("  Skriptertrag         " + fmtMoney(prod / seconds).padStart(12) + "/s   (gesamt " + fmtMoney(prod) + ")");
+  if (verworfen) console.log("  (" + verworfen + " von " + (rows.length - 1) + " Abschnitten herausgeschnitten)");
   if (exp != null) console.log("  Hacking-Erfahrung    " + (exp / seconds).toFixed(2).padStart(12) + "/s");
   // Das Hacking-Level gehoert in JEDEN Bericht. Der Ertrag haengt ueber
   // skillMult in calculatePercentMoneyHacked und ueber (level+50) in der

@@ -608,10 +608,36 @@ export async function main(ns) {
     // Ganz weglassen darf man den Rest nicht: Daedalus verlangt 30
     // VERSCHIEDENE Augmentierungen, und ohne Daedalus gibt es keine Red Pill
     // und keinen Zugang zu w0r1d_d43m0n.
+    // 22.08.2026 ERSETZT. Die zweistufige Rangordnung war unter einer
+    // Annahme richtig, die nicht mehr gilt: dass nuetzliche und nutzlose
+    // Stuecke aehnlich teuer sind. Am laufenden Spiel gemessen sind sie es
+    // nicht. Der Bot arbeitete The Black Hand auf 50.000 Rep fuer EIN Stueck,
+    // waehrend bei Netburners SECHS Stueck zwischen 1.875 und 12.500 Rep
+    // lagen - Faktor 4 bis 27 je gezaehlter Augmentierung. Weil immer noch 19
+    // nuetzliche Stuecke offen waren, kam die zweite Stufe nie an die Reihe.
+    //
+    // Jetzt eine gemeinsame Guetezahl: Reputationskosten je Fortschritt.
+    // Fortschritt ist zweierlei, und beides zaehlt fuer den Knotenabschluss:
+    //   - ein Zaehlplatz Richtung der 30 verschiedenen Augmentierungen, die
+    //     Daedalus verlangt (ohne Daedalus keine Red Pill, kein Zugang zu
+    //     w0r1d_d43m0n)
+    //   - der Hacking-Multiplikator, der das Level ueberhaupt erreichbar macht
+    //
+    // Der Zaehlplatz faellt weg, sobald die 30 zusammen sind - danach ist eine
+    // Augmentierung ohne Multiplikator wirklich wertlos, und die Rangfolge
+    // kippt von selbst auf reinen Nutzen zurueck. Genau das war der berechtigte
+    // Kern der alten Regel.
+    //
+    // NUTZEN_GEWICHT 5: hackNutzen liefert den Multiplikator minus eins, also
+    // typisch 0,15 bis 0,30. Mal fuenf wiegt ein durchschnittliches nuetzliches
+    // Stueck damit etwa so schwer wie ein Zaehlplatz. Das ist eine Setzung,
+    // keine Messung - sie sagt aus, dass beide Wege zum Knotenabschluss
+    // ungefaehr gleich wichtig sind.
+    const NUTZEN_GEWICHT = 5;
+    const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
+    const guete = (k) => (zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug))) / Math.max(1, k.repReq - k.rep);
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
-    const nachNaehe = (a, b) => (a.repReq - a.rep) - (b.repReq - b.rep);
-    const nuetzlich = alleOffenen.filter((k) => hackNutzen(k.aug) > 0).sort(nachNaehe);
-    const offen = nuetzlich.length ? nuetzlich : alleOffenen.sort(nachNaehe);
+    const offen = alleOffenen.sort((a, b) => guete(b) - guete(a));
 
     if (!offen.length) { await ns.sleep(20000); continue; }
 

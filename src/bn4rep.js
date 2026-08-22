@@ -702,6 +702,34 @@ export async function main(ns) {
     //
     // Der Ertrag eines Ziels ist deshalb die Summe ueber alles, was bei
     // DERSELBEN Faktion mit dem Erreichen seiner Schwelle mit freikommt.
+    // FAVOR ALS ZWEITER ERTRAG (23.08.2026). Reputation zahlt doppelt: sie
+    // schaltet Augmentierungen frei UND wird beim Einbau zu Favor
+    // (Faction.ts:77-85 ruft addRepToFavor). Ab Favor 150 darf gespendet
+    // werden, und dann gilt rep = betrag/1e6 * mults.faction_rep - bei den
+    // 1,53 Billionen, die gerade herumliegen, sind das 1,78 Millionen
+    // Reputation auf einen Schlag.
+    //
+    // Gerechnet am laufenden Spiel: Favor 150 entspricht 462.490 kumulierter
+    // Reputation (favorToRep, favor.ts:12-15). BitRunners steht bei Favor
+    // 16,4 = 9.593 kumuliert plus 44.393 aktuell, es fehlen also 408.504 -
+    // rund 20 Stunden bei gemessenen 5,5 rep/s. Danach ist JEDE Huerde dort
+    // sofort kaufbar, auch BitRunners Neurolink mit 875.000.
+    // Direkt erarbeitet kostete Neurolink allein 44 Stunden. Der Umweg lohnt
+    // sich also, sobald mehr als zwei Stuecke bei derselben Faktion liegen.
+    //
+    // Deshalb bekommt eine Faktion Zuschlag, je naeher sie an der
+    // Spendenschwelle steht. Der Zuschlag ist bewusst klein gehalten: er soll
+    // bei aehnlicher Guete den Ausschlag geben und den Bot bei EINER Faktion
+    // halten, statt die Rangfolge umzuwerfen.
+    const FAVOR_ZIEL_REP = 462490;
+    const favorNaehe = (faktion) => {
+      const f = favor[faktion] || 0;
+      if (f >= ns.getFavorToDonate()) return 2;   // schon spendenberechtigt
+      const kumuliert = 25000 * Math.expm1(0.019802627296179712 * f);
+      const jetzt = ns.singularity.getFactionRep(faktion);
+      return 1 + Math.min(1, (kumuliert + jetzt) / FAVOR_ZIEL_REP);
+    };
+
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
     const guete = (k) => {
       let ertrag = 0;
@@ -710,7 +738,7 @@ export async function main(ns) {
         if (m.repReq > k.repReq) continue;   // liegt jenseits der Schwelle
         ertrag += einzelWert(m);
       }
-      return ertrag / Math.max(1, k.repReq - k.rep);
+      return ertrag * favorNaehe(k.faktion) / Math.max(1, k.repReq - k.rep);
     };
     const offen = alleOffenen.sort((a, b) => guete(b) - guete(a));
 

@@ -722,7 +722,14 @@ export async function main(ns) {
     //
     // Deshalb: die besten Ziele in den Stapelbetrieb, der Rest bleibt bei der
     // offenen Steuerung, die den uebrigen Speicher weiter aufnimmt.
-    const BATCH_ZIELE = Number(ns.read("data/batch-ziele.txt")) || 0;
+    // Der Vorgabewert steht im CODE, nicht in der Datei. Die Datei ist nur der
+    // Uebersteuerungsschalter fuer Messungen ("0" schaltet ganz ab). Stuende
+    // die Vorgabe in der Datei, waere der groesste Hebel dieses Bots von einer
+    // Textdatei abhaengig, die niemand vermisst - genau das Muster, an dem
+    // dieser Bot schon mehrfach stundenlang stillstand. Drei Ziele sind
+    // gemessen: 1 Ziel gab $9.12m/s, 3 Ziele $18.06m/s.
+    const batchRoh = ns.read("data/batch-ziele.txt").trim();
+    const BATCH_ZIELE = batchRoh === "" ? 3 : (Number(batchRoh) || 0);
     // Unter dieser Netzgroesse gar kein Stapelbetrieb. Nach einem
     // Augmentierungs-Einbau sind alle gekauften Rechner weg (Prestige.ts:73)
     // und das Netz faellt auf wenige hundert GB - dann passt kein Stapel, und

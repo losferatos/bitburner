@@ -70,13 +70,76 @@ export async function main(ns) {
   //   Fristen; ein kuerzer gewordener Stapel startet einfach spaeter.
   const batchStand = new Map();
   const batchKalender = new Map();
-  // Der mittlere Gleichgewichtsertrag der laufenden Geldziele in $/GB*s, aus
-  // der VORIGEN Runde. Die Serveraufruestung braucht ihn (Abschnitt 1a2), er
-  // entsteht aber erst in Abschnitt 2 - eine Runde Verzoegerung ist dabei
-  // unschaedlich, weil sich der Wert nur mit dem Hacking-Level und der
-  // Zielauswahl aendert, also langsam. Startwert 0 heisst "noch unbekannt"
-  // und laesst keinen Ausbau zu, bis einmal gerechnet wurde.
-  let effFlotteMerker = 0;
+  // GRENZERTRAG von zusaetzlichem Arbeitsspeicher, aus der VORIGEN Runde.
+  // Die Serveraufruestung braucht ihn (Abschnitt 1a2), er entsteht aber erst
+  // in Abschnitt 2 - eine Runde Verzoegerung ist unschaedlich, weil sich der
+  // Wert nur mit Level und Zielauswahl aendert, also langsam.
+  //
+  // WARUM NICHT MEHR DER MITTELWERT (22.08.2026). Bis hierher stand hier der
+  // Durchschnitt der laufenden Geldziele. Zwei Fehler auf einmal:
+  //   (1) Seit die drei besten Ziele im Stapelbetrieb laufen, sind sie aus
+  //       moneyTargets heraus - der Durchschnitt mittelte nur noch ueber die
+  //       verbliebenen, schlechteren. Gemessen am 22.08.2026: 202 $/GB*s
+  //       gemeldet, tatsaechlicher Grenzertrag fuer den anstehenden Schritt
+  //       (4096 GB) 250 $/GB*s. Kaeufe wurden also 24 % unrentabler
+  //       gerechnet, als sie sind.
+  //   (2) Ein Durchschnitt ist ohnehin die falsche Groesse. Bezahlt wird der
+  //       NAECHSTE Speicher, und der landet nicht beim Durchschnittsziel: Er
+  //       geht der Reihe nach dorthin, wo noch Aufnahme frei ist. Und das
+  //       haengt an der MENGE - gemessen im selben Zustand 301 $/GB*s fuer
+  //       1024 GB, 250 fuer 4096, 154 fuer 16384, 112 fuer 65536. Eine
+  //       einzelne Zahl kann das gar nicht abbilden, deshalb steht hier eine
+  //       Kurve und eine Funktion, die sie fuer eine Menge auswertet.
+  //
+  // Zwei Listen, weil die beiden Verfahren zusaetzlichen Speicher voellig
+  // verschieden aufnehmen - Begruendung bei grenzErtrag().
+  // Leere Listen heissen "noch nichts gerechnet" und lassen keinen Ausbau zu.
+  let grenzStapelMerker = [];   // [{eff, frei}] je Stapelziel
+  let grenzOffenMerker = [];    // [{eff, frei}] je offenem Ziel, absteigend
+  let grenzAnteilMerker = 0;    // F_NETZANTEIL der letzten Runde
+
+  /**
+   * Was bringen `gb` zusaetzliche Gigabyte Arbeitsspeicher, in $/GB*s?
+   *
+   * Die beiden Verfahren nehmen ihn verschieden auf:
+   *
+   *   STAPELZIELE nehmen einen ANTEIL des Netzes, keinen festen Betrag. Ihre
+   *   Aufnahme ist ram(f) * kalenderPlaetze, und f waehlt der Stapelbetrieb
+   *   selbst als das kleinste, dessen voller Kalender ramTotal*F_NETZANTEIL
+   *   fasst. Waechst das Netz, waechst f mit - jedes Stapelziel schluckt also
+   *   F_NETZANTEIL jedes zusaetzlichen Gigabytes, und zwar zur GRENZ-Guete
+   *   der naechsten Leitersprosse (nicht zur Durchschnittsguete: die Sprosse
+   *   bringt zusaetzliches Geld fuer zusaetzlichen Speicher, das Verhaeltnis
+   *   der beiden Zuwaechse ist der Grenzertrag). Erst am oberen Ende der
+   *   Leiter ist ein Ziel wirklich gesaettigt; dann steht in "frei" die
+   *   restliche Aufnahme statt Infinity.
+   *
+   *   OFFENE ZIELE haben eine feste Kapazitaet (KAP_ABZUG, siehe kennzahlen).
+   *   Was dort noch frei ist, wird der Guete nach aufgefuellt - das beste
+   *   Ziel zuerst, genau wie die Zuteilung es tut.
+   *
+   * Was danach noch uebrig ist, bringt NICHTS. Das ist der Fall, den die
+   * alte Zahl nicht kannte und der die Amortisationsrechnung wertlos macht,
+   * sobald das Netz die Ziele ueberholt.
+   */
+  const grenzErtrag = (gb) => {
+    if (!(gb > 0)) return 0;
+    let ertrag = 0, rest = gb;
+    for (const s of grenzStapelMerker) {
+      const nimm = Math.min(grenzAnteilMerker * gb, s.frei);
+      if (!(nimm > 0)) continue;
+      ertrag += nimm * s.eff;
+      rest -= nimm;
+    }
+    for (const o of grenzOffenMerker) {
+      if (rest <= 0) break;
+      const nimm = Math.min(o.frei, rest);
+      if (!(nimm > 0)) continue;
+      ertrag += nimm * o.eff;
+      rest -= nimm;
+    }
+    return ertrag / gb;
+  };
   // Ungenutzter Speicher der letzten Runde. Die Serveraufruestung braucht ihn
   // als Bremse: Wer Speicher kauft, obwohl der vorhandene brachliegt,
   // verbrennt Geld.
@@ -327,11 +390,12 @@ export async function main(ns) {
         try { kosten = ns.cloud.getServerUpgradeCost(smallest.host, zielGb); }
         catch { kosten = 0; }   // wirft, wenn der Rechner kein gekaufter ist
 
-        // Ertrag je GB und Sekunde aus der letzten Runde. effFlotteMerker ist
-        // der mittlere Gleichgewichtsertrag der laufenden Geldziele. Gemessen
-        // stimmt dieses Modell auf 4 %: 320 $/GB*s tatsaechlich gegen 334
-        // $/GB*s berechnet (Messung vom 22.08.2026 mit vier Zielen). Es ist
-        // damit belastbar genug fuer eine Amortisationsrechnung - und es
+        // Ertrag je GB und Sekunde aus der letzten Runde. Massgeblich ist der
+        // GRENZERTRAG genau dieses Schrittes: was die zusatzGb bringen, die
+        // hier bezahlt werden - nicht, was der bereits laufende Speicher
+        // bringt. Herleitung und Messung stehen bei grenzErtrag() oben.
+        // Das Modell dahinter ist gegen die Telemetrie geprueft und stimmt
+        // auf 2 % (stapelGb/kalenderPlaetze/erwartetProS, 22.08.2026); es
         // waechst und faellt automatisch mit Level, Zielen und BitNode,
         // anders als eine eingetragene Zahl.
         //
@@ -347,8 +411,13 @@ export async function main(ns) {
         // buchstaeblich brach - aber Erfahrung ist keine Rechtfertigung fuer
         // eine Ausgabe, die sich in Dollar amortisieren soll. Deshalb: Sobald
         // die Geldziele mehr als ein Zwanzigstel des Netzes nicht abnehmen,
-        // wird nicht mehr gekauft.
-        const ertrag = ueberschussMerker > ramTotal * 0.05 ? 0 : effFlotteMerker;
+        // wird nicht mehr gekauft. grenzErtrag() faengt denselben Fall
+        // inzwischen selbst ab (kein Abnehmer - kein Ertrag); die Bremse
+        // bleibt trotzdem stehen, weil sie einen zweiten Fall deckt: eine
+        // Zuteilung, die die vorhandene Aufnahme nicht FINDET. Das ist kein
+        // Modellfall, das ist ein Fehler - und dann ist neuer Speicher erst
+        // recht keine Loesung.
+        const ertrag = ueberschussMerker > ramTotal * 0.05 ? 0 : grenzErtrag(zusatzGb);
         const amortSek = (ertrag > 0 && zusatzGb > 0)
           ? kosten / (zusatzGb * ertrag) : Infinity;
 
@@ -730,19 +799,45 @@ export async function main(ns) {
     // gemessen: 1 Ziel gab $9.12m/s, 3 Ziele $18.06m/s.
     const batchRoh = ns.read("data/batch-ziele.txt").trim();
     const BATCH_ZIELE = batchRoh === "" ? 3 : (Number(batchRoh) || 0);
-    // Unter dieser Netzgroesse gar kein Stapelbetrieb. Nach einem
-    // Augmentierungs-Einbau sind alle gekauften Rechner weg (Prestige.ts:73)
-    // und das Netz faellt auf wenige hundert GB - dann passt kein Stapel, und
-    // ein Ziel, das auf seinen ersten Stapel wartet, waere ein Ziel, das gar
-    // nichts tut. Unterhalb der Schwelle uebernimmt wieder die offene
-    // Steuerung, ohne dass irgendjemand eingreifen muss.
-    const BATCH_MIN_NETZ_GB = 3000;
+    // --- Die Sicherung fuer die Zeit direkt nach einem Einbau -------------
+    //
+    // WAS HIER FRUEHER STAND UND WARUM ES NICHTS TAT (22.08.2026). Hier stand
+    // BATCH_MIN_NETZ_GB = 3000 mit der Begruendung, nach einem
+    // Augmentierungs-Einbau falle das Netz "auf wenige hundert GB". Das ist
+    // falsch: home-RAM ueberlebt den Einbau (src/install.js:8-9), im
+    // laufenden Stand sind das 4096 GB. ramTotal zaehlt home mit, liegt also
+    // NIE unter 4096 - die Schwelle konnte gar nicht ausloesen. Eine
+    // Sicherung, die auf einer nicht erreichbaren Groesse steht, ist keine.
+    //
+    // WAS NACH EINEM EINBAU WIRKLICH KNAPP IST, IST NICHT DER SPEICHER,
+    // SONDERN DIE ZAHL DER ZIELE. Das Hacking-Level faellt auf 1, und alle
+    // Portprogramme sind weg ausser NUKE.exe - erreichbar sind dann nur die
+    // Server ohne Portanforderung und unter dem eigenen Level. Aus dem
+    // Spielstand gezaehlt (22.08.2026):
+    //     Level 1   -> 2 Geldziele    Level 30  -> 6
+    //     Level 10  -> 4 Geldziele    ab hier deckelt die Portgrenze bei 7
+    // Ein Stapelziel wird der offenen Steuerung ENTZOGEN und verdient
+    // waehrend seiner Vorbereitung nichts. Mit BATCH_ZIELE = 3 und zwei
+    // erreichbaren Zielen - eines davon meist das Erfahrungsziel - bliebe
+    // moneyTargets LEER, und dann faellt Durchgang 2 komplett aus
+    // ("if (!sameTarget && moneyTargets.length)"): Der Bot verdiente gar
+    // nichts, bis die Vorbereitung durch ist.
+    //
+    // Deshalb die Sicherung auf der Groesse, die wirklich knapp ist: Es
+    // muessen immer Ziele fuer die offene Steuerung uebrig bleiben. Zwei,
+    // nicht eines - ein einzelnes Ziel taeuscht sonst nur Betrieb vor,
+    // waehrend ein Anlauf oder eine Sperre es sofort wieder leert.
+    // Ab Level 50 ist die Sicherung von selbst inaktiv (8 Ziele, davon 3 im
+    // Stapel, 5 offen), sie bremst also nur den Wiederanlauf.
+    const BATCH_MIN_OFFENE_ZIELE = 2;
     // Das Erfahrungsziel bleibt aussen vor: Es hat sein eigenes Fadenbudget
     // und bekommt zusaetzlich den Ueberschuss - beides wuerde ungetaktet
     // zwischen den Stapeln landen. Der Fall tritt nur ueber den Notnagel
     // "moneyTargets = [expTarget]" weiter oben ueberhaupt ein.
-    const batchTargets = (BATCH_ZIELE > 0 && ramTotal >= BATCH_MIN_NETZ_GB)
-      ? moneyTargets.filter((h) => h !== expTarget).slice(0, BATCH_ZIELE) : [];
+    const batchKandidaten = moneyTargets.filter((h) => h !== expTarget);
+    const batchPlaetze = Math.max(0,
+      Math.min(BATCH_ZIELE, batchKandidaten.length - BATCH_MIN_OFFENE_ZIELE));
+    const batchTargets = BATCH_ZIELE > 0 ? batchKandidaten.slice(0, batchPlaetze) : [];
     if (batchTargets.length) {
       moneyTargets = moneyTargets.filter((h) => !batchTargets.includes(h));
     }
@@ -756,6 +851,12 @@ export async function main(ns) {
     let fehlstart = 0;
     let mixStat = null;
     let batchStat = null;
+    // Grenzertragskurve dieser Runde. Wird JEDE Runde neu aufgebaut, auch
+    // wenn ein Zweig gar nicht laeuft - sonst rechnete die Serveraufruestung
+    // mit den Abnehmern eines Zustands, den es nicht mehr gibt (Stapelbetrieb
+    // abgeschaltet, Ziel gesperrt, Netz geschrumpft).
+    const grenzStapel = [];
+    const grenzOffen = [];
     // Speicher, den die Geldziele in dieser Runde nicht aufnehmen konnten und
     // der deshalb an die Erfahrung ging. Gehoert nach draussen: Er ist das
     // Mass dafuer, ob sich weiterer Serverausbau ueberhaupt noch lohnt.
@@ -1474,13 +1575,44 @@ export async function main(ns) {
                   geld: echt * s.moneyMax * chanceMin,
                 };
               };
-              for (const f of F_LEITER) {
-                const pl = stapelPlan(f);
-                fraction = f;
+              let fIndex = F_LEITER.length - 1;
+              for (let i = 0; i < F_LEITER.length; i++) {
+                const pl = stapelPlan(F_LEITER[i]);
+                fIndex = i;
                 if (pl.ram * kalenderPlaetze >= wunschGb) break;
               }
+              fraction = F_LEITER[fIndex];
               st.fraction = fraction;
               const plan = stapelPlan(fraction);
+
+              // --- Beitrag dieses Ziels zur Grenzertragskurve (22.08.2026) --
+              // Ein Stapelziel nimmt keinen festen Betrag auf, sondern einen
+              // ANTEIL des Netzes: wunschGb waechst mit ramTotal, also rutscht
+              // f eine Sprosse hoeher, sobald genug Speicher da ist. Der
+              // Ertrag DIESER Sprosse ist der Grenzertrag - zusaetzliches Geld
+              // geteilt durch zusaetzlichen Speicher, nicht der Durchschnitt.
+              // Gemessen am 22.08.2026 liegen beide dicht beieinander
+              // (omega-net 249 Schnitt gegen 242 Grenz), das ist kein
+              // Rechenfehler: Die Guete ist ueber f fast flach, weil hack und
+              // grow beide ungefaehr linear mitwachsen.
+              //
+              // Oben auf der Leiter (f = 0.5) waechst die Aufnahme nicht mehr
+              // mit. Dann - und nur dann - ist ein Stapelziel wirklich
+              // gesaettigt, und mehr Speicher bringt dort NICHTS mehr; "frei"
+              // ist dann die restliche Aufnahme statt Infinity.
+              const uNun = plan.ram * kalenderPlaetze;
+              const rNun = plan.geld / (4 * GAP_MS / 1000);
+              const naechst = fIndex + 1 < F_LEITER.length ? stapelPlan(F_LEITER[fIndex + 1]) : null;
+              const uNext = naechst ? naechst.ram * kalenderPlaetze : 0;
+              if (naechst && uNext > uNun) {
+                const rNext = naechst.geld / (4 * GAP_MS / 1000);
+                grenzStapel.push({ eff: (rNext - rNun) / (uNext - uNun), frei: Infinity });
+              } else if (uNun > 0) {
+                grenzStapel.push({
+                  eff: rNun / uNun,
+                  frei: Math.max(0, uNun - (fl.hack * ramHack + fl.grow * ramGrow + fl.weaken * ramWeaken)),
+                });
+              }
 
               let kalender = batchKalender.get(ziel) || 0;
               let budget = freiGesamt() * BATCH_ANTEIL;
@@ -1534,8 +1666,9 @@ export async function main(ns) {
               // offene Steuerung fasst es ja nicht mehr an. Das kann jederzeit
               // eintreten, wenn das Netz schrumpft: ein Augmentierungs-Einbau
               // loescht alle gekauften Rechner (Prestige.ts:73). Fuer den
-              // grossen Fall greift BATCH_MIN_NETZ_GB, fuer den schleichenden
-              // diese Wache.
+              // grossen Fall greift BATCH_MIN_OFFENE_ZIELE (dann wird das Ziel
+              // gar nicht erst zum Stapelziel), fuer den schleichenden diese
+              // Wache.
               //
               // Behandelt wird er ueber die schon vorhandene Sperrliste: Das
               // Ziel faellt fuer eine Weile aus den Kandidaten, damit wird der
@@ -1577,6 +1710,7 @@ export async function main(ns) {
          }
         }
         batchStat = { gap: GAP_MS, ziele: batchInfo };
+        grenzAnteilMerker = F_NETZANTEIL;
       }
 
       // --- Durchgang 2: Geldziele mit gemischten Aktionen -------------------
@@ -1680,6 +1814,17 @@ export async function main(ns) {
           const b0 = f0.hack * ramHack + f0.grow * ramGrow + f0.weaken * ramWeaken;
           moneyStandGb += b0;
           kapFrei += Math.max(0, kap - b0);
+          // Beitrag zur Grenzertragskurve. Nur Ziele im DAUERBETRIEB: Ein
+          // Anlaufziel nimmt Speicher erst auf, nachdem es gesaeubert wurde,
+          // und ob es ueberhaupt anlaufen darf, entscheidet das Nutzen-Gate
+          // weiter unten. Wer solche Aufnahme in eine Amortisationsrechnung
+          // schreibt, bezahlt Speicher fuer Abnehmer, die es noch gar nicht
+          // gibt - genau der Fehler, den kapFrei oben schon einmal gemacht
+          // hat (137.860 GB gemeldete Aufnahme, 3.400 GB tatsaechlich
+          // zugeteilt).
+          if (!e.plan.anlauf && e.plan.steadyEff > 0 && kap - b0 > 0) {
+            grenzOffen.push({ eff: e.plan.steadyEff, frei: kap - b0 });
+          }
         }
         // Der in DIESER Runde freie Speicher taugt nicht als Bezugsgroesse -
         // er ist selbst das Ergebnis der Zuteilung: Was einmal ans
@@ -1896,7 +2041,6 @@ export async function main(ns) {
 
         // Nur fuer die Beobachtung von aussen - die Verteilung ist die Zahl,
         // an der dieser Umbau gemessen wird.
-        effFlotteMerker = massstab;
         ueberschussMerker = ueberschussGb;
         mixStat = {
           ...summeFaeden, anlaufZiele, restGb: Math.round(budget),
@@ -1917,6 +2061,18 @@ export async function main(ns) {
         };
       }
     }
+
+    // --- Grenzertragskurve festschreiben (22.08.2026) ---------------------
+    // Ausserhalb aller if-Zweige, damit sie auch dann stimmt, wenn ein Zweig
+    // in dieser Runde nicht gelaufen ist. Gelesen wird sie eine Runde spaeter
+    // von der Serveraufruestung (Abschnitt 1a2).
+    grenzStapelMerker = grenzStapel;
+    grenzOffen.sort((a, b) => b.eff - a.eff);
+    grenzOffenMerker = grenzOffen;
+    // Nach draussen, sonst ist die Zahl, an der jeder Serverkauf haengt, von
+    // aussen unsichtbar. Drei Stuetzstellen, weil der Grenzertrag von der
+    // MENGE abhaengt - eine einzelne Zahl waere wieder derselbe Fehler.
+    if (mixStat) mixStat.grenz = [1024, 4096, 16384].map((g) => Math.round(grenzErtrag(g)));
 
     if (fehlstart) sag(fehlstart + " Arbeiter liessen sich nicht starten (Speicher?).");
 

@@ -50,6 +50,13 @@ export async function main(ns) {
   // bn4life.js selbst (19,85 GB), sonst kann es nach einem Absturz nicht mehr
   // starten.
   let werkbankMerker = null;
+  // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
+  // Minuten anlaeuft, ohne fertig zu werden, ist nur zu erkennen, wenn sich
+  // irgendwer merkt, wann es angefangen hat - eine Runde allein sieht immer
+  // nur den Augenblick. Genau deshalb konnte the-hub stundenlang 30 % des
+  // Netzes binden, ohne dass es irgendwo auffiel.
+  const anlaufSeit = new Map();     // Ziel -> Zeitstempel des Anlaufbeginns
+  const gesperrtBis = new Map();    // Ziel -> Zeitstempel, ab dem es wieder darf
   const reserveHome = () => Math.max(24, ns.getServerMaxRam("home") / 4);
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
@@ -331,8 +338,14 @@ export async function main(ns) {
     // (EXP_THREAD_BUDGET weiter unten) und soll nicht zusaetzlich als Geldziel
     // zaehlen - sonst bekaeme derselbe Host zwei getrennte exec-Auftraege mit
     // je eigener Fadenzaehlung, ohne jeden Nutzen.
+    // Gesperrte Ziele fallen VOR dem Zuschnitt heraus, nicht danach: Sonst
+    // belegte ein gesperrtes Ziel weiter seinen Platz in der Liste, und die
+    // Sperre haette nur den Platz stillgelegt statt ihn weiterzugeben.
+    // Abgelaufene Sperren werden im selben Durchgang aufgeraeumt, damit die
+    // Karte nicht ueber Tage waechst.
+    for (const [host, bis] of gesperrtBis) if (Date.now() >= bis) gesperrtBis.delete(host);
     let moneyTargets = moneyCandidates
-      .filter((c) => c.host !== expTarget)
+      .filter((c) => c.host !== expTarget && !gesperrtBis.has(c.host))
       .slice(0, MONEY_TARGET_COUNT)
       .map((c) => c.host);
 
@@ -551,6 +564,53 @@ export async function main(ns) {
         const k = cycles > 0 ? Math.LN2 / cycles : 0;
         const f = flight.get(host) || { hack: 0, grow: 0, weaken: 0 };
 
+        // GLEICHGEWICHTSERTRAG in Dollar je GB und Sekunde - also die Zahl,
+        // die sagt, was dieses Ziel im SAUBEREN Dauerbetrieb wert ist. Sie
+        // ist die Grundlage des Nutzen-Gates weiter unten: Ein Ziel, das
+        // erst teuer gesaeubert werden muss und danach schlechter zahlt als
+        // die Flotte, ist den Anlauf nicht wert.
+        //
+        // Gerechnet wird bei minDifficulty, nicht beim IST-Zustand. ns.
+        // hackAnalyze & Co. liefern immer den Ist-Wert; the-hub steht bei
+        // Sicherheit 41 statt 14 und saehe damit dreimal schlechter aus, als
+        // es nach dem Saeubern waere - genau das Ziel wuerde das Gate dann
+        // aus dem falschen Grund verwerfen. Die Umrechnung nutzt, dass jeder
+        // Faktor bekannt von der Sicherheit abhaengt:
+        //   p, chance  ~ (100 - hackDifficulty)      (Hacking.ts:50, :15)
+        //   hackTime   ~ 2.5*req*hackDifficulty+500  (Hacking.ts:64-70)
+        //   k          ~ min(log1p(0.03/hd), ServerMaxGrowthLog)
+        //                (grow.ts:16-19, Constants.ts:8)
+        // Der Deckel ServerMaxGrowthLog greift ab hackDifficulty <= 8.571 -
+        // unterhalb davon ist k von der Sicherheit unabhaengig, darueber
+        // nicht. Ohne ihn waere die Umrechnung fuer omega-net (min 9),
+        // silver-helix (10) und iron-gym (10) falsch.
+        const SERVER_MAX_GROWTH_LOG = 0.00349388925425578;
+        const wachstumsLog = (hd) => Math.min(Math.log1p(0.03 / hd), SERVER_MAX_GROWTH_LOG);
+        const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
+        const sauber = (100 - hdIst) > 0 ? (100 - hdMin) / (100 - hdIst) : 1;
+        const pMin = Math.min(1, p * sauber);
+        const chanceMin = Math.min(1, chance * sauber);
+        const zeitIst = 2.5 * s.requiredHackingSkill * hdIst + 500;
+        const zeitMin = 2.5 * s.requiredHackingSkill * hdMin + 500;
+        const hackTimeMin = ns.getHackTime(host) * (zeitIst > 0 ? zeitMin / zeitIst : 1) / 1000;
+        const kMin = k * (wachstumsLog(hdIst) > 0 ? wachstumsLog(hdMin) / wachstumsLog(hdIst) : 1);
+        // Beute je hack-Faden im Gleichgewicht, und der RAM-Sekunden-Preis
+        // einer vollstaendigen Mischeinheit dazu. grow dauert das 3,2-fache,
+        // weaken das 4-fache eines hack (Hacking.ts:81-95).
+        const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
+        const wphMin = (FORTIFY_HACK * chanceMin + FORTIFY_GROW * gphMin) / WEAKEN_POWER;
+        const gbSekProEinheit = hackTimeMin
+          * (ramHack + 3.2 * gphMin * ramGrow + 4 * wphMin * ramWeaken);
+        // null statt 0, wenn sich der Wert nicht bestimmen laesst: Bei
+        // hackDifficulty >= 100 gibt hackAnalyze 0 zurueck (Hacking.ts:46),
+        // und die Hochrechnung auf minDifficulty bleibt dann ebenfalls 0 -
+        // obwohl der Server nach dem Saeubern durchaus gut sein kann. Ein
+        // Gate, das darauf mit "unrentabel" antwortet, wuerde genau diesen
+        // Server fuer immer ungesaeubert liegen lassen. Unbekannt heisst
+        // deshalb: durchlassen.
+        const steadyEff = (p > 0 && gbSekProEinheit > 0)
+          ? (s.moneyMax * MIX_MONEY_HIGH * pMin * chanceMin) / gbSekProEinheit : null;
+
         // ANLAUFPHASE, ausdruecklich und als eigener Zweig. Aus einem
         // beliebigen Ausgangszustand (Sicherheit hoch, Guthaben leer) fuehrt
         // die Gleichgewichtsmischung allein nicht heraus - sie HAELT einen
@@ -579,11 +639,26 @@ export async function main(ns) {
           // eines erst geplanten grow gehoert nicht dazu - sonst schwaecht
           // diese Runde auf Vorrat, und der Deckel waere wieder wirkungslos.
           const weakenNeed = (secOver + FORTIFY_GROW * f.grow) / WEAKEN_POWER;
+          // SEQUENZIELL, nicht gleichzeitig (Korrektur 22.08.2026). Der
+          // Kommentar oben rechnet seit jeher vor, warum erst gesaeubert und
+          // dann gewachsen wird - der Code hat weaken und grow aber in
+          // DERSELBEN Runde aus demselben Anteil vergeben. Damit lief grow
+          // genau in dem Zustand, den die Rechnung als dreimal zu teuer
+          // ausweist: the-hub wuchs bei Sicherheit 41 mit k = 4.6e-4 statt
+          // bei 14 mit 1.35e-3. Gemessen lagen dort 369 GB grow, von denen
+          // rund zwei Drittel verschenkt waren.
+          //
+          // Solange also nennenswert Sicherheit ueber dem Minimum liegt, gibt
+          // es NUR weaken. Das kostet eine weaken-Runde Wartezeit; die ist
+          // billig, weil der nicht abgerufene Anteil unten an die anderen
+          // Ziele weiterkaskadiert, statt liegenzubleiben.
+          const nurSaeubern = secOver > MIX_SEC_OK;
           return {
             anlauf: true,
+            steadyEff,
             bedarf: {
               hack: 0,
-              grow: Math.max(0, growNeed - f.grow),
+              grow: nurSaeubern ? 0 : Math.max(0, growNeed - f.grow),
               weaken: Math.max(0, weakenNeed - f.weaken),
             },
           };
@@ -608,6 +683,7 @@ export async function main(ns) {
         const secErr = clamp01((secOver - MIX_SEC_OK) / (MIX_SEC_BAD - MIX_SEC_OK));
         return {
           anlauf: false,
+          steadyEff,
           ratio: {
             hack: (1 - moneyErr) * (1 - secErr),
             grow: growPerHack + moneyErr * einheit,
@@ -732,17 +808,35 @@ export async function main(ns) {
         const wuensche = [];
         const summeFaeden = { hack: 0, grow: 0, weaken: 0 };
         let anlaufZiele = 0;
-        let restZiele = moneyTargets.length;
+
+        // --- Anlaufphase eindaemmen (22.08.2026) ---------------------------
+        // Gemessener Anlass: the-hub lag ueber Stunden bei Sicherheit 41
+        // (Minimum 14) und 27 % Guthaben und band dabei 1376 von 4608 GB
+        // Arbeiterspeicher - 30 % des Netzes fuer null Ertrag. Der Grund ist
+        // nicht ein einzelner Rechenfehler, sondern dass die Anlaufphase gar
+        // keine Grenze kannte: kein Nutzen-Gate, keine Obergrenze, keine
+        // Frist. Ein Ziel, das aus eigener Kraft nicht herausfindet, konnte
+        // beliebig lange beliebig viel binden.
+        //
+        // Drei Bremsen, absichtlich getrennt, weil sie verschiedene Fehler
+        // abfangen:
+        //   Gate   - Ziele, die den Anlauf sachlich nicht wert sind.
+        //   Deckel - Ziele, die ihn wert waeren, aber nicht auf einmal.
+        //   Frist  - Ziele, bei denen die Rechnung stimmt und es trotzdem
+        //            nicht vorangeht (Ursache unbekannt und egal).
+        const ANLAUF_ANTEIL_ZIEL = 0.15;    // je Ziel und Runde
+        const ANLAUF_ANTEIL_GESAMT = 0.30;  // alle Anlaufziele zusammen
+        const ANLAUF_FRIST_MS = 20 * 60000;
+        const ANLAUF_SPERRE_MS = 30 * 60000;
+
+        // Erst planen, dann verteilen. Der Grund fuer die getrennten
+        // Durchgaenge ist das Nutzen-Gate: Es vergleicht ein Anlaufziel mit
+        // dem Durchschnitt der Ziele, die schon im Dauerbetrieb laufen - und
+        // den kennt man erst, wenn alle Plaene vorliegen.
+        const plaene = [];
         for (const ziel of moneyTargets) {
-          if (restZiele <= 0) break;
-          // Gleicher Anteil je Ziel, Rest kaskadiert - wie bisher. Ein Ziel in
-          // der Anlaufphase nimmt nur, was es braucht; was es liegen laesst,
-          // kommt den folgenden Zielen zugute.
-          const anteil = budget / restZiele;
-          restZiele--;
-          let plan;
           try {
-            plan = planMix(ziel);
+            plaene.push({ ziel, plan: planMix(ziel) });
           } catch (e) {
             // Nicht stillschweigend ueberspringen. Wirft hackAnalyze oder
             // growthAnalyze fuer ein Ziel dauerhaft, faellt dieses Ziel sonst
@@ -750,8 +844,72 @@ export async function main(ns) {
             // das Muster, das diesen Bot schon mehrfach stundenlang hat
             // stillstehen lassen. Gedrosselt, damit das Log lesbar bleibt.
             if (runde % 10 === 0) sag("planMix(" + ziel + ") warf: " + String(e));
-            continue;
           }
+        }
+
+        // Vergleichsmassstab: der mittlere Gleichgewichtsertrag der Ziele, die
+        // gerade LAUFEN. Ist keines im Dauerbetrieb - direkt nach einem
+        // Einbau, oder wenn wirklich alles schmutzig ist -, bleibt das Gate
+        // aus. Sonst blockierte es sich selbst: Kein Ziel duerfte anlaufen,
+        // weil keines laeuft, und keines liefe, weil keines anlaufen darf.
+        const laufende = plaene.filter((e) => !e.plan.anlauf && e.plan.steadyEff > 0);
+        const massstab = laufende.length
+          ? laufende.reduce((n, e) => n + e.plan.steadyEff, 0) / laufende.length : 0;
+
+        const anlaufDeckelZiel = budget * ANLAUF_ANTEIL_ZIEL;
+        let anlaufDeckelRest = budget * ANLAUF_ANTEIL_GESAMT;
+        let restZiele = plaene.length;
+        for (const eintrag of plaene) {
+          const ziel = eintrag.ziel;
+          const plan = eintrag.plan;
+          if (restZiele <= 0) break;
+          // Gleicher Anteil je Ziel, Rest kaskadiert - wie bisher. Ein Ziel in
+          // der Anlaufphase nimmt nur, was es braucht; was es liegen laesst,
+          // kommt den folgenden Zielen zugute.
+          let anteil = budget / restZiele;
+          restZiele--;
+
+          if (plan.anlauf) {
+            // GATE. Ein Anlauf kostet Speicher, der sonst SOFORT Geld
+            // brachte. Er lohnt nur, wenn das Ziel hinterher mindestens so
+            // gut zahlt wie das, was man dafuer stehenlaesst. steadyEff ist
+            // dafuer schon auf minDifficulty hochgerechnet, das Ziel wird
+            // also nach seinem Zustand NACH dem Saeubern beurteilt, nicht
+            // nach dem davor. null heisst "nicht bestimmbar" und laesst
+            // durch (Begruendung bei steadyEff).
+            if (plan.steadyEff != null && massstab > 0 && plan.steadyEff < massstab) {
+              if (runde % 30 === 0) {
+                sag("Anlauf fuer " + ziel + " uebersprungen: " + Math.round(plan.steadyEff)
+                  + " $/GB*s im Gleichgewicht, Flotte laeuft mit " + Math.round(massstab) + ".");
+              }
+              anlaufSeit.delete(ziel);
+              continue;
+            }
+            // FRIST. Auch ein rentables Ziel darf nicht ewig anlaufen. Kommt
+            // es binnen ANLAUF_FRIST_MS nicht in den Dauerbetrieb, wird es
+            // fuer ANLAUF_SPERRE_MS beiseitegelegt. Die Sperre ist kein
+            // Urteil ueber den Server, sondern ueber die Lage: Sie laeuft ab,
+            // und dann wird es mit dem dann gueltigen Netz neu versucht.
+            const seit = anlaufSeit.get(ziel);
+            if (seit == null) {
+              anlaufSeit.set(ziel, Date.now());
+            } else if (Date.now() - seit > ANLAUF_FRIST_MS) {
+              gesperrtBis.set(ziel, Date.now() + ANLAUF_SPERRE_MS);
+              anlaufSeit.delete(ziel);
+              sag(ziel + ": Anlauf nach " + Math.round((Date.now() - seit) / 60000)
+                + " min ohne Erfolg abgebrochen, " + Math.round(ANLAUF_SPERRE_MS / 60000)
+                + " min gesperrt.");
+              continue;
+            }
+            // DECKEL. Auch mit Gate und Frist darf ein einzelnes Anlaufziel
+            // nicht das halbe Netz binden, und alle zusammen erst recht
+            // nicht. Was hier gekuerzt wird, faellt ueber die Kaskade an die
+            // Ziele, die schon Geld verdienen.
+            anteil = Math.min(anteil, anlaufDeckelZiel, anlaufDeckelRest);
+          } else {
+            anlaufSeit.delete(ziel);
+          }
+
           const faeden = { hack: 0, grow: 0, weaken: 0 };
           if (plan.anlauf) {
             // Anlaufphase: der offene Bedarf wird der Reihe nach abgearbeitet,
@@ -814,6 +972,10 @@ export async function main(ns) {
             });
           }
           budget = Math.max(0, budget - verbraucht);
+          // Der Gesamtdeckel wird nur von Anlaufzielen abgetragen, sonst
+          // waere er nach dem ersten Dauerbetriebsziel aufgebraucht und
+          // wirkte gar nicht.
+          if (plan.anlauf) anlaufDeckelRest = Math.max(0, anlaufDeckelRest - verbraucht);
         }
 
         // Wuensche auf Rechner legen, groesster Rechner zuerst. So braucht ein
@@ -839,7 +1001,14 @@ export async function main(ns) {
 
         // Nur fuer die Beobachtung von aussen - die Verteilung ist die Zahl,
         // an der dieser Umbau gemessen wird.
-        mixStat = { ...summeFaeden, anlaufZiele, restGb: Math.round(budget) };
+        mixStat = {
+          ...summeFaeden, anlaufZiele, restGb: Math.round(budget),
+          // Der Massstab des Nutzen-Gates gehoert nach draussen: Er ist die
+          // einzige Zahl, an der von aussen zu sehen ist, wie gut die Flotte
+          // gerade laeuft - und wie streng das Gate deshalb ist.
+          effFlotte: Math.round(massstab),
+          gesperrt: [...gesperrtBis.keys()],
+        };
       }
     }
 

@@ -50,6 +50,8 @@ export async function main(ns) {
   // bn4life.js selbst (19,85 GB), sonst kann es nach einem Absturz nicht mehr
   // starten.
   let werkbankMerker = null;
+  // Zeitpunkt des letzten darkweb.js-Anlaufs (Abschnitt 2b1).
+  let nachholMerker = 0;
   // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
   // Minuten anlaeuft, ohne fertig zu werden, ist nur zu erkennen, wenn sich
   // irgendwer merkt, wann es angefangen hat - eine Runde allein sieht immer
@@ -2420,6 +2422,58 @@ export async function main(ns) {
         sag("Doppelte Instanz von " + datei + " auf " + ueberzaehlig.host
           + " beendet (pid " + ueberzaehlig.pid + "); " + wo[0].host
           + " behaelt sie.");
+      }
+    }
+
+    // --- 2b1. Nachholer: TOR und Portknacker ----------------------------------
+    //
+    // Der Reset nimmt alle Programme ausser NUKE.exe mit, und der TOR-Router
+    // ueberlebt ihn ebenfalls nicht. Ohne Portknacker sind von 87 Rechnern
+    // acht erreichbar - ohne Einkommen keine Server, ohne Server keine
+    // Rechenzeit. src/darkweb.js nennt das im Kopf "der Engpass nach jedem
+    // Reset", und genau so war es: In BitNode 5 stand der Bot bei acht
+    // Rechnern, bis der Kauf von Hand angestossen wurde.
+    //
+    // WARUM DER OBERFLAECHENWEG UND NICHT bn4life. bn4life kauft dasselbe
+    // ueber Singularity und ist damit ausserhalb von BitNode 4 293,8 GB gross
+    // - es laeuft im frischen Knoten stundenlang nicht. darkweb.js liest die
+    // Oberflaeche ueber globalThis["document"]; der Zugriff kostet pauschal
+    // 25 GB und ist vom BitNode voellig unabhaengig. Gemessen 27,65 GB, also
+    // auf jedem 64-GB-Mietrechner startbar. Dieselbe Ueberlegung gilt fuer
+    // homeram.js (30,4 GB statt 148,5 GB fuer homegrow.js).
+    //
+    // ABSTAND VON FUENF MINUTEN. darkweb.js wechselt die Seite im Spiel. Alle
+    // zehn Sekunden gestartet, wuerde es die Oberflaeche unter den Haenden
+    // wegziehen, waehrend jemand zusieht. Es beendet sich von selbst, sobald
+    // das Geld fuer das naechste Programm nicht reicht - der Wiederanlauf
+    // holt dann das nach, was inzwischen bezahlbar geworden ist.
+    const PORTPROGRAMME = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe",
+                           "HTTPWorm.exe", "SQLInject.exe"];
+    const NACHHOL_ABSTAND_MS = 300000;
+    if (PORTPROGRAMME.some((d) => !ns.fileExists(d, "home"))
+        && Date.now() - nachholMerker > NACHHOL_ABSTAND_MS
+        && !hosts.some((h) => {
+          try { return ns.ps(h).some((pr) => pr.filename === "darkweb.js"); }
+          catch { return false; }
+        })) {
+      const braucht = ns.getScriptRam("darkweb.js", "home");
+      let wirt = null, meistFrei = 0;
+      for (const host of hosts) {
+        if (!ns.hasRootAccess(host)) continue;
+        const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
+          - (host === "home" ? reserveHome() : 0);
+        if (frei > meistFrei) { meistFrei = frei; wirt = host; }
+      }
+      if (braucht > 0 && wirt && meistFrei >= braucht) {
+        nachholMerker = Date.now();
+        if (wirt !== "home") ns.scp("darkweb.js", wirt, "home");
+        const pid = ns.exec("darkweb.js", wirt, 1);
+        sag(pid ? "Portknacker nachkaufen: darkweb.js auf " + wirt
+            + " (pid " + pid + ")."
+          : "darkweb.js liess sich auf " + wirt + " nicht starten (exec gab 0).");
+      } else if (runde % 30 === 0) {
+        sag("Portknacker fehlen, aber darkweb.js (" + braucht.toFixed(1)
+          + " GB) findet nirgends Platz.");
       }
     }
 

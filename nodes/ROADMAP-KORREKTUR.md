@@ -104,3 +104,32 @@ Freischalter wie SF6 nur dort, wo man ihn benutzt.
   Fehlermodi-Kritikers: nach einem BitNode-Wechsel laeuft derzeit gar nichts,
   weil `prestigeSourceFile` alle Skripte beendet und die vorgesehene
   `boot.js` nicht existiert. **Das ist die dringendste offene Baustelle.**
+
+## Uebergang BN4 -> BN5, Stand 23.08.2026 16:55
+
+Gepruefte Zahlen fuer den naechsten Knoten (BitNode.tsx, ueber die
+Reihenfolge der `new BitNode(...)`-Bloecke zugeordnet):
+
+| Groesse | BN4 | BN5 |
+|---|---|---|
+| WorldDaemonDifficulty | 3 | **1,5** |
+| Zielniveau Hacking | 9000 | **4500** |
+| ScriptHackMoney | 0,15 | 0,15 (unveraendert) |
+| FactionWorkRepGain | 0,75 | 1 (nicht gesetzt) |
+| Singularity-RAM | Grundpreis | **x16** (SF4Cost, nur BN4 rabattiert) |
+
+KORREKTUR 17:05: die 0,75 in der Zeile ScriptHackMoney waren falsch
+abgelesen - sie gehoeren zu BN6, BN5 laesst den Wert bei 0,15 wie BN4.
+Zusaetzlich gilt in BN5: HackExpGain 0,5 statt 0,4 (+25 Prozent) und
+AugmentationMoneyCost 2, Augmentierungen kosten also das Doppelte.
+
+BN5 ist damit leichter als BN4, aber aus anderen Gruenden als zuerst
+notiert: halbes Zielniveau, ein Viertel mehr Erfahrung je Aktion, kein
+Reputationsabschlag - dafuer doppelt so teure Augmentierungen. Die fuenfte
+ist der Preis dafuer und der Grund fuer den Umbau vom selben Tag
+(A22/A23): bn4net.js ist jetzt singularityfrei und passt mit 16,25 GB in
+jedes frische home.
+
+`data/exit-ziel.txt` steht auf 5. Die Kette ist bis auf das Level
+geprueft - `exit.js --pruefen` meldete um 16:53 "Hacking 8310 von 9000,
+Root: ja".

@@ -20,7 +20,22 @@
  * Menue offen hat, bekaeme es unter den Haenden weggeraeumt. Deshalb wird
  * vorher geprueft, ob ueberhaupt ein Dialog offen ist, und nur dann gefeuert.
  *
- * Aufruf: run popups.js   (laeuft dauerhaft, ~2 GB)
+ * ZWEITE AUFGABE: WACHE UEBER bn4net.js (23.08.2026)
+ *
+ * Der Bot hat eine Wachkette - boot.js startet bn4net, bn4life startet bn4net
+ * nach, bn4net startet alles Uebrige. Nach einem BitNode-Wechsel fehlt genau
+ * ein Glied: bn4life ist dort 293,8 GB gross (Singularity kostet ausserhalb
+ * von BitNode 4 das Sechzehnfache) und laeuft stundenlang nicht. Stirbt
+ * bn4net in diesem Fenster - oder beendet es sich auf Zuruf, um neuen Code zu
+ * laden -, steht der Bot still, bis ein Mensch "run bn4net.js" tippt. Genau
+ * das ist am 23.08. um 17:40 passiert.
+ *
+ * Diese Datei ist der einzige sinnvolle Platz fuer die Wache: Sie ist das
+ * kleinste Werkzeug der Liste (passt auf jedes frische home), braucht kein
+ * Singularity, laeuft ohnehin dauerhaft und wird von bn4net selbst
+ * nachgestartet, wenn sie fehlt. Die beiden bewachen sich damit gegenseitig.
+ *
+ * Aufruf: run popups.js   (laeuft dauerhaft, ~3,3 GB)
  *
  * @param {NS} ns
  */
@@ -54,6 +69,31 @@ export async function main(ns) {
   // Die Einladung bleibt nach "Decide later" bestehen und geht nicht verloren.
   const HARMLOS = ["decide later", "close", "cancel", "ok", "dismiss", "later", "got it"];
 
+  // --- Wache ueber bn4net.js -------------------------------------------------
+  // Bewusst ohne jede Bedingung ausser "laeuft nicht und passt": Wer hier
+  // klug sein will (Karenzzeit, Fehlversuchszaehler, Stillstandserkennung),
+  // baut die naechste Stelle, an der der Bot aus einem gut gemeinten Grund
+  // NICHT startet. Ein Doppelstart ist harmlos - bn4net hat einen eigenen
+  // Doppelinstanz-Waechter, der die juengere Instanz beendet.
+  let wachMeldungen = 0;
+  const wache = () => {
+    if (ns.ps("home").some((p) => p.filename === "bn4net.js")) return;
+    const frei = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
+    if (!ns.fileExists("bn4net.js", "home")) return;
+    const pid = ns.exec("bn4net.js", "home");
+    if (pid) {
+      wachMeldungen++;
+      ns.print("bn4net.js lag still und wurde neu gestartet (pid " + pid + ").");
+      ns.write("data/popups-wache.txt",
+        new Date().toLocaleTimeString() + "  bn4net.js neu gestartet (pid "
+        + pid + "), " + wachMeldungen + ". Mal." + String.fromCharCode(10), "a");
+    } else {
+      ns.write("data/popups-wache.txt",
+        new Date().toLocaleTimeString() + "  bn4net.js liess sich nicht starten,"
+        + " home hat " + frei.toFixed(2) + " GB frei." + String.fromCharCode(10), "a");
+    }
+  };
+
   const knoepfeSchliessen = () => {
     let getan = 0;
     for (const modal of doc.querySelectorAll(".MuiModal-root")) {
@@ -69,6 +109,8 @@ export async function main(ns) {
 
   while (true) {
     try {
+      // Die Wache zuerst: ein stehender Bot ist teurer als ein offener Dialog.
+      wache();
       if (dialogOffen()) {
         // Zweimal mit Abstand: der erste Schlag leert die Alert-Warteschlange,
         // ein zweiter erwischt einen Dialog, der erst dadurch sichtbar wurde.

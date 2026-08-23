@@ -158,10 +158,13 @@ export async function main(ns) {
   // den Zustand direkt nach einem Knotenwechsel, wenn home wieder bei 32 GB
   // steht und getScriptRam fuer noch nicht kopierte Dateien 0 liefert.
   const reserveHome = () => {
+    const homeMax = ns.getServerMaxRam("home");
+    const eigenRam = ns.getScriptRam("bn4net.js", "home");
+    const passtAufHome = Math.max(0, homeMax - (eigenRam > 0 ? eigenRam : 0));
     let bedarf = 0;
     for (const [datei] of WERKZEUGE) {
       const r = ns.getScriptRam(datei, "home");
-      if (r > 0) bedarf += r;
+      if (r > 0 && r <= passtAufHome) bedarf += r;
     }
     // REIHENFOLGE BEACHTEN. Erst deckeln, dann die Untergrenze - andersherum
     // deckelt das Viertel die Untergrenze weg: bei einem frischen 32-GB-home
@@ -174,7 +177,7 @@ export async function main(ns) {
     // aber mitgezaehlt werden, sonst schuetzt die Reserve genau die Haelfte
     // der Steuerung nicht.
     const rLife = ns.getScriptRam("bn4life.js", "home");
-    if (rLife > 0) bedarf += rLife;
+    if (rLife > 0 && rLife <= passtAufHome) bedarf += rLife;
 
     // Erst die Untergrenze, dann der Deckel - und die Untergrenze gewinnt.
     // Die vorige Fassung schrieb Math.max(24, Math.min(max/4, Math.max(64,
@@ -186,8 +189,33 @@ export async function main(ns) {
     // nicht mehr startet. Deshalb gilt der Deckel nur oberhalb der
     // Untergrenze.
     const max = ns.getServerMaxRam("home");
+
+    // DIE RESERVE DARF NICHT GROESSER SEIN ALS DAS, WAS SIE SCHUETZEN SOLL
+    // (23.08.2026, im neuen Knoten gemessen).
+    //
+    // Diese Zeile ist zweimal repariert worden, beide Male nach oben - und
+    // beide Male ist der Fall uebersehen worden, in dem die Untergrenze
+    // groesser ist als der Platz, der nach bn4net selbst uebrig bleibt.
+    // Gemessen 25 Minuten nach dem Eintritt in BitNode 5: home 32 GB,
+    // bn4net.js belegt 16,25 davon, frei 15,75 - und die Untergrenze
+    // min(64, 32/2) = 16 lag DARUEBER. home hat also null Faeden getragen,
+    // waehrend das Guthaben eine halbe Stunde lang auf 1.262 Dollar stand.
+    //
+    // Zwei Grenzen, beide aus derselben Ueberlegung: Eine Reserve ist nur
+    // sinnvoll, wenn ein Werkzeug sie auch benutzen kann.
+    //   - `bedarf` zaehlt nur noch Werkzeuge, die auf home ueberhaupt Platz
+    //     faenden. Ausserhalb von BitNode 4 kostet jeder Singularity-Aufruf
+    //     das Sechzehnfache; bn4life.js misst dort 293,8 GB und bn4rep.js
+    //     noch mehr. Fuer die auf einem 32-GB-home Platz freizuhalten, ist
+    //     nicht vorsichtig, sondern sinnlos - sie starten dort nie.
+    //   - Nichts zu schuetzen heisst nichts zu reservieren, und mehr als die
+    //     Haelfte des Verteilbaren nimmt die Reserve nie.
+    const eigen = ns.getScriptRam("bn4net.js", "home");
+    const verteilbar = Math.max(0, max - (eigen > 0 ? eigen : 0));
+    if (bedarf <= 0) return 0;
     const untergrenze = Math.min(64, max / 2);
-    return Math.max(untergrenze, Math.min(max / 4, bedarf * 3));
+    const wunsch = Math.max(untergrenze, Math.min(max / 4, bedarf * 3));
+    return Math.min(wunsch, bedarf, verteilbar / 2);
   };
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
@@ -198,7 +226,26 @@ export async function main(ns) {
   // Wiederaufbauplan nach einem Reset (Prestige.ts:73 loescht alle gekauften
   // Rechner) - wer die Werkzeuge von Hand starten muesste, haette nach jedem
   // Einbau einen toten Bot.
+  // REIHENFOLGE = DRINGLICHKEIT (23.08.2026). Der Werkzeugstarter geht die
+  // Liste der Reihe nach durch und ueberspringt, was gerade nicht in die
+  // Werkbank passt. In einem frischen Knoten ist der Platz knapp, und dann
+  // entscheidet diese Reihenfolge, was zuerst laeuft.
+  //
+  // Vorn stehen die beiden, ohne die der Bot nicht aus der Startlage
+  // herauskommt: bn4life kauft TOR und die Portprogramme - ohne sie bleibt
+  // das Netz bei den sechs Servern ohne Portbedarf stehen. homegrow baut
+  // home aus, und erst ein grosses home traegt den Rest. Vertragsloeser,
+  // Reputationsarbeit und die Bequemlichkeiten kommen danach.
   const WERKZEUGE = [
+    // bn4life kauft TOR und die Portprogramme. Es steht in dieser Liste und
+    // nicht in boot.js, weil es voller Singularity ist und ausserhalb von
+    // BitNode 4 mehrere hundert GB gross - in ein frisches home mit 32 GB
+    // passt es nie. Auf der Werkbank stoert der Preis nicht; Singularity
+    // wirkt spielerweit, nicht rechnergebunden.
+    ["bn4life.js", []],
+    // home-Ausbau, aus demselben Grund ausgelagert (vier Singularity-Aufrufe,
+    // 9 GB im Knoten 4 und 144 GB draussen) - siehe Kopf von homegrow.js.
+    ["homegrow.js", []],
     ["contracts.js", ["--loop", "300"]],
     ["bn4rep.js", []],
     ["bn4door.js", []],
@@ -212,23 +259,6 @@ export async function main(ns) {
     // vor und muss jeden einzeln wegklicken. Gehoert aus demselben Grund
     // hierher wie der Tonanker: er soll den Einbau ueberleben.
     ["popups.js", []],
-    // home-Ausbau. Steht hier und nicht in bn4net selbst, weil seine vier
-    // Singularity-Aufrufe ausserhalb von BitNode 4 das Sechzehnfache kosten -
-    // siehe Kopf von homegrow.js. Auf der Werkbank stoert der Preis nicht.
-    ["homegrow.js", []],
-    // Die zweite Steuerhaelfte gehoert in diese Liste, seit boot.js sie nicht
-    // mehr erzwingt (23.08.2026). Grund: bn4life ist voller Singularity und
-    // ausserhalb von BitNode 4 mehrere hundert GB gross - in ein frisches home
-    // mit 32 GB passt es nie. Bisher haette boot.js zwanzig Minuten darauf
-    // gewartet, aufgegeben, und niemand haette es je gestartet: bn4life
-    // startet bn4net (bn4life.js:93), aber nicht umgekehrt. Damit waeren TOR
-    // und die Portprogramme nie gekauft worden und das Netz bei den sechs
-    // Servern ohne Portbedarf stehengeblieben.
-    //
-    // Auf der Werkbank ist der Preis egal. Der Doppelinstanz-Waechter weiter
-    // unten laesst die Fassung auf home gewinnen, sobald dort wieder Platz
-    // ist - die Reihenfolge stimmt also in beide Richtungen.
-    ["bn4life.js", []],
   ];
   const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 
@@ -319,6 +349,82 @@ export async function main(ns) {
       sag("Neuladen angefordert - beende mich, die Wache holt mich zurueck.");
       ns.exit();
     }
+    // --- 0b2. Auftragslaeufer, ersatzweise ------------------------------------
+    // data/task.txt ist der einzige Weg, von aussen ein Skript im Spiel zu
+    // starten - die Bruecke kann Dateien schieben, aber nichts ausfuehren.
+    // Gelesen hat ihn bisher nur bn4life.js. Das faellt genau dann aus, wenn
+    // man ihn am dringendsten braucht: bn4life ist ausserhalb von BitNode 4
+    // 293,8 GB gross und laeuft nach einem Knotenwechsel stundenlang nicht.
+    // Am 23.08. um 17:30 stand der Bot in BitNode 5 fest, und es gab keinen
+    // Weg mehr, ihm etwas zu sagen - ausser einem Menschen an der Tastatur.
+    //
+    // bn4net.js ist die Haelfte, die IMMER laeuft (16,25 GB, singularityfrei).
+    // Deshalb liest es den Auftrag ersatzweise mit - aber nur, wenn bn4life
+    // nirgends laeuft. Damit gibt es nie zwei Leser und nie ein Wettrennen um
+    // dieselbe Zeile.
+    const lifeLaeuft = hosts.some((h) => {
+      try { return ns.ps(h).some((pr) => pr.filename === "bn4life.js"); }
+      catch { return false; }
+    });
+    if (!lifeLaeuft && ns.fileExists("data/task.txt", "home")) {
+      const roh = ns.read("data/task.txt").trim();
+      ns.write("data/task.txt", "", "w");     // sofort leeren, sonst Endlosstart
+      if (roh) {
+        try {
+          const teile = JSON.parse(roh);
+          const braucht = ns.getScriptRam(teile[0], "home");
+          // Wirt mit dem meisten freien Speicher. Auf home bleibt ein Sockel
+          // stehen, damit ein Auftrag nicht die Steuerung selbst verdraengt.
+          let wirt = "home", meistFrei = -1;
+          for (const host of hosts) {
+            if (!ns.hasRootAccess(host)) continue;
+            const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
+              - (host === "home" ? 2 : 0);
+            if (frei > meistFrei) { meistFrei = frei; wirt = host; }
+          }
+          // PLATZ SCHAFFEN, STATT ZU SCHEITERN (23.08.2026).
+          //
+          // Im frischen Knoten ist jedes Byte mit Arbeitern belegt: gemessen
+          // 11 GB frei im ganzen Netz, verteilt auf acht Rechner mit je 1,6 -
+          // ein Auftrag von 12 GB passt nirgends, obwohl das Netz 132 GB hat.
+          // Ohne diesen Block waere der Fernkanal genau dann tot, wenn man ihn
+          // braucht.
+          //
+          // Arbeiter sind der richtige Posten zum Raeumen: sie sind
+          // Einwegskripte, bn4net legt sie in der naechsten Runde von selbst
+          // wieder nach, und der Verlust ist die angefangene Aktion - Sekunden.
+          // Ein Werkzeug dagegen verliert beim Abbruch seinen Arbeitsstand.
+          // Geraeumt wird nur auf dem gewaehlten Wirt und nur so viel, wie der
+          // Auftrag braucht.
+          if (braucht > 0 && meistFrei < braucht) {
+            const vorher = meistFrei;
+            for (const w of WORKER) {
+              if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
+              ns.scriptKill(w, wirt);
+              const frei = ns.getServerMaxRam(wirt) - ns.getServerUsedRam(wirt)
+                - (wirt === "home" ? 2 : 0);
+              if (frei >= braucht) break;
+            }
+            const nachher = ns.getServerMaxRam(wirt) - ns.getServerUsedRam(wirt);
+            sag("Fuer den Auftrag Arbeiter auf " + wirt + " geraeumt: "
+              + vorher.toFixed(1) + " -> " + nachher.toFixed(1) + " GB frei.");
+            meistFrei = nachher;
+          }
+          if (wirt !== "home") ns.scp([teile[0], ...BIBLIOTHEKEN], wirt, "home");
+          const pid = ns.exec(teile[0], wirt, 1, ...teile.slice(1));
+          // ns.exec gibt bei Speichermangel still 0 zurueck - der Rueckgabewert
+          // gehoert ins Log, sonst verschwindet der Auftrag spurlos.
+          sag(pid ? "Auftrag gestartet: " + teile.join(" ") + " auf " + wirt
+              + " (pid " + pid + ")."
+            : "Auftrag FEHLGESCHLAGEN: " + teile[0] + " braucht "
+              + braucht.toFixed(2) + " GB, bester Wirt " + wirt + " hat "
+              + meistFrei.toFixed(2) + " GB frei.");
+        } catch (e) {
+          sag("Auftrag unlesbar: " + String(e));
+        }
+      }
+    }
+
     // --- 1. Aufschliessen -----------------------------------------------------
     const offen = knacker.filter(([datei]) => ns.fileExists(datei, "home"));
     let neu = 0;
@@ -555,9 +661,23 @@ export async function main(ns) {
     // der Vertragsloeser brach, obwohl er auf home passt: 64 GB bleiben beim
     // Einbau erhalten (nur der BitNode-Wechsel setzt sie zurueck). Das ist der
     // Unterschied zwischen einer Stunde Anlauf und fuenf Minuten.
+    // Die Schwelle 18 war auf contracts.js gemuenzt (17,65 GB) und hat
+    // deshalb im frischen Knoten alles blockiert: home hatte 15,75 GB frei,
+    // also fiel die Werkbank ganz aus - und mit ihr der Werkzeugstarter, der
+    // nur innerhalb von `if (werkbank)` laeuft. popups.js braucht 1,6 GB und
+    // haette dort muehelos Platz gefunden; stattdessen sammelten sich die
+    // Dialoge im Spiel, weil eine Schwelle fuer ein ganz anderes Werkzeug im
+    // Weg stand. Jetzt entscheidet das KLEINSTE noch nicht laufende Werkzeug:
+    // passt eines, ist home Werkbank; passt keines, aendert die Werkbank
+    // ohnehin nichts.
     if (!werkbank) {
       const freiHome = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
-      if (freiHome >= 18) werkbank = "home";
+      let kleinstes = Infinity;
+      for (const [datei] of WERKZEUGE) {
+        const r = ns.getScriptRam(datei, "home");
+        if (r > 0 && r < kleinstes) kleinstes = r;
+      }
+      if (Number.isFinite(kleinstes) && freiHome >= kleinstes) werkbank = "home";
     }
     werkbankMerker = werkbank;
 

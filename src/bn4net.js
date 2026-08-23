@@ -1001,8 +1001,29 @@ export async function main(ns) {
       // logarithmisch ist: Von 4.000 auf 10.000 Faeden sind es noch +3,7 %
       // fuer weitere 24.000 GB. Jenseits davon ist der Speicher im Geldziel
       // mehr wert, auch bei niedrigem Grenznutzen des Geldes.
+      // DECKEL GELOEST (23.08.2026). Der Absatz darueber begruendet die 4.000
+      // damit, dass "jenseits davon der Speicher im Geldziel mehr wert" sei.
+      // Diese Begruendung traegt nicht mehr, aus zwei unabhaengigen Gruenden:
+      //
+      // 1. Der Speicher hat im Geldziel gar keinen Abnehmer. Gemessen am
+      //    23.08.: kapGesamtGb 8.951 - so viel nehmen ALLE offenen Ziele
+      //    zusammen auf - bei einem Netz von 1.072.988 GB. 71,7 Prozent
+      //    liegen brach. Wer share deckelt, verschenkt nichts an das
+      //    Geldziel, sondern an niemanden.
+      // 2. Geld ist nicht der Engpass des Knotens. Reputation ist es, und der
+      //    share-Bonus wirkt auf die aktive UND die passive Reputation
+      //    zugleich (reputation.ts:16-24, FactionHelpers.tsx:132-170).
+      //
+      // Gerechnet: 4.000 Faeden geben 1,3318, die vom SHARE_ANTEIL erlaubten
+      // 32.189 geben 1,4152 - also +6,3 Prozent auf jede Reputationsquelle,
+      // ohne ein Byte mehr als ohnehin vorgesehen.
+      //
+      // Der Deckel bleibt als Sicherheitsnetz stehen, nur weit oben: Der
+      // Bonus ist logarithmisch, jenseits von etwa 200.000 Faeden bringt
+      // eine Verdopplung noch 2,8 Prozent. Die eigentliche Bremse ist und
+      // bleibt SHARE_ANTEIL.
       const SHARE_ANTEIL = 0.12;
-      const SHARE_MAX = 4000;
+      const SHARE_MAX = 200000;
       const SHARE_DECKEL = shareBraucht > 0
         ? Math.max(1, Math.min(SHARE_MAX, Math.floor((ramTotal * SHARE_ANTEIL) / shareBraucht)))
         : 0;

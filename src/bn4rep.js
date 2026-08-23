@@ -78,6 +78,13 @@ export async function main(ns) {
   // stand faelschlich 2. BitNode 12 skaliert mit der Knotenstufe und faellt
   // ebenfalls auf 1 zurueck; das ist dort nur eine Schaetzung fuer die
   // Rangfolge, kein Grenzwert.
+  // FactionWorkRepGain je BitNode - nur die Knoten, die ihn ueberhaupt setzen
+  // (BitNode.tsx), alle uebrigen lassen ihn bei 1. Steht HIER OBEN, weil die
+  // Einbau-Schwelle ihn 450 Zeilen frueher braucht als die Spendenrechnung;
+  // eine const-Definition weiter unten landete in der temporalen Totzone.
+  // Das ist am 23.08.2026 dreimal passiert, jedes Mal mit demselben Muster.
+  const FACTION_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
+
   const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 1,
     9: 2, 10: 2, 11: 1.5, 12: 1, 13: 3, 14: 5, 15: 2 };
   const zielLevel = (() => {
@@ -208,7 +215,19 @@ export async function main(ns) {
   // Einladung finge von vorn an. Deshalb zuerst einbauen, dann Firma; und
   // waehrend der Phase wird der Einbau gesperrt (siehe INSTALL_LOCK_FILE).
   const MINDEST_WARTESCHLANGE = 3;
-  const LUECKE_ZU_GROSS = 15000;   // Reputation; bei ~40/min ueber sechs Stunden
+
+  // ZEIT STATT REPUTATION (23.08.2026). Hier stand 15.000 Reputation, mit dem
+  // Kommentar "bei ~40/min ueber sechs Stunden". Die Rate ist inzwischen
+  // 40 bis 190 je SEKUNDE - die Konstante war um Faktor 63 veraltet, und
+  // 15.000 Reputation sind heute anderthalb bis sechs Minuten. Die Bedingung
+  // "naechste Huerde zu weit weg, also lieber einbauen" war damit praktisch
+  // immer wahr.
+  //
+  // Der Sinn der Regel ist eine Zeitaussage, keine Reputationsaussage:
+  // Lohnt es sich noch zu warten, oder holt ein Einbau mehr heraus? Deshalb
+  // steht hier jetzt die Zeit, und die Reputationsschwelle wird daraus
+  // gerechnet.
+  const LUECKE_ZU_GROSS_MINUTEN = 45;
 
   // Die Sperrdatei aus dem Tuerschloss von heute frueh, jetzt auch von diesem
   // Skript selbst benutzt. Zwei Schreiber, eine Datei - unterscheidbar am
@@ -588,6 +607,17 @@ export async function main(ns) {
     //
     // Genau so war es zwischen 13:55 und 15:00 am 23.08.2026 gebaut. Der
     // Riegel gegen einen Fehler war selbst der schwerere Fehler.
+    // Die Reputationsschwelle aus der Zeitvorgabe. Grobe Schaetzung der Rate
+    // reicht: sie entscheidet nur, ob eine Huerde als "zu weit" gilt.
+    // Bewusst ohne Favor und ohne share-Bonus - beides hebt die echte Rate
+    // noch, die Schwelle ist damit eher zu niedrig als zu hoch, und das ist
+    // die sichere Richtung (lieber einmal zu lange arbeiten als einmal zu oft
+    // einbauen).
+    const grobRate = Math.max(1,
+      5 * spieler.skills.hacking / 975 * spieler.mults.faction_rep
+        * (FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1));
+    const lueckeZuGross = grobRate * 60 * LUECKE_ZU_GROSS_MINUTEN;
+
     const ausgangSteht = eingebauteAugs.includes(EXIT_KEY);
     if (ausgangSteht && Date.now() - letzteAusgangsmeldung > 300000) {
       letzteAusgangsmeldung = Date.now();
@@ -627,7 +657,7 @@ export async function main(ns) {
 
     if (!ausgangSteht
         && (wartend >= MINDEST_WARTESCHLANGE || (spendenrechtFaellig && wartend >= 1))
-        && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
+        && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
             || spendenrechtFaellig)
         && !gesperrt) {
@@ -1038,9 +1068,7 @@ export async function main(ns) {
     // ihn bei 1. BitNode 12 skaliert ihn mit der Knotenstufe; dort greift
     // bewusst der sichere Wert 1, weil eine zu hoch geschaetzte Spende nur
     // Geld kostet, eine zu niedrig geschaetzte dagegen den Kauf verfehlt.
-    const FACTION_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
-    const knoten = ns.getResetInfo().currentNode;
-    const knotenRepFaktor = FACTION_REP_GAIN[knoten] || 1;
+    const knotenRepFaktor = FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1;
     const geldFuerRep = (fehlend) =>
       fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / knotenRepFaktor;
 

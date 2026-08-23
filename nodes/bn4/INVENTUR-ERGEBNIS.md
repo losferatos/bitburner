@@ -57,6 +57,67 @@ moeglichen Multiplikatorpunkten geholt - Faktor 5,19 liegt offen.
   rund 30.000 Rep pro Tag - gegen 225 rep/s Arbeitsrate etwa zwei Minuten.
   Verworfen, weil er im Browser einen Download-Dialog oeffnet.
 
+## Kritikerrunde vom 23.08.2026, 14:00
+
+Drei Kritiker gegen die heutigen Aenderungen: Praemisse, Fehlermodi,
+Zahlen. Ergebnis: **acht Befunde, drei davon Fehler in Aenderungen von
+diesem Mittag.** Alle behoben.
+
+| Befund | Wirkung | Status |
+|---|---|---|
+| Einbau-Karussell: die Spendenschwelle loeste einen Einbau aus, der sie entwertet - und nach dem Red-Pill-Einbau haette jede der sieben Restfaktionen das Level wieder auf 1 geworfen | **Knotenausgang waere unerreichbar gewesen** | behoben, zwei Riegel |
+| reserveHome gab nach einem Knotenwechsel 8 GB statt 64 - Math.min deckelte die Untergrenze weg | schlechter als vorher (24 GB) | behoben |
+| Nach einem BitNode-Wechsel lief gar nichts: destroyW0r1dD43m0n, b1tflum3 und boot.js kamen nur in der Dokumentation vor | 45 moegliche Totalausfaelle | boot.js und exit.js gebaut |
+| repPerSecond unterstellte allen Faktionen Hacking-Arbeit | Faktor 6 bei Tetrads und Slum Snakes | behoben |
+| Entdopplung deckte bn4life und bn4net selbst nicht ab | zwei Steuerungen zugleich | behoben |
+| Programmkauf umging data/geldbedarf.txt | ueberholte verdiente Augmentierungen | behoben |
+| Telemetrie zeigte beim Schwellenziel eine erfundene Huerde | Nachtaufsicht unmoeglich | behoben |
+| beitritt-erledigt.txt ueberlebte jeden Reset | vier Faktionen mit 19 Augmentierungen dauerhaft draussen | behoben - Faktionen von 9 auf 13 |
+
+### Korrekturen an den Zahlen der Inventur
+
+- **Die Zeitspalte oben war Faktor 338 zu optimistisch.** Sie unterstellte
+  4,07e8 Erfahrung/s - die Obergrenze eines 5,3-PB-Netzes. Gemessen sind es
+  1,2e6/s. Die Schwelle, ab der Level 9000 leicht wird, liegt bei
+  **mult 16 bis 17, nicht bei 14**.
+- **"4,41 von 22,89 Multiplikatorpunkten" vermischt zwei Groessen.**
+  `mults.hacking 9,128 = 4,361 (Augmentierungen) x 1,01^59 (NeuroFlux)
+  x 1,16 (SF1.1)`. Und 22,89 ist kein Maximum, weil NeuroFlux unbegrenzt
+  ist. Realistisch offen ohne Kampftraining: **x2,61, nicht x5,19** - QLink
+  und SPTN-97 verlangen alle vier Kampfwerte bei 1200.
+- **Der Spendenweg war toter Code**: nur BitRunners ist spendenberechtigt,
+  und dort war alles gekauft. Erst der NeuroFlux-Zukauf macht ihn nutzbar.
+- Die Geldrate ist hoeher als gemessen angenommen: 7,4e10 statt 3,4e10 $/s.
+  Der Spendenvorteil ist damit Faktor 1017 statt 390.
+
+### Die eigentliche Lehre
+
+**NeuroFlux war der Hebel, nicht ein Nebenpunkt.** Stufe 59 traegt allein
+x1,80 zum Multiplikator bei - mehr als jedes einzelne Katalogstueck. Der
+Kauf war seit Stufe 59 blockiert, weil Stufe 60 exakt 1.138.795 Reputation
+verlangt und die hoechste Faktion 57.177 hatte. Die fehlende Reputation
+kostet bei einer spendenberechtigten Faktion 421 Mrd - sechs Sekunden
+Einkommen. Seit dem Zukauf sind es rund 14 Stufen je Einbauzyklus, also
+x1,15 auf den Multiplikator pro Zyklus.
+
+### Auch behoben: die Zielwahl bewertete den falschen Nutzen
+
+`hackNutzen` multipliziert alle sechs Hacking-Multiplikatoren gleichwertig.
+Fuer ein Levelziel ist das grob falsch - der Multiplikator sitzt im
+Exponenten, `hacking_money` und `hacking_grow` tragen null bei,
+`hacking_chance` wird auf 1,0 geklemmt. Die neue Funktion `levelNutzen`
+(src/lib/hackaugs.js) rechnet die Ersparnis in logarithmischer Erfahrung:
+
+| Stueck | hackNutzen | levelNutzen |
+|---|---|---|
+| ECorp HVMind | 2,00 (zweithoechster Wert) | **0** |
+| DataJack | 0,25 | **0** |
+| nextSENS | 0,20 | **5,14** |
+
+Zwei Stuecke, die der Bot bevorzugt gekauft haette, tragen zum
+Knotenabschluss nichts bei - und haetten dabei jedes weitere um Faktor 1,9
+verteuert.
+
 ## Offen - die naechsten Hebel
 
 1. **`hackNutzen` gewichtet falsch.** `lib/hackaugs.js:104-113` bildet das

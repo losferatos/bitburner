@@ -30,7 +30,7 @@ Status: UMGESETZT | VERWORFEN | OFFEN | LAEUFT
 | I6 | share-Deckel 4.000 gegen ein 40x kleineres Netz kalibriert | +6,3 % Reputation | UMGESETZT UND GEMESSEN - erster Anlauf lieferte nur 19 % der Wirkung, weil der Deckel aus dem Gesamt-RAM gerechnet wurde (home = 97,7 %), die Zuteilung home aber ausschloss |
 | I7 | NeuroFlux seit Stufe 59 blockiert, Reputation nicht zukaufbar | x1,15 je Zyklus | UMGESETZT |
 | I8 | hackNutzen gewichtet hacking_money wie hacking | ECorp HVMind 2,00 -> 0 | UMGESETZT |
-| I9 | home-RAM-Ausbau ohne Amortisationspruefung | 167 Mio je GB gegen 409k beim Mietrechner | **OFFEN** |
+| I9 | home-RAM-Ausbau ohne Amortisationspruefung | 167 Mio je GB gegen 409k beim Mietrechner | UMGESETZT (= A7) |
 | I10 | GAP_MS 400: Netz nimmt nur 8.951 GB von 1,07 PB auf | 71,7 % brach | **OFFEN** |
 | I11 | Erfahrungsofen laeuft auf weaken statt hack | Faktor 4,1 je GB-Sekunde, +9 % Reputation | **OFFEN** |
 | I12 | Vier weitere Firmenfaktionen (NWO, ECorp, Blade Industries, **Fulcrum Secret Technologies** - nicht Four Sigma, das war ein Uebertragungsfehler: Four Sigma traegt fast nur charisma und company_rep, Fulcrum die ENM-Kette mit echten hacking-Multiplikatoren) | zusammen ~x1,45 | **OFFEN** |
@@ -55,7 +55,7 @@ eingemischt.
 | N2 | Die Firmenwahl ignoriert den Firmenfavor. `COMPANIES` (bn4rep.js) ist eine feste Liste; `(1 + Firmenfavor/100)` geht aber direkt in die Rate ein (Work/Formulas.ts:131,156). Clarke stand auf Favor 132,3, OmniTek auf 0 | x2,32 auf die Firmenphase | **OFFEN** |
 | N3 | `lib/hackaugs.js` wertet `faction_rep` mit halbem Gewicht (Wurzel). Der Multiplikator wirkt aber dreifach: auf Arbeit, auf Passivrate UND auf den Spendenkurs | volles Gewicht waere richtig | **OFFEN** |
 | N4 | `buyaugs.js` gewichtet `hacking_money` mit 1,5 ueber `hacking` mit 1,0 - derselbe Fehler wie in bn4rep, aber in einer zweiten Datei, die beim levelNutzen-Umbau nicht mitgezogen wurde | falsche Kaufreihenfolge, wenn buyaugs benutzt wird | **OFFEN** |
-| N5 | `MINDEST_WARTESCHLANGE = 3` und `LUECKE_ZU_GROSS = 15000` (bn4rep.js) sind auf "~40 rep/**min**" kalibriert. Tatsaechlich sind es 40 bis 190 rep/**s** - die Konstanten sind um Faktor 63 veraltet. 15.000 Reputation sind heute sechs Minuten, nicht sechs Stunden | Einbau-Ausloeser feuert zu selten | **OFFEN** |
+| N5 | `MINDEST_WARTESCHLANGE = 3` und `LUECKE_ZU_GROSS = 15000` (bn4rep.js) sind auf "~40 rep/**min**" kalibriert. Tatsaechlich sind es 40 bis 190 rep/**s** - die Konstanten sind um Faktor 63 veraltet. 15.000 Reputation sind heute sechs Minuten, nicht sechs Stunden | Einbau-Ausloeser war praktisch dauerhaft scharf: 15.000 Rep entsprachen 3,7 Minuten statt sechs Stunden | UMGESETZT - Schwelle jetzt in Zeit (45 min) |
 | N6 | `kandidaten` prueft keine `prereqs`. Die ENM-Kette bei Daedalus haengt aneinander; fehlt ein Vorlaeufer, rankt der Bot dauerhaft ein unkaufbares Stueck | heute unkritisch, alle Vorlaeufer vorhanden | **OFFEN** |
 | N7 | Exploits: 3 von 11 eingesammelt (`src/exploit.js`). Jeder gibt 1,001 auf `hacking`, `hacking_exp`, `faction_rep` und ein Dutzend weitere - und **ueberlebt jeden BitNode** | +0,8 % auf alles, dauerhaft ueber alle 15 Knoten | **OFFEN** |
 | N8 | `lib/calc.js` hat einen `cores`-Parameter (Zeilen 123, 203, 230, 268), aber kein Aufrufer uebergibt je etwas anderes als den Vorgabewert 1 | gehoert zu I14 | **OFFEN** |
@@ -98,10 +98,10 @@ darunter ein Show-Stopper.
 | A10 | Zeilennummern in dieser Datei zeigten 34 bis 66 Zeilen daneben; PLANER.md verbietet sie ausdruecklich | ein Befund, den man nicht findet, faellt wieder raus | UMGESETZT - Zeilennummern entfernt |
 | A11 | I12 nannte "Four Sigma" statt "Fulcrum Secret Technologies" | die genannte Faktion traegt nichts bei, die gemeinte die ENM-Kette | UMGESETZT |
 | A12 | ROADMAP.md, ABSCHLUSS.md und der Kopf von INVENTUR-ERGEBNIS.md trugen widerlegte Zahlen unmarkiert weiter | wer sie oeffnet, liest die falsche Fassung ohne Warnung | UMGESETZT - Warnhinweise gesetzt |
-| A13 | `lib/hackaugs.js` behauptet im Doc-Block weiter "additiv ueber mehrere Stuecke" - das galt fuer ln(f), nicht fuer (1-1/f) | zwei Stuecke f=1,75 werden mit 0,857 statt 0,674 bewertet | **OFFEN** |
-| A14 | `WD_DIFFICULTY` setzt fuer BitNode 8 den Wert 2; im Quelltext wird dort nichts gesetzt, der Vorgabewert ist 1 | wirkt erst in BN8 | **OFFEN** |
+| A13 | Doc-Block behauptete "additiv ueber mehrere Stuecke" - galt fuer ln(f), nicht fuer (1-1/f) | fuer Rangfolgen unerheblich, fuer Buendel nicht | UMGESETZT |
+| A14 | WD_DIFFICULTY setzte fuer BitNode 8 den Wert 2, richtig ist 1 (BitNode.tsx setzt dort nichts); BitNode 12 ebenso | Schwelle 3000 statt 6000 | UMGESETZT |
 | A15 | NUTZEN_GEWICHT und EXIT_KEY_VALUE sind gegen mult 9 kalibriert; levelNutzen skaliert mit zielLevel/(32*mult) - bei mult 1,7 liefert nextSENS 27 statt 5 | trifft die Fruehphase nach einem Knotenwechsel | **OFFEN** |
-| A16 | Die Entdopplung haengt an `if (werkbank)` - ohne Werkbank keine Entdopplung | genau nach einem Knotenwechsel | **OFFEN** |
+| A16 | Die Entdopplung hing an `if (werkbank)` - ohne Werkbank keine Entdopplung | genau nach einem Knotenwechsel | UMGESETZT |
 | A17 | Drei weitere Kaufstellen lesen data/geldbedarf.txt nicht (Tor-Kauf, darkweb.js) | koennen verdiente Augmentierungen ueberholen | **OFFEN** |
 | A18 | Die Wiederanlaufkette ist UNGETESTET - K3 stand auf UMGESETZT, gebaut ist nicht getestet | 45 Knotenuebergaenge haengen daran | **OFFEN** |
 | A19 | Kampfwerttraining als Weg zu QLink (x1,75) und SPTN-97 (x1,15) - weder verworfen noch offen gefuehrt | x2 auf den Multiplikator, Kampfwert steht seit dem Beitrittslauf bei 167 statt 2 | **OFFEN** |

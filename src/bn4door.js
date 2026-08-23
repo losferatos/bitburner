@@ -50,8 +50,18 @@ export async function main(ns) {
   // installBackdoor ist KEINE Spielerarbeit, sondern eine Wartezeit
   // (Singularity.ts:491-498 ruft netscriptDelay und fasst Player.currentWork
   // nicht an) - es reisst die laufende Firmenarbeit also nicht ab.
+  //
+  // ecorp, nwo und blade sind am 23.08.2026 dazugekommen, als die
+  // Firmenphase auf diese drei ausgeweitet wurde. Der Grund ist derselbe wie
+  // bei clarkinc und omnitek: calculateEffectiveRequiredReputation
+  // (Company/utils.ts) senkt die verlangte Firmenreputation auf 75 Prozent,
+  // sobald auf dem Firmenserver eine Backdoor liegt. Das sind je Firma
+  // 100.000 Reputation weniger, bei gemessenen 110 je Sekunde also rund eine
+  // Viertelstunde - dreimal, und der Rabatt gilt fuer jeden weiteren Durchlauf
+  // dieses BitNodes mit.
   const ZIELE = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "fulcrumassets",
-    "clarkinc", "omnitek", "The-Cave", "w0r1d_d43m0n"];
+    "clarkinc", "omnitek", "ecorp", "nwo", "blade",
+    "The-Cave", "w0r1d_d43m0n"];
 
   const NL = String.fromCharCode(10);
   let log = [];

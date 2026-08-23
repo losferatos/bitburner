@@ -4,6 +4,13 @@ Sechs Agenten, gestartet 13:01 nach dem Kontingent-Reset. Auftragstexte in
 `INVENTUR-AUFTRAEGE.md`. Was hier steht, ist geprueft und - wo umgesetzt -
 mit Commit belegt.
 
+> **ACHTUNG, die Zeitspalte der folgenden Tabelle ist widerlegt.** Sie
+> unterstellt 4,07e8 Erfahrung je Sekunde - die Obergrenze eines 5,3-PB-Netzes,
+> das ausschliesslich hackt. Gemessen sind 1,2e6/s. Die Schwelle, ab der
+> Level 9000 leicht wird, liegt bei **mult 16 bis 17, nicht bei 14**. Die
+> Erfahrungsspalte selbst stimmt. Siehe den Abschnitt "Korrekturen an den
+> Zahlen der Inventur" weiter unten.
+
 ## Der zentrale Befund: der Multiplikator entscheidet alles
 
 `w0r1d_d43m0n` verlangt Hacking 9000 (`WorldDaemonDifficulty: 3`,
@@ -18,10 +25,14 @@ BitNode.tsx:660). Das Level ist `floor(mult * (32*ln(exp+534,6) - 200))`.
 | 16 | 2,23e10 | ~1 min |
 | 18,56 | 1,97e9 | bereits auf dem Konto |
 
-Unterhalb von mult 11 ist der Knoten NICHT abschliessbar, oberhalb von 14
-ist er fast geschenkt. Es gibt keinen Zustand, in dem Weitersammeln bei 7,94
+Unterhalb von mult 11 ist der Knoten NICHT abschliessbar; leicht wird er ab
+mult 16 bis 17 (korrigiert - urspruenglich stand hier 14). Es gibt keinen Zustand, in dem Weitersammeln bei 7,94
 richtig ist. Von 25 erhaeltlichen Hacking-Augmentierungen sind 4,41 von 22,89
-moeglichen Multiplikatorpunkten geholt - Faktor 5,19 liegt offen.
+moeglichen Multiplikatorpunkten geholt. **Diese Gegenueberstellung ist
+falsch** - 4,361 ist das Produkt der Augmentierungen, 9,128 der
+Multiplikator einschliesslich NeuroFlux und SF1.1. Realistisch offen ohne
+Kampftraining sind **x2,61, nicht x5,19**; QLink und SPTN-97 verlangen alle
+vier Kampfwerte bei 1200 beziehungsweise 850.
 
 ## Umgesetzt am 23.08.2026
 

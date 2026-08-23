@@ -1,5 +1,18 @@
 # BitNode-Roadmap (Fassung 4, 22.08.2026)
 
+> **UEBERHOLT SEIT 23.08.2026 - Abschnitt 4.1 und Abschnitt 6.**
+>
+> Abschnitt 4.1 extrapoliert die Erfahrungsrate nur ueber RAM und haelt dabei
+> `hacking_exp` bei 1,39 fest, waehrend dieselbe Tabelle `mults.hacking` auf
+> 26,8 zieht. Beides kommt aus denselben Augmentierungen, die real
+> `hacking_exp` 15,32 und `hacking_speed` 3,63 tragen - Faktor 300 bis 3.000
+> auf jede Zeile. Kein BitNode ist unter dem Hacking-Weg unerreichbar; die
+> Begruendung fuer die Bladeburner-Route und damit fuer BN6 auf Platz 2
+> faellt. **Massgeblich ist `nodes/ROADMAP-KORREKTUR.md`.**
+>
+> Unberuehrt bleiben: BN4 zuerst, BN8 zuletzt, und der strukturelle Vorteil
+> von Bladeburner (sein Fortschritt ueberlebt den Augmentierungs-Einbau).
+
 Dritte Ueberarbeitung nach adversarieller Pruefung. Route, Reihenfolge und
 V2-als-Hauptverfahren sind seit Fassung 3 unbestritten und unveraendert; diese
 Fassung korrigiert Zahlen und den Betriebsteil. Die BN4-Planerabstimmung liegt

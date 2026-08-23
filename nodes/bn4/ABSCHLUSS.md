@@ -1,5 +1,11 @@
 # BN4 — Abschlussplan (22.08.2026, Fassung 3)
 
+> **UEBERHOLT SEIT 23.08.2026.** Der Plan steht auf "m = 14 statt 16" - die
+> Zeitrechnung dahinter war Faktor 338 zu optimistisch (4,07e8 statt
+> gemessener 1,2e6 Erfahrung je Sekunde). Die noetige Schwelle liegt bei
+> mult 16 bis 17. Auch die Empfehlung zu b1tflum3 ist damit neu zu bewerten.
+> Siehe `nodes/bn4/INVENTUR-ERGEBNIS.md` und `nodes/bn4/BEFUNDE.md`.
+
 > **Fassung 3** arbeitet elf Befunde eines Skeptikers (B1-B11) und drei
 > Messkorrekturen eines zweiten Agenten (N1-N3) ein. **Alle vierzehn wurden
 > nachgerechnet, nicht uebernommen.** Zehn halten unveraendert, drei halten in

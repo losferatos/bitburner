@@ -769,6 +769,22 @@ export async function main(ns) {
       return 1 + Math.min(1, (kumuliert + jetzt) / FAVOR_ZIEL_REP);
     };
 
+    // SPENDENRECHT SCHLAEGT ALLES (23.08.2026). Hat eine Faktion Favor 150,
+    // ist Reputation dort keine Zeitfrage mehr, sondern eine Geldfrage:
+    // rep = betrag/1e6 * mults.faction_rep (Faction/formulas/donation.ts).
+    // Gemessen am laufenden Spiel: BitRunners stand auf Favor 171 mit 48
+    // Billionen auf der Hand - das sind ueber 50 Millionen Reputation auf
+    // Zuruf. Der Bot arbeitete trotzdem an PCMatrix bei einer anderen
+    // Faktion, weil die Guetezahl nur die Reputationsluecke sah und nicht,
+    // dass diese Luecke woanders mit Geld sofort verschwindet.
+    //
+    // Deshalb wird fuer spendenberechtigte Faktionen die Luecke nicht in
+    // Reputation, sondern in Geld gemessen. Reicht das Guthaben, ist sie
+    // effektiv null und das Ziel gewinnt jede Rangfolge - zu Recht, denn es
+    // kostet keine Zeit. Reicht es nicht, zaehlt der fehlende Betrag.
+    const spendenSchwelle = ns.getFavorToDonate();
+    const geldFuerRep = (fehlend) => fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep);
+
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
     const guete = (k) => {
       let ertrag = 0;
@@ -776,6 +792,13 @@ export async function main(ns) {
         if (m.faktion !== k.faktion) continue;
         if (m.repReq > k.repReq) continue;   // liegt jenseits der Schwelle
         ertrag += einzelWert(m);
+      }
+      if ((favor[k.faktion] || 0) >= spendenSchwelle) {
+        const kosten = geldFuerRep(k.repReq - k.rep);
+        // Der Kauf selbst muss auch bezahlbar bleiben, sonst waere die
+        // Spende umsonst.
+        if (kosten + k.preis <= geld) return ertrag * 1e6;
+        return ertrag * 100 / Math.max(1, (kosten + k.preis - geld) / 1e9);
       }
       return ertrag * favorNaehe(k.faktion) / Math.max(1, k.repReq - k.rep);
     };

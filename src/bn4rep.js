@@ -52,6 +52,21 @@ export async function main(ns) {
   // alle anderen Augmentierungen um 1,9 je Stueck verteuern. Erst zum Schluss.
   const NFG = "NeuroFlux Governor";
 
+  // Der Ausgangsschluessel. Steht HIER OBEN und nicht bei einzelWert weiter
+  // unten, weil der Endspiel-Riegel ihn rund zweihundert Zeilen frueher
+  // braucht - ein const-Zugriff von dort landete in der temporalen Totzone
+  // und warf "Cannot access EXIT_KEY before initialization" in jeder Runde.
+  // Genau das ist am 23.08.2026 passiert, zwei Minuten lang.
+  //
+  // Der Wert 10 ist eine Setzung: The Red Pill hat keine Statistikwerte
+  // (Augmentations.ts:1946-1953) und faellt durch jede Nutzenrechnung, ist
+  // aber das Stueck, ohne das w0r1d_d43m0n nicht am Netz haengt. 10
+  // entspricht dem Gewicht des gesamten uebrigen Daedalus-Angebots -
+  // absichtlich nicht unendlich, weil der Ausgang auch Hacking 9000
+  // verlangt und das nur ueber Multiplikatoren kommt, also ueber Einbauten.
+  const EXIT_KEY = "The Red Pill";
+  const EXIT_KEY_VALUE = 10;
+
   // --- Firmenfaktionen (M4) ------------------------------------------------
   // Clarke Incorporated und OmniTek Incorporated laden nicht ein, weil man
   // etwas gehackt hat, sondern weil man bei IHNEN ANGESTELLT ist und
@@ -866,8 +881,6 @@ export async function main(ns) {
     // darf; der Multiplikator staende still, und der ist der eigentliche
     // Engpass. 10 entspricht dem Gewicht des gesamten uebrigen
     // Daedalus-Angebots. Setzung wie NUTZEN_GEWICHT, keine Messung.
-    const EXIT_KEY = "The Red Pill";
-    const EXIT_KEY_VALUE = 10;
     const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)
       + zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug));
 

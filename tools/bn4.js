@@ -85,9 +85,16 @@ const rep = (await liesVon("data/bn4rep.json", wirt)) || (await lies("data/bn4re
 const tuer = (await liesVon("data/bn4door.json", wirt)) || (await lies("data/bn4door.json"));
 
 if (rep) {
-  zeile("arbeitet an", rep.ziel || "-", rep.zielFaktion || "");
+  // Ein Schwellenziel traegt den Namen der billigsten offenen Augmentierung,
+  // aber die Reputationsmarke der Spendenschwelle. Ohne diesen Hinweis liest
+  // man "Synfibril Muscle: 78416 / 458941" und haelt den Bot fuer entgleist -
+  // die Zahl gehoert zu keiner Augmentierung.
+  zeile("arbeitet an",
+    rep.istSchwelle ? "SPENDENRECHT (Favor 150)" : (rep.ziel || "-"),
+    rep.zielFaktion || "");
   zeile("Reputation", rep.rep + " / " + rep.repReq,
-    rep.repReq > rep.rep ? "noch " + (rep.repReq - rep.rep) : "erreicht");
+    (rep.repReq > rep.rep ? "noch " + (rep.repReq - rep.rep) : "erreicht")
+      + (rep.istSchwelle ? " - danach kostet dort alles nur noch Geld" : ""));
   zeile("Augs offen", rep.offen, rep.kaufbereit ? rep.kaufbereit + " kaufbereit" : "");
   zeile("Meldung", alter(rep.zeit) + " alt", "");
 } else zeile("bn4rep", "KEIN LEBENSZEICHEN", "");

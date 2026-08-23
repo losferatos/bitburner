@@ -31,7 +31,7 @@
  *
  * @param {NS} ns
  */
-import { hackNutzen } from "lib/hackaugs.js";
+import { hackNutzen, levelNutzen } from "lib/hackaugs.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -66,6 +66,25 @@ export async function main(ns) {
   // verlangt und das nur ueber Multiplikatoren kommt, also ueber Einbauten.
   const EXIT_KEY = "The Red Pill";
   const EXIT_KEY_VALUE = 10;
+
+  // Das Hacking-Level, das der Knoten am Ende verlangt: 3000 mal
+  // WorldDaemonDifficulty (Server/data/servers.ts:1536, ServerHelpers.ts:384).
+  // Solange w0r1d_d43m0n nicht am Netz haengt - also vor dem Einbau von
+  // The Red Pill - laesst er sich nicht abfragen, deshalb die Tabelle aus
+  // BitNode.tsx. BitNode 12 skaliert mit der Knotenstufe und faellt auf den
+  // Standardwert 2 zurueck; das ist dort ohnehin nur eine Schaetzung fuer die
+  // Rangfolge, kein Grenzwert.
+  const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 2,
+    9: 2, 10: 2, 11: 1.5, 12: 2, 13: 3, 14: 5, 15: 2 };
+  const zielLevel = (() => {
+    try {
+      if (ns.serverExists("w0r1d_d43m0n")) {
+        const r = ns.getServer("w0r1d_d43m0n").requiredHackingSkill;
+        if (r > 0) return r;
+      }
+    } catch (e) { /* haengt noch nicht am Netz */ }
+    return 3000 * (WD_DIFFICULTY[ns.getResetInfo().currentNode] || 2);
+  })();
 
   // --- Firmenfaktionen (M4) ------------------------------------------------
   // Clarke Incorporated und OmniTek Incorporated laden nicht ein, weil man
@@ -861,7 +880,12 @@ export async function main(ns) {
     // Stueck damit etwa so schwer wie ein Zaehlplatz. Das ist eine Setzung,
     // keine Messung - sie sagt aus, dass beide Wege zum Knotenabschluss
     // ungefaehr gleich wichtig sind.
-    const NUTZEN_GEWICHT = 5;
+    // NUTZEN_GEWICHT 1 seit dem 23.08.2026. Die Zahl gehoerte zu hackNutzen,
+    // dessen Werte zwischen 0 und 2 lagen; levelNutzen liefert 0 bis 7 und
+    // ist damit schon in der richtigen Groessenordnung. Ein Zaehlplatz wiegt
+    // jetzt so viel wie ein sehr schwaches Stueck - das ist richtig herum,
+    // denn die 30er-Huerde ist laengst erfuellt.
+    const NUTZEN_GEWICHT = 1;
     const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
     // DER AUSGANGSSCHLUESSEL (23.08.2026). The Red Pill hat keinerlei Werte
     // (Augmentations.ts:1946-1953, stats: ""), faellt also durch jede
@@ -881,8 +905,21 @@ export async function main(ns) {
     // darf; der Multiplikator staende still, und der ist der eigentliche
     // Engpass. 10 entspricht dem Gewicht des gesamten uebrigen
     // Daedalus-Angebots. Setzung wie NUTZEN_GEWICHT, keine Messung.
+    // levelNutzen statt hackNutzen (23.08.2026). hackNutzen multipliziert alle
+    // sechs Hacking-Multiplikatoren gleichwertig - richtig fuer den Geldfluss,
+    // grob falsch fuer ein Levelziel. Der Multiplikator sitzt im Exponenten
+    // der Levelformel, hacking_money und hacking_grow tragen ueberhaupt nichts
+    // bei, und hacking_chance wird auf 1,0 geklemmt.
+    //
+    // Was das aendert, an den beiden Extremfaellen im Bestand:
+    //   ECorp HVMind   hackNutzen 2,00 (zweithoechster Wert) -> levelNutzen 0
+    //   DataJack       hackNutzen 0,25                       -> levelNutzen 0
+    //   nextSENS       hackNutzen 0,20                       -> levelNutzen 5,14
+    // Der Bot haette also zweimal ein Stueck gekauft, das zum Knotenabschluss
+    // nichts beitraegt, und dabei jedes weitere um Faktor 1,9 verteuert.
     const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)
-      + zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug));
+      + zaehlplatzWert
+      + NUTZEN_GEWICHT * Math.max(0, levelNutzen(k.aug, spieler.mults.hacking, zielLevel));
 
     // BESTAND, NICHT SUMME (22.08.2026). Reputation ist ein Bestand je
     // Faktion, keine Zahl je Augmentierung. Wer bei Tetrads 9.994 Reputation

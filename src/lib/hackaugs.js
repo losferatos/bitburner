@@ -153,17 +153,22 @@ export function levelNutzen(name, mult, ziel) {
   if (!stats) return 0;
   if (!(mult > 0) || !(ziel > 0)) return 0;
 
-  // Der Multiplikator wirkt ueber ziel/(32*mult) im Exponenten. Ein Faktor f
-  // auf `hacking` senkt ln(exp) um ziel/(32*mult) * (1 - 1/f), was fuer
-  // kleine Zuwaechse gut durch ziel/(32*mult) * ln(f) genaehert ist - und die
-  // Naeherung ist hier die ehrlichere Zahl, weil sie ueber mehrere Stuecke
-  // additiv bleibt.
+  // Der Multiplikator wirkt ueber ziel/(32*mult) im Exponenten: Ein Faktor f
+  // auf `hacking` senkt ln(exp) um genau ziel/(32*mult) * (1 - 1/f).
+  //
+  // Hier stand zuerst ln(f) als Naeherung, mit der Begruendung, sie bleibe
+  // ueber mehrere Stuecke additiv. Das trifft zu, ist aber kein Grund: die
+  // exakte Form ist ueber das Produkt der Faktoren genauso zusammensetzbar,
+  // und ln(f) ueberschaetzt sichtbar - bei f=1,2 um 9,4 Prozent, bei QLink
+  // mit f=1,75 um 30,6 Prozent. Genau die grossen Stuecke wuerden damit
+  // zusaetzlich bevorzugt, und das sind die teuersten.
   const hebel = ziel / (32 * mult);
 
   let wert = 0;
-  if (stats.hacking > 0) wert += hebel * Math.log(stats.hacking);
+  if (stats.hacking > 0) wert += hebel * (1 - 1 / stats.hacking);
   // Erfahrungsrate und Tempo wirken beide linear auf die gesammelte
-  // Erfahrung je Sekunde, also mit Gewicht eins.
+  // Erfahrung je Sekunde. Hier ist ln richtig und keine Naeherung: die
+  // benoetigte ZEIT ist exp/rate, und ln der Zeitersparnis ist genau ln(f).
   if (stats.hacking_exp > 0) wert += Math.log(stats.hacking_exp);
   if (stats.hacking_speed > 0) wert += Math.log(stats.hacking_speed);
   // Reputation ist kein Levelbeitrag, aber sie beschafft die naechsten

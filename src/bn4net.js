@@ -2206,70 +2206,76 @@ export async function main(ns) {
     let vertraege = 0;
     for (const host of hosts) vertraege += ns.ls(host, ".cct").length;
 
+    // Sammeln und Entdoppeln stehen VOR der Werkbank-Pruefung (23.08.2026).
+    // Vorher hing der ganze Block an `if (werkbank)` - gab es keine
+    // Werkbank, unterblieb auch die Entdopplung. Genau dieser Zustand
+    // herrscht direkt nach einem Knotenwechsel, wenn home wieder 32 GB hat
+    // und noch nichts gekauft ist: also dort, wo ein Mensch am ehesten von
+    // Hand nachhilft und dabei eine zweite Instanz erzeugt.
+    // Netzweit pruefen. Nur auf der Werkbank nachzusehen hiesse: Sobald ein
+    // groesserer Rechner gekauft wird und die Werkbank wechselt, gilt jedes
+    // Werkzeug als fehlend und wird ein zweites Mal gestartet - waehrend die
+    // alte Instanz weiterlaeuft. Bei bn4rep.js waeren das zwei Steuerungen
+    // fuer dieselbe Spielfigur, also genau der Fehler, den die
+    // Aufgabenteilung verhindern soll.
+    const laufend = [];
+    const orte = new Map();          // Datei -> [{host, pid}, ...]
+    for (const host of hosts) {
+      if (!ns.hasRootAccess(host)) continue;
+      for (const pr of ns.ps(host)) {
+        laufend.push(pr.filename);
+        // Die beiden Steuerhaelften gehoeren mit in die Entdopplung, obwohl
+        // sie nicht in WERKZEUGE stehen: Der Auftragslaeufer in bn4life.js
+        // startet ein Skript auf dem Rechner mit dem MEISTEN freien
+        // Speicher, und das ist praktisch nie home. Wer bn4life.js von Hand
+        // neu startet, bekommt eine Instanz auf einem Mietrechner - und
+        // weil die Wiederbelebung mit ns.isRunning(..., "home") prueft,
+        // startet die andere Haelfte prompt eine zweite auf home. Zwei
+        // bn4life begehen dann gleichzeitig Verbrechen, treten Faktionen
+        // bei und reisen.
+        const istSteuerung = pr.filename === "bn4life.js" || pr.filename === "bn4net.js";
+        if (!istSteuerung && !WERKZEUGE.some(([d]) => d === pr.filename)) continue;
+        if (!orte.has(pr.filename)) orte.set(pr.filename, []);
+        orte.get(pr.filename).push({ host, pid: pr.pid });
+      }
+    }
+
+    // Doppelte Werkzeuge einsammeln. Die Pruefung oben verhindert nur, dass
+    // DIESES Skript ein zweites Mal startet - sie raeumt nichts weg, was
+    // auf anderem Weg dazugekommen ist. Am 23.08.2026 lief bn4rep.js
+    // gleichzeitig auf home und auf fulcrumtech, weil ein Neustart von Hand
+    // (tools/task.js) auf home landete, waehrend die Werkbank ihre Instanz
+    // behielt. Zwei Steuerungen fuer dieselbe Spielfigur heben sich
+    // gegenseitig die Arbeit ab: workForCompany und workForFaction ersetzen
+    // die jeweils laufende Taetigkeit, das Ergebnis ist eine Figur, die im
+    // Sekundentakt zwischen zwei Auftraegen springt und an keinem
+    // Fortschritt macht. Genau so stand der Bot am 22.08. eine Stunde.
+    //
+    // Die aelteste Instanz bleibt: Sie hat den laengsten ununterbrochenen
+    // Arbeitsfortschritt hinter sich, und bei bn4rep.js haengt daran die
+    // laufende Faktions- oder Firmenarbeit. Kleinere pid heisst frueher
+    // gestartet - die Vergabe ist im Spiel streng aufsteigend
+    // (Netscript/killWorkerScript.ts, generatePid).
+    for (const [datei, wo] of orte) {
+      if (wo.length < 2) continue;
+      // Bei den Steuerhaelften gewinnt IMMER die auf home - dort sucht die
+      // jeweils andere Haelfte sie. Sonst die aelteste, also die kleinste
+      // pid: sie hat den laengsten Arbeitsfortschritt hinter sich.
+      const istSteuerung = datei === "bn4life.js" || datei === "bn4net.js";
+      if (istSteuerung && wo.some((w) => w.host === "home")) {
+        wo.sort((a, b) => (a.host === "home" ? -1 : 0) - (b.host === "home" ? -1 : 0));
+      } else {
+        wo.sort((a, b) => a.pid - b.pid);
+      }
+      for (const ueberzaehlig of wo.slice(1)) {
+        ns.kill(ueberzaehlig.pid);
+        sag("Doppelte Instanz von " + datei + " auf " + ueberzaehlig.host
+          + " beendet (pid " + ueberzaehlig.pid + "); " + wo[0].host
+          + " behaelt sie.");
+      }
+    }
+
     if (werkbank) {
-      // Netzweit pruefen. Nur auf der Werkbank nachzusehen hiesse: Sobald ein
-      // groesserer Rechner gekauft wird und die Werkbank wechselt, gilt jedes
-      // Werkzeug als fehlend und wird ein zweites Mal gestartet - waehrend die
-      // alte Instanz weiterlaeuft. Bei bn4rep.js waeren das zwei Steuerungen
-      // fuer dieselbe Spielfigur, also genau der Fehler, den die
-      // Aufgabenteilung verhindern soll.
-      const laufend = [];
-      const orte = new Map();          // Datei -> [{host, pid}, ...]
-      for (const host of hosts) {
-        if (!ns.hasRootAccess(host)) continue;
-        for (const pr of ns.ps(host)) {
-          laufend.push(pr.filename);
-          // Die beiden Steuerhaelften gehoeren mit in die Entdopplung, obwohl
-          // sie nicht in WERKZEUGE stehen: Der Auftragslaeufer in bn4life.js
-          // startet ein Skript auf dem Rechner mit dem MEISTEN freien
-          // Speicher, und das ist praktisch nie home. Wer bn4life.js von Hand
-          // neu startet, bekommt eine Instanz auf einem Mietrechner - und
-          // weil die Wiederbelebung mit ns.isRunning(..., "home") prueft,
-          // startet die andere Haelfte prompt eine zweite auf home. Zwei
-          // bn4life begehen dann gleichzeitig Verbrechen, treten Faktionen
-          // bei und reisen.
-          const istSteuerung = pr.filename === "bn4life.js" || pr.filename === "bn4net.js";
-          if (!istSteuerung && !WERKZEUGE.some(([d]) => d === pr.filename)) continue;
-          if (!orte.has(pr.filename)) orte.set(pr.filename, []);
-          orte.get(pr.filename).push({ host, pid: pr.pid });
-        }
-      }
-
-      // Doppelte Werkzeuge einsammeln. Die Pruefung oben verhindert nur, dass
-      // DIESES Skript ein zweites Mal startet - sie raeumt nichts weg, was
-      // auf anderem Weg dazugekommen ist. Am 23.08.2026 lief bn4rep.js
-      // gleichzeitig auf home und auf fulcrumtech, weil ein Neustart von Hand
-      // (tools/task.js) auf home landete, waehrend die Werkbank ihre Instanz
-      // behielt. Zwei Steuerungen fuer dieselbe Spielfigur heben sich
-      // gegenseitig die Arbeit ab: workForCompany und workForFaction ersetzen
-      // die jeweils laufende Taetigkeit, das Ergebnis ist eine Figur, die im
-      // Sekundentakt zwischen zwei Auftraegen springt und an keinem
-      // Fortschritt macht. Genau so stand der Bot am 22.08. eine Stunde.
-      //
-      // Die aelteste Instanz bleibt: Sie hat den laengsten ununterbrochenen
-      // Arbeitsfortschritt hinter sich, und bei bn4rep.js haengt daran die
-      // laufende Faktions- oder Firmenarbeit. Kleinere pid heisst frueher
-      // gestartet - die Vergabe ist im Spiel streng aufsteigend
-      // (Netscript/killWorkerScript.ts, generatePid).
-      for (const [datei, wo] of orte) {
-        if (wo.length < 2) continue;
-        // Bei den Steuerhaelften gewinnt IMMER die auf home - dort sucht die
-        // jeweils andere Haelfte sie. Sonst die aelteste, also die kleinste
-        // pid: sie hat den laengsten Arbeitsfortschritt hinter sich.
-        const istSteuerung = datei === "bn4life.js" || datei === "bn4net.js";
-        if (istSteuerung && wo.some((w) => w.host === "home")) {
-          wo.sort((a, b) => (a.host === "home" ? -1 : 0) - (b.host === "home" ? -1 : 0));
-        } else {
-          wo.sort((a, b) => a.pid - b.pid);
-        }
-        for (const ueberzaehlig of wo.slice(1)) {
-          ns.kill(ueberzaehlig.pid);
-          sag("Doppelte Instanz von " + datei + " auf " + ueberzaehlig.host
-            + " beendet (pid " + ueberzaehlig.pid + "); " + wo[0].host
-            + " behaelt sie.");
-        }
-      }
-
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d));
 
       // Nur raeumen, wenn wirklich nichts von uns dort laeuft. Ein killall auf

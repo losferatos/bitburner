@@ -74,8 +74,12 @@ export async function main(ns) {
   // BitNode.tsx. BitNode 12 skaliert mit der Knotenstufe und faellt auf den
   // Standardwert 2 zurueck; das ist dort ohnehin nur eine Schaetzung fuer die
   // Rangfolge, kein Grenzwert.
-  const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 2,
-    9: 2, 10: 2, 11: 1.5, 12: 2, 13: 3, 14: 5, 15: 2 };
+  // BitNode 8 fehlt in BitNode.tsx, gilt also mit dem Vorgabewert 1 - hier
+  // stand faelschlich 2. BitNode 12 skaliert mit der Knotenstufe und faellt
+  // ebenfalls auf 1 zurueck; das ist dort nur eine Schaetzung fuer die
+  // Rangfolge, kein Grenzwert.
+  const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 1,
+    9: 2, 10: 2, 11: 1.5, 12: 1, 13: 3, 14: 5, 15: 2 };
   const zielLevel = (() => {
     try {
       if (ns.serverExists("w0r1d_d43m0n")) {

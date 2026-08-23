@@ -140,8 +140,15 @@ export function hackNutzen(name) {
  *                    vorhandene Multiplikator 3,02 treibt das auf 2,86, und
  *                    clampNumber(...,0,1) schneidet auf 1,00 (Hacking.ts:23).
  *
- * Der zurueckgegebene Wert ist die Ersparnis in LOGARITHMISCHER Erfahrung,
- * also direkt vergleichbar und additiv ueber mehrere Stuecke.
+ * Der zurueckgegebene Wert ist die Ersparnis in LOGARITHMISCHER Erfahrung.
+ *
+ * NICHT STRENG ADDITIV: Der `hacking`-Anteil rechnet mit (1 - 1/f), und
+ * (1-1/a) + (1-1/b) ist groesser als 1 - 1/(a*b). Zwei Stuecke mit je f=1,75
+ * ergeben summiert 0,857 statt der korrekten 0,674 - die Summe ueberschaetzt
+ * also, je mehr Stuecke zusammenkommen. Fuer eine RANGFOLGE einzelner Stuecke
+ * ist das unerheblich, und genau dafuer ist die Funktion gedacht. Wer
+ * Buendel gegeneinander stellt, muss die Faktoren erst multiplizieren und
+ * dann einmal (1 - 1/Produkt) bilden.
  *
  * @param {string} name     Anzeigename der Augmentierung
  * @param {number} mult     aktueller Hacking-Multiplikator des Spielers

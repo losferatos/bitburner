@@ -94,9 +94,53 @@ export async function main(ns) {
     }
   };
 
+  // --- Faktionseinladungen annehmen ------------------------------------------
+  // Der Einladungsdialog ist die EINZIGE Stelle, an der ein Beitritt ohne
+  // echten Tastendruck moeglich ist: FactionInvitationManager.tsx:53-59
+  // prueft im Handler nur `alreadyInvited` und `isBanned`, nicht `isTrusted`
+  // - anders als der Join!-Knopf auf der Faktionsseite
+  // (FactionsRoot.tsx:88-94). Genau diese Luecke nutzt auch src/join.js.
+  //
+  // WARUM HIER UND NICHT IN bn4rep. bn4rep ist ausserhalb von BitNode 4
+  // 768,3 GB gross und laeuft nach einem Knotenwechsel stundenlang nicht -
+  // in genau der Phase also, in der die ersten Einladungen eintreffen und
+  // ohne Mitgliedschaft gar keine Reputation entsteht. Hier kostet es nichts:
+  // die Dialoge werden ohnehin durchgegangen.
+  //
+  // DIE EINZIGE GEFAHR IST DER FEHLGRIFF. Ein Beitritt sperrt sofort alle
+  // Feinde der Faktion bis zum naechsten Einbau (FactionHelpers.tsx:45-47).
+  // Feinde haben laut FactionInfo.tsx ausschliesslich die sechs
+  // Stadtfaktionen (Aevum, Chongqing, Ishima, New Tokyo, Sector-12,
+  // Volhaven) - und genau dann rendert der Dialog den Satz "is enemies
+  // with". Ist er da, wird nicht beigetreten, sondern auf "Decide later"
+  // geklickt; die Einladung bleibt erhalten und bn4rep entscheidet spaeter
+  // mit vollem Ueberblick.
+  let beigetreten = 0;
+  const einladungAnnehmen = (modal) => {
+    const text = modal.textContent || "";
+    if (!text.includes("You received a faction invitation")) return false;
+    if (text.includes("is enemies with")) return false;   // Stadtfaktion: Finger weg
+    const b = modal.querySelector("b");
+    const name = b ? (b.textContent || "").trim() : "";
+    for (const knopf of modal.querySelectorAll("button")) {
+      if ((knopf.textContent || "").trim().toLowerCase() !== "join") continue;
+      try {
+        reactKlick(knopf);
+        beigetreten++;
+        ns.write("data/popups-beitritt.txt",
+          new Date().toLocaleTimeString() + "  beigetreten: " + (name || "?")
+          + String.fromCharCode(10), "a");
+        return true;
+      } catch { return false; }
+    }
+    return false;
+  };
+
   const knoepfeSchliessen = () => {
     let getan = 0;
     for (const modal of doc.querySelectorAll(".MuiModal-root")) {
+      // Erst die Einladung pruefen - danach ist der Dialog ohnehin zu.
+      if (einladungAnnehmen(modal)) { getan++; continue; }
       for (const b of modal.querySelectorAll("button")) {
         const t = (b.textContent || "").trim().toLowerCase();
         if (!HARMLOS.includes(t)) continue;
@@ -112,6 +156,14 @@ export async function main(ns) {
       // Die Wache zuerst: ein stehender Bot ist teurer als ein offener Dialog.
       wache();
       if (dialogOffen()) {
+        // Einladungen ZUERST, vor dem Escape-Schlag. Der keydown-Handler in
+        // AlertManager.tsx leert die ganze Warteschlange auf einmal; ein
+        // Einladungsdialog waere danach weg, bevor er gelesen wurde. Die
+        // Einladung selbst ginge dabei nicht verloren (close() behaelt sie),
+        // aber jeder Beitritt haette einen ganzen Takt Verspaetung.
+        for (const modal of doc.querySelectorAll(".MuiModal-root")) {
+          einladungAnnehmen(modal);
+        }
         // Zweimal mit Abstand: der erste Schlag leert die Alert-Warteschlange,
         // ein zweiter erwischt einen Dialog, der erst dadurch sichtbar wurde.
         for (let i = 0; i < 2; i++) {
@@ -136,7 +188,7 @@ export async function main(ns) {
           ns.print(`Dialoge geschlossen (${geschlossen}. Mal).`);
         }
       }
-      ns.write("data/popups.txt", `${Date.now()}|${geschlossen}`, "w");
+      ns.write("data/popups.txt", `${Date.now()}|${geschlossen}|${beigetreten}`, "w");
     } catch (e) {
       ns.print("FEHLER: " + String(e && e.message ? e.message : e));
       await ns.sleep(60000);

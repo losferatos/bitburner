@@ -249,8 +249,6 @@ export async function main(ns) {
     // 9 GB im Knoten 4 und 144 GB draussen) - siehe Kopf von homegrow.js.
     ["homegrow.js", []],
     ["contracts.js", ["--loop", "300"]],
-    ["bn4rep.js", []],
-    ["bn4door.js", []],
     // Der Tonanker gehoert dazu, nicht daneben: Ein verborgener Browsertab
     // bekommt statt sechzehn Zeitgebern je Sekunde nur einen je Minute, und
     // ohne ihn laeuft der ganze Bot dreifach langsamer. Er lag bisher auf
@@ -261,6 +259,19 @@ export async function main(ns) {
     // vor und muss jeden einzeln wegklicken. Gehoert aus demselben Grund
     // hierher wie der Tonanker: er soll den Einbau ueberleben.
     ["popups.js", []],
+    // bn4rep und bn4door stehen ANS ENDE, seit die Werkbank immer nur EIN
+    // Rechner ist (der groesste). In BitNode 5 hat der 128 GB, und bn4door
+    // allein belegt 99,85 davon - zusammen mit dem Vertragsloeser war die
+    // Werkbank voll, und wakelock.js (34,25 GB) fand keinen Platz mehr.
+    //
+    // Das ist die falsche Reihenfolge: Der Tonanker schuetzt die
+    // Geschwindigkeit des GANZEN Laufs (ein verborgener Browsertab bekommt
+    // statt sechzehn Zeitgebern je Sekunde nur einen je Minute), waehrend
+    // Backdoors eine Verbilligung der FIRMENreputation sind - ein Posten der
+    // Spaetphase, der in den ersten Stunden eines Knotens nichts beitraegt.
+    // bn4rep braucht ohnehin 768,3 GB und wartet, bis der Park so weit ist.
+    ["bn4rep.js", []],
+    ["bn4door.js", []],
   ];
   const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 

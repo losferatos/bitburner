@@ -82,6 +82,7 @@ function buildRecord(now, net, life, rep) {
       repReq: rep.repReq ?? null,
       ziel: rep.ziel ?? null,
       zielFaktion: rep.zielFaktion ?? null,
+      istSchwelle: rep.istSchwelle ?? false,
     } : null,
   };
 }
@@ -193,7 +194,15 @@ async function main() {
     // Rep-Stillstand ist nur ein Alarm, wenn ueberhaupt ein Ziel verfolgt
     // wird - ohne Ziel gibt es nichts zu erarbeiten, das ist dann normal.
     if (record.rep?.ziel && curRep != null && baseRep != null && curRep === baseRep) {
-      warnings.push("Reputation fuer '" + record.rep.ziel + "' unveraendert seit " + Math.round(minutesElapsed) + " min (" + curRep + ").");
+      // Bei einem Schwellenziel traegt rep.ziel den Namen der billigsten
+      // offenen Augmentierung, gemeint ist aber die Spendenschwelle der
+      // Faktion. Ein Alarm, der die falsche Sache benennt, kostet nachts
+      // genau die Zeit, die er sparen soll.
+      const was = record.rep.istSchwelle
+        ? "Spendenschwelle bei " + (record.rep.zielFaktion || "?")
+        : "'" + record.rep.ziel + "'";
+      warnings.push("Reputation fuer " + was + " unveraendert seit "
+        + Math.round(minutesElapsed) + " min (" + curRep + ").");
     }
   }
 

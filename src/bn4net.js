@@ -169,8 +169,25 @@ export async function main(ns) {
     // alte Formel mit ihren 24. Genau dort, wo es am meisten weh tut, weil
     // dann kein Werkzeug mehr Platz zum Neustart findet und der Bot ohne
     // Logzeile stehenbleibt - das Muster des Stillstands vom 20.08.
+    // bn4life.js steht NICHT in WERKZEUGE (es laeuft immer auf home und wird
+    // von bn4net gestartet, nicht auf die Werkbank verteilt) - es muss hier
+    // aber mitgezaehlt werden, sonst schuetzt die Reserve genau die Haelfte
+    // der Steuerung nicht.
+    const rLife = ns.getScriptRam("bn4life.js", "home");
+    if (rLife > 0) bedarf += rLife;
+
+    // Erst die Untergrenze, dann der Deckel - und die Untergrenze gewinnt.
+    // Die vorige Fassung schrieb Math.max(24, Math.min(max/4, Math.max(64,
+    // ...))): auf einem frischen 32-GB-home kuerzte das innere Math.min die
+    // 64 auf 8 weg, und uebrig blieben 24. Der Kommentar versprach 64.
+    //
+    // Auf einem kleinen home ist der Viertel-Deckel das falsche Werkzeug:
+    // Lieber vier Werkzeuge weniger gleichzeitig als eine Steuerung, die
+    // nicht mehr startet. Deshalb gilt der Deckel nur oberhalb der
+    // Untergrenze.
     const max = ns.getServerMaxRam("home");
-    return Math.max(24, Math.min(max / 4, Math.max(64, bedarf * 3)));
+    const untergrenze = Math.min(64, max / 2);
+    return Math.max(untergrenze, Math.min(max / 4, bedarf * 3));
   };
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
@@ -2325,11 +2342,34 @@ export async function main(ns) {
     // wird home beim BitNode-Wechsel auf 32 GB und einen Kern zurueckgesetzt
     // (Prestige.ts:243-249) - der Ausbau aus BitNode 1 ist ersatzlos weg.
     // Solange home klein ist, passt kein richtiger Autopilot hinein.
+    //
+    // AMORTISATION (23.08.2026). Bis hierher war die einzige Bedingung
+    // "Geld > Kosten mal drei" - der home-Ausbau war die einzige Ausgabe der
+    // ganzen Kette ohne Pruefung, ob der Speicher ueberhaupt gebraucht wird.
+    // Der Mietrechner-Ausbau vierzig Zeilen weiter oben hat all das.
+    //
+    // Was das gekostet hat: die letzten beiden Verdopplungen schlugen mit
+    // rund 131 Bio zu Buche, das sind 167 Mio je GB. Ein Mietrechner kostet
+    // auf derselben Sprosse 409.000 je GB - Faktor 409. Fuer dasselbe Geld
+    // waere der 25er-Park siebenmal komplett zu maximieren gewesen.
+    //
+    // Zwei Bremsen, beide aus dem Bestand:
+    //   - was bn4rep fuer verdiente Augmentierungen zurueckgelegt hat, ist
+    //     tabu (data/geldbedarf.txt, dieselbe Quelle wie beim Serverkauf)
+    //   - liegt mehr als ein Drittel des Netzes brach, wird nicht gekauft.
+    //     Speicher, fuer den es keinen Abnehmer gibt, ist kein Engpass.
     const kosten = ns.singularity.getUpgradeHomeRamCost();
-    if (ns.getServerMoneyAvailable("home") > kosten * 3) {
+    const ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
+      ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+    const brachAnteil = ramTotal > 0 ? ueberschussMerker / ramTotal : 0;
+    if (ns.getServerMoneyAvailable("home") - ruecklage > kosten * 3
+        && brachAnteil < 0.34) {
       if (ns.singularity.upgradeHomeRam()) {
         sag("home-Speicher verdoppelt auf " + ns.getServerMaxRam("home") + " GB.");
       }
+    } else if (brachAnteil >= 0.34 && runde % 60 === 0) {
+      sag("home-Ausbau ausgesetzt: " + Math.round(brachAnteil * 100)
+        + " Prozent des Netzes liegen brach, mehr Speicher braucht niemand.");
     }
 
     // --- 4. Zustand nach draussen ---------------------------------------------

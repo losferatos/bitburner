@@ -333,7 +333,13 @@ export async function main(ns) {
     // "es gibt gar keine Huerde mehr" - dieselbe Zahl, zwei gegensaetzliche
     // Bedeutungen. Hier wird der leere Fall benannt, statt ihn zu verkleiden.
     const offeneNuetzliche = kandidaten
-      .filter((k) => k.rep < k.repReq && hackNutzen(k.aug) > 0)
+      // levelNutzen, nicht hackNutzen: Diese Zeile entscheidet, ob eine
+      // Firmenphase beginnt - also ob es sich lohnt, die Faktionsarbeit fuer
+      // Stunden zu unterbrechen. Mit hackNutzen galt ECorp HVMind (Wert 2,00,
+      // aber reiner hacking_grow) als lohnendes Ziel und haette die Phase
+      // verhindert, obwohl es zum Knotenabschluss null beitraegt.
+      .filter((k) => k.rep < k.repReq
+        && levelNutzen(k.aug, spieler.mults.hacking, zielLevel) > 0)
       .map((k) => k.repReq - k.rep);
     const naechsteNuetzlicheLuecke = offeneNuetzliche.length
       ? Math.min(...offeneNuetzliche) : null;      // null = nichts mehr offen
@@ -582,7 +588,37 @@ export async function main(ns) {
     if (ausgangSteht && Date.now() - letzteAusgangsmeldung > 300000) {
       letzteAusgangsmeldung = Date.now();
       sag("The Red Pill ist eingebaut - ab jetzt kein Einbau mehr, nur noch"
-        + " Hacking-Level (" + spieler.skills.hacking + " von 9000).");
+        + " Hacking-Level (" + spieler.skills.hacking + " von " + zielLevel + ").");
+    }
+
+    // --- DEN KNOTEN VERLASSEN, WENN BEIDE BEDINGUNGEN STEHEN ----------------
+    //
+    // exit.js und boot.js waren gebaut, aber niemand rief sie auf - gebaut ist
+    // nicht verdrahtet. Ohne diesen Block laege der Bot mit erfuelltem
+    // Ausgang da und arbeitete weiter an Reputation, die er nicht mehr
+    // braucht.
+    //
+    // Das Ziel steht in data/exit-ziel.txt und laesst sich von aussen
+    // vorgeben. Ohne Datei gilt BitNode 5: Er hat WorldDaemonDifficulty 1,5
+    // (die niedrigste ueberhaupt), braucht keine NeuroFlux-Stufen, und SF5
+    // gibt acht Prozent je Stufe auf `hacking` UND `hacking_exp` - dazu
+    // formulas.exe zum Nulltarif und dauerhafte Intelligence, die in jedem
+    // weiteren Knoten wirkt. Begruendung in nodes/ROADMAP-KORREKTUR.md.
+    if (ausgangSteht && spieler.skills.hacking >= zielLevel) {
+      const zielKnoten = Number(liesVonHome("data/exit-ziel.txt")) || 5;
+      if (!ns.fileExists("exit.js", "home")) {
+        sag("AUSGANG OFFEN, aber exit.js fehlt auf home - hier muss ein"
+          + " Mensch nachsehen.");
+      } else if (!ns.ps("home").some((p) => p.filename === "exit.js")) {
+        const pid = ns.exec("exit.js", "home", 1, zielKnoten);
+        sag(pid
+          ? "AUSGANG: Hacking " + spieler.skills.hacking + " reicht fuer "
+            + zielLevel + ", The Red Pill ist eingebaut. exit.js gestartet,"
+            + " naechster Knoten " + zielKnoten + " (pid " + pid + ")."
+          : "AUSGANG offen, aber exit.js liess sich nicht starten (exec gab 0).");
+      }
+      await ns.sleep(15000);
+      continue;
     }
 
     if (!ausgangSteht
@@ -1040,7 +1076,12 @@ export async function main(ns) {
     const ARBEITSTEILER = { hacking: 1, field: 5.5 / 0.9, security: 4.5 / 0.9 };
     const arbeitsart = (faktion) => {
       const typen = ns.singularity.getFactionWorkTypes(faktion);
+      // Reihenfolge nach dem Nenner der Formel (reputation.ts): hacking ohne
+      // Teiler, security durch 4,5, field durch 5,5. Hier stand field vor
+      // security - das verschenkte 22 Prozent bei jeder Faktion, die beides
+      // anbietet, und das sind genau die Kampf-Faktionen wie Tetrads.
       return typen.includes("hacking") ? "hacking"
+        : typen.includes("security") ? "security"
         : typen.includes("field") ? "field" : (typen[0] || "hacking");
     };
     const repPerSecond = (faktion) => {
@@ -1189,8 +1230,12 @@ export async function main(ns) {
       ns.write("data/rep-modus.txt", ziel.faktion + "|" + Date.now(), "w");
       if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
       await ns.sleep(1200);
+      // Dieselbe Reihenfolge wie in arbeitsart oben - beide muessen
+      // uebereinstimmen, sonst schaetzt die Rangfolge eine andere Rate, als
+      // die Arbeit dann erzielt.
       const typen = ns.singularity.getFactionWorkTypes(ziel.faktion);
       const art = typen.includes("hacking") ? "hacking"
+        : typen.includes("security") ? "security"
         : typen.includes("field") ? "field" : typen[0];
       if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
         // Ein Schwellenziel traegt den Namen der billigsten offenen

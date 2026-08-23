@@ -961,11 +961,44 @@ export async function main(ns) {
     // stattdessen DURCH den Passivanteil geteilt und damit Faktionen mit
     // niedrigem Favor um Faktor 6 bevorzugt - genau falsch herum, denn hoher
     // Favor verdoppelt die Arbeitsrate. Der Versuch wurde zurueckgenommen.
-    const repPerSecond = (faktion) => Math.max(0.01,
-      5 * (spieler.skills.hacking + (spieler.skills.intelligence || 0) / 3) / 975
-        * spieler.mults.faction_rep
-        * (1 + (favor[faktion] || 0) / 100)
-        * knotenRepFaktor);
+    //
+    // NICHT JEDE FAKTION BIETET HACKING-ARBEIT (23.08.2026). Wo sie fehlt,
+    // faellt der Bot weiter unten auf Feld- oder Sicherheitsarbeit zurueck,
+    // und deren Formeln sind voellig andere (reputation.ts):
+    //
+    //   hacking:  (hacking + int/3) / 975
+    //   field:    0,9 * (str+def+dex+agi+cha + (hacking+int)*share) / 975 / 5,5
+    //   security: dieselbe Summe / 975 / 4,5
+    //
+    // Bei Kampfwerten um 2 - der Bot trainiert sie nicht - ist Feldarbeit
+    // rund ein Sechstel der Hacking-Rate. Genau die Faktionen, die der
+    // Beitrittslauf nachholt (Tetrads, Slum Snakes), bieten kein Hacking;
+    // ohne diese Unterscheidung erschiene ihr Schwellenziel sechsmal
+    // billiger, als es ist. Seit die Beitrittsmarke wieder verfaellt, ist
+    // das kein hypothetischer Fall mehr.
+    const ARBEITSTEILER = { hacking: 1, field: 5.5 / 0.9, security: 4.5 / 0.9 };
+    const arbeitsart = (faktion) => {
+      const typen = ns.singularity.getFactionWorkTypes(faktion);
+      return typen.includes("hacking") ? "hacking"
+        : typen.includes("field") ? "field" : (typen[0] || "hacking");
+    };
+    const repPerSecond = (faktion) => {
+      const art = arbeitsart(faktion);
+      const k = spieler.skills;
+      // Bei Feld- und Sicherheitsarbeit zaehlen alle Werte, bei Hacking nur
+      // das Hacking-Level. Der share-Bonus auf den Hacking-Anteil ist
+      // weggelassen: er ist faktionsunabhaengig und kuerzt sich in einer
+      // Rangfolge weg.
+      const basis = art === "hacking"
+        ? k.hacking + (k.intelligence || 0) / 3
+        : k.strength + k.defense + k.dexterity + k.agility + k.charisma
+          + k.hacking + (k.intelligence || 0);
+      return Math.max(0.01,
+        5 * basis / 975 / (ARBEITSTEILER[art] || 1)
+          * spieler.mults.faction_rep
+          * (1 + (favor[faktion] || 0) / 100)
+          * knotenRepFaktor);
+    };
 
     // Umkehrung von geldFuerRep - gleiche Fundstelle, gleicher Knotenfaktor.
     const repForMoney = (betrag) => betrag / 1e6
@@ -1099,10 +1132,20 @@ export async function main(ns) {
       const art = typen.includes("hacking") ? "hacking"
         : typen.includes("field") ? "field" : typen[0];
       if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
-        sag("Arbeite fuer " + ziel.faktion + " (" + art + ") auf "
-          + "[Nutzen " + hackNutzen(ziel.aug).toFixed(2) + "] "
-          + ziel.aug + ": " + Math.round(ziel.rep) + " von "
-          + Math.round(ziel.repReq) + " Reputation.");
+        // Ein Schwellenziel traegt den Namen der billigsten offenen
+        // Augmentierung, aber die Reputationsmarke der Spendenschwelle. Wer
+        // das nicht weiss, liest "Synfibril Muscle: 31918 von 458941" und
+        // haelt den Bot fuer entgleist - die Zahl gehoert zu keiner
+        // Augmentierung. Deshalb steht hier, was wirklich gemeint ist.
+        sag(ziel.istSchwelle
+          ? "Arbeite fuer " + ziel.faktion + " (" + art + ") auf SPENDENRECHT: "
+            + Math.round(ziel.rep) + " von " + Math.round(ziel.repReq)
+            + " Reputation - danach ist der ganze Katalog dieser Faktion"
+            + " eine Geldfrage."
+          : "Arbeite fuer " + ziel.faktion + " (" + art + ") auf "
+            + "[Nutzen " + hackNutzen(ziel.aug).toFixed(2) + "] "
+            + ziel.aug + ": " + Math.round(ziel.rep) + " von "
+            + Math.round(ziel.repReq) + " Reputation.");
       } else {
         sag("workForFaction(" + ziel.faktion + ", " + art + ") abgelehnt.");
         try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
@@ -1127,6 +1170,7 @@ export async function main(ns) {
       faktionen: spieler.factions,
       ziel: ziel.aug,
       zielFaktion: ziel.faktion,
+      istSchwelle: !!ziel.istSchwelle,
       rep: Math.round(ziel.rep),
       repReq: Math.round(ziel.repReq),
       preis: ziel.preis,

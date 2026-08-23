@@ -2171,7 +2171,17 @@ export async function main(ns) {
         if (!ns.hasRootAccess(host)) continue;
         for (const pr of ns.ps(host)) {
           laufend.push(pr.filename);
-          if (!WERKZEUGE.some(([d]) => d === pr.filename)) continue;
+          // Die beiden Steuerhaelften gehoeren mit in die Entdopplung, obwohl
+          // sie nicht in WERKZEUGE stehen: Der Auftragslaeufer in bn4life.js
+          // startet ein Skript auf dem Rechner mit dem MEISTEN freien
+          // Speicher, und das ist praktisch nie home. Wer bn4life.js von Hand
+          // neu startet, bekommt eine Instanz auf einem Mietrechner - und
+          // weil die Wiederbelebung mit ns.isRunning(..., "home") prueft,
+          // startet die andere Haelfte prompt eine zweite auf home. Zwei
+          // bn4life begehen dann gleichzeitig Verbrechen, treten Faktionen
+          // bei und reisen.
+          const istSteuerung = pr.filename === "bn4life.js" || pr.filename === "bn4net.js";
+          if (!istSteuerung && !WERKZEUGE.some(([d]) => d === pr.filename)) continue;
           if (!orte.has(pr.filename)) orte.set(pr.filename, []);
           orte.get(pr.filename).push({ host, pid: pr.pid });
         }
@@ -2195,7 +2205,15 @@ export async function main(ns) {
       // (Netscript/killWorkerScript.ts, generatePid).
       for (const [datei, wo] of orte) {
         if (wo.length < 2) continue;
-        wo.sort((a, b) => a.pid - b.pid);
+        // Bei den Steuerhaelften gewinnt IMMER die auf home - dort sucht die
+        // jeweils andere Haelfte sie. Sonst die aelteste, also die kleinste
+        // pid: sie hat den laengsten Arbeitsfortschritt hinter sich.
+        const istSteuerung = datei === "bn4life.js" || datei === "bn4net.js";
+        if (istSteuerung && wo.some((w) => w.host === "home")) {
+          wo.sort((a, b) => (a.host === "home" ? -1 : 0) - (b.host === "home" ? -1 : 0));
+        } else {
+          wo.sort((a, b) => a.pid - b.pid);
+        }
         for (const ueberzaehlig of wo.slice(1)) {
           ns.kill(ueberzaehlig.pid);
           sag("Doppelte Instanz von " + datei + " auf " + ueberzaehlig.host

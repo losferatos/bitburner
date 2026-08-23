@@ -491,9 +491,28 @@ export async function main(ns) {
       if (gewinn > favorGewinn) { favorGewinn = gewinn; favorFaktion = f; }
     }
     const favorLohnt = favorGewinn >= RATEN_GEWINN_SCHWELLE;
-    if (wartend >= MINDEST_WARTESCHLANGE
+    // SPENDENRECHT EINLOESEN (23.08.2026). Favor waechst nur beim Einbau
+    // (Faction.ts:77-85). Wer die Reputation fuer Favor 150 beisammen hat und
+    // nicht einbaut, hat sie umsonst erarbeitet - das Schwellenziel
+    // verschwindet dann aus der Rangfolge, und der Bot arbeitet stattdessen
+    // die volle Augmentierungshuerde nach. Genau der Weg, den der Umbau der
+    // Guetefunktion vermeiden soll.
+    //
+    // Diese eine Bedingung darf deshalb an der Mindestwarteschlange vorbei -
+    // aber nie an der LEEREN: installAugmentations gibt bei leerer Liste
+    // false zurueck (Singularity.ts:203-206), und die Zeile danach beendet
+    // dieses Skript bedingungslos.
+    const REP_ZUM_SPENDEN = 25000 * Math.expm1(0.019802627296179712 * ns.getFavorToDonate());
+    const spendenrechtFaellig = spieler.factions.some((f) => {
+      if ((favor[f] || 0) >= ns.getFavorToDonate()) return false;
+      const kumuliert = 25000 * Math.expm1(0.019802627296179712 * (favor[f] || 0));
+      return kumuliert + ns.singularity.getFactionRep(f) >= REP_ZUM_SPENDEN;
+    });
+
+    if ((wartend >= MINDEST_WARTESCHLANGE || (spendenrechtFaellig && wartend >= 1))
         && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
-            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt)
+            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
+            || spendenrechtFaellig)
         && !gesperrt) {
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
         + (favorLohnt ? "Favor bei " + favorFaktion + " hebt die Reputationsrate um "
@@ -751,7 +770,28 @@ export async function main(ns) {
     // ungefaehr gleich wichtig sind.
     const NUTZEN_GEWICHT = 5;
     const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
-    const einzelWert = (k) => zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug));
+    // DER AUSGANGSSCHLUESSEL (23.08.2026). The Red Pill hat keinerlei Werte
+    // (Augmentations.ts:1946-1953, stats: ""), faellt also durch jede
+    // Nutzenrechnung: hackNutzen ist null, und der Zaehlplatz-Bonus greift nur
+    // unter 30 Stueck - bei 46 eingebauten nie. Sobald die uebrigen
+    // Daedalus-Stuecke gekauft sind, ist seine Guetezahl EXAKT null.
+    //
+    // Sein Wert ist ein anderer: ohne ihn haengt w0r1d_d43m0n gar nicht am
+    // Netz (Prestige.ts:173-181) - der Knoten ist ohne ihn nicht zu verlassen.
+    //
+    // WARUM 10 UND NICHT UNENDLICH. Der Ausgang braucht ZWEI Dinge, den
+    // Schluessel UND Hacking 9000. Das Level kommt nur ueber den
+    // Multiplikator, der nur ueber Einbauten - und jeder Einbau wirft die
+    // Daedalus-Mitgliedschaft weg (kein keepOnInstall, FactionInfo.tsx:138-149,
+    // Vorgabewert false in :105). Ein unendlicher Wert liesse den Bot zwoelf
+    // Stunden lang 2,5 Mio Reputation erarbeiten, in denen er nicht einbauen
+    // darf; der Multiplikator staende still, und der ist der eigentliche
+    // Engpass. 10 entspricht dem Gewicht des gesamten uebrigen
+    // Daedalus-Angebots. Setzung wie NUTZEN_GEWICHT, keine Messung.
+    const EXIT_KEY = "The Red Pill";
+    const EXIT_KEY_VALUE = 10;
+    const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)
+      + zaehlplatzWert + NUTZEN_GEWICHT * Math.max(0, hackNutzen(k.aug));
 
     // BESTAND, NICHT SUMME (22.08.2026). Reputation ist ein Bestand je
     // Faktion, keine Zahl je Augmentierung. Wer bei Tetrads 9.994 Reputation
@@ -782,14 +822,11 @@ export async function main(ns) {
     // Spendenschwelle steht. Der Zuschlag ist bewusst klein gehalten: er soll
     // bei aehnlicher Guete den Ausschlag geben und den Bot bei EINER Faktion
     // halten, statt die Rangfolge umzuwerfen.
-    const FAVOR_ZIEL_REP = 462490;
-    const favorNaehe = (faktion) => {
-      const f = favor[faktion] || 0;
-      if (f >= ns.getFavorToDonate()) return 2;   // schon spendenberechtigt
-      const kumuliert = 25000 * Math.expm1(0.019802627296179712 * f);
-      const jetzt = ns.singularity.getFactionRep(faktion);
-      return 1 + Math.min(1, (kumuliert + jetzt) / FAVOR_ZIEL_REP);
-    };
+    // favorNaehe ist am 23.08.2026 entfallen. Der Zuschlag konnte hoechstens
+    // Faktor 2 sein, wirkte gleichmaessig auf ALLE Stuecke einer Faktion statt
+    // auf die eine Reputationsmarke, an der das Regime kippt, und belohnte
+    // auch Faktionen, bei denen gar nichts mehr offen ist. Die Schwelle ist
+    // jetzt ein eigener Kandidat, weiter unten.
 
     // SPENDENRECHT SCHLAEGT ALLES (23.08.2026). Hat eine Faktion Favor 150,
     // ist Reputation dort keine Zeitfrage mehr, sondern eine Geldfrage:
@@ -828,24 +865,99 @@ export async function main(ns) {
     const geldFuerRep = (fehlend) =>
       fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / knotenRepFaktor;
 
+    // --- Der Preis eines Ziels: SEKUNDEN, nicht rohe Reputation --------------
+    // Bis zum 23.08.2026 stand im Nenner die rohe Reputationsluecke. Das
+    // vergleicht Ungleiches: dieselben 7.000 Reputation kosten bei einer
+    // Faktion mit Favor 130 nur 46 Prozent der Zeit, die sie bei Favor 0
+    // kosten - mult(favor) = 1 + favor/100 geht direkt in die Rate ein
+    // (PersonObjects/formulas/reputation.ts:8-14).
+    //
+    // Alles, was fuer JEDE Faktion gleich ist - share-Bonus, Intelligenzbonus,
+    // die fuenf Zyklen je Sekunde -, kuerzt sich in einer Rangfolge weg und
+    // steht deshalb absichtlich nicht in der Formel.
+    //
+    // Der Passivertrag (FactionHelpers.tsx:132-170) steht bewusst NICHT drin.
+    // Er sieht groesser aus, als er ist: Aktive Arbeit ersetzt die passive
+    // Rate der bearbeiteten Faktion, der Gewinn ist also (1 - passivAnteil)
+    // und damit hoechstens zehn Prozent. Ein erster Versuch am 23.08. hat
+    // stattdessen DURCH den Passivanteil geteilt und damit Faktionen mit
+    // niedrigem Favor um Faktor 6 bevorzugt - genau falsch herum, denn hoher
+    // Favor verdoppelt die Arbeitsrate. Der Versuch wurde zurueckgenommen.
+    const repPerSecond = (faktion) => Math.max(0.01,
+      5 * (spieler.skills.hacking + (spieler.skills.intelligence || 0) / 3) / 975
+        * spieler.mults.faction_rep
+        * (1 + (favor[faktion] || 0) / 100)
+        * knotenRepFaktor);
+
+    // Umkehrung von geldFuerRep - gleiche Fundstelle, gleicher Knotenfaktor.
+    const repForMoney = (betrag) => betrag / 1e6
+      * spieler.mults.faction_rep * knotenRepFaktor;
+
+    // --- Die Spendenschwelle als EIGENES Ziel --------------------------------
+    // Favor 150 ist keine Verbesserung, sondern ein Regimewechsel: danach
+    // kostet jede weitere Huerde dieser Faktion nur noch Geld. Deshalb steht
+    // hier ein zusaetzlicher Kandidat je Faktion - "arbeite bis zu der
+    // Reputation, die beim naechsten Einbau Favor 150 ergibt". Sein Ertrag
+    // ist das GANZE restliche Angebot der Faktion. Ist nichts mehr offen, ist
+    // der Ertrag null und das Ziel verschwindet von selbst.
+    //
+    // Favor waechst NUR beim Einbau, aus der dann gehaltenen Reputation
+    // (Faction.ts:77-85). Deshalb wird die Restluecke gegen den schon
+    // kumulierten Favor gerechnet. Ueber mehrere Zyklen verteilt geht nichts
+    // verloren, addRepToFavor ist additiv in der Reputation.
+    const LOG_1_02 = 0.019802627296179712;          // = log(1,02), favor.ts
+    const favorToRep = (f) => 25000 * Math.expm1(LOG_1_02 * f);
+    const REP_FOR_DONATION = favorToRep(spendenSchwelle);
+
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
-    const guete = (k) => {
-      let ertrag = 0;
-      for (const m of kandidaten) {
-        if (m.faktion !== k.faktion) continue;
-        if (m.repReq > k.repReq) continue;   // liegt jenseits der Schwelle
-        ertrag += einzelWert(m);
-      }
+    const schwellenZiele = [];
+    for (const faktion of new Set(alleOffenen.map((k) => k.faktion))) {
+      if ((favor[faktion] || 0) >= spendenSchwelle) continue;
+      const eigene = alleOffenen.filter((k) => k.faktion === faktion);
+      const rep = eigene[0].rep;                    // Bestand, je Faktion gleich
+      const fehlt = REP_FOR_DONATION - favorToRep(favor[faktion] || 0) - rep;
+      if (fehlt <= 0) continue;                     // beim Einbau ohnehin da
+      // Das Ziel traegt das billigste offene Stueck als Namen: gearbeitet wird
+      // ohnehin auf die FAKTION, so muessen Protokoll, Kaufschleife und
+      // Telemetrie nichts Neues lernen.
+      const billigstes = eigene.slice().sort((a, b) => a.repReq - b.repReq)[0];
+      schwellenZiele.push({
+        aug: billigstes.aug, faktion, rep, repReq: rep + fehlt,
+        preis: billigstes.preis, istSchwelle: true,
+      });
+    }
+
+    // Was die Luecke kostet, in Sekunden. Bei einer spendenberechtigten
+    // Faktion faellt der Teil weg, den der Kassenstand sofort kauft; was dann
+    // noch fehlt, wird erarbeitet. Damit braucht es keinen geratenen
+    // Wechselkurs zwischen Dollar und Sekunden.
+    const kostenSekunden = (k) => {
+      let luecke = Math.max(0, k.repReq - k.rep);
       if ((favor[k.faktion] || 0) >= spendenSchwelle) {
-        const kosten = geldFuerRep(k.repReq - k.rep);
-        // Der Kauf selbst muss auch bezahlbar bleiben, sonst waere die
-        // Spende umsonst.
-        if (kosten + k.preis <= geld) return ertrag * 1e6;
-        return ertrag * 100 / Math.max(1, (kosten + k.preis - geld) / 1e9);
+        luecke = Math.max(0, luecke - repForMoney(Math.max(0, geld - k.preis)));
       }
-      return ertrag * favorNaehe(k.faktion) / Math.max(1, k.repReq - k.rep);
+      return luecke / repPerSecond(k.faktion);
     };
-    const offen = alleOffenen.sort((a, b) => guete(b) - guete(a));
+
+    // Der Ertrag ist der BESTAND, nicht die Einzelzahl (22.08.2026). Ein
+    // Schwellenziel schaltet nach dem Einbau das ganze Angebot frei.
+    const ertragBis = (faktion, repReq) => kandidaten
+      .filter((m) => m.faktion === faktion && m.repReq <= repReq)
+      .reduce((n, m) => n + einzelWert(m), 0);
+    const ertragGesamt = (faktion) => kandidaten
+      .filter((m) => m.faktion === faktion)
+      .reduce((n, m) => n + einzelWert(m), 0);
+
+    // GUETE = Ertrag je Sekunde Wartezeit. Erarbeiten und Spenden stehen damit
+    // in DERSELBEN Einheit; der Sonderfall "ertrag * 1e6" fuer eine bezahlbare
+    // Spende entfaellt, er ergibt sich aus Kosten null von selbst.
+    const guete = (k) => {
+      const wert = k.istSchwelle ? ertragGesamt(k.faktion) : ertragBis(k.faktion, k.repReq);
+      if (wert <= 0) return 0;
+      return wert / Math.max(1, kostenSekunden(k));
+    };
+    const offen = alleOffenen.concat(schwellenZiele)
+      .sort((a, b) => guete(b) - guete(a));
 
     if (!offen.length) { await ns.sleep(20000); continue; }
 

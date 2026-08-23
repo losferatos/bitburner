@@ -2139,10 +2139,44 @@ export async function main(ns) {
       // fuer dieselbe Spielfigur, also genau der Fehler, den die
       // Aufgabenteilung verhindern soll.
       const laufend = [];
+      const orte = new Map();          // Datei -> [{host, pid}, ...]
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
-        for (const pr of ns.ps(host)) laufend.push(pr.filename);
+        for (const pr of ns.ps(host)) {
+          laufend.push(pr.filename);
+          if (!WERKZEUGE.some(([d]) => d === pr.filename)) continue;
+          if (!orte.has(pr.filename)) orte.set(pr.filename, []);
+          orte.get(pr.filename).push({ host, pid: pr.pid });
+        }
       }
+
+      // Doppelte Werkzeuge einsammeln. Die Pruefung oben verhindert nur, dass
+      // DIESES Skript ein zweites Mal startet - sie raeumt nichts weg, was
+      // auf anderem Weg dazugekommen ist. Am 23.08.2026 lief bn4rep.js
+      // gleichzeitig auf home und auf fulcrumtech, weil ein Neustart von Hand
+      // (tools/task.js) auf home landete, waehrend die Werkbank ihre Instanz
+      // behielt. Zwei Steuerungen fuer dieselbe Spielfigur heben sich
+      // gegenseitig die Arbeit ab: workForCompany und workForFaction ersetzen
+      // die jeweils laufende Taetigkeit, das Ergebnis ist eine Figur, die im
+      // Sekundentakt zwischen zwei Auftraegen springt und an keinem
+      // Fortschritt macht. Genau so stand der Bot am 22.08. eine Stunde.
+      //
+      // Die aelteste Instanz bleibt: Sie hat den laengsten ununterbrochenen
+      // Arbeitsfortschritt hinter sich, und bei bn4rep.js haengt daran die
+      // laufende Faktions- oder Firmenarbeit. Kleinere pid heisst frueher
+      // gestartet - die Vergabe ist im Spiel streng aufsteigend
+      // (Netscript/killWorkerScript.ts, generatePid).
+      for (const [datei, wo] of orte) {
+        if (wo.length < 2) continue;
+        wo.sort((a, b) => a.pid - b.pid);
+        for (const ueberzaehlig of wo.slice(1)) {
+          ns.kill(ueberzaehlig.pid);
+          sag("Doppelte Instanz von " + datei + " auf " + ueberzaehlig.host
+            + " beendet (pid " + ueberzaehlig.pid + "); " + wo[0].host
+            + " behaelt sie.");
+        }
+      }
+
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d));
 
       // Nur raeumen, wenn wirklich nichts von uns dort laeuft. Ein killall auf

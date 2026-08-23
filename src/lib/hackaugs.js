@@ -111,3 +111,64 @@ export function hackNutzen(name) {
   }
   return product - 1;
 }
+
+/**
+ * Nutzen einer Augmentierung fuer ein LEVELZIEL - die Zahl, auf die es beim
+ * Abschluss eines BitNodes ankommt.
+ *
+ * WARUM ES DIESE ZWEITE FUNKTION GIBT (23.08.2026)
+ *
+ * hackNutzen oben behandelt alle Hacking-Multiplikatoren als gleichwertig und
+ * multipliziert sie zusammen. Fuer den Geldfluss ist das richtig: dort zaehlt
+ * jeder Faktor einmal. Fuer ein Levelziel ist es grob falsch.
+ *
+ * Das Level ist  skill = floor(mult * (32*ln(exp + 534,6) - 200))
+ * (PersonObjects/formulas/skill.ts:13). Nach der noetigen Erfahrung aufgeloest:
+ *
+ *     exp(ziel, mult) = e^((ziel/mult + 200)/32) - 534,6
+ *
+ * Der Multiplikator sitzt also im EXPONENTEN, die Erfahrung nur linear davor.
+ * Ein Prozent mehr `hacking` senkt die noetige Erfahrung bei Level 9000 und
+ * mult 8 um rund 29 Prozent; ein Prozent mehr Erfahrungsrate senkt die
+ * noetige ZEIT um ein Prozent. Das Verhaeltnis ist rund 35 : 1.
+ *
+ * Nicht enthalten, weil sie zum Level nichts beitragen:
+ *   hacking_money  - Geld, kein Level
+ *   hacking_grow   - Wachstum, kein Level
+ *   hacking_chance - zusaetzlich nachweislich tot: auf joesguns liegt
+ *                    skillChance * difficultyMult schon bei 0,949, der
+ *                    vorhandene Multiplikator 3,02 treibt das auf 2,86, und
+ *                    clampNumber(...,0,1) schneidet auf 1,00 (Hacking.ts:23).
+ *
+ * Der zurueckgegebene Wert ist die Ersparnis in LOGARITHMISCHER Erfahrung,
+ * also direkt vergleichbar und additiv ueber mehrere Stuecke.
+ *
+ * @param {string} name     Anzeigename der Augmentierung
+ * @param {number} mult     aktueller Hacking-Multiplikator des Spielers
+ * @param {number} ziel     angestrebtes Hacking-Level (BN4: 9000)
+ * @returns {number}        Ersparnis in ln(Erfahrung); 0 bei unbekanntem Namen
+ */
+export function levelNutzen(name, mult, ziel) {
+  const stats = HACK_AUGS[name];
+  if (!stats) return 0;
+  if (!(mult > 0) || !(ziel > 0)) return 0;
+
+  // Der Multiplikator wirkt ueber ziel/(32*mult) im Exponenten. Ein Faktor f
+  // auf `hacking` senkt ln(exp) um ziel/(32*mult) * (1 - 1/f), was fuer
+  // kleine Zuwaechse gut durch ziel/(32*mult) * ln(f) genaehert ist - und die
+  // Naeherung ist hier die ehrlichere Zahl, weil sie ueber mehrere Stuecke
+  // additiv bleibt.
+  const hebel = ziel / (32 * mult);
+
+  let wert = 0;
+  if (stats.hacking > 0) wert += hebel * Math.log(stats.hacking);
+  // Erfahrungsrate und Tempo wirken beide linear auf die gesammelte
+  // Erfahrung je Sekunde, also mit Gewicht eins.
+  if (stats.hacking_exp > 0) wert += Math.log(stats.hacking_exp);
+  if (stats.hacking_speed > 0) wert += Math.log(stats.hacking_speed);
+  // Reputation ist kein Levelbeitrag, aber sie beschafft die naechsten
+  // Stuecke. Halbes Gewicht wie in hackNutzen, aus demselben Grund.
+  if (stats.faction_rep > 0) wert += 0.5 * Math.log(stats.faction_rep);
+  if (stats.company_rep > 0) wert += 0.5 * Math.log(stats.company_rep);
+  return wert;
+}

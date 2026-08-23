@@ -200,14 +200,36 @@ export async function main(ns) {
       if (!ns.hasTorRouter()) {
         if (geld > 200e3 * 3 && ns.singularity.purchaseTor()) sag("TOR-Router gekauft.");
       } else {
+        // ALLE FEHLENDEN AUF EINMAL, UND MIT DUENNER DECKUNG (23.08.2026).
+        //
+        // Vorher stand hier ein `break` nach dem ersten Stueck und eine
+        // dreifache Deckung. Beides stammt aus der Anfangszeit eines
+        // BitNodes, wo Geld knapp ist und ein Fehlkauf weh tut. Fuer den
+        // Zustand nach einem Augmentierungs-Einbau ist es falsch:
+        //
+        // prestigeHomeComputer setzt `homeComp.programs.length = 0`
+        // (Server/ServerHelpers.ts:227) - und das laeuft bei JEDEM Einbau,
+        // nicht nur beim Knotenwechsel. Alle fuenf Portprogramme sind danach
+        // weg, und mit ihnen der Zugang zu den Rechnern mit dem meisten Geld.
+        // Gemessen am 23.08.: 0 von 30 Fuenf-Port-Servern gerootet, waehrend
+        // diese 30 Rechner 95,6 Prozent des gesamten moneyMax im Netz halten
+        // ($761 von $796 Mrd). Die Gelddecke lag dadurch bei 11 statt bei
+        // 248 Mrd je Sekunde.
+        //
+        // Ein Portprogramm ist keine Ausgabe, sondern der Schluessel zum
+        // Ertrag - SQLInject allein hebt die Decke um Faktor 22. Deshalb
+        // reicht knappe Deckung, und deshalb werden alle fehlenden in einem
+        // Durchgang geholt statt eines je zwanzig Sekunden.
+        let gekauft = 0;
         for (const p of PROGRAMME) {
           if (ns.fileExists(p, "home")) continue;
           const preis = ns.singularity.getDarkwebProgramCost(p);
-          if (preis > 0 && geld > preis * 3) {
-            if (ns.singularity.purchaseProgram(p)) sag("Gekauft: " + p + ".");
-          }
-          break;  // immer nur das naechste, nicht alle auf einmal
+          if (preis <= 0) continue;
+          const verfuegbar = ns.getServerMoneyAvailable("home");
+          if (verfuegbar < preis * 1.05) break;   // teuerste zuerst abwarten
+          if (ns.singularity.purchaseProgram(p)) { sag("Gekauft: " + p + "."); gekauft++; }
         }
+        if (gekauft > 1) sag(gekauft + " Portprogramme in einem Durchgang zurueckgeholt.");
       }
     }
 

@@ -144,7 +144,28 @@ export async function main(ns) {
   // als Bremse: Wer Speicher kauft, obwohl der vorhandene brachliegt,
   // verbrennt Geld.
   let ueberschussMerker = 0;
-  const reserveHome = () => Math.max(24, ns.getServerMaxRam("home") / 4);
+  // ABSOLUT STATT ANTEILIG (23.08.2026). Der Viertelanteil stammt aus der
+  // Zeit, in der home 32 GB hatte - acht Gigabyte freizuhalten war da
+  // vernuenftig. Bei einem Petabyte sperrt dieselbe Formel 262.144 GB, um
+  // Werkzeuge zu schuetzen, die zusammen rund 126 GB brauchen. Gemessen am
+  // 23.08. waren das 24,9 Prozent des GESAMTEN Netzes ohne jeden Zweck,
+  // waehrend 71,7 Prozent des Speichers ohnehin schon brachlagen.
+  //
+  // Jetzt wird der tatsaechliche Bedarf gerechnet und verdreifacht. Der
+  // Puffer faengt ab, dass ein Werkzeug neu startet, waehrend Arbeiter den
+  // Platz schon belegt haben - das ist der Fehler, wegen dem bn4rep.js
+  // einmal stundenlang gar nicht lief. Die Untergrenze von 64 GB gilt fuer
+  // den Zustand direkt nach einem Knotenwechsel, wenn home wieder bei 32 GB
+  // steht und getScriptRam fuer noch nicht kopierte Dateien 0 liefert.
+  const reserveHome = () => {
+    let bedarf = 0;
+    for (const [datei] of WERKZEUGE) {
+      const r = ns.getScriptRam(datei, "home");
+      if (r > 0) bedarf += r;
+    }
+    const max = ns.getServerMaxRam("home");
+    return Math.min(max / 4, Math.max(64, bedarf * 3));
+  };
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 
   // Die Werkzeugliste steht hier oben statt unten bei ihrer Verwendung, weil

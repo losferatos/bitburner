@@ -109,7 +109,34 @@ export async function main(ns) {
   // Firmenname und Faktionsname sind derselbe Text. Das ist kein Zufall,
   // sondern die Datenstruktur des Spiels (CompanyName und FactionName tragen
   // beide "Clarke Incorporated"), und es erspart eine Uebersetzungstabelle.
-  const COMPANIES = ["Clarke Incorporated", "OmniTek Incorporated"];
+  // Reihenfolge nach dem, was hinter der Faktion liegt - gerechnet mit
+  // levelNutzen bei Multiplikator 9,13 und Ziel 9000:
+  //
+  //   ECorp    PC Direct-Neural Interface 2,41 + Optimization Submodule 3,08
+  //   NWO      Xanipher 5,28 (hacking 1,20 UND hacking_exp 1,15)
+  //   Blade    PC Direct-Neural Interface 2,41
+  //
+  // Fulcrum ist NICHT dabei, aus zwei Gruenden: Die Faktion heisst "Fulcrum
+  // Secret Technologies", die Firma aber "Fulcrum Technologies" (Company und
+  // Faction Enums.ts) - die Gleichsetzung von Firmen- und Faktionsnamen, auf
+  // der die Pruefung `spieler.factions.includes(c)` beruht, gilt dort nicht.
+  // Und die Faktion verlangt ohnehin keine Firmenreputation, sondern eine
+  // Backdoor auf fulcrumassets. Ihr wertvollstes Stueck (Optimization
+  // Submodule) liegt zudem auch bei ECorp.
+  //
+  // Zusammen rund 14 Punkte, also fast das Dreifache von nextSENS. Alle vier
+  // bieten daneben dieselbe ENM-Kette wie Daedalus an - die zaehlt hier
+  // nicht, sie ist ueber Daedalus ohnehin erreichbar.
+  //
+  // Der Umweg kostet je Firma rund 300.000 Firmenreputation (400.000 mal dem
+  // Backdoor-Rabatt), bei gemessenen 110 rep/s also etwa 45 Minuten. Die
+  // Einladung ueberlebt jeden Einbau (keepOnInstall), es ist eine einmalige
+  // Investition je BitNode.
+  //
+  // Der Bot geht sie NICHT stur der Reihe nach durch: Die Firmenphase startet
+  // nur, wenn keine naehere nuetzliche Augmentierung offen ist (COMPANY_GAP).
+  const COMPANIES = ["Clarke Incorporated", "OmniTek Incorporated",
+    "ECorp", "NWO", "Blade Industries"];
   // ACHTUNG, das sind NICHT immer 400.000: calculateEffectiveRequiredReputation
   // (Company/utils.ts:15-19) multipliziert die verlangte Reputation mit
   // CONSTANTS.CompanyRequiredReputationMultiplier = 0,75, sobald auf dem
@@ -126,6 +153,9 @@ export async function main(ns) {
   const COMPANY_SERVER = {
     "Clarke Incorporated": "clarkinc",
     "OmniTek Incorporated": "omnitek",
+    "ECorp": "ecorp",
+    "NWO": "nwo",
+    "Blade Industries": "blade",
   };
   const companyRepGoal = (firma) => {
     const host = COMPANY_SERVER[firma];

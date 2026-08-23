@@ -104,7 +104,7 @@ darunter ein Show-Stopper.
 | A16 | Die Entdopplung hing an `if (werkbank)` - ohne Werkbank keine Entdopplung | genau nach einem Knotenwechsel | UMGESETZT |
 | A17 | Drei weitere Kaufstellen lesen data/geldbedarf.txt nicht (Tor-Kauf, darkweb.js) | koennen verdiente Augmentierungen ueberholen | **OFFEN** |
 | A18 | Die Wiederanlaufkette ist UNGETESTET - K3 stand auf UMGESETZT, gebaut ist nicht getestet | 45 Knotenuebergaenge haengen daran | **OFFEN** |
-| A19 | Kampfwerttraining als Weg zu QLink (x1,75) und SPTN-97 (x1,15) - weder verworfen noch offen gefuehrt | x2 auf den Multiplikator, Kampfwert steht seit dem Beitrittslauf bei 167 statt 2 | **OFFEN** |
+| A19 | Kampfwerttraining als Weg zu QLink (x1,75) und SPTN-97 (x1,15) | x2 auf den Multiplikator | **VERWORFEN, gerechnet am 23.08. um 15:20**: Die Kampf-Multiplikatoren stehen bei 3,18 bis 4,18. Fuer Kampfwert 1200 braucht defense 6,96e7 Erfahrung, agility 6,78e7, strength 4,17e7 - bei rund 50 Erfahrung je Sekunde im Gym sind das allein fuer defense 390 Stunden. Erreichbar wuerde es erst ab Kampf-Multiplikator 6 (dann 1,5 h je Wert), und dafuer braeuchte es zuerst Kampf-Augmentierungen, deren Reputation bei den Hacking-Augmentierungen fehlt. Dieselben x2 liefern rund 70 NeuroFlux-Stufen, und die laufen bereits automatisch. |
 | A20 | Bladeburner-Fortschritt ueberlebt den Einbau vollstaendig - die stehende Gegenrechnung zur Routenkorrektur | koennte die Route wieder kippen | **OFFEN** |
 | A21 | Die neue BitNode-Reihenfolge ist Entwurf, nicht beschlossen | K12 laesst sie entschieden aussehen | **OFFEN** |
 | A22 | Der Spendenweg war bis zum NFG-Zukauf toter Code (nur BitRunners berechtigt, dort alles gekauft) | bewertet I3 und I4 nachtraeglich | zur Kenntnis |

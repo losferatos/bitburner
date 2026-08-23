@@ -163,8 +163,14 @@ export async function main(ns) {
       const r = ns.getScriptRam(datei, "home");
       if (r > 0) bedarf += r;
     }
+    // REIHENFOLGE BEACHTEN. Erst deckeln, dann die Untergrenze - andersherum
+    // deckelt das Viertel die Untergrenze weg: bei einem frischen 32-GB-home
+    // gab Math.min(8, Math.max(64, ...)) genau 8 GB, also WENIGER als die
+    // alte Formel mit ihren 24. Genau dort, wo es am meisten weh tut, weil
+    // dann kein Werkzeug mehr Platz zum Neustart findet und der Bot ohne
+    // Logzeile stehenbleibt - das Muster des Stillstands vom 20.08.
     const max = ns.getServerMaxRam("home");
-    return Math.min(max / 4, Math.max(64, bedarf * 3));
+    return Math.max(24, Math.min(max / 4, Math.max(64, bedarf * 3)));
   };
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
 

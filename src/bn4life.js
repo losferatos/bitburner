@@ -220,13 +220,24 @@ export async function main(ns) {
         // Ertrag - SQLInject allein hebt die Decke um Faktor 22. Deshalb
         // reicht knappe Deckung, und deshalb werden alle fehlenden in einem
         // Durchgang geholt statt eines je zwanzig Sekunden.
+        // Was bn4rep.js fuer bereits VERDIENTE Augmentierungen zurueckgelegt
+        // hat, ist auch hier tabu. Der Kanal ist data/geldbedarf.txt; bn4net
+        // liest ihn seit langem (bn4net.js:348), der Programmkauf tat es
+        // nicht - und mit der duennen Deckung haette er eine fertig
+        // erarbeitete Augmentierung ueberholt. Bei dicker Deckung ist das nie
+        // aufgefallen, weil das Dreifache faktisch dasselbe bewirkte.
+        const reserviert = ns.fileExists("data/geldbedarf.txt", "home")
+          ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+        // PROGRAMME ist aufsteigend nach Preis sortiert. Der Abbruch beim
+        // ersten unbezahlbaren kauft also die billigen zuerst und wartet auf
+        // das teure - richtig so, denn jedes einzelne oeffnet schon Rechner.
         let gekauft = 0;
         for (const p of PROGRAMME) {
           if (ns.fileExists(p, "home")) continue;
           const preis = ns.singularity.getDarkwebProgramCost(p);
           if (preis <= 0) continue;
-          const verfuegbar = ns.getServerMoneyAvailable("home");
-          if (verfuegbar < preis * 1.05) break;   // teuerste zuerst abwarten
+          const verfuegbar = ns.getServerMoneyAvailable("home") - reserviert;
+          if (verfuegbar < preis * 1.05) break;
           if (ns.singularity.purchaseProgram(p)) { sag("Gekauft: " + p + "."); gekauft++; }
         }
         if (gekauft > 1) sag(gekauft + " Portprogramme in einem Durchgang zurueckgeholt.");

@@ -184,6 +184,9 @@ export async function main(ns) {
   // eine mit Zeitstempel nur fuenf Minuten; die Phase erneuert sie alle 15 s.
   const INSTALL_LOCK_FILE = "data/install-sperre.txt";
   const INSTALL_LOCK_TAG = "FIRMENPHASE";
+  // Drossel fuer die Endspiel-Meldung: alle fuenf Minuten genuegt, sonst
+  // fuellt sie bei 15-Sekunden-Runden das Log.
+  let letzteAusgangsmeldung = 0;
   const INSTALL_LOCK_MAX_AGE = 300000;
 
   // Der Aussenschalter. Inhalt:
@@ -506,10 +509,39 @@ export async function main(ns) {
     const spendenrechtFaellig = spieler.factions.some((f) => {
       if ((favor[f] || 0) >= ns.getFavorToDonate()) return false;
       const kumuliert = 25000 * Math.expm1(0.019802627296179712 * (favor[f] || 0));
-      return kumuliert + ns.singularity.getFactionRep(f) >= REP_ZUM_SPENDEN;
+      if (kumuliert + ns.singularity.getFactionRep(f) < REP_ZUM_SPENDEN) return false;
+      // NUR WENN DORT AUCH ETWAS ZU HOLEN IST. Eine Faktion, deren Angebot
+      // vollstaendig gekauft ist, macht das Spendenrecht wertlos - ein Einbau
+      // dafuer waere reiner Verlust.
+      return ns.singularity.getAugmentationsFromFaction(f)
+        .some((a) => a !== NFG && !besitz.has(a));
     });
 
-    if ((wartend >= MINDEST_WARTESCHLANGE || (spendenrechtFaellig && wartend >= 1))
+    // --- ENDSPIEL-RIEGEL (23.08.2026) ---------------------------------------
+    //
+    // Ist The Red Pill eingebaut, haengt w0r1d_d43m0n am Netz und es fehlt nur
+    // noch das Hacking-Level. Das kommt aus Erfahrung - und jeder weitere
+    // Einbau setzt die Erfahrung auf den Wert von Level 1 zurueck
+    // (Prestige.ts:44). Ein Einbau in dieser Phase macht den Knotenabschluss
+    // also nicht schneller, sondern verhindert ihn.
+    //
+    // Der Kritiker hat diesen Fall am 23.08. gefunden: Ohne den Riegel
+    // erreicht waehrend des Aufstiegs von Level 1 auf 9000 mit Sicherheit
+    // eine der sieben Faktionen unter Favor 150 ihre Spendenschwelle, loest
+    // einen Einbau aus und wirft das Level wieder auf 1. Der Ausgang waere
+    // unerreichbar gewesen, solange ueberhaupt eine Faktion unter 150 steht.
+    // Die Bedingung im if unten genuegt - eine Sperrdatei waere hier falsch,
+    // weil die Firmenphase ihre eigene Sperre am Praefix erkennt und alles
+    // wegraeumt, was damit anfaengt.
+    const ausgangSteht = besitz.has(EXIT_KEY);
+    if (ausgangSteht && Date.now() - letzteAusgangsmeldung > 300000) {
+      letzteAusgangsmeldung = Date.now();
+      sag("The Red Pill ist eingebaut - ab jetzt kein Einbau mehr, nur noch"
+        + " Hacking-Level (" + spieler.skills.hacking + " von 9000).");
+    }
+
+    if (!ausgangSteht
+        && (wartend >= MINDEST_WARTESCHLANGE || (spendenrechtFaellig && wartend >= 1))
         && ((kleinsteLuecke !== null && kleinsteLuecke > LUECKE_ZU_GROSS)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
             || spendenrechtFaellig)

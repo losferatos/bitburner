@@ -849,47 +849,7 @@ export async function main(ns) {
 
     if (!offen.length) { await ns.sleep(20000); continue; }
 
-    // --- PASSIVREPUTATION SCHLAEGT DIE RANGFOLGE (23.08.2026) ----------------
-    //
-    // processPassiveFactionRepGain (Faction/FactionHelpers.tsx:132-170) laesst
-    // JEDE Mitgliedsfaktion im Hintergrund Reputation sammeln, mit
-    // min(0,1; favor/1000 + 0,01) der eigenen, favor-verstaerkten Arbeitsrate.
-    // In BitNode 4 ist das ungedaempft (FactionPassiveRepGain steht nicht in
-    // case 4). Gemessen am laufenden Spiel: rund 119 rep/s fliessen passiv,
-    // waehrend der Charakter an EINER Faktion arbeitet.
-    //
-    // Der entscheidende Satz steht in Zeile 138-140: Die Faktion, fuer die
-    // gerade GEARBEITET wird, ist von der Passivrunde ausgenommen. Aktive
-    // Arbeit ersetzt die passive, sie addiert nicht. Daraus folgt die
-    // Zielwahl zwingend: Arbeiten lohnt dort am meisten, wo die Passivrate am
-    // KLEINSTEN ist - also bei der Faktion mit dem niedrigsten Favor. Alle
-    // uebrigen laufen unterdessen von allein auf Favor 150 zu und werden
-    // danach zur reinen Geldfrage.
-    //
-    // Das ist das Gegenteil dessen, was die Guetezahl allein waehlt: Sie
-    // sortiert nach der kleinsten Reputationsluecke, also genau nach den
-    // Zielen, die der Hintergrund ohnehin liefert.
-    //
-    // Der Zuschlag greift nur, solange die Faktion NICHT spendenberechtigt
-    // ist - ab Favor 150 kostet Reputation dort keine Zeit mehr, und die
-    // Rangfolge darf wieder der Guetezahl folgen.
-    const passivAnteil = (f) => Math.min(0.1, (favor[f] || 0) / 1000 + 0.01);
-    const entgangen = (f) => (favor[f] || 0) >= spendenSchwelle
-      ? 1
-      : passivAnteil(f);
-
-    // Der Gewinn aus aktiver Arbeit ist der Anteil, der NICHT ohnehin passiv
-    // kaeme: Bei Favor 6,7 sind das 98,3 % der Rate, bei Favor 100 nur noch
-    // 90 %. Der Unterschied ist klein - entscheidend ist, dass eine Faktion
-    // mit hohem Favor ihre Reputation auch ohne uns bekommt, eine mit
-    // niedrigem aber nicht.
-    const arbeitsGewinn = (f) => 1 - entgangen(f) + 1e-9;
-
-    const zielFeld = offen.map((k) => ({
-      k,
-      wert: guete(k) * arbeitsGewinn(k.faktion) / Math.max(1e-9, passivAnteil(k.faktion)),
-    })).sort((a, b) => b.wert - a.wert);
-    const ziel = zielFeld[0].k;
+    const ziel = offen[0];
 
     // --- Spendenweg, sobald eine Faktion Favor 150 hat ------------------------
     // Ab dieser Marke bringt Geld direkt Reputation:

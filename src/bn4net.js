@@ -1340,7 +1340,17 @@ export async function main(ns) {
         if (!repModus) {
           if (shareLaeuft) ns.scriptKill("worker/share.js", host);
           shareHier = 0;
-        } else if (shareBraucht > 0 && host !== "home") {
+        } else if (shareBraucht > 0) {
+          // home ist hier NICHT mehr ausgenommen (23.08.2026). Der Ausschluss
+          // machte den ganzen SHARE_ANTEIL zur Luege: Der Deckel wird aus
+          // ramTotal gerechnet - und home stellt 97,7 Prozent davon -,
+          // verteilt werden durfte aber nur auf den Rest. Von den
+          // beabsichtigten 32.189 Faeden waren dadurch rund 6.000 erreichbar,
+          // also 19 Prozent der Wirkung; gemessen wurde genau das.
+          //
+          // Der Platz auf home ist geschuetzt, ohne dass es diesen Ausschluss
+          // braucht: `frei` zieht reserveHome() bereits ab, und `passt` nimmt
+          // ohnehin nur die Haelfte des Verbleibenden.
           const nochOffen = Math.max(0, SHARE_DECKEL - shareGesamt);
           if (shareHier > nochOffen) {
             // Ueberhang. Ganz raeumen und im naechsten Durchgang gedeckelt

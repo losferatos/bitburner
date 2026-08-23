@@ -56,8 +56,14 @@ export async function main(ns) {
   }
   // Dasselbe fuer die Einbausperre und die Beitrittsmarke: beide sind
   // Zustaende des alten Knotens.
-  for (const datei of ["data/install-lock.txt", "data/beitritt-erledigt.txt",
-                       "data/rep-modus.txt", "data/company-order.txt"]) {
+  // Namen exakt so, wie die schreibenden Skripte sie verwenden - ein Tippfehler
+  // hier raeumt nichts weg und faellt nie auf. data/geldbedarf.txt gehoert
+  // dazu: dort steht der Ruecklagenbedarf des alten Knotens, und solange er
+  // steht, kauft bn4life.js kein Portprogramm - genau im Fenster, in dem es
+  // am noetigsten waere.
+  for (const datei of ["data/install-sperre.txt", "data/beitritt-erledigt.txt",
+                       "data/rep-modus.txt", "data/company-order.txt",
+                       "data/geldbedarf.txt"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }
 

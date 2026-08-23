@@ -567,7 +567,18 @@ export async function main(ns) {
     // Die Bedingung im if unten genuegt - eine Sperrdatei waere hier falsch,
     // weil die Firmenphase ihre eigene Sperre am Praefix erkennt und alles
     // wegraeumt, was damit anfaengt.
-    const ausgangSteht = besitz.has(EXIT_KEY);
+    // EINGEBAUT, NICHT GEKAUFT. `besitz` enthaelt auch die gekauften Stuecke,
+    // die noch in der Warteschlange liegen (getOwnedAugmentations(true)).
+    // The Red Pill kostet null Dollar und wird deshalb in derselben Runde
+    // gekauft, in der die Reputation reicht - stuende hier `besitz`, sperrte
+    // der Riegel ab der naechsten Runde den einzigen installAugmentations-
+    // Aufruf des Projekts. Das Stueck bliebe fuer immer in der Warteschlange,
+    // w0r1d_d43m0n kaeme nie ans Netz, und der Knoten waere unverlassbar -
+    // waehrend das Log "The Red Pill ist eingebaut" meldet.
+    //
+    // Genau so war es zwischen 13:55 und 15:00 am 23.08.2026 gebaut. Der
+    // Riegel gegen einen Fehler war selbst der schwerere Fehler.
+    const ausgangSteht = eingebauteAugs.includes(EXIT_KEY);
     if (ausgangSteht && Date.now() - letzteAusgangsmeldung > 300000) {
       letzteAusgangsmeldung = Date.now();
       sag("The Red Pill ist eingebaut - ab jetzt kein Einbau mehr, nur noch"

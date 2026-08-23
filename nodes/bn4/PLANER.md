@@ -188,3 +188,44 @@ Fehler ist, den dieses Projekt nicht wiederholen will.
 nach einem Prestige (`CONSTANTS.Donations = 262`). Wer die Datei fuer eine
 Modellrechnung heranzieht, liegt um Faktor 800 daneben. Sie gehoert geloescht
 oder mit Knotenkennung versehen.
+
+## Der Ausgang aus BitNode 4 - Befund vom 23.08.2026, 12:15
+
+**Der Bot kann diesen BitNode derzeit nicht verlassen.** The Red Pill hat in
+der Guetefunktion von bn4rep.js den Wert null: Das Stueck hat keine Stats,
+also ist `hackNutzen` null, und der Zaehlplatz-Bonus greift nur unterhalb von
+30 installierten Augmentierungen (aktuell 43). Es wird damit nie zum Ziel
+gewaehlt, egal wie lange der Bot laeuft.
+
+Der Ausgang ist zweistufig, und beide Stufen fehlen in der Steuerung:
+
+1. **The Red Pill**, 2,5 Mio Reputation bei Daedalus, Geldkosten null
+   (Augmentations.ts:1946-1953, `isSpecial: true`). Ohne den Einbau haengt
+   `w0r1d_d43m0n` gar nicht erst am Netz (Prestige.ts:173-181).
+2. **Hacking 9000.** BitNode 4 hat `WorldDaemonDifficulty: 3`
+   (BitNode.tsx:660), der Schwellwert ist 3000 mal diesem Faktor. Bestaetigt
+   am Spielstand: `w0r1d_d43m0n ab Level 9000`. Stand jetzt 3571 bei
+   Hacking-Multiplikator 7,94.
+
+### Warum der Favor-Weg und nicht der direkte Grind
+
+Gemessen am 23.08. um 12:16 (`tools/lage.js --reprate`): Firmenarbeit bei
+Clarke bringt 52,8 Rep/s. Faktionsarbeit ist in BitNode 4 mit
+`FactionWorkRepGain: 0.75` gedaempft (BitNode.tsx:633ff), fuer Daedalus also
+rund 40 Rep/s. Daedalus laeuft ohne aktive Arbeit bei 0,527 Rep/s - passiv
+ist der Weg mit 244 Stunden ausgeschlossen.
+
+| Weg                                          | Zeit    | Geld      |
+|----------------------------------------------|---------|-----------|
+| 2,5 Mio Rep direkt erarbeiten                | ~17 h   | -         |
+| 462.490 Rep fuer Favor 150, dann spenden     | ~3,2 h  | $876 Mrd  |
+
+Die 462.490 sind `favorToRep(150)` (Faction/formulas/favor.ts). Favor waechst
+nur beim EINBAU (`addRepToFavor`, Faction.ts:77-85), die Reputation muss also
+vor einem Install beisammen sein. Danach gilt das Spendenrecht:
+`rep = betrag/1e6 * mults.faction_rep`, bei `faction_rep` 2,853 kosten
+2,5 Mio Reputation 876 Mrd. Bei 160 Bio Barbestand ist das keine Huerde.
+
+**Ersparnis rund 14 Stunden.** Der Umbau der Guetefunktion steht aus - er
+gehoert in die Formel-Inventur, nicht in einen schnellen Eingriff, weil die
+Guetefunktion die Zielwahl des gesamten Bots traegt.

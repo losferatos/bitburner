@@ -65,7 +65,29 @@ export async function main(ns) {
   // sondern die Datenstruktur des Spiels (CompanyName und FactionName tragen
   // beide "Clarke Incorporated"), und es erspart eine Uebersetzungstabelle.
   const COMPANIES = ["Clarke Incorporated", "OmniTek Incorporated"];
-  const COMPANY_REP_GOAL = 400e3;
+  // ACHTUNG, das sind NICHT immer 400.000: calculateEffectiveRequiredReputation
+  // (Company/utils.ts:15-19) multipliziert die verlangte Reputation mit
+  // CONSTANTS.CompanyRequiredReputationMultiplier = 0,75, sobald auf dem
+  // FIRMENSERVER eine Backdoor liegt. Mit Backdoor genuegen also 300.000.
+  //
+  // Am 23.08.2026 aufgefallen, weil die Clarke-Einladung schon bei 302.063
+  // kam, waehrend die Anzeige weiter 400.000 als Ziel auswies. Ein Leerlauf
+  // war das NICHT: Der Ausstieg aus der Firmenphase haengt an der
+  // Mitgliedschaft (spieler.factions.includes), nicht an dieser Zahl - der
+  // Bot hat im selben Zyklus gekuendigt. Die Zahl ist reine Telemetrie, aber
+  // eine falsche Telemetrie laedt zu falschen Schluessen ein, und genau das
+  // ist hier passiert. Beide Firmenserver sind laengst gerootet und mit
+  // Backdoor versehen, der Rabatt ist also der Normalfall.
+  const COMPANY_SERVER = {
+    "Clarke Incorporated": "clarkinc",
+    "OmniTek Incorporated": "omnitek",
+  };
+  const companyRepGoal = (firma) => {
+    const host = COMPANY_SERVER[firma];
+    let rabatt = false;
+    try { rabatt = !!ns.getServer(host).backdoorInstalled; } catch (e) { rabatt = false; }
+    return 400e3 * (rabatt ? 0.75 : 1);
+  };
 
   // IT statt Software. Beide Leitern haben dieselbe zweite Sprosse
   // (repMultiplier 1,1 / hackingEffectiveness 85), aber die IT-Leiter ist
@@ -655,7 +677,7 @@ export async function main(ns) {
         if (!arbeitJetzt || arbeitJetzt.companyName !== companyTarget) {
           if (ns.singularity.workForCompany(companyTarget, true)) {
             sag("Arbeite fuer " + companyTarget + " als " + job + ": "
-              + Math.round(companyRep) + " von " + COMPANY_REP_GOAL + " Firmenreputation.");
+              + Math.round(companyRep) + " von " + companyRepGoal(companyTarget) + " Firmenreputation.");
           }
         }
 
@@ -668,7 +690,7 @@ export async function main(ns) {
           job,
           companyRep,
           companyFavor: ns.singularity.getCompanyFavor(companyTarget),
-          goal: COMPANY_REP_GOAL,
+          goal: companyRepGoal(companyTarget),
           hacking: ns.getPlayer().skills.hacking,
           charisma: ns.getPlayer().skills.charisma,
           forced: orderActive,

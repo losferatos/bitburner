@@ -1234,6 +1234,20 @@ export async function main(ns) {
     const offen = alleOffenen.concat(schwellenZiele)
       .sort((a, b) => guete(b) - guete(a));
 
+    // RANGLISTE NACH DRAUSSEN (23.08.2026). Bis heute stand in der Telemetrie
+    // nur das Ergebnis der Wahl, nicht ihre Begruendung. Wer von aussen fragen
+    // wollte, warum ein offensichtlich billigeres Ziel NICHT gewaehlt wurde,
+    // musste die Guetefunktion im Kopf nachrechnen - und genau dabei ist am
+    // 23.08. eine Stunde verlorengegangen. Die fuenf besten Kandidaten mit
+    // Ertrag und Kosten kosten nichts und beantworten die Frage sofort.
+    const rangliste = offen.slice(0, 5).map((k) => ({
+      aug: k.aug, faktion: k.faktion, schwelle: !!k.istSchwelle,
+      wert: Math.round((k.istSchwelle ? ertragGesamt(k.faktion)
+        : ertragBis(k.faktion, k.repReq)) * 1000) / 1000,
+      sek: Math.round(kostenSekunden(k)),
+      guete: Math.round(guete(k) * 1e6) / 1e6,
+    }));
+
     if (!offen.length) { await ns.sleep(20000); continue; }
 
     const ziel = offen[0];
@@ -1339,6 +1353,7 @@ export async function main(ns) {
       ziel: ziel.aug,
       zielFaktion: ziel.faktion,
       istSchwelle: !!ziel.istSchwelle,
+      rangliste,
       rep: Math.round(ziel.rep),
       repReq: Math.round(ziel.repReq),
       preis: ziel.preis,

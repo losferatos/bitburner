@@ -212,6 +212,23 @@ export async function main(ns) {
     // vor und muss jeden einzeln wegklicken. Gehoert aus demselben Grund
     // hierher wie der Tonanker: er soll den Einbau ueberleben.
     ["popups.js", []],
+    // home-Ausbau. Steht hier und nicht in bn4net selbst, weil seine vier
+    // Singularity-Aufrufe ausserhalb von BitNode 4 das Sechzehnfache kosten -
+    // siehe Kopf von homegrow.js. Auf der Werkbank stoert der Preis nicht.
+    ["homegrow.js", []],
+    // Die zweite Steuerhaelfte gehoert in diese Liste, seit boot.js sie nicht
+    // mehr erzwingt (23.08.2026). Grund: bn4life ist voller Singularity und
+    // ausserhalb von BitNode 4 mehrere hundert GB gross - in ein frisches home
+    // mit 32 GB passt es nie. Bisher haette boot.js zwanzig Minuten darauf
+    // gewartet, aufgegeben, und niemand haette es je gestartet: bn4life
+    // startet bn4net (bn4life.js:93), aber nicht umgekehrt. Damit waeren TOR
+    // und die Portprogramme nie gekauft worden und das Netz bei den sechs
+    // Servern ohne Portbedarf stehengeblieben.
+    //
+    // Auf der Werkbank ist der Preis egal. Der Doppelinstanz-Waechter weiter
+    // unten laesst die Fassung auf home gewinnen, sobald dort wieder Platz
+    // ist - die Reihenfolge stimmt also in beide Richtungen.
+    ["bn4life.js", []],
   ];
   const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 
@@ -1196,9 +1213,20 @@ export async function main(ns) {
       // +1-je-Faden-Term weg und liefert bei moneyAvailable 0 eine Division
       // durch null. Hier wird es anders benutzt: growthAnalyze(host, 2) ist
       // schlicht ln(2)/k und haengt weder am Guthaben noch am additiven Term.
-      // k faellt daraus exakt heraus. Der dritte Parameter (cores) ist 1 -
-      // richtig so, denn die Arbeiter laufen fast alle auf Fremdrechnern mit
-      // einem Kern.
+      // k faellt daraus exakt heraus. Der dritte Parameter (cores) bleibt 1.
+      //
+      // Das war frueher damit begruendet, dass die Arbeiter fast alle auf
+      // Fremdrechnern mit einem Kern laufen. Diese Begruendung ist seit dem
+      // home-Ausbau falsch: home traegt 98 Prozent des Netzes. Die 1 bleibt
+      // trotzdem, jetzt aber aus einem anderen Grund - sie ist die SICHERE
+      // Annahme. Wer mit acht Kernen plant und einen Faden auf einem
+      // Mietrechner landen laesst, weakent zu wenig; die Sicherheit steigt
+      // und der Ertrag faellt. Umgekehrt kostet die Untertreibung nichts, was
+      // knapp waere: 71,7 Prozent des Netzes liegen ohnehin brach, Faeden sind
+      // nicht der Engpass. Der Kernbonus kommt als ungeplanter Ueberschuss
+      // an - sauberere Server, vollere Guthaben - statt als eingesparte
+      // Faeden. Erst wenn das Netz wirklich ausgelastet ist, lohnt es, die
+      // Kerne je Ausfuehrungsort einzurechnen (Befund N8).
       const planMix = (host) => {
         const s = ns.getServer(host);
         const secOver = Math.max(0, s.hackDifficulty - s.minDifficulty);
@@ -2364,19 +2392,21 @@ export async function main(ns) {
     //     tabu (data/geldbedarf.txt, dieselbe Quelle wie beim Serverkauf)
     //   - liegt mehr als ein Drittel des Netzes brach, wird nicht gekauft.
     //     Speicher, fuer den es keinen Abnehmer gibt, ist kein Engpass.
-    const kosten = ns.singularity.getUpgradeHomeRamCost();
-    const ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
-      ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+    // AUSGELAGERT nach src/homegrow.js (23.08.2026). Der Ausbau stand hier,
+    // mit vier Singularity-Aufrufen - und genau die haben den Bot am
+    // Knotenuebergang unbrauchbar gemacht: SF4Cost (RamCostGenerator.ts:82-96)
+    // gibt den Rabatt NUR in BitNode 4, ausserhalb kostet jeder Aufruf das
+    // Sechzehnfache. Die 9 GB Grundpreis dieser vier Aufrufe waeren draussen
+    // 144 GB gewesen; bn4net.js waere von 16 auf 160 GB gesprungen und haette
+    // in das frische home mit 32 GB (Prestige.ts:241-247) nicht mehr
+    // hineingepasst. boot.js haette zwanzig Minuten gewartet und aufgegeben.
+    //
+    // Ohne Singularity bleibt diese Datei portabel. Der Ausbau laeuft als
+    // Werkzeug auf der Werkbank weiter (WERKZEUGE, homegrow.js) - dort stoert
+    // sein Preis nicht, und Singularity wirkt spielerweit, nicht
+    // rechnergebunden. Der brachAnteil geht unten mit hinaus, weil homegrow
+    // ihn fuer die Amortisationsbremse braucht und ihn selbst nicht kennt.
     const brachAnteil = ramTotal > 0 ? ueberschussMerker / ramTotal : 0;
-    if (ns.getServerMoneyAvailable("home") - ruecklage > kosten * 3
-        && brachAnteil < 0.34) {
-      if (ns.singularity.upgradeHomeRam()) {
-        sag("home-Speicher verdoppelt auf " + ns.getServerMaxRam("home") + " GB.");
-      }
-    } else if (brachAnteil >= 0.34 && runde % 60 === 0) {
-      sag("home-Ausbau ausgesetzt: " + Math.round(brachAnteil * 100)
-        + " Prozent des Netzes liegen brach, mehr Speicher braucht niemand.");
-    }
 
     // --- 4. Zustand nach draussen ---------------------------------------------
     const gerootet = hosts.filter((h) => ns.hasRootAccess(h));
@@ -2404,7 +2434,7 @@ export async function main(ns) {
       mischung: mixStat,
       homeRam: ns.getServerMaxRam("home"),
       homeFrei: ns.getServerMaxRam("home") - ns.getServerUsedRam("home"),
-      ausbauKosten: kosten,
+      brachAnteil,
       reserve: reserveHome(),
       fehlstart,
       werkbank,

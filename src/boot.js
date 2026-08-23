@@ -93,10 +93,26 @@ export async function main(ns) {
         : datei + " liess sich nicht starten (exec gab 0).");
     }
 
-    const laufen = ns.ps("home").filter((p) =>
-      p.filename === "bn4net.js" || p.filename === "bn4life.js").length;
-    if (laufen === 2) { sag("Beide Steuerhaelften laufen. Fertig."); return; }
+    // ABBRUCHBEDINGUNG: bn4net allein genuegt (23.08.2026).
+    //
+    // Vorher wurde auf BEIDE Steuerhaelften gewartet. Das konnte im neuen
+    // Knoten nie eintreten: bn4life.js ist voller Singularity-Aufrufe, und
+    // SF4Cost (RamCostGenerator.ts:82-96) gibt den Rabatt nur in BitNode 4 -
+    // ausserhalb ist die Datei mehrere hundert GB gross, home aber 32
+    // (Prestige.ts:241-247). boot.js haette zwanzig Minuten gewartet und dann
+    // "hier muss ein Mensch nachsehen" gemeldet, obwohl der Bot laengst lief.
+    // Genau diese Fehlmeldung waere im Nachtlauf als Ausfall gelesen worden.
+    //
+    // bn4net.js kommt seit demselben Tag ohne Singularity aus (16,25 GB,
+    // knotenunabhaengig) und passt immer. Es holt bn4life ueber seine
+    // Werkzeugliste nach, sobald eine Werkbank steht.
+    if (ns.ps("home").some((p) => p.filename === "bn4net.js")) {
+      sag("bn4net.js laeuft. bn4life.js holt es sich selbst, sobald eine"
+        + " Werkbank mit genug Speicher steht. Fertig.");
+      return;
+    }
     await ns.sleep(5000);
   }
-  sag("ABBRUCH nach zwanzig Minuten - hier muss ein Mensch nachsehen.");
+  sag("ABBRUCH nach zwanzig Minuten: bn4net.js liess sich nicht starten."
+    + " Hier muss ein Mensch nachsehen.");
 }

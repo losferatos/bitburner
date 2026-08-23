@@ -107,11 +107,26 @@ export async function main(ns) {
     //
     // joinrun.js trainiert und tritt bei, netburn.js baut das Hacknet auf die
     // Netburners-Schwelle. Beide beenden sich von selbst; die Marke verhindert
-    // nur, dass sie in derselben Runde mehrfach anlaufen. Sie faellt beim
-    // naechsten Einbau mit dem Rest weg - genau dann sollen sie wieder ran.
+    // nur, dass sie in derselben Runde mehrfach anlaufen.
+    //
+    // ACHTUNG, HIER STAND EIN FEHLER (23.08.2026): Der Kommentar behauptete,
+    // die Marke falle beim naechsten Einbau mit dem Rest weg. Das stimmt
+    // nicht - prestigeHomeComputer loescht `programs` und `messages`
+    // (Server/ServerHelpers.ts:224-237), aber KEINE Textdateien, und
+    // geloescht wurde sie im ganzen Projekt nirgends. Nach dem allerersten
+    // Einbau lief der Beitrittslauf damit nie wieder: Netburners, Tetrads,
+    // Tian Di Hui und Slum Snakes blieben mitsamt ihren rund 19
+    // Augmentierungen dauerhaft draussen - und das sind Multiplikatorpunkte,
+    // an denen der ganze Knoten haengt.
+    //
+    // Jetzt traegt die Marke den Zeitpunkt des Einbaus, gegen den sie gilt.
+    // Ist seither ein neuer Einbau gelaufen, ist sie ungueltig.
     const BEITRITT_MARKE = "data/beitritt-erledigt.txt";
+    const letzterEinbau = ns.getResetInfo().lastAugReset;
+    const markeGilt = ns.fileExists(BEITRITT_MARKE, "home")
+      && Number(ns.read(BEITRITT_MARKE)) >= letzterEinbau;
     if (!ns.fileExists("data/bn4-stop.txt", "home")
-        && !ns.fileExists(BEITRITT_MARKE, "home")
+        && !markeGilt
         && !ns.isRunning("joinrun.js", "home")
         && !ns.isRunning("netburn.js", "home")) {
       const drin = ns.getPlayer().factions;
@@ -126,7 +141,9 @@ export async function main(ns) {
           sag("Nach Einbau: " + fehlend.length + " Faktionen fehlen ("
             + fehlend.join(", ") + ") - joinrun.js gestartet (pid " + pid + ").");
           if (ns.fileExists("netburn.js", "home")) ns.exec("netburn.js", "home");
-          ns.write(BEITRITT_MARKE, String(Date.now()), "w");
+          // Der Zeitstempel des EINBAUS, nicht die aktuelle Uhrzeit - nur so
+          // wird die Marke beim naechsten Einbau von selbst ungueltig.
+          ns.write(BEITRITT_MARKE, String(letzterEinbau), "w");
         }
       }
     }

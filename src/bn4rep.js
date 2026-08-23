@@ -579,20 +579,66 @@ export async function main(ns) {
       // Abbruch, sobald eine Stufe mehr kostet als vorhanden oder die
       // Reputation der Faktion nicht reicht - beides steigt je Stufe, der
       // Preis mit 1,14 mal dem 1,9-Aufschlag, die Reputation mit 1,14.
+      // FEHLENDE REPUTATION WIRD GESPENDET (23.08.2026). Bis hierher brach die
+      // Schleife ab, sobald die Reputation der Faktion nicht mehr reichte -
+      // und das tat sie zuverlaessig, denn der Reputationsbedarf waechst je
+      // Stufe mit 1,14 (NeuroFluxGovernorLevelMult, Constants.ts:36). Stufe
+      // 60 verlangt 500 * 1,14^59 = 1.138.795 Reputation; die hoechste
+      // Faktionsreputation im Spielstand lag bei 57.177. Seit Stufe 59 wurde
+      // deshalb keine einzige weitere gekauft.
+      //
+      // Dabei ist genau das der groesste Hebel des Knotens: Stufe 59 traegt
+      // allein x1,80 zum Hacking-Multiplikator bei - mehr als jedes einzelne
+      // Katalogstueck je koennte -, und die fehlende Reputation kostet bei
+      // einer spendenberechtigten Faktion rund 421 Mrd. Das sind sechs
+      // Sekunden Einkommen.
+      //
+      // Der Deckel ist damit nicht mehr die Reputation, sondern das Geld: der
+      // Kaufpreis waechst je Stufe mit 1,14 mal dem 1,9-Aufschlag aus
+      // getGenericAugmentationPriceMultiplier (AugmentationHelpers.ts:32-37).
+      // Bei rund 100 Bio Guthaben sind das etwa 14 Stufen je Zyklus, also
+      // x1,15 auf den Multiplikator - drei Zyklen von 9,13 auf 14.
+      // Beide Werte hier LOKAL, nicht aus dem Block weiter unten: dort stehen
+      // sie erst ab Zeile ~910, und ein const-Zugriff von hier oben liefe in
+      // die temporale Totzone - ReferenceError mitten im Einbau. Genau dieser
+      // Fehler ist am 22.08. schon einmal passiert.
+      const nfgSpendenSchwelle = ns.getFavorToDonate();
+      const NFG_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
+      const nfgKnotenFaktor = NFG_REP_GAIN[ns.getResetInfo().currentNode] || 1;
+      const nfgGeldFuerRep = (fehlend) =>
+        fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / nfgKnotenFaktor;
+
       let nfgStufen = 0;
+      let nfgGespendet = 0;
       for (let i = 0; i < 40; i++) {
         const geldJetzt = ns.getServerMoneyAvailable("home");
         let gekauft = false;
         for (const f of spieler.factions) {
           if (!ns.singularity.getAugmentationsFromFaction(f).includes(NFG)) continue;
-          if (ns.singularity.getAugmentationRepReq(NFG) > ns.singularity.getFactionRep(f)) continue;
-          if (ns.singularity.getAugmentationPrice(NFG) > geldJetzt) continue;
+          const preis = ns.singularity.getAugmentationPrice(NFG);
+          if (preis > geldJetzt) continue;
+          const noetig = ns.singularity.getAugmentationRepReq(NFG);
+          const habe = ns.singularity.getFactionRep(f);
+          if (noetig > habe) {
+            // Nur spenden, wenn das Recht besteht UND danach noch Geld fuer
+            // den Kauf selbst bleibt - sonst waere die Spende verbrannt.
+            if ((favor[f] || 0) < nfgSpendenSchwelle) continue;
+            const kosten = nfgGeldFuerRep(noetig - habe) * 1.02;
+            if (kosten + preis > geldJetzt) continue;
+            if (!ns.singularity.donateToFaction(f, kosten)) continue;
+            nfgGespendet += kosten;
+          }
           if (ns.singularity.purchaseAugmentation(f, NFG)) { nfgStufen++; gekauft = true; break; }
         }
         if (!gekauft) break;
         await ns.sleep(50);
       }
-      if (nfgStufen) sag("NeuroFlux: " + nfgStufen + " Stufen vor dem Einbau gekauft.");
+      if (nfgStufen) {
+        sag("NeuroFlux: " + nfgStufen + " Stufen vor dem Einbau gekauft"
+          + (nfgGespendet > 0
+            ? " (dafuer " + Math.round(nfgGespendet / 1e9) + " Mrd Reputation zugekauft)"
+            : "") + ".");
+      }
 
       await ns.sleep(1500);
       ns.singularity.installAugmentations("bn4life.js");

@@ -42,6 +42,24 @@ Status: UMGESETZT | VERWORFEN | OFFEN | LAEUFT
 | I18 | Aktienmarkt | Geld ist nicht der Engpass | VERWORFEN |
 | I19 | Hacknet ueber die Netburners-Schwelle hinaus | HacknetNodeMoney 0,05; Augs ohne Hacking-Multiplikator | VERWORFEN - Zweck (30er-Huerde) erfuellt |
 
+## Nachtrag: beim ersten Durchgang selbst uebersehen (23.08.2026, 14:40)
+
+Eric fragte nach, ob noch etwas aus den Berichten fehle. Es fehlten sieben
+Punkte - die Liste war schon beim Anlegen unvollstaendig, aus genau dem
+Grund, den sie beheben soll. Deshalb stehen sie hier eigens, nicht
+eingemischt.
+
+| # | Befund | Wirkung | Status |
+|---|---|---|---|
+| N1 | Charisma-Break-even im Code ist um Faktor 760 falsch. Der Kommentar (bn4rep.js:101-107) rechnet mit `mults.charisma` 1,163 und 14,5 h Training; gemessen sind es 4,059 und **69 Sekunden**. IT Manager gaebe +12,9 %, Systems Administrator +21,8 % Firmenreputation | Ergebnis stimmt zufaellig, Begruendung ist falsch - und eine falsche Begruendung sperrt beim naechsten Zustandswechsel das Falsche | **OFFEN** |
+| N2 | Die Firmenwahl ignoriert den Firmenfavor. `COMPANIES` (bn4rep.js:67) ist eine feste Liste; `(1 + Firmenfavor/100)` geht aber direkt in die Rate ein (Work/Formulas.ts:131,156). Clarke stand auf Favor 132,3, OmniTek auf 0 | x2,32 auf die Firmenphase | **OFFEN** |
+| N3 | `lib/hackaugs.js` wertet `faction_rep` mit halbem Gewicht (Wurzel). Der Multiplikator wirkt aber dreifach: auf Arbeit, auf Passivrate UND auf den Spendenkurs | volles Gewicht waere richtig | **OFFEN** |
+| N4 | `buyaugs.js:485-492` gewichtet `hacking_money` mit 1,5 ueber `hacking` mit 1,0 - derselbe Fehler wie in bn4rep, aber in einer zweiten Datei, die beim levelNutzen-Umbau nicht mitgezogen wurde | falsche Kaufreihenfolge, wenn buyaugs benutzt wird | **OFFEN** |
+| N5 | `MINDEST_WARTESCHLANGE = 3` und `LUECKE_ZU_GROSS = 15000` (bn4rep.js:172-173) sind auf "~40 rep/**min**" kalibriert. Tatsaechlich sind es 40 bis 190 rep/**s** - die Konstanten sind um Faktor 63 veraltet. 15.000 Reputation sind heute sechs Minuten, nicht sechs Stunden | Einbau-Ausloeser feuert zu selten | **OFFEN** |
+| N6 | `kandidaten` prueft keine `prereqs`. Die ENM-Kette bei Daedalus haengt aneinander; fehlt ein Vorlaeufer, rankt der Bot dauerhaft ein unkaufbares Stueck | heute unkritisch, alle Vorlaeufer vorhanden | **OFFEN** |
+| N7 | Exploits: 3 von 11 eingesammelt (`src/exploit.js`). Jeder gibt 1,001 auf `hacking`, `hacking_exp`, `faction_rep` und ein Dutzend weitere - und **ueberlebt jeden BitNode** | +0,8 % auf alles, dauerhaft ueber alle 15 Knoten | **OFFEN** |
+| N8 | `lib/calc.js` hat einen `cores`-Parameter (Zeilen 123, 203, 230, 268), aber kein Aufrufer uebergibt je etwas anderes als den Vorgabewert 1 | gehoert zu I14 | **OFFEN** |
+
 ## Aus der Kritikerrunde (23.08.2026, drei Kritiker)
 
 | # | Befund | Wirkung | Status |

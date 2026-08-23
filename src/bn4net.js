@@ -163,6 +163,11 @@ export async function main(ns) {
     // ohne ihn laeuft der ganze Bot dreifach langsamer. Er lag bisher auf
     // einem gekauften Rechner - und die verschwinden bei jedem Einbau.
     ["wakelock.js", []],
+    // Popup-Waechter. Das Spiel sammelt Dialoge in einer Warteschlange
+    // (AlertManager.tsx); wer stundenlang nicht hinsieht, findet dutzende
+    // vor und muss jeden einzeln wegklicken. Gehoert aus demselben Grund
+    // hierher wie der Tonanker: er soll den Einbau ueberleben.
+    ["popups.js", []],
   ];
   const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 

@@ -805,7 +805,28 @@ export async function main(ns) {
     // effektiv null und das Ziel gewinnt jede Rangfolge - zu Recht, denn es
     // kostet keine Zeit. Reicht es nicht, zaehlt der fehlende Betrag.
     const spendenSchwelle = ns.getFavorToDonate();
-    const geldFuerRep = (fehlend) => fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep);
+
+    // FactionWorkRepGain gehoert in die Spendenformel. donationForRep teilt
+    // NICHT nur durch mults.faction_rep, sondern zusaetzlich durch den
+    // Knotenfaktor (Faction/formulas/donation.ts:12-14):
+    //
+    //   geld = rep * 1e6 / mults.faction_rep / FactionWorkRepGain
+    //
+    // In BitNode 4 ist der 0,75 (BitNode.tsx:651). Ohne ihn rechnet der Bot
+    // jede Spende um ein Drittel zu billig - und `kosten + preis <= geld`
+    // weiter unten wird zu frueh wahr, der Kauf schlaegt dann fehl.
+    //
+    // ns.getBitNodeMultipliers() gibt es nur mit SF5 oder in BitNode 5, wir
+    // haben beides nicht. Deshalb die Werte aus dem Quelltext, und zwar nur
+    // fuer die Knoten, die den Faktor ueberhaupt setzen - alle uebrigen lassen
+    // ihn bei 1. BitNode 12 skaliert ihn mit der Knotenstufe; dort greift
+    // bewusst der sichere Wert 1, weil eine zu hoch geschaetzte Spende nur
+    // Geld kostet, eine zu niedrig geschaetzte dagegen den Kauf verfehlt.
+    const FACTION_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
+    const knoten = ns.getResetInfo().currentNode;
+    const knotenRepFaktor = FACTION_REP_GAIN[knoten] || 1;
+    const geldFuerRep = (fehlend) =>
+      fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / knotenRepFaktor;
 
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
     const guete = (k) => {
@@ -838,10 +859,24 @@ export async function main(ns) {
     // Zeit wird durch Geld ersetzbar. Solange keine Faktion so weit ist, bleibt
     // es bei der Arbeit - der Aufruf waere sonst nur ein teurer Fehlschlag.
     if (favor[ziel.faktion] >= ns.getFavorToDonate()) {
-      const uebrig = ns.getServerMoneyAvailable("home") - teuerstesVerdiente;
+      // NUR SOVIEL WIE NOETIG (23.08.2026). Vorher ging der gesamte Bestand
+      // abzueglich der bereits verdienten Stuecke raus. Das ist zweifach
+      // verkehrt: Reputation ueber der Schwelle kauft nichts mehr, und der
+      // Ueberschuss faellt spaetestens beim naechsten Einbau der
+      // Geldvernichtung zum Opfer (PlayerObjectGeneralMethods.ts:102 setzt
+      // auf 1262 zurueck). Gerechnet am Stand vom 23.08. waeren 300 Bio
+      // gespendet worden, gebraucht war weniger als ein Prozent davon.
+      //
+      // Der Zuschlag von zwei Prozent faengt ab, dass die Reputation zwischen
+      // Rechnung und Ueberweisung leicht anders steht als hier angenommen.
+      const fehlt = Math.max(0, ziel.repReq - ns.singularity.getFactionRep(ziel.faktion));
+      const noetig = geldFuerRep(fehlt) * 1.02;
+      const verfuegbar = ns.getServerMoneyAvailable("home") - teuerstesVerdiente;
+      const uebrig = Math.min(noetig, verfuegbar);
       if (uebrig > 1e9) {
         if (ns.singularity.donateToFaction(ziel.faktion, uebrig)) {
           sag("GESPENDET: " + Math.round(uebrig / 1e6) + "m an " + ziel.faktion
+            + " fuer " + Math.round(fehlt) + " fehlende Reputation"
             + " (Favor " + Math.round(favor[ziel.faktion]) + ").");
           await ns.sleep(1000);
           continue;

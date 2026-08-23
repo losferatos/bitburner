@@ -34,6 +34,39 @@ export async function main(ns) {
   // keiner da, gibt es nichts zu tun - dann bleibt die Escape-Taste in Ruhe.
   const dialogOffen = () => !!doc.querySelector(".MuiModal-root");
 
+  // React 17 legt die Host-Props als __reactProps$<zufall> auf den DOM-Knoten.
+  // Ein .click() geht bei MUI-Knoepfen oft ins Leere (im Projekt 22-mal am
+  // TOR-Knopf belegt, src/darkweb.js:178-184), der Aufruf des Handlers nicht.
+  const reactKlick = (el) => {
+    for (const k of Object.keys(el)) {
+      if (!k.startsWith("__reactProps$")) continue;
+      const props = el[k];
+      if (props && typeof props.onClick === "function") { props.onClick(); return true; }
+    }
+    el.click();
+    return true;
+  };
+
+  // Nur Knoepfe, die nichts entscheiden und nichts zerstoeren. "Join" steht
+  // bewusst NICHT dabei: ob eine Faktion betreten wird, entscheidet bn4rep -
+  // manche Faktionen sind untereinander verfeindet und sperren sich
+  // gegenseitig bis zum naechsten Einbau (FactionInvitationManager.tsx:56-58).
+  // Die Einladung bleibt nach "Decide later" bestehen und geht nicht verloren.
+  const HARMLOS = ["decide later", "close", "cancel", "ok", "dismiss", "later", "got it"];
+
+  const knoepfeSchliessen = () => {
+    let getan = 0;
+    for (const modal of doc.querySelectorAll(".MuiModal-root")) {
+      for (const b of modal.querySelectorAll("button")) {
+        const t = (b.textContent || "").trim().toLowerCase();
+        if (!HARMLOS.includes(t)) continue;
+        try { reactKlick(b); getan++; } catch { /* naechster Knopf */ }
+        break;   // je Dialog nur einen Knopf
+      }
+    }
+    return getan;
+  };
+
   while (true) {
     try {
       if (dialogOffen()) {
@@ -45,6 +78,16 @@ export async function main(ns) {
             bubbles: true, cancelable: true,
           }));
           await ns.sleep(120);
+        }
+        // Was Escape nicht erwischt hat, hat einen eigenen Handler am Modal
+        // statt am Dokument - Ereignisse blubbern nach oben, nicht nach unten.
+        // Solche Dialoge werden ueber ihren Knopf geschlossen. Mehrere Runden,
+        // weil hinter einem Dialog der naechste warten kann: die Einladungen
+        // stehen in einer Liste und close() nimmt nur die erste heraus
+        // (FactionInvitationManager.tsx:45-49).
+        for (let runde = 0; runde < 12 && dialogOffen(); runde++) {
+          if (!knoepfeSchliessen()) break;
+          await ns.sleep(150);
         }
         if (!dialogOffen()) {
           geschlossen++;

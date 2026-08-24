@@ -115,34 +115,57 @@ Diese Messung ist damit das wertvollste Einzelergebnis der naechsten Tage.
 
 ---
 
-## 5. Der dritte Abschlussweg (V1b), bisher uebersehen
+## 5. Der Darknet-Weg (V1b) - kein Abkuerzer, aber der Weg durch BN15
 
 Beide Vorgaengerdokumente kennen nur zwei Wege zu `w0r1d_d43m0n`: Hacking-Level
-(V1, ueber The Red Pill von Daedalus) und 21 Black Ops (V2).
+(V1, ueber The Red Pill von Daedalus) und 21 Black Ops (V2). Es gibt einen
+dritten: `labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor.
 
-Es gibt einen dritten. `labyrinth.ts:424-427`:
+**Die erste Fassung dieses Abschnitts nannte das eine "Daedalus-Umgehung in 13
+von 15 Knoten". Das war falsch**, und die Fremdpruefung hat den Fehler in einem
+Nachtrag selbst zurueckgenommen. Nachgeschlagen:
 
 ```
-// On BNs that allow TRP in Lab, the sixth lab has the red pill
-if (!nextAug && allowTRP) return AugmentationName.TheRedPill;
+hasFullDarknetAccess = Player.bitNodeN === 15 || Player.activeSourceFileLvl(15) > 0
 ```
+(effects.ts:301). Ohne vollen Zugang liefert `labData` `lab: null` und ein
+flaches Netz der Tiefe 5 (labyrinth.ts:486-497). **Die Labore existieren nur in
+BitNode 15 oder nach dem ersten BN15-Abschluss.** Die `dnet`-API selbst ist zwar
+ueberall fuer $50 Mio kaufbar - die Labore sind es nicht.
 
-`allowTRP` haengt an `DarknetLabyrinthRewardsTheRedPill`, Vorgabewert 1
-(BitNodeMultipliers.ts:64); nur BN8 (BitNode.tsx:786) und BN12 (:954) setzen ihn
-auf 0. **In 13 von 15 Knoten liefert das sechste Darknet-Labor The Red Pill —
-komplett am Daedalus-Sockel vorbei.** Kein 30-Augmentierungs-Sockel, keine
-2,5 Mio Reputation, kein Favor-Bootstrap.
+Der zweite Kostentreiber wiegt noch schwerer: `prestigeDarknetState(false)`
+steht in `Prestige.ts:76`, also im **Augmentierungs**-Einbau. Jeder Einbau
+wuerfelt Netz, Sitzungen und Irrgarten neu. Die Laborbelohnung ist eine
+vorgemerkte Augmentierung, und das naechste Labor erscheint erst, wenn die
+vorige eingebaut ist. **Je Labor also ein voller Einbauzyklus, und je Zyklus
+wird das Netz von Ebene 0 neu geknackt** - fuenf Zyklen bis The Red Pill in
+BN15, sieben ueberall sonst.
 
-Belegt ist die Existenz, die Laborreihenfolge und eine umfangreiche
-`ns.dnet`-API (RamCostGenerator.ts:238-263). **Nicht belegt** ist, ob der Weg
-vollstaendig skriptbar ist und was die sechs Labor-Augmentierungen an Zeit und
-Einbauzyklen kosten.
+**Bewertung:**
 
-**Aufgabe:** In einem billigen Knoten einmal antesten und messen. Faellt der Weg
-unter etwa 40 Stunden, ersetzt er in BN15 alle drei V2-Laeufe — und ist
-womoeglich in weiteren Knoten der kuerzere Weg.
+- **In BN15 ist es der Weg.** Daedalus fuehrt The Red Pill dort gar nicht
+  (FactionHelpers.tsx:204-207), das Labor ist der einzige V1-Zugang. Geschaetzt
+  10-35 h gegen 94 h aus der V2-Simulation.
+- **Ausserhalb BN15 gestrichen.** Erst ab SF15.1, dann sieben Einbauzyklen,
+  Tiefe 36, Charisma 4.000 - das verliert gegen Daedalus mit Spendenrecht
+  (ein bis zwei Zyklen) praktisch immer.
 
----
+**Skriptbar ist der Weg vollstaendig** (geprueft: kein `isTrusted` im ganzen
+DarkNet-Ordner, `ns.dnet.labreport()` liefert die Nachbarschaft maschinenlesbar,
+die rund 24 Servertypen sind deterministische Textraetsel ueber den
+`authenticate`-Antwortkanal). Der Preis ist kein Zeitproblem, sondern ein
+**neues Gewerk**: rund 24 Raetsel-Loeser, ein Netznavigator, der mit Mutation
+und Zeitueberschreitungen umgeht, eine Tiefensuche durch den Irrgarten und eine
+Deploy-Kette auf Darknet-Rechner.
+
+Charisma ist dabei die Waehrung und wirkt exponentiell ueber den Multiplikator:
+bei cha-mult 6 kostet Charisma 3.000 unerreichbare 7,6e8 Erfahrung, bei
+mult 12 nur 6,3e5. Charisma-Augmentierungen sind also Pflichtkaeufe, keine
+Nebensache.
+
+**Plan:** BN15-Lauf 1 als Labyrinth-V1 einplanen, die Laeufe 2 und 3 nach dem
+gemessenen Ergebnis. Das Gewerk vorher in einem billigen Knoten gegen das
+flache Netz testen - die API ist ueberall kaufbar, nur die Labore nicht.
 
 ## 6. Was aus der Fremdpruefung NICHT uebernommen wird
 
@@ -161,8 +184,10 @@ womoeglich in weiteren Knoten der kuerzere Weg.
 1. **Boersen-Bot fuer BN8.** Der einzige Knoten ohne Alternative, und das
    Werkzeug dafuer existiert nicht. Steht am Ende der Route, also viel Zeit —
    aber es ist die einzige echte Neuentwicklung, die diese Route verlangt.
-2. **Darknet-Labyrinth vermessen** (Abschnitt 5). Kann die Route an mehreren
-   Stellen verkuerzen.
+2. **Das Labyrinth-Gewerk bauen** (Abschnitt 5) - rund 24 Raetsel-Loeser,
+   Netznavigator, Irrgarten-Tiefensuche, Deploy-Kette. Wird erst fuer BN15
+   gebraucht, also spaet, aber es ist nach dem Boersen-Bot die zweite echte
+   Neuentwicklung dieser Route. Vorher im flachen Netz testbar.
 3. **V2 ueberhaupt einmal messen** (Abschnitt 4). Passiert automatisch in BN6.
 4. **Der NeuroFlux-Bedarf ist kein fester Wert**, sondern ein
    Geld-gegen-Level-Optimierungsproblem. Die Zahlen in

@@ -69,6 +69,37 @@ export async function main(ns) {
   // Die Einladung bleibt nach "Decide later" bestehen und geht nicht verloren.
   const HARMLOS = ["decide later", "close", "cancel", "ok", "dismiss", "later", "got it"];
 
+  // --- Zwischensequenzen wegklicken ------------------------------------------
+  //
+  // Beim Betreten von BitNode 6 stand der Lauf am 24.08.2026 still, bis Eric
+  // von Hand "Continue ..." gedrueckt hat. Das ist keine Kleinigkeit: Der Bot
+  // soll die restlichen Knoten unbeaufsichtigt durchlaufen, und jeder Knoten
+  // mit einer Vorgeschichte haette einen Menschen an der Tastatur verlangt.
+  //
+  // Der Knopf kommt aus CinematicText.tsx:34 und ist der EINZIGE mit diesem
+  // Text im ganzen Spiel (gegengeprueft: nur ein Treffer in src/**/*.tsx).
+  // Benutzt wird die Komponente an zwei Stellen, beide harmlos:
+  //   BladeburnerCinematic.tsx  - die Synthoid-Vorgeschichte von BitNode 6
+  //   BitverseRoot.tsx          - der Enders-Text nach einem Knotenabschluss
+  // In beiden Faellen beendet der Klick nur den Text. Die Knotenauswahl im
+  // Bitverse laeuft ueber eigene Portal-Symbole und wird davon nicht beruehrt.
+  //
+  // Der Knopf erscheint erst, wenn der Text fertig getippt ist (10 ms je
+  // Zeichen, CinematicLine.tsx:24) - bei BitNode 6 also nach gut zwanzig
+  // Sekunden. Deshalb wird er nicht einmalig gesucht, sondern in jedem Takt.
+  let sequenzen = 0;
+  const sequenzWeiterklicken = () => {
+    for (const b of doc.querySelectorAll("button")) {
+      const text = (b.textContent || "").trim().toLowerCase();
+      if (!text.startsWith("continue")) continue;
+      reactKlick(b);
+      sequenzen++;
+      ns.print("Zwischensequenz weggeklickt (" + sequenzen + ". Mal).");
+      return true;
+    }
+    return false;
+  };
+
   // --- Wache ueber bn4net.js -------------------------------------------------
   // Bewusst ohne jede Bedingung ausser "laeuft nicht und passt": Wer hier
   // klug sein will (Karenzzeit, Fehlversuchszaehler, Stillstandserkennung),
@@ -155,6 +186,10 @@ export async function main(ns) {
     try {
       // Die Wache zuerst: ein stehender Bot ist teurer als ein offener Dialog.
       wache();
+      // Zuerst die Zwischensequenz: sie ist KEIN Modal (Router.toPage, nicht
+      // MuiModal-root) und wird von der Escape-Logik unten nicht erfasst.
+      sequenzWeiterklicken();
+
       if (dialogOffen()) {
         // Einladungen ZUERST, vor dem Escape-Schlag. Der keydown-Handler in
         // AlertManager.tsx leert die ganze Warteschlange auf einmal; ein
@@ -188,7 +223,7 @@ export async function main(ns) {
           ns.print(`Dialoge geschlossen (${geschlossen}. Mal).`);
         }
       }
-      ns.write("data/popups.txt", `${Date.now()}|${geschlossen}|${beigetreten}`, "w");
+      ns.write("data/popups.txt", `${Date.now()}|${geschlossen}|${beigetreten}|${sequenzen}`, "w");
     } catch (e) {
       ns.print("FEHLER: " + String(e && e.message ? e.message : e));
       await ns.sleep(60000);

@@ -281,6 +281,12 @@ async function pruefe(zustand, jetzt) {
       typ: "rep",
       text: "Kein Lebenszeichen von bn4rep.js - der Reputationsmotor laeuft nicht.",
     });
+  }
+  // Frisch heisst hier: juenger als eine Waechterrunde. Nach einem
+  // Knotenwechsel liegt die alte Datei noch da, sie ist dann Minuten alt.
+  const repFrisch = typeof rep?.zeit === "number" && jetzt - rep.zeit < POLL_MS;
+  if (!Number.isFinite(puls) || puls <= 0) {
+    // schon oben gemeldet
   } else if (jetzt - puls > REP_MAX_ALTER) {
     befunde.push({
       typ: "rep",
@@ -288,7 +294,17 @@ async function pruefe(zustand, jetzt) {
         + " min nicht mehr - keine Reputationsarbeit.",
     });
   }
-  if (typeof rep?.knoten === "number") messwerte.knoten = rep.knoten;
+  // NUR EINE FRISCHE KNOTENNUMMER IST EINE KNOTENNUMMER (24.08.2026).
+  //
+  // Beim Wechsel BitNode 5 -> 6 um 21:22 meldete der Waechter "jetzt in
+  // BitNode 5": Den Wechsel hatte er richtig am Einbruch des home-Speichers
+  // erkannt, die Zahl aber aus einer bn4rep.json geholt, die noch aus dem
+  // ALTEN Knoten stammte - die JSON-Dateien auf home ueberleben den Wechsel,
+  // nur die Skripte sterben. Richtiger Befund, falsche Beschriftung.
+  //
+  // Lieber gar keine Zahl als eine aus dem vorigen Knoten: Ohne `knoten`
+  // meldet der Waechter schlicht "BitNode geschafft", und das stimmt immer.
+  if (typeof rep?.knoten === "number" && repFrisch) messwerte.knoten = rep.knoten;
 
   // 5. Eine Fortschrittspruefung stand hier und ist am 24.08.2026 wieder
   //    ausgebaut worden. Sie verlangte, dass Hacking-Level UND Guthaben ueber

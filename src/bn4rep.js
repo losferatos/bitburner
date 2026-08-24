@@ -706,7 +706,33 @@ export async function main(ns) {
     // formulas.exe zum Nulltarif und dauerhafte Intelligence, die in jedem
     // weiteren Knoten wirkt. Begruendung in nodes/ROADMAP-KORREKTUR.md.
     if (ausgangSteht && spieler.skills.hacking >= zielLevel) {
-      const zielKnoten = Number(liesVonHome("data/exit-ziel.txt")) || 5;
+      // NIE IN DEN EIGENEN KNOTEN AUSSTEIGEN (24.08.2026).
+      //
+      // Hier stand `|| 5` als Vorgabe - gesetzt, als der Bot in BitNode 4 sass
+      // und BitNode 5 das Ziel war. Am 24.08. um 20:42 stand der Bot in
+      // BitNode 5, zwanzig Minuten vor dem Ausgang, und data/exit-ziel.txt
+      // enthielt weiterhin die 5. Der naechste Schritt waere gewesen: Knoten
+      // verlassen, in denselben Knoten zurueckkehren, alles von vorn - ohne
+      // dass irgendetwas es gemeldet haette, denn aus Sicht des Bots waere der
+      // Uebergang geglueckt.
+      //
+      // Eine Vorgabe, die zufaellig richtig war, ist keine Vorgabe. Steht
+      // nichts oder steht der eigene Knoten da, wird nicht geraten, sondern
+      // ein Mensch gerufen - der Ausgang ist der teuerste Moment des ganzen
+      // Laufs, und ein falscher Sprung kostet den Knoten zweimal.
+      const zielRoh = Number(liesVonHome("data/exit-ziel.txt"));
+      const eigenerKnoten = ns.getResetInfo().currentNode;
+      if (!Number.isInteger(zielRoh) || zielRoh < 1 || zielRoh > 13
+          || zielRoh === eigenerKnoten) {
+        rufeMenschen("AUSGANG BLOCKIERT: data/exit-ziel.txt sagt \""
+          + liesVonHome("data/exit-ziel.txt") + "\", wir sind in BitNode "
+          + eigenerKnoten + ". Zielknoten setzen, sonst geht es nicht weiter.");
+        sag("Ausgang offen, aber der Zielknoten ist unbrauchbar ("
+          + zielRoh + ") - kein Sprung. data/exit-ziel.txt setzen.");
+        await ns.sleep(15000);
+        continue;
+      }
+      const zielKnoten = zielRoh;
       if (!ns.fileExists("exit.js", "home")) {
         sag("AUSGANG OFFEN, aber exit.js fehlt auf home - hier muss ein"
           + " Mensch nachsehen.");

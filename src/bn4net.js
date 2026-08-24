@@ -505,10 +505,34 @@ export async function main(ns) {
       // Groesste bezahlbare Stufe. In BitNode 4 verteuert CloudServerSoftcap
       // 1.2 die grossen Rechner ueberproportional, deshalb wird gefragt statt
       // gerechnet.
-      for (const gb of [1024, 512, 256, 128, 64]) {
+      // DER KALTSTART BRAUCHT ANDERE REGELN (24.08.2026).
+      //
+      // Die Leiter begann bei 64 GB und verlangte das VIERFACHE des Preises.
+      // Fuer einen eingespielten Bot ist beides richtig; nach einem
+      // Knotenwechsel ist es eine Sackgasse. Gemessen in BitNode 6 um 21:40:
+      // home faellt auf 32 GB zurueck, bn4net belegt davon 16,25, es bleiben
+      // 3,4 GB. Der groesste sonstige Rechner im Netz hat 16 GB. Damit passt
+      // KEIN einziges Werkzeug mehr irgendwohin - nicht contracts.js (17,65),
+      // nicht darkweb.js (27,65), erst recht nicht der Rest. Ohne darkweb
+      // keine Portknacker, ohne Portknacker bleibt es bei 8 von 70 Rechnern,
+      // und die naechsten Ziele brauchen genau den einen Port.
+      //
+      // Der einzige Ausweg ist ein gekaufter Rechner. 64 GB kosten dort
+      // 3,52m, mal vier also 14,1m Guthaben - bei gemessenen 260 $/s sind das
+      // fuenfzehn Stunden Leerlauf.
+      //
+      // Deshalb: Solange KEIN eigener Rechner existiert, geht die Leiter bis
+      // 32 GB hinunter (das genuegt fuer darkweb.js oder contracts.js) und der
+      // Sicherheitsfaktor faellt auf 1,25. Der Faktor soll Geld fuer
+      // Augmentierungen schonen - bei Hacking-Level 11 gibt es keine zu
+      // kaufen. Sobald der erste Rechner steht, gelten wieder die alten Werte.
+      const kaltstart = eigene.length === 0;
+      const leiter = kaltstart ? [1024, 512, 256, 128, 64, 32] : [1024, 512, 256, 128, 64];
+      const faktor = kaltstart ? 1.25 : 4;
+      for (const gb of leiter) {
         const preis = ns.cloud.getServerCost(gb);
         if (!(preis > 0)) continue;
-        if (ns.getServerMoneyAvailable("home") - reserviert < preis * 4) continue;
+        if (ns.getServerMoneyAvailable("home") - reserviert < preis * faktor) continue;
         const name = ns.cloud.purchaseServer("werk-" + eigene.length, gb);
         if (name) sag("Rechner gekauft: " + name + " mit " + gb + " GB fuer "
           + (preis / 1e6).toFixed(2) + "m.");

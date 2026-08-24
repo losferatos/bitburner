@@ -23,4 +23,8 @@ export async function main(ns) {
     warteschlange: ns.singularity.getOwnedAugmentations(true)
       .filter((a) => !ns.singularity.getOwnedAugmentations(false).includes(a)),
   }), "w");
+  // ns.write schreibt LOKAL. Der Auftragslaeufer sucht sich den Wirt mit dem
+  // meisten freien Speicher, und das ist praktisch nie home - ohne diese Zeile
+  // liegt das Ergebnis auf einem Rechner, auf dem niemand nachsieht.
+  if (ns.getHostname() !== "home") ns.scp("data/stat.json", "home", ns.getHostname());
 }

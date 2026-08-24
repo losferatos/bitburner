@@ -314,6 +314,23 @@ export async function main(ns) {
     }
   };
 
+  // DER NOTRUF NACH DRAUSSEN.
+  //
+  // Alles, was der Bot bisher zu sagen hatte, ging ins Spiellog - und das
+  // liest nur, wer ohnehin gerade hinsieht. Fuer den einen Fall, in dem er
+  // wirklich einen Menschen braucht, ist das zu wenig: data/hilfe.txt wird
+  // von tools/wache.js alle drei Minuten gelesen und landet als Push auf dem
+  // Handy.
+  //
+  // Deshalb ist die Leitung bewusst SCHMAL. Sie ist nicht fuer Meldungen,
+  // sondern nur fuer "ohne dich geht es nicht weiter" - jede Zeile hier
+  // klingelt bei Eric. Wer sie fuer Fortschritt benutzt, hat sie kaputt
+  // gemacht, denn dann schaltet er sie ab (so ist es der Wache am 24.08.
+  // ergangen).
+  const rufeMenschen = (text) => {
+    schreibNachHome("data/hilfe.txt", text);
+  };
+
   const geldText = (n) => {
     for (const [t, k] of [[1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
       if (Math.abs(n) >= t) return "$" + (n / t).toFixed(2) + k;
@@ -321,8 +338,28 @@ export async function main(ns) {
     return "$" + n.toFixed(0);
   };
 
+  // Ein liegengebliebener Notruf aus einem frueheren Lauf ist Laerm: Der
+  // Waechter meldet ihn stuendlich weiter, obwohl die Lage laengst bereinigt
+  // ist - und ein NEUER Notruf kaeme wegen der Drosselung erst eine Stunde
+  // spaeter durch. Beim Start ist die Leitung deshalb frei.
+  loeschAufHome("data/hilfe.txt");
+
   for (;;) {
    try {
+    // DER PULS (24.08.2026).
+    //
+    // data/bn4rep.json taugt NICHT als Lebenszeichen. Das Skript steigt an
+    // mindestens vier Stellen vor der Telemetriezeile aus der Runde aus:
+    // Firmenphase (:959), nichts mehr zu kaufen (:462-470, laut eigenem
+    // Kommentar "der Normalfall am Ende eines Zyklus"), Ausgangsphase (:715)
+    // und leere Zielliste (:1281). In all diesen Zustaenden arbeitet es
+    // einwandfrei und schweigt trotzdem - ein Waechter, der daraus auf
+    // Stillstand schliesst, schlaegt stundenlang grundlos Alarm.
+    //
+    // Diese Zeile steht deshalb GANZ oben und ohne jede Bedingung. Sie ist
+    // das einzige verlaessliche "ich lebe" dieses Skripts.
+    schreibNachHome("data/hb-rep.txt", String(Date.now()));
+
     const spieler = ns.getPlayer();
     // Einmal abfragen, dreimal benutzt. Die Warteschlangenlaenge steht seit
     // dem 22.08.2026 hier oben statt beim Einbaukriterium, weil schon die
@@ -673,13 +710,26 @@ export async function main(ns) {
       if (!ns.fileExists("exit.js", "home")) {
         sag("AUSGANG OFFEN, aber exit.js fehlt auf home - hier muss ein"
           + " Mensch nachsehen.");
+        // DIE NOTRUFLEITUNG (24.08.2026). Bis hierher konnte der Bot nur ins
+        // Spiellog schreiben - und das liest nur jemand, der ohnehin
+        // hinsieht. Genau dieser Fall ist aber der teuerste ueberhaupt: Der
+        // Knoten ist geschafft, der Bot koennte weiter, und er steht wegen
+        // einer fehlenden Datei. tools/wache.js liest data/hilfe.txt alle
+        // drei Minuten und schickt den Inhalt aufs Handy.
+        rufeMenschen("Knoten fertig, aber exit.js fehlt auf home."
+          + " Der Wechsel in den naechsten BitNode klemmt.");
       } else if (!ns.ps("home").some((p) => p.filename === "exit.js")) {
         const pid = ns.exec("exit.js", "home", 1, zielKnoten);
+        if (!pid) {
+          rufeMenschen("Knoten fertig, aber exit.js liess sich nicht"
+            + " starten (exec gab 0) - vermutlich kein Speicher auf home.");
+        }
         sag(pid
           ? "AUSGANG: Hacking " + spieler.skills.hacking + " reicht fuer "
             + zielLevel + ", The Red Pill ist eingebaut. exit.js gestartet,"
             + " naechster Knoten " + zielKnoten + " (pid " + pid + ")."
           : "AUSGANG offen, aber exit.js liess sich nicht starten (exec gab 0).");
+        if (pid) loeschAufHome("data/hilfe.txt");
       }
       await ns.sleep(15000);
       continue;
@@ -1344,6 +1394,19 @@ export async function main(ns) {
 
     ns.write("data/bn4rep.json", JSON.stringify({
       zeit: Date.now(),
+      // Fuer tools/wache.js: woran erkennt man von aussen einen
+      // Knotenwechsel? getResetInfo ist hier ohnehin schon aufgerufen
+      // (FACTION_REP_GAIN weiter oben), die Zahl kostet also kein Gigabyte
+      // extra - anders als dieselbe Zeile in bn4net.js, das auf jedem
+      // Rechner des Netzes liegt.
+      knoten: ns.getResetInfo().currentNode,
+      // Die vier Zahlen, an denen das Endspiel haengt - fuer das Dashboard.
+      // Alle vier sind an dieser Stelle laengst berechnet, sie kosten also
+      // nichts ausser den Bytes in der Datei.
+      zielLevel,
+      hacking: spieler.skills.hacking,
+      multHacking: spieler.mults.hacking,
+      redPill: ausgangSteht,
       repGesamt,
       favor,
       favorBeste,

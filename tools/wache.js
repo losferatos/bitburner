@@ -274,19 +274,31 @@ async function pruefe(zustand, jetzt) {
   // Asymmetrie war ein Versehen.
   const rep = await spielJson("data/bn4rep.json");
   const job = await spielJson("data/bn4job.json");
-  const pulsRoh = await spieldatei("data/hb-rep.txt");
-  const puls = Number(pulsRoh);
-  if (!Number.isFinite(puls) || puls <= 0) {
+  const puls = Number(await spieldatei("data/hb-rep.txt"));
+
+  // KALTSTART IST KEINE STOERUNG (24.08.2026).
+  //
+  // bn4rep.js braucht 768 GB. Nach einem Knotenwechsel faellt home auf 32 GB
+  // zurueck (128 mit SF9.2), und im ganzen Netz gibt es zunaechst nichts
+  // Groesseres. Der Reputationsmotor KANN dann nicht laufen - das ist kein
+  // Ausfall, sondern der Normalzustand der ersten Stunden, und er dauert
+  // genau so lange, bis der erste grosse Rechner gekauft ist.
+  //
+  // Ein Waechter, der das meldet, meldet eine Tatsache, an der niemand etwas
+  // aendern kann. Genau daran ist die Vorgaengerloesung gestorben.
+  const homeRam = net.homeRam ?? null;
+  const kaltstart = Number.isFinite(homeRam) && homeRam <= 128;
+
+  if (kaltstart) {
+    // nichts pruefen - siehe oben
+  } else if (!Number.isFinite(puls) || puls <= 0) {
+    // FEHLENDE DATEI IST EIN ALARM, nicht Schweigen. Die erste Fassung
+    // uebersprang die Pruefung, wenn die Datei fehlte - also genau dann, wenn
+    // bn4rep gar nicht erst gestartet war.
     befunde.push({
       typ: "rep",
       text: "Kein Lebenszeichen von bn4rep.js - der Reputationsmotor laeuft nicht.",
     });
-  }
-  // Frisch heisst hier: juenger als eine Waechterrunde. Nach einem
-  // Knotenwechsel liegt die alte Datei noch da, sie ist dann Minuten alt.
-  const repFrisch = typeof rep?.zeit === "number" && jetzt - rep.zeit < POLL_MS;
-  if (!Number.isFinite(puls) || puls <= 0) {
-    // schon oben gemeldet
   } else if (jetzt - puls > REP_MAX_ALTER) {
     befunde.push({
       typ: "rep",
@@ -294,6 +306,11 @@ async function pruefe(zustand, jetzt) {
         + " min nicht mehr - keine Reputationsarbeit.",
     });
   }
+
+  // Frisch heisst: juenger als eine Waechterrunde. Nach einem Knotenwechsel
+  // liegt die alte Datei noch da, sie ist dann Minuten alt.
+  const repFrisch = typeof rep?.zeit === "number" && jetzt - rep.zeit < POLL_MS;
+
   // NUR EINE FRISCHE KNOTENNUMMER IST EINE KNOTENNUMMER (24.08.2026).
   //
   // Beim Wechsel BitNode 5 -> 6 um 21:22 meldete der Waechter "jetzt in
@@ -411,11 +428,23 @@ async function verarbeite(zustand, ergebnis, jetzt) {
       continue;
     }
 
-    // Der Text geht in den Vergleich ein: Ein NEUER Notruf soll nicht eine
-    // Stunde warten muessen, nur weil vorhin ein anderer unter demselben Typ
-    // lief. Bei gleichbleibendem Text greift die Steigerung wie vorgesehen.
+    // DER VERGLEICH BRAUCHT EINEN STABILEN SCHLUESSEL (24.08.2026).
+    //
+    // Hier stand der volle Meldungstext. Der Gedanke war richtig - ein NEUER
+    // Notruf soll nicht eine Stunde warten muessen, nur weil vorhin ein
+    // anderer unter demselben Typ lief. Die Ausfuehrung war es nicht: In den
+    // Texten steht eine hochzaehlende Zahl ("meldet sich seit 36 min nicht
+    // mehr"). Damit war der Text bei JEDER Pruefung ein anderer, die
+    // Drosselung griff nie, und dieselbe Stoerung ging alle drei Minuten
+    // erneut raus. Gemessen am 24.08. um 21:57: Stufe 8, also achtmal
+    // gesendet, wo einmal vorgesehen war.
+    //
+    // Verglichen werden deshalb nur noch die Ziffern-freien Anteile. Ein
+    // wirklich anderer Notruf hat anderen Wortlaut und kommt weiter sofort
+    // durch; ein hochzaehlender Zaehler nicht.
+    const schluessel = (t) => t.replace(/[0-9]+/g, "#");
     const zuletzt = zustand.gemeldet[b.typ] || 0;
-    const gleicherText = zustand.text[b.typ] === b.text;
+    const gleicherText = zustand.text[b.typ] === schluessel(b.text);
     const wartezeit = cooldownFuer(zustand.stufe[b.typ] || 0);
     if (gleicherText && jetzt - zuletzt < wartezeit) {
       log("gedrosselt (noch " + minuten(wartezeit - (jetzt - zuletzt)) + " min): " + b.typ);
@@ -438,7 +467,7 @@ async function verarbeite(zustand, ergebnis, jetzt) {
       b.tag || "warning", b.prioritaet || "high");
     if (zugestellt) {
       zustand.gemeldet[b.typ] = jetzt;
-      zustand.text[b.typ] = b.text;
+      zustand.text[b.typ] = schluessel(b.text);
       zustand.stufe[b.typ] = (zustand.stufe[b.typ] || 0) + 1;
     }
   }

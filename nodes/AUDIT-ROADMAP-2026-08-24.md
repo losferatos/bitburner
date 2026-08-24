@@ -144,3 +144,154 @@ BitNode-Wechsel gelaufen.
     waere** — der Abstand x100 zwischen Modell und Messung besteht heute
     (I10/I11: 71,7 % RAM brach, Ofen auf weaken); wie viel davon behebbar ist,
     entscheidet, ob die milden Knoten unter 20 h fallen.
+
+---
+
+## Nachtrag (24.08.2026, 21:20): Das Darknet-Labyrinth, vermessen
+
+Antwort auf die Rueckfrage der Planungs-Session. Alles Quellcode, nichts
+simuliert; die Zeitbandbreiten sind aus den Formeln gerechnet.
+
+### A. Skriptbarkeit: JA, vollstaendig — an jedem Glied belegt
+
+1. **Kein UI-Zwang.** Das `manual`-Flag der ersten zwei Labs steuert nur die
+   manuelle UI-Ansicht (LabyrinthSummary.tsx:61-84, PasswordPrompt.tsx:30);
+   kein einziger API-Pfad prueft es. Die grossen Labs sind sogar NUR per
+   Skript spielbar. Kein `isTrusted` im gesamten DarkNet-Ordner.
+2. **Maze-Navigation per API.** `ns.dnet.authenticate(lab, "go north")` bewegt
+   (Bewegungen laufen als Passwortversuche, labyrinth.ts:236-332, Kommandos
+   n/e/s/w/north/... :348-362); `ns.dnet.labreport()` (0 GB RAM!) liefert
+   maschinenlesbar `{coords, north, east, south, west}`
+   (Darknet.ts:642-671, labyrinth.ts:217-234); `labradar()` zeigt ein
+   7x7-Fenster inklusive Zielmarkierung "X" (Darknet.ts:672-705,
+   `getSurroundingsVisualized(..., showEnd=true)`). Das Maze ist statisch je
+   Lauf (DarknetState.labyrinth, generiert bei erstem Zugriff) — klassisches
+   DFS mit Kartenaufbau reicht.
+3. **Alle ~24 Servertypen sind deterministische TEXT-Raetsel** ueber den
+   authenticate-Antwortkanal (authentication.ts:33-149): Mastermind
+   (exakt/verschoben-Zaehler), GuessNumber/RomanNumeral (binaere Suche),
+   Yesn_t und SpiceLevel (positionsweises Feedback → zeichenweise),
+   TimingAttack (der Mismatch-Index steht IM KLARTEXT in der Antwort, :96-98),
+   BufferOverflow (mit einem einzigen 2xLaenge-Versuch aus gleichen Zeichen
+   loesbar, :101-118), divisibilityTest/tripleModulo (Zahlentheorie/CRT),
+   globalMaxima (1D-Hill-Climbing mit Altitude-Feedback), SortedEchoVuln
+   (RMSD-Feedback), packetSniffer/Woerterbuecher (heartbleed-Logs + Hints).
+   Geknackte Server droppen zudem Passwort-Hinweise fuer Nachbarn als
+   Textdateien (addClue, effects.ts:134-206).
+4. **Deploy-Kette noetig:** `authenticate` verlangt, dass das Skript auf einem
+   DIREKT verbundenen Darknet-Server laeuft (requireDirectConnection,
+   Darknet.ts:113-115); labreport/openCache muessen AUF einem Darknet-Server
+   laufen. Darknet-Server haben RAM (maxRam minus blockedRam;
+   `memoryReallocation` schaufelt frei, ~8 s je Aufruf, Darknet.ts:517-567);
+   das Lab selbst hat 128 GB frei (NetworkGenerator.ts:237). Standard-scp/exec
+   funktionieren (DarknetServer ist Server-Subklasse; die
+   getServer-Sichtbarkeitsausnahme steht in NetscriptHelpers.tsx:559-560).
+
+### B. Die zwei Kostentreiber, die vorher nicht im Audit standen
+
+1. **SF15-Gate — Korrektur meiner eigenen Fehlertabelle.** Die Labs existieren
+   nur bei `hasFullDarknetAccess()` = **BN15 oder SF15 > 0**
+   (effects.ts:301, labyrinth.ts:486-497). Die dnet-API selbst ist ueberall
+   fuer $50 Mio kaufbar (darkscape, darknetAuthUtils.ts:6-8,
+   Constants.ts), aber die "Daedalus-Umgehung in 13 Knoten" aus Tabelle 1
+   schaltet sich erst nach dem ersten BN15-Abschluss frei. Vorher ist der
+   Labyrinth-Weg NUR in BN15 selbst begehbar.
+2. **Jeder Aug-Einbau wuerfelt das Darknet komplett neu.**
+   `prestigeDarknetState` wird auch beim Aug-Einbau gerufen
+   (Prestige.ts:76) und leert Netz, Sessions, Maze und Positionen
+   (DarknetState.ts:84-101); die Serverobjekte selbst fallen mit
+   `prestigeAllServers` (Prestige.ts:74). Und die Lab-Belohnung ist eine
+   **gequeuete** Augmentierung (`Player.queueAugmentation`,
+   cacheFiles.ts:197-207), waehrend das naechste Lab erst bei INSTALLIERTER
+   Vorgaenger-Aug erscheint (getCurrentLabName prueft Player.augmentations,
+   labyrinth.ts:432-473). **Folge: je Lab ein voller Einbau-Zyklus, und je
+   Zyklus wird das Netz von Ebene 0 neu geknackt** (neue Passwoerter, neue
+   Topologie). TRP kostet damit in BN15 **5 Zyklen** (BrokenWings → Boots →
+   Hammer → Staff → TRP im EternalLab; labyrinth.ts:449-455), in allen
+   anderen erlaubten Knoten **7 Zyklen** (6 Vor-Augs, TRP im FinalLab,
+   :462-470).
+
+### C. Zahlengeruest (aus den Formeln, mit Fundstelle)
+
+| Phase (aktuelles Lab) | Netztiefe | Server im Netz (~Tiefe x 8 x 0,6) | cha-Anforderung Netz-Boden (=(d/labDepth)^1.5 x labCha x 0.85) | Lab-Gate (cha) | Maze | Zuege (DFS) |
+|---|---|---|---|---|---|---|
+| NormalLab | 7 | ~34 | ~255 | 300 | 20x14 | ~70-140 |
+| CruelLab | 12 | ~58 | ~510 | 600 | 30x20 | ~150-300 |
+| MercilessLab | 19 | ~91 | ~1.275 | 1.500 | 40x26 | ~260-520 |
+| UberLab | 23 | ~110 | ~2.125 | 2.500 | 60x40 | ~600-1.200 |
+| **EternalLab (TRP in BN15)** | 29 | ~139 | ~2.550 | **3.000** | 60x40 | ~600-1.200 |
+| EndlessLab | 31 | ~149 | ~2.975 | 3.500 | 60x40 | ~600-1.200 |
+| **FinalLab (TRP ausserhalb BN15)** | 36 | ~173 | ~3.400 | **4.000** | 60x40 | ~600-1.200 |
+
+Fundstellen: labData (labyrinth.ts:37-110), Netzgroesse
+NET_WIDTH 8 / SERVER_DENSITY 0,6 (Enums.ts:7-9, NetworkGenerator.ts:101),
+cha-Skalierung DarknetServerOptions.ts:67-72.
+
+- **Zeit je authenticate-Versuch** (effects.ts:60-98): `850 ms x
+  (5 x chaReq + (diff+1) x 100)/(cha+150) x Faktoren`; Threads senken auf
+  `1/(1+0,2(t-1))`, TheBoots x0,8, SF15.2 x0,8, Intelligence-Bonus.
+  Gerechnet: EternalLab bei cha 3.200 mit 1 Thread ~4,1 s je Zug, mit 16
+  Threads + Boots ~0,8 s. Wer unter der cha-Anforderung liegt, zahlt x2,5-4
+  (underleveledFactor) — Charisma zuerst.
+- **Maze-Zeit grosses Lab:** 600-1.200 Zuege x 0,8-4 s = **10-80 min**, plus
+  labreport-Aufrufe (gleiche Zeitformel; mit Kartenaufbau ~1,5 Aktionen je
+  Zug).
+- **Charisma ist die Waehrung des ganzen Wegs** — und exponentiell im
+  Multiplikator: cha 3.000 kostet bei mult 6 rund 7,6e8 EXP (unerreichbar),
+  bei mult 12 nur 6,3e5, bei mult 24 nur 1,8e4 (skill.ts:13; BN15 hat
+  CharismaLevelMultiplier 1,1, BitNode.tsx:1094). Charisma-Augs sind also
+  Pflichtkaeufe des Wegs. Als Farm dient `heartbleed` selbst: 50 x
+  (500+cha)/500 x charisma_exp je ~0,7-4,5 s (Darknet.ts:276), gerechnet
+  ~90-2.700 XP/s je Skript — der Weg fuettert sich selbst. Beschleuniger aus
+  der Progression: TheBoots x0,8 Auth-Zeit (effects.ts:79), Stasis-Limit +1 je
+  BrokenWings/Hammer/Staff (:232-237), TheLaw/TheSword tragen je hacking 1,1.
+- **Betriebsdynamik, einpreisbar aber nervig:** Das Netz mutiert (30 s je
+  Zeile, Enums.ts:11; `nextMutation` ist abonnierbar), Server gehen offline,
+  Migration/Stasis/Freeze sind API-steuerbar; zu viele Backdoors verlangsamen
+  ALLE Auth-Zeiten global (1,07^Ueberschuss, effects.ts:100-107). Timeouts
+  nach Instabilitaet (Darknet.ts:148) — jeder Versuch braucht Retry-Logik.
+
+### D. Bewertung fuer die Route
+
+- **BN15 selbst: der Labyrinth-Weg ist der einzige TRP-Weg und wohl der
+  richtige.** Grobrechnung: 5 Zyklen x (Wiederanlauf 0,5-1 h + Charisma
+  0-1 h + Netzpfad 0,3-2 h + Maze 0,1-1,3 h) = **5-25 h**, plus
+  WD-Level (eff. 10.000; mit NFG-Leveln Stunden) und TRP-Einbau — gesamt
+  grob **10-35 h** gegen 94 h V2-Simulation (Faktor 0,2, Skill x3). Selbst
+  am oberen Rand schlaegt er die V2-Schaetzung. Vorbehalt: Das ist
+  Formelrechnung, kein Messwert, und es braucht ein NEUES Bot-Gewerk
+  (~24 Minigame-Loeser, Netz-Navigator mit Mutation-Handling, Maze-DFS,
+  Deploy-Kette) — dieser Entwicklungsaufwand ist der eigentliche Preis.
+- **Ausserhalb BN15: als Daedalus-Umgehung streichen.** Erst ab SF15.1
+  verfuegbar, dann 7 Einbau-Zyklen, Netz bis Tiefe 36, cha-Gate 4.000 —
+  gegen den Daedalus-Weg mit Spendenrecht (1-2 Zyklen, Favor-Bootstrap
+  462k Rep) verliert das fast immer. Einzige denkbare Nische waeren
+  rep-verkrueppelte Knoten (BN14, FactionWorkRepGain 0,2) — die faehrt die
+  Route ohnehin ueber V2 ohne TRP-Bedarf.
+- **Konsequenz fuer die Reihenfolge-Tabelle:** Zeilen 39-41 (BN15) werden
+  konkreter: BN15-Lauf 1 als Labyrinth-V1 planen und das Gewerk VOR dem
+  ersten BN15-Eintritt in einem billigen Knoten gegen die ersten zwei
+  (kleinen) Labs testen — geht dort mangels SF15 nicht, also stattdessen:
+  die Minigame-Loeser gegen die dnet-API im normalen Netz testen (die API
+  plus flaches Netz ist ueberall fuer $50 Mio kaufbar — was genau ohne SF15
+  im Netz haengt, ist der eine ungeklaerte Rest, s. u.). Laeufe 2-3 dann je
+  nach Messwert Labyrinth oder V2.
+
+### E. Was auch dieser Nachtrag nicht belegt
+
+1. **Wie das Darknet OHNE SF15/BN15 aussieht** (nur darkscape gekauft):
+   `getNetDepth` faellt auf den Default der Lab-Details zurueck (kein Lab →
+   depth 5, labyrinth.ts:486-497); ob das abgespeckte Netz zum Ueben der
+   Minigame-Loeser taugt, ist plausibel, aber nicht verifiziert.
+2. **Die tatsaechliche Pfadlaenge durchs Netz je Zyklus** (wie viele Server
+   man real knacken muss, haengt an der zufaelligen Topologie inkl.
+   AIR_GAP_DEPTH 8 und den garantierten Verbindungen) — meine 0,3-2 h je
+   Zyklus sind eine Formelbandbreite.
+3. **Captcha-/EchoVuln-/encryptedPassword-Details**: default-Zweig liefert
+   nur Hint+Daten (authentication.ts:147-148); dass jeder dieser Hints
+   maschinell loesbar ist, habe ich fuer die genannten Typen aus dem Code
+   belegt, fuer die restlichen Woerterbuch-/Hint-Typen nur die Mechanik
+   (dictionaryData, heartbleed-Logs), nicht jede Instanz.
+4. **Die Charisma-Aufbau-Kurve je Zyklus** haengt am cha-Multiplikator
+   (Augs), den der Bot je Knoten erst kaufen muss — die 0-1 h gelten ab
+   mult ~12.

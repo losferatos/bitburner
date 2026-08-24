@@ -479,7 +479,21 @@ export async function main(ns) {
       }
     }
 
-    if (!kandidaten.length && !companyTarget) {
+    // NUR LEERLAUFEN, WENN AUCH NICHTS EINZUBAUEN IST (24.08.2026).
+    //
+    // Hier stand `if (!kandidaten.length && !companyTarget)`, und das war ein
+    // Verklemmer: Der Zustand "nichts mehr zu kaufen" ist genau der, der einen
+    // Einbau ausloesen SOLL - `nichtsMehrOffen` steht als Bedingung im
+    // Einbaublock weiter unten. Dieser Ausstieg liegt aber DAVOR. Damit war
+    // `nichtsMehrOffen` toter Code, und der Bot schlief im Minutentakt an
+    // seiner eigenen Warteschlange vorbei.
+    //
+    // Aufgefallen am 24.08. um 21:18 in BitNode 5: fuenf Augmentierungen
+    // wartend, darunter The Red Pill, alles gekauft, Hacking 5177 weit ueber
+    // der Schwelle 4500 - und der Knoten waere trotzdem nie fertig geworden.
+    // Der Puls lief weiter, die Telemetrie stand seit 20:46. Ein Waechter, der
+    // nur nach Lebenszeichen sieht, kann so etwas nicht finden.
+    if (!kandidaten.length && !companyTarget && wartend === 0) {
       // Nichts mehr zu holen: Bremse loesen, damit bn4life wieder Geld
       // verdienen darf, statt dass die Figur untaetig herumsteht.
       if (ns.fileExists("data/rep-modus.txt", "home")) {

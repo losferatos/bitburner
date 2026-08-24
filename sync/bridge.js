@@ -308,6 +308,24 @@ function startDashboard() {
       return;
     }
 
+    // Der Puls des Waechters, damit das Dashboard seinen Ausfall zeigen kann.
+    //
+    // Ein Waechter, der im Normalbetrieb schweigt, sieht im Tod genauso aus
+    // wie im Betrieb. Deshalb liefert die Bruecke seinen Zustand mit aus -
+    // die Datei liegt ohnehin daneben, und ohne sie waere die Ueberwachung
+    // selbst der einzige unueberwachte Teil der Kette.
+    if (url.pathname === "/api/wache") {
+      try {
+        const roh = await readFile(path.join(ROOT, "data", "wache-zustand.json"), "utf8");
+        res.writeHead(200, { "Content-Type": MIME[".json"] });
+        res.end(roh);
+      } catch {
+        res.writeHead(200, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ fehlt: true }));
+      }
+      return;
+    }
+
     if (url.pathname === "/api/state") {
       res.writeHead(200, { "Content-Type": MIME[".json"] });
       res.end(JSON.stringify({ ...publicState(), servers: state.servers, log: state.log.slice(-100) }));

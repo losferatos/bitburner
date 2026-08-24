@@ -1,292 +1,344 @@
 <!doctype html>
-<html lang="de">
-  <head>
-    <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <title>Bitburner Autopilot</title>
-    <style>
-      :root {
-        --bg: #0a0e0a;
-        --panel: #10160f;
-        --line: #1e2a1c;
-        --fg: #b9f6ca;
-        --dim: #5c8c62;
-        --accent: #4ade80;
-        --warn: #fbbf24;
-        --bad: #f87171;
-        --money: #facc15;
-      }
-      * { box-sizing: border-box; }
-      body {
-        margin: 0;
-        background: var(--bg);
-        color: var(--fg);
-        font: 13px/1.5 "Cascadia Mono", "Consolas", ui-monospace, monospace;
-        padding: 14px;
-      }
-      h1 {
-        font-size: 15px;
-        margin: 0 0 12px;
-        letter-spacing: 0.14em;
-        text-transform: uppercase;
-        color: var(--accent);
-        display: flex;
-        align-items: center;
-        gap: 12px;
-      }
-      .dot { width: 9px; height: 9px; border-radius: 50%; background: var(--bad); }
-      .dot.on { background: var(--accent); box-shadow: 0 0 8px var(--accent); }
-      .grid {
-        display: grid;
-        grid-template-columns: repeat(auto-fit, minmax(280px, 1fr));
-        gap: 10px;
-      }
-      .card {
-        background: var(--panel);
-        border: 1px solid var(--line);
-        border-radius: 4px;
-        padding: 10px 12px;
-        min-width: 0;
-      }
-      .card h2 {
-        font-size: 10px;
-        letter-spacing: 0.18em;
-        text-transform: uppercase;
-        color: var(--dim);
-        margin: 0 0 8px;
-        font-weight: normal;
-      }
-      .kv { display: flex; justify-content: space-between; gap: 10px; padding: 2px 0; }
-      .kv span:first-child { color: var(--dim); }
-      .kv span:last-child { text-align: right; white-space: nowrap; }
-      .big { font-size: 22px; color: var(--money); line-height: 1.2; }
-      .sub { color: var(--dim); font-size: 11px; }
-      table { width: 100%; border-collapse: collapse; font-size: 12px; }
-      th {
-        text-align: left;
-        color: var(--dim);
-        font-weight: normal;
-        font-size: 10px;
-        letter-spacing: 0.1em;
-        text-transform: uppercase;
-        border-bottom: 1px solid var(--line);
-        padding: 3px 6px 3px 0;
-      }
-      td { padding: 2px 6px 2px 0; white-space: nowrap; }
-      tr:hover td { background: #16211505; }
-      .bar { height: 5px; background: var(--line); border-radius: 3px; overflow: hidden; margin-top: 5px; }
-      .bar > i { display: block; height: 100%; background: var(--accent); transition: width 0.4s; }
-      #log {
-        max-height: 260px;
-        overflow-y: auto;
-        font-size: 11px;
-        display: flex;
-        flex-direction: column-reverse;
-      }
-      #log div { padding: 1px 0; border-bottom: 1px solid #131a12; }
-      #log .t { color: #3f6b45; margin-right: 7px; }
-      #log .warn { color: var(--warn); }
-      #log .error { color: var(--bad); }
-      .wide { grid-column: 1 / -1; }
-      .empty { color: var(--dim); font-style: italic; padding: 6px 0; }
-      .hint {
-        background: #1a1508;
-        border: 1px solid #3d2f0c;
-        color: var(--warn);
-        padding: 9px 12px;
-        border-radius: 4px;
-        margin-bottom: 10px;
-      }
-      .hint code { background: #00000040; padding: 1px 5px; border-radius: 3px; color: #fde68a; }
-      .hidden { display: none; }
-    </style>
-  </head>
-  <body>
-    <h1><span class="dot" id="dot"></span> Bitburner Autopilot <span class="sub" id="uptime"></span></h1>
+<meta charset="utf-8">
+<title>Bitburner - Lage</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<style>
+  /* Bewusst eine einzige Datei ohne Abhaengigkeiten: Die Seite muss auch
+     dann noch aufgehen, wenn sonst nichts mehr laeuft ausser der Bruecke. */
+  :root {
+    --bg: #0b0f14; --card: #131a23; --line: #1f2b38;
+    --fg: #d7e3f0; --dim: #7d90a5; --ok: #35d07f; --warn: #f0b429; --bad: #f2545b;
+    --bar: #2a3b4d; --accent: #4aa8ff;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin: 0; padding: 18px; background: var(--bg); color: var(--fg);
+    font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+  }
+  h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .04em; }
+  h2 {
+    font-size: 11px; margin: 0 0 10px; color: var(--dim);
+    text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
+  }
+  header {
+    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+  #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); flex: none; }
+  #dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
+  #dot.bad { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
+  #status { color: var(--dim); font-size: 12px; }
+  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
+  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
+  .card.wide { grid-column: 1 / -1; }
+  .big { font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
+  .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
+  .row span:last-child { color: var(--fg); font-variant-numeric: tabular-nums; }
+  .row span:first-child { color: var(--dim); }
+  .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 9px 0 5px; }
+  .bar > i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
+  .bar.done > i { background: var(--ok); }
+  .sub { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
+  .age { font-variant-numeric: tabular-nums; }
+  .age.stale { color: var(--warn); }
+  .age.dead { color: var(--bad); }
+  .pill {
+    display: inline-block; padding: 1px 8px; border-radius: 999px;
+    font-size: 11px; border: 1px solid var(--line); color: var(--dim);
+  }
+  .pill.on { color: var(--ok); border-color: var(--ok); }
+  footer { margin-top: 16px; color: var(--dim); font-size: 12px; }
+  .hint { color: var(--warn); }
+</style>
 
-    <div class="hint" id="hint">
-      Warte auf das Spiel. Im Spiel oeffnen: <code>Options</code> &rarr; <code>Remote API</code>,
-      Hostname <code>localhost</code>, Port <code>12525</code>, dann <code>Connect</code>.
-    </div>
+<header>
+  <span id="dot"></span>
+  <h1>BITBURNER</h1>
+  <span id="status">verbinde...</span>
+</header>
 
-    <div class="grid">
-      <div class="card">
-        <h2>Vermoegen</h2>
-        <div class="big" id="money">--</div>
-        <div class="sub" id="income">Einkommen: --</div>
-      </div>
+<div class="grid">
+  <div class="card wide">
+    <h2>Knotenausgang</h2>
+    <div class="big" id="hack">-</div>
+    <div class="bar"><i id="hackbar" style="width:0"></i></div>
+    <div class="sub" id="hacksub">-</div>
+  </div>
 
-      <div class="card">
-        <h2>Faehigkeiten</h2>
-        <div id="skills"><div class="empty">noch keine Daten</div></div>
-      </div>
+  <div class="card">
+    <h2>Vermoegen</h2>
+    <div class="big" id="money">-</div>
+    <div class="sub" id="moneysub">-</div>
+  </div>
 
-      <div class="card">
-        <h2>Netzwerk</h2>
-        <div id="network"><div class="empty">noch keine Daten</div></div>
-      </div>
+  <div class="card">
+    <h2>Netz</h2>
+    <div class="row"><span>gerootet</span><span id="rooted">-</span></div>
+    <div class="row"><span>home-RAM</span><span id="homeram">-</span></div>
+    <div class="row"><span>Runde</span><span id="round">-</span></div>
+    <div class="row"><span>brach</span><span id="idle">-</span></div>
+  </div>
 
-      <div class="card">
-        <h2>Autopilot</h2>
-        <div id="autopilot"><div class="empty">laeuft noch nicht</div></div>
-      </div>
+  <div class="card">
+    <h2>Reputation</h2>
+    <div class="sub" id="reptitle">-</div>
+    <div class="bar"><i id="repbar" style="width:0"></i></div>
+    <div class="sub" id="repsub">-</div>
+    <div class="row" style="margin-top:8px"><span>Warteschlange</span><span id="queue">-</span></div>
+    <div class="row"><span>offen</span><span id="open">-</span></div>
+  </div>
 
-      <div class="card wide">
-        <h2>Ziele</h2>
-        <div id="targets"><div class="empty">noch keine Ziele gewaehlt</div></div>
-      </div>
+  <div class="card">
+    <h2>Firmenphase</h2>
+    <div class="sub" id="jobtitle">-</div>
+    <div class="bar"><i id="jobbar" style="width:0"></i></div>
+    <div class="sub" id="jobsub">-</div>
+  </div>
 
-      <div class="card wide">
-        <h2>Verlauf</h2>
-        <div id="log"></div>
-      </div>
-    </div>
+  <div class="card wide">
+    <h2>Lebenszeichen</h2>
+    <div class="row"><span>Bruecke / Spiel</span><span id="lifebridge">-</span></div>
+    <div class="row"><span>bn4net.js</span><span id="lifenet" class="age">-</span></div>
+    <div class="row"><span>bn4rep.js</span><span id="liferep" class="age">-</span></div>
+    <div class="row"><span id="helplabel">Notruf</span><span id="help">-</span></div>
+    <div class="row"><span>Waechter</span><span id="wache" class="age">-</span></div>
+  </div>
+</div>
 
-    <script>
-      const $ = (id) => document.getElementById(id);
+<footer id="foot">-</footer>
 
-      function money(n) {
-        if (n === undefined || n === null || Number.isNaN(n)) return "--";
-        const neg = n < 0;
-        n = Math.abs(n);
-        const units = ["", "k", "m", "b", "t", "q", "Q", "s", "S"];
-        let i = 0;
-        while (n >= 1000 && i < units.length - 1) { n /= 1000; i++; }
-        const s = n < 10 ? n.toFixed(3) : n < 100 ? n.toFixed(2) : n.toFixed(1);
-        return (neg ? "-$" : "$") + s + units[i];
-      }
+<script>
+// ---------------------------------------------------------------------------
+// Diese Seite hat EINE Aufgabe: in fuenf Sekunden zeigen, ob der Bot laeuft
+// und wo er steht.
+//
+// Sie liest deshalb ausschliesslich die Dateien, die der Bot JETZT schreibt.
+// Die Vorgaengerfassung hing an /api/state, das der alte Autopilot gefuettert
+// hat - nach dem BitNode-Wechsel lief der nicht mehr, und die Seite zeigte
+// vom 21. bis zum 24.08.2026 unveraendert drei Tage alte Zahlen, ohne dass
+// irgendetwas darauf hingewiesen haette. Deshalb steht das ALTER jeder
+// Quelle unten sichtbar auf der Seite: Eine Anzeige, die nicht sagen kann,
+// wie alt sie ist, ist schlimmer als gar keine.
+// ---------------------------------------------------------------------------
 
-      function num(n, digits = 0) {
-        if (n === undefined || n === null || Number.isNaN(n)) return "--";
-        return n.toLocaleString("de-DE", { maximumFractionDigits: digits });
-      }
+const TAKT_MS = 10000;
+// Ab hier gilt eine Quelle als verdaechtig bzw. als tot. Die Werte passen zu
+// tools/wache.js: bn4net schreibt alle 10-15 s, bn4rep pausiert waehrend der
+// Firmenphase und meldet sich dann ueber bn4job.json.
+const ALT = { net: [60, 300], rep: [300, 1200] };
 
-      function secs(s) {
-        if (!s || s < 0) return "--";
-        const h = Math.floor(s / 3600), m = Math.floor((s % 3600) / 60);
-        if (h) return h + "h " + m + "m";
-        if (m) return m + "m " + Math.floor(s % 60) + "s";
-        return Math.floor(s) + "s";
-      }
+const $ = (id) => document.getElementById(id);
 
-      function rows(pairs) {
-        if (!pairs.length) return '<div class="empty">noch keine Daten</div>';
-        return pairs
-          .map((p) => '<div class="kv"><span>' + p[0] + "</span><span>" + p[1] + "</span></div>")
-          .join("");
-      }
+const geld = (n) => {
+  if (!Number.isFinite(n)) return "-";
+  for (const [t, k] of [[1e15, "q"], [1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
+    if (Math.abs(n) >= t) return "$" + (n / t).toFixed(2) + k;
+  }
+  return "$" + Math.round(n);
+};
 
-      function render(s) {
-        $("dot").className = "dot" + (s.connected ? " on" : "");
-        $("hint").className = s.connected ? "hint hidden" : "hint";
+const zahl = (n) => Number.isFinite(n) ? n.toLocaleString("de-DE") : "-";
 
-        if (s.connectedSince) {
-          const up = (Date.now() - new Date(s.connectedSince).getTime()) / 1000;
-          $("uptime").textContent = "verbunden seit " + secs(up);
-        } else {
-          $("uptime").textContent = "";
-        }
+const ram = (gb) => {
+  if (!Number.isFinite(gb)) return "-";
+  if (gb >= 1048576) return (gb / 1048576).toFixed(1) + " PB";
+  if (gb >= 1024) return (gb / 1024).toFixed(0) + " TB";
+  return gb + " GB";
+};
 
-        const t = s.telemetry;
+function alterText(ms) {
+  if (!Number.isFinite(ms)) return "kein Lebenszeichen";
+  const s = Math.round(ms / 1000);
+  if (s < 90) return s + " s alt";
+  return Math.round(s / 60) + " min alt";
+}
 
-        // --- Vermoegen ---
-        if (t && t.player) {
-          $("money").textContent = money(t.player.money);
-          const inc = t.income ? t.income.scriptIncome : null;
-          $("income").textContent =
-            "Einkommen: " + (inc != null ? money(inc) + "/s" : "--") +
-            (t.income && t.income.scriptExpGain != null
-              ? "   ·   " + num(t.income.scriptExpGain, 1) + " exp/s"
-              : "");
-        }
+function setzeAlter(el, ms, grenzen) {
+  el.textContent = alterText(ms);
+  el.classList.remove("stale", "dead");
+  if (!Number.isFinite(ms)) { el.classList.add("dead"); return; }
+  const s = ms / 1000;
+  if (s > grenzen[1]) el.classList.add("dead");
+  else if (s > grenzen[0]) el.classList.add("stale");
+}
 
-        // --- Faehigkeiten ---
-        if (t && t.player) {
-          const p = t.player;
-          $("skills").innerHTML = rows([
-            ["Hacking", num(p.hackLevel)],
-            ["Strength", num(p.str)],
-            ["Defense", num(p.def)],
-            ["Dexterity", num(p.dex)],
-            ["Agility", num(p.agi)],
-            ["Charisma", num(p.cha)],
-            ["Karma", num(p.karma, 1)],
-          ]);
-        }
+function balken(el, anteil) {
+  const a = Math.max(0, Math.min(1, Number.isFinite(anteil) ? anteil : 0));
+  el.style.width = (a * 100).toFixed(1) + "%";
+  el.parentElement.classList.toggle("done", a >= 1);
+}
 
-        // --- Netzwerk ---
-        const netRows = [
-          ["Server gesamt", num(s.serverCount)],
-          ["mit Root", num(s.rootedCount)],
-          ["gekauft", num(s.purchasedCount)],
-        ];
-        if (t && t.network) {
-          if (t.network.backdoored != null) netRows.push(["Backdoors", num(t.network.backdoored)]);
-        }
-        if (t && t.ram) {
-          netRows.push(["RAM belegt", num(t.ram.used, 1) + " / " + num(t.ram.max, 1) + " GB"]);
-        }
-        $("network").innerHTML =
-          rows(netRows) +
-          (t && t.ram && t.ram.max
-            ? '<div class="bar"><i style="width:' +
-              Math.min(100, (t.ram.used / t.ram.max) * 100).toFixed(1) +
-              '%"></i></div>'
-            : "");
+async function rpcDatei(name) {
+  try {
+    const r = await fetch("/api/rpc?method=getFile&filename="
+      + encodeURIComponent(name) + "&server=home");
+    const b = await r.json();
+    if (b.error || typeof b.result !== "string") return null;
+    return b.result;
+  } catch { return null; }
+}
 
-        // --- Autopilot ---
-        if (t) {
-          const ap = [];
-          if (t.phase) ap.push(["Phase", t.phase]);
-          if (t.action) ap.push(["Aktion", t.action]);
-          if (t.uptime != null) ap.push(["Laufzeit", secs(t.uptime)]);
-          if (t.cycle != null) ap.push(["Zyklus", num(t.cycle)]);
-          let html = rows(ap);
-          if (t.reason) html += '<div class="sub" style="margin-top:8px">' + t.reason + "</div>";
-          $("autopilot").innerHTML = html;
-        }
+async function rpcJson(name) {
+  const roh = await rpcDatei(name);
+  if (!roh) return null;
+  try { return JSON.parse(roh); } catch { return null; }
+}
 
-        // --- Ziele ---
-        if (t && Array.isArray(t.targets) && t.targets.length) {
-          let h = "<table><tr><th>Server</th><th>Aktion</th><th>Threads</th><th>Geld</th><th>Sicherheit</th><th>Wert/s</th></tr>";
-          for (const x of t.targets) {
-            h +=
-              "<tr><td>" + x.host + "</td>" +
-              "<td>" + (x.action ?? "--") + "</td>" +
-              "<td>" + num(x.threads) + "</td>" +
-              "<td>" + money(x.money) + (x.moneyPct != null ? ' <span class="sub">' + (x.moneyPct * 100).toFixed(0) + "%</span>" : "") + "</td>" +
-              "<td>" + num(x.sec, 2) + (x.minSec != null ? ' <span class="sub">/ ' + num(x.minSec, 2) + "</span>" : "") + "</td>" +
-              "<td>" + (x.valuePerSec != null ? money(x.valuePerSec) + "/s" : "--") + "</td></tr>";
-          }
-          $("targets").innerHTML = h + "</table>";
-        }
-      }
+// Der Waechter selbst. Er schweigt im Normalbetrieb - deshalb ist die Frage
+// "laeuft er ueberhaupt noch?" nicht beantwortbar, ohne hier nachzusehen.
+async function zeigeWache() {
+  const el = $("wache");
+  try {
+    const w = await (await fetch("/api/wache")).json();
+    if (w.fehlt || !w.letztePruefung) {
+      el.textContent = "laeuft nicht";
+      el.classList.remove("stale"); el.classList.add("dead");
+      return;
+    }
+    const alter = Date.now() - w.letztePruefung;
+    // Der Waechter prueft alle 3 min. Ueber 8 min heisst: er hat einen Takt
+    // ausgelassen, ueber 15 min heisst: er ist weg.
+    setzeAlter(el, alter, [8 * 60, 15 * 60]);
+    el.textContent = "letzte Pruefung " + el.textContent
+      + (w.offeneBefunde && w.offeneBefunde.length
+        ? " - " + w.offeneBefunde.length + " Befund(e)" : "");
+  } catch {
+    el.textContent = "nicht abfragbar";
+    el.classList.add("dead");
+  }
+}
 
-      function addLog(e) {
-        const d = document.createElement("div");
-        d.className = e.level;
-        d.innerHTML = '<span class="t">' + e.at.slice(11, 19) + "</span>" + e.message.replace(/</g, "&lt;");
-        $("log").prepend(d);
-        while ($("log").childElementCount > 200) $("log").lastElementChild.remove();
-      }
+async function aktualisiere() {
+  const jetzt = Date.now();
 
-      let last = null;
-      function connect() {
-        const es = new EventSource("/events");
-        es.onmessage = (ev) => {
-          const msg = JSON.parse(ev.data);
-          if (msg.type === "state") { last = msg.state; render(msg.state); }
-          else if (msg.type === "log") addLog(msg.entry);
-        };
-        es.onerror = () => {
-          $("dot").className = "dot";
-          es.close();
-          setTimeout(connect, 2000);
-        };
-      }
-      connect();
-      // Laufzeitanzeige weiterlaufen lassen, auch ohne neue Daten.
-      setInterval(() => { if (last) render(last); }, 1000);
-    </script>
-  </body>
-</html>
+  let zustand = null;
+  try { zustand = await (await fetch("/api/state")).json(); } catch { /* Bruecke tot */ }
+
+  // KEINE ZAHL STEHEN LASSEN, DIE NICHT MEHR STIMMT.
+  //
+  // Die erste Fassung ist bei toter Bruecke einfach ausgestiegen und liess
+  // alle Karten unangetastet - also genau der Fehler, den der Kommentar
+  // oben anprangert, nur eine Ebene tiefer. Wer auf die Seite schaut, sieht
+  // dann Zahlen, die aussehen wie Messwerte und keine mehr sind.
+  const entwerten = () => {
+    for (const id of ["hack", "money", "moneysub", "rooted", "homeram", "round",
+                      "idle", "queue", "open", "repsub", "jobsub", "hacksub",
+                      "reptitle", "jobtitle", "lifenet", "liferep"]) {
+      $(id).textContent = "-";
+    }
+    balken($("hackbar"), 0); balken($("repbar"), 0); balken($("jobbar"), 0);
+  };
+
+  const dot = $("dot");
+  if (!zustand) {
+    dot.className = "bad";
+    $("status").textContent = "Bruecke auf Port 8795 antwortet nicht - start.cmd starten";
+    $("lifebridge").textContent = "Bruecke tot";
+    entwerten();
+    await zeigeWache();
+    return;
+  }
+  if (!zustand.connected) {
+    dot.className = "bad";
+    $("status").textContent = "Spiel nicht verbunden - Bitburner-Tab oeffnen";
+    $("lifebridge").textContent = "Spiel getrennt";
+    entwerten();
+    await zeigeWache();
+    return;
+  }
+  dot.className = "ok";
+  $("lifebridge").textContent = "verbunden";
+
+  const [net, rep, job, hilfe] = await Promise.all([
+    rpcJson("data/bn4net.json"),
+    rpcJson("data/bn4rep.json"),
+    rpcJson("data/bn4job.json"),
+    rpcDatei("data/hilfe.txt"),
+  ]);
+
+  // --- Knotenausgang: die eine Zahl, auf die alles zulaeuft ---------------
+  const level = net?.hacking ?? rep?.hacking ?? null;
+  const ziel = rep?.zielLevel ?? null;
+  if (level != null && ziel) {
+    $("hack").textContent = zahl(level) + " / " + zahl(ziel);
+    balken($("hackbar"), level / ziel);
+    const rest = Math.max(0, ziel - level);
+    $("hacksub").innerHTML = "Hacking-Level fuer w0r1d_d43m0n"
+      + (rep?.knoten ? " in BitNode " + rep.knoten : "")
+      + " &middot; noch " + zahl(rest)
+      + (rep?.multHacking ? " &middot; Multiplikator " + rep.multHacking.toFixed(2) : "")
+      + " &middot; <span class='pill" + (rep?.redPill ? " on" : "") + "'>Red Pill "
+      + (rep?.redPill ? "eingebaut" : "fehlt") + "</span>";
+  } else if (level != null) {
+    $("hack").textContent = zahl(level);
+    $("hacksub").textContent = "Zielniveau noch unbekannt - bn4rep.js hat noch nichts gemeldet";
+  } else {
+    // Ohne diesen Zweig bliebe die Kopfzahl auf dem letzten bekannten Wert
+    // stehen, waehrend alles andere auf "-" faellt.
+    $("hack").textContent = "-";
+    $("hacksub").textContent = "keine Telemetrie";
+    balken($("hackbar"), 0);
+  }
+
+  // --- Vermoegen und Netz --------------------------------------------------
+  $("money").textContent = geld(net?.geld ?? rep?.geld);
+  $("moneysub").textContent = net?.batchZiele?.length
+    ? "Stapelbetrieb auf " + net.batchZiele.join(", ") : "-";
+  $("rooted").textContent = net ? net.gerootet + " / " + net.netz : "-";
+  $("homeram").textContent = ram(net?.homeRam);
+  $("round").textContent = zahl(net?.runde);
+  $("idle").textContent = Number.isFinite(net?.brachAnteil)
+    ? Math.round(net.brachAnteil * 100) + " %" : "-";
+
+  // --- Reputation ----------------------------------------------------------
+  if (rep?.ziel) {
+    $("reptitle").textContent = rep.ziel + " @ " + rep.zielFaktion
+      + (rep.istSchwelle ? " (Spendenschwelle)" : "");
+    balken($("repbar"), (rep.rep ?? 0) / (rep.repReq || 1));
+    $("repsub").textContent = zahl(Math.round(rep.rep)) + " / " + zahl(rep.repReq)
+      + (rep.preis ? "  -  " + geld(rep.preis) : "");
+  } else {
+    $("reptitle").textContent = "kein Ziel";
+    balken($("repbar"), 0);
+    $("repsub").textContent = "-";
+  }
+  $("queue").textContent = rep ? rep.wartend + " vorgemerkt" : "-";
+  $("open").textContent = rep ? rep.offen + " Augmentierungen" : "-";
+
+  // --- Firmenphase ---------------------------------------------------------
+  // Sie ist nur dann die aktuelle Arbeit, wenn bn4job.json juenger ist als
+  // bn4rep.json - sonst liegt sie in der Vergangenheit.
+  const jobAktiv = job && (!rep || job.zeit >= rep.zeit);
+  if (job) {
+    $("jobtitle").textContent = job.company + " als " + job.job
+      + (jobAktiv ? "" : " (beendet)");
+    balken($("jobbar"), (job.companyRep ?? 0) / (job.goal || 1));
+    $("jobsub").textContent = zahl(Math.round(job.companyRep)) + " / " + zahl(job.goal)
+      + " Firmenreputation";
+  } else {
+    $("jobtitle").textContent = "keine Firmenarbeit";
+    balken($("jobbar"), 0);
+    $("jobsub").textContent = "-";
+  }
+
+  // --- Lebenszeichen -------------------------------------------------------
+  setzeAlter($("lifenet"), net?.zeit ? jetzt - net.zeit : NaN, ALT.net);
+  const repZeit = Math.max(rep?.zeit ?? 0, job?.zeit ?? 0);
+  setzeAlter($("liferep"), repZeit ? jetzt - repZeit : NaN, ALT.rep);
+
+  const notruf = (hilfe || "").trim();
+  $("help").innerHTML = notruf
+    ? "<span class='hint'>" + notruf.replace(/[<>&]/g, "") + "</span>"
+    : "still";
+
+  await zeigeWache();
+
+  $("status").textContent = "aktualisiert " + new Date().toTimeString().slice(0, 8);
+  $("foot").textContent = "Aktualisierung alle " + (TAKT_MS / 1000)
+    + " s. Der Waechter (tools/wache.js) meldet Stoerungen von selbst aufs Handy -"
+    + " diese Seite ist zum Nachsehen, nicht zum Aufpassen.";
+}
+
+aktualisiere();
+setInterval(aktualisiere, TAKT_MS);
+</script>

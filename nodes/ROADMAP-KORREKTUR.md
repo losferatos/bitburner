@@ -1,5 +1,9 @@
 # Korrektur der Route - 23.08.2026
 
+> **Die Reihenfolge in dieser Datei ist ueberholt.** Massgeblich ist
+> `nodes/ROUTE.md` (24.08.2026). Die Zahlenbasis hier bleibt gueltig, soweit
+> `nodes/AUDIT-ROADMAP-2026-08-24.md` sie bestaetigt.
+
 Drei Kritiker haben am 23.08.2026 die Route aus `ROADMAP.md` angegriffen. Ein
 Befund traegt: **die Kernentscheidung "Bladeburner statt Hacking" steht auf
 einem Rechenfehler.** Diese Datei haelt fest, was faellt und was bleibt.

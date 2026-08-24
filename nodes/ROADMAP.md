@@ -1,5 +1,9 @@
 # BitNode-Roadmap (Fassung 4, 22.08.2026)
 
+> **Die Reihenfolge in dieser Datei ist ueberholt.** Massgeblich ist
+> `nodes/ROUTE.md` (24.08.2026). Die Zahlenbasis hier bleibt gueltig, soweit
+> `nodes/AUDIT-ROADMAP-2026-08-24.md` sie bestaetigt.
+
 > **UEBERHOLT SEIT 23.08.2026 - Abschnitt 4.1 und Abschnitt 6.**
 >
 > Abschnitt 4.1 extrapoliert die Erfahrungsrate nur ueber RAM und haelt dabei

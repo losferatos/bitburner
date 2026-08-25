@@ -348,6 +348,9 @@ export async function main(ns) {
           punkte: ns.bladeburner.getSkillPoints(),
           ausdauer: Math.round(jetzt) + "/" + Math.round(max),
           hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
+          // Auch hier - gerade hier. Eine lange Ruhephase ist der Zustand, in
+          // dem eine stehende Engine am laengsten unentdeckt bleibt.
+          spielzeit: ns.getPlayer().totalPlaytime,
           aktion: "General/Hyperbolic Regeneration Chamber",
           grund: ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
             : "ruht bis HP " + Math.round(hp.max * HP_WEITER),

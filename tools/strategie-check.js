@@ -526,6 +526,33 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
     }
   }
 
+  // --- STEHT DIE SPIELENGINE? ---------------------------------------------
+  //
+  // Diese Pruefung hat Vorrang vor allen anderen: Steht die Engine, sind
+  // saemtliche anderen Befunde nur ihre Symptome, und keiner der ueblichen
+  // Eingriffe hilft. Der einzige Ausweg ist ein Neuladen des Tabs - das kann
+  // kein Loop, das muss Eric tun. Deshalb ist die Meldung so deutlich.
+  if (blade && Number.isFinite(blade.spielzeit)) {
+    const frueher = [...(v.punkte || [])].reverse().find(
+      (x) => Number.isFinite(x.spielzeit) && jetzt - x.zeit >= 4 * 60_000);
+    if (frueher) {
+      const stillMin = Math.round((jetzt - frueher.zeit) / 60000);
+      const zuwachsSek = (blade.spielzeit - frueher.spielzeit) / 1000;
+      const vergangenSek = (jetzt - frueher.zeit) / 1000;
+      // Grosszuegige Grenze: Ein Zehntel der verstrichenen Zeit reicht als
+      // Lebenszeichen. Gedrosselt laeuft die Engine langsamer, aber nicht
+      // still - unterschieden werden soll "kriecht" von "tot".
+      if (zuwachsSek < vergangenSek * 0.1) {
+        sag("DIE SPIELENGINE STEHT: Spielzeit waechst seit " + stillMin
+          + " min nur um " + zuwachsSek.toFixed(1) + " s statt um "
+          + Math.round(vergangenSek) + " s. Netscript laeuft weiter, updateGame"
+          + " nicht - Bladeburner, Reputation und Ausdauer stehen alle still."
+          + " Hilft nur ein Neuladen des Tabs (F5).");
+        urteil = "STAGNATION";
+      }
+    }
+  }
+
   // Das URTEIL gehoert in den Verlauf, nicht nur auf den Bildschirm.
   //
   // Ohne diese Zeile bleibt von jedem Lauf nur eine Zahl uebrig, und die Frage
@@ -543,7 +570,18 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
     // alle drei Minuten statt alle zehn Sekunden - beide Frischegrenzen
     // bleiben unterschritten, und alles sieht normal aus. Nur diese Zahl
     // verraet es.
-    runde: Number.isFinite(net.runde) ? net.runde : null });
+    runde: Number.isFinite(net.runde) ? net.runde : null,
+    // DER PULS DER SPIELENGINE (25.08.2026, 21:45).
+    //
+    // Netscript und die Engine sind ZWEI Schleifen. Am 25.08. stand
+    // updateGame ab 20:27 still, waehrend bn4net sechs Runden je Minute
+    // zaehlte und Hackgeld hereinkam - dieser Pruefer meldete 46 Minuten lang
+    // SPUR. Die Rundenzahl oben kann das nicht sehen: Sie misst Netscript.
+    //
+    // totalPlaytime waechst ausschliesslich in updateGame. blade.js schreibt
+    // die Zahl seit 21:15 mit; bleibt sie zwischen zwei Laeufen gleich, ist
+    // die Engine tot, und dann hilft kein Neustart eines Werkzeugs.
+    spielzeit: blade && Number.isFinite(blade.spielzeit) ? blade.spielzeit : null });
   speichereVerlauf(v);
 
   return aus();

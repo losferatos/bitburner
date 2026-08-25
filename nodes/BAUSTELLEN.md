@@ -24,107 +24,6 @@ Regeln:
 
 ## Sofort
 
-### Die SPIELENGINE ist eingefroren, nur Netscript laeuft (20:49, praezisiert 21:15)
-
-**Nachtrag 21:15 - die Ursache ist gefunden, nicht mehr nur Bladeburner:**
-`ns.getPlayer().totalPlaytime` steht ueber 30 Sekunden Messdauer exakt still
-(524735400 -> 524735400). Diese Zahl waechst ausschliesslich in `updateGame`.
-Netscript und die Spielengine sind zwei getrennte Schleifen: Skripte laufen,
-bn4net zaehlt sechs Runden je Minute, Hackgeld kommt herein - aber die Engine
-tickt nicht. Damit stehen auch Reputation, Ausdauer und Vertragsnachschub.
-
-Der `startAction`-Verdacht ist damit **widerlegt**: Das Enum
-`BladeburnerActionType` (Enums.ts:1-6) hat exakt die Werte, die blade.js
-verwendet, der Vergleich in `blade.js:365` stimmt. `data/bbtick.json` zeigt
-dreissig Messungen in Folge `zeit 0 von 20000` - nicht ein Zuruecksetzen,
-sondern gar kein Tick.
-
-**Verdacht auf `src/hacktimer.js`, also auf eine eigene Aenderung von 20:15.**
-Die Zeitlinie passt: Eric minimierte um 20:20:48, der Patch haengt sich bei
-verstecktem Tab ein, das Skript verschwand kurz darauf aus `ps.json` - und ein
-sterbendes Netscript-Skript raeumt seine window-Patches NICHT auf. Der
-Engine-Loop plant sich per `setTimeout` neu; geht dieser eine Rueckruf
-verloren, steht die Engine fuer immer. Der Rang steht seit 20:27.
-Abgeraeumt um 21:11 (`hacktimer.js --stop`), ohne Wirkung - der verlorene
-Rueckruf kommt nicht von selbst zurueck.
-
-**Zu tun:**
-1. Eric muss den Tab einmal neu laden (F5). Push um 21:14 gesendet.
-2. `hacktimer.js` gehoert aus dem Verkehr, bis das Aufraeumen beim Skriptende
-   geloest ist. Ein Werkzeug, das die Engine anhalten kann, wenn es stirbt,
-   darf in keinem Nachtlauf mitfahren.
-   **Geaendert 21:19, Wirkung noch nicht gemessen:** `ns.atExit` gibt die
-   Timer beim Skriptende zurueck, und eingehaengt wird nur noch mit dem
-   Argument `--scharf`. Ohne das Argument misst das Skript und laesst window
-   in Ruhe. Nachzumessen ist beides erst, wenn die Engine wieder laeuft -
-   dann `["hacktimer.js","--scharf"]` starten, Tab verstecken, ueber den
-   Reload-Kanal beenden und pruefen, ob `getPlayer().totalPlaytime` danach
-   weiterwaechst.
-3. Der Puls der Engine gehoert in die Telemetrie - erledigt 21:15, blade.js
-   schreibt jetzt `spielzeit`. Der Pruefer muss ihn noch auswerten.
-
---- urspruenglicher Eintrag ---
-
-### Die Bladeburner-Simulation ist eingefroren, das uebrige Spiel laeuft (20:49)
-Gemessen ueber `data/bbspann.json`, zwei Messungen im Abstand von 15 Minuten:
-
-    20:34   rang 101.69326509516765   ausdauer 29.21913997841716 / 53.212556220576175
-    20:49   rang 101.69326509516765   ausdauer 29.21913997841716 / 53.212556220576175
-
-Identisch auf siebzehn Nachkommastellen - das ist kein langsamer Fortschritt,
-sondern Stillstand. Die laufende Aktion ist dabei durchgehend
-`Contracts/Retirement`, also kein Ruhezustand.
-
-Gleichzeitig laeuft der Rest des Spiels normal: `bn4net.json.runde` steigt mit
-rund sechs Runden je Minute, das Guthaben waechst, `data/sonde.json` meldet
-Stufe "keine". Es ist also NICHT die Tab-Drosselung.
-
-Erwartet: Bei `Contracts/Retirement` mit 45 Prozent Erfolgschance rund 0,3 Rang
-je Minute; die Hoechstausdauer waechst ausserdem mit jedem Kampf-Exp-Punkt
-weiter, sie kann gar nicht exakt konstant bleiben.
-
-Verdacht, in dieser Reihenfolge zu pruefen:
-1. Die Aktion wird bei jedem Tick neu gestartet und ihr Fortschritt damit
-   zurueckgesetzt. `src/blade.js:364-366` prueft zwar auf Gleichheit
-   (`laeuft.type === wahl.typ && laeuft.name === wahl.name`), aber wenn die
-   Schreibweise der Typen auseinanderlaeuft, ist `gleich` immer falsch. Das
-   erklaert einen exakt eingefrorenen Zustand besser als alles andere.
-2. Der Spieler steht seit etwa 20:40 in **Ishima** statt Sector-12 (Quelle:
-   strategie-check). Wer ihn dorthin gebracht hat, ist unklar - bbtrain reist
-   nach Sector-12, bn4life nach Aevum, blade.js reist gar nicht.
-3. Ein blockierender Dialog im Spiel.
-
-Zu tun: `getCurrentAction()` und die gewaehlte Aktion nebeneinander
-protokollieren, dann sieht man Fall 1 sofort. Das ist die naechste Aenderung an
-blade.js - in diesem Lauf nicht mehr gemacht, weil die Zehn-Minuten-Grenze
-erreicht war und zwei Aenderungen an derselben Datei nicht mehr auseinander zu
-halten waeren.
-
-### blade.js stand 23 Minuten in der Regenerationskammer fest (20:42)
-Gemessen: `data/blade.json` trug um 20:42 noch den Zeitstempel 20:19:16, Aktion
-`General/Hyperbolic Regeneration Chamber`, Ausdauer 27/53. Der Rang stand seit
-20:27 unveraendert bei 102 (+4 in 24 Minuten statt der vorher gemessenen 0,8
-je Minute). Der Strategiepruefer meldete dabei SPUR - er haelt die Kammer fuer
-eine legitime Aktion und misst ihre Sollrate mit null.
-Erwartet: Die Ausdauer regeneriert passiv rund 1,2 je Minute
-(`Bladeburner.ts:1382`, 0,0085 * agi^0,17). In 23 Minuten haette sie von 27 auf
-das Maximum von 53 steigen muessen; die Weiter-Schwelle (60 Prozent = 31,9)
-waere nach vier Minuten erreicht gewesen.
-Gemessen ist sie in dieser Zeit nur von 27 auf 29 gestiegen - der Zustand war
-faktisch eingefroren.
-Eingriff 20:43: `WERKZEUG blade.js` ueber den Reload-Kanal. Danach sofort
-`Contracts/Retirement` bei Ausdauer 29/53. Der Neustart hat also geholfen, die
-URSACHE ist damit nicht gefunden.
-Verdacht: Die Hysterese-Schleife in `src/blade.js` (der `continue`-Zweig mit
-`ausdauerKnapp || hpKnapp`, geaendert am 25.08. um 20:02). Sie wartet auf
-`ns.bladeburner.nextUpdate()` und schreibt in diesem Zweig keine Telemetrie -
-ein Haenger dort ist von aussen nicht von normalem Ruhen zu unterscheiden.
-Zweiter Verdacht: `HP_WEITER = 0,95` haelt den Bot in der Ruhe, solange die
-Trefferpunkte nicht fast voll sind.
-Zu tun: In den Ruhe-Zweig eine Telemetriezeile schreiben (dann altert
-blade.json nicht mehr und der Haenger wird sichtbar), und die HP-Schwelle
-gegen die tatsaechlichen Werte pruefen.
-
 ### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
 Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor
 durchgehend `General/Hyperbolic Regeneration Chamber` fuhr.
@@ -133,32 +32,6 @@ Befund - erst recht, wenn der Traeger dabei stillsteht.
 Verdacht: `sollRate()` in `tools/strategie-check.js` gibt fuer General-Aktionen
 eine Sollrate nahe null zurueck und erklaert damit jeden Stillstand fuer
 erwartungsgemaess. `stecktInLeerlauf()` greift erst nach 40 Minuten.
-
-### hacktimer.js laeuft nicht mehr, weil es in keiner Startliste steht (20:28)
-Gemessen: `data/ps.json` um 20:28 fuehrt blade, bbtrain, wakelock, sonde,
-homegrow, bn4door, bn4rep, contracts, popups, bn4life, bn4net - aber kein
-hacktimer.js. Um 20:16 lief es noch (`data/hacktimer.json` wurde geschrieben).
-Erwartet: Es laeuft dauerhaft, wie wakelock.js und popups.js auch.
-Verdacht: Der Reload-Kanal beendet ein Werkzeug, und die Liste WERKZEUGE in
-`src/bn4net.js` (ab Zeile 241) startet es neu. Steht es dort nicht - und
-hacktimer steht nicht dort -, bleibt es nach dem Reload einfach tot. Derselbe
-Mechanismus wuerde es nach jedem Augmentierungs-Einbau verlieren.
-Zu tun: Eintrag in WERKZEUGE. Das ist eine Aenderung an bn4net.js und braucht
-deshalb Erics Freigabe; bis dahin ist der Patch nur von Hand startbar
-(`["hacktimer.js"]` ueber data/task.txt).
-
-### data/blade.json war um 20:27 acht Minuten alt (20:27)
-Gemessen: `zeit` 1787681956153 = 20:19:16, gelesen um 20:27:20. blade.js lief
-laut ps.json die ganze Zeit (pid 33788 auf werk-0).
-Erwartet: Die Datei wird bei jeder Aktionswahl geschrieben; bei Aktionsdauern
-von rund 30 Sekunden waeren das hoechstens ein bis zwei Minuten Abstand.
-Verdacht: `src/blade.js:360` schreibt nur im Zweig, der eine NEUE Aktion
-startet. Bleibt die Aktion dieselbe (hier durchgehend die
-Regenerationskammer), wartet die Schleife auf `nextUpdate()` und schreibt
-nicht - die Telemetrie altert, obwohl alles laeuft. Fuer den Pruefer und die
-Wache sieht das aus wie ein stehender Motor, sobald eine Ruhephase laenger
-dauert.
-
 
 ---
 
@@ -344,6 +217,71 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Spielengine stand 52 Minuten still (25.08., 20:27 bis 21:19)
+
+Der groesste Ausfall des Tages, und der am schwersten zu sehende: Netscript
+und die Spielengine sind ZWEI Schleifen. `updateGame` stand ab 20:27 still -
+`totalPlaytime` unveraendert ueber 30 Sekunden Messdauer, Rang, Ausdauer und
+Aktionsfortschritt eingefroren auf siebzehn Nachkommastellen -, waehrend
+bn4net sechs Runden je Minute zaehlte und Hackgeld hereinkam. Jede vorhandene
+Pruefung sah Normalbetrieb; der Strategiepruefer meldete 46 Minuten lang SPUR.
+
+**Ursache: `src/hacktimer.js`, also eine eigene Aenderung von 20:15.** Es
+haengte sich ein, sobald der Tab versteckt wurde (Eric minimierte um 20:20:48),
+und starb kurz darauf, ohne `window.setTimeout` zurueckzugeben. Ein sterbendes
+Netscript-Skript raeumt seine window-Patches nicht von allein auf; der
+Engine-Loop plant sich per setTimeout neu, dieser eine Rueckruf ging verloren.
+
+Zwei Verdaechtige wurden dabei ausgeschlossen: Der `startAction`-Vergleich in
+`blade.js:365` stimmt (das Enum `BladeburnerActionType` traegt genau die Werte,
+die blade.js verwendet), und die Tab-Drosselung war es auch nicht -
+`data/sonde.json` meldete durchgehend Stufe "keine".
+
+Behoben in drei Schritten:
+1. **Neuladen des Tabs um 21:19** durch Eric. Von aussen ist das nicht
+   machbar; die Push-Nachricht ging um 21:14 raus.
+2. **`hacktimer.js` entschaerft** (21:19): `ns.atExit` gibt die Timer beim
+   Skriptende zurueck, und eingehaengt wird nur noch mit `--scharf`. Ohne das
+   Argument misst es und laesst window in Ruhe.
+3. **Der Puls steht jetzt in der Telemetrie** (21:15 und 21:45): blade.js
+   schreibt `spielzeit` in beiden Zweigen - auch im Ruhen, denn eine lange
+   Ruhephase ist der Zustand, in dem eine stehende Engine am laengsten
+   unentdeckt bliebe. `tools/strategie-check.js` wertet sie aus und meldet
+   STAGNATION mit der einzigen Anweisung, die dann hilft.
+
+**Verifiziert dreifach:**
+- Engine laeuft: 21:20 Spielzeitzuwachs 34,8 s ueber 30 s Messdauer, Rang
+  101,69326509516765 -> 103,23571126575352 in derselben halben Minute.
+- Traeger holt auf: Rang 127 um 21:45, +25 in 26 Minuten.
+- Der Pruefer erkennt den Fall: gegen einen praeparierten Verlauf mit
+  gleichbleibender Spielzeit meldet er
+  `DIE SPIELENGINE STEHT: Spielzeit waechst seit 6 min nur um 4.0 s statt um
+  360 s ... Hilft nur ein Neuladen des Tabs (F5).` und URTEIL STAGNATION.
+
+Damit miterledigt: der Eintrag "Die Bladeburner-Simulation ist eingefroren"
+(20:49) - derselbe Vorgang, eine Ebene zu tief gesehen.
+
+### blade.js stand 23 Minuten in der Regenerationskammer fest (25.08., 20:42)
+Zwei Ursachen, beide behoben:
+- `HP_WEITER` stand auf 0,95. Da jeder Vertrag Schaden macht, ist diese Marke
+  im laufenden Betrieb kaum je erreichbar - einmal in der Ruhe, blieb der
+  Motor haengen. Jetzt 0,75.
+- Der Ruhe-Zweig schrieb keine Telemetrie. `data/blade.json` trug um 20:42
+  noch den Zeitstempel 20:19, und von aussen war ein Haenger nicht von ruhigem
+  Ruhen zu unterscheiden.
+Ab 20:27 kam der Engine-Stillstand oben dazu, der den Rest der Zeit erklaert.
+**Verifiziert 21:45:** `"hp":"10/22","spielzeit":529845400,"grund":"ruht bis
+HP 17"` - die Datei altert nicht mehr, und der Ruhegrund steht dabei.
+Damit miterledigt: "data/blade.json war um 20:27 acht Minuten alt".
+
+### hacktimer.js stand in keiner Startliste (25.08., 21:19)
+Der Befund von 20:28 war richtig, die Schlussfolgerung falsch: Das Werkzeug
+gehoert NICHT in die Liste WERKZEUGE. Es hat wenige Minuten spaeter die
+gesamte Spielengine angehalten (siehe oben). Seit 21:19 faehrt es nur noch mit
+ausdruecklichem `--scharf` und raeumt beim Skriptende auf.
+**Verifiziert 21:45:** Es laeuft nicht, und der Bot arbeitet - Rang 127.
+
 
 ### Der Bitburner-Tab lief gedrosselt - der Tonanker war zu leise (25.08., 20:25)
 

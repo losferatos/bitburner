@@ -104,6 +104,37 @@ messbar wird statt nur spuerbar.
 
 ## Offen, nach Dringlichkeit
 
+### Worker-Timer-Ersatz gegen die Drosselung (flag-freier Weg)
+
+Die Timer-Drosselung trifft nur den Haupt-Thread. Der Codepfad fuer
+Worker-Timer haengt an `BlinkSchedulerWorkerThrottling`, und das Merkmal ist
+standardmaessig **aus** (der Pfad traegt im Chromium-Quelltext den Kommentar
+"if this feature is ever revived"). Dedicated-Worker-Timer laufen also
+ungedrosselt, und die Zustellung per `postMessage` ist keine Timer-Warteschlange.
+
+Bitburner ist dafuer ideal gebaut: Sowohl der Engine-Loop als auch **alle**
+Netscript-Wartezeiten (`netscriptDelay` in `NetscriptHelpers.tsx`) greifen
+`window.setTimeout` bei JEDEM Aufruf dynamisch ab. Ein nachtraeglich
+eingehaengter Ersatz wirkt damit sofort auf Engine und alle laufenden Skripte,
+ohne Neustart des Spiels.
+
+Zu tun: `window.setTimeout` und `setInterval` in der Seite durch eine
+Worker-getriebene Fassung ersetzen (HackTimer-Prinzip), am besten als
+eigenstaendiges Werkzeug neben `src/wakelock.js`. `src/sonde.js` misst bereits
+beide Seiten - solange dort `haupt.median` gross und `worker.median` klein ist,
+ist der Weg fuer diesen Browser belegt.
+
+Grenze: Ebene 3 (Prozessprioritaet, EcoQoS) bleibt bestehen; die drosselt
+Rechenleistung, nicht den Takt. Gegen das Einfrieren von Tabs durch den
+Energiesparmodus hilft der Worker ebenfalls nicht.
+
+Ausfuehrlich in `doku/drosselung.md`, Abschnitt 5.
+
+**Dringlichkeit:** hoch, solange die Flags nicht gesetzt sind - er ist der
+einzige Weg, der ohne Erics Eingreifen und ohne den Tonkniff auskommt.
+
+
+
 ### Nichts verhindert einen zweiten Waechterprozess
 
 Gemessen 19:43: **zwei** `node tools/wache.js` liefen gleichzeitig (PID 24464 und

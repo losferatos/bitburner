@@ -24,15 +24,49 @@ Regeln:
 
 ## Sofort
 
+### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
+Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
+`data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.
+**Es fehlen blade.js, bbtrain.js, wakelock.js, homegrow.js, bn4rep.js und
+bn4door.js** - darunter der Motor des Knotens und der Tonanker.
+Erwartet: bn4net startet fehlende Werkzeuge in seiner Runde selbst nach.
+Es liegt NICHT am Platz: `data/werkbank.json` meldet um 22:03 auf home
+1024 GB gesamt, **253,1 GB frei**, 339,7 nach Raeumung. blade braucht 47,75,
+bbtrain 94,75, wakelock 34,25 - alle drei zusammen passen.
+Verdacht: Die Nachstart-Logik in `src/bn4net.js` (die `fehlend`-Liste um
+Zeile 2576). Sie hat in den zwanzig Minuten nach dem Einbau nichts gestartet.
+Der Reload-Kanal hilft hier nicht: `WERKZEUG <name>` **killt nur** (bn4net.js
+:532-545) und verlaesst sich aufs Nachstarten - laeuft das Werkzeug gar nicht,
+trifft der Befehl ins Leere.
+Eingriff 22:05: wakelock, bbtrain und blade einzeln ueber den Auftragskanal
+gestartet (`["wakelock.js"]` in data/task.txt). Danach laufen alle drei.
+Zu tun: Entweder die Nachstart-Logik reparieren (bn4net, braucht Erics
+Freigabe) oder dem Reload-Kanal ein "starte, falls nicht laufend" geben.
+Dies ist der vierte stille Fehlschlag des Wiederanlaufs an einem Tag.
+
+### Der Pruefer erkennt einen Augmentierungs-Einbau in BN6 nicht (22:01)
+Gemessen: URTEIL SPUR bei Kampfwerten 1/1/1/1, Netz 13/70 und 1m Guthaben -
+alles Zeichen eines frischen Einbaus.
+Erwartet: RESET. Danach gehoert der Wiederanlauf geprueft, und genau der ist
+diesmal wieder stillgeschwiegen gescheitert (siehe Punkt darueber).
+Verdacht: `tools/strategie-check.js` erkennt RESET am Rueckgang des TRAEGERS.
+In BitNode 6 ist der Traeger der Bladeburner-Rang - und der ueberlebt einen
+Augmentierungs-Einbau, er faellt nur beim BitNode-Wechsel. Der Einbau ist
+deshalb fuer diesen Pruefer unsichtbar.
+Zu tun: Zusaetzliches Kennzeichen pruefen - Einbruch der Kampfwerte, des
+Netzes oder des home-Speichers. `tools/wache.js` kann das bereits
+(Knotenwechsel ueber den home-Speicher, Zeile ~440); dem Pruefer fehlt es.
+
 ### Der Spieler steht wiederholt in Ishima, ohne dass jemand dorthin reist (21:47)
 Gemessen: `strategie-check` meldet um 20:42, 21:13 und 21:47 die Stadt Ishima,
 dazwischen um 21:19 Sector-12. Der Wechsel wiederholt sich also.
 Erwartet: Sector-12. Dort steht das beste Trainingsstudio (Powerhouse Gym), und
 `bbtrain.js` reist ausdruecklich dorthin zurueck (`src/bbtrain.js:156-165`).
-Verdacht: offen. Keines der bekannten Skripte reist nach Ishima - bbtrain nach
+Verdacht **bestaetigt 22:01**: `joinrun.js` laeuft (steht in `data/ps.json`)
+und ist das einzige uebrige Skript mit `travelToCity`. bbtrain reist nach
 Sector-12, bn4life nach Aevum (`bn4life.js:208`), blade.js reist gar nicht.
-Bleiben `joinrun.js` (hat travelToCity) und ein Faktionsbeitritt ueber
-popups.js: `data/popups.txt` zaehlte um 21:03 sieben Beitritte, und Ishima ist
+Zu pruefen bleibt, wohin joinrun reist und warum. Ergaenzend moeglich ist ein
+Faktionsbeitritt ueber popups.js: `data/popups.txt` zaehlte um 21:03 sieben Beitritte, und Ishima ist
 eine Stadtfaktion.
 Folgen: Fuer Bladeburner-Aktionen ist der Aufenthaltsort ohne Bedeutung (die
 Division fuehrt ihre eigene Stadt, `bbspann.json` meldet dort Sector-12).

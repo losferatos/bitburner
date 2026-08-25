@@ -24,6 +24,18 @@ Regeln:
 
 ## Sofort
 
+### Der Pruefer stuerzt beim Beenden ab, nach der Urteilszeile (19:03)
+Gemessen: `node tools/strategie-check.js` gibt nach `URTEIL: SPUR` noch
+`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\winsync.c,
+line 94` aus. Tritt unregelmaessig auf, etwa jeder dritte Lauf.
+Erwartet: Letzte Ausgabezeile ist die Urteilszeile, sauberer Exit.
+Verdacht: `process.exit()` in `aus()` waehrend ein `fetch`-AbortController-Timer
+noch offen ist. Wahrscheinlich reicht es, die Timeouts vor dem Beenden zu
+loeschen oder `process.exitCode` zu setzen statt `process.exit()` zu rufen.
+Dringlichkeit: Der Wache-Prompt prueft ausdruecklich, ob die Ausgabe auf
+`URTEIL:` endet - tut sie es wegen dieser Zeile nicht, haelt die Wache den
+Pruefer fuer kaputt und meldet per Push, obwohl alles laeuft.
+
 ### Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
 Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
 Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der

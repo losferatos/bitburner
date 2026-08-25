@@ -140,52 +140,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Worker-Timer-Ersatz gegen die Drosselung (flag-freier Weg)
-
-Die Timer-Drosselung trifft nur den Haupt-Thread. Der Codepfad fuer
-Worker-Timer haengt an `BlinkSchedulerWorkerThrottling`, und das Merkmal ist
-standardmaessig **aus** (der Pfad traegt im Chromium-Quelltext den Kommentar
-"if this feature is ever revived"). Dedicated-Worker-Timer laufen also
-ungedrosselt, und die Zustellung per `postMessage` ist keine Timer-Warteschlange.
-
-Bitburner ist dafuer ideal gebaut: Sowohl der Engine-Loop als auch **alle**
-Netscript-Wartezeiten (`netscriptDelay` in `NetscriptHelpers.tsx`) greifen
-`window.setTimeout` bei JEDEM Aufruf dynamisch ab. Ein nachtraeglich
-eingehaengter Ersatz wirkt damit sofort auf Engine und alle laufenden Skripte,
-ohne Neustart des Spiels.
-
-Zu tun: `window.setTimeout` und `setInterval` in der Seite durch eine
-Worker-getriebene Fassung ersetzen (HackTimer-Prinzip), am besten als
-eigenstaendiges Werkzeug neben `src/wakelock.js`. `src/sonde.js` misst bereits
-beide Seiten - solange dort `haupt.median` gross und `worker.median` klein ist,
-ist der Weg fuer diesen Browser belegt.
-
-Grenze: Ebene 3 (Prozessprioritaet, EcoQoS) bleibt bestehen; die drosselt
-Rechenleistung, nicht den Takt. Gegen das Einfrieren von Tabs durch den
-Energiesparmodus hilft der Worker ebenfalls nicht.
-
-Ausfuehrlich in `doku/drosselung.md`, Abschnitt 5.
-
-Stand 25.08., 20:20: **gebaut und im Spiel** (`src/hacktimer.js`, dazu
-`src/timerzwang.js` als Schalter fuer die Pruefung). Der Selbsttest laeuft
-durch, der Patch haengt sich nur bei verstecktem Tab ein und hat einen Waechter
-ueber den Originaltimer als Notbremse. Belegt ist auch die Voraussetzung:
-`data/sonde.json` meldete um 20:25 bei minimiertem Fenster `worker.median` 5 ms.
-
-Was fehlt: eine Messung des Patches im gedrosselten Zustand. Die ist seit dem
-Pegelfix nicht mehr herstellbar, weil der Tab nicht mehr gedrosselt wird - der
-Patch ist damit **Rueckfallebene**, nicht Tagesgeschaeft.
-
-Ausserdem offen: `hacktimer.js` steht nicht in der Liste WERKZEUGE in
-`src/bn4net.js` (dort ab Zeile 241) und ueberlebt deshalb keinen
-Augmentierungs-Einbau. Das Eintragen braucht Erics Freigabe, weil bn4net der
-Motor ist.
-
-**Dringlichkeit:** niedrig, seit der Tonanker traegt. Wieder hoch, sobald die
-Rundenrate im verdeckten Zustand erneut einbricht.
-
-
-
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
 Zweimal an einem Nachmittag hat `sollRate()` in `tools/strategie-check.js` einen
@@ -296,6 +250,35 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Worker-Timer-Ersatz gegen die Drosselung (26.08., 01:45)
+Gebaut als `src/hacktimer.js`, dazu `src/timerzwang.js` als Schalter. Er
+haengt `window.setTimeout` an einen Web Worker, dessen Timer nicht gedrosselt
+werden (der Codepfad haengt an `BlinkSchedulerWorkerThrottling`,
+standardmaessig aus). Bitburner greift `window.setTimeout` bei jedem Aufruf
+dynamisch ab, ein Patch wirkt also sofort auf Engine und alle ns-Wartezeiten.
+
+**Er faehrt bewusst NICHT mit.** Am 25.08. hat er die gesamte Spielengine 52
+Minuten angehalten: Er haengte sich beim Verstecken des Tabs ein und starb
+kurz darauf, ohne `window.setTimeout` zurueckzugeben. Seit 21:19 raeumt
+`ns.atExit` beim Skriptende auf, und eingehaengt wird nur mit `--scharf`.
+
+**Gebraucht wird er nicht.** Verifiziert 01:45 ueber `data/sonde.json` bei
+verstecktem Fenster: `sichtbarkeit hidden`, `haupt.median 5 ms`,
+`worker.median 5 ms`, `stufe keine`. Der Tonanker traegt seit dem Pegelfix -
+der Haupt-Thread laeuft so schnell wie der Worker.
+
+Die Wirkung des Patches selbst bleibt ungemessen und wird es bleiben, solange
+keine Drosselung mehr auftritt. Das ist der richtige Zustand: Er ist die
+Rueckfallebene, nicht das Tagesgeschaeft. Bricht die Rundenrate wieder ein,
+steht in `doku/drosselung.md` Abschnitt 5, was zu tun ist.
+
+Nebenbefund, gleich mitbehoben: `sonde.js` stand seit dem Einbau um 22:01
+still - dreieinhalb Stunden, ohne dass es auffiel, denn sie steht in keiner
+Startliste des Spiels. Sie ist jetzt in der Nachstartliste von
+`tools/wache.js`. Ausgerechnet das Messwerkzeug gegen die Drosselung war das
+einzige, dessen Ausfall niemand bemerkt haette.
+
 
 ### Der Totmannschalter der Loops schlug nachts faelschlich an (26.08., 01:15)
 Gemessen 00:45: Der Waechter meldete `loops` - "Die Ueberwachungs-Loops melden

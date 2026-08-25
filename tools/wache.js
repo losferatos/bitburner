@@ -539,6 +539,12 @@ async function pruefe(zustand, jetzt) {
   const WERKZEUGE = [
     { datei: "data/blade.json", skript: "blade.js", json: true },
     { datei: "data/wakelock.txt", skript: "wakelock.js", json: false },
+    // Die Sonde ist kein Betriebsteil, sondern das Messwerkzeug gegen die
+    // Drosselung - und genau deshalb faellt ihr Ausfall niemandem auf. Am
+    // 26.08. stand sie seit dem Einbau um 22:01 still, dreieinhalb Stunden
+    // lang: Sie steht in keiner Startliste des Spiels. Ohne sie waere eine
+    // wiederkehrende Drosselung wieder nur zu erraten.
+    { datei: "data/sonde.json", skript: "sonde.js", json: true },
   ];
   for (const w of WERKZEUGE) {
     const roh = await spieldatei(w.datei);

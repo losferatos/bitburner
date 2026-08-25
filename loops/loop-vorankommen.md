@@ -13,8 +13,12 @@ Arbeite so:
    Steht dort eine, ist das dein Punkt. Ohne Abwägung, ohne Reihenfolgediskussion — dort tragen Reportloop und Wache ein, was sie kaputt vorgefunden, aber nicht selbst behoben haben. Sind es mehrere, nimm den obersten.
    Sonst: den obersten `### `-Punkt aus `## Offen`, dessen Überschrift nicht mit „Wartet bis" beginnt. **Die Reihenfolge in der Datei IST die Rangfolge** — nicht neu bewerten, nicht umsortieren.
 3. Arbeite ihn ab oder bring ihn ein Stück weiter. Konkrete Arbeit heißt: messen, Code ändern, im Spiel prüfen — nicht planen.
-4. Schreib das Ergebnis in BAUSTELLEN.md zurück. Erledigtes wandert nach unten in den Abschnitt "Erledigt", mit Datum und Commit-Kennung — auch ein abgeräumter `## Sofort`-Punkt; steht danach nichts mehr dort, schreib wieder `keine` hin. Neue Befunde kommen oben in die Liste, mit Fundstelle und Dringlichkeit.
-5. Committen und pushen — jede Änderung, ohne Rückfrage (steht so in der globalen CLAUDE.md). Aber: **nur anfassen, was du selbst geändert hast** (`git add <pfad>`, nie `git add -A`) — drei Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`; bei einem Konflikt in `nodes/BAUSTELLEN.md` gilt: beide Abschnitte behalten, nichts verwerfen.
+4. **Bevor du einen Punkt abhakst, zwei Fragen:**
+   - *Ist es wirklich behoben?* Nach Erledigt wandert nur, was eine Zeile `Verifiziert: <Zahl> um <HH:MM>` trägt — eine Messung nach der Änderung, nicht die Änderung selbst. Ein Punkt, den du geändert, aber nicht nachgemessen hast, bleibt stehen und bekommt die Zeile `Geaendert <HH:MM>, Wirkung noch nicht gemessen`. Am 25.08. wurde ein Sofort-Punkt vier Minuten nach dem Eintrag abgehakt, während die Zahl unverändert danebenstand.
+   - *Gab es das schon einmal?* Steht unter „Erledigt" ein ähnlicher Fall, wurde beim ersten Mal ein Symptom behoben und nicht die Ursache. Dann trag den **strukturellen** Punkt unter `## Offen` ein, statt den Einzelfall ein zweites Mal zu flicken. Beispiel vom 25.08.: erst `bn4life`, dann `bn4rep` — beide unterbrachen Bladeburner-Aktionen, beide wurden einzeln geflickt.
+
+5. Schreib das Ergebnis in BAUSTELLEN.md zurück. Erledigtes wandert nach unten in den Abschnitt "Erledigt", mit Datum und Commit-Kennung — auch ein abgeräumter `## Sofort`-Punkt; steht danach nichts mehr dort, schreib wieder `keine` hin. Neue Befunde kommen oben in die Liste, mit Fundstelle und Dringlichkeit.
+6. Committen und pushen — jede Änderung, ohne Rückfrage (steht so in der globalen CLAUDE.md). Aber: **nur anfassen, was du selbst geändert hast** (`git add <pfad>`, nie `git add -A`) — drei Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`; bei einem Konflikt in `nodes/BAUSTELLEN.md` gilt: beide Abschnitte behalten, nichts verwerfen.
 
 Spieldateien (`data/bblage.json`, `data/ps.json`, `data/blade.json`) liegen **nicht** auf der Platte — ein `cat` schlägt fehl, obwohl alles läuft. Lesen ausschließlich über die Brücke:
 ```

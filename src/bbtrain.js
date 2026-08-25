@@ -92,30 +92,25 @@ async function runde(ns) {
     await ns.sleep(60000);
   }
 
-  // Erst umziehen, dann trainieren.
-  if (ns.getPlayer().city !== BESTES_GYM.stadt) {
-    if (ns.singularity.travelToCity(BESTES_GYM.stadt)) {
-      sag("Nach " + BESTES_GYM.stadt + " gereist (" + BESTES_GYM.name + ", expMult 10).");
-    } else {
-      sag("Reise nach " + BESTES_GYM.stadt + " fehlgeschlagen - trainiere vor Ort.");
-    }
-  }
-
-  const stadt = ns.getPlayer().city;
-  const gym = GYM[stadt];
-  if (!gym) {
-    // Kein Studio in dieser Stadt bekannt. Reisen waere moeglich, kostet aber
-    // einen weiteren Singularity-Aufruf und - schlimmer - koennte eine
-    // Stadtfaktion beruehren. Lieber melden als raten.
-    ns.write("data/hilfe.txt",
-      "bbtrain: kein Fitnessstudio fuer Stadt " + stadt + " hinterlegt."
-      + " Kampfwerte lassen sich nicht trainieren, BitNode 6 bleibt zu.", "w");
-    sag("Kein Studio fuer " + stadt + " - Notruf gesetzt.");
-    return;
-  }
-
-  sag("Trainiere auf " + ZIEL + " in " + stadt + " (" + gym + ").");
-
+  // DIE STADT GEHOERT IN DIE SCHLEIFE, NICHT DAVOR (25.08.2026).
+  //
+  // Hier wurden Stadt und Studio EINMAL vor der Trainingsschleife bestimmt.
+  // Das haelt genau so lange, wie niemand sonst die Figur bewegt - und genau
+  // das tut bn4life.js: Es reist nach Aevum, sobald das Guthaben 45 Millionen
+  // ueberschreitet, um der Stadtfaktion beizutreten (bn4life.js:203-212).
+  //
+  // Gemessen am 25.08. um 15:56 in BitNode 6, nach siebeneinhalb Stunden Lauf:
+  //   str 93, def 1, dex 1, agi 1 - Stadt Aevum, laufende Arbeit "Powerhouse
+  //   Gym" (Sector-12).
+  // bbtrain hatte in Sector-12 begonnen, `gym` auf Powerhouse festgeschrieben
+  // und die Schleife nie wieder verlassen. Nach der Reise nach Aevum lehnte
+  // gymWorkout("Powerhouse Gym", ...) jeden Aufruf ab - der Bot lief alle 30
+  // Sekunden in denselben Fehlschlag, waehrend die alte, nie gestoppte
+  // str-Arbeit weiterlief. Drei von vier Kampfwerten standen bei 1, und das
+  // Beitrittstor ist ein MINIMUM ueber alle vier: der Knoten war zu.
+  //
+  // Ein Skript, das eine Vorbedingung nur beim Eintritt prueft, verlaesst sich
+  // darauf, alleiniger Herr der Figur zu sein. Das ist es hier nie.
   for (;;) {
     const p = ns.getPlayer();
     // Der niedrigste Wert zuerst. Das Tor ist ein Minimum ueber alle vier -
@@ -128,16 +123,47 @@ async function runde(ns) {
 
     if (tiefstand >= ZIEL) break;
 
+    // Jede Runde neu: Wo stehen wir, und welches Studio gilt hier?
+    let stadt = p.city;
+    if (stadt !== BESTES_GYM.stadt && p.money > 1e6) {
+      // Die Reise kostet 200.000 (LocationsMetadata) und bringt den Faktor 10
+      // statt 5 - sie rechnet sich nach wenigen Minuten. Die Million als
+      // Untergrenze verhindert nur, dass ein knapper Kontoschluss die Reise
+      // gegen laufende Kaeufe stellt.
+      if (ns.singularity.travelToCity(BESTES_GYM.stadt)) {
+        stadt = BESTES_GYM.stadt;
+        sag("Zurueck nach " + BESTES_GYM.stadt + " (" + BESTES_GYM.name + ").");
+      }
+    }
+
+    const gym = GYM[stadt];
+    if (!gym) {
+      // Kein Studio in dieser Stadt bekannt und die Reise ging nicht.
+      ns.write("data/hilfe.txt",
+        "bbtrain: kein Fitnessstudio fuer Stadt " + stadt + " hinterlegt und"
+        + " die Reise nach " + BESTES_GYM.stadt + " misslang.", "w");
+      sag("Kein Studio fuer " + stadt + " - Notruf gesetzt.");
+      await ns.sleep(60000);
+      continue;
+    }
+
+    // ORT UND WERT MUESSEN BEIDE STIMMEN (25.08.2026).
+    //
+    // Vorher wurde nur der trainierte Wert verglichen. Damit galt eine
+    // str-Arbeit im falschen Studio als "trainiert schon" - der Kern des
+    // Fehlers oben. Ein Vergleich, der den Ort auslaesst, kann einen
+    // Ortswechsel nicht bemerken.
     const laeuft = ns.singularity.getCurrentWork();
     const trainiertSchon = laeuft && laeuft.type === "CLASS"
-      && laeuft.classType === schlechtester;
+      && laeuft.classType === schlechtester
+      && (!laeuft.location || laeuft.location === gym);
     if (!trainiertSchon) {
       if (!ns.singularity.gymWorkout(gym, schlechtester, false)) {
-        sag("gymWorkout abgelehnt (" + schlechtester + ") - Geld? Stadt?");
+        sag("gymWorkout abgelehnt (" + schlechtester + " in " + gym + ").");
         await ns.sleep(30000);
         continue;
       }
-      sag(schlechtester + " bei " + tiefstand + " - trainiere weiter.");
+      sag(schlechtester + " bei " + tiefstand + " in " + gym + " - trainiere weiter.");
     }
     // Laenger schlafen als frueher: Der Wechsel lohnt erst, wenn ein anderer
     // Wert der niedrigste geworden ist. Bei zwanzig Sekunden wurde die Arbeit

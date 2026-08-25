@@ -80,9 +80,52 @@ export async function main(ns) {
       + "  (Browser verlangen dafuer meist eine vorherige Nutzerinteraktion im Tab.)");
   }
 
-  // Am Leben bleiben. Der AudioContext gehoert dem Fenster und liefe zwar auch
-  // ohne dieses Skript weiter - aber ein laufender Prozess ist der einzige
-  // Beleg von aussen, dass der Anker steht. Er kostet nichts: ein Faden, der
-  // fast immer schlaeft.
-  for (;;) await ns.sleep(60000);
+  // WACHEN, NICHT NUR ANWERFEN (25.08.2026).
+  //
+  // Bis hierher lief die Schleife nur mit, ohne je nachzusehen. Das war der
+  // teuerste blinde Fleck des Tages: Am 25.08. stand der Tonanker als
+  // "laeuft" in der Prozessliste, waehrend der Tab fuenffach gedrosselt lief -
+  // 1 Motorrunde je Minute statt 4 bis 6, ueber Stunden, auf alles.
+  //
+  // Ein AudioContext kann jederzeit still in den Zustand "suspended" fallen:
+  // nach einem Reload (Browser verlangen fuer Tonausgabe eine vorherige
+  // Nutzerinteraktion), bei einem Wechsel des Audiogeraets, nach dem
+  // Aufwachen aus dem Ruhezustand. Das Skript merkte davon nichts, weil es
+  // seinen eigenen Zustand nie las.
+  //
+  // Jetzt: jede Minute nachsehen, resume() versuchen, und den Zustand nach
+  // draussen schreiben. resume() gelingt ohne Nutzerinteraktion oft nicht -
+  // aber dann steht wenigstens in der Datei, woran es liegt, statt dass die
+  // Drosselung nur an der Rundenrate zu erahnen waere.
+  let letzterZustand = "";
+  for (;;) {
+    let zustand = "unbekannt";
+    try {
+      const anker = w.__wakelock;
+      if (!anker || !anker.ctx) {
+        zustand = "weg";
+      } else {
+        zustand = anker.ctx.state;
+        if (zustand === "suspended") {
+          // Der Rueckgabewert ist ein Promise; wir warten nicht darauf,
+          // sondern lesen den Zustand in der naechsten Runde erneut.
+          try { anker.ctx.resume(); } catch (e) { /* Browser verweigert */ }
+        }
+      }
+    } catch (e) {
+      zustand = "fehler:" + e.message;
+    }
+
+    ns.write("data/wakelock.txt", Date.now() + "|" + zustand, "w");
+    if (ns.getHostname() !== "home") {
+      try { ns.scp("data/wakelock.txt", "home", ns.getHostname()); } catch (e) { /* egal */ }
+    }
+    if (zustand !== letzterZustand) {
+      sag("Tonanker jetzt: " + zustand
+        + (zustand === "running" ? "" : " - der Tab wird gedrosselt, bis das"
+          + " wieder 'running' ist. Ein Klick ins Spielfenster hilft."));
+      letzterZustand = zustand;
+    }
+    await ns.sleep(60000);
+  }
 }

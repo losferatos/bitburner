@@ -43,7 +43,18 @@ Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwische
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
 Erwartet: 4-6 Runden je Minute. Faktor 5 auf ALLES - Geld, Kampfwerte,
 Bladeburner-Rang, jede Aktionsdauer.
-Verdacht: `src/wakelock.js` laeuft (steht in der Prozessliste), aber sein
+WIDERLEGT 19:24: Der Tonanker meldet `running` (neu gemessen ueber
+`data/wakelock.txt`), und der Tab wird trotzdem gedrosselt. Der Ton ist also
+nicht die Ursache - die Vermutung unten war falsch.
+
+Neuer Verdacht: Opera drosselt nicht nur inaktive Tabs, sondern auch **verdeckte
+Fenster**, und diese zweite Drosselung hebt ein laufender Ton nicht auf. Die
+Chromium-Schalter dagegen heissen `--disable-background-timer-throttling`,
+`--disable-backgrounding-occluded-windows` und `--disable-renderer-backgrounding`.
+Zu tun (nur Eric kann das): Opera einmal mit diesen drei Schaltern starten.
+Danach messen, ob die Rundenrate auch bei verdecktem Fenster ueber 4 bleibt.
+
+Alter Verdacht, widerlegt: `src/wakelock.js` laeuft (steht in der Prozessliste), aber sein
 unhoerbarer 19,5-kHz-Ton kommt nicht an. Nach einem Reload steht der
 AudioContext auf "suspended", weil Browser Tonausgabe ohne Nutzerinteraktion
 blockieren. Das Skript merkt davon nichts und meldet nichts.

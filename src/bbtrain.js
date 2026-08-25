@@ -30,6 +30,17 @@
  */
 export async function main(ns) {
   ns.disableLog("ALL");
+  // Aeussere Schleife: Nach jedem Augmentierungs-Einbau faellt der Beitritt
+  // nicht weg, wohl aber - in einem frischen Knoten - die Kampfwerte. Das
+  // Skript laeuft deshalb dauerhaft und faengt bei Bedarf von vorn an.
+  for (;;) {
+    await runde(ns);
+    await ns.sleep(30000);
+  }
+}
+
+/** @param {NS} ns */
+async function runde(ns) {
 
   const ZIEL = Number(ns.args[0]) || 100;
   // DAS BESTE STUDIO, NICHT DAS NAECHSTE (25.08.2026).
@@ -65,9 +76,20 @@ export async function main(ns) {
   const sag = (t) => { ns.print(t); ns.tprint("[bbtrain] " + t); };
 
   // Schon drin? Dann gibt es hier nichts zu tun.
-  if (ns.bladeburner.inBladeburner()) {
-    sag("Bereits in der Bladeburner-Division - nichts zu tun.");
-    return;
+  // NICHT BEENDEN, SONDERN WARTEN (25.08.2026).
+  //
+  // Hier stand `return`, sobald der Beitritt stand - mit der Begruendung, das
+  // Skript habe seine Arbeit getan. Das war falsch, und zwar teuer: Um 05:50
+  // hat bn4rep sechs Augmentierungen eingebaut. Ein Einbau setzt ALLE
+  // Kampfwerte auf 1 zurueck und toetet jedes laufende Skript. bbtrain war
+  // deshalb weg, stand nicht in der Werkzeugliste (weil es sich ja beendet)
+  // und wurde nie wieder gestartet. Drei Stunden Training waren verloren, und
+  // niemand hat es gemerkt.
+  //
+  // Ein Skript, dessen Aufgabe nach jedem Reset erneut anfaellt, darf sich
+  // nicht beenden. Es wartet.
+  while (ns.bladeburner.inBladeburner()) {
+    await ns.sleep(60000);
   }
 
   // Erst umziehen, dann trainieren.

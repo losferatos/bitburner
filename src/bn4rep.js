@@ -274,6 +274,7 @@ export async function main(ns) {
   // Drossel fuer die Endspiel-Meldung: alle fuenf Minuten genuegt, sonst
   // fuellt sie bei 15-Sekunden-Runden das Log.
   let letzteAusgangsmeldung = 0;
+  let letzteBladeMeldung = 0;
   const INSTALL_LOCK_MAX_AGE = 300000;
 
   // Der Aussenschalter. Inhalt:
@@ -591,7 +592,35 @@ export async function main(ns) {
     // Bot, der nie wieder einbaut - und der Einbau ist das einzige, was den
     // Multiplikator hebt.
     const lockInhalt = liesVonHome(INSTALL_LOCK_FILE);
-    let gesperrt = false;
+    // KEIN EINBAU VOR DEM DIVISIONSBEITRITT (25.08.2026).
+    //
+    // In BitNode 6 und 7 fuehrt der Ausgang ueber 21 Black Operations, nicht
+    // ueber das Hackniveau. Der Beitritt zur Bladeburner-Division verlangt
+    // alle vier Kampfwerte auf 100 - und ein Augmentierungs-Einbau setzt
+    // genau die auf 1 zurueck (Prestige.ts). Solange der Beitritt aussteht,
+    // wirft jeder Einbau also drei Stunden Training weg und bringt fuer den
+    // Knotenabschluss nichts.
+    //
+    // Genau das ist am 25.08. um 05:50 passiert: sechs Augmentierungen
+    // eingebaut, Kampfwerte von 13/13/17/19 zurueck auf 1.
+    //
+    // NACH dem Beitritt ist der Einbau wieder unbedenklich - Rang und
+    // Faehigkeiten der Division ueberleben ihn vollstaendig
+    // (Bladeburner.ts:259-263). Die Sperre gilt also nur fuer das Zeitfenster
+    // davor. inBladeburner kostet 0 GB (RamCostGenerator.ts:338).
+    let bladeSperre = false;
+    const knotenJetzt = ns.getResetInfo().currentNode;
+    if (knotenJetzt === 6 || knotenJetzt === 7) {
+      try { bladeSperre = !ns.bladeburner.inBladeburner(); }
+      catch { bladeSperre = true; }   // kein Zugriff heisst: erst recht warten
+    }
+
+    let gesperrt = bladeSperre;
+    if (bladeSperre && Date.now() - letzteBladeMeldung > 600000) {
+      letzteBladeMeldung = Date.now();
+      sag("Kein Einbau: Divisionsbeitritt steht aus, ein Reset wuerde die"
+        + " Kampfwerte auf 1 werfen (BitNode " + knotenJetzt + ").");
+    }
     if (lockInhalt) {
       const lockStempel = Number(lockInhalt.split("|")[1]);
       gesperrt = !Number.isFinite(lockStempel)
@@ -876,7 +905,22 @@ export async function main(ns) {
       }
 
       await ns.sleep(1500);
-      ns.singularity.installAugmentations("bn4life.js");
+      // DAS RUECKSTART-SKRIPT MUSS AUF home PASSEN (25.08.2026).
+      //
+      // Hier stand "bn4life.js". Das Spiel startet das Callback nach dem
+      // Reset auf home (Singularity.ts:210, runAfterReset) - und bn4life
+      // braucht ausserhalb von BitNode 4 volle 293,8 GB, weil es voller
+      // Singularity-Aufrufe steckt. Auf einem home mit 256 GB passt es nicht.
+      //
+      // Folge: Der Rueckstart schlaegt LAUTLOS fehl. Am 25.08. um 05:50 hat
+      // dieser Einbau den ganzen Bot stillgelegt - alle Skripte tot, kein
+      // Callback, keine Wache, kein Weg zurueck ausser einem Menschen an der
+      // Tastatur. Genau der Fall, den das Callback verhindern sollte.
+      //
+      // boot.js kostet 4 GB, passt also immer, und startet die Kette
+      // boot -> bn4net -> Werkzeuge. Mehr braucht das Callback nicht zu
+      // koennen: Es muss nur den ersten Dominostein umwerfen.
+      ns.singularity.installAugmentations("boot.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr
     }
 

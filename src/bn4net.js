@@ -251,6 +251,17 @@ export async function main(ns) {
     // Beitrittstor weg (alle Kampfwerte auf 100) und beendet sich danach -
     // diese Liste wuerde es ewig neu starten.
     ["blade.js", []],
+    // bbtrain gehoert HIERHER, nicht danebenn (25.08.2026).
+    //
+    // Es stand bewusst nicht in dieser Liste: "raeumt einmalig das
+    // Beitrittstor weg und beendet sich danach - die Liste wuerde es ewig neu
+    // starten." Der erste Satz war falsch. Ein Augmentierungs-Einbau setzt
+    // alle Kampfwerte auf 1 zurueck; die Aufgabe faellt also nach JEDEM Reset
+    // erneut an. Am 25.08. um 05:50 hat bn4rep sechs Stueck eingebaut, das
+    // Training war weg, und niemand hat es wieder angestossen - der Knoten
+    // stand. Seitdem wartet bbtrain, statt sich zu beenden, und gehoert damit
+    // in die Liste wie jedes andere Werkzeug.
+    ["bbtrain.js", []],
     // bn4life kauft TOR und die Portprogramme. Es steht in dieser Liste und
     // nicht in boot.js, weil es voller Singularity ist und ausserhalb von
     // BitNode 4 mehrere hundert GB gross - in ein frisches home mit 32 GB

@@ -492,6 +492,31 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   }
 
   // --- 5. Steckt der Motor in einer Aktion ohne Ertrag? --------------------
+  // --- 4b. PHASENWECHSEL IN DEN WIEDERAUFBAU IST EIN RESET -----------------
+  //
+  // In BitNode 6 und 7 faellt der Traeger bei einem Augmentierungs-Einbau
+  // NICHT: Der Bladeburner-Rang ueberlebt ihn, nur ein Knotenwechsel setzt ihn
+  // zurueck. Die Rueckgangspruefung oben ist hier also blind, und am 25.08. um
+  // 22:01 hat sie genau deshalb SPUR gemeldet, waehrend die Kampfwerte auf 1
+  // standen, das Netz von 95 auf 13 gefallen war und sechs Werkzeuge fehlten.
+  //
+  // Der Wechsel der PHASE ist das fehlende Kennzeichen. Er tritt genau einmal
+  // je Einbau auf, und danach gehoert der Wiederanlauf geprueft - dafuer hat
+  // der Wache-Prompt seinen RESET-Zweig.
+  // NICHT `frueher` benutzen: Das ist nach TRAEGER gefiltert, und genau der
+  // wechselt hier mit. Nach einem Einbau enthielte die Liste nur Punkte aus
+  // der VORIGEN Wiederaufbauphase - deren Phase ist dieselbe, und der Wechsel
+  // waere unsichtbar. Gefragt ist der letzte Messpunkt ueberhaupt.
+  const letzterPunkt = (v.punkte || []).filter((x) => x.knoten === knoten).pop();
+  const vorigePhase = letzterPunkt ? letzterPunkt.phase : null;
+  if (t.phase === "Wiederaufbau nach Einbau" && vorigePhase
+      && vorigePhase !== t.phase) {
+    sag("RESET: Augmentierungs-Einbau - die Kampfwerte sind auf "
+      + t.wert + " zurueckgefallen, der Rang bleibt. Wiederanlauf pruefen:"
+      + " Nach dem Einbau vom 25.08. fehlten sechs Werkzeuge.");
+    urteil = "RESET";
+  }
+
   // Nicht waehrend des Wiederaufbaus: Dort ist der Traeger das Training, und
   // die Aktion in blade.json stammt aus der Zeit VOR dem Einbau - eine
   // Leerlaufmeldung darueber waere doppelt falsch.

@@ -112,9 +112,22 @@ Verdacht: `tools/strategie-check.js` erkennt RESET am Rueckgang des TRAEGERS.
 In BitNode 6 ist der Traeger der Bladeburner-Rang - und der ueberlebt einen
 Augmentierungs-Einbau, er faellt nur beim BitNode-Wechsel. Der Einbau ist
 deshalb fuer diesen Pruefer unsichtbar.
-Zu tun: Zusaetzliches Kennzeichen pruefen - Einbruch der Kampfwerte, des
-Netzes oder des home-Speichers. `tools/wache.js` kann das bereits
-(Knotenwechsel ueber den home-Speicher, Zeile ~440); dem Pruefer fehlt es.
+**Geaendert 23:47, Wirkung noch nicht gemessen:** Der Pruefer meldet RESET,
+wenn die Phase von etwas anderem auf "Wiederaufbau nach Einbau" wechselt. Das
+tritt genau einmal je Einbau auf, und danach betritt die Wache ihren
+RESET-Zweig und prueft den Wiederanlauf - genau das, was um 22:01 gefehlt hat.
+
+Eine Falle steckte im ersten Entwurf: Als Vergleich diente `frueher`, und das
+ist nach TRAEGER gefiltert. Nach einem Einbau enthaelt die Liste nur Punkte
+aus der VORIGEN Wiederaufbauphase, deren Phase dieselbe ist - der Wechsel
+waere unsichtbar geblieben. Verglichen wird jetzt mit dem letzten Messpunkt
+des Knotens, unabhaengig vom Traeger.
+
+Nachzumessen beim naechsten Augmentierungs-Einbau: Kommt genau ein
+`URTEIL: RESET`, und bleibt es danach bei SPUR? Ein Versuch, den Fall mit
+praeparierten Kampfwerten in `data/bblage.json` herbeizufuehren, ist
+gescheitert - `frischerSteckbrief()` erneuert die Datei selbst, sobald sie alt
+wirkt, und ueberschreibt die Praeparation.
 
 ### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
 Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor

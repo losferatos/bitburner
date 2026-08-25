@@ -24,6 +24,19 @@ Regeln:
 
 ## Sofort
 
+### Die Sollrate im Pruefer ignoriert die Erfolgswahrscheinlichkeit (18:21)
+Gemessen: 0,15 Rang je Minute ueber 20 Minuten, Aktion `Contracts/Retirement`,
+Erfolgschance min 0,493. Der Pruefer erwartet 1,7 und meldet STAGNATION.
+Erwartet: Retirement gibt rankGain 0,6 - aber nur bei Erfolg. Bei knapp der
+Haelfte sind das effektiv rund 0,3 je Durchlauf. Die gemessenen 0,15 sind damit
+plausibel, der Motor arbeitet korrekt.
+Verdacht: `tools/strategie-check.js`, Funktion `sollRate()`. Die Tabelle nennt
+Bruttowerte aus dem Quellcode und rechnet die Erfolgschance nicht ein. Fuer
+Tracking (0,678) faellt das kaum auf, fuer Retirement (0,493) um Faktor zwei.
+Zu tun: `blade.js` schreibt die Erfolgschance der laufenden Aktion nach
+`data/blade.json`; `sollRate()` multipliziert damit. Zwei Dateien, deshalb hier
+eingetragen statt im Wachelauf erledigt.
+
 ### Der Bitburner-Tab laeuft gedrosselt (17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.

@@ -9,11 +9,17 @@ Loop 1 bewacht den laufenden Betrieb, Loop 3 berichtet. DIESER Loop bringt das P
 Arbeite so:
 
 1. Lies `nodes/BAUSTELLEN.md`. Das ist die verbindliche Arbeitsliste.
-2. **Steht unter `## Sofort` etwas anderes als das Wort `keine`, ist das dein Punkt.** Ohne Abwägung, ohne Reihenfolgediskussion — dort tragen der Reportloop und die Wache ein, was sie kaputt vorgefunden, aber nicht selbst behoben haben. Sind es mehrere, nimm den obersten.
-   Sonst: Nimm **genau EINEN** Punkt aus `## Offen` — den dringlichsten, der jetzt bearbeitbar ist. Ein Punkt, der auf ein Ereignis wartet (z. B. der Zwei-Stunden-Kontrollpunkt wartet auf seinen Zeitpunkt), wird übersprungen, nicht angefangen.
+2. **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt** — nur solche zählen. Steht unter `## Sofort` keine `### `-Zeile, ist der Abschnitt leer.
+   Steht dort eine, ist das dein Punkt. Ohne Abwägung, ohne Reihenfolgediskussion — dort tragen Reportloop und Wache ein, was sie kaputt vorgefunden, aber nicht selbst behoben haben. Sind es mehrere, nimm den obersten.
+   Sonst: den obersten `### `-Punkt aus `## Offen`, dessen Überschrift nicht mit „Wartet bis" beginnt. **Die Reihenfolge in der Datei IST die Rangfolge** — nicht neu bewerten, nicht umsortieren.
 3. Arbeite ihn ab oder bring ihn ein Stück weiter. Konkrete Arbeit heißt: messen, Code ändern, im Spiel prüfen — nicht planen.
 4. Schreib das Ergebnis in BAUSTELLEN.md zurück. Erledigtes wandert nach unten in den Abschnitt "Erledigt", mit Datum und Commit-Kennung — auch ein abgeräumter `## Sofort`-Punkt; steht danach nichts mehr dort, schreib wieder `keine` hin. Neue Befunde kommen oben in die Liste, mit Fundstelle und Dringlichkeit.
-5. Committen und pushen — jede Änderung, ohne Rückfrage (steht so in der globalen CLAUDE.md).
+5. Committen und pushen — jede Änderung, ohne Rückfrage (steht so in der globalen CLAUDE.md). Aber: **nur anfassen, was du selbst geändert hast** (`git add <pfad>`, nie `git add -A`) — drei Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`; bei einem Konflikt in `nodes/BAUSTELLEN.md` gilt: beide Abschnitte behalten, nichts verwerfen.
+
+Spieldateien (`data/bblage.json`, `data/ps.json`, `data/blade.json`) liegen **nicht** auf der Platte — ein `cat` schlägt fehl, obwohl alles läuft. Lesen ausschließlich über die Brücke:
+```
+curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile" --data-urlencode "filename=data/bblage.json" --data-urlencode "server=home"
+```
 
 Prüfe außerdem bei jedem Lauf kurz: Meldet `data/bblage.json` inzwischen `inBladeburner: true`? Wenn ja und der Zeitpunkt steht noch nicht in BAUSTELLEN.md, trag ihn dort ein — der Zwei-Stunden-Kontrollpunkt aus nodes/ROUTE.md hängt daran, und er ist das wertvollste Einzelergebnis der nächsten Tage.
 

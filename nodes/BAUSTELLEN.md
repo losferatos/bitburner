@@ -6,6 +6,15 @@ Pruefbefunden untergegangen, weil sie in einem Fliesstext standen statt in einer
 Liste, die man abhaken kann.
 
 Regeln:
+- **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
+  zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
+  leer - Erklaerungen und Fliesstext sind keine Arbeit.
+- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
+  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
+  beheben. Abgeraeumtes wandert nach "Erledigt".
+- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
+  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
+  beginnt, wird uebersprungen statt angefangen.
 - Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
 - Erledigtes wird nach unten verschoben, nicht geloescht - der Verlauf ist die
   Begruendung fuer das, was heute steht.
@@ -14,13 +23,6 @@ Regeln:
 ---
 
 ## Sofort
-
-*Was hier steht, hat Vorrang vor allem unter "Offen" - ohne Abwaegung, ohne
-Reihenfolgediskussion. Der Reportloop und die Wache tragen hier ein, was sie
-kaputt vorfinden aber nicht selbst beheben; der Vorankommens-Loop raeumt es als
-Erstes ab und verschiebt es danach nach "Erledigt".*
-
-*Ist dieser Abschnitt leer, steht hier genau ein Wort: keine.*
 
 ### tools/wache.js misst noch den Traeger des vorigen Knotens (17:30)
 Gemessen: `data/wache-zustand.json` fuehrt als Verlauf ausschliesslich

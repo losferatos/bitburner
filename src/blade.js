@@ -241,8 +241,37 @@ export async function main(ns) {
   // --- Hauptschleife -------------------------------------------------------
   let letzte = "";
   let ruhend = false;
+  let gewichen = false;
   for (;;) {
     try {
+      // WER ZU SCHWACH IST, MACHT PLATZ (25.08.2026).
+      //
+      // Nach einem Augmentierungs-Einbau stehen alle Kampfwerte auf 1. In
+      // diesem Zustand kommt keine Aktion ueber ihre Schwelle, und der Motor
+      // faellt auf Bladeburner-Training durch - das baut die Werte auf, aber
+      // ohne den Ortsmultiplikator des Powerhouse Gym (Faktor 10).
+      //
+      // bbtrain.js kann das zehnmal schneller, braucht dafuer aber die Figur:
+      // gymWorkout ist eine normale Arbeit und wuerde jede laufende
+      // Bladeburner-Aktion abbrechen. Zwei Skripte, die sich gegenseitig
+      // unterbrechen, erzeugen genau die Dialogflut, die an diesem Nachmittag
+      // zweimal aufgetreten ist.
+      //
+      // Also tritt der Motor zurueck, solange das Tor zu ist. Er verliert dabei
+      // nichts: Ohne Kampfwerte gaebe es ohnehin keinen Rang.
+      const kw = ns.getPlayer().skills;
+      const tiefstand = Math.min(kw.strength, kw.defense, kw.dexterity, kw.agility);
+      if (tiefstand < 100) {
+        if (!gewichen) {
+          sag("Kampfwerte bei " + tiefstand + " - ueberlasse die Figur bbtrain.js.");
+          gewichen = true;
+          try { ns.bladeburner.stopBladeburnerAction(); } catch {}
+        }
+        await ns.sleep(30000);
+        continue;
+      }
+      gewichen = false;
+
       faehigkeitenKaufen();
 
       const [jetzt, max] = ns.bladeburner.getStamina();

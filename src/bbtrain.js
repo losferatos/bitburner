@@ -88,7 +88,35 @@ async function runde(ns) {
   //
   // Ein Skript, dessen Aufgabe nach jedem Reset erneut anfaellt, darf sich
   // nicht beenden. Es wartet.
-  while (ns.bladeburner.inBladeburner()) {
+  // DER BEITRITT IST NICHT DAS TOR - DIE KAMPFWERTE SIND ES (25.08.2026, 17:50).
+  //
+  // Hier stand `while (inBladeburner()) sleep`. Das war als Ruhezustand nach
+  // getaner Arbeit gedacht und ist eine Falle: Nach dem Beitritt ist die
+  // Bedingung fuer immer wahr, also schlaeft bbtrain fuer immer.
+  //
+  // Ein Augmentierungs-Einbau setzt alle vier Kampfwerte auf 1 zurueck, waehrend
+  // Rang und Faehigkeiten ueberleben - bn4rep laesst Einbauten nach dem Beitritt
+  // wieder zu (bn4rep.js:618-624 sperrt nur davor). Danach findet blade.js mit
+  // Kampf 1/1/1/1 keine Aktion mehr ueber seinen Schwellen und faellt auf
+  // Bladeburner-Training durch. Das baut die Werte zwar wieder auf, aber ohne
+  // den Ortsmultiplikator des Powerhouse Gym (Faktor 10) und ohne jeden Rang.
+  //
+  // Ausgerechnet die Reparatur von heute Morgen - "ein Skript, dessen Aufgabe
+  // nach jedem Reset erneut anfaellt, darf sich nicht beenden" - hat diesen
+  // Zustand erzeugt: Das Beenden wurde durch ein Warten ersetzt, das nie endet.
+  // Gefunden hat es eine Fremdpruefung, kein Loop.
+  //
+  // Gewartet wird deshalb auf den Zustand, nicht auf das Ereignis.
+  for (;;) {
+    let drin = false;
+    try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
+    if (!drin) break;
+    const k = ns.getPlayer().skills;
+    const tief = Math.min(k.strength, k.defense, k.dexterity, k.agility);
+    if (tief < ZIEL) {
+      sag("In der Division, aber Kampfwerte bei " + tief + " - trainiere nach.");
+      break;
+    }
     await ns.sleep(60000);
   }
 

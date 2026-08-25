@@ -11,3 +11,6 @@ data/wache-zustand.json
 
 # Zwischenstand des Reportloops, kein Ergebnis
 data/ziele.md
+
+# Messverlauf des Strategiepruefers - wird bei jedem Lauf neu geschrieben
+data/verlauf-strategie.json

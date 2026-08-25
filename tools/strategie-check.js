@@ -28,6 +28,8 @@
  *   URTEIL: STAGNATION   der Traeger bewegt sich nicht mehr
  *   URTEIL: BLIND        die Lage ist nicht messbar (Bruecke/Spiel/Telemetrie)
  *   URTEIL: STOERUNG     der Bot hat selbst um Hilfe gerufen
+ *   URTEIL: RESET        der Traeger ist gefallen - Einbau oder Knotenwechsel;
+ *                        kein Fehler, aber der Wiederanlauf gehoert geprueft
  *
  * Aufruf:  node tools/strategie-check.js [--json]
  */
@@ -258,7 +260,25 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   // --- 3. Wo stehen wir, und ist das die richtige Richtung? ----------------
   const rep = await liesJson("data/bn4rep.json");
   const blade = await liesJson("data/blade.json");
-  const bb = await frischerSteckbrief();
+  let bb = await frischerSteckbrief();
+  // ALTE DATEN SIND SCHLIMMER ALS KEINE (25.08.2026, Fremdpruefung).
+  //
+  // frischerSteckbrief() prueft das Alter nur INNERHALB seiner Warteschleife.
+  // Beide Ausstiege - Kanal belegt, zwoelf Versuche erfolglos - liefern die
+  // Datei ungeprueft zurueck. Direkt nach einem BitNode-Wechsel ist das fatal:
+  // Die JSON-Dateien auf home ueberleben den Wechsel, die Skripte nicht. Der
+  // Pruefer haette dann den ALTEN Knoten mit dem ALTEN Traeger gemeldet und
+  // ein Urteil ueber eine Lage gefaellt, die es nicht mehr gibt.
+  //
+  // tools/wache.js hat gegen genau das eine Regel ("nur eine frische
+  // Knotennummer uebernehmen"). Sie ist damals nur in eines der beiden
+  // Bauteile eingeflossen.
+  if (bb && Number.isFinite(bb.zeit) && jetzt - bb.zeit > 5 * 60000) {
+    sag("Steckbrief ist " + Math.round((jetzt - bb.zeit) / 60000)
+      + " min alt - kein Urteil auf dieser Grundlage.");
+    bb = null;
+    urteil = "BLIND";
+  }
   const knoten = (bb && bb.knoten) || (rep && rep.knoten) || null;
 
   if (!knoten) {
@@ -355,6 +375,27 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
           }
         }
       }
+    } else if (delta < 0) {
+      // EIN RUECKGANG IST KEIN STILLSTAND (25.08.2026, Fremdpruefung).
+      //
+      // Faellt der Traeger - Kampfwerte auf 1 nach einem Augmentierungs-Einbau,
+      // Rang auf 0 nach einem Knotenwechsel -, findet die Suche nach dem
+      // "letzten niedrigeren Punkt" keinen mehr. Der Bezug faellt auf den
+      // aeltesten Punkt zurueck, die Stillstandsdauer waechst unbegrenzt, und
+      // der Pruefer meldet STAGNATION, bis der alte Hoechststand wieder
+      // erreicht ist - also stundenlang.
+      //
+      // Ausgerechnet in der Phase, in der der Bot planmaessig arbeitet
+      // (Wiederaufbau nach dem Einbau), haette die Wache damit ihren
+      // Eingriffsmodus betreten. Das ist der denkbar schlechteste Zeitpunkt.
+      //
+      // Ein Rueckgang ist ein Ereignis, kein Fehler. Er bekommt ein eigenes
+      // Urteil, und der Verlauf dieses Traegers wird verworfen - er beschreibt
+      // eine Welt, die es nicht mehr gibt.
+      sag("RESET: " + t.name + " ist von " + bezug.wert + " auf " + t.wert
+        + " gefallen - Augmentierungs-Einbau oder Knotenwechsel.");
+      urteil = "RESET";
+      v.punkte = v.punkte.filter((x) => x.knoten !== knoten || x.traeger !== t.name);
     } else if (stillMs > STILLSTAND_MS) {
       sag("STAGNATION: " + t.name + " steht seit " + stillMin
         + " min auf " + t.wert + ".");
@@ -408,6 +449,24 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
     }
   }
 
+  // --- 7. Laeuft das Spiel ueberhaupt mit voller Geschwindigkeit? ----------
+  if (Number.isFinite(net.runde)) {
+    const vorher = [...v.punkte].reverse().find((x) => Number.isFinite(x.runde));
+    if (vorher) {
+      const min = (jetzt - vorher.zeit) / 60000;
+      const drunden = net.runde - vorher.runde;
+      // Normal sind vier bis sechs Runden je Minute. Unter einer Runde je
+      // Minute ist der Tab gedrosselt - das ist Faktor 16 auf ALLES, vom
+      // Geldverdienen bis zum Bladeburner-Rang.
+      if (min >= 5 && drunden >= 0 && drunden / min < 1) {
+        sag("GEDROSSELT: nur " + (drunden / min).toFixed(2)
+          + " Motorrunden je Minute (normal 4-6) - laeuft der Tab im"
+          + " Hintergrund ohne wakelock?");
+        if (urteil === "SPUR") urteil = "STAGNATION";
+      }
+    }
+  }
+
   // Das URTEIL gehoert in den Verlauf, nicht nur auf den Bildschirm.
   //
   // Ohne diese Zeile bleibt von jedem Lauf nur eine Zahl uebrig, und die Frage
@@ -417,7 +476,15 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   v.punkte.push({ zeit: jetzt, knoten, traeger: t.name, wert: t.wert,
     phase: t.phase, netz: net.gerootet, geld: bb ? bb.geld : null,
     urteil, aktion: blade && blade.aktion ? blade.aktion : null,
-    popups: popups ? popups.geschlossen : null });
+    popups: popups ? popups.geschlossen : null,
+    // Die Rundenzahl des Motors ist das einzige Mass fuer die
+    // SPIELGESCHWINDIGKEIT. Ein verborgener Browsertab laeuft 16-fach
+    // langsamer; wakelock.js haelt ihn wach, kann aber lautlos ausfallen
+    // (AudioContext auf suspended nach einem Reload). Dann schreibt bn4net
+    // alle drei Minuten statt alle zehn Sekunden - beide Frischegrenzen
+    // bleiben unterschritten, und alles sieht normal aus. Nur diese Zahl
+    // verraet es.
+    runde: Number.isFinite(net.runde) ? net.runde : null });
   speichereVerlauf(v);
 
   return aus();

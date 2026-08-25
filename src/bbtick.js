@@ -55,11 +55,18 @@ export async function main(ns) {
     spielzeitVon: reihe[0] && reihe[0].spielzeit,
     spielzeitBis: reihe[reihe.length - 1] && reihe[reihe.length - 1].spielzeit,
     // Die Deutung gehoert in die Datei, nicht in den Kopf des Lesers.
+    // EIN RUECKSPRUNG AUF 0 IST NORMAL (25.08.2026, 21:22).
+    //
+    // Die erste Fassung urteilte "jemand startet staendig neu", sobald
+    // irgendwo eine 0 vorkam. Das ist der Regelfall: Eine abgeschlossene
+    // Aktion beginnt von vorn, also faellt der Zaehler einmal je Zyklus auf
+    // null. Verdaechtig ist nur, wenn er NIE nennenswert steigt - gemessen
+    // wird deshalb der hoechste erreichte Wert, nicht der niedrigste.
     urteil: zeiten.every((z) => z === zeiten[0])
       ? (zeiten[0] === 0 ? "steht bei 0 - Aktion kommt nie in Gang"
         : "konstant " + zeiten[0] + " - Engine bekommt keine Zyklen")
-      : (Math.min(...zeiten) === 0 && Math.max(...zeiten) > 0
-        ? "springt auf 0 zurueck - jemand startet staendig neu"
+      : (Math.max(...zeiten) < 2000
+        ? "kommt nie ueber 2 s - jemand startet staendig neu"
         : "waechst - alles in Ordnung"),
   }), "w");
   if (ns.getHostname() !== "home") ns.scp("data/bbtick.json", "home", ns.getHostname());

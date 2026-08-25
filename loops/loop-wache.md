@@ -26,5 +26,6 @@ Die letzte Zeile ist das Urteil. Handle danach:
   - Ein Werkzeug neu starten: pushFile nach data/reload.txt mit Inhalt `WERKZEUG <name>`.
   - Greife in den Code ein, wenn die Ursache dort liegt. Committen und pushen ist ausdrücklich erlaubt und erwünscht.
   - Melde in max. 4 Stichpunkten: Befund, Ursache, Eingriff, Erwartung.
+  - **Was du nicht selbst behebst, wird ein Auftrag.** Trag es oben in `nodes/BAUSTELLEN.md` unter `## Sofort` ein (Befund, gemessene Zahl, erwarteter Wert, Verdacht auf die Fundstelle) und ersetze dort das Wort `keine`, falls es allein dasteht. Der Vorankommens-Loop nimmt es als Erstes. Ein Befund, der nur im Chat steht, ist verloren.
 
 Regeln: Systemzeit per `date`, nie schätzen. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. Keine Wall of Text — Eric will Stichpunkte.

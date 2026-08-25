@@ -13,6 +13,19 @@ Regeln:
 
 ---
 
+## Sofort
+
+*Was hier steht, hat Vorrang vor allem unter "Offen" - ohne Abwaegung, ohne
+Reihenfolgediskussion. Der Reportloop und die Wache tragen hier ein, was sie
+kaputt vorfinden aber nicht selbst beheben; der Vorankommens-Loop raeumt es als
+Erstes ab und verschiebt es danach nach "Erledigt".*
+
+*Ist dieser Abschnitt leer, steht hier genau ein Wort: keine.*
+
+keine
+
+---
+
 ## Offen, nach Dringlichkeit
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden

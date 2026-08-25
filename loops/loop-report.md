@@ -49,4 +49,17 @@ ZIELE
 
 5. Diese Datei nicht committen — sie ist ein Zwischenstand, kein Ergebnis. Steht sie noch nicht in `.gitignore`, dort eintragen.
 
-Weitere Regeln: Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. In diesem Loop wird **nicht eingegriffen** — er berichtet. Fällt etwas Kaputtes auf, gehört es als vierter Stichpunkt unter „Lage" und wird von Loop 1 oder 2 bearbeitet.
+6. **Jeder kaputte Befund wird zum Auftrag, nicht zum Stichpunkt.** Fällt etwas auf, das nicht stimmt — eine Zahl, die stehenbleibt, ein Werkzeug, das nichts liefert, ein Dialog, der sich wiederholt —, dann trag es SOFORT oben in `nodes/BAUSTELLEN.md` unter `## Sofort` ein, in genau dieser Form:
+
+```
+### <Kurzer Befund in einem Satz> (<HH:MM>)
+Gemessen: <die Zahl, die den Befund belegt, mit ihrer Quelle>
+Erwartet: <was stattdessen dastehen müsste>
+Verdacht: <Fundstelle im Code, wenn es eine gibt - sonst "offen">
+```
+
+Ersetze dabei das Wort `keine`, falls es dort noch allein steht. Im Chat bekommt der Befund den Zusatz **„→ Auftrag"**, damit Eric sieht, dass er nicht im Bericht versandet. Der Vorankommens-Loop nimmt ihn sieben Minuten später als Erstes.
+
+Ein Befund, der nur im Chat steht, ist verloren: Der nächste Report erinnert sich nicht an ihn, und Eric soll ihn nicht nachhalten müssen. Genau deshalb gibt es diesen Schritt.
+
+Weitere Regeln: Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. In diesem Loop wird **nicht am Bot herumrepariert** — er misst, berichtet und schreibt Aufträge. Die Reparatur ist Sache von Loop 1 und 2.

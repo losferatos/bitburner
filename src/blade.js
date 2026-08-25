@@ -227,6 +227,54 @@ export async function main(ns) {
     }
   };
 
+  // EINE STELLE FUER DIE TELEMETRIE (25.08.2026, 22:15).
+  //
+  // Zweimal an einem Abend ist derselbe Fehler an verschiedenen Stellen
+  // aufgetreten: Ein Zweig der Hauptschleife machte `continue`, ohne etwas zu
+  // schreiben. Erst der Ruhe-Zweig - das kostete 23 Minuten Blindflug, weil
+  // niemand einen Haenger von ruhigem Ruhen unterscheiden konnte. Dann der
+  // Weichen-Zweig, der einen Fehlalarm ueber eine angeblich stehende
+  // Spielengine ausloeste, waehrend sie nachweislich lief. Beide Male wurde
+  // der Einzelfall geflickt.
+  //
+  // Die Ursache ist die Duplikation selbst. Diese Funktion holt sich alles,
+  // was jeder Zustand gemeinsam hat, selbst - ein neuer Zweig kann damit
+  // nichts mehr vergessen ausser dem Aufruf. Und der faellt beim Lesen auf.
+  const meldeLage = (aktion, grund, chance) => {
+    let ausdauer = "?", hp = null, spielzeit = null, rang = null, punkte = null;
+    try {
+      const [a, amax] = ns.bladeburner.getStamina();
+      ausdauer = Math.round(a) + "/" + Math.round(amax);
+    } catch { /* nicht in der Division */ }
+    try {
+      const p = ns.getPlayer();
+      spielzeit = p.totalPlaytime;
+      if (p.hp && p.hp.max > 0) {
+        hp = Math.round(p.hp.current) + "/" + Math.round(p.hp.max);
+      }
+    } catch { /* egal */ }
+    try { rang = Math.round(ns.bladeburner.getRank()); } catch { /* egal */ }
+    try { punkte = ns.bladeburner.getSkillPoints(); } catch { /* egal */ }
+    let bo = null;
+    try { bo = ns.bladeburner.getNextBlackOp(); } catch { /* egal */ }
+    ns.write("data/blade.json", JSON.stringify({
+      zeit: Date.now(),
+      chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
+      rang, punkte, ausdauer, hp,
+      // Der Puls der Spielengine. Netscript und die Engine sind zwei
+      // Schleifen; totalPlaytime waechst nur in updateGame. Steht die Zahl
+      // zwischen zwei Messungen still, ist die Engine tot, und dann hilft
+      // kein Neustart eines Werkzeugs, sondern nur ein Neuladen des Tabs.
+      spielzeit,
+      aktion, grund,
+      naechsteBlackOp: bo ? bo.name : null,
+      blackOpRang: bo ? bo.rank : null,
+    }), "w");
+    if (ns.getHostname() !== "home") {
+      try { ns.scp("data/blade.json", "home", ns.getHostname()); } catch { /* egal */ }
+    }
+  };
+
   // --- Die naechste Aktion waehlen -----------------------------------------
   const waehle = () => {
     // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
@@ -349,6 +397,7 @@ export async function main(ns) {
           gewichen = true;
           try { ns.bladeburner.stopBladeburnerAction(); } catch {}
         }
+        meldeLage("General/keine", "weicht bbtrain, Kampfwerte " + tiefstand);
         await ns.sleep(30000);
         continue;
       }
@@ -363,31 +412,11 @@ export async function main(ns) {
       const ausdauerKnapp = max > 0 && jetzt < max * AUSDAUER_WEITER;
       const hpKnapp = hp && hp.max > 0 && hp.current < hp.max * HP_WEITER;
       if (ruhend && (ausdauerKnapp || hpKnapp)) {
-        // TELEMETRIE AUCH IM RUHEN (25.08.2026, 20:46).
-        //
-        // Dieser Zweig schrieb bisher nichts. Am 25.08. stand der Motor
-        // deshalb 23 Minuten hier fest, ohne dass es jemand sehen konnte:
-        // data/blade.json trug um 20:42 noch den Zeitstempel 20:19, und von
-        // aussen ist eine haengende Schleife nicht von ruhigem Ruhen zu
-        // unterscheiden. Der Strategiepruefer meldete die ganze Zeit SPUR.
-        //
-        // Die Zeile kostet nichts und macht den Unterschied messbar: Altert
-        // blade.json ab jetzt, steht der Motor wirklich.
-        ns.write("data/blade.json", JSON.stringify({
-          zeit: Date.now(),
-          chance: null,
-          rang: Math.round(ns.bladeburner.getRank()),
-          punkte: ns.bladeburner.getSkillPoints(),
-          ausdauer: Math.round(jetzt) + "/" + Math.round(max),
-          hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
-          // Auch hier - gerade hier. Eine lange Ruhephase ist der Zustand, in
-          // dem eine stehende Engine am laengsten unentdeckt bleibt.
-          spielzeit: ns.getPlayer().totalPlaytime,
-          aktion: "General/Hyperbolic Regeneration Chamber",
-          grund: ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
-            : "ruht bis HP " + Math.round(hp.max * HP_WEITER),
-        }), "w");
-        if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
+        // Telemetrie auch im Ruhen - gerade hier. Eine lange Ruhephase ist
+        // der Zustand, in dem ein Haenger am laengsten unentdeckt bliebe.
+        meldeLage("General/Hyperbolic Regeneration Chamber",
+          ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
+            : "ruht bis HP " + Math.round(hp.max * HP_WEITER));
         await ns.bladeburner.nextUpdate();
         continue;
       }
@@ -424,32 +453,14 @@ export async function main(ns) {
       // rund 0,3 je Durchlauf. Der Pruefer erwartete 1,7 und meldete
       // STAGNATION, obwohl blade.js genau das Richtige tat.
       const s = spanne(wahl.typ, wahl.name);
-      ns.write("data/blade.json", JSON.stringify({
-        zeit: Date.now(),
-        chance: +s.min.toFixed(3),
-        rang: Math.round(ns.bladeburner.getRank()),
-        punkte: ns.bladeburner.getSkillPoints(),
-        ausdauer: Math.round(jetzt) + "/" + Math.round(max),
-        hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
-        // DER PULS DER SPIELENGINE (25.08.2026, 21:15).
-        //
-        // Netscript und die Spielengine sind ZWEI Schleifen. Am 25.08. stand
-        // updateGame ab 20:27 still - Rang, Ausdauer und Aktionsfortschritt
-        // eingefroren auf siebzehn Nachkommastellen -, waehrend bn4net munter
-        // Runden zaehlte und Hackgeld hereinkam. Jede vorhandene Pruefung sah
-        // deshalb Normalbetrieb, und der Strategiepruefer meldete 46 Minuten
-        // lang SPUR.
-        //
-        // totalPlaytime waechst ausschliesslich in updateGame. Steht die Zahl
-        // zwischen zwei Messungen still, ist die Engine tot - und dann hilft
-        // kein Neustart eines Werkzeugs, sondern nur ein Neuladen des Tabs.
-        spielzeit: ns.getPlayer().totalPlaytime,
-        aktion: wahl.typ + "/" + wahl.name,
-        grund: wahl.grund,
-        naechsteBlackOp: bo ? bo.name : null,
-        blackOpRang: bo ? bo.rank : null,
-      }), "w");
-      if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
+      // Die Erfolgschance der laufenden Aktion gehoert nach draussen: Ohne sie
+      // rechnet der Strategiepruefer mit dem Bruttoertrag aus dem Quellcode
+      // und haelt jeden Motor fuer zu langsam, der einen Vertrag mit maessiger
+      // Chance faehrt. Gemessen am 25.08. um 18:21: Retirement gibt rankGain
+      // 0,6, gelingt aber nur in 49 Prozent der Faelle - effektiv rund 0,3 je
+      // Durchlauf. Der Pruefer erwartete 1,7 und meldete STAGNATION, obwohl
+      // blade.js genau das Richtige tat.
+      meldeLage(wahl.typ + "/" + wahl.name, wahl.grund, s.min);
 
       await ns.bladeburner.nextUpdate();
     } catch (e) {

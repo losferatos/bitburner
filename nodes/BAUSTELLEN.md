@@ -24,20 +24,6 @@ Regeln:
 
 ## Sofort
 
-### blade.js schreibt auch im Weichen-Zweig keine Telemetrie (22:13)
-Gemessen: Nach dem Einbau um 22:01 trat blade.js korrekt zurueck (Kampfwerte
-unter 100, `blade.js:304`) - und schrieb elf Minuten lang nichts. Der Pruefer
-meldete daraufhin faelschlich eine stehende Spielengine, weil er zweimal
-dieselbe alte Zahl aus `data/blade.json` verglich. Nachgemessen ueber
-`data/bbtick.json`: Die Engine lief mit 29,2 Sekunden je halber Minute.
-Erwartet: Jeder Zweig der Hauptschleife schreibt Telemetrie. Der Ruhe-Zweig
-tut es seit 20:46, der Weichen-Zweig noch nicht - es ist derselbe Fehler an
-der naechsten Stelle.
-Verdacht: `src/blade.js:304-312`, der `continue` nach `await ns.sleep(30000)`.
-Vorlaeufig entschaerft in `tools/strategie-check.js` (die Pruefungen auf
-blade-Alter und Leerlauf ruhen in der Phase "Wiederaufbau nach Einbau"), aber
-die Ursache liegt in blade.js.
-
 ### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
 `data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.
@@ -57,6 +43,14 @@ gestartet (`["wakelock.js"]` in data/task.txt). Danach laufen alle drei.
 Zu tun: Entweder die Nachstart-Logik reparieren (bn4net, braucht Erics
 Freigabe) oder dem Reload-Kanal ein "starte, falls nicht laufend" geben.
 Dies ist der vierte stille Fehlschlag des Wiederanlaufs an einem Tag.
+
+**Nachtrag 22:16 - der Reload-Kanal ist derzeit eine Falle.** Ein
+`WERKZEUG blade.js` um 22:15 hat blade.js beendet, und nichts hat es
+zurueckgeholt: Um 22:16 fehlte es in `data/ps.json`. Wer den Kanal benutzt,
+legt das Werkzeug also still, statt es neu zu starten. Bis das behoben ist,
+gilt: **Werkzeuge ueber den Auftragskanal starten** (`["blade.js"]` in
+data/task.txt), nicht ueber den Reload-Kanal. Das gehoert auch in die
+Loop-Prompts, die den Reload-Kanal bisher als Standardweg nennen.
 
 ### Der Pruefer erkennt einen Augmentierungs-Einbau in BN6 nicht (22:01)
 Gemessen: URTEIL SPUR bei Kampfwerten 1/1/1/1, Netz 13/70 und 1m Guthaben -
@@ -280,6 +274,32 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### blade.js schrieb in zwei von drei Zweigen keine Telemetrie (25.08., 22:16)
+
+Zweimal an einem Abend derselbe Fehler an anderer Stelle: Ein Zweig der
+Hauptschleife machte `continue`, ohne etwas zu schreiben.
+- **Ruhe-Zweig** (20:42): kostete 23 Minuten Blindflug - von aussen war ein
+  Haenger nicht von ruhigem Ruhen zu unterscheiden.
+- **Weichen-Zweig** (22:13): erzeugte einen Fehlalarm ueber eine angeblich
+  stehende Spielengine, waehrend sie nachweislich mit 29,2 s je halber Minute
+  lief. Der Pruefer verglich zweimal dieselbe eingefrorene Datei.
+
+Beim ersten Mal wurde der Einzelfall geflickt. Die Ursache ist die
+Duplikation: Drei Zweige, drei getrennte `ns.write`-Bloecke, und jeder neue
+Zweig faengt wieder bei null an.
+
+Behoben strukturell: Eine Funktion `meldeLage(aktion, grund, chance)` holt
+sich alles, was jeder Zustand gemeinsam hat - Rang, Punkte, Ausdauer,
+Trefferpunkte, Spielzeit, naechste Black Op - selbst. Alle drei Zweige rufen
+sie; im Code steht nur noch **ein** `ns.write("data/blade.json")`. Ein neuer
+Zweig kann nichts mehr vergessen ausser dem Aufruf, und der faellt beim Lesen
+auf.
+
+**Verifiziert 22:17:** `"aktion":"General/keine","grund":"weicht bbtrain,
+Kampfwerte 80","spielzeit":531709600,"hp":"18/18"` - der Zweig, der eben noch
+stumm war, meldet vollstaendig.
+
 
 ### Die Spielengine stand 52 Minuten still (25.08., 20:27 bis 21:19)
 

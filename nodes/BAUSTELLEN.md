@@ -24,7 +24,14 @@ Regeln:
 
 ## Sofort
 
-### Das Guthaben ist negativ: -1,58 Millionen (22:18)
+*Alle drei Punkte tragen "Wartet bis" und werden vom Vorankommens-Loop
+uebersprungen - nicht weil sie unwichtig waeren, sondern weil sie an ein
+Ereignis gebunden sind, das noch nicht eingetreten ist. Zwei brauchen den
+naechsten Augmentierungs-Einbau als Pruefstein, einer Erics Freigabe fuer
+`src/bn4net.js`. Ohne diese Kennzeichnung stuende jeder Lauf vor derselben
+Wand, statt die Liste weiter abzuarbeiten (gekennzeichnet 26.08., 00:44).*
+
+### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
 laeuft also noch.
@@ -51,7 +58,7 @@ Offen bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten
 darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
 Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
-### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
+### Wartet bis Eric bn4net freigibt: Nach einem Einbau starten die Werkzeuge nicht nach (22:03)
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
 `data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.
 **Es fehlen blade.js, bbtrain.js, wakelock.js, homegrow.js, bn4rep.js und
@@ -103,7 +110,7 @@ gilt: **Werkzeuge ueber den Auftragskanal starten** (`["blade.js"]` in
 data/task.txt), nicht ueber den Reload-Kanal. Das gehoert auch in die
 Loop-Prompts, die den Reload-Kanal bisher als Standardweg nennen.
 
-### Der Pruefer erkennt einen Augmentierungs-Einbau in BN6 nicht (22:01)
+### Wartet bis zum naechsten Einbau: Erkennt der Pruefer ihn jetzt? (22:01)
 Gemessen: URTEIL SPUR bei Kampfwerten 1/1/1/1, Netz 13/70 und 1m Guthaben -
 alles Zeichen eines frischen Einbaus.
 Erwartet: RESET. Danach gehoert der Wiederanlauf geprueft, und genau der ist
@@ -132,6 +139,28 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Der Totmannschalter der Loops schlaegt nachts faelschlich an
+
+Gemessen 26.08. um 00:45: Der Waechter meldet `loops` - "Die
+Ueberwachungs-Loops melden sich seit X min nicht mehr". Nachts wird die
+Meldung von der Nachtruhe geschluckt ("Nachtruhe - nicht gesendet: loops"),
+um 5:00 ginge sie aber raus.
+
+Der Schalter haengt am Alter von `data/ziele.md` (`tools/wache.js`, Abschnitt
+3c): Bleibt die Datei ueber 90 Minuten stehen, gilt die Loop-Schleife als tot.
+Geschrieben wird sie aber nur vom Reportloop - und der pausiert planmaessig
+zwischen 22:30 und 5:00. Jede Nacht ist die Datei also stundenlang alt,
+obwohl Wache und Vorankommen munter weiterlaufen.
+
+Zu tun: Entweder die Pruefung zwischen 22:30 und 5:30 aussetzen, oder besser
+einen Totmannschalter waehlen, den ALLE Loops beruehren - der Reportloop ist
+der einzige mit Nachtpause, die anderen beiden laufen durch.
+
+**Dringlichkeit:** mittel. Ein Fehlalarm aus dem Alarmwerkzeug selbst ist die
+teuerste Sorte: Er kommt zu einer Zeit, zu der Eric gerade aufwacht, und er
+stumpft die Meldungen ab, auf die es ankommt.
+
 
 ### Worker-Timer-Ersatz gegen die Drosselung (flag-freier Weg)
 
@@ -176,30 +205,6 @@ Motor ist.
 
 **Dringlichkeit:** niedrig, seit der Tonanker traegt. Wieder hoch, sobald die
 Rundenrate im verdeckten Zustand erneut einbricht.
-
-
-
-### Nichts verhindert einen zweiten Waechterprozess
-
-Gemessen 19:43: **zwei** `node tools/wache.js` liefen gleichzeitig (PID 24464 und
-19744). Beide schreiben dieselbe Datei `data/wache-zustand.json` - und in ihr
-stehen die Meldesperren (`gemeldet`, `stufe`, `seit`). Wer zuletzt schreibt,
-gewinnt: Ein Prozess kann die Sperre des anderen ueberschreiben, sodass derselbe
-Alarm zweimal aufs Handy geht, oder eine Entwarnung eine noch bestehende
-Stoerung aus dem Zustand loescht.
-
-Entstanden ist es vermutlich durch den Startpfad in `/bb-loops`: Der prueft das
-**Alter** von `data/wache-zustand.json` und startet neu, wenn sie alt ist. Laeuft
-aber bereits ein Waechter, ist die Datei frisch UND der zweite Start passiert
-trotzdem, wenn die Pruefung uebersprungen oder von Hand gestartet wurde.
-
-Zu tun: Eine Sperrdatei (`data/wache.pid`) beim Start schreiben, beim Start
-pruefen, ob der dort genannte Prozess noch lebt, und sich sonst beenden.
-Beide Prozesse wurden 19:44 beendet, einer neu gestartet - das ist die
-Symptombehandlung, nicht die Ursache.
-
-**Dringlichkeit:** mittel. Es beschaedigt still die Meldelogik des einzigen
-Bauteils, das ohne Claude-Sitzung laeuft.
 
 
 
@@ -313,6 +318,23 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Nichts verhinderte einen zweiten Waechterprozess (26.08., 00:45)
+Gemessen 25.08. um 19:43: ZWEI `node tools/wache.js` liefen gleichzeitig
+(PID 24464 und 19744). Beide schreiben `data/wache-zustand.json`, und dort
+stehen die Meldesperren - wer zuletzt schreibt, gewinnt. Derselbe Alarm haette
+zweimal aufs Handy gehen koennen, oder eine Entwarnung haette eine noch
+bestehende Stoerung geloescht. Seit dem 25.08. greift der Waechter ausserdem
+selbst ein und startet Werkzeuge nach; zwei davon wuerden sich Auftraege
+ueberschreiben.
+Behoben: `data/wache.pid` traegt die Prozesskennung. Beim Start prueft der
+Waechter mit Signal 0, ob der dort genannte Prozess noch lebt, und beendet
+sich dann selbst. Eine verwaiste Sperrdatei wird uebernommen. Die Datei steht
+in `.gitignore` - reine Laufzeitinformation.
+**Verifiziert 00:45:** Erster Start meldet "Waechter laeuft (PID 17372)" und
+legt die Sperrdatei an; der zweite meldet "Es laeuft bereits ein Waechter
+(PID 17372) - beende mich" und beendet sich.
+
 
 ### Der Pruefer hielt die Regenerationskammer fuer Fortschritt (26.08., 00:16)
 Gemessen 20:42: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor

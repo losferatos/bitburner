@@ -3,6 +3,8 @@ reference/
 zustand/
 *.log
 data/tick-last.json
+# Sperrdatei des Waechters: reine Laufzeitinformation, gehoert keinem Commit.
+data/wache.pid
 nightshift/log/
 data/nightshift-heartbeat
 data/meter/

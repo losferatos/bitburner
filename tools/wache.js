@@ -741,7 +741,41 @@ async function main() {
     return;
   }
 
-  log("Waechter laeuft. Pruefung alle " + minuten(POLL_MS) + " min,"
+  // NUR EINER (26.08.2026, 00:45).
+  //
+  // Am 25.08. um 19:43 liefen ZWEI Waechter gleichzeitig (PID 24464 und
+  // 19744). Beide schreiben dieselbe Datei data/wache-zustand.json, und in ihr
+  // stehen die Meldesperren: gemeldet, stufe, seit. Wer zuletzt schreibt,
+  // gewinnt - ein Prozess kann die Sperre des anderen ueberschreiben, sodass
+  // derselbe Alarm zweimal aufs Handy geht oder eine Entwarnung eine noch
+  // bestehende Stoerung aus dem Zustand loescht. Seit dem 25.08. greift der
+  // Waechter ausserdem selbst ein und startet Werkzeuge nach; zwei davon
+  // wuerden sich gegenseitig Auftraege ueberschreiben.
+  //
+  // Die Sperrdatei traegt die eigene Prozesskennung. Lebt der dort genannte
+  // Prozess noch, beendet sich der neue - lieber gar kein zweiter als ein
+  // zweiter, der stillschweigend dazwischenfunkt.
+  const PID_DATEI = path.join(ROOT, "data", "wache.pid");
+  try {
+    const roh = await readFile(PID_DATEI, "utf8");
+    const alt = Number(String(roh).trim());
+    if (Number.isFinite(alt) && alt > 0 && alt !== process.pid) {
+      let lebt = false;
+      // Signal 0 sendet nichts, prueft nur die Existenz. Auf Windows wirft es
+      // ESRCH, wenn der Prozess weg ist - genau das wollen wir wissen.
+      try { process.kill(alt, 0); lebt = true; } catch { lebt = false; }
+      if (lebt) {
+        log("Es laeuft bereits ein Waechter (PID " + alt + ") - beende mich.");
+        return;
+      }
+      log("Verwaiste Sperrdatei von PID " + alt + " gefunden, uebernehme.");
+    }
+  } catch { /* keine Sperrdatei: normaler Erststart */ }
+  await mkdir(path.dirname(PID_DATEI), { recursive: true });
+  await writeFile(PID_DATEI, String(process.pid), "utf8");
+
+  log("Waechter laeuft (PID " + process.pid + "). Pruefung alle "
+    + minuten(POLL_MS) + " min,"
     + " Meldung erst nach " + BESTAETIGUNGEN + " Pruefungen,"
     + " hoechstens einmal je Stunde und Stoerung."
     + " Nachtruhe " + RUHE_VON + "-" + RUHE_BIS + " Uhr.");

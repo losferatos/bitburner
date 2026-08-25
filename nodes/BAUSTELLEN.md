@@ -31,6 +31,12 @@ Tab im Vordergrund bleibt - der Weckton von wakelock.js traegt nicht. Damit ist
 das kein einmaliger Zwischenfall, sondern ein Dauerzustand, der jeden
 Nachtlauf um Faktor fuenf verkuerzt.
 Nachtrag 18:53: unveraendert, 0,90 Runden je Minute.
+Nachtrag 19:33: nach einer ungedrosselten Phase um 19:03 (4,59/min) wieder bei
+0,93. Der Zustand wechselt also mit dem Fokus des Fensters - ein Klick hilft nur
+so lange, wie der Tab vorn bleibt. Folge: Der Rang stand von 19:03 bis 19:33 bei
+33, eine halbe Stunde ohne messbaren Fortschritt. Der Motor ruht dabei
+regelkonform (Ausdauer 27/50, Regenerationskammer) - nur dauert das Regenerieren
+gedrosselt fuenfmal so lange wie es sollte.
 
 ### Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen

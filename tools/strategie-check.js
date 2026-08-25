@@ -78,7 +78,23 @@ const schlaf = (ms) => new Promise((r) => setTimeout(r, ms));
 // belegt, wenn er frei ist: Eine fremde Zeile darf nicht ueberschrieben werden.
 async function frischerSteckbrief() {
   const belegt = await rpc({ method: "getFile", filename: "data/task.txt", server: "home" });
-  if (typeof belegt === "string" && belegt.trim()) return await liesJson("data/bblage.json");
+  if (typeof belegt === "string" && belegt.trim()) {
+    // BELEGTER KANAL IST KEIN AUSFALL (25.08.2026, 18:53).
+    //
+    // Vier Loops greifen ueber denselben Ein-Leser-Kanal ins Spiel. Trifft ein
+    // Pruflauf einen fremden Auftrag an, bekommt er die alte Datei - und die
+    // Alterspruefung weiter unten machte daraus BLIND. Bei der Wache loest das
+    // eine Push-Nachricht aus, obwohl Bruecke, Spiel und Motor einwandfrei
+    // laufen. Gemessen: Bruecke 200, Motortelemetrie 5 Sekunden alt, Kanal
+    // inzwischen wieder frei - der Prueflauf unmittelbar danach ergab SPUR.
+    //
+    // Der Unterschied gehoert markiert, nicht verwischt: Ein alter Steckbrief
+    // bei belegtem Kanal heisst "gerade nicht messbar", ein alter Steckbrief
+    // bei freiem Kanal heisst "etwas ist kaputt".
+    const alt = await liesJson("data/bblage.json");
+    if (alt) alt.__kanalBelegt = true;
+    return alt;
+  }
   await rpc({ method: "pushFile", filename: "data/task.txt",
     content: JSON.stringify(["bblage.js"]), server: "home" });
   for (let i = 0; i < 12; i++) {
@@ -276,6 +292,7 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   const rep = await liesJson("data/bn4rep.json");
   const blade = await liesJson("data/blade.json");
   let bb = await frischerSteckbrief();
+  const kanalWarBelegt = !!(bb && bb.__kanalBelegt);
   // ALTE DATEN SIND SCHLIMMER ALS KEINE (25.08.2026, Fremdpruefung).
   //
   // frischerSteckbrief() prueft das Alter nur INNERHALB seiner Warteschleife.
@@ -289,10 +306,19 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   // Knotennummer uebernehmen"). Sie ist damals nur in eines der beiden
   // Bauteile eingeflossen.
   if (bb && Number.isFinite(bb.zeit) && jetzt - bb.zeit > 5 * 60000) {
-    sag("Steckbrief ist " + Math.round((jetzt - bb.zeit) / 60000)
-      + " min alt - kein Urteil auf dieser Grundlage.");
-    bb = null;
-    urteil = "BLIND";
+    const alterMin = Math.round((jetzt - bb.zeit) / 60000);
+    if (bb.__kanalBelegt) {
+      // Kein Alarm: Ein anderer Loop hatte den Auftragskanal. Der naechste
+      // Lauf in wenigen Minuten misst frisch.
+      sag("Steckbrief " + alterMin + " min alt, Auftragskanal war belegt -"
+        + " diesmal keine Traegermessung.");
+      bb = null;
+    } else {
+      sag("Steckbrief ist " + alterMin + " min alt und der Auftragskanal war"
+        + " frei - der Auftragslaeufer im Spiel arbeitet nicht.");
+      bb = null;
+      urteil = "BLIND";
+    }
   }
   const knoten = (bb && bb.knoten) || (rep && rep.knoten) || null;
 
@@ -308,7 +334,10 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
 
   if (!t) {
     sag("Der Traeger dieses Knotens ist nicht messbar - Steckbrief fehlt.");
-    urteil = "BLIND";
+    // Nur dann Alarm, wenn oben nicht schon geklaert wurde, dass bloss der
+    // Kanal belegt war. Der Motor laeuft ja nachweislich, sonst waeren wir
+    // hier gar nicht angekommen.
+    if (urteil === "SPUR" && !kanalWarBelegt) urteil = "BLIND";
     return aus();
   }
 

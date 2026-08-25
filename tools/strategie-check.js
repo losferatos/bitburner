@@ -118,14 +118,101 @@ function traeger(knoten, bb, rep) {
       return { name: "Kampfwert-Tiefstand", wert: bb.tiefstand, ziel: 100,
         phase: "Tor zur Division", sollRate: 1.7 };
     }
-    // Der Kontrollpunkt aus nodes/ROUTE.md verlangt Rang 3.500 nach zwei
-    // Stunden. Das sind 29 Rang je Minute.
+    // KEINE FESTE SOLLRATE (25.08.2026, korrigiert nach Fremdpruefung).
+    //
+    // Hier stand 29 je Minute, hergeleitet aus dem Kontrollpunkt in
+    // nodes/ROUTE.md: 3.500 Rang nach zwei Stunden. Diese Herleitung ist eine
+    // Kategorienverwechslung, und sie hat den Pruefer eine Stunde lang
+    // durchgehend STAGNATION melden lassen, waehrend der Bot nahe am
+    // Moeglichen arbeitete.
+    //
+    // Der Rangzuwachs in Bladeburner ist nicht linear, sondern haengt an der
+    // gerade laufenden Aktion (Formulas.ts: rankGain * rewardFac^(level-1)):
+    //   Field Analysis   rankGain 0,1    rund 0,2 je Minute
+    //   Tracking         rankGain 0,3    rund 1,7
+    //   Retirement       rankGain 0,6    rund 2,1
+    //   Bounty Hunter    rankGain 0,9    rund 2,6
+    //   Investigation    rankGain 2,2    rund 4
+    //   Raid             rankGain 55     rund 60
+    //
+    // Kein einziger Vertrag erreicht auch nur ein Zehntel von 29. Die Zahl aus
+    // ROUTE.md stammt aus der ROADMAP-Zeile MIT Raid - und Raid verlangt
+    // `city.comms >= 1` (Operations.ts:147-150), was in der Anfangsphase nicht
+    // erfuellbar ist. Beim Uebertragen in den Pruefer ist die Fussnote
+    // verlorengegangen.
+    //
+    // Die Sollrate wird deshalb unten aus der laufenden Aktion bestimmt, nicht
+    // hier festgeschrieben.
     return { name: "Bladeburner-Rang", wert: bb.rang, ziel: null,
-      phase: "Black Operations", sollRate: 29 };
+      phase: "Black Operations" };
   }
   if (!rep) return null;
   return { name: "Hackniveau", wert: rep.hacking, ziel: rep.zielLevel || null,
     phase: "Hacking-Weg" };
+}
+
+/**
+ * Was ist von der GERADE LAUFENDEN Aktion an Rangzuwachs zu erwarten?
+ *
+ * Die Zahlen stammen aus dem Spielquellcode (Formulas.ts:9-27, Action.ts:105-121,
+ * Constants.ts DifficultyToTimeFactor) und sind bewusst grob - sie sollen eine
+ * Groessenordnung setzen, keine Prognose sein. Verglichen wird ohnehin nur
+ * gegen ein Zehntel davon.
+ */
+function sollRate(t, blade) {
+  if (t.name !== "Bladeburner-Rang") return null;
+  const aktion = blade && blade.aktion ? String(blade.aktion) : "";
+  if (!aktion) return null;
+  // General umfasst Training, Field Analysis und die Regenerationskammer.
+  // Alle drei bringen so gut wie keinen Rang - das ist kein Fehler, sondern
+  // ihr Zweck. Eine Erwartung an den Rang waere hier sinnlos; ob der Motor zu
+  // LANGE darin steckt, prueft der Block darunter gesondert.
+  if (aktion.startsWith("General/")) return null;
+  if (aktion.startsWith("Contracts/")) {
+    return { wert: 1.7, grund: aktion };
+  }
+  if (aktion.startsWith("Operations/")) {
+    // Raid ist der Ausreisser: rankGain 55 gegen 2,2 bei Investigation. Genau
+    // diese Zeile meint der Kontrollpunkt in nodes/ROUTE.md mit "6.000 mit
+    // Raid" - und genau sie verlangt city.comms >= 1.
+    if (aktion.includes("Raid")) return { wert: 60, grund: aktion };
+    return { wert: 4, grund: aktion };
+  }
+  if (aktion.startsWith("Black Operations/")) return null;
+  return null;
+}
+
+/**
+ * Steckt der Motor zu lange in einer Aktion, die keinen Rang bringt?
+ *
+ * Das ist der Fall vom 25.08. um 17:00: Die Vertragsschwelle stand zu hoch,
+ * kein Vertrag kam darueber, und blade.js fiel auf "Training" durch. Dort blieb
+ * es. Training hebt Kampfwerte, bringt aber keinen Rang - von aussen sah das
+ * aus wie Arbeit.
+ *
+ * Die Regenerationskammer ist ausgenommen, solange die Ausdauer wirklich
+ * niedrig ist: Ruhen ist dann richtig und keine Sackgasse.
+ */
+function stecktInLeerlauf(frueher, blade, jetzt) {
+  const GRENZE_MIN = 40;
+  if (!blade || !blade.aktion) return null;
+  const aktion = String(blade.aktion);
+  if (!aktion.startsWith("General/")) return null;
+  if (aktion.includes("Regeneration")) {
+    const [ist, max] = String(blade.ausdauer || "0/1").split("/").map(Number);
+    if (max > 0 && ist / max < 0.9) return null;
+  }
+  // Wie lange steht der Rang schon? Der Verlauf ist das einzige Gedaechtnis.
+  const still = [...frueher].reverse();
+  let seit = jetzt;
+  const wertJetzt = still.length ? still[0].wert : null;
+  for (const p of still) {
+    if (p.wert !== wertJetzt) break;
+    seit = p.zeit;
+  }
+  const min = (jetzt - seit) / 60000;
+  if (min < GRENZE_MIN) return null;
+  return aktion + " laeuft, der Rang steht seit " + Math.round(min) + " min";
 }
 
 (async () => {
@@ -170,6 +257,7 @@ function traeger(knoten, bb, rep) {
 
   // --- 3. Wo stehen wir, und ist das die richtige Richtung? ----------------
   const rep = await liesJson("data/bn4rep.json");
+  const blade = await liesJson("data/blade.json");
   const bb = await frischerSteckbrief();
   const knoten = (bb && bb.knoten) || (rep && rep.knoten) || null;
 
@@ -231,14 +319,38 @@ function traeger(knoten, bb, rep) {
       // dem ersten Punkt dieser Phase. Ein Zehntel der Sollrate ist grosszuegig
       // - es schlaegt erst an, wenn der Traeger um eine Groessenordnung zu
       // langsam ist, nicht bei einer schlechten Viertelstunde.
-      if (t.sollRate && aeltester) {
-        const spanneMin = (jetzt - aeltester.zeit) / 60000;
+      // DIE ERWARTUNG HAENGT AN DER AKTION, NICHT AN DER UHR
+      // (25.08.2026, korrigiert nach Fremdpruefung).
+      //
+      // Zwei Fehler steckten in der Vorgaengerfassung, beide haben denselben
+      // Effekt: Der Alarm konnte nicht anschlagen, wenn er sollte, und kaum
+      // aufhoeren, wenn er nicht mehr sollte.
+      //
+      //  1. Eine feste Sollrate von 29 je Minute, hergeleitet aus einem
+      //     Zwei-Stunden-Ziel. Kein Vertrag der Anfangsphase erreicht davon
+      //     auch nur ein Zehntel - siehe die Tabelle bei traeger(). Der Pruefer
+      //     meldete deshalb eine Stunde lang durchgehend STAGNATION, waehrend
+      //     der Bot nahe am Moeglichen arbeitete. Ein Alarm, der immer
+      //     schrillt, ist kein Alarm.
+      //  2. Gemessen wurde gegen den ERSTEN Punkt der Phase, samt Aufwaermzeit.
+      //     Der Nenner waechst monoton, der Lebenszeitdurchschnitt reagiert
+      //     immer traeger - selbst eine perfekte spaetere Phase haette den
+      //     Alarm kaum wieder abschalten koennen.
+      //
+      // Jetzt: gleitendes Fenster ueber die letzten FENSTER_MIN Minuten, und
+      // die Erwartung kommt aus der Aktion, die gerade tatsaechlich laeuft.
+      const FENSTER_MIN = 25;
+      const fenster = frueher.filter((x) => jetzt - x.zeit <= FENSTER_MIN * 60000);
+      const anker = fenster.length ? fenster[0] : null;
+      const soll = sollRate(t, blade);
+      if (soll && anker) {
+        const spanneMin = (jetzt - anker.zeit) / 60000;
         if (spanneMin >= 10) {
-          const rate = (t.wert - aeltester.wert) / spanneMin;
-          if (rate < t.sollRate / 10) {
+          const rate = (t.wert - anker.wert) / spanneMin;
+          if (rate < soll.wert / 10) {
             sag("ZU LANGSAM: " + rate.toFixed(2) + " je Minute ueber "
-              + Math.round(spanneMin) + " min, noetig waeren rund "
-              + t.sollRate + ".");
+              + Math.round(spanneMin) + " min. Fuer " + soll.grund
+              + " waeren rund " + soll.wert + " zu erwarten.");
             if (urteil === "SPUR") urteil = "STAGNATION";
           }
         }
@@ -253,8 +365,59 @@ function traeger(knoten, bb, rep) {
     }
   }
 
+  // --- 5. Steckt der Motor in einer Aktion ohne Ertrag? --------------------
+  const leerlauf = stecktInLeerlauf(frueher, blade, jetzt);
+  if (leerlauf) {
+    sag("LEERLAUF: " + leerlauf + ".");
+    if (urteil === "SPUR") urteil = "STAGNATION";
+  }
+
+  // --- 6. Sammeln sich Dialogfenster im Spiel? -----------------------------
+  //
+  // DIE MESSGROESSE WAR DA, NUR HAT SIE NIEMAND GELESEN (25.08.2026).
+  //
+  // An diesem Nachmittag hat der Bot zweimal ueber Stunden Bladeburner-Aktionen
+  // abgebrochen, weil andere Skripte Arbeit anfingen - das Spiel meldet das je
+  // Vorfall mit einem Dialogfenster. Beide Male hat Eric es bemerkt, kein
+  // Pruefer. Dabei zaehlt src/popups.js die geschlossenen Dialoge laengst und
+  // schreibt sie nach data/popups.txt.
+  //
+  // Ein Dialog hier und da ist normal (Faktionseinladungen, Hinweise). Eine
+  // steigende Rate ist es nicht: Sie heisst, dass sich zwei Teile des Bots
+  // gegenseitig die Arbeit abbrechen.
+  //
+  // Vorbehalt, der zur Ehrlichkeit gehoert: Die Einstellung
+  // SuppressBladeburnerPopup schaltet genau diesen Dialog stumm, OHNE den
+  // Abbruch zu verhindern. Der Zaehler ist also ein Stellvertreter, kein
+  // Beweis - er kann schweigen, waehrend der Schaden weiterlaeuft.
+  const popRoh = await rpc({ method: "getFile", filename: "data/popups.txt", server: "home" });
+  let popups = null;
+  if (typeof popRoh === "string" && popRoh.includes("|")) {
+    const teile = popRoh.split("|");
+    popups = { zeit: Number(teile[0]) || 0, geschlossen: Number(teile[1]) || 0 };
+    const vorher = [...v.punkte].reverse().find((x) => Number.isFinite(x.popups));
+    if (vorher && Number.isFinite(vorher.popups)) {
+      const zuwachs = popups.geschlossen - vorher.popups;
+      const min = (jetzt - vorher.zeit) / 60000;
+      // Mehr als ein Dialog je zwei Minuten ueber ein sinnvolles Fenster.
+      if (min >= 5 && zuwachs / min > 0.5) {
+        sag("DIALOGFLUT: " + zuwachs + " Dialoge in " + Math.round(min)
+          + " min - zwei Teile des Bots brechen sich gegenseitig die Arbeit ab.");
+        if (urteil === "SPUR") urteil = "STAGNATION";
+      }
+    }
+  }
+
+  // Das URTEIL gehoert in den Verlauf, nicht nur auf den Bildschirm.
+  //
+  // Ohne diese Zeile bleibt von jedem Lauf nur eine Zahl uebrig, und die Frage
+  // "hat ein Pruefer schon einmal SPUR gemeldet, obwohl etwas kaputt war"
+  // laesst sich nicht beantworten - die Meldung selbst existiert dann nirgends.
+  // Genau diese Luecke hat eine Fremdpruefung am 25.08. aufgedeckt.
   v.punkte.push({ zeit: jetzt, knoten, traeger: t.name, wert: t.wert,
-    phase: t.phase, netz: net.gerootet, geld: bb ? bb.geld : null });
+    phase: t.phase, netz: net.gerootet, geld: bb ? bb.geld : null,
+    urteil, aktion: blade && blade.aktion ? blade.aktion : null,
+    popups: popups ? popups.geschlossen : null });
   speichereVerlauf(v);
 
   return aus();

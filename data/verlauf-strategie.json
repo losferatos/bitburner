@@ -143,6 +143,27 @@
    "phase": "Black Operations",
    "netz": 95,
    "geld": 880826758
+  },
+  {
+   "zeit": 1787671835209,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 17,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 732409547
+  },
+  {
+   "zeit": 1787672020586,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 17,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 765675791,
+   "urteil": "SPUR",
+   "aktion": "General/Hyperbolic Regeneration Chamber",
+   "popups": 16
   }
  ]
 }

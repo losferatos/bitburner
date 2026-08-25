@@ -92,12 +92,30 @@ export async function main(ns) {
   const SICHER_BLACKOP = 0.99;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
   const SPANNE_ZU_BREIT = 0.10;
-  // Ausdauer. Unter der Haelfte des Hoechstwerts faellt die Erfolgschance
-  // (Bladeburner.ts:168: min(1, stamina/(0,5*max))), deshalb wird schon bei
-  // 55 Prozent geruht und erst ab 90 wieder gearbeitet - Hysterese, sonst
-  // pendelt der Bot zwischen Ruhe und Einsatz.
-  const AUSDAUER_RUHE = 0.55;
-  const AUSDAUER_WEITER = 0.90;
+  // Ausdauer. Die Strafe ist min(1, stamina/(0,5*max)) (Bladeburner.ts:167-169)
+  // und wirkt an genau einer Stelle: competence *= staminaPenalty
+  // (Action.ts:176). OBERHALB VON 50 PROZENT IST SIE EXAKT 1 - jede Ausdauer
+  // darueber ist wertlos.
+  //
+  // Bis zum 25.08.2026 stand hier 55 / 90 Prozent. Der Bot ruhte damit ab
+  // einem Punkt, an dem er noch volle Leistung hatte, und ruhte dann bis zu
+  // einem Wert, der ihm nichts brachte. Gemessen zwischen 19:40 und 19:59:
+  // neunzehn Minuten Regenerationskammer bei unveraendertem Rang 73, waehrend
+  // die Ausdauer bei 29 von 53 stand - 54,7 Prozent, Strafe 1,0, also keine.
+  //
+  // Jetzt: ruhen erst unter 52 Prozent, weiterarbeiten ab 60. Der schmale
+  // Streifen ist Absicht - er haelt den Bot dicht ueber der Strafgrenze,
+  // statt ihn eine Reserve aufbauen zu lassen, die keine Wirkung hat.
+  // Ausdauer regeneriert ohnehin passiv weiter, auch waehrend der Arbeit
+  // (Bladeburner.ts:1382), die Kammer verdoppelt das nur.
+  const AUSDAUER_RUHE = 0.52;
+  const AUSDAUER_WEITER = 0.60;
+  // Trefferpunkte. Die Kammer heilt nebenbei 2 HP je Durchlauf
+  // (Bladeburner.ts:1198). Solange lange geruht wurde, geschah das von selbst;
+  // bei der kurzen Ruhe oben nicht mehr. Ohne eigene Schwelle liefe der Bot
+  // sonst mit sinkenden HP weiter, bis ihn ein Einsatz ins Krankenhaus bringt.
+  const HP_RUHE = 0.50;
+  const HP_WEITER = 0.95;
 
   // Reihenfolge der Faehigkeiten. Overclock zuerst, weil es die Dauer JEDER
   // Aktion senkt und damit auf alles andere wirkt; es ist bei Stufe 90
@@ -206,6 +224,10 @@ export async function main(ns) {
     if (max > 0 && jetzt < max * AUSDAUER_RUHE) {
       return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "Ausdauer" };
     }
+    const hp = ns.getPlayer().hp;
+    if (hp && hp.max > 0 && hp.current < hp.max * HP_RUHE) {
+      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "HP" };
+    }
 
     // 2. Die naechste Black Op, wenn Rang und Sicherheit reichen. Sie sind
     //    der eigentliche Zweck: 21 Stueck, dann ist der Knoten offen.
@@ -293,15 +315,19 @@ export async function main(ns) {
       faehigkeitenKaufen();
 
       const [jetzt, max] = ns.bladeburner.getStamina();
-      // Hysterese: Einmal in der Ruhe, wird bis 90 Prozent geruht.
-      if (ruhend && max > 0 && jetzt < max * AUSDAUER_WEITER) {
+      const hp = ns.getPlayer().hp;
+      // Hysterese: Einmal in der Ruhe, wird bis zur Weiter-Schwelle geruht -
+      // sonst pendelt der Bot bei jedem Aktionsschritt zwischen beidem.
+      const ausdauerKnapp = max > 0 && jetzt < max * AUSDAUER_WEITER;
+      const hpKnapp = hp && hp.max > 0 && hp.current < hp.max * HP_WEITER;
+      if (ruhend && (ausdauerKnapp || hpKnapp)) {
         await ns.bladeburner.nextUpdate();
         continue;
       }
       ruhend = false;
 
       const wahl = waehle();
-      if (wahl.grund === "Ausdauer") ruhend = true;
+      if (wahl.grund === "Ausdauer" || wahl.grund === "HP") ruhend = true;
 
       const laeuft = ns.bladeburner.getCurrentAction();
       const gleich = laeuft && laeuft.type === wahl.typ && laeuft.name === wahl.name;

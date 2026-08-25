@@ -242,14 +242,30 @@ function sollRate(t, blade) {
  * niedrig ist: Ruhen ist dann richtig und keine Sackgasse.
  */
 function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
-  const GRENZE_MIN = 40;
   if (!blade || !blade.aktion) return null;
   const aktion = String(blade.aktion);
   if (!aktion.startsWith("General/")) return null;
-  if (aktion.includes("Regeneration")) {
-    const [ist, max] = String(blade.ausdauer || "0/1").split("/").map(Number);
-    if (max > 0 && ist / max < 0.9) return null;
-  }
+
+  // DEN GRUND LESEN, STATT IHN ZU ERRATEN (26.08.2026, 00:15).
+  //
+  // Hier stand eine Heuristik: Steht die Ausdauer unter 90 Prozent, gilt die
+  // Regenerationskammer als legitim - egal wie lange. Zwei Dinge stimmen daran
+  // nicht mehr. Erstens arbeitet blade.js seit dem 25.08. schon ab 60 Prozent
+  // weiter, die 90 stammen aus der alten Hysterese. Zweitens ruht der Motor
+  // inzwischen meist wegen der TREFFERPUNKTE, und dann ist die Ausdauer voll -
+  // die Ausnahme greift also ausgerechnet im haeufigsten Fall nicht.
+  //
+  // blade.js schreibt den Grund seit 20:46 selbst mit ("ruht bis Ausdauer 33",
+  // "ruht bis HP 17"). Den zu lesen ist genauer als jede Schaetzung ueber die
+  // Ausdauer - und eine Ruhe MIT Grund darf trotzdem nicht ewig dauern.
+  //
+  // Zwanzig Minuten sind grosszuegig: Die Kammer heilt zwei Trefferpunkte je
+  // Durchlauf und die Ausdauer regeneriert rund 1,2 je Minute passiv - beide
+  // Schwellen sind in wenigen Minuten erreicht. Wer nach zwanzig Minuten noch
+  // ruht, ruht nicht, sondern steckt fest.
+  const grund = String(blade.grund || "");
+  const ruhtMitGrund = grund.startsWith("ruht bis");
+  const GRENZE_MIN = ruhtMitGrund ? 20 : 40;
   // Wie lange steht der Rang schon? Der Verlauf ist das einzige Gedaechtnis.
   //
   // DER VERGLEICHSWERT IST DER AKTUELLE, NICHT DER LETZTE GESPEICHERTE
@@ -271,7 +287,8 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   }
   const min = (jetzt - seit) / 60000;
   if (min < GRENZE_MIN) return null;
-  return aktion + " laeuft, der Rang steht seit " + Math.round(min) + " min";
+  return aktion + " laeuft" + (ruhtMitGrund ? " (" + grund + ")" : "")
+    + ", der Rang steht seit " + Math.round(min) + " min";
 }
 
 (async () => {

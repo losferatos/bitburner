@@ -129,15 +129,6 @@ praeparierten Kampfwerten in `data/bblage.json` herbeizufuehren, ist
 gescheitert - `frischerSteckbrief()` erneuert die Datei selbst, sobald sie alt
 wirkt, und ueberschreibt die Praeparation.
 
-### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
-Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor
-durchgehend `General/Hyperbolic Regeneration Chamber` fuhr.
-Erwartet: Eine Ruhephase von mehr als zehn Minuten ist keine Spur, sondern ein
-Befund - erst recht, wenn der Traeger dabei stillsteht.
-Verdacht: `sollRate()` in `tools/strategie-check.js` gibt fuer General-Aktionen
-eine Sollrate nahe null zurueck und erklaert damit jeden Stillstand fuer
-erwartungsgemaess. `stecktInLeerlauf()` greift erst nach 40 Minuten.
-
 ---
 
 ## Offen, nach Dringlichkeit
@@ -322,6 +313,27 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Pruefer hielt die Regenerationskammer fuer Fortschritt (26.08., 00:16)
+Gemessen 20:42: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor
+durchgehend in der Kammer stand.
+Ursache: Eine Heuristik. Stand die Ausdauer unter 90 Prozent, galt die Kammer
+als legitim - beliebig lange. Zwei Dinge stimmten daran nicht mehr: blade.js
+arbeitet seit dem 25.08. schon ab 60 Prozent weiter (die 90 stammten aus der
+alten Hysterese), und der Motor ruht inzwischen meist wegen der Trefferpunkte,
+wobei die Ausdauer voll ist - die Ausnahme griff also ausgerechnet im
+haeufigsten Fall nicht.
+Behoben: Der Pruefer LIEST den Grund, statt ihn zu erraten. blade.js schreibt
+ihn seit 20:46 mit ("ruht bis Ausdauer 33", "ruht bis HP 17"). Eine Ruhe mit
+Grund darf 20 Minuten dauern, eine ohne weiterhin 40. Zwanzig Minuten sind
+grosszuegig: Die Kammer heilt zwei Trefferpunkte je Durchlauf, die Ausdauer
+regeneriert rund 1,2 je Minute passiv - beide Schwellen sind in wenigen
+Minuten erreicht.
+**Verifiziert 00:16** gegen einen praeparierten Verlauf mit 30 Minuten
+unveraendertem Rang: `LEERLAUF: General/Hyperbolic Regeneration Chamber laeuft
+(ruht bis HP 17), der Rang steht seit 30 min`, URTEIL STAGNATION. Der Grund
+steht jetzt in der Meldung. Im Normalbetrieb unveraendert SPUR.
+
 
 ### blade.js schrieb in zwei von drei Zweigen keine Telemetrie (25.08., 22:16)
 

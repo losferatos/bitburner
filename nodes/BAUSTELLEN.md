@@ -140,28 +140,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Der Totmannschalter der Loops schlaegt nachts faelschlich an
-
-Gemessen 26.08. um 00:45: Der Waechter meldet `loops` - "Die
-Ueberwachungs-Loops melden sich seit X min nicht mehr". Nachts wird die
-Meldung von der Nachtruhe geschluckt ("Nachtruhe - nicht gesendet: loops"),
-um 5:00 ginge sie aber raus.
-
-Der Schalter haengt am Alter von `data/ziele.md` (`tools/wache.js`, Abschnitt
-3c): Bleibt die Datei ueber 90 Minuten stehen, gilt die Loop-Schleife als tot.
-Geschrieben wird sie aber nur vom Reportloop - und der pausiert planmaessig
-zwischen 22:30 und 5:00. Jede Nacht ist die Datei also stundenlang alt,
-obwohl Wache und Vorankommen munter weiterlaufen.
-
-Zu tun: Entweder die Pruefung zwischen 22:30 und 5:30 aussetzen, oder besser
-einen Totmannschalter waehlen, den ALLE Loops beruehren - der Reportloop ist
-der einzige mit Nachtpause, die anderen beiden laufen durch.
-
-**Dringlichkeit:** mittel. Ein Fehlalarm aus dem Alarmwerkzeug selbst ist die
-teuerste Sorte: Er kommt zu einer Zeit, zu der Eric gerade aufwacht, und er
-stumpft die Meldungen ab, auf die es ankommt.
-
-
 ### Worker-Timer-Ersatz gegen die Drosselung (flag-freier Weg)
 
 Die Timer-Drosselung trifft nur den Haupt-Thread. Der Codepfad fuer
@@ -318,6 +296,24 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Totmannschalter der Loops schlug nachts faelschlich an (26.08., 01:15)
+Gemessen 00:45: Der Waechter meldete `loops` - "Die Ueberwachungs-Loops melden
+sich seit X min nicht mehr". Nachts hat die Nachtruhe die Meldung geschluckt
+("Nachtruhe - nicht gesendet: loops"), um 5:00 waere sie rausgegangen.
+Ursache: Der Schalter hing am Alter von `data/ziele.md`, und die schreibt nur
+der Reportloop - der planmaessig zwischen 22:30 und 5:00 pausiert. Jede Nacht
+war die Datei stundenlang alt, obwohl Wache und Vorankommen weiterliefen.
+Behoben: Der Schalter haengt jetzt an `data/verlauf-strategie.json`. Die
+schreibt `tools/strategie-check.js` bei JEDEM Lauf, und den ruft jeder der
+vier Loops als erstes auf - der haeufigste ist die Wache alle zwanzig Minuten.
+Grenze deshalb 60 statt 90 Minuten: Das sind drei verpasste Laeufe und nicht
+mehr mit Verspaetung zu erklaeren.
+**Verifiziert 01:14 in beide Richtungen:** Mit frischer Datei meldet der
+Waechter nichts mehr (vorher schlug er an). Nach `touch -d "70 minutes ago"`
+meldet er "Die Ueberwachungs-Loops melden sich seit 70 min nicht mehr", und
+ein einziger Prueferlauf raeumt den Befund wieder ab.
+
 
 ### Nichts verhinderte einen zweiten Waechterprozess (26.08., 00:45)
 Gemessen 25.08. um 19:43: ZWEI `node tools/wache.js` liefen gleichzeitig

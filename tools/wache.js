@@ -347,13 +347,25 @@ async function pruefe(zustand, jetzt) {
   // Sieben-Tage-Ablauf und ein misslungener Cron-Umbau anders aussehen als
   // Normalbetrieb.
   //
-  // data/ziele.md ist der Totmannschalter: Der Reportloop schreibt sie alle
-  // dreissig Minuten, sie liegt lokal (nicht im Spiel), und sie wird nicht
-  // versioniert. Bleibt sie stehen, ist die Schleife tot.
+  // DER SCHALTER MUSS VON ALLEN LOOPS BERUEHRT WERDEN (26.08.2026, 01:15).
+  //
+  // Hier stand `data/ziele.md`. Die schreibt aber nur der Reportloop - und der
+  // pausiert planmaessig zwischen 22:30 und 5:00. Jede Nacht war die Datei
+  // damit stundenlang alt, obwohl Wache und Vorankommen munter weiterliefen;
+  // in der Nacht zum 26.08. hat nur die Nachtruhe die Fehlmeldung geschluckt,
+  // um 5:00 waere sie rausgegangen. Ein Fehlalarm aus dem Alarmwerkzeug selbst
+  // ist die teuerste Sorte: Er kommt, wenn Eric gerade aufwacht, und stumpft
+  // die Meldungen ab, auf die es ankommt.
+  //
+  // `data/verlauf-strategie.json` ist der bessere Schalter: Sie wird von
+  // `tools/strategie-check.js` bei JEDEM Lauf geschrieben, und den ruft jeder
+  // der vier Loops als erstes auf. Der haeufigste ist die Wache alle zwanzig
+  // Minuten - eine Stunde Stille ist also drei verpasste Laeufe und nicht
+  // mehr mit Verspaetung zu erklaeren.
   try {
-    const st = statSync(path.join(ROOT, "data", "ziele.md"));
+    const st = statSync(path.join(ROOT, "data", "verlauf-strategie.json"));
     const alter = jetzt - st.mtimeMs;
-    if (alter > 90 * 60_000) {
+    if (alter > 60 * 60_000) {
       befunde.push({
         typ: "loops",
         text: "Die Ueberwachungs-Loops melden sich seit " + minuten(alter)

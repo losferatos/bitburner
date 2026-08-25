@@ -2614,6 +2614,49 @@ export async function main(ns) {
         }
       }
 
+      // EINE WERKBANK REICHT NICHT MEHR (25.08.2026, gemessen in BitNode 6).
+      //
+      // Alle Werkzeuge auf EINEN Rechner zu legen war richtig, solange ihre
+      // Summe unter den groessten Rechner passte. Das gilt nicht mehr:
+      //   blade 41,25 + bbtrain 94,75 + bn4life 293,8 + homegrow 148,5
+      //   + wakelock 34,25 + bn4door 99,85 = 712,4 GB auf werk-0 (1024 GB)
+      // Fuer bn4rep.js mit 768,25 GB blieben 312,25 GB - und es gab keinen
+      // zweiten Wirt, denn gestartet wurde ausschliesslich auf der Werkbank.
+      // bn4rep lief deshalb vom Einbau um 05:50 bis 16:50 gar nicht, ohne
+      // dass die Zeile "wartet" jemals ausserhalb des Spiel-Logs sichtbar
+      // geworden waere.
+      //
+      // Es gab durchaus Platz: fulcrumtech haette nach dem Raeumen seiner
+      // Arbeiter 1.021 GB gehabt. Nur hat niemand dort nachgesehen.
+      //
+      // Deshalb sucht jedes fehlende Werkzeug jetzt selbst einen Wirt: erst
+      // die Werkbank (dort gehoert es hin, dort steht die Reserve), und wenn
+      // es dort auch nach dem Raeumen nie passen kann, den Rechner mit dem
+      // meisten Platz nach Raeumung. Arbeiter sind Einwegskripte - bn4net legt
+      // sie in der naechsten Runde von selbst wieder nach.
+      const freiAuf = (h) => ns.getServerMaxRam(h) - ns.getServerUsedRam(h);
+      const arbeiterGbAuf = (h) => {
+        let gb = 0;
+        for (const pr of ns.ps(h)) {
+          if (!WORKER.includes(pr.filename)) continue;
+          gb += ns.getScriptRam(pr.filename, "home") * pr.threads;
+        }
+        return gb;
+      };
+      const ausweichwirt = (braucht) => {
+        let bester = null, meist = -1;
+        for (const h of hosts) {
+          if (!ns.hasRootAccess(h)) continue;
+          if (h === werkbank) continue;
+          // home bleibt aussen vor: Dort schuetzt reserveHome() den Platz der
+          // Steuerung, und ein 768-GB-Werkzeug haette dort ohnehin nie Platz.
+          if (h === "home") continue;
+          const moeglich = freiAuf(h) + arbeiterGbAuf(h);
+          if (moeglich >= braucht && moeglich > meist) { meist = moeglich; bester = h; }
+        }
+        return bester;
+      };
+
       for (const [datei, args] of fehlend) {
         const braucht = ns.getScriptRam(datei, "home");
         // Nicht stillschweigend ueberspringen. Ein Werkzeug, das seit einer
@@ -2624,19 +2667,52 @@ export async function main(ns) {
           if (runde % 10 === 0) sag(datei + " nicht lesbar (getScriptRam gibt 0).");
           continue;
         }
+
+        let wirt = werkbank;
         if (frei() < braucht) {
-          if (runde % 10 === 0) sag(datei + " wartet: " + werkbank + " hat "
-            + frei().toFixed(1) + " von " + braucht.toFixed(1) + " GB frei.");
-          continue;
+          // Kann es auf der Werkbank ueberhaupt je passen, wenn man alle
+          // Arbeiter dort raeumte? Wenn nein, ist Warten sinnlos - dann fehlt
+          // nicht Geduld, sondern ein anderer Rechner.
+          const werkbankMoeglich = freiAuf(werkbank) + arbeiterGbAuf(werkbank);
+          if (werkbankMoeglich >= braucht) {
+            if (runde % 10 === 0) sag(datei + " wartet: " + werkbank + " hat "
+              + frei().toFixed(1) + " von " + braucht.toFixed(1) + " GB frei.");
+            continue;
+          }
+          const weg = ausweichwirt(braucht);
+          if (!weg) {
+            if (runde % 10 === 0) sag(datei + " (" + braucht.toFixed(1)
+              + " GB) passt auf " + werkbank + " nie und findet auch sonst"
+              + " nirgends Platz.");
+            continue;
+          }
+          wirt = weg;
+          // Auf dem Ausweichwirt selbst raeumen - der Block oben raeumt nur
+          // die Werkbank.
+          if (freiAuf(wirt) < braucht) {
+            for (const w of ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"]) {
+              if (freiAuf(wirt) >= braucht) break;
+              if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
+              ns.scriptKill(w, wirt);
+            }
+          }
+          if (freiAuf(wirt) < braucht) {
+            if (runde % 10 === 0) sag(datei + ": Raeumen auf " + wirt
+              + " brachte nur " + freiAuf(wirt).toFixed(1) + " von "
+              + braucht.toFixed(1) + " GB.");
+            continue;
+          }
+          sag(datei + " passt nicht auf " + werkbank + " (" + braucht.toFixed(1)
+            + " GB) - weiche auf " + wirt + " aus.");
         }
         // Abhaengigkeiten mitkopieren. ns.scp nimmt nur, was man ihm nennt -
         // fehlt eine importierte Datei auf dem Zielrechner, laesst sich das
         // Skript dort nicht uebersetzen und ns.exec gibt still 0 zurueck. Kein
         // Absturz, keine Meldung, das Werkzeug fehlt einfach.
-        ns.scp([datei, ...BIBLIOTHEKEN], werkbank, "home");
-        const pid = ns.exec(datei, werkbank, 1, ...args);
-        sag(pid ? datei + " laeuft auf " + werkbank + " (pid " + pid + ")."
-          : datei + " liess sich auf " + werkbank + " nicht starten (exec gab 0).");
+        ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home");
+        const pid = ns.exec(datei, wirt, 1, ...args);
+        sag(pid ? datei + " laeuft auf " + wirt + " (pid " + pid + ")."
+          : datei + " liess sich auf " + wirt + " nicht starten (exec gab 0).");
       }
     }
 

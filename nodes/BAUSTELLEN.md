@@ -15,28 +15,7 @@ Regeln:
 
 ## Offen, nach Dringlichkeit
 
-### 1. bn4rep.js laeuft nicht (seit dem Einbau am 25.08. um 05:50)
-
-Stand 25.08. 16:10: Das Werkzeug steht in der Liste (bn4net.js:296), es gibt
-keinen Fehlstart, und die Werkbank werk-0 haelt 2.207 GB Reserve - trotzdem
-laeuft es nirgends. bn4rep braucht 768,25 GB.
-
-Vermutung, nicht gemessen: `frei()` auf werk-0 liegt unter 768 GB, weil Arbeiter
-den Platz belegen, und der Raeumblock (bn4net.js:2598-2615) raeumt nur fuer das
-ERSTE fehlende Werkzeug und bricht dann ab (`break`). Steht ein kleineres
-Werkzeug vor bn4rep in der Liste, wird fuer das geraeumt und bn4rep bleibt
-liegen.
-
-Zu tun: Im Spiel-Log nach der Zeile "bn4rep.js wartet: werk-0 hat X von 768.2 GB
-frei" suchen (sie wird alle zehn Runden geschrieben). Bestaetigt sie die
-Vermutung, den Raeumblock so aendern, dass er das GROESSTE fehlende Werkzeug
-bedient statt des ersten.
-
-**Dringlichkeit:** mittel. In BitNode 6 ist der Traeger Bladeburner, nicht
-Reputation - aber ohne bn4rep gibt es keine Augmentierungen, und die
-Kampfwert-Multiplikatoren daraus verkuerzen jeden weiteren Trainingslauf.
-
-### 2. Der V2-Kontrollpunkt ist nie gemessen worden
+### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
 in BitNode 6 mindestens 6.000 mit Raid, mindestens 3.500 ohne.** Die gesamte
@@ -60,7 +39,7 @@ Erfolgsschaetzungen sind noch zu unscharf fuer einen Vertrag), naechste Black Op
 **Dringlichkeit:** hoch. Es ist das wertvollste Einzelergebnis der naechsten
 Tage - an ihm haengt die gesamte Reihenfolge ab Platz 3.
 
-### 3. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
+### 2. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die
 Skeptiker-Runde vier Konstruktionsfehler fand: Das "Ventil" mass Fragmentierung
@@ -79,7 +58,7 @@ statt 1,80 beim Einwegarbeiter). Was fehlt, ist die Zuteilung:
 Hacking-Weg, und der traegt diesen Knoten nicht. Vor dem naechsten V1-Knoten
 wieder hochstufen.
 
-### 4. Boersen-Bot fuer BitNode 8
+### 3. Boersen-Bot fuer BitNode 8
 
 BitNode 8 steht ganz am Ende der Route (Platz 42-44) und ist der einzige Knoten
 ohne Bladeburner, Gang, Corporation und Skript-Hackgeld. Reputation ist dort
@@ -89,7 +68,7 @@ noch nicht.
 **Dringlichkeit:** niedrig, aber nicht null: Er ist die einzige Voraussetzung
 auf der ganzen Route, die noch gar nicht existiert.
 
-### 5. Darknet-Labyrinth-Gewerk (V1b)
+### 4. Darknet-Labyrinth-Gewerk (V1b)
 
 `labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei
 `hasFullDarknetAccess()` - also in BitNode 15 oder mit SF15. Jeder
@@ -101,6 +80,24 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### bn4rep.js lief seit dem Einbau um 05:50 nicht (25.08., behoben 16:50)
+Die Werkbank war strukturell zu klein geworden. Auf werk-0 (1.024 GB) lagen
+blade 41,25 + bbtrain 94,75 + bn4life 293,8 + homegrow 148,5 + wakelock 34,25 +
+bn4door 99,85 = 712,4 GB; fuer bn4rep mit 768,25 GB blieben 312,25 GB. Gestartet
+wurde ausschliesslich auf der Werkbank, also gab es keinen zweiten Wirt - und
+die Zeile "wartet" stand nur im Spiel-Log, das von aussen niemand liest.
+
+Platz gab es durchaus: fulcrumtech haette nach dem Raeumen seiner Arbeiter
+1.021 GB gehabt. Nur hat niemand dort nachgesehen.
+
+Behoben: Jedes fehlende Werkzeug sucht sich jetzt selbst einen Wirt - erst die
+Werkbank, und wenn es dort auch nach dem Raeumen nie passen kann, den Rechner
+mit dem meisten Platz nach Raeumung. Gemessen 16:50: bn4rep laeuft auf
+fulcrumtech.
+
+Dazu neu: `src/werkbank.js` beantwortet die Frage "warum startet ein Werkzeug
+nicht" in einer Datei statt im Spiel-Log.
 
 ### bn4life und blade.js stritten sekuendlich um die Figur (25.08., 16:25)
 Unmittelbar nach dem Beitritt zur Division erschienen im Spiel sekuendlich

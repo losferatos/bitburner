@@ -71,6 +71,30 @@ Zu tun: Entweder die Nachstart-Logik reparieren (bn4net, braucht Erics
 Freigabe) oder dem Reload-Kanal ein "starte, falls nicht laufend" geben.
 Dies ist der vierte stille Fehlschlag des Wiederanlaufs an einem Tag.
 
+**Nachtrag 23:16 - die Folge ist abgefangen, die Ursache nicht.**
+`tools/wache.js` startet jetzt selbst nach. Der residente Waechter war bisher
+reine Beobachtung; er meldet aufs Handy und konnte nichts tun. Genau das hat
+heute vier Mal Stunden gekostet, und nachts haette es bis zum Morgen gedauert.
+
+Geprueft werden die beiden Werkzeuge, deren Telemetrie ihr Lebenszeichen ist:
+`blade.js` ueber `data/blade.json` (der Motor des Knotens - seit 22:16 schreibt
+er in JEDEM Zweig) und `wakelock.js` ueber `data/wakelock.txt` (der Tonanker;
+ohne ihn drosselt der Browser auf ein Timer-Aufwachen je Minute). Aelter als
+zehn Minuten heisst: laeuft nicht mehr. Dann schickt der Waechter
+`["<name>"]` in den Auftragskanal - vorher pruefend, ob der frei ist, denn er
+hat genau einen Leser und gehoert sonst einem Loop. Hoechstens ein Versuch je
+Werkzeug und Viertelstunde.
+
+**Verifiziert 23:15:** `data/wakelock.txt` von Hand auf einen 15 Minuten alten
+Zeitstempel gesetzt, danach `node tools/wache.js --einmal`. Ergebnis:
+"Nachgestartet: wakelock.js (Telemetrie war 15 min alt)", und um 23:15:08
+meldete das Werkzeug seinen Start. Der Folgelauf ist wieder still.
+
+Nicht geprueft wird `bbtrain.js` - es schreibt nur bei Ereignissen, ein Alter
+sagt dort nichts. Und die URSACHE bleibt offen: Warum bn4net nach einem Einbau
+zwanzig Minuten lang nichts nachstartet, obwohl Platz da ist, steht weiter
+oben und braucht Erics Freigabe fuer eine Aenderung am Motor.
+
 **Nachtrag 22:16 - der Reload-Kanal ist derzeit eine Falle.** Ein
 `WERKZEUG blade.js` um 22:15 hat blade.js beendet, und nichts hat es
 zurueckgeholt: Um 22:16 fehlte es in `data/ps.json`. Wer den Kanal benutzt,

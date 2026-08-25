@@ -181,6 +181,35 @@ async function spieldatei(name) {
   }
 }
 
+// STARTEN, NICHT NUR MELDEN (25.08.2026, 23:15).
+//
+// Der Waechter war bisher reine Beobachtung: Er meldet aufs Handy und kann
+// nichts tun. Das hat am 25.08. vier Mal Stunden gekostet - nach einem
+// Augmentierungs-Einbau um 22:01 fehlten sechs Werkzeuge, darunter der Motor
+// des Knotens und der Tonanker gegen die Tab-Drosselung, und bn4net hat sie
+// zwanzig Minuten lang nicht nachgestartet. Am Platz lag es nicht: home hatte
+// 253 GB frei. Von aussen half nur der Auftragskanal, von Hand bedient.
+//
+// Genau das kann der Waechter selbst. Ein Werkzeugstart ist ungefaehrlich und
+// wiederholbar: bn4net erkennt laufende Skripte und startet nichts doppelt.
+//
+// Der Kanal hat GENAU EINEN LESER und wird beim Lesen geleert. Deshalb erst
+// nachsehen, ob er frei ist - ein belegter Kanal gehoert einem der Loops, und
+// dessen Auftrag zu ueberschreiben waere schlimmer als eine Runde zu warten.
+async function starteWerkzeug(name) {
+  try {
+    const belegt = await spieldatei("data/task.txt");
+    if (belegt && belegt.trim()) return false;
+    const antwort = await holeJson("/api/rpc?method=pushFile&filename="
+      + encodeURIComponent("data/task.txt")
+      + "&content=" + encodeURIComponent(JSON.stringify([name]))
+      + "&server=home");
+    return !antwort || !antwort.error;
+  } catch {
+    return false;
+  }
+}
+
 async function spielJson(name) {
   const roh = await spieldatei(name);
   if (!roh) return null;
@@ -196,6 +225,7 @@ async function ladeZustand() {
       stufe: z.stufe || {},
       text: z.text || {},
       verlauf: Array.isArray(z.verlauf) ? z.verlauf : [],
+      gestartet: z.gestartet || {},
       knoten: z.knoten ?? null,
       homeRam: z.homeRam ?? null,
       nachtpost: Array.isArray(z.nachtpost) ? z.nachtpost : [],
@@ -482,6 +512,58 @@ async function pruefe(zustand, jetzt) {
     });
   }
 
+  // --- 8. LEBEN DIE ZWEI WICHTIGSTEN WERKZEUGE? ---------------------------
+  //
+  // Ihre Telemetrie IST ihr Lebenszeichen - beide schreiben mindestens
+  // minuetlich, in jedem Zweig ihrer Schleife. Eine alte Datei heisst also:
+  // Das Skript laeuft nicht mehr.
+  //
+  //   blade.js     der Motor von BitNode 6 und 7. Ohne ihn steht der Rang.
+  //   wakelock.js  der Tonanker. Ohne ihn drosselt der Browser den Tab auf
+  //                ein Timer-Aufwachen je Minute - Faktor 5 bis 60 auf alles.
+  //
+  // Nicht geprueft wird bbtrain.js: Es schreibt nur bei Ereignissen, ein
+  // Alter sagt dort nichts.
+  const WERKZEUGE = [
+    { datei: "data/blade.json", skript: "blade.js", json: true },
+    { datei: "data/wakelock.txt", skript: "wakelock.js", json: false },
+  ];
+  for (const w of WERKZEUGE) {
+    const roh = await spieldatei(w.datei);
+    let stempel = null;
+    if (roh) {
+      if (w.json) {
+        try { stempel = JSON.parse(roh).zeit; } catch { stempel = null; }
+      } else {
+        // Format "<ms>|<zustand>|<rate>"; die Klartextzeile beim Start hat
+        // keinen Zeitstempel und zaehlt deshalb nicht als Lebenszeichen.
+        const n = Number(String(roh).split("|")[0]);
+        stempel = Number.isFinite(n) && n > 1e12 ? n : null;
+      }
+    }
+    const alt = stempel ? jetzt - stempel : null;
+    if (alt === null || alt <= 10 * 60_000) continue;
+
+    // Hoechstens alle 15 Minuten ein Startversuch je Werkzeug. Sonst schiebt
+    // der Waechter bei einem echten Problem alle drei Minuten einen Auftrag
+    // nach und verstopft den Kanal fuer die Loops.
+    const letzter = zustand.gestartet && zustand.gestartet[w.skript];
+    if (letzter && jetzt - letzter < 15 * 60_000) continue;
+    const los = await starteWerkzeug(w.skript);
+    if (los) {
+      zustand.gestartet = zustand.gestartet || {};
+      zustand.gestartet[w.skript] = jetzt;
+      log("Nachgestartet: " + w.skript + " (Telemetrie war "
+        + minuten(alt) + " min alt).");
+    }
+    befunde.push({
+      typ: "werkzeug",
+      text: w.skript + " meldet sich seit " + minuten(alt) + " min nicht."
+        + (los ? " Neustart ueber den Auftragskanal angestossen."
+          : " Der Auftragskanal war belegt - naechster Versuch in 15 min."),
+    });
+  }
+
   return { befunde, messwerte };
 }
 
@@ -584,7 +666,8 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     motor: "bn4net.js meldet sich wieder.",
     rep: "bn4rep.js arbeitet wieder.",
     hilfe: "Der Bot kommt wieder allein zurecht.",
-    traeger: "Der Traeger des Knotens steigt wieder."
+    traeger: "Der Traeger des Knotens steigt wieder.",
+    werkzeug: "Das fehlende Werkzeug laeuft wieder."
   };
   for (const typ of Object.keys(zustand.seit)) {
     if (aktiv.has(typ)) continue;

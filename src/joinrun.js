@@ -72,7 +72,23 @@ export async function main(ns) {
       if (!offen.length) { sag(`Alle Kampfwerte >= ${ZIEL}: ${JSON.stringify(w)}`); break; }
       const naechst = offen.sort((a, b) => w[a.feld] - w[b.feld])[0];
       const arbeit = s.getCurrentWork();
-      const trainiertSchon = arbeit && arbeit.type === "CLASS" && String(arbeit.classType).toLowerCase().includes(naechst.kurz);
+      // ZWEI TRAINER SIND EINER ZU VIEL (25.08.2026, 22:46).
+      //
+      // Hier stand eine Pruefung auf GENAU diese Kurzform: Trainierte die
+      // Figur gerade "agi" und joinrun wollte "str", startete es trotzdem.
+      // Neben joinrun laeuft aber bbtrain.js mit derselben Aufgabe und einer
+      // anderen Reihenfolge - die beiden haben sich das Training gegenseitig
+      // aus der Hand geschlagen, und jeder Wechsel kostet Gym-Gebuehren.
+      //
+      // Gemessen am 25.08. um 22:18, kurz nach einem Einbau: Guthaben
+      // -1.576.559, waehrend beide Skripte gleichzeitig im Powerhouse Gym
+      // standen. Nach einem Einbau ist das Konto bei null, und Gym-Training
+      // laeuft weiter, bis es ins Minus geht.
+      //
+      // Jetzt: Laeuft IRGENDEIN Kurs, laesst joinrun die Finger davon. Die
+      // Werte steigen ohnehin - bbtrain zieht sie auf 100, joinruns Ziel ist
+      // 80. Es wartet einfach, bis sie da sind.
+      const trainiertSchon = arbeit && arbeit.type === "CLASS";
       if (!trainiertSchon) {
         if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
         else sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);

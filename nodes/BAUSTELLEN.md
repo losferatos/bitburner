@@ -24,16 +24,6 @@ Regeln:
 
 ## Sofort
 
-### Nach dem Wiederaufbau melden die Werkzeuge weiter Ishima/Aevum (22:43)
-Gemessen: Der Strategiepruefer meldet um 22:41 und 22:43 die Stadt **Aevum**,
-vorher mehrfach Ishima, dazwischen Sector-12.
-Erwartet: Sector-12, dort steht das Powerhouse Gym.
-Verdacht: Aevum passt zu `bn4life.js:208` (`travelToCity("Aevum")`), Ishima zu
-`joinrun.js`. Beide reisen also, ohne sich abzustimmen, und bbtrain holt die
-Figur jedes Mal zurueck. Solange die Kampfwerte ueber 100 sind, kostet das
-nichts; nach dem naechsten Einbau kostet es Trainingszeit.
-Zusammengefasst mit dem Eintrag von 21:47 - derselbe Befund, zweite Stadt.
-
 ### Das Guthaben ist negativ: -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
@@ -41,14 +31,25 @@ laeuft also noch.
 Erwartet: Nie unter null. Ein negatives Guthaben blockiert in Bitburner jeden
 weiteren Kauf - Portprogramme, Server, Augmentierungen -, und genau die
 braucht der Wiederaufbau.
-Verdacht: `bbtrain.js` trainiert im Powerhouse Gym, und Gym-Training kostet
-laufend Geld. Nach einem Einbau steht das Guthaben bei null; niemand prueft,
-ob das Training noch bezahlbar ist. `src/bbtrain.js` hat eine Untergrenze nur
-fuer die REISE (`p.money > 1e6`, Zeile 156), nicht fuers Training selbst.
-Zu tun: Pruefen, ob bbtrain bei zu wenig Geld auf eine kostenlose Alternative
-ausweichen kann (Bladeburner-Training ist gratis und hebt Kampfwerte
-ebenfalls, Bladeburner.ts:1091-1105), oder ob das Minus sich von selbst
-schliesst, sobald das Netz wieder Ertrag bringt.
+Ursache **gefunden 22:46**: Es trainierten ZWEI Skripte gleichzeitig im
+Powerhouse Gym. Neben `bbtrain.js` (Ziel 100) lief `joinrun.js` (Ziel 80) mit
+derselben Aufgabe und einer anderen Reihenfolge. joinrun prueft zwar, ob
+bereits trainiert wird - aber nur auf GENAU die Uebung, die es selbst will.
+Trainierte die Figur "agi" und joinrun wollte "str", startete es trotzdem,
+bbtrain schaltete zurueck, und jeder Wechsel kostete Gym-Gebuehren.
+Dazu passt der Stadtstreit: joinrun reist absichtlich nach Ishima (Zeile 87,
+Stadtbedingung fuer Tetrads und Tian Di Hui), bn4life nach Aevum
+(`bn4life.js:208`), bbtrain zurueck nach Sector-12 - jede Reise kostet 200.000.
+Das erklaert den Befund von 21:47 und 22:43 gleich mit; beide Eintraege sind
+hier aufgegangen.
+**Geaendert 22:46 in `src/joinrun.js`, Wirkung noch nicht gemessen:** Laeuft
+irgendein Kurs, laesst joinrun die Finger davon und wartet, bis die Werte da
+sind. Nachzumessen beim naechsten Augmentierungs-Einbau - nur dann laufen
+beide Skripte gleichzeitig. Zu pruefen ist dann: Bleibt das Guthaben ueber
+null, und steigen die Kampfwerte ohne Ruckeln?
+Offen bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten
+darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
+Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
 ### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
@@ -90,22 +91,6 @@ deshalb fuer diesen Pruefer unsichtbar.
 Zu tun: Zusaetzliches Kennzeichen pruefen - Einbruch der Kampfwerte, des
 Netzes oder des home-Speichers. `tools/wache.js` kann das bereits
 (Knotenwechsel ueber den home-Speicher, Zeile ~440); dem Pruefer fehlt es.
-
-### Der Spieler steht wiederholt in Ishima, ohne dass jemand dorthin reist (21:47)
-Gemessen: `strategie-check` meldet um 20:42, 21:13 und 21:47 die Stadt Ishima,
-dazwischen um 21:19 Sector-12. Der Wechsel wiederholt sich also.
-Erwartet: Sector-12. Dort steht das beste Trainingsstudio (Powerhouse Gym), und
-`bbtrain.js` reist ausdruecklich dorthin zurueck (`src/bbtrain.js:156-165`).
-Verdacht **bestaetigt 22:01**: `joinrun.js` laeuft (steht in `data/ps.json`)
-und ist das einzige uebrige Skript mit `travelToCity`. bbtrain reist nach
-Sector-12, bn4life nach Aevum (`bn4life.js:208`), blade.js reist gar nicht.
-Zu pruefen bleibt, wohin joinrun reist und warum. Ergaenzend moeglich ist ein
-Faktionsbeitritt ueber popups.js: `data/popups.txt` zaehlte um 21:03 sieben Beitritte, und Ishima ist
-eine Stadtfaktion.
-Folgen: Fuer Bladeburner-Aktionen ist der Aufenthaltsort ohne Bedeutung (die
-Division fuehrt ihre eigene Stadt, `bbspann.json` meldet dort Sector-12).
-Teuer wird es erst, wenn bbtrain nach dem naechsten Augmentierungs-Einbau
-wieder Kampfwerte hochziehen muss - dann kostet jede Reise Zeit und Geld.
 
 ### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
 Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor

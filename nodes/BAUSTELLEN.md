@@ -24,81 +24,7 @@ Regeln:
 
 ## Sofort
 
-### Wartet bis Eric Opera neu startet: Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
-Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
-Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
-Tab im Vordergrund bleibt - der Weckton von wakelock.js traegt nicht. Damit ist
-das kein einmaliger Zwischenfall, sondern ein Dauerzustand, der jeden
-Nachtlauf um Faktor fuenf verkuerzt.
-Nachtrag 18:53: unveraendert, 0,90 Runden je Minute.
-Nachtrag 19:33: nach einer ungedrosselten Phase um 19:03 (4,59/min) wieder bei
-0,93. Der Zustand wechselt also mit dem Fokus des Fensters - ein Klick hilft nur
-so lange, wie der Tab vorn bleibt. Folge: Der Rang stand von 19:03 bis 19:33 bei
-33, eine halbe Stunde ohne messbaren Fortschritt. Der Motor ruht dabei
-regelkonform (Ausdauer 27/50, Regenerationskammer) - nur dauert das Regenerieren
-gedrosselt fuenfmal so lange wie es sollte.
-
-### Wartet bis Eric Opera neu startet: Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
-Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
-17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
-Erwartet: 4-6 Runden je Minute. Faktor 5 auf ALLES - Geld, Kampfwerte,
-Bladeburner-Rang, jede Aktionsdauer.
-WIDERLEGT 19:24: Der Tonanker meldet `running` (neu gemessen ueber
-`data/wakelock.txt`), und der Tab wird trotzdem gedrosselt. Der Ton ist also
-nicht die Ursache - die Vermutung unten war falsch.
-
-Nachtrag 20:05 - DIE URSACHE IST GEKLAERT, Belege liegen vor:
-
-Chromium entscheidet die Hoerbarkeit an der gemessenen LEISTUNG des Stroms
-gegen -72,247 dBFS (services/audio/output_stream.cc). Fuer einen Sinus liegt
-die Leistung 3 dB unter der Amplitude - genau diese drei Dezibel fehlten in der
-bisherigen Rechnung. Der Pegel 0,0005 ergibt -69,0 dBFS und damit nur 3,2 dB
-Reserve: ein Grenzfall, der mit Ausgabegeraet, Mixerpfad oder einer kurzen
-suspended-Phase kippt. Deshalb wirkte der Kniff am 21.08. und heute nicht.
-
-Ebenfalls geklaert: Es gibt fuer Timer nur EINEN Drosselungsmechanismus, und
-hoerbares Audio hebt ihn vollstaendig auf, unabhaengig davon, warum die Seite
-versteckt ist (PageSchedulerImpl::IsBackgrounded). Die Vermutung von 19:24 -
-eine zweite, audio-resistente Drosselung fuer verdeckte Fenster - ist damit
-widerlegt. Occlusion ist ein eigener Kanal, aber nur fuer die Einstufung als
-hidden.
-
-Behoben 20:03 in `src/wakelock.js`: Verstaerkung 0,0005 -> 0,01 (-43,0 dBFS,
-29 dB Reserve). Zusaetzlich wird `ctx.sampleRate` mitgeloggt - 19,5 kHz
-verlangt mindestens 44,1 kHz Ausgaberate, sonst liegt der Ton ueber Nyquist.
-Wirkung noch nicht gemessen; die Rundenrate entscheidet.
-
-Weiterhin offen und nur von Eric zu machen: Opera einmal mit
-`--disable-background-timer-throttling` starten. Das ist der Schalter, der die
-Drosselung unabhaengig vom Ton abschaltet - die beiden Occlusion-Schalter
-beheben nur die Sichtbarkeits-Einstufung.
-
-Nachtrag 19:47 (Zwischenstand aus Erics Recherchelauf, Belege stehen aus):
-Die beiden Messungen haben denselben **Absolutwert**, nicht denselben Faktor -
-am 21.08. 16 -> 1 Runde/min, heute 4,59 -> 0,93. Beide Male landet der verdeckte
-Tab bei rund einer Runde je Minute. Genau ein Timer-Aufwachen je Minute ist die
-Signatur des **Intensive Wake Up Throttling** (Minutenraster nach fuenf Minuten
-im Hintergrund), nicht die einer proportionalen Drosselung. Folge fuer die
-Diagnose: Es greift vermutlich die volle Stufe, und der Ton zaehlt fuer Chromium
-schlicht nicht als hoerbar - `ctx.state === "running"` belegt nur, dass der
-Kontext rechnet, nicht dass der Tab als *audible* eingestuft wird. Der Kommentar
-in `src/wakelock.js` ahnt das bereits ("diese Meldung ist kein Beleg dafuer").
-
-Neuer Verdacht: Opera drosselt nicht nur inaktive Tabs, sondern auch **verdeckte
-Fenster**, und diese zweite Drosselung hebt ein laufender Ton nicht auf. Die
-Chromium-Schalter dagegen heissen `--disable-background-timer-throttling`,
-`--disable-backgrounding-occluded-windows` und `--disable-renderer-backgrounding`.
-Zu tun (nur Eric kann das): Opera einmal mit diesen drei Schaltern starten.
-Danach messen, ob die Rundenrate auch bei verdecktem Fenster ueber 4 bleibt.
-
-Alter Verdacht, widerlegt: `src/wakelock.js` laeuft (steht in der Prozessliste), aber sein
-unhoerbarer 19,5-kHz-Ton kommt nicht an. Nach einem Reload steht der
-AudioContext auf "suspended", weil Browser Tonausgabe ohne Nutzerinteraktion
-blockieren. Das Skript merkt davon nichts und meldet nichts.
-Behebbar nur durch einen Klick in den Tab - Eric am 25.08. um 17:48 informiert.
-Zu tun, unabhaengig davon: wakelock.js soll `ctx.state` pruefen, `resume()`
-versuchen und den Zustand nach `data/wakelock.txt` schreiben, damit der Ausfall
-messbar wird statt nur spuerbar.
+keine
 
 ---
 
@@ -130,8 +56,23 @@ Energiesparmodus hilft der Worker ebenfalls nicht.
 
 Ausfuehrlich in `doku/drosselung.md`, Abschnitt 5.
 
-**Dringlichkeit:** hoch, solange die Flags nicht gesetzt sind - er ist der
-einzige Weg, der ohne Erics Eingreifen und ohne den Tonkniff auskommt.
+Stand 25.08., 20:20: **gebaut und im Spiel** (`src/hacktimer.js`, dazu
+`src/timerzwang.js` als Schalter fuer die Pruefung). Der Selbsttest laeuft
+durch, der Patch haengt sich nur bei verstecktem Tab ein und hat einen Waechter
+ueber den Originaltimer als Notbremse. Belegt ist auch die Voraussetzung:
+`data/sonde.json` meldete um 20:25 bei minimiertem Fenster `worker.median` 5 ms.
+
+Was fehlt: eine Messung des Patches im gedrosselten Zustand. Die ist seit dem
+Pegelfix nicht mehr herstellbar, weil der Tab nicht mehr gedrosselt wird - der
+Patch ist damit **Rueckfallebene**, nicht Tagesgeschaeft.
+
+Ausserdem offen: `hacktimer.js` steht nicht in der Liste WERKZEUGE in
+`src/bn4net.js` (dort ab Zeile 241) und ueberlebt deshalb keinen
+Augmentierungs-Einbau. Das Eintragen braucht Erics Freigabe, weil bn4net der
+Motor ist.
+
+**Dringlichkeit:** niedrig, seit der Tonanker traegt. Wieder hoch, sobald die
+Rundenrate im verdeckten Zustand erneut einbricht.
 
 
 
@@ -269,6 +210,35 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Bitburner-Tab lief gedrosselt - der Tonanker war zu leise (25.08., 20:25)
+
+Gemessen am 17:47 und ueber Stunden: eine Motorrunde je Minute statt vier bis
+sechs, sobald das Fenster verdeckt war. Zwei Verdaechtige wurden geprueft und
+verworfen: der Tonanker lief nachweislich (`ctx.state === "running"`), und eine
+zweite, audio-resistente Drosselung fuer verdeckte Fenster gibt es nicht.
+
+Die Ursache lag im Pegel. Chromium entscheidet die Hoerbarkeit an der
+gemessenen LEISTUNG des Stroms gegen -72,247 dBFS; fuer einen Sinus liegt die
+Leistung 3 dB unter der Amplitude. Der bisherige Wert 0,0005 ergab -69,0 dBFS -
+3,2 dB Reserve, ein Grenzfall, der mit Ausgabegeraet oder Mixerpfad kippt. Das
+erklaert, warum derselbe Kniff am 21.08. wirkte und am 25.08. nicht.
+
+Behoben 20:03 in `src/wakelock.js`: Verstaerkung 0,01 (-43,0 dBFS, 29 dB
+Reserve), dazu wird `ctx.sampleRate` mitgeloggt.
+
+**Verifiziert 20:23-20:25 bei MINIMIERTEM Fenster: 12 Motorrunden in 120
+Sekunden, also 6,0 je Minute** - der volle Wert. `data/sonde.json` meldete
+dabei `sichtbarkeit: hidden` und 0 Bilder je Sekunde, `data/wakelock.txt`
+meldete `running|48000`. Vorher lag die Rate im selben Zustand bei 0,93.
+
+Damit ist der Faktor sechs zurueck, ohne dass Eric Opera neu starten muss. Die
+Flags aus `doku/drosselung.md` Abschnitt 4 bleiben die dauerhaftere Loesung -
+der Ton haengt an einer Einstufung, die der Browser jederzeit anders treffen
+kann.
+
+Die vollstaendige Mechanik steht in `doku/drosselung.md`.
+
 
 ### tools/wache.js misst jetzt den Traeger des Knotens (25.08., 19:44)
 Gemessen 17:30: Der Waechter fuehrte als Verlauf nur `hacking`, `geld` und

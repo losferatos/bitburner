@@ -22,7 +22,23 @@ Erstes ab und verschiebt es danach nach "Erledigt".*
 
 *Ist dieser Abschnitt leer, steht hier genau ein Wort: keine.*
 
-keine
+### Der Bladeburner-Rang waechst um Faktor 100 zu langsam (17:12)
+Gemessen: 0,26 Rang je Minute ueber 43 Minuten (strategie-check), Rang steht bei
+rund 16. Motor faehrt durchgehend Contracts/Tracking, Stufe 4.
+Erwartet: rund 29 je Minute - das ist die Rate, die der Kontrollpunkt aus
+nodes/ROUTE.md verlangt (3.500 nach zwei Stunden).
+Verdacht: offen. Drei Kandidaten, in dieser Reihenfolge zu pruefen:
+ 1. Skillpunkte werden nicht wirksam - bei Rang 6 standen sie auf 0. Blade's
+    Intuition und Overclock heben Erfolgschance und Tempo aller Aktionen;
+    fallen keine Punkte an oder kauft blade.js sie nicht, fehlt der ganze
+    Verstaerkungspfad (src/blade.js, faehigkeitenKaufen).
+ 2. Tracking ist der schwaechste Rangbringer. Operationen geben ein Vielfaches,
+    liegen aber bei 0,14 Erfolgschance - sie werden erst mit Skills spielbar.
+ 3. Die Sollrate selbst koennte falsch sein. 3.500 in zwei Stunden stammt aus
+    einer Simulation, die nie gegen einen echten Lauf geprueft wurde - genau
+    deshalb gibt es den Kontrollpunkt. Dann ist nicht der Motor kaputt, sondern
+    die Route.
+Erst messen, welcher der drei es ist. Nicht raten.
 
 ---
 

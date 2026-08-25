@@ -37,6 +37,50 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Notvertrag statt Field Analysis (26.08., 00:55)
+
+Engpass: Der Motor stand zweieinhalb Stunden auf `General/Field Analysis` und
+kam auf **0,22 Rang je Minute** (Rang 143 um 22:43, 171 um 00:51 - 28 in 128
+Minuten). Field Analysis gibt rankGain 0,1, also rund 0,2 je Minute; die
+Messung trifft den Wert exakt.
+
+Hypothese: Der Rueckfall ist falsch bemessen. Gemessen 00:52 ueber
+`data/bbspann.json`:
+
+    Bounty Hunter   0,381 Chance · 0,9 Rang · 21 s  ->  0,98 Rang/min
+    Retirement      0,386        · 0,6      · 21 s  ->  0,70
+    Field Analysis  --           · 0,1      · 30 s  ->  0,20
+
+Beide Vertraege lagen knapp unter der Sicherheitsschwelle von 0,45 - und
+brachten trotzdem das Drei- bis Fuenffache von Field Analysis. Die Schwelle
+vergleicht die Chance mit einer festen Zahl, statt den Ertrag mit der
+Alternative. Bei Vertraegen ist ein Misserfolg billig: etwas Ausdauer, etwas
+Chaos, kein Rangverlust und kein Toter. Erwartung: mindestens 0,9 statt 0,22.
+
+Beleg: rankGain in `reference/bitburner-src/src/Bladeburner/data/Contracts.ts`
+(19, 53, 86) und `data/GeneralActions.ts`; Dauern ueber
+`ns.bladeburner.getActionTime`.
+
+Umgesetzt: Faellt kein Vertrag ueber die Schwelle, wird trotzdem der
+ertragsstaerkste genommen, sofern er das Anderthalbfache von Field Analysis
+bringt. Operationen (Teamverluste) und Black Ops (Tod) behalten ihre
+Sicherheitsschwellen unangetastet.
+
+Vorher: 0,22 Rang je Minute (22:43 bis 00:51)
+Nachher: (offen) - **die Wirkung ist noch nicht beobachtet**, weil sich die
+Lage vor der ersten Gelegenheit entspannt hat: Um 01:00 war der
+Tracking-Vorrat nachgewachsen (0,604 Chance), und damit lag wieder ein Vertrag
+ueber der Schwelle. Der neue Zweig greift erst, wenn keiner mehr passt.
+
+**Naechster Kandidat, bewusst nicht in diesem Lauf:** Auch oberhalb der
+Schwelle waehlt der Motor nicht optimal. Um 01:00 fuhr er Tracking (0,78 Rang
+je Minute), waehrend Bounty Hunter 0,98 gebracht haette - der lag nur unter
+der Schwelle. Konsequent waere, bei VERTRAEGEN ganz auf die Sicherheitsschwelle
+zu verzichten und rein nach Ertrag zu waehlen, mit einer harten Untergrenze
+gegen Unsinn. Erst messen, was der jetzige Schritt bringt.
+
+Commit: siehe git log, blade.js 26.08. 00:55
+
 ### Aktionsauswahl nach Rangertrag je Minute statt nach Erfolgschance (25.08., 21:57)
 
 Engpass: Der Bladeburner-Rang. Bei 129 von 2.500 fuer die erste Black Op und
@@ -73,7 +117,11 @@ Trefferpunkte und erhoeht das Chaos der Stadt, was wiederum alle Chancen
 senkt. Das gehoert durchgerechnet, nicht ueberstuerzt.
 
 Vorher: 0,84 Rang je Minute (21:19 bis 21:51, Rang 102 -> 129)
-Nachher: (offen - naechster Lauf misst)
+Nachher: **nicht sauber messbar.** Um 22:01 kam ein Augmentierungs-Einbau
+dazwischen, danach lag der Motor bis 00:51 bei 0,22 Rang je Minute - aber aus
+einem anderen Grund (siehe den Eintrag darueber: Field Analysis statt
+Vertraege). Die Auswahl nach Ertrag ist davon unberuehrt richtig; nachzumessen
+ist sie erst auf einer Strecke ohne Einbau.
 Commit: f5b7f07
 
 ### Ausdauer-Hysterese von 55/90 auf 52/60 Prozent (25.08., 20:02)

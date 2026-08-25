@@ -353,6 +353,36 @@ export async function main(ns) {
     const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
     if (vt) return { typ: V, name: vt.name, grund: "Vertrag" };
 
+    // EIN UNSICHERER VERTRAG SCHLAEGT FIELD ANALYSIS UM LAENGEN
+    // (26.08.2026, 00:55).
+    //
+    // Faellt keine Aktion ueber ihre Sicherheitsschwelle, landete der Motor
+    // bisher bei Field Analysis - und die bringt rankGain 0,1, also rund 0,2
+    // Rang je Minute. Gemessen am 26.08. zwischen 22:43 und 00:51: 28 Rang in
+    // 128 Minuten, 0,22 je Minute. Genau dieser Wert.
+    //
+    // Dabei lagen die Vertraege nur knapp darunter: Bounty Hunter 0,381 gegen
+    // eine Schwelle von 0,45. Sein Ertrag betraegt trotzdem 0,98 Rang je
+    // Minute - das FUENFFACHE von Field Analysis. Die Schwelle vergleicht die
+    // Chance mit einer festen Zahl, statt den Ertrag mit der Alternative.
+    //
+    // Bei Vertraegen ist ein Misserfolg billig: etwas Ausdauer, etwas Chaos,
+    // kein Rangverlust und kein Toter. Deshalb gilt hier der Ertragsvergleich.
+    // Operationen (Teamverluste) und Black Ops (Tod) behalten ihre
+    // Sicherheitsschwellen unangetastet.
+    let feldErtrag = 0.2;
+    try {
+      const t = ns.bladeburner.getActionTime(G, "Field Analysis");
+      if (t > 0) feldErtrag = 0.1 / (t / 60000);
+    } catch { /* Schaetzwert bleibt */ }
+    const notvertrag = beste(VERTRAEGE, V, 0);
+    // Der Faktor 1,5 ist Absicht: Ein knapper Vorsprung waere die Unschaerfe
+    // nicht wert, die Field Analysis ausraeumen wuerde.
+    if (notvertrag && notvertrag.ertrag > feldErtrag * 1.5) {
+      return { typ: V, name: notvertrag.name,
+        grund: "Vertrag unter Schwelle, lohnt trotzdem" };
+    }
+
     // 4. Nichts sicher genug. Liegt das an der Schaetzung oder an uns?
     //    Ist irgendwo die Spanne breit, fehlt Wissen ueber die Population -
     //    dann ist Field Analysis die Antwort, nicht ein Versuch auf gut Glueck.

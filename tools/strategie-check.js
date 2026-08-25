@@ -262,7 +262,22 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
       for (const z of zeilen) console.log(z);
       console.log("URTEIL: " + urteil);
     }
-    process.exit(urteil === "SPUR" ? 0 : 1);
+    // NICHT process.exit() (25.08.2026, 19:12).
+    //
+    // Der harte Ausstieg reisst Node mitten aus seiner Ereignisschleife. Bei
+    // etwa jedem dritten Lauf brach das mit
+    //   Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), src/win/async.c
+    // ab - NACH der Urteilszeile, aber auf demselben Ausgabekanal.
+    //
+    // Das ist nicht kosmetisch: Der Wache-Prompt prueft ausdruecklich, ob die
+    // Ausgabe auf "URTEIL:" endet, und haelt den Pruefer sonst fuer kaputt -
+    // samt Push-Nachricht aufs Handy, obwohl alles laeuft. Ein Fehlalarm aus
+    // dem Alarmwerkzeug selbst ist die teuerste Sorte.
+    //
+    // process.exitCode setzt denselben Rueckgabewert, laesst Node aber seine
+    // offenen Handles selbst schliessen. Alle fetch-Aufrufe sind awaited und
+    // ihre Timeouts im finally geloescht, es bleibt also nichts haengen.
+    process.exitCode = urteil === "SPUR" ? 0 : 1;
   };
 
   // --- 1. Ist ueberhaupt etwas messbar? ------------------------------------

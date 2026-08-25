@@ -24,18 +24,6 @@ Regeln:
 
 ## Sofort
 
-### Der Pruefer stuerzt beim Beenden ab, nach der Urteilszeile (19:03)
-Gemessen: `node tools/strategie-check.js` gibt nach `URTEIL: SPUR` noch
-`Assertion failed: !(handle->flags & UV_HANDLE_CLOSING), file src\winsync.c,
-line 94` aus. Tritt unregelmaessig auf, etwa jeder dritte Lauf.
-Erwartet: Letzte Ausgabezeile ist die Urteilszeile, sauberer Exit.
-Verdacht: `process.exit()` in `aus()` waehrend ein `fetch`-AbortController-Timer
-noch offen ist. Wahrscheinlich reicht es, die Timeouts vor dem Beenden zu
-loeschen oder `process.exitCode` zu setzen statt `process.exit()` zu rufen.
-Dringlichkeit: Der Wache-Prompt prueft ausdruecklich, ob die Ausgabe auf
-`URTEIL:` endet - tut sie es wegen dieser Zeile nicht, haelt die Wache den
-Pruefer fuer kaputt und meldet per Push, obwohl alles laeuft.
-
 ### Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
 Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
 Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
@@ -188,6 +176,20 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Pruefer stuerzte beim Beenden ab, nach der Urteilszeile (25.08., 19:12)
+Gemessen: `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),
+file src/win/async.c, line 94` nach `URTEIL: SPUR`, bei etwa jedem dritten Lauf.
+Ursache: `process.exit()` reisst Node mitten aus der Ereignisschleife, waehrend
+noch Handles offen sind.
+Behoben: `process.exitCode` statt `process.exit()` - derselbe Rueckgabewert,
+aber Node schliesst seine Handles selbst. Alle fetch-Aufrufe sind awaited und
+ihre Timeouts im finally geloescht, es bleibt nichts haengen.
+Nicht kosmetisch: Der Wache-Prompt prueft, ob die Ausgabe auf `URTEIL:` endet,
+und haelt den Pruefer sonst fuer kaputt - samt Push-Nachricht, obwohl alles
+laeuft. Ein Fehlalarm aus dem Alarmwerkzeug selbst ist die teuerste Sorte.
+**Verifiziert: fuenf Laeufe in Folge um 19:12, jeder endet auf der Urteilszeile;
+Rueckgabewert 0 bei SPUR unveraendert.**
 
 ### Die Sollrate ignorierte die Erfolgswahrscheinlichkeit (25.08., 18:42)
 Gemessen 18:21: 0,15 Rang je Minute bei `Contracts/Retirement` mit 0,493

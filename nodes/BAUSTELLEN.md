@@ -24,6 +24,16 @@ Regeln:
 
 ## Sofort
 
+### Nach dem Wiederaufbau melden die Werkzeuge weiter Ishima/Aevum (22:43)
+Gemessen: Der Strategiepruefer meldet um 22:41 und 22:43 die Stadt **Aevum**,
+vorher mehrfach Ishima, dazwischen Sector-12.
+Erwartet: Sector-12, dort steht das Powerhouse Gym.
+Verdacht: Aevum passt zu `bn4life.js:208` (`travelToCity("Aevum")`), Ishima zu
+`joinrun.js`. Beide reisen also, ohne sich abzustimmen, und bbtrain holt die
+Figur jedes Mal zurueck. Solange die Kampfwerte ueber 100 sind, kostet das
+nichts; nach dem naechsten Einbau kostet es Trainingszeit.
+Zusammengefasst mit dem Eintrag von 21:47 - derselbe Befund, zweite Stadt.
+
 ### Das Guthaben ist negativ: -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau

@@ -241,7 +241,7 @@ function sollRate(t, blade) {
  * Die Regenerationskammer ist ausgenommen, solange die Ausdauer wirklich
  * niedrig ist: Ruhen ist dann richtig und keine Sackgasse.
  */
-function stecktInLeerlauf(frueher, blade, jetzt) {
+function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   const GRENZE_MIN = 40;
   if (!blade || !blade.aktion) return null;
   const aktion = String(blade.aktion);
@@ -251,9 +251,20 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
     if (max > 0 && ist / max < 0.9) return null;
   }
   // Wie lange steht der Rang schon? Der Verlauf ist das einzige Gedaechtnis.
+  //
+  // DER VERGLEICHSWERT IST DER AKTUELLE, NICHT DER LETZTE GESPEICHERTE
+  // (25.08.2026, 22:43).
+  //
+  // Hier stand `still[0].wert`, also der letzte Eintrag im Verlauf. Das ging
+  // gut, solange der Prueferlauf lueckenlos war. Nach dem Einbau um 22:01 war
+  // er es nicht mehr: Waehrend des Wiederaufbaus trug der Kampfwert-Tiefstand,
+  // die Rang-Punkte brachen ab. Der letzte gespeicherte Rang war 131, der
+  // tatsaechliche 137 - und die Kette der 131er reichte bis 22:01 zurueck.
+  // Ergebnis: "der Rang steht seit 40 min", waehrend er in Wahrheit gerade um
+  // sechs gestiegen war.
   const still = [...frueher].reverse();
   let seit = jetzt;
-  const wertJetzt = still.length ? still[0].wert : null;
+  if (!Number.isFinite(wertJetzt)) return null;
   for (const p of still) {
     if (p.wert !== wertJetzt) break;
     seit = p.zeit;
@@ -485,7 +496,7 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   // die Aktion in blade.json stammt aus der Zeit VOR dem Einbau - eine
   // Leerlaufmeldung darueber waere doppelt falsch.
   const leerlauf = t.phase === "Wiederaufbau nach Einbau"
-    ? null : stecktInLeerlauf(frueher, blade, jetzt);
+    ? null : stecktInLeerlauf(frueher, blade, jetzt, t.wert);
   if (leerlauf) {
     sag("LEERLAUF: " + leerlauf + ".");
     if (urteil === "SPUR") urteil = "STAGNATION";

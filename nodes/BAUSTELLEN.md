@@ -24,6 +24,20 @@ Regeln:
 
 ## Sofort
 
+### blade.js schreibt auch im Weichen-Zweig keine Telemetrie (22:13)
+Gemessen: Nach dem Einbau um 22:01 trat blade.js korrekt zurueck (Kampfwerte
+unter 100, `blade.js:304`) - und schrieb elf Minuten lang nichts. Der Pruefer
+meldete daraufhin faelschlich eine stehende Spielengine, weil er zweimal
+dieselbe alte Zahl aus `data/blade.json` verglich. Nachgemessen ueber
+`data/bbtick.json`: Die Engine lief mit 29,2 Sekunden je halber Minute.
+Erwartet: Jeder Zweig der Hauptschleife schreibt Telemetrie. Der Ruhe-Zweig
+tut es seit 20:46, der Weichen-Zweig noch nicht - es ist derselbe Fehler an
+der naechsten Stelle.
+Verdacht: `src/blade.js:304-312`, der `continue` nach `await ns.sleep(30000)`.
+Vorlaeufig entschaerft in `tools/strategie-check.js` (die Pruefungen auf
+blade-Alter und Leerlauf ruhen in der Phase "Wiederaufbau nach Einbau"), aber
+die Ursache liegt in blade.js.
+
 ### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
 `data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.

@@ -136,6 +136,21 @@ function traeger(knoten, bb, rep) {
       return { name: "Kampfwert-Tiefstand", wert: bb.tiefstand, ziel: 100,
         phase: "Tor zur Division", sollRate: 1.7 };
     }
+    // NACH EINEM EINBAU TRAEGT WIEDER DAS TRAINING (25.08.2026, 22:12).
+    //
+    // Ein Augmentierungs-Einbau setzt alle Kampfwerte auf 1 zurueck, laesst
+    // aber die Mitgliedschaft in der Division und den Rang bestehen. Der Rang
+    // bleibt also stehen, waehrend bbtrain stundenlang die Kampfwerte
+    // wiederaufbaut - voellig regelkonform.
+    //
+    // Ohne diese Unterscheidung meldet der Pruefer die gesamte Trainingsphase
+    // als STAGNATION, weil er den Rang als Traeger misst. Genau das ist um
+    // 22:08 passiert. In dieser Phase ist der Kampfwert-Tiefstand der Traeger,
+    // nicht der Rang - blade.js weicht dann ohnehin zurueck (blade.js:304).
+    if (Number.isFinite(bb.tiefstand) && bb.tiefstand < 100) {
+      return { name: "Kampfwert-Tiefstand", wert: bb.tiefstand, ziel: 100,
+        phase: "Wiederaufbau nach Einbau", sollRate: 1.7 };
+    }
     // KEINE FESTE SOLLRATE (25.08.2026, korrigiert nach Fremdpruefung).
     //
     // Hier stand 29 je Minute, hergeleitet aus dem Kontrollpunkt in
@@ -466,7 +481,11 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   }
 
   // --- 5. Steckt der Motor in einer Aktion ohne Ertrag? --------------------
-  const leerlauf = stecktInLeerlauf(frueher, blade, jetzt);
+  // Nicht waehrend des Wiederaufbaus: Dort ist der Traeger das Training, und
+  // die Aktion in blade.json stammt aus der Zeit VOR dem Einbau - eine
+  // Leerlaufmeldung darueber waere doppelt falsch.
+  const leerlauf = t.phase === "Wiederaufbau nach Einbau"
+    ? null : stecktInLeerlauf(frueher, blade, jetzt);
   if (leerlauf) {
     sag("LEERLAUF: " + leerlauf + ".");
     if (urteil === "SPUR") urteil = "STAGNATION";
@@ -532,7 +551,30 @@ function stecktInLeerlauf(frueher, blade, jetzt) {
   // saemtliche anderen Befunde nur ihre Symptome, und keiner der ueblichen
   // Eingriffe hilft. Der einzige Ausweg ist ein Neuladen des Tabs - das kann
   // kein Loop, das muss Eric tun. Deshalb ist die Meldung so deutlich.
-  if (blade && Number.isFinite(blade.spielzeit)) {
+  // EINE ALTE DATEI IST KEIN BEWEIS (25.08.2026, 22:09).
+  //
+  // Der erste Entwurf verglich einfach zwei Spielzeitwerte aus dem Verlauf.
+  // Um 22:08 hat das einen Fehlalarm erzeugt: Nach einem Augmentierungs-Einbau
+  // lief blade.js acht Minuten nicht, also stand in blade.json zweimal
+  // hintereinander DIESELBE alte Zahl - und der Pruefer meldete eine stehende
+  // Engine, waehrend sie nachweislich mit 29,2 Sekunden je halber Minute lief.
+  //
+  // Nachts waere daraus eine Push-Nachricht geworden, die Eric weckt, fuer ein
+  // Problem, das es nicht gibt. Deshalb: Erst pruefen, ob die Quelle selbst
+  // frisch ist. Ist sie es nicht, steht nicht die Engine, sondern blade.js -
+  // und das ist ein anderer Befund mit einer anderen Reparatur.
+  const bladeAlterMs = blade && Number.isFinite(blade.zeit) ? jetzt - blade.zeit : null;
+  // In der Wiederaufbauphase ist blade.js planmaessig stumm: Es tritt zurueck,
+  // solange die Kampfwerte unter 100 liegen (blade.js:304), und schreibt in
+  // diesem Zweig keine Telemetrie. Das ist kein Befund, sondern der Normalfall
+  // nach jedem Augmentierungs-Einbau.
+  const wiederaufbau = t.phase === "Wiederaufbau nach Einbau";
+  if (!wiederaufbau && blade && Number.isFinite(blade.spielzeit)
+      && bladeAlterMs !== null && bladeAlterMs > 5 * 60_000) {
+    sag("blade.js meldet sich seit " + Math.round(bladeAlterMs / 60000)
+      + " min nicht - die Engine laesst sich damit nicht beurteilen.");
+    if (urteil === "SPUR") urteil = "STAGNATION";
+  } else if (!wiederaufbau && blade && Number.isFinite(blade.spielzeit)) {
     const frueher = [...(v.punkte || [])].reverse().find(
       (x) => Number.isFinite(x.spielzeit) && jetzt - x.zeit >= 4 * 60_000);
     if (frueher) {

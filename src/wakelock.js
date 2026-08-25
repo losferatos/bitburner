@@ -29,13 +29,32 @@
  * Hoerschwelle faellt bei den meisten schon ab 17 kHz weg. Die Tonhoehe ist
  * deshalb der eigentliche Schutz, nicht der Pegel.
  *
- * Der erste Versuch nahm 0,00002 (rund -94 dB) und blieb wirkungslos: Der
- * AudioContext lief nachweislich ("running"), die Drosselung aber auch. Der
- * Verdacht faellt auf die Amplitude - Browser stufen einen Tab erst ab einem
- * messbaren Pegel als "audible" ein, und der alte Nachtdienst notierte genau
- * das ("nicht exakt 0 - das zaehlt teilweise als still"). Jetzt 0,0005, also
- * rund -66 dB und fuenfmal lauter als der alte Nachtdienst, aber bei einer
- * Tonhoehe, die er nicht hatte: Er nahm 440 Hz, mitten im Hoerbereich.
+ * DER PEGEL WAR ZWEIMAL ZU LEISE (nachgerechnet 25.08.2026)
+ *
+ * Chromium entscheidet die Hoerbarkeit nicht am Zustand des AudioContext,
+ * sondern misst die LEISTUNG des tatsaechlich gerenderten Stroms gegen
+ * kSilenceThresholdDBFS = -72,247 dBFS (services/audio/output_stream.cc).
+ * Fuer einen Sinus ist die Leistung 20*log10(a) - 3 dB, also 3 dB unter der
+ * Amplitude - genau diese drei Dezibel wurden bisher uebersehen:
+ *
+ *   0,00002  ->  -97,0 dBFS  weit unter der Schwelle, wirkungslos (Versuch 1)
+ *   0,0005   ->  -69,0 dBFS  nur 3,2 dB Reserve - ein Grenzfall (Versuch 2)
+ *   0,005    ->  -49,0 dBFS  23 dB Reserve
+ *   0,01     ->  -43,0 dBFS  29 dB Reserve   <- jetzt eingestellt
+ *
+ * Das erklaert zwanglos, warum der Kniff am 21.08. wirkte und am 25.08. nicht:
+ * Bei 3,2 dB Reserve kippt das Urteil mit dem Ausgabegeraet, dem Mixerpfad
+ * oder einer kurzen suspended-Phase zwischen zwei Kontrollen.
+ *
+ * Unhoerbar bleibt der Ton durch die TONHOEHE, nicht durch den Pegel - 19,5
+ * kHz liegt oberhalb dessen, was Erwachsene ueblicherweise hoeren. Bei -43
+ * dBFS koennen Haustiere und sehr junge Ohren ihn allerdings wahrnehmen; wer
+ * das vermeiden will, geht auf 0,005 zurueck und behaelt 23 dB Reserve.
+ *
+ * Mitgeloggt wird jetzt ctx.sampleRate: 19,5 kHz verlangt eine Ausgaberate von
+ * mindestens 44,1 kHz. Laeuft der Kontext nach einem Geraetewechsel auf einem
+ * 16-kHz-Headsetprofil, liegt der Ton ueber Nyquist und es kommt gar nichts
+ * an - ohne dass am Zustand etwas auffiele.
  *
  * Aufruf:  node tools/task.js wakelock.js          starten
  *          node tools/task.js wakelock.js --stop   Ton beenden
@@ -68,13 +87,14 @@ export async function main(ns) {
     const osc = ctx.createOscillator();
     const gain = ctx.createGain();
     osc.frequency.value = 19500;
-    gain.gain.value = 0.0005;
+    gain.gain.value = 0.01;
     osc.connect(gain).connect(ctx.destination);
     osc.start();
     w.__wakelock = { ctx, osc, gain };
     sag("Tonanker laeuft: " + osc.frequency.value + " Hz bei Verstaerkung "
-      + gain.gain.value + ". Ob der Tab dadurch als hoerbar gilt, zeigt erst"
-      + " die Rundenrate - diese Meldung ist kein Beleg dafuer.");
+      + gain.gain.value + ", Ausgaberate " + ctx.sampleRate + " Hz."
+      + " Ob der Tab dadurch als hoerbar gilt, zeigt erst die Rundenrate oder"
+      + " das Lautsprechersymbol am Tab - diese Meldung ist kein Beleg dafuer.");
   } catch (e) {
     return sag("Tonanker fehlgeschlagen: " + e.message
       + "  (Browser verlangen dafuer meist eine vorherige Nutzerinteraktion im Tab.)");
@@ -116,7 +136,9 @@ export async function main(ns) {
       zustand = "fehler:" + e.message;
     }
 
-    ns.write("data/wakelock.txt", Date.now() + "|" + zustand, "w");
+    let rate = "?";
+    try { rate = w.__wakelock?.ctx?.sampleRate ?? "?"; } catch (e) { /* egal */ }
+    ns.write("data/wakelock.txt", Date.now() + "|" + zustand + "|" + rate, "w");
     if (ns.getHostname() !== "home") {
       try { ns.scp("data/wakelock.txt", "home", ns.getHostname()); } catch (e) { /* egal */ }
     }

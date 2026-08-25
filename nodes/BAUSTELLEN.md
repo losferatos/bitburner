@@ -47,6 +47,32 @@ WIDERLEGT 19:24: Der Tonanker meldet `running` (neu gemessen ueber
 `data/wakelock.txt`), und der Tab wird trotzdem gedrosselt. Der Ton ist also
 nicht die Ursache - die Vermutung unten war falsch.
 
+Nachtrag 20:05 - DIE URSACHE IST GEKLAERT, Belege liegen vor:
+
+Chromium entscheidet die Hoerbarkeit an der gemessenen LEISTUNG des Stroms
+gegen -72,247 dBFS (services/audio/output_stream.cc). Fuer einen Sinus liegt
+die Leistung 3 dB unter der Amplitude - genau diese drei Dezibel fehlten in der
+bisherigen Rechnung. Der Pegel 0,0005 ergibt -69,0 dBFS und damit nur 3,2 dB
+Reserve: ein Grenzfall, der mit Ausgabegeraet, Mixerpfad oder einer kurzen
+suspended-Phase kippt. Deshalb wirkte der Kniff am 21.08. und heute nicht.
+
+Ebenfalls geklaert: Es gibt fuer Timer nur EINEN Drosselungsmechanismus, und
+hoerbares Audio hebt ihn vollstaendig auf, unabhaengig davon, warum die Seite
+versteckt ist (PageSchedulerImpl::IsBackgrounded). Die Vermutung von 19:24 -
+eine zweite, audio-resistente Drosselung fuer verdeckte Fenster - ist damit
+widerlegt. Occlusion ist ein eigener Kanal, aber nur fuer die Einstufung als
+hidden.
+
+Behoben 20:03 in `src/wakelock.js`: Verstaerkung 0,0005 -> 0,01 (-43,0 dBFS,
+29 dB Reserve). Zusaetzlich wird `ctx.sampleRate` mitgeloggt - 19,5 kHz
+verlangt mindestens 44,1 kHz Ausgaberate, sonst liegt der Ton ueber Nyquist.
+Wirkung noch nicht gemessen; die Rundenrate entscheidet.
+
+Weiterhin offen und nur von Eric zu machen: Opera einmal mit
+`--disable-background-timer-throttling` starten. Das ist der Schalter, der die
+Drosselung unabhaengig vom Ton abschaltet - die beiden Occlusion-Schalter
+beheben nur die Sichtbarkeits-Einstufung.
+
 Nachtrag 19:47 (Zwischenstand aus Erics Recherchelauf, Belege stehen aus):
 Die beiden Messungen haben denselben **Absolutwert**, nicht denselben Faktor -
 am 21.08. 16 -> 1 Runde/min, heute 4,59 -> 0,93. Beide Male landet der verdeckte

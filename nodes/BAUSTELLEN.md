@@ -43,12 +43,22 @@ in BitNode 6 mindestens 6.000 mit Raid, mindestens 3.500 ohne.** Die gesamte
 Reihenfolge ab Platz 3 steht auf einer Simulation, die nie gegen einen echten
 Lauf geprueft wurde.
 
-Zu tun: Sobald `data/bblage.json` `inBladeburner: true` meldet, den Zeitpunkt
-festhalten und zwei Stunden spaeter den Rang gegen die Schwelle halten. Das
-Ergebnis gehoert nach ROUTE.md, nicht in den Chat.
+**Der Beitritt steht seit dem 25.08.2026 zwischen 16:20 und 16:29** (um 16:19:55
+war der Kampfwert-Tiefstand noch 98, um 16:29:23 meldete `bblage.json`
+`inBladeburner: true` bei Rang 0). Genauer laesst er sich nicht mehr eingrenzen:
+bbtrain schrieb `data/bbjoin.txt` lokal auf die Werkbank statt nach home - das
+ist inzwischen behoben, half aber fuer diesen Beitritt nicht mehr.
 
-**Dringlichkeit:** hoch, sobald der Beitritt steht. Es ist das wertvollste
-Einzelergebnis der naechsten Tage.
+**Der Kontrollpunkt faellt damit auf 18:30 Uhr.** Zu messen ist dann der Rang
+aus `data/blade.json` gegen die Schwelle aus ROUTE.md: mindestens 6.000 mit
+Raid, mindestens 3.500 ohne. Das Ergebnis gehoert nach ROUTE.md.
+
+Zwischenstand 16:29: Rang 0, Ausdauer 41/41, Aktion "Field Analysis" (die
+Erfolgsschaetzungen sind noch zu unscharf fuer einen Vertrag), naechste Black Op
+"Operation Typhoon" ab Rang 2.500.
+
+**Dringlichkeit:** hoch. Es ist das wertvollste Einzelergebnis der naechsten
+Tage - an ihm haengt die gesamte Reihenfolge ab Platz 3.
 
 ### 3. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
@@ -91,6 +101,18 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### bn4life und blade.js stritten sekuendlich um die Figur (25.08., 16:25)
+Unmittelbar nach dem Beitritt zur Division erschienen im Spiel sekuendlich
+Dialoge "Your Bladeburner action was cancelled because you started doing
+something else". Ursache: Eine Bladeburner-Aktion ist keine Arbeit im Sinne von
+`getCurrentWork()` - die Funktion gibt dabei null zurueck. bn4life las das als
+"die Figur hat nichts zu tun" und schob ein Verbrechen nach, was die
+Bladeburner-Aktion abbrach; blade.js startete sie neu, bn4life schob wieder
+nach. Beide Seiten liefen ins Leere.
+Behoben: bn4life begeht keine Verbrechen mehr, solange `inBladeburner()` true
+ist (0 GB, also gratis). In einem Knoten, dessen Ausgang ueber Black Operations
+fuehrt, traegt Bladeburner - Verbrechen sind Beiwerk.
 
 ### bbtrain trainierte nur str, waehrend def/dex/agi auf 1 standen (25.08.)
 Behoben in 19c324d. Stadt und Studio werden jetzt in der Trainingsschleife

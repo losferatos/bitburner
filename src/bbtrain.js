@@ -177,6 +177,11 @@ async function runde(ns) {
   if (ns.bladeburner.joinBladeburnerDivision()) {
     sag("BLADEBURNER-DIVISION BEIGETRETEN.");
     ns.write("data/bbjoin.txt", String(Date.now()), "w");
+    // ns.write schreibt LOKAL, und bbtrain laeuft auf der Werkbank, nicht auf
+    // home. Ohne diese Zeile liegt der Beitrittszeitpunkt auf einem Rechner,
+    // auf dem niemand nachsieht - am 25.08. hat genau das den Zeitstempel
+    // gekostet, an dem der Zwei-Stunden-Kontrollpunkt aus nodes/ROUTE.md haengt.
+    if (ns.getHostname() !== "home") ns.scp("data/bbjoin.txt", "home", ns.getHostname());
   } else {
     ns.write("data/hilfe.txt",
       "bbtrain: Kampfwerte stehen auf " + ZIEL + ", aber der Beitritt zur"

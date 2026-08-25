@@ -344,7 +344,29 @@ export async function main(ns) {
       ? ns.read("data/rep-modus.txt") : "";
     const stempel = Number(String(bremse).split("|")[1]) || 0;
     const repModus = bremse !== "" && Date.now() - stempel < 120000;
-    if (!repModus && (!arbeit || arbeit.crimeType)) {
+    // BLADEBURNER SCHLAEGT VERBRECHEN (25.08.2026).
+    //
+    // Eine Bladeburner-Aktion ist keine Arbeit im Sinne von getCurrentWork():
+    // Die Division fuehrt ihre eigene Handlung, und getCurrentWork() gibt
+    // dabei null zurueck. Die Bedingung unten las das als "die Figur hat
+    // nichts zu tun" und schob ein Verbrechen nach - das bricht die
+    // Bladeburner-Aktion ab (Bladeburner.ts, "Your Bladeburner action was
+    // cancelled because you started doing something else"). blade.js startet
+    // sie sofort neu, bn4life schiebt sofort wieder ein Verbrechen nach.
+    //
+    // Am 25.08. um 16:25, unmittelbar nach dem Beitritt zur Division, erzeugte
+    // dieses Wettrennen sekuendlich Dialoge im Spiel und liess beide Seiten
+    // ins Leere laufen: kein Verbrechen kam zum Abschluss, keine
+    // Bladeburner-Aktion auch.
+    //
+    // In einem Knoten, dessen Ausgang ueber 21 Black Operations fuehrt, ist
+    // die Rangfolge eindeutig - Bladeburner traegt, Verbrechen sind Beiwerk.
+    // inBladeburner() kostet 0 GB (RamCostGenerator.ts), die Bremse ist also
+    // gratis.
+    let inDivision = false;
+    try { inDivision = ns.bladeburner.inBladeburner(); } catch { inDivision = false; }
+
+    if (!repModus && !inDivision && (!arbeit || arbeit.crimeType)) {
       if (!arbeit || arbeit.crimeType !== verbrechen) {
         ns.singularity.commitCrime(verbrechen, true);
         if (verbrechen !== letztesVerbrechen) {

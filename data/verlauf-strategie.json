@@ -26,6 +26,33 @@
    "phase": "Tor zur Division",
    "netz": 95,
    "geld": 50140080
+  },
+  {
+   "zeit": 1787667595458,
+   "knoten": 6,
+   "traeger": "Kampfwert-Tiefstand",
+   "wert": 98,
+   "phase": "Tor zur Division",
+   "netz": 95,
+   "geld": 134295392
+  },
+  {
+   "zeit": 1787668164068,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 0,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 219677809
+  },
+  {
+   "zeit": 1787668213418,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 0,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 229755007
   }
  ]
 }

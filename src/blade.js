@@ -46,7 +46,30 @@ export async function main(ns) {
   const V = "Contracts", O = "Operations", B = "Black Operations", G = "General";
 
   // Schwellen. Siehe Kopf - je teurer der Fehlschlag, desto hoeher.
-  const SICHER_VERTRAG = 0.80;
+  // GEMESSEN, NICHT GERATEN (25.08.2026, 16:45, Rang 0,7 nach 15 Minuten).
+  //
+  // Hier stand 0,80. Das hat den Motor in eine Sackgasse gefuehrt, die von
+  // aussen wie Arbeit aussah: Die Schaetzungen waren laengst scharf (Spanne
+  // 0,076 bei Tracking), also griff die Field-Analysis-Regel nicht mehr -
+  // aber kein einziger Vertrag kam ueber 0,80, also fiel der Motor auf
+  // "Training" durch und blieb dort. Training gibt KEINEN Rang. Nach einer
+  // Viertelstunde in der Division stand der Rang bei 0,7 von 3.500.
+  //
+  // Die gemessenen Erfolgschancen beim Eintritt:
+  //   Tracking       0,628 - 0,703
+  //   Retirement     0,397 - 0,445
+  //   Bounty Hunter  0,318 - 0,356
+  //
+  // 0,80 ist fuer Vertraege die falsche Groesse. Ein misslungener Vertrag
+  // kostet etwas Rang und etwas Chaos - er wirft nicht den Lauf weg wie eine
+  // misslungene Black Op. Was zaehlt, ist der Erwartungswert, und der ist ab
+  // etwa der Haelfte klar positiv. Dazu kommt: Vertraege geben Kampferfahrung
+  // UND Rang UND Geld, Training nur Erfahrung. Ein spielbarer Vertrag schlaegt
+  // Training immer.
+  //
+  // Fuer Operationen und Black Ops bleibt es bei den hohen Schwellen: Dort ist
+  // der Fehlschlag teuer, und dort wartet man zu Recht.
+  const SICHER_VERTRAG = 0.50;
   const SICHER_OPERATION = 0.85;
   const SICHER_BLACKOP = 0.99;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.

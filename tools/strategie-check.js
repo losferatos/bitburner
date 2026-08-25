@@ -113,11 +113,15 @@ function traeger(knoten, bb, rep) {
   if (bladeKnoten) {
     if (!bb) return null;
     if (!bb.inBladeburner) {
+      // 100 Kampfwert in einer knappen Stunde - gemessen am 25.08.: von 1 auf
+      // 98 in 25 Minuten im Powerhouse Gym.
       return { name: "Kampfwert-Tiefstand", wert: bb.tiefstand, ziel: 100,
-        phase: "Tor zur Division" };
+        phase: "Tor zur Division", sollRate: 1.7 };
     }
+    // Der Kontrollpunkt aus nodes/ROUTE.md verlangt Rang 3.500 nach zwei
+    // Stunden. Das sind 29 Rang je Minute.
     return { name: "Bladeburner-Rang", wert: bb.rang, ziel: null,
-      phase: "Black Operations" };
+      phase: "Black Operations", sollRate: 29 };
   }
   if (!rep) return null;
   return { name: "Hackniveau", wert: rep.hacking, ziel: rep.zielLevel || null,
@@ -214,6 +218,31 @@ function traeger(knoten, bb, rep) {
     const delta = t.wert - bezug.wert;
     if (delta > 0) {
       sag("Fortschritt: +" + delta + " in " + stillMin + " min.");
+      // BEWEGUNG IST NICHT TEMPO (25.08.2026, 16:45).
+      //
+      // Der Bezugspunkt oben ist der letzte NIEDRIGERE Messpunkt - das schuetzt
+      // langsame Traeger vor Fehlalarm, hat aber ein Loch: Ein einziger Schritt
+      // vor einer Stunde gilt seither als "Fortschritt", fuer immer. Genau so
+      // ist am 25.08. ein Rang von 0,7 nach fuenfzehn Minuten als SPUR
+      // durchgewunken worden, waehrend der Motor in "Training" feststeckte und
+      // gar keinen Rang mehr sammelte. Das Ziel lag bei 3.500.
+      //
+      // Deshalb zusaetzlich das Tempo, gemessen ueber die volle Strecke seit
+      // dem ersten Punkt dieser Phase. Ein Zehntel der Sollrate ist grosszuegig
+      // - es schlaegt erst an, wenn der Traeger um eine Groessenordnung zu
+      // langsam ist, nicht bei einer schlechten Viertelstunde.
+      if (t.sollRate && aeltester) {
+        const spanneMin = (jetzt - aeltester.zeit) / 60000;
+        if (spanneMin >= 10) {
+          const rate = (t.wert - aeltester.wert) / spanneMin;
+          if (rate < t.sollRate / 10) {
+            sag("ZU LANGSAM: " + rate.toFixed(2) + " je Minute ueber "
+              + Math.round(spanneMin) + " min, noetig waeren rund "
+              + t.sollRate + ".");
+            if (urteil === "SPUR") urteil = "STAGNATION";
+          }
+        }
+      }
     } else if (stillMs > STILLSTAND_MS) {
       sag("STAGNATION: " + t.name + " steht seit " + stillMin
         + " min auf " + t.wert + ".");

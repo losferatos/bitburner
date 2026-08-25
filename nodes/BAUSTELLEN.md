@@ -24,6 +24,40 @@ Regeln:
 
 ## Sofort
 
+### blade.js stand 23 Minuten in der Regenerationskammer fest (20:42)
+Gemessen: `data/blade.json` trug um 20:42 noch den Zeitstempel 20:19:16, Aktion
+`General/Hyperbolic Regeneration Chamber`, Ausdauer 27/53. Der Rang stand seit
+20:27 unveraendert bei 102 (+4 in 24 Minuten statt der vorher gemessenen 0,8
+je Minute). Der Strategiepruefer meldete dabei SPUR - er haelt die Kammer fuer
+eine legitime Aktion und misst ihre Sollrate mit null.
+Erwartet: Die Ausdauer regeneriert passiv rund 1,2 je Minute
+(`Bladeburner.ts:1382`, 0,0085 * agi^0,17). In 23 Minuten haette sie von 27 auf
+das Maximum von 53 steigen muessen; die Weiter-Schwelle (60 Prozent = 31,9)
+waere nach vier Minuten erreicht gewesen.
+Gemessen ist sie in dieser Zeit nur von 27 auf 29 gestiegen - der Zustand war
+faktisch eingefroren.
+Eingriff 20:43: `WERKZEUG blade.js` ueber den Reload-Kanal. Danach sofort
+`Contracts/Retirement` bei Ausdauer 29/53. Der Neustart hat also geholfen, die
+URSACHE ist damit nicht gefunden.
+Verdacht: Die Hysterese-Schleife in `src/blade.js` (der `continue`-Zweig mit
+`ausdauerKnapp || hpKnapp`, geaendert am 25.08. um 20:02). Sie wartet auf
+`ns.bladeburner.nextUpdate()` und schreibt in diesem Zweig keine Telemetrie -
+ein Haenger dort ist von aussen nicht von normalem Ruhen zu unterscheiden.
+Zweiter Verdacht: `HP_WEITER = 0,95` haelt den Bot in der Ruhe, solange die
+Trefferpunkte nicht fast voll sind.
+Zu tun: In den Ruhe-Zweig eine Telemetriezeile schreiben (dann altert
+blade.json nicht mehr und der Haenger wird sichtbar), und die HP-Schwelle
+gegen die tatsaechlichen Werte pruefen.
+
+### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
+Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor
+durchgehend `General/Hyperbolic Regeneration Chamber` fuhr.
+Erwartet: Eine Ruhephase von mehr als zehn Minuten ist keine Spur, sondern ein
+Befund - erst recht, wenn der Traeger dabei stillsteht.
+Verdacht: `sollRate()` in `tools/strategie-check.js` gibt fuer General-Aktionen
+eine Sollrate nahe null zurueck und erklaert damit jeden Stillstand fuer
+erwartungsgemaess. `stecktInLeerlauf()` greift erst nach 40 Minuten.
+
 ### hacktimer.js laeuft nicht mehr, weil es in keiner Startliste steht (20:28)
 Gemessen: `data/ps.json` um 20:28 fuehrt blade, bbtrain, wakelock, sonde,
 homegrow, bn4door, bn4rep, contracts, popups, bn4life, bn4net - aber kein

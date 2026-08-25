@@ -22,7 +22,21 @@ Erstes ab und verschiebt es danach nach "Erledigt".*
 
 *Ist dieser Abschnitt leer, steht hier genau ein Wort: keine.*
 
-keine
+### tools/wache.js misst noch den Traeger des vorigen Knotens (17:30)
+Gemessen: `data/wache-zustand.json` fuehrt als Verlauf ausschliesslich
+`hacking`, `geld` und `homeRam` - zuletzt `{"hacking":103,"geld":683838024}`.
+Die Stillstandspruefung und die Meldezeile (`tools/wache.js:258, :262-263, :538`)
+haengen an diesen Werten.
+Erwartet: In BitNode 6 traegt der Bladeburner-Rang, nicht das Hackniveau. Beide
+gemessenen Groessen steigen durch bn4net von selbst weiter, auch wenn die
+Division vollstaendig stillsteht - der Waechter wuerde also genau den Stillstand
+verschweigen, gegen den er gebaut ist.
+Verdacht: Fundstelle klar (siehe oben). Es ist derselbe Fehler, gegen den
+`tools/strategie-check.js` am 25.08. gebaut wurde - nur eine Ebene tiefer, im
+dauerhafteren Bauteil: Der Waechter ist das einzige Stueck, das ohne
+Claude-Sitzung laeuft und aufs Handy meldet.
+Gefunden nicht von einem Loop, sondern von einem Skeptiker-Subagenten beim
+Pruefen eines ganz anderen Entwurfs. Das ist selbst ein Befund.
 
 ---
 

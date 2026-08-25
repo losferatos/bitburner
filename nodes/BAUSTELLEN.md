@@ -47,6 +47,17 @@ WIDERLEGT 19:24: Der Tonanker meldet `running` (neu gemessen ueber
 `data/wakelock.txt`), und der Tab wird trotzdem gedrosselt. Der Ton ist also
 nicht die Ursache - die Vermutung unten war falsch.
 
+Nachtrag 19:47 (Zwischenstand aus Erics Recherchelauf, Belege stehen aus):
+Die beiden Messungen haben denselben **Absolutwert**, nicht denselben Faktor -
+am 21.08. 16 -> 1 Runde/min, heute 4,59 -> 0,93. Beide Male landet der verdeckte
+Tab bei rund einer Runde je Minute. Genau ein Timer-Aufwachen je Minute ist die
+Signatur des **Intensive Wake Up Throttling** (Minutenraster nach fuenf Minuten
+im Hintergrund), nicht die einer proportionalen Drosselung. Folge fuer die
+Diagnose: Es greift vermutlich die volle Stufe, und der Ton zaehlt fuer Chromium
+schlicht nicht als hoerbar - `ctx.state === "running"` belegt nur, dass der
+Kontext rechnet, nicht dass der Tab als *audible* eingestuft wird. Der Kommentar
+in `src/wakelock.js` ahnt das bereits ("diese Meldung ist kein Beleg dafuer").
+
 Neuer Verdacht: Opera drosselt nicht nur inaktive Tabs, sondern auch **verdeckte
 Fenster**, und diese zweite Drosselung hebt ein laufender Ton nicht auf. Die
 Chromium-Schalter dagegen heissen `--disable-background-timer-throttling`,

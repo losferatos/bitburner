@@ -322,8 +322,18 @@ export async function main(ns) {
       // Knoten gemessen wird - der Kontrollpunkt aus nodes/ROUTE.md verlangt
       // nach zwei Stunden mindestens 3.500.
       const bo = ns.bladeburner.getNextBlackOp();
+      // Die Erfolgschance der laufenden Aktion gehoert nach draussen.
+      //
+      // Ohne sie rechnet der Strategiepruefer mit dem Bruttoertrag aus dem
+      // Quellcode und haelt jeden Motor fuer zu langsam, der einen Vertrag mit
+      // maessiger Chance faehrt. Gemessen am 25.08. um 18:21: Retirement gibt
+      // rankGain 0,6, gelingt aber nur in 49 Prozent der Faelle - effektiv
+      // rund 0,3 je Durchlauf. Der Pruefer erwartete 1,7 und meldete
+      // STAGNATION, obwohl blade.js genau das Richtige tat.
+      const s = spanne(wahl.typ, wahl.name);
       ns.write("data/blade.json", JSON.stringify({
         zeit: Date.now(),
+        chance: +s.min.toFixed(3),
         rang: Math.round(ns.bladeburner.getRank()),
         punkte: ns.bladeburner.getSkillPoints(),
         ausdauer: Math.round(jetzt) + "/" + Math.round(max),

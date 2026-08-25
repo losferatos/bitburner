@@ -24,19 +24,6 @@ Regeln:
 
 ## Sofort
 
-### Die Sollrate im Pruefer ignoriert die Erfolgswahrscheinlichkeit (18:21)
-Gemessen: 0,15 Rang je Minute ueber 20 Minuten, Aktion `Contracts/Retirement`,
-Erfolgschance min 0,493. Der Pruefer erwartet 1,7 und meldet STAGNATION.
-Erwartet: Retirement gibt rankGain 0,6 - aber nur bei Erfolg. Bei knapp der
-Haelfte sind das effektiv rund 0,3 je Durchlauf. Die gemessenen 0,15 sind damit
-plausibel, der Motor arbeitet korrekt.
-Verdacht: `tools/strategie-check.js`, Funktion `sollRate()`. Die Tabelle nennt
-Bruttowerte aus dem Quellcode und rechnet die Erfolgschance nicht ein. Fuer
-Tracking (0,678) faellt das kaum auf, fuer Retirement (0,493) um Faktor zwei.
-Zu tun: `blade.js` schreibt die Erfolgschance der laufenden Aktion nach
-`data/blade.json`; `sollRate()` multipliziert damit. Zwei Dateien, deshalb hier
-eingetragen statt im Wachelauf erledigt.
-
 ### Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
 Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
 Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
@@ -78,6 +65,26 @@ Pruefen eines ganz anderen Entwurfs. Das ist selbst ein Befund.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
+
+Zweimal an einem Nachmittag hat `sollRate()` in `tools/strategie-check.js` einen
+Fehlalarm erzeugt, beide Male aus derselben Wurzel: Die Zahlen stammen aus einer
+Ueberschlagsrechnung am Spielquellcode, nicht aus dem eigenen Messverlauf.
+- 17:00: eine feste Rate von 29 je Minute, aus einem Zwei-Stunden-Ziel geteilt
+- 18:21: Bruttoertraege ohne die Erfolgswahrscheinlichkeit
+
+Beide Male wurde die Formel nachgebessert. Beide Male blieb sie eine Schaetzung.
+
+`data/verlauf-strategie.json` enthaelt inzwischen zu jedem Messpunkt Zeit, Wert,
+Aktion und Urteil - damit liesse sich die tatsaechliche Rate je Aktionsart aus
+dem eigenen Lauf ableiten, statt sie zu raten. Ein gleitender Median ueber die
+letzten Stunden je Aktion waere selbstkalibrierend und ginge nicht mehr daneben,
+wenn sich Aktionslevel oder Faehigkeiten aendern.
+
+**Dringlichkeit:** mittel. Ein Fehlalarm ist teurer als er aussieht - er schickt
+die Wache in ihre Diagnosebranche und stumpft ihre Meldungen ab.
+
 
 ### blade.js hat kein Gegenmittel gegen leere Vertragsvorraete
 
@@ -169,6 +176,17 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Sollrate ignorierte die Erfolgswahrscheinlichkeit (25.08., 18:42)
+Gemessen 18:21: 0,15 Rang je Minute bei `Contracts/Retirement` mit 0,493
+Erfolgschance. Der Pruefer erwartete 1,7 - den Bruttoertrag laut Quellcode - und
+meldete STAGNATION, obwohl der Motor genau das Richtige tat. rankGain 0,6 mal
+knapp der Haelfte Erfolg sind effektiv rund 0,3 je Durchlauf.
+Behoben in zwei Dateien: `blade.js` schreibt die Erfolgschance der laufenden
+Aktion nach `data/blade.json`, `sollRate()` multipliziert damit. Fehlt das Feld,
+wird konservativ mit 0,5 gerechnet.
+**Verifiziert: `chance: 0.482` in blade.json und URTEIL SPUR um 18:42** (vorher
+STAGNATION bei identischer Lage).
 
 ### blade.js fiel auf General/Training zurueck, weil Tracking leer war (25.08., 18:13)
 Gemessen 18:12: Tracking offen 0,4 bei Stufe 10 (leergespielt), Retirement min

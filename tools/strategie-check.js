@@ -170,15 +170,30 @@ function sollRate(t, blade) {
   // ihr Zweck. Eine Erwartung an den Rang waere hier sinnlos; ob der Motor zu
   // LANGE darin steckt, prueft der Block darunter gesondert.
   if (aktion.startsWith("General/")) return null;
+  // BRUTTOERTRAG MAL ERFOLGSCHANCE (25.08.2026, 18:42).
+  //
+  // Die Zahlen unten sind Bruttowerte: was eine Aktion einbringt, WENN sie
+  // gelingt. blade.js faehrt aber alles ab einer Chance von 0,45 - und ein
+  // Fehlschlag bringt null Rang. Gemessen um 18:21: Retirement mit 0,493
+  // Chance lieferte 0,15 je Minute, waehrend der Pruefer 1,7 erwartete und
+  // STAGNATION meldete, obwohl der Motor genau das Richtige tat.
+  //
+  // Ohne die Chance ist die Erwartung fuer Tracking (0,678) knapp daneben und
+  // fuer Retirement (0,493) um Faktor zwei zu hoch. Fehlt sie in der Datei -
+  // aeltere Fassung von blade.js -, wird konservativ mit der Haelfte
+  // gerechnet: lieber ein verpasster Alarm als ein taeglicher Fehlalarm.
+  const chance = Number.isFinite(blade.chance) ? blade.chance : 0.5;
   if (aktion.startsWith("Contracts/")) {
-    return { wert: 1.7, grund: aktion };
+    return { wert: +(1.7 * chance).toFixed(2), grund: aktion
+      + " bei " + Math.round(chance * 100) + " % Erfolgschance" };
   }
   if (aktion.startsWith("Operations/")) {
     // Raid ist der Ausreisser: rankGain 55 gegen 2,2 bei Investigation. Genau
     // diese Zeile meint der Kontrollpunkt in nodes/ROUTE.md mit "6.000 mit
     // Raid" - und genau sie verlangt city.comms >= 1.
-    if (aktion.includes("Raid")) return { wert: 60, grund: aktion };
-    return { wert: 4, grund: aktion };
+    const brutto = aktion.includes("Raid") ? 60 : 4;
+    return { wert: +(brutto * chance).toFixed(2), grund: aktion
+      + " bei " + Math.round(chance * 100) + " % Erfolgschance" };
   }
   if (aktion.startsWith("Black Operations/")) return null;
   return null;

@@ -24,6 +24,20 @@ Regeln:
 
 ## Sofort
 
+### blade.js faellt wieder auf General/Training zurueck (18:03)
+Gemessen: `data/blade.json` = `{"rang":26,"punkte":3,"aktion":"General/Training",
+"grund":"zu schwach"}`. Um 17:47 lief noch `Contracts/Tracking`.
+Erwartet: Ein Vertrag ueber der Schwelle 0,50. Training bringt keinen Rang.
+Verdacht: Zwei Kandidaten, in dieser Reihenfolge zu pruefen.
+ 1. Drei Faehigkeitspunkte liegen unausgegeben. Der Sparmodus aus d6a59a0
+    bleibt beim ersten Eintrag des SKILL_PLAN stehen (Overclock) - kostet der
+    inzwischen mehr als 3, spart der Bot weiter, waehrend alles andere auf
+    null steht. Preise per `bbspann.js` messen (Feld `faehigkeiten`).
+ 2. Vertragsvorrat oder Chaos: `getActionCountRemaining` faellt mit jedem
+    Einsatz, Chaos steigt. Beides senkt die Erfolgschance unter die Schwelle.
+    `blade.js` kennt weder Diplomacy noch Incite Violence - es hat also kein
+    Gegenmittel und landet zwangslaeufig in Training.
+
 ### Der Bitburner-Tab laeuft gedrosselt (17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.

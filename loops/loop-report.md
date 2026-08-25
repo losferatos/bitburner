@@ -69,4 +69,6 @@ Regeln für den Bericht:
 - Die Reflexion ist **ehrlich**. Ein verfehltes Ziel wird als verfehlt benannt, mit der Zahl daneben. Ein Ziel, das sich als falsch herausgestellt hat, wird als falsch benannt — nicht stillschweigend durch ein neues ersetzt.
 - Ein Befund aus Schritt 3 bekommt eine eigene Zeile unter „Lage" mit dem Zusatz **„→ Auftrag"**, damit Eric sieht, dass er nicht im Bericht versandet.
 
+**Der erste Bericht des Tages (5:00 Uhr) ist ein Nachtbericht.** Zwischen 22:30 und 5:00 wird nicht berichtet — Eric schläft. Der 5-Uhr-Lauf deckt deshalb die ganze Nacht ab: Im Rückblick gehört dazu, was in den sieben Stunden passiert ist (Rangzuwachs, Resets, BitNode-Wechsel, was die Wache eingegriffen hat — nachzulesen in `git log --since="8 hours ago"` und im Abschnitt „Erledigt" von `nodes/BAUSTELLEN.md`). Dafür darf er 20 statt 16 Zeilen haben.
+
 Regeln: Systemzeit per `date`, nie schätzen. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf.

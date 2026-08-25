@@ -24,6 +24,22 @@ Regeln:
 
 ## Sofort
 
+### Das Guthaben ist negativ: -1,58 Millionen (22:18)
+Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
+zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
+laeuft also noch.
+Erwartet: Nie unter null. Ein negatives Guthaben blockiert in Bitburner jeden
+weiteren Kauf - Portprogramme, Server, Augmentierungen -, und genau die
+braucht der Wiederaufbau.
+Verdacht: `bbtrain.js` trainiert im Powerhouse Gym, und Gym-Training kostet
+laufend Geld. Nach einem Einbau steht das Guthaben bei null; niemand prueft,
+ob das Training noch bezahlbar ist. `src/bbtrain.js` hat eine Untergrenze nur
+fuer die REISE (`p.money > 1e6`, Zeile 156), nicht fuers Training selbst.
+Zu tun: Pruefen, ob bbtrain bei zu wenig Geld auf eine kostenlose Alternative
+ausweichen kann (Bladeburner-Training ist gratis und hebt Kampfwerte
+ebenfalls, Bladeburner.ts:1091-1105), oder ob das Minus sich von selbst
+schliesst, sobald das Netz wieder Ertrag bringt.
+
 ### Nach einem Augmentierungs-Einbau starten die Werkzeuge nicht nach (22:03)
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
 `data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.

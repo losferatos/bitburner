@@ -37,6 +37,45 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Aktionsauswahl nach Rangertrag je Minute statt nach Erfolgschance (25.08., 21:57)
+
+Engpass: Der Bladeburner-Rang. Bei 129 von 2.500 fuer die erste Black Op und
+0,84 Rang je Minute sind das noch **47 Stunden** - das ist die Zahl, an der
+dieser Knoten haengt.
+
+Hypothese: Der Motor fuhr die **schlechteste** Aktion der ganzen Liste.
+Gemessen 21:56 ueber `data/bbspann.json`, sortiert nach Ertrag je Minute:
+
+    Raid                          0,094 Chance ·   55 Rang ·  62 s  ->  5,00
+    Stealth Retirement Operation  0,077        ·   22      ·  77 s  ->  1,32
+    Undercover Operation          0,191        ·  4,4      ·  39 s  ->  1,29
+    Bounty Hunter                 0,457        ·  0,9      ·  21 s  ->  1,18
+    Assassination                 0,049        ·   44      · 116 s  ->  1,11
+    Tracking                      0,734        ·  0,3      ·  13 s  ->  1,02
+    Investigation                 0,230        ·  2,2      ·  31 s  ->  0,98
+    Sting Operation               0,122        ·  5,5      ·  51 s  ->  0,79
+    Retirement                    0,449        ·  0,6      ·  21 s  ->  0,77   <- gefahren
+
+Bounty Hunter und Retirement sind gleich lang und praktisch gleich sicher,
+aber der eine bringt die Haelfte mehr. Die alte Regel waehlte nach `s.min`
+allein und nahm deshalb Retirement, sobald dessen Schaetzung einen Hauch
+hoeher lag. Erwartung: Die Rangrate steigt von 0,84 auf mindestens 1,1 je
+Minute.
+
+Beleg: rankGain in `reference/bitburner-src/src/Bladeburner/data/`
+(Contracts.ts:19, 53, 86 · Operations.ts:19, 53, 89, 124, 164, 202), Dauern
+ueber `ns.bladeburner.getActionTime`.
+
+Bewusst NICHT geaendert: die Schwelle fuer Operationen (`SICHER_OPERATION`
+0,85). Raid steht mit 5,0 Rang je Minute weit oben, aber bei 9,4 Prozent
+Erfolg sind das ueber neunzig Prozent Fehlschlaege - jeder kostet Ausdauer und
+Trefferpunkte und erhoeht das Chaos der Stadt, was wiederum alle Chancen
+senkt. Das gehoert durchgerechnet, nicht ueberstuerzt.
+
+Vorher: 0,84 Rang je Minute (21:19 bis 21:51, Rang 102 -> 129)
+Nachher: (offen - naechster Lauf misst)
+Commit: f5b7f07
+
 ### Ausdauer-Hysterese von 55/90 auf 52/60 Prozent (25.08., 20:02)
 
 Engpass: Der Bot verbrachte den Grossteil seiner Zeit in der
@@ -64,6 +103,16 @@ arbeitet ab 95 Prozent weiter.
 
 Vorher: Rang 73, unveraendert ueber 19 Minuten Kammer (19:40-19:59)
 Nachher: 20:02 sofort nach dem Neustart `Contracts/Tracking` bei Ausdauer
-41/53 (77 Prozent) — unter der alten Regel haette er weitergeruht. Der
-Rangzuwachs ueber eine laengere Strecke misst der naechste Lauf.
+41/53 (77 Prozent) — unter der alten Regel haette er weitergeruht.
+
+**Nachgemessen 21:51:** Auf der einzigen sauberen Strecke (21:19 bis 21:51,
+nach dem Neuladen, ohne Drosselung, ohne Engine-Stillstand) stieg der Rang von
+102 auf 129 — **0,84 je Minute**. Eine belastbare Vorher-Zahl gibt es nicht:
+Alle Strecken davor sind durch die Tab-Drosselung oder den Engine-Ausfall
+verunreinigt. Der Hebel bleibt damit **plausibel, aber nicht sauber belegt**.
+Zurueckgenommen wird er nicht - die Begruendung haengt am Quellcode, nicht an
+der Messung: Oberhalb von 50 Prozent Ausdauer ist die Strafe exakt 1.
+
+Nachtrag zur HP-Schwelle: 0,95 war unerreichbar und hielt den Motor in der
+Kammer fest; seit 20:47 steht sie auf 0,75.
 Commit: (siehe git log, blade.js 25.08.)

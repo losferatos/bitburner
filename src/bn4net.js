@@ -512,6 +512,23 @@ export async function main(ns) {
       const b = ns.fileExists("data/reload.txt", "home") ? ns.read("data/reload.txt") : "";
       if (b.startsWith("WERKZEUG ")) {
         const name = b.slice(9).trim();
+        // NICHT UEBER DIESEN KANAL SELBSTMORD (25.08.2026).
+        //
+        // "WERKZEUG bn4net.js" laesst diese Schleife sich selbst beenden - und
+        // dann haengt es an der Wache in popups.js, ob jemand zurueckkommt.
+        // Steht die auch nicht (etwa direkt nach einem Einbau, wo ALLE
+        // Skripte tot sind und boot.js gerade erst bn4net gestartet hat), ist
+        // der Bot weg. Genau so ist am 25.08. um 05:59 der Wiederanlauf
+        // gescheitert - das Protokoll meldete "gestartet" und "laeuft".
+        //
+        // Fuer den eigenen Neustart gibt es den SELBST-Kanal eine Ebene
+        // hoeher; der beendet sich an definierter Stelle, statt auf eine
+        // Wache zu hoffen.
+        if (name === "bn4net.js") {
+          ns.write("data/reload.txt", "", "w");
+          sag("WERKZEUG bn4net.js abgelehnt - fuer den Selbstneustart"
+            + " 'SELBST bn4net.js' benutzen.");
+        } else {
         ns.write("data/reload.txt", "", "w");
         // Ueberall killen, nicht nur auf der aktuellen Werkbank. Die Werkbank
         // ist der GROESSTE Rechner und wechselt, sobald ein groesserer gekauft
@@ -526,6 +543,7 @@ export async function main(ns) {
           getroffen++;
         }
         sag(name + ": " + getroffen + " Instanz(en) beendet, startet gleich neu.");
+        }
       }
     }
 

@@ -68,6 +68,20 @@ export async function main(ns) {
     stadt: ns.bladeburner.getCity(),
     ausdauer: ns.bladeburner.getStamina(),
     aktion: ns.bladeburner.getCurrentAction(),
+    // DER FORTSCHRITT DER LAUFENDEN AKTION (25.08.2026, 20:53).
+    //
+    // Ohne ihn ist ein Stillstand nicht zu deuten. Drei Faelle sehen von
+    // aussen gleich aus und haben voellig verschiedene Ursachen:
+    //   waechst        - alles in Ordnung, die Aktion laeuft
+    //   steht bei 0    - sie wird bei jedem Tick neu gestartet
+    //   steht konstant - die Bladeburner-Engine bekommt keine Zyklen
+    aktionZeit: (() => { try { return ns.bladeburner.getActionCurrentTime(); } catch (e) { return null; } })(),
+    aktionDauer: (() => {
+      try {
+        const a = ns.bladeburner.getCurrentAction();
+        return a ? ns.bladeburner.getActionTime(a.type, a.name) : null;
+      } catch (e) { return null; }
+    })(),
     naechsteBlackOp: bo ? { name: bo.name, rang: bo.rank } : null,
     vertraege, operationen, staedte, faehigkeiten,
   }), "w");

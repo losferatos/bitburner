@@ -24,6 +24,40 @@ Regeln:
 
 ## Sofort
 
+### Die SPIELENGINE ist eingefroren, nur Netscript laeuft (20:49, praezisiert 21:15)
+
+**Nachtrag 21:15 - die Ursache ist gefunden, nicht mehr nur Bladeburner:**
+`ns.getPlayer().totalPlaytime` steht ueber 30 Sekunden Messdauer exakt still
+(524735400 -> 524735400). Diese Zahl waechst ausschliesslich in `updateGame`.
+Netscript und die Spielengine sind zwei getrennte Schleifen: Skripte laufen,
+bn4net zaehlt sechs Runden je Minute, Hackgeld kommt herein - aber die Engine
+tickt nicht. Damit stehen auch Reputation, Ausdauer und Vertragsnachschub.
+
+Der `startAction`-Verdacht ist damit **widerlegt**: Das Enum
+`BladeburnerActionType` (Enums.ts:1-6) hat exakt die Werte, die blade.js
+verwendet, der Vergleich in `blade.js:365` stimmt. `data/bbtick.json` zeigt
+dreissig Messungen in Folge `zeit 0 von 20000` - nicht ein Zuruecksetzen,
+sondern gar kein Tick.
+
+**Verdacht auf `src/hacktimer.js`, also auf eine eigene Aenderung von 20:15.**
+Die Zeitlinie passt: Eric minimierte um 20:20:48, der Patch haengt sich bei
+verstecktem Tab ein, das Skript verschwand kurz darauf aus `ps.json` - und ein
+sterbendes Netscript-Skript raeumt seine window-Patches NICHT auf. Der
+Engine-Loop plant sich per `setTimeout` neu; geht dieser eine Rueckruf
+verloren, steht die Engine fuer immer. Der Rang steht seit 20:27.
+Abgeraeumt um 21:11 (`hacktimer.js --stop`), ohne Wirkung - der verlorene
+Rueckruf kommt nicht von selbst zurueck.
+
+**Zu tun:**
+1. Eric muss den Tab einmal neu laden (F5). Push um 21:14 gesendet.
+2. `hacktimer.js` gehoert aus dem Verkehr, bis das Aufraeumen beim Skriptende
+   geloest ist. Ein Werkzeug, das die Engine anhalten kann, wenn es stirbt,
+   darf in keinem Nachtlauf mitfahren.
+3. Der Puls der Engine gehoert in die Telemetrie - erledigt 21:15, blade.js
+   schreibt jetzt `spielzeit`. Der Pruefer muss ihn noch auswerten.
+
+--- urspruenglicher Eintrag ---
+
 ### Die Bladeburner-Simulation ist eingefroren, das uebrige Spiel laeuft (20:49)
 Gemessen ueber `data/bbspann.json`, zwei Messungen im Abstand von 15 Minuten:
 

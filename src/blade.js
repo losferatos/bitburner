@@ -396,6 +396,19 @@ export async function main(ns) {
         punkte: ns.bladeburner.getSkillPoints(),
         ausdauer: Math.round(jetzt) + "/" + Math.round(max),
         hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
+        // DER PULS DER SPIELENGINE (25.08.2026, 21:15).
+        //
+        // Netscript und die Spielengine sind ZWEI Schleifen. Am 25.08. stand
+        // updateGame ab 20:27 still - Rang, Ausdauer und Aktionsfortschritt
+        // eingefroren auf siebzehn Nachkommastellen -, waehrend bn4net munter
+        // Runden zaehlte und Hackgeld hereinkam. Jede vorhandene Pruefung sah
+        // deshalb Normalbetrieb, und der Strategiepruefer meldete 46 Minuten
+        // lang SPUR.
+        //
+        // totalPlaytime waechst ausschliesslich in updateGame. Steht die Zahl
+        // zwischen zwei Messungen still, ist die Engine tot - und dann hilft
+        // kein Neustart eines Werkzeugs, sondern nur ein Neuladen des Tabs.
+        spielzeit: ns.getPlayer().totalPlaytime,
         aktion: wahl.typ + "/" + wahl.name,
         grund: wahl.grund,
         naechsteBlackOp: bo ? bo.name : null,

@@ -24,7 +24,31 @@ Regeln:
 
 ## Sofort
 
-keine
+### hacktimer.js laeuft nicht mehr, weil es in keiner Startliste steht (20:28)
+Gemessen: `data/ps.json` um 20:28 fuehrt blade, bbtrain, wakelock, sonde,
+homegrow, bn4door, bn4rep, contracts, popups, bn4life, bn4net - aber kein
+hacktimer.js. Um 20:16 lief es noch (`data/hacktimer.json` wurde geschrieben).
+Erwartet: Es laeuft dauerhaft, wie wakelock.js und popups.js auch.
+Verdacht: Der Reload-Kanal beendet ein Werkzeug, und die Liste WERKZEUGE in
+`src/bn4net.js` (ab Zeile 241) startet es neu. Steht es dort nicht - und
+hacktimer steht nicht dort -, bleibt es nach dem Reload einfach tot. Derselbe
+Mechanismus wuerde es nach jedem Augmentierungs-Einbau verlieren.
+Zu tun: Eintrag in WERKZEUGE. Das ist eine Aenderung an bn4net.js und braucht
+deshalb Erics Freigabe; bis dahin ist der Patch nur von Hand startbar
+(`["hacktimer.js"]` ueber data/task.txt).
+
+### data/blade.json war um 20:27 acht Minuten alt (20:27)
+Gemessen: `zeit` 1787681956153 = 20:19:16, gelesen um 20:27:20. blade.js lief
+laut ps.json die ganze Zeit (pid 33788 auf werk-0).
+Erwartet: Die Datei wird bei jeder Aktionswahl geschrieben; bei Aktionsdauern
+von rund 30 Sekunden waeren das hoechstens ein bis zwei Minuten Abstand.
+Verdacht: `src/blade.js:360` schreibt nur im Zweig, der eine NEUE Aktion
+startet. Bleibt die Aktion dieselbe (hier durchgehend die
+Regenerationskammer), wartet die Schleife auf `nextUpdate()` und schreibt
+nicht - die Telemetrie altert, obwohl alles laeuft. Fuer den Pruefer und die
+Wache sieht das aus wie ein stehender Motor, sobald eine Ruhephase laenger
+dauert.
+
 
 ---
 

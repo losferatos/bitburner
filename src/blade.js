@@ -115,7 +115,17 @@ export async function main(ns) {
   // bei der kurzen Ruhe oben nicht mehr. Ohne eigene Schwelle liefe der Bot
   // sonst mit sinkenden HP weiter, bis ihn ein Einsatz ins Krankenhaus bringt.
   const HP_RUHE = 0.50;
-  const HP_WEITER = 0.95;
+  // 0,95 WAR EINE FALLE (25.08.2026, 20:47).
+  //
+  // Die erste Fassung ruhte, bis die Trefferpunkte fast voll waren. Gemessen
+  // um 20:46: 14 von 22, also 64 Prozent. Da jeder Vertrag neuen Schaden
+  // macht, ist die 95-Prozent-Marke im laufenden Betrieb kaum je erreichbar -
+  // einmal in der Ruhe, blieb der Motor dort haengen, und zwar unsichtbar,
+  // weil dieser Zweig keine Telemetrie schrieb.
+  //
+  // 0,75 ist erreichbar (die Kammer heilt 2 HP je Durchlauf) und laesst
+  // trotzdem Puffer: Unter 50 Prozent wird geruht, ab 75 wieder gearbeitet.
+  const HP_WEITER = 0.75;
 
   // Reihenfolge der Faehigkeiten. Overclock zuerst, weil es die Dauer JEDER
   // Aktion senkt und damit auf alles andere wirkt; es ist bei Stufe 90
@@ -321,6 +331,28 @@ export async function main(ns) {
       const ausdauerKnapp = max > 0 && jetzt < max * AUSDAUER_WEITER;
       const hpKnapp = hp && hp.max > 0 && hp.current < hp.max * HP_WEITER;
       if (ruhend && (ausdauerKnapp || hpKnapp)) {
+        // TELEMETRIE AUCH IM RUHEN (25.08.2026, 20:46).
+        //
+        // Dieser Zweig schrieb bisher nichts. Am 25.08. stand der Motor
+        // deshalb 23 Minuten hier fest, ohne dass es jemand sehen konnte:
+        // data/blade.json trug um 20:42 noch den Zeitstempel 20:19, und von
+        // aussen ist eine haengende Schleife nicht von ruhigem Ruhen zu
+        // unterscheiden. Der Strategiepruefer meldete die ganze Zeit SPUR.
+        //
+        // Die Zeile kostet nichts und macht den Unterschied messbar: Altert
+        // blade.json ab jetzt, steht der Motor wirklich.
+        ns.write("data/blade.json", JSON.stringify({
+          zeit: Date.now(),
+          chance: null,
+          rang: Math.round(ns.bladeburner.getRank()),
+          punkte: ns.bladeburner.getSkillPoints(),
+          ausdauer: Math.round(jetzt) + "/" + Math.round(max),
+          hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
+          aktion: "General/Hyperbolic Regeneration Chamber",
+          grund: ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
+            : "ruht bis HP " + Math.round(hp.max * HP_WEITER),
+        }), "w");
+        if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
         await ns.bladeburner.nextUpdate();
         continue;
       }
@@ -363,6 +395,7 @@ export async function main(ns) {
         rang: Math.round(ns.bladeburner.getRank()),
         punkte: ns.bladeburner.getSkillPoints(),
         ausdauer: Math.round(jetzt) + "/" + Math.round(max),
+        hp: hp ? Math.round(hp.current) + "/" + Math.round(hp.max) : null,
         aktion: wahl.typ + "/" + wahl.name,
         grund: wahl.grund,
         naechsteBlackOp: bo ? bo.name : null,

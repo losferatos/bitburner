@@ -24,6 +24,41 @@ Regeln:
 
 ## Sofort
 
+### Die Bladeburner-Simulation ist eingefroren, das uebrige Spiel laeuft (20:49)
+Gemessen ueber `data/bbspann.json`, zwei Messungen im Abstand von 15 Minuten:
+
+    20:34   rang 101.69326509516765   ausdauer 29.21913997841716 / 53.212556220576175
+    20:49   rang 101.69326509516765   ausdauer 29.21913997841716 / 53.212556220576175
+
+Identisch auf siebzehn Nachkommastellen - das ist kein langsamer Fortschritt,
+sondern Stillstand. Die laufende Aktion ist dabei durchgehend
+`Contracts/Retirement`, also kein Ruhezustand.
+
+Gleichzeitig laeuft der Rest des Spiels normal: `bn4net.json.runde` steigt mit
+rund sechs Runden je Minute, das Guthaben waechst, `data/sonde.json` meldet
+Stufe "keine". Es ist also NICHT die Tab-Drosselung.
+
+Erwartet: Bei `Contracts/Retirement` mit 45 Prozent Erfolgschance rund 0,3 Rang
+je Minute; die Hoechstausdauer waechst ausserdem mit jedem Kampf-Exp-Punkt
+weiter, sie kann gar nicht exakt konstant bleiben.
+
+Verdacht, in dieser Reihenfolge zu pruefen:
+1. Die Aktion wird bei jedem Tick neu gestartet und ihr Fortschritt damit
+   zurueckgesetzt. `src/blade.js:364-366` prueft zwar auf Gleichheit
+   (`laeuft.type === wahl.typ && laeuft.name === wahl.name`), aber wenn die
+   Schreibweise der Typen auseinanderlaeuft, ist `gleich` immer falsch. Das
+   erklaert einen exakt eingefrorenen Zustand besser als alles andere.
+2. Der Spieler steht seit etwa 20:40 in **Ishima** statt Sector-12 (Quelle:
+   strategie-check). Wer ihn dorthin gebracht hat, ist unklar - bbtrain reist
+   nach Sector-12, bn4life nach Aevum, blade.js reist gar nicht.
+3. Ein blockierender Dialog im Spiel.
+
+Zu tun: `getCurrentAction()` und die gewaehlte Aktion nebeneinander
+protokollieren, dann sieht man Fall 1 sofort. Das ist die naechste Aenderung an
+blade.js - in diesem Lauf nicht mehr gemacht, weil die Zehn-Minuten-Grenze
+erreicht war und zwei Aenderungen an derselben Datei nicht mehr auseinander zu
+halten waeren.
+
 ### blade.js stand 23 Minuten in der Regenerationskammer fest (20:42)
 Gemessen: `data/blade.json` trug um 20:42 noch den Zeitstempel 20:19:16, Aktion
 `General/Hyperbolic Regeneration Chamber`, Ausdauer 27/53. Der Rang stand seit

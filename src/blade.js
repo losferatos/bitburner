@@ -254,15 +254,47 @@ export async function main(ns) {
       }
     }
 
-    // 3. Operationen, danach Vertraege. In beiden Gruppen gewinnt die Aktion
-    //    mit der hoechsten gesicherten Erfolgschance, die noch Vorraete hat.
+    // 3. Operationen, danach Vertraege. Innerhalb einer Gruppe gewinnt die
+    //    Aktion mit dem hoechsten RANGERTRAG JE MINUTE - nicht die mit der
+    //    hoechsten Erfolgschance.
+    //
+    // DIE SICHERSTE AKTION IST NICHT DIE BESTE (25.08.2026, 21:57).
+    //
+    // Bis hierher gewann `s.min`, also die Erfolgswahrscheinlichkeit allein.
+    // Das optimiert die falsche Zahl: Was zaehlt, ist Ertrag mal Chance
+    // geteilt durch Dauer. Gemessen um 21:56 (`data/bbspann.json`):
+    //
+    //   Bounty Hunter   0,457 Chance · 0,9 Rang · 21 s  ->  1,176 Rang/min
+    //   Retirement      0,449 Chance · 0,6 Rang · 21 s  ->  0,770 Rang/min
+    //
+    // Beide Vertraege sind gleich lang und praktisch gleich sicher, aber der
+    // eine bringt die Haelfte mehr. Die alte Regel hat trotzdem Retirement
+    // gewaehlt, sobald dessen Schaetzung einen Hauch hoeher lag.
+    //
+    // Die Sicherheitsschwelle bleibt als FILTER erhalten - sie entscheidet,
+    // was ueberhaupt in Frage kommt. Nur die Rangfolge darunter aendert sich.
+    //
+    // rankGain-Werte aus reference/bitburner-src/src/Bladeburner/data/.
+    const RANG_JE_ERFOLG = {
+      "Tracking": 0.3, "Bounty Hunter": 0.9, "Retirement": 0.6,
+      "Investigation": 2.2, "Undercover Operation": 4.4, "Sting Operation": 5.5,
+      "Stealth Retirement Operation": 22, "Assassination": 44, "Raid": 55,
+    };
     const beste = (liste, typ, schwelle) => {
       let treffer = null;
       for (const name of liste) {
         if (offen(typ, name) < 1) continue;
         const s = spanne(typ, name);
         if (s.min < schwelle) continue;
-        if (!treffer || s.min > treffer.min) treffer = { name, min: s.min };
+        const rang = RANG_JE_ERFOLG[name];
+        let dauer = 0;
+        try { dauer = ns.bladeburner.getActionTime(typ, name); } catch {}
+        // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
+        // Bewertung zurueck: besser eine grobe Rangfolge als gar keine.
+        const ertrag = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
+        if (!treffer || ertrag > treffer.ertrag) {
+          treffer = { name, min: s.min, ertrag };
+        }
       }
       return treffer;
     };

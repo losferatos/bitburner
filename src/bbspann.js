@@ -25,8 +25,34 @@ export async function main(ns) {
     let offen = 0, stufe = 0;
     try { offen = ns.bladeburner.getActionCountRemaining(typ, name); } catch {}
     try { stufe = ns.bladeburner.getActionCurrentLevel(typ, name); } catch {}
+    // DER ERTRAG JE ZEIT IST DIE ENTSCHEIDENDE GROESSE (25.08.2026, 21:55).
+    //
+    // blade.js waehlt bisher die SICHERSTE Aktion oberhalb einer Schwelle.
+    // Das optimiert die falsche Zahl: Ein Vertrag mit 56 Prozent Chance und
+    // 0,6 Rang schlaegt eine Operation mit 28 Prozent und 2,2 Rang nur dann,
+    // wenn er auch entsprechend kuerzer dauert. Ohne die Dauer laesst sich
+    // das nicht entscheiden - deshalb steht sie jetzt hier.
+    //
+    // rankGain aus reference/bitburner-src/src/Bladeburner/data/:
+    //   Contracts   Tracking 0,3 · Bounty Hunter 0,9 · Retirement 0,6
+    //   Operations  Investigation 2,2 · Undercover 4,4 · Sting 5,5
+    //               Stealth Retirement 22 · Assassination 44 · Raid 55
+    let dauer = null;
+    try { dauer = Math.round(ns.bladeburner.getActionTime(typ, name)); } catch {}
+    const RANG = {
+      "Tracking": 0.3, "Bounty Hunter": 0.9, "Retirement": 0.6,
+      "Investigation": 2.2, "Undercover Operation": 4.4, "Sting Operation": 5.5,
+      "Stealth Retirement Operation": 22, "Assassination": 44, "Raid": 55,
+    };
+    const rangGewinn = RANG[name] ?? null;
+    // Erwarteter Rang je Minute: Ertrag mal Erfolgswahrscheinlichkeit,
+    // geteilt durch die Dauer. Die untere Schaetzgrenze ist die vorsichtige
+    // Wahl - die Spanne ist bei unsicheren Aktionen betraechtlich.
+    const ertrag = (rangGewinn != null && dauer)
+      ? +(rangGewinn * min / (dauer / 60000)).toFixed(3) : null;
     return { name, min: +min.toFixed(3), max: +max.toFixed(3),
-      spanne: +(max - min).toFixed(3), offen, stufe };
+      spanne: +(max - min).toFixed(3), offen, stufe,
+      dauer, rangGewinn, ertragJeMinute: ertrag };
   };
 
   const vertraege = ns.bladeburner.getContractNames().map((n) => zeile("Contracts", n));

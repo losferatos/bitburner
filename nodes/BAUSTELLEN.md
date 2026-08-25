@@ -24,6 +24,20 @@ Regeln:
 
 ## Sofort
 
+### Der Bitburner-Tab laeuft gedrosselt (17:47)
+Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
+17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
+Erwartet: 4-6 Runden je Minute. Faktor 5 auf ALLES - Geld, Kampfwerte,
+Bladeburner-Rang, jede Aktionsdauer.
+Verdacht: `src/wakelock.js` laeuft (steht in der Prozessliste), aber sein
+unhoerbarer 19,5-kHz-Ton kommt nicht an. Nach einem Reload steht der
+AudioContext auf "suspended", weil Browser Tonausgabe ohne Nutzerinteraktion
+blockieren. Das Skript merkt davon nichts und meldet nichts.
+Behebbar nur durch einen Klick in den Tab - Eric am 25.08. um 17:48 informiert.
+Zu tun, unabhaengig davon: wakelock.js soll `ctx.state` pruefen, `resume()`
+versuchen und den Zustand nach `data/wakelock.txt` schreiben, damit der Ausfall
+messbar wird statt nur spuerbar.
+
 ### tools/wache.js misst noch den Traeger des vorigen Knotens (17:30)
 Gemessen: `data/wache-zustand.json` fuehrt als Verlauf ausschliesslich
 `hacking`, `geld` und `homeRam` - zuletzt `{"hacking":103,"geld":683838024}`.

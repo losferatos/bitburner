@@ -20,7 +20,7 @@
  */
 
 import { readFile, writeFile, mkdir } from "node:fs/promises";
-import { existsSync } from "node:fs";
+import { existsSync, statSync } from "node:fs";
 import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
@@ -262,6 +262,74 @@ async function pruefe(zustand, jetzt) {
   messwerte.hacking = net.hacking ?? null;
   messwerte.geld = net.geld ?? null;
   messwerte.homeRam = net.homeRam ?? null;
+  messwerte.runde = Number.isFinite(net.runde) ? net.runde : null;
+
+  // 3b. LAEUFT DAS SPIEL ueberhaupt mit voller Geschwindigkeit?
+  //
+  // Gemessen am 25.08.2026 um 17:47: eine Motorrunde in 61 Sekunden statt der
+  // ueblichen vier bis sechs. Der Browsertab war gedrosselt - verborgene Tabs
+  // laufen sechzehnfach langsamer, und wakelock.js haelt sie mit einem
+  // unhoerbaren Ton wach. Der Ton kann lautlos ausfallen: Nach einem Reload
+  // steht der AudioContext auf "suspended", weil Browser Tonausgabe ohne
+  // Nutzerinteraktion blockieren. Das Skript laeuft weiter und meldet nichts.
+  //
+  // Kein bestehender Pruefer konnte das sehen: bn4net schreibt dann alle drei
+  // Minuten statt alle zehn Sekunden, und beide Frischegrenzen (sechs und zehn
+  // Minuten) bleiben unterschritten. Alles sah normal aus, waehrend der ganze
+  // Bot ein Fuenftel seiner moeglichen Arbeit leistete.
+  //
+  // Die Rundenzahl stand die ganze Zeit in der Telemetrie. Sie zu speichern
+  // kostet nichts - sie nicht zu speichern hat Stunden gekostet.
+  // Der Verlauf steht neueste-zuerst. Gesucht ist der juengste Eintrag, der
+  // mindestens fuenf Minuten alt ist - bei drei Minuten Takt ist das der
+  // zweite oder dritte. Kuerzere Abstaende schwanken zu stark.
+  const vorigeRunde = (zustand.verlauf || []).find(
+    (x) => Number.isFinite(x.runde) && jetzt - x.ts >= 5 * 60_000);
+  if (vorigeRunde && Number.isFinite(messwerte.runde)) {
+    const min = (jetzt - vorigeRunde.ts) / 60000;
+    const drunden = messwerte.runde - vorigeRunde.runde;
+    // Ein Neustart des Motors setzt den Zaehler zurueck - dann ist die
+    // Differenz negativ und sagt nichts ueber die Geschwindigkeit.
+    if (min >= 5 && drunden >= 0 && drunden / min < 1) {
+      befunde.push({
+        typ: "tempo",
+        text: "Das Spiel laeuft gedrosselt: nur " + (drunden / min).toFixed(2)
+          + " Motorrunden je Minute statt 4-6. Einmal in den Bitburner-Tab"
+          + " klicken - der Weckton braucht eine Nutzerinteraktion.",
+      });
+    }
+  }
+
+  // 3c. LEBEN DIE LOOPS NOCH?
+  //
+  // Die drei Cron-Loops laufen in EINER Claude-Sitzung. Ein /compact, ein
+  // geschlossenes Fenster, der Ablauf nach sieben Tagen - und die gesamte
+  // eingreifende Ebene ist weg. Der Bot laeuft weiter, also schweigt dieser
+  // Waechter voellig korrekt, waehrend niemand mehr eingreift.
+  //
+  // Fuenf Skeptiker-Pruefungen am 25.08.2026 haben das unabhaengig voneinander
+  // als groessten Einzelfehler benannt: Es gab keine Stelle, an der Session-Tod,
+  // Sieben-Tage-Ablauf und ein misslungener Cron-Umbau anders aussehen als
+  // Normalbetrieb.
+  //
+  // data/ziele.md ist der Totmannschalter: Der Reportloop schreibt sie alle
+  // dreissig Minuten, sie liegt lokal (nicht im Spiel), und sie wird nicht
+  // versioniert. Bleibt sie stehen, ist die Schleife tot.
+  try {
+    const st = statSync(path.join(ROOT, "data", "ziele.md"));
+    const alter = jetzt - st.mtimeMs;
+    if (alter > 90 * 60_000) {
+      befunde.push({
+        typ: "loops",
+        text: "Die Ueberwachungs-Loops melden sich seit " + minuten(alter)
+          + " min nicht mehr - Sitzung beendet oder Cron abgelaufen."
+          + " In Claude Code '/bb-loops' aufrufen.",
+      });
+    }
+  } catch {
+    // Datei fehlt: Der Reportloop hat noch nie gelaufen. Das ist beim ersten
+    // Start normal und kein Alarm - erst ihr Verschwinden waere einer.
+  }
 
   // 4. Der Reputationsmotor, gemessen am Puls (data/hb-rep.txt).
   //

@@ -24,6 +24,21 @@ Regeln:
 
 ## Sofort
 
+### Der Spieler steht wiederholt in Ishima, ohne dass jemand dorthin reist (21:47)
+Gemessen: `strategie-check` meldet um 20:42, 21:13 und 21:47 die Stadt Ishima,
+dazwischen um 21:19 Sector-12. Der Wechsel wiederholt sich also.
+Erwartet: Sector-12. Dort steht das beste Trainingsstudio (Powerhouse Gym), und
+`bbtrain.js` reist ausdruecklich dorthin zurueck (`src/bbtrain.js:156-165`).
+Verdacht: offen. Keines der bekannten Skripte reist nach Ishima - bbtrain nach
+Sector-12, bn4life nach Aevum (`bn4life.js:208`), blade.js reist gar nicht.
+Bleiben `joinrun.js` (hat travelToCity) und ein Faktionsbeitritt ueber
+popups.js: `data/popups.txt` zaehlte um 21:03 sieben Beitritte, und Ishima ist
+eine Stadtfaktion.
+Folgen: Fuer Bladeburner-Aktionen ist der Aufenthaltsort ohne Bedeutung (die
+Division fuehrt ihre eigene Stadt, `bbspann.json` meldet dort Sector-12).
+Teuer wird es erst, wenn bbtrain nach dem naechsten Augmentierungs-Einbau
+wieder Kampfwerte hochziehen muss - dann kostet jede Reise Zeit und Geld.
+
 ### Der Pruefer haelt die Regenerationskammer fuer Fortschritt (20:42)
 Gemessen: URTEIL SPUR bei +4 Rang in 24 Minuten, waehrend der Motor
 durchgehend `General/Hyperbolic Regeneration Chamber` fuhr.

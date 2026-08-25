@@ -37,7 +37,14 @@ Zu tun: `blade.js` schreibt die Erfolgschance der laufenden Aktion nach
 `data/blade.json`; `sollRate()` multipliziert damit. Zwei Dateien, deshalb hier
 eingetragen statt im Wachelauf erledigt.
 
-### Der Bitburner-Tab laeuft gedrosselt (17:47)
+### Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
+Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
+Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
+Tab im Vordergrund bleibt - der Weckton von wakelock.js traegt nicht. Damit ist
+das kein einmaliger Zwischenfall, sondern ein Dauerzustand, der jeden
+Nachtlauf um Faktor fuenf verkuerzt.
+
+### Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
 Erwartet: 4-6 Runden je Minute. Faktor 5 auf ALLES - Geld, Kampfwerte,

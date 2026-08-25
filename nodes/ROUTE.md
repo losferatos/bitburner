@@ -115,6 +115,49 @@ Diese Messung ist damit das wertvollste Einzelergebnis der naechsten Tage.
 
 ---
 
+### Das Ergebnis vom 25.08.2026, 18:30 Uhr
+
+**Gemessener Rang nach zwei Stunden: 29.** Schwelle waren 3.500 ohne Raid.
+Verfehlt um Faktor 120.
+
+**Die Messung ist als Test der Route unbrauchbar.** Von den 125 Minuten seit dem
+Beitritt (zwischen 16:20 und 16:29) lief hoechstens eine knappe halbe Stunde
+ungestoert:
+
+| Zeitraum | Stoerung |
+|---|---|
+| 16:25-17:05 | bn4life und bn4rep brachen die Bladeburner-Aktionen sekuendlich ab (Verbrechen, Faktionsarbeit) |
+| bis 17:20 | Der Faehigkeitenkauf nahm das Billigste statt des Wichtigsten - Overclock und Blade's Intuition standen auf null |
+| bis 17:47 | Der Browsertab lief fuenffach gedrosselt (1 Motorrunde/min statt 4-6) |
+| 17:58-18:20 | sauber, nach einem Klick in den Tab |
+| 18:03-18:13 | Rueckfall auf General/Training, weil der Tracking-Vorrat leer war |
+| ab 18:20 | wieder gedrosselt |
+
+**Was sich trotzdem sagen laesst - und das ist der eigentliche Befund:** Die
+Stoerungen erklaeren zusammen etwa Faktor fuenf. Die Luecke betraegt Faktor 120.
+Selbst ein vollstaendig ungestoerter Lauf haette bei der sauber gemessenen Rate
+von rund 0,3 Rang je Minute nach zwei Stunden bei etwa 36 gelegen, nicht bei
+3.500.
+
+Hochgerechnet auf die erste Black Operation (Operation Typhoon, Rang 2.500)
+waeren das rund 140 Stunden - fuer **einen** von 45 Laeufen.
+
+**Der Verdacht richtet sich damit gegen die Simulation, nicht gegen den Bot.**
+Bewiesen ist er nicht: Bladeburner waechst exponentiell, die Rangertraege
+steigen mit dem Aktionslevel, und der Sprung kommt erst mit Raid (rankGain 55
+gegen 0,6 bei Retirement). Moeglich bleibt, dass die Simulation den Anlauf
+richtig, aber die Anlaufdauer falsch modelliert hat.
+
+**Was daraus folgt:** Die Reihenfolge ab Platz 3 bleibt vorlaeufig, wie in
+Abschnitt 4 festgelegt. Vor einer Neuberechnung braucht es eine **zweite
+Messung unter sauberen Bedingungen** - ein durchgehend ungestoerter
+Vier-Stunden-Lauf mit funktionierendem wakelock. Erst wenn auch der bei einer
+Rate unter einem Rang je Minute bleibt, ist V2 als Traeger widerlegt und die
+Route muss neu gerechnet werden. Diese Entscheidung trifft Eric.
+
+
+---
+
 ## 5. Der Darknet-Weg (V1b) - kein Abkuerzer, aber der Weg durch BN15
 
 Beide Vorgaengerdokumente kennen nur zwei Wege zu `w0r1d_d43m0n`: Hacking-Level

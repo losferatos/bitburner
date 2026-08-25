@@ -61,9 +61,18 @@ export async function main(ns) {
   // dazu: dort steht der Ruecklagenbedarf des alten Knotens, und solange er
   // steht, kauft bn4life.js kein Portprogramm - genau im Fenster, in dem es
   // am noetigsten waere.
+  // data/reload.txt gehoert AUSDRUECKLICH dazu (25.08.2026). Dort steht ein
+  // Fernbefehl der Form "WERKZEUG <name>", und bn4net beendet das genannte
+  // Werkzeug ueberall - auch sich selbst, wenn es sich selbst nennt.
+  //
+  // Am 25.08. um 05:59 hat genau das den Wiederanlauf verschluckt: boot.js
+  // startete bn4net, bn4net las in seiner ersten Runde einen zehn Minuten
+  // alten "WERKZEUG bn4net.js"-Befehl, beendete sich selbst und war wieder
+  // weg. Aus dem Protokoll sah der Start erfolgreich aus. Ein Fernbefehl aus
+  // der Zeit VOR dem Neuanlauf ist immer veraltet.
   for (const datei of ["data/install-sperre.txt", "data/beitritt-erledigt.txt",
                        "data/rep-modus.txt", "data/company-order.txt",
-                       "data/geldbedarf.txt"]) {
+                       "data/geldbedarf.txt", "data/reload.txt"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }
 

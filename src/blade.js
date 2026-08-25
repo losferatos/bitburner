@@ -1,0 +1,237 @@
+/**
+ * Der Bladeburner-Motor.
+ *
+ * WOZU
+ *
+ * In BitNode 6 und 7 fuehrt der Weg zu w0r1d_d43m0n nicht ueber das
+ * Hackniveau, sondern ueber 21 Black Operations: `destroyW0r1dD43m0n`
+ * akzeptiert beides (Singularity.ts:1124-1176). Der Hacking-Weg ist hier
+ * versperrt - WorldDaemonDifficulty 2 hebt das Ziel auf Level 6.000, waehrend
+ * HackExpGain 0,25 jede Erfahrung viertelt.
+ *
+ * Vorbedingung ist der Beitritt zur Division, und der verlangt alle vier
+ * Kampfwerte auf 100 (NetscriptFunctions/Bladeburner.ts:356). Darum kuemmert
+ * sich bbtrain.js; dieses Skript wartet, bis es soweit ist.
+ *
+ * DIE ENTSCHEIDUNGSREGEL
+ *
+ * Bladeburner ist ein Spiel gegen die Ausfallwahrscheinlichkeit. Jede Aktion
+ * hat eine geschaetzte Erfolgsspanne, und der Bot bekommt sie als Paar
+ * [min, max] geliefert (getSuccessRange, Bladeburner.ts:142). Zwei Dinge
+ * folgen daraus:
+ *
+ *   - Gerechnet wird mit dem MINIMUM, nie mit dem Mittelwert. Die Spanne ist
+ *     Ausdruck der Unkenntnis ueber die Synthoid-Population; wer mit ihrer
+ *     Mitte plant, plant mit einer Zahl, die das Spiel nie zugesagt hat.
+ *   - Ist die Spanne breit, ist nicht die Aktion schlecht, sondern die
+ *     Schaetzung. Dann hilft Field Analysis, nicht ein Versuch auf gut Glueck.
+ *
+ * Ein misslungener Vertrag kostet Rang und Zeit, eine misslungene Black Op
+ * kostet zusaetzlich den Versuch selbst - deshalb steigt die geforderte
+ * Sicherheit mit dem Einsatz: 0,80 fuer Vertraege, 0,85 fuer Operationen,
+ * 0,99 fuer Black Ops.
+ *
+ * WARUM KEIN SCHLAF, SONDERN nextUpdate
+ *
+ * ns.bladeburner.nextUpdate() kostet 0 GB (RamCostGenerator.ts:378,
+ * CycleTiming) und weckt genau dann, wenn die Division ihren Zustand
+ * fortgeschrieben hat. Ein fester Schlaf waere entweder zu langsam (verpasste
+ * Ticks) oder zu schnell (Leerlaufaufrufe, die je 4 GB kosten).
+ *
+ * @param {NS} ns
+ */
+export async function main(ns) {
+  ns.disableLog("ALL");
+
+  const V = "Contracts", O = "Operations", B = "Black Operations", G = "General";
+
+  // Schwellen. Siehe Kopf - je teurer der Fehlschlag, desto hoeher.
+  const SICHER_VERTRAG = 0.80;
+  const SICHER_OPERATION = 0.85;
+  const SICHER_BLACKOP = 0.99;
+  // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
+  const SPANNE_ZU_BREIT = 0.10;
+  // Ausdauer. Unter der Haelfte des Hoechstwerts faellt die Erfolgschance
+  // (Bladeburner.ts:168: min(1, stamina/(0,5*max))), deshalb wird schon bei
+  // 55 Prozent geruht und erst ab 90 wieder gearbeitet - Hysterese, sonst
+  // pendelt der Bot zwischen Ruhe und Einsatz.
+  const AUSDAUER_RUHE = 0.55;
+  const AUSDAUER_WEITER = 0.90;
+
+  // Reihenfolge der Faehigkeiten. Overclock zuerst, weil es die Dauer JEDER
+  // Aktion senkt und damit auf alles andere wirkt; es ist bei Stufe 90
+  // gedeckelt. Danach die Erfolgschancen, danach der Rest.
+  const SKILL_PLAN = [
+    ["Overclock", 90],
+    ["Blade's Intuition", Infinity],
+    ["Digital Observer", Infinity],
+    ["Cloak", Infinity],
+    ["Tracer", Infinity],
+    ["Short-Circuit", Infinity],
+    ["Reaper", Infinity],
+    ["Evasive System", Infinity],
+  ];
+
+  const sag = (t) => ns.print(t);
+
+  // --- Warten, bis der Beitritt steht --------------------------------------
+  while (!ns.bladeburner.inBladeburner()) {
+    sag("Noch nicht in der Division - warte (bbtrain.js trainiert).");
+    await ns.sleep(30000);
+  }
+  sag("In der Division. Motor laeuft.");
+
+  const VERTRAEGE = ns.bladeburner.getContractNames();
+  const OPERATIONEN = ns.bladeburner.getOperationNames();
+  const SKILLS = new Set(ns.bladeburner.getSkillNames());
+
+  // Erfolgsspanne einer Aktion als {min, max}. Das Spiel liefert ein Paar;
+  // aeltere Fassungen lieferten eine einzelne Zahl - beides wird angenommen,
+  // damit ein Versionswechsel den Motor nicht stillegt.
+  const spanne = (typ, name) => {
+    try {
+      const r = ns.bladeburner.getActionEstimatedSuccessChance(typ, name);
+      if (Array.isArray(r)) return { min: r[0], max: r[1] };
+      return { min: r, max: r };
+    } catch { return { min: 0, max: 0 }; }
+  };
+
+  const offen = (typ, name) => {
+    try { return ns.bladeburner.getActionCountRemaining(typ, name); }
+    catch { return 0; }
+  };
+
+  // --- Faehigkeiten kaufen -------------------------------------------------
+  // Punkte liegen zu lassen ist immer falsch: Sie verfallen nicht, aber jede
+  // Runde ohne den Bonus ist verloren. Gekauft wird strikt nach Plan, nicht
+  // nach Preis - der billigste Kauf ist selten der wirksamste.
+  const faehigkeitenKaufen = () => {
+    let punkte = ns.bladeburner.getSkillPoints();
+    if (punkte <= 0) return;
+    for (const [name, deckel] of SKILL_PLAN) {
+      if (!SKILLS.has(name)) continue;
+      for (;;) {
+        const stufe = ns.bladeburner.getSkillLevel(name);
+        if (stufe >= deckel) break;
+        const preis = ns.bladeburner.getSkillUpgradeCost(name, 1);
+        if (!(preis > 0) || preis > punkte) break;
+        if (!ns.bladeburner.upgradeSkill(name, 1)) break;
+        punkte -= preis;
+        sag("Faehigkeit " + name + " auf " + (stufe + 1) + " (" + preis + " Punkte).");
+      }
+    }
+  };
+
+  // --- Die naechste Aktion waehlen -----------------------------------------
+  const waehle = () => {
+    // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
+    const [jetzt, max] = ns.bladeburner.getStamina();
+    if (max > 0 && jetzt < max * AUSDAUER_RUHE) {
+      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "Ausdauer" };
+    }
+
+    // 2. Die naechste Black Op, wenn Rang und Sicherheit reichen. Sie sind
+    //    der eigentliche Zweck: 21 Stueck, dann ist der Knoten offen.
+    const bo = ns.bladeburner.getNextBlackOp();
+    if (bo) {
+      if (ns.bladeburner.getRank() >= bo.rank) {
+        const s = spanne(B, bo.name);
+        if (s.min >= SICHER_BLACKOP) {
+          return { typ: B, name: bo.name, grund: "Black Op" };
+        }
+        // Rang reicht, Sicherheit nicht: Das ist der Normalfall und kein
+        // Grund zu warten - unten wird weiter Rang und Erfahrung gesammelt,
+        // bis die Chance steht.
+      }
+    }
+
+    // 3. Operationen, danach Vertraege. In beiden Gruppen gewinnt die Aktion
+    //    mit der hoechsten gesicherten Erfolgschance, die noch Vorraete hat.
+    const beste = (liste, typ, schwelle) => {
+      let treffer = null;
+      for (const name of liste) {
+        if (offen(typ, name) < 1) continue;
+        const s = spanne(typ, name);
+        if (s.min < schwelle) continue;
+        if (!treffer || s.min > treffer.min) treffer = { name, min: s.min };
+      }
+      return treffer;
+    };
+
+    const op = beste(OPERATIONEN, O, SICHER_OPERATION);
+    if (op) return { typ: O, name: op.name, grund: "Operation" };
+
+    const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
+    if (vt) return { typ: V, name: vt.name, grund: "Vertrag" };
+
+    // 4. Nichts sicher genug. Liegt das an der Schaetzung oder an uns?
+    //    Ist irgendwo die Spanne breit, fehlt Wissen ueber die Population -
+    //    dann ist Field Analysis die Antwort, nicht ein Versuch auf gut Glueck.
+    for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
+      const s = spanne(OPERATIONEN.includes(name) ? O : V, name);
+      if (s.max - s.min > SPANNE_ZU_BREIT) {
+        return { typ: G, name: "Field Analysis", grund: "Schaetzung unsicher" };
+      }
+    }
+
+    // 5. Die Schaetzung ist scharf und trotzdem zu niedrig: Dann sind wir zu
+    //    schwach. Training hebt Kampfwerte UND Hoechstausdauer.
+    return { typ: G, name: "Training", grund: "zu schwach" };
+  };
+
+  // --- Hauptschleife -------------------------------------------------------
+  let letzte = "";
+  let ruhend = false;
+  for (;;) {
+    try {
+      faehigkeitenKaufen();
+
+      const [jetzt, max] = ns.bladeburner.getStamina();
+      // Hysterese: Einmal in der Ruhe, wird bis 90 Prozent geruht.
+      if (ruhend && max > 0 && jetzt < max * AUSDAUER_WEITER) {
+        await ns.bladeburner.nextUpdate();
+        continue;
+      }
+      ruhend = false;
+
+      const wahl = waehle();
+      if (wahl.grund === "Ausdauer") ruhend = true;
+
+      const laeuft = ns.bladeburner.getCurrentAction();
+      const gleich = laeuft && laeuft.type === wahl.typ && laeuft.name === wahl.name;
+      if (!gleich) {
+        if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
+          const kennung = wahl.typ + "/" + wahl.name;
+          if (kennung !== letzte) {
+            sag(kennung + "  (" + wahl.grund + ")");
+            letzte = kennung;
+          }
+        } else {
+          sag("startAction abgelehnt: " + wahl.typ + "/" + wahl.name);
+          await ns.sleep(5000);
+        }
+      }
+
+      // Telemetrie nach draussen. Rang ist die Zahl, an der dieser ganze
+      // Knoten gemessen wird - der Kontrollpunkt aus nodes/ROUTE.md verlangt
+      // nach zwei Stunden mindestens 3.500.
+      const bo = ns.bladeburner.getNextBlackOp();
+      ns.write("data/blade.json", JSON.stringify({
+        zeit: Date.now(),
+        rang: Math.round(ns.bladeburner.getRank()),
+        punkte: ns.bladeburner.getSkillPoints(),
+        ausdauer: Math.round(jetzt) + "/" + Math.round(max),
+        aktion: wahl.typ + "/" + wahl.name,
+        grund: wahl.grund,
+        naechsteBlackOp: bo ? bo.name : null,
+        blackOpRang: bo ? bo.rank : null,
+      }), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
+
+      await ns.bladeburner.nextUpdate();
+    } catch (e) {
+      sag("FEHLER: " + String(e && e.message ? e.message : e));
+      await ns.sleep(10000);
+    }
+  }
+}

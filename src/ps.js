@@ -1,8 +1,11 @@
 /** Wer laeuft wo? Ergebnis nach data/ps.json. Start ueber data/task.txt.
  * @param {NS} ns */
 export async function main(ns) {
-  const WERKZEUG = ["bn4net.js", "bn4rep.js", "bn4life.js", "homegrow.js",
-    "contracts.js", "wakelock.js", "popups.js", "bn4door.js", "exit.js"];
+  // Keine feste Liste mehr: Sie verschweigt genau die Skripte, die neu sind
+  // und ueber die man deshalb etwas wissen will. Gezeigt wird alles ausser
+  // den Arbeitern - von denen laufen Zehntausende und sie sagen nichts aus.
+  const ARBEITER = new Set(["worker/hack.js", "worker/grow.js",
+    "worker/weaken.js", "worker/share.js", "worker/expfarm.js"]);
   const gesehen = [];
   const offen = ["home"], bekannt = new Set(["home"]);
   while (offen.length) {
@@ -11,10 +14,12 @@ export async function main(ns) {
   }
   for (const h of bekannt) {
     for (const pr of ns.ps(h)) {
-      if (WERKZEUG.includes(pr.filename)) {
-        gesehen.push({ host: h, datei: pr.filename, pid: pr.pid, args: pr.args });
-      }
+      if (ARBEITER.has(pr.filename)) continue;
+      gesehen.push({ host: h, datei: pr.filename, pid: pr.pid, args: pr.args });
     }
   }
   ns.write("data/ps.json", JSON.stringify({ zeit: Date.now(), gesehen }), "w");
+  // ns.write ist LOKAL - ohne diese Zeile liegt das Ergebnis auf dem Wirt,
+  // den der Auftragslaeufer gewaehlt hat, und das ist selten home.
+  if (ns.getHostname() !== "home") ns.scp("data/ps.json", "home", ns.getHostname());
 }

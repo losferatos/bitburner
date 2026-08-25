@@ -239,6 +239,18 @@ export async function main(ns) {
   // home aus, und erst ein grosses home traegt den Rest. Vertragsloeser,
   // Reputationsarbeit und die Bequemlichkeiten kommen danach.
   const WERKZEUGE = [
+    // DER KNOTENSPEZIFISCHE MOTOR (25.08.2026).
+    //
+    // In BitNode 6 und 7 fuehrt der Weg nicht ueber das Hackniveau, sondern
+    // ueber 21 Black Operations. blade.js steht deshalb GANZ oben: Es ist in
+    // diesen Knoten nicht ein Werkzeug neben anderen, sondern der Motor, der
+    // den Knoten ueberhaupt abschliesst. In anderen Knoten wartet es nur und
+    // kostet ausser dem Speicher nichts.
+    //
+    // bbtrain.js steht bewusst NICHT hier: Es raeumt einmalig das
+    // Beitrittstor weg (alle Kampfwerte auf 100) und beendet sich danach -
+    // diese Liste wuerde es ewig neu starten.
+    ["blade.js", []],
     // bn4life kauft TOR und die Portprogramme. Es steht in dieser Liste und
     // nicht in boot.js, weil es voller Singularity ist und ausserhalb von
     // BitNode 4 mehrere hundert GB gross - in ein frisches home mit 32 GB
@@ -375,7 +387,26 @@ export async function main(ns) {
     // Deshalb liest es den Auftrag ersatzweise mit - aber nur, wenn bn4life
     // nirgends laeuft. Damit gibt es nie zwei Leser und nie ein Wettrennen um
     // dieselbe Zeile.
-    const lifeLaeuft = hosts.some((h) => {
+    // EIN LEBENDER LESER, KEIN VORHANDENER (25.08.2026).
+    //
+    // Hier stand nur "laeuft bn4life irgendwo?". Der Gedanke war richtig - es
+    // soll nie zwei Leser derselben Zeile geben. Die Pruefung war es nicht:
+    // Sie fragt nach der EXISTENZ eines Prozesses, nicht nach seiner Arbeit.
+    //
+    // Am 25.08. um 05:25 stand bn4life seit 484 Minuten (letzte Telemetrie
+    // vom Vortag um 21:21), lief aber noch als Prozess. Damit trat der
+    // Auftragslaeufer zurueck, bn4life selbst las nichts mehr - und der
+    // einzige Fernkanal ins Spiel war zu. Ein Auftrag lag minutenlang
+    // unangetastet in data/task.txt. Ausgerechnet die Schutzbedingung gegen
+    // zwei Leser hat dafuer gesorgt, dass es KEINEN gab.
+    //
+    // Massgeblich ist deshalb das Lebenszeichen, nicht der Prozess.
+    const lifeZeit = (() => {
+      try { return JSON.parse(ns.read("data/bn4life.json")).zeit || 0; }
+      catch { return 0; }
+    })();
+    const lifeFrisch = lifeZeit > 0 && Date.now() - lifeZeit < 300000;
+    const lifeLaeuft = lifeFrisch && hosts.some((h) => {
       try { return ns.ps(h).some((pr) => pr.filename === "bn4life.js"); }
       catch { return false; }
     });

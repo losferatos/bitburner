@@ -33,6 +33,21 @@ export async function main(ns) {
   const operationen = ns.bladeburner.getOperationNames().map((n) => zeile("Operations", n));
   const bo = ns.bladeburner.getNextBlackOp();
 
+  // DIE FAEHIGKEITEN SIND DER VERSTAERKUNGSPFAD (25.08.2026).
+  //
+  // Ohne sie bleibt Bladeburner linear: Jede Aktion dauert gleich lang und
+  // gelingt gleich oft. Blade's Intuition hebt die Erfolgschance aller
+  // Vertraege und Operationen, Overclock senkt die Dauer JEDER Aktion. Wenn
+  // der Rang zu langsam waechst, ist die erste Frage nicht "welche Aktion",
+  // sondern "kommen ueberhaupt Punkte an und werden sie ausgegeben".
+  const faehigkeiten = [];
+  for (const name of ns.bladeburner.getSkillNames()) {
+    let stufe = 0, preis = 0;
+    try { stufe = ns.bladeburner.getSkillLevel(name); } catch {}
+    try { preis = ns.bladeburner.getSkillUpgradeCost(name, 1); } catch {}
+    faehigkeiten.push({ name, stufe, preis });
+  }
+
   const staedte = {};
   for (const stadt of ["Sector-12", "Aevum", "Volhaven", "Chongqing", "New Tokyo", "Ishima"]) {
     try {
@@ -54,7 +69,7 @@ export async function main(ns) {
     ausdauer: ns.bladeburner.getStamina(),
     aktion: ns.bladeburner.getCurrentAction(),
     naechsteBlackOp: bo ? { name: bo.name, rang: bo.rank } : null,
-    vertraege, operationen, staedte,
+    vertraege, operationen, staedte, faehigkeiten,
   }), "w");
   if (ns.getHostname() !== "home") ns.scp("data/bbspann.json", "home", ns.getHostname());
 }

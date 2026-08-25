@@ -96,6 +96,8 @@ export async function main(ns) {
   ];
 
   const sag = (t) => ns.print(t);
+  // Damit die Sparmeldung nicht bei jedem Bladeburner-Tick erneut im Log steht.
+  let letzterSparziel = "";
 
   // --- Warten, bis der Beitritt steht --------------------------------------
   while (!ns.bladeburner.inBladeburner()) {
@@ -131,17 +133,51 @@ export async function main(ns) {
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();
     if (punkte <= 0) return;
+    // SPAREN STATT AUSWEICHEN (25.08.2026).
+    //
+    // Hier stand eine Schleife, die bei "zu teuer" mit `break` aus dem
+    // aktuellen Skill aussteigt - und danach mit dem NAECHSTEN weitermacht.
+    // Der Kommentar darueber versprach "strikt nach Plan, nicht nach Preis";
+    // der Code tat genau das Gegenteil. Wer den teuersten Eintrag nicht
+    // bezahlen kann, kauft eben den billigsten weiter unten.
+    //
+    // Gemessen um 17:15, eine Dreiviertelstunde nach dem Beitritt:
+    //   Overclock          Stufe 0   (Plan-Platz 1, kostet 3)
+    //   Blade's Intuition  Stufe 0   (Plan-Platz 2, kostet 3)
+    //   Digital Observer   Stufe 1   (Plan-Platz 3)
+    // Gekauft wurde also ausgerechnet der Eintrag, der zufaellig dran war, als
+    // ein Punkt anfiel. Die beiden Faehigkeiten, die auf JEDE Aktion wirken -
+    // Overclock senkt die Dauer, Blade's Intuition hebt die Erfolgschance -
+    // standen weiter auf null, und der Rang wuchs mit 0,24 je Minute.
+    //
+    // Punkte fallen hier einzeln an. Eine Kaufregel, die nie wartet, kann
+    // deshalb systematisch nur das Billigste kaufen. Richtig ist: beim ersten
+    // Eintrag stehenbleiben, der noch nicht am Deckel ist, und sparen bis er
+    // bezahlbar ist. Ein Punkt, der eine Runde liegen bleibt, ist billiger als
+    // ein Punkt, der im falschen Skill steckt - Faehigkeiten lassen sich nicht
+    // zurueckgeben.
     for (const [name, deckel] of SKILL_PLAN) {
       if (!SKILLS.has(name)) continue;
-      for (;;) {
-        const stufe = ns.bladeburner.getSkillLevel(name);
-        if (stufe >= deckel) break;
-        const preis = ns.bladeburner.getSkillUpgradeCost(name, 1);
-        if (!(preis > 0) || preis > punkte) break;
-        if (!ns.bladeburner.upgradeSkill(name, 1)) break;
-        punkte -= preis;
-        sag("Faehigkeit " + name + " auf " + (stufe + 1) + " (" + preis + " Punkte).");
+      const stufe = ns.bladeburner.getSkillLevel(name);
+      // Am Deckel: weiterruecken, hier ist nichts mehr zu holen.
+      if (stufe >= deckel) continue;
+      const preis = ns.bladeburner.getSkillUpgradeCost(name, 1);
+      if (!(preis > 0)) continue;
+      if (preis > punkte) {
+        // NICHT weitergehen. Das ist der ganze Punkt dieser Aenderung.
+        if (name !== letzterSparziel) {
+          sag("Spare auf " + name + " (" + preis + " Punkte, habe " + punkte + ").");
+          letzterSparziel = name;
+        }
+        return;
       }
+      if (!ns.bladeburner.upgradeSkill(name, 1)) return;
+      punkte -= preis;
+      letzterSparziel = "";
+      sag("Faehigkeit " + name + " auf " + (stufe + 1) + " (" + preis + " Punkte).");
+      // Nach einem Kauf wieder von vorn: Vielleicht reicht der Rest schon fuer
+      // die naechste Stufe desselben Eintrags.
+      return faehigkeitenKaufen();
     }
   };
 

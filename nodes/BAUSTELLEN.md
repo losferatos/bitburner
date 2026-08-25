@@ -22,23 +22,7 @@ Erstes ab und verschiebt es danach nach "Erledigt".*
 
 *Ist dieser Abschnitt leer, steht hier genau ein Wort: keine.*
 
-### Der Bladeburner-Rang waechst um Faktor 100 zu langsam (17:12)
-Gemessen: 0,26 Rang je Minute ueber 43 Minuten (strategie-check), Rang steht bei
-rund 16. Motor faehrt durchgehend Contracts/Tracking, Stufe 4.
-Erwartet: rund 29 je Minute - das ist die Rate, die der Kontrollpunkt aus
-nodes/ROUTE.md verlangt (3.500 nach zwei Stunden).
-Verdacht: offen. Drei Kandidaten, in dieser Reihenfolge zu pruefen:
- 1. Skillpunkte werden nicht wirksam - bei Rang 6 standen sie auf 0. Blade's
-    Intuition und Overclock heben Erfolgschance und Tempo aller Aktionen;
-    fallen keine Punkte an oder kauft blade.js sie nicht, fehlt der ganze
-    Verstaerkungspfad (src/blade.js, faehigkeitenKaufen).
- 2. Tracking ist der schwaechste Rangbringer. Operationen geben ein Vielfaches,
-    liegen aber bei 0,14 Erfolgschance - sie werden erst mit Skills spielbar.
- 3. Die Sollrate selbst koennte falsch sein. 3.500 in zwei Stunden stammt aus
-    einer Simulation, die nie gegen einen echten Lauf geprueft wurde - genau
-    deshalb gibt es den Kontrollpunkt. Dann ist nicht der Motor kaputt, sondern
-    die Route.
-Erst messen, welcher der drei es ist. Nicht raten.
+keine
 
 ---
 
@@ -109,6 +93,28 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Faehigkeitenkauf kaufte das Billigste statt des Wichtigsten (25.08., 17:20)
+Gemessen um 17:15, eine Dreiviertelstunde nach dem Beitritt: Overclock Stufe 0
+(Plan-Platz 1), Blade's Intuition Stufe 0 (Plan-Platz 2), Digital Observer
+Stufe 1 (Plan-Platz 3). Rang wuchs mit 0,24 je Minute.
+
+Ursache: Die Kaufschleife stieg bei "zu teuer" mit `break` aus dem aktuellen
+Skill aus und machte mit dem NAECHSTEN weiter. Der Kommentar darueber versprach
+"strikt nach Plan, nicht nach Preis" - der Code tat das Gegenteil. Da Punkte
+einzeln anfallen, konnte so systematisch nur das Billigste gekauft werden,
+waehrend die beiden Faehigkeiten mit Wirkung auf JEDE Aktion auf null blieben.
+
+Behoben: Beim ersten Eintrag stehenbleiben, der nicht am Deckel ist, und sparen
+bis er bezahlbar ist. Ein Punkt, der eine Runde liegen bleibt, ist billiger als
+einer, der im falschen Skill steckt - Faehigkeiten lassen sich nicht
+zurueckgeben.
+
+Offen geblieben und bewusst nicht angefasst: Die Ausdauer-Hysterese (ruhen ab
+55 %, weiterarbeiten erst ab 90 %) kostet viel Zeit - um 17:15 lief
+"Hyperbolic Regeneration Chamber" bei 31,6 von 43,8. Ob 90 % zu hoch gegriffen
+ist, laesst sich erst nach dem Kontrollpunkt sinnvoll beurteilen; zwei
+gleichzeitige Aenderungen waeren nicht mehr auseinanderzuhalten.
 
 ### bn4rep.js lief seit dem Einbau um 05:50 nicht (25.08., behoben 16:50)
 Die Werkbank war strukturell zu klein geworden. Auf werk-0 (1.024 GB) lagen

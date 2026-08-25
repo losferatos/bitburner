@@ -31,15 +31,38 @@
  * 3. Beim Zurueckschalten werden alle noch offenen Rueckrufe ueber den
  *    Originalpfad nachgefeuert, statt sie im toten Worker verfallen zu lassen.
  *
- * Aufruf:  node tools/task.js hacktimer.js          einhaengen
- *          node tools/task.js hacktimer.js --stop   abraeumen
+ * WARUM ES OHNE `--scharf` NUR MISST (25.08.2026, 21:17)
+ *
+ * Die erste Fassung haengte sich selbsttaetig ein, sobald der Tab versteckt
+ * war. Am 25.08. um 20:20 ist genau das passiert - und kurz darauf starb das
+ * Skript, ohne `window.setTimeout` zurueckzugeben. Ein sterbendes
+ * Netscript-Skript raeumt seine Patches nicht von allein auf, und der
+ * Engine-Loop plant sich per setTimeout neu: Dieser eine Rueckruf ging
+ * verloren, und die gesamte Spielengine stand ab 20:27 still. Netscript lief
+ * weiter, bn4net zaehlte sechs Runden je Minute - deshalb hat es 46 Minuten
+ * lang niemand gemerkt.
+ *
+ * Zwei Konsequenzen, beide hier eingebaut:
+ *
+ * 1. `ns.atExit` gibt die Timer beim Skriptende zurueck. Das ist die
+ *    eigentliche Reparatur - ohne sie ist jeder Patch am Haupt-Thread eine
+ *    Zeitbombe, die beim naechsten Neustart des Werkzeugs hochgeht.
+ * 2. Eingehaengt wird nur noch mit `--scharf`. Ohne das Argument misst das
+ *    Skript, meldet seinen Modus und laesst window in Ruhe. Ein Werkzeug, das
+ *    die Engine anhalten kann, faehrt nicht ungefragt im Nachtlauf mit.
+ *
+ * Aufruf:  node tools/task.js hacktimer.js            nur messen
+ *          node tools/task.js hacktimer.js --scharf   wirklich einhaengen
+ *          node tools/task.js hacktimer.js --stop     abraeumen
  *
  * Zustand: data/hacktimer.json, jede Minute neu.
  *
  * @param {NS} ns
  */
 export async function main(ns) {
-  const stop = ns.args.map(String).includes("--stop");
+  const argumente = ns.args.map(String);
+  const stop = argumente.includes("--stop");
+  const scharf = argumente.includes("--scharf");
   const schreib = (o) => {
     ns.write("data/hacktimer.json", JSON.stringify(o), "w");
     if (ns.getHostname() !== "home") {
@@ -187,6 +210,7 @@ export async function main(ns) {
   }
 
   const aufWechsel = () => {
+    if (!scharf) return;   // ohne --scharf wird nur gemessen, nichts gepatcht
     if (w.document.visibilityState === "hidden") einhaengen();
     else aushaengen("wieder sichtbar");
   };
@@ -217,6 +241,15 @@ export async function main(ns) {
   // verdeckten Tab zu warten. Ein Eingriff am Herzen der Seite, der zum ersten
   // Mal nachts und unbeaufsichtigt aktiv wird, ist genau der Fehlertyp, an dem
   // dieses Projekt schon zweimal Stunden verloren hat.
+  // DIE WICHTIGSTE ZEILE DIESER DATEI.
+  //
+  // Stirbt das Skript - durch den Reload-Kanal, durch bn4net beim Raeumen,
+  // durch einen Fehler -, gibt es window.setTimeout zurueck, bevor es geht.
+  // Ohne sie bleibt ein Patch zurueck, dessen Besitzer nicht mehr existiert,
+  // und der Engine-Loop verliert seinen naechsten Rueckruf. Genau so stand am
+  // 25.08. die gesamte Spielengine 46 Minuten still.
+  ns.atExit(() => { try { abraeumen(); } catch (e) { /* egal */ } });
+
   w.__hacktimer = {
     abraeumen,
     istAktiv: () => aktiv,
@@ -228,6 +261,7 @@ export async function main(ns) {
     schreib({
       zeit: Date.now(),
       sichtbarkeit: w.document.visibilityState,
+      modus: scharf ? "scharf" : "nur messen",
       aktiv,
       abgeschaltet,
       grund: grund || null,

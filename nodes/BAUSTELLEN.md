@@ -53,6 +53,13 @@ Rueckruf kommt nicht von selbst zurueck.
 2. `hacktimer.js` gehoert aus dem Verkehr, bis das Aufraeumen beim Skriptende
    geloest ist. Ein Werkzeug, das die Engine anhalten kann, wenn es stirbt,
    darf in keinem Nachtlauf mitfahren.
+   **Geaendert 21:19, Wirkung noch nicht gemessen:** `ns.atExit` gibt die
+   Timer beim Skriptende zurueck, und eingehaengt wird nur noch mit dem
+   Argument `--scharf`. Ohne das Argument misst das Skript und laesst window
+   in Ruhe. Nachzumessen ist beides erst, wenn die Engine wieder laeuft -
+   dann `["hacktimer.js","--scharf"]` starten, Tab verstecken, ueber den
+   Reload-Kanal beenden und pruefen, ob `getPlayer().totalPlaytime` danach
+   weiterwaechst.
 3. Der Puls der Engine gehoert in die Telemetrie - erledigt 21:15, blade.js
    schreibt jetzt `spielzeit`. Der Pruefer muss ihn noch auswerten.
 

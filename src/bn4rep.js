@@ -345,6 +345,14 @@ export async function main(ns) {
   // spaeter durch. Beim Start ist die Leitung deshalb frei.
   loeschAufHome("data/hilfe.txt");
 
+  // Traegt in diesem Knoten die Division statt der Reputation? inBladeburner()
+  // kostet 0 GB (RamCostGenerator.ts), die Abfrage ist also gratis.
+  const bladeSperreArbeit = () => {
+    const k = ns.getResetInfo().currentNode;
+    if (k !== 6 && k !== 7) return false;
+    try { return ns.bladeburner.inBladeburner(); } catch { return false; }
+  };
+
   for (;;) {
    try {
     // DER PULS (24.08.2026).
@@ -1051,7 +1059,10 @@ export async function main(ns) {
         // Nicht ueber isBusy pruefen, sondern ueber das, was tatsaechlich
         // laeuft - dieselbe Falle wie beim Verbrechen in bn4life.js.
         if (!arbeitJetzt || arbeitJetzt.companyName !== companyTarget) {
-          if (ns.singularity.workForCompany(companyTarget, true)) {
+          if (bladeSperreArbeit()) {
+            // Siehe die Begruendung bei workForFaction weiter unten: In BN6/7
+            // bricht jede Arbeit die laufende Bladeburner-Aktion ab.
+          } else if (ns.singularity.workForCompany(companyTarget, true)) {
             sag("Arbeite fuer " + companyTarget + " als " + job + ": "
               + Math.round(companyRep) + " von " + companyRepGoal(companyTarget) + " Firmenreputation.");
           }
@@ -1447,7 +1458,31 @@ export async function main(ns) {
       const art = typen.includes("hacking") ? "hacking"
         : typen.includes("security") ? "security"
         : typen.includes("field") ? "field" : typen[0];
-      if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
+      // BLADEBURNER SCHLAEGT FAKTIONSARBEIT (25.08.2026).
+      //
+      // Eine Bladeburner-Aktion und eine Faktionsarbeit koennen nicht
+      // nebeneinander laufen: workForFaction ersetzt die laufende Handlung, das
+      // Spiel meldet "Your Bladeburner action was cancelled because you started
+      // doing something else", und blade.js startet seine Aktion sofort neu.
+      // Beide Seiten kommen dann nie zum Abschluss.
+      //
+      // Am 25.08. um 16:50 ist bn4rep nach elf Stunden wieder angelaufen - und
+      // sofort waren die Dialoge zurueck, die eine Stunde vorher an derselben
+      // Ursache in bn4life behoben worden waren.
+      //
+      // In BitNode 6 und 7 fuehrt der Ausgang ueber 21 Black Operations, nicht
+      // ueber Reputation. Also gewinnt Bladeburner. bn4rep verliert dadurch
+      // seine Arbeitsphasen, behaelt aber alles andere: Kaufen und Einbauen von
+      // Augmentierungen brauchen keine Arbeit, nur Geld und vorhandene
+      // Reputation. Der Preis ist bekannt und gewollt - eine halb gelaufene
+      // Faktionsarbeit alle zwei Sekunden ist keine Reputation, sondern nur
+      // ein Dialogfenster.
+      if (bladeSperreArbeit()) {
+        if (runde % 20 === 0) {
+          sag("Faktionsarbeit ausgesetzt: die Bladeburner-Division traegt"
+            + " diesen Knoten, Arbeit wuerde ihre Aktionen abbrechen.");
+        }
+      } else if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
         // Ein Schwellenziel traegt den Namen der billigsten offenen
         // Augmentierung, aber die Reputationsmarke der Spendenschwelle. Wer
         // das nicht weiss, liest "Synfibril Muscle: 31918 von 458941" und

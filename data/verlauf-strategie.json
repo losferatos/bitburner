@@ -89,6 +89,33 @@
    "phase": "Black Operations",
    "netz": 95,
    "geld": 461419027
+  },
+  {
+   "zeit": 1787669444566,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 1,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 510332393
+  },
+  {
+   "zeit": 1787670063052,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 1,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 747332820
+  },
+  {
+   "zeit": 1787670144087,
+   "knoten": 6,
+   "traeger": "Bladeburner-Rang",
+   "wert": 1,
+   "phase": "Black Operations",
+   "netz": 95,
+   "geld": 747332820
   }
  ]
 }

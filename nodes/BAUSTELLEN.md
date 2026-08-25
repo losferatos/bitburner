@@ -24,7 +24,7 @@ Regeln:
 
 ## Sofort
 
-### Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
+### Wartet bis Eric Opera neu startet: Der Bitburner-Tab laeuft gedrosselt (17:47, WIEDER AUFGETRETEN 18:30)
 Nachtrag 18:30: Nach Erics Klick um 17:58 lief der Tab wieder mit 5,3 Runden je
 Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
 Tab im Vordergrund bleibt - der Weckton von wakelock.js traegt nicht. Damit ist
@@ -38,7 +38,7 @@ so lange, wie der Tab vorn bleibt. Folge: Der Rang stand von 19:03 bis 19:33 bei
 regelkonform (Ausdauer 27/50, Regenerationskammer) - nur dauert das Regenerieren
 gedrosselt fuenfmal so lange wie es sollte.
 
-### Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
+### Wartet bis Eric Opera neu startet: Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
 Erwartet: 4-6 Runden je Minute. Faktor 5 auf ALLES - Geld, Kampfwerte,
@@ -63,25 +63,33 @@ Zu tun, unabhaengig davon: wakelock.js soll `ctx.state` pruefen, `resume()`
 versuchen und den Zustand nach `data/wakelock.txt` schreiben, damit der Ausfall
 messbar wird statt nur spuerbar.
 
-### tools/wache.js misst noch den Traeger des vorigen Knotens (17:30)
-Gemessen: `data/wache-zustand.json` fuehrt als Verlauf ausschliesslich
-`hacking`, `geld` und `homeRam` - zuletzt `{"hacking":103,"geld":683838024}`.
-Die Stillstandspruefung und die Meldezeile (`tools/wache.js:258, :262-263, :538`)
-haengen an diesen Werten.
-Erwartet: In BitNode 6 traegt der Bladeburner-Rang, nicht das Hackniveau. Beide
-gemessenen Groessen steigen durch bn4net von selbst weiter, auch wenn die
-Division vollstaendig stillsteht - der Waechter wuerde also genau den Stillstand
-verschweigen, gegen den er gebaut ist.
-Verdacht: Fundstelle klar (siehe oben). Es ist derselbe Fehler, gegen den
-`tools/strategie-check.js` am 25.08. gebaut wurde - nur eine Ebene tiefer, im
-dauerhafteren Bauteil: Der Waechter ist das einzige Stueck, das ohne
-Claude-Sitzung laeuft und aufs Handy meldet.
-Gefunden nicht von einem Loop, sondern von einem Skeptiker-Subagenten beim
-Pruefen eines ganz anderen Entwurfs. Das ist selbst ein Befund.
-
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Nichts verhindert einen zweiten Waechterprozess
+
+Gemessen 19:43: **zwei** `node tools/wache.js` liefen gleichzeitig (PID 24464 und
+19744). Beide schreiben dieselbe Datei `data/wache-zustand.json` - und in ihr
+stehen die Meldesperren (`gemeldet`, `stufe`, `seit`). Wer zuletzt schreibt,
+gewinnt: Ein Prozess kann die Sperre des anderen ueberschreiben, sodass derselbe
+Alarm zweimal aufs Handy geht, oder eine Entwarnung eine noch bestehende
+Stoerung aus dem Zustand loescht.
+
+Entstanden ist es vermutlich durch den Startpfad in `/bb-loops`: Der prueft das
+**Alter** von `data/wache-zustand.json` und startet neu, wenn sie alt ist. Laeuft
+aber bereits ein Waechter, ist die Datei frisch UND der zweite Start passiert
+trotzdem, wenn die Pruefung uebersprungen oder von Hand gestartet wurde.
+
+Zu tun: Eine Sperrdatei (`data/wache.pid`) beim Start schreiben, beim Start
+pruefen, ob der dort genannte Prozess noch lebt, und sich sonst beenden.
+Beide Prozesse wurden 19:44 beendet, einer neu gestartet - das ist die
+Symptombehandlung, nicht die Ursache.
+
+**Dringlichkeit:** mittel. Es beschaedigt still die Meldelogik des einzigen
+Bauteils, das ohne Claude-Sitzung laeuft.
+
+
 
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
@@ -193,6 +201,31 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### tools/wache.js misst jetzt den Traeger des Knotens (25.08., 19:44)
+Gemessen 17:30: Der Waechter fuehrte als Verlauf nur `hacking`, `geld` und
+`homeRam`. Beide steigen in BitNode 6 durch bn4net von selbst weiter, auch wenn
+die Bladeburner-Division vollstaendig stillsteht - der Waechter haette genau den
+Stillstand verschwiegen, gegen den er gebaut ist. Gefunden von einem
+Skeptiker-Subagenten, nicht von einem Loop.
+
+Behoben in `tools/wache.js`: Frisches `data/blade.json` (juenger als 10 min)
+gilt als Zeichen fuer einen Bladeburner-Knoten - damit braucht die Pruefung die
+Knotennummer gar nicht. Der Rang wandert in den Messverlauf; steht er
+45 Minuten unveraendert, faellt der neue Befund `traeger`. Ist der Tab gedrosselt,
+schweigt er: Dann nennt der Tempobefund die Ursache, und zwei Nachrichten ueber
+dieselbe Sache waeren Laerm.
+
+Bewusst nicht die 2024 ausgebaute Hacking-Pruefung wiederbelebt (siehe Punkt 5
+im Quelltext): Die scheiterte an "hat sich irgendetwas bewegt". Der Rang hat
+genau eine Quelle - versiegt sie, ist der Knoten blockiert.
+
+**Verifiziert um 19:44 auf zwei Wegen:** Im Normallauf meldet der Waechter
+`still - Hacking 114, $2.1b, Rang 73` (der Traeger steht jetzt in der
+Meldezeile), und gegen einen praeparierten Verlauf mit 50 Minuten Stillstand
+faellt der Befund `Bladeburner-Rang steht seit 50 min bei 73`. Der residente
+Prozess laeuft seit 19:44 mit dem neuen Code.
+
 
 ### Der Pruefer stuerzte beim Beenden ab, nach der Urteilszeile (25.08., 19:12)
 Gemessen: `Assertion failed: !(handle->flags & UV_HANDLE_CLOSING),

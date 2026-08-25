@@ -63,6 +63,11 @@ const cooldownFuer = (stufe) =>
 // Wiederaufbau ab; ein wirklich toter Bot faellt dadurch fuenf Minuten
 // spaeter auf - gegen die fuenf STUNDEN vom 20.08. ist das nichts.
 const MOTOR_MAX_ALTER = 10 * 60_000;
+
+// Wie lange der Traeger des Knotens stehen darf, bevor es ein Befund ist.
+// 45 Minuten sind grosszuegig: Eine Regenerationspause dauert Minuten, eine
+// lange Black Operation hoechstens eine Viertelstunde.
+const TRAEGER_STILL_MS = 45 * 60_000;
 // bn4rep.js meldet sich ueber data/hb-rep.txt - einen reinen Zeitstempel, den
 // es ganz oben in jeder Runde schreibt.
 //
@@ -391,6 +396,37 @@ async function pruefe(zustand, jetzt) {
   // meldet der Waechter schlicht "BitNode geschafft", und das stimmt immer.
   if (typeof rep?.knoten === "number" && repFrisch) messwerte.knoten = rep.knoten;
 
+  // 5a. DEN TRAEGER MESSEN, NICHT DAS NAHELIEGENDE (25.08.2026).
+  //
+  // Bis hierher prueft der Waechter nur Infrastruktur - Bruecke, Motor, Tempo,
+  // Loops. In BitNode 6 haengt der Ausgang aber am Bladeburner-Rang, und der
+  // kann stundenlang stehen, waehrend Hacking und Geld durch bn4net munter
+  // weiterwachsen. Genau diesen Stillstand haette der Waechter verschwiegen -
+  // gegen ihn ist er gebaut.
+  //
+  // Anders als die unter 5. ausgebaute Hacking-Pruefung ist das keine
+  // "hat sich irgendetwas bewegt"-Frage: Der Rang hat genau eine Quelle, und
+  // versiegt sie, ist der Knoten blockiert. Frisches blade.json heisst
+  // Bladeburner-Knoten - damit braucht es die Knotennummer hier gar nicht.
+  const blade = await spielJson("data/blade.json");
+  const bladeFrisch = typeof blade?.zeit === "number" && jetzt - blade.zeit < MOTOR_MAX_ALTER;
+  if (bladeFrisch && Number.isFinite(blade.rang)) {
+    messwerte.rang = blade.rang;
+    const vorher = (zustand.verlauf || []).find(
+      (x) => Number.isFinite(x.rang) && jetzt - x.ts >= TRAEGER_STILL_MS);
+    // Ist der Tab gedrosselt, steht ohnehin alles - dann nennt der Tempobefund
+    // die Ursache, und eine zweite Meldung ueber dieselbe Sache waere Laerm.
+    const gedrosselt = befunde.some((b) => b.typ === "tempo");
+    if (vorher && !gedrosselt && blade.rang <= vorher.rang) {
+      befunde.push({
+        typ: "traeger",
+        text: "Bladeburner-Rang steht seit " + minuten(jetzt - vorher.ts)
+          + " min bei " + blade.rang + " (Aktion: " + (blade.aktion || "?")
+          + "). In diesem Knoten traegt der Rang - es geht nicht voran.",
+      });
+    }
+  }
+
   // 5. Eine Fortschrittspruefung stand hier und ist am 24.08.2026 wieder
   //    ausgebaut worden. Sie verlangte, dass Hacking-Level UND Guthaben ueber
   //    zwanzig Minuten unveraendert bleiben - und war damit gleichzeitig
@@ -548,6 +584,7 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     motor: "bn4net.js meldet sich wieder.",
     rep: "bn4rep.js arbeitet wieder.",
     hilfe: "Der Bot kommt wieder allein zurecht.",
+    traeger: "Der Traeger des Knotens steigt wieder."
   };
   for (const typ of Object.keys(zustand.seit)) {
     if (aktiv.has(typ)) continue;
@@ -603,7 +640,8 @@ async function runde() {
 
   const m = ergebnis.messwerte;
   if (ergebnis.befunde.length === 0) {
-    log("still - Hacking " + (m.hacking ?? "?") + ", " + geldText(m.geld));
+    log("still - Hacking " + (m.hacking ?? "?") + ", " + geldText(m.geld)
+      + (Number.isFinite(m.rang) ? ", Rang " + m.rang : ""));
   }
   return ergebnis;
 }

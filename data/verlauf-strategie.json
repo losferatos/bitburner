@@ -8,6 +8,24 @@
    "phase": "Tor zur Division",
    "netz": 94,
    "geld": 10249383
+  },
+  {
+   "zeit": 1787666796827,
+   "knoten": 6,
+   "traeger": "Kampfwert-Tiefstand",
+   "wert": 57,
+   "phase": "Tor zur Division",
+   "netz": 94,
+   "geld": 9885741
+  },
+  {
+   "zeit": 1787667288298,
+   "knoten": 6,
+   "traeger": "Kampfwert-Tiefstand",
+   "wert": 88,
+   "phase": "Tor zur Division",
+   "netz": 95,
+   "geld": 50140080
   }
  ]
 }

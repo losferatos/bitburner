@@ -8,3 +8,6 @@ data/nightshift-heartbeat
 data/meter/
 data/watch-verlauf.json
 data/wache-zustand.json
+
+# Zwischenstand des Reportloops, kein Ergebnis
+data/ziele.md

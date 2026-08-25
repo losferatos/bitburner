@@ -43,6 +43,7 @@ Minute. Um 18:30 steht er erneut bei 1,00. Der Klick hilft also nur, solange der
 Tab im Vordergrund bleibt - der Weckton von wakelock.js traegt nicht. Damit ist
 das kein einmaliger Zwischenfall, sondern ein Dauerzustand, der jeden
 Nachtlauf um Faktor fuenf verkuerzt.
+Nachtrag 18:53: unveraendert, 0,90 Runden je Minute.
 
 ### Der Bitburner-Tab laeuft gedrosselt (Erstbefund 17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen

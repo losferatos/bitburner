@@ -24,20 +24,6 @@ Regeln:
 
 ## Sofort
 
-### blade.js faellt wieder auf General/Training zurueck (18:03)
-Gemessen: `data/blade.json` = `{"rang":26,"punkte":3,"aktion":"General/Training",
-"grund":"zu schwach"}`. Um 17:47 lief noch `Contracts/Tracking`.
-Erwartet: Ein Vertrag ueber der Schwelle 0,50. Training bringt keinen Rang.
-Verdacht: Zwei Kandidaten, in dieser Reihenfolge zu pruefen.
- 1. Drei Faehigkeitspunkte liegen unausgegeben. Der Sparmodus aus d6a59a0
-    bleibt beim ersten Eintrag des SKILL_PLAN stehen (Overclock) - kostet der
-    inzwischen mehr als 3, spart der Bot weiter, waehrend alles andere auf
-    null steht. Preise per `bbspann.js` messen (Feld `faehigkeiten`).
- 2. Vertragsvorrat oder Chaos: `getActionCountRemaining` faellt mit jedem
-    Einsatz, Chaos steigt. Beides senkt die Erfolgschance unter die Schwelle.
-    `blade.js` kennt weder Diplomacy noch Incite Violence - es hat also kein
-    Gegenmittel und landet zwangslaeufig in Training.
-
 ### Der Bitburner-Tab laeuft gedrosselt (17:47)
 Gemessen: Eine Motorrunde in 61 Sekunden (`bn4net.json.runde` 121 -> 122 zwischen
 17:46:11 und 17:47:12). Normal sind vier bis sechs je Minute.
@@ -71,6 +57,31 @@ Pruefen eines ganz anderen Entwurfs. Das ist selbst ein Befund.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### blade.js hat kein Gegenmittel gegen leere Vertragsvorraete
+
+Zweimal an einem Nachmittag ist der Motor in "General/Training" gelandet, beide
+Male mit demselben Muster: keine Aktion ueber der Schwelle, also Rueckfall auf
+etwas, das keinen Rang bringt. Um 17:00 war die Schwelle zu hoch (0,80), um
+18:12 war der Vorrat leer (Tracking offen 0,4 bei Stufe 10). Beide Male wurde
+die Schwelle gesenkt - das ist Symptombehandlung.
+
+Die Ursache liegt tiefer: Vertraege und Operationen haben endliche Zahlen und
+wachsen nur langsam nach (Bladeburner.ts:1387-1390), waehrend Chaos mit jedem
+Einsatz steigt und passiv fast nicht faellt (0,0001/s, Bladeburner.ts:1397).
+Das Spiel hat dafuer zwei Werkzeuge, die `blade.js` nicht kennt:
+- **Incite Violence** fuellt die Vorraete sprunghaft auf (Bladeburner.ts:1221-1224)
+- **Diplomacy** senkt das Chaos (Bladeburner.ts:1185-1195)
+
+Ohne beide bleibt jede Schwellensenkung ein Aufschub: Irgendwann ist auch der
+letzte Vertrag leer, und dann faellt der Motor wieder in Training. Zu tun: beide
+Aktionen in die Auswahl aufnehmen - Incite Violence, wenn die Summe der offenen
+Vertragszahlen unter einen Schwellwert faellt, Diplomacy, wenn das Chaos der
+Arbeitsstadt eine Grenze ueberschreitet.
+
+**Dringlichkeit:** hoch. Es ist die Ursache hinter zwei bereits behobenen
+Symptomen, und sie tritt garantiert wieder auf.
+
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
@@ -137,6 +148,19 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### blade.js fiel auf General/Training zurueck, weil Tracking leer war (25.08., 18:13)
+Gemessen 18:12: Tracking offen 0,4 bei Stufe 10 (leergespielt), Retirement min
+0,493 - sieben Tausendstel unter der Schwelle 0,50. Der Motor wartete auf nichts
+und fuhr Training, das keinen Rang gibt. Chaos war 0, Overclock bereits auf
+Stufe 2 - der Faehigkeitenkauf funktioniert also, der erste Verdacht war falsch.
+Behoben: Vertragsschwelle 0,50 -> 0,45. Ein misslungener Vertrag kostet Zeit und
+etwas Chaos, aber keinen Rang; verglichen wird nicht mit einem besseren Vertrag,
+sondern mit Training, und das liefert garantiert null.
+**Verifiziert: aktion "Contracts/Retirement" um 18:13** (vorher
+"General/Training").
+Die Ursache dahinter - endliche Vorraete ohne Gegenmittel - steht als
+struktureller Punkt unter Offen.
 
 ### Der Faehigkeitenkauf kaufte das Billigste statt des Wichtigsten (25.08., 17:20)
 Gemessen um 17:15, eine Dreiviertelstunde nach dem Beitritt: Overclock Stufe 0

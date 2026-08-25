@@ -69,7 +69,25 @@ export async function main(ns) {
   //
   // Fuer Operationen und Black Ops bleibt es bei den hohen Schwellen: Dort ist
   // der Fehlschlag teuer, und dort wartet man zu Recht.
-  const SICHER_VERTRAG = 0.50;
+  // NACHGESCHAERFT AM 25.08. UM 18:12, nachdem der Motor erneut in Training fiel.
+  //
+  // Gemessen in diesem Moment:
+  //   Tracking       min 0,678  offen 0,4   Stufe 10  <- leergespielt
+  //   Retirement     min 0,493  offen 116,6 Stufe 1
+  //   Bounty Hunter  min 0,398  offen 171,8 Stufe 1
+  //   Chaos 0, Overclock bereits auf Stufe 2
+  //
+  // Der Vorrat an Tracking war aufgebraucht (Vertraege haben endliche Zahlen und
+  // wachsen nur langsam nach, Bladeburner.ts:1387-1390). Damit blieb nur
+  // Retirement mit 0,493 - sieben Tausendstel unter der Schwelle. Der Motor
+  // wartete also auf nichts und fuhr stattdessen Training, das keinen Rang gibt.
+  //
+  // 0,45 statt 0,50: Ein misslungener Vertrag kostet Zeit und ein wenig Chaos,
+  // aber keinen Rang. Verglichen wird nicht mit einem besseren Vertrag, sondern
+  // mit Training - und das liefert garantiert null. Bei knapp der Haelfte
+  // Erfolgswahrscheinlichkeit und dem doppelten Rangertrag von Tracking
+  // (rankGain 0,6 gegen 0,3) ist die Rechnung eindeutig.
+  const SICHER_VERTRAG = 0.45;
   const SICHER_OPERATION = 0.85;
   const SICHER_BLACKOP = 0.99;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.

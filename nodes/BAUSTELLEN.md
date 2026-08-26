@@ -24,6 +24,27 @@ Regeln:
 
 ## Sofort
 
+### Sieben Milliarden sind in achtzig Minuten verschwunden (08:16)
+Gemessen: `strategie-check` meldete um 07:46 ein Guthaben von 8.985m, um 08:15
+noch **1.870m**. Der home-Speicher ist unveraendert bei 1.024 GB, es gab also
+weder einen Serverkauf auf home noch einen Reset.
+Erwartet: Ein steigendes Guthaben - das Netz wirft laufend ab.
+Verdacht, in dieser Reihenfolge:
+1. `bn4rep.js` hat Reputation gespendet oder Augmentierungen gekauft. Das
+   waere gewollt und wuerde einen Einbau ankuendigen. `data/bn4rep.json` ist
+   allerdings von gestern 17:05 - das Werkzeug schreibt seine Telemetrie nicht
+   mehr fort, und das ist selbst ein Befund.
+2. Gekaufte Server (`homegrow.js`) - die tauchen im home-Speicher nicht auf.
+3. **Der Krankenhaus-Hebel von 06:55.** Rechnerisch unwahrscheinlich: Die
+   Kosten sind `min(Guthaben * 0,1, fehlendeHP * 100.000)`, das Maximum liegt
+   bei 23 Trefferpunkten also bei 2,3 Millionen je Heilung. Sieben Milliarden
+   waeren dreitausend Heilungen in achtzig Minuten. Ausschliessen laesst es
+   sich aber erst, wenn blade.js die Kosten mitprotokolliert.
+Zu tun: `data/bn4rep.json` wieder frisch bekommen (Werkzeug laeuft laut ps.json,
+schreibt aber nicht), und in blade.js die Summe der Krankenhauskosten
+mitzaehlen. Erst dann ist die Frage entschieden.
+
+
 *Alle drei Punkte tragen "Wartet bis" und werden vom Vorankommens-Loop
 uebersprungen - nicht weil sie unwichtig waeren, sondern weil sie an ein
 Ereignis gebunden sind, das noch nicht eingetreten ist. Zwei brauchen den

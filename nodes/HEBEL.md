@@ -37,6 +37,34 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Faehigkeitsplan nach Nutzen je Punkt statt nach Rangliste (26.08., 18:52)
+
+Engpass: **Die Erfolgschance, nicht der Vorrat.** Bounty Hunter lief mit 0,322
+und dem Grund "Vertrag unter Schwelle, lohnt trotzdem"; gleichzeitig lagen 21
+Faehigkeitspunkte eine Stunde lang ungenutzt herum (`data/blade.json`, Feld
+`punkte`: 1 um 17:37, 11 um 18:07, 21 um 18:37).
+
+Hypothese: Die Erfolgschance von Bounty Hunter steigt von **0,322** auf
+mindestens **0,34**, wenn statt Blade's Intuition die billigen Stufe-0-
+Faehigkeiten gekauft werden.
+
+Beleg: Die Kosten sind **linear**, nicht exponentiell -
+`(baseCost + level * costInc) * mult` (`Bladeburner/Skill.ts:37-41`). Damit
+liefert Tracer auf Stufe 0 fuer 2 Punkte +4 Prozent auf alle Vertraege
+(`data/Skills.ts`), Blade's Intuition auf Stufe 10 fuer 24 Punkte +3 Prozent
+auf alles - **Faktor 16**. Der Gleichstand liegt bei
+`m = (6 + 8,4n)/6,3`, fuer n=10 also Tracer-Stufe 14; daher die Deckel
+Tracer 14, Short-Circuit 12, Evasive System 12, Reaper 8 vor Blade's
+Intuition.
+
+Vorher: Bounty-Hunter-Chance **0,322**, offene Punkte **21** um 18:37
+Nachher: **0,348 um 18:52** nach einem einzigen Kauf fuer 2 Punkte, offene
+Punkte 1. Die Hypothese haelt; die volle Wirkung steht noch aus, weil erst
+eine von 46 geplanten Stufen gekauft ist. **Naechster Lauf misst die
+Zyklusrate** - Bounty Hunter lag um 18:50 bei 0,971, erwartet wird ueber 1,10,
+sobald Tracer Stufe 5 erreicht.
+Commit: siehe git log, blade.js 26.08. 18:52
+
 ### Geprueft und verworfen: Team, Ausdauerschwelle, Punkterate (26.08., 15:57)
 
 Kein Hebel in diesem Lauf. Drei Kandidaten am Quellcode geprueft, alle drei
@@ -266,10 +294,24 @@ Damit ist auch der zweite Teil des alten Baustellenpunkts entschieden:
 unterhalb von 50 gar nicht.
 
 Vorher: 0,602 Rang je Minute, Tracking-Vorrat 1,0 (10:16-10:44)
-Nachher: (offen - naechster Lauf misst)
-Erste Beobachtung 10:50: Tracking ist nachgewachsen und laeuft wieder ueber
-der Schwelle, der Block hat also noch nicht ausgeloest. Er greift beim
-naechsten Leerlauf.
+Nachher: **Nie ausgeloest - und heute waere er schaedlich (26.08., 18:55).**
+Gemessen: Tracking-Vorrat **1,52** (von ueber 200), Chaos in Sector-12
+**48,78**. Der Block greift nur unter Chaos 25, ist also gesperrt - genau in
+der Lage, fuer die er gebaut wurde.
+
+**Die Sperre ist richtig, aber der Hebel taugt heute ohnehin nichts.** Incite
+wuerde Tracking auffuellen, und Tracking hat eine Zyklusrate von **0,904** -
+schlechter als der gerade gefahrene Bounty Hunter mit **0,971** (587 offene
+Auftraege, kein Vorratsproblem). Der Vorrat ist seit dem Einbau von 16:31
+nicht mehr der Engpass; die Erfolgschance ist es.
+
+Dazu kaeme der Schaden: Incite hebt das Chaos um 10 plus `chaos/log10(chaos)`,
+von 48,78 aus also ueber 60. Ueber der Schwelle 50 werden alle Aktionen mit
+`sqrt(1 + chaos - 50)` schwerer - der Block wuerde die Chancen halbieren, um
+einen Vertrag aufzufuellen, den niemand fahren will.
+
+**Der Block bleibt stehen** (er kostet nichts und greift in einem Knoten mit
+niedrigem Chaos wieder), aber er zaehlt nicht mehr als offener Hebel.
 Commit: siehe git log, blade.js 26.08. 10:49
 
 ### Auswahl nach Rang je Ausdauer, selbstkalibrierend (26.08., 09:57)

@@ -24,26 +24,7 @@ Regeln:
 
 ## Sofort
 
-### Der Faehigkeitsplan kauft Overclock, obwohl Cyber's Edge neunmal mehr bringt (11:46)
-Gemessen: 14 Faehigkeitspunkte sind da (`data/blade.json`, 11:45). Der Plan in
-`src/blade.js` (`SKILL_PLAN`) kauft strikt der Reihe nach, und Overclock steht
-auf Platz 1 - naechste Stufe 10 Punkte. Cyber's Edge steht auf Platz 10 und
-kommt damit nie dran.
-Erwartet: Der Plan sollte die Faehigkeit vorziehen, die den aktuellen Engpass
-hebt. Das ist seit heute belegt die Ausdauer-Regeneration.
-Rechnung (aus `nodes/HEBEL.md`, Eintraege 11:15 und 11:45):
-- **Overclock**, Stufe 6 fuer 10 Punkte: minus 1 Prozent Aktionsdauer, also
-  rund **1 Prozent** mehr Rangrate.
-- **Cyber's Edge**, drei Stufen fuer 1+3+9 = 13 Punkte: plus 6 Prozent
-  Hoechstausdauer UND Regeneration (`getSkillMult(Stamina)` steckt in
-  `calculateMaxStamina` und `calculateStaminaGainPerSecond`). Die Arbeitszeit
-  ist `S/(V-R)` mit fixem V - der Nenner sinkt, die Arbeitsphase waechst
-  ueberproportional. Rund **9 Prozent** mehr Rangrate.
-Zu tun: Cyber's Edge im SKILL_PLAN vor Overclock ziehen, danach messen. Der
-Plan steht bewusst fest und wird strikt abgearbeitet (das war am 25.08. ein
-Bugfix) - eine Umsortierung ist deshalb eine bewusste Entscheidung, kein
-Nebenbei.
-
+keine
 
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
@@ -153,6 +134,33 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Der naechste Faehigkeitsplan-Eintrag hat wieder keinen Deckel
+
+Gefunden 26.08. um 12:22 beim Umbau des `SKILL_PLAN` in `src/blade.js`. Der Plan
+kauft strikt der Reihe nach und bleibt beim ersten Eintrag stehen, der noch
+nicht am Deckel ist - das ist Absicht (Bugfix vom 25.08., 17:20). Bis heute
+stand `Overclock` mit Deckel 90 auf Platz 1 und hat damit **jeden** Punkt
+gefressen. Jetzt steht `Cyber's Edge` mit Deckel 5 davor; sobald der erreicht
+ist (35 Punkte kumulativ), erbt **`Blade's Intuition` mit Deckel `Infinity`**
+dieselbe Rolle.
+
+Bei Blade's Intuition ist das ein echter Fehlermodus, kein theoretischer: Die
+Faehigkeit hebt die Erfolgschance (`SuccessChanceAll`, +3 Prozent je Stufe), und
+die Chance ist bei 1,0 geklemmt. Ist sie erreicht, bringt jede weitere Stufe
+exakt null - der Plan haengt aber trotzdem fuer immer daran, weil `Infinity` nie
+erreicht wird. Dasselbe gilt fuer die fuenf Eintraege danach.
+
+Zu tun: Jedem Eintrag einen begruendeten Deckel geben, oder - besser, weil
+selbstkalibrierend - beim Sparziel pruefen, ob die Faehigkeit ueberhaupt noch
+etwas bewegt (bei den Chancen-Faehigkeiten: liegt `spanne().min` der besten
+Aktion schon bei 1,0?) und sonst weiterruecken. Erst das macht den Plan
+robust gegen genau den Fall, den er heute zum zweiten Mal produziert hat.
+
+**Dringlichkeit:** mittel. Er schlaegt nicht sofort zu, aber wenn er zuschlaegt,
+faellt es niemandem auf - Punkte verschwinden lautlos in einer wirkungslosen
+Faehigkeit.
+
 
 ### Der Motor steht drei Viertel der Zeit in der Regenerationskammer
 
@@ -452,6 +460,56 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Faehigkeitsplan kaufte Overclock, das im Ausdauer-Engpass nichts bringt (26.08., 12:22)
+
+Gemessen 11:45: 14 Faehigkeitspunkte lagen da, `Overclock` stand auf Platz 1 des
+`SKILL_PLAN` und `Cyber's Edge` stand ueberhaupt nicht darin - die urspruengliche
+Notiz sprach von "Platz 10", tatsaechlich hatte der Plan nur acht Eintraege.
+
+**Die Verwerfung von Overclock ist schaerfer ausgefallen als der Befund
+annahm.** Dort stand "rund 1 Prozent". Nachgerechnet am Quellcode ist es
+naeher an null: Der Ausdauerverlust faellt **je Aktion** an, nicht je Zeit
+(`Bladeburner.ts:921`, `BaseStaminaLoss * difficultyMultiplier`). Eine um ein
+Prozent kuerzere Aktion heisst also ein Prozent mehr Durchlaeufe je Minute UND
+ein Prozent mehr Verbrauch je Minute - der Ausdauerengpass zieht den Gewinn
+sofort wieder ein. Mit V = 2,7 und R = 1,2 je Minute:
+
+    ohne Overclock   Arbeit S/1,5000   Ruhe S/1,2   Rate 0,4444 * g/T
+    mit  Overclock   Arbeit S/1,5273   Ruhe S/1,2   Rate 0,4445 * g/T
+
+Overclock ist damit nicht "schwaecher als Cyber's Edge", sondern in diesem
+Regime wirkungslos. Es zahlt sich erst aus, wenn die Ausdauer nicht mehr klemmt.
+
+Geaendert in `src/blade.js`: `Cyber's Edge` auf Platz 1 mit **Deckel 5**,
+Overclock auf Platz 2 mit unveraendertem Deckel 90. Der Deckel ist Absicht -
+die Kosten sind `1 + 3 * Stufe` und damit kumulativ quadratisch (5 Stufen = 35
+Punkte, 8 Stufen = 92), der Nutzen linear.
+
+Bestaetigt am Quellcode, weil die Wirkung an genau einer Stelle haengt:
+`getSkillMult(Stamina)` steckt in **beiden** Formeln - `calculateMaxStamina`
+(`Bladeburner.ts:1327-1343`) und `calculateStaminaGainPerSecond`
+(`:1317-1325`). Die Ruhezeit S/R bleibt deshalb gleich, die Arbeitszeit
+S/(V-R) waechst ueberproportional.
+
+**Verifiziert 12:21, drei Messungen:**
+- **Hoechstausdauer 70 -> 74** (+5,7 Prozent). Drei Stufen zu je 2 Prozent
+  ergeben 6 Prozent - das ist die Wirkung selbst, nicht ihre Ankuendigung.
+- **Punkte 21 -> 9**, also 12 ausgegeben: genau `1 + 4 + 7` fuer die Stufen 1
+  bis 3. Die vierte kostet 10 und wird angespart.
+- **Regeneration in der Kammer 2,3 je Minute** (37 -> 41 Ausdauer in 104 s);
+  vorher gemessen waren 2,04.
+
+Baseline fuer die Rangrate, gemessen 12:18 ueber `tools/ratencheck.js` vor der
+Aenderung: **0,649 Rang je Minute** ueber 541 Minuten, davon 340,1 Minuten
+(62,9 Prozent) in der Regenerationskammer. Der Vergleichswert gehoert in den
+naechsten Optimierungslauf - erwartet werden rund sechs Prozent mehr, und das
+ist wenig genug, dass es eine ordentliche Messdauer braucht.
+
+Nebenbefund: `General/Incite Violence` steht mit **2 Abschnitten** im
+Ratencheck. Die Aktion hat also inzwischen ausgeloest - der Vermerk "hat noch
+nie ausgeloest" beim Vorratspunkt ist ueberholt.
+
 
 ### Sieben Milliarden auf einen Schlag - kein Leck, ein Kauf (26.08., 08:50)
 Gemessen im Verlauf: 07:55 noch 8,98 Mrd, 08:15 nur 1,87 Mrd - **7,11

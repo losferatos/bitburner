@@ -142,10 +142,41 @@ export async function main(ns) {
   // trotzdem Puffer: Unter 50 Prozent wird geruht, ab 75 wieder gearbeitet.
   const HP_WEITER = 0.75;
 
-  // Reihenfolge der Faehigkeiten. Overclock zuerst, weil es die Dauer JEDER
-  // Aktion senkt und damit auf alles andere wirkt; es ist bei Stufe 90
-  // gedeckelt. Danach die Erfolgschancen, danach der Rest.
+  // Reihenfolge der Faehigkeiten.
+  //
+  // OVERCLOCK STAND HIER AUF PLATZ 1 UND IST DORT WERTLOS (26.08.2026, 12:20).
+  //
+  // Die alte Begruendung lautete: Overclock senkt die Dauer JEDER Aktion und
+  // wirkt damit auf alles andere. Das stimmt, solange die ZEIT der Engpass
+  // ist. Sie ist es nicht: Der Motor steht rund die Haelfte der Zeit in der
+  // Regenerationskammer und wartet auf Ausdauer.
+  //
+  // Der Ausdauerverlust faellt JE AKTION an, nicht je Zeit
+  // (`Bladeburner.ts:921`: `stamina -= BaseStaminaLoss * difficultyMultiplier`,
+  // BaseStaminaLoss 0,285). Eine um ein Prozent kuerzere Aktion heisst also ein
+  // Prozent mehr Aktionen je Minute UND ein Prozent mehr Verbrauch je Minute.
+  // Nachgerechnet mit Verbrauch V = 2,7 und Regeneration R = 1,2 je Minute:
+  //
+  //     ohne Overclock   Arbeit S/1,5000   Ruhe S/1,2   Rate 0,4444 * g/T
+  //     mit  Overclock   Arbeit S/1,5273   Ruhe S/1,2   Rate 0,4445 * g/T
+  //
+  // Der Gewinn ist ein Zehntausendstel. Overclock zahlt sich erst aus, wenn
+  // die Ausdauer nicht mehr klemmt - deshalb steht es jetzt hinter dem, was
+  // genau diesen Engpass hebt, und behaelt seinen Deckel bei Stufe 90.
+  //
+  // CYBER'S EDGE steht dafuer auf Platz 1. Es hebt `getSkillMult(Stamina)` um
+  // 2 Prozent je Stufe, und der Multiplikator steckt in BEIDEN Formeln:
+  // `calculateMaxStamina` (`Bladeburner.ts:1327-1343`) und
+  // `calculateStaminaGainPerSecond` (`:1317-1325`). Die Ruhezeit S/R bleibt
+  // damit gleich, die Arbeitszeit S/(V-R) waechst ueberproportional, weil V
+  // fest bleibt und nur R steigt. Fuenf Stufen (+10 Prozent) bringen rund
+  // zehn Prozent Rangrate.
+  //
+  // Der Deckel 5 ist Absicht: Die Kosten sind `1 + 3 * Stufe` und damit
+  // quadratisch kumulativ (5 Stufen = 35 Punkte, 8 Stufen = 92), der Nutzen
+  // dagegen linear. Ohne Deckel fraesse die Faehigkeit jeden weiteren Punkt.
   const SKILL_PLAN = [
+    ["Cyber's Edge", 5],
     ["Overclock", 90],
     ["Blade's Intuition", Infinity],
     ["Digital Observer", Infinity],

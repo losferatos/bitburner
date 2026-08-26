@@ -494,9 +494,26 @@ export async function main(ns) {
         // Jetzt bekommt eine ungemessene Aktion den Durchschnitt der
         // gemessenen als Schaetzwert. Damit steht sie auf derselben Skala,
         // kommt trotzdem an die Reihe und liefert dabei ihre eigene Messung.
+        // ZURUECKGEDREHT (26.08.2026, 10:15) - die Messung hat die Rechnung
+        // widerlegt. Ausgewaehlt wird wieder nach Rang je MINUTE.
+        //
+        // Von 09:57 bis 10:14 lief die Auswahl nach Rang je Ausdauerpunkt:
+        //   vorher (09:19-09:45)   55,5 % Kammer   0,926 Rang/min
+        //   danach (09:57-10:14)   62,3 % Kammer   0,606 Rang/min
+        // Erwartet waren mindestens 1,15. Selbst auf siebzehn Minuten
+        // Messstrecke ist ein Drittel Verlust kein Rauschen.
+        //
+        // Die Zyklusrechnung von 09:46 hat etwas uebersehen - vermutlich, dass
+        // Bounty Hunter mit 44 Prozent Erfolgschance unter der Sicherheits-
+        // schwelle liegt und ueber den Notvertrag-Zweig laeuft: Jeder
+        // Fehlschlag kostet volle Ausdauer und bringt null Rang, und das
+        // trifft mehr als die Haelfte der Versuche.
+        //
+        // Die MESSUNG bleibt (kostenAktualisieren oben): Sie kostet nichts,
+        // liefert weiter Daten, und die naechste Hypothese kann darauf
+        // aufbauen, statt wieder bei null anzufangen.
         const proLauf = kosten.get(typ + "/" + name) ?? kostenSchnitt;
-        const ertrag = (rang && proLauf) ? rang * s.min / proLauf
-          : ((rang && dauer) ? rang * s.min / (dauer / 60000) : s.min);
+        const ertrag = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
         // proMinute wird MITGEFUEHRT, auch wenn nach Ausdauer ausgewaehlt
         // wird: Der Vergleich mit General-Aktionen (Field Analysis, Training)
         // geht nur ueber die Zeit, denn die kosten gar keine Ausdauer. Ohne

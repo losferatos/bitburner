@@ -73,9 +73,32 @@ Beleg: `Bladeburner.ts:921` (Ausdauerverlust je Aktion), `1317-1325`
 (Regeneration), eigene Messung ueber 295 Abschnitte.
 
 Vorher: 0,926 Rang je Minute, 55,5 Prozent Kammerzeit (09:19-09:45)
-Nachher: (offen - naechster Lauf misst)
-Erste Beobachtung 09:57: Der Motor faehrt `Contracts/Bounty Hunter` - genau
-die Aktion, die die Rechnung vorne sieht.
+Nachher: **WIDERLEGT, zurueckgedreht um 10:15.**
+
+    vorher (09:19-09:45)   55,5 % Kammer   0,926 Rang/min
+    danach (09:57-10:14)   62,3 % Kammer   0,606 Rang/min
+
+Erwartet waren mindestens 1,15. Gemessen ist ein Drittel WENIGER - und selbst
+auf siebzehn Minuten Messstrecke ist das kein Rauschen mehr.
+
+**Was die Rechnung uebersehen hat:** Bounty Hunter liegt mit 44 Prozent
+Erfolgschance UNTER der Sicherheitsschwelle und lief nur ueber den
+Notvertrag-Zweig. Mehr als die Haelfte der Versuche schlaegt fehl, und jeder
+Fehlschlag kostet die volle Ausdauer bei null Rang. Die Kennzahl "Rang je
+Ausdauer" aus `ratencheck.js` enthaelt diese Fehlschlaege zwar, aber der
+Zyklus rechnet sich dadurch anders als angenommen: Die Ausdauer ist schneller
+weg, ohne dass die kuerzere Arbeitsphase das ausgleicht.
+
+Zurueckgedreht wurde NUR das Auswahlkriterium - ausgewaehlt wird wieder nach
+Rang je Minute. **Die Messung bleibt** (`kostenAktualisieren` in blade.js):
+Sie kostet nichts, liefert weiter Daten, und die naechste Hypothese kann
+darauf aufbauen, statt bei null anzufangen.
+
+Zwei Lehren, beide teuer bezahlt:
+1. Wer die Bewertungsgroesse aendert, muss JEDEN Vergleich mitziehen, in dem
+   sie vorkommt (zwei Einheitenfehler in einem Lauf, siehe oben).
+2. Eine Zyklusrechnung auf dem Papier ersetzt keine Messung. Der Faktor 1,44
+   war sauber hergeleitet und trotzdem falsch.
 Commit: siehe git log, blade.js 26.08. 09:57
 
 ### Die Auswahl misst die falsche Groesse - gerechnet, noch nicht umgesetzt (26.08., 09:46)

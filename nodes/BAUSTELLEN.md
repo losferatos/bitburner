@@ -195,9 +195,37 @@ Einbau dieses Laufs.
 **Was daraus folgt, ohne Umbau:** Die Bladeburner-Augmentierungen selbst sind
 schwach (`bladeburner_success_chance` 1,02 bis 1,06,
 `Augmentation/Augmentations.ts:203,215,228`; nur eine gibt x2). Der Hebel sind
-die **Kampfwert-Multiplikatoren** - beim naechsten Einbau gehoeren sie vor die
-Hack-Augmentierungen. Das ist eine Frage an `bn4rep`s Kaufreihenfolge und
-gehoert geprueft, bevor der naechste Einbau ansteht.
+die **Kampfwert-Multiplikatoren**.
+
+**Und genau die sieht der Bot nicht (geprueft 27.08., 01:50).** `bn4rep.js`
+waehlt Faktion und Zielaugmentierung ueber `levelNutzen`/`hackNutzen` aus
+`lib/hackaugs.js` - und dessen Kopfkommentar sagt es selbst: die Liste enthaelt
+"alle Augmentierungen, die mindestens einen **Hacking- oder
+Reputations-Multiplikator** setzen". Kampfwert-Augmentierungen kommen darin
+**gar nicht vor**. In einem Knoten, dessen Traeger der Bladeburner-Rang ist und
+dessen Ausgang an den Kampfwerten haengt, priorisiert der Reputationsmotor also
+ausschliesslich nach Hacking.
+
+Was dabei liegen bleibt, aus `Augmentations.ts` gezaehlt - 17 Augmentierungen
+setzen mindestens drei Kampfwerte, die staerksten:
+
+    Augmentierung          Produkt   repCost   je Wert
+    SPTN-97                   9,38   1,25e6    1,75
+    CordiARC Reactor          3,32   1,125e6   1,35
+    Photosynthetic Cells      2,74   5,625e5   1,40 (str/def/agi)
+    nextSENS / Xanipher       2,07   4,375e5   1,20
+    Bionic Spine              1,75   4,5e4     1,15
+
+Zum Vergleich: `mults.dexterity` steht heute bei **1,834**. Allein SPTN-97
+wuerde ihn auf 3,21 heben - dex 230 wuerde damit zu rund 402, und die
+Typhoon-Chance von 0,037 auf grob 0,075 steigen.
+
+**Auftrag, eigener Lauf:** Eine Kampfwert-Liste analog zu `lib/hackaugs.js`
+anlegen und `bn4rep.js` in den Kampfknoten (6 und 7) danach priorisieren
+lassen. Zwei Dateien, deshalb nicht in diesem Lauf. **Vorher zu klaeren:** ob
+`bn4rep` ueberhaupt kauft oder nur freischaltet, und wie die Nachtsteuerung
+(`nacht.cmd`) die Auswahl trifft - sonst wird an der falschen Stelle
+umgebaut.
 
 **Dringlichkeit: hoch.** Es ist die Frage, ob der Knoten ueberhaupt auf dem
 eingeschlagenen Weg endet.

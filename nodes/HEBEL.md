@@ -37,6 +37,43 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Krankenhaus statt Regenerationskammer (26.08., 06:55)
+
+Engpass: **Der Motor stand 161 von 222 Minuten - 72,5 Prozent - in der
+Regenerationskammer** (`tools/ratencheck.js`, 06:47). Die Arbeitszeit bringt
+1,4 bis 2,0 Rang je Minute, ueber alles blieben **0,475**. Das ist der
+groesste Einzelhebel des Knotens; bei Rang 331 von 2.500 entscheidet er ueber
+Tage.
+
+Der Ruhegrund waren fast immer die Trefferpunkte, nicht die Ausdauer. Kein
+Wunder: Das Maximum ist `floor(10 + defense/10)` = 23 (`Person.ts:97`), und
+die Kammer heilt **2 je Durchlauf** (`Bladeburner.ts:1198`). Von 11 auf 17
+sind das drei Durchlaeufe.
+
+Verworfen, bevor es umgesetzt wurde: **mehr Trefferpunkte durch hoeheres
+Trainingsziel.** Bei doppeltem Maximum verdoppelt sich die Arbeitsspanne, aber
+die Heilung bleibt bei 2 je Durchlauf - die Ruhezeit verdoppelt sich mit. Der
+ANTEIL bleibt gleich, und das Training selbst kostet Stunden ohne Rang.
+
+Hypothese: `ns.singularity.hospitalize()` setzt `hp.current` in EINEM Aufruf
+auf das Maximum (`PlayerObjectGeneralMethods.ts:281-290`). Es kostet Geld und
+sonst nichts - keine Zeit, keine Aktionsunterbrechung; auf das Ereignis hoert
+nur die Infiltration (`Infiltration.ts:83`). Kosten:
+`min(Guthaben * 0,1, fehlendeHP * 100.000)` (`Hospital.ts:4-10`), bei zwoelf
+fehlenden Punkten also 1,2 Millionen gegen ein Guthaben von 7,5 Milliarden.
+
+Erwartung: Die Kammerzeit faellt von 72,5 auf unter 25 Prozent (es bleibt nur
+noch die Ausdauer-Ruhe), die Rangrate steigt von **0,475 auf mindestens 1,3**
+je Minute.
+
+Untergrenze eingebaut: Unter zehn Millionen Guthaben bleibt die Kammer. Nach
+einem Augmentierungs-Einbau zaehlt jeder Euro fuer Server und Programme, und
+der Deckel `Guthaben * 0,1` waere dort ein schlechter Tausch.
+
+Vorher: 0,475 Rang je Minute, 72,5 Prozent Kammerzeit (06:47)
+Nachher: (offen - naechster Lauf misst)
+Commit: siehe git log, blade.js 26.08. 06:55
+
 ### Notvertrag statt Field Analysis (26.08., 00:55)
 
 Engpass: Der Motor stand zweieinhalb Stunden auf `General/Field Analysis` und
@@ -67,10 +104,12 @@ bringt. Operationen (Teamverluste) und Black Ops (Tod) behalten ihre
 Sicherheitsschwellen unangetastet.
 
 Vorher: 0,22 Rang je Minute (22:43 bis 00:51)
-Nachher: (offen) - **die Wirkung ist noch nicht beobachtet**, weil sich die
-Lage vor der ersten Gelegenheit entspannt hat: Um 01:00 war der
-Tracking-Vorrat nachgewachsen (0,604 Chance), und damit lag wieder ein Vertrag
-ueber der Schwelle. Der neue Zweig greift erst, wenn keiner mehr passt.
+Nachher: **gegriffen, aber selten.** In `data/aktionen.txt` steht bis 06:51
+genau EIN Abschnitt mit dem Grund "Vertrag unter Schwelle, lohnt trotzdem" -
+der Fall tritt nur ein, wenn gleichzeitig alle Vorraete knapp und alle Chancen
+unter 0,45 sind. Der Wert des Hebels liegt darin, dass die Alternative
+(Field Analysis mit 0,2 je Minute) nie wieder gewaehlt wird; als Dauerzustand
+war er nie gedacht. Nicht zurueckgenommen.
 
 **Naechster Kandidat, bewusst nicht in diesem Lauf:** Auch oberhalb der
 Schwelle waehlt der Motor nicht optimal. Um 01:00 fuhr er Tracking (0,78 Rang

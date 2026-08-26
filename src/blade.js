@@ -492,7 +492,37 @@ export async function main(ns) {
       faehigkeitenKaufen();
 
       const [jetzt, max] = ns.bladeburner.getStamina();
-      const hp = ns.getPlayer().hp;
+      let hp = ns.getPlayer().hp;
+
+      // DAS KRANKENHAUS SCHLAEGT DIE KAMMER UM LAENGEN (26.08.2026, 06:55).
+      //
+      // Gemessen ueber 222 Minuten: Der Motor stand 161 davon - 72,5 Prozent -
+      // in der Regenerationskammer, und der Grund waren fast immer die
+      // Trefferpunkte, nicht die Ausdauer. Kein Wunder: Das Maximum ist
+      // floor(10 + defense/10), also 23 (Person.ts:97), und die Kammer heilt
+      // 2 je Durchlauf (Bladeburner.ts:1198). Von 11 auf 17 sind das drei
+      // Durchlaeufe - Minuten, in denen kein Rang entsteht.
+      //
+      // `ns.singularity.hospitalize()` setzt hp.current in EINEM Aufruf auf
+      // das Maximum (PlayerObjectGeneralMethods.ts:281-290). Es kostet Geld
+      // und sonst nichts: keine Zeit, keine Aktionsunterbrechung. Auf das
+      // Ereignis hoert nur die Infiltration (Infiltration.ts:83), und die
+      // fahren wir nicht.
+      //
+      // Kosten: min(Guthaben * 0,1, fehlendeHP * 100.000). Bei zwoelf
+      // fehlenden Punkten sind das 1,2 Millionen - gegen ein Guthaben von
+      // siebeneinhalb Milliarden ist das nichts. Die Untergrenze von zehn
+      // Millionen schuetzt den Wiederaufbau nach einem Einbau: Dort zaehlt
+      // jeder Euro fuer Server und Programme, und die Kammer tut es auch.
+      if (hp && hp.max > 0 && hp.current < hp.max * HP_WEITER) {
+        try {
+          if (ns.getPlayer().money > 10e6) {
+            ns.singularity.hospitalize();
+            hp = ns.getPlayer().hp;
+          }
+        } catch (e) { /* ohne Singularity bleibt die Kammer */ }
+      }
+
       // Hysterese: Einmal in der Ruhe, wird bis zur Weiter-Schwelle geruht -
       // sonst pendelt der Bot bei jedem Aktionsschritt zwischen beidem.
       const ausdauerKnapp = max > 0 && jetzt < max * AUSDAUER_WEITER;

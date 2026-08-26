@@ -35,6 +35,37 @@ Regeln:
 
 ## Sofort
 
+### Der Waechter meldet fehlenden Speicher als Ausfall - und verdeckt damit den echten Fehlerfall (17:55)
+
+Gemessen: `data/wache-zustand.json` zeigt um 17:45:33 Stufe 2 mit dem Text
+"bn4rep.js meldet sich seit 63 min nicht mehr - keine Reputationsarbeit". Eric
+bekam das als Push aufs Handy. Tatsaechlich lief bn4rep bis 16:42 und fand nach
+dem Einbau von 16:31 keinen Platz mehr: `bn4rep.js` braucht 768,3 GB, die
+Werkbank ist `werk-0` und traegt bereits blade, bbtrain, homegrow, wakelock und
+bn4door.
+
+Erwartet: Eine Meldung, die den **Grund** nennt, statt "meldet sich nicht".
+
+Verdacht: `tools/wache.js:462-463`. Die Kaltstart-Ausnahme lautet
+`homeRam <= 128` - sie prueft **den falschen Rechner**. bn4rep laeuft auf der
+Werkbank, und die ist seit dem Umbau nicht mehr `home` (hier: `werk-0` bei
+`homeRam` 2048). Die Ausnahme greift deshalb nie, obwohl der Zustand derselbe
+ist wie beim Kaltstart.
+
+**Nicht stummschalten - unterscheiden.** Eric am 26.08. um 17:52: "kann
+Letzteres nicht auch ein Fehler sein?" Er hat recht: Kein Platz IST ein Fehler,
+wenn Geld fuer einen groesseren Rechner da ist (hier 671 Mio) und der Motor
+trotzdem keinen kauft. Ein Waechter, der Platzmangel pauschal stumm schaltet,
+verdeckt genau diesen Fall dauerhaft. Die Meldung soll also den Grund nennen
+("kein Platz - Werkbank `werk-0` belegt, Geld 671m") und erst dann eskalieren,
+wenn der Zustand anhaelt, **obwohl** das Geld reicht.
+
+Dafuer braucht der Waechter eine Zahl, die er heute nicht hat: den freien
+Speicher der Werkbank. `bn4net.json` liefert `werkbank` und `werkbankReserve`,
+nicht die Belegung - der erste Arbeitsschritt ist deshalb, diese Zahl in
+`bn4net.json` mitzuschreiben. Das faellt in `src/bn4net.js` und braucht Erics
+Freigabe.
+
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau

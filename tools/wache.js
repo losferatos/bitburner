@@ -25,6 +25,7 @@ import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import os from "node:os";
+import zlib from "node:zlib";
 
 const BASE = "http://localhost:8795";
 const ROOT = path.dirname(path.dirname(fileURLToPath(import.meta.url)));
@@ -176,6 +177,42 @@ async function spieldatei(name) {
     if (antwort.error) return null;
     if (typeof antwort.result !== "string") return null;
     return antwort.result;
+  } catch {
+    return null;
+  }
+}
+
+/**
+ * Groesster Rechner im Netz ausser home, in GB - aus dem Spielstand.
+ *
+ * WOZU (26.08.2026, 20:50). Der Waechter konnte bisher nicht unterscheiden,
+ * ob ein Werkzeug abgestuerzt ist oder schlicht keinen Platz findet. Die
+ * Kaltstart-Ausnahme fragte `homeRam <= 128` - und damit den falschen
+ * Rechner, seit die Werkbank nicht mehr home ist. Am 26.08. um 17:45 ging
+ * deshalb ein Alarm der Stufe 2 aufs Handy, waehrend `bn4rep.js` nur an
+ * einer 512-GB-Werkbank scheiterte, in die seine 768,3 GB nie passen.
+ *
+ * Der Spielstand ist der einzige Weg an die Zahl: Die Telemetrie fuehrt
+ * `werkbank` und `werkbankReserve`, aber keine Groessen. Deshalb wird er nur
+ * im Verdachtsfall geholt - er ist mehrere Megabyte gross, und der Waechter
+ * laeuft alle drei Minuten.
+ */
+async function groessterRechnerGb() {
+  try {
+    const antwort = await holeJson("/api/rpc?method=getSaveFile", 15000);
+    const roh = antwort && antwort.result && antwort.result.save;
+    if (!roh) return null;
+    const save = JSON.parse(
+      zlib.gunzipSync(Buffer.from(roh, "latin1")).toString("utf8"));
+    const alle = JSON.parse(save.data.AllServersSave);
+    let groesster = 0;
+    for (const eintrag of Object.values(alle)) {
+      const server = eintrag && eintrag.data ? eintrag.data : eintrag;
+      if (!server || !server.hostname || server.hostname === "home") continue;
+      const ram = Number(server.maxRam);
+      if (Number.isFinite(ram) && ram > groesster) groesster = ram;
+    }
+    return groesster;
   } catch {
     return null;
   }
@@ -459,8 +496,24 @@ async function pruefe(zustand, jetzt) {
   //
   // Ein Waechter, der das meldet, meldet eine Tatsache, an der niemand etwas
   // aendern kann. Genau daran ist die Vorgaengerloesung gestorben.
+  // KEIN PLATZ IST NICHT DASSELBE WIE KEIN LEBENSZEICHEN (26.08.2026, 20:50).
+  //
+  // Hier stand `homeRam <= 128` - der Kaltstart-Test von frueher, als die
+  // Werkbank noch home war. Er greift heute nie: home hat 2048 GB, waehrend
+  // bn4rep auf einer 512-GB-Maschine keinen Platz findet. Massgeblich ist
+  // der groesste Rechner im Netz ausser home, denn dort laeuft die Werkbank.
+  //
+  // Eric am 26.08. um 17:52, nachdem ihn ein Fehlalarm erreicht hatte: "kann
+  // Letzteres nicht auch ein Fehler sein?" - Ja. Deshalb wird Platzmangel
+  // nicht stumm geschaltet, sondern mit seinem GRUND gemeldet, und die
+  // Meldung zaehlt die Eskalationsstufe nicht hoch: Sie kommt einmal und ist
+  // dann ruhig, statt sich alle zwanzig Minuten zu wiederholen.
+  const REP_BEDARF_GB = 768.3;
   const homeRam = net.homeRam ?? null;
   const kaltstart = Number.isFinite(homeRam) && homeRam <= 128;
+  let platzGb = null;
+  if (!kaltstart) platzGb = await groessterRechnerGb();
+  const zuKlein = Number.isFinite(platzGb) && platzGb < REP_BEDARF_GB;
 
   if (kaltstart) {
     // nichts pruefen - siehe oben
@@ -475,8 +528,15 @@ async function pruefe(zustand, jetzt) {
   } else if (jetzt - puls > REP_MAX_ALTER) {
     befunde.push({
       typ: "rep",
-      text: "bn4rep.js meldet sich seit " + minuten(jetzt - puls)
-        + " min nicht mehr - keine Reputationsarbeit.",
+      text: zuKlein
+        ? "bn4rep.js hat keinen Platz: groesste Maschine " + platzGb
+          + " GB, gebraucht " + REP_BEDARF_GB + " GB. Guthaben "
+          + (messwerte.geld != null ? Math.round(messwerte.geld / 1e6) + "m" : "?")
+          + " - Ausbau pruefen."
+        : "bn4rep.js meldet sich seit " + minuten(jetzt - puls)
+          + " min nicht mehr - keine Reputationsarbeit.",
+      // Platzmangel eskaliert nicht: einmal melden, dann Ruhe.
+      keineEskalation: zuKlein,
     });
   }
 
@@ -730,7 +790,12 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     if (zugestellt) {
       zustand.gemeldet[b.typ] = jetzt;
       zustand.text[b.typ] = schluessel(b.text);
-      zustand.stufe[b.typ] = (zustand.stufe[b.typ] || 0) + 1;
+      // Ein Befund mit `keineEskalation` bleibt auf seiner Stufe stehen. Die
+      // Wartezeit verdoppelt sich damit nicht, aber der Text-Vergleich haelt
+      // ihn trotzdem still, solange sich nichts aendert.
+      if (!b.keineEskalation) {
+        zustand.stufe[b.typ] = (zustand.stufe[b.typ] || 0) + 1;
+      }
     }
   }
 

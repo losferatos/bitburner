@@ -35,113 +35,6 @@ Regeln:
 
 ## Sofort
 
-### Der Waechter meldet fehlenden Speicher als Ausfall - und verdeckt damit den echten Fehlerfall (17:55)
-
-**GEMESSEN 18:20 - Eric hatte recht, es IST ein Fehler.** Aus dem Spielstand
-(`AllServersSave`): Die Werkbank `werk-0` hat **512 GB**. `bn4rep.js` braucht
-**768,3 GB** und passt dort nicht hin - und kann es nie. Der einzige groessere
-Rechner ist `home` mit 2048 GB, dessen freier Speicher aber hinter der
-Arbeiterreserve liegt (`homeFrei` 513,15 bei `reserve` 512).
-
-**Die 84,5 Millionen aus der ersten Fassung dieses Punktes waren falsch.**
-Sie stammten aus der BitNode-1-Rechnung mit 55.000 Dollar je GB
-(`Server/data/Constants.ts:4`). In BitNode 6 kostet der Ausbau von werk-0 auf
-2048 GB tatsaechlich **3,379 Milliarden**, auf 1024 GB **676 Millionen** -
-gemessen um 20:25 ueber `ns.cloud.getServerUpgradeCost`. Der Faktor liegt bei
-24, nicht bei 1.
-
-Damit relativiert sich der Vorwurf an den Motor: Es war keine Nachlaessigkeit,
-sondern eine Groessenordnung, die er nicht ohne Weiteres bezahlen konnte -
-1.284 Millionen um 18:20 haetten fuer 1024 GB gereicht, fuer 2048 nicht.
-Trotzdem bleibt der Befund: Er kauft Arbeiterserver (26 Stueck, die meisten
-128 GB), fasst die Werkbank aber nie an, und der Reputationsmotor lag deshalb
-seit 16:42 still.
-
-**BEHOBEN um 20:27.** `werk-0` steht auf **1024 GB** (676 Millionen von 6,6
-Milliarden Guthaben), und `bn4rep.js` laeuft wieder - `data/ps.json` um 20:29
-listet es neben blade, bbtrain, homegrow, wakelock, bn4door und sonde.
-**Verifiziert: bn4rep.js in der Prozessliste um 20:29.**
-
-**Versuchte Reparatur von aussen, 18:20 bis 18:35: fehlgeschlagen.**
-`src/wbgrow.js` ruestet die groesste gekaufte Maschine auf 2048 GB auf, mit
-einer Grenze von einem Fuenftel des Guthabens. Das Skript startet nicht:
-Erst kam es gar nicht im Spiel an (die Brueckenbeobachtung von `src/` hat die
-**neue** Datei nicht gepusht - `getFile src/wbgrow.js` meldete "does not
-exist"), nach einem `pushFile` von Hand nahm der Auftragskanal den Auftrag
-zwar an (`data/task.txt` war danach leer), aber `data/wbgrow.txt` entstand
-nie. Verdacht: bn4net startet Auftragsskripte auf einem Host, auf dem die
-Datei nicht liegt - gepusht wurde nur nach `home`.
-
-**Zwei getrennte Baustellen, beide offen:**
-1. Die Werkbank waechst nicht mit. Gehoert in `src/bn4net.js` - Erics Freigabe.
-2. ~~Neue Dateien unter `src/` erreichen das Spiel nicht von selbst.~~
-   **WIDERLEGT um 19:20 - der Fehler lag bei mir.** Im Spiel heissen die
-   Dateien **ohne** `src/`-Praefix (`collectScripts` bildet `gameName`
-   relativ zu `SCRIPT_DIR`, `sync/bridge.js:137-157`). Ich hatte mit
-   `getFile src/wbgrow.js` gesucht und "existiert nicht" als Sync-Ausfall
-   gelesen. Gegenprobe: eine frisch angelegte `src/synctest.js` war nach
-   **acht Sekunden** unter `synctest.js` im Spiel. Die Beobachtung
-   funktioniert einwandfrei.
-
-   Nebenwirkung meines Irrtums: Eine unbrauchbare Kopie liegt jetzt im Spiel
-   unter dem Namen `src/wbgrow.js`. Sie stoert nichts, sollte aber beim
-   naechsten Aufraeumen weg.
-
-3. **`wbgrow.js` startet nicht ueber den Auftragskanal** (19:25). Die Datei
-   liegt korrekt im Spiel (`getFile wbgrow.js` liefert den Quelltext), der
-   Kanal nimmt den Auftrag an (`data/task.txt` ist danach leer), aber
-   `data/wbgrow.txt` entsteht weder auf `home` noch auf `werk-0`, und
-   `werk-0` steht unveraendert bei 512 GB. Zwei Versuche, 18:30 und 19:25.
-   **Zwei Verdaechte geprueft und ausgeraeumt (19:55):**
-   - *Namensliste:* Es gibt keine. Weder `bn4life.js:270-297` noch
-     `bn4net.js:424-470` filtern Skriptnamen; beide nehmen `teile[0]`
-     unbesehen. Gelesen wird der Kanal derzeit von **bn4life**, weil bn4net
-     nur einspringt, wenn bn4life kein frisches Lebenszeichen hat.
-   - *Fehlende Rueckgabe:* `wbgrow.js` schrieb seine Ausgabe ohne `scp` - der
-     Auftragslaeufer waehlt den Rechner mit dem meisten freien Speicher
-     (`bn4life.js:283-291`), und das ist selten home. Behoben, dazu schliesst
-     das Skript jetzt `home` aus der Werkbank-Wahl aus (es ist mit 2048 GB der
-     groesste Rechner, und `ns.getPurchasedServers()` haette es geliefert -
-     das Skript haette "hat bereits genug" gemeldet und nichts getan).
-
-   **Dritter Versuch um 19:56 trotzdem ohne Ergebnis**: keine
-   `data/wbgrow.txt` auf home, `werk-0` unveraendert bei 512 GB. Nach der
-   Zehn-Minuten-Regel abgebrochen.
-
-   Verdacht jetzt: offen. Der naechste Schritt ist eine Gegenprobe mit einem
-   Skript, das **nur** eine Zeile schreibt und nichts kauft - laeuft das, liegt
-   es an `wbgrow.js` selbst (etwa an `ns.getPurchasedServerUpgradeCost`, das
-   die RAM-Kosten des Skripts hebt); laeuft es nicht, liegt es am Kanal.
-
-Gemessen: `data/wache-zustand.json` zeigt um 17:45:33 Stufe 2 mit dem Text
-"bn4rep.js meldet sich seit 63 min nicht mehr - keine Reputationsarbeit". Eric
-bekam das als Push aufs Handy. Tatsaechlich lief bn4rep bis 16:42 und fand nach
-dem Einbau von 16:31 keinen Platz mehr: `bn4rep.js` braucht 768,3 GB, die
-Werkbank ist `werk-0` und traegt bereits blade, bbtrain, homegrow, wakelock und
-bn4door.
-
-Erwartet: Eine Meldung, die den **Grund** nennt, statt "meldet sich nicht".
-
-Verdacht: `tools/wache.js:462-463`. Die Kaltstart-Ausnahme lautet
-`homeRam <= 128` - sie prueft **den falschen Rechner**. bn4rep laeuft auf der
-Werkbank, und die ist seit dem Umbau nicht mehr `home` (hier: `werk-0` bei
-`homeRam` 2048). Die Ausnahme greift deshalb nie, obwohl der Zustand derselbe
-ist wie beim Kaltstart.
-
-**Nicht stummschalten - unterscheiden.** Eric am 26.08. um 17:52: "kann
-Letzteres nicht auch ein Fehler sein?" Er hat recht: Kein Platz IST ein Fehler,
-wenn Geld fuer einen groesseren Rechner da ist (hier 671 Mio) und der Motor
-trotzdem keinen kauft. Ein Waechter, der Platzmangel pauschal stumm schaltet,
-verdeckt genau diesen Fall dauerhaft. Die Meldung soll also den Grund nennen
-("kein Platz - Werkbank `werk-0` belegt, Geld 671m") und erst dann eskalieren,
-wenn der Zustand anhaelt, **obwohl** das Geld reicht.
-
-Dafuer braucht der Waechter eine Zahl, die er heute nicht hat: den freien
-Speicher der Werkbank. `bn4net.json` liefert `werkbank` und `werkbankReserve`,
-nicht die Belegung - der erste Arbeitsschritt ist deshalb, diese Zahl in
-`bn4net.json` mitzuschreiben. Das faellt in `src/bn4net.js` und braucht Erics
-Freigabe.
-
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
@@ -578,6 +471,37 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Waechter meldet fehlenden Speicher als Ausfall (26.08., 20:50)
+
+**Verifiziert: Waechter laeuft mit der neuen Pruefung seit 20:47:22** (PID
+14576, Sperrdatei des Vorgaengers uebernommen, erste Runde ohne Fehler).
+
+Ausgeloest von einem Fehlalarm um 17:45:33: Stufe 2, "bn4rep.js meldet sich
+seit 63 min nicht mehr". Der Grund war Speicher, nicht Absturz - die Werkbank
+`werk-0` hatte 512 GB, `bn4rep.js` braucht 768,3.
+
+**Die Ursache war ein Test am falschen Rechner.** `tools/wache.js:462` prueft
+`homeRam <= 128` - der Kaltstart-Test aus der Zeit, als die Werkbank noch home
+war. Er greift heute nie, weil home 2048 GB hat, waehrend die Werkbank ein
+gekaufter Rechner ist.
+
+**Nicht stumm geschaltet, sondern unterschieden** - nach Erics Einwand vom
+26.08., 17:52: *"kann Letzteres nicht auch ein Fehler sein?"* Er hat recht:
+Kein Platz IST ein Fehler, wenn Geld fuer einen Ausbau da ist. Deshalb:
+
+- Neue Funktion `groessterRechnerGb()` liest den groessten Rechner ausser home
+  aus dem Spielstand - **nur im Verdachtsfall**, denn der Save ist mehrere
+  Megabyte gross und der Waechter laeuft alle drei Minuten.
+- Die Meldung nennt jetzt den Grund: "bn4rep.js hat keinen Platz: groesste
+  Maschine 512 GB, gebraucht 768,3 GB. Guthaben 6713m - Ausbau pruefen."
+- Sie **eskaliert nicht** (`keineEskalation`): einmal melden, dann Ruhe. Ein
+  Alarm, der sich alle zwanzig Minuten wiederholt, entwertet den Kanal.
+
+**Die zwei Nebenbaustellen dieses Punktes sind ebenfalls erledigt:** Der
+Sync-Verdacht war ein eigener Lesefehler (im Spiel fehlt das `src/`-Praefix),
+und `wbgrow.js` startete nicht, weil drei ns-Funktionen in Bitburner 3.0.0
+entfernt sind. Beides steht in eigenen Eintraegen weiter unten.
 
 ### Der Faehigkeitsplan kaufte die teuerste Stufe im Feld statt der billigsten Wirkung (26.08., 18:52)
 

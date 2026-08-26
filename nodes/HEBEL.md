@@ -58,11 +58,20 @@ Tracer 14, Short-Circuit 12, Evasive System 12, Reaper 8 vor Blade's
 Intuition.
 
 Vorher: Bounty-Hunter-Chance **0,322**, offene Punkte **21** um 18:37
-Nachher: **0,348 um 18:52** nach einem einzigen Kauf fuer 2 Punkte, offene
-Punkte 1. Die Hypothese haelt; die volle Wirkung steht noch aus, weil erst
-eine von 46 geplanten Stufen gekauft ist. **Naechster Lauf misst die
-Zyklusrate** - Bounty Hunter lag um 18:50 bei 0,971, erwartet wird ueber 1,10,
-sobald Tracer Stufe 5 erreicht.
+Nachher: **BESTAETIGT um 19:37, deutlicher als erwartet.** Bei Tracer Stufe 4:
+
+    Aktion           Chance 18:50 -> 19:37    Zyklusrate 18:50 -> 19:37
+    Bounty Hunter    0,348 -> 0,394           0,971 -> 1,258   (+30%)
+    Tracking         0,660 -> 0,771           0,904 -> 1,168   (+29%)
+    Retirement       0,415 -> 0,487           0,893 -> 1,120   (+25%)
+
+Erwartet war "ueber 1,10 bei Tracer Stufe 5" - erreicht sind 1,258 schon bei
+Stufe 4, fuer insgesamt 20 Punkte. Blade's Intuition haette fuer dieselben 20
+Punkte nicht einmal eine Stufe gebracht.
+
+Der Gewinn ist breiter als gedacht, weil Tracer auf **alle** Vertraege wirkt
+und der Motor ohnehin nur Vertraege faehrt. Die restlichen Deckel (Tracer bis
+14, dann Short-Circuit 12, Evasive System 12, Reaper 8) stehen noch aus.
 Commit: siehe git log, blade.js 26.08. 18:52
 
 ### Geprueft und verworfen: Team, Ausdauerschwelle, Punkterate (26.08., 15:57)

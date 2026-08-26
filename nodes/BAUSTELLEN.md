@@ -406,6 +406,14 @@ die Wache in ihre Diagnosebranche und stumpft ihre Meldungen ab.
 
 ### blade.js hat kein Gegenmittel gegen leere Vertragsvorraete
 
+**Messung 26.08., 18:07:** `data/blade.json` zeigt Aktion
+"Contracts/Bounty Hunter", Chance **0,308**, Grund "Vertrag unter Schwelle,
+lohnt trotzdem" - `SICHER_VERTRAG` liegt bei 0,45. Der Tracking-Vorrat ist
+also wieder leer, und der Motor faehrt einen Vertrag mit knapp einem Drittel
+Erfolgschance. Die Rangrate liegt entsprechend bei **0,93 je Minute** (933 um
+17:37 auf 961 um 18:07) statt der gerechneten 1,339 fuer Tracking. Der Punkt
+kostet damit rund 30 Prozent Rangrate und ist keine Randnotiz.
+
 Zweimal an einem Nachmittag ist der Motor in "General/Training" gelandet, beide
 Male mit demselben Muster: keine Aktion ueber der Schwelle, also Rueckfall auf
 etwas, das keinen Rang bringt. Um 17:00 war die Schwelle zu hoch (0,80), um

@@ -238,21 +238,50 @@ function sollRate(t, blade) {
     if (!fac || stufe <= 1) return 1;
     return Math.pow(fac, stufe - 1);
   };
-  if (aktion.startsWith("Contracts/")) {
-    const name = aktion.slice("Contracts/".length);
+  // DIE PAUSCHALE 1,7 WAR ZUFAELLIG BOUNTY HUNTER (27.08.2026, 00:20).
+  //
+  // Hier stand `1,7 * chance * levelFaktor` fuer ALLE Vertraege. Gegen 406
+  // gemessene Abschnitte (`tools/ratencheck.js`, 26.08. 23:18) traf das nur
+  // bei einem:
+  //
+  //   Aktion                    gemessen   Pauschale   rankGain/Dauer
+  //   Contracts/Tracking           3,438       5,45           3,21
+  //   Contracts/Retirement         2,938       3,91           3,19
+  //   Contracts/Bounty Hunter      2,279       2,50           2,48
+  //
+  // Der Grund: `rankGain` ist 0,3 / 0,9 / 0,6 (`data/Contracts.ts:19,53,86`)
+  // und die Dauer 18 / 32 / 26 Sekunden. Die 1,7 entspricht ungefaehr
+  // `0,9 / 0,53 min` - also genau Bounty Hunter, und daneben liegt sie um bis
+  // zu 59 Prozent.
+  //
+  // Richtig ist `rankGain * rewardFac^(stufe-1) * chance / dauerMinuten`.
+  // `blade.js` meldet die Dauer seit dem 26.08., 23:30 mit (`getActionTime`,
+  // in Millisekunden); fehlt sie - aeltere Fassung -, bleibt die Pauschale
+  // als Rueckfall stehen, damit ein Versionsunterschied keinen Fehlalarm
+  // ausloest.
+  const RANK_GAIN = {
+    "Tracking": 0.3, "Bounty Hunter": 0.9, "Retirement": 0.6,
+    "Investigation": 2.2, "Undercover Operation": 4.4,
+    "Sting Operation": 5.5, "Raid": 55,
+    "Stealth Retirement Operation": 22, "Assassination": 44,
+  };
+  const dauerMin = Number.isFinite(blade.dauer) && blade.dauer > 0
+    ? blade.dauer / 60000 : null;
+
+  if (aktion.startsWith("Contracts/") || aktion.startsWith("Operations/")) {
+    const name = aktion.slice(aktion.indexOf("/") + 1);
     const f = levelFaktor(name);
-    return { wert: +(1.7 * chance * f).toFixed(2), grund: aktion
-      + " bei " + Math.round(chance * 100) + " % Erfolgschance"
-      + (f > 1.05 ? ", Stufe " + blade.stufe + " (Faktor "
-        + f.toFixed(2) + ")" : "") };
-  }
-  if (aktion.startsWith("Operations/")) {
-    // Raid ist der Ausreisser: rankGain 55 gegen 2,2 bei Investigation. Genau
-    // diese Zeile meint der Kontrollpunkt in nodes/ROUTE.md mit "6.000 mit
-    // Raid" - und genau sie verlangt city.comms >= 1.
-    const brutto = aktion.includes("Raid") ? 60 : 4;
+    const gain = RANK_GAIN[name];
+    if (dauerMin && gain) {
+      return { wert: +(gain * f * chance / dauerMin).toFixed(2), grund: aktion
+        + " bei " + Math.round(chance * 100) + " % Erfolgschance, Stufe "
+        + (blade.stufe || 1) + ", " + Math.round(blade.dauer / 1000) + " s" };
+    }
+    // Rueckfall ohne gemeldete Dauer.
+    const brutto = aktion.startsWith("Operations/")
+      ? (aktion.includes("Raid") ? 60 : 4) : 1.7 * f;
     return { wert: +(brutto * chance).toFixed(2), grund: aktion
-      + " bei " + Math.round(chance * 100) + " % Erfolgschance" };
+      + " bei " + Math.round(chance * 100) + " % Erfolgschance (ohne Dauer)" };
   }
   if (aktion.startsWith("Black Operations/")) return null;
   return null;

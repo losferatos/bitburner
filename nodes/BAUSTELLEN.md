@@ -160,151 +160,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
-
-**Der letzte Rest ist die Pauschale 1,7 - und sie ist jetzt widerlegt
-(26.08., 23:30).** `sollRate()` rechnet fuer alle Vertraege
-`1,7 * chance * levelFaktor` (`strategie-check.js:245`). Die 1,7 soll Rang je
-Minute sein, aber weder Ertrag noch Dauer sind bei den Vertraegen gleich:
-rankGain ist **0,3 / 0,9 / 0,6** fuer Tracking, Bounty Hunter und Retirement
-(`data/Contracts.ts:19,53,86`), die Dauer 18, 32 und 26 Sekunden.
-
-Gegen die Messung aus **406 Abschnitten** (`tools/ratencheck.js`, 23:18):
-
-    Aktion                    n   Arbeitsmin  gemessen  Pauschale  richtig
-    Contracts/Tracking      164        60,3     3,438      5,45      3,21
-    Contracts/Retirement     59        44,0     2,938      3,91      3,19
-    Contracts/Bounty Hunter  88        73,0     2,279      2,50      2,48
-
-"richtig" ist `rankGain * rewardFac^(stufe-1) * chance / dauerMinuten`. Bei
-Bounty Hunter trifft auch die Pauschale, bei Tracking liegt sie **59 Prozent
-zu hoch**, bei Retirement 33 Prozent. Der Zufall dahinter: 1,7 entspricht
-ungefaehr `0,9 / 0,53 min` - also genau Bounty Hunter.
-
-**Geaendert 23:30, Wirkung noch nicht gemessen:** `blade.js` schreibt jetzt
-`dauer` (in Millisekunden, aus `getActionTime`) nach `data/blade.json`.
-*Verifiziert 23:31:* `"stufe":21,"dauer":26000` bei Contracts/Retirement. Die
-Dauer haengt an dex und agi (`Actions/Action.ts:104-120`) und aendert sich mit
-jedem Training - sie gehoert gemessen, nicht in eine Tabelle im Pruefer.
-
-**Naechster Schritt, eigener Lauf (eine Datei je Lauf):** `sollRate()` auf
-`rankGain / dauer` umstellen, mit der rankGain-Tabelle aus `Contracts.ts` und
-`Operations.ts`. Faellt `dauer` weg - aeltere `blade.js` -, bleibt die
-Pauschale als Rueckfall stehen.
-
-**Nebenbefund aus derselben Messung: Der Kammeranteil ist von 74 auf 48,9
-Prozent gefallen** (182,9 von 374 Minuten). Am 26.08. um 05:47 waren es noch
-122 von 164. Das ist die kumulierte Wirkung der Hebel dieses Tages.
-
-Zweimal an einem Nachmittag hat `sollRate()` in `tools/strategie-check.js` einen
-Fehlalarm erzeugt, beide Male aus derselben Wurzel: Die Zahlen stammen aus einer
-Ueberschlagsrechnung am Spielquellcode, nicht aus dem eigenen Messverlauf.
-- 17:00: eine feste Rate von 29 je Minute, aus einem Zwei-Stunden-Ziel geteilt
-- 18:21: Bruttoertraege ohne die Erfolgswahrscheinlichkeit
-
-Beide Male wurde die Formel nachgebessert. Beide Male blieb sie eine Schaetzung.
-
-`data/verlauf-strategie.json` enthaelt inzwischen zu jedem Messpunkt Zeit, Wert,
-Aktion und Urteil - damit liesse sich die tatsaechliche Rate je Aktionsart aus
-dem eigenen Lauf ableiten, statt sie zu raten. Ein gleitender Median ueber die
-letzten Stunden je Aktion waere selbstkalibrierend und ginge nicht mehr daneben,
-wenn sich Aktionslevel oder Faehigkeiten aendern.
-
-**Stand 26.08., 02:15: Der geplante Umbau ist widerlegt, bevor er begann.**
-`tools/ratencheck.js` (neu) rechnet die tatsaechlichen Raten je Aktion aus dem
-Verlauf. Ergebnis ueber 73 Messpunkte:
-
-    Aktion                                  n   median      max   Null%
-    General/Hyperbolic Regeneration Chamber 16    0.072    1.032      50
-    Contracts/Retirement                     6    0.000    0.308      67
-    General/Training                         2    0.151    0.200       0
-
-Contracts/Retirement zeigt einen Median von **null** - waehrend der Rang im
-selben Zeitraum nachweislich um rund 0,5 je Minute gestiegen ist. Die Zahlen
-sind also nicht die Wahrheit, gegen die man die Formel haelt, sondern selbst
-ein Artefakt.
-
-Der Grund ist die Aufloesung: Ein Verlaufspunkt traegt die Aktion, die im
-MOMENT der Messung lief; der Zuwachs davor stammt aus zwanzig Minuten, in
-denen der Motor mehrfach gewechselt hat. Die Rate landet bei der Aktion, die
-zufaellig zum Messpunkt lief - und das ist zur Haelfte die Kammer, die
-naturgemaess null bringt.
-
-**Zu tun, in dieser Reihenfolge:**
-1. ~~`blade.js` protokolliert bei JEDEM Aktionswechsel Rang und Zeit.~~
-   **Erledigt 26.08., 03:01.** Beim Wechsel wird der abgeschlossene Abschnitt
-   nach `data/aktionen.txt` geschrieben: von, bis, Aktion, Grund, Rang davor
-   und danach - mit dem UNGERUNDETEN Rang, anders als im Messverlauf.
-   Abschnitte unter zehn Sekunden gelten als Umschaltzucken und entfallen.
-   *Verifiziert 03:01:*
-
-       Contracts/Tracking        42 s   Rang 221,855 -> 222,530   (0,96/min)
-       Contracts/Bounty Hunter   22 s   Rang 222,530 -> 222,530   (Misserfolg)
-
-   Die Endung ist `.txt`, nicht `.jsonl`: Bitburner laesst nur wenige
-   Dateiendungen zu und weist alles andere mit "Invalid file extension" ab.
-2. ~~`tools/ratencheck.js` gegen diese Datei laufen lassen.~~
-   **Erledigt 26.08., 05:47.** Das Werkzeug holt die Datei ueber die Bruecke
-   und rechnet gewichtet (Summe Rang durch Summe Zeit), nicht als Median
-   einzelner Abschnitte. Die Erfolgsquote faellt dabei gratis ab: Der Anteil
-   der Abschnitte mit Rangzuwachs ist die GEZAEHLTE Erfolgswahrscheinlichkeit.
-   Ergebnis ueber 84 Abschnitte (164 Minuten):
-
-       Aktion                                    n     min  Rang/min  Erfolg
-       Contracts/Tracking                       31    19,9     1,994     84%
-       Contracts/Retirement                      2     1,3     1,547     50%
-       Contracts/Bounty Hunter                  28    21,2     1,469     64%
-       General/Hyperbolic Regeneration Chamber  23   122,0     0,000      0%
-
-3. **Die Formel liegt um Faktor 5 bis 6 daneben - und der Grund ist gefunden.**
-   Der Pruefer rechnet `rankGain * Chance / Dauer`, fuer Tracking also
-   0,3 * 0,73 / 0,63 min = **0,35** je Minute. Gemessen sind es **1,994**.
-   Es fehlt der Levelfaktor: `Bladeburner.ts:917` multipliziert den Ertrag mit
-   `Math.pow(action.rewardFac, action.level - 1)`, und `rewardFac` ist
-   standardmaessig 1,02 (`Actions/LevelableAction.ts:20`). Tracking stand am
-   25.08. auf Stufe 14 - allein das erklaert einen Teil; die Faehigkeiten
-   (Blade's Intuition, Overclock) kommen dazu.
-   **Geaendert 26.08., 06:16, Wirkung noch nicht gemessen:**
-   `blade.js` schreibt die Stufe der laufenden Aktion nach `data/blade.json`
-   (`getActionCurrentLevel`, nur fuer Contracts und Operations - General-
-   Aktionen haben keine). `sollRate()` multipliziert die Erwartung mit
-   `rewardFac^(stufe-1)`; die Faktoren stehen je Aktion im Quellcode
-   (Contracts.ts:18, 52, 85 - Tracking 1,041, Bounty Hunter 1,085,
-   Retirement 1,065; Operations.ts:18, 52, 88, 123, 163, 201).
-   Nachzumessen ist das erst, wenn der Motor wieder an einem Vertrag steht -
-   bei der Messung um 06:16 ruhte er (`stufe: null`, Kammer).
-
-   **Der Restfaktor ist erklaert (26.08., 06:45) - er war ein
-   Auswertungsfehler, kein Spielgeheimnis.**
-   Gemessen mit echtem Wert: `Contracts/Tracking`, **Stufe 24** (nicht 14),
-   Chance 0,737. Damit rechnet die Formel
-   0,3 * 1,041^23 = 0,756 Rang je Erfolg, mal 0,737 durch die AKTIONSdauer
-   von 13 Sekunden = **2,57 Rang je Minute**. Gemessen sind 1,984 - eine
-   Abweichung von 1,3, die durch Rangverluste bei Misserfolgen, die
-   Zufallsstreuung (`addOffset(gain, 10)`) und die veraltete Dauermessung
-   vollstaendig gedeckt ist.
-
-   Der scheinbare Faktor 3,4 entstand, weil in der Rechnung die
-   ABSCHNITTSdauer (36 s) statt der Aktionsdauer (13 s) stand. Ein Abschnitt
-   laeuft, bis blade.js die Aktion wechselt, und enthaelt in der Regel
-   mehrere Durchlaeufe - die "Erfolgsquote" in `ratencheck.js` ist deshalb der
-   Anteil der Abschnitte mit Zuwachs, nicht die Erfolgschance je Versuch.
-   Beides steht jetzt als Warnung im Werkzeug und in seiner Ausgabe.
-
-4. **Der eigentliche Engpass steht daneben und ist groesser als alles andere:**
-   Der Motor verbringt **122 von 164 Minuten - 74 Prozent - in der
-   Regenerationskammer**. Die Arbeitszeit bringt 1,5 bis 2 Rang je Minute,
-   ueber alles sind es 0,443. Faellt die Kammerzeit von 74 auf 30 Prozent,
-   verdreifacht sich die Rate. Das gehoert in den Optimierungs-Loop, nicht
-   hierher - siehe nodes/HEBEL.md.
-
-Bis dahin bleibt die Formel die bessere Schaetzung: Sie ist wenigstens nicht
-durch die Messmethode verfaelscht.
-
-**Dringlichkeit:** mittel. Ein Fehlalarm ist teurer als er aussieht - er schickt
-die Wache in ihre Diagnosebranche und stumpft ihre Meldungen ab.
-
-
 ### blade.js hat kein Gegenmittel gegen leere Vertragsvorraete
 
 **Messung 26.08., 18:07:** `data/blade.json` zeigt Aktion
@@ -403,6 +258,42 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Erwartungswerte des Pruefers rechnen jetzt mit rankGain und Dauer (27.08., 00:20)
+
+**Verifiziert: `URTEIL: SPUR` unveraendert nach dem Umbau um 00:20**, und die
+Formel trifft die Messung. Retirement, Stufe 21, Chance 0,647, Dauer 26 s:
+`0,6 * 1,065^20 * 0,647 / 0,4333 min` = **3,19** gegen gemessene **2,938** -
+eine Abweichung von 8 Prozent, gedeckt durch Rangverluste bei Misserfolgen und
+die Zufallsstreuung `addOffset(gain, 10)`.
+
+Der Punkt lief seit dem 25.08. und hatte zwei Fehlalarme zur Ursache. Er ist in
+mehreren Schritten abgearbeitet worden; die letzten beiden:
+
+**1. Die Pauschale 1,7 war zufaellig Bounty Hunter.** Gegen 406 gemessene
+Abschnitte (`ratencheck.js`, 26.08. 23:18):
+
+    Aktion                    gemessen   Pauschale   rankGain/Dauer
+    Contracts/Tracking           3,438       5,45           3,21
+    Contracts/Retirement         2,938       3,91           3,19
+    Contracts/Bounty Hunter      2,279       2,50           2,48
+
+`rankGain` ist 0,3 / 0,9 / 0,6 (`data/Contracts.ts:19,53,86`), die Dauer
+18 / 32 / 26 Sekunden. 1,7 entspricht ungefaehr `0,9 / 0,53 min` - genau
+Bounty Hunter, und bei Tracking 59 Prozent daneben.
+
+**2. Umgesetzt in zwei Laeufen, eine Datei je Lauf.** Erst meldet `blade.js`
+die Aktionsdauer aus `getActionTime` mit (26.08., 23:30; verifiziert
+`"stufe":21,"dauer":26000`), dann rechnet `sollRate()` damit
+(27.08., 00:20). Fehlt die Dauer - aeltere `blade.js` -, bleibt die Pauschale
+als Rueckfall stehen, damit ein Versionsunterschied keinen Fehlalarm ausloest.
+Operationen sind mitgenommen: rankGain 2,2 bis 55 aus `data/Operations.ts`.
+
+**Was offen bleibt und anderswo steht:** Der urspruengliche Plan - die Raten
+selbstkalibrierend aus dem eigenen Verlauf ableiten - ist am 26.08. um 02:15
+widerlegt worden (die Aufloesung des Messverlaufs ordnet den Zuwachs der
+Aktion zu, die zufaellig zum Messpunkt lief). Stattdessen ist die Formel jetzt
+richtig, und `ratencheck.js` liefert die Gegenprobe aus echten Abschnitten.
 
 ### Das Springen zwischen Vertraegen ist kein Fehler - Hysterese widerlegt (26.08., 23:50)
 

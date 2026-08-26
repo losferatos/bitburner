@@ -140,6 +140,39 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
+### Der Motor steht drei Viertel der Zeit in der Regenerationskammer
+
+Gemessen 26.08. um 06:47 ueber `tools/ratencheck.js`: **161 von 222 Minuten -
+72,5 Prozent - in `General/Hyperbolic Regeneration Chamber`.** Die Arbeitszeit
+bringt 1,4 bis 2,0 Rang je Minute, ueber alles bleiben **0,475**.
+
+Faellt die Kammerzeit von 72 auf 30 Prozent, verdreifacht sich die Rate. Das
+ist der groesste Einzelhebel des Knotens - groesser als jede Feinarbeit an der
+Aktionsauswahl. Bei Rang 327 von 2.500 fuer die erste Black Op entscheidet er
+ueber Tage.
+
+Der Ruhegrund steht in der Telemetrie und ist fast immer derselbe:
+`"grund": "ruht bis HP 17"`. Es sind die TREFFERPUNKTE, nicht die Ausdauer -
+das Maximum liegt bei 22 bis 23, jeder misslungene Vertrag kostet welche, und
+die Kammer heilt nur 2 je Durchlauf (`Bladeburner.ts:1198`).
+
+Ansaetze, in der Reihenfolge ihrer Wucht:
+1. **Mehr Trefferpunkte.** Sie haengen an Defense (`Player.hp.max`); bbtrain
+   traniert nur bis Kampfwert 100 und hoert dann auf. Ein hoeherer Zielwert
+   waere ein dauerhafter Gewinn statt einer Symptombehandlung.
+2. **Weniger Schaden.** Der Schaden je Misserfolg haengt an der Schwierigkeit
+   der Aktion. Ein sichererer Vertrag mit etwas weniger Ertrag koennte netto
+   gewinnen, wenn er die Kammerzeit halbiert - das ist rechenbar, sobald
+   `data/aktionen.txt` genug Abschnitte je Aktion hat.
+3. **Die HP-Schwelle senken.** Sie steht auf 50/75 Prozent. Weiter zu arbeiten
+   heisst mehr Erfolge je Stunde, aber auch das Risiko, im Krankenhaus zu
+   landen (Zeit- und Geldverlust). Vorher pruefen, was ein Krankenhausaufenthalt
+   tatsaechlich kostet.
+
+**Dringlichkeit:** hoch. Es ist die einzige Zahl, die den Knoten um Tage
+verkuerzen kann.
+
+
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
 Zweimal an einem Nachmittag hat `sollRate()` in `tools/strategie-check.js` einen

@@ -58,6 +58,23 @@ export async function main(ns) {
   const vertraege = ns.bladeburner.getContractNames().map((n) => zeile("Contracts", n));
   const operationen = ns.bladeburner.getOperationNames().map((n) => zeile("Operations", n));
   const bo = ns.bladeburner.getNextBlackOp();
+  // DIE CHANCE DER NAECHSTEN BLACK OP ENTSCHEIDET UEBER DEN SKILL_PLAN
+  // (26.08.2026, 12:47).
+  //
+  // Die Chancen-Faehigkeiten (Blade's Intuition, Digital Observer, Cloak,
+  // Short-Circuit) wirken laut `Actions/Action.ts:184-187` auf Contracts,
+  // Operations UND BlackOps. Ob eine von ihnen ausgereizt ist, laesst sich
+  // deshalb NICHT an den Vertraegen ablesen - erst wenn auch die naechste
+  // Black Op bei 1,0 steht, bringt eine weitere Stufe nichts mehr. Ohne diese
+  // Zahl faellt die Entscheidung "Deckel oder nicht" ins Blaue.
+  let boChance = null;
+  if (bo) {
+    try {
+      const r = ns.bladeburner.getActionEstimatedSuccessChance("Black Operations", bo.name);
+      boChance = Array.isArray(r) ? { min: +r[0].toFixed(3), max: +r[1].toFixed(3) }
+        : { min: +r.toFixed(3), max: +r.toFixed(3) };
+    } catch (e) { boChance = { fehler: String(e && e.message ? e.message : e) }; }
+  }
 
   // DIE FAEHIGKEITEN SIND DER VERSTAERKUNGSPFAD (25.08.2026).
   //
@@ -108,7 +125,7 @@ export async function main(ns) {
         return a ? ns.bladeburner.getActionTime(a.type, a.name) : null;
       } catch (e) { return null; }
     })(),
-    naechsteBlackOp: bo ? { name: bo.name, rang: bo.rank } : null,
+    naechsteBlackOp: bo ? { name: bo.name, rang: bo.rank, chance: boChance } : null,
     vertraege, operationen, staedte, faehigkeiten,
   }), "w");
   if (ns.getHostname() !== "home") ns.scp("data/bbspann.json", "home", ns.getHostname());

@@ -135,31 +135,85 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Der naechste Faehigkeitsplan-Eintrag hat wieder keinen Deckel
+### Operationen bringen bis zum Siebenfachen und werden nie gefahren
 
-Gefunden 26.08. um 12:22 beim Umbau des `SKILL_PLAN` in `src/blade.js`. Der Plan
-kauft strikt der Reihe nach und bleibt beim ersten Eintrag stehen, der noch
-nicht am Deckel ist - das ist Absicht (Bugfix vom 25.08., 17:20). Bis heute
-stand `Overclock` mit Deckel 90 auf Platz 1 und hat damit **jeden** Punkt
-gefressen. Jetzt steht `Cyber's Edge` mit Deckel 5 davor; sobald der erreicht
-ist (35 Punkte kumulativ), erbt **`Blade's Intuition` mit Deckel `Infinity`**
-dieselbe Rolle.
+Gemessen 26.08. um 12:47 ueber `data/bbspann.json` - Ertrag je Minute
+(`rangGewinn * min-Chance / Dauer`), nebeneinander:
 
-Bei Blade's Intuition ist das ein echter Fehlermodus, kein theoretischer: Die
-Faehigkeit hebt die Erfolgschance (`SuccessChanceAll`, +3 Prozent je Stufe), und
-die Chance ist bei 1,0 geklemmt. Ist sie erreicht, bringt jede weitere Stufe
-exakt null - der Plan haengt aber trotzdem fuer immer daran, weil `Infinity` nie
-erreicht wird. Dasselbe gilt fuer die fuenf Eintraege danach.
+    Raid                    min 0,073   55 Rang   56 s   ->  4,279 je Minute
+    Undercover Operation    min 0,158    4,4      35 s   ->  1,195
+    Stealth Retirement      min 0,061   22        70 s   ->  1,157
+    Assassination           min 0,039   44       104 s   ->  0,992
+    Investigation           min 0,191    2,2      28 s   ->  0,899
+    ---
+    Tracking                min 0,502    0,3      15 s   ->  0,603   <- gefahren
+    Bounty Hunter           min 0,256    0,9      27 s   ->  0,512   <- gefahren
 
-Zu tun: Jedem Eintrag einen begruendeten Deckel geben, oder - besser, weil
-selbstkalibrierend - beim Sparziel pruefen, ob die Faehigkeit ueberhaupt noch
-etwas bewegt (bei den Chancen-Faehigkeiten: liegt `spanne().min` der besten
-Aktion schon bei 1,0?) und sonst weiterruecken. Erst das macht den Plan
-robust gegen genau den Fall, den er heute zum zweiten Mal produziert hat.
+Der Motor faehrt Tracking und Bounty Hunter. **Raid brachte rechnerisch das
+Siebenfache.** Der Grund steht in `src/blade.js:48`: `SICHER_OPERATION = 0.85`,
+waehrend `SICHER_VERTRAG` seit dem 25.08. auf 0,45 gesenkt wurde. Keine
+Operation kommt je auch nur in die Naehe von 0,85 - alle sechs liegen zwischen
+0,039 und 0,191. Die Schwelle schliesst die gesamte Aktionsklasse aus.
 
-**Dringlichkeit:** mittel. Er schlaegt nicht sofort zu, aber wenn er zuschlaegt,
-faellt es niemandem auf - Punkte verschwinden lautlos in einer wirkungslosen
-Faehigkeit.
+**Die Zahl ist ein Erwartungswert und noch keine Empfehlung.** Was ein
+misslungener Vertrag kostet, ist belegt (Zeit und etwas Chaos, aber keinen
+Rang - deshalb wurde 0,45 gewaehlt). Fuer Operationen ist es NICHT belegt, und
+sie unterscheiden sich in drei Punkten: Es gibt ein Team, das Verluste erleiden
+kann, der Vorrat ist endlich (Raid 350 offen), und der Ausdauerverbrauch steigt
+mit der Schwierigkeit (`BaseStaminaLoss * difficultyMultiplier`,
+`Bladeburner.ts:921`) - bei einem Motor, dessen Engpass die Ausdauer ist, kann
+das den ganzen Vorteil auffressen.
+
+**Zu tun, in dieser Reihenfolge:**
+1. Am Quellcode klaeren, was ein Misserfolg bei einer Operation kostet -
+   Rang, Team, Vorrat, Ausdauer. Erst danach ist die Schwelle zu bewerten.
+2. Den Ausdauerverbrauch je Operation gegen den je Vertrag halten. Die
+   Kennzahl ist **Rang je Ausdauerpunkt**, nicht Rang je Minute -
+   `tools/ratencheck.js` rechnet sie bereits.
+3. Erst dann `SICHER_OPERATION` anfassen, und dann einzeln: Raid zuerst, weil
+   dort der Abstand am groessten ist.
+
+**Dringlichkeit:** hoch. Es ist der groesste unausgeschoepfte Faktor am Knoten,
+seit der Kammeranteil gefallen ist - und er ist bisher nie geprueft worden,
+weil die Schwelle ihn stumm ausblendet.
+
+
+### Der Faehigkeitsplan hatte den zweiten Platz noch falsch besetzt
+
+**Der Eintrag von 12:22 hatte die Praemisse verkehrt herum, gemessen 12:47.**
+Dort stand die Sorge, `Blade's Intuition` mit Deckel `Infinity` koenne Punkte
+lautlos verschlingen, sobald seine Erfolgschance bei 1,0 klemmt. Gemessen ist
+das Gegenteil: **Operation Typhoon, die naechste Black Op, steht bei einer
+Erfolgschance von 0,025.** Die Chancen-Faehigkeiten wirken laut
+`Actions/Action.ts:184-187` auch auf Black Ops - Blade's Intuition ist also
+von "ausgereizt" so weit entfernt wie moeglich, und `Infinity` ist dort richtig.
+
+Dafuer stand ein echter Fehler daneben: **Overclock auf Stufe 14, Blade's
+Intuition auf Stufe 0.** Die vierzehn Stufen haben kumulativ rund 169 Punkte
+gekostet (`Summe(3 + 1,4*i)`, i = 0..13), in eine Faehigkeit, deren Wirkung im
+Ausdauer-Engpass mit 0,4444 gegen 0,4445 beziffert ist. Auf Platz 2 haette
+Overclock sich das sofort zurueckgeholt, sobald Cyber's Edge am Deckel steht -
+naechste Stufe 23 Punkte gegen 3 Punkte fuer Blade's Intuition Stufe 1.
+
+**Geaendert 12:48 in `src/blade.js`, Wirkung noch nicht gemessen:** Overclock
+steht jetzt als letzter Eintrag im `SKILL_PLAN`, die Chancen-Faehigkeiten
+davor. Der Deckel 90 bleibt - faellt der Ausdauerengpass je weg, ist die
+Faehigkeit wieder etwas wert.
+
+**Nachzumessen, sobald Cyber's Edge Stufe 5 erreicht** (Deckel; naechste Stufe
+kostet 13 Punkte, um 12:54 lagen 10 bereit): Der naechste Kauf muss
+**Blade's Intuition Stufe 1** sein, nicht Overclock Stufe 15. Beobachtbar ist
+das erst dann - solange Cyber's Edge unter seinem Deckel steht, bleibt der Plan
+ohnehin dort stehen, und die Umsortierung dahinter ist von aussen unsichtbar.
+
+Die Sicherung, die im Eintrag von 12:22 gefordert wurde - beim Sparziel
+pruefen, ob die Faehigkeit ueberhaupt noch etwas bewegt - ist **bewusst nicht
+gebaut worden.** Sie wuerde bei den heutigen Zahlen nie ausloesen und liesse
+sich deshalb auch nicht pruefen; ungetesteter Code, der nie laeuft, ist eine
+Last und keine Absicherung. Wieder aufnehmen, wenn eine Chance tatsaechlich
+1,0 erreicht.
+
+**Dringlichkeit:** niedrig.
 
 
 ### Der Motor steht drei Viertel der Zeit in der Regenerationskammer

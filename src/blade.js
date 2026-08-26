@@ -175,9 +175,29 @@ export async function main(ns) {
   // Der Deckel 5 ist Absicht: Die Kosten sind `1 + 3 * Stufe` und damit
   // quadratisch kumulativ (5 Stufen = 35 Punkte, 8 Stufen = 92), der Nutzen
   // dagegen linear. Ohne Deckel fraesse die Faehigkeit jeden weiteren Punkt.
+  //
+  // NACHTRAG 12:52 - OVERCLOCK GEHOERT ANS ENDE, NICHT AUF PLATZ 2.
+  //
+  // Gemessen ueber `data/bbspann.json`: Overclock stand auf **Stufe 14**,
+  // Blade's Intuition auf **Stufe 0**. Die vierzehn Stufen haben kumulativ
+  // rund 169 Punkte gekostet (`Summe(3 + 1,4*i)`, i = 0..13) - in eine
+  // Faehigkeit, deren Wirkung im Ausdauer-Engpass oben mit 0,4444 gegen
+  // 0,4445 beziffert ist. Auf Platz 2 haette sie sich das sofort wiedergeholt,
+  // sobald Cyber's Edge am Deckel steht.
+  //
+  // Entscheidend ist eine andere Zahl: **Operation Typhoon, die naechste
+  // Black Operation, hat eine Erfolgschance von 0,025.** Der Rang 2.500 ist
+  // nur die Eintrittskarte - danach sind 21 Black Ops zu bestehen, und bei
+  // zweieinhalb Prozent ist das aussichtslos. Die Erfolgschance ist die
+  // eigentliche Ausgangsbedingung dieses Knotens, nicht der Rang.
+  //
+  // Die Chancen-Faehigkeiten wirken laut `Actions/Action.ts:184-187` auf
+  // Contracts, Operations UND Black Ops. Blade's Intuition kostet in der
+  // ersten Stufe **3 Punkte** und hebt die Chance jeder Aktion um 3 Prozent;
+  // Overclock kostet in Stufe 15 **23 Punkte** und bewegt nichts. Damit
+  // steht die Reihenfolge fest.
   const SKILL_PLAN = [
     ["Cyber's Edge", 5],
-    ["Overclock", 90],
     ["Blade's Intuition", Infinity],
     ["Digital Observer", Infinity],
     ["Cloak", Infinity],
@@ -185,6 +205,9 @@ export async function main(ns) {
     ["Short-Circuit", Infinity],
     ["Reaper", Infinity],
     ["Evasive System", Infinity],
+    // Zuletzt: wirkungslos, solange die Ausdauer klemmt. Deckel 90 ist das
+    // Maximum des Spiels und bleibt stehen, falls der Engpass je wegfaellt.
+    ["Overclock", 90],
   ];
 
   const sag = (t) => ns.print(t);

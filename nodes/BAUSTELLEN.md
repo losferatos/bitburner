@@ -162,6 +162,26 @@ wirkt, und ueberschreibt die Praeparation.
 
 ### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 
+**Die Luecke WAECHST, waehrend die Rechnung besser wird (26.08., 21:07).**
+Seit dem Skill-Umbau um 18:52 steigt die gerechnete Zyklusrate stetig, die
+gemessene Rangrate faellt:
+
+    Zeitfenster     Zyklusrate (bbspann)   Rangrate (gemessen)
+    19:37-20:07               1,351                   1,67
+    20:07-20:37               1,443                   1,23
+    20:37-21:07               1,560                   0,87
+
+Von 18:50 bis 21:07 ist die gerechnete Rate um **61 Prozent** gestiegen
+(0,971 auf 1,560), die gemessene um **48 Prozent gefallen**. Beide Zahlen
+koennen nicht stimmen. Erwartet waere eine gemessene Rate nahe der
+gerechneten; sie liegt jetzt bei 56 Prozent davon.
+
+Verdacht: offen, aber die Richtung ist neu - frueher war die Luecke konstant
+bei rund einem Drittel, jetzt oeffnet sie sich. Zu pruefen ist zuerst, ob die
+Kammerzeit mitwaechst (hoehere Chancen heissen kuerzere Aktionen, damit mehr
+Aktionen je Minute und mehr Ausdauerverbrauch je Minute - der Effekt, der beim
+Raid-Befund schon einmal die Rechnung gekippt hat).
+
 **Messung 26.08., 17:37 (nach dem Einbau von 16:31):** `data/blade.json` zeigt
 Aktion "General/Hyperbolic Regeneration Chamber", Grund "ruht bis Ausdauer 31",
 Ausdauer **29/56**. Die Rangrate liegt bei **0,83 je Minute** (908 um 17:07 auf

@@ -37,6 +37,48 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Geprueft und nichts geaendert: Raid, Cyber's Edge, Overclock (26.08., 21:55)
+
+Engpass: Weiterhin die Ausdauer. Der Kammeranteil liegt bei 67 Prozent
+(gemessen 21:45, siehe BAUSTELLEN.md), weil das Ruheband nur 3,4 Punkte breit
+ist und die Regeneration 2,3 je Minute betraegt.
+
+Vollstaendige Messung um 21:51 ueber `data/bbspann.js`, alle neun Aktionen:
+
+    Aktion                  min   dauer  netto/min  aus/min  arbeit  zyklus
+    Raid                  0,124     56s      4,980     2,36   0,901   4,486
+    Bounty Hunter         0,480     32s      2,755     3,33   0,639   1,761  <- gefahren
+    Tracking              0,953     18s      3,736     4,79   0,444   1,658
+    Retirement            0,580     26s      2,829     3,79   0,561   1,588
+    Undercover Operation  0,269     35s      1,527     3,16   0,673   1,028
+    Investigation         0,328     28s      1,260     3,30   0,645   0,812
+
+**Raid steht mit 4,486 wieder ganz oben - und bleibt trotzdem verworfen.**
+Die Zahl ist die ROHE Zyklusrate ohne die Chaos-Gegenkraft. Raid erzeugt
++3,21 Prozent Chaos je Minute, Diplomacy baut bei Charisma 27 nur 1,187 ab
+(siehe den Erledigt-Eintrag vom 17:20); der tragbare Raid-Anteil liegt damit
+bei 27 Prozent, effektiv also **4,486 x 0,27 = 1,21** gegen 1,761 fuer Bounty
+Hunter. Der Verwurf haelt auch mit den neuen Zahlen - **nachgerechnet, nicht
+uebernommen.**
+
+**Overclock ist nicht wirkungslos, sondern schaedlich** - der Kommentar in
+`blade.js` untertreibt. Es kuerzt die Aktionsdauer um 1 Prozent je Stufe, und
+weil der Ausdauerverlust JE AKTION anfaellt (`Bladeburner.ts:921`), steigt
+`aus/min` im selben Mass. Bei Stufe 14 sind das rund 16 Prozent mehr
+Verbrauch je Minute. Zurueckdrehen geht nicht, aber der letzte Platz im
+Faehigkeitsplan ist damit doppelt begruendet.
+
+**Cyber's Edge ueber Deckel 5 hinaus: gerechnet, verworfen.** Stufe 6 kostet
+16 Punkte und hebt Hoechstausdauer und Regeneration um je 2 Prozent. Weil das
+Band prozentual definiert ist, waechst die Arbeitsphase um 2 Prozent, die
+Ruhephase bleibt gleich - Arbeitsanteil 0,3333 auf 0,3377, Zyklusrate 1,761
+auf 1,784. Dieselben 16 Punkte in Tracer Stufe 8 geben +4 Prozent auf alle
+Vertragschancen, also rund 1,83. **Der laufende Plan ist die bessere
+Verwendung**, deshalb keine Aenderung.
+
+Vorher/Nachher: keine Aenderung - dies ist die Absage an drei naheliegende
+Griffe, damit sie niemand ein zweites Mal probiert.
+
 ### Faehigkeitsplan nach Nutzen je Punkt statt nach Rangliste (26.08., 18:52)
 
 Engpass: **Die Erfolgschance, nicht der Vorrat.** Bounty Hunter lief mit 0,322

@@ -224,14 +224,36 @@ regeneriert die Ausdauer passiv mit rund 1,2 je Minute, in der Kammer mit 2,31
 (gemessen 14:20). Verworfene Arbeitszeit ist deshalb schlechter als Kammerzeit
 - aber der Gewinn liegt bei wenigen Prozent, nicht bei acht.
 
+**Verdacht 1 ist WIDERLEGT (26.08., 17:50) - und die Luecke ist dadurch
+groesser, nicht kleiner.** Die Schaetzung ist nicht optimistisch, sondern
+pessimistisch. `getPopulationSuccessFactor` nimmt `est ? city.popEst : city.pop`
+(`Actions/Action.ts:88-92`), und aus dem Spielstand gemessen:
+
+    Stadt        pop        popEst     est/ist
+    Sector-12    1,754e9    1,466e9    0,835   <- Arbeitsstadt
+    Volhaven     3,653e9    1,577e9    0,432
+    Aevum        1,432e9    7,484e8    0,523
+    New Tokyo    1,344e9    1,532e9    1,140
+    Ishima       5,714e8    8,105e8    1,418
+
+Mit `(pop/1e9)^0,7` (`data/Constants.ts:29-30`) heisst das fuer Sector-12:
+Faktor 1,482 wahr gegen 1,307 geschaetzt - die **echte Erfolgschance liegt 13
+Prozent ueber der gerechneten**. Die gemessene Rate muesste also ueber der
+gerechneten liegen; sie liegt 20 Prozent darunter. Die tatsaechliche Luecke
+betraegt damit rund **33 Prozent**.
+
+**Verdacht 2 ist ebenfalls widerlegt: keine Tab-Drosselung.** Aus zwei
+`data/blade.json` verglichen (17:07 und 17:37): Wanduhr 1.789.027 ms,
+Spielzeit-Delta 1.789.000 ms. Der Tonanker haelt, die Engine laeuft in
+Echtzeit.
+
 **Zu tun:**
-1. Den Restfaktor klaeren. Nach Abzug der 13,9 Prozent bleiben 2,06 gegen 2,51
-   gerechnet - rund 20 Prozent unerklaert. Verdaechtig ist
-   `getActionEstimatedSuccessChance`: Die Zahl ist eine SCHAETZUNG auf Basis
-   der geschaetzten Population, und `bbspann` nimmt die untere Grenze. Liegt
-   auch die noch ueber der Wahrheit, sind alle Ertragsrechnungen zu optimistisch
-   - **einschliesslich der Raid-Bilanz.** Das ist der Grund, warum dieser Punkt
-   nicht kosmetisch ist.
+1. Die 33 Prozent klaeren. Ausgeschlossen sind jetzt die
+   Chancenschaetzung und die Engine-Geschwindigkeit. Offen bleiben: der
+   Rangverlust bei Operationen (bei Vertraegen null), die Zeit zwischen
+   Aktionsende und Neustart durch `blade.js` selbst, und ob `data/aktionen.txt`
+   Abschnitte verliert. Naechster Schritt: Rang-Delta und Aktionszahl ueber
+   dieselbe Spanne gegeneinander halten, statt nur die Rate.
 2. Erst danach ueber das Aufschieben von Arbeit->Arbeit-Wechseln entscheiden,
    und dann mit einer Erwartung in Prozent, die diese Rechnung beruecksichtigt.
 

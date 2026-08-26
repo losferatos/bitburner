@@ -210,6 +210,38 @@ async function starteWerkzeug(name) {
   }
 }
 
+/**
+ * bash-Prozesse, die aelter sind als eine halbe Stunde.
+ *
+ * Ein Loop-Lauf dauert Minuten, kein einziger legitimer Hintergrundbefehl
+ * dieses Projekts laeuft laenger als zehn. Was danach noch steht, haengt -
+ * und blockiert die gesamte Cron-Ebene.
+ */
+function altebashProzesse(jetzt) {
+  return new Promise((fertig) => {
+    execFile("powershell", ["-NoProfile", "-Command",
+      "Get-CimInstance Win32_Process -Filter \"Name='bash.exe'\""
+      + " | Select-Object ProcessId,CreationDate | ConvertTo-Json -Compress"],
+      { timeout: 10000 }, (fehler, aus) => {
+        if (fehler || !aus) return fertig([]);
+        let d;
+        try { d = JSON.parse(aus); } catch { return fertig([]); }
+        const liste = Array.isArray(d) ? d : [d];
+        const treffer = [];
+        for (const p of liste) {
+          if (!p || !p.CreationDate) continue;
+          // ConvertTo-Json macht aus einem DateTime "/Date(1787...)/"
+          const m = String(p.CreationDate).match(/(\d{10,})/);
+          if (!m) continue;
+          const alterMin = (jetzt - Number(m[1])) / 60000;
+          if (alterMin > 30) treffer.push({ pid: p.ProcessId, alterMin });
+        }
+        treffer.sort((a, b) => b.alterMin - a.alterMin);
+        fertig(treffer);
+      });
+  });
+}
+
 async function spielJson(name) {
   const roh = await spieldatei(name);
   if (!roh) return null;
@@ -365,12 +397,38 @@ async function pruefe(zustand, jetzt) {
   try {
     const st = statSync(path.join(ROOT, "data", "verlauf-strategie.json"));
     const alter = jetzt - st.mtimeMs;
-    if (alter > 60 * 60_000) {
+    // 35 Minuten: Der haeufigste Loop laeuft alle zwanzig, dazu Jitter und
+    // Puffer fuer einen langen Lauf. Hier standen 90 Minuten, dann 60 - beide
+    // Male zu traege. In der Nacht zum 26.08. hat der Ausfall 119 Minuten
+    // gedauert, bis er gemeldet wurde.
+    if (alter > 35 * 60_000) {
+      // DIE URSACHE GLEICH MITLIEFERN.
+      //
+      // Experimentell belegt am 26.08.: Ein schwebender Hintergrundtask
+      // blockiert ALLE Cron-Jobs der Sitzung, bis er endet - und fuer
+      // Hintergrund-Bash gibt es keine Zeitobergrenze. Ausloeser war eine
+      // `until`-Warteschleife, die 2h56m auf eine Datei wartete, die es nie
+      // geben konnte; die erste Feuerung kam 45 Sekunden nach dem Kill.
+      //
+      // Alte bash-Prozesse sind deshalb der erste Verdacht. Sie taugen NICHT
+      // als eigener Alarm - die persistente Arbeits-Shell des Bash-Werkzeugs
+      // laeuft ebenfalls stundenlang und blockiert nichts. Zusammen mit einer
+      // stehenden Loop-Kette sind sie aber der entscheidende Hinweis.
+      let zusatz = "";
+      try {
+        const alteProzesse = await altebashProzesse(jetzt);
+        if (alteProzesse.length) {
+          zusatz = " Verdacht: " + alteProzesse.length + " alte(r) bash-Prozess(e),"
+            + " aeltester PID " + alteProzesse[0].pid + " seit "
+            + Math.round(alteProzesse[0].alterMin) + " min."
+            + " Ein haengender Hintergrundtask legt die Cron-Ebene still.";
+        }
+      } catch { /* Prozessliste nicht lesbar */ }
       befunde.push({
         typ: "loops",
         text: "Die Ueberwachungs-Loops melden sich seit " + minuten(alter)
-          + " min nicht mehr - Sitzung beendet oder Cron abgelaufen."
-          + " In Claude Code '/bb-loops' aufrufen.",
+          + " min nicht mehr - Sitzung beendet, Cron abgelaufen oder blockiert."
+          + zusatz + " In Claude Code '/bb-loops' aufrufen.",
       });
     }
   } catch {

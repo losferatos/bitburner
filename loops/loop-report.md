@@ -71,4 +71,24 @@ Regeln für den Bericht:
 
 **Der erste Bericht des Tages (5:00 Uhr) ist ein Nachtbericht.** Zwischen 22:30 und 5:00 wird nicht berichtet — Eric schläft. Der 5-Uhr-Lauf deckt deshalb die ganze Nacht ab: Im Rückblick gehört dazu, was in den sieben Stunden passiert ist (Rangzuwachs, Resets, BitNode-Wechsel, was die Wache eingegriffen hat — nachzulesen in `git log --since="8 hours ago"` und im Abschnitt „Erledigt" von `nodes/BAUSTELLEN.md`). Dafür darf er 20 statt 16 Zeilen haben.
 
+**Hintergrundtasks legen die Loops still — harte Regel, experimentell belegt.**
+Ein schwebender Hintergrundtask (`run_in_background`-Bash oder Monitor)
+blockiert ALLE Cron-Jobs der Sitzung bis zu seinem Ende, und verpasste
+Feuerungen verfallen ersatzlos. Das `timeout` gilt fuer Hintergrund-Bash
+NICHT - dort gibt es keine Obergrenze. In der Nacht zum 26.08. hat das die
+Loops zwei Stunden stillgelegt: Eine `until`-Warteschleife wartete auf eine
+Datei, die es nie geben konnte, und lief 2h56m. Die erste Feuerung kam 45
+Sekunden nach dem Kill des Prozesses.
+Deshalb:
+- Warteschleifen IMMER mit harter Grenze: `for i in $(seq 1 20); do ...;
+  sleep 30; done` statt `until <bedingung>`. Eine Bedingung, die nie eintritt,
+  wird so zum begrenzten Fehlschlag statt zur Endlosblockade.
+- Monitor nur mit knappem `timeout_ms`, **nie** `persistent: true`.
+- Wirklich lange Wartearbeit gar nicht als verfolgten Task starten, sondern
+  abgekoppelt (`nohup`, `Start-Process`) mit Datei-Polling durch die Loops.
+- Vor dem Turn-Ende pruefen, ob ein Task zurueckbleibt. Hilfe:
+  `powershell -NoProfile -Command "Get-CimInstance Win32_Process -Filter
+  \"Name='bash.exe'\" | Select-Object ProcessId,CreationDate"` - alles aelter
+  als eine halbe Stunde ist verdaechtig.
+
 Regeln: Systemzeit per `date`, nie schätzen. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf.

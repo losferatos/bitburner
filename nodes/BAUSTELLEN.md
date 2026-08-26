@@ -319,6 +319,50 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 
 ## Erledigt
 
+### Ein haengender Hintergrundtask legte die Loops zwei Stunden still (26.08., 06:02)
+
+Gemessen: Von 03:02 bis 05:10 feuerte kein einziger der vier Cron-Loops. Die
+Jobs existierten unveraendert (CronList um 05:10, Original-IDs), die Sitzung
+lebte, es gab keinen Compact und keinen Standby - der residente Waechter
+loggte luekenlos alle drei Minuten weiter, und der Bot lief durch (Rang 143
+auf 296).
+
+**Ursache, experimentell belegt** (drei Versuche in einer Fremdsitzung):
+Ein schwebender Hintergrundtask blockiert ALLE Cron-Jobs der Sitzung bis zu
+seinem Ende. Verpasste Feuerungen verfallen ersatzlos. Das `timeout`-Argument
+gilt fuer Hintergrund-Bash **nicht** - dort gibt es keine Obergrenze; ein Test
+mit `timeout: 15000` lief die vollen 45 Sekunden durch. Auch ein laufender
+Monitor blockiert; `persistent: true` waere neben Cron-Loops fatal.
+
+Ausloeser war eine eigene `until`-Warteschleife von 02:45, die auf
+`data/aktionen.jsonl` wartete - eine Datei, die es nie geben konnte, weil
+Bitburner die Endung ablehnt. Zwei bash-Prozesse liefen 2h56m.
+
+**Im eigenen Transcript nachgeprueft, die Vorhersage trifft:**
+
+    05:12:46  letzte Spur des manuellen /bb-loops
+       -      Wache 05:13 faellig: nichts. 05:33: nichts. Report 05:30: nichts.
+    05:41:05  Kill der haengenden Prozesse
+    05:41:50  erste Cron-Feuerung, 45 Sekunden spaeter
+
+**Behoben in drei Schritten:**
+1. Die Regel steht in allen vier Loop-Prompts (`loops/loop-*.md`):
+   Warteschleifen nur mit harter Grenze (`for i in $(seq 1 20)` statt
+   `until`), Monitor nur mit knappem `timeout_ms` und nie `persistent`, lange
+   Wartearbeit abgekoppelt starten.
+2. Der Totmannschalter im Waechter greift ab **35 statt 60 Minuten** - der
+   haeufigste Loop laeuft alle zwanzig. In der Nacht dauerte es 119 Minuten.
+3. Die Meldung nennt jetzt die wahrscheinliche Ursache: alte bash-Prozesse mit
+   PID und Alter. Sie taugen NICHT als eigener Alarm - die persistente
+   Arbeits-Shell des Bash-Werkzeugs laeuft ebenfalls stundenlang und blockiert
+   nichts -, zusammen mit einer stehenden Loop-Kette sind sie aber der
+   entscheidende Hinweis.
+
+**Verifiziert 06:03** gegen eine 40 Minuten alte Verlaufsdatei: "Die
+Ueberwachungs-Loops melden sich seit 40 min nicht mehr ... Verdacht: 1 alte(r)
+bash-Prozess(e), aeltester PID 23092 seit 848 min." Im Normalbetrieb still.
+
+
 ### Worker-Timer-Ersatz gegen die Drosselung (26.08., 01:45)
 Gebaut als `src/hacktimer.js`, dazu `src/timerzwang.js` als Schalter. Er
 haengt `window.setTimeout` an einen Web Worker, dessen Timer nicht gedrosselt

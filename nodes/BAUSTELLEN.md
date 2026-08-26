@@ -160,39 +160,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### blade.js hat kein Gegenmittel gegen leere Vertragsvorraete
-
-**Messung 26.08., 18:07:** `data/blade.json` zeigt Aktion
-"Contracts/Bounty Hunter", Chance **0,308**, Grund "Vertrag unter Schwelle,
-lohnt trotzdem" - `SICHER_VERTRAG` liegt bei 0,45. Der Tracking-Vorrat ist
-also wieder leer, und der Motor faehrt einen Vertrag mit knapp einem Drittel
-Erfolgschance. Die Rangrate liegt entsprechend bei **0,93 je Minute** (933 um
-17:37 auf 961 um 18:07) statt der gerechneten 1,339 fuer Tracking. Der Punkt
-kostet damit rund 30 Prozent Rangrate und ist keine Randnotiz.
-
-Zweimal an einem Nachmittag ist der Motor in "General/Training" gelandet, beide
-Male mit demselben Muster: keine Aktion ueber der Schwelle, also Rueckfall auf
-etwas, das keinen Rang bringt. Um 17:00 war die Schwelle zu hoch (0,80), um
-18:12 war der Vorrat leer (Tracking offen 0,4 bei Stufe 10). Beide Male wurde
-die Schwelle gesenkt - das ist Symptombehandlung.
-
-Die Ursache liegt tiefer: Vertraege und Operationen haben endliche Zahlen und
-wachsen nur langsam nach (Bladeburner.ts:1387-1390), waehrend Chaos mit jedem
-Einsatz steigt und passiv fast nicht faellt (0,0001/s, Bladeburner.ts:1397).
-Das Spiel hat dafuer zwei Werkzeuge, die `blade.js` nicht kennt:
-- **Incite Violence** fuellt die Vorraete sprunghaft auf (Bladeburner.ts:1221-1224)
-- **Diplomacy** senkt das Chaos (Bladeburner.ts:1185-1195)
-
-Ohne beide bleibt jede Schwellensenkung ein Aufschub: Irgendwann ist auch der
-letzte Vertrag leer, und dann faellt der Motor wieder in Training. Zu tun: beide
-Aktionen in die Auswahl aufnehmen - Incite Violence, wenn die Summe der offenen
-Vertragszahlen unter einen Schwellwert faellt, Diplomacy, wenn das Chaos der
-Arbeitsstadt eine Grenze ueberschreitet.
-
-**Dringlichkeit:** hoch. Es ist die Ursache hinter zwei bereits behobenen
-Symptomen, und sie tritt garantiert wieder auf.
-
-
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
@@ -258,6 +225,40 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Gegenmittel gegen leere Vertragsvorraete sind eingebaut (27.08., 00:50)
+
+**Verifiziert: kein einziger Training-Abschnitt in 483 gemessenen Abschnitten
+ueber 464 Minuten** (`tools/ratencheck.js`, 00:48). Genau das war das Symptom,
+das den Punkt ausgeloest hat - zweimal am 25.08. fiel der Motor auf
+"General/Training" durch, weil keine Aktion ueber der Schwelle lag.
+
+Beide geforderten Werkzeuge stehen in `blade.js`:
+- **Diplomacy** seit 26.08., 15:26 (`SPIEL_CHAOS_AN`, `CHAOS_EIN 50`,
+  `blade.js:93-95,692`) - schaltet ein, sobald das Chaos die Schwelle des
+  Spiels ueberschreitet, ab der alle Chancen mit `sqrt(1 + chaos - 50)`
+  faellt.
+- **Incite Violence** seit 26.08., 10:49 (`blade.js:872`, Grund
+  "Vertragsvorrat leer").
+
+**Der ehrliche Rest: Incite Violence hat nie ausgeloest** und ist am 26.08. um
+18:55 in HEBEL.md als heute schaedlich eingetragen worden - der Block greift
+nur unter Chaos 25, und Incite selbst hebt das Chaos um 10 plus
+`chaos/log10(chaos)`. Er bleibt stehen, weil er in einem Knoten mit niedrigem
+Chaos richtig ist.
+
+**Warum das Symptom trotzdem verschwunden ist:** Nicht durch die Gegenmittel,
+sondern weil die Chancen gestiegen sind. Gemessen 00:47: Tracking ist mit 0,6
+offenen Auftraegen weiterhin leergespielt, aber Bounty Hunter hat **686,5** und
+Retirement **493,0**, und ihre Chancen liegen bei 0,462 und 0,546 - beide ueber
+`SICHER_VERTRAG` 0,45. Der Faehigkeitsumbau vom 18:52 hat den Punkt praktisch
+miterledigt.
+
+**Was das fuer den naechsten Einbau heisst:** Fallen die Kampfwerte wieder auf
+1, rutschen die Chancen unter die Schwelle, und dann traegt allein der
+Notvertrag-Zweig ("Vertrag unter Schwelle, lohnt trotzdem"). Der ist seit dem
+25.08. drin und hat am 26.08. gehalten - der Motor fuhr Bounty Hunter mit 0,308
+statt in Training zu fallen.
 
 ### Die Erwartungswerte des Pruefers rechnen jetzt mit rankGain und Dauer (27.08., 00:20)
 

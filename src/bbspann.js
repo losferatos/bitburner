@@ -234,18 +234,94 @@ export async function main(ns) {
     faehigkeiten.push({ name, stufe, preis });
   }
 
+  // ALLE STAEDTE DURCHMESSEN, NICHT NUR DIE EIGENE (26.08.2026, 15:45).
+  //
+  // Um 14:49 stand die Division in Sector-12 bei Chaos 53,89, waehrend
+  // Chongqing 27,71 hatte - bei groesserer Population. Ein Wechsel waere
+  // Faktor 2,35 wert gewesen und haette nichts gekostet: `switchCity` setzt
+  // nur `bladeburner.city` (`NetscriptFunctions/Bladeburner.ts:314-319`).
+  //
+  // Was fehlte, war die Entscheidungsgrundlage. `getActionEstimatedSuccessChance`
+  // gilt immer fuer die AKTUELLE Stadt (`Actions/Action.ts:90-101` liest
+  // `bladeburner.getCurrentCity()`), also musste man hinwechseln, um zu
+  // messen - und niemand wechselt ins Blaue.
+  //
+  // Der Ausweg ist der Wechsel selbst: Er ist ein reines Feld-Setzen, und
+  // Netscript laeuft zwischen zwei `await` synchron. Diese Schleife enthaelt
+  // keines, also kann die Spielengine nicht dazwischen ticken - der Rundgang
+  // ist atomar, und am Ende steht die Division wieder dort, wo sie war.
+  //
+  // Gemessen wird die SPANNE, nicht nur die Chance. `getSuccessRange`
+  // (`Action.ts:144-165`) zentriert um die ECHTE Chance und setzt die Breite
+  // auf `|real - est|` - die Spanne ist damit ein direktes Mass dafuer, wie
+  // gut die Division eine Stadt kennt. Eine breite Spanne heisst: Der Motor
+  // wuerde dort nach `spanne().min` entscheiden und die Aktionen fuer
+  // schlechter halten, als sie sind.
+  const heimat = ns.bladeburner.getCity();
   const staedte = {};
   for (const stadt of ["Sector-12", "Aevum", "Volhaven", "Chongqing", "New Tokyo", "Ishima"]) {
     try {
+      let gewechselt = false;
+      if (stadt !== heimat) {
+        try { gewechselt = ns.bladeburner.switchCity(stadt); } catch { gewechselt = false; }
+      }
+      const proben = {};
+      if (stadt === heimat || gewechselt) {
+        // DREI EBENEN, WEIL DIE STADT NUR OBEN ZAEHLT (26.08.2026, 15:52).
+        //
+        // Tracking steht bei 0,83 und ist damit fast am Deckel: Die Chance
+        // klemmt bei 1 (`Action.ts:196`), also bringt eine bessere Stadt dort
+        // kaum noch etwas. Raid steht bei 0,10 und die naechste Black Op bei
+        // 0,03 - dort schlaegt jeder Faktor voll durch. Wer die Stadtwahl an
+        // Tracking misst, misst an der Aktion, die am wenigsten davon hat.
+        const messe = (typ, name, schluessel) => {
+          try {
+            const r = ns.bladeburner.getActionEstimatedSuccessChance(typ, name);
+            const lo = Array.isArray(r) ? r[0] : r, hi = Array.isArray(r) ? r[1] : r;
+            proben[schluessel] = { min: +lo.toFixed(4), max: +hi.toFixed(4),
+              spanne: +(hi - lo).toFixed(4) };
+          } catch { /* Aktion in dieser Stadt nicht schaetzbar */ }
+        };
+        for (const name of ["Tracking", "Bounty Hunter", "Retirement"]) {
+          messe("Contracts", name, name);
+        }
+        messe("Operations", "Raid", "Raid");
+        if (bo) messe("Black Operations", bo.name, "BlackOp");
+      }
       staedte[stadt] = {
+        proben,
         // Die Population ist der Grund fuer breite Spannen: Je weniger die
         // Division ueber die Synthoids einer Stadt weiss, desto unschaerfer
         // jede Schaetzung (Bladeburner.ts, getSuccessRange).
         popEst: Math.round(ns.bladeburner.getCityEstimatedPopulation(stadt)),
         chaos: +ns.bladeburner.getCityChaos(stadt).toFixed(2),
       };
+      // DIESE ZAHL IST WIDERLEGT - SIE STEHT NUR NOCH ALS WARNUNG DA
+      // (26.08.2026, 15:55).
+      //
+      // Sie rechnet die Guete einer Stadt aus Population und Chaos, so wie
+      // die Formeln es nahelegen: `(popEst/1e9)^0,7` in die competence
+      // (`Action.ts:90-91`), Chaos ueber 50 mit `sqrt(1 + chaos - 50)` in die
+      // Schwierigkeit (`:94-101`). Gemessen um 15:55 sagt sie das Gegenteil
+      // der tatsaechlichen Chancen: Chongqing hat die HOECHSTE Guete (1,415)
+      // und zugleich die NIEDRIGSTE Tracking-Chance der vier guten Staedte
+      // (0,771 gegen 0,854 in Volhaven).
+      //
+      // Der Grund ist `popEst` gegen `pop`. Die Guete rechnet mit der
+      // Schaetzung, die Chance mit der Wahrheit - und in einer Stadt, in der
+      // die Division selten arbeitet, ist die Schaetzung eben falsch.
+      //
+      // **Wer die Stadt waehlt, waehlt nach `proben`, nicht nach `guete`.**
+      const c = staedte[stadt].chaos;
+      staedte[stadt].guete = +(
+        Math.pow(staedte[stadt].popEst / 1e9, 0.7)
+        / (c > 50 ? Math.sqrt(1 + (c - 50)) : 1)
+      ).toFixed(3);
     } catch {}
   }
+  // ZURUECK, BEDINGUNGSLOS. Ein Messwerkzeug, das die Arbeitsstadt verstellt,
+  // waere schlimmer als gar keine Messung.
+  try { ns.bladeburner.switchCity(heimat); } catch {}
 
   ns.write("data/bbspann.json", JSON.stringify({
     zeit: Date.now(),

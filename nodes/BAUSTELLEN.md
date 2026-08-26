@@ -135,51 +135,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Die Arbeitsstadt wird nie gewechselt, obwohl es gratis ist
-
-Aufgefallen 26.08. um 15:15 beim Chaos-Befund. `blade.js` kennt keine
-Stadtwahl - der Motor bleibt, wo er einmal steht. Gemessen um 14:49 waren die
-sechs Staedte weit auseinander:
-
-    Stadt        Chaos   popEst     Guete = (pop/1e9)^0,7 / Chaosfaktor
-    Sector-12    53,89   1,50e9     1,331 / 2,21 = 0,602   <- Arbeitsstadt
-    Chongqing    27,71   1,64e9     1,412 / 1    = 1,412
-    New Tokyo    20,93   1,53e9     1,350 / 1    = 1,350
-    Volhaven     43,64   1,58e9     1,378 / 1    = 1,378
-    Aevum        37,72   7,48e8     0,821 / 1    = 0,821
-
-Die Guete folgt aus `Actions/Action.ts:90-101`: Die Population geht mit
-`(pop/1e9)^0,7` in die competence ein (`PopulationThreshold` 1e9,
-`PopulationExponent` 0,7), das Chaos ueber 50 mit `sqrt(1 + chaos - 50)` in die
-Schwierigkeit. **Chongqing war in diesem Moment 2,35-mal besser als
-Sector-12** - in beiden Groessen zugleich.
-
-**Der Wechsel ist gratis.** `ns.bladeburner.switchCity` setzt nur
-`bladeburner.city` (`NetscriptFunctions/Bladeburner.ts:314-319`) - keine
-Reisegebuehr, keine Zeit, kein Ortswechsel der Spielfigur. Das ist etwas
-anderes als eine Reise; die Bladeburner-Stadt ist von `getPlayer().city`
-unabhaengig (deshalb meldete der Strategiepruefer "Aevum", waehrend die
-Division in Sector-12 arbeitete).
-
-**Der Haken, und er ist ernst:** Die Erfolgsschaetzung nutzt `popEst`, nicht
-die echte Population. In einer Stadt, in der die Division noch nie gearbeitet
-hat, ist die Schaetzung unscharf, die Spanne breit - und `blade.js` entscheidet
-nach `spanne().min`. Der Motor koennte nach dem Wechsel in Field Analysis
-landen, bis die Schaetzung steht. Das ist selbstheilend, kostet aber Zeit, und
-wie viel, ist unbekannt.
-
-**Zu tun:**
-1. Die Spannen der anderen Staedte messen, bevor gewechselt wird. `bbspann.js`
-   liest bisher nur `popEst` und `chaos` je Stadt - die Erfolgsspannen gelten
-   nur fuer die aktuelle. Ohne diese Zahl ist der Haken oben nicht bezifferbar.
-2. Erst danach eine Stadtwahl bauen, und dann mit Hysterese: Ein Wechsel, der
-   bei jedem Chaos-Zucken zurueckspringt, verliert mehr durch unscharfe
-   Schaetzungen, als er gewinnt.
-
-**Dringlichkeit:** hoch. Faktor 2,35 auf die Erfolgschance, kostenlos - das ist
-in derselben Groessenordnung wie der Raid-Hebel, aber ohne dessen Geldproblem.
-
-
 ### Wartet bis Eric entscheidet: Raid bringt die dreifache Zyklusrate
 
 **Blockiert seit 14:20.** Alles Messbare ist gemessen (Punkte 1, 2 und 2b unten
@@ -565,6 +520,54 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Stadtwechsel-Hebel ist geprueft und verworfen (26.08., 15:55)
+
+Eingetragen um 15:28 mit **hoher** Dringlichkeit und der Zahl "Faktor 2,35".
+Gemessen 27 Minuten spaeter: **Der Hebel existiert praktisch nicht.**
+
+Um die Staedte ueberhaupt vergleichen zu koennen, misst `src/bbspann.js` jetzt
+alle sechs durch. Das geht, weil `switchCity` nur `bladeburner.city` setzt
+(`NetscriptFunctions/Bladeburner.ts:314-319`) und Netscript zwischen zwei
+`await` synchron laeuft: Die Schleife enthaelt keines, der Rundgang ist damit
+atomar, und am Ende steht die Division wieder in ihrer Stadt.
+
+    Stadt        Chaos  Guete   Tracking   Raid     Operation Typhoon
+    Chongqing    27,36  1,415   0,7712     0,1148   0,0331
+    Volhaven     43,29  1,375   0,8539     0,1271   0,0349
+    New Tokyo    25,91  1,348   0,8368     0,1245   0,0349
+    Sector-12    46,91  1,331   0,8265     0,1230   0,0349   <- Arbeitsstadt
+    Ishima       39,61  0,863   0,5359     0,0798   0,0349
+    Aevum        37,38  0,816   0,5068     0,0754   0,0349
+
+**Drei Befunde, jeder fuer sich das Gegenteil der Erwartung:**
+
+1. **Die Black Op ist in allen Staedten gleich** (0,0349, Chongqing 0,0331).
+   Fuer die Aktion, an der der Ausgang des Knotens haengt, ist die Stadtwahl
+   ohne Wirkung.
+2. **Bei Raid liegt Volhaven 3 Prozent vor Sector-12**, Chongqing sogar
+   darunter. Kein Hebel, sondern Rauschen.
+3. **Die Guete-Formel ist widerlegt.** Chongqing hat die hoechste Guete
+   (1,415) und die niedrigste Tracking-Chance der vier guten Staedte. Der
+   Grund ist `popEst` gegen `pop`: Die Formel rechnet mit der Schaetzung, die
+   Chance mit der Wahrheit. Die Zahl bleibt in `bbspann.json` stehen, aber mit
+   einer Warnung im Code - **wer die Stadt waehlt, waehlt nach `proben`.**
+
+**Warum der Faktor 2,35 trotzdem richtig gemessen war:** Er galt um 14:49, als
+Sector-12 bei Chaos 53,89 stand. Diplomacy hat das seit 15:26 auf 46,9
+gedrueckt, und damit ist der Faktor `sqrt(1 + chaos - 50)` auf exakt 1
+zurueckgefallen. **Der Stadtwechsel waere ein Ausweichen vor einem Problem
+gewesen, das inzwischen an der Wurzel behoben ist.**
+
+Die Befuerchtung aus dem Auftrag - in einer fremden Stadt sei die Schaetzung
+so unscharf, dass der Motor in Field Analysis landet - ist ebenfalls
+widerlegt: Die Tracking-Spannen liegen in den vier guten Staedten zwischen
+0,107 und 0,174, Chongqing hat sogar die schmalste.
+
+**Was bleibt:** Die Messung selbst. Sollte das Chaos einer Stadt je wieder
+davonlaufen, waehrend Diplomacy nicht hinterherkommt, steht die Grundlage fuer
+einen Wechsel jetzt in `data/bbspann.json` - je Stadt, je Aktion, mit Spanne.
+
 
 ### Chaos ueber 50 halbierte alle Erfolgschancen - Diplomacy fehlte (26.08., 15:26)
 

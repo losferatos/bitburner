@@ -99,6 +99,7 @@ export async function main(ns) {
   const RAID_CHAOS_MAX = 50;
   const RAID_CHANCE_MIN = 0.08;
   const RAID_VORRAT_MIN = 3;
+  const RAID_CHARISMA_MIN = 1200;
   let chaosAufraeumen = false;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
@@ -681,10 +682,40 @@ export async function main(ns) {
     // das richtige Ergebnis geliefert. Genau dieser Fehler hat am 26.08. um
     // 12:55 einen falschen Auftrag erzeugt. Solange `beste()` brutto rechnet,
     // entscheiden hier feste Grenzen - das ist ehrlicher.
+    // WARUM EINE CHARISMA-SCHWELLE (26.08.2026, 16:50)
+    //
+    // Raid erzeugt selbst das Chaos, das ihn ausbremst:
+    // `city.changeChaosByPercentage(getRandomIntInclusive(1, 5))` je Durchlauf,
+    // unabhaengig von Erfolg (`Bladeburner.ts:846`). Im Mittel 3 Prozent auf
+    // 56 Sekunden Laufzeit, also **+3,21 Prozent je Minute**.
+    //
+    // Dagegen haelt nur Diplomacy: 60 Sekunden, keine Ausdauer, keine
+    // Erfahrung, senkt das Chaos um `charisma^0,045 + charisma/1000` Prozent
+    // (`Bladeburner.ts:737-745`, `:1188-1189`). Beide Groessen sind prozentual,
+    // das Verhaeltnis ist damit chaos-unabhaengig, und der Raid-Anteil im
+    // Gleichgewicht ist `D / (D + 3,21)` mit D = Diplomacy-Prozent je Minute.
+    //
+    // D haengt allein am Charisma, und der lineare Term regiert:
+    //
+    //   Charisma    D/min   Raid-Anteil   effektive Zyklusrate (3,791 x Anteil)
+    //        100     1,33         29,3%                            1,11
+    //      1.200     2,58         44,5%                            1,69
+    //      5.000     6,47         66,8%                            2,53
+    //
+    // Tracking liefert 1,115. Bei Charisma 100 ist Raid also NICHT besser -
+    // er kostet nur zusaetzlich rund 37 Millionen je Minute an
+    // Krankenhausrechnungen. Der Gleichstand liegt bei D = 1,337, also knapp
+    // ueber Charisma 100; ein Vorsprung von 50 Prozent erst bei rund 1.150.
+    // Daher die Schwelle 1.200 - darunter faehrt der Motor weiter Tracking.
+    //
+    // Die alte Erwartung "Faktor 3,4" (BAUSTELLEN.md, 13:22) galt fuer einen
+    // Raid-Anteil von 97 Prozent und hat die Chaos-Gegenkraft nicht gerechnet.
     if (RAID_AN) {
       const rc = spanne(O, "Raid");
-      const raidGeld = ns.getPlayer().money;
+      const raidSpieler = ns.getPlayer();
+      const raidGeld = raidSpieler.money;
       if (raidGeld > RAID_GELD_MIN
+        && raidSpieler.skills.charisma > RAID_CHARISMA_MIN
         && chaosLage() < RAID_CHAOS_MAX
         && rc.min > RAID_CHANCE_MIN
         && offen(O, "Raid") > RAID_VORRAT_MIN) {

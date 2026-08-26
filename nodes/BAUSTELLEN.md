@@ -37,6 +37,53 @@ Regeln:
 
 ### Raid einbauen - dreifache Zyklusrate, Guthabengrenze als Notbremse (16:05)
 
+**Geaendert 16:15 und 16:50, Wirkung noch nicht gemessen.** Der Einbau steht
+(`src/blade.js`, Commit 3240793 und der folgende), gemessen ist er nicht - um
+16:31 kam ein Augmentierungs-Einbau dazwischen, das Guthaben liegt seither bei
+-281.147 Dollar und `RAID_GELD_MIN = 2e9` greift damit gar nicht. Die
+30-Minuten-Messung aus Punkt 2 faellt fruehestens an, wenn die Kampfwerte
+wieder bei 100 stehen und das Guthaben zwei Milliarden erreicht hat.
+
+**Die Abnahmeschwelle aus Punkt 2 ist falsch und wird hiermit korrigiert
+(16:50).** Dort steht "erwartet wird eine Zyklusrate ueber 2,5". Diese Zahl
+rechnet die Chaos-Gegenkraft nicht mit, und wer spaeter danach misst, dreht
+eine funktionierende Aenderung an einer unerreichbaren Zahl zurueck.
+
+Raid erzeugt selbst das Chaos, das ihn ausbremst:
+`city.changeChaosByPercentage(getRandomIntInclusive(1, 5))` je Durchlauf,
+unabhaengig von Erfolg (`Bladeburner.ts:846`). Im Mittel 3 Prozent auf 56
+Sekunden Laufzeit, also **+3,21 Prozent je Minute**. Dagegen haelt nur
+Diplomacy: 60 Sekunden, keine Ausdauer, **keine Erfahrung**
+(`data/GeneralActions.ts:37-44`), senkt das Chaos um
+`charisma^0,045 + charisma/1000` Prozent (`Bladeburner.ts:737-745`,
+`:1188-1189`). Beide Groessen sind prozentual, das Verhaeltnis ist damit
+chaos-unabhaengig, und der Raid-Anteil im Gleichgewicht betraegt
+`D / (D + 3,21)` mit D = Diplomacy-Prozent je Minute.
+
+D haengt allein am Charisma, und der lineare Term regiert:
+
+    Charisma    D/min   Raid-Anteil   effektive Zyklusrate (3,791 x Anteil)
+         100     1,33         29,3%                            1,11
+       1.200     2,58         44,5%                            1,69
+       5.000     6,47         66,8%                            2,53
+
+Tracking liefert 1,115. **Bei niedrigem Charisma ist Raid nicht besser** - er
+kostet nur zusaetzlich rund 37 Millionen je Minute an Krankenhausrechnungen.
+Der Gleichstand liegt bei D = 1,337, also knapp ueber Charisma 100; ein
+Vorsprung von 50 Prozent erst bei rund 1.150.
+
+**Umgesetzt (16:50):** `RAID_CHARISMA_MIN = 1200` in `src/blade.js`, als
+fuenfte Bedingung neben Guthaben, Chaos, Chance und Vorrat. blade.js wurde
+ueber `data/reload.txt` neu gestartet.
+
+**Neue Abnahmeschwelle:** Zyklusrate ueber **1,60** bei Charisma um 1.200,
+gemessen ueber 30 Minuten aus `data/aktionen.txt`. Traegt sie nicht, oder
+faellt das Guthaben schneller als 15 Millionen je Minute: `RAID_AN = false`.
+
+**Offen geblieben:** Charisma ist damit ein Hebel, den niemand bedient - es
+waechst nicht durch Bladeburner-Arbeit. Ob sich gezieltes Charisma-Training
+rechnet, steht als eigener Punkt unter `## Offen`.
+
 **Nicht mehr blockiert.** Der Punkt stand vier Laeufe lang auf "Wartet bis Eric
 entscheidet". Eric hat das am 26.08. um 16:05 zurueckgewiesen: **Die Loops
 entscheiden selbst, und aus einer belegten Erkenntnis wird ein unmittelbarer
@@ -271,6 +318,28 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Charisma ist ein unbedienter Hebel auf die Raid-Zyklusrate
+
+Aus der Chaos-Rechnung im Sofort-Punkt folgt: Der Raid-Anteil im Gleichgewicht
+ist `D / (D + 3,21)` mit `D = charisma^0,045 + charisma/1000`. Von Charisma
+1.200 auf 5.000 steigt die effektive Zyklusrate von 1,69 auf 2,53 - **plus 50
+Prozent auf den Traeger des Knotens**, allein aus einem Wert, den bisher kein
+Werkzeug ansteuert.
+
+Charisma waechst nicht durch Bladeburner-Arbeit: Diplomacy hat keine
+Erfahrungsfelder (`data/GeneralActions.ts:37-44`), und die Kampfaktionen geben
+nur Kampferfahrung. Es kaeme aus Uni-Kursen (Leadership), Firmenarbeit oder
+Verbrechen.
+
+**Zu messen, bevor irgendetwas gebaut wird:** Was kostet Charisma 1.200 -> 5.000
+an Zeit und Geld, gegen die 50 Prozent Zyklusrate, die es bringt? Die
+Uni-Kurse ignorieren die Fokus-Strafe vollstaendig (`Work/ClassWork.tsx` kennt
+`focusPenalty` nicht), kosten aber Geld und pruefen den Kontostand nicht.
+Gegenrechnung: Dieselbe Zeit in Kampfwert-Training gesteckt hebt die
+Erfolgschance und damit `netto/min` direkt.
+
+Gefunden 26.08.2026, 16:50, beim Einbau der Charisma-Schwelle.
 
 ### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 

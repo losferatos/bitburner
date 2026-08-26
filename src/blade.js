@@ -93,6 +93,12 @@ export async function main(ns) {
   const CHAOS_EIN = 50;
   const CHAOS_AUS = 47;
   const SPIEL_CHAOS_AN = true;
+  // Raid. Die Zahlen sind bei der Auswahl unten hergeleitet.
+  const RAID_AN = true;
+  const RAID_GELD_MIN = 2e9;
+  const RAID_CHAOS_MAX = 50;
+  const RAID_CHANCE_MIN = 0.08;
+  const RAID_VORRAT_MIN = 3;
   let chaosAufraeumen = false;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
@@ -625,6 +631,65 @@ export async function main(ns) {
       if (chaosAufraeumen) {
         return { typ: G, name: "Diplomacy",
           grund: "Chaos " + chaosLage().toFixed(1) };
+      }
+    }
+
+    // RAID - DIE EINZIGE OPERATION, DIE SICH RECHNET (26.08.2026, 16:20).
+    //
+    // `SICHER_OPERATION` steht auf 0,85 und schliesst damit die gesamte
+    // Aktionsklasse aus: Alle sechs Operationen liegen zwischen 0,04 und 0,19.
+    // Fuer fuenf von ihnen ist das richtig - Assassination hat bei diesen
+    // Chancen einen NEGATIVEN Erwartungswert (-0,72 je Minute), Stealth
+    // Retirement einen von null. Raid ist die Ausnahme, und zwar deutlich.
+    //
+    // Gemessen 16:14 ueber `data/bbspann.json`:
+    //
+    //     Raid       Chance 0,123   55 Rang   56 s   Zyklusrate 4,86
+    //     Tracking   Chance 0,725    0,3      15 s   Zyklusrate 1,20
+    //
+    // Der Grund liegt nicht im Rangertrag allein, sondern in der DAUER: Der
+    // Ausdauerverlust faellt je AKTION an (`Bladeburner.ts:921`), und Raid
+    // verteilt seine 2,20 Punkte auf 56 Sekunden. Das sind 2,36 je Minute
+    // gegen eine Regeneration von 2,31 - der Arbeitsanteil steigt von 44 auf
+    // 99 Prozent. Tracking verbraucht 5,18 je Minute und muss mehr als die
+    // Haelfte der Zeit ruhen.
+    //
+    // DREI BEDINGUNGEN, UND JEDE HAT EINE GEMESSENE ZAHL DAHINTER:
+    //
+    // *Guthaben.* Raids Schaden ist `50 * difficultyMultiplier` = 397
+    // Trefferpunkte, das Maximum liegt bei 25 - also Krankenhaus bei jedem
+    // Fehlschlag. Die Kosten sind `min(Geld * 0,1, (max - current) * 100.000)`
+    // (`Hospital.ts:4-10`), hier 39,7 Millionen je Misserfolg, rund 37 je
+    // Minute. Gemessen mit `geld.js` kommen 25,7 Millionen je Minute herein.
+    // Das Defizit ist selbstbegrenzend - faellt das Guthaben, greift der
+    // Deckel `Geld * 0,1` -, aber unterhalb von zwei Milliarden soll der Bot
+    // wieder Vertraege fahren koennen, ohne dass ein Portprogramm oder eine
+    // Serveraufruestung daran scheitert.
+    //
+    // *Chaos.* Ueber 50 wird die Schwierigkeit mit `sqrt(1 + chaos - 50)`
+    // multipliziert (`Actions/Action.ts:94-101`). Bei halbierter Chance kippt
+    // Raids Erwartungswert schnell - siehe die naechste Bedingung.
+    //
+    // *Erfolgschance.* Der Erwartungswert je Versuch ist
+    // `p * 55 - (1 - p) * 2,5` und wird bei **p = 0,0435** negativ. Die
+    // Grenze 0,08 haelt den doppelten Abstand dazu.
+    //
+    // ES WIRD BEWUSST NICHT MIT DEM BESTEN VERTRAG VERGLICHEN. `beste()`
+    // rechnet einen BRUTTOertrag ohne Levelfaktor und ohne Rangverlust; ein
+    // Vergleich auf dieser Grundlage haette Raid mit 7,25 gegen 0,87
+    // bewertet statt mit 4,90 gegen 2,51 und damit aus dem falschen Grund
+    // das richtige Ergebnis geliefert. Genau dieser Fehler hat am 26.08. um
+    // 12:55 einen falschen Auftrag erzeugt. Solange `beste()` brutto rechnet,
+    // entscheiden hier feste Grenzen - das ist ehrlicher.
+    if (RAID_AN) {
+      const rc = spanne(O, "Raid");
+      const raidGeld = ns.getPlayer().money;
+      if (raidGeld > RAID_GELD_MIN
+        && chaosLage() < RAID_CHAOS_MAX
+        && rc.min > RAID_CHANCE_MIN
+        && offen(O, "Raid") > RAID_VORRAT_MIN) {
+        return { typ: O, name: "Raid",
+          grund: "Raid, Chance " + rc.min.toFixed(3) };
       }
     }
 

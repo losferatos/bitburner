@@ -24,34 +24,6 @@ Regeln:
 
 ## Sofort
 
-### Sieben Milliarden sind in achtzig Minuten verschwunden (08:16)
-Gemessen: `strategie-check` meldete um 07:46 ein Guthaben von 8.985m, um 08:15
-noch **1.870m**. Der home-Speicher ist unveraendert bei 1.024 GB, es gab also
-weder einen Serverkauf auf home noch einen Reset.
-Erwartet: Ein steigendes Guthaben - das Netz wirft laufend ab.
-Verdacht, in dieser Reihenfolge:
-1. `bn4rep.js` hat Reputation gespendet oder Augmentierungen gekauft. Das
-   waere gewollt und wuerde einen Einbau ankuendigen. `data/bn4rep.json` ist
-   allerdings von gestern 17:05 - das Werkzeug schreibt seine Telemetrie nicht
-   mehr fort, und das ist selbst ein Befund.
-2. Gekaufte Server (`homegrow.js`) - die tauchen im home-Speicher nicht auf.
-3. **Der Krankenhaus-Hebel von 06:55.** Rechnerisch unwahrscheinlich: Die
-   Kosten sind `min(Guthaben * 0,1, fehlendeHP * 100.000)`, das Maximum liegt
-   bei 23 Trefferpunkten also bei 2,3 Millionen je Heilung. Sieben Milliarden
-   waeren dreitausend Heilungen in achtzig Minuten. Ausschliessen laesst es
-   sich aber erst, wenn blade.js die Kosten mitprotokolliert.
-Zu tun: `data/bn4rep.json` wieder frisch bekommen (Werkzeug laeuft laut ps.json,
-schreibt aber nicht), und in blade.js die Summe der Krankenhauskosten
-mitzaehlen. Erst dann ist die Frage entschieden.
-
-
-*Alle drei Punkte tragen "Wartet bis" und werden vom Vorankommens-Loop
-uebersprungen - nicht weil sie unwichtig waeren, sondern weil sie an ein
-Ereignis gebunden sind, das noch nicht eingetreten ist. Zwei brauchen den
-naechsten Augmentierungs-Einbau als Pruefstein, einer Erics Freigabe fuer
-`src/bn4net.js`. Ohne diese Kennzeichnung stuende jeder Lauf vor derselben
-Wand, statt die Liste weiter abzuarbeiten (gekennzeichnet 26.08., 00:44).*
-
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
@@ -424,6 +396,35 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Sieben Milliarden auf einen Schlag - kein Leck, ein Kauf (26.08., 08:50)
+Gemessen im Verlauf: 07:55 noch 8,98 Mrd, 08:15 nur 1,87 Mrd - **7,11
+Milliarden in einem Schritt.** Danach stieg das Guthaben sofort wieder normal
+(+0,38 Mrd in zwanzig Minuten). Ein einmaliger Kauf also, kein laufendes Leck.
+
+**Damit ist der Krankenhaus-Hebel von 06:55 entlastet.** Er kostet
+`min(Guthaben * 0,1, fehlendeHP * 100.000)`, bei 23 Trefferpunkten hoechstens
+2,3 Millionen je Heilung - und er wuerde KONTINUIERLICH kosten, nicht in einem
+Sprung. Das Guthaben waechst seither ungestoert.
+
+Nicht der Grund waren auch die vier gekauften Server `werk-1` bis `werk-4`
+(`data/werkbank.json`, je 128 GB): Bei rund 55.000 je GB sind das etwa 28
+Millionen zusammen.
+
+Gemessen mit dem neuen `src/augcheck.js` (liest `getOwnedAugmentations`):
+elf eingebaute Augmentierungen, **eine wartende** (Cranial Signal Processors -
+Gen II, Grundpreis 0,12 Mrd). Der bezahlte Preis liegt hoeher - jede weitere
+Augmentierung im selben Zyklus kostet das 1,9-fache -, aber Faktor 58 waere
+viel. Der wahrscheinlichste Rest ist eine **Spende an eine Faktion**:
+`bn4rep.js` fuehrt eine `spendenSchwelle` und kauft Reputation gegen Geld,
+und Spenden tauchen in keinem Inventar auf.
+
+**Restunsicherheit bleibt.** Endgueltig bewiesen ist es nicht - `bn4rep.json`
+stand seit gestern 17:05 still, und das ist KEIN Defekt: Das Skript steigt an
+mehreren Stellen aus der Runde aus, bevor es seine Telemetrie schreibt (der
+Kommentar bei `bn4rep.js:357-363` sagt es selbst). Wer die Frage abschliessend
+klaeren will, muss bn4rep an diesen Ausstiegen protokollieren lassen.
+
 
 ### Ein haengender Hintergrundtask legte die Loops zwei Stunden still (26.08., 06:02)
 

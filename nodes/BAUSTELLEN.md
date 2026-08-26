@@ -135,57 +135,80 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Raid bringt anderthalbfachen Ertrag und wird nie gefahren
+### Raid bringt die dreifache Zyklusrate - der Blocker ist Geld, nicht HP
 
-**Korrigiert 13:05 - der Eintrag von 12:55 nannte das Siebenfache und war
-falsch.** Die Zahl kam aus `data/bbspann.json`, und das Werkzeug rechnete
-einen Bruttoertrag ohne Levelfaktor und ohne Rangverlust. Beides ist seit
-13:05 behoben (siehe `nodes/HEBEL.md`). Richtig gerechnet, gemessen 13:05:
+**Dritte Korrektur dieses Punktes, und diesmal mit der richtigen Kennzahl
+(13:22).** 12:55 stand hier "das Siebenfache" (Bruttoertrag, falsch), 13:05
+"anderthalbfach" (netto je Minute, richtig gerechnet aber die falsche Groesse).
+Beide Male fehlte die Ausdauer.
 
-    Aktion                 Stufe  Chance   netto/min   HP je Misserfolg
-    Raid                       1   0,103       3,669               44,9
-    Tracking                  29   0,700       2,425                0,2   <- gefahren
-    Retirement                16   0,434       1,828                0,6
-    Bounty Hunter             12   0,363       1,783                0,6   <- gefahren
-    Undercover Operation       1   0,225       1,166                1,6
-    Investigation              1   0,271       0,965                0,0
-    Sting Operation            1   0,142       0,461                2,1
-    Stealth Retirement         1   0,087       0,077                9,1
-    Assassination              1   0,055      -0,772                4,7
+**Der Ausdauerverlust faellt JE AKTION an** (`Bladeburner.ts:921`), nicht je
+Zeit. Eine lange Aktion verteilt denselben Verlust auf mehr Minuten und
+braucht deshalb weniger Kammerzeit. Das kehrt die Rangfolge um. Gemessen im
+Spiel um 13:22 ueber `data/bbspann.json`, das die Rechnung jetzt selbst fuehrt:
 
-Der Grund, warum keine Operation gefahren wird, steht in `src/blade.js:48`:
-`SICHER_OPERATION = 0.85`, waehrend `SICHER_VERTRAG` seit dem 25.08. auf 0,45
-steht. Keine Operation kommt je in die Naehe von 0,85.
+    Aktion                  Stufe  Chance  netto/min  Aus/min  Arbeit  Zyklus
+    Raid                        1   0,107      3,891     2,36   97,4%   3,791
+    Bounty Hunter              13   0,362      1,859     3,65   63,1%   1,173
+    Tracking                   29   0,725      2,513     5,18   44,4%   1,115   <- gefahren
+    Retirement                 16   0,450      1,895     4,25   54,1%   1,025
+    Undercover Operation        1   0,233      1,231     3,16   72,8%   0,896
+    Investigation               1   0,280      1,013     3,30   69,7%   0,706
+    Sting Operation             1   0,147      0,500     2,65   86,7%   0,434
+    Stealth Retirement          1   0,090      0,140     2,07  100,0%   0,140
+    Assassination               1   0,057     -0,717     1,65  100,0%  -0,717
 
-**Vier der sechs Operationen sind bei diesen Chancen wertlos oder schaedlich.**
-Assassination hat einen negativen Erwartungswert, Stealth Retirement einen von
-null. Eine pauschale Senkung von `SICHER_OPERATION` waere deshalb falsch - die
-Schwelle muesste durch dieselbe Ertragsrechnung ersetzt werden, die blade.js
-fuer Vertraege schon fuehrt.
+Raid verbraucht **2,36 Ausdauer je Minute** - knapp unter der Regeneration von
+2,3, gemessen am 26.08. um 12:21. Der Arbeitsanteil steigt damit von 44 auf
+97 Prozent: **Raid braucht praktisch keine Kammerzeit.** Faktor 3,4 gegen die
+gefahrene Aktion.
 
-**Der Blocker ist Raids HP-Schaden.** 50 Trefferpunkte je Misserfolg
-(`data/Operations.ts:126`) bei einem Maximum von 25 heisst: **jeder einzelne
-Fehlschlag fuehrt ins Krankenhaus**, und bei 10 Prozent Erfolgschance ist das
-neun von zehn Versuchen.
+**Der HP-Schaden ist KEIN Blocker** (geklaert 13:15). `hospitalize()` setzt HP
+auf max, zieht Geld ab und feuert `PlayerEventType.Hospitalized`
+(`PlayerObjectGeneralMethods.ts:281-290`). Auf dieses Ereignis hoert im ganzen
+Spiel **nur die Infiltration** (`Infiltration/Infiltration.ts:83`) - die
+laufende Bladeburner-Aktion wird nicht abgebrochen. Ein Raid-Misserfolg kostet
+also Geld, aber keine Zeit. Nebeneffekt: Nach der Heilung sind die
+Trefferpunkte voll, die HP-Ruhe entfaellt bei Raid vollstaendig.
 
-**Zu tun, in dieser Reihenfolge:**
-1. Klaeren, ob eine Hospitalisierung die laufende Bladeburner-Aktion abbricht
-   (`person.takeDamage`, `Bladeburner.ts:983-989`). Wenn ja, ist Raid
-   unfahrbar, bis die Trefferpunkte deutlich ueber 50 liegen - dann faellt der
-   Punkt auf "Defense trainieren" zurueck.
-2. Den Ausdauerverbrauch je Raid messen. Bei einem Motor, dessen Engpass die
-   Ausdauer ist, ist Rang je AUSDAUERPUNKT die Kennzahl, nicht Rang je Minute.
-3. Erst dann die Schwellenlogik anfassen - und dann fuer Raid allein, nicht
-   fuer die Klasse.
+**Der Blocker ist das Guthaben.** Raids Schaden ist
+`50 * difficultyMultiplier` = 50 * (800^0,28 + 800/650) = **397 Trefferpunkte**
+je Misserfolg. Die Krankenhauskosten sind
+`min(Geld * 0,1, (max - current) * 100.000)` (`Hospital.ts:4-10`), und weil
+`current` auf -372 faellt, sind das 39,7 Millionen je Misserfolg - **unabhaengig
+von den maximalen Trefferpunkten**, solange diese unter 397 liegen. Bei 0,93
+Misserfolgen je Minute macht das **rund 37 Millionen je Minute**.
 
-**Nebenbefund, der eigenstaendig zaehlt:** Die Operationen stehen alle auf
-**Stufe 1**, die Vertraege auf 12 bis 29. Eine Operationsstufe zahlt 7 bis 14
-Prozent mehr Ertrag (`rewardFac` 1,07 bis 1,14) gegen 4,1 Prozent bei
-Tracking. Eine hochgespielte Operation waere langfristig die deutlich bessere
-Rangquelle.
+Dagegen steht das gemessene Einkommen: 6.667m um 12:16, 8.188m um 13:00, also
+**34,6 Millionen je Minute**. Raid waere um rund 2,4 Millionen je Minute
+defizitaer.
 
-**Dringlichkeit:** mittel (herabgestuft von hoch). Der Faktor ist 1,5, nicht 7,
-und er ist durch den HP-Schaden blockiert.
+**Das ist weniger schlimm, als es klingt, und es ist selbstbegrenzend.** Bei
+8 Milliarden Guthaben reicht der Puffer rechnerisch 55 Stunden, und in dieser
+Zeit brachte Raid rund 12.500 Rang - das Fuenffache dessen, was die erste
+Black Op verlangt. Faellt das Guthaben, greift der Deckel `Geld * 0,1`: Bei
+100 Millionen kostet eine Heilung nur noch 10 Millionen. Das System pendelt
+sich ein, statt zu kollabieren.
+
+**Zu tun - und das ist bewusst KEIN Nebenbei-Eingriff:**
+1. ~~Klaeren, ob eine Hospitalisierung die Aktion abbricht.~~ **Erledigt
+   13:15: nein.**
+2. ~~Den Ausdauerverbrauch je Operation messen.~~ **Erledigt 13:22**, die
+   Rechnung steht jetzt dauerhaft in `src/bbspann.js`.
+3. Offen: Die Umstellung selbst. Sie ersetzt die feste Schwelle
+   `SICHER_OPERATION = 0.85` (`src/blade.js:48`) durch dieselbe
+   Ertragsrechnung, die blade.js fuer Vertraege schon fuehrt - erweitert um
+   den Arbeitsanteil. **Vorschlag zur Stufung:** Raid nur fahren, solange das
+   Guthaben ueber einer Grenze liegt (etwa 2 Milliarden), darunter zurueck auf
+   Vertraege. Damit ist der Geldpuffer die Regelgroesse und nicht das Risiko.
+
+**Warum es hier steht und nicht schon umgesetzt ist:** Der Umbau greift in den
+Kern der Aktionsauswahl und tauscht Geld gegen Rang - eine Abwaegung, die die
+Augmentierungen und den Serverkauf betrifft. Das gehoert vorgelegt, nicht
+nebenbei entschieden.
+
+**Dringlichkeit:** hoch. Faktor 3,4 auf den Traeger des Knotens ist der
+groesste belegte Hebel, der derzeit offen liegt.
 
 
 ### Der Faehigkeitsplan hatte den zweiten Platz noch falsch besetzt

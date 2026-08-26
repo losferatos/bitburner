@@ -80,6 +80,31 @@ export async function main(ns) {
       "Undercover Operation": 2, "Sting Operation": 2.5, "Raid": 50,
       "Stealth Retirement Operation": 10, "Assassination": 5,
     };
+    // DIE ZYKLUSRATE IST DIE ZAHL, DIE ZAEHLT (26.08.2026, 13:20).
+    //
+    // Rang je Minute misst nur die ARBEITSphase. Der Motor steht aber rund
+    // die Haelfte der Zeit in der Regenerationskammer, und wie lange, haengt
+    // an der Aktion: Der Ausdauerverlust faellt JE AKTION an
+    // (`Bladeburner.ts:921`), nicht je Zeit. Eine lange Aktion verteilt
+    // denselben Verlust auf mehr Minuten und braucht deshalb weniger Ruhe.
+    //
+    // Das kehrt die Rangfolge um. Tracking dauert 15 Sekunden und verbraucht
+    // 5,53 Ausdauer je Minute; Raid dauert 56 Sekunden und verbraucht 2,36 -
+    // knapp unter der Regeneration von 2,3. Der Arbeitsanteil steigt damit
+    // von 42 auf 97 Prozent.
+    //
+    //     Zyklusrate = netto/min * min(1, R/V)
+    //
+    // mit R = Regeneration je Minute (Kammer, gemessen 2,3) und V = Verbrauch
+    // je Minute. Diese Zahl, nicht `ertragJeMinute`, ist mit dem tatsaechlich
+    // beobachteten Rangzuwachs vergleichbar.
+    const DIFF = {
+      "Tracking": [125, 1.02], "Bounty Hunter": [250, 1.04],
+      "Retirement": [200, 1.03], "Investigation": [300, 1.03],
+      "Undercover Operation": [500, 1.04], "Sting Operation": [650, 1.04],
+      "Raid": [800, 1.045], "Stealth Retirement Operation": [1000, 1.05],
+      "Assassination": [1500, 1.06],
+    };
     const rangGewinn = RANG[name] ?? null;
     const rf = REWARD_FAC[name] ?? 1;
     const verlust = RANG_VERLUST[name] ?? 0;
@@ -99,6 +124,30 @@ export async function main(ns) {
       rangVerlust: verlust,
       hpJeMisserfolg: +((1 - min) * (HP_VERLUST[name] ?? 0)).toFixed(1),
       ertragJeMinute: ertrag,
+      // Ausdauer je Lauf und je Minute, plus die daraus folgende Zyklusrate.
+      // `BaseStaminaLoss * difficultyMultiplier` mit
+      // difficultyMultiplier = d^0,28 + d/650 (`Bladeburner.ts:913-916`,
+      // Constants DiffMultExponentialFactor 0,28 / DiffMultLinearFactor 650).
+      ...(() => {
+        const dd = DIFF[name];
+        if (!dd || !dauer) return {};
+        const d = dd[0] * Math.pow(dd[1], Math.max(0, stufe - 1));
+        const ausJeLauf = 0.285 * (Math.pow(d, 0.28) + d / 650);
+        const min_ = dauer / 60000;
+        const ausJeMin = ausJeLauf / min_;
+        // R aus der Kammermessung vom 26.08., 12:21. Waechst mit Cyber's Edge -
+        // dann verschiebt sich die Rangfolge zugunsten der kurzen Aktionen.
+        const R = 2.3;
+        const anteil = Math.min(1, R / ausJeMin);
+        return {
+          ausdauerJeLauf: +ausJeLauf.toFixed(2),
+          ausdauerJeMinute: +ausJeMin.toFixed(2),
+          arbeitsanteil: +anteil.toFixed(3),
+          zyklusrate: ertrag != null ? +(ertrag * anteil).toFixed(3) : null,
+          rangJeAusdauer: (evJeVersuch != null && ausJeLauf)
+            ? +(evJeVersuch / ausJeLauf).toFixed(3) : null,
+        };
+      })(),
       // Was die alte Zeile gemeldet haette - zum Vergleich, damit ein
       // Rueckfall auf die falsche Zahl sofort auffaellt.
       bruttoJeMinute: (rangGewinn != null && dauer)

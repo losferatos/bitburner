@@ -94,7 +94,14 @@ export async function main(ns) {
   const CHAOS_AUS = 47;
   const SPIEL_CHAOS_AN = true;
   // Raid. Die Zahlen sind bei der Auswahl unten hergeleitet.
-  const RAID_AN = true;
+  // Raid ist in diesem Knoten VERWORFEN (26.08.2026, 17:20). Die Herleitung
+  // steht bei der Auswahl unten: Bei Charisma 27 - dem gemessenen Ist-Wert -
+  // liegt die effektive Zyklusrate bei 1,02 gegen 1,34 fuer Tracking, und der
+  // Gleichstand kaeme erst bei Charisma 440, wofuer 3,5 Millionen Erfahrung
+  // noetig waeren statt der vorhandenen 409. Der Schalter bleibt samt
+  // Bedingungslogik stehen, weil ein spaeterer Knoten mit hohem Charisma
+  // starten kann - dann genuegt `true`.
+  const RAID_AN = false;
   const RAID_GELD_MIN = 2e9;
   const RAID_CHAOS_MAX = 50;
   const RAID_CHANCE_MIN = 0.08;
@@ -697,16 +704,27 @@ export async function main(ns) {
     //
     // D haengt allein am Charisma, und der lineare Term regiert:
     //
-    //   Charisma    D/min   Raid-Anteil   effektive Zyklusrate (3,791 x Anteil)
-    //        100     1,33         29,3%                            1,11
-    //      1.200     2,58         44,5%                            1,69
-    //      5.000     6,47         66,8%                            2,53
+    // GEMESSEN am 26.08. um 17:15 aus dem Spielstand: **Charisma 27**, 409
+    // Erfahrung, `mults.charisma` 1,557. Damit sieht die Tabelle so aus, und
+    // die Erfahrungsspalte ist die eigentliche Antwort
+    // (`exp = e^((lvl/mult + 200)/32) - 534,6`, `formulas/skill.ts:17-19`):
     //
-    // Tracking liefert 1,115. Bei Charisma 100 ist Raid also NICHT besser -
-    // er kostet nur zusaetzlich rund 37 Millionen je Minute an
-    // Krankenhausrechnungen. Der Gleichstand liegt bei D = 1,337, also knapp
-    // ueber Charisma 100; ein Vorsprung von 50 Prozent erst bei rund 1.150.
-    // Daher die Schwelle 1.200 - darunter faehrt der Motor weiter Tracking.
+    //   Charisma   noetige Exp   D/min   Anteil   effektive Zyklusrate
+    //         27      3,6 x 10^2   1,187    27,0%                  1,02  <- ist
+    //        100      3,3 x 10^3   1,330    29,3%                  1,11
+    //        300      2,1 x 10^5   1,593    33,2%                  1,26
+    //        440      3,5 x 10^6   1,755    35,3%                  1,34  <- gleichstand
+    //      1.200      1,5 x 10^13  2,576    44,5%                  1,69
+    //
+    // Tracking liefert 1,339 (`data/bbspann.json`, 15:46). Raid holt den
+    // Gleichstand erst bei Charisma 440 ein - und dorthin fehlen dem Spieler
+    // 3,5 Millionen Erfahrung, das rund 8.700-fache des vorhandenen Standes.
+    // Bei geschaetzten 20 Erfahrung je Sekunde am Leadership-Kurs waeren das
+    // rund 49 Stunden, in denen der Rang gar nicht waechst; dieselben 49
+    // Stunden Tracking bringen rund 3.900 Rang - mehr als die 1.592, die bis
+    // Operation Typhoon fehlen. Charisma-Training ist damit strikt schlechter,
+    // und Raid ist in diesem Knoten kein Hebel. Die Schwelle 1.200 bleibt
+    // stehen, weil sie in einem Knoten mit hohem Startcharisma greifen wuerde.
     //
     // Die alte Erwartung "Faktor 3,4" (BAUSTELLEN.md, 13:22) galt fuer einen
     // Raid-Anteil von 97 Prozent und hat die Chaos-Gegenkraft nicht gerechnet.

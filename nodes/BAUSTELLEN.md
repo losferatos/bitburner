@@ -35,181 +35,6 @@ Regeln:
 
 ## Sofort
 
-### Raid einbauen - dreifache Zyklusrate, Guthabengrenze als Notbremse (16:05)
-
-**Geaendert 16:15 und 16:50, Wirkung noch nicht gemessen.** Der Einbau steht
-(`src/blade.js`, Commit 3240793 und der folgende), gemessen ist er nicht - um
-16:31 kam ein Augmentierungs-Einbau dazwischen, das Guthaben liegt seither bei
--281.147 Dollar und `RAID_GELD_MIN = 2e9` greift damit gar nicht. Die
-30-Minuten-Messung aus Punkt 2 faellt fruehestens an, wenn die Kampfwerte
-wieder bei 100 stehen und das Guthaben zwei Milliarden erreicht hat.
-
-**Die Abnahmeschwelle aus Punkt 2 ist falsch und wird hiermit korrigiert
-(16:50).** Dort steht "erwartet wird eine Zyklusrate ueber 2,5". Diese Zahl
-rechnet die Chaos-Gegenkraft nicht mit, und wer spaeter danach misst, dreht
-eine funktionierende Aenderung an einer unerreichbaren Zahl zurueck.
-
-Raid erzeugt selbst das Chaos, das ihn ausbremst:
-`city.changeChaosByPercentage(getRandomIntInclusive(1, 5))` je Durchlauf,
-unabhaengig von Erfolg (`Bladeburner.ts:846`). Im Mittel 3 Prozent auf 56
-Sekunden Laufzeit, also **+3,21 Prozent je Minute**. Dagegen haelt nur
-Diplomacy: 60 Sekunden, keine Ausdauer, **keine Erfahrung**
-(`data/GeneralActions.ts:37-44`), senkt das Chaos um
-`charisma^0,045 + charisma/1000` Prozent (`Bladeburner.ts:737-745`,
-`:1188-1189`). Beide Groessen sind prozentual, das Verhaeltnis ist damit
-chaos-unabhaengig, und der Raid-Anteil im Gleichgewicht betraegt
-`D / (D + 3,21)` mit D = Diplomacy-Prozent je Minute.
-
-D haengt allein am Charisma, und der lineare Term regiert:
-
-    Charisma    D/min   Raid-Anteil   effektive Zyklusrate (3,791 x Anteil)
-         100     1,33         29,3%                            1,11
-       1.200     2,58         44,5%                            1,69
-       5.000     6,47         66,8%                            2,53
-
-Tracking liefert 1,115. **Bei niedrigem Charisma ist Raid nicht besser** - er
-kostet nur zusaetzlich rund 37 Millionen je Minute an Krankenhausrechnungen.
-Der Gleichstand liegt bei D = 1,337, also knapp ueber Charisma 100; ein
-Vorsprung von 50 Prozent erst bei rund 1.150.
-
-**Umgesetzt (16:50):** `RAID_CHARISMA_MIN = 1200` in `src/blade.js`, als
-fuenfte Bedingung neben Guthaben, Chaos, Chance und Vorrat. blade.js wurde
-ueber `data/reload.txt` neu gestartet.
-
-**Neue Abnahmeschwelle:** Zyklusrate ueber **1,60** bei Charisma um 1.200,
-gemessen ueber 30 Minuten aus `data/aktionen.txt`. Traegt sie nicht, oder
-faellt das Guthaben schneller als 15 Millionen je Minute: `RAID_AN = false`.
-
-**Offen geblieben:** Charisma ist damit ein Hebel, den niemand bedient - es
-waechst nicht durch Bladeburner-Arbeit. Ob sich gezieltes Charisma-Training
-rechnet, steht als eigener Punkt unter `## Offen`.
-
-**Nicht mehr blockiert.** Der Punkt stand vier Laeufe lang auf "Wartet bis Eric
-entscheidet". Eric hat das am 26.08. um 16:05 zurueckgewiesen: **Die Loops
-entscheiden selbst, und aus einer belegten Erkenntnis wird ein unmittelbarer
-Arbeitsauftrag.** Alles Messbare ist gemessen (Punkte 1, 2 und 2b unten sind
-abgehakt), also wird gebaut und nachgemessen - nicht gewartet.
-
-**Auftrag, konkret:**
-1. `SICHER_OPERATION` (`src/blade.js:48`) nicht pauschal senken. Stattdessen
-   Raid einzeln zulassen, wenn zwei Bedingungen zugleich gelten:
-   **Guthaben ueber 2 Mrd** (Notbremse - bei 25,7 Mio je Minute Einkommen und
-   37 Mio je Minute Kosten bleiben von dort aus rund drei Stunden Puffer, und
-   der Deckel `Geld * 0,1` senkt die Kosten mit) **und Chaos der Arbeitsstadt
-   unter 50** (sonst ist die Chance halbiert und der Erwartungswert kippt).
-2. Nach dem Einbau **mindestens 30 Minuten messen**: Rangrate aus
-   `data/aktionen.txt`, Guthabenverlauf aus `geld.js`, Kammeranteil.
-   Erwartet wird eine Zyklusrate ueber 2,5 (gegen 1,12 bei Tracking) und ein
-   Guthabenrueckgang von hoechstens 15 Mio je Minute.
-3. Traegt es nicht, oder faellt das Guthaben schneller: **zurueckdrehen** und
-   das Ergebnis hier eintragen. Eine widerlegte Zahl ist ein Ergebnis.
-
-**Dritte Korrektur dieses Punktes, und diesmal mit der richtigen Kennzahl
-(13:22).** 12:55 stand hier "das Siebenfache" (Bruttoertrag, falsch), 13:05
-"anderthalbfach" (netto je Minute, richtig gerechnet aber die falsche Groesse).
-Beide Male fehlte die Ausdauer.
-
-**Der Ausdauerverlust faellt JE AKTION an** (`Bladeburner.ts:921`), nicht je
-Zeit. Eine lange Aktion verteilt denselben Verlust auf mehr Minuten und
-braucht deshalb weniger Kammerzeit. Das kehrt die Rangfolge um. Gemessen im
-Spiel um 13:22 ueber `data/bbspann.json`, das die Rechnung jetzt selbst fuehrt:
-
-    Aktion                  Stufe  Chance  netto/min  Aus/min  Arbeit  Zyklus
-    Raid                        1   0,107      3,891     2,36   97,4%   3,791
-    Bounty Hunter              13   0,362      1,859     3,65   63,1%   1,173
-    Tracking                   29   0,725      2,513     5,18   44,4%   1,115   <- gefahren
-    Retirement                 16   0,450      1,895     4,25   54,1%   1,025
-    Undercover Operation        1   0,233      1,231     3,16   72,8%   0,896
-    Investigation               1   0,280      1,013     3,30   69,7%   0,706
-    Sting Operation             1   0,147      0,500     2,65   86,7%   0,434
-    Stealth Retirement          1   0,090      0,140     2,07  100,0%   0,140
-    Assassination               1   0,057     -0,717     1,65  100,0%  -0,717
-
-Raid verbraucht **2,36 Ausdauer je Minute** - knapp unter der Regeneration von
-2,3, gemessen am 26.08. um 12:21. Der Arbeitsanteil steigt damit von 44 auf
-97 Prozent: **Raid braucht praktisch keine Kammerzeit.** Faktor 3,4 gegen die
-gefahrene Aktion.
-
-**Der HP-Schaden ist KEIN Blocker** (geklaert 13:15). `hospitalize()` setzt HP
-auf max, zieht Geld ab und feuert `PlayerEventType.Hospitalized`
-(`PlayerObjectGeneralMethods.ts:281-290`). Auf dieses Ereignis hoert im ganzen
-Spiel **nur die Infiltration** (`Infiltration/Infiltration.ts:83`) - die
-laufende Bladeburner-Aktion wird nicht abgebrochen. Ein Raid-Misserfolg kostet
-also Geld, aber keine Zeit. Nebeneffekt: Nach der Heilung sind die
-Trefferpunkte voll, die HP-Ruhe entfaellt bei Raid vollstaendig.
-
-**Der Blocker ist das Guthaben.** Raids Schaden ist
-`50 * difficultyMultiplier` = 50 * (800^0,28 + 800/650) = **397 Trefferpunkte**
-je Misserfolg. Die Krankenhauskosten sind
-`min(Geld * 0,1, (max - current) * 100.000)` (`Hospital.ts:4-10`), und weil
-`current` auf -372 faellt, sind das 39,7 Millionen je Misserfolg - **unabhaengig
-von den maximalen Trefferpunkten**, solange diese unter 397 liegen. Bei 0,93
-Misserfolgen je Minute macht das **rund 37 Millionen je Minute**.
-
-Dagegen steht das gemessene Einkommen: 6.667m um 12:16, 8.188m um 13:00, also
-**34,6 Millionen je Minute**. Raid waere um rund 2,4 Millionen je Minute
-defizitaer.
-
-**Das ist weniger schlimm, als es klingt, und es ist selbstbegrenzend.** Bei
-8 Milliarden Guthaben reicht der Puffer rechnerisch 55 Stunden, und in dieser
-Zeit brachte Raid rund 12.500 Rang - das Fuenffache dessen, was die erste
-Black Op verlangt. Faellt das Guthaben, greift der Deckel `Geld * 0,1`: Bei
-100 Millionen kostet eine Heilung nur noch 10 Millionen. Das System pendelt
-sich ein, statt zu kollabieren.
-
-**Die Bilanz ist jetzt gemessen, nicht geschaetzt (13:48).** Die 34,6 Millionen
-je Minute oben waren eine Guthabendifferenz - und die untertreibt das
-Bruttoeinkommen nicht, sie UEBERTREIBT es hier: Das Fenster 12:16 bis 13:00
-enthielt keine groesseren Ausgaben. Mit `src/geld.js` (neu) ueber
-`ns.getMoneySources()` gemessen, vier Minuten am Stueck:
-
-    hacking             +25,17 Mio/min
-    bladeburner          +0,55
-    hospitalization      -0,30      (der bestehende Hebel von 06:55)
-    ---
-    gesamt              +25,41 Mio/min
-
-**Damit ist das Defizit groesser als angenommen: 11,3 statt 2,4 Millionen je
-Minute.** Aber die Rechnung dahinter faellt trotzdem zugunsten von Raid aus:
-
-- Bei 9,2 Milliarden Guthaben reicht der Puffer **13,6 Stunden**, und in
-  dieser Zeit bringt Raid **rund 3.100 Rang** - von 645 auf 3.700, also weit
-  ueber die 2.500 der ersten Black Op.
-- Danach kollabiert nichts. Der Deckel `Geld * 0,1` greift und senkt die
-  Kosten mit dem Guthaben. Das Gleichgewicht, wo Kosten und Einkommen sich
-  treffen, liegt bei **rund 276 Millionen** - dort kostet eine Heilung 27,6
-  Millionen, also genau die 25,7 Millionen je Minute, die hereinkommen.
-
-**Die Abwaegung lautet also nicht "riskant oder nicht", sondern: 8,9
-Milliarden Guthaben gegen Faktor 3,4 auf den Traeger.** Was das Geld in
-BitNode 6 noch wert ist, haengt an den Augmentierungen - und die heben die
-Kampfwerte und damit die Erfolgschancen, die ihrerseits Raid billiger machen.
-Das ist ein Kreis, kein einfacher Tausch, und deshalb Erics Entscheidung.
-
-**Zu tun - und das ist bewusst KEIN Nebenbei-Eingriff:**
-1. ~~Klaeren, ob eine Hospitalisierung die Aktion abbricht.~~ **Erledigt
-   13:15: nein.**
-2. ~~Den Ausdauerverbrauch je Operation messen.~~ **Erledigt 13:22**, die
-   Rechnung steht jetzt dauerhaft in `src/bbspann.js`.
-2b. ~~Das Einkommen messen statt schaetzen.~~ **Erledigt 13:48** mit
-   `src/geld.js`: 25,7 Millionen je Minute brutto, davon 25,17 aus Hacking.
-3. Offen: Die Umstellung selbst. Sie ersetzt die feste Schwelle
-   `SICHER_OPERATION = 0.85` (`src/blade.js:48`) durch dieselbe
-   Ertragsrechnung, die blade.js fuer Vertraege schon fuehrt - erweitert um
-   den Arbeitsanteil. **Vorschlag zur Stufung:** Raid nur fahren, solange das
-   Guthaben ueber einer Grenze liegt (etwa 2 Milliarden), darunter zurueck auf
-   Vertraege. Damit ist der Geldpuffer die Regelgroesse und nicht das Risiko.
-
-**Warum es hier steht und nicht schon umgesetzt ist:** Der Umbau greift in den
-Kern der Aktionsauswahl und tauscht Geld gegen Rang - eine Abwaegung, die die
-Augmentierungen und den Serverkauf betrifft. Das gehoert vorgelegt, nicht
-nebenbei entschieden.
-
-**Dringlichkeit:** hoch. Faktor 3,4 auf den Traeger des Knotens ist der
-groesste belegte Hebel, der derzeit offen liegt.
-
-
-
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
@@ -238,6 +63,15 @@ darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
 Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
 ### Wartet bis Eric bn4net freigibt: Nach einem Einbau starten die Werkzeuge nicht nach (22:03)
+
+**Messung 26.08., Einbau 16:31: teilweise behoben.** Um 16:36 liefen nur
+`bn4net`, `bn4life`, `joinrun`, `popups`, `contracts` - `blade.js` fehlte und
+wurde um 16:38 von Hand nachgestartet. Um 17:14 lagen dann `blade`, `bbtrain`,
+`homegrow`, `wakelock`, `bn4door` von selbst auf `werk-0`, `sonde` auf home.
+Die Nachstart-Logik greift also, sobald wieder Rechner mit Speicher da sind
+(Netz 13/70 um 16:36 gegen 66/95 um 17:07) - sie ist nur langsamer als der
+Motor des Knotens. **Offen bleibt genau das:** `blade.js` traegt den Knoten und
+sollte nicht auf den Netzausbau warten muessen.
 Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
 `data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.
 **Es fehlen blade.js, bbtrain.js, wakelock.js, homegrow.js, bn4rep.js und
@@ -290,6 +124,13 @@ data/task.txt), nicht ueber den Reload-Kanal. Das gehoert auch in die
 Loop-Prompts, die den Reload-Kanal bisher als Standardweg nennen.
 
 ### Wartet bis zum naechsten Einbau: Erkennt der Pruefer ihn jetzt? (22:01)
+
+**Messung 26.08., 16:31: JA.** Der Einbau kam um 16:31:42, und
+`tools/strategie-check.js` meldete unmittelbar `URTEIL: RESET` mit der Phase
+"Wiederaufbau nach Einbau" und dem Traeger "Kampfwert-Tiefstand = 1 von 100".
+Um 17:07 stand die Phase wieder auf "Black Operations". Der Punkt ist damit
+beantwortet, bleibt aber bis zum naechsten Einbau stehen - eine einzelne
+Beobachtung ist noch kein Nachweis, dass die Erkennung stabil ist.
 Gemessen: URTEIL SPUR bei Kampfwerten 1/1/1/1, Netz 13/70 und 1m Guthaben -
 alles Zeichen eines frischen Einbaus.
 Erwartet: RESET. Danach gehoert der Wiederanlauf geprueft, und genau der ist
@@ -318,28 +159,6 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
-
-### Charisma ist ein unbedienter Hebel auf die Raid-Zyklusrate
-
-Aus der Chaos-Rechnung im Sofort-Punkt folgt: Der Raid-Anteil im Gleichgewicht
-ist `D / (D + 3,21)` mit `D = charisma^0,045 + charisma/1000`. Von Charisma
-1.200 auf 5.000 steigt die effektive Zyklusrate von 1,69 auf 2,53 - **plus 50
-Prozent auf den Traeger des Knotens**, allein aus einem Wert, den bisher kein
-Werkzeug ansteuert.
-
-Charisma waechst nicht durch Bladeburner-Arbeit: Diplomacy hat keine
-Erfahrungsfelder (`data/GeneralActions.ts:37-44`), und die Kampfaktionen geben
-nur Kampferfahrung. Es kaeme aus Uni-Kursen (Leadership), Firmenarbeit oder
-Verbrechen.
-
-**Zu messen, bevor irgendetwas gebaut wird:** Was kostet Charisma 1.200 -> 5.000
-an Zeit und Geld, gegen die 50 Prozent Zyklusrate, die es bringt? Die
-Uni-Kurse ignorieren die Fokus-Strafe vollstaendig (`Work/ClassWork.tsx` kennt
-`focusPenalty` nicht), kosten aber Geld und pruefen den Kontostand nicht.
-Gegenrechnung: Dieselbe Zeit in Kampfwert-Training gesteckt hebt die
-Erfolgschance und damit `netto/min` direkt.
-
-Gefunden 26.08.2026, 16:50, beim Einbau der Charisma-Schwelle.
 
 ### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 
@@ -613,6 +432,57 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Raid ist verworfen - Charisma 27 macht ihn zum Verlustgeschaeft (26.08., 17:20)
+
+**Verifiziert: Charisma 27 um 17:15**, gemessen aus dem Spielstand
+(`tools/save.js`-Ladeweg, `p.skills.charisma`), 409 Erfahrung,
+`mults.charisma` 1,557.
+
+Der Punkt stand seit 16:05 unter `## Sofort` und verlangte eine 30-Minuten-
+Messung mit einer Zielrate von 2,5. Diese Messung findet nicht statt, weil die
+Rechnung sie vorwegnimmt - und das ist ein Ergebnis, kein Ausweichen.
+
+Raid erzeugt selbst das Chaos, das ihn ausbremst
+(`city.changeChaosByPercentage(getRandomIntInclusive(1, 5))` je Durchlauf,
+unabhaengig von Erfolg, `Bladeburner.ts:846`): im Mittel **+3,21 Prozent je
+Minute**. Dagegen haelt nur Diplomacy, und deren Wirkung haengt allein am
+Charisma (`charisma^0,045 + charisma/1000` Prozent je Minute,
+`Bladeburner.ts:737-745`). Beides ist prozentual, das Verhaeltnis damit
+chaos-unabhaengig, und der Raid-Anteil im Gleichgewicht betraegt
+`D / (D + 3,21)`.
+
+    Charisma   noetige Exp   D/min   Anteil   effektive Zyklusrate
+          27    3,6 x 10^2   1,187    27,0%                  1,02  <- ist
+         100    3,3 x 10^3   1,330    29,3%                  1,11
+         300    2,1 x 10^5   1,593    33,2%                  1,26
+         440    3,5 x 10^6   1,755    35,3%                  1,34  <- gleichstand
+       1.200    1,5 x 10^13  2,576    44,5%                  1,69
+
+Tracking liefert **1,339**. Raid liegt bei **1,02** - er ist nicht nur nicht
+besser, er ist ein Drittel schlechter, und dazu kaemen rund 37 Millionen je
+Minute an Krankenhausrechnungen.
+
+**Damit ist auch der Charisma-Hebel erledigt**, der um 16:50 als eigener
+Offen-Punkt eingetragen wurde. Der Gleichstand kaeme bei Charisma 440, wofuer
+3,5 Millionen Erfahrung noetig sind - das 8.700-fache des Vorhandenen. Bei
+geschaetzten 20 Erfahrung je Sekunde am Leadership-Kurs sind das rund 49
+Stunden ohne Rangzuwachs; dieselben 49 Stunden Tracking bringen rund 3.900
+Rang, mehr als die 1.592 bis Operation Typhoon. **Charisma-Training ist strikt
+schlechter.** Die Erfahrungskurve `exp = e^((lvl/mult + 200)/32) - 534,6`
+(`PersonObjects/formulas/skill.ts:17-19`) macht jede dreistellige Zielmarke
+teuer und jede vierstellige unerreichbar.
+
+**Geaendert:** `RAID_AN = false` in `src/blade.js`. Bedingungslogik und
+Charisma-Schwelle bleiben stehen - ein spaeterer Knoten kann mit hohem
+Charisma starten, dann genuegt `true`.
+
+**Was die Episode gekostet hat:** Die Erwartung "Faktor 3,4" stand seit 13:22
+in dieser Datei und hat vier Loop-Laeufe lang als groesster offener Hebel
+gegolten. Sie war brutto gerechnet - ohne die Gegenkraft, die die Aktion
+selbst erzeugt. **Lehre: Wenn eine Aktion einen Zustand veraendert, gehoert
+die Rueckwirkung dieses Zustands in dieselbe Rechnung**, sonst misst man den
+ersten Zug eines Regelkreises und haelt ihn fuer den Dauerzustand.
 
 ### Der Stadtwechsel-Hebel ist geprueft und verworfen (26.08., 15:55)
 

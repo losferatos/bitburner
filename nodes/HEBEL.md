@@ -71,7 +71,20 @@ einem Augmentierungs-Einbau zaehlt jeder Euro fuer Server und Programme, und
 der Deckel `Guthaben * 0,1` waere dort ein schlechter Tausch.
 
 Vorher: 0,475 Rang je Minute, 72,5 Prozent Kammerzeit (06:47)
-Nachher: (offen - naechster Lauf misst)
+Nachher: **1,118 Rang je Minute, 33,5 Prozent Kammerzeit** - gemessen 07:15
+ueber die 18 Minuten seit der Aenderung, gegen 229 Minuten davor:
+
+    bis 06:55   229,0 min gesamt, 166,0 in der Kammer (72,5 %)  ->  0,484/min
+    ab  06:55    18,1 min gesamt,   6,1 in der Kammer (33,5 %)  ->  1,118/min
+
+**Faktor 2,3.** Die Erwartung von 1,3 ist knapp verfehlt, das Ziel von unter
+25 Prozent Kammerzeit auch - aber die Richtung stimmt eindeutig, und die
+Messstrecke ist mit 18 Minuten noch kurz.
+
+Was uebrig bleibt, ist ein ANDERER Engpass: Die verbliebenen 33,5 Prozent sind
+Ausdauer-Ruhe, nicht Trefferpunkte. Die Ausdauer regeneriert passiv rund 1,2
+je Minute (`Bladeburner.ts:1382`), die Kammer verdoppelt das nur - gegen sie
+hilft kein Krankenhaus. Das ist der naechste Hebel, nicht dieser.
 Commit: siehe git log, blade.js 26.08. 06:55
 
 ### Notvertrag statt Field Analysis (26.08., 00:55)

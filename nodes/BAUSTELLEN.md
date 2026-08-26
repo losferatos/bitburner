@@ -169,8 +169,32 @@ Ansaetze, in der Reihenfolge ihrer Wucht:
    landen (Zeit- und Geldverlust). Vorher pruefen, was ein Krankenhausaufenthalt
    tatsaechlich kostet.
 
-**Dringlichkeit:** hoch. Es ist die einzige Zahl, die den Knoten um Tage
-verkuerzen kann.
+**Verifiziert 07:15 - der groesste Teil ist gehoben.** Seit dem
+Krankenhaus-Hebel von 06:55 (`nodes/HEBEL.md`):
+
+    bis 06:55   229,0 min gesamt, 166,0 in der Kammer (72,5 %)  ->  0,484/min
+    ab  06:55    18,1 min gesamt,   6,1 in der Kammer (33,5 %)  ->  1,118/min
+
+Faktor 2,3 auf die Rangrate. Ansatz 1 (mehr Trefferpunkte) wurde dabei
+verworfen, bevor er umgesetzt wurde: Bei doppeltem Maximum verdoppelt sich die
+Ruhezeit mit, der Anteil bleibt gleich.
+
+**Was bleibt, ist ein anderer Engpass.** Die verbliebenen 33,5 Prozent sind
+Ausdauer-Ruhe, nicht Trefferpunkte - dagegen hilft kein Krankenhaus. Die
+Ausdauer regeneriert passiv rund 1,2 je Minute (`Bladeburner.ts:1382`), die
+Kammer verdoppelt das. Ansaetze:
+- **Die Hoechstausdauer heben.** Sie haengt an den Kampfwerten
+  (`calculateMaxStamina`), und anders als bei den Trefferpunkten wirkt das
+  hier: Eine groessere Reserve heisst laengere Arbeitsphasen bei gleicher
+  Regeneration je Minute.
+- **Die Faehigkeit "Reaper"** hebt die effektiven Kampfwerte um 2 Prozent je
+  Stufe und damit mittelbar die Hoechstausdauer.
+- **Weniger Ausdauerverbrauch:** `BaseStaminaLoss * difficultyMultiplier`
+  (`Bladeburner.ts:921`) - schwierigere Aktionen kosten mehr. Auch das ist ein
+  Tausch, der sich rechnen laesst, sobald genug Abschnitte je Aktion vorliegen.
+
+**Dringlichkeit:** mittel, seit der Krankenhaus-Hebel greift. Vorher war es die
+einzige Zahl, die den Knoten um Tage verkuerzen konnte.
 
 
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen

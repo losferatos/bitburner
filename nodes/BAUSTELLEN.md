@@ -229,6 +229,40 @@ der Rate (Lehre vom 21:20).
 
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
+**Der letzte Rest ist die Pauschale 1,7 - und sie ist jetzt widerlegt
+(26.08., 23:30).** `sollRate()` rechnet fuer alle Vertraege
+`1,7 * chance * levelFaktor` (`strategie-check.js:245`). Die 1,7 soll Rang je
+Minute sein, aber weder Ertrag noch Dauer sind bei den Vertraegen gleich:
+rankGain ist **0,3 / 0,9 / 0,6** fuer Tracking, Bounty Hunter und Retirement
+(`data/Contracts.ts:19,53,86`), die Dauer 18, 32 und 26 Sekunden.
+
+Gegen die Messung aus **406 Abschnitten** (`tools/ratencheck.js`, 23:18):
+
+    Aktion                    n   Arbeitsmin  gemessen  Pauschale  richtig
+    Contracts/Tracking      164        60,3     3,438      5,45      3,21
+    Contracts/Retirement     59        44,0     2,938      3,91      3,19
+    Contracts/Bounty Hunter  88        73,0     2,279      2,50      2,48
+
+"richtig" ist `rankGain * rewardFac^(stufe-1) * chance / dauerMinuten`. Bei
+Bounty Hunter trifft auch die Pauschale, bei Tracking liegt sie **59 Prozent
+zu hoch**, bei Retirement 33 Prozent. Der Zufall dahinter: 1,7 entspricht
+ungefaehr `0,9 / 0,53 min` - also genau Bounty Hunter.
+
+**Geaendert 23:30, Wirkung noch nicht gemessen:** `blade.js` schreibt jetzt
+`dauer` (in Millisekunden, aus `getActionTime`) nach `data/blade.json`.
+*Verifiziert 23:31:* `"stufe":21,"dauer":26000` bei Contracts/Retirement. Die
+Dauer haengt an dex und agi (`Actions/Action.ts:104-120`) und aendert sich mit
+jedem Training - sie gehoert gemessen, nicht in eine Tabelle im Pruefer.
+
+**Naechster Schritt, eigener Lauf (eine Datei je Lauf):** `sollRate()` auf
+`rankGain / dauer` umstellen, mit der rankGain-Tabelle aus `Contracts.ts` und
+`Operations.ts`. Faellt `dauer` weg - aeltere `blade.js` -, bleibt die
+Pauschale als Rueckfall stehen.
+
+**Nebenbefund aus derselben Messung: Der Kammeranteil ist von 74 auf 48,9
+Prozent gefallen** (182,9 von 374 Minuten). Am 26.08. um 05:47 waren es noch
+122 von 164. Das ist die kumulierte Wirkung der Hebel dieses Tages.
+
 Zweimal an einem Nachmittag hat `sollRate()` in `tools/strategie-check.js` einen
 Fehlalarm erzeugt, beide Male aus derselben Wurzel: Die Zahlen stammen aus einer
 Ueberschlagsrechnung am Spielquellcode, nicht aus dem eigenen Messverlauf.

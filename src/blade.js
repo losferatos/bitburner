@@ -395,10 +395,32 @@ export async function main(ns) {
     // Ohne sie unterschaetzt der Pruefer systematisch und meldet STAGNATION,
     // wo der Motor genau das Richtige tut.
     let stufe = null;
+    // DIE AKTIONSDAUER GEHOERT DAZU (26.08.2026, 23:30).
+    //
+    // Der Pruefer rechnet fuer Vertraege pauschal `1,7 * chance * levelFaktor`
+    // (`strategie-check.js:245`). Die 1,7 ist ein Rang-je-Minute-Schaetzwert
+    // fuer ALLE Vertraege - aber weder der Ertrag noch die Dauer sind gleich:
+    // rankGain ist 0,3 bei Tracking, 0,9 bei Bounty Hunter und 0,6 bei
+    // Retirement (`data/Contracts.ts:19,53,86`), die Dauer 18, 32 und 26
+    // Sekunden.
+    //
+    // Gegen die Messung aus 406 Abschnitten (`tools/ratencheck.js`, 23:18)
+    // faellt das auf: Fuer Bounty Hunter trifft die Pauschale gut (2,50
+    // erwartet gegen 2,279 gemessen), fuer Tracking liegt sie **59 Prozent zu
+    // hoch** (5,45 gegen 3,438). Mit `rankGain / dauer` statt der Pauschale
+    // kaeme 3,21 heraus - und das trifft.
+    //
+    // Die Dauer haengt an dex und agi (`Actions/Action.ts:104-120`) und
+    // aendert sich mit jedem Trainingsfortschritt; sie gehoert deshalb
+    // gemessen und nicht in eine Tabelle im Pruefer.
+    let dauer = null;
     try {
       const teile = String(aktion).split("/");
       if (teile.length === 2 && teile[0] !== "General") {
         stufe = ns.bladeburner.getActionCurrentLevel(teile[0], teile[1]);
+      }
+      if (teile.length === 2) {
+        dauer = Math.round(ns.bladeburner.getActionTime(teile[0], teile[1]));
       }
     } catch { /* General-Aktionen haben keine Stufe */ }
     ns.write("data/blade.json", JSON.stringify({
@@ -411,7 +433,7 @@ export async function main(ns) {
       // kein Neustart eines Werkzeugs, sondern nur ein Neuladen des Tabs.
       spielzeit,
       aktion, grund,
-      stufe,
+      stufe, dauer,
       naechsteBlackOp: bo ? bo.name : null,
       blackOpRang: bo ? bo.rank : null,
     }), "w");

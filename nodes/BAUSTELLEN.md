@@ -176,11 +176,34 @@ Von 18:50 bis 21:07 ist die gerechnete Rate um **61 Prozent** gestiegen
 koennen nicht stimmen. Erwartet waere eine gemessene Rate nahe der
 gerechneten; sie liegt jetzt bei 56 Prozent davon.
 
-Verdacht: offen, aber die Richtung ist neu - frueher war die Luecke konstant
-bei rund einem Drittel, jetzt oeffnet sie sich. Zu pruefen ist zuerst, ob die
-Kammerzeit mitwaechst (hoehere Chancen heissen kuerzere Aktionen, damit mehr
-Aktionen je Minute und mehr Ausdauerverbrauch je Minute - der Effekt, der beim
-Raid-Befund schon einmal die Rechnung gekippt hat).
+**WIDERLEGT um 21:20, eine Viertelstunde spaeter - es war Fensterrauschen.**
+`data/wache-zustand.json` fuehrt eine Rangreihe im Drei-Minuten-Takt. Sie zeigt
+keine fallende Rate, sondern einen **Zyklus**:
+
+    20:53-21:02   Rang steht neun Minuten bei 1160     Rate 0,00
+    21:05                                    1163           1,00
+    21:08                                    1172           3,00
+    21:11                                    1186           4,66
+    21:14                                    1194           2,66
+    21:17                                    1199           1,66
+
+Ueber 20:30 bis 21:17 geglaettet: **1,23 Rang je Minute** (1141 auf 1199 in 47
+Minuten) gegen eine Zyklusrate von 1,56 - ein Verhaeltnis von 0,79, also rund
+**20 Prozent Luecke** statt der gemeldeten 44. Die drei Halbstundenwerte
+1,67 / 1,23 / 0,87 sahen nach Trend aus, waren aber nur unterschiedlich
+platzierte Fenster ueber demselben Ausdauerzyklus.
+
+**Lehre, und das ist der bleibende Teil: Ein 30-Minuten-Fenster ist zu kurz
+fuer diese Groesse.** Der Ausdauerzyklus laeuft mit einer Periode in derselben
+Groessenordnung; wer ein Fenster misst, misst die Phase, nicht die Rate. Die
+Rangrate gehoert **geglaettet ueber mindestens 45 Minuten** aus
+`data/wache-zustand.json` gelesen, nicht als Differenz zweier Reportzeitpunkte.
+Das betrifft auch die Ziele in `data/ziele.md` - "Rangrate ueber X" ist so
+formuliert eine Muenzwurfmessung.
+
+Verdacht zum Rest der 20 Prozent: offen. Neu ist die Nullphase - **neun
+Minuten ohne einen einzigen Rangpunkt** um 20:53. Das ist mehr, als eine
+Kammerphase erklaeren sollte, und der naechste konkrete Messpunkt.
 
 **Messung 26.08., 17:37 (nach dem Einbau von 16:31):** `data/blade.json` zeigt
 Aktion "General/Hyperbolic Regeneration Chamber", Grund "ruht bis Ausdauer 31",

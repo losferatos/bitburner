@@ -80,9 +80,13 @@ async function spieldatei(name) {
  * einzelner Abschnittsraten. Ein Vertrag von 20 Sekunden und einer von 120
  * duerfen nicht gleich zaehlen.
  *
- * Die Erfolgsquote faellt dabei gratis ab: Der Anteil der Abschnitte mit
- * Rangzuwachs IST die gemessene Erfolgswahrscheinlichkeit. Genau die schaetzt
- * das Spiel selbst nur als Spanne - hier steht sie gezaehlt daneben.
+ * Die "Erfolgsquote" ist der Anteil der ABSCHNITTE mit Rangzuwachs - NICHT
+ * die Erfolgschance je Versuch. Ein Abschnitt laeuft, bis blade.js die Aktion
+ * wechselt, und enthaelt in der Regel MEHRERE Durchlaeufe: Tracking dauerte
+ * am 25.08. dreizehn Sekunden, die Abschnitte sind im Schnitt sechsunddreissig
+ * lang. Wer die Quote als Erfolgschance liest, verrechnet sich um genau diesen
+ * Faktor - so ist am 26.08. der scheinbare "Restfaktor 3,4" zwischen Erwartung
+ * und Messung entstanden.
  */
 async function ausAbschnitten() {
   const roh = await spieldatei("data/aktionen.txt");
@@ -139,8 +143,10 @@ async function ausAbschnitten() {
   console.log("Ueber alles: " + rangGesamt.toFixed(1) + " Rang in "
     + gesamt.toFixed(0) + " Minuten = "
     + (rangGesamt / gesamt).toFixed(3) + " je Minute.");
-  console.log("Die Erfolgsquote ist gezaehlt, nicht geschaetzt - sie gehoert"
-    + " gegen die Spanne aus data/bbspann.json gehalten.");
+  console.log("Achtung: 'Erfolg' ist der Anteil der ABSCHNITTE mit Zuwachs,"
+    + " nicht die Erfolgschance je Versuch - ein Abschnitt enthaelt meist"
+    + " mehrere Durchlaeufe (s/Lauf gegen die Aktionsdauer aus bbspann.json"
+    + " halten).");
 }
 
 function main() {

@@ -220,14 +220,22 @@ naturgemaess null bringt.
    Nachzumessen ist das erst, wenn der Motor wieder an einem Vertrag steht -
    bei der Messung um 06:16 ruhte er (`stufe: null`, Kammer).
 
-   **Ein Rest bleibt offen.** Nachgerechnet fuer Tracking auf Stufe 14:
-   0,3 * 1,041^13 = 0,506 Basisertrag, mal 0,73 Chance durch 0,633 Minuten
-   Dauer = 0,58 je Minute. Gemessen sind 1,994 - also weiterhin Faktor 3,4.
-   Der BitNode-Multiplikator ist es nicht (`BitNode.tsx` fuehrt fuer BN6
-   keinen abweichenden Wert, Standard ist 1). Kandidaten: eine hoehere Stufe
-   als 14 (sie steigt mit jedem zehnten Erfolg), oder ein Faehigkeitseinfluss
-   auf den Rangertrag. Die naechste Messung mit echtem `stufe`-Wert entscheidet
-   das - deshalb erst messen, dann weitersuchen.
+   **Der Restfaktor ist erklaert (26.08., 06:45) - er war ein
+   Auswertungsfehler, kein Spielgeheimnis.**
+   Gemessen mit echtem Wert: `Contracts/Tracking`, **Stufe 24** (nicht 14),
+   Chance 0,737. Damit rechnet die Formel
+   0,3 * 1,041^23 = 0,756 Rang je Erfolg, mal 0,737 durch die AKTIONSdauer
+   von 13 Sekunden = **2,57 Rang je Minute**. Gemessen sind 1,984 - eine
+   Abweichung von 1,3, die durch Rangverluste bei Misserfolgen, die
+   Zufallsstreuung (`addOffset(gain, 10)`) und die veraltete Dauermessung
+   vollstaendig gedeckt ist.
+
+   Der scheinbare Faktor 3,4 entstand, weil in der Rechnung die
+   ABSCHNITTSdauer (36 s) statt der Aktionsdauer (13 s) stand. Ein Abschnitt
+   laeuft, bis blade.js die Aktion wechselt, und enthaelt in der Regel
+   mehrere Durchlaeufe - die "Erfolgsquote" in `ratencheck.js` ist deshalb der
+   Anteil der Abschnitte mit Zuwachs, nicht die Erfolgschance je Versuch.
+   Beides steht jetzt als Warnung im Werkzeug und in seiner Ausgabe.
 
 4. **Der eigentliche Engpass steht daneben und ist groesser als alles andere:**
    Der Motor verbringt **122 von 164 Minuten - 74 Prozent - in der

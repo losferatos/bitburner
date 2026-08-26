@@ -363,6 +363,61 @@ export async function main(ns) {
     abschnitt = null;
   };
 
+  // WAS EINE AKTION AN AUSDAUER KOSTET - AUS DEM EIGENEN PROTOKOLL
+  // (26.08.2026, 09:52).
+  //
+  // Seit dem Krankenhaus-Hebel ist die Ausdauer der einzige Grund zu ruhen,
+  // und sie kostet 55 Prozent der Zeit. Damit zaehlt nicht mehr Rang je
+  // MINUTE, sondern Rang je AUSDAUERPUNKT - die Minuten sind reichlich da,
+  // die Ausdauer ist knapp.
+  //
+  // Gemessen 09:45 ueber 295 Abschnitte (tools/ratencheck.js):
+  //   Tracking        2,180 Rang/min   0,533 je Ausdauer   1,17 je Lauf
+  //   Bounty Hunter   1,710 Rang/min   0,989 je Ausdauer   1,78 je Lauf
+  // Die beiden Kennzahlen widersprechen sich, und ueber den vollen Zyklus aus
+  // Arbeit und Ruhe gewinnt Bounty Hunter um Faktor 1,44.
+  //
+  // Die Kosten werden NICHT geschaetzt, sondern aus data/aktionen.txt
+  // gerechnet - derselben Datei, die dieses Skript selbst fuellt. Damit
+  // kalibriert sich die Auswahl mit jedem Aktionslevel neu, statt auf einer
+  // Tabelle von heute stehen zu bleiben.
+  let kostenStand = 0;
+  let kosten = new Map();
+  let kostenSchnitt = null;
+  const kostenAktualisieren = () => {
+    // Alle fuenf Minuten reicht: Die Werte aendern sich mit dem Aktionslevel,
+    // und das steigt mit jedem zehnten Erfolg.
+    if (Date.now() - kostenStand < 5 * 60_000) return;
+    kostenStand = Date.now();
+    try {
+      const roh = ns.read("data/aktionen.txt");
+      if (!roh) return;
+      const zeilen = roh.split(String.fromCharCode(10)).filter((z) => z.trim());
+      const neu = new Map();
+      // Nur die juengsten dreihundert Abschnitte: Aeltere stammen aus einer
+      // Zeit mit anderen Aktionsleveln und verfaelschen den Schnitt.
+      for (const z of zeilen.slice(-300)) {
+        let d;
+        try { d = JSON.parse(z); } catch { continue; }
+        if (!Number.isFinite(d.ausdauerVon) || !Number.isFinite(d.ausdauerBis)) continue;
+        if (d.ausdauerBis >= d.ausdauerVon) continue;   // Ruhephase, kein Verbrauch
+        const e = neu.get(d.aktion) || { aus: 0, n: 0 };
+        e.aus += d.ausdauerVon - d.ausdauerBis;
+        e.n++;
+        neu.set(d.aktion, e);
+      }
+      const fertig = new Map();
+      for (const [name, e] of neu) {
+        // Unter fuenf Abschnitten ist der Schnitt Rauschen.
+        if (e.n >= 5) fertig.set(name, e.aus / e.n);
+      }
+      kosten = fertig;
+      const werte = [...fertig.values()];
+      kostenSchnitt = werte.length
+        ? werte.reduce((n, v) => n + v, 0) / werte.length : null;
+    } catch (e) { /* Protokoll fehlt: dann eben nach Zeit */ }
+  };
+
   // --- Die naechste Aktion waehlen -----------------------------------------
   const waehle = () => {
     // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
@@ -427,9 +482,29 @@ export async function main(ns) {
         try { dauer = ns.bladeburner.getActionTime(typ, name); } catch {}
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
         // Bewertung zurueck: besser eine grobe Rangfolge als gar keine.
-        const ertrag = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
+        // Rang je AUSDAUERPUNKT, sobald ueberhaupt etwas gemessen ist.
+        //
+        // ZWEI EINHEITEN IM SELBEN VERGLEICH SIND KEIN VERGLEICH
+        // (26.08.2026, 09:55). Der erste Entwurf liess Aktionen ohne Messung
+        // auf "Rang je Minute" zurueckfallen - und die Zahlen liegen auf
+        // voellig verschiedenen Skalen: 0,19 gegen 0,77. Der Rueckfall gewann
+        // dadurch IMMER, und um 09:54 fuhr der Motor prompt Retirement, die
+        // einzige Aktion ohne Messwert.
+        //
+        // Jetzt bekommt eine ungemessene Aktion den Durchschnitt der
+        // gemessenen als Schaetzwert. Damit steht sie auf derselben Skala,
+        // kommt trotzdem an die Reihe und liefert dabei ihre eigene Messung.
+        const proLauf = kosten.get(typ + "/" + name) ?? kostenSchnitt;
+        const ertrag = (rang && proLauf) ? rang * s.min / proLauf
+          : ((rang && dauer) ? rang * s.min / (dauer / 60000) : s.min);
+        // proMinute wird MITGEFUEHRT, auch wenn nach Ausdauer ausgewaehlt
+        // wird: Der Vergleich mit General-Aktionen (Field Analysis, Training)
+        // geht nur ueber die Zeit, denn die kosten gar keine Ausdauer. Ohne
+        // diese zweite Zahl vergleicht man Aepfel mit Birnen - genau das ist
+        // um 09:55 passiert, und der Motor landete prompt auf Field Analysis.
+        const proMinute = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
         if (!treffer || ertrag > treffer.ertrag) {
-          treffer = { name, min: s.min, ertrag };
+          treffer = { name, min: s.min, ertrag, proMinute };
         }
       }
       return treffer;
@@ -466,7 +541,7 @@ export async function main(ns) {
     const notvertrag = beste(VERTRAEGE, V, 0);
     // Der Faktor 1,5 ist Absicht: Ein knapper Vorsprung waere die Unschaerfe
     // nicht wert, die Field Analysis ausraeumen wuerde.
-    if (notvertrag && notvertrag.ertrag > feldErtrag * 1.5) {
+    if (notvertrag && notvertrag.proMinute > feldErtrag * 1.5) {
       return { typ: V, name: notvertrag.name,
         grund: "Vertrag unter Schwelle, lohnt trotzdem" };
     }
@@ -522,6 +597,7 @@ export async function main(ns) {
       gewichen = false;
 
       faehigkeitenKaufen();
+      kostenAktualisieren();
 
       const [jetzt, max] = ns.bladeburner.getStamina();
       let hp = ns.getPlayer().hp;

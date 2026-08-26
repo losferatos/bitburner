@@ -37,6 +37,47 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Auswahl nach Rang je Ausdauer, selbstkalibrierend (26.08., 09:57)
+
+Engpass: 55 Prozent Kammerzeit, allein wegen Ausdauer. Die Minuten sind
+reichlich da, die Ausdauer ist knapp - also zaehlt Rang je AUSDAUERPUNKT.
+
+Hypothese und Rechnung stehen im Eintrag von 09:46: Ueber den vollen Zyklus
+aus Arbeit und Ruhe gewinnt Bounty Hunter (0,989 Rang je Ausdauer) gegen
+Tracking (0,533) um **Faktor 1,44**, obwohl Tracking bei Rang je Minute vorne
+liegt. Erwartung: Die Rangrate steigt von **0,926 auf mindestens 1,15** je
+Minute.
+
+Umgesetzt **selbstkalibrierend**, nicht als Tabelle: `blade.js` liest alle
+fuenf Minuten die juengsten dreihundert Abschnitte aus `data/aktionen.txt` -
+derselben Datei, die es selbst fuellt - und rechnet daraus den Verbrauch je
+Aktion. Damit passt sich die Auswahl an steigende Aktionslevel an, statt auf
+den Zahlen von heute stehen zu bleiben. Aktionen mit weniger als fuenf
+Abschnitten bekommen den Durchschnitt der uebrigen als Schaetzwert.
+
+**Zwei Einheitenfehler in einem Lauf, beide selbst verursacht und behoben:**
+1. 09:54: Ungemessene Aktionen fielen auf "Rang je Minute" zurueck - eine
+   voellig andere Skala (0,77 gegen 0,19). Der Rueckfall gewann dadurch immer,
+   und der Motor fuhr prompt Retirement, die einzige Aktion ohne Messwert.
+   Behoben durch den Durchschnitts-Schaetzwert.
+2. 09:55: Der Notvertrag-Zweig vergleicht gegen Field Analysis, und General-
+   Aktionen kosten gar keine Ausdauer - der Vergleich geht nur ueber die Zeit.
+   Der Motor landete auf Field Analysis mit 0,2 Rang je Minute. Behoben:
+   `beste()` fuehrt jetzt BEIDE Zahlen mit, `ertrag` fuer die Auswahl und
+   `proMinute` fuer den Vergleich mit General-Aktionen.
+
+Wer die Bewertungsgroesse aendert, muss JEDEN Vergleich mitziehen, in dem sie
+vorkommt. Das ist die Lehre.
+
+Beleg: `Bladeburner.ts:921` (Ausdauerverlust je Aktion), `1317-1325`
+(Regeneration), eigene Messung ueber 295 Abschnitte.
+
+Vorher: 0,926 Rang je Minute, 55,5 Prozent Kammerzeit (09:19-09:45)
+Nachher: (offen - naechster Lauf misst)
+Erste Beobachtung 09:57: Der Motor faehrt `Contracts/Bounty Hunter` - genau
+die Aktion, die die Rechnung vorne sieht.
+Commit: siehe git log, blade.js 26.08. 09:57
+
 ### Die Auswahl misst die falsche Groesse - gerechnet, noch nicht umgesetzt (26.08., 09:46)
 
 Engpass: 55 Prozent Kammerzeit, allein wegen Ausdauer. Wenn die Ausdauer der

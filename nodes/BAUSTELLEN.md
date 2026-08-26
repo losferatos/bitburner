@@ -37,6 +37,37 @@ Regeln:
 
 ### Der Waechter meldet fehlenden Speicher als Ausfall - und verdeckt damit den echten Fehlerfall (17:55)
 
+**GEMESSEN 18:20 - Eric hatte recht, es IST ein Fehler.** Aus dem Spielstand
+(`AllServersSave`): Die Werkbank `werk-0` hat **512 GB**. `bn4rep.js` braucht
+**768,3 GB** und passt dort nicht hin - und kann es nie. Der einzige groessere
+Rechner ist `home` mit 2048 GB, dessen freier Speicher aber hinter der
+Arbeiterreserve liegt (`homeFrei` 513,15 bei `reserve` 512).
+
+Dabei reichte das Geld **zwanzigfach**: 1.284 Millionen gegen 84,5 Millionen
+fuer den Ausbau auf 2048 GB (55.000 Dollar je GB,
+`Server/data/Constants.ts:4`). Der Motor kauft Arbeiterserver - 26 Stueck,
+die meisten mit 128 GB - laesst die Werkbank aber auf ihrer Startgroesse
+stehen. Damit liegt der Reputationsmotor seit 16:42 still, ohne dass irgendwo
+ein Fehler auftaucht.
+
+**Versuchte Reparatur von aussen, 18:20 bis 18:35: fehlgeschlagen.**
+`src/wbgrow.js` ruestet die groesste gekaufte Maschine auf 2048 GB auf, mit
+einer Grenze von einem Fuenftel des Guthabens. Das Skript startet nicht:
+Erst kam es gar nicht im Spiel an (die Brueckenbeobachtung von `src/` hat die
+**neue** Datei nicht gepusht - `getFile src/wbgrow.js` meldete "does not
+exist"), nach einem `pushFile` von Hand nahm der Auftragskanal den Auftrag
+zwar an (`data/task.txt` war danach leer), aber `data/wbgrow.txt` entstand
+nie. Verdacht: bn4net startet Auftragsskripte auf einem Host, auf dem die
+Datei nicht liegt - gepusht wurde nur nach `home`.
+
+**Zwei getrennte Baustellen, beide offen:**
+1. Die Werkbank waechst nicht mit. Gehoert in `src/bn4net.js` - Erics Freigabe.
+2. **Neue Dateien unter `src/` erreichen das Spiel nicht von selbst.** Das
+   trifft jedes kuenftige Werkzeug und ist unabhaengig von bn4rep.
+   Fundstelle: `watchScripts()` in `sync/bridge.js:182-224`, `fs.watch` mit
+   `recursive: true` meldet auf Windows neu angelegte Dateien nicht
+   zuverlaessig.
+
 Gemessen: `data/wache-zustand.json` zeigt um 17:45:33 Stufe 2 mit dem Text
 "bn4rep.js meldet sich seit 63 min nicht mehr - keine Reputationsarbeit". Eric
 bekam das als Push aufs Handy. Tatsaechlich lief bn4rep bis 16:42 und fand nach

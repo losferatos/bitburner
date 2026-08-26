@@ -62,11 +62,28 @@ Datei nicht liegt - gepusht wurde nur nach `home`.
 
 **Zwei getrennte Baustellen, beide offen:**
 1. Die Werkbank waechst nicht mit. Gehoert in `src/bn4net.js` - Erics Freigabe.
-2. **Neue Dateien unter `src/` erreichen das Spiel nicht von selbst.** Das
-   trifft jedes kuenftige Werkzeug und ist unabhaengig von bn4rep.
-   Fundstelle: `watchScripts()` in `sync/bridge.js:182-224`, `fs.watch` mit
-   `recursive: true` meldet auf Windows neu angelegte Dateien nicht
-   zuverlaessig.
+2. ~~Neue Dateien unter `src/` erreichen das Spiel nicht von selbst.~~
+   **WIDERLEGT um 19:20 - der Fehler lag bei mir.** Im Spiel heissen die
+   Dateien **ohne** `src/`-Praefix (`collectScripts` bildet `gameName`
+   relativ zu `SCRIPT_DIR`, `sync/bridge.js:137-157`). Ich hatte mit
+   `getFile src/wbgrow.js` gesucht und "existiert nicht" als Sync-Ausfall
+   gelesen. Gegenprobe: eine frisch angelegte `src/synctest.js` war nach
+   **acht Sekunden** unter `synctest.js` im Spiel. Die Beobachtung
+   funktioniert einwandfrei.
+
+   Nebenwirkung meines Irrtums: Eine unbrauchbare Kopie liegt jetzt im Spiel
+   unter dem Namen `src/wbgrow.js`. Sie stoert nichts, sollte aber beim
+   naechsten Aufraeumen weg.
+
+3. **`wbgrow.js` startet nicht ueber den Auftragskanal** (19:25). Die Datei
+   liegt korrekt im Spiel (`getFile wbgrow.js` liefert den Quelltext), der
+   Kanal nimmt den Auftrag an (`data/task.txt` ist danach leer), aber
+   `data/wbgrow.txt` entsteht weder auf `home` noch auf `werk-0`, und
+   `werk-0` steht unveraendert bei 512 GB. Zwei Versuche, 18:30 und 19:25.
+   Verdacht: offen. Zu pruefen ist, ob `bn4net` fuer Auftragsskripte eine
+   Liste erlaubter Namen fuehrt, und ob das Skript einen Host waehlt, auf dem
+   die Datei fehlt - `wbgrow.js` schreibt seine Ausgabe ohne `scp` nach home,
+   anders als `work.js`.
 
 Gemessen: `data/wache-zustand.json` zeigt um 17:45:33 Stufe 2 mit dem Text
 "bn4rep.js meldet sich seit 63 min nicht mehr - keine Reputationsarbeit". Eric

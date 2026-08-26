@@ -44,15 +44,65 @@ export async function main(ns) {
       "Investigation": 2.2, "Undercover Operation": 4.4, "Sting Operation": 5.5,
       "Stealth Retirement Operation": 22, "Assassination": 44, "Raid": 55,
     };
+    // DER BRUTTOERTRAG HAT AM 26.08. UM 12:55 EINEN FALSCHEN AUFTRAG ERZEUGT.
+    //
+    // Die alte Zeile rechnete `rangGewinn * min / Dauer` und meldete damit
+    // fuer Raid 4,302 gegen 0,602 bei Tracking - angeblich das Siebenfache.
+    // Beide Zahlen waren falsch, und zwar in ENTGEGENGESETZTE Richtung:
+    //
+    //   Es fehlte der LEVELFAKTOR. `Bladeburner.ts:917` multipliziert den
+    //   Ertrag mit `rewardFac^(level-1)`. Tracking steht auf Stufe 28
+    //   (1,041^27 = 2,96), alle Operationen auf Stufe 1 (Faktor 1). Der
+    //   Vergleich verglich also eine ausgereizte Aktion mit einer frischen.
+    //
+    //   Es fehlte der RANGVERLUST. Operationen haben `rankLoss`
+    //   (Operations.ts:20, 54, 90, 125, 165, 203), Vertraege nicht. Bei
+    //   Erfolgschancen unter 0,2 dominiert dieser Term: Stealth Retirement
+    //   und Assassination haben einen NEGATIVEN Erwartungswert.
+    //
+    // Richtig gerechnet liegen Raid (1,819) und Tracking (1,783) gleichauf.
+    const REWARD_FAC = {
+      "Tracking": 1.041, "Bounty Hunter": 1.085, "Retirement": 1.065,
+      "Investigation": 1.07, "Undercover Operation": 1.09,
+      "Sting Operation": 1.095, "Raid": 1.1,
+      "Stealth Retirement Operation": 1.11, "Assassination": 1.14,
+    };
+    // Nur Operationen verlieren Rang bei einem Misserfolg.
+    const RANG_VERLUST = {
+      "Investigation": 0.2, "Undercover Operation": 0.4, "Sting Operation": 0.5,
+      "Raid": 2.5, "Stealth Retirement Operation": 2, "Assassination": 4,
+    };
+    // Trefferpunkte je Misserfolg, mal difficultyMultiplier
+    // (`Bladeburner.ts:983`). Raid nimmt 50 - bei einem Maximum von 25
+    // bedeutet das Krankenhaus bei jedem einzelnen Fehlschlag.
+    const HP_VERLUST = {
+      "Tracking": 0.5, "Bounty Hunter": 1, "Retirement": 1,
+      "Undercover Operation": 2, "Sting Operation": 2.5, "Raid": 50,
+      "Stealth Retirement Operation": 10, "Assassination": 5,
+    };
     const rangGewinn = RANG[name] ?? null;
-    // Erwarteter Rang je Minute: Ertrag mal Erfolgswahrscheinlichkeit,
-    // geteilt durch die Dauer. Die untere Schaetzgrenze ist die vorsichtige
-    // Wahl - die Spanne ist bei unsicheren Aktionen betraechtlich.
-    const ertrag = (rangGewinn != null && dauer)
-      ? +(rangGewinn * min / (dauer / 60000)).toFixed(3) : null;
+    const rf = REWARD_FAC[name] ?? 1;
+    const verlust = RANG_VERLUST[name] ?? 0;
+    // Der Ertrag je Stufe, wie ihn das Spiel tatsaechlich gutschreibt.
+    const gewinnEff = (rangGewinn != null && stufe > 0)
+      ? rangGewinn * Math.pow(rf, stufe - 1) : rangGewinn;
+    // Erwartungswert je Versuch: Gewinn mal Chance minus Verlust mal
+    // Gegenchance. Die untere Schaetzgrenze ist die vorsichtige Wahl.
+    const evJeVersuch = (gewinnEff != null)
+      ? gewinnEff * min - (1 - min) * verlust : null;
+    const ertrag = (evJeVersuch != null && dauer)
+      ? +(evJeVersuch / (dauer / 60000)).toFixed(3) : null;
     return { name, min: +min.toFixed(3), max: +max.toFixed(3),
       spanne: +(max - min).toFixed(3), offen, stufe,
-      dauer, rangGewinn, ertragJeMinute: ertrag };
+      dauer, rangGewinn,
+      gewinnEff: gewinnEff != null ? +gewinnEff.toFixed(3) : null,
+      rangVerlust: verlust,
+      hpJeMisserfolg: +((1 - min) * (HP_VERLUST[name] ?? 0)).toFixed(1),
+      ertragJeMinute: ertrag,
+      // Was die alte Zeile gemeldet haette - zum Vergleich, damit ein
+      // Rueckfall auf die falsche Zahl sofort auffaellt.
+      bruttoJeMinute: (rangGewinn != null && dauer)
+        ? +(rangGewinn * min / (dauer / 60000)).toFixed(3) : null };
   };
 
   const vertraege = ns.bladeburner.getContractNames().map((n) => zeile("Contracts", n));

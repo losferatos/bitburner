@@ -37,6 +37,60 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### bbspann.js rechnete einen irrefuehrenden Ertrag (26.08., 13:05)
+
+Engpass: Nicht der Bot, sondern das Messwerkzeug. Der falsche Ertrag hat um
+12:55 einen Auftrag mit hoher Dringlichkeit erzeugt ("Operationen bringen das
+Siebenfache"), der so nicht stimmt.
+
+Zwei Fehler, die sich gegenseitig verstaerkten:
+- **Levelfaktor fehlte.** `Bladeburner.ts:917` multipliziert den Ertrag mit
+  `rewardFac^(level-1)`. Tracking steht auf Stufe 29 (1,041^28 = 3,07), alle
+  Operationen auf Stufe 1. Verglichen wurde eine ausgereizte Aktion mit einer
+  frischen.
+- **Rangverlust fehlte.** Nur Operationen haben `rankLoss` (Operations.ts:20,
+  54, 90, 125, 165, 203). Bei Chancen unter 0,2 dominiert dieser Term.
+
+Beleg: `Bladeburner.ts:917` (Levelfaktor), `:975-978` (`changeRank` mit
+negativem Vorzeichen bei Misserfolg), `data/Operations.ts` (rankLoss, hpLoss).
+
+Gemessen 13:05 mit der korrigierten Rechnung - `netto` gegen `brutto`, wie es
+vorher dastand:
+
+    Aktion                 Stufe  Chance   netto/min   brutto/min
+    Tracking                  29   0,700       2,425        0,787
+    Retirement                16   0,434       1,828        0,711
+    Bounty Hunter             12   0,363       1,783        0,727
+    Raid                       1   0,103       3,669        6,071
+    Undercover Operation       1   0,225       1,166        1,697
+    Investigation              1   0,271       0,965        1,277
+    Sting Operation            1   0,142       0,461        1,021
+    Stealth Retirement         1   0,087       0,077        1,642
+    Assassination              1   0,055      -0,772        1,408
+
+**Drei Ergebnisse:**
+1. **Assassination hat einen negativen Erwartungswert**, Stealth Retirement
+   einen von praktisch null. Die alte Zahl wies beiden 1,4 bis 1,6 zu.
+2. **Raid ist besser, aber um Faktor 1,5 statt 7.** Der Auftrag von 12:55
+   bleibt bestehen, mit korrigierter Zahl.
+3. **Der Levelfaktor ist der Grund, warum Vertraege mithalten.** Tracking
+   bringt roh 0,3 Rang, effektiv 0,92. Das ist kein Argument gegen
+   Operationen, sondern eines dafuer, eine davon HOCHZUSPIELEN - jede
+   Operationsstufe zahlt 7 bis 14 Prozent, gegen 4,1 bei Tracking.
+
+Vorher: kein Vergleichswert - die Zahl war vorher schlicht falsch.
+Nachher: Die Datei fuehrt jetzt `gewinnEff`, `rangVerlust`, `hpJeMisserfolg`,
+`ertragJeMinute` (netto) und `bruttoJeMinute` (die alte Zahl, zum Vergleich).
+Commit: siehe unten.
+
+**Keine Aenderung am Bot in diesem Lauf.** Der Hebel ist gerechnet und liegt
+bei Raid, aber er haengt an einer ungeklaerten Frage: Raid nimmt 50
+Trefferpunkte je Misserfolg (`data/Operations.ts:126`) bei einem Maximum von
+25, also **Krankenhaus bei jedem einzelnen Fehlschlag** - und ob eine
+Hospitalisierung die laufende Bladeburner-Aktion abbricht, ist nicht geprueft.
+Das gehoert vor jede Aenderung an `SICHER_OPERATION`.
+
+
 ### Die Kammerzeit ist strukturell - gerechnet, keine Aenderung (26.08., 11:45)
 
 **Ziel dieses Laufs war die Frage, ob gegen die 55 Prozent Kammerzeit

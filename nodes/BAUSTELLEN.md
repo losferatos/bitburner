@@ -135,47 +135,57 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Operationen bringen bis zum Siebenfachen und werden nie gefahren
+### Raid bringt anderthalbfachen Ertrag und wird nie gefahren
 
-Gemessen 26.08. um 12:47 ueber `data/bbspann.json` - Ertrag je Minute
-(`rangGewinn * min-Chance / Dauer`), nebeneinander:
+**Korrigiert 13:05 - der Eintrag von 12:55 nannte das Siebenfache und war
+falsch.** Die Zahl kam aus `data/bbspann.json`, und das Werkzeug rechnete
+einen Bruttoertrag ohne Levelfaktor und ohne Rangverlust. Beides ist seit
+13:05 behoben (siehe `nodes/HEBEL.md`). Richtig gerechnet, gemessen 13:05:
 
-    Raid                    min 0,073   55 Rang   56 s   ->  4,279 je Minute
-    Undercover Operation    min 0,158    4,4      35 s   ->  1,195
-    Stealth Retirement      min 0,061   22        70 s   ->  1,157
-    Assassination           min 0,039   44       104 s   ->  0,992
-    Investigation           min 0,191    2,2      28 s   ->  0,899
-    ---
-    Tracking                min 0,502    0,3      15 s   ->  0,603   <- gefahren
-    Bounty Hunter           min 0,256    0,9      27 s   ->  0,512   <- gefahren
+    Aktion                 Stufe  Chance   netto/min   HP je Misserfolg
+    Raid                       1   0,103       3,669               44,9
+    Tracking                  29   0,700       2,425                0,2   <- gefahren
+    Retirement                16   0,434       1,828                0,6
+    Bounty Hunter             12   0,363       1,783                0,6   <- gefahren
+    Undercover Operation       1   0,225       1,166                1,6
+    Investigation              1   0,271       0,965                0,0
+    Sting Operation            1   0,142       0,461                2,1
+    Stealth Retirement         1   0,087       0,077                9,1
+    Assassination              1   0,055      -0,772                4,7
 
-Der Motor faehrt Tracking und Bounty Hunter. **Raid brachte rechnerisch das
-Siebenfache.** Der Grund steht in `src/blade.js:48`: `SICHER_OPERATION = 0.85`,
-waehrend `SICHER_VERTRAG` seit dem 25.08. auf 0,45 gesenkt wurde. Keine
-Operation kommt je auch nur in die Naehe von 0,85 - alle sechs liegen zwischen
-0,039 und 0,191. Die Schwelle schliesst die gesamte Aktionsklasse aus.
+Der Grund, warum keine Operation gefahren wird, steht in `src/blade.js:48`:
+`SICHER_OPERATION = 0.85`, waehrend `SICHER_VERTRAG` seit dem 25.08. auf 0,45
+steht. Keine Operation kommt je in die Naehe von 0,85.
 
-**Die Zahl ist ein Erwartungswert und noch keine Empfehlung.** Was ein
-misslungener Vertrag kostet, ist belegt (Zeit und etwas Chaos, aber keinen
-Rang - deshalb wurde 0,45 gewaehlt). Fuer Operationen ist es NICHT belegt, und
-sie unterscheiden sich in drei Punkten: Es gibt ein Team, das Verluste erleiden
-kann, der Vorrat ist endlich (Raid 350 offen), und der Ausdauerverbrauch steigt
-mit der Schwierigkeit (`BaseStaminaLoss * difficultyMultiplier`,
-`Bladeburner.ts:921`) - bei einem Motor, dessen Engpass die Ausdauer ist, kann
-das den ganzen Vorteil auffressen.
+**Vier der sechs Operationen sind bei diesen Chancen wertlos oder schaedlich.**
+Assassination hat einen negativen Erwartungswert, Stealth Retirement einen von
+null. Eine pauschale Senkung von `SICHER_OPERATION` waere deshalb falsch - die
+Schwelle muesste durch dieselbe Ertragsrechnung ersetzt werden, die blade.js
+fuer Vertraege schon fuehrt.
+
+**Der Blocker ist Raids HP-Schaden.** 50 Trefferpunkte je Misserfolg
+(`data/Operations.ts:126`) bei einem Maximum von 25 heisst: **jeder einzelne
+Fehlschlag fuehrt ins Krankenhaus**, und bei 10 Prozent Erfolgschance ist das
+neun von zehn Versuchen.
 
 **Zu tun, in dieser Reihenfolge:**
-1. Am Quellcode klaeren, was ein Misserfolg bei einer Operation kostet -
-   Rang, Team, Vorrat, Ausdauer. Erst danach ist die Schwelle zu bewerten.
-2. Den Ausdauerverbrauch je Operation gegen den je Vertrag halten. Die
-   Kennzahl ist **Rang je Ausdauerpunkt**, nicht Rang je Minute -
-   `tools/ratencheck.js` rechnet sie bereits.
-3. Erst dann `SICHER_OPERATION` anfassen, und dann einzeln: Raid zuerst, weil
-   dort der Abstand am groessten ist.
+1. Klaeren, ob eine Hospitalisierung die laufende Bladeburner-Aktion abbricht
+   (`person.takeDamage`, `Bladeburner.ts:983-989`). Wenn ja, ist Raid
+   unfahrbar, bis die Trefferpunkte deutlich ueber 50 liegen - dann faellt der
+   Punkt auf "Defense trainieren" zurueck.
+2. Den Ausdauerverbrauch je Raid messen. Bei einem Motor, dessen Engpass die
+   Ausdauer ist, ist Rang je AUSDAUERPUNKT die Kennzahl, nicht Rang je Minute.
+3. Erst dann die Schwellenlogik anfassen - und dann fuer Raid allein, nicht
+   fuer die Klasse.
 
-**Dringlichkeit:** hoch. Es ist der groesste unausgeschoepfte Faktor am Knoten,
-seit der Kammeranteil gefallen ist - und er ist bisher nie geprueft worden,
-weil die Schwelle ihn stumm ausblendet.
+**Nebenbefund, der eigenstaendig zaehlt:** Die Operationen stehen alle auf
+**Stufe 1**, die Vertraege auf 12 bis 29. Eine Operationsstufe zahlt 7 bis 14
+Prozent mehr Ertrag (`rewardFac` 1,07 bis 1,14) gegen 4,1 Prozent bei
+Tracking. Eine hochgespielte Operation waere langfristig die deutlich bessere
+Rangquelle.
+
+**Dringlichkeit:** mittel (herabgestuft von hoch). Der Faktor ist 1,5, nicht 7,
+und er ist durch den HP-Schaden blockiert.
 
 
 ### Der Faehigkeitsplan hatte den zweiten Platz noch falsch besetzt

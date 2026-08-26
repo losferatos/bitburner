@@ -24,43 +24,7 @@ Regeln:
 
 ## Sofort
 
-### Sector-12 hat Chaos 53,89 - die Erfolgschancen sind halbiert (14:50)
-Gemessen (`data/bbspann.json`, 14:49): Der Motor steht in **Sector-12**, Chaos
-**53,89**. Die Erfolgschancen sind gegenueber 13:22 auf die Haelfte gefallen:
-
-    Tracking        0,778  ->  0,357
-    Retirement      0,468  ->  0,219
-    Bounty Hunter   0,388  ->  0,182
-
-Die Rangrate faellt entsprechend: 0,841 je Minute (seit 13:33) gegen **0,625
-in den letzten 35 Minuten**.
-
-Erwartet: Chancen wie um 13:22, also Chaos unter 50.
-
-Ursache **gefunden**, kein Verdacht: `Actions/Action.ts:94-101`. Ueberschreitet
-das Chaos der Arbeitsstadt `ChaosThreshold` (50), wird die SCHWIERIGKEIT mit
-`sqrt(1 + (chaos - 50))` multipliziert - hier `sqrt(4,89) = 2,21`. Das deckt
-sich mit dem gemessenen Faktor 2,18 bei Tracking. Unter 50 ist der Faktor
-exakt 1; der Schaden setzt also schlagartig ein.
-
-Zwei Gegenmittel, beide bereits im Spiel vorhanden und beide `blade.js`
-unbekannt:
-- **Die Stadt wechseln.** Gemessen zur selben Zeit: Chongqing hat Chaos
-  **27,71** bei einer Population von 1,64e9 - in BEIDEN Groessen besser als
-  Sector-12 (53,89 / 1,50e9). New Tokyo 20,93 / 1,53e9. Ein Wechsel wirkt
-  sofort und kostet nur die Reisegebuehr.
-- **Diplomacy** senkt das Chaos (`Bladeburner.ts:1185-1195`). Das steht schon
-  im Offen-Punkt "blade.js hat kein Gegenmittel gegen leere Vertragsvorraete",
-  war dort aber als nachrangig eingestuft, weil Chaos "unter 50 nutzlos" ist.
-  Genau diese Bedingung ist jetzt gekippt.
-
-Nebenbefund, derselbe Punkt: **Tracking hat nur noch 1,2 offene Vertraege**
-(gegen 539 bei Bounty Hunter). Der Motor faellt deshalb auf Bounty Hunter
-zurueck, und das ist mit 0,596 Rang je Minute die schlechteste der drei.
-
-Ungeklaert: Warum der Motor ueberhaupt in Sector-12 steht. Um 13:44 meldete
-`data/bblage.json` noch Aevum (Chaos 37,72).
-
+keine
 
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
@@ -170,6 +134,51 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Die Arbeitsstadt wird nie gewechselt, obwohl es gratis ist
+
+Aufgefallen 26.08. um 15:15 beim Chaos-Befund. `blade.js` kennt keine
+Stadtwahl - der Motor bleibt, wo er einmal steht. Gemessen um 14:49 waren die
+sechs Staedte weit auseinander:
+
+    Stadt        Chaos   popEst     Guete = (pop/1e9)^0,7 / Chaosfaktor
+    Sector-12    53,89   1,50e9     1,331 / 2,21 = 0,602   <- Arbeitsstadt
+    Chongqing    27,71   1,64e9     1,412 / 1    = 1,412
+    New Tokyo    20,93   1,53e9     1,350 / 1    = 1,350
+    Volhaven     43,64   1,58e9     1,378 / 1    = 1,378
+    Aevum        37,72   7,48e8     0,821 / 1    = 0,821
+
+Die Guete folgt aus `Actions/Action.ts:90-101`: Die Population geht mit
+`(pop/1e9)^0,7` in die competence ein (`PopulationThreshold` 1e9,
+`PopulationExponent` 0,7), das Chaos ueber 50 mit `sqrt(1 + chaos - 50)` in die
+Schwierigkeit. **Chongqing war in diesem Moment 2,35-mal besser als
+Sector-12** - in beiden Groessen zugleich.
+
+**Der Wechsel ist gratis.** `ns.bladeburner.switchCity` setzt nur
+`bladeburner.city` (`NetscriptFunctions/Bladeburner.ts:314-319`) - keine
+Reisegebuehr, keine Zeit, kein Ortswechsel der Spielfigur. Das ist etwas
+anderes als eine Reise; die Bladeburner-Stadt ist von `getPlayer().city`
+unabhaengig (deshalb meldete der Strategiepruefer "Aevum", waehrend die
+Division in Sector-12 arbeitete).
+
+**Der Haken, und er ist ernst:** Die Erfolgsschaetzung nutzt `popEst`, nicht
+die echte Population. In einer Stadt, in der die Division noch nie gearbeitet
+hat, ist die Schaetzung unscharf, die Spanne breit - und `blade.js` entscheidet
+nach `spanne().min`. Der Motor koennte nach dem Wechsel in Field Analysis
+landen, bis die Schaetzung steht. Das ist selbstheilend, kostet aber Zeit, und
+wie viel, ist unbekannt.
+
+**Zu tun:**
+1. Die Spannen der anderen Staedte messen, bevor gewechselt wird. `bbspann.js`
+   liest bisher nur `popEst` und `chaos` je Stadt - die Erfolgsspannen gelten
+   nur fuer die aktuelle. Ohne diese Zahl ist der Haken oben nicht bezifferbar.
+2. Erst danach eine Stadtwahl bauen, und dann mit Hysterese: Ein Wechsel, der
+   bei jedem Chaos-Zucken zurueckspringt, verliert mehr durch unscharfe
+   Schaetzungen, als er gewinnt.
+
+**Dringlichkeit:** hoch. Faktor 2,35 auf die Erfolgschance, kostenlos - das ist
+in derselben Groessenordnung wie der Raid-Hebel, aber ohne dessen Geldproblem.
+
 
 ### Wartet bis Eric entscheidet: Raid bringt die dreifache Zyklusrate
 
@@ -556,6 +565,54 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Chaos ueber 50 halbierte alle Erfolgschancen - Diplomacy fehlte (26.08., 15:26)
+
+Gemessen 14:49: Sector-12 stand bei Chaos **53,89**, und die Erfolgschancen
+waren gegenueber 13:22 auf die Haelfte gefallen - Tracking 0,778 auf 0,357,
+Retirement 0,468 auf 0,219, Bounty Hunter 0,388 auf 0,182. Die Rangrate fiel
+von 0,841 auf 0,625 je Minute.
+
+Ursache am Quellcode belegt: `Actions/Action.ts:94-101`. Ueber
+`ChaosThreshold` (50) wird die SCHWIERIGKEIT mit `sqrt(1 + (chaos - 50))`
+multipliziert, hier `sqrt(4,89) = 2,21`. Der gemessene Faktor war 2,18. Unter
+50 ist der Faktor exakt 1 - der Schaden setzt schlagartig ein und verschwindet
+ebenso schlagartig.
+
+**Das war eine Vorhersage, kein Rueckschluss.** Der Faktor 2,21 stand in
+`nodes/BAUSTELLEN.md`, bevor die Gegenmassnahme lief; die Messung danach hat
+ihn bestaetigt.
+
+Behoben in `src/blade.js`: Steigt das Chaos der Arbeitsstadt ueber 50, faehrt
+der Motor `Diplomacy`, bis es unter 47 liegt. Die Pruefung steht **vor** der
+Aktionswahl - der Wert, den `beste()` vergleicht, ist bei hohem Chaos bereits
+verdorben, wer erst waehlt und dann aufraeumt, waehlt auf Basis halbierter
+Zahlen.
+
+Diplomacy senkt das Chaos prozentual um `charisma^0,045 + charisma/1000`
+(`Bladeburner.ts:735-743`), dauert 60 Sekunden und kostet **keine Ausdauer**
+(`data/GeneralActions.ts:37-44`). Die Hysterese ist knapp (ein ab 50, aus bei
+47), weil die Senkung prozentual und damit langsam ist - von 50 auf 40 waeren
+es siebzehn Durchlaeufe.
+
+**Verifiziert 15:26, durchgehend beobachtet:**
+
+    15:16:23   Chaos 53,8   General/Diplomacy startet
+    15:21:14   Chaos 50,0
+    15:25:47   Chaos 47,3
+    15:26:07   Contracts/Tracking, **chance 0,801**
+
+Zehn Minuten Diplomacy, danach **Tracking-Chance 0,801 gegen 0,357** - Faktor
+2,24 gegen den vorhergesagten 2,21. Gemessene Senkung rund 0,76 Chaospunkte je
+Durchlauf, also 1,4 Prozent.
+
+Damit ist zugleich der Diplomacy-Teil des Offen-Punkts "blade.js hat kein
+Gegenmittel gegen leere Vertragsvorraete" erledigt. Dort stand er als
+nachrangig, weil "Chaos unter 50 nutzlos" ist - genau diese Bedingung war
+gekippt, und niemand hat den Eintrag daraufhin noch einmal angesehen. Die
+Lehre steht als eigener Punkt nicht da, gehoert aber hierher: **Eine
+Verwerfung mit Bedingung muss die Bedingung mitpruefen.**
+
 
 ### Die Zyklusrate rechnete mit einer festen Regeneration (26.08., 14:20)
 

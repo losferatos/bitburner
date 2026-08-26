@@ -88,6 +88,16 @@ export async function main(ns) {
   // Erfolgswahrscheinlichkeit und dem doppelten Rangertrag von Tracking
   // (rankGain 0,6 gegen 0,3) ist die Rechnung eindeutig.
   const SICHER_VERTRAG = 0.45;
+  // Chaos-Aufraeumen. Die Grenze 50 ist `ChaosThreshold` aus dem Spiel
+  // (`data/Constants.ts`), nicht gewaehlt; 47 ist der Ausschaltpunkt.
+  const CHAOS_EIN = 50;
+  const CHAOS_AUS = 47;
+  const SPIEL_CHAOS_AN = true;
+  let chaosAufraeumen = false;
+  const chaosLage = () => {
+    try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
+    catch { return 0; }
+  };
   const SICHER_OPERATION = 0.85;
   const SICHER_BLACKOP = 0.99;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
@@ -580,6 +590,43 @@ export async function main(ns) {
       }
       return treffer;
     };
+
+    // CHAOS UEBER 50 HALBIERT ALLE ERFOLGSCHANCEN (26.08.2026, 15:20).
+    //
+    // Gemessen um 14:49: Sector-12 stand bei Chaos 53,89, und die Chancen
+    // waren gegenueber 13:22 auf die Haelfte gefallen - Tracking 0,778 auf
+    // 0,357, Retirement 0,468 auf 0,219, Bounty Hunter 0,388 auf 0,182. Die
+    // Rangrate fiel von 0,841 auf 0,625 je Minute.
+    //
+    // Der Grund steht in `Actions/Action.ts:94-101`: Ueber `ChaosThreshold`
+    // (50) wird die SCHWIERIGKEIT mit `sqrt(1 + (chaos - 50))` multipliziert,
+    // hier `sqrt(4,89) = 2,21`. Das deckt sich mit dem gemessenen Faktor 2,18.
+    // Unter 50 ist der Faktor exakt 1 - der Schaden setzt schlagartig ein und
+    // verschwindet ebenso schlagartig.
+    //
+    // Diplomacy senkt das Chaos PROZENTUAL um `charisma^0,045 + charisma/1000`
+    // (`Bladeburner.ts:735-743`, `:1185-1187`), dauert 60 Sekunden und kostet
+    // **keine Ausdauer** (`data/GeneralActions.ts:37-44`). Bei niedrigem
+    // Charisma sind das gut ein Prozent je Durchlauf - von 53,89 auf unter 50
+    // also rund sieben Minuten. Danach arbeitet jede Aktion wieder mit der
+    // doppelten Chance, und zwar dauerhaft.
+    //
+    // Die Hysterese ist knapp gewaehlt (ein ab 50, aus bei 47), weil die
+    // Senkung prozentual und damit langsam ist: Von 50 auf 40 waeren es
+    // siebzehn Durchlaeufe. Drei Prozentpunkte Abstand halten die Schwelle
+    // sicher unterschritten, ohne die Arbeit lange zu unterbrechen.
+    //
+    // WARUM VOR DER AKTIONSWAHL: Der Wert, den `beste()` vergleicht, ist
+    // bereits durch das Chaos verdorben. Wer erst waehlt und dann aufraeumt,
+    // waehlt auf Basis halbierter Zahlen.
+    if (SPIEL_CHAOS_AN) {
+      if (chaosLage() > CHAOS_EIN) chaosAufraeumen = true;
+      if (chaosLage() < CHAOS_AUS) chaosAufraeumen = false;
+      if (chaosAufraeumen) {
+        return { typ: G, name: "Diplomacy",
+          grund: "Chaos " + chaosLage().toFixed(1) };
+      }
+    }
 
     const op = beste(OPERATIONEN, O, SICHER_OPERATION);
     if (op) return { typ: O, name: op.name, grund: "Operation" };

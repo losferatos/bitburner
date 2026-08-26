@@ -275,6 +275,44 @@ export async function main(ns) {
     }
   };
 
+  // DER ABSCHNITTSSCHREIBER (26.08.2026, 02:45).
+  //
+  // Der Strategiepruefer rechnet seine Erwartungswerte aus dem Quellcode:
+  // rankGain mal Erfolgschance durch Aktionsdauer. Ob das stimmt, liess sich
+  // bisher nicht sagen - `tools/ratencheck.js` hat am 26.08. um 02:15 gezeigt,
+  // warum: Der Messverlauf haelt alle zwanzig Minuten fest, welche Aktion
+  // GERADE laeuft, und schreibt ihr den ganzen Zuwachs der Zwischenzeit zu.
+  // In zwanzig Minuten wechselt der Motor aber mehrfach. Contracts/Retirement
+  // kam so auf einen Median von null, waehrend der Rang nachweislich stieg.
+  //
+  // Hier entsteht die saubere Grundlage: Bei JEDEM Aktionswechsel wird der
+  // abgeschlossene Abschnitt weggeschrieben - von wann bis wann, welche
+  // Aktion, wie viel Rang dazwischen. Daraus laesst sich die Rate je Aktion
+  // ohne Vermischung ableiten.
+  //
+  // Die Endung ist .txt und nicht .jsonl: Bitburner laesst nur eine kurze
+  // Liste von Dateiendungen zu und weist alles andere mit "Invalid file
+  // extension" ab. Der Inhalt ist trotzdem JSON, eine Zeile je Abschnitt.
+  let abschnitt = null;
+  const schliesseAbschnitt = (jetztRang) => {
+    if (!abschnitt) return;
+    const dauer = Date.now() - abschnitt.von;
+    // Abschnitte unter zehn Sekunden sind Umschaltzucken, keine Arbeit.
+    if (dauer >= 10_000) {
+      const zeile = JSON.stringify({
+        von: abschnitt.von, bis: Date.now(), aktion: abschnitt.aktion,
+        grund: abschnitt.grund, rangVon: abschnitt.rang, rangBis: jetztRang,
+      }) + String.fromCharCode(10);
+      try {
+        ns.write("data/aktionen.txt", zeile, "a");
+        if (ns.getHostname() !== "home") {
+          ns.scp("data/aktionen.txt", "home", ns.getHostname());
+        }
+      } catch (e) { /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
+    }
+    abschnitt = null;
+  };
+
   // --- Die naechste Aktion waehlen -----------------------------------------
   const waehle = () => {
     // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
@@ -459,6 +497,11 @@ export async function main(ns) {
       const gleich = laeuft && laeuft.type === wahl.typ && laeuft.name === wahl.name;
       if (!gleich) {
         if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
+          let r = null;
+          try { r = ns.bladeburner.getRank(); } catch { /* egal */ }
+          schliesseAbschnitt(r);
+          abschnitt = { von: Date.now(), aktion: wahl.typ + "/" + wahl.name,
+            grund: wahl.grund, rang: r };
           const kennung = wahl.typ + "/" + wahl.name;
           if (kennung !== letzte) {
             sag(kennung + "  (" + wahl.grund + ")");

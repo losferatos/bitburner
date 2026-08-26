@@ -177,9 +177,22 @@ zufaellig zum Messpunkt lief - und das ist zur Haelfte die Kammer, die
 naturgemaess null bringt.
 
 **Zu tun, in dieser Reihenfolge:**
-1. `blade.js` protokolliert bei JEDEM Aktionswechsel Rang und Zeit in eine
-   eigene Datei. Erst damit gibt es saubere Intervalle je Aktion.
-2. Nach einigen Stunden `tools/ratencheck.js` gegen diese Datei laufen lassen.
+1. ~~`blade.js` protokolliert bei JEDEM Aktionswechsel Rang und Zeit.~~
+   **Erledigt 26.08., 03:01.** Beim Wechsel wird der abgeschlossene Abschnitt
+   nach `data/aktionen.txt` geschrieben: von, bis, Aktion, Grund, Rang davor
+   und danach - mit dem UNGERUNDETEN Rang, anders als im Messverlauf.
+   Abschnitte unter zehn Sekunden gelten als Umschaltzucken und entfallen.
+   *Verifiziert 03:01:*
+
+       Contracts/Tracking        42 s   Rang 221,855 -> 222,530   (0,96/min)
+       Contracts/Bounty Hunter   22 s   Rang 222,530 -> 222,530   (Misserfolg)
+
+   Die Endung ist `.txt`, nicht `.jsonl`: Bitburner laesst nur wenige
+   Dateiendungen zu und weist alles andere mit "Invalid file extension" ab.
+2. **Naechster Schritt:** Nach einigen Stunden `tools/ratencheck.js` gegen
+   diese Datei laufen lassen. Sie liegt im SPIEL, nicht auf der Platte - das
+   Werkzeug muss sie also ueber die Bruecke holen (`getFile`,
+   `filename=data/aktionen.txt`).
 3. Erst dann entscheiden, ob die Formel aus dem Quellcode ersetzt wird.
 
 Bis dahin bleibt die Formel die bessere Schaetzung: Sie ist wenigstens nicht

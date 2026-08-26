@@ -24,7 +24,43 @@ Regeln:
 
 ## Sofort
 
-keine
+### Sector-12 hat Chaos 53,89 - die Erfolgschancen sind halbiert (14:50)
+Gemessen (`data/bbspann.json`, 14:49): Der Motor steht in **Sector-12**, Chaos
+**53,89**. Die Erfolgschancen sind gegenueber 13:22 auf die Haelfte gefallen:
+
+    Tracking        0,778  ->  0,357
+    Retirement      0,468  ->  0,219
+    Bounty Hunter   0,388  ->  0,182
+
+Die Rangrate faellt entsprechend: 0,841 je Minute (seit 13:33) gegen **0,625
+in den letzten 35 Minuten**.
+
+Erwartet: Chancen wie um 13:22, also Chaos unter 50.
+
+Ursache **gefunden**, kein Verdacht: `Actions/Action.ts:94-101`. Ueberschreitet
+das Chaos der Arbeitsstadt `ChaosThreshold` (50), wird die SCHWIERIGKEIT mit
+`sqrt(1 + (chaos - 50))` multipliziert - hier `sqrt(4,89) = 2,21`. Das deckt
+sich mit dem gemessenen Faktor 2,18 bei Tracking. Unter 50 ist der Faktor
+exakt 1; der Schaden setzt also schlagartig ein.
+
+Zwei Gegenmittel, beide bereits im Spiel vorhanden und beide `blade.js`
+unbekannt:
+- **Die Stadt wechseln.** Gemessen zur selben Zeit: Chongqing hat Chaos
+  **27,71** bei einer Population von 1,64e9 - in BEIDEN Groessen besser als
+  Sector-12 (53,89 / 1,50e9). New Tokyo 20,93 / 1,53e9. Ein Wechsel wirkt
+  sofort und kostet nur die Reisegebuehr.
+- **Diplomacy** senkt das Chaos (`Bladeburner.ts:1185-1195`). Das steht schon
+  im Offen-Punkt "blade.js hat kein Gegenmittel gegen leere Vertragsvorraete",
+  war dort aber als nachrangig eingestuft, weil Chaos "unter 50 nutzlos" ist.
+  Genau diese Bedingung ist jetzt gekippt.
+
+Nebenbefund, derselbe Punkt: **Tracking hat nur noch 1,2 offene Vertraege**
+(gegen 539 bei Bounty Hunter). Der Motor faellt deshalb auf Bounty Hunter
+zurueck, und das ist mit 0,596 Rang je Minute die schlechteste der drei.
+
+Ungeklaert: Warum der Motor ueberhaupt in Sector-12 steht. Um 13:44 meldete
+`data/bblage.json` noch Aevum (Chaos 37,72).
+
 
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer

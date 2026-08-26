@@ -162,6 +162,43 @@ wirkt, und ueberschreibt die Praeparation.
 
 ### Operation Typhoon ist mit Rang 2500 erreichbar, aber nicht fahrbar
 
+**Alle drei Messauftraege sind erledigt (27.08., 01:20) - und die Antwort ist
+beruhigender als der Befund klang.**
+
+**1. Kampfwerte aus Bladeburner-Arbeit: 0,159 dex je Minute.** Gemessen aus
+den Pruefausgaben, 20:07 (dex 181) gegen 01:15 (dex 230), 308 Minuten. Fuer
+dex 4.400 waeren das **434 Stunden** - auf diesem Weg unerreichbar.
+
+**2. Gym scheidet ebenfalls aus, und zwar rechnerisch.** Die Erfahrungskurve
+ist `exp = e^((lvl/mult + 200)/32) - 534,6`
+(`PersonObjects/formulas/skill.ts:17-19`). Bei `mults.dexterity` = 1,834
+braeuchte dex 4.400 einen Exponenten von rund `(2.399+200)/32 = 81` - eine
+Zahl jenseits jeder Spielzeit.
+
+**3. Der Fehlschlag-Versuch ist strikt defizitaer** (schon 01:05 gerechnet):
+`rankLoss` 10 gegen `rankGain` 50, bei 3,7 Prozent Chance im Mittel 27
+Versuche je Erfolg - also 270 Rang Verlust gegen 50 Gewinn.
+
+**Der Ausweg stand die ganze Zeit im Multiplikator.** `calculateSkill` ist
+`floor(mult * (32*ln(exp + 534,6) - 200))` - der Multiplikator wirkt **direkt
+auf das Ergebnis**, nicht auf die Erfahrung. Gemessen 01:15: `mults.dexterity`
+steht bei **1,834**, str und def bei 1,260, agi bei 1,389, bei 14
+installierten Augmentierungen. Die Basis hinter dex 230 ist also 125 - mit
+einem Multiplikator von 20 waeren daraus 2.508, mit 35 rund 4.390.
+
+**Damit ist die Route richtig und nur die Erwartung war falsch.** Rang 2500 ist
+kein Ausgang, sondern ein Zwischenschritt; die Black Ops kommen nach mehreren
+Augmentierungs-Zyklen im selben Knoten. Genau das tut der Bot bereits -
+`bn4rep` sammelt Reputation, `bn4net` baut aus, und um 16:31 lief der erste
+Einbau dieses Laufs.
+
+**Was daraus folgt, ohne Umbau:** Die Bladeburner-Augmentierungen selbst sind
+schwach (`bladeburner_success_chance` 1,02 bis 1,06,
+`Augmentation/Augmentations.ts:203,215,228`; nur eine gibt x2). Der Hebel sind
+die **Kampfwert-Multiplikatoren** - beim naechsten Einbau gehoeren sie vor die
+Hack-Augmentierungen. Das ist eine Frage an `bn4rep`s Kaufreihenfolge und
+gehoert geprueft, bevor der naechste Einbau ansteht.
+
 **Dringlichkeit: hoch.** Es ist die Frage, ob der Knoten ueberhaupt auf dem
 eingeschlagenen Weg endet.
 

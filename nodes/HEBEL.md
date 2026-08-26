@@ -37,6 +37,47 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Der Knotenausgang haengt an den Kampfwerten, nicht am Rang (27.08., 01:05)
+
+Engpass: **Die Erfolgschance von Operation Typhoon steht seit zehn Stunden
+still.** Gemessen 15:46 bei Rang 745: `min 0,035, max 0,042`. Gemessen 00:57
+bei Rang **1528**: `min 0,035, max 0,038`. Der Rang hat sich verdoppelt, die
+Kampfwerte sind von rund 115 auf 224 (dex) gestiegen - die Chance ist
+unveraendert.
+
+Beleg: `Actions/Action.ts:169-196`. Fuer Black Ops faellt alles weg, was sonst
+hilft: `getPopulationSuccessFactor` gibt 1, `getChaosSuccessFactor` gibt 1
+(`Actions/BlackOperation.ts:54-60`), und `getDifficulty` ist die **feste**
+`baseDifficulty` 2000 (`data/BlackOperations.ts:10`) - Black Ops sind nicht
+levelbar, es gibt keinen `difficultyFac`. Der **Rang geht ueberhaupt nicht in
+die Chance ein**; er ist nur die Eintrittskarte (`reqdRank` 2500).
+
+Was bleibt, ist die Kompetenz:
+
+    competence = SUMME weights[stat] * effSkill[stat]^0,9
+    chance     = competence / 2000
+
+Mit den Gewichten von Typhoon (hacking 0,1; str/def/dex/agi je 0,2) und den
+Werten von 00:57 ergibt das rund 92 roh, mit Blade's Intuition Stufe 10
+(x1,30) und dem Intelligenzbonus rund 124 - also **0,062**, in derselben
+Groessenordnung wie die gemessenen 0,037.
+
+**Die Konsequenz ist unbequem und gehoert festgehalten:** Fuer eine Chance von
+50 Prozent braucht es Faktor 13,5 in der Kompetenz. Weil die Werte mit
+Exponent 0,9 eingehen, sind das **Faktor 19,6 in den Kampfwerten** - also dex
+von 224 auf rund 4.400. Ueber Faehigkeiten allein ist das nicht zu holen:
+Reaper gibt 2 Prozent je Stufe auf die effektiven Werte, Evasive System 4
+Prozent auf dex und agi; selbst Stufe 50 in beiden braechte nur rund x3,5.
+
+**Damit steht die Route des Knotens zur Ueberpruefung.** Rang 2500 ist in gut
+zehn Stunden erreicht, die Kampfwerte fuer eine fahrbare Chance nicht. Was das
+heisst - Gym-Training aus den 18,7 Milliarden, Augmentierungen, oder Typhoon
+mit kleiner Chance wiederholt versuchen und die Rangverluste hinnehmen - ist
+eine Abwaegung mit Zahlen und steht als eigener Punkt in BAUSTELLEN.md.
+
+Vorher/Nachher: keine Aenderung. Dies ist der Befund, der die naechste
+Entscheidung traegt.
+
 ### Geprueft und nichts geaendert: Raid, Cyber's Edge, Overclock (26.08., 21:55)
 
 Engpass: Weiterhin die Ausdauer. Der Kammeranteil liegt bei 67 Prozent

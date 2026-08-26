@@ -160,6 +160,41 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
+### Operation Typhoon ist mit Rang 2500 erreichbar, aber nicht fahrbar
+
+**Dringlichkeit: hoch.** Es ist die Frage, ob der Knoten ueberhaupt auf dem
+eingeschlagenen Weg endet.
+
+Gemessen 27.08., 00:57: Die Erfolgschance von Operation Typhoon liegt bei
+**0,035 bis 0,038** - unveraendert gegenueber 15:46 (0,035 bis 0,042), obwohl
+sich der Rang von 745 auf 1528 verdoppelt hat. Der Grund steht in HEBEL.md
+(01:05): **Der Rang geht nicht in die Chance ein.** Black Ops ignorieren
+Stadtwerte und Chaos, ihre Schwierigkeit ist die feste `baseDifficulty` 2000,
+und die Chance ist `competence / 2000` mit
+`competence = SUMME weights[stat] * effSkill^0,9`.
+
+Fuer 50 Prozent braucht es **Faktor 19,6 in den Kampfwerten** - dex von 224
+auf rund 4.400. Ueber Faehigkeiten ist das nicht zu holen (Reaper 2 Prozent je
+Stufe, Evasive System 4 auf dex/agi; Stufe 50 in beiden braechte x3,5).
+
+**Zu messen, bevor irgendetwas entschieden wird:**
+1. Wie schnell wachsen die Kampfwerte aus Bladeburner-Arbeit? Aus
+   `data/aktionen.txt` laesst sich das nicht ablesen - es braucht zwei
+   Messpunkte der Kampfwerte mit Zeitstempel. Der Strategiepruefer schreibt
+   sie bereits in `data/verlauf-strategie.json`.
+2. Was kostet dieselbe Steigerung im Gym? Powerhouse Gym kostet 2.400 Dollar
+   je Sekunde, das Guthaben liegt bei 18,7 Milliarden - Geld ist hier nicht
+   der Engpass, Zeit ist es.
+3. Was bringt ein Fehlschlag-Versuch? `rankLoss` 10, `hpLoss` 100
+   (`data/BlackOperations.ts:12-14`). Bei 3,7 Prozent Chance kostet ein
+   Erfolg im Mittel 27 Versuche, also 270 Rang und 2.700 HP-Schaden - gegen
+   `rankGain` 50. **Das ist strikt defizitaer**, Typhoon auf gut Glueck zu
+   versuchen scheidet damit aus.
+
+**Erst danach ist die Route zu bewerten** - und eine Aenderung an der
+Reihenfolge der BitNodes waere Erics Entscheidung, kein Loop-Beschluss.
+
+
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden

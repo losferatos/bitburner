@@ -80,10 +80,26 @@ Datei nicht liegt - gepusht wurde nur nach `home`.
    Kanal nimmt den Auftrag an (`data/task.txt` ist danach leer), aber
    `data/wbgrow.txt` entsteht weder auf `home` noch auf `werk-0`, und
    `werk-0` steht unveraendert bei 512 GB. Zwei Versuche, 18:30 und 19:25.
-   Verdacht: offen. Zu pruefen ist, ob `bn4net` fuer Auftragsskripte eine
-   Liste erlaubter Namen fuehrt, und ob das Skript einen Host waehlt, auf dem
-   die Datei fehlt - `wbgrow.js` schreibt seine Ausgabe ohne `scp` nach home,
-   anders als `work.js`.
+   **Zwei Verdaechte geprueft und ausgeraeumt (19:55):**
+   - *Namensliste:* Es gibt keine. Weder `bn4life.js:270-297` noch
+     `bn4net.js:424-470` filtern Skriptnamen; beide nehmen `teile[0]`
+     unbesehen. Gelesen wird der Kanal derzeit von **bn4life**, weil bn4net
+     nur einspringt, wenn bn4life kein frisches Lebenszeichen hat.
+   - *Fehlende Rueckgabe:* `wbgrow.js` schrieb seine Ausgabe ohne `scp` - der
+     Auftragslaeufer waehlt den Rechner mit dem meisten freien Speicher
+     (`bn4life.js:283-291`), und das ist selten home. Behoben, dazu schliesst
+     das Skript jetzt `home` aus der Werkbank-Wahl aus (es ist mit 2048 GB der
+     groesste Rechner, und `ns.getPurchasedServers()` haette es geliefert -
+     das Skript haette "hat bereits genug" gemeldet und nichts getan).
+
+   **Dritter Versuch um 19:56 trotzdem ohne Ergebnis**: keine
+   `data/wbgrow.txt` auf home, `werk-0` unveraendert bei 512 GB. Nach der
+   Zehn-Minuten-Regel abgebrochen.
+
+   Verdacht jetzt: offen. Der naechste Schritt ist eine Gegenprobe mit einem
+   Skript, das **nur** eine Zeile schreibt und nichts kauft - laeuft das, liegt
+   es an `wbgrow.js` selbst (etwa an `ns.getPurchasedServerUpgradeCost`, das
+   die RAM-Kosten des Skripts hebt); laeuft es nicht, liegt es am Kanal.
 
 Gemessen: `data/wache-zustand.json` zeigt um 17:45:33 Stufe 2 mit dem Text
 "bn4rep.js meldet sich seit 63 min nicht mehr - keine Reputationsarbeit". Eric

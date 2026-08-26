@@ -28,12 +28,22 @@ export async function main(ns) {
   const sag = (t) => {
     zeilen.push(t);
     ns.write("data/wbgrow.txt", zeilen.join("\n") + "\n", "w");
+    // Die Ausgabe MUSS nach home zurueck. Der Auftragslaeufer startet das
+    // Skript auf dem Rechner mit dem meisten freien Speicher
+    // (`bn4life.js:283-291`), und das ist selten home - ohne `scp` schreibt
+    // es seinen Bericht dorthin, wo niemand nachsieht. Genau das ist am
+    // 26.08. zweimal passiert und sah wie ein Startfehler aus.
+    if (ns.getHostname() !== "home") {
+      ns.scp("data/wbgrow.txt", "home", ns.getHostname());
+    }
   };
 
   // Die Werkbank ist der groesste gekaufte Rechner - dieselbe Wahl, die
   // bn4net trifft. Sie hier neu zu bestimmen statt sie zu uebergeben haelt
   // das Skript unabhaengig von der Telemetrie.
-  const eigene = ns.getPurchasedServers();
+  // `home` gehoert ausdruecklich NICHT dazu: Es ist mit 2048 GB der groesste
+  // Rechner, und ein Skript, das ihn waehlt, meldet "hat bereits genug".
+  const eigene = ns.getPurchasedServers().filter((h) => h !== "home");
   if (eigene.length === 0) return sag("Keine gekauften Rechner.");
   let bank = eigene[0];
   for (const h of eigene) if (ns.getServerMaxRam(h) > ns.getServerMaxRam(bank)) bank = h;

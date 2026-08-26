@@ -214,9 +214,37 @@ function sollRate(t, blade) {
   // aeltere Fassung von blade.js -, wird konservativ mit der Haelfte
   // gerechnet: lieber ein verpasster Alarm als ein taeglicher Fehlalarm.
   const chance = Number.isFinite(blade.chance) ? blade.chance : 0.5;
+  // DER LEVELFAKTOR WAR DER FEHLENDE FAKTOR 6 (26.08.2026, 06:16).
+  //
+  // Gemessen ueber 84 saubere Abschnitte (tools/ratencheck.js): Tracking
+  // bringt 1,994 Rang je Minute. Erwartet wurden 0,35 - der Bruttoertrag
+  // rankGain 0,3 mal Erfolgschance durch Dauer.
+  //
+  // Formulas.ts:9-23 rechnet aber
+  //   rankGain * rewardFac^(level-1) * currentNodeMults.BladeburnerRank
+  // und jede Aktion hat ihren eigenen rewardFac (Contracts.ts:18, 52, 85;
+  // Operations.ts:18, 52, 88, 123, 163, 201). Die Stufe steigt mit jedem
+  // zehnten Erfolg, in einem langen Lauf also betraechtlich - genau deshalb
+  // wuchs die Luecke mit der Zeit.
+  const REWARD_FAC = {
+    "Tracking": 1.041, "Bounty Hunter": 1.085, "Retirement": 1.065,
+    "Investigation": 1.07, "Undercover Operation": 1.09,
+    "Sting Operation": 1.095, "Raid": 1.1,
+    "Stealth Retirement Operation": 1.11, "Assassination": 1.14,
+  };
+  const levelFaktor = (name) => {
+    const fac = REWARD_FAC[name];
+    const stufe = Number.isFinite(blade.stufe) ? blade.stufe : 1;
+    if (!fac || stufe <= 1) return 1;
+    return Math.pow(fac, stufe - 1);
+  };
   if (aktion.startsWith("Contracts/")) {
-    return { wert: +(1.7 * chance).toFixed(2), grund: aktion
-      + " bei " + Math.round(chance * 100) + " % Erfolgschance" };
+    const name = aktion.slice("Contracts/".length);
+    const f = levelFaktor(name);
+    return { wert: +(1.7 * chance * f).toFixed(2), grund: aktion
+      + " bei " + Math.round(chance * 100) + " % Erfolgschance"
+      + (f > 1.05 ? ", Stufe " + blade.stufe + " (Faktor "
+        + f.toFixed(2) + ")" : "") };
   }
   if (aktion.startsWith("Operations/")) {
     // Raid ist der Ausreisser: rankGain 55 gegen 2,2 bei Investigation. Genau

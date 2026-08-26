@@ -257,6 +257,23 @@ export async function main(ns) {
     try { punkte = ns.bladeburner.getSkillPoints(); } catch { /* egal */ }
     let bo = null;
     try { bo = ns.bladeburner.getNextBlackOp(); } catch { /* egal */ }
+    // DAS AKTIONSLEVEL GEHOERT NACH DRAUSSEN (26.08.2026, 06:15).
+    //
+    // Der Strategiepruefer erwartete fuer Contracts/Tracking 0,35 Rang je
+    // Minute, gemessen waren 1,994 - Faktor 6. Der Grund steht in
+    // Formulas.ts:9-23: Der Ertrag ist nicht `rankGain`, sondern
+    // `rankGain * rewardFac^(level-1) * BitNode-Multiplikator`. Jede Aktion
+    // hat einen eigenen rewardFac (Tracking 1,041, Bounty Hunter 1,085,
+    // Retirement 1,065), und die Stufe steigt mit jedem zehnten Erfolg.
+    // Ohne sie unterschaetzt der Pruefer systematisch und meldet STAGNATION,
+    // wo der Motor genau das Richtige tut.
+    let stufe = null;
+    try {
+      const teile = String(aktion).split("/");
+      if (teile.length === 2 && teile[0] !== "General") {
+        stufe = ns.bladeburner.getActionCurrentLevel(teile[0], teile[1]);
+      }
+    } catch { /* General-Aktionen haben keine Stufe */ }
     ns.write("data/blade.json", JSON.stringify({
       zeit: Date.now(),
       chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
@@ -267,6 +284,7 @@ export async function main(ns) {
       // kein Neustart eines Werkzeugs, sondern nur ein Neuladen des Tabs.
       spielzeit,
       aktion, grund,
+      stufe,
       naechsteBlackOp: bo ? bo.name : null,
       blackOpRang: bo ? bo.rank : null,
     }), "w");

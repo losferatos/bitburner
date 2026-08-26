@@ -210,9 +210,24 @@ naturgemaess null bringt.
    standardmaessig 1,02 (`Actions/LevelableAction.ts:20`). Tracking stand am
    25.08. auf Stufe 14 - allein das erklaert einen Teil; die Faehigkeiten
    (Blade's Intuition, Overclock) kommen dazu.
-   **Zu tun:** `sollRate()` um den Levelfaktor ergaenzen. Das Aktionslevel
-   steht in `data/bbspann.json` (Feld `stufe`), muss aber in eine Datei, die
-   der Pruefer bei jedem Lauf liest - am ehesten `data/blade.json`.
+   **Geaendert 26.08., 06:16, Wirkung noch nicht gemessen:**
+   `blade.js` schreibt die Stufe der laufenden Aktion nach `data/blade.json`
+   (`getActionCurrentLevel`, nur fuer Contracts und Operations - General-
+   Aktionen haben keine). `sollRate()` multipliziert die Erwartung mit
+   `rewardFac^(stufe-1)`; die Faktoren stehen je Aktion im Quellcode
+   (Contracts.ts:18, 52, 85 - Tracking 1,041, Bounty Hunter 1,085,
+   Retirement 1,065; Operations.ts:18, 52, 88, 123, 163, 201).
+   Nachzumessen ist das erst, wenn der Motor wieder an einem Vertrag steht -
+   bei der Messung um 06:16 ruhte er (`stufe: null`, Kammer).
+
+   **Ein Rest bleibt offen.** Nachgerechnet fuer Tracking auf Stufe 14:
+   0,3 * 1,041^13 = 0,506 Basisertrag, mal 0,73 Chance durch 0,633 Minuten
+   Dauer = 0,58 je Minute. Gemessen sind 1,994 - also weiterhin Faktor 3,4.
+   Der BitNode-Multiplikator ist es nicht (`BitNode.tsx` fuehrt fuer BN6
+   keinen abweichenden Wert, Standard ist 1). Kandidaten: eine hoehere Stufe
+   als 14 (sie steigt mit jedem zehnten Erfolg), oder ein Faehigkeitseinfluss
+   auf den Rangertrag. Die naechste Messung mit echtem `stufe`-Wert entscheidet
+   das - deshalb erst messen, dann weitersuchen.
 
 4. **Der eigentliche Engpass steht daneben und ist groesser als alles andere:**
    Der Motor verbringt **122 von 164 Minuten - 74 Prozent - in der

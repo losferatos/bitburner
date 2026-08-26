@@ -38,31 +38,48 @@ export async function main(ns) {
     }
   };
 
-  // Die Werkbank ist der groesste gekaufte Rechner - dieselbe Wahl, die
-  // bn4net trifft. Sie hier neu zu bestimmen statt sie zu uebergeben haelt
-  // das Skript unabhaengig von der Telemetrie.
-  // `home` gehoert ausdruecklich NICHT dazu: Es ist mit 2048 GB der groesste
-  // Rechner, und ein Skript, das ihn waehlt, meldet "hat bereits genug".
-  const eigene = ns.getPurchasedServers().filter((h) => h !== "home");
-  if (eigene.length === 0) return sag("Keine gekauften Rechner.");
-  let bank = eigene[0];
-  for (const h of eigene) if (ns.getServerMaxRam(h) > ns.getServerMaxRam(bank)) bank = h;
+  // EIN SKRIPT, DAS STILL STIRBT, SIEHT AUS WIE EINS, DAS NIE STARTET
+  // (26.08.2026, 20:18). Drei Startversuche galten als "Kanal kaputt", weil
+  // keine Ausgabedatei entstand. Der Kanal war in Ordnung - eine Gegenprobe
+  // mit einem Skript, das nur eine Zeile schreibt, kam sofort an. Wirft eine
+  // ns-Funktion, bevor der erste `sag()`-Aufruf kommt, hinterlaesst das
+  // Skript nichts. Deshalb: erste Zeile sofort, Rest in try/catch.
+  sag("Start auf " + ns.getHostname() + ".");
+  try {
+    // Die Werkbank ist der groesste gekaufte Rechner - dieselbe Wahl, die
+    // bn4net trifft. Sie hier neu zu bestimmen statt sie zu uebergeben haelt
+    // das Skript unabhaengig von der Telemetrie.
+    // `home` gehoert ausdruecklich NICHT dazu: Es ist mit 2048 GB der groesste
+    // Rechner, und ein Skript, das ihn waehlt, meldet "hat bereits genug".
+    //
+    // API-STAND 3.0.1: Die alten Namen sind ENTFERNT, nicht nur veraltet -
+    // `getPurchasedServers`, `getPurchasedServerUpgradeCost` und
+    // `upgradePurchasedServer` werfen "REMOVED FUNCTION ERROR". Der Ersatz
+    // liegt unter `ns.cloud` (`NetscriptFunctions/Cloud.ts:94,104,195`), und
+    // `ns.formatNumber` heisst jetzt `ns.format.number`.
+    const eigene = ns.cloud.getServerNames().filter((h) => h !== "home");
+    if (eigene.length === 0) return sag("Keine gekauften Rechner.");
+    let bank = eigene[0];
+    for (const h of eigene) if (ns.getServerMaxRam(h) > ns.getServerMaxRam(bank)) bank = h;
 
-  const jetztGb = ns.getServerMaxRam(bank);
-  const zielGb = Number(ns.args[0] ?? 2048);
-  if (jetztGb >= zielGb) return sag(bank + " hat bereits " + jetztGb + " GB.");
+    const jetztGb = ns.getServerMaxRam(bank);
+    const zielGb = Number(ns.args[0] ?? 2048);
+    if (jetztGb >= zielGb) return sag(bank + " hat bereits " + jetztGb + " GB.");
 
-  const kosten = ns.getPurchasedServerUpgradeCost(bank, zielGb);
-  const geld = ns.getPlayer().money;
-  // Ein Fuenftel des Guthabens ist die Grenze. Daruber waere es keine
-  // Reparatur mehr, sondern eine Investitionsentscheidung.
-  if (kosten > geld * 0.2) {
-    return sag("Zu teuer: " + ns.formatNumber(kosten) + " gegen "
-      + ns.formatNumber(geld) + " Guthaben (Grenze ein Fuenftel).");
+    const kosten = ns.cloud.getServerUpgradeCost(bank, zielGb);
+    const geld = ns.getPlayer().money;
+    // Ein Fuenftel des Guthabens ist die Grenze. Daruber waere es keine
+    // Reparatur mehr, sondern eine Investitionsentscheidung.
+    if (kosten > geld * 0.2) {
+      return sag("Zu teuer: " + ns.format.number(kosten) + " gegen "
+        + ns.format.number(geld) + " Guthaben (Grenze ein Fuenftel).");
+    }
+    if (!ns.cloud.upgradeServer(bank, zielGb)) {
+      return sag("Aufruestung abgelehnt: " + bank + " auf " + zielGb + " GB.");
+    }
+    sag(bank + ": " + jetztGb + " -> " + ns.getServerMaxRam(bank)
+      + " GB fuer " + ns.format.number(kosten) + ".");
+  } catch (e) {
+    sag("Abgebrochen: " + String(e && e.message ? e.message : e));
   }
-  if (!ns.upgradePurchasedServer(bank, zielGb)) {
-    return sag("Aufruestung abgelehnt: " + bank + " auf " + zielGb + " GB.");
-  }
-  sag(bank + ": " + jetztGb + " -> " + ns.getServerMaxRam(bank)
-    + " GB fuer " + ns.formatNumber(kosten) + ".");
 }

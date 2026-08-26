@@ -43,12 +43,24 @@ Regeln:
 Rechner ist `home` mit 2048 GB, dessen freier Speicher aber hinter der
 Arbeiterreserve liegt (`homeFrei` 513,15 bei `reserve` 512).
 
-Dabei reichte das Geld **zwanzigfach**: 1.284 Millionen gegen 84,5 Millionen
-fuer den Ausbau auf 2048 GB (55.000 Dollar je GB,
-`Server/data/Constants.ts:4`). Der Motor kauft Arbeiterserver - 26 Stueck,
-die meisten mit 128 GB - laesst die Werkbank aber auf ihrer Startgroesse
-stehen. Damit liegt der Reputationsmotor seit 16:42 still, ohne dass irgendwo
-ein Fehler auftaucht.
+**Die 84,5 Millionen aus der ersten Fassung dieses Punktes waren falsch.**
+Sie stammten aus der BitNode-1-Rechnung mit 55.000 Dollar je GB
+(`Server/data/Constants.ts:4`). In BitNode 6 kostet der Ausbau von werk-0 auf
+2048 GB tatsaechlich **3,379 Milliarden**, auf 1024 GB **676 Millionen** -
+gemessen um 20:25 ueber `ns.cloud.getServerUpgradeCost`. Der Faktor liegt bei
+24, nicht bei 1.
+
+Damit relativiert sich der Vorwurf an den Motor: Es war keine Nachlaessigkeit,
+sondern eine Groessenordnung, die er nicht ohne Weiteres bezahlen konnte -
+1.284 Millionen um 18:20 haetten fuer 1024 GB gereicht, fuer 2048 nicht.
+Trotzdem bleibt der Befund: Er kauft Arbeiterserver (26 Stueck, die meisten
+128 GB), fasst die Werkbank aber nie an, und der Reputationsmotor lag deshalb
+seit 16:42 still.
+
+**BEHOBEN um 20:27.** `werk-0` steht auf **1024 GB** (676 Millionen von 6,6
+Milliarden Guthaben), und `bn4rep.js` laeuft wieder - `data/ps.json` um 20:29
+listet es neben blade, bbtrain, homegrow, wakelock, bn4door und sonde.
+**Verifiziert: bn4rep.js in der Prozessliste um 20:29.**
 
 **Versuchte Reparatur von aussen, 18:20 bis 18:35: fehlgeschlagen.**
 `src/wbgrow.js` ruestet die groesste gekaufte Maschine auf 2048 GB auf, mit

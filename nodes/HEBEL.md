@@ -112,9 +112,16 @@ ueber die 18 Minuten seit der Aenderung, gegen 229 Minuten davor:
     bis 06:55   229,0 min gesamt, 166,0 in der Kammer (72,5 %)  ->  0,484/min
     ab  06:55    18,1 min gesamt,   6,1 in der Kammer (33,5 %)  ->  1,118/min
 
-**Faktor 2,3.** Die Erwartung von 1,3 ist knapp verfehlt, das Ziel von unter
-25 Prozent Kammerzeit auch - aber die Richtung stimmt eindeutig, und die
-Messstrecke ist mit 18 Minuten noch kurz.
+**Faktor 2,3 - diese Zahl war zu guenstig.** Nachgemessen 07:47 ueber die
+volle Strecke 06:55 bis 07:46 (49 Minuten statt 18):
+
+    06:55-07:46   49,0 min | Kammer 50,1 % | 0,888 Rang/min
+
+Der Hebel bringt also **72,5 auf 50,1 Prozent** und **0,484 auf 0,888** -
+Faktor 1,8, nicht 2,3. Die ersten achtzehn Minuten waren ein zu guenstiger
+Ausschnitt; wer auf so kurzer Strecke misst, misst Rauschen mit. Die
+Erwartung von 1,3 ist damit klar verfehlt, das Ziel von unter 25 Prozent
+Kammerzeit ebenso.
 
 Was uebrig bleibt, ist ein ANDERER Engpass: Die verbliebenen 33,5 Prozent sind
 Ausdauer-Ruhe, nicht Trefferpunkte. Die Ausdauer regeneriert passiv rund 1,2

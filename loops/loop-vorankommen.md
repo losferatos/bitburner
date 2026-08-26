@@ -49,4 +49,14 @@ Deshalb:
   \"Name='bash.exe'\" | Select-Object ProcessId,CreationDate"` - alles aelter
   als eine halbe Stunde ist verdaechtig.
 
+**Die Loops entscheiden selbst.** Aus einer belegten Erkenntnis wird ein
+**unmittelbarer Arbeitsauftrag**, kein Wartestatus - wer eine Zahl gemessen
+hat, die eine Aenderung rechtfertigt, setzt sie um, misst nach und nimmt sie
+zurueck, wenn sie nicht traegt. Eric vorgelegt wird ausschliesslich, was er
+sich ausdruecklich vorbehalten hat: **Aenderungen an `src/bn4net.js` und
+`src/boot.js`** sowie **die Reihenfolge der BitNodes**. "Wartet bis Eric" ist
+kein Ablageort fuer unbequeme Entscheidungen (seine Ansage vom 26.08.2026,
+16:05, nachdem der groesste offene Hebel des Knotens vier Laeufe lang dort
+gelegen hatte).
+
 Regeln: Systemzeit per `date`. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. Änderungen an der BitNode-REIHENFOLGE sind Erics Entscheidung — vorschlagen, nicht selbst umsetzen.

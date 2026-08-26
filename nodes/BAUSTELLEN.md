@@ -19,12 +19,149 @@ Regeln:
 - Erledigtes wird nach unten verschoben, nicht geloescht - der Verlauf ist die
   Begruendung fuer das, was heute steht.
 - Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
+- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
+  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
+  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
+  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
+  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
+  Vorgelegt wird nur, was Eric sich ausdruecklich vorbehalten hat:
+  **Aenderungen an `src/bn4net.js` und `src/boot.js`** sowie **die Reihenfolge
+  der BitNodes**. Alles andere ist Sache der Loops.
+  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
+  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
+  groessten offenen Hebel des Knotens einen halben Nachmittag.*
 
 ---
 
 ## Sofort
 
-keine
+### Raid einbauen - dreifache Zyklusrate, Guthabengrenze als Notbremse (16:05)
+
+**Nicht mehr blockiert.** Der Punkt stand vier Laeufe lang auf "Wartet bis Eric
+entscheidet". Eric hat das am 26.08. um 16:05 zurueckgewiesen: **Die Loops
+entscheiden selbst, und aus einer belegten Erkenntnis wird ein unmittelbarer
+Arbeitsauftrag.** Alles Messbare ist gemessen (Punkte 1, 2 und 2b unten sind
+abgehakt), also wird gebaut und nachgemessen - nicht gewartet.
+
+**Auftrag, konkret:**
+1. `SICHER_OPERATION` (`src/blade.js:48`) nicht pauschal senken. Stattdessen
+   Raid einzeln zulassen, wenn zwei Bedingungen zugleich gelten:
+   **Guthaben ueber 2 Mrd** (Notbremse - bei 25,7 Mio je Minute Einkommen und
+   37 Mio je Minute Kosten bleiben von dort aus rund drei Stunden Puffer, und
+   der Deckel `Geld * 0,1` senkt die Kosten mit) **und Chaos der Arbeitsstadt
+   unter 50** (sonst ist die Chance halbiert und der Erwartungswert kippt).
+2. Nach dem Einbau **mindestens 30 Minuten messen**: Rangrate aus
+   `data/aktionen.txt`, Guthabenverlauf aus `geld.js`, Kammeranteil.
+   Erwartet wird eine Zyklusrate ueber 2,5 (gegen 1,12 bei Tracking) und ein
+   Guthabenrueckgang von hoechstens 15 Mio je Minute.
+3. Traegt es nicht, oder faellt das Guthaben schneller: **zurueckdrehen** und
+   das Ergebnis hier eintragen. Eine widerlegte Zahl ist ein Ergebnis.
+
+**Dritte Korrektur dieses Punktes, und diesmal mit der richtigen Kennzahl
+(13:22).** 12:55 stand hier "das Siebenfache" (Bruttoertrag, falsch), 13:05
+"anderthalbfach" (netto je Minute, richtig gerechnet aber die falsche Groesse).
+Beide Male fehlte die Ausdauer.
+
+**Der Ausdauerverlust faellt JE AKTION an** (`Bladeburner.ts:921`), nicht je
+Zeit. Eine lange Aktion verteilt denselben Verlust auf mehr Minuten und
+braucht deshalb weniger Kammerzeit. Das kehrt die Rangfolge um. Gemessen im
+Spiel um 13:22 ueber `data/bbspann.json`, das die Rechnung jetzt selbst fuehrt:
+
+    Aktion                  Stufe  Chance  netto/min  Aus/min  Arbeit  Zyklus
+    Raid                        1   0,107      3,891     2,36   97,4%   3,791
+    Bounty Hunter              13   0,362      1,859     3,65   63,1%   1,173
+    Tracking                   29   0,725      2,513     5,18   44,4%   1,115   <- gefahren
+    Retirement                 16   0,450      1,895     4,25   54,1%   1,025
+    Undercover Operation        1   0,233      1,231     3,16   72,8%   0,896
+    Investigation               1   0,280      1,013     3,30   69,7%   0,706
+    Sting Operation             1   0,147      0,500     2,65   86,7%   0,434
+    Stealth Retirement          1   0,090      0,140     2,07  100,0%   0,140
+    Assassination               1   0,057     -0,717     1,65  100,0%  -0,717
+
+Raid verbraucht **2,36 Ausdauer je Minute** - knapp unter der Regeneration von
+2,3, gemessen am 26.08. um 12:21. Der Arbeitsanteil steigt damit von 44 auf
+97 Prozent: **Raid braucht praktisch keine Kammerzeit.** Faktor 3,4 gegen die
+gefahrene Aktion.
+
+**Der HP-Schaden ist KEIN Blocker** (geklaert 13:15). `hospitalize()` setzt HP
+auf max, zieht Geld ab und feuert `PlayerEventType.Hospitalized`
+(`PlayerObjectGeneralMethods.ts:281-290`). Auf dieses Ereignis hoert im ganzen
+Spiel **nur die Infiltration** (`Infiltration/Infiltration.ts:83`) - die
+laufende Bladeburner-Aktion wird nicht abgebrochen. Ein Raid-Misserfolg kostet
+also Geld, aber keine Zeit. Nebeneffekt: Nach der Heilung sind die
+Trefferpunkte voll, die HP-Ruhe entfaellt bei Raid vollstaendig.
+
+**Der Blocker ist das Guthaben.** Raids Schaden ist
+`50 * difficultyMultiplier` = 50 * (800^0,28 + 800/650) = **397 Trefferpunkte**
+je Misserfolg. Die Krankenhauskosten sind
+`min(Geld * 0,1, (max - current) * 100.000)` (`Hospital.ts:4-10`), und weil
+`current` auf -372 faellt, sind das 39,7 Millionen je Misserfolg - **unabhaengig
+von den maximalen Trefferpunkten**, solange diese unter 397 liegen. Bei 0,93
+Misserfolgen je Minute macht das **rund 37 Millionen je Minute**.
+
+Dagegen steht das gemessene Einkommen: 6.667m um 12:16, 8.188m um 13:00, also
+**34,6 Millionen je Minute**. Raid waere um rund 2,4 Millionen je Minute
+defizitaer.
+
+**Das ist weniger schlimm, als es klingt, und es ist selbstbegrenzend.** Bei
+8 Milliarden Guthaben reicht der Puffer rechnerisch 55 Stunden, und in dieser
+Zeit brachte Raid rund 12.500 Rang - das Fuenffache dessen, was die erste
+Black Op verlangt. Faellt das Guthaben, greift der Deckel `Geld * 0,1`: Bei
+100 Millionen kostet eine Heilung nur noch 10 Millionen. Das System pendelt
+sich ein, statt zu kollabieren.
+
+**Die Bilanz ist jetzt gemessen, nicht geschaetzt (13:48).** Die 34,6 Millionen
+je Minute oben waren eine Guthabendifferenz - und die untertreibt das
+Bruttoeinkommen nicht, sie UEBERTREIBT es hier: Das Fenster 12:16 bis 13:00
+enthielt keine groesseren Ausgaben. Mit `src/geld.js` (neu) ueber
+`ns.getMoneySources()` gemessen, vier Minuten am Stueck:
+
+    hacking             +25,17 Mio/min
+    bladeburner          +0,55
+    hospitalization      -0,30      (der bestehende Hebel von 06:55)
+    ---
+    gesamt              +25,41 Mio/min
+
+**Damit ist das Defizit groesser als angenommen: 11,3 statt 2,4 Millionen je
+Minute.** Aber die Rechnung dahinter faellt trotzdem zugunsten von Raid aus:
+
+- Bei 9,2 Milliarden Guthaben reicht der Puffer **13,6 Stunden**, und in
+  dieser Zeit bringt Raid **rund 3.100 Rang** - von 645 auf 3.700, also weit
+  ueber die 2.500 der ersten Black Op.
+- Danach kollabiert nichts. Der Deckel `Geld * 0,1` greift und senkt die
+  Kosten mit dem Guthaben. Das Gleichgewicht, wo Kosten und Einkommen sich
+  treffen, liegt bei **rund 276 Millionen** - dort kostet eine Heilung 27,6
+  Millionen, also genau die 25,7 Millionen je Minute, die hereinkommen.
+
+**Die Abwaegung lautet also nicht "riskant oder nicht", sondern: 8,9
+Milliarden Guthaben gegen Faktor 3,4 auf den Traeger.** Was das Geld in
+BitNode 6 noch wert ist, haengt an den Augmentierungen - und die heben die
+Kampfwerte und damit die Erfolgschancen, die ihrerseits Raid billiger machen.
+Das ist ein Kreis, kein einfacher Tausch, und deshalb Erics Entscheidung.
+
+**Zu tun - und das ist bewusst KEIN Nebenbei-Eingriff:**
+1. ~~Klaeren, ob eine Hospitalisierung die Aktion abbricht.~~ **Erledigt
+   13:15: nein.**
+2. ~~Den Ausdauerverbrauch je Operation messen.~~ **Erledigt 13:22**, die
+   Rechnung steht jetzt dauerhaft in `src/bbspann.js`.
+2b. ~~Das Einkommen messen statt schaetzen.~~ **Erledigt 13:48** mit
+   `src/geld.js`: 25,7 Millionen je Minute brutto, davon 25,17 aus Hacking.
+3. Offen: Die Umstellung selbst. Sie ersetzt die feste Schwelle
+   `SICHER_OPERATION = 0.85` (`src/blade.js:48`) durch dieselbe
+   Ertragsrechnung, die blade.js fuer Vertraege schon fuehrt - erweitert um
+   den Arbeitsanteil. **Vorschlag zur Stufung:** Raid nur fahren, solange das
+   Guthaben ueber einer Grenze liegt (etwa 2 Milliarden), darunter zurueck auf
+   Vertraege. Damit ist der Geldpuffer die Regelgroesse und nicht das Risiko.
+
+**Warum es hier steht und nicht schon umgesetzt ist:** Der Umbau greift in den
+Kern der Aktionsauswahl und tauscht Geld gegen Rang - eine Abwaegung, die die
+Augmentierungen und den Serverkauf betrifft. Das gehoert vorgelegt, nicht
+nebenbei entschieden.
+
+**Dringlichkeit:** hoch. Faktor 3,4 auf den Traeger des Knotens ist der
+groesste belegte Hebel, der derzeit offen liegt.
+
+
 
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
@@ -134,119 +271,6 @@ wirkt, und ueberschreibt die Praeparation.
 ---
 
 ## Offen, nach Dringlichkeit
-
-### Wartet bis Eric entscheidet: Raid bringt die dreifache Zyklusrate
-
-**Blockiert seit 14:20.** Alles Messbare ist gemessen (Punkte 1, 2 und 2b unten
-sind abgehakt); offen ist nur noch die Abwaegung 8,9 Milliarden Guthaben gegen
-Faktor 3,4 auf den Traeger. Die gehoert Eric, nicht einem Loop - deshalb steht
-hier "Wartet", damit der Vorankommens-Loop nicht jede halbe Stunde davorsteht.
-Sobald die Entscheidung da ist, ist es Punkt 3.
-
-**Dritte Korrektur dieses Punktes, und diesmal mit der richtigen Kennzahl
-(13:22).** 12:55 stand hier "das Siebenfache" (Bruttoertrag, falsch), 13:05
-"anderthalbfach" (netto je Minute, richtig gerechnet aber die falsche Groesse).
-Beide Male fehlte die Ausdauer.
-
-**Der Ausdauerverlust faellt JE AKTION an** (`Bladeburner.ts:921`), nicht je
-Zeit. Eine lange Aktion verteilt denselben Verlust auf mehr Minuten und
-braucht deshalb weniger Kammerzeit. Das kehrt die Rangfolge um. Gemessen im
-Spiel um 13:22 ueber `data/bbspann.json`, das die Rechnung jetzt selbst fuehrt:
-
-    Aktion                  Stufe  Chance  netto/min  Aus/min  Arbeit  Zyklus
-    Raid                        1   0,107      3,891     2,36   97,4%   3,791
-    Bounty Hunter              13   0,362      1,859     3,65   63,1%   1,173
-    Tracking                   29   0,725      2,513     5,18   44,4%   1,115   <- gefahren
-    Retirement                 16   0,450      1,895     4,25   54,1%   1,025
-    Undercover Operation        1   0,233      1,231     3,16   72,8%   0,896
-    Investigation               1   0,280      1,013     3,30   69,7%   0,706
-    Sting Operation             1   0,147      0,500     2,65   86,7%   0,434
-    Stealth Retirement          1   0,090      0,140     2,07  100,0%   0,140
-    Assassination               1   0,057     -0,717     1,65  100,0%  -0,717
-
-Raid verbraucht **2,36 Ausdauer je Minute** - knapp unter der Regeneration von
-2,3, gemessen am 26.08. um 12:21. Der Arbeitsanteil steigt damit von 44 auf
-97 Prozent: **Raid braucht praktisch keine Kammerzeit.** Faktor 3,4 gegen die
-gefahrene Aktion.
-
-**Der HP-Schaden ist KEIN Blocker** (geklaert 13:15). `hospitalize()` setzt HP
-auf max, zieht Geld ab und feuert `PlayerEventType.Hospitalized`
-(`PlayerObjectGeneralMethods.ts:281-290`). Auf dieses Ereignis hoert im ganzen
-Spiel **nur die Infiltration** (`Infiltration/Infiltration.ts:83`) - die
-laufende Bladeburner-Aktion wird nicht abgebrochen. Ein Raid-Misserfolg kostet
-also Geld, aber keine Zeit. Nebeneffekt: Nach der Heilung sind die
-Trefferpunkte voll, die HP-Ruhe entfaellt bei Raid vollstaendig.
-
-**Der Blocker ist das Guthaben.** Raids Schaden ist
-`50 * difficultyMultiplier` = 50 * (800^0,28 + 800/650) = **397 Trefferpunkte**
-je Misserfolg. Die Krankenhauskosten sind
-`min(Geld * 0,1, (max - current) * 100.000)` (`Hospital.ts:4-10`), und weil
-`current` auf -372 faellt, sind das 39,7 Millionen je Misserfolg - **unabhaengig
-von den maximalen Trefferpunkten**, solange diese unter 397 liegen. Bei 0,93
-Misserfolgen je Minute macht das **rund 37 Millionen je Minute**.
-
-Dagegen steht das gemessene Einkommen: 6.667m um 12:16, 8.188m um 13:00, also
-**34,6 Millionen je Minute**. Raid waere um rund 2,4 Millionen je Minute
-defizitaer.
-
-**Das ist weniger schlimm, als es klingt, und es ist selbstbegrenzend.** Bei
-8 Milliarden Guthaben reicht der Puffer rechnerisch 55 Stunden, und in dieser
-Zeit brachte Raid rund 12.500 Rang - das Fuenffache dessen, was die erste
-Black Op verlangt. Faellt das Guthaben, greift der Deckel `Geld * 0,1`: Bei
-100 Millionen kostet eine Heilung nur noch 10 Millionen. Das System pendelt
-sich ein, statt zu kollabieren.
-
-**Die Bilanz ist jetzt gemessen, nicht geschaetzt (13:48).** Die 34,6 Millionen
-je Minute oben waren eine Guthabendifferenz - und die untertreibt das
-Bruttoeinkommen nicht, sie UEBERTREIBT es hier: Das Fenster 12:16 bis 13:00
-enthielt keine groesseren Ausgaben. Mit `src/geld.js` (neu) ueber
-`ns.getMoneySources()` gemessen, vier Minuten am Stueck:
-
-    hacking             +25,17 Mio/min
-    bladeburner          +0,55
-    hospitalization      -0,30      (der bestehende Hebel von 06:55)
-    ---
-    gesamt              +25,41 Mio/min
-
-**Damit ist das Defizit groesser als angenommen: 11,3 statt 2,4 Millionen je
-Minute.** Aber die Rechnung dahinter faellt trotzdem zugunsten von Raid aus:
-
-- Bei 9,2 Milliarden Guthaben reicht der Puffer **13,6 Stunden**, und in
-  dieser Zeit bringt Raid **rund 3.100 Rang** - von 645 auf 3.700, also weit
-  ueber die 2.500 der ersten Black Op.
-- Danach kollabiert nichts. Der Deckel `Geld * 0,1` greift und senkt die
-  Kosten mit dem Guthaben. Das Gleichgewicht, wo Kosten und Einkommen sich
-  treffen, liegt bei **rund 276 Millionen** - dort kostet eine Heilung 27,6
-  Millionen, also genau die 25,7 Millionen je Minute, die hereinkommen.
-
-**Die Abwaegung lautet also nicht "riskant oder nicht", sondern: 8,9
-Milliarden Guthaben gegen Faktor 3,4 auf den Traeger.** Was das Geld in
-BitNode 6 noch wert ist, haengt an den Augmentierungen - und die heben die
-Kampfwerte und damit die Erfolgschancen, die ihrerseits Raid billiger machen.
-Das ist ein Kreis, kein einfacher Tausch, und deshalb Erics Entscheidung.
-
-**Zu tun - und das ist bewusst KEIN Nebenbei-Eingriff:**
-1. ~~Klaeren, ob eine Hospitalisierung die Aktion abbricht.~~ **Erledigt
-   13:15: nein.**
-2. ~~Den Ausdauerverbrauch je Operation messen.~~ **Erledigt 13:22**, die
-   Rechnung steht jetzt dauerhaft in `src/bbspann.js`.
-2b. ~~Das Einkommen messen statt schaetzen.~~ **Erledigt 13:48** mit
-   `src/geld.js`: 25,7 Millionen je Minute brutto, davon 25,17 aus Hacking.
-3. Offen: Die Umstellung selbst. Sie ersetzt die feste Schwelle
-   `SICHER_OPERATION = 0.85` (`src/blade.js:48`) durch dieselbe
-   Ertragsrechnung, die blade.js fuer Vertraege schon fuehrt - erweitert um
-   den Arbeitsanteil. **Vorschlag zur Stufung:** Raid nur fahren, solange das
-   Guthaben ueber einer Grenze liegt (etwa 2 Milliarden), darunter zurueck auf
-   Vertraege. Damit ist der Geldpuffer die Regelgroesse und nicht das Risiko.
-
-**Warum es hier steht und nicht schon umgesetzt ist:** Der Umbau greift in den
-Kern der Aktionsauswahl und tauscht Geld gegen Rang - eine Abwaegung, die die
-Augmentierungen und den Serverkauf betrifft. Das gehoert vorgelegt, nicht
-nebenbei entschieden.
-
-**Dringlichkeit:** hoch. Faktor 3,4 auf den Traeger des Knotens ist der
-groesste belegte Hebel, der derzeit offen liegt.
-
 
 ### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 

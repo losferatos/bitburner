@@ -16,6 +16,52 @@ export async function main(ns) {
     return;
   }
 
+  // DIE REGENERATION WIRD GEMESSEN, NICHT ANGENOMMEN (26.08.2026, 14:18).
+  //
+  // Die Zyklusrate weiter unten teilt durch R - die Ausdauer, die je Minute
+  // nachkommt. Bis 14:18 stand dort die feste Zahl 2,3 aus der Messung vom
+  // 12:21. Genau die veraltet: Cyber's Edge hebt `getSkillMult(Stamina)`, und
+  // der steckt in `calculateStaminaGainPerSecond` (`Bladeburner.ts:1317-1325`).
+  // Gemessen ueber die Kammerphasen in `data/aktionen.txt`:
+  //
+  //     vor 12:21, Cyber's Edge Stufe 0   R = 2,068   (53 Phasen, 108 min)
+  //     ab  13:33, Cyber's Edge Stufe 5   R = 2,313   (11 Phasen,  23 min)
+  //
+  // Ein fester Wert haette die Zyklusrate ab jetzt systematisch zu niedrig
+  // gerechnet - und zwar zugunsten der langen Aktionen, also in die Richtung,
+  // in die die Auswertung ohnehin schon zeigt. Das ist der gefaehrliche Fall.
+  //
+  // Die Kammer ist die einzige Aktion, in der die Ausdauer NUR steigt: Sie
+  // verbraucht nichts (`GeneralActions.ts`, kein Eintrag in der
+  // Verbrauchsformel), also ist die Differenz je Minute genau R.
+  let regeneration = 2.3;
+  let regenerationQuelle = "Vorgabe";
+  try {
+    const roh = ns.fileExists("data/aktionen.txt", "home")
+      ? ns.read("data/aktionen.txt") : "";
+    let zeit = 0, gewinn = 0, n = 0;
+    // Rueckwaerts, damit die JUENGSTEN Phasen zaehlen - eine gerade gekaufte
+    // Faehigkeit soll sich sofort niederschlagen, nicht erst nach Stunden.
+    const zeilen = roh.split(String.fromCharCode(10)).filter((z) => z.trim());
+    for (let i = zeilen.length - 1; i >= 0 && zeit < 20; i--) {
+      let r;
+      try { r = JSON.parse(zeilen[i]); } catch { continue; }
+      if (r.aktion !== "General/Hyperbolic Regeneration Chamber") continue;
+      if (r.ausdauerVon == null || r.ausdauerBis == null) continue;
+      const dt = (r.bis - r.von) / 60000;
+      // Kurze Phasen taugen nicht: Die Ausdauer wird auf ganze Zehntel
+      // gerundet gemeldet, und bei 20 Sekunden ist der Rundungsfehler groesser
+      // als das Signal.
+      if (dt < 0.5) continue;
+      zeit += dt; gewinn += r.ausdauerBis - r.ausdauerVon; n++;
+    }
+    if (zeit >= 5 && gewinn > 0) {
+      regeneration = gewinn / zeit;
+      regenerationQuelle = "gemessen ueber " + n + " Kammerphasen, "
+        + zeit.toFixed(1) + " min";
+    }
+  } catch (e) { regenerationQuelle = "Vorgabe (" + String(e && e.message ? e.message : e) + ")"; }
+
   const zeile = (typ, name) => {
     let min = 0, max = 0;
     try {
@@ -135,9 +181,7 @@ export async function main(ns) {
         const ausJeLauf = 0.285 * (Math.pow(d, 0.28) + d / 650);
         const min_ = dauer / 60000;
         const ausJeMin = ausJeLauf / min_;
-        // R aus der Kammermessung vom 26.08., 12:21. Waechst mit Cyber's Edge -
-        // dann verschiebt sich die Rangfolge zugunsten der kurzen Aktionen.
-        const R = 2.3;
+        const R = regeneration;
         const anteil = Math.min(1, R / ausJeMin);
         return {
           ausdauerJeLauf: +ausJeLauf.toFixed(2),
@@ -206,6 +250,8 @@ export async function main(ns) {
   ns.write("data/bbspann.json", JSON.stringify({
     zeit: Date.now(),
     rang: ns.bladeburner.getRank(),
+    regeneration: +regeneration.toFixed(3),
+    regenerationQuelle,
     punkte: ns.bladeburner.getSkillPoints(),
     stadt: ns.bladeburner.getCity(),
     ausdauer: ns.bladeburner.getStamina(),

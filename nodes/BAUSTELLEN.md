@@ -135,7 +135,13 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Raid bringt die dreifache Zyklusrate - der Blocker ist Geld, nicht HP
+### Wartet bis Eric entscheidet: Raid bringt die dreifache Zyklusrate
+
+**Blockiert seit 14:20.** Alles Messbare ist gemessen (Punkte 1, 2 und 2b unten
+sind abgehakt); offen ist nur noch die Abwaegung 8,9 Milliarden Guthaben gegen
+Faktor 3,4 auf den Traeger. Die gehoert Eric, nicht einem Loop - deshalb steht
+hier "Wartet", damit der Vorankommens-Loop nicht jede halbe Stunde davorsteht.
+Sobald die Entscheidung da ist, ist es Punkt 3.
 
 **Dritte Korrektur dieses Punktes, und diesmal mit der richtigen Kennzahl
 (13:22).** 12:55 stand hier "das Siebenfache" (Bruttoertrag, falsch), 13:05
@@ -240,50 +246,6 @@ nebenbei entschieden.
 
 **Dringlichkeit:** hoch. Faktor 3,4 auf den Traeger des Knotens ist der
 groesste belegte Hebel, der derzeit offen liegt.
-
-
-### Der Faehigkeitsplan hatte den zweiten Platz noch falsch besetzt
-
-**Der Eintrag von 12:22 hatte die Praemisse verkehrt herum, gemessen 12:47.**
-Dort stand die Sorge, `Blade's Intuition` mit Deckel `Infinity` koenne Punkte
-lautlos verschlingen, sobald seine Erfolgschance bei 1,0 klemmt. Gemessen ist
-das Gegenteil: **Operation Typhoon, die naechste Black Op, steht bei einer
-Erfolgschance von 0,025.** Die Chancen-Faehigkeiten wirken laut
-`Actions/Action.ts:184-187` auch auf Black Ops - Blade's Intuition ist also
-von "ausgereizt" so weit entfernt wie moeglich, und `Infinity` ist dort richtig.
-
-Dafuer stand ein echter Fehler daneben: **Overclock auf Stufe 14, Blade's
-Intuition auf Stufe 0.** Die vierzehn Stufen haben kumulativ rund 169 Punkte
-gekostet (`Summe(3 + 1,4*i)`, i = 0..13), in eine Faehigkeit, deren Wirkung im
-Ausdauer-Engpass mit 0,4444 gegen 0,4445 beziffert ist. Auf Platz 2 haette
-Overclock sich das sofort zurueckgeholt, sobald Cyber's Edge am Deckel steht -
-naechste Stufe 23 Punkte gegen 3 Punkte fuer Blade's Intuition Stufe 1.
-
-**Geaendert 12:48 in `src/blade.js`, Wirkung noch nicht gemessen:** Overclock
-steht jetzt als letzter Eintrag im `SKILL_PLAN`, die Chancen-Faehigkeiten
-davor. Der Deckel 90 bleibt - faellt der Ausdauerengpass je weg, ist die
-Faehigkeit wieder etwas wert.
-
-**Verifiziert 13:18: Blade's Intuition Stufe 1 um 13:18.** Cyber's Edge steht
-auf Stufe 5 (Deckel), Hoechstausdauer 78. Der erste Kauf nach dem Deckel war
-Blade's Intuition, **nicht** Overclock (das unveraendert auf Stufe 14 steht,
-naechste Stufe 23 Punkte). Damit ist die Umsortierung wirksam und der Punkt
-kann nach Erledigt.
-
-**Urspruenglich nachzumessen, sobald Cyber's Edge Stufe 5 erreicht** (Deckel; naechste Stufe
-kostet 13 Punkte, um 12:54 lagen 10 bereit): Der naechste Kauf muss
-**Blade's Intuition Stufe 1** sein, nicht Overclock Stufe 15. Beobachtbar ist
-das erst dann - solange Cyber's Edge unter seinem Deckel steht, bleibt der Plan
-ohnehin dort stehen, und die Umsortierung dahinter ist von aussen unsichtbar.
-
-Die Sicherung, die im Eintrag von 12:22 gefordert wurde - beim Sparziel
-pruefen, ob die Faehigkeit ueberhaupt noch etwas bewegt - ist **bewusst nicht
-gebaut worden.** Sie wuerde bei den heutigen Zahlen nie ausloesen und liesse
-sich deshalb auch nicht pruefen; ungetesteter Code, der nie laeuft, ist eine
-Last und keine Absicherung. Wieder aufnehmen, wenn eine Chance tatsaechlich
-1,0 erreicht.
-
-**Dringlichkeit:** niedrig.
 
 
 ### Der Motor steht drei Viertel der Zeit in der Regenerationskammer
@@ -584,6 +546,79 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Zyklusrate rechnete mit einer festen Regeneration (26.08., 14:20)
+
+`src/bbspann.js` teilte durch R = 2,3 - eine feste Zahl aus der Messung vom
+12:21. Genau die veraltet: Cyber's Edge hebt `getSkillMult(Stamina)`, und der
+steckt in `calculateStaminaGainPerSecond` (`Bladeburner.ts:1317-1325`).
+Gemessen ueber die Kammerphasen in `data/aktionen.txt`:
+
+    vor 12:21, Cyber's Edge Stufe 0   R = 2,068   (53 Phasen, 108 min)
+    ab  13:33, Cyber's Edge Stufe 5   R = 2,313   (11 Phasen,  23 min)
+
+Das sind **11,8 Prozent mehr Regeneration** - fuenf Stufen zu je zwei Prozent
+plus das Wachstum der Agility. Damit ist der Cyber's-Edge-Hebel von 12:22 zum
+zweiten Mal belegt, diesmal an der Groesse, auf die er wirkt.
+
+Ein fester Wert haette die Zyklusrate ab jetzt systematisch zu niedrig
+gerechnet, und zwar **zugunsten der langen Aktionen** - also in die Richtung,
+in die die Auswertung ohnehin schon zeigt. Das ist der gefaehrliche Fall: ein
+Messfehler, der die eigene These stuetzt.
+
+Behoben: `bbspann.js` liest die juengsten Kammerphasen aus `data/aktionen.txt`
+und leitet R daraus ab. Die Kammer ist die einzige Aktion, in der die Ausdauer
+nur steigt, also ist die Differenz je Minute genau R. Rueckwaerts gelesen, bis
+20 Minuten zusammen sind, Phasen unter 30 Sekunden verworfen (die gemeldete
+Ausdauer ist gerundet, bei kurzen Phasen ist der Rundungsfehler groesser als
+das Signal). Die Datei fuehrt `regeneration` und `regenerationQuelle` mit.
+
+**Verifiziert 14:20:** `R = 2.312 (gemessen ueber 10 Kammerphasen, 20.6 min)` -
+deckt sich mit der unabhaengigen Rechnung ausserhalb des Spiels (2,313).
+
+
+### Der Faehigkeitsplan hatte den zweiten Platz falsch besetzt (26.08., 13:18)
+
+**Der Eintrag von 12:22 hatte die Praemisse verkehrt herum, gemessen 12:47.**
+Dort stand die Sorge, `Blade's Intuition` mit Deckel `Infinity` koenne Punkte
+lautlos verschlingen, sobald seine Erfolgschance bei 1,0 klemmt. Gemessen ist
+das Gegenteil: **Operation Typhoon, die naechste Black Op, steht bei einer
+Erfolgschance von 0,025.** Die Chancen-Faehigkeiten wirken laut
+`Actions/Action.ts:184-187` auch auf Black Ops - Blade's Intuition ist also
+von "ausgereizt" so weit entfernt wie moeglich, und `Infinity` ist dort richtig.
+
+Dafuer stand ein echter Fehler daneben: **Overclock auf Stufe 14, Blade's
+Intuition auf Stufe 0.** Die vierzehn Stufen haben kumulativ rund 169 Punkte
+gekostet (`Summe(3 + 1,4*i)`, i = 0..13), in eine Faehigkeit, deren Wirkung im
+Ausdauer-Engpass mit 0,4444 gegen 0,4445 beziffert ist. Auf Platz 2 haette
+Overclock sich das sofort zurueckgeholt, sobald Cyber's Edge am Deckel steht -
+naechste Stufe 23 Punkte gegen 3 Punkte fuer Blade's Intuition Stufe 1.
+
+**Geaendert 12:48 in `src/blade.js`, Wirkung noch nicht gemessen:** Overclock
+steht jetzt als letzter Eintrag im `SKILL_PLAN`, die Chancen-Faehigkeiten
+davor. Der Deckel 90 bleibt - faellt der Ausdauerengpass je weg, ist die
+Faehigkeit wieder etwas wert.
+
+**Verifiziert 13:18: Blade's Intuition Stufe 1 um 13:18.** Cyber's Edge steht
+auf Stufe 5 (Deckel), Hoechstausdauer 78. Der erste Kauf nach dem Deckel war
+Blade's Intuition, **nicht** Overclock (das unveraendert auf Stufe 14 steht,
+naechste Stufe 23 Punkte). Damit ist die Umsortierung wirksam und der Punkt
+kann nach Erledigt.
+
+**Urspruenglich nachzumessen, sobald Cyber's Edge Stufe 5 erreicht** (Deckel; naechste Stufe
+kostet 13 Punkte, um 12:54 lagen 10 bereit): Der naechste Kauf muss
+**Blade's Intuition Stufe 1** sein, nicht Overclock Stufe 15. Beobachtbar ist
+das erst dann - solange Cyber's Edge unter seinem Deckel steht, bleibt der Plan
+ohnehin dort stehen, und die Umsortierung dahinter ist von aussen unsichtbar.
+
+Die Sicherung, die im Eintrag von 12:22 gefordert wurde - beim Sparziel
+pruefen, ob die Faehigkeit ueberhaupt noch etwas bewegt - ist **bewusst nicht
+gebaut worden.** Sie wuerde bei den heutigen Zahlen nie ausloesen und liesse
+sich deshalb auch nicht pruefen; ungetesteter Code, der nie laeuft, ist eine
+Last und keine Absicherung. Wieder aufnehmen, wenn eine Chance tatsaechlich
+1,0 erreicht.
+
+
 
 ### Der Faehigkeitsplan kaufte Overclock, das im Ausdauer-Engpass nichts bringt (26.08., 12:22)
 

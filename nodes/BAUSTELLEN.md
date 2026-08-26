@@ -156,6 +156,35 @@ dem eigenen Lauf ableiten, statt sie zu raten. Ein gleitender Median ueber die
 letzten Stunden je Aktion waere selbstkalibrierend und ginge nicht mehr daneben,
 wenn sich Aktionslevel oder Faehigkeiten aendern.
 
+**Stand 26.08., 02:15: Der geplante Umbau ist widerlegt, bevor er begann.**
+`tools/ratencheck.js` (neu) rechnet die tatsaechlichen Raten je Aktion aus dem
+Verlauf. Ergebnis ueber 73 Messpunkte:
+
+    Aktion                                  n   median      max   Null%
+    General/Hyperbolic Regeneration Chamber 16    0.072    1.032      50
+    Contracts/Retirement                     6    0.000    0.308      67
+    General/Training                         2    0.151    0.200       0
+
+Contracts/Retirement zeigt einen Median von **null** - waehrend der Rang im
+selben Zeitraum nachweislich um rund 0,5 je Minute gestiegen ist. Die Zahlen
+sind also nicht die Wahrheit, gegen die man die Formel haelt, sondern selbst
+ein Artefakt.
+
+Der Grund ist die Aufloesung: Ein Verlaufspunkt traegt die Aktion, die im
+MOMENT der Messung lief; der Zuwachs davor stammt aus zwanzig Minuten, in
+denen der Motor mehrfach gewechselt hat. Die Rate landet bei der Aktion, die
+zufaellig zum Messpunkt lief - und das ist zur Haelfte die Kammer, die
+naturgemaess null bringt.
+
+**Zu tun, in dieser Reihenfolge:**
+1. `blade.js` protokolliert bei JEDEM Aktionswechsel Rang und Zeit in eine
+   eigene Datei. Erst damit gibt es saubere Intervalle je Aktion.
+2. Nach einigen Stunden `tools/ratencheck.js` gegen diese Datei laufen lassen.
+3. Erst dann entscheiden, ob die Formel aus dem Quellcode ersetzt wird.
+
+Bis dahin bleibt die Formel die bessere Schaetzung: Sie ist wenigstens nicht
+durch die Messmethode verfaelscht.
+
 **Dringlichkeit:** mittel. Ein Fehlalarm ist teurer als er aussieht - er schickt
 die Wache in ihre Diagnosebranche und stumpft ihre Meldungen ab.
 

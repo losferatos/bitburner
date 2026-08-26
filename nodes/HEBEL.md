@@ -37,6 +37,53 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Die Kammerzeit ist strukturell - gerechnet, keine Aenderung (26.08., 11:45)
+
+**Ziel dieses Laufs war die Frage, ob gegen die 55 Prozent Kammerzeit
+ueberhaupt ein Hebel existiert.** Antwort: kaum. Zum ersten Mal mit echten
+Zahlen statt Schaetzungen, gemessen ueber 161 Abschnitte seit 09:15:
+
+    Regenerationskammer     +2,04 Ausdauer je Minute
+    Contracts/Tracking      -4,09 je Minute netto   (2,18 Rang/min)
+    Contracts/Retirement    -2,50                   (1,71)
+    Contracts/Bounty Hunter -2,17                   (1,60)
+
+Daraus folgt der Kammeranteil zwingend, denn Arbeit und Ruhe teilen sich
+dieselbe Spanne:
+
+    Anteil = (1/R) / (1/V + 1/R)
+
+    mit Tracking        66,7 %   ->  Zyklusrate 2,18 * 0,333 = 0,726 Rang/min
+    mit Bounty Hunter   51,5 %   ->              1,60 * 0,485 = 0,776
+
+Gemessen wurden 55 Prozent - die Mischung passt.
+
+**Zwei Ergebnisse:**
+
+1. **Bounty Hunter ist tatsaechlich besser, aber nur um sieben Prozent** -
+   nicht um die 44, die die Rechnung von 09:46 ergab. Der Unterschied
+   verschwindet im Rauschen, und genau deshalb war in der Messung von
+   09:57-10:14 nichts davon zu sehen. Die Umstellung bleibt zurueckgedreht;
+   sieben Prozent rechtfertigen die zusaetzliche Verwicklung nicht.
+
+2. **Die Kammerzeit laesst sich mit der Aktionsauswahl allein nicht unter
+   etwa 50 Prozent druecken.** Selbst die sparsamste Aktion verbraucht mehr
+   als das Doppelte dessen, was die Kammer nachliefert. Eine Aktion mit
+   Verbrauch nahe 2,04 gaebe zwar wenig Kammerzeit, braechte aber auch
+   entsprechend wenig Rang.
+
+**Was den Knoten wirklich beschleunigen wuerde, haengt an
+Faehigkeitspunkten** - hoehere Regeneration (Cyber's Edge), hoehere
+Erfolgschancen (Blade's Intuition, Tracer), kuerzere Aktionen (Overclock).
+Alle drei Multiplikatoren kosten Punkte, und die kommen aus Rangaufstiegen.
+Gemessen 10:45: **null Punkte.** Der eigentliche Engpass ist damit nicht die
+Kammerzeit, sondern dass nichts da ist, um die Multiplikatoren zu heben.
+
+Vorher: 0,707 Rang je Minute, 55,9 Prozent Kammerzeit (10:49-11:15)
+Nachher: (keine Aenderung - dies ist die Absage an weitere Versuche in diese
+Richtung)
+Commit: siehe git log, HEBEL.md 26.08. 11:45
+
 ### Incite Violence, wenn der beste Vertrag leergespielt ist (26.08., 10:49)
 
 Engpass: **Der Vorrat, nicht die Auswahl.** Gemessen 10:45: Tracking hat noch

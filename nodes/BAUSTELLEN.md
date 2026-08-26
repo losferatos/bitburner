@@ -201,9 +201,36 @@ Rangrate gehoert **geglaettet ueber mindestens 45 Minuten** aus
 Das betrifft auch die Ziele in `data/ziele.md` - "Rangrate ueber X" ist so
 formuliert eine Muenzwurfmessung.
 
-Verdacht zum Rest der 20 Prozent: offen. Neu ist die Nullphase - **neun
-Minuten ohne einen einzigen Rangpunkt** um 20:53. Das ist mehr, als eine
-Kammerphase erklaeren sollte, und der naechste konkrete Messpunkt.
+**Die Nullphase ist gemessen (21:45) und sie ist kein Defekt, sondern die
+Zyklusgeometrie.** Fuenf Stichproben im 15-Sekunden-Takt:
+
+    1243  Kammer, "ruht bis Ausdauer 38"   37/68
+    1243  Kammer                            38/68
+    1243  Contracts/Tracking                39/68
+    1244  Contracts/Tracking                38/68
+    1245  Contracts/Retirement              37/68
+
+Das Band ist `AUSDAUER_RUHE 0,51` bis `AUSDAUER_WEITER 0,56` (`blade.js:150`),
+bei Hoechstausdauer 68 also **3,4 Punkte breit**. Eine Tracking-Aktion kostet
+rund 1,4 - der Motor schafft **zwei bis drei Aktionen**, dann ist das Band
+durchlaufen. Die Regeneration liegt bei 2,3 je Minute, das Auffuellen dauert
+also **1,5 Minuten** gegen **45 Sekunden** Arbeit. Daraus folgt ein
+Kammeranteil von **67 Prozent** - und damit auch die restliche Luecke zur
+gerechneten Zyklusrate, die einen hoeheren Arbeitsanteil unterstellt.
+
+**Nicht an der Bandbreite drehen.** Genau das wurde am 26.08. um 07:46 schon
+versucht (HEBEL.md, "Ausdauer-Ruhespanne von 52/60 auf 51/56") und ist
+widerlegt: Die Spanne ist symmetrisch, sie begrenzt Ruhe und Arbeit im selben
+Verhaeltnis, und enger heisst nur mehr Umschaltvorgaenge. Der Kammeranteil
+stieg damals von 50,1 auf 60,7 Prozent.
+
+**Was bleibt** - und das ist der Rest dieses Punktes: Der Kammeranteil ist
+**strukturell**, nicht behebbar durch Umsortieren. Er faellt nur ueber das
+Verhaeltnis Regeneration zu Verbrauch je Minute. Der Verbrauch je Aktion ist
+fest (`BaseStaminaLoss * difficultyMultiplier`, `Bladeburner.ts:921`), die
+Regeneration haengt am Stamina-Multiplikator. Der laufende Hebel - Ertrag JE
+Aktion ueber die Erfolgschance heben - greift daran vorbei und wirkt trotzdem:
+genau deshalb steigt die Rate seit dem Faehigkeitsumbau.
 
 **Messung 26.08., 17:37 (nach dem Einbau von 16:31):** `data/blade.json` zeigt
 Aktion "General/Hyperbolic Regeneration Chamber", Grund "ruht bis Ausdauer 31",

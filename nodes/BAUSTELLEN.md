@@ -248,101 +248,75 @@ nebenbei entschieden.
 groesste belegte Hebel, der derzeit offen liegt.
 
 
-### Der Motor steht drei Viertel der Zeit in der Regenerationskammer
+### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 
-Gemessen 26.08. um 06:47 ueber `tools/ratencheck.js`: **161 von 222 Minuten -
-72,5 Prozent - in `General/Hyperbolic Regeneration Chamber`.** Die Arbeitszeit
-bringt 1,4 bis 2,0 Rang je Minute, ueber alles bleiben **0,475**.
+**Der alte Titel ("drei Viertel") ist ueberholt.** Gemessen 26.08. um 14:44
+ueber `data/aktionen.txt`, gestaffelt nach den Hebeln des Tages:
 
-Faellt die Kammerzeit von 72 auf 30 Prozent, verdreifacht sich die Rate. Das
-ist der groesste Einzelhebel des Knotens - groesser als jede Feinarbeit an der
-Aktionsauswahl. Bei Rang 327 von 2.500 fuer die erste Black Op entscheidet er
-ueber Tage.
+    gesamter Verlauf      682,7 min   0,699 Rang/min   Kammer 60,5 %
+    ab 10:00              238,4 min   0,789            Kammer 52,7 %
+    ab 12:21 (Cyber's E.) 122,2 min   0,842            Kammer 51,3 %
+    ab 13:33 (CE Stufe 5)  69,7 min   0,841            Kammer 52,6 %
 
-Der Ruhegrund steht in der Telemetrie und ist fast immer derselbe:
-`"grund": "ruht bis HP 17"`. Es sind die TREFFERPUNKTE, nicht die Ausdauer -
-das Maximum liegt bei 22 bis 23, jeder misslungene Vertrag kostet welche, und
-die Kammer heilt nur 2 je Durchlauf (`Bladeburner.ts:1198`).
+Von 72,5 Prozent (06:47) auf 52 - der Krankenhaus-Hebel und Cyber's Edge
+zusammen. **Die Ruhe ist inzwischen zu 100 Prozent Ausdauer-Ruhe**; kein
+einziger HP-Grund mehr in 69,7 Minuten. Ansatz 1 des alten Eintrags (mehr
+Trefferpunkte) ist damit endgueltig erledigt.
 
-Ansaetze, in der Reihenfolge ihrer Wucht:
-1. **Mehr Trefferpunkte.** Sie haengen an Defense (`Player.hp.max`); bbtrain
-   traniert nur bis Kampfwert 100 und hoert dann auf. Ein hoeherer Zielwert
-   waere ein dauerhafter Gewinn statt einer Symptombehandlung.
-2. **Weniger AUSDAUERVERBRAUCH - jetzt messbar (26.08., 09:18).** `blade.js`
-   schreibt seither `ausdauerVon` und `ausdauerBis` je Abschnitt mit, und
-   `tools/ratencheck.js` rechnet daraus **Rang je Ausdauerpunkt**. Bei einem
-   Motor, der mehr als die Haelfte der Zeit auf Ausdauer wartet, ist das die
-   entscheidende Kennzahl - nicht Rang je Minute. Erste Werte auf duenner
-   Basis (nur die Abschnitte seit 09:15):
+**Was jetzt offen ist: Die gerechnete Rate liegt ein Drittel ueber der
+gemessenen.**
 
-       Contracts/Tracking        99,8 Rang je Ausdauer   1,02 Ausdauer je Lauf
-       Contracts/Bounty Hunter   25,4                    2,09
+    gerechnet (bbspann, Tracking)   2,513 Rang je Arbeitsminute
+    gemessen  (Aktionsmix)          1,77
 
-   Tracking ist damit **viermal ausdauer-effizienter** und fuehrt zugleich bei
-   Rang je Minute (2,19 gegen 1,61). Haelt sich das ueber mehr Abschnitte,
-   waere die Folgerung: Die Auswahl sollte nach Rang je AUSDAUER gehen,
-   solange die Ausdauer der Engpass ist. Das ist eine Strategieaenderung und
-   gehoert in den Optimierungs-Loop. Der Verbrauch haengt an
-   `BaseStaminaLoss * difficultyMultiplier` (`Bladeburner.ts:921`), und die
-   Schwierigkeit steigt mit dem Aktionslevel.
-3. **Die HP-Schwelle senken.** Sie steht auf 50/75 Prozent. Weiter zu arbeiten
-   heisst mehr Erfolge je Stunde, aber auch das Risiko, im Krankenhaus zu
-   landen (Zeit- und Geldverlust). Vorher pruefen, was ein Krankenhausaufenthalt
-   tatsaechlich kostet.
+Der Mix erklaert die Luecke nicht - nachgerechnet stimmt er auf drei
+Nachkommastellen: 52,6 % Kammer, und die Arbeitsphase bringt
+(17,4*2,086 + 9,3*1,896 + 6,4*0,739) / 33,1 = 1,77, mal 0,474 = **0,839**
+gegen gemessene 0,841.
 
-**Verifiziert 07:15 - der groesste Teil ist gehoben.** Seit dem
-Krankenhaus-Hebel von 06:55 (`nodes/HEBEL.md`):
+**Ein Teil ist gefunden: verworfener Aktionsfortschritt.** Jeder Wechsel setzt
+`actionTimeCurrent` auf 0 (`Bladeburner.ts:187`), der angefangene Durchlauf ist
+weg. Gemessen ueber die Abschnittsdauern modulo Aktionsdauer, seit 13:33:
 
-    bis 06:55   229,0 min gesamt, 166,0 in der Kammer (72,5 %)  ->  0,484/min
-    ab  06:55    18,1 min gesamt,   6,1 in der Kammer (33,5 %)  ->  1,118/min
+    Contracts/Tracking        31 Abschnitte    35 s verworfen   ( 6 %)
+    Contracts/Retirement      22 Abschnitte   183 s            (18 %)
+    Contracts/Bounty Hunter    8 Abschnitte    58 s            (15 %)
+    ---
+    gesamt                                    276 s von 1.983 s = 13,9 %
 
-Faktor 2,3 auf die Rangrate. Ansatz 1 (mehr Trefferpunkte) wurde dabei
-verworfen, bevor er umgesetzt wurde: Bei doppeltem Maximum verdoppelt sich die
-Ruhezeit mit, der Anteil bleibt gleich.
+Davon entfallen **160 Sekunden auf 43 Wechsel Arbeit->Arbeit** - der Motor
+springt zwischen Vertraegen hin und her, weil `waehle()` bei jedem Durchlauf
+neu entscheidet und die Erfolgsschaetzungen schwanken. Die restlichen 114
+Sekunden sind 17 Wechsel Arbeit->Kammer, die man nicht aufschieben darf: Die
+Ruheschwelle liegt bei 51 Prozent, die Strafgrenze bei 50
+(`Bladeburner.ts:167-169`), da ist kein Puffer fuer 22 Sekunden Aufschub.
 
-**Was bleibt, ist ein anderer Engpass.** Die verbliebenen 33,5 Prozent sind
-Ausdauer-Ruhe, nicht Trefferpunkte - dagegen hilft kein Krankenhaus. Die
-Ausdauer regeneriert passiv rund 1,2 je Minute (`Bladeburner.ts:1382`), die
-Kammer verdoppelt das. Ansaetze:
-- **Die Hoechstausdauer heben - die Verwerfung von 08:14 war falsch
-  begruendet (nachgerechnet 26.08., 11:15).**
-  Damals hiess es: Reserve und Regeneration wachsen gemeinsam, der Anteil
-  bleibt. Das stimmt fuer die RUHEzeit, aber nicht fuer die Arbeitszeit.
-  Sauber gerechnet, mit Spanne S, Verbrauch V und Regeneration R:
+**Warum daraus KEIN Acht-Prozent-Hebel folgt - und das ist der Punkt:**
+Ein abgebrochener Durchlauf kostet **keine Ausdauer**. Der Abzug passiert erst
+beim Abschluss (`Bladeburner.ts:921`, innerhalb von `completeAction`). Wer die
+Abbrueche vermeidet, bekommt also mehr vollstaendige Aktionen je Arbeitsminute
+- und damit mehr Verbrauch je Minute, also mehr Kammerzeit. Solange die
+Ausdauer der Engpass ist, hebt sich das weitgehend auf.
 
-      Ruhezeit    = S / R                 -> waechst beides um x, bleibt gleich
-      Arbeitszeit = S / (V - R)           -> V ist FIX, nur R waechst
+Es hebt sich nur **weitgehend** auf, nicht vollstaendig: Waehrend der Arbeit
+regeneriert die Ausdauer passiv mit rund 1,2 je Minute, in der Kammer mit 2,31
+(gemessen 14:20). Verworfene Arbeitszeit ist deshalb schlechter als Kammerzeit
+- aber der Gewinn liegt bei wenigen Prozent, nicht bei acht.
 
-  Der Nenner sinkt, die Arbeitszeit waechst also ueberproportional. Mit
-  Tracking (V = 2,7 je Minute, R = 1,2) und zehn Prozent mehr Regeneration:
-  netto 1,38 statt 1,50, Arbeitszeit plus 19 Prozent bei gleicher Ruhezeit -
-  der Kammeranteil faellt von 52 auf knapp 48 Prozent.
-  Der Hebel dafuer ist die Faehigkeit **Cyber's Edge** (+2 Prozent
-  Hoechstausdauer je Stufe, `Skills.ts:84-89`), die ueber
-  `getSkillMult(Stamina)` in BEIDEN Formeln steckt - `calculateMaxStamina`
-  (`Bladeburner.ts:1327-1343`) und `calculateStaminaGainPerSecond`
-  (`:1317-1325`).
-  **Nicht umsetzbar, solange keine Faehigkeitspunkte da sind** (gemessen 10:45:
-  null). Drei Stufen kosten 1+3+9 = 13 Punkte und braechten rund neun Prozent
-  Rate. Wieder aufnehmen, sobald Punkte anfallen.
+**Zu tun:**
+1. Den Restfaktor klaeren. Nach Abzug der 13,9 Prozent bleiben 2,06 gegen 2,51
+   gerechnet - rund 20 Prozent unerklaert. Verdaechtig ist
+   `getActionEstimatedSuccessChance`: Die Zahl ist eine SCHAETZUNG auf Basis
+   der geschaetzten Population, und `bbspann` nimmt die untere Grenze. Liegt
+   auch die noch ueber der Wahrheit, sind alle Ertragsrechnungen zu optimistisch
+   - **einschliesslich der Raid-Bilanz.** Das ist der Grund, warum dieser Punkt
+   nicht kosmetisch ist.
+2. Erst danach ueber das Aufschieben von Arbeit->Arbeit-Wechseln entscheiden,
+   und dann mit einer Erwartung in Prozent, die diese Rechnung beruecksichtigt.
 
-- ~~**Alte Fassung dieser Verwerfung, 26.08. 08:14:**~~ Der Versuch
-  lief ueber die Hysteresespanne (51/56 statt 52/60) und ging nach hinten los:
-  Die Kammerzeit stieg von 50,1 auf 60,7 Prozent. Die Spanne ist SYMMETRISCH -
-  sie begrenzt Ruhe UND Arbeit, beide schrumpfen gleich, und der
-  Umschalt-Overhead kommt obendrauf. Dasselbe gilt fuer eine hoehere
-  Hoechstausdauer: Reserve und Regeneration wachsen gemeinsam
-  (`Bladeburner.ts:1317-1325` - `maxStaminaBonus = maxStamina / 70000` steckt
-  in der Regenerationsformel), der Anteil bleibt.
-  Details in `nodes/HEBEL.md`.
-- **Die Faehigkeit "Reaper"** hebt die effektiven Kampfwerte um 2 Prozent je
-  Stufe und damit mittelbar die Hoechstausdauer.
-- **Weniger Ausdauerverbrauch:** `BaseStaminaLoss * difficultyMultiplier`
-  (`Bladeburner.ts:921`) - schwierigere Aktionen kosten mehr. Auch das ist ein
-  Tausch, der sich rechnen laesst, sobald genug Abschnitte je Aktion vorliegen.
-
-**Dringlichkeit:** mittel, seit der Krankenhaus-Hebel greift. Vorher war es die
-einzige Zahl, die den Knoten um Tage verkuerzen konnte.
+**Dringlichkeit:** mittel. Der Kammeranteil selbst ist kein Notfall mehr; die
+Frage nach der Verlaesslichkeit der Ertragsrechnung schon, weil an ihr die
+Raid-Entscheidung haengt.
 
 
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen

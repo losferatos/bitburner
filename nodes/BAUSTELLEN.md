@@ -233,7 +233,13 @@ steht jetzt als letzter Eintrag im `SKILL_PLAN`, die Chancen-Faehigkeiten
 davor. Der Deckel 90 bleibt - faellt der Ausdauerengpass je weg, ist die
 Faehigkeit wieder etwas wert.
 
-**Nachzumessen, sobald Cyber's Edge Stufe 5 erreicht** (Deckel; naechste Stufe
+**Verifiziert 13:18: Blade's Intuition Stufe 1 um 13:18.** Cyber's Edge steht
+auf Stufe 5 (Deckel), Hoechstausdauer 78. Der erste Kauf nach dem Deckel war
+Blade's Intuition, **nicht** Overclock (das unveraendert auf Stufe 14 steht,
+naechste Stufe 23 Punkte). Damit ist die Umsortierung wirksam und der Punkt
+kann nach Erledigt.
+
+**Urspruenglich nachzumessen, sobald Cyber's Edge Stufe 5 erreicht** (Deckel; naechste Stufe
 kostet 13 Punkte, um 12:54 lagen 10 bereit): Der naechste Kauf muss
 **Blade's Intuition Stufe 1** sein, nicht Overclock Stufe 15. Beobachtbar ist
 das erst dann - solange Cyber's Edge unter seinem Deckel steht, bleibt der Plan

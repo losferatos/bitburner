@@ -65,11 +65,27 @@ Arbeitsphasen, also gut zwei Prozent Rate - dieselbe Groessenordnung wie eine
 Stufe Overclock fuer zehn Punkte. Kein klarer Gewinner, deshalb keine
 Aenderung am Faehigkeitsplan ohne Messung.
 
-Vorher: 33,5 Prozent Kammerzeit, 1,118 Rang je Minute (07:15)
-Nachher: (offen - naechster Lauf misst)
-Erste Beobachtung 07:46: Ausdauer 34/65 = 52,3 Prozent, und der Motor
-ARBEITET (`Contracts/Retirement`). Unter der alten Regel waere er hier noch in
-der Kammer gewesen.
+Vorher: 50,1 Prozent Kammerzeit, 0,888 Rang je Minute (06:55-07:46, 49 min)
+Nachher: **Die Hypothese ist widerlegt.** Gemessen 08:14 ueber 26 Minuten:
+
+    seit 07:46   26,3 min | Kammer 16,0 min = 60,7 % | 0,941 Rang/min
+
+Die Kammerzeit ist nicht gefallen, sondern **gestiegen** - von 50,1 auf 60,7
+Prozent. Die Rangrate liegt mit 0,941 gegen 0,888 leicht darueber, aber das
+ist bei 26 Minuten Messstrecke nicht von Rauschen zu unterscheiden.
+
+**Der Denkfehler, und er ist lehrreich:** Die Spanne ist SYMMETRISCH. Sie
+begrenzt nicht nur, wie lange geruht wird, sondern auch, wie lange gearbeitet
+werden darf - von 56 Prozent hinunter auf 51 statt von 60 auf 52. Beide
+Phasen schrumpfen um denselben Anteil, das Verhaeltnis bleibt gleich, und
+zusaetzlich steigt der Umschalt-Overhead: acht Kammerabschnitte in 26 Minuten
+statt weniger, laengerer.
+
+Nicht zurueckgenommen, weil die ZIELGROESSE - die Rangrate - nicht gefallen
+ist. Aber der behauptete Mechanismus tritt nicht ein, und der Eintrag bleibt
+als Warnung stehen: An der Hysteresespanne zu drehen bringt nichts. Wer die
+Ausdauerruhe verkuerzen will, muss an den Verbrauch (leichtere Aktionen) oder
+an die Regeneration heran.
 Commit: siehe git log, blade.js 26.08. 07:46
 
 ### Krankenhaus statt Regenerationskammer (26.08., 06:55)

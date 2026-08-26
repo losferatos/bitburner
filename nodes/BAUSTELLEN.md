@@ -183,10 +183,15 @@ Ruhezeit mit, der Anteil bleibt gleich.
 Ausdauer-Ruhe, nicht Trefferpunkte - dagegen hilft kein Krankenhaus. Die
 Ausdauer regeneriert passiv rund 1,2 je Minute (`Bladeburner.ts:1382`), die
 Kammer verdoppelt das. Ansaetze:
-- **Die Hoechstausdauer heben.** Sie haengt an den Kampfwerten
-  (`calculateMaxStamina`), und anders als bei den Trefferpunkten wirkt das
-  hier: Eine groessere Reserve heisst laengere Arbeitsphasen bei gleicher
-  Regeneration je Minute.
+- ~~**Die Hoechstausdauer heben.**~~ **Widerlegt 26.08., 08:14.** Der Versuch
+  lief ueber die Hysteresespanne (51/56 statt 52/60) und ging nach hinten los:
+  Die Kammerzeit stieg von 50,1 auf 60,7 Prozent. Die Spanne ist SYMMETRISCH -
+  sie begrenzt Ruhe UND Arbeit, beide schrumpfen gleich, und der
+  Umschalt-Overhead kommt obendrauf. Dasselbe gilt fuer eine hoehere
+  Hoechstausdauer: Reserve und Regeneration wachsen gemeinsam
+  (`Bladeburner.ts:1317-1325` - `maxStaminaBonus = maxStamina / 70000` steckt
+  in der Regenerationsformel), der Anteil bleibt.
+  Details in `nodes/HEBEL.md`.
 - **Die Faehigkeit "Reaper"** hebt die effektiven Kampfwerte um 2 Prozent je
   Stufe und damit mittelbar die Hoechstausdauer.
 - **Weniger Ausdauerverbrauch:** `BaseStaminaLoss * difficultyMultiplier`

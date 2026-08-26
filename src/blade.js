@@ -955,7 +955,46 @@ export async function main(ns) {
 
       const laeuft = ns.bladeburner.getCurrentAction();
       const gleich = laeuft && laeuft.type === wahl.typ && laeuft.name === wahl.name;
-      if (!gleich) {
+
+      // EINEN ANGEFANGENEN DURCHLAUF ZU ENDE FAHREN (26.08.2026, 22:55).
+      //
+      // Jeder Aktionswechsel setzt `actionTimeCurrent` auf 0
+      // (`Bladeburner.ts:187`) - der angefangene Durchlauf ist weg. Gemessen
+      // am 26.08. um 14:44: **160 Sekunden von 1.983 gehen so verloren**, auf
+      // 43 Wechsel zwischen Vertraegen verteilt.
+      //
+      // Der Motor springt, weil er bei jedem Durchlauf neu entscheidet und die
+      // Schaetzungen schwanken. Wie stark, zeigt die Messung um 22:45:
+      //
+      //   Bounty Hunter   min 0,508  max 0,862  Spanne 0,354   Zyklus 2,064
+      //   Tracking        min 1,000  max 1,000  Spanne 0,000   Zyklus 1,864
+      //   Retirement      min 0,636  max 1,000  Spanne 0,364   Zyklus 1,807
+      //
+      // Der Abstand zwischen den beiden Besten betraegt 11 Prozent, die
+      // Unsicherheit der Schaetzung bei Bounty Hunter dagegen **41 Prozent
+      // relativ**. Verglichen werden also Zahlen, deren Rauschen groesser ist
+      // als ihr Abstand - die Reihenfolge kippt bei fast jedem Durchlauf.
+      //
+      // Statt einer Hysterese auf den WERTEN (die eine Schwelle braucht, die
+      // niemand kennt) eine auf der ZEIT: Ist der laufende Durchlauf schon zu
+      // mehr als einem Viertel gelaufen, wird er zu Ende gefahren. Der
+      // mittlere Verlust je Wechsel sinkt damit von rund der halben Dauer auf
+      // ein Achtel - erwartet werden drei Viertel der 160 Sekunden, also gut
+      // 6 Prozent weniger verworfene Arbeitszeit.
+      //
+      // Ausgenommen ist alles, was nicht warten darf: Ruhe wegen Ausdauer
+      // oder Trefferpunkten greift sofort.
+      let angefangen = false;
+      if (!gleich && laeuft && (laeuft.type === V || laeuft.type === O)
+        && wahl.grund !== "Ausdauer" && wahl.grund !== "HP") {
+        try {
+          const bisher = ns.bladeburner.getActionCurrentTime();
+          const gesamt = ns.bladeburner.getActionTime(laeuft.type, laeuft.name);
+          angefangen = gesamt > 0 && bisher > gesamt * 0.25;
+        } catch { angefangen = false; }
+      }
+
+      if (!gleich && !angefangen) {
         if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
           let r = null;
           try { r = ns.bladeburner.getRank(); } catch { /* egal */ }

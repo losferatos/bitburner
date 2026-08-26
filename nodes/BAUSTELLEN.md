@@ -162,6 +162,39 @@ wirkt, und ueberschreibt die Praeparation.
 
 ### Der Motor springt zwischen Vertraegen hin und her - 8 Prozent verworfene Arbeitszeit
 
+**Geaendert 22:55, Wirkung noch nicht gemessen.**
+
+Das Vormessen aus "Zu tun" ist erledigt (22:45) und faellt deutlicher aus als
+erwartet:
+
+    Vertrag          min     max  spanne   zyklus
+    Bounty Hunter  0,508   0,862   0,354    2,064
+    Tracking       1,000   1,000   0,000    1,864
+    Retirement     0,636   1,000   0,364    1,807
+
+Der Abstand zwischen den beiden Besten liegt bei **11 Prozent**, die
+Unsicherheit der Schaetzung bei Bounty Hunter dagegen bei **41 Prozent
+relativ** (0,354 auf 0,508 bis 0,862). Verglichen werden Zahlen, deren
+Rauschen groesser ist als ihr Abstand - genau deshalb kippt die Reihenfolge
+staendig. Tracking ist der Sonderfall mit Spanne 0: Die Schaetzung ist dort
+exakt, weil Tracking selbst die Populationsschaetzung verbessert.
+
+**Eingebaut wurde eine Hysterese auf der ZEIT, nicht auf den Werten** - eine
+Wertschwelle braeuchte eine Zahl, die niemand kennt. Neue Regel in
+`blade.js`: Ist der laufende Durchlauf zu mehr als einem Viertel gelaufen
+(`getActionCurrentTime` gegen `getActionTime`), wird er zu Ende gefahren.
+Ruhe wegen Ausdauer oder Trefferpunkten greift weiterhin sofort.
+
+**Erwartung:** Der mittlere Verlust je Wechsel faellt von rund der halben
+Dauer auf ein Achtel, also drei Viertel der 160 Sekunden. Auf die Rangrate
+sind das gut **6 Prozent**.
+
+**Abnahme:** Rangrate geglaettet ueber mindestens 45 Minuten aus
+`data/wache-zustand.json`. **Vorher: 1,76 Rang je Minute um 22:52** (42
+Minuten, Rang 1339). Traegt es nicht - also unter 1,76 nach einer Stunde -,
+wird der Block zurueckgenommen; er ist eine zusammenhaengende Stelle und
+laesst sich sauber herausloesen.
+
 Abgespalten am 26.08. um 22:15 aus dem Kammeranteil-Punkt, der im Uebrigen
 geklaert ist. Dies ist der einzige Teil, der noch behebbar aussieht.
 

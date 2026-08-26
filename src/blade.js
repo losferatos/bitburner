@@ -108,8 +108,23 @@ export async function main(ns) {
   // statt ihn eine Reserve aufbauen zu lassen, die keine Wirkung hat.
   // Ausdauer regeneriert ohnehin passiv weiter, auch waehrend der Arbeit
   // (Bladeburner.ts:1382), die Kammer verdoppelt das nur.
-  const AUSDAUER_RUHE = 0.52;
-  const AUSDAUER_WEITER = 0.60;
+  // DIE RUHESPANNE WAR DOPPELT SO BREIT WIE NOETIG (26.08.2026, 07:46).
+  //
+  // Nach dem Krankenhaus-Hebel von 06:55 ist die Ausdauer der letzte Grund,
+  // aus dem der Motor noch ruht - gemessen 33,5 Prozent der Zeit. Die Spanne
+  // von 52 auf 60 Prozent sind acht Prozent der Hoechstausdauer, bei 64 also
+  // gut fuenf Punkte. Die Regeneration betraegt rund 1,2 je Minute
+  // (Bladeburner.ts:1317-1325), macht vier Minuten Ruhe je Zyklus.
+  //
+  // Die Haelfte davon ist geschenkt: Die Strafe beginnt erst UNTER 50 Prozent
+  // (`min(1, stamina/(0,5*max))`, Bladeburner.ts:167-169). Alles zwischen 50
+  // und 100 Prozent ist gleich gut. Eine Spanne von 51 auf 56 haelt denselben
+  // Sicherheitsabstand zur Strafgrenze und halbiert die Ruhezeit.
+  //
+  // Erwartung: Der Kammeranteil faellt von 33,5 auf unter 25 Prozent, die
+  // Rangrate steigt entsprechend um rund ein Zehntel.
+  const AUSDAUER_RUHE = 0.51;
+  const AUSDAUER_WEITER = 0.56;
   // Trefferpunkte. Die Kammer heilt nebenbei 2 HP je Durchlauf
   // (Bladeburner.ts:1198). Solange lange geruht wurde, geschah das von selbst;
   // bei der kurzen Ruhe oben nicht mehr. Ohne eigene Schwelle liefe der Bot

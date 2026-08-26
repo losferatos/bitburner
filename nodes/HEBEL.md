@@ -37,6 +37,41 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Ausdauer-Ruhespanne von 52/60 auf 51/56 Prozent (26.08., 07:46)
+
+Engpass: Nach dem Krankenhaus-Hebel ist die Ausdauer der letzte Grund, aus dem
+der Motor ruht - gemessen **33,5 Prozent der Zeit** (07:15).
+
+Hypothese: Die Haelfte davon ist geschenkt. Die Spanne von 52 auf 60 Prozent
+sind acht Prozent der Hoechstausdauer, bei 64 also gut fuenf Punkte; die
+Regeneration betraegt rund 1,2 je Minute (`Bladeburner.ts:1317-1325`), macht
+vier Minuten Ruhe je Zyklus. Die Strafe beginnt aber erst UNTER 50 Prozent
+(`min(1, stamina/(0,5*max))`, `Bladeburner.ts:167-169`) - alles zwischen 50
+und 100 ist gleich gut. 51 auf 56 haelt denselben Abstand zur Strafgrenze und
+halbiert die Ruhezeit. Erwartung: Kammeranteil von 33,5 auf unter 25 Prozent,
+Rangrate rund ein Zehntel hoeher.
+
+Beleg: `Bladeburner.ts:167-169` (die Strafe und ihre Grenze), `1317-1325`
+(Regeneration), `1327-1343` (Hoechstausdauer).
+
+**Geprueft und fuer jetzt verworfen: die Faehigkeit "Cyber's Edge."** Sie hebt
+die Hoechstausdauer um 2 Prozent je Stufe (`Skills.ts:84-89`) - und weil
+`getSkillMult(Stamina)` in BEIDEN Formeln steckt, auch die Regeneration. Der
+Ruheanteil sinkt dadurch tatsaechlich, aber nur schwach: Bei gleicher
+prozentualer Steigerung von Reserve und Regeneration bleibt die Ruhezeit
+gleich, waehrend die Arbeitsphase mitwaechst. Drei Stufen kosten 1+3+9 = 13
+Punkte (baseCost 1, costInc 3) und braechten rund sechs Prozent laengere
+Arbeitsphasen, also gut zwei Prozent Rate - dieselbe Groessenordnung wie eine
+Stufe Overclock fuer zehn Punkte. Kein klarer Gewinner, deshalb keine
+Aenderung am Faehigkeitsplan ohne Messung.
+
+Vorher: 33,5 Prozent Kammerzeit, 1,118 Rang je Minute (07:15)
+Nachher: (offen - naechster Lauf misst)
+Erste Beobachtung 07:46: Ausdauer 34/65 = 52,3 Prozent, und der Motor
+ARBEITET (`Contracts/Retirement`). Unter der alten Regel waere er hier noch in
+der Kammer gewesen.
+Commit: siehe git log, blade.js 26.08. 07:46
+
 ### Krankenhaus statt Regenerationskammer (26.08., 06:55)
 
 Engpass: **Der Motor stand 161 von 222 Minuten - 72,5 Prozent - in der

@@ -220,15 +220,49 @@ export async function main(ns) {
   // ersten Stufe **3 Punkte** und hebt die Chance jeder Aktion um 3 Prozent;
   // Overclock kostet in Stufe 15 **23 Punkte** und bewegt nichts. Damit
   // steht die Reihenfolge fest.
+  // REIHENFOLGE NACH NUTZEN JE PUNKT (26.08.2026, 18:50).
+  //
+  // Die Kosten sind LINEAR, nicht exponentiell:
+  // `(baseCost + level * costInc) * mult` (`Bladeburner/Skill.ts:37-41`). Das
+  // aendert alles - eine Faehigkeit wird mit jeder Stufe nur langsam teurer,
+  // und die billigen Stufe-0-Kaeufe sind konkurrenzlos.
+  //
+  // Gemessen 18:45 aus `data/bbspann.json`, Nutzen je Punkt bei der jeweils
+  // aktuellen Stufe:
+  //
+  //   Faehigkeit          Stufe  Preis  Wirkung           je Punkt
+  //   Short-Circuit           0      2  +5,5% Retirement     2,75
+  //   Tracer                  0      2  +4%   Contracts      2,00
+  //   Evasive System          0      2  +4%   dex/agi        2,00
+  //   Reaper                  0      2  +2%   Kampfwerte     1,00
+  //   Digital Observer        1      4  +4%   Operations     0,98
+  //   Blade's Intuition      10     24  +3%   alles          0,125  <- gekauft
+  //
+  // Der alte Plan hatte Blade's Intuition auf Platz 2 mit `Infinity`. Es
+  // frass damit jeden Punkt, waehrend sechs Faehigkeiten auf Stufe 0 standen,
+  // die je Punkt das **Sechzehn- bis Zweiundzwanzigfache** liefern. Am 26.08.
+  // um 18:37 lagen deshalb 21 Punkte eine Stunde lang ungenutzt herum - der
+  // Motor sparte auf die teuerste Stufe im Feld.
+  //
+  // Die Deckel sind der Gleichstandspunkt, nicht geraten: Blade's Intuition
+  // liefert bei Stufe n `3/(3+2,1n)`, Tracer bei Stufe m `4/(2+2,1m)`. Gleich
+  // sind sie bei `m = (6 + 8,4n)/6,3`, fuer n=10 also **m = 14,3**. Tracer
+  // gehoert damit auf Stufe 14, bevor Blade's Intuition seine elfte kauft.
+  //
+  // Der Aktionsmix entscheidet die Reihenfolge innerhalb der billigen: Der
+  // Motor faehrt derzeit fast nur Vertraege (Tracking, Bounty Hunter,
+  // Retirement), deshalb Tracer vor Short-Circuit vor den Kampfwerten.
+  // Digital Observer und Cloak stehen hinten, weil Operationen und
+  // Stealth-Vertraege kaum vorkommen.
   const SKILL_PLAN = [
     ["Cyber's Edge", 5],
+    ["Tracer", 14],
+    ["Short-Circuit", 12],
+    ["Evasive System", 12],
+    ["Reaper", 8],
     ["Blade's Intuition", Infinity],
     ["Digital Observer", Infinity],
     ["Cloak", Infinity],
-    ["Tracer", Infinity],
-    ["Short-Circuit", Infinity],
-    ["Reaper", Infinity],
-    ["Evasive System", Infinity],
     // Zuletzt: wirkungslos, solange die Ausdauer klemmt. Deckel 90 ist das
     // Maximum des Spiels und bleibt stehen, falls der Engpass je wegfaellt.
     ["Overclock", 90],

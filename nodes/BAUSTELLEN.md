@@ -35,24 +35,6 @@ Regeln:
 
 ## Sofort
 
-### 21 Faehigkeitspunkte liegen ungenutzt herum, seit einer Stunde steigend (18:37)
-
-Gemessen: `data/blade.json`, Feld `punkte` - 13 um 17:07, dann **1** um 17:37
-(also wurde gekauft), danach 11 um 18:07 und **21** um 18:37. Seit 17:37 wird
-nichts mehr gekauft, obwohl der Rang von 933 auf 992 gestiegen ist
-(`RanksPerSkillPoint: 3`, `data/Constants.ts:47` - der Zufluss ist rein
-linear).
-
-Erwartet: Entweder ein Kauf, oder ein nachvollziehbarer Sparvorgang. Die
-Kosten der Faehigkeiten steigen mit der Stufe, ein Ansparen auf den naechsten
-Rang ist also normal - aber nach einer Stunde ohne Kauf gehoert belegt, worauf
-gespart wird und wann es reicht.
-
-Verdacht: `SKILL_PLAN` in `src/blade.js`. Der Plan wurde am 26.08. um 12:22
-und 13:18 umsortiert (Cyber's Edge zuerst, Overclock zuletzt mit Deckel 90).
-Zu pruefen ist, ob der naechste Eintrag erreichbar ist oder ob der Plan an
-einem Deckel haengt und deshalb gar nichts mehr kauft.
-
 ### Der Waechter meldet fehlenden Speicher als Ausfall - und verdeckt damit den echten Fehlerfall (17:55)
 
 **GEMESSEN 18:20 - Eric hatte recht, es IST ein Fehler.** Aus dem Spielstand
@@ -551,6 +533,44 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Faehigkeitsplan kaufte die teuerste Stufe im Feld statt der billigsten Wirkung (26.08., 18:52)
+
+**Verifiziert: Bounty-Hunter-Chance 0,322 -> 0,348 um 18:52**, nach einem
+einzigen Kauf fuer 2 Punkte. Tracer stieg von Stufe 0 auf 1, die offenen
+Punkte fielen von 21 auf 1.
+
+Eingetragen um 18:37 als "21 Faehigkeitspunkte liegen ungenutzt herum". Der
+Verdacht lautete "SKILL_PLAN haengt an einem Deckel" - falsch. Der Motor
+sparte voellig korrekt, nur auf das Falscheste im Feld.
+
+**Der Fehler liegt in der Kostenformel, die niemand nachgesehen hatte.** Die
+Kosten sind **linear**, nicht exponentiell:
+`(baseCost + level * costInc) * mult` (`Bladeburner/Skill.ts:37-41`). Gemessen
+18:45 aus `data/bbspann.json`, Nutzen je Punkt bei der jeweiligen Stufe:
+
+    Faehigkeit          Stufe  Preis  Wirkung           je Punkt
+    Short-Circuit           0      2  +5,5% Retirement     2,75
+    Tracer                  0      2  +4%   Contracts      2,00
+    Evasive System          0      2  +4%   dex/agi        2,00
+    Reaper                  0      2  +2%   Kampfwerte     1,00
+    Digital Observer        1      4  +4%   Operations     0,98
+    Blade's Intuition      10     24  +3%   alles          0,125  <- wurde gekauft
+
+Blade's Intuition stand auf Platz 2 mit `Infinity` und frass damit jeden
+Punkt, waehrend sechs Faehigkeiten auf Stufe 0 lagen, die je Punkt das
+**Sechzehn- bis Zweiundzwanzigfache** liefern.
+
+**Die Deckel sind gerechnet, nicht geraten.** Blade's Intuition liefert bei
+Stufe n `3/(3+2,1n)`, Tracer bei Stufe m `4/(2+2,1m)`; gleich sind sie bei
+`m = (6 + 8,4n)/6,3`, fuer n=10 also m = 14,3. Neue Reihenfolge: Cyber's Edge
+5, **Tracer 14, Short-Circuit 12, Evasive System 12, Reaper 8**, dann Blade's
+Intuition, Digital Observer, Cloak, Overclock 90.
+
+**Lehre: Eine Prioritaetenliste ohne Preise ist eine Vermutung.** Der Plan
+wurde am 25.08. um 17:20 schon einmal repariert ("kaufte das Billigste statt
+des Wichtigsten") - und dabei ins andere Extrem gedreht. Richtig ist keins von
+beidem, sondern **Wirkung je Punkt**, und die haengt an der Stufe.
 
 ### Raid ist verworfen - Charisma 27 macht ihn zum Verlustgeschaeft (26.08., 17:20)
 

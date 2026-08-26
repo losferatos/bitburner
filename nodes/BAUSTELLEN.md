@@ -190,11 +190,42 @@ Black Op verlangt. Faellt das Guthaben, greift der Deckel `Geld * 0,1`: Bei
 100 Millionen kostet eine Heilung nur noch 10 Millionen. Das System pendelt
 sich ein, statt zu kollabieren.
 
+**Die Bilanz ist jetzt gemessen, nicht geschaetzt (13:48).** Die 34,6 Millionen
+je Minute oben waren eine Guthabendifferenz - und die untertreibt das
+Bruttoeinkommen nicht, sie UEBERTREIBT es hier: Das Fenster 12:16 bis 13:00
+enthielt keine groesseren Ausgaben. Mit `src/geld.js` (neu) ueber
+`ns.getMoneySources()` gemessen, vier Minuten am Stueck:
+
+    hacking             +25,17 Mio/min
+    bladeburner          +0,55
+    hospitalization      -0,30      (der bestehende Hebel von 06:55)
+    ---
+    gesamt              +25,41 Mio/min
+
+**Damit ist das Defizit groesser als angenommen: 11,3 statt 2,4 Millionen je
+Minute.** Aber die Rechnung dahinter faellt trotzdem zugunsten von Raid aus:
+
+- Bei 9,2 Milliarden Guthaben reicht der Puffer **13,6 Stunden**, und in
+  dieser Zeit bringt Raid **rund 3.100 Rang** - von 645 auf 3.700, also weit
+  ueber die 2.500 der ersten Black Op.
+- Danach kollabiert nichts. Der Deckel `Geld * 0,1` greift und senkt die
+  Kosten mit dem Guthaben. Das Gleichgewicht, wo Kosten und Einkommen sich
+  treffen, liegt bei **rund 276 Millionen** - dort kostet eine Heilung 27,6
+  Millionen, also genau die 25,7 Millionen je Minute, die hereinkommen.
+
+**Die Abwaegung lautet also nicht "riskant oder nicht", sondern: 8,9
+Milliarden Guthaben gegen Faktor 3,4 auf den Traeger.** Was das Geld in
+BitNode 6 noch wert ist, haengt an den Augmentierungen - und die heben die
+Kampfwerte und damit die Erfolgschancen, die ihrerseits Raid billiger machen.
+Das ist ein Kreis, kein einfacher Tausch, und deshalb Erics Entscheidung.
+
 **Zu tun - und das ist bewusst KEIN Nebenbei-Eingriff:**
 1. ~~Klaeren, ob eine Hospitalisierung die Aktion abbricht.~~ **Erledigt
    13:15: nein.**
 2. ~~Den Ausdauerverbrauch je Operation messen.~~ **Erledigt 13:22**, die
    Rechnung steht jetzt dauerhaft in `src/bbspann.js`.
+2b. ~~Das Einkommen messen statt schaetzen.~~ **Erledigt 13:48** mit
+   `src/geld.js`: 25,7 Millionen je Minute brutto, davon 25,17 aus Hacking.
 3. Offen: Die Umstellung selbst. Sie ersetzt die feste Schwelle
    `SICHER_OPERATION = 0.85` (`src/blade.js:48`) durch dieselbe
    Ertragsrechnung, die blade.js fuer Vertraege schon fuehrt - erweitert um

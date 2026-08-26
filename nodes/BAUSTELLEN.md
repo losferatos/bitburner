@@ -160,177 +160,39 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
+### Der Motor springt zwischen Vertraegen hin und her - 8 Prozent verworfene Arbeitszeit
 
-**Die Luecke WAECHST, waehrend die Rechnung besser wird (26.08., 21:07).**
-Seit dem Skill-Umbau um 18:52 steigt die gerechnete Zyklusrate stetig, die
-gemessene Rangrate faellt:
+Abgespalten am 26.08. um 22:15 aus dem Kammeranteil-Punkt, der im Uebrigen
+geklaert ist. Dies ist der einzige Teil, der noch behebbar aussieht.
 
-    Zeitfenster     Zyklusrate (bbspann)   Rangrate (gemessen)
-    19:37-20:07               1,351                   1,67
-    20:07-20:37               1,443                   1,23
-    20:37-21:07               1,560                   0,87
+Gemessen 26.08. um 14:44 ueber die Abschnittsdauern modulo Aktionsdauer:
+**160 Sekunden von 1.983** entfallen auf **43 Wechsel Arbeit->Arbeit**. Jeder
+Aktionswechsel verwirft `actionTimeCurrent` (`Bladeburner.ts:187`), der
+angefangene Durchlauf ist also weg. Ursache: `waehle()` in `blade.js`
+entscheidet bei jedem Durchlauf neu, und die Erfolgsschaetzungen schwanken -
+zwei Vertraege mit fast gleicher Zyklusrate tauschen sich staendig ab.
 
-Von 18:50 bis 21:07 ist die gerechnete Rate um **61 Prozent** gestiegen
-(0,971 auf 1,560), die gemessene um **48 Prozent gefallen**. Beide Zahlen
-koennen nicht stimmen. Erwartet waere eine gemessene Rate nahe der
-gerechneten; sie liegt jetzt bei 56 Prozent davon.
+**Warum es trotzdem kein Acht-Prozent-Hebel ist:** Ein abgebrochener Lauf
+kostet keine Ausdauer (der Abzug passiert erst in `completeAction`,
+`Bladeburner.ts:921`). Wer die Abbrueche vermeidet, bekommt mehr
+vollstaendige Aktionen je Arbeitsminute - und damit mehr Verbrauch je Minute,
+also mehr Kammerzeit. Es hebt sich weitgehend auf.
 
-**WIDERLEGT um 21:20, eine Viertelstunde spaeter - es war Fensterrauschen.**
-`data/wache-zustand.json` fuehrt eine Rangreihe im Drei-Minuten-Takt. Sie zeigt
-keine fallende Rate, sondern einen **Zyklus**:
+**Weitgehend, nicht ganz:** Waehrend der Arbeit regeneriert die Ausdauer mit
+rund 1,2 je Minute, in der Kammer mit 2,3 (gemessen 14:20). Verworfene
+Arbeitszeit ist deshalb echter Verlust - nur eben in der Groessenordnung
+weniger Prozent, nicht acht.
 
-    20:53-21:02   Rang steht neun Minuten bei 1160     Rate 0,00
-    21:05                                    1163           1,00
-    21:08                                    1172           3,00
-    21:11                                    1186           4,66
-    21:14                                    1194           2,66
-    21:17                                    1199           1,66
+**Zu tun:** Eine Hysterese in `waehle()` - nicht wechseln, solange die
+laufende Aktion nicht fertig ist und die Alternative nicht um einen
+Mindestabstand besser liegt. Vorher messen, wie gross der Abstand zwischen
+den beiden Spitzenvertraegen typischerweise ist; liegt er unter dem
+Schaetzrauschen, ist die Hysterese die richtige Antwort.
 
-Ueber 20:30 bis 21:17 geglaettet: **1,23 Rang je Minute** (1141 auf 1199 in 47
-Minuten) gegen eine Zyklusrate von 1,56 - ein Verhaeltnis von 0,79, also rund
-**20 Prozent Luecke** statt der gemeldeten 44. Die drei Halbstundenwerte
-1,67 / 1,23 / 0,87 sahen nach Trend aus, waren aber nur unterschiedlich
-platzierte Fenster ueber demselben Ausdauerzyklus.
-
-**Lehre, und das ist der bleibende Teil: Ein 30-Minuten-Fenster ist zu kurz
-fuer diese Groesse.** Der Ausdauerzyklus laeuft mit einer Periode in derselben
-Groessenordnung; wer ein Fenster misst, misst die Phase, nicht die Rate. Die
-Rangrate gehoert **geglaettet ueber mindestens 45 Minuten** aus
-`data/wache-zustand.json` gelesen, nicht als Differenz zweier Reportzeitpunkte.
-Das betrifft auch die Ziele in `data/ziele.md` - "Rangrate ueber X" ist so
-formuliert eine Muenzwurfmessung.
-
-**Die Nullphase ist gemessen (21:45) und sie ist kein Defekt, sondern die
-Zyklusgeometrie.** Fuenf Stichproben im 15-Sekunden-Takt:
-
-    1243  Kammer, "ruht bis Ausdauer 38"   37/68
-    1243  Kammer                            38/68
-    1243  Contracts/Tracking                39/68
-    1244  Contracts/Tracking                38/68
-    1245  Contracts/Retirement              37/68
-
-Das Band ist `AUSDAUER_RUHE 0,51` bis `AUSDAUER_WEITER 0,56` (`blade.js:150`),
-bei Hoechstausdauer 68 also **3,4 Punkte breit**. Eine Tracking-Aktion kostet
-rund 1,4 - der Motor schafft **zwei bis drei Aktionen**, dann ist das Band
-durchlaufen. Die Regeneration liegt bei 2,3 je Minute, das Auffuellen dauert
-also **1,5 Minuten** gegen **45 Sekunden** Arbeit. Daraus folgt ein
-Kammeranteil von **67 Prozent** - und damit auch die restliche Luecke zur
-gerechneten Zyklusrate, die einen hoeheren Arbeitsanteil unterstellt.
-
-**Nicht an der Bandbreite drehen.** Genau das wurde am 26.08. um 07:46 schon
-versucht (HEBEL.md, "Ausdauer-Ruhespanne von 52/60 auf 51/56") und ist
-widerlegt: Die Spanne ist symmetrisch, sie begrenzt Ruhe und Arbeit im selben
-Verhaeltnis, und enger heisst nur mehr Umschaltvorgaenge. Der Kammeranteil
-stieg damals von 50,1 auf 60,7 Prozent.
-
-**Was bleibt** - und das ist der Rest dieses Punktes: Der Kammeranteil ist
-**strukturell**, nicht behebbar durch Umsortieren. Er faellt nur ueber das
-Verhaeltnis Regeneration zu Verbrauch je Minute. Der Verbrauch je Aktion ist
-fest (`BaseStaminaLoss * difficultyMultiplier`, `Bladeburner.ts:921`), die
-Regeneration haengt am Stamina-Multiplikator. Der laufende Hebel - Ertrag JE
-Aktion ueber die Erfolgschance heben - greift daran vorbei und wirkt trotzdem:
-genau deshalb steigt die Rate seit dem Faehigkeitsumbau.
-
-**Messung 26.08., 17:37 (nach dem Einbau von 16:31):** `data/blade.json` zeigt
-Aktion "General/Hyperbolic Regeneration Chamber", Grund "ruht bis Ausdauer 31",
-Ausdauer **29/56**. Die Rangrate liegt bei **0,83 je Minute** (908 um 17:07 auf
-933 um 17:37) gegen eine Tracking-Zyklusrate von 1,339. Neu ist der Grund:
-Die maximale Ausdauer ist durch den Einbau von **79 auf 56** gefallen, und die
-Regeneration haengt am Maximum - der Kammeranteil steigt also nach jedem
-Einbau, bis die Kampfwerte wieder oben sind. Das gehoert in die Rechnung des
-Punktes, die bisher von einem festen Maximum ausgeht.
-
-**Der alte Titel ("drei Viertel") ist ueberholt.** Gemessen 26.08. um 14:44
-ueber `data/aktionen.txt`, gestaffelt nach den Hebeln des Tages:
-
-    gesamter Verlauf      682,7 min   0,699 Rang/min   Kammer 60,5 %
-    ab 10:00              238,4 min   0,789            Kammer 52,7 %
-    ab 12:21 (Cyber's E.) 122,2 min   0,842            Kammer 51,3 %
-    ab 13:33 (CE Stufe 5)  69,7 min   0,841            Kammer 52,6 %
-
-Von 72,5 Prozent (06:47) auf 52 - der Krankenhaus-Hebel und Cyber's Edge
-zusammen. **Die Ruhe ist inzwischen zu 100 Prozent Ausdauer-Ruhe**; kein
-einziger HP-Grund mehr in 69,7 Minuten. Ansatz 1 des alten Eintrags (mehr
-Trefferpunkte) ist damit endgueltig erledigt.
-
-**Was jetzt offen ist: Die gerechnete Rate liegt ein Drittel ueber der
-gemessenen.**
-
-    gerechnet (bbspann, Tracking)   2,513 Rang je Arbeitsminute
-    gemessen  (Aktionsmix)          1,77
-
-Der Mix erklaert die Luecke nicht - nachgerechnet stimmt er auf drei
-Nachkommastellen: 52,6 % Kammer, und die Arbeitsphase bringt
-(17,4*2,086 + 9,3*1,896 + 6,4*0,739) / 33,1 = 1,77, mal 0,474 = **0,839**
-gegen gemessene 0,841.
-
-**Ein Teil ist gefunden: verworfener Aktionsfortschritt.** Jeder Wechsel setzt
-`actionTimeCurrent` auf 0 (`Bladeburner.ts:187`), der angefangene Durchlauf ist
-weg. Gemessen ueber die Abschnittsdauern modulo Aktionsdauer, seit 13:33:
-
-    Contracts/Tracking        31 Abschnitte    35 s verworfen   ( 6 %)
-    Contracts/Retirement      22 Abschnitte   183 s            (18 %)
-    Contracts/Bounty Hunter    8 Abschnitte    58 s            (15 %)
-    ---
-    gesamt                                    276 s von 1.983 s = 13,9 %
-
-Davon entfallen **160 Sekunden auf 43 Wechsel Arbeit->Arbeit** - der Motor
-springt zwischen Vertraegen hin und her, weil `waehle()` bei jedem Durchlauf
-neu entscheidet und die Erfolgsschaetzungen schwanken. Die restlichen 114
-Sekunden sind 17 Wechsel Arbeit->Kammer, die man nicht aufschieben darf: Die
-Ruheschwelle liegt bei 51 Prozent, die Strafgrenze bei 50
-(`Bladeburner.ts:167-169`), da ist kein Puffer fuer 22 Sekunden Aufschub.
-
-**Warum daraus KEIN Acht-Prozent-Hebel folgt - und das ist der Punkt:**
-Ein abgebrochener Durchlauf kostet **keine Ausdauer**. Der Abzug passiert erst
-beim Abschluss (`Bladeburner.ts:921`, innerhalb von `completeAction`). Wer die
-Abbrueche vermeidet, bekommt also mehr vollstaendige Aktionen je Arbeitsminute
-- und damit mehr Verbrauch je Minute, also mehr Kammerzeit. Solange die
-Ausdauer der Engpass ist, hebt sich das weitgehend auf.
-
-Es hebt sich nur **weitgehend** auf, nicht vollstaendig: Waehrend der Arbeit
-regeneriert die Ausdauer passiv mit rund 1,2 je Minute, in der Kammer mit 2,31
-(gemessen 14:20). Verworfene Arbeitszeit ist deshalb schlechter als Kammerzeit
-- aber der Gewinn liegt bei wenigen Prozent, nicht bei acht.
-
-**Verdacht 1 ist WIDERLEGT (26.08., 17:50) - und die Luecke ist dadurch
-groesser, nicht kleiner.** Die Schaetzung ist nicht optimistisch, sondern
-pessimistisch. `getPopulationSuccessFactor` nimmt `est ? city.popEst : city.pop`
-(`Actions/Action.ts:88-92`), und aus dem Spielstand gemessen:
-
-    Stadt        pop        popEst     est/ist
-    Sector-12    1,754e9    1,466e9    0,835   <- Arbeitsstadt
-    Volhaven     3,653e9    1,577e9    0,432
-    Aevum        1,432e9    7,484e8    0,523
-    New Tokyo    1,344e9    1,532e9    1,140
-    Ishima       5,714e8    8,105e8    1,418
-
-Mit `(pop/1e9)^0,7` (`data/Constants.ts:29-30`) heisst das fuer Sector-12:
-Faktor 1,482 wahr gegen 1,307 geschaetzt - die **echte Erfolgschance liegt 13
-Prozent ueber der gerechneten**. Die gemessene Rate muesste also ueber der
-gerechneten liegen; sie liegt 20 Prozent darunter. Die tatsaechliche Luecke
-betraegt damit rund **33 Prozent**.
-
-**Verdacht 2 ist ebenfalls widerlegt: keine Tab-Drosselung.** Aus zwei
-`data/blade.json` verglichen (17:07 und 17:37): Wanduhr 1.789.027 ms,
-Spielzeit-Delta 1.789.000 ms. Der Tonanker haelt, die Engine laeuft in
-Echtzeit.
-
-**Zu tun:**
-1. Die 33 Prozent klaeren. Ausgeschlossen sind jetzt die
-   Chancenschaetzung und die Engine-Geschwindigkeit. Offen bleiben: der
-   Rangverlust bei Operationen (bei Vertraegen null), die Zeit zwischen
-   Aktionsende und Neustart durch `blade.js` selbst, und ob `data/aktionen.txt`
-   Abschnitte verliert. Naechster Schritt: Rang-Delta und Aktionszahl ueber
-   dieselbe Spanne gegeneinander halten, statt nur die Rate.
-2. Erst danach ueber das Aufschieben von Arbeit->Arbeit-Wechseln entscheiden,
-   und dann mit einer Erwartung in Prozent, die diese Rechnung beruecksichtigt.
-
-**Dringlichkeit:** mittel. Der Kammeranteil selbst ist kein Notfall mehr; die
-Frage nach der Verlaesslichkeit der Ertragsrechnung schon, weil an ihr die
-Raid-Entscheidung haengt.
-
+**Vorsicht bei der Abnahme:** Der Gewinn liegt bei wenigen Prozent und
+verschwindet im Ausdauerzyklus. Die Messung braucht **mindestens 45 Minuten
+geglaettet** aus `data/wache-zustand.json`, sonst misst man die Phase statt
+der Rate (Lehre vom 21:20).
 
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
@@ -541,6 +403,43 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Kammeranteil ist geklaert - er ist Zyklusgeometrie (26.08., 22:15)
+
+**Verifiziert: Kammeranteil 67 Prozent, gerechnet und im Spiel bestaetigt um
+21:45.** Fuenf Stichproben im 15-Sekunden-Takt zeigten den vollstaendigen
+Zyklus: zwei Kammerproben bei 37 und 38 von 68, dann drei Arbeitsproben bei
+39, 38, 37.
+
+Der Punkt lief seit dem 26.08. frueh unter dem Titel "die Rechnung erklaert
+nur zwei Drittel davon". Sie erklaert jetzt alles:
+
+- Das Ruheband ist `AUSDAUER_RUHE 0,51` bis `AUSDAUER_WEITER 0,56`
+  (`blade.js:150`), bei Hoechstausdauer 68 also **3,4 Punkte breit**.
+- Eine Vertragsaktion kostet rund 1,4 Ausdauer - **zwei bis drei Aktionen**,
+  dann ist das Band durchlaufen.
+- Regeneration 2,3 je Minute: **1,5 Minuten Auffuellen gegen 45 Sekunden
+  Arbeit** = 67 Prozent Kammeranteil.
+
+Damit ist auch die "Luecke" zwischen gerechneter Zyklusrate und gemessener
+Rangrate erklaert - `bbspann` unterstellt einen hoeheren Arbeitsanteil.
+
+**Drei Griffe sind geprueft und verworfen**, jeder mit Zahl:
+1. *Bandbreite aendern* - am 07:46 versucht, widerlegt: Die Spanne ist
+   symmetrisch, der Kammeranteil stieg von 50,1 auf 60,7 Prozent (HEBEL.md).
+2. *Chancenschaetzung als Ursache* - widerlegt um 17:50: `popEst/pop` liegt
+   bei 0,835, die Schaetzung ist pessimistisch, nicht optimistisch.
+3. *Tab-Drosselung* - widerlegt um 17:50: Wanduhr 1.789.027 ms gegen
+   Spielzeit 1.789.000 ms.
+
+**Der bleibende Satz:** Der Kammeranteil ist **strukturell**. Er faellt nur
+ueber das Verhaeltnis Regeneration zu Verbrauch je Minute, nicht ueber
+Umsortieren, Schwellen oder Auswahllogik. Der wirksame Weg fuehrt am
+Kammeranteil vorbei - **Ertrag JE Aktion heben**, und genau das tut der
+Faehigkeitsplan seit 18:52.
+
+Der einzige noch behebbare Rest - die Wechsel zwischen Vertraegen - steht als
+eigener Punkt unter `## Offen`.
 
 ### Der Waechter meldet fehlenden Speicher als Ausfall (26.08., 20:50)
 

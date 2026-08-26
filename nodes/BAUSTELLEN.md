@@ -160,73 +160,6 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
-### Der Motor springt zwischen Vertraegen hin und her - 8 Prozent verworfene Arbeitszeit
-
-**Geaendert 22:55, Wirkung noch nicht gemessen.**
-
-Das Vormessen aus "Zu tun" ist erledigt (22:45) und faellt deutlicher aus als
-erwartet:
-
-    Vertrag          min     max  spanne   zyklus
-    Bounty Hunter  0,508   0,862   0,354    2,064
-    Tracking       1,000   1,000   0,000    1,864
-    Retirement     0,636   1,000   0,364    1,807
-
-Der Abstand zwischen den beiden Besten liegt bei **11 Prozent**, die
-Unsicherheit der Schaetzung bei Bounty Hunter dagegen bei **41 Prozent
-relativ** (0,354 auf 0,508 bis 0,862). Verglichen werden Zahlen, deren
-Rauschen groesser ist als ihr Abstand - genau deshalb kippt die Reihenfolge
-staendig. Tracking ist der Sonderfall mit Spanne 0: Die Schaetzung ist dort
-exakt, weil Tracking selbst die Populationsschaetzung verbessert.
-
-**Eingebaut wurde eine Hysterese auf der ZEIT, nicht auf den Werten** - eine
-Wertschwelle braeuchte eine Zahl, die niemand kennt. Neue Regel in
-`blade.js`: Ist der laufende Durchlauf zu mehr als einem Viertel gelaufen
-(`getActionCurrentTime` gegen `getActionTime`), wird er zu Ende gefahren.
-Ruhe wegen Ausdauer oder Trefferpunkten greift weiterhin sofort.
-
-**Erwartung:** Der mittlere Verlust je Wechsel faellt von rund der halben
-Dauer auf ein Achtel, also drei Viertel der 160 Sekunden. Auf die Rangrate
-sind das gut **6 Prozent**.
-
-**Abnahme:** Rangrate geglaettet ueber mindestens 45 Minuten aus
-`data/wache-zustand.json`. **Vorher: 1,76 Rang je Minute um 22:52** (42
-Minuten, Rang 1339). Traegt es nicht - also unter 1,76 nach einer Stunde -,
-wird der Block zurueckgenommen; er ist eine zusammenhaengende Stelle und
-laesst sich sauber herausloesen.
-
-Abgespalten am 26.08. um 22:15 aus dem Kammeranteil-Punkt, der im Uebrigen
-geklaert ist. Dies ist der einzige Teil, der noch behebbar aussieht.
-
-Gemessen 26.08. um 14:44 ueber die Abschnittsdauern modulo Aktionsdauer:
-**160 Sekunden von 1.983** entfallen auf **43 Wechsel Arbeit->Arbeit**. Jeder
-Aktionswechsel verwirft `actionTimeCurrent` (`Bladeburner.ts:187`), der
-angefangene Durchlauf ist also weg. Ursache: `waehle()` in `blade.js`
-entscheidet bei jedem Durchlauf neu, und die Erfolgsschaetzungen schwanken -
-zwei Vertraege mit fast gleicher Zyklusrate tauschen sich staendig ab.
-
-**Warum es trotzdem kein Acht-Prozent-Hebel ist:** Ein abgebrochener Lauf
-kostet keine Ausdauer (der Abzug passiert erst in `completeAction`,
-`Bladeburner.ts:921`). Wer die Abbrueche vermeidet, bekommt mehr
-vollstaendige Aktionen je Arbeitsminute - und damit mehr Verbrauch je Minute,
-also mehr Kammerzeit. Es hebt sich weitgehend auf.
-
-**Weitgehend, nicht ganz:** Waehrend der Arbeit regeneriert die Ausdauer mit
-rund 1,2 je Minute, in der Kammer mit 2,3 (gemessen 14:20). Verworfene
-Arbeitszeit ist deshalb echter Verlust - nur eben in der Groessenordnung
-weniger Prozent, nicht acht.
-
-**Zu tun:** Eine Hysterese in `waehle()` - nicht wechseln, solange die
-laufende Aktion nicht fertig ist und die Alternative nicht um einen
-Mindestabstand besser liegt. Vorher messen, wie gross der Abstand zwischen
-den beiden Spitzenvertraegen typischerweise ist; liegt er unter dem
-Schaetzrauschen, ist die Hysterese die richtige Antwort.
-
-**Vorsicht bei der Abnahme:** Der Gewinn liegt bei wenigen Prozent und
-verschwindet im Ausdauerzyklus. Die Messung braucht **mindestens 45 Minuten
-geglaettet** aus `data/wache-zustand.json`, sonst misst man die Phase statt
-der Rate (Lehre vom 21:20).
-
 ### Die Erwartungswerte des Pruefers sind geschaetzt, nicht gemessen
 
 **Der letzte Rest ist die Pauschale 1,7 - und sie ist jetzt widerlegt
@@ -470,6 +403,36 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Das Springen zwischen Vertraegen ist kein Fehler - Hysterese widerlegt (26.08., 23:50)
+
+**Verifiziert: 1,58 Rang je Minute gegen 1,76 vorher**, gemessen ueber 48
+Minuten aus `data/wache-zustand.json` (1364 um 22:55 auf 1440 um 23:45).
+Erwartet waren gut 6 Prozent mehr; gemessen sind **10 Prozent weniger**. Die
+Aenderung ist um 23:50 zurueckgenommen.
+
+Der Punkt kam aus der Messung vom 14:44: 43 Wechsel zwischen Vertraegen
+verwerfen 160 von 1.983 Sekunden, weil jeder Wechsel `actionTimeCurrent` auf
+0 setzt (`Bladeburner.ts:187`). Das Vormessen um 22:45 bestaetigte auch den
+Grund fuer das Springen - der Abstand zwischen den beiden besten Vertraegen
+liegt bei 11 Prozent, die Schaetzunsicherheit bei Bounty Hunter dagegen bei
+41 Prozent relativ (min 0,508, max 0,862).
+
+Eingebaut war daraufhin eine Hysterese auf der ZEIT: Ein Durchlauf, der zu
+mehr als einem Viertel gelaufen war, wurde zu Ende gefahren.
+
+**Der Denkfehler - und er ist der eigentliche Ertrag dieses Punktes:** Der
+Ertragsunterschied zwischen den Aktionen ist groesser als die verworfene
+Zeit. Gemessen ueber 406 Abschnitte (`ratencheck.js`, 23:18) bringt Tracking
+**3,438** Rang je Arbeitsminute, Bounty Hunter **2,279** - **51 Prozent**
+Unterschied. Wer einen Wechsel um bis zu drei Viertel eines Durchlaufs
+aufschiebt, sitzt genau so lange auf der schlechteren Aktion. Die 8 Prozent
+verworfene Zeit sind billiger als das.
+
+**Damit ist das Springen als richtig erwiesen**, nicht nur als hinnehmbar: Es
+ist die Antwort auf schwankende Schaetzungen, und jede Verzoegerung kostet
+mehr, als sie spart. Der Kommentarblock in `blade.js` haelt das fest, damit
+niemand dieselbe Hysterese ein zweites Mal einbaut.
 
 ### Der Kammeranteil ist geklaert - er ist Zyklusgeometrie (26.08., 22:15)
 

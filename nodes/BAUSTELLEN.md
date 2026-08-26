@@ -189,7 +189,29 @@ Ruhezeit mit, der Anteil bleibt gleich.
 Ausdauer-Ruhe, nicht Trefferpunkte - dagegen hilft kein Krankenhaus. Die
 Ausdauer regeneriert passiv rund 1,2 je Minute (`Bladeburner.ts:1382`), die
 Kammer verdoppelt das. Ansaetze:
-- ~~**Die Hoechstausdauer heben.**~~ **Widerlegt 26.08., 08:14.** Der Versuch
+- **Die Hoechstausdauer heben - die Verwerfung von 08:14 war falsch
+  begruendet (nachgerechnet 26.08., 11:15).**
+  Damals hiess es: Reserve und Regeneration wachsen gemeinsam, der Anteil
+  bleibt. Das stimmt fuer die RUHEzeit, aber nicht fuer die Arbeitszeit.
+  Sauber gerechnet, mit Spanne S, Verbrauch V und Regeneration R:
+
+      Ruhezeit    = S / R                 -> waechst beides um x, bleibt gleich
+      Arbeitszeit = S / (V - R)           -> V ist FIX, nur R waechst
+
+  Der Nenner sinkt, die Arbeitszeit waechst also ueberproportional. Mit
+  Tracking (V = 2,7 je Minute, R = 1,2) und zehn Prozent mehr Regeneration:
+  netto 1,38 statt 1,50, Arbeitszeit plus 19 Prozent bei gleicher Ruhezeit -
+  der Kammeranteil faellt von 52 auf knapp 48 Prozent.
+  Der Hebel dafuer ist die Faehigkeit **Cyber's Edge** (+2 Prozent
+  Hoechstausdauer je Stufe, `Skills.ts:84-89`), die ueber
+  `getSkillMult(Stamina)` in BEIDEN Formeln steckt - `calculateMaxStamina`
+  (`Bladeburner.ts:1327-1343`) und `calculateStaminaGainPerSecond`
+  (`:1317-1325`).
+  **Nicht umsetzbar, solange keine Faehigkeitspunkte da sind** (gemessen 10:45:
+  null). Drei Stufen kosten 1+3+9 = 13 Punkte und braechten rund neun Prozent
+  Rate. Wieder aufnehmen, sobald Punkte anfallen.
+
+- ~~**Alte Fassung dieser Verwerfung, 26.08. 08:14:**~~ Der Versuch
   lief ueber die Hysteresespanne (51/56 statt 52/60) und ging nach hinten los:
   Die Kammerzeit stieg von 50,1 auf 60,7 Prozent. Die Spanne ist SYMMETRISCH -
   sie begrenzt Ruhe UND Arbeit, beide schrumpfen gleich, und der

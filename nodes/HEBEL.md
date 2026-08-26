@@ -37,6 +37,48 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Die Auswahl misst die falsche Groesse - gerechnet, noch nicht umgesetzt (26.08., 09:46)
+
+Engpass: 55 Prozent Kammerzeit, allein wegen Ausdauer. Wenn die Ausdauer der
+Engpass ist, zaehlt **Rang je Ausdauerpunkt**, nicht Rang je Minute - und die
+Auswahl in `blade.js` optimiert bis heute Letzteres.
+
+Gemessen 09:45 ueber 295 Abschnitte (`tools/ratencheck.js`):
+
+    Aktion                   Rang/min   Rang/Ausdauer   Ausdauer/Lauf   s/Lauf
+    Contracts/Tracking          2,180           0,533            1,17       26
+    Contracts/Bounty Hunter     1,710           0,989            1,78       48
+
+**Die beiden Kennzahlen widersprechen sich.** Tracking ist in der Arbeitszeit
+schneller, Bounty Hunter je Ausdauerpunkt fast doppelt so ergiebig.
+
+Ueber den vollen Zyklus aus Arbeit UND Ruhe gerechnet, mit Budget B (die
+Hysteresespanne) und 1,2 Ausdauer je Minute passiver Regeneration, in der
+Kammer verdoppelt:
+
+    Bounty Hunter   Verbrauch 2,22/min, netto 1,02  ->  Zyklus 1,397 B, Rang 0,989 B  =  0,708 Rang/min
+    Tracking        Verbrauch 2,70/min, netto 1,50  ->  Zyklus 1,084 B, Rang 0,533 B  =  0,492 Rang/min
+
+**Bounty Hunter gewinnt ueber den vollen Zyklus um Faktor 1,44**, obwohl die
+bisherige Kennzahl Tracking vorne sieht. Die Absolutwerte des Modells passen
+nicht exakt zur Messung (0,708 gegen gemessene 0,93 ueber alles) - das
+Verhaeltnis ist die belastbare Aussage, nicht die Zahl.
+
+**Bewusst NICHT in diesem Lauf umgesetzt.** Die saubere Loesung ist
+selbstkalibrierend: `blade.js` liest den gemessenen Verbrauch je Aktion aus
+`data/aktionen.txt` und waehlt danach. Eine hartkodierte Tabelle aus dreissig
+Minuten Messung waere genau der Fehler, gegen den `tools/ratencheck.js`
+ueberhaupt gebaut wurde - und Retirement fehlt in der Messung noch ganz.
+
+Ausserdem korrigiert: Der erste Lauf um 09:18 meldete "Tracking 99,8 Rang je
+Ausdauer". Diese Zahl war falsch - der Zaehler stammte aus allen Abschnitten,
+der Nenner nur aus denen mit Ausdauermessung. Nach der Korrektur sind es 0,533,
+und die Rangfolge kehrt sich um.
+
+Vorher: 0,926 Rang je Minute, 55,5 Prozent Kammerzeit (09:19)
+Nachher: (keine Aenderung - dies ist die Rechnung, die der Aenderung vorausgeht)
+Commit: siehe git log, ratencheck.js 26.08. 09:45
+
 ### Ausdauer-Ruhespanne von 52/60 auf 51/56 Prozent (26.08., 07:46)
 
 Engpass: Nach dem Krankenhaus-Hebel ist die Ausdauer der letzte Grund, aus dem

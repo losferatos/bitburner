@@ -106,7 +106,7 @@ async function ausAbschnitten() {
     const rang = d.rangBis - d.rangVon;
     // Ein Rueckgang ist ein Einbau oder Knotenwechsel, keine Aktion.
     if (rang < 0) continue;
-    if (!je.has(d.aktion)) je.set(d.aktion, { n: 0, sek: 0, rang: 0, treffer: 0, aus: 0, ausN: 0 });
+    if (!je.has(d.aktion)) je.set(d.aktion, { n: 0, sek: 0, rang: 0, treffer: 0, aus: 0, ausN: 0, rangMitAus: 0 });
     const e = je.get(d.aktion);
     e.n++; e.sek += dauer; e.rang += rang;
     if (rang > 0) e.treffer++;
@@ -118,6 +118,14 @@ async function ausAbschnitten() {
         && d.ausdauerBis < d.ausdauerVon) {
       e.aus += d.ausdauerVon - d.ausdauerBis;
       e.ausN++;
+      // NUR DIESELBEN ABSCHNITTE IN BEIDE SUMMEN (26.08.2026, 09:45).
+      //
+      // Der erste Entwurf teilte den Rang ALLER Abschnitte durch den Verbrauch
+      // der wenigen mit Ausdauermessung. Beim ersten Lauf um 09:18 kam so
+      // "99,8 Rang je Ausdauer" heraus - eine Zahl, die nur entstand, weil der
+      // Zaehler aus dreihundert Abschnitten stammte und der Nenner aus fuenf.
+      // Auf breiter Basis sind es 7,1.
+      e.rangMitAus += rang;
     }
   }
 
@@ -129,7 +137,7 @@ async function ausAbschnitten() {
     schnittSek: +(e.sek / e.n).toFixed(0),
     // Rang je Ausdauerpunkt. Bei einem Motor, der mehr als die Haelfte der
     // Zeit auf Ausdauer wartet, ist DAS die Kennzahl - nicht Rang je Minute.
-    rangJeAusdauer: e.aus > 0 ? +(e.rang / e.aus).toFixed(3) : null,
+    rangJeAusdauer: e.aus > 0 ? +(e.rangMitAus / e.aus).toFixed(3) : null,
     ausdauerJeLauf: e.ausN > 0 ? +(e.aus / e.ausN).toFixed(2) : null,
   })).sort((a, b) => b.rangJeMinute - a.rangJeMinute);
 

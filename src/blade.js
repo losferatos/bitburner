@@ -327,6 +327,22 @@ export async function main(ns) {
   // Liste von Dateiendungen zu und weist alles andere mit "Invalid file
   // extension" ab. Der Inhalt ist trotzdem JSON, eine Zeile je Abschnitt.
   let abschnitt = null;
+  // DER AUSDAUERVERBRAUCH IST DER LETZTE UNGEMESSENE POSTEN (26.08., 09:15).
+  //
+  // Nach dem Krankenhaus-Hebel bleibt die Ausdauer der einzige Grund zu ruhen,
+  // und sie kostet weiter 58 Prozent der Zeit (gemessen 09:14 ueber 59
+  // Minuten). Zwei Ansaetze dagegen sind schon widerlegt: die Hysteresespanne
+  // (symmetrisch) und die Hoechstausdauer (Regeneration waechst mit).
+  //
+  // Uebrig bleibt der Verbrauch selbst: `BaseStaminaLoss * difficultyMultiplier`
+  // (Bladeburner.ts:921), und die Schwierigkeit steigt mit dem AKTIONSLEVEL
+  // (`difficultyFac^(level-1)`). Tracking steht auf Stufe 24 und ist damit
+  // teuer geworden - moeglicherweise teurer, als sein Ertrag von 2,2 Rang je
+  // Minute wert ist. Ohne den Verbrauch je Aktion laesst sich das nicht
+  // entscheiden, also wird er ab jetzt mitgeschrieben.
+  const holeAusdauer = () => {
+    try { return +ns.bladeburner.getStamina()[0].toFixed(3); } catch { return null; }
+  };
   const schliesseAbschnitt = (jetztRang) => {
     if (!abschnitt) return;
     const dauer = Date.now() - abschnitt.von;
@@ -335,6 +351,7 @@ export async function main(ns) {
       const zeile = JSON.stringify({
         von: abschnitt.von, bis: Date.now(), aktion: abschnitt.aktion,
         grund: abschnitt.grund, rangVon: abschnitt.rang, rangBis: jetztRang,
+        ausdauerVon: abschnitt.ausdauer, ausdauerBis: holeAusdauer(),
       }) + String.fromCharCode(10);
       try {
         ns.write("data/aktionen.txt", zeile, "a");
@@ -564,7 +581,7 @@ export async function main(ns) {
           try { r = ns.bladeburner.getRank(); } catch { /* egal */ }
           schliesseAbschnitt(r);
           abschnitt = { von: Date.now(), aktion: wahl.typ + "/" + wahl.name,
-            grund: wahl.grund, rang: r };
+            grund: wahl.grund, rang: r, ausdauer: holeAusdauer() };
           const kennung = wahl.typ + "/" + wahl.name;
           if (kennung !== letzte) {
             sag(kennung + "  (" + wahl.grund + ")");

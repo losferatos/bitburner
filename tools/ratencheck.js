@@ -106,10 +106,19 @@ async function ausAbschnitten() {
     const rang = d.rangBis - d.rangVon;
     // Ein Rueckgang ist ein Einbau oder Knotenwechsel, keine Aktion.
     if (rang < 0) continue;
-    if (!je.has(d.aktion)) je.set(d.aktion, { n: 0, sek: 0, rang: 0, treffer: 0 });
+    if (!je.has(d.aktion)) je.set(d.aktion, { n: 0, sek: 0, rang: 0, treffer: 0, aus: 0, ausN: 0 });
     const e = je.get(d.aktion);
     e.n++; e.sek += dauer; e.rang += rang;
     if (rang > 0) e.treffer++;
+    // Der Ausdauerverbrauch ist die eigentlich knappe Groesse: Er erzwingt die
+    // Ruhezeit, und die kostet mehr als jede Aktionsauswahl. Nur fallende
+    // Werte zaehlen - waehrend der Kammer und in Ruhephasen steigt die
+    // Ausdauer, und das ist kein Verbrauch.
+    if (Number.isFinite(d.ausdauerVon) && Number.isFinite(d.ausdauerBis)
+        && d.ausdauerBis < d.ausdauerVon) {
+      e.aus += d.ausdauerVon - d.ausdauerBis;
+      e.ausN++;
+    }
   }
 
   const zeilenAus = [...je.entries()].map(([aktion, e]) => ({
@@ -118,6 +127,10 @@ async function ausAbschnitten() {
     rangJeMinute: e.sek > 0 ? +(e.rang / (e.sek / 60)).toFixed(3) : 0,
     erfolgsquote: +(e.treffer / e.n).toFixed(3),
     schnittSek: +(e.sek / e.n).toFixed(0),
+    // Rang je Ausdauerpunkt. Bei einem Motor, der mehr als die Haelfte der
+    // Zeit auf Ausdauer wartet, ist DAS die Kennzahl - nicht Rang je Minute.
+    rangJeAusdauer: e.aus > 0 ? +(e.rang / e.aus).toFixed(3) : null,
+    ausdauerJeLauf: e.ausN > 0 ? +(e.aus / e.ausN).toFixed(2) : null,
   })).sort((a, b) => b.rangJeMinute - a.rangJeMinute);
 
   if (process.argv.includes("--json")) {
@@ -128,14 +141,17 @@ async function ausAbschnitten() {
     + " Abschnitten, data/aktionen.txt)");
   console.log("");
   console.log("Aktion".padEnd(42) + "n".padStart(4) + "min".padStart(8)
-    + "Rang/min".padStart(10) + "Erfolg".padStart(8) + "s/Lauf".padStart(8));
+    + "Rang/min".padStart(10) + "Erfolg".padStart(8) + "s/Lauf".padStart(8)
+    + "Rang/Aus".padStart(10) + "Aus/Lauf".padStart(10));
   for (const z of zeilenAus) {
     console.log(z.aktion.padEnd(42)
       + String(z.n).padStart(4)
       + z.minuten.toFixed(1).padStart(8)
       + z.rangJeMinute.toFixed(3).padStart(10)
       + (z.erfolgsquote * 100).toFixed(0).padStart(7) + "%"
-      + String(z.schnittSek).padStart(8));
+      + String(z.schnittSek).padStart(8)
+      + (z.rangJeAusdauer === null ? "-" : z.rangJeAusdauer.toFixed(3)).padStart(10)
+      + (z.ausdauerJeLauf === null ? "-" : z.ausdauerJeLauf.toFixed(2)).padStart(10));
   }
   const gesamt = zeilenAus.reduce((s, z) => s + z.minuten, 0);
   const rangGesamt = zeilenAus.reduce((s, z) => s + z.rangJeMinute * z.minuten, 0);

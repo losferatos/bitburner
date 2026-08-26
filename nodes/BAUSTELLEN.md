@@ -162,6 +162,15 @@ wirkt, und ueberschreibt die Praeparation.
 
 ### Der Kammeranteil steht bei 52 Prozent - und die Rechnung erklaert nur zwei Drittel davon
 
+**Messung 26.08., 17:37 (nach dem Einbau von 16:31):** `data/blade.json` zeigt
+Aktion "General/Hyperbolic Regeneration Chamber", Grund "ruht bis Ausdauer 31",
+Ausdauer **29/56**. Die Rangrate liegt bei **0,83 je Minute** (908 um 17:07 auf
+933 um 17:37) gegen eine Tracking-Zyklusrate von 1,339. Neu ist der Grund:
+Die maximale Ausdauer ist durch den Einbau von **79 auf 56** gefallen, und die
+Regeneration haengt am Maximum - der Kammeranteil steigt also nach jedem
+Einbau, bis die Kampfwerte wieder oben sind. Das gehoert in die Rechnung des
+Punktes, die bisher von einem festen Maximum ausgeht.
+
 **Der alte Titel ("drei Viertel") ist ueberholt.** Gemessen 26.08. um 14:44
 ueber `data/aktionen.txt`, gestaffelt nach den Hebeln des Tages:
 

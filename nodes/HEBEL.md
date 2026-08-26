@@ -37,6 +37,105 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Geprueft und verworfen: Team, Ausdauerschwelle, Punkterate (26.08., 15:57)
+
+Kein Hebel in diesem Lauf. Drei Kandidaten am Quellcode geprueft, alle drei
+tragen heute nicht - das steht hier, damit sie niemand ein zweites Mal aufruft.
+
+**Bladeburner-Team.** `operationTeamSuccessBonus` ist
+`(teamCount + 1)^0,05` (`Actions/Operation.ts:96-98`). Zwanzig Mann bringen
+`21^0,05 = 1,164`, hundert Mann 1,259 - und der Bonus haengt **nur an
+Operationen und Black Ops** (`Actions/Action.ts:124-126` gibt fuer alles andere
+1 zurueck). Der Motor faehrt ausschliesslich Vertraege, also ist die Wirkung
+derzeit **exakt null**. Rekrutierung kostet zwar keine Ausdauer, aber die
+Erfolgschance ist `charisma^0,45 / (teamSize + 1)`
+(`data/GeneralActions.ts:29-31`), und Charisma wurde in diesem Lauf nie
+trainiert.
+**Vermerk fuer spaeter:** Sobald Operationen oder Black Ops gefahren werden,
+ist das Team Pflicht - dann sind es +16 Prozent auf die Erfolgschance, und
+bei Raid schlaegt das wegen des Rangverlust-Terms als +25 Prozent auf den
+Erwartungswert durch. `setTeamSize` wird von `blade.js` bisher nie aufgerufen,
+`teamCount` steht also auf 0.
+
+**Ausdauerschwelle senken.** Nachgerechnet mit den heutigen Zahlen
+(V = 5,2 je Minute bei Tracking, R = 2,31, Maximum 79):
+
+    Schwelle 51/56   Spanne 3,95   Arbeit 1,37 min   Ruhe 1,71   Anteil 44,5 %
+    Schwelle 30/56   Spanne 20,5   Arbeit 7,10 min   Ruhe 8,90   Anteil 44,4 %
+
+Der Anteil ist identisch - die Spanne ist symmetrisch, sie begrenzt Arbeit und
+Ruhe gleichermassen. Unterhalb von 50 Prozent kaeme die Ausdauerstrafe dazu
+(`min(1, stamina/(0,5*max))`, `Bladeburner.ts:167-169`), die den Ertrag der
+laengeren Arbeitsphase auffrisst. **Damit ist die Verwerfung vom 08:14 zum
+zweiten Mal bestaetigt, diesmal mit gemessenen statt geschaetzten Werten.**
+
+**Punkterate getrennt heben.** Geht nicht: Faehigkeitspunkte fallen streng
+linear aus dem Rang an - `RanksPerSkillPoint: 3` (`data/Constants.ts:47`),
+ausgewertet in `Bladeburner.ts:1282-1289` gegen `maxRank`. Ein Punkt je drei
+Rang, ohne Zwischengroesse, an der sich drehen liesse. Die Rueckkopplung ist
+damit sauber: mehr Rang, mehr Punkte, bessere Faehigkeiten, mehr Rang - und
+der einzige Angriffspunkt bleibt die Rangrate selbst.
+
+
+### Diplomacy gegen Chaos ueber 50 (26.08., 15:26)
+
+Engpass: Die Erfolgschancen. Sector-12 stand um 14:49 bei Chaos 53,89, und
+`Actions/Action.ts:94-101` multipliziert oberhalb von 50 die SCHWIERIGKEIT mit
+`sqrt(1 + (chaos - 50))`.
+
+Hypothese: Faellt das Chaos unter 50, steigt die Tracking-Chance von 0,357 auf
+mindestens 0,75, weil der Faktor `sqrt(4,89) = 2,21` auf exakt 1 zurueckfaellt.
+
+Beleg: `Actions/Action.ts:94-101` (Schwellwert und Wurzelformel),
+`Bladeburner.ts:735-743` und `:1185-1187` (Diplomacy senkt prozentual um
+`charisma^0,045 + charisma/1000`), `data/GeneralActions.ts:37-44` (60 Sekunden,
+keine Ausdauer).
+
+Vorher: Tracking-Chance 0,357 um 14:49, Rangrate 0,625 je Minute.
+Nachher: **Tracking-Chance 0,801 um 15:26** - Faktor 2,24 gegen den
+vorhergesagten 2,21. Rangrate **1,361 je Minute** ueber die zwanzig Minuten bis
+15:47, Kammeranteil 40 Prozent. Zehn Minuten Diplomacy waren dafuer noetig.
+
+Commit: "blade: Diplomacy gegen Chaos ueber 50"
+
+**Das war der groesste Einzelhebel des Tages** - und er lag seit gestern als
+verworfener Nebensatz in einem Offen-Punkt, mit der Begruendung "Chaos unter
+50 ist nutzlos". Die Begruendung stimmte, als sie geschrieben wurde. Die
+Lehre: **Eine Verwerfung mit Bedingung muss die Bedingung mitpruefen.**
+
+
+### Cyber's Edge vor Overclock im SKILL_PLAN (26.08., 12:22)
+
+Engpass: Die Regeneration. Der Motor stand 62,9 Prozent der Zeit in der
+Kammer und wartete auf Ausdauer.
+
+Hypothese: Cyber's Edge hebt R um 2 Prozent je Stufe, weil
+`getSkillMult(Stamina)` in BEIDEN Formeln steckt - `calculateMaxStamina`
+(`Bladeburner.ts:1327-1343`) und `calculateStaminaGainPerSecond`
+(`:1317-1325`). Die Ruhezeit `S/R` bleibt gleich, die Arbeitszeit `S/(V-R)`
+waechst ueberproportional, weil V fest ist.
+
+Mitgeprueft und dabei verworfen: **Overclock ist im Ausdauer-Engpass
+wirkungslos.** Der Ausdauerverlust faellt je AKTION an (`Bladeburner.ts:921`),
+eine um ein Prozent kuerzere Aktion heisst also auch ein Prozent mehr
+Verbrauch je Minute. Nachgerechnet 0,4444 gegen 0,4445 - und es hatte bis
+dahin 14 Stufen bekommen, rund 169 Punkte.
+
+Vorher: R = 2,068 Ausdauer je Minute (53 Kammerphasen, 108 min),
+Hoechstausdauer 70, Rangrate 0,649 je Minute, Kammeranteil 62,9 Prozent.
+Nachher: **R = 2,313** (11 Phasen, 23 min) bei Cyber's Edge Stufe 5,
+Hoechstausdauer 79. Das sind 11,8 Prozent - fuenf Stufen zu je zwei Prozent
+plus das Agility-Wachstum.
+
+Commit: "blade: Cyber's Edge vor Overclock, Deckel 5"
+
+Die Rangrate stieg im selben Zeitraum von 0,649 auf 0,842. Der Anteil, der
+auf Cyber's Edge entfaellt, ist damit **nicht sauber getrennt** - der
+Krankenhaus-Hebel und die schwankenden Erfolgschancen liefen mit. Belastbar
+ist nur die Regeneration selbst, und die ist die Groesse, auf die der Hebel
+zielt.
+
+
 ### bbspann.js rechnete einen irrefuehrenden Ertrag (26.08., 13:05)
 
 Engpass: Nicht der Bot, sondern das Messwerkzeug. Der falsche Ertrag hat um

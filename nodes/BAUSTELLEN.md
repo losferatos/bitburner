@@ -153,10 +153,23 @@ Ansaetze, in der Reihenfolge ihrer Wucht:
 1. **Mehr Trefferpunkte.** Sie haengen an Defense (`Player.hp.max`); bbtrain
    traniert nur bis Kampfwert 100 und hoert dann auf. Ein hoeherer Zielwert
    waere ein dauerhafter Gewinn statt einer Symptombehandlung.
-2. **Weniger Schaden.** Der Schaden je Misserfolg haengt an der Schwierigkeit
-   der Aktion. Ein sichererer Vertrag mit etwas weniger Ertrag koennte netto
-   gewinnen, wenn er die Kammerzeit halbiert - das ist rechenbar, sobald
-   `data/aktionen.txt` genug Abschnitte je Aktion hat.
+2. **Weniger AUSDAUERVERBRAUCH - jetzt messbar (26.08., 09:18).** `blade.js`
+   schreibt seither `ausdauerVon` und `ausdauerBis` je Abschnitt mit, und
+   `tools/ratencheck.js` rechnet daraus **Rang je Ausdauerpunkt**. Bei einem
+   Motor, der mehr als die Haelfte der Zeit auf Ausdauer wartet, ist das die
+   entscheidende Kennzahl - nicht Rang je Minute. Erste Werte auf duenner
+   Basis (nur die Abschnitte seit 09:15):
+
+       Contracts/Tracking        99,8 Rang je Ausdauer   1,02 Ausdauer je Lauf
+       Contracts/Bounty Hunter   25,4                    2,09
+
+   Tracking ist damit **viermal ausdauer-effizienter** und fuehrt zugleich bei
+   Rang je Minute (2,19 gegen 1,61). Haelt sich das ueber mehr Abschnitte,
+   waere die Folgerung: Die Auswahl sollte nach Rang je AUSDAUER gehen,
+   solange die Ausdauer der Engpass ist. Das ist eine Strategieaenderung und
+   gehoert in den Optimierungs-Loop. Der Verbrauch haengt an
+   `BaseStaminaLoss * difficultyMultiplier` (`Bladeburner.ts:921`), und die
+   Schwierigkeit steigt mit dem Aktionslevel.
 3. **Die HP-Schwelle senken.** Sie steht auf 50/75 Prozent. Weiter zu arbeiten
    heisst mehr Erfolge je Stunde, aber auch das Risiko, im Krankenhaus zu
    landen (Zeit- und Geldverlust). Vorher pruefen, was ein Krankenhausaufenthalt

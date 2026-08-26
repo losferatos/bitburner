@@ -35,6 +35,24 @@ Regeln:
 
 ## Sofort
 
+### 21 Faehigkeitspunkte liegen ungenutzt herum, seit einer Stunde steigend (18:37)
+
+Gemessen: `data/blade.json`, Feld `punkte` - 13 um 17:07, dann **1** um 17:37
+(also wurde gekauft), danach 11 um 18:07 und **21** um 18:37. Seit 17:37 wird
+nichts mehr gekauft, obwohl der Rang von 933 auf 992 gestiegen ist
+(`RanksPerSkillPoint: 3`, `data/Constants.ts:47` - der Zufluss ist rein
+linear).
+
+Erwartet: Entweder ein Kauf, oder ein nachvollziehbarer Sparvorgang. Die
+Kosten der Faehigkeiten steigen mit der Stufe, ein Ansparen auf den naechsten
+Rang ist also normal - aber nach einer Stunde ohne Kauf gehoert belegt, worauf
+gespart wird und wann es reicht.
+
+Verdacht: `SKILL_PLAN` in `src/blade.js`. Der Plan wurde am 26.08. um 12:22
+und 13:18 umsortiert (Cyber's Edge zuerst, Overclock zuletzt mit Deckel 90).
+Zu pruefen ist, ob der naechste Eintrag erreichbar ist oder ob der Plan an
+einem Deckel haengt und deshalb gar nichts mehr kauft.
+
 ### Der Waechter meldet fehlenden Speicher als Ausfall - und verdeckt damit den echten Fehlerfall (17:55)
 
 **GEMESSEN 18:20 - Eric hatte recht, es IST ein Fehler.** Aus dem Spielstand

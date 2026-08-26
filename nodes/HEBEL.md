@@ -37,6 +37,41 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Incite Violence, wenn der beste Vertrag leergespielt ist (26.08., 10:49)
+
+Engpass: **Der Vorrat, nicht die Auswahl.** Gemessen 10:45: Tracking hat noch
+1,0 offene Auftraege (von ueber 200), seine Chance ist von 0,74 auf 0,525
+gefallen. Bounty Hunter und Retirement liegen bei 0,273 und 0,324 - beide
+unter der Sicherheitsschwelle von 0,45. Die Rangrate ist deshalb von 0,926 auf
+0,60 je Minute eingebrochen.
+
+Hypothese: `Incite Violence` fuellt ALLE Vertraege und Operationen auf einen
+Schlag - es rechnet 180 Wachstumsschritte gut (`Bladeburner.ts:1219-1225`,
+`60 * 3 * growthFunction()`). Es dauert 60 Sekunden und kostet **keine
+Ausdauer** (`data/GeneralActions.ts:52-58`), was gerade dann zaehlt, wenn die
+Ausdauer der Engpass ist. Erwartung: Die Rate kehrt auf **ueber 0,9** zurueck.
+
+Die Rechnung: Eine Minute Incite kostet den Ertrag des Notvertrags (Bounty
+Hunter, 0,567 Rang je Minute). Danach ist Tracking mit 2,2 wieder da - der
+Verlust ist nach gut dreissig Sekunden eingespielt.
+
+**Chaos geprueft, bevor es zum Problem wird:** Incite hebt das Chaos jeder
+Stadt um 10 plus `chaos/log10(chaos)`. Erst ueber **50** macht Chaos die
+Aktionen schwerer (`ChaosThreshold`, `Actions/Action.ts:94-101`); Sector-12
+steht bei 13. Ein Durchlauf bringt es auf etwa 35, ein zweiter darueber -
+deshalb greift der Block nur unter Chaos 25.
+
+Damit ist auch der zweite Teil des alten Baustellenpunkts entschieden:
+**Diplomacy braucht es vorerst nicht.** Es senkt Chaos, und Chaos schadet
+unterhalb von 50 gar nicht.
+
+Vorher: 0,602 Rang je Minute, Tracking-Vorrat 1,0 (10:16-10:44)
+Nachher: (offen - naechster Lauf misst)
+Erste Beobachtung 10:50: Tracking ist nachgewachsen und laeuft wieder ueber
+der Schwelle, der Block hat also noch nicht ausgeloest. Er greift beim
+naechsten Leerlauf.
+Commit: siehe git log, blade.js 26.08. 10:49
+
 ### Auswahl nach Rang je Ausdauer, selbstkalibrierend (26.08., 09:57)
 
 Engpass: 55 Prozent Kammerzeit, allein wegen Ausdauer. Die Minuten sind
@@ -94,11 +129,35 @@ Rang je Minute. **Die Messung bleibt** (`kostenAktualisieren` in blade.js):
 Sie kostet nichts, liefert weiter Daten, und die naechste Hypothese kann
 darauf aufbauen, statt bei null anzufangen.
 
-Zwei Lehren, beide teuer bezahlt:
+**KORREKTUR 10:50 - die Widerlegung war selbst falsch.** Nach dem
+Zurueckdrehen gemessen:
+
+    mit neuer Auswahl (09:57-10:14)   62,3 % Kammer   0,606 Rang/min
+    zurueckgedreht    (10:16-10:44)   55,7 % Kammer   0,602 Rang/min
+
+**Die Rate blieb unten.** Die Auswahl war also nicht die Ursache - sie war
+unschuldig. Gefunden 10:45 ueber `data/bbspann.json`:
+
+    Tracking        Chance 0,525 (war 0,74)   offen  1,0   <- leergespielt
+    Bounty Hunter   Chance 0,273 (war 0,44)   offen  487
+    Retirement      Chance 0,324 (war 0,45)   offen  359
+
+Der **Vorrat des besten Vertrags war erschoepft**, und der Motor fiel auf
+Aktionen zurueck, deren Erfolgschance unter der Sicherheitsschwelle liegt.
+Genau in dieses Loch fiel die Messung der neuen Auswahl.
+
+Die Aenderung bleibt trotzdem zurueckgedreht: Sie ist damit weder belegt noch
+widerlegt, und ohne Beleg faehrt der Motor die einfachere Regel. Wer sie
+erneut probiert, braucht eine Strecke mit gefuellten Vorraeten.
+
+Drei Lehren, alle teuer bezahlt:
 1. Wer die Bewertungsgroesse aendert, muss JEDEN Vergleich mitziehen, in dem
    sie vorkommt (zwei Einheitenfehler in einem Lauf, siehe oben).
 2. Eine Zyklusrechnung auf dem Papier ersetzt keine Messung. Der Faktor 1,44
    war sauber hergeleitet und trotzdem falsch.
+3. **Eine Widerlegung braucht dieselbe Sorgfalt wie eine Bestaetigung.** Ich
+   habe eine Aenderung fuer schuldig erklaert, ohne zu pruefen, ob die Zahl
+   nach dem Zurueckdrehen wieder steigt. Sie tat es nicht.
 Commit: siehe git log, blade.js 26.08. 09:57
 
 ### Die Auswahl misst die falsche Groesse - gerechnet, noch nicht umgesetzt (26.08., 09:46)

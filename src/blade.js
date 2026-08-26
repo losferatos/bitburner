@@ -563,6 +563,44 @@ export async function main(ns) {
         grund: "Vertrag unter Schwelle, lohnt trotzdem" };
     }
 
+    // 3b. SIND DIE VORRAETE LEER? DANN NACHFUELLEN (26.08.2026, 10:48).
+    //
+    // Gemessen 10:45: Tracking hat nur noch **1,0** offene Vertraege, und
+    // seine Erfolgschance ist von 0,74 auf 0,525 gefallen. Bounty Hunter und
+    // Retirement stehen bei 0,273 und 0,324 - beide unter der Schwelle. Der
+    // Motor faellt deshalb auf schlechte Aktionen zurueck, und die Rangrate
+    // ist von 0,926 auf 0,60 je Minute eingebrochen.
+    //
+    // `Incite Violence` fuellt ALLE Vertraege und Operationen auf einen
+    // Schlag: Es rechnet 180 Wachstumsschritte auf einmal gut
+    // (`Bladeburner.ts:1219-1225`, `60 * 3 * growthFunction()`). Es dauert
+    // 60 Sekunden und kostet **keine Ausdauer**
+    // (`data/GeneralActions.ts:52-58`) - genau richtig, wenn die Ausdauer
+    // ohnehin der Engpass ist.
+    //
+    // Der Preis ist Chaos: +10 plus chaos/log10(chaos) in JEDER Stadt. Erst
+    // ueber 50 macht Chaos die Aktionen schwerer
+    // (`ChaosThreshold`, `Actions/Action.ts:94-101`), und aktuell steht
+    // Sector-12 bei 13. Ein Durchlauf bringt es auf etwa 35, ein zweiter
+    // darueber - deshalb die Grenze bei 25.
+    const chaosJetzt = (() => {
+      try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
+      catch { return 999; }
+    })();
+    // `some`, nicht `every` (korrigiert 10:49): Leer sein muss nur EIN
+    // Vertrag - und zwar der beste. Um 10:47 stand Tracking bei 1,0 offenen
+    // Auftraegen, waehrend Bounty Hunter noch 487 hatte; mit `every` haette
+    // der Block nie gegriffen, obwohl genau dieser Fall gemeint ist.
+    //
+    // Die Rechnung dahinter: Eine Minute Incite Violence kostet den Ertrag
+    // des Notvertrags (Bounty Hunter, 0,567 Rang je Minute). Danach ist
+    // Tracking wieder da und bringt 2,2 - der Verlust ist nach gut dreissig
+    // Sekunden wieder eingespielt.
+    const vorratLeer = VERTRAEGE.some((name) => offen(V, name) < 3);
+    if (vorratLeer && chaosJetzt < 25) {
+      return { typ: G, name: "Incite Violence", grund: "Vertragsvorrat leer" };
+    }
+
     // 4. Nichts sicher genug. Liegt das an der Schaetzung oder an uns?
     //    Ist irgendwo die Spanne breit, fehlt Wissen ueber die Population -
     //    dann ist Field Analysis die Antwort, nicht ein Versuch auf gut Glueck.

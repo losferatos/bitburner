@@ -189,11 +189,37 @@ naturgemaess null bringt.
 
    Die Endung ist `.txt`, nicht `.jsonl`: Bitburner laesst nur wenige
    Dateiendungen zu und weist alles andere mit "Invalid file extension" ab.
-2. **Naechster Schritt:** Nach einigen Stunden `tools/ratencheck.js` gegen
-   diese Datei laufen lassen. Sie liegt im SPIEL, nicht auf der Platte - das
-   Werkzeug muss sie also ueber die Bruecke holen (`getFile`,
-   `filename=data/aktionen.txt`).
-3. Erst dann entscheiden, ob die Formel aus dem Quellcode ersetzt wird.
+2. ~~`tools/ratencheck.js` gegen diese Datei laufen lassen.~~
+   **Erledigt 26.08., 05:47.** Das Werkzeug holt die Datei ueber die Bruecke
+   und rechnet gewichtet (Summe Rang durch Summe Zeit), nicht als Median
+   einzelner Abschnitte. Die Erfolgsquote faellt dabei gratis ab: Der Anteil
+   der Abschnitte mit Rangzuwachs ist die GEZAEHLTE Erfolgswahrscheinlichkeit.
+   Ergebnis ueber 84 Abschnitte (164 Minuten):
+
+       Aktion                                    n     min  Rang/min  Erfolg
+       Contracts/Tracking                       31    19,9     1,994     84%
+       Contracts/Retirement                      2     1,3     1,547     50%
+       Contracts/Bounty Hunter                  28    21,2     1,469     64%
+       General/Hyperbolic Regeneration Chamber  23   122,0     0,000      0%
+
+3. **Die Formel liegt um Faktor 5 bis 6 daneben - und der Grund ist gefunden.**
+   Der Pruefer rechnet `rankGain * Chance / Dauer`, fuer Tracking also
+   0,3 * 0,73 / 0,63 min = **0,35** je Minute. Gemessen sind es **1,994**.
+   Es fehlt der Levelfaktor: `Bladeburner.ts:917` multipliziert den Ertrag mit
+   `Math.pow(action.rewardFac, action.level - 1)`, und `rewardFac` ist
+   standardmaessig 1,02 (`Actions/LevelableAction.ts:20`). Tracking stand am
+   25.08. auf Stufe 14 - allein das erklaert einen Teil; die Faehigkeiten
+   (Blade's Intuition, Overclock) kommen dazu.
+   **Zu tun:** `sollRate()` um den Levelfaktor ergaenzen. Das Aktionslevel
+   steht in `data/bbspann.json` (Feld `stufe`), muss aber in eine Datei, die
+   der Pruefer bei jedem Lauf liest - am ehesten `data/blade.json`.
+
+4. **Der eigentliche Engpass steht daneben und ist groesser als alles andere:**
+   Der Motor verbringt **122 von 164 Minuten - 74 Prozent - in der
+   Regenerationskammer**. Die Arbeitszeit bringt 1,5 bis 2 Rang je Minute,
+   ueber alles sind es 0,443. Faellt die Kammerzeit von 74 auf 30 Prozent,
+   verdreifacht sich die Rate. Das gehoert in den Optimierungs-Loop, nicht
+   hierher - siehe nodes/HEBEL.md.
 
 Bis dahin bleibt die Formel die bessere Schaetzung: Sie ist wenigstens nicht
 durch die Messmethode verfaelscht.

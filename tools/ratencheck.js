@@ -22,7 +22,21 @@
  * Stimmt die Formel im Rahmen, bleibt sie; liegt sie systematisch daneben,
  * gehoert sie durch den gleitenden Median ersetzt.
  *
- * Aufruf:  node tools/ratencheck.js
+ * ZWEI QUELLEN, EINE TAUGT (26.08.2026, 05:45)
+ *
+ * `data/verlauf-strategie.json` haelt alle zwanzig Minuten fest, welche Aktion
+ * GERADE laeuft, und schreibt ihr den ganzen Zuwachs der Zwischenzeit zu. In
+ * zwanzig Minuten wechselt der Motor aber mehrfach - Contracts/Retirement kam
+ * so auf einen Median von null, waehrend der Rang nachweislich stieg. Diese
+ * Quelle ist damit als Ratenmessung unbrauchbar.
+ *
+ * `data/aktionen.txt` schreibt blade.js seit dem 26.08. um 02:56 bei JEDEM
+ * Aktionswechsel: von, bis, Aktion, Grund, Rang davor und danach - ungerundet.
+ * Das ist die richtige Aufloesung. Die Datei liegt im SPIEL, nicht auf der
+ * Platte, und wird ueber die Bruecke geholt.
+ *
+ * Aufruf:  node tools/ratencheck.js            Abschnitte aus dem Spiel
+ *          node tools/ratencheck.js --verlauf  die alte, grobe Quelle
  *          node tools/ratencheck.js --json
  */
 
@@ -45,6 +59,88 @@ function median(werte) {
   const s = [...werte].sort((a, b) => a - b);
   const m = s.length >> 1;
   return s.length % 2 ? s[m] : (s[m - 1] + s[m]) / 2;
+}
+
+const BRUECKE = "http://localhost:8795";
+
+async function spieldatei(name) {
+  const url = BRUECKE + "/api/rpc?method=getFile&filename="
+    + encodeURIComponent(name) + "&server=home";
+  const r = await fetch(url, { signal: AbortSignal.timeout(8000) });
+  const j = await r.json();
+  if (j.error || typeof j.result !== "string") return null;
+  return j.result;
+}
+
+/**
+ * Die Auswertung, auf die es ankommt: je Aktion die tatsaechliche Rate aus
+ * sauber abgegrenzten Abschnitten.
+ *
+ * Gerechnet wird GEWICHTET - Summe Rang durch Summe Zeit -, nicht als Median
+ * einzelner Abschnittsraten. Ein Vertrag von 20 Sekunden und einer von 120
+ * duerfen nicht gleich zaehlen.
+ *
+ * Die Erfolgsquote faellt dabei gratis ab: Der Anteil der Abschnitte mit
+ * Rangzuwachs IST die gemessene Erfolgswahrscheinlichkeit. Genau die schaetzt
+ * das Spiel selbst nur als Spanne - hier steht sie gezaehlt daneben.
+ */
+async function ausAbschnitten() {
+  const roh = await spieldatei("data/aktionen.txt");
+  if (!roh) {
+    console.log("data/aktionen.txt nicht lesbar - laeuft blade.js, und ist die"
+      + " Bruecke auf " + BRUECKE + " erreichbar?");
+    process.exitCode = 1;
+    return;
+  }
+  const zeilen = roh.split(String.fromCharCode(10)).map((z) => z.trim()).filter(Boolean);
+  const je = new Map();
+  for (const z of zeilen) {
+    let d;
+    try { d = JSON.parse(z); } catch { continue; }
+    if (!d.aktion || !Number.isFinite(d.rangVon) || !Number.isFinite(d.rangBis)) continue;
+    const dauer = (d.bis - d.von) / 1000;
+    const rang = d.rangBis - d.rangVon;
+    // Ein Rueckgang ist ein Einbau oder Knotenwechsel, keine Aktion.
+    if (rang < 0) continue;
+    if (!je.has(d.aktion)) je.set(d.aktion, { n: 0, sek: 0, rang: 0, treffer: 0 });
+    const e = je.get(d.aktion);
+    e.n++; e.sek += dauer; e.rang += rang;
+    if (rang > 0) e.treffer++;
+  }
+
+  const zeilenAus = [...je.entries()].map(([aktion, e]) => ({
+    aktion, n: e.n,
+    minuten: +(e.sek / 60).toFixed(1),
+    rangJeMinute: e.sek > 0 ? +(e.rang / (e.sek / 60)).toFixed(3) : 0,
+    erfolgsquote: +(e.treffer / e.n).toFixed(3),
+    schnittSek: +(e.sek / e.n).toFixed(0),
+  })).sort((a, b) => b.rangJeMinute - a.rangJeMinute);
+
+  if (process.argv.includes("--json")) {
+    console.log(JSON.stringify({ zeit: Date.now(), quelle: "aktionen", zeilenAus }, null, 1));
+    return;
+  }
+  console.log("Gemessene Rangraten je Aktion (aus " + zeilen.length
+    + " Abschnitten, data/aktionen.txt)");
+  console.log("");
+  console.log("Aktion".padEnd(42) + "n".padStart(4) + "min".padStart(8)
+    + "Rang/min".padStart(10) + "Erfolg".padStart(8) + "s/Lauf".padStart(8));
+  for (const z of zeilenAus) {
+    console.log(z.aktion.padEnd(42)
+      + String(z.n).padStart(4)
+      + z.minuten.toFixed(1).padStart(8)
+      + z.rangJeMinute.toFixed(3).padStart(10)
+      + (z.erfolgsquote * 100).toFixed(0).padStart(7) + "%"
+      + String(z.schnittSek).padStart(8));
+  }
+  const gesamt = zeilenAus.reduce((s, z) => s + z.minuten, 0);
+  const rangGesamt = zeilenAus.reduce((s, z) => s + z.rangJeMinute * z.minuten, 0);
+  console.log("");
+  console.log("Ueber alles: " + rangGesamt.toFixed(1) + " Rang in "
+    + gesamt.toFixed(0) + " Minuten = "
+    + (rangGesamt / gesamt).toFixed(3) + " je Minute.");
+  console.log("Die Erfolgsquote ist gezaehlt, nicht geschaetzt - sie gehoert"
+    + " gegen die Spanne aus data/bbspann.json gehalten.");
 }
 
 function main() {
@@ -141,4 +237,5 @@ function main() {
   console.log("  General     Field Analysis 0,1 · Training 0 · Kammer 0");
 }
 
-main();
+if (process.argv.includes("--verlauf")) main();
+else await ausAbschnitten();

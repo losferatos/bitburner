@@ -105,6 +105,37 @@ vernachlaessigbar.
 Vorher: Rangrate **32,75/min** (45-min-Fenster 18:26-19:11), Trupp **0**,
 Rang 9.083 um 19:10, popEst Sector-12 **1,109e9**, Chaos **48,9**
 
+Nachher, zweiter Teil (20:40, jetzt laeuft Raid wirklich):
+
+**Der Zyklus ist grenzwertig.** Beobachtet: Raid, dann Chaos ueber 50, dann
+Diplomacy, dann wieder Raid - genau das erwartete Wechselspiel. Die Frage ist
+der Preis. Gerechnet mit Chaos 49, Raid 67 s, Diplomacy 60 s und einer Senkung
+von 1,563 Prozent je Lauf:
+
+    Chaosanstieg je Raid   Diplomacy noetig   Zyklus   Rang je Minute
+    1 % (+0,49 Punkte)                    1    127 s             45,8
+    3 % (+1,47)                           2    187 s             31,1
+    5 % (+2,45)                           4    307 s             19,0
+
+Der Anstieg ist zufaellig zwischen 1 und 5 Prozent
+(`getRandomIntInclusive(1, 5)`, `Bladeburner.ts:843`). Im Mittel bei 3 Prozent
+sind das **31,1 Rang je Minute** gegen **26,9** der laufenden Arbeit - ein
+Gewinn von 16 Prozent, nicht die erhofften 80.
+
+**Der Grund liegt im Ausgangschaos, nicht in Raid.** Sector-12 stand schon bei
+48,8, also direkt unter der Schwelle. Jeder Raid reisst sie, und die Hysterese
+(`CHAOS_EIN 50`, `CHAOS_AUS 47`) faehrt danach bis 47 herunter - drei Punkte,
+also rund vier Diplomacy-Laeufe. In einer Stadt mit Chaos 20 waere derselbe
+Raid fast kostenlos.
+
+**Was daraus folgt, ist nicht "Raid abschalten", sondern die Rundreise anders
+zu sortieren:** nicht nach der Zahl der Gemeinden, sondern nach dem Chaos, das
+NACH der Diplomacy-Phase bleibt. `tools/staedte.js` rechnet diese Zahl schon
+aus - sie wird nur noch nicht so verwendet.
+
+Zu messen bleibt die Rangrate ueber 45 Minuten, sobald die Rekrutierungsphase
+(20:00 bis 20:14, dabei null Rangzuwachs) aus dem Fenster gelaufen ist.
+
 Nachher (teilweise widerlegt, 20:15 - noch bevor der erste Raid lief):
 
 **Die 80 Rang je Minute stimmen, die Reichweite nicht.** `Raid` senkt bei

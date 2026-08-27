@@ -23,6 +23,62 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der WERKZEUG-Kanal traf ins Leere - BEHOBEN (27.08., 19:46)
+
+**Verifiziert: `blade.js` lief unter PID 7004 mit altem Code, obwohl der
+Kanal fuenfmal bedient wurde. Nach `WERKZEUG blade.js` startete es als
+PID 40117 neu, und Digital Observer stieg binnen zwei Minuten von Stufe 1
+auf 4 - um 19:51 stand er auf 6.**
+
+**Das ist die Ursache hinter zwei Sofort-Punkten**, die beide danach von
+selbst verschwanden:
+
+- *Digital Observer bleibt auf Stufe 1 (19:13).* Der Hebel war richtig
+  gerechnet - `src/skillcheck.js` (neu) hat die Sortierwerte im Spiel
+  nachgerechnet: Digital Observer 0,4231 gegen Blade's Intuition 0,0239,
+  Faktor 17,7, und bezahlbar. Die Sortierung war nie das Problem; der neue
+  Code lief nur nicht.
+- *Die Geldrate ist auf 1,3 Mio/min eingebrochen (19:13).* Um 19:38 stand sie
+  wieder bei **27,8 Mio/min** ueber 45 Minuten, Konto 3,96 Mrd. Der Einbruch
+  war voruebergehend - vermutlich eine Einkaufsphase von `bn4net`. Kein
+  Fehler, aber die Messung bleibt im Reportloop.
+
+**Die Ursache:** `bn4net.js` vergleicht gegen `pr.filename`, und das ist
+`"blade.js"`, nicht `"blade"`. Ein Befehl ohne Endung leerte die Datei,
+schrieb `"0 Instanz(en) beendet, startet gleich neu"` - was sich wie ein
+Erfolg liest - und tat nichts.
+
+**Was das gekostet hat:** einen ganzen Nachmittag. Drei Aenderungen an
+`blade.js` waren eingebaut, committet und "neu gestartet": die gerechnete
+Black-Op-Chance (18:26), der Digital-Observer-Hebel (18:55) und dessen
+Nachbesserung. Alle drei liefen nicht. Sichtbar wurde es erst durch einen
+PID-Vergleich ueber fuenf Versuche.
+
+**Behoben in `src/bn4net.js`:** Die Endung wird jetzt ergaenzt statt
+verlangt, und der Kanal meldet ausdruecklich, wenn er nichts getroffen hat.
+
+**Und sofort belohnt:** Um 19:51 ist die naechste Black Op **Operation Zero**
+statt Typhoon - **Operation Typhoon ist bestanden**, die erste von 21. Genau
+das, was die gerechnete Chance ermoeglichen sollte: Sie stand bei 0,375,
+waehrend `s.min` noch 0,336 meldete.
+
+<details><summary>Die urspruenglichen Eintraege</summary>
+
+### Digital Observer bleibt auf Stufe 1, obwohl er im Plan vorn steht (19:13)
+Gemessen um 19:10: **21 Faehigkeitspunkte verfuegbar, Digital Observer Stufe 1 (Preis 4)**, waehrend Blade's Intuition seit 18:52 von 26 auf **29** gestiegen ist (Preis 64). Um 18:57 lagen sogar 56 Punkte da.
+Erwartet: Digital Observer wird zuerst gekauft. Er wurde um 18:55 in `DYNAMISCH` aufgenommen UND im `SKILL_PLAN` vor `Blade's Intuition` gesetzt; sein Nutzen je Punkt liegt bei 0,423 gegen 0,031 - Faktor 13,8 (Rechnung in `nodes/HEBEL.md`). Die neue Fassung IST im Spiel (`getFile blade.js` findet "abdeckung") und `data/reload.txt` wurde geleert, der Neustart lief also.
+Verdacht: die Umsortierung in `faehigkeitenKaufen()` (`src/blade.js`, Block "Die drei dynamischen Eintraege an ihren Planplaetzen neu ordnen"). Zwei Kandidaten: **(1)** Die Bedingung `plaetze.length === DYNAMISCH.length` schlaegt fehl, seit `DYNAMISCH` sechs statt fuenf Eintraege hat - dann findet gar keine Sortierung statt und der Plan wirkt in seiner Rohreihenfolge. **(2)** `relNutzen("Digital Observer")` liefert 0, weil ein frueherer Zweig der Funktion greift, bevor `CHANCE_SKILLS` gelesen wird.
+**Zuerst pruefen, nicht raten:** Ein Probelauf, der `relNutzen` und `getSkillUpgradeCost` fuer alle sechs dynamischen Eintraege ausgibt, entscheidet zwischen beiden in einer Minute.
+
+### Die Geldrate ist von 22,9 auf 1,3 Mio je Minute eingebrochen (19:13)
+Gemessen: `data/wache-zustand.json`, 45-Minuten-Fenster 18:26 bis 19:11: **1,3 Mio/min**. Im Fenster davor (17:53 bis 18:38) waren es **22,9**. Der Kontostand faellt: 3.507 Mio um 18:40, **3.182** um 19:10.
+Erwartet: rund 23 Mio je Minute, so wie den ganzen Nachmittag ueber.
+Verdacht: **offen.** Zwei Moeglichkeiten, beide pruefbar: (1) `bn4net` kauft gerade Server oder Speicher - dann ist der Rueckgang eine Investition und kein Fehler, ablesbar an `data/bn4net.json` und der Netzzeile des Pruefers (steht seit Stunden auf 66/95). (2) Die Hackschleife steht. **Wichtig, weil Geld der Engpass der Augmentierungsrunde ist** (INTERLINKED 5,5 Mrd, Golem Serum 11 Mrd) - und weil eine Nacht mit ausgeschaltetem Rechner ohnehin nur 75 Prozent des Lebensdurchschnitts einbringt.
+
+</details>
+
+---
+
 ### `s.min` bei Black Ops - BEHOBEN (27.08., 18:26)
 
 **Verifiziert um 18:19 im Spiel** (`src/chance.js`, neu, schreibt

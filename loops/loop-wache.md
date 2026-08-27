@@ -29,7 +29,7 @@ Handle nach dem Urteil:
 
 **URTEIL: RESET** — Der Träger ist gefallen: Augmentierungs-Einbau oder BitNode-Wechsel. Das ist **kein Fehler**, aber der Wiederanlauf gehört geprüft, denn genau dort ist er am 25.08.2026 dreimal still gescheitert.
   - `ps.js` über den Auftragskanal anstoßen (siehe unten), dann prüfen: Läuft `bn4net.js`? Laufen die Werkzeuge?
-  - Fehlt etwas, das laufen müsste: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`.
+  - Fehlt etwas, das laufen müsste: `pushFile` nach `data/reload.txt` mit `WERKZEUG <dateiname>.js` — **die Endung gehoert dazu** (der Kanal vergleicht gegen `pr.filename`; seit 27.08. 19:46 wird sie zwar ergaenzt, aber schreib sie hin).
   - Läuft **bn4net selbst** nicht, kann von außen nichts getan werden — der einzige Startkanal wird von bn4net gelesen. Dann `~/.claude/notify.sh --title "Bitburner" --tag warning --priority high "Nach Reset steht der Motor - bitte 'run boot.js' im Spielterminal eintippen"`.
   - Melde in max. 3 Stichpunkten. Bei einem BitNode-Wechsel gehört die neue Knotennummer dazu — das ist eine der wenigen Meldungen, die Eric jederzeit sehen will. **Und der Kurs ist danach ungültig:** Trag in `nodes/BAUSTELLEN.md` unter `## Sofort` ein, dass `nodes/KURS.md` für den neuen Knoten neu hergeleitet werden muss — die Ausgangsbedingung ist je BitNode eine andere.
 
@@ -46,7 +46,7 @@ Handle nach dem Urteil:
   - Ist er frei: `pushFile` nach `data/task.txt` mit Inhalt `["ps.js"]`, **26 s** warten, dann `data/ps.json` lesen (Befehl oben). Welche Werkzeuge laufen, welche fehlen?
   - **Vorher den Zeitstempel prüfen.** `data/ps.json` ist eine Momentaufnahme, kein Dauerlauf — `src/ps.js` schreibt einmal und endet. Ist `zeit` älter als zwei Minuten, hat dein Auftrag den Kanal nicht erreicht (er hat mehrere Schreiber, darunter `tools/wache.js` alle drei Minuten, alle ohne Sperre). Dann liest du einen alten Stand und diagnostizierst „Werkzeug X läuft nicht", während alles läuft. Am 27.08. um 18:05 war die Datei **3 Stunden 25 Minuten** alt. Im Zweifel: keinen Neustart auslösen, sondern einen Auftrag eintragen.
   - In BitNode 6 gilt: solange `inBladeburner` false ist, muss `bbtrain.js` laufen und die Arbeit ein Gym in Sector-12 sein. Danach trägt `blade.js`.
-  - Ein Werkzeug neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`. **Ein Neustart ist kein Nachweis** — ob die Änderung greift, sieht man nur an der Zahl, die sie ändern sollte.
+  - Ein Werkzeug neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <dateiname>.js` — **die Endung gehoert dazu** (der Kanal vergleicht gegen `pr.filename`; seit 27.08. 19:46 wird sie zwar ergaenzt, aber schreib sie hin). **Ein Neustart ist kein Nachweis** — ob die Änderung greift, sieht man nur an der Zahl, die sie ändern sollte.
 
   **Grenzen für einen Eingriff — sie gelten ohne Ausnahme:**
   - Höchstens **eine Datei** und höchstens **30 geänderte Zeilen** je Lauf.

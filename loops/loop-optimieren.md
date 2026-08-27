@@ -51,7 +51,7 @@ Prüfe die Hypothese am Quellcode, bevor du sie umsetzt. Die meisten Vermutungen
 - Höchstens **eine Datei** je Lauf.
 - `src/bn4net.js` und `src/boot.js` sind seit dem 27.08.2026 freigegeben, bleiben aber Motor und Wiederanlauf: **einzeln committen**, kleine Schritte, nach jeder Änderung `node tools/strategie-check.js`. Ein Fehler dort kostet den ganzen Lauf.
 - Nach jeder Änderung an `tools/strategie-check.js`: `node tools/strategie-check.js` ausführen. Endet die Ausgabe nicht auf `URTEIL:`, sofort `git checkout --` und nichts committen.
-- Werkzeug im Spiel neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`. **Danach nachsehen, ob die Änderung auch greift** — am 27.08. um 18:55 wurde ein Hebel eingebaut, neu gestartet, und die Wirkung blieb aus; erst eine Stunde später fiel auf, dass die Kaufreihenfolge ihn übersprang.
+- Werkzeug im Spiel neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <dateiname>.js` — **die Endung gehoert dazu** (der Kanal vergleicht gegen `pr.filename`; seit 27.08. 19:46 wird sie zwar ergaenzt, aber schreib sie hin). **Danach nachsehen, ob die Änderung auch greift** — am 27.08. um 18:55 wurde ein Hebel eingebaut, neu gestartet, und die Wirkung blieb aus; erst eine Stunde später fiel auf, dass die Kaufreihenfolge ihn übersprang.
 - Findest du in **fünfzehn Minuten** keinen belegten Hebel: nichts ändern. Schreib in HEBEL.md, was du geprüft und verworfen hast, und beende den Turn. Das ist ein gültiges Ergebnis — eine erfundene Optimierung ist schlechter als keine.
 
 **4. Protokollieren — das ist der Teil, der diesen Loop von Bastelei trennt.**

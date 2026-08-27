@@ -73,10 +73,10 @@ Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millione
 
 ## Offen, nach Dringlichkeit
 
-### Der Ausgang aus BitNode 6 ist 400.000 Rang entfernt - rund 418 Stunden bei heutiger Rate (17:51)
+### Der Ausgang aus BitNode 6: 319.430 Rang netto, geschaetzt 80-180 Stunden (17:51, korrigiert 18:13 nach Fremdpruefung)
 
-**Erstmals vollstaendig gemessen** (`node`-Auswertung von `data/blackops.json`,
-neu geschrieben von `src/blackops.js`). Rang 6.910, alle 21 Black Ops:
+**Erstmals vollstaendig gemessen** (`src/blackops.js` schreibt
+`data/blackops.json`). Rang 6.910 zum Messzeitpunkt, alle 21 Black Ops:
 
      1. Typhoon        Rang   2.500   Chance 0,278-0,305    196 s
      2. Zero           Rang   5.000   Chance 0,086-0,094    244 s
@@ -86,25 +86,81 @@ neu geschrieben von `src/blackops.js`). Rang 6.910, alle 21 Black Ops:
     15. Morpheus       Rang 150.000   Chance 0,006-0,007  4.391 s
     21. Daedalus       Rang 400.000   Chance 0,003-0,003  7.807 s
 
-**Das aendert, worauf die Loops optimieren.** Bisher galt die Black-Op-Chance
-als der Engpass. Sie ist es nicht: Der Rang ist es. 400.000 gegen 6.910 sind
-bei den heute gemessenen **15,67 Rang je Minute** rund **418 Stunden**. Selbst
-eine Verdopplung der Rangrate laesst 200 Stunden stehen.
+Die Rangschwellen sind gegen `reference/bitburner-src/src/Bladeburner/data/
+BlackOperations.ts` geprueft und stimmen exakt. BN6 setzt keinen
+`BladeburnerRank`-Multiplikator.
 
-Die Dauer waechst mit: 196 Sekunden fuer Typhoon, **7.807 fuer Daedalus** -
-Faktor 40. Bei Chance 0,003 waeren das rechnerisch 43.000 Versuche zu je zwei
-Stunden; die Black Ops am Ende der Liste sind mit den heutigen Kampfwerten
-nicht fahrbar, sondern nur mit denen, die 400.000 Rang mitbringen.
+**Der Rang ist der Engpass, nicht die Chance.** Das haelt. Aber drei Zahlen im
+urspruenglichen Eintrag waren falsch; sie sind hier ersetzt:
 
-Daraus folgt fuer die naechsten Laeufe: **Rangrate und Kampfwerte sind die
-Ziele, nicht die Black-Op-Chance.** Jeder Hebel, der die Rangrate hebt, zaehlt
-direkt gegen die 418 Stunden. Der naechste Schritt ist zu pruefen, welche
-Faktoren die Rangrate ueberhaupt noch skalieren - Aktionsstufen (`rewardFac`
-waechst exponentiell mit der Stufe), Fertigkeiten, Chaos, Bevoelkerung - und
-ob eine Augmentierungsrunde mehr bringt als weiterzufahren.
+**(1) Die Strecke ist kuerzer als 400.000.** Die ersten zwanzig Black Ops
+liefern zusammen **73.660 Rang** (`rankGain` 50 bis 20.000, nachgerechnet).
+Netto bleiben **319.430** statt 393.090 - 18 Prozent der Strecke waren
+doppelt gezaehlt.
 
-*Werkzeug:* `src/blackops.js` schreibt `data/blackops.json`, Start ueber
-`data/task.txt` mit `["blackops.js"]`.
+**(2) Die 418 Stunden waren eine unzulaessige lineare Fortschreibung.** Der
+Rang erzeugt seine eigene Beschleunigung: `skillPoints = floor(maxRank/3)`
+(`Constants.ts:47`), und weil die Fertigkeitskosten LINEAR steigen
+(`Skill.ts:37-41`), waechst die Stufe mit `sqrt(Punkte)`, also mit
+`sqrt(Rang)`. Damit gilt `dR/dt ~ R^a` mit a zwischen 0,4 und 0,6 statt a = 0.
+Mit `t = R1/(rate*(1-a)) * ((R2/R1)^(1-a) - 1)`:
+
+    a = 0,3  ->  179 h        a = 0,5  ->  103 h
+    a = 0,44 ->  121 h        a = 0,6  ->   79 h
+    a = 0    ->  443 h   <- die alte Zahl
+
+**Die eigene Messreihe widerlegt a = 0**: 6.910 Rang in rund 50 Stunden
+Knotenlaufzeit sind 2,3 je Minute im Mittel gegen 14,8 jetzt - Faktor 6.
+**Massgeblich sind 80-180 Stunden, Mitte rund 120.** Nicht die Aktionsstufen
+sind der Motor (`rewardFac/difficultyFac^2` ist bei Bounty Hunter 1,003, also
+fast neutral), sondern die Fertigkeitspunkte.
+
+**(3) "43.000 Versuche" bei Chance 0,003 war Faktor 130 daneben.** Der
+Erwartungswert ist `1/p = 333` Versuche. Die Aussage, die spaeten Black Ops
+seien mit heutigen Kampfwerten nicht fahrbar, bleibt trotzdem richtig -
+333 Versuche zu 7.807 Sekunden sind 722 Stunden.
+
+**Der Hackweg ist geprueft und faellt aus.** `destroyW0r1dD43m0n` akzeptiert
+Hacking >= 6.000 (`requiredHackingSkill 3000` x `WorldDaemonDifficulty 2`)
+ODER 21 Black Ops (`Singularity.ts:1148-1160`). Aber `level = floor(mult *
+(32*ln(exp) - 200))` mit `mult = 0,35 * Aug-Mult` (BN6:
+`HackingLevelMultiplier 0,35`) verlangt bei Aug-Mult 3 ein `exp` von e^184 -
+unerreichbar. Erst ab Hacking-Multiplikator 25-30 wird es rechnerisch
+moeglich. Dazu verlangt Daedalus in BN6 **35 Augmentierungen** statt 30
+(`DaedalusAugsRequirement`). Black Ops bleiben der Weg.
+
+### Der groesste ungehobene Hebel: eine Augmentierungsrunde - Engpass ist GELD (18:13)
+
+**Der Bladeburner-Fortschritt ueberlebt den Einbau fast vollstaendig.**
+`Prestige.ts:153-154` ruft `Bladeburner.prestigeAugmentation()
+(`Bladeburner.ts:259-263`), und das macht **nur** `resetAction()` +
+`joinFaction()`. Rang, `skillPoints`, Fertigkeitsstufen und Aktionsstufen
+bleiben stehen. Es fallen allein die Kampfwerte.
+
+**Und die kommen ueberproportional schneller zurueck.** Die Kampfstufe ist
+*multiplikativ* im Augmentierungs-Multiplikator, aber nur *logarithmisch* in
+der Erfahrung (`PersonObjects/formulas/skill.ts:13`). Stufe 1.000 bei
+mult 1,0 verlangt `exp = e^37,5 = 1,9e16`; bei mult 1,1 genuegt
+`exp = e^34,6 = 1,1e15` - **17-mal weniger, also rund 6 Prozent der bisherigen
+Trainingszeit**. Der Wiederaufbau kostet Stunden, die Decke steigt dauerhaft.
+
+**Reputation ist kein Engpass, Geld ist einer.** Bei Rang 6.910 sind
+mindestens 13.820 Bladeburner-Reputation verdient (`RankToFactionRepFactor 2`).
+Die Preise:
+
+    INTERLINKED     25.000 Rep   $5,5 Mrd   (Erfahrung auf alle vier Werte)
+    Golem Serum     31.250 Rep   $11 Mrd    (str/def/dex/agi je x1,07)
+    Omnibeam        62.500 Rep   $27,5 Mrd  (+10 % Erfolgschance)
+
+Kontostand um 18:00: **2,5 Milliarden**. Damit ist die Zielsetzung der Loops
+unvollstaendig: Sie optimieren Rangrate, aber der Hebel mit dem groessten
+Dauerertrag haengt am Geld - und Geld steht in keinem Ziel der letzten sechs
+Berichte.
+
+Zu tun: (1) Die drei Augmentierungen gegen ihre Wirkung auf die Rangrate
+rechnen, nicht schaetzen. (2) Pruefen, was `bn4net` an Geld je Stunde liefert
+und ob sich das heben laesst (BN6 hat `ScriptHackMoney 0,75`, also nur leicht
+gedaempft). (3) Erst dann entscheiden, wann der Einbau faellt.
 
 ### Der Faehigkeitsplan hat feste Deckel - er veraltet zwangslaeufig
 

@@ -42,7 +42,11 @@ Regeln:
 
 ## Sofort
 
-keine
+### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
+Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`). Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.
+Erwartet: Die Schwelle darf **jetzt noch nicht feuern**. Verifiziert um 12:49: Motor waehlt `Contracts/Bounty Hunter`, `URTEIL: SPUR`. Bei der gemessenen Steigerung (Faktor 1,25 je 2,5 Stunden) wird 0,40 in **rund 12 Stunden** erreicht, also gegen Mitternacht.
+Verdacht: kein Fehler vermutet. Zu pruefen ist zweierlei, sobald sie feuert: **(1)** Kostet ein Fehlschlag wirklich rund 115 Mio? Ablesen an `data/bblage.json` vor und nach dem Versuch. **(2)** Faellt der Rang unter 4.598 zurueck? Operation Zero verlangt reqdRank 5.000, ein Absturz darunter waere teuer.
+Abbruchkriterium: Kostet ein Fehlschlag deutlich mehr als 150 Mio oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie dagegen, ist der naechste Schritt **0,30**.
 
 ## Offen, nach Dringlichkeit
 

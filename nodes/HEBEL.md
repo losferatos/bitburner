@@ -37,6 +37,42 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Hyperdrive in den Faehigkeitsplan, Deckel 7 (27.08., 12:52)
+
+Engpass: Die Kampfwerte tragen den Knotenausgang (`competence = Sum weights *
+skill^0,9`), und ihre einzige Quelle ist die Erfahrung. Die Faehigkeitspunkte
+gingen bisher vollstaendig an Blade's Intuition - die steht auf **Stufe 25**,
+und die naechste kostet **56 Punkte** fuer +3 Prozent.
+
+Hypothese: Die Chance steigt je investiertem Punkt um **1,45 statt 0,054
+Prozent**, also Faktor 27 auf der ersten Stufe. Der Grund ist die
+Erfahrungskurve: +10 Prozent Erfahrung geben ueber
+`lvl = mult * (32*ln(exp+534,6) - 200)` genau **+3,05 Levelpunkte** auf alle
+vier Kampfwerte, und zwar unabhaengig vom Niveau.
+
+Beleg: `Bladeburner/data/Skills.ts:98-104` - Hyperdrive, baseCost **1**,
+costInc 2,5, `ExpGain: 10`. Gegen Blade's Intuition (`:5-10`, baseCost 3,
+costInc 2,1, `SuccessChanceAll: 3`). Nutzen je Punkt:
+
+    Blade's Intuition Stufe 26    56 Punkte   +3,00 %   0,054 % je Punkt
+    Hyperdrive Stufe 1             1 Punkt    +1,45 %   1,451
+    Hyperdrive Stufe 3             6 Punkte   +1,22 %   0,203
+    Hyperdrive Stufe 5            11 Punkte   +1,05 %   0,096
+    Hyperdrive Stufe 7            16 Punkte   +0,92 %   0,058   <- Gleichstand
+    Hyperdrive Stufe 8            18,5        +0,87 %   0,047   <- schlechter
+
+Deckel 7 ist der Schnittpunkt. Die 59,5 Punkte fuer sieben Stufen bringen
+Erfahrungsfaktor **1,7**; dieselben Punkte reichen bei Blade's Intuition fuer
+genau EINE Stufe.
+
+Vorher: **84 exp/min** (def, 12:10 gegen 12:40), Hyperdrive Stufe 0
+Nachher: (offen - **Stufe 5 bereits um 12:54**, der Bot hat die aufgelaufenen
+Punkte sofort investiert. Erwartet wird die Erfahrungsrate bei Stufe 5 auf
+**126 exp/min** und bei Stufe 7 auf **143**. Der naechste Lauf misst
+`kampfExp.def` ueber ein volles 30-Minuten-Fenster. Bleibt sie unter 110,
+traegt die Rechnung nicht und der Eintrag gehoert zurueckgedreht.)
+Commit: siehe git log, blade.js 27.08. 12:52
+
 ### Geprueft und verworfen: Gym statt Bladeburner-Arbeit (27.08., 09:56)
 
 Engpass: **Die Kampfwerte, nicht der Rang.** Rang 3476 liegt laengst ueber den
@@ -116,8 +152,13 @@ Versuch ein Fehlschlag statt jeder dritte.
 
 Vorher: **Chance 0,062-0,075 um 06:10**, Schwelle 0,99 - die Black Op wurde
 nie versucht, und bei 0,99 waere sie es womoeglich nie geworden.
-Nachher: (offen - greift erst, wenn die Chance 0,80 erreicht. Die naechsten
-Laeufe messen die Chance, nicht die Rate.)
+Nachher: **UEBERHOLT am 27.08., 12:49 - die Begruendung war falsch.** Der Satz
+"das kostet min(Geld * 0,1, ...) - bei 3,6 Milliarden also 360 Millionen" las
+nur den ERSTEN Term des Minimums. Der zweite deckelt bei
+`(hp.max - hp.current) * 100.000`, und mit `damage = hpLoss * difficultyMult
+= 100 * (2000^0,28 + 2000/650) = 1.148` sind das **114,8 Millionen** - drei
+Minuten Einkommen. Die Kosten haengen an der Schwierigkeit, nicht am
+Kontostand. Schwelle steht seither auf **0,40**.
 Commit: siehe git log, blade.js 27.08. 06:56
 
 ### Die Stillstandsuhr zaehlte ueber den Einbau hinweg (27.08., 04:00)

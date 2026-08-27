@@ -315,6 +315,34 @@ export async function main(ns) {
   // Digital Observer und Cloak stehen hinten, weil Operationen und
   // Stealth-Vertraege kaum vorkommen.
   const SKILL_PLAN = [
+    // HYPERDRIVE ZUERST (27.08.2026, 12:52).
+    //
+    // Gemessen 12:41 aus `data/bbspann.json`: Blade's Intuition steht auf
+    // **Stufe 25**, die naechste kostet **56 Punkte** fuer +3 Prozent Chance -
+    // also 0,054 Prozent je Punkt. Hyperdrive steht auf **Stufe 0** und kostet
+    // **1 Punkt** (`data/Skills.ts:98-104`, baseCost 1, costInc 2,5).
+    //
+    // Was eine Hyperdrive-Stufe wert ist: +10 Prozent Erfahrung, und ueber
+    // `lvl = mult * (32*ln(exp+534,6) - 200)` sind das **+3,05 Levelpunkte**
+    // auf ALLE VIER Kampfwerte - unabhaengig vom Niveau. Bei def 189 macht das
+    // +1,45 Prozent competence.
+    //
+    //     Stufe 1    1 Punkt    +1,45 %   1,451 % je Punkt
+    //     Stufe 3    6 Punkte   +1,22 %   0,203
+    //     Stufe 5   11 Punkte   +1,05 %   0,096
+    //     Stufe 7   16 Punkte   +0,92 %   0,058   <- hier holt Blade's auf
+    //     Stufe 8   18,5        +0,87 %   0,047   <- ab hier schlechter
+    //
+    // Deckel 7, weil dort der Nutzen je Punkt unter den von Blade's Intuition
+    // faellt. Die 59,5 Punkte fuer sieben Stufen bringen Erfahrungsfaktor 1,7;
+    // dieselben Punkte in Blade's Intuition reichen fuer genau EINE Stufe.
+    //
+    // Der Bonus wirkt auf kuenftige Erfahrung, nicht auf den Bestand - der
+    // Vorsprung waechst also mit der Zeit. Nach einer Stunde sind es +3,2
+    // Level, nach fuenf Stunden +8,2. Bei einem Knoten, der noch Tage laeuft,
+    // und ueber Augmentierungs-Einbauten hinweg (Bladeburner-Faehigkeiten
+    // ueberleben sie) ist das der bessere Kauf.
+    ["Hyperdrive", 7],
     ["Cyber's Edge", 5],
     ["Tracer", 14],
     ["Short-Circuit", 12],

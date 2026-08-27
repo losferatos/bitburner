@@ -46,6 +46,17 @@ Regeln:
 
 ## Sofort
 
+### Digital Observer bleibt auf Stufe 1, obwohl er im Plan vorn steht (19:13)
+Gemessen um 19:10: **21 Faehigkeitspunkte verfuegbar, Digital Observer Stufe 1 (Preis 4)**, waehrend Blade's Intuition seit 18:52 von 26 auf **29** gestiegen ist (Preis 64). Um 18:57 lagen sogar 56 Punkte da.
+Erwartet: Digital Observer wird zuerst gekauft. Er wurde um 18:55 in `DYNAMISCH` aufgenommen UND im `SKILL_PLAN` vor `Blade's Intuition` gesetzt; sein Nutzen je Punkt liegt bei 0,423 gegen 0,031 - Faktor 13,8 (Rechnung in `nodes/HEBEL.md`). Die neue Fassung IST im Spiel (`getFile blade.js` findet "abdeckung") und `data/reload.txt` wurde geleert, der Neustart lief also.
+Verdacht: die Umsortierung in `faehigkeitenKaufen()` (`src/blade.js`, Block "Die drei dynamischen Eintraege an ihren Planplaetzen neu ordnen"). Zwei Kandidaten: **(1)** Die Bedingung `plaetze.length === DYNAMISCH.length` schlaegt fehl, seit `DYNAMISCH` sechs statt fuenf Eintraege hat - dann findet gar keine Sortierung statt und der Plan wirkt in seiner Rohreihenfolge. **(2)** `relNutzen("Digital Observer")` liefert 0, weil ein frueherer Zweig der Funktion greift, bevor `CHANCE_SKILLS` gelesen wird.
+**Zuerst pruefen, nicht raten:** Ein Probelauf, der `relNutzen` und `getSkillUpgradeCost` fuer alle sechs dynamischen Eintraege ausgibt, entscheidet zwischen beiden in einer Minute.
+
+### Die Geldrate ist von 22,9 auf 1,3 Mio je Minute eingebrochen (19:13)
+Gemessen: `data/wache-zustand.json`, 45-Minuten-Fenster 18:26 bis 19:11: **1,3 Mio/min**. Im Fenster davor (17:53 bis 18:38) waren es **22,9**. Der Kontostand faellt: 3.507 Mio um 18:40, **3.182** um 19:10.
+Erwartet: rund 23 Mio je Minute, so wie den ganzen Nachmittag ueber.
+Verdacht: **offen.** Zwei Moeglichkeiten, beide pruefbar: (1) `bn4net` kauft gerade Server oder Speicher - dann ist der Rueckgang eine Investition und kein Fehler, ablesbar an `data/bn4net.json` und der Netzzeile des Pruefers (steht seit Stunden auf 66/95). (2) Die Hackschleife steht. **Wichtig, weil Geld der Engpass der Augmentierungsrunde ist** (INTERLINKED 5,5 Mrd, Golem Serum 11 Mrd) - und weil eine Nacht mit ausgeschaltetem Rechner ohnehin nur 75 Prozent des Lebensdurchschnitts einbringt.
+
 ### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
 Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`).
 Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.

@@ -42,12 +42,6 @@ Regeln:
 
 ## Sofort
 
-### `data/bbspann.json` steht seit 21 Minuten still - der Chancenmesser ist tot (16:12)
-Gemessen: Zwei Abrufe ueber die Bruecke um 16:11 und um 16:12:32 lieferten denselben Zeitstempel `1787838684644` = **15:51**. In derselben Datei steht `"stadt":"Sector-12"`, waehrend `data/bblage.json` (16:10, frisch) Aevum meldet. `blade.json` und `bblage.json` sind beide aktuell, nur `bbspann.json` nicht.
-Erwartet: Ein Stand, der nicht aelter als ein Aktionszyklus ist (unter 2 Minuten), und dieselbe Stadt wie `bblage.json`.
-Verdacht: `src/bbspann.js` laeuft nicht mehr - vermutlich beim Neustart um 16:06 nicht mit hochgekommen (`data/aktionen.txt` beginnt um 16:06:39, das Protokoll wurde also dort neu angelegt). Erst die Prozessliste im Spiel pruefen, dann `src/boot.js` daraufhin ansehen, ob `bbspann.js` im Wiederanlauf ueberhaupt gestartet wird.
-**Blockiert zwei offene Punkte**: Die Typhoon-Chance und die Faehigkeitsstufen sind nur hier ablesbar. Der Nachmesspunkt zur Black-Op-Schwelle 0,40 und die Kontrolle von Reaper/Evasive System koennen bis dahin nicht beantwortet werden.
-
 ### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
 Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
 Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
@@ -96,7 +90,8 @@ gemessen. Kein Revert.
 
 ### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
 Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`).
-Nachtrag 16:12: Letzter lesbarer Stand min **0,133** / max 0,186 (15:51) - danach steht die Datei still, siehe den Befund oben. Die Schwelle greift bis dahin nicht; der Rang ist mit 5778 gegen 2500 laengst kein Engpass mehr, die Chance ist es. Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.
+Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.
+Damit ist die Lage klar: Der Rang ist mit **5845 gegen 2500** um mehr als das Doppelte uebererfuellt und war nie der Engpass. Der Engpass ist die Chance, und die haengt allein an den Kampfwerten. Von 0,116 (12:41) auf 0,212 (16:19) sind **+0,096 in 3,6 Stunden** - linear fortgeschrieben faellt 0,40 gegen **23:00**, was die 12-Stunden-Schaetzung von 12:50 bestaetigt. Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.
 Erwartet: Die Schwelle darf **jetzt noch nicht feuern**. Verifiziert um 12:49: Motor waehlt `Contracts/Bounty Hunter`, `URTEIL: SPUR`. Bei der gemessenen Steigerung (Faktor 1,25 je 2,5 Stunden) wird 0,40 in **rund 12 Stunden** erreicht, also gegen Mitternacht.
 Verdacht: kein Fehler vermutet. Zu pruefen ist zweierlei, sobald sie feuert: **(1)** Kostet ein Fehlschlag wirklich rund 115 Mio? Ablesen an `data/bblage.json` vor und nach dem Versuch. **(2)** Faellt der Rang unter 4.598 zurueck? Operation Zero verlangt reqdRank 5.000, ein Absturz darunter waere teuer.
 Abbruchkriterium: Kostet ein Fehlschlag deutlich mehr als 150 Mio oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie dagegen, ist der naechste Schritt **0,30**.
@@ -320,6 +315,33 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Erfolgsspannen waren nur umstaendlich lesbar - BEHOBEN (27.08., 16:19)
+
+**Verifiziert: `node tools/spann.js` um 16:19:27 - Chance 0,212 exakt, alle
+zwoelf Faehigkeitsstufen, Ausdauer 72,4/121,3. Ein Befehl statt vier.**
+
+Der Reportloop hatte um 16:12 eingetragen, `data/bbspann.json` stehe still und
+der Chancenmesser sei tot. **Die Diagnose war falsch.** `src/bbspann.js` hat
+gar keine Schleife (Zeile 11 ff.) - es ist eine Momentaufnahme, die einmal
+schreibt und endet, gestartet ueber `data/task.txt`. Die Datei war 21 Minuten
+alt, weil sie seit 15:51 niemand angefordert hatte. Auch der zweite Beleg trug
+nicht: `"stadt":"Sector-12"` neben Aevum in `bblage.json` ist kein Widerspruch,
+sondern der Unterschied zwischen dem Aufenthaltsort des Spielers und der Stadt,
+in der die Division arbeitet.
+
+Was daran ECHT war: Die Typhoon-Chance und die Faehigkeitsstufen sind nur hier
+ablesbar, beide stehen in offenen Nachmesspunkten - und um an sie
+heranzukommen, musste man von Hand einen Auftrag nach `data/task.txt` schieben,
+pollen und die Antwort aus der JSON-Maskierung der Bruecke schaelen. Vier
+Schritte fuer eine Zahl, die zwei Loops regelmaessig brauchen. Genau deshalb
+stand sie stundenlang veraltet da und wurde als Absturz missdeutet.
+
+`tools/spann.js` macht daraus einen Befehl: Auftrag schieben, auf einen neuen
+Zeitstempel warten (harte Grenze 60 s), die drei Zahlen ausgeben, die zaehlen.
+Bewusst **kein Selbstlaeufer** - `data/task.txt` ist ein einzelner Platz mit
+einem Leser, den sich drei Loops teilen; ein Wecker darin wuerde ihnen den
+Kanal wegnehmen.
 
 ### bbtrain liess die Gym-Arbeit bei leerem Konto weiterlaufen - BEHOBEN (27.08., 15:48)
 

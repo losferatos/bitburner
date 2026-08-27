@@ -67,9 +67,21 @@ Beitrittsschwelle liegt.
 
 Vorher: Reaper **Stufe 8** (Deckel 8), Evasive System **Stufe 12** (Deckel 12),
 Typhoon-Chance min **0,133** um 15:51
-Nachher: (offen - der naechste Lauf misst beide Stufen in `data/bbspann.json`.
-Steigen sie nicht ueber 8 beziehungsweise 12, greift die Sortierung fuer diese
-zwei nicht und der Eintrag gehoert geprueft. Die Chance sollte mitziehen.)
+Nachher (gemessen 16:19 mit `node tools/spann.js`, 26 Minuten spaeter):
+**Reaper Stufe 8 auf 9** - die Sortierung greift, der alte Deckel haette hier
+gestoppt. **Evasive System steht unveraendert auf 12**, und das ist kein
+Fehlschlag, sondern der Preis: 27 Punkte bei 16 verfuegbaren. Es ist die
+teuerste der vier dynamischen Faehigkeiten und liegt im Nutzen je Punkt hinten
+(0,0467 gegen 0,0593), also kommt es zuletzt dran - so soll die Sortierung
+arbeiten. **Typhoon-Chance 0,133 auf 0,212**, und die Schaetzspanne ist dabei
+ganz zugegangen (min = max). Der Deckel wird erst dann wieder zum Thema, wenn
+Reaper die 16 erreicht.
+
+**Offen bleibt der Vergleichsmassstab.** Short-Circuit stieg im selben Fenster
+von 19 auf 21, Blade’s Intuition blieb auf 25 - die Punkte gehen also
+ueberwiegend an Short-Circuit, nicht an Reaper. Ob die +0,079 Chance aus der
+Umlenkung kommen oder schlicht aus den gestiegenen Kampfwerten, trennt diese
+Messung nicht. Dafuer braeuchte es einen Lauf mit eingefrorenen Stufen.
 Commit: siehe git log, blade.js 27.08. 15:53
 
 ### Short-Circuit-Deckel von 12 auf 30 (27.08., 13:19)

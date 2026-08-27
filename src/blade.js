@@ -294,8 +294,11 @@ export async function main(ns) {
     ["Short-Circuit", 30],
     ["Evasive System", 17],
     ["Reaper", 16],
-    ["Blade's Intuition", Infinity],
+    // Digital Observer VOR Blade's Intuition (27.08., 18:55): Dahinter kam er
+    // nie an die Reihe, weil ein Infinity-Deckel nie erreicht wird - nach
+    // einem ganzen Tag stand er auf Stufe 1. Rechnung in nodes/HEBEL.md.
     ["Digital Observer", Infinity],
+    ["Blade's Intuition", Infinity],
     ["Cloak", Infinity],
     // Zuletzt: wirkungslos, solange die Ausdauer klemmt. Deckel 90 ist das
     // Maximum des Spiels und bleibt stehen, falls der Engpass je wegfaellt.
@@ -352,7 +355,42 @@ export async function main(ns) {
   //
   // Verglichen wird der RELATIVE Zuwachs: Die Multiplikatoren verrechnen sich
   // multiplikativ, ein Prozentpunkt auf 1,66 ist mehr wert als auf 2,65.
-  const CHANCE_SKILLS = { "Blade's Intuition": 3, "Short-Circuit": 5.5 };
+  // DIE ABDECKUNG GEHOERT IN DIE RECHNUNG (27.08.2026, 18:55).
+  //
+  // Bis hierher verglich `relNutzen` nur die Multiplikatoren. Das
+  // benachteiligt Digital Observer schwer: Er stand nach einem ganzen Tag auf
+  // **Stufe 1**, weil er zwar im Plan steht, aber hinter
+  // `["Blade's Intuition", Infinity]` - und ein Infinity-Deckel wird nie
+  // erreicht. Er kam also nie an die Reihe.
+  //
+  // Dabei ist er die mit Abstand billigste Chance-Faehigkeit, die auf Black
+  // Ops wirkt: `BlackOperation.getActionTypeSkillSuccessBonus =
+  // operationSkillSuccessBonus` (`Actions/BlackOperation.ts:69`), und das ist
+  // `getSkillMult(SuccessChanceOperation)` (`Actions/Operation.ts:92-94`).
+  // Er trifft damit **21 von 21** Black Ops, waehrend Short-Circuit (isKill)
+  // 15 davon trifft und Cloak (isStealth) drei.
+  //
+  // Gerechnet auf den Stand von 18:53, Preise nach
+  // `(baseCost + stufe*costInc)` (`Bladeburner/Skill.ts:37-41`):
+  //
+  //     Digital Observer   St. 1  Preis  4  0,962 % je Punkt  x 0,44 = 0,423
+  //     Blade's Intuition  St.25  Preis 56  0,031 % je Punkt  x 1,00 = 0,031
+  //     Short-Circuit      St.28  Preis 61  0,036 % je Punkt  x 0,55 = 0,020
+  //
+  // Faktor **13,8** gegen Blade's Intuition, **21,7** gegen Short-Circuit -
+  // und das mit der vorsichtigen Abdeckung.
+  //
+  // Die Abdeckung ist der Anteil der Zeit, in dem die Faehigkeit ueberhaupt
+  // wirkt, gemessen an der Aktionsmischung von 16:06 bis 17:17
+  // (`data/aktionen.txt`, 70,6 Minuten): Operationen 43,9 Prozent, Kill-
+  // Aktionen rund 55, alle Aktionen 100. Black Ops sind darin nicht enthalten -
+  // sie kommen bei Digital Observer und Short-Circuit noch obendrauf, also
+  // sind beide Werte eher zu niedrig als zu hoch.
+  const CHANCE_SKILLS = {
+    "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll
+    "Short-Circuit": { proz: 5.5, abdeckung: 0.55 },      // isKill
+    "Digital Observer": { proz: 4, abdeckung: 0.44 },     // Operations + alle Black Ops
+  };
   const relNutzen = (name) => {
     const stufe = ns.bladeburner.getSkillLevel(name);
     if (name === "Hyperdrive") {
@@ -385,17 +423,17 @@ export async function main(ns) {
       const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
       return 100 * (danach / jetzt - 1);
     }
-    const p = CHANCE_SKILLS[name];
-    if (!p) return 0;
-    const a = 1 + stufe * p / 100;
-    return 100 * ((a + p / 100) / a - 1);
+    const c = CHANCE_SKILLS[name];
+    if (!c) return 0;
+    const a = 1 + stufe * c.proz / 100;
+    return 100 * ((a + c.proz / 100) / a - 1) * c.abdeckung;
   };
   // Reaper und Evasive System kamen am 27.08. um 15:53 dazu. Gerechnet auf dem
   // damaligen Stand (str 172, def 143, dex 325, agi 168): Reaper Stufe 9 gab
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System"];
+    "Reaper", "Evasive System", "Digital Observer"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();

@@ -42,13 +42,6 @@ Regeln:
 
 ## Sofort
 
-### Nachmessen: stoppt bbtrain jetzt das Gym bei leerem Konto? (15:19)
-**Beide Befunde von 15:12 und 14:41 hatten dieselbe Ursache, und sie ist behoben.**
-Die `GYM_MIN_GELD`-Sperre machte nur `continue`. Das unterlaesst den NEUSTART, beendet aber die bereits laufende Gym-Arbeit nicht - sie laeuft im Spiel weiter, auf dem Wert, der beim letzten erfolgreichen Durchlauf der niedrigste war.
-Gemessen: Nach dem Einbau um 14:40 lag das Konto von der ersten Sekunde an unter 5 Mio, jede Runde lief also ins `continue`. Die dex-Arbeit aus der Runde davor blieb stehen. Um 15:10: **dex 289, agi 88** - der Tiefstand seit 14:52 unbewegt, dex um 39 gestiegen, Konto von 6 auf 1,5 Mio gefallen. Doppelte Kosten: laengere Wiederaufbauphase **und** leerere Kasse.
-**Geaendert 15:18, Wirkung noch nicht gemessen** (`src/bbtrain.js`): Liegt das Konto unter der Schwelle, wird eine laufende **CLASS**-Arbeit gestoppt. Eine Bladeburner-Aktion bleibt unberuehrt.
-Erwartet, ablesbar an `data/bblage.json` binnen einer Minute nach dem naechsten bbtrain-Durchlauf: Bei Geld unter 5 Mio muss `arbeit` **leer** sein (dann trainiert `blade.js` gratis weiter), bei Geld darueber muss `klasse` auf **`agi`** stehen, dem Tiefstand - nicht mehr auf `dex`. Steht dort weiter `dex` bei einem Konto unter 5 Mio, greift der Stopp nicht und der Commit gehoert zurueckgedreht.
-
 ### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
 Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
 Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
@@ -320,6 +313,44 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### bbtrain liess die Gym-Arbeit bei leerem Konto weiterlaufen - BEHOBEN (27.08., 15:48)
+
+**Verifiziert: Tiefstand 88 auf 139 in 29 Minuten, Konto 1,5 auf 20 Millionen.**
+Beide Zahlen waren vorher festgefahren.
+
+Die `GYM_MIN_GELD`-Sperre machte nur `continue`. Das unterlaesst den NEUSTART,
+beendet aber die bereits laufende Gym-Arbeit nicht - sie laeuft im Spiel
+weiter, auf dem Wert, der beim letzten erfolgreichen Durchlauf der niedrigste
+war, und zieht dabei weiter Geld.
+
+Nach dem Einbau um 14:40 lag das Konto von der ersten Sekunde an unter der
+Schwelle, jede Runde lief also ins `continue`. Die dex-Arbeit aus der Runde
+davor blieb stehen:
+
+    14:52   dex 250   agi  88   Konto  6,0 Mio   Arbeit dex
+    15:10   dex 289   agi  88   Konto  1,5 Mio   Arbeit dex
+    15:19   dex 308   agi  88   Konto  3,6 Mio   Arbeit dex   <- Fix greift
+    15:40   dex 319   agi 150   Konto 13,1 Mio   Arbeit keine
+    15:47   dex 323   agi 162   Konto 20,0 Mio   Arbeit keine
+
+**Der Zustand kostete doppelt**: In 18 Minuten kein einziger Punkt auf dem
+Tiefstand, waehrend dex - schon dreimal so hoch - um 39 weiterstieg, und
+gleichzeitig floss das Geld ins Gym ab, das der Wiederaufbau braucht.
+
+**Geaendert 15:18** (`src/bbtrain.js`): Liegt das Konto unter der Schwelle,
+wird eine laufende **CLASS**-Arbeit gestoppt. Eine Bladeburner-Aktion bleibt
+unberuehrt.
+
+**Die Auswahl war nie falsch.** `bbtrain.js:145-151` nimmt korrekt den
+niedrigsten Wert - sie kam nur nie zum Zug, weil die Runde vorher abbrach.
+Der erste Verdacht ("trainiert den hoechsten statt den niedrigsten") war ein
+Symptom, nicht die Ursache.
+
+**Lehre, allgemein:** Eine Sperre, die nur den Start unterlaesst, haelt nichts
+an, was schon laeuft. Wo `continue` einen Zustand verhindern soll, gehoert
+geprueft, ob der Zustand nicht bereits besteht - im Spiel laufen Arbeiten
+weiter, auch wenn das Skript sie nicht mehr anfasst.
 
 ### bn4rep auf Kampfwerte umgestellt - VERIFIZIERT am Einbau (27.08., 14:51)
 

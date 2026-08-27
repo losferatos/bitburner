@@ -37,6 +37,55 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Geprueft und verworfen: Gym statt Bladeburner-Arbeit (27.08., 09:56)
+
+Engpass: **Die Kampfwerte, nicht der Rang.** Rang 3476 liegt laengst ueber den
+2500 fuer Operation Typhoon; was fehlt, ist die Chance (Mitte 0,104 gegen
+Schwelle 0,80), und die haengt an `competence = Sum weights * skill^0,9`.
+
+Hypothese: Powerhouse Gym hat `expMult: 10` (`Locations/data/LocationsMetadata.ts:325`)
+und `costMult: 20`. Bei 10,4 Mrd auf der Hand sind die Kosten irrelevant
+(480 $/s, also 361.000 Minuten Vorrat). Wenn Gym die Kampfwerte schneller
+hebt als Bladeburner-Arbeit, gehoert der Motor umgestellt.
+
+Beleg, beide Seiten gerechnet statt geschaetzt:
+
+- **Gym**: `Classes[GymType.defense].earnings = {defExp: 1}` je Zyklus,
+  skaliert mit `expMult / gameCPS` (`Work/Formulas.ts:115-118`) und mit
+  `person.mults`. Bei 5 Zyklen je Sekunde sind das **600 * mult exp/min**
+  fuer **einen** Wert.
+- **Bladeburner**, gemessen 09:04 gegen 09:52 aus `data/bblage.json`:
+  str 39.467 -> 45.935, def 18.615 -> 25.083. Beide **+6.468 in 48 Minuten**,
+  also **135 exp/min je Wert** - und zwar fuer **alle vier gleichzeitig**,
+  in Summe 540.
+- Der Multiplikator faellt aus den Daten selbst: `lvl = mult * (32*ln(exp+534,6) - 200)`
+  gibt fuer str (196 / 45.935) und def (170 / 25.083) **beide Male 1,362**.
+  Gym liefert damit 817 exp/min je Wert.
+
+Der Vergleich ueber die 101 Minuten, die ORION-MKIV Shoulder noch entfernt ist:
+
+    Bladeburner   +13.635 exp je Wert  ->  def 170 -> 188,7   (+18,7)
+                  plus ORION-MKIV (str/def/dex x1,05)          (+8,5)
+                  ------------------------------------------------
+                                                        SUMME  +27,2
+
+    Gym           25 min je Wert, +20.425 exp -> def 195,6     (+25,6)
+
+**Bladeburner gewinnt** - knapp bei den Kampfwerten, und ohne dass Rang fuer
+die spaeteren Black Ops und die weiteren Augmentierungen ueberhaupt gezaehlt
+sind. Der Grund ist, dass Gym nur EINEN Wert traegt: je Wert ist es Faktor
+4,4 besser, in der Summe nur Faktor 1,51 - und das kauft den Verlust von
+8,7 Rang und 19 Reputation je Minute nicht auf.
+
+**Die bestehende Auslegung ist also richtig**, und die Ausnahme stimmt auch:
+Nach einem Einbau stehen alle Werte auf 1, Bladeburner-Aktionen scheitern,
+und dort schlaegt der Faktor 4,4 je Wert voll durch - genau dafuer gibt es
+`bbtrain.js`.
+
+Vorher: keine Aenderung
+Nachher: (keine Aenderung - dies ist die Absage an den Umbau auf Gym-Betrieb)
+Commit: nur dieser Eintrag
+
 ### Black-Op-Schwelle von 0,99 auf 0,80 (27.08., 06:56)
 
 Engpass: **Nicht der Rang - die Schwelle, ab der er benutzt wird.** Der Rang

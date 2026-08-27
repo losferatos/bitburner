@@ -137,6 +137,12 @@ export async function main(ns) {
   // klemmt erst ab zwoelf Mitgliedern), also ist die Bedingung erfuellt,
   // sobald ueberhaupt rekrutiert werden kann.
   const RAID_CHARISMA_MIN = 200;
+  // Ab wieviel Gemeinden sich ein Stadtwechsel lohnt. Zehn sind rund 970 Rang
+  // bei Raid-Stufe 7 - genug, um die Diplomacy-Phase zu bezahlen, die der
+  // Wechsel nach sich zieht.
+  const RUNDREISE_MIN_COMMS = 10;
+  const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
+    "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
@@ -1007,6 +1013,65 @@ export async function main(ns) {
         // Grund zu warten - unten wird weiter Rang und Erfahrung gesammelt,
         // bis die Chance steht.
       }
+    }
+
+    // 2a. DIE RUNDREISE: comms SIND EIN ENDLICHER VORRAT JE STADT
+    //     (27.08.2026, 20:40).
+    //
+    // Raid ist kein Dauerlaeufer. Jeder Erfolg senkt `city.comms` um eins
+    // (`Bladeburner.ts:836`), und `Operation.getSuccessChance` gibt **0**
+    // zurueck, sobald `comms <= 0` (`Actions/Operation.ts:63-68`). Der Bot hat
+    // bis heute nie die Stadt gewechselt und deshalb nur die 15 Gemeinden von
+    // Sector-12 gesehen - ueber alle sechs Staedte sind es 384.
+    //
+    // Gemessen am 27.08. um 20:29 (`node tools/staedte.js`), Raid Stufe 7 mit
+    // 97 Rang je Lauf:
+    //
+    //     Stadt        comms  chaos  Diplomacy  Ertrag Rang  Rang/Diplo-Min
+    //     Sector-12       15   48,8      keine        1.462          sofort
+    //     Chongqing      138   66,5     20 min       13.446             672
+    //     New Tokyo      123   73,8     27 min       11.985             444
+    //     Aevum           49   86,4     37 min        4.774             129
+    //     Ishima          42  109,3     51 min        4.092              80
+    //     Volhaven        17  132,9     64 min        1.656              26
+    //
+    // Zusammen **37.415 Rang fuer 199 Minuten Diplomacy** - gut ein Zehntel
+    // des Restwegs von 317.000. `switchCity` ist ein reines Feldsetzen und
+    // kostet null Sekunden.
+    //
+    // WAS HIER NICHT PASSIERT: Das Chaos der Zielstadt wird NICHT hier
+    // gesenkt. Dafuer gibt es die bestehende Hysterese weiter unten
+    // (`CHAOS_EIN`/`CHAOS_AUS`) - sie sieht nach dem Wechsel einfach eine
+    // Stadt mit zu hohem Chaos und faehrt Diplomacy, bis es passt. Zwei
+    // Stellen, die dasselbe tun wollen, waeren ein Flatterrisiko.
+    //
+    // GEWECHSELT WIRD NUR NACH UNTEN-OBEN, NIE ZURUECK: Bedingung ist, dass
+    // die aktuelle Stadt leer ist UND das Ziel deutlich mehr hat. Ohne die
+    // zweite Haelfte koennte der Motor zwischen zwei fast leeren Staedten
+    // pendeln und dabei jedes Mal die Chaos-Hysterese neu ausloesen.
+    if (RAID_AN) {
+      try {
+        const hier = ns.bladeburner.getCity();
+        const commsHier = ns.bladeburner.getCityCommunities(hier);
+        if (commsHier < RAID_VORRAT_MIN) {
+          let beste = null, besteComms = 0;
+          for (const stadt of STAEDTE) {
+            if (stadt === hier) continue;
+            let c = 0;
+            try { c = ns.bladeburner.getCityCommunities(stadt); } catch { continue; }
+            if (c > besteComms) { besteComms = c; beste = stadt; }
+          }
+          // Die Schwelle ist bewusst hoch: Ein Wechsel zieht eine
+          // Diplomacy-Phase nach sich, und die lohnt erst ab einem Vorrat,
+          // der sie bezahlt. Zehn Gemeinden sind rund 970 Rang.
+          if (beste && besteComms >= RUNDREISE_MIN_COMMS) {
+            if (ns.bladeburner.switchCity(beste)) {
+              sag("Stadtwechsel nach " + beste + ": " + hier + " hat nur noch "
+                + commsHier + " Gemeinden, dort sind es " + besteComms + ".");
+            }
+          }
+        }
+      } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
     }
 
     // 2b. DEN TRUPP AUFFUELLEN, SOLANGE ER BILLIG IST (27.08.2026, 19:52).

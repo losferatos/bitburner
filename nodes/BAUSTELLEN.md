@@ -42,7 +42,11 @@ Regeln:
 
 ## Sofort
 
-keine
+### Die Typhoon-Chance rauscht staerker als sie steigt - Einzelmessungen taugen nicht als Ziel (09:15)
+Gemessen: data/bbspann.json, chance.min ueber vier Punkte - 0,088 (07:41), 0,091 (08:21), 0,097 (08:41), **0,086 (09:11)**. Die Spanne, die sich bis 08:41 auf 0,006 eingeengt hatte, steht wieder bei **0,021** (0,086-0,107). Stadt bei allen Messungen Sector-12, Ausdauerstrafe durchgehend 1 (64,5 von 119,8), Aktion zuletzt Hyperbolic Regeneration Chamber, Faehigkeitspunkte 9 -> 19 -> 26.
+Erwartet: Ein monoton steigendes min, wie es der Kampfwertzuwachs (def 160 -> 165 im selben Fenster) nahelegt.
+Verdacht: offen. Weder Stadt noch Ausdauer erklaeren es - beide sind konstant. Zu pruefen ist, ob `getActionEstimatedSuccessChance` die Spanne an etwas haengt, das sich zyklisch bewegt (Kammerphase, Faehigkeitsausgabe), Fundstelle `src/bbspann.js:216`.
+Konsequenz, die den Befund dringlich macht: **Die 11-Stunden-Prognose von 08:45 war auf einem Rauschgipfel extrapoliert und ist damit hinfaellig.** Und `blade.js:600` entscheidet ueber genau diesen Einzelwert (`s.min >= SICHER_BLACKOP`) - bei aufgehender Spanne verzoegert das die Black Op ohne Grund. Die Chance gehoert geglaettet gemessen, so wie die Rangrate seit dem 26.08.
 
 ## Offen, nach Dringlichkeit
 

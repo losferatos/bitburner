@@ -42,23 +42,18 @@ Regeln:
 
 ## Sofort
 
-### bbtrain trainiert den hoechsten Kampfwert statt den niedrigsten (15:12)
-Gemessen: `data/bblage.json` um 15:10 - Kampf **str 152, def 93, dex 289, agi 88**, `tiefstand: 88`, und die Arbeit ist **`dex @ Powerhouse Gym`**. Trainiert wird also der Wert, der mit 289 ohnehin dreimal so hoch steht wie der Tiefstand.
-Erwartet: **agi**, der niedrigste Wert. Der Traeger dieser Phase ist der Kampfwert-TIEFSTAND (`strategie-check`, Traegerzeile), und `blade.js` uebernimmt erst ab 100 wieder von `bbtrain`.
-Belegte Folge: Der Tiefstand steht **seit 14:52 unverruckt auf 88** - in 18 Minuten kein einziger Punkt, waehrend dex von 250 auf 289 gestiegen ist. Die Wiederaufbauphase verlaengert sich dadurch ohne Not, und sie kostet doppelt: Gym-Zeit **und** Geld (der Kontostand faellt, siehe den Punkt darunter).
-Verdacht: `src/bbtrain.js`, die Auswahl des zu trainierenden Werts. Zu pruefen ist, ob sie den Tiefstand ueberhaupt neu bestimmt oder nach dem ersten Wechsel beim einmal gewaehlten Wert bleibt. Der Waechter hat dafuer bereits eine Regel ("solange der Tiefstand unter 100 liegt, muss der trainierte Wert der niedrigste sein") - sie schlaegt hier offenbar nicht an, obwohl der Fall genau eingetreten ist.
+### Nachmessen: stoppt bbtrain jetzt das Gym bei leerem Konto? (15:19)
+**Beide Befunde von 15:12 und 14:41 hatten dieselbe Ursache, und sie ist behoben.**
+Die `GYM_MIN_GELD`-Sperre machte nur `continue`. Das unterlaesst den NEUSTART, beendet aber die bereits laufende Gym-Arbeit nicht - sie laeuft im Spiel weiter, auf dem Wert, der beim letzten erfolgreichen Durchlauf der niedrigste war.
+Gemessen: Nach dem Einbau um 14:40 lag das Konto von der ersten Sekunde an unter 5 Mio, jede Runde lief also ins `continue`. Die dex-Arbeit aus der Runde davor blieb stehen. Um 15:10: **dex 289, agi 88** - der Tiefstand seit 14:52 unbewegt, dex um 39 gestiegen, Konto von 6 auf 1,5 Mio gefallen. Doppelte Kosten: laengere Wiederaufbauphase **und** leerere Kasse.
+**Geaendert 15:18, Wirkung noch nicht gemessen** (`src/bbtrain.js`): Liegt das Konto unter der Schwelle, wird eine laufende **CLASS**-Arbeit gestoppt. Eine Bladeburner-Aktion bleibt unberuehrt.
+Erwartet, ablesbar an `data/bblage.json` binnen einer Minute nach dem naechsten bbtrain-Durchlauf: Bei Geld unter 5 Mio muss `arbeit` **leer** sein (dann trainiert `blade.js` gratis weiter), bei Geld darueber muss `klasse` auf **`agi`** stehen, dem Tiefstand - nicht mehr auf `dex`. Steht dort weiter `dex` bei einem Konto unter 5 Mio, greift der Stopp nicht und der Commit gehoert zurueckgedreht.
 
 ### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
 Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
 Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
 Verdacht: Der Abschnitt greift nicht mehr. `tools/strategie-check.js:537-556`. Die 649 Minuten passen zum Einbau von 03:48 - der Verlauf wird also wieder ueber den vorigen Wiederaufbau hinweg gelesen. Moeglicherweise hat der damalige Fix nur den Fall abgedeckt, in dem der Phasenwechsel im selben Verlauf steht.
 **Folgenschwer, weil es die Wache in den Eingriffsmodus schickt** - im ungeeignetsten Moment, denn dort arbeitet der Bot planmaessig.
-
-### Der Kontostand ist negativ (14:41)
-Gemessen: `Geld -1m` in der Pruefzeile um 14:40.
-Erwartet: Ueber null. `bbtrain.js` hat seit dem 27.08. frueh eine Sperre (`GYM_MIN_GELD = 5e6`), die das Training aussetzt, solange weniger als 5 Mio da sind - das Gym prueft den Kontostand selbst nicht (`Work/ClassWork.tsx:22-73`, `gainMoney` ohne Boden).
-Verdacht: Die Sperre greift nicht, oder der Einbau selbst hat den Bestand geleert und die Sperre setzt erst nach ihrer naechsten Runde ein. `src/bbtrain.js`, Suchbegriff `GYM_MIN_GELD`.
-**Nachgemessen 15:10: der Bestand FAELLT weiter** - 6m um 14:45, **1,5m** um 15:10. Die Sperre bei 5 Mio hat also nicht angehalten, obwohl der Wert laengst unterschritten ist. Das Einkommen ist nach dem Einbau weggebrochen (Netz 29/71 statt 95/95), die Gym-Kosten laufen weiter (480 Dollar je Sekunde im Powerhouse Gym, `costMult 20`). Damit ist der Verdacht "Sperre greift nicht" **belegt** und nicht mehr nur vermutet.
 
 ### Kammeranteil auf 31 Prozent gestiegen, Erfahrungsrate zurueck auf Vor-Hyperdrive-Niveau (14:14)
 Gemessen: `data/bblage.json`, `kampfExp.def` 45.209 (13:40) auf 47.735 (14:10) - **84 exp/min**. Das ist exakt der Wert von vor dem Hyperdrive-Hebel, obwohl der Erfahrungsfaktor seit 13:17 bei 1,7 steht. Die Aktionsmischung aus `data/aktionen.txt` im selben Fenster (87 Prozent erfasst):

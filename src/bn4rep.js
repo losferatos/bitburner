@@ -1509,9 +1509,22 @@ export async function main(ns) {
     //
     // Zeile 1 bleibt unveraendert `<ms>|<aug>|<faktion>`; die Rangliste steht
     // als JSON in Zeile 2. Wer nur die erste Zeile liest, merkt nichts.
+    // Zeile 3: was der Motor als Reputationsrate ANNIMMT, in rep je Minute.
+    // Nachgerechnet um 10:17 stimmte sie nicht: aus `sek` liess sich auf rund
+    // 115 rep/min zurueckschliessen, real waren es 23,8 (Bladeburners 5.665
+    // um 09:47 gegen 6.380 um 10:17). Rueckrechnen ueber `sek` braucht die
+    // repReq-Werte und ist damit selbst unsicher - die Zahl gehoert direkt
+    // herausgeschrieben. Ein Stern markiert einen Wert aus der Formel.
+    const ratenSicht = {};
+    for (const f of repMessung.keys()) {
+      const m = repMessung.get(f);
+      ratenSicht[f] = Math.round(repPerSecond(f) * 60 * 10) / 10
+        + (m && m.rate > 0 ? "" : "*");
+    }
     schreibNachHome("data/rep-ziel.txt",
       Date.now() + "|" + ziel.aug + "|" + ziel.faktion
-      + "\n" + JSON.stringify(rangliste));
+      + "\n" + JSON.stringify(rangliste)
+      + "\n" + JSON.stringify(ratenSicht));
 
     // --- Spendenweg, sobald eine Faktion Favor 150 hat ------------------------
     // Ab dieser Marke bringt Geld direkt Reputation:

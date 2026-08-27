@@ -65,6 +65,25 @@ async function main() {
     + "  exp " + (mults.hacking_exp ?? 1).toFixed(2)
     + "  speed " + (mults.hacking_speed ?? 1).toFixed(2)
     + "  money " + (mults.hacking_money ?? 1).toFixed(2));
+  // KAMPFWERTE DAZU (27.08.2026, 14:49). In BitNode 6 und 7 traegt die
+  // Bladeburner-Division den Knoten, und ihr Engpass sind die Kampfwerte -
+  // dort wirkt der Multiplikator direkt auf das Level
+  // (`lvl = mult * (32*ln(exp+534,6) - 200)`). Ohne diese Zeile liess sich
+  // nach einem Augmentierungs-Einbau nicht ablesen, ob der Kampfterm in
+  // `bn4rep.js` getragen hat.
+  console.log("  Kampf-Mult       str " + (mults.strength ?? 1).toFixed(3)
+    + "  def " + (mults.defense ?? 1).toFixed(3)
+    + "  dex " + (mults.dexterity ?? 1).toFixed(3)
+    + "  agi " + (mults.agility ?? 1).toFixed(3)
+    + "  |  Erfahrung str " + (mults.strength_exp ?? 1).toFixed(3)
+    + "  def " + (mults.defense_exp ?? 1).toFixed(3)
+    + "  dex " + (mults.dexterity_exp ?? 1).toFixed(3)
+    + "  agi " + (mults.agility_exp ?? 1).toFixed(3));
+  console.log("  Bladeburner-Mult chance "
+    + (mults.bladeburner_success_chance ?? 1).toFixed(3)
+    + "  ausdauer " + (mults.bladeburner_max_stamina ?? 1).toFixed(3)
+    + "  regen " + (mults.bladeburner_stamina_gain ?? 1).toFixed(3)
+    + "  analyse " + (mults.bladeburner_analysis ?? 1).toFixed(3));
 
   console.log("");
   console.log("  Faktionen");

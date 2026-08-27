@@ -723,7 +723,36 @@ export async function main(ns) {
         if (offen(typ, name) < 1) continue;
         const s = spanne(typ, name);
         if (s.min < schwelle) continue;
-        const rang = RANG_JE_ERFOLG[name];
+        // DIE STUFE GEHOERT IN DEN ERTRAG (27.08.2026, 14:19).
+        //
+        // `RANG_JE_ERFOLG` sind die BASISwerte. Der tatsaechliche Gewinn
+        // waechst mit der Aktionsstufe: `rankGain * rewardFac^(level-1)`
+        // (`Bladeburner.ts:1029-1034` ueber `calculateActionRankGain`). Weil
+        // die Basiswerte ungefaehr proportional zur Dauer sind, kommen ohne
+        // diesen Faktor ALLE Vertraege auf denselben Ertrag je Minute - der
+        // Vergleich entscheidet dann nach Rauschen.
+        //
+        // Gemessen 14:17 (`data/bbspann.json`, das rechnet es bereits richtig):
+        //
+        //     Tracking        Stufe 39   1,041^38 = 4,62   ->  4,63 je Minute
+        //     Retirement      Stufe 30   1,065^29 = 6,08   ->  6,26
+        //     Bounty Hunter   Stufe 28   1,085^27 = 8,90   ->  8,90
+        //
+        // Bounty Hunter ist fast doppelt so gut wie Tracking - und verbraucht
+        // dabei 2,46 Ausdauer je Minute gegen 4,92. Bei einer Regeneration von
+        // 3,113 je Minute heisst das: Mit Bounty Hunter braucht es fast keine
+        // Kammer, mit Tracking laeuft die Ausdauer leer. Im Fenster
+        // 13:40-14:10 lief Tracking 25,1 Prozent und die Kammer 31,1.
+        const REWARD_FAC = {
+          "Tracking": 1.041, "Bounty Hunter": 1.085, "Retirement": 1.065,
+          "Investigation": 1.07, "Undercover Operation": 1.09,
+          "Sting Operation": 1.095, "Raid": 1.1,
+          "Stealth Retirement Operation": 1.11, "Assassination": 1.14,
+        };
+        let stufe = 1;
+        try { stufe = ns.bladeburner.getActionCurrentLevel(typ, name); } catch { /* dann Basis */ }
+        const fac = REWARD_FAC[name] || 1;
+        const rang = RANG_JE_ERFOLG[name] * Math.pow(fac, Math.max(0, stufe - 1));
         let dauer = 0;
         try { dauer = ns.bladeburner.getActionTime(typ, name); } catch {}
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte

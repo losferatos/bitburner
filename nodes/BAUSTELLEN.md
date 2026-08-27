@@ -76,37 +76,6 @@ Sitzung im Notfall etwas im Spielterminal eintippen. Das ist der letzte
 Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
 greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
-### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
-Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`).
-Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.
-Damit ist die Lage klar: Der Rang ist mit **5845 gegen 2500** um mehr als das Doppelte uebererfuellt und war nie der Engpass. Der Engpass ist die Chance, und die haengt allein an den Kampfwerten. Von 0,116 (12:41) auf 0,212 (16:19) sind **+0,096 in 3,6 Stunden** - linear fortgeschrieben faellt 0,40 gegen **23:00**, was die 12-Stunden-Schaetzung von 12:50 bestaetigt. Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.
-Erwartet: Die Schwelle darf **jetzt noch nicht feuern**. Verifiziert um 12:49: Motor waehlt `Contracts/Bounty Hunter`, `URTEIL: SPUR`. Bei der gemessenen Steigerung (Faktor 1,25 je 2,5 Stunden) wird 0,40 in **rund 12 Stunden** erreicht, also gegen Mitternacht.
-**KORREKTUR 17:51: Die Kostenannahme war um Faktor 40 zu hoch.** Ein
-Fehlschlag kostet `min(Geld * 0,1, fehlendeHP * 100.000)`, und der ZWEITE Term
-deckelt: Die Hoechstgrenze der Trefferpunkte steht bei **29**
-(`data/blade.json`, 17:47), also **maximal 2,9 Millionen** - nicht 115 und
-nicht 360. Dieselbe Formel steht in `nodes/HEBEL.md` beim
-Krankenhaus-statt-Kammer-Hebel richtig gerechnet und mit 1,2 Millionen
-GEMESSEN; beim Black-Op-Eintrag wurde nur der erste Term eingesetzt. Damit ist
-auch das Abbruchkriterium unten wertlos: 150 Millionen koennen nie eintreten.
-
-Der Grund fuer eine hohe Schwelle ist ein anderer und staerker: **die
-Opportunitaetsrate.** Typhoon bringt bei Chance 0,29 und 196 Sekunden Dauer
-`(0,29*50 - 0,71*10)/3,27 = 2,3 Rang je Minute`, waehrend die laufende Arbeit
-**15,67** liefert. Rangmaessig lohnt Typhoon bei keiner erreichbaren Chance -
-es ist ein Pflichtschritt zum Freischalten, kein Ertragsschritt. Genau deshalb
-bleibt 0,40 richtig: Es geht nur darum, keine Zeit in Fehlversuchen zu
-verbrennen (bei 0,40 sind es 8,2 Minuten je Black Op, bei 0,80 noch 4,1 - der
-Unterschied ueber 21 Stueck ist gut eine Stunde, das Warten auf 0,80 kostet
-ein Vielfaches).
-
-Zu pruefen bleibt, sobald sie feuert: **(1)** Bleiben die Kosten bei rund 2,9
-Millionen? **(2)** Faellt der Rang unter 5.000 zurueck? Operation Zero
-verlangt genau das.
-Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millionen oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie, bleibt es bei 0,40 - tiefer zu gehen bringt nichts, weil der Zeitgewinn gegen die Fehlversuche laeuft.
-
-## Offen, nach Dringlichkeit
-
 ### Die Raid-Rundreise: 37.248 Rang liegen in den Gemeinden anderer Staedte (20:15, gerechnet 20:23)
 
 Beim Nachrechnen von Raid gefunden. Jede Stadt hat einen eigenen Vorrat an

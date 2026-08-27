@@ -55,6 +55,8 @@ Regeln:
 
 ## Sofort
 
+keine
+
 ## Offen, nach Dringlichkeit
 
 ### Nachmessen: traegt der Assassination-Aufbau? (23:42)

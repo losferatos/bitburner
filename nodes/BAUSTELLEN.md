@@ -47,10 +47,64 @@ Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.jso
 Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.
 Damit ist die Lage klar: Der Rang ist mit **5845 gegen 2500** um mehr als das Doppelte uebererfuellt und war nie der Engpass. Der Engpass ist die Chance, und die haengt allein an den Kampfwerten. Von 0,116 (12:41) auf 0,212 (16:19) sind **+0,096 in 3,6 Stunden** - linear fortgeschrieben faellt 0,40 gegen **23:00**, was die 12-Stunden-Schaetzung von 12:50 bestaetigt. Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.
 Erwartet: Die Schwelle darf **jetzt noch nicht feuern**. Verifiziert um 12:49: Motor waehlt `Contracts/Bounty Hunter`, `URTEIL: SPUR`. Bei der gemessenen Steigerung (Faktor 1,25 je 2,5 Stunden) wird 0,40 in **rund 12 Stunden** erreicht, also gegen Mitternacht.
-Verdacht: kein Fehler vermutet. Zu pruefen ist zweierlei, sobald sie feuert: **(1)** Kostet ein Fehlschlag wirklich rund 115 Mio? Ablesen an `data/bblage.json` vor und nach dem Versuch. **(2)** Faellt der Rang unter 4.598 zurueck? Operation Zero verlangt reqdRank 5.000, ein Absturz darunter waere teuer.
-Abbruchkriterium: Kostet ein Fehlschlag deutlich mehr als 150 Mio oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie dagegen, ist der naechste Schritt **0,30**.
+**KORREKTUR 17:51: Die Kostenannahme war um Faktor 40 zu hoch.** Ein
+Fehlschlag kostet `min(Geld * 0,1, fehlendeHP * 100.000)`, und der ZWEITE Term
+deckelt: Die Hoechstgrenze der Trefferpunkte steht bei **29**
+(`data/blade.json`, 17:47), also **maximal 2,9 Millionen** - nicht 115 und
+nicht 360. Dieselbe Formel steht in `nodes/HEBEL.md` beim
+Krankenhaus-statt-Kammer-Hebel richtig gerechnet und mit 1,2 Millionen
+GEMESSEN; beim Black-Op-Eintrag wurde nur der erste Term eingesetzt. Damit ist
+auch das Abbruchkriterium unten wertlos: 150 Millionen koennen nie eintreten.
+
+Der Grund fuer eine hohe Schwelle ist ein anderer und staerker: **die
+Opportunitaetsrate.** Typhoon bringt bei Chance 0,29 und 196 Sekunden Dauer
+`(0,29*50 - 0,71*10)/3,27 = 2,3 Rang je Minute`, waehrend die laufende Arbeit
+**15,67** liefert. Rangmaessig lohnt Typhoon bei keiner erreichbaren Chance -
+es ist ein Pflichtschritt zum Freischalten, kein Ertragsschritt. Genau deshalb
+bleibt 0,40 richtig: Es geht nur darum, keine Zeit in Fehlversuchen zu
+verbrennen (bei 0,40 sind es 8,2 Minuten je Black Op, bei 0,80 noch 4,1 - der
+Unterschied ueber 21 Stueck ist gut eine Stunde, das Warten auf 0,80 kostet
+ein Vielfaches).
+
+Zu pruefen bleibt, sobald sie feuert: **(1)** Bleiben die Kosten bei rund 2,9
+Millionen? **(2)** Faellt der Rang unter 5.000 zurueck? Operation Zero
+verlangt genau das.
+Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millionen oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie, bleibt es bei 0,40 - tiefer zu gehen bringt nichts, weil der Zeitgewinn gegen die Fehlversuche laeuft.
 
 ## Offen, nach Dringlichkeit
+
+### Der Ausgang aus BitNode 6 ist 400.000 Rang entfernt - rund 418 Stunden bei heutiger Rate (17:51)
+
+**Erstmals vollstaendig gemessen** (`node`-Auswertung von `data/blackops.json`,
+neu geschrieben von `src/blackops.js`). Rang 6.910, alle 21 Black Ops:
+
+     1. Typhoon        Rang   2.500   Chance 0,278-0,305    196 s
+     2. Zero           Rang   5.000   Chance 0,086-0,094    244 s
+     3. X              Rang   7.500   Chance 0,186-0,203    293 s
+     5. Ares           Rang  12.500   Chance 0,133-0,146    488 s
+    10. Deckard        Rang  40.000   Chance 0,032-0,035  1.952 s
+    15. Morpheus       Rang 150.000   Chance 0,006-0,007  4.391 s
+    21. Daedalus       Rang 400.000   Chance 0,003-0,003  7.807 s
+
+**Das aendert, worauf die Loops optimieren.** Bisher galt die Black-Op-Chance
+als der Engpass. Sie ist es nicht: Der Rang ist es. 400.000 gegen 6.910 sind
+bei den heute gemessenen **15,67 Rang je Minute** rund **418 Stunden**. Selbst
+eine Verdopplung der Rangrate laesst 200 Stunden stehen.
+
+Die Dauer waechst mit: 196 Sekunden fuer Typhoon, **7.807 fuer Daedalus** -
+Faktor 40. Bei Chance 0,003 waeren das rechnerisch 43.000 Versuche zu je zwei
+Stunden; die Black Ops am Ende der Liste sind mit den heutigen Kampfwerten
+nicht fahrbar, sondern nur mit denen, die 400.000 Rang mitbringen.
+
+Daraus folgt fuer die naechsten Laeufe: **Rangrate und Kampfwerte sind die
+Ziele, nicht die Black-Op-Chance.** Jeder Hebel, der die Rangrate hebt, zaehlt
+direkt gegen die 418 Stunden. Der naechste Schritt ist zu pruefen, welche
+Faktoren die Rangrate ueberhaupt noch skalieren - Aktionsstufen (`rewardFac`
+waechst exponentiell mit der Stufe), Fertigkeiten, Chaos, Bevoelkerung - und
+ob eine Augmentierungsrunde mehr bringt als weiterzufahren.
+
+*Werkzeug:* `src/blackops.js` schreibt `data/blackops.json`, Start ueber
+`data/task.txt` mit `["blackops.js"]`.
 
 ### Der Faehigkeitsplan hat feste Deckel - er veraltet zwangslaeufig
 

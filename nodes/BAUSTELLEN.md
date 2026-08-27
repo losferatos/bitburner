@@ -42,10 +42,7 @@ Regeln:
 
 ## Sofort
 
-### Black-Op-Chance stagniert trotz Rang- und Kampfwertzuwachs (08:12)
-Gemessen: data/bbspann.json, frisch angestossen. 07:40 Rang 2753, Chance Typhoon 0,088-0,099. 08:12 Rang 2910, def 150->155, dex ->238 - Chance 0,088-0,094, Obergrenze GESUNKEN.
-Erwartet: Chance = competence/baseDifficulty mit competence ~ skill^0,9. +3,3 % Kampfwert muessten ~+3 % Chance geben.
-Verdacht: Die Spanne min/max haengt an der Ausdauer, nicht an den Kampfwerten - bei der Messung 63,8 von 114,5 (0,557). Der Kampfwertzuwachs verschwindet im Ausdauerrauschen. Fundstelle offen: erst pruefen, wie bbspann.js min/max bildet (src/bbspann.js). Konsequenz fuer das Ziel: von 0,09 auf die Schwelle 0,80 braucht competence Faktor 8,9, also Kampfwerte Faktor 11,3 (def 155 -> 1750). Ein Halbstundenziel auf die Chance ist damit unsinnig; gemessen gehoert der Kampfwert-Tiefstand.
+keine
 
 ## Offen, nach Dringlichkeit
 
@@ -338,6 +335,43 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Black-Op-Chance stagniert - WIDERLEGT (27.08., 08:22)
+
+**Verifiziert: min 0,091 um 08:21**, gegen 0,088 um 08:12 und 0,088 um 07:41.
+Die untere Schaetzgrenze steigt monoton, der Traeger arbeitet.
+
+Der Befund von 08:12 war ein Artefakt der **schrumpfenden Schaetzspanne**.
+`getActionEstimatedSuccessChance` liefert ein Intervall, und das engt sich mit
+laufender Erfahrung ein:
+
+| Zeit  | min   | max   | Spanne |
+|-------|-------|-------|--------|
+| 06:10 | 0,062 | 0,075 | 0,013  |
+| 07:41 | 0,088 | 0,099 | 0,011  |
+| 08:12 | 0,088 | 0,094 | 0,006  |
+| 08:21 | 0,091 | 0,097 | 0,006  |
+
+Die Obergrenze fiel von 0,099 auf 0,094, weil die Schaetzung praeziser wurde -
+nicht, weil die Chance sank. Wer `max` als Fortschrittsmass nimmt, misst die
+Genauigkeit der Schaetzung, nicht den Fortschritt.
+
+**Lehre fuer die Zielsetzung: der Indikator ist `min`, nie `max` und nie die
+Mitte.** `blade.js:600` macht es bereits richtig (`if (s.min >= SICHER_BLACKOP)`),
+die Zielsetzung des Reportloops um 07:40 nicht - sie schrieb die Spanne hin und
+las die falsche Haelfte. Kein Codeeingriff noetig.
+
+**Nebenbefund, die wertvollste Zahl des Laufs:** min stieg von 0,062 (06:10) auf
+0,091 (08:21), also Faktor 1,468 in 131 Minuten - exponentiell 0,00294 je Minute.
+Haelt die Rate, ist die Schwelle 0,80 in **rund 12 Stunden** erreicht
+(ln(0,80/0,091) / 0,00294 = 739 min). Die Rate wird abflachen, weil die
+Erfahrungskurve exponentiell im Level ist; die 12 Stunden sind die Untergrenze,
+nicht die Prognose. Nachmessen: min um 12:00 - liegt es unter 0,20, flacht die
+Kurve schon ab.
+
+**Ausdauer scheidet als Ursache aus**: Die Strafe ist min(1, stamina/(0,5*max))
+(Bladeburner.ts:167-169, zitiert in blade.js:146). Bei 64,5 von 115,5 ist
+0,5*max = 57,75 - die Strafe steht bei allen drei Messungen auf 1.
 
 ### Der Pruefer erkennt den Einbau (27.08., 07:20)
 

@@ -86,53 +86,6 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Der Bot rekrutiert nie ein Team - +9,4 Prozent auf jede Black Op fuer 24 Minuten (19:57, durchgerechnet 19:50)
-
-Gemessen: `teamCount` ist 0 (`src/chance.js`, 18:19). Kein Skript in `src/`
-ruft `setTeamSize` oder faehrt `General/Recruitment` - null Treffer im grep.
-
-Beleg: `operationTeamSuccessBonus = (teamCount + 1)^0,05`
-(`Actions/Operation.ts:96-98`) gilt fuer Operationen **und Black Ops** -
-multiplikativ auf die competence, also auf die volle Reststrecke von 20
-Black Ops.
-
-**Charisma ist 264, nicht 27.** Damit ist `charisma^0,45 = 12,29`, und die
-Rekrutierungschance `charisma^0,45/(teamSize+1)` (`data/GeneralActions.ts:
-29-31`) steht **bis elf Mitglieder auf 1,00** - jeder Versuch sitzt. Erst
-darueber faellt sie. Die urspruengliche Schaetzung von 3,8 Stunden ging von
-Charisma 27 aus und war um Faktor vier zu pessimistisch.
-
-Durchgerechnet, Dauer 285 s je Versuch:
-
-    bis  5 Mitglieder   5 Versuche   0,40 h   Bonus  +9,4 %    23,7 %/h
-    bis 11              11           0,87 h         +13,2 %     8,1 %/h
-    bis 15              15           1,22 h         +14,9 %     4,7 %/h
-    bis 20              23           1,80 h         +16,4 %     2,7 %/h
-    bis 30              43           3,44 h         +18,7 %     1,2 %/h
-
-**Der Grenznutzen bricht nach fuenf Mitgliedern um Faktor drei ein**, weil der
-Exponent 0,05 extrem flach ist. Die ersten 24 Minuten bringen 9,4 Prozent,
-die naechsten drei Stunden zusammen nur noch 9,3.
-
-**Zielgroesse ist also 5 bis 8, nicht 20.** Und das haelt sich leicht selbst:
-`BlackOperation.getMinimumCasualties()` gibt 1 zurueck
-(`Actions/BlackOperation.ts:63-65`), aber solange die Chance auf 1,00 steht,
-kostet jeder Ersatz genau einen Versuch - knapp fuenf Minuten.
-
-**Der eigentliche Preis daneben:** `Raid` hat in `data/bbspann.json` einen
-Ertrag von **66,3 Rang je Minute** gemessen - gegen 18 bis 32, die der Motor
-gerade faehrt. Raid verlangt ein Team und Bevoelkerung in der Stadt. Ob es
-mit fuenf Mitgliedern fahrbar wird, ist die Frage, die diesen Punkt vom
-netten Bonus zum groessten Hebel des Knotens macht. Die frueheren
-Raid-Rechnungen in `nodes/HEBEL.md` gingen alle von Charisma 27 aus und
-gehoeren mit 264 neu aufgemacht.
-
-Zu tun: (1) In `blade.js` eine Regel, die `General/Recruitment` faehrt,
-solange `getTeamSize` unter 6 liegt - aber nur, wenn keine Black Op ansteht
-und die Ausdauer nicht knapp ist. (2) Danach messen, ob `Raid` seine
-Mindestchance erreicht, und die alte Ablehnung mit den neuen Zahlen
-pruefen.
-
 ### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
 
 **Gemessen um 18:49: `storedCycles` = 8, Rueckstand 0,0 Minuten.** Der Tab ist

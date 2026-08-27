@@ -37,6 +37,47 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Feste Deckel raus, wo die Sortierung greift (27.08., 20:33)
+
+Engpass: Zum **fuenften Mal an einem Tag** lag die beste Faehigkeit gedeckelt
+daneben. Gemessen um 20:33 mit `src/skillcheck.js`:
+
+    Faehigkeit         Stufe  Preis  Nutzen   Wert je Punkt
+    Hyperdrive             7     19   0,738   0,0388  <- gedeckelt
+    Digital Observer      15     34   1,100   0,0324     wurde gekauft
+    Evasive System        17     38   1,035   0,0272  <- gedeckelt
+    Reaper                16     36   0,944   0,0262  <- gedeckelt
+    Blade's Intuition     30     66   1,579   0,0239     wurde gekauft
+    Short-Circuit         30     65   1,142   0,0176  <- gedeckelt
+
+Hypothese: Ohne die Deckel kauft der Motor sofort Hyperdrive statt Digital
+Observer, und die Faehigkeitspunkte fliessen dauerhaft dorthin, wo der
+Grenznutzen am hoechsten ist - statt dorthin, wo zufaellig kein Deckel steht.
+
+Beleg: Die Sortierung in `faehigkeitenKaufen()` rechnet den Grenznutzen bei
+der AKTUELLEN Stufe. Ein Deckel bildet dasselbe grob nach und ist damit
+ueberfluessig - aber er ueberstimmt die Sortierung, weil ein Eintrag am
+Deckel auf `-1` faellt. Zwei Mechanismen fuer dieselbe Frage, und der
+groebere gewinnt.
+
+**Das Muster war der Fehler, nicht die einzelne Zahl.** 12:52 Hyperdrive,
+13:19 Short-Circuit, 15:53 Reaper und Evasive System, 18:55 Digital Observer -
+jedes Mal wurde ein Deckel einzeln hochgesetzt, und beim naechsten Lauf stand
+das naechste Deckel-Problem an.
+
+Vorher: Hyperdrive **Stufe 7** (Deckel 7) seit 12:52, Cloak 3, Rang 10.398
+Nachher: **Hyperdrive 8, Cloak 15** binnen 13 Minuten (20:20) - beide vorher
+blockiert. Rang 10.505.
+
+Bleibende Deckel, jeder mit Grund: Cyber's Edge 5 (Arbeitsanteil ist bei 1,00
+angekommen), Tracer 14 (Vertragschancen klemmen bei 0,92-1,00), Overclock 90
+(Maximum des Spiels).
+
+Abbruchkriterium: Faellt die Rangrate ueber 45 Minuten unter 15/min oder
+sammelt sich ein Faehigkeitspunktestau (`punkte` ueber 100), war die
+Sortierung ohne Deckel doch nicht ausreichend.
+Commit: siehe git log, blade.js 27.08. 20:33
+
 ### Raid wieder an und ein Trupp von sechs (27.08., 19:54)
 
 Engpass: Die Rangrate. Sie stand ueber 45 Minuten bei 18 bis 32 je Minute,

@@ -160,6 +160,50 @@ wirkt, und ueberschreibt die Praeparation.
 
 ## Offen, nach Dringlichkeit
 
+### bn4rep optimiert auf den Hacking-Ausgang - in einem Knoten, der ihn vierfach daempft
+
+**Dringlichkeit: hoch.** Der Reputationsmotor arbeitet seit Knotenbeginn auf ein
+Ziel hin, das in BitNode 6 der teurere von zwei Wegen ist.
+
+**Gemessen 27.08., 02:25.** Die Guetezahl, nach der `bn4rep.js` Faktion und
+Augmentierung waehlt, ist (`bn4rep.js:1178-1181`):
+
+    einzelWert = (aug === "The Red Pill" ? 10 : 0)
+               + zaehlplatzWert
+               + levelNutzen(aug, mults.hacking, zielLevel)
+
+Alle drei Summanden zielen auf den **Hacking-Ausgang**: The Red Pill haengt
+w0r1d_d43m0n ans Netz, `levelNutzen` bewertet den Hacking-Multiplikator, und
+der Zaehlplatz zaehlt Richtung Daedalus. Eine Kampfwert-Augmentierung wie
+**SPTN-97** (x1,75 auf alle vier Werte) bekommt damit `0 + 1 + 0 = 1` - genau
+so viel wie ein voellig wertloses Stueck.
+
+**Was BitNode 6 dazu sagt** (`BitNode/BitNode.tsx:694-720`):
+
+    HackingLevelMultiplier   0,35     <- Level wird auf ein Drittel gestaucht
+    HackExpGain              0,25     <- Erfahrung geviertelt
+    DaedalusAugsRequirement  35       <- statt 30, wir haben 14
+
+Der Hacking-Weg verlangt hier Hacking **6000** fuer den Backdoor auf
+w0r1d_d43m0n (aus `tools/save.js`) bei einem Multiplikator von 0,35 und
+gevierteltem Erfahrungsgewinn. Aktuell steht Hacking bei **155**.
+
+Der Bladeburner-Weg dagegen laeuft: Rang 1658 von 2500 fuer die erste Black Op,
+Rate rund 1,4 je Minute.
+
+**Zu klaeren, bevor umgebaut wird:**
+1. Ist der Hacking-Weg in BN6 wirklich chancenlos, oder traegt er als
+   Zweitweg? Zu rechnen: Wie viele Einbau-Zyklen braucht Hacking 6000 bei
+   Multiplikator 0,35, gegen die Zyklen bis Kampfwerte fuer 21 Black Ops?
+2. Wenn Bladeburner traegt: `einzelWert` um einen Kampfwert-Term erweitern,
+   der in den Knoten 6 und 7 greift. Die Liste dafuer fehlt - `lib/hackaugs.js`
+   kennt nur Hacking- und Reputationsmultiplikatoren.
+3. **`bn4rep.js` ist gross und traegt den ganzen Reputationszyklus.** Ein
+   Umbau der Guetezahl beruehrt auch die Firmenphase, das Einbaukriterium und
+   die Daedalus-Logik. Das ist kein Einzeiler und braucht einen eigenen Lauf
+   mit Nachmessung.
+
+
 ### Operation Typhoon ist mit Rang 2500 erreichbar, aber nicht fahrbar
 
 **Alle drei Messauftraege sind erledigt (27.08., 01:20) - und die Antwort ist

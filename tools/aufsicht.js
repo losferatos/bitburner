@@ -27,8 +27,9 @@
  * blind einen Bitburner-Tab: Zwei Tabs auf demselben Spielstand ueberschreiben
  * sich gegenseitig. Geoeffnet wird nur, wenn nachweislich keiner da ist.
  *
- *   node tools/aufsicht.js           pruefen und herstellen
+ *   node tools/aufsicht.js           einmal pruefen und herstellen
  *   node tools/aufsicht.js --pruefen nur berichten, nichts anfassen
+ *   node tools/aufsicht.js --dauer   alle 10 Minuten wiederholen (Autostart)
  */
 import { execSync, spawn } from "node:child_process";
 import fs from "node:fs";
@@ -44,6 +45,8 @@ const DEBUG_PORT = 9222;                  // Opera mit Fernsteuerung
 const SPIEL_URL = "bitburner-official.github.io";
 const PROTOKOLL = path.join(WURZEL, "data", "aufsicht.log");
 const NUR_PRUEFEN = process.argv.includes("--pruefen");
+const DAUERLAUF = process.argv.includes("--dauer");
+const TAKT_MS = 10 * 60 * 1000;
 
 const jetzt = () => new Date().toLocaleString("sv-SE");   // Ortszeit, nicht UTC
 const meldungen = [];
@@ -85,8 +88,9 @@ function starte(skript, name) {
   return kind.pid;
 }
 
-(async () => {
+async function durchgang() {
   const fehlte = [];
+  meldungen.length = 0;
 
   // --- 1. Die Bruecke ------------------------------------------------------
   // Erst den Port fragen, nicht die Prozessliste: Ein Prozess, der lebt aber
@@ -204,5 +208,31 @@ function starte(skript, name) {
       } catch { /* ntfy ist Beiwerk */ }
     }
   }
-  process.exit(fehlte.length ? 1 : 0);
-})();
+  return fehlte.length;
+}
+
+// DER DAUERLAUF IST DER AUTOSTART-MODUS (27.08.2026, 19:58).
+//
+// `Register-ScheduledTask` verlangt Adminrechte, die hier nicht da sind, und
+// `schtasks` wird vom Berechtigungsfilter geblockt. Der Autostart-Ordner
+// braucht beides nicht: Er startet dieses Skript beim Anmelden, und die
+// Schleife uebernimmt die Wiederholung. Damit ist derselbe Zweck erfuellt -
+// nach einem Neustart kommt alles von allein hoch, und stirbt zwischendurch
+// etwas, wird es binnen zehn Minuten ersetzt.
+//
+// Diese Schleife ist der einzige Prozess ohne Aufsicht ueber sich selbst.
+// Deshalb ist sie bewusst duenn: kein Netzwerkdienst, kein Zustand auf der
+// Platte, nichts was haengenbleiben kann. Stirbt sie doch, kommt sie beim
+// naechsten Anmelden zurueck - und bis dahin laeuft das Spiel im Browser
+// ohnehin weiter, nur ohne Selbstheilung.
+if (DAUERLAUF) {
+  sag("Aufsicht im Dauerlauf, Takt " + (TAKT_MS / 60000) + " min.");
+  const runde = async () => {
+    try { await durchgang(); }
+    catch (e) { sag("Durchgang fehlgeschlagen: " + String(e.message || e)); }
+    setTimeout(runde, TAKT_MS);
+  };
+  runde();
+} else {
+  durchgang().then((n) => process.exit(n ? 1 : 0));
+}

@@ -23,6 +23,34 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Prompt-Drift zwischen Datei und Job - BEHOBEN (27.08., 19:22-19:45)
+
+**Verifiziert: `grep -c Ausdauerzyklus loops/*.md` liefert jetzt 1 fuer
+loop-report.md und loop-optimieren.md, vorher 0 in allen vier Dateien.** Alle
+fuenf Cron-Jobs wurden danach aus den Dateien neu gesetzt (CronList um 19:34:
+0ff850cd Wache, 0dab30a5 Vorankommen, 2fc6fe81 Report, dc588542 Optimieren,
+9869e40d Kurs).
+
+Der laufende Reportloop enthielt einen Absatz zur geglaetteten Rangmessung,
+der in `loops/` nirgends stand. Beim naechsten Wiederaufsetzen waere er still
+verlorengegangen - eine Lehre aus einer Scheindivergenz vom 26.08.
+
+Die Regel steht jetzt im Skill `bb-loops`: **erst die Datei aendern, dann den
+Job aus der Datei neu setzen** - nie umgekehrt.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Die versionierten Loop-Prompts weichen von den laufenden Jobs ab (19:22)
+Gemessen: Der aktive Reportloop enthaelt einen Absatz "Die Rangrate gehoert geglaettet gemessen ... Der Ausdauerzyklus ist laenger als ein 30-Minuten-Fenster". In `loops/loop-report.md` stand er **nicht** - `grep -c Ausdauerzyklus` lieferte 0 in allen vier Dateien. Dasselbe beim Optimierloop ("Miss geglaettet").
+Erwartet: Die Dateien in `loops/` sind die Wahrheit. Der Skill `/bb-loops` setzt die Cron-Jobs **woertlich aus ihnen** neu auf.
+Verdacht: Eine Prompt-Regel wurde direkt beim `CronCreate` ergaenzt, ohne die Datei nachzuziehen. Behoben 19:22 durch Rueckuebertragen beider Absaetze.
+**Folgenschwer, weil es still ist:** Cron-Jobs sterben mit der Sitzung. Beim Wiederaufsetzen aus `loops/` gehen alle Regeln verloren, die nur im laufenden Job stehen - und niemand merkt es, weil der Bot weiterlaeuft. Genau die Glaettungsregel war eine Lehre aus einer Scheindivergenz vom 26.08.
+**Strukturell, nicht einmalig:** Solange Prompts von Hand an CronCreate gehen koennen, driften Datei und Job wieder auseinander. Die Regel lautet ab jetzt: **erst die Datei aendern, dann den Job aus der Datei neu setzen** - nie umgekehrt.
+
+</details>
+
+---
+
 ### Der WERKZEUG-Kanal traf ins Leere - BEHOBEN (27.08., 19:46)
 
 **Verifiziert: `blade.js` lief unter PID 7004 mit altem Code, obwohl der

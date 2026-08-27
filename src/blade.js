@@ -566,6 +566,42 @@ export async function main(ns) {
       const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
       return 100 * (danach / jetzt - 1);
     }
+    if (name === "Overclock") {
+      // OVERCLOCK IST KEINE CHANCE-, SONDERN EINE ZEITFAEHIGKEIT
+      // (28.08.2026, 00:58).
+      //
+      // `mults: { ActionTime: -1 }` (`data/Skills.ts:44-53`), und
+      // `getSkillMult` bildet daraus `1 - stufe/100`. Die Dauer jeder
+      // Aktion wird damit direkt multipliziert (`Action.ts:108,119`:
+      // `baseTime * skillFac`, im Quellcode als "Always < 1" kommentiert).
+      //
+      // Der Ertrag je Aktion bleibt gleich, die Dauer sinkt - die Rangrate
+      // steigt also um `1/(99 - stufe)` je Stufe, und das gilt fuer
+      // **Vertraege, Operationen UND Black Ops** gleichermassen. Keine andere
+      // Faehigkeit wirkt so breit.
+      //
+      // Bei Stufe 14 sind das 1,18 Prozent fuer 23 Punkte = **0,0511 je
+      // Punkt**. Zum Vergleich, gemessen 00:53 auf demselben Stand:
+      //
+      //     Blade's Intuition  Stufe 44   Nutzen 1,293   Preis 95  ->  0,0136
+      //     Hyperdrive         Stufe 13          0,452         34  ->  0,0133
+      //     Overclock          Stufe 14          1,176         23  ->  0,0511
+      //
+      // **Faktor 3,8 gegenueber dem bisher Besten** - und es stand
+      // ausserhalb von `DYNAMISCH`, wurde also nie mit den anderen
+      // verglichen. Derselbe Fehler wie bei den Deckeln am 27.08. um 20:33,
+      // nur andersherum: Damals hing eine gute Faehigkeit an einem Deckel,
+      // hier hing sie ganz ausserhalb der Sortierung.
+      //
+      // DER ZWEITE GRUND, WARUM ES JETZT GILT: Die Chance-Faehigkeiten sind
+      // heute weitgehend wertlos, weil die Operationschancen bei **1,00**
+      // klemmen (Raid 1,0 bis 1,0 gemessen 21:40, Assassination 1,000).
+      // `relNutzen` rechnet ihren competence-Zuwachs trotzdem voll an. Das
+      // ist ein eigener Befund und steht als Baustelle - hier zaehlt nur,
+      // dass Overclock davon unberuehrt ist: Zeit wirkt immer.
+      const stufe2 = Math.min(stufe, 98);
+      return 100 / (99 - stufe2);
+    }
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;
     const a = 1 + stufe * c.proz / 100;
@@ -576,7 +612,7 @@ export async function main(ns) {
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System", "Digital Observer", "Cloak"];
+    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();

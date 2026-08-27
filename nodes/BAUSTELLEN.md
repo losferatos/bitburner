@@ -59,6 +59,27 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### relNutzen rechnet Chance-Faehigkeiten voll an, obwohl die Chance bei 1,00 klemmt (00:58)
+
+Gemessen: Raid steht bei **1,0 bis 1,0** (21:40), Assassination bei
+**1,000** (00:53). Trotzdem gibt `relNutzen` in `src/blade.js` fuer
+Blade's Intuition auf Stufe 44 einen Nutzen von 1,293 Prozent aus und
+kaufte sie um 00:54 auf Stufe 45 - fuer 95 Punkte.
+
+Erwartet: Der Nutzen einer Chance-Faehigkeit ist **null**, sobald die
+Aktionen, auf die sie wirkt, bei 1,00 stehen. `getSuccessChance` klemmt dort
+(`Actions/Action.ts`), jeder weitere competence-Zuwachs verpufft.
+
+Verdacht: `src/blade.js`, `relNutzen` und `CHANCE_SKILLS`. Die Abdeckung
+ist als feste Zahl hinterlegt (`abdeckung: 1.0` fuer Blade's Intuition), sie
+muesste stattdessen die Aktionen zaehlen, deren Chance **noch nicht** klemmt.
+
+Vorsicht bei der Umsetzung: Fuer **Black Ops** gilt die Klemme nicht - Ares
+stand um 00:53 bei 0,758 bis 1,000. Eine Faehigkeit, die dort wirkt (Digital
+Observer trifft alle 21), behaelt ihren Wert. Der Fix ist also kein
+Abschalten, sondern eine Abdeckung, die misst statt zu raten.
+
+
 ### Nachmessen: traegt der Assassination-Aufbau? (23:42)
 
 Gemessen: Seit 23:39 laeuft `Operations/Assassination` mit dem Grund

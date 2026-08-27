@@ -37,6 +37,45 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Overclock in die dynamische Sortierung (28.08., 00:58)
+
+Engpass:    Die Faehigkeitspunkte stauten sich: **84 unverbraucht** um 00:53,
+            waehrend der teuerste Kandidat 98 kostete. Gekauft wurde Blade's
+            Intuition auf Stufe 45 - eine reine Chance-Faehigkeit, waehrend
+            die Operationschancen bei **1,00** klemmen.
+
+Hypothese:  Die Rangrate steigt, weil Overclock die Dauer JEDER Aktion senkt
+            statt eine Chance zu heben, die nicht mehr steigen kann. Von
+            Stufe 14 auf 30 waeren das `(100-30)/(100-14)` = Faktor 0,814
+            auf die Dauer, also **plus 23 Prozent** auf die Rate.
+
+Beleg:      `data/Skills.ts:44-53`: `mults: { ActionTime: -1 }`, maxLvl 90,
+            "decreases the time it takes to attempt a Contract, Operation,
+            and BlackOp by 1%". `getSkillMult` macht daraus `1 - stufe/100`,
+            und `Action.ts:108,119` multipliziert die Dauer direkt damit
+            (`baseTime * skillFac`, im Quellcode als "Always < 1"
+            kommentiert). Der Rangertrag je Aktion bleibt unberuehrt.
+
+            Nutzen je Punkt, gerechnet auf dem Stand von 00:53:
+
+                Overclock          Stufe 14   1,176 %   23 Punkte   0,0511
+                Blade's Intuition  Stufe 44   1,293     95          0,0136
+                Hyperdrive         Stufe 13   0,452     34          0,0133
+
+            **Faktor 3,8 gegenueber dem bisher Besten.** Overclock stand
+            ausserhalb von `DYNAMISCH` und wurde deshalb nie verglichen -
+            derselbe Fehler wie bei den Deckeln am 27.08. um 20:33, nur
+            andersherum.
+
+Vorher:     Overclock Stufe 14, 84 Punkte unverbraucht, 00:53.
+Nachher:    **Verifiziert 00:56: Stufe 16.** Zwei Kaeufe binnen einer Minute,
+            nachdem die Sortierung sie sah. Die Rangrate misst der naechste
+            Lauf ueber 45 Minuten - sie ist derzeit vom laufenden
+            Assassination-Stufenaufbau ueberlagert (38,1/min seit 23:39,
+            Stufe 7 von 12 um 00:53, planmaessig).
+
+Commit:     (folgt)
+
 ### Black Ops erst ab Chance 0,90 statt 0,40 (27.08., 21:55)
 
 Engpass:    Der Anteil der Zeit, den der Motor NICHT in Raid steckt. In der
@@ -73,7 +112,9 @@ Beleg:      `src/bodauer.js` um 21:52, Rang 13.209:
             uebersetzt.
 
 Vorher:     29,3 Rang/min um 21:35, kein Raid in der Stunde davor.
-Nachher:    (offen - der naechste Lauf misst über 45 min)
+Nachher:    **52,7 Rang/min** ueber das Fenster 21:56 bis 23:39 (97 Minuten,
+            `data/verlauf-strategie.json`). Die Hypothese verlangte
+            mindestens 45 - **bestaetigt, plus 80 Prozent gegen vorher.**
             Verifiziert 21:55, dass die Regel greift: `data/blade.json`
             meldet `"aktion":"Operations/Raid"`, wo vorher Operation Ares
             lief.

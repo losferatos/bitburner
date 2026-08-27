@@ -23,6 +23,113 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Assassination-Aufbau laeuft - EINGEBAUT und verifiziert (27.08., 23:42)
+
+**Verifiziert 23:39:** `data/blade.json` meldet
+`"aktion":"Operations/Assassination"` mit dem Grund
+`"Stufenaufbau 1/12 (Chance 1.000)"`. Die Regel greift.
+
+**Zuerst die Korrektur meiner eigenen Rechnung von 23:12.** Dort stand,
+Assassination brachte auf Stufe 9 "125 Rang je 96 Sekunden = 78,5 Rang je
+Minute". Das ist falsch: Die **Dauer waechst mit der Schwierigkeit**, und
+zwar linear (`Action.ts:105-121`: `baseTime = difficulty /
+DifficultyToTimeFactor`, `difficulty = baseDifficulty x difficultyFac^(level-1)`).
+Bei Stufe 9 stehen 153 Sekunden statt 96, macht **49,2 Rang je Minute** -
+unter dem Raid-Zyklus, nicht darueber.
+
+**Was nach der Korrektur bleibt, traegt trotzdem** - es steht in zwei
+Konstanten je Operation:
+
+    Aktion         rewardFac  difficultyFac  netto je Stufe
+    Raid                1,10          1,045          1,0526
+    Stealth Ret.        1,11          1,050          1,0571
+    Assassination       1,14          1,060          1,0755
+
+Assassination hat das beste Verhaeltnis und waechst deshalb mit **7,55
+Prozent je Stufe**, waehrend Raid nur 5,26 schafft. Von der Basisrate 27,5
+Rang/min (Stufe 1, gemessen 20:41):
+
+    Stufe 11   56,9   ->  schlaegt den Raid-Zyklus (53,4)
+    Stufe 12   61,2
+    Stufe 15   76,4
+    Stufe 20  110,0   ->  und weiter, ohne Deckel
+
+**Der Aufbau ist fast umsonst.** 96 Erfolge bis Stufe 12
+(`ceil(0,5 x n x (2 x 2,5 + n - 1))`, `LevelableAction.ts:54-56`,
+`OperationSuccessesPerLevel` 2,5) bei im Mittel 130 Sekunden sind 3,5
+Stunden. Dabei entsteht selbst Rang - im Mittel 42 je Minute gegen 53,4 des
+Raid-Zyklus. **Nettokosten rund 2.700 Rang** gegen die 163 Stunden Stealth
+Retirement, die sonst nach dem Raid-Vorrat drohen.
+
+**Warum der Motor es nicht von allein tat:** `beste()` rechnet den Ertrag
+bei der aktuellen Stufe (`blade.js`, `RANG_JE_ERFOLG` x
+`REWARD_FAC^(stufe-1)` / Dauer). Eine Aktion mit Aufbaukosten gewinnt in
+einer Momentaufnahme nie - sie braucht eine Regel, die den Aufbau als
+Investition behandelt. Das ist derselbe Denkfehler wie bei den
+Faehigkeitsdeckeln um 20:33: Eine Sortierung nach Grenznutzen sieht nur den
+naechsten Schritt.
+
+Die Nachmessung steht als eigener Punkt in `nodes/BAUSTELLEN.md`.
+
+<details><summary>Der Eintrag von 23:12, mit dem Rechenfehler</summary>
+
+### Assassination ist das einzige unbegrenzte Rangfahrzeug - und es steht auf Stufe 1 (23:12)
+
+Gemessen: `getActionCurrentLevel("Operations", "Assassination")` = **1**,
+Chance **0,999 bis 1,000**, Dauer 96 s (`src/sr.js` um 20:41 und
+`src/trupp.js` um 21:40). Der Motor hat es nie gefahren, weil Raid bei
+Stufe 9 mehr Rang je Minute gibt.
+
+Erwartet: **Assassination schlaegt den Raid-Zyklus, sobald es Stufe 9
+erreicht** - und der Aufbau kostet 94 Minuten.
+
+Die Zahlen aus `data/Operations.ts` und `Actions/LevelableAction.ts`:
+
+    Aktion         rankGain  rewardFac  Dauer   Vorrat        Chaos
+    Raid                 55       1,10   73 s   361 comms     +3 %
+    Assassination        44       1,14   96 s   unbegrenzt    -5..+5 %
+    Stealth Ret.         22       1,11   78 s   unbegrenzt    -2 %
+
+**`rewardFac` 1,14 ist der hoechste im Spiel.** Bei Stufe 9 gibt
+Assassination `44 x 1,14^8` = **125 Rang** je 96 Sekunden = 78,5 Rang je
+Minute - und zwar **ohne Begleitaktion**, weil sein Chaos-Effekt im Mittel
+null ist (`getRandomIntInclusive(-5, 5)`, `Bladeburner.ts:859`).
+
+Der Raid-Zyklus kommt dagegen nur auf **53,4 Rang/min**, weil jeder Raid 1,5
+Stealth Retirements zum Chaos-Ausgleich braucht. **Assassination ist also
+schon heute die bessere Aktion - sobald die Stufe steht.**
+
+Der Aufbau ist billig:
+`getSuccessesNeededForNextLevel = ceil(0,5 x maxLevel x (2 x 2,5 + maxLevel - 1))`
+(`LevelableAction.ts:54-56`, `OperationSuccessesPerLevel` 2,5,
+`Constants.ts:45`):
+
+    Stufe  9   ->   59 Erfolge kumuliert  =  94 min
+    Stufe 12   ->   96                    = 154 min
+    Stufe 15   ->  143                    = 229 min
+
+Der Verbrauch ist vernachlaessigbar: `changePopulationByCount(-1)`
+(`Bladeburner.ts:857`) - **eine einzige Person je Lauf**, gegen die 0,5
+Prozent, die Stealth Retirement kostet.
+
+Verdacht auf die Stellschraube: `SICHER_OPERATION` = 0,85 in
+`src/blade.js` und die Nutzenrechnung in `beste()`, die nach Rang je
+Minute bei der **aktuellen** Stufe sortiert. Sie sieht Assassination auf
+Stufe 1 mit 27,5 Rang/min und waehlt Raid - eine Aktion mit Aufbaukosten
+gewinnt in einer Momentaufnahme nie. Es braucht eine Anlaufregel: erst 59
+Erfolge Assassination, dann vergleichen.
+
+Zu tun: (1) Die Aufbauphase in `blade.js` einbauen, mit Abbruch, wenn die
+Chance unter `SICHER_OPERATION` faellt (`difficultyFac` 1,06 hebt die
+Schwierigkeit bei Stufe 9 auf das 1,59fache). (2) Nach dem Aufbau die
+Rangrate ueber 45 Minuten messen und gegen die 53,4 des Raid-Zyklus halten.
+(3) Traegt es, ist der Punkt "Phase 2" der ETA-Rechnung hinfaellig - dann
+gibt es kein Rangloch nach dem Raid-Vorrat.
+
+</details>
+
+---
+
 ### Die Rueckstandsmessung laeuft - VERIFIZIERT, und die Praemisse ist entfallen (27.08., 22:40)
 
 Der Punkt hatte drei Auftraege. Zwei sind erledigt, der dritte ist keiner

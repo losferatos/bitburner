@@ -166,6 +166,9 @@ export async function main(ns) {
     catch { return 0; }
   };
   const SICHER_OPERATION = 0.85;
+  // Stufenaufbau von Assassination - siehe den Block bei "2c." weiter unten.
+  const ASSASSIN_AUFBAU = true;
+  const ASSASSIN_ZIEL_STUFE = 12;
   // SCHWELLE FUER BLACK OPS: 0,80 STATT 0,99 (27.08.2026, 06:56).
   //
   // 0,99 war nie gerechnet, sondern vorsichtig gesetzt. Bei 21 Black Ops mit
@@ -1196,6 +1199,75 @@ export async function main(ns) {
           }
         }
       } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
+    }
+
+    // 2c. ASSASSINATION AUF STUFE BRINGEN, SOLANGE RAID NOCH TRAEGT
+    //     (27.08.2026, 23:42).
+    //
+    // Raid ist die beste Aktion, die dieser Knoten hat - aber sie ist
+    // **endlich**: 361 Gemeinden ueber alle sechs Staedte, jeder Erfolg
+    // verbraucht eine (`Bladeburner.ts:836`), und Nachschub gibt es nur
+    // alle 140 Minuten (`randomEvent`, 5 Prozent von einem Ereignis alle
+    // 240 bis 600 Sekunden). Bei einem Zyklus von 190 Sekunden ist der
+    // Vorrat in **19 Stunden** aufgebraucht. Danach faellt der Motor auf
+    // Stealth Retirement mit 25,4 Rang je Minute - und der Restweg von rund
+    // 250.000 Rang dauert dann 163 Stunden.
+    //
+    // Assassination ist der einzige Ausweg, und der Grund steht in zwei
+    // Konstanten (`data/Operations.ts`):
+    //
+    //     Aktion         rewardFac  difficultyFac  netto je Stufe
+    //     Raid                1,10          1,045          1,0526
+    //     Stealth Ret.        1,11          1,050          1,0571
+    //     Assassination       1,14          1,060          1,0755
+    //
+    // **Warum netto:** Die Dauer ist LINEAR in der Schwierigkeit
+    // (`Action.ts:105-121`, `baseTime = difficulty / DifficultyToTimeFactor`),
+    // und die Schwierigkeit waechst mit `difficultyFac^(level-1)`. Der
+    // Ertrag je Minute waechst also nur mit dem Quotienten. Assassination
+    // gewinnt dort mit 7,55 Prozent je Stufe.
+    //
+    // KORREKTUR ZU MEINER EIGENEN RECHNUNG VON 23:12: Dort stand, Stufe 9
+    // brachte "125 Rang je 96 Sekunden = 78,5 je Minute". Falsch - bei
+    // Stufe 9 ist die Dauer auf 153 Sekunden gestiegen, macht **49,2**.
+    // Das liegt UNTER dem Raid-Zyklus. Die Dauersteigerung war vergessen.
+    //
+    // Gerechnet mit der Basisrate 27,5 Rang/min (Stufe 1, gemessen 20:41:
+    // 44 Rang, 96 s, Chance 0,999):
+    //
+    //     Stufe 11   27,5 x 1,0755^10 = 56,9   ->  schlaegt den Raid-Zyklus
+    //     Stufe 12                      61,2
+    //     Stufe 15                      76,4
+    //     Stufe 20                     110,0   ->  und weiter, unbegrenzt
+    //
+    // Der Aufbau bis Stufe 12 kostet 96 Erfolge
+    // (`ceil(0,5 x n x (2 x 2,5 + n - 1))`, `LevelableAction.ts:54-56`) bei
+    // im Mittel rund 130 Sekunden - **3,5 Stunden**. Dabei entsteht selbst
+    // Rang (im Mittel 42 je Minute gegen 53,4 des Raid-Zyklus), die
+    // Nettokosten sind also nur rund **2.700 Rang**. Gegen 163 Stunden
+    // Stealth Retirement ist das nichts.
+    //
+    // WARUM DER MOTOR ES NICHT VON ALLEIN TUT: `beste()` rechnet den Ertrag
+    // bei der AKTUELLEN Stufe. Eine Aktion mit Aufbaukosten gewinnt in einer
+    // Momentaufnahme nie - sie braucht eine Regel, die den Aufbau als
+    // Investition behandelt.
+    //
+    // ABBRUCH: Faellt die geschaetzte Chance unter `SICHER_OPERATION`,
+    // greift die Regel nicht mehr - dann uebernimmt die normale Auswahl.
+    // Bei Stufe 12 ist die Schwierigkeit auf das 2,01fache gestiegen; wo die
+    // Chance kippt, ist der Aufbau zu Ende.
+    if (ASSASSIN_AUFBAU) {
+      try {
+        const stufe = ns.bladeburner.getActionMaxLevel(O, "Assassination");
+        if (stufe < ASSASSIN_ZIEL_STUFE && offen(O, "Assassination") >= 1) {
+          const s = spanne(O, "Assassination");
+          if (s.min >= SICHER_OPERATION) {
+            return { typ: O, name: "Assassination",
+              grund: "Stufenaufbau " + stufe + "/" + ASSASSIN_ZIEL_STUFE
+                + " (Chance " + s.min.toFixed(3) + ")" };
+          }
+        }
+      } catch { /* alte API-Fassung: dann bleibt es bei der normalen Auswahl */ }
     }
 
     // 2b. DEN TRUPP AUFFUELLEN, SOLANGE ER BILLIG IST (27.08.2026, 19:52).

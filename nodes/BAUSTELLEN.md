@@ -86,58 +86,28 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Assassination ist das einzige unbegrenzte Rangfahrzeug - und es steht auf Stufe 1 (23:12)
+### Nachmessen: traegt der Assassination-Aufbau? (23:42)
 
-Gemessen: `getActionCurrentLevel("Operations", "Assassination")` = **1**,
-Chance **0,999 bis 1,000**, Dauer 96 s (`src/sr.js` um 20:41 und
-`src/trupp.js` um 21:40). Der Motor hat es nie gefahren, weil Raid bei
-Stufe 9 mehr Rang je Minute gibt.
+Gemessen: Seit 23:39 laeuft `Operations/Assassination` mit dem Grund
+"Stufenaufbau 1/12". Der Aufbau dauert rund **3,5 Stunden** (96 Erfolge),
+waehrend die Rangrate unter dem Raid-Zyklus liegt.
 
-Erwartet: **Assassination schlaegt den Raid-Zyklus, sobald es Stufe 9
-erreicht** - und der Aufbau kostet 94 Minuten.
+Erwartet: Ab Stufe 11 schlaegt Assassination den Raid-Zyklus (56,9 gegen
+53,4 Rang/min), ab Stufe 12 sind es 61,2. Zu pruefen ist beides:
 
-Die Zahlen aus `data/Operations.ts` und `Actions/LevelableAction.ts`:
+  1. **Die Stufe steigt wirklich.** `getActionMaxLevel` waechst nur bei
+     Erfolgen (`Bladeburner.ts:944`). Bleibt sie stehen, greift die Regel
+     nicht - dann faehrt der Motor 3,5 Stunden die schlechteste Aktion.
+     Abbruch, wenn die Stufe nach einer Stunde unter 6 liegt.
+  2. **Die Rangrate nach dem Aufbau**, geglaettet ueber 45 Minuten. Liegt
+     sie unter 53,4, wird `ASSASSIN_AUFBAU` auf `false` gesetzt und der
+     Eintrag als widerlegt vermerkt.
 
-    Aktion         rankGain  rewardFac  Dauer   Vorrat        Chaos
-    Raid                 55       1,10   73 s   361 comms     +3 %
-    Assassination        44       1,14   96 s   unbegrenzt    -5..+5 %
-    Stealth Ret.         22       1,11   78 s   unbegrenzt    -2 %
-
-**`rewardFac` 1,14 ist der hoechste im Spiel.** Bei Stufe 9 gibt
-Assassination `44 x 1,14^8` = **125 Rang** je 96 Sekunden = 78,5 Rang je
-Minute - und zwar **ohne Begleitaktion**, weil sein Chaos-Effekt im Mittel
-null ist (`getRandomIntInclusive(-5, 5)`, `Bladeburner.ts:859`).
-
-Der Raid-Zyklus kommt dagegen nur auf **53,4 Rang/min**, weil jeder Raid 1,5
-Stealth Retirements zum Chaos-Ausgleich braucht. **Assassination ist also
-schon heute die bessere Aktion - sobald die Stufe steht.**
-
-Der Aufbau ist billig:
-`getSuccessesNeededForNextLevel = ceil(0,5 x maxLevel x (2 x 2,5 + maxLevel - 1))`
-(`LevelableAction.ts:54-56`, `OperationSuccessesPerLevel` 2,5,
-`Constants.ts:45`):
-
-    Stufe  9   ->   59 Erfolge kumuliert  =  94 min
-    Stufe 12   ->   96                    = 154 min
-    Stufe 15   ->  143                    = 229 min
-
-Der Verbrauch ist vernachlaessigbar: `changePopulationByCount(-1)`
-(`Bladeburner.ts:857`) - **eine einzige Person je Lauf**, gegen die 0,5
-Prozent, die Stealth Retirement kostet.
-
-Verdacht auf die Stellschraube: `SICHER_OPERATION` = 0,85 in
-`src/blade.js` und die Nutzenrechnung in `beste()`, die nach Rang je
-Minute bei der **aktuellen** Stufe sortiert. Sie sieht Assassination auf
-Stufe 1 mit 27,5 Rang/min und waehlt Raid - eine Aktion mit Aufbaukosten
-gewinnt in einer Momentaufnahme nie. Es braucht eine Anlaufregel: erst 59
-Erfolge Assassination, dann vergleichen.
-
-Zu tun: (1) Die Aufbauphase in `blade.js` einbauen, mit Abbruch, wenn die
-Chance unter `SICHER_OPERATION` faellt (`difficultyFac` 1,06 hebt die
-Schwierigkeit bei Stufe 9 auf das 1,59fache). (2) Nach dem Aufbau die
-Rangrate ueber 45 Minuten messen und gegen die 53,4 des Raid-Zyklus halten.
-(3) Traegt es, ist der Punkt "Phase 2" der ETA-Rechnung hinfaellig - dann
-gibt es kein Rangloch nach dem Raid-Vorrat.
+Verdacht auf eine Schwachstelle: Die Chance faellt mit der Stufe
+(`difficultyFac` 1,06, bei Stufe 12 das 2,01fache). Bei Stufe 1 stand sie
+auf 1,000 - wo sie unter `SICHER_OPERATION` = 0,85 faellt, hoert der Aufbau
+von selbst auf, und dann ist die erreichte Stufe die Antwort auf die Frage,
+wie weit es ueberhaupt geht.
 
 
 ### Der Ausgang aus BitNode 6: 319.430 Rang netto (17:51, korrigiert 18:13, ETA neu gerechnet 23:12)

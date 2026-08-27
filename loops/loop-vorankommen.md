@@ -49,14 +49,24 @@ Deshalb:
   \"Name='bash.exe'\" | Select-Object ProcessId,CreationDate"` - alles aelter
   als eine halbe Stunde ist verdaechtig.
 
-**Die Loops entscheiden selbst.** Aus einer belegten Erkenntnis wird ein
-**unmittelbarer Arbeitsauftrag**, kein Wartestatus - wer eine Zahl gemessen
-hat, die eine Aenderung rechtfertigt, setzt sie um, misst nach und nimmt sie
-zurueck, wenn sie nicht traegt. Eric vorgelegt wird ausschliesslich, was er
-sich ausdruecklich vorbehalten hat: **Aenderungen an `src/bn4net.js` und
-`src/boot.js`** sowie **die Reihenfolge der BitNodes**. "Wartet bis Eric" ist
-kein Ablageort fuer unbequeme Entscheidungen (seine Ansage vom 26.08.2026,
-16:05, nachdem der groesste offene Hebel des Knotens vier Laeufe lang dort
-gelegen hatte).
+**Die Loops entscheiden selbst - seit dem 27.08.2026 ohne Ausnahme.**
+Aus einer belegten Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, kein
+Wartestatus: Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt,
+setzt sie um, misst nach und nimmt sie zurueck, wenn sie nicht traegt.
+"Wartet bis Eric" ist kein Ablageort fuer unbequeme Entscheidungen (seine
+Ansage vom 26.08.2026, 16:05, nachdem der groesste offene Hebel des Knotens
+vier Laeufe lang dort gelegen hatte).
 
-Regeln: Systemzeit per `date`. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. Änderungen an der BitNode-REIHENFOLGE sind Erics Entscheidung — vorschlagen, nicht selbst umsetzen.
+**`src/bn4net.js` und `src/boot.js` sind seit dem 27.08.2026, 05:00
+freigegeben.** Eric hat den Vorbehalt aufgehoben, mit einer Auflage:
+**jede Aenderung dort einzeln committen**, damit sie sich einzeln zurueckdrehen
+laesst. Sie bleiben Motor und Wiederanlauf - ein Fehler dort kostet den ganzen
+Lauf -, also gilt dort besonders: kleine Schritte, nach jeder Aenderung
+`node tools/strategie-check.js`, und im Zweifel die vorsichtigere Fassung.
+
+**Die Reihenfolge der BitNodes steht fest und wird von niemandem geaendert** -
+weder von Eric noch von den Loops. Sie ist das Ergebnis von Fables Analyse
+(`nodes/AUDIT-ROADMAP-2026-08-24.md`). Wer einen Grund zu haben glaubt, sie
+anzufassen, traegt ihn in `nodes/BAUSTELLEN.md` ein und faehrt weiter.
+
+Regeln: Systemzeit per `date`. Keine Augmentierungen von Hand kaufen. NIEMALS einen zweiten Tab auf bitburner-official.github.io öffnen. Kein b1tflum3, kein Destroy-Knopf. Die BitNode-Reihenfolge steht fest (Fables Analyse, `nodes/AUDIT-ROADMAP-2026-08-24.md`) und wird nicht geändert — auch nicht vorgeschlagen.

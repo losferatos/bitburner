@@ -24,9 +24,16 @@ Regeln:
   Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
   Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
   misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
-  Vorgelegt wird nur, was Eric sich ausdruecklich vorbehalten hat:
-  **Aenderungen an `src/bn4net.js` und `src/boot.js`** sowie **die Reihenfolge
-  der BitNodes**. Alles andere ist Sache der Loops.
+  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
+  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
+  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
+  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
+  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
+  bin."
+  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
+  sondern weil sie feststeht (Fables Analyse,
+  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
+  dazwischenfunken.
   *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
   Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
   groessten offenen Hebel des Knotens einen halben Nachmittag.*

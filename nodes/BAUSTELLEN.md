@@ -114,6 +114,45 @@ Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millione
 
 ## Offen, nach Dringlichkeit
 
+### Der Stadtwechsel ist ein Chaos-Problem, kein Bevoelkerungsproblem (20:15)
+
+Beim Nachrechnen von Raid aufgefallen. Die Erfolgschance jeder Aktion ausser
+Black Ops haengt an zwei Stadtgroessen:
+`getPopulationSuccessFactor = (pop/1e9)^0,7` (`Actions/Action.ts:88-92`) und
+`getChaosSuccessFactor`, der ab Chaos 50 mit `sqrt(1+chaos-50)` auf die
+**Schwierigkeit** schlaegt. Gemessen aus dem Spielstand um 20:14:
+
+    Stadt         popFaktor  chaosFaktor   netto   comms
+    Sector-12         1,013        1,00    1,013      15
+    Chongqing         1,908        4,18    0,456     138
+    New Tokyo         2,131        4,98    0,428     123
+    Aevum             1,571        6,12    0,257      49
+    Ishima            1,569        7,77    0,202      42
+    Volhaven          0,878        9,16    0,096      17
+
+**Sector-12 ist heute richtig gewaehlt** - das bestaetigt die Messung vom
+26.08. ("Stadtwechsel-Hebel widerlegt"). Aber der Grund ist ein anderer als
+gedacht: nicht die Bevoelkerung, sondern das niedrige Chaos.
+
+**Und genau daraus wird ein Hebel.** Chongqing hat die **1,88-fache
+Bevoelkerung** von Sector-12 und **neunmal so viele Gemeinden** (138 gegen
+15). Was es unbrauchbar macht, ist allein Chaos 66,5. Faellt das unter 50,
+kippt die Rechnung: 1,908 gegen 1,013, also **+88 Prozent competence auf
+jede Aktion ausser Black Ops** - und Raid waere dort neunmal so lange
+fahrbar.
+
+Chaos senkt `Diplomacy` prozentual (`Bladeburner.ts:1187-1198`), und der Bot
+faehrt es ohnehin schon (15,6 Prozent der Zeit am Nachmittag). Die Frage ist
+nur, ob es sich lohnt, es **in einer anderen Stadt** zu tun.
+
+Zu rechnen: (1) Wieviele Minuten Diplomacy bringen Chongqing von 66,5 unter
+50? Die Senkung ist prozentual, also braucht es `ln(66,5/49)/ln(1/(1-r))`
+Laeufe bei Rate r je Lauf - r ist aus `getDiplomacyEffectiveness`
+herzuleiten, nicht zu schaetzen. (2) Lohnt sich das gegen +88 Prozent auf
+die Reststrecke von 317.000 Rang? (3) Wenn ja, gehoert ein Stadtwechsel in
+`blade.js` - der ist ein reines Feldsetzen und kostet null Sekunden.
+
+
 ### Das letzte Autonomieloch: Cron-Jobs sterben mit der Sitzung (20:05)
 
 Gemessen: `CronCreate` meldet bei jedem Job "session-only (not written to

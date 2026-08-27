@@ -64,7 +64,39 @@ vernachlaessigbar.
 Vorher: Rangrate **32,75/min** (45-min-Fenster 18:26-19:11), Trupp **0**,
 Rang 9.083 um 19:10, popEst Sector-12 **1,109e9**, Chaos **48,9**
 
-Nachher: (offen - der naechste Lauf misst)
+Nachher (teilweise widerlegt, 20:15 - noch bevor der erste Raid lief):
+
+**Die 80 Rang je Minute stimmen, die Reichweite nicht.** `Raid` senkt bei
+jedem Erfolg `city.comms` um eins (`Bladeburner.ts:830-844`), und
+`Operation.getSuccessChance` gibt **0** zurueck, sobald `comms <= 0`
+(`Actions/Operation.ts:63-68`). Raid ist also nicht dauerhaft fahrbar,
+sondern **endlich** - und Sector-12 hat nur **15 comms**.
+
+    15 Raids x 97 Rang (55 x rewardFac 1,1^6) = 1.455 Rang
+    Restweg 317.000  ->  Raid deckt davon 0,46 Prozent
+
+Dazu die zweite Grenze: Raid hebt das Chaos um **1 bis 5 Prozent je Lauf**
+(`Bladeburner.ts:843`, `changeChaosByPercentage`). Sector-12 steht bei 48,9
+gegen `RAID_CHAOS_MAX = 50` - nach **einem** Raid ist die Schwelle gerissen,
+und der Motor schaltet Raid selbst wieder ab.
+
+**Was ich falsch gemacht habe:** Ich habe `ertragJeMinute` aus
+`data/bbspann.json` genommen und daraus einen Hebel gemacht, ohne den Vorrat
+zu pruefen. Die Zahl 794 in `offen` ist der Vorrat der OPERATION, nicht die
+Zahl der Gemeinden - die steht nur im Spielstand unter `cities`. Eine
+Ertragsrate ohne ihre Reichweite ist keine Entscheidungsgrundlage.
+
+**Der Schalter bleibt trotzdem an.** 1.455 Rang sind kein Hebel, aber sie
+sind auch nicht falsch: Raid ist waehrend seiner fuenfzehn Laeufe die beste
+verfuegbare Aktion, und der Motor waehlt ohnehin nach Ertrag je Minute. Was
+faellt, ist die Erwartung - nicht die Entscheidung.
+
+**Der Trupp bleibt richtig und unberuehrt.** `(teamCount+1)^0,05` wirkt auf
+Operationen UND Black Ops, unabhaengig von comms. +9,4 Prozent fuer
+siebzehn Minuten steht.
+
+Zu messen bleibt: Rangrate ueber 45 Minuten, `popEst` und Chaos - wie unten
+beschrieben. Nach fuenfzehn Raids ist der Effekt vorbei.
 **Drei Zahlen gehoeren zusammen geprueft, nicht nur die erste:**
   1. Rangrate ueber 45 Minuten - traegt der Hebel? Ziel > 60/min.
   2. `popEst` in Sector-12 - Raid senkt die Bevoelkerung prozentual, und die

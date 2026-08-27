@@ -113,7 +113,34 @@ export async function main(ns) {
     catch { return 0; }
   };
   const SICHER_OPERATION = 0.85;
-  const SICHER_BLACKOP = 0.99;
+  // SCHWELLE FUER BLACK OPS: 0,80 STATT 0,99 (27.08.2026, 06:56).
+  //
+  // 0,99 war nie gerechnet, sondern vorsichtig gesetzt. Bei 21 Black Ops mit
+  // steigender Schwierigkeit heisst das aber unter Umstaenden: nie.
+  //
+  // Die Rechnung fuer Operation Typhoon (`data/BlackOperations.ts:10-14`:
+  // baseDifficulty 2000, rankGain 50, rankLoss 10, hpLoss 100):
+  //
+  //   statFac  = 0,5 * (agi^0,04 + dex^0,035 + agi/1e4 + dex/1e4) = 1,234
+  //              bei agi 161, dex 209 (`Actions/Action.ts:105-120`)
+  //   Dauer    = 2000/10 * 0,86 (Overclock 14) / 1,234 * 1,5 = **209 s**
+  //              (`getActionTimePenalty` gibt fuer Black Ops 1,5)
+  //   Ertrag/min = (chance*50 - (1-chance)*10) / 3,49
+  //
+  // Gegen die derzeit beste Alternative - Bounty Hunter mit Zyklusrate rund
+  // 2,0 - liegt der Gleichstand bei **chance 0,283**. Alles darueber ist
+  // besser als weiterzufahren wie bisher.
+  //
+  // Trotzdem nicht 0,283, sondern 0,80. Der Grund ist der HP-Verlust: 100
+  // gegen eine Hoechstgrenze um 23 heisst Krankenhaus bei JEDEM Fehlschlag,
+  // und das kostet `min(Geld * 0,1, ...)` (`Hospital.ts:4-10`) - bei 3,6
+  // Milliarden also 360 Millionen je Versuch. Bei 0,80 ist jeder fuenfte
+  // Versuch ein Fehlschlag statt jeder dritte, der Ertrag liegt bei
+  // (48-2)/3,49 = **13,2 Rang je Minute** gegen 2,0.
+  //
+  // Wer die Schwelle spaeter weiter senken will, hat mit 0,283 die harte
+  // Untergrenze und mit dem Guthaben den Grund - nicht mit dem Bauchgefuehl.
+  const SICHER_BLACKOP = 0.80;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
   const SPANNE_ZU_BREIT = 0.10;
   // Ausdauer. Die Strafe ist min(1, stamina/(0,5*max)) (Bladeburner.ts:167-169)

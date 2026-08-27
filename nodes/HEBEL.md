@@ -37,6 +37,40 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Black-Op-Schwelle von 0,99 auf 0,80 (27.08., 06:56)
+
+Engpass: **Nicht der Rang - die Schwelle, ab der er benutzt wird.** Der Rang
+steht um 06:51 bei 2477 und faellt in Minuten unter die 2500 von Operation
+Typhoon. Danach entscheidet `SICHER_BLACKOP` in `blade.js`, ob die Black Op
+ueberhaupt versucht wird. Sie stand auf **0,99** - nie gerechnet, nur
+vorsichtig gesetzt. Bei 21 Black Ops mit steigender Schwierigkeit heisst das
+unter Umstaenden: nie.
+
+Hypothese: Sobald die Chance 0,80 erreicht, steigt die Rangrate von **2,0**
+(Bounty Hunter, gemessen 22:45) auf **13,2** je Minute.
+
+Beleg: `data/BlackOperations.ts:10-14` (baseDifficulty 2000, rankGain 50,
+rankLoss 10, hpLoss 100), `Actions/Action.ts:105-120` (Dauer),
+`Actions/BlackOperation.ts:50-52` (`getActionTimePenalty` 1,5),
+`Hospital.ts:4-10` (Krankenhauskosten).
+
+    statFac  = 0,5 * (161^0,04 + 209^0,035 + 161/1e4 + 209/1e4) = 1,234
+    Dauer    = 2000/10 * 0,86 / 1,234 * 1,5 = 209 s = 3,49 min
+    Ertrag/min = (chance*50 - (1-chance)*10) / 3,49
+
+Der **Gleichstand mit Bounty Hunter liegt bei chance 0,283** - alles darueber
+ist besser als weiterzufahren wie bisher. Gewaehlt wurde trotzdem 0,80, und
+zwar wegen der Trefferpunkte: 100 Verlust gegen eine Hoechstgrenze um 23
+heisst Krankenhaus bei JEDEM Fehlschlag, und das kostet `min(Geld * 0,1, ...)`
+- bei 3,6 Milliarden also 360 Millionen je Versuch. Bei 0,80 ist jeder fuenfte
+Versuch ein Fehlschlag statt jeder dritte.
+
+Vorher: **Chance 0,062-0,075 um 06:10**, Schwelle 0,99 - die Black Op wurde
+nie versucht, und bei 0,99 waere sie es womoeglich nie geworden.
+Nachher: (offen - greift erst, wenn die Chance 0,80 erreicht. Die naechsten
+Laeufe messen die Chance, nicht die Rate.)
+Commit: siehe git log, blade.js 27.08. 06:56
+
 ### Die Stillstandsuhr zaehlte ueber den Einbau hinweg (27.08., 04:00)
 
 Engpass: Nicht der Bot, sondern der Pruefer. Vier Minuten nach dem

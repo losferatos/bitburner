@@ -468,7 +468,36 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
 
   // --- 4. Bewegt sich der Traeger? ----------------------------------------
   const v = ladeVerlauf();
-  const frueher = v.punkte.filter((x) => x.knoten === knoten && x.traeger === t.name);
+  let frueher = v.punkte.filter((x) => x.knoten === knoten && x.traeger === t.name);
+  // DIE STILLSTANDSUHR DARF NICHT UEBER EINEN EINBAU HINWEG ZAEHLEN
+  // (27.08.2026, 04:00).
+  //
+  // Der Rueckgangszweig weiter unten verwirft den Verlauf, wenn ein Traeger
+  // FAELLT. Beim Augmentierungs-Einbau faellt er aber nicht, er WECHSELT: von
+  // "Bladeburner-Rang" auf "Kampfwert-Tiefstand". Dessen alte Punkte stammen
+  // aus der vorigen Wiederaufbauphase und stehen dort ebenfalls auf 1 - die
+  // Uhr zaehlt also von damals durch.
+  //
+  // Gemessen am 27.08. um 03:52, vier Minuten nach einem Einbau:
+  // "STAGNATION: Kampfwert-Tiefstand steht seit 681 min auf 1", waehrend
+  // bbtrain str gerade von 51 auf 75 hochtrainierte. Die Wache waere damit
+  // unmittelbar nach dem Einbau in ihren Eingriffsmodus gegangen - genau das,
+  // was der Rueckgangszweig verhindern soll.
+  //
+  // Die Wiederaufbauphase beginnt mit jedem Einbau neu. Punkte davor
+  // beschreiben einen anderen Lauf und werden fuer die Uhr ignoriert; im
+  // Verlauf bleiben sie stehen, denn dort sind sie Geschichte, nicht Messwert.
+  if (t.phase === "Wiederaufbau nach Einbau") {
+    let schnitt = -1;
+    const alle = v.punkte.filter((x) => x.knoten === knoten);
+    for (let i = alle.length - 1; i > 0; i--) {
+      if (alle[i].phase === t.phase && alle[i - 1].phase !== t.phase) { schnitt = i; break; }
+    }
+    if (schnitt >= 0) {
+      const ab = alle[schnitt].zeit;
+      frueher = frueher.filter((x) => x.zeit >= ab);
+    }
+  }
   // Bezugspunkt ist der letzte Messpunkt, der NIEDRIGER lag als jetzt - also
   // der Moment, in dem zuletzt etwas vorwaerts ging. Gegen den unmittelbar
   // vorigen Punkt zu vergleichen wuerde jede langsame, aber gesunde Steigung
@@ -589,6 +618,20 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       + t.wert + " zurueckgefallen, der Rang bleibt. Wiederanlauf pruefen:"
       + " Nach dem Einbau vom 25.08. fehlten sechs Werkzeuge.");
     urteil = "RESET";
+    // DEN VERLAUF DES NEUEN TRAEGERS MIT VERWERFEN (27.08.2026, 03:56).
+    //
+    // Der Rueckgangszweig oben loescht den Verlauf, wenn ein Traeger FAELLT.
+    // Beim Einbau faellt er aber nicht, er WECHSELT: von "Bladeburner-Rang"
+    // auf "Kampfwert-Tiefstand". Dessen alte Punkte stammen aus der vorigen
+    // Wiederaufbauphase und stehen dort ebenfalls auf 1 - die Stillstandsuhr
+    // zaehlt also von damals durch.
+    //
+    // Gemessen am 27.08. um 03:52, vier Minuten nach dem Einbau:
+    // "STAGNATION: Kampfwert-Tiefstand steht seit 681 min auf 1", waehrend
+    // bbtrain gerade str von 51 auf 75 hochtrainierte. Die Wache waere damit
+    // unmittelbar nach dem Einbau in ihren Eingriffsmodus gegangen - genau
+    // das, was der Rueckgangszweig verhindern sollte.
+    v.punkte = v.punkte.filter((x) => x.knoten !== knoten || x.traeger !== t.name);
   }
 
   // Nicht waehrend des Wiederaufbaus: Dort ist der Traeger das Training, und

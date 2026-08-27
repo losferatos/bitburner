@@ -37,6 +37,33 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Die Stillstandsuhr zaehlte ueber den Einbau hinweg (27.08., 04:00)
+
+Engpass: Nicht der Bot, sondern der Pruefer. Vier Minuten nach dem
+Augmentierungs-Einbau von 03:48 meldete er
+**"STAGNATION: Kampfwert-Tiefstand steht seit 681 min auf 1"**, waehrend
+`bbtrain` str gerade von 51 auf 75 hochtrainierte. Die Wache waere damit
+unmittelbar nach dem Einbau in ihren Eingriffsmodus gegangen - im
+ungeeignetsten Moment, denn dort arbeitet der Bot planmaessig.
+
+Hypothese: Das Urteil kehrt von STAGNATION auf SPUR zurueck, und die
+gemeldete Stillstandsdauer faellt von 681 auf unter 10 Minuten.
+
+Beleg: `tools/strategie-check.js:537-556` verwirft den Verlauf, wenn ein
+Traeger **faellt**. Beim Einbau faellt er aber nicht, er **wechselt** - von
+"Bladeburner-Rang" auf "Kampfwert-Tiefstand". Dessen alte Punkte stammen aus
+der vorigen Wiederaufbauphase (16:31 desselben Tages) und stehen dort
+ebenfalls auf 1. Die Uhr zaehlte also von damals durch, quer ueber elf Stunden
+Bladeburner-Arbeit hinweg.
+
+Geaendert: Bei Phase "Wiederaufbau nach Einbau" wird der Verlauf am letzten
+Phasenwechsel abgeschnitten. Die Punkte davor bleiben in der Datei - dort sind
+sie Geschichte, nicht Messwert.
+
+Vorher: **STAGNATION, 681 min** um 03:52
+Nachher: **SPUR, 3 min** um 04:02 - unmittelbar verifiziert, dieselbe Lage.
+Commit: siehe git log, strategie-check.js 27.08. 04:00
+
 ### Der Knotenausgang haengt an den Kampfwerten, nicht am Rang (27.08., 01:05)
 
 Engpass: **Die Erfolgschance von Operation Typhoon steht seit zehn Stunden

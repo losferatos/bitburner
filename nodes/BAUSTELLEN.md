@@ -42,6 +42,13 @@ Regeln:
 
 ## Sofort
 
+### `s.min` ist bei Black Ops Bevoelkerungsrauschen - der Motor gated auf einer Zufallszahl (18:17)
+Gemessen: Typhoon meldete heute 0,212 exakt (16:19), dann 0,239-0,269 (17:41), dann 0,286-0,295 (18:15). Die Spanne geht auf und zu, ohne dass sich an der Sache etwas aendert.
+Erwartet: Bei Black Ops gibt es GAR KEINE Schaetzunsicherheit. `Actions/BlackOperation.ts:55-61`: `getPopulationSuccessFactor()` und `getChaosSuccessFactor()` geben beide fest **1** zurueck. Damit ist in `getSuccessRange` (`Actions/Action.ts:144-167`) `est === real`, also `diff = 0`, also `low = high = real` - und trotzdem wird danach `low *= r` mit `r = city.pop / city.popEst` gerechnet. Die Spanne stammt allein aus der Bevoelkerungsschaetzung, die auf Black Ops nicht wirkt.
+Verdacht: `src/blade.js:687-712` gated `SICHER_BLACKOP` auf genau diesem `s.min`. `popEst` startet bei `pop*(rand+0,5)` (`City.ts:23`), kann also bis zu **1,5-fach** zu hoch stehen - dann sieht der Motor **zwei Drittel** der wahren Chance. Der wahre Wert ist immer einer der beiden Randwerte: bei `r < 1` ist es `s.max`, bei `r >= 1` ist es `s.min`.
+**Die wahre Chance ist exakt berechenbar** - alle Eingaben sind ueber die API lesbar (Kampfwerte, `getSkillLevel`, `getStamina`, `teamCount`, `baseDifficulty` fest 2000 fuer Typhoon; Formel in `Actions/Action.ts:169-196`). Zu tun: die Chance rechnen statt schaetzen lassen, dann gegen `SICHER_BLACKOP` pruefen.
+**Folgenschwer ueber den Motor hinaus:** Der Reportloop hat um 17:42 die aufgehende Spanne als "die Kampfwerte steigen schneller als die Schaetzung nachkommt" gedeutet und darauf ein Ziel gesetzt. Das war Rauschen als Fortschrittsmass. Jedes Ziel auf `s.min` oder der Spannenmitte ist wertlos, bis dieser Punkt behoben ist.
+
 ### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
 Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`).
 Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.

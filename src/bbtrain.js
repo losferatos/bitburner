@@ -107,6 +107,7 @@ async function runde(ns) {
   // Gefunden hat es eine Fremdpruefung, kein Loop.
   //
   // Gewartet wird deshalb auf den Zustand, nicht auf das Ereignis.
+  let letzterGrund = "";
   for (;;) {
     let drin = false;
     try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
@@ -181,6 +182,38 @@ async function runde(ns) {
     // str-Arbeit im falschen Studio als "trainiert schon" - der Kern des
     // Fehlers oben. Ein Vergleich, der den Ort auslaesst, kann einen
     // Ortswechsel nicht bemerken.
+    // KEIN GYM AUF PUMP (27.08.2026, 06:52).
+    //
+    // Das Powerhouse Gym kostet 2.400 Dollar je Sekunde, und weder die
+    // Oberflaeche noch `applyWorkStats` pruefen den Kontostand
+    // (`Work/ClassWork.tsx:22-73`, `PlayerObjectGeneralMethods.ts:216-224` -
+    // `gainMoney` hat keinen Boden). Nach einem Einbau ist das Konto leer:
+    // Gemessen am 27.08. um 04:45, knapp eine Stunde nach dem Einbau, stand
+    // es bei **-3 Millionen**. Ein negatives Guthaben blockiert jeden Kauf -
+    // Portprogramme, Server, Augmentierungen -, und genau die braucht der
+    // Wiederaufbau.
+    //
+    // Der Ausweg kostet nichts: Findet `blade.js` keine Aktion ueber seinen
+    // Schwellen - und mit Kampfwerten um 1 findet es keine -, faellt es von
+    // selbst auf Bladeburner-Training durch. Das ist gratis
+    // (`Bladeburner.ts:1091-1105`) und hebt dieselben Werte, nur ohne den
+    // Ortsmultiplikator des Gyms.
+    //
+    // Also: unter der Schwelle gar nichts tun und blade.js machen lassen.
+    // Die 5 Millionen sind rund 35 Minuten Gym - genug Abstand, dass ein
+    // Kauf dazwischen nicht ins Minus fuehrt.
+    const GYM_MIN_GELD = 5e6;
+    if (ns.getPlayer().money < GYM_MIN_GELD) {
+      if (letzterGrund !== "arm") {
+        sag("Konto unter " + (GYM_MIN_GELD / 1e6) + " Mio - kein Gym."
+          + " blade.js trainiert gratis weiter.");
+        letzterGrund = "arm";
+      }
+      await ns.sleep(60000);
+      continue;
+    }
+    letzterGrund = "";
+
     const laeuft = ns.singularity.getCurrentWork();
     const trainiertSchon = laeuft && laeuft.type === "CLASS"
       && laeuft.classType === schlechtester

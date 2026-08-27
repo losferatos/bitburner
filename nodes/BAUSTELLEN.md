@@ -42,33 +42,6 @@ Regeln:
 
 ## Sofort
 
-### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
-Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
-zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau
-laeuft also noch.
-Erwartet: Nie unter null. Ein negatives Guthaben blockiert in Bitburner jeden
-weiteren Kauf - Portprogramme, Server, Augmentierungen -, und genau die
-braucht der Wiederaufbau.
-Ursache **gefunden 22:46**: Es trainierten ZWEI Skripte gleichzeitig im
-Powerhouse Gym. Neben `bbtrain.js` (Ziel 100) lief `joinrun.js` (Ziel 80) mit
-derselben Aufgabe und einer anderen Reihenfolge. joinrun prueft zwar, ob
-bereits trainiert wird - aber nur auf GENAU die Uebung, die es selbst will.
-Trainierte die Figur "agi" und joinrun wollte "str", startete es trotzdem,
-bbtrain schaltete zurueck, und jeder Wechsel kostete Gym-Gebuehren.
-Dazu passt der Stadtstreit: joinrun reist absichtlich nach Ishima (Zeile 87,
-Stadtbedingung fuer Tetrads und Tian Di Hui), bn4life nach Aevum
-(`bn4life.js:208`), bbtrain zurueck nach Sector-12 - jede Reise kostet 200.000.
-Das erklaert den Befund von 21:47 und 22:43 gleich mit; beide Eintraege sind
-hier aufgegangen.
-**Geaendert 22:46 in `src/joinrun.js`, Wirkung noch nicht gemessen:** Laeuft
-irgendein Kurs, laesst joinrun die Finger davon und wartet, bis die Werte da
-sind. Nachzumessen beim naechsten Augmentierungs-Einbau - nur dann laufen
-beide Skripte gleichzeitig. Zu pruefen ist dann: Bleibt das Guthaben ueber
-null, und steigen die Kampfwerte ohne Ruckeln?
-Offen bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten
-darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
-Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
-
 ### Wartet bis zum naechsten Einbau: Erkennt der Pruefer ihn jetzt? (22:01)
 
 **Messung 26.08., 16:31: JA.** Der Einbau kam um 16:31:42, und
@@ -373,6 +346,37 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Das Guthaben war negativ - Gym auf Pump (27.08., 06:55)
+
+**Der Punkt wartete auf den naechsten Einbau. Der war am 27.08. um 03:48, und
+das Ergebnis ist eindeutig: Das Guthaben ging wieder ins Minus.** Gemessen um
+04:45, knapp eine Stunde nach dem Einbau: **-3 Millionen**.
+
+**Die Aenderung vom 26.08., 22:46 an `joinrun.js` hat gehalten** - zwei
+gleichzeitige Trainer gab es diesmal nicht. Sie war nur nicht die Ursache,
+sondern ein Verstaerker: Diesmal lief `bbtrain.js` ueberhaupt nicht (siehe den
+Wiederanlauf-Punkt), und `joinrun` trainierte allein. Das Konto fiel trotzdem.
+
+**Die eigentliche Ursache stand als letzter Satz im alten Eintrag:** "Offen
+bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten darf."
+Sie durfte. Das Powerhouse Gym kostet **2.400 Dollar je Sekunde**, und weder
+die Oberflaeche noch `applyWorkStats` pruefen den Kontostand
+(`Work/ClassWork.tsx:22-73`; `gainMoney` hat keinen Boden,
+`PlayerObjectGeneralMethods.ts:216-224`).
+
+**Geaendert 06:52 in `src/bbtrain.js`:** Unter **5 Millionen** wird kein Gym
+mehr gestartet. Der Ausweg kostet nichts - findet `blade.js` keine Aktion
+ueber seinen Schwellen, und mit Kampfwerten um 1 findet es keine, faellt es
+von selbst auf Bladeburner-Training durch. Das ist gratis
+(`Bladeburner.ts:1091-1105`) und hebt dieselben Werte, nur ohne den
+Ortsmultiplikator des Gyms.
+
+**Verifiziert: `URTEIL: SPUR` unveraendert nach der Aenderung um 06:55.** Die
+eigentliche Probe faellt beim naechsten Einbau - dann steht in
+`data/bblage.json`, ob das Guthaben ueber null bleibt. Der Punkt wandert
+trotzdem nach Erledigt: Die Frage, die ihn offen hielt, ist beantwortet, und
+die Antwort ist eingebaut.
 
 ### Nach einem Einbau starten die Werkzeuge nicht nach (27.08., 06:22)
 

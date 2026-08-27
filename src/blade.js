@@ -292,8 +292,8 @@ export async function main(ns) {
     // Deckel 12 auf 30 am 27.08. um 13:19: SuccessChanceKill trifft auch
     // Typhoon. Rechnung in nodes/HEBEL.md.
     ["Short-Circuit", 30],
-    ["Evasive System", 12],
-    ["Reaper", 8],
+    ["Evasive System", 17],
+    ["Reaper", 16],
     ["Blade's Intuition", Infinity],
     ["Digital Observer", Infinity],
     ["Cloak", Infinity],
@@ -365,12 +365,37 @@ export async function main(ns) {
       try { basis = Math.max(1, ns.getPlayer().skills.defense); } catch { /* egal */ }
       return 100 * (Math.pow((basis + lvlPlus) / basis, 0.9) - 1);
     }
+    if (name === "Reaper" || name === "Evasive System") {
+      // Diese beiden heben nicht die Chance, sondern den EFFEKTIVEN Kampfwert
+      // (`data/Skills.ts:54-72`, Reaper 2 Prozent auf alle vier, Evasive
+      // System 4 auf dex und agi). Der wirkt ueber
+      // `competence += weights * effSkill^decay` (`Actions/Action.ts:173`),
+      // bei Black Ops mit Gewicht 0,2 und Decay 0,8 je Kampfwert - also
+      // gedaempft und von den aktuellen Werten abhaengig.
+      const sk = ns.getPlayer().skills;
+      const r = ns.bladeburner.getSkillLevel("Reaper");
+      const e = ns.bladeburner.getSkillLevel("Evasive System");
+      const comp = (rr, ee) => {
+        const a = 1 + rr * 0.02, b = 1 + rr * 0.02 + ee * 0.04;
+        return Math.pow(sk.strength * a, 0.8) + Math.pow(sk.defense * a, 0.8)
+          + Math.pow(sk.dexterity * b, 0.8) + Math.pow(sk.agility * b, 0.8);
+      };
+      const jetzt = comp(r, e);
+      if (!(jetzt > 0)) return 0;
+      const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
+      return 100 * (danach / jetzt - 1);
+    }
     const p = CHANCE_SKILLS[name];
     if (!p) return 0;
     const a = 1 + stufe * p / 100;
     return 100 * ((a + p / 100) / a - 1);
   };
-  const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition"];
+  // Reaper und Evasive System kamen am 27.08. um 15:53 dazu. Gerechnet auf dem
+  // damaligen Stand (str 172, def 143, dex 325, agi 168): Reaper Stufe 9 gab
+  // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
+  // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
+  const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
+    "Reaper", "Evasive System"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();

@@ -46,6 +46,19 @@ Regeln:
 Gemessen: `data/rep-ziel.txt`, Zeile 2, Feld `sek` fuer ORION-MKIV Shoulder. Um 09:51 stand dort **290** - noch der Formelwert, das Messfenster von 300 Sekunden lief seit dem Neustart um 09:50 erst an.
 Erwartet: Ab etwa 09:56 muss `sek` auf das **Sechzehn- bis Achtzehnfache** springen, also in die Groessenordnung **4.500 bis 5.500**. Das entspricht der gemessenen Rate von 19 rep/min bei Bladeburners statt der gerechneten 335.
 Verdacht: kein Fehler vermutet - das ist die faellige Verifikation der Aenderung von 09:50 (`bn4rep.js`, `repMessung`/`REP_MESSFENSTER`). **Bleibt `sek` bei rund 300, greift die Messung nicht und die Aenderung gehoert zurueckgedreht** (`git revert` des Commits "bn4rep: die Reputationsrate wird gemessen").
+**Nachgemessen 10:11: die Messung greift, aber schwaecher als erwartet.**
+`Hyperion Plasma Cannon V1` und `BLADE-51b Tesla Armor` sprangen von **3.930
+auf 28.914** Sekunden - Faktor **7,4**, nicht die erwarteten 16 bis 18. Kein
+Revert (das Abbruchkriterium war "bleibt bei rund 300"), aber der Faktor ist
+zu klaeren: Entweder lief das Messfenster erst teilweise, oder die Rate bei
+Bladeburners steigt mit dem Rangzuwachs schneller, als eine Momentaufnahme
+zeigt. ORION-MKIV steht bei **156** - dort ist die Luecke fast geschlossen,
+die Zahl ist also kein Gegenbeleg.
+Die Rangfolge hat sich innerhalb derselben Faktion verschoben (V1 und
+BLADE-51b vor V2 und I.N.T.E.R.L.I.N.K.E.D), ORION bleibt vorn. Der
+befuerchtete Fall - Verzerrung ZWISCHEN Faktionen - ist damit nicht
+eingetreten.
+
 Zweite Probe im selben Zug: Die **Rangfolge** muss unveraendert bleiben (ORION vorn). Kippt sie, trifft der Faktor die Faktionen doch nicht gleichmaessig - dann ist der Befund groesser als gedacht.
 
 ## Offen, nach Dringlichkeit

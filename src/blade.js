@@ -237,7 +237,15 @@ export async function main(ns) {
   // OFFENE FLANKE, als Baustelle eingetragen: Geht der Raid-Vorrat in allen
   // sechs Staedten zur Neige (384 Gemeinden, rund 45.000 Rang), ist Raid
   // nicht mehr die Alternative - dann gehoert die Schwelle zurueck auf 0,40.
+  // Solange Raid die Alternative ist, wird gewartet (0,90). Ist der Vorrat
+  // aufgebraucht, ist Warten sinnlos - dann faellt die Schwelle zurueck auf
+  // die alte 0,40. Siehe `blackOpSchwelle()` weiter unten.
   const SICHER_BLACKOP = 0.90;
+  const SICHER_BLACKOP_OHNE_RAID = 0.40;
+  // Ab wieviel Gemeinden ueber ALLE Staedte sich das Warten noch lohnt. 20
+  // sind bei Stufe 9 rund 2.360 Rang - genug, um die Wartezeit auf eine
+  // bessere Black-Op-Chance zu ueberbruecken.
+  const RAID_VORRAT_GESAMT_MIN = 20;
   // Zielgroesse des Trupps. Sechs, weil der Bonus mit Exponent 0,05 waechst
   // und der Grenznutzen danach um Faktor drei einbricht - Rechnung im Block
   // "2b. Den Trupp auffuellen" weiter unten. 0 schaltet die Regel ab.
@@ -1003,7 +1011,36 @@ export async function main(ns) {
       "Reaper": { EffStr: 2, EffDef: 2, EffDex: 2, EffAgi: 2 },
       "Evasive System": { EffDex: 4, EffAgi: 4 },
     };
-    const blackOpChance = (name) => {
+    // DIE BLACK-OP-SCHWELLE HAENGT AM RAID-VORRAT (27.08.2026, 22:10).
+  //
+  // Die 0,90 von 21:55 ruhen auf einer Annahme: dass Raid mit 98,3 Rang je
+  // Minute die bessere Verwendung der Zeit ist. Das gilt nur, solange es
+  // Gemeinden gibt - `Operation.getSuccessChance` gibt **0** zurueck, sobald
+  // `comms <= 0` (`Actions/Operation.ts:63-68`), und jeder Erfolg
+  // verbraucht eine (`Bladeburner.ts:836`). Ueber alle sechs Staedte sind es
+  // 384, also rund 45.000 Rang.
+  //
+  // Ohne diese Regel waere der Bot nach dem letzten Raid in eine Falle
+  // gelaufen: Er haette auf eine Chance gewartet, die er sich ohne Raid nur
+  // noch aus Vertraegen erarbeiten kann - bei 8,7 Rang je Minute statt 98.
+  // Das ist kein hypothetischer Fall, sondern der sichere Endzustand dieses
+  // Knotens.
+  //
+  // Gezaehlt wird ueber alle Staedte, nicht nur die aktuelle: Die
+  // Rundreise-Regel in Block 2a wechselt selbsttaetig dorthin, wo noch etwas
+  // liegt.
+  const blackOpSchwelle = () => {
+    if (!RAID_AN) return SICHER_BLACKOP_OHNE_RAID;
+    let gesamt = 0;
+    try {
+      for (const stadt of STAEDTE) {
+        try { gesamt += ns.bladeburner.getCityCommunities(stadt); } catch { /* Stadt unbekannt */ }
+      }
+    } catch { return SICHER_BLACKOP; }
+    return gesamt >= RAID_VORRAT_GESAMT_MIN ? SICHER_BLACKOP : SICHER_BLACKOP_OHNE_RAID;
+  };
+
+  const blackOpChance = (name) => {
       const a = BLACKOP_DATEN[name];
       if (!a) return null;
       try {
@@ -1058,10 +1095,12 @@ export async function main(ns) {
         // Die gerechnete Zahl schlaegt die geschaetzte. Fehlen die Daten,
         // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
         const chance = gerechnet !== null ? gerechnet : s.min;
-        if (chance >= SICHER_BLACKOP) {
+        const schwelle = blackOpSchwelle();
+        if (chance >= schwelle) {
           return { typ: B, name: bo.name,
             grund: "Black Op (Chance " + chance.toFixed(3)
-              + (gerechnet !== null ? " gerechnet" : " geschaetzt") + ")" };
+              + (gerechnet !== null ? " gerechnet" : " geschaetzt")
+              + ", Schwelle " + schwelle.toFixed(2) + ")" };
         }
         // WENN NUR DIE SCHAETZUNG IM WEG STEHT, IST SIE DAS ZIEL
         // (27.08.2026, 09:19).
@@ -1090,7 +1129,7 @@ export async function main(ns) {
         // Bevoelkerung gar nicht mit. Field Analysis kauft dann nur die
         // bessere ANZEIGE, zum Preis von 0,2 Rang je Minute gegen 8,7.
         // Wo gerechnet wird, ist sie ueberfluessig.
-        if (gerechnet === null && s.max >= SICHER_BLACKOP && s.min < SICHER_BLACKOP) {
+        if (gerechnet === null && s.max >= schwelle && s.min < schwelle) {
           return { typ: G, name: "Field Analysis",
             grund: "nur die Schaetzung fehlt zur Black Op" };
         }

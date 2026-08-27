@@ -23,6 +23,60 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Black-Op-Schwelle faellt zurueck, wenn Raid ausgeht - VERIFIZIERT (27.08., 22:12)
+
+Die 0,90 von 21:55 ruhen auf einer Annahme: dass Raid mit 98,3 Rang je
+Minute die bessere Verwendung der Zeit ist. `blackOpSchwelle()` in
+`src/blade.js` prueft diese Annahme jetzt bei jeder Entscheidung, statt sie
+vorauszusetzen - liegt der Vorrat ueber alle sechs Staedte unter
+`RAID_VORRAT_GESAMT_MIN` = 20, faellt die Schwelle auf 0,40 zurueck.
+
+**Verifiziert 22:11** (`src/vorrat.js`, ein Aufruf ueber den Auftragskanal):
+
+    Sector-12 2 | Aevum 49 | Volhaven 17 | Chongqing 128 | New Tokyo 122
+    Ishima 43   |   gesamt 361   |   Fehler: keine   |   Schwelle 0,90
+
+Die Messung prueft genau die Stelle, die stillschweigend kippen koennte:
+Antwortet `getCityCommunities` fuer auch nur eine Stadt nicht, faellt die
+Summe und mit ihr die Schwelle - ohne dass es jemand merkt. Alle sechs
+antworten.
+
+**Der Vorrat ist praktisch endlich.** `randomEvent()` laeuft alle 240 bis 600
+Spielsekunden (`Bladeburner.ts:1402-1406`), und nur 5 Prozent davon sind
+"New Synthoid Community" (`:613-615`). Das sind **0,43 Gemeinden je Stunde**
+gegen einen Verbrauch von rund 19 - der Vorrat von 361 haelt etwa **19
+Stunden**, dann greift der Rueckfall. Ohne ihn waere der Bot in eine Falle
+gelaufen: warten auf eine Chance, die er sich ohne Raid nur noch aus
+Vertraegen erarbeiten kann, bei 8,7 Rang je Minute statt 98.
+
+Nebenbei sichtbar geworden: Nach dem Neustart um 22:12 stand der Fortschritt
+bei **+558 Rang in 7 Minuten = 79,7/min** gegen 24,4 im 45-Minuten-Fenster
+davor. Das Fenster ist zu kurz fuer eine Aussage - der naechste Optimierlauf
+misst es geglaettet -, aber die Richtung stimmt mit der Hypothese von 21:55
+ueberein.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Die Black-Op-Schwelle 0,90 braucht einen Rueckfall, wenn Raid ausgeht (21:55)
+
+Gemessen: `SICHER_BLACKOP` steht seit 21:55 auf 0,90 statt 0,40, weil Raid
+mit 98,3 Rang/min die bessere Alternative ist (Rechnung in
+`nodes/HEBEL.md`). Das gilt nur, **solange es Raid-Gemeinden gibt**: 384
+ueber alle sechs Staedte, rund 45.000 Rang.
+
+Erwartet: Sind sie aufgebraucht, ist Raid keine Alternative mehr, und die
+Schwelle gehoert zurueck auf 0,40 - sonst wartet der Motor auf eine Chance,
+die er sich nicht mehr erarbeiten kann, und faehrt nur noch Contracts.
+
+Verdacht: Kein Fehler, eine fehlende Regel. In `src/blade.js` gehoert die
+Schwelle dynamisch: `const schwelle = raidVorratGesamt() > 20 ? 0.90 : 0.40`.
+Der Vorrat laesst sich mit `getCityCommunities` ueber `STAEDTE` summieren -
+die Schleife steht schon in Block 2a.
+
+</details>
+
+---
+
 ### Der Trupp steht bei 6 - VERIFIZIERT, und Raid ist rehabilitiert (27.08., 21:40)
 
 **Verifiziert 21:40** (`src/trupp.js`, ein Aufruf ueber den Auftragskanal):

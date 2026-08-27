@@ -86,23 +86,6 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Die Black-Op-Schwelle 0,90 braucht einen Rueckfall, wenn Raid ausgeht (21:55)
-
-Gemessen: `SICHER_BLACKOP` steht seit 21:55 auf 0,90 statt 0,40, weil Raid
-mit 98,3 Rang/min die bessere Alternative ist (Rechnung in
-`nodes/HEBEL.md`). Das gilt nur, **solange es Raid-Gemeinden gibt**: 384
-ueber alle sechs Staedte, rund 45.000 Rang.
-
-Erwartet: Sind sie aufgebraucht, ist Raid keine Alternative mehr, und die
-Schwelle gehoert zurueck auf 0,40 - sonst wartet der Motor auf eine Chance,
-die er sich nicht mehr erarbeiten kann, und faehrt nur noch Contracts.
-
-Verdacht: Kein Fehler, eine fehlende Regel. In `src/blade.js` gehoert die
-Schwelle dynamisch: `const schwelle = raidVorratGesamt() > 20 ? 0.90 : 0.40`.
-Der Vorrat laesst sich mit `getCityCommunities` ueber `STAEDTE` summieren -
-die Schleife steht schon in Block 2a.
-
-
 ### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
 
 **Gemessen um 18:49: `storedCycles` = 8, Rueckstand 0,0 Minuten.** Der Tab ist

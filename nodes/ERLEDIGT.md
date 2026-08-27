@@ -23,6 +23,128 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### WIDERLEGT: bn4rep.js ist nicht tot - drei eigene Fehlalarme in Folge (28.08., 00:52)
+
+Der Sofort-Punkt von 00:11 war falsch, und die beiden Verdachtsmomente, die
+daraus folgten, ebenfalls. Alle drei sind gemessen und entkraeftet.
+
+**(1) "bn4rep.js schreibt seit 55 Stunden nicht."** Gemessen 00:38:
+`data/hb-rep.txt` ist **22 Sekunden** alt, `data/rep-ziel.txt` nennt das
+aktuelle Ziel "Nanofiber Weave" samt vollstaendiger Rangliste. Das Skript
+arbeitet.
+
+`data/bn4rep.json` taugt nicht als Lebenszeichen - und das steht seit dem
+24.08. im Code, in `bn4rep.js:389`: Das Skript steigt an mindestens vier
+Stellen vor der Telemetriezeile aus der Runde aus (Firmenphase, nichts mehr
+zu kaufen, Ausgangsphase, leere Zielliste). Genau davor warnt der Kommentar,
+und genau in die Falle bin ich gelaufen. **Die Warnung stand nicht dort, wo
+jemand sie sucht** - deshalb steht sie jetzt oben in den Regeln dieser Datei.
+
+**(2) "I.N.T.E.R.L.I.N.K.E.D fehlt in der Bewertungstabelle."** Sie heisst im
+Spiel mit Punkten (`Augmentation/Enums.ts`), mein `grep` suchte nach
+"INTERLINKED". Ein Abgleich aller **19** Bladeburner-Augmentierungen aus
+`Augmentations.ts` gegen `COMBAT_AUGS` in `src/lib/hackaugs.js` ergibt:
+**keine einzige fehlt**, bei der `combatNutzen` groesser null waere.
+
+**(3) "Die Geldreserve von 888 Mrd blockiert die teuren Stuecke."** Umgekehrt:
+`bn4rep.js:996` **schreibt** `data/geldbedarf.txt`, und `bn4net.js:578`
+sowie `bn4life.js:246` **lesen** ihn als Tabu-Betrag. Es ist ein Kanal von
+der Augmentierungsplanung an den Serverkauf, keine Sperre gegen sie.
+
+**Was tatsaechlich laeuft:** 22 Augmentierungen eingebaut, **zwei in der
+Warteschlange** (BLADE-51b Tesla Armor: IPU Upgrade, Vangelis Virus), 71.851
+Bladeburner-Reputation, Favor 26,8, Geld 7,76 Mrd. Von den 17
+Bladeburner-Augmentierungen sind 5 eingebaut und 12 offen.
+
+**Die Lehre, und sie ist teurer als die drei Fehlalarme:** Ein Zeitstempel
+belegt, wann zuletzt geschrieben wurde - nicht, ob gearbeitet wird. Wer
+daraus auf Stillstand schliesst, diagnostiziert die Datei statt des
+Programms. Die Gegenprobe kostet einen Aufruf: erst den Puls lesen, dann
+urteilen.
+
+<details><summary>Der falsche Sofort-Punkt von 00:11</summary>
+
+### bn4rep.js laeuft, schreibt aber seit 55 Stunden nicht mehr (00:11)
+
+Gemessen: `data/ps.json` um 00:09 zeigt `bn4rep.js` als PID 26 - der
+Prozess lebt. Aber `data/bn4rep.json` traegt den Zeitstempel
+1787670308432 = **25.08. um 17:05**, also **55 Stunden alt**.
+
+Erwartet: Die Datei wird in jeder Runde neu geschrieben. Ein Prozess, der
+laeuft und nichts schreibt, haengt in einem Zweig ohne Rueckweg.
+
+Der Inhalt bestaetigt, wie alt er ist:
+
+    hacking 100, multHacking 1,387, repGesamt 9.562
+    faktionen: Aevum, Sector-12, Slum Snakes, CyberSec
+    ziel: "Cranial Signal Processors - Gen II" (CyberSec)
+
+**Bladeburners steht nicht in der Faktionsliste** - dabei sind dort bei Rang
+19.327 rund 38.654 Reputation verdient
+(`RankToFactionRepFactor 2`). Die gesamte Augmentierungsplanung laeuft
+also an der einzigen Faktion vorbei, die in diesem Knoten etwas beitraegt.
+
+Verdacht auf die Fundstelle: `src/bn4rep.js:1093` haelt selbst fest, dass
+"jede Arbeit die laufende Bladeburner-Aktion abbricht". Wahrscheinlich
+wartet das Skript auf eine Faktionsarbeit, die `blade.js` ihm in jeder
+Runde wieder wegnimmt - eine Warteschleife ohne Ausgang. Zu pruefen ist
+auch die `bladeSperre` bei `:651`, die aber greifen duerfte, weil
+`inBladeburner()` heute true ist.
+
+**Warum das dringend ist:** Geld steht bei **6,07 Mrd**, INTERLINKED kostet
+5,5. Der groesste Dauerhebel des Knotens ist finanzierbar, und der
+Automatismus, der ihn ziehen soll, ist seit zwei Tagen blind.
+
+**Und eine Abwaegung gehoert dazu, bevor jemand den Einbau ausloest:** Ein
+Prestige setzt die Kampfwerte zurueck (`Prestige.ts`), Rang und
+Aktionsstufen bleiben (`Bladeburner.ts:259-263`). Der laufende
+Assassination-Aufbau (Stufe 5 von 12 um 00:07) wuerde dadurch abbrechen -
+seine Chance faellt unter `SICHER_OPERATION`, bis die Kampfwerte wieder
+stehen. Der Einbau gehoert also **nach** den Aufbau, nicht mitten hinein.
+
+
+### Wartet bis Eric: zwei Handgriffe im Spiel (19:45, belegt 20:45)
+
+**Belegt, nicht vermutet:** `Settings.AutoexecScript` steht im Spielstand auf
+`""` - gelesen 20:45 ueber `getSaveFile` (`save.data.SettingsSave`), also
+ohne Browser. Von aussen ist das Feld nicht setzbar: Die Remote File API kennt
+`getSaveFile`, aber kein Gegenstueck zum Schreiben, und keine ns-Funktion
+fasst `Settings` an. Der Punkt ist deshalb kein Loop-Auftrag, sondern eine
+Eric-Sache - die Ueberschrift sagt das jetzt, damit er den Loop nicht jeden
+Lauf blockiert.
+
+Beide sind Ein-Klick-Sachen fuer Eric und von aussen nicht setzbar. Die
+Aufsicht prueft sie und erinnert daran, statt dass sie jemand vergisst.
+
+**1. Autoexec auf `boot.js`** — Options -> System -> "Autoexec Script + Args".
+`Settings.AutoexecScript` wird beim Laden der Seite auf `home` gestartet
+(`NetscriptWorker.ts:185-253`). Damit heilt sich der Bot nach jedem
+Seitenladen selbst. Risikofrei, weil `boot.js` idempotent ist — es prueft
+`ns.ps("home")`, bevor es etwas startet (`boot.js:86,118`).
+
+Was ohne diesen Schalter NICHT gedeckt ist — und nur das:
+
+    Rechnerneustart        gedeckt: die Engine stellt laufende Skripte
+                           selbst wieder her (loadAllRunningScripts)
+    geplanter Einbau       gedeckt: bn4rep.js:960 ruft
+                           installAugmentations("boot.js")
+    alles tot, kein Reset   NUR ueber Autoexec
+
+**Damit korrigiere ich meine eigene Darstellung von 19:44:** Das Loch ist
+kleiner, als ich es genannt hatte. Der Rechnerneustart ist kein Fall — die
+Engine startet die laufenden Skripte aus dem Spielstand neu. Es bleibt der
+Totalausfall ohne Prestige.
+
+**2. Opera mit `--remote-debugging-port=9222`.** Port 9222 ist zu. Solange
+das so ist, kann kein Skript pruefen, ob der Spiel-Tab lebt, und keine
+Sitzung im Notfall etwas im Spielterminal eintippen. Das ist der letzte
+Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
+greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
+
+</details>
+
+---
+
 ### Der Assassination-Aufbau laeuft - EINGEBAUT und verifiziert (27.08., 23:42)
 
 **Verifiziert 23:39:** `data/blade.json` meldet

@@ -23,6 +23,15 @@ Regeln:
   schneidet bei 2.000 stumm ab. Im Archiv wird **gegrept, nicht gelesen**:
   `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`.
 - Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
+- **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
+  ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
+  Die Lebenszeichen stehen woanders und sind bedingungslos:
+  `data/hb-rep.txt` fuer `bn4rep.js` (Puls), `data/rep-ziel.txt` fuer sein
+  aktuelles Ziel samt Rangliste, `data/wache-zustand.json` fuer den Waechter.
+  `data/bn4rep.json` und `data/ps.json` sind Momentaufnahmen, keine Pulse.
+  *In der Nacht zum 28.08. hat diese Falle einen Sofort-Punkt erzeugt, der
+  komplett falsch war - die Warnung stand seit dem 24.08. in `bn4rep.js:389`,
+  nur nicht dort, wo jemand sie sucht.*
 - **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
   unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
   Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
@@ -45,83 +54,6 @@ Regeln:
 ---
 
 ## Sofort
-
-### bn4rep.js laeuft, schreibt aber seit 55 Stunden nicht mehr (00:11)
-
-Gemessen: `data/ps.json` um 00:09 zeigt `bn4rep.js` als PID 26 - der
-Prozess lebt. Aber `data/bn4rep.json` traegt den Zeitstempel
-1787670308432 = **25.08. um 17:05**, also **55 Stunden alt**.
-
-Erwartet: Die Datei wird in jeder Runde neu geschrieben. Ein Prozess, der
-laeuft und nichts schreibt, haengt in einem Zweig ohne Rueckweg.
-
-Der Inhalt bestaetigt, wie alt er ist:
-
-    hacking 100, multHacking 1,387, repGesamt 9.562
-    faktionen: Aevum, Sector-12, Slum Snakes, CyberSec
-    ziel: "Cranial Signal Processors - Gen II" (CyberSec)
-
-**Bladeburners steht nicht in der Faktionsliste** - dabei sind dort bei Rang
-19.327 rund 38.654 Reputation verdient
-(`RankToFactionRepFactor 2`). Die gesamte Augmentierungsplanung laeuft
-also an der einzigen Faktion vorbei, die in diesem Knoten etwas beitraegt.
-
-Verdacht auf die Fundstelle: `src/bn4rep.js:1093` haelt selbst fest, dass
-"jede Arbeit die laufende Bladeburner-Aktion abbricht". Wahrscheinlich
-wartet das Skript auf eine Faktionsarbeit, die `blade.js` ihm in jeder
-Runde wieder wegnimmt - eine Warteschleife ohne Ausgang. Zu pruefen ist
-auch die `bladeSperre` bei `:651`, die aber greifen duerfte, weil
-`inBladeburner()` heute true ist.
-
-**Warum das dringend ist:** Geld steht bei **6,07 Mrd**, INTERLINKED kostet
-5,5. Der groesste Dauerhebel des Knotens ist finanzierbar, und der
-Automatismus, der ihn ziehen soll, ist seit zwei Tagen blind.
-
-**Und eine Abwaegung gehoert dazu, bevor jemand den Einbau ausloest:** Ein
-Prestige setzt die Kampfwerte zurueck (`Prestige.ts`), Rang und
-Aktionsstufen bleiben (`Bladeburner.ts:259-263`). Der laufende
-Assassination-Aufbau (Stufe 5 von 12 um 00:07) wuerde dadurch abbrechen -
-seine Chance faellt unter `SICHER_OPERATION`, bis die Kampfwerte wieder
-stehen. Der Einbau gehoert also **nach** den Aufbau, nicht mitten hinein.
-
-
-### Wartet bis Eric: zwei Handgriffe im Spiel (19:45, belegt 20:45)
-
-**Belegt, nicht vermutet:** `Settings.AutoexecScript` steht im Spielstand auf
-`""` - gelesen 20:45 ueber `getSaveFile` (`save.data.SettingsSave`), also
-ohne Browser. Von aussen ist das Feld nicht setzbar: Die Remote File API kennt
-`getSaveFile`, aber kein Gegenstueck zum Schreiben, und keine ns-Funktion
-fasst `Settings` an. Der Punkt ist deshalb kein Loop-Auftrag, sondern eine
-Eric-Sache - die Ueberschrift sagt das jetzt, damit er den Loop nicht jeden
-Lauf blockiert.
-
-Beide sind Ein-Klick-Sachen fuer Eric und von aussen nicht setzbar. Die
-Aufsicht prueft sie und erinnert daran, statt dass sie jemand vergisst.
-
-**1. Autoexec auf `boot.js`** — Options -> System -> "Autoexec Script + Args".
-`Settings.AutoexecScript` wird beim Laden der Seite auf `home` gestartet
-(`NetscriptWorker.ts:185-253`). Damit heilt sich der Bot nach jedem
-Seitenladen selbst. Risikofrei, weil `boot.js` idempotent ist — es prueft
-`ns.ps("home")`, bevor es etwas startet (`boot.js:86,118`).
-
-Was ohne diesen Schalter NICHT gedeckt ist — und nur das:
-
-    Rechnerneustart        gedeckt: die Engine stellt laufende Skripte
-                           selbst wieder her (loadAllRunningScripts)
-    geplanter Einbau       gedeckt: bn4rep.js:960 ruft
-                           installAugmentations("boot.js")
-    alles tot, kein Reset   NUR ueber Autoexec
-
-**Damit korrigiere ich meine eigene Darstellung von 19:44:** Das Loch ist
-kleiner, als ich es genannt hatte. Der Rechnerneustart ist kein Fall — die
-Engine startet die laufenden Skripte aus dem Spielstand neu. Es bleibt der
-Totalausfall ohne Prestige.
-
-**2. Opera mit `--remote-debugging-port=9222`.** Port 9222 ist zu. Solange
-das so ist, kann kein Skript pruefen, ob der Spiel-Tab lebt, und keine
-Sitzung im Notfall etwas im Spielterminal eintippen. Das ist der letzte
-Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
-greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 

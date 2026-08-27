@@ -42,11 +42,11 @@ Regeln:
 
 ## Sofort
 
-### Nachmessen: steht die gemessene Reputationsrate in der richtigen Groessenordnung? (10:21)
-Gemessen: `data/rep-ziel.txt`, **Zeile 3** - seit 10:19 steht dort direkt, mit welcher Rate der Motor rechnet. Erste Ablesung, alle drei noch mit Stern (= Formelwert, der Neustart hat den Messspeicher geleert): **Aevum 169,1 | Slum Snakes 150,4 | Bladeburners 104,2** rep/min.
-Erwartet: Ab etwa 10:25 muessen die Sterne verschwinden, und **Bladeburners muss bei 20 bis 30** liegen - real gemessen sind 23,8 rep/min (5.665 um 09:47 gegen 6.380 um 10:17). Aevum lag bei 34.
-Verdacht: kein Fehler vermutet. Steht dort weiter ein Stern, laeuft die Messschleife nicht durch - dann ist zu pruefen, ob `bn4rep` das Rundenende ueberhaupt erreicht (`bn4rep.js:355` nennt vier Ausstiegsstellen). Liegt der Wert ohne Stern deutlich neben 23,8, stimmt die Messung selbst nicht und die Aenderung von 09:50 gehoert zurueckgedreht.
-Nebenbei korrigiert: Meine Handrechnung von 09:50 (543 fuer Aevum, 335 fuer Bladeburners) war zu hoch - die Formel liefert 169,1 und 104,2. Der Fehlfaktor ist also **rund 4,4**, nicht 16 bis 18.
+### Nachmessen: traegt der Messanker die Reputationsrate? (11:50)
+Gemessen um 11:47, erstmals ohne Sterne - und das Kriterium von 10:21 war **verfehlt**: Der Motor sagte **Bladeburners 39,4** rep/min (verlangt waren 20 bis 30), real sind es **24,4** (6.380 um 10:17 gegen 8.580 um 11:47). **Aevum 20** gegen real **40,1**. **Slum Snakes 3** gegen real **2,85** - exakt.
+Erwartet: Nach der Aenderung von 11:49 waechst das Messfenster mit der Laufzeit. Ab etwa **12:35** (45 Minuten nach dem Neustart um 11:49) muessen stehen: **Bladeburners 20 bis 30**, **Aevum 35 bis 45**, Slum Snakes 2 bis 4. Vorher sind die Werte noch zu ungeglaettet, um zu urteilen.
+Verdacht: kein Fehler vermutet. Trifft es nach 45 Minuten immer noch nicht, ist der Mechanismus falsch und nicht nur das Fenster - dann beide Commits (09:50 und 11:49) zurueckdrehen und den Formelwert wieder nehmen.
+**Warum nicht zurueckgedreht wurde**, obwohl das Kriterium verfehlt war: Die zwei Abweichungen gehen in ENTGEGENGESETZTE Richtungen (39,4 statt 24,4 und 20 statt 40,1). Das ist Rauschen, kein systematischer Fehler - und Slum Snakes traf exakt, der Mechanismus funktioniert also. Die Formel dagegen liegt bei allen drei um Faktor 4,4 zu hoch. Eine rauschende Messung mit richtigem Mittel ist besser als ein sicher falscher Wert; behoben gehoerte die Fensterlaenge, nicht die Messung.
 
 ## Offen, nach Dringlichkeit
 

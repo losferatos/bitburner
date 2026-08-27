@@ -23,6 +23,65 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Chance-Faehigkeiten werden gedaempft, wenn die Chance klemmt - VERIFIZIERT (28.08., 01:14)
+
+`getSuccessChance` klemmt bei 1,00 (`Actions/Action.ts`). Steht eine Aktion
+dort, verpufft jeder weitere competence-Zuwachs. `relNutzen` hat das bis
+01:10 nicht gewusst und den prozentualen Zuwachs voll angerechnet - deshalb
+kaufte der Motor um 00:54 Blade's Intuition auf Stufe 45 fuer **95 Punkte**,
+mit einem ausgewiesenen Nutzen von 1,293 Prozent. Der wahre Nutzen war null:
+Raid stand bei 1,0 bis 1,0 (21:40), Assassination bei 1,000.
+
+**Kein pauschales Abschalten, sondern eine Messung.** Bei Black Ops klemmt es
+nicht - Operation Ares stand um 00:53 bei 0,758 bis 1,000, und dort wirken
+diese Faehigkeiten voll. Wer sie generell abwertet, laesst genau die
+verhungern, die den Knotenausgang tragen.
+
+`klemmFaktor()` in `src/blade.js` nimmt deshalb zwei Sonden - die naechste
+Black Op und die beste laufende Operation - und gibt den Anteil derer
+zurueck, die noch unter 0,999 stehen. Bei Ares offen und Assassination
+geklemmt sind das **0,5**. Untergrenze 0,05, damit die Faehigkeiten wieder
+anziehen koennen, wenn eine schwere Black Op ansteht.
+
+**Verifiziert 01:14, ueber sechs Messungen in zwei Minuten:**
+
+    Blade's Intuition   45  ->  45   (kein Kauf mehr)
+    Overclock           16  ->  23   (sieben Kaeufe)
+
+Vor der Aenderung war es umgekehrt: Blade's Intuition stieg, Overclock stand.
+Der Motor laeuft unveraendert weiter (Assassination-Stufenaufbau 8 von 12).
+
+Und die Rangrate zieht an: **58,7 Rang/min** im Fenster 01:07 bis 01:14
+(`strategie-check`) gegen 38,1 waehrend des Aufbaus seit 23:39. Das ist ein
+kurzes Fenster und enthaelt beide Hebel - Overclock und die gestiegene
+Assassination-Stufe -, die Trennung misst der naechste Optimierlauf.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### relNutzen rechnet Chance-Faehigkeiten voll an, obwohl die Chance bei 1,00 klemmt (00:58)
+
+Gemessen: Raid steht bei **1,0 bis 1,0** (21:40), Assassination bei
+**1,000** (00:53). Trotzdem gibt `relNutzen` in `src/blade.js` fuer
+Blade's Intuition auf Stufe 44 einen Nutzen von 1,293 Prozent aus und
+kaufte sie um 00:54 auf Stufe 45 - fuer 95 Punkte.
+
+Erwartet: Der Nutzen einer Chance-Faehigkeit ist **null**, sobald die
+Aktionen, auf die sie wirkt, bei 1,00 stehen. `getSuccessChance` klemmt dort
+(`Actions/Action.ts`), jeder weitere competence-Zuwachs verpufft.
+
+Verdacht: `src/blade.js`, `relNutzen` und `CHANCE_SKILLS`. Die Abdeckung
+ist als feste Zahl hinterlegt (`abdeckung: 1.0` fuer Blade's Intuition), sie
+muesste stattdessen die Aktionen zaehlen, deren Chance **noch nicht** klemmt.
+
+Vorsicht bei der Umsetzung: Fuer **Black Ops** gilt die Klemme nicht - Ares
+stand um 00:53 bei 0,758 bis 1,000. Eine Faehigkeit, die dort wirkt (Digital
+Observer trifft alle 21), behaelt ihren Wert. Der Fix ist also kein
+Abschalten, sondern eine Abdeckung, die misst statt zu raten.
+
+</details>
+
+---
+
 ### WIDERLEGT: bn4rep.js ist nicht tot - drei eigene Fehlalarme in Folge (28.08., 00:52)
 
 Der Sofort-Punkt von 00:11 war falsch, und die beiden Verdachtsmomente, die

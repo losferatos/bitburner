@@ -605,7 +605,57 @@ export async function main(ns) {
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;
     const a = 1 + stufe * c.proz / 100;
-    return 100 * ((a + c.proz / 100) / a - 1) * c.abdeckung;
+    return 100 * ((a + c.proz / 100) / a - 1) * c.abdeckung * klemmFaktor();
+  };
+
+  // WAS NICHT MEHR STEIGEN KANN, IST NICHTS MEHR WERT (28.08.2026, 01:10).
+  //
+  // `getSuccessChance` klemmt bei 1,00 (`Actions/Action.ts`). Steht eine
+  // Aktion dort, verpufft jeder weitere competence-Zuwachs - und mit ihm der
+  // Nutzen jeder Chance-Faehigkeit, die auf sie wirkt. `relNutzen` hat das
+  // bis hierher nicht gewusst: Es rechnete den prozentualen Zuwachs, ohne zu
+  // pruefen, ob er ankommt.
+  //
+  // Gemessen 00:53, und deshalb steht diese Funktion hier: Raid 1,0 bis 1,0
+  // (21:40), Assassination 1,000 - und trotzdem wurde Blade's Intuition fuer
+  // **95 Punkte** auf Stufe 45 gekauft, mit einem ausgewiesenen Nutzen von
+  // 1,293 Prozent. Der wahre Nutzen war null.
+  //
+  // ABER NICHT IMMER NULL: Bei Black Ops klemmt es nicht. Operation Ares
+  // stand um 00:53 bei 0,758 bis 1,000, und dort wirkt jede dieser
+  // Faehigkeiten voll. Ein pauschales Abschalten waere also falsch - es
+  // wuerde genau die Faehigkeiten verhungern lassen, die den Knotenausgang
+  // tragen.
+  //
+  // Deshalb wird GEMESSEN statt geraten: zwei Sonden, die zusammen abdecken,
+  // wo die Chance-Faehigkeiten ueberhaupt wirken koennen - die naechste
+  // Black Op und die beste laufende Operation. Der Faktor ist der Anteil der
+  // Sonden, die noch Luft haben. Bei Ares offen und Assassination geklemmt
+  // sind das 0,5.
+  //
+  // Die 0,999 statt 1,0 als Grenze: Die geschaetzte Chance schwankt im
+  // letzten Promille mit der Bevoelkerungsschaetzung der Stadt, und ein
+  // Nutzen, der an dieser Stelle kippt, waere Rauschen.
+  const klemmFaktor = () => {
+    const sonden = [];
+    try {
+      const bo = ns.bladeburner.getNextBlackOp();
+      if (bo) sonden.push(ns.bladeburner.getActionEstimatedSuccessChance(B, bo.name)[0]);
+    } catch { /* keine Black Op mehr: dann zaehlt nur die Operation */ }
+    for (const n of ["Assassination", "Raid", "Stealth Retirement Operation"]) {
+      try {
+        if (offen(O, n) < 1) continue;
+        sonden.push(ns.bladeburner.getActionEstimatedSuccessChance(O, n)[0]);
+        break;
+      } catch { /* naechste */ }
+    }
+    if (!sonden.length) return 1;
+    const offenAnteil = sonden.filter((x) => x < 0.999).length / sonden.length;
+    // Nie ganz auf null: Faellt eine schwere Black Op an, muessen die
+    // Faehigkeiten wieder anziehen koennen, und dafuer brauchen sie einen
+    // Rest an Gewicht in der Sortierung. Ein Zwanzigstel genuegt - es
+    // verliert gegen Overclock, gewinnt aber gegen gar nichts.
+    return Math.max(0.05, offenAnteil);
   };
   // Reaper und Evasive System kamen am 27.08. um 15:53 dazu. Gerechnet auf dem
   // damaligen Stand (str 172, def 143, dex 325, agi 168): Reaper Stufe 9 gab

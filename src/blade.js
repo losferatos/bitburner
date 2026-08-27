@@ -143,6 +143,10 @@ export async function main(ns) {
   // Von 0,80 auf 0,40 am 27.08. um 12:49: die alte Begruendung uebersah den
   // zweiten Term der Krankenhauskosten. Rechnung in nodes/HEBEL.md.
   const SICHER_BLACKOP = 0.40;
+  // Zielgroesse des Trupps. Sechs, weil der Bonus mit Exponent 0,05 waechst
+  // und der Grenznutzen danach um Faktor drei einbricht - Rechnung im Block
+  // "2b. Den Trupp auffuellen" weiter unten. 0 schaltet die Regel ab.
+  const TRUPP_ZIEL = 6;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
   const SPANNE_ZU_BREIT = 0.10;
   // Ausdauer. Die Strafe ist min(1, stamina/(0,5*max)) (Bladeburner.ts:167-169)
@@ -972,6 +976,53 @@ export async function main(ns) {
         // Rang reicht, Sicherheit nicht: Das ist der Normalfall und kein
         // Grund zu warten - unten wird weiter Rang und Erfahrung gesammelt,
         // bis die Chance steht.
+      }
+    }
+
+    // 2b. DEN TRUPP AUFFUELLEN, SOLANGE ER BILLIG IST (27.08.2026, 19:52).
+    //
+    // `operationTeamSuccessBonus = (teamCount + 1)^0,05`
+    // (`Actions/Operation.ts:96-98`) gilt fuer Operationen UND Black Ops -
+    // multiplikativ auf die competence, also auf die ganze Reststrecke. Der
+    // Bot hat trotzdem nie einen Mann rekrutiert: `teamCount` stand am
+    // 27.08. um 18:19 auf 0, und in `src/` gab es keinen einzigen Aufruf von
+    // `Recruitment`.
+    //
+    // Warum genau SECHS und nicht zwanzig: Der Exponent 0,05 ist extrem
+    // flach, und die Rekrutierungschance ist
+    // `charisma^0,45/(teamSize - sleeveSize + 1)`
+    // (`data/GeneralActions.ts:29-31`). Bei Charisma 264 ist
+    // `charisma^0,45 = 12,29`, die Chance steht also **bis elf Mitglieder auf
+    // 1,00** - jeder Versuch sitzt. Die Dauer betraegt
+    // `max(10, 300 - (cha^0,81 + cha/90))` = **206 Sekunden**. Gerechnet:
+    //
+    //     bis  5 Mitglieder   0,29 h   Bonus  +9,4 %    32,8 %/h
+    //     bis 11              0,63 h         +13,2 %    11,2 %/h
+    //     bis 20              1,32 h         +16,4 %     3,7 %/h
+    //     bis 30              2,46 h         +18,7 %     1,7 %/h
+    //
+    // Der Grenznutzen bricht nach fuenf um Faktor drei ein. Die ersten
+    // siebzehn Minuten bringen 9,4 Prozent, die naechsten zwei Stunden
+    // zusammen nur noch 9,3.
+    //
+    // Und es haelt sich selbst: `BlackOperation.getMinimumCasualties()` gibt
+    // 1 zurueck (`Actions/BlackOperation.ts:63-65`), aber solange die Chance
+    // auf 1,00 steht, kostet jeder Ersatz genau einen Lauf.
+    //
+    // NICHT waehrend einer Black Op und nicht bei knapper Ausdauer - der
+    // Block steht deshalb NACH der Black-Op-Pruefung. Recruitment selbst
+    // verbraucht keine Ausdauer (`data/GeneralActions.ts:33-34`).
+    if (TRUPP_ZIEL > 0) {
+      let trupp = -1;
+      try { trupp = ns.bladeburner.getTeamSize(); } catch { /* alte Fassung */ }
+      if (trupp >= 0 && trupp < TRUPP_ZIEL) {
+        return { typ: G, name: "Recruitment",
+          grund: "Trupp auffuellen (" + trupp + "/" + TRUPP_ZIEL + ")" };
+      }
+    }
+
+    {
+      {
       }
     }
 

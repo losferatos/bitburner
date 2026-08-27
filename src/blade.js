@@ -1801,15 +1801,62 @@ export async function main(ns) {
       //
       // Also tritt der Motor zurueck, solange das Tor zu ist. Er verliert dabei
       // nichts: Ohne Kampfwerte gaebe es ohnehin keinen Rang.
+      // DIE SCHWELLE 100 WAR ZU NIEDRIG (28.08.2026, 01:52).
+      //
+      // Sie stammt aus dem Fall "Kampfwerte auf 1" und trifft den heutigen
+      // nicht mehr. Nach dem Einbau um 01:25 stand der Tiefstand binnen
+      // Minuten wieder bei 101 - der Motor uebernahm also die Figur zurueck,
+      // waehrend die Chancen noch am Boden lagen. Gemessen 01:39
+      // (`src/astufe.js`):
+      //
+      //     Assassination  Stufe  9   Chance 0,354
+      //     Raid           Stufe 12          0,230
+      //     Stealth Ret.   Stufe 10          0,561
+      //
+      // Alle drei liegen unter `SICHER_OPERATION` = 0,85. Was blieb, war
+      // **Diplomacy**: null Rang, null Erfahrung - und dabei blockierte es
+      // das Gym, das mit `expMult` 10 (`bbtrain.js:50`) den Tiefstand
+      // zehnmal schneller hebt als Bladeburner-Training (30 exp je 30 s auf
+      // alle vier, `Bladeburner.ts:1092-1103`).
+      //
+      // Um 01:33 stand "Arbeit dex @ Powerhouse Gym", um 01:37 "Diplomacy",
+      // um 01:41 wieder Diplomacy - die beiden Skripte haben sich die Figur
+      // gegenseitig weggenommen. Genau die Dialogflut, gegen die diese Regel
+      // urspruenglich gebaut wurde, nur eine Etage hoeher.
+      //
+      // Der richtige Test ist nicht der Kampfwert, sondern die Frage, ob es
+      // ueberhaupt etwas zu verdienen gibt: Liegt **keine** Operation und
+      // **kein** Vertrag ueber seiner Schwelle, ist Weichen strikt besser als
+      // jede Aktion, die dann noch bliebe.
       const kw = ns.getPlayer().skills;
       const tiefstand = Math.min(kw.strength, kw.defense, kw.dexterity, kw.agility);
-      if (tiefstand < 100) {
+      let lohntSich = false;
+      try {
+        for (const n of OPERATIONEN) {
+          if (offen(O, n) < 1) continue;
+          if (ns.bladeburner.getActionEstimatedSuccessChance(O, n)[0] >= SICHER_OPERATION) {
+            lohntSich = true; break;
+          }
+        }
+        if (!lohntSich) {
+          for (const n of VERTRAEGE) {
+            if (offen(V, n) < 1) continue;
+            if (ns.bladeburner.getActionEstimatedSuccessChance(V, n)[0] >= SICHER_VERTRAG) {
+              lohntSich = true; break;
+            }
+          }
+        }
+      } catch { lohntSich = true; }   // im Zweifel weiterarbeiten
+      if (tiefstand < 100 || !lohntSich) {
         if (!gewichen) {
-          sag("Kampfwerte bei " + tiefstand + " - ueberlasse die Figur bbtrain.js.");
+          sag("Kampfwerte bei " + tiefstand
+            + (lohntSich ? "" : ", keine Aktion ueber ihrer Schwelle")
+            + " - ueberlasse die Figur bbtrain.js.");
           gewichen = true;
           try { ns.bladeburner.stopBladeburnerAction(); } catch {}
         }
-        meldeLage("General/keine", "weicht bbtrain, Kampfwerte " + tiefstand);
+        meldeLage("General/keine", "weicht bbtrain, Kampfwerte " + tiefstand
+          + (lohntSich ? "" : ", nichts ueber Schwelle"));
         await ns.sleep(30000);
         continue;
       }

@@ -46,13 +46,6 @@ Regeln:
 
 ## Sofort
 
-### `s.min` ist bei Black Ops Bevoelkerungsrauschen - der Motor gated auf einer Zufallszahl (18:17)
-Gemessen: Typhoon meldete heute 0,212 exakt (16:19), dann 0,239-0,269 (17:41), dann 0,286-0,295 (18:15). Die Spanne geht auf und zu, ohne dass sich an der Sache etwas aendert.
-Erwartet: Bei Black Ops gibt es GAR KEINE Schaetzunsicherheit. `Actions/BlackOperation.ts:55-61`: `getPopulationSuccessFactor()` und `getChaosSuccessFactor()` geben beide fest **1** zurueck. Damit ist in `getSuccessRange` (`Actions/Action.ts:144-167`) `est === real`, also `diff = 0`, also `low = high = real` - und trotzdem wird danach `low *= r` mit `r = city.pop / city.popEst` gerechnet. Die Spanne stammt allein aus der Bevoelkerungsschaetzung, die auf Black Ops nicht wirkt.
-Verdacht: `src/blade.js:687-712` gated `SICHER_BLACKOP` auf genau diesem `s.min`. `popEst` startet bei `pop*(rand+0,5)` (`City.ts:23`), kann also bis zu **1,5-fach** zu hoch stehen - dann sieht der Motor **zwei Drittel** der wahren Chance. Der wahre Wert ist immer einer der beiden Randwerte: bei `r < 1` ist es `s.max`, bei `r >= 1` ist es `s.min`.
-**Die wahre Chance ist exakt berechenbar** - alle Eingaben sind ueber die API lesbar (Kampfwerte, `getSkillLevel`, `getStamina`, `teamCount`, `baseDifficulty` fest 2000 fuer Typhoon; Formel in `Actions/Action.ts:169-196`). Zu tun: die Chance rechnen statt schaetzen lassen, dann gegen `SICHER_BLACKOP` pruefen.
-**Folgenschwer ueber den Motor hinaus:** Der Reportloop hat um 17:42 die aufgehende Spanne als "die Kampfwerte steigen schneller als die Schaetzung nachkommt" gedeutet und darauf ein Ziel gesetzt. Das war Rauschen als Fortschrittsmass. Jedes Ziel auf `s.min` oder der Spannenmitte ist wertlos, bis dieser Punkt behoben ist.
-
 ### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
 Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`).
 Nachtrag 16:19 (`node tools/spann.js`): Chance **0,212 - 0,212, die Schaetzspanne ist ZU**. Um 15:51 stand dort noch 0,133 / 0,186. Field Analysis hat ihre Arbeit getan; der Motor rechnet ab jetzt mit einer exakten Zahl statt mit einer Untergrenze.
@@ -83,6 +76,44 @@ verlangt genau das.
 Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millionen oder faellt der Rang um mehr als 100, gehoert die Schwelle auf 0,80 zurueck. Traegt sie, bleibt es bei 0,40 - tiefer zu gehen bringt nichts, weil der Zeitgewinn gegen die Fehlversuche laeuft.
 
 ## Offen, nach Dringlichkeit
+
+### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
+
+**Gemessen um 18:49: `storedCycles` = 8, Rueckstand 0,0 Minuten.** Der Tab ist
+also nicht gedrosselt und es haengt nichts hinterher. Das ist der Ausgangswert
+einer Messreihe, kein Entwarnungssignal - der Rechner lief bisher durch.
+
+Eric hat kein Homeoffice; der Rechner laeuft kuenftig etwa **15:30 bis 21:00**.
+Bitburner verliert dadurch keinen Bladeburner-Rang: `engine.tsx:333` legt die
+Offline-Zeit vollstaendig als `storedCycles` zur Seite (`Bladeburner.ts:275`,
+`clampInteger(..., 0)` - keine Obergrenze), und `process()` arbeitet sie mit
+hoechstens fuenf Spielsekunden je Aufruf ab (`Bladeburner.ts:1375-1378`), einmal
+je Realsekunde (`engine.tsx:150,201` plus `MilliPerCycle 200`).
+
+    Abbau je Realstunde = 5 h Spielzeit, davon 1 h "neu"  ->  netto 4 h
+    Gleichgewicht:  T_on * 4 = 24 - T_on   ->   T_on = 4,8 h am Tag
+
+**5,5 Stunden liegen darueber - aber der Puffer sind 42 Minuten.** Ein
+kuerzerer Tag, und der Rest bleibt stehen und summiert sich. Ausserdem gehen
+4,6 der 5,5 Stunden fuers Aufholen drauf; in dieser Zeit laeuft das Spiel
+fuenffach beschleunigt, waehrend die Claude-Loops in Echtzeit takten - die
+Strategie entscheidet also fuenfmal traeger, als das Spiel laeuft.
+
+**Der zweite Weg unter die Schwelle ist die Tab-Drosselung.** Ein verdeckter
+Tab bekommt eine Timer-Weckung je Minute (`doku/drosselung.md`), dann faellt
+der Abbau von 5 s/s auf 5 s/min - Faktor zwoelf. Damit reicht auch ein
+durchlaufender Rechner nicht mehr.
+
+Werkzeug dafuer ist neu: `node tools/rueckstand.js` liest `storedCycles` aus
+dem Spielstand (die API kennt es nicht), schreibt es nach
+`data/rueckstand.json` fort und meldet den Trend je Stunde. Es gehoert in den
+Reportloop, damit aus der Rechnung oben eine Messreihe wird.
+
+Zu tun: (1) Den Aufruf in den Reportloop aufnehmen. (2) Nach drei Tagen
+entscheiden, ob 5,5 Stunden reichen - **an der Messreihe, nicht an dieser
+Rechnung**. (3) Waechst der Rueckstand, ist die Drosselung der erste Verdacht,
+nicht die Rechnerzeit.
+
 
 ### Der Ausgang aus BitNode 6: 319.430 Rang netto, geschaetzt 80-180 Stunden (17:51, korrigiert 18:13 nach Fremdpruefung)
 

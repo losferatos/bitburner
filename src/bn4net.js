@@ -2595,7 +2595,25 @@ export async function main(ns) {
       // beim Neustart ohne Verlust wieder an; ein abgebrochener weaken, grow
       // oder hack dagegen wirft seine gesamte bisherige Laufzeit weg, und
       // hack ist der einzige, der Geld bringt - er stirbt zuletzt.
-      if (fehlend.length && werkbank !== "home") {
+      // AUCH AUF HOME RAEUMEN (27.08.2026, 06:20) - hier stand
+      // `werkbank !== "home"`, und genau daran ist der Wiederanlauf seit dem
+      // 25.08. immer wieder gescheitert.
+      //
+      // Die Kette: Nach einem Einbau sind alle gekauften Rechner weg, also
+      // wird home zur Werkbank (:770-778). Der Startcode unten prueft dann
+      // `werkbankMoeglich = frei + raeumbare Arbeiter` und WARTET, wenn das
+      // Werkzeug dort theoretisch passen wuerde - in der Annahme, dieser
+      // Block habe inzwischen geraeumt. Auf home hat er das nie getan.
+      // Ergebnis: Ein Werkzeug, das auf home passen wuerde, wartet endlos auf
+      // Platz, den niemand schafft.
+      //
+      // Gemessen am 27.08.: `bbtrain.js` (94,75 GB) lief von 03:48 bis 04:18
+      // nicht, waehrend home 2048 GB hatte - belegt mit Arbeitern. Dasselbe
+      // Muster am 26.08. um 16:36 mit `blade.js`.
+      //
+      // Geraeumt werden ausschliesslich `WORKER`-Skripte; die beiden
+      // Steuerhaelften stehen nicht in der Liste und bleiben unberuehrt.
+      if (fehlend.length) {
         for (const [datei] of fehlend) {
           const braucht = ns.getScriptRam(datei, "home");
           if (!(braucht > 0) || frei() >= braucht) continue;

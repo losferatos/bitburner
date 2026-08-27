@@ -37,6 +37,41 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Reaper und Evasive System dynamisch, Deckel 16 und 17 (27.08., 15:53)
+
+Engpass: **Zum dritten und vierten Mal an einem Tag dasselbe Muster** - eine
+gedeckelte Faehigkeit mit besserem Nutzen je Punkt, waehrend Blade's Intuition
+mit dem schlechtesten Wert alle Punkte bekommt.
+
+Hypothese: Die competence steigt je Punkt um **0,059 (Reaper) und 0,047
+(Evasive System)** statt um 0,031 - Faktor 1,9 beziehungsweise 1,5.
+
+Beleg: `data/Skills.ts:54-72`. Beide heben nicht die Chance, sondern den
+**effektiven Kampfwert**: Reaper 2 Prozent auf alle vier, Evasive System 4 auf
+dex und agi. Der wirkt ueber
+`competence += weights[stat] * effSkill^decays[stat]`
+(`Actions/Action.ts:173`), bei Black Ops mit Gewicht 0,2 und Decay 0,8 je
+Kampfwert - also gedaempft und abhaengig vom aktuellen Stand. Gerechnet auf
+str 172, def 143, dex 325, agi 168:
+
+    Short-Circuit     St.20   41,9 Punkte   0,0642 je Punkt
+    Reaper            St. 9   18,8          0,0593
+    Evasive System    St.13   27,2          0,0467
+    Blade's Intuition St.26   55,5          0,0309   <- bekam alles
+
+**Nebenbefund, der eine naheliegende Idee erledigt:** Die Kampfwerte stehen
+sehr ungleich (dex 325 gegen def 143). Weil der Decay 0,8 fast linear ist,
+braechte eine Gleichverteilung bei gleicher Summe nur **+0,8 Prozent** - es
+lohnt nicht, gezielt den Tiefstand hochzuziehen, sobald er ueber der
+Beitrittsschwelle liegt.
+
+Vorher: Reaper **Stufe 8** (Deckel 8), Evasive System **Stufe 12** (Deckel 12),
+Typhoon-Chance min **0,133** um 15:51
+Nachher: (offen - der naechste Lauf misst beide Stufen in `data/bbspann.json`.
+Steigen sie nicht ueber 8 beziehungsweise 12, greift die Sortierung fuer diese
+zwei nicht und der Eintrag gehoert geprueft. Die Chance sollte mitziehen.)
+Commit: siehe git log, blade.js 27.08. 15:53
+
 ### Short-Circuit-Deckel von 12 auf 30 (27.08., 13:19)
 
 Engpass: Dieselbe Luecke wie bei Hyperdrive - die Faehigkeitspunkte gingen an
@@ -57,11 +92,11 @@ die der Motor faehrt. Die Faehigkeit trifft also alles, was zaehlt.
     Short-Circuit     St. 30   62,9 Punkte   +2,12 %   0,034   <- Schnittpunkt
 
 Vorher: Short-Circuit **Stufe 12**, Typhoon-Chance min **0,125** um 13:17
-Nachher: (offen - die 811 Punkte fuer Stufe 13 bis 30 brauchen Zeit. Erste
-Wirkung ab Stufe 13 bis 15, also nach rund 90 Punkten. Der naechste Lauf
-misst die Stufe in `data/bbspann.json` und die Chance. Steht die Stufe nach
-zwei Stunden noch auf 12, greift der Plan nicht und der Eintrag gehoert
-geprueft.)
+Nachher: **BESTAETIGT um 15:51 - Stufe 19**, und die Chance steht bei min
+**0,133** (max 0,186), obwohl zwischendurch ein Augmentierungs-Einbau alle
+Kampfwerte auf 1 zurueckgesetzt hat. Blade's Intuition blieb dabei
+unveraendert auf 25 - die dynamische Sortierung von 13:49 lenkt die Punkte
+also nachweislich um.
 Commit: ac7565c
 
 **Struktureller Befund, der aus beiden Hebeln folgt:** Ein Faehigkeitsplan mit

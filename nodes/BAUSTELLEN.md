@@ -9,73 +9,9 @@ Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
-- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
-  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
-  beheben. Abgeraeumtes wandert nach "Erledigt".
-- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
-  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
-  beginnt, wird uebersprungen statt angefangen.
-- Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
-- Erledigtes wird nach unten verschoben, nicht geloescht - der Verlauf ist die
-  Begruendung fuer das, was heute steht.
-- Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
-- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
-  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
-  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
-  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
-  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
-  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
-  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
-  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
-  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
-  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
-  bin."
-  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
-  sondern weil sie feststeht (Fables Analyse,
-  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
-  dazwischenfunken.
-  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
-  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
-  groessten offenen Hebel des Knotens einen halben Nachmittag.*
+- **`## Sofort
 
----
-
-## Sofort
-
-### Wartet bis zum naechsten Einbau: Erkennt der Pruefer ihn jetzt? (22:01)
-
-**Messung 26.08., 16:31: JA.** Der Einbau kam um 16:31:42, und
-`tools/strategie-check.js` meldete unmittelbar `URTEIL: RESET` mit der Phase
-"Wiederaufbau nach Einbau" und dem Traeger "Kampfwert-Tiefstand = 1 von 100".
-Um 17:07 stand die Phase wieder auf "Black Operations". Der Punkt ist damit
-beantwortet, bleibt aber bis zum naechsten Einbau stehen - eine einzelne
-Beobachtung ist noch kein Nachweis, dass die Erkennung stabil ist.
-Gemessen: URTEIL SPUR bei Kampfwerten 1/1/1/1, Netz 13/70 und 1m Guthaben -
-alles Zeichen eines frischen Einbaus.
-Erwartet: RESET. Danach gehoert der Wiederanlauf geprueft, und genau der ist
-diesmal wieder stillgeschwiegen gescheitert (siehe Punkt darueber).
-Verdacht: `tools/strategie-check.js` erkennt RESET am Rueckgang des TRAEGERS.
-In BitNode 6 ist der Traeger der Bladeburner-Rang - und der ueberlebt einen
-Augmentierungs-Einbau, er faellt nur beim BitNode-Wechsel. Der Einbau ist
-deshalb fuer diesen Pruefer unsichtbar.
-**Geaendert 23:47, Wirkung noch nicht gemessen:** Der Pruefer meldet RESET,
-wenn die Phase von etwas anderem auf "Wiederaufbau nach Einbau" wechselt. Das
-tritt genau einmal je Einbau auf, und danach betritt die Wache ihren
-RESET-Zweig und prueft den Wiederanlauf - genau das, was um 22:01 gefehlt hat.
-
-Eine Falle steckte im ersten Entwurf: Als Vergleich diente `frueher`, und das
-ist nach TRAEGER gefiltert. Nach einem Einbau enthaelt die Liste nur Punkte
-aus der VORIGEN Wiederaufbauphase, deren Phase dieselbe ist - der Wechsel
-waere unsichtbar geblieben. Verglichen wird jetzt mit dem letzten Messpunkt
-des Knotens, unabhaengig vom Traeger.
-
-Nachzumessen beim naechsten Augmentierungs-Einbau: Kommt genau ein
-`URTEIL: RESET`, und bleibt es danach bei SPUR? Ein Versuch, den Fall mit
-praeparierten Kampfwerten in `data/bblage.json` herbeizufuehren, ist
-gescheitert - `frischerSteckbrief()` erneuert die Datei selbst, sobald sie alt
-wirkt, und ueberschreibt die Praeparation.
-
----
+keine
 
 ## Offen, nach Dringlichkeit
 
@@ -346,6 +282,22 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der Pruefer erkennt den Einbau (27.08., 07:20)
+
+**Verifiziert: `URTEIL: RESET` um 03:48**, unmittelbar nach dem Einbau, mit
+Phase "Wiederaufbau nach Einbau" und Traeger "Kampfwert-Tiefstand = 1 von
+100". Zweite Bestaetigung nach dem Einbau vom 26.08., 16:31 - der Punkt
+verlangte genau diese Wiederholung, weil eine einzelne Beobachtung noch kein
+Nachweis ist.
+
+**Ein Folgefehler kam dabei ans Licht und ist behoben:** Vier Minuten nach dem
+Einbau meldete der Pruefer `STAGNATION: Kampfwert-Tiefstand steht seit 681 min
+auf 1`, waehrend bbtrain gerade trainierte. Die Stillstandsuhr zaehlte ueber
+den Einbau hinweg, weil der Traeger dort nicht faellt, sondern **wechselt**
+(Bladeburner-Rang zu Kampfwert-Tiefstand) und der Rueckgangszweig nur auf
+Fallen reagiert. Behoben um 04:00, verifiziert: 681 min auf 3 min bei
+unveraenderter Lage. Eigener Eintrag in HEBEL.md.
 
 ### Das Guthaben war negativ - Gym auf Pump (27.08., 06:55)
 

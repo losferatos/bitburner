@@ -69,7 +69,32 @@ Offen bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten
 darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
 Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
-### Wartet bis Eric bn4net freigibt: Nach einem Einbau starten die Werkzeuge nicht nach (22:03)
+### Nach einem Einbau starten die Werkzeuge nicht nach (Freigabe seit 27.08., 05:00)
+
+**Der Titel hiess bis 05:58 "Wartet bis Eric bn4net freigibt".** Die Freigabe
+ist da; der Punkt ist damit normale Arbeit und wird nicht mehr uebersprungen.
+
+**Untersucht 27.08., 05:50 bis 05:58 - Ursache noch nicht belegt, aber der
+Suchraum ist kleiner.** Die gesamte Nachstart-Logik steckt in
+`if (werkbank) { ... }` (`bn4net.js:2575`). Die Werkbank ist der groesste
+gekaufte Rechner ueber 20 GB - und nach einem Einbau gibt es keinen
+(`"Keine gekauften Rechner"`, gemessen 04:21).
+
+**Dieser Fall ist aber bereits abgefangen** (`bn4net.js:770-778`): Faellt die
+Werkbank aus, wird home genommen, sofern das kleinste Werkzeug dort passt.
+home hatte 2048 GB. Die Bedingung war also erfuellt, und trotzdem lief
+`bbtrain.js` von 03:48 bis 04:18 nicht.
+
+**Was als Naechstes zu tun ist, konkret:** `bn4net` protokolliert seine
+Entscheidungen ueber `sag()` ins Spiel-Log. Beim naechsten Einbau gehoert
+dieses Log gelesen, statt weiter im Quelltext zu suchen - dort steht, ob der
+Block ueberhaupt lief und woran der Start scheiterte. Nach der
+Zehn-Minuten-Regel hier abgebrochen, statt zu raten.
+
+**Ein Nebenbefund, der stehen bleiben soll:** Der Kommentar bei :770 spricht
+vom "kleinsten noch nicht laufenden Werkzeug", der Code nimmt aber das
+kleinste aus der GESAMTEN Werkzeugliste. Das ist grosszuegiger als
+beschrieben, also ungefaehrlich - aber es ist nicht dasselbe.
 
 **Messung 27.08., 04:50 - der Fall ist wieder eingetreten, und diesmal traf er
 den Traeger selbst.** Eine Stunde nach dem Einbau von 03:48 liefen `blade`,

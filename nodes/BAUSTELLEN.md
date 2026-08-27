@@ -42,7 +42,11 @@ Regeln:
 
 ## Sofort
 
-keine
+### Nachmessen: traegt die gemessene Reputationsrate? (09:52)
+Gemessen: `data/rep-ziel.txt`, Zeile 2, Feld `sek` fuer ORION-MKIV Shoulder. Um 09:51 stand dort **290** - noch der Formelwert, das Messfenster von 300 Sekunden lief seit dem Neustart um 09:50 erst an.
+Erwartet: Ab etwa 09:56 muss `sek` auf das **Sechzehn- bis Achtzehnfache** springen, also in die Groessenordnung **4.500 bis 5.500**. Das entspricht der gemessenen Rate von 19 rep/min bei Bladeburners statt der gerechneten 335.
+Verdacht: kein Fehler vermutet - das ist die faellige Verifikation der Aenderung von 09:50 (`bn4rep.js`, `repMessung`/`REP_MESSFENSTER`). **Bleibt `sek` bei rund 300, greift die Messung nicht und die Aenderung gehoert zurueckgedreht** (`git revert` des Commits "bn4rep: die Reputationsrate wird gemessen").
+Zweite Probe im selben Zug: Die **Rangfolge** muss unveraendert bleiben (ORION vorn). Kippt sie, trifft der Faktor die Faktionen doch nicht gleichmaessig - dann ist der Befund groesser als gedacht.
 
 ## Offen, nach Dringlichkeit
 
@@ -89,6 +93,29 @@ den Preismultiplikator hochtreiben. Der Motor wartet richtig.
 ORION gewinnt uebrigens trotz sechsfach kleinerem Wert: die Guete ist Ertrag
 je Sekunde Wartezeit (0,002854 gegen 0,001449), und Hyperion steht danach
 immer noch da.
+
+**Der naechste Einbau liegt weiter weg als gedacht (27.08., 09:52).** Die
+Zahl `sek` aus der Rangliste ist um Faktor 16 bis 18 zu klein: `repPerSecond`
+(`bn4rep.js:1329`) rechnet die Rate aus den Stats des Spielers, unterstellt
+also Faktionsarbeit - die in BitNode 6 gar nicht stattfindet. Gemessen 08:50
+gegen 09:47:
+
+    Aevum        15.726 -> 17.671    34 rep/min   Formel: rund 543
+    Sector-12    14.941 -> 17.011    36 rep/min
+    CyberSec     22.115 -> 24.063    34 rep/min
+    Bladeburners  4.580 ->  5.665    19 rep/min   Formel: rund 335
+    Slum Snakes     655 ->    820     2,9 rep/min
+
+Die Guete-RANGFOLGE bleibt davon weitgehend unberuehrt, weil der Fehler alle
+Faktionen aehnlich trifft - die Wahl war nie falsch. Die Vorhersage aber
+schon: "Kauf gegen 09:09" war siebzehnfach zu frueh, real steht ORION-MKIV
+rund 101 Minuten entfernt.
+
+**Geaendert 09:50, Wirkung noch nicht gemessen** (`bn4rep.js`): Je Faktion
+werden Stand und Zeitstempel mitgefuehrt; nach 300 Sekunden ersetzt die
+gemessene Rate die Formel. Negative Raten - ein Einbau setzt die Reputation
+zurueck - werden verworfen, die Formel bleibt als Anlauf. Die Verifikation
+steht unter `## Sofort`.
 
 **Was offen bleibt:** Ob der Kampfterm mit **Gewicht 10** richtig kalibriert
 ist, zeigt erst der naechste Einbau - dort entscheidet sich, ob die

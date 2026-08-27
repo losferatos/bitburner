@@ -128,10 +128,28 @@ Gewinn von 16 Prozent, nicht die erhofften 80.
 also rund vier Diplomacy-Laeufe. In einer Stadt mit Chaos 20 waere derselbe
 Raid fast kostenlos.
 
-**Was daraus folgt, ist nicht "Raid abschalten", sondern die Rundreise anders
-zu sortieren:** nicht nach der Zahl der Gemeinden, sondern nach dem Chaos, das
-NACH der Diplomacy-Phase bleibt. `tools/staedte.js` rechnet diese Zahl schon
-aus - sie wird nur noch nicht so verwendet.
+**Nachtrag 20:47, eigene Fehlfolgerung korrigiert:** Oben stand, die Rundreise
+gehoere nach dem Chaos zu sortieren statt nach der Zahl der Gemeinden. Das ist
+falsch. Nach der Diplomacy-Phase stehen **alle** Staedte bei 49 - das Chaos ist
+danach kein Unterscheidungsmerkmal mehr, und seine Kosten stecken bereits in
+der Spalte "Rang je Diplomacy-Minute", nach der `tools/staedte.js` ohnehin
+sortiert. Die comms-Sortierung ist richtig.
+
+**Was wirklich hilft, ist tiefer zu senken.** Der Zyklus ist teuer, weil
+`CHAOS_AUS` auf 47 steht und Raid die Schwelle bei 50 sofort wieder reisst.
+Bei einem Ziel von 35 statt 47:
+
+    von 49 auf 35   22 Diplomacy-Laeufe = 22 min, einmalig
+    danach          Raid hebt 3 % je Lauf, also 35 -> 36,05 -> 37,1 ...
+                    bis 50 sind das 12 Raids ohne jede Unterbrechung
+    Ergebnis        12 x 107 Rang in 22 + 13,4 min = 36,3 Rang/min
+
+gegen 31,1 im jetzigen 47er-Zyklus. **Plus 17 Prozent, und der Vorteil waechst
+mit dem Vorrat:** In Sector-12 mit zehn Gemeinden lohnt die Vorab-Diplomacy
+nicht, in Chongqing mit 138 zahlt sie sich zwoelfmal aus.
+
+Das ist eine Optimierung zweiter Ordnung und gehoert erst angefasst, wenn die
+erste gemessen ist. Eingetragen, damit sie nicht verlorengeht.
 
 Zu messen bleibt die Rangrate ueber 45 Minuten, sobald die Rekrutierungsphase
 (20:00 bis 20:14, dabei null Rangzuwachs) aus dem Fenster gelaufen ist.

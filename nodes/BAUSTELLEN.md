@@ -46,6 +46,36 @@ Regeln:
 
 ## Sofort
 
+### Zwei Handgriffe im Spiel, die die Selbstheilung vollenden (19:45)
+
+Beide sind Ein-Klick-Sachen fuer Eric und von aussen nicht setzbar. Die
+Aufsicht prueft sie und erinnert daran, statt dass sie jemand vergisst.
+
+**1. Autoexec auf `boot.js`** — Options -> System -> "Autoexec Script + Args".
+`Settings.AutoexecScript` wird beim Laden der Seite auf `home` gestartet
+(`NetscriptWorker.ts:185-253`). Damit heilt sich der Bot nach jedem
+Seitenladen selbst. Risikofrei, weil `boot.js` idempotent ist — es prueft
+`ns.ps("home")`, bevor es etwas startet (`boot.js:86,118`).
+
+Was ohne diesen Schalter NICHT gedeckt ist — und nur das:
+
+    Rechnerneustart        gedeckt: die Engine stellt laufende Skripte
+                           selbst wieder her (loadAllRunningScripts)
+    geplanter Einbau       gedeckt: bn4rep.js:960 ruft
+                           installAugmentations("boot.js")
+    alles tot, kein Reset   NUR ueber Autoexec
+
+**Damit korrigiere ich meine eigene Darstellung von 19:44:** Das Loch ist
+kleiner, als ich es genannt hatte. Der Rechnerneustart ist kein Fall — die
+Engine startet die laufenden Skripte aus dem Spielstand neu. Es bleibt der
+Totalausfall ohne Prestige.
+
+**2. Opera mit `--remote-debugging-port=9222`.** Port 9222 ist zu. Solange
+das so ist, kann kein Skript pruefen, ob der Spiel-Tab lebt, und keine
+Sitzung im Notfall etwas im Spielterminal eintippen. Das ist der letzte
+Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
+greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
+
 ### Die versionierten Loop-Prompts weichen von den laufenden Jobs ab (19:22)
 Gemessen: Der aktive Reportloop enthaelt einen Absatz "Die Rangrate gehoert geglaettet gemessen ... Der Ausdauerzyklus ist laenger als ein 30-Minuten-Fenster". In `loops/loop-report.md` stand er **nicht** - `grep -c Ausdauerzyklus` lieferte 0 in allen vier Dateien. Dasselbe beim Optimierloop ("Miss geglaettet").
 Erwartet: Die Dateien in `loops/` sind die Wahrheit. Der Skill `/bb-loops` setzt die Cron-Jobs **woertlich aus ihnen** neu auf.

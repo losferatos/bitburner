@@ -35,6 +35,7 @@ import { execSync, spawn } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
+import zlib from "node:zlib";
 import { fileURLToPath } from "node:url";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -189,6 +190,47 @@ async function durchgang() {
     }
   }
 
+  // --- 4. Der Selbstheilungsschalter im Spiel ------------------------------
+  // `Settings.AutoexecScript` wird beim Laden der Seite auf `home` gestartet
+  // (`NetscriptWorker.ts:185-253`, `createAutoexec` in
+  // `loadAllRunningScripts`). Steht dort `boot.js`, heilt sich der Bot nach
+  // jedem Seitenladen selbst - auch dann, wenn ALLE Skripte tot sind und
+  // kein Prestige stattgefunden hat. Das ist der einzige Fall, den sonst
+  // nichts abdeckt:
+  //
+  //   Rechnerneustart      -> gedeckt, die Engine stellt laufende Skripte
+  //                           selbst wieder her (dieselbe Funktion)
+  //   geplanter Einbau     -> gedeckt, `bn4rep.js:960` ruft
+  //                           `installAugmentations("boot.js")`
+  //   alles tot, kein Reset -> NUR ueber Autoexec
+  //
+  // Risikofrei, weil `boot.js` idempotent ist: Es prueft `ns.ps("home")`,
+  // bevor es etwas startet (`boot.js:86,118`).
+  //
+  // Setzen laesst es sich nur in der Oberflaeche (Options -> System ->
+  // "Autoexec Script + Args") - die NS-API kennt die Einstellung nicht, und
+  // ueber das DOM ginge es nur mit der Fernsteuerung. Deshalb prueft die
+  // Aufsicht es und erinnert daran, statt dass es jemand vergisst.
+  try {
+    const res = await fetch("http://127.0.0.1:" + BRUECKE_PORT
+      + "/api/rpc?method=getSaveFile", { signal: AbortSignal.timeout(20000) });
+    const body = await res.json();
+    if (body?.result?.save) {
+      const save = JSON.parse(zlib.gunzipSync(
+        Buffer.from(body.result.save, "latin1")).toString("utf8"));
+      const st = JSON.parse(save.data.SettingsSave);
+      const auto = (st.data ?? st).AutoexecScript ?? "";
+      if (auto.trim()) {
+        sag("Autoexec steht auf '" + auto.trim() + "'.");
+      } else {
+        sag("OFFEN: Autoexec ist leer. Ein Handgriff im Spiel schliesst die"
+          + " letzte Luecke der Selbstheilung: Options -> System ->"
+          + " 'Autoexec Script + Args' auf 'boot.js' setzen.");
+        fehlte.push("autoexec");
+      }
+    }
+  } catch { /* Spielstand nicht lesbar - dann ist die Bruecke das Problem */ }
+
   // --- Protokoll -----------------------------------------------------------
   // Nur schreiben, wenn etwas zu berichten war. Ein Lauf, der alles in Ordnung
   // vorfindet, hinterlaesst nichts - sonst waechst die Datei um 144 Zeilen
@@ -198,7 +240,8 @@ async function durchgang() {
       fs.appendFileSync(PROTOKOLL, meldungen.join("\n") + "\n");
     } catch { /* Protokoll ist Beiwerk, kein Grund zu scheitern */ }
     // Nur bei echten Eingriffen ans Handy - "Tab nicht pruefbar" ist keiner.
-    const meldenswert = fehlte.filter((f) => f !== "bruecke-stumm");
+    // "autoexec" ist eine Erinnerung, keine Stoerung - sie geht nicht ans Handy.
+    const meldenswert = fehlte.filter((f) => f !== "bruecke-stumm" && f !== "autoexec");
     if (meldenswert.length) {
       try {
         execSync("bash \"" + process.env.USERPROFILE.replace(/\\/g, "/")

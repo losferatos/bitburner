@@ -2648,10 +2648,24 @@ export async function main(ns) {
         for (const h of hosts) {
           if (!ns.hasRootAccess(h)) continue;
           if (h === werkbank) continue;
-          // home bleibt aussen vor: Dort schuetzt reserveHome() den Platz der
-          // Steuerung, und ein 768-GB-Werkzeug haette dort ohnehin nie Platz.
-          if (h === "home") continue;
-          const moeglich = freiAuf(h) + arbeiterGbAuf(h);
+          // HOME IST KEIN TABU MEHR, SONDERN EINE RECHNUNG (27.08.2026, 06:10).
+          //
+          // Hier stand `if (h === "home") continue` mit der Begruendung, ein
+          // 768-GB-Werkzeug haette dort "ohnehin nie Platz". Das stimmte, als
+          // home 64 GB hatte. Heute hat es **2048**, und der Ausschluss ist
+          // der Grund, warum `bn4rep.js` in BitNode 6 nirgends unterkommt:
+          // Die Werkbank ist `millenium-fitness` mit 256 GB, der Ausbau auf
+          // 1024 GB kostet **897,6 Milliarden** (CloudServerSoftcap 2,
+          // `BitNode.tsx:702`) gegen 1,9 Milliarden Guthaben - ueber Server
+          // ist der Platz in diesem Knoten nicht zu bekommen.
+          //
+          // Statt des Tabus jetzt die Rechnung: Was auf home moeglich ist,
+          // ist der freie Platz plus die raeumbaren Arbeiter, MINUS der
+          // Reserve, die die beiden Steuerhaelften schuetzt. Fehlt danach
+          // Platz, faellt home wie jeder andere Rechner durch die Pruefung
+          // darunter - nur eben aus Mangel, nicht aus Prinzip.
+          const abzug = h === "home" ? reserveHome() : 0;
+          const moeglich = freiAuf(h) + arbeiterGbAuf(h) - abzug;
           if (moeglich >= braucht && moeglich > meist) { meist = moeglich; bester = h; }
         }
         return bester;

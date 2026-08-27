@@ -42,24 +42,11 @@ Regeln:
 
 ## Sofort
 
-### Nachmessen: traegt die gemessene Reputationsrate? (09:52)
-Gemessen: `data/rep-ziel.txt`, Zeile 2, Feld `sek` fuer ORION-MKIV Shoulder. Um 09:51 stand dort **290** - noch der Formelwert, das Messfenster von 300 Sekunden lief seit dem Neustart um 09:50 erst an.
-Erwartet: Ab etwa 09:56 muss `sek` auf das **Sechzehn- bis Achtzehnfache** springen, also in die Groessenordnung **4.500 bis 5.500**. Das entspricht der gemessenen Rate von 19 rep/min bei Bladeburners statt der gerechneten 335.
-Verdacht: kein Fehler vermutet - das ist die faellige Verifikation der Aenderung von 09:50 (`bn4rep.js`, `repMessung`/`REP_MESSFENSTER`). **Bleibt `sek` bei rund 300, greift die Messung nicht und die Aenderung gehoert zurueckgedreht** (`git revert` des Commits "bn4rep: die Reputationsrate wird gemessen").
-**Nachgemessen 10:11: die Messung greift, aber schwaecher als erwartet.**
-`Hyperion Plasma Cannon V1` und `BLADE-51b Tesla Armor` sprangen von **3.930
-auf 28.914** Sekunden - Faktor **7,4**, nicht die erwarteten 16 bis 18. Kein
-Revert (das Abbruchkriterium war "bleibt bei rund 300"), aber der Faktor ist
-zu klaeren: Entweder lief das Messfenster erst teilweise, oder die Rate bei
-Bladeburners steigt mit dem Rangzuwachs schneller, als eine Momentaufnahme
-zeigt. ORION-MKIV steht bei **156** - dort ist die Luecke fast geschlossen,
-die Zahl ist also kein Gegenbeleg.
-Die Rangfolge hat sich innerhalb derselben Faktion verschoben (V1 und
-BLADE-51b vor V2 und I.N.T.E.R.L.I.N.K.E.D), ORION bleibt vorn. Der
-befuerchtete Fall - Verzerrung ZWISCHEN Faktionen - ist damit nicht
-eingetreten.
-
-Zweite Probe im selben Zug: Die **Rangfolge** muss unveraendert bleiben (ORION vorn). Kippt sie, trifft der Faktor die Faktionen doch nicht gleichmaessig - dann ist der Befund groesser als gedacht.
+### Nachmessen: steht die gemessene Reputationsrate in der richtigen Groessenordnung? (10:21)
+Gemessen: `data/rep-ziel.txt`, **Zeile 3** - seit 10:19 steht dort direkt, mit welcher Rate der Motor rechnet. Erste Ablesung, alle drei noch mit Stern (= Formelwert, der Neustart hat den Messspeicher geleert): **Aevum 169,1 | Slum Snakes 150,4 | Bladeburners 104,2** rep/min.
+Erwartet: Ab etwa 10:25 muessen die Sterne verschwinden, und **Bladeburners muss bei 20 bis 30** liegen - real gemessen sind 23,8 rep/min (5.665 um 09:47 gegen 6.380 um 10:17). Aevum lag bei 34.
+Verdacht: kein Fehler vermutet. Steht dort weiter ein Stern, laeuft die Messschleife nicht durch - dann ist zu pruefen, ob `bn4rep` das Rundenende ueberhaupt erreicht (`bn4rep.js:355` nennt vier Ausstiegsstellen). Liegt der Wert ohne Stern deutlich neben 23,8, stimmt die Messung selbst nicht und die Aenderung von 09:50 gehoert zurueckgedreht.
+Nebenbei korrigiert: Meine Handrechnung von 09:50 (543 fuer Aevum, 335 fuer Bladeburners) war zu hoch - die Formel liefert 169,1 und 104,2. Der Fehlfaktor ist also **rund 4,4**, nicht 16 bis 18.
 
 ## Offen, nach Dringlichkeit
 
@@ -129,6 +116,11 @@ werden Stand und Zeitstempel mitgefuehrt; nach 300 Sekunden ersetzt die
 gemessene Rate die Formel. Negative Raten - ein Einbau setzt die Reputation
 zurueck - werden verworfen, die Formel bleibt als Anlauf. Die Verifikation
 steht unter `## Sofort`.
+
+**MEILENSTEIN 27.08., 10:17: ORION-MKIV Shoulder ist gekauft.** Der Spielstand
+meldet "installiert 19, gekauft und wartend **1**", und das Stueck ist aus der
+Rangliste verschwunden - die erste Augmentierung, die der Kampfterm ausgesucht
+hat, liegt in der Warteschlange. Reputation bei Bladeburners dabei: 6.380.
 
 **Was offen bleibt:** Ob der Kampfterm mit **Gewicht 10** richtig kalibriert
 ist, zeigt erst der naechste Einbau - dort entscheidet sich, ob die

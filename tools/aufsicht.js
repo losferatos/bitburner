@@ -31,7 +31,7 @@
  *   node tools/aufsicht.js --pruefen nur berichten, nichts anfassen
  *   node tools/aufsicht.js --dauer   alle 10 Minuten wiederholen (Autostart)
  */
-import { execSync, spawn } from "node:child_process";
+import { execSync, spawn, spawnSync } from "node:child_process";
 import fs from "node:fs";
 import http from "node:http";
 import path from "node:path";
@@ -87,6 +87,89 @@ function starte(skript, name) {
   });
   kind.unref();
   return kind.pid;
+}
+
+const NOTNAGEL_STAND = path.join(WURZEL, "data", "notnagel.json");
+const NOTNAGEL_STILL_MIN = 75;     // ab wann die Loops als gestorben gelten
+const NOTNAGEL_ABSTAND_MIN = 20;   // Mindestabstand zweier Laeufe
+const NOTNAGEL_PRO_TAG = 30;       // hartes Kontingent, rund 6,50 USD
+
+// DER NOTNAGEL: HEADLESS-LAEUFE, WENN DIE LOOPS STEHEN (27.08.2026, 21:12).
+//
+// Cron-Jobs haengen an der Claude-Sitzung: Sie sterben mit ihr und laufen
+// ohnehin nach sieben Tagen aus. Bis heute war der einzige Rueckfall eine
+// ntfy-Meldung an Eric - also ein Mensch, der nachts nicht da ist.
+//
+// GEMESSEN, BEVOR ES GEBAUT WURDE (21:08 und 21:09, zwei Laeufe):
+//
+//     claude -p mit loop-wache.md   0,2162 USD   10,4 s   Ergebnis "SPUR."
+//     derselbe Aufruf noch einmal   0,2188 USD   10,3 s   Ergebnis "SPUR."
+//
+// Der zweite Lauf zeigt das Entscheidende: `cache_creation` 17.791 statt
+// `cache_read` - **jede headless-Sitzung zahlt ihren Kaltstart voll**, der
+// Cache der vorigen hilft ihr nicht. Als Dauerbetrieb waeren das allein fuer
+// die Wache 72 x 0,217 = 15,60 USD am Tag, mit allen fuenf Loops grob 60 bis
+// 150. Das ist nicht, was Eric mit "tokenoekonomisch" gemeint hat - der Takt
+// wird deshalb NICHT dauerhaft uebernommen.
+//
+// Als Notnagel rechnet es sich dagegen: Stehen die Loops eine Nacht lang,
+// kosten 24 Wachelaeufe 5,20 USD und halten den Bot in Bewegung, statt ihn
+// zwoelf Stunden stehenzulassen.
+//
+// DREI SICHERUNGEN, damit daraus kein Dauerbetrieb wird:
+//   1. Ausloeser ist `data/ziele.md` aelter als 75 Minuten - der Reportloop
+//      schreibt sie alle 30, drei verpasste Laeufe sind der Beweis, dass
+//      niemand mehr taktet.
+//   2. Hoechstens ein Lauf je 20 Minuten (der Dauerlauf taktet alle 10).
+//   3. Hartes Tageskontingent in `data/notnagel.json`. Ist es erschoepft,
+//      gibt es eine ntfy-Meldung und danach Ruhe.
+async function notnagel() {
+  const ziele = path.join(WURZEL, "data", "ziele.md");
+  let stillMin = Infinity;
+  try { stillMin = (Date.now() - fs.statSync(ziele).mtimeMs) / 60000; } catch { /* fehlt */ }
+  if (stillMin < NOTNAGEL_STILL_MIN) return;
+
+  let stand = { tag: "", laeufe: 0, zuletzt: 0, gemeldet: false };
+  try { stand = JSON.parse(fs.readFileSync(NOTNAGEL_STAND, "utf8")); } catch { /* erster Lauf */ }
+  const heute = new Date().toLocaleDateString("sv-SE");
+  if (stand.tag !== heute) stand = { tag: heute, laeufe: 0, zuletzt: 0, gemeldet: false };
+
+  if ((Date.now() - stand.zuletzt) / 60000 < NOTNAGEL_ABSTAND_MIN) return;
+  if (stand.laeufe >= NOTNAGEL_PRO_TAG) {
+    // Nur einmal am Tag melden, nicht bei jedem Durchgang.
+    if (!stand.gemeldet) {
+      stand.gemeldet = true;
+      fs.writeFileSync(NOTNAGEL_STAND, JSON.stringify(stand));
+      try {
+        execSync("bash \"" + process.env.USERPROFILE.replace(/\\/g, "/")
+          + "/.claude/notify.sh\" --title Bitburner --tag rotating_light --priority high "
+          + "\"Notnagel-Kontingent erschoepft - Loops stehen, bitte /bb-loops\"",
+          { timeout: 20000, stdio: "ignore" });
+      } catch { /* ntfy ist Beiwerk */ }
+    }
+    return;
+  }
+
+  // Der Prompt beginnt bei der ersten Zeile mit "BITBURNER-" - davor stehen
+  // Ueberschrift und Erklaerung, die nicht mitgehen duerfen.
+  let text = "";
+  try { text = fs.readFileSync(path.join(WURZEL, "loops", "loop-wache.md"), "utf8"); }
+  catch { return; }
+  const i = text.indexOf("BITBURNER-");
+  if (i < 0) return;
+
+  sag("Loops stehen seit " + stillMin.toFixed(0) + " min - headless-Wachelauf ("
+    + (stand.laeufe + 1) + " von " + NOTNAGEL_PRO_TAG + " heute).");
+  // Ueber stdin statt als Argument: Der Prompt ist 10 KB lang und enthaelt
+  // Anfuehrungszeichen, Backslashes und Zeilenumbrueche. Auf der Kommandozeile
+  // waere jedes davon eine eigene Fehlerquelle - `input` kennt keine.
+  try {
+    spawnSync("claude", ["-p", "--allowedTools", "Bash"],
+      { input: text.slice(i), timeout: 300000, stdio: ["pipe", "ignore", "ignore"], shell: true });
+  } catch { /* ein gescheiterter Lauf ist kein Grund, die Aufsicht zu stoppen */ }
+  stand.laeufe += 1;
+  stand.zuletzt = Date.now();
+  fs.writeFileSync(NOTNAGEL_STAND, JSON.stringify(stand));
 }
 
 async function durchgang() {
@@ -230,6 +313,12 @@ async function durchgang() {
       }
     }
   } catch { /* Spielstand nicht lesbar - dann ist die Bruecke das Problem */ }
+
+  // --- 5. Notnagel: headless-Laeufe, wenn die Loops stehen ----------------
+  if (!NUR_PRUEFEN) {
+    try { await notnagel(); }
+    catch (e) { sag("Notnagel fehlgeschlagen: " + String(e.message || e)); }
+  }
 
   // --- Protokoll -----------------------------------------------------------
   // Nur schreiben, wenn etwas zu berichten war. Ein Lauf, der alles in Ordnung

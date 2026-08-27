@@ -86,37 +86,6 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Das letzte Autonomieloch: Cron-Jobs sterben mit der Sitzung (20:05)
-
-Gemessen: `CronCreate` meldet bei jedem Job "session-only (not written to
-disk, dies when Claude exits)" und "auto-expires after 7 days". Beides
-zusammen heisst: **spaetestens nach sieben Tagen stehen alle fuenf Loops**,
-auch wenn nichts abstuerzt.
-
-Was heute abgedeckt ist: `tools/wache.js:464-469` erkennt stehende Loops am
-Alter von `data/ziele.md` und meldet per ntfy "In Claude Code /bb-loops
-aufrufen". Das ist eine Meldung an einen Menschen, keine Selbstheilung.
-
-**Warum `claude -p` das NICHT einfach loest:** Eine headless-Sitzung endet
-nach ihrem Prompt, und ihre Cron-Jobs sterben mit ihr. Sie kann also keine
-Loops fuer spaeter setzen. Der einzige Weg waere, den Takt selbst zu
-uebernehmen: Die Aufsicht ruft alle 20 bzw. 30 Minuten `claude -p` mit dem
-jeweiligen Loop-Prompt auf, jeder Aufruf ist dann ein Loop-Lauf. Technisch
-traegt das - die Prompts lesen ihren Zustand ohnehin aus Dateien und
-brauchen keinen Sitzungskontext.
-
-**Der Preis, der es zur Entscheidung macht:** rund 160 headless-Sitzungen am
-Tag statt Turns in einer bestehenden. Eric hat "tokenoekonomisch" verlangt,
-und ob das eine Verbesserung oder eine Verschlechterung ist, haengt daran,
-was ein Kaltstart gegen einen Turn im warmen Kontext kostet. **Das ist
-gemessen zu beantworten, nicht geschaetzt** - ein einzelner `claude -p`-Lauf
-mit dem Wache-Prompt und ein Blick auf den Verbrauch genuegen.
-
-Zu tun: (1) Einen `claude -p`-Lauf mit `loops/loop-wache.md` fahren und die
-Kosten messen. (2) Erst danach entscheiden, ob die Aufsicht den Takt
-uebernimmt. (3) Bis dahin bleibt die ntfy-Meldung der Rueckfall - sie
-funktioniert, sie braucht nur einen Menschen.
-
 ### Der Bot rekrutiert nie ein Team - +9,4 Prozent auf jede Black Op fuer 24 Minuten (19:57, durchgerechnet 19:50)
 
 Gemessen: `teamCount` ist 0 (`src/chance.js`, 18:19). Kein Skript in `src/`

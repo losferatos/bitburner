@@ -23,6 +23,85 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Das Autonomieloch ist geschlossen - VERIFIZIERT (27.08., 21:12)
+
+**Die Kostenfrage ist beantwortet, und zwar gemessen statt geschaetzt.** Zwei
+`claude -p`-Laeufe mit `loops/loop-wache.md` ueber `--output-format json`:
+
+    Lauf 1   0,2162 USD   10,4 s   Ergebnis "SPUR."
+    Lauf 2   0,2188 USD   10,3 s   Ergebnis "SPUR."
+
+Der zweite Lauf ist die eigentliche Antwort: `cache_creation` 17.791 gegen
+`cache_read` 66.697 - **jede headless-Sitzung zahlt ihren Kaltstart voll**,
+der Cache der vorigen hilft ihr nicht. Als Dauerbetrieb waeren das allein fuer
+die Wache 72 x 0,217 = **15,60 USD am Tag**, mit allen fuenf Loops grob 60 bis
+150. Damit ist Punkt (2) des alten Eintrags entschieden: **Die Aufsicht
+uebernimmt den Takt NICHT.** Das waere das Gegenteil von "tokenoekonomisch".
+
+**Was stattdessen gebaut wurde: ein Notnagel** (`tools/aufsicht.js`,
+Funktion `notnagel()`). Er feuert nur, wenn die Loops nachweislich stehen,
+und haelt den Bot dann in Bewegung, statt ihn eine Nacht lang stehenzulassen -
+24 Wachelaeufe kosten 5,20 USD.
+
+Drei Sicherungen gegen einen schleichenden Dauerbetrieb:
+
+  1. Ausloeser ist `data/ziele.md` aelter als **75 Minuten**. Der Reportloop
+     schreibt sie alle 30 - drei verpasste Laeufe sind der Beweis, dass
+     niemand mehr taktet.
+  2. Mindestens **20 Minuten** zwischen zwei Laeufen (der Dauerlauf der
+     Aufsicht taktet alle 10).
+  3. Hartes Tageskontingent von **30 Laeufen** in `data/notnagel.json`. Ist
+     es erschoepft, geht **eine** ntfy-Meldung raus und danach ist Ruhe.
+
+**Verifiziert 21:12 im Ernstfall, nicht nur syntaktisch:** `data/ziele.md`
+auf 90 Minuten zurueckdatiert, dann `node tools/aufsicht.js`. Ausgabe
+"Loops stehen seit 90 min - headless-Wachelauf (1 von 30 heute)", Laufzeit
+16 s, `data/notnagel.json` mit `{"laeufe":1}` angelegt. Danach
+zurueckgesetzt und der Dauerlauf-Prozess mit der neuen Fassung neu gestartet
+(PID 11504).
+
+Ein Detail, das beim Bauen Zeit gekostet hat: Der Prompt geht ueber **stdin**
+an `claude -p`, nicht als Argument. Er ist 10 KB lang und enthaelt
+Anfuehrungszeichen, Backslashes und Zeilenumbrueche - auf der Kommandozeile
+waere jedes davon eine eigene Fehlerquelle.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Das letzte Autonomieloch: Cron-Jobs sterben mit der Sitzung (20:05)
+
+Gemessen: `CronCreate` meldet bei jedem Job "session-only (not written to
+disk, dies when Claude exits)" und "auto-expires after 7 days". Beides
+zusammen heisst: **spaetestens nach sieben Tagen stehen alle fuenf Loops**,
+auch wenn nichts abstuerzt.
+
+Was heute abgedeckt ist: `tools/wache.js:464-469` erkennt stehende Loops am
+Alter von `data/ziele.md` und meldet per ntfy "In Claude Code /bb-loops
+aufrufen". Das ist eine Meldung an einen Menschen, keine Selbstheilung.
+
+**Warum `claude -p` das NICHT einfach loest:** Eine headless-Sitzung endet
+nach ihrem Prompt, und ihre Cron-Jobs sterben mit ihr. Sie kann also keine
+Loops fuer spaeter setzen. Der einzige Weg waere, den Takt selbst zu
+uebernehmen: Die Aufsicht ruft alle 20 bzw. 30 Minuten `claude -p` mit dem
+jeweiligen Loop-Prompt auf, jeder Aufruf ist dann ein Loop-Lauf. Technisch
+traegt das - die Prompts lesen ihren Zustand ohnehin aus Dateien und
+brauchen keinen Sitzungskontext.
+
+**Der Preis, der es zur Entscheidung macht:** rund 160 headless-Sitzungen am
+Tag statt Turns in einer bestehenden. Eric hat "tokenoekonomisch" verlangt,
+und ob das eine Verbesserung oder eine Verschlechterung ist, haengt daran,
+was ein Kaltstart gegen einen Turn im warmen Kontext kostet. **Das ist
+gemessen zu beantworten, nicht geschaetzt** - ein einzelner `claude -p`-Lauf
+mit dem Wache-Prompt und ein Blick auf den Verbrauch genuegen.
+
+Zu tun: (1) Einen `claude -p`-Lauf mit `loops/loop-wache.md` fahren und die
+Kosten messen. (2) Erst danach entscheiden, ob die Aufsicht den Takt
+uebernimmt. (3) Bis dahin bleibt die ntfy-Meldung der Rueckfall - sie
+funktioniert, sie braucht nur einen Menschen.
+
+</details>
+
+---
+
 ### Die Raid-Rundreise laeuft - VERIFIZIERT (27.08., 20:45)
 
 **Verifiziert 20:45: Der Bot steht in Chongqing.** Sector-12 war auf 4

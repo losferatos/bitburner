@@ -69,113 +69,6 @@ Offen bleibt die Frage, ob ein Training bei leerem Konto ueberhaupt starten
 darf. Bladeburner-Training ist gratis (Bladeburner.ts:1091-1105) und hebt die
 Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
-### Nach einem Einbau starten die Werkzeuge nicht nach (Freigabe seit 27.08., 05:00)
-
-**Der Titel hiess bis 05:58 "Wartet bis Eric bn4net freigibt".** Die Freigabe
-ist da; der Punkt ist damit normale Arbeit und wird nicht mehr uebersprungen.
-
-**Untersucht 27.08., 05:50 bis 05:58 - Ursache noch nicht belegt, aber der
-Suchraum ist kleiner.** Die gesamte Nachstart-Logik steckt in
-`if (werkbank) { ... }` (`bn4net.js:2575`). Die Werkbank ist der groesste
-gekaufte Rechner ueber 20 GB - und nach einem Einbau gibt es keinen
-(`"Keine gekauften Rechner"`, gemessen 04:21).
-
-**Dieser Fall ist aber bereits abgefangen** (`bn4net.js:770-778`): Faellt die
-Werkbank aus, wird home genommen, sofern das kleinste Werkzeug dort passt.
-home hatte 2048 GB. Die Bedingung war also erfuellt, und trotzdem lief
-`bbtrain.js` von 03:48 bis 04:18 nicht.
-
-**Was als Naechstes zu tun ist, konkret:** `bn4net` protokolliert seine
-Entscheidungen ueber `sag()` ins Spiel-Log. Beim naechsten Einbau gehoert
-dieses Log gelesen, statt weiter im Quelltext zu suchen - dort steht, ob der
-Block ueberhaupt lief und woran der Start scheiterte. Nach der
-Zehn-Minuten-Regel hier abgebrochen, statt zu raten.
-
-**Ein Nebenbefund, der stehen bleiben soll:** Der Kommentar bei :770 spricht
-vom "kleinsten noch nicht laufenden Werkzeug", der Code nimmt aber das
-kleinste aus der GESAMTEN Werkzeugliste. Das ist grosszuegiger als
-beschrieben, also ungefaehrlich - aber es ist nicht dasselbe.
-
-**Messung 27.08., 04:50 - der Fall ist wieder eingetreten, und diesmal traf er
-den Traeger selbst.** Eine Stunde nach dem Einbau von 03:48 liefen `blade`,
-`bn4life`, `bn4net`, `contracts`, `joinrun`, `popups`, `sonde` und `wakelock`
-- aber **`bbtrain.js` nicht**. Das ist genau das Werkzeug, das in der
-Wiederaufbauphase den Traeger hebt.
-
-Sichtbar war es an den Kampfwerten: **str 169, def 1, dex 2, agi 1** nach 27
-Minuten. `joinrun.js` trainiert nur str; die anderen drei standen still, und
-der Traeger - der Tiefstand - blieb auf 1. Der Pruefer meldete SPUR, weil die
-Toleranz 75 Minuten betraegt; er haette erst um 05:03 angeschlagen.
-
-**Eingriff 04:50:** `bbtrain.js` ueber den Auftragskanal gestartet.
-*Verifiziert 04:52:* Es laeuft, und def steht bereits bei **42** statt 1 -
-die Arbeit ist auf "def @ Powerhouse Gym" gewechselt.
-
-**Was das fuer die Freigabe heisst:** Der Nachstart greift, aber zu langsam
-und in der falschen Reihenfolge. `bbtrain.js` steht in `bn4net.js:264` an
-zweiter Stelle der Werkzeugliste - trotzdem war es nach einer Stunde nicht da,
-waehrend spaetere Werkzeuge liefen. Das ist der Punkt, der Erics Freigabe
-braucht.
-
-**Messung 26.08., Einbau 16:31: teilweise behoben.** Um 16:36 liefen nur
-`bn4net`, `bn4life`, `joinrun`, `popups`, `contracts` - `blade.js` fehlte und
-wurde um 16:38 von Hand nachgestartet. Um 17:14 lagen dann `blade`, `bbtrain`,
-`homegrow`, `wakelock`, `bn4door` von selbst auf `werk-0`, `sonde` auf home.
-Die Nachstart-Logik greift also, sobald wieder Rechner mit Speicher da sind
-(Netz 13/70 um 16:36 gegen 66/95 um 17:07) - sie ist nur langsamer als der
-Motor des Knotens. **Offen bleibt genau das:** `blade.js` traegt den Knoten und
-sollte nicht auf den Netzausbau warten muessen.
-Gemessen 22:01, kurz nach einem Einbau (Kampfwerte auf 1, Netz 13/70, Geld 1m):
-`data/ps.json` fuehrt nur bn4net, bn4life, joinrun, popups und contracts.
-**Es fehlen blade.js, bbtrain.js, wakelock.js, homegrow.js, bn4rep.js und
-bn4door.js** - darunter der Motor des Knotens und der Tonanker.
-Erwartet: bn4net startet fehlende Werkzeuge in seiner Runde selbst nach.
-Es liegt NICHT am Platz: `data/werkbank.json` meldet um 22:03 auf home
-1024 GB gesamt, **253,1 GB frei**, 339,7 nach Raeumung. blade braucht 47,75,
-bbtrain 94,75, wakelock 34,25 - alle drei zusammen passen.
-Verdacht: Die Nachstart-Logik in `src/bn4net.js` (die `fehlend`-Liste um
-Zeile 2576). Sie hat in den zwanzig Minuten nach dem Einbau nichts gestartet.
-Der Reload-Kanal hilft hier nicht: `WERKZEUG <name>` **killt nur** (bn4net.js
-:532-545) und verlaesst sich aufs Nachstarten - laeuft das Werkzeug gar nicht,
-trifft der Befehl ins Leere.
-Eingriff 22:05: wakelock, bbtrain und blade einzeln ueber den Auftragskanal
-gestartet (`["wakelock.js"]` in data/task.txt). Danach laufen alle drei.
-Zu tun: Entweder die Nachstart-Logik reparieren (bn4net, braucht Erics
-Freigabe) oder dem Reload-Kanal ein "starte, falls nicht laufend" geben.
-Dies ist der vierte stille Fehlschlag des Wiederanlaufs an einem Tag.
-
-**Nachtrag 23:16 - die Folge ist abgefangen, die Ursache nicht.**
-`tools/wache.js` startet jetzt selbst nach. Der residente Waechter war bisher
-reine Beobachtung; er meldet aufs Handy und konnte nichts tun. Genau das hat
-heute vier Mal Stunden gekostet, und nachts haette es bis zum Morgen gedauert.
-
-Geprueft werden die beiden Werkzeuge, deren Telemetrie ihr Lebenszeichen ist:
-`blade.js` ueber `data/blade.json` (der Motor des Knotens - seit 22:16 schreibt
-er in JEDEM Zweig) und `wakelock.js` ueber `data/wakelock.txt` (der Tonanker;
-ohne ihn drosselt der Browser auf ein Timer-Aufwachen je Minute). Aelter als
-zehn Minuten heisst: laeuft nicht mehr. Dann schickt der Waechter
-`["<name>"]` in den Auftragskanal - vorher pruefend, ob der frei ist, denn er
-hat genau einen Leser und gehoert sonst einem Loop. Hoechstens ein Versuch je
-Werkzeug und Viertelstunde.
-
-**Verifiziert 23:15:** `data/wakelock.txt` von Hand auf einen 15 Minuten alten
-Zeitstempel gesetzt, danach `node tools/wache.js --einmal`. Ergebnis:
-"Nachgestartet: wakelock.js (Telemetrie war 15 min alt)", und um 23:15:08
-meldete das Werkzeug seinen Start. Der Folgelauf ist wieder still.
-
-Nicht geprueft wird `bbtrain.js` - es schreibt nur bei Ereignissen, ein Alter
-sagt dort nichts. Und die URSACHE bleibt offen: Warum bn4net nach einem Einbau
-zwanzig Minuten lang nichts nachstartet, obwohl Platz da ist, steht weiter
-oben und braucht Erics Freigabe fuer eine Aenderung am Motor.
-
-**Nachtrag 22:16 - der Reload-Kanal ist derzeit eine Falle.** Ein
-`WERKZEUG blade.js` um 22:15 hat blade.js beendet, und nichts hat es
-zurueckgeholt: Um 22:16 fehlte es in `data/ps.json`. Wer den Kanal benutzt,
-legt das Werkzeug also still, statt es neu zu starten. Bis das behoben ist,
-gilt: **Werkzeuge ueber den Auftragskanal starten** (`["blade.js"]` in
-data/task.txt), nicht ueber den Reload-Kanal. Das gehoert auch in die
-Loop-Prompts, die den Reload-Kanal bisher als Standardweg nennen.
-
 ### Wartet bis zum naechsten Einbau: Erkennt der Pruefer ihn jetzt? (22:01)
 
 **Messung 26.08., 16:31: JA.** Der Einbau kam um 16:31:42, und
@@ -480,6 +373,44 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Nach einem Einbau starten die Werkzeuge nicht nach (27.08., 06:22)
+
+**Verifiziert: alle zwoelf Werkzeuge laufen um 06:22**, nach einem
+Selbstneustart von bn4net, `URTEIL: SPUR`. Der Punkt stand seit dem 25.08.,
+22:03 - vier stille Fehlschlaege des Wiederanlaufs an drei Tagen.
+
+**Die Ursache ist eine Zeile:** `if (fehlend.length && werkbank !== "home")`
+im Raeumblock (`bn4net.js:2598`).
+
+Die Kette dahinter:
+1. Nach einem Einbau sind alle gekauften Rechner weg (`Prestige.ts:73`), also
+   wird **home zur Werkbank** (`bn4net.js:770-778`).
+2. Der Startcode prueft
+   `werkbankMoeglich = freiAuf(werkbank) + arbeiterGbAuf(werkbank)` und
+   **wartet**, wenn das Werkzeug dort theoretisch passen wuerde - in der
+   Annahme, der Raeumblock habe inzwischen Arbeiter geraeumt.
+3. Auf home hat er das nie getan. Also wartete ein Werkzeug, das auf home
+   passen wuerde, endlos auf Platz, den niemand schafft.
+
+**Gemessen:** `bbtrain.js` (94,75 GB) lief am 27.08. von 03:48 bis 04:18
+nicht, waehrend home **2048 GB** hatte - vollstaendig mit Arbeitern belegt.
+Dasselbe Muster am 26.08. um 16:36 mit `blade.js`, am 25.08. dreimal.
+
+**Warum es so lange unentdeckt blieb:** Jeder Fehlschlag sah anders aus - mal
+fehlte blade, mal bbtrain, mal sechs Werkzeuge auf einmal -, und jedes Mal
+half ein Handstart. Der gemeinsame Nenner war unsichtbar, weil er nur nach
+einem Einbau auftritt und sich von selbst aufloest, sobald wieder ein
+gekaufter Rechner ueber 20 GB steht.
+
+**Die zweite Aenderung desselben Morgens, dieselbe Wurzel:** Um 06:10 wurde
+`ausweichwirt()` repariert, das home mit einer Begruendung aus der 64-GB-Zeit
+ausschloss. Beide Stellen behandelten home als Sonderfall, den es seit dem
+Ausbau auf 2048 GB nicht mehr gibt.
+
+**Ohne Erics Freigabe von 05:00 waere das nicht behoben worden** - der Punkt
+hiess seit dem 25.08. "Wartet bis Eric bn4net freigibt" und wurde von jedem
+Loop uebersprungen.
 
 ### bn4rep fand keinen Platz, weil home pauschal ausgeschlossen war (27.08., 06:12)
 

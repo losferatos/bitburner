@@ -70,6 +70,8 @@ Commit: <kennung>
 
 **Beim nächsten Lauf zuerst die offenen Einträge nachmessen**, bevor du einen neuen Hebel suchst — aber **höchstens zwei Läufe hintereinander am selben Thema**. Am 27.08. gingen drei Läufe in Folge an denselben Fähigkeitsplan (12:52, 13:19, 15:53), weil jeder Eintrag eine offene Nachmessung hinterließ. Das ist ein Gradient, keine Suche. Steht ein Thema zum dritten Mal an, trag die Nachmessung als Auftrag in `nodes/BAUSTELLEN.md` und such woanders. Ist die Zahl nicht gestiegen, trag das ein und nimm die Änderung zurück (`git revert`). Der Eintrag bleibt stehen: Eine widerlegte Hypothese verhindert, dass jemand dieselbe in zwei Wochen noch einmal probiert.
 
+**Miss geglättet.** Die Rangrate schwankt mit dem Ausdauerzyklus; ein 30-Minuten-Fenster misst dessen Phase, nicht die Rate. Nimm den Verlauf aus `data/wache-zustand.json` über mindestens 45 Minuten. Am 26.08. um 21:07 hat ein Fenstervergleich eine Scheindivergenz erzeugt, und um 23:50 wurde eine Änderung an einer Fenstermessung zurückgedreht.
+
 **5. Committen und pushen.** Nur was du selbst geändert hast (`git add <pfad>`, nie `git add -A`) — vier Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`.
 
 ## Ausgabe

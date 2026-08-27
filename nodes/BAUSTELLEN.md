@@ -46,6 +46,13 @@ Regeln:
 
 ## Sofort
 
+### Die versionierten Loop-Prompts weichen von den laufenden Jobs ab (19:30)
+Gemessen: Der aktive Reportloop enthaelt einen Absatz "Die Rangrate gehoert geglaettet gemessen ... Der Ausdauerzyklus ist laenger als ein 30-Minuten-Fenster". In `loops/loop-report.md` stand er **nicht** - `grep -c Ausdauerzyklus` lieferte 0 in allen vier Dateien. Dasselbe beim Optimierloop ("Miss geglaettet").
+Erwartet: Die Dateien in `loops/` sind die Wahrheit. Der Skill `/bb-loops` setzt die Cron-Jobs **woertlich aus ihnen** neu auf.
+Verdacht: Eine Prompt-Regel wurde direkt beim `CronCreate` ergaenzt, ohne die Datei nachzuziehen. Behoben 19:30 durch Rueckuebertragen beider Absaetze.
+**Folgenschwer, weil es still ist:** Cron-Jobs sterben mit der Sitzung. Beim Wiederaufsetzen aus `loops/` gehen alle Regeln verloren, die nur im laufenden Job stehen - und niemand merkt es, weil der Bot weiterlaeuft. Genau die Glaettungsregel war eine Lehre aus einer Scheindivergenz vom 26.08.
+**Strukturell, nicht einmalig:** Solange Prompts von Hand an CronCreate gehen koennen, driften Datei und Job wieder auseinander. Die Regel lautet ab jetzt: **erst die Datei aendern, dann den Job aus der Datei neu setzen** - nie umgekehrt.
+
 ### Digital Observer bleibt auf Stufe 1, obwohl er im Plan vorn steht (19:13)
 Gemessen um 19:10: **21 Faehigkeitspunkte verfuegbar, Digital Observer Stufe 1 (Preis 4)**, waehrend Blade's Intuition seit 18:52 von 26 auf **29** gestiegen ist (Preis 64). Um 18:57 lagen sogar 56 Punkte da.
 Erwartet: Digital Observer wird zuerst gekauft. Er wurde um 18:55 in `DYNAMISCH` aufgenommen UND im `SKILL_PLAN` vor `Blade's Intuition` gesetzt; sein Nutzen je Punkt liegt bei 0,423 gegen 0,031 - Faktor 13,8 (Rechnung in `nodes/HEBEL.md`). Die neue Fassung IST im Spiel (`getFile blade.js` findet "abdeckung") und `data/reload.txt` wurde geleert, der Neustart lief also.

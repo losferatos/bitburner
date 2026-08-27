@@ -21,6 +21,10 @@ Brauchst du Zahlen aus dem Spiel (`data/blade.json`, `data/bblage.json`): Die li
 curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile" --data-urlencode "filename=data/blade.json" --data-urlencode "server=home"
 ```
 
+**Die Rangrate gehört geglättet gemessen**, nicht als Differenz zweier Reportzeitpunkte: Der Ausdauerzyklus ist länger als ein 30-Minuten-Fenster, und wer eines misst, misst dessen Phase. Am 26.08. um 21:07 hat das eine Scheindivergenz erzeugt. Nimm den Verlauf aus `data/wache-zustand.json` über mindestens 45 Minuten.
+
+**Miss auch den Rückstand:** `node tools/rueckstand.js`. Es liest `storedCycles` aus dem Spielstand — die Spielzeit, die noch nicht verarbeitet ist — und meldet den Trend je Stunde. Wächst er, obwohl der Rechner läuft, ist der Browser-Tab gedrosselt und das Spiel läuft langsamer als die Uhr. Das ist die einzige Störung, die kein anderes Werkzeug sieht, und sie ist von außen an nichts anderem erkennbar.
+
 **2. Neue Ziele festhalten** — vor dem Bericht, sonst geht es unter. Ohne diese Datei kann der nächste Report nicht reflektieren; seine Sitzung erinnert sich an nichts.
 ```bash
 cat > data/ziele.md <<'ZIELE'
@@ -30,7 +34,11 @@ cat > data/ziele.md <<'ZIELE'
 3. <Ziel> | Messung: <...>
 ZIELE
 ```
-Ziele sind **überprüfbar**, nicht Absichten. „Kampfwert-Tiefstand über 100" ist ein Ziel, „am Training weiterarbeiten" ist keines. Die Datei wird nicht committet.
+Ziele sind **überprüfbar**, nicht Absichten. „Kampfwert-Tiefstand über 100" ist ein Ziel, „am Training weiterarbeiten" ist keines.
+
+**Jedes Ziel muss auf den Restweg einzahlen.** Der steht mit seiner Leitgröße in `nodes/KURS.md` — lies ihn, bevor du Ziele setzt, und schreib hinter jedes Ziel, wieviel es davon abträgt. Ein Ziel, das die Restzeit nicht senkt, ist keins. In den Kopf der Zieldatei gehört immer der absolute Stand: `X von Y = Z %, ETA <Spanne>`.
+
+*Warum:* Am 27.08. optimierten drei Berichte in Folge auf die Typhoon-Chance — eine Größe, die sich am Abend als irrelevant herausstellte, weil der Rang der Engpass ist und nicht die Chance. Kleinteilige 30-Minuten-Ziele erzeugen den Eindruck von Fortschritt, ohne ihn an einem absoluten Maßstab zu prüfen. Die Datei wird nicht committet.
 
 **3. Kaputte Befunde werden Aufträge, nicht Stichpunkte.** Fällt etwas auf, das nicht stimmt — eine Zahl, die stehenbleibt, ein Werkzeug, das nichts liefert, ein Dialog, der sich wiederholt —, trag es oben in `nodes/BAUSTELLEN.md` unter `## Sofort` ein:
 
@@ -69,7 +77,7 @@ Regeln für den Bericht:
 - Die Reflexion ist **ehrlich**. Ein verfehltes Ziel wird als verfehlt benannt, mit der Zahl daneben. Ein Ziel, das sich als falsch herausgestellt hat, wird als falsch benannt — nicht stillschweigend durch ein neues ersetzt.
 - Ein Befund aus Schritt 3 bekommt eine eigene Zeile unter „Lage" mit dem Zusatz **„→ Auftrag"**, damit Eric sieht, dass er nicht im Bericht versandet.
 
-**Der erste Bericht des Tages (5:00 Uhr) ist ein Nachtbericht.** Zwischen 22:30 und 5:00 wird nicht berichtet — Eric schläft. Der 5-Uhr-Lauf deckt deshalb die ganze Nacht ab: Im Rückblick gehört dazu, was in den sieben Stunden passiert ist (Rangzuwachs, Resets, BitNode-Wechsel, was die Wache eingegriffen hat — nachzulesen in `git log --since="8 hours ago"` und im Abschnitt „Erledigt" von `nodes/BAUSTELLEN.md`). Dafür darf er 20 statt 16 Zeilen haben.
+**Der erste Bericht des Tages (5:00 Uhr) ist ein Nachtbericht.** Zwischen 22:30 und 5:00 wird nicht berichtet — Eric schläft. Der 5-Uhr-Lauf deckt deshalb die ganze Nacht ab: Im Rückblick gehört dazu, was in den sieben Stunden passiert ist (Rangzuwachs, Resets, BitNode-Wechsel, was die Wache eingegriffen hat — nachzulesen in `git log --since="8 hours ago"` und in `nodes/ERLEDIGT.md`). Dafür darf er 20 statt 16 Zeilen haben.
 
 **Hintergrundtasks legen die Loops still — harte Regel, experimentell belegt.**
 Ein schwebender Hintergrundtask (`run_in_background`-Bash oder Monitor)

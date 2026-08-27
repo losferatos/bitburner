@@ -487,15 +487,38 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // Die Wiederaufbauphase beginnt mit jedem Einbau neu. Punkte davor
   // beschreiben einen anderen Lauf und werden fuer die Uhr ignoriert; im
   // Verlauf bleiben sie stehen, denn dort sind sie Geschichte, nicht Messwert.
+  // DER SCHNITT MUSS DEN ERSTEN LAUF NACH DEM EINBAU MITNEHMEN
+  // (27.08.2026, 16:49).
+  //
+  // Die Fassung von 04:00 suchte den Phasenwechsel im GESPEICHERTEN Verlauf.
+  // Beim ersten Lauf nach einem Einbau steht dort aber noch kein Punkt der
+  // neuen Wiederaufbauphase - der aktuelle Messpunkt wird erst danach
+  // angehaengt. Gefunden wurde deshalb der Beginn der VORIGEN
+  // Wiederaufbauphase, und genau deren Punkte blieben stehen.
+  //
+  // Gemessen am 27.08. um 14:40, eine Minute nach dem Einbau:
+  // "STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1" - 14:40 minus
+  // 649 Minuten ist 03:51, der Wiederaufbau vom Vorlauf. Dessen Punkte stehen
+  // ebenfalls auf 1, also findet die Suche nach dem letzten NIEDRIGEREN Punkt
+  // keinen, faellt auf den aeltesten zurueck und zaehlt von damals durch.
+  // Der 04:00-Fix half erst ab dem zweiten Lauf - und im ersten schickt die
+  // Meldung die Wache in den Eingriffsmodus, waehrend bbtrain planmaessig
+  // arbeitet.
   if (t.phase === "Wiederaufbau nach Einbau") {
-    let schnitt = -1;
     const alle = v.punkte.filter((x) => x.knoten === knoten);
-    for (let i = alle.length - 1; i > 0; i--) {
-      if (alle[i].phase === t.phase && alle[i - 1].phase !== t.phase) { schnitt = i; break; }
-    }
-    if (schnitt >= 0) {
-      const ab = alle[schnitt].zeit;
-      frueher = frueher.filter((x) => x.zeit >= ab);
+    const letzte = alle.length ? alle[alle.length - 1].phase : null;
+    if (letzte !== null && letzte !== t.phase) {
+      // Die Wiederaufbauphase beginnt JETZT - alles davor ist ein anderer Lauf.
+      frueher = [];
+    } else {
+      let schnitt = -1;
+      for (let i = alle.length - 1; i > 0; i--) {
+        if (alle[i].phase === t.phase && alle[i - 1].phase !== t.phase) { schnitt = i; break; }
+      }
+      if (schnitt >= 0) {
+        const ab = alle[schnitt].zeit;
+        frueher = frueher.filter((x) => x.zeit >= ab);
+      }
     }
   }
   // Bezugspunkt ist der letzte Messpunkt, der NIEDRIGER lag als jetzt - also

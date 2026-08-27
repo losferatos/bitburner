@@ -42,12 +42,6 @@ Regeln:
 
 ## Sofort
 
-### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
-Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
-Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
-Verdacht: Der Abschnitt greift nicht mehr. `tools/strategie-check.js:537-556`. Die 649 Minuten passen zum Einbau von 03:48 - der Verlauf wird also wieder ueber den vorigen Wiederaufbau hinweg gelesen. Moeglicherweise hat der damalige Fix nur den Fall abgedeckt, in dem der Phasenwechsel im selben Verlauf steht.
-**Folgenschwer, weil es die Wache in den Eingriffsmodus schickt** - im ungeeignetsten Moment, denn dort arbeitet der Bot planmaessig.
-
 ### Kammeranteil auf 31 Prozent gestiegen, Erfahrungsrate zurueck auf Vor-Hyperdrive-Niveau (14:14)
 Gemessen: `data/bblage.json`, `kampfExp.def` 45.209 (13:40) auf 47.735 (14:10) - **84 exp/min**. Das ist exakt der Wert von vor dem Hyperdrive-Hebel, obwohl der Erfahrungsfaktor seit 13:17 bei 1,7 steht. Die Aktionsmischung aus `data/aktionen.txt` im selben Fenster (87 Prozent erfasst):
     Hyperbolic Regeneration Chamber   560 s   **31,1 %**   (zuvor 18 bis 23)
@@ -315,6 +309,33 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Der falsche STAGNATION-Alarm nach dem Einbau - BEHOBEN (27.08., 16:49)
+
+**Verifiziert: Die alte Fassung liess beim ersten Lauf nach dem Einbau zwei
+Punkte von 03:51 stehen und kam damit auf eine Stillstandsuhr von exakt
+649 Minuten - genau die Zahl, die um 14:40 gemeldet wurde. Die neue Fassung
+laesst null Punkte stehen.** Nachgestellt in `tools/test-stillstandsuhr.js`,
+`node tools/strategie-check.js` danach unveraendert `URTEIL: SPUR`.
+
+Der Fix von 04:00 suchte den Phasenwechsel im **gespeicherten** Verlauf. Beim
+ersten Lauf nach einem Einbau steht dort aber noch kein Punkt der neuen
+Wiederaufbauphase - der aktuelle Messpunkt wird erst danach angehaengt.
+Gefunden wurde deshalb der Beginn der VORIGEN Wiederaufbauphase, und genau
+deren Punkte blieben stehen. Sie stehen ebenfalls auf 1, also findet die Suche
+nach dem letzten NIEDRIGEREN Punkt keinen, faellt auf den aeltesten zurueck
+und zaehlt von damals durch. Der Fix half also erst ab dem zweiten Lauf - und
+im ersten schickt die Meldung die Wache in den Eingriffsmodus, waehrend
+`bbtrain` planmaessig hochtrainiert.
+
+Neu: Steht der letzte gespeicherte Punkt in einer anderen Phase, beginnt die
+Wiederaufbauphase JETZT und `frueher` wird geleert (`strategie-check.js:490`).
+
+**Der Fehler kam zum zweiten Mal zurueck, deshalb liegt jetzt ein Test
+daneben.** `tools/test-stillstandsuhr.js` haelt beide echten Faelle fest
+(erster und zweiter Lauf nach dem Einbau) plus die Gegenprobe, dass ein
+laufender Wiederaufbau vollstaendig erhalten bleibt. Vier Faelle, laeuft in
+einer Sekunde, kein Spiel noetig - wer die Uhr anfasst, faehrt ihn vorher.
 
 ### Die Erfolgsspannen waren nur umstaendlich lesbar - BEHOBEN (27.08., 16:19)
 

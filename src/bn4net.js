@@ -511,7 +511,22 @@ export async function main(ns) {
     {
       const b = ns.fileExists("data/reload.txt", "home") ? ns.read("data/reload.txt") : "";
       if (b.startsWith("WERKZEUG ")) {
-        const name = b.slice(9).trim();
+        // DIE ENDUNG WIRD ERGAENZT, NICHT VERLANGT (27.08.2026, 19:46).
+        //
+        // Verglichen wird unten gegen `pr.filename`, und das ist "blade.js",
+        // nicht "blade". Ein Befehl ohne Endung traf deshalb ins Leere - die
+        // Datei wurde geleert, eine Meldung geschrieben ("0 Instanz(en)
+        // beendet"), und niemand sah nach.
+        //
+        // Am 27.08. hat das einen ganzen Nachmittag gekostet: Drei Aenderungen
+        // an `blade.js` - die gerechnete Black-Op-Chance um 18:26, der
+        // Digital-Observer-Hebel um 18:55 und dessen Nachbesserung - wurden
+        // eingebaut, committet, "neu gestartet" und blieben wirkungslos. Der
+        // Prozess lief die ganze Zeit unter derselben PID mit altem Code. Erst
+        // ein PID-Vergleich zeigte es. Nach "WERKZEUG blade.js" stieg Digital
+        // Observer binnen zwei Minuten von Stufe 1 auf 4.
+        let name = b.slice(9).trim();
+        if (name && !name.endsWith(".js")) name += ".js";
         // NICHT UEBER DIESEN KANAL SELBSTMORD (25.08.2026).
         //
         // "WERKZEUG bn4net.js" laesst diese Schleife sich selbst beenden - und
@@ -542,7 +557,9 @@ export async function main(ns) {
           ns.scriptKill(name, host);
           getroffen++;
         }
-        sag(name + ": " + getroffen + " Instanz(en) beendet, startet gleich neu.");
+        sag(getroffen > 0
+          ? name + ": " + getroffen + " Instanz(en) beendet, startet gleich neu."
+          : "WERKZEUG " + name + " traf NICHTS - laeuft es ueberhaupt?");
         }
       }
     }

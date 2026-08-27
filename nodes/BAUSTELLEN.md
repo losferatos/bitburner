@@ -46,7 +46,15 @@ Regeln:
 
 ## Sofort
 
-### Zwei Handgriffe im Spiel, die die Selbstheilung vollenden (19:45)
+### Wartet bis Eric: zwei Handgriffe im Spiel (19:45, belegt 20:45)
+
+**Belegt, nicht vermutet:** `Settings.AutoexecScript` steht im Spielstand auf
+`""` - gelesen 20:45 ueber `getSaveFile` (`save.data.SettingsSave`), also
+ohne Browser. Von aussen ist das Feld nicht setzbar: Die Remote File API kennt
+`getSaveFile`, aber kein Gegenstueck zum Schreiben, und keine ns-Funktion
+fasst `Settings` an. Der Punkt ist deshalb kein Loop-Auftrag, sondern eine
+Eric-Sache - die Ueberschrift sagt das jetzt, damit er den Loop nicht jeden
+Lauf blockiert.
 
 Beide sind Ein-Klick-Sachen fuer Eric und von aussen nicht setzbar. Die
 Aufsicht prueft sie und erinnert daran, statt dass sie jemand vergisst.
@@ -77,60 +85,6 @@ Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
 greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
-
-### Die Raid-Rundreise: 37.248 Rang liegen in den Gemeinden anderer Staedte (20:15, gerechnet 20:23)
-
-Beim Nachrechnen von Raid gefunden. Jede Stadt hat einen eigenen Vorrat an
-Synthoid-Gemeinden (`comms`), und jeder erfolgreiche Raid verbraucht genau
-eine (`Bladeburner.ts:836`). Aus dem Spielstand um 20:14:
-
-    Stadt         pop     chaos   comms   Raid-Rang (x97)
-    Sector-12     1,019e9  48,9      15             1.455
-    Chongqing     2,516e9  66,5     138            13.386
-    New Tokyo     2,948e9  73,8     123            11.931
-    Aevum         1,907e9  86,4      49             4.753
-    Ishima        1,903e9 109,3      42             4.074
-    Volhaven      0,830e9 132,9      17             1.649
-    ------------------------------------------------------
-    gesamt                          384            37.248
-
-**37.248 Rang sind 11,8 Prozent des Restwegs von 317.000** - und sie liegen
-in einem Vorrat, den der Bot bisher gar nicht angefasst hat, weil er die
-Stadt nie wechselt.
-
-**Chaos ist der einzige Grund, warum die anderen Staedte heute unbrauchbar
-sind.** `getChaosSuccessFactor` schlaegt ab Chaos 50 mit `sqrt(1+chaos-50)`
-auf die Schwierigkeit; bei Chongqing sind das Faktor 4,18. Und das laesst
-sich billig aufloesen: `Diplomacy` senkt das Chaos um
-`charisma^0,045 + charisma/1000` **Prozent** je Lauf
-(`Bladeburner.ts:735-743`), bei Charisma 264 also **1,549 Prozent**, und ein
-Lauf dauert fest **60 Sekunden** (`data/GeneralActions.ts:39`).
-
-    Chongqing  Chaos 66,5 -> 49   20 Laeufe = 20 Minuten
-    New Tokyo  Chaos 73,8 -> 49   27 Laeufe = 27 Minuten
-    Aevum      Chaos 86,4 -> 49   37 Laeufe = 37 Minuten
-
-**Chongqing: 13.386 Rang fuer 20 Minuten Diplomacy.** Bei 30 Rang je Minute
-normaler Arbeit entspricht das 446 Minuten - **Faktor 22**.
-
-**Was NICHT traegt, obwohl es zuerst so aussah:** Die Bevoelkerung wirkt
-ueber `(pop/1e9)^0,7` auf die competence, und Chongqing haette dort 1,908
-gegen 1,013 - also +88 Prozent. Das bringt aber fast nichts, weil
-`getSuccessChance` bei **1 klemmt** und die Vertraege und Operationen dort
-ohnehin schon stehen (Raid 0,919, Investigation 0,981). Und auf Black Ops
-wirkt die Bevoelkerung gar nicht (`BlackOperation.ts:55-61` gibt fest 1
-zurueck). **Der Wert liegt allein im comms-Vorrat, nicht in der competence.**
-
-Zu tun: (1) Eine Rundreise-Regel in `blade.js`: Ist `comms` in der aktuellen
-Stadt aufgebraucht, in die Stadt mit dem groessten Vorrat wechseln
-(`switchCity` ist ein reines Feldsetzen und kostet null Sekunden), dort das
-Chaos per Diplomacy unter 50 druecken, dann Raid fahren. (2) Die
-Reihenfolge nach `comms/Diplomacy-Minuten` sortieren - Chongqing (6,9 Rang
-je Diplomacy-Sekunde) vor New Tokyo (7,4)... beide vor Aevum (2,1). (3)
-Aufpassen, dass die Regel nicht mit der bestehenden Chaos-Hysterese
-(`CHAOS_EIN 50`, `CHAOS_AUS 47`) kollidiert - die ist fuer die aktuelle
-Stadt gedacht und wuerde beim Wechsel dasselbe tun wollen.
-
 
 ### Das letzte Autonomieloch: Cron-Jobs sterben mit der Sitzung (20:05)
 

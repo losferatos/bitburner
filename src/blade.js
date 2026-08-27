@@ -92,6 +92,23 @@ export async function main(ns) {
   // (`data/Constants.ts`), nicht gewaehlt; 47 ist der Ausschaltpunkt.
   const CHAOS_EIN = 50;
   const CHAOS_AUS = 47;
+  // Untergrenze der Stadtbevoelkerung, ab der Stealth Retirement als
+  // Chaos-Senker abgeschaltet wird. 0,8e9 laesst `(pop/1e9)^0,7` auf 0,86
+  // fallen - Raid stuende dann bei rund 0,77 statt 0,90 und bliebe fahrbar.
+  const SR_POP_MIN = 0.8e9;
+  // 0,70 und nicht 0,95: Die Chaos-Senkung von Stealth Retirement steht im
+  // Quellcode **ausserhalb** der Erfolgspruefung (`Bladeburner.ts:846-854` -
+  // nur `changePopulationByPercentage` haengt an `if (success)`,
+  // `changeChaosByPercentage` nicht). Ein Fehlschlag senkt das Chaos also
+  // genauso und kostet nur `rankLoss` 2 x 1,11^4 = 3,0 Rang. Der
+  // Break-even gegen Diplomacy liegt damit bei p > 0,083 - alles darueber
+  // ist ein Gewinn. 0,70 ist die Grenze fuer den HP-Verlust, nicht fuer den
+  // Rang: Fehlschlaege kosten Leben und damit Kammerzeit.
+  //
+  // Gemessen 20:44 nach dem Stadtwechsel: In Chongqing steht die Spanne bei
+  // 0,909 bis 1,000 - die alte 0,95er Grenze auf die UNTERgrenze hat die
+  // Regel dort stillgelegt, obwohl der Erwartungswert bei 0,95 lag.
+  const SR_CHANCE_MIN = 0.70;
   const SPIEL_CHAOS_AN = true;
   // RAID IST WIEDER AN (27.08.2026, 19:54) - die Ablehnung von 26.08. stand
   // auf einer Groesse, die Raid gar nicht beruehrt.
@@ -1290,6 +1307,46 @@ export async function main(ns) {
       if (chaosLage() > CHAOS_EIN) chaosAufraeumen = true;
       if (chaosLage() < CHAOS_AUS) chaosAufraeumen = false;
       if (chaosAufraeumen) {
+        // STEALTH RETIREMENT STATT DIPLOMACY (27.08.2026, 20:42).
+        //
+        // Beide senken das Chaos **prozentual** - Diplomacy um
+        // `charisma^0,045 + charisma/1000` (`Bladeburner.ts:1185-1187`),
+        // Stealth Retirement um 1 bis 3 Prozent (`Bladeburner.ts:853`).
+        // Nur eines von beiden gibt dabei Rang. Gemessen 20:41 im Spiel
+        // (`src/sr.js`), Charisma 287, Chaos 50,8:
+        //
+        //     Raid       lvl 9  Chance 0,900  73 s  118 Rang  Chaos +3 %
+        //     Stealth R. lvl 5  Chance 0,999  78 s   33 Rang  Chaos -2 %
+        //     Diplomacy                       60 s    0 Rang  Chaos -1,58 %
+        //
+        // Ein Raid hebt bei Chaos 50 um 1,5 Punkte. Zum Ausgleich braucht es
+        // 1,5 Stealth Retirements (je -1,0) oder 1,9 Diplomacy-Laeufe
+        // (je -0,79):
+        //
+        //     Raid + 1,5 SR    190 s fuer 156 Rang  =  49,3 Rang/min
+        //     Raid + 1,9 Dipl. 187 s fuer 106 Rang  =  34,0 Rang/min
+        //
+        // **Plus 45 Prozent.** Diplomacy ist strikt dominiert, solange die
+        // SR-Chance hoch ist.
+        //
+        // DIE GRENZE IST DIE BEVOELKERUNG, nicht die Chance: SR senkt sie um
+        // 0,5 Prozent je Erfolg (`Bladeburner.ts:848`), und sie wirkt ueber
+        // `(pop/1e9)^0,7` auf die Erfolgschance jeder Operation
+        // (`Action.ts`, `getPopulationSuccessFactor`). Unter 0,8e9 faellt
+        // Raid unter seine Schwelle - dann wieder Diplomacy, die nichts
+        // verbraucht.
+        let srTauglich = false;
+        try {
+          const stadt = ns.bladeburner.getCity();
+          const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
+          const ch = ns.bladeburner.getActionEstimatedSuccessChance(
+            "Operations", "Stealth Retirement Operation");
+          srTauglich = pop >= SR_POP_MIN && ch[0] >= SR_CHANCE_MIN;
+        } catch { srTauglich = false; }
+        if (srTauglich) {
+          return { typ: O, name: "Stealth Retirement Operation",
+            grund: "Chaos " + chaosLage().toFixed(1) + " (senkt und gibt Rang)" };
+        }
         return { typ: G, name: "Diplomacy",
           grund: "Chaos " + chaosLage().toFixed(1) };
       }

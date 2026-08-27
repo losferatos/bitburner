@@ -135,21 +135,57 @@ danach kein Unterscheidungsmerkmal mehr, und seine Kosten stecken bereits in
 der Spalte "Rang je Diplomacy-Minute", nach der `tools/staedte.js` ohnehin
 sortiert. Die comms-Sortierung ist richtig.
 
-**Was wirklich hilft, ist tiefer zu senken.** Der Zyklus ist teuer, weil
-`CHAOS_AUS` auf 47 steht und Raid die Schwelle bei 50 sofort wieder reisst.
-Bei einem Ziel von 35 statt 47:
+**Nachtrag 20:45, zweite eigene Fehlfolgerung - der CHAOS_AUS-Hebel traegt
+NICHTS.** Hier stand, `CHAOS_AUS` von 47 auf 35 zu senken bringe 17 Prozent.
+Das ist falsch, und der Quellcode sagt es in einer Zeile: **Beide Richtungen
+sind prozentual.** Raid ruft `changeChaosByPercentage(getRandomIntInclusive(
+1, 5))` (`Bladeburner.ts:844`), Diplomacy ruft
+`changeChaosByPercentage(-diplomacyPct)` (`Bladeburner.ts:1187`). Das
+Verhaeltnis "wieviele Diplomacy-Laeufe kostet ein Raid" ist damit vom
+Chaos-Niveau **unabhaengig** - es kuerzt sich heraus. Bei Chaos 42 hebt ein
+Raid um 1,26 und ein Diplomacy-Lauf senkt um 0,66; bei Chaos 48 sind es 1,45
+und 0,76. Beide Male 1,9 Laeufe. Die Rechnung oben hat den Anlauf einmalig
+gegen einen stationaeren Zyklus gestellt und deshalb einen Gewinn gesehen, wo
+keiner ist. **Nicht umsetzen.**
 
-    von 49 auf 35   22 Diplomacy-Laeufe = 22 min, einmalig
-    danach          Raid hebt 3 % je Lauf, also 35 -> 36,05 -> 37,1 ...
-                    bis 50 sind das 12 Raids ohne jede Unterbrechung
-    Ergebnis        12 x 107 Rang in 22 + 13,4 min = 36,3 Rang/min
+**Was stattdessen traegt: Stealth Retirement statt Diplomacy** (eingebaut und
+verifiziert 20:45). Beim Nachschlagen der Chaos-Zeilen fiel auf, dass es eine
+zweite Aktion gibt, die das Chaos senkt - und die dabei Rang gibt:
 
-gegen 31,1 im jetzigen 47er-Zyklus. **Plus 17 Prozent, und der Vorteil waechst
-mit dem Vorrat:** In Sector-12 mit zehn Gemeinden lohnt die Vorab-Diplomacy
-nicht, in Chongqing mit 138 zahlt sie sich zwoelfmal aus.
+    case StealthRetirement:
+      if (success) { city.changePopulationByPercentage(-0.5, ...) }
+      city.changeChaosByPercentage(getRandomIntInclusive(-3, -1));
 
-Das ist eine Optimierung zweiter Ordnung und gehoert erst angefasst, wenn die
-erste gemessen ist. Eingetragen, damit sie nicht verlorengeht.
+Die Chaos-Senkung steht **ausserhalb** der Erfolgspruefung. Gemessen 20:41 im
+Spiel (`src/sr.js`), Charisma 287:
+
+    Raid        lvl 9  Chance 0,900  73 s  118 Rang  Chaos +3 %
+    Stealth R.  lvl 5  Chance 0,999  78 s   33 Rang  Chaos -2 %
+    Diplomacy                        60 s    0 Rang  Chaos -1,58 %
+
+Ein Raid hebt bei Chaos 50 um 1,5 Punkte; zum Ausgleich braucht es 1,5
+Stealth Retirements oder 1,9 Diplomacy-Laeufe:
+
+    Raid + 1,5 SR     190 s fuer 156 Rang  =  49,3 Rang/min
+    Raid + 1,9 Dipl.  187 s fuer 106 Rang  =  34,0 Rang/min
+
+**Plus 45 Prozent.** Diplomacy ist strikt dominiert - der Break-even liegt bei
+einer Erfolgswahrscheinlichkeit von 0,083, weil ein Fehlschlag nur
+`rankLoss` 2 x 1,11^4 = 3,0 Rang kostet und das Chaos trotzdem faellt.
+
+Die Grenze ist die **Bevoelkerung**, nicht die Chance: SR senkt sie um 0,5 %
+je Erfolg, und sie wirkt ueber `(pop/1e9)^0,7` auf jede Operationschance.
+Unter `SR_POP_MIN` = 0,8e9 schaltet die Regel zurueck auf Diplomacy.
+
+**Ein Fallstrick beim Einbau, gemessen 20:44:** Die erste Fassung prueft die
+**Untergrenze** der geschaetzten Chance gegen 0,95. Nach dem Stadtwechsel nach
+Chongqing stand die Spanne bei 0,909 bis 1,000 - die Regel legte sich still,
+obwohl der Erwartungswert bei 0,95 lag. Eine breite Schaetzspanne ist in einer
+frisch betretenen Stadt der Normalfall, nicht die Ausnahme. Grenze auf 0,70.
+
+Verifiziert 20:45: `data/blade.json` meldet
+`"aktion":"Operations/Stealth Retirement Operation"` bei Chaos 66,3 in
+Chongqing - dort lief vorher Diplomacy.
 
 Zu messen bleibt die Rangrate ueber 45 Minuten, sobald die Rekrutierungsphase
 (20:00 bis 20:14, dabei null Rangzuwachs) aus dem Fenster gelaufen ist.

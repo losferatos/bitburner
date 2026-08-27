@@ -35,6 +35,25 @@ Regeln:
 
 ## Sofort
 
+### Ein Server-Ausbau kurz vor einem Einbau verbrennt das Geld doppelt (04:10)
+
+Gemessen: Um 04:06 habe ich `werk-0` von 1024 auf 2048 GB ausgebaut, fuer
+**2,703 Milliarden**. Um 04:08 meldete der Pruefer `URTEIL: RESET` - ein
+Augmentierungs-Einbau, Kampfwerte auf 1, Netz 13/70, Guthaben 1 Million.
+**Gekaufte Rechner ueberleben einen Einbau nicht** (`Prestige.ts:73`, steht so
+schon im Kommentar von `bn4net.js:530`). Der Ausbau war damit zwei Minuten
+lang nuetzlich.
+
+Erwartet: Vor einem Kauf in Milliardenhoehe gehoert geprueft, ob ein Einbau
+ansteht. Die Anzeichen waren da - 28,9 Milliarden Guthaben und ein
+Reputationsmotor, der seit Stunden sammelt.
+
+Verdacht: keine Codestelle, ein Verfahrensfehler von mir. **Zu tun:**
+`src/wbgrow.js` um eine Vorpruefung erweitern - liegt eine kaufbare
+Augmentierung vor, deren Preis in der Groessenordnung des Guthabens liegt,
+wird der Ausbau abgelehnt und der Grund geschrieben. Die Zahlen dafuer liefert
+`ns.singularity.getAugmentationPrice` auf die wartenden Stuecke.
+
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer
 zeigt "Geld -2m". Netz 13 von 70 gerootet, der Wiederaufbau nach dem Einbau

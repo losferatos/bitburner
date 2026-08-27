@@ -31,7 +31,7 @@
  *
  * @param {NS} ns
  */
-import { hackNutzen, levelNutzen } from "lib/hackaugs.js";
+import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -1173,9 +1173,44 @@ export async function main(ns) {
     //   nextSENS       hackNutzen 0,20                       -> levelNutzen 5,14
     // Der Bot haette also zweimal ein Stueck gekauft, das zum Knotenabschluss
     // nichts beitraegt, und dabei jedes weitere um Faktor 1,9 verteuert.
+    // DER KAMPFTERM (27.08.2026, 03:50).
+    //
+    // In BitNode 6 und 7 fuehrt der Ausgang ueber 21 Black Operations, nicht
+    // ueber das Hackniveau. Die Guetezahl oben kannte davon nichts: Ihre drei
+    // Summanden zielen alle auf den Hacking-Ausgang, und SPTN-97 mit x1,75 auf
+    // alle vier Kampfwerte bekam damit `0 + 1 + 0 = 1` - so viel wie ein
+    // wertloses Stueck.
+    //
+    // Warum das in BitNode 6 nicht nur suboptimal, sondern falsch ist,
+    // gemessen am 27.08. um 02:48: Der effektive Hacking-Multiplikator liegt
+    // bei 0,559 (1,605 mal die Knotendaempfung 0,35). Der Backdoor auf
+    // w0r1d_d43m0n verlangt Hacking 6000, das sind bei diesem Multiplikator
+    // **2,44 x 10^148 Erfahrung** gegen einen Bestand von 3,55 Millionen.
+    // Der Bladeburner-Weg dagegen braucht Faktor 5,63 in den Kampfwerten -
+    // die zehn staerksten Stuecke aus `lib/combataugs.js` ergeben zusammen
+    // x6,91.
+    //
+    // GEWICHT 10, und die Zahl ist nicht gegriffen: `levelNutzen` liefert 0
+    // bis 7, `combatNutzen` 0 bis 0,655 (SPTN-97). Mal zehn stehen beide in
+    // derselben Groessenordnung, und ein starkes Kampfstueck wiegt damit so
+    // viel wie ein starkes Hackstueck - nicht mehr. In einem Knoten, in dem
+    // der Hacking-Weg 146 Groessenordnungen entfernt ist, ist das eher zu
+    // vorsichtig als zu forsch.
+    //
+    // Der Term greift NUR in den Kampfknoten. Ueberall sonst bleibt die
+    // Guetezahl exakt wie bisher - das ist der Grund fuer die Abfrage statt
+    // einer pauschalen Addition.
+    const KAMPF_GEWICHT = 10;
+    const kampfKnoten = (() => {
+      try {
+        const n = ns.getResetInfo().currentNode;
+        return n === 6 || n === 7;
+      } catch { return false; }
+    })();
     const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)
       + zaehlplatzWert
-      + NUTZEN_GEWICHT * Math.max(0, levelNutzen(k.aug, spieler.mults.hacking, zielLevel));
+      + NUTZEN_GEWICHT * Math.max(0, levelNutzen(k.aug, spieler.mults.hacking, zielLevel))
+      + (kampfKnoten ? KAMPF_GEWICHT * combatNutzen(k.aug) : 0);
 
     // BESTAND, NICHT SUMME (22.08.2026). Reputation ist ein Bestand je
     // Faktion, keine Zahl je Augmentierung. Wer bei Tetrads 9.994 Reputation

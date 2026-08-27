@@ -1400,17 +1400,38 @@ export async function main(ns) {
     // je Faktion genuegt also. Die Rate wird nur uebernommen, wenn sie
     // positiv ist - ein Einbau setzt die Reputation zurueck, und eine
     // negative Rate wuerde die Rangfolge zerstoeren.
+    // DER ANKER BLEIBT STEHEN (27.08.2026, 11:49).
+    //
+    // Bis eben wurde der Messpunkt bei jeder Uebernahme nachgezogen, die Rate
+    // also immer ueber genau 300 Sekunden gebildet. Das ist zu kurz: Nachgemessen
+    // um 11:47 sagte der Motor Bladeburners 39,4 rep/min, real waren es 24,4
+    // (6.380 um 10:17 gegen 8.580 um 11:47), und fuer Aevum 20 gegen real 40,1.
+    // Beide Male daneben, und zwar in ENTGEGENGESETZTE Richtung - das ist kein
+    // systematischer Fehler mehr, das ist Rauschen.
+    //
+    // Der Grund ist derselbe wie bei der Rangrate: Die Bladeburner-Reputation
+    // haengt am Rangzuwachs, und der schwankt mit dem Ausdauerzyklus zwischen
+    // 4,5 und 7,4 je Minute. Die Aevum-Reputation kommt aus Coding Contracts,
+    // die unregelmaessig anfallen - in 300 Sekunden kann schlicht keiner liegen.
+    // Wer ein so kurzes Fenster misst, misst dessen Phase.
+    //
+    // Deshalb bleibt der erste Messpunkt jetzt als ANKER stehen und nur die
+    // Rate wird fortgeschrieben. Das Fenster waechst mit der Laufzeit: nach
+    // einer Stunde ist es eine Stunde lang, ohne dass jemand eine Wartezeit
+    // festlegen muesste. 300 Sekunden sind nur noch das MINDESTfenster fuer
+    // die allererste Rate.
     const jetztSek = Date.now() / 1000;
     for (const k of kandidaten) {
       const alt = repMessung.get(k.faktion);
-      if (!alt) { repMessung.set(k.faktion, { rep: k.rep, zeit: jetztSek, rate: 0 }); continue; }
+      // Faellt die Reputation, war ein Einbau dazwischen - neu ankern, sonst
+      // rechnete der Anker gegen einen Bestand, den es nicht mehr gibt.
+      if (!alt || k.rep < alt.rep) {
+        repMessung.set(k.faktion, { rep: k.rep, zeit: jetztSek, rate: 0 });
+        continue;
+      }
       const dt = jetztSek - alt.zeit;
       if (dt < REP_MESSFENSTER) continue;
-      const dr = k.rep - alt.rep;
-      repMessung.set(k.faktion, {
-        rep: k.rep, zeit: jetztSek,
-        rate: dr > 0 ? dr / dt : alt.rate,
-      });
+      alt.rate = (k.rep - alt.rep) / dt;
     }
 
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);

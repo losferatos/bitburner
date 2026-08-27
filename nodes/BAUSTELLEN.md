@@ -42,12 +42,6 @@ Regeln:
 
 ## Sofort
 
-### Einbau um 14:40 - jetzt ist der Kampfterm kalibrierbar (14:41)
-Gemessen: `URTEIL: RESET` um 14:40, Kampfwerte auf 1 zurueckgefallen (str 151 vom Gym, def/dex/agi 1), Rang bleibt bei 5.198. **ORION-MKIV Shoulder ist eingebaut.** Netz 13/70 (gekaufte Rechner ueberleben den Einbau nicht), Arbeit `str @ Powerhouse Gym`.
-**Der Wiederanlauf hat funktioniert** - alle zehn Werkzeuge laufen (`bn4net`, `bn4life`, `blade`, `bbtrain`, `homegrow`, `contracts`, `wakelock`, `bn4rep`, `joinrun`, `ps`), `bn4net.js` mit pid 2. Kein Eingriff noetig.
-Erwartet: **Das ist die Nachmessung, auf die der oberste Offen-Punkt seit heute frueh wartet.** Zu vergleichen sind die Kampf-Multiplikatoren gegen die **1,834 auf 1,986** des Einbaus von 03:48, der noch ohne den Kampfterm lief. Steigen sie staerker, traegt `KAMPF_GEWICHT = 10`; steigen sie schwaecher, gehoert das Gewicht nach unten.
-Verdacht: kein Fehler - dies ist ein faelliger Messauftrag, kein Stoerungsbefund.
-
 ### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
 Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
 Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
@@ -157,185 +151,6 @@ Digital Observer trifft nur Operations, Cloak nur Stealth, Hands of Midas nur
 Geld - Typhoon ist `isKill`, also zaehlen Blade's Intuition (alle),
 Short-Circuit (kill) und ueber die Erfahrung Hyperdrive. Ein blinder
 Nutzen-je-Punkt-Vergleich ueber alle zwoelf Faehigkeiten kauft sonst Unsinn.
-
-
-### bn4rep optimiert auf den Hacking-Ausgang - in einem Knoten, der ihn vierfach daempft
-
-**VERIFIZIERT 27.08., 07:56: Der Kampfterm greift.** Das gewaehlte Ziel ist
-**ORION-MKIV Shoulder** von **Bladeburners** - str/def/dex je 1,05 und
-`bladeburner_success_chance` 1,04, Guetebeitrag 0,74. Zum Vergleich der
-letzte bekannte Stand vor der Aenderung (26.08., 09:45):
-**Cranial Signal Processors - Gen II**, eine reine Hacking-Augmentierung.
-
-**Messbar wurde das erst durch eine zweite Aenderung.** `data/bn4rep.json`
-steht am Ende der Runde, und das Skript steigt an mindestens vier Stellen
-davor aus (dokumentiert im Kommentar bei `bn4rep.js:355`). Gemessen um 07:47:
-Puls **0 Minuten** alt, Telemetrie **2.323** - von aussen war nicht zu sehen,
-worauf der Motor spart. `bn4rep.js` schreibt jetzt direkt bei der Zielwahl
-nach `data/rep-ziel.txt` (`<ms>|<aug>|<faktion>`).
-
-Eigene Datei statt Anhang an `hb-rep.txt`: Der Waechter liest den Puls mit
-`Number(...)` (`wache.js:176-180`), ein Textzusatz haette dort NaN ergeben und
-einen Ausfall gemeldet, den es nicht gibt.
-
-**VERIFIZIERT 27.08., 08:53: der Kampfterm traegt die ganze Spitze, nicht nur
-Platz eins.** Die Rangliste faehrt jetzt in Zeile 2 von `data/rep-ziel.txt`
-mit (`bn4rep.js:1451`); sie wurde oben ohnehin gebaut (:1424), landete aber
-nur in `data/bn4rep.json` - und die steht seit dem 25.08. um 17:45 still,
-gemessen **39,7 Stunden** alt. Gelesen um 08:53:
-
-    2,737 / 959 s      ORION-MKIV Shoulder                      Bladeburners
-    17,490 / 12.067 s  Hyperion Plasma Cannon V2                Bladeburners
-    17,490 / 12.067 s  I.N.T.E.R.L.I.N.K.E.D                    Bladeburners
-    13,969 / 9.845 s   BLADE-51b Tesla Armor: Energy Shielding  Bladeburners
-    3,920 / 2.884 s    Combat Rib I                             Slum Snakes
-
-**Keine einzige Hacking-Augmentierung mehr in den ersten fuenf.** Vor dem
-Umbau stand dort Cranial Signal Processors - Gen II.
-
-**Damit ist auch die Frage von 08:50 beantwortet**, die den Verdacht auf einen
-Fehler geworfen hatte: 7,97 Mrd auf der Hand, **0 wartende Stuecke**, fuenf
-Stunden nach dem Einbau. Das ist kein Stillstand - das Ziel ist in **959
-Sekunden** erreichbar, und ein billigeres Stueck vorher zu kaufen wuerde nur
-den Preismultiplikator hochtreiben. Der Motor wartet richtig.
-
-ORION gewinnt uebrigens trotz sechsfach kleinerem Wert: die Guete ist Ertrag
-je Sekunde Wartezeit (0,002854 gegen 0,001449), und Hyperion steht danach
-immer noch da.
-
-**Der naechste Einbau liegt weiter weg als gedacht (27.08., 09:52).** Die
-Zahl `sek` aus der Rangliste ist um Faktor 16 bis 18 zu klein: `repPerSecond`
-(`bn4rep.js:1329`) rechnet die Rate aus den Stats des Spielers, unterstellt
-also Faktionsarbeit - die in BitNode 6 gar nicht stattfindet. Gemessen 08:50
-gegen 09:47:
-
-    Aevum        15.726 -> 17.671    34 rep/min   Formel: rund 543
-    Sector-12    14.941 -> 17.011    36 rep/min
-    CyberSec     22.115 -> 24.063    34 rep/min
-    Bladeburners  4.580 ->  5.665    19 rep/min   Formel: rund 335
-    Slum Snakes     655 ->    820     2,9 rep/min
-
-Die Guete-RANGFOLGE bleibt davon weitgehend unberuehrt, weil der Fehler alle
-Faktionen aehnlich trifft - die Wahl war nie falsch. Die Vorhersage aber
-schon: "Kauf gegen 09:09" war siebzehnfach zu frueh, real steht ORION-MKIV
-rund 101 Minuten entfernt.
-
-**Geaendert 09:50, Wirkung noch nicht gemessen** (`bn4rep.js`): Je Faktion
-werden Stand und Zeitstempel mitgefuehrt; nach 300 Sekunden ersetzt die
-gemessene Rate die Formel. Negative Raten - ein Einbau setzt die Reputation
-zurueck - werden verworfen, die Formel bleibt als Anlauf. Die Verifikation
-steht unter `## Sofort`.
-
-**MEILENSTEIN 27.08., 10:17: ORION-MKIV Shoulder ist gekauft.** Der Spielstand
-meldet "installiert 19, gekauft und wartend **1**", und das Stueck ist aus der
-Rangliste verschwunden - die erste Augmentierung, die der Kampfterm ausgesucht
-hat, liegt in der Warteschlange. Reputation bei Bladeburners dabei: 6.380.
-
-**Was offen bleibt:** Ob der Kampfterm mit **Gewicht 10** richtig kalibriert
-ist, zeigt erst der naechste Einbau - dort entscheidet sich, ob die
-Kampf-Multiplikatoren schneller steigen als die 1,834 auf 1,986 des Einbaus
-von 03:48 (der lief noch ohne den Term). Der naechste Kauf faellt nach der
-959-Sekunden-Rechnung gegen 09:09; der Einbau kommt, sobald die
-Warteschlange voll ist. Der Punkt bleibt bis dahin offen.
-
-**Dringlichkeit: hoch.** Der Reputationsmotor arbeitet seit Knotenbeginn auf ein
-Ziel hin, das in BitNode 6 der teurere von zwei Wegen ist.
-
-**Gemessen 27.08., 02:25.** Die Guetezahl, nach der `bn4rep.js` Faktion und
-Augmentierung waehlt, ist (`bn4rep.js:1178-1181`):
-
-    einzelWert = (aug === "The Red Pill" ? 10 : 0)
-               + zaehlplatzWert
-               + levelNutzen(aug, mults.hacking, zielLevel)
-
-Alle drei Summanden zielen auf den **Hacking-Ausgang**: The Red Pill haengt
-w0r1d_d43m0n ans Netz, `levelNutzen` bewertet den Hacking-Multiplikator, und
-der Zaehlplatz zaehlt Richtung Daedalus. Eine Kampfwert-Augmentierung wie
-**SPTN-97** (x1,75 auf alle vier Werte) bekommt damit `0 + 1 + 0 = 1` - genau
-so viel wie ein voellig wertloses Stueck.
-
-**Was BitNode 6 dazu sagt** (`BitNode/BitNode.tsx:694-720`):
-
-    HackingLevelMultiplier   0,35     <- Level wird auf ein Drittel gestaucht
-    HackExpGain              0,25     <- Erfahrung geviertelt
-    DaedalusAugsRequirement  35       <- statt 30, wir haben 14
-
-Der Hacking-Weg verlangt hier Hacking **6000** fuer den Backdoor auf
-w0r1d_d43m0n (aus `tools/save.js`) bei einem Multiplikator von 0,35 und
-gevierteltem Erfahrungsgewinn. Aktuell steht Hacking bei **155**.
-
-Der Bladeburner-Weg dagegen laeuft: Rang 1658 von 2500 fuer die erste Black Op,
-Rate rund 1,4 je Minute.
-
-**Vorbedingung 1 ist geklaert (27.08., 02:48): Der Hacking-Weg ist in diesem
-Knoten chancenlos, der Bladeburner-Weg braucht EINEN Einbau-Zyklus.**
-
-Gemessen aus dem Spielstand:
-
-    effektiver Hacking-Mult   0,559   (mults.hacking 1,605 x BN-Daempfung 0,35)
-    effektiver Dex-Mult       1,827   (ungedaempft - BN6 daempft nur Hacking)
-
-Was der Hacking-Ausgang bei diesem Multiplikator kostet
-(`exp = e^((lvl/mult + 200)/32) - 534,6`):
-
-    Hacking 1000   9,85 x 10^26  Erfahrung
-    Hacking 3000   3,56 x 10^75
-    Hacking 6000   2,44 x 10^148   <- der Backdoor auf w0r1d_d43m0n
-
-Der Bestand liegt bei 3,55 Millionen. Das sind **146 Groessenordnungen**, und
-sie lassen sich nur ueber den Multiplikator schliessen: fuer Hacking 6000
-braeuchte es einen effektiven Mult um 25 bis 30, also `mults.hacking` bei 50
-bis 90 - mit Hack-Augmentierungen von x1,05 bis x1,3 sind das Dutzende
-Einbau-Zyklen.
-
-**Der Bladeburner-Weg dagegen ist eine Frage von einem Zyklus.** Ein
-Typhoon-Versuch lohnt sich, sobald der Erwartungswert positiv ist:
-`chance * 50 - (1 - chance) * 10 > 0`, also ab **Chance 0,167** - nicht ab 50
-Prozent, wie der Eintrag von 01:05 unterstellte. Von 0,037 auf 0,167 ist
-Faktor 4,5 in der Kompetenz, wegen des Exponenten 0,9 also **Faktor 5,63 in
-den Kampfwerten**: dex von 240 auf rund 1.350, der Multiplikator von 1,83 auf
-10,3.
-
-Die zehn staerksten Kampfwert-Augmentierungen zusammen ergeben **x6,91**
-(SPTN-97 1,75; CordiARC 1,35; Photosynthetic Cells 1,40; nextSENS und
-Xanipher je 1,20; Bionic Spine 1,15; HemoRecirculator 1,08; Golem Serum 1,07;
-Power Recirculator 1,05; BladeArmor 1,04). Auf den heutigen 1,827 sind das
-**12,6** - mehr als die noetigen 10,3.
-
-**Damit ist die Richtung entschieden, und zwar durch die Zahlen:** Der
-Reputationsmotor gehoert in den Kampfknoten auf Kampfwert-Augmentierungen
-umgestellt. Bleiben Vorbedingung 2 (die Liste fehlt) und 3 (der Umbau
-beruehrt Firmenphase, Einbaukriterium und Daedalus-Logik).
-
-**Zu klaeren, bevor umgebaut wird:**
-2. ~~Die Liste fehlt.~~ **Erledigt 27.08., 03:25.** `src/lib/combataugs.js`
-   ist angelegt: **60 Augmentierungen** mit Kampfwert- oder
-   Bladeburner-Multiplikatoren, maschinell aus `Augmentations.ts` gezogen,
-   Anzeigenamen aus `Augmentation/Enums.ts` aufgeloest. Dazu `combatNutzen()`
-   nach derselben Bauart wie `levelNutzen`: Ein Faktor f auf einen Kampfwert
-   hebt dessen Beitrag um `f^0,9` (nicht um f - bei x1,75 sind das 6 Prozent
-   Unterschied), Gewicht 0,25 je Wert nach den Typhoon-Gewichten,
-   `bladeburner_success_chance` ungedaempft, Erfahrungs- und
-   Ausdauermultiplikatoren mit halbem Gewicht ueber den Logarithmus.
-
-   *Verifiziert 03:25*, die acht besten Stuecke:
-
-       0,655  SPTN-97 Gene Modification
-       0,527  Graphene Bionic Spine Upgrade
-       0,460  CordiARC Fusion Reactor
-       0,382  Hydroflame Left Arm
-       0,370  Graphene Bionic Arms Upgrade
-       0,320  Graphene Bionic Legs Upgrade
-       0,306  Graphene Bone Lacings
-       0,265  Photosynthetic Cells
-
-   Die Datei aendert noch **nichts** am Verhalten - sie wird von niemandem
-   importiert. Das ist Absicht: Der Umbau von `einzelWert` ist der naechste
-   Schritt und gehoert in einen eigenen Lauf mit Nachmessung.
-3. **`bn4rep.js` ist gross und traegt den ganzen Reputationszyklus.** Ein
-   Umbau der Guetezahl beruehrt auch die Firmenphase, das Einbaukriterium und
-   die Daedalus-Logik. Das ist kein Einzeiler und braucht einen eigenen Lauf
-   mit Nachmessung.
 
 
 ### Operation Typhoon ist mit Rang 2500 erreichbar, aber nicht fahrbar
@@ -503,6 +318,39 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### bn4rep auf Kampfwerte umgestellt - VERIFIZIERT am Einbau (27.08., 14:51)
+
+**Verifiziert: der dex-Multiplikator stieg von 1,986 auf 2,325, also +17,1
+Prozent.** Der Einbau von 03:48, der noch ohne den Kampfterm lief, brachte
+1,834 auf 1,986 - **+8,3 Prozent**. Der Kampfterm hat die Steigerung also
+**mehr als verdoppelt (Faktor 2,06)**, und damit ist `KAMPF_GEWICHT = 10`
+belegt. Kein Grund, es zu senken.
+
+Gemessen um 14:49 aus dem Spielstand (drei Augmentierungen eingebaut, 19 auf
+22 installiert):
+
+    Kampf-Mult       str 1,597   def 1,597   dex 2,325   agi 1,677
+    Erfahrung        durchgehend 1,609
+    Bladeburner      chance 1,205   ausdauer 1,000   regen 1,040   analyse 1,050
+
+Alle vier Kampfwerte sind bewegt, nicht nur einer - das war der Zweck der
+Gewichtung `0,25 je Wert` in `combatNutzen`. Der Term
+`bladeburner_success_chance` steht bei 1,205 und wirkt ungedaempft auf die
+Black-Op-Chance.
+
+**Ablesbar wurde das erst durch eine Werkzeugaenderung**: `tools/save.js` gab
+nur die Hacking-Multiplikatoren aus. Seit 14:49 stehen die Kampf- und
+Bladeburner-Multiplikatoren daneben - ohne sie liess sich nach einem Einbau
+nicht pruefen, ob der Reputationsmotor das Richtige gekauft hat.
+
+**Der Weg dorthin, zum Nachlesen:** 02:25 Guetezahl analysiert (SPTN-97 bekam
+denselben Wert wie ein wertloses Stueck) - 02:48 Hacking-Weg als chancenlos
+belegt (2,44 x 10^148 Erfahrung fuer Hacking 6000) - 03:25 die Liste der 60
+Kampf-Augmentierungen gebaut - 04:10 `combatNutzen` in `einzelWert` - 07:56
+am gewaehlten Ziel verifiziert (ORION-MKIV statt Cranial Signal Processors) -
+08:53 die ganze Rangliste umgestellt - 10:17 gekauft - **14:51 am Einbau
+gemessen.**
 
 ### Die Reputationsrate wird gemessen statt gerechnet - VERIFIZIERT (27.08., 12:18)
 

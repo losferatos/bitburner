@@ -42,6 +42,23 @@ Regeln:
 
 ## Sofort
 
+### Einbau um 14:40 - jetzt ist der Kampfterm kalibrierbar (14:41)
+Gemessen: `URTEIL: RESET` um 14:40, Kampfwerte auf 1 zurueckgefallen (str 151 vom Gym, def/dex/agi 1), Rang bleibt bei 5.198. **ORION-MKIV Shoulder ist eingebaut.** Netz 13/70 (gekaufte Rechner ueberleben den Einbau nicht), Arbeit `str @ Powerhouse Gym`.
+**Der Wiederanlauf hat funktioniert** - alle zehn Werkzeuge laufen (`bn4net`, `bn4life`, `blade`, `bbtrain`, `homegrow`, `contracts`, `wakelock`, `bn4rep`, `joinrun`, `ps`), `bn4net.js` mit pid 2. Kein Eingriff noetig.
+Erwartet: **Das ist die Nachmessung, auf die der oberste Offen-Punkt seit heute frueh wartet.** Zu vergleichen sind die Kampf-Multiplikatoren gegen die **1,834 auf 1,986** des Einbaus von 03:48, der noch ohne den Kampfterm lief. Steigen sie staerker, traegt `KAMPF_GEWICHT = 10`; steigen sie schwaecher, gehoert das Gewicht nach unten.
+Verdacht: kein Fehler - dies ist ein faelliger Messauftrag, kein Stoerungsbefund.
+
+### Der falsche STAGNATION-Alarm nach dem Einbau ist zurueck (14:41)
+Gemessen: `tools/strategie-check.js` meldete um 14:40, eine Minute nach dem Einbau: **"STAGNATION: Kampfwert-Tiefstand steht seit 649 min auf 1."** Gleichzeitig trainiert `bbtrain` str bereits auf 151.
+Erwartet: Unter 10 Minuten. Genau dieser Fehler wurde am 27.08. um 04:00 behoben (`nodes/HEBEL.md`, "Die Stillstandsuhr zaehlte ueber den Einbau hinweg") - dort wurde der Verlauf bei Phase "Wiederaufbau nach Einbau" am letzten Phasenwechsel abgeschnitten, verifiziert mit 681 auf 3 Minuten.
+Verdacht: Der Abschnitt greift nicht mehr. `tools/strategie-check.js:537-556`. Die 649 Minuten passen zum Einbau von 03:48 - der Verlauf wird also wieder ueber den vorigen Wiederaufbau hinweg gelesen. Moeglicherweise hat der damalige Fix nur den Fall abgedeckt, in dem der Phasenwechsel im selben Verlauf steht.
+**Folgenschwer, weil es die Wache in den Eingriffsmodus schickt** - im ungeeignetsten Moment, denn dort arbeitet der Bot planmaessig.
+
+### Der Kontostand ist negativ (14:41)
+Gemessen: `Geld -1m` in der Pruefzeile um 14:40.
+Erwartet: Ueber null. `bbtrain.js` hat seit dem 27.08. frueh eine Sperre (`GYM_MIN_GELD = 5e6`), die das Training aussetzt, solange weniger als 5 Mio da sind - das Gym prueft den Kontostand selbst nicht (`Work/ClassWork.tsx:22-73`, `gainMoney` ohne Boden).
+Verdacht: Die Sperre greift nicht, oder der Einbau selbst hat den Bestand geleert und die Sperre setzt erst nach ihrer naechsten Runde ein. `src/bbtrain.js`, Suchbegriff `GYM_MIN_GELD`. Zu pruefen: Steht der Kontostand in 20 Minuten immer noch negativ, greift sie nicht.
+
 ### Kammeranteil auf 31 Prozent gestiegen, Erfahrungsrate zurueck auf Vor-Hyperdrive-Niveau (14:14)
 Gemessen: `data/bblage.json`, `kampfExp.def` 45.209 (13:40) auf 47.735 (14:10) - **84 exp/min**. Das ist exakt der Wert von vor dem Hyperdrive-Hebel, obwohl der Erfahrungsfaktor seit 13:17 bei 1,7 steht. Die Aktionsmischung aus `data/aktionen.txt` im selben Fenster (87 Prozent erfasst):
     Hyperbolic Regeneration Chamber   560 s   **31,1 %**   (zuvor 18 bis 23)

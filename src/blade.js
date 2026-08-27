@@ -195,7 +195,49 @@ export async function main(ns) {
   // Untergrenze und mit dem Guthaben den Grund - nicht mit dem Bauchgefuehl.
   // Von 0,80 auf 0,40 am 27.08. um 12:49: die alte Begruendung uebersah den
   // zweiten Term der Krankenhauskosten. Rechnung in nodes/HEBEL.md.
-  const SICHER_BLACKOP = 0.40;
+  // BLACK OPS ERST BEI HOHER CHANCE FAHREN (27.08.2026, 21:55).
+  //
+  // Die Schwelle stand auf 0,40, und das war aus einer falschen Frage
+  // abgeleitet: "ab wann ist ein Versuch nicht mehr verschwenderisch?"
+  // Richtig ist "wann ist es billiger als die Alternative?" - und die
+  // Alternative ist Raid.
+  //
+  // GEMESSEN 21:52 (`src/bodauer.js`), Rang 13.209:
+  //
+  //     Operation Ares         469 s   Chance 0,405 - 0,637
+  //     Operation Archangel    703 s          0,289 - 0,455
+  //     Operation Juggernaut   938 s          0,202 - 0,318
+  //     Operation Red Dragon  1172 s          0,154 - 0,242
+  //     Raid                    72 s   118 Rang  =  98,3 Rang/min
+  //
+  // Eine Black Op kostet erwartet `Dauer / p` Sekunden. Fuer Ares bei
+  // p = 0,52 sind das 902 s = 15,0 Minuten fuer `rankGain` 125
+  // (`data/BlackOperations.ts:152`). In derselben Zeit brachte Raid 1.475
+  // Rang. **Nettokosten: 1.350 Rang.** Bei p = 0,95 waeren es 494 s und
+  // damit nur 681 - **669 Rang gespart, allein bei dieser einen.**
+  //
+  // Fuer Red Dragon ist der Unterschied dramatisch: 5.860 s bei p = 0,20
+  // gegen 1.234 s bei p = 0,95 - **7.577 Rang.**
+  //
+  // WARUM WARTEN NICHTS KOSTET: Der Engpass ist der Rang (400.000 fuer
+  // Daedalus), nicht die Zahl der abgehakten Black Ops. Ihre 73.660 Rang
+  // zaehlen zum selben Ziel, egal wann sie anfallen. Und p steigt von allein:
+  // `skillPoints = floor(maxRank/3)` (`Bladeburner.ts`) bei linear
+  // steigenden Faehigkeitskosten (`Skill.ts:37-41`) - wer Rang sammelt,
+  // sammelt Chance mit.
+  //
+  // Die Gesamtzeit ist `(400.000 - 73.660)/Raidrate + Summe(Dauer_i / p_i)`.
+  // Der erste Term haengt nicht davon ab, WANN die Black Ops fallen; der
+  // zweite wird kleiner, je hoeher p ist. Also: so spaet wie moeglich.
+  //
+  // 0,90 statt 0,99, weil die letzten Prozentpunkte lange brauchen und der
+  // Gewinn dort flach wird (bei p = 0,90 gegen 0,95 sind es fuer Ares 60
+  // Rang).
+  //
+  // OFFENE FLANKE, als Baustelle eingetragen: Geht der Raid-Vorrat in allen
+  // sechs Staedten zur Neige (384 Gemeinden, rund 45.000 Rang), ist Raid
+  // nicht mehr die Alternative - dann gehoert die Schwelle zurueck auf 0,40.
+  const SICHER_BLACKOP = 0.90;
   // Zielgroesse des Trupps. Sechs, weil der Bonus mit Exponent 0,05 waechst
   // und der Grenznutzen danach um Faktor drei einbricht - Rechnung im Block
   // "2b. Den Trupp auffuellen" weiter unten. 0 schaltet die Regel ab.

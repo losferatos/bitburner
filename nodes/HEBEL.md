@@ -37,6 +37,68 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Black Ops erst ab Chance 0,90 statt 0,40 (27.08., 21:55)
+
+Engpass:    Der Anteil der Zeit, den der Motor NICHT in Raid steckt. In der
+            Stunde bis 21:51 lief kein einziger Raid - 55 % Stealth
+            Retirement, 45 % Black Operations. Raid gibt 98,3 Rang/min, eine
+            fruehe Black Op rund 8.
+
+Hypothese:  Die Rangrate steigt von **29,3/min** (geglättet über 45 min,
+            `data/verlauf-strategie.json`, 21:35) auf mindestens **45/min**,
+            weil die Black-Op-Zeit durch Raid ersetzt wird, bis die Chance
+            hoch genug ist.
+
+Beleg:      `src/bodauer.js` um 21:52, Rang 13.209:
+
+                Operation Ares         469 s   Chance 0,405 - 0,637
+                Operation Archangel    703 s          0,289 - 0,455
+                Operation Juggernaut   938 s          0,202 - 0,318
+                Operation Red Dragon  1172 s          0,154 - 0,242
+                Raid                    72 s   118 Rang = 98,3 Rang/min
+
+            Eine Black Op kostet erwartet `Dauer / p`. Ares bei p = 0,52:
+            902 s fuer `rankGain` 125 (`data/BlackOperations.ts:152`) -
+            in derselben Zeit brachte Raid 1.475 Rang. **Nettokosten 1.350.**
+            Bei p = 0,95 nur 681. Bei Red Dragon steht 5.860 s gegen 1.234 s,
+            also **7.577 Rang Unterschied.**
+
+            Warum Warten nichts kostet: Die Gesamtzeit ist
+            `(400.000 - 73.660)/Raidrate + Summe(Dauer_i / p_i)`. Der erste
+            Term haengt nicht davon ab, WANN die Black Ops fallen - ihre
+            73.660 Rang zaehlen zum selben Ziel. Der zweite wird kleiner, je
+            hoeher p ist. Und p steigt von allein, weil
+            `skillPoints = floor(maxRank/3)` bei linear steigenden
+            Faehigkeitskosten (`Skill.ts:37-41`) den Rang in Chance
+            uebersetzt.
+
+Vorher:     29,3 Rang/min um 21:35, kein Raid in der Stunde davor.
+Nachher:    (offen - der naechste Lauf misst über 45 min)
+            Verifiziert 21:55, dass die Regel greift: `data/blade.json`
+            meldet `"aktion":"Operations/Raid"`, wo vorher Operation Ares
+            lief.
+
+**Was dabei geprueft und VERWORFEN wurde** - damit es niemand ein zweites Mal
+aufmacht:
+
+  - **Die Chaos-Hysterese enger stellen** (`CHAOS_AUS` 47 -> 49). Gerechnet:
+    ab 47 sind es 2 Raids bis ueber 50 und 3,2 SR zurueck = 51,8 Rang/min;
+    ab 49 ein Raid und 1,5 SR = 53,0. **Plus 2,3 Prozent** - unter der
+    Messgenauigkeit. Der einzige echte Verlust ist der einmalige Anlauf nach
+    einem Stadtwechsel (Chongqing kam mit Chaos 66), und der betrifft sechs
+    Staedte einmal.
+  - **Stealth Retirement wegen der Bevoelkerung begrenzen.** SR senkt sie um
+    0,5 % je Erfolg, und sie wirkt mit `(pop/1e9)^0,7` auf die competence.
+    Aber: Auf Black Ops wirkt sie **gar nicht**
+    (`Actions/BlackOperation.ts:55-61` gibt fest 1), und bei den Operationen
+    klemmt die Chance ohnehin bei 1,00 - Raid steht bei 1,0 bis 1,0. Die
+    bestehende Grenze `SR_POP_MIN` = 0,8e9 deckt den Fall ab, in dem es
+    anfaengt zu kosten. Kein Handlungsbedarf.
+
+Commit:     (folgt)
+
+---
+
 ### Feste Deckel raus, wo die Sortierung greift (27.08., 20:33)
 
 Engpass: Zum **fuenften Mal an einem Tag** lag die beste Faehigkeit gedeckelt

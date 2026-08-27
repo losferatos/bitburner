@@ -50,7 +50,37 @@ Gemessen: `data/bblage.json`, `kampfExp.def` 45.209 (13:40) auf 47.735 (14:10) -
     Contracts/Bounty Hunter           162 s    9,0 %
 Erwartet: Bei Hyperdrive Stufe 7 rund **142 exp/min**, so wie um 13:10 gemessen. Kammeranteil um 20 Prozent.
 Verdacht: **zwei Ursachen, beide plausibel, keine belegt.** (1) Der Kammeranteil ist um die Haelfte gestiegen - die Ausdauer reicht nicht mehr. Zu pruefen an `data/bbspann.json` (`ausdauer`, `regeneration`) ueber mehrere Punkte; die Hoechstausdauer waechst mit den Kampfwerten, der Verbrauch faellt aber JE AKTION an (`Bladeburner.ts:921`), und kuerzere Aktionen heissen mehr Aktionen. (2) **Tracking ist `isStealth`, nicht `isKill`** - es profitiert weder von Short-Circuit noch traegt es viel Kampferfahrung, weil seine Gewichte auf hacking und charisma liegen (`data/Contracts.ts`). Ein Viertel der Zeit floss also in eine Aktion, die den Traeger kaum bewegt. Warum sie gewaehlt wurde, ist zu klaeren - Bounty Hunter stand bei nur 9 Prozent, sein Vorrat duerfte leer sein.
-**Nicht voreilig zurueckdrehen:** Der Hyperdrive-Eintrag in `nodes/HEBEL.md` nennt als Abbruchkriterium "unter 110 exp/min", und 84 liegt darunter. Die Zahl ist aber durch den Leerlauf verdorben, nicht durch den Hebel - um 13:10 wurden mit demselben Faktor 142 gemessen. Erst die Ursache klaeren, dann ueber den Revert entscheiden.
+**URSACHE GEFUNDEN UND BEHOBEN 14:19 - beide Verdachte haengen zusammen.**
+`RANG_JE_ERFOLG` in `blade.js` fuehrte die **Basiswerte** des Rangertrags. Der
+tatsaechliche Gewinn waechst aber mit der Aktionsstufe
+(`rankGain * rewardFac^(level-1)`). Weil die Basiswerte ungefaehr proportional
+zur Dauer sind, kamen ohne diesen Faktor **alle drei Vertraege auf denselben
+Ertrag je Minute** - die Auswahl entschied nach Rauschen. Gemessen 14:17:
+
+    Tracking        Stufe 39   1,041^38 = 4,62   ->  4,63 je Minute
+    Retirement      Stufe 30   1,065^29 = 6,08   ->  6,26
+    Bounty Hunter   Stufe 28   1,085^27 = 8,90   ->  8,90
+
+Und damit erklaert sich auch der Kammeranteil: Bounty Hunter verbraucht
+**2,46 Ausdauer je Minute**, Tracking **4,92** - bei einer Regeneration von
+**3,113**. Mit Bounty Hunter braucht es fast keine Kammer, mit Tracking laeuft
+die Ausdauer leer. Der Motor fuhr also die schlechtere Aktion und musste den
+Verlust anschliessend in der Kammer nachholen.
+
+**Geaendert 14:19** (`blade.js`, in `beste()`): `rewardFac^(stufe-1)` wird
+eingerechnet, die Faktoren aus `data/Contracts.ts` und `data/Operations.ts`.
+Verifiziert um 14:19 nach dem Neustart: Der Motor waehlt
+`Contracts/Bounty Hunter`, Rang 5.177, `URTEIL: SPUR`.
+
+**Wirkung noch nicht gemessen.** Nachzumessen im naechsten vollen
+30-Minuten-Fenster: Kammeranteil muss von 31,1 Prozent deutlich fallen,
+Tracking von 25,1 gegen null, und die Erfahrungsrate zurueck ueber 110
+exp/min. Bleibt der Kammeranteil ueber 25 Prozent, war die Rechnung falsch.
+
+**Damit ist auch der Hyperdrive-Eintrag entlastet:** Sein Abbruchkriterium
+(unter 110 exp/min) war formal verletzt, aber die 84 waren durch den Leerlauf
+verdorben, nicht durch den Hebel - um 13:10 wurden mit demselben Faktor 142
+gemessen. Kein Revert.
 
 ### Nachmessen: traegt die Black-Op-Schwelle 0,40? (12:50)
 Gemessen: Typhoon-Chance min **0,116**, Mitte 0,1305 um 12:41 (`data/bbspann.json`). Die Schwelle steht seit 12:49 auf **0,40** statt 0,80 (`blade.js:143`), weil die alte Begruendung eine Fehlrechnung war - siehe den Commit und `nodes/HEBEL.md`.

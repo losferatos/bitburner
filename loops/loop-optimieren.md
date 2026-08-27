@@ -15,7 +15,8 @@ Dieser Loop ist der einzige, der fragt: **Was begrenzt uns gerade, und lässt si
 ```
 date
 cd /c/Users/erche/Desktop/claude_projecto/bitburner && node tools/strategie-check.js
-cat nodes/HEBEL.md
+head -60 nodes/HEBEL.md          # nur die offenen Eintraege, nicht das Archiv
+cat nodes/KURS.md 2>/dev/null || echo "(kein Kurs gesetzt - siehe Schritt 1)"
 ```
 
 Spieldateien liegen **nicht** auf der Platte, sondern nur im Spiel. Lesen über die Brücke:
@@ -24,12 +25,20 @@ curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile
 ```
 Nützlich sind je nach Phase `data/blade.json`, `data/bblage.json`, `data/bn4net.json`, `data/bbspann.json` und `data/werkbank.json`. Die letzten beiden musst du über den Auftragskanal anstoßen (`pushFile` nach `data/task.txt` mit `["bbspann.js"]`, 26 s warten) — vorher prüfen, ob der Kanal frei ist, er hat genau einen Leser.
 
-Die Leitfrage: **Welche Zahl bringt den Knoten näher an seinen Ausgang, und was begrenzt sie gerade?** In BitNode 6 ist das der Bladeburner-Rang. Eine Verbesserung der Hackrate wäre dort messbar richtig und strategisch wertlos.
+Die Leitfrage: **Welche Zahl bringt den Knoten näher an seinen Ausgang, und was begrenzt sie gerade?**
 
-Quellen, in dieser Reihenfolge:
-1. Die Telemetrie — was der Bot tatsächlich tut
-2. `doku/formeln-*.md` und `doku/auffaellige-werte.md` — was daran schon verstanden ist
-3. `reference/bitburner-src/src/` — der Spielquellcode, wenn die Doku schweigt. Dort stehen die echten Formeln; grep ist schneller als raten. Beispiele, die sich bewährt haben: `Bladeburner/`, `Hacking.ts`, `Formulas.ts`, `Server/`, `PersonObjects/`.
+**Die Leitgröße wird NICHT vorgegeben — sie steht in `nodes/KURS.md`, wo der Kursloop sie aus dem Quellcode hergeleitet hat.** Lies sie von dort. Fehlt die Datei oder ist ihr Eintrag älter als 24 Stunden, leite sie selbst her (die Anleitung steht in der Datei) und schreib sie hin, bevor du irgendetwas optimierst.
+
+*Warum das so streng steht:* Bis zum 27.08.2026 stand hier der Satz „In BitNode 6 ist das der Bladeburner-Rang", und Schritt 1 ließ `nodes/HEBEL.md` einlesen — wo derselbe Satz stand. Der Loop las als Quelle seine eigene Ausgabe. Die Größe war zufällig richtig, aber weil sie nie **hergeleitet** wurde, wurde sie auch nie **durchgerechnet**: Optimiert wurde auf den nächsten Meilenstein (Typhoon, Rang 2.500) statt auf den Ausgang (Daedalus, 400.000). Sechs Stunden Loop-Arbeit flossen in Feinheiten, während die Kernfrage ungestellt blieb — und der Befund kam am Ende durch Zufall.
+
+**Quellen, in dieser Reihenfolge — der Quellcode zuerst:**
+1. **`reference/bitburner-src/src/`** — der Spielquellcode. Er liegt vollständig vor (v3.0.2), also wird **nachgeschlagen statt gemessen**, wo immer eine Zahl dort steht. `grep` ist schneller als jede Messreihe, und eine Konstante aus `data/` ist verlässlicher als ein 45-Minuten-Fenster. Bewährt: `Bladeburner/`, `Bladeburner/data/`, `BitNode/BitNode.tsx`, `Hacking.ts`, `Formulas.ts`, `PersonObjects/formulas/`.
+2. `doku/formeln-*.md` und `doku/auffaellige-werte.md` — was daran schon verstanden ist.
+3. Die Telemetrie — was der Bot tatsächlich tut. Sie sagt, **ob** die Rechnung stimmt, nicht **was** richtig wäre.
+
+**Diese Reihenfolge ist die eigentliche Regel dieses Loops.** Eric am 27.08.2026: *„Dadurch dass uns der Source Code vorliegt, kann ich keinesfalls akzeptieren, wenn wir nicht JEDERZEIT die optimalste Strategie fahren. Wir können buchstäblich nachschauen und rechnen, wann was exakt perfekt die richtige Entscheidung ist."* Belegt am selben Tag: Die 400.000 Rang standen seit dem ersten Tag in `Bladeburner/data/BlackOperations.ts` — sie mussten nie gemessen werden, nur gelesen.
+
+**Ein gesetzter Parameter ist ein Befund.** Findest du in `src/*.js` eine Zahl, für die im Quellcode eine berechenbare Antwort steht — eine Schwelle, ein Deckel, eine feste Reihenfolge —, dann ist das ein Hebel, auch wenn gerade nichts kaputt aussieht. Am 27.08. wurden so 30 freie Parameter allein in `blade.js` gefunden, von denen mindestens acht exakt lösbar sind. Zwei Beispiele, was das wert war: Die Black-Op-Chance wurde an `s.min` entschieden — einer Zahl, die bei Black Ops **reines Bevölkerungsrauschen** ist (`Actions/BlackOperation.ts:55-61`). Und Digital Observer stand auf Stufe 1, obwohl er als einzige Chance-Fähigkeit **alle 21** Black Ops trifft (`Actions/BlackOperation.ts:69`).
 
 **2. Eine Hypothese formulieren, die eine Zahl nennt.**
 
@@ -59,7 +68,7 @@ Nachher: (offen — nächster Lauf misst)
 Commit: <kennung>
 ```
 
-**Beim nächsten Lauf zuerst die offenen Einträge nachmessen**, bevor du einen neuen Hebel suchst. Ist die Zahl nicht gestiegen, trag das ein und nimm die Änderung zurück (`git revert`). Der Eintrag bleibt stehen: Eine widerlegte Hypothese verhindert, dass jemand dieselbe in zwei Wochen noch einmal probiert.
+**Beim nächsten Lauf zuerst die offenen Einträge nachmessen**, bevor du einen neuen Hebel suchst — aber **höchstens zwei Läufe hintereinander am selben Thema**. Am 27.08. gingen drei Läufe in Folge an denselben Fähigkeitsplan (12:52, 13:19, 15:53), weil jeder Eintrag eine offene Nachmessung hinterließ. Das ist ein Gradient, keine Suche. Steht ein Thema zum dritten Mal an, trag die Nachmessung als Auftrag in `nodes/BAUSTELLEN.md` und such woanders. Ist die Zahl nicht gestiegen, trag das ein und nimm die Änderung zurück (`git revert`). Der Eintrag bleibt stehen: Eine widerlegte Hypothese verhindert, dass jemand dieselbe in zwei Wochen noch einmal probiert.
 
 **5. Committen und pushen.** Nur was du selbst geändert hast (`git add <pfad>`, nie `git add -A`) — vier Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`.
 

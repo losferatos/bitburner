@@ -42,6 +42,14 @@ Regeln:
 
 ## Sofort
 
+### Die Kampferfahrungsrate ist um 41 Prozent gefallen (10:42)
+Gemessen: `data/bblage.json`, `kampfExp`. Zwei gleich lange Fenster von je 48 Minuten, beide in sich konsistent (str und def bekommen exakt denselben Zuwachs):
+    09:04 -> 09:52   str 39.467 -> 45.935, def 18.615 -> 25.083   +6.468   **135 exp/min**
+    09:52 -> 10:40   str 45.935 -> 49.780, def 25.083 -> 28.928   +3.845   **80 exp/min**
+Erwartet: Eine gleichbleibende oder steigende Rate. Die Kampfwerte sind der Traeger des Knotenausgangs (`competence = Sum weights * skill^0,9`), und die Erfahrung ist ihre einzige Quelle.
+Verdacht: offen, aber **es ist nicht der Rang** - der lief im selben Fenster schneller (3.596 um 10:10 auf 3.819 um 10:40, also 7,4 je Minute gegen zuvor 6,5). Mehr Rang bei weniger Erfahrung deutet auf einen Wechsel der Aktionsmischung: entweder mehr Kammerzeit (Hyperbolic Regeneration Chamber gibt weder Rang noch Kampferfahrung) oder eine Aktion mit hohem Rangertrag und niedrigem Erfahrungsertrag. Zu pruefen an `data/blade.json` (`aktion`, `grund`) ueber mehrere Stichproben und an der Erfahrungsformel je Aktionstyp im Quellcode (`reference/v301/src/Bladeburner/`).
+Nicht verwechseln mit der Aenderung von 09:19 (Field Analysis an der Black-Op-Schwelle): Die kann nicht die Ursache sein, sie feuert nachweislich nicht, solange `max` unter 0,80 liegt - und das erste, schnellere Fenster lag ohnehin schon nach dem Neustart.
+
 ### Nachmessen: steht die gemessene Reputationsrate in der richtigen Groessenordnung? (10:21)
 Gemessen: `data/rep-ziel.txt`, **Zeile 3** - seit 10:19 steht dort direkt, mit welcher Rate der Motor rechnet. Erste Ablesung, alle drei noch mit Stern (= Formelwert, der Neustart hat den Messspeicher geleert): **Aevum 169,1 | Slum Snakes 150,4 | Bladeburners 104,2** rep/min.
 Erwartet: Ab etwa 10:25 muessen die Sterne verschwinden, und **Bladeburners muss bei 20 bis 30** liegen - real gemessen sind 23,8 rep/min (5.665 um 09:47 gegen 6.380 um 10:17). Aevum lag bei 34.

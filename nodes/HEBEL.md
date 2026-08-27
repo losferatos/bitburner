@@ -37,6 +37,48 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Raid wieder an und ein Trupp von sechs (27.08., 19:54)
+
+Engpass: Die Rangrate. Sie stand ueber 45 Minuten bei 18 bis 32 je Minute,
+waehrend `data/bbspann.json` fuer Raid **80,01** meldet - bei Chance 0,919,
+794 offenen Laeufen und Arbeitsanteil 1,00 (2,2 Ausdauer je Minute gegen
+3,07 Regeneration, also ohne Kammerpausen).
+
+Hypothese: Die geglaettete Rangrate steigt von 32,75 auf **mindestens 60**
+je Minute. Dazu +9,4 Prozent competence aus dem Trupp
+(`(teamCount+1)^0,05`, `Actions/Operation.ts:96-98`).
+
+Beleg: `data/Operations.ts:113-132` (Raid: baseDifficulty 800, rewardFac 1,1,
+rankGain 55, aktuell Stufe 7 also 97,4 effektiv) und
+`data/GeneralActions.ts:24-31` (Recruitment: Dauer
+`max(10, 300-(cha^0,81+cha/90))` = 206 s, Chance `cha^0,45/(team+1)` = 1,00
+bis elf Mitglieder bei Charisma 264).
+
+**Die alte Ablehnung war doppelt falsch.** Sie stand seit 26.08., 17:20 auf
+`RAID_AN = false` mit der Begruendung "bei Charisma 27 ... Gleichstand erst
+bei Charisma 440". Erstens ist Charisma **264**, nicht 27. Zweitens sagt
+`data/Operations.ts:120` woertlich "Unaffected by Charisma" - es wirkt auf
+Raid gar nicht, sondern nur ueber die Truppkosten, und die sind bei 264
+vernachlaessigbar.
+
+Vorher: Rangrate **32,75/min** (45-min-Fenster 18:26-19:11), Trupp **0**,
+Rang 9.083 um 19:10, popEst Sector-12 **1,109e9**, Chaos **48,9**
+
+Nachher: (offen - der naechste Lauf misst)
+**Drei Zahlen gehoeren zusammen geprueft, nicht nur die erste:**
+  1. Rangrate ueber 45 Minuten - traegt der Hebel? Ziel > 60/min.
+  2. `popEst` in Sector-12 - Raid senkt die Bevoelkerung prozentual, und die
+     steckt in `getPopulationSuccessFactor = (pop/1e9)^0,7`. **Faellt sie
+     unter 1e9, dreht der Hebel ins Minus**, weil der Faktor dann unter 1
+     rutscht und JEDE Aktion ausser Black Ops schwaecher macht.
+  3. Chaos - Raid hebt es prozentual. Ueber 50 greift die Diplomacy-Regel und
+     frisst Arbeitszeit; ueber `RAID_CHAOS_MAX` schaltet sich Raid selbst ab.
+
+Abbruchkriterium: Faellt popEst unter 1,0e9 oder steigt das Chaos ueber 55,
+gehoert `RAID_AN` zurueck auf `false` - dann kostet der Hebel mehr, als er
+bringt. Bleibt die Rangrate unter 45/min, war die bbspann-Zahl irrefuehrend.
+Commit: siehe git log, blade.js 27.08. 19:54
+
 ### Reaper und Evasive System dynamisch, Deckel 16 und 17 (27.08., 15:53)
 
 Engpass: **Zum dritten und vierten Mal an einem Tag dasselbe Muster** - eine

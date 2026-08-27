@@ -42,59 +42,6 @@ Regeln:
 
 ## Sofort
 
-### Die Kampferfahrungsrate ist um 41 Prozent gefallen (10:42)
-Gemessen: `data/bblage.json`, `kampfExp`. Zwei gleich lange Fenster von je 48 Minuten, beide in sich konsistent (str und def bekommen exakt denselben Zuwachs):
-    09:04 -> 09:52   str 39.467 -> 45.935, def 18.615 -> 25.083   +6.468   **135 exp/min**
-    09:52 -> 10:40   str 45.935 -> 49.780, def 25.083 -> 28.928   +3.845   **80 exp/min**
-**Dritte Messung 11:10: der Rueckgang haelt an, aber diesmal faellt auch der Rang.**
-def-Erfahrung 28.928 (10:40) auf 30.884 (11:10), also **65 exp/min** - die Reihe
-lautet jetzt 135, 80, 65. Der Rang lief im selben Fenster ebenfalls langsamer:
-3.819 auf 3.968, also **5,0 je Minute** gegen 7,4 im Fenster davor.
-
-Das ist neu und grenzt ein: Beim ersten Rueckgang fiel NUR die Erfahrung, jetzt
-faellt beides. Ein gemeinsamer Rueckgang deutet auf **mehr Leerlauf** - also
-Kammerzeit oder Ruhephasen -, nicht auf eine veraenderte Aktionswahl. Damit
-ruecken die Ausdauerkurve und der Kammeranteil in den Vordergrund, und die
-Protokolluecke aus Spur 2 wird wichtiger: `data/aktionen.txt` muss zeigen, ob
-der Kammeranteil ueber 23,1 Prozent gestiegen ist.
-
-Erwartet: Eine gleichbleibende oder steigende Rate. Die Kampfwerte sind der Traeger des Knotenausgangs (`competence = Sum weights * skill^0,9`), und die Erfahrung ist ihre einzige Quelle.
-**UNTERSUCHT 10:50 - die Aktionsmischung ist es NICHT.** Aus `data/aktionen.txt`,
-dieselben zwei Fenster:
-
-    Fenster 1   Retirement 47,1 %   Bounty Hunter 31,1 %   Kammer 21,8 %
-    Fenster 2   Retirement 21,4 %   Bounty Hunter 55,4 %   Kammer 23,1 %
-
-Die Verschiebung ist real, taugt aber nicht als Erklaerung - **sie zeigt in die
-Gegenrichtung.** Gerechnet aus dem Quellcode
-(`Bladeburner.ts:706-735`, `data/Contracts.ts`, `data/Constants.ts`):
-
-    unweightedGain = time * BaseStatGain(1/s) * successMult * difficultyMult
-    difficultyMult = difficulty^0,28 + difficulty/650
-    difficulty     = baseDifficulty * difficultyFac^(stufe-1)
-
-    Bounty Hunter  250 * 1,04^27 = 721  ->  7,11   Gewicht def 0,15  ->  1,067 /s
-    Retirement     200 * 1,03^29 = 471  ->  6,05   Gewicht def 0,20  ->  1,210 /s
-
-Mit den protokollierten Sekunden ergibt das roh **2.183** fuer Fenster 1 und
-**2.412** fuer Fenster 2 - Fenster 2 haette also MEHR liefern muessen. Gemessen
-wurden 6.468 gegen 3.845.
-
-Der Wirkungsgrad zwischen Rechnung und Messung faellt damit von **2,96 auf
-1,59**, Faktor 1,86. Das ist die eigentliche offene Frage, nicht die Mischung.
-
-Zwei Spuren, beide noch ungeprueft:
-1. **`successMult` ist 0,5 bei Misserfolg** (`Bladeburner.ts:718`). `data/blade.json`
-   meldete um 10:47 fuer Retirement `chance: 0.598` - vier von zehn Laeufen
-   scheitern. Das erklaert aber hoechstens Faktor 1,25, nicht 1,86.
-2. **Fenster 1 ist nur zu 84 Prozent protokolliert** (2.421 von 2.880 Sekunden),
-   Fenster 2 zu 98. Die 459 unprotokollierten Sekunden koennten eine ertragreiche
-   Aktion gewesen sein - dann waere der ganze Befund ein Messartefakt. Das ist
-   zuerst zu klaeren: warum verliert `data/aktionen.txt` Zeit?
-
-Verdacht: offen, aber **es ist nicht der Rang** - der lief im selben Fenster schneller (3.596 um 10:10 auf 3.819 um 10:40, also 7,4 je Minute gegen zuvor 6,5). Mehr Rang bei weniger Erfahrung deutet auf einen Wechsel der Aktionsmischung: entweder mehr Kammerzeit (Hyperbolic Regeneration Chamber gibt weder Rang noch Kampferfahrung) oder eine Aktion mit hohem Rangertrag und niedrigem Erfahrungsertrag. Zu pruefen an `data/blade.json` (`aktion`, `grund`) ueber mehrere Stichproben und an der Erfahrungsformel je Aktionstyp im Quellcode (`reference/v301/src/Bladeburner/`).
-Nicht verwechseln mit der Aenderung von 09:19 (Field Analysis an der Black-Op-Schwelle): Die kann nicht die Ursache sein, sie feuert nachweislich nicht, solange `max` unter 0,80 liegt - und das erste, schnellere Fenster lag ohnehin schon nach dem Neustart.
-
 ### Nachmessen: steht die gemessene Reputationsrate in der richtigen Groessenordnung? (10:21)
 Gemessen: `data/rep-ziel.txt`, **Zeile 3** - seit 10:19 steht dort direkt, mit welcher Rate der Motor rechnet. Erste Ablesung, alle drei noch mit Stern (= Formelwert, der Neustart hat den Messspeicher geleert): **Aevum 169,1 | Slum Snakes 150,4 | Bladeburners 104,2** rep/min.
 Erwartet: Ab etwa 10:25 muessen die Sterne verschwinden, und **Bladeburners muss bei 20 bis 30** liegen - real gemessen sind 23,8 rep/min (5.665 um 09:47 gegen 6.380 um 10:17). Aevum lag bei 34.
@@ -447,6 +394,44 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Kampferfahrungsrate faellt - GEKLAERT, zwei getrennte Ursachen (27.08., 11:19)
+
+**Verifiziert um 11:19: der Wirkungsgrad ist konstant 1,59 bis 1,62**, sobald
+man richtig misst. Die gemeldete Reihe 135 -> 80 -> 65 exp/min hat zwei
+verschiedene Ursachen, und **keine davon ist ein Fehler im Bot**.
+
+**Ursache 1 (Fenster 2 -> 3): Diplomacy.** Im Fenster 10:40-11:10 lief
+`General/Diplomacy` **300 Sekunden, also 16,7 Prozent der Spanne**.
+`Bladeburner.ts:1187-1198` zeigt: Diplomacy senkt nur das Chaos - **kein Rang,
+keine Kampferfahrung**. Genau deshalb fielen diesmal BEIDE Traeger zugleich
+(Rang von 7,4 auf 5,0 je Minute). Der Kammeranteil war es nicht, der liegt
+ueber alle drei Fenster stabil bei 18 bis 23 Prozent.
+
+Das ist gewolltes Verhalten: Der Diplomacy-Hebel vom 26.08., 15:26 hat die
+Tracking-Chance von 0,36 auf 0,801 gehoben, Faktor 2,24. Fuenf Minuten kosten
+rund 43 Rang und 330 def-Erfahrung - der Tausch ist gemessen und bleibt.
+
+**Ursache 2 (Fenster 1 -> 2): ein Messartefakt, und zwar meines.** Die erste
+Auswertung filterte mit `von >= a && bis <= b` und warf damit jeden Eintrag
+weg, der ueber eine Fenstergrenze ragt. Anteilig gerechnet steht Fenster 2 bei
+**100 Prozent** erfasster Zeit, Fenster 3 bei 97 - und dort stimmt die Rechnung:
+
+    Fenster 2   roh 2.421   gemessen 3.845   Verhaeltnis 1,588
+    Fenster 3   roh 1.204   gemessen 1.956   Verhaeltnis 1,624
+    Fenster 1   roh 2.183   gemessen 6.468   Verhaeltnis 2,96   <- Ausreisser
+
+Das Verhaeltnis ist `person.mults.defense_exp`, und es ist konstant. **Fenster 1
+ist der Ausreisser, nicht Fenster 2** - dort fehlen 282 Sekunden im Protokoll,
+in denen etwas deutlich Schwereres lief (rund 6,6 roh je Sekunde, das waere eine
+Operation). Die Zahl 135 exp/min war also nie die normale Rate.
+
+**Lehre fuer die Zielsetzung**: Halbstundenziele auf der Erfahrungsrate muessen
+den Anteil der General-Aktionen einrechnen. Diplomacy und Hyperbolic
+Regeneration Chamber nehmen zusammen bis zu 40 Prozent der Spanne, und beide
+liefern null Erfahrung. Die belastbare Rate ist die aus Fenster 2 und 3.
+
+Keine Aenderung am Code - es gab nichts zu beheben.
 
 ### Die Typhoon-Chance rauscht - URSACHE GEKLAERT (27.08., 09:21)
 

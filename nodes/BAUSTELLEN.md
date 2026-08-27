@@ -48,6 +48,28 @@ keine
 
 ### bn4rep optimiert auf den Hacking-Ausgang - in einem Knoten, der ihn vierfach daempft
 
+**VERIFIZIERT 27.08., 07:56: Der Kampfterm greift.** Das gewaehlte Ziel ist
+**ORION-MKIV Shoulder** von **Bladeburners** - str/def/dex je 1,05 und
+`bladeburner_success_chance` 1,04, Guetebeitrag 0,74. Zum Vergleich der
+letzte bekannte Stand vor der Aenderung (26.08., 09:45):
+**Cranial Signal Processors - Gen II**, eine reine Hacking-Augmentierung.
+
+**Messbar wurde das erst durch eine zweite Aenderung.** `data/bn4rep.json`
+steht am Ende der Runde, und das Skript steigt an mindestens vier Stellen
+davor aus (dokumentiert im Kommentar bei `bn4rep.js:355`). Gemessen um 07:47:
+Puls **0 Minuten** alt, Telemetrie **2.323** - von aussen war nicht zu sehen,
+worauf der Motor spart. `bn4rep.js` schreibt jetzt direkt bei der Zielwahl
+nach `data/rep-ziel.txt` (`<ms>|<aug>|<faktion>`).
+
+Eigene Datei statt Anhang an `hb-rep.txt`: Der Waechter liest den Puls mit
+`Number(...)` (`wache.js:176-180`), ein Textzusatz haette dort NaN ergeben und
+einen Ausfall gemeldet, den es nicht gibt.
+
+**Was offen bleibt:** Ob der Kampfterm mit **Gewicht 10** richtig kalibriert
+ist, zeigt erst der naechste Einbau - dort entscheidet sich, ob die
+Kampf-Multiplikatoren schneller steigen als die 1,834 auf 1,986 des Einbaus
+von 03:48 (der lief noch ohne den Term). Der Punkt bleibt bis dahin offen.
+
 **Dringlichkeit: hoch.** Der Reputationsmotor arbeitet seit Knotenbeginn auf ein
 Ziel hin, das in BitNode 6 der teurere von zwei Wegen ist.
 

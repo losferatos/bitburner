@@ -1432,6 +1432,25 @@ export async function main(ns) {
 
     const ziel = offen[0];
 
+    // DAS ZIEL GEHOERT NEBEN DEN PULS (27.08.2026, 07:55).
+    //
+    // `data/bn4rep.json` steht am Ende der Runde, und das Skript steigt an
+    // mindestens vier Stellen davor aus (siehe den Kommentar beim Puls, :355).
+    // Gemessen am 27.08. um 07:47: Der Puls war **0 Minuten** alt, die
+    // Telemetrie **2.323** - also von gestern Vormittag. Von aussen war damit
+    // nicht zu sehen, worauf der Motor gerade spart.
+    //
+    // Das ist mehr als Kosmetik: Seit dem 27.08., 04:10 bewertet `einzelWert`
+    // auch Kampfwert-Augmentierungen (`lib/hackaugs.js`, `combatNutzen`), und
+    // ob das greift, laesst sich **nur** am gewaehlten Ziel ablesen. Ohne
+    // diese Zeile bleibt der Punkt in BAUSTELLEN.md dauerhaft ungemessen.
+    //
+    // Eigene Datei statt Anhang an `hb-rep.txt`: Der Waechter liest den Puls
+    // mit `Number(...)` (`wache.js:176-180`), ein Textzusatz wuerde dort NaN
+    // ergeben und einen Ausfall melden, den es nicht gibt.
+    schreibNachHome("data/rep-ziel.txt",
+      Date.now() + "|" + ziel.aug + "|" + ziel.faktion);
+
     // --- Spendenweg, sobald eine Faktion Favor 150 hat ------------------------
     // Ab dieser Marke bringt Geld direkt Reputation:
     //     rep = betrag / 1e6 * mults.faction_rep     (Faction/formulas/donation.ts)

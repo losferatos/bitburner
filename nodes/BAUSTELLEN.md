@@ -232,9 +232,30 @@ umgestellt. Bleiben Vorbedingung 2 (die Liste fehlt) und 3 (der Umbau
 beruehrt Firmenphase, Einbaukriterium und Daedalus-Logik).
 
 **Zu klaeren, bevor umgebaut wird:**
-2. Wenn Bladeburner traegt: `einzelWert` um einen Kampfwert-Term erweitern,
-   der in den Knoten 6 und 7 greift. Die Liste dafuer fehlt - `lib/hackaugs.js`
-   kennt nur Hacking- und Reputationsmultiplikatoren.
+2. ~~Die Liste fehlt.~~ **Erledigt 27.08., 03:25.** `src/lib/combataugs.js`
+   ist angelegt: **60 Augmentierungen** mit Kampfwert- oder
+   Bladeburner-Multiplikatoren, maschinell aus `Augmentations.ts` gezogen,
+   Anzeigenamen aus `Augmentation/Enums.ts` aufgeloest. Dazu `combatNutzen()`
+   nach derselben Bauart wie `levelNutzen`: Ein Faktor f auf einen Kampfwert
+   hebt dessen Beitrag um `f^0,9` (nicht um f - bei x1,75 sind das 6 Prozent
+   Unterschied), Gewicht 0,25 je Wert nach den Typhoon-Gewichten,
+   `bladeburner_success_chance` ungedaempft, Erfahrungs- und
+   Ausdauermultiplikatoren mit halbem Gewicht ueber den Logarithmus.
+
+   *Verifiziert 03:25*, die acht besten Stuecke:
+
+       0,655  SPTN-97 Gene Modification
+       0,527  Graphene Bionic Spine Upgrade
+       0,460  CordiARC Fusion Reactor
+       0,382  Hydroflame Left Arm
+       0,370  Graphene Bionic Arms Upgrade
+       0,320  Graphene Bionic Legs Upgrade
+       0,306  Graphene Bone Lacings
+       0,265  Photosynthetic Cells
+
+   Die Datei aendert noch **nichts** am Verhalten - sie wird von niemandem
+   importiert. Das ist Absicht: Der Umbau von `einzelWert` ist der naechste
+   Schritt und gehoert in einen eigenen Lauf mit Nachmessung.
 3. **`bn4rep.js` ist gross und traegt den ganzen Reputationszyklus.** Ein
    Umbau der Guetezahl beruehrt auch die Firmenphase, das Einbaukriterium und
    die Daedalus-Logik. Das ist kein Einzeiler und braucht einen eigenen Lauf

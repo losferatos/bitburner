@@ -679,14 +679,107 @@ export async function main(ns) {
       return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "HP" };
     }
 
+    // DIE BLACK-OP-CHANCE WIRD GERECHNET, NICHT GESCHAETZT (27.08.2026, 18:22).
+    //
+    // `getActionEstimatedSuccessChance` liefert ein Paar [min, max], und bis
+    // heute entschied hier `min`. Bei Black Ops ist diese Spanne aber ein
+    // ARTEFAKT: `Actions/BlackOperation.ts:55-61` gibt fuer
+    // `getPopulationSuccessFactor()` und `getChaosSuccessFactor()` fest 1
+    // zurueck, also ist in `getSuccessRange` (`Actions/Action.ts:144-167`)
+    // `est === real` und `diff = 0` - und trotzdem wird danach `low *= r`
+    // mit `r = city.pop/city.popEst` gerechnet. Die Bevoelkerungsschaetzung
+    // wirkt auf Black Ops gar nicht, verzerrt aber die Anzeige.
+    //
+    // Verifiziert im Spiel um 18:19 (`src/chance.js`, `data/chance.json`):
+    //     API-Paar   min 0,2955   max 0,3064
+    //     gerechnet             0,3064   <- deckungsgleich mit max
+    // Der Motor entschied auf 0,2955, wahr waren 0,3064. Heute sind das
+    // 3,7 Prozent; um 17:41 waren es 11, und `popEst` kann bis zum
+    // Anderthalbfachen danebenliegen (`City.ts:23`), also bis zu 33.
+    //
+    // Nachbau von `Action.getSuccessChance` (`Actions/Action.ts:169-196`).
+    // Gibt `null` zurueck, wenn die Aktionsdaten fehlen - dann faellt die
+    // Entscheidung wie bisher auf `min`, also auf die vorsichtige Seite.
+    const BLACKOP_DATEN = {
+      "Operation Typhoon": {
+        baseDifficulty: 2000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2,
+          agility: 0.2, charisma: 0, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8,
+          agility: 0.8, charisma: 0, intelligence: 0.75 },
+      },
+      // Weitere Black Ops hier nachtragen, wenn sie an die Reihe kommen - die
+      // Werte stehen in
+      // `reference/bitburner-src/src/Bladeburner/data/BlackOperations.ts`.
+    };
+    // `mult = 1 + baseMult*stufe/100`, multiplikativ (`Bladeburner.ts:778-783`)
+    const SKILL_WIRKUNG = {
+      "Blade's Intuition": { SuccessChanceAll: 3 },
+      "Short-Circuit": { SuccessChanceKill: 5.5 },
+      "Cloak": { SuccessChanceStealth: 5.5 },
+      "Digital Observer": { SuccessChanceOperation: 4 },
+      "Reaper": { EffStr: 2, EffDef: 2, EffDex: 2, EffAgi: 2 },
+      "Evasive System": { EffDex: 4, EffAgi: 4 },
+    };
+    const blackOpChance = (name) => {
+      const a = BLACKOP_DATEN[name];
+      if (!a) return null;
+      try {
+        const mult = {};
+        for (const [skill, wirkungen] of Object.entries(SKILL_WIRKUNG)) {
+          const stufe = ns.bladeburner.getSkillLevel(skill);
+          if (!stufe) continue;
+          for (const [was, basis] of Object.entries(wirkungen)) {
+            mult[was] = (mult[was] ?? 1) * (1 + (basis * stufe) / 100);
+          }
+        }
+        const m = (was) => mult[was] ?? 1;
+        const sp = ns.getPlayer();
+        const sk = sp.skills;
+        const [aus, ausMax] = ns.bladeburner.getStamina();
+        let team = 0;
+        try { team = ns.bladeburner.getTeamSize(B, name); } catch { /* kein Trupp */ }
+        const eff = {
+          hacking: sk.hacking,
+          strength: sk.strength * m("EffStr"),
+          defense: sk.defense * m("EffDef"),
+          dexterity: sk.dexterity * m("EffDex"),
+          agility: sk.agility * m("EffAgi"),
+          charisma: sk.charisma * m("EffCha"),
+          intelligence: sk.intelligence,
+        };
+        let c = 0;
+        for (const stat of Object.keys(a.weights)) {
+          if (!a.weights[stat]) continue;
+          c += a.weights[stat] * Math.pow(eff[stat], a.decays[stat]);
+        }
+        c *= 1 + (0.75 * Math.pow(sk.intelligence, 0.8)) / 600;   // Intelligenz
+        c *= Math.min(1, aus / (0.5 * ausMax));                   // Ausdauerstrafe
+        c *= Math.pow(team + 1, 0.05);                            // Truppbonus
+        c *= m("SuccessChanceAll");
+        c *= m("SuccessChanceOperation");   // Black Ops zaehlen als Operation
+        if (a.isStealth) c *= m("SuccessChanceStealth");
+        if (a.isKill) c *= m("SuccessChanceKill");
+        c *= sp.mults.bladeburner_success_chance ?? 1;
+        const wert = Math.min(1, c / a.baseDifficulty);
+        return Number.isFinite(wert) ? wert : null;
+      } catch { return null; }
+    };
+
     // 2. Die naechste Black Op, wenn Rang und Sicherheit reichen. Sie sind
     //    der eigentliche Zweck: 21 Stueck, dann ist der Knoten offen.
     const bo = ns.bladeburner.getNextBlackOp();
     if (bo) {
       if (ns.bladeburner.getRank() >= bo.rank) {
         const s = spanne(B, bo.name);
-        if (s.min >= SICHER_BLACKOP) {
-          return { typ: B, name: bo.name, grund: "Black Op" };
+        const gerechnet = blackOpChance(bo.name);
+        // Die gerechnete Zahl schlaegt die geschaetzte. Fehlen die Daten,
+        // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
+        const chance = gerechnet !== null ? gerechnet : s.min;
+        if (chance >= SICHER_BLACKOP) {
+          return { typ: B, name: bo.name,
+            grund: "Black Op (Chance " + chance.toFixed(3)
+              + (gerechnet !== null ? " gerechnet" : " geschaetzt") + ")" };
         }
         // WENN NUR DIE SCHAETZUNG IM WEG STEHT, IST SIE DAS ZIEL
         // (27.08.2026, 09:19).
@@ -706,7 +799,16 @@ export async function main(ns) {
         //
         // Solange max unter der Schwelle liegt, ist die Regel wirkungslos -
         // sie kostet dann nichts und wartet auf ihren Moment.
-        if (s.max >= SICHER_BLACKOP && s.min < SICHER_BLACKOP) {
+        // ABGESCHALTET, SOBALD DIE CHANCE GERECHNET WIRD (27.08.2026, 18:22).
+        //
+        // Die Regel oben stammt von 09:19 und ruht auf derselben Fehlannahme:
+        // dass die Spanne einer Black Op eine echte Unschaerfe ihrer Chance
+        // sei, die Field Analysis schliessen kann. Fuer Vertraege und
+        // Operationen stimmt das - fuer Black Ops nicht, dort wirkt die
+        // Bevoelkerung gar nicht mit. Field Analysis kauft dann nur die
+        // bessere ANZEIGE, zum Preis von 0,2 Rang je Minute gegen 8,7.
+        // Wo gerechnet wird, ist sie ueberfluessig.
+        if (gerechnet === null && s.max >= SICHER_BLACKOP && s.min < SICHER_BLACKOP) {
           return { typ: G, name: "Field Analysis",
             grund: "nur die Schaetzung fehlt zur Black Op" };
         }

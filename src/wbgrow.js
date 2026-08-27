@@ -74,6 +74,37 @@ export async function main(ns) {
       return sag("Zu teuer: " + ns.format.number(kosten) + " gegen "
         + ns.format.number(geld) + " Guthaben (Grenze ein Fuenftel).");
     }
+    // STEHT EIN EINBAU AN? (27.08.2026, 04:20)
+    //
+    // Gekaufte Rechner ueberleben einen Augmentierungs-Einbau NICHT
+    // (`Prestige.ts:73`). Am 27.08. um 03:46 habe ich `werk-0` fuer 2,703
+    // Milliarden auf 2048 GB ausgebaut - zwei Minuten spaeter kam der Einbau,
+    // und das Geld war doppelt weg: einmal fuer den Server, einmal, weil es
+    // sonst in Augmentierungen gegangen waere.
+    //
+    // Die Anzeichen waren da: 28,9 Milliarden Guthaben und ein
+    // Reputationsmotor, der seit Stunden sammelt. Genau das wird hier
+    // geprueft - liegt eine kaufbare Augmentierung vor, deren Preis in der
+    // Groessenordnung des Ausbaus liegt, hat sie Vorrang.
+    let wartend = 0;
+    try {
+      const besitz = new Set(ns.singularity.getOwnedAugmentations(true));
+      for (const f of ns.getPlayer().factions) {
+        const rep = ns.singularity.getFactionRep(f);
+        for (const aug of ns.singularity.getAugmentationsFromFaction(f)) {
+          if (besitz.has(aug)) continue;
+          if (ns.singularity.getAugmentationRepReq(aug) > rep) continue;
+          wartend += ns.singularity.getAugmentationPrice(aug);
+        }
+      }
+    } catch { wartend = 0; }   // ohne Singularity keine Pruefung, dann eben so
+    if (wartend > kosten) {
+      return sag("Kein Ausbau: " + ns.format.number(wartend)
+        + " an kaufbaren Augmentierungen warten, der Ausbau kostet "
+        + ns.format.number(kosten) + ". Gekaufte Rechner ueberleben den"
+        + " Einbau nicht.");
+    }
+
     if (!ns.cloud.upgradeServer(bank, zielGb)) {
       return sag("Aufruestung abgelehnt: " + bank + " auf " + zielGb + " GB.");
     }

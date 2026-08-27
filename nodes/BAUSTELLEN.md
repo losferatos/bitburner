@@ -48,11 +48,19 @@ Erwartet: Vor einem Kauf in Milliardenhoehe gehoert geprueft, ob ein Einbau
 ansteht. Die Anzeichen waren da - 28,9 Milliarden Guthaben und ein
 Reputationsmotor, der seit Stunden sammelt.
 
-Verdacht: keine Codestelle, ein Verfahrensfehler von mir. **Zu tun:**
-`src/wbgrow.js` um eine Vorpruefung erweitern - liegt eine kaufbare
-Augmentierung vor, deren Preis in der Groessenordnung des Guthabens liegt,
-wird der Ausbau abgelehnt und der Grund geschrieben. Die Zahlen dafuer liefert
-`ns.singularity.getAugmentationPrice` auf die wartenden Stuecke.
+Verdacht: keine Codestelle, ein Verfahrensfehler von mir.
+
+**Geaendert 27.08., 04:20, Wirkung noch nicht gemessen.** `src/wbgrow.js`
+summiert jetzt vor dem Ausbau die Preise aller Augmentierungen, deren
+Reputationsschwelle bereits erreicht ist, und lehnt ab, wenn diese Summe die
+Ausbaukosten uebersteigt. Der Grund wird in `data/wbgrow.txt` geschrieben,
+statt still zu scheitern.
+
+**Der Testlauf um 04:21 lief ins Leere und bestaetigt dabei den Befund:**
+`"Keine gekauften Rechner."` - der Einbau von 03:48 hat sie alle geloescht.
+Die 2,703 Milliarden von 03:46 sind damit belegt verloren, und die neue
+Pruefung konnte nicht durchlaufen. Sie wird erst messbar, wenn der Serverpark
+wieder steht; bis dahin bleibt dieser Punkt offen.
 
 ### Wartet bis zum naechsten Einbau: Das Guthaben war negativ, -1,58 Millionen (22:18)
 Gemessen: `data/bn4net.json` meldet `geld -1576559.02`, der Strategiepruefer

@@ -191,10 +191,47 @@ gevierteltem Erfahrungsgewinn. Aktuell steht Hacking bei **155**.
 Der Bladeburner-Weg dagegen laeuft: Rang 1658 von 2500 fuer die erste Black Op,
 Rate rund 1,4 je Minute.
 
+**Vorbedingung 1 ist geklaert (27.08., 02:48): Der Hacking-Weg ist in diesem
+Knoten chancenlos, der Bladeburner-Weg braucht EINEN Einbau-Zyklus.**
+
+Gemessen aus dem Spielstand:
+
+    effektiver Hacking-Mult   0,559   (mults.hacking 1,605 x BN-Daempfung 0,35)
+    effektiver Dex-Mult       1,827   (ungedaempft - BN6 daempft nur Hacking)
+
+Was der Hacking-Ausgang bei diesem Multiplikator kostet
+(`exp = e^((lvl/mult + 200)/32) - 534,6`):
+
+    Hacking 1000   9,85 x 10^26  Erfahrung
+    Hacking 3000   3,56 x 10^75
+    Hacking 6000   2,44 x 10^148   <- der Backdoor auf w0r1d_d43m0n
+
+Der Bestand liegt bei 3,55 Millionen. Das sind **146 Groessenordnungen**, und
+sie lassen sich nur ueber den Multiplikator schliessen: fuer Hacking 6000
+braeuchte es einen effektiven Mult um 25 bis 30, also `mults.hacking` bei 50
+bis 90 - mit Hack-Augmentierungen von x1,05 bis x1,3 sind das Dutzende
+Einbau-Zyklen.
+
+**Der Bladeburner-Weg dagegen ist eine Frage von einem Zyklus.** Ein
+Typhoon-Versuch lohnt sich, sobald der Erwartungswert positiv ist:
+`chance * 50 - (1 - chance) * 10 > 0`, also ab **Chance 0,167** - nicht ab 50
+Prozent, wie der Eintrag von 01:05 unterstellte. Von 0,037 auf 0,167 ist
+Faktor 4,5 in der Kompetenz, wegen des Exponenten 0,9 also **Faktor 5,63 in
+den Kampfwerten**: dex von 240 auf rund 1.350, der Multiplikator von 1,83 auf
+10,3.
+
+Die zehn staerksten Kampfwert-Augmentierungen zusammen ergeben **x6,91**
+(SPTN-97 1,75; CordiARC 1,35; Photosynthetic Cells 1,40; nextSENS und
+Xanipher je 1,20; Bionic Spine 1,15; HemoRecirculator 1,08; Golem Serum 1,07;
+Power Recirculator 1,05; BladeArmor 1,04). Auf den heutigen 1,827 sind das
+**12,6** - mehr als die noetigen 10,3.
+
+**Damit ist die Richtung entschieden, und zwar durch die Zahlen:** Der
+Reputationsmotor gehoert in den Kampfknoten auf Kampfwert-Augmentierungen
+umgestellt. Bleiben Vorbedingung 2 (die Liste fehlt) und 3 (der Umbau
+beruehrt Firmenphase, Einbaukriterium und Daedalus-Logik).
+
 **Zu klaeren, bevor umgebaut wird:**
-1. Ist der Hacking-Weg in BN6 wirklich chancenlos, oder traegt er als
-   Zweitweg? Zu rechnen: Wie viele Einbau-Zyklen braucht Hacking 6000 bei
-   Multiplikator 0,35, gegen die Zyklen bis Kampfwerte fuer 21 Black Ops?
 2. Wenn Bladeburner traegt: `einzelWert` um einen Kampfwert-Term erweitern,
    der in den Knoten 6 und 7 greift. Die Liste dafuer fehlt - `lib/hackaugs.js`
    kennt nur Hacking- und Reputationsmultiplikatoren.

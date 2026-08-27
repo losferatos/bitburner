@@ -114,34 +114,52 @@ Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millione
 
 ## Offen, nach Dringlichkeit
 
-### Der Bot rekrutiert nie ein Team - bis zu +16 Prozent auf JEDE Black Op (19:57)
+### Der Bot rekrutiert nie ein Team - +9,4 Prozent auf jede Black Op fuer 24 Minuten (19:57, durchgerechnet 20:03)
 
 Gemessen: `teamCount` ist 0 (`src/chance.js`, 18:19). Kein Skript in `src/`
 ruft `setTeamSize` oder faehrt `General/Recruitment` - null Treffer im grep.
 
 Beleg: `operationTeamSuccessBonus = (teamCount + 1)^0,05`
-(`Actions/Operation.ts:96-98`) gilt fuer Operationen **und Black Ops**. Bei
-20 Mitgliedern sind das `21^0,05 = 1,161`, also **+16,1 Prozent competence**
-auf jede der 21 Black Ops - multiplikativ, also auf die volle Reststrecke.
+(`Actions/Operation.ts:96-98`) gilt fuer Operationen **und Black Ops** -
+multiplikativ auf die competence, also auf die volle Reststrecke von 20
+Black Ops.
 
-Kosten: `Recruitment` verbraucht keine Ausdauer, Chance
-`charisma^0,45/(teamSize+1)` (`data/GeneralActions.ts:29-31`), Dauer rund
-285 s. Von 0 auf 20 sind das ueberschlaegig 48 Versuche, also **rund 3,8
-Stunden** - gegen eine ETA von 71 bis 148 h.
+**Charisma ist 264, nicht 27.** Damit ist `charisma^0,45 = 12,29`, und die
+Rekrutierungschance `charisma^0,45/(teamSize+1)` (`data/GeneralActions.ts:
+29-31`) steht **bis elf Mitglieder auf 1,00** - jeder Versuch sitzt. Erst
+darueber faellt sie. Die urspruengliche Schaetzung von 3,8 Stunden ging von
+Charisma 27 aus und war um Faktor vier zu pessimistisch.
 
-**Der Haken, der die Rechnung kippen kann:** `BlackOperation.
-getMinimumCasualties()` gibt **1** zurueck (`Actions/BlackOperation.ts:63-65`).
-Bei jeder Black Op stirbt also mindestens ein Mitglied, und bei 21 Stueck
-plus Fehlversuchen ist der Nachschub selbst eine laufende Kosten. Zu rechnen
-ist deshalb nicht "lohnt Rekrutierung", sondern **"welche Teamgroesse haelt
-sich selbst"**: Der Bonus waechst mit Exponent 0,05, also extrem flach - von
-10 auf 20 Mitglieder sind es nur noch +3,4 Prozent. Das Optimum duerfte
-deutlich unter 20 liegen.
+Durchgerechnet, Dauer 285 s je Versuch:
 
-Zu tun: Die Verlustrate je Black Op gegen die Rekrutierungsrate stellen und
-die Teamgroesse bestimmen, ab der sich beides die Waage haelt. Dann in
-`blade.js` eine Regel, die unter dieser Grenze `Recruitment` faehrt - aber
-nur, wenn gerade keine Black Op ansteht.
+    bis  5 Mitglieder   5 Versuche   0,40 h   Bonus  +9,4 %    23,7 %/h
+    bis 11              11           0,87 h         +13,2 %     8,1 %/h
+    bis 15              15           1,22 h         +14,9 %     4,7 %/h
+    bis 20              23           1,80 h         +16,4 %     2,7 %/h
+    bis 30              43           3,44 h         +18,7 %     1,2 %/h
+
+**Der Grenznutzen bricht nach fuenf Mitgliedern um Faktor drei ein**, weil der
+Exponent 0,05 extrem flach ist. Die ersten 24 Minuten bringen 9,4 Prozent,
+die naechsten drei Stunden zusammen nur noch 9,3.
+
+**Zielgroesse ist also 5 bis 8, nicht 20.** Und das haelt sich leicht selbst:
+`BlackOperation.getMinimumCasualties()` gibt 1 zurueck
+(`Actions/BlackOperation.ts:63-65`), aber solange die Chance auf 1,00 steht,
+kostet jeder Ersatz genau einen Versuch - knapp fuenf Minuten.
+
+**Der eigentliche Preis daneben:** `Raid` hat in `data/bbspann.json` einen
+Ertrag von **66,3 Rang je Minute** gemessen - gegen 18 bis 32, die der Motor
+gerade faehrt. Raid verlangt ein Team und Bevoelkerung in der Stadt. Ob es
+mit fuenf Mitgliedern fahrbar wird, ist die Frage, die diesen Punkt vom
+netten Bonus zum groessten Hebel des Knotens macht. Die frueheren
+Raid-Rechnungen in `nodes/HEBEL.md` gingen alle von Charisma 27 aus und
+gehoeren mit 264 neu aufgemacht.
+
+Zu tun: (1) In `blade.js` eine Regel, die `General/Recruitment` faehrt,
+solange `getTeamSize` unter 6 liegt - aber nur, wenn keine Black Op ansteht
+und die Ausdauer nicht knapp ist. (2) Danach messen, ob `Raid` seine
+Mindestchance erreicht, und die alte Ablehnung mit den neuen Zahlen
+pruefen.
 
 ### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
 

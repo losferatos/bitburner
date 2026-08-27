@@ -140,7 +140,40 @@ export async function main(ns) {
   //
   // Wer die Schwelle spaeter weiter senken will, hat mit 0,283 die harte
   // Untergrenze und mit dem Guthaben den Grund - nicht mit dem Bauchgefuehl.
-  const SICHER_BLACKOP = 0.80;
+  // SCHWELLE 0,80 -> 0,40 (27.08.2026, 12:49).
+  //
+  // Die 0,80 vom 06:56 beruhten auf einer Fehlrechnung: "100 HP Verlust gegen
+  // eine Hoechstgrenze um 23 heisst Krankenhaus bei JEDEM Fehlschlag, das
+  // kostet min(Geld * 0,1, ...) - bei 3,6 Milliarden also 360 Millionen."
+  // Gelesen wurde nur der ERSTE Term des Minimums. Der zweite deckelt
+  // (`Hospital.ts:4-10`):
+  //
+  //     Kosten = min(Geld * 0,1, (hp.max - hp.current) * 100.000)
+  //     damage = hpLoss * difficultyMult
+  //            = 100 * (2000^0,28 + 2000/650) = 100 * 11,48 = 1.148
+  //     Kosten = min(1.769 Mio, 1.148 * 100.000) = 114,8 Mio
+  //
+  // Die Kosten haengen also an der SCHWIERIGKEIT, nicht am Kontostand, und
+  // liegen fest bei 114,8 Millionen je Fehlschlag - drei Minuten Einkommen
+  // bei 17,7 Milliarden Bestand. Der Geld-Term greift erst unter 1,15 Mrd.
+  //
+  // Was ein frueher Versuch wirklich kostet (Typhoon, rankLoss 10, 3,49 min):
+  //
+  //     Chance 0,116   8,6 Versuche   875 Mio   76 Rang   30,1 min
+  //     Chance 0,30    3,3 Versuche   268 Mio   23 Rang   11,6 min
+  //     Chance 0,40    2,5 Versuche   172 Mio   15 Rang    8,7 min
+  //     Chance 0,80    1,3 Versuche    29 Mio    3 Rang    4,4 min
+  //
+  // Dagegen steht die Wartezeit: Die Chance stieg von 0,104 (10:11) auf
+  // 0,1305 (12:41), also Faktor 1,25 in 2,5 Stunden. Bis 0,80 waeren das rund
+  // **20 Stunden**; bis 0,40 rund 12. Fuer 172 Millionen und 15 Rang acht
+  // Stunden zu sparen ist kein knapper Fall.
+  //
+  // 0,40 statt tiefer, weil die Rechnung eine Unbekannte hat: Nach einem
+  // Erfolg kommt Operation Zero mit reqdRank 5.000 (wir stehen bei 4.598) -
+  // der Rang bleibt also gebraucht, und Rangverlust ist nicht gratis. Traegt
+  // 0,40, ist der naechste Schritt 0,30 oder tiefer.
+  const SICHER_BLACKOP = 0.40;
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
   const SPANNE_ZU_BREIT = 0.10;
   // Ausdauer. Die Strafe ist min(1, stamina/(0,5*max)) (Bladeburner.ts:167-169)

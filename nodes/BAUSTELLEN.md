@@ -42,11 +42,7 @@ Regeln:
 
 ## Sofort
 
-### Nachmessen: traegt der Messanker die Reputationsrate? (11:50)
-Gemessen um 11:47, erstmals ohne Sterne - und das Kriterium von 10:21 war **verfehlt**: Der Motor sagte **Bladeburners 39,4** rep/min (verlangt waren 20 bis 30), real sind es **24,4** (6.380 um 10:17 gegen 8.580 um 11:47). **Aevum 20** gegen real **40,1**. **Slum Snakes 3** gegen real **2,85** - exakt.
-Erwartet: Nach der Aenderung von 11:49 waechst das Messfenster mit der Laufzeit. Ab etwa **12:35** (45 Minuten nach dem Neustart um 11:49) muessen stehen: **Bladeburners 20 bis 30**, **Aevum 35 bis 45**, Slum Snakes 2 bis 4. Vorher sind die Werte noch zu ungeglaettet, um zu urteilen.
-Verdacht: kein Fehler vermutet. Trifft es nach 45 Minuten immer noch nicht, ist der Mechanismus falsch und nicht nur das Fenster - dann beide Commits (09:50 und 11:49) zurueckdrehen und den Formelwert wieder nehmen.
-**Warum nicht zurueckgedreht wurde**, obwohl das Kriterium verfehlt war: Die zwei Abweichungen gehen in ENTGEGENGESETZTE Richtungen (39,4 statt 24,4 und 20 statt 40,1). Das ist Rauschen, kein systematischer Fehler - und Slum Snakes traf exakt, der Mechanismus funktioniert also. Die Formel dagegen liegt bei allen drei um Faktor 4,4 zu hoch. Eine rauschende Messung mit richtigem Mittel ist besser als ein sicher falscher Wert; behoben gehoerte die Fensterlaenge, nicht die Messung.
+keine
 
 ## Offen, nach Dringlichkeit
 
@@ -394,6 +390,41 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Reputationsrate wird gemessen statt gerechnet - VERIFIZIERT (27.08., 12:18)
+
+**Verifiziert um 12:18: alle drei Faktionen unter 1,5 Prozent Abweichung.**
+Gegenprobe ueber 30 Minuten (Faktionsreputation um 11:47 gegen 12:17) gegen
+das, was der Motor in Zeile 3 von `data/rep-ziel.txt` selbst angibt:
+
+    Aevum          real 29,3   Motor 29,7   +1,3 %
+    Slum Snakes    real  3,0   Motor  3,0    0,0 %
+    Bladeburners   real 25,6   Motor 25,4   -0,9 %
+
+Zum Vergleich der Ausgangszustand: Die Formel (`bn4rep.js:1329`) sagte fuer
+dieselben drei **169,1 | 150,4 | 104,2** - Faktor 4 bis 50 daneben, weil sie
+Faktionsarbeit unterstellt, die in BitNode 6 gar nicht stattfindet.
+
+**Der Weg dahin ging ueber einen Fehlschlag**, und der gehoert festgehalten:
+Die erste Fassung (09:50) zog den Messpunkt bei jeder Uebernahme nach und
+bildete die Rate immer ueber genau 300 Sekunden. Nachgemessen um 11:47 stand
+Bladeburners bei 39,4 statt real 24,4 und Aevum bei 20 statt 40,1 - **in
+entgegengesetzte Richtungen**, also Rauschen. Slum Snakes traf schon damals
+exakt; daran war zu sehen, dass der Mechanismus stimmt und nur das Fenster zu
+kurz war. Seit 11:49 bleibt der erste Messpunkt als **Anker** stehen, das
+Fenster waechst mit der Laufzeit, und bei fallender Reputation (Einbau) wird
+neu geankert.
+
+**Lehre:** Ein verfehltes Abbruchkriterium heisst nicht automatisch Revert.
+Zeigen die Abweichungen in verschiedene Richtungen und trifft ein Fall exakt,
+ist der Mechanismus richtig und die Parametrierung falsch. Ein Revert haette
+hier den sicher falschen Wert wiederhergestellt.
+
+Zweite Lehre, fuer die Erwartungsbaender: Mein Band "Aevum 35 bis 45" stammte
+aus dem Fenster 09:47-11:47. Die Aevum-Rate ist seither selbst auf 29,3
+gesunken - **das Band war veraltet, nicht die Messung**. Was zaehlt, ist die
+Uebereinstimmung zwischen Motor und frisch gemessener Wirklichkeit, nicht ein
+Band aus einer aelteren Messung.
 
 ### Die Kampferfahrungsrate faellt - GEKLAERT, zwei getrennte Ursachen (27.08., 11:19)
 

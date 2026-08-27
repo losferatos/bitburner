@@ -204,6 +204,28 @@ async function runde(ns) {
     // Kauf dazwischen nicht ins Minus fuehrt.
     const GYM_MIN_GELD = 5e6;
     if (ns.getPlayer().money < GYM_MIN_GELD) {
+      // DIE LAUFENDE ARBEIT MUSS WEG (27.08.2026, 15:18).
+      //
+      // Bis eben stand hier nur `continue` - das unterlaesst den NEUSTART,
+      // beendet aber die bereits laufende Gym-Arbeit nicht. Sie laeuft im
+      // Spiel weiter, auf dem Wert, der beim letzten erfolgreichen Durchlauf
+      // der niedrigste war, und zieht dabei weiter Geld.
+      //
+      // Gemessen nach dem Einbau um 14:40: Das Konto lag von der ersten
+      // Sekunde an unter der Schwelle, also lief jede Runde ins `continue`.
+      // Die dex-Arbeit aus der einen Runde davor blieb stehen. Um 15:10 stand
+      // **dex bei 289, agi bei 88** - der Tiefstand hatte sich seit 14:52
+      // nicht um einen Punkt bewegt, waehrend dex um 39 gestiegen war. Der
+      // Kontostand fiel im selben Zeitraum von 6 auf 1,5 Millionen.
+      //
+      // Also kostete der Zustand doppelt: Er verlaengerte die
+      // Wiederaufbauphase UND leerte die Kasse, die der Wiederaufbau braucht.
+      // Gestoppt wird nur eine CLASS-Arbeit - eine laufende
+      // Bladeburner-Aktion geht das hier nichts an.
+      const laufendeArbeit = ns.singularity.getCurrentWork();
+      if (laufendeArbeit && laufendeArbeit.type === "CLASS") {
+        ns.singularity.stopAction();
+      }
       if (letzterGrund !== "arm") {
         sag("Konto unter " + (GYM_MIN_GELD / 1e6) + " Mio - kein Gym."
           + " blade.js trainiert gratis weiter.");

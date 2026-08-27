@@ -47,6 +47,39 @@ Gemessen: `data/bblage.json`, `kampfExp`. Zwei gleich lange Fenster von je 48 Mi
     09:04 -> 09:52   str 39.467 -> 45.935, def 18.615 -> 25.083   +6.468   **135 exp/min**
     09:52 -> 10:40   str 45.935 -> 49.780, def 25.083 -> 28.928   +3.845   **80 exp/min**
 Erwartet: Eine gleichbleibende oder steigende Rate. Die Kampfwerte sind der Traeger des Knotenausgangs (`competence = Sum weights * skill^0,9`), und die Erfahrung ist ihre einzige Quelle.
+**UNTERSUCHT 10:50 - die Aktionsmischung ist es NICHT.** Aus `data/aktionen.txt`,
+dieselben zwei Fenster:
+
+    Fenster 1   Retirement 47,1 %   Bounty Hunter 31,1 %   Kammer 21,8 %
+    Fenster 2   Retirement 21,4 %   Bounty Hunter 55,4 %   Kammer 23,1 %
+
+Die Verschiebung ist real, taugt aber nicht als Erklaerung - **sie zeigt in die
+Gegenrichtung.** Gerechnet aus dem Quellcode
+(`Bladeburner.ts:706-735`, `data/Contracts.ts`, `data/Constants.ts`):
+
+    unweightedGain = time * BaseStatGain(1/s) * successMult * difficultyMult
+    difficultyMult = difficulty^0,28 + difficulty/650
+    difficulty     = baseDifficulty * difficultyFac^(stufe-1)
+
+    Bounty Hunter  250 * 1,04^27 = 721  ->  7,11   Gewicht def 0,15  ->  1,067 /s
+    Retirement     200 * 1,03^29 = 471  ->  6,05   Gewicht def 0,20  ->  1,210 /s
+
+Mit den protokollierten Sekunden ergibt das roh **2.183** fuer Fenster 1 und
+**2.412** fuer Fenster 2 - Fenster 2 haette also MEHR liefern muessen. Gemessen
+wurden 6.468 gegen 3.845.
+
+Der Wirkungsgrad zwischen Rechnung und Messung faellt damit von **2,96 auf
+1,59**, Faktor 1,86. Das ist die eigentliche offene Frage, nicht die Mischung.
+
+Zwei Spuren, beide noch ungeprueft:
+1. **`successMult` ist 0,5 bei Misserfolg** (`Bladeburner.ts:718`). `data/blade.json`
+   meldete um 10:47 fuer Retirement `chance: 0.598` - vier von zehn Laeufen
+   scheitern. Das erklaert aber hoechstens Faktor 1,25, nicht 1,86.
+2. **Fenster 1 ist nur zu 84 Prozent protokolliert** (2.421 von 2.880 Sekunden),
+   Fenster 2 zu 98. Die 459 unprotokollierten Sekunden koennten eine ertragreiche
+   Aktion gewesen sein - dann waere der ganze Befund ein Messartefakt. Das ist
+   zuerst zu klaeren: warum verliert `data/aktionen.txt` Zeit?
+
 Verdacht: offen, aber **es ist nicht der Rang** - der lief im selben Fenster schneller (3.596 um 10:10 auf 3.819 um 10:40, also 7,4 je Minute gegen zuvor 6,5). Mehr Rang bei weniger Erfahrung deutet auf einen Wechsel der Aktionsmischung: entweder mehr Kammerzeit (Hyperbolic Regeneration Chamber gibt weder Rang noch Kampferfahrung) oder eine Aktion mit hohem Rangertrag und niedrigem Erfahrungsertrag. Zu pruefen an `data/blade.json` (`aktion`, `grund`) ueber mehrere Stichproben und an der Erfahrungsformel je Aktionstyp im Quellcode (`reference/v301/src/Bladeburner/`).
 Nicht verwechseln mit der Aenderung von 09:19 (Field Analysis an der Black-Op-Schwelle): Die kann nicht die Ursache sein, sie feuert nachweislich nicht, solange `max` unter 0,80 liegt - und das erste, schnellere Fenster lag ohnehin schon nach dem Neustart.
 

@@ -86,7 +86,98 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Der Ausgang aus BitNode 6: 319.430 Rang netto, geschaetzt 80-180 Stunden (17:51, korrigiert 18:13 nach Fremdpruefung)
+### Assassination ist das einzige unbegrenzte Rangfahrzeug - und es steht auf Stufe 1 (23:12)
+
+Gemessen: `getActionCurrentLevel("Operations", "Assassination")` = **1**,
+Chance **0,999 bis 1,000**, Dauer 96 s (`src/sr.js` um 20:41 und
+`src/trupp.js` um 21:40). Der Motor hat es nie gefahren, weil Raid bei
+Stufe 9 mehr Rang je Minute gibt.
+
+Erwartet: **Assassination schlaegt den Raid-Zyklus, sobald es Stufe 9
+erreicht** - und der Aufbau kostet 94 Minuten.
+
+Die Zahlen aus `data/Operations.ts` und `Actions/LevelableAction.ts`:
+
+    Aktion         rankGain  rewardFac  Dauer   Vorrat        Chaos
+    Raid                 55       1,10   73 s   361 comms     +3 %
+    Assassination        44       1,14   96 s   unbegrenzt    -5..+5 %
+    Stealth Ret.         22       1,11   78 s   unbegrenzt    -2 %
+
+**`rewardFac` 1,14 ist der hoechste im Spiel.** Bei Stufe 9 gibt
+Assassination `44 x 1,14^8` = **125 Rang** je 96 Sekunden = 78,5 Rang je
+Minute - und zwar **ohne Begleitaktion**, weil sein Chaos-Effekt im Mittel
+null ist (`getRandomIntInclusive(-5, 5)`, `Bladeburner.ts:859`).
+
+Der Raid-Zyklus kommt dagegen nur auf **53,4 Rang/min**, weil jeder Raid 1,5
+Stealth Retirements zum Chaos-Ausgleich braucht. **Assassination ist also
+schon heute die bessere Aktion - sobald die Stufe steht.**
+
+Der Aufbau ist billig:
+`getSuccessesNeededForNextLevel = ceil(0,5 x maxLevel x (2 x 2,5 + maxLevel - 1))`
+(`LevelableAction.ts:54-56`, `OperationSuccessesPerLevel` 2,5,
+`Constants.ts:45`):
+
+    Stufe  9   ->   59 Erfolge kumuliert  =  94 min
+    Stufe 12   ->   96                    = 154 min
+    Stufe 15   ->  143                    = 229 min
+
+Der Verbrauch ist vernachlaessigbar: `changePopulationByCount(-1)`
+(`Bladeburner.ts:857`) - **eine einzige Person je Lauf**, gegen die 0,5
+Prozent, die Stealth Retirement kostet.
+
+Verdacht auf die Stellschraube: `SICHER_OPERATION` = 0,85 in
+`src/blade.js` und die Nutzenrechnung in `beste()`, die nach Rang je
+Minute bei der **aktuellen** Stufe sortiert. Sie sieht Assassination auf
+Stufe 1 mit 27,5 Rang/min und waehlt Raid - eine Aktion mit Aufbaukosten
+gewinnt in einer Momentaufnahme nie. Es braucht eine Anlaufregel: erst 59
+Erfolge Assassination, dann vergleichen.
+
+Zu tun: (1) Die Aufbauphase in `blade.js` einbauen, mit Abbruch, wenn die
+Chance unter `SICHER_OPERATION` faellt (`difficultyFac` 1,06 hebt die
+Schwierigkeit bei Stufe 9 auf das 1,59fache). (2) Nach dem Aufbau die
+Rangrate ueber 45 Minuten messen und gegen die 53,4 des Raid-Zyklus halten.
+(3) Traegt es, ist der Punkt "Phase 2" der ETA-Rechnung hinfaellig - dann
+gibt es kein Rangloch nach dem Raid-Vorrat.
+
+
+### Der Ausgang aus BitNode 6: 319.430 Rang netto (17:51, korrigiert 18:13, ETA neu gerechnet 23:12)
+
+**Nachtrag 23:12 - die ETA ist zweiphasig, und das stand hier nicht.** Die
+alte Spanne von 80 bis 180 Stunden ruht auf einem Exponenten `a` zwischen
+0,3 und 0,6, also auf der Annahme, der Rang beschleunige sich selbst. Diese
+Annahme ist heute **groesstenteils ausgereizt**: Die Selbstbeschleunigung
+lief ueber die Erfolgschance, und Raid steht bei **1,0 bis 1,0** (gemessen
+21:40). Weitere Faehigkeitspunkte aendern dort nichts mehr.
+
+Ein aus der eigenen Messreihe geschaetztes `a` waere zudem wertlos: Die
+Regression ueber 25 Stundenfenster ergibt 1,29, aber ein grosser Teil des
+Anstiegs kommt von den Strategieaenderungen dieses Abends (Stealth
+Retirement 20:42, Black-Op-Schwelle 21:55), nicht vom Rang. **Wer die eigene
+Optimierarbeit als Naturgesetz misst, rechnet sich reich.**
+
+Die belastbare Rechnung ist stattdessen eine Phasenrechnung:
+
+    Phase 1, Raid-Zyklus     53,4 Rang/min gemessen ueber 63 min
+                             361 Gemeinden Vorrat, 1 je Zyklus a 190 s
+                             = 19,1 Stunden, 60.648 Rang
+                             Ende bei Rang rund 77.400
+
+    Phase 2, ohne Raid       Stealth Retirement 25,4 Rang/min
+                             Restweg 322.632, davon 73.375 aus den
+                             verbleibenden Black Ops
+                             = 249.257 / 25,4 = 163 Stunden
+
+    Gesamt                   rund 182 Stunden
+
+**Das ist am oberen Rand der alten Spanne, nicht in ihrer Mitte.** Und der
+Grund steht ganz woanders als vermutet: nicht in der Chance, sondern im
+**endlichen Raid-Vorrat**. `Incite Violence` hilft nicht - es erhoeht nur
+`count` der Vertraege und Operationen (`Bladeburner.ts:1219-1225`), nicht
+`comms`.
+
+Wie Phase 2 tatsaechlich aussehen sollte, steht im Punkt darueber
+(Assassination).
+
 
 **Erstmals vollstaendig gemessen** (`src/blackops.js` schreibt
 `data/blackops.json`). Rang 6.910 zum Messzeitpunkt, alle 21 Black Ops:

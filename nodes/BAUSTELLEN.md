@@ -114,6 +114,35 @@ Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millione
 
 ## Offen, nach Dringlichkeit
 
+### Der Bot rekrutiert nie ein Team - bis zu +16 Prozent auf JEDE Black Op (19:57)
+
+Gemessen: `teamCount` ist 0 (`src/chance.js`, 18:19). Kein Skript in `src/`
+ruft `setTeamSize` oder faehrt `General/Recruitment` - null Treffer im grep.
+
+Beleg: `operationTeamSuccessBonus = (teamCount + 1)^0,05`
+(`Actions/Operation.ts:96-98`) gilt fuer Operationen **und Black Ops**. Bei
+20 Mitgliedern sind das `21^0,05 = 1,161`, also **+16,1 Prozent competence**
+auf jede der 21 Black Ops - multiplikativ, also auf die volle Reststrecke.
+
+Kosten: `Recruitment` verbraucht keine Ausdauer, Chance
+`charisma^0,45/(teamSize+1)` (`data/GeneralActions.ts:29-31`), Dauer rund
+285 s. Von 0 auf 20 sind das ueberschlaegig 48 Versuche, also **rund 3,8
+Stunden** - gegen eine ETA von 71 bis 148 h.
+
+**Der Haken, der die Rechnung kippen kann:** `BlackOperation.
+getMinimumCasualties()` gibt **1** zurueck (`Actions/BlackOperation.ts:63-65`).
+Bei jeder Black Op stirbt also mindestens ein Mitglied, und bei 21 Stueck
+plus Fehlversuchen ist der Nachschub selbst eine laufende Kosten. Zu rechnen
+ist deshalb nicht "lohnt Rekrutierung", sondern **"welche Teamgroesse haelt
+sich selbst"**: Der Bonus waechst mit Exponent 0,05, also extrem flach - von
+10 auf 20 Mitglieder sind es nur noch +3,4 Prozent. Das Optimum duerfte
+deutlich unter 20 liegen.
+
+Zu tun: Die Verlustrate je Black Op gegen die Rekrutierungsrate stellen und
+die Teamgroesse bestimmen, ab der sich beides die Waage haelt. Dann in
+`blade.js` eine Regel, die unter dieser Grenze `Recruitment` faehrt - aber
+nur, wenn gerade keine Black Op ansteht.
+
 ### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
 
 **Gemessen um 18:49: `storedCycles` = 8, Rueckstand 0,0 Minuten.** Der Tab ist

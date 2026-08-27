@@ -37,6 +37,41 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Short-Circuit-Deckel von 12 auf 30 (27.08., 13:19)
+
+Engpass: Dieselbe Luecke wie bei Hyperdrive - die Faehigkeitspunkte gingen an
+Blade's Intuition, waehrend eine billigere Faehigkeit gedeckelt danebenlag.
+
+Hypothese: Die Erfolgschance aller Kill-Aktionen steigt von Multiplikator
+**1,66 auf 2,65**, also um **59 Prozent**. Dieselben Punkte reichen bei
+Blade's Intuition nur fuer +36 Prozent.
+
+Beleg: `data/Skills.ts:21-28` - Short-Circuit, baseCost 2, costInc 2,1,
+`SuccessChanceKill: 5,5`. Und `data/BlackOperations.ts:35`: **Typhoon ist
+`isKill: true`** - genau wie Bounty Hunter und Retirement, die zwei Vertraege,
+die der Motor faehrt. Die Faehigkeit trifft also alles, was zaehlt.
+
+    Blade's Intuition St. 26   55,5 Punkte   +1,71 %   0,031 je Punkt
+    Short-Circuit     St. 13   27,2 Punkte   +3,31 %   0,122
+    Short-Circuit     St. 20   41,9 Punkte   +2,69 %   0,064
+    Short-Circuit     St. 30   62,9 Punkte   +2,12 %   0,034   <- Schnittpunkt
+
+Vorher: Short-Circuit **Stufe 12**, Typhoon-Chance min **0,125** um 13:17
+Nachher: (offen - die 811 Punkte fuer Stufe 13 bis 30 brauchen Zeit. Erste
+Wirkung ab Stufe 13 bis 15, also nach rund 90 Punkten. Der naechste Lauf
+misst die Stufe in `data/bbspann.json` und die Chance. Steht die Stufe nach
+zwei Stunden noch auf 12, greift der Plan nicht und der Eintrag gehoert
+geprueft.)
+Commit: ac7565c
+
+**Struktureller Befund, der aus beiden Hebeln folgt:** Ein Faehigkeitsplan mit
+**festen Deckeln veraltet zwangslaeufig.** Die Kosten steigen linear mit der
+Stufe, der Nutzen je Punkt faellt - also wandert die beste Faehigkeit im Lauf
+der Zeit. Zweimal heute lag eine deutlich bessere Option gedeckelt daneben,
+waehrend die Infinity-Eintraege alles auffrassen. Der saubere Fix waere, den
+Plan durch einen Vergleich des relativen Nutzens je Punkt zu ersetzen. Eingetragen
+in `nodes/BAUSTELLEN.md`.
+
 ### Hyperdrive in den Faehigkeitsplan, Deckel 7 (27.08., 12:52)
 
 Engpass: Die Kampfwerte tragen den Knotenausgang (`competence = Sum weights *
@@ -66,11 +101,12 @@ Erfahrungsfaktor **1,7**; dieselben Punkte reichen bei Blade's Intuition fuer
 genau EINE Stufe.
 
 Vorher: **84 exp/min** (def, 12:10 gegen 12:40), Hyperdrive Stufe 0
-Nachher: (offen - **Stufe 5 bereits um 12:54**, der Bot hat die aufgelaufenen
-Punkte sofort investiert. Erwartet wird die Erfahrungsrate bei Stufe 5 auf
-**126 exp/min** und bei Stufe 7 auf **143**. Der naechste Lauf misst
-`kampfExp.def` ueber ein volles 30-Minuten-Fenster. Bleibt sie unter 110,
-traegt die Rechnung nicht und der Eintrag gehoert zurueckgedreht.)
+Nachher: **BESTAETIGT um 13:10.** `kampfExp.def` stieg von 38.479 (12:40) auf
+41.931 (13:10), also 115 exp/min im Fenster. Der Bonus wirkte aber erst ab
+12:54 - rechnet man die ersten 14 Minuten mit der alten Rate heraus, bleiben
+fuer die letzten 16 Minuten **142 exp/min, Faktor 1,69**. Erwartet waren 143
+bei Stufe 7, die Abbruchschwelle lag bei 110. Um 13:17 stand Hyperdrive auf
+**Stufe 7**, dem Deckel.
 Commit: siehe git log, blade.js 27.08. 12:52
 
 ### Geprueft und verworfen: Gym statt Bladeburner-Arbeit (27.08., 09:56)

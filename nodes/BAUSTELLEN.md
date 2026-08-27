@@ -46,6 +46,18 @@ Regeln:
 Gemessen: `data/bblage.json`, `kampfExp`. Zwei gleich lange Fenster von je 48 Minuten, beide in sich konsistent (str und def bekommen exakt denselben Zuwachs):
     09:04 -> 09:52   str 39.467 -> 45.935, def 18.615 -> 25.083   +6.468   **135 exp/min**
     09:52 -> 10:40   str 45.935 -> 49.780, def 25.083 -> 28.928   +3.845   **80 exp/min**
+**Dritte Messung 11:10: der Rueckgang haelt an, aber diesmal faellt auch der Rang.**
+def-Erfahrung 28.928 (10:40) auf 30.884 (11:10), also **65 exp/min** - die Reihe
+lautet jetzt 135, 80, 65. Der Rang lief im selben Fenster ebenfalls langsamer:
+3.819 auf 3.968, also **5,0 je Minute** gegen 7,4 im Fenster davor.
+
+Das ist neu und grenzt ein: Beim ersten Rueckgang fiel NUR die Erfahrung, jetzt
+faellt beides. Ein gemeinsamer Rueckgang deutet auf **mehr Leerlauf** - also
+Kammerzeit oder Ruhephasen -, nicht auf eine veraenderte Aktionswahl. Damit
+ruecken die Ausdauerkurve und der Kammeranteil in den Vordergrund, und die
+Protokolluecke aus Spur 2 wird wichtiger: `data/aktionen.txt` muss zeigen, ob
+der Kammeranteil ueber 23,1 Prozent gestiegen ist.
+
 Erwartet: Eine gleichbleibende oder steigende Rate. Die Kampfwerte sind der Traeger des Knotenausgangs (`competence = Sum weights * skill^0,9`), und die Erfahrung ist ihre einzige Quelle.
 **UNTERSUCHT 10:50 - die Aktionsmischung ist es NICHT.** Aus `data/aktionen.txt`,
 dieselben zwei Fenster:

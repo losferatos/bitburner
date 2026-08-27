@@ -86,44 +86,6 @@ greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
 ## Offen, nach Dringlichkeit
 
-### Der Rechner laeuft nur 5,5 von 24 Stunden - die Schwelle liegt bei 4,8 (18:52)
-
-**Gemessen um 18:49: `storedCycles` = 8, Rueckstand 0,0 Minuten.** Der Tab ist
-also nicht gedrosselt und es haengt nichts hinterher. Das ist der Ausgangswert
-einer Messreihe, kein Entwarnungssignal - der Rechner lief bisher durch.
-
-Eric hat kein Homeoffice; der Rechner laeuft kuenftig etwa **15:30 bis 21:00**.
-Bitburner verliert dadurch keinen Bladeburner-Rang: `engine.tsx:333` legt die
-Offline-Zeit vollstaendig als `storedCycles` zur Seite (`Bladeburner.ts:275`,
-`clampInteger(..., 0)` - keine Obergrenze), und `process()` arbeitet sie mit
-hoechstens fuenf Spielsekunden je Aufruf ab (`Bladeburner.ts:1375-1378`), einmal
-je Realsekunde (`engine.tsx:150,201` plus `MilliPerCycle 200`).
-
-    Abbau je Realstunde = 5 h Spielzeit, davon 1 h "neu"  ->  netto 4 h
-    Gleichgewicht:  T_on * 4 = 24 - T_on   ->   T_on = 4,8 h am Tag
-
-**5,5 Stunden liegen darueber - aber der Puffer sind 42 Minuten.** Ein
-kuerzerer Tag, und der Rest bleibt stehen und summiert sich. Ausserdem gehen
-4,6 der 5,5 Stunden fuers Aufholen drauf; in dieser Zeit laeuft das Spiel
-fuenffach beschleunigt, waehrend die Claude-Loops in Echtzeit takten - die
-Strategie entscheidet also fuenfmal traeger, als das Spiel laeuft.
-
-**Der zweite Weg unter die Schwelle ist die Tab-Drosselung.** Ein verdeckter
-Tab bekommt eine Timer-Weckung je Minute (`doku/drosselung.md`), dann faellt
-der Abbau von 5 s/s auf 5 s/min - Faktor zwoelf. Damit reicht auch ein
-durchlaufender Rechner nicht mehr.
-
-Werkzeug dafuer ist neu: `node tools/rueckstand.js` liest `storedCycles` aus
-dem Spielstand (die API kennt es nicht), schreibt es nach
-`data/rueckstand.json` fort und meldet den Trend je Stunde. Es gehoert in den
-Reportloop, damit aus der Rechnung oben eine Messreihe wird.
-
-Zu tun: (1) Den Aufruf in den Reportloop aufnehmen. (2) Nach drei Tagen
-entscheiden, ob 5,5 Stunden reichen - **an der Messreihe, nicht an dieser
-Rechnung**. (3) Waechst der Rueckstand, ist die Drosselung der erste Verdacht,
-nicht die Rechnerzeit.
-
-
 ### Der Ausgang aus BitNode 6: 319.430 Rang netto, geschaetzt 80-180 Stunden (17:51, korrigiert 18:13 nach Fremdpruefung)
 
 **Erstmals vollstaendig gemessen** (`src/blackops.js` schreibt

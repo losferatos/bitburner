@@ -9,7 +9,38 @@ Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
-- **`## Sofort
+- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
+  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
+  beheben. Abgeraeumtes wandert nach "Erledigt".
+- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
+  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
+  beginnt, wird uebersprungen statt angefangen.
+- Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
+- Erledigtes wird nach unten verschoben, nicht geloescht - der Verlauf ist die
+  Begruendung fuer das, was heute steht.
+- Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
+- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
+  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
+  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
+  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
+  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
+  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
+  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
+  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
+  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
+  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
+  bin."
+  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
+  sondern weil sie feststeht (Fables Analyse,
+  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
+  dazwischenfunken.
+  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
+  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
+  groessten offenen Hebel des Knotens einen halben Nachmittag.*
+
+---
+
+## Sofort
 
 keine
 

@@ -46,10 +46,10 @@ Regeln:
 
 ## Sofort
 
-### Die versionierten Loop-Prompts weichen von den laufenden Jobs ab (19:30)
+### Die versionierten Loop-Prompts weichen von den laufenden Jobs ab (19:22)
 Gemessen: Der aktive Reportloop enthaelt einen Absatz "Die Rangrate gehoert geglaettet gemessen ... Der Ausdauerzyklus ist laenger als ein 30-Minuten-Fenster". In `loops/loop-report.md` stand er **nicht** - `grep -c Ausdauerzyklus` lieferte 0 in allen vier Dateien. Dasselbe beim Optimierloop ("Miss geglaettet").
 Erwartet: Die Dateien in `loops/` sind die Wahrheit. Der Skill `/bb-loops` setzt die Cron-Jobs **woertlich aus ihnen** neu auf.
-Verdacht: Eine Prompt-Regel wurde direkt beim `CronCreate` ergaenzt, ohne die Datei nachzuziehen. Behoben 19:30 durch Rueckuebertragen beider Absaetze.
+Verdacht: Eine Prompt-Regel wurde direkt beim `CronCreate` ergaenzt, ohne die Datei nachzuziehen. Behoben 19:22 durch Rueckuebertragen beider Absaetze.
 **Folgenschwer, weil es still ist:** Cron-Jobs sterben mit der Sitzung. Beim Wiederaufsetzen aus `loops/` gehen alle Regeln verloren, die nur im laufenden Job stehen - und niemand merkt es, weil der Bot weiterlaeuft. Genau die Glaettungsregel war eine Lehre aus einer Scheindivergenz vom 26.08.
 **Strukturell, nicht einmalig:** Solange Prompts von Hand an CronCreate gehen koennen, driften Datei und Job wieder auseinander. Die Regel lautet ab jetzt: **erst die Datei aendern, dann den Job aus der Datei neu setzen** - nie umgekehrt.
 

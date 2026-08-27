@@ -91,6 +91,27 @@ Kampfwerte ebenfalls - langsamer, aber ohne Schulden.
 
 ### Wartet bis Eric bn4net freigibt: Nach einem Einbau starten die Werkzeuge nicht nach (22:03)
 
+**Messung 27.08., 04:50 - der Fall ist wieder eingetreten, und diesmal traf er
+den Traeger selbst.** Eine Stunde nach dem Einbau von 03:48 liefen `blade`,
+`bn4life`, `bn4net`, `contracts`, `joinrun`, `popups`, `sonde` und `wakelock`
+- aber **`bbtrain.js` nicht**. Das ist genau das Werkzeug, das in der
+Wiederaufbauphase den Traeger hebt.
+
+Sichtbar war es an den Kampfwerten: **str 169, def 1, dex 2, agi 1** nach 27
+Minuten. `joinrun.js` trainiert nur str; die anderen drei standen still, und
+der Traeger - der Tiefstand - blieb auf 1. Der Pruefer meldete SPUR, weil die
+Toleranz 75 Minuten betraegt; er haette erst um 05:03 angeschlagen.
+
+**Eingriff 04:50:** `bbtrain.js` ueber den Auftragskanal gestartet.
+*Verifiziert 04:52:* Es laeuft, und def steht bereits bei **42** statt 1 -
+die Arbeit ist auf "def @ Powerhouse Gym" gewechselt.
+
+**Was das fuer die Freigabe heisst:** Der Nachstart greift, aber zu langsam
+und in der falschen Reihenfolge. `bbtrain.js` steht in `bn4net.js:264` an
+zweiter Stelle der Werkzeugliste - trotzdem war es nach einer Stunde nicht da,
+waehrend spaetere Werkzeuge liefen. Das ist der Punkt, der Erics Freigabe
+braucht.
+
 **Messung 26.08., Einbau 16:31: teilweise behoben.** Um 16:36 liefen nur
 `bn4net`, `bn4life`, `joinrun`, `popups`, `contracts` - `blade.js` fehlte und
 wurde um 16:38 von Hand nachgestartet. Um 17:14 lagen dann `blade`, `bbtrain`,

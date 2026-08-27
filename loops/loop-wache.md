@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-WACHE (Loop 1 von 3). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-WACHE (Loop 1 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 Führe genau das aus:
 
@@ -43,6 +43,7 @@ Handle nach dem Urteil:
 **URTEIL: STAGNATION** — Der Träger kommt nicht voran. Diagnostiziere, aber **halte dich an die Grenzen weiter unten** — du läufst möglicherweise nachts, unbeaufsichtigt, und 23 andere Läufe vor und nach dir sehen dasselbe Bild.
   - Auftragskanal prüfen, bevor du ihn belegst — er hat genau einen Leser und wird beim Lesen geleert. Erst `getFile data/task.txt` lesen; kommt etwas anderes als eine leere Zeichenkette zurück, läuft gerade ein fremder Auftrag: diesen Schritt überspringen und ohne `ps.js` weiterarbeiten.
   - Ist er frei: `pushFile` nach `data/task.txt` mit Inhalt `["ps.js"]`, **26 s** warten, dann `data/ps.json` lesen (Befehl oben). Welche Werkzeuge laufen, welche fehlen?
+  - **Vorher den Zeitstempel prüfen.** `data/ps.json` ist eine Momentaufnahme, kein Dauerlauf — `src/ps.js` schreibt einmal und endet. Ist `zeit` älter als zwei Minuten, hat dein Auftrag den Kanal nicht erreicht (er hat mehrere Schreiber, darunter `tools/wache.js` alle drei Minuten, alle ohne Sperre). Dann liest du einen alten Stand und diagnostizierst „Werkzeug X läuft nicht", während alles läuft. Am 27.08. um 18:05 war die Datei **3 Stunden 25 Minuten** alt. Im Zweifel: keinen Neustart auslösen, sondern einen Auftrag eintragen.
   - In BitNode 6 gilt: solange `inBladeburner` false ist, muss `bbtrain.js` laufen und die Arbeit ein Gym in Sector-12 sein. Danach trägt `blade.js`.
   - Ein Werkzeug neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`.
 

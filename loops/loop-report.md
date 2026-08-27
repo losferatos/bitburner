@@ -2,9 +2,9 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-REPORT (Loop 3 von 3). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-REPORT (Loop 3 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
-Der Halbstundenbericht für Eric. Er ist das einzige, was regelmäßig im Chat landet — Loop 1 schweigt bei „alles gut", Loop 2 meldet nur seine Arbeit.
+Der Halbstundenbericht für Eric. Er ist das einzige, was regelmäßig im Chat landet — Loop 1 schweigt bei „alles gut", Loop 2 meldet nur seine Arbeit, Loop 5 meldet sich zweimal am Tag.
 
 **Reihenfolge beachten: erst arbeiten, dann berichten.** Der Bericht steht am Ende, weil danach nichts mehr kommt.
 
@@ -13,6 +13,7 @@ Der Halbstundenbericht für Eric. Er ist das einzige, was regelmäßig im Chat l
 date
 cd /c/Users/erche/Desktop/claude_projecto/bitburner && node tools/strategie-check.js
 cat data/ziele.md 2>/dev/null || echo "(erster Report)"
+cat nodes/KURS.md 2>/dev/null | head -40
 ```
 Ein Rückgabewert ungleich 0 ist normal — er heißt nur „Urteil nicht SPUR". Fehlt die Zeile `URTEIL:` ganz, ist der Prüfer kaputt; dann sag das als einzigen Inhalt des Berichts und ändere nichts.
 
@@ -29,9 +30,10 @@ curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile
 ```bash
 cat > data/ziele.md <<'ZIELE'
 # Ziele, gesetzt <HH:MM> am <TT.MM.JJJJ>
-1. <Ziel> | Messung: <woran man es abliest>
-2. <Ziel> | Messung: <...>
-3. <Ziel> | Messung: <...>
+# ABSOLUTER STAND: <X von Y = Z %>, Restweg <netto>, ETA <Spanne> (aus nodes/KURS.md)
+1. <Ziel> | Messung: <woran man es abliest> | <wieviel es vom Restweg abträgt>
+2. <Ziel> | Messung: <...> | <...>
+3. <Ziel> | Messung: <...> | <...>
 ZIELE
 ```
 Ziele sind **überprüfbar**, nicht Absichten. „Kampfwert-Tiefstand über 100" ist ein Ziel, „am Training weiterarbeiten" ist keines.
@@ -62,7 +64,7 @@ Rückblick
 - <je ein Stichpunkt pro Ziel der letzten halben Stunde: erreicht / verfehlt / überholt, mit der Zahl die es belegt>
 
 Lage
-- <Träger>: <Wert> (<Delta seit dem letzten Report>)
+- <Träger>: <X von Y = Z %> (<Delta seit dem letzten Report>)
 - <die zwei bis drei Zahlen, die gerade zählen — nicht alle, die es gibt>
 
 Nächste 30 Minuten
@@ -73,6 +75,7 @@ Nächste 30 Minuten
 
 Regeln für den Bericht:
 - **Höchstens 16 Zeilen, Leerzeilen mitgezählt.** Reicht das nicht, kürze in dieser Reihenfolge: erst die Lage-Zahlen auf zwei, dann den Rückblick zu einer Zeile („2 von 3 erreicht, verfehlt: `<Ziel>` (`<Zahl>`)"). **Der Rückblick entfällt nie.**
+- **Die erste Lage-Zeile trägt immer den absoluten Stand** — `X von Y = Z %`, nicht nur den Zuwachs. Ein Delta ohne Bezugsgröße hat am 27.08. einen ganzen Tag lang Fortschritt vorgetäuscht, während 1,7 Prozent der Strecke lagen.
 - Keine Tabellen, keine Vorrede, keine Erklärung der Mechanik. Eric kennt das Spiel.
 - Die Reflexion ist **ehrlich**. Ein verfehltes Ziel wird als verfehlt benannt, mit der Zahl daneben. Ein Ziel, das sich als falsch herausgestellt hat, wird als falsch benannt — nicht stillschweigend durch ein neues ersetzt.
 - Ein Befund aus Schritt 3 bekommt eine eigene Zeile unter „Lage" mit dem Zusatz **„→ Auftrag"**, damit Eric sieht, dass er nicht im Bericht versandet.

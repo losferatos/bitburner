@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-VORANKOMMEN (Loop 2 von 3). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-VORANKOMMEN (Loop 2 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 Loop 1 bewacht den laufenden Betrieb, Loop 3 berichtet. DIESER Loop bringt das Projekt voran. Ziel des Projekts: alle 15 BitNodes bis Level 3, aktuell BitNode 6 (Ausgang über 21 Black Operations, nicht über das Hackniveau).
 

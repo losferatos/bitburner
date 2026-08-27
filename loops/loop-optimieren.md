@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-OPTIMIEREN (Loop 4 von 4). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-OPTIMIEREN (Loop 4 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 Die anderen drei Loops halten den Betrieb: Loop 1 greift bei Störungen ein, Loop 2 arbeitet gemeldete Befunde ab, Loop 3 berichtet. Alle drei sind **reaktiv** — sie machen den Bot wieder heil, nicht besser.
 
@@ -23,7 +23,7 @@ Spieldateien liegen **nicht** auf der Platte, sondern nur im Spiel. Lesen über 
 ```
 curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile" --data-urlencode "filename=data/blade.json" --data-urlencode "server=home"
 ```
-Nützlich sind je nach Phase `data/blade.json`, `data/bblage.json`, `data/bn4net.json`, `data/bbspann.json` und `data/werkbank.json`. Die letzten beiden musst du über den Auftragskanal anstoßen (`pushFile` nach `data/task.txt` mit `["bbspann.js"]`, 26 s warten) — vorher prüfen, ob der Kanal frei ist, er hat genau einen Leser.
+Nützlich sind je nach Phase `data/blade.json`, `data/bblage.json`, `data/bn4net.json`, `data/bbspann.json` und `data/werkbank.json`. Die letzten beiden musst du über den Auftragskanal anstoßen (`pushFile` nach `data/task.txt` mit `["bbspann.js"]`, 26 s warten) — vorher prüfen, ob der Kanal frei ist, er hat genau einen Leser. Bequemer: `node tools/spann.js` macht das in einem Aufruf.
 
 Die Leitfrage: **Welche Zahl bringt den Knoten näher an seinen Ausgang, und was begrenzt sie gerade?**
 
@@ -51,7 +51,7 @@ Prüfe die Hypothese am Quellcode, bevor du sie umsetzt. Die meisten Vermutungen
 - Höchstens **eine Datei** je Lauf.
 - `src/bn4net.js` und `src/boot.js` sind seit dem 27.08.2026 freigegeben, bleiben aber Motor und Wiederanlauf: **einzeln committen**, kleine Schritte, nach jeder Änderung `node tools/strategie-check.js`. Ein Fehler dort kostet den ganzen Lauf.
 - Nach jeder Änderung an `tools/strategie-check.js`: `node tools/strategie-check.js` ausführen. Endet die Ausgabe nicht auf `URTEIL:`, sofort `git checkout --` und nichts committen.
-- Werkzeug im Spiel neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`.
+- Werkzeug im Spiel neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <name>`. **Danach nachsehen, ob die Änderung auch greift** — am 27.08. um 18:55 wurde ein Hebel eingebaut, neu gestartet, und die Wirkung blieb aus; erst eine Stunde später fiel auf, dass die Kaufreihenfolge ihn übersprang.
 - Findest du in **fünfzehn Minuten** keinen belegten Hebel: nichts ändern. Schreib in HEBEL.md, was du geprüft und verworfen hast, und beende den Turn. Das ist ein gültiges Ergebnis — eine erfundene Optimierung ist schlechter als keine.
 
 **4. Protokollieren — das ist der Teil, der diesen Loop von Bastelei trennt.**
@@ -72,7 +72,7 @@ Commit: <kennung>
 
 **Miss geglättet.** Die Rangrate schwankt mit dem Ausdauerzyklus; ein 30-Minuten-Fenster misst dessen Phase, nicht die Rate. Nimm den Verlauf aus `data/wache-zustand.json` über mindestens 45 Minuten. Am 26.08. um 21:07 hat ein Fenstervergleich eine Scheindivergenz erzeugt, und um 23:50 wurde eine Änderung an einer Fenstermessung zurückgedreht.
 
-**5. Committen und pushen.** Nur was du selbst geändert hast (`git add <pfad>`, nie `git add -A`) — vier Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`.
+**5. Committen und pushen.** Nur was du selbst geändert hast (`git add <pfad>`, nie `git add -A`) — fünf Loops schreiben in dieselben Dateien. Vor dem Push `git pull --rebase`.
 
 ## Ausgabe
 

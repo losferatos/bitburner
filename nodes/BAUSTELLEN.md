@@ -46,6 +46,45 @@ Regeln:
 
 ## Sofort
 
+### bn4rep.js laeuft, schreibt aber seit 55 Stunden nicht mehr (00:11)
+
+Gemessen: `data/ps.json` um 00:09 zeigt `bn4rep.js` als PID 26 - der
+Prozess lebt. Aber `data/bn4rep.json` traegt den Zeitstempel
+1787670308432 = **25.08. um 17:05**, also **55 Stunden alt**.
+
+Erwartet: Die Datei wird in jeder Runde neu geschrieben. Ein Prozess, der
+laeuft und nichts schreibt, haengt in einem Zweig ohne Rueckweg.
+
+Der Inhalt bestaetigt, wie alt er ist:
+
+    hacking 100, multHacking 1,387, repGesamt 9.562
+    faktionen: Aevum, Sector-12, Slum Snakes, CyberSec
+    ziel: "Cranial Signal Processors - Gen II" (CyberSec)
+
+**Bladeburners steht nicht in der Faktionsliste** - dabei sind dort bei Rang
+19.327 rund 38.654 Reputation verdient
+(`RankToFactionRepFactor 2`). Die gesamte Augmentierungsplanung laeuft
+also an der einzigen Faktion vorbei, die in diesem Knoten etwas beitraegt.
+
+Verdacht auf die Fundstelle: `src/bn4rep.js:1093` haelt selbst fest, dass
+"jede Arbeit die laufende Bladeburner-Aktion abbricht". Wahrscheinlich
+wartet das Skript auf eine Faktionsarbeit, die `blade.js` ihm in jeder
+Runde wieder wegnimmt - eine Warteschleife ohne Ausgang. Zu pruefen ist
+auch die `bladeSperre` bei `:651`, die aber greifen duerfte, weil
+`inBladeburner()` heute true ist.
+
+**Warum das dringend ist:** Geld steht bei **6,07 Mrd**, INTERLINKED kostet
+5,5. Der groesste Dauerhebel des Knotens ist finanzierbar, und der
+Automatismus, der ihn ziehen soll, ist seit zwei Tagen blind.
+
+**Und eine Abwaegung gehoert dazu, bevor jemand den Einbau ausloest:** Ein
+Prestige setzt die Kampfwerte zurueck (`Prestige.ts`), Rang und
+Aktionsstufen bleiben (`Bladeburner.ts:259-263`). Der laufende
+Assassination-Aufbau (Stufe 5 von 12 um 00:07) wuerde dadurch abbrechen -
+seine Chance faellt unter `SICHER_OPERATION`, bis die Kampfwerte wieder
+stehen. Der Einbau gehoert also **nach** den Aufbau, nicht mitten hinein.
+
+
 ### Wartet bis Eric: zwei Handgriffe im Spiel (19:45, belegt 20:45)
 
 **Belegt, nicht vermutet:** `Settings.AutoexecScript` steht im Spielstand auf
@@ -102,6 +141,16 @@ Erwartet: Ab Stufe 11 schlaegt Assassination den Raid-Zyklus (56,9 gegen
   2. **Die Rangrate nach dem Aufbau**, geglaettet ueber 45 Minuten. Liegt
      sie unter 53,4, wird `ASSASSIN_AUFBAU` auf `false` gesetzt und der
      Eintrag als widerlegt vermerkt.
+
+**Zwischenstand 00:07 - Pruefpunkt 1 ist bestanden.** `data/blade.json`
+meldet `"grund":"Stufenaufbau 5/12"` und `"stufe":5` nach 28 Minuten - das
+Kriterium war Stufe 6 nach einer Stunde. Die Dauer steht bei **116 s** gegen
+121 s aus der Rechnung (96 x 1,06^4); die Abweichung nach unten kommt von den
+gestiegenen Kampfwerten, die in `statFac` eingehen (`Action.ts:112-117`).
+
+Die Rangrate liegt bei **30,4/min** seit 23:39 - wie erwartet unter den 53,4
+des Raid-Zyklus, das ist der Preis des Aufbaus. Pruefpunkt 2 (Rate nach dem
+Aufbau) steht noch aus; Stufe 12 ist gegen 02:30 zu erwarten.
 
 Verdacht auf eine Schwachstelle: Die Chance faellt mit der Stufe
 (`difficultyFac` 1,06, bei Stufe 12 das 2,01fache). Bei Stufe 1 stand sie

@@ -93,20 +93,50 @@ export async function main(ns) {
   const CHAOS_EIN = 50;
   const CHAOS_AUS = 47;
   const SPIEL_CHAOS_AN = true;
-  // Raid. Die Zahlen sind bei der Auswahl unten hergeleitet.
-  // Raid ist in diesem Knoten VERWORFEN (26.08.2026, 17:20). Die Herleitung
-  // steht bei der Auswahl unten: Bei Charisma 27 - dem gemessenen Ist-Wert -
-  // liegt die effektive Zyklusrate bei 1,02 gegen 1,34 fuer Tracking, und der
-  // Gleichstand kaeme erst bei Charisma 440, wofuer 3,5 Millionen Erfahrung
-  // noetig waeren statt der vorhandenen 409. Der Schalter bleibt samt
-  // Bedingungslogik stehen, weil ein spaeterer Knoten mit hohem Charisma
-  // starten kann - dann genuegt `true`.
-  const RAID_AN = false;
+  // RAID IST WIEDER AN (27.08.2026, 19:54) - die Ablehnung von 26.08. stand
+  // auf einer Groesse, die Raid gar nicht beruehrt.
+  //
+  // Damals verworfen mit: "Bei Charisma 27 liegt die effektive Zyklusrate bei
+  // 1,02 gegen 1,34 fuer Tracking, Gleichstand erst bei Charisma 440." Zwei
+  // Dinge daran stimmen heute nicht mehr:
+  //
+  //  1. **Charisma ist 264, nicht 27** (Spielstand, 27.08. 19:50). Die alte
+  //     Rechnung ging von einem Stand aus, der einen Monat zurueckliegt.
+  //  2. **Charisma wirkt auf Raid ueberhaupt nicht.** `data/Operations.ts:120`
+  //     sagt woertlich "Unaffected by Charisma", und in den `weights` steht
+  //     kein charisma. Der Zusammenhang lief nur ueber die Truppkosten: Raid
+  //     verbraucht Mitglieder, und Rekrutierung haengt an Charisma. Bei 264
+  //     kostet ein Mann 206 Sekunden bei Erfolgschance 1,00 - das ist kein
+  //     Argument mehr.
+  //
+  // Gemessen am 27.08. um 19:52 (`data/bbspann.json`, Sector-12):
+  //
+  //     Raid            80,01 Rang/min   Chance 0,919   794 Laeufe offen
+  //     Bounty Hunter    8,90            Arbeitsanteil 1,00
+  //     laufende Rate   18 bis 32 Rang/min ueber 45 Minuten
+  //
+  // Also **Faktor 2,5 bis 4,4 auf die Leitgroesse**. Der Arbeitsanteil von 1
+  // heisst: 2,2 Ausdauer je Minute gegen 3,07 Regeneration - Raid laesst sich
+  // durchgehend fahren, ohne Kammerpausen.
+  //
+  // DER PREIS, DER IN DER RECHNUNG BLEIBEN MUSS: Raid senkt die
+  // Synthoid-Bevoelkerung und hebt das Chaos, beides prozentual
+  // (`data/Operations.ts:119`). Die Bevoelkerung steckt in
+  // `getPopulationSuccessFactor = (pop/1e9)^0,7` (`Actions/Action.ts:88-92`)
+  // und wirkt damit auf JEDE Aktion ausser Black Ops - Sector-12 steht bei
+  // popEst 1,109e9, also Faktor 1,075. Faellt die Bevoelkerung unter 1e9,
+  // dreht der Hebel ins Minus. Deshalb bleibt `RAID_CHAOS_MAX` scharf, und
+  // die Nachmessung in `nodes/HEBEL.md` prueft ausdruecklich popEst mit.
+  const RAID_AN = true;
   const RAID_GELD_MIN = 2e9;
   const RAID_CHAOS_MAX = 50;
   const RAID_CHANCE_MIN = 0.08;
   const RAID_VORRAT_MIN = 3;
-  const RAID_CHARISMA_MIN = 1200;
+  // Charisma-Riegel entschaerft: Er sollte die Truppkosten abbilden, nicht
+  // Raid selbst. Bei 264 steht die Rekrutierungschance auf 1,00 (die Formel
+  // klemmt erst ab zwoelf Mitgliedern), also ist die Bedingung erfuellt,
+  // sobald ueberhaupt rekrutiert werden kann.
+  const RAID_CHARISMA_MIN = 200;
   let chaosAufraeumen = false;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }

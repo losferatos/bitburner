@@ -1448,8 +1448,21 @@ export async function main(ns) {
     // Eigene Datei statt Anhang an `hb-rep.txt`: Der Waechter liest den Puls
     // mit `Number(...)` (`wache.js:176-180`), ein Textzusatz wuerde dort NaN
     // ergeben und einen Ausfall melden, den es nicht gibt.
+    //
+    // NACHTRAG 27.08., 08:52: Die Rangliste faehrt mit. Sie wird oben
+    // ohnehin gebaut (:1424), landete aber nur in `data/bn4rep.json` - und
+    // die steht seit dem 25.08. um 17:45 still, gemessen 39,7 Stunden alt.
+    // Ohne sie sieht man WAS gewaehlt wurde, aber nicht WARUM und nicht, wie
+    // lange es noch dauert. Genau die Frage stand um 08:50 offen: 7,97 Mrd
+    // auf der Hand, 0 wartende Stuecke, fuenf Stunden nach dem Einbau - ist
+    // die Reputation fuers Ziel unerreichbar, oder liegt ein bezahlbares
+    // Stueck daneben? `sek` je Kandidat beantwortet das.
+    //
+    // Zeile 1 bleibt unveraendert `<ms>|<aug>|<faktion>`; die Rangliste steht
+    // als JSON in Zeile 2. Wer nur die erste Zeile liest, merkt nichts.
     schreibNachHome("data/rep-ziel.txt",
-      Date.now() + "|" + ziel.aug + "|" + ziel.faktion);
+      Date.now() + "|" + ziel.aug + "|" + ziel.faktion
+      + "\n" + JSON.stringify(rangliste));
 
     // --- Spendenweg, sobald eine Faktion Favor 150 hat ------------------------
     // Ab dieser Marke bringt Geld direkt Reputation:

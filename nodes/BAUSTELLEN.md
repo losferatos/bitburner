@@ -42,7 +42,10 @@ Regeln:
 
 ## Sofort
 
-keine
+### Black-Op-Chance stagniert trotz Rang- und Kampfwertzuwachs (08:12)
+Gemessen: data/bbspann.json, frisch angestossen. 07:40 Rang 2753, Chance Typhoon 0,088-0,099. 08:12 Rang 2910, def 150->155, dex ->238 - Chance 0,088-0,094, Obergrenze GESUNKEN.
+Erwartet: Chance = competence/baseDifficulty mit competence ~ skill^0,9. +3,3 % Kampfwert muessten ~+3 % Chance geben.
+Verdacht: Die Spanne min/max haengt an der Ausdauer, nicht an den Kampfwerten - bei der Messung 63,8 von 114,5 (0,557). Der Kampfwertzuwachs verschwindet im Ausdauerrauschen. Fundstelle offen: erst pruefen, wie bbspann.js min/max bildet (src/bbspann.js). Konsequenz fuer das Ziel: von 0,09 auf die Schwelle 0,80 braucht competence Faktor 8,9, also Kampfwerte Faktor 11,3 (def 155 -> 1750). Ein Halbstundenziel auf die Chance ist damit unsinnig; gemessen gehoert der Kampfwert-Tiefstand.
 
 ## Offen, nach Dringlichkeit
 

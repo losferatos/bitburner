@@ -76,6 +76,8 @@ Sitzung im Notfall etwas im Spielterminal eintippen. Das ist der letzte
 Punkt, an dem das System einen Menschen braucht — aber ein seltener: Er
 greift nur, wenn Autoexec (Punkt 1) und der Einbau-Rueckruf beide versagen.
 
+## Offen, nach Dringlichkeit
+
 ### Die Raid-Rundreise: 37.248 Rang liegen in den Gemeinden anderer Staedte (20:15, gerechnet 20:23)
 
 Beim Nachrechnen von Raid gefunden. Jede Stadt hat einen eigenen Vorrat an

@@ -65,10 +65,37 @@ Eigene Datei statt Anhang an `hb-rep.txt`: Der Waechter liest den Puls mit
 `Number(...)` (`wache.js:176-180`), ein Textzusatz haette dort NaN ergeben und
 einen Ausfall gemeldet, den es nicht gibt.
 
+**VERIFIZIERT 27.08., 08:53: der Kampfterm traegt die ganze Spitze, nicht nur
+Platz eins.** Die Rangliste faehrt jetzt in Zeile 2 von `data/rep-ziel.txt`
+mit (`bn4rep.js:1451`); sie wurde oben ohnehin gebaut (:1424), landete aber
+nur in `data/bn4rep.json` - und die steht seit dem 25.08. um 17:45 still,
+gemessen **39,7 Stunden** alt. Gelesen um 08:53:
+
+    2,737 / 959 s      ORION-MKIV Shoulder                      Bladeburners
+    17,490 / 12.067 s  Hyperion Plasma Cannon V2                Bladeburners
+    17,490 / 12.067 s  I.N.T.E.R.L.I.N.K.E.D                    Bladeburners
+    13,969 / 9.845 s   BLADE-51b Tesla Armor: Energy Shielding  Bladeburners
+    3,920 / 2.884 s    Combat Rib I                             Slum Snakes
+
+**Keine einzige Hacking-Augmentierung mehr in den ersten fuenf.** Vor dem
+Umbau stand dort Cranial Signal Processors - Gen II.
+
+**Damit ist auch die Frage von 08:50 beantwortet**, die den Verdacht auf einen
+Fehler geworfen hatte: 7,97 Mrd auf der Hand, **0 wartende Stuecke**, fuenf
+Stunden nach dem Einbau. Das ist kein Stillstand - das Ziel ist in **959
+Sekunden** erreichbar, und ein billigeres Stueck vorher zu kaufen wuerde nur
+den Preismultiplikator hochtreiben. Der Motor wartet richtig.
+
+ORION gewinnt uebrigens trotz sechsfach kleinerem Wert: die Guete ist Ertrag
+je Sekunde Wartezeit (0,002854 gegen 0,001449), und Hyperion steht danach
+immer noch da.
+
 **Was offen bleibt:** Ob der Kampfterm mit **Gewicht 10** richtig kalibriert
 ist, zeigt erst der naechste Einbau - dort entscheidet sich, ob die
 Kampf-Multiplikatoren schneller steigen als die 1,834 auf 1,986 des Einbaus
-von 03:48 (der lief noch ohne den Term). Der Punkt bleibt bis dahin offen.
+von 03:48 (der lief noch ohne den Term). Der naechste Kauf faellt nach der
+959-Sekunden-Rechnung gegen 09:09; der Einbau kommt, sobald die
+Warteschlange voll ist. Der Punkt bleibt bis dahin offen.
 
 **Dringlichkeit: hoch.** Der Reputationsmotor arbeitet seit Knotenbeginn auf ein
 Ziel hin, das in BitNode 6 der teurere von zwei Wegen ist.

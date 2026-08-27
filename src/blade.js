@@ -337,9 +337,65 @@ export async function main(ns) {
   // Punkte liegen zu lassen ist immer falsch: Sie verfallen nicht, aber jede
   // Runde ohne den Bonus ist verloren. Gekauft wird strikt nach Plan, nicht
   // nach Preis - der billigste Kauf ist selten der wirksamste.
+  // DREI FAEHIGKEITEN WERDEN DYNAMISCH SORTIERT (27.08.2026, 13:49).
+  //
+  // Ein fester Rang veraltet zwangslaeufig: Die Kosten steigen linear mit der
+  // Stufe (`Bladeburner/Skill.ts:37-41`), der Nutzen je Stufe bleibt gleich -
+  // also faellt der Nutzen je Punkt monoton, und die beste Faehigkeit wandert.
+  // Am 27.08. lag deswegen zweimal eine viel bessere Option gedeckelt daneben
+  // (Hyperdrive 1,451 und Short-Circuit 0,122 gegen Blade's Intuition 0,031).
+  //
+  // Sortiert werden NUR diese drei - die einzigen, deren Wirkung auf die
+  // Black-Op-Chance gerechnet ist. Digital Observer trifft nur Operations,
+  // Cloak nur Stealth, Hands of Midas nur Geld; ein blinder Vergleich ueber
+  // alle zwoelf kaufte Unsinn. Der Rest des Plans behaelt seine feste Folge.
+  //
+  // Verglichen wird der RELATIVE Zuwachs: Die Multiplikatoren verrechnen sich
+  // multiplikativ, ein Prozentpunkt auf 1,66 ist mehr wert als auf 2,65.
+  const CHANCE_SKILLS = { "Blade's Intuition": 3, "Short-Circuit": 5.5 };
+  const relNutzen = (name) => {
+    const stufe = ns.bladeburner.getSkillLevel(name);
+    if (name === "Hyperdrive") {
+      // +10 Prozent Erfahrung je Stufe geben ueber die Erfahrungskurve
+      // `lvl = mult * (32*ln(exp+534,6) - 200)` einen festen Levelzuwachs,
+      // und der wirkt mit Exponent 0,9 auf die competence.
+      const a = 1 + stufe * 0.1;
+      const lvlPlus = 32 * Math.log((a + 0.1) / a);
+      let basis = 1;
+      try { basis = Math.max(1, ns.getPlayer().skills.defense); } catch { /* egal */ }
+      return 100 * (Math.pow((basis + lvlPlus) / basis, 0.9) - 1);
+    }
+    const p = CHANCE_SKILLS[name];
+    if (!p) return 0;
+    const a = 1 + stufe * p / 100;
+    return 100 * ((a + p / 100) / a - 1);
+  };
+  const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition"];
+
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();
     if (punkte <= 0) return;
+
+    // Die drei dynamischen Eintraege an ihren Planplaetzen neu ordnen: Der
+    // beste Nutzen je Punkt kommt auf den obersten der drei Plaetze. Alle
+    // anderen Eintraege und alle Deckel bleiben unangetastet.
+    const plaetze = [];
+    for (let i = 0; i < SKILL_PLAN.length; i++) {
+      if (DYNAMISCH.includes(SKILL_PLAN[i][0])) plaetze.push(i);
+    }
+    if (plaetze.length === DYNAMISCH.length) {
+      const eintraege = plaetze.map((i) => SKILL_PLAN[i]);
+      eintraege.sort((a, b) => {
+        const wert = (e) => {
+          const stufe = ns.bladeburner.getSkillLevel(e[0]);
+          if (stufe >= e[1]) return -1;                 // am Deckel: ganz nach hinten
+          const preis = ns.bladeburner.getSkillUpgradeCost(e[0], 1);
+          return preis > 0 ? relNutzen(e[0]) / preis : -1;
+        };
+        return wert(b) - wert(a);
+      });
+      plaetze.forEach((i, n) => { SKILL_PLAN[i] = eintraege[n]; });
+    }
     // SPAREN STATT AUSWEICHEN (25.08.2026).
     //
     // Hier stand eine Schleife, die bei "zu teuer" mit `break` aus dem

@@ -298,8 +298,8 @@ export async function main(ns) {
     // nie an die Reihe, weil ein Infinity-Deckel nie erreicht wird - nach
     // einem ganzen Tag stand er auf Stufe 1. Rechnung in nodes/HEBEL.md.
     ["Digital Observer", Infinity],
-    ["Blade's Intuition", Infinity],
     ["Cloak", Infinity],
+    ["Blade's Intuition", Infinity],
     // Zuletzt: wirkungslos, solange die Ausdauer klemmt. Deckel 90 ist das
     // Maximum des Spiels und bleibt stehen, falls der Engpass je wegfaellt.
     ["Overclock", 90],
@@ -390,6 +390,13 @@ export async function main(ns) {
     "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll
     "Short-Circuit": { proz: 5.5, abdeckung: 0.55 },      // isKill
     "Digital Observer": { proz: 4, abdeckung: 0.44 },     // Operations + alle Black Ops
+    // Cloak dazu (27.08., 19:52): Es stand auf Stufe 0, weil im Plan hinter
+    // zwei Infinity-Deckeln - und dann fiel Typhoon, und die naechste Black Op
+    // ist `isStealth`. Die Abdeckung ist niedrig (3 von 21 Black Ops plus die
+    // Stealth-Vertraege und -Operationen), aber bei Stufe 0 und Preis 2 ist
+    // der Nutzen je Punkt trotzdem hoch - genau die Lage, in der Digital
+    // Observer heute Faktor 17 brachte.
+    "Cloak": { proz: 5.5, abdeckung: 0.2 },               // isStealth
   };
   const relNutzen = (name) => {
     const stufe = ns.bladeburner.getSkillLevel(name);
@@ -433,7 +440,7 @@ export async function main(ns) {
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System", "Digital Observer"];
+    "Reaper", "Evasive System", "Digital Observer", "Cloak"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();
@@ -738,18 +745,130 @@ export async function main(ns) {
     // Nachbau von `Action.getSuccessChance` (`Actions/Action.ts:169-196`).
     // Gibt `null` zurueck, wenn die Aktionsdaten fehlen - dann faellt die
     // Entscheidung wie bisher auf `min`, also auf die vorsichtige Seite.
+    // ALLE 21 BLACK OPS, AUS DEM QUELLCODE ERZEUGT (27.08.2026, 19:52).
+    //
+    // Bis hierher stand nur Typhoon drin, und fuer alles andere fiel die
+    // Entscheidung auf `s.min` zurueck - also auf die Zahl, die bei Black
+    // Ops reines Bevoelkerungsrauschen ist. Typhoon fiel um 19:51, damit war
+    // der Rueckfall ab sofort der Normalfall gewesen.
+    //
+    // Erzeugt aus `reference/bitburner-src/src/Bladeburner/data/
+    // BlackOperations.ts`, nicht abgetippt: 21 Aktionen mit je sieben
+    // Gewichten und sieben Decays sind 294 Zahlen, und eine falsche davon
+    // faellt nie auf.
+    //
+    // Beim Extrahieren aufgefallen und sofort wichtig: **Operation Zero ist
+    // `isStealth`, nicht `isKill`.** Short-Circuit (Stufe 30) wirkt darauf
+    // GAR NICHT, Cloak dagegen schon - und Cloak stand auf Stufe 0. Von den
+    // 21 Black Ops sind 15 isKill, 3 isStealth und 3 keins von beidem.
     const BLACKOP_DATEN = {
       "Operation Typhoon": {
         baseDifficulty: 2000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2,
-          agility: 0.2, charisma: 0, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8,
-          agility: 0.8, charisma: 0, intelligence: 0.75 },
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
       },
-      // Weitere Black Ops hier nachtragen, wenn sie an die Reihe kommen - die
-      // Werte stehen in
-      // `reference/bitburner-src/src/Bladeburner/data/BlackOperations.ts`.
+      "Operation Zero": {
+        baseDifficulty: 2500, isKill: false, isStealth: true,
+        weights: { hacking: 0.2, strength: 0.15, defense: 0.15, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation X": {
+        baseDifficulty: 3000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Titan": {
+        baseDifficulty: 4000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Ares": {
+        baseDifficulty: 5000, isKill: true, isStealth: false,
+        weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
+        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Archangel": {
+        baseDifficulty: 7500, isKill: true, isStealth: false,
+        weights: { strength: 0.2, defense: 0.2, dexterity: 0.3, agility: 0.3 },
+        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Juggernaut": {
+        baseDifficulty: 10000, isKill: true, isStealth: false,
+        weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
+        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Red Dragon": {
+        baseDifficulty: 12500, isKill: true, isStealth: false,
+        weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation K": {
+        baseDifficulty: 15000, isKill: true, isStealth: false,
+        weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Deckard": {
+        baseDifficulty: 20000, isKill: true, isStealth: false,
+        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Tyrell": {
+        baseDifficulty: 25000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Wallace": {
+        baseDifficulty: 30000, isKill: true, isStealth: false,
+        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Shoulder of Orion": {
+        baseDifficulty: 35000, isKill: false, isStealth: true,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Hyron": {
+        baseDifficulty: 40000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Morpheus": {
+        baseDifficulty: 45000, isKill: false, isStealth: true,
+        weights: { hacking: 0.05, strength: 0.15, defense: 0.15, dexterity: 0.3, agility: 0.3, intelligence: 0.05 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Ion Storm": {
+        baseDifficulty: 50000, isKill: true, isStealth: false,
+        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Annihilus": {
+        baseDifficulty: 55000, isKill: true, isStealth: false,
+        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Ultron": {
+        baseDifficulty: 60000, isKill: true, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Centurion": {
+        baseDifficulty: 70000, isKill: false, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Vindictus": {
+        baseDifficulty: 75000, isKill: false, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
+      "Operation Daedalus": {
+        baseDifficulty: 80000, isKill: false, isStealth: false,
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      },
     };
+
     // `mult = 1 + baseMult*stufe/100`, multiplikativ (`Bladeburner.ts:778-783`)
     const SKILL_WIRKUNG = {
       "Blade's Intuition": { SuccessChanceAll: 3 },

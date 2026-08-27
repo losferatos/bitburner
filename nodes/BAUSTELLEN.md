@@ -42,11 +42,7 @@ Regeln:
 
 ## Sofort
 
-### Die Typhoon-Chance rauscht staerker als sie steigt - Einzelmessungen taugen nicht als Ziel (09:15)
-Gemessen: data/bbspann.json, chance.min ueber vier Punkte - 0,088 (07:41), 0,091 (08:21), 0,097 (08:41), **0,086 (09:11)**. Die Spanne, die sich bis 08:41 auf 0,006 eingeengt hatte, steht wieder bei **0,021** (0,086-0,107). Stadt bei allen Messungen Sector-12, Ausdauerstrafe durchgehend 1 (64,5 von 119,8), Aktion zuletzt Hyperbolic Regeneration Chamber, Faehigkeitspunkte 9 -> 19 -> 26.
-Erwartet: Ein monoton steigendes min, wie es der Kampfwertzuwachs (def 160 -> 165 im selben Fenster) nahelegt.
-Verdacht: offen. Weder Stadt noch Ausdauer erklaeren es - beide sind konstant. Zu pruefen ist, ob `getActionEstimatedSuccessChance` die Spanne an etwas haengt, das sich zyklisch bewegt (Kammerphase, Faehigkeitsausgabe), Fundstelle `src/bbspann.js:216`.
-Konsequenz, die den Befund dringlich macht: **Die 11-Stunden-Prognose von 08:45 war auf einem Rauschgipfel extrapoliert und ist damit hinfaellig.** Und `blade.js:600` entscheidet ueber genau diesen Einzelwert (`s.min >= SICHER_BLACKOP`) - bei aufgehender Spanne verzoegert das die Black Op ohne Grund. Die Chance gehoert geglaettet gemessen, so wie die Rangrate seit dem 26.08.
+keine
 
 ## Offen, nach Dringlichkeit
 
@@ -366,6 +362,43 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 ---
 
 ## Erledigt
+
+### Die Typhoon-Chance rauscht - URSACHE GEKLAERT (27.08., 09:21)
+
+**Verifiziert: es ist nicht die Chance, es ist die Bevoelkerungsschaetzung.**
+Der Beleg ist, dass **alle** Aktionen gleichzeitig aufgehen, nicht nur die
+Black Op. Gemessen um 08:11 gegen 09:11, dieselbe Stadt (Sector-12):
+
+    Tracking          1,000 / 1,000  (Spanne 0)   ->  0,803 / 1,000  (0,197)
+    Bounty Hunter     1,000 / 1,000  (Spanne 0)   ->  0,803 / 1,000  (0,197)
+    Investigation     -                           ->  0,337 / 0,587  (0,249)
+    Operation Typhoon 0,088 / 0,094  (0,006)      ->  0,086 / 0,107  (0,021)
+
+Eine Chance, die faellt, waere ein Einzelbefund. Vier Aktionen, die binnen
+einer Stunde synchron unscharf werden, sind ein Schaetzfehler - `popEst` der
+Stadt verrottet, solange niemand Field Analysis faehrt.
+
+**Damit war die Zielsetzung von 08:45 doppelt falsch:** Erst wurde `max` als
+Indikator genommen (widerlegt um 08:22), dann `min` - und `min` ist bei
+verrottender Schaetzung genauso wenig ein Fortschrittsmass. Der wahre Wert
+liegt in der Mitte: 0,0965 statt der abgelesenen 0,086, also **12 Prozent
+pessimistischer als noetig**.
+
+**Geaendert 09:19** (`blade.js`, direkt nach der Black-Op-Pruefung): Wenn
+`s.max >= SICHER_BLACKOP && s.min < SICHER_BLACKOP`, faehrt der Motor Field
+Analysis - dann und nur dann steht ausschliesslich die Unschaerfe zwischen
+ihm und dem Knotenausgang.
+
+Field Analysis dauerhaft einzustreuen waere teuer und wurde deshalb
+**verworfen**: 0,2 Rang je Minute gegen 8,7 bei Bounty Hunter, Faktor 43. Die
+scharfe Schaetzung bringt keinen Rang, sie kauft nur einen frueheren Versuch -
+bei 12 Prozent und einer Wachstumsrate von 0,003 je Minute rund 38 Minuten.
+Das lohnt einmal kurz vor dem Versuch, nicht stuendlich.
+
+**Wirkung noch nicht gemessen** - die Regel kann erst greifen, wenn `max` die
+Schwelle 0,80 erreicht (steht bei 0,107). Verifiziert ist bisher nur, dass sie
+nicht faelschlich feuert: nach dem Neustart um 09:20 waehlte der Motor
+`Contracts/Retirement`, Grund "Vertrag", `URTEIL: SPUR`.
 
 ### Black-Op-Chance stagniert - WIDERLEGT (27.08., 08:22)
 

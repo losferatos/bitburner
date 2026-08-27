@@ -114,7 +114,7 @@ Abbruchkriterium (neu gefasst 17:51): Kostet ein Fehlschlag mehr als 10 Millione
 
 ## Offen, nach Dringlichkeit
 
-### Der Bot rekrutiert nie ein Team - +9,4 Prozent auf jede Black Op fuer 24 Minuten (19:57, durchgerechnet 20:03)
+### Der Bot rekrutiert nie ein Team - +9,4 Prozent auf jede Black Op fuer 24 Minuten (19:57, durchgerechnet 19:50)
 
 Gemessen: `teamCount` ist 0 (`src/chance.js`, 18:19). Kein Skript in `src/`
 ruft `setTeamSize` oder faehrt `General/Recruitment` - null Treffer im grep.

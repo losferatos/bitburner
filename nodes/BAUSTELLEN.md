@@ -481,6 +481,36 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 
 ## Erledigt
 
+### bn4rep fand keinen Platz, weil home pauschal ausgeschlossen war (27.08., 06:12)
+
+**Verifiziert: `bn4rep.js` laeuft auf home um 06:12**, alle zwoelf Werkzeuge
+stehen. Erste Aenderung an `bn4net.js` nach der Freigabe.
+
+Der Waechter meldete um 06:00 per Push "bn4rep.js hat keinen Platz" - die neue
+Meldung mit Grund, die seit 20:50 im Waechter steht. Sie hat funktioniert wie
+gedacht: Eric sah den Grund, nicht nur den Ausfall.
+
+**Der Grund war eine veraltete Begruendung im Code.** `ausweichwirt()` in
+`bn4net.js` schloss home aus, "ein 768-GB-Werkzeug haette dort ohnehin nie
+Platz". Das stimmte, als home 64 GB hatte. Heute hat es **2048**.
+
+Gemessen um 06:05: Werkbank ist `millenium-fitness` mit **256 GB**, bn4rep
+braucht 768,3. Ein Ausbau auf 1024 GB kostet **897,6 Milliarden** gegen 1,9
+Milliarden Guthaben - `CloudServerSoftcap: 2` (`BitNode.tsx:702`) macht
+Serverplatz in diesem Knoten unbezahlbar. **Ueber Server war der Platz nicht
+zu bekommen**, ueber home schon: 2048 GB, davon 512 Reserve.
+
+**Geaendert:** Statt des Tabus eine Rechnung - freier Platz plus raeumbare
+Arbeiter minus `reserveHome()`. Reicht es nicht, faellt home wie jeder andere
+Rechner durch die Pruefung, aus Mangel statt aus Prinzip.
+
+**Die Lehre, und sie betrifft mehr als diese Zeile:** Der Ausschluss war
+einmal richtig und ist mit dem Ausbau von home falsch geworden, ohne dass
+irgendetwas kaputtging - er hat nur still ein Werkzeug ausgesperrt. **Eine
+Begruendung, die eine Zahl nennt, gehoert nachgerechnet, wenn sich die Zahl
+aendert.** Genau dasselbe Muster steckte in der 84,5-Millionen-Rechnung von
+17:55 und in der Pauschale 1,7 des Pruefers.
+
 ### Ein Server-Ausbau kurz vor einem Einbau verbrennt das Geld doppelt (27.08., 04:50)
 
 Gemessen: Um 04:06 habe ich `werk-0` von 1024 auf 2048 GB ausgebaut, fuer

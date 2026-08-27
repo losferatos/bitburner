@@ -353,6 +353,35 @@ export async function main(ns) {
     try { return ns.bladeburner.inBladeburner(); } catch { return false; }
   };
 
+  // WAS DIE REPUTATION WIRKLICH KOSTET, WIRD GEMESSEN (27.08.2026, 09:50).
+  //
+  // `repPerSecond` unten rechnet die Rate aus den Stats des Spielers, also aus
+  // der Annahme, er ARBEITE fuer die Faktion. In BitNode 6 tut er das nicht -
+  // `bladeSperreArbeit()` haelt ihn bei der Division, und die Reputation kommt
+  // passiv herein (Bladeburner-Rang, Coding Contracts). Gemessen 08:50 gegen
+  // 09:47, 57 Minuten:
+  //
+  //     Aevum        15.726 -> 17.671   34 rep/min      Formel: rund 543
+  //     Sector-12    14.941 -> 17.011   36 rep/min
+  //     CyberSec     22.115 -> 24.063   34 rep/min
+  //     Bladeburners  4.580 ->  5.665   19 rep/min      Formel: rund 335
+  //     Slum Snakes     655 ->    820    2,9 rep/min
+  //
+  // Die Formel liegt durchgehend um Faktor 16 bis 18 daneben. In der
+  // Guete-RANGFOLGE kuerzt sich das weitgehend weg, weil der Fehler alle
+  // Faktionen aehnlich trifft - die Wahl war also nie falsch. Die Zahl `sek`
+  // aber ist es: Sie sagte um 09:47 "356 Sekunden bis ORION-MKIV", real sind
+  // es rund 101 Minuten. Wer von aussen den naechsten Einbau vorhersagt,
+  // rechnet damit siebzehnfach zu frueh - genau das ist um 08:53 passiert.
+  //
+  // Deshalb wird die Rate jetzt beobachtet: je Faktion der letzte Stand mit
+  // Zeitstempel, und sobald REP_MESSFENSTER Sekunden vergangen sind, ersetzt
+  // die gemessene Rate die Formel. Bis dahin bleibt die Formel - ein Bot, der
+  // beim Start zehn Minuten lang keine Rangfolge bilden kann, waere schlimmer
+  // als eine ungenaue.
+  const REP_MESSFENSTER = 300;                     // Sekunden
+  const repMessung = new Map();                    // faktion -> {rep, zeit, rate}
+
   for (;;) {
    try {
     // DER PULS (24.08.2026).
@@ -1327,6 +1356,9 @@ export async function main(ns) {
         : typen.includes("field") ? "field" : (typen[0] || "hacking");
     };
     const repPerSecond = (faktion) => {
+      // Die Beobachtung schlaegt die Formel, sobald sie lang genug lief.
+      const m = repMessung.get(faktion);
+      if (m && m.rate > 0) return m.rate;
       const art = arbeitsart(faktion);
       const k = spieler.skills;
       // Bei Feld- und Sicherheitsarbeit zaehlen alle Werte, bei Hacking nur
@@ -1363,6 +1395,23 @@ export async function main(ns) {
     const LOG_1_02 = 0.019802627296179712;          // = log(1,02), favor.ts
     const favorToRep = (f) => 25000 * Math.expm1(LOG_1_02 * f);
     const REP_FOR_DONATION = favorToRep(spendenSchwelle);
+
+    // Messstand fortschreiben. `k.rep` ist je Faktion gleich, ein Kandidat
+    // je Faktion genuegt also. Die Rate wird nur uebernommen, wenn sie
+    // positiv ist - ein Einbau setzt die Reputation zurueck, und eine
+    // negative Rate wuerde die Rangfolge zerstoeren.
+    const jetztSek = Date.now() / 1000;
+    for (const k of kandidaten) {
+      const alt = repMessung.get(k.faktion);
+      if (!alt) { repMessung.set(k.faktion, { rep: k.rep, zeit: jetztSek, rate: 0 }); continue; }
+      const dt = jetztSek - alt.zeit;
+      if (dt < REP_MESSFENSTER) continue;
+      const dr = k.rep - alt.rep;
+      repMessung.set(k.faktion, {
+        rep: k.rep, zeit: jetztSek,
+        rate: dr > 0 ? dr / dt : alt.rate,
+      });
+    }
 
     const alleOffenen = kandidaten.filter((k) => k.rep < k.repReq);
     const schwellenZiele = [];

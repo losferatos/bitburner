@@ -600,6 +600,28 @@ export async function main(ns) {
         if (s.min >= SICHER_BLACKOP) {
           return { typ: B, name: bo.name, grund: "Black Op" };
         }
+        // WENN NUR DIE SCHAETZUNG IM WEG STEHT, IST SIE DAS ZIEL
+        // (27.08.2026, 09:19).
+        //
+        // Gemessen um 09:11: Die Vertragsspanne war um 08:11 noch **0**
+        // (Tracking 1,0/1,0) und stand eine Stunde spaeter bei **0,197**
+        // (0,803/1,0); die Operationen bis 0,249, die Black Op 0,086/0,107.
+        // Alle Aktionen gehen GLEICHZEITIG auf - das ist keine schwankende
+        // Chance, das ist die verrottende Bevoelkerungsschaetzung der Stadt.
+        //
+        // Field Analysis dagegen einzustreuen lohnt im Normalbetrieb NICHT:
+        // sie bringt 0,2 Rang je Minute gegen 8,7 bei Bounty Hunter, also
+        // Faktor 43. Genau ein Fall rechtfertigt sie - wenn die Obergrenze
+        // ueber der Schwelle liegt und nur die Unschaerfe den Versuch
+        // verhindert. Dann kauft eine Minute Field Analysis den Knotenausgang
+        // frueher, statt nur Rang zu kosten.
+        //
+        // Solange max unter der Schwelle liegt, ist die Regel wirkungslos -
+        // sie kostet dann nichts und wartet auf ihren Moment.
+        if (s.max >= SICHER_BLACKOP && s.min < SICHER_BLACKOP) {
+          return { typ: G, name: "Field Analysis",
+            grund: "nur die Schaetzung fehlt zur Black Op" };
+        }
         // Rang reicht, Sicherheit nicht: Das ist der Normalfall und kein
         // Grund zu warten - unten wird weiter Rang und Erfahrung gesammelt,
         // bis die Chance steht.

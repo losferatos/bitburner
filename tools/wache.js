@@ -664,6 +664,54 @@ async function pruefe(zustand, jetzt) {
     // wiederkehrende Drosselung wieder nur zu erraten.
     { datei: "data/sonde.json", skript: "sonde.js", json: true },
   ];
+  // BBTRAIN HAT KEIN LEBENSZEICHEN - ES WIRD AN SEINER WIRKUNG ERKANNT
+  // (27.08.2026, 05:10).
+  //
+  // Die Schleife darunter prueft Werkzeuge ueber ihre Telemetriedatei.
+  // `bbtrain.js` schreibt keine, und genau deshalb ist es am 27.08. um 03:48
+  // durchgerutscht: Nach dem Einbau lief es eine halbe Stunde nicht, waehrend
+  // `joinrun.js` nur `str` trainierte - str stand bei 169, def bei 1, dex bei
+  // 2, agi bei 1. Der Traeger des Knotens (der Tiefstand) stand still, und
+  // der Strategiepruefer haette erst nach 75 Minuten angeschlagen.
+  //
+  // Erkannt wird es an der Wirkung: Solange der Tiefstand unter 100 liegt,
+  // MUSS der gerade trainierte Wert der niedrigste sein. Trainiert die Figur
+  // etwas anderes - oder gar nichts -, dann macht das ein anderes Werkzeug,
+  // und bbtrain fehlt.
+  const lage = await spielJson("data/bblage.json");
+  if (lage && typeof lage.zeit === "number" && jetzt - lage.zeit < POLL_MS
+      && Number.isFinite(lage.tiefstand) && lage.tiefstand < 100
+      && lage.kampf) {
+    const werte = ["str", "def", "dex", "agi"];
+    let niedrigster = werte[0];
+    for (const k of werte) {
+      if (Number(lage.kampf[k]) < Number(lage.kampf[niedrigster])) niedrigster = k;
+    }
+    const arbeit = lage.arbeit || null;
+    const trainiertRichtig = arbeit && arbeit.typ === "CLASS"
+      && arbeit.klasse === niedrigster;
+    if (!trainiertRichtig) {
+      const letzter = zustand.gestartet && zustand.gestartet["bbtrain.js"];
+      if (!letzter || jetzt - letzter >= 15 * 60_000) {
+        const los = await starteWerkzeug("bbtrain.js");
+        if (los) {
+          zustand.gestartet = zustand.gestartet || {};
+          zustand.gestartet["bbtrain.js"] = jetzt;
+          log("Nachgestartet: bbtrain.js (Tiefstand " + lage.tiefstand
+            + ", trainiert wird " + (arbeit ? arbeit.klasse : "nichts")
+            + " statt " + niedrigster + ").");
+        }
+      }
+      befunde.push({
+        typ: "bbtrain",
+        text: "bbtrain.js laeuft nicht: Tiefstand " + lage.tiefstand
+          + " von 100, trainiert wird "
+          + (arbeit ? arbeit.klasse : "nichts") + " statt " + niedrigster
+          + ". Neustart angestossen.",
+      });
+    }
+  }
+
   for (const w of WERKZEUGE) {
     const roh = await spieldatei(w.datei);
     let stempel = null;
@@ -808,7 +856,8 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     rep: "bn4rep.js arbeitet wieder.",
     hilfe: "Der Bot kommt wieder allein zurecht.",
     traeger: "Der Traeger des Knotens steigt wieder.",
-    werkzeug: "Das fehlende Werkzeug laeuft wieder."
+    werkzeug: "Das fehlende Werkzeug laeuft wieder.",
+    bbtrain: "bbtrain.js trainiert wieder den richtigen Wert."
   };
   for (const typ of Object.keys(zustand.seit)) {
     if (aktiv.has(typ)) continue;

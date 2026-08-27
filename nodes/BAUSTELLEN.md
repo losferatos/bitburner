@@ -73,10 +73,27 @@ Prozentpunkt auf 1,66 ist mehr wert als auf 2,65. Die Daten dafuer liegen
 bereits vor: `ns.bladeburner.getSkillUpgradeCost` und die Tabelle in
 `data/Skills.ts`.
 
-**Dringlichkeit: mittel.** Die zwei Handkorrekturen von heute nehmen den
-akuten Druck; der Plan bleibt aber falsch, sobald Short-Circuit die 30
-erreicht. Fundstelle `blade.js:317` (`SKILL_PLAN`) und die Kaufschleife
-darunter.
+**GEAENDERT 13:49, Wirkung noch nicht gemessen.** Die drei Faehigkeiten, deren
+Wirkung auf die Black-Op-Chance gerechnet ist - **Hyperdrive, Short-Circuit,
+Blade's Intuition** -, werden vor jedem Kauf nach relativem Nutzen je Punkt
+sortiert und tauschen ihre Planplaetze untereinander. Deckel und alle uebrigen
+Eintraege bleiben unangetastet; wer am Deckel steht, faellt auf -1 und wandert
+nach hinten.
+
+Verifiziert ist bisher nur, dass nichts bricht: nach dem Neustart um 13:49
+Rang 5.024, Aktion `Contracts/Tracking`, `URTEIL: SPUR`.
+
+**Nachzumessen:** Bei 26 Punkten und Preis 27 muss der Motor jetzt auf
+**Short-Circuit** sparen (0,122 je Punkt) statt auf Blade's Intuition (0,031).
+Ablesen an der Stufe in `data/bbspann.json` - steigt Short-Circuit ueber 12,
+traegt die Sortierung. Steigt stattdessen Blade's Intuition ueber 25, greift
+sie nicht und der Commit gehoert zurueckgedreht.
+
+**Was offen bleibt:** Die neun uebrigen Faehigkeiten stehen weiter in fester
+Folge, weil ihre Wirkung auf den Traeger nicht gerechnet ist. Digital Observer
+trifft nur Operations, Cloak nur Stealth, Hands of Midas nur Geld - fuer sie
+braucht es erst eine Umrechnung in Prozent Black-Op-Chance, bevor sie in den
+Vergleich duerfen.
 
 **Achtung bei der Umsetzung:** Nicht jede Faehigkeit wirkt auf den Traeger.
 Digital Observer trifft nur Operations, Cloak nur Stealth, Hands of Midas nur

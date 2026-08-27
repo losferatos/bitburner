@@ -323,25 +323,51 @@ export async function main(ns) {
   // Retirement), deshalb Tracer vor Short-Circuit vor den Kampfwerten.
   // Digital Observer und Cloak stehen hinten, weil Operationen und
   // Stealth-Vertraege kaum vorkommen.
+  // DECKEL NUR NOCH FUER DAS, WAS NICHT SORTIERT WIRD (27.08.2026, 20:33).
+  //
+  // Bis hierher hatten sechs Faehigkeiten feste Deckel, obwohl vier davon in
+  // `DYNAMISCH` stehen und damit ohnehin nach Nutzen je Punkt geordnet werden.
+  // Ein Deckel neben einer Sortierung ist kein zweites Sicherheitsnetz - er
+  // hebelt sie aus. Gemessen um 20:33 (`src/skillcheck.js`):
+  //
+  //     Faehigkeit         Stufe  Preis  Nutzen   Wert je Punkt
+  //     Hyperdrive             7     19   0,738   0,0388  <- gedeckelt
+  //     Digital Observer      15     34   1,100   0,0324     wird gekauft
+  //     Evasive System        17     38   1,035   0,0272  <- gedeckelt
+  //     Reaper                16     36   0,944   0,0262  <- gedeckelt
+  //     Blade's Intuition     30     66   1,579   0,0239     wird gekauft
+  //     Short-Circuit         30     65   1,142   0,0176  <- gedeckelt
+  //
+  // **Hyperdrive haette den besten Wert von allen** und stand still. Das ist
+  // an einem Tag der fuenfte Fall derselben Art: 12:52 Hyperdrive, 13:19
+  // Short-Circuit, 15:53 Reaper und Evasive System, 18:55 Digital Observer -
+  // jedes Mal lag die bessere Option gedeckelt daneben, und jedes Mal wurde
+  // der Deckel einzeln hochgesetzt. Das Muster ist der Fehler, nicht die
+  // einzelne Zahl.
+  //
+  // Deshalb: Wer in `DYNAMISCH` steht, bekommt `Infinity`. Die Sortierung
+  // entscheidet, und sie rechnet den Grenznutzen bei der aktuellen Stufe -
+  // genau das, was ein Deckel grob nachbilden sollte. Deckel bleiben nur, wo
+  // nicht sortiert wird:
+  //
+  //   Cyber's Edge  5  - wirkt ueber die Ausdauer auf den Arbeitsanteil, und
+  //                      der ist bei 1,00 angekommen. Mehr bringt dort nichts.
+  //   Tracer       14  - SuccessChanceContract, und Vertraege stehen bei 0,92
+  //                      bis 1,00. Die Chance klemmt, der Nutzen ist null.
+  //   Overclock    90  - das Maximum des Spiels; die Zahl ist keine Wahl.
   const SKILL_PLAN = [
-    // Neu am 27.08. um 12:52: 10 Prozent mehr Erfahrung je Stufe geben 3,05
-    // Levelpunkte auf alle vier Kampfwerte. Rechnung in nodes/HEBEL.md.
-    ["Hyperdrive", 7],
-    ["Cyber's Edge", 5],
-    ["Tracer", 14],
-    // Deckel 12 auf 30 am 27.08. um 13:19: SuccessChanceKill trifft auch
-    // Typhoon. Rechnung in nodes/HEBEL.md.
-    ["Short-Circuit", 30],
-    ["Evasive System", 17],
-    ["Reaper", 16],
-    // Digital Observer VOR Blade's Intuition (27.08., 18:55): Dahinter kam er
-    // nie an die Reihe, weil ein Infinity-Deckel nie erreicht wird - nach
-    // einem ganzen Tag stand er auf Stufe 1. Rechnung in nodes/HEBEL.md.
+    // Die sechs dynamischen zuerst - ihre Reihenfolge hier ist ohne Belang,
+    // `faehigkeitenKaufen()` sortiert sie bei jedem Kauf neu.
+    ["Hyperdrive", Infinity],
+    ["Short-Circuit", Infinity],
     ["Digital Observer", Infinity],
     ["Cloak", Infinity],
+    ["Reaper", Infinity],
+    ["Evasive System", Infinity],
+    // Ab hier statisch, mit begruendetem Deckel.
+    ["Cyber's Edge", 5],
+    ["Tracer", 14],
     ["Blade's Intuition", Infinity],
-    // Zuletzt: wirkungslos, solange die Ausdauer klemmt. Deckel 90 ist das
-    // Maximum des Spiels und bleibt stehen, falls der Engpass je wegfaellt.
     ["Overclock", 90],
   ];
 

@@ -770,8 +770,17 @@ async function pruefe(zustand, jetzt) {
   //
   // Nicht geprueft wird bbtrain.js: Es schreibt nur bei Ereignissen, ein
   // Alter sagt dort nichts.
+  // NUR VERLANGEN, WAS IN DIESEM KNOTEN LAUFEN SOLL (28.08.2026, 17:58).
+  //
+  // `blade.js` ist der Motor von BitNode 6 und 7. In BitNode 10 laeuft es
+  // nicht und soll es nicht - seine alte `blade.json` ueberlebt aber den
+  // Knotenwechsel auf home. Der Waechter hat es deshalb seit 17:05 fuer tot
+  // gehalten, alle 15 Minuten nachgestartet und dabei den Auftragskanal
+  // belegt, den die Loops brauchen.
+  const kampfKnoten = messwerte.knoten === 6 || messwerte.knoten === 7;
   const WERKZEUGE = [
-    { datei: "data/blade.json", skript: "blade.js", json: true },
+    ...(kampfKnoten
+      ? [{ datei: "data/blade.json", skript: "blade.js", json: true }] : []),
     { datei: "data/wakelock.txt", skript: "wakelock.js", json: false },
     // Die Sonde ist kein Betriebsteil, sondern das Messwerkzeug gegen die
     // Drosselung - und genau deshalb faellt ihr Ausfall niemandem auf. Am
@@ -857,7 +866,17 @@ async function pruefe(zustand, jetzt) {
         + minuten(alt) + " min alt).");
     }
     befunde.push({
-      typ: "werkzeug",
+      // EIN TYP JE WERKZEUG (28.08.2026, 17:58).
+      //
+      // Hier stand fuer alle Werkzeuge derselbe Typ "werkzeug". Die
+      // Drosselung vergleicht den ziffernfreien Text des LETZTEN Alarms
+      // dieses Typs - und der wechselte bei jedem Durchlauf zwischen
+      // "blade.js meldet sich..." und "sonde.js meldet sich...". Damit war
+      // der Text nie gleich, die Drosselung griff nie, und Eric bekam alle
+      // drei Minuten eine Meldung. Das ist derselbe Fehler wie am 24.08. mit
+      // der hochzaehlenden Minutenzahl, nur ueber zwei Werkzeuge statt ueber
+      // eine Zahl verteilt.
+      typ: "werkzeug:" + w.skript,
       text: w.skript + " meldet sich seit " + minuten(alt) + " min nicht."
         + (los ? " Neustart ueber den Auftragskanal angestossen."
           : " Der Auftragskanal war belegt - naechster Versuch in 15 min."),
@@ -984,7 +1003,11 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     delete zustand.stufe[typ];
     delete zustand.text[typ];
     if (!warGemeldet) continue;
-    const text = ENTWARNUNG[typ] || (typ + " ist behoben.");
+    // Die Werkzeug-Typen heissen seit 17:58 "werkzeug:<datei>" - der
+    // Entwarnungstext haengt am Praefix, nicht am ganzen Schluessel.
+    const text = ENTWARNUNG[typ]
+      || (typ.startsWith("werkzeug:") ? typ.slice(9) + " laeuft wieder." : null)
+      || (typ + " ist behoben.");
     // IN DER NACHTRUHE IN DIE NACHTPOST, nicht in den Papierkorb. Vorher fiel
     // sie hier ersatzlos weg: Eric ging mit "Bruecke tot" ins Bett, das
     // Problem behob sich um halb eins - und weil der Zustand dabei geloescht

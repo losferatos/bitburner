@@ -23,6 +23,50 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Augmentierungsrunde ist nicht bezahlbar - und lohnt auch nicht (erledigt 28.08., 21:45)
+
+Alle drei Wege gerechnet, mit gemessenen Raten. Der Bedarf je Kampfwert folgt
+aus `calculateSkill` (`PersonObjects/formulas/skill.ts:13`), umgestellt:
+`exp(m) = e^((100/(m*0,4) + 200)/32) - 534,6`. Das Training geht immer auf den
+niedrigsten Wert, es zaehlt also die **Summe ueber alle vier**.
+
+Gemessene Eingangsgroessen:
+  Gym Spieler        10 Erfahrung je Sekunde (auf einen Wert)
+  Sleeve im Gym       3,25 (Anteil, der beim Spieler ankommt)
+  Feldarbeit          1,26 je Kampfwert, alle vier gleichzeitig
+                      (`Work/Formulas.ts:41-48`, 1 exp/s mal mults)
+  Reputation          29,6 je Minute, gerechnet aus
+                      `getFactionFieldWorkRepGain`
+                      (`PersonObjects/formulas/reputation.ts:40-52`) mit
+                      Skills 69/68/68/68, Hacking 106, Int 93, Favor 0
+
+    Weg 3  nur Gym                          **18,6 h**
+    Weg 2  Feldarbeit bis Combat Rib I       8,3 h Reputation
+           (Slum Snakes, 15.000, habe 347)
+           danach Einbau und Gym            12,1 h
+                                            = **20,3 h**
+    Weg 1  Augmented Targeting I            **kein Gewinn** - es hebt nur
+           (Sector-12, 10.000)              dexterity, und str/def sind das
+                                            Tor
+
+**Weg 3 gewinnt. Der Bot faehrt ihn bereits.**
+
+Der Grund, warum Weg 2 verliert, steckt im Einbau: Er setzt die
+Kampferfahrung auf null. Die 8,3 Stunden Feldarbeit erzeugen zwar nebenbei
+Erfahrung, aber die ist danach weg - und der gesparte Bedarf (143.755 statt
+252.817 je Wert) wiegt die 8,3 Stunden nicht auf.
+
+**Damit ist die Kursentscheidung vom 19:20 widerlegt.** Sie verglich
+"Erfahrung bei mult 1,26" mit "Erfahrung bei mult 2,0" und schloss auf 19,6
+gesparte Stunden. Zwei Dinge fehlten: der **Zeitpreis der Reputation** und
+die Frage, **welche** Werte die erreichbaren Augmentierungen ueberhaupt
+heben. Von den zehn in Reichweite hebt genau eine str und def.
+
+Die Leitgroesse ist damit wieder der **Kampfwert-Tiefstand**, nicht
+`mults.strength`. Korrigiert in `nodes/KURS.md`, Eintrag 21:45.
+
+---
+
 ### Wann wird eingebaut? Jetzt gerechnet statt geraten (erledigt 28.08., 21:28)
 
 Die Regel steht in `src/kampfaugs.js` und folgt aus `calculateSkill`

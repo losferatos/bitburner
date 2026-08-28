@@ -25,6 +25,58 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 28.08., 21:45 - BitNode 10 (KORREKTUR des Eintrags von 19:20)
+
+Geschrieben vom Vorankommensloop, weil der Eintrag von 19:20 eine Leitgroesse
+gesetzt hat, die einer Nachrechnung nicht standhaelt. Eine falsche Leitgroesse
+kostet vier Loops zwoelf Stunden - das kann nicht bis 6:44 warten.
+
+**Was 19:20 richtig war:** Der Multiplikator steht in `calculateSkill` vor
+der Klammer, die Erfahrung im Logarithmus. Ein Kampf-Multiplikator von 2,0
+statt 1,26 senkt den Bedarf von 1.019.268 auf 100.868 Erfahrung.
+
+**Was fehlte:** der Preis. Zwei Posten, beide inzwischen gemessen.
+
+  1. **Reputation.** Sie kostet Zeit, und zwar in derselben Waehrung: Der
+     Spieler bringt bei Feldarbeit 29,6 Reputation je Minute
+     (`reputation.ts:40-52` mit den heutigen Werten), waehrend sein
+     Erfahrungsgewinn von 10 auf 5,04 je Sekunde faellt.
+  2. **Welche Werte gehoben werden.** Von den zehn erreichbaren
+     Kampf-Augmentierungen hebt **genau eine** str und def (Combat Rib I,
+     Slum Snakes, 15.000 Reputation). Der Rest wirkt auf dex und agi - und
+     das Tor ist der NIEDRIGSTE Wert.
+
+Durchgerechnet mit gemessenen Raten (Details in `nodes/ERLEDIGT.md`, 21:45):
+
+    Weg 3  nur Gym                                    **18,6 h**
+    Weg 2  Feldarbeit bis Combat Rib I, Einbau, Gym    20,3 h
+    Weg 1  Augmented Targeting I                       kein Gewinn
+
+Engpass:           **Kampfwert-Tiefstand 66 von 100** - in Erfahrung 31.000
+                   von 252.817 je Wert, also 12,3 %.
+
+Restweg:           4 x (252.817 - 31.000) = **887.268 Erfahrung**.
+
+Rate:              **13,25 je Sekunde** (Spieler 10 im Gym, Sleeve 3,25 ueber
+                   `sync/100`). Gemessen 19:14 bis 19:16 und 20:57.
+
+ETA:               **18,6 h fuer Tor 1.** Vorlauf 19:20: 21,8 h ohne
+                   Zwischenschritt, 2,2 h mit - der zweite Wert war falsch.
+
+Entscheidung:      **Weiterfahren.** Der Bot macht bereits das Richtige:
+                   Spieler und Sleeve trainieren, niemand jagt Reputation.
+                   Der Zwischenschritt von 19:20 wird zurueckgenommen.
+
+Leitgroesse:       **Kampfwert-Tiefstand, jetzt 66 von 100.** NICHT
+                   `mults.strength` - dieser Wert steht bis Tor 1 still, und
+                   das ist richtig so.
+
+Naechste Pruefung: Steigt der Tiefstand um mindestens 3 je halbe Stunde
+                   (13,25/s auf vier Werte, logarithmische Kurve), traegt der
+                   Weg. Bleibt er stehen, ist das Gym aus.
+
+---
+
 ## 28.08., 19:20 - BitNode 10
 
 Ausgangsbedingung: unveraendert gegenueber 18:55 - **21 Black Operations**

@@ -22,7 +22,7 @@ Brauchst du Zahlen aus dem Spiel (`data/blade.json`, `data/bblage.json`): Die li
 curl -s -m 8 -G "http://localhost:8795/api/rpc" --data-urlencode "method=getFile" --data-urlencode "filename=data/blade.json" --data-urlencode "server=home"
 ```
 
-**Die Rangrate gehört geglättet gemessen**, nicht als Differenz zweier Reportzeitpunkte: Der Ausdauerzyklus ist länger als ein 30-Minuten-Fenster, und wer eines misst, misst dessen Phase. Am 26.08. um 21:07 hat das eine Scheindivergenz erzeugt. Nimm den Verlauf aus `data/wache-zustand.json` über mindestens 45 Minuten.
+**Die Rangrate gehört geglättet gemessen**, nicht als Differenz zweier Reportzeitpunkte: Der Ausdauerzyklus ist länger als ein 30-Minuten-Fenster, und wer eines misst, misst dessen Phase. Am 26.08. um 21:07 hat das eine Scheindivergenz erzeugt. Nimm den Verlauf aus `data/wache-zustand.json` über mindestens 45 Minuten. **Achtung: die Liste `verlauf` steht neueste-zuerst** — wer `verlauf[0]` für den ältesten Punkt hält, bekommt ein negatives `dt` und eine erfundene Rate. Erst sortieren.
 
 **Miss auch den Rückstand:** `node tools/rueckstand.js`. Es liest `storedCycles` aus dem Spielstand — die Spielzeit, die noch nicht verarbeitet ist — und meldet den Trend je Stunde. Wächst er, obwohl der Rechner läuft, ist der Browser-Tab gedrosselt und das Spiel läuft langsamer als die Uhr. Das ist die einzige Störung, die kein anderes Werkzeug sieht, und sie ist von außen an nichts anderem erkennbar.
 
@@ -51,7 +51,7 @@ Erwartet: <was stattdessen dastehen müsste>
 Verdacht: <Fundstelle im Code, wenn es eine gibt - sonst "offen">
 ```
 
-Steht dort schon ein Punkt mit **demselben** Befund, ergänze nur Messung und Uhrzeit — kein zweiter Eintrag, sonst verhungern die älteren. Committe nur diese Datei (`git add nodes/BAUSTELLEN.md`, nie `git add -A`), vor dem Push `git pull --rebase`.
+Steht dort schon ein Punkt mit **demselben** Befund, ergänze nur Messung und Uhrzeit — kein zweiter Eintrag, sonst verhungern die älteren. Neue Punkte werden **nach der `---`-Trennlinie** eingesetzt, nie per Textsuche — die Zeichenketten `## Sofort` und `## Offen` stehen auch im Regelkopf, und eine Sucheinfügung hat die Datei am 28.08. um 14:08 zerlegt. Danach `grep -n "^## |^### "` prüfen. Committe nur diese Datei (`git add nodes/BAUSTELLEN.md`, nie `git add -A`), vor dem Push `git pull --rebase`.
 
 In diesem Loop wird **nicht am Bot herumrepariert**. Er misst, berichtet und schreibt Aufträge; die Reparatur ist Sache von Loop 1 und 2.
 
@@ -79,6 +79,7 @@ Regeln für den Bericht:
 - Keine Tabellen, keine Vorrede, keine Erklärung der Mechanik. Eric kennt das Spiel.
 - Die Reflexion ist **ehrlich**. Ein verfehltes Ziel wird als verfehlt benannt, mit der Zahl daneben. Ein Ziel, das sich als falsch herausgestellt hat, wird als falsch benannt — nicht stillschweigend durch ein neues ersetzt.
 - Ein Befund aus Schritt 3 bekommt eine eigene Zeile unter „Lage" mit dem Zusatz **„→ Auftrag"**, damit Eric sieht, dass er nicht im Bericht versandet.
+- **Ein BitNode-Wechsel gehört immer in den Bericht** — mit der neuen Knotennummer, dem Datum des Wechsels und dem Hinweis, dass `nodes/KURS.md` für den neuen Knoten neu hergeleitet werden muss.
 
 **Der erste Bericht des Tages (5:00 Uhr) ist ein Nachtbericht.** Zwischen 22:30 und 5:00 wird nicht berichtet — Eric schläft. Der 5-Uhr-Lauf deckt deshalb die ganze Nacht ab: Im Rückblick gehört dazu, was in den sieben Stunden passiert ist (Rangzuwachs, Resets, BitNode-Wechsel, was die Wache eingegriffen hat — nachzulesen in `git log --since="8 hours ago"` und in `nodes/ERLEDIGT.md`). Dafür darf er 20 statt 16 Zeilen haben.
 
@@ -91,9 +92,10 @@ Loops zwei Stunden stillgelegt: Eine `until`-Warteschleife wartete auf eine
 Datei, die es nie geben konnte, und lief 2h56m. Die erste Feuerung kam 45
 Sekunden nach dem Kill des Prozesses.
 Deshalb:
-- Warteschleifen IMMER mit harter Grenze: `for i in $(seq 1 20); do ...;
-  sleep 30; done` statt `until <bedingung>`. Eine Bedingung, die nie eintritt,
-  wird so zum begrenzten Fehlschlag statt zur Endlosblockade.
+- Warteschleifen IMMER mit harter Grenze und **kurz genug fuer das
+  120-Sekunden-Zeitlimit des Werkzeugs**: `for i in $(seq 1 6); do ...;
+  sleep 15; done`. Wer laenger schleift, erzeugt genau den Hintergrundtask,
+  den diese Regel verbietet - am 28.08. um 16:12 passiert.
 - Monitor nur mit knappem `timeout_ms`, **nie** `persistent: true`.
 - Wirklich lange Wartearbeit gar nicht als verfolgten Task starten, sondern
   abgekoppelt (`nohup`, `Start-Process`) mit Datei-Polling durch die Loops.

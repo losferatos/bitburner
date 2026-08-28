@@ -11,6 +11,31 @@ Regeln:
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
 
+### `blade.js` verliert beim Neustart den offenen Abschnitt (14:03)
+
+Gemessen: `data/aktionen.txt` endet um **13:19:44** und hat seither nichts mehr
+          geschrieben - 43 Minuten Luecke, obwohl der Motor durchgehend lief
+          (Rang 154.848 um 13:40 auf 188.713 um 14:03).
+
+Erwartet: Ein Abschnitt je Aktionswechsel. Die Luecke deckt sich exakt mit den
+          beiden `WERKZEUG blade.js`-Neustarts um 13:40 und 13:41: Ein
+          Abschnitt wird erst beim Wechsel geschlossen, und ein Neustart wirft
+          den offenen weg.
+
+Verdacht: `src/blade.js`, `abschnitt`/`schliesseAbschnitt`. Der Abschnitt lebt
+          nur im Speicher. Sauber waere, ihn beim Start aus `data/blade.json`
+          zu rekonstruieren oder ihn periodisch statt nur beim Wechsel zu
+          schreiben.
+
+Dringlichkeit: **niedrig fuer den Betrieb, mittel fuer die Messung.** Der Bot
+          verliert nichts, aber genau die Datei, aus der die Loops den
+          Zeitanteil je Aktion lesen, ist nach jedem Eingriff blind - und
+          Eingriffe sind der Moment, in dem gemessen werden muesste. Der
+          Diplomacy-Anteil nach 13:35 liess sich deshalb nur indirekt belegen
+          (`aufraeumen: false` in `data/blade.json`, Chaos faellt ohne
+          Diplomacy von 39,84 auf 37,50).
+
+
 ### Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte

@@ -126,7 +126,7 @@ function speichereVerlauf(v) {
  * ueberwacht wurde weiter das Hackniveau. Wer den Traeger nicht mit dem Knoten
  * wechselt, ueberwacht ab dem Knotenwechsel das falsche Ding.
  */
-function traeger(knoten, bb, rep) {
+function traeger(knoten, bb, rep, net) {
   const bladeKnoten = knoten === 6 || knoten === 7;
   if (bladeKnoten) {
     if (!bb) return null;
@@ -179,8 +179,29 @@ function traeger(knoten, bb, rep) {
     return { name: "Bladeburner-Rang", wert: bb.rang, ziel: null,
       phase: "Black Operations" };
   }
-  if (!rep) return null;
-  return { name: "Hackniveau", wert: rep.hacking, ziel: rep.zielLevel || null,
+  // JEDE QUELLE WIRD AUF DEN KNOTEN GEPRUEFT (28.08.2026, 17:38).
+  //
+  // Hier stand schlicht `rep.hacking`. `data/bn4rep.json` ueberlebt aber den
+  // Knotenwechsel auf home, waehrend `bn4rep.js` es nicht tut - es ist voller
+  // Singularity-Aufrufe und passt ausserhalb von BitNode 4 nicht auf ein
+  // frisches home mit 32 GB. Gemessen 17:32, eine halbe Stunde nach dem
+  // Wechsel nach BitNode 10: Der Pruefer meldete "Hackniveau = 100 von 6000"
+  // aus einer Datei vom 25.08., waehrend `bn4net.json` frisch 16 auswies.
+  //
+  // Eine Zahl, die sich nie bewegt, ist per Definition stagnierend - der
+  // Pruefer haette also ab jetzt bei jedem Lauf Alarm geschlagen und dabei
+  // echten Fortschritt verdeckt.
+  //
+  // `bn4net.json` ist die verlaessliche Quelle: bn4net.js ist das Skript, das
+  // `boot.js` nach jedem Wechsel als erstes startet, und es ist
+  // singularityfrei. Es kennt aber kein `zielLevel` - das bleibt bei
+  // bn4rep.json, und zwar nur, wenn die Datei zum aktuellen Knoten gehoert.
+  const repGilt = rep && rep.knoten === knoten;
+  const wert = (net && Number.isFinite(net.hacking)) ? net.hacking
+    : (repGilt ? rep.hacking : null);
+  if (!Number.isFinite(wert)) return null;
+  return { name: "Hackniveau", wert,
+    ziel: (repGilt && rep.zielLevel) ? rep.zielLevel : null,
     phase: "Hacking-Weg" };
 }
 
@@ -470,9 +491,12 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
     return aus();
   }
 
-  const t = traeger(knoten, bb, rep);
+  const t = traeger(knoten, bb, rep, net);
   sag("BitNode " + knoten + ", Netz " + net.gerootet + "/" + net.netz
-    + ", Geld " + (bb ? Math.round(bb.geld / 1e6) + "m" : "?"));
+    // Geld stand nur im Steckbrief - und der ist eine Bladeburner-Groesse.
+    // In BitNode 10 kam deshalb "Geld ?". bn4net.json fuehrt es ohnehin mit.
+    + ", Geld " + (bb ? Math.round(bb.geld / 1e6) + "m"
+      : (net && Number.isFinite(net.geld)) ? Math.round(net.geld / 1e6) + "m" : "?"));
 
   if (!t) {
     sag("Der Traeger dieses Knotens ist nicht messbar - Steckbrief fehlt.");

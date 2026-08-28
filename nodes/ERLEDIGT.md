@@ -23,6 +23,32 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Traeger-Wert kam aus einer toten Quelle (erledigt 28.08., 17:40)
+
+`traeger()` las das Hackniveau aus `data/bn4rep.json`. Die Datei ueberlebt den
+Knotenwechsel auf home, `bn4rep.js` nicht - es ist voller Singularity-Aufrufe
+und passt ausserhalb von BitNode 4 nicht auf ein frisches home mit 32 GB.
+Gemessen 17:32, eine halbe Stunde nach dem Wechsel nach BitNode 10: "Hackniveau
+= 100 von 6000" aus einer Datei vom 25.08., waehrend `bn4net.json` frisch 16
+auswies. Eine Zahl, die sich nie bewegt, ist per Definition stagnierend - der
+Pruefer haette ab jetzt bei jedem Lauf Alarm geschlagen und echten Fortschritt
+verdeckt.
+
+Behoben: `traeger()` nimmt jetzt `net.hacking` aus `bn4net.json` (bn4net.js
+startet `boot.js` nach jedem Wechsel als erstes und ist singularityfrei).
+`zielLevel` bleibt bei bn4rep.json, gilt aber nur noch, wenn
+`rep.knoten === knoten`. Dieselbe Frischepruefung wie bei den beiden
+Fehlalarmen von 17:30.
+
+Mitgenommen: Die Geldanzeige stand ebenfalls nur im Bladeburner-Steckbrief und
+meldete in BitNode 10 "Geld ?" - sie faellt jetzt auf `net.geld` zurueck.
+
+Verifiziert 17:40, drei Laeufe hintereinander:
+  17:38  Hackniveau = 33, RESET (der Sprung von der alten 100 auf die echte 33)
+  17:39  Hackniveau = 34, "Fortschritt: +1 in 1 min", Geld 1m, URTEIL SPUR
+
+---
+
 ### `data/wache-zustand.json` speichert den Verlauf rueckwaerts (erledigt 28.08., 16:42)
 
 `tools/wache.js:961` haengt den neuen Messpunkt per `unshift` VORN an. Wer

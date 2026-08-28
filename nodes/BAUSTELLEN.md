@@ -66,29 +66,6 @@ Regeln:
 
 
 
-### Der Traeger-Wert kommt aus einer toten Quelle (17:32)
-
-Gemessen: `tools/strategie-check.js` meldet "Traeger: Hackniveau = 100 von
-          6000". Die 100 stammen aus `data/bn4rep.json`, Zeitstempel
-          25.08. - die Datei hat den Knotenwechsel auf home ueberlebt, das
-          Skript nicht. Das echte Hackniveau steht in `data/bn4net.json`
-          (frisch, 17:13: `hacking 16`).
-
-Erwartet: Die Traegerzeile nennt das Hackniveau aus `bn4net.json`. Solange
-          sie es nicht tut, sind alle Stagnationsurteile auf dem Hacking-Weg
-          wertlos: Eine Zahl, die sich nie bewegt, ist per Definition
-          stagnierend - und eine, die um 100 klemmt, waehrend das echte
-          Niveau bei 16 anfaengt, verdeckt echten Fortschritt.
-
-Verdacht: `tools/strategie-check.js`, Funktion `traeger()` (Zeile 129) und
-          ihre Aufrufstelle. Dieselbe Klasse wie die beiden heute behobenen
-          Fehlalarme: Nach einem Knotenwechsel ueberleben die JSON-Dateien,
-          die Skripte nicht - jede Quelle gehoert auf Frische geprueft.
-
-Dringlichkeit: **hoch.** Der Hacking-Weg ist in BitNode 10 einer der beiden
-          moeglichen Traeger, und der Pruefer laeuft alle zwanzig Minuten.
-
-
 ### Der Sleeve in BitNode 10 tut nichts (17:12)
 
 Gemessen: Eric hat es im Spiel gesehen; im Repo gibt es dazu **kein einziges

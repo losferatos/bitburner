@@ -869,8 +869,40 @@ export async function main(ns) {
       continue;
     }
 
+    // IM KAMPFKNOTEN KOSTET JEDER EINBAU STUNDEN (28.08.2026, 10:12).
+    //
+    // Der Spendenrecht-Zweig darf bewusst an der Mindestwarteschlange vorbei
+    // (Begruendung oben, 23.08.). In einem Hackingknoten stimmt das: Der
+    // Einbau kostet dort Erfahrung, die schnell zurueckkommt.
+    //
+    // In BitNode 6 und 7 nicht. Dort traegt der Bladeburner-Rang, und der
+    // haengt an den Kampfwerten - die ein Einbau auf 1 setzt, waehrend die
+    // AKTIONSSTUFE ihn ueberlebt (`Bladeburner.prestigeAugmentation()` macht
+    // nur `resetAction()` + `joinFaction()`). Der Motor findet danach keine
+    // Aktion mehr ueber seiner Schwelle.
+    //
+    // Gemessen am 28.08.: Der Einbau um **05:53 baute genau EIN Stueck ein**
+    // (25 installierte Augmentierungen um 01:25, 26 um 09:33) und kostete
+    // **3 Stunden 49 Minuten** bis zur ersten wieder fahrbaren Aktion um
+    // 09:42. Bei der Reisegeschwindigkeit von 226 Rang je Minute sind das
+    // rund **50.000 Rang** - ein Fuenftel des Restwegs, fuer ein einziges
+    // Stueck.
+    //
+    // Die Mindestwarteschlange gilt deshalb in den Kampfknoten auch fuer den
+    // Spendenrecht-Zweig. Das Spendenrecht geht nicht verloren, es wird nur
+    // spaeter eingeloest - zusammen mit zwei weiteren Stuecken, die dieselbe
+    // Wiederaufbaupause mitbenutzen.
+    const kampfKnotenEinbau = (() => {
+      try {
+        const n = ns.getResetInfo().currentNode;
+        return n === 6 || n === 7;
+      } catch { return false; }
+    })();
+    const spendenAusnahme = spendenrechtFaellig
+      && wartend >= (kampfKnotenEinbau ? MINDEST_WARTESCHLANGE : 1);
+
     if (!ausgangSteht
-        && (wartend >= MINDEST_WARTESCHLANGE || (spendenrechtFaellig && wartend >= 1))
+        && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
         && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
             || spendenrechtFaellig)

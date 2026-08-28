@@ -94,11 +94,19 @@ Verdacht: `src/bn4rep.js`, das Einbaukriterium. Es entscheidet nach
           auf, und wie lange?** Ein Einbau, der 40.000 Rang kostet, muss mehr
           als 40.000 Rang einbringen.
 
-          **Vorher zu messen** (der Punkt ist ohne diese Zahl nicht
-          entscheidbar): Wie lange dauert der Wiederaufbau wirklich, also
-          welcher Kampfwert-Tiefstand bringt Assassination Stufe 20 wieder
-          ueber `SICHER_OPERATION` = 0,85? Das laesst sich aus
-          `Actions/Action.ts:169-196` **rechnen** statt abwarten.
+          **Die Messvorgabe von 09:35 ist ueberholt (09:45).** Sie lautete:
+          "Welcher Kampfwert-Tiefstand bringt Assassination Stufe 20 wieder
+          ueber 0,85?" Die Antwort ist **keiner** - gemessen 09:40 standen
+          alle sechs Operationen bei [0,000 - 1,000], weil `s.min` an der
+          Bevoelkerungsschaetzung haengt und nicht an den Kampfwerten
+          (`Actions/Action.ts`: `low = real - diff`). Der Wiederaufbau war
+          also gar nicht der Engpass, die Schaetzung war es.
+
+          **Was stattdessen zu messen ist:** Wie lange dauert es nach einem
+          Einbau, bis die Schaetzung wieder brauchbar ist? Das ist der
+          eigentliche Kostenblock, und er haengt an Field Analysis, deren
+          Wirksamkeit `eff = 0,04*hacking^0,3 + ...` in BitNode 6 klein ist.
+          Der Lauf ab 09:42 liefert die erste saubere Messung dafuer.
 
 Dringlichkeit: **hoch.** Der naechste Einbau steht in der Warteschlange.
 

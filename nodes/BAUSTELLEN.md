@@ -59,46 +59,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### Die Chaos-Hysterese hat Vorrang vor allem - auch vor dem Wiederaufbau (01:57)
-
-Gemessen: Nach dem Einbau um 01:25 faehrt der Motor durchgehend
-`General/Diplomacy` bei Chaos 58,3 - fuenf Messungen im Abstand von 20
-Sekunden, alle gleich. Kampfwerte 101/105/121/101, Chancen
-(`src/astufe.js`, 01:39): Assassination 0,354, Raid 0,230, Stealth
-Retirement 0,561 - alle unter `SICHER_OPERATION` 0,85.
-
-Erwartet: In der Wiederaufbauphase gehoert die Figur ins **Powerhouse Gym**.
-Es hebt den Kampfwert-Tiefstand mit `expMult` 10 (`bbtrain.js:50`), waehrend
-Diplomacy **null Rang und null Erfahrung** gibt. Bladeburner-Training waere
-mit 30 exp je 30 s auf alle vier (`Bladeburner.ts:1092-1103`) immer noch
-zehnmal langsamer als das Gym.
-
-**Was um 01:52 eingebaut wurde und warum es nicht reicht:** Die Weichen-Regel
-in `blade.js` prueft jetzt nicht mehr nur `tiefstand < 100` (nach einem
-Prestige mit hohen Multiplikatoren ist das binnen Minuten wieder erfuellt),
-sondern auch, ob ueberhaupt eine Operation oder ein Vertrag ueber seiner
-Schwelle liegt. **Sie greift trotzdem nicht** - offenbar steht mindestens ein
-Vertrag ueber `SICHER_VERTRAG` = 0,45, also gilt die Arbeit als lohnend.
-
-Und genau dann schlaegt die naechste Regel zu: `waehle()` prueft die
-Chaos-Hysterese (`CHAOS_EIN` 50 / `CHAOS_AUS` 47) **vor** der Vertragswahl
-und faehrt Diplomacy, bis das Chaos unter 47 liegt. Von 58,3 aus sind das bei
-rund 1,5 Prozent je Lauf etwa **14 Minuten ohne jeden Ertrag** - und ohne
-Gym, weil die laufende Bladeburner-Aktion die Gym-Arbeit blockiert.
-
-Verdacht auf die Fundstelle: `src/blade.js`, der Block `if (SPIEL_CHAOS_AN)`
-in `waehle()`. Die Hysterese ist fuer den Normalbetrieb richtig - dort kostet
-Chaos ueber 50 den Faktor `sqrt(1+chaos-50)` auf die Schwierigkeit
-(`getChaosSuccessFactor`), bei 58,3 also 3,05. Im Wiederaufbau ist der
-Kampfwert aber der viel groessere Hebel, und Diplomacy blockiert das Mittel,
-das ihn hebt.
-
-Zu tun: (1) Entscheiden, ob die Chaos-Phase im Wiederaufbau ausgesetzt wird -
-gerechnet, nicht geschaetzt: Chaos-Faktor 3,05 gegen den Erfahrungsgewinn von
-14 Minuten Gym. (2) Falls ja, die Weichen-Regel VOR die Chaos-Pruefung
-ziehen, nicht nur die Bedingung erweitern.
-
-
 ### Nachmessen: traegt der Assassination-Aufbau? (23:42)
 
 Gemessen: Seit 23:39 laeuft `Operations/Assassination` mit dem Grund

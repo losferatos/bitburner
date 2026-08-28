@@ -23,6 +23,94 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### WIDERLEGT: Die Chaos-Hysterese hatte recht, mein Verdacht nicht (28.08., 02:10)
+
+Um 01:57 stand hier der Verdacht, die Chaos-Hysterese blockiere den
+Wiederaufbau: Der Motor fuhr nach dem Einbau durchgehend Diplomacy, waehrend
+das Powerhouse Gym mit `expMult` 10 die Kampfwerte haette heben koennen.
+**Nachgerechnet ist Diplomacy dort die klar bessere Aktion.**
+
+Die Formel steht in `Actions/Action.ts:169-196`:
+
+    difficulty *= this.getChaosSuccessFactor(inst)
+    return Math.min(1, competence / difficulty)
+
+und der Faktor ist `sqrt(1 + chaos - 50)` ab Chaos 50
+(`Action.ts:94-100`, `ChaosThreshold` 50 in `Constants.ts:31`). Bei den
+gemessenen **58,3** sind das **3,05** auf die Schwierigkeit.
+
+Damit steht der Vergleich:
+
+    Diplomacy   Chaos 58,3 -> 47   14 Laeufe = 14 Minuten
+                Chance danach mal 3,05
+
+    Gym         dieselbe Wirkung ueber die Kampfwerte braucht
+                3,05^(1/0,8) = Faktor 3,95, also 120 -> 474
+                das sind Stunden, nicht Minuten
+
+**Verifiziert 02:08, ohne jeden Eingriff:** `data/blade.json` meldet
+`"aktion":"Operations/Assassination"`, `"grund":"Stufenaufbau 10/12
+(Chance 1.000)"`. Die Chance sprang von 0,354 auf 1,000, sobald das Chaos
+unter der Schwelle war - genau um den gerechneten Faktor. Der Rang stieg in
+derselben Zeit von 22.867 auf 23.628.
+
+**Die Lehre:** Ich habe eine Aktion, die "null Rang gibt", fuer wertlos
+gehalten, ohne ihren Multiplikator auf alles Uebrige zu rechnen. Diplomacy
+verdient nichts - es macht alles andere dreimal wahrscheinlicher. Wer nur
+den direkten Ertrag misst, sieht solche Aktionen nie.
+
+**Was von der Aenderung um 01:52 bleibt:** Die Weichen-Regel prueft jetzt
+zusaetzlich, ob ueberhaupt eine Operation oder ein Vertrag ueber ihrer
+Schwelle liegt. Sie greift in dieser Lage nicht - und das ist richtig so.
+Sie bleibt als Abdeckung fuer den Fall, dass auch Diplomacy nichts mehr
+bringt: Chaos schon unter 47, Kampfwerte trotzdem zu schwach. Harmlos und
+enger als die alte `tiefstand < 100`.
+
+<details><summary>Der widerlegte Eintrag von 01:57</summary>
+
+### Die Chaos-Hysterese hat Vorrang vor allem - auch vor dem Wiederaufbau (01:57)
+
+Gemessen: Nach dem Einbau um 01:25 faehrt der Motor durchgehend
+`General/Diplomacy` bei Chaos 58,3 - fuenf Messungen im Abstand von 20
+Sekunden, alle gleich. Kampfwerte 101/105/121/101, Chancen
+(`src/astufe.js`, 01:39): Assassination 0,354, Raid 0,230, Stealth
+Retirement 0,561 - alle unter `SICHER_OPERATION` 0,85.
+
+Erwartet: In der Wiederaufbauphase gehoert die Figur ins **Powerhouse Gym**.
+Es hebt den Kampfwert-Tiefstand mit `expMult` 10 (`bbtrain.js:50`), waehrend
+Diplomacy **null Rang und null Erfahrung** gibt. Bladeburner-Training waere
+mit 30 exp je 30 s auf alle vier (`Bladeburner.ts:1092-1103`) immer noch
+zehnmal langsamer als das Gym.
+
+**Was um 01:52 eingebaut wurde und warum es nicht reicht:** Die Weichen-Regel
+in `blade.js` prueft jetzt nicht mehr nur `tiefstand < 100` (nach einem
+Prestige mit hohen Multiplikatoren ist das binnen Minuten wieder erfuellt),
+sondern auch, ob ueberhaupt eine Operation oder ein Vertrag ueber seiner
+Schwelle liegt. **Sie greift trotzdem nicht** - offenbar steht mindestens ein
+Vertrag ueber `SICHER_VERTRAG` = 0,45, also gilt die Arbeit als lohnend.
+
+Und genau dann schlaegt die naechste Regel zu: `waehle()` prueft die
+Chaos-Hysterese (`CHAOS_EIN` 50 / `CHAOS_AUS` 47) **vor** der Vertragswahl
+und faehrt Diplomacy, bis das Chaos unter 47 liegt. Von 58,3 aus sind das bei
+rund 1,5 Prozent je Lauf etwa **14 Minuten ohne jeden Ertrag** - und ohne
+Gym, weil die laufende Bladeburner-Aktion die Gym-Arbeit blockiert.
+
+Verdacht auf die Fundstelle: `src/blade.js`, der Block `if (SPIEL_CHAOS_AN)`
+in `waehle()`. Die Hysterese ist fuer den Normalbetrieb richtig - dort kostet
+Chaos ueber 50 den Faktor `sqrt(1+chaos-50)` auf die Schwierigkeit
+(`getChaosSuccessFactor`), bei 58,3 also 3,05. Im Wiederaufbau ist der
+Kampfwert aber der viel groessere Hebel, und Diplomacy blockiert das Mittel,
+das ihn hebt.
+
+Zu tun: (1) Entscheiden, ob die Chaos-Phase im Wiederaufbau ausgesetzt wird -
+gerechnet, nicht geschaetzt: Chaos-Faktor 3,05 gegen den Erfahrungsgewinn von
+14 Minuten Gym. (2) Falls ja, die Weichen-Regel VOR die Chaos-Pruefung
+ziehen, nicht nur die Bedingung erweitern.
+
+</details>
+
+---
+
 ### Chance-Faehigkeiten werden gedaempft, wenn die Chance klemmt - VERIFIZIERT (28.08., 01:14)
 
 `getSuccessChance` klemmt bei 1,00 (`Actions/Action.ts`). Steht eine Aktion

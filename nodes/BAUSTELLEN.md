@@ -137,9 +137,37 @@ Das Geld war um 19:41 bei 298 Mio und ist um 19:45 bei **42 Mio** - der Bot
 hat es in fuenfzehn kleine Rechner gesteckt. Bei rund 8,5 Mio je Minute
 Einkommen ist die Aufruestung in etwa 45 Minuten bezahlbar.
 
-Zu klaeren im naechsten Lauf: Ruestet der Bot `werk-0` von selbst auf 1.024
-hoch, oder deckelt seine Kaufregel bei 128? Wenn er deckelt, ist das der
-eigentliche Eingriff - und er kostet nichts ausser einer Zahl.
+**Beantwortet 20:20, und der Umweg war unnoetig.** Der Bot ruestet sehr wohl
+auf - `werk-0` stand um 19:45 bei 128 und home um 20:07 bei **256 GB**. Die
+Regel in `bn4net.js:754` nimmt aber immer den KLEINSTEN Rechner
+(`ns.cloud.upgradeServer(smallest.host, zielGb)`), damit die Flotte gleich
+waechst. Ein einzelner 848-GB-Rechner entstuende so erst, wenn alle sechzehn
+dort sind - 16 x 412 Mio.
+
+**Der Umweg entfaellt, weil bn4rep.js gar nicht gebraucht wird.** Es ist
+848,25 GB gross, weil es die ganze Singularity-Werkzeugkiste mitbringt. Fuer
+Kampf-Augmentierungen reichen sechs Aufrufe; ausserhalb von BitNode 4 kostet
+jeder das Sechzehnfache (`SF4Cost`, `RamCostGenerator.ts:82-94`):
+
+    getAugmentationsFromFaction   80,0 GB      purchaseAugmentation  80,0
+    workForFaction                48,0         getAugmentationPrice  40,0
+    getAugmentationRepReq         40,0         getFactionRep         16,0
+
+**Neu gebaut: `src/kampfaugs.js`. Gemessen 20:20 mit `ramcheck.js`:
+306,85 GB** - genau die Rechnung. Das passt auf ein home mit 512, und der
+Ausbau von 256 auf 512 kostet in BitNode 10 **477 Mio**
+(`getUpgradeHomeRamCost`: `32.000 x ram x 1,58^log2(ram) x
+HomeComputerRamCost 1,5`). Guthaben um 20:21: **880 Mio**.
+
+`homegrow.js` laeuft (Prozessliste 20:11, zusammen mit bn4life, bbtrain,
+blade, sonde, contracts und wakelock - der Wiederanlauf ist vollstaendig).
+Der Ausbau kommt also von selbst.
+
+Naechster Schritt, sobald ein Rechner 512 GB hat:
+`node tools/task.js kampfaugs.js --pruefen`, dann ohne `--pruefen`.
+Erwartung: Wired Reflexes (1.250 Rep), Lumin Cloaking V1 (1.500) und
+Augmented Targeting I (5.000) sind die ersten drei - in BitNode 10 mit
+doppelter Reputation und fuenffachem Preis.
 
 
 ---

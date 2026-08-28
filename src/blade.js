@@ -2114,8 +2114,23 @@ export async function main(ns) {
   // Dazu eine Sperre von dreissig Minuten. Ohne sie pendelt der Motor: Der
   // Deckel greift, Training wird gewaehlt, damit faellt `feldanalyseSeit` auf
   // null - und im naechsten Durchlauf waere Field Analysis wieder frei.
-  const FELDANALYSE_MAX_MS = 10 * 60 * 1000;
-  const FELDANALYSE_SPERRE_MS = 30 * 60 * 1000;
+  // DER DECKEL WAR ZU KNAPP (28.08.2026, 09:42).
+  //
+  // Zehn Minuten reichen, wenn die Schaetzung nur leicht verrutscht ist. Nach
+  // einem Stadtwechsel der Division ist sie das nicht: Am 28.08. um 09:40
+  // standen ALLE SECHS Operationen bei [0,000 - 1,000], und
+  // `improvePopulationEstimateByPercentage` bringt mit
+  // `eff = 0,04*hacking^0,3 + 0,04*int^0,9 + 0,02*cha^0,3`
+  // (`Bladeburner.ts:1122-1131`) in BitNode 6 ein bis zwei Prozent je
+  // Durchlauf. Eine Schaetzung, die um ein Vielfaches danebenliegt, braucht
+  // damit deutlich mehr als zwanzig Durchlaeufe.
+  //
+  // 45 Minuten sind die Obergrenze dessen, was sich lohnt: Bei 226 Rang je
+  // Minute Reisegeschwindigkeit kostet das gut 10.000 Rang - gegen einen
+  // Zustand, in dem der Motor GAR NICHTS verdient. Die Sperre faellt auf 15
+  // Minuten, damit ein zweiter Anlauf nicht eine halbe Stunde warten muss.
+  const FELDANALYSE_MAX_MS = 45 * 60 * 1000;
+  const FELDANALYSE_SPERRE_MS = 15 * 60 * 1000;
   let feldanalyseSeit = 0;
   let feldanalyseGesperrtBis = 0;
   let letzte = "";
@@ -2208,6 +2223,55 @@ export async function main(ns) {
         // (`Actions/BlackOperation.ts:55-61`). Dieselbe Zahl und dieselbe
         // Schwelle wie in `waehle()`, sonst entscheiden zwei Stellen
         // verschieden ueber dieselbe Aktion.
+        // DAS GYM DARF FIELD ANALYSIS NICHT VERDRAENGEN (28.08.2026, 09:42).
+        //
+        // Gemessen 09:40 (`src/bbspann.js` ueber den Auftragskanal), Division
+        // in Chongqing:
+        //
+        //     Investigation                 0,001 - 1,000
+        //     Undercover Operation          0,001 - 1,000
+        //     Sting Operation               0,000 - 1,000
+        //     Raid                          0,000 - 1,000
+        //     Stealth Retirement Operation  0,001 - 1,000
+        //     Assassination                 0,000 - 1,000
+        //
+        // **Alle sechs Spannen sind maximal breit.** Der Motor entscheidet an
+        // `s.min`, und `s.min` ist null - unabhaengig von den Kampfwerten.
+        // Der Wiederaufbau im Gym kann daran also NICHTS aendern: Er haette
+        // laufen koennen, bis die Werte bei tausend stehen, und `lohntSich`
+        // waere falsch geblieben. Eine Sackgasse, und zwar eine selbstgebaute
+        // (Gym-Zweig von 08:40).
+        //
+        // Die Ursache ist die Bevoelkerungsschaetzung: `getSuccessRange`
+        // rechnet `low = real - diff`, und `diff` uebersteigt `real`, sobald
+        // `popEst` weit von `pop` entfernt ist (`Actions/Action.ts`). Nach
+        // einem Stadtwechsel der Division ist genau das der Fall.
+        //
+        // Dagegen hilft Field Analysis - und nur sie. Der Gym-Zweig darf
+        // deshalb nicht greifen, solange das Schaerfen eine Aktion freigeben
+        // KANN, also solange irgendwo die Obergrenze ueber und die
+        // Untergrenze unter der Schwelle liegt. Dieselbe Bedingung wie in
+        // Regel 4 von `waehle()`, die der Gym-Zweig sonst ueberspringt.
+        if (!lohntSich) {
+          try {
+            for (const n of OPERATIONEN) {
+              if (offen(O, n) < 1) continue;
+              const s = spanne(O, n);
+              if (s.max >= SICHER_OPERATION && s.min < SICHER_OPERATION) {
+                lohntSich = true; break;
+              }
+            }
+            if (!lohntSich) {
+              for (const n of VERTRAEGE) {
+                if (offen(V, n) < 1) continue;
+                const s = spanne(V, n);
+                if (s.max >= SICHER_VERTRAG && s.min < SICHER_VERTRAG) {
+                  lohntSich = true; break;
+                }
+              }
+            }
+          } catch { /* ohne Spanne bleibt es beim Gym */ }
+        }
         if (!lohntSich) {
           try {
             const bo = ns.bladeburner.getNextBlackOp();

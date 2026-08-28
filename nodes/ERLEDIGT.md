@@ -23,6 +23,66 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Kampf-Augmentierungen vor dem Bladeburner-Beitritt - strukturell tot (erledigt 28.08., 22:52)
+
+Der Punkt stand seit 19:20 unter `## Sofort` und war der oberste der Liste.
+Der Kurseintrag von 21:45 hatte ihn bereits gekippt (Weg 3 "nur Gym" 18,6 h
+gegen Weg 2 "Augmentierungsrunde" 20,3 h), aber nur knapp - zwei Stunden
+Abstand laden dazu ein, es beim naechsten Lauf wieder aufzumachen. Deshalb
+hier zu Ende gerechnet, mit exakten Werten aus dem Spielstand um 22:43.
+
+**Gemessen** (`getSaveFile` -> `PlayerSave`, nicht geschaetzt):
+
+    exp   str 51.677  def 50.643  dex 50.216  agi 50.433
+    mults alle vier   1,2615959526918732
+    Level alle vier   74 von 100
+
+Erfahrungsrate ueber 29 Minuten (22:14 -> 22:43, niedrigster Wert dex):
+43.524 -> 50.216 = **230 je Minute**.
+
+**Weg 3, nur Gym.** m_eff = 1,2616 x 0,4 (BitNode-10-Kampfmultiplikator) =
+0,50464. Bedarf fuer Level 100 nach `calculateSkill`
+(`PersonObjects/formulas/skill.ts:13`, umgestellt):
+
+    exp(100) = e^((100/0,50464 + 200)/32) - 534,6 = 252.795
+
+Rest 252.795 - 50.216 = 202.579, bei 230/min = **14,7 Stunden**.
+
+**Weg 2 kann das nicht schlagen, und der Grund ist strukturell:** Tor 1
+verlangt alle vier Kampfwerte ueber 100, es zaehlt also der NIEDRIGSTE. Ein
+Multiplikator hilft nur, wenn er den schwaechsten Wert hebt - und von den
+erreichbaren Stuecken hebt **genau eines** die Staerke: Combat Rib I, in
+BitNode 10 fuer 15.000 Reputation (`AugmentationRepCost` 2, `BitNode.tsx`
+case 10). Die drei billigen (Wired Reflexes, Lumin Cloaking V1, Augmented
+Targeting I, zusammen 15.500 Rep) heben dex, agi und def - str bliebe bei
+1,2616, und damit bliebe der Tiefstand **exakt unveraendert**. Fuer einen
+Effekt braucht es mindestens Combat Rib I + Wired Reflexes = 17.500 Rep.
+
+    Reputation  17.500 / 29,6 je Minute (`reputation.ts:40-52`)   9,85 h
+    danach: kleinster Faktor 1,05 -> m_eff 0,52987 -> Bedarf 188.182
+    188.182 / 230 je Minute                                       13,6 h
+    Summe                                                        23,5 h
+
+gegen 14,7 h fuer Weg 3. Dazu kommt, was die Tabelle nicht zeigt: Der Einbau
+setzt die Kampferfahrung auf null, wirft also die heute erarbeiteten 50.216
+weg, und waehrend der Feldarbeit faellt die Erfahrungsrate auf die Haelfte.
+
+**Die Lehre, die den Punkt endgueltig schliesst:** Der Abstand waechst mit
+jeder Stunde Gym, weil der Verlust beim Einbau mitwaechst. Weg 2 war um 19:20
+am besten und ist seither monoton schlechter geworden - er kann in diesem Lauf
+nicht mehr zurueckkommen. Wer ihn wieder aufmachen will, braucht einen anderen
+Grund als Rechenzeit.
+
+**Was aus dem Punkt bleibt:** `src/kampfaugs.js` (306,85 GB, gebaut 20:20) ist
+korrekt und einsatzbereit. Es wird gebraucht, sobald Reputation ohnehin
+anfaellt - in der Bladeburner-Phase oder vor dem naechsten Knotenwechsel.
+Nicht loeschen.
+
+Verifiziert: Tiefstand 74 von 100 um 22:43, ETA 14,7 h gegen 18,6 h im Bericht
+von 22:14 - der Gym-Weg traegt, ohne dass etwas geaendert werden musste.
+
+---
+
 ### Der Tonanker ist suspendiert - der Alarm war trotzdem falsch (erledigt 28.08., 22:15)
 
 Um 22:00 meldete `tools/strategie-check.js` STAGNATION mit "GEDROSSELT: nur

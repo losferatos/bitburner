@@ -64,110 +64,16 @@ Regeln:
 
 ## Sofort
 
-### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
+keine
 
-Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je
-          Wert. Erfahrungsrate 13/s, gemessen ueber 76 Sekunden Spielzeit.
-          **ETA fuer Tor 1: 21,8 Stunden.**
-
-Erwartet: 2,2 Stunden. `calculateSkill` ist
-          `floor(mult * (32*ln(exp+534,6) - 200))`
-          (`PersonObjects/formulas/skill.ts:13`) - der Multiplikator steht vor
-          der Klammer, die Erfahrung im Logarithmus:
-
-              mults.kampf 1,26 (jetzt)  ->  1.019.268 Erfahrung  21,8 h
-              mults.kampf 1,50          ->    376.610             8,0 h
-              mults.kampf 2,00          ->    100.868             2,2 h
-              mults.kampf 2,50          ->     45.021             1,0 h
-
-          Der Einbau setzt die Kampferfahrung auf null - das ist kein Einwand,
-          sondern der Punkt: Die 100.868 danach sind ein Zehntel der 1.019.268
-          davor.
-
-Verdacht: Kein Fehler, eine fehlende Runde. Zu klaeren ist, WELCHE Faktion und
-          welche Stuecke - in BitNode 10 kostet das Fuenffache an Geld und das
-          Doppelte an Reputation (`AugmentationMoneyCost` 5,
-          `AugmentationRepCost` 2, `BitNode.tsx` case 10). Geld ist mit 67 Mio
-          und wachsendem Netz (43 von 72) nicht der Engpass; Reputation ist es.
-          `src/augplan.js` und `src/bn4rep.js` gibt es bereits - bn4rep laeuft
-          aber nicht, weil es singularitylastig ist und auf ein 32-GB-home
-          nicht passt. Erste Frage deshalb: Was kostet der Speicher, und ab
-          welcher home-Groesse geht es?
-
-Dringlichkeit: **hoechste.** Der Unterschied ist 19,6 Stunden auf Tor 1, und
-          Tor 2 (400.000 Rang bei BladeburnerRank 0,8) kommt danach noch.
-
-**Gemessen 19:45 - der Weg ist bekannt, der Engpass ist ein einzelner
-Rechner.**
-
-Erreichbare Faktionen laut Spielstand: **Slum Snakes** und **CyberSec**, dazu
-eine offene Einladung von **Sector-12**. Karma steht bei -49,7. Was diese drei
-an Kampf-Augmentierungen fuehren (`Augmentation/Augmentations.ts`, Preise vor
-den BitNode-10-Aufschlaegen):
-
-    Reputation   Geld   Augmentierung        Wirkung
-         1.250     3m   Wired Reflexes       dex, agi x1,05
-         1.500     5m   Lumin Cloaking V1    def, agi x1,05
-         5.000    15m   Targeting I          dex x1,1
-         7.500    24m   Combat Rib I         str, def x1,1
-        22.500    75m   Smart Sonar          dex x1,1
-
-In BitNode 10 verdoppelt sich die Reputation und das Geld wird verfuenffacht.
-Alle fuenf zusammen brachten `mults.kampf` von 1,2616 auf rund **1,39 bis
-1,60** je nach Wert - das ist Tor 1 von 21,8 auf etwa **12 Stunden**, nicht auf
-die 2,2 des Kursziels. Fuer 2,0 braucht es Tetrads oder The Dark Army
-(Chongqing, Karma -18 beziehungsweise -45 - beides erfuellt) mit Bionic Arms
-(str, dex x1,3) und Targeting II.
-
-**Und genau da steht der Bot an.** Die Faktions- und Augmentierungslogik ist
-`src/bn4rep.js`. Gemessen 19:38 mit `src/ramcheck.js`: **848,25 GB**. Kein
-Rechner im Netz ist so gross:
-
-    home     64 GB
-    werk-0  128 GB
-    werk-1 bis werk-14   je 64 GB
-
-Ein Cloud-Server mit 1.024 GB kostet in BitNode 10 **412 Mio**
-(`ram * 55.000 * CloudServerCost 5 * CloudServerSoftcap 1,1^(log2(ram)-6)`,
-`Server/ServerPurchases.ts:22-41`). Neue Rechner gehen nicht mehr: Das Limit
-ist `25 * CloudServerLimit 0,6` = **15**, und 15 stehen. Es bleibt also nur
-das Hochruesten von `werk-0`, rund 373 Mio.
-
-Das Geld war um 19:41 bei 298 Mio und ist um 19:45 bei **42 Mio** - der Bot
-hat es in fuenfzehn kleine Rechner gesteckt. Bei rund 8,5 Mio je Minute
-Einkommen ist die Aufruestung in etwa 45 Minuten bezahlbar.
-
-**Beantwortet 20:20, und der Umweg war unnoetig.** Der Bot ruestet sehr wohl
-auf - `werk-0` stand um 19:45 bei 128 und home um 20:07 bei **256 GB**. Die
-Regel in `bn4net.js:754` nimmt aber immer den KLEINSTEN Rechner
-(`ns.cloud.upgradeServer(smallest.host, zielGb)`), damit die Flotte gleich
-waechst. Ein einzelner 848-GB-Rechner entstuende so erst, wenn alle sechzehn
-dort sind - 16 x 412 Mio.
-
-**Der Umweg entfaellt, weil bn4rep.js gar nicht gebraucht wird.** Es ist
-848,25 GB gross, weil es die ganze Singularity-Werkzeugkiste mitbringt. Fuer
-Kampf-Augmentierungen reichen sechs Aufrufe; ausserhalb von BitNode 4 kostet
-jeder das Sechzehnfache (`SF4Cost`, `RamCostGenerator.ts:82-94`):
-
-    getAugmentationsFromFaction   80,0 GB      purchaseAugmentation  80,0
-    workForFaction                48,0         getAugmentationPrice  40,0
-    getAugmentationRepReq         40,0         getFactionRep         16,0
-
-**Neu gebaut: `src/kampfaugs.js`. Gemessen 20:20 mit `ramcheck.js`:
-306,85 GB** - genau die Rechnung. Das passt auf ein home mit 512, und der
-Ausbau von 256 auf 512 kostet in BitNode 10 **477 Mio**
-(`getUpgradeHomeRamCost`: `32.000 x ram x 1,58^log2(ram) x
-HomeComputerRamCost 1,5`). Guthaben um 20:21: **880 Mio**.
-
-`homegrow.js` laeuft (Prozessliste 20:11, zusammen mit bn4life, bbtrain,
-blade, sonde, contracts und wakelock - der Wiederanlauf ist vollstaendig).
-Der Ausbau kommt also von selbst.
-
-Naechster Schritt, sobald ein Rechner 512 GB hat:
-`node tools/task.js kampfaugs.js --pruefen`, dann ohne `--pruefen`.
-Erwartung: Wired Reflexes (1.250 Rep), Lumin Cloaking V1 (1.500) und
-Augmented Targeting I (5.000) sind die ersten drei - in BitNode 10 mit
-doppelter Reputation und fuenffachem Preis.
+*Der Punkt "Kampf-Augmentierungen vor dem Bladeburner-Beitritt" (19:20) ist am
+28.08. um 22:52 abgeraeumt worden - nicht umgesetzt, sondern zu Ende gerechnet
+und verworfen. Die Rechnung steht in `nodes/ERLEDIGT.md`. Kurz: Tor 1 zaehlt
+den NIEDRIGSTEN Kampfwert, und von den erreichbaren Stuecken hebt genau eines
+die Staerke (Combat Rib I, 15.000 Rep in BitNode 10). Die billigen drei kosten
+Reputation, ohne den Tiefstand um einen Punkt zu bewegen. Gemessen 22:43: Gym
+allein 14,7 h, Augmentierungsrunde 23,5 h - und der Abstand waechst mit jeder
+Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
 
 
 ---

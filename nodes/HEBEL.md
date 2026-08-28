@@ -37,6 +37,73 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### WIDERLEGT und zurueckgenommen: Gym und Bladeburner laufen NICHT parallel (28.08., 07:34)
+
+**Der Hebel von 07:00 ruhte auf einer falschen Annahme, und er war nicht nur
+wirkungslos, sondern schaedlich.** Er ist mit `git revert` zurueckgenommen
+(`9703d3c` nimmt `41fa473` zurueck).
+
+Die Annahme war: "Der Arbeitskanal laeuft parallel zur Bladeburner-Aktion -
+eine Gym-Einheit kostet den Motor keine Sekunde." Der Quellcode sagt das
+Gegenteil, an zwei Stellen:
+
+    Bladeburner.ts:178-180   startAction():
+      if (!Player.hasAugmentation(AugmentationName.BladesSimulacrum, true))
+        Player.finishWork(true);
+
+    Bladeburner.ts:1353-1360  process():
+      if (!hasAugmentation(BladesSimulacrum) && Player.currentWork)
+        -> "Your Bladeburner action was cancelled because you started
+            doing something else."
+
+**Ohne die Augmentierung `The Blade's Simulacrum` schliessen die beiden
+einander aus, und zwar in beide Richtungen.** Jeder Aktionswechsel von
+`blade.js` beendet die Gym-Arbeit; jede Gym-Arbeit bricht die laufende
+Bladeburner-Aktion ab. Die beiden Skripte haben sich eine halbe Stunde lang
+im Minutentakt gegenseitig unterbrochen.
+
+**Nachgemessen 07:33, und die Zahlen sind eindeutig:**
+
+    Kampfwert-Tiefstand   195 -> 222 in 28 min   =  0,96/min
+    davor, ohne Gym       169 -> 195 in 27 min   =  0,96/min
+    Rangrate (45 min)                               49,0/min
+    davor (55 min)                                  49,1/min
+
+**Kein einziger Messwert hat sich bewegt.** Und "Arbeit keine" stand um 07:08,
+07:14 und 07:33 in der Pruefzeile - das Gym lief nur in kurzen Stoessen,
+bevor `blade.js` es wieder abraeumte.
+
+**Was der Befund von 07:00 richtig gesehen hat:** Der Wiederaufbau nach einem
+Einbau IST der Engpass (53,8/min gegen 442), und die Aktionsstufe ueberlebt
+den Einbau, waehrend die Kampfwerte fallen. Das bleibt stehen. Falsch war nur
+der vorgeschlagene Ausweg.
+
+**Der echte Hebel liegt eine Ebene tiefer - und er ist kaufbar:**
+
+    The Blade's Simulacrum    repCost  1.250      moneyCost  1,5e11
+    (Augmentations.ts:284-297, Faktion Bladeburners, isSpecial)
+    "allows you to perform Bladeburner actions and other actions
+     (such as working, committing crimes, etc.) at the same time."
+
+Die Reputation ist kein Thema (1.250 gegen einen Rang von 81.935, bei
+`RankToFactionRepFactor` 2). **Geld ist das Tor: 150 Milliarden gegen einen
+Kontostand von 1,81 Milliarden.** Damit waere der Wiederaufbau nach jedem
+kuenftigen Einbau tatsaechlich parallelisierbar - genau das, was der Hebel von
+07:00 gewollt und nicht bekommen hat.
+
+Vorher:     Tiefstand +0,96/min, Rang 49,1/min  (07:05)
+Nachher:    Tiefstand +0,96/min, Rang 49,0/min  (07:33) - **unveraendert**
+Commit:     41fa473 eingebaut, 9703d3c zurueckgenommen
+
+**Lehre, die ueber diesen Fall hinausgeht:** Der Befund von 07:00 hat den
+Arbeitskanal als "leer" gelesen und daraus "ungenutzt" geschlossen. Er war
+aber nicht ungenutzt, sondern **gesperrt** - und die Sperre stand im
+Quellcode, zwei `grep` entfernt. Die Prompt-Regel "Nachschlagen schlaegt
+raten" wurde hier auf die Wirkung angewandt (Gym-Multiplikator 10 gegen 1) und
+nicht auf die Voraussetzung (darf das ueberhaupt gleichzeitig laufen?).
+
+---
+
 ### Die Chaos-Folgekosten gehoeren in die Dauer (28.08., 03:42)
 
 Engpass:    `beste()` verglich die **nackte** Aktionsdauer. Aktionen, die

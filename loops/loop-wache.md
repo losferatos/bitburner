@@ -25,7 +25,7 @@ Auf der Platte liegen `data/verlauf-strategie.json`, `data/ziele.md`, `data/wach
 
 Handle nach dem Urteil:
 
-**URTEIL: SPUR** — Antworte mit genau einem Wort: `SPUR.` Nichts sonst. Keine Zahlen, keine Zusammenfassung, keine Erklärung. Dann Turn beenden.
+**URTEIL: SPUR** — **Gib nichts aus und beende den Turn.** Kein Wort, kein Zeichen, keine Zahl, keine Zusammenfassung. Bis zum 28.08.2026 stand hier `SPUR.` als Lebenszeichen; Eric hat es an dem Tag abbestellt, weil der Lauf inzwischen autonom genug ist. Alle anderen Urteile melden wie unten beschrieben — das Schweigen gilt ausschliesslich fuer SPUR.
 
 **URTEIL: RESET** — Der Träger ist gefallen: Augmentierungs-Einbau oder BitNode-Wechsel. Das ist **kein Fehler**, aber der Wiederanlauf gehört geprüft, denn genau dort ist er am 25.08.2026 dreimal still gescheitert.
   - `ps.js` über den Auftragskanal anstoßen (siehe unten), dann prüfen: Läuft `bn4net.js`? Laufen die Werkzeuge?

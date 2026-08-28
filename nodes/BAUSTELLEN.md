@@ -11,6 +11,53 @@ Regeln:
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
 
+### Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
+
+Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte
+          Minuten):
+
+              Operations/Assassination   10,5 min   71,3 %   12.626 Rang
+              General/Diplomacy           4,2 min   28,7 %        0 Rang
+
+          Raid kam nicht mehr vor - der Chaos-Zuschlag von 13:00 wirkt. Das
+          Chaos steigt jetzt **exogen**: `randomEvent` alle 240 bis 600
+          Sekunden, davon 20 Prozent Synthoid-Riots mit `+1` Zaehlwert und
+          `+5 bis +20 %` (`Bladeburner.ts:679-684`), Stadt zufaellig aus
+          sechs. Das trifft die eigene Stadt rund alle 35 Minuten und kostet
+          bei Charisma 309 (Diplomacy -1,603 % je 60 s) rund 7,3 Minuten
+          Aufraeumen - also etwa ein Fuenftel der Zeit, und der Rest ist die
+          Streuung von Assassination (`-5 bis +5 %`, `:859`).
+
+Erwartet: **Null Minuten Diplomacy.** Chaos schadet nur ueber
+          `difficulty *= sqrt(1 + chaos - 50)` (`Actions/Operation.ts:52-61`),
+          und die Erfolgschance ist `Math.min(1, competence/difficulty)`
+          (`Actions/Action.ts:196`) - sie klemmt. Solange sie klemmt, ist der
+          Chaos-Aufschlag **wirkungslos**, und jede Minute Diplomacy ist
+          bezahlter Leerlauf.
+
+          Der Beleg, dass die Reserve gross ist: In Sector-12 stand das Chaos
+          um 12:40 bei **101,67** - Faktor 7,26 auf die Schwierigkeit - und
+          Raid trotzdem bei **0,997** (`data/bbspann.json`, Block `staedte`).
+          In New Tokyo stehen bei Chaos um 50 alle sechs Operationen und alle
+          drei Vertraege auf **1,000**.
+
+Verdacht: `src/blade.js`, `CHAOS_EIN = 50` / `CHAOS_AUS = 47`. Die Schwellen
+          sind absolut gesetzt, obwohl der Schaden relativ ist. Sauber waere,
+          `chaosAufraeumen` erst einzuschalten, wenn das Chaos eine Aktion
+          tatsaechlich unter ihre Schwelle drueckt - messbar daran, dass
+          `s.min` der besten Aktion unter `SICHER_OPERATION` faellt. Solange
+          die beste Aktion bei 1,000 steht, wird nicht aufgeraeumt.
+
+          Zweitlinie, falls die Schwelle doch gebraucht wird: Ein Stadtwechsel
+          kostet nichts und setzt das Chaos-Konto auf das der neuen Stadt -
+          Diplomacy ist die teuerste aller Moeglichkeiten, das Chaos
+          loszuwerden.
+
+Dringlichkeit: **hoch.** 28,7 Prozent der Leitgroesse, bei einem Restweg von
+          185.215 Rang und einer gemessenen Rate von 858/min sind das rund
+          62 Minuten reiner Leerlauf bis zum Knotenausgang.
+
+
 ### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
 
 Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.

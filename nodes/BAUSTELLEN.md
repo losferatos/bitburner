@@ -55,7 +55,45 @@ Regeln:
 
 ## Sofort
 
-keine
+### Field Analysis blockiert den Wiederaufbau - 12 Minuten bei 0,2 Rang je Minute (08:03)
+
+Gemessen: `data/blade.json` steht seit **07:52** auf
+          `General/Field Analysis`, Grund "Schaetzung unsicher". Der Rang
+          bewegte sich in dieser Zeit von 82.293 auf 82.295 -
+          **+2 in 12 Minuten**, also 0,17/min. Die geglaettete 45-Minuten-Rate
+          ist dadurch auf **12,0/min** gefallen (`data/verlauf-strategie.json`),
+          gegen 218,6/min im Vier-Stunden-Mittel.
+
+Erwartet: Waehrend eines Wiederaufbaus nach einem Einbau ist nicht die
+          Schaetzung der Engpass, sondern die Kampfwerte. Bladeburner-Training
+          (gratis, `Bladeburner.ts:1091-1105`, hebt alle vier Werte) traegt
+          dort mehr als Field Analysis - die bringt `rankGain` 0,1 und
+          **keine** Kampferfahrung. Der Motor sollte also Training fahren,
+          solange die Kampfwerte unter dem liegen, was die erreichte
+          Aktionsstufe verlangt.
+
+Verdacht: `src/blade.js:1959-1966`, Regel 4 in `waehle()`:
+
+              for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
+                const s = spanne(...);
+                if (s.max - s.min > SPANNE_ZU_BREIT) return Field Analysis;
+              }
+
+          `SPANNE_ZU_BREIT` = 0,10 (`blade.js:257`). Die Regel steht **vor**
+          dem Training-Rueckfall und kennt keine Gegenrechnung: Sie fragt, ob
+          die Schaetzung unscharf ist, nicht, ob das Schaerfen sich gegen die
+          Alternative lohnt.
+
+          **Die Regel konvergiert immerhin** - die Spanne der naechsten
+          Black Op fiel von 0,220 (07:08) auf 0,117 (08:03), die Chance stieg
+          von 0,780 auf 0,883. Sie ist also nicht kaputt, nur teuer. Ein
+          Abbruch nach fester Zeit oder ein Vergleich `Rang je Minute mit
+          geschaerfter Schaetzung` gegen `Rang je Minute mit Training` waere
+          die saubere Loesung.
+
+          **Zusammenhang:** Der Zustand wurde durch den Fix von 07:53 erst
+          sichtbar (vorher stand dort `General/keine`, also Leerlauf). Der Fix
+          war richtig, deckt aber die naechste Schicht auf.
 
 ## Offen, nach Dringlichkeit
 

@@ -23,6 +23,30 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### `nodes/KURS.md` galt noch fuer BitNode 6 (erledigt 28.08., 18:55)
+
+Erledigt vom Optimierloop, nicht vom Kursloop - der haette um 18:44 feuern
+sollen und lieferte nichts. Der volle Eintrag steht in `nodes/KURS.md` unter
+"28.08., 18:55 - BitNode 10", die Herleitung im Protokoll `nodes/HEBEL.md`.
+
+Kurz: **Weg B (21 Black Operations) traegt, Weg A (Hacking 6.000) ist
+rechnerisch tot.** Das Modell ist an zwei unabhaengigen Werten geeicht -
+`calculateSkill` rechnet aus 42.542 Erfahrung Level 62 (gemessen 62) und aus
+2.613 Erfahrung Kampfwert 29 (gemessen 29).
+
+Weg A verlangt bei `HackingLevelMultiplier` 0,35 einen
+Augmentierungsmultiplikator um **40**; bei 20 waeren es noch 2,2e14
+Erfahrung, beim heutigen 1,26 sind es 2,3e187. BitNode 10 verteuert genau den
+Ausweg (`AugmentationMoneyCost` 5, `AugmentationRepCost` 2).
+
+Weg B hat zwei Tore: der Beitritt (alle vier Kampfwerte >= 100) kostet bei
+Kampffaktor 0,4 **252.822 Erfahrung je Wert** gegen 5.633 in BitNode 6, und
+Daedalus verlangt 400.000 Rang bei `BladeburnerRank` 0,8.
+
+**Neue Leitgroesse: der Kampfwert-Tiefstand, 27 von 100.**
+
+---
+
 ### Das Netz haengt auf 8 von 70 - und darkweb.js kostete 25 GB zuviel (erledigt 28.08., 18:41)
 
 **Der gefundene Fehler, sauber belegt:** `src/darkweb.js` begann mit

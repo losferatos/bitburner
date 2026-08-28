@@ -64,23 +64,9 @@ Regeln:
 
 ## Sofort
 
+keine
 
-
-### `nodes/KURS.md` gilt noch fuer BitNode 6 (17:26)
-
-Gemessen: Der oberste Eintrag ist vom 28.08., 07:15 und nennt als Engpass
-          "Bladeburner-Rang, 80.706 von 400.000". Der Knoten ist seit 17:05
-          abgeschlossen.
-
-Erwartet: Ein Eintrag fuer **BitNode 10**, hergeleitet nach der Anleitung im
-          Kopf der Datei. `WorldDaemonDifficulty` steht dort auf 2
-          (`BitNode.tsx`, case 10), `HackingLevelMultiplier` auf 0,35 und
-          `BladeburnerRank` auf 0,8 - beide Wege sind also offen und muessen
-          gegeneinander gerechnet werden, nicht geraten.
-
-Verdacht: Kein Fehler. Der Kursloop feuert um 18:44 und macht es; steht er
-          dann noch offen, macht es der naechste Vorankommen-Lauf.
-
+---
 
 ## Offen, nach Dringlichkeit
 

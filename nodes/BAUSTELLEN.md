@@ -55,28 +55,7 @@ Regeln:
 
 ## Sofort
 
-### WERKZEUG <name> beendet, startet aber nicht neu (05:56)
-
-Gemessen: Nach dem Reset um 05:53 liefen **zwei** `bbtrain.js`-Instanzen
-(PID 21 und 29, `data/ps.json` 05:54). Ein `WERKZEUG bbtrain.js` ueber
-`data/reload.txt` hat beide beendet - und **keine** neu gestartet. Zwei
-Minuten lang lief kein Training, waehrend die Kampfwerte auf 1 standen.
-
-Erwartet: Der Kanal meldet selbst "beendet, startet gleich neu"
-(`src/bn4net.js`, WERKZEUG-Zweig). Entweder stimmt die Meldung nicht, oder
-der Neustart haengt an einer Bedingung, die hier nicht griff.
-
-Verdacht: `src/bn4net.js`, der Block ab `if (b.startsWith("WERKZEUG "))`.
-Moeglich ist, dass der Neustart nur fuer Skripte gilt, die in einer festen
-Liste stehen, und `bbtrain.js` dort fehlt - es wird sonst von `boot.js`
-gestartet, nicht vom Motor.
-
-Behoben von Hand um 05:57: `node tools/task.js bbtrain.js`, danach genau eine
-Instanz (PID 74) und "Arbeit dex @ Powerhouse Gym". **Der Fehler in der
-Meldung bleibt** - beim naechsten Mal verlaesst sich jemand darauf.
-
-
-
+keine
 
 ## Offen, nach Dringlichkeit
 

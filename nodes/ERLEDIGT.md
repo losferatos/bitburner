@@ -23,6 +23,72 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der WERKZEUG-Kanal versprach einen Neustart, den es nicht gab (28.08., 06:15)
+
+**Die Ursache steht in `bn4net.js` und ist strukturell.** Der Kanal killt in
+Abschnitt 1 (`:546-563`); den Neustart erledigt Abschnitt 2c - und der haengt
+an `if (werkbank)`. Die Werkbank ist der groesste **gekaufte** Rechner, und
+**nach einem Augmentierungs-Einbau sind die gekauften Rechner weg**. In genau
+der Phase, in der die Werkzeuge am noetigsten sind, startet also nichts nach.
+
+Am 28.08. um 05:54, nach dem zweiten Einbau der Nacht: zwei `bbtrain.js`
+(PID 21 und 29), ein `WERKZEUG bbtrain.js` beendete beide, und zwei Minuten
+lang trainierte niemand - bei Kampfwerten auf 1. Behoben um 05:57 mit
+`node tools/task.js bbtrain.js`, danach genau eine Instanz (PID 74) und
+"Arbeit dex @ Powerhouse Gym".
+
+**Was NICHT geaendert wurde, und warum.** Der naheliegende Fix waere, fehlende
+Werkzeuge auf `home` nachzustarten. Das ist falsch: Die Werkzeuge liegen auf
+der Werkbank, **weil** sie in ein frisches home mit 32 GB nicht passen -
+`blade.js` allein ist groesser als der Rest -, und bn4net wuerde sich den
+eigenen Speicher wegnehmen. Der Motor darf sich nicht selbst gefaehrden, um
+einen Fall abzudecken, den ein Mensch ausgeloest hat.
+
+Denn das war es: Im Normalbetrieb killt niemand Werkzeuge nach einem Einbau,
+und `boot.js` startet nach dem Prestige ohnehin alles neu. Die Luecke ist
+echt, aber selten - und der reale Schaden waren zwei Minuten.
+
+**Geaendert wurde deshalb nur die Meldung**, die die Fehlannahme erzeugt hat.
+Sie sagt jetzt, woran der Neustart haengt:
+
+    name + ": N Instanz(en) beendet - ACHTUNG: keine Werkbank, es startet
+    NICHTS nach. Mit 'node tools/task.js <name>' selbst starten."
+
+Verifiziert: `node --check src/bn4net.js` sauber,
+`node tools/strategie-check.js` weiterhin `URTEIL: SPUR` bei +8.408 Rang in
+28 Minuten. Die Aenderung ist einzeln committet, wie es fuer den Motor gilt.
+
+**Nebenbefund, schon vom Motor abgedeckt:** Die zwei `bbtrain.js`-Instanzen
+haette `bn4net.js` selbst aufgeraeumt - die Entdopplung in Abschnitt 2c ist
+netzweit und steht bewusst **vor** der Werkbank-Pruefung (Kommentar vom
+23.08.). Ich war nur schneller.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### WERKZEUG <name> beendet, startet aber nicht neu (05:56)
+
+Gemessen: Nach dem Reset um 05:53 liefen **zwei** `bbtrain.js`-Instanzen
+(PID 21 und 29, `data/ps.json` 05:54). Ein `WERKZEUG bbtrain.js` ueber
+`data/reload.txt` hat beide beendet - und **keine** neu gestartet. Zwei
+Minuten lang lief kein Training, waehrend die Kampfwerte auf 1 standen.
+
+Erwartet: Der Kanal meldet selbst "beendet, startet gleich neu"
+(`src/bn4net.js`, WERKZEUG-Zweig). Entweder stimmt die Meldung nicht, oder
+der Neustart haengt an einer Bedingung, die hier nicht griff.
+
+Verdacht: `src/bn4net.js`, der Block ab `if (b.startsWith("WERKZEUG "))`.
+Moeglich ist, dass der Neustart nur fuer Skripte gilt, die in einer festen
+Liste stehen, und `bbtrain.js` dort fehlt - es wird sonst von `boot.js`
+gestartet, nicht vom Motor.
+
+Behoben von Hand um 05:57: `node tools/task.js bbtrain.js`, danach genau eine
+Instanz (PID 74) und "Arbeit dex @ Powerhouse Gym". **Der Fehler in der
+Meldung bleibt** - beim naechsten Mal verlaesst sich jemand darauf.
+
+</details>
+
+---
+
 ### Der Faehigkeitsplan ist dynamisch - VERIFIZIERT, letzter Deckel gefallen (28.08., 05:41)
 
 Der Punkt vom 27.08. verlangte, `SKILL_PLAN` durch einen Vergleich nach

@@ -899,12 +899,23 @@ export async function main(ns) {
       const [a, amax] = ns.bladeburner.getStamina();
       ausdauer = Math.round(a) + "/" + Math.round(amax);
     } catch { /* nicht in der Division */ }
+    let tiefstand = null;
     try {
       const p = ns.getPlayer();
       spielzeit = p.totalPlaytime;
       if (p.hp && p.hp.max > 0) {
         hp = Math.round(p.hp.current) + "/" + Math.round(p.hp.max);
       }
+      // DER KAMPFWERT-TIEFSTAND GEHOERT IN DIE TELEMETRIE (28.08.2026, 09:16).
+      //
+      // Seit 08:40 gibt blade.js die Figur ans Gym, wenn nichts ueber seiner
+      // Schwelle liegt - der Rang steht dann absichtlich still. Der residente
+      // Waechter hat das um 09:09 als Stillstand aufs Handy gepusht, weil ihm
+      // die Zahl fehlte, an der man den Fortschritt in diesem Zustand ablesen
+      // kann. Sie stand nur im Klartext des Grundes, und eine Meldekette ueber
+      // eine Protokollzeichenkette bricht still.
+      const k = p.skills;
+      tiefstand = Math.min(k.strength, k.defense, k.dexterity, k.agility);
     } catch { /* egal */ }
     try { rang = Math.round(ns.bladeburner.getRank()); } catch { /* egal */ }
     try { punkte = ns.bladeburner.getSkillPoints(); } catch { /* egal */ }
@@ -952,7 +963,7 @@ export async function main(ns) {
     ns.write("data/blade.json", JSON.stringify({
       zeit: Date.now(),
       chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
-      rang, punkte, ausdauer, hp,
+      rang, punkte, ausdauer, hp, tiefstand,
       // Der Puls der Spielengine. Netscript und die Engine sind zwei
       // Schleifen; totalPlaytime waechst nur in updateGame. Steht die Zahl
       // zwischen zwei Messungen still, ist die Engine tot, und dann hilft
@@ -2171,6 +2182,41 @@ export async function main(ns) {
               lohntSich = true; break;
             }
           }
+        }
+        // DIE BLACK OP GEHOERT IN DIESE FRAGE (28.08.2026, 09:08).
+        //
+        // `lohntSich` entscheidet, ob der Motor ueberhaupt arbeitet oder die
+        // Figur ans Gym abgibt - und es sah nur `OPERATIONEN` und
+        // `VERTRAEGE` an. **Die Black Ops fehlten**, obwohl sie der Zweck des
+        // ganzen Knotens sind: 21 Stueck, dann ist er offen.
+        //
+        // Der Black-Op-Zweig steht als Punkt 2 in `waehle()` - und
+        // `waehle()` wird im Gym-Fall nie erreicht, weil der Gym-Zweig davor
+        // steht. Sobald also die naechste Black Op fahrbar wird, waehrend
+        // keine Operation und kein Vertrag ueber ihrer Schwelle liegt, bleibt
+        // der Bot im Gym haengen.
+        //
+        // Gemessen 09:03, genau dieser Zustand:
+        //     spann.js   Operation Red Dragon, Chance 0,905 - 1,000
+        //     SICHER_BLACKOP                             0,90
+        //     data/blade.json  "Gym/str", Grund "nichts ueber Schwelle"
+        //     Rangrate   0,0/min ueber 30 Minuten
+        //
+        // Geprueft wird mit der GERECHNETEN Chance, nicht mit `s.min`: Die
+        // Spanne ist bei Black Ops reines Bevoelkerungsrauschen, weil
+        // `getPopulationSuccessFactor()` dort fest 1 zurueckgibt
+        // (`Actions/BlackOperation.ts:55-61`). Dieselbe Zahl und dieselbe
+        // Schwelle wie in `waehle()`, sonst entscheiden zwei Stellen
+        // verschieden ueber dieselbe Aktion.
+        if (!lohntSich) {
+          try {
+            const bo = ns.bladeburner.getNextBlackOp();
+            if (bo && ns.bladeburner.getRank() >= bo.rank) {
+              const gerechnet = blackOpChance(bo.name);
+              const chance = gerechnet !== null ? gerechnet : spanne(B, bo.name).min;
+              if (chance >= blackOpSchwelle(bo.name)) lohntSich = true;
+            }
+          } catch { /* keine Black Op lesbar: dann bleibt es beim Gym */ }
         }
       } catch { lohntSich = true; }   // im Zweifel weiterarbeiten
       // GEWICHEN WIRD NUR, WENN JEMAND UEBERNIMMT (28.08.2026, 07:53).

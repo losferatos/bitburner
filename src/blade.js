@@ -2087,19 +2087,54 @@ export async function main(ns) {
     //
     // Die alte Erwartung "Faktor 3,4" (BAUSTELLEN.md, 13:22) galt fuer einen
     // Raid-Anteil von 97 Prozent und hat die Chaos-Gegenkraft nicht gerechnet.
-    if (RAID_AN) {
-      const rc = spanne(O, "Raid");
-      const raidSpieler = ns.getPlayer();
-      const raidGeld = raidSpieler.money;
-      if (raidGeld > RAID_GELD_MIN
-        && raidSpieler.skills.charisma > RAID_CHARISMA_MIN
-        && chaosLage() < RAID_CHAOS_MAX
-        && rc.min > RAID_CHANCE_MIN
-        && offen(O, "Raid") > RAID_VORRAT_MIN) {
-        return { typ: O, name: "Raid",
-          grund: "Raid, Chance " + rc.min.toFixed(3) };
-      }
-    }
+    // DER RAID-VORRANG IST GESTRICHEN (28.08.2026, 12:52).
+    //
+    // Dieser Zweig gab Raid zurueck, BEVOR `beste()` ueberhaupt gefragt wurde.
+    // Damit umging er genau die Rechnung, die den Chaos-Zuschlag enthaelt -
+    // und der ist bei Raid der groesste Posten ueberhaupt.
+    //
+    // GEMESSEN 12:38 aus `data/aktionen.txt`, 50 Abschnitte ueber 125
+    // protokollierte Minuten (08:12 bis 12:35):
+    //
+    //     General/Diplomacy                    71,0 min   56,8 %      0 Rang
+    //     Contracts/Bounty Hunter              13,1 min   10,4 %  2.061
+    //     Contracts/Tracking                   12,3 min    9,8 %    618
+    //     Operations/Stealth Retirement        11,3 min    9,0 %  4.209
+    //     Operations/Raid                       7,9 min    6,3 % 10.124
+    //     General/Hyperbolic Regeneration       2,8 min    2,3 %      0
+    //     Black Operations/Operation K          2,4 min    1,9 %    746
+    //     General/Field Analysis                2,3 min    1,9 %      0
+    //     Black Operations/Red Dragon           2,0 min    1,6 %    469
+    //
+    // **Ueber die Haelfte der Zeit ging an Diplomacy, die null Rang bringt.**
+    // Die Ausdauerkammer war es NICHT (2,3 Prozent) - die Spalten
+    // `arbeitsanteil` und `zyklusrate` in `data/bbspann.json` rechnen mit der
+    // Ersatzregeneration 2,3/min und ueberschaetzen den Ausdauerdruck damit
+    // um mehr als das Zwanzigfache. Sie taugen als Auswahlkriterium nicht.
+    //
+    // Die Rechnung, die dieser Zweig uebersprungen hat, mit den Zahlen aus
+    // `data/bbspann.json` von 12:40 (alle Chancen stehen bei 1,000):
+    //
+    //     Raid           Stufe 17   252,7 Rang je Lauf,  11 s
+    //                    Chaos +1 bis +5 % (`Bladeburner.ts:844`), im Mittel
+    //                    3 %. Diplomacy senkt bei Charisma 309 um 1,603 % je
+    //                    60 s (`:735-743`), macht 1,87 Laeufe = 112 s.
+    //                    -> 252,7 Rang je 123 s = **123 Rang/min**
+    //     Assassination  Stufe 20   530,4 Rang je Lauf,  29 s
+    //                    Chaos -5 bis +5 % (`:859`), im Mittel **null**.
+    //                    -> **1.097 Rang/min**, Faktor 8,9
+    //
+    // Und der zweite Posten ist schlimmer als der erste: Raid nimmt der Stadt
+    // je Erfolg **ein Prozent der Bevoelkerung** (`:831-834`), Assassination
+    // genau **einen Kopf** (`:855-858`). Die Bevoelkerung geht ueber
+    // `(pop/1e9)^0,7` in jede Erfolgschance ein - Raid frisst also die
+    // Grundlage aller anderen Aktionen. Genau daran ist heute frueh Chongqing
+    // gestorben (popEst 0, ERLEDIGT.md 11:10), und New Tokyo steht um 12:40
+    // bei 223 Mio nach 1.532 Mio um 11:03.
+    //
+    // Der Zweig wird ersatzlos gestrichen statt umparametriert: Raid steht in
+    // `OPERATIONEN` und wird von `beste()` mitbewertet - samt Chaos-Zuschlag.
+    // Gewinnt Raid dort, kommt es weiterhin dran.
 
     const op = beste(OPERATIONEN, O, SICHER_OPERATION);
     if (op) return { typ: O, name: op.name, grund: "Operation" };

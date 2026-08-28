@@ -1298,6 +1298,7 @@ export async function main(ns) {
   // Liste von Dateiendungen zu und weist alles andere mit "Invalid file
   // extension" ab. Der Inhalt ist trotzdem JSON, eine Zeile je Abschnitt.
   let abschnitt = null;
+  const OFFEN = "data/bladeoffen.txt";
   // DER AUSDAUERVERBRAUCH IST DER LETZTE UNGEMESSENE POSTEN (26.08., 09:15).
   //
   // Nach dem Krankenhaus-Hebel bleibt die Ausdauer der einzige Grund zu ruhen,
@@ -1332,7 +1333,40 @@ export async function main(ns) {
       } catch (e) { /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
     }
     abschnitt = null;
+    try { ns.write(OFFEN, "", "w"); } catch { /* siehe oben */ }
   };
+
+  // DER OFFENE ABSCHNITT UEBERLEBT JETZT EINEN NEUSTART (28.08., 23:45).
+  //
+  // Er lebte nur im Speicher und wurde erst beim Aktionswechsel geschrieben,
+  // also warf jeder `WERKZEUG blade.js`-Neustart ihn weg. Am 28.08. riss das
+  // eine Luecke von 43 Minuten in `data/aktionen.txt` - ausgerechnet um die
+  // beiden Eingriffe herum, deren Wirkung man daran messen wollte.
+  const merkeOffen = (jetztRang) => {
+    if (!abschnitt) return;
+    try {
+      ns.write(OFFEN, JSON.stringify({ ...abschnitt, bis: Date.now(),
+        rangBis: jetztRang }), "w");
+    } catch { /* Protokoll ist Beiwerk */ }
+  };
+  // Wiederanlauf: nachtragen, was beim letzten Lauf offen war. Ende und
+  // Endrang sind der zuletzt gemerkte Stand, nicht der jetzige - dazwischen
+  // lag der Neustart. `abgebrochen: true` markiert die Zeile, damit eine
+  // Auswertung sie von einem sauber geschlossenen Abschnitt unterscheiden kann.
+  try {
+    const rest = ns.read(OFFEN);
+    if (rest && rest.trim()) {
+      const a = JSON.parse(rest);
+      if (a.bis - a.von >= 10_000) {
+        ns.write("data/aktionen.txt", JSON.stringify({
+          von: a.von, bis: a.bis, aktion: a.aktion, grund: a.grund,
+          rangVon: a.rang, rangBis: a.rangBis, ausdauerVon: a.ausdauer,
+          ausdauerBis: null, abgebrochen: true,
+        }) + String.fromCharCode(10), "a");
+      }
+      ns.write(OFFEN, "", "w");
+    }
+  } catch { /* ein kaputter Rest darf den Start nicht kosten */ }
 
   // WAS EINE AKTION AN AUSDAUER KOSTET - AUS DEM EIGENEN PROTOKOLL
   // (26.08.2026, 09:52).
@@ -3019,6 +3053,10 @@ export async function main(ns) {
       // Durchlauf. Der Pruefer erwartete 1,7 und meldete STAGNATION, obwohl
       // blade.js genau das Richtige tat.
       meldeLage(wahl.typ + "/" + wahl.name, wahl.grund, s.min);
+
+      // Den offenen Abschnitt je Runde festhalten, damit ein Neustart
+      // hoechstens einen Durchlauf kostet statt des ganzen Abschnitts.
+      merkeOffen(ns.bladeburner.getRank());
 
       await ns.bladeburner.nextUpdate();
     } catch (e) {

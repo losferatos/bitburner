@@ -213,6 +213,19 @@ Dringlichkeit: **niedrig fuer den Betrieb, mittel fuer die Messung.** Der Bot
           (`aufraeumen: false` in `data/blade.json`, Chaos faellt ohne
           Diplomacy von 39,84 auf 37,50).
 
+**Geaendert 28.08. um 23:47, Wirkung noch nicht gemessen.** `src/blade.js`
+haelt den offenen Abschnitt jetzt je Runde in `data/bladeoffen.txt` fest und
+traegt ihn beim Start als abgeschlossenen Abschnitt nach - mit `abgebrochen:
+true`, damit die Auswertung ihn unterscheiden kann. Ein Neustart kostet damit
+hoechstens einen Durchlauf statt des ganzen Abschnitts. Im Spiel angekommen
+(Pruefung ueber die Bruecke, 23:48).
+
+**Nachmessen laesst sich das erst, wenn `blade.js` wieder laeuft** - also nach
+dem Bladeburner-Beitritt, ETA rund 14 h. Pruefung dann: `blade.js` per
+`WERKZEUG blade.js` neu starten und in `data/aktionen.txt` nachsehen, ob eine
+Zeile mit `abgebrochen: true` erscheint, deren `bis` hoechstens eine Runde vor
+dem Neustart liegt. Erscheint keine, ist der Wiederanlaufblock tot.
+
 ### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
 
 Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.

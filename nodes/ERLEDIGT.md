@@ -23,6 +23,138 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Chongqing war ausgebrannt - popEst 0, und der Motor sass darin fest (28.08., 11:12)
+
+Der Punkt fragte, was ein Stadtwechsel kostet. Die Antwort war eine andere und
+eine bessere: **Die Stadt, in der der Motor sass, war tot.**
+
+Gemessen 11:03 (`src/bbspann.js`), alle sechs Staedte:
+
+    Stadt        Chaos   Faktor   breiteste Spanne   popEst    Wert
+    Chongqing    52,83     1,96              0,797        0       0   <- hier
+    New Tokyo   106,39     7,58              0,144  1.532 Mio     202
+    Sector-12    73,03     4,90              0,144    976 Mio     199
+    Volhaven    205,69    12,52              0,797  1.577 Mio     126
+    Aevum        88,13     6,26              0,050    748 Mio     119
+    Ishima      134,34     9,24              0,270    810 Mio      88
+
+**Chongqings geschaetzte Bevoelkerung war null.** Der Motor sass dort, weil
+das Chaos am niedrigsten war - aber das Chaos ist niedrig, WEIL nichts mehr
+los ist. Die Stadt war leergeraeumt.
+
+**Und sie war nicht heilbar.** `getSuccessRange` rechnet
+`r = city.pop / city.popEst`; bei 0 wird daraus NaN, der Code setzt `r = 0`,
+und `low *= r` macht `s.min` **immer null** (`Actions/Action.ts`). Damit ist
+JEDE Operation und JEDER Vertrag unfahrbar, unabhaengig von Kampfwerten,
+Faehigkeiten und Ausdauer.
+
+Field Analysis kommt dagegen nicht an - und das ist der Grund, warum sie
+heute frueh eine Stunde lang nichts gebracht hat:
+
+    improvePopulationEstimateByPercentage(p):        (City.ts:46-58)
+      popEst = (popEst + p) * (1 + p/100)
+
+Bei `p` = 1,25 waechst das aus der Null heraus um **1,27 je Durchlauf** und
+verdoppelt sich alle 56. Von dort auf eine Milliarde sind rund **1.700
+Durchlaeufe, also 14 Stunden**. Die Regel, die um 08:14 einen Deckel von zehn
+Minuten bekam und um 09:42 auf 45 erhoeht wurde, haette also in keiner Fassung
+gereicht - das Problem war nie die Dauer.
+
+**Die neue Regel** bewertet jede Stadt mit Bevoelkerung geteilt durch den
+Chaos-Faktor `sqrt(1 + chaos - 50)` (`Actions/Action.ts:94-101`) und wechselt
+bei doppeltem Vorsprung. `getCityEstimatedPopulation` und `getCityChaos` gehen
+fuer FREMDE Staedte, es braucht also keinen Probewechsel.
+
+**Verifiziert 11:12**, zwei Minuten nach dem Neustart:
+
+    Division                New Tokyo (Wert 202)
+    data/blade.json         "Operations/Stealth Retirement Operation",
+                            Stufe 11, Chance 1,000
+    Rangrate                +955 in 3 Minuten = **318/min**
+    davor                   57,8/min ueber 30 Minuten
+
+Das ist die erste fahrbare Operation seit dem Einbau um 05:53 - und der beste
+Wert seit der Nacht.
+
+**Was der Punkt richtig geahnt und falsch benannt hat:** Er sprach von einer
+"ungepflegten Schaetzung nach einem Stadtwechsel". Der Wechsel war nicht die
+Ursache; die leergeraeumte Stadt war es. Die Rundreise hat den Motor dorthin
+gebracht, weil sie nach Raid-Vorrat waehlt - und Raid ist genau die Aktion,
+die eine Stadt leerraeumt (`Bladeburner.ts:836`, jeder Erfolg verbraucht eine
+Gemeinde und senkt die Bevoelkerung). **Die Rundreise hat sich ihre eigene
+Sackgasse gebaut.** Dass ihre Schwelle um 10:42 von 10 auf 55 Gemeinden stieg,
+war deshalb richtig, aber aus dem falschen Grund.
+
+Commit: `e22bc89`
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Der Stadtwechsel der Division bringt eine unbrauchbare Schaetzung mit
+
+Gefunden am 28.08., 10:10. Die Division stand am Morgen in **Chongqing**,
+und dort war die Bevoelkerungsschaetzung nie gepflegt: Gemessen 09:40
+(`src/bbspann.js`) standen **alle sechs** Operationen bei [0,000 - 1,000].
+Der Motor entscheidet an `s.min` und fand deshalb 87 Minuten lang nichts zu
+tun.
+
+Die Schaetzung ist **je Stadt** gespeichert und ueberlebt einen
+Augmentierungs-Einbau (`Bladeburner.prestigeAugmentation()` fasst die Staedte
+nicht an). Wer die Stadt wechselt, aktiviert also eine Schaetzung, an der
+niemand gearbeitet hat - und zahlt mit der Zeit, die Field Analysis braucht,
+um sie wieder scharf zu bekommen.
+
+Gewechselt wird an zwei Stellen:
+    `src/blade.js:1554`    die Raid-Rundreise, nach `comms` je Stadt
+    `src/bbspann.js:266`   das Messwerkzeug (kehrt bei :324 zurueck)
+
+**Die Rundreise rechnet den Schaetzungsverlust nicht mit.** Sie vergleicht
+allein den Raid-Vorrat. Sauber waere, die Kosten des Wechsels zu beziffern -
+die Zeit bis zur brauchbaren Schaetzung mal die entgangene Rangrate - und sie
+gegen den Gewinn an `comms` zu stellen.
+
+**`bbspann.js` ist unschuldig - geprueft 10:38.** `switchCity` setzt
+ausschliesslich `bladeburner.city` (`NetscriptFunctions/Bladeburner.ts:314-319`),
+es fasst weder `popEst` noch sonst etwas an. Das Messwerkzeug veraendert den
+Messgegenstand nicht.
+
+**Teilerledigt 10:42: `RUNDREISE_MIN_COMMS` von 10 auf 55.** Die alte Schwelle
+zaehlte nur den Gewinn. Die Rechnung jetzt vollstaendig:
+
+    Gewinn je Gemeinde   Raid rankGain 55 x rewardFac 1,1^13 (Stufe 14) = 190
+    Kosten je Wechsel    45 min Field Analysis x 226 Rang/min        = 10.170
+    Break-even                                                   54 Gemeinden
+
+Das schaltet die Rundreise in der Praxis fast ab - und das ist die ehrliche
+Folgerung: Bei den zuletzt gemessenen Bestaenden (Aevum 49, Ishima 42,
+Volhaven 17) war sie schon immer defizitaer, nur hat es niemand ausgerechnet.
+
+**DER GROESSERE HEBEL LIEGT NOCH OFFEN, und die Zahlen dafuer stehen schon da.**
+`data/bbspann.json` misst die Schaetzungsguete JEDER Stadt (10:38-Messung von
+09:40):
+
+    Sector-12   alle Spannen 0,000   perfekt scharf   Chaos 67,42
+    Aevum       0,006 bis 0,016      sehr scharf      Chaos 88,31
+    Volhaven    0,54 bis 0,78        schlecht
+    Chongqing   alle bei [0,000-1,000]                <- hier stand die Division
+
+**Der Motor haette nicht eine Stunde schaerfen muessen, er haette wechseln
+koennen** - `switchCity` kostet null Sekunden. Die Stadtwahl kennt aber nur
+den Raid-Vorrat und (an anderer Stelle) das Chaos, nicht die Schaetzungsguete.
+
+Was dafuer noch zu klaeren ist: Der Wechsel muss Chaos UND Schaetzung
+gegeneinander abwaegen - Sector-12 ist scharf, hat aber Chaos 67, und ueber 50
+schlaegt `sqrt(1+chaos-50)` auf die Schwierigkeit jeder Aktion
+(`Actions/Action.ts:94-101`). Ein halbgarer Wechsel waere schlimmer als
+keiner. Die Probe selbst ist billig: kurz hinwechseln, `spanne()` lesen,
+zurueckwechseln - ohne `await` dazwischen, sonst rechnet das Spiel eine
+Aktion in der falschen Stadt ab.
+
+Dringlichkeit: mittel-hoch. Der Fall kostet ein bis zwei Stunden je Wechsel.
+
+</details>
+
+---
+
 ### blade.js fuehrt das Gym jetzt selbst - Faktor 13,5 auf den Wiederaufbau (28.08., 08:42)
 
 **Verifiziert 08:42 ueber 89 Sekunden**, unmittelbar nach dem Neustart:

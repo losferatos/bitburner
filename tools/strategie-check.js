@@ -435,7 +435,24 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       urteil = "BLIND";
     }
   }
-  const knoten = (bb && bb.knoten) || (rep && rep.knoten) || null;
+  // DIE KNOTENNUMMER KOMMT ZUERST AUS data/knoten.json (28.08.2026, 17:25).
+  //
+  // Die beiden Quellen unten sind nach einem Knotenwechsel beide tot:
+  // `bblage.json` schreibt blade.js (laeuft nur in Kampfknoten und erst nach
+  // dem Beitritt), `bn4rep.json` schreibt bn4rep.js (voller Singularity und
+  // ausserhalb BitNode 4 mehrere hundert Gigabyte gross - passt nicht auf ein
+  // frisches home mit 32 GB). Nach dem Wechsel um 17:05 meldete dieser
+  // Pruefer deshalb zwanzig Minuten lang "BitNode 6", obwohl der Bot laengst
+  // in BitNode 10 war - also genau in dem Fenster, in dem eine falsche
+  // Knotennummer die Traegerbestimmung komplett verdreht.
+  //
+  // `data/knoten.json` kommt seit 17:20 von `src/knoten.js` (1,6 GB, nur
+  // getResetInfo) und ab dem naechsten Wechsel zusaetzlich aus
+  // `data/bn4net.json` - beides laeuft ab der ersten Sekunde eines Knotens.
+  const ks = await liesJson("data/knoten.json");
+  const netKnoten = (net && typeof net.knoten === "number") ? net.knoten : null;
+  const knoten = (ks && ks.knoten) || netKnoten
+    || (bb && bb.knoten) || (rep && rep.knoten) || null;
 
   if (!knoten) {
     sag("BitNode nicht bestimmbar - weder Steckbrief noch Reputationsmelder da.");

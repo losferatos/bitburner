@@ -64,7 +64,54 @@ Regeln:
 
 ## Sofort
 
-keine
+
+
+### Der Sleeve in BitNode 10 tut nichts (17:12)
+
+Gemessen: Eric hat es im Spiel gesehen; im Repo gibt es dazu **kein einziges
+          Skript**. `grep -rl sleeve src/*.js` findet nur `blade.js` und
+          `travel.js`, und beide erwaehnen ihn nur im Kommentar.
+
+Erwartet: BitNode 10 gibt ab der ersten Sekunde **einen** Sleeve
+          (`SleeveCovenantPurchases.tsx:62-63`:
+          `min(3, SF10-Level + (bitNodeN === 10 ? 1 : 0))`), und er startet
+          dort brauchbar statt bei null - `prestigeSourceFile` setzt in
+          BitNode 10 `shock <= 25` und `sync >= 25`
+          (`PlayerObjectGeneralMethods.ts:150-155`), also rund 75 Prozent
+          Wirkungsgrad sofort.
+
+          Was er kann (`PersonObjects/Sleeve/Work/`): Verbrechen, Training,
+          Firmen- und Faktionsarbeit, Infiltration, Bladeburner-Aktionen,
+          Support, Shock-Erholung, Synchronisation. **Skripte kann er nicht
+          laufen lassen** - das Netz hackt ohnehin ohne ihn.
+
+          An den Spieler gehen Geld, Reputation und Karma; Kampf- und
+          Hackwerte bleiben beim Sleeve (`applySleeveGains`). In der
+          Fruehphase eines Knotens ist Verbrechen deshalb der offensichtliche
+          Kandidat: Es ist die einzige Geldquelle, die kein Netz braucht, und
+          `CrimeMoney` steht in BitNode 10 auf 0,5 - halbiert, nicht null.
+
+Verdacht: Kein Fehler, sondern eine Luecke. Es braucht `src/sleeve.js`.
+          Der Sleeve war bis heute nie verfuegbar; SF10 gibt es erst seit
+          17:05.
+
+Dringlichkeit: **hoch.** Drei BitNode-10-Laeufe stehen an, und der Sleeve ist
+          der ganze Grund, warum sie in der Roadmap vorn stehen.
+
+### `nodes/KURS.md` gilt noch fuer BitNode 6 (17:26)
+
+Gemessen: Der oberste Eintrag ist vom 28.08., 07:15 und nennt als Engpass
+          "Bladeburner-Rang, 80.706 von 400.000". Der Knoten ist seit 17:05
+          abgeschlossen.
+
+Erwartet: Ein Eintrag fuer **BitNode 10**, hergeleitet nach der Anleitung im
+          Kopf der Datei. `WorldDaemonDifficulty` steht dort auf 2
+          (`BitNode.tsx`, case 10), `HackingLevelMultiplier` auf 0,35 und
+          `BladeburnerRank` auf 0,8 - beide Wege sind also offen und muessen
+          gegeneinander gerechnet werden, nicht geraten.
+
+Verdacht: Kein Fehler. Der Kursloop feuert um 18:44 und macht es; steht er
+          dann noch offen, macht es der naechste Vorankommen-Lauf.
 
 
 ## Offen, nach Dringlichkeit

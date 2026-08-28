@@ -124,12 +124,26 @@ und liefern - **13:42:51 `chaos 39.84, fahrbar true, aufraeumen false`**. Ohne
 sie liesse sich "es wird nicht aufgeraeumt" nicht von "es gab nichts
 aufzuraeumen" unterscheiden.
 
-Was **nicht** gemessen ist: Genau dieser Fall. Das Chaos steht seit dem Eingriff
-bei 37 bis 40 und damit unter `CHAOS_EIN` - die alte Regel haette hier ebenfalls
-nicht aufgeraeumt. Der Nachweis ist erst erbracht, wenn `data/blade.json` einmal
-`chaos > 50` bei `fahrbar: true` und `aufraeumen: false` zeigt. Bis dahin bleibt
-der Punkt stehen.
+Was **nicht** gemessen ist: Genau dieser Fall - und bis 15:45 war er auch
+gar nicht messbar. `chaosStand` und `fahrbarStand` wurden erst tief in
+`waehle()` gesetzt, im Block hinter `if (SPIEL_CHAOS_AN)`. Faellt die Wahl
+vorher auf eine Black Op, kehrt `waehle()` vorher zurueck. Gemessen 15:38
+waehrend Operation Annihilus: `chaos null, fahrbar null` - seit dem Neustart
+um 15:25 war der Block kein einziges Mal erreicht worden. Je besser der Motor
+laeuft, desto weniger war zu sehen.
 
+**Geaendert 15:45:** `chaosMessen()` laeuft jetzt am Kopf von `waehle()`, vor
+jeder Verzweigung, und fuehrt zusaetzlich eine Hochwassermarke `chaosMax` -
+den hoechsten Chaosstand, der je bei `fahrbar: true` und `aufraeumen: false`
+gemessen wurde. Damit muss niemand mehr den richtigen Augenblick treffen.
+
+Verifiziert 15:39 bis 15:41, waehrend Operation Ultron lief:
+`chaos 33.82, fahrbar true, aufraeumen false, chaosMax 33.82` - vorher stand
+dort dreimal `null`. Die **Messluecke** ist damit geschlossen.
+
+Der Punkt selbst bleibt offen: `chaosMax` steht bei 33,82 und muss ueber 50
+steigen, bevor die Regel bewiesen ist. Das laeuft jetzt von allein mit; der
+naechste Lauf liest nur noch die eine Zahl.
 ---
 
 ## Offen, nach Dringlichkeit

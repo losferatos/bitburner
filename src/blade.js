@@ -186,9 +186,59 @@ export async function main(ns) {
   let chaosAufraeumen = false;
   let chaosStand = null;
   let fahrbarStand = null;
+  // Hoechster Chaosstand, der je gemessen wurde, WAEHREND etwas fahrbar war
+  // und nicht aufgeraeumt wurde. Siehe den Block bei "chaosMessen" unten.
+  let chaosMaxFahrbar = null;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
     catch { return 0; }
+  };
+  // DIE MESSUNG DARF NICHT AN DER AKTIONSWAHL HAENGEN (28.08.2026, 15:45).
+  //
+  // `chaosStand` und `fahrbarStand` wurden bisher erst tief in `waehle()`
+  // gesetzt, im Block hinter `if (SPIEL_CHAOS_AN)`. Faellt die Wahl vorher auf
+  // eine Black Op, kehrt `waehle()` zurueck, bevor der Block laeuft - und die
+  // beiden Felder in `data/blade.json` bleiben **null**.
+  //
+  // Gemessen 15:38, waehrend Operation Annihilus lief:
+  // `chaos null, fahrbar null, aufraeumen false`. Seit dem Neustart um 15:25
+  // war der Block kein einziges Mal erreicht worden.
+  //
+  // Das macht genau den Nachweis unmoeglich, auf den der offene Punkt vom
+  // 13:33 wartet: "`chaos > 50` bei `fahrbar: true` und
+  // `aufraeumen: false`". Je besser der Motor laeuft, desto mehr Zeit
+  // verbringt er in Black Ops - und desto weniger ist zu sehen.
+  //
+  // Deshalb wird jetzt bei JEDEM Aufruf gemessen, vor jeder Verzweigung, und
+  // zusaetzlich eine Hochwassermarke gefuehrt. Damit muss niemand mehr den
+  // richtigen Augenblick treffen: Steht `chaosMax` ueber 50, ist der Fall
+  // eingetreten und die Regel hat ihn richtig behandelt.
+  const etwasFahrbarJetzt = () => {
+    try {
+      for (const n of OPERATIONEN) {
+        if (offen(O, n) < 1) continue;
+        if (spanne(O, n).min >= SICHER_OPERATION) return true;
+      }
+      for (const n of VERTRAEGE) {
+        if (offen(V, n) < 1) continue;
+        if (spanne(V, n).min >= SICHER_VERTRAG) return true;
+      }
+      return false;
+    } catch {
+      // Ohne Messung lieber die alte Regel: ein Aufraeumen zuviel ist
+      // billiger als eine Stadt, in der nichts mehr geht.
+      return false;
+    }
+  };
+  const chaosMessen = () => {
+    chaosStand = chaosLage();
+    fahrbarStand = etwasFahrbarJetzt();
+    if (fahrbarStand && !chaosAufraeumen && Number.isFinite(chaosStand)) {
+      if (chaosMaxFahrbar === null || chaosStand > chaosMaxFahrbar) {
+        chaosMaxFahrbar = chaosStand;
+      }
+    }
+    return fahrbarStand;
   };
   const SICHER_OPERATION = 0.85;
   // Stufenaufbau von Assassination - siehe den Block bei "2c." weiter unten.
@@ -1172,6 +1222,7 @@ export async function main(ns) {
       chaos: Number.isFinite(chaosStand) ? +chaosStand.toFixed(2) : null,
       fahrbar: fahrbarStand,
       aufraeumen: chaosAufraeumen,
+      chaosMax: Number.isFinite(chaosMaxFahrbar) ? +chaosMaxFahrbar.toFixed(2) : null,
       // Erste Hand statt Schaetzung: `getActionEstimatedSuccessChance` liefert
       // fuer Black Ops einen Bereich, dessen eine Grenze mit dem Verhaeltnis
       // `pop/popEst` verzerrt ist (`Actions/Action.ts:144-167`). Welche der
@@ -1309,6 +1360,10 @@ export async function main(ns) {
     if (hp && hp.max > 0 && hp.current < hp.max * HP_RUHE) {
       return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "HP" };
     }
+
+    // Messen, bevor irgendein Zweig zurueckkehrt (Begruendung bei
+    // `chaosMessen`). Nur messen - entschieden wird weiter unten.
+    if (SPIEL_CHAOS_AN) chaosMessen();
 
     // DIE BLACK-OP-CHANCE WIRD GERECHNET, NICHT GESCHAETZT (27.08.2026, 18:22).
     //
@@ -2187,32 +2242,15 @@ export async function main(ns) {
     // Stunden, waehrend die ersten Laeufe schon reichen, um die Schwierigkeit
     // unter die Klemmgrenze zu druecken.
     if (SPIEL_CHAOS_AN) {
-      let etwasFahrbar = false;
-      try {
-        for (const n of OPERATIONEN) {
-          if (offen(O, n) < 1) continue;
-          if (spanne(O, n).min >= SICHER_OPERATION) { etwasFahrbar = true; break; }
-        }
-        if (!etwasFahrbar) {
-          for (const n of VERTRAEGE) {
-            if (offen(V, n) < 1) continue;
-            if (spanne(V, n).min >= SICHER_VERTRAG) { etwasFahrbar = true; break; }
-          }
-        }
-      } catch {
-        // Ohne Messung lieber die alte Regel: ein Aufraeumen zuviel ist
-        // billiger als eine Stadt, in der nichts mehr geht.
-        etwasFahrbar = false;
-      }
       // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR.
-      // Beide Groessen gehen deshalb in `data/blade.json`: Ohne sie liesse
-      // sich "es wird nicht aufgeraeumt" nicht von "es gab nichts
-      // aufzuraeumen" unterscheiden - genau die Verwechslung, die den
-      // Einbau-Riegel am 28.08. um 11:40 unpruefbar gemacht hat.
-      chaosStand = chaosLage();
-      fahrbarStand = etwasFahrbar;
-      if (chaosLage() > CHAOS_EIN && !etwasFahrbar) chaosAufraeumen = true;
-      if (chaosLage() < CHAOS_AUS || etwasFahrbar) chaosAufraeumen = false;
+      // `chaosMessen()` schreibt `chaosStand`, `fahrbarStand` und die
+      // Hochwassermarke; ohne sie liesse sich "es wird nicht aufgeraeumt"
+      // nicht von "es gab nichts aufzuraeumen" unterscheiden - genau die
+      // Verwechslung, die den Einbau-Riegel am 28.08. um 11:40 unpruefbar
+      // gemacht hat.
+      const etwasFahrbar = chaosMessen();
+      if (chaosStand > CHAOS_EIN && !etwasFahrbar) chaosAufraeumen = true;
+      if (chaosStand < CHAOS_AUS || etwasFahrbar) chaosAufraeumen = false;
       if (chaosAufraeumen) {
         // STEALTH RETIREMENT STATT DIPLOMACY (27.08.2026, 20:42).
         //

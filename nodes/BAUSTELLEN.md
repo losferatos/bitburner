@@ -59,20 +59,51 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### Nachmessen: bringen die Chaos-Folgekosten die 86 Rang/min zurueck? (03:42)
+### Overclock hat eine harte Grenze, und sie ist die Ausdauer (03:56)
 
-Gemessen: 35,4 Rang/min im Fenster 02:53 bis 03:33, waehrend Raid und
-Diplomacy sich abwechselten - gegen 86,4 im Fenster davor, als nur
-Assassination lief.
+Gemessen: Overclock steht um 03:51 auf **Stufe 69** von 90 und ist der
+staerkste laufende Hebel - die Rangrate sprang im kurzen Fenster auf 190,5
+je Minute. Die Ausdauer steht dabei aber schon bei **231,0 von 243,9**, und
+`tools/spann.js` meldet die Regeneration als "2.3/min (Vorgabe)" statt
+gemessen: Es hat keine Kammerphase mehr gesehen.
 
-Erwartet: Ueber 45 Minuten wieder **ueber 70 Rang/min**. Der Zuschlag in
-`beste()` (`src/blade.js`, seit 03:42) rechnet die Diplomacy-Laeufe ein,
-die ein Raid nach sich zieht.
+Erwartet: Genau das kippt bald, und der Grund steht im Quellcode.
+**Der Ausdauerverlust faellt je AKTION an, die Regeneration je SEKUNDE:**
 
-Verdacht, falls es nicht traegt: Der Mittelwert +3 Prozent je Raid ist eine
-Annahme aus `getRandomIntInclusive(1, 5)`. Faellt die Rate nicht zurueck auf
-die 86, gehoert die tatsaechliche Chaos-Aenderung je Raid gemessen, statt sie
-aus der Spanne zu mitteln.
+    this.stamina -= BaseStaminaLoss * difficultyMultiplier   (Bladeburner.ts:921, :1019)
+    BaseStaminaLoss: 0.285                                   (Constants.ts:5)
+    StaminaGainPerSecond: 0.0085                             (Constants.ts:4)
+
+Overclock halbiert die Aktionsdauer - also verdoppelt es den Verbrauch je
+Minute, waehrend der Gewinn gleich bleibt. Gerechnet fuer Assassination auf
+Stufe 12 (`difficulty` = 1500 x 1,06^11 = 2.846,
+`diffMult = difficulty^0,28 + difficulty/650` = 9,49 + 4,38 = **13,87**,
+`Constants.ts:15-16`):
+
+    Verlust je Aktion            0,285 x 13,87  =  3,95 Ausdauer
+    Dauer bei Overclock 69       rund 48 s      ->  4,94 je Minute
+    Dauer bei Overclock 90       rund 15,5 s    -> 15,3 je Minute
+    Regeneration (Anzeige)                          2,3 je Minute
+
+**Bei Stufe 69 fehlt schon der Faktor 2, bei 90 waere es Faktor 6,6.** Die
+Kammer muesste den Rest auffangen - und Kammerzeit ist Zeit ohne Rang. Ab
+einem Punkt frisst Overclock mehr, als es bringt.
+
+Verdacht auf die Fundstelle: `src/blade.js`, `relNutzen` fuer Overclock.
+Der Zweig gibt `100 / (99 - stufe)` zurueck und kennt die Ausdauer nicht.
+Er muesste den Zuwachs mit dem Anteil verrechnen, der davon in der Kammer
+wieder verlorengeht.
+
+Zu tun: (1) Den Kammeranteil messen, **bevor** gedeckelt wird - die
+Stichproben aus `data/verlauf-strategie.json` zeigen ihn in den letzten
+zwei Stunden mit **null Prozent**, die Rechnung sagt also mehr voraus als
+bisher eingetreten ist. Erst wenn er steigt, ist der Deckel faellig.
+(2) Die Regeneration wirklich messen statt die Vorgabe zu nehmen - sie
+haengt an `bladeburner_stamina_gain` und den Augmentierungen des Einbaus
+von 01:25.
+(3) Nicht vorschnell deckeln: Overclock ist gerade der beste Kauf je Punkt,
+und ein Deckel auf eine ungerechnete Vermutung hin waere teurer als der
+Kammeranteil.
 
 
 ### Der groesste ungehobene Hebel: eine Augmentierungsrunde - Engpass ist GELD (18:13)

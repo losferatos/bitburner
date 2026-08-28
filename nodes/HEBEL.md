@@ -75,10 +75,17 @@ Beleg:      Drei Aktionen aendern das Chaos (`Bladeburner.ts:836-859`):
 
 Vorher:     35,4 Rang/min (02:53 bis 03:33), Aktion Raid im Wechsel mit
             Diplomacy.
-Nachher:    **Verifiziert 03:39, 16 Sekunden nach dem Neustart:**
-            `data/blade.json` meldet `"aktion":"Operations/Assassination"`,
-            wo unmittelbar davor Raid lief. Die Rate misst der naechste Lauf
-            ueber 45 Minuten.
+Nachher:    **BESTAETIGT. 86,9 Rang/min ueber 45 Minuten** (Messung 03:51),
+            gegen die 35,4 vorher und die geforderten 70. Im kurzen Fenster
+            seit dem Neustart sind es sogar 190,5 - dort wirkt zusaetzlich
+            Overclock, das inzwischen auf **Stufe 69** steht.
+            Verifiziert 03:39, 16 Sekunden nach dem Neustart: `blade.json`
+            meldete `"aktion":"Operations/Assassination"`, wo unmittelbar
+            davor Raid lief.
+
+            Raid taucht weiterhin auf (einmal seit 03:40) - das ist richtig
+            so: Der Zuschlag greift nur ueber `CHAOS_AUS`, und unterhalb ist
+            Raid tatsaechlich guenstig.
 
 Commit:     (folgt)
 

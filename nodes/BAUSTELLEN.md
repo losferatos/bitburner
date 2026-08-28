@@ -97,6 +97,50 @@ Verdacht: Kein Fehler, eine fehlende Runde. Zu klaeren ist, WELCHE Faktion und
 Dringlichkeit: **hoechste.** Der Unterschied ist 19,6 Stunden auf Tor 1, und
           Tor 2 (400.000 Rang bei BladeburnerRank 0,8) kommt danach noch.
 
+**Gemessen 19:45 - der Weg ist bekannt, der Engpass ist ein einzelner
+Rechner.**
+
+Erreichbare Faktionen laut Spielstand: **Slum Snakes** und **CyberSec**, dazu
+eine offene Einladung von **Sector-12**. Karma steht bei -49,7. Was diese drei
+an Kampf-Augmentierungen fuehren (`Augmentation/Augmentations.ts`, Preise vor
+den BitNode-10-Aufschlaegen):
+
+    Reputation   Geld   Augmentierung        Wirkung
+         1.250     3m   Wired Reflexes       dex, agi x1,05
+         1.500     5m   Lumin Cloaking V1    def, agi x1,05
+         5.000    15m   Targeting I          dex x1,1
+         7.500    24m   Combat Rib I         str, def x1,1
+        22.500    75m   Smart Sonar          dex x1,1
+
+In BitNode 10 verdoppelt sich die Reputation und das Geld wird verfuenffacht.
+Alle fuenf zusammen brachten `mults.kampf` von 1,2616 auf rund **1,39 bis
+1,60** je nach Wert - das ist Tor 1 von 21,8 auf etwa **12 Stunden**, nicht auf
+die 2,2 des Kursziels. Fuer 2,0 braucht es Tetrads oder The Dark Army
+(Chongqing, Karma -18 beziehungsweise -45 - beides erfuellt) mit Bionic Arms
+(str, dex x1,3) und Targeting II.
+
+**Und genau da steht der Bot an.** Die Faktions- und Augmentierungslogik ist
+`src/bn4rep.js`. Gemessen 19:38 mit `src/ramcheck.js`: **848,25 GB**. Kein
+Rechner im Netz ist so gross:
+
+    home     64 GB
+    werk-0  128 GB
+    werk-1 bis werk-14   je 64 GB
+
+Ein Cloud-Server mit 1.024 GB kostet in BitNode 10 **412 Mio**
+(`ram * 55.000 * CloudServerCost 5 * CloudServerSoftcap 1,1^(log2(ram)-6)`,
+`Server/ServerPurchases.ts:22-41`). Neue Rechner gehen nicht mehr: Das Limit
+ist `25 * CloudServerLimit 0,6` = **15**, und 15 stehen. Es bleibt also nur
+das Hochruesten von `werk-0`, rund 373 Mio.
+
+Das Geld war um 19:41 bei 298 Mio und ist um 19:45 bei **42 Mio** - der Bot
+hat es in fuenfzehn kleine Rechner gesteckt. Bei rund 8,5 Mio je Minute
+Einkommen ist die Aufruestung in etwa 45 Minuten bezahlbar.
+
+Zu klaeren im naechsten Lauf: Ruestet der Bot `werk-0` von selbst auf 1.024
+hoch, oder deckelt seine Kaufregel bei 128? Wenn er deckelt, ist das der
+eigentliche Eingriff - und er kostet nichts ausser einer Zahl.
+
 
 ---
 

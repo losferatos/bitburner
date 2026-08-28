@@ -10,6 +10,45 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
+
+### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
+
+Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.
+          Chongqing stand um 11:10 bei **0**. Beides waren Staedte, in denen
+          der Motor laenger Raid gefahren hat.
+
+Erwartet: Die Bevoelkerung ist eine endliche, gemeinsam genutzte Ressource.
+          Sie geht ueber `getPopulationSuccessFactor = (pop/1e9)^0,7`
+          (`Actions/Action.ts:88-92`) in die Erfolgschance JEDER Aktion ausser
+          Black Ops ein. Wer sie verbraucht, verteuert alles andere - und zwar
+          dauerhaft, denn Nachwuchs kommt nur ueber `randomEvent` alle 240 bis
+          600 Sekunden mit 25 Prozent Wahrscheinlichkeit
+          (`Bladeburner.ts:601-694`).
+
+          Die Verbrauchsraten je Erfolg stehen in `Bladeburner.ts:806-861`:
+
+              Raid                    -1 %      der Bevoelkerung, -1 Gemeinde
+              Stealth Retirement      -0,5 %
+              Sting Operation         -0,1 %
+              Assassination           -1 Kopf
+              Bounty Hunter / Retire. -1 Kopf
+
+          Bei 1e9 Einwohnern sind das 10 Mio gegen 1. **Faktor zehn
+          Millionen** - und `beste()` sieht davon nichts.
+
+Verdacht: `src/blade.js`, `beste()`. Der Chaos-Zuschlag von 03:42 rechnet die
+          Folgekosten einer Aktion bereits in ihre Dauer ein
+          (`CHAOS_JE_LAUF`). Fuer die Bevoelkerung fehlt das Gegenstueck. Ein
+          sauberer Zuschlag waere: Wieviel Rang je Minute verliert der Motor
+          dauerhaft, wenn `pop` um `x` faellt? Ueber `(pop/1e9)^0,7` ist die
+          Ableitung bezifferbar, die verbleibende Laufzeit des Knotens auch
+          (`nodes/KURS.md`).
+
+Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
+          `beste()` fast immer Assassination, und die kostet einen Kopf. Der
+          Fehler ist damit entschaerft, aber nicht behoben - er schlaegt wieder
+          zu, sobald Raid einmal auf der Chaos-Rechnung gewinnt.
+
   Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
   beheben. Abgeraeumtes wandert nach "Erledigt".
 - **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
@@ -54,59 +93,6 @@ Regeln:
 ---
 
 ## Sofort
-
-### Raid bietet 1.378 Rang je Minute - real sind es 124 (12:12)
-
-Gemessen: `src/bbspann.js` um 12:08, Division New Tokyo, alle Spannen bei
-          `min 1` (perfekte Schaetzung):
-
-              Raid                          **1.378,5** Rang/min   Dauer 10 s
-              Assassination                  1.097,5                    29 s
-              Stealth Retirement Operation     437,7                    13 s
-              Bounty Hunter                    176,4                     8 s
-
-          Die tatsaechliche Rangrate liegt bei **123,8/min** (45-Minuten-
-          Fenster, `data/verlauf-strategie.json`). **Faktor 11.**
-
-Erwartet: Der Motor waehlt bereits die beste Aktion - der Verlust liegt also
-          nicht in der Auswahl, sondern in der Zeit, die er NICHT mit ihr
-          verbringt. Drei Kandidaten, alle messbar:
-
-              1. Ausdauer  Raid kostet Ausdauer, die Kammer bringt keinen Rang.
-              2. Chaos     Raid hebt es um 1 bis 5 Prozent je Erfolg
-                           (`Bladeburner.ts:836-859`), Diplomacy bringt keinen
-                           Rang. Um 12:03 stand Chaos bei 50,8 und der Motor
-                           fuhr Diplomacy.
-              3. comms     Jeder Raid-Erfolg verbraucht eine Gemeinde
-                           (`Bladeburner.ts:836`); Nachschub kommt nur ueber
-                           `randomEvent` alle 240 bis 600 s zu 5 Prozent.
-
-Verdacht: Kein Fehler, sondern eine ungerechnete Groesse. `beste()` bewertet
-          Rang je Aktionsminute und hat seit 03:42 die Chaos-Folgekosten drin
-          - aber die AUSDAUER-Folgekosten fehlen, und der comms-Verbrauch
-          ebenfalls. Eine Aktion, die 10 Sekunden dauert und danach zwei
-          Minuten Kammer erzwingt, ist nicht 1.378 Rang je Minute wert.
-
-          Zu messen ist der **Arbeitsanteil**: Wieviel Prozent der Zeit
-          verbringt der Motor mit rangbringenden Aktionen? `bbspann.js`
-          rechnet je Aktion bereits `ausdauerJeMinute`, `arbeitsanteil` und
-          `zyklusrate` - die Zahlen liegen also schon vor und werden nur nicht
-          benutzt.
-
-Dringlichkeit: **hoch.** Faktor 11 auf die Leitgroesse ist der groesste
-          offene Posten des Knotens.
-
-Nachmessung 12:34 (Reportloop): Die Luecke ist kleiner als um 12:12 gedacht,
-          aber sie bleibt gross. Vier Fenster aus `verlauf-strategie.json`:
-          **118,4/min** (61 min), **130,7/min** (121 min), **71,4/min**
-          (242 min). Gegen 1.378,5 ist das immer noch Faktor 10,5 bis 19.
-          Die Folge fuer den Kurs ist beziffert: Bei 130,7/min brauchen die
-          restlichen **227.712** Rang **29 Stunden** statt der 13,3-18,1 h aus
-          `nodes/KURS.md` - der Kurswert war mit 226/min gerechnet, dem
-          Spitzenwert eines ungestoerten Fensters ohne Kammer und ohne
-          comms-Mangel. Der Arbeitsanteil ist damit nicht nur der groesste
-          offene Posten, sondern auch der Grund, warum die ETA um mehr als
-          das Doppelte danebenliegt.
 
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
 

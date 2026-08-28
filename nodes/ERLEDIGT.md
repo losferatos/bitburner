@@ -23,6 +23,73 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Raid bietet 1.378 Rang je Minute - real sind es 124 (erledigt 28.08., 12:51)
+
+Der Verlust lag **nicht** bei der Ausdauer, wie der Punkt vermutete, sondern bei
+Diplomacy - und die Ursache war ein Zweig in `waehle()`, der Raid zurueckgab,
+BEVOR `beste()` ueberhaupt gefragt wurde. Er umging damit genau die Rechnung,
+die den Chaos-Zuschlag enthaelt.
+
+Gemessen 12:38 aus `data/aktionen.txt` (50 Abschnitte, 125 protokollierte
+Minuten von 08:12 bis 12:35):
+
+    General/Diplomacy                    71,0 min   56,8 %       0 Rang
+    Contracts/Bounty Hunter              13,1 min   10,4 %   2.061
+    Contracts/Tracking                   12,3 min    9,8 %     618
+    Operations/Stealth Retirement        11,3 min    9,0 %   4.209
+    Operations/Raid                       7,9 min    6,3 %  10.124
+    General/Hyperbolic Regeneration       2,8 min    2,3 %       0
+    Black Operations/Operation K          2,4 min    1,9 %     746
+    General/Field Analysis                2,3 min    1,9 %       0
+    Black Operations/Red Dragon           2,0 min    1,6 %     469
+
+**Die Ausdauerkammer war 2,3 Prozent.** Damit ist der im Punkt vorgeschlagene
+Ansatz widerlegt: Die Spalten `arbeitsanteil` und `zyklusrate` in
+`data/bbspann.json` rechnen mit der Ersatzregeneration 2,3/min
+(`regenerationQuelle: "Vorgabe"`) und ueberschaetzen den Ausdauerdruck um mehr
+als das Zwanzigfache - die Ausdauer stand um 12:40 bei 949 von 949. Sie taugen
+als Auswahlkriterium nicht und werden weiterhin nicht benutzt.
+
+Die uebersprungene Rechnung, mit `data/bbspann.json` von 12:40 (alle Chancen
+bei 1,000):
+
+    Raid           Stufe 17   252,7 Rang je Lauf,  11 s
+                   Chaos +1 bis +5 % (`Bladeburner.ts:844`), im Mittel 3 %.
+                   Diplomacy senkt bei Charisma 309 um 1,603 % je 60 s
+                   (`:735-743`), macht 1,87 Laeufe = 112 s.
+                   -> 252,7 Rang je 123 s = **123 Rang/min**
+    Assassination  Stufe 20   530,4 Rang je Lauf,  29 s
+                   Chaos -5 bis +5 % (`:859`), im Mittel **null**.
+                   -> **1.097 Rang/min**, Faktor 8,9
+
+Der zweite Posten wiegt schwerer als der erste: Raid nimmt der Stadt je Erfolg
+**ein Prozent der Bevoelkerung** (`:831-834`) und eine Gemeinde, Assassination
+genau **einen Kopf** (`:855-858`). Die Bevoelkerung geht ueber `(pop/1e9)^0,7`
+in jede Erfolgschance ein. Raid frisst also die Grundlage aller anderen
+Aktionen - dieselbe Ursache, an der heute frueh Chongqing gestorben ist
+(popEst 0 um 11:10) und an der New Tokyo gerade starb: **1.532 Mio um 11:03,
+223 Mio um 12:40.** Deshalb war auch Stealth Retirement nicht mehr waehlbar
+(`SR_POP_MIN` 0,8e9), und der Motor fiel auf Diplomacy zurueck.
+
+Aenderung: Der Raid-Vorrangzweig ist ersatzlos gestrichen. Raid steht in
+`OPERATIONEN` und wird von `beste()` mitbewertet, Chaos-Zuschlag inklusive -
+gewinnt es dort, kommt es weiter dran (und tat es um 12:49:18 auch einmal).
+
+**Verifiziert: 857 Rang/min um 12:51** (102.082 um 12:47:25 auf 105.366 um
+12:51:15, 230 s, `data/blade.json` im 15-Sekunden-Takt). Vorher lagen die
+geglaetteten Fenster bei 118,4/min (61 min) und 130,7/min (121 min). **Faktor
+6,6.** In diesen vier Minuten lief kein einziger Diplomacy-Lauf.
+
+Fallstrick, der zwei Minuten gekostet hat: Die Bruecke schiebt `src/`
+automatisch nach, aber `blade.js` lief unveraendert weiter - um 12:46 stand
+noch "Raid, Chance 1.000" als Grund, ein String aus dem geloeschten Zweig.
+Erst `pushFile data/reload.txt` mit `WERKZEUG blade.js` hat den Prozess
+ersetzt. **Ein Dateiabgleich ist kein Neustart.**
+
+Commit: siehe `git log src/blade.js`.
+
+---
+
 ### WIDERLEGT: Die Black-Op-Schwelle 0,90 ist richtig (28.08., 12:12)
 
 Der Sofort-Punkt von 12:05 behauptete, `blackOpSchwelle()` blockiere Operation

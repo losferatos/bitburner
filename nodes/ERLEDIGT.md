@@ -23,6 +23,103 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Field Analysis gedeckelt - der Motor trainiert wieder (28.08., 08:33)
+
+Der Sofort-Punkt von 08:03 ist nachgemessen und erledigt.
+
+**Verifiziert 08:33:** `data/blade.json` steht auf
+`"aktion":"General/Training"`, Grund "zu schwach" - der Zehn-Minuten-Deckel
+von 08:14 hat gegriffen, wie vorhergesagt. Vorher lief Field Analysis von
+07:52 bis 08:24 durch, 32 Minuten fuer sechs Rang.
+
+Zwei Aenderungen trugen (Commit `6bd4d98`):
+
+1. **Freigabe-Bedingung statt Spannenbreite.** Field Analysis laeuft nur noch,
+   wenn das Schaerfen eine Aktion aufschliesst
+   (`s.max >= schwelle && s.min < schwelle`). Verifiziert schon um 08:09 am
+   Grund-Text: "Schaetzung verdeckt Investigation (0.00-1.00 gegen 0.85)".
+
+2. **Deckel nach der Uhr, nicht nach Durchlaeufen.** `waehle()` wird je
+   Aktualisierung gerufen, nicht je Aktionsdurchlauf - ein Zaehler haette die
+   Schleifenfrequenz gemessen. Zehn Minuten am Stueck, danach dreissig Minuten
+   Sperre gegen das Pendeln.
+
+**Warum die Freigabe-Bedingung allein nicht gereicht haette**, und das ist der
+eigentliche Fund: Bei schlechter Bevoelkerungsschaetzung liefert
+`getSuccessRange` fuer **jede** Aktion [0,00-1,00] - `low = real - diff`
+klemmt auf 0, sobald `diff` groesser als `real` ist
+(`Actions/Action.ts`). Die Bedingung ist dann immer wahr, und die Regel
+bindet sich selbst nicht. Dazu ist das Schaerfen langsam:
+`eff = 0,04*hacking^0,3 + 0,04*int^0,9 + 0,02*cha^0,3`
+(`Bladeburner.ts:1122-1131`), und in BitNode 6 mit
+`HackingLevelMultiplier` 0,35 ist der Hacking-Summand klein.
+
+**Was der Eingriff NICHT geloest hat:** Der Motor trainiert jetzt, aber mit
+Ortsmultiplikator 1 statt der 10 des Powerhouse Gym. Die Rangrate steht bei
+0,1/min. Das ist der Nachfolgepunkt oben in `## Sofort`.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Field Analysis blockiert den Wiederaufbau - 12 Minuten bei 0,2 Rang je Minute (08:03)
+
+Gemessen: `data/blade.json` steht seit **07:52** auf
+          `General/Field Analysis`, Grund "Schaetzung unsicher". Der Rang
+          bewegte sich in dieser Zeit von 82.293 auf 82.295 -
+          **+2 in 12 Minuten**, also 0,17/min. Die geglaettete 45-Minuten-Rate
+          ist dadurch auf **12,0/min** gefallen (`data/verlauf-strategie.json`),
+          gegen 218,6/min im Vier-Stunden-Mittel.
+
+Erwartet: Waehrend eines Wiederaufbaus nach einem Einbau ist nicht die
+          Schaetzung der Engpass, sondern die Kampfwerte. Bladeburner-Training
+          (gratis, `Bladeburner.ts:1091-1105`, hebt alle vier Werte) traegt
+          dort mehr als Field Analysis - die bringt `rankGain` 0,1 und
+          **keine** Kampferfahrung. Der Motor sollte also Training fahren,
+          solange die Kampfwerte unter dem liegen, was die erreichte
+          Aktionsstufe verlangt.
+
+Verdacht: `src/blade.js:1959-1966`, Regel 4 in `waehle()`:
+
+              for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
+                const s = spanne(...);
+                if (s.max - s.min > SPANNE_ZU_BREIT) return Field Analysis;
+              }
+
+          `SPANNE_ZU_BREIT` = 0,10 (`blade.js:257`). Die Regel steht **vor**
+          dem Training-Rueckfall und kennt keine Gegenrechnung: Sie fragt, ob
+          die Schaetzung unscharf ist, nicht, ob das Schaerfen sich gegen die
+          Alternative lohnt.
+
+          **Die Regel konvergiert immerhin** - die Spanne der naechsten
+          Black Op fiel von 0,220 (07:08) auf 0,117 (08:03), die Chance stieg
+          von 0,780 auf 0,883. Sie ist also nicht kaputt, nur teuer. Ein
+          Abbruch nach fester Zeit oder ein Vergleich `Rang je Minute mit
+          geschaerfter Schaetzung` gegen `Rang je Minute mit Training` waere
+          die saubere Loesung.
+
+          **Zusammenhang:** Der Zustand wurde durch den Fix von 07:53 erst
+          sichtbar (vorher stand dort `General/keine`, also Leerlauf). Der Fix
+          war richtig, deckt aber die naechste Schicht auf.
+
+**Geaendert 08:14, Wirkung noch nicht gemessen** (Commit `6bd4d98`). Zwei
+Aenderungen an Regel 4:
+
+1. Sie fragt jetzt, ob das Schaerfen eine Aktion FREIGIBT
+   (`s.max >= schwelle && s.min < schwelle`), statt nur nach der Breite der
+   Spanne. **Verifiziert 08:09**: Der Grund lautet seither
+   "Schaetzung verdeckt Investigation (0.00-1.00 gegen 0.85)".
+
+2. Das allein bindet nicht: Bei schlechter Bevoelkerungsschaetzung liefert
+   `getSuccessRange` fuer JEDE Aktion [0,00-1,00] (`Actions/Action.ts`:
+   `low = real - diff` klemmt auf 0), die Bedingung ist dann immer wahr.
+   Deshalb ein Deckel nach der Uhr - zehn Minuten am Stueck, danach dreissig
+   Minuten Sperre. **Der Deckel greift fruehestens 10 Minuten nach dem
+   Neustart von 08:14, also gegen 08:24. Das ist die offene Nachmessung:
+   Steht `data/blade.json` dann auf `General/Training`?**
+
+</details>
+
+---
+
 ### Zwei Fehler in blade.js: die Schwelle ignorierte den Einsatz, die Weiche fuehrte ins Nichts (28.08., 07:53)
 
 **1. Die Black-Op-Schwelle folgte dem Raid-Vorrat statt dem Einsatz.**

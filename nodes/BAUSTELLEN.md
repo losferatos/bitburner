@@ -55,62 +55,51 @@ Regeln:
 
 ## Sofort
 
-### Field Analysis blockiert den Wiederaufbau - 12 Minuten bei 0,2 Rang je Minute (08:03)
+### Das Gym ist im Wiederaufbau der bessere Tausch - als ERSATZ, nicht parallel (08:33)
 
-Gemessen: `data/blade.json` steht seit **07:52** auf
-          `General/Field Analysis`, Grund "Schaetzung unsicher". Der Rang
-          bewegte sich in dieser Zeit von 82.293 auf 82.295 -
-          **+2 in 12 Minuten**, also 0,17/min. Die geglaettete 45-Minuten-Rate
-          ist dadurch auf **12,0/min** gefallen (`data/verlauf-strategie.json`),
-          gegen 218,6/min im Vier-Stunden-Mittel.
+Gemessen: `data/blade.json` steht seit dem Deckel-Eingriff auf
+          `General/Training`, Grund "zu schwach" - das ist die richtige
+          Aktion, aber die langsame. Ueber 44 Minuten:
 
-Erwartet: Waehrend eines Wiederaufbaus nach einem Einbau ist nicht die
-          Schaetzung der Engpass, sondern die Kampfwerte. Bladeburner-Training
-          (gratis, `Bladeburner.ts:1091-1105`, hebt alle vier Werte) traegt
-          dort mehr als Field Analysis - die bringt `rankGain` 0,1 und
-          **keine** Kampferfahrung. Der Motor sollte also Training fahren,
-          solange die Kampfwerte unter dem liegen, was die erreichte
-          Aktionsstufe verlangt.
+              Rangrate                 0,1/min   (44 min, geglaettet)
+              Rangrate 4-h-Mittel    163,1/min
+              Kampfwert-Tiefstand      225, plus rund 0,2/min
 
-Verdacht: `src/blade.js:1959-1966`, Regel 4 in `waehle()`:
+          Bladeburner-Training gibt 30 Erfahrung je 30 Sekunden auf alle vier
+          Werte (`Bladeburner.ts:1091-1105`), also Ortsmultiplikator **1**.
+          Das Powerhouse Gym in Sector-12 hat **10** (`LocationsMetadata.ts`).
 
-              for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
-                const s = spanne(...);
-                if (s.max - s.min > SPANNE_ZU_BREIT) return Field Analysis;
-              }
+Erwartet: **Der Verzicht kostet derzeit 0,1 Rang je Minute.** Genau das ist
+          der Punkt: Am 07:34 wurde der Gym-Hebel zurueckgenommen, weil
+          `Bladeburner.ts:178-180` und `:1353-1360` beweisen, dass Arbeit und
+          Bladeburner sich ohne `The Blade's Simulacrum` ausschliessen. Die
+          Ruecknahme war richtig - die Begruendung "laeuft parallel" war
+          falsch. Aber im Zustand "blade.js faehrt ohnehin nur Training" ist
+          das Gym kein Parallelbetrieb mehr, sondern ein **Ersatz** - und der
+          rechnet sich: Faktor 10 auf die Kampferfahrung gegen 0,1 Rang je
+          Minute.
 
-          `SPANNE_ZU_BREIT` = 0,10 (`blade.js:257`). Die Regel steht **vor**
-          dem Training-Rueckfall und kennt keine Gegenrechnung: Sie fragt, ob
-          die Schaetzung unscharf ist, nicht, ob das Schaerfen sich gegen die
-          Alternative lohnt.
+Verdacht: Kein Fehler im Code, sondern eine fehlende Regel. Sauber waere:
+          Waehlt `waehle()` `General/Training` (Grund "zu schwach"), soll
+          `blade.js` die Figur an bbtrain abgeben - dieselbe Weiche wie bei
+          `tiefstand < BBTRAIN_ZIEL`, nur mit dem Training-Fall als zweitem
+          Ausloeser. Und `bbtrain.js` muss dann auch oberhalb von `ZIEL`
+          trainieren, was der zurueckgenommene Commit `41fa473` schon konnte.
 
-          **Die Regel konvergiert immerhin** - die Spanne der naechsten
-          Black Op fiel von 0,220 (07:08) auf 0,117 (08:03), die Chance stieg
-          von 0,780 auf 0,883. Sie ist also nicht kaputt, nur teuer. Ein
-          Abbruch nach fester Zeit oder ein Vergleich `Rang je Minute mit
-          geschaerfter Schaetzung` gegen `Rang je Minute mit Training` waere
-          die saubere Loesung.
+          **Vorsicht, das ist der Sackgassen-Kandidat:** Beide Skripte duerfen
+          nicht wieder anfangen, sich die Figur gegenseitig wegzunehmen (das
+          war der Vorfall vom 28.08., 01:33). Die Uebergabe braucht genau eine
+          Richtung: blade.js weicht, bbtrain uebernimmt, und blade.js kommt
+          erst zurueck, wenn wieder eine Aktion ueber ihrer Schwelle liegt.
 
-          **Zusammenhang:** Der Zustand wurde durch den Fix von 07:53 erst
-          sichtbar (vorher stand dort `General/keine`, also Leerlauf). Der Fix
-          war richtig, deckt aber die naechste Schicht auf.
+Dringlichkeit: **hoch.** Es ist der einzige Posten, der die ETA gerade
+          bestimmt - 0,1 statt 163 Rang je Minute.
 
-**Geaendert 08:14, Wirkung noch nicht gemessen** (Commit `6bd4d98`). Zwei
-Aenderungen an Regel 4:
-
-1. Sie fragt jetzt, ob das Schaerfen eine Aktion FREIGIBT
-   (`s.max >= schwelle && s.min < schwelle`), statt nur nach der Breite der
-   Spanne. **Verifiziert 08:09**: Der Grund lautet seither
-   "Schaetzung verdeckt Investigation (0.00-1.00 gegen 0.85)".
-
-2. Das allein bindet nicht: Bei schlechter Bevoelkerungsschaetzung liefert
-   `getSuccessRange` fuer JEDE Aktion [0,00-1,00] (`Actions/Action.ts`:
-   `low = real - diff` klemmt auf 0), die Bedingung ist dann immer wahr.
-   Deshalb ein Deckel nach der Uhr - zehn Minuten am Stueck, danach dreissig
-   Minuten Sperre. **Der Deckel greift fruehestens 10 Minuten nach dem
-   Neustart von 08:14, also gegen 08:24. Das ist die offene Nachmessung:
-   Steht `data/blade.json` dann auf `General/Training`?**
-
+**Der langfristige Ausweg steht schon fest und ist kaufbar:**
+`The Blade's Simulacrum` (repCost 1.250, moneyCost 1,5e11,
+`Augmentations.ts:284-297`) hebt den Ausschluss auf. Geld ist das Tor: 3,8
+Mrd bei rund 3 Mrd je Stunde, also gut 50 Stunden - zu lang, um darauf zu
+warten, aber ein Kandidat fuer die naechste Augmentierungsrunde.
 
 ## Offen, nach Dringlichkeit
 

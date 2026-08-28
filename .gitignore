@@ -17,3 +17,6 @@ data/ziele.md
 # Messverlauf des Strategiepruefers - wird bei jedem Lauf neu geschrieben
 data/verlauf-strategie.json
 data/notnagel.json
+
+# Spielstand-Sicherungen: enthalten den vollstaendigen Save, gehoeren nicht ins Repo.
+backups/

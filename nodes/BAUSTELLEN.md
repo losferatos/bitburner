@@ -59,6 +59,73 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Source-File -1: die letzten vier Exploits (Stand 28.08., 07:45 - 7 von 11)
+
+Eingesammelt: `UndocumentedFunctionCall`, `INeedARainbow`, `Bypass`
+(`src/exploit.js`), `TimeCompression` (`src/exploit2.js`), `TrueRecursion`
+und `N00dles` (`src/exploit3.js`). `PrototypeTampering` haengt am
+15-Minuten-Zeitgeber und sollte kurz nach 07:57 fallen - nachsehen mit
+`node tools/lage.js | grep Exploits`.
+
+**Der Ertrag ist bewusst klein**: `applyExploits.ts` multipliziert alle
+Multiplikatoren mit `1,001^n`. Von 7 auf 11 sind das 1,007 auf 1,011, also
+**+0,4 %**. Dafuer permanent und ueber jeden Reset hinweg - bei 45 geplanten
+Laeufen ist das kein Nichts, aber es hat keine Dringlichkeit.
+
+**1. `YoureNotMeantToAccessThis` - im ausgelieferten Spiel NICHT erreichbar.**
+`ns.openDevMenu()` oeffnet nur den April-Scherz (`Extra.ts:19` zeigt auf
+`Apr1Events`, `ui/Apr1.tsx:41`). Den Exploit vergibt `DevMenuRoot`
+(`DevMenu.tsx:41-43`), und dorthin fuehrt einzig der Sidebar-Eintrag unter
+`process.env.NODE_ENV === "development"` (`SidebarRoot.tsx:436`). Ohne
+Zugriff auf das `Router`-Modul aus der Seite heraus gibt es keinen Weg.
+**Nur ueber React-Interna (Fiber-Baum nach dem Router absuchen) - fragil,
+lohnt fuer 0,1 Prozent nicht.**
+
+**2. `Unclickable` - loesbar, braucht aber einen ECHTEN Mausklick.**
+`Exploits/Unclickable.tsx:11` prueft `event.isTrusted`, und
+`element.click()` aus einem Skript ist unwahr. Der Rest ist geloest:
+
+    const getComputedStyle = window.getComputedStyle;   // Zeile 5, beim Laden
+                                                        // des Moduls gefangen
+
+Ein spaeteres Ueberschreiben von `window.getComputedStyle` greift also nicht.
+**Aber die zurueckgegebene `CSSStyleDeclaration` gehorcht ihrem Prototyp** -
+werden dort die Lesefunktionen fuer `display` und `visibility` auf "none"
+und "hidden" festgenagelt, darf das Element in Wahrheit sichtbar und
+anklickbar sein. Also: Prototyp verbiegen, `#unclickable` per Inline-Stil
+gross und sichtbar machen, klicken lassen, alles zuruecksetzen.
+
+Der Klick selbst geht entweder per CDP (`Input.dispatchMouseEvent` erzeugt
+vertrauenswuerdige Ereignisse) ueber die Opera-Verbindung - oder Eric klickt
+einmal hin. **Vorsicht:** `<Unclickable/>` haengt in `GameRoot`
+(`ui/GameRoot.tsx:558`) und wird oft neu gezeichnet; React setzt den
+Inline-Stil dann zurueck. Der Stil muss also kurz vor dem Klick gesetzt
+werden.
+
+**3. `RealityAlteration` - braucht den Debugger, nichts anderes.**
+
+    let x = false;
+    const recur = function (depth) { if (depth === 0) return; x = !x; recur(depth - 1); };
+    recur(2);                          // zwei Umschaltungen -> x bleibt false
+    if (x) giveExploit(RealityAlteration);
+
+`x` ist eine Abschlussvariable, `recur` ruft sich ueber den eigenen Namen
+auf, und `depth === 0` wie `depth - 1` sind strikte Operationen auf
+Zahl-Primitiven - an keiner Stelle greift ein Prototyp. Der Kommentar der
+Entwickler sagt es selbst: "a variable that is guaranteed to be false **(and
+doesn't use prototypes)**". Der Weg ist ein Haltepunkt in `alterReality` und
+`Debugger.setVariableValue` - per CDP machbar, von einem Skript aus nicht.
+
+**4. `EditSaveFile` - kein Ausloeser im Spiel, nur der Spielstand selbst.**
+Ausser der Achievement-Pruefung kommt der Name nirgends vor. Er entsteht
+allein dadurch, dass `"EditSaveFile"` in der Exploit-Liste des Standes steht.
+Also: exportieren, entpacken, Eintrag setzen, packen, importieren. **Nur mit
+Sicherung und nicht im laufenden Betrieb** - eine Sicherung liegt seit 07:37
+unter `backups/` (nicht im Repo, siehe `.gitignore`).
+
+**Dringlichkeit: niedrig.** Nichts davon bewegt den Knotenausgang. Der Punkt
+steht hier, damit die Arbeit von heute frueh nicht verlorengeht.
+
 ### Die Black-Op-Schwelle muss zum Ende hin steigen - ab Nr. 18 ist ein Fehlschlag ruinoes
 
 Gefunden vom Kursloop am 28.08., 07:15, beim Erzeugen der Black-Op-Tabelle aus

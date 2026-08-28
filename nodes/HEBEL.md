@@ -37,6 +37,54 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kein Hebel, fuenfter Winkel: die Gym-Formel selbst (29.08., 01:00)
+
+Engpass:    Unveraendert der Kampfwert-Tiefstand (`nodes/KURS.md`, 21:45):
+            **81 von 100** um 00:51, in Erfahrung rund 55.000 von 252.795.
+
+Der Lauf von 22:05 hat vier Kandidaten rund um Gym und Sleeve verworfen. Um
+nicht denselben Gradienten ein zweites Mal abzulaufen, hier ein anderer
+Ansatz: **nicht die Umstaende des Trainings, sondern seine Formel.**
+
+`calculateClassEarnings` (`Work/Formulas.ts:108-116`):
+
+    scaleWorkStats(classInfo.earnings, (location.expMult / gameCPS) * hashMult)
+    hashMult = isMember("GymType", type)
+             ? hashManager.getTrainingMult()      // Gym
+             : hashManager.getStudyMult()         // Universitaet
+
+Drei Faktoren, mehr gibt es nicht. `classInfo.earnings` ist fest,
+`location.expMult` ist mit Powerhouse Gym bereits maximal (10) - bleibt
+`hashMult`. Er kommt aus dem Hash-Upgrade **Improve Gym Training**: 50 Hashes
+je Stufe, **+20 Prozent je Stufe**, und der Effekt haelt bis zum naechsten
+Augmentierungs-Einbau (`Hacknet/data/HashUpgradesMetadata.tsx:72-80`). Bei der
+gemessenen Rate von 13,25 Erfahrung je Sekunde waeren zwei Stufen +40 Prozent,
+also rund **vier Stunden weniger** auf den Restweg.
+
+**Verworfen, und zwar hart: Hashes gibt es hier nicht.** Sie entstehen nur auf
+Hacknet-SERVERN, und die verlangen SF9. Aus dem Spielstand um 00:58 gelesen:
+
+    sourceFiles  {1:1, 4:1, 5:1, 6:1}      - kein 9
+    hashManager  capacity 0, hashes 0, alle Upgrades auf 0
+    hacknetNodes 0
+
+Damit ist `hashMult` in diesem Knoten fest 1, und die Gym-Formel hat keinen
+freien Parameter mehr. Der Bot faehrt sie optimal.
+
+**Der Fund gehoert trotzdem festgehalten**, denn dieselbe Tabelle enthaelt
+zwei Eintraege, die einen Bladeburner-Knoten direkt betreffen:
+
+    Exchange for Bladeburner Rank   250 Hashes  ->  100 Rang
+    Exchange for Bladeburner SP     250 Hashes  ->   10 Faehigkeitspunkte
+
+Bei einem Ausgang von 400.000 Rang ist das eine eigene Waehrung neben der
+Aktionswahl. Sobald SF9 vorliegt, gehoert sie in die Kursrechnung jedes
+Kampfknotens - als Offen-Punkt eingetragen (01:02).
+
+Vorher:     Tiefstand 81 um 00:51, Rate 13,25/s.
+Nachher:    (keine Aenderung - Nullergebnis, wie 22:05, aber aus anderer
+            Richtung)
+
 ### Kein Hebel gefunden - vier Kandidaten gerechnet und verworfen (28.08., 22:05)
 
 Engpass:    Laut `nodes/KURS.md` (21:45) der **Kampfwert-Tiefstand, 68 von

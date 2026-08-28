@@ -95,6 +95,34 @@ Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
 
 ## Offen, nach Dringlichkeit
 
+### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
+
+Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,
+          `hashManager` mit capacity 0 und allen Upgrades auf 0. In diesem
+          Knoten ist die Sache also tot; der Eintrag ist fuer die Route.
+
+Erwartet: `Hacknet/data/HashUpgradesMetadata.tsx` fuehrt drei Upgrades, die
+          direkt auf unsere Engpaesse zielen:
+
+              Improve Gym Training           50 Hashes  ->  +20 % Gym-Erfahrung
+              Exchange for Bladeburner Rank 250 Hashes  ->  100 Rang
+              Exchange for Bladeburner SP   250 Hashes  ->   10 Faehigkeitspunkte
+
+          Die ersten beiden Groessen sind genau die, an denen ein Kampfknoten
+          haengt: Tor 1 ist Gym-Erfahrung, Tor 2 sind 400.000 Rang. Das
+          Gym-Upgrade haelt ausserdem bis zum naechsten Augmentierungs-Einbau,
+          ist also je Lauf einmal zu kaufen und wirkt durchgehend.
+
+Verdacht: Kein Fehler, eine fehlende Route. Hashes entstehen nur auf
+          Hacknet-SERVERN, und die verlangen SF9. Zu klaeren, sobald BitNode 9
+          gefahren ist: Wieviele Hashes je Minute traegt eine gekaufte
+          Serverflotte, und wie verhaelt sich das zu 250 Hashes je 100 Rang?
+          Bei 400.000 Rang waeren das 1 Mio Hashes - die Zahl entscheidet, ob
+          es ein Hebel oder eine Randnotiz ist.
+
+Dringlichkeit: niedrig, aber nicht vergessen. Die BitNode-Reihenfolge steht
+          fest; dieser Punkt wird geprueft, wenn SF9 vorliegt.
+
 ### Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte

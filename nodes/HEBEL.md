@@ -37,6 +37,54 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kurs fuer BitNode 10 hergeleitet (28.08., 18:55)
+
+Engpass:    **Es gab keinen gueltigen Kurs.** `nodes/KURS.md` trug als
+            obersten Eintrag "28.08., 07:15 - BitNode 6", waehrend der Knoten
+            seit 17:05 BitNode 10 ist. Ein Kurs fuer den falschen Knoten ist
+            schlechter als keiner: Er nennt eine Leitgroesse, die es hier
+            nicht gibt. Der Kursloop haette um 18:44 feuern sollen und hat
+            nichts geliefert.
+
+Hypothese:  Keine Aenderung am Bot, sondern die fehlende Grundlage. Die
+            Leitgroesse ist herleitbar, nicht messbar - also wurde sie
+            hergeleitet.
+
+Beleg:      Das Modell ist an zwei unabhaengigen Werten geeicht:
+            `calculateSkill` (`PersonObjects/formulas/skill.ts:13`) rechnet
+            mit `mults.hacking` 1,2616 x `HackingLevelMultiplier` 0,35 aus
+            42.542 Erfahrung **Level 62** (gemessen 62) und mit Kampffaktor
+            0,4 aus 2.613 Erfahrung **29** (gemessen 29).
+
+            Weg A, Hacking auf 6.000 (3.000 x `WorldDaemonDifficulty` 2):
+
+                mults.hacking  1,26 -> 2,3e187 Erfahrung
+                mults.hacking    20 -> 2,2e14
+                mults.hacking    40 -> 339.456.229    <- erst hier realistisch
+
+            Der eigene BitNode-5-Lauf zeigt den Unterschied: Dort stand
+            `HackingLevelMultiplier` auf 1,0, und Level 4.500 kostete bei
+            mult 20 nur 585.568 Erfahrung. Nicht die Erfahrung ist das
+            Problem, sondern der Faktor 0,35 - und BitNode 10 verteuert genau
+            den Ausweg (`AugmentationMoneyCost` 5, `AugmentationRepCost` 2).
+
+            Weg B, 21 Black Ops: Tor 1 ist der Beitritt (alle vier Kampfwerte
+            >= 100, `NetscriptFunctions/Bladeburner.ts:356`) und kostet bei
+            Faktor 0,4 **252.822 Erfahrung je Wert** gegen 5.633 in BitNode 6
+            - das 45-fache, aber Gym-Zeit und Geld sind da. Tor 2 ist Daedalus
+            mit `reqdRank` 400.000; die Schwelle ist knotenunabhaengig,
+            gedaempft wird der Ertrag (`BladeburnerRank` 0,8,
+            `Bladeburner/Formulas.ts:13, 22, 25`).
+
+Vorher:     Kampfwert-Tiefstand **27 von 100** um 18:52, Hacking 62.
+Nachher:    (offen - der naechste Lauf misst, ob bbtrain.js laeuft und der
+            Tiefstand steigt)
+
+Folge fuer die anderen Loops: Der Traeger dieses Knotens ist bis auf Weiteres
+der **Kampfwert-Tiefstand**, nicht das Hackniveau - `tools/strategie-check.js`
+meldet aber "Phase: Hacking-Weg", weil seine `traeger()`-Funktion nur
+BitNode 6 und 7 als Kampfknoten kennt. Das ist der naechste Hebel.
+
 ### Feuerschwelle fuer Black Ops von 0,90 auf 0,35 (28.08., 16:00)
 
 Engpass:    **Nicht mehr der Rang, sondern die erwartete Zeit bis Daedalus
@@ -77,8 +125,20 @@ Beleg:      Drei Fundstellen, alle im Quellcode:
 
 Vorher:     Daedalus 0,2571 um 15:55 (Spielzeit), Schwelle 0,90,
             Aktion Operations/Assassination.
-Nachher:    (offen - der naechste Lauf misst, ob Centurion bei 0,50 statt
-            0,90 gefeuert hat und wann die drei gefallen sind)
+Nachher:    **Getragen, und deutlich.** Die drei letzten Black Ops fielen
+            zwischen 16:10 und 17:00:
+
+                16:10  Centurion feuert bei Chance 0,405 gegen Schwelle 0,35
+                       ("Black Op (Chance 0.405 gerechnet, Schwelle 0.35)")
+                16:38  Vindictus feuert bei 0,390 - mit der alten Regel haette
+                       der Bot dort bis 0,75 gewartet
+                17:00  Daedalus gefallen, 21 von 21, BitNode 6 zu
+
+            Die Rechnung sagte 27 bis 29 Minuten je Aktion beim Feuern ab
+            0,35 gegen 78 bis 86 bei 0,90. Gemessen wurden fuer alle drei
+            zusammen **50 Minuten** - im Rahmen. Ein Fehlschlag kam vor
+            (Rang 400.234 auf 395.033 um 16:15, Centurions 5.000 rankLoss)
+            und kostete wie vorhergesagt nur Zeit, keine Skillpunkte.
 
 Naechster Kandidat, bewusst NICHT mitgeaendert: `EINSATZ_ABSTAND = 0.25`.
 Der Zuschlag stammt aus derselben Rang-je-Minute-Herleitung; die Rechnung oben

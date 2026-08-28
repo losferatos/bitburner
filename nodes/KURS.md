@@ -25,6 +25,87 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 28.08., 18:55 - BitNode 10
+
+Geschrieben vom Optimierloop, nicht vom Kursloop: Der Eintrag darueber galt
+noch fuer BitNode 6, und ein Kurs fuer den falschen Knoten ist schlechter als
+keiner. Der Knoten wurde um 17:05 gewechselt.
+
+Ausgangsbedingung: **Zwei Wege, ODER-verknuepft**
+                   (`NetscriptFunctions/Singularity.ts:1148-1164`):
+                   Hacking >= `wd.requiredHackingSkill` **mit** Root-Zugang,
+                   ODER `numBlackOpsComplete >= 21`.
+                   `WorldDaemonDifficulty` ist in BitNode 10 **2**
+                   (`BitNode.tsx`, case 10), das Hackziel also **6.000**.
+
+Das Modell ist geeicht: `calculateSkill` = `floor(mult * (32*ln(exp+534,6)
+- 200))` (`PersonObjects/formulas/skill.ts:13`), wobei `mult` das Produkt
+aus dem Spielermultiplikator und dem Knotenfaktor ist
+(`Person.ts:62`). Mit `mults.hacking` 1,2616 und
+`HackingLevelMultiplier` 0,35 ergibt das aus 42.542 Erfahrung **Level 62** -
+gemessen 62. Fuer die Kampfwerte (Faktor 0,4) rechnet es 29 gegen gemessene 29.
+
+**Weg A - Hacking auf 6.000.** Der Knotenfaktor 0,35 macht das Ziel zu einer
+reinen Frage des Augmentierungs-Multiplikators:
+
+    mults.hacking    benoetigte Erfahrung fuer Level 6.000
+      1,26 (jetzt)   2,3e187
+      5              1,8e49
+     10              9,6e25
+     20              2,2e14
+     40              339.456.229      <- erst hier realistisch
+
+Zum Vergleich der eigene BitNode-5-Lauf: Dort stand `HackingLevelMultiplier`
+auf **1,0**, und Level 4.500 verlangte bei mult 20 nur 585.568 Erfahrung. Der
+Unterschied ist nicht die Erfahrung, sondern der Faktor 0,35 - er verschiebt
+den ganzen Bedarf um Zehnerpotenzen. Weg A verlangt also **zuerst einen
+Augmentierungs-Multiplikator um 40**, und BitNode 10 verteuert genau das:
+`AugmentationMoneyCost` **5**, `AugmentationRepCost` **2**.
+
+**Weg B - 21 Black Operations.** Zwei Tore:
+
+    Tor 1  Beitritt: alle vier Kampfwerte >= 100
+           (`NetscriptFunctions/Bladeburner.ts:356`).
+           Bei Kampffaktor 0,4 sind das **252.822 Erfahrung je Wert**
+           gegen 2.613 heute. In BitNode 6 waren es 5.633 - also das
+           **45-fache**, aber es ist Gym-Zeit und Geld, beides vorhanden.
+
+    Tor 2  Daedalus, `reqdRank` **400.000**
+           (`Bladeburner/data/BlackOperations.ts:708`). Die Schwelle ist
+           knotenunabhaengig; gedaempft wird der ERTRAG:
+           `BladeburnerRank` **0,8** multipliziert jeden Rangzuwachs
+           (`Bladeburner/Formulas.ts:13, 22, 25`). 400.000 Rang kosten hier
+           also so viel Arbeit wie 500.000 in BitNode 6.
+
+Engpass:           **Weg B, und darin zuerst Tor 1.** Kampfwert-Tiefstand
+                   **27 von 100**. Weg A ist nicht verworfen, sondern
+                   nachgelagert: Er wuerde denselben Augmentierungsaufbau
+                   verlangen, den Weg B ohnehin unterwegs mitnimmt, und dann
+                   noch einen Multiplikator um 40 obendrauf.
+
+Restweg:           Tor 1: 4 x 252.822 Erfahrung, davon 2.287 bis 2.708
+                   verdient - also praktisch der volle Weg.
+                   Tor 2: 400.000 Rang bei Faktor 0,8, plus die
+                   Skillpunkte fuer die Black-Op-Chancen. In BitNode 6
+                   brauchte Daedalus allein **84.441 Skillpunkte = 253.323
+                   Rang** (siehe nodes/ERLEDIGT.md, 15:25) - bei niedrigeren
+                   Kampfwerten hier eher mehr.
+
+Rate:              Noch nicht messbar. Der Knoten ist 110 Minuten alt, die
+                   Kampfwerte steigen gerade erst (27 bis 29), und ein
+                   Gym-Lauf hat noch nicht stattgefunden.
+
+Was daraus folgt fuer die anderen Loops:
+  1. **`bbtrain.js` ist das naechste Werkzeug**, nicht `blade.js`. Solange
+     der Tiefstand unter 100 liegt, traegt das Training.
+  2. Der Sleeve gehoert perspektivisch ins Gym oder auf Bladeburner-Support -
+     seine Erfahrung faellt beim Spieler mit `sync/100` an
+     (`Sleeve/Work/Work.ts:22`), in BitNode 10 mindestens 25 Prozent.
+  3. Geld ist in dieser Phase **kein** Engpass (55 Mio bei 42 von 71
+     Rechnern), Rechenzeit auch nicht. Zeit ist es.
+
+---
+
 ## 28.08., 07:15 - BitNode 6
 
 Ausgangsbedingung: **21 Black Operations.** `destroyW0r1dD43m0n` prueft

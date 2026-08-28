@@ -64,6 +64,39 @@ Regeln:
 
 ## Sofort
 
+### Wann wird eingebaut? Die Frage ist offen und teuer (20:50)
+
+Gemessen: `Wired Reflexes` steht seit 20:40 in `queuedAugmentations`,
+          `mults.strength` unveraendert bei **1,2616**. Ein Multiplikator
+          wirkt erst nach dem Einbau (`applyAugmentation`), und der Einbau
+          setzt die Kampferfahrung auf null - aktuell **25.796 je Wert**,
+          also 10,1 Prozent des Weges zu Tor 1.
+
+Erwartet: Eine gerechnete Regel statt einer Gewohnheit. Wired Reflexes
+          allein gibt dex und agi x1,05 - str und def gar nichts. Einbauen
+          hiesse also: 25.796 Erfahrung auf allen vier Werten weg, dafuer
+          zwei Werte 5 Prozent schneller. Das ist offensichtlich zu wenig.
+
+          Die Schwelle ist ausrechenbar. Erfahrungsbedarf je Wert fuer
+          Level 100 bei Kampffaktor 0,4:
+
+              mults.kampf 1,2616 -> 254.817     1,50 ->  94.153
+              mults.kampf 1,32   -> 190.000*    2,00 ->  25.217
+
+          (*gerundet fuer x1,05 auf zwei von vier Werten). Der Einbau lohnt,
+          sobald der VERBLEIBENDE Bedarf nach dem Einbau kleiner ist als der
+          verbleibende Bedarf ohne ihn - und zwar auf dem NIEDRIGSTEN der
+          vier Werte, denn der ist das Tor.
+
+Verdacht: Kein Fehler. Es gibt schlicht noch keine Regel. `src/bn4rep.js`
+          haette eine (Mindestwarteschlange), laeuft aber nicht - 848 GB.
+          `src/kampfaugs.js` kauft nur, es baut nicht ein.
+
+Dringlichkeit: **hoch.** Solange nicht eingebaut wird, steht die Leitgroesse
+          des Kurses still; wird zu frueh eingebaut, ist die bisherige
+          Trainingszeit verloren. Beides kostet Stunden.
+
+
 ### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
 
 Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je

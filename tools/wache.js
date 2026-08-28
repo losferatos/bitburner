@@ -385,11 +385,22 @@ async function pruefe(zustand, jetzt) {
   //
   // Die Rundenzahl stand die ganze Zeit in der Telemetrie. Sie zu speichern
   // kostet nichts - sie nicht zu speichern hat Stunden gekostet.
-  // Der Verlauf steht neueste-zuerst. Gesucht ist der juengste Eintrag, der
-  // mindestens fuenf Minuten alt ist - bei drei Minuten Takt ist das der
-  // zweite oder dritte. Kuerzere Abstaende schwanken zu stark.
-  const vorigeRunde = (zustand.verlauf || []).find(
+  // Gesucht ist der JUENGSTE Eintrag, der mindestens fuenf Minuten alt ist -
+  // bei drei Minuten Takt ist das der zweite oder dritte. Kuerzere Abstaende
+  // schwanken zu stark.
+  //
+  // Hier stand ein `.find()`, und das war nur richtig, WEIL die Liste
+  // neueste-zuerst gespeichert wird (`unshift` weiter unten). Wer die
+  // Sortierung je umdreht - und der Gedanke liegt nahe, siehe den Vorfall vom
+  // 28.08. um 15:03 -, bekommt hier still den AELTESTEN Eintrag und damit eine
+  // Rundenrate ueber zwei Stunden statt ueber fuenf Minuten. Deshalb sucht die
+  // Stelle jetzt ausdruecklich das Maximum von `ts` und haengt nicht mehr an
+  // der Reihenfolge.
+  const kandidaten = (zustand.verlauf || []).filter(
     (x) => Number.isFinite(x.runde) && jetzt - x.ts >= 5 * 60_000);
+  const vorigeRunde = kandidaten.length
+    ? kandidaten.reduce((a, b) => (b.ts > a.ts ? b : a))
+    : undefined;
   if (vorigeRunde && Number.isFinite(messwerte.runde)) {
     const min = (jetzt - vorigeRunde.ts) / 60000;
     const drunden = messwerte.runde - vorigeRunde.runde;
@@ -956,8 +967,17 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     }
   }
 
-  // Verlauf: neueste zuerst. Er dient nur noch der Knotenerkennung, seit die
-  // Fortschrittspruefung ausgebaut ist - zwei Stunden sind reichlich.
+  // VERLAUF: NEUESTE ZUERST - das ist eine Zusage, keine Nebensache.
+  //
+  // `unshift` stellt den neuen Eintrag VORN hin. Wer die Liste von aussen
+  // liest und `verlauf[0]` fuer den aeltesten Punkt haelt, rechnet mit einem
+  // negativen Zeitabstand; am 28.08. um 15:03 kam so "1.419 Rang je Minute
+  // ueber -117 Minuten" heraus. Die Reihenfolge bleibt trotzdem, weil der
+  // Leser oben den juengsten hinreichend alten Eintrag braucht - sie ist nur
+  // dokumentiert, statt vorausgesetzt.
+  //
+  // Er dient nur noch der Knotenerkennung, seit die Fortschrittspruefung
+  // ausgebaut ist - zwei Stunden sind reichlich.
   zustand.verlauf.unshift(messwerte);
   zustand.verlauf = zustand.verlauf.filter((v) => jetzt - v.ts <= 2 * 60 * 60_000);
   if (messwerte.knoten != null) zustand.knoten = messwerte.knoten;

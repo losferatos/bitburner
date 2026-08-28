@@ -23,6 +23,36 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### `data/wache-zustand.json` speichert den Verlauf rueckwaerts (erledigt 28.08., 16:42)
+
+`tools/wache.js:961` haengt den neuen Messpunkt per `unshift` VORN an. Wer
+die Liste von aussen liest und `verlauf[0]` fuer den aeltesten Punkt haelt,
+bekommt ein negatives `dt`; am 28.08. um 15:03 kam so "1.419 Rang je Minute
+ueber -117 Minuten" heraus.
+
+**Nicht umsortiert, sondern entkoppelt.** Die Reihenfolge ist tragend: Der
+einzige Leser (`tools/wache.js:391`) suchte den juengsten Eintrag, der
+mindestens fuenf Minuten alt ist, per `.find()` - und das ist nur richtig,
+solange neueste-zuerst gilt. Ein Umsortieren haette dort still den AELTESTEN
+Eintrag geliefert und die Rundenrate ueber zwei Stunden statt ueber fuenf
+Minuten gemessen. Der Fehler waere also vom Report in die Stillstandserkennung
+gewandert.
+
+Stattdessen drei Eingriffe:
+1. Der Leser sucht jetzt ausdruecklich das Maximum von `ts`
+   (`filter` + `reduce`) und haengt nicht mehr an der Reihenfolge.
+2. Die Schreibstelle traegt die Zusage "neueste zuerst" als Kommentar, mit dem
+   Vorfall von 15:03 als Begruendung.
+3. `loops/loop-report.md` warnt an der Stelle, an der die Rangrate verlangt
+   wird ("Erst sortieren").
+
+Verifiziert 16:41, alter gegen neuen Leser an derselben Liste: bei
+neueste-zuerst liefern beide Runde 90; an der umgedrehten Liste liefert der
+alte Leser Runde 10 (falsch), der neue Runde 90 (richtig).
+
+---
+
+
 ### Die Abdeckung wiegt nach Arbeit statt nach Anzahl (erledigt 28.08., 16:15)
 
 Kurz: Short-Circuit und Cloak wirken auf Centurion, Vindictus und Daedalus

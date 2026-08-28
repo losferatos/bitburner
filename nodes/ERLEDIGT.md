@@ -23,6 +23,85 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Assassination-Aufbau traegt - BEIDE PRUEFPUNKTE BESTANDEN (28.08., 02:38)
+
+**Pruefpunkt 1, die Stufe steigt.** Verifiziert ueber vier Messungen:
+
+    00:07  Stufe  5   Dauer 116 s
+    01:11  Stufe  8
+    02:08  Stufe 10   Chance 1,000
+    02:38  Stufe 11   Dauer 102 s
+
+Das Kriterium war Stufe 6 nach einer Stunde. Der Einbau um 01:25 hat den
+Aufbau nicht zurueckgeworfen - `prestigeAugmentation()` laesst die
+Aktionsstufen stehen (`Bladeburner.ts:259-263`), gemessen 01:39 mit
+Assassination 9, Raid 12, Stealth Retirement 10.
+
+**Pruefpunkt 2, die Rangrate.** Das Kriterium waren 53,4 Rang/min - die Rate
+des Raid-Zyklus, den Assassination ersetzen sollte:
+
+    seit 02:05 (nach der Diplomacy-Phase)   **78,8 Rang/min** ueber 20 min
+    45-Minuten-Fenster                        69,6
+    Raid-Zyklus zum Vergleich (21:56-23:39)   52,7
+
+**Plus 49 Prozent gegenueber dem Raid-Zyklus** - die Hypothese von 23:42
+hatte 56,9 bei Stufe 11 vorhergesagt und ist damit uebertroffen.
+
+**Der Grund fuer die Uebererfuellung ist der zweite Hebel:** Die Dauer steht
+bei Stufe 11 auf **102 Sekunden** statt der gerechneten 173. Overclock ist
+seit 00:58 in der dynamischen Sortierung und stand um 01:39 bereits auf
+Stufe 30 - das sind 30 Prozent weniger Aktionszeit
+(`ActionTime: -1` je Stufe, `data/Skills.ts:44-53`). Die beiden Hebel
+multiplizieren sich: mehr Rang je Aktion, weniger Zeit je Aktion.
+
+Theoretisch sind es `44 x 1,14^10` = 163 Rang je 102 Sekunden = **95,9 je
+Minute**; die gemessenen 78,8 enthalten Kammer, Vertraege und die
+Chaos-Phasen.
+
+**Das Ziel Stufe 12 bleibt richtig.** Danach schaltet die Anlaufregel ab und
+`beste()` uebernimmt - und waehlt Assassination weiter, weil es dann den
+besten Ertrag hat. Die Stufe steigt also von allein weiter, mit 7,55 Prozent
+netto je Stufe (`rewardFac` 1,14 gegen `difficultyFac` 1,06).
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Nachmessen: traegt der Assassination-Aufbau? (23:42)
+
+Gemessen: Seit 23:39 laeuft `Operations/Assassination` mit dem Grund
+"Stufenaufbau 1/12". Der Aufbau dauert rund **3,5 Stunden** (96 Erfolge),
+waehrend die Rangrate unter dem Raid-Zyklus liegt.
+
+Erwartet: Ab Stufe 11 schlaegt Assassination den Raid-Zyklus (56,9 gegen
+53,4 Rang/min), ab Stufe 12 sind es 61,2. Zu pruefen ist beides:
+
+  1. **Die Stufe steigt wirklich.** `getActionMaxLevel` waechst nur bei
+     Erfolgen (`Bladeburner.ts:944`). Bleibt sie stehen, greift die Regel
+     nicht - dann faehrt der Motor 3,5 Stunden die schlechteste Aktion.
+     Abbruch, wenn die Stufe nach einer Stunde unter 6 liegt.
+  2. **Die Rangrate nach dem Aufbau**, geglaettet ueber 45 Minuten. Liegt
+     sie unter 53,4, wird `ASSASSIN_AUFBAU` auf `false` gesetzt und der
+     Eintrag als widerlegt vermerkt.
+
+**Zwischenstand 00:07 - Pruefpunkt 1 ist bestanden.** `data/blade.json`
+meldet `"grund":"Stufenaufbau 5/12"` und `"stufe":5` nach 28 Minuten - das
+Kriterium war Stufe 6 nach einer Stunde. Die Dauer steht bei **116 s** gegen
+121 s aus der Rechnung (96 x 1,06^4); die Abweichung nach unten kommt von den
+gestiegenen Kampfwerten, die in `statFac` eingehen (`Action.ts:112-117`).
+
+Die Rangrate liegt bei **30,4/min** seit 23:39 - wie erwartet unter den 53,4
+des Raid-Zyklus, das ist der Preis des Aufbaus. Pruefpunkt 2 (Rate nach dem
+Aufbau) steht noch aus; Stufe 12 ist gegen 02:30 zu erwarten.
+
+Verdacht auf eine Schwachstelle: Die Chance faellt mit der Stufe
+(`difficultyFac` 1,06, bei Stufe 12 das 2,01fache). Bei Stufe 1 stand sie
+auf 1,000 - wo sie unter `SICHER_OPERATION` = 0,85 faellt, hoert der Aufbau
+von selbst auf, und dann ist die erreichte Stufe die Antwort auf die Frage,
+wie weit es ueberhaupt geht.
+
+</details>
+
+---
+
 ### WIDERLEGT: Die Chaos-Hysterese hatte recht, mein Verdacht nicht (28.08., 02:10)
 
 Um 01:57 stand hier der Verdacht, die Chaos-Hysterese blockiere den

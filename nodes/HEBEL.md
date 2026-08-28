@@ -68,7 +68,13 @@ Beleg:      `data/Skills.ts:44-53`: `mults: { ActionTime: -1 }`, maxLvl 90,
             andersherum.
 
 Vorher:     Overclock Stufe 14, 84 Punkte unverbraucht, 00:53.
-Nachher:    **Verifiziert 00:56: Stufe 16.** Zwei Kaeufe binnen einer Minute,
+Nachher:    **Verifiziert 00:56: Stufe 16, um 01:39 bereits Stufe 30.**
+            Die Wirkung ist an der Aktionsdauer ablesbar: Assassination
+            braucht auf Stufe 11 nur **102 Sekunden** statt der aus
+            `difficultyFac` gerechneten 173 - rund 30 Prozent weniger,
+            genau der Overclock-Faktor. Die Rangrate steht bei **78,8/min**
+            (02:05 bis 02:38) gegen 52,7 des Raid-Zyklus.
+            Zwei Kaeufe binnen einer Minute,
             nachdem die Sortierung sie sah. Die Rangrate misst der naechste
             Lauf ueber 45 Minuten - sie ist derzeit vom laufenden
             Assassination-Stufenaufbau ueberlagert (38,1/min seit 23:39,

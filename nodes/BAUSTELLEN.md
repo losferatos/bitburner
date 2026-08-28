@@ -59,40 +59,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### Nachmessen: traegt der Assassination-Aufbau? (23:42)
-
-Gemessen: Seit 23:39 laeuft `Operations/Assassination` mit dem Grund
-"Stufenaufbau 1/12". Der Aufbau dauert rund **3,5 Stunden** (96 Erfolge),
-waehrend die Rangrate unter dem Raid-Zyklus liegt.
-
-Erwartet: Ab Stufe 11 schlaegt Assassination den Raid-Zyklus (56,9 gegen
-53,4 Rang/min), ab Stufe 12 sind es 61,2. Zu pruefen ist beides:
-
-  1. **Die Stufe steigt wirklich.** `getActionMaxLevel` waechst nur bei
-     Erfolgen (`Bladeburner.ts:944`). Bleibt sie stehen, greift die Regel
-     nicht - dann faehrt der Motor 3,5 Stunden die schlechteste Aktion.
-     Abbruch, wenn die Stufe nach einer Stunde unter 6 liegt.
-  2. **Die Rangrate nach dem Aufbau**, geglaettet ueber 45 Minuten. Liegt
-     sie unter 53,4, wird `ASSASSIN_AUFBAU` auf `false` gesetzt und der
-     Eintrag als widerlegt vermerkt.
-
-**Zwischenstand 00:07 - Pruefpunkt 1 ist bestanden.** `data/blade.json`
-meldet `"grund":"Stufenaufbau 5/12"` und `"stufe":5` nach 28 Minuten - das
-Kriterium war Stufe 6 nach einer Stunde. Die Dauer steht bei **116 s** gegen
-121 s aus der Rechnung (96 x 1,06^4); die Abweichung nach unten kommt von den
-gestiegenen Kampfwerten, die in `statFac` eingehen (`Action.ts:112-117`).
-
-Die Rangrate liegt bei **30,4/min** seit 23:39 - wie erwartet unter den 53,4
-des Raid-Zyklus, das ist der Preis des Aufbaus. Pruefpunkt 2 (Rate nach dem
-Aufbau) steht noch aus; Stufe 12 ist gegen 02:30 zu erwarten.
-
-Verdacht auf eine Schwachstelle: Die Chance faellt mit der Stufe
-(`difficultyFac` 1,06, bei Stufe 12 das 2,01fache). Bei Stufe 1 stand sie
-auf 1,000 - wo sie unter `SICHER_OPERATION` = 0,85 faellt, hoert der Aufbau
-von selbst auf, und dann ist die erreichte Stufe die Antwort auf die Frage,
-wie weit es ueberhaupt geht.
-
-
 ### Der Ausgang aus BitNode 6: 319.430 Rang netto (17:51, korrigiert 18:13, ETA neu gerechnet 23:12)
 
 **Nachtrag 23:12 - die ETA ist zweiphasig, und das stand hier nicht.** Die

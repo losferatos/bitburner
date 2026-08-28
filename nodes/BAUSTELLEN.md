@@ -55,6 +55,47 @@ Regeln:
 
 ## Sofort
 
+### Die Black-Op-Schwelle nimmt das Maximum - die Raid-Zahl blockiert die Rechnung (12:05)
+
+Gemessen: Operation K haengt seit **11:03** knapp unter der Schwelle:
+
+              11:03  Chance 0,856     11:33  0,889
+              11:11  0,858            12:03  **0,894**   Schwelle 0,90
+
+          Eine Stunde lang fast dran, und die Kampfwerte steigen kaum noch
+          (272 auf 273 in zwanzig Minuten). Aus eigener Kraft kommt sie nicht
+          mehr ueber 0,90.
+
+Erwartet: Sie sollte laengst gefahren werden. Operation K hat `rankGain` 750
+          und `rankLoss` 60 (`BlackOperations.ts`). Bei Chance 0,894:
+
+              0,894 x 750  -  0,106 x 60  =  **+664 Rang je Versuch**
+
+          Der Break-even liegt bei p* = 60/810 = **0,074**. Die Aktion ist
+          also seit Stunden hoch profitabel und wird von einer Zahl
+          aufgehalten, die mit ihr nichts zu tun hat.
+
+Verdacht: `src/blade.js`, `blackOpSchwelle()`. Sie gibt
+          `Math.max(vorrat, einsatzSchwelle(name))` zurueck. `einsatzSchwelle`
+          rechnet richtig - fuer Operation K ergaebe sie
+          `p* + 0,25 = 0,324`. Aber `vorrat` ist bei vollem Raid-Bestand
+          pauschal `SICHER_BLACKOP` = 0,90, und das Maximum gewinnt.
+
+          **Die Rechnung von 07:49 wirkt damit nur nach oben, nie nach
+          unten.** Sie sollte Vindictus schuetzen (dort `rankLoss` = `rankGain`,
+          Schwelle 0,75) - und tut das auch. Aber sie kann eine zu hohe
+          pauschale Schwelle nicht korrigieren, und genau das waere hier
+          richtig.
+
+          Sauber waere, die einsatzabhaengige Schwelle die **fuehrende** zu
+          machen und den Raid-Vorrat nur noch als Untergrenze zu benutzen -
+          oder ihn ganz zu streichen. Ein Raid-Vorrat sagt nichts darueber
+          aus, ob eine Black Op sich lohnt; er war ein Ersatzmass aus der
+          Zeit, als niemand `rankGain` gegen `rankLoss` gerechnet hat.
+
+Dringlichkeit: **hoch.** Operation K bringt 750 Rang und schaltet Deckard
+          frei; sie liegt seit einer Stunde brach.
+
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
 
 Gemessen: Der Einbau von **05:53** hat alle vier Kampfwerte auf 1 gesetzt. Um

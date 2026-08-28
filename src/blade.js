@@ -184,6 +184,8 @@ export async function main(ns) {
   const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
     "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;
+  let chaosStand = null;
+  let fahrbarStand = null;
   const chaosLage = () => {
     try { return ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); }
     catch { return 0; }
@@ -1047,6 +1049,9 @@ export async function main(ns) {
       spielzeit,
       aktion, grund,
       stufe, dauer,
+      chaos: Number.isFinite(chaosStand) ? +chaosStand.toFixed(2) : null,
+      fahrbar: fahrbarStand,
+      aufraeumen: chaosAufraeumen,
       naechsteBlackOp: bo ? bo.name : null,
       blackOpRang: bo ? bo.rank : null,
     }), "w");
@@ -1982,9 +1987,72 @@ export async function main(ns) {
     // WARUM VOR DER AKTIONSWAHL: Der Wert, den `beste()` vergleicht, ist
     // bereits durch das Chaos verdorben. Wer erst waehlt und dann aufraeumt,
     // waehlt auf Basis halbierter Zahlen.
+    // AUFGERAEUMT WIRD ERST, WENN DAS CHAOS AUCH WEHTUT (28.08.2026, 13:40).
+    //
+    // Gemessen `data/aktionen.txt` ab 13:05, 14,7 protokollierte Minuten:
+    //
+    //     Operations/Assassination   10,5 min   71,3 %   12.626 Rang
+    //     General/Diplomacy           4,2 min   28,7 %        0 Rang
+    //
+    // Raid kam nicht mehr vor - der Chaos-Zuschlag von 13:00 wirkt. Das Chaos
+    // steigt jetzt **exogen**: `randomEvent` alle 240 bis 600 Sekunden, davon
+    // 20 Prozent Synthoid-Riots mit `+1` Zaehlwert und `+5 bis +20 %`
+    // (`Bladeburner.ts:679-684`), Stadt zufaellig aus sechs. Das trifft die
+    // eigene Stadt rund alle 35 Minuten und kostet bei Charisma 309
+    // (Diplomacy -1,603 % je 60 s) rund 7,3 Minuten Aufraeumen.
+    //
+    // Nur: Dieses Aufraeumen kauft nichts. Chaos hat im ganzen Spiel **genau
+    // eine** Wirkung - `difficulty *= sqrt(1 + chaos - 50)`
+    // (`Actions/Action.ts:94-102` fuer Vertraege, `Actions/Operation.ts:52-61`
+    // fuer Operationen; Black Ops sind immun, `BlackOperation.ts:59-61` gibt
+    // fest 1 zurueck). Und die Erfolgschance ist
+    // `Math.min(1, competence/difficulty)` (`Action.ts:196`) - sie **klemmt**.
+    // Solange sie klemmt, ist der Aufschlag wirkungslos.
+    //
+    // Wie gross die Reserve ist, steht in `data/bbspann.json` von 12:40: In
+    // Sector-12 stand das Chaos bei **101,67** - Faktor 7,26 auf die
+    // Schwierigkeit - und Raid trotzdem bei **0,997**. In New Tokyo stehen bei
+    // Chaos um 50 alle sechs Operationen und alle drei Vertraege auf 1,000.
+    //
+    // Die Schwellen `CHAOS_EIN`/`CHAOS_AUS` sind absolut gesetzt, obwohl der
+    // Schaden relativ ist. Deshalb entscheidet jetzt die Wirkung: Solange
+    // irgendeine Operation oder ein Vertrag ueber seiner Sicherheitsschwelle
+    // steht, ist das Chaos folgenlos und es wird nicht aufgeraeumt. Faellt
+    // alles darunter, greift die alte Hysterese unveraendert - dann kostet
+    // das Chaos wirklich etwas.
+    //
+    // Der Ausstieg haengt damit nicht mehr allein an `CHAOS_AUS`: Sobald
+    // wieder etwas fahrbar ist, hoert das Aufraeumen auf. Das ist wichtig,
+    // weil die Senkung prozentual ist - von einem hohen Stand auf 47 waeren es
+    // Stunden, waehrend die ersten Laeufe schon reichen, um die Schwierigkeit
+    // unter die Klemmgrenze zu druecken.
     if (SPIEL_CHAOS_AN) {
-      if (chaosLage() > CHAOS_EIN) chaosAufraeumen = true;
-      if (chaosLage() < CHAOS_AUS) chaosAufraeumen = false;
+      let etwasFahrbar = false;
+      try {
+        for (const n of OPERATIONEN) {
+          if (offen(O, n) < 1) continue;
+          if (spanne(O, n).min >= SICHER_OPERATION) { etwasFahrbar = true; break; }
+        }
+        if (!etwasFahrbar) {
+          for (const n of VERTRAEGE) {
+            if (offen(V, n) < 1) continue;
+            if (spanne(V, n).min >= SICHER_VERTRAG) { etwasFahrbar = true; break; }
+          }
+        }
+      } catch {
+        // Ohne Messung lieber die alte Regel: ein Aufraeumen zuviel ist
+        // billiger als eine Stadt, in der nichts mehr geht.
+        etwasFahrbar = false;
+      }
+      // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR.
+      // Beide Groessen gehen deshalb in `data/blade.json`: Ohne sie liesse
+      // sich "es wird nicht aufgeraeumt" nicht von "es gab nichts
+      // aufzuraeumen" unterscheiden - genau die Verwechslung, die den
+      // Einbau-Riegel am 28.08. um 11:40 unpruefbar gemacht hat.
+      chaosStand = chaosLage();
+      fahrbarStand = etwasFahrbar;
+      if (chaosLage() > CHAOS_EIN && !etwasFahrbar) chaosAufraeumen = true;
+      if (chaosLage() < CHAOS_AUS || etwasFahrbar) chaosAufraeumen = false;
       if (chaosAufraeumen) {
         // STEALTH RETIREMENT STATT DIPLOMACY (27.08.2026, 20:42).
         //

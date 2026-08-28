@@ -57,6 +57,26 @@ Dringlichkeit: **hoch.** 28,7 Prozent der Leitgroesse, bei einem Restweg von
           185.215 Rang und einer gemessenen Rate von 858/min sind das rund
           62 Minuten reiner Leerlauf bis zum Knotenausgang.
 
+**Geaendert 13:40, Wirkung noch nicht vollstaendig gemessen.** `chaosAufraeumen`
+schaltet jetzt nur noch ein, wenn das Chaos ueber `CHAOS_EIN` liegt **und**
+keine Operation ueber `SICHER_OPERATION` und kein Vertrag ueber
+`SICHER_VERTRAG` steht - und es schaltet sofort ab, sobald wieder etwas fahrbar
+ist. Die Fundstellen sind nachgeschlagen und decken den ganzen Effekt ab: Chaos
+kommt im Bladeburner-Quellcode ausser beim passiven Abbau (`:1397`) und den
+`changeChaosBy*`-Setzern **nur** in `Action.ts:96` und `Operation.ts:54` vor;
+Black Ops sind immun (`BlackOperation.ts:59-61` gibt fest 1 zurueck).
+
+Was gemessen ist: Die drei neuen Telemetriefelder in `data/blade.json` stehen
+und liefern - **13:42:51 `chaos 39.84, fahrbar true, aufraeumen false`**. Ohne
+sie liesse sich "es wird nicht aufgeraeumt" nicht von "es gab nichts
+aufzuraeumen" unterscheiden.
+
+Was **nicht** gemessen ist: Genau dieser Fall. Das Chaos steht seit dem Eingriff
+bei 37 bis 40 und damit unter `CHAOS_EIN` - die alte Regel haette hier ebenfalls
+nicht aufgeraeumt. Der Nachweis ist erst erbracht, wenn `data/blade.json` einmal
+`chaos > 50` bei `fahrbar: true` und `aufraeumen: false` zeigt. Bis dahin bleibt
+der Punkt stehen.
+
 
 ### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
 

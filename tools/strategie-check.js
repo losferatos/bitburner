@@ -405,7 +405,12 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
 
   // --- 3. Wo stehen wir, und ist das die richtige Richtung? ----------------
   const rep = await liesJson("data/bn4rep.json");
-  const blade = await liesJson("data/blade.json");
+  let blade = await liesJson("data/blade.json");
+  // Frueh lesen: Die beiden folgenden Pruefungen gelten nur in Kampfknoten.
+  const ks = await liesJson("data/knoten.json");
+  const knotenFrueh = (ks && typeof ks.knoten === "number") ? ks.knoten
+    : (net && typeof net.knoten === "number") ? net.knoten : null;
+  const kampfKnoten = knotenFrueh === 6 || knotenFrueh === 7;
   let bb = await frischerSteckbrief();
   const kanalWarBelegt = !!(bb && bb.__kanalBelegt);
   // ALTE DATEN SIND SCHLIMMER ALS KEINE (25.08.2026, Fremdpruefung).
@@ -429,10 +434,18 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
         + " diesmal keine Traegermessung.");
       bb = null;
     } else {
+      // NUR IN KAMPFKNOTEN EIN BLIND (28.08.2026, 17:30).
+      //
+      // Der Steckbrief kommt von `bblage.js` und beschreibt die
+      // Bladeburner-Lage. In BitNode 10 gibt es zu diesem Zeitpunkt gar keine
+      // Division - er FEHLT zu Recht, und ein BLIND daraus ist ein
+      // Fehlalarm, der die Wache bei jedem Lauf in die Diagnose schickt.
       sag("Steckbrief ist " + alterMin + " min alt und der Auftragskanal war"
-        + " frei - der Auftragslaeufer im Spiel arbeitet nicht.");
+        + " frei" + (kampfKnoten ? " - der Auftragslaeufer im Spiel arbeitet"
+          + " nicht." : " - in BitNode " + knotenFrueh + " ohne Belang, der"
+          + " Steckbrief ist eine Bladeburner-Groesse."));
       bb = null;
-      urteil = "BLIND";
+      if (kampfKnoten) urteil = "BLIND";
     }
   }
   // DIE KNOTENNUMMER KOMMT ZUERST AUS data/knoten.json (28.08.2026, 17:25).
@@ -449,10 +462,7 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // `data/knoten.json` kommt seit 17:20 von `src/knoten.js` (1,6 GB, nur
   // getResetInfo) und ab dem naechsten Wechsel zusaetzlich aus
   // `data/bn4net.json` - beides laeuft ab der ersten Sekunde eines Knotens.
-  const ks = await liesJson("data/knoten.json");
-  const netKnoten = (net && typeof net.knoten === "number") ? net.knoten : null;
-  const knoten = (ks && ks.knoten) || netKnoten
-    || (bb && bb.knoten) || (rep && rep.knoten) || null;
+  const knoten = knotenFrueh || (bb && bb.knoten) || (rep && rep.knoten) || null;
 
   if (!knoten) {
     sag("BitNode nicht bestimmbar - weder Steckbrief noch Reputationsmelder da.");
@@ -762,6 +772,14 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // diesem Zweig keine Telemetrie. Das ist kein Befund, sondern der Normalfall
   // nach jedem Augmentierungs-Einbau.
   const wiederaufbau = t.phase === "Wiederaufbau nach Einbau";
+  // UND IN EINEM KNOTEN OHNE BLADEBURNER SCHWEIGT ES FUER IMMER
+  // (28.08.2026, 17:31). `blade.js` ist der Motor von BitNode 6 und 7. In
+  // BitNode 10 laeuft es nicht und soll es nicht - seine alte Telemetrie
+  // ueberlebt aber den Knotenwechsel auf home, und das Alter dieser Datei
+  // hat den Pruefer um 17:30 auf STAGNATION geschickt, obwohl der Bot
+  // planmaessig sein Netz aufbaut. Der Puls dieses Knotens ist bn4net.json,
+  // nicht blade.json.
+  if (!kampfKnoten) blade = null;
   if (!wiederaufbau && blade && Number.isFinite(blade.spielzeit)
       && bladeAlterMs !== null && bladeAlterMs > 5 * 60_000) {
     sag("blade.js meldet sich seit " + Math.round(bladeAlterMs / 60000)

@@ -37,67 +37,6 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
-### Das Gym haelt nach dem Beitritt an - der Arbeitskanal stand leer (28.08., 07:00)
-
-Engpass:    **Der Wiederaufbau nach einem Augmentierungs-Einbau.** Der Einbau
-            von 05:53 setzte alle vier Kampfwerte auf 1; die AKTIONSSTUFE
-            ueberlebt ihn (`prestigeAugmentation` macht nur `resetAction()`
-            + `joinFaction()`). Assassination steht auf Stufe 20 und ist
-            damit unfahrbar - der Motor faellt auf Vertraege zurueck.
-
-                Rangrate 06:09-06:51, geglaettet   53,8/min
-                Rangrate in der Nacht             442,0/min
-                                                  Faktor 8,2
-
-            Dass die Schwelle `SICHER_OPERATION` = 0,85 dabei richtig ist,
-            wurde um 06:47 nachgewiesen (88 HP Schaden je Fehlschlag bei 27 HP
-            Vorrat). Der Motor macht also nichts falsch. Falsch war, WER den
-            Wiederaufbau betreibt.
-
-            **Der Arbeitskanal stand leer**: "Arbeit keine" in beiden
-            Pruefungen um 06:46 und 06:51, bei 848 Millionen auf dem Konto.
-
-Ursache:    `bbtrain.js` ist als **Beitrittstor** gebaut - trainieren, bis der
-            niedrigste Kampfwert `ZIEL` (Vorgabe 100) erreicht, dann der
-            Division beitreten. Danach parkt es in der Warteschleife
-            (`bbtrain.js:143-153`) und ruehrt das Gym nie wieder an. Der
-            Tiefstand lag um 06:51 bei 184, also weit ueber 100 - und weit
-            unter dem, was Stufe 20 verlangt.
-
-Hypothese:  Der Tiefstand der Kampfwerte steigt von **1,07/min** (str
-            169 -> 184 zwischen 06:37 und 06:51, allein aus
-            Bladeburner-Erfahrung) auf mindestens **2,0/min**, und die
-            Rangrate kehrt von 53,8/min in Richtung der 442 zurueck, sobald
-            Assassination wieder ueber 0,85 liegt.
-
-Beleg:      Der Arbeitskanal laeuft **parallel** zur Bladeburner-Aktion - eine
-            Gym-Einheit kostet den Motor keine Sekunde. Das Powerhouse Gym in
-            Sector-12 hat Ortsmultiplikator **10**, das kostenlose
-            Bladeburner-Training **1** (`LocationsMetadata.ts`, Vergleich
-            schon in `bbtrain.js:44-58` dokumentiert). Kampfwerte wirken
-            monoton auf die Erfolgschance (`Actions/Action.ts:169-196`), es
-            gibt also keinen Punkt, ab dem mehr davon nichts mehr braechte.
-            Ein leerer Arbeitskanal ist damit reiner Verlust.
-
-Aenderung:  `ZIEL` ist nach dem Beitritt **unendlich** (`zielJetzt()`), das
-            Training endet nicht mehr von selbst. Dazu die notwendige
-            Gegenbedingung: **fremde Arbeit hat Vorrang** - steht im Kanal
-            etwas anderes als eine Gym-Einheit (bn4rep laesst die Figur fuer
-            Faktionen arbeiten, und Ruf ist die Waehrung fuer
-            Augmentierungen), wird nichts angefasst. Ohne diese Regel waere
-            das Gym kein Zugewinn, sondern ein schlechter Tausch. Sie gilt
-            erst NACH dem Beitritt; davor ist das Training das Tor zum ganzen
-            Knoten.
-
-Vorher:     Tiefstand 184, +1,07/min  |  Rang 79.887, 53,8/min  (06:51)
-Nachher:    07:02 laeuft "str @ Powerhouse Gym" in Sector-12 - die Reise und
-            der Start haben zusammen unter zwei Minuten gedauert.
-            Rangrate: (offen - naechster Lauf misst ueber 45 Minuten)
-
-Commit:     (siehe unten)
-
----
-
 ### Die Chaos-Folgekosten gehoeren in die Dauer (28.08., 03:42)
 
 Engpass:    `beste()` verglich die **nackte** Aktionsdauer. Aktionen, die

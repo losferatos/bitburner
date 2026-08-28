@@ -43,38 +43,6 @@ export async function main(ns) {
 async function runde(ns) {
 
   const ZIEL = Number(ns.args[0]) || 100;
-  // NACH DEM BEITRITT GIBT ES KEIN TOR MEHR, NUR NOCH NUTZEN (28.08.2026, 06:59).
-  //
-  // `ZIEL` war das Beitrittstor: trainieren, bis der niedrigste Kampfwert
-  // 100 erreicht, dann der Division beitreten. Nach dem Beitritt parkte
-  // bbtrain in der Warteschleife oben und ruehrte das Gym nie wieder an.
-  //
-  // Das ist genau in der Wiederaufbauphase falsch. Ein Einbau setzt alle vier
-  // Kampfwerte auf 1, die AKTIONSSTUFE ueberlebt ihn aber (`Bladeburner.ts`
-  // `prestigeAugmentation` macht nur `resetAction()` + `joinFaction()`).
-  // Assassination steht auf Stufe 20 und verlangt Werte in ganz anderer
-  // Groessenordnung als 100 - der Motor faellt also auf Vertraege zurueck und
-  // ruht, waehrend bbtrain sich fuer fertig haelt.
-  //
-  // Gemessen am 28.08., 35 Minuten nach dem Einbau von 05:53:
-  //     Rangrate    53,8/min (06:09-06:51, geglaettet)
-  //     nachts      442/min
-  //     Arbeitskanal  LEER ("Arbeit keine" in zwei Pruefungen)
-  //     Konto         848 Mio, also weit ueber GYM_MIN_GELD
-  //
-  // Der Arbeitskanal laeuft PARALLEL zur Bladeburner-Aktion - eine
-  // Gym-Einheit kostet den Motor keine Sekunde. Das Powerhouse Gym hat
-  // Ortsmultiplikator 10 gegen 1 beim kostenlosen Bladeburner-Training
-  // (LocationsMetadata.ts). Ein leerer Arbeitskanal ist damit reiner Verlust.
-  //
-  // Also: Solange die Division steht, ist das Ziel unendlich. Kampfwerte
-  // helfen der Erfolgschance monoton (`Actions/Action.ts:169-196`), es gibt
-  // keinen Punkt, ab dem mehr davon nichts mehr braechte.
-  const zielJetzt = () => {
-    let drin = false;
-    try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
-    return drin ? Infinity : ZIEL;
-  };
   // DAS BESTE STUDIO, NICHT DAS NAECHSTE (25.08.2026).
   //
   // Der Ortsmultiplikator geht voll in die Erfahrung ein, und die Spanne ist
@@ -146,8 +114,8 @@ async function runde(ns) {
     if (!drin) break;
     const k = ns.getPlayer().skills;
     const tief = Math.min(k.strength, k.defense, k.dexterity, k.agility);
-    if (tief < zielJetzt()) {
-      sag("In der Division, Kampfwerte bei " + tief + " - trainiere weiter.");
+    if (tief < ZIEL) {
+      sag("In der Division, aber Kampfwerte bei " + tief + " - trainiere nach.");
       break;
     }
     await ns.sleep(60000);
@@ -182,7 +150,7 @@ async function runde(ns) {
       if (wert < tiefstand) { tiefstand = wert; schlechtester = kurz; }
     }
 
-    if (tiefstand >= zielJetzt()) break;
+    if (tiefstand >= ZIEL) break;
 
     // Jede Runde neu: Wo stehen wir, und welches Studio gilt hier?
     let stadt = p.city;
@@ -266,30 +234,9 @@ async function runde(ns) {
       await ns.sleep(60000);
       continue;
     }
-    const laeuft = ns.singularity.getCurrentWork();
-    // FREMDE ARBEIT HAT VORRANG (28.08.2026).
-    //
-    // Notwendige Gegenbedingung zum unendlichen Ziel oben: bbtrain laeuft
-    // jetzt dauerhaft, und `gymWorkout` ueberschreibt `currentWork`
-    // kommentarlos. bn4rep laesst die Figur fuer Faktionen arbeiten, und Ruf
-    // ist die Waehrung fuer Augmentierungen - das Gym waere dann kein
-    // Zugewinn mehr, sondern ein Tausch, und zwar ein schlechter.
-    //
-    // Gym-Erfahrung ist nur solange geschenkt, wie der Kanal leer ist. Steht
-    // dort etwas anderes als eine Gym-Einheit, wird nichts angefasst.
-    //
-    // Die Regel gilt erst NACH dem Beitritt: davor ist das Training das Tor
-    // zum ganzen Knoten, und eine laufende Faktionsarbeit duerfte es nicht
-    // verschliessen.
-    if (zielJetzt() === Infinity && laeuft && laeuft.type !== "CLASS") {
-      if (letzterGrund !== "fremd") {
-        sag("Arbeitskanal belegt (" + laeuft.type + ") - kein Gym, das hat Vorrang.");
-        letzterGrund = "fremd";
-      }
-      await ns.sleep(60000);
-      continue;
-    }
     letzterGrund = "";
+
+    const laeuft = ns.singularity.getCurrentWork();
     const trainiertSchon = laeuft && laeuft.type === "CLASS"
       && laeuft.classType === schlechtester
       && (!laeuft.location || laeuft.location === gym);

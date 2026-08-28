@@ -96,6 +96,18 @@ Verdacht: Kein Fehler, sondern eine ungerechnete Groesse. `beste()` bewertet
 Dringlichkeit: **hoch.** Faktor 11 auf die Leitgroesse ist der groesste
           offene Posten des Knotens.
 
+Nachmessung 12:34 (Reportloop): Die Luecke ist kleiner als um 12:12 gedacht,
+          aber sie bleibt gross. Vier Fenster aus `verlauf-strategie.json`:
+          **118,4/min** (61 min), **130,7/min** (121 min), **71,4/min**
+          (242 min). Gegen 1.378,5 ist das immer noch Faktor 10,5 bis 19.
+          Die Folge fuer den Kurs ist beziffert: Bei 130,7/min brauchen die
+          restlichen **227.712** Rang **29 Stunden** statt der 13,3-18,1 h aus
+          `nodes/KURS.md` - der Kurswert war mit 226/min gerechnet, dem
+          Spitzenwert eines ungestoerten Fensters ohne Kammer und ohne
+          comms-Mangel. Der Arbeitsanteil ist damit nicht nur der groesste
+          offene Posten, sondern auch der Grund, warum die ETA um mehr als
+          das Doppelte danebenliegt.
+
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
 
 Gemessen: Der Einbau von **05:53** hat alle vier Kampfwerte auf 1 gesetzt. Um

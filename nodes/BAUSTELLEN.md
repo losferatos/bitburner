@@ -206,6 +206,24 @@ der Punkt stehen.
 
 ## Offen, nach Dringlichkeit
 
+### `data/wache-zustand.json` speichert den Verlauf rueckwaerts (15:05)
+
+Gemessen 15:04: `verlauf` hat 40 Punkte, davon sind **39 von 39 Uebergaengen
+absteigend** - der neueste Eintrag steht vorn (erster ts 13:03 / Rang 281.027,
+letzter 11:05 / Rang 114.698).
+
+Erwartet: Wer `verlauf[0]` als aeltesten und `verlauf[n-1]` als neuesten
+Punkt liest - so steht es im Reportloop-Prompt ("Nimm den Verlauf aus
+`data/wache-zustand.json` ueber mindestens 45 Minuten") - bekommt ein
+negatives `dt` und damit eine erfundene Rate. Genau das ist im Report um
+15:03 passiert: erste Rechnung ergab "1419/min ueber -117 min".
+
+Verdacht: `tools/wache.js:296` fuehrt die Liste per unshift. Kein Werkzeug im
+Repo bricht daran (geprueft: kein Leser ausser dem Report), es ist eine Falle
+fuer Menschen und Loops. Zwei Wege: entweder beim Schreiben sortieren, oder
+eine Zeile im Loop-Prompt und im Dateikopf, dass die Liste neueste-zuerst ist.
+
+
 ### `blade.js` verliert beim Neustart den offenen Abschnitt (14:03)
 
 Gemessen: `data/aktionen.txt` endet um **13:19:44** und hat seither nichts mehr

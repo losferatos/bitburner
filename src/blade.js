@@ -318,7 +318,47 @@ export async function main(ns) {
   // Solange Raid die Alternative ist, wird gewartet (0,90). Ist der Vorrat
   // aufgebraucht, ist Warten sinnlos - dann faellt die Schwelle zurueck auf
   // die alte 0,40. Siehe `blackOpSchwelle()` weiter unten.
-  const SICHER_BLACKOP = 0.90;
+  // 0,90 -> 0,35 (28.08.2026, 16:00). DAS ZIEL IST NICHT MEHR RANG JE MINUTE.
+  //
+  // Alle bisherigen Herleitungen dieser Schwelle - 0,99, dann 0,80, dann 0,40,
+  // dann 0,90 - haben denselben Ertrag maximiert: **Rang je Minute**. Das war
+  // richtig, solange 12 Black Ops offen waren und jede den naechsten Rang
+  // finanzierte. Offen sind noch **drei**, und hinter Daedalus ist der Knoten
+  // zu Ende. Rang, der nach dem letzten Schuss anfaellt, ist wertlos. Die
+  // richtige Groesse ist die **erwartete Zeit bis zum Fall der Aktion**.
+  //
+  // Der Fehlschlag ist dabei viel billiger als gedacht. `changeRank` vergibt
+  // Skillpunkte gegen `maxRank` (`Bladeburner.ts:1283-1291`), und
+  // `maxRank = Math.max(rank, maxRank)` (`:1273`) faellt **nie**. Ein
+  // verlorener Rang kostet also **keinen einzigen Skillpunkt** - er verzoegert
+  // nur die `reqdRank`-Freigabe fuer den naechsten Versuch. Bei 1.846 Rang je
+  // Minute sind Daedalus' 10.000 rankLoss genau 5,4 Minuten.
+  //
+  // Die Dauer steht ebenfalls fest (`Action.ts:105-121`, mit Reaper 90,
+  // Evasive 93, Overclock 90): Centurion 484 s, Vindictus 518 s, Daedalus
+  // 553 s - also gut **neun Minuten**, nicht die zwei Stunden der rohen
+  // Tabelle.
+  //
+  // Gerechnet 15:57 ueber die Chancenbahn (Daedalus 0,2296 um 15:51, gieriger
+  // Ausbau von Blade's Intuition, Digital Observer, Reaper, Evasive System bei
+  // 615 Skillpunkten je Minute), erwartete Zeit bis Daedalus faellt:
+  //
+  //     Feuern ab 0,25   57 min        Feuern ab 0,75   101 min
+  //     Feuern ab 0,35   57 min        Feuern ab 0,85   113 min
+  //     Feuern ab 0,45   64 min        Feuern ab 0,90   119 min   <- bisher
+  //     Feuern ab 0,55   77 min        Feuern ab 1,00   130 min
+  //
+  // Die Kurve ist unter 0,45 flach, darueber steil. 0,35 liegt auf dem flachen
+  // Stueck und laesst `einsatzSchwelle()` die Fuehrung - die rechnet je
+  // Aktion `rankLoss / (rankGain + rankLoss) + 0,25` und ergibt Centurion
+  // 0,50, Vindictus 0,75, Daedalus 0,45. Damit bleibt die alte, begruendete
+  // Regel in Kraft; nur der pauschale Boden faellt weg.
+  //
+  // Gegenposten Krankenhaus: `min(Geld * 0,1, ...)` (`Hospital.ts:4-10`),
+  // bei 6,4 Milliarden also 640 Millionen je Fehlschlag. Bei zwei bis drei
+  // erwarteten Fehlschlaegen rund ein Viertel des Guthabens - in BitNode 6
+  // (`ScriptHackMoney` 0,75) verschmerzbar und kein Traeger des Ausgangs.
+  const SICHER_BLACKOP = 0.35;
   const SICHER_BLACKOP_OHNE_RAID = 0.40;
   // Ab wieviel Gemeinden ueber ALLE Staedte sich das Warten noch lohnt. 20
   // sind bei Stufe 9 rund 2.360 Rang - genug, um die Wartezeit auf eine

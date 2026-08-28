@@ -37,6 +37,54 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Feuerschwelle fuer Black Ops von 0,90 auf 0,35 (28.08., 16:00)
+
+Engpass:    **Nicht mehr der Rang, sondern die erwartete Zeit bis Daedalus
+            faellt.** Offen sind noch drei Black Ops (Centurion, Vindictus,
+            Daedalus); hinter Daedalus ist der Knoten zu Ende, Rang danach ist
+            wertlos. Gemessen 15:51: Daedalus 0,2296, Rang 344.123 von
+            400.000, Rate 1.846/min.
+
+Hypothese:  Die erwartete Zeit bis Daedalus faellt sinkt von **119 auf 64
+            Minuten**, weil ein Fehlschlag viel billiger ist als die alte
+            Schwelle unterstellt.
+
+Beleg:      Drei Fundstellen, alle im Quellcode:
+            1. `changeRank` vergibt Skillpunkte gegen `maxRank`
+               (`Bladeburner.ts:1283-1291`), und `maxRank` faellt nie
+               (`:1273`). **Ein verlorener Rang kostet keinen Skillpunkt** -
+               er verzoegert nur die `reqdRank`-Freigabe. Die 10.000 rankLoss
+               von Daedalus sind bei 1.846/min genau 5,4 Minuten.
+            2. Die Dauer steht in `Action.ts:105-121`: mit Reaper 90,
+               Evasive 93 und Overclock 90 sind es Centurion 484 s,
+               Vindictus 518 s, Daedalus 553 s - gut neun Minuten, nicht die
+               zwei Stunden der rohen Tabelle.
+            3. Krankenhaus `min(Geld * 0,1, ...)` (`Hospital.ts:4-10`) =
+               640 Mio je Fehlschlag bei 6,4 Mrd. Kein Traeger des Ausgangs.
+
+            Erwartete Zeit bis Daedalus faellt, gerechnet ueber die
+            Chancenbahn (615 Skillpunkte/min in Blade's Intuition, Digital
+            Observer, Reaper, Evasive System):
+
+                ab 0,25   57 min       ab 0,75   101 min
+                ab 0,35   57 min       ab 0,85   113 min
+                ab 0,45   64 min       ab 0,90   119 min   <- bisher
+                ab 0,55   77 min       ab 1,00   130 min
+
+            Die Kurve ist unter 0,45 flach. 0,35 laesst `einsatzSchwelle()`
+            die Fuehrung (Centurion 0,50, Vindictus 0,75, Daedalus 0,45) -
+            die alte begruendete Regel bleibt, nur der pauschale Boden faellt.
+
+Vorher:     Daedalus 0,2571 um 15:55 (Spielzeit), Schwelle 0,90,
+            Aktion Operations/Assassination.
+Nachher:    (offen - der naechste Lauf misst, ob Centurion bei 0,50 statt
+            0,90 gefeuert hat und wann die drei gefallen sind)
+
+Naechster Kandidat, bewusst NICHT mitgeaendert: `EINSATZ_ABSTAND = 0.25`.
+Der Zuschlag stammt aus derselben Rang-je-Minute-Herleitung; die Rechnung oben
+sagt, dass das Optimum bei 0,25 bis 0,35 flach liegt, also unter allen drei
+`einsatzSchwelle`-Werten. Eine Aenderung je Lauf.
+
 ### Der Chaos-Zuschlag galt erst ueber `CHAOS_AUS` (28.08., 13:05)
 
 Engpass:    **Ein Grenzzyklus aus Raid und Diplomacy**, nicht eine Stoerung.

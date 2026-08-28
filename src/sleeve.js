@@ -54,7 +54,30 @@
 export async function main(ns) {
   ns.disableLog("ALL");
 
-  const VERBRECHEN = "Shoplift";
+  // VON SHOPLIFT AUF FAKTIONSARBEIT - UND VON DORT INS GYM (28.08.2026, 20:50)
+  //
+  // Schritt 1 war richtig: Geld ist kein Engpass mehr (1,4 Milliarden bei 85
+  // Rechnern), die Shoplifts mit 7.500 je Stueck waren es einmal.
+  //
+  // Schritt 2 war es nicht. Faktionsarbeit schreibt die Reputation zwar direkt
+  // dem Spieler gut (`Sleeve/Work/SleeveFactionWork.ts:51`), aber **gemessen
+  // 20:48 bis 20:49 waren es 3 Reputation je Minute** fuer Sector-12. Bis zu
+  // den 10.000 fuer Augmented Targeting I fehlen 4.835 - das waeren 27
+  // Stunden. Der Sleeve ist frisch aus dem Prestige und hat Stufe 1; seine
+  // Faktionsarbeit ist deshalb fast wertlos.
+  //
+  // Was traegt, ist das Gym. Die Erfahrung eines Sleeves geht mit `sync/100`
+  // an den Spieler (`Sleeve/Work/Work.ts:22`), in BitNode 10 mindestens 25
+  // Prozent, und die Gym-Rate haengt nicht an den Stufen, sondern am Gym und
+  // an den Erfahrungsmultiplikatoren. Bei gemessenen 13 Erfahrung je Sekunde
+  // beim Spieler sind das rund **+3,25/s**, also gut ein Viertel mehr - Tor 1
+  // faellt damit von 21,8 auf etwa 17,4 Stunden.
+  // ZWEITER PARAMETER IST DER GYMNAME, NICHT DIE STADT, und die Statangabe
+  // heisst "str"/"def"/"dex"/"agi" (`Work/Enums.ts:17-22`, GymType). Beides
+  // um 20:53 falsch geraten - der Aufruf wurde abgelehnt und fiel still auf
+  // Shoplift zurueck. Powerhouse Gym steht in Sector-12 und ist das beste.
+  const GYM = "Powerhouse Gym";
+  const VERBRECHEN = "Shoplift";   // Rueckfall, wenn das Gym nicht geht
   const TAKT = 60000;
   // Ohne getNumSleeves (4 GB) blind bis zur Obergrenze durchzaehlen. Mehr als
   // drei kann es ohne Covenant-Kaeufe nicht geben
@@ -65,13 +88,27 @@ export async function main(ns) {
   for (;;) {
     const stand = [];
     for (let i = 0; i < MAX; i++) {
-      let ok = false;
-      try { ok = ns.sleeve.setToCommitCrime(i, VERBRECHEN); }
-      catch { break; }   // ab hier gibt es keinen Sleeve mehr
-      stand.push({ nr: i, gesetzt: ok });
+      let ok = false, was = "gym";
+      // Der Sleeve trainiert den Wert, der beim SPIELER am niedrigsten ist -
+      // der Beitritt verlangt alle vier ueber 100, es zaehlt also der
+      // Tiefstand.
+      try {
+        const sk = ns.getPlayer().skills;
+        const paare = [["str", sk.strength], ["def", sk.defense],
+          ["dex", sk.dexterity], ["agi", sk.agility]];
+        paare.sort((a, b) => a[1] - b[1]);
+        was = paare[0][0];
+        ok = ns.sleeve.setToGymWorkout(i, GYM, was);
+      } catch { ok = false; }
+      if (!ok) {
+        was = VERBRECHEN;
+        try { ok = ns.sleeve.setToCommitCrime(i, VERBRECHEN); }
+        catch { break; }   // ab hier gibt es keinen Sleeve mehr
+      }
+      stand.push({ nr: i, gesetzt: ok, aufgabe: was });
     }
     ns.write("data/sleeve.json", JSON.stringify({
-      zeit: Date.now(), verbrechen: VERBRECHEN, anzahl: stand.length,
+      zeit: Date.now(), gym: GYM, anzahl: stand.length,
       sleeves: stand,
     }), "w");
     // Der Auftragslaeufer sucht den Wirt mit dem meisten freien Speicher -

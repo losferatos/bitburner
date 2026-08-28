@@ -23,6 +23,55 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der home-Ausbau haengt an einer Regel fuer Hackdurchsatz (erledigt 28.08., 20:38)
+
+Hat sich selbst erledigt, und die Regel war richtig. `homegrow.js:112`
+verlangt `geld > kosten * 3`; der Ausbau von 256 auf 512 kostet 477 Mio, also
+1,43 Mrd. Um 20:12 standen 956 Mio, um 20:38 waren es 1.405 Mio - **und home
+stand auf 512 GB**. Kein Eingriff noetig, nur Geduld.
+
+Der Punkt bleibt als Warnung stehen: Die Dreifach-Regel ist fuer den
+Hackdurchsatz gedacht. Braucht ein Werkzeug kuenftig eine Mindestgroesse, die
+nicht in dieser Zeit erreichbar ist, gehoert eine Ausnahme her.
+
+---
+
+### src/kampfaugs.js hat die erste Augmentierung gekauft (28.08., 20:40)
+
+Erster scharfer Lauf, nachdem home 512 GB erreicht hatte:
+
+    GEKAUFT: Wired Reflexes (Aevum, Rep 2.500, $12,5m)
+    Fertig. 1 gekauft, 10 in Reichweite.
+
+Die restlichen neun scheitern an der Reputation, nicht am Geld (1,4 Mrd):
+Sector-12 hat 5.147 von 10.000 fuer Augmented Targeting I, Slum Snakes 258
+von 2.500 fuer Wired Reflexes.
+
+**Gemessen und verworfen: der Sleeve als Reputationsquelle.** Faktionsarbeit
+schreibt die Reputation direkt dem Spieler gut
+(`Sleeve/Work/SleeveFactionWork.ts:51`), aber gemessen 20:48 bis 20:49 waren
+es **3 Reputation je Minute**. Bis zu den fehlenden 4.835 waeren das 27
+Stunden. Der Sleeve ist frisch aus dem Prestige und hat Stufe 1.
+
+**Stattdessen ins Gym.** Die Erfahrung eines Sleeves geht mit `sync/100` an
+den Spieler (`Sleeve/Work/Work.ts:22`), in BitNode 10 mindestens 25 Prozent,
+und die Gym-Rate haengt nicht an den Stufen. Bei 13 Erfahrung je Sekunde beim
+Spieler sind das rund +3,25/s - Tor 1 faellt von 21,8 auf etwa 17,4 Stunden.
+
+Zwei Anlaeufe brauchte es, beide Male hat der eingebaute Rueckfall auf
+Shoplift den Fehler verdeckt statt den Sleeve stillzulegen:
+  20:46  `setToFactionWork(0, "Sector-12", "Field Work")` - gueltig sind nur
+         "hacking", "field", "security" (`Work/Enums.ts:1-5`)
+  20:53  `setToGymWorkout(0, "Sector-12", "strength")` - der zweite Parameter
+         ist der GYMNAME, und die Statangabe heisst "str"/"def"/"dex"/"agi"
+         (`Work/Enums.ts:17-22`)
+
+Verifiziert 20:57: `{"gym":"Powerhouse Gym","sleeves":[{"nr":0,
+"gesetzt":true,"aufgabe":"dex"}]}` - der Sleeve trainiert den Wert, der beim
+Spieler am niedrigsten ist.
+
+---
+
 ### `nodes/KURS.md` galt noch fuer BitNode 6 (erledigt 28.08., 18:55)
 
 Erledigt vom Optimierloop, nicht vom Kursloop - der haette um 18:44 feuern

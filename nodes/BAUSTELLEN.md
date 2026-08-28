@@ -64,36 +64,6 @@ Regeln:
 
 ## Sofort
 
-### Der home-Ausbau haengt an einer Regel fuer Hackdurchsatz (20:14)
-
-Gemessen: home steht bei **256 GB**, Guthaben bei **956 Mio**. Der Ausbau auf
-          512 kostet 477 Mio (`getUpgradeHomeRamCost`). `src/homegrow.js:112`
-          verlangt aber `geld > kosten * 3` **und** `brachAnteil < 0.34` -
-          also **1,43 Mrd**, nicht 477 Mio.
-
-Erwartet: Der Ausbau. Seit 20:20 haengt der Kurs daran: `src/kampfaugs.js`
-          braucht 306,85 GB und passt auf keinen der sechzehn Rechner
-          (groesster 256). Ohne ihn keine Kampf-Augmentierungen, ohne die
-          bleibt Tor 1 bei 21,8 Stunden statt 2,2.
-
-Verdacht: `src/homegrow.js:111-113`. Die Dreifach-Regel ist fuer den
-          Hackdurchsatz gedacht - home-Speicher ist dort um Faktor 409 teurer
-          als ein Mietrechner, also soll er nur aus dem Ueberfluss bezahlt
-          werden. Das ist richtig, solange Speicher nur Durchsatz bedeutet.
-          Seit es ein Skript gibt, das eine MINDESTGROESSE braucht, ist es
-          eine andere Groesse: Dann zaehlt nicht der Ertrag je Gigabyte,
-          sondern ob ein einzelner Rechner die Schwelle reisst.
-
-          Nicht einfach den Faktor senken - das gilt fuer alle Knoten. Sauber
-          waere eine Ausnahme: Fehlt genau eine Stufe, damit ein gebrauchtes
-          Werkzeug ueberhaupt laufen kann, reicht `geld > kosten * 1,2`.
-
-Dringlichkeit: **hoch**, aber nicht dringend: Bei rund 16 Mio je Minute ist
-          die 1,43 Mrd in etwa 30 Minuten von selbst erreicht. Wer den Punkt
-          aufgreift, prueft zuerst nach, ob home inzwischen 512 hat - dann ist
-          nur noch der Kommentar zu schreiben.
-
-
 ### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
 
 Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je

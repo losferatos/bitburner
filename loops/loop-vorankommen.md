@@ -4,7 +4,9 @@
 
 BITBURNER-VORANKOMMEN (Loop 2 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
-Loop 1 bewacht den laufenden Betrieb, Loop 3 berichtet. DIESER Loop bringt das Projekt voran. Ziel des Projekts: alle 15 BitNodes bis Level 3, aktuell BitNode 6 (Ausgang über 21 Black Operations, nicht über das Hackniveau).
+**LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
+
+Loop 1 bewacht den laufenden Betrieb, Loop 3 berichtet. DIESER Loop bringt das Projekt voran. Ziel des Projekts: alle 15 BitNodes bis Level 3. **In welchem Knoten der Lauf gerade steht und wie sein Ausgang aussieht, steht in `nodes/KURS.md`** — lies das, statt es aus diesem Prompt zu nehmen. Bis zum 28.08.2026 stand hier fest „aktuell BitNode 6“; nach dem Wechsel nach BitNode 10 um 17:05 war der Satz falsch, und ein Prompt, der die Lage behauptet statt sie zu lesen, veraltet bei jedem Knotenwechsel erneut.
 
 Arbeite so:
 

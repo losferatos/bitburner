@@ -20,3 +20,6 @@ data/notnagel.json
 
 # Spielstand-Sicherungen: enthalten den vollstaendigen Save, gehoeren nicht ins Repo.
 backups/
+
+# Nachtruhe-Schalter der Loops: reine Laufzeitinformation.
+data/lautlos

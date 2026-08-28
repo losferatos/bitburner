@@ -4,6 +4,8 @@
 
 BITBURNER-KURS (Loop 5 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
+**LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
+
 Die vier anderen Loops arbeiten alle auf einer Zeitskala von 20 Minuten bis 3 Stunden. Das Projekt läuft auf hunderte Stunden. Dieser Loop ist der einzige, der **nach oben** schaut: Fahren wir überhaupt in die richtige Richtung, und wie weit ist es noch?
 
 **Er entscheidet nichts am Motor und repariert nichts.** Er setzt den Kurs, an dem sich der Optimierloop ausrichtet. Wenn du dich in `src/` wiederfindest, bist du im falschen Loop.

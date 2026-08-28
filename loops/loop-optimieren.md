@@ -4,6 +4,8 @@
 
 BITBURNER-OPTIMIEREN (Loop 4 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
+**LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
+
 Die anderen drei Loops halten den Betrieb: Loop 1 greift bei Störungen ein, Loop 2 arbeitet gemeldete Befunde ab, Loop 3 berichtet. Alle drei sind **reaktiv** — sie machen den Bot wieder heil, nicht besser.
 
 Dieser Loop ist der einzige, der fragt: **Was begrenzt uns gerade, und lässt sich das heben?** Ziel des Projekts sind 45 Läufe durch 15 BitNodes. Bei dieser Länge zahlt sich jeder Faktor vielfach aus — und jede Stunde, die niemand nach ihm sucht, ist verschenkt.

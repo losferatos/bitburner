@@ -4,6 +4,8 @@
 
 BITBURNER-WACHE (Loop 1 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
+**LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
+
 Führe genau das aus:
 
 ```
@@ -45,7 +47,7 @@ Handle nach dem Urteil:
   - Auftragskanal prüfen, bevor du ihn belegst — er hat genau einen Leser und wird beim Lesen geleert. Erst `getFile data/task.txt` lesen; kommt etwas anderes als eine leere Zeichenkette zurück, läuft gerade ein fremder Auftrag: diesen Schritt überspringen und ohne `ps.js` weiterarbeiten.
   - Ist er frei: `pushFile` nach `data/task.txt` mit Inhalt `["ps.js"]`, **26 s** warten, dann `data/ps.json` lesen (Befehl oben). Welche Werkzeuge laufen, welche fehlen?
   - **Vorher den Zeitstempel prüfen.** `data/ps.json` ist eine Momentaufnahme, kein Dauerlauf — `src/ps.js` schreibt einmal und endet. Ist `zeit` älter als zwei Minuten, hat dein Auftrag den Kanal nicht erreicht (er hat mehrere Schreiber, darunter `tools/wache.js` alle drei Minuten, alle ohne Sperre). Dann liest du einen alten Stand und diagnostizierst „Werkzeug X läuft nicht", während alles läuft. Am 27.08. um 18:05 war die Datei **3 Stunden 25 Minuten** alt. Im Zweifel: keinen Neustart auslösen, sondern einen Auftrag eintragen.
-  - In BitNode 6 gilt: solange `inBladeburner` false ist, muss `bbtrain.js` laufen und die Arbeit ein Gym in Sector-12 sein. Danach trägt `blade.js`.
+  - In den Kampfknoten (6, 7, 10) gilt: solange `inBladeburner` false ist, muss `bbtrain.js` laufen und die Arbeit ein Gym in Sector-12 sein. Danach trägt `blade.js`.
   - Ein Werkzeug neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <dateiname>.js` — **die Endung gehoert dazu** (der Kanal vergleicht gegen `pr.filename`; seit 27.08. 19:46 wird sie zwar ergaenzt, aber schreib sie hin). **Ein Neustart ist kein Nachweis** — ob die Änderung greift, sieht man nur an der Zahl, die sie ändern sollte.
 
   **Grenzen für einen Eingriff — sie gelten ohne Ausnahme:**

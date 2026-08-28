@@ -23,6 +23,42 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### `tools/liste.js` gebaut - die Arbeitsliste kann sich nicht mehr selbst zerlegen (erledigt 28.08., 23:18)
+
+Der Befund von 22:55: Fuenf Loops schreiben programmatisch in
+`nodes/BAUSTELLEN.md`, und jeder sucht seine Einfuegestelle per Text. Die
+Zeichenketten `## Sofort` und `## Offen` stehen aber auch im Regelkopf, wo die
+Datei ihre eigenen Regeln erklaert - eine Suche findet den Fliesstext. Am
+28.08. zweimal passiert (14:08 und 22:47), beide Male stand die Warnung davor
+bereits in derselben Datei.
+
+**Gebaut statt gewarnt.** `tools/liste.js` grenzt Abschnitte ueber
+Zeilennummern ab und erkennt eine Ueberschrift nur, wenn sie NACH der ersten
+`---`-Trennlinie steht. Der Regelkopf ist damit strukturell unerreichbar, nicht
+nur per Konvention geschuetzt.
+
+    node tools/liste.js                                  Abschnitte + Punkte
+    node tools/liste.js --sofort-leeren [--vermerk "..."]
+    node tools/liste.js --eintragen sofort|offen --datei <pfad>
+    node tools/liste.js --erledigen "<anfang>" --datei <pfad>
+
+Der Eintragstext kommt aus einer Datei, nicht von der Kommandozeile - Umlaute,
+Backticks und mehrzeilige Rechnungen ueberleben keine Shell.
+
+**Die eigentliche Absicherung ist `writeChecked()`:** Vor dem Ersetzen wird das
+Ergebnis in eine `.tmp` geschrieben und neu geparst. Stimmen Abschnittstitel
+oder Regelkopf nicht mehr mit dem Vorzustand ueberein, wird die `.tmp`
+geloescht und **gar nichts** geaendert. Ein Schnitt an der falschen Stelle
+kann die Datei also nicht mehr beschaedigen, er kann nur noch scheitern.
+
+Verifiziert um 23:16 auf der echten Datei: `--eintragen sofort` setzte einen
+Probepunkt an Zeile 67 (Sofort: 0 -> 1 Punkt, Offen unveraendert bei 9),
+`--sofort-leeren` raeumte ihn wieder ab (Sofort: 1 -> 0), beide Male blieb der
+Regelkopf bei Zeile 1 bis 63 unberuehrt. Danach `git checkout` und der Punkt
+hier mit `--erledigen` abgeraeumt - also mit sich selbst.
+
+---
+
 ### Kampf-Augmentierungen vor dem Bladeburner-Beitritt - strukturell tot (erledigt 28.08., 22:52)
 
 Der Punkt stand seit 19:20 unter `## Sofort` und war der oberste der Liste.

@@ -23,15 +23,30 @@ Regeln:
   schneidet bei 2.000 stumm ab. Im Archiv wird **gegrept, nicht gelesen**:
   `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`.
 - Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
-- **Ein neuer Punkt wird NACH der `---`-Trennlinie eingesetzt, nie per Suche
-  nach `## Sofort` oder `## Offen`.** Beide Zeichenketten stehen auch in diesem
-  Regelkopf, und eine Suche trifft die erste Fundstelle - also den Fliesstext.
-  Am 28.08.2026 hat das die Datei zerlegt: Drei Eintraege landeten mitten im
-  Kopf, zwei Abschnittsueberschriften existierten doppelt, und ein bereits
-  abgeraeumter Punkt stand wieder in der Liste. Aufgefallen ist es erst zwei
-  Laeufe spaeter. Wer die Datei per Skript aendert, prueft danach
-  `grep -n "^## \|^### " nodes/BAUSTELLEN.md` - die Gliederung muss lauten:
-  ein `## Sofort`, ein `## Offen, nach Dringlichkeit`, ein `## Erledigt`.
+- **Diese Datei wird mit `tools/liste.js` bearbeitet, nicht von Hand
+  geschnitten** (seit 28.08.2026, 23:18):
+
+      node tools/liste.js                                  Abschnitte + Punkte
+      node tools/liste.js --sofort-leeren [--vermerk "..."]
+      node tools/liste.js --eintragen sofort|offen --datei <pfad>
+      node tools/liste.js --erledigen "<anfang>" --datei <pfad>
+
+  Es grenzt Abschnitte ueber Zeilennummern ab, erkennt eine Ueberschrift nur
+  NACH der ersten `---`-Trennlinie, und schreibt nur, wenn die Gliederung
+  danach unveraendert ist - sonst bleibt der alte Stand stehen. Der Eintrags-
+  text kommt aus einer Datei, damit Umlaute und Backticks die Shell ueberleben.
+
+  *Warum es das Werkzeug gibt:* Eine Suche nach `## Sofort` oder `## Offen`
+  trifft die erste Fundstelle - also den Fliesstext in diesem Regelkopf, wo
+  beide Zeichenketten ebenfalls stehen. Am 28.08.2026 hat das die Datei
+  zweimal zerlegt (14:08 und 22:47): Eintraege landeten mitten im Kopf,
+  Abschnittsueberschriften existierten doppelt, ein abgeraeumter Punkt stand
+  wieder in der Liste. Beide Male stand die Warnung davor **hier**. Ein
+  Hinweis in dem Text, den man gerade umschreibt, wird nicht gelesen.
+
+  Wer die Datei doch von Hand aendert, prueft danach `node tools/liste.js` -
+  die Gliederung muss lauten: ein `## Sofort`, ein
+  `## Offen, nach Dringlichkeit`, ein `## Erledigt`.
 - **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
   ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
   Die Lebenszeichen stehen woanders und sind bedingungslos:
@@ -79,29 +94,6 @@ Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
 ---
 
 ## Offen, nach Dringlichkeit
-
-### Die Arbeitsliste laesst sich weiter per Textsuche zerlegen (22:55)
-
-Gemessen: Heute zweimal passiert - 14:08 (drei Eintraege mitten im Regelkopf,
-          zwei doppelte Abschnittsueberschriften) und 22:47 beim Abraeumen des
-          Sofort-Punkts. Beide Male hat `s.index("## Sofort")` die Fundstelle
-          im **Regelkopf** getroffen statt die Ueberschrift.
-
-Erwartet: Ein Schreibzugriff, der die Stelle nicht raten kann. Der Regelkopf
-          warnt zwar davor, aber eine Warnung in derselben Datei, die man
-          gerade programmatisch aendert, wird von jedem zweiten Lauf uebersehen
-          - und der Schaden faellt erst beim naechsten `grep` auf.
-
-Verdacht: Kein Codefehler, ein fehlendes Werkzeug. `tools/liste.js` mit
-          `--sofort-leeren`, `--sofort-eintragen <datei>` und
-          `--erledigt <ueberschrift>` waere klein (Abschnitte ueber die
-          Zeilennummern der `^## `-Zeilen abgrenzen, nicht ueber Text) und
-          wuerde die Klasse ganz schliessen. Danach die Regel im Kopf durch
-          den Werkzeugaufruf ersetzen.
-
-Dringlichkeit: mittel. Kostet keine Spielzeit, aber jeder Vorfall kostet einen
-          halben Loop-Lauf und im schlimmsten Fall einen stillen Datenverlust.
-
 
 ### Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 

@@ -577,7 +577,44 @@ async function pruefe(zustand, jetzt) {
     // Ist der Tab gedrosselt, steht ohnehin alles - dann nennt der Tempobefund
     // die Ursache, und eine zweite Meldung ueber dieselbe Sache waere Laerm.
     const gedrosselt = befunde.some((b) => b.typ === "tempo");
-    if (vorher && !gedrosselt && blade.rang <= vorher.rang) {
+    // DER WIEDERAUFBAU IST KEIN STILLSTAND (28.08.2026, 09:15).
+    //
+    // Seit dem 28.08., 08:40 gibt `blade.js` die Figur ans Powerhouse Gym,
+    // wenn nach einem Augmentierungs-Einbau keine Aktion mehr ueber ihrer
+    // Schwelle liegt (`data/blade.json`, `"aktion": "Gym/<wert>"`). Der Rang
+    // steht dann absichtlich still, waehrend die Kampfwerte mit dem
+    // zehnfachen Ortsmultiplikator zurueckkommen - gemessen 0,59 gegen 0,10
+    // je Minute.
+    //
+    // Um 09:09 hat der Waechter genau das gemeldet: "Rang steht seit 45 min
+    // bei 82299 (Aktion: Gym/def)". Sachlich richtig, als Push aufs Handy
+    // aber wertlos - und er haette es alle 30 Minuten wiederholt.
+    //
+    // Der Zustand wird deshalb ausgenommen, ABER NICHT BLIND: Er ist nur so
+    // lange gutartig, wie die Kampfwerte tatsaechlich steigen. Bleiben auch
+    // sie stehen, ist das Gym kaputt (leeres Konto, fremde Arbeit, misslungene
+    // Reise) - und dann gehoert genau darueber gemeldet, mit eigenem Text.
+    const imGym = typeof blade.aktion === "string" && blade.aktion.startsWith("Gym/");
+    let kampfSteigt = false;
+    if (imGym && Number.isFinite(blade.tiefstand)) {
+      messwerte.tiefstand = blade.tiefstand;
+      const kv = (zustand.verlauf || []).find(
+        (x) => Number.isFinite(x.tiefstand) && jetzt - x.ts >= TRAEGER_STILL_MS);
+      kampfSteigt = !kv || blade.tiefstand > kv.tiefstand;
+    } else if (imGym) {
+      // Kein Tiefstand in der Telemetrie: dann nicht raten, sondern die
+      // Ausnahme gewaehren - der Gym-Zustand ist als solcher gewollt.
+      kampfSteigt = true;
+    }
+    if (imGym && !kampfSteigt) {
+      befunde.push({
+        typ: "gym",
+        text: "Der Bot steht im Gym (" + blade.aktion + "), aber die"
+          + " Kampfwerte steigen seit " + minuten(TRAEGER_STILL_MS)
+          + " min nicht. Konto leer, fremde Arbeit oder Reise misslungen?",
+      });
+    }
+    if (vorher && !gedrosselt && !imGym && blade.rang <= vorher.rang) {
       befunde.push({
         typ: "traeger",
         text: "Bladeburner-Rang steht seit " + minuten(jetzt - vorher.ts)
@@ -856,6 +893,7 @@ async function verarbeite(zustand, ergebnis, jetzt) {
     rep: "bn4rep.js arbeitet wieder.",
     hilfe: "Der Bot kommt wieder allein zurecht.",
     traeger: "Der Traeger des Knotens steigt wieder.",
+    gym: "Die Kampfwerte steigen wieder - der Wiederaufbau laeuft.",
     werkzeug: "Das fehlende Werkzeug laeuft wieder.",
     bbtrain: "bbtrain.js trainiert wieder den richtigen Wert."
   };

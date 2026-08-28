@@ -55,7 +55,48 @@ Regeln:
 
 ## Sofort
 
-keine
+### Der Gym-Zweig kennt die Black Ops nicht - Red Dragon koennte fahrbar sein (09:03)
+
+Gemessen: `node tools/spann.js` um 09:03:
+
+              Naechste Black Op  Operation Red Dragon (Rang 25.000, erfuellt)
+              Chance             **0,905 - 1,000**, Spanne 0,095
+
+          Die Untergrenze der Schaetzung liegt damit **ueber** `SICHER_BLACKOP`
+          (0,90). Gleichzeitig steht `data/blade.json` auf `"Gym/str"`,
+          Grund "nichts ueber Schwelle" - der Motor hat die Black Op gar nicht
+          erst geprueft.
+
+Erwartet: Der Bot sollte Red Dragon starten. Sie bringt `rankGain` 500
+          (`BlackOperations.ts:254`) und ist die achte von 21 - der Restweg
+          haengt an ihr.
+
+Verdacht: **Mein eigener Eingriff von 08:40**, `src/blade.js`, Gym-Zweig in
+          der Hauptschleife. Er steht **vor** `waehle()` und entscheidet
+          allein an `lohntSich` - und `lohntSich` prueft nur `OPERATIONEN`
+          (gegen 0,85) und `VERTRAEGE` (gegen 0,45). **Black Ops kommen darin
+          nicht vor.** Der Black-Op-Zweig steht als Punkt 2 in `waehle()`,
+          und `waehle()` wird im Gym-Fall nie erreicht.
+
+          Damit gilt: Sobald die naechste Black Op fahrbar wird, waehrend
+          keine Operation und kein Vertrag ueber ihrer Schwelle liegt, bleibt
+          der Bot im Gym haengen. Genau dieser Zustand liegt jetzt vor.
+
+          Der Fix ist klein: `lohntSich` um die naechste Black Op ergaenzen,
+          mit derselben gerechneten Chance und derselben Schwelle, die
+          `waehle()` benutzt (`blackOpChance()` gegen `blackOpSchwelle(name)`,
+          nicht `s.min` - die Spanne ist bei Black Ops
+          Bevoelkerungsrauschen, `Actions/BlackOperation.ts:55-61`).
+
+**Dieselbe Fehlerform zum dritten Mal heute:** Eine Regel prueft ihre
+Voraussetzung nicht vollstaendig. 07:49 wich blade.js an bbtrain, das gar
+nicht uebernahm; 08:03 lief Field Analysis, ohne zu fragen, ob sie etwas
+aufschliesst; jetzt entscheidet der Gym-Zweig ueber "nichts zu tun", ohne die
+wichtigste Aktion des Knotens anzusehen. **Wer eine Abkuerzung vor die
+Hauptlogik legt, muss deren Vorbedingungen mitnehmen.**
+
+Dringlichkeit: **hoch.** Rangrate 0,0/min ueber 30 Minuten.
+
 ## Offen, nach Dringlichkeit
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden

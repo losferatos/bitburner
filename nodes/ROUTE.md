@@ -155,6 +155,52 @@ Vier-Stunden-Lauf mit funktionierendem wakelock. Erst wenn auch der bei einer
 Rate unter einem Rang je Minute bleibt, ist V2 als Traeger widerlegt und die
 Route muss neu gerechnet werden. Diese Entscheidung trifft Eric.
 
+---
+
+### Die zweite Messung liegt vor: der ganze Knoten (29.08.2026, 01:20)
+
+Auf den ungestoerten Vier-Stunden-Lauf musste niemand mehr warten - BitNode 6
+ist am 28.08. um 17:05 abgeschlossen worden, und `data/verlauf-strategie.json`
+hat 154 Messpunkte davon aufbewahrt. Das ist eine bessere Messung als die
+geforderte, weil sie den ganzen Weg abdeckt statt eines Ausschnitts.
+
+| Spielzeit | Rang | Uhrzeit |
+|---|---|---|
+| 195,3 h |  13.209 | 27.08. 21:51 |
+| 201,6 h |  33.212 | 28.08. 04:11 |
+| 204,4 h |  80.304 | 28.08. 07:01 |
+| 208,5 h |  85.453 | 28.08. 11:03 |
+| 211,6 h | 205.963 | 28.08. 14:13 |
+| 214,5 h | 452.411 | 28.08. 17:05 |
+
+**19,2 Spielstunden, Faktor 34.** Die Rate stieg dabei von 3.082 Rang je
+Spielstunde auf 82.541 - also um Faktor 27, waehrend der Rang um Faktor 27
+stieg. Eine log-log-Regression ueber 142 gleitende Zweistundenfenster gibt den
+Exponenten `dR/dt ~ R^a` mit **a = 1,32**; ohne die Stoerungsphase zwischen
+07:01 und 11:03 (85.453 minus 80.304 in vier Stunden - dort klemmte die
+Feuerschwelle fuer Black Ops) liegt er bei **a ~ 1,0**, was einer konstanten
+Verdopplungszeit von rund **3,5 Spielstunden** entspricht.
+
+**Damit ist der Pruefstein selbst widerlegt, nicht nur seine Messung.** Ein
+Zweistundenstand kann bei einem Wachstum dieser Form nichts ueber die
+Gesamtdauer sagen: Die ersten zwei Stunden liegen vollstaendig in der
+Anlaufphase, in der die Rate noch nicht proportional zum Rang ist. Die 29 Rang
+vom 25.08. und der Abschluss desselben Knotens drei Tage spaeter widersprechen
+sich nicht - sie sind derselbe Vorgang an zwei Punkten einer Exponentialkurve.
+
+**Die Sorge von damals ist erledigt.** Der Eintrag von 18:30 rechnete linear
+hoch: "bei 0,3 Rang je Minute nach zwei Stunden rund 36, hochgerechnet auf die
+erste Black Operation etwa 140 Stunden". Tatsaechlich waren alle 21 Black Ops
+nach 52 Spielstunden ab Beitritt erledigt, die letzten drei davon in 50
+Minuten. Die lineare Fortschreibung lag nicht daneben, sie war die falsche
+Modellklasse.
+
+**Fuer die Route heisst das: V2 traegt.** Die Reihenfolge ab Platz 3 bleibt,
+und zwar jetzt gemessen statt vorlaeufig. Was fuer die naechsten Kampfknoten
+gilt, steht damit auch fest: Nicht der Fruehstand zaehlt, sondern ob die
+Verdopplungszeit stabil bleibt - und die einzige gemessene Stoerung dieser
+Groesse war eine zu hohe Feuerschwelle, kein Mechanismus des Spiels.
+
 
 ---
 

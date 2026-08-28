@@ -317,30 +317,6 @@ faellt danach `popEst` der Stadt? Bleibt popEst ueber einer Stunde stabil, kann
 der Horizont bleiben; faellt es weiter, gehoert er hochgesetzt - dann aber mit
 der Rangrate als Beleg, nicht mit der Rechnung allein.
 
-### 1. Der V2-Kontrollpunkt ist nie gemessen worden
-
-`nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
-in BitNode 6 mindestens 6.000 mit Raid, mindestens 3.500 ohne.** Die gesamte
-Reihenfolge ab Platz 3 steht auf einer Simulation, die nie gegen einen echten
-Lauf geprueft wurde.
-
-**Der Beitritt steht seit dem 25.08.2026 zwischen 16:20 und 16:29** (um 16:19:55
-war der Kampfwert-Tiefstand noch 98, um 16:29:23 meldete `bblage.json`
-`inBladeburner: true` bei Rang 0). Genauer laesst er sich nicht mehr eingrenzen:
-bbtrain schrieb `data/bbjoin.txt` lokal auf die Werkbank statt nach home - das
-ist inzwischen behoben, half aber fuer diesen Beitritt nicht mehr.
-
-**Der Kontrollpunkt faellt damit auf 18:30 Uhr.** Zu messen ist dann der Rang
-aus `data/blade.json` gegen die Schwelle aus ROUTE.md: mindestens 6.000 mit
-Raid, mindestens 3.500 ohne. Das Ergebnis gehoert nach ROUTE.md.
-
-Zwischenstand 16:29: Rang 0, Ausdauer 41/41, Aktion "Field Analysis" (die
-Erfolgsschaetzungen sind noch zu unscharf fuer einen Vertrag), naechste Black Op
-"Operation Typhoon" ab Rang 2.500.
-
-**Dringlichkeit:** hoch. Es ist das wertvollste Einzelergebnis der naechsten
-Tage - an ihm haengt die gesamte Reihenfolge ab Platz 3.
-
 ### 2. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die

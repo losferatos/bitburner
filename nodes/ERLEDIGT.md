@@ -23,6 +23,49 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der V2-Kontrollpunkt ist gemessen - und der Pruefstein selbst widerlegt (erledigt 29.08., 01:20)
+
+Der Punkt stand mit Dringlichkeit **hoch** und dem Satz "ist nie gemessen
+worden". Beides war ueberholt, und zwar zweimal.
+
+**Erstens: gemessen wurde er am 25.08. um 18:30** (Commit 740e9c5, in
+`nodes/ROUTE.md` Abschnitt 4). Ergebnis: Rang 29 gegen eine Schwelle von 3.500,
+verfehlt um Faktor 120 - aber als Test der Route unbrauchbar, weil von 125
+Minuten hoechstens eine halbe Stunde ungestoert lief. Der Eintrag verlangte
+deshalb eine zweite Messung unter sauberen Bedingungen.
+
+**Zweitens: die zweite Messung liegt seit dem 28.08., 17:05 vor** - der ganze
+BitNode-6-Lauf. `data/verlauf-strategie.json` hat 154 Punkte davon:
+
+    195,3 h Spielzeit   13.209 Rang     27.08. 21:51
+    204,4 h             80.304          28.08. 07:01
+    208,5 h             85.453          28.08. 11:03   (Stoerung: Feuerschwelle)
+    211,6 h            205.963          28.08. 14:13
+    214,5 h            452.411          28.08. 17:05
+
+19,2 Spielstunden, Faktor 34. Die Rate stieg von 3.082 auf 82.541 Rang je
+Stunde. Log-log-Regression ueber 142 gleitende Zweistundenfenster:
+`dR/dt ~ R^a` mit **a = 1,32**; ohne die Stoerungsphase **a ~ 1,0**, also
+konstante Verdopplungszeit von rund **3,5 Spielstunden**.
+
+**Der Pruefstein taugt nicht, unabhaengig von der Messung.** Ein
+Zweistundenstand liegt vollstaendig in der Anlaufphase, in der die Rate noch
+nicht proportional zum Rang ist - er kann ueber die Gesamtdauer nichts sagen.
+Die 29 Rang vom 25.08. und der Abschluss desselben Knotens drei Tage spaeter
+sind kein Widerspruch, sondern zwei Punkte derselben Exponentialkurve. Die
+damalige Hochrechnung ("140 Stunden bis zur ersten Black Operation") war nicht
+knapp daneben, sie war die falsche Modellklasse: linear auf etwas Exponentielles.
+
+**Fuer die Route heisst das: V2 traegt, und die Reihenfolge ab Platz 3 bleibt** -
+jetzt gemessen statt vorlaeufig. Das war die Frage, an der laut Eintrag "die
+gesamte Reihenfolge ab Platz 3" hing.
+
+Verifiziert: 21 von 21 Black Ops am 28.08. um 17:05, Rang 452.411 gegen eine
+Ausgangsschwelle von 400.000. Ergebnis in `nodes/ROUTE.md` Abschnitt 4
+nachgetragen.
+
+---
+
 ### `tools/liste.js` gebaut - die Arbeitsliste kann sich nicht mehr selbst zerlegen (erledigt 28.08., 23:18)
 
 Der Befund von 22:55: Fuenf Loops schreiben programmatisch in

@@ -64,7 +64,39 @@ Regeln:
 
 ## Sofort
 
-keine
+### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
+
+Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je
+          Wert. Erfahrungsrate 13/s, gemessen ueber 76 Sekunden Spielzeit.
+          **ETA fuer Tor 1: 21,8 Stunden.**
+
+Erwartet: 2,2 Stunden. `calculateSkill` ist
+          `floor(mult * (32*ln(exp+534,6) - 200))`
+          (`PersonObjects/formulas/skill.ts:13`) - der Multiplikator steht vor
+          der Klammer, die Erfahrung im Logarithmus:
+
+              mults.kampf 1,26 (jetzt)  ->  1.019.268 Erfahrung  21,8 h
+              mults.kampf 1,50          ->    376.610             8,0 h
+              mults.kampf 2,00          ->    100.868             2,2 h
+              mults.kampf 2,50          ->     45.021             1,0 h
+
+          Der Einbau setzt die Kampferfahrung auf null - das ist kein Einwand,
+          sondern der Punkt: Die 100.868 danach sind ein Zehntel der 1.019.268
+          davor.
+
+Verdacht: Kein Fehler, eine fehlende Runde. Zu klaeren ist, WELCHE Faktion und
+          welche Stuecke - in BitNode 10 kostet das Fuenffache an Geld und das
+          Doppelte an Reputation (`AugmentationMoneyCost` 5,
+          `AugmentationRepCost` 2, `BitNode.tsx` case 10). Geld ist mit 67 Mio
+          und wachsendem Netz (43 von 72) nicht der Engpass; Reputation ist es.
+          `src/augplan.js` und `src/bn4rep.js` gibt es bereits - bn4rep laeuft
+          aber nicht, weil es singularitylastig ist und auf ein 32-GB-home
+          nicht passt. Erste Frage deshalb: Was kostet der Speicher, und ab
+          welcher home-Groesse geht es?
+
+Dringlichkeit: **hoechste.** Der Unterschied ist 19,6 Stunden auf Tor 1, und
+          Tor 2 (400.000 Rang bei BladeburnerRank 0,8) kommt danach noch.
+
 
 ---
 

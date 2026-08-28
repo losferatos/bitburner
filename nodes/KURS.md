@@ -25,6 +25,76 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 28.08., 19:20 - BitNode 10
+
+Ausgangsbedingung: unveraendert gegenueber 18:55 - **21 Black Operations**
+                   (`Singularity.ts:1148-1164`), Weg A (Hacking 6.000) bleibt
+                   rechnerisch tot.
+
+Engpass:           **Kampfwert-Tiefstand 42 von 100** = 42 %, Tor 1 zum
+                   Bladeburner-Beitritt
+                   (`NetscriptFunctions/Bladeburner.ts:356`). Gemessen in
+                   Erfahrung ist der Stand schlechter als er aussieht: 6.723
+                   von 254.817 je Wert, also **2,6 Prozent** - die Levelkurve
+                   ist logarithmisch, die ersten 42 Level sind fast geschenkt.
+
+Restweg:           4 x 254.817 minus rund 27.750 verdient = **991.500
+                   Erfahrung**.
+
+Rate:              **13 Erfahrung je Sekunde**, gemessen ueber ein
+                   76-Sekunden-Fenster der SPIELZEIT (zwei Spielstaende,
+                   19:14 und 19:16). Davon 10/s auf den gerade trainierten
+                   Wert, der Rest aus den Shoplifts des Sleeves.
+
+ETA:               **21,8 h fuer Tor 1 allein**, wenn nichts geaendert wird.
+                   Vorlauf 18:55: "noch nicht messbar".
+
+**Und genau deshalb ist die Entscheidung nicht "weiterfahren".**
+
+`calculateSkill` ist `floor(mult * (32*ln(exp+534,6) - 200))`
+(`PersonObjects/formulas/skill.ts:13`). Der Multiplikator steht **vor** der
+Klammer, die Erfahrung **im Logarithmus** - ein besserer Multiplikator ist
+also exponentiell mehr wert als mehr Training:
+
+    mults.kampf   Erfahrung je Wert fuer 100    x4        bei 13/s
+      1,26 (jetzt)          254.817          1.019.268     21,8 h
+      1,50                   94.153            376.610      8,0 h
+      1,75                   44.459            177.838      3,8 h
+      2,00                   25.217            100.868      2,2 h
+      2,50                   11.255             45.021      1,0 h
+
+**Von 1,26 auf 2,00 spart 19,6 Stunden.** Das ist mehr, als eine
+Augmentierungsrunde kosten kann - Geld steht bei 67 Mio und waechst, das Netz
+bei 43 von 72.
+
+Der Einbau setzt die Kampferfahrung auf null zurueck. Das ist hier kein
+Einwand, sondern der Punkt: Die 100.868 Erfahrung DANACH sind ein Zehntel der
+1.019.268 davor.
+
+Entscheidung:      **Zwischenschritt: eine Kampf-Augmentierungsrunde vor dem
+                   Beitritt.** Ziel ist `mults.strength/defense/dexterity/
+                   agility` >= 2,0. Nicht weiterfahren - 21,8 Stunden Gym
+                   gegen 2,2 sind kein Abwaegen mehr.
+
+                   Zu beachten: BitNode 10 verteuert das
+                   (`AugmentationMoneyCost` **5**, `AugmentationRepCost`
+                   **2**, `BitNode.tsx` case 10). Welche Faktion und welche
+                   Stuecke - das rechnet der Vorankommensloop; als Auftrag
+                   eingetragen.
+
+Leitgroesse:       **Kampf-Multiplikator `mults.strength` (und die drei
+                   Geschwister), jetzt 1,2616, Ziel 2,0.** NICHT die
+                   Erfahrung je Sekunde - die zu verdoppeln spart 11 Stunden,
+                   den Multiplikator auf 2,0 zu bringen spart 19,6.
+
+Naechste Pruefung: Steht `mults.strength` beim naechsten Lauf noch bei
+                   1,2616, hat die Augmentierungsrunde nicht begonnen. Dann
+                   ist die ETA fuer Tor 1 unveraendert 21,8 h - und das waere
+                   das zweite Mal in Folge, also ein Fall fuer die
+                   Abbruchregel.
+
+---
+
 ## 28.08., 18:55 - BitNode 10
 
 Geschrieben vom Optimierloop, nicht vom Kursloop: Der Eintrag darueber galt

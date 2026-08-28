@@ -1957,12 +1957,48 @@ export async function main(ns) {
     }
 
     // 4. Nichts sicher genug. Liegt das an der Schaetzung oder an uns?
-    //    Ist irgendwo die Spanne breit, fehlt Wissen ueber die Population -
-    //    dann ist Field Analysis die Antwort, nicht ein Versuch auf gut Glueck.
+    //
+    // FIELD ANALYSIS NUR, WENN SIE ETWAS AUFSCHLIESST (28.08.2026, 08:09).
+    //
+    // Hier stand `s.max - s.min > SPANNE_ZU_BREIT` - eine breite Spanne
+    // genuegte. Das ist zu wenig verlangt: Eine unscharfe Schaetzung ist nur
+    // dann ein Problem, wenn das Schaerfen eine Aktion FREIGIBT. Liegt die
+    // Obergrenze schon unter der Schwelle, aendert genaueres Wissen nichts
+    // an der Entscheidung - die Aktion bleibt zu riskant, und Field Analysis
+    // kauft dann nur die bessere Anzeige.
+    //
+    // Was das gekostet hat, gemessen am 28.08.: `data/blade.json` stand von
+    // 07:52 bis 08:08 auf "General/Field Analysis", **16 Minuten**. Der Rang
+    // bewegte sich dabei von 82.293 auf 82.297 - vier Punkte, 0,25 je Minute.
+    // Die geglaettete 45-Minuten-Rate fiel auf 12,0/min, gegen 218,6 im
+    // Vier-Stunden-Mittel. Field Analysis hat `rankGain` 0,1 und gibt
+    // **keine** Kampferfahrung, half also gegen den Wiederaufbau doppelt
+    // nicht.
+    //
+    // Genau dieselbe Einsicht steht seit dem 27.08., 09:19 im Black-Op-Zweig
+    // ("Genau ein Fall rechtfertigt sie - wenn die Obergrenze ueber der
+    // Schwelle liegt und nur die Unschaerfe den Versuch verhindert"). Sie war
+    // dort richtig und ist hier nie angekommen.
+    //
+    // Der Test konvergiert in beide Richtungen: Field Analysis verengt die
+    // Spanne, also steigt `s.min` ueber die Schwelle (dann laeuft die Aktion)
+    // oder `s.max` faellt darunter (dann greift die Regel nicht mehr). Ein
+    // Dauerzustand wie heute frueh ist damit ausgeschlossen.
     for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
-      const s = spanne(OPERATIONEN.includes(name) ? O : V, name);
-      if (s.max - s.min > SPANNE_ZU_BREIT) {
-        return { typ: G, name: "Field Analysis", grund: "Schaetzung unsicher" };
+      const istOp = OPERATIONEN.includes(name);
+      const s = spanne(istOp ? O : V, name);
+      const schwelle = istOp ? SICHER_OPERATION : SICHER_VERTRAG;
+      if (s.max >= schwelle && s.min < schwelle) {
+        const jetztMs = Date.now();
+        if (jetztMs < feldanalyseGesperrtBis) break;   // gesperrt -> Training
+        if (feldanalyseSeit && jetztMs - feldanalyseSeit >= FELDANALYSE_MAX_MS) {
+          feldanalyseGesperrtBis = jetztMs + FELDANALYSE_SPERRE_MS;
+          break;
+        }
+        return { typ: G, name: "Field Analysis",
+          grund: "Schaetzung verdeckt " + name
+            + " (" + s.min.toFixed(2) + "-" + s.max.toFixed(2)
+            + " gegen " + schwelle.toFixed(2) + ")" };
       }
     }
 
@@ -1972,6 +2008,36 @@ export async function main(ns) {
   };
 
   // --- Hauptschleife -------------------------------------------------------
+  // HARTE GRENZE FUER FIELD ANALYSIS (28.08.2026, 08:14).
+  //
+  // Die Freigabe-Bedingung allein reicht nicht. Bei einer wirklich schlechten
+  // Bevoelkerungsschaetzung liefert `getSuccessRange` fuer JEDE Aktion
+  // [0,00 - 1,00] (`Actions/Action.ts`: `low = real - diff`, und `diff`
+  // uebersteigt `real`, also klemmt `low` auf 0). Damit ist "die Obergrenze
+  // liegt ueber der Schwelle, die Untergrenze darunter" immer wahr, und die
+  // Regel bindet sich selbst nicht.
+  //
+  // Und sie schliesst langsam: `improvePopulationEstimateByPercentage` bekommt
+  // `eff = 0,04*hacking^0,3 + 0,04*int^0,9 + 0,02*cha^0,3`
+  // (`Bladeburner.ts:1122-1131`) - in BitNode 6 mit
+  // `HackingLevelMultiplier` 0,35 ist der Hacking-Summand klein, es bleiben
+  // ein bis zwei Prozent je Durchlauf. Gemessen am 28.08.: 17 Minuten Field
+  // Analysis, vier Punkte Rang.
+  //
+  // Also ein Deckel NACH DER UHR, nicht nach Durchlaeufen: `waehle()` wird
+  // je Aktualisierung gerufen, nicht je Aktionsdurchlauf - ein Zaehler wuerde
+  // die Schleifenfrequenz messen und nicht die Zeit. Zehn Minuten am Stueck
+  // reichen, um eine brauchbare Schaetzung zu holen; danach ist Training die
+  // ehrlichere Antwort, denn es hebt die Kampfwerte, und die sind im
+  // Wiederaufbau der eigentliche Engpass.
+  //
+  // Dazu eine Sperre von dreissig Minuten. Ohne sie pendelt der Motor: Der
+  // Deckel greift, Training wird gewaehlt, damit faellt `feldanalyseSeit` auf
+  // null - und im naechsten Durchlauf waere Field Analysis wieder frei.
+  const FELDANALYSE_MAX_MS = 10 * 60 * 1000;
+  const FELDANALYSE_SPERRE_MS = 30 * 60 * 1000;
+  let feldanalyseSeit = 0;
+  let feldanalyseGesperrtBis = 0;
   let letzte = "";
   let ruhend = false;
   let gewichen = false;
@@ -2131,6 +2197,14 @@ export async function main(ns) {
       ruhend = false;
 
       const wahl = waehle();
+      // Der Deckel oben misst eine ZUSAMMENHAENGENDE Strecke: Der Zeitstempel
+      // wird beim ersten Field-Analysis-Durchlauf gesetzt und faellt weg,
+      // sobald etwas anderes gewaehlt wird.
+      if (wahl.typ === G && wahl.name === "Field Analysis") {
+        if (!feldanalyseSeit) feldanalyseSeit = Date.now();
+      } else {
+        feldanalyseSeit = 0;
+      }
       if (wahl.grund === "Ausdauer" || wahl.grund === "HP") ruhend = true;
 
       const laeuft = ns.bladeburner.getCurrentAction();

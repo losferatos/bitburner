@@ -296,12 +296,13 @@ async function ladeZustand() {
       verlauf: Array.isArray(z.verlauf) ? z.verlauf : [],
       gestartet: z.gestartet || {},
       knoten: z.knoten ?? null,
+      nodeReset: z.nodeReset ?? null,
       homeRam: z.homeRam ?? null,
       nachtpost: Array.isArray(z.nachtpost) ? z.nachtpost : [],
     };
   } catch {
     return { seit: {}, gemeldet: {}, stufe: {}, text: {}, verlauf: [],
-      knoten: null, homeRam: null, nachtpost: [] };
+      knoten: null, nodeReset: null, homeRam: null, nachtpost: [] };
   }
 }
 
@@ -555,6 +556,29 @@ async function pruefe(zustand, jetzt) {
   // Lieber gar keine Zahl als eine aus dem vorigen Knoten: Ohne `knoten`
   // meldet der Waechter schlicht "BitNode geschafft", und das stimmt immer.
   if (typeof rep?.knoten === "number" && repFrisch) messwerte.knoten = rep.knoten;
+  // DIE QUELLE IST JETZT data/knoten.json (28.08.2026, 09:28).
+  //
+  // `bn4rep.json` steht am Ende der Runde, und bn4rep steigt an mindestens
+  // vier Stellen vorher aus - gemessen war die Datei am 28.08. um 09:26 DREI
+  // TAGE alt. Die Frischepruefung oben griff also fast immer, und damit lief
+  // die Knotenwechsel-Erkennung ins Leere. `data/knoten.json` steht neben
+  // dem Puls, ganz oben in der Runde und ohne jede Bedingung.
+  const ks = await spielJson("data/knoten.json");
+  const ksFrisch = typeof ks?.zeit === "number" && jetzt - ks.zeit < MOTOR_MAX_ALTER;
+  if (ksFrisch) {
+    if (typeof ks.knoten === "number") messwerte.knoten = ks.knoten;
+    if (typeof ks.nodeReset === "number") messwerte.nodeReset = ks.nodeReset;
+  }
+  // DERSELBE KNOTEN NOCH EINMAL IST AUCH EIN WECHSEL (28.08.2026, 09:22).
+  //
+  // Eric: "und bei Bitnodewechsel, bzw. auch wenn der gleiche Bitnode nochmal
+  // gewaehlt wurde. aber nicht bei den normalen/einfachen Resets."
+  //
+  // `lastNodeReset` trennt beides sauber und ist die einzige Zahl, die das
+  // tut: Sie wird ausschliesslich in `prestigeSourceFile()` gesetzt
+  // (`PersonObjects/Player/PlayerObjectGeneralMethods.ts:173`), waehrend ein
+  // Augmentierungs-Einbau nur `lastAugReset` anfasst (`:126`).
+  if (typeof rep?.nodeReset === "number" && repFrisch) messwerte.nodeReset = rep.nodeReset;
 
   // 5a. DEN TRAEGER MESSEN, NICHT DAS NAHELIEGENDE (25.08.2026).
   //
@@ -665,8 +689,22 @@ async function pruefe(zustand, jetzt) {
   const knotenJetzt = messwerte.knoten ?? null;
   const ramVorher = zustand.homeRam;
   const ramJetzt = messwerte.homeRam ?? null;
+  // DREI ANZEICHEN, das erste ist das genaue.
+  //
+  //  1. `nodeReset` hat sich geaendert. Das ist der Zeitstempel des letzten
+  //     BitNode-Eintritts und trifft auch den Fall "derselbe Knoten noch
+  //     einmal", den die Nummer nicht sieht - und den Level 2 und 3 der
+  //     Roadmap ausdruecklich verlangen.
+  //  2. Die Knotennummer hat sich geaendert. Faengt den Fall ab, dass
+  //     `nodeReset` noch fehlt (aeltere Telemetrie).
+  //  3. Der home-Speicher ist eingebrochen. NUR ein Knotenwechsel setzt home
+  //     zurueck, ein Einbau laesst ihn stehen - aber die Regel greift erst ab
+  //     1024 GB und verpasst damit einen Wechsel, der frueher kommt.
+  const resetVorher = zustand.nodeReset;
+  const resetJetzt = messwerte.nodeReset ?? null;
   const knotenWechsel =
-    (knotenVorher != null && knotenJetzt != null && knotenJetzt !== knotenVorher)
+    (resetVorher != null && resetJetzt != null && resetJetzt !== resetVorher)
+    || (knotenVorher != null && knotenJetzt != null && knotenJetzt !== knotenVorher)
     || (ramVorher != null && ramJetzt != null && ramVorher >= 1024 && ramJetzt <= ramVorher / 8);
   if (knotenWechsel) {
     befunde.push({
@@ -675,6 +713,8 @@ async function pruefe(zustand, jetzt) {
       tag: "tada",
       text: "BitNode geschafft"
         + (knotenJetzt ? " - jetzt in BitNode " + knotenJetzt : "")
+        + (knotenVorher != null && knotenJetzt === knotenVorher
+          ? " (derselbe noch einmal, naechste Stufe)" : "")
         + ". Der Bot baut sich gerade neu auf.",
     });
   }

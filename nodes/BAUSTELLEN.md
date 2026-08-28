@@ -94,6 +94,27 @@ Der Zweig gibt `100 / (99 - stufe)` zurueck und kennt die Ausdauer nicht.
 Er muesste den Zuwachs mit dem Anteil verrechnen, der davon in der Kammer
 wieder verlorengeht.
 
+**Geaendert 04:11, Wirkung noch nicht gemessen.** Der Daempfer steht in
+`relNutzen` fuer Overclock: Faellt der Ausdauer-Fuellstand unter 90 Prozent,
+sinkt der ausgewiesene Nutzen linear gegen null bei 50 Prozent. Er misst
+damit die Groesse, die kippt, statt eine Stufe zu raten.
+
+**Er greift noch nicht - und das ist richtig so.** Gemessen 04:11 ueber fuenf
+Punkte in 90 Sekunden: Ausdauer **234,9 bis 238,6 von 247,6** (95 Prozent,
+steigend), Kammeranteil weiterhin null. Bei 95 Prozent ist der Faktor 1,0,
+der Nutzen also unveraendert. Overclock steht bei **75** und wartet nur auf
+Punkte (Stufe 76 kostet 109, vorhanden waren 17).
+
+Die Rechnung dahinter, die den Daempfer rechtfertigt: **Rang je
+Ausdauerpunkt ist konstant** - beides haengt an der Aktion, nicht an der
+Zeit. Sobald die Ausdauer bindet, ist die Rangrate
+`(Rang je Aktion / Verlust je Aktion) x Regeneration`, und darin kommt die
+Dauer nicht mehr vor. Overclock kuerzt sich dann vollstaendig heraus.
+
+Zu messen bleibt: ob der Fuellstand faellt, wenn Overclock weiter steigt.
+Bei Stufe 90 waeren es rechnerisch 13,1 Ausdauer je Minute gegen rund 4,4
+Regeneration.
+
 Zu tun: (1) Den Kammeranteil messen, **bevor** gedeckelt wird - die
 Stichproben aus `data/verlauf-strategie.json` zeigen ihn in den letzten
 zwei Stunden mit **null Prozent**, die Rechnung sagt also mehr voraus als

@@ -599,8 +599,52 @@ export async function main(ns) {
       // `relNutzen` rechnet ihren competence-Zuwachs trotzdem voll an. Das
       // ist ein eigener Befund und steht als Baustelle - hier zaehlt nur,
       // dass Overclock davon unberuehrt ist: Zeit wirkt immer.
+      //
+      // ABER NUR, SOLANGE DIE AUSDAUER NICHT BINDET (28.08.2026, 04:11).
+      //
+      // Der Ausdauerverlust faellt je **Aktion** an, die Regeneration je
+      // **Sekunde**:
+      //
+      //     stamina -= BaseStaminaLoss * difficultyMultiplier   (:921, :1019)
+      //     stamina += calculateStaminaGainPerSecond() * seconds (:1382)
+      //
+      // Overclock halbiert die Dauer und verdoppelt damit den Verbrauch je
+      // Minute, waehrend der Gewinn gleich bleibt. **Rang je Ausdauerpunkt
+      // ist konstant** - beides haengt an der Aktion, nicht an der Zeit.
+      // Sobald die Ausdauer der Engpass ist, kuerzt Overclock sich also
+      // vollstaendig heraus: Die Rangrate ist dann
+      // `(Rang je Aktion / Verlust je Aktion) x Regeneration`, und darin
+      // kommt die Dauer nicht mehr vor.
+      //
+      // Gerechnet fuer Assassination auf Stufe 13 um 04:08
+      // (`difficulty` = 1500 x 1,06^12 = 3.018,
+      // `diffMult = difficulty^0,28 + difficulty/650` = 9,42 + 4,64 = 14,06,
+      // `Constants.ts:5,15,16`):
+      //
+      //     Verlust je Aktion          0,285 x 14,06  =  4,01
+      //     Dauer bei Overclock 69     57 s           ->  4,22 je Minute
+      //     Dauer bei Overclock 90     18,4 s         -> 13,1 je Minute
+      //
+      // Die Regeneration lag zur selben Zeit bei rund 4,4 je Minute
+      // (`(0,0085 + maxStamina/70000) x effAgility^0,17` mal Faehigkeits-
+      // und Augmentierungsmultiplikator, `:1317-1325`). **Der Bot faehrt
+      // also genau am Gleichgewicht** - Ausdauer 237 von 247, Kammeranteil
+      // null in der letzten Stunde. Jede weitere Stufe kippt ihn darueber.
+      //
+      // Deshalb der Daempfer: Faellt der Fuellstand unter 90 Prozent, sinkt
+      // der ausgewiesene Nutzen linear gegen null. Er misst damit genau die
+      // Groesse, die kippt, statt eine Stufe zu raten - und er gibt den
+      // Nutzen von allein zurueck, wenn spaetere Augmentierungen die
+      // Regeneration heben.
       const stufe2 = Math.min(stufe, 98);
-      return 100 / (99 - stufe2);
+      let ausdauerLuft = 1;
+      try {
+        const [jetzt, max] = ns.bladeburner.getStamina();
+        if (max > 0) {
+          ausdauerLuft = Math.max(0, Math.min(1, (jetzt / max - 0.5) / 0.4));
+        }
+      } catch { /* ohne Messung bleibt es beim vollen Nutzen */ }
+      return (100 / (99 - stufe2)) * ausdauerLuft;
     }
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;

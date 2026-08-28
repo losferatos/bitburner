@@ -46,25 +46,59 @@ export async function main(ns) {
   // `reference/bitburner-src/src/Augmentation/Augmentations.ts`, nicht
   // abgetippt. Stanek's Gift und BigDsBigBrain sind bewusst draussen: Das
   // eine SENKT die Kampfwerte, das andere ist unkaeuflich.
-  const KAMPF = new Set([
-    "Bionic Arms", "Bionic Legs", "Bionic Spine", "BLADE-51b Tesla Armor",
-    "BLADE-51b Tesla Armor: Energy Shielding Upgrade", "Blade's Runners",
-    "BrachiBlades", "Combat Rib I", "Combat Rib II", "Combat Rib III",
-    "CordiARC Fusion Reactor", "DermaForce Particle Barrier",
-    "EsperTech Bladeburner Eyewear", "GOLEM Serum",
-    "Graphene Bionic Arms Upgrade", "Graphene Bionic Legs Upgrade",
-    "Graphene Bionic Spine Upgrade", "Graphene Bone Lacings",
-    "Graphene BrachiBlades Upgrade", "HemoRecirculator", "Hydroflame Left Arm",
-    "HyperSight Corneal Implant", "INFRARET Enhancement",
-    "LuminCloaking-V1 Skin Implant", "LuminCloaking-V2 Skin Implant",
-    "Nanofiber Weave", "Neotra", "nextSENS Gene Modification",
-    "ORION-MKIV Shoulder", "Photosynthetic Cells", "Power Recirculation Core",
-    "SPTN-97 Gene Modification", "SmartSonar Implant", "NEMEAN Subdermal Weave",
-    "Synfibril Muscle", "Synthetic Heart", "Augmented Targeting I",
-    "Augmented Targeting II", "Augmented Targeting III", "The Black Hand",
-    "The W1ngs of Icarus", "The B00ts of Perseus", "The H4mmer of Daedalus",
-    "The St4ff of Asclepius", "Wired Reflexes", "Xanipher",
-  ]);
+  // Name -> [strength, defense, dexterity, agility]. Erzeugt aus
+  // `reference/bitburner-src/src/Augmentation/Augmentations.ts`, nicht
+  // abgetippt. Stanek's Gift und BigDsBigBrain sind draussen: das eine SENKT
+  // die Kampfwerte, das andere ist unkaeuflich.
+  const KAMPF_MULT = {
+    "Bionic Arms": [1.3, 1, 1.3, 1],
+    "Bionic Legs": [1, 1, 1, 1.6],
+    "Bionic Spine": [1.15, 1.15, 1.15, 1.15],
+    "BLADE-51b Tesla Armor": [1.04, 1.04, 1.04, 1.04],
+    "BLADE-51b Tesla Armor: Energy Shielding Upgrade": [1, 1.05, 1, 1],
+    "Blade's Runners": [1, 1, 1, 1.05],
+    "BrachiBlades": [1.15, 1.15, 1, 1],
+    "Combat Rib I": [1.1, 1.1, 1, 1],
+    "Combat Rib II": [1.14, 1.14, 1, 1],
+    "Combat Rib III": [1.18, 1.18, 1, 1],
+    "CordiARC Fusion Reactor": [1.35, 1.35, 1.35, 1.35],
+    "DermaForce Particle Barrier": [1, 1.4, 1, 1],
+    "EsperTech Bladeburner Eyewear": [1, 1, 1.05, 1],
+    "GOLEM Serum": [1.07, 1.07, 1.07, 1.07],
+    "Graphene Bionic Arms Upgrade": [1.85, 1, 1.85, 1],
+    "Graphene Bionic Legs Upgrade": [1, 1, 1, 2.5],
+    "Graphene Bionic Spine Upgrade": [1.6, 1.6, 1.6, 1.6],
+    "Graphene Bone Lacings": [1.7, 1.7, 1, 1],
+    "Graphene BrachiBlades Upgrade": [1.4, 1.4, 1, 1],
+    "HemoRecirculator": [1.08, 1.08, 1.08, 1.08],
+    "Hydroflame Left Arm": [2.8, 1, 1, 1],
+    "HyperSight Corneal Implant": [1, 1, 1.4, 1],
+    "INFRARET Enhancement": [1, 1, 1.1, 1],
+    "LuminCloaking-V1 Skin Implant": [1, 1, 1, 1.05],
+    "LuminCloaking-V2 Skin Implant": [1, 1.1, 1, 1.1],
+    "Nanofiber Weave": [1.2, 1.2, 1, 1],
+    "Neotra": [1.55, 1.55, 1, 1],
+    "nextSENS Gene Modification": [1.2, 1.2, 1.2, 1.2],
+    "ORION-MKIV Shoulder": [1.05, 1.05, 1.05, 1],
+    "Photosynthetic Cells": [1.4, 1.4, 1, 1.4],
+    "Power Recirculation Core": [1.05, 1.05, 1.05, 1.05],
+    "SPTN-97 Gene Modification": [1.75, 1.75, 1.75, 1.75],
+    "SmartSonar Implant": [1, 1, 1.1, 1],
+    "NEMEAN Subdermal Weave": [1, 2.2, 1, 1],
+    "Synfibril Muscle": [1.3, 1.3, 1, 1],
+    "Synthetic Heart": [1.5, 1, 1, 1.5],
+    "Augmented Targeting I": [1, 1, 1.1, 1],
+    "Augmented Targeting II": [1, 1, 1.2, 1],
+    "Augmented Targeting III": [1, 1, 1.3, 1],
+    "The Black Hand": [1.15, 1, 1.15, 1],
+    "The W1ngs of Icarus": [1, 1, 1, 1.1],
+    "The B00ts of Perseus": [1, 1, 1.06, 1],
+    "The H4mmer of Daedalus": [1.1, 1, 1, 1],
+    "The St4ff of Asclepius": [1, 1.1, 1, 1],
+    "Wired Reflexes": [1, 1, 1.05, 1.05],
+    "Xanipher": [1.2, 1.2, 1.2, 1.2],
+  };
+  const KAMPF = new Set(Object.keys(KAMPF_MULT));
 
   const log = [];
   const sag = (t) => {
@@ -76,6 +110,26 @@ export async function main(ns) {
   };
 
   const sp = ns.getPlayer();
+  // ns.getPlayer() FUEHRT KEINE AUGMENTIERUNGEN (28.08.2026, 21:18).
+  //
+  // Die Rueckgabe ist eine feste Auswahl von sechzehn Feldern
+  // (`NetscriptFunctions.ts:1371-1390`) - `augmentations` und
+  // `queuedAugmentations` sind NICHT dabei. Beide Zugriffe darauf liefen
+  // still ins Leere: Die Doppelkauf-Sperre unten griff nie, und die
+  // Einbaurechnung meldete um 21:14 "0 wartend", obwohl Wired Reflexes seit
+  // 20:40 in der Warteschlange stand - erkennbar daran, dass der Preis von
+  // 12,5 auf 23,8 Mio gestiegen war (der Aufschlag je gekaufter
+  // Augmentierung).
+  //
+  // `getOwnedAugmentations(true)` liefert beides, `false` nur die
+  // eingebauten. Zwei Aufrufe derselben Funktion kosten nur einmal Speicher
+  // (SingularityFn3 x16 = 80 GB).
+  let eingebaut = [], besessen = [];
+  try {
+    eingebaut = ns.singularity.getOwnedAugmentations(false);
+    besessen = ns.singularity.getOwnedAugmentations(true);
+  } catch { /* ohne SF4 nicht verfuegbar - dann ohne Sperre weiter */ }
+  const schonDa = new Set(besessen);
   const faktionen = sp.factions || [];
   if (!faktionen.length) { sag("Keine Faktion - nichts zu kaufen."); return; }
 
@@ -90,7 +144,7 @@ export async function main(ns) {
     try { augs = ns.singularity.getAugmentationsFromFaction(f); } catch { continue; }
     for (const a of augs) {
       if (!KAMPF.has(a)) continue;
-      if (sp.augmentations && sp.augmentations.some((x) => x.name === a)) continue;
+      if (schonDa.has(a)) continue;   // gekauft ODER eingebaut
       let preis = Infinity, repReq = Infinity;
       try {
         preis = ns.singularity.getAugmentationPrice(a);
@@ -136,4 +190,59 @@ export async function main(ns) {
     } catch (e) { sag("workForFaction: " + String(e).slice(0, 120)); }
   }
   sag("Fertig. " + gekauft + " gekauft, " + liste.length + " in Reichweite.");
+
+  // --- Lohnt der Einbau? ---------------------------------------------------
+  //
+  // Ein Multiplikator wirkt erst NACH dem Einbau (`applyAugmentation`), und
+  // der Einbau kostet drei Dinge:
+  //   1. die gesamte Kampferfahrung (Spieler-Prestige),
+  //   2. die Reputation aller Faktionen - sie wird zu Favor
+  //      (`Faction.ts:77-83`, `prestigeAugmentation`),
+  //   3. die Mitgliedschaft (`isMember = false`), es muss neu beigetreten
+  //      werden.
+  //
+  // Punkt 1 ist der teure. Der Bedarf je Kampfwert fuer Stufe 100 folgt aus
+  // `calculateSkill` (`PersonObjects/formulas/skill.ts:13`), umgestellt:
+  //
+  //     exp(m) = e^((100/(m * knotenfaktor) + 200)/32) - 534,6
+  //
+  // Der Einbau lohnt genau dann, wenn der Bedarf DANACH kleiner ist als der
+  // Rest davor - und zwar auf dem Wert, der am weitesten zurueckliegt, denn
+  // der ist das Tor. Alles andere waere ein Bauchgefuehl.
+  try {
+    const sp2 = ns.getPlayer();
+    const knoten = ns.getResetInfo().currentNode;
+    // Kampffaktor des Knotens: BitNode 10 daempft auf 0,4 (`BitNode.tsx`,
+    // case 10). Ausserhalb bekannter Faelle vorsichtig mit 1 rechnen.
+    const KNOTENFAKTOR = knoten === 10 ? 0.4 : 1;
+    const expNoetig = (m) => Math.exp((100 / (m * KNOTENFAKTOR) + 200) / 32) - 534.6;
+
+    const werte = ["strength", "defense", "dexterity", "agility"];
+    const jetztMult = werte.map((w) => sp2.mults[w]);
+    // Was die wartenden Stuecke zusaetzlich braechten.
+    const eing = new Set(eingebaut);
+    const wartend = besessen.filter((a) => !eing.has(a));
+    const nachher = jetztMult.slice();
+    for (const nm of wartend) {
+      const f = KAMPF_MULT[nm];
+      if (!f) continue;
+      for (let i = 0; i < 4; i++) nachher[i] *= f[i];
+    }
+
+    const expJetzt = [sp2.exp.strength, sp2.exp.defense,
+      sp2.exp.dexterity, sp2.exp.agility];
+    let restOhne = 0, restMit = 0;
+    for (let i = 0; i < 4; i++) {
+      restOhne = Math.max(restOhne, expNoetig(jetztMult[i]) - expJetzt[i]);
+      restMit = Math.max(restMit, expNoetig(nachher[i]));
+    }
+    sag("Einbaurechnung: ohne Einbau noch " + Math.round(restOhne)
+      + " Erfahrung, mit Einbau " + Math.round(restMit)
+      + " (" + wartend.length + " wartend).");
+    if (wartend.length && restMit < restOhne) {
+      sag("EINBAU LOHNT - " + Math.round(restOhne - restMit)
+        + " Erfahrung gespart. Ausgefuehrt wird er hier NICHT: Der Einbau"
+        + " beendet jedes laufende Skript, das gehoert in den Wiederanlauf.");
+    }
+  } catch (e) { sag("Einbaurechnung: " + String(e).slice(0, 140)); }
 }

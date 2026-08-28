@@ -23,6 +23,44 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Wann wird eingebaut? Jetzt gerechnet statt geraten (erledigt 28.08., 21:28)
+
+Die Regel steht in `src/kampfaugs.js` und folgt aus `calculateSkill`
+(`PersonObjects/formulas/skill.ts:13`), umgestellt nach der Erfahrung:
+
+    exp(m) = e^((100/(m * knotenfaktor) + 200)/32) - 534,6
+
+Eingebaut wird, wenn der Bedarf DANACH kleiner ist als der Rest davor - und
+zwar auf dem Wert, der am weitesten zurueckliegt, denn der ist das Tor
+(alle vier >= 100, `NetscriptFunctions/Bladeburner.ts:356`).
+
+Der Einbau kostet drei Dinge, alle nachgeschlagen: die gesamte
+Kampferfahrung (Spieler-Prestige), die Reputation aller Faktionen - sie wird
+zu Favor (`Faction.ts:77-83`) - und die Mitgliedschaft (`isMember = false`).
+
+**Verifiziert 21:28:** "Einbaurechnung: ohne Einbau noch 223.740 Erfahrung,
+mit Einbau 252.822 (1 wartend)." Der Einbau lohnt also **nicht** - Wired
+Reflexes gibt dex und agi x1,05 und str/def nichts, und str/def sind das Tor.
+
+**Zwei Fehler dabei gefunden, beide aus derselben falschen Annahme.**
+`ns.getPlayer()` liefert eine feste Auswahl von sechzehn Feldern
+(`NetscriptFunctions.ts:1371-1390`); `augmentations` und
+`queuedAugmentations` sind NICHT dabei. Beide Zugriffe liefen still ins
+Leere:
+
+  1. Die Doppelkauf-Sperre griff nie. Wired Reflexes stand nach dem Kauf um
+     20:40 weiter als "kaufbar" in der Liste - zum inzwischen fast doppelten
+     Preis (12,5 -> 23,8 Mio, der Aufschlag je besessener Augmentierung).
+  2. Die Einbaurechnung meldete "0 wartend", obwohl eines wartete.
+
+Behoben mit `getOwnedAugmentations(false)` und `(true)` - zwei Aufrufe
+derselben Funktion, also nur einmal Speicher.
+
+Verifiziert am selben Lauf: "7 in Reichweite" statt 10 (Wired Reflexes und
+seine zwei Dubletten sind raus) und "1 wartend" statt 0.
+
+---
+
 ### Der home-Ausbau haengt an einer Regel fuer Hackdurchsatz (erledigt 28.08., 20:38)
 
 Hat sich selbst erledigt, und die Regel war richtig. `homegrow.js:112`

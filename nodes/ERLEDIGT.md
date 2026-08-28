@@ -23,6 +23,86 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Augmentierungsrunde ist gelaufen - VERIFIZIERT (28.08., 05:08)
+
+Der Punkt fragte, **wann** der Einbau faellt. Er ist am **28.08. um 01:25**
+gefallen, ausgeloest von `bn4rep.js` ohne jeden Eingriff von aussen. Der
+Wacheloop hat ihn als `URTEIL: RESET` erkannt und den Wiederanlauf geprueft:
+alle elf Skripte mit frischen PIDs, `boot.js` hatte gegriffen.
+
+**Verifiziert 05:08** aus dem Spielstand:
+
+    eingebaut 25 Augmentierungen, Warteschlange 1
+    str 1,597   def 1,597   dex 2,325   agi 1,677
+    bladeburner_success_chance 1,278   bladeburner_analysis 1,328
+    bladeburner_stamina_gain 1,040
+
+**Die Kernaussage des Punktes hat gehalten:** "Der Bladeburner-Fortschritt
+ueberlebt den Einbau fast vollstaendig." Gemessen 01:39, 14 Minuten nach dem
+Prestige: Rang 22.867 unveraendert, Assassination Stufe 9, Raid 12, Stealth
+Retirement 10, Overclock 30 - nur die Kampfwerte fielen auf 101 bis 121.
+
+**Und der Wiederaufbau war schnell, wie vorhergesagt:**
+
+    01:33   str  96  def  96  dex 101  agi  83
+    05:03   str 228  def 228  dex 405  agi 287
+
+Dreieinhalb Stunden fuer das Vierfache - die Multiplikatoren tragen genau so,
+wie es der Eintrag aus `PersonObjects/formulas/skill.ts:13` hergeleitet
+hatte.
+
+**Was der Punkt NICHT vorhergesehen hat:** Die Rangrate stieg in derselben
+Nacht von 53,4 auf **442,9 je Minute** - aber nicht wegen des Einbaus. Die
+drei Hebel dahinter waren Assassination als Rangfahrzeug (23:42), Overclock
+in der Faehigkeitssortierung (00:58) und die Chaos-Folgekosten in der
+Aktionsbewertung (03:42). Der Einbau lieferte die Kampfwerte, auf denen sie
+alle aufsetzen, aber die Zuordnung "Einbau bringt Faktor X" waere falsch.
+
+**Der offene Teil (2) - "was liefert `bn4net` an Geld je Stunde" - ist
+entfallen.** Er sollte entscheiden helfen, wann der Einbau faellt. Diese
+Entscheidung trifft `bn4rep.js` selbst, und sie hat sie richtig getroffen:
+Geld steht um 05:08 wieder bei 2,66 Mrd, ein Stueck liegt schon in der
+Warteschlange. Der Kreislauf laeuft ohne Zutun.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Der groesste ungehobene Hebel: eine Augmentierungsrunde - Engpass ist GELD (18:13)
+
+**Der Bladeburner-Fortschritt ueberlebt den Einbau fast vollstaendig.**
+`Prestige.ts:153-154` ruft `Bladeburner.prestigeAugmentation()
+(`Bladeburner.ts:259-263`), und das macht **nur** `resetAction()` +
+`joinFaction()`. Rang, `skillPoints`, Fertigkeitsstufen und Aktionsstufen
+bleiben stehen. Es fallen allein die Kampfwerte.
+
+**Und die kommen ueberproportional schneller zurueck.** Die Kampfstufe ist
+*multiplikativ* im Augmentierungs-Multiplikator, aber nur *logarithmisch* in
+der Erfahrung (`PersonObjects/formulas/skill.ts:13`). Stufe 1.000 bei
+mult 1,0 verlangt `exp = e^37,5 = 1,9e16`; bei mult 1,1 genuegt
+`exp = e^34,6 = 1,1e15` - **17-mal weniger, also rund 6 Prozent der bisherigen
+Trainingszeit**. Der Wiederaufbau kostet Stunden, die Decke steigt dauerhaft.
+
+**Reputation ist kein Engpass, Geld ist einer.** Bei Rang 6.910 sind
+mindestens 13.820 Bladeburner-Reputation verdient (`RankToFactionRepFactor 2`).
+Die Preise:
+
+    INTERLINKED     25.000 Rep   $5,5 Mrd   (Erfahrung auf alle vier Werte)
+    Golem Serum     31.250 Rep   $11 Mrd    (str/def/dex/agi je x1,07)
+    Omnibeam        62.500 Rep   $27,5 Mrd  (+10 % Erfolgschance)
+
+Kontostand um 18:00: **2,5 Milliarden**. Damit ist die Zielsetzung der Loops
+unvollstaendig: Sie optimieren Rangrate, aber der Hebel mit dem groessten
+Dauerertrag haengt am Geld - und Geld steht in keinem Ziel der letzten sechs
+Berichte.
+
+Zu tun: (1) Die drei Augmentierungen gegen ihre Wirkung auf die Rangrate
+rechnen, nicht schaetzen. (2) Pruefen, was `bn4net` an Geld je Stunde liefert
+und ob sich das heben laesst (BN6 hat `ScriptHackMoney 0,75`, also nur leicht
+gedaempft). (3) Erst dann entscheiden, wann der Einbau faellt.
+
+</details>
+
+---
+
 ### Overclock steht auf 90 - die Rechnung stimmte, die Folgerung nicht (28.08., 04:41)
 
 **Die Ausdauerrechnung von 03:56 war richtig.** Overclock ist inzwischen am

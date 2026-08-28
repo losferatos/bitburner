@@ -59,39 +59,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### Der groesste ungehobene Hebel: eine Augmentierungsrunde - Engpass ist GELD (18:13)
-
-**Der Bladeburner-Fortschritt ueberlebt den Einbau fast vollstaendig.**
-`Prestige.ts:153-154` ruft `Bladeburner.prestigeAugmentation()
-(`Bladeburner.ts:259-263`), und das macht **nur** `resetAction()` +
-`joinFaction()`. Rang, `skillPoints`, Fertigkeitsstufen und Aktionsstufen
-bleiben stehen. Es fallen allein die Kampfwerte.
-
-**Und die kommen ueberproportional schneller zurueck.** Die Kampfstufe ist
-*multiplikativ* im Augmentierungs-Multiplikator, aber nur *logarithmisch* in
-der Erfahrung (`PersonObjects/formulas/skill.ts:13`). Stufe 1.000 bei
-mult 1,0 verlangt `exp = e^37,5 = 1,9e16`; bei mult 1,1 genuegt
-`exp = e^34,6 = 1,1e15` - **17-mal weniger, also rund 6 Prozent der bisherigen
-Trainingszeit**. Der Wiederaufbau kostet Stunden, die Decke steigt dauerhaft.
-
-**Reputation ist kein Engpass, Geld ist einer.** Bei Rang 6.910 sind
-mindestens 13.820 Bladeburner-Reputation verdient (`RankToFactionRepFactor 2`).
-Die Preise:
-
-    INTERLINKED     25.000 Rep   $5,5 Mrd   (Erfahrung auf alle vier Werte)
-    Golem Serum     31.250 Rep   $11 Mrd    (str/def/dex/agi je x1,07)
-    Omnibeam        62.500 Rep   $27,5 Mrd  (+10 % Erfolgschance)
-
-Kontostand um 18:00: **2,5 Milliarden**. Damit ist die Zielsetzung der Loops
-unvollstaendig: Sie optimieren Rangrate, aber der Hebel mit dem groessten
-Dauerertrag haengt am Geld - und Geld steht in keinem Ziel der letzten sechs
-Berichte.
-
-Zu tun: (1) Die drei Augmentierungen gegen ihre Wirkung auf die Rangrate
-rechnen, nicht schaetzen. (2) Pruefen, was `bn4net` an Geld je Stunde liefert
-und ob sich das heben laesst (BN6 hat `ScriptHackMoney 0,75`, also nur leicht
-gedaempft). (3) Erst dann entscheiden, wann der Einbau faellt.
-
 ### Der Faehigkeitsplan hat feste Deckel - er veraltet zwangslaeufig
 
 **Zweimal am 27.08. lag eine deutlich bessere Faehigkeit gedeckelt daneben**,

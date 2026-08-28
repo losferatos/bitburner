@@ -346,6 +346,31 @@ noch nicht.
 **Dringlichkeit:** niedrig, aber nicht null: Er ist die einzige Voraussetzung
 auf der ganzen Route, die noch gar nicht existiert.
 
+**Grundlage gelegt 29.08. um 01:50: `doku/formeln-boerse.md`.** Die Mechanik
+ist jetzt aus `StockMarket/` gelesen statt vermutet. Die drei Zahlen, an denen
+der Bot haengt:
+
+- **Zyklus 7,5 Minuten** (`TicksPerCycle: 75` a 6 s). Jede Aktie kippt dabei
+  mit 45 Prozent ihre Richtung. Ein Schaetzfenster laenger als ein Zyklus
+  mittelt ueber den Wechsel und liefert systematisch 50 Prozent - also nichts.
+- **Ohne 4S ist die Richtung kaum messbar.** `chc = (50 ± otlkMag)/100` mit
+  otlkMag zwischen 1 und 10; der Standardfehler eines Anteils aus n Ticks ist
+  `0,5/sqrt(n)`, ein Signal von 5 Punkten braucht also n = 100 Ticks = 10
+  Minuten - laenger als der Zyklus. Die 4S-API (25 Mrd) ist damit kein Luxus,
+  sondern der Unterschied zwischen Rechnen und Raten.
+- **Provision 100.000 je Richtung**, unabhaengig von der Groesse. Bei einem
+  Prozent erwartetem Gewinn deckt erst ein Einsatz von 20 Mio die Gebuehr.
+
+**Nicht gekauft, nichts ausgegeben.** Der Zugang kostet 5 Mrd (TIX) plus 25 Mrd
+(4S-API); der Spielstand hatte um 01:43 vier Mrd, und in diesem Knoten traegt
+Geld den Fortschritt ohnehin nicht - der Traeger ist die Kampferfahrung. Ein
+Kauf hier waere nur fuer einen Test, und beim Knotenwechsel ist er wieder weg.
+
+Offen und im Doku-Anhang notiert: `PlayerInfluencing.ts` (eigene Hack- und
+Grow-Aufrufe verschieben den Forecast - in einem Knoten mit laufendem Hacknetz
+ein Hebel, der nichts kostet), der Darknet-Volatilitaetsmultiplikator und die
+Frage, ob Limit-Orders mehr koennen als Marktorders.
+
 ### 4. Darknet-Labyrinth-Gewerk (V1b)
 
 `labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei

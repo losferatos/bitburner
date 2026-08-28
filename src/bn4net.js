@@ -557,8 +557,30 @@ export async function main(ns) {
           ns.scriptKill(name, host);
           getroffen++;
         }
+        // DIE MELDUNG SAGT JETZT, WORAN DER NEUSTART HAENGT (28.08.2026, 06:15).
+        //
+        // Hier stand "startet gleich neu" - eine Zusage, die nur mit Werkbank
+        // gilt. Der Nachstart in Abschnitt 2c haengt an `if (werkbank)`, und
+        // die Werkbank ist der groesste GEKAUFTE Rechner. Nach einem
+        // Augmentierungs-Einbau sind die weg, also startet dort nichts nach.
+        //
+        // Genau das ist am 28.08. um 05:54 passiert: Nach dem zweiten Einbau
+        // der Nacht liefen zwei `bbtrain.js`, ein `WERKZEUG bbtrain.js`
+        // beendete beide, und zwei Minuten lang trainierte niemand - bei
+        // Kampfwerten auf 1. Behoben mit `node tools/task.js bbtrain.js`.
+        //
+        // Kein Nachstart auf home an dieser Stelle: Die Werkzeuge liegen auf
+        // der Werkbank, WEIL sie in ein frisches home mit 32 GB nicht passen
+        // (`blade.js` allein ist groesser als der Rest), und bn4net wuerde
+        // sich den eigenen Speicher wegnehmen. Die Meldung soll den Anwender
+        // warnen, nicht der Motor sich selbst gefaehrden.
+        const hatWerkbank = ns.cloud.getServerNames().length > 0;
         sag(getroffen > 0
-          ? name + ": " + getroffen + " Instanz(en) beendet, startet gleich neu."
+          ? name + ": " + getroffen + " Instanz(en) beendet"
+            + (hatWerkbank
+              ? ", startet gleich neu."
+              : " - ACHTUNG: keine Werkbank, es startet NICHTS nach."
+                + " Mit 'node tools/task.js " + name + "' selbst starten.")
           : "WERKZEUG " + name + " traf NICHTS - laeuft es ueberhaupt?");
         }
       }

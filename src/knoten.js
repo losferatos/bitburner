@@ -37,6 +37,18 @@ export async function main(ns) {
       nodeReset: r.lastNodeReset,
       augReset: r.lastAugReset,
       quelle: "knoten.js",
+      // Die Kampfwerte gehoeren dazu, seit der Kurs vom 28.08. 18:55 den
+      // Kampfwert-Tiefstand zum Traeger von BitNode 10 macht. Sie standen
+      // bisher nur in `data/bblage.json`, das ohne Bladeburner-Division
+      // nichts liefert - also ausgerechnet vor dem Beitritt nicht, wo sie der
+      // Traeger sind. `getPlayer` kostet 0,5 GB.
+      kampf: (() => {
+        try {
+          const sk = ns.getPlayer().skills;
+          return { str: sk.strength, def: sk.defense,
+            dex: sk.dexterity, agi: sk.agility, hacking: sk.hacking };
+        } catch { return null; }
+      })(),
     }), "w");
     // Der Auftragslaeufer sucht den Wirt mit dem meisten freien Speicher -
     // das ist selten home. Ohne diese Zeile schreibt das Skript brav seine

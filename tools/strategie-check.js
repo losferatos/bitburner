@@ -126,9 +126,21 @@ function speichereVerlauf(v) {
  * ueberwacht wurde weiter das Hackniveau. Wer den Traeger nicht mit dem Knoten
  * wechselt, ueberwacht ab dem Knotenwechsel das falsche Ding.
  */
-function traeger(knoten, bb, rep, net) {
-  const bladeKnoten = knoten === 6 || knoten === 7;
+function traeger(knoten, bb, rep, net, bladeKnoten, tiefstand) {
   if (bladeKnoten) {
+    // VOR DEM BEITRITT GIBT ES KEINEN STECKBRIEF (28.08.2026, 19:15).
+    //
+    // `bb` kommt von `bblage.js` und setzt eine Bladeburner-Division voraus.
+    // In BitNode 10 gibt es die zu Knotenbeginn nicht - der Traeger ist dort
+    // trotzdem der Kampfwert-Tiefstand, denn das erste Tor ist der Beitritt
+    // mit allen vier Werten >= 100
+    // (`NetscriptFunctions/Bladeburner.ts:356`). Ohne diesen Zweig meldete
+    // der Pruefer ersatzweise "Hacking-Weg" und ueberwachte damit genau die
+    // Groesse, die der Kurs vom 18:55 als rechnerisch tot ausgewiesen hat.
+    if (!bb && Number.isFinite(tiefstand)) {
+      return { name: "Kampfwert-Tiefstand", wert: tiefstand, ziel: 100,
+        phase: "Tor zur Division", sollRate: 1.7 };
+    }
     if (!bb) return null;
     if (!bb.inBladeburner) {
       // 100 Kampfwert in einer knappen Stunde - gemessen am 25.08.: von 1 auf
@@ -431,7 +443,18 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   const ks = await liesJson("data/knoten.json");
   const knotenFrueh = (ks && typeof ks.knoten === "number") ? ks.knoten
     : (net && typeof net.knoten === "number") ? net.knoten : null;
+  // BITNODE 10 IST AUCH EIN KAMPFKNOTEN (28.08.2026, 19:15).
+  //
+  // Der Kurs vom 18:55 hat es hergeleitet: In BitNode 10 fuehrt der Ausgang
+  // ueber 21 Black Operations, nicht ueber das Hackniveau - Weg A verlangt
+  // bei `HackingLevelMultiplier` 0,35 einen Augmentierungsmultiplikator um 40.
+  // Der Traeger ist damit derselbe wie in BitNode 6 und 7.
+  //
+  // Fuer die WERKZEUGPRUEFUNGEN gilt das trotzdem nicht: `blade.js` und der
+  // Bladeburner-Steckbrief kommen erst nach dem Beitritt, und der verlangt
+  // alle vier Kampfwerte >= 100 (heute 41). Deshalb zwei Begriffe.
   const kampfKnoten = knotenFrueh === 6 || knotenFrueh === 7;
+  const bladeKnoten = kampfKnoten || knotenFrueh === 10;
   let bb = await frischerSteckbrief();
   const kanalWarBelegt = !!(bb && bb.__kanalBelegt);
   // ALTE DATEN SIND SCHLIMMER ALS KEINE (25.08.2026, Fremdpruefung).
@@ -484,6 +507,14 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // getResetInfo) und ab dem naechsten Wechsel zusaetzlich aus
   // `data/bn4net.json` - beides laeuft ab der ersten Sekunde eines Knotens.
   const knoten = knotenFrueh || (bb && bb.knoten) || (rep && rep.knoten) || null;
+  // Kampfwerte aus der knotenunabhaengigen Quelle: `knoten.js` schreibt sie
+  // seit 19:12 mit (`getPlayer`, 0,5 GB), `bn4net.json` ab dem naechsten
+  // Neustart ebenfalls. Vorher standen sie nur in `bblage.json` - also
+  // ausgerechnet vor dem Bladeburner-Beitritt nicht, wo sie der Traeger sind.
+  const kampfQuelle = (ks && ks.kampf) || (net && net.kampf) || null;
+  const tiefstand = kampfQuelle
+    ? Math.min(kampfQuelle.str, kampfQuelle.def, kampfQuelle.dex, kampfQuelle.agi)
+    : null;
 
   if (!knoten) {
     sag("BitNode nicht bestimmbar - weder Steckbrief noch Reputationsmelder da.");
@@ -491,7 +522,7 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
     return aus();
   }
 
-  const t = traeger(knoten, bb, rep, net);
+  const t = traeger(knoten, bb, rep, net, bladeKnoten, tiefstand);
   sag("BitNode " + knoten + ", Netz " + net.gerootet + "/" + net.netz
     // Geld stand nur im Steckbrief - und der ist eine Bladeburner-Groesse.
     // In BitNode 10 kam deshalb "Geld ?". bn4net.json fuehrt es ohnehin mit.

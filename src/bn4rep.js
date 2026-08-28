@@ -397,6 +397,34 @@ export async function main(ns) {
     // Diese Zeile steht deshalb GANZ oben und ohne jede Bedingung. Sie ist
     // das einzige verlaessliche "ich lebe" dieses Skripts.
     schreibNachHome("data/hb-rep.txt", String(Date.now()));
+    // DER KNOTENSTEMPEL GEHOERT NEBEN DEN PULS (28.08.2026, 09:28).
+    //
+    // Der Waechter las `knoten` bisher aus `data/bn4rep.json` - und pruefte
+    // dabei richtigerweise, ob die Datei frisch ist. Sie ist es fast nie:
+    // Gemessen am 28.08. um 09:26 war sie **drei Tage alt** (25.08.), weil das
+    // Skript an mindestens vier Stellen vor der Telemetriezeile aus der Runde
+    // aussteigt - genau der Grund, aus dem oben der Puls steht. Damit lief die
+    // Knotenwechsel-Erkennung des Waechters faktisch nie; ihr blieb allein der
+    // home-Speicher-Einbruch, und der greift erst ab 1024 GB.
+    //
+    // Also dieselbe Stelle, dieselbe Bedingungslosigkeit. `getResetInfo`
+    // kostet 1 GB (`RamCostGenerator.ts:664`), aber bn4rep ruft es ohnehin
+    // an vier Stellen - der Aufruf hier ist gratis.
+    //
+    // `lastNodeReset` wird ausschliesslich in `prestigeSourceFile()` gesetzt
+    // (`PlayerObjectGeneralMethods.ts:173`), `lastAugReset` nur bei einem
+    // Einbau (`:126`). Damit trennt der Waechter genau, was Eric verlangt
+    // hat: Knoteneintritt melden - auch derselbe Knoten noch einmal -,
+    // gewoehnlicher Reset nicht.
+    try {
+      const ri = ns.getResetInfo();
+      schreibNachHome("data/knoten.json", JSON.stringify({
+        zeit: Date.now(),
+        knoten: ri.currentNode,
+        nodeReset: ri.lastNodeReset,
+        augReset: ri.lastAugReset,
+      }));
+    } catch { /* ohne Stempel laeuft der Rest weiter */ }
 
     const spieler = ns.getPlayer();
     // Einmal abfragen, dreimal benutzt. Die Warteschlangenlaenge steht seit
@@ -1669,6 +1697,21 @@ export async function main(ns) {
       // extra - anders als dieselbe Zeile in bn4net.js, das auf jedem
       // Rechner des Netzes liegt.
       knoten: ns.getResetInfo().currentNode,
+      // DIE KNOTENNUMMER ALLEIN REICHT NICHT (28.08.2026, 09:22).
+      //
+      // Eric will Push bei jedem BitNode-Eintritt - auch wenn DERSELBE Knoten
+      // noch einmal gewaehlt wird (Level 2 und 3 verlangen genau das). Die
+      // Nummer aendert sich dann nicht, also erkennt der Waechter es daran
+      // nicht.
+      //
+      // `lastNodeReset` erkennt es: Es wird ausschliesslich in
+      // `prestigeSourceFile()` gesetzt
+      // (`PersonObjects/Player/PlayerObjectGeneralMethods.ts:173`), ein
+      // Augmentierungs-Einbau setzt nur `lastAugReset` (`:126`). Damit ist
+      // die Unterscheidung exakt die, die Eric verlangt hat: Knoteneintritt
+      // meldet, gewoehnlicher Reset nicht.
+      nodeReset: ns.getResetInfo().lastNodeReset,
+      augReset: ns.getResetInfo().lastAugReset,
       // Die vier Zahlen, an denen das Endspiel haengt - fuer das Dashboard.
       // Alle vier sind an dieser Stelle laengst berechnet, sie kosten also
       // nichts ausser den Bytes in der Datei.

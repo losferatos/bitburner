@@ -1193,15 +1193,80 @@ export async function main(ns) {
   // Gezaehlt wird ueber alle Staedte, nicht nur die aktuelle: Die
   // Rundreise-Regel in Block 2a wechselt selbsttaetig dorthin, wo noch etwas
   // liegt.
-  const blackOpSchwelle = () => {
-    if (!RAID_AN) return SICHER_BLACKOP_OHNE_RAID;
+  // DIE SCHWELLE FOLGT DEM EINSATZ, NICHT NUR DEM RAID-VORRAT (28.08.2026, 07:52).
+  //
+  // Bis hierher gab es zwei feste Werte, und gewaehlt wurde zwischen ihnen
+  // nach dem Raid-Vorrat: Ist genug da, wird vorsichtig gefeuert (0,90), ist
+  // wenig da, lohnt das Risiko (0,40), weil die Alternative schwach ist.
+  //
+  // Das ist fuer die fruehen Operationen richtig und fuer die spaeten falsch,
+  // denn `rankLoss` waechst schneller als `rankGain`
+  // (`Bladeburner/data/BlackOperations.ts`):
+  //
+  //     Nr  Operation      rankGain   rankLoss   Break-even p*
+  //      8  Red Dragon          500         50       0,091
+  //     18  Ultron           10.000      2.000       0,167
+  //     19  Centurion        15.000      5.000       0,250
+  //     20  Vindictus        20.000     20.000       0,500   <- Verlust = Gewinn
+  //     21  Daedalus         40.000     10.000       0,200
+  //
+  // **Bei Vindictus kostet ein Fehlschlag genau so viel Rang wie ein Erfolg
+  // einbringt.** Mit Schwelle 0,40 waere der Rang-Erwartungswert dort negativ
+  // (0,4 x 20.000 - 0,6 x 20.000 = -4.000 je Versuch), und der Bot wuerde sich
+  // in einer Schleife selbst zurueckwerfen - bei der Rate von 226 Rang je
+  // Minute sind 4.000 Rang rund achtzehn Minuten je Fehlversuch.
+  //
+  // Die untere Grenze ist deshalb `p* + Sicherheitsabstand`, mit
+  // `p* = rankLoss / (rankGain + rankLoss)` - dem Punkt, an dem der
+  // Erwartungswert null wird. Der Abstand von 0,25 ist nicht gegriffen: Er
+  // deckt den zweiten Posten ab, den die reine Rangrechnung uebersieht - die
+  // ZEIT. Ein Fehlversuch kostet die volle Aktionsdauer, und Black Ops haben
+  // `getActionTimePenalty()` 1,5 (`Actions/BlackOperation.ts:51-53`).
+  //
+  // Die Tabelle ist aus `BlackOperations.ts` ERZEUGT, nicht abgetippt.
+  const BLACKOP_EINSATZ = {
+      "Operation Typhoon": { rankGain: 50, rankLoss: 10 }, // p* = 0.167
+      "Operation Zero": { rankGain: 60, rankLoss: 15 }, // p* = 0.200
+      "Operation X": { rankGain: 75, rankLoss: 15 },    // p* = 0.167
+      "Operation Titan": { rankGain: 100, rankLoss: 20 }, // p* = 0.167
+      "Operation Ares": { rankGain: 125, rankLoss: 20 }, // p* = 0.138
+      "Operation Archangel": { rankGain: 200, rankLoss: 20 }, // p* = 0.091
+      "Operation Juggernaut": { rankGain: 300, rankLoss: 40 }, // p* = 0.118
+      "Operation Red Dragon": { rankGain: 500, rankLoss: 50 }, // p* = 0.091
+      "Operation K": { rankGain: 750, rankLoss: 60 },   // p* = 0.074
+      "Operation Deckard": { rankGain: 1000, rankLoss: 75 }, // p* = 0.070
+      "Operation Tyrell": { rankGain: 1500, rankLoss: 100 }, // p* = 0.063
+      "Operation Wallace": { rankGain: 2000, rankLoss: 150 }, // p* = 0.070
+      "Operation Shoulder of Orion": { rankGain: 2500, rankLoss: 500 }, // p* = 0.167
+      "Operation Hyron": { rankGain: 3000, rankLoss: 1000 }, // p* = 0.250
+      "Operation Morpheus": { rankGain: 4000, rankLoss: 1000 }, // p* = 0.200
+      "Operation Ion Storm": { rankGain: 5000, rankLoss: 1000 }, // p* = 0.167
+      "Operation Annihilus": { rankGain: 7500, rankLoss: 1000 }, // p* = 0.118
+      "Operation Ultron": { rankGain: 10000, rankLoss: 2000 }, // p* = 0.167
+      "Operation Centurion": { rankGain: 15000, rankLoss: 5000 }, // p* = 0.250
+      "Operation Vindictus": { rankGain: 20000, rankLoss: 20000 }, // p* = 0.500
+      "Operation Daedalus": { rankGain: 40000, rankLoss: 10000 }, // p* = 0.200
+  };
+  const EINSATZ_ABSTAND = 0.25;
+  const einsatzSchwelle = (name) => {
+    const e = BLACKOP_EINSATZ[name];
+    // Unbekannter Name: auf die vorsichtige Seite, nicht auf die billige.
+    if (!e) return SICHER_BLACKOP;
+    const stern = e.rankLoss / (e.rankGain + e.rankLoss);
+    return Math.min(0.95, stern + EINSATZ_ABSTAND);
+  };
+
+  const blackOpSchwelle = (name) => {
+    if (!RAID_AN) return Math.max(SICHER_BLACKOP_OHNE_RAID, einsatzSchwelle(name));
     let gesamt = 0;
     try {
       for (const stadt of STAEDTE) {
         try { gesamt += ns.bladeburner.getCityCommunities(stadt); } catch { /* Stadt unbekannt */ }
       }
     } catch { return SICHER_BLACKOP; }
-    return gesamt >= RAID_VORRAT_GESAMT_MIN ? SICHER_BLACKOP : SICHER_BLACKOP_OHNE_RAID;
+    const vorrat = gesamt >= RAID_VORRAT_GESAMT_MIN
+      ? SICHER_BLACKOP : SICHER_BLACKOP_OHNE_RAID;
+    return Math.max(vorrat, einsatzSchwelle(name));
   };
 
   const blackOpChance = (name) => {
@@ -1259,7 +1324,7 @@ export async function main(ns) {
         // Die gerechnete Zahl schlaegt die geschaetzte. Fehlen die Daten,
         // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
         const chance = gerechnet !== null ? gerechnet : s.min;
-        const schwelle = blackOpSchwelle();
+        const schwelle = blackOpSchwelle(bo.name);
         if (chance >= schwelle) {
           return { typ: B, name: bo.name,
             grund: "Black Op (Chance " + chance.toFixed(3)

@@ -23,6 +23,30 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Abdeckung wiegt nach Arbeit statt nach Anzahl (erledigt 28.08., 16:15)
+
+Kurz: Short-Circuit und Cloak wirken auf Centurion, Vindictus und Daedalus
+nicht - keine der drei ist `isKill` oder `isStealth`. Die alte Abdeckung
+(0,58 / 0,17, gezaehlt ueber alle offenen Black Ops) leitete Punkte dorthin.
+Neu wiegt jede offene Black Op mit `ln(0,90 / Chance)`.
+
+**Verifiziert 16:08, 43 Minuten nach der Aenderung um 15:25:**
+
+    Faehigkeit           15:25   16:08   Wirkt auf Daedalus
+    Digital Observer        81     104    ja
+    Blade's Intuition       78      99    ja
+    Evasive System          79      93    ja
+    Reaper                  76      90    ja
+    Short-Circuit           62      62    nein   <- steht still
+    Cloak                   44      44    nein   <- steht still
+
+Genau die vier, die auf der Mauer wirken, sind gestiegen; die beiden anderen
+haben keinen einzigen Punkt mehr bekommen. Daedalus stieg im selben Fenster
+von 0,1274 auf 0,3543.
+
+---
+
+
 ### Der Rang bleibt die Leitgroesse - auch nach 400.000 (erledigt 28.08., 15:25)
 
 Die offene Frage des Sofort-Punkts war: Muss `beste()` umschalten, sobald der

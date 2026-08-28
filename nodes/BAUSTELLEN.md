@@ -64,6 +64,11 @@ Regeln:
 
 ## Sofort
 
+keine
+
+
+## Offen, nach Dringlichkeit
+
 ### Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte
@@ -141,42 +146,22 @@ Verifiziert 15:39 bis 15:41, waehrend Operation Ultron lief:
 `chaos 33.82, fahrbar true, aufraeumen false, chaosMax 33.82` - vorher stand
 dort dreimal `null`. Die **Messluecke** ist damit geschlossen.
 
-Der Punkt selbst bleibt offen: `chaosMax` steht bei 33,82 und muss ueber 50
-steigen, bevor die Regel bewiesen ist. Das laeuft jetzt von allein mit; der
-naechste Lauf liest nur noch die eine Zahl.
+Der Punkt selbst bleibt offen - **und er ist in BitNode 6 nicht mehr zu
+schliessen.** Gemessen 16:08: `chaosMax 34.52` nach 43 Minuten Laufzeit der
+Marke. Das Chaos steigt in der eigenen Stadt nur durch `randomEvent`
+(alle 240-600 s, davon 20 Prozent Riots, Stadt zufaellig aus sechs -
+`Bladeburner.ts:107, 679-684`), also rund alle 35 Minuten um 5 bis 20
+Prozent; von 34,5 auf ueber 50 waeren das mehrere Stunden. Der Knoten endet
+vorher: Rang 400.234 um 16:10, Centurion laeuft, danach zwei Aktionen.
+
+**Beim BitNode-Wechsel ist die Bladeburner-Division weg** (Prestige), und mit
+ihr das Chaos-Konto. Der Nachweis muss deshalb in **BitNode 7** gefuehrt
+werden - dem zweiten Kampfknoten der Route. `chaosMax` steht dafuer bereit
+und braucht dort nur abgelesen zu werden.
+
+Der Punkt wandert damit nach `## Offen`; er ist nicht erledigt, aber in
+diesem Knoten nicht mehr bearbeitbar.
 ---
-
-## Offen, nach Dringlichkeit
-
-### Die Abdeckung wiegt jetzt nach Arbeit - Wirkung noch nicht gemessen (15:25)
-
-Geaendert 15:25 in `src/blade.js`, Wirkung noch nicht gemessen.
-
-Gemessen 15:21, aus erster Hand ueber `blackOpChance()` (neu in
-`data/blade.json` als `boChancen`):
-
-    Operation Morpheus     1,0000      Operation Centurion   0,1456
-    Operation Ion Storm    1,0000      Operation Vindictus   0,1359
-    Operation Annihilus    0,9727      Operation Daedalus    0,1274
-    Operation Ultron       0,7490
-
-Die drei rechts sind die Mauer, und **keine von ihnen ist `isKill` oder
-`isStealth`**. Die alte Abdeckung (Short-Circuit 0,58, Cloak 0,17) hat
-Punkte dorthin geleitet, wo sie auf der Mauer nichts bewirken. Neu wiegt jede
-offene Black Op mit `ln(0,90 / Chance)` - dem multiplikativen Rest bis zur
-Feuerschwelle. Damit tragen Centurion, Vindictus und Daedalus je 1,955 und
-Ultron 0,184, waehrend alles bei 1,00 auf null faellt; Short-Circuit und Cloak
-sinken rechnerisch auf rund 0,03.
-
-Erwartet: Digital Observer, Blade's Intuition, Reaper und Evasive System
-steigen, Short-Circuit (62) und Cloak (44) bleiben stehen.
-
-Warum noch nicht gemessen: Skillpunkte entstehen nur bei Rangzuwachs
-(`Bladeburner.ts:1283-1291`), und der Rang kommt bei Black Ops als
-Einmalbetrag am Ende. Zwischen 15:22 und 15:23 lief Operation Morpheus, es
-wurde kein einziger Punkt ausgegeben. Der naechste Lauf liest die Stufen
-gegen die oben notierten und haakt ab oder dreht zurueck.
-
 
 ### `data/wache-zustand.json` speichert den Verlauf rueckwaerts (15:05)
 

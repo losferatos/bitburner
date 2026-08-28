@@ -1632,10 +1632,54 @@ export async function main(ns) {
       "Operation Daedalus": { rankGain: 40000, rankLoss: 10000 }, // p* = 0.200
   };
   const EINSATZ_ABSTAND = 0.25;
+  // DER RANG-ERWARTUNGSWERT IST DIE FALSCHE GROESSE (28.08.2026, 16:12).
+  //
+  // Die Regel oben ruht auf einem Satz, der nicht stimmt: "Mit Schwelle 0,40
+  // waere der Rang-Erwartungswert bei Vindictus negativ, und der Bot wuerde
+  // sich in einer Schleife selbst zurueckwerfen."
+  //
+  // **Ein verlorener Rang kostet keinen einzigen Skillpunkt.** `changeRank`
+  // vergibt sie gegen `maxRank` (`Bladeburner.ts:1283-1291`), und
+  // `maxRank = Math.max(rank, maxRank)` faellt nie (`:1273`). Der Rang ist
+  // in diesem Knoten kein Guthaben, sondern ein Durchlaufposten: Er zaehlt
+  // ueber die Skillpunkte, die er einmal erzeugt hat, und ueber die
+  // `reqdRank`-Schranke der naechsten Black Op. Sonst nichts.
+  //
+  // Damit ist der einzige echte Preis eines Fehlschlags **Zeit**: die
+  // Aktionsdauer plus die Minuten, bis der Rang die Schranke wieder
+  // ueberschreitet. Gerechnet 16:10 mit den gemessenen Zahlen (Chancenbahn aus
+  // 15:51 und 16:08, Dauer aus `Action.ts:105-121`, Rate 1.846 Rang/min),
+  // erwartete Zeit bis die Aktion faellt:
+  //
+  //     Schwelle          0,30   0,35   0,45   0,50   0,75   0,90
+  //     Centurion          20     20     24     28     53     69
+  //     Vindictus          29     29     34     38     62 <-  78
+  //     Daedalus           27     27     36 <-  40     68     86
+  //
+  // Die Pfeile sind die Schwellen, die die alte Regel setzt. Sie kosten
+  // zusammen rund **50 Minuten** - bei drei verbleibenden Aktionen und einem
+  // Knoten, der sonst in einer Stunde zu Ende ist.
+  //
+  // Die Selbstzurueckwerf-Schleife kann es ausserdem gar nicht geben: Ein
+  // Fehlschlagzyklus bei Vindictus dauert 8,6 min Aktion + 10,8 min
+  // Wiederaufholen und bringt dabei 1.846 x 19,4 = **35.800 Rang** ein, gegen
+  // 20.000 Verlust. Netto positiv.
+  //
+  // Die alte Regel bleibt trotzdem stehen - fuer den Fall, in dem sie
+  // wirklich greift: Wenn der Rang die Schranke nur knapp ueberschreitet,
+  // wirft ein Fehlschlag den Bot unter `reqdRank` zurueck, und dann kostet
+  // er echte Wartezeit. Gemessen wird deshalb der **Ueberschuss**, nicht der
+  // Erwartungswert.
   const einsatzSchwelle = (name) => {
     const e = BLACKOP_EINSATZ[name];
     // Unbekannter Name: auf die vorsichtige Seite, nicht auf die billige.
     if (!e) return SICHER_BLACKOP;
+    try {
+      const ueberschuss = ns.bladeburner.getRank() - ns.bladeburner.getBlackOpRank(name);
+      // Traegt der Vorsprung den Verlust, kostet ein Fehlschlag nur die
+      // Aktionsdauer - und dann ist frueh feuern schneller als warten.
+      if (ueberschuss >= e.rankLoss) return SICHER_BLACKOP;
+    } catch { /* API unbekannt: unten weiter, vorsichtig */ }
     const stern = e.rankLoss / (e.rankGain + e.rankLoss);
     return Math.min(0.95, stern + EINSATZ_ABSTAND);
   };

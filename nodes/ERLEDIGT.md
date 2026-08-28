@@ -23,6 +23,52 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Sleeve in BitNode 10 tut nichts (erledigt 28.08., 17:55)
+
+Es gab im ganzen Repo kein Sleeve-Skript - der Sleeve stand seit dem
+Knotenwechsel um 17:05 still. Neu: `src/sleeve.js`.
+
+**Shoplift, nicht Mug.** Aus `Crime/Crimes.ts:6-62`:
+
+    Verbrechen    Dauer     Geld    Schwierigkeit   Geld je Sekunde
+    Shoplift      2,0 s   15.000        0,05             7.500
+    Mug           4,0 s   36.000        0,20             9.000
+    Rob Store    60,0 s  400.000        0,20             6.667
+
+Mug sieht besser aus, ist aber viermal so schwer, und ein frischer Sleeve hat
+Kampfwerte um 1. Bruttoertrag zaehlt nur, wenn die Aktion gelingt.
+
+**Speicher war der eigentliche Gegner.** Jede Sleeve-Funktion kostet 4 GB
+(`RamCostGenerator.ts:51, 398-421`), und Bitburner summiert je VERSCHIEDENER
+Funktion. Die erste Fassung nutzte drei (getNumSleeves, getTask,
+setToCommitCrime) und kam auf rund 13,6 GB - sie startete um 17:52 nicht, weil
+auf home nur 9,2 GB frei waren und die gerooteten Server in dieser Phase noch
+kleiner sind. Die zweite Fassung nutzt genau eine Funktion
+(`setToCommitCrime`, rund 6,3 GB gesamt) und setzt das Verbrechen dafuer bei
+jedem Takt neu; bei 60 s Takt und 2 s Verbrechen kostet der Abbruch unter vier
+Prozent.
+
+**Verifiziert 17:50, Geldverlauf aus `bn4net.json`:**
+
+    17:48:54   711.248
+    17:49:14   718.748     +7.500
+    17:50:04   726.248     +7.500
+
+Exakt 7.500 je Schritt - das sind Shoplifts 15.000 mal `CrimeMoney: 0,5`
+(`BitNode.tsx`, case 10). Das Geld kommt beim Spieler an
+(`Sleeve/Work/Work.ts:19`, `Player.gainMoney(..., "sleeves")`).
+
+**Nebenbefund, der eine frueher gegebene Auskunft korrigiert:** Der Spieler
+bekommt die Erfahrung des Sleeves sehr wohl mit - `Work.ts:22` ruft
+`applyWorkStatsExp(Player, shockedStats, mult * sync)`. Sie ist mit
+`sync/100` gedaempft (in BitNode 10 mindestens 25 Prozent), aber sie faellt
+nicht weg.
+
+Offen bleibt die stufenweise Auswahl nach Kampfwerten - sie braucht
+`ns.sleeve.getSleeve` und damit 4 GB mehr, als heute frei sind.
+
+---
+
 ### Der Traeger-Wert kam aus einer toten Quelle (erledigt 28.08., 17:40)
 
 `traeger()` las das Hackniveau aus `data/bn4rep.json`. Die Datei ueberlebt den

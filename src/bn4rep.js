@@ -901,6 +901,64 @@ export async function main(ns) {
     const spendenAusnahme = spendenrechtFaellig
       && wartend >= (kampfKnotenEinbau ? MINDEST_WARTESCHLANGE : 1);
 
+    // IM KAMPFKNOTEN MUSS DIE WARTESCHLANGE DEN WIEDERAUFBAU VERKUERZEN
+    // (28.08.2026, 13:15).
+    //
+    // Ein Einbau setzt die vier Kampfwerte auf 1, waehrend Rang, Faehigkeits-
+    // und AKTIONSSTUFEN ihn ueberleben (`Bladeburner.prestigeAugmentation()`
+    // macht nur `resetAction()` + `joinFaction()`, `Bladeburner.ts:259-263`).
+    // Der Motor muss die Werte also wieder hochziehen, bevor er Aktionen auf
+    // Stufe 20 fahren kann. Gemessen am 28.08.: Einbau 05:53, erste wieder
+    // fahrbare Aktion 09:42 - **3 h 49 min**. Bei der Rate von 13:02
+    // (354 Rang/min ueber 49 Minuten) sind das **81.000 Rang**, gut ein
+    // Drittel des Restwegs von 214.361.
+    //
+    // Verkuerzen laesst sich diese Pause nur durch Multiplikatoren, die auf
+    // die Kampfwerte oder die Ausdauer wirken - `strength`, `defense`,
+    // `dexterity`, `agility` samt ihren `_exp`-Varianten, dazu
+    // `bladeburner_max_stamina` und `bladeburner_stamina_gain`. Alles andere
+    // zahlt die Pause, ohne sie zu verkuerzen.
+    //
+    // Der aktuelle Fall zeigt, warum das kein theoretischer Punkt ist: In der
+    // Warteschlange liegt `Hyperion Plasma Cannon V2`, und sein EINZIGER
+    // Multiplikator ist `bladeburner_success_chance: 1.08`
+    // (`Augmentation/Augmentations.ts:964-974`). Die Erfolgschancen stehen
+    // aber schon bei 1,000 - alle sechs Operationen und alle drei Vertraege
+    // (`data/bbspann.json`, 12:56), weil `getSuccessChance` mit
+    // `Math.min(1, competence/difficulty)` klemmt (`Actions/Action.ts:196`).
+    // Die acht Prozent wirken damit nur auf Black Ops, und dort heben sie die
+    // naechste (Deckard) von 0,719 auf 0,777 - weiterhin unter der
+    // Feuerschwelle 0,90. Fuer diesen Gewinn waere eine mehrstuendige Pause
+    // zu zahlen.
+    //
+    // Die Regel gilt nur in den Kampfknoten. In einem Hackingknoten ist der
+    // Wiederaufbau billig, dort bleibt jedes Stueck willkommen.
+    const WIEDERAUFBAU_MULTS = [
+      "strength", "defense", "dexterity", "agility",
+      "strength_exp", "defense_exp", "dexterity_exp", "agility_exp",
+      "bladeburner_max_stamina", "bladeburner_stamina_gain",
+    ];
+    let wiederaufbauHilfe = !kampfKnotenEinbau;
+    if (kampfKnotenEinbau) {
+      try {
+        const eingebaut = new Set(eingebauteAugs);
+        for (const aug of alleAugs) {
+          if (eingebaut.has(aug)) continue;
+          let m = null;
+          try { m = ns.singularity.getAugmentationStats(aug); } catch { continue; }
+          if (!m) continue;
+          if (WIEDERAUFBAU_MULTS.some((k) => Number(m[k]) > 1)) {
+            wiederaufbauHilfe = true; break;
+          }
+        }
+      } catch {
+        // Ohne die Abfrage lieber die alte, grosszuegige Regel: eine Sperre,
+        // die aus einem Fehler heraus greift, waere schlimmer als ein Einbau
+        // zuviel.
+        wiederaufbauHilfe = true;
+      }
+    }
+
     // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR
     // (28.08.2026, 11:40).
     //
@@ -926,10 +984,17 @@ export async function main(ns) {
         // Stuecke - genau dann haette die alte Fassung eingebaut.
         gesperrt: kampfKnotenEinbau && spendenrechtFaellig
           && wartend < MINDEST_WARTESCHLANGE,
+        // Zweite Sperre: genug Stuecke, aber keines davon verkuerzt den
+        // Wiederaufbau. Auch sie muss von aussen sichtbar sein, sonst ist sie
+        // nicht nachmessbar.
+        wiederaufbauHilfe,
+        gesperrtOhneHilfe: kampfKnotenEinbau && !wiederaufbauHilfe
+          && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme),
       }));
     } catch { /* ohne Telemetrie laeuft der Rest weiter */ }
 
     if (!ausgangSteht
+        && wiederaufbauHilfe
         && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
         && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt

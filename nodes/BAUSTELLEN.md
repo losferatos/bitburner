@@ -94,6 +94,95 @@ Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
 
 ## Sofort
 
+keine
+
+---
+
+## Offen`**, ohne Abwaegung. Dort tragen der
+
+### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
+
+Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.
+          Chongqing stand um 11:10 bei **0**. Beides waren Staedte, in denen
+          der Motor laenger Raid gefahren hat.
+
+Erwartet: Die Bevoelkerung ist eine endliche, gemeinsam genutzte Ressource.
+          Sie geht ueber `getPopulationSuccessFactor = (pop/1e9)^0,7`
+          (`Actions/Action.ts:88-92`) in die Erfolgschance JEDER Aktion ausser
+          Black Ops ein. Wer sie verbraucht, verteuert alles andere - und zwar
+          dauerhaft, denn Nachwuchs kommt nur ueber `randomEvent` alle 240 bis
+          600 Sekunden mit 25 Prozent Wahrscheinlichkeit
+          (`Bladeburner.ts:601-694`).
+
+          Die Verbrauchsraten je Erfolg stehen in `Bladeburner.ts:806-861`:
+
+              Raid                    -1 %      der Bevoelkerung, -1 Gemeinde
+              Stealth Retirement      -0,5 %
+              Sting Operation         -0,1 %
+              Assassination           -1 Kopf
+              Bounty Hunter / Retire. -1 Kopf
+
+          Bei 1e9 Einwohnern sind das 10 Mio gegen 1. **Faktor zehn
+          Millionen** - und `beste()` sieht davon nichts.
+
+Verdacht: `src/blade.js`, `beste()`. Der Chaos-Zuschlag von 03:42 rechnet die
+          Folgekosten einer Aktion bereits in ihre Dauer ein
+          (`CHAOS_JE_LAUF`). Fuer die Bevoelkerung fehlt das Gegenstueck. Ein
+          sauberer Zuschlag waere: Wieviel Rang je Minute verliert der Motor
+          dauerhaft, wenn `pop` um `x` faellt? Ueber `(pop/1e9)^0,7` ist die
+          Ableitung bezifferbar, die verbleibende Laufzeit des Knotens auch
+          (`nodes/KURS.md`).
+
+Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
+          `beste()` fast immer Assassination, und die kostet einen Kopf. Der
+          Fehler ist damit entschaerft, aber nicht behoben - er schlaegt wieder
+          zu, sobald Raid einmal auf der Chaos-Rechnung gewinnt.
+
+  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
+  beheben. Abgeraeumtes wandert nach "Erledigt".
+- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
+  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
+  beginnt, wird uebersprungen statt angefangen.
+- Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
+- **Erledigtes wandert nach `nodes/ERLEDIGT.md`, nicht nach unten** (seit
+  27.08.2026, 18:35). Es wird nie geloescht - der Verlauf ist die Begruendung
+  fuer das, was heute steht -, aber er gehoert nicht in die Arbeitsliste: Sie
+  stand bei 1.777 Zeilen, davon 81 Prozent Archiv, und das Read-Werkzeug
+  schneidet bei 2.000 stumm ab. Im Archiv wird **gegrept, nicht gelesen**:
+  `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`.
+- Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
+- **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
+  ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
+  Die Lebenszeichen stehen woanders und sind bedingungslos:
+  `data/hb-rep.txt` fuer `bn4rep.js` (Puls), `data/rep-ziel.txt` fuer sein
+  aktuelles Ziel samt Rangliste, `data/wache-zustand.json` fuer den Waechter.
+  `data/bn4rep.json` und `data/ps.json` sind Momentaufnahmen, keine Pulse.
+  *In der Nacht zum 28.08. hat diese Falle einen Sofort-Punkt erzeugt, der
+  komplett falsch war - die Warnung stand seit dem 24.08. in `bn4rep.js:389`,
+  nur nicht dort, wo jemand sie sucht.*
+- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
+  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
+  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
+  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
+  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
+  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
+  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
+  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
+  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
+  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
+  bin."
+  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
+  sondern weil sie feststeht (Fables Analyse,
+  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
+  dazwischenfunken.
+  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
+  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
+  groessten offenen Hebel des Knotens einen halben Nachmittag.*
+
+---
+
+## Sofort
+
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
 
 Gemessen: Der Einbau von **05:53** hat alle vier Kampfwerte auf 1 gesetzt. Um

@@ -23,6 +23,61 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (erledigt 28.08., 13:15)
+
+Der Punkt verlangte eine Bedingung, die in den Kampfknoten fragt: **Wieviel
+Rang je Minute gebe ich auf, und wie lange?** Sie steht jetzt in
+`src/bn4rep.js`, in zwei Stufen.
+
+**Stufe 1 (10:12, Commit `d7cb290`):** Der Spendenrecht-Zweig darf in BitNode 6
+und 7 nicht mehr an der Mindestwarteschlange vorbei. Genau daran lag der Einbau
+vom 05:53, der **ein einziges Stueck** einbaute und 3 h 49 min Wiederaufbau
+kostete.
+
+**Stufe 2 (13:15, dieser Lauf):** Ein Einbau im Kampfknoten verlangt jetzt, dass
+mindestens ein wartendes Stueck den Wiederaufbau ueberhaupt **verkuerzt**.
+Verkuerzen kann das nur, wer auf die Kampfwerte oder die Ausdauer wirkt -
+`strength`, `defense`, `dexterity`, `agility` samt `_exp`,
+`bladeburner_max_stamina`, `bladeburner_stamina_gain`. Alles andere zahlt die
+Pause, ohne sie zu verkuerzen.
+
+Warum das kein theoretischer Punkt ist: In der Warteschlange liegt
+`Hyperion Plasma Cannon V2`, und sein **einziger** Multiplikator ist
+`bladeburner_success_chance: 1.08`
+(`Augmentation/Augmentations.ts:964-974`). Die Erfolgschancen stehen aber schon
+bei 1,000 - alle sechs Operationen und alle drei Vertraege
+(`data/bbspann.json`, 12:56), weil `getSuccessChance` mit
+`Math.min(1, competence/difficulty)` klemmt (`Actions/Action.ts:196`). Die acht
+Prozent wirken damit nur auf Black Ops und heben die naechste (Deckard) von
+0,719 auf 0,777 - weiterhin unter der Feuerschwelle 0,90. Dafuer waeren bei der
+Rate von 13:02 (354 Rang/min ueber 49 Minuten) rund **81.000 Rang** Pause zu
+zahlen, gut ein Drittel des Restwegs von 214.361.
+
+**Verifiziert: `wiederaufbauHilfe: false` um 13:10** (`data/einbau.json`, sechs
+Messungen im 15-Sekunden-Takt). Das Gate liest `getAugmentationStats` fuer jedes
+wartende Stueck aus dem laufenden Spiel und stuft die tatsaechliche
+Warteschlange korrekt als nutzlos fuer den Wiederaufbau ein.
+
+**Was NICHT bewiesen ist, und das gehoert dazu:** Keine der beiden Sperren hat
+bisher einen Einbau tatsaechlich verhindert, weil keine ihrer
+Ausloesebedingungen eingetreten ist - `spendenrechtFaellig` war den ganzen Tag
+`false`, und `wartend` steht bei 1 gegen eine Mindestwarteschlange von 3. Beide
+Zustaende stehen in `data/einbau.json` (`gesperrt`, `gesperrtOhneHilfe`), damit
+der Nachweis kommt, wenn der Fall eintritt. Bei einem Fehler in der
+`getAugmentationStats`-Abfrage faellt das Gate bewusst auf `true` zurueck: Eine
+Sperre, die aus einem Fehler heraus greift, waere schlimmer als ein Einbau
+zuviel.
+
+Zwei Annahmen aus dem urspruenglichen Punkt bleiben widerlegt: Der Einbau
+ruiniert die Bevoelkerungsschaetzung **nicht**
+(`Bladeburner.prestigeAugmentation()` macht nur `resetAction()` +
+`joinFaction()`, `Bladeburner.ts:259-263`), und der Wiederaufbau dauerte nicht,
+bis die Kampfwerte reichten, sondern bis die Schaetzung reichte.
+
+Commit: siehe `git log src/bn4rep.js`.
+
+---
+
 ### Raid bietet 1.378 Rang je Minute - real sind es 124 (erledigt 28.08., 12:51)
 
 Der Verlust lag **nicht** bei der Ausdauer, wie der Punkt vermutete, sondern bei

@@ -64,6 +64,43 @@ Regeln:
 
 ## Sofort
 
+### Die Augmentierungsrunde ist nicht bezahlbar - die Reputation fehlt (21:15)
+
+Gemessen: Sector-12 hatte um 21:08 **5.241** Reputation, um 21:13 **5.246**.
+          Das ist **1 je Minute**. Fuer Augmented Targeting I fehlen 4.754 -
+          das waeren **79 Stunden**. Slum Snakes steht bei 347 von 2.500.
+
+          Niemand arbeitet fuer eine Faktion: Der Spieler steht im Gym
+          (Traeger des Knotens), der Sleeve seit 20:57 auch. Die eine
+          Reputation je Minute ist der passive Rest.
+
+Erwartet: Die Kursentscheidung vom 19:20 ("Zwischenschritt: eine
+          Kampf-Augmentierungsrunde, spart 19,6 Stunden auf Tor 1") hat den
+          Preis der Reputation **nicht mitgerechnet**. Die Rechnung stimmt
+          fuer die Multiplikatoren; sie unterstellt aber, dass die
+          Augmentierungen zu haben sind. Sie sind es nicht.
+
+          Drei Wege, alle noch ungerechnet:
+          1. **Der Spieler arbeitet fuer die Faktion** statt zu trainieren.
+             Seine Werte sind hoeher als die des Sleeves, die Rate also
+             deutlich besser - aber das Gym steht still, und das Gym ist der
+             Traeger. Was ist teurer?
+          2. **Andere Faktion.** Tetrads und The Dark Army verlangen Karma
+             -18 beziehungsweise -45 (vorhanden: -49,7) und fuehren die
+             staerkeren Stuecke (Bionic Arms str/dex x1,3). Beitritt kostet
+             eine Reise nach Chongqing.
+          3. **Gar keine Augmentierungen** und die 21,8 Stunden Gym fahren.
+             Das ist die Rueckfalloption und muss geschlagen werden, nicht
+             angenommen.
+
+Verdacht: Kein Fehler im Code. Ein Rechenfehler im Kurs, der sich erst zeigt,
+          wenn man die Reputation misst statt sie vorauszusetzen.
+
+Dringlichkeit: **hoechste.** Solange das nicht entschieden ist, laeuft der
+          Knoten auf der Rueckfalloption - und niemand hat sie gegen die
+          Alternativen gerechnet.
+
+
 ### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
 
 Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je

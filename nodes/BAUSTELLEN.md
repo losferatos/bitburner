@@ -208,13 +208,44 @@ allein den Raid-Vorrat. Sauber waere, die Kosten des Wechsels zu beziffern -
 die Zeit bis zur brauchbaren Schaetzung mal die entgangene Rangrate - und sie
 gegen den Gewinn an `comms` zu stellen.
 
-**Zu pruefen ist ausserdem, ob `bbspann.js` schadet.** Es reist durch alle
-sechs Staedte und kehrt zurueck; ob dabei etwas an den Schaetzungen haengen
-bleibt, ist nicht geprueft. Ein Messwerkzeug, das den Messgegenstand
-veraendert, waere ein eigener Fehler.
+**`bbspann.js` ist unschuldig - geprueft 10:38.** `switchCity` setzt
+ausschliesslich `bladeburner.city` (`NetscriptFunctions/Bladeburner.ts:314-319`),
+es fasst weder `popEst` noch sonst etwas an. Das Messwerkzeug veraendert den
+Messgegenstand nicht.
 
-Dringlichkeit: mittel. Der Fall tritt nur bei einem Stadtwechsel auf, kostet
-dann aber ein bis zwei Stunden.
+**Teilerledigt 10:42: `RUNDREISE_MIN_COMMS` von 10 auf 55.** Die alte Schwelle
+zaehlte nur den Gewinn. Die Rechnung jetzt vollstaendig:
+
+    Gewinn je Gemeinde   Raid rankGain 55 x rewardFac 1,1^13 (Stufe 14) = 190
+    Kosten je Wechsel    45 min Field Analysis x 226 Rang/min        = 10.170
+    Break-even                                                   54 Gemeinden
+
+Das schaltet die Rundreise in der Praxis fast ab - und das ist die ehrliche
+Folgerung: Bei den zuletzt gemessenen Bestaenden (Aevum 49, Ishima 42,
+Volhaven 17) war sie schon immer defizitaer, nur hat es niemand ausgerechnet.
+
+**DER GROESSERE HEBEL LIEGT NOCH OFFEN, und die Zahlen dafuer stehen schon da.**
+`data/bbspann.json` misst die Schaetzungsguete JEDER Stadt (10:38-Messung von
+09:40):
+
+    Sector-12   alle Spannen 0,000   perfekt scharf   Chaos 67,42
+    Aevum       0,006 bis 0,016      sehr scharf      Chaos 88,31
+    Volhaven    0,54 bis 0,78        schlecht
+    Chongqing   alle bei [0,000-1,000]                <- hier stand die Division
+
+**Der Motor haette nicht eine Stunde schaerfen muessen, er haette wechseln
+koennen** - `switchCity` kostet null Sekunden. Die Stadtwahl kennt aber nur
+den Raid-Vorrat und (an anderer Stelle) das Chaos, nicht die Schaetzungsguete.
+
+Was dafuer noch zu klaeren ist: Der Wechsel muss Chaos UND Schaetzung
+gegeneinander abwaegen - Sector-12 ist scharf, hat aber Chaos 67, und ueber 50
+schlaegt `sqrt(1+chaos-50)` auf die Schwierigkeit jeder Aktion
+(`Actions/Action.ts:94-101`). Ein halbgarer Wechsel waere schlimmer als
+keiner. Die Probe selbst ist billig: kurz hinwechseln, `spanne()` lesen,
+zurueckwechseln - ohne `await` dazwischen, sonst rechnet das Spiel eine
+Aktion in der falschen Stadt ab.
+
+Dringlichkeit: mittel-hoch. Der Fall kostet ein bis zwei Stunden je Wechsel.
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 

@@ -157,7 +157,30 @@ export async function main(ns) {
   // Ab wieviel Gemeinden sich ein Stadtwechsel lohnt. Zehn sind rund 970 Rang
   // bei Raid-Stufe 7 - genug, um die Diplomacy-Phase zu bezahlen, die der
   // Wechsel nach sich zieht.
-  const RUNDREISE_MIN_COMMS = 10;
+  // DIE SCHWELLE ZAEHLTE NUR DEN GEWINN (28.08.2026, 10:42).
+  //
+  // Zehn Gemeinden galten als "rund 970 Rang" und damit als genug, um einen
+  // Wechsel zu bezahlen. Die Rechnung nennt aber nur die Einnahmen. Ein
+  // Stadtwechsel bringt eine **ungepflegte Bevoelkerungsschaetzung** mit, und
+  // die ist je Stadt gespeichert - der Motor entscheidet an `s.min`, und das
+  // ist nach einem Wechsel null, unabhaengig von allem anderen.
+  //
+  // Was das gekostet hat, gemessen am 28.08.: Die Division stand in
+  // Chongqing, alle sechs Operationen bei [0,000 - 1,000], und von 07:52
+  // (erste Field Analysis) bis 09:42 (erste wieder fahrbare Aktion) vergingen
+  // **110 Minuten**. Konservativ gerechnet - ohne die Zeit, die eigene Fehler
+  // gekostet haben - bleiben **45 Minuten** Field Analysis. Bei der
+  // Reisegeschwindigkeit von 226 Rang je Minute sind das **10.170 Rang**.
+  //
+  // Der Gewinn je Gemeinde: Raid hat `rankGain` 55 und `rewardFac` 1,1
+  // (`data/Operations.ts:113-125`), auf Stufe 14 also 55 x 1,1^13 = **190
+  // Rang**. Damit lohnt ein Wechsel erst ab **54 Gemeinden**, nicht ab zehn.
+  //
+  // 55 statt 10. Das schaltet die Rundreise in der Praxis fast ab - und das
+  // ist die ehrliche Folgerung: Bei den zuletzt gemessenen Bestaenden (Aevum
+  // 49, Ishima 42, Volhaven 17) war sie schon immer defizitaer, nur hat es
+  // niemand ausgerechnet.
+  const RUNDREISE_MIN_COMMS = 55;
   const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
     "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;

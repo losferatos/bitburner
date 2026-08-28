@@ -37,6 +37,71 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Datamancer - die Faehigkeit, die in blade.js nirgends vorkam (28.08., 09:55)
+
+Engpass:    **Die Bevoelkerungsschaetzung, nicht die Kampfwerte.** Gemessen
+            09:40 (`src/bbspann.js`), Division in Chongqing: ALLE SECHS
+            Operationen standen bei **[0,000 - 1,000]**. Der Motor entscheidet
+            an `s.min`, und `s.min` war null. Er hat von 08:40 bis 09:42
+            **87 Minuten** nichts verdient - im Gym, weil `lohntSich` nie
+            wahr wurde.
+
+            Der Grund steht in `Actions/Action.ts`: `low = real - diff`, und
+            `diff` uebersteigt `real`, sobald `popEst` weit von `pop`
+            entfernt ist. Nach einem Stadtwechsel der Division ist das der
+            Normalfall.
+
+Hypothese:  `Datamancer` wird von der dynamischen Sortierung **sofort und
+            weit** gekauft, weil sein Nutzen je Punkt die Konkurrenz um rund
+            **Faktor 250** schlaegt:
+
+                Datamancer Stufe 0    5,00 Nutzen / 3 Punkte  = 1,67 je Punkt
+                Blade's Intuition 65  (Klemmfaktor)           = 0,0066 je Punkt
+
+            Und damit faellt die breiteste Spanne im Feld von **1,000** auf
+            unter **0,500**, weil alle vier Wege zur besseren Schaetzung mit
+            demselben Multiplikator skalieren.
+
+Beleg:      `data/Skills.ts:73-83` - `Datamancer`,
+            `mults: { SuccessChanceEstimate: 5 }`, also fuenf Prozent je
+            Stufe. `baseCost 3, costInc 1`, Stufe n kostet also `3 + n`
+            (`Skill.ts:37-41`) - Stufe 13 zusammen 117 Punkte. Zum Vergleich
+            kostet Blade's Intuition die naechste Stufe allein 140.
+
+            Der Multiplikator greift an **vier** Stellen (`Bladeburner.ts`):
+
+                :806   Investigation gelungen   +0,4 % Schaetzung
+                :815   Undercover gelungen      +0,8 %
+                :875   Tracking (Vertrag)       +100 bis 1.000 Zaehlwerte
+                :1140  Field Analysis           + eff Prozent
+
+            **Sie kam in `src/blade.js` nirgends vor** - weder im Plan noch in
+            `DYNAMISCH`. Seit dem ersten Tag auf Stufe 0, waehrend genau die
+            Groesse, die sie hebt, den Motor heute anderthalb Stunden
+            blockiert hat.
+
+            Der Nutzen ist situativ und haengt deshalb an `schaetzNot()` -
+            der breitesten Spanne im Feld, normiert auf `SPANNE_ZU_BREIT`.
+            Ist die Schaetzung scharf, faellt er auf null. Dasselbe Muster wie
+            bei Overclock und Cyber's Edge.
+
+Vorher:     Datamancer Stufe 0 (fehlt in `bbspann.json`, das ueber
+            `getSkillNames()` ALLE Faehigkeiten fuehrt und nur Stufe > 0
+            anzeigt). Breiteste Spanne 1,000 um 09:40.
+Nachher:    (offen - der Motor hatte um 09:55 nur noch 4 Punkte, die 117 davor
+            gingen vor dem Neustart an Blade's Intuition, Digital Observer und
+            Cloak. Die neue Sortierung entscheidet erst beim naechsten
+            Punkteschub. Naechster Lauf misst: Stufe > 0? Spanne < 0,5?)
+Commit:     (siehe git log)
+
+**Nachmessung des Hebels von 09:42 - er traegt:** Der Gym-Zweig verdraengte
+Field Analysis; seit der Korrektur laeuft der Motor wieder. **Operation Red
+Dragon ist um 09:55 gefallen** (naechste Black Op ist jetzt Operation K, Rang
+30.000), der Rang stieg von 82.299 auf **82.770**. Das sind **8 von 21** Black
+Operations.
+
+---
+
 ### WIDERLEGT und zurueckgenommen: Gym und Bladeburner laufen NICHT parallel (28.08., 07:34)
 
 **Der Hebel von 07:00 ruhte auf einer falschen Annahme, und er war nicht nur

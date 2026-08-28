@@ -566,6 +566,38 @@ export async function main(ns) {
       const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
       return 100 * (danach / jetzt - 1);
     }
+    if (name === "Datamancer") {
+      // DIE FAEHIGKEIT, DIE HEUTE 87 MINUTEN GEKOSTET HAT (28.08.2026, 09:55).
+      //
+      // `Datamancer` stand in `blade.js` NIRGENDS - weder im Plan noch in
+      // `DYNAMISCH`. Sie ist damit seit dem ersten Tag auf Stufe 0, und sie
+      // ist die einzige Faehigkeit, die auf die Bevoelkerungsschaetzung
+      // wirkt: `mults: { SuccessChanceEstimate: 5 }`, also fuenf Prozent je
+      // Stufe (`data/Skills.ts:73-83`).
+      //
+      // Der Multiplikator greift an VIER Stellen (`Bladeburner.ts`):
+      //     :806   Investigation gelungen      +0,4 % Schaetzung
+      //     :815   Undercover gelungen         +0,8 %
+      //     :875   Tracking (Vertrag)          +100 bis 1.000 Zaehlwerte
+      //     :1140  Field Analysis              + eff Prozent
+      //
+      // Warum das der Engpass ist, gemessen am 28.08. um 09:40
+      // (`src/bbspann.js`): Nach dem Stadtwechsel der Division standen ALLE
+      // SECHS Operationen bei [0,000 - 1,000]. Der Motor entscheidet an
+      // `s.min`, und `s.min` war null - er hat 87 Minuten lang nichts
+      // verdient, weil die Schaetzung unbrauchbar war und nicht, weil die
+      // Kampfwerte zu niedrig waren.
+      //
+      // Und sie ist billig: `baseCost 3, costInc 1` heisst, Stufe n kostet
+      // `3 + n` Punkte (`Skill.ts:37-41`). Stufe 13 kostet zusammen 117 -
+      // bei 121 verfuegbaren Punkten. Zum Vergleich: Blade's Intuition steht
+      // auf Stufe 65 und kostet die naechste Stufe 140.
+      //
+      // Der Nutzen ist SITUATIV, wie bei Overclock und Cyber's Edge: Ist die
+      // Schaetzung scharf, bringt eine bessere Schaetzung nichts. Deshalb
+      // haengt er an `schaetzNot()` - der breitesten Spanne im Feld.
+      return (100 * 5 / (100 + 5 * stufe)) * schaetzNot();
+    }
     if (name === "Cyber's Edge") {
       // DAS GEGENSTUECK ZU OVERCLOCK (28.08.2026, 05:40).
       //
@@ -700,6 +732,27 @@ export async function main(ns) {
   // Die 0,999 statt 1,0 als Grenze: Die geschaetzte Chance schwankt im
   // letzten Promille mit der Bevoelkerungsschaetzung der Stadt, und ein
   // Nutzen, der an dieser Stelle kippt, waere Rauschen.
+  // Wie schlecht ist die Bevoelkerungsschaetzung? 1 = voellig unbekannt
+  // (Spanne ueber die ganze Breite), 0 = scharf. Massgeblich ist die
+  // BREITESTE Spanne im Feld, denn eine einzige unscharfe Aktion kann den
+  // Motor blockieren - genau das ist am 28.08. um 07:52 passiert.
+  const schaetzNot = () => {
+    try {
+      let breit = 0;
+      for (const n of OPERATIONEN) {
+        const s = spanne(O, n);
+        breit = Math.max(breit, s.max - s.min);
+      }
+      for (const n of VERTRAEGE) {
+        const s = spanne(V, n);
+        breit = Math.max(breit, s.max - s.min);
+      }
+      // Unter SPANNE_ZU_BREIT ist die Schaetzung gut genug - dann ist eine
+      // bessere wertlos, und der Nutzen faellt auf null.
+      return Math.max(0, Math.min(1, (breit - SPANNE_ZU_BREIT) / (1 - SPANNE_ZU_BREIT)));
+    } catch { return 0; }
+  };
+
   // Wieviel Luft hat die Ausdauer? 1 = voll, 0 = am Anschlag. Zwei
   // Faehigkeiten haengen daran, und zwar gegenlaeufig: Overclock verliert
   // seinen Wert, wenn die Luft ausgeht, Cyber's Edge gewinnt ihn dann.
@@ -806,7 +859,7 @@ export async function main(ns) {
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock", "Cyber's Edge"];
+    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock", "Cyber's Edge", "Datamancer"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();

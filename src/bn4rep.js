@@ -901,6 +901,34 @@ export async function main(ns) {
     const spendenAusnahme = spendenrechtFaellig
       && wartend >= (kampfKnotenEinbau ? MINDEST_WARTESCHLANGE : 1);
 
+    // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR
+    // (28.08.2026, 11:40).
+    //
+    // Die Sperre oben wurde um 10:12 eingebaut, und die Nachmessung lautete
+    // "beim naechsten faelligen Spendenrecht darf kein Einbau mit weniger als
+    // drei Stuecken stattfinden". Von aussen war das nicht pruefbar: Dass
+    // 86 Minuten spaeter immer noch 26 Augmentierungen installiert waren,
+    // belegt nur, dass NICHT eingebaut wurde - nicht, dass die Sperre der
+    // Grund war. Vielleicht war das Spendenrecht nie faellig.
+    //
+    // Deshalb steht der Zustand jetzt in der Telemetrie. Die Datei ist klein
+    // und wird bei jedem Durchlauf geschrieben, damit ein Loop sie ohne
+    // Auftragskanal lesen kann.
+    try {
+      schreibNachHome("data/einbau.json", JSON.stringify({
+        zeit: Date.now(),
+        wartend,
+        mindest: MINDEST_WARTESCHLANGE,
+        kampfknoten: kampfKnotenEinbau,
+        spendenrechtFaellig,
+        spendenAusnahme,
+        // Das ist die Zahl, die die Sperre belegt: faellig, aber zu wenige
+        // Stuecke - genau dann haette die alte Fassung eingebaut.
+        gesperrt: kampfKnotenEinbau && spendenrechtFaellig
+          && wartend < MINDEST_WARTESCHLANGE,
+      }));
+    } catch { /* ohne Telemetrie laeuft der Rest weiter */ }
+
     if (!ausgangSteht
         && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
         && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)

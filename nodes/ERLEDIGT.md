@@ -23,6 +23,117 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Overclock steht auf 90 - die Rechnung stimmte, die Folgerung nicht (28.08., 04:41)
+
+**Die Ausdauerrechnung von 03:56 war richtig.** Overclock ist inzwischen am
+Maximum (Stufe **90**, gemessen 04:37), Assassination steht auf Stufe 15 mit
+einer Dauer von **24 Sekunden** - und der Fuellstand ist wie vorhergesagt
+gefallen:
+
+    03:51   Overclock 69   Ausdauer 231,0 / 243,9  =  95 %
+    04:37   Overclock 90   Ausdauer 195,2 / 283,7  =  69 %
+
+**Die Folgerung "dann wird Overclock wertlos" ist dagegen widerlegt.** Die
+Rangrate ist im selben Zeitraum von **83,3 auf 347 je Minute** gestiegen.
+
+Der Grund steht in `Bladeburner.ts:1317-1325`, und er fehlte in meiner
+Rechnung: Die Regeneration enthaelt `maxStamina / MaxStaminaToGainFactor`
+und den Faktor `effAgility^0,17`. **Beide wachsen mit den Kampfwerten mit** -
+und die steigen gerade schnell, weil der Einbau von 01:25 die
+Multiplikatoren gehoben hat. Gemessen ueber sechs Punkte in zwei Minuten:
+
+    Ausdauer 193/284 -> 192/287 -> 190/294 -> 187/294 -> 188/295
+
+Die absolute Ausdauer bleibt bei rund 190 stehen, waehrend das Maximum
+waechst. **Das ist ein Gleichgewicht, kein Absturz** - die Kammer lief in
+keiner der sechs Messungen, durchgehend Assassination.
+
+**Der Daempfer bleibt trotzdem drin.** Er kostet nichts, solange die Ausdauer
+Luft hat (Faktor 1,0 ueber 90 Prozent), und er ist die Versicherung fuer den
+Fall, dass die Regeneration einmal nicht mitwaechst - nach einem BitNode-
+Wechsel etwa, wenn Overclock wieder bei null anfaengt und die Kampfwerte
+ebenfalls. Eine Sicherung, die im Normalbetrieb nicht auffaellt, ist nicht
+falsch, nur weil der Ernstfall diesmal ausblieb.
+
+**Die Lehre:** Ich habe zwei Groessen als fest angenommen, die beide
+mitwachsen - `maxStamina` und `effAgility`. Eine Rechnung, die einen Teil
+des Systems einfriert, sagt zuverlaessig den Zusammenbruch voraus. Der Blick
+in `calculateStaminaGainPerSecond` haette fuenf Minuten gekostet und stand
+in derselben Datei wie die Verlustzeile, die ich nachgeschlagen hatte.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Overclock hat eine harte Grenze, und sie ist die Ausdauer (03:56)
+
+Gemessen: Overclock steht um 03:51 auf **Stufe 69** von 90 und ist der
+staerkste laufende Hebel - die Rangrate sprang im kurzen Fenster auf 190,5
+je Minute. Die Ausdauer steht dabei aber schon bei **231,0 von 243,9**, und
+`tools/spann.js` meldet die Regeneration als "2.3/min (Vorgabe)" statt
+gemessen: Es hat keine Kammerphase mehr gesehen.
+
+Erwartet: Genau das kippt bald, und der Grund steht im Quellcode.
+**Der Ausdauerverlust faellt je AKTION an, die Regeneration je SEKUNDE:**
+
+    this.stamina -= BaseStaminaLoss * difficultyMultiplier   (Bladeburner.ts:921, :1019)
+    BaseStaminaLoss: 0.285                                   (Constants.ts:5)
+    StaminaGainPerSecond: 0.0085                             (Constants.ts:4)
+
+Overclock halbiert die Aktionsdauer - also verdoppelt es den Verbrauch je
+Minute, waehrend der Gewinn gleich bleibt. Gerechnet fuer Assassination auf
+Stufe 12 (`difficulty` = 1500 x 1,06^11 = 2.846,
+`diffMult = difficulty^0,28 + difficulty/650` = 9,49 + 4,38 = **13,87**,
+`Constants.ts:15-16`):
+
+    Verlust je Aktion            0,285 x 13,87  =  3,95 Ausdauer
+    Dauer bei Overclock 69       rund 48 s      ->  4,94 je Minute
+    Dauer bei Overclock 90       rund 15,5 s    -> 15,3 je Minute
+    Regeneration (Anzeige)                          2,3 je Minute
+
+**Bei Stufe 69 fehlt schon der Faktor 2, bei 90 waere es Faktor 6,6.** Die
+Kammer muesste den Rest auffangen - und Kammerzeit ist Zeit ohne Rang. Ab
+einem Punkt frisst Overclock mehr, als es bringt.
+
+Verdacht auf die Fundstelle: `src/blade.js`, `relNutzen` fuer Overclock.
+Der Zweig gibt `100 / (99 - stufe)` zurueck und kennt die Ausdauer nicht.
+Er muesste den Zuwachs mit dem Anteil verrechnen, der davon in der Kammer
+wieder verlorengeht.
+
+**Geaendert 04:11, Wirkung noch nicht gemessen.** Der Daempfer steht in
+`relNutzen` fuer Overclock: Faellt der Ausdauer-Fuellstand unter 90 Prozent,
+sinkt der ausgewiesene Nutzen linear gegen null bei 50 Prozent. Er misst
+damit die Groesse, die kippt, statt eine Stufe zu raten.
+
+**Er greift noch nicht - und das ist richtig so.** Gemessen 04:11 ueber fuenf
+Punkte in 90 Sekunden: Ausdauer **234,9 bis 238,6 von 247,6** (95 Prozent,
+steigend), Kammeranteil weiterhin null. Bei 95 Prozent ist der Faktor 1,0,
+der Nutzen also unveraendert. Overclock steht bei **75** und wartet nur auf
+Punkte (Stufe 76 kostet 109, vorhanden waren 17).
+
+Die Rechnung dahinter, die den Daempfer rechtfertigt: **Rang je
+Ausdauerpunkt ist konstant** - beides haengt an der Aktion, nicht an der
+Zeit. Sobald die Ausdauer bindet, ist die Rangrate
+`(Rang je Aktion / Verlust je Aktion) x Regeneration`, und darin kommt die
+Dauer nicht mehr vor. Overclock kuerzt sich dann vollstaendig heraus.
+
+Zu messen bleibt: ob der Fuellstand faellt, wenn Overclock weiter steigt.
+Bei Stufe 90 waeren es rechnerisch 13,1 Ausdauer je Minute gegen rund 4,4
+Regeneration.
+
+Zu tun: (1) Den Kammeranteil messen, **bevor** gedeckelt wird - die
+Stichproben aus `data/verlauf-strategie.json` zeigen ihn in den letzten
+zwei Stunden mit **null Prozent**, die Rechnung sagt also mehr voraus als
+bisher eingetreten ist. Erst wenn er steigt, ist der Deckel faellig.
+(2) Die Regeneration wirklich messen statt die Vorgabe zu nehmen - sie
+haengt an `bladeburner_stamina_gain` und den Augmentierungen des Einbaus
+von 01:25.
+(3) Nicht vorschnell deckeln: Overclock ist gerade der beste Kauf je Punkt,
+und ein Deckel auf eine ungerechnete Vermutung hin waere teurer als der
+Kammeranteil.
+
+</details>
+
+---
+
 ### Der Ausgang aus BitNode 6: von 182 auf 64 Stunden (28.08., 03:10)
 
 Die Phasenrechnung von 23:12 ist ueberholt - und zwar von der Aenderung, die

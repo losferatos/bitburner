@@ -23,6 +23,98 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### WIDERLEGT: Die Black-Op-Schwelle 0,90 ist richtig (28.08., 12:12)
+
+Der Sofort-Punkt von 12:05 behauptete, `blackOpSchwelle()` blockiere Operation
+K unnoetig: Erwartungswert +664 Rang je Versuch, Break-even bei p* = 0,074,
+und trotzdem Schwelle 0,90. **Die Rechnung war unvollstaendig - es fehlte
+genau der Posten, den ich der alten Fassung vorgeworfen hatte: die ZEIT.**
+
+**Die Aktionsdauer, hergeleitet statt geschaetzt** (`Actions/Action.ts:105-121`):
+
+    baseTime = difficulty / DifficultyToTimeFactor(10)
+    baseTime = baseTime * skillFac / statFac
+    Ergebnis * getActionTimePenalty()          (bei Black Ops 1,5)
+
+`statFac` laesst sich aus einer gemessenen Aktion rueckrechnen. Raid steht auf
+Stufe 14, also `difficulty` = 800 x 1,045^13 = 1.418, `baseTime` = 141,8 s -
+gemessen sind **10 s** (`bbspann.js`, 12:08). Mit `skillFac` = 0,10
+(Overclock 90) folgt `statFac` = **1,418**.
+
+Fuer Operation K (`baseDifficulty` 15.000, Black Ops sind einstufig):
+
+    baseTime  = 1.500 s
+    x 0,10 / 1,418 = 105,8 s
+    x 1,5 (Black-Op-Aufschlag) = **158,7 s = 2,6 Minuten**
+
+    Ertrag = (0,895 x 750 - 0,105 x 60) / 2,6 min = **256 Rang/min**
+
+**Die Alternative bringt 1.378.** Raid steht bei 1.378,5 Rang je Minute, und
+der Motor kann sie fahren (Spanne `min 1`). Die Schwelle 0,90 kostet also
+keinen einzigen Rang - sie haelt den Motor bei der **besseren** Aktion.
+
+**Was die Schwelle sehr wohl kostet, ist Knotenfortschritt** (8 von 21 Black
+Ops). Aber der Ausgang verlangt Rang 400.000 fuer Daedalus, und solange der
+Rang das Nadeloehr ist, ist Rang machen und die Black Op spaeter mit hoeherer
+Chance fahren die richtige Reihenfolge.
+
+**Die Lehre, und sie trifft mich zweimal am selben Tag:** Um 07:49 habe ich
+der alten Schwelle vorgeworfen, nur den Gewinn zu zaehlen. Um 12:05 habe ich
+denselben Fehler gemacht - Erwartungswert je VERSUCH gerechnet statt je
+ZEIT, und die Alternative gar nicht angesehen. Eine Rate ohne Nenner ist
+keine Rate.
+
+**Der Befund, der dabei herausfiel, ist der groessere** und steht jetzt oben
+in `## Sofort`: Raid bietet 1.378 Rang/min, die tatsaechliche Rate ist 124.
+Faktor 11.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Die Black-Op-Schwelle nimmt das Maximum - die Raid-Zahl blockiert die Rechnung (12:05)
+
+Gemessen: Operation K haengt seit **11:03** knapp unter der Schwelle:
+
+              11:03  Chance 0,856     11:33  0,889
+              11:11  0,858            12:03  **0,894**   Schwelle 0,90
+
+          Eine Stunde lang fast dran, und die Kampfwerte steigen kaum noch
+          (272 auf 273 in zwanzig Minuten). Aus eigener Kraft kommt sie nicht
+          mehr ueber 0,90.
+
+Erwartet: Sie sollte laengst gefahren werden. Operation K hat `rankGain` 750
+          und `rankLoss` 60 (`BlackOperations.ts`). Bei Chance 0,894:
+
+              0,894 x 750  -  0,106 x 60  =  **+664 Rang je Versuch**
+
+          Der Break-even liegt bei p* = 60/810 = **0,074**. Die Aktion ist
+          also seit Stunden hoch profitabel und wird von einer Zahl
+          aufgehalten, die mit ihr nichts zu tun hat.
+
+Verdacht: `src/blade.js`, `blackOpSchwelle()`. Sie gibt
+          `Math.max(vorrat, einsatzSchwelle(name))` zurueck. `einsatzSchwelle`
+          rechnet richtig - fuer Operation K ergaebe sie
+          `p* + 0,25 = 0,324`. Aber `vorrat` ist bei vollem Raid-Bestand
+          pauschal `SICHER_BLACKOP` = 0,90, und das Maximum gewinnt.
+
+          **Die Rechnung von 07:49 wirkt damit nur nach oben, nie nach
+          unten.** Sie sollte Vindictus schuetzen (dort `rankLoss` = `rankGain`,
+          Schwelle 0,75) - und tut das auch. Aber sie kann eine zu hohe
+          pauschale Schwelle nicht korrigieren, und genau das waere hier
+          richtig.
+
+          Sauber waere, die einsatzabhaengige Schwelle die **fuehrende** zu
+          machen und den Raid-Vorrat nur noch als Untergrenze zu benutzen -
+          oder ihn ganz zu streichen. Ein Raid-Vorrat sagt nichts darueber
+          aus, ob eine Black Op sich lohnt; er war ein Ersatzmass aus der
+          Zeit, als niemand `rankGain` gegen `rankLoss` gerechnet hat.
+
+Dringlichkeit: **hoch.** Operation K bringt 750 Rang und schaltet Deckard
+          frei; sie liegt seit einer Stunde brach.
+
+</details>
+
+---
+
 ### Der Gym-Zweig kennt jetzt die Black Ops - und der Verdacht war trotzdem falsch (28.08., 11:41)
 
 Der Sofort-Punkt von 09:03 meldete: `spann.js` zeigte Operation Red Dragon mit

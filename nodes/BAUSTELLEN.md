@@ -55,46 +55,46 @@ Regeln:
 
 ## Sofort
 
-### Die Black-Op-Schwelle nimmt das Maximum - die Raid-Zahl blockiert die Rechnung (12:05)
+### Raid bietet 1.378 Rang je Minute - real sind es 124 (12:12)
 
-Gemessen: Operation K haengt seit **11:03** knapp unter der Schwelle:
+Gemessen: `src/bbspann.js` um 12:08, Division New Tokyo, alle Spannen bei
+          `min 1` (perfekte Schaetzung):
 
-              11:03  Chance 0,856     11:33  0,889
-              11:11  0,858            12:03  **0,894**   Schwelle 0,90
+              Raid                          **1.378,5** Rang/min   Dauer 10 s
+              Assassination                  1.097,5                    29 s
+              Stealth Retirement Operation     437,7                    13 s
+              Bounty Hunter                    176,4                     8 s
 
-          Eine Stunde lang fast dran, und die Kampfwerte steigen kaum noch
-          (272 auf 273 in zwanzig Minuten). Aus eigener Kraft kommt sie nicht
-          mehr ueber 0,90.
+          Die tatsaechliche Rangrate liegt bei **123,8/min** (45-Minuten-
+          Fenster, `data/verlauf-strategie.json`). **Faktor 11.**
 
-Erwartet: Sie sollte laengst gefahren werden. Operation K hat `rankGain` 750
-          und `rankLoss` 60 (`BlackOperations.ts`). Bei Chance 0,894:
+Erwartet: Der Motor waehlt bereits die beste Aktion - der Verlust liegt also
+          nicht in der Auswahl, sondern in der Zeit, die er NICHT mit ihr
+          verbringt. Drei Kandidaten, alle messbar:
 
-              0,894 x 750  -  0,106 x 60  =  **+664 Rang je Versuch**
+              1. Ausdauer  Raid kostet Ausdauer, die Kammer bringt keinen Rang.
+              2. Chaos     Raid hebt es um 1 bis 5 Prozent je Erfolg
+                           (`Bladeburner.ts:836-859`), Diplomacy bringt keinen
+                           Rang. Um 12:03 stand Chaos bei 50,8 und der Motor
+                           fuhr Diplomacy.
+              3. comms     Jeder Raid-Erfolg verbraucht eine Gemeinde
+                           (`Bladeburner.ts:836`); Nachschub kommt nur ueber
+                           `randomEvent` alle 240 bis 600 s zu 5 Prozent.
 
-          Der Break-even liegt bei p* = 60/810 = **0,074**. Die Aktion ist
-          also seit Stunden hoch profitabel und wird von einer Zahl
-          aufgehalten, die mit ihr nichts zu tun hat.
+Verdacht: Kein Fehler, sondern eine ungerechnete Groesse. `beste()` bewertet
+          Rang je Aktionsminute und hat seit 03:42 die Chaos-Folgekosten drin
+          - aber die AUSDAUER-Folgekosten fehlen, und der comms-Verbrauch
+          ebenfalls. Eine Aktion, die 10 Sekunden dauert und danach zwei
+          Minuten Kammer erzwingt, ist nicht 1.378 Rang je Minute wert.
 
-Verdacht: `src/blade.js`, `blackOpSchwelle()`. Sie gibt
-          `Math.max(vorrat, einsatzSchwelle(name))` zurueck. `einsatzSchwelle`
-          rechnet richtig - fuer Operation K ergaebe sie
-          `p* + 0,25 = 0,324`. Aber `vorrat` ist bei vollem Raid-Bestand
-          pauschal `SICHER_BLACKOP` = 0,90, und das Maximum gewinnt.
+          Zu messen ist der **Arbeitsanteil**: Wieviel Prozent der Zeit
+          verbringt der Motor mit rangbringenden Aktionen? `bbspann.js`
+          rechnet je Aktion bereits `ausdauerJeMinute`, `arbeitsanteil` und
+          `zyklusrate` - die Zahlen liegen also schon vor und werden nur nicht
+          benutzt.
 
-          **Die Rechnung von 07:49 wirkt damit nur nach oben, nie nach
-          unten.** Sie sollte Vindictus schuetzen (dort `rankLoss` = `rankGain`,
-          Schwelle 0,75) - und tut das auch. Aber sie kann eine zu hohe
-          pauschale Schwelle nicht korrigieren, und genau das waere hier
-          richtig.
-
-          Sauber waere, die einsatzabhaengige Schwelle die **fuehrende** zu
-          machen und den Raid-Vorrat nur noch als Untergrenze zu benutzen -
-          oder ihn ganz zu streichen. Ein Raid-Vorrat sagt nichts darueber
-          aus, ob eine Black Op sich lohnt; er war ein Ersatzmass aus der
-          Zeit, als niemand `rankGain` gegen `rankLoss` gerechnet hat.
-
-Dringlichkeit: **hoch.** Operation K bringt 750 Rang und schaltet Deckard
-          frei; sie liegt seit einer Stunde brach.
+Dringlichkeit: **hoch.** Faktor 11 auf die Leitgroesse ist der groesste
+          offene Posten des Knotens.
 
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
 

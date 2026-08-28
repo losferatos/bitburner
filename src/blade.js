@@ -711,6 +711,75 @@ export async function main(ns) {
     return 1;
   };
 
+  // DAS GYM ALS ERSATZ, NICHT ALS PARALLELBETRIEB (28.08.2026, 08:40).
+  //
+  // Vorgeschichte in zwei Schritten, beide gemessen:
+  //
+  //  07:00  Gym-Hebel eingebaut mit der Begruendung, der Arbeitskanal laufe
+  //         parallel zur Bladeburner-Aktion. **Falsch.**
+  //         `Bladeburner.ts:178-180` ruft in `startAction()` ein
+  //         `Player.finishWork(true)`, und `process()` bricht umgekehrt die
+  //         Bladeburner-Aktion ab, sobald `currentWork` gesetzt ist
+  //         (`:1353-1360`) - beides nur ohne `The Blade's Simulacrum`.
+  //         Zurueckgenommen um 07:34, kein Messwert hatte sich bewegt.
+  //
+  //  08:33  Nachgemessen im Zustand nach dem Einbau: `blade.js` faehrt
+  //         `General/Training` ("zu schwach"), die Rangrate steht bei
+  //         **0,1 je Minute** ueber 44 Minuten. Bladeburner-Training gibt 30
+  //         Erfahrung je 30 Sekunden auf alle vier Werte
+  //         (`Bladeburner.ts:1091-1105`), Ortsmultiplikator **1**; das
+  //         Powerhouse Gym in Sector-12 hat **10**
+  //         (`LocationsMetadata.ts`).
+  //
+  // Damit dreht sich die Rechnung: Solange nichts ueber seiner Schwelle
+  // liegt, ist die Bladeburner-Aktion 0,1 Rang je Minute wert. Dafuer den
+  // zehnfachen Erfahrungssatz aufzugeben, waere teuer - andersherum ist es
+  // billig. Das Gym ist hier kein Parallelbetrieb, sondern ein **Tausch**,
+  // und der lohnt.
+  //
+  // NICHT ueber bbtrain: Das waere wieder eine Uebergabe zwischen zwei
+  // Skripten, und genau daran ist es zweimal gescheitert - am 28.08. um 01:33
+  // haben sich beide die Figur im Minutentakt weggenommen, um 07:49 hat
+  // keines von beiden gearbeitet. Wer weicht, muss wissen, dass jemand
+  // uebernimmt; am sichersten weiss man das, wenn man selbst uebernimmt.
+  //
+  // Drei Bedingungen, jede aus einem frueheren Schaden:
+  //   - Konto ueber GYM_MIN_GELD. Das Powerhouse kostet 2.400 je Sekunde und
+  //     prueft den Kontostand nicht (`Work/ClassWork.tsx`,
+  //     `PlayerObjectGeneralMethods.ts` - `gainMoney` hat keinen Boden). Am
+  //     27.08. stand das Konto deshalb bei -3 Millionen.
+  //   - Fremde Arbeit hat Vorrang. Laeuft etwas anderes als unsere
+  //     Gym-Einheit im Arbeitskanal - bn4rep laesst die Figur fuer Faktionen
+  //     arbeiten -, wird nichts angefasst. Ruf ist die Waehrung fuer
+  //     Augmentierungen.
+  //   - Der niedrigste Wert wird trainiert. Die Schwellen haengen an allen
+  //     vier, wer den hoechsten weitertreibt, kommt nicht naeher.
+  const GYM_STADT = "Sector-12";
+  const GYM_NAME = "Powerhouse Gym";
+  const GYM_MIN_GELD = 5e6;
+  const GYM_WERTE = [["strength", "str"], ["defense", "def"],
+    ["dexterity", "dex"], ["agility", "agi"]];
+  const gymGreifen = () => {
+    try {
+      const p = ns.getPlayer();
+      if (p.money < GYM_MIN_GELD) return null;
+      let kurz = null, tief = Infinity;
+      for (const [lang, k] of GYM_WERTE) {
+        if (p.skills[lang] < tief) { tief = p.skills[lang]; kurz = k; }
+      }
+      const laeuft = ns.singularity.getCurrentWork();
+      if (laeuft && laeuft.type === "CLASS"
+          && laeuft.classType === kurz
+          && (!laeuft.location || laeuft.location === GYM_NAME)) {
+        return kurz;   // laeuft schon richtig, nicht neu starten
+      }
+      if (laeuft && laeuft.type !== "CLASS") return null;   // fremde Arbeit
+      if (p.city !== GYM_STADT && !ns.singularity.travelToCity(GYM_STADT)) return null;
+      try { ns.bladeburner.stopBladeburnerAction(); } catch { /* nichts lief */ }
+      return ns.singularity.gymWorkout(GYM_NAME, kurz, false) ? kurz : null;
+    } catch { return null; }
+  };
+
   const klemmFaktor = () => {
     const sonden = [];
     try {
@@ -2131,6 +2200,23 @@ export async function main(ns) {
       // (`Bladeburner.ts:1091-1105`), hebt alle vier Kampfwerte und belegt
       // den Arbeitskanal NICHT, kann sich also mit nichts in die Quere kommen.
       const BBTRAIN_ZIEL = 100;
+      // Der `!lohntSich`-Zweig ist zurueck (28.08., 08:40) - aber jetzt mit
+      // einem Uebernehmer: Nicht bbtrain bekommt die Figur, sondern blade.js
+      // fuehrt das Gym selbst (`gymGreifen()` oben). Damit kann der Fall von
+      // 07:49 nicht wiederkehren, in dem beide Skripte gewichen sind.
+      if (tiefstand >= BBTRAIN_ZIEL && !lohntSich) {
+        const wert = gymGreifen();
+        if (wert) {
+          gewichen = false;
+          meldeLage("Gym/" + wert, "nichts ueber Schwelle, Powerhouse statt"
+            + " Bladeburner-Training (Tiefstand " + tiefstand + ")");
+          await ns.sleep(30000);
+          continue;
+        }
+        // Kein Gym moeglich (Konto leer, fremde Arbeit, Reise misslungen):
+        // dann eben weiter im Bladeburner - `waehle()` faellt auf Training
+        // zurueck. Besser langsam als gar nicht.
+      }
       if (tiefstand < BBTRAIN_ZIEL) {
         if (!gewichen) {
           sag("Kampfwerte bei " + tiefstand

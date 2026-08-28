@@ -55,52 +55,7 @@ Regeln:
 
 ## Sofort
 
-### Das Gym ist im Wiederaufbau der bessere Tausch - als ERSATZ, nicht parallel (08:33)
-
-Gemessen: `data/blade.json` steht seit dem Deckel-Eingriff auf
-          `General/Training`, Grund "zu schwach" - das ist die richtige
-          Aktion, aber die langsame. Ueber 44 Minuten:
-
-              Rangrate                 0,1/min   (44 min, geglaettet)
-              Rangrate 4-h-Mittel    163,1/min
-              Kampfwert-Tiefstand      225, plus rund 0,2/min
-
-          Bladeburner-Training gibt 30 Erfahrung je 30 Sekunden auf alle vier
-          Werte (`Bladeburner.ts:1091-1105`), also Ortsmultiplikator **1**.
-          Das Powerhouse Gym in Sector-12 hat **10** (`LocationsMetadata.ts`).
-
-Erwartet: **Der Verzicht kostet derzeit 0,1 Rang je Minute.** Genau das ist
-          der Punkt: Am 07:34 wurde der Gym-Hebel zurueckgenommen, weil
-          `Bladeburner.ts:178-180` und `:1353-1360` beweisen, dass Arbeit und
-          Bladeburner sich ohne `The Blade's Simulacrum` ausschliessen. Die
-          Ruecknahme war richtig - die Begruendung "laeuft parallel" war
-          falsch. Aber im Zustand "blade.js faehrt ohnehin nur Training" ist
-          das Gym kein Parallelbetrieb mehr, sondern ein **Ersatz** - und der
-          rechnet sich: Faktor 10 auf die Kampferfahrung gegen 0,1 Rang je
-          Minute.
-
-Verdacht: Kein Fehler im Code, sondern eine fehlende Regel. Sauber waere:
-          Waehlt `waehle()` `General/Training` (Grund "zu schwach"), soll
-          `blade.js` die Figur an bbtrain abgeben - dieselbe Weiche wie bei
-          `tiefstand < BBTRAIN_ZIEL`, nur mit dem Training-Fall als zweitem
-          Ausloeser. Und `bbtrain.js` muss dann auch oberhalb von `ZIEL`
-          trainieren, was der zurueckgenommene Commit `41fa473` schon konnte.
-
-          **Vorsicht, das ist der Sackgassen-Kandidat:** Beide Skripte duerfen
-          nicht wieder anfangen, sich die Figur gegenseitig wegzunehmen (das
-          war der Vorfall vom 28.08., 01:33). Die Uebergabe braucht genau eine
-          Richtung: blade.js weicht, bbtrain uebernimmt, und blade.js kommt
-          erst zurueck, wenn wieder eine Aktion ueber ihrer Schwelle liegt.
-
-Dringlichkeit: **hoch.** Es ist der einzige Posten, der die ETA gerade
-          bestimmt - 0,1 statt 163 Rang je Minute.
-
-**Der langfristige Ausweg steht schon fest und ist kaufbar:**
-`The Blade's Simulacrum` (repCost 1.250, moneyCost 1,5e11,
-`Augmentations.ts:284-297`) hebt den Ausschluss auf. Geld ist das Tor: 3,8
-Mrd bei rund 3 Mrd je Stunde, also gut 50 Stunden - zu lang, um darauf zu
-warten, aber ein Kandidat fuer die naechste Augmentierungsrunde.
-
+keine
 ## Offen, nach Dringlichkeit
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden

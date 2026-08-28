@@ -23,6 +23,112 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### blade.js fuehrt das Gym jetzt selbst - Faktor 13,5 auf den Wiederaufbau (28.08., 08:42)
+
+**Verifiziert 08:42 ueber 89 Sekunden**, unmittelbar nach dem Neustart:
+
+    Kampfwert-Tiefstand (def)   228 -> 230   in 89 s   =  1,35/min
+    davor, Bladeburner-Training 223 -> 225   in 20 min =  0,10/min
+                                                       ** Faktor 13,5 **
+
+`data/blade.json` meldet `"aktion":"Gym/def"`, Grund "nichts ueber Schwelle,
+Powerhouse statt Bladeburner-Training (Tiefstand 227)". Die Pruefzeile zeigt
+"Arbeit def @ Powerhouse Gym".
+
+**Der Weg dahin ging ueber einen eigenen Irrtum, und der gehoert dazu.**
+
+  07:00  Gym-Hebel eingebaut, Begruendung: der Arbeitskanal laufe **parallel**
+         zur Bladeburner-Aktion. Falsch. `Bladeburner.ts:178-180` ruft in
+         `startAction()` ein `Player.finishWork(true)`, und `process()`
+         bricht umgekehrt die Bladeburner-Aktion ab, sobald `currentWork`
+         gesetzt ist (`:1353-1360`) - beides nur ohne
+         `The Blade's Simulacrum`.
+  07:34  Zurueckgenommen (`9703d3c`), kein Messwert hatte sich bewegt.
+  08:33  Nachgemessen im Zustand nach dem Einbau: Der Motor faehrt
+         `General/Training`, die Rangrate steht bei **0,1 je Minute** ueber
+         44 Minuten.
+
+Damit dreht sich die Rechnung. Der Ausschluss ist real, aber der Einsatz ist
+es auch: Solange nichts ueber seiner Schwelle liegt, ist die
+Bladeburner-Aktion **0,1 Rang je Minute** wert. Dafuer den zehnfachen
+Erfahrungssatz aufzugeben waere teuer - andersherum ist es billig. Das Gym ist
+hier kein Parallelbetrieb, sondern ein **Tausch**.
+
+**Warum blade.js es selbst tut und nicht bbtrain.** Eine Uebergabe zwischen
+zwei Skripten ist an genau dieser Stelle zweimal gescheitert: am 28.08. um
+01:33 haben sich beide die Figur im Minutentakt weggenommen, um 07:49 hat
+keines von beiden gearbeitet. Wer weicht, muss wissen, dass jemand uebernimmt
+- am sichersten weiss man das, wenn man selbst uebernimmt. Der
+`!lohntSich`-Zweig ist damit zurueck, aber mit einem Uebernehmer.
+
+**Drei Bedingungen, jede aus einem frueheren Schaden:**
+- Konto ueber 5 Millionen. Das Powerhouse kostet 2.400 je Sekunde und prueft
+  den Kontostand nicht - am 27.08. stand das Konto deshalb bei -3 Millionen.
+- Fremde Arbeit hat Vorrang. Laeuft etwas anderes als unsere Gym-Einheit im
+  Arbeitskanal (bn4rep arbeitet fuer Faktionen), wird nichts angefasst.
+- Schlaegt das Gym fehl - Konto leer, fremde Arbeit, Reise misslungen -,
+  laeuft der Motor normal weiter und faellt auf Bladeburner-Training zurueck.
+  Besser langsam als gar nicht.
+
+**Was offen bleibt:** Der Tausch ist eine Notloesung fuer den Wiederaufbau.
+Sauber waere `The Blade's Simulacrum` (repCost 1.250, moneyCost 1,5e11,
+`Augmentations.ts:284-297`) - damit laufen beide gleichzeitig. Reputation ist
+kein Thema, Geld ist das Tor: 3,9 Mrd bei rund 3 Mrd je Stunde.
+
+Commit: `(siehe git log)`
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Das Gym ist im Wiederaufbau der bessere Tausch - als ERSATZ, nicht parallel (08:33)
+
+Gemessen: `data/blade.json` steht seit dem Deckel-Eingriff auf
+          `General/Training`, Grund "zu schwach" - das ist die richtige
+          Aktion, aber die langsame. Ueber 44 Minuten:
+
+              Rangrate                 0,1/min   (44 min, geglaettet)
+              Rangrate 4-h-Mittel    163,1/min
+              Kampfwert-Tiefstand      225, plus rund 0,2/min
+
+          Bladeburner-Training gibt 30 Erfahrung je 30 Sekunden auf alle vier
+          Werte (`Bladeburner.ts:1091-1105`), also Ortsmultiplikator **1**.
+          Das Powerhouse Gym in Sector-12 hat **10** (`LocationsMetadata.ts`).
+
+Erwartet: **Der Verzicht kostet derzeit 0,1 Rang je Minute.** Genau das ist
+          der Punkt: Am 07:34 wurde der Gym-Hebel zurueckgenommen, weil
+          `Bladeburner.ts:178-180` und `:1353-1360` beweisen, dass Arbeit und
+          Bladeburner sich ohne `The Blade's Simulacrum` ausschliessen. Die
+          Ruecknahme war richtig - die Begruendung "laeuft parallel" war
+          falsch. Aber im Zustand "blade.js faehrt ohnehin nur Training" ist
+          das Gym kein Parallelbetrieb mehr, sondern ein **Ersatz** - und der
+          rechnet sich: Faktor 10 auf die Kampferfahrung gegen 0,1 Rang je
+          Minute.
+
+Verdacht: Kein Fehler im Code, sondern eine fehlende Regel. Sauber waere:
+          Waehlt `waehle()` `General/Training` (Grund "zu schwach"), soll
+          `blade.js` die Figur an bbtrain abgeben - dieselbe Weiche wie bei
+          `tiefstand < BBTRAIN_ZIEL`, nur mit dem Training-Fall als zweitem
+          Ausloeser. Und `bbtrain.js` muss dann auch oberhalb von `ZIEL`
+          trainieren, was der zurueckgenommene Commit `41fa473` schon konnte.
+
+          **Vorsicht, das ist der Sackgassen-Kandidat:** Beide Skripte duerfen
+          nicht wieder anfangen, sich die Figur gegenseitig wegzunehmen (das
+          war der Vorfall vom 28.08., 01:33). Die Uebergabe braucht genau eine
+          Richtung: blade.js weicht, bbtrain uebernimmt, und blade.js kommt
+          erst zurueck, wenn wieder eine Aktion ueber ihrer Schwelle liegt.
+
+Dringlichkeit: **hoch.** Es ist der einzige Posten, der die ETA gerade
+          bestimmt - 0,1 statt 163 Rang je Minute.
+
+**Der langfristige Ausweg steht schon fest und ist kaufbar:**
+`The Blade's Simulacrum` (repCost 1.250, moneyCost 1,5e11,
+`Augmentations.ts:284-297`) hebt den Ausschluss auf. Geld ist das Tor: 3,8
+Mrd bei rund 3 Mrd je Stunde, also gut 50 Stunden - zu lang, um darauf zu
+warten, aber ein Kandidat fuer die naechste Augmentierungsrunde.
+
+</details>
+
+---
+
 ### Field Analysis gedeckelt - der Motor trainiert wieder (28.08., 08:33)
 
 Der Sofort-Punkt von 08:03 ist nachgemessen und erledigt.

@@ -23,6 +23,85 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Gym-Zweig kennt jetzt die Black Ops - und der Verdacht war trotzdem falsch (28.08., 11:41)
+
+Der Sofort-Punkt von 09:03 meldete: `spann.js` zeigte Operation Red Dragon mit
+Chance **0,905 - 1,000**, die Untergrenze also ueber `SICHER_BLACKOP` (0,90) -
+und der Motor stand im Gym, ohne die Black Op geprueft zu haben.
+
+**Die Ursache war echt und ist behoben** (Commit `a5c46d0`): Der Gym-Zweig
+steht vor `waehle()` und entschied allein an `lohntSich`, das nur
+`OPERATIONEN` und `VERTRAEGE` kannte. Der Black-Op-Zweig steht als Punkt 2 in
+`waehle()` und wurde im Gym-Fall nie erreicht. `lohntSich` prueft jetzt auch
+die naechste Black Op, mit der **gerechneten** Chance und `blackOpSchwelle()`
+- also derselben Zahl und derselben Schwelle wie `waehle()`.
+
+**Der Verdacht selbst war aber falsch, und das ist der lehrreiche Teil.** Nach
+dem Einbau der Pruefung waehlte der Motor weiter das Gym. Damit ist belegt,
+dass Red Dragons **gerechnete** Chance zu diesem Zeitpunkt unter 0,90 lag -
+die 0,905 der Schaetzung waren Bevoelkerungsrauschen, genau wie es der
+Kommentar in `blade.js` seit dem 27.08. sagt
+(`Actions/BlackOperation.ts:55-61`: `getPopulationSuccessFactor` gibt bei
+Black Ops fest 1 zurueck, die Spanne ist ein Anzeigeartefakt).
+
+**Verifiziert 09:55:** Operation Red Dragon ist gefallen, nachdem die
+Sackgasse von 09:42 aufgeloest war - 8 von 21 Black Operations, Rang 82.299
+auf 82.770. Der Zweig hat also seither mindestens einmal richtig entschieden.
+
+**Was daraus fuer die Fehlersuche folgt:** Eine Schaetzspanne ist kein Beweis.
+Wer aus `s.min` auf "haette fahren koennen" schliesst, muss vorher pruefen, ob
+`s.min` fuer diese Aktionsart ueberhaupt etwas bedeutet.
+
+Commits: `a5c46d0`, Sackgasse `5809d76`
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Der Gym-Zweig kennt die Black Ops nicht - Red Dragon koennte fahrbar sein (09:03)
+
+Gemessen: `node tools/spann.js` um 09:03:
+
+              Naechste Black Op  Operation Red Dragon (Rang 25.000, erfuellt)
+              Chance             **0,905 - 1,000**, Spanne 0,095
+
+          Die Untergrenze der Schaetzung liegt damit **ueber** `SICHER_BLACKOP`
+          (0,90). Gleichzeitig steht `data/blade.json` auf `"Gym/str"`,
+          Grund "nichts ueber Schwelle" - der Motor hat die Black Op gar nicht
+          erst geprueft.
+
+Erwartet: Der Bot sollte Red Dragon starten. Sie bringt `rankGain` 500
+          (`BlackOperations.ts:254`) und ist die achte von 21 - der Restweg
+          haengt an ihr.
+
+Verdacht: **Mein eigener Eingriff von 08:40**, `src/blade.js`, Gym-Zweig in
+          der Hauptschleife. Er steht **vor** `waehle()` und entscheidet
+          allein an `lohntSich` - und `lohntSich` prueft nur `OPERATIONEN`
+          (gegen 0,85) und `VERTRAEGE` (gegen 0,45). **Black Ops kommen darin
+          nicht vor.** Der Black-Op-Zweig steht als Punkt 2 in `waehle()`,
+          und `waehle()` wird im Gym-Fall nie erreicht.
+
+          Damit gilt: Sobald die naechste Black Op fahrbar wird, waehrend
+          keine Operation und kein Vertrag ueber ihrer Schwelle liegt, bleibt
+          der Bot im Gym haengen. Genau dieser Zustand liegt jetzt vor.
+
+          Der Fix ist klein: `lohntSich` um die naechste Black Op ergaenzen,
+          mit derselben gerechneten Chance und derselben Schwelle, die
+          `waehle()` benutzt (`blackOpChance()` gegen `blackOpSchwelle(name)`,
+          nicht `s.min` - die Spanne ist bei Black Ops
+          Bevoelkerungsrauschen, `Actions/BlackOperation.ts:55-61`).
+
+**Dieselbe Fehlerform zum dritten Mal heute:** Eine Regel prueft ihre
+Voraussetzung nicht vollstaendig. 07:49 wich blade.js an bbtrain, das gar
+nicht uebernahm; 08:03 lief Field Analysis, ohne zu fragen, ob sie etwas
+aufschliesst; jetzt entscheidet der Gym-Zweig ueber "nichts zu tun", ohne die
+wichtigste Aktion des Knotens anzusehen. **Wer eine Abkuerzung vor die
+Hauptlogik legt, muss deren Vorbedingungen mitnehmen.**
+
+Dringlichkeit: **hoch.** Rangrate 0,0/min ueber 30 Minuten.
+
+</details>
+
+---
+
 ### Chongqing war ausgebrannt - popEst 0, und der Motor sass darin fest (28.08., 11:12)
 
 Der Punkt fragte, was ein Stadtwechsel kostet. Die Antwort war eine andere und

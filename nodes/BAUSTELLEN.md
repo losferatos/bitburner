@@ -135,53 +135,26 @@ Pause mitbenutzen.
    dauerte, bis die SCHAETZUNG reichte. Die Kampfwerte standen um 09:42 bei
    258 und damit kaum hoeher als um 08:40 bei 244.
 
-**Offene Nachmessung:** Beim naechsten faelligen Spendenrecht darf kein Einbau
-mit weniger als drei Stuecken stattfinden. In der Warteschlange liegt derzeit
-ein Stueck (`Hyperion Plasma Cannon V2`).
+**Offene Nachmessung, jetzt ueberhaupt erst beobachtbar** (Commit `45fb4c4`).
+Die Sperre war bis 11:40 von aussen nicht pruefbar. `data/einbau.json` fuehrt
+seither `wartend`, `MINDEST_WARTESCHLANGE`, `kampfknoten`,
+`spendenrechtFaellig`, `spendenAusnahme` und `gesperrt`.
+
+**Erste Messung 11:39 - und sie korrigiert eine zu grosszuegige Bilanz:**
+
+    wartend 1 | mindest 3 | kampfknoten true
+    spendenrechtFaellig **false** | gesperrt false
+
+Der Report von 11:05 hatte "kein Einbau, d7cb290 haelt" als erreicht gebucht.
+Das war falsch: Das Spendenrecht war gar nicht faellig. Der ausbleibende
+Einbau lag schlicht daran, dass nur ein Stueck wartet - die alte Fassung
+haette hier **genauso** nicht eingebaut.
+
+**Der Nachweis ist erst erbracht, wenn `data/einbau.json` einmal
+`gesperrt: true` zeigt** und danach kein Einbau erfolgt. Bis dahin gilt die
+Aenderung als eingebaut, aber unbelegt.
 
 Dringlichkeit: **hoch.** Der naechste Einbau steht in der Warteschlange.
-
-### Der Gym-Zweig kennt die Black Ops nicht - Red Dragon koennte fahrbar sein (09:03)
-
-Gemessen: `node tools/spann.js` um 09:03:
-
-              Naechste Black Op  Operation Red Dragon (Rang 25.000, erfuellt)
-              Chance             **0,905 - 1,000**, Spanne 0,095
-
-          Die Untergrenze der Schaetzung liegt damit **ueber** `SICHER_BLACKOP`
-          (0,90). Gleichzeitig steht `data/blade.json` auf `"Gym/str"`,
-          Grund "nichts ueber Schwelle" - der Motor hat die Black Op gar nicht
-          erst geprueft.
-
-Erwartet: Der Bot sollte Red Dragon starten. Sie bringt `rankGain` 500
-          (`BlackOperations.ts:254`) und ist die achte von 21 - der Restweg
-          haengt an ihr.
-
-Verdacht: **Mein eigener Eingriff von 08:40**, `src/blade.js`, Gym-Zweig in
-          der Hauptschleife. Er steht **vor** `waehle()` und entscheidet
-          allein an `lohntSich` - und `lohntSich` prueft nur `OPERATIONEN`
-          (gegen 0,85) und `VERTRAEGE` (gegen 0,45). **Black Ops kommen darin
-          nicht vor.** Der Black-Op-Zweig steht als Punkt 2 in `waehle()`,
-          und `waehle()` wird im Gym-Fall nie erreicht.
-
-          Damit gilt: Sobald die naechste Black Op fahrbar wird, waehrend
-          keine Operation und kein Vertrag ueber ihrer Schwelle liegt, bleibt
-          der Bot im Gym haengen. Genau dieser Zustand liegt jetzt vor.
-
-          Der Fix ist klein: `lohntSich` um die naechste Black Op ergaenzen,
-          mit derselben gerechneten Chance und derselben Schwelle, die
-          `waehle()` benutzt (`blackOpChance()` gegen `blackOpSchwelle(name)`,
-          nicht `s.min` - die Spanne ist bei Black Ops
-          Bevoelkerungsrauschen, `Actions/BlackOperation.ts:55-61`).
-
-**Dieselbe Fehlerform zum dritten Mal heute:** Eine Regel prueft ihre
-Voraussetzung nicht vollstaendig. 07:49 wich blade.js an bbtrain, das gar
-nicht uebernahm; 08:03 lief Field Analysis, ohne zu fragen, ob sie etwas
-aufschliesst; jetzt entscheidet der Gym-Zweig ueber "nichts zu tun", ohne die
-wichtigste Aktion des Knotens anzusehen. **Wer eine Abkuerzung vor die
-Hauptlogik legt, muss deren Vorbedingungen mitnehmen.**
-
-Dringlichkeit: **hoch.** Rangrate 0,0/min ueber 30 Minuten.
 
 ## Offen, nach Dringlichkeit
 

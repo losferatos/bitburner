@@ -2882,6 +2882,27 @@ export async function main(ns) {
       // frueheste und verlaesslichste Quelle, die es gibt.
       knoten: ns.getResetInfo().currentNode,
       nodeReset: ns.getResetInfo().lastNodeReset,
+      // DIE KAMPFWERTE GEHOEREN AUCH HIERHER (28.08.2026, 19:10).
+      //
+      // In BitNode 10 traegt der Knoten ueber Bladeburner
+      // (`nodes/KURS.md`, Eintrag 18:55), und das erste Tor ist der Beitritt:
+      // alle vier Kampfwerte >= 100. Die Zahl stand bisher nur in
+      // `data/bblage.json`, geschrieben von `bblage.js` - einem
+      // Bladeburner-Werkzeug, das ohne Division nichts liefert. Genau in der
+      // Phase VOR dem Beitritt war der Traeger des Knotens also unsichtbar,
+      // und `tools/strategie-check.js` meldete ersatzweise "Hacking-Weg".
+      //
+      // `getPlayer` kostet 0,5 GB (`RamCostGenerator.ts`) und ist in jedem
+      // Knoten verfuegbar. Dieselbe Ueberlegung wie bei der Knotennummer:
+      // Die Quelle muss das Skript sein, das nach jedem Wechsel als erstes
+      // laeuft.
+      kampf: (() => {
+        try {
+          const sk = ns.getPlayer().skills;
+          return { str: sk.strength, def: sk.defense,
+            dex: sk.dexterity, agi: sk.agility };
+        } catch { return null; }
+      })(),
     }), "w");
 
    } catch (e) {

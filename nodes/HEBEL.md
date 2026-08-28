@@ -37,6 +37,52 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kein Hebel gefunden - vier Kandidaten gerechnet und verworfen (28.08., 22:05)
+
+Engpass:    Laut `nodes/KURS.md` (21:45) der **Kampfwert-Tiefstand, 68 von
+            100**, in Erfahrung 34.419 von 252.817. Die Rate ist **13,25
+            Erfahrung je Sekunde** - Spieler 10 im Gym, Sleeve 2,77 ueber
+            `sync/100` (gemessen, nicht die frueher geschaetzten 3,25:
+            `shockBonus` ist (100-14,76)/100 = 0,8524 und `sync` 25).
+
+Vier Kandidaten geprueft, **alle vier verworfen**:
+
+**1. Besseres Gym.** Verworfen, weil schon getan. `bbtrain.js:65` faehrt
+   `Powerhouse Gym` in Sector-12, und das ist mit `expMult 10` das beste im
+   Spiel (`Locations/data/LocationsMetadata.ts:325`; Iron Gym 1, Snap
+   Fitness 2, Millenium 4).
+
+**2. Sleeve synchronisieren.** `SleeveSynchroWork.ts:14-18`:
+   `sync += calculateIntelligenceBonus(int, 0,5) * 0,0002 * cycles`. Mit
+   Intelligenz 93 sind das 0,00103 je Sekunde - von 25 auf 100 also **20,2
+   Stunden**, mehr als der ganze Restweg von 18,6. Auch teilweise lohnt es
+   kaum: Eine Stunde Synchronisation kostet 9.970 Erfahrung und bringt
+   danach 0,41 je Sekunde mehr, amortisiert sich also erst nach 6,75
+   Stunden.
+
+**3. Shock abbauen.** `SleeveRecoveryWork.ts:13-16`, dieselbe Konstante mit
+   Gewicht 0,75 - aber die Intelligenz des SLEEVES zaehlt, und die ist 1.
+   0,00100 je Sekunde, von 14,76 auf 0 also 4,09 Stunden. Das hebt den
+   Beitrag von 2,77 auf 3,25 je Sekunde (+0,48), kostet aber 40.800
+   Erfahrung - Amortisation **23,6 Stunden**, mehr als der Restweg.
+
+**4. Weitere Sleeves kaufen.** `SleeveCovenantPurchases.tsx:28-46`:
+   `purchaseSleeve` verlangt Mitgliedschaft in **The Covenant**. Dieselbe
+   Sperre gilt fuer `purchaseSleeveMemoryUpgrade` - und `memory` waere
+   sonst der eigentliche Fund gewesen, denn `Sleeve.ts:253` setzt bei jedem
+   Prestige `sync = Math.max(memory, 1)`. Ein Sleeve mit Memory 100 startet
+   also bei Sync 100. Fuer spaetere BitNode-10-Laeufe vormerken; in diesem
+   ist The Covenant nicht erreichbar.
+
+Vorher:     Kampfwert-Tiefstand 68 um 21:41, Rate 13,25/s.
+Nachher:    (keine Aenderung - dies ist ein Nullergebnis, kein Hebel)
+
+**Das ist ein gueltiges Ergebnis.** Der Bot faehrt in diesem Knoten die beste
+bekannte Strategie: bestes Gym, Sleeve im selben Gym, niemand jagt
+Reputation (das war die Korrektur von 21:45). Der naechste echte Hebel liegt
+nicht in dieser Phase, sondern hinter Tor 1 - dann traegt wieder der
+Bladeburner-Rang, und dafuer gibt es aus BitNode 6 einen fertigen Motor.
+
 ### Kurs fuer BitNode 10 hergeleitet (28.08., 18:55)
 
 Engpass:    **Es gab keinen gueltigen Kurs.** `nodes/KURS.md` trug als

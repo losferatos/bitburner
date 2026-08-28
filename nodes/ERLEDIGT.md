@@ -23,6 +23,55 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Rangstillstand nach dem Einbau ist richtig - zwei Verdachte geprueft (28.08., 06:47)
+
+Um 06:37 stand der Rang seit zwanzig Minuten fast still (+154), und
+`data/blade.json` meldete `General/Hyperbolic Regeneration Chamber`,
+"ruht bis Ausdauer 375" bei 346 von 670. Zwei Verdachte lagen nahe, **beide
+sind widerlegt**.
+
+**(1) "Die Stufensteuerung ist ein ungenutzter Hebel."** `autoLevel` setzt
+nach jeder Aktion `level = maxLevel` (`Bladeburner.ts:1004`) - der Motor
+faehrt also immer die schwerste Stufe, auch wenn die Kampfwerte im Keller
+sind. Gemessen 06:45 (`src/stufentest.js`, Assassination):
+
+    Stufe   Chance   Zeit   rep     Ertrag je Sekunde
+       20    0,230    31 s  5.060         **37,5**
+       16    0,291    25 s  2.996           34,9
+       13    0,346    21 s  2.022           33,3
+        1    0,697    11 s    420           26,6
+
+**Die hoechste Stufe gewinnt**, selbst bei einer Chance von 0,23. Der Grund
+steht in den Konstanten: `rewardFac` 1,14 gegen `difficultyFac` 1,06 - der
+Ertrag waechst schneller als Dauer und Schwierigkeit. `autoLevel` ist
+richtig, und eine Stufensteuerung waere ein Verlust.
+
+**(2) "`SICHER_OPERATION` = 0,85 ist zu hoch, der Motor ruht statt zu
+arbeiten."** Bei Stufe 20 und Chance 0,23 waere der Rang-Erwartungswert
+positiv (0,23 x 531 minus 0,77 x 48 = 85 je Lauf). Das uebersieht aber den
+eigentlichen Preis - **den Schaden**:
+
+    hpLoss: 5                                      (data/Operations.ts:204)
+    damage = hpLoss * difficultyMultiplier          (Bladeburner.ts:982)
+
+Bei Stufe 20 ist `difficulty` = 1500 x 1,06^19 = 4.541 und
+`diffMult = difficulty^0,28 + difficulty/650` = 17,62. Der Schaden je
+Fehlschlag betraegt damit **88 HP** - und der Spieler hat um 06:37 genau
+**27**. Jeder einzelne Fehlschlag bedeutet Krankenhaus, bei Chance 0,23 also
+in drei von vier Versuchen.
+
+**Die Schwelle 0,85 ist damit exakt richtig.** Der Motor ruht nicht aus
+Vorsicht, sondern weil Arbeiten hier teurer waere als Warten. Der
+Rangstillstand ist der Preis des Einbaus von 05:53, kein Defekt.
+
+**Was das fuer den naechsten Einbau heisst:** Die Wiederaufbauphase dauert,
+solange die Kampfwerte unter dem liegen, was die erreichte Aktionsstufe
+verlangt - und die Stufe ueberlebt den Einbau, die Kampfwerte nicht. Je
+weiter der Knoten fortschreitet, desto laenger wird diese Pause. Das ist
+kein Fehler, aber es gehoert in die ETA.
+
+---
+
 ### Der WERKZEUG-Kanal versprach einen Neustart, den es nicht gab (28.08., 06:15)
 
 **Die Ursache steht in `bn4net.js` und ist strukturell.** Der Kanal killt in

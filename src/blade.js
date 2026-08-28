@@ -1558,6 +1558,69 @@ export async function main(ns) {
     // die aktuelle Stadt leer ist UND das Ziel deutlich mehr hat. Ohne die
     // zweite Haelfte koennte der Motor zwischen zwei fast leeren Staedten
     // pendeln und dabei jedes Mal die Chaos-Hysterese neu ausloesen.
+    // 2a-0. DIE STADT MUSS UEBERHAUPT NOCH SYNTHOIDS HABEN (28.08.2026, 11:10).
+    //
+    // Gemessen 11:03 (`src/bbspann.js`), alle sechs Staedte:
+    //
+    //     Stadt        Chaos   Faktor   breiteste Spanne   popEst
+    //     Chongqing    52,83     1,96              0,797       0     <- hier
+    //     Sector-12    73,03     4,90              0,144    976 Mio
+    //     New Tokyo   106,39     7,58              0,144  1.532 Mio
+    //     Aevum        88,13     6,26              0,050    748 Mio
+    //     Ishima      134,34     9,24              0,270    810 Mio
+    //     Volhaven    205,69    12,52              0,797  1.577 Mio
+    //
+    // **Chongqings geschaetzte Bevoelkerung ist NULL.** Der Motor sass dort,
+    // weil das Chaos am niedrigsten war - aber das Chaos ist niedrig, WEIL
+    // nichts mehr los ist. Die Stadt ist ausgebrannt.
+    //
+    // Und sie ist nicht heilbar. `getSuccessRange` rechnet
+    // `r = city.pop / city.popEst`; bei 0 wird daraus NaN, der Code setzt
+    // `r = 0`, und `low *= r` macht `s.min` **immer null**
+    // (`Actions/Action.ts`). Field Analysis kommt dagegen nicht an:
+    // `improvePopulationEstimateByPercentage` rechnet
+    // `popEst = (popEst + p) * (1 + p/100)` (`City.ts:46-58`) - bei
+    // `p` = 1,25 waechst das aus der Null heraus um 1,27 je Durchlauf und
+    // verdoppelt sich alle 56. Von dort auf eine Milliarde sind rund
+    // **1.700 Durchlaeufe, also 14 Stunden**.
+    //
+    // Deshalb eine eigene Regel VOR der Rundreise, und sie sieht nicht auf
+    // den Raid-Vorrat, sondern auf das, was eine Stadt ueberhaupt wert ist:
+    // Bevoelkerung geteilt durch den Chaos-Faktor
+    // `sqrt(1 + chaos - 50)` (`Actions/Action.ts:94-101`). Mit den Zahlen
+    // oben: New Tokyo 202, Sector-12 199, Volhaven 126, Aevum 119, Ishima 88
+    // - und Chongqing **0**.
+    //
+    // `getCityEstimatedPopulation` und `getCityChaos` gehen fuer FREMDE
+    // Staedte, es braucht also keinen Probewechsel.
+    const STADT_VORSPRUNG = 2;
+    try {
+      const hier = ns.bladeburner.getCity();
+      const wert = (stadt) => {
+        const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
+        const chaos = ns.bladeburner.getCityChaos(stadt);
+        const faktor = chaos > 50 ? Math.sqrt(1 + chaos - 50) : 1;
+        return pop / faktor;
+      };
+      const wertHier = wert(hier);
+      let beste = null, besterWert = wertHier;
+      for (const stadt of STAEDTE) {
+        if (stadt === hier) continue;
+        let w = 0;
+        try { w = wert(stadt); } catch { continue; }
+        if (w > besterWert) { besterWert = w; beste = stadt; }
+      }
+      // Der Vorsprung muss deutlich sein, sonst pendelt der Motor - und jeder
+      // Wechsel zieht eine Diplomacy-Phase nach sich.
+      if (beste && besterWert > wertHier * STADT_VORSPRUNG) {
+        if (ns.bladeburner.switchCity(beste)) {
+          sag("Stadtwechsel nach " + beste + ": Wert " + Math.round(besterWert)
+            + " gegen " + Math.round(wertHier) + " in " + hier
+            + " (Bevoelkerung je Chaos-Faktor).");
+        }
+      }
+    } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
+
     if (RAID_AN) {
       try {
         const hier = ns.bladeburner.getCity();

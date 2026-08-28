@@ -713,17 +713,45 @@ async function pruefe(zustand, jetzt) {
   //     1024 GB und verpasst damit einen Wechsel, der frueher kommt.
   const resetVorher = zustand.nodeReset;
   const resetJetzt = messwerte.nodeReset ?? null;
+  //  4. Das Hackniveau ist eingebrochen. NACHGETRAGEN AM 28.08.2026, 17:15,
+  //     weil die drei Anzeichen oben den Wechsel um 17:05 NICHT gemeldet
+  //     haben - und zwar aus einem strukturellen Grund:
+  //
+  //     `knoten` und `nodeReset` kommen aus `data/knoten.json`, und die
+  //     schreibt `bn4rep.js`. Ein Knotenwechsel beendet aber JEDES laufende
+  //     Skript (`prestigeSourceFile`); `boot.js` startet danach zuerst nur
+  //     `bn4net.js`, alles andere kommt erst, wenn der Speicher reicht.
+  //     Die Quelle der Erkennung ist also genau in dem Augenblick tot, in dem
+  //     das Ereignis eintritt. Gemessen 17:06:14, eine Minute nach dem
+  //     Wechsel: `knoten.json` stand unveraendert auf 6, Zeitstempel 17:05:04
+  //     - sechs Sekunden VOR dem Wechsel. Und Anzeichen 3 greift erst ab
+  //     1024 GB home.
+  //
+  //     Das Hackniveau steht dagegen im eigenen Steckbrief der Wache und
+  //     ueberlebt keinen Prestige: Es faellt auf 1. Im eigenen Verlauf steht
+  //     17:03:14 `hacking 200` und 17:06:14 `hacking 1`. Eindeutiger geht es
+  //     nicht, und es braucht kein fremdes Skript.
+  const hackVorher = (zustand.verlauf || [])
+    .filter((x) => Number.isFinite(x.hacking))
+    .sort((x, y) => y.ts - x.ts)[0]?.hacking ?? null;
+  const hackJetzt = Number.isFinite(messwerte.hacking) ? messwerte.hacking : null;
+  const hackEinbruch = hackVorher != null && hackJetzt != null
+    && hackVorher >= 50 && hackJetzt <= 5;
+
   const knotenWechsel =
     (resetVorher != null && resetJetzt != null && resetJetzt !== resetVorher)
     || (knotenVorher != null && knotenJetzt != null && knotenJetzt !== knotenVorher)
-    || (ramVorher != null && ramJetzt != null && ramVorher >= 1024 && ramJetzt <= ramVorher / 8);
+    || (ramVorher != null && ramJetzt != null && ramVorher >= 1024 && ramJetzt <= ramVorher / 8)
+    || hackEinbruch;
   if (knotenWechsel) {
     befunde.push({
       typ: "knoten",
       ereignis: true,
       tag: "tada",
       text: "BitNode geschafft"
-        + (knotenJetzt ? " - jetzt in BitNode " + knotenJetzt : "")
+        + (knotenJetzt ? " - jetzt in BitNode " + knotenJetzt
+          : hackEinbruch ? " (Hackniveau " + hackVorher + " -> " + hackJetzt
+            + "; die Knotennummer kommt, sobald bn4rep.js wieder laeuft)" : "")
         + (knotenVorher != null && knotenJetzt === knotenVorher
           ? " (derselbe noch einmal, naechste Stufe)" : "")
         + ". Der Bot baut sich gerade neu auf.",

@@ -64,34 +64,6 @@ Regeln:
 
 ## Sofort
 
-### Der Tonanker ist suspendiert, der Tab gedrosselt (22:00)
-
-Gemessen: `data/wakelock.txt` steht auf **`suspended`** (Zeitstempel 86 s
-          alt, das Skript lebt also). `tools/strategie-check.js` meldet
-          **1,00 Motorrunden je Minute statt der normalen 4 bis 6**.
-          `tools/rueckstand.js`: Tempo **0,977**, Rueckstand 0,4 min, Trend
-          **+0,2 min je Stunde**.
-
-Erwartet: `running` und 4 bis 6 Runden. Ein verdeckter Tab ohne Tonausgabe
-          bekommt nur eine Timer-Weckung je Minute.
-
-Verdacht: Kein Fehler im Skript. `src/wakelock.js:117` sagt es selbst:
-          "resume() gelingt ohne Nutzerinteraktion oft nicht". Das Skript
-          versucht es jede Minute und schreibt den Zustand nach draussen -
-          mehr kann es von innen nicht tun. Ein AudioContext braucht fuer die
-          Tonausgabe eine vorherige Nutzerinteraktion im Tab.
-
-          **Von aussen nicht behebbar.** Es braucht einen Klick im
-          Bitburner-Tab (irgendeinen), oder den Tab im Vordergrund.
-
-Dringlichkeit: **niedrig, und das ist wichtig.** Der Engpass dieses Knotens
-          ist das Gym-Training, und das laeuft in der Spielengine, nicht in
-          einem Skript - deshalb steht das Tempo bei 0,977 und nicht bei 0,2.
-          Der Traeger stieg im selben Fenster von 68 auf 70. Betroffen sind
-          die Skripte: Netzausbau, Vertraege, Telemetrie. Sobald hinter Tor 1
-          wieder Bladeburner traegt, wird daraus ein echter Verlust.
-
-
 ### Kampf-Augmentierungen vor dem Bladeburner-Beitritt (19:20)
 
 Gemessen: Kampfwert-Tiefstand 42 von 100, in Erfahrung 6.723 von 254.817 je

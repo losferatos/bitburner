@@ -23,6 +23,42 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Tonanker ist suspendiert - der Alarm war trotzdem falsch (erledigt 28.08., 22:15)
+
+Um 22:00 meldete `tools/strategie-check.js` STAGNATION mit "GEDROSSELT: nur
+1,00 Motorrunden je Minute (normal 4-6)", und `data/wakelock.txt` stand auf
+`suspended`. Beides zusammen sah nach der bekannten Tab-Drosselung aus.
+
+**Direkt nachgemessen, 22:08 bis 22:10:** Runde 112 auf 120 in 80 Sekunden =
+**6 Runden je Minute**, also der Normalwert. `tools/rueckstand.js` sah das
+Spiel im selben Fenster mit **Tempo 1,044** sogar leicht VOR der Uhr; der
+Rueckstand von 0,4 min war aufgeholt. Der Traeger stieg von 68 auf 71.
+
+**Zwei Lehren.**
+
+1. `suspended` allein beweist keine Drosselung. Der AudioContext kann
+   suspendiert sein, waehrend der Tab sichtbar ist - dann drosselt niemand.
+   `src/wakelock.js` bleibt richtig: Es versucht jede Minute `resume()` und
+   schreibt den Zustand nach draussen. Mehr geht von innen nicht
+   (`wakelock.js:117`), ein AudioContext braucht eine Nutzerinteraktion.
+
+2. **Die Rechnung war falsch, nicht der Bot.** Die Pruefung verglich
+   `jetzt - vorher.zeit` - die Spanne zwischen zwei PRUEFLAEUFEN - mit
+   Rundenzahlen aus `data/bn4net.json`. Ist die Datei alt, zaehlt der Bruch
+   eine Wallclock-Spanne gegen einen Rundenzuwachs, den es darin nie gab.
+
+Behoben: Der Verlaufspunkt fuehrt jetzt `netZeit` mit, und die Spanne kommt
+aus den Zeitstempeln DERSELBEN Quelle. Fehlt der alte Wert, wird nicht
+gemessen statt falsch gemessen.
+
+Verifiziert 22:15 und 22:16, zwei Laeufe: URTEIL SPUR, keine
+GEDROSSELT-Zeile - bei unveraendertem `suspended` im Tonanker.
+
+Ohne diese Aenderung haette der Alarm die ganze Nacht alle zwanzig Minuten
+gefeuert.
+
+---
+
 ### Die Augmentierungsrunde ist nicht bezahlbar - und lohnt auch nicht (erledigt 28.08., 21:45)
 
 Alle drei Wege gerechnet, mit gemessenen Raten. Der Bedarf je Kampfwert folgt

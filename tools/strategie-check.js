@@ -789,7 +789,26 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   if (Number.isFinite(net.runde)) {
     const vorher = [...v.punkte].reverse().find((x) => Number.isFinite(x.runde));
     if (vorher) {
-      const min = (jetzt - vorher.zeit) / 60000;
+      // DIE UHR DES MOTORS, NICHT DIE DES PRUEFERS (28.08.2026, 22:15).
+      //
+      // Hier stand `jetzt - vorher.zeit`, also die Zeit zwischen zwei
+      // PRUEFLAEUFEN, verglichen mit Rundenzahlen aus `data/bn4net.json`.
+      // Die Datei kann aber alt sein - und dann zaehlt der Bruch eine
+      // Wallclock-Spanne gegen einen Rundenzuwachs, den es in dieser Spanne
+      // gar nicht gab.
+      //
+      // Genau das ist um 22:00 passiert: gemeldet wurden "1,00 Motorrunden je
+      // Minute", waehrend eine direkte Messung um 22:09 **6 je Minute** ergab
+      // (Runde 112 auf 120 in 80 Sekunden) und `tools/rueckstand.js` das
+      // Spiel mit Tempo 1,044 sogar leicht VOR der Uhr sah. Der Alarm war
+      // falsch, und er haette die ganze Nacht alle zwanzig Minuten gefeuert.
+      //
+      // Richtig ist die Spanne zwischen den beiden Zeitstempeln DERSELBEN
+      // Quelle. Fehlt der alte (Verlaufspunkte von vor dieser Aenderung),
+      // wird nicht gemessen statt falsch gemessen.
+      const spanneMs = (Number.isFinite(net.zeit) && Number.isFinite(vorher.netZeit))
+        ? net.zeit - vorher.netZeit : null;
+      const min = spanneMs === null ? 0 : spanneMs / 60000;
       const drunden = net.runde - vorher.runde;
       // Normal sind vier bis sechs Runden je Minute. Unter einer Runde je
       // Minute ist der Tab gedrosselt - das ist Faktor 16 auf ALLES, vom
@@ -871,6 +890,9 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
     phase: t.phase, netz: net.gerootet, geld: bb ? bb.geld : null,
     urteil, aktion: blade && blade.aktion ? blade.aktion : null,
     popups: popups ? popups.geschlossen : null,
+    // Der Zeitstempel des MOTORS, nicht der des Pruefers. Warum, steht bei
+    // der Drosselungspruefung in Abschnitt 7.
+    netZeit: Number.isFinite(net.zeit) ? net.zeit : null,
     // Die Rundenzahl des Motors ist das einzige Mass fuer die
     // SPIELGESCHWINDIGKEIT. Ein verborgener Browsertab laeuft 16-fach
     // langsamer; wakelock.js haelt ihn wach, kann aber lautlos ausfallen

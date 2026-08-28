@@ -23,6 +23,105 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Faehigkeitsplan ist dynamisch - VERIFIZIERT, letzter Deckel gefallen (28.08., 05:41)
+
+Der Punkt vom 27.08. verlangte, `SKILL_PLAN` durch einen Vergleich nach
+**Nutzen je Punkt** zu ersetzen. Von den zehn Faehigkeiten stehen jetzt
+**neun** in `DYNAMISCH`; die letzte, Tracer, hat einen begruendeten Deckel
+(`SuccessChanceContract`, und die Vertragschancen klemmen bei 1,00).
+
+**Der heutige Zugewinn: Cyber's Edge.** Es stand bei Deckel 5 und war das
+fehlende Gegenstueck zu Overclock:
+
+    Overclock       ActionTime -1 je Stufe   kuerzere Aktionen, mehr Verbrauch
+    Cyber's Edge    Stamina    +2 je Stufe   mehr Vorrat UND mehr Nachschub
+
+Der `Stamina`-Multiplikator wirkt **doppelt**: `calculateMaxStamina` nimmt
+ihn, und `calculateStaminaGainPerSecond` nimmt ihn ein zweites Mal
+(`Bladeburner.ts:1322`) - dort steht ausserdem `maxStamina / 70000` im
+Summanden, den er gerade gehoben hat.
+
+**Beide sind gegenlaeufig an dieselbe Messung gekoppelt** (`ausdauerLuft()`):
+Was den einen daempft, weckt den anderen. Damit regelt sich das Paar selbst -
+Overclock treibt die Aktionen schneller, bis die Ausdauer knapp wird, dann
+faellt sein Nutzen und der von Cyber's Edge steigt, bis wieder Luft da ist.
+
+**Verifiziert 05:40 ueber vier Messungen in 72 Sekunden:**
+
+    Cyber's Edge   Stufe  5 -> 10 -> 14 -> 17
+    max Ausdauer     295   ->  538 -> 575 -> 602
+
+**Die Ausdauer band also tatsaechlich schon** - der Fuellstand lag bei 54
+Prozent, nicht bei den 69 von 04:41. Der Daempfer von 04:11 hat damit zum
+ersten Mal gegriffen, und zwar in beide Richtungen gleichzeitig.
+
+Die Rangrate steigt weiter: **633,9 je Minute ueber 20 Minuten**, 451,6 im
+45-Minuten-Fenster, Kammeranteil weiterhin null (30 Minuten nur
+Assassination).
+
+**Was der alte Eintrag richtig sah:** Die Kosten steigen linear mit der Stufe
+(`Skill.ts:37-41`), der Nutzen je Stufe bleibt konstant - der Nutzen je
+Punkt faellt also monoton, und die beste Faehigkeit wandert. Ein Plan mit
+festen Zahlen ist ab dem Moment falsch, in dem eine `Infinity`-Faehigkeit
+teurer wird als eine gedeckelte. Genau das war heute Nacht viermal der Fall.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Der Faehigkeitsplan hat feste Deckel - er veraltet zwangslaeufig
+
+**Zweimal am 27.08. lag eine deutlich bessere Faehigkeit gedeckelt daneben**,
+waehrend die `Infinity`-Eintraege alle Punkte auffrassen:
+
+    12:52   Hyperdrive       Stufe 0, 1 Punkt      1,451 % je Punkt
+    13:19   Short-Circuit    Stufe 12, 27 Punkte   0,122
+            Blade's Intuition Stufe 25, 56 Punkte  0,031   <- bekam alles
+
+Die Ursache ist strukturell: Die Kosten steigen **linear** mit der Stufe
+(`(baseCost + level * costInc) * mult`, `Bladeburner/Skill.ts:37-41`), der
+Nutzen je Stufe bleibt konstant - also faellt der Nutzen je Punkt monoton, und
+die beste Faehigkeit wandert im Lauf des Knotens. Ein Plan mit festen Zahlen
+kann das nicht abbilden; er ist ab dem Moment falsch, in dem eine
+`Infinity`-Faehigkeit teurer wird als eine gedeckelte.
+
+**Der Fix:** `SKILL_PLAN` durch einen Vergleich ersetzen, der bei jedem Kauf
+den **relativen Nutzen je Punkt** rechnet und die beste Faehigkeit nimmt.
+Relativ, nicht absolut - die Multiplikatoren verrechnen sich multiplikativ, ein
+Prozentpunkt auf 1,66 ist mehr wert als auf 2,65. Die Daten dafuer liegen
+bereits vor: `ns.bladeburner.getSkillUpgradeCost` und die Tabelle in
+`data/Skills.ts`.
+
+**GEAENDERT 13:49, Wirkung noch nicht gemessen.** Die drei Faehigkeiten, deren
+Wirkung auf die Black-Op-Chance gerechnet ist - **Hyperdrive, Short-Circuit,
+Blade's Intuition** -, werden vor jedem Kauf nach relativem Nutzen je Punkt
+sortiert und tauschen ihre Planplaetze untereinander. Deckel und alle uebrigen
+Eintraege bleiben unangetastet; wer am Deckel steht, faellt auf -1 und wandert
+nach hinten.
+
+Verifiziert ist bisher nur, dass nichts bricht: nach dem Neustart um 13:49
+Rang 5.024, Aktion `Contracts/Tracking`, `URTEIL: SPUR`.
+
+**Nachzumessen:** Bei 26 Punkten und Preis 27 muss der Motor jetzt auf
+**Short-Circuit** sparen (0,122 je Punkt) statt auf Blade's Intuition (0,031).
+Ablesen an der Stufe in `data/bbspann.json` - steigt Short-Circuit ueber 12,
+traegt die Sortierung. Steigt stattdessen Blade's Intuition ueber 25, greift
+sie nicht und der Commit gehoert zurueckgedreht.
+
+**Was offen bleibt:** Die neun uebrigen Faehigkeiten stehen weiter in fester
+Folge, weil ihre Wirkung auf den Traeger nicht gerechnet ist. Digital Observer
+trifft nur Operations, Cloak nur Stealth, Hands of Midas nur Geld - fuer sie
+braucht es erst eine Umrechnung in Prozent Black-Op-Chance, bevor sie in den
+Vergleich duerfen.
+
+**Achtung bei der Umsetzung:** Nicht jede Faehigkeit wirkt auf den Traeger.
+Digital Observer trifft nur Operations, Cloak nur Stealth, Hands of Midas nur
+Geld - Typhoon ist `isKill`, also zaehlen Blade's Intuition (alle),
+Short-Circuit (kill) und ueber die Erfahrung Hyperdrive. Ein blinder
+Nutzen-je-Punkt-Vergleich ueber alle zwoelf Faehigkeiten kauft sonst Unsinn.
+
+</details>
+
+---
+
 ### Die Augmentierungsrunde ist gelaufen - VERIFIZIERT (28.08., 05:08)
 
 Der Punkt fragte, **wann** der Einbau faellt. Er ist am **28.08. um 01:25**

@@ -435,7 +435,7 @@ export async function main(ns) {
     ["Reaper", Infinity],
     ["Evasive System", Infinity],
     // Ab hier statisch, mit begruendetem Deckel.
-    ["Cyber's Edge", 5],
+    ["Cyber's Edge", Infinity],
     ["Tracer", 14],
     ["Blade's Intuition", Infinity],
     ["Overclock", 90],
@@ -566,6 +566,33 @@ export async function main(ns) {
       const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
       return 100 * (danach / jetzt - 1);
     }
+    if (name === "Cyber's Edge") {
+      // DAS GEGENSTUECK ZU OVERCLOCK (28.08.2026, 05:40).
+      //
+      // `mults: { Stamina: 2 }` - zwei Prozent mehr maximale Ausdauer je
+      // Stufe (`data/Skills.ts:84-90`). Der Multiplikator wirkt **doppelt**:
+      // `calculateMaxStamina` nimmt ihn, und `calculateStaminaGainPerSecond`
+      // nimmt ihn ein zweites Mal (`Bladeburner.ts:1322`) - dort steht
+      // ausserdem `maxStamina / 70000` im Summanden, den er gerade gehoben
+      // hat.
+      //
+      // **Wert hat das nur, wenn die Ausdauer bindet.** Steht sie voll, ist
+      // mehr Vorrat und mehr Nachschub gleich viel wert wie nichts - dieselbe
+      // Logik wie bei den Chance-Faehigkeiten, deren Chance bei 1,00 klemmt.
+      // Deshalb ist der Nutzen hier **umgekehrt** an die Ausdauer gekoppelt
+      // wie bei Overclock: Was den einen daempft, weckt den anderen.
+      //
+      // Der relative Zuwachs des Multiplikators ist `2 / (100 + 2*stufe)` -
+      // bei Stufe 5 also 1,82 Prozent fuer 16 Punkte = 0,114 je Punkt. Zum
+      // Vergleich, gemessen 04:37: Blade's Intuition auf Stufe 45 kommt mit
+      // dem Klemmfaktor auf 0,0066 je Punkt. **Faktor 17** - aber eben erst,
+      // wenn die Ausdauer wirklich knapp wird.
+      //
+      // Damit regelt sich das Paar selbst: Overclock treibt die Aktionen
+      // schneller, bis die Ausdauer knapp wird; dann faellt sein Nutzen und
+      // der von Cyber's Edge steigt, bis wieder Luft da ist.
+      return (100 * 2 / (100 + 2 * stufe)) * (1 - ausdauerLuft());
+    }
     if (name === "Overclock") {
       // OVERCLOCK IST KEINE CHANCE-, SONDERN EINE ZEITFAEHIGKEIT
       // (28.08.2026, 00:58).
@@ -637,14 +664,7 @@ export async function main(ns) {
       // Nutzen von allein zurueck, wenn spaetere Augmentierungen die
       // Regeneration heben.
       const stufe2 = Math.min(stufe, 98);
-      let ausdauerLuft = 1;
-      try {
-        const [jetzt, max] = ns.bladeburner.getStamina();
-        if (max > 0) {
-          ausdauerLuft = Math.max(0, Math.min(1, (jetzt / max - 0.5) / 0.4));
-        }
-      } catch { /* ohne Messung bleibt es beim vollen Nutzen */ }
-      return (100 / (99 - stufe2)) * ausdauerLuft;
+      return (100 / (99 - stufe2)) * ausdauerLuft();
     }
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;
@@ -680,6 +700,17 @@ export async function main(ns) {
   // Die 0,999 statt 1,0 als Grenze: Die geschaetzte Chance schwankt im
   // letzten Promille mit der Bevoelkerungsschaetzung der Stadt, und ein
   // Nutzen, der an dieser Stelle kippt, waere Rauschen.
+  // Wieviel Luft hat die Ausdauer? 1 = voll, 0 = am Anschlag. Zwei
+  // Faehigkeiten haengen daran, und zwar gegenlaeufig: Overclock verliert
+  // seinen Wert, wenn die Luft ausgeht, Cyber's Edge gewinnt ihn dann.
+  const ausdauerLuft = () => {
+    try {
+      const [jetzt, max] = ns.bladeburner.getStamina();
+      if (max > 0) return Math.max(0, Math.min(1, (jetzt / max - 0.5) / 0.4));
+    } catch { /* ohne Messung: volle Luft annehmen */ }
+    return 1;
+  };
+
   const klemmFaktor = () => {
     const sonden = [];
     try {
@@ -706,7 +737,7 @@ export async function main(ns) {
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock"];
+    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock", "Cyber's Edge"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();

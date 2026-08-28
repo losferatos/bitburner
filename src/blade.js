@@ -1864,17 +1864,47 @@ export async function main(ns) {
         // nach oben, und ein Raid kostet nichts.
         const CHAOS_JE_LAUF = { "Raid": 3, "Stealth Retirement Operation": -2, "Assassination": 0 };
         const chaosDelta = CHAOS_JE_LAUF[name] || 0;
+        // DER ZUSCHLAG GILT IMMER, NICHT ERST UEBER `CHAOS_AUS`
+        // (28.08.2026, 13:05).
+        //
+        // Die alte Bedingung `if (c > CHAOS_AUS)` hielt Chaos unterhalb von
+        // 47 fuer gratis - "dort ist Platz nach oben, und ein Raid kostet
+        // nichts". Das stimmt fuer die SCHWIERIGKEIT (der Faktor
+        // `sqrt(1 + chaos - 50)` ist unter 50 exakt 1,
+        // `Actions/Operation.ts:52-61`), aber nicht fuer die ZEIT.
+        //
+        // Denn der Motor kehrt immer zu 47 zurueck: `chaosAufraeumen` schaltet
+        // bei 50 ein und erst unter 47 wieder aus. Jedes Prozent Chaos, das
+        // eine Aktion erzeugt, wird also frueher oder spaeter mit Diplomacy
+        // bezahlt - der Zeitpunkt verschiebt sich, der Preis nicht. Gratis ist
+        // nur, was der passive Abbau wegnimmt, und der betraegt
+        // `chaos -= 0,0001 * seconds` (`Bladeburner.ts:1397`), also 0,36
+        // Punkte je Stunde.
+        //
+        // Was die alte Fassung erzeugt hat, durchgerechnet mit den Zahlen von
+        // 12:56 (`data/bbspann.json`, Charisma 309, Diplomacy -1,603 % je
+        // 60 s):
+        //
+        //     Chaos 47 -> 50    +6,4 %   = 2,13 Raids a 11 s  =  23 s, 538 Rang
+        //     Diplomacy zurueck  ln(50/47)/0,01616 = 3,83 Laeufe = 230 s, 0 Rang
+        //     Zyklus            253 s fuer 538 Rang           = **128 Rang/min**
+        //
+        // Das ist genau die Rate, die den ganzen Vormittag gemessen wurde
+        // (118,4/min ueber 61 min, 130,7 ueber 121). Der Motor sass nicht in
+        // einer Stoerung, sondern in einem Grenzzyklus, den diese Bedingung
+        // gebaut hat.
+        //
+        // Mit dem Zuschlag steht Raid bei 252,7 Rang je 123 s = 123/min gegen
+        // Assassination 1.097/min (chaosneutral, `Bladeburner.ts:859`) - der
+        // Zyklus entsteht gar nicht erst, und Diplomacy faellt weg.
         if (chaosDelta > 0 && dauer > 0) {
           try {
-            const c = chaosLage();
-            if (c > CHAOS_AUS) {
-              const cha = ns.getPlayer().skills.charisma;
-              const senkungProz = Math.pow(cha, 0.045) + cha / 1000;
-              // Beide Richtungen sind prozentual, das Niveau kuerzt sich
-              // heraus - das Verhaeltnis ist die Zahl der noetigen Laeufe.
-              const laeufe = chaosDelta / senkungProz;
-              dauer += laeufe * 60000;
-            }
+            const cha = ns.getPlayer().skills.charisma;
+            const senkungProz = Math.pow(cha, 0.045) + cha / 1000;
+            // Beide Richtungen sind prozentual, das Niveau kuerzt sich
+            // heraus - das Verhaeltnis ist die Zahl der noetigen Laeufe.
+            const laeufe = chaosDelta / senkungProz;
+            dauer += laeufe * 60000;
           } catch { /* ohne Charisma-Wert bleibt es bei der nackten Dauer */ }
         }
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte

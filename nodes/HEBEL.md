@@ -37,6 +37,61 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Der Chaos-Zuschlag galt erst ueber `CHAOS_AUS` (28.08., 13:05)
+
+Engpass:    **Ein Grenzzyklus aus Raid und Diplomacy**, nicht eine Stoerung.
+            Gemessen ueber `data/aktionen.txt` (08:12 bis 12:35, 125
+            protokollierte Minuten): Diplomacy hatte **56,8 Prozent** der Zeit
+            und brachte null Rang; die Ausdauerkammer nur 2,3 Prozent.
+
+            Der Zuschlag in `beste()` rechnet die Diplomacy-Laeufe, die eine
+            Aktion durch ihren Chaos-Anstieg erzwingt, in ihre Dauer ein - aber
+            nur `if (c > CHAOS_AUS)`, also ab Chaos 47. Darunter galt Chaos als
+            gratis.
+
+            Das stimmt fuer die SCHWIERIGKEIT: `sqrt(1 + chaos - 50)` ist unter
+            50 exakt 1 (`Actions/Operation.ts:52-61`). Fuer die ZEIT stimmt es
+            nicht, denn `chaosAufraeumen` schaltet bei 50 ein und erst unter 47
+            wieder aus - der Motor kehrt **immer** zu 47 zurueck. Jedes Prozent
+            Chaos wird also bezahlt; nur der Zeitpunkt verschiebt sich. Gratis
+            ist allein der passive Abbau, `chaos -= 0,0001 * seconds`
+            (`Bladeburner.ts:1397`), also 0,36 Punkte je Stunde.
+
+Hypothese:  Der Zyklus, den die Bedingung baut, ist durchrechenbar (Charisma
+            309, Diplomacy -1,603 % je 60 s, `Bladeburner.ts:735-743`):
+
+                Chaos 47 -> 50   +6,4 %  = 2,13 Raids a 11 s  =  23 s, 538 Rang
+                Diplomacy zurueck ln(50/47)/0,01616 = 3,83 Laeufe = 230 s, 0
+                Zyklus           253 s fuer 538 Rang         = **128 Rang/min**
+
+            Das ist auf zwei Prozent genau die Rate, die den ganzen Vormittag
+            gemessen wurde: 118,4/min ueber 61 Minuten, 130,7 ueber 121
+            (`data/verlauf-strategie.json`, 12:34). Mit unbedingtem Zuschlag
+            steht Raid bei 252,7 Rang je 123 s = **123/min** gegen
+            Assassination **1.097/min** (chaosneutral, `Bladeburner.ts:859`) -
+            der Zyklus entsteht nicht mehr, Diplomacy faellt weg.
+
+            Erwartet: geglaettete Rate ueber 45 Minuten **mindestens
+            1.000/min**, Diplomacy-Anteil **null**.
+
+Beleg:      `Actions/Operation.ts:52-61` (Chaos wirkt erst ab 50 auf die
+            Schwierigkeit), `Bladeburner.ts:1397` (passiver Abbau 0,0001/s),
+            `:844` (Raid +1 bis +5 %), `:859` (Assassination -5 bis +5 %, im
+            Mittel null), `:735-743` und `:1185-1187` (Diplomacy prozentual
+            ueber Charisma), `src/blade.js` `CHAOS_EIN`/`CHAOS_AUS` 50/47.
+
+Vorher:     **1.137 Rang/min** von 12:47 bis 12:56 (`data/aktionen.txt`:
+            Assassination 86,8 %, Raid 13,2 %, Diplomacy 0 %) - aber das war
+            der Transient nach dem Wegfall des Raid-Vorrangs, mit Chaos bei
+            45,3 und noch unbezahlter Schuld. Die Fenster davor: 118,4/min
+            (61 min) und 130,7 (121 min).
+Nachher:    (offen - naechster Lauf misst ueber mindestens 45 Minuten. Zu
+            pruefen: Diplomacy-Anteil in `data/aktionen.txt` = 0, und Chaos in
+            New Tokyo bleibt unter 47.)
+Commit:     siehe `git log src/blade.js`
+
+---
+
 ### Datamancer - die Faehigkeit, die in blade.js nirgends vorkam (28.08., 09:55)
 
 Engpass:    **Die Bevoelkerungsschaetzung, nicht die Kampfwerte.** Gemessen
@@ -88,10 +143,19 @@ Beleg:      `data/Skills.ts:73-83` - `Datamancer`,
 Vorher:     Datamancer Stufe 0 (fehlt in `bbspann.json`, das ueber
             `getSkillNames()` ALLE Faehigkeiten fuehrt und nur Stufe > 0
             anzeigt). Breiteste Spanne 1,000 um 09:40.
-Nachher:    (offen - der Motor hatte um 09:55 nur noch 4 Punkte, die 117 davor
-            gingen vor dem Neustart an Blade's Intuition, Digital Observer und
-            Cloak. Die neue Sortierung entscheidet erst beim naechsten
-            Punkteschub. Naechster Lauf misst: Stufe > 0? Spanne < 0,5?)
+Nachher:    **Stufe weiterhin 0 - und das ist richtig so** (nachgemessen
+            28.08., 12:56). `schaetzNot()` normiert auf die breiteste Spanne im
+            Feld, und die steht bei **null**: alle sechs Operationen und alle
+            drei Vertraege melden `min 1, max 1` (`data/bbspann.json`, 12:56).
+            Eine schaerfere Schaetzung kann dort nichts mehr freigeben, also
+            ist der Nutzen null und die Faehigkeit zu Recht unten in der
+            Sortierung. Der Hebel ist damit **eingebaut und schlafend**, nicht
+            wirkungslos - er greift beim naechsten Stadtwechsel.
+
+            Nebenbefund, der die urspruengliche Diagnose stuetzt: Die
+            Bevoelkerungsschaetzung liegt um **Faktor acht** daneben (pop
+            1.126 Mio, popEst 141 Mio, Spielstand 12:53) und richtet trotzdem
+            keinen Schaden an, weil die Chancen ohnehin bei 1 klemmen.
 Commit:     (siehe git log)
 
 **Nachmessung des Hebels von 09:42 - er traegt:** Der Gym-Zweig verdraengte

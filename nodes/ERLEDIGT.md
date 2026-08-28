@@ -23,6 +23,156 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Typhoon-Punkt abgeraeumt: die Praemisse ist tot, der Auftrag darin erledigt (28.08., 07:10)
+
+Der oberste Punkt der Arbeitsliste fragte, ob **Operation Typhoon** ueberhaupt
+fahrbar sei - Chance 0,035 bis 0,038, und fuer 50 Prozent brauche es Faktor
+19,6 in den Kampfwerten. Beides ist ueberholt:
+
+    Typhoon gefallen      27.08., 19:51
+    Black Ops gefallen    7 von 21
+    naechste              Operation Red Dragon, Chance 0,780-1,000
+    Rang                  80.593 von 400.000 = 20,1 %
+
+**Die Frage war richtig gestellt und ist beantwortet.** Der Punkt hatte
+korrekt hergeleitet, dass der Rang nicht in die Black-Op-Chance eingeht
+(`competence / baseDifficulty`, Stadtwerte und Chaos zaehlen nicht) und dass
+Rang 2500 kein Ausgang, sondern ein Zwischenschritt ist. Der Ausgang laeuft
+ueber mehrere Augmentierungsrunden im selben Knoten - genau das ist seither
+zweimal passiert (01:25 mit 25 Augmentierungen, 05:53).
+
+**Der eingebettete Auftrag ist ebenfalls erledigt**, und zwar am selben Tag,
+an dem er geschrieben wurde. Er lautete: "Eine Kampfwert-Liste analog zu
+`lib/hackaugs.js` anlegen und `bn4rep.js` in den Kampfknoten (6 und 7)
+danach priorisieren lassen."
+
+    src/lib/hackaugs.js:204   COMBAT_AUGS - die Kampfwert-Liste
+    src/lib/hackaugs.js:288   combatNutzen(name)
+    src/bn4rep.js:1232-1242   KAMPF_GEWICHT = 10, nur fuer Knoten 6 und 7
+
+Die Liste liegt in `hackaugs.js` statt in einer eigenen Datei, und das ist
+Absicht: `bn4net.js` fuehrt die Dateiliste, ein zweites Modul haette dort
+nachgetragen werden muessen (Kommentar `hackaugs.js:194`).
+
+**Verifiziert 07:08** an der laufenden Rangliste (`data/rep-ziel.txt`): Ganz
+oben stehen `Vangelis Virus 3.0` (Guete 0,0236) und
+`BLADE-51b Tesla Armor: Omnibeam Upgrade`, darunter mit `Combat Rib I` und
+`LuminCloaking-V2 Skin Implant` zwei reine Kampfstuecke aus einer
+Nicht-Hacking-Faktion. Vor dem Kampfterm haetten die dort nicht gestanden -
+sie setzen keinen einzigen Hacking- oder Reputationsmultiplikator und waeren
+mit Guetezahl 0 durchgefallen.
+
+**Nebenbefund, beruhigend:** Der Gym-Hebel von 07:00 schickt die Figur nach
+Sector-12, die Bladeburner-Division arbeitet aber weiter in **Chongqing**
+(`tools/spann.js`, 07:08). Spielerstadt und Bladeburner-Stadt sind
+unabhaengig - die Reise ins Powerhouse Gym stoert die laufenden Aktionen
+nicht.
+
+<details><summary>Der urspruengliche Eintrag</summary>
+
+### Operation Typhoon ist mit Rang 2500 erreichbar, aber nicht fahrbar
+
+**Alle drei Messauftraege sind erledigt (27.08., 01:20) - und die Antwort ist
+beruhigender als der Befund klang.**
+
+**1. Kampfwerte aus Bladeburner-Arbeit: 0,159 dex je Minute.** Gemessen aus
+den Pruefausgaben, 20:07 (dex 181) gegen 01:15 (dex 230), 308 Minuten. Fuer
+dex 4.400 waeren das **434 Stunden** - auf diesem Weg unerreichbar.
+
+**2. Gym scheidet ebenfalls aus, und zwar rechnerisch.** Die Erfahrungskurve
+ist `exp = e^((lvl/mult + 200)/32) - 534,6`
+(`PersonObjects/formulas/skill.ts:17-19`). Bei `mults.dexterity` = 1,834
+braeuchte dex 4.400 einen Exponenten von rund `(2.399+200)/32 = 81` - eine
+Zahl jenseits jeder Spielzeit.
+
+**3. Der Fehlschlag-Versuch ist strikt defizitaer** (schon 01:05 gerechnet):
+`rankLoss` 10 gegen `rankGain` 50, bei 3,7 Prozent Chance im Mittel 27
+Versuche je Erfolg - also 270 Rang Verlust gegen 50 Gewinn.
+
+**Der Ausweg stand die ganze Zeit im Multiplikator.** `calculateSkill` ist
+`floor(mult * (32*ln(exp + 534,6) - 200))` - der Multiplikator wirkt **direkt
+auf das Ergebnis**, nicht auf die Erfahrung. Gemessen 01:15: `mults.dexterity`
+steht bei **1,834**, str und def bei 1,260, agi bei 1,389, bei 14
+installierten Augmentierungen. Die Basis hinter dex 230 ist also 125 - mit
+einem Multiplikator von 20 waeren daraus 2.508, mit 35 rund 4.390.
+
+**Damit ist die Route richtig und nur die Erwartung war falsch.** Rang 2500 ist
+kein Ausgang, sondern ein Zwischenschritt; die Black Ops kommen nach mehreren
+Augmentierungs-Zyklen im selben Knoten. Genau das tut der Bot bereits -
+`bn4rep` sammelt Reputation, `bn4net` baut aus, und um 16:31 lief der erste
+Einbau dieses Laufs.
+
+**Was daraus folgt, ohne Umbau:** Die Bladeburner-Augmentierungen selbst sind
+schwach (`bladeburner_success_chance` 1,02 bis 1,06,
+`Augmentation/Augmentations.ts:203,215,228`; nur eine gibt x2). Der Hebel sind
+die **Kampfwert-Multiplikatoren**.
+
+**Und genau die sieht der Bot nicht (geprueft 27.08., 01:50).** `bn4rep.js`
+waehlt Faktion und Zielaugmentierung ueber `levelNutzen`/`hackNutzen` aus
+`lib/hackaugs.js` - und dessen Kopfkommentar sagt es selbst: die Liste enthaelt
+"alle Augmentierungen, die mindestens einen **Hacking- oder
+Reputations-Multiplikator** setzen". Kampfwert-Augmentierungen kommen darin
+**gar nicht vor**. In einem Knoten, dessen Traeger der Bladeburner-Rang ist und
+dessen Ausgang an den Kampfwerten haengt, priorisiert der Reputationsmotor also
+ausschliesslich nach Hacking.
+
+Was dabei liegen bleibt, aus `Augmentations.ts` gezaehlt - 17 Augmentierungen
+setzen mindestens drei Kampfwerte, die staerksten:
+
+    Augmentierung          Produkt   repCost   je Wert
+    SPTN-97                   9,38   1,25e6    1,75
+    CordiARC Reactor          3,32   1,125e6   1,35
+    Photosynthetic Cells      2,74   5,625e5   1,40 (str/def/agi)
+    nextSENS / Xanipher       2,07   4,375e5   1,20
+    Bionic Spine              1,75   4,5e4     1,15
+
+Zum Vergleich: `mults.dexterity` steht heute bei **1,834**. Allein SPTN-97
+wuerde ihn auf 3,21 heben - dex 230 wuerde damit zu rund 402, und die
+Typhoon-Chance von 0,037 auf grob 0,075 steigen.
+
+**Auftrag, eigener Lauf:** Eine Kampfwert-Liste analog zu `lib/hackaugs.js`
+anlegen und `bn4rep.js` in den Kampfknoten (6 und 7) danach priorisieren
+lassen. Zwei Dateien, deshalb nicht in diesem Lauf. **Vorher zu klaeren:** ob
+`bn4rep` ueberhaupt kauft oder nur freischaltet, und wie die Nachtsteuerung
+(`nacht.cmd`) die Auswahl trifft - sonst wird an der falschen Stelle
+umgebaut.
+
+**Dringlichkeit: hoch.** Es ist die Frage, ob der Knoten ueberhaupt auf dem
+eingeschlagenen Weg endet.
+
+Gemessen 27.08., 00:57: Die Erfolgschance von Operation Typhoon liegt bei
+**0,035 bis 0,038** - unveraendert gegenueber 15:46 (0,035 bis 0,042), obwohl
+sich der Rang von 745 auf 1528 verdoppelt hat. Der Grund steht in HEBEL.md
+(01:05): **Der Rang geht nicht in die Chance ein.** Black Ops ignorieren
+Stadtwerte und Chaos, ihre Schwierigkeit ist die feste `baseDifficulty` 2000,
+und die Chance ist `competence / 2000` mit
+`competence = SUMME weights[stat] * effSkill^0,9`.
+
+Fuer 50 Prozent braucht es **Faktor 19,6 in den Kampfwerten** - dex von 224
+auf rund 4.400. Ueber Faehigkeiten ist das nicht zu holen (Reaper 2 Prozent je
+Stufe, Evasive System 4 auf dex/agi; Stufe 50 in beiden braechte x3,5).
+
+**Zu messen, bevor irgendetwas entschieden wird:**
+1. Wie schnell wachsen die Kampfwerte aus Bladeburner-Arbeit? Aus
+   `data/aktionen.txt` laesst sich das nicht ablesen - es braucht zwei
+   Messpunkte der Kampfwerte mit Zeitstempel. Der Strategiepruefer schreibt
+   sie bereits in `data/verlauf-strategie.json`.
+2. Was kostet dieselbe Steigerung im Gym? Powerhouse Gym kostet 2.400 Dollar
+   je Sekunde, das Guthaben liegt bei 18,7 Milliarden - Geld ist hier nicht
+   der Engpass, Zeit ist es.
+3. Was bringt ein Fehlschlag-Versuch? `rankLoss` 10, `hpLoss` 100
+   (`data/BlackOperations.ts:12-14`). Bei 3,7 Prozent Chance kostet ein
+   Erfolg im Mittel 27 Versuche, also 270 Rang und 2.700 HP-Schaden - gegen
+   `rankGain` 50. **Das ist strikt defizitaer**, Typhoon auf gut Glueck zu
+   versuchen scheidet damit aus.
+
+**Erst danach ist die Route zu bewerten** - und eine Aenderung an der
+Reihenfolge der BitNodes waere Erics Entscheidung, kein Loop-Beschluss.
+
+</details>
+
+---
+
 ### Der Rangstillstand nach dem Einbau ist richtig - zwei Verdachte geprueft (28.08., 06:47)
 
 Um 06:37 stand der Rang seit zwanzig Minuten fast still (+154), und

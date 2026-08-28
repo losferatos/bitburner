@@ -47,6 +47,50 @@ export async function main(ns) {
   }
 
   const WD = "w0r1d_d43m0n";
+
+  // ZWEITER WEG: 21 BLACK OPS (28.08.2026, 17:05).
+  //
+  // Oben stand "der Alternativweg ueber Bladeburner ist NICHT gebaut - er
+  // braucht SF6 oder SF7, die es in diesem Spielstand nicht gibt". Seit dem
+  // Einstieg in BitNode 6 gibt es Bladeburner nativ, und um 17:00 ist
+  // Operation Daedalus gefallen: 21 von 21.
+  //
+  // destroyW0r1dD43m0n prueft zwei Bedingungen ODER-verknuepft
+  // (NetscriptFunctions/Singularity.ts:1148-1164): Hacking-Level plus Root,
+  // ODER numBlackOpsComplete >= 21. Der Server muss dafuer NICHT am Netz
+  // haengen - die Funktion holt ihn mit GetServer(SpecialServers.WorldDaemon)
+  // direkt aus der Serverliste. Die Vorpruefung ns.serverExists(WD) unten
+  // haette den Bladeburner-Weg also faelschlich abgewiesen.
+  let ueberBlackOps = false;
+  try {
+    if (ns.bladeburner.inBladeburner()) {
+      const anzahl = ns.bladeburner.getBlackOpNames().length;
+      const naechste = ns.bladeburner.getNextBlackOp();
+      ueberBlackOps = naechste === null && anzahl > 0;
+      sag("Black Ops: " + (ueberBlackOps
+        ? "alle " + anzahl + " gefallen - Weg 2 offen"
+        : "noch offen: " + (naechste ? naechste.name : "?")));
+    }
+  } catch { sag("Keine Bladeburner-Division - Weg 2 entfaellt."); }
+
+  if (ueberBlackOps) {
+    if (nurPruefen) {
+      sag("PRUEFLAUF: Weg 2 ist offen. Ohne --pruefen wuerde jetzt BitNode "
+        + ziel + " betreten, Rueckruf boot.js.");
+      return;
+    }
+    if (!ns.fileExists("boot.js", "home")) {
+      sag("ABBRUCH: boot.js liegt nicht auf home. Ohne den Rueckruf staende"
+        + " der Bot im neuen Knoten still.");
+      return;
+    }
+    sag("Verlasse BitNode ueber 21 Black Ops Richtung " + ziel
+      + ", Rueckruf boot.js.");
+    await ns.sleep(500);
+    ns.singularity.destroyW0r1dD43m0n(ziel, "boot.js");
+    return;
+  }
+
   if (!ns.serverExists(WD)) {
     sag(WD + " haengt nicht am Netz. The Red Pill ist noch nicht eingebaut.");
     return;

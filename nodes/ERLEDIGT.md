@@ -23,6 +23,53 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Rang bleibt die Leitgroesse - auch nach 400.000 (erledigt 28.08., 15:25)
+
+Die offene Frage des Sofort-Punkts war: Muss `beste()` umschalten, sobald der
+Rang reicht - von "Rang je Minute" auf "Kampferfahrung je Minute"? Die Antwort
+steht im Quellcode und lautet **nein**, aus drei unabhaengigen Gruenden.
+
+**1. Der Rang hoert nie auf zu zahlen.** `changeRank` vergibt Skillpunkte im
+festen Verhaeltnis `RanksPerSkillPoint: 3` (`Bladeburner.ts:1283-1291`,
+`data/Constants.ts:47`) - ohne Obergrenze, ohne Sattigung. Bei 1.500 Rang je
+Minute sind das **500 Skillpunkte je Minute**, dauerhaft. Der Rang ist nicht
+das Ziel, sondern die Quelle.
+
+**2. Erfahrung je Minute haengt gar nicht an der Aktionsdauer.**
+`getActionStats` rechnet
+`unweightedGain = time * BaseStatGain * successMult * difficultyMult`
+(`Bladeburner.ts:718`). Die Zeit steht als **Faktor** darin, also kuerzt sie
+sich aus "Erfahrung je Minute" heraus. Eine kuerzere Aktion bringt kein
+bisschen mehr Erfahrung je Zeit - nur die Schwierigkeit zaehlt
+(`difficultyMult = diff^0,28 + diff/650`). Die Vermutung im Sofort-Punkt,
+Assassination mit 38 s koenne von einer kuerzeren Aktion geschlagen werden,
+war damit von vornherein gegenstandslos.
+
+**3. Kampfwerte wachsen logarithmisch, Faehigkeiten linear.**
+`calculateSkill` ist `floor(mult * (32*ln(exp+534,6) - 200))`. Aus
+str 387 bei 813.888 Erfahrung folgt `mult` = 1,643. Fuer den Wert 1.990, den
+die alte Rechnung verlangte, braeuchte es `e^44,1` = **1,4e19** Erfahrung -
+das 1,7e13-fache des heutigen Stands. Dieser Weg existiert nicht.
+
+**Was stattdessen traegt, mit Zahlen.** Gemessen 15:21 aus erster Hand:
+Daedalus steht bei Chance **0,1274**, es fehlt Faktor **7,06**. Ein gieriger
+Ausbau der vier Faehigkeiten, die auf Daedalus ueberhaupt wirken - Blade's
+Intuition, Digital Observer, Reaper, Evasive System, alle mit `costInc` 2,1 -
+erreicht 0,90 bei den Stufen 178 / 181 / 146 / 139 und kostet **84.441
+Skillpunkte = 253.323 Rang = 2,8 Stunden** bei der heutigen Rate. Der Rang ist
+also nicht in einer Stunde erledigt, sondern traegt den Rest des Knotens.
+
+**Zurueckgenommen wird ausserdem die Zahl 0,220** aus dem Sofort-Punkt. Sie
+stammte aus einer Hochrechnung ueber Deckards gemeldete Chance; der gemeldete
+Bereich ist fuer Black Ops aber unbrauchbar (siehe den Kommentar in
+`blackOpChance`). Der wahre Wert ist 0,1274.
+
+Erledigt in `src/blade.js` (Kommentarblock bei `CHANCE_SKILLS`) und
+`data/blade.json` (neues Feld `boChancen`).
+
+---
+
+
 ### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (erledigt 28.08., 13:15)
 
 Der Punkt verlangte eine Bedingung, die in den Kampfknoten fragt: **Wieviel

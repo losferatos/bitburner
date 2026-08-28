@@ -599,6 +599,50 @@ export async function main(ns) {
   // `isStealth`. Da der Ausgang an der schwersten haengt, waere ihre Abdeckung
   // fuer den eigentlichen Engpass sogar null. Die Zaehlung ueber alle zwoelf
   // ist die vorsichtigere Wahl und bleibt stehen.
+  //
+  // NACHTRAG 28.08.2026, 15:25 - DIE ZAEHLUNG UEBER ALLE OFFENEN IST FALSCH.
+  //
+  // Die Vorsichtsanmerkung oben ("waere fuer den eigentlichen Engpass sogar
+  // null") war richtig und wurde trotzdem verworfen. Von den neun noch
+  // offenen Black Ops sind die drei schwersten - Centurion 70.000,
+  // Vindictus 75.000, Daedalus 80.000 (`data/BlackOperations.ts`) - weder
+  // `isKill` noch `isStealth`. Short-Circuit und Cloak sind dort per
+  // Konstruktion **exakt null** wert, und genau diese drei entscheiden ueber
+  // den Ausgang des Knotens: `destroyW0r1dD43m0n` verlangt alle 21.
+  //
+  // Eine Abdeckung von 0,58 (7 von 12) beziehungsweise 0,17 (2 von 12)
+  // leitet also Punkte in Faehigkeiten, die auf der Mauer nichts bewirken,
+  // waehrend die vier, die dort wirken - Blade's Intuition, Digital
+  // Observer, Reaper, Evasive System - warten muessen.
+  //
+  // Deshalb wiegt die Abdeckung jetzt nach ARBEIT, nicht nach Anzahl: je
+  // offener Black Op `ln(Schwelle / Chance)` - der multiplikative Rest bis
+  // zur Feuerschwelle -, und null fuer alles, was schon feuern koennte. Eine
+  // Faehigkeit bekommt den Anteil der Arbeit, den sie ueberhaupt beruehrt.
+  // Sobald die vorderen Black Ops bei 1,00 klemmen, faellt ihr Gewicht von
+  // selbst weg und die drei schweren bestimmen das Bild - dann gehen Cloak
+  // und Short-Circuit gegen null, ohne dass jemand eine Zahl nachpflegen
+  // muss.
+  //
+  // WICHTIG - die Chance kommt aus `blackOpChance()`, nicht aus
+  // `getActionEstimatedSuccessChance`. Der gemeldete Bereich ist fuer Black
+  // Ops unbrauchbar: `getSuccessRange` setzt bei ihnen `est === real`, also
+  // `low = high = real`, und verzerrt danach **eine** der beiden Grenzen mit
+  // `r = pop / popEst` (`Actions/Action.ts:144-167`) - bei `r < 1` die
+  // untere, sonst die obere. Von aussen ist nicht zu sehen, welche. Am
+  // 28.08. um 15:03 meldete Shoulder of Orion "0,678 bis 1,000"; die untere
+  // Grenze sah nach der wahren Zahl aus und war das Artefakt - die Aktion
+  // fiel zwoelf Minuten spaeter mit gerechneter Chance 1,000.
+  //
+  // Die statischen Werte unten bleiben als Rueckfallebene stehen: Sie gelten,
+  // solange `blackOpArbeit` noch nichts gerechnet hat (erster Durchlauf) oder
+  // wenn keine offene Black Op mehr Arbeit uebrig hat.
+  let blackOpArbeit = null;   // { "Short-Circuit": 0.13, "Cloak": 0.02, ... }
+  // Die aus erster Hand gerechneten Chancen aller noch offenen Black Ops,
+  // damit sie in `data/blade.json` sichtbar werden. Warum das noetig ist,
+  // steht bei "Der gemeldete Bereich ist fuer Black Ops unbrauchbar" weiter
+  // unten in `blackOpChance`.
+  let boChancen = null;
   const CHANCE_SKILLS = {
     "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll, 12/12
     "Short-Circuit": { proz: 5.5, abdeckung: 0.58 },      // isKill, 7/12
@@ -772,7 +816,9 @@ export async function main(ns) {
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;
     const a = 1 + stufe * c.proz / 100;
-    return 100 * ((a + c.proz / 100) / a - 1) * c.abdeckung * klemmFaktor();
+    const abd = (blackOpArbeit && Number.isFinite(blackOpArbeit[name]))
+      ? blackOpArbeit[name] : c.abdeckung;
+    return 100 * ((a + c.proz / 100) / a - 1) * abd * klemmFaktor();
   };
 
   // WAS NICHT MEHR STEIGEN KANN, IST NICHTS MEHR WERT (28.08.2026, 01:10).
@@ -1126,6 +1172,14 @@ export async function main(ns) {
       chaos: Number.isFinite(chaosStand) ? +chaosStand.toFixed(2) : null,
       fahrbar: fahrbarStand,
       aufraeumen: chaosAufraeumen,
+      // Erste Hand statt Schaetzung: `getActionEstimatedSuccessChance` liefert
+      // fuer Black Ops einen Bereich, dessen eine Grenze mit dem Verhaeltnis
+      // `pop/popEst` verzerrt ist (`Actions/Action.ts:144-167`). Welche der
+      // beiden Grenzen die wahre ist, haengt davon ab, ob das Verhaeltnis
+      // ueber oder unter 1 liegt - von aussen nicht unterscheidbar. Diese
+      // Zahlen hier sind aus den Gewichten gerechnet und brauchen die
+      // Schaetzung nicht.
+      boChancen,
       naechsteBlackOp: bo ? bo.name : null,
       blackOpRang: bo ? bo.rank : null,
     }), "w");
@@ -1548,6 +1602,38 @@ export async function main(ns) {
         return Number.isFinite(wert) ? wert : null;
       } catch { return null; }
     };
+
+    // Abdeckung nach verbleibender Arbeit (Begruendung oben bei
+    // `blackOpArbeit`). Laeuft bei jedem Aufruf von `beste()` mit; die
+    // Rechnung ist eine Schleife ueber hoechstens 21 Eintraege.
+    try {
+      const erledigt = ns.bladeburner.getBlackOpNames().indexOf(
+        (ns.bladeburner.getNextBlackOp() || {}).name);
+      if (erledigt >= 0) {
+        let summe = 0, kill = 0, stealth = 0;
+        const gerechnet = {};
+        for (const nm of ns.bladeburner.getBlackOpNames().slice(erledigt)) {
+          const d = BLACKOP_DATEN[nm];
+          if (!d) continue;
+          const ch = blackOpChance(nm);
+          if (!Number.isFinite(ch) || ch <= 0) continue;
+          gerechnet[nm] = +ch.toFixed(4);
+          const w = Math.max(0, Math.log(SICHER_BLACKOP / ch));
+          summe += w;
+          if (d.isKill) kill += w;
+          if (d.isStealth) stealth += w;
+        }
+        blackOpArbeit = summe > 0
+          ? {
+            "Blade's Intuition": 1,
+            "Digital Observer": 1,
+            "Short-Circuit": kill / summe,
+            "Cloak": stealth / summe,
+          }
+          : null;
+        boChancen = Object.keys(gerechnet).length ? gerechnet : null;
+      }
+    } catch { blackOpArbeit = null; }
 
     // 2. Die naechste Black Op, wenn Rang und Sicherheit reichen. Sie sind
     //    der eigentliche Zweck: 21 Stueck, dann ist der Knoten offen.

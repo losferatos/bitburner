@@ -64,78 +64,6 @@ Regeln:
 
 ## Sofort
 
-### Nicht der Rang ist der Engpass, sondern die letzte Black Op (14:33)
-
-Gemessen: Rang **240.086 von 400.000** um 14:33, 45-Minuten-Rate
-          **1.656/min**. Die restlichen 88.414 netto sind damit **53 Minuten**.
-          Gefallen sind aber erst **9 von 21** Black Ops, und die naechste
-          (Deckard) steht bei Chance **0,881** gegen die Feuerschwelle 0,90.
-
-Erwartet: Der Rang ist bald kein Engpass mehr - die Black Ops sind es. Ihre
-          Schwierigkeit steht in `Bladeburner/data/BlackOperations.ts`:
-
-              #10 Deckard    baseDifficulty 20.000   Chance heute 0,881
-              #21 Daedalus   baseDifficulty 80.000   Chance heute ~0,220
-
-          `getSuccessChance` ist `min(1, competence/difficulty)`
-          (`Actions/Action.ts:196`), und der Chaos- wie der
-          Bevoelkerungsfaktor sind bei Black Ops fest 1
-          (`BlackOperation.ts:55-61`). Daedalus ist also **exakt viermal so
-          schwer** wie Deckard, und die heutige Chance dort betraegt
-          0,881 x 20/80 = **0,220**.
-
-          Die Kompetenz waechst mit `stat^0,8` (`Action.ts:174`, `decays`).
-          Um Faktor 4 zu holen, muessen die Kampfwerte um
-          `4^(1/0,8) = 5,66` steigen - vom heutigen Tiefstand 351 auf rund
-          **1.990**.
-
-Verdacht: Kein Fehler, sondern eine Verschiebung des Engpasses. Zu pruefen
-          ist, ob die Aktionswahl das schon abbildet: `beste()` waehlt nach
-          Rang je Minute. Sobald der Rang reicht, ist die richtige Groesse
-          **Kampferfahrung je Minute** - und die beiden fallen nicht
-          zusammen. Assassination steht auf Stufe 26 mit 38 s Dauer; ob eine
-          kuerzere Aktion mehr Erfahrung je Minute liefert, ist ungemessen.
-
-Dringlichkeit: **hoch, aber erst ab Rang 400.000** - das ist in unter einer
-          Stunde. Bis dahin bleibt der Rang die Leitgroesse.
-
-**Geaendert 14:47, zwei Eingriffe - der zweite ist der eigentliche Fund.**
-
-**(a) Die Abdeckung zaehlt jetzt Black Ops statt der Aktionsmischung.** Die
-alten Werte stammten vom 27.08. (Operationen 43,9 %, Kill rund 55 %). Fuer die
-zwoelf offenen Black Ops steht die Abdeckung in `data/BlackOperations.ts`:
-Blade's Intuition 12/12, **Digital Observer 12/12** (er trifft alle, weil
-`BlackOperation.getActionTypeSkillSuccessBonus = operationSkillSuccessBonus`,
-`BlackOperation.ts:69`), Short-Circuit 7/12, Cloak 2/12. Digital Observer
-springt damit von 0,00703 auf **0,01599** je Punkt und fuehrt das Feld mit
-Faktor 2,1.
-
-**(b) Die dynamische Sortierung war seit 09:55 still abgeschaltet.** Die
-Bedingung lautete `plaetze.length === DYNAMISCH.length`. `Tracer` steht im Plan,
-aber nicht in `DYNAMISCH`; solange beide Listen deckungsgleich waren, ging es
-auf. Um 09:55 kam `Datamancer` in `DYNAMISCH`, aber nicht in den Plan - `plaetze`
-blieb bei 9, `DYNAMISCH.length` sprang auf 10, und **die Sortierung lief nie
-wieder**. Ohne Fehlermeldung, ohne Log.
-
-Gekauft wurde seither strikt der erste Eintrag ohne Deckel: `Hyperdrive`. Er
-stand um 12:40 auf Stufe 73 und um 14:43 auf **219**, waehrend Digital Observer
-die ganze Zeit auf 43 lag. Bei Kosten `1 + 2,5*stufe` (`Skill.ts:37-41`) sind
-das rund **53.000 Punkte** in die schwaechste Faehigkeit des Feldes:
-
-    Hyperdrive        St.219  Preis 549   0,0369 % -> 0,000067 je Punkt
-    Digital Observer  St. 43  Preis  92   1,471 %  -> 0,01599
-
-**Faktor 240.**
-
-**Verifiziert 14:44, eine Minute nach dem Neustart:** Digital Observer **43 ->
-51**, Reaper 53 -> 54, Hyperdrive unveraendert 219. Die Sortierung laeuft wieder
-und kauft das Richtige. Deckards Chance stand um 14:43 bei **0,895** gegen die
-Schwelle 0,90.
-
-Der Punkt bleibt trotzdem stehen: Die eigentliche Frage - ob `beste()` ab Rang
-400.000 auf Kampferfahrung je Minute statt auf Rang je Minute umschalten muss -
-ist unberuehrt.
-
 ### Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte
@@ -205,6 +133,36 @@ der Punkt stehen.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Die Abdeckung wiegt jetzt nach Arbeit - Wirkung noch nicht gemessen (15:25)
+
+Geaendert 15:25 in `src/blade.js`, Wirkung noch nicht gemessen.
+
+Gemessen 15:21, aus erster Hand ueber `blackOpChance()` (neu in
+`data/blade.json` als `boChancen`):
+
+    Operation Morpheus     1,0000      Operation Centurion   0,1456
+    Operation Ion Storm    1,0000      Operation Vindictus   0,1359
+    Operation Annihilus    0,9727      Operation Daedalus    0,1274
+    Operation Ultron       0,7490
+
+Die drei rechts sind die Mauer, und **keine von ihnen ist `isKill` oder
+`isStealth`**. Die alte Abdeckung (Short-Circuit 0,58, Cloak 0,17) hat
+Punkte dorthin geleitet, wo sie auf der Mauer nichts bewirken. Neu wiegt jede
+offene Black Op mit `ln(0,90 / Chance)` - dem multiplikativen Rest bis zur
+Feuerschwelle. Damit tragen Centurion, Vindictus und Daedalus je 1,955 und
+Ultron 0,184, waehrend alles bei 1,00 auf null faellt; Short-Circuit und Cloak
+sinken rechnerisch auf rund 0,03.
+
+Erwartet: Digital Observer, Blade's Intuition, Reaper und Evasive System
+steigen, Short-Circuit (62) und Cloak (44) bleiben stehen.
+
+Warum noch nicht gemessen: Skillpunkte entstehen nur bei Rangzuwachs
+(`Bladeburner.ts:1283-1291`), und der Rang kommt bei Black Ops als
+Einmalbetrag am Ende. Zwischen 15:22 und 15:23 lief Operation Morpheus, es
+wurde kein einziger Punkt ausgegeben. Der naechste Lauf liest die Stufen
+gegen die oben notierten und haakt ab oder dreht zurueck.
+
 
 ### `data/wache-zustand.json` speichert den Verlauf rueckwaerts (15:05)
 

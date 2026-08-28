@@ -2865,6 +2865,23 @@ export async function main(ns) {
       vertraege,
       geld: ns.getServerMoneyAvailable("home"),
       hacking: ns.getHackingLevel(),
+      // DIE KNOTENNUMMER GEHOERT HIERHER (28.08.2026, 17:18).
+      //
+      // Bisher stand sie nur in `data/knoten.json`, geschrieben von
+      // `bn4rep.js`. Das ist voller Singularity-Aufrufe und deshalb
+      // ausserhalb von BitNode 4 mehrere hundert Gigabyte gross
+      // (`RamCostGenerator.ts:82-96` gibt den SF4-Rabatt nur dort) - auf
+      // einem frischen home mit 32 GB laeuft es nicht. Genau deshalb war
+      // `tools/strategie-check.js` nach dem Wechsel um 17:05 blind und
+      // meldete elf Minuten lang "BitNode 6", obwohl der Knoten schon
+      // gewechselt war.
+      //
+      // `getResetInfo` kostet 1 GB (`RamCostGenerator.ts:664`) und
+      // ist in jedem Knoten ab der ersten Sekunde verfuegbar. bn4net.js ist
+      // das einzige Skript, das `boot.js` sofort startet - damit ist das die
+      // frueheste und verlaesslichste Quelle, die es gibt.
+      knoten: ns.getResetInfo().currentNode,
+      nodeReset: ns.getResetInfo().lastNodeReset,
     }), "w");
 
    } catch (e) {

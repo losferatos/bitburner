@@ -55,6 +55,53 @@ Regeln:
 
 ## Sofort
 
+### Der Einbauzeitpunkt preist den Wiederaufbau nicht ein (09:35)
+
+Gemessen: Der Einbau von **05:53** hat alle vier Kampfwerte auf 1 gesetzt. Um
+          09:33, also **3 h 40 min spaeter**, liegt der Tiefstand bei 251 und
+          **noch immer keine Operation ueber ihrer Schwelle** - der Motor
+          steht seit 08:40 im Gym.
+
+              Rangrate im Wiederaufbau      0,0 bis 0,1 je Minute
+              Rangrate danach (4-h-Mittel)  163 bis 226 je Minute
+              Dauer bisher                  3 h 40 min, Ende offen
+
+          **Der Einbau hat damit rund 40.000 Rang gekostet** (3,7 h mal
+          180/min) - bei einem Restweg von 244.951 sind das **16 Prozent der
+          verbleibenden Strecke**, fuer eine Handvoll Multiplikatoren.
+
+          Und es geht sofort weiter: In der Warteschlange steht bereits
+          `Hyperion Plasma Cannon V2`, das Guthaben ist dafuer von 5,3 Mrd auf
+          439 Mio gefallen. Der naechste Einbau kommt also bald.
+
+Erwartet: Der Einbau soll sich rechnen, nicht nur stattfinden. Die Rechnung
+          hat zwei Seiten, und nur eine steht bisher irgendwo:
+
+          **Nutzen** (in `nodes/KURS.md`, 27.08.): Die Kampfwerte kommen mit
+          besseren Multiplikatoren um Faktor 17 schneller zurueck, weil die
+          Stufe multiplikativ im Multiplikator, aber nur logarithmisch in der
+          Erfahrung steckt (`PersonObjects/formulas/skill.ts:13`).
+
+          **Kosten** (nirgends): Die Wiederaufbauzeit mal die entgangene
+          Rangrate. Und sie waechst mit jedem Einbau, weil die AKTIONSSTUFE
+          den Einbau ueberlebt und die Kampfwerte nicht - Assassination steht
+          auf Stufe 20 und verlangt Werte, die 100 oder 250 nicht sind.
+
+Verdacht: `src/bn4rep.js`, das Einbaukriterium. Es entscheidet nach
+          Reputation und Guthaben, nicht nach dem, was der Einbau im
+          Bladeburner-Knoten kostet. Sauber waere eine Bedingung, die in
+          Knoten 6 und 7 zusaetzlich fragt: **Wieviel Rang je Minute gebe ich
+          auf, und wie lange?** Ein Einbau, der 40.000 Rang kostet, muss mehr
+          als 40.000 Rang einbringen.
+
+          **Vorher zu messen** (der Punkt ist ohne diese Zahl nicht
+          entscheidbar): Wie lange dauert der Wiederaufbau wirklich, also
+          welcher Kampfwert-Tiefstand bringt Assassination Stufe 20 wieder
+          ueber `SICHER_OPERATION` = 0,85? Das laesst sich aus
+          `Actions/Action.ts:169-196` **rechnen** statt abwarten.
+
+Dringlichkeit: **hoch.** Der naechste Einbau steht in der Warteschlange.
+
 ### Der Gym-Zweig kennt die Black Ops nicht - Red Dragon koennte fahrbar sein (09:03)
 
 Gemessen: `node tools/spann.js` um 09:03:

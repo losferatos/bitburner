@@ -23,6 +23,44 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Das Netz haengt auf 8 von 70 - und darkweb.js kostete 25 GB zuviel (erledigt 28.08., 18:41)
+
+**Der gefundene Fehler, sauber belegt:** `src/darkweb.js` begann mit
+`const doc = document;`. Der Bezeichner `document` kostet **25 GB**
+(`RamCostGenerator.ts:12`, `Dom: 25`); der RAM-Rechner ist rein statisch und
+zaehlt genau zwei Namen, `document` und `window`
+(`Script/RamCalculations.ts:185-192`).
+
+In einem gewachsenen Knoten faellt das nicht auf. Direkt nach einem Wechsel
+schon: home hat dann 32 GB, davon belegt bn4net den groessten Teil, und die
+acht ohne Portknacker erreichbaren Rechner haben hoechstens 16 GB. Das Skript,
+das die Portknacker kauft, passte also nirgends hin - und ohne Portknacker
+bleibt es bei acht Rechnern. Ein Henne-Ei-Problem, das genau in der Phase
+zuschlaegt, in der es am teuersten ist.
+
+Behoben mit einem Zugriff, der den Namen erst zur Laufzeit bildet.
+
+**Verifiziert 18:41 ueber `src/ramcheck.js` (neu, drei Zeilen):**
+`{"datei":"darkweb.js","ram":2.65}` - vorher waren es 27,65 GB. Der Bedarf ist
+auf ein Zehntel gefallen und passt damit auf jeden gerooteten Rechner.
+
+**Was NICHT bewiesen ist, und das gehoert dazu:** Der Sprung des Netzes von
+8 auf 42 Rechner zwischen 18:14 und 18:40 laesst sich dieser Aenderung nicht
+zuschreiben. Als der erzwungene Lauf um 18:39:48 startete, waren BruteSSH und
+FTPCrack **schon vorhanden** und das Guthaben stand bei 92,9 Mio - der
+Wiederanlauf hatte sich in dem Fenster also bereits selbst geloest. Mein Lauf
+kaufte relaySMTP und HTTPWorm dazu. Die Aussage im Auftrag, darkweb.js habe
+"seit dem Wechsel kein einziges Mal gelaufen", stuetzte sich auf den
+Zeitstempel in `data/darkweb.txt` um 18:13 (07:02, alter Knoten) - die Datei
+wird bei jedem Lauf ueberschrieben, ein Lauf dazwischen ist damit nicht
+auszuschliessen.
+
+Die RAM-Senkung bleibt trotzdem richtig und wichtig: Sie entscheidet beim
+naechsten Knotenwechsel darueber, ob der Portknacker-Kauf ueberhaupt starten
+kann - und davon gibt es auf der Route noch rund 40.
+
+---
+
 ### `tools/rueckstand.js` misst nur in einer Bladeburner-Division (erledigt 28.08., 18:10)
 
 Seit dem Wechsel nach BitNode 10 um 17:05 kam nur noch "Nicht in der Division -

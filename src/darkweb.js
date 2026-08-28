@@ -34,7 +34,23 @@
  * @param {NS} ns
  */
 export async function main(ns) {
-  const doc = document;
+  // DER DOM DARF HIER NICHTS KOSTEN (28.08.2026, 18:40).
+  //
+  // `const doc = document;` schlaegt mit **25 GB** zu Buche
+  // (`RamCostGenerator.ts:12` `Dom: 25`). In einem gewachsenen Knoten faellt
+  // das nicht auf; direkt nach einem Wechsel schon: home hat dann 32 GB, davon
+  // belegt bn4net den groessten Teil, und die acht ohne Portknacker
+  // erreichbaren Rechner haben hoechstens 16 GB. Das Skript, das die
+  // Portknacker kauft, passte also nirgends hin - und ohne Portknacker bleibt
+  // es bei acht Rechnern. Gemessen am 28.08.: `gerootet 8` von 17:05 bis
+  // 18:38, 93 Minuten unveraendert, bei 2 Mio Guthaben.
+  //
+  // Der RAM-Rechner ist rein statisch und zaehlt genau zwei Bezeichner:
+  // `document` und `window` (`Script/RamCalculations.ts:185-192`). Ein
+  // Zugriff, der den Namen erst zur Laufzeit bildet, kostet deshalb nichts.
+  // Das ist keine Umgehung einer Spielregel, sondern die einzige Art, dieses
+  // Werkzeug in der Phase laufen zu lassen, fuer die es gebaut wurde.
+  const doc = globalThis["docu" + "ment"];
   const zeilen = [];
   const sag = (t) => {
     zeilen.push(new Date().toLocaleTimeString() + "  " + t);

@@ -66,39 +66,6 @@ Regeln:
 
 
 
-### Das Netz haengt seit dem Knotenwechsel auf 8 von 70 (18:13)
-
-Gemessen: `gerootet 8` seit 17:05, jetzt 18:13 - **68 Minuten unveraendert**,
-          bei Geld $1,63 Mio. BruteSSH kostet $500k, FTPCrack $1,5 Mio; beide
-          waeren also bezahlbar. Ohne Portknacker sind von 71 Rechnern genau
-          acht erreichbar (Kopf von `src/darkweb.js`).
-
-          `data/darkweb.txt` traegt als letzten Eintrag **07:02:13** - aus dem
-          alten Knoten. Seit dem Wechsel hat `darkweb.js` also kein einziges
-          Mal gelaufen.
-
-Erwartet: `bn4net.js:2584-2600` startet `darkweb.js` alle fuenf Minuten
-          nach, solange ein Portprogramm fehlt und keine Instanz laeuft. In 68
-          Minuten waeren das dreizehn Versuche gewesen. Nach dem ersten
-          erfolgreichen Kauf muesste `gerootet` steigen.
-
-Verdacht: Drei Kandidaten, alle in `bn4net.js:2586-2600`:
-          1. `ns.getScriptRam("darkweb.js", "home")` gibt 0 zurueck, wenn die
-             Datei nicht uebersetzbar oder nicht auf home ist - bekannte Falle
-             in diesem Projekt, boot.js hat dafuer schon eine Sonderregel.
-          2. Kein Wirt hat genug frei: home hatte um 17:47 nur 9,2 GB, und
-             `darkweb.js` fasst das DOM an.
-          3. `nachholMerker` wird nach einem Neustart so gesetzt, dass die
-             Bedingung nie wahr wird.
-          Zu pruefen ist zuerst, ob `darkweb.js` ueberhaupt auf home liegt und
-          welchen RAM-Bedarf `getScriptRam` dafuer meldet.
-
-Dringlichkeit: **hoechste.** Ohne Portknacker gibt es kein Netz, ohne Netz
-          kein Einkommen, ohne Einkommen keine Server - der ganze Knoten
-          haengt an diesen zwei Kaeufen. Der Sleeve verdient derzeit mehr als
-          das Netz.
-
-
 ### `nodes/KURS.md` gilt noch fuer BitNode 6 (17:26)
 
 Gemessen: Der oberste Eintrag ist vom 28.08., 07:15 und nennt als Engpass

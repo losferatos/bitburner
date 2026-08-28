@@ -108,6 +108,37 @@ Verdacht: `src/bn4rep.js`, das Einbaukriterium. Es entscheidet nach
           Wirksamkeit `eff = 0,04*hacking^0,3 + ...` in BitNode 6 klein ist.
           Der Lauf ab 09:42 liefert die erste saubere Messung dafuer.
 
+**Geaendert 10:12, Wirkung noch nicht gemessen** (Commit `d7cb290`).
+
+**Der Fund, der den Punkt konkret gemacht hat:** Der Einbau um 05:53 baute
+**genau EIN Stueck** ein - 25 installierte Augmentierungen um 01:25, 26 um
+09:33. Er lief also nicht ueber `MINDEST_WARTESCHLANGE` (3), sondern ueber die
+Ausnahme `spendenrechtFaellig && wartend >= 1` (`bn4rep.js:873`). Diese
+Ausnahme ist vom 23.08. und fuer Hackingknoten richtig begruendet; in BitNode
+6 kostet sie eine mehrstuendige Wiederaufbaupause fuer ein einziges Stueck.
+
+Die Ausnahme gilt jetzt in den Kampfknoten nicht mehr - dort greift auch fuer
+das Spendenrecht die Mindestwarteschlange. Das Recht geht nicht verloren, es
+wird spaeter eingeloest, zusammen mit zwei weiteren Stuecken, die dieselbe
+Pause mitbenutzen.
+
+**Zwei Annahmen sind dabei WIDERLEGT worden:**
+
+1. "Der Einbau ruiniert die Bevoelkerungsschaetzung." Nein -
+   `Bladeburner.prestigeAugmentation()` macht nur `resetAction()` +
+   `joinFaction()` (`Bladeburner.ts:259-263`), die Staedte samt `popEst`
+   bleiben stehen. Die kaputte Schaetzung von heute frueh kam vom
+   **Stadtwechsel** der Division nach Chongqing, nicht vom Einbau. Das sind
+   zwei getrennte Kostenbloecke - siehe den neuen Punkt unter `## Offen`.
+
+2. "Der Wiederaufbau dauert, bis die Kampfwerte reichen." Auch nicht: Er
+   dauerte, bis die SCHAETZUNG reichte. Die Kampfwerte standen um 09:42 bei
+   258 und damit kaum hoeher als um 08:40 bei 244.
+
+**Offene Nachmessung:** Beim naechsten faelligen Spendenrecht darf kein Einbau
+mit weniger als drei Stuecken stattfinden. In der Warteschlange liegt derzeit
+ein Stueck (`Hyperion Plasma Cannon V2`).
+
 Dringlichkeit: **hoch.** Der naechste Einbau steht in der Warteschlange.
 
 ### Der Gym-Zweig kennt die Black Ops nicht - Red Dragon koennte fahrbar sein (09:03)
@@ -153,6 +184,37 @@ Hauptlogik legt, muss deren Vorbedingungen mitnehmen.**
 Dringlichkeit: **hoch.** Rangrate 0,0/min ueber 30 Minuten.
 
 ## Offen, nach Dringlichkeit
+
+### Der Stadtwechsel der Division bringt eine unbrauchbare Schaetzung mit
+
+Gefunden am 28.08., 10:10. Die Division stand am Morgen in **Chongqing**,
+und dort war die Bevoelkerungsschaetzung nie gepflegt: Gemessen 09:40
+(`src/bbspann.js`) standen **alle sechs** Operationen bei [0,000 - 1,000].
+Der Motor entscheidet an `s.min` und fand deshalb 87 Minuten lang nichts zu
+tun.
+
+Die Schaetzung ist **je Stadt** gespeichert und ueberlebt einen
+Augmentierungs-Einbau (`Bladeburner.prestigeAugmentation()` fasst die Staedte
+nicht an). Wer die Stadt wechselt, aktiviert also eine Schaetzung, an der
+niemand gearbeitet hat - und zahlt mit der Zeit, die Field Analysis braucht,
+um sie wieder scharf zu bekommen.
+
+Gewechselt wird an zwei Stellen:
+    `src/blade.js:1554`    die Raid-Rundreise, nach `comms` je Stadt
+    `src/bbspann.js:266`   das Messwerkzeug (kehrt bei :324 zurueck)
+
+**Die Rundreise rechnet den Schaetzungsverlust nicht mit.** Sie vergleicht
+allein den Raid-Vorrat. Sauber waere, die Kosten des Wechsels zu beziffern -
+die Zeit bis zur brauchbaren Schaetzung mal die entgangene Rangrate - und sie
+gegen den Gewinn an `comms` zu stellen.
+
+**Zu pruefen ist ausserdem, ob `bbspann.js` schadet.** Es reist durch alle
+sechs Staedte und kehrt zurueck; ob dabei etwas an den Schaetzungen haengen
+bleibt, ist nicht geprueft. Ein Messwerkzeug, das den Messgegenstand
+veraendert, waere ein eigener Fehler.
+
+Dringlichkeit: mittel. Der Fall tritt nur bei einem Stadtwechsel auf, kostet
+dann aber ein bis zwei Stunden.
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 

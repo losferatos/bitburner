@@ -99,6 +99,43 @@ Verdacht: Kein Fehler, sondern eine Verschiebung des Engpasses. Zu pruefen
 Dringlichkeit: **hoch, aber erst ab Rang 400.000** - das ist in unter einer
           Stunde. Bis dahin bleibt der Rang die Leitgroesse.
 
+**Geaendert 14:47, zwei Eingriffe - der zweite ist der eigentliche Fund.**
+
+**(a) Die Abdeckung zaehlt jetzt Black Ops statt der Aktionsmischung.** Die
+alten Werte stammten vom 27.08. (Operationen 43,9 %, Kill rund 55 %). Fuer die
+zwoelf offenen Black Ops steht die Abdeckung in `data/BlackOperations.ts`:
+Blade's Intuition 12/12, **Digital Observer 12/12** (er trifft alle, weil
+`BlackOperation.getActionTypeSkillSuccessBonus = operationSkillSuccessBonus`,
+`BlackOperation.ts:69`), Short-Circuit 7/12, Cloak 2/12. Digital Observer
+springt damit von 0,00703 auf **0,01599** je Punkt und fuehrt das Feld mit
+Faktor 2,1.
+
+**(b) Die dynamische Sortierung war seit 09:55 still abgeschaltet.** Die
+Bedingung lautete `plaetze.length === DYNAMISCH.length`. `Tracer` steht im Plan,
+aber nicht in `DYNAMISCH`; solange beide Listen deckungsgleich waren, ging es
+auf. Um 09:55 kam `Datamancer` in `DYNAMISCH`, aber nicht in den Plan - `plaetze`
+blieb bei 9, `DYNAMISCH.length` sprang auf 10, und **die Sortierung lief nie
+wieder**. Ohne Fehlermeldung, ohne Log.
+
+Gekauft wurde seither strikt der erste Eintrag ohne Deckel: `Hyperdrive`. Er
+stand um 12:40 auf Stufe 73 und um 14:43 auf **219**, waehrend Digital Observer
+die ganze Zeit auf 43 lag. Bei Kosten `1 + 2,5*stufe` (`Skill.ts:37-41`) sind
+das rund **53.000 Punkte** in die schwaechste Faehigkeit des Feldes:
+
+    Hyperdrive        St.219  Preis 549   0,0369 % -> 0,000067 je Punkt
+    Digital Observer  St. 43  Preis  92   1,471 %  -> 0,01599
+
+**Faktor 240.**
+
+**Verifiziert 14:44, eine Minute nach dem Neustart:** Digital Observer **43 ->
+51**, Reaper 53 -> 54, Hyperdrive unveraendert 219. Die Sortierung laeuft wieder
+und kauft das Richtige. Deckards Chance stand um 14:43 bei **0,895** gegen die
+Schwelle 0,90.
+
+Der Punkt bleibt trotzdem stehen: Die eigentliche Frage - ob `beste()` ab Rang
+400.000 auf Kampferfahrung je Minute statt auf Rang je Minute umschalten muss -
+ist unberuehrt.
+
 ### Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte

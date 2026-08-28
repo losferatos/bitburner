@@ -463,6 +463,11 @@ export async function main(ns) {
     ["Cyber's Edge", Infinity],
     ["Tracer", 14],
     ["Blade's Intuition", Infinity],
+    // Datamancer kam am 28.08. um 09:55 in `DYNAMISCH`, aber nicht hierher -
+    // und was nicht im Plan steht, wird nie gekauft. Sein `relNutzen` haengt
+    // an `schaetzNot()` und ist null, solange die Schaetzung scharf ist; er
+    // sortiert sich also von selbst nach hinten.
+    ["Datamancer", Infinity],
     ["Overclock", 90],
   ];
 
@@ -547,17 +552,58 @@ export async function main(ns) {
   // Aktionen rund 55, alle Aktionen 100. Black Ops sind darin nicht enthalten -
   // sie kommen bei Digital Observer und Short-Circuit noch obendrauf, also
   // sind beide Werte eher zu niedrig als zu hoch.
+  // DIE ABDECKUNG ZAEHLT JETZT BLACK OPS, NICHT MEHR DIE AKTIONSMISCHUNG
+  // (28.08.2026, 14:45).
+  //
+  // Die alten Werte (Digital Observer 0,44, Short-Circuit 0,55, Cloak 0,2)
+  // stammen aus der Aktionsmischung vom 27.08., 16:06 bis 17:17: Operationen
+  // 43,9 Prozent, Kill-Aktionen rund 55. Beide Bezugsgroessen sind heute
+  // falsch:
+  //
+  //   1. Der Motor faehrt seit 12:51 fast nur noch Assassination - eine
+  //      Operation UND eine Kill-Aktion. Gemessen 13:05 bis 13:19:
+  //      71,3 Prozent Assassination, Rest Diplomacy. Stealth kommt gar nicht
+  //      mehr vor.
+  //   2. Wichtiger: Der Engpass ist nicht mehr die Operationsrate, sondern die
+  //      Black-Op-Chance (Sofort-Punkt 14:33). Rang 248.930 von 400.000 bei
+  //      1.656/min - der Rang ist in unter einer Stunde da, gefallen sind aber
+  //      erst 9 von 21 Black Ops.
+  //
+  // Fuer die zwoelf noch offenen Black Ops (Deckard bis Daedalus) steht die
+  // Abdeckung in `data/BlackOperations.ts`:
+  //
+  //     Blade's Intuition  SuccessChanceAll         12 von 12   = 1,00
+  //     Digital Observer   SuccessChanceOperation   12 von 12   = 1,00
+  //     Short-Circuit      isKill                    7 von 12   = 0,58
+  //     Cloak              isStealth                 2 von 12   = 0,17
+  //
+  // Digital Observer trifft **alle** Black Ops, weil
+  // `BlackOperation.getActionTypeSkillSuccessBonus = operationSkillSuccessBonus`
+  // (`Actions/BlackOperation.ts:69`) und das
+  // `getSkillMult(SuccessChanceOperation)` ist (`Actions/Operation.ts:92-94`).
+  // Die 0,44 waren also schon immer zu niedrig; jetzt sind sie es doppelt.
+  //
+  // Was die Aenderung bewirkt, mit den Preisen von 14:38:
+  //
+  //     Digital Observer  St.43  Preis  92   1,471 % -> **0,01599** je Punkt
+  //     Short-Circuit     St.51  Preis 109   1,446 % ->   0,00773
+  //     Blade's Intuition St.65  Preis 140   1,017 % ->   0,00726
+  //     Cloak             St.41  Preis  47   1,690 % ->   0,00600
+  //
+  // Mit den alten Werten lagen alle vier zwischen 0,00703 und 0,00729 - also
+  // praktisch gleichauf, und die Reihenfolge war Zufall. Jetzt fuehrt Digital
+  // Observer mit **Faktor 2,1**.
+  //
+  // Anmerkung zur Vorsicht bei Short-Circuit und Cloak: Die drei SCHWERSTEN
+  // Black Ops - Centurion, Vindictus, Daedalus - sind weder `isKill` noch
+  // `isStealth`. Da der Ausgang an der schwersten haengt, waere ihre Abdeckung
+  // fuer den eigentlichen Engpass sogar null. Die Zaehlung ueber alle zwoelf
+  // ist die vorsichtigere Wahl und bleibt stehen.
   const CHANCE_SKILLS = {
-    "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll
-    "Short-Circuit": { proz: 5.5, abdeckung: 0.55 },      // isKill
-    "Digital Observer": { proz: 4, abdeckung: 0.44 },     // Operations + alle Black Ops
-    // Cloak dazu (27.08., 19:52): Es stand auf Stufe 0, weil im Plan hinter
-    // zwei Infinity-Deckeln - und dann fiel Typhoon, und die naechste Black Op
-    // ist `isStealth`. Die Abdeckung ist niedrig (3 von 21 Black Ops plus die
-    // Stealth-Vertraege und -Operationen), aber bei Stufe 0 und Preis 2 ist
-    // der Nutzen je Punkt trotzdem hoch - genau die Lage, in der Digital
-    // Observer heute Faktor 17 brachte.
-    "Cloak": { proz: 5.5, abdeckung: 0.2 },               // isStealth
+    "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll, 12/12
+    "Short-Circuit": { proz: 5.5, abdeckung: 0.58 },      // isKill, 7/12
+    "Digital Observer": { proz: 4, abdeckung: 1.0 },      // SuccessChanceOperation, 12/12
+    "Cloak": { proz: 5.5, abdeckung: 0.17 },              // isStealth, 2/12
   };
   const relNutzen = (name) => {
     const stufe = ns.bladeburner.getSkillLevel(name);
@@ -897,7 +943,35 @@ export async function main(ns) {
     for (let i = 0; i < SKILL_PLAN.length; i++) {
       if (DYNAMISCH.includes(SKILL_PLAN[i][0])) plaetze.push(i);
     }
-    if (plaetze.length === DYNAMISCH.length) {
+    // DIE KOPPLUNG AN DIE LISTENLAENGE HAT DIE SORTIERUNG STILL ABGESCHALTET
+    // (28.08.2026, 14:47).
+    //
+    // Die Bedingung lautete `plaetze.length === DYNAMISCH.length`. `plaetze`
+    // sind die Plaetze im SKILL_PLAN, deren Name in `DYNAMISCH` steht - und
+    // `Tracer` steht im Plan, aber nicht in `DYNAMISCH`. Solange beide Listen
+    // dieselben Namen trugen, ging die Rechnung auf. Am 28.08. um 09:55 kam
+    // `Datamancer` in `DYNAMISCH` dazu, aber nicht in den Plan: `plaetze`
+    // blieb bei 9, `DYNAMISCH.length` sprang auf 10, und die Sortierung lief
+    // **ab diesem Moment nie wieder**. Ohne Fehlermeldung, ohne Log.
+    //
+    // Gekauft wurde seither strikt in Planreihenfolge, also der erste Eintrag
+    // ohne Deckel - `["Hyperdrive", Infinity]`. Gemessen: Hyperdrive stand um
+    // 12:40 auf Stufe 73 und um 14:43 auf **219**, waehrend Digital Observer
+    // die ganze Zeit auf 43 und Blade's Intuition auf 65 standen. Die Kosten
+    // sind `1 + 2,5*stufe` (`Bladeburner/Skill.ts:37-41`), die 146 Stufen also
+    // rund **53.000 Punkte** - und zwar in die mit Abstand schwaechste
+    // Faehigkeit des Feldes:
+    //
+    //     Hyperdrive        St.219  Preis 549   0,0369 % -> 0,000067 je Punkt
+    //     Digital Observer  St. 43  Preis  92   1,471 %  -> **0,01599**
+    //
+    // **Faktor 240.**
+    //
+    // Die Bedingung war nie noetig - sie sollte nur verhindern, dass eine
+    // halb gefuellte Liste sortiert wird. Zwei Eintraege reichen dafuer, und
+    // die Kopplung an eine zweite Liste ist genau die Art Bindung, die beim
+    // naechsten Zusatz wieder still bricht.
+    if (plaetze.length >= 2) {
       const eintraege = plaetze.map((i) => SKILL_PLAN[i]);
       eintraege.sort((a, b) => {
         const wert = (e) => {

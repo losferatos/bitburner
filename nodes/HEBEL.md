@@ -37,6 +37,51 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Die Chaos-Folgekosten gehoeren in die Dauer (28.08., 03:42)
+
+Engpass:    `beste()` verglich die **nackte** Aktionsdauer. Aktionen, die
+            das Chaos heben, laden ihre Kosten damit bei der naechsten
+            Diplomacy-Phase ab - und die taucht in keiner Rechnung auf.
+
+Hypothese:  Die Rangrate steigt von **35,4/min** zurueck auf die **86,4**,
+            die Assassination allein gebracht hat, weil Raid mit seinen
+            Folgekosten bewertet wird statt ohne.
+
+Beleg:      Drei Aktionen aendern das Chaos (`Bladeburner.ts:836-859`):
+            Raid +1 bis +5 Prozent, Stealth Retirement -1 bis -3,
+            Assassination -5 bis +5 (Mittel null). Ueber Chaos 50 schlaegt
+            das mit `sqrt(1+chaos-50)` auf die Schwierigkeit **jeder**
+            Aktion (`Action.ts:94-100`).
+
+            **Gemessen in zwei Fenstern**, beide 40 bis 49 Minuten
+            (`data/verlauf-strategie.json`):
+
+                02:04 - 02:53   nur Assassination     86,4 Rang/min
+                02:53 - 03:33   Raid und Diplomacy    35,4
+
+            Der Wechsel kam, als Assassination Stufe 12 erreichte und die
+            Anlaufregel abschaltete. `beste()` rechnete dann Raid auf Stufe
+            12 mit 157 Rang je 59 Sekunden = 159 je Minute gegen
+            Assassination mit 186 je 108 Sekunden = 103 - und waehlte Raid.
+            Mit den zwei Diplomacy-Laeufen, die jeder Raid nach sich zieht,
+            sind es real **52,6 gegen 103**.
+
+            Der Zuschlag rechnet die noetigen Diplomacy-Laeufe: 60 Sekunden
+            fest (`data/GeneralActions.ts:39`), Senkung
+            `charisma^0,045 + charisma/1000` Prozent
+            (`Bladeburner.ts:735-743`). Beide Richtungen sind prozentual,
+            das Chaos-Niveau kuerzt sich heraus. Unter `CHAOS_AUS` ist der
+            Zuschlag null - dort ist Platz nach oben.
+
+Vorher:     35,4 Rang/min (02:53 bis 03:33), Aktion Raid im Wechsel mit
+            Diplomacy.
+Nachher:    **Verifiziert 03:39, 16 Sekunden nach dem Neustart:**
+            `data/blade.json` meldet `"aktion":"Operations/Assassination"`,
+            wo unmittelbar davor Raid lief. Die Rate misst der naechste Lauf
+            ueber 45 Minuten.
+
+Commit:     (folgt)
+
 ### Overclock in die dynamische Sortierung (28.08., 00:58)
 
 Engpass:    Die Faehigkeitspunkte stauten sich: **84 unverbraucht** um 00:53,

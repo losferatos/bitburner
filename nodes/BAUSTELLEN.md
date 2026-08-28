@@ -59,6 +59,22 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Nachmessen: bringen die Chaos-Folgekosten die 86 Rang/min zurueck? (03:42)
+
+Gemessen: 35,4 Rang/min im Fenster 02:53 bis 03:33, waehrend Raid und
+Diplomacy sich abwechselten - gegen 86,4 im Fenster davor, als nur
+Assassination lief.
+
+Erwartet: Ueber 45 Minuten wieder **ueber 70 Rang/min**. Der Zuschlag in
+`beste()` (`src/blade.js`, seit 03:42) rechnet die Diplomacy-Laeufe ein,
+die ein Raid nach sich zieht.
+
+Verdacht, falls es nicht traegt: Der Mittelwert +3 Prozent je Raid ist eine
+Annahme aus `getRandomIntInclusive(1, 5)`. Faellt die Rate nicht zurueck auf
+die 86, gehoert die tatsaechliche Chaos-Aenderung je Raid gemessen, statt sie
+aus der Spanne zu mitteln.
+
+
 ### Der groesste ungehobene Hebel: eine Augmentierungsrunde - Engpass ist GELD (18:13)
 
 **Der Bladeburner-Fortschritt ueberlebt den Einbau fast vollstaendig.**

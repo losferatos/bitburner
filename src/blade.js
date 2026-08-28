@@ -1467,6 +1467,57 @@ export async function main(ns) {
         const rang = RANG_JE_ERFOLG[name] * Math.pow(fac, Math.max(0, stufe - 1));
         let dauer = 0;
         try { dauer = ns.bladeburner.getActionTime(typ, name); } catch {}
+        // DIE CHAOS-FOLGEKOSTEN GEHOEREN IN DIE DAUER (28.08.2026, 03:42).
+        //
+        // Drei Aktionen veraendern das Chaos ihrer Stadt
+        // (`Bladeburner.ts:836-859`), und zwar prozentual:
+        //
+        //     Raid                        +1 bis +5 %   (Mittel +3)
+        //     Stealth Retirement          -1 bis -3 %   (Mittel -2)
+        //     Assassination               -5 bis +5 %   (Mittel  0)
+        //
+        // Ueber Chaos 50 schlaegt das mit `sqrt(1+chaos-50)` auf die
+        // Schwierigkeit JEDER Aktion (`Action.ts:94-100`). Ein Raid dort
+        // erzwingt also Diplomacy-Laeufe, die selbst nichts einbringen - und
+        // `beste()` hat sie bis hierher nicht gesehen. Es verglich die
+        // nackte Dauer und waehlte damit systematisch die Aktion, deren
+        // Rechnung ausgelagert ist.
+        //
+        // GEMESSEN in der Nacht, zwei Fenster von je 40 bis 49 Minuten
+        // (`data/verlauf-strategie.json`):
+        //
+        //     02:04 - 02:53   nur Assassination      **86,4 Rang/min**
+        //     02:53 - 03:33   Raid und Diplomacy     **35,4**
+        //
+        // Der Wechsel kam, als Assassination Stufe 12 erreichte und die
+        // Anlaufregel abschaltete: `beste()` rechnete Raid auf Stufe 12 mit
+        // 157 Rang je 59 Sekunden = 159 je Minute, Assassination mit 186 je
+        // 108 Sekunden = 103 - und waehlte Raid. Mit den zwei
+        // Diplomacy-Laeufen, die jeder Raid nach sich zieht, sind es real
+        // aber nur 52,6 gegen 103.
+        //
+        // Der Zuschlag rechnet genau das: Wieviele Diplomacy-Laeufe kostet
+        // der Chaos-Anstieg dieser Aktion? Ein Lauf dauert fest 60 Sekunden
+        // (`data/GeneralActions.ts:39`) und senkt um
+        // `charisma^0,045 + charisma/1000` Prozent (`Bladeburner.ts:735-743`).
+        //
+        // Unterhalb von `CHAOS_AUS` ist der Zuschlag null - dort ist Platz
+        // nach oben, und ein Raid kostet nichts.
+        const CHAOS_JE_LAUF = { "Raid": 3, "Stealth Retirement Operation": -2, "Assassination": 0 };
+        const chaosDelta = CHAOS_JE_LAUF[name] || 0;
+        if (chaosDelta > 0 && dauer > 0) {
+          try {
+            const c = chaosLage();
+            if (c > CHAOS_AUS) {
+              const cha = ns.getPlayer().skills.charisma;
+              const senkungProz = Math.pow(cha, 0.045) + cha / 1000;
+              // Beide Richtungen sind prozentual, das Niveau kuerzt sich
+              // heraus - das Verhaeltnis ist die Zahl der noetigen Laeufe.
+              const laeufe = chaosDelta / senkungProz;
+              dauer += laeufe * 60000;
+            }
+          } catch { /* ohne Charisma-Wert bleibt es bei der nackten Dauer */ }
+        }
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
         // Bewertung zurueck: besser eine grobe Rangfolge als gar keine.
         // Rang je AUSDAUERPUNKT, sobald ueberhaupt etwas gemessen ist.

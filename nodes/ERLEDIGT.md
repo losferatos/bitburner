@@ -23,6 +23,151 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Ausgang aus BitNode 6: von 182 auf 64 Stunden (28.08., 03:10)
+
+Die Phasenrechnung von 23:12 ist ueberholt - und zwar von der Aenderung, die
+sie selbst ausgeloest hat. Sie kam auf **182 Stunden**, weil sie fuer die
+Zeit nach dem Raid-Vorrat mit Stealth Retirement und 25,4 Rang/min rechnete.
+Genau dort steht heute Assassination.
+
+**Gemessen 03:08, ueber zwei Fenster:**
+
+    45-Minuten-Fenster    78,2 Rang/min
+    60-Minuten-Fenster    77,6
+    Rang                  28.062
+
+Die Rate ist stabil - das 90-Minuten-Fenster liegt mit 59,6 nur deshalb
+darunter, weil es noch in die Wiederaufbauphase nach dem Einbau um 01:25
+hineinreicht.
+
+**Die neue Rechnung:**
+
+    Restweg brutto            400.000 - 28.062  =  371.938
+    davon aus Black Ops       73.660 minus die vier gefallenen (285)
+                                                =   73.375
+    aus Aktionen zu holen                       =  298.563
+
+    bei 78 Rang/min                             =  3.828 min  =  63,8 h
+    plus 17 Black Ops, im Mittel 800 s bei p 0,9 =            =   4,2 h
+    ------------------------------------------------------------------
+    Gesamt                                                    rund 68 h
+
+**Und das ist die konservative Zahl**, weil sie zwei laufende
+Beschleunigungen ignoriert:
+
+  - Die **Assassination-Stufe** waechst mit 7,55 Prozent je Stufe netto
+    (`rewardFac` 1,14 gegen `difficultyFac` 1,06) und steht erst bei 11.
+  - **Overclock** steht bei 30 von maximal 90. Voll ausgebaut waere die
+    Aktionsdauer `(100-90)/(100-30)` = Faktor **0,143**, die Rate also
+    siebenmal so hoch. Die noetigen rund 5.000 Faehigkeitspunkte kommen aus
+    dem Rang selbst (`skillPoints = floor(maxRank/3)`).
+
+**Der Raid-Vorrat ist als Engpass erledigt.** Er war der Grund fuer die 182
+Stunden - Assassination verbraucht keine Gemeinden, nur eine Person je Lauf
+(`Bladeburner.ts:857`). Die 361 Gemeinden bleiben als Reserve liegen.
+
+Fuer `nodes/KURS.md` beim naechsten Kurslauf: ETA **rund 64 bis 68 Stunden**
+statt 71 bis 148, Leitgroesse unveraendert Bladeburner-Rang je Minute.
+
+<details><summary>Der urspruengliche Eintrag mit der 182-Stunden-Rechnung</summary>
+
+### Der Ausgang aus BitNode 6: 319.430 Rang netto (17:51, korrigiert 18:13, ETA neu gerechnet 23:12)
+
+**Nachtrag 23:12 - die ETA ist zweiphasig, und das stand hier nicht.** Die
+alte Spanne von 80 bis 180 Stunden ruht auf einem Exponenten `a` zwischen
+0,3 und 0,6, also auf der Annahme, der Rang beschleunige sich selbst. Diese
+Annahme ist heute **groesstenteils ausgereizt**: Die Selbstbeschleunigung
+lief ueber die Erfolgschance, und Raid steht bei **1,0 bis 1,0** (gemessen
+21:40). Weitere Faehigkeitspunkte aendern dort nichts mehr.
+
+Ein aus der eigenen Messreihe geschaetztes `a` waere zudem wertlos: Die
+Regression ueber 25 Stundenfenster ergibt 1,29, aber ein grosser Teil des
+Anstiegs kommt von den Strategieaenderungen dieses Abends (Stealth
+Retirement 20:42, Black-Op-Schwelle 21:55), nicht vom Rang. **Wer die eigene
+Optimierarbeit als Naturgesetz misst, rechnet sich reich.**
+
+Die belastbare Rechnung ist stattdessen eine Phasenrechnung:
+
+    Phase 1, Raid-Zyklus     53,4 Rang/min gemessen ueber 63 min
+                             361 Gemeinden Vorrat, 1 je Zyklus a 190 s
+                             = 19,1 Stunden, 60.648 Rang
+                             Ende bei Rang rund 77.400
+
+    Phase 2, ohne Raid       Stealth Retirement 25,4 Rang/min
+                             Restweg 322.632, davon 73.375 aus den
+                             verbleibenden Black Ops
+                             = 249.257 / 25,4 = 163 Stunden
+
+    Gesamt                   rund 182 Stunden
+
+**Das ist am oberen Rand der alten Spanne, nicht in ihrer Mitte.** Und der
+Grund steht ganz woanders als vermutet: nicht in der Chance, sondern im
+**endlichen Raid-Vorrat**. `Incite Violence` hilft nicht - es erhoeht nur
+`count` der Vertraege und Operationen (`Bladeburner.ts:1219-1225`), nicht
+`comms`.
+
+Wie Phase 2 tatsaechlich aussehen sollte, steht im Punkt darueber
+(Assassination).
+
+
+**Erstmals vollstaendig gemessen** (`src/blackops.js` schreibt
+`data/blackops.json`). Rang 6.910 zum Messzeitpunkt, alle 21 Black Ops:
+
+     1. Typhoon        Rang   2.500   Chance 0,278-0,305    196 s
+     2. Zero           Rang   5.000   Chance 0,086-0,094    244 s
+     3. X              Rang   7.500   Chance 0,186-0,203    293 s
+     5. Ares           Rang  12.500   Chance 0,133-0,146    488 s
+    10. Deckard        Rang  40.000   Chance 0,032-0,035  1.952 s
+    15. Morpheus       Rang 150.000   Chance 0,006-0,007  4.391 s
+    21. Daedalus       Rang 400.000   Chance 0,003-0,003  7.807 s
+
+Die Rangschwellen sind gegen `reference/bitburner-src/src/Bladeburner/data/
+BlackOperations.ts` geprueft und stimmen exakt. BN6 setzt keinen
+`BladeburnerRank`-Multiplikator.
+
+**Der Rang ist der Engpass, nicht die Chance.** Das haelt. Aber drei Zahlen im
+urspruenglichen Eintrag waren falsch; sie sind hier ersetzt:
+
+**(1) Die Strecke ist kuerzer als 400.000.** Die ersten zwanzig Black Ops
+liefern zusammen **73.660 Rang** (`rankGain` 50 bis 20.000, nachgerechnet).
+Netto bleiben **319.430** statt 393.090 - 18 Prozent der Strecke waren
+doppelt gezaehlt.
+
+**(2) Die 418 Stunden waren eine unzulaessige lineare Fortschreibung.** Der
+Rang erzeugt seine eigene Beschleunigung: `skillPoints = floor(maxRank/3)`
+(`Constants.ts:47`), und weil die Fertigkeitskosten LINEAR steigen
+(`Skill.ts:37-41`), waechst die Stufe mit `sqrt(Punkte)`, also mit
+`sqrt(Rang)`. Damit gilt `dR/dt ~ R^a` mit a zwischen 0,4 und 0,6 statt a = 0.
+Mit `t = R1/(rate*(1-a)) * ((R2/R1)^(1-a) - 1)`:
+
+    a = 0,3  ->  179 h        a = 0,5  ->  103 h
+    a = 0,44 ->  121 h        a = 0,6  ->   79 h
+    a = 0    ->  443 h   <- die alte Zahl
+
+**Die eigene Messreihe widerlegt a = 0**: 6.910 Rang in rund 50 Stunden
+Knotenlaufzeit sind 2,3 je Minute im Mittel gegen 14,8 jetzt - Faktor 6.
+**Massgeblich sind 80-180 Stunden, Mitte rund 120.** Nicht die Aktionsstufen
+sind der Motor (`rewardFac/difficultyFac^2` ist bei Bounty Hunter 1,003, also
+fast neutral), sondern die Fertigkeitspunkte.
+
+**(3) "43.000 Versuche" bei Chance 0,003 war Faktor 130 daneben.** Der
+Erwartungswert ist `1/p = 333` Versuche. Die Aussage, die spaeten Black Ops
+seien mit heutigen Kampfwerten nicht fahrbar, bleibt trotzdem richtig -
+333 Versuche zu 7.807 Sekunden sind 722 Stunden.
+
+**Der Hackweg ist geprueft und faellt aus.** `destroyW0r1dD43m0n` akzeptiert
+Hacking >= 6.000 (`requiredHackingSkill 3000` x `WorldDaemonDifficulty 2`)
+ODER 21 Black Ops (`Singularity.ts:1148-1160`). Aber `level = floor(mult *
+(32*ln(exp) - 200))` mit `mult = 0,35 * Aug-Mult` (BN6:
+`HackingLevelMultiplier 0,35`) verlangt bei Aug-Mult 3 ein `exp` von e^184 -
+unerreichbar. Erst ab Hacking-Multiplikator 25-30 wird es rechnerisch
+moeglich. Dazu verlangt Daedalus in BN6 **35 Augmentierungen** statt 30
+(`DaedalusAugsRequirement`). Black Ops bleiben der Weg.
+
+</details>
+
+---
+
 ### Der Assassination-Aufbau traegt - BEIDE PRUEFPUNKTE BESTANDEN (28.08., 02:38)
 
 **Pruefpunkt 1, die Stufe steigt.** Verifiziert ueber vier Messungen:

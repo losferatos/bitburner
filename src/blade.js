@@ -2038,7 +2038,34 @@ export async function main(ns) {
           }
         }
       } catch { lohntSich = true; }   // im Zweifel weiterarbeiten
-      if (tiefstand < 100 || !lohntSich) {
+      // GEWICHEN WIRD NUR, WENN JEMAND UEBERNIMMT (28.08.2026, 07:53).
+      //
+      // Hier stand `tiefstand < 100 || !lohntSich`, mit der Begruendung, der
+      // richtige Test sei nicht der Kampfwert, sondern ob es ueberhaupt etwas
+      // zu verdienen gibt. Der Gedanke stimmt - die Folgerung nicht, denn er
+      // unterstellt, dass bbtrain dann uebernimmt. **Das tut es nicht.**
+      //
+      // `bbtrain.js` ist ein Beitrittstor: Es trainiert, bis der niedrigste
+      // Kampfwert `ZIEL` erreicht (Vorgabe 100, `bbtrain.js:45`), und parkt
+      // danach in seiner Warteschleife. Der Zweig `!lohntSich` hat also gar
+      // keine Gegenstelle - er trifft genau dann zu, wenn der Wiederaufbau
+      // nach einem Einbau laeuft und die Kampfwerte laengst ueber 100 stehen.
+      //
+      // Gemessen am 28.08. um 07:49, 1 h 56 min nach dem Einbau von 05:53:
+      //     data/blade.json  "General/keine", Grund "weicht bbtrain,
+      //                      Kampfwerte 223, nichts ueber Schwelle"
+      //     bbtrain.js       parkt (Tiefstand 223 >= ZIEL 100)
+      //     Rangrate         25/min gegen 226,5 im Vier-Stunden-Mittel
+      // **Niemand hat gearbeitet.** Zwei Skripte, die einander die Figur
+      // ueberlassen, und die Figur stand still.
+      //
+      // Gewichen wird deshalb nur noch, wenn bbtrain wirklich uebernimmt.
+      // Faellt der `!lohntSich`-Fall weg, laeuft `waehle()` normal durch und
+      // greift auf Bladeburner-Training zurueck - gratis
+      // (`Bladeburner.ts:1091-1105`), hebt alle vier Kampfwerte und belegt
+      // den Arbeitskanal NICHT, kann sich also mit nichts in die Quere kommen.
+      const BBTRAIN_ZIEL = 100;
+      if (tiefstand < BBTRAIN_ZIEL) {
         if (!gewichen) {
           sag("Kampfwerte bei " + tiefstand
             + (lohntSich ? "" : ", keine Aktion ueber ihrer Schwelle")

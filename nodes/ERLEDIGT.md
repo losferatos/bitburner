@@ -23,6 +23,116 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Zwei Fehler in blade.js: die Schwelle ignorierte den Einsatz, die Weiche fuehrte ins Nichts (28.08., 07:53)
+
+**1. Die Black-Op-Schwelle folgte dem Raid-Vorrat statt dem Einsatz.**
+
+`blackOpSchwelle()` waehlte zwischen 0,90 und 0,40, und zwar danach, wieviel
+Raid-Vorrat noch da ist - die Ueberlegung war: ist die Alternative schwach,
+lohnt das Risiko. Fuer die fruehen Operationen stimmt das. Fuer die spaeten
+nicht, denn `rankLoss` waechst schneller als `rankGain`:
+
+    Nr  Operation      rankGain   rankLoss   p*      neue Schwelle
+     8  Red Dragon          500         50   0,091        0,34
+    18  Ultron           10.000      2.000   0,167        0,42
+    19  Centurion        15.000      5.000   0,250        0,50
+    20  Vindictus        20.000     20.000   0,500        0,75
+    21  Daedalus         40.000     10.000   0,200        0,45
+
+Bei **Vindictus** kostet ein Fehlschlag genau so viel Rang wie ein Erfolg
+einbringt. Mit 0,40 waere der Erwartungswert dort **negativ**: 0,4 x 20.000
+minus 0,6 x 20.000 = -4.000 je Versuch, bei 226 Rang je Minute rund achtzehn
+Minuten. Der Bot haette sich in einer Schleife selbst zurueckgeworfen.
+
+Die Untergrenze ist jetzt `p* + 0,25` mit `p* = rankLoss/(rankGain+rankLoss)`.
+Der Abstand deckt den Posten ab, den die reine Rangrechnung uebersieht: die
+**Zeit**, denn Black Ops haben `getActionTimePenalty()` 1,5
+(`Actions/BlackOperation.ts:51-53`). Die Tabelle ist aus
+`BlackOperations.ts` **erzeugt**, nicht abgetippt.
+
+**Verifiziert 07:49** durch Nachrechnen aller 21 Werte; im Spiel aendert sich
+vor Nr. 19 nichts, weil die Raid-Schwelle dort hoeher liegt. Commit `e6eb5dc`.
+
+**2. Die Weiche fuehrte ins Nichts - und das war der eigentliche Fund.**
+
+Beim Neustart nach Aenderung 1 meldete `data/blade.json`:
+
+    "aktion": "General/keine"
+    "grund":  "weicht bbtrain, Kampfwerte 223, nichts ueber Schwelle"
+
+`blade.js:2041` wich der Figur, sobald `tiefstand < 100 || !lohntSich`. Der
+Zweig `!lohntSich` (keine Operation ueber 0,85, kein Vertrag ueber 0,45)
+stammt vom 28.08., 01:52 und ruht auf der Annahme, bbtrain uebernehme dann.
+**Es uebernimmt nicht.** `bbtrain.js` ist ein Beitrittstor: Es trainiert bis
+`ZIEL` (Vorgabe 100, `bbtrain.js:45`) und parkt danach. Der Zweig trifft
+also genau dann zu, wenn der Wiederaufbau nach einem Einbau laeuft und die
+Kampfwerte laengst ueber 100 stehen.
+
+Gemessen 07:49, 1 h 56 min nach dem Einbau: Tiefstand 223, bbtrain geparkt,
+blade.js gewichen. **Niemand hat gearbeitet** - 25 Rang je Minute gegen 226,5
+im Vier-Stunden-Mittel. Zwei Skripte, die einander die Figur ueberlassen, und
+die Figur stand still.
+
+Die Weiche greift jetzt nur noch bei `tiefstand < BBTRAIN_ZIEL`, also wenn
+bbtrain wirklich uebernimmt. Damit ist die gesamte Rueckfallkette in
+`waehle()` wieder erreichbar, die der Zweig kurzgeschlossen hatte.
+
+**Verifiziert 07:52**, unmittelbar nach dem Neustart:
+
+    vorher    "General/keine"           - Leerlauf
+    nachher   "General/Field Analysis"  - Grund "Schaetzung unsicher"
+
+Field Analysis ist hier die richtige Wahl und begrenzt sich selbst: Sie laeuft
+nur, solange irgendwo `s.max - s.min > SPANNE_ZU_BREIT` gilt
+(`blade.js:1959-1966`), und genau das schliesst sie. Der Rangertrag ist dabei
+klein (+1 in 2 Minuten) - **die Wirkung auf die Rangrate misst der naechste
+Lauf**, sie ist noch offen.
+
+**Die Lehre, und sie ist dieselbe wie um 07:34:** Beide Fehler entstanden
+dadurch, dass eine Regel ihre eigene Voraussetzung nicht geprueft hat. Die
+Schwelle prueft den Vorrat und nicht den Einsatz; die Weiche prueft, ob es
+sich lohnt, und nicht, ob jemand uebernimmt. Beide Male stand die Antwort
+zwei `grep` entfernt.
+
+<details><summary>Der urspruengliche Eintrag zur Schwelle</summary>
+
+### Die Black-Op-Schwelle muss zum Ende hin steigen - ab Nr. 18 ist ein Fehlschlag ruinoes
+
+Gefunden vom Kursloop am 28.08., 07:15, beim Erzeugen der Black-Op-Tabelle aus
+`Bladeburner/data/BlackOperations.ts`. Der `rankLoss` waechst am Ende
+dramatisch, waehrend `blade.js` mit einer festen Schwelle arbeitet:
+
+    Nr  Operation           reqdRank   rankGain   rankLoss
+     8  Red Dragon            25.000        500         50
+    18  Ultron               250.000     10.000      2.000
+    19  Centurion            300.000     15.000      5.000
+    20  Vindictus            350.000     20.000     20.000   <- Verlust = Gewinn
+    21  Daedalus             400.000     40.000     10.000
+
+**Bei Vindictus kostet ein Fehlschlag genau so viel Rang, wie ein Erfolg
+einbringt.** Ein Fehlschlag dort wirft den Lauf um eine volle Operation zurueck
+- rund anderthalb Stunden bei der aktuellen Rate.
+
+`blade.js` hat zwei Schwellen (`SICHER_BLACKOP` = 0,90 und
+`SICHER_BLACKOP_OHNE_RAID` = 0,40) und waehlt zwischen ihnen nach dem
+**Raid-Vorrat**, nicht nach dem Einsatz. Bei Red Dragon ist 0,40 vertretbar
+(50 Rang Verlust gegen 500 Gewinn). Bei Vindictus waere sie fahrlaessig.
+
+Erwartet: Die Schwelle sollte aus dem Einsatz folgen statt aus dem Vorrat -
+etwa so, dass der Rang-Erwartungswert `p*rankGain - (1-p)*rankLoss` positiv
+bleibt, mit Sicherheitsabstand. Fuer Vindictus (Gewinn = Verlust) hiesse das
+p > 0,5 als harte Untergrenze, praktisch eher 0,9.
+
+Verdacht: `src/blade.js`, `blackOpSchwelle()` (Zeile ~1196) und die
+Konstanten bei Zeile 246.
+
+**Nicht dringend, aber terminiert**: Es trifft ab Rang 250.000, also bei
+80.706 noch nicht - aber die ETA dafuer liegt bei rund 12 Stunden.
+
+</details>
+
+---
+
 ### Typhoon-Punkt abgeraeumt: die Praemisse ist tot, der Auftrag darin erledigt (28.08., 07:10)
 
 Der oberste Punkt der Arbeitsliste fragte, ob **Operation Typhoon** ueberhaupt

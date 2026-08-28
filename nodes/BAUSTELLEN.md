@@ -59,6 +59,72 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### 1. Der V2-Kontrollpunkt ist nie gemessen worden
+
+`nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
+in BitNode 6 mindestens 6.000 mit Raid, mindestens 3.500 ohne.** Die gesamte
+Reihenfolge ab Platz 3 steht auf einer Simulation, die nie gegen einen echten
+Lauf geprueft wurde.
+
+**Der Beitritt steht seit dem 25.08.2026 zwischen 16:20 und 16:29** (um 16:19:55
+war der Kampfwert-Tiefstand noch 98, um 16:29:23 meldete `bblage.json`
+`inBladeburner: true` bei Rang 0). Genauer laesst er sich nicht mehr eingrenzen:
+bbtrain schrieb `data/bbjoin.txt` lokal auf die Werkbank statt nach home - das
+ist inzwischen behoben, half aber fuer diesen Beitritt nicht mehr.
+
+**Der Kontrollpunkt faellt damit auf 18:30 Uhr.** Zu messen ist dann der Rang
+aus `data/blade.json` gegen die Schwelle aus ROUTE.md: mindestens 6.000 mit
+Raid, mindestens 3.500 ohne. Das Ergebnis gehoert nach ROUTE.md.
+
+Zwischenstand 16:29: Rang 0, Ausdauer 41/41, Aktion "Field Analysis" (die
+Erfolgsschaetzungen sind noch zu unscharf fuer einen Vertrag), naechste Black Op
+"Operation Typhoon" ab Rang 2.500.
+
+**Dringlichkeit:** hoch. Es ist das wertvollste Einzelergebnis der naechsten
+Tage - an ihm haengt die gesamte Reihenfolge ab Platz 3.
+
+### 2. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
+
+Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die
+Skeptiker-Runde vier Konstruktionsfehler fand: Das "Ventil" mass Fragmentierung
+statt Bedarf, hebelte die Kaufbremse aus, vertrat den Stapelbetrieb gar nicht
+und hatte eine katastrophale Kill-Granularitaet.
+
+`src/worker/expfarm.js` liegt fertig und unverdrahtet im Baum (1,75 GB je Faden
+statt 1,80 beim Einwegarbeiter). Was fehlt, ist die Zuteilung:
+- Ofenbudget aus den Bedarfen DERSELBEN Runde ableiten, nicht aus der vorigen
+- Raeumen nach dem share-Muster (bn4net.js:1565)
+- Lease im Arbeiter gegen Waisen
+- `ramJeSkript` um `worker/expfarm.js` ergaenzen
+- danach den Einweg-Pfad (bn4net.js ~1596-1622) streichen
+
+**Dringlichkeit:** niedrig in BitNode 6 - der Ofen beschleunigt den
+Hacking-Weg, und der traegt diesen Knoten nicht. Vor dem naechsten V1-Knoten
+wieder hochstufen.
+
+### 3. Boersen-Bot fuer BitNode 8
+
+BitNode 8 steht ganz am Ende der Route (Platz 42-44) und ist der einzige Knoten
+ohne Bladeburner, Gang, Corporation und Skript-Hackgeld. Reputation ist dort
+eine reine Geldfrage - und Geld kommt nur aus dem Aktienmarkt. Den Bot gibt es
+noch nicht.
+
+**Dringlichkeit:** niedrig, aber nicht null: Er ist die einzige Voraussetzung
+auf der ganzen Route, die noch gar nicht existiert.
+
+### 4. Darknet-Labyrinth-Gewerk (V1b)
+
+`labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei
+`hasFullDarknetAccess()` - also in BitNode 15 oder mit SF15. Jeder
+Augmentierungs-Einbau wuerfelt das Darknet neu (Prestige.ts:76), es braucht also
+je Labor einen Einbauzyklus und rund 24 Raetselloeser.
+
+**Dringlichkeit:** niedrig. Erst vor BitNode 15 relevant.
+
+---
+
+---
+
 ### Source-File -1: die letzten vier Exploits (Stand 28.08., 07:45 - 7 von 11)
 
 Eingesammelt: `UndocumentedFunctionCall`, `INeedARainbow`, `Bypass`
@@ -125,105 +191,6 @@ unter `backups/` (nicht im Repo, siehe `.gitignore`).
 
 **Dringlichkeit: niedrig.** Nichts davon bewegt den Knotenausgang. Der Punkt
 steht hier, damit die Arbeit von heute frueh nicht verlorengeht.
-
-### Die Black-Op-Schwelle muss zum Ende hin steigen - ab Nr. 18 ist ein Fehlschlag ruinoes
-
-Gefunden vom Kursloop am 28.08., 07:15, beim Erzeugen der Black-Op-Tabelle aus
-`Bladeburner/data/BlackOperations.ts`. Der `rankLoss` waechst am Ende
-dramatisch, waehrend `blade.js` mit einer festen Schwelle arbeitet:
-
-    Nr  Operation           reqdRank   rankGain   rankLoss
-     8  Red Dragon            25.000        500         50
-    18  Ultron               250.000     10.000      2.000
-    19  Centurion            300.000     15.000      5.000
-    20  Vindictus            350.000     20.000     20.000   <- Verlust = Gewinn
-    21  Daedalus             400.000     40.000     10.000
-
-**Bei Vindictus kostet ein Fehlschlag genau so viel Rang, wie ein Erfolg
-einbringt.** Ein Fehlschlag dort wirft den Lauf um eine volle Operation zurueck
-- rund anderthalb Stunden bei der aktuellen Rate.
-
-`blade.js` hat zwei Schwellen (`SICHER_BLACKOP` = 0,90 und
-`SICHER_BLACKOP_OHNE_RAID` = 0,40) und waehlt zwischen ihnen nach dem
-**Raid-Vorrat**, nicht nach dem Einsatz. Bei Red Dragon ist 0,40 vertretbar
-(50 Rang Verlust gegen 500 Gewinn). Bei Vindictus waere sie fahrlaessig.
-
-Erwartet: Die Schwelle sollte aus dem Einsatz folgen statt aus dem Vorrat -
-etwa so, dass der Rang-Erwartungswert `p*rankGain - (1-p)*rankLoss` positiv
-bleibt, mit Sicherheitsabstand. Fuer Vindictus (Gewinn = Verlust) hiesse das
-p > 0,5 als harte Untergrenze, praktisch eher 0,9.
-
-Verdacht: `src/blade.js`, `blackOpSchwelle()` (Zeile ~1196) und die
-Konstanten bei Zeile 246.
-
-**Nicht dringend, aber terminiert**: Es trifft ab Rang 250.000, also bei
-80.706 noch nicht - aber die ETA dafuer liegt bei rund 12 Stunden.
-
-### 1. Der V2-Kontrollpunkt ist nie gemessen worden
-
-`nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
-in BitNode 6 mindestens 6.000 mit Raid, mindestens 3.500 ohne.** Die gesamte
-Reihenfolge ab Platz 3 steht auf einer Simulation, die nie gegen einen echten
-Lauf geprueft wurde.
-
-**Der Beitritt steht seit dem 25.08.2026 zwischen 16:20 und 16:29** (um 16:19:55
-war der Kampfwert-Tiefstand noch 98, um 16:29:23 meldete `bblage.json`
-`inBladeburner: true` bei Rang 0). Genauer laesst er sich nicht mehr eingrenzen:
-bbtrain schrieb `data/bbjoin.txt` lokal auf die Werkbank statt nach home - das
-ist inzwischen behoben, half aber fuer diesen Beitritt nicht mehr.
-
-**Der Kontrollpunkt faellt damit auf 18:30 Uhr.** Zu messen ist dann der Rang
-aus `data/blade.json` gegen die Schwelle aus ROUTE.md: mindestens 6.000 mit
-Raid, mindestens 3.500 ohne. Das Ergebnis gehoert nach ROUTE.md.
-
-Zwischenstand 16:29: Rang 0, Ausdauer 41/41, Aktion "Field Analysis" (die
-Erfolgsschaetzungen sind noch zu unscharf fuer einen Vertrag), naechste Black Op
-"Operation Typhoon" ab Rang 2.500.
-
-**Dringlichkeit:** hoch. Es ist das wertvollste Einzelergebnis der naechsten
-Tage - an ihm haengt die gesamte Reihenfolge ab Platz 3.
-
-### 2. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
-
-Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die
-Skeptiker-Runde vier Konstruktionsfehler fand: Das "Ventil" mass Fragmentierung
-statt Bedarf, hebelte die Kaufbremse aus, vertrat den Stapelbetrieb gar nicht
-und hatte eine katastrophale Kill-Granularitaet.
-
-`src/worker/expfarm.js` liegt fertig und unverdrahtet im Baum (1,75 GB je Faden
-statt 1,80 beim Einwegarbeiter). Was fehlt, ist die Zuteilung:
-- Ofenbudget aus den Bedarfen DERSELBEN Runde ableiten, nicht aus der vorigen
-- Raeumen nach dem share-Muster (bn4net.js:1565)
-- Lease im Arbeiter gegen Waisen
-- `ramJeSkript` um `worker/expfarm.js` ergaenzen
-- danach den Einweg-Pfad (bn4net.js ~1596-1622) streichen
-
-**Dringlichkeit:** niedrig in BitNode 6 - der Ofen beschleunigt den
-Hacking-Weg, und der traegt diesen Knoten nicht. Vor dem naechsten V1-Knoten
-wieder hochstufen.
-
-### 3. Boersen-Bot fuer BitNode 8
-
-BitNode 8 steht ganz am Ende der Route (Platz 42-44) und ist der einzige Knoten
-ohne Bladeburner, Gang, Corporation und Skript-Hackgeld. Reputation ist dort
-eine reine Geldfrage - und Geld kommt nur aus dem Aktienmarkt. Den Bot gibt es
-noch nicht.
-
-**Dringlichkeit:** niedrig, aber nicht null: Er ist die einzige Voraussetzung
-auf der ganzen Route, die noch gar nicht existiert.
-
-### 4. Darknet-Labyrinth-Gewerk (V1b)
-
-`labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei
-`hasFullDarknetAccess()` - also in BitNode 15 oder mit SF15. Jeder
-Augmentierungs-Einbau wuerfelt das Darknet neu (Prestige.ts:76), es braucht also
-je Labor einen Einbauzyklus und rund 24 Raetselloeser.
-
-**Dringlichkeit:** niedrig. Erst vor BitNode 15 relevant.
-
----
-
----
 
 ## Erledigt
 

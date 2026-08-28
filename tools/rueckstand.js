@@ -65,8 +65,9 @@ const uhr = (ts) => new Date(ts).toLocaleString("sv-SE").slice(5, 16);
     const v = ladeVerlauf();
     if (!v.punkte.length) { console.log("Noch keine Messung."); return; }
     for (const p of v.punkte.slice(-20)) {
-      console.log(uhr(p.ts) + "  Rueckstand " + (p.minuten).toFixed(1).padStart(7)
-        + " min   (storedCycles " + p.storedCycles + ")");
+      console.log(uhr(p.ts) + "  Rueckstand " + (p.minuten || 0).toFixed(1).padStart(7)
+        + " min   Tempo "
+        + (Number.isFinite(p.tempo) ? p.tempo.toFixed(3) : "  -  "));
     }
     return;
   }
@@ -80,20 +81,67 @@ const uhr = (ts) => new Date(ts).toLocaleString("sv-SE").slice(5, 16);
   }
 
   const p = JSON.parse(save.data.PlayerSave).data;
-  const bb = p.bladeburner?.data ?? p.bladeburner;
-  if (!bb) { console.log("Nicht in der Division - kein Rueckstand messbar."); return; }
-
-  const storedCycles = bb.storedCycles ?? 0;
-  const minuten = storedCycles / ZYKLEN_JE_SEKUNDE / 60;
   const jetzt = Date.now();
 
+  // DER RUECKSTAND HING AN BLADEBURNER - UND DAS WAR EIN DENKFEHLER
+  // (28.08.2026, 18:10).
+  //
+  // Hier stand `bb.storedCycles`, mit Ausstieg "Nicht in der Division - kein
+  // Rueckstand messbar". Seit dem Wechsel nach BitNode 10 um 17:05 gab es
+  // deshalb gar keine Messung mehr - ausgerechnet fuer die Stoerung, die laut
+  // Reportloop kein anderes Werkzeug sieht.
+  //
+  // Nachgeschlagen statt geraten: `storedCycles` ist **kein** Engine-Wert. Es
+  // gibt ihn nur auf Teilsystemen, die ihre eigene Sekundenschleife haben -
+  // `Bladeburner.ts:105`, `Corporation.ts:58`, ebenso Gang und Stanek. Ein
+  // knotenunabhaengiges Gegenstueck existiert schlicht nicht.
+  //
+  // Was es gibt, ist besser: `totalPlaytime` (`PlayerObject.ts:74`) waechst
+  // nur in `updateGame` - also nur, wenn die Engine wirklich tickt. Der
+  // Rueckstand ist damit kein Vorrat mehr, den man ausliest, sondern ein
+  // VERHAELTNIS, das man ueber zwei Messungen bildet:
+  //
+  //     tempo = (Spielzeit jetzt - Spielzeit vorher)
+  //           / (Uhrzeit  jetzt - Uhrzeit  vorher)
+  //
+  // Bei 1,00 laeuft das Spiel so schnell wie die Uhr. Ein gedrosselter Tab
+  // bekommt eine Weckung je Minute statt fuenf je Sekunde (doku/drosselung.md)
+  // und faellt weit darunter. Das misst dieselbe Stoerung wie vorher, gilt aber
+  // in jedem BitNode und braucht kein Teilsystem.
+  const spielzeit = Number(p.totalPlaytime);
+  if (!Number.isFinite(spielzeit)) {
+    console.log("totalPlaytime fehlt im Spielstand - Rueckstand nicht messbar.");
+    return;
+  }
+
   const v = ladeVerlauf();
-  v.punkte.push({ ts: jetzt, storedCycles, minuten });
+  const vorher = v.punkte.filter((x) => Number.isFinite(x.spielzeit)).pop();
+  let tempo = null;
+  if (vorher && jetzt - vorher.ts > 30_000) {
+    tempo = (spielzeit - vorher.spielzeit) / (jetzt - vorher.ts);
+  }
+  // Der Rueckstand in Minuten ist ab jetzt der aufgelaufene Verlust, nicht ein
+  // Vorrat: Wieviel Spielzeit ist gegenueber der Uhr liegengeblieben?
+  const minuten = (vorher && Number.isFinite(vorher.spielzeit))
+    ? ((jetzt - vorher.ts) - (spielzeit - vorher.spielzeit)) / 60000
+      + (vorher.minuten || 0)
+    : 0;
+
+  v.punkte.push({ ts: jetzt, spielzeit, minuten, tempo });
   if (v.punkte.length > MAX_PUNKTE) v.punkte = v.punkte.slice(-MAX_PUNKTE);
   fs.writeFileSync(VERLAUF, JSON.stringify(v));
 
-  console.log("Rueckstand " + minuten.toFixed(1) + " min (storedCycles "
-    + storedCycles + ", Stand " + uhr(jetzt) + ")");
+  if (tempo === null) {
+    console.log("Erste Messung dieser Reihe (Spielzeit "
+      + (spielzeit / 3600e3).toFixed(1) + " h, Stand " + uhr(jetzt)
+      + ") - das Tempo braucht zwei Punkte.");
+  } else {
+    console.log("Tempo " + tempo.toFixed(3) + " (1,000 = Spiel laeuft wie die"
+      + " Uhr), Rueckstand " + minuten.toFixed(1) + " min, Stand " + uhr(jetzt));
+    if (tempo < 0.9) {
+      console.log("WARNUNG: Das Spiel laeuft langsamer als die Uhr.");
+    }
+  }
 
   // --- Bewertung -----------------------------------------------------------
   // Ein einzelner Wert sagt wenig: Nach dem Einschalten ist ein grosser
@@ -119,14 +167,26 @@ const uhr = (ts) => new Date(ts).toLocaleString("sv-SE").slice(5, 16);
   }
 
   // --- Die Schwelle --------------------------------------------------------
-  console.log("Schwelle: " + SCHWELLE_STUNDEN.toFixed(1) + " h Rechnerzeit am Tag."
-    + " Darueber wird jede Offline-Stunde aufgeholt, darunter waechst der"
-    + " Rueckstand unbegrenzt.");
-  if (minuten > 60) {
-    const abbauStunden = minuten / 60 / (ABBAU_JE_SEKUNDE - 1);
-    console.log("Aufholzeit beim jetzigen Stand: " + abbauStunden.toFixed(1)
-      + " h - so lange laeuft das Spiel fuenffach beschleunigt.");
-    console.log("  Merke: In dieser Zeit takten die Claude-Loops weiter in"
-      + " Echtzeit, entscheiden also fuenfmal traeger als das Spiel laeuft.");
+  //
+  // Der Aufholmechanismus mit 5 s je Sekunde gehoert zu Bladeburner
+  // (`Bladeburner.ts:1375-1378`: `storedCycles` wird in Sekundenschritten
+  // abgearbeitet). Er galt fuer die alte Messung und gilt fuer die neue nicht:
+  // `totalPlaytime` holt nichts auf, es zaehlt nur, was die Engine wirklich
+  // getickt hat. Die Zahlen unten stehen deshalb nur noch, solange eine
+  // Bladeburner-Division existiert - sonst waeren sie eine Beruhigung, die
+  // nichts deckt.
+  const bb = p.bladeburner?.data ?? p.bladeburner;
+  if (bb) {
+    console.log("Bladeburner-Schwelle: " + SCHWELLE_STUNDEN.toFixed(1)
+      + " h Rechnerzeit am Tag. Darueber wird jede Offline-Stunde aufgeholt,"
+      + " darunter waechst der Rueckstand der Division unbegrenzt.");
+    const bbMin = (bb.storedCycles ?? 0) / ZYKLEN_JE_SEKUNDE / 60;
+    if (bbMin > 60) {
+      const abbauStunden = bbMin / 60 / (ABBAU_JE_SEKUNDE - 1);
+      console.log("Aufholzeit der Division: " + abbauStunden.toFixed(1)
+        + " h - so lange laeuft sie fuenffach beschleunigt.");
+      console.log("  Merke: In dieser Zeit takten die Claude-Loops weiter in"
+        + " Echtzeit, entscheiden also fuenfmal traeger.");
+    }
   }
 })();

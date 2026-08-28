@@ -23,6 +23,41 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### `tools/rueckstand.js` misst nur in einer Bladeburner-Division (erledigt 28.08., 18:10)
+
+Seit dem Wechsel nach BitNode 10 um 17:05 kam nur noch "Nicht in der Division -
+kein Rueckstand messbar" - ausgerechnet fuer die Stoerung, die laut Reportloop
+kein anderes Werkzeug sieht.
+
+**Die Erwartung im Auftrag war falsch, und das Nachschlagen hat es gezeigt.**
+Dort stand, `storedCycles` sei "eine Eigenschaft der Spielengine". Ist es
+nicht: Es gibt den Wert nur auf Teilsystemen mit eigener Sekundenschleife -
+`Bladeburner.ts:105`, `Corporation.ts:58`, ebenso Gang und Stanek. Ein
+knotenunabhaengiges Gegenstueck existiert nicht.
+
+Was es gibt, ist besser. `totalPlaytime` (`PlayerObject.ts:74`) waechst nur in
+`updateGame`, also nur wenn die Engine wirklich tickt. Der Rueckstand ist damit
+kein Vorrat mehr, den man ausliest, sondern ein Verhaeltnis ueber zwei
+Messungen:
+
+    tempo = (Spielzeit jetzt - Spielzeit vorher) / (Uhrzeit jetzt - Uhrzeit vorher)
+
+1,00 heisst: Das Spiel laeuft so schnell wie die Uhr. Ein gedrosselter Tab
+bekommt eine Weckung je Minute statt fuenf je Sekunde und faellt weit darunter.
+Dieselbe Stoerung, aber in jedem BitNode messbar.
+
+Mitgenommen: Der Aufholblock ("4,8 h Rechnerzeit am Tag, danach wird jede
+Offline-Stunde aufgeholt") gehoert zu Bladeburners `storedCycles`-Abbau
+(`Bladeburner.ts:1375-1378`) und gilt fuer die neue Messung nicht -
+`totalPlaytime` holt nichts auf. Er steht jetzt nur noch, solange eine Division
+existiert; sonst waere er eine Beruhigung, die nichts deckt.
+
+Verifiziert 18:10 in BitNode 10, zwei Laeufe:
+  18:08  "Erste Messung dieser Reihe (Spielzeit 215,6 h)"
+  18:10  "Tempo 1.000, Rueckstand 0.0 min"  und  "Tempo 0.999"
+
+---
+
 ### Der Sleeve in BitNode 10 tut nichts (erledigt 28.08., 17:55)
 
 Es gab im ganzen Repo kein Sleeve-Skript - der Sleeve stand seit dem

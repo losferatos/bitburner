@@ -66,31 +66,6 @@ Regeln:
 
 
 
-### `tools/rueckstand.js` misst nur in einer Bladeburner-Division (17:41)
-
-Gemessen: "Nicht in der Division - kein Rueckstand messbar."
-          (`tools/rueckstand.js:84`). In BitNode 10 gibt es keine Division,
-          also gibt es seit 17:05 **keine Rueckstandsmessung mehr**.
-
-Erwartet: Eine Zahl. `storedCycles` ist eine Eigenschaft der Spielengine, kein
-          Bladeburner-Wert - der Rueckstand ist in jedem Knoten dieselbe
-          Groesse und in jedem gleich wichtig. Er ist laut Reportloop-Prompt
-          "die einzige Stoerung, die kein anderes Werkzeug sieht": ein
-          gedrosselter Browser-Tab laesst das Spiel langsamer laufen als die
-          Uhr, und von aussen ist das an nichts anderem erkennbar.
-
-Verdacht: `tools/rueckstand.js:82-84`. Die Zeile
-          `const bb = p.bladeburner?.data ?? p.bladeburner;` und der Ausstieg
-          darunter. Vermutlich stammt `storedCycles` in der bisherigen Fassung
-          aus dem Bladeburner-Objekt; im Spielstand steht es aber auch am
-          Spieler beziehungsweise am Engine-Objekt. Nachschlagen in
-          `reference/bitburner-src/src/` statt raten.
-
-Dringlichkeit: **hoch.** Dritte Fundstelle derselben Klasse an einem Tag
-          (nach `strategie-check` und der Wache): ein Werkzeug, das
-          stillschweigend BitNode 6 voraussetzt.
-
-
 ### `nodes/KURS.md` gilt noch fuer BitNode 6 (17:26)
 
 Gemessen: Der oberste Eintrag ist vom 28.08., 07:15 und nennt als Engpass

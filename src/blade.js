@@ -2245,6 +2245,39 @@ export async function main(ns) {
             dauer += laeufe * 60000;
           } catch { /* ohne Charisma-Wert bleibt es bei der nackten Dauer */ }
         }
+        // DIE BEVOELKERUNG IST DER ZWEITE AUSGELAGERTE POSTEN (29.08., 00:55).
+        //
+        // Drei Aktionen verbrauchen die Bevoelkerung PROZENTUAL
+        // (`Bladeburner.ts:823-853`): Raid -1 %, Stealth Retirement -0,5 %,
+        // Sting -0,1 %. Assassination und die Vertraege kosten dagegen genau
+        // einen Kopf - bei 1e9 Einwohnern ein Zehnmillionstel davon.
+        //
+        // Die Bevoelkerung geht ueber `(pop/1e9)^0,7` in die Erfolgschance
+        // JEDER Aktion ausser Black Ops ein (`Actions/Action.ts:88-92`,
+        // `PopulationThreshold: 1e9`, `PopulationExponent: 0,7`). Abgeleitet:
+        //
+        //     dF/F = 0,7 * dp/p
+        //
+        // Ein Raid senkt also den Erfolgsfaktor aller kuenftigen Aktionen um
+        // 0,7 Prozent - dauerhaft, denn Nachwuchs kommt nur ueber
+        // `randomEvent` alle 240 bis 600 Sekunden mit 25 Prozent
+        // (`Bladeburner.ts:601-694`). Gemessen wurde der Schaden am 28.08.:
+        // New Tokyo fiel von 1.532 Mio (11:03) auf 223 Mio (12:40),
+        // Chongqing stand bei 0 - beides Staedte mit langen Raid-Phasen.
+        //
+        // Als Zeitzuschlag: `0,7 * r * HORIZONT`. Der Horizont ist die
+        // kuenftige Arbeitszeit, ueber die der Verlust wirkt. Rechnerisch ist
+        // das die Restlaufzeit des Knotens (Stunden bis Tage), aber die kennt
+        // der Motor nicht - und ein Horizont in dieser Groesse wuerde jede
+        // prozentuale Aktion faktisch sperren. Deshalb bewusst konservativ
+        // **eine Stunde**: die Zeitskala, auf der der Motor ohnehin misst.
+        // Der Zuschlag unterschaetzt damit eher, als dass er etwas verbietet;
+        // wer ihn anhebt, muss die Wirkung an der Rangrate zeigen.
+        const POP_JE_ERFOLG = { "Raid": 0.01, "Stealth Retirement Operation": 0.005,
+          "Sting Operation": 0.001 };
+        const POP_HORIZONT_MS = 3600000;
+        const popAnteil = POP_JE_ERFOLG[name] || 0;
+        if (popAnteil > 0 && dauer > 0) dauer += 0.7 * popAnteil * POP_HORIZONT_MS;
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
         // Bewertung zurueck: besser eine grobe Rangfolge als gar keine.
         // Rang je AUSDAUERPUNKT, sobald ueberhaupt etwas gemessen ist.

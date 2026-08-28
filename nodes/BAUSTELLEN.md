@@ -265,6 +265,30 @@ Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
           Fehler ist damit entschaerft, aber nicht behoben - er schlaegt wieder
           zu, sobald Raid einmal auf der Chaos-Rechnung gewinnt.
 
+**Geaendert 29.08. um 00:55, Wirkung noch nicht gemessen.** `beste()` rechnet
+den Bevoelkerungsverbrauch jetzt als Zeitzuschlag ein, analog zum
+Chaos-Zuschlag von 03:42:
+
+    dF/F = 0,7 * dp/p     (aus `(pop/1e9)^0,7`, `Actions/Action.ts:88-92`)
+    Zuschlag = 0,7 * r * HORIZONT
+
+mit r aus `Bladeburner.ts:823-853` (Raid 1 %, Stealth Retirement 0,5 %, Sting
+0,1 %) und HORIZONT = **eine Stunde**. Raid bekommt damit 25 Sekunden auf eine
+Dauer von rund 59 - also gut 40 Prozent.
+
+**Der Horizont ist bewusst zu klein.** Rechnerisch richtig waere die
+Restlaufzeit des Knotens, und die betraegt Stunden bis Tage; mit ihr wuerde
+jede prozentuale Aktion faktisch gesperrt. Das mag sogar stimmen - Raid stand
+am 28.08. schon ohne diesen Zuschlag bei 123 Rang/min gegen 1.097 fuer
+Assassination -, aber eine Sperre, die niemand gemessen hat, ist keine
+Verbesserung. Eine Stunde ist die Zeitskala, auf der der Motor ohnehin misst.
+
+**Offen bleibt der Horizont.** Nachzumessen, sobald `blade.js` laeuft (nach dem
+Bladeburner-Beitritt, ETA rund 13 h): Waehlt der Motor Raid noch, und wenn ja,
+faellt danach `popEst` der Stadt? Bleibt popEst ueber einer Stunde stabil, kann
+der Horizont bleiben; faellt es weiter, gehoert er hochgesetzt - dann aber mit
+der Rangrate als Beleg, nicht mit der Rechnung allein.
+
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden

@@ -80,6 +80,29 @@ Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
 
 ## Offen, nach Dringlichkeit
 
+### Die Arbeitsliste laesst sich weiter per Textsuche zerlegen (22:55)
+
+Gemessen: Heute zweimal passiert - 14:08 (drei Eintraege mitten im Regelkopf,
+          zwei doppelte Abschnittsueberschriften) und 22:47 beim Abraeumen des
+          Sofort-Punkts. Beide Male hat `s.index("## Sofort")` die Fundstelle
+          im **Regelkopf** getroffen statt die Ueberschrift.
+
+Erwartet: Ein Schreibzugriff, der die Stelle nicht raten kann. Der Regelkopf
+          warnt zwar davor, aber eine Warnung in derselben Datei, die man
+          gerade programmatisch aendert, wird von jedem zweiten Lauf uebersehen
+          - und der Schaden faellt erst beim naechsten `grep` auf.
+
+Verdacht: Kein Codefehler, ein fehlendes Werkzeug. `tools/liste.js` mit
+          `--sofort-leeren`, `--sofort-eintragen <datei>` und
+          `--erledigt <ueberschrift>` waere klein (Abschnitte ueber die
+          Zeilennummern der `^## `-Zeilen abgrenzen, nicht ueber Text) und
+          wuerde die Klasse ganz schliessen. Danach die Regel im Kopf durch
+          den Werkzeugaufruf ersetzen.
+
+Dringlichkeit: mittel. Kostet keine Spielzeit, aber jeder Vorfall kostet einen
+          halben Loop-Lauf und im schlimmsten Fall einen stillen Datenverlust.
+
+
 ### Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte

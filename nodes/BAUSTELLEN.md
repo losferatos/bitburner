@@ -59,6 +59,39 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Die Black-Op-Schwelle muss zum Ende hin steigen - ab Nr. 18 ist ein Fehlschlag ruinoes
+
+Gefunden vom Kursloop am 28.08., 07:15, beim Erzeugen der Black-Op-Tabelle aus
+`Bladeburner/data/BlackOperations.ts`. Der `rankLoss` waechst am Ende
+dramatisch, waehrend `blade.js` mit einer festen Schwelle arbeitet:
+
+    Nr  Operation           reqdRank   rankGain   rankLoss
+     8  Red Dragon            25.000        500         50
+    18  Ultron               250.000     10.000      2.000
+    19  Centurion            300.000     15.000      5.000
+    20  Vindictus            350.000     20.000     20.000   <- Verlust = Gewinn
+    21  Daedalus             400.000     40.000     10.000
+
+**Bei Vindictus kostet ein Fehlschlag genau so viel Rang, wie ein Erfolg
+einbringt.** Ein Fehlschlag dort wirft den Lauf um eine volle Operation zurueck
+- rund anderthalb Stunden bei der aktuellen Rate.
+
+`blade.js` hat zwei Schwellen (`SICHER_BLACKOP` = 0,90 und
+`SICHER_BLACKOP_OHNE_RAID` = 0,40) und waehlt zwischen ihnen nach dem
+**Raid-Vorrat**, nicht nach dem Einsatz. Bei Red Dragon ist 0,40 vertretbar
+(50 Rang Verlust gegen 500 Gewinn). Bei Vindictus waere sie fahrlaessig.
+
+Erwartet: Die Schwelle sollte aus dem Einsatz folgen statt aus dem Vorrat -
+etwa so, dass der Rang-Erwartungswert `p*rankGain - (1-p)*rankLoss` positiv
+bleibt, mit Sicherheitsabstand. Fuer Vindictus (Gewinn = Verlust) hiesse das
+p > 0,5 als harte Untergrenze, praktisch eher 0,9.
+
+Verdacht: `src/blade.js`, `blackOpSchwelle()` (Zeile ~1196) und die
+Konstanten bei Zeile 246.
+
+**Nicht dringend, aber terminiert**: Es trifft ab Rang 250.000, also bei
+80.706 noch nicht - aber die ETA dafuer liegt bei rund 12 Stunden.
+
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden

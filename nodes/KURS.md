@@ -25,6 +25,84 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 28.08., 07:15 - BitNode 6
+
+Ausgangsbedingung: **21 Black Operations.** `destroyW0r1dD43m0n` prueft
+                   `numBlackOpsComplete >= numberOfBlackOperations`
+                   (`NetscriptFunctions/Singularity.ts:1154-1158`); die letzte
+                   (Daedalus) verlangt `reqdRank` **400.000**
+                   (`Bladeburner/data/BlackOperations.ts:708`).
+                   Der zweite Weg - Hacking >= `wd.requiredHackingSkill`
+                   (6.000) MIT `hasAdminRights` - bleibt verworfen: bei
+                   `HackingLevelMultiplier` 0,35 verlangt
+                   `level = floor(mult*(32*ln(exp)-200))` ein `exp` von e^184.
+
+Engpass:           Bladeburner-Rang. **80.706 von 400.000 = 20,2 %.**
+                   Aussagekraeftiger ist der Anteil an der ARBEIT, weil die
+                   Black Ops sich selbst mitfinanzieren: Von den 400.000 kommen
+                   **73.660** aus den `rankGain`-Werten der ersten zwanzig
+                   Operationen, es bleiben also **326.340** aus gewoehnlichen
+                   Aktionen. Davon sind 79.796 verdient - **24,5 %.**
+
+Restweg:           **246.544 netto.** 400.000 minus 80.706 Rang minus die
+                   **72.750**, die die Black Ops 8 bis 20 unterwegs noch selbst
+                   einbringen (aus der Tabelle erzeugt, nicht geschaetzt).
+
+Rate:              **226,5 Rang je Minute**, geglaettet ueber **229 Minuten**
+                   (`data/verlauf-strategie.json`, 03:25-07:14, 28.876 auf
+                   80.706). Das Fenster schliesst den Augmentierungs-Einbau von
+                   05:53 samt Wiederaufbau **ein** - genau deshalb ist es das
+                   richtige. Zum Vergleich, dieselbe Reihe:
+
+                       229 min   226,5/min   (mit Einbau)
+                       132 min   224,6/min   (mit Einbau)
+                        41 min    34,5/min   (nur Wiederaufbau)
+                       Nacht     442,0/min   (nur Spitzenphase)
+
+                   **Eine Rate ohne Einbaupause ueberschaetzt den Fortschritt
+                   um Faktor 8.** Die 442 der Nacht sind keine Reisegeschwindig-
+                   keit, sondern eine Momentaufnahme zwischen zwei Einbauten.
+
+ETA:               **13,3-18,1 h**, Mitte rund **15,4** (a = 0,6 / 0,44 / 0).
+                   Vorlauf: **71-148 h**, Mitte 104. **Faktor 6,7 besser.**
+
+                   Die Selbstbeschleunigung ist belegt, aber sie ist nicht
+                   allein Rueckkopplung: 32,75/min bei Rang 9.083 gegen
+                   442/min bei 51.000 waere a = 1,51 - das ist zu steil, weil
+                   in dieser Zeit vier bewusste Hebel eingebaut wurden
+                   (Assassination als Rangfahrzeug, Overclock, Chaos-
+                   Folgekosten, Cyber's Edge). a = 0 bis 0,6 ist die
+                   ehrliche Spanne.
+
+Leitgroesse:       **Bladeburner-Rang je Minute, gemessen ueber mindestens
+                   45 Minuten und EINSCHLIESSLICH der Wiederaufbaupausen nach
+                   einem Einbau.** Der Zusatz ist neu und er ist der Kern
+                   dieses Laufs: Wer nur die Spitzenphase misst, optimiert
+                   gegen eine Zahl, die achtmal zu gross ist - und uebersieht
+                   damit genau den Posten, der gerade der groesste ist.
+
+Entscheidung:      **Weiterfahren.** Der Kurs stimmt, die ETA ist von 104 auf
+                   15,4 Stunden gefallen. Kein Zwischenschritt noetig: Die
+                   Augmentierungsrunde, die der Eintrag vom 27.08. vorbereiten
+                   wollte, ist zweimal gelaufen (01:25 mit 25 Stueck, 05:53),
+                   und der Bot loest sie selbst aus.
+
+                   Der einzige verbliebene Bremsklotz ist die Wiederaufbau-
+                   phase nach jedem Einbau. Sie wird mit jedem Einbau laenger,
+                   weil die AKTIONSSTUFE ihn ueberlebt und die Kampfwerte
+                   nicht - Assassination steht auf Stufe 20 und verlangt Werte,
+                   die der Wiederaufbau erst wieder erreichen muss. Das ist
+                   bereits als Hebel adressiert (07:00, Gym laeuft jetzt
+                   parallel weiter), gehoert aber dauerhaft in die ETA.
+
+Naechste Pruefung: Liegt die 45-Minuten-Rate wieder ueber 220/min, also ist der
+                   Wiederaufbau vorbei? Faellt Operation Red Dragon (Nr. 8 von
+                   21, `reqdRank` 25.000 laengst erfuellt, Chance zuletzt
+                   0,780-1,000)? Und ist die ETA erneut gesunken - zweimal
+                   steigend hiesse, der Knoten wird falsch gefahren.
+
+---
+
 ## 27.08., 19:22 - BitNode 6
 
 Ausgangsbedingung: **21 Black Operations**, die letzte (Daedalus) verlangt Rang

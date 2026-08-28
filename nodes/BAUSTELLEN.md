@@ -187,6 +187,7 @@ und braucht dort nur abgelesen zu werden.
 
 Der Punkt wandert damit nach `## Offen`; er ist nicht erledigt, aber in
 diesem Knoten nicht mehr bearbeitbar.
+
 ---
 
 ### `blade.js` verliert beim Neustart den offenen Abschnitt (14:03)
@@ -264,49 +265,6 @@ Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
           Fehler ist damit entschaerft, aber nicht behoben - er schlaegt wieder
           zu, sobald Raid einmal auf der Chaos-Rechnung gewinnt.
 
-  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
-  beheben. Abgeraeumtes wandert nach "Erledigt".
-- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
-  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
-  beginnt, wird uebersprungen statt angefangen.
-- Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
-- **Erledigtes wandert nach `nodes/ERLEDIGT.md`, nicht nach unten** (seit
-  27.08.2026, 18:35). Es wird nie geloescht - der Verlauf ist die Begruendung
-  fuer das, was heute steht -, aber er gehoert nicht in die Arbeitsliste: Sie
-  stand bei 1.777 Zeilen, davon 81 Prozent Archiv, und das Read-Werkzeug
-  schneidet bei 2.000 stumm ab. Im Archiv wird **gegrept, nicht gelesen**:
-  `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`.
-- Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
-- **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
-  ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
-  Die Lebenszeichen stehen woanders und sind bedingungslos:
-  `data/hb-rep.txt` fuer `bn4rep.js` (Puls), `data/rep-ziel.txt` fuer sein
-  aktuelles Ziel samt Rangliste, `data/wache-zustand.json` fuer den Waechter.
-  `data/bn4rep.json` und `data/ps.json` sind Momentaufnahmen, keine Pulse.
-  *In der Nacht zum 28.08. hat diese Falle einen Sofort-Punkt erzeugt, der
-  komplett falsch war - die Warnung stand seit dem 24.08. in `bn4rep.js:389`,
-  nur nicht dort, wo jemand sie sucht.*
-- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
-  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
-  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
-  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
-  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
-  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
-  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
-  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
-  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
-  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
-  bin."
-  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
-  sondern weil sie feststeht (Fables Analyse,
-  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
-  dazwischenfunken.
-  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
-  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
-  groessten offenen Hebel des Knotens einen halben Nachmittag.*
-
----
-
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden
 
 `nodes/ROUTE.md` Abschnitt 4 erklaert ihn fuer bindend: **Rang nach zwei Stunden
@@ -368,8 +326,6 @@ Augmentierungs-Einbau wuerfelt das Darknet neu (Prestige.ts:76), es braucht also
 je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 
 **Dringlichkeit:** niedrig. Erst vor BitNode 15 relevant.
-
----
 
 ---
 

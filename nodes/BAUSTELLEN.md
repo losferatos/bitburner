@@ -95,6 +95,23 @@ Verdacht: `src/blade.js:1959-1966`, Regel 4 in `waehle()`:
           sichtbar (vorher stand dort `General/keine`, also Leerlauf). Der Fix
           war richtig, deckt aber die naechste Schicht auf.
 
+**Geaendert 08:14, Wirkung noch nicht gemessen** (Commit `6bd4d98`). Zwei
+Aenderungen an Regel 4:
+
+1. Sie fragt jetzt, ob das Schaerfen eine Aktion FREIGIBT
+   (`s.max >= schwelle && s.min < schwelle`), statt nur nach der Breite der
+   Spanne. **Verifiziert 08:09**: Der Grund lautet seither
+   "Schaetzung verdeckt Investigation (0.00-1.00 gegen 0.85)".
+
+2. Das allein bindet nicht: Bei schlechter Bevoelkerungsschaetzung liefert
+   `getSuccessRange` fuer JEDE Aktion [0,00-1,00] (`Actions/Action.ts`:
+   `low = real - diff` klemmt auf 0), die Bedingung ist dann immer wahr.
+   Deshalb ein Deckel nach der Uhr - zehn Minuten am Stueck, danach dreissig
+   Minuten Sperre. **Der Deckel greift fruehestens 10 Minuten nach dem
+   Neustart von 08:14, also gegen 08:24. Das ist die offene Nachmessung:
+   Steht `data/blade.json` dann auf `General/Training`?**
+
+
 ## Offen, nach Dringlichkeit
 
 ### 1. Der V2-Kontrollpunkt ist nie gemessen worden

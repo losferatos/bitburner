@@ -23,6 +23,55 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Beitritt zur Bladeburner-Division geprueft (Commit folgt)
+
+Der Beitritt am 29.08. um 18:14:36 ist vollstaendig abgearbeitet. Nachmessung 1
+war verifiziert (Sleeve zurueck auf `contract:Tracking` um 18:41:54). Die
+Nachmessungen 2 und 3 sind **gegenstandslos geworden**: Um kurz nach 19:05 hat
+`bn4rep.js` Augmentierungen eingebaut, die Kampfwerte fielen auf 1, und der
+Spieler steht seither wieder im Gym statt bei Bladeburner-Aktionen. Die
+Rangrate und die Aktionsverteilung lassen sich erst nach dem Wiederaufbau
+messen - Restzeit 8,06 h, gerechnet um 19:38. Der neue Punkt dazu steht unter
+`## Offen` ("Der Einbau kam 50 Minuten nach dem Divisionsbeitritt").
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### BEITRITT ZUR DIVISION: 29.08.2026, 18:14:36 (eingetragen 18:20)
+
+Quelle:   `data/bbjoin.txt` = 1788020076769. `bbtrain.js:262` schreibt den
+          Stempel unmittelbar nach `joinBladeburnerDivision()`.
+
+Uebergang geprueft, **er traegt**:
+
+    18:14:36  Beitritt, Kampfwerte 100/100/100/100
+    18:19     blade.js hat uebernommen - `data/blade.json` 0,0 min alt,
+              Aktion `General/Recruitment`, Rang 0
+    18:19     Sleeve auf `def` im Gym - sein eigener Tiefstand (1), also
+              greift die Umstellung von 17:50; die Kontraktschwelle 40 haelt
+              ihn korrekt zurueck
+
+**Damit laufen die Uhren fuer die drei offenen Nachmessungen:**
+
+  1. ~~**20 Minuten** (ab 18:35): Sleeve zurueck auf Kampfwert 40,
+     `data/sleeve.json` muss `contract:Tracking` zeigen.~~
+     **Verifiziert: `contract:Tracking` um 18:41:54.** Die Schwelle
+     `KONTRAKT_MIN_KAMPF = 40` hat ihn nach rund 25 Minuten Gym freigegeben,
+     die Gym-Wahl nach seinem eigenen Tiefstand (Umstellung 17:50) hat
+     getragen. Damit ist der Aug-Reset von 17:45 vollstaendig aufgeholt.
+  2. **Eine Stunde** (ab 19:15): Rangrate gegen die gerechneten 6,6/h
+     (Spieler allein) bzw. 31,8/h (mit Sleeve). Dazu `data/blade.json` auf
+     die Aktionsverteilung ansehen - faellt der Spieler auf Training oder
+     Diplomacy durch, ist der Kontrakttopf leer.
+  3. **Zwei Stunden** (ab 20:15): `node tools/spann.js` fuer die
+     Cyber's-Edge-Frage, und `data/aktionen.txt` auf eine Zeile mit
+     `abgebrochen: true` pruefen (Wiederanlauf-Nachweis).
+
+Ausserdem faellig: Taucht **Raid** in der Aktionsverteilung auf? Der
+Chaos-Zuschlag wurde um 16:50 an die Schwelle gebunden, weil er Raid sonst
+von 0,0437 auf 0,0118 Rang/s druecken wuerde.
+
+
+
 ## 29.08.2026 - ETA zum Beitritt: gerechnet statt geschaetzt (Commit 2e2a0f3, 4c1bd1b)
 
 ### ETA zum Beitritt wurde geschaetzt statt gerechnet - Werkzeug gebaut (13:30)

@@ -118,41 +118,6 @@ Regeln:
 
 ## Sofort
 
-### BEITRITT ZUR DIVISION: 29.08.2026, 18:14:36 (eingetragen 18:20)
-
-Quelle:   `data/bbjoin.txt` = 1788020076769. `bbtrain.js:262` schreibt den
-          Stempel unmittelbar nach `joinBladeburnerDivision()`.
-
-Uebergang geprueft, **er traegt**:
-
-    18:14:36  Beitritt, Kampfwerte 100/100/100/100
-    18:19     blade.js hat uebernommen - `data/blade.json` 0,0 min alt,
-              Aktion `General/Recruitment`, Rang 0
-    18:19     Sleeve auf `def` im Gym - sein eigener Tiefstand (1), also
-              greift die Umstellung von 17:50; die Kontraktschwelle 40 haelt
-              ihn korrekt zurueck
-
-**Damit laufen die Uhren fuer die drei offenen Nachmessungen:**
-
-  1. ~~**20 Minuten** (ab 18:35): Sleeve zurueck auf Kampfwert 40,
-     `data/sleeve.json` muss `contract:Tracking` zeigen.~~
-     **Verifiziert: `contract:Tracking` um 18:41:54.** Die Schwelle
-     `KONTRAKT_MIN_KAMPF = 40` hat ihn nach rund 25 Minuten Gym freigegeben,
-     die Gym-Wahl nach seinem eigenen Tiefstand (Umstellung 17:50) hat
-     getragen. Damit ist der Aug-Reset von 17:45 vollstaendig aufgeholt.
-  2. **Eine Stunde** (ab 19:15): Rangrate gegen die gerechneten 6,6/h
-     (Spieler allein) bzw. 31,8/h (mit Sleeve). Dazu `data/blade.json` auf
-     die Aktionsverteilung ansehen - faellt der Spieler auf Training oder
-     Diplomacy durch, ist der Kontrakttopf leer.
-  3. **Zwei Stunden** (ab 20:15): `node tools/spann.js` fuer die
-     Cyber's-Edge-Frage, und `data/aktionen.txt` auf eine Zeile mit
-     `abgebrochen: true` pruefen (Wiederanlauf-Nachweis).
-
-Ausserdem faellig: Taucht **Raid** in der Aktionsverteilung auf? Der
-Chaos-Zuschlag wurde um 16:50 an die Schwelle gebunden, weil er Raid sonst
-von 0,0437 auf 0,0118 Rang/s druecken wuerde.
-
-
 ### Selbstverschuldet: Aug-Kauf hat den Sleeve auf 1 zurueckgesetzt (17:45)
 
 Gemessen: Sleeve-Kampfwerte um 17:20 **74/75/70/77**, um 17:40 **14/1/1/11**.
@@ -351,6 +316,41 @@ Dringlichkeit: **hoch** - groesster bekannter ungenutzter Hebel des Knotens,
 relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
+
+### Der Einbau kam 50 Minuten nach dem Divisionsbeitritt und kostet 8 h (29.08., 19:45)
+
+Befund:   Um kurz nach 19:05 hat `bn4rep.js:1150` Augmentierungen eingebaut -
+          50 Minuten nach dem Beitritt zur Bladeburner-Division um 18:14:36.
+          Kampfwerte 100/100/100/100 fielen auf 1, der Rang 17 blieb.
+
+Gemessen um 19:38, Multiplikatoren aus dem laufenden Stand zurueckgerechnet
+(`m = level / (32*ln(exp+534,6) - 200)`, `PersonObjects/formulas/skill.ts:13`):
+
+    Stat  m neu    m alt    Zuwachs   Rest bis 100
+    str   0,5600   0,5143     +9 %      2,75 h
+    def   0,5599   0,5142     +9 %      2,75 h
+    dex   0,7769   0,5936    +31 %      0,53 h
+    agi   0,5901   0,5398     +9 %      2,03 h
+                                        ------
+                                        8,06 h
+
+**Die Kosten sind belegt, der Nutzen noch nicht.** 8,06 Stunden Gym, in denen
+der Bot keinen Rang sammelt - bei der am 29.08. gemessenen Rate von rund
+40 Rang/h waeren das gut 320 Rang. Dagegen stehen +9 Prozent auf drei
+Kampf-Multiplikatoren, und Kampfwerte gehen nach `nodes/KURS.md` (10:20) nur
+stark gedaempft in den Rang ein: 100 -> 300 bringt +46 Prozent Rang.
+
+Die Zeile `Einbau vor dem Divisionsbeitritt = nie` im Abschnitt
+`## ENTSCHIEDEN` deckt diesen Fall **nicht** ab - sie endet mit dem Beitritt,
+obwohl ihre Begruendung (Prestige setzt die Kampfwerte auf 1) danach
+unveraendert gilt. Das ist eine Luecke in der Regel, kein Regelbruch.
+
+**Naechster Schritt, nicht in diesem Lauf:** Auflisten, welche
+Augmentierungen tatsaechlich eingebaut wurden (`data/bn4rep.json` oder
+`ns.singularity.getOwnedAugmentations`), und ihren Nutzen gegen die 8,06 h
+rechnen. Erst danach laesst sich entscheiden, ob die Regel auf "kein Einbau,
+solange der Kampfwert-Tiefstand ueber X liegt" erweitert gehoert - eine
+Sperre ohne diese Gegenrechnung waere geraten.
 
 ### Skill-Abdeckung ist auf das BN6-Spaetspiel geeicht, nicht auf BN10 (29.08., 18:55)
 

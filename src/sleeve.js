@@ -170,6 +170,28 @@ export async function main(ns) {
         for (let n = 0; n < KONTRAKTE.length && !ok; n++) {
           const art = KONTRAKTE[(i + n) % KONTRAKTE.length];
           try {
+            // VORRAT PRUEFEN, SONST STEHT DER SLEEVE STILL (29.08.2026, 22:30).
+            //
+            // `SleeveBladeburnerWork.process` bricht bei leerem Vorrat sofort
+            // ab: `if (action.count < 1) return sleeve.stopWork()`
+            // (`Sleeve/Work/SleeveBladeburnerWork.ts:44-47`). Der Sleeve steht
+            // dann auf Idle - aber `setToBladeburnerAction` hat trotzdem
+            // `true` zurueckgegeben, also setzt dieser Block im naechsten Takt
+            // denselben leeren Kontrakt wieder. Endlosschleife auf Idle, und
+            // die Telemetrie meldet weiter `contract:<art>`, weil sie den
+            // eigenen Merker schreibt statt `getTask` (RAM-Verzicht, Dateikopf).
+            //
+            // Eric hat es um 22:28 im Spiel gesehen, die Zahl bestaetigt es:
+            // Rang stand von 22:21 bis 22:28 unveraendert bei 65, waehrend der
+            // Sleeve zu dem Zeitpunkt den GESAMTEN Rang liefern sollte.
+            //
+            // Die 4 GB fuer `getActionCountRemaining` sind der Preis dafuer,
+            // dass die Rueckfallkette ueberhaupt greift - ohne sie bricht sie
+            // beim ersten `true` ab, das nichts bedeutet.
+            let vorrat = 1;
+            try { vorrat = ns.bladeburner.getActionCountRemaining("Contracts", art); }
+            catch { /* alte Fassung: dann wie bisher blind setzen */ }
+            if (vorrat < 1) continue;
             ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts", art);
             if (ok) was = "contract:" + art;
           } catch { ok = false; }

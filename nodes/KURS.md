@@ -25,6 +25,72 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 29.08., 07:20 - BitNode 10 (Kursloop: beide Ausgaenge gegeneinander gerechnet)
+
+Der Eintrag von 07:15 beziffert die Bladeburner-Strecke. Was dort fehlte: der
+Beleg, dass es der billigere der beiden Ausgaenge IST. Bisher stand das als
+Annahme im Kurs, hergeleitet war es nie.
+
+Ausgangsbedingung: Es gibt **genau zwei** Wege, und beide stehen im Code.
+
+    Weg A  Bladeburner: alle 21 Black Ops abschliessen, dann erscheint der
+           Knopf 'Destroy w0r1d_d43m0n' (`Bladeburner/ui/BlackOpPage.tsx:39-51`,
+           Bedingung `numBlackOpsComplete >= numberOfBlackOperations`).
+           Kein Hackniveau noetig.
+    Weg B  Backdoor auf w0r1d_d43m0n (`NetscriptFunctions/Singularity.ts:524`).
+           `requiredHackingSkill *= WorldDaemonDifficulty`
+           (`Server/ServerHelpers.ts:423`), in BitNode 10 also 3.000 * 2 =
+           **6.000**.
+
+Weg B durchgerechnet, nicht geschaetzt: `HackingLevelMultiplier` ist in diesem
+Knoten 0,35 (`BitNode.tsx`, case 10), mit dem heutigen Aug-Multiplikator 1,3513
+ergibt das m_eff = 0,4730. Ueber `calculateSkill` umgestellt braucht Level
+6.000 dann **10^175 Erfahrung**. Selbst mit einem utopischen Hack-Multiplikator
+von 10 (m_eff 3,5) blieben 10^26 - bei der aktuellen Gesamtrate von rund
+64.000 Erfahrung je Stunde. Weg B ist in diesem Knoten nicht langsamer, er ist
+unmoeglich. Damit ist Weg A nicht die bessere Wahl, sondern die einzige.
+
+Engpass:           Zweistufig, und nur die erste Stufe laeuft gerade.
+                   Stufe 1 (jetzt): Kampfwert-Tiefstand **67 von 100**.
+                     In Erfahrung ueber alle vier Werte, weil ihre
+                     Multiplikatoren verschieden sind (dex 1,4864 braucht
+                     nur 98.774, str/def 1,2870 brauchen 223.671):
+                     Restsumme **614.366 Erfahrung**.
+                   Stufe 2 (danach): Bladeburner-Rang **0 von 400.000**,
+                     netto 309.072 nach Abzug der 113.660 * 0,8 rankGain.
+
+Rate:              1.072 Erfahrung/min, aus der Tiefstandsrate von 268/min
+                   ueber 48 Minuten hochgerechnet (4 Werte im Gleichlauf).
+
+ETA:               Stufe 1 **9,6 h** (gegen 16:45), Stufe 2 89-185 h.
+                   Gesamt rund **99-195 h**.
+                   Vorlauf 28.08., 21:45: Stufe 1 in 18,6 h, also gegen 16:20
+                   heute. Praktisch unveraendert - und das ist ein ehrlicher
+                   Befund, kein guter: Der Augmentierungs-Einbau um 04:15 hat
+                   6,6 Stunden vernichtet, aber die acht Stuecke hoben die
+                   Erfahrungsmultiplikatoren, und die Rate stieg von 13,25 auf
+                   17,9/s. Der Fehler hat sich selbst bezahlt gemacht - was
+                   ihn nicht richtig macht, denn geplant war er nicht.
+
+Zur Selbstbeschleunigung: Fuer Stufe 1 gibt es keine, a = 0 ist hier richtig.
+Die Gym-Rate haengt nicht an den Stufen (`Work/Formulas.ts:108-116`), und der
+Bedarf waechst exponentiell im Level. Erst Stufe 2 hat die Rueckkopplung ueber
+`skillPoints = floor(maxRank/3)`; dort gilt weiter a zwischen 0,4 und 0,6.
+
+Leitgroesse:       Bis Tor 1 der **Kampfwert-Tiefstand** (67 von 100). Danach
+                   **Bladeburner-Rang je Minute**, Ziel 400.000.
+
+Entscheidung:      **Weiterfahren.** Beide Ausgaenge gerechnet, Weg B ist
+                   ausgeschlossen; die ETA ist gegenueber dem Vorlauf nicht
+                   gestiegen, die Abbruchregel greift nicht.
+
+Naechste Pruefung: Sobald `inBladeburner` true meldet - erwartet gegen 16:45 -
+                   die Rangrate ueber 45 Minuten glaetten und die Spanne
+                   89-185 h durch eine gemessene ersetzen. Sie stammt aus
+                   BitNode 6 und ist bisher nur mit 1/0,8 hochgerechnet.
+
+---
+
 ## 29.08., 07:15 - BitNode 10, die Strecke NACH dem Tor
 
 Geschrieben vom Vorankommensloop. Der Eintrag von 21:45 beziffert Tor 1 (die

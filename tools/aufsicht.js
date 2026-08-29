@@ -117,16 +117,30 @@ const NOTNAGEL_PRO_TAG = 30;       // hartes Kontingent, rund 6,50 USD
 // zwoelf Stunden stehenzulassen.
 //
 // DREI SICHERUNGEN, damit daraus kein Dauerbetrieb wird:
-//   1. Ausloeser ist `data/ziele.md` aelter als 75 Minuten - der Reportloop
-//      schreibt sie alle 30, drei verpasste Laeufe sind der Beweis, dass
-//      niemand mehr taktet.
+//   1. Ausloeser ist `data/verlauf-strategie.json` aelter als 75 Minuten -
+//      `tools/strategie-check.js` schreibt sie bei JEDEM Lauf, und der
+//      Wache-Loop taktet alle 20 Minuten. Drei verpasste Laeufe sind der
+//      Beweis, dass niemand mehr taktet.
+//
+//      HIER STAND `data/ziele.md`, UND DAS WAR AB 10:25 FALSCH (29.08.2026,
+//      17:00). Der Reportloop wurde an dem Vormittag auf Erics Ansage hin auf
+//      zwei Zeilen gekuerzt und schreibt `ziele.md` seither nicht mehr. Die
+//      Datei blieb auf dem Stand von 10:08 stehen; ab 11:23 hielt der Notnagel
+//      die Loops fuer tot und feuerte alle 20 Minuten einen headless-Lauf -
+//      **30 Stueck bis 16:08, rund 6,50 USD**, waehrend alle fuenf Loops
+//      einwandfrei liefen. Um 16:28 kam die Meldung "Kontingent erschoepft".
+//
+//      Die Lehre steckt nicht im Dateinamen: Ein Waechter darf nicht an einem
+//      Nebenprodukt haengen, das ein Loop beilaeufig schreibt. Er haengt jetzt
+//      an der Datei, die der Pruefer selbst fuehrt - solange irgendein Loop
+//      prueft, ist sie frisch.
 //   2. Hoechstens ein Lauf je 20 Minuten (der Dauerlauf taktet alle 10).
 //   3. Hartes Tageskontingent in `data/notnagel.json`. Ist es erschoepft,
 //      gibt es eine ntfy-Meldung und danach Ruhe.
 async function notnagel() {
-  const ziele = path.join(WURZEL, "data", "ziele.md");
+  const puls = path.join(WURZEL, "data", "verlauf-strategie.json");
   let stillMin = Infinity;
-  try { stillMin = (Date.now() - fs.statSync(ziele).mtimeMs) / 60000; } catch { /* fehlt */ }
+  try { stillMin = (Date.now() - fs.statSync(puls).mtimeMs) / 60000; } catch { /* fehlt */ }
   if (stillMin < NOTNAGEL_STILL_MIN) return;
 
   let stand = { tag: "", laeufe: 0, zuletzt: 0, gemeldet: false };

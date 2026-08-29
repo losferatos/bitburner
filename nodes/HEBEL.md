@@ -37,6 +37,56 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Der Sleeve faehrt ab dem Beitritt Kontrakte statt Gym (29.08., 13:00)
+
+Engpass:    Der Spieler arbeitet nach dem Beitritt nur **18 Prozent** der
+            Zeit (Eintrag 10:00). Der Sleeve stand bisher im Gym - nach Tor 1
+            ist Kampferfahrung aber nicht mehr die Leitgroesse.
+
+Hypothese:  Ein Sleeve auf Kontrakten bringt **25,2 Rang je Stunde** gegen
+            6,6 des Spielers - Faktor 3,8. Der Gesamtzuwachs steigt damit von
+            6,6 auf 31,8 je Stunde, also um **+382 Prozent**.
+
+Beleg:      `SleeveBladeburnerWork.ts:54` ruft
+            `completeAction(sleeve, actionId, false)`; `Bladeburner.ts:948-950`
+            vergibt `changeRank(person, gain)`, und `changeRank` (`:1265-1292`)
+            erhoeht `this.rank` - den Spieler-Rang. Der Ausdauerabzug steht
+            hinter `if (isPlayer)` (`:921`), der Sleeve verbraucht also keine.
+            Vertraege haben **keinen `rankLoss`** (`data/Contracts.ts`, kein
+            Treffer) - ein Fehlschlag kostet nichts ausser Zeit.
+
+Gerechnet mit den Werten von 12:50 (Sleeve 72/72/69/71, Spieler 91/91/91/90),
+Tracking Stufe 1, `getSuccessChance` mit den Gewichten aus
+`data/Contracts.ts:21-38` und `calculateIntelligenceBonus(int, 0,75)`:
+
+    Spieler   Kompetenz 55,61   Chance 0,445   Dauer 10,5 s   Anteil  18 %
+    Sleeve    Kompetenz 38,70   Chance 0,310   Dauer 10,6 s   Anteil 100 %
+
+Die niedrigere Chance des Sleeves faellt kaum ins Gewicht, weil sein
+Arbeitsanteil fuenfeinhalb Mal so hoch ist. Gedaempft wird beides von
+`calculateStaminaPenalty()` (`:167-169`): Sie haengt an der SPIELER-Ausdauer
+und senkt auch die Sleeve-Chance, solange diese unter der Haelfte steht - ein
+weiterer Grund, warum Cyber's Edge in dieser Phase wichtig ist.
+
+Umgesetzt in `src/sleeve.js`: Ist `inBladeburner` true, wird
+`setToBladeburnerAction(i, "Take on contracts", KONTRAKTE[i % 3])` versucht;
+schlaegt das fehl, bleibt es beim Gym. Je Sleeve ein eigener Kontrakt, weil
+zwei denselben nicht fahren duerfen (`NetscriptFunctions/Sleeve.ts:283-293`).
+Der Sleeve steht also nie still.
+
+Vorher:     Sleeve im Gym, Rangbeitrag 0. Tiefstand 91 um 12:51,
+            `inBladeburner` noch false.
+Nachher:    (offen - misst der erste Lauf nach dem Beitritt, ETA 18:15).
+            Pruefung: `data/sleeve.json` muss `contract:Tracking` zeigen, und
+            die Rangrate der ersten Stunde gegen die 6,6 des Spielers allein.
+Commit:     siehe unten.
+
+*Warum trotz der eigenen Regel "vor dem Beitritt nichts am Motor aendern":
+Die Aenderung greift erst, wenn `inBladeburner` true ist, und faellt sonst
+auf das bisherige Verhalten zurueck. Sie kann den Trainingsbetrieb also nicht
+stoeren - und haette man sie erst danach eingebaut, waeren die ersten Stunden
+der Rangphase mit einem Viertel der moeglichen Rate gelaufen.*
+
 ### Kein Hebel, aber die wichtigste Zahl fuer die naechste Phase (29.08., 10:00)
 
 Engpass:    Noch der Kampfwert-Tiefstand (82 von 100 um 09:51), aber der

@@ -77,6 +77,10 @@ export async function main(ns) {
   // um 20:53 falsch geraten - der Aufruf wurde abgelehnt und fiel still auf
   // Shoplift zurueck. Powerhouse Gym steht in Sector-12 und ist das beste.
   const GYM = "Powerhouse Gym";
+  // Je Sleeve ein eigener Kontrakt: zwei Sleeves duerfen denselben nicht
+  // fahren (`NetscriptFunctions/Sleeve.ts:283-293`, wirft sonst). Tracking
+  // steht vorn, weil es den hoechsten Vorrat hat und stealth ist.
+  const KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"];
   const VERBRECHEN = "Shoplift";   // Rueckfall, wenn das Gym nicht geht
   const TAKT = 60000;
   // Ohne getNumSleeves (4 GB) blind bis zur Obergrenze durchzaehlen. Mehr als
@@ -89,10 +93,44 @@ export async function main(ns) {
     const stand = [];
     for (let i = 0; i < MAX; i++) {
       let ok = false, was = "gym";
+      // NACH DEM BEITRITT FAEHRT DER SLEEVE KONTRAKTE (29.08.2026, 13:00).
+      //
+      // Gerechnet, nicht vermutet. `SleeveBladeburnerWork.ts:54` ruft
+      // `completeAction(sleeve, actionId, false)`, und
+      // `Bladeburner.ts:948-950` vergibt dabei `changeRank(person, gain)` -
+      // das erhoeht `this.rank`, den SPIELER-Rang. Der Ausdauerabzug steht
+      // dagegen hinter `if (isPlayer)` (`:921`): der Sleeve verbraucht
+      // keine Ausdauer und arbeitet deshalb durchgehend, waehrend der
+      // Spieler nach dem Beitritt nur 18 Prozent der Zeit arbeitet.
+      //
+      // Mit den Werten vom 29.08., 12:50 (Sleeve 72/72/69/71, Spieler
+      // 91/91/91/90) und Tracking auf Stufe 1:
+      //
+      //     Spieler  Chance 0,445  Dauer 10,5 s  Anteil 18 %   6,6 Rang/h
+      //     Sleeve   Chance 0,310  Dauer 10,6 s  Anteil 100 % 25,2 Rang/h
+      //
+      // Faktor 3,8 - und ein Fehlschlag kostet nichts, weil Vertraege gar
+      // keinen `rankLoss` haben (`data/Contracts.ts`, kein Treffer).
+      // Gedaempft wird beides von `calculateStaminaPenalty()` (`:167`),
+      // das an der SPIELER-Ausdauer haengt und auch die Sleeve-Chance
+      // senkt, solange sie unter der Haelfte steht.
+      //
+      // Faellt der Aufruf durch, bleibt es beim Gym - der Sleeve steht
+      // also nie still, auch wenn der Kontrakt gerade ausverkauft ist
+      // oder ein anderer Sleeve ihn schon faehrt.
+      let inDivision = false;
+      try { inDivision = ns.bladeburner.inBladeburner(); } catch { /* 0 GB */ }
+      if (inDivision) {
+        try {
+          ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts",
+            KONTRAKTE[i % KONTRAKTE.length]);
+          if (ok) was = "contract:" + KONTRAKTE[i % KONTRAKTE.length];
+        } catch { ok = false; }
+      }
       // Der Sleeve trainiert den Wert, der beim SPIELER am niedrigsten ist -
       // der Beitritt verlangt alle vier ueber 100, es zaehlt also der
       // Tiefstand.
-      try {
+      if (!ok) try {
         const sk = ns.getPlayer().skills;
         const paare = [["str", sk.strength], ["def", sk.defense],
           ["dex", sk.dexterity], ["agi", sk.agility]];

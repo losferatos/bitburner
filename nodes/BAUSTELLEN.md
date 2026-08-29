@@ -79,6 +79,59 @@ Regeln:
 
 ## Sofort
 
+### Der Spieler macht Faktionsarbeit statt Gym - Traegerrate faellt auf ein Zehntel (05:40)
+
+Gemessen: `currentWork` aus dem Spielstand um 05:38:
+
+    {"ctor":"FactionWork","data":{"factionWorkType":"hacking",
+     "factionName":"CyberSec","cyclesWorked":126}}
+
+          Kampferfahrung (niedrigster Wert) 05:08 bis 05:37: **1.220 -> 1.868**,
+          also 648 in 29 Minuten = **22 je Minute**. Vor dem Einbau waren es
+          **230 je Minute** (gemessen 22:43 bis 23:01).
+
+Erwartet: Gym-Training im Powerhouse Gym, wie vor dem Einbau. Bei 22/min
+          braucht der Restweg von 221.844 Erfahrung **168 Stunden** statt der
+          16,1, die bei 230/min stehen.
+
+Verdacht: `src/bn4rep.js` laeuft seit dem Wiederanlauf um 04:15 wieder (PID 20,
+          nach dem Neustart 46) und setzt den Spieler auf Faktionsarbeit, um
+          Reputation fuer die naechste Augmentierungsrunde zu sammeln.
+          `bbtrain.js` laeuft parallel, kommt aber nicht dagegen an. Genau
+          diese Konkurrenz beschreibt `nodes/ERLEDIGT.md` fuer den 25.08.
+          ("bn4life und bn4rep brachen die Bladeburner-Aktionen sekuendlich
+          ab") - damals fuer Bladeburner, jetzt fuer das Gym.
+
+          Die Rechnung dagegen steht seit 22:52: Reputation zu sammeln, um
+          Kampf-Augmentierungen zu kaufen, ist in diesem Knoten teurer als
+          stumpfes Gym (23,5 h gegen 14,7 h) - und der Einbau um 04:15 hat das
+          gerade eben noch einmal belegt, mit 6,6 Stunden Verlust.
+
+Dringlichkeit: **hoechste.** Solange das laeuft, steht der Traeger praktisch
+          still. Zu klaeren ist, wo bn4rep den Vorrang von bbtrain
+          missachtet - der Riegel dafuer existiert (`bn4rep.js:683`, seit
+          04:25 auch fuer BitNode 10), aber er verhindert nur den EINBAU, nicht
+          das Reputationssammeln davor.
+
+### Der Sleeve arbeitet seit dem Reset nicht mehr (05:40)
+
+Gemessen: Aus dem Spielstand um 05:38: ein Sleeve, `shock: 0`, `sync: 25`,
+          **`currentWork: keine`**.
+
+Erwartet: Gym-Training im selben Gym wie der Spieler. Vor dem Einbau trug der
+          Sleeve 2,77 der 13,25 Erfahrungspunkte je Sekunde
+          (`nodes/HEBEL.md`, 22:05) - also rund ein Fuenftel des Traegers.
+
+Verdacht: `src/sleeve.js` lief vor dem Reset auf `fulcrumtech` (Prozessliste
+          03:13) und steht in der Prozessliste von 04:20 nicht mehr. Es gehoert
+          offenbar nicht zur Startliste des Wiederanlaufs
+          (`src/bn4net.js`, WERKZEUGE) - dann faellt es nach jedem Einbau
+          stillschweigend aus.
+
+Dringlichkeit: hoch, aber nach dem Faktionsarbeits-Punkt. Ein Fuenftel der
+          Traegerrate ist viel, aber der Spieler selbst steht gerade bei einem
+          Zehntel.
+
 ### bn4rep hat in BitNode 10 vor dem Beitritt eingebaut - 6,6 Stunden verloren (04:15)
 
 Gemessen: Um 04:15 meldete der Pruefer RESET: Kampfwert-Tiefstand von 88 auf 1,

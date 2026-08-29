@@ -23,6 +23,125 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### 29.08.2026 - bn4rep hat in BitNode 10 vor dem Beitritt eingebaut (04:15), Commits a9e4d1a und Vorlaeufer
+
+
+Gemessen: Um 04:15 meldete der Pruefer RESET: Kampfwert-Tiefstand von 88 auf 1,
+          Netz 85 auf 8, Geld 0. Kein Knotenwechsel - `knoten.json` zeigt
+          weiter 10, aber `augReset` ist neu (04:15:31), `playtimeSinceLastAug`
+          0,07 h. Acht Augmentierungen wurden eingebaut:
+
+              Wired Reflexes, Augmented Targeting I, Cranial Signal
+              Processors Gen I, Speech Processor, Nuoptimal Nootropic,
+              ADR-V1 Pheromone, Speech Enhancement, NeuroFlux Governor
+
+          Neue Multiplikatoren: str/def 1,2870 (vorher 1,2616), dex 1,4864,
+          agi 1,3513.
+
+Bilanz:   Der Tiefstand haengt an str/def, und die stiegen nur um 2 Prozent.
+          Bedarf fuer Level 100 faellt damit von 252.795 auf **223.740**
+          Erfahrung (`calculateSkill` umgestellt, m_eff = 1,2870 * 0,4).
+          Verloren sind die 119.865 Erfahrung, die um 04:15 bei Tiefstand 88
+          standen.
+
+              Ersparnis   29.055 Erfahrung
+              Verlust    119.865
+              netto      **-90.810 Erfahrung = 6,6 Stunden** bei 230/min
+
+          Das ist genau die Rechnung vom 28.08., 22:52 (`nodes/ERLEDIGT.md`):
+          Gym allein schlaegt die Augmentierungsrunde, und der Abstand waechst
+          mit jeder Gym-Stunde. Der Bot hat die schlechtere Option gewaehlt.
+
+Ursache:  `src/bn4rep.js` hatte an **drei** Stellen `n === 6 || n === 7`, die
+          10 fehlte ueberall:
+
+              683   Beitritts-Sperre ("KEIN EINBAU VOR DEM DIVISIONSBEITRITT")
+              904   Spendenrecht-Ausnahme an der Mindestwarteschlange vorbei
+             1396   Kampfgewicht in der Augmentierungsbewertung
+
+          Die Sperre von Zeile 683 haette den Einbau verhindert - ihr Kommentar
+          beschreibt exakt diesen Fall ("ein Einbau setzt genau die Kampfwerte
+          auf 1 zurueck"), nur galt sie fuer den falschen Knoten.
+
+Behoben:  Alle drei Stellen um `|| n === 10` ergaenzt, `bn4rep.js` per
+          `WERKZEUG bn4rep.js` neu gestartet - **verifiziert 04:22, neue PID
+          46** (vorher 20). Der laufende Prozess trug sonst weiter die alte
+          Fassung; genau diese Falle hat um 03:14 schon `blade.js` betroffen.
+
+Verifiziert: `node tools/strategie-check.js` um 04:21 - URTEIL SPUR, der
+          Wiederanlauf nach dem Einbau ist vollstaendig (alle elf Werkzeuge
+          laufen auf home). Dass die Sperre jetzt greift, zeigt sich erst beim
+          naechsten Einbauversuch; bis zum Beitritt darf keiner mehr kommen.
+
+**Fuenfte Fundstelle, aus derselben Familie (29.08., 06:20).** `bn4rep.js`
+hob die Blade-Sperre selbst wieder auf: Nach `let gesperrt = bladeSperre;`
+folgte `if (lockInhalt) { gesperrt = ... }` als **Zuweisung**. Ein
+abgelaufenes Firmenschloss setzte `gesperrt` damit auf false, obwohl der
+Divisionsbeitritt noch aussteht - genau der Einbau, der um 04:15 6,6 Stunden
+gekostet hat, waere so ein zweites Mal moeglich gewesen. Aktuell existierte
+`data/install-sperre.txt` nicht, die Falle war also scharf, aber ungezuendet.
+Behoben mit `gesperrt = bladeSperre || lockGilt;` - die beiden Sperren sind
+unabhaengig, es reicht, wenn eine greift. Das Loeschen des abgelaufenen
+Schlosses bleibt erhalten.
+
+Verifiziert: `node --check` sauber; Pruefer 06:13 URTEIL SPUR, rc 0; die neue
+Zeile steht in der Spielfassung (`getFile bn4rep.js`), `bn4rep.js` neu
+gestartet - **PID 14843** (vorher 46), belegt in `data/ps.json` um 06:15:21.
+Wahrheitstafel isoliert nachgerechnet: blade=true + Schloss abgelaufen gibt
+jetzt true (vorher false), die drei uebrigen Faelle unveraendert.
+
+**Die Suche nach weiteren Stellen ist gelaufen** (05:12,
+`grep -rn "=== 6" src/ tools/`). Vier Fundstellen insgesamt, alle behoben:
+
+    tools/strategie-check.js:856   04:18   blade.json wurde verworfen
+    src/bn4rep.js  683, 904, 1396  04:25   Einbausperre griff nicht
+    tools/wache.js:780             04:45   Motor wurde nicht ueberwacht
+    tools/strategie-check.js:492   05:15   fehlender Steckbrief kein BLIND
+
+Der letzte Fund ist derselbe Fehler in der Gegenrichtung: Ein fehlender
+Bladeburner-Steckbrief loeste in BitNode 10 nie BLIND aus - vor dem Beitritt
+richtig, danach ein stiller Ausfall von `bblage.js`. Das Kriterium ist jetzt
+nicht mehr der Knoten, sondern ob die Division existieren MUESSTE: Ab
+Kampfwert-Tiefstand 100 verlangt das Spiel nichts weiter
+(`NetscriptFunctions/Bladeburner.ts:356`), also muss sie stehen. Das behebt
+nebenbei denselben Fehler in BitNode 6 und 7, wo vor dem Beitritt bisher
+faelschlich BLIND gemeldet wurde.
+
+**Die Lehre fuer die Liste:** Der Knoten ist der falsche Traeger fuer solche
+Bedingungen. Richtig ist die Eigenschaft, um die es geht - "traegt Bladeburner
+hier?" oder "muesste die Division stehen?". Wer nach dem naechsten
+Knotenwechsel wieder eine Nummer in eine Bedingung schreibt, baut denselben
+Fehler ein fuenftes Mal.
+
+Verifiziert: `node --check` sauber, `node tools/strategie-check.js` um 05:16
+URTEIL SPUR, Rueckgabewert 0, Traeger unveraendert.
+
+*Der Punkt "Kampf-Augmentierungen vor dem Bladeburner-Beitritt" (19:20) ist am
+28.08. um 22:52 abgeraeumt worden - nicht umgesetzt, sondern zu Ende gerechnet
+und verworfen. Die Rechnung steht in `nodes/ERLEDIGT.md`. Kurz: Tor 1 zaehlt
+den NIEDRIGSTEN Kampfwert, und von den erreichbaren Stuecken hebt genau eines
+die Staerke (Combat Rib I, 15.000 Rep in BitNode 10). Die billigen drei kosten
+Reputation, ohne den Tiefstand um einen Punkt zu bewegen. Gemessen 22:43: Gym
+allein 14,7 h, Augmentierungsrunde 23,5 h - und der Abstand waechst mit jeder
+Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
+
+
+---
+
+**Abgeschlossen 06:45 am 29.08.2026.** Der Verhaltensnachweis, auf den der
+Punkt wartete, liegt vor: Seit dem Fix um 04:25 stehen **zwei gekaufte
+Augmentierungen ungebaut** (Neurotrainer I, Synaptic Enhancement Implant,
+`tools/save.js` um 06:44), und in 2 h 20 min gab es keinen Reset -
+`augReset` unveraendert 1787969731675 (04:15). Die alte Fassung hatte bei
+genau dieser Ausgangslage um 04:15 eingebaut. Zusaetzlich ist die fuenfte
+Fundstelle derselben Fehlerklasse behoben (Firmenschloss hob die
+Blade-Sperre auf, Commit a9e4d1a).
+
+Nebenbei geprueft und **kein Befund**: `data/bn4rep.json` stand um 06:42
+seit 05:40 still. Das ist dokumentiertes Verhalten - das Skript steigt an
+vier Stellen vor der Telemetriezeile aus der Runde aus (`src/bn4rep.js:406`).
+Das Lebenszeichen ist `data/hb-rep.txt`, und das war 8 Sekunden alt.
+
 ### Der Sleeve arbeitet wieder - und steht jetzt in der Startliste (erledigt 29.08., 05:50)
 
 Befund von 05:40: Ein Sleeve, `shock 0`, `sync 25`, `currentWork: keine`. Vor

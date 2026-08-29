@@ -23,6 +23,82 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Sleeve auf Bladeburner-Kontrakten: 14,4 Rang/h, belegt
+
+**Verifiziert: 14,4 Rang je Stunde, gemessen 19:07:51 bis 21:17:22 (2,16 h).**
+Rang 17 -> 48, also 31 Rang - und zwar **restlos vom Sleeve**. Der
+Augmentierungs-Einbau um 19:05 hat die Kampfwerte des Spielers auf 1
+gesetzt; `blade.js` weicht seither `bbtrain` (`data/blade.json`:
+`General/keine`, Grund "weicht bbtrain, Kampfwerte 78"), der Spieler faehrt
+also **keine einzige** Bladeburner-Aktion. Der Sleeve ist nicht betroffen und
+laeuft durchgehend auf Kontrakten (`contract:Bounty Hunter`, spaeter
+`contract:Retirement` - die Rueckfallkette bei leerem Vorrat).
+
+Das ist ein saubereres Experiment, als der Punkt verlangt hatte: Statt eine
+Stunde Gym gegen eine Stunde Kontrakte zu stellen, hat der Einbau den
+Spieleranteil auf null gesetzt. Der Gym-Vergleichswert ist damit trivial
+**0 Rang/h** - ein Sleeve im Gym vergibt keinen Rang.
+
+Kurze Fenster taugen hier nicht: Zwischen 21:15:47 und 21:17:22 stiegen 4
+Rang in 95 Sekunden (151/h), zwischen 20:15 und 21:17 waren es 13,6/h. Die
+Kontraktdauer und der Ausdauerzyklus schwanken; nur das Zwei-Stunden-Fenster
+ist belastbar.
+
+**Damit steht die Aenderung vom 29.08., 13:00 dauerhaft** (`src/sleeve.js:83`,
+`KONTRAKTE` + `setToBladeburnerAction` bei `inBladeburner() === true`, Gym als
+Rueckfall unter `KONTRAKT_MIN_KAMPF = 40`).
+
+Nebenbefund fuer den Kursloop: 14,4 Rang/h ist die erste gemessene Rate in
+BitNode 10 und liegt ueber der Simulation von 10:20, die fuer den Spieler
+allein rund 6,6/h nach 10 Stunden erwartete.
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### Der Sleeve kann Bladeburner-Kontrakte fahren - ungenutzt (12:15)
+
+Gemessen: Aus dem Quellcode, vor dem Beitritt. `sleeve.js` setzt den Sleeve
+          ausschliesslich ins Gym. Nach dem Beitritt ist das voraussichtlich
+          die schlechtere Wahl.
+
+Beleg:    `Sleeve/Work/SleeveBladeburnerWork.ts:54` ruft
+          `Player.bladeburner.completeAction(sleeve, actionId, false)`. In
+          `Bladeburner.ts:948-950` vergibt das bei Erfolg
+          `changeRank(person, gain)` - und `changeRank` erhoeht **`this.rank`,
+          den Spieler-Rang** (`:1265-1292`), unabhaengig davon, wer die Aktion
+          gefahren hat. Der Ausdauerabzug dagegen steht hinter
+          `if (isPlayer)` (`Bladeburner.ts:921`): **Der Sleeve verbraucht
+          keine Ausdauer.**
+
+Erwartet: Genau das ist der Engpass. Der Spieler arbeitet nach dem Beitritt
+          nur **18 Prozent** der Zeit (Regeneration 1,19 gegen Verbrauch 6,65
+          je Minute, Hebel-Eintrag 10:00); ein Sleeve auf Kontrakten arbeitet
+          durchgehend. Bei aehnlicher Aktionsdauer waere er also grob
+          **fuenfmal produktiver** im Rangaufbau als der Spieler selbst.
+
+          Dagegen zu rechnen ist die Erfolgschance: `attempt()` nutzt die
+          Stats des Sleeves, nicht die des Spielers, und ein Fehlschlag
+          kostet Rang (`Bladeburner.ts:977-979`). Der Sleeve trainiert bis zum
+          Beitritt mit, seine Kampfwerte liegen aber unter denen des Spielers.
+
+Weg:      `ns.sleeve.setToBladeburnerAction(0, "Take on contracts", <name>)`
+          (`NetscriptFunctions/Sleeve.ts:271-300`). Zwei Sleeves duerfen nicht
+          denselben Kontrakt fahren, und der Kontrakt muss verfuegbar sein -
+          beides pruefbar. In BitNode 10 ist der Zugang ohnehin frei.
+
+**Geaendert 29.08. um 13:00, Wirkung noch nicht gemessen.** `src/sleeve.js:83`
+fuehrt jetzt `KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"]` und setzt
+den Sleeve bei `inBladeburner() === true` per `setToBladeburnerAction` darauf
+(`:122-127`); der Gym-Zweig bleibt als Rueckfall. Nicht messbar bis zum
+Beitritt - `data/sleeve.json` zeigt um 13:12 noch `aufgabe: agi`.
+
+**Zu tun, sobald `inBladeburner` true ist:** Eine Stunde Gym gegen eine Stunde
+Kontrakte messen - Rangzuwachs je Stunde, sonst nichts aendern. Traegt es,
+gehoert es dauerhaft in `sleeve.js`.
+
+Dringlichkeit: **hoch** - groesster bekannter ungenutzter Hebel des Knotens,
+relevant genau im Moment des Beitritts.
+
+
 ## 29.08.2026 - `WERKZEUG sleeve.js`: Fehlbedienung aus den Loop-Prompts entfernt
 
 **Verifiziert 20:50 am Motor-Log.** `data/bn4net-log.txt` fuehrt seit dem

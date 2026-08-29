@@ -118,49 +118,7 @@ Regeln:
 
 ## Sofort
 
-### Der Sleeve kann Bladeburner-Kontrakte fahren - ungenutzt (12:15)
-
-Gemessen: Aus dem Quellcode, vor dem Beitritt. `sleeve.js` setzt den Sleeve
-          ausschliesslich ins Gym. Nach dem Beitritt ist das voraussichtlich
-          die schlechtere Wahl.
-
-Beleg:    `Sleeve/Work/SleeveBladeburnerWork.ts:54` ruft
-          `Player.bladeburner.completeAction(sleeve, actionId, false)`. In
-          `Bladeburner.ts:948-950` vergibt das bei Erfolg
-          `changeRank(person, gain)` - und `changeRank` erhoeht **`this.rank`,
-          den Spieler-Rang** (`:1265-1292`), unabhaengig davon, wer die Aktion
-          gefahren hat. Der Ausdauerabzug dagegen steht hinter
-          `if (isPlayer)` (`Bladeburner.ts:921`): **Der Sleeve verbraucht
-          keine Ausdauer.**
-
-Erwartet: Genau das ist der Engpass. Der Spieler arbeitet nach dem Beitritt
-          nur **18 Prozent** der Zeit (Regeneration 1,19 gegen Verbrauch 6,65
-          je Minute, Hebel-Eintrag 10:00); ein Sleeve auf Kontrakten arbeitet
-          durchgehend. Bei aehnlicher Aktionsdauer waere er also grob
-          **fuenfmal produktiver** im Rangaufbau als der Spieler selbst.
-
-          Dagegen zu rechnen ist die Erfolgschance: `attempt()` nutzt die
-          Stats des Sleeves, nicht die des Spielers, und ein Fehlschlag
-          kostet Rang (`Bladeburner.ts:977-979`). Der Sleeve trainiert bis zum
-          Beitritt mit, seine Kampfwerte liegen aber unter denen des Spielers.
-
-Weg:      `ns.sleeve.setToBladeburnerAction(0, "Take on contracts", <name>)`
-          (`NetscriptFunctions/Sleeve.ts:271-300`). Zwei Sleeves duerfen nicht
-          denselben Kontrakt fahren, und der Kontrakt muss verfuegbar sein -
-          beides pruefbar. In BitNode 10 ist der Zugang ohnehin frei.
-
-**Geaendert 29.08. um 13:00, Wirkung noch nicht gemessen.** `src/sleeve.js:83`
-fuehrt jetzt `KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"]` und setzt
-den Sleeve bei `inBladeburner() === true` per `setToBladeburnerAction` darauf
-(`:122-127`); der Gym-Zweig bleibt als Rueckfall. Nicht messbar bis zum
-Beitritt - `data/sleeve.json` zeigt um 13:12 noch `aufgabe: agi`.
-
-**Zu tun, sobald `inBladeburner` true ist:** Eine Stunde Gym gegen eine Stunde
-Kontrakte messen - Rangzuwachs je Stunde, sonst nichts aendern. Traegt es,
-gehoert es dauerhaft in `sleeve.js`.
-
-Dringlichkeit: **hoch** - groesster bekannter ungenutzter Hebel des Knotens,
-relevant genau im Moment des Beitritts.
+keine
 
 ## Offen, nach Dringlichkeit
 

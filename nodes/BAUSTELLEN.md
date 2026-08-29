@@ -118,6 +118,53 @@ Regeln:
 
 ## Sofort
 
+### `WERKZEUG sleeve.js` startet nichts - der Sleeve stand 90 Minuten (14:20)
+
+Gemessen: `data/ps.json` um 14:12 fuehrte **kein `sleeve.js`** - wohl aber
+          `bn4net`, `bbtrain`, `blade`, `bn4rep` und sechs weitere.
+          `data/sleeve.json` war **81,8 Minuten alt**, der Sleeve also seit
+          rund 12:50 unbeschaeftigt. Um 10:42 lief es noch (PID 9629).
+
+Erwartet: Ein Dauerprozess. `sleeve.js` steht seit dem 29.08., 05:50
+          ausdruecklich in der `WERKZEUGE`-Liste (`src/bn4net.js:277`), damit
+          es Resets ueberlebt - genau wegen desselben Vorfalls am 28.08.
+
+Was nicht half: `pushFile data/reload.txt` mit `WERKZEUG sleeve.js` um
+          14:14:49. Der Kanal **nahm es an** (`reload.txt` war 90 s spaeter
+          wieder leer, also gelesen), aber die Prozessliste um 14:16 war
+          unveraendert. Kein `data/hilfe.txt`, `fehlstart: 0` in
+          `data/bn4net.json`.
+
+Was half:  Der **Auftragskanal**. `pushFile data/task.txt` mit
+          `["sleeve.js"]` um 14:17. **Verifiziert 14:19:40: laeuft auf
+          fulcrumtech, PID 161300**, `data/sleeve.json` 0,7 min alt, Sleeve
+          auf `dex` im Gym - vor dem Beitritt die richtige Aufgabe.
+
+Verdacht: Nicht der RAM. Der Bedarf liegt bei rund 13 GB (drei
+          `ns.sleeve.*`-Funktionen je 4 GB `SleeveBase`, plus Basis), die
+          Werkbank fulcrumtech hat 1.859 GB Reserve, `homeFrei` war 1.025 GB.
+          Auch kein Dateiproblem: `getFile sleeve.js` liefert auf **home und
+          fulcrumtech** die neue Fassung mit `KONTRAKTE` (7.809 Zeichen).
+          Bleibt der Nachstart-Zweig selbst: `src/bn4net.js:2628`
+          (`fehlend = WERKZEUGE.filter(...)`) und die Platzpruefung darunter
+          bei `:2670` (`if (!(braucht > 0) || frei() >= braucht) continue`).
+          Wenn `laufend` den Prozess faelschlich als vorhanden fuehrt, wird
+          nie nachgestartet - und `WERKZEUG` wuerde ebenfalls ins Leere
+          laufen, weil es denselben Weg nimmt.
+
+**Warum das dringend ist:** Genau dieses Werkzeug traegt den groessten Hebel
+des Knotens (Sofort-Punkt darunter, Sleeve auf Bladeburner-Kontrakte). Waere
+es beim Beitritt gegen 18:50 tot gewesen, haette der Hebel nicht gegriffen -
+und niemand haette es gemerkt, weil kein Urteil darauf anschlaegt: Der
+Strategiepruefer meldete waehrend der 90 Minuten durchgehend **SPUR**.
+
+Naechster Schritt: `laufend` an der Fundstelle nachvollziehen. Bis dahin gilt:
+**ein fehlendes Werkzeug wird ueber `data/task.txt` gestartet, nicht ueber
+`data/reload.txt`** - der Auftragskanal ist der belegt funktionierende Weg.
+
+Dringlichkeit: **hoch**. Ein stiller Ausfall ohne Urteil ist schlimmer als ein
+lauter.
+
 ### Der Sleeve kann Bladeburner-Kontrakte fahren - ungenutzt (12:15)
 
 Gemessen: Aus dem Quellcode, vor dem Beitritt. `sleeve.js` setzt den Sleeve
@@ -163,57 +210,6 @@ Dringlichkeit: **hoch** - groesster bekannter ungenutzter Hebel des Knotens,
 relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
-
-### ETA zum Beitritt wurde geschaetzt statt gerechnet - Werkzeug gebaut (13:30)
-
-Gemessen: Der stuendliche Report leitete die ETA aus dem Skill-Zuwachs ab
-          ("+1 in 6 min" mal die fehlenden Punkte). Das ist methodisch falsch,
-          weil die Erfahrung je Skillpunkt exponentiell steigt - die Zahl kann
-          nur zufaellig stimmen.
-
-Beleg:    `PersonObjects/formulas/skill.ts:13`, umgestellt
-          `exp(z) = e^((z/m + 200)/32) - 534.6`. Stand 13:41 (str 93, def 92,
-          dex 92, agi 92): fehlend 70.833 + 80.923 + 31.697 + 58.969 =
-          **242.422 exp**.
-
-          Die Rate steht ebenfalls im Quellcode und muss nicht gemessen
-          werden: Powerhouse Gym `expMult: 10` (`LocationsMetadata.ts:325`)
-          durch `gameCPS` 5, mal 5 Cycles je Sekunde, **mal dem
-          Erfahrungs-Multiplikator der Figur** (`Work/Formulas.ts:115-118`,
-          `multWorkStats(..., person.mults)`). Der liegt bei **1,287** fuer
-          alle vier Kampfwerte (`node tools/save.js`, 13:45), also
-          **12,87 exp/s**. Ergebnis: **5,2 h, Tor um 18:53**.
-
-Behoben:  `tools/tor.js` (neu). Rechnet die Umkehrung, leitet m aus dem
-          laufenden Stand zurueck statt es hartzucodieren, und glaettet die
-          Rate ueber `data/tor-verlauf.json`. Ausgabe zweizeilig, dazu
-          `data/tor.json` fuer den Reportloop.
-
-**Zwei eigene Fehler dabei, beide behoben - sie sind der eigentliche Lehrsatz:**
-
-1. Die erste Fassung (13:18) nahm 10,0 exp/s als Formelwert und vergass den
-   Multiplikator 1,287. Ergebnis 7,7 h statt 5,2 h - **29 Prozent zu lang**.
-2. Der Versuch, die Rate stattdessen zu *messen*, ergab in zwei Fenstern von
-   je unter 40 Minuten einmal **9,10** und einmal **15,37 exp/s** - denselben
-   Bot, denselben Zustand, den echten Wert 12,87 dazwischen. Ursache ist die
-   Tab-Drosselung: Ein gedrosselter Tab holt schubweise nach
-   (`data/rueckstand.json` existiert genau dafuer). Mindestfenster deshalb
-   auf **20 Minuten** gesetzt.
-
-   Die daraus gezogene Zwischenbehauptung "die gemeldete ETA war um 3 h zu
-   optimistisch" **war falsch** und ist hiermit zurueckgenommen. Der Report
-   von 12:53 nannte 18:13, richtig sind 18:53 - 40 Minuten daneben, nicht
-   drei Stunden. Das Muster ist bekannt: **Nachschlagen schlaegt messen**,
-   und ein kurzes Messfenster ist in diesem Spiel keine Messung.
-
-**Verifiziert: 5,2 h / 18:53 um 13:47** - `node --check` sauber, zweimal
-identisch, Pruefer SPUR.
-
-**Was noch aussteht:** Der Reportloop soll `node tools/tor.js` aufrufen statt
-selbst zu rechnen.
-
-Dringlichkeit: mittel. Der Bot laeuft davon unbeeindruckt; falsch war nur die
-Zahl, die Eric bekommt - und die ist seit dem 29.08. sein einziger Bericht.
 
 ### `ausdauerLuft()` misst den Fuellstand, nicht die Knappheit (11:45)
 

@@ -23,6 +23,65 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - ETA zum Beitritt: gerechnet statt geschaetzt (Commit 2e2a0f3, 4c1bd1b)
+
+### ETA zum Beitritt wurde geschaetzt statt gerechnet - Werkzeug gebaut (13:30)
+
+Gemessen: Der stuendliche Report leitete die ETA aus dem Skill-Zuwachs ab
+          ("+1 in 6 min" mal die fehlenden Punkte). Das ist methodisch falsch,
+          weil die Erfahrung je Skillpunkt exponentiell steigt - die Zahl kann
+          nur zufaellig stimmen.
+
+Beleg:    `PersonObjects/formulas/skill.ts:13`, umgestellt
+          `exp(z) = e^((z/m + 200)/32) - 534.6`. Stand 13:41 (str 93, def 92,
+          dex 92, agi 92): fehlend 70.833 + 80.923 + 31.697 + 58.969 =
+          **242.422 exp**.
+
+          Die Rate steht ebenfalls im Quellcode und muss nicht gemessen
+          werden: Powerhouse Gym `expMult: 10` (`LocationsMetadata.ts:325`)
+          durch `gameCPS` 5, mal 5 Cycles je Sekunde, **mal dem
+          Erfahrungs-Multiplikator der Figur** (`Work/Formulas.ts:115-118`,
+          `multWorkStats(..., person.mults)`). Der liegt bei **1,287** fuer
+          alle vier Kampfwerte (`node tools/save.js`, 13:45), also
+          **12,87 exp/s**. Ergebnis: **5,2 h, Tor um 18:53**.
+
+Behoben:  `tools/tor.js` (neu). Rechnet die Umkehrung, leitet m aus dem
+          laufenden Stand zurueck statt es hartzucodieren, und glaettet die
+          Rate ueber `data/tor-verlauf.json`. Ausgabe zweizeilig, dazu
+          `data/tor.json` fuer den Reportloop.
+
+**Zwei eigene Fehler dabei, beide behoben - sie sind der eigentliche Lehrsatz:**
+
+1. Die erste Fassung (13:18) nahm 10,0 exp/s als Formelwert und vergass den
+   Multiplikator 1,287. Ergebnis 7,7 h statt 5,2 h - **29 Prozent zu lang**.
+2. Der Versuch, die Rate stattdessen zu *messen*, ergab in zwei Fenstern von
+   je unter 40 Minuten einmal **9,10** und einmal **15,37 exp/s** - denselben
+   Bot, denselben Zustand, den echten Wert 12,87 dazwischen. Ursache ist die
+   Tab-Drosselung: Ein gedrosselter Tab holt schubweise nach
+   (`data/rueckstand.json` existiert genau dafuer). Mindestfenster deshalb
+   auf **20 Minuten** gesetzt.
+
+   Die daraus gezogene Zwischenbehauptung "die gemeldete ETA war um 3 h zu
+   optimistisch" **war falsch** und ist hiermit zurueckgenommen. Der Report
+   von 12:53 nannte 18:13, richtig sind 18:53 - 40 Minuten daneben, nicht
+   drei Stunden. Das Muster ist bekannt: **Nachschlagen schlaegt messen**,
+   und ein kurzes Messfenster ist in diesem Spiel keine Messung.
+
+**Verifiziert: 5,2 h / 18:53 um 13:47** - `node --check` sauber, zweimal
+identisch, Pruefer SPUR.
+
+**Was noch aussteht:** Der Reportloop soll `node tools/tor.js` aufrufen statt
+selbst zu rechnen.
+
+Dringlichkeit: mittel. Der Bot laeuft davon unbeeindruckt; falsch war nur die
+Zahl, die Eric bekommt - und die ist seit dem 29.08. sein einziger Bericht.
+
+**Abgeschlossen 14:12.** Der offene Rest - der Reportloop soll `tor.js`
+aufrufen statt selbst hochzurechnen - ist um 13:50 erledigt:
+`loops/loop-report.md` umgestellt und der Cron-Job aus der Datei neu gesetzt
+(e56bceb2, stuendlich :47), in dieser Reihenfolge, wie es der bb-loops-Skill
+verlangt. Erste Feuerung mit dem neuen Text: 14:47.
+
 ### 29.08.2026 - BitNode 10: die Rangstrecke steht jetzt im Kurs (erledigt 07:15)
 
 Gemessen: Aus dem Quellcode gelesen, nicht aus Telemetrie.

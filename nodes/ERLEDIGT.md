@@ -23,6 +23,41 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Faktionsarbeit statt Gym - behoben, Rate von 22 auf 386 je Minute (erledigt 29.08., 05:50)
+
+Befund von 05:40: `currentWork` war `FactionWork` (CyberSec, hacking), die
+Kampferfahrung stieg um 22 je Minute statt der 230 vom Vortag. Der Restweg
+haette damit 168 Stunden gebraucht statt 16.
+
+Ursache: `bn4rep.js:350`, `bladeSperreArbeit()`. Zwei Luecken auf einmal:
+
+    if (k !== 6 && k !== 7) return false;          // die 10 fehlte
+    return ns.bladeburner.inBladeburner();          // erst NACH dem Beitritt
+
+Die erste ist die **fuenfte** Fundstelle derselben Klasse in dieser Nacht
+(strategie-check 856 und 492, wache 780, bn4rep 683/904/1396). Die zweite ist
+neu und war auch in BitNode 6 und 7 falsch: Vor dem Beitritt traegt das Gym,
+und Faktionsarbeit bricht ein Gym-Training genauso ab wie eine
+Bladeburner-Aktion - nur ist es dort nie aufgefallen, weil der Beitritt am
+ersten Tag kam.
+
+Behoben: In einem Kampfknoten wird gar nicht mehr fuer Faktionen gearbeitet,
+weder vor noch nach dem Beitritt.
+
+    return k === 6 || k === 7 || k === 10;
+
+bn4rep behaelt alles andere - Kaufen und Einbauen brauchen keine Arbeit, nur
+Geld und vorhandene Reputation. Und die Reputationsarbeit ist in diesem Knoten
+ohnehin verworfen (`nodes/ERLEDIGT.md`, 22:52: Gym allein 14,7 h gegen 23,5 h
+mit Augmentierungsrunde).
+
+Verifiziert: Nach `WERKZEUG bn4rep.js` steht `currentWork` auf `ClassWork`
+(Gym, defExp steigt). Erfahrung des niedrigsten Werts **2.043 -> 2.815 in zwei
+Minuten = 386 je Minute**, gegen 22 vorher. Restweg 220.898 Erfahrung, ETA
+damit **9,5 Stunden** statt 168.
+
+---
+
 ### Der Pruefer haette den Motor von BitNode 10 nie geprueft (erledigt 29.08., 04:18)
 
 Gefunden beim Blick nach vorn: Was passiert nach dem Bladeburner-Beitritt, der

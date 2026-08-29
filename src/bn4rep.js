@@ -347,10 +347,27 @@ export async function main(ns) {
 
   // Traegt in diesem Knoten die Division statt der Reputation? inBladeburner()
   // kostet 0 GB (RamCostGenerator.ts), die Abfrage ist also gratis.
+  // ZWEI LUECKEN, BEIDE AM 29.08.2026 UM 05:45 GEMESSEN.
+  //
+  // 1. Die 10 fehlte. Fuenfte Fundstelle derselben Klasse in dieser Nacht
+  //    (vorher: strategie-check 856 und 492, wache 780, bn4rep 683/904/1396).
+  // 2. `inBladeburner()` machte die Sperre erst NACH dem Beitritt scharf.
+  //    Davor traegt aber das Gym, und Faktionsarbeit bricht ein Gym-Training
+  //    genauso ab wie eine Bladeburner-Aktion.
+  //
+  // Gemessen 05:08 bis 05:37: `currentWork` war FactionWork (CyberSec,
+  // hacking), die Kampferfahrung stieg um **22 je Minute** statt der 230 vom
+  // Vortag. Der Restweg von 221.844 Erfahrung braucht damit 168 Stunden statt
+  // 16. Die Reputationsarbeit selbst ist in diesem Knoten ohnehin verworfen
+  // (`nodes/ERLEDIGT.md`, 22:52: Gym allein 14,7 h gegen 23,5 h mit
+  // Augmentierungsrunde).
+  //
+  // In einem Kampfknoten wird also gar nicht mehr fuer Faktionen gearbeitet -
+  // weder vor noch nach dem Beitritt. bn4rep behaelt alles andere: Kaufen und
+  // Einbauen brauchen keine Arbeit, nur Geld und vorhandene Reputation.
   const bladeSperreArbeit = () => {
     const k = ns.getResetInfo().currentNode;
-    if (k !== 6 && k !== 7) return false;
-    try { return ns.bladeburner.inBladeburner(); } catch { return false; }
+    return k === 6 || k === 7 || k === 10;
   };
 
   // WAS DIE REPUTATION WIRKLICH KOSTET, WIRD GEMESSEN (27.08.2026, 09:50).

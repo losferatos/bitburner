@@ -92,10 +92,13 @@ function starte(skript, name) {
 const NOTNAGEL_STAND = path.join(WURZEL, "data", "notnagel.json");
 const NOTNAGEL_STILL_MIN = 75;     // ab wann die Loops als gestorben gelten
 const NOTNAGEL_ABSTAND_MIN = 20;   // Mindestabstand zweier Laeufe
-// 0 SCHALTET DEN NOTNAGEL AB (29.08.2026, 18:58). Eric spart Kontingent
-// bis Sonntag 13:00; bis dahin darf nichts headless-claude starten. Die
-// Bruecken- und Waechteraufsicht laeuft weiter, sie kostet nichts.
-const NOTNAGEL_PRO_TAG = 0;        // 30 = Normalbetrieb, rund 6,50 USD
+// 0 SCHALTET DEN NOTNAGEL AB. Gebraucht wird das fuer Erics Token-Pausen:
+// Ohne Loops schreibt niemand mehr `data/verlauf-strategie.json`, der
+// Notnagel haelt das nach 75 Minuten fuer Stillstand und startet alle 20
+// Minuten einen headless-claude - also genau das, was gespart werden soll.
+// Die Bruecken- und Waechteraufsicht laeuft bei 0 weiter, sie kostet nichts.
+// Am 29.08. um 21:00 geht er wieder auf 0, bis Sonntag 13:00.
+const NOTNAGEL_PRO_TAG = 30;       // 0 = stumm, 30 = Normalbetrieb (6,50 USD/Tag)
 
 // DER NOTNAGEL: HEADLESS-LAEUFE, WENN DIE LOOPS STEHEN (27.08.2026, 21:12).
 //

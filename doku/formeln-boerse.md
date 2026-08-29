@@ -113,11 +113,56 @@ selten umschichtet, verpasst den 7,5-Minuten-Zyklus. Die Positionsdauer sollte
 also nahe an einem Zyklus liegen und die Positionsgroesse so gross, dass 200.000
 Provision unter einem Zehntel des erwarteten Gewinns bleiben.
 
-## 6. Was hier noch fehlt
+## 6. Den Forecast selbst setzen - der eigentliche Weg fuer BitNode 8
 
-- `PlayerInfluencing.ts`: Eigene Hack- und Grow-Aufrufe verschieben den
-  Forecast der zugehoerigen Aktie (`shareTxUntilMovement`). In einem Knoten mit
-  laufendem Hacknetz ist das ein Hebel, der nichts kostet - ungelesen.
+Nachgelesen 29.08. um 02:15 (`PlayerInfluencing.ts`, `Stock.ts:154-239`,
+`NetscriptFunctions.ts:302`, `Netscript/NetscriptHelpers.tsx:669`). Das aendert
+die Bauart des Bots grundlegend, deshalb hier vollstaendig.
+
+**Die Kette.** Jede Aktie hat zwei Groessen:
+
+    getAbsoluteForecast() = b ? 50 + otlkMag : 50 - otlkMag     // wirkt sofort
+    otlkMagForecast                                              // das ZIEL
+
+Der Forecast wandert bei jedem Tick auf sein Ziel zu
+(`cycleForecast`/`getForecastIncreaseChance`, `Stock.ts:174-239`):
+
+    increaseChance = (50 + clamp(otlkMagForecast - absoluteForecast, -45, 45))/100
+
+Steht das Ziel ueber dem Ist, steigt der Forecast mit bis zu **95 Prozent**
+Wahrscheinlichkeit je Tick; steht es darunter, faellt er mit derselben
+Sicherheit.
+
+**Und das Ziel ist steuerbar.** `ns.grow(host, {stock: true})` hebt
+`otlkMagForecast` um **0,1**, `ns.hack(host, {stock: true})` senkt es um
+denselben Betrag - jeweils mit einer Wahrscheinlichkeit, die dem bewegten
+Anteil des Servergeldes entspricht (`moneyGrown / server.moneyMax`). Ein
+vollstaendiger grow auf einen Server mit vollem Geldstand trifft also fast
+sicher. Bedingung ist allein die `stock`-Option des Aufrufs; ein WSE-Konto
+wird **nicht** geprueft (`validateHGWOptions`, `NetscriptFunctions.ts:411`).
+
+**Damit braucht der Bot die 4S-Daten nicht.** Er muss den Forecast nicht
+schaetzen, weil er ihn setzt: genug grow-Aufrufe auf den Server einer Aktie,
+und ihr Kurs steigt danach mit hoher Wahrscheinlichkeit. Die 25 Mrd fuer die
+4S-API sind damit ein Komfortkauf, kein Nadeloehr - Abschnitt 4 oben bewertet
+das noch andersherum und gilt nur fuer einen rein beobachtenden Bot.
+
+**Der Punkt, an dem es fuer BitNode 8 haengt - und aufgeht.** Dort steht
+`ScriptHackMoneyGain: 0`, der Spieler bekommt aus `hack()` also nichts. Aber
+`ScriptHackMoney: 0.3` ist nicht null: Dem **Server** wird weiterhin Geld
+entnommen, und genau diese Menge geht als `moneyDrained` in
+`influenceStockThroughServerHack`. Manipulation funktioniert in BitNode 8 also
+vollstaendig, obwohl Hacken kein Einkommen mehr ist. In dem einzigen Knoten
+ohne Einnahmequelle ist das Hacknetz damit weiterhin die Einnahmequelle - nur
+ueber den Umweg des Kurses.
+
+**Die Grenze:** `stockMarketCycle` kippt alle 7,5 Minuten mit 45 Prozent
+sowohl `b` als auch - ueber `flipForecastForecast` - das Ziel auf
+`100 - otlkMagForecast`. Eine aufgebaute Manipulation ist danach weg und muss
+neu aufgebaut werden. Die Haltedauer einer Position sollte also innerhalb eines
+Zyklus liegen, und der Aufbau muss schneller sein als 7,5 Minuten.
+
+## 7. Was hier noch fehlt
 - `getDarknetVolatilityMult`: In `processStockPrices` steht ein
   Darknet-Multiplikator auf die Volatilitaet. Woher er kommt und ob er
   steuerbar ist, ist ungeprueft.

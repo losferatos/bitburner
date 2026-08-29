@@ -366,10 +366,34 @@ der Bot haengt:
 Geld den Fortschritt ohnehin nicht - der Traeger ist die Kampferfahrung. Ein
 Kauf hier waere nur fuer einen Test, und beim Knotenwechsel ist er wieder weg.
 
-Offen und im Doku-Anhang notiert: `PlayerInfluencing.ts` (eigene Hack- und
-Grow-Aufrufe verschieben den Forecast - in einem Knoten mit laufendem Hacknetz
-ein Hebel, der nichts kostet), der Darknet-Volatilitaetsmultiplikator und die
-Frage, ob Limit-Orders mehr koennen als Marktorders.
+**Nachgelegt 29.08. um 02:20 - und es kippt die Bauart des Bots.**
+`PlayerInfluencing.ts` war als Randnotiz vermerkt und ist der Hauptweg:
+
+- `ns.grow(host, {stock: true})` hebt das Forecast-ZIEL `otlkMagForecast` einer
+  Aktie um 0,1, `ns.hack(..., {stock: true})` senkt es - mit einer
+  Wahrscheinlichkeit gleich dem bewegten Anteil des Servergeldes.
+- Der Forecast wandert je Tick auf dieses Ziel zu, mit bis zu **95 Prozent**
+  Wahrscheinlichkeit (`getForecastIncreaseChance`, `Stock.ts:235-239`).
+- Ein WSE-Konto wird dabei **nicht** geprueft, nur die `stock`-Option des
+  Aufrufs (`validateHGWOptions`, `NetscriptFunctions.ts:411`).
+
+**Der Bot muss den Forecast also nicht schaetzen, er setzt ihn.** Damit ist die
+4S-API (25 Mrd) ein Komfortkauf statt eines Nadeloehrs - die Rechnung aus
+`doku/formeln-boerse.md` Abschnitt 4 gilt nur noch fuer einen rein
+beobachtenden Bot.
+
+**Und fuer BitNode 8 geht es auf.** Dort ist `ScriptHackMoneyGain: 0` - Hacken
+bringt dem Spieler nichts -, aber `ScriptHackMoney: 0.3` ist nicht null: Dem
+Server wird weiterhin Geld entnommen, und genau diese Menge treibt die
+Manipulation. Im einzigen Knoten ohne Einnahmequelle bleibt das Hacknetz die
+Einnahmequelle, nur ueber den Umweg des Kurses.
+
+Grenze: `stockMarketCycle` kippt alle 7,5 Minuten mit 45 Prozent auch das Ziel
+(`flipForecastForecast`: `100 - otlkMagForecast`). Aufbau und Haltedauer
+muessen in einen Zyklus passen.
+
+Offen bleibt: der Darknet-Volatilitaetsmultiplikator und die Frage, ob
+Limit-Orders mehr koennen als Marktorders.
 
 ### 4. Darknet-Labyrinth-Gewerk (V1b)
 

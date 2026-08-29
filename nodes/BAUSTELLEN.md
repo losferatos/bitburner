@@ -162,6 +162,18 @@ Naechster Schritt: `laufend` an der Fundstelle nachvollziehen. Bis dahin gilt:
 **ein fehlendes Werkzeug wird ueber `data/task.txt` gestartet, nicht ueber
 `data/reload.txt`** - der Auftragskanal ist der belegt funktionierende Weg.
 
+**Nachtrag 14:22 - der Befund war zu scharf formuliert.** Der Sleeve stand
+nicht still: Eine einmal gesetzte Aufgabe bleibt aktiv, auch wenn das Skript
+stirbt. Er trainierte also weiter `agi`. Beleg ist die Erfahrungsrate: `tor.js`
+misst ueber 42 Minuten **15,37 exp/s**, wo das Gym allein 12,87 gibt - die
+Differenz von 19 Prozent ist der Sleeve-Anteil (`Sleeve/Work/Work.ts:17-25`,
+`applyWorkStatsExp(Player, stats, sync)`, sync 25 in BitNode 10).
+
+Der Kern des Befunds bleibt: Beim Beitritt gegen 18:00 haette **niemand** den
+Sleeve von `agi` auf Kontrakte umgestellt, und das ist der groesste Hebel des
+Knotens. Ausserdem bleibt die Ratenmessung von 13:41 damit erklaert - sie war
+kein Messfehler, sondern der Sleeve.
+
 Dringlichkeit: **hoch**. Ein stiller Ausfall ohne Urteil ist schlimmer als ein
 lauter.
 

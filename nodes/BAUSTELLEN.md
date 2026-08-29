@@ -128,9 +128,31 @@ Verifiziert: `node tools/strategie-check.js` um 04:21 - URTEIL SPUR, der
           laufen auf home). Dass die Sperre jetzt greift, zeigt sich erst beim
           naechsten Einbauversuch; bis zum Beitritt darf keiner mehr kommen.
 
-**Offen und wichtig:** Dieselbe 6-oder-7-Luecke steckte im Pruefer (behoben
-04:18) und in bn4rep. Es lohnt eine Suche nach weiteren Stellen, die
-Kampfknoten hart als 6 und 7 aufzaehlen - `grep -rn "=== 6" src/ tools/`.
+**Die Suche nach weiteren Stellen ist gelaufen** (05:12,
+`grep -rn "=== 6" src/ tools/`). Vier Fundstellen insgesamt, alle behoben:
+
+    tools/strategie-check.js:856   04:18   blade.json wurde verworfen
+    src/bn4rep.js  683, 904, 1396  04:25   Einbausperre griff nicht
+    tools/wache.js:780             04:45   Motor wurde nicht ueberwacht
+    tools/strategie-check.js:492   05:15   fehlender Steckbrief kein BLIND
+
+Der letzte Fund ist derselbe Fehler in der Gegenrichtung: Ein fehlender
+Bladeburner-Steckbrief loeste in BitNode 10 nie BLIND aus - vor dem Beitritt
+richtig, danach ein stiller Ausfall von `bblage.js`. Das Kriterium ist jetzt
+nicht mehr der Knoten, sondern ob die Division existieren MUESSTE: Ab
+Kampfwert-Tiefstand 100 verlangt das Spiel nichts weiter
+(`NetscriptFunctions/Bladeburner.ts:356`), also muss sie stehen. Das behebt
+nebenbei denselben Fehler in BitNode 6 und 7, wo vor dem Beitritt bisher
+faelschlich BLIND gemeldet wurde.
+
+**Die Lehre fuer die Liste:** Der Knoten ist der falsche Traeger fuer solche
+Bedingungen. Richtig ist die Eigenschaft, um die es geht - "traegt Bladeburner
+hier?" oder "muesste die Division stehen?". Wer nach dem naechsten
+Knotenwechsel wieder eine Nummer in eine Bedingung schreibt, baut denselben
+Fehler ein fuenftes Mal.
+
+Verifiziert: `node --check` sauber, `node tools/strategie-check.js` um 05:16
+URTEIL SPUR, Rueckgabewert 0, Traeger unveraendert.
 
 *Der Punkt "Kampf-Augmentierungen vor dem Bladeburner-Beitritt" (19:20) ist am
 28.08. um 22:52 abgeraeumt worden - nicht umgesetzt, sondern zu Ende gerechnet

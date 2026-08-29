@@ -484,12 +484,32 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       // Bladeburner-Lage. In BitNode 10 gibt es zu diesem Zeitpunkt gar keine
       // Division - er FEHLT zu Recht, und ein BLIND daraus ist ein
       // Fehlalarm, der die Wache bei jedem Lauf in die Diagnose schickt.
+      // VERFEINERT 29.08.2026, 05:15 - das Kriterium ist nicht der Knoten,
+      // sondern ob die Division ueberhaupt existieren muesste.
+      //
+      // `kampfKnoten` liess BitNode 10 aussen vor. Das war richtig, solange
+      // dort keine Division existiert - ab dem Beitritt aber waere ein
+      // fehlender Steckbrief ein echter Ausfall von `bblage.js`, und niemand
+      // haette ihn gemeldet. Umgekehrt gilt dasselbe in BitNode 6 und 7: Auch
+      // dort ist der Steckbrief vor dem Beitritt zu Recht nicht da.
+      //
+      // Der Tiefstand entscheidet: Ab 100 verlangt das Spiel keine weiteren
+      // Kampfwerte mehr (`NetscriptFunctions/Bladeburner.ts:356`), die
+      // Division muesste also stehen. Faellt die Quelle aus, bleibt das alte
+      // Verhalten.
+      const tiefstandFrueh = ks && ks.kampf
+        ? Math.min(ks.kampf.str, ks.kampf.def, ks.kampf.dex, ks.kampf.agi)
+        : null;
+      const divisionErwartet = Number.isFinite(tiefstandFrueh)
+        ? (bladeKnoten && tiefstandFrueh >= 100)
+        : kampfKnoten;
       sag("Steckbrief ist " + alterMin + " min alt und der Auftragskanal war"
-        + " frei" + (kampfKnoten ? " - der Auftragslaeufer im Spiel arbeitet"
-          + " nicht." : " - in BitNode " + knotenFrueh + " ohne Belang, der"
-          + " Steckbrief ist eine Bladeburner-Groesse."));
+        + " frei" + (divisionErwartet ? " - der Auftragslaeufer im Spiel arbeitet"
+          + " nicht." : " - in BitNode " + knotenFrueh + " noch ohne Belang, die"
+          + " Division steht erst ab Kampfwert 100 (jetzt "
+          + (tiefstandFrueh ?? "?") + ")."));
       bb = null;
-      if (kampfKnoten) urteil = "BLIND";
+      if (divisionErwartet) urteil = "BLIND";
     }
   }
   // DIE KNOTENNUMMER KOMMT ZUERST AUS data/knoten.json (28.08.2026, 17:25).

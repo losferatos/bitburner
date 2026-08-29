@@ -381,11 +381,46 @@ async function durchgang() {
 // Platte, nichts was haengenbleiben kann. Stirbt sie doch, kommt sie beim
 // naechsten Anmelden zurueck - und bis dahin laeuft das Spiel im Browser
 // ohnehin weiter, nur ohne Selbstheilung.
+// DER DAUERLAUF STARTET SICH NEU, WENN SEIN CODE SICH AENDERT (29.08., 22:50).
+//
+// Am 29.08. lief dieser Prozess seit dem 27.08., 21:13 - also zwei Tage mit
+// dem Code von damals im Speicher. Die Korrektur des Notnagel-Ausloesers vom
+// selben Tag um 16:53 lag auf der Platte und wirkte NICHT: Der Prozess
+// feuerte weiter Fehlalarme, 30 headless-Laeufe und rund 6,50 USD, bis Eric
+// um 18:40 das Terminal aufblitzen sah und ich ihn von Hand neu startete.
+//
+// Das ist dieselbe Klasse wie die Waechter-Falle in BAUSTELLEN.md, nur eine
+// Ebene tiefer: Dort hing ein Waechter an der falschen Datei, hier haengt er
+// an der richtigen - aber in einer Fassung, die es nicht mehr gibt. Eine
+// Codeaenderung an einem Dauerprozess ist folgenlos, solange ihn niemand
+// neu startet, und niemand erinnert daran.
+//
+// Deshalb prueft die Schleife die mtime ihrer eigenen Quelldatei gegen den
+// Zeitpunkt ihres Starts. Ist die Datei neuer, startet sie sich abgekoppelt
+// neu und beendet sich. Eine Schleife kann daraus nicht werden: Nach dem
+// Neustart liegt der Startzeitpunkt hinter der mtime.
+const START_MS = Date.now();
+const EIGEN = fileURLToPath(import.meta.url);
+function eigenerCodeIstNeuer() {
+  try { return fs.statSync(EIGEN).mtimeMs > START_MS; } catch { return false; }
+}
+function selbstNeustart() {
+  sag("Eigener Code hat sich geaendert - starte neu.");
+  try {
+    spawnSync("powershell", ["-NoProfile", "-Command",
+      "Start-Process -FilePath 'node' -ArgumentList 'tools/aufsicht.js','--dauer'"
+      + " -WorkingDirectory '" + WURZEL + "' -WindowStyle Hidden"],
+      { timeout: 20000, stdio: "ignore", windowsHide: true });
+  } catch { /* dann laeuft eben der alte weiter - besser als gar keiner */ }
+  process.exit(0);
+}
+
 if (DAUERLAUF) {
   sag("Aufsicht im Dauerlauf, Takt " + (TAKT_MS / 60000) + " min.");
   const runde = async () => {
     try { await durchgang(); }
     catch (e) { sag("Durchgang fehlgeschlagen: " + String(e.message || e)); }
+    if (eigenerCodeIstNeuer()) return selbstNeustart();
     setTimeout(runde, TAKT_MS);
   };
   runde();

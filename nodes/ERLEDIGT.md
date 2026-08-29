@@ -23,6 +23,118 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Waechter-Falle: die drei Fundstellen bestaetigt, eine vierte Klasse geschlossen
+
+**Die Regel des Punkts nachgeprueft, sie haelt.** `grep -n "mtimeMs\|statSync"
+tools/*.js src/*.js sync/*.js` findet genau drei Frischepruefungen, und alle
+drei haengen an einer Datei, die der ueberwachte Vorgang selbst schreibt:
+
+    tools/aufsicht.js:150   data/verlauf-strategie.json   schreibt strategie-check.js:38
+    tools/aufsicht.js:228   data/wache-zustand.json       schreibt wache.js selbst (:32)
+    tools/wache.js:447      data/verlauf-strategie.json   dieselbe, ebenfalls richtig
+
+Kein Nebenprodukt mehr dabei. Der Punkt ist damit inhaltlich erledigt.
+
+**Aber er beschreibt nur die halbe Klasse.** Was am 29.08. tatsaechlich
+passierte, war eine Ebene tiefer: Der Ausloeser wurde um 16:53 korrekt auf
+`verlauf-strategie.json` umgestellt - und **wirkte trotzdem nicht**. Der
+Dauerlauf-Prozess lief seit dem 27.08., 21:13 und hatte den Code von damals
+im Speicher. Er feuerte weiter Fehlalarme, bis Eric um 18:40 das aufblitzende
+Terminal meldete und ich ihn von Hand neu startete.
+
+Ein Waechter kann also an der richtigen Datei haengen und trotzdem falsch
+laufen - in einer Fassung, die es nicht mehr gibt. Eine Codeaenderung an
+einem Dauerprozess ist folgenlos, solange ihn niemand neu startet, und nichts
+erinnert daran.
+
+**Behoben (22:50):** `tools/aufsicht.js` prueft in jeder Runde die mtime
+seiner eigenen Quelldatei gegen `START_MS`. Ist die Datei neuer, startet er
+sich abgekoppelt neu (`Start-Process`, `-WindowStyle Hidden`) und beendet
+sich. Eine Schleife kann daraus nicht werden, weil der Startzeitpunkt danach
+hinter der mtime liegt. Prozess mit der neuen Fassung laeuft seit 22:48:48
+(PID 19580).
+
+**Offene Nachmessung:** Der Selbstneustart greift fruehestens beim naechsten
+Takt (10 Minuten). Beim naechsten Mal, wenn `aufsicht.js` geaendert wird,
+gehoert geprueft, dass die PID sich von allein aendert - vorher ist die
+Mechanik eingebaut, aber nicht bewiesen.
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### Dieselbe Waechter-Falle stand an zwei Stellen - eine blieb 3 Tage stehen (17:15)
+
+Gemessen: Am 29.08. um 16:28 kam die ntfy-Meldung "Notnagel-Kontingent
+          erschoepft - Loops stehen", **waehrend alle fuenf Loops liefen**.
+          `data/ziele.md` stand auf 10:08, `data/verlauf-strategie.json` war
+          frisch. Der Notnagel hatte ab 11:23 **30 headless-Laeufe** gefeuert,
+          rund 6,50 USD, alle wirkungslos.
+
+Ursache:  `tools/aufsicht.js:129` erkannte lebende Loops an `data/ziele.md`.
+          Die schrieb der **alte** Reportloop alle 30 Minuten; seit seiner
+          Kuerzung auf zwei Zeilen am 29.08. um 10:25 schreibt er sie nicht
+          mehr. Behoben 16:53, Ausloeser ist jetzt
+          `data/verlauf-strategie.json` (schreibt der Pruefer bei jedem Lauf).
+
+**Der eigentliche Befund ist nicht der Bug, sondern seine Wiederholung.**
+Genau dieselbe Falle stand in `tools/wache.js` und wurde dort am **26.08. um
+01:15** behoben - mit derselben Begruendung, demselben Ersatz und dem
+ausdruecklichen Satz "Ein Fehlalarm aus dem Alarmwerkzeug selbst ist die
+teuerste Sorte". `aufsicht.js` blieb dabei unberuehrt und lief drei Tage
+weiter mit dem alten Signal. Das ist das Muster vom 25.08. (`bn4life`, dann
+`bn4rep`): behoben wurde der Einzelfall, nicht die Klasse.
+
+Geprueft und **kein Befund**: Es gibt genau drei Frischepruefungen im Repo
+(`grep -n mtimeMs tools/*.js src/*.js`). Die dritte, `aufsicht.js:218` auf
+`data/wache-zustand.json`, ist richtig - der Waechter schreibt diese Datei
+selbst, sie ist sein eigenes Lebenszeichen und kein Nebenprodukt.
+
+**Regel, die daraus folgt:** Ein Waechter haengt an einer Datei, die der
+ueberwachte Vorgang **selbst** schreibt - nie an einem Nebenprodukt, das ein
+anderer Loop beilaeufig mitfuehrt. Wer ein Ausgabeformat aendert, greppt
+vorher nach dem Dateinamen: `grep -rn "<datei>" tools/ src/ sync/`.
+
+Dringlichkeit: niedrig - beide Fundstellen sind behoben. Der Eintrag steht
+hier, damit die naechste Formataenderung die Frage stellt.
+
+**Der Uebergang um 18:04 ist vorgeprueft (15:45) - er traegt.**
+
+    bbtrain.js:257-272   endet nicht nach dem Beitritt, sondern geht in eine
+                         Warteschleife (`drin && tief >= ZIEL` -> sleep 60 s).
+                         Kein zweiter Beitrittsversuch, kein hilfe.txt-Sturm.
+                         Verlassen wird sie nur, wenn die Kampfwerte fallen -
+                         also nach einem Augmentierungs-Einbau.
+    blade.js:569-573     wartet im 30-s-Takt und uebernimmt sofort.
+    sleeve.js:85,157     prueft im 60-s-Takt, stellt also spaetestens eine
+                         Minute nach dem Beitritt auf Kontrakte um.
+
+**Neuer Befund dabei: Kontrakte sind ein gemeinsamer Topf.** Der Nachschub
+betraegt `count += seconds * growthFunction() / 480`
+(`Bladeburner.ts:1387`, `Constants.ts:39`) mit `growthFunction` = 0,5 bis 7,5
+(`data/Contracts.ts:40`), im Mittel 4,0 - also **30 Kontrakte je Stunde und
+Art**, 90 fuer alle drei zusammen.
+
+Dagegen der erwartete Verbrauch: Spieler rund 62 Aktionen/h (10,5 s je Aktion
+bei 18 Prozent Arbeitsanteil), Sleeve rund 340/h (10,6 s, durchgehend). Zusammen
+**etwa 400 gegen 90** - der Vorrat wird geleert, und zwar binnen der ersten
+Stunde.
+
+Das ist **nicht automatisch schlecht**: Sind die Kontrakte leer, weicht der
+Spieler auf Operationen aus, und die bringen mehr Rang je Aktion. Schlecht
+waere erst, wenn auch die Operationen leerlaufen und `beste()` auf Training
+oder Diplomacy zurueckfaellt - dann kostet der Sleeve mehr, als er bringt.
+
+**Messvorschrift fuer die erste Stunde nach dem Beitritt** (ersetzt die
+bisherige Gym-gegen-Kontrakte-Messung, die ohne zweiten Sleeve ohnehin nicht
+vergleichbar waere):
+
+  1. `data/sleeve.json` zeigt `contract:Tracking`.
+  2. Rangrate der ersten Stunde gegen die gerechneten 6,6/h (Spieler allein)
+     bzw. 31,8/h (mit Sleeve).
+  3. **`data/blade.json` auf die Aktionsverteilung ansehen.** Faellt der
+     Spieler auf `Training` oder `Diplomacy` durch, ist der Topf leer und der
+     Sleeve gehoert auf eine Kontraktart beschraenkt, die blade.js meidet.
+
+
 ## 29.08.2026 - Tracer in die Sortierung, und der Fähigkeitskauf lief im Ausweichzweig gar nicht
 
 **Verifiziert 22:21: Punkte 17 -> 0.** Gekauft wurden in einer einzigen Runde

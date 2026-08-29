@@ -349,6 +349,48 @@ Raid ueberhaupt noch waehlt. Sie entscheidet nichts mehr am Horizont, sondern
 belegt nur, dass der Zuschlag rechnerisch dort ankommt, wo er soll.
 
 
+**Konstanten gegen die Quelle geprueft (30.08., 00:25) - sie stimmen, aber der
+Zuschlag ignoriert die Erfolgschance.**
+
+Die Umrechnung ist richtig: `changePopulationByPercentage(p)` rechnet
+`pop * (p/100)` (`Bladeburner/City.ts:79-87`), aus `-1` wird also 1 Prozent.
+`POP_JE_ERFOLG` in `src/blade.js:2341` fuehrt Raid 0,01, Stealth Retirement
+0,005, Sting 0,001 - alle drei korrekt.
+
+**Zwei Ungenauigkeiten, beide belegt:**
+
+1. **Raid verbraucht auch bei Fehlschlag.** `Bladeburner.ts:837-843`, der
+   `else`-Zweig: `getRandomIntInclusive(-10, -5) / 10`, also -0,5 bis -1,0
+   Prozent, im Mittel **0,75 Prozent**. Der Punkt oben nannte nur den
+   Erfolgsfall.
+
+2. **Sting und Stealth Retirement verbrauchen NUR bei Erfolg.** Beide stehen
+   ausschliesslich im `if (success)`-Zweig (`:816-821` und `:846-852`). Der
+   Zuschlag rechnet aber mit der vollen Rate, unabhaengig von der Chance - bei
+   halber Erfolgschance ist er damit **doppelt so hoch wie der Erwartungswert**.
+
+**Die exakte Formel waere** (p = Erfolgschance):
+
+    Sting               p * 0,001
+    Stealth Retirement  p * 0,005
+    Raid                p * 0,01 + (1 - p) * 0,0075
+
+Bei p = 1 aendert sich nichts; bei p = 0,5 faellt der Zuschlag fuer Sting und
+Stealth Retirement auf die Haelfte, fuer Raid auf 0,875 Prozent.
+
+**Nicht umgesetzt**, weil `p` an der Stelle `src/blade.js:2345` nicht
+vorliegt - `beste()` rechnet die Chance in einer eigenen Funktion weiter oben
+(`:1745-1782`). Der Umbau ist keine Zeile, sondern das Durchreichen eines
+Wertes durch die Bewertungskette; ohne laufende Operationen laesst er sich
+auch nicht nachmessen. Der derzeitige Wert ist die **obere Schranke**, der
+Zuschlag also eher zu hoch als zu niedrig - konservativ im Sinne der Sache.
+
+**Wirkung weiterhin nicht gemessen.** Der Spieler faehrt seit dem Einbau um
+19:05 gar keine Bladeburner-Aktionen (Wiederaufbau, Restzeit 2,3 h um 00:15);
+`data/aktionen.txt` fuehrt fuer die 50 Minuten davor nur Kontrakte, die
+Regenerationskammer und Recruitment - kein Raid, aber bei Rang 0 bis 16 sagt
+das nichts. Messbar ab dem Moment, in dem `blade.js` wieder traegt.
+
 ### Wartet bis V1-Knoten: Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die

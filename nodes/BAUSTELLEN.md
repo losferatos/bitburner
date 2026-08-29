@@ -134,8 +134,12 @@ Uebergang geprueft, **er traegt**:
 
 **Damit laufen die Uhren fuer die drei offenen Nachmessungen:**
 
-  1. **20 Minuten** (also ab 18:35): Sleeve zurueck auf Kampfwert 40,
-     `data/sleeve.json` muss dann `contract:Tracking` zeigen.
+  1. ~~**20 Minuten** (ab 18:35): Sleeve zurueck auf Kampfwert 40,
+     `data/sleeve.json` muss `contract:Tracking` zeigen.~~
+     **Verifiziert: `contract:Tracking` um 18:41:54.** Die Schwelle
+     `KONTRAKT_MIN_KAMPF = 40` hat ihn nach rund 25 Minuten Gym freigegeben,
+     die Gym-Wahl nach seinem eigenen Tiefstand (Umstellung 17:50) hat
+     getragen. Damit ist der Aug-Reset von 17:45 vollstaendig aufgeholt.
   2. **Eine Stunde** (ab 19:15): Rangrate gegen die gerechneten 6,6/h
      (Spieler allein) bzw. 31,8/h (mit Sleeve). Dazu `data/blade.json` auf
      die Aktionsverteilung ansehen - faellt der Spieler auf Training oder

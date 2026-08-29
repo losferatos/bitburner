@@ -3102,6 +3102,28 @@ export async function main(ns) {
       // Vertraegen ist kein Fehler, sondern die Antwort auf schwankende
       // Schaetzungen - und es ist billiger als jede Verzoegerung.
       if (!gleich) {
+        // Truppeinsatz NUR bei Black Ops (29.08.2026, 18:50). Der Bonus ist
+        // `(teamCount+1)^0,05` (`Actions/Operation.ts:96-98`) und wirkt ueber
+        // `competence *= getTeamSuccessBonus` (`Actions/Action.ts:178`) - bei
+        // sechs Mann +10,1 Prozent. Er greift NUR nach `setTeamSize`;
+        // `action.teamCount` steht sonst auf 0 (`Actions/Operation.ts:23`),
+        // und genau das war bisher der Fall: Der Bot rekrutierte brav auf
+        // TRUPP_ZIEL und setzte den Trupp nie ein - die Rekrutierungszeit
+        // war vollstaendig verschenkt.
+        //
+        // Bei OPERATIONEN bleibt er ungenutzt, und das ist gerechnet:
+        // Verluste sind 0..ceil(n/2) bei Erfolg, 0..n bei Fehlschlag
+        // (`Actions/TeamCasualties.ts:36-38`), im Mittel rund 1,5 Mann je
+        // Operation. Ersatz kostet 284 s Recruitment je Mann - mehr Rangzeit,
+        // als die +10 Prozent an einer einzelnen Operation je einbringen.
+        // Black Ops sind einmalig und tragen den Knotenausgang; dort zaehlt
+        // die Chance, nicht der Truppbestand.
+        if (wahl.typ === B) {
+          try {
+            const mann = ns.bladeburner.getTeamSize();
+            if (mann > 0) ns.bladeburner.setTeamSize(B, wahl.name, mann);
+          } catch { /* alte Fassung ohne setTeamSize */ }
+        }
         if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
           let r = null;
           try { r = ns.bladeburner.getRank(); } catch { /* egal */ }

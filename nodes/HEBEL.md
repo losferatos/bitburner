@@ -8,6 +8,42 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Der Trupp wurde rekrutiert, aber nie eingesetzt (29.08.2026, 18:50)
+
+**Befund.** `blade.js` fuellt den Trupp auf `TRUPP_ZIEL = 6` auf
+(`src/blade.js:2097-2104`) und rechnet den Truppbonus in die Erfolgschance
+ein (`src/blade.js:1776`). Aufgerufen wurde `setTeamSize` aber **nie** - an
+keiner Stelle der Datei. Damit blieb `action.teamCount` auf seinem Startwert
+0 (`Actions/Operation.ts:23`), und `getTeamSize(typ, name)` gab konsequent 0
+zurueck.
+
+Die Chancenrechnung war dadurch nicht falsch - sie spiegelte die Realitaet
+korrekt mit `1^0,05 = 1`. Falsch war die **Realitaet**: Jede Rekrutierung
+kostete 284 s Spielerzeit (`data/GeneralActions.ts:24-27`, Charisma 1) fuer
+einen Bonus, der nie zur Anwendung kam.
+
+**Was der Bonus wert ist.** `(teamCount+1)^0,05`
+(`Actions/Operation.ts:96-98`), angewendet als `competence *=
+getTeamSuccessBonus` (`Actions/Action.ts:178`). Bei sechs Mann sind das
+`7^0,05 = 1,1006`, also **+10,1 Prozent competence**. Kontrakte und General
+Actions bekommen ihn nicht - `getTeamSize` gibt fuer beide hart 0 zurueck
+(`NetscriptFunctions/Bladeburner.ts:262-265`).
+
+**Warum nur Black Ops, nicht Operationen.** Truppmitglieder sterben:
+`0..ceil(n/2)` bei Erfolg, `0..n` bei Fehlschlag
+(`Actions/TeamCasualties.ts:36-38`), bei sechs Mann also im Mittel rund 1,5
+je Operation. Ersatz kostet 284 s Recruitment je Mann - bei der Rangrate
+kurz nach dem Beitritt rund 3,8 Rang je Mann, gegen +10 Prozent auf eine
+einzelne Operation, die selbst nur wenige Rang bringt. Operationen laufen
+laufend, Black Ops einmal: Dort ist die Chance der Engpass (Typhoon steht
+bei 0,0194), sie tragen den Knotenausgang, und die Feuerschwelle 0,35 wird
+mit +10 Prozent frueher erreicht.
+
+**Eingebaut** vor `startAction` (`src/blade.js:3104-3125`): bei `wahl.typ === B`
+wird `setTeamSize(B, name, getTeamSize())` gesetzt, sonst nichts. Wirkung
+messbar erst ab Rang 2500 (erste Black Op) - bis dahin ist die Aenderung
+folgenlos, aber die Rekrutierungszeit ist ab jetzt keine verlorene Zeit mehr.
+
 ## Regeln
 
 - **Eine Änderung je Lauf.** Zwei gleichzeitig sind nicht mehr auseinanderzuhalten.

@@ -23,6 +23,47 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Pruefer haette den Motor von BitNode 10 nie geprueft (erledigt 29.08., 04:18)
+
+Gefunden beim Blick nach vorn: Was passiert nach dem Bladeburner-Beitritt, der
+in rund zwei Stunden ansteht?
+
+Gemessen: `tools/strategie-check.js:856` stand
+          `if (!kampfKnoten) blade = null;`, und `kampfKnoten` ist in Zeile 456
+          als `knoten === 6 || knoten === 7` definiert. In BitNode 10 wurde die
+          Telemetrie des Motors damit **immer** verworfen.
+
+Erwartet: Ab dem Beitritt traegt `blade.js` diesen Knoten. Der Pruefer haette
+          dann weder gemeldet, dass `blade.json` ausbleibt (der
+          Fuenf-Minuten-Alarm ein paar Zeilen darunter), noch die Rate gegen
+          den Vorlauf geprueft. Die gesamte Motorueberwachung waere still
+          ausgefallen - und zwar genau ab dem Moment, in dem sie gebraucht
+          wird.
+
+Ursache: Der Kommentar an der Stelle war am 28.08. um 17:31 richtig ("in
+          BitNode 10 laeuft blade.js nicht und soll es nicht") - der Knoten
+          hatte gerade begonnen, der Bot baute sein Netz auf. Seit dem Kurs von
+          18:55 ist Bladeburner auch hier der Weg, und `bladeKnoten` schliesst
+          die 10 ein. Die eine Zeile ist bei der Umstellung stehengeblieben.
+
+Behoben: `if (!bladeKnoten || !(bb && bb.inBladeburner)) blade = null;`
+
+          Der urspruengliche Grund bleibt gedeckt: Eine alte `blade.json`
+          ueberlebt den Knotenwechsel auf home und hat am 28.08. um 17:30 eine
+          falsche STAGNATION ausgeloest. Sie wird jetzt genau dann verworfen,
+          wenn der Motor nachweislich nicht arbeitet - ausserhalb der
+          Kampfknoten oder vor dem Beitritt. Das ist praeziser als vorher, denn
+          es deckt auch die Vor-Beitritts-Phase in BitNode 6 und 7 ab, in der
+          bisher eine veraltete blade.json bewertet worden waere.
+
+Verifiziert: `node tools/strategie-check.js` um 04:16 - URTEIL: SPUR,
+          Rueckgabewert 0, Traeger unveraendert "Kampfwert-Tiefstand 88 von
+          100". Die Wirkung selbst zeigt sich erst nach dem Beitritt; dann muss
+          der Pruefer den Traeger auf "Bladeburner-Rang" umstellen und bei
+          ausbleibender blade.json Alarm geben.
+
+---
+
 ### Der V2-Kontrollpunkt ist gemessen - und der Pruefstein selbst widerlegt (erledigt 29.08., 01:20)
 
 Der Punkt stand mit Dringlichkeit **hoch** und dem Satz "ist nie gemessen

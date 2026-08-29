@@ -853,7 +853,23 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // hat den Pruefer um 17:30 auf STAGNATION geschickt, obwohl der Bot
   // planmaessig sein Netz aufbaut. Der Puls dieses Knotens ist bn4net.json,
   // nicht blade.json.
-  if (!kampfKnoten) blade = null;
+  // KORRIGIERT 29.08.2026, 04:15 - die alte Fassung haette den Motor dieses
+  // Knotens ab dem Beitritt ungeprueft laufen lassen.
+  //
+  // Hier stand `if (!kampfKnoten) blade = null;`, und `kampfKnoten` ist nur 6
+  // oder 7. In BitNode 10 wurde die Telemetrie des Motors also IMMER
+  // verworfen - der Satz oben ("in BitNode 10 laeuft es nicht und soll es
+  // nicht") stimmte am 28.08. um 17:31, weil der Knoten gerade erst begonnen
+  // hatte. Seit dem Kurs von 18:55 ist Bladeburner auch hier der Weg, und
+  // `bladeKnoten` schliesst die 10 ein. Ab dem Beitritt haette der Pruefer
+  // damit weder das Ausbleiben von `blade.json` gemeldet noch die Rate
+  // geprueft - ein stiller Ausfall der gesamten Motorueberwachung.
+  //
+  // Der urspruengliche Grund bleibt gedeckt: Eine alte `blade.json` ueberlebt
+  // den Knotenwechsel auf home. Deshalb wird sie jetzt genau dann verworfen,
+  // wenn der Motor nachweislich nicht arbeitet - also ausserhalb der
+  // Kampfknoten oder vor dem Beitritt zur Division.
+  if (!bladeKnoten || !(bb && bb.inBladeburner)) blade = null;
   if (!wiederaufbau && blade && Number.isFinite(blade.spielzeit)
       && bladeAlterMs !== null && bladeAlterMs > 5 * 60_000) {
     sag("blade.js meldet sich seit " + Math.round(bladeAlterMs / 60000)

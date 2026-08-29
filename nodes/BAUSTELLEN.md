@@ -298,6 +298,19 @@ Nebenbefund, bewusst nicht behoben: Bei einem kaputten Rest bleibt
 entsteht keiner - der Block faengt den Parse-Fehler ab, und die erste Runde
 ueberschreibt die Datei ohnehin.
 
+**Der scp-Fix von 07:45 war nicht theoretisch (geprueft 10:45).** `blade.js`
+laeuft in diesem Knoten **auf fulcrumtech, nicht auf home** (`data/ps.json`
+um 10:42, PID 31355; ebenso `sleeve.js` 9629 und `bn4rep.js` 44917). Ohne das
+ergaenzte `ns.scp` waere die nachgetragene Abschnittszeile also mit Sicherheit
+dort gelandet, wo sie niemand liest - nicht nur im Ausnahmefall.
+
+Mitgeprueft und **kein Befund**: Die Datei auf fulcrumtech traegt den Stand
+vom letzten Neustart (07:47), die Kommentaraenderung von 09:12 fehlt dort. Das
+ist folgenlos - `bn4net.js:2796` kopiert vor **jedem** `ns.exec` frisch von
+home (`ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home")`), ein Neustart holt
+die aktuelle Fassung also immer nach. Die einzige echte Luecke bleibt der
+dokumentierte Fall ohne Werkbank: dann startet gar nichts nach.
+
 **Was weiter aussteht:** der Nachweis im laufenden Betrieb, also nach dem
 Beitritt (ETA 18:15). Pruefung unveraendert: `WERKZEUG blade.js` und dann in
 `data/aktionen.txt` nach einer Zeile mit `abgebrochen: true` sehen.

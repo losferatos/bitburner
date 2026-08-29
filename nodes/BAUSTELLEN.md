@@ -122,44 +122,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### `ausdauerLuft()` misst den Fuellstand, nicht die Knappheit (11:45)
-
-Gemessen: Nicht am Bot - am Code, vor dem Ernstfall. `blade.js:966-972`
-          bildet `ausdauerLuft()` aus `(jetzt/max - 0,5)/0,4`, also aus dem
-          **momentanen Fuellstand**. Cyber's Edge wird mit
-          `(1 - ausdauerLuft())` gewichtet (`:831`), Overclock umgekehrt.
-
-Erwartet: Die Groesse, die zaehlt, ist nicht der Fuellstand, sondern der
-          **Arbeitsanteil** R/V - und der liegt nach dem Beitritt bei 18
-          Prozent (Rechnung im Hebel-Eintrag von 10:00). Er ist konstant,
-          waehrend der Fuellstand im Ausdauerzyklus zwischen voll und leer
-          pendelt. Damit schwankt der bewertete Nutzen von Cyber's Edge
-          zwischen 0 und voll, obwohl die Knappheit sich nicht aendert.
-
-          Besonders am Anfang: Direkt nach dem Beitritt ist die Ausdauer
-          **voll**, also Luft = 1 und Cyber's Edge = 0 - bewertet als
-          wertlos, obwohl es dann die wichtigste Faehigkeit des Knotens ist.
-          Der Fehler ist ein Transient (nach wenigen Aktionen faellt der
-          Fuellstand), und in den ersten Minuten gibt es kaum Punkte zu
-          verteilen - deshalb kein Sofort-Punkt.
-
-Verdacht: `src/blade.js:966` und die beiden Gewichtungen bei `:831` und im
-          Overclock-Zweig darunter.
-
-**Nicht vor dem Beitritt anfassen.** Ein Eingriff in die Kaufsortierung
-wenige Stunden vor dem Ernstfall ist genau die Sorte Aenderung, die am
-29.08. um 04:15 teuer war. Stattdessen messen, sobald `blade.js` traegt:
-
-    node tools/spann.js        # schreibt data/bbspann.json
-
-Dort stehen Stufe und Nutzen je Faehigkeit. Steht Cyber's Edge nach zwei
-Stunden noch auf Stufe 0, waehrend andere gekauft wurden, ist der Befund
-belegt und der Umbau faellig - dann mit dem gemessenen Arbeitsanteil als
-Gewicht statt des Fuellstands. Steht es vorn, war die Sorge unbegruendet und
-dieser Punkt wird mit der Messung geschlossen.
-
-Dringlichkeit: mittel, aber erst ab dem Beitritt messbar.
-
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

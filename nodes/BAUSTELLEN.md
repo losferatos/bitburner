@@ -352,6 +352,37 @@ relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
 
+### Skill-Abdeckung ist auf das BN6-Spaetspiel geeicht, nicht auf BN10 (29.08., 18:55)
+
+Befund, nicht behoben - der Lauf wurde fuer Erics Token-Pause abgebrochen.
+
+`ABDECKUNG` in `src/blade.js:737-740` wurde am 28.08. um 14:45 von der
+Aktionsmischung auf **Black Ops** umgestellt. Damals war das richtig: Rang
+248.930 von 400.000, die Black-Op-Chance war der Engpass. Digital Observer
+bekam dadurch `abdeckung: 1.0` (trifft 12 von 12 Black Ops), Tracer steht
+gar nicht in `DYNAMISCH` und damit hinter allen sechs sortierten.
+
+**Jetzt ist die Lage umgekehrt.** Stand 18:52: Rang 10 von 400.000, erste
+Black Op bei 2.500, Aktion `Contracts/Retirement` mit **Chance 0,239**.
+Gekauft wurden Digital Observer 1 und Hyperdrive 1 - Digital Observer wirkt
+ueber `SuccessChanceOperation` (`data/Skills.ts:31-36`) und damit auf
+**keine einzige** Aktion, die der Bot gerade faehrt. Tracer
+(`SuccessChanceContract: 4`, baseCost 2, `data/Skills.ts:38-43`) steht auf
+Stufe 0.
+
+Nutzen je Punkt in der aktuellen Phase:
+
+    Tracer            St.0  Preis 2  +4 % auf Kontrakte   Abdeckung 1,00  2,00
+    Digital Observer  St.1  Preis 4  +4 % auf Operationen Abdeckung ~0    ~0
+    Hyperdrive        St.1  Preis 4  +10 % Erfahrung, wirkt nur ueber
+                                     Kampfwerte (Exponent 0,04-0,8)
+
+**Vorschlag** (ungeprueft): Tracer in `DYNAMISCH` aufnehmen und die
+Abdeckung an die Naehe zur ersten Black Op binden statt sie fest auf 1,0 zu
+setzen - `blackOpArbeit[name]` in Zeile 910 tut das bereits fuer einen Teil
+der Faehigkeiten. Erwartung: Kontraktchance von 0,239 auf 0,249 je
+Tracer-Stufe, bei Stufe 3 rund +12 % Rangrate.
+
 ### Dieselbe Waechter-Falle stand an zwei Stellen - eine blieb 3 Tage stehen (17:15)
 
 Gemessen: Am 29.08. um 16:28 kam die ntfy-Meldung "Notnagel-Kontingent

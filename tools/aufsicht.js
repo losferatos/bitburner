@@ -92,7 +92,10 @@ function starte(skript, name) {
 const NOTNAGEL_STAND = path.join(WURZEL, "data", "notnagel.json");
 const NOTNAGEL_STILL_MIN = 75;     // ab wann die Loops als gestorben gelten
 const NOTNAGEL_ABSTAND_MIN = 20;   // Mindestabstand zweier Laeufe
-const NOTNAGEL_PRO_TAG = 30;       // hartes Kontingent, rund 6,50 USD
+// 0 SCHALTET DEN NOTNAGEL AB (29.08.2026, 18:58). Eric spart Kontingent
+// bis Sonntag 13:00; bis dahin darf nichts headless-claude starten. Die
+// Bruecken- und Waechteraufsicht laeuft weiter, sie kostet nichts.
+const NOTNAGEL_PRO_TAG = 0;        // 30 = Normalbetrieb, rund 6,50 USD
 
 // DER NOTNAGEL: HEADLESS-LAEUFE, WENN DIE LOOPS STEHEN (27.08.2026, 21:12).
 //
@@ -138,6 +141,7 @@ const NOTNAGEL_PRO_TAG = 30;       // hartes Kontingent, rund 6,50 USD
 //   3. Hartes Tageskontingent in `data/notnagel.json`. Ist es erschoepft,
 //      gibt es eine ntfy-Meldung und danach Ruhe.
 async function notnagel() {
+  if (NOTNAGEL_PRO_TAG <= 0) return;
   const puls = path.join(WURZEL, "data", "verlauf-strategie.json");
   let stillMin = Infinity;
   try { stillMin = (Date.now() - fs.statSync(puls).mtimeMs) / 60000; } catch { /* fehlt */ }

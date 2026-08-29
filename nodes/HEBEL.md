@@ -37,6 +37,49 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Sleeve-Kontraktwahl gegengerechnet - Tracking ist belegt richtig (29.08., 16:00)
+
+Engpass:   Ab dem Beitritt (18:04) der Bladeburner-Rang. Offen war, ob der
+           Sleeve die richtige Kontraktart faehrt - `sleeve.js:83` setzt ihn
+           auf `Tracking`, den Kontrakt mit dem **niedrigsten** Rangertrag.
+
+Hypothese: Bounty Hunter (rankGain 0,9) bringt mehr als Tracking (0,3).
+           **Widerlegt.**
+
+Beleg:     `Bladeburner/data/Contracts.ts` und `Operations.ts`, dazu
+           `Action.ts:195` (Chance = `min(1, competence/difficulty)`) und
+           `Action.ts:108` (Dauer proportional zu `difficulty/10`).
+
+               Kontrakt        rankGain  difficulty  Chance*  Rang/Aktion  Rang/s
+               Tracking            0,30         125    0,310        0,093  0,0088
+               Retirement          0,60         200    0,194        0,116  0,0068
+               Bounty Hunter       0,90         250    0,155        0,140  0,0066
+                                                   * mit Sleeve-Stats um 72
+
+           Der hoehere Ertrag wird von zwei Seiten aufgefressen: Die Chance
+           faellt linear mit der Schwierigkeit, **und** die Aktion dauert
+           laenger. Tracking bleibt um ein Drittel besser. Ein Fehlschlag ist
+           dabei gratis - Kontrakte haben keinen `rankLoss`.
+
+**Mitgenommen, und wichtiger als die Rechnung: Der Sleeve kann keine
+Operationen.** `PersonObjects/Sleeve/Sleeve.ts:488-540` und
+`Bladeburner/Enums.ts:17-21` lassen genau drei Sonderfaelle zu - `Infiltrate
+Synthoids`, `Support main sleeve`, `Take on contracts` - plus die sechs
+General Actions. Operationen sind **dem Spieler vorbehalten**.
+
+Damit ist die Arbeitsteilung ab 18:04 vorgezeichnet und der Vorratskonflikt
+aus `nodes/BAUSTELLEN.md` (15:45) entschaerft: Frisst der Sleeve die Kontrakte
+leer, weicht der Spieler auf Operationen aus - und die bringen je Aktion das
+**7- bis 180-fache** (Investigation 2,2 bis Raid 55 gegen Tracking 0,3).
+Gegengeprueft: Operationen haben **keinen `reqdRank`** (nur Black Ops haben
+einen, `BlackOperation.ts:47`), stehen also ab Rang 0 offen. Der befuerchtete
+Durchfall auf Training oder Diplomacy setzt damit erst ein, wenn **beide**
+Toepfe leer sind.
+
+Vorher:    Sleeve auf `Tracking` (Stand 13:00).
+Nachher:   unveraendert - **keine Aenderung, die Wahl war schon richtig.**
+Commit:    nur dieser Eintrag.
+
 ### Der Sleeve faehrt ab dem Beitritt Kontrakte statt Gym (29.08., 13:00)
 
 Engpass:    Der Spieler arbeitet nach dem Beitritt nur **18 Prozent** der

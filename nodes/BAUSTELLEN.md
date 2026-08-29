@@ -5,6 +5,30 @@ Befunde sonst in Prosa verschwinden: Am 24.08.2026 sind drei von fuenf
 Pruefbefunden untergegangen, weil sie in einem Fliesstext standen statt in einer
 Liste, die man abhaken kann.
 
+## ENTSCHIEDEN - nicht wieder aufmachen
+
+**Vor jeder Aenderung diese Liste lesen.** Wer etwas aendern will, das hier
+steht, braucht eine **neue Messung oder eine neue Fundstelle** - nicht ein
+neues Argument. Steht beides nicht zur Verfuegung, wird nicht angefasst.
+
+*Warum die Liste existiert (29.08.2026, 09:00, auf Erics Ansage):* Die
+Begruendungen lagen verstreut in `nodes/HEBEL.md` und `nodes/ERLEDIGT.md` und
+wurden nur gefunden, wenn jemand zufaellig danach greppte. Zweimal binnen
+24 Stunden wurde eine erledigte Frage neu aufgerollt und erst beim
+Nachrechnen wieder verworfen - die Feuerschwelle um 03:45 und Raid mehrfach.
+Beide Male ging es gut, aber Nachrechnen ist Zufall, kein Mechanismus.
+
+| Entschieden | Wert | Beleg | Wann |
+|---|---|---|---|
+| Feuerschwelle Black Ops | **0,35**, nicht 0,90 | Rangverlust ist Zeit, kein Bestand (`Bladeburner.ts:1273,1283-1291`); Kosten `T_op + L/(m*Rangrate)` = 6,8 min gegen 80 min Warten | 28.08. 16:00, bestaetigt 29.08. 03:55 und 07:20 |
+| Bevoelkerungs-Horizont in `beste()` | **1 Stunde**, nicht die Restlaufzeit | Black Ops ignorieren pop (`BlackOperation.ts:55`), Chance bei 1 gedeckelt (`Action.ts:195`), Ereignisse driftfrei (-0,0016/Ereignis) | 29.08. 08:20 |
+| Einbau vor dem Divisionsbeitritt | **nie** | Prestige setzt Kampfwerte auf 1; am 29.08. 04:15 kostete es netto 90.810 Erfahrung = 6,6 h | 25.08., erzwungen 29.08. 04:25 und 06:20 |
+| Augmentierungsrunde vor Tor 1 | **verworfen** | Gym allein 18,6 h gegen 20,3 h; nur Combat Rib I hebt str/def, der Rest wirkt auf dex/agi | 28.08. 22:52 |
+| Sleeve: sync hochziehen | **verworfen** | 20,2 h Stillstand = 236.285 Erfahrung, mehr als der ganze Restweg | 29.08. 06:55 |
+| Gym und Bladeburner parallel | **unmoeglich** | gemessen und per `git revert` zurueckgenommen | 28.08. 07:34 |
+| Ausgang aus BitNode 10 | **nur Bladeburner** | Hacking-Weg braucht Level 6.000 = 10^175 Erfahrung | 29.08. 07:20 |
+| Reihenfolge der BitNodes | **fest** | `nodes/AUDIT-ROADMAP-2026-08-24.md` | 24.08. |
+
 Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt

@@ -42,6 +42,13 @@ Die Leitfrage: **Welche Zahl bringt den Knoten näher an seinen Ausgang, und was
 
 **Ein gesetzter Parameter ist ein Befund.** Findest du in `src/*.js` eine Zahl, für die im Quellcode eine berechenbare Antwort steht — eine Schwelle, ein Deckel, eine feste Reihenfolge —, dann ist das ein Hebel, auch wenn gerade nichts kaputt aussieht. Am 27.08. wurden so 30 freie Parameter allein in `blade.js` gefunden, von denen mindestens acht exakt lösbar sind. Zwei Beispiele, was das wert war: Die Black-Op-Chance wurde an `s.min` entschieden — einer Zahl, die bei Black Ops **reines Bevölkerungsrauschen** ist (`Actions/BlackOperation.ts:55-61`). Und Digital Observer stand auf Stufe 1, obwohl er als einzige Chance-Fähigkeit **alle 21** Black Ops trifft (`Actions/BlackOperation.ts:69`).
 
+**Vorher `## ENTSCHIEDEN` im Kopf von `nodes/BAUSTELLEN.md` lesen.** Dort
+steht, was bereits belegt entschieden ist - mit Zahl und Fundstelle. Wer
+eine dieser Sachen aendern will, braucht eine **neue Messung oder eine neue
+Fundstelle**, nicht ein neues Argument. Sonst entsteht Fehler-Ping-Pong:
+heute einbauen, was vorgestern evidenzbasiert entfernt wurde (Erics Ansage
+vom 29.08.2026).
+
 **2. Eine Hypothese formulieren, die eine Zahl nennt.**
 
 „Wenn ich X ändere, steigt Y von <jetzt> auf mindestens <erwartet>." Ohne beide Zahlen keine Änderung — sonst lässt sich hinterher nicht sagen, ob es gewirkt hat.

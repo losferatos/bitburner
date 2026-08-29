@@ -33,6 +33,13 @@ Für den aktuellen BitNode zu beantworten:
 - **Welche Zahl ist dabei der Engpass, und wie weit ist sie entfernt?** Absolut, nicht relativ: nicht „wir sind schneller geworden", sondern „X von Y, also Z Prozent".
 - **Was zählt bereits auf das Ziel ein, das noch nicht mitgerechnet ist?** Am 27.08. lagen 73.660 Rang allein in den `rankGain`-Werten der ersten zwanzig Black Ops — 18 Prozent der Strecke waren doppelt gezählt.
 
+**Vorher `## ENTSCHIEDEN` im Kopf von `nodes/BAUSTELLEN.md` lesen.** Dort
+steht, was bereits belegt entschieden ist - mit Zahl und Fundstelle. Wer
+eine dieser Sachen aendern will, braucht eine **neue Messung oder eine neue
+Fundstelle**, nicht ein neues Argument. Sonst entsteht Fehler-Ping-Pong:
+heute einbauen, was vorgestern evidenzbasiert entfernt wurde (Erics Ansage
+vom 29.08.2026).
+
 **2. Die Restzeit rechnen — und die Annahme dahinter offenlegen.**
 
 Eine lineare Fortschreibung ist fast immer falsch. Prüfe, ob die Rate sich selbst beschleunigt: In BitNode 6 erzeugt der Rang über `skillPoints = floor(maxRank/3)` (`Bladeburner/data/Constants.ts`) bei **linear** steigenden Fähigkeitskosten (`Bladeburner/Skill.ts:37-41`) eine Rückkopplung, also `dR/dt ~ R^a` mit a zwischen 0,4 und 0,6 statt a = 0. Der Unterschied betrug am 27.08. **Faktor 4** (443 gegen 104 Stunden).

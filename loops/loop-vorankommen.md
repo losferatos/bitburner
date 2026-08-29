@@ -14,6 +14,13 @@ Arbeite so:
 2. **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt** — nur solche zählen. Steht unter `## Sofort` keine `### `-Zeile, ist der Abschnitt leer.
    Steht dort eine, ist das dein Punkt. Ohne Abwägung, ohne Reihenfolgediskussion — dort tragen Reportloop und Wache ein, was sie kaputt vorgefunden, aber nicht selbst behoben haben. Sind es mehrere, nimm den obersten.
    Sonst: den obersten `### `-Punkt aus `## Offen`, dessen Überschrift nicht mit „Wartet bis" beginnt. **Die Reihenfolge in der Datei IST die Rangfolge** — nicht neu bewerten, nicht umsortieren.
+**Vorher `## ENTSCHIEDEN` im Kopf von `nodes/BAUSTELLEN.md` lesen.** Dort
+steht, was bereits belegt entschieden ist - mit Zahl und Fundstelle. Wer
+eine dieser Sachen aendern will, braucht eine **neue Messung oder eine neue
+Fundstelle**, nicht ein neues Argument. Sonst entsteht Fehler-Ping-Pong:
+heute einbauen, was vorgestern evidenzbasiert entfernt wurde (Erics Ansage
+vom 29.08.2026).
+
 3. Arbeite ihn ab oder bring ihn ein Stück weiter. Konkrete Arbeit heißt: messen, Code ändern, im Spiel prüfen — nicht planen.
 
    **Nachschlagen schlägt messen.** Der vollständige Spielquellcode liegt unter `reference/bitburner-src/src/` (v3.0.2). Wo eine Zahl dort steht, wird sie gelesen, nicht über ein Zeitfenster geschätzt — das ist schneller und verlässlicher. Am 27.08. kostete die umgekehrte Reihenfolge einen ganzen Tag: Die 400.000 Rang des Knotenausgangs standen in `Bladeburner/data/BlackOperations.ts`, während vier Loops auf Telemetrie optimierten. Bewährte Pfade: `Bladeburner/`, `Bladeburner/data/`, `BitNode/BitNode.tsx`, `PersonObjects/formulas/`, `Formulas.ts`.

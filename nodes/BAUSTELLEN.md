@@ -79,25 +79,6 @@ Regeln:
 
 ## Sofort
 
-### Der Sleeve arbeitet seit dem Reset nicht mehr (05:40)
-
-Gemessen: Aus dem Spielstand um 05:38: ein Sleeve, `shock: 0`, `sync: 25`,
-          **`currentWork: keine`**.
-
-Erwartet: Gym-Training im selben Gym wie der Spieler. Vor dem Einbau trug der
-          Sleeve 2,77 der 13,25 Erfahrungspunkte je Sekunde
-          (`nodes/HEBEL.md`, 22:05) - also rund ein Fuenftel des Traegers.
-
-Verdacht: `src/sleeve.js` lief vor dem Reset auf `fulcrumtech` (Prozessliste
-          03:13) und steht in der Prozessliste von 04:20 nicht mehr. Es gehoert
-          offenbar nicht zur Startliste des Wiederanlaufs
-          (`src/bn4net.js`, WERKZEUGE) - dann faellt es nach jedem Einbau
-          stillschweigend aus.
-
-Dringlichkeit: hoch, aber nach dem Faktionsarbeits-Punkt. Ein Fuenftel der
-          Traegerrate ist viel, aber der Spieler selbst steht gerade bei einem
-          Zehntel.
-
 ### bn4rep hat in BitNode 10 vor dem Beitritt eingebaut - 6,6 Stunden verloren (04:15)
 
 Gemessen: Um 04:15 meldete der Pruefer RESET: Kampfwert-Tiefstand von 88 auf 1,

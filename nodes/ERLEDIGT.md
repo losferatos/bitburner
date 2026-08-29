@@ -23,6 +23,36 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Sleeve arbeitet wieder - und steht jetzt in der Startliste (erledigt 29.08., 05:50)
+
+Befund von 05:40: Ein Sleeve, `shock 0`, `sync 25`, `currentWork: keine`. Vor
+dem Einbau trug er 2,77 von 13,25 Erfahrungspunkten je Sekunde
+(`nodes/HEBEL.md`, 22:05) - also rund ein Fuenftel des Traegers.
+
+Ursache: `src/sleeve.js` wurde am 28.08. um 17:50 gebaut und **von Hand**
+gestartet. Es stand in keiner Startliste, also war es nach dem
+Augmentierungs-Einbau um 04:15 weg - in der Prozessliste von 04:20 fehlte es.
+Genau dieselbe Lehre steht seit dem 25.08. in `src/bn4net.js` acht Zeilen ueber
+der Einfuegestelle, damals fuer `bbtrain.js` und nach demselben Vorfall
+("Ein Augmentierungs-Einbau setzt alle Kampfwerte auf 1 zurueck; die Aufgabe
+faellt also nach JEDEM Reset erneut an").
+
+Behoben: `sleeve.js` in die `WERKZEUGE`-Liste von `src/bn4net.js` aufgenommen.
+Damit startet es nach jedem Reset von selbst.
+
+**Fallstrick beim Nachziehen:** `WERKZEUG sleeve.js` ueber `data/reload.txt`
+hat NICHT gewirkt - der Reload-Kanal startet nur, was der laufende
+`bn4net`-Prozess kennt, und der trug noch die alte Liste. Gestartet wurde es
+deshalb ueber den Auftragskanal (`node tools/task.js sleeve.js`); die neue
+Liste greift von selbst ab dem naechsten Motorneustart.
+
+Verifiziert 05:50: `sleeve.js` laeuft auf fulcrumtech (PID 9629), und der
+Spielstand meldet `currentWork: SleeveClassWork` statt `keine`. Die
+Kampferfahrung des niedrigsten Werts stand um 05:46 bei 2.815 und um 05:50 bei
+**3.588**.
+
+---
+
 ### Faktionsarbeit statt Gym - behoben, Rate von 22 auf 386 je Minute (erledigt 29.08., 05:50)
 
 Befund von 05:40: `currentWork` war `FactionWork` (CyberSec, hacking), die

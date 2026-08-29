@@ -262,6 +262,19 @@ export async function main(ns) {
     // stand. Seitdem wartet bbtrain, statt sich zu beenden, und gehoert damit
     // in die Liste wie jedes andere Werkzeug.
     ["bbtrain.js", []],
+    // DER SLEEVE GEHOERT IN DIE LISTE, NICHT AN DIE HAND (29.08.2026, 05:50).
+    //
+    // `sleeve.js` wurde am 28.08. um 17:50 gebaut und von Hand gestartet. Nach
+    // dem Augmentierungs-Einbau um 04:15 war es weg: In der Prozessliste von
+    // 04:20 fehlte es, und der Sleeve stand seither still (`currentWork:
+    // keine`, gemessen 05:38). Das kostet rund ein Fuenftel der Traegerrate -
+    // vor dem Einbau trug er 2,77 von 13,25 Erfahrungspunkten je Sekunde
+    // (`nodes/HEBEL.md`, 22:05).
+    //
+    // Alles, was einen Reset ueberleben soll, gehoert in diese Liste. Genau
+    // dieselbe Lehre steht acht Zeilen weiter oben fuer `bbtrain.js`, gezogen
+    // am 25.08. nach demselben Vorfall.
+    ["sleeve.js", []],
     // bn4life kauft TOR und die Portprogramme. Es steht in dieser Liste und
     // nicht in boot.js, weil es voller Singularity ist und ausserhalb von
     // BitNode 4 mehrere hundert GB gross - in ein frisches home mit 32 GB

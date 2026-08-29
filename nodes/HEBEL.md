@@ -8,6 +8,69 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Gekaufte Sleeves geprueft und verworfen - The Covenant ist unerreichbar (29.08., 21:55)
+
+**Engpass:** Der Rang kommt derzeit **restlos vom Sleeve** (14,4 Rang/h,
+geglaettet ueber 2,16 h gemessen). Ein zweiter Sleeve waere damit der
+groesste denkbare Einzelhebel des Knotens - er verdoppelt die Rangrate
+linear, ohne dass am Motor irgendetwas besser werden muesste.
+
+**In BitNode 10 lassen sich Sleeves kaufen** - das ist die Besonderheit des
+Knotens (`PersonObjects/Sleeve/SleeveCovenantPurchases.tsx`):
+
+    BaseCostPerSleeve         10e12   (10 Billionen fuer den ersten)
+    Preis je weiterem          x10    (10^n * 10e12)
+    MaxSleevesFromCovenant     5
+
+Der Preis waere sogar erreichbar: Das Vermoegen stieg zwischen 20:38 und
+21:38 von 15,7 auf 199,3 Milliarden, also rund 183 Mrd/h - die 10 Billionen
+staenden nach etwa 54 Stunden, innerhalb der ETA-Spanne des Knotens.
+
+**Verworfen an der Beitrittsbedingung.** `canPurchaseSleeve()` verlangt
+Mitgliedschaft bei The Covenant, und deren `inviteReqs`
+(`Faction/FactionInfo.tsx:167`) lauten:
+
+    haveAugmentations(20)      wir haben 14
+    haveMoney(75e9)            erfuellt (242 Mrd)
+    haveSkill("hacking", 850)  wir haben 192
+    haveCombatSkills(850)      wir haben 82
+
+Die Kampfwerte sind der Ausschlussgrund, und zwar endgueltig. Mit dem
+gemessenen m = 0,56 und der Gym-Rate 15,48 exp/s
+(`PersonObjects/formulas/skill.ts:13`):
+
+    Kampfwert 100   1,37e5  exp    2,5 Stunden
+    Kampfwert 425   1,03e13 exp    1,85e8 Stunden
+    Kampfwert 850   2,06e23 exp    3,70e18 Stunden
+
+Das ist keine Frage der Geduld, sondern eine Groessenordnung jenseits des
+Spiels. Gekaufte Sleeves sind in diesem Lauf **nicht erreichbar**, und in
+keinem der drei BN10-Laeufe der Roadmap, solange die Kampfwerte aus dem Gym
+kommen. Auch die Memory-Upgrades haengen an derselben Bedingung.
+
+**Was daraus folgt - und das ist der eigentliche Ertrag dieses Laufs:**
+Zusaetzliche Sleeves kommen ausschliesslich ueber SF10-Level
+(`recalculateNumberOfOwnedSleeves()`):
+
+    numSleeves = min(3, sourceFileLvl(10) + (bitNodeN === 10 ? 1 : 0))
+                 + sleevesFromCovenant
+
+Aktuell also `min(3, 0 + 1) = 1`. Nach diesem Lauf steht SF10 auf Level 1,
+Lauf 2 startet mit **2 Sleeves**, Lauf 3 mit **3**. Die drei BN10-Laeufe
+kosten damit nicht 3*T, sondern rund **1,83*T** (1 + 1/2 + 1/3), wenn die
+Rangrate linear mit der Sleeve-Zahl skaliert - was sie tut, weil jeder Sleeve
+seine eigene Aktion faehrt und der Ausdauerabzug nur den Spieler trifft
+(`Bladeburner.ts:921`, hinter `if (isPlayer)`).
+
+**Kein Eingriff.** Es gibt nichts zu aendern - der Hebel existiert, ist aber
+nicht erreichbar. Der Eintrag steht hier, damit ihn niemand ein zweites Mal
+prueft.
+
+**Naechster Hebel, noch offen:** `KONTRAKT_MIN_KAMPF = 40` in `src/sleeve.js`
+ist gesetzt, nicht hergeleitet. Jetzt liegen die Zahlen vor, um den
+Schnittpunkt auszurechnen - Gym-Zeit gegen entgangenen Rang, mit 14,4 Rang/h
+als Messpunkt.
+
 ## Der Trupp wurde rekrutiert, aber nie eingesetzt (29.08.2026, 18:50)
 
 **Befund.** `blade.js` fuellt den Trupp auf `TRUPP_ZIEL = 6` auf

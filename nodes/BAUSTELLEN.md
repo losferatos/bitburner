@@ -95,6 +95,46 @@ Gym-Stunde, weil der Einbau die inzwischen erarbeitete Erfahrung vernichtet.*
 
 ## Offen, nach Dringlichkeit
 
+### BitNode 10 verlangt 25 Prozent mehr Rangarbeit als BitNode 6 (03:45)
+
+Gemessen: Aus dem Quellcode gelesen, nicht aus Telemetrie.
+          `Bladeburner/Formulas.ts:8-26`:
+
+              calculateActionRankGain  ... * currentNodeMults.BladeburnerRank
+              calculateActionRankLoss  ... KEIN BitNode-Multiplikator
+              reqdRank (BlackOperations.ts)  fest, kein Multiplikator
+
+          In BitNode 10 steht `BladeburnerRank: 0.8` (`BitNode.tsx`, case 10).
+          Der Gewinn faellt also um ein Fuenftel, der **Verlust bleibt**, und
+          das Ziel bleibt: max `reqdRank` 400.000, Summe aller 21 `rankGain`
+          113.660.
+
+Erwartet: Die Rechnung aus `nodes/KURS.md` uebernimmt bisher die BitNode-6-
+          Zahlen. Richtig ist fuer diesen Knoten:
+
+              Netto-Strecke  400.000 - 113.660 * 0.8 = 309.072 Rang
+                             (in BitNode 6 waren es 286.340)
+              Zeitbedarf     bei gleicher Aktionsrate **+25 %**
+
+          Und die Feuerschwelle fuer Black Ops ist mitbetroffen: Sie wurde am
+          28.08. um 16:00 auf 0,35 gesenkt, kalibriert in BitNode 6. Der
+          Erwartungswert eines Versuchs ist `p * G * 0,8 - (1-p) * L`, der
+          Break-even also `p = L / (L + 0,8 G)` statt `L / (L + G)`. Bei
+          Daedalus (G 40.000, L 10.000) verschiebt das die Grenze von 0,200 auf
+          **0,238**. Bei Vindictus (G 20.000, L 20.000) von 0,500 auf 0,556.
+
+Verdacht: `src/blade.js`, `SICHER_BLACKOP = 0.35` und `einsatzSchwelle()`. Die
+          0,35 liegen ueber beiden Break-even-Werten der letzten Black Ops, die
+          Schwelle ist also **nicht falsch, nur nicht mehr hergeleitet**.
+          Sauber waere, sie aus `calculateActionRankGain`/`RankLoss` je Black Op
+          zu rechnen, statt eine Zahl zu setzen - dann stimmt sie in jedem
+          Knoten von selbst.
+
+Dringlichkeit: mittel, aber zeitkritisch: Der Beitritt steht in rund vier
+          Stunden an (Tiefstand 87 um 03:39), und danach traegt `blade.js` den
+          Knoten. Vor dem ersten Black Op geprueft, kostet es nichts; danach
+          kostet jede falsche Entscheidung Rang.
+
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

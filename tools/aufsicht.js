@@ -179,7 +179,10 @@ async function notnagel() {
   // waere jedes davon eine eigene Fehlerquelle - `input` kennt keine.
   try {
     spawnSync("claude", ["-p", "--allowedTools", "Bash"],
-      { input: text.slice(i), timeout: 300000, stdio: ["pipe", "ignore", "ignore"], shell: true });
+      // windowsHide: sonst blitzt bei jedem Lauf ein cmd-Fenster mit Titel
+      // "claude" auf Erics Bildschirm auf (er hat es am 29.08. 18:40 gemeldet).
+      { input: text.slice(i), timeout: 300000, stdio: ["pipe", "ignore", "ignore"],
+        shell: true, windowsHide: true });
   } catch { /* ein gescheiterter Lauf ist kein Grund, die Aufsicht zu stoppen */ }
   stand.laeufe += 1;
   stand.zuletzt = Date.now();

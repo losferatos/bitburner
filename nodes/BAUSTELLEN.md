@@ -164,35 +164,55 @@ relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
 
-### ETA zum Beitritt war um 3 h zu optimistisch - Werkzeug gebaut (13:30)
+### ETA zum Beitritt wurde geschaetzt statt gerechnet - Werkzeug gebaut (13:30)
 
-Gemessen: Der stuendliche Report meldete um 12:53 "Tor in 5,3 h". Exakt
-          gerechnet waren es **8,4 h**. Die Zahl kam aus einer linearen
-          Hochrechnung des Skill-Zuwachses ("+1 in 6 min"), die Erfahrung je
-          Punkt steigt aber exponentiell.
+Gemessen: Der stuendliche Report leitete die ETA aus dem Skill-Zuwachs ab
+          ("+1 in 6 min" mal die fehlenden Punkte). Das ist methodisch falsch,
+          weil die Erfahrung je Skillpunkt exponentiell steigt - die Zahl kann
+          nur zufaellig stimmen.
 
 Beleg:    `PersonObjects/formulas/skill.ts:13`, umgestellt
-          `exp(z) = e^((z/m + 200)/32) - 534.6`. Stand 13:11 (str 132.919,
-          def 129.642, dex 61.471, agi 99.906, alle Skill 91): fehlend 90.059
-          + 87.345 + 34.706 + 63.398 = **275.507 exp**. Gemessene Rate
-          12:53->13:11 (nur str trainiert): **9,10 exp/s**, gegen den
-          Formelwert 10,0 (Powerhouse expMult 10 / gameCPS 5, mal 5 Cycles).
+          `exp(z) = e^((z/m + 200)/32) - 534.6`. Stand 13:41 (str 93, def 92,
+          dex 92, agi 92): fehlend 70.833 + 80.923 + 31.697 + 58.969 =
+          **242.422 exp**.
 
-Behoben:  `tools/tor.js` (neu). Es rechnet die Umkehrung, leitet den
-          Multiplikator m aus dem laufenden Stand zurueck statt ihn
-          hartzucodieren, und misst die Rate ueber `data/tor-verlauf.json`.
-          Ausgabe zweizeilig, dazu `data/tor.json` fuer den Reportloop.
-          Erster Lauf 13:18: **7,7 h, Tor um 20:38** (noch Formelrate 10,0;
-          mit der gemessenen 9,10 waeren es 8,4 h).
+          Die Rate steht ebenfalls im Quellcode und muss nicht gemessen
+          werden: Powerhouse Gym `expMult: 10` (`LocationsMetadata.ts:325`)
+          durch `gameCPS` 5, mal 5 Cycles je Sekunde, **mal dem
+          Erfahrungs-Multiplikator der Figur** (`Work/Formulas.ts:115-118`,
+          `multWorkStats(..., person.mults)`). Der liegt bei **1,287** fuer
+          alle vier Kampfwerte (`node tools/save.js`, 13:45), also
+          **12,87 exp/s**. Ergebnis: **5,2 h, Tor um 18:53**.
 
-**Verifiziert: 7,7 h um 13:18** - zweimal hintereinander identisch, Verlauf
-wird geschrieben, `node --check` sauber, Pruefer 13:19 SPUR.
+Behoben:  `tools/tor.js` (neu). Rechnet die Umkehrung, leitet m aus dem
+          laufenden Stand zurueck statt es hartzucodieren, und glaettet die
+          Rate ueber `data/tor-verlauf.json`. Ausgabe zweizeilig, dazu
+          `data/tor.json` fuer den Reportloop.
 
-**Was noch aussteht:** Der Reportloop nennt die ETA weiterhin aus eigener
-Rechnung. Er soll `node tools/tor.js` aufrufen. Bis dahin gilt: **wer die ETA
-meldet, holt sie dort** - nicht aus dem Skill-Delta des Strategiepruefers.
+**Zwei eigene Fehler dabei, beide behoben - sie sind der eigentliche Lehrsatz:**
 
-Dringlichkeit: mittel. Der Bot laeuft davon unbeeindruckt; falsch ist nur die
+1. Die erste Fassung (13:18) nahm 10,0 exp/s als Formelwert und vergass den
+   Multiplikator 1,287. Ergebnis 7,7 h statt 5,2 h - **29 Prozent zu lang**.
+2. Der Versuch, die Rate stattdessen zu *messen*, ergab in zwei Fenstern von
+   je unter 40 Minuten einmal **9,10** und einmal **15,37 exp/s** - denselben
+   Bot, denselben Zustand, den echten Wert 12,87 dazwischen. Ursache ist die
+   Tab-Drosselung: Ein gedrosselter Tab holt schubweise nach
+   (`data/rueckstand.json` existiert genau dafuer). Mindestfenster deshalb
+   auf **20 Minuten** gesetzt.
+
+   Die daraus gezogene Zwischenbehauptung "die gemeldete ETA war um 3 h zu
+   optimistisch" **war falsch** und ist hiermit zurueckgenommen. Der Report
+   von 12:53 nannte 18:13, richtig sind 18:53 - 40 Minuten daneben, nicht
+   drei Stunden. Das Muster ist bekannt: **Nachschlagen schlaegt messen**,
+   und ein kurzes Messfenster ist in diesem Spiel keine Messung.
+
+**Verifiziert: 5,2 h / 18:53 um 13:47** - `node --check` sauber, zweimal
+identisch, Pruefer SPUR.
+
+**Was noch aussteht:** Der Reportloop soll `node tools/tor.js` aufrufen statt
+selbst zu rechnen.
+
+Dringlichkeit: mittel. Der Bot laeuft davon unbeeindruckt; falsch war nur die
 Zahl, die Eric bekommt - und die ist seit dem 29.08. sein einziger Bericht.
 
 ### `ausdauerLuft()` misst den Fuellstand, nicht die Knappheit (11:45)

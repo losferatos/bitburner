@@ -16,22 +16,31 @@ trotzdem aus - aber nur die zwei Zeilen unten.
 
 ```
 date
-cd /c/Users/erche/Desktop/claude_projecto/bitburner && node tools/strategie-check.js
-head -60 nodes/KURS.md
+node tools/tor.js
+node tools/strategie-check.js
 ```
 
-Die ETA steht in `nodes/KURS.md` im obersten Eintrag. Ist sie aelter als zwei
-Stunden oder passt sie nicht zum aktuellen Traegerwert, rechne sie neu:
+**Die ETA wird nicht geschaetzt, sie wird gerechnet.** In der Phase „Tor zur
+Division" liefert `tools/tor.js` sie fertig: Es kehrt die Skillformel um
+(`PersonObjects/formulas/skill.ts:13`), leitet den Multiplikator aus dem
+laufenden Stand zurueck und nimmt die Gym-Rate aus dem Quellcode statt aus
+einem Zeitfenster. Uebernimm die Zahl, rechne nicht daneben.
 
-- **Phase „Tor zur Division"**: Restsumme der vier Kampfwerte aus
-  `data/bblage.json` (ueber die Bruecke lesen), geteilt durch die gemessene
-  Erfahrungsrate. Bedarf je Wert: `exp(100) = e^((100/(m*0,4)+200)/32) - 534,6`
-  mit m = dem jeweiligen Aug-Multiplikator.
-- **Phase Bladeburner-Rang**: Restrang aus `nodes/KURS.md` durch die
-  geglaettete Rangrate (mindestens 45 Minuten Fenster, `data/blade.json`).
+*Warum das dasteht (29.08., 13:50):* Bis dahin wurde die ETA aus dem
+Skill-Zuwachs hochgerechnet ("+1 in 6 min" mal die fehlenden Punkte). Die
+Erfahrung je Punkt steigt aber exponentiell. Der Versuch, es stattdessen zu
+messen, war noch schlechter: zwei Fenster unter 40 Minuten ergaben 9,10 und
+15,37 exp/s, wo der Quellcode 12,87 sagt - die Tab-Drosselung holt
+schubweise nach.
+
+Meldet `tor.js` „Bereits in der Division", traegt der Rang. Dann: Restrang
+aus `nodes/KURS.md` durch die **geglaettete** Rangrate, Fenster mindestens 45
+Minuten (`data/blade.json`).
 
 Die ETA ist die Zeit bis zum **naechsten BitNode-Reset**, also bis der Knoten
-abgeschlossen ist - nicht bis zum naechsten Zwischenschritt.
+abgeschlossen ist - nicht bis zum naechsten Zwischenschritt. In der Phase
+„Tor zur Division" ist die Zahl aus `tor.js` also nur der erste Teil; der
+Rangweg kommt dahinter und steht in `nodes/KURS.md`.
 
 **2. Der naechste Knoten** steht in `nodes/AUDIT-ROADMAP-2026-08-24.md`,
 Abschnitt „2. Empfohlene Reihenfolge". Die Reihenfolge ist fest. Stand

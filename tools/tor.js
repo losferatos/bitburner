@@ -31,8 +31,14 @@ const ZIEL = 100;
 const STATS = ["str", "def", "dex", "agi"];
 
 // Ohne zweite Messung: Powerhouse Gym, 1 exp je Cycle mal Ortsfaktor 10,
-// 5 Cycles je Sekunde (`Work/Formulas.ts:116`, `gameCPS`).
-const RATE_NOTFALL = 10;
+// 5 Cycles je Sekunde (`Work/Formulas.ts:116`, `gameCPS`) - **mal dem
+// Erfahrungs-Multiplikator der Figur**, den `calculateClassEarnings` als
+// letzten Schritt anwendet (`multWorkStats(..., person.mults)`, dort :117).
+// Der lag am 29.08. um 13:45 bei 1,287 fuer alle vier Kampfwerte
+// (`node tools/save.js`), also 12,87 statt 10,0. Die erste Fassung um 13:18
+// hatte den Faktor vergessen und die ETA dadurch um 29 Prozent zu lang
+// geschaetzt.
+const RATE_NOTFALL = 12.87;
 // Aeltere Messungen sind fuer die Rate wertvoller (glaettet Gym-Pausen),
 // aber nicht aelter als das hier - sonst steckt ein Reset darin.
 const VERLAUF_MAX_MS = 6 * 3600 * 1000;
@@ -72,7 +78,11 @@ verlauf = verlauf.filter((e) => e && e.zeit && lage.zeit - e.zeit < VERLAUF_MAX_
 const summeJetzt = STATS.reduce((s, k) => s + lage.kampfExp[k], 0);
 const alt = verlauf[0];
 let rate = RATE_NOTFALL, quelle = "Formel (keine zweite Messung)";
-if (alt && lage.zeit > alt.zeit + 120000) {
+// Mindestens 20 Minuten Fenster. Kuerzere Fenster messen nicht die Rate,
+// sondern die Tab-Drosselung: Ein gedrosselter Tab holt schubweise nach, und
+// ein 18-Minuten-Fenster ergab am 29.08. einmal 9,10 und einmal 15,37 exp/s -
+// beide Male denselben Bot, beide Male neben dem Formelwert 12,87.
+if (alt && lage.zeit > alt.zeit + 1200000) {
   const r = (summeJetzt - alt.summe) / ((lage.zeit - alt.zeit) / 1000);
   if (r > 0.1) {
     rate = r;

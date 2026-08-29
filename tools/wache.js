@@ -796,8 +796,12 @@ async function pruefe(zustand, jetzt) {
   // ist sie frisch und die Ueberwachung greift von selbst.
   const bladeAusDiesemKnoten = typeof blade?.zeit === "number"
     && (typeof messwerte.nodeReset !== "number" || blade.zeit >= messwerte.nodeReset);
-  const kampfKnoten = (messwerte.knoten === 6 || messwerte.knoten === 7
-    || messwerte.knoten === 10) && bladeAusDiesemKnoten;
+  // Die Liste steht auch in src/bn4rep.js (BLADE_KNOTEN) und in
+  // tools/strategie-check.js. Drei Prozesse ohne gemeinsamen Modulraum -
+  // aber alle drei tragen denselben Namen, damit ein grep nach
+  // BLADE_KNOTEN jede Fundstelle zeigt (29.08.2026, 09:15).
+  const BLADE_KNOTEN = [6, 7, 10];
+  const kampfKnoten = BLADE_KNOTEN.includes(messwerte.knoten) && bladeAusDiesemKnoten;
   const WERKZEUGE = [
     ...(kampfKnoten
       ? [{ datei: "data/blade.json", skript: "blade.js", json: true }] : []),

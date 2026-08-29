@@ -453,8 +453,12 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // Fuer die WERKZEUGPRUEFUNGEN gilt das trotzdem nicht: `blade.js` und der
   // Bladeburner-Steckbrief kommen erst nach dem Beitritt, und der verlangt
   // alle vier Kampfwerte >= 100 (heute 41). Deshalb zwei Begriffe.
-  const kampfKnoten = knotenFrueh === 6 || knotenFrueh === 7;
-  const bladeKnoten = kampfKnoten || knotenFrueh === 10;
+  // Die Liste steht auch in src/bn4rep.js und tools/wache.js unter demselben
+  // Namen - drei Prozesse ohne gemeinsamen Modulraum, aber ein grep nach
+  // BLADE_KNOTEN zeigt jede Fundstelle (29.08.2026, 09:15).
+  const BLADE_KNOTEN = [6, 7, 10];
+  const bladeKnoten = BLADE_KNOTEN.includes(knotenFrueh);
+
   let bb = await frischerSteckbrief();
   const kanalWarBelegt = !!(bb && bb.__kanalBelegt);
   // ALTE DATEN SIND SCHLIMMER ALS KEINE (25.08.2026, Fremdpruefung).
@@ -500,9 +504,13 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       const tiefstandFrueh = ks && ks.kampf
         ? Math.min(ks.kampf.str, ks.kampf.def, ks.kampf.dex, ks.kampf.agi)
         : null;
+      // Faellt die Kampfwert-Quelle aus, wissen wir nichts - und dann wird
+      // NICHT gemeldet (29.08.2026, 09:20). Vorher stand hier `kampfKnoten`,
+      // also "in 6 und 7 melden". Ein Fehlalarm um drei Uhr nachts kostet
+      // mehr als eine Meldung, die der naechste Lauf zwanzig Minuten spaeter
+      // ohnehin sieht.
       const divisionErwartet = Number.isFinite(tiefstandFrueh)
-        ? (bladeKnoten && tiefstandFrueh >= 100)
-        : kampfKnoten;
+        && bladeKnoten && tiefstandFrueh >= 100;
       sag("Steckbrief ist " + alterMin + " min alt und der Auftragskanal war"
         + " frei" + (divisionErwartet ? " - der Auftragslaeufer im Spiel arbeitet"
           + " nicht." : " - in BitNode " + knotenFrueh + " noch ohne Belang, die"
@@ -560,7 +568,7 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
 
   sag("Phase: " + t.phase);
   sag("Traeger: " + t.name + " = " + t.wert + (t.ziel ? " von " + t.ziel : ""));
-  if (bb && (knoten === 6 || knoten === 7)) {
+  if (bb && BLADE_KNOTEN.includes(knoten)) {
     sag("  Kampf str " + bb.kampf.str + " def " + bb.kampf.def
       + " dex " + bb.kampf.dex + " agi " + bb.kampf.agi
       + "  Stadt " + bb.stadt

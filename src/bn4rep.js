@@ -52,6 +52,22 @@ export async function main(ns) {
   // alle anderen Augmentierungen um 1,9 je Stueck verteuern. Erst zum Schluss.
   const NFG = "NeuroFlux Governor";
 
+  // BLADEBURNER-KNOTEN: EINE STELLE, NICHT FUENF (29.08.2026, 09:10).
+  //
+  // Bis heute stand `n === 6 || n === 7` an vier Stellen in dieser Datei und
+  // an drei weiteren in tools/. Beim Wechsel nach BitNode 10 am 28.08. wurde
+  // die 10 an keiner davon ergaenzt - am 29.08. um 04:15 baute der Bot
+  // deshalb acht Augmentierungen zwei Stunden vor dem Divisionsbeitritt ein
+  // und warf 90.810 Erfahrung weg, rund 6,6 Stunden.
+  //
+  // Die Liste steht jetzt an genau einer Stelle. Wer einen Kampfknoten
+  // ergaenzt, aendert diese Zeile - und nichts sonst.
+  const BLADE_KNOTEN = [6, 7, 10];
+  const bladeburnerTraegtHier = () => {
+    try { return BLADE_KNOTEN.includes(ns.getResetInfo().currentNode); }
+    catch { return false; }   // kein Zugriff heisst: vorsichtig sein
+  };
+
   // Der Ausgangsschluessel. Steht HIER OBEN und nicht bei einzelWert weiter
   // unten, weil der Endspiel-Riegel ihn rund zweihundert Zeilen frueher
   // braucht - ein const-Zugriff von dort landete in der temporalen Totzone
@@ -365,10 +381,7 @@ export async function main(ns) {
   // In einem Kampfknoten wird also gar nicht mehr fuer Faktionen gearbeitet -
   // weder vor noch nach dem Beitritt. bn4rep behaelt alles andere: Kaufen und
   // Einbauen brauchen keine Arbeit, nur Geld und vorhandene Reputation.
-  const bladeSperreArbeit = () => {
-    const k = ns.getResetInfo().currentNode;
-    return k === 6 || k === 7 || k === 10;
-  };
+  const bladeSperreArbeit = bladeburnerTraegtHier;
 
   // WAS DIE REPUTATION WIRKLICH KOSTET, WIRD GEMESSEN (27.08.2026, 09:50).
   //
@@ -697,7 +710,7 @@ export async function main(ns) {
     // Kampfwerte auf 100. Ohne die 10 griff die Sperre nicht: Um 04:15 wurden
     // acht Augmentierungen eingebaut, Tiefstand 88 -> 1.
     const knotenJetzt = ns.getResetInfo().currentNode;
-    if (knotenJetzt === 6 || knotenJetzt === 7 || knotenJetzt === 10) {
+    if (bladeburnerTraegtHier()) {
       try { bladeSperre = !ns.bladeburner.inBladeburner(); }
       catch { bladeSperre = true; }   // kein Zugriff heisst: erst recht warten
     }
@@ -921,13 +934,7 @@ export async function main(ns) {
     // Spendenrecht-Zweig. Das Spendenrecht geht nicht verloren, es wird nur
     // spaeter eingeloest - zusammen mit zwei weiteren Stuecken, die dieselbe
     // Wiederaufbaupause mitbenutzen.
-    const kampfKnotenEinbau = (() => {
-      try {
-        const n = ns.getResetInfo().currentNode;
-        // 10 ergaenzt 29.08. 04:25 - siehe Beitritts-Sperre weiter oben.
-        return n === 6 || n === 7 || n === 10;
-      } catch { return false; }
-    })();
+    const kampfKnotenEinbau = bladeburnerTraegtHier();
     const spendenAusnahme = spendenrechtFaellig
       && wartend >= (kampfKnotenEinbau ? MINDEST_WARTESCHLANGE : 1);
 
@@ -1413,13 +1420,7 @@ export async function main(ns) {
     // Guetezahl exakt wie bisher - das ist der Grund fuer die Abfrage statt
     // einer pauschalen Addition.
     const KAMPF_GEWICHT = 10;
-    const kampfKnoten = (() => {
-      try {
-        const n = ns.getResetInfo().currentNode;
-        // 10 ergaenzt 29.08. 04:25 - siehe Beitritts-Sperre weiter oben.
-        return n === 6 || n === 7 || n === 10;
-      } catch { return false; }
-    })();
+    const kampfKnoten = bladeburnerTraegtHier();
     const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)
       + zaehlplatzWert
       + NUTZEN_GEWICHT * Math.max(0, levelNutzen(k.aug, spieler.mults.hacking, zielLevel))

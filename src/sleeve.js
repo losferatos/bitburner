@@ -141,7 +141,31 @@ export async function main(ns) {
       //
       // Der Versatz `i` bleibt drin, damit zwei Sleeves nicht auf derselben
       // Art beginnen - das Spiel verbietet das (`Sleeve.ts:282-292`).
+      // ERST AB BRAUCHBAREN KAMPFWERTEN (29.08.2026, 17:45).
+      //
+      // Die Erfolgschance ist `min(1, competence/difficulty)` (`Action.ts:195`),
+      // und competence ist bei Tracking zu 70 Prozent aus dex und agi gebaut
+      // (`data/Contracts.ts:22-30`). Mit Kampfwerten um 1 liegt sie unter zwei
+      // Prozent - der Sleeve wuerde die Kontrakte leerfahren, ohne Rang zu
+      // bringen, und dem Spieler dabei den Vorrat wegnehmen. Im Gym baut er
+      // stattdessen die Werte auf, die er fuer die Kontrakte braucht.
+      //
+      // Anlass war ein selbst verursachter Schaden: Ein Aug-Kauf um 17:35 hat
+      // den Sleeve von 74/75/70/77 auf 14/1/1/11 zurueckgesetzt.
+      // `Sleeve.ts:215-225` nullt bei **jeder** Installation saemtliche
+      // Erfahrungswerte - das stand im Quellcode und wurde vor dem Kauf nicht
+      // gelesen. Der Kauf-Block ist zurueckgenommen; diese Schwelle bleibt,
+      // weil derselbe Zustand nach jedem Augmentierungs-Einbau des Spielers
+      // ohnehin eintritt.
+      const KONTRAKT_MIN_KAMPF = 40;
+      let sleeveKampf = 0;
       if (inDivision) {
+        try {
+          const sk = ns.sleeve.getSleeve(i).skills;
+          sleeveKampf = Math.min(sk.strength, sk.defense, sk.dexterity, sk.agility);
+        } catch { sleeveKampf = 0; }
+      }
+      if (inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
         for (let n = 0; n < KONTRAKTE.length && !ok; n++) {
           const art = KONTRAKTE[(i + n) % KONTRAKTE.length];
           try {

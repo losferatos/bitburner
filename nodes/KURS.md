@@ -25,6 +25,57 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 29.08., 10:20 - BitNode 10: sofort beitreten, und was danach wirklich kommt
+
+Zwei Fragen aus der Simulation der Startphase beantwortet, beide mit den
+echten Formeln gerechnet (`LevelableAction.ts:49-56`, `Bladeburner.ts:915-946`,
+`Actions/Action.ts:104-121`, `data/Constants.ts`).
+
+**1. Beitritt bei Kampfwert 100 oder spaeter? Sofort - die Frage ist
+entschieden.** Hoehere Kampfwerte helfen der Rangphase nur schwach, weil sie
+dort ueber `statFac` (Exponent 0,04 bzw. 0,035) und `agi^0,8` eingehen, also
+stark gedaempft. Zehn Stunden Bladeburner ab verschiedenen Niveaus:
+
+    Kampfwerte 100   Rang nach 10 h  297   Arbeitsanteil  17,9 %
+    Kampfwerte 150   Rang nach 10 h  338   Arbeitsanteil  19,3 %
+    Kampfwerte 300   Rang nach 10 h  435   Arbeitsanteil  22,2 %
+
+Von 100 auf 300 sind das **+46 Prozent Rang** - dafuer waeren Tage im Gym
+noetig (der Erfahrungsbedarf waechst exponentiell im Level). Das Verhaeltnis
+ist eindeutig; wer beitreten kann, tritt bei.
+
+**2. Die Startrate ist sehr klein, und das ist normal.** Bei Kampfwerten 100,
+Rang 0 und allen Faehigkeiten auf 0:
+
+    Regeneration   1,19 Ausdauer je Minute      Verbrauch  6,65 je Minute
+    Arbeitsanteil  R/V = 18 Prozent
+    Tracking Lvl 1 10,4 s je Aktion, Rangertrag 0,3 * 0,8 = 0,24
+    Startrate      rund **0,5 Rang je Minute**
+
+Der Motor der Phase ist nicht die Ausdauer, sondern der **Aktionslevel**: Der
+Ertrag waechst mit `rewardFac^(level-1)` (Tracking 1,041), und ein Level
+braucht `ceil(0,5 * L * (2*3 + L-1))` Erfolge. Nach 10 Stunden steht Level 31
+und der Ertrag bei 0,77 je Aktion - Faktor 3 gegenueber dem Start. Zum
+Vergleich das BitNode-6-Spaetspiel: dort wurden **1.400 Rang je Minute**
+gemessen (Verlauf 28.08., 13:40 bis 14:03).
+
+**Was das fuer die ETA heisst - ehrlich:** Die Spanne 89-185 h aus dem
+Eintrag von 07:15 ist aus BitNode-6-Raten hochgerechnet und beschreibt das
+Spaetspiel, nicht den Anfang. Die Simulation hier ist umgekehrt eine **untere
+Schranke**, weil sie drei Beschleuniger auslaesst: das Wachstum der
+Kampfwerte durch die Aktionen selbst, die Skillpunkte aus `floor(maxRank/3)`
+und den Wechsel auf Operationen mit hoeherem `rankGain`. Die belastbare Zahl
+kommt aus der ersten geglaetteten Messung nach dem Beitritt - bis dahin bleibt
+die Spanne stehen, jetzt aber mit dem Vermerk, dass sie am oberen Ende
+wahrscheinlich zu knapp ist.
+
+Leitgroesse: unveraendert. Bis zum Tor der Kampfwert-Tiefstand (83 von 100 um
+10:07), danach der Bladeburner-Rang.
+
+Entscheidung: **weiterfahren**, Beitritt bei 100 ohne Zwischenschritt.
+
+---
+
 ## 29.08., 07:20 - BitNode 10 (Kursloop: beide Ausgaenge gegeneinander gerechnet)
 
 Der Eintrag von 07:15 beziffert die Bladeburner-Strecke. Was dort fehlte: der

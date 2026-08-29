@@ -158,10 +158,11 @@ export async function main(ns) {
       // weil derselbe Zustand nach jedem Augmentierungs-Einbau des Spielers
       // ohnehin eintritt.
       const KONTRAKT_MIN_KAMPF = 40;
-      let sleeveKampf = 0;
+      let sleeveKampf = 0, sleeveSkills = null;
       if (inDivision) {
         try {
           const sk = ns.sleeve.getSleeve(i).skills;
+          sleeveSkills = sk;
           sleeveKampf = Math.min(sk.strength, sk.defense, sk.dexterity, sk.agility);
         } catch { sleeveKampf = 0; }
       }
@@ -174,11 +175,23 @@ export async function main(ns) {
           } catch { ok = false; }
         }
       }
-      // Der Sleeve trainiert den Wert, der beim SPIELER am niedrigsten ist -
-      // der Beitritt verlangt alle vier ueber 100, es zaehlt also der
-      // Tiefstand.
+      // WESSEN TIEFSTAND? DAS HAENGT AM BEITRITT (29.08.2026, 17:50).
+      //
+      // **Vor** dem Beitritt zaehlt der Spieler: Das Tor verlangt alle vier
+      // seiner Kampfwerte ueber 100, der Sleeve traegt ueber `sync` anteilig
+      // dazu bei (`Sleeve/Work/Work.ts:17-25`).
+      //
+      // **Nach** dem Beitritt ist das falsch. Der Spieler steht dann bei 100
+      // und bewegt sich nicht mehr; wer jetzt zaehlt, ist der Sleeve - er
+      // braucht Kampfwert 40, um ueberhaupt Kontrakte fahren zu duerfen
+      // (`KONTRAKT_MIN_KAMPF` oben). Mit dem Spieler-Tiefstand als Wahl
+      // traeniert er einen beliebigen Wert statt seines schwaechsten und
+      // braucht ein Vielfaches der Zeit bis zur Schwelle.
+      //
+      // Akut wurde das durch den Aug-Reset von 17:35: Der Sleeve steht bei
+      // 14/1/1/11 und muss vier Werte gleichzeitig hochziehen.
       if (!ok) try {
-        const sk = ns.getPlayer().skills;
+        const sk = (inDivision && sleeveSkills) ? sleeveSkills : ns.getPlayer().skills;
         const paare = [["str", sk.strength], ["def", sk.defense],
           ["dex", sk.dexterity], ["agi", sk.agility]];
         paare.sort((a, b) => a[1] - b[1]);

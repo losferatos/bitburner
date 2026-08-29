@@ -8,6 +8,63 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## KONTRAKT_MIN_KAMPF misst den Tiefstand, die Aktion misst gewichtet (30.08., 00:55)
+
+**Engpass:** Der Sleeve liefert derzeit den gesamten Rang (14,4/h, gemessen
+29.08. ueber 2,16 h). Seine Erfolgschance haengt an seinen Kampfwerten, und
+die Schwelle, ab der er ueberhaupt arbeiten darf, ist der einzige gesetzte
+Parameter in `src/sleeve.js:160` - `KONTRAKT_MIN_KAMPF = 40`, seinerzeit
+gesetzt und nie hergeleitet.
+
+**Erste Frage geklaert: Der Sleeve waechst waehrend der Arbeit.**
+`SleeveBladeburnerWork.process` ruft `applySleeveGains(sleeve,
+scaleWorkStats(retValue, sleeve.shockBonus(), false))` (`:54-55`), und
+`retValue` traegt die vollen Erfahrungswerte der Aktion
+(`Bladeburner.ts:722-732`). Ein Sleeve auf Kontrakten trainiert also mit -
+die Schwelle ist keine Einbahnstrasse.
+
+**Zweite Frage, und hier wird es interessant: wie schnell, und worin.**
+Gerechnet fuer Tracking (`data/Contracts.ts:16-32`, baseDifficulty 125,
+Zeit 12 s) mit `unweightedGain = time * BaseStatGain * successMult *
+difficultyMult` und `difficultyMult = 125^0,28 + 125/650 = 4,057`
+(`Bladeburner.ts:710-720`, `data/Constants.ts:15-16,33`):
+
+    dex   17,0 exp je Aktion  =  1,42 exp/s     Gewicht 0,35
+    agi   17,0 exp je Aktion  =  1,42 exp/s     Gewicht 0,35
+    str    2,4 exp je Aktion  =  0,20 exp/s     Gewicht 0,05
+    def    2,4 exp je Aktion  =  0,20 exp/s     Gewicht 0,05
+
+    zum Vergleich Powerhouse Gym: 12,87 exp/s in EINEN Stat
+
+**Daraus folgt der Befund:** Auf Tracking wachsen str und def des Sleeves mit
+**einem Vierundsechzigstel** der Gym-Rate. Sein Tiefstand - und genau den
+prueft `Math.min(str, def, dex, agi)` in `sleeve.js:166` - bleibt damit nach
+jedem Reset praktisch auf der Schwelle stehen, waehrend dex und agi
+davonziehen.
+
+**Die Schwelle misst die falsche Groesse.** Die Erfolgschance nutzt die Stats
+**gewichtet** (`Actions/Action.ts:172-174`: `competence += weights[stat] *
+eff[stat]^decays[stat]`). Bei Tracking tragen dex und agi je 0,35, str und def
+je 0,05 - ein niedriger str-Wert kostet dort fast nichts. Der Tiefstand ist
+das strengste denkbare Mass und sperrt den Sleeve laenger aus, als die Aktion
+es verlangt.
+
+**Kein Eingriff in diesem Lauf**, und zwar aus drei Gruenden:
+
+1. Die richtige Groesse waere die gewichtete Kompetenz je Kontraktart, nicht
+   eine Zahl - das ist ein Umbau der Auswahl, keine Konstante.
+2. Er ist derzeit nicht nachmessbar: Der Sleeve liegt laengst ueber der
+   Schwelle und faehrt Kontrakte. Die Schwelle greift erst nach dem naechsten
+   Reset wieder.
+3. Der Fehler ist konservativ - er laesst den Sleeve zu spaet statt zu frueh
+   arbeiten. Ein zu frueher Start haette Kontrakte mit unter 2 Prozent Chance
+   leergefahren (Grund der Einfuehrung am 29.08., 17:45).
+
+**Der Auftrag steht damit fest fuer den naechsten Reset:** Schwelle je
+Kontraktart gegen die gewichtete Kompetenz pruefen statt gegen den Tiefstand.
+Erwartung: Der Sleeve startet nach einem Einbau frueher auf Tracking (dex/agi
+kommen schnell zurueck) und spaeter auf str/def-lastigen Arten.
+
 ## Gekaufte Sleeves geprueft und verworfen - The Covenant ist unerreichbar (29.08., 21:55)
 
 **Engpass:** Der Rang kommt derzeit **restlos vom Sleeve** (14,4 Rang/h,

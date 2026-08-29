@@ -171,10 +171,32 @@ Strategiepruefer meldete waehrend der 90 Minuten durchgehend **SPUR**.
    war um 14:14 der Fall. **Das ist kein Fehler, sondern eine Fehlbedienung -
    auch im Wache-Prompt, der `WERKZEUG` als Startweg beschreibt.**
 
-Offen bleibt Frage 2: Warum hat der Nachstart in 2c es 87 Minuten lang nicht
-hochgeholt? Naechster Verdacht ist die Warteschleife bei `:2760`
-(`werkbankMoeglich >= braucht` -> `continue` mit "wartet"-Meldung), die ohne
-Raeumung endlos laufen kann.
+**Das Motor-Log hat die Frage beantwortet (15:15).** `data/bn4net-log.txt`
+liegt als Datei im Spiel (`src/bn4net.js:341-347`, `sag()` schreibt jede
+Zeile mit); niemand hatte bisher hineingesehen. Der Auszug:
+
+    12:53:10  sleeve.js: 1 Instanz(en) beendet, startet gleich neu.
+    ...  87 Minuten lang KEINE Zeile zu sleeve.js  ...
+    14:14:53  WERKZEUG sleeve.js traf NICHTS - laeuft es ueberhaupt?
+
+Damit steht zweierlei fest. **Erstens habe ich es selbst gekillt** - der
+`WERKZEUG sleeve.js`-Befehl von 12:53, mit dem die neue Kontrakt-Fassung
+geladen werden sollte. Die Zusage "startet gleich neu" wurde nicht
+eingeloest. **Zweitens hat der Nachstart-Zweig nicht etwa erfolglos versucht,
+sondern gar nicht angefasst:** Jeder seiner Pfade meldet etwas - `laeuft auf`,
+`wartet`, `nicht lesbar`, `exec gab 0`, `Raeumen brachte nur`. Keine davon kam.
+`sleeve.js` war also nie in `fehlend`, obwohl `ns.ps` es netzweit nicht zeigte
+(`src/ps.js` scannt von home aus vollstaendig - kein blinder Fleck).
+
+Bleibt genau eine Erklaerung: **`laufend` fuehrte einen Geisterprozess.**
+Belegt ist sie noch nicht - deshalb meldet `src/bn4net.js:2629` jetzt alle 10
+Runden beide Mengen (`fehlend: ... | laufend: ...`). Beim naechsten Vorfall
+steht die Antwort im Log statt in einer Vermutung. Motor um 15:15 ueber den
+SELBST-Kanal neu gestartet, damit die Zeile greift; **verifiziert 15:17:
+"bn4net gestartet", Stapelbetrieb laeuft wieder an, Urteil SPUR.**
+
+Lehre fuer alle Loops: **`data/bn4net-log.txt` zuerst lesen.** Diese Diagnose
+kostete zwei Laeufe Raterei; der Auszug hat sie in zehn Sekunden entschieden.
 
 **Behoben ist dafuer die Erkennungsluecke (14:50).** `tools/strategie-check.js`
 vergleicht jetzt `data/ps.json` gegen die `WERKZEUGE`-Liste, die es aus

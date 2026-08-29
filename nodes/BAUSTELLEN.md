@@ -255,6 +255,44 @@ relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
 
+**Der Uebergang um 18:04 ist vorgeprueft (15:45) - er traegt.**
+
+    bbtrain.js:257-272   endet nicht nach dem Beitritt, sondern geht in eine
+                         Warteschleife (`drin && tief >= ZIEL` -> sleep 60 s).
+                         Kein zweiter Beitrittsversuch, kein hilfe.txt-Sturm.
+                         Verlassen wird sie nur, wenn die Kampfwerte fallen -
+                         also nach einem Augmentierungs-Einbau.
+    blade.js:569-573     wartet im 30-s-Takt und uebernimmt sofort.
+    sleeve.js:85,157     prueft im 60-s-Takt, stellt also spaetestens eine
+                         Minute nach dem Beitritt auf Kontrakte um.
+
+**Neuer Befund dabei: Kontrakte sind ein gemeinsamer Topf.** Der Nachschub
+betraegt `count += seconds * growthFunction() / 480`
+(`Bladeburner.ts:1387`, `Constants.ts:39`) mit `growthFunction` = 0,5 bis 7,5
+(`data/Contracts.ts:40`), im Mittel 4,0 - also **30 Kontrakte je Stunde und
+Art**, 90 fuer alle drei zusammen.
+
+Dagegen der erwartete Verbrauch: Spieler rund 62 Aktionen/h (10,5 s je Aktion
+bei 18 Prozent Arbeitsanteil), Sleeve rund 340/h (10,6 s, durchgehend). Zusammen
+**etwa 400 gegen 90** - der Vorrat wird geleert, und zwar binnen der ersten
+Stunde.
+
+Das ist **nicht automatisch schlecht**: Sind die Kontrakte leer, weicht der
+Spieler auf Operationen aus, und die bringen mehr Rang je Aktion. Schlecht
+waere erst, wenn auch die Operationen leerlaufen und `beste()` auf Training
+oder Diplomacy zurueckfaellt - dann kostet der Sleeve mehr, als er bringt.
+
+**Messvorschrift fuer die erste Stunde nach dem Beitritt** (ersetzt die
+bisherige Gym-gegen-Kontrakte-Messung, die ohne zweiten Sleeve ohnehin nicht
+vergleichbar waere):
+
+  1. `data/sleeve.json` zeigt `contract:Tracking`.
+  2. Rangrate der ersten Stunde gegen die gerechneten 6,6/h (Spieler allein)
+     bzw. 31,8/h (mit Sleeve).
+  3. **`data/blade.json` auf die Aktionsverteilung ansehen.** Faellt der
+     Spieler auf `Training` oder `Diplomacy` durch, ist der Topf leer und der
+     Sleeve gehoert auf eine Kontraktart beschraenkt, die blade.js meidet.
+
 ### `ausdauerLuft()` misst den Fuellstand, nicht die Knappheit (11:45)
 
 Gemessen: Nicht am Bot - am Code, vor dem Ernstfall. `blade.js:966-972`

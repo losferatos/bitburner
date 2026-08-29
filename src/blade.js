@@ -2274,13 +2274,28 @@ export async function main(ns) {
         // Chongqing stand bei 0 - beides Staedte mit langen Raid-Phasen.
         //
         // Als Zeitzuschlag: `0,7 * r * HORIZONT`. Der Horizont ist die
-        // kuenftige Arbeitszeit, ueber die der Verlust wirkt. Rechnerisch ist
-        // das die Restlaufzeit des Knotens (Stunden bis Tage), aber die kennt
-        // der Motor nicht - und ein Horizont in dieser Groesse wuerde jede
-        // prozentuale Aktion faktisch sperren. Deshalb bewusst konservativ
-        // **eine Stunde**: die Zeitskala, auf der der Motor ohnehin misst.
-        // Der Zuschlag unterschaetzt damit eher, als dass er etwas verbietet;
-        // wer ihn anhebt, muss die Wirkung an der Rangrate zeigen.
+        // kuenftige Arbeitszeit, ueber die der Verlust wirkt.
+        //
+        // EINE STUNDE IST RICHTIG, NICHT NUR VORSICHTIG (29.08.2026, 08:20).
+        // Hier stand, die Restlaufzeit des Knotens waere "rechnerisch" der
+        // richtige Horizont und die Stunde ein Notbehelf. Das ist falsch, und
+        // der Satz haette den naechsten Loop zum Anheben verfuehrt. Drei
+        // Fundstellen zeigen, dass ein Verlust die kuenftige Produktion NICHT
+        // proportional daempft:
+        //
+        //   1. Black Ops ignorieren die Bevoelkerung ganz - der Knotenausgang
+        //      haengt gar nicht daran (`BlackOperation.ts:55-57`, gibt 1).
+        //   2. Die Erfolgschance ist bei 1 gedeckelt (`Action.ts:195`). Wo sie
+        //      gesaettigt ist, kostet ein Verlust nur Reserve.
+        //   3. Die Bevoelkerungsereignisse sind rein prozentual und im
+        //      Erwartungswert driftfrei (-0,0016 Log je Ereignis,
+        //      `Bladeburner.ts:600-694`). Ein Verlust ist ein Niveausprung,
+        //      keine wachsende Wunde.
+        //
+        // Mit der Restlaufzeit bekaeme schon Sting (0,1 %) vier Minuten
+        // Zuschlag auf eine 30-Sekunden-Aktion - eine Sperre ohne Grundlage.
+        // Steht als entschieden in `nodes/BAUSTELLEN.md`, Abschnitt
+        // ENTSCHIEDEN: Aenderung nur mit neuer Messung oder neuer Fundstelle.
         const POP_JE_ERFOLG = { "Raid": 0.01, "Stealth Retirement Operation": 0.005,
           "Sting Operation": 0.001 };
         const POP_HORIZONT_MS = 3600000;

@@ -1363,6 +1363,14 @@ export async function main(ns) {
           rangVon: a.rang, rangBis: a.rangBis, ausdauerVon: a.ausdauer,
           ausdauerBis: null, abgebrochen: true,
         }) + String.fromCharCode(10), "a");
+        // DIE NACHGETRAGENE ZEILE MUSS AUCH NACH HOME (29.08., 07:45).
+        // `schliesseAbschnitt` kopiert, dieser Zweig tat es nicht - laeuft
+        // blade.js nicht auf home, waere die nachgetragene Zeile genau dort
+        // gelandet, wo sie niemand liest. bn4net verteilt Werkzeuge sehr wohl
+        // auf andere Server (sleeve.js lief am 29.08. auf fulcrumtech).
+        if (ns.getHostname() !== "home") {
+          ns.scp("data/aktionen.txt", "home", ns.getHostname());
+        }
       }
       ns.write(OFFEN, "", "w");
     }

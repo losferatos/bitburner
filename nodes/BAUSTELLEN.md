@@ -244,6 +244,37 @@ nachsehen, ob eine Zeile mit `abgebrochen: true` erscheint, deren `bis`
 hoechstens eine Runde vor dem Neustart liegt. Erscheint keine, ist der
 Wiederanlaufblock tot.
 
+**Die Logik ist jetzt bewiesen, die Wirkung im Spiel noch nicht (29.08.,
+07:45).** Warten war unnoetig: Der Wiederanlaufblock ist reines Datei-Handeln
+und laesst sich ohne Bladeburner pruefen. Isolierter Testlauf mit einem
+ns-Stub (`merkeOffen` + Wiederanlauf woertlich uebernommen), vier Faelle:
+
+    1  Abschnitt 5 min alt, Neustart   nachgetragen, abgebrochen: true,
+                                       rangVon 1000, rangBis 1250,
+                                       Ausdauer und Aktion erhalten   OK
+    2  Abschnitt 4 s alt               verworfen (unter 10 s)         OK
+    3  kaputter Rest in der Datei      Start ueberlebt, nichts        OK
+                                       geschrieben
+    4  kein offener Abschnitt          nichts geschrieben             OK
+
+**Dabei ein echter Fehler gefunden und behoben:** Der Wiederanlauf-Zweig
+schrieb `data/aktionen.txt`, kopierte sie aber **nicht nach home** - anders
+als `schliesseAbschnitt`, das genau dafuer ein `ns.scp` hat. Laeuft `blade.js`
+nicht auf home, waere die nachgetragene Zeile dort gelandet, wo sie niemand
+liest. Das ist kein theoretischer Fall: `bn4net` verteilt Werkzeuge auf andere
+Server, `sleeve.js` lief am 29.08. auf fulcrumtech. Behoben mit denselben drei
+Zeilen wie im Schliessen-Pfad; `node --check` sauber, Pruefer 07:45 SPUR, im
+Spiel angekommen (`getFile blade.js`), `WERKZEUG blade.js` gesetzt.
+
+Nebenbefund, bewusst nicht behoben: Bei einem kaputten Rest bleibt
+`data/bladeoffen.txt` mit dem Muell stehen, statt geleert zu werden. Schaden
+entsteht keiner - der Block faengt den Parse-Fehler ab, und die erste Runde
+ueberschreibt die Datei ohnehin.
+
+**Was weiter aussteht:** der Nachweis im laufenden Betrieb, also nach dem
+Beitritt (ETA 18:15). Pruefung unveraendert: `WERKZEUG blade.js` und dann in
+`data/aktionen.txt` nach einer Zeile mit `abgebrochen: true` sehen.
+
 **Wichtig, um 03:14 beinahe verpasst:** Der laufende `blade.js`-Prozess hatte
 noch den Code vom Knotenstart (17:05, PID 30) - beide Nachtaenderungen lagen
 zwar als Datei im Spiel, aber nicht im laufenden Prozess. Beim Beitritt waere

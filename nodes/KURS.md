@@ -25,6 +25,54 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 29.08., 07:15 - BitNode 10, die Strecke NACH dem Tor
+
+Geschrieben vom Vorankommensloop. Der Eintrag von 21:45 beziffert Tor 1 (die
+vier Kampfwerte auf 100) und hoert dort auf. Was danach kommt, stand bisher
+nur als Baustellenpunkt (03:45) und nirgends im Kurs - also fuhr der Bot auf
+eine Strecke zu, deren Laenge er nicht kannte.
+
+**Aus dem Quellcode gelesen, nicht gemessen:**
+
+    Bladeburner/data/BlackOperations.ts   21 Black Ops
+                                          max reqdRank   400.000
+                                          Summe rankGain 113.660
+    BitNode/BitNode.tsx, case 10          BladeburnerRank 0,8
+    Bladeburner/Formulas.ts:8-26          Gewinn * Multiplikator,
+                                          VERLUST ohne Multiplikator,
+                                          reqdRank fest
+
+**Netto-Strecke bis Daedalus (der letzte Black Op, reqdRank 400.000):**
+
+    BitNode 10   400.000 - 113.660 * 0,8 = **309.072 Rang**
+    BitNode 6    400.000 - 113.660       =   286.340 Rang
+
+Also **+7,9 Prozent Netto-Strecke** gegenueber BitNode 6 - und weil auch die
+laufende Rangrate mit 0,8 skaliert, **+25 Prozent Zeitbedarf** bei gleicher
+Aktionsrate. Die BitNode-6-Erfahrung aus `nodes/ROUTE.md` (71-148 h) wird
+damit zu **89-185 h** fuer diesen Knoten.
+
+**Was das fuer die Fahrweise heisst - und was ausdruecklich NICHT:**
+
+Die Feuerschwelle fuer Black Ops bleibt bei 0,35. Sie wurde am 28.08. um
+16:00 nicht aus einem Erwartungswert hergeleitet, sondern aus der Zeit:
+Rangverlust ist kein Bestandsverlust, weil `changeRank` gegen `maxRank`
+vergibt und `maxRank` nie faellt (`Bladeburner.ts:1273,1283-1291`). Die
+Kosten eines Fehlschlags sind `T_op + L / (m * Rangrate)`; in diesem Knoten
+wird dieser Posten um ein Viertel teurer - bei Daedalus von 5,4 auf 6,8
+Minuten. Dem stehen 78 bis 86 Minuten gegenueber, die Warten auf eine hoehere
+Chance kosten wuerde. 1,4 Minuten gegen achtzig: die 0,35 bleiben richtig.
+
+Leitgroesse bis Tor 1: unveraendert der **Kampfwert-Tiefstand** (66 von 100
+um 07:07). Danach: **Bladeburner-Rang, 0 von 400.000**, Netto-Strecke
+309.072.
+
+Naechste Pruefung: Sobald `inBladeburner` true meldet, die tatsaechliche
+Rangrate ueber 45 Minuten glaetten und die 89-185 h damit ersetzen. Die
+Spanne stammt aus BitNode 6 und ist nur hochgerechnet.
+
+---
+
 ## 28.08., 21:45 - BitNode 10 (KORREKTUR des Eintrags von 19:20)
 
 Geschrieben vom Vorankommensloop, weil der Eintrag von 19:20 eine Leitgroesse

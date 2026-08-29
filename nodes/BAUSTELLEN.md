@@ -83,57 +83,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### BitNode 10 verlangt 25 Prozent mehr Rangarbeit als BitNode 6 (03:45)
-
-Gemessen: Aus dem Quellcode gelesen, nicht aus Telemetrie.
-          `Bladeburner/Formulas.ts:8-26`:
-
-              calculateActionRankGain  ... * currentNodeMults.BladeburnerRank
-              calculateActionRankLoss  ... KEIN BitNode-Multiplikator
-              reqdRank (BlackOperations.ts)  fest, kein Multiplikator
-
-          In BitNode 10 steht `BladeburnerRank: 0.8` (`BitNode.tsx`, case 10).
-          Der Gewinn faellt also um ein Fuenftel, der **Verlust bleibt**, und
-          das Ziel bleibt: max `reqdRank` 400.000, Summe aller 21 `rankGain`
-          113.660.
-
-Erwartet: Die Rechnung aus `nodes/KURS.md` uebernimmt bisher die BitNode-6-
-          Zahlen. Richtig ist fuer diesen Knoten:
-
-              Netto-Strecke  400.000 - 113.660 * 0.8 = 309.072 Rang
-                             (in BitNode 6 waren es 286.340)
-              Zeitbedarf     bei gleicher Aktionsrate **+25 %**
-
-**KORREKTUR 03:55 (Optimierlauf), noch vor der Umsetzung.** Der erste Entwurf
-dieses Punkts wollte aus derselben Asymmetrie eine neue Feuerschwelle fuer
-Black Ops ableiten - ueber den Erwartungswert `p * G * 0,8 - (1-p) * L` mit
-Break-even `L / (L + 0,8 G)`. **Das Modell ist falsch, und es haette den
-groessten Hebel des Vortags kaputtgemacht.**
-
-Rangverlust ist kein Verlust, sondern Zeit: `changeRank` vergibt Skillpunkte
-gegen `maxRank`, und `maxRank` faellt nie (`Bladeburner.ts:1273,1283-1291`).
-Ein Fehlschlag kostet also **keinen** Skillpunkt, er verzoegert nur die
-`reqdRank`-Freigabe - genau die Begruendung, mit der die Schwelle am 28.08. um
-16:00 von 0,90 auf 0,35 gesenkt wurde (`nodes/HEBEL.md`). Die richtige
-Rechnung steht in Minuten:
-
-    Kosten eines Fehlschlags = T_op + L / (m * Rangrate)
-
-In BitNode 10 wird dieser Posten mit `m = 0,8` um ein Viertel teurer: bei
-Daedalus (L 10.000, Rate 1.846/min in BitNode 6) von 5,4 auf 6,8 Minuten. Dem
-stehen die **78 bis 86 Minuten** gegenueber, die Warten auf eine hoehere Chance
-am 28.08. gekostet haette. Die Verschiebung betraegt also 1,4 Minuten gegen
-achtzig - **die 0,35 bleiben richtig, auch in diesem Knoten.**
-
-Verdacht: keiner mehr an der Schwelle. Was bleibt, ist der Wunsch, sie
-          herzuleiten statt zu setzen - dann aber ueber die Zeitrechnung oben,
-          nicht ueber den Erwartungswert.
-
-Dringlichkeit: mittel, aber zeitkritisch: Der Beitritt steht in rund vier
-          Stunden an (Tiefstand 87 um 03:39), und danach traegt `blade.js` den
-          Knoten. Vor dem ersten Black Op geprueft, kostet es nichts; danach
-          kostet jede falsche Entscheidung Rang.
-
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

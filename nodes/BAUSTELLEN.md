@@ -255,6 +255,41 @@ relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
 
+### Dieselbe Waechter-Falle stand an zwei Stellen - eine blieb 3 Tage stehen (17:15)
+
+Gemessen: Am 29.08. um 16:28 kam die ntfy-Meldung "Notnagel-Kontingent
+          erschoepft - Loops stehen", **waehrend alle fuenf Loops liefen**.
+          `data/ziele.md` stand auf 10:08, `data/verlauf-strategie.json` war
+          frisch. Der Notnagel hatte ab 11:23 **30 headless-Laeufe** gefeuert,
+          rund 6,50 USD, alle wirkungslos.
+
+Ursache:  `tools/aufsicht.js:129` erkannte lebende Loops an `data/ziele.md`.
+          Die schrieb der **alte** Reportloop alle 30 Minuten; seit seiner
+          Kuerzung auf zwei Zeilen am 29.08. um 10:25 schreibt er sie nicht
+          mehr. Behoben 16:53, Ausloeser ist jetzt
+          `data/verlauf-strategie.json` (schreibt der Pruefer bei jedem Lauf).
+
+**Der eigentliche Befund ist nicht der Bug, sondern seine Wiederholung.**
+Genau dieselbe Falle stand in `tools/wache.js` und wurde dort am **26.08. um
+01:15** behoben - mit derselben Begruendung, demselben Ersatz und dem
+ausdruecklichen Satz "Ein Fehlalarm aus dem Alarmwerkzeug selbst ist die
+teuerste Sorte". `aufsicht.js` blieb dabei unberuehrt und lief drei Tage
+weiter mit dem alten Signal. Das ist das Muster vom 25.08. (`bn4life`, dann
+`bn4rep`): behoben wurde der Einzelfall, nicht die Klasse.
+
+Geprueft und **kein Befund**: Es gibt genau drei Frischepruefungen im Repo
+(`grep -n mtimeMs tools/*.js src/*.js`). Die dritte, `aufsicht.js:218` auf
+`data/wache-zustand.json`, ist richtig - der Waechter schreibt diese Datei
+selbst, sie ist sein eigenes Lebenszeichen und kein Nebenprodukt.
+
+**Regel, die daraus folgt:** Ein Waechter haengt an einer Datei, die der
+ueberwachte Vorgang **selbst** schreibt - nie an einem Nebenprodukt, das ein
+anderer Loop beilaeufig mitfuehrt. Wer ein Ausgabeformat aendert, greppt
+vorher nach dem Dateinamen: `grep -rn "<datei>" tools/ src/ sync/`.
+
+Dringlichkeit: niedrig - beide Fundstellen sind behoben. Der Eintrag steht
+hier, damit die naechste Formataenderung die Frage stellt.
+
 **Der Uebergang um 18:04 ist vorgeprueft (15:45) - er traegt.**
 
     bbtrain.js:257-272   endet nicht nach dem Beitritt, sondern geht in eine

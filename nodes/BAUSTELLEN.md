@@ -122,41 +122,6 @@ keine
 
 ## Offen, nach Dringlichkeit
 
-### Der Einbau kam 50 Minuten nach dem Divisionsbeitritt und kostet 8 h (29.08., 19:45)
-
-Befund:   Um kurz nach 19:05 hat `bn4rep.js:1150` Augmentierungen eingebaut -
-          50 Minuten nach dem Beitritt zur Bladeburner-Division um 18:14:36.
-          Kampfwerte 100/100/100/100 fielen auf 1, der Rang 17 blieb.
-
-Gemessen um 19:38, Multiplikatoren aus dem laufenden Stand zurueckgerechnet
-(`m = level / (32*ln(exp+534,6) - 200)`, `PersonObjects/formulas/skill.ts:13`):
-
-    Stat  m neu    m alt    Zuwachs   Rest bis 100
-    str   0,5600   0,5143     +9 %      2,75 h
-    def   0,5599   0,5142     +9 %      2,75 h
-    dex   0,7769   0,5936    +31 %      0,53 h
-    agi   0,5901   0,5398     +9 %      2,03 h
-                                        ------
-                                        8,06 h
-
-**Die Kosten sind belegt, der Nutzen noch nicht.** 8,06 Stunden Gym, in denen
-der Bot keinen Rang sammelt - bei der am 29.08. gemessenen Rate von rund
-40 Rang/h waeren das gut 320 Rang. Dagegen stehen +9 Prozent auf drei
-Kampf-Multiplikatoren, und Kampfwerte gehen nach `nodes/KURS.md` (10:20) nur
-stark gedaempft in den Rang ein: 100 -> 300 bringt +46 Prozent Rang.
-
-Die Zeile `Einbau vor dem Divisionsbeitritt = nie` im Abschnitt
-`## ENTSCHIEDEN` deckt diesen Fall **nicht** ab - sie endet mit dem Beitritt,
-obwohl ihre Begruendung (Prestige setzt die Kampfwerte auf 1) danach
-unveraendert gilt. Das ist eine Luecke in der Regel, kein Regelbruch.
-
-**Naechster Schritt, nicht in diesem Lauf:** Auflisten, welche
-Augmentierungen tatsaechlich eingebaut wurden (`data/bn4rep.json` oder
-`ns.singularity.getOwnedAugmentations`), und ihren Nutzen gegen die 8,06 h
-rechnen. Erst danach laesst sich entscheiden, ob die Regel auf "kein Einbau,
-solange der Kampfwert-Tiefstand ueber X liegt" erweitert gehoert - eine
-Sperre ohne diese Gegenrechnung waere geraten.
-
 ### Skill-Abdeckung ist auf das BN6-Spaetspiel geeicht, nicht auf BN10 (29.08., 18:55)
 
 Befund, nicht behoben - der Lauf wurde fuer Erics Token-Pause abgebrochen.

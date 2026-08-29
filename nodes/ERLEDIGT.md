@@ -23,6 +23,97 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Der Einbau nach dem Beitritt hat sich gelohnt; zwei eigene Rechenfehler korrigiert
+
+**Der Punkt wird geschlossen: Der Einbau war richtig.** Beide Zahlen, mit
+denen er als teuer dastand, waren zu hoch gegriffen - und zwar von mir.
+
+**Fehler 1: Die Gym-Rate war festgeschrieben.** `tools/tor.js` rechnete mit
+`RATE_NOTFALL = 12.87`, dem Erfahrungs-Multiplikator vom 29.08. um 13:45.
+Der Einbau um 19:05 hat ihn auf **1,548** gehoben (`node tools/save.js`,
+Zeile "Erfahrung str"), das Gym gibt seither **15,48 exp/s**. Alle
+Restzeit-Rechnungen zwischen 19:38 und 21:47 waren dadurch 20 Prozent zu
+lang. Gemessen um 21:49 bei Tiefstand 82:
+
+    mit 12,87 exp/s   Restaufbau 5,33 h
+    mit 15,48 exp/s   Restaufbau 4,43 h   <- richtig
+
+Behoben: `tools/tor.js` liest den Faktor jetzt bei jedem Lauf aus dem
+Spielstand (`gymRate()`, `execSync` auf `tools/save.js`, 0,4 s Laufzeit), die
+12,87 bleiben nur als Rueckfall. Ohne den Fix waechst der Fehler mit jedem
+weiteren Einbau. **Verifiziert 21:52: Faktor 1,548 gelesen, Rate 15,48.**
+
+**Fehler 2: Der entgangene Rang war mit der falschen Rate gerechnet.** Im
+Punkt standen "rund 40 Rang/h" - das kam aus einem Fenster von sechs Minuten
+um 18:51. Die geglaettete Zwei-Stunden-Messung von 21:17 sagt **14,4 Rang/h**,
+und die stammt **restlos vom Sleeve**, der waehrend des Wiederaufbaus
+ungestoert weiterlaeuft. Entgangen ist also nur der Spieleranteil, nach der
+Simulation in `nodes/KURS.md` (10:20) rund **6,6 Rang/h**:
+
+    Kosten   6,7 h Wiederaufbau x 6,6 Rang/h  =  rund 44 Rang
+    (im Punkt stand: 8,06 h x 40 Rang/h = 320 Rang, also das Siebenfache)
+
+**Der Nutzen, gemessen** (`node tools/save.js`, 14 Augmentierungen
+installiert):
+
+    Erfahrung alle vier Kampfwerte   1,287 -> 1,548   +20 %
+    Kampf-Mult str/def               1,287 -> 1,408   +9 %
+    Kampf-Mult dex                   1,486 -> 1,951   +31 %
+    Kampf-Mult agi                   1,351 -> 1,478   +9 %
+    Hacking-Mult                     1,351 -> 1,55    +15 %
+
+Die +20 Prozent Erfahrungsrate wirken auf **jeden** kuenftigen Wiederaufbau,
+und davon kommen in diesem Knoten noch mehrere. Gegen 44 Rang einmalig ist
+das kein knappes Rennen.
+
+**Damit bleibt die ENTSCHIEDEN-Zeile, wie sie ist:** "Einbau vor dem
+Divisionsbeitritt = nie" - danach ist er erlaubt und war hier richtig. Die
+vermutete Regelluecke gibt es nicht. Eine Sperre "kein Einbau ueber
+Kampfwert X" waere nach dieser Rechnung **schaedlich** gewesen.
+
+Lehre, dieselbe wie am 26.08.: **Kurze Fenster luegen.** Sechs Minuten ergaben
+40 Rang/h, zwei Stunden 14,4. Und eine Konstante, die aus einer Messung
+stammt, veraltet mit dem naechsten Reset - wenn sie im Spielstand steht, wird
+sie gelesen, nicht festgeschrieben.
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### Der Einbau kam 50 Minuten nach dem Divisionsbeitritt und kostet 8 h (29.08., 19:45)
+
+Befund:   Um kurz nach 19:05 hat `bn4rep.js:1150` Augmentierungen eingebaut -
+          50 Minuten nach dem Beitritt zur Bladeburner-Division um 18:14:36.
+          Kampfwerte 100/100/100/100 fielen auf 1, der Rang 17 blieb.
+
+Gemessen um 19:38, Multiplikatoren aus dem laufenden Stand zurueckgerechnet
+(`m = level / (32*ln(exp+534,6) - 200)`, `PersonObjects/formulas/skill.ts:13`):
+
+    Stat  m neu    m alt    Zuwachs   Rest bis 100
+    str   0,5600   0,5143     +9 %      2,75 h
+    def   0,5599   0,5142     +9 %      2,75 h
+    dex   0,7769   0,5936    +31 %      0,53 h
+    agi   0,5901   0,5398     +9 %      2,03 h
+                                        ------
+                                        8,06 h
+
+**Die Kosten sind belegt, der Nutzen noch nicht.** 8,06 Stunden Gym, in denen
+der Bot keinen Rang sammelt - bei der am 29.08. gemessenen Rate von rund
+40 Rang/h waeren das gut 320 Rang. Dagegen stehen +9 Prozent auf drei
+Kampf-Multiplikatoren, und Kampfwerte gehen nach `nodes/KURS.md` (10:20) nur
+stark gedaempft in den Rang ein: 100 -> 300 bringt +46 Prozent Rang.
+
+Die Zeile `Einbau vor dem Divisionsbeitritt = nie` im Abschnitt
+`## ENTSCHIEDEN` deckt diesen Fall **nicht** ab - sie endet mit dem Beitritt,
+obwohl ihre Begruendung (Prestige setzt die Kampfwerte auf 1) danach
+unveraendert gilt. Das ist eine Luecke in der Regel, kein Regelbruch.
+
+**Naechster Schritt, nicht in diesem Lauf:** Auflisten, welche
+Augmentierungen tatsaechlich eingebaut wurden (`data/bn4rep.json` oder
+`ns.singularity.getOwnedAugmentations`), und ihren Nutzen gegen die 8,06 h
+rechnen. Erst danach laesst sich entscheiden, ob die Regel auf "kein Einbau,
+solange der Kampfwert-Tiefstand ueber X liegt" erweitert gehoert - eine
+Sperre ohne diese Gegenrechnung waere geraten.
+
+
 ## 29.08.2026 - Sleeve auf Bladeburner-Kontrakten: 14,4 Rang/h, belegt
 
 **Verifiziert: 14,4 Rang je Stunde, gemessen 19:07:51 bis 21:17:22 (2,16 h).**

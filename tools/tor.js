@@ -22,6 +22,7 @@
 import fs from "fs";
 import path from "path";
 import { fileURLToPath } from "url";
+import { execSync } from "child_process";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, "..");
@@ -38,7 +39,26 @@ const STATS = ["str", "def", "dex", "agi"];
 // (`node tools/save.js`), also 12,87 statt 10,0. Die erste Fassung um 13:18
 // hatte den Faktor vergessen und die ETA dadurch um 29 Prozent zu lang
 // geschaetzt.
-const RATE_NOTFALL = 12.87;
+//
+// DIE 12,87 WAREN AUF DEN 29.08., 13:45 FESTGESCHRIEBEN (29.08., 21:50).
+// Der Erfahrungs-Multiplikator steigt mit **jedem** Augmentierungs-Einbau:
+// Nach dem Einbau um 19:05 stand er bei 1,548 statt 1,287, das Gym gab also
+// 15,48 exp/s. Die Restzeit-Rechnung von 19:38 kam dadurch auf 8,06 h, wo
+// rund 6,7 h richtig waren - 20 Prozent zu lang, und der Fehler waechst mit
+// jedem weiteren Einbau. Deshalb wird der Faktor jetzt aus dem laufenden
+// Spielstand gelesen (`tools/save.js` liest ihn ohne Browser aus IndexedDB,
+// Laufzeit 0,4 s); die 12,87 bleiben nur als Rueckfall stehen.
+function gymRate() {
+  try {
+    const aus = execSync("node tools/save.js", {
+      cwd: WURZEL, timeout: 20000, encoding: "utf8" });
+    const t = /Erfahrung str ([0-9.]+)/.exec(aus);
+    const m = t ? Number(t[1]) : NaN;
+    if (Number.isFinite(m) && m > 0) return 10 * m;
+  } catch { /* Rueckfall unten */ }
+  return 12.87;
+}
+const RATE_NOTFALL = gymRate();
 // Aeltere Messungen sind fuer die Rate wertvoller (glaettet Gym-Pausen),
 // aber nicht aelter als das hier - sonst steckt ein Reset darin.
 const VERLAUF_MAX_MS = 6 * 3600 * 1000;

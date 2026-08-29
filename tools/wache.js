@@ -777,7 +777,27 @@ async function pruefe(zustand, jetzt) {
   // Knotenwechsel auf home. Der Waechter hat es deshalb seit 17:05 fuer tot
   // gehalten, alle 15 Minuten nachgestartet und dabei den Auftragskanal
   // belegt, den die Loops brauchen.
-  const kampfKnoten = messwerte.knoten === 6 || messwerte.knoten === 7;
+  // KORRIGIERT 29.08.2026, 04:45 - die 10 fehlte, und damit die Ueberwachung.
+  //
+  // Der Satz oben stimmte am 28.08. um 17:31: In BitNode 10 lief blade.js
+  // nicht. Seit dem Kurs von 18:55 ist Bladeburner auch hier der Weg, und ab
+  // dem Beitritt traegt blade.js den Knoten. Mit der alten Bedingung haette
+  // der Waechter einen toten Motor nie bemerkt und nie neu gestartet - genau
+  // die Aufgabe, fuer die er ohne Claude-Sitzung laeuft. Dieselbe Luecke
+  // steckte in `tools/strategie-check.js:856` (behoben 04:18) und an drei
+  // Stellen in `src/bn4rep.js` (04:25, nach einem Einbau, der 6,6 Stunden
+  // gekostet hat).
+  //
+  // Der urspruengliche Grund bleibt gedeckt, aber praeziser: Eine alte
+  // `blade.json` ueberlebt den Knotenwechsel auf home. Statt den ganzen
+  // Knoten auszunehmen, wird jetzt geprueft, ob die Datei AUS DIESEM KNOTEN
+  // stammt - `blade.zeit >= nodeReset`. Vor dem Beitritt schreibt blade.js
+  // nichts Neues, die Datei ist also alt und wird verworfen; ab dem Beitritt
+  // ist sie frisch und die Ueberwachung greift von selbst.
+  const bladeAusDiesemKnoten = typeof blade?.zeit === "number"
+    && (typeof messwerte.nodeReset !== "number" || blade.zeit >= messwerte.nodeReset);
+  const kampfKnoten = (messwerte.knoten === 6 || messwerte.knoten === 7
+    || messwerte.knoten === 10) && bladeAusDiesemKnoten;
   const WERKZEUGE = [
     ...(kampfKnoten
       ? [{ datei: "data/blade.json", skript: "blade.js", json: true }] : []),

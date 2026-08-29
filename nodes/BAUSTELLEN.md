@@ -31,6 +31,7 @@ Beide Male ging es gut, aber Nachrechnen ist Zufall, kein Mechanismus.
 | Kampfknoten-Bedingung | **`BLADE_KNOTEN`**, nie eine Nummer im Code | derselbe Fehler an sieben Stellen; die 10 fehlte ueberall | 29.08. 09:15 |
 | EditSaveFile im laufenden Spiel | **nein**, erst beim naechsten Reset | Remote-API kann Spielstaende nur lesen; IndexedDB-Schreiben riskiert den ganzen Lauf fuer 0,1 % | 29.08. 09:45 |
 | Beitritt zur Division | **sofort bei Kampfwert 100** | Kampfwerte 100 -> 300 bringen nur +46 % Rang nach 10 h, kosten aber Tage Gym (Simulation 29.08., `nodes/KURS.md` 10:20) | 29.08. 10:20 |
+| Verbrechen statt Gym zum Kampftraining | **verworfen** | Gym Powerhouse 10 exp/s in einem Stat gegen bestenfalls 3,0 exp/s ueber alle vier (Mug 12 exp/4 s, Heist 1800/600 s); BN10 hat keinen Gym-Malus, nur `CrimeMoney: 0,5` | 29.08. 13:25 |
 
 Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
@@ -148,6 +149,12 @@ Weg:      `ns.sleeve.setToBladeburnerAction(0, "Take on contracts", <name>)`
           denselben Kontrakt fahren, und der Kontrakt muss verfuegbar sein -
           beides pruefbar. In BitNode 10 ist der Zugang ohnehin frei.
 
+**Geaendert 29.08. um 13:00, Wirkung noch nicht gemessen.** `src/sleeve.js:83`
+fuehrt jetzt `KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"]` und setzt
+den Sleeve bei `inBladeburner() === true` per `setToBladeburnerAction` darauf
+(`:122-127`); der Gym-Zweig bleibt als Rueckfall. Nicht messbar bis zum
+Beitritt - `data/sleeve.json` zeigt um 13:12 noch `aufgabe: agi`.
+
 **Zu tun, sobald `inBladeburner` true ist:** Eine Stunde Gym gegen eine Stunde
 Kontrakte messen - Rangzuwachs je Stunde, sonst nichts aendern. Traegt es,
 gehoert es dauerhaft in `sleeve.js`.
@@ -156,6 +163,37 @@ Dringlichkeit: **hoch** - groesster bekannter ungenutzter Hebel des Knotens,
 relevant genau im Moment des Beitritts.
 
 ## Offen, nach Dringlichkeit
+
+### ETA zum Beitritt war um 3 h zu optimistisch - Werkzeug gebaut (13:30)
+
+Gemessen: Der stuendliche Report meldete um 12:53 "Tor in 5,3 h". Exakt
+          gerechnet waren es **8,4 h**. Die Zahl kam aus einer linearen
+          Hochrechnung des Skill-Zuwachses ("+1 in 6 min"), die Erfahrung je
+          Punkt steigt aber exponentiell.
+
+Beleg:    `PersonObjects/formulas/skill.ts:13`, umgestellt
+          `exp(z) = e^((z/m + 200)/32) - 534.6`. Stand 13:11 (str 132.919,
+          def 129.642, dex 61.471, agi 99.906, alle Skill 91): fehlend 90.059
+          + 87.345 + 34.706 + 63.398 = **275.507 exp**. Gemessene Rate
+          12:53->13:11 (nur str trainiert): **9,10 exp/s**, gegen den
+          Formelwert 10,0 (Powerhouse expMult 10 / gameCPS 5, mal 5 Cycles).
+
+Behoben:  `tools/tor.js` (neu). Es rechnet die Umkehrung, leitet den
+          Multiplikator m aus dem laufenden Stand zurueck statt ihn
+          hartzucodieren, und misst die Rate ueber `data/tor-verlauf.json`.
+          Ausgabe zweizeilig, dazu `data/tor.json` fuer den Reportloop.
+          Erster Lauf 13:18: **7,7 h, Tor um 20:38** (noch Formelrate 10,0;
+          mit der gemessenen 9,10 waeren es 8,4 h).
+
+**Verifiziert: 7,7 h um 13:18** - zweimal hintereinander identisch, Verlauf
+wird geschrieben, `node --check` sauber, Pruefer 13:19 SPUR.
+
+**Was noch aussteht:** Der Reportloop nennt die ETA weiterhin aus eigener
+Rechnung. Er soll `node tools/tor.js` aufrufen. Bis dahin gilt: **wer die ETA
+meldet, holt sie dort** - nicht aus dem Skill-Delta des Strategiepruefers.
+
+Dringlichkeit: mittel. Der Bot laeuft davon unbeeindruckt; falsch ist nur die
+Zahl, die Eric bekommt - und die ist seit dem 29.08. sein einziger Bericht.
 
 ### `ausdauerLuft()` misst den Fuellstand, nicht die Knappheit (11:45)
 

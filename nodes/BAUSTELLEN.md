@@ -317,7 +317,7 @@ faellt danach `popEst` der Stadt? Bleibt popEst ueber einer Stunde stabil, kann
 der Horizont bleiben; faellt es weiter, gehoert er hochgesetzt - dann aber mit
 der Rangrate als Beleg, nicht mit der Rechnung allein.
 
-### 2. Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
+### Wartet bis V1-Knoten: Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die
 Skeptiker-Runde vier Konstruktionsfehler fand: Das "Ventil" mass Fragmentierung
@@ -395,7 +395,7 @@ muessen in einen Zyklus passen.
 Offen bleibt: der Darknet-Volatilitaetsmultiplikator und die Frage, ob
 Limit-Orders mehr koennen als Marktorders.
 
-### 4. Darknet-Labyrinth-Gewerk (V1b)
+### Wartet bis BitNode 15: Darknet-Labyrinth-Gewerk (V1b)
 
 `labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei
 `hasFullDarknetAccess()` - also in BitNode 15 oder mit SF15. Jeder
@@ -406,7 +406,7 @@ je Labor einen Einbauzyklus und rund 24 Raetselloeser.
 
 ---
 
-### Source-File -1: die letzten vier Exploits (Stand 28.08., 07:45 - 7 von 11)
+### Source-File -1: die letzten vier Exploits (Stand 29.08., 02:45 - 7 von 11)
 
 Eingesammelt: `UndocumentedFunctionCall`, `INeedARainbow`, `Bypass`
 (`src/exploit.js`), `TimeCompression` (`src/exploit2.js`), `TrueRecursion`
@@ -418,6 +418,26 @@ und `N00dles` (`src/exploit3.js`). `PrototypeTampering` haengt am
 Multiplikatoren mit `1,001^n`. Von 7 auf 11 sind das 1,007 auf 1,011, also
 **+0,4 %**. Dafuer permanent und ueber jeden Reset hinweg - bei 45 geplanten
 Laeufen ist das kein Nichts, aber es hat keine Dringlichkeit.
+
+**Nachgemessen 29.08. um 02:44** (`node tools/lage.js | grep Exploits`):
+`PrototypeTampering` **ist da** - der Zeitgeber ist wie erwartet gefallen. Die
+Liste steht jetzt bei sieben:
+
+    UndocumentedFunctionCall, INeedARainbow, Bypass, TimeCompression,
+    TrueRecursion, N00dles, PrototypeTampering
+
+Damit ist alles eingesammelt, was ein Skript allein erreichen kann. Die
+verbleibenden vier brauchen etwas, das kein Loop hat: zwei einen echten
+Mausklick beziehungsweise den Debugger ueber die Opera-Verbindung
+(`Unclickable`, `RealityAlteration`), einer ist im ausgelieferten Spiel gar
+nicht erreichbar (`YoureNotMeantToAccessThis`), und `EditSaveFile` verlangt,
+den Spielstand zu exportieren, zu veraendern und zurueckzuspielen.
+
+**`EditSaveFile` wird nachts nicht angefasst.** Der Ertrag ist 0,1 Prozent auf
+alle Multiplikatoren; der Einsatz ist ein Import ueber einen laufenden Bot,
+der jeden Fortschritt seit dem Export verwirft. Das gehoert in einen Moment
+mit Aufsicht, nicht in einen unbeaufsichtigten Nachtlauf - so steht es auch
+schon im Absatz darueber ("nur mit Sicherung und nicht im laufenden Betrieb").
 
 **1. `YoureNotMeantToAccessThis` - im ausgelieferten Spiel NICHT erreichbar.**
 `ns.openDevMenu()` oeffnet nur den April-Scherz (`Extra.ts:19` zeigt auf

@@ -118,6 +118,37 @@ Regeln:
 
 ## Sofort
 
+### BEITRITT ZUR DIVISION: 29.08.2026, 18:14:36 (eingetragen 18:20)
+
+Quelle:   `data/bbjoin.txt` = 1788020076769. `bbtrain.js:262` schreibt den
+          Stempel unmittelbar nach `joinBladeburnerDivision()`.
+
+Uebergang geprueft, **er traegt**:
+
+    18:14:36  Beitritt, Kampfwerte 100/100/100/100
+    18:19     blade.js hat uebernommen - `data/blade.json` 0,0 min alt,
+              Aktion `General/Recruitment`, Rang 0
+    18:19     Sleeve auf `def` im Gym - sein eigener Tiefstand (1), also
+              greift die Umstellung von 17:50; die Kontraktschwelle 40 haelt
+              ihn korrekt zurueck
+
+**Damit laufen die Uhren fuer die drei offenen Nachmessungen:**
+
+  1. **20 Minuten** (also ab 18:35): Sleeve zurueck auf Kampfwert 40,
+     `data/sleeve.json` muss dann `contract:Tracking` zeigen.
+  2. **Eine Stunde** (ab 19:15): Rangrate gegen die gerechneten 6,6/h
+     (Spieler allein) bzw. 31,8/h (mit Sleeve). Dazu `data/blade.json` auf
+     die Aktionsverteilung ansehen - faellt der Spieler auf Training oder
+     Diplomacy durch, ist der Kontrakttopf leer.
+  3. **Zwei Stunden** (ab 20:15): `node tools/spann.js` fuer die
+     Cyber's-Edge-Frage, und `data/aktionen.txt` auf eine Zeile mit
+     `abgebrochen: true` pruefen (Wiederanlauf-Nachweis).
+
+Ausserdem faellig: Taucht **Raid** in der Aktionsverteilung auf? Der
+Chaos-Zuschlag wurde um 16:50 an die Schwelle gebunden, weil er Raid sonst
+von 0,0437 auf 0,0118 Rang/s druecken wuerde.
+
+
 ### Selbstverschuldet: Aug-Kauf hat den Sleeve auf 1 zurueckgesetzt (17:45)
 
 Gemessen: Sleeve-Kampfwerte um 17:20 **74/75/70/77**, um 17:40 **14/1/1/11**.

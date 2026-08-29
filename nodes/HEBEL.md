@@ -37,6 +37,61 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Sleeve probiert alle drei Kontraktarten statt einer (29.08., 16:25)
+
+Engpass:   Ab 18:04 der Rang. `sleeve.js` setzte den Sleeve auf
+           `KONTRAKTE[i % 3]` - bei **einem** Sleeve also immer nur
+           `Tracking`. Ist der ausverkauft, gab `setToBladeburnerAction`
+           false zurueck und der Sleeve fiel in den Gym-Zweig. Das Gym bringt
+           nach dem Beitritt **null Rang**.
+
+Hypothese: Ausverkauft ist der Regelfall. Nachschub 30 Stueck je Stunde und
+           Art (`Bladeburner.ts:1387`, `Constants.ts:39`), Verbrauch von
+           Spieler und Sleeve zusammen rund 400. Mit Rueckfallkette faellt der
+           Sleeve statt auf 0 auf **0,0108 Rang/s** (Retirement) bzw. 0,0104
+           (BountyHunter) zurueck.
+
+Beleg:     Alle neun Aktionen mit den echten Spielerwerten von 16:15
+           durchgerechnet (`Action.ts:169-196`, Gewichte und Zerfaelle aus
+           `data/Contracts.ts` und `data/Operations.ts`). Skills gemessen:
+           str/def/dex/agi 97, hacking 163, **charisma 1**, **intelligence 94**.
+
+               KON  Tracking            diff  125  chance 47,1 %  0,01353 Rang/s
+               KON  Retirement          diff  200  chance 30,1 %  0,01081
+               KON  BountyHunter        diff  250  chance 24,1 %  0,01038
+               OP   Raid                diff  800  chance  5,3 %  0,04372
+               OP   StealthRetirement   diff 1000  chance  4,3 %  0,01119
+               OP   Undercover          diff  500  chance 10,2 %  0,01073
+               OP   Assassination       diff 1500  chance  2,6 %  0,00907
+               OP   Investigation       diff  400  chance 13,0 %  0,00858
+               OP   Sting               diff  650  chance  6,9 %  0,00699
+
+**Damit ist mein eigener Eintrag von 16:00 zu korrigieren.** Dort stand, der
+Ausweichpfad auf Operationen sei unproblematisch, weil sie "das 7- bis
+180-fache je Aktion" bringen. Je **Aktion** stimmt das, je **Sekunde** nicht:
+Die Erfolgschance faellt mit der Schwierigkeit, und die Dauer steigt mit ihr.
+**Tracking schlaegt jede Operation ausser Raid.** Der Kontrakttopf ist also
+kein Randthema, sondern die Hauptquelle - und Raid der einzige echte Sprung
+(0,0437 Rang/s, dreimal Tracking, wegen rankGain 55 trotz 5,3 Prozent).
+
+           Zwei Groessen sind Annahmen und gehoeren nach dem Beitritt geprueft:
+           `skillFac` = 1 (noch keine Bladeburner-Faehigkeiten gekauft) und
+           `popFac` = 1 (Bevoelkerung genau auf der Schwelle 1e9). Beide
+           verschieben alle Zeilen gleichsinnig, die **Reihenfolge** aendern
+           sie nicht.
+
+Vorher:    Sleeve faellt bei ausverkauftem Tracking auf 0 Rang/s (Gym).
+Nachher:   (offen - misst der naechste Lauf nach 18:04)
+Umsetzung: `src/sleeve.js:121-145`, Schleife ueber `KONTRAKTE` mit Versatz `i`,
+           damit zwei Sleeves nicht kollidieren (`Sleeve.ts:282-292` verbietet
+           dieselbe Art). `node --check` sauber, Pruefer SPUR.
+           **Im Spiel angekommen und neu gestartet, verifiziert 16:17:**
+           alte Instanz (pid 161300, alter Code) per `WERKZEUG` beendet, neue
+           **pid 223447 auf werk-0**, Motor-Log: "sleeve.js laeuft auf werk-0".
+           Der Nachstart hat diesmal also funktioniert - der Ausfall von 12:53
+           bleibt ein Einzelfall, den die neue Diagnosezeile beim naechsten Mal
+           aufklaert.
+
 ### Sleeve-Kontraktwahl gegengerechnet - Tracking ist belegt richtig (29.08., 16:00)
 
 Engpass:   Ab dem Beitritt (18:04) der Bladeburner-Rang. Offen war, ob der

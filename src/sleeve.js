@@ -120,12 +120,35 @@ export async function main(ns) {
       // oder ein anderer Sleeve ihn schon faehrt.
       let inDivision = false;
       try { inDivision = ns.bladeburner.inBladeburner(); } catch { /* 0 GB */ }
+      // ALLE DREI ARTEN DURCHPROBIEREN, NICHT NUR EINE (29.08.2026, 16:25).
+      //
+      // Hier stand `KONTRAKTE[i % KONTRAKTE.length]` - bei einem Sleeve also
+      // immer nur `Tracking`. Ist der ausverkauft, fiel der Sleeve ins Gym,
+      // und das bringt nach dem Beitritt **null Rang**.
+      //
+      // Ausverkauft ist der Regelfall, nicht die Ausnahme: Der Nachschub
+      // betraegt 30 Stueck je Stunde und Art (`Bladeburner.ts:1387`,
+      // `Constants.ts:39`, growthFunction im Mittel 4,0 geteilt durch 480 s),
+      // der Verbrauch von Spieler und Sleeve zusammen rund 400.
+      //
+      // Die Reihenfolge ist nach gerechnetem Rang je Sekunde sortiert, mit
+      // den Spielerwerten von 16:15 (str/def/dex/agi 97, hacking 163,
+      // charisma 1, intelligence 94):
+      //
+      //     Tracking       chance 47,1 %   10,4 s   0,0135 Rang/s
+      //     Retirement     chance 30,1 %   16,7 s   0,0108
+      //     BountyHunter   chance 24,1 %   20,9 s   0,0104
+      //
+      // Der Versatz `i` bleibt drin, damit zwei Sleeves nicht auf derselben
+      // Art beginnen - das Spiel verbietet das (`Sleeve.ts:282-292`).
       if (inDivision) {
-        try {
-          ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts",
-            KONTRAKTE[i % KONTRAKTE.length]);
-          if (ok) was = "contract:" + KONTRAKTE[i % KONTRAKTE.length];
-        } catch { ok = false; }
+        for (let n = 0; n < KONTRAKTE.length && !ok; n++) {
+          const art = KONTRAKTE[(i + n) % KONTRAKTE.length];
+          try {
+            ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts", art);
+            if (ok) was = "contract:" + art;
+          } catch { ok = false; }
+        }
       }
       // Der Sleeve trainiert den Wert, der beim SPIELER am niedrigsten ist -
       // der Beitritt verlangt alle vier ueber 100, es zaehlt also der

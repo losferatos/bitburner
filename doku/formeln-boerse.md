@@ -169,3 +169,23 @@ Zyklus liegen, und der Aufbau muss schneller sein als 7,5 Minuten.
 - Limit- und Stop-Orders (`OrderProcessing.tsx`) werden bei jedem Tick
   abgearbeitet. Ob sie einem Bot etwas bringen, das er nicht auch mit
   Marktorders erreicht, ist ungeprueft.
+
+## 8. Nachtrag 29.08.2026, 08:50 - Volatilitaet, Orderarten, Positionsgroesse
+
+**Darknet-Volatilitaetsmultiplikator, `DarkNet/effects/effects.ts:218-222`:**
+
+    mult(c) = 1 + (1 - e^(-0,001 c)) + 2 * (1 - e^(-0,00015 c))    ->  max 4
+
+c sind die `stockPromotions`-Ladungen der Aktie. Er greift nur in
+`StockMarket.ts:268` auf die Preisbewegung, nicht auf die Manipulation ueber
+`grow`/`hack`. Mehr Amplitude, gleiche Steuerbarkeit.
+
+**Orderarten: in BitNode 8 ist alles frei.** `checkSFAccess` (Zeile 47) prueft
+`Player.bitNodeN !== 8 && activeSourceFileLvl(8) < sfLevel` - im Knoten selbst
+greift die Sperre nie. Shorts (Level 2) und Limit-/Stop-Orders (Level 3)
+stehen also ohne Source-File zur Verfuegung.
+
+**Die eigene Position verdirbt den Forecast.** `StockMarketHelpers.ts:86,106`:
+jede vom eigenen Handel ausgeloeste Preisbewegung ruft
+`influenceForecastForecast(forecastChange * mv/100)` - gegen die eigene
+Richtung. Positionsgroesse an `shareTxForMovement` koppeln, nicht ans Geld.

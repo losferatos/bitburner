@@ -463,8 +463,43 @@ Grenze: `stockMarketCycle` kippt alle 7,5 Minuten mit 45 Prozent auch das Ziel
 (`flipForecastForecast`: `100 - otlkMagForecast`). Aufbau und Haltedauer
 muessen in einen Zyklus passen.
 
-Offen bleibt: der Darknet-Volatilitaetsmultiplikator und die Frage, ob
-Limit-Orders mehr koennen als Marktorders.
+**Beide offenen Fragen sind beantwortet (29.08., 08:50), aus dem Quellcode.**
+
+**1. Der Darknet-Volatilitaetsmultiplikator ist gedeckelt bei 4.**
+`DarkNet/effects/effects.ts:218-222`:
+
+    mult(c) = 1 + (1 - e^(-0,001 c)) + 2 * (1 - e^(-0,00015 c))
+
+mit c = `DarknetState.stockPromotions[symbol]`. Fuer c gegen unendlich laeuft
+das gegen **4**, und die Haelfte des Wegs (Faktor 2,5) liegt bei rund 4.600
+Ladungen. Er wirkt an **genau einer** Stelle: `StockMarket.ts:268`,
+`const volatility = stock.mv * getDarknetVolatilityMult(stock.symbol)` - also
+auf die **Preisbewegung**, nicht auf die Manipulation. Fuer den Bot heisst
+das: mehr Amplitude je Tick, gleiche Steuerbarkeit. Nuetzlich, aber kein
+Hebel, den man vor dem Bot bauen muesste.
+
+**2. Limit-Orders koennen mehr - und sie sind in BitNode 8 gratis dabei.**
+`NetscriptFunctions/StockMarket.ts:183` verlangt `checkSFAccess(ctx, 3)`, und
+der Wachhund lautet (Zeile 47):
+
+    if (Player.bitNodeN !== 8 && Player.activeSourceFileLvl(8) < sfLevel)
+
+**Im Knoten selbst greift die Sperre nie.** In BitNode 8 stehen damit ohne
+jedes Source-File offen: Shorts (Level 2, Zeilen 160/170) und Limit-/
+Stop-Orders (Level 3, Zeilen 183/195/205). Der Bot darf also von Anfang an mit
+dem vollen Werkzeugkasten rechnen - die bisherige Annahme, er muesse mit
+Marktorders auskommen, war zu vorsichtig.
+
+**3. Nebenbefund, der die Positionsgroesse begrenzt.** Der eigene Handel
+schiebt den Forecast gegen einen: `StockMarketHelpers.ts:86` und `:106` rufen
+`influenceForecastForecast(forecastChange * (stock.mv / 100))` - je Paket, das
+eine Preisbewegung ausloest. Wer zu gross kauft, verdirbt sich das Ziel, das
+er per `grow(host, {stock:true})` gerade aufgebaut hat. Die Positionsgroesse
+gehoert also an `shareTxForMovement` gekoppelt, nicht ans verfuegbare Geld.
+
+Damit ist die Vorarbeit fuer den Bot abgeschlossen; was fehlt, ist der Bot
+selbst - und der wird erst in BitNode 8 gebraucht (Route Platz 42-44).
+
 
 ### Wartet bis BitNode 15: Darknet-Labyrinth-Gewerk (V1b)
 

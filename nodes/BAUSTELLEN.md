@@ -156,6 +156,25 @@ Behoben:  Zwei Schritte, beide 17:45.
           Die Schwelle bleibt dauerhaft - derselbe Zustand tritt nach jedem
           Augmentierungs-Einbau des Spielers ohnehin ein.
 
+**Erwartung fuer die Nachmessung, gerechnet 18:15:** Der Sleeve ist nach rund
+**20 Minuten** wieder bei Kampfwert 40 und darf dann Kontrakte fahren. Die
+Rechnung, mit `exp(z) = e^((z/m + 200)/32) - 534,6` und der Gym-Rate 12,87:
+
+    str  m 0,5148   14 -> 40   4.661 exp   6,0 min
+    def  m 0,5148    1 -> 40   5.323 exp   6,9 min
+    dex  m 0,8241    1 -> 40   1.823 exp   2,4 min
+    agi  m 0,5675   11 -> 40   3.737 exp   4,8 min
+                              15.544 exp  20,1 min
+
+Die Multiplikatoren sind der einzige Rest, der vom Aug-Kauf bleibt: dex liegt
+jetzt bei 0,8241 statt 0,5946 (Wired Reflexes, Targeting I und II), agi bei
+0,5675 statt 0,5405. Deshalb kommt dex in 2,4 Minuten zurueck, wo es beim
+ersten Aufbau ein Vielfaches war.
+
+**Fehlt der Sleeve 40 Minuten nach dem Beitritt immer noch in
+`data/sleeve.json` als `contract:...`, stimmt die Rechnung nicht** - dann
+traeniert er den falschen Wert oder die Schwelle greift nicht.
+
 Dringlichkeit: erledigt, steht hier als Lehre. **Was billig aussieht, ist
 nicht automatisch gratis** - der Preis stand nicht im Geld, sondern in der
 Erfahrung.

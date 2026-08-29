@@ -340,11 +340,53 @@ am 28.08. schon ohne diesen Zuschlag bei 123 Rang/min gegen 1.097 fuer
 Assassination -, aber eine Sperre, die niemand gemessen hat, ist keine
 Verbesserung. Eine Stunde ist die Zeitskala, auf der der Motor ohnehin misst.
 
-**Offen bleibt der Horizont.** Nachzumessen, sobald `blade.js` laeuft (nach dem
-Bladeburner-Beitritt, ETA rund 13 h): Waehlt der Motor Raid noch, und wenn ja,
-faellt danach `popEst` der Stadt? Bleibt popEst ueber einer Stunde stabil, kann
-der Horizont bleiben; faellt es weiter, gehoert er hochgesetzt - dann aber mit
-der Rangrate als Beleg, nicht mit der Rechnung allein.
+**Die Horizontfrage ist beantwortet - aus dem Quellcode, ohne auf den Betrieb
+zu warten (29.08., 08:20). Der Horizont von einer Stunde bleibt.**
+
+Der Eintrag von 00:55 nannte die Restlaufzeit des Knotens als "rechnerisch
+richtigen" Horizont und den 1-Stunden-Wert als Notbehelf. Das ist falsch
+herum: Die Restlaufzeit waere die richtige Groesse nur, wenn ein
+Bevoelkerungsverlust die gesamte kuenftige Produktion proportional daempft.
+Drei Fundstellen zeigen, dass er das nicht tut.
+
+1. **Black Ops ignorieren die Bevoelkerung vollstaendig.**
+   `Actions/BlackOperation.ts:55-57`: `getPopulationSuccessFactor()` gibt
+   fest **1** zurueck. Der Knotenausgang laeuft ueber 21 Black Ops - auf ihn
+   wirkt ein Raid gar nicht.
+
+2. **Die Erfolgschance ist bei 1 gedeckelt.**
+   `Actions/Action.ts:195`: `return Math.min(1, competence / difficulty)`.
+   Wo die Chance gesaettigt ist, kostet ein Bevoelkerungsverlust nichts - er
+   frisst nur die Reserve auf. Der Schaden setzt erst ein, wenn die Reserve
+   aufgebraucht ist, und das ist keine lineare Funktion der Zeit.
+
+3. **Die Bevoelkerung erholt sich nicht, aber sie faellt auch nicht weiter.**
+   `Bladeburner.ts:600-694`, alle Ereignisse sind **prozentual**
+   (`sourceCity.pop * percentage`); `BasePopGrowth` ist 100 Koepfe
+   (`data/Constants.ts:36`) und bei Millionen bedeutungslos. Erwartete
+   Log-Drift je Ereignis, ueber die Zweige gerechnet:
+
+       +5 %  Gemeinde neu      0,05 * ln(1,15)  = +0,0070
+       +20 % mehr Synthoiden   0,20 * ln(1,16)  = +0,0297
+       -20 % weniger           0,20 * ln(0,86)  = -0,0302
+       -5 %  Abwanderung       0,05 * ln(0,85)  = -0,0081
+                                          Summe   -0,0016
+
+   Also praktisch **driftfrei**. Ein Verlust ist damit weder dauerhaft im
+   Sinne einer wachsenden Wunde noch heilt er von selbst - er ist ein
+   Niveausprung in einem Random Walk.
+
+Zusammen heisst das: Der Zuschlag soll die Aktion verteuern, nicht sperren.
+Mit der Restlaufzeit (89-185 h laut `nodes/KURS.md`) bekaeme schon Sting mit
+seinen 0,1 Prozent einen Zuschlag von ueber vier Minuten auf eine
+30-Sekunden-Aktion - eine Sperre, die nach 1. und 2. gar nicht gerechtfertigt
+ist. Eine Stunde ist die Zeitskala, auf der der Motor misst, und sie liegt
+zwischen den beiden Fehlern. **Der Horizont bleibt, jetzt mit Begruendung.**
+
+Was offen bleibt, ist kleiner als gedacht: die Betriebsmessung, ob `beste()`
+Raid ueberhaupt noch waehlt. Sie entscheidet nichts mehr am Horizont, sondern
+belegt nur, dass der Zuschlag rechnerisch dort ankommt, wo er soll.
+
 
 ### Wartet bis V1-Knoten: Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 

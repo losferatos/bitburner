@@ -391,6 +391,40 @@ Zuschlag also eher zu hoch als zu niedrig - konservativ im Sinne der Sache.
 Regenerationskammer und Recruitment - kein Raid, aber bei Rang 0 bis 16 sagt
 das nichts. Messbar ab dem Moment, in dem `blade.js` wieder traegt.
 
+**Umgesetzt (30.08., 01:20) - die Erfolgschance lag doch vor.**
+
+Der Eintrag von 00:55 schloss mit "nicht umgesetzt, weil `p` an der Stelle
+`blade.js:2345` nicht vorliegt". Das war zu schnell geurteilt: `const s =
+spanne(typ, name)` steht in **Zeile 2152**, also 190 Zeilen VOR dem Zuschlag,
+und `s.min` ist genau die Erfolgschance - dieselbe Groesse, mit der 34 Zeilen
+spaeter der `ertrag` gerechnet wird.
+
+Eingebaut ist jetzt der Erwartungswert:
+
+    pErfolg = clamp(s.min, 0, 1)
+    Raid    p * 0,01 + (1 - p) * 0,0075
+    sonst   p * rate
+
+Wirkung, gerechnet (Zuschlag in Sekunden):
+
+    p       Raid alt   Raid neu   Sting alt   Sting neu
+    0,3       25,2       20,8        2,52        0,76
+    0,6       25,2       22,7        2,52        1,51
+    1,0       25,2       25,2        2,52        2,52
+
+Bei sicherer Aktion aendert sich nichts, bei unsicherer faellt der Zuschlag
+auf den Erwartungswert. Die alte Fassung war die obere Schranke - sie sperrte,
+statt zu verteuern.
+
+`node --check` sauber, Pruefer unveraendert SPUR, ins Spiel geschoben und
+`blade.js` neu gestartet (**verifiziert 01:22: laeuft, Rang 97**).
+
+**Wirkung im Betrieb weiterhin nicht messbar** - der Spieler faehrt seit dem
+Einbau um 19:05 keine Bladeburner-Aktionen (Restaufbau 1,2 h um 01:15). Die
+Nachmessung bleibt offen: Sobald `blade.js` traegt, in `data/aktionen.txt`
+nachsehen, ob Sting oder Stealth Retirement ueberhaupt auftauchen - vorher
+waren sie durch den zu hohen Zuschlag faktisch gesperrt.
+
 ### Wartet bis V1-Knoten: Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die

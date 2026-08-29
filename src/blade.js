@@ -2342,7 +2342,32 @@ export async function main(ns) {
           "Sting Operation": 0.001 };
         const POP_HORIZONT_MS = 3600000;
         const popAnteil = POP_JE_ERFOLG[name] || 0;
-        if (popAnteil > 0 && dauer > 0) dauer += 0.7 * popAnteil * POP_HORIZONT_MS;
+        // DER VERBRAUCH HAENGT AM ERFOLG (30.08.2026, 01:20).
+        //
+        // Bis hierher wurde die volle Rate angesetzt, unabhaengig von der
+        // Erfolgschance. Der Quellcode sagt etwas anderes
+        // (`Bladeburner.ts:816-852`):
+        //
+        //   Sting und Stealth Retirement verbrauchen NUR bei Erfolg - beide
+        //   Aufrufe stehen ausschliesslich im `if (success)`-Zweig.
+        //   Raid verbraucht immer, aber unterschiedlich: bei Erfolg 1 %,
+        //   bei Fehlschlag `getRandomIntInclusive(-10,-5)/10`, also 0,5 bis
+        //   1,0 % - im Mittel 0,75 %.
+        //
+        // Erwartungswert also `p*rate` bzw. fuer Raid
+        // `p*0,01 + (1-p)*0,0075`. Als p dient `s.min`, die untere Schranke
+        // der Schaetzspanne - dieselbe Groesse, mit der die Datei sonst
+        // rechnet (`ertrag` weiter unten).
+        //
+        // Wirkung, gerechnet: Bei p = 0,3 faellt der Zuschlag fuer Sting von
+        // 2,52 s auf 0,76 s und fuer Raid von 25,2 s auf 20,8 s. Bei p = 1
+        // aendert sich nichts. Die alte Fassung war die obere Schranke, also
+        // konservativ - der Fehler sperrte, statt zu verteuern.
+        const pErfolg = (s && Number.isFinite(s.min)) ? Math.max(0, Math.min(1, s.min)) : 1;
+        const popErwartet = (name === "Raid")
+          ? pErfolg * 0.01 + (1 - pErfolg) * 0.0075
+          : pErfolg * popAnteil;
+        if (popErwartet > 0 && dauer > 0) dauer += 0.7 * popErwartet * POP_HORIZONT_MS;
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
         // Bewertung zurueck: besser eine grobe Rangfolge als gar keine.
         // Rang je AUSDAUERPUNKT, sobald ueberhaupt etwas gemessen ist.

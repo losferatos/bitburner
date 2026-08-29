@@ -37,6 +37,66 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kein Hebel, sechster Winkel: der Sleeve (29.08., 06:55)
+
+Engpass:    Unveraendert der Kampfwert-Tiefstand, 63 von 100 um 06:51. In
+            Erfahrung 19.241 von 223.671 je Wert. Rate geglaettet ueber 47
+            Minuten: 301 Erfahrung/min je Wert, ETA rund 11 h.
+
+Diesmal nicht am Gym des Spielers gesucht (das ist seit dem 01:00-Lauf
+erschoepft), sondern am zweiten Traeger: dem Sleeve. Drei Kandidaten, alle
+aus dem Quellcode gerechnet, alle verworfen.
+
+**1. Zusaetzliche Sleeves kaufen.** BitNode 10 ist der einzige Knoten, in dem
+das geht (`Faction/ui/CovenantCampaign.tsx:48`). Preis:
+`Math.pow(10, gekaufte) * 10e12` (`SleeveCovenantPurchases.tsx:13-27`), also
+**10 Billionen Dollar** fuer den ersten - bei aktuell 4,2 Milliarden. Dazu
+Mitgliedschaft in The Covenant. Ausser Reichweite, und zwar um drei
+Groessenordnungen.
+
+**2. Shock des Sleeves senken.** Der Sleeve-Ertrag wird mit
+`(100 - shock)/100` skaliert (`Sleeve.ts:173`), und BitNode 10 setzt beim
+Prestige `shock <= 25`. Gemessen aus dem Spielstand um 06:53: **shock = 0**.
+Es gibt nichts zu holen, der Sleeve arbeitet bereits ungedaempft.
+
+**3. Sync des Sleeves heben - der einzige, der wehtut.** Der Spieler
+bekommt `sync/100` der Sleeve-Erfahrung (`Sleeve/Work/Work.ts:20-22`).
+Gemessen: **sync = 25**, also drei Viertel des Sleeve-Ertrags verfallen.
+Sync 100 wuerde den Sleeve-Beitrag vervierfachen - aus 3,25 Erfahrung/s
+wuerden 13, die Gesamtrate stiege von 13,25 auf 26/s, also **+96 Prozent**.
+
+Der Preis macht es kaputt. `SleeveSynchroWork.process` hebt sync um
+`0,0002 * calculateIntelligenceBonus(int, 0.5)` je Cycle, bei 5 Cycles je
+Sekunde (`Work/Formulas.ts:38`) und Intelligenz 94 (Bonus 1,0316):
+
+    0,0002 * 1,0316 * 5 = 0,0010316 sync/s
+    75 Punkte / 0,0010316 = 72.703 s = **20,2 Stunden**
+
+Waehrend dieser 20,2 Stunden trainiert der Sleeve nicht. Verlust:
+3,25/s * 72.703 s = **236.285 Erfahrung** - mehr als der ganze Restweg von
+204.430. Selbst wenn man nur bis sync 50 ginge (6,7 h, Verlust 78.500),
+brachte die Restzeit danach keinen Ausgleich mehr: Der Gewinn von +3,25/s
+holt 78.500 Erfahrung erst in 6,7 weiteren Stunden ein, und so lange dauert
+Tor 1 nach der Investition nicht mehr.
+
+Und nach dem Tor traegt es nichts: Dann ist die Leitgroesse der
+Bladeburner-Rang, und `sync` beruehrt die Bladeburner-Arbeit des Sleeves
+nicht (`SleeveBladeburnerWork.ts:55` skaliert nur mit shock).
+
+Hypothese:  keine - alle drei Kandidaten sind vor der Umsetzung gefallen.
+Beleg:      `SleeveCovenantPurchases.tsx:13-27`, `Sleeve.ts:173-179`,
+            `Sleeve/Work/Work.ts:20-22`, `SleeveSynchroWork.ts:14-18`,
+            `PersonObjects/formulas/intelligence.ts`, `Work/Formulas.ts:38`.
+Vorher:     Tiefstand 63 um 06:51, Rate 301/min je Wert.
+Nachher:    entfaellt, keine Aenderung.
+Commit:     nur dieser Protokolleintrag.
+
+**Nebenbefund fuer spaeter:** sync bleibt der groesste ungenutzte Faktor am
+Sleeve (Faktor 4 auf seinen Beitrag). Er lohnt in einem Knoten, dessen
+Leitgroesse ueber viele Tage an Erfahrung haengt - nicht in diesem, wo Tor 1
+in 11 Stunden faellt und danach der Rang zaehlt. Wer in einem V1-Knoten
+landet, rechnet ihn neu.
+
 ### Eine eigene Empfehlung widerlegt, bevor sie umgesetzt wurde (29.08., 03:55)
 
 Engpass:    Unveraendert der Kampfwert-Tiefstand (87 von 100 um 03:39). Der

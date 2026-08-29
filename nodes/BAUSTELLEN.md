@@ -73,7 +73,18 @@ Regeln:
 
   Wer die Datei doch von Hand aendert, prueft danach `node tools/liste.js` -
   die Gliederung muss lauten: ein `## Sofort`, ein
-  `## Offen, nach Dringlichkeit`, ein `## Erledigt`.
+  `## Offen, nach Dringlichkeit
+
+*Der Beitritt selbst ist geprueft und braucht keinen Punkt (29.08., 11:15).*
+*`bbtrain.js:257-272` haelt bei ZIEL 100 an, ruft `stopAction()` und dann*
+*`joinBladeburnerDivision()`; bei Ablehnung schreibt es `data/hilfe.txt`, was*
+*der Pruefer als STOERUNG meldet. Der Beitrittszeitpunkt geht nach*
+*`data/bbjoin.txt` und wird nach home kopiert - wichtig, weil bbtrain auf der*
+*Werkbank laeuft. Alle vier Spielbedingungen (`NetscriptFunctions/Bladeburner.ts:335-352`)*
+*sind erfuellt: `disableBladeburner` ist false (Spielstand 11:14),*
+*`BladeburnerRank` ist 0,8 und damit ungleich 0, `Player.bladeburner` ist noch*
+*null, und die vier Kampfwerte stehen bei 86-87 von 100.*
+`, ein `## Erledigt`.
 - **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
   ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
   Die Lebenszeichen stehen woanders und sind bedingungslos:

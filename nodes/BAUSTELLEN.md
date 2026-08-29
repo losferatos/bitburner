@@ -118,68 +118,6 @@ Regeln:
 
 ## Sofort
 
-### Selbstverschuldet: Aug-Kauf hat den Sleeve auf 1 zurueckgesetzt (17:45)
-
-Gemessen: Sleeve-Kampfwerte um 17:20 **74/75/70/77**, um 17:40 **14/1/1/11**.
-          Dazwischen lag ein von mir eingebauter Aug-Kauf, der alle elf
-          kaufbaren Augmentierungen erwarb (274 Mio).
-
-Ursache:  `PersonObjects/Sleeve/Sleeve.ts:215-225`. `installAugmentation`
-          setzt **bei jeder einzelnen Installation** saemtliche
-          Erfahrungswerte auf null:
-
-              this.exp.hacking = 0; this.exp.strength = 0;
-              this.exp.defense = 0; this.exp.dexterity = 0;
-              this.exp.agility = 0; this.exp.charisma = 0;
-
-          Elf Kaeufe bedeuten elf Ruecksetzungen. Das steht offen im
-          Quellcode und wurde **vor** dem Kauf nicht gelesen - genau der
-          Fehler, gegen den der Loop-Prompt seit dem 27.08. warnt.
-
-Schaden:  Der Sleeve faellt als Rangquelle aus, bis er wieder auf 40 ist.
-          Er trainiert mit den neuen Multiplikatoren (dex x1,386 durch
-          Targeting I+II und Wired Reflexes), kommt also schneller zurueck
-          als beim ersten Mal - aber der Beitritt um 17:58 findet ohne ihn
-          statt. Erwarteter Verlust in der ersten Stunde: die gerechneten
-          31,7 Rang/h des Sleeves.
-
-Behoben:  Zwei Schritte, beide 17:45.
-          1. Der Kauf-Block ist **zurueckgenommen** (`git checkout`, nie
-             committet). Sleeve-Augmentierungen bleiben verboten, bis jemand
-             den Erfahrungsverlust gegen den Multiplikatorgewinn rechnet.
-          2. `src/sleeve.js` faehrt Kontrakte erst ab **Kampfwert 40**
-             (`KONTRAKT_MIN_KAMPF`), sonst Gym. Ohne die Schwelle haette der
-             Sleeve ab 17:58 mit Chance unter 2 Prozent Kontrakte leergefahren
-             und dem Spieler den Vorrat weggenommen. **Verifiziert 17:38:**
-             pid 266608, Sleeve auf `str` im Gym.
-
-          Die Schwelle bleibt dauerhaft - derselbe Zustand tritt nach jedem
-          Augmentierungs-Einbau des Spielers ohnehin ein.
-
-**Erwartung fuer die Nachmessung, gerechnet 18:15:** Der Sleeve ist nach rund
-**20 Minuten** wieder bei Kampfwert 40 und darf dann Kontrakte fahren. Die
-Rechnung, mit `exp(z) = e^((z/m + 200)/32) - 534,6` und der Gym-Rate 12,87:
-
-    str  m 0,5148   14 -> 40   4.661 exp   6,0 min
-    def  m 0,5148    1 -> 40   5.323 exp   6,9 min
-    dex  m 0,8241    1 -> 40   1.823 exp   2,4 min
-    agi  m 0,5675   11 -> 40   3.737 exp   4,8 min
-                              15.544 exp  20,1 min
-
-Die Multiplikatoren sind der einzige Rest, der vom Aug-Kauf bleibt: dex liegt
-jetzt bei 0,8241 statt 0,5946 (Wired Reflexes, Targeting I und II), agi bei
-0,5675 statt 0,5405. Deshalb kommt dex in 2,4 Minuten zurueck, wo es beim
-ersten Aufbau ein Vielfaches war.
-
-**Fehlt der Sleeve 40 Minuten nach dem Beitritt immer noch in
-`data/sleeve.json` als `contract:...`, stimmt die Rechnung nicht** - dann
-traeniert er den falschen Wert oder die Schwelle greift nicht.
-
-Dringlichkeit: erledigt, steht hier als Lehre. **Was billig aussieht, ist
-nicht automatisch gratis** - der Preis stand nicht im Geld, sondern in der
-Erfahrung.
-
-
 ### `WERKZEUG sleeve.js` startet nichts - der Sleeve stand 90 Minuten (14:20)
 
 Gemessen: `data/ps.json` um 14:12 fuehrte **kein `sleeve.js`** - wohl aber

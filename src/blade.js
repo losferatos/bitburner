@@ -2243,15 +2243,46 @@ export async function main(ns) {
         // Mit dem Zuschlag steht Raid bei 252,7 Rang je 123 s = 123/min gegen
         // Assassination 1.097/min (chaosneutral, `Bladeburner.ts:859`) - der
         // Zyklus entsteht gar nicht erst, und Diplomacy faellt weg.
+        // DER ZUSCHLAG GILT ERST IN DER NAEHE DER SCHWELLE (29.08.2026, 16:50).
+        //
+        // Bis hierher wurde er **unbedingt** aufgeschlagen. Das ist falsch,
+        // sobald das Chaos niedrig steht - und nach einem Knotenwechsel steht
+        // es bei **null**:
+        //
+        //  - Chaos schadet ueberhaupt erst ueber 50. `getChaosSuccessFactor`
+        //    (`Actions/Action.ts:94-103`) gibt darunter glatt 1 zurueck,
+        //    `ChaosThreshold: 50` in `data/Constants.ts:31`.
+        //  - Raid erhoeht Chaos **prozentual** (+1 bis +5 %,
+        //    `Bladeburner.ts:844`). Von einem niedrigen Stand aus ist das
+        //    absolut fast nichts; von null aus ist es exakt null.
+        //  - Passiv faellt Chaos ausserdem um 0,0001 je Sekunde
+        //    (`Bladeburner.ts:1397`), also 0,36 je Stunde.
+        //
+        // Was der unbedingte Zuschlag kostete, mit den Werten von 16:15
+        // (charisma 1, also senkungProz 1,001 und damit 3 Diplomacy-Laeufe
+        // = 180 s): Raid faellt von **0,0437 auf 0,0118 Rang je Sekunde** -
+        // von dreimal Tracking auf darunter. Raid ist mit rankGain 55 die mit
+        // Abstand ertragreichste Aktion des Knotens; der Zuschlag hat sie
+        // ausgerechnet dort ausgeschaltet, wo sie nichts kostet.
+        //
+        // Der Grenzzyklus, gegen den der Zuschlag 28.08. eingebaut wurde, war
+        // echt - aber er entstand bei Chaos um 38, nicht bei 0. Deshalb bleibt
+        // er, verblasst aber linear: voll ab Schwelle, null bei 40 und darunter.
+        const CHAOS_ZUSCHLAG_AB = 40;
         if (chaosDelta > 0 && dauer > 0) {
           try {
-            const cha = ns.getPlayer().skills.charisma;
-            const senkungProz = Math.pow(cha, 0.045) + cha / 1000;
-            // Beide Richtungen sind prozentual, das Niveau kuerzt sich
-            // heraus - das Verhaeltnis ist die Zahl der noetigen Laeufe.
-            const laeufe = chaosDelta / senkungProz;
-            dauer += laeufe * 60000;
-          } catch { /* ohne Charisma-Wert bleibt es bei der nackten Dauer */ }
+            const chaos = ns.bladeburner.getCityChaos(ns.bladeburner.getCity());
+            const naehe = Math.max(0, Math.min(1,
+              (chaos - CHAOS_ZUSCHLAG_AB) / (50 - CHAOS_ZUSCHLAG_AB)));
+            if (naehe > 0) {
+              const cha = ns.getPlayer().skills.charisma;
+              const senkungProz = Math.pow(cha, 0.045) + cha / 1000;
+              // Beide Richtungen sind prozentual, das Niveau kuerzt sich
+              // heraus - das Verhaeltnis ist die Zahl der noetigen Laeufe.
+              const laeufe = chaosDelta / senkungProz;
+              dauer += laeufe * 60000 * naehe;
+            }
+          } catch { /* ohne Messung bleibt es bei der nackten Dauer */ }
         }
         // DIE BEVOELKERUNG IST DER ZWEITE AUSGELAGERTE POSTEN (29.08., 00:55).
         //

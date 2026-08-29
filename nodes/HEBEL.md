@@ -37,6 +37,49 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Chaos-Zuschlag gilt erst nahe der Schwelle - Raid war ausgeschaltet (29.08., 16:50)
+
+Engpass:   Ab 18:04 der Rang. `blade.js:2246` schlug bei chaoserzeugenden
+           Aktionen **unbedingt** Diplomacy-Zeit auf die Dauer auf. Mit
+           charisma 1 (gemessen 16:15) sind das 3 Laeufe zu 60 s = **180 s**
+           je Raid.
+
+Hypothese: Raid steigt von 0,0118 auf **0,0437 Rang/s** - Faktor 3,7 - und
+           wird damit zur besten Aktion des Knotens statt zur schlechtesten.
+
+Beleg:     Drei Fundstellen, alle drei sprechen dagegen, den Zuschlag bei
+           niedrigem Chaos zu rechnen:
+
+             - Chaos schadet erst **ueber 50**. `getChaosSuccessFactor`
+               (`Actions/Action.ts:94-103`) gibt darunter glatt 1 zurueck;
+               `ChaosThreshold: 50` in `data/Constants.ts:31`.
+             - Raid erhoeht Chaos **prozentual** (+1 bis 5 %,
+               `Bladeburner.ts:844`, `City.ts:31-33`). Von einem niedrigen
+               Stand aus ist das absolut fast nichts - von **null** aus, wie
+               nach dem Knotenwechsel, ist es exakt null.
+             - Passiv faellt Chaos um 0,0001 je Sekunde
+               (`Bladeburner.ts:1397`), also 0,36 je Stunde.
+
+           Rang je Sekunde mit den Werten von 16:15, Raid: rankGain 55,
+           chance 5,3 %, Dauer nackt 66,8 s -> **0,0437**. Mit 180 s Zuschlag
+           246,8 s -> **0,0118**, also unter Tracking (0,0135).
+
+**Der Zuschlag selbst war richtig, nur seine Unbedingtheit nicht.** Der
+Grenzzyklus, gegen den er am 28.08. eingebaut wurde, war echt - aber er
+entstand bei Chaos um 38, nicht bei 0. Er bleibt deshalb erhalten und
+verblasst linear: voll ab 50, null bei 40 und darunter
+(`CHAOS_ZUSCHLAG_AB = 40`). Das ist bewusst **keine** Ruecknahme der
+Entscheidung von gestern, sondern ihre Begrenzung auf den Bereich, fuer den
+sie hergeleitet wurde.
+
+Vorher:    Raid 0,0118 Rang/s (rechnerisch, Chaos noch nicht messbar).
+Nachher:   (offen - misst der naechste Lauf nach 18:04 an `data/blade.json`:
+           taucht Raid in der Aktionsverteilung auf?)
+Umsetzung: `src/blade.js`, `getCityChaos`-Abfrage plus lineare Verblassung.
+           `node --check` sauber, Pruefer SPUR. **Im Spiel und neu gestartet,
+           verifiziert 16:44:01** - alte Instanz beendet, neue **pid 239674
+           auf werk-0**, Motor-Log bestaetigt.
+
 ### Sleeve probiert alle drei Kontraktarten statt einer (29.08., 16:25)
 
 Engpass:   Ab 18:04 der Rang. `sleeve.js` setzte den Sleeve auf

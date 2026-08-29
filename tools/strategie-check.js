@@ -437,6 +437,34 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   }
 
   // --- 3. Wo stehen wir, und ist das die richtige Richtung? ----------------
+  // FEHLT EIN WERKZEUG? (29.08.2026, 14:50)
+  //
+  // Am 29.08. lief `sleeve.js` von 12:50 bis 14:17 nicht - 87 Minuten, in
+  // denen der Pruefer durchgehend SPUR meldete. Kein Urteil schlug an, weil
+  // niemand die Prozessliste gegen `WERKZEUGE` haelt: `data/ps.json` wurde
+  // von keinem Werkzeug gelesen. Ein stiller Ausfall ist schlimmer als ein
+  // lauter, und dieser traf ausgerechnet den groessten Hebel des Knotens.
+  //
+  // Die Sollliste wird aus `src/bn4net.js` geparst statt hier kopiert - eine
+  // zweite Liste waere binnen Tagen veraltet.
+  const ps = await liesJson("data/ps.json");
+  let werkzeugFehlt = null;
+  if (ps && Array.isArray(ps.gesehen) && Date.now() - ps.zeit < 15 * 60000) {
+    try {
+      const quelle = fs.readFileSync(path.join(WURZEL, "src", "bn4net.js"), "utf8");
+      const teil = quelle.slice(quelle.indexOf("const WERKZEUGE = ["));
+      const ende = teil.indexOf("\n  ];");
+      const soll = [...teil.slice(0, ende > 0 ? ende : 4000)
+        .matchAll(/\["([\w.]+\.js)"/g)].map((m) => m[1]);
+      const da = ps.gesehen.map((x) => x.datei);
+      const fehlt = soll.filter((d) => !da.includes(d));
+      if (fehlt.length) werkzeugFehlt = fehlt.join(", ");
+    } catch { /* ohne Sollliste keine Pruefung - kein Grund zu laermen */ }
+  }
+  if (werkzeugFehlt) sag("WERKZEUG FEHLT: " + werkzeugFehlt
+    + " - mit 'pushFile data/task.txt [\"<name>\"]' starten"
+    + " (WERKZEUG in reload.txt killt nur, es startet nicht).");
+
   const rep = await liesJson("data/bn4rep.json");
   let blade = await liesJson("data/blade.json");
   // Frueh lesen: Die beiden folgenden Pruefungen gelten nur in Kampfknoten.

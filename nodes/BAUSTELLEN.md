@@ -158,21 +158,31 @@ es beim Beitritt gegen 18:50 tot gewesen, haette der Hebel nicht gegriffen -
 und niemand haette es gemerkt, weil kein Urteil darauf anschlaegt: Der
 Strategiepruefer meldete waehrend der 90 Minuten durchgehend **SPUR**.
 
-Naechster Schritt: `laufend` an der Fundstelle nachvollziehen. Bis dahin gilt:
-**ein fehlendes Werkzeug wird ueber `data/task.txt` gestartet, nicht ueber
-`data/reload.txt`** - der Auftragskanal ist der belegt funktionierende Weg.
+**Zwei Verdachte ausgeschlossen (14:45, Diagnoselauf im Spiel):**
 
-**Nachtrag 14:22 - der Befund war zu scharf formuliert.** Der Sleeve stand
-nicht still: Eine einmal gesetzte Aufgabe bleibt aktiv, auch wenn das Skript
-stirbt. Er trainierte also weiter `agi`. Beleg ist die Erfahrungsrate: `tor.js`
-misst ueber 42 Minuten **15,37 exp/s**, wo das Gym allein 12,87 gibt - die
-Differenz von 19 Prozent ist der Sleeve-Anteil (`Sleeve/Work/Work.ts:17-25`,
-`applyWorkStatsExp(Player, stats, sync)`, sync 25 in BitNode 10).
+1. Nicht die RAM-Berechnung. Ein Wegwerfskript `ramtest.js` fragte im Spiel
+   `ns.getScriptRam(d, "home")` ab: **sleeve.js 14,75 GB**, blade 162,25,
+   bbtrain 94,75, bn4rep 848,25, contracts 17,65 - alle `exists=true`. Der
+   Abbruchpfad `if (!(braucht > 0))` (`src/bn4net.js:2750`) greift also nicht.
+2. `WERKZEUG <name>` ist gar **kein Startbefehl**, sondern ein Kill
+   (`src/bn4net.js:566-597`): Es sucht netzweit laufende Instanzen, killt sie
+   und verlaesst sich auf den Nachstart in Abschnitt 2c. Laeuft nichts, meldet
+   es `"traf NICHTS - laeuft es ueberhaupt?"` und startet nichts. Genau das
+   war um 14:14 der Fall. **Das ist kein Fehler, sondern eine Fehlbedienung -
+   auch im Wache-Prompt, der `WERKZEUG` als Startweg beschreibt.**
 
-Der Kern des Befunds bleibt: Beim Beitritt gegen 18:00 haette **niemand** den
-Sleeve von `agi` auf Kontrakte umgestellt, und das ist der groesste Hebel des
-Knotens. Ausserdem bleibt die Ratenmessung von 13:41 damit erklaert - sie war
-kein Messfehler, sondern der Sleeve.
+Offen bleibt Frage 2: Warum hat der Nachstart in 2c es 87 Minuten lang nicht
+hochgeholt? Naechster Verdacht ist die Warteschleife bei `:2760`
+(`werkbankMoeglich >= braucht` -> `continue` mit "wartet"-Meldung), die ohne
+Raeumung endlos laufen kann.
+
+**Behoben ist dafuer die Erkennungsluecke (14:50).** `tools/strategie-check.js`
+vergleicht jetzt `data/ps.json` gegen die `WERKZEUGE`-Liste, die es aus
+`src/bn4net.js` parst (keine zweite Liste, die veraltet), und meldet
+`WERKZEUG FEHLT: <namen>` samt dem richtigen Startweg. Nur bei ps.json unter
+15 Minuten Alter - ein alter Stand soll keinen Fehlalarm ausloesen.
+**Verifiziert 14:52:** Sollliste 10 Eintraege korrekt geparst, alle laufen,
+keine Meldung; `node --check` sauber, Urteil unveraendert SPUR.
 
 Dringlichkeit: **hoch**. Ein stiller Ausfall ohne Urteil ist schlimmer als ein
 lauter.

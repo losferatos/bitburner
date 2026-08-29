@@ -504,6 +504,50 @@ Damit ist die Vorarbeit fuer den Bot abgeschlossen; was fehlt, ist der Bot
 selbst - und der wird erst in BitNode 8 gebraucht (Route Platz 42-44).
 
 
+**Bestandsaufnahme und zwei Korrekturen (30.08., 00:55).**
+
+**1. "Den Bot gibt es noch nicht" stimmt nur halb.** Im Baum liegen
+`src/stocks.js` (208 Zeilen) und `src/stockaccess.js` (130 Zeilen). Der
+vorhandene Bot ist aber ein **beobachtender**: Er entscheidet ueber
+`ns.stock.getForecast`, und das wirft ohne 4S-Daten
+(`NetscriptFunctions/StockMarket.ts:237-241`, `if (!Player.has4SDataTixApi)
+throw`). In BitNode 8 ist er damit erst nach dem 25-Mrd-Kauf lauffaehig. Was
+fehlt, ist der **manipulierende** Bot - und der braucht `getForecast` gar
+nicht, weil er die Richtung selbst setzt.
+
+**2. Die Zugangskosten sind falsch beziffert - in BitNode 8 ist der Handel
+gratis.** Der Eintrag oben nennt "5 Mrd (TIX) plus 25 Mrd (4S-API)". Fuer
+BitNode 8 gilt das nicht: `Prestige.ts:156-163` schenkt beides beim Betreten,
+
+    if (Player.bitNodeN === 8) Player.money = BitNode8StartingMoney;   // 250 Mio
+    if (canAccessBitNodeFeature(8)) {
+      Player.hasWseAccount = true;
+      Player.hasTixApiAccess = true;
+    }
+
+und `canAccessBitNodeFeature(8)` ist im Knoten selbst immer wahr
+(`BitNode/BitNodeUtils.ts:17-19`). **Startkapital 250 Mio, TIX-API frei.**
+
+**Das war die entscheidende Frage, und sie war offen.** In BitNode 8 stehen
+saemtliche Geldquellen auf null (`BitNode.tsx:765-780`):
+
+    CompanyWorkMoney 0   CrimeMoney 0        HacknetNodeMoney 0
+    ManualHackMoney 0    ScriptHackMoneyGain 0   CodingContractMoney 0
+    InfiltrationMoney 0  DarknetMoneyMultiplier 0
+
+Waere die TIX-API zu kaufen, gaebe es keinen Weg, die 5 Mrd zu verdienen -
+der Knoten waere verschlossen. Er ist es nicht, weil der Zugang zum Start
+gehoert. `ScriptHackMoney: 0.3` bleibt dabei ungleich null: Dem Server wird
+weiter Geld entnommen, was die Manipulation ueber `grow(host, {stock:true})`
+antreibt, auch wenn der Spieler davon nichts bekommt.
+
+**Damit steht die Bauart fest:** Startkapital 250 Mio, kein 4S, Richtung per
+Hacknetz gesetzt, Positionsgroesse an `shareTxForMovement` gekoppelt
+(Nebenbefund 3 oben), Shorts und Limit-Orders frei
+(`checkSFAccess` greift in BN8 nie). Von `stocks.js` wiederverwendbar sind
+Kauf-, Verkaufs- und Positionslogik; die Entscheidungsregel ueber
+`getForecast` muss durch die eigene Manipulationsabsicht ersetzt werden.
+
 ### Wartet bis BitNode 15: Darknet-Labyrinth-Gewerk (V1b)
 
 `labyrinth.ts:424-427` legt The Red Pill ins sechste Darknet-Labor, aber nur bei

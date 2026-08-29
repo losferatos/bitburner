@@ -128,6 +128,23 @@ Verifiziert: `node tools/strategie-check.js` um 04:21 - URTEIL SPUR, der
           laufen auf home). Dass die Sperre jetzt greift, zeigt sich erst beim
           naechsten Einbauversuch; bis zum Beitritt darf keiner mehr kommen.
 
+**Fuenfte Fundstelle, aus derselben Familie (29.08., 06:20).** `bn4rep.js`
+hob die Blade-Sperre selbst wieder auf: Nach `let gesperrt = bladeSperre;`
+folgte `if (lockInhalt) { gesperrt = ... }` als **Zuweisung**. Ein
+abgelaufenes Firmenschloss setzte `gesperrt` damit auf false, obwohl der
+Divisionsbeitritt noch aussteht - genau der Einbau, der um 04:15 6,6 Stunden
+gekostet hat, waere so ein zweites Mal moeglich gewesen. Aktuell existierte
+`data/install-sperre.txt` nicht, die Falle war also scharf, aber ungezuendet.
+Behoben mit `gesperrt = bladeSperre || lockGilt;` - die beiden Sperren sind
+unabhaengig, es reicht, wenn eine greift. Das Loeschen des abgelaufenen
+Schlosses bleibt erhalten.
+
+Verifiziert: `node --check` sauber; Pruefer 06:13 URTEIL SPUR, rc 0; die neue
+Zeile steht in der Spielfassung (`getFile bn4rep.js`), `bn4rep.js` neu
+gestartet - **PID 14843** (vorher 46), belegt in `data/ps.json` um 06:15:21.
+Wahrheitstafel isoliert nachgerechnet: blade=true + Schloss abgelaufen gibt
+jetzt true (vorher false), die drei uebrigen Faelle unveraendert.
+
 **Die Suche nach weiteren Stellen ist gelaufen** (05:12,
 `grep -rn "=== 6" src/ tools/`). Vier Fundstellen insgesamt, alle behoben:
 

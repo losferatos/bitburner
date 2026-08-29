@@ -709,13 +709,20 @@ export async function main(ns) {
         + " Kampfwerte auf 1 werfen (BitNode " + knotenJetzt + ").");
     }
     if (lockInhalt) {
+      // DIE FIRMENSPERRE DARF DIE BLADE-SPERRE NICHT AUFHEBEN (29.08.2026,
+      // 06:20). Hier stand `gesperrt = ...` als Zuweisung. Ein abgelaufenes
+      // Firmenschloss setzte damit `gesperrt` auf false - auch dann, wenn
+      // `bladeSperre` true war, der Divisionsbeitritt also noch aussteht.
+      // Genau dieser Einbau hat am 29.08. um 04:15 6,6 Stunden gekostet.
+      // Die beiden Sperren sind unabhaengig: es reicht, wenn eine greift.
       const lockStempel = Number(lockInhalt.split("|")[1]);
-      gesperrt = !Number.isFinite(lockStempel)
+      const lockGilt = !Number.isFinite(lockStempel)
         || Date.now() - lockStempel < INSTALL_LOCK_MAX_AGE;
-      if (!gesperrt) {
+      if (!lockGilt) {
         loeschAufHome(INSTALL_LOCK_FILE);
         sag("Einbausperre war ueber fuenf Minuten alt - aufgehoben.");
       }
+      gesperrt = bladeSperre || lockGilt;
     }
     // FAVOR-EINBAU (23.08.2026). Der Einbau ist nicht nur ein Preis, den man
     // zahlt, um weiterzukommen - er ist selbst ein Ertrag. Beim Einbau wird

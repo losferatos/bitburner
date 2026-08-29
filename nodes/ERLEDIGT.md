@@ -23,6 +23,85 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Tracer in die Sortierung, und der Fähigkeitskauf lief im Ausweichzweig gar nicht
+
+**Verifiziert 22:21: Punkte 17 -> 0.** Gekauft wurden in einer einzigen Runde
+Digital Observer 2, **Tracer 2**, Blade's Intuition 1, Short-Circuit 1 und
+Reaper 1. Vorher (22:19) standen nur Digital Observer 1, Cyber's Edge 1 und
+Hyperdrive 1, und 17 Punkte lagen brach.
+
+Der Punkt hatte einen Vorschlag; beim Umsetzen kam ein zweiter, groesserer
+Fehler zum Vorschein.
+
+**Teil 1 - Tracer stand ausserhalb der Sortierung.** Er war der einzige
+Chance-Skill, der nur im `SKILL_PLAN` mit Deckel 14 stand, also **hinter**
+allen sechs dynamisch sortierten - und wurde deshalb nie gekauft, obwohl er
+mit `SuccessChanceContract: 4` bei baseCost 2 (`data/Skills.ts:38-43`) den
+besten Nutzen je Punkt der ganzen Phase hat. Er steht jetzt in
+`CHANCE_SKILLS` (Abdeckung 1,0) und in `DYNAMISCH`, der Deckel ist auf
+Infinity.
+
+Die Abdeckung 1,0 ist fuer diese Phase belegt, nicht geraten: Der Sleeve kann
+**ausschliesslich** Kontrakte fahren (`Bladeburner/Enums.ts:17-21`), und er
+liefert derzeit den gesamten Rang. Dass die Spieler-Faehigkeiten auch fuer
+ihn gelten, steht in `Actions/Action.ts:170-182` - die Multiplikatoren kommen
+ueber `inst`, die Bladeburner-Instanz des **Spielers**, nicht ueber `person`.
+
+**Teil 2, der eigentliche Fund - `faehigkeitenKaufen()` stand hinter dem
+`continue`.** Im Ausweichzweig, mit dem `blade.js` dem `bbtrain` das Feld
+ueberlaesst (`src/blade.js:3018-3028`), wurde die Runde per `continue`
+beendet, **bevor** der Kaufblock erreicht war. Solange der Motor weicht -
+also den ganzen Wiederaufbau nach einem Augmentierungs-Einbau, diesmal 4,3
+Stunden - wurde damit **kein einziger Punkt ausgegeben**.
+
+Das ist teuer, und zwar genau dann, wenn es am meisten weh tut: In dieser
+Zeit produziert der Sleeve den kompletten Rang, und seine Erfolgschance
+haengt an denselben Faehigkeiten. Ein Punkt, der hier liegen bleibt, kostet
+Sleeve-Chance. Faehigkeiten kosten weder Ausdauer noch Aktionszeit; es gab
+keinen Grund, den Kauf an eine laufende Aktion zu binden.
+
+Der Aufruf steht jetzt vor dem `continue`, zusammen mit
+`kostenAktualisieren()`.
+
+**Wie oft das zugeschlagen hat:** bei jedem Augmentierungs-Einbau und jedem
+BitNode-Wechsel, also in jeder Wiederaufbauphase des ganzen Projekts. Die
+Punkte gingen nicht verloren, sie lagen nur ungenutzt - der Schaden ist die
+entgangene Erfolgschance ueber Stunden.
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### Skill-Abdeckung ist auf das BN6-Spaetspiel geeicht, nicht auf BN10 (29.08., 18:55)
+
+Befund, nicht behoben - der Lauf wurde fuer Erics Token-Pause abgebrochen.
+
+`ABDECKUNG` in `src/blade.js:737-740` wurde am 28.08. um 14:45 von der
+Aktionsmischung auf **Black Ops** umgestellt. Damals war das richtig: Rang
+248.930 von 400.000, die Black-Op-Chance war der Engpass. Digital Observer
+bekam dadurch `abdeckung: 1.0` (trifft 12 von 12 Black Ops), Tracer steht
+gar nicht in `DYNAMISCH` und damit hinter allen sechs sortierten.
+
+**Jetzt ist die Lage umgekehrt.** Stand 18:52: Rang 10 von 400.000, erste
+Black Op bei 2.500, Aktion `Contracts/Retirement` mit **Chance 0,239**.
+Gekauft wurden Digital Observer 1 und Hyperdrive 1 - Digital Observer wirkt
+ueber `SuccessChanceOperation` (`data/Skills.ts:31-36`) und damit auf
+**keine einzige** Aktion, die der Bot gerade faehrt. Tracer
+(`SuccessChanceContract: 4`, baseCost 2, `data/Skills.ts:38-43`) steht auf
+Stufe 0.
+
+Nutzen je Punkt in der aktuellen Phase:
+
+    Tracer            St.0  Preis 2  +4 % auf Kontrakte   Abdeckung 1,00  2,00
+    Digital Observer  St.1  Preis 4  +4 % auf Operationen Abdeckung ~0    ~0
+    Hyperdrive        St.1  Preis 4  +10 % Erfahrung, wirkt nur ueber
+                                     Kampfwerte (Exponent 0,04-0,8)
+
+**Vorschlag** (ungeprueft): Tracer in `DYNAMISCH` aufnehmen und die
+Abdeckung an die Naehe zur ersten Black Op binden statt sie fest auf 1,0 zu
+setzen - `blackOpArbeit[name]` in Zeile 910 tut das bereits fuer einen Teil
+der Faehigkeiten. Erwartung: Kontraktchance von 0,239 auf 0,249 je
+Tracer-Stufe, bei Stufe 3 rund +12 % Rangrate.
+
+
 ## 29.08.2026 - Der Einbau nach dem Beitritt hat sich gelohnt; zwei eigene Rechenfehler korrigiert
 
 **Der Punkt wird geschlossen: Der Einbau war richtig.** Beide Zahlen, mit

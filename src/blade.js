@@ -551,7 +551,7 @@ export async function main(ns) {
     ["Evasive System", Infinity],
     // Ab hier statisch, mit begruendetem Deckel.
     ["Cyber's Edge", Infinity],
-    ["Tracer", 14],
+    ["Tracer", Infinity],   // seit 29.08. 22:20 in DYNAMISCH, dort gilt Infinity
     ["Blade's Intuition", Infinity],
     // Datamancer kam am 28.08. um 09:55 in `DYNAMISCH`, aber nicht hierher -
     // und was nicht im Plan steht, wird nie gekauft. Sein `relNutzen` haengt
@@ -738,6 +738,16 @@ export async function main(ns) {
     "Short-Circuit": { proz: 5.5, abdeckung: 0.58 },      // isKill, 7/12
     "Digital Observer": { proz: 4, abdeckung: 1.0 },      // SuccessChanceOperation, 12/12
     "Cloak": { proz: 5.5, abdeckung: 0.17 },              // isStealth, 2/12
+    // TRACER KAM DAZU (29.08.2026, 22:20). Er stand als einziger
+    // Chance-Skill nur im SKILL_PLAN mit Deckel 14, also HINTER allen
+    // sortierten - und wurde deshalb nie gekauft. Die Abdeckung 1,0 ist
+    // fuer diese Phase belegt: Der Sleeve kann ausschliesslich Kontrakte
+    // fahren (`Bladeburner/Enums.ts:17-21`), und er liefert derzeit den
+    // GESAMTEN Rang - 14,4/h ueber 2,16 h gemessen, waehrend der Spieler
+    // nach dem Einbau im Gym steht. Die Skill-Multiplikatoren gelten
+    // dabei auch fuer ihn: `Actions/Action.ts:170-182` zieht sie ueber
+    // `inst`, die Bladeburner-Instanz des SPIELERS, nicht ueber `person`.
+    "Tracer": { proz: 4, abdeckung: 1.0 },                // SuccessChanceContract
   };
   const relNutzen = (name) => {
     const stufe = ns.bladeburner.getSkillLevel(name);
@@ -1066,7 +1076,8 @@ export async function main(ns) {
   // 0,059 je Punkt und Evasive System Stufe 13 gab 0,047 - beide besser als
   // Blade's Intuition Stufe 26 mit 0,031, und beide standen gedeckelt.
   const DYNAMISCH = ["Hyperdrive", "Short-Circuit", "Blade's Intuition",
-    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock", "Cyber's Edge", "Datamancer"];
+    "Reaper", "Evasive System", "Digital Observer", "Cloak", "Overclock", "Cyber's Edge", "Datamancer",
+    "Tracer"];
 
   const faehigkeitenKaufen = () => {
     let punkte = ns.bladeburner.getSkillPoints();
@@ -3010,6 +3021,25 @@ export async function main(ns) {
           gewichen = true;
           try { ns.bladeburner.stopBladeburnerAction(); } catch {}
         }
+        // FAEHIGKEITEN WERDEN AUCH IM AUSWEICHZWEIG GEKAUFT (29.08.2026, 22:25).
+        //
+        // Der Aufruf stand nur unterhalb dieses `continue`. Solange der Motor
+        // `bbtrain` weicht - also den ganzen Wiederaufbau nach einem
+        // Augmentierungs-Einbau, aktuell 4,3 Stunden - wurde deshalb KEIN
+        // Punkt ausgegeben. Gemessen um 22:19: **17 Punkte lagen brach**,
+        // Tracer stand auf Stufe 0 und haette 2 gekostet.
+        //
+        // Das ist teuer, weil der Sleeve in genau dieser Zeit den GESAMTEN
+        // Rang produziert (14,4/h) und seine Erfolgschance an denselben
+        // Faehigkeiten haengt: `Actions/Action.ts:170-182` zieht die
+        // Multiplikatoren ueber `inst`, die Bladeburner-Instanz des Spielers,
+        // nicht ueber `person`. Ein Punkt, der hier liegen bleibt, kostet
+        // Sleeve-Chance, nicht nur Spieler-Chance.
+        //
+        // Faehigkeiten kosten weder Ausdauer noch Aktionszeit - es gibt
+        // keinen Grund, den Kauf an eine laufende Aktion zu binden.
+        faehigkeitenKaufen();
+        kostenAktualisieren();
         meldeLage("General/keine", "weicht bbtrain, Kampfwerte " + tiefstand
           + (lohntSich ? "" : ", nichts ueber Schwelle"));
         await ns.sleep(30000);

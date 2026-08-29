@@ -2626,6 +2626,20 @@ export async function main(ns) {
 
     if (werkbank) {
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d));
+      // WAS GILT GERADE ALS FEHLEND? (29.08.2026, 15:20)
+      //
+      // Am 29.08. lief sleeve.js von 12:53 bis 14:17 nicht. Im Log steht der
+      // Kill ("1 Instanz(en) beendet, startet gleich neu") - und danach 87
+      // Minuten lang NICHTS. Kein "laeuft auf", kein "wartet", kein
+      // "nicht lesbar", kein "exec gab 0". Jeder Pfad unten meldet etwas,
+      // also wurde die Datei nie in `fehlend` aufgenommen - `laufend` muss
+      // sie gefuehrt haben, obwohl `ns.ps` sie netzweit nicht zeigte.
+      // Ohne diese Zeile ist das nicht zu unterscheiden.
+      if (fehlend.length && runde % 10 === 0) {
+        sag("fehlend: " + fehlend.map(([d]) => d).join(", ")
+          + " | laufend: " + [...new Set(laufend)].filter(
+            (d) => WERKZEUGE.some(([w]) => w === d)).join(", "));
+      }
 
       // Nur raeumen, wenn wirklich nichts von uns dort laeuft. Ein killall auf
       // eine belegte Werkbank wuerde den Vertragsloeser mitten im Durchlauf

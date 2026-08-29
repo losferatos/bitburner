@@ -37,6 +37,62 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kein Hebel, aber die wichtigste Zahl fuer die naechste Phase (29.08., 10:00)
+
+Engpass:    Noch der Kampfwert-Tiefstand (82 von 100 um 09:51), aber der
+            faellt in rund 8 Stunden weg. Dieser Lauf hat deshalb nach vorn
+            geschaut: auf die 89-185 Stunden, die danach kommen.
+
+**Geprueft und weiterhin verworfen: Overclock in der Fruehphase.** Die
+Ablehnung von 26.08. beruhte auf gemessenen Werten aus dem BitNode-6-
+Spaetspiel (Verbrauch 2,7 gegen Regeneration 1,2 je Minute). Ob sie bei Rang
+0 und frisch 100er Kampfwerten auch gilt, war offen. Sie gilt - und deutlich:
+
+    maxStamina        agi^0,8 = 100^0,8            = 39,8
+    Regeneration      (0,0085 + 39,8/70000) * 100^0,17 * 60
+                                                   = **1,19 je Minute**
+    Aktionsdauer      (125/10) / statFac 1,1986    = 10,4 s   (Tracking Lvl 1)
+    Verlust je Aktion 0,285 * (125^0,28 + 125/650) = 1,156
+    Verbrauch         1,156 * 60/10,4              = **6,65 je Minute**
+
+**Der Arbeitsanteil ist damit R/V = 1,19/6,65 = 18 Prozent.** Overclock
+verkuerzt die Aktion und hebt den Verbrauch im gleichen Verhaeltnis - bei
+Stufe 30 auf 9,50/min, bei Stufe 90 auf 66,5/min. Es macht den Engpass
+schlimmer, nicht besser. Die Ablehnung von 26.08. gilt also von Rang 0 bis
+zum Knotenende.
+
+**Die Zahl selbst ist der Ertrag dieses Laufs.** In BitNode 6 lag der
+Arbeitsanteil bei rund 50 Prozent (gemessen 26.08., "rund die Haelfte der
+Zeit in der Regenerationskammer"). Nach dem Beitritt in BitNode 10 sind es
+**18 Prozent** - der Motor wird vier Fuenftel der Zeit ruhen. Grund ist nicht
+der Knoten, sondern der Neuanfang: Ausdauer haengt an `agi^0,8`, und agi
+steht bei 100 statt bei mehreren hundert.
+
+Zwei Folgerungen, beide ohne Codeaenderung:
+
+1. **Cyber's Edge ist in der Fruehphase die mit Abstand wichtigste
+   Faehigkeit.** Ihr Nutzen ist mit `(1 - ausdauerLuft())` gewichtet
+   (`blade.js:831`), und die Luft ist bei 18 Prozent Arbeitsanteil nahe null.
+   Die Sortierung erkennt das von selbst - hier ist nichts zu tun ausser
+   nachzusehen, ob sie es dann auch tut.
+2. **Die ETA-Spanne 89-185 h im Kurs stammt aus BitNode-6-Raten und ist
+   damit optimistisch.** Sie gehoert ersetzt, sobald die erste echte Rangrate
+   nach dem Beitritt vorliegt - das steht dort schon als naechste Pruefung.
+
+Hypothese:  keine - kein Hebel gefunden, der Plan macht bereits das Richtige.
+Beleg:      `Bladeburner.ts:1317-1343` (Ausdauerformeln), `:921` (Verlust je
+            Aktion), `Actions/Action.ts:104-121` (Dauer), `data/Constants.ts`
+            (BaseStaminaLoss 0,285, StaminaGainPerSecond 0,0085),
+            `data/Contracts.ts:16` (Tracking baseDifficulty 125).
+Vorher:     Tiefstand 82 um 09:51.
+Nachher:    entfaellt, keine Aenderung.
+Commit:     nur dieser Protokolleintrag.
+
+*Korrektur an mir selbst: Der Lauf startete mit der Vermutung, Overclock
+stehe gar nicht im `SKILL_PLAN`. Es steht dort, ganz am Ende mit Deckel 90 -
+ich hatte die Liste abgeschnitten gelesen. Die Vermutung war falsch, die
+Rechnung daraus trotzdem nuetzlich.*
+
 ### Kein Hebel, sechster Winkel: der Sleeve (29.08., 06:55)
 
 Engpass:    Unveraendert der Kampfwert-Tiefstand, 63 von 100 um 06:51. In

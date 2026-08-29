@@ -23,3 +23,13 @@ backups/
 
 # Nachtruhe-Schalter der Loops: reine Laufzeitinformation.
 data/lautlos
+
+# LAUFZEITDATEN (29.08.2026, 12:45).
+# In data/ liegen ausschliesslich Zustands- und Messdateien, die sich im
+# Minutentakt aendern: Verlauf, Wachterzustand, Rueckstand, Ziele, Logs, der
+# Lautlos-Schalter. Keine einzige davon war je getrackt (git ls-files data/
+# ist leer). Bisher stand nur eine Handvoll Einzelnamen hier, und der Rest
+# tauchte bei jedem `git status` als `?? data/` auf - eine stehende
+# Einladung zu `git add -A`, das in diesem Repo verboten ist, weil fuenf
+# Loops gleichzeitig schreiben.
+data/

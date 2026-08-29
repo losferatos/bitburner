@@ -37,6 +37,52 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Eine eigene Empfehlung widerlegt, bevor sie umgesetzt wurde (29.08., 03:55)
+
+Engpass:    Unveraendert der Kampfwert-Tiefstand (87 von 100 um 03:39). Der
+            Knoten selbst gibt in dieser Phase keinen Hebel her - das haben die
+            Laeufe von 22:05 und 01:00 aus zwei Richtungen gezeigt. Also nach
+            vorn geschaut: auf `blade.js`, das in rund vier Stunden den Knoten
+            uebernimmt.
+
+Der Vorankommenslauf hat um 03:45 einen richtigen Befund eingetragen: In
+BitNode 10 wird der Rang**gewinn** mit `BladeburnerRank: 0.8` multipliziert
+(`Bladeburner/Formulas.ts:8-26`), der Rang**verlust** nicht, und `reqdRank`
+ist ohnehin fest. Netto sind 309.072 Rang zu erarbeiten statt 286.340 in
+BitNode 6 - 25 Prozent mehr Zeit. Das steht.
+
+**Die daraus abgeleitete Empfehlung war falsch.** Sie wollte die Feuerschwelle
+fuer Black Ops ueber den Erwartungswert neu setzen:
+
+    p * G * 0,8 - (1-p) * L   ->   Break-even  p = L / (L + 0,8 G)
+
+und kam damit bei Vindictus auf 0,556 - also weit ueber die geltenden 0,35.
+Wer das umsetzt, dreht den groessten Hebel des Vortags zurueck.
+
+Beleg:      `changeRank` vergibt Skillpunkte gegen `maxRank`, und `maxRank`
+            faellt nie (`Bladeburner.ts:1273,1283-1291`). **Ein Fehlschlag
+            kostet keinen Skillpunkt**, er verzoegert nur die
+            `reqdRank`-Freigabe. Rangverlust ist damit kein Verlust, sondern
+            Zeit, und die richtige Rechnung lautet
+
+                Kosten eines Fehlschlags = T_op + L / (m * Rangrate)
+
+            In BitNode 10 wird dieser Posten mit m = 0,8 um ein Viertel
+            teurer: bei Daedalus von 5,4 auf 6,8 Minuten. Dem stehen die 78 bis
+            86 Minuten gegenueber, die Warten am 28.08. gekostet haette. **1,4
+            Minuten gegen achtzig - die 0,35 bleiben richtig.**
+
+Vorher:     Schwelle 0,35 (seit 28.08., 16:00).
+Nachher:    Schwelle 0,35 - unveraendert, jetzt aber auch fuer BitNode 10
+            geprueft statt uebernommen.
+
+**Warum das hier steht, obwohl nichts geaendert wurde:** Der Prompt dieses
+Loops verlangt, eine Hypothese am Quellcode zu pruefen, *bevor* sie umgesetzt
+wird. Hier war die Hypothese die eigene aus dem Lauf zwei Stunden davor - und
+das falsche Modell (Rang als Bestand statt als Zeit) haette sich ohne diesen
+Eintrag im naechsten Lauf als "belegter Befund aus BAUSTELLEN.md" durchgesetzt.
+Der Eintrag in BAUSTELLEN.md traegt die Korrektur jetzt an derselben Stelle.
+
 ### Kein Hebel, fuenfter Winkel: die Gym-Formel selbst (29.08., 01:00)
 
 Engpass:    Unveraendert der Kampfwert-Tiefstand (`nodes/KURS.md`, 21:45):

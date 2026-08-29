@@ -23,6 +23,132 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+## 29.08.2026 - Wiederanlauf des offenen Abschnitts: im Spiel bewiesen
+
+Der Punkt nannte sein Kriterium woertlich: *"`blade.js` per `WERKZEUG
+blade.js` neu starten und in `data/aktionen.txt` nachsehen, ob eine Zeile mit
+`abgebrochen: true` erscheint, deren `bis` hoechstens eine Runde vor dem
+Neustart liegt. Erscheint keine, ist der Wiederanlaufblock tot."*
+
+**Verifiziert 23:48 an `data/aktionen.txt`:**
+
+    {"von":1788020101985,"bis":1788021930058,
+     "aktion":"General/Recruitment","grund":"Trupp auffuellen (0/6)",
+     "rangVon":0,"rangBis":6.97,"ausdauerVon":39.811,"ausdauerBis":null,
+     "abgebrochen":true}
+
+    von = 18:15:01   bis = 18:45:30   Neustart war 18:46
+
+Der offene Abschnitt lag **30 Sekunden** vor dem Neustart, also genau eine
+Runde - exakt die Zusage des Umbaus vom 28.08., 23:47. Der Abschnitt ging
+nicht verloren, sondern wurde beim Start als abgeschlossen nachgetragen und
+per `abgebrochen: true` von einem regulaeren unterschieden. Es ist die
+einzige solche Zeile in der Datei, also kein Zufallstreffer.
+
+**Die beiden spaeteren Neustarts (22:18:33 und 22:20:33, aus dem Motor-Log)
+erzeugten korrekt KEINE Zeile.** Seit dem Augmentierungs-Einbau um 19:05:37 -
+dem Zeitstempel der letzten regulaeren Zeile - weicht `blade.js` dem
+`bbtrain` und faehrt gar keine Aktion. Wo kein Abschnitt offen ist, gibt es
+nichts abzubrechen.
+
+Damit ist die Kette vollstaendig belegt: Logik isoliert bewiesen (29.08.,
+07:45, ns-Stub mit vier Faellen), Wirkung im Spiel bewiesen (heute), und der
+Fall "kein offener Abschnitt" verhaelt sich ebenfalls richtig.
+
+Der urspruengliche Eintrag im Wortlaut:
+
+### `blade.js` verliert beim Neustart den offenen Abschnitt (14:03)
+
+Gemessen: `data/aktionen.txt` endet um **13:19:44** und hat seither nichts mehr
+          geschrieben - 43 Minuten Luecke, obwohl der Motor durchgehend lief
+          (Rang 154.848 um 13:40 auf 188.713 um 14:03).
+
+Erwartet: Ein Abschnitt je Aktionswechsel. Die Luecke deckt sich exakt mit den
+          beiden `WERKZEUG blade.js`-Neustarts um 13:40 und 13:41: Ein
+          Abschnitt wird erst beim Wechsel geschlossen, und ein Neustart wirft
+          den offenen weg.
+
+Verdacht: `src/blade.js`, `abschnitt`/`schliesseAbschnitt`. Der Abschnitt lebt
+          nur im Speicher. Sauber waere, ihn beim Start aus `data/blade.json`
+          zu rekonstruieren oder ihn periodisch statt nur beim Wechsel zu
+          schreiben.
+
+Dringlichkeit: **niedrig fuer den Betrieb, mittel fuer die Messung.** Der Bot
+          verliert nichts, aber genau die Datei, aus der die Loops den
+          Zeitanteil je Aktion lesen, ist nach jedem Eingriff blind - und
+          Eingriffe sind der Moment, in dem gemessen werden muesste. Der
+          Diplomacy-Anteil nach 13:35 liess sich deshalb nur indirekt belegen
+          (`aufraeumen: false` in `data/blade.json`, Chaos faellt ohne
+          Diplomacy von 39,84 auf 37,50).
+
+**Geaendert 28.08. um 23:47, Wirkung noch nicht gemessen.** `src/blade.js`
+haelt den offenen Abschnitt jetzt je Runde in `data/bladeoffen.txt` fest und
+traegt ihn beim Start als abgeschlossenen Abschnitt nach - mit `abgebrochen:
+true`, damit die Auswertung ihn unterscheiden kann. Ein Neustart kostet damit
+hoechstens einen Durchlauf statt des ganzen Abschnitts. Im Spiel angekommen
+(Pruefung ueber die Bruecke, 23:48).
+
+**Nachmessen laesst sich das erst, wenn `blade.js` wieder laeuft** - also nach
+dem Bladeburner-Beitritt, ETA rund 5 h (Tiefstand 86 um 03:12). Pruefung dann:
+`blade.js` per `WERKZEUG blade.js` neu starten und in `data/aktionen.txt`
+nachsehen, ob eine Zeile mit `abgebrochen: true` erscheint, deren `bis`
+hoechstens eine Runde vor dem Neustart liegt. Erscheint keine, ist der
+Wiederanlaufblock tot.
+
+**Die Logik ist jetzt bewiesen, die Wirkung im Spiel noch nicht (29.08.,
+07:45).** Warten war unnoetig: Der Wiederanlaufblock ist reines Datei-Handeln
+und laesst sich ohne Bladeburner pruefen. Isolierter Testlauf mit einem
+ns-Stub (`merkeOffen` + Wiederanlauf woertlich uebernommen), vier Faelle:
+
+    1  Abschnitt 5 min alt, Neustart   nachgetragen, abgebrochen: true,
+                                       rangVon 1000, rangBis 1250,
+                                       Ausdauer und Aktion erhalten   OK
+    2  Abschnitt 4 s alt               verworfen (unter 10 s)         OK
+    3  kaputter Rest in der Datei      Start ueberlebt, nichts        OK
+                                       geschrieben
+    4  kein offener Abschnitt          nichts geschrieben             OK
+
+**Dabei ein echter Fehler gefunden und behoben:** Der Wiederanlauf-Zweig
+schrieb `data/aktionen.txt`, kopierte sie aber **nicht nach home** - anders
+als `schliesseAbschnitt`, das genau dafuer ein `ns.scp` hat. Laeuft `blade.js`
+nicht auf home, waere die nachgetragene Zeile dort gelandet, wo sie niemand
+liest. Das ist kein theoretischer Fall: `bn4net` verteilt Werkzeuge auf andere
+Server, `sleeve.js` lief am 29.08. auf fulcrumtech. Behoben mit denselben drei
+Zeilen wie im Schliessen-Pfad; `node --check` sauber, Pruefer 07:45 SPUR, im
+Spiel angekommen (`getFile blade.js`), `WERKZEUG blade.js` gesetzt.
+
+Nebenbefund, bewusst nicht behoben: Bei einem kaputten Rest bleibt
+`data/bladeoffen.txt` mit dem Muell stehen, statt geleert zu werden. Schaden
+entsteht keiner - der Block faengt den Parse-Fehler ab, und die erste Runde
+ueberschreibt die Datei ohnehin.
+
+**Der scp-Fix von 07:45 war nicht theoretisch (geprueft 10:45).** `blade.js`
+laeuft in diesem Knoten **auf fulcrumtech, nicht auf home** (`data/ps.json`
+um 10:42, PID 31355; ebenso `sleeve.js` 9629 und `bn4rep.js` 44917). Ohne das
+ergaenzte `ns.scp` waere die nachgetragene Abschnittszeile also mit Sicherheit
+dort gelandet, wo sie niemand liest - nicht nur im Ausnahmefall.
+
+Mitgeprueft und **kein Befund**: Die Datei auf fulcrumtech traegt den Stand
+vom letzten Neustart (07:47), die Kommentaraenderung von 09:12 fehlt dort. Das
+ist folgenlos - `bn4net.js:2796` kopiert vor **jedem** `ns.exec` frisch von
+home (`ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home")`), ein Neustart holt
+die aktuelle Fassung also immer nach. Die einzige echte Luecke bleibt der
+dokumentierte Fall ohne Werkbank: dann startet gar nichts nach.
+
+**Was weiter aussteht:** der Nachweis im laufenden Betrieb, also nach dem
+Beitritt (ETA 18:15). Pruefung unveraendert: `WERKZEUG blade.js` und dann in
+`data/aktionen.txt` nach einer Zeile mit `abgebrochen: true` sehen.
+
+**Wichtig, um 03:14 beinahe verpasst:** Der laufende `blade.js`-Prozess hatte
+noch den Code vom Knotenstart (17:05, PID 30) - beide Nachtaenderungen lagen
+zwar als Datei im Spiel, aber nicht im laufenden Prozess. Beim Beitritt waere
+der Motor mit dem alten Stand losgelaufen und die Nachmessungen haetten ins
+Leere gezeigt. Per `WERKZEUG blade.js` neu gestartet, **verifiziert um 03:15:
+neue PID 47894**. Genau diese Falle steht seit dem 27.08., 18:55 im
+Optimierloop-Prompt; sie greift auch, wenn zwischen Aenderung und Wirkung
+Stunden liegen.
+
+
 ## 29.08.2026 - `ausdauerLuft()`: Sorge widerlegt, die Gewichtung trifft den richtigen Bereich
 
 Der Punkt nannte selbst sein Abbruchkriterium: *"Steht Cyber's Edge nach zwei

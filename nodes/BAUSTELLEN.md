@@ -79,7 +79,58 @@ Regeln:
 
 ## Sofort
 
-keine
+### bn4rep hat in BitNode 10 vor dem Beitritt eingebaut - 6,6 Stunden verloren (04:15)
+
+Gemessen: Um 04:15 meldete der Pruefer RESET: Kampfwert-Tiefstand von 88 auf 1,
+          Netz 85 auf 8, Geld 0. Kein Knotenwechsel - `knoten.json` zeigt
+          weiter 10, aber `augReset` ist neu (04:15:31), `playtimeSinceLastAug`
+          0,07 h. Acht Augmentierungen wurden eingebaut:
+
+              Wired Reflexes, Augmented Targeting I, Cranial Signal
+              Processors Gen I, Speech Processor, Nuoptimal Nootropic,
+              ADR-V1 Pheromone, Speech Enhancement, NeuroFlux Governor
+
+          Neue Multiplikatoren: str/def 1,2870 (vorher 1,2616), dex 1,4864,
+          agi 1,3513.
+
+Bilanz:   Der Tiefstand haengt an str/def, und die stiegen nur um 2 Prozent.
+          Bedarf fuer Level 100 faellt damit von 252.795 auf **223.740**
+          Erfahrung (`calculateSkill` umgestellt, m_eff = 1,2870 * 0,4).
+          Verloren sind die 119.865 Erfahrung, die um 04:15 bei Tiefstand 88
+          standen.
+
+              Ersparnis   29.055 Erfahrung
+              Verlust    119.865
+              netto      **-90.810 Erfahrung = 6,6 Stunden** bei 230/min
+
+          Das ist genau die Rechnung vom 28.08., 22:52 (`nodes/ERLEDIGT.md`):
+          Gym allein schlaegt die Augmentierungsrunde, und der Abstand waechst
+          mit jeder Gym-Stunde. Der Bot hat die schlechtere Option gewaehlt.
+
+Ursache:  `src/bn4rep.js` hatte an **drei** Stellen `n === 6 || n === 7`, die
+          10 fehlte ueberall:
+
+              683   Beitritts-Sperre ("KEIN EINBAU VOR DEM DIVISIONSBEITRITT")
+              904   Spendenrecht-Ausnahme an der Mindestwarteschlange vorbei
+             1396   Kampfgewicht in der Augmentierungsbewertung
+
+          Die Sperre von Zeile 683 haette den Einbau verhindert - ihr Kommentar
+          beschreibt exakt diesen Fall ("ein Einbau setzt genau die Kampfwerte
+          auf 1 zurueck"), nur galt sie fuer den falschen Knoten.
+
+Behoben:  Alle drei Stellen um `|| n === 10` ergaenzt, `bn4rep.js` per
+          `WERKZEUG bn4rep.js` neu gestartet - **verifiziert 04:22, neue PID
+          46** (vorher 20). Der laufende Prozess trug sonst weiter die alte
+          Fassung; genau diese Falle hat um 03:14 schon `blade.js` betroffen.
+
+Verifiziert: `node tools/strategie-check.js` um 04:21 - URTEIL SPUR, der
+          Wiederanlauf nach dem Einbau ist vollstaendig (alle elf Werkzeuge
+          laufen auf home). Dass die Sperre jetzt greift, zeigt sich erst beim
+          naechsten Einbauversuch; bis zum Beitritt darf keiner mehr kommen.
+
+**Offen und wichtig:** Dieselbe 6-oder-7-Luecke steckte im Pruefer (behoben
+04:18) und in bn4rep. Es lohnt eine Suche nach weiteren Stellen, die
+Kampfknoten hart als 6 und 7 aufzaehlen - `grep -rn "=== 6" src/ tools/`.
 
 *Der Punkt "Kampf-Augmentierungen vor dem Bladeburner-Beitritt" (19:20) ist am
 28.08. um 22:52 abgeraeumt worden - nicht umgesetzt, sondern zu Ende gerechnet

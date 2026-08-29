@@ -674,8 +674,13 @@ export async function main(ns) {
     // (Bladeburner.ts:259-263). Die Sperre gilt also nur fuer das Zeitfenster
     // davor. inBladeburner kostet 0 GB (RamCostGenerator.ts:338).
     let bladeSperre = false;
+    // BITNODE 10 GEHOERT DAZU (29.08.2026, 04:25 - nach dem Vorfall um 04:15).
+    // Hier stand `=== 6 || === 7`. In BitNode 10 traegt Bladeburner genauso
+    // (nodes/KURS.md, 18:55), und der Beitritt verlangt dieselben vier
+    // Kampfwerte auf 100. Ohne die 10 griff die Sperre nicht: Um 04:15 wurden
+    // acht Augmentierungen eingebaut, Tiefstand 88 -> 1.
     const knotenJetzt = ns.getResetInfo().currentNode;
-    if (knotenJetzt === 6 || knotenJetzt === 7) {
+    if (knotenJetzt === 6 || knotenJetzt === 7 || knotenJetzt === 10) {
       try { bladeSperre = !ns.bladeburner.inBladeburner(); }
       catch { bladeSperre = true; }   // kein Zugriff heisst: erst recht warten
     }
@@ -895,7 +900,8 @@ export async function main(ns) {
     const kampfKnotenEinbau = (() => {
       try {
         const n = ns.getResetInfo().currentNode;
-        return n === 6 || n === 7;
+        // 10 ergaenzt 29.08. 04:25 - siehe Beitritts-Sperre weiter oben.
+        return n === 6 || n === 7 || n === 10;
       } catch { return false; }
     })();
     const spendenAusnahme = spendenrechtFaellig
@@ -1386,7 +1392,8 @@ export async function main(ns) {
     const kampfKnoten = (() => {
       try {
         const n = ns.getResetInfo().currentNode;
-        return n === 6 || n === 7;
+        // 10 ergaenzt 29.08. 04:25 - siehe Beitritts-Sperre weiter oben.
+        return n === 6 || n === 7 || n === 10;
       } catch { return false; }
     })();
     const einzelWert = (k) => (k.aug === EXIT_KEY ? EXIT_KEY_VALUE : 0)

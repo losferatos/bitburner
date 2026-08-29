@@ -250,10 +250,20 @@ hoechstens einen Durchlauf statt des ganzen Abschnitts. Im Spiel angekommen
 (Pruefung ueber die Bruecke, 23:48).
 
 **Nachmessen laesst sich das erst, wenn `blade.js` wieder laeuft** - also nach
-dem Bladeburner-Beitritt, ETA rund 14 h. Pruefung dann: `blade.js` per
-`WERKZEUG blade.js` neu starten und in `data/aktionen.txt` nachsehen, ob eine
-Zeile mit `abgebrochen: true` erscheint, deren `bis` hoechstens eine Runde vor
-dem Neustart liegt. Erscheint keine, ist der Wiederanlaufblock tot.
+dem Bladeburner-Beitritt, ETA rund 5 h (Tiefstand 86 um 03:12). Pruefung dann:
+`blade.js` per `WERKZEUG blade.js` neu starten und in `data/aktionen.txt`
+nachsehen, ob eine Zeile mit `abgebrochen: true` erscheint, deren `bis`
+hoechstens eine Runde vor dem Neustart liegt. Erscheint keine, ist der
+Wiederanlaufblock tot.
+
+**Wichtig, um 03:14 beinahe verpasst:** Der laufende `blade.js`-Prozess hatte
+noch den Code vom Knotenstart (17:05, PID 30) - beide Nachtaenderungen lagen
+zwar als Datei im Spiel, aber nicht im laufenden Prozess. Beim Beitritt waere
+der Motor mit dem alten Stand losgelaufen und die Nachmessungen haetten ins
+Leere gezeigt. Per `WERKZEUG blade.js` neu gestartet, **verifiziert um 03:15:
+neue PID 47894**. Genau diese Falle steht seit dem 27.08., 18:55 im
+Optimierloop-Prompt; sie greift auch, wenn zwischen Aenderung und Wirkung
+Stunden liegen.
 
 ### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
 

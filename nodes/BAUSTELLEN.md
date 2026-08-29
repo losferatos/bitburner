@@ -29,6 +29,7 @@ Beide Male ging es gut, aber Nachrechnen ist Zufall, kein Mechanismus.
 | Ausgang aus BitNode 10 | **nur Bladeburner** | Hacking-Weg braucht Level 6.000 = 10^175 Erfahrung | 29.08. 07:20 |
 | Reihenfolge der BitNodes | **fest** | `nodes/AUDIT-ROADMAP-2026-08-24.md` | 24.08. |
 | Kampfknoten-Bedingung | **`BLADE_KNOTEN`**, nie eine Nummer im Code | derselbe Fehler an sieben Stellen; die 10 fehlte ueberall | 29.08. 09:15 |
+| EditSaveFile im laufenden Spiel | **nein**, erst beim naechsten Reset | Remote-API kann Spielstaende nur lesen; IndexedDB-Schreiben riskiert den ganzen Lauf fuer 0,1 % | 29.08. 09:45 |
 
 Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
@@ -620,6 +621,29 @@ allein dadurch, dass `"EditSaveFile"` in der Exploit-Liste des Standes steht.
 Also: exportieren, entpacken, Eintrag setzen, packen, importieren. **Nur mit
 Sicherung und nicht im laufenden Betrieb** - eine Sicherung liegt seit 07:37
 unter `backups/` (nicht im Repo, siehe `.gitignore`).
+
+**Entschieden 29.08., 09:45: alle vier bleiben liegen, drei davon endgueltig.**
+
+Die Frage war, ob ein Loop wenigstens `EditSaveFile` allein schafft. Antwort:
+nein - und der Beleg ist knapp. `RemoteFileAPI/MessageHandlers.ts` hat elf
+Handler, darunter `getSaveFile` (Zeile 226), aber **kein Gegenstueck zum
+Schreiben**. Der Spielstand ist ueber die Bruecke lesbar und nicht
+schreibbar. Opera antwortet nicht auf Port 9222 (geprueft 09:43, HTTP 000),
+also faellt auch der CDP-Weg weg - und mit ihm `Unclickable` und
+`RealityAlteration`.
+
+Bleibt ein dritter Weg, den ein Skript IM Spiel haette: IndexedDB direkt
+schreiben und die Seite neu laden. **Wird nicht gemacht.** Der Ertrag ist
+0,1 Prozent auf die Multiplikatoren; der Einsatz ist der laufende Spielstand
+mit 237.533 Erfahrung, 85 Servern und dem halben Weg zum Divisionsbeitritt.
+Ein Schreibfehler an dieser Stelle kostet den ganzen Lauf. Das Verhaeltnis
+stimmt nicht, und zwar nicht knapp.
+
+**Der richtige Moment dafuer ist ein Reset, der ohnehin kommt.** Beim
+naechsten BitNode-Wechsel steht der Stand ohnehin auf Anfang - dann kostet
+ein misslungener Versuch nichts. Bis dahin ruht der Punkt; er steht nicht
+unter "Wartet bis Eric", weil hier nichts zu entscheiden ist, sondern eine
+Gelegenheit abzuwarten.
 
 **Dringlichkeit: niedrig.** Nichts davon bewegt den Knotenausgang. Der Punkt
 steht hier, damit die Arbeit von heute frueh nicht verlorengeht.

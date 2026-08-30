@@ -118,6 +118,68 @@ Regeln:
 
 ## Sofort
 
+### Vier Restbefunde aus dem ersten Skeptiker-Lauf (31.08., 01:40)
+
+Fuenf Commits am unbeaufsichtigten Code geprueft (`a8cbe68`, `0cc22a2`,
+`543cb6f`, `064acef`, `1062631`). Der Fehler der Klasse a - die Firmensperre
+loeschte den Graft-Riegel wieder - ist behoben und committet. Diese vier
+bleiben; keiner richtet unbeaufsichtigt Schaden an, alle sind belegt.
+
+**1. `src/bn4rep.js`: die Graftpruefung liegt bis zu 3,5 s vor dem Einbau.**
+Zwischen der Pruefung (`:736-741`) und `installAugmentations` (`:1173`) liegen
+`await ns.sleep(50)` (bis 40-mal) und ein `await ns.sleep(1500)`. Der Messwert
+ist beim Ausfuehren also veraltet. Das Fenster ist klein, aber der Einsatz ist
+bis $450 Mrd - die Pruefung gehoert unmittelbar vor den Aufruf wiederholt.
+
+**2. `src/graft.js:63`: der Kommentar begruendet den Riegel verkehrt herum.**
+`blade.js:2971` liest `graftRiegel = !ns.fileExists(...)` - **Marker
+vorhanden heisst Riegel AUS, Marker geloescht heisst Riegel SCHARF.** Der
+Kommentar behauptet, Loeschen wuerde ihn abschalten. Die Bedingung
+`!raus.fehler` laesst deshalb bei einem Lesefehler einen veralteten Marker
+stehen, statt ihn zu entfernen - das ist die unsichere Seite. Richtig waere:
+bei Zweifel loeschen. Praktisch selten (ohne SF4 fallen alle Riegel
+gleichzeitig aus), aber die Begruendung fuehrt die naechste Aenderung in die
+falsche Richtung.
+
+**3. `src/bbtrain.js:268`: die Drosselung der Graft-Meldung ist tot.**
+`letzterGrund = ""` steht in jeder Runde unmittelbar VOR dem Graft-Zweig, also
+ist `letzterGrund !== "graft"` immer wahr. `sag()` ruft `ns.tprint` - bei
+einem Zwei-Stunden-Graft rund 120 Terminalzeilen statt einer, und das fuer
+jedes Stueck des 42-Stunden-Pakets. Der `"arm"`-Zweig funktioniert nur, weil
+er vor Zeile 268 `continue`t.
+
+**4. `src/bbtrain.js:122-129`: die Entropietabelle ist die optimistische
+Schranke.** Nachgerechnet gegen `PersonObjects/formulas/skill.ts` und
+`EntropyAccumulation.ts:7` (0,98 je Stapel auf `mults.strength` **und**
+`mults.strength_exp`): Das Spiel rundet ab, der Kommentar rundet auf. Nach dem
+**ersten** Graft kann der Tiefstand schon bei 99 stehen, nicht erst nach dem
+zweiten bei 100. Die Aussage "Nach dem zweiten Graft faellt der Tiefstand
+unter ZIEL" stimmt nicht; die Richtung ist harmlos, weil der Riegel ohnehin
+greift.
+
+**5. `src/blade.js:2703`: Eingabe aktualisiert, Ergebnis stehengelassen.**
+Der Charisma-Umbau (`a8cbe68`) rechnet richtig - `309^0,045 + 309/1000 =
+1,60334 %` und `4^0,045 + 0,004 = 1,06837 %` gegen `Bladeburner.ts:735-743`,
+nachgerechnet und geeicht. Aber unter der neuen Charisma-4-Zeile steht
+unveraendert `-> 252,7 Rang je 123 s = 123 Rang/min`. Mit den 169 s, die der
+Kommentar zwei Zeilen darueber selbst nennt, sind es **84 Rang/min**. Der
+Block widerspricht sich um 31 %. Ohne Entscheidungswirkung - Assassination
+steht mit 1.097 Rang/min uneinholbar davor.
+
+**Zitatfehler nebenbei:** `bn4rep.js:727` und der Commit-Text von `064acef`
+belegen `finishWork(true, true)` mit `Prestige.ts:137`. In `reference/`
+enthaelt `Prestige.ts` kein `finishWork` - der Aufruf steht in
+`PersonObjects/Player/PlayerObjectGeneralMethods.ts:137`. Falsche Datei, nicht
+nur falsche Zeile.
+
+**Was der Pruefer nachgerechnet hat und was haelt:** die $450 Mrd des
+Simulacrums exakt (`Augmentations.ts:286` x `GraftableAugmentation` Faktor 3,
+kein BN10-Aufschlag beim Graften), die Markersemantik gegen
+`Person.ts:233-241`, die Stale-Marker-Praemisse von `543cb6f` gegen
+`ServerHelpers.ts:226ff`, die Selbsthaltungsfrage fuer alle drei Riegel
+(keiner haelt sich selbst), und dass `blade.js:3171` `gymGreifen()` vor dem
+Riegel ruft, aber bei GRAFTING `null` liefert, bevor es reist.
+
 ### Graft-Treiber weiterlaufen lassen, ein Stueck je Lauf (ab 31.08., 01:20)
 
 SPTN-97 laeuft seit 00:26 und ist gegen 02:05 durch. Danach in JEDEM

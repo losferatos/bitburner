@@ -508,6 +508,50 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Erstes Graft gefahren, Einbau-Riegel gegen Graft-Abbruch (30.08., 21:30)
+
+Engpass: Der Ausgang aus BitNode 10 haengt an Rang 400.000 bei einer
+gemessenen Rate von rund 50/h - 6.575 Stunden. Der einzige bekannte Hebel ist
+das Graft-Paket (`nodes/GRAFTING.md`), und der stand bis heute still, weil
+jedes Graft von den eigenen Werkzeugen getoetet worden waere.
+
+Hypothese: Nach den vier Codeaenderungen (blade.js-Riegel, wache.js,
+Faehigkeitskauf, Graftwerkzeug) ueberlebt ein Graft. Pruefstueck:
+`Neuroreceptor Management Implant`, $1,65 Mrd, 14,1 min - billig genug zum
+Scheitern.
+
+Beleg: `Bladeburner.ts:177-180` (startAction ruft finishWork unbedingt),
+`GraftingWork.tsx:75-83` (keine Erstattung), `EntropyAccumulation.ts:7`
+(0,98 je Stapel auf alle Multiplikatoren).
+
+Vorher: 98 graftbare Augmentierungen, Entropie 0, Tiefstand 102 um 21:12.
+
+Nachher: **97 graftbar, NMI nicht mehr in der Liste, Entropie 1, Tiefstand
+100** um 21:26. Waehrend der 14 Minuten meldete `data/blade.json`
+`aktion "Grafting"`, `grund "Graft laeuft ohne Simulacrum - Motor haelt
+still"`; danach wieder `Contracts/Tracking`. Der Riegel haelt und loest sich
+sauber.
+
+**Die Entropierechnung war exakt** - Tiefstand 100, nicht 99. Das war die
+Zahl, an der die Reihenfolge des ganzen Pakets haengt.
+
+**Eine eigene Erwartung ist widerlegt:** Die Graft-Zeiten fallen durch NMI
+NICHT um 20 %. Die Simulacrum-Zeit steht unveraendert bei 845.690 ms, weil
+`getAugmentationGraftTime` `baseTime / intBonus` liefert - ohne
+`focusPenalty` (`GraftingHelpers.ts:27-30`). Die Strafe wirkt erst in
+`GraftingWork.process` (`:41-43`). NMI kuerzt also nichts, es garantiert nur,
+dass die gemeldete Zeit auch bei verlorenem Fokus gilt.
+
+Dazu der zweite Riegel: `src/bn4rep.js` baut keine Augmentierungen mehr ein,
+solange ein Graft laeuft. `installAugmentations` fuehrt ueber
+`prestigeAugmentation` zu `finishWork(true, true)` (`Prestige.ts:137`); die
+bestehende Sperre `!inBladeburner()` greift dabei nicht, weil der Spieler
+Mitglied ist.
+
+Commit: 23dc764, 8c1933a, 1062631, 064acef
+
+---
+
 ### Kammerzulage aus der Regenerationsmessung herausgerechnet (30.08., 18:45)
 
 Engpass: 48,5 % der Zeit steht der Bot in der Hyperbolic Regeneration Chamber

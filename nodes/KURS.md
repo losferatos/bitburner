@@ -25,6 +25,75 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 07:20 - BitNode 10: erste Messung im Vollbetrieb, ETA halbiert sich
+
+Der erste Kurslauf, der auf einer Rangreihe im **Vollbetrieb** steht statt auf
+Hochrechnungen aus BitNode 6. Seit 06:26 ist der Kampfwert-Wiederaufbau nach
+dem Einbau abgeschlossen, seit 06:20/06:35 leistet der Sleeve wieder
+Kontrakte. Erst ab diesem Zeitpunkt misst man den Motor und nicht das Anlaufen.
+
+**Ausgangsbedingung, neu aus dem Quellcode hergeleitet.**
+`Singularity.ts:1153-1158`: `bladeburnerRequirements()` verlangt
+`numBlackOpsComplete >= numberOfBlackOperations`, also **alle 21 Black Ops**.
+Die letzte ist Operation Daedalus (`BlackOperations.ts:704-709`) mit
+`reqdRank: 400e3`. Der Hacking-Weg bleibt verworfen (Level 6.000, siehe
+`## ENTSCHIEDEN`); `WorldDaemonDifficulty: 2` in BN10 macht ihn zusaetzlich
+teurer.
+
+**Was schon eingerechnet ist.** Die 21 Black Ops tragen zusammen 113.660
+`rankGain`. Davon zaehlt Daedalus' eigener Ertrag (40.000) nicht auf die
+Schwelle, weil er erst danach anfaellt. Es bleiben 73.660 - und **in BitNode 10
+wirkt `BladeburnerRank: 0,8`** auf jeden Rangertrag, Black Ops eingeschlossen
+(`Formulas.ts:22-25`, `BitNode.tsx:870`). Unterwegs fallen also
+73.660 x 0,8 = **58.928** Rang von allein an, knapp 15 Prozent der Strecke.
+
+    Ziel                400.000
+    Stand (07:15)           287   = 0,07 %
+    Black Ops unterwegs  58.928
+    ---------------------------------
+    selbst zu erarbeiten 340.785
+
+**Die Rate, gemessen ueber 22 Punkte des Waechters (06:13 bis 07:15):**
+
+    1. Drittel (Rang 99-136)    111,5 Rang/h
+    2. Drittel (Rang 136-198)   176,8 Rang/h
+    3. Drittel (Rang 198-287)   253,8 Rang/h
+    gesamt                      182,0 Rang/h
+
+Eine lineare Fortschreibung ist damit widerlegt, ohne dass man den Exponenten
+kennen muss: **+128 Prozent Rate binnen einer Stunde.** Das erste Drittel
+enthaelt noch Gym-Anteil, aber auch 2. gegen 3. Drittel allein sind +43 Prozent
+in 20 Minuten.
+
+Der momentane Exponent aus den drei Stuetzstellen ist a = 1,09 bis 1,10 - das
+ist **kein Langfristwert**, sondern die Anlaufphase: Aktionslevel steigen am
+Anfang schnell (`rewardFac^(level-1)`), und die ersten Skillpunkte aus
+`floor(maxRank/3)` haben bei kleinem Rang die groesste relative Wirkung. Ein
+a >= 1 wuerde in endlicher Zeit divergieren; das kann die Mechanik nicht.
+Langfristig gilt: Skillkosten wachsen **linear** (`Skill.ts:37-41`), also
+Level ~ sqrt(Punkte) ~ sqrt(Rang), und der Multiplikator ist linear im Level -
+das ergibt **a = 0,5**.
+
+**ETA** aus `dR/dt = c*R^a` mit c aus dem 3. Drittel (253,8 Rang/h bei R=250):
+
+    a = 0,4    134 h
+    a = 0,5     77 h     <- der hergeleitete Wert
+    a = 0,6     45 h
+
+Konservativ, weil die 58.928 Rang aus den Black Ops als Spruenge die Rate
+zusaetzlich anheben und hier nicht mitintegriert sind.
+
+Ausgangsbedingung: alle 21 Black Ops; Daedalus verlangt Rang 400.000 (`BlackOperations.ts:708`)
+Engpass:           Bladeburner-Rang **287 von 400.000 = 0,07 %**; netto 340.785 selbst zu erarbeiten
+Restweg:           340.785 (nach Abzug von 58.928 aus Black-Ops-`rankGain` x 0,8)
+Rate:              253,8 Rang/h, gemessen 06:57-07:15; 182,0 ueber die volle Stunde
+ETA:               **45-134 h, Mitte 77 h** (a=0,5) | Vorlauf: 89-185 h
+Leitgroesse:       **Bladeburner-Rang je Stunde**, geglaettet ueber mindestens 30 Minuten. Stand 254.
+Entscheidung:      **weiterfahren.** Ein Einbau kostet den Kampfwert-Wiederaufbau (heute Nacht 11,3 h gemessen) = rund 2.800 Rang bei aktueller Rate, gegen unbezifferten Nutzen - und die Rate steigt gerade steil. Nicht jetzt.
+Naechste Pruefung: Traegt a = 0,5? Bei Rang 1.000 muss die Rate rund 500/h betragen, bei Rang 4.000 rund 1.000/h. Liegt sie darunter, ist a kleiner und die ETA waechst - dann ist der Einbau neu zu rechnen.
+
+---
+
 ## 29.08., 10:20 - BitNode 10: sofort beitreten, und was danach wirklich kommt
 
 Zwei Fragen aus der Simulation der Startphase beantwortet, beide mit den

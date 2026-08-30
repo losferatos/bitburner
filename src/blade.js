@@ -3156,7 +3156,38 @@ export async function main(ns) {
       // Der Eintrag bleibt als Warnung stehen: Das Springen zwischen
       // Vertraegen ist kein Fehler, sondern die Antwort auf schwankende
       // Schaetzungen - und es ist billiger als jede Verzoegerung.
-      if (!gleich) {
+      // INCITE VIOLENCE WIRD NICHT ABGEBROCHEN (30.08.2026, 07:55).
+      //
+      // Gemessen 07:26 bis 07:47 (`data/aktionen.txt`, 18 Abschnitte): kein
+      // einziger Incite-Durchlauf laenger als 46 Sekunden, alle mit
+      // `rangVon == rangBis`. Die Aktion dauert aber fest 60 s
+      // (`data/GeneralActions.ts:54`, `getActionTime: () => 60`), und ihr
+      // ganzer Nutzen faellt erst beim Abschluss an: Der `case
+      // InciteViolence` steht im completeAction-Zweig
+      // (`Bladeburner.ts:1219-1225`) und schreibt dort 180
+      // Wachstumsschritte auf alle Vertraege und Operationen gut. Ein
+      // Abbruch verliert davon **alles**.
+      //
+      // Der Motor lief deshalb 21 Minuten in einem Zweiminutenzyklus:
+      // Retirement -> Bounty Hunter -> Incite (38 s, abgebrochen) ->
+      // Tracking -> Incite (17 s, abgebrochen) -> Retirement. Jeder Vertrag
+      // kroch durch natuerliches Wachstum knapp ueber eine offene Aktion,
+      // wurde sofort geleert, und der Vorrat fuellte sich nie auf.
+      // Rangrate 59 statt 280 je Stunde.
+      //
+      // Das ist NICHT die Zeit-Hysterese vom 26.08., 22:55, die zehn Prozent
+      // schlechter war und zu Recht zurueckgenommen wurde. Dort ging es um
+      // den Wechsel zwischen Vertraegen, deren Fortschritt anteilig zaehlt -
+      // und der Ertragsunterschied war groesser als die verworfene Zeit.
+      // Incite Violence ist binaer: fertig oder wertlos. Ausdauer kostet es
+      // keine (`GeneralActions.ts:57`), das Festhalten kann also nichts
+      // leerlaufen lassen.
+      //
+      // Black Ops duerfen weiterhin unterbrechen - sie tragen den Ausgang.
+      const festhalten = !gleich && wahl.typ !== B && abschnitt
+        && laeuft && laeuft.type === G && laeuft.name === "Incite Violence"
+        && Date.now() - abschnitt.von < 62000;
+      if (!gleich && !festhalten) {
         // Truppeinsatz NUR bei Black Ops (29.08.2026, 18:50). Der Bonus ist
         // `(teamCount+1)^0,05` (`Actions/Operation.ts:96-98`) und wirkt ueber
         // `competence *= getTeamSuccessBonus` (`Actions/Action.ts:178`) - bei

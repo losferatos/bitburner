@@ -178,6 +178,65 @@ Erwartet: Offen ist nicht das Ob, sondern das **Wieviel**. Der Einbruch dauert
 Dringlichkeit: mittel. Kein Defekt, aber der erste gemessene Ratenverlust im
           Vollbetrieb - und der Optimierloop hat gerade keinen groesseren.
 
+
+**URSACHE GEFUNDEN UND BEHOBEN (30.08., 07:55). Es war doch ein Fehler - der
+Eintrag von 07:42 hat zu frueh entwarnt.**
+
+Der Blick ins Aktionsprotokoll (`data/aktionen.txt`, 07:26 bis 07:47) zeigt
+ein Muster, das die Momentaufnahme aus `blade.json` nicht hergab:
+
+    07:26:59  38,0 s  General/Incite Violence     r 332,9
+    07:27:37  15,0 s  Contracts/Tracking          r 333,3
+    07:27:52  17,0 s  General/Incite Violence     r 333,3
+    07:28:09  26,0 s  Contracts/Retirement        r 334,6
+    07:28:35  24,0 s  Contracts/Bounty Hunter     r 334,6
+    07:28:59  46,0 s  General/Incite Violence     r 334,6
+    ... 18 Incite-Abschnitte, keiner laenger als 46 s ...
+
+**Incite Violence dauert fest 60 Sekunden** (`data/GeneralActions.ts:54`,
+`getActionTime: () => 60`), und **kein einziger Durchlauf wurde fertig**. Der
+ganze Nutzen faellt aber erst beim Abschluss an: Der `case InciteViolence`
+steht im completeAction-Zweig (`Bladeburner.ts:1219-1225`) und schreibt dort
+`60 * 3 * growthFunction()` auf jeden Vertrag und jede Operation gut. Ein
+Abbruch verliert davon **alles** - `rangVon == rangBis` in allen 18
+Abschnitten belegt es.
+
+Der Motor lief damit 21 Minuten in einem geschlossenen Zweiminutenzyklus:
+Jeder Vertrag kroch durch natuerliches Wachstum knapp ueber eine offene
+Aktion, `beste()` griff ihn, leerte ihn in 15 bis 26 Sekunden, fiel auf
+Incite Violence zurueck - und brach es beim naechsten wieder frei gewordenen
+Vertrag ab. Der Vorrat konnte sich nie fuellen.
+
+**Kosten:** 332,9 -> 351,7 Rang in 19 Minuten = **59 Rang/h gegen 280 im
+Trend.** Der Zustand endete nicht von selbst.
+
+**Eingebaut in `src/blade.js`** (vor `if (!gleich)`, 6 Zeilen Code):
+
+    const festhalten = !gleich && wahl.typ !== B && abschnitt
+      && laeuft && laeuft.type === G && laeuft.name === "Incite Violence"
+      && Date.now() - abschnitt.von < 62000;
+    if (!gleich && !festhalten) {
+
+Black Ops duerfen weiterhin unterbrechen. Ausdauer kostet Incite Violence
+keine (`GeneralActions.ts:57`), das Festhalten kann also nichts leerlaufen
+lassen.
+
+**Abgegrenzt gegen die zurueckgenommene Hysterese vom 26.08., 22:55.** Die
+war zehn Prozent schlechter und wurde zu Recht verworfen - aber sie betraf
+den Wechsel **zwischen Vertraegen**, deren Fortschritt anteilig zaehlt und
+deren Ertragsunterschied groesser ist als die verworfene Zeit. Incite
+Violence ist binaer: fertig oder wertlos. Das ist kein Wiedereinbau einer
+verworfenen Idee, sondern eine Ausnahme mit eigener Fundstelle.
+
+**Geaendert 07:55, Wirkung noch nicht gemessen.** `node --check` sauber,
+Pruefer unveraendert SPUR, ins Spiel synchronisiert und `blade.js` neu
+gestartet (verifiziert 07:49:47: laeuft, Rang 357, `Contracts/Tracking`).
+
+Nachzumessen beim naechsten Lauf: Steht in `data/aktionen.txt` ein
+Incite-Violence-Abschnitt von **60 Sekunden**? Und faellt die Zahl der
+Incite-Abschnitte je Stunde deutlich unter die 18 aus diesen 21 Minuten?
+Bleibt beides aus, greift das Festhalten nicht und die Zeilen gehoeren
+zurueckgenommen.
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

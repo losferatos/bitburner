@@ -123,7 +123,16 @@ Regeln:
 Zwei davon sind in `578e750` behoben (Selbsthaltung, offener Abschnitt). Drei
 bleiben offen, alle mit Fundstelle:
 
-**1. `tools/wache.js` kennt `Grafting` nicht - Fehlalarm nach 45 Minuten.**
+**1. ~~`tools/wache.js` kennt `Grafting` nicht~~ ERLEDIGT 19:46, Commit
+`a734b54`.** Ausnahme analog zu `imGym`, mit einem Deckel von 150 Minuten
+(`GRAFT_MAX_MS`) - danach faellt ein eigener Befund mit eigenem Text, weil ein
+verklemmter Riegel sonst genauso aussaehe wie ein legitimer Graft. Der
+Zeitstempel liegt in `zustand.graftSeit`, weil der Verlauf nur zwei Stunden
+haelt (`:1057`) und kein Aktionsfeld fuehrt. **Verifiziert 19:46:** Waechter
+neu gestartet (PID 13720), `graftSeit` steht im Zustand,
+`node tools/aufsicht.js` meldet "Waechter frisch".
+
+*Der urspruengliche Befund, zum Nachlesen:*
 Der Riegel schreibt jede Runde frische Telemetrie, damit die Motorfrische-
 Pruefung (`tools/wache.js:66`, `MOTOR_MAX_ALTER` 10 min) nicht anschlaegt.
 Uebrig bleibt die Traegerpruefung (`:651`): Rang 45 Minuten flach **und** nicht

@@ -147,7 +147,13 @@ greift also nicht. Beide Ausgaenge sind falsch:
 Zu tun: `Grafting`-Ausnahme analog zu `imGym`, plus ein harter Deckel auf die
 Riegeldauer (die Graftzeit ist bekannt, `src/bbgraft.js:44` liest sie schon).
 
-**2. Der Faehigkeitskauf faellt waehrend des Riegels aus.**
+**2. ~~Der Faehigkeitskauf faellt waehrend des Riegels aus~~ ERLEDIGT 20:11.**
+`faehigkeitenKaufen()` wird jetzt im Riegel-Zweig aufgerufen, bevor die Runde
+uebersprungen wird. **Verifiziert 20:11** nach Neustart: Normalbetrieb
+unveraendert (Contracts/Tracking, Rang 964, 12 Punkte offen). Der Zweig
+selbst ist erst beim ersten Graft pruefbar.
+
+*Der urspruengliche Befund, zum Nachlesen:*
 Alles ab `src/blade.js:2947` wird uebersprungen, darunter
 `faehigkeitenKaufen()` (`:3172`). Genau der wurde am 29.08. in den
 Weichen-Zweig nachgezogen (`:3163`, "17 Punkte lagen brach"), weil die

@@ -23,6 +23,73 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Gemessen: Raid ist der Hebel, nicht Assassination - und der Aktionsvorrat ist die harte Grenze (30.08., 17:20)
+
+**Korrigiert den eigenen Eintrag von 17:15.** Der rechnete nur mit Rang je
+Erfolg und liess die **Aktionsdauer** weg. `src/bbspann.js` hat um 17:10 im
+laufenden Spiel gemessen:
+
+| Aktion | Chance | Dauer | Rang/Erfolg | **Rang je Minute** | HP je Fehlschlag |
+|---|---|---|---|---|---|
+| Tracking (laeuft) | 98,5-100 % | 19 s | 0,3 (Lvl 32: 1,04) | 3,242 | 0 |
+| Retirement | 72,1-76,6 % | 29 s | 0,6 (Lvl 20: 1,99) | 2,959 | 1,6 |
+| Bounty Hunter | 59,8-63,5 % | 36 s | 0,9 (Lvl 15: 2,82) | 2,810 | 2,5 |
+| Investigation | 59,3-63,0 % | 33 s | 2,2 | 2,223 | **0** |
+| Undercover | 42,5-45,1 % | 41 s | 4,4 | 2,398 | 7,4 |
+| **Raid** | **21,6-23,0 %** | 66 s | **55,0** | **9,032** | **302,9** |
+| Assassination | 12,0-12,7 % | 123 s | 44,0 | 0,854 | 44,3 |
+
+**Assassination ist die schlechteste Aktion im Feld**, nicht die beste - 123 s
+Dauer bei 12 % Chance. Der Eintrag von 17:15 hat das falsch herum gerechnet.
+
+**Raid liefert 9,03 Rang je Minute - das Dreifache der besten laufenden Aktion,
+und das bei 22 % Erfolgschance.** Bei Chance nahe 1,0 waeren es 50 Rang je
+Minute. Gesperrt ist es allein durch **302,9 HP je Fehlschlag bei 20 HP
+Maximum**: jeder zweite Fehlschlag beendet den Betrieb.
+
+**Der zweite Befund ist wichtiger und war bisher nirgends notiert: der
+Aktionsvorrat ist endlich und der Nachschub betraegt 18,75 Stueck je Stunde
+und Art.** Damit ist eine hohe Erfolgschance kein Komfort, sondern
+Voraussetzung - wer mit 22 % faehrt, verbrennt den Vorrat, ohne anzukommen:
+
+| Aktion | Erfolge bis Rang 400.000 | bei Chance 1,0 | bei heutiger Chance | Vorrat | Nachschub braucht dann |
+|---|---|---|---|---|---|
+| **Raid** | 710 (Endlevel 37) | **13,0 h** | 58,4 h | 642 | 136 h |
+| Assassination | 532 | 18,2 h | 146,6 h | 438 | 205 h |
+| Stealth Retirement | 900 | 20,5 h | 99,5 h | 451 | 209 h |
+| Undercover | 1.820 | 20,7 h | 47,3 h | 704 | 184 h |
+| Investigation | 2.221 | 20,4 h | 33,3 h | 654 | 159 h |
+
+Bei Chance 1,0 kommt **jede** Operation in 13 bis 21 Stunden ans Ziel, und
+Raids Vorrat von 642 deckt 90 % des Bedarfs - der Rest kommt in 3,6 Stunden
+nach. Bei den heutigen Chancen reicht kein Vorrat, und der Nachschub streckt
+alles auf Wochen.
+
+**Damit ist der Wert des Graft-Pakets beziffert und er ist gross:**
+`hp.max = 1.912` statt 20 macht Raid ueberhaupt erst fahrbar, und Kampfwerte
+um 20.000 heben die Chance von 22 % auf nahe 1,0. **Rang 400.000 in rund
+13 Stunden Raid-Betrieb** statt in Wochen. Das ist der Ausgang aus dem Knoten.
+
+**Rechenweg** (an der Messung geeicht): Rang je Erfolg
+`= rankGain x rewardFac^(level-1) x 0,8` (`Bladeburner/Formulas.ts:9-28`),
+Level `= floor(sqrt(2 x Erfolge))` (aus
+`LevelableAction.getSuccessesNeededForNextLevel`, an Tracking geeicht: Level 32
+bei 563 Erfolgen). Raid `rewardFac 1,100`, `difficultyFac 1,045`
+(`data/Operations.ts`).
+
+**Was noch fehlt, bevor daraus ein Plan wird:**
+
+- **Die Erfolgschance bei Raid-Level 37** ist nicht gerechnet.
+  `baseDifficulty 800 x 1,045^36 = 3.916` - mit den Kampfwerten nach dem Graft
+  sollte das tragen, belegt ist es nicht.
+- **Bevoelkerungsverbrauch.** Ein Raid-Misserfolg ruft
+  `triggerPotentialMigration` (`Bladeburner.ts:809,818`), und Raid senkt die
+  Bevoelkerung auch bei Erfolg. Bei Chance nahe 1,0 faellt der Misserfolgspfad
+  weg, der Erfolgspfad nicht.
+- **Chaos** steht bei 46,6, die Schwelle ist 50.
+
+---
+
 ### Chaos-Aufraeumen greift wieder - Wirkung auf die Rangrate noch nicht nachgemessen (30.08., 17:50)
 
 **Geaendert 17:44, Wirkung auf das Chaos verifiziert, Wirkung auf die Rangrate

@@ -118,70 +118,78 @@ Regeln:
 
 ## Sofort
 
-### Gemessen: Raid ist der Hebel, nicht Assassination - und der Aktionsvorrat ist die harte Grenze (30.08., 17:20)
+### Der Weg zu Rang 400.000 ist durchgerechnet: 27 h mit Grafting, 246-526 h ohne (30.08., 18:20)
 
-**Korrigiert den eigenen Eintrag von 17:15.** Der rechnete nur mit Rang je
-Erfolg und liess die **Aktionsdauer** weg. `src/bbspann.js` hat um 17:10 im
-laufenden Spiel gemessen:
+**Korrigiert und ersetzt den Eintrag von 17:20.** Der sagte "Raid ist der
+Hebel". Raid ist es nicht - es ist hart gedeckelt.
 
-| Aktion | Chance | Dauer | Rang/Erfolg | **Rang je Minute** | HP je Fehlschlag |
-|---|---|---|---|---|---|
-| Tracking (laeuft) | 98,5-100 % | 19 s | 0,3 (Lvl 32: 1,04) | 3,242 | 0 |
-| Retirement | 72,1-76,6 % | 29 s | 0,6 (Lvl 20: 1,99) | 2,959 | 1,6 |
-| Bounty Hunter | 59,8-63,5 % | 36 s | 0,9 (Lvl 15: 2,82) | 2,810 | 2,5 |
-| Investigation | 59,3-63,0 % | 33 s | 2,2 | 2,223 | **0** |
-| Undercover | 42,5-45,1 % | 41 s | 4,4 | 2,398 | 7,4 |
-| **Raid** | **21,6-23,0 %** | 66 s | **55,0** | **9,032** | **302,9** |
-| Assassination | 12,0-12,7 % | 123 s | 44,0 | 0,854 | 44,3 |
+**Der Deckel, den bisher niemand gesehen hat: Synthoid-Gemeinden.** Jeder
+erfolgreiche Raid ruft `--city.comms` (`Bladeburner.ts:830-836`), und
+`getAvailability` verlangt `comms >= 1`. Aus dem Spielstand um 18:10:
 
-**Assassination ist die schlechteste Aktion im Feld**, nicht die beste - 123 s
-Dauer bei 12 % Chance. Der Eintrag von 17:15 hat das falsch herum gerechnet.
+| Stadt | comms | pop | Chaos |
+|---|---|---|---|
+| Aevum | 127 | 2,71e9 | 46,7 |
+| New Tokyo | 80 | 1,03e9 | 36,9 |
+| Chongqing | 40 | 2,38e9 | 31,3 |
+| Ishima | 40 | 1,05e9 | 56,7 |
+| Volhaven | 37 | 8,47e8 | 18,0 |
+| Sector-12 | 25 | 1,39e9 | 24,8 |
+| **gesamt** | **349** | | |
 
-**Raid liefert 9,03 Rang je Minute - das Dreifache der besten laufenden Aktion,
-und das bei 22 % Erfolgschance.** Bei Chance nahe 1,0 waeren es 50 Rang je
-Minute. Gesperrt ist es allein durch **302,9 HP je Fehlschlag bei 20 HP
-Maximum**: jeder zweite Fehlschlag beendet den Betrieb.
+Nachwachsen tun sie fast nicht: 5 % der Zufallsereignisse geben `+1 comms`
+(`Bladeburner.ts:613-620`), ein Ereignis alle 240-600 s, Stadt gleichverteilt
+aus sechs - **rund 0,007 comms je Stunde**. 349 Raids liefern 83.237 Rang,
+also **21 % des Wegs**, und dann ist Schluss. Raid senkt zusaetzlich bei jedem
+Erfolg die Bevoelkerung um 1 %, und die geht ueber `(pop/1e9)^0,7` direkt in
+die Erfolgschance.
 
-**Der zweite Befund ist wichtiger und war bisher nirgends notiert: der
-Aktionsvorrat ist endlich und der Nachschub betraegt 18,75 Stueck je Stunde
-und Art.** Damit ist eine hohe Erfolgschance kein Komfort, sondern
-Voraussetzung - wer mit 22 % faehrt, verbrennt den Vorrat, ohne anzukommen:
+**Assassination und Stealth Retirement verbrauchen KEINE Gemeinde** - nur
+`changePopulationByCount(-1)` bzw. `-0,5 %` (`Bladeburner.ts:848,857`).
 
-| Aktion | Erfolge bis Rang 400.000 | bei Chance 1,0 | bei heutiger Chance | Vorrat | Nachschub braucht dann |
-|---|---|---|---|---|---|
-| **Raid** | 710 (Endlevel 37) | **13,0 h** | 58,4 h | 642 | 136 h |
-| Assassination | 532 | 18,2 h | 146,6 h | 438 | 205 h |
-| Stealth Retirement | 900 | 20,5 h | 99,5 h | 451 | 209 h |
-| Undercover | 1.820 | 20,7 h | 47,3 h | 704 | 184 h |
-| Investigation | 2.221 | 20,4 h | 33,3 h | 654 | 159 h |
+**Die Rechnung, mit levelabhaengiger Chance, Vorrat und Nachschub** (Modell an
+der Messung von 17:58 geeicht, Aevum, Chaos 46,68):
 
-Bei Chance 1,0 kommt **jede** Operation in 13 bis 21 Stunden ans Ziel, und
-Raids Vorrat von 642 deckt 90 % des Bedarfs - der Rest kommt in 3,6 Stunden
-nach. Bei den heutigen Chancen reicht kein Vorrat, und der Nachschub streckt
-alles auf Wochen.
+| Aktion | Erfolge | Versuche | Aktionszeit | Nachschub braucht | min-Chance | Endlevel |
+|---|---|---|---|---|---|---|
+| Raid | - | - | Abbruch bei 349 | - | 100 % | 26 |
+| **Assassination** | 534 | 792 | **27,0 h** | 18,9 h | 41,8 % | 32 |
+| Stealth Retirement | 902 | 1.087 | 24,8 h | **33,9 h** | 54,0 % | 42 |
+| Undercover | 1.822 | 1.839 | 20,9 h | **60,5 h** | 86,1 % | 60 |
 
-**Damit ist der Wert des Graft-Pakets beziffert und er ist gross:**
-`hp.max = 1.912` statt 20 macht Raid ueberhaupt erst fahrbar, und Kampfwerte
-um 20.000 heben die Chance von 22 % auf nahe 1,0. **Rang 400.000 in rund
-13 Stunden Raid-Betrieb** statt in Wochen. Das ist der Ausgang aus dem Knoten.
+**Die massgebliche Zahl ist `max(Aktionszeit, Nachschub)`** - der Vorrat
+kommt mit 18,75 Stueck je Stunde und Art nach. Damit ist **Assassination mit
+27 h der schnellste Einzelweg**, Undercover trotz kuerzerer Aktionszeit erst
+bei 60 h.
 
-**Rechenweg** (an der Messung geeicht): Rang je Erfolg
-`= rankGain x rewardFac^(level-1) x 0,8` (`Bladeburner/Formulas.ts:9-28`),
-Level `= floor(sqrt(2 x Erfolge))` (aus
-`LevelableAction.getSuccessesNeededForNextLevel`, an Tracking geeicht: Level 32
-bei 563 Erfolgen). Raid `rewardFac 1,100`, `difficultyFac 1,045`
-(`data/Operations.ts`).
+**Ohne Grafting:** Assassination 526 h, Stealth Retirement 409 h, Undercover
+246 h. **Grafting bringt also Faktor 10 bis 20** - nicht auf die
+Black-Op-Chance, sondern auf den Weg selbst.
 
-**Was noch fehlt, bevor daraus ein Plan wird:**
+**Zusammen mit den rund 42 h Graft-Zeit ergibt das etwa 70 Stunden** bis zum
+Knotenausgang. Das deckt sich mit der Groessenordnung, die am 30.08. um 15:00
+abgenommen wurde.
 
-- **Die Erfolgschance bei Raid-Level 37** ist nicht gerechnet.
-  `baseDifficulty 800 x 1,045^36 = 3.916` - mit den Kampfwerten nach dem Graft
-  sollte das tragen, belegt ist es nicht.
-- **Bevoelkerungsverbrauch.** Ein Raid-Misserfolg ruft
-  `triggerPotentialMigration` (`Bladeburner.ts:809,818`), und Raid senkt die
-  Bevoelkerung auch bei Erfolg. Bei Chance nahe 1,0 faellt der Misserfolgspfad
-  weg, der Erfolgspfad nicht.
-- **Chaos** steht bei 46,6, die Schwelle ist 50.
+**Neuer Befund zum Graft-Paket selbst - es ist fuer die falsche Aktion
+optimiert.** Das Paket in `nodes/GRAFTING.md` wurde nach den Gewichten von
+Operation Daedalus zusammengestellt (str/def/dex/agi je 0,2) und liefert
+str x214,6 und def x184, aber dex nur x10,4 und agi x33,2. **Assassination
+gewichtet dex und agi mit je 0,3, str und def nur mit je 0,1**
+(`data/Operations.ts`). Folge, gerechnet:
+
+- Raid traegt mit dem Paket bis **Level 45** (95 %-Grenze) - gebraucht wird 26.
+- Assassination traegt nur bis **Level 18** - gebraucht wird 32, dort sind es
+  noch **44 %**.
+
+Eine Gegenprobe mit dex/agi 12.000 statt str 22.300 ergibt bei Level 31
+**58,3 % statt 44,3 %**. **Das Paket gehoert neu zusammengestellt, mit den
+Gewichten der Aktion, die den Rang tragen soll - nicht mit denen von
+Daedalus.** Das ist der naechste Rechenschritt, vor jedem Bauen.
+
+**Offen bleibt:** Mehrere Operationsarten parallel fahren. Jede hat ihren
+eigenen Nachschub von 18,75/h; wer drei Arten mischt, hebt die
+Nachschubgrenze auf das Dreifache. Das ist noch nicht gerechnet und koennte
+die 27 h deutlich druecken.
 
 ### TEILWEISE UEBERHOLT - Die Rangrechnung: ohne Operationen ist Rang 400.000 unerreichbar (30.08., 17:15)
 

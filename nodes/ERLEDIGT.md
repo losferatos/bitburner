@@ -23,6 +23,112 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Hacking-Ausgang aus BitNode 10 wurde nie gerechnet, nur behauptet (30.08., 12:55)
+
+**Das ist der schwerste Befund des Tages und stellt die Kursentscheidung in
+Frage.** Ein Praemissen-Skeptiker hat den Eintrag aus `## ENTSCHIEDEN`
+angegriffen: *"Ausgang aus BitNode 10 = nur Bladeburner, Hacking-Weg braucht
+Level 6.000 = 10^175 Erfahrung"*.
+
+**Die 10^175 sind keine Eigenschaft des Weges, sondern des heutigen
+Augmentierungsstands.**
+
+Die Schwelle selbst haelt: `Server/data/servers.ts:1553` gibt w0r1d_d43m0n
+`requiredHackingSkill: 3000`, `ServerHelpers.ts:422-423` multipliziert einmalig
+mit `WorldDaemonDifficulty` = 2 (`BitNode.tsx:838,880`) - **6.000, fix**, es
+skaliert nicht mit dem Fortschritt.
+
+Der Erfahrungsbedarf haengt aber am Multiplikator:
+`exp = e^((6000/m + 200)/32)` mit `m = mults.hacking * HackingLevelMultiplier`
+(0,35 in BN10, `Person.ts:224`, `skill.ts:13`):
+
+    m = 0,66  (heute, hacking 1,89)   7,8e123
+    m = 4                              1,2e23
+    m = 7,6                            2,7e13
+    m = 10                             7,2e10
+    m = 12                             3,2e9
+
+`Augmentation/Augmentations.ts` fuehrt 31 Augmentierungen mit
+Hacking-Multiplikator, Produkt 43,5; abzueglich der unkaeuflichen
+`BigDsBigBrain` (`repCost: Infinity`) bleiben **21,7**.
+
+---
+
+**BEANTWORTET (30.08., 13:10). Der Hacking-Weg ist nicht ausgeschlossen, aber
+er hat ein Nadeloehr - und das Nadeloehr ist bezifferbar.**
+
+**1. Die Fraktionslage ist besser als angenommen.** Der Spieler ist in
+**sieben** Fraktionen, nicht in zwei (`node tools/save.js`, 13:05):
+
+    NiteSec      8.342 Rep, Gunst 26,5      Sector-12    11.793, Gunst 83,8
+    Aevum       10.105 Rep, Gunst 85,1      Tian Di Hui  11.630, Gunst 71,8
+    CyberSec    10.883 Rep, Gunst 85,9      Slum Snakes   1.304, Gunst 12,2
+    Bladeburners   606 Rep, Gunst  2,1
+
+**2. Aber die Rep reicht um eine Groessenordnung nicht.** `tools/augplan.js`
+zeigt die **rohen** Basiskosten (bekannter Werkzeugfehler, eigener Punkt); in
+BN10 verdoppelt `AugmentationRepCost: 2` sie. Beispiel NiteSec, wo der Spieler
+mit 8,3k am weitesten ist:
+
+    Neurotrainer II                   10,0k roh  ->  20,0k in BN10
+    Embedded Netburner Module         15,0k      ->  30,0k
+    Neural-Retention Enhancement      20,0k      ->  40,0k
+    CRTX42-AA Gene Modification       45,0k      ->  90,0k
+    Cranial Signal Processors III     50,0k      -> 100,0k
+    DataJack                         112,5k      -> 225,0k
+
+Fuer den Multiplikator 7,6 braucht es rund 25 solcher Stuecke, verteilt ueber
+die Hacking-Fraktionen - und in die High-End-Fraktionen (The Black Hand,
+BitRunners, Daedalus, Illuminati) ist der Spieler noch gar nicht aufgenommen.
+
+**3. Das eigentliche Nadeloehr ist Zeit, nicht Geld.** Fraktionsreputation
+kommt aus Fraktionsarbeit - und die **bricht Bladeburner-Aktionen ab**.
+`Bladeburner.ts:178-180`: `startAction` ruft `Player.finishWork(true)`, und
+`:1354-1360` bricht eine laufende Aktion ab. Genau deshalb verzichtet
+`src/bn4rep.js:1796-1814` im Kampfknoten auf **jede** Faktions- und
+Firmenarbeit.
+
+**Damit konkurrieren die beiden Wege doch** - nicht ueber den Rang (der
+ueberlebt einen Einbau, `Bladeburner.prestigeAugmentation()` macht nur
+`resetAction()` + `joinFaction()`), sondern ueber die Spielfigur. Wer Rep
+sammelt, sammelt keinen Rang.
+
+**4. Der Schluessel, der beides aufhebt, kostet 494 Rang.**
+
+`The Blade's Simulacrum` (`Augmentations.ts:284-296`): `repCost: 1.25e3`,
+`moneyCost: 1.5e11`, Fraktion **Bladeburners**. In BN10 also **2.500 Rep und
+750 Mrd Dollar**. Sie hebt genau den Konflikt auf - mit ihr laufen
+Bladeburner-Aktion und normale Arbeit gleichzeitig
+(`PlayerObjectBladeburnerMethods.ts:13-19` zeigt dieselbe Wirkung als
+SF7.3-Geschenk).
+
+Der Stand: **606 Bladeburner-Rep**, Geld 225 Mrd und steigend (Zufluss laut
+Wache rund 2 Bio je Stunde - das Geld ist in einer Stunde da). Fehlende Rep:
+1.894, bei 3,83 Rep je Rangpunkt also **494 Rang**. Bei der geglaetteten Rate
+von 41,9 Rang/h (Waechterreihe 11:04-13:01) sind das **11,8 Stunden**.
+
+**Was daraus folgt - und was NICHT:**
+
+Der Eintrag in `## ENTSCHIEDEN` bleibt vorerst stehen, aber **nicht mehr mit
+der Begruendung "10^175"**, sondern mit dieser: Der Hacking-Weg verlangt rund
+25 Augmentierungen aus Fraktionen, in die der Spieler teils nicht aufgenommen
+ist, mit in BN10 verdoppelten Rep-Anforderungen - und die Rep-Beschaffung
+schliesst Rangarbeit aus, solange das Simulacrum fehlt.
+
+**Die naechste Messung ist damit klar und billig:** Bei Bladeburner-Rang rund
+1.100 (in etwa 12 Stunden) ist das Simulacrum kaufbar. Danach - und erst
+danach - laesst sich der Hacking-Weg ehrlich rechnen, weil Rep und Rang dann
+parallel laufen. Bis dahin ist die Frage nicht entscheidbar, und jede
+Antwort waere geraten.
+
+Zu tun beim naechsten Lauf: pruefen, ob `bn4rep.js` das Simulacrum ueberhaupt
+auf dem Schirm hat. Der Geld-Audit von 12:58 sagt nein - `combatNutzen("The
+Blade's Simulacrum")` gibt 0,000, es steht gleichauf mit einer wertlosen
+Augmentierung. Ein Sonderwert analog zu `EXIT_KEY_VALUE` (`bn4rep.js:83-84`,
+existiert fuer The Red Pill) fehlt.
+
+---
+
 ### Die Rangrate liegt im Vollbetrieb bei 30 statt 254 je Stunde (30.08., 12:45)
 
 Gemessen (Waechterreihe, 3-Minuten-Takt): Seit der Wiederaufbau um 12:26

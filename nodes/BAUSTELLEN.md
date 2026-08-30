@@ -118,59 +118,6 @@ Regeln:
 
 ## Sofort
 
-### Der Hacking-Ausgang aus BitNode 10 wurde nie gerechnet, nur behauptet (30.08., 12:55)
-
-**Das ist der schwerste Befund des Tages und stellt die Kursentscheidung in
-Frage.** Ein Praemissen-Skeptiker hat den Eintrag aus `## ENTSCHIEDEN`
-angegriffen: *"Ausgang aus BitNode 10 = nur Bladeburner, Hacking-Weg braucht
-Level 6.000 = 10^175 Erfahrung"*.
-
-**Die 10^175 sind keine Eigenschaft des Weges, sondern des heutigen
-Augmentierungsstands.**
-
-Die Schwelle selbst haelt: `Server/data/servers.ts:1553` gibt w0r1d_d43m0n
-`requiredHackingSkill: 3000`, `ServerHelpers.ts:422-423` multipliziert einmalig
-mit `WorldDaemonDifficulty` = 2 (`BitNode.tsx:838,880`) - **6.000, fix**, es
-skaliert nicht mit dem Fortschritt.
-
-Der Erfahrungsbedarf haengt aber am Multiplikator:
-`exp = e^((6000/m + 200)/32)` mit `m = mults.hacking * HackingLevelMultiplier`
-(0,35 in BN10, `Person.ts:224`, `skill.ts:13`):
-
-    m = 0,47  (heute)   9,3e175      <- die zitierte Zahl
-    m = 4                1,2e23
-    m = 7,6              2,7e13
-    m = 10               7,2e10
-    m = 12               3,2e9
-
-`Augmentation/Augmentations.ts` fuehrt 31 Augmentierungen mit
-Hacking-Multiplikator, Produkt 43,5; abzueglich der unkaeuflichen
-`BigDsBigBrain` (`repCost: Infinity`) bleiben **21,7**. Damit ist
-m = 0,35 x 21,7 = **7,6**, mit NeuroFlux-Stufen (`hacking: 1.01` je Stufe,
-unbegrenzt) 10 bis 12.
-
-**Und die Wege konkurrieren nicht.** `Bladeburner.prestigeAugmentation()`
-(`Bladeburner.ts:259-263`) setzt den **Rang nicht zurueck**, nur die
-Kampferfahrung. Ein Augmentierungs-Grind kostet also keinen einzigen
-Rangpunkt - beide Wege haben dieselbe Vorbedingung (Rep und Geld fuer die
-Aug-Runde), und danach kostet der Hacking-Ausgang Minuten statt 400.000 Rang.
-
-**Was offen ist - und was gemessen gehoert, bevor irgendetwas entschieden
-wird:** Ob ein Hacking-Multiplikator von 7 bis 12 in diesem Lauf bezahlbar
-ist. BN10 hat `AugmentationRepCost: 2` und `AugmentationMoneyCost: 5`. Das
-ist die einzige offene Groesse. Der Skeptiker nennt sie ausdruecklich als
-Vermutung, nicht als Beleg.
-
-Zu tun: Die Rep- und Geldkosten fuer einen Hacking-Multiplikator von 7,6
-durchrechnen - alle 30 kaufbaren Hacking-Augs mit ihren Fraktionen, Rep- und
-Geldanforderungen in BN10. Dann beide Wege nebeneinander stellen. **Bis
-dahin bleibt der Eintrag in `## ENTSCHIEDEN` stehen** - er wird nicht
-aufgrund einer unbelegten Gegenrechnung geaendert -, aber er ist als
-"nicht gerechnet" markiert.
-
-Dringlichkeit: **hoch.** Wenn der Hacking-Weg traegt, spart er den groessten
-Teil von 400.000 Rang.
-
 ## Offen, nach Dringlichkeit
 
 ### Elf Fehler in der eigenen Dokumentation, gepruefte Liste (30.08., 13:05)

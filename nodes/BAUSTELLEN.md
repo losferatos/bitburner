@@ -118,85 +118,124 @@ Regeln:
 
 ## Sofort
 
-### `SICHER_OPERATION = 0,85` sperrt 2.491 verfuegbare Aktionen, waehrend die Vertraege leer sind (30.08., 13:20)
+keine
 
-**Der groesste offene Hebel des Knotens.** Er erklaert, warum die Rangrate bei
-42 je Stunde klebt, obwohl der Bot durchgehend arbeitet.
-
-Gemessen (`node tools/spann.js` -> `data/bbspann.json`, 13:09):
-
-    Aktion                 Chance  Vorrat  Rang/Ausdauer  Rang/Minute  HP/Fehl
-    ------------------------------------------------------------------------
-    Tracking                0,874       0          0,511        2,428      0,1
-    Bounty Hunter           0,460      23          0,742        2,163      0,5
-    Retirement              0,579      19          0,671        2,311        -
-    ------------------------------------------------------------------------
-    Investigation           0,446     457          0,566        1,583      0,0
-    Undercover Operation    0,323     507          0,624        1,643      1,4
-    Sting Operation         0,228     485          0,427        0,965      1,9
-    Raid                    0,168     458          3,241        6,491     41,6
-    Stealth Retirement      0,151     298          0,677        1,180      8,5
-    Assassination           0,091     286          0,126        0,175      4,5
-
-**Alle sechs Operationen stehen auf Stufe 1 mit null Erfolgen** - in achtzehn
-Stunden BitNode 10 wurde keine einzige gefahren. Der Grund ist
-`SICHER_OPERATION = 0,85` (`src/blade.js:243`), und keine Operation kommt auch
-nur in die Naehe.
-
-**Der Punkt ist nicht, dass Operationen besser waeren - sie sind es je Aktion
-meist nicht.** Der Punkt ist der Vorrat. Die Vertraege stehen bei **0, 23 und
-19**, die Operationen bei zusammen **2.491**. Der Nachschub ist bei 30 Stueck
-je Stunde und Art gedeckelt (`Bladeburner.ts:1387`), und der Zaehler faellt
-bei Erfolg **und** Misserfolg (`:934, :971`). Der Bot faehrt deshalb die
-Regenerationskammer oder Incite Violence, waehrend 2.491 Auftraege
-danebenliegen.
-
-**Die Schwelle hat keine Herleitung im Code.** Der Kommentar bei
-`blade.js:243` gehoert zur Black-Op-Schwelle (0,80 statt 0,99, sauber
-gerechnet); die 0,85 fuer Operationen steht ohne Begruendung da. Der
-naechstgelegene Beleg ist von 26.08. 16:20: *"Alle sechs Operationen liegen
-zwischen 0,04 und 0,19"* - gemessen in **BitNode 6**. Heute liegen
-Investigation bei 0,446 und Undercover bei 0,323, also in einem voellig
-anderen Bereich. Die Begruendung ist mit dem Knotenwechsel verfallen.
-
-**Zwei Operationen sind risikofrei und sofort besser als der Leerlauf:**
-
-- **Investigation** - Chance 0,446, **null HP-Verlust**, **kein**
-  Bevoelkerungsverbrauch (`Bladeburner.ts:803-810` ruft nur
-  `improvePopulationEstimateByPercentage`), 457 Stueck Vorrat, 0,566 Rang je
-  Ausdauerpunkt gegen Tracking 0,511.
-- **Undercover Operation** - Chance 0,323, 1,4 HP je Fehlschlag, ebenfalls
-  **kein** Bevoelkerungsverbrauch (`:812-819`), 507 Stueck, 0,624 Rang je
-  Ausdauerpunkt.
-
-**Raid bleibt gesperrt, und zwar zu Recht.** Es ist mit 3,241 Rang je
-Ausdauerpunkt und 6,491 je Minute die mit Abstand ertragreichste Aktion im
-Spiel - aber es kostet **41,6 HP je Fehlschlag** bei 20 HP Maximum. Bei 83
-Prozent Fehlschlagquote landet der Spieler bei jedem zweiten Versuch im
-Krankenhaus. Dazu verbraucht es 1 Prozent der Stadtbevoelkerung je Erfolg und
-0,5 bis 1 bei Fehlschlag (`:830-844`) - bei 458 Versuchen waere Aevum leer.
-Raid ist ein eigener Punkt, kein Teil dieses hier.
-
-**Was das wert ist.** Der Bot verliert heute rund die Haelfte seiner Zeit an
-Kammer und Leerlauf, weil nichts Fahrbares da ist. Mit Investigation und
-Undercover als Rueckfall laeuft er durch. Die Nachschubdecke steigt von 90
-Versuchen je Stunde (drei Vertraege) auf 150 (fuenf Aktionen) - und der
-vorhandene Bestand von 964 Stueck traegt die ersten Stunden ohne jeden
-Nachschub.
-
-Zu tun: `SICHER_OPERATION` auf einen **gerechneten** Wert senken, der
-Investigation und Undercover einschliesst und Raid, Stealth Retirement sowie
-Assassination draussen laesst. Kandidat **0,30**. Danach messen, ob die
-Rangrate steigt und ob der HP-Stand haelt.
-
-**Vor dem Abhaken:** Die Aenderung geht in `src/blade.js`, also in Code, der
-unbeaufsichtigt weiterlaeuft. Nach der Regel vom 30.08. braucht sie einen
-Skeptiker-Lauf, bevor sie als fertig gilt - und die drei Fragen sind zu
-beantworten: Welche Uhr? Was bei Stillstand und Nachholen? Rate oder Bestand?
-
-Dringlichkeit: **hoch.** Die Leitgroesse des Knotens haengt daran.
+---
 
 ## Offen, nach Dringlichkeit
+
+### Operationen freigeben: verworfen, aber drei echte Fehler dabei gefunden (30.08., 13:35)
+
+**Zwei unabhaengige Skeptiker sagen BRICHT.** Die Aenderung (Ausnahmetabelle
+fuer Investigation und Undercover auf Schwelle 0,30) war gebaut, nie aktiv,
+und ist per `git checkout` verworfen. Die Praemisse dahinter war falsch.
+
+**Mein Fehler 1: Nur den Erfolgszweig gelesen.** Behauptet war "kein
+Bevoelkerungsverbrauch, `Bladeburner.ts:803-819` ruft nur
+`improvePopulationEstimateByPercentage`". Das gilt fuer `if (success)`. Der
+`else`-Zweig steht direkt daneben (`:809` und `:818`) und ruft
+`triggerPotentialMigration(this.city, 0.1)` bzw. `0.15`.
+
+`triggerMigration` (`:564-587`) schiebt `getRandomIntInclusive(3,15)/100` der
+Bevoelkerung weg, mit 5 Prozent Chance zusaetzlich mal 2 bis 4 - **und
+dekrementiert `sourceCity.comms`**, also genau die Gemeinden, die Raid
+braucht. Erwartungswert 9,9 Prozent je Migration, und `popEst` bleibt stehen:
+der Bot merkt es nicht einmal.
+
+Erwartete Bevoelkerungskosten je Versuch, aus dem Quellcode gerechnet:
+
+    Undercover Operation   (1-0,355) * 0,15 * 0,099 = 0,959 %
+    Raid                   0,182*1 % + 0,818*0,75 % = 0,796 %
+    Investigation          (1-0,492) * 0,10 * 0,099 = 0,503 %
+    Stealth Retirement     0,165 * 0,5 %             = 0,082 %
+    Sting                  0,251 * 0,1 %             = 0,025 %
+
+**Undercover ist die bevoelkerungsteuerste Aktion des ganzen Knotens** -
+teurer als Raid, das die Aenderung genau deshalb gesperrt liess. Ausgerechnet
+sie sollte freigegeben werden.
+
+**Mein Fehler 2: Die Kernbehauptung "der Vorrat ist der Engpass" ist falsch.**
+Der Nachschub liegt bei 90 Vertraegen je Stunde (drei Arten a 30,
+`Bladeburner.ts:1387`), der maximale Verbrauch bei **43 bis 61 Aktionen je
+Stunde** - begrenzt durch die Ausdauer (Gewinn 78,4/h plus hoechstens 28,2 aus
+der Kammer, Verbrauch 1,36 bis 1,84 je Aktion). Der Vorrat kann strukturell
+nicht leerlaufen.
+
+Und der Messwert, auf den ich mich berufen habe, sagt es selbst:
+`data/bbspann.json` um 13:09 zeigt `ausdauer: [22,74, 45,80]` = **49,6
+Prozent**, knapp unter `AUSDAUER_RUHE = 0,51`. Die Kammer lief mit
+`grund: "Ausdauer"`, nicht mangels Auftraegen - und 42 Vertraege lagen im
+Regal (Bounty Hunter 23, Retirement 19). Leergefahren war nur **Tracking**,
+die schnellste und ausdauerbilligste Aktion. Ich habe "Tracking: 0" gesehen
+und daraus "keine Arbeit" geschlossen.
+
+Ausdauerkorrigierte Rangraten (Zyklusrate = netto je Minute mal
+Arbeitsanteil):
+
+    Bounty Hunter   1,099        Undercover     0,922
+    Retirement      0,994        Tracking       0,790
+                                 Investigation  0,753
+
+Die Freigabe haette 0,99 bis 1,10 gegen 0,75 bis 0,92 getauscht.
+
+**Beide Skeptiker haben ihre Modelle geeicht**, bevor sie gerechnet haben -
+einer reproduziert sechs von neun Aktionszeiten auf die Sekunde und alle neun
+Chancen auf einem gemeinsamen Faktor 1,11 (das Statwachstum seit der
+Momentaufnahme). Genau das Verfahren, das die neue Regel in der globalen
+CLAUDE.md vorschreibt.
+
+---
+
+**Drei echte Fehler, die dabei herausgefallen sind. Sie bleiben als Arbeit
+stehen:**
+
+**A) `src/bbspann.js:171` laesst den Schwierigkeitsfaktor weg.** Es rechnet
+`hpJeMisserfolg = (1 - min) * HP_VERLUST[name]` - den **Rohwert**. Der echte
+Schaden ist `action.hpLoss * difficultyMultiplier` mit
+`difficultyMultiplier = d^0,28 + d/650` (`Bladeburner.ts:981-983`,
+`data/Constants.ts:16-17`). Undercover bei d=500: 6,466 mal 2 = **12,93 HP**,
+nicht 1,4. Das Werkzeug meldet die HP-Kosten um **Faktor 6,5 bis 9,3 zu
+klein** - und jede HP-Debatte, die es als Beleg zitiert, steht auf falschen
+Zahlen. (Diese hier auch: Die Sperre fuer Raid war zufaellig richtig, aber
+falsch begruendet.)
+
+Nebenbefund dazu: **HP ist ohnehin kein ernsthafter Kostenposten.**
+`blade.js:3141-3148` ruft `ns.singularity.hospitalize()` ab 75 Prozent, und
+das kostet `min(money*0,1, fehlendeHP*100e3)` (`Hospital/Hospital.ts:8`) - bei
+20 maximalen HP also hoechstens 2 Mio gegen 197 Mrd Guthaben. Der Spielstand
+zeigt 394 Krankenhausaufenthalte fuer zusammen 215,8 Mio.
+
+**B) `POP_JE_ERFOLG` (`blade.js:2381-2384`) kennt Investigation und Undercover
+nicht.** Beide stehen dort auf 0, waehrend Raid einen Zuschlag von 20 Sekunden
+bekommt. Traegt man ihre Migrationskosten konsequent ein (`0,7 * popKost *
+3600`), faellt Investigation auf 1,287 und Undercover auf 1,199 Rang je
+Minute - **und `beste()` entscheidet dann von selbst richtig, ohne dass an
+einer Schwelle gedreht werden muss.** Das ist der eigentliche Fix.
+
+**C) `blade.js:2716-2720` bietet Operationen nicht an, es erzwingt sie.**
+
+    const op = beste(OPERATIONEN, O, SICHER_OPERATION);
+    if (op) return { typ: O, name: op.name, grund: "Operation" };
+    const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
+
+Die Operation kehrt **unbedingt** zurueck, es gibt keinen Vergleich mit den
+Vertraegen. Sobald eine Operation die Schwelle reisst, faehrt der Motor nur
+noch sie - auch wenn sein eigenes Mass (`ertrag`, Zeile 2444) die Vertraege
+klar vorne sieht. Heute folgenlos, weil keine Operation die 0,85 erreicht;
+beim naechsten Schwellenversuch ist es die Falle.
+
+Der Umbau waere `max(op.ertrag, vt.ertrag)` statt der Reihenfolge. Zusammen
+mit (B) ist das der Weg, Operationen sauber zugaenglich zu machen - nicht
+ueber eine Ausnahmetabelle.
+
+**Nachrangig:** `SICHER_OPERATION` wird an fuenf weiteren Stellen geprueft
+(`:220`, `:2102`, `:2821`, `:2940`, `:3011`). Eine Ausnahmetabelle, die nur in
+`beste()` wirkt, laesst den Zustand inkonsistent - `etwasFahrbarJetzt` (`:220`)
+speist die Chaos- und Diplomacy-Entscheidung.
+
+Dringlichkeit: **A hoch** (ein Messwerkzeug, das um Faktor 8 daneben liegt,
+vergiftet jede kuenftige Rechnung). **B mittel** und der eigentliche Hebel.
+**C mittel**, heute folgenlos, aber eine gestellte Falle.
 
 ### Elf Fehler in der eigenen Dokumentation, gepruefte Liste (30.08., 13:05)
 

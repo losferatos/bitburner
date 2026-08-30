@@ -118,48 +118,63 @@ Regeln:
 
 ## Sofort
 
-### Der Einbau von 23:02 hat $28,4 Bio vernichtet fuer Augmentierungen im Wert von $5,58 Mrd (30.08., 23:12)
+### ZURUECKGEZOGEN: die Einbausperre. Drei eigene Fehler, und ein Baufehler (30.08., 23:32)
 
-**`prestigeAugmentation` setzt das Geld auf 1.262 Dollar**
-(`PlayerObjectGeneralMethods.ts:102`: `this.money = 1000 + CONSTANTS.Donations`).
-Nicht "das Ausgegebene ist weg" - **alles** ist weg.
+**Der Vorschlag von 23:12 - `bn4rep.js` baut nicht mehr ein, solange der
+Graftplan offen ist - wird nicht gebaut.** Ein Skeptiker-Lauf hat ihn zerlegt.
+In der Sache hatte die These recht, die Begruendung war an drei Stellen falsch,
+und die Umsetzung waere schaedlich gewesen.
 
-Die Rechnung fuer die drei Augmentierungen, die der Einbau gebracht hat:
+**Meine drei Fehler, alle selbst nachgelesen:**
 
-| | Basispreis | Kauf (x5 Knoten) | mit 1,9er-Treppe | **Graft (x3)** |
-|---|---|---|---|---|
-| Neurotrainer II | 0,04 Mrd | 0,23 | | 0,14 |
-| Embedded Netburner Module | 0,25 Mrd | 1,25 | | 0,75 |
-| EsperTech Bladeburner Eyewear | 0,17 Mrd | 0,82 | | 0,49 |
-| **Summe** | **0,46 Mrd** | **2,30 Mrd** | **5,58 Mrd** | **1,38 Mrd** |
+1. **"Beim Kauf wird Reputation abgezogen" - falsch.**
+   `FactionHelpers.tsx:118-119` ruft nur `queueAugmentation` und `loseMoney`.
+   Reputation wird nirgends abgezogen, sie ist eine **Schwelle**. Der Vorteil
+   des Graftens ist, dass es die Huerde **umgeht**, nicht dass es Rep spart.
+2. **"Der Einbau setzt das Geld auf $1.262" - falsch.** `Prestige.ts:85-88`
+   zahlt fuer jede installierte Augmentierung `startingMoney` aus; CashRoot
+   Starter Kit gibt $1 Mio zurueck. Es sind **$1.001.262**.
+3. **"Mit dem Geld waere das Paket 67-mal bezahlt" - richtig gerechnet,
+   irrefuehrend argumentiert.** $28,4 Bio sind bei der gemessenen Nettorate von
+   $4,43 Bio/h **6,4 Stunden Einkommen**. Geld ist in diesem Knoten nicht der
+   Engpass. Das Paket kostet 5,7 Minuten Einkommen.
 
-Gegraftet haetten dieselben drei **$1,38 Mrd** gekostet - ein Viertel des
-Kaufpreises, ohne Reputation, **ohne Reset**. Und der Reset kostete
-zusaetzlich: $28,4 Bio Bargeld, die Kampfwerte (auf 28) und das Netz (85 auf
-47/76).
+**Was ich gar nicht bilanziert hatte:** Der Einbau hat **Favor auf sechs
+Faktionen gehoben** (`Faction.ts:76-79` wandelt Reputation in Favor, nur beim
+Prestige). CyberSec steht jetzt bei 104,25, Aevum 103,98, Sector-12 101,98 -
+mindestens eine Faktion sprang von unter 63,4, also **ueber 25 Prozent
+dauerhafte Reputationsratensteigerung**. Ich hatte den Einbau mit null Ertrag
+gerechnet.
 
-**Zum Vergleich: Das gesamte 38-teilige Graft-Paket kostet $0,42 Bio.** Mit
-dem Geld, das dieser eine Einbau vernichtet hat, haette man es
-**67-mal** bezahlen koennen.
+**Und der Baufehler, der ihn untauglich gemacht haette:** `bn4rep.js:1180-1195`
+**kauft unabhaengig von `gesperrt`**. Eine Einbausperre ohne Kaufsperre laesst
+`queuedAugmentations` monoton wachsen - und mit ihr die 1,9er-Treppe. Bei k=10
+kostet das naechste Stueck das 613-fache. Heute raeumt der Einbau die Treppe
+zurueck (`AugmentationHelpers.ts:103`); die Sperre haette diesen Reset
+entfernt und den Zaehler laufen lassen. **Schlechter als der Ist-Zustand.**
 
-**Der Befund ist nicht "Einbau ist schlecht", sondern:** In BitNode 10, wo
-Grafting offensteht, ist **Kaufen** dem Graften unterlegen - und wer kauft,
-muss einbauen. Drei Gruende, alle aus dem Quellcode:
+Dazu: Ein Riegel an `GRAFTPLAN.md`, dessen Leerwerden nicht garantiert ist,
+kann `bn4rep`s eigenen Ausgangspfad blockieren - `The Red Pill` ist `isSpecial`
+und nicht graftbar. Genau dieser Fehler wurde am 23.08. schon einmal gebaut
+und wieder entfernt (`bn4rep.js:838-849`).
 
-1. Preis: `baseCost x 3` gegen `baseCost x AugmentationMoneyCost(5) x 1,9^k`
-   (`GraftableAugmentation.ts:21` gegen `AugmentationHelpers.ts:157`).
-2. Keine Reputation (`FactionHelpers.tsx:118-120` zieht beim Kauf beides).
-3. Kein Reset - Kampfwerte, Netz und Bargeld bleiben.
+**Was von der These bleibt** - und es ist nicht wenig: Fuer jede **graftbare**
+Augmentierung ist Graften billiger (`baseCost x 3` gegen `x5 x 1,9^k`, geeicht
+auf 96 von 96 Spielwerten), umgeht die Reputationshuerde und spart den Reset.
+Nur ist die richtige Regel nicht "nie einbauen", sondern:
 
-**Vorschlag, noch nicht gebaut:** `src/bn4rep.js` baut in BitNode 10 nicht
-ein, solange `nodes/GRAFTPLAN.md` offene Stuecke hat und der Grafting-Zugang
-steht. Erst das Paket (42 h, $0,42 Bio), dann der Einbau.
+> **Erst das Paket graften, dann Congruity, dann EINMAL einbauen - mit
+> maximaler NeuroFlux-Ladung und maximalem Favor.**
 
-**Ein Skeptiker-Lauf ist angesetzt, bevor das gebaut wird.** Die Gegenseite
-muss jemand suchen: Faktionsarbeit waere ohne Einbau wertlos; manche
-Augmentierungen sind vielleicht nicht graftbar; und die Reihenfolge
-"erst 42 h graften, dann einbauen" verschiebt jeden Reputationsgewinn nach
-hinten.
+Der `NeuroFlux Governor` ist die einzige nicht graftbare Augmentierung, die
+dieser Bot je erreichen kann (`Augmentations.ts:1169` `isSpecial`, Faktionen
+ohne Bladeburners). Zehn Stufen kosten $4,8 Mrd und 1,28 Mio Reputation - ueber
+Spenden rund 18 Minuten Einkommen - und geben **x1,105 auf praktisch alles,
+ohne Entropie**. Das ist die billigste Multiplikatorquelle im Spiel und geht
+nur ueber den Einbau.
+
+**Kein Code geaendert.** Der einzige Eingriff aus diesem Lauf ist die Aufnahme
+von `violet Congruity Implant` in `nodes/GRAFTPLAN.md` (`883826d`).
 
 ### RESET 23:02: Augmentierungs-Einbau - Wiederanlauf vollstaendig, alle Grafts ueberlebt (30.08., 23:05)
 

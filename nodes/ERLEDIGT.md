@@ -23,6 +23,51 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Der Einbau von 23:02 hat $28,4 Bio vernichtet fuer Augmentierungen im Wert von $5,58 Mrd (30.08., 23:12)
+
+**`prestigeAugmentation` setzt das Geld auf 1.262 Dollar**
+(`PlayerObjectGeneralMethods.ts:102`: `this.money = 1000 + CONSTANTS.Donations`).
+Nicht "das Ausgegebene ist weg" - **alles** ist weg.
+
+Die Rechnung fuer die drei Augmentierungen, die der Einbau gebracht hat:
+
+| | Basispreis | Kauf (x5 Knoten) | mit 1,9er-Treppe | **Graft (x3)** |
+|---|---|---|---|---|
+| Neurotrainer II | 0,04 Mrd | 0,23 | | 0,14 |
+| Embedded Netburner Module | 0,25 Mrd | 1,25 | | 0,75 |
+| EsperTech Bladeburner Eyewear | 0,17 Mrd | 0,82 | | 0,49 |
+| **Summe** | **0,46 Mrd** | **2,30 Mrd** | **5,58 Mrd** | **1,38 Mrd** |
+
+Gegraftet haetten dieselben drei **$1,38 Mrd** gekostet - ein Viertel des
+Kaufpreises, ohne Reputation, **ohne Reset**. Und der Reset kostete
+zusaetzlich: $28,4 Bio Bargeld, die Kampfwerte (auf 28) und das Netz (85 auf
+47/76).
+
+**Zum Vergleich: Das gesamte 38-teilige Graft-Paket kostet $0,42 Bio.** Mit
+dem Geld, das dieser eine Einbau vernichtet hat, haette man es
+**67-mal** bezahlen koennen.
+
+**Der Befund ist nicht "Einbau ist schlecht", sondern:** In BitNode 10, wo
+Grafting offensteht, ist **Kaufen** dem Graften unterlegen - und wer kauft,
+muss einbauen. Drei Gruende, alle aus dem Quellcode:
+
+1. Preis: `baseCost x 3` gegen `baseCost x AugmentationMoneyCost(5) x 1,9^k`
+   (`GraftableAugmentation.ts:21` gegen `AugmentationHelpers.ts:157`).
+2. Keine Reputation (`FactionHelpers.tsx:118-120` zieht beim Kauf beides).
+3. Kein Reset - Kampfwerte, Netz und Bargeld bleiben.
+
+**Vorschlag, noch nicht gebaut:** `src/bn4rep.js` baut in BitNode 10 nicht
+ein, solange `nodes/GRAFTPLAN.md` offene Stuecke hat und der Grafting-Zugang
+steht. Erst das Paket (42 h, $0,42 Bio), dann der Einbau.
+
+**Ein Skeptiker-Lauf ist angesetzt, bevor das gebaut wird.** Die Gegenseite
+muss jemand suchen: Faktionsarbeit waere ohne Einbau wertlos; manche
+Augmentierungen sind vielleicht nicht graftbar; und die Reihenfolge
+"erst 42 h graften, dann einbauen" verschiebt jeden Reputationsgewinn nach
+hinten.
+
+---
+
 ### VERLUST $14,63 Mrd: SPTN-97-Graft von bbtrain getoetet - und warum (30.08., 22:06)
 
 **Der Fehler war meiner, nicht der des Codes.** Der Riegel in `bbtrain.js`

@@ -25,6 +25,34 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 18:45 - BitNode 10: Assassination, 21 Stunden, Ausgang bei rund 63 h
+
+**Verfeinerung des Eintrags von 18:20, nicht sein Widerruf.** Zwei Zahlen sind
+dazugekommen: das maximale Graft-Paket beim heutigen Geldstand und die
+berichtigte Ausdauerregeneration (R = 1,774 statt 2,300, Commit `929f177` -
+die Kammer gibt 1 % maxStamina je Abschluss obendrauf, das gehoerte
+herausgerechnet).
+
+> **Leitgroesse: `max(Aktionszeit / Arbeitsanteil, Nachschubzeit)` bis
+> Rang 400.000.** Der Arbeitsanteil ist `min(1, R / Ausdauerverbrauch)`; er
+> fehlte bis 18:20 in der Rechnung.
+
+| Aktion | Erfolge | Aktionszeit | Arbeitsanteil | **Realzeit** | Nachschub |
+|---|---|---|---|---|---|
+| **Assassination** | 533 | 21,1 h | **1,000** | **21,1 h** | 7,0 h |
+| Stealth Retirement | 901 | 21,2 h | 1,000 | 21,2 h | 23,2 h |
+| Undercover | 1.953 | 22,2 h | 0,657 | 33,9 h | 63,4 h |
+| Raid | Abbruch nach 349 Synthoid-Gemeinden bei 83.236 Rang | | | | |
+
+Assassination ist die einzige Aktion, die beides erfuellt: ausdauerneutral
+(1,41 Verbrauch gegen 1,774 Regeneration) und genug Nachschub. **21,1 Stunden.**
+
+**Ausgang aus dem Knoten: rund 63 Stunden** - 42 h Graften, dann 21 h
+Assassination. Herleitung und die drei Codeaenderungen, die vorher noetig
+sind, im obersten Sofort-Punkt von `nodes/BAUSTELLEN.md`.
+
+---
+
 ## 30.08., 18:20 - BitNode 10: die Leitgroesse ist der NACHSCHUB, nicht die Rate
 
 **Dritter Korrektureintrag heute, und diesmal mit einer durchgerechneten

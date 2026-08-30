@@ -118,78 +118,54 @@ Regeln:
 
 ## Sofort
 
-### Der Weg zu Rang 400.000 ist durchgerechnet: 27 h mit Grafting, 246-526 h ohne (30.08., 18:20)
+### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
 
-**Korrigiert und ersetzt den Eintrag von 17:20.** Der sagte "Raid ist der
-Hebel". Raid ist es nicht - es ist hart gedeckelt.
+**Verfeinert und ersetzt den Eintrag von 18:20.** Zwei Korrekturen sind
+eingeflossen: das maximale Graft-Paket beim heutigen Geldstand und die
+berichtigte Ausdauerregeneration (R = 1,774 statt 2,300, Commit `929f177`).
 
-**Der Deckel, den bisher niemand gesehen hat: Synthoid-Gemeinden.** Jeder
-erfolgreiche Raid ruft `--city.comms` (`Bladeburner.ts:830-836`), und
-`getAvailability` verlangt `comms >= 1`. Aus dem Spielstand um 18:10:
+**Der offene Punkt "das Paket ist fuer die falsche Aktion optimiert" ist
+erledigt - er war unbegruendet.** Ich habe das Paket zweimal greedy gebaut,
+einmal nach den Gewichten von Operation Daedalus (str/def/dex/agi je 0,2) und
+einmal nach denen von Assassination (dex/agi je 0,3, str/def je 0,1). **Beide
+Laeufe waehlen dieselben 38 Augmentierungen.** Es gibt schlicht keine
+Alternative: Alle bezahlbaren Kampf-Augmentierungen werden ohnehin genommen,
+die Zielfunktion hat nichts zu entscheiden.
 
-| Stadt | comms | pop | Chaos |
-|---|---|---|---|
-| Aevum | 127 | 2,71e9 | 46,7 |
-| New Tokyo | 80 | 1,03e9 | 36,9 |
-| Chongqing | 40 | 2,38e9 | 31,3 |
-| Ishima | 40 | 1,05e9 | 56,7 |
-| Volhaven | 37 | 8,47e8 | 18,0 |
-| Sector-12 | 25 | 1,39e9 | 24,8 |
-| **gesamt** | **349** | | |
+Skills nach dem Paket (Geldstand 18:41, $7,92 Bio Kosten, 42,0 h Graft-Zeit,
+38 Entropiestapel): **str 62.824, def 17.402, dex 1.374, agi 3.451.**
+Assassination-Chance damit: 100 % bis Level 24, bei Level 32 noch **59,6 %**.
 
-Nachwachsen tun sie fast nicht: 5 % der Zufallsereignisse geben `+1 comms`
-(`Bladeburner.ts:613-620`), ein Ereignis alle 240-600 s, Stadt gleichverteilt
-aus sechs - **rund 0,007 comms je Stunde**. 349 Raids liefern 83.237 Rang,
-also **21 % des Wegs**, und dann ist Schluss. Raid senkt zusaetzlich bei jedem
-Erfolg die Bevoelkerung um 1 %, und die geht ueber `(pop/1e9)^0,7` direkt in
-die Erfolgschance.
+**Die Wegrechnung, mit Arbeitsanteil und Nachschub:**
 
-**Assassination und Stealth Retirement verbrauchen KEINE Gemeinde** - nur
-`changePopulationByCount(-1)` bzw. `-0,5 %` (`Bladeburner.ts:848,857`).
+| Aktion | Erfolge | Versuche | Aktionszeit | Arbeitsanteil | **Realzeit** | Nachschub | min-Chance |
+|---|---|---|---|---|---|---|---|
+| **Assassination** | 533 | 616 | 21,1 h | **1,000** | **21,1 h** | 7,0 h | 60 % |
+| Stealth Retirement | 901 | 932 | 21,2 h | 1,000 | 21,2 h | **23,2 h** | 77 % |
+| Undercover | 1.953 | 1.953 | 22,2 h | 0,657 | **33,9 h** | 63,4 h | 100 % |
+| Raid | - | - | Abbruch nach 349 Gemeinden bei 83.236 Rang | | | | |
 
-**Die Rechnung, mit levelabhaengiger Chance, Vorrat und Nachschub** (Modell an
-der Messung von 17:58 geeicht, Aevum, Chaos 46,68):
+**Assassination ist der Weg: 21,1 Stunden.** Es ist die einzige Aktion, die
+sowohl ausdauerneutral laeuft (1,41 Verbrauch gegen 1,774 Regeneration) als
+auch genug Nachschub hat (7,0 h gegen 21,1 h Aktionszeit).
 
-| Aktion | Erfolge | Versuche | Aktionszeit | Nachschub braucht | min-Chance | Endlevel |
-|---|---|---|---|---|---|---|
-| Raid | - | - | Abbruch bei 349 | - | 100 % | 26 |
-| **Assassination** | 534 | 792 | **27,0 h** | 18,9 h | 41,8 % | 32 |
-| Stealth Retirement | 902 | 1.087 | 24,8 h | **33,9 h** | 54,0 % | 42 |
-| Undercover | 1.822 | 1.839 | 20,9 h | **60,5 h** | 86,1 % | 60 |
+**Damit steht die Gesamtzeit bis zum Knotenausgang: rund 63 Stunden** - 42 h
+Graften, dann 21 h Assassination.
 
-**Die massgebliche Zahl ist `max(Aktionszeit, Nachschub)`** - der Vorrat
-kommt mit 18,75 Stueck je Stunde und Art nach. Damit ist **Assassination mit
-27 h der schnellste Einzelweg**, Undercover trotz kuerzerer Aktionszeit erst
-bei 60 h.
+**Was bleibt zu tun, in dieser Reihenfolge:**
 
-**Ohne Grafting:** Assassination 526 h, Stealth Retirement 409 h, Undercover
-246 h. **Grafting bringt also Faktor 10 bis 20** - nicht auf die
-Black-Op-Chance, sondern auf den Weg selbst.
+1. Die drei Codeaenderungen aus dem gesperrten Graft-Punkt (`blade.js`,
+   `bbtrain.js`, `tools/wache.js`). Ohne sie kein Graft.
+2. `Neuroreceptor Management Implant` und `The Blade's Simulacrum` graften,
+   dann die 38 Augmentierungen.
+3. `blade.js` muss danach Assassination fahren duerfen. Heute ist es durch die
+   Sicherheitsschwelle gesperrt (min-Chance 0,126). Nach dem Graften liegt sie
+   bei 1,000 und faellt erst ab Level 25 - der bestehende Mechanismus sollte
+   also von selbst greifen. **Das ist zu pruefen, nicht anzunehmen.**
 
-**Zusammen mit den rund 42 h Graft-Zeit ergibt das etwa 70 Stunden** bis zum
-Knotenausgang. Das deckt sich mit der Groessenordnung, die am 30.08. um 15:00
-abgenommen wurde.
-
-**Neuer Befund zum Graft-Paket selbst - es ist fuer die falsche Aktion
-optimiert.** Das Paket in `nodes/GRAFTING.md` wurde nach den Gewichten von
-Operation Daedalus zusammengestellt (str/def/dex/agi je 0,2) und liefert
-str x214,6 und def x184, aber dex nur x10,4 und agi x33,2. **Assassination
-gewichtet dex und agi mit je 0,3, str und def nur mit je 0,1**
-(`data/Operations.ts`). Folge, gerechnet:
-
-- Raid traegt mit dem Paket bis **Level 45** (95 %-Grenze) - gebraucht wird 26.
-- Assassination traegt nur bis **Level 18** - gebraucht wird 32, dort sind es
-  noch **44 %**.
-
-Eine Gegenprobe mit dex/agi 12.000 statt str 22.300 ergibt bei Level 31
-**58,3 % statt 44,3 %**. **Das Paket gehoert neu zusammengestellt, mit den
-Gewichten der Aktion, die den Rang tragen soll - nicht mit denen von
-Daedalus.** Das ist der naechste Rechenschritt, vor jedem Bauen.
-
-**Offen bleibt:** Mehrere Operationsarten parallel fahren. Jede hat ihren
-eigenen Nachschub von 18,75/h; wer drei Arten mischt, hebt die
-Nachschubgrenze auf das Dreifache. Das ist noch nicht gerechnet und koennte
-die 27 h deutlich druecken.
+**Offen:** Mehrere Operationsarten mischen. Assassination allein braucht
+7,0 h Nachschub bei 21,1 h Aktionszeit - der Vorrat ist also nicht der
+Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ### TEILWEISE UEBERHOLT - Die Rangrechnung: ohne Operationen ist Rang 400.000 unerreichbar (30.08., 17:15)
 

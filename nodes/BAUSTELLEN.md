@@ -122,6 +122,65 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Sleeve stand still, weil die Vorratsschwelle keinen Abschluss ueberlebt (30.08., 10:00)
+
+Eric hat es zweimal im Spiel gesehen (09:53 und 09:56) - beide Male meldete
+`data/sleeve.json` brav `gesetzt: true, contract:Retirement`, waehrend
+`ns.sleeve.getTask(0)` **null** zurueckgab.
+
+Gemessen (`data/sleevediag.json`, 09:53:59):
+
+    task    null
+    skills  str 45  def 45  dex 57  agi 48     (ueber KONTRAKT_MIN_KAMPF 40)
+    shock   98,7
+    vorrat  Tracking 3,41   Bounty Hunter 5,69   Retirement 1,93
+
+Ursache: **Zwei Fehler, die sich gegenseitig verdeckt haben.**
+
+  1. **Die Schwelle war 1, nicht 2.** `sleeve.js` liess Retirement mit 1,93
+     durch. Der Sleeve schloss einen Kontrakt ab, der Stand fiel auf 0,93,
+     und `SleeveBladeburnerWork.process` stoppte ihn im selben Takt
+     (`if (action.count < 1) return sleeve.stopWork()`, Zeile 44-47). Jedes
+     Setzen war also sofort tot - und `setToBladeburnerAction` gab trotzdem
+     `true` zurueck (`Sleeve.ts`, `bladeburner()` ruft `startWork`
+     bedingungslos), weshalb die Rueckfallkette nie griff.
+
+     Verschaerfend: Die Sortierung nach Vorrat waehlte zwar die ergiebigste
+     Art, aber `sleeve.json` zeigte Retirement - die knappste. Der Grund ist
+     derselbe: Bei einer Schwelle von 1 kam auch die knappste durch.
+
+  2. **In der Wiederaufbauphase fuellt niemand den Vorrat nach.** Der Spieler
+     faehrt Gym (`blade.json`: `grund: "weicht bbtrain, Kampfwerte 1, nichts
+     ueber Schwelle"`) und damit kein Incite Violence. Der Sleeve frisst den
+     Restvorrat auf und steht danach - zehn Stunden lang, bis der
+     Wiederaufbau durch ist.
+
+Eingebaut: **`src/sleeve.js`, zwei Aenderungen.**
+
+  1. `if (vorrat < 2) continue;` statt `< 1` - die Schwelle muss einen
+     Abschluss ueberleben.
+  2. Neuer Rueckfall vor dem Gym: `Infiltrate Synthoids`. Es legt
+     `Math.pow(infilSleeves, -0.5) / 2` auf **jede** Kontraktart und **jede**
+     Operation (`Bladeburner.ts`, `infiltrateSynthoidCommunities`), bei einem
+     Sleeve also 0,5 je 60 Sekunden. Nach zwei Minuten ist jede Art wieder
+     ueber der Schwelle, dann greift oben der Kontraktzweig - selbstbegrenzend.
+     Besser als das Gym, weil der Sleeve mit 45/45/57/48 laengst ueber
+     `KONTRAKT_MIN_KAMPF` liegt und Training den Vorrat nicht fuellt.
+
+**Verifiziert 09:56:48.** Nach dem Neustart:
+
+    task    {"actionName": "Bounty Hunter", "tasksCompleted": 3,
+             "cyclesWorked": 15, "cyclesNeeded": 175}
+    vorrat  Tracking 4,63   Bounty Hunter 4,02   Retirement 1,75
+
+Der Sleeve arbeitet, hat drei Kontrakte abgeschlossen - und Retirement mit
+1,75 wird jetzt korrekt uebersprungen. Genau der Fall, der ihn vorher toetete.
+
+Offen: Der **Infiltrate-Rueckfall ist noch ungetestet** - er greift erst, wenn
+alle drei Arten unter 2 fallen. Beim naechsten Lauf in `data/sleeve.json`
+nachsehen, ob `aufgabe: "infiltrate"` je auftaucht, und ob der Vorrat danach
+wieder steigt.
+
 ### Bladeburner-Augmentierungen sind ungenutzt und werden mit 0,00 bewertet (30.08., 09:40)
 
 Gemessen: Nach dem Einbau von 09:2x stehen **alle vier Bladeburner-

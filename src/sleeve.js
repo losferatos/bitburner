@@ -238,11 +238,41 @@ export async function main(ns) {
             let vorrat = 1;
             try { vorrat = ns.bladeburner.getActionCountRemaining("Contracts", art); }
             catch { /* alte Fassung: dann wie bisher blind setzen */ }
-            if (vorrat < 1) continue;
+            // SCHWELLE 2, NICHT 1 (30.08.2026, 10:00). Bei 1,93 offenen
+            // Auftraegen liess die alte Pruefung durch - der Sleeve schloss
+            // einen ab, der Stand fiel auf 0,93, und `process` stoppte ihn
+            // im selben Takt (`SleeveBladeburnerWork.ts:44-47`). Genau so
+            // stand er um 09:53 auf Idle, waehrend `sleeve.json` brav
+            // `contract:Retirement` meldete. Die Schwelle muss einen
+            // Abschluss ueberleben, sonst ist jedes Setzen sofort tot.
+            if (vorrat < 2) continue;
             ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts", art);
             if (ok) was = "contract:" + art;
           } catch { ok = false; }
         }
+
+        // KEIN KONTRAKT DA? NACHFUELLEN STATT STILLSTEHEN (30.08., 10:00).
+        //
+        // In der Wiederaufbauphase nach einem Einbau faehrt der Spieler Gym
+        // (`blade.js` weicht bbtrain aus, `grund: "weicht bbtrain,
+        // Kampfwerte 1"`) und damit auch kein Incite Violence. **Niemand
+        // fuellt den Vorrat nach**, waehrend der Sleeve ihn aufbraucht -
+        // danach steht er die ganzen zehn Stunden still.
+        //
+        // `Infiltrate Synthoids` ist der Ausweg: Es legt
+        // `Math.pow(infilSleeves, -0.5) / 2` auf JEDE Kontraktart und JEDE
+        // Operation (`Bladeburner.ts`, `infiltrateSynthoidCommunities`), bei
+        // einem Sleeve also 0,5 je 60 Sekunden - nach zwei Minuten ist jede
+        // Art wieder ueber der Schwelle. Selbstbegrenzend: Sobald Vorrat da
+        // ist, greift oben wieder der Kontraktzweig.
+        //
+        // Besser als der Gym-Rueckfall darunter, weil der Sleeve mit
+        // 45/45/57/48 laengst ueber `KONTRAKT_MIN_KAMPF` liegt - Training
+        // braucht er nicht, und der Vorrat fuellt sich davon auch nicht.
+        if (!ok) try {
+          ok = ns.sleeve.setToBladeburnerAction(i, "Infiltrate Synthoids");
+          if (ok) was = "infiltrate";
+        } catch { ok = false; }
       }
       // WESSEN TIEFSTAND? DAS HAENGT AM BEITRITT (29.08.2026, 17:50).
       //

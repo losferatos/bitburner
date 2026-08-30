@@ -56,8 +56,19 @@ stabil - kein exponentielles Wachstum, wie es der Eintrag von 14:45 annahm.
   von `nodes/BAUSTELLEN.md`. Vorlauf 18:45: 63 h, unveraendert.
 
 **Leitgroesse:** `max(Aktionszeit / Arbeitsanteil, Nachschubzeit)` bis Rang
-400.000, mit Arbeitsanteil `min(1, R / Ausdauerverbrauch)` und R = 1,774 je
-Minute. Fuer Assassination sind das 21,1 h; jede Aenderung wird daran gemessen.
+400.000, mit Arbeitsanteil `min(1, (R + Z) / (V + Z))` - R = **1,360** je
+Minute, Z = Kammerzulage (maxStamina x 1 % je Abschluss), V der Verbrauch der
+Aktion. Fuer Assassination sind das **21,8 h**; jede Aenderung wird daran
+gemessen.
+
+*Korrigiert 19:50 (Commit `712442c`, nach einem Skeptiker-Lauf).* Hier stand
+`min(1, R / V)` mit R = 1,774. Beides war falsch: Die 1,774 stammten aus einer
+Vorgabe vom 26.08. aus einem anderen Lauf, und die Kammerzulage gehoert nicht
+weggerechnet, sondern auf die Ruhe-Seite. `calculateStaminaGainPerSecond`
+(`Bladeburner.ts:1317-1325`) ergibt 1,349-1,366, die Messung ueber 11
+Kammerphasen 1,360. **Assassination ist damit nicht ausdauerneutral** (1,42
+gegen 1,360), Anteil 0,969. Stealth Retirement faellt von 21,2 auf 25,9 h -
+die Wahl kippt nicht, sie wird robuster.
 
 **Entscheidung: Zwischenschritt - das Graft-Paket.** Der Faktor zwischen 6.575
 und 63 Stunden ist zu gross, um ihn zu diskutieren. Die drei Codeaenderungen,

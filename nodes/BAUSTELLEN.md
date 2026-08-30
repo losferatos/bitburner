@@ -164,9 +164,28 @@ unbeaufsichtigt, also jedes mit Skeptiker vor dem Commit):
 gehoeren als **Paar** geplant: das 99er-Fenster dazwischen ist der
 gefaehrlichste Moment des ganzen Laufs.
 
-Die Rechnung selbst haelt - Preise, Zeiten, Entropie, Skill-Formel und die
-Simulacrum-Mechanik wurden unabhaengig nachgerechnet und bestaetigt. Gekippt
-ist nicht die Rechnung, sondern ihre **betriebliche Folge**.
+Ein zweiter Skeptiker hat zusaetzlich **sechs Zahlen der Rechnung** widerlegt,
+alle in `nodes/GRAFTING.md` korrigiert. Die drei, die die Bewertung aendern:
+
+- **`bladeburner_success_chance` faellt netto auf x0,822** - es stand als
+  Bruttowert x1,771 unter der Ueberschrift "nach Abzug der Entropie".
+  `max_stamina` netto 0,487, `stamina_gain` 0,507, **`analysis` 0,587** - das
+  letzte verschlechtert die Schaetzung, aus der der Bot entscheidet.
+- **Das Paket kostet $0,87 Bio (15 %), nicht $0,42 Bio (8 %)**, und hat 39-40
+  Entropiestapel statt 38: Simulacrum und NMI waren nicht mitgerechnet.
+- **`violet Congruity Implant` IST graftbar** - $150 Bio, 14 min, steht in der
+  Liste des laufenden Spiels. Sie loescht die Entropie und kostet selbst keine
+  (`GraftingWork.tsx:51` vor `:60`). Damit: competence **x106,7 statt x26,8**,
+  Daedalus **8,7 % statt 2,1 %**. $150 Bio sind rund 33 Stunden Einnahmen.
+  **Diese Abwaegung ist die naechste zu rechnende Frage**, nicht der Bau.
+
+Und: **Entropie ueberlebt einen Augmentierungs-Einbau** (`Prestige.ts:127-128`),
+zurueckgesetzt wird sie nur beim BitNode-Wechsel. Die -54,5 % begleiten also
+auch die spaeter geplante Augmentierungsrunde.
+
+Das Chancenmodell selbst wurde unabhaengig nachgebaut und gegen fuenf im Spiel
+gemessene Black-Op-Chancen geeicht (Abweichung unter 0,1 %). Die Rechnung ist
+im Kern solide; falsch waren einzelne Zahlen und die betriebliche Folge.
 
 ---
 

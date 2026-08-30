@@ -118,6 +118,46 @@ Regeln:
 
 ## Sofort
 
+### VERLUST $14,63 Mrd: SPTN-97-Graft von bbtrain getoetet - und warum (30.08., 22:06)
+
+**Der Fehler war meiner, nicht der des Codes.** Der Riegel in `bbtrain.js`
+(`1062631`, 21:11) war richtig gebaut - aber **nie neu gestartet**. Im Commit
+steht woertlich "bbtrain.js laeuft derzeit nicht, weil der Tiefstand bei 102
+ueber ZIEL liegt". Das war falsch: Das Skript lief die ganze Zeit, es parkte
+nur in seiner Warteschleife (`bbtrain.js:112-122`). Als der zweite
+Entropiestapel den Tiefstand auf 99 druckte, wachte es auf - **mit der alten
+Fassung** - und rief `gymWorkout`.
+
+Ablauf, aus der Telemetrie:
+
+    22:03:29  graft.js: SPTN-97 gestartet, $14.625.000.000, 99,4 min
+    22:03:23  blade.json: "General/keine", "weicht bbtrain, Kampfwerte 99"
+    22:04:27  bblage.json: Arbeit CLASS / def / Powerhouse Gym
+    22:05:37  graft.js Pruefmodus: verfuegbar 96 - unveraendert
+
+`verfuegbar` haette auf 95 fallen muessen. SPTN-97 ist nicht installiert, das
+Geld ist weg (`GraftingWork.tsx:75-83`, keine Erstattung).
+
+**Die Lehre, und sie ist allgemein:** Eine Codeaenderung an einem Skript im
+Spiel wirkt erst nach einem Neustart ueber `data/reload.txt` - **auch dann,
+wenn das Skript gerade nichts zu tun scheint.** Ein Skript in einer
+Warteschleife laeuft; es haelt seine alte Fassung im Speicher und handelt
+danach, sobald seine Bedingung eintritt. "Es tut gerade nichts" ist kein
+Ersatz fuer "es laeuft nicht".
+
+**Sofort behoben:**
+
+- `bbtrain.js` um 22:05 ueber `data/reload.txt` neu gestartet - der Riegel
+  ist jetzt wirklich aktiv.
+- `blade.js` weicht nicht mehr, solange ein Graft laeuft (Commit oben). Der
+  Stillstand von 22:03 waere sonst bei jedem Graft wiedergekommen.
+
+**Vor dem naechsten Versuch:** Warten, bis der Tiefstand wieder bei 100 steht
+(das Gym hebt ihn mit Faktor 10, also wenige Minuten), damit `bbtrain` von
+selbst parkt. Erst dann SPTN-97 erneut graften. Kosten des Fehlers: $14,63
+Mrd von $25,8 Bio, also 0,06 Prozent - aber die Lehre ist mehr wert als der
+Betrag.
+
 ### LAEUFT: The Blade's Simulacrum ($450 Mrd), fertig gegen 21:57 (30.08., 21:43)
 
 Alle drei Riegel stehen und sind einzeln verifiziert:

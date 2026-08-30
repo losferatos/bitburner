@@ -118,45 +118,34 @@ Regeln:
 
 ## Sofort
 
-### VERLUST $14,63 Mrd: SPTN-97-Graft von bbtrain getoetet - und warum (30.08., 22:06)
+### Die Graft-Kette laeuft: Rang und Graft gleichzeitig - verifiziert (30.08., 22:14)
 
-**Der Fehler war meiner, nicht der des Codes.** Der Riegel in `bbtrain.js`
-(`1062631`, 21:11) war richtig gebaut - aber **nie neu gestartet**. Im Commit
-steht woertlich "bbtrain.js laeuft derzeit nicht, weil der Tiefstand bei 102
-ueber ZIEL liegt". Das war falsch: Das Skript lief die ganze Zeit, es parkte
-nur in seiner Warteschleife (`bbtrain.js:112-122`). Als der zweite
-Entropiestapel den Tiefstand auf 99 druckte, wachte es auf - **mit der alten
-Fassung** - und rief `gymWorkout`.
+**Nach dem Verlust von 22:06 wurde mit dem billigsten Stueck nachgetestet,
+nicht mit dem teuersten.** `Combat Rib I` kostet $71,25 Mio - 205-mal weniger
+als SPTN-97. Gestartet 22:11, Dauer 46,2 min.
 
-Ablauf, aus der Telemetrie:
+**Gemessen 22:13, drei Minuten nach dem Start:**
 
-    22:03:29  graft.js: SPTN-97 gestartet, $14.625.000.000, 99,4 min
-    22:03:23  blade.json: "General/keine", "weicht bbtrain, Kampfwerte 99"
-    22:04:27  bblage.json: Arbeit CLASS / def / Powerhouse Gym
-    22:05:37  graft.js Pruefmodus: verfuegbar 96 - unveraendert
+    tools/lage.js     Arbeit: GRAFTING   Fokus: JA   Stadt New Tokyo
+    data/blade.json   Aktion Contracts/Tracking, Rang 1087 (22:12:59)
 
-`verfuegbar` haette auf 95 fallen muessen. SPTN-97 ist nicht installiert, das
-Geld ist weg (`GraftingWork.tsx:75-83`, keine Erstattung).
+**Beides gleichzeitig.** Damit ist die ganze Kette belegt:
 
-**Die Lehre, und sie ist allgemein:** Eine Codeaenderung an einem Skript im
-Spiel wirkt erst nach einem Neustart ueber `data/reload.txt` - **auch dann,
-wenn das Skript gerade nichts zu tun scheint.** Ein Skript in einer
-Warteschleife laeuft; es haelt seine alte Fassung im Speicher und handelt
-danach, sobald seine Bedingung eintritt. "Es tut gerade nichts" ist kein
-Ersatz fuer "es laeuft nicht".
+1. **Das Simulacrum wirkt** - die Bladeburner-Aktion laeuft neben dem Graft
+   (`Bladeburner.ts:1354`). Ab jetzt kostet Graften keinen Rang mehr.
+2. **`bbtrain.js` unterbricht nicht mehr.** Es ist seit 22:05 in der neuen
+   Fassung (`1062631`) und hat das Graft in drei Minuten nicht angefasst -
+   die alte Fassung hatte um 22:04 nach knapp einer Minute zugeschlagen.
+3. **`blade.js` weicht nicht mehr** (`0cc22a2`). Es fuhr um 22:03 noch
+   "General/keine, weicht bbtrain"; jetzt faehrt es Vertraege.
 
-**Sofort behoben:**
+**Die Lehre aus dem Verlust steht:** Erst mit dem billigsten Stueck testen,
+dann mit dem teuren. $71 Mio als Pruefgebuehr statt $14,63 Mrd.
 
-- `bbtrain.js` um 22:05 ueber `data/reload.txt` neu gestartet - der Riegel
-  ist jetzt wirklich aktiv.
-- `blade.js` weicht nicht mehr, solange ein Graft laeuft (Commit oben). Der
-  Stillstand von 22:03 waere sonst bei jedem Graft wiedergekommen.
-
-**Vor dem naechsten Versuch:** Warten, bis der Tiefstand wieder bei 100 steht
-(das Gym hebt ihn mit Faktor 10, also wenige Minuten), damit `bbtrain` von
-selbst parkt. Erst dann SPTN-97 erneut graften. Kosten des Fehlers: $14,63
-Mrd von $25,8 Bio, also 0,06 Prozent - aber die Lehre ist mehr wert als der
-Betrag.
+**Naechster Schritt, sobald Combat Rib I durch ist (gegen 22:57):**
+`SPTN-97 Gene Modification`, $14,63 Mrd, 99,4 min - der groesste Einzelposten
+des Pakets (Kampf x9,38). Vorher `node tools/task.js graft.js` im Pruefmodus,
+`verfuegbar` muss von 96 auf 95 gefallen sein.
 
 ### LAEUFT: The Blade's Simulacrum ($450 Mrd), fertig gegen 21:57 (30.08., 21:43)
 

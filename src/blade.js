@@ -3184,9 +3184,50 @@ export async function main(ns) {
       // leerlaufen lassen.
       //
       // Black Ops duerfen weiterhin unterbrechen - sie tragen den Ausgang.
-      const festhalten = !gleich && wahl.typ !== B && abschnitt
-        && laeuft && laeuft.type === G && laeuft.name === "Incite Violence"
-        && Date.now() - abschnitt.von < 62000;
+      // KORREKTUR (30.08.2026, 12:52, nach einem Skeptiker-Lauf). Die erste
+      // Fassung mass `Date.now() - abschnitt.von < 62000` - ECHTZEIT gegen
+      // eine Aktion, die in SPIELZEIT laeuft. Das geht in beide Richtungen
+      // schief:
+      //
+      //   Gedrosselter Tab: `Bladeburner.process` verarbeitet hoechstens 5
+      //   Spielsekunden je Engine-Tick (`Bladeburner.ts:1376-1377`), bei
+      //   einem Wake je Minute also 12x zu langsam. Der Riegel haelt zwei
+      //   Durchlaeufe statt zwoelf - wirkungslos, ohne dass es auffaellt.
+      //
+      //   Nachholen nach Offline-Zeit: `engine.tsx:333` legt
+      //   `numCyclesOffline` in `storedCycles`, abgebaut mit 25x. In 62
+      //   Echtsekunden laufen dann bis zu 1550 Spielsekunden, also bis zu
+      //   **25 Incite-Abschluesse**. Jeder hebt das Chaos in ALLEN sechs
+      //   Staedten um `10 + chaos/log10(chaos)` (`Bladeburner.ts:1230-1233`).
+      //   Ab der Torgrenze gerechnet: 25 -> 57,7 -> 104,7 -> ... -> 1029
+      //   nach acht Abschluessen. `getChaosSuccessFactor` multipliziert die
+      //   Schwierigkeit dann mit `sqrt(1+1029-50) = 31,3`
+      //   (`Actions/Action.ts:94-101`), passiver Abbau 0,36 je Stunde. Das
+      //   ist kein Effizienzverlust, das killt den Knoten.
+      //
+      // Der Fall ist real: Das Spiel war in der Nacht zum 30.08. zwischen
+      // 01:30 und 06:12 offline (`data/aufsicht.log`, `data/wache.log`).
+      //
+      // `getActionCurrentTime()` liefert Spielzeit
+      // (`NetscriptFunctions/Bladeburner.ts:131-137`), immun gegen
+      // Drosselung UND Nachholen. Dazu der Chaos-Riegel: Waehrend des
+      // Haltens wird `waehle()` verworfen und damit auch die
+      // Aufraeum-Entscheidung bei `CHAOS_EIN` - die muss hier separat
+      // durchkommen. Und `abschnitt.aktion` wird jetzt mitgeprueft: Wird
+      // `startAction` abgelehnt (`sag("startAction abgelehnt")` weiter
+      // unten), bleibt `abschnitt` auf der vorherigen Aktion stehen und der
+      // Zeitstempel gehoert zu etwas anderem als dem, was laeuft.
+      let festhalten = false;
+      if (!gleich && wahl.typ !== B && abschnitt
+          && abschnitt.aktion === G + "/Incite Violence"
+          && laeuft && laeuft.type === G && laeuft.name === "Incite Violence") {
+        try {
+          const jetzt = ns.bladeburner.getActionCurrentTime();
+          const voll = ns.bladeburner.getActionTime(G, "Incite Violence") * 1000;
+          const chaosNun = ns.bladeburner.getCityChaos(ns.bladeburner.getCity());
+          festhalten = jetzt < voll && chaosNun < CHAOS_EIN;
+        } catch { festhalten = false; }   // alte Fassung: dann eben abbrechen
+      }
       if (!gleich && !festhalten) {
         // Truppeinsatz NUR bei Black Ops (29.08.2026, 18:50). Der Bonus ist
         // `(teamCount+1)^0,05` (`Actions/Operation.ts:96-98`) und wirkt ueber

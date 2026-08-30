@@ -2925,22 +2925,47 @@ export async function main(ns) {
       // Den Motor abzuschalten hilft nicht: `src/bn4net.js:253` startet
       // ihn jede Motorrunde nach. Der Riegel muss hier drin sitzen.
       //
-      // WORAN ER ERKENNT, OB DAS SIMULACRUM DA IST - ohne einen weiteren
-      // Singularity-Aufruf zu bezahlen: am Verhalten. Fehlt es, hat die
-      // Engine die Bladeburner-Aktion beim Graftstart selbst
-      // zurueckgesetzt (`Bladeburner.ts:1354-1365`), `getCurrentAction()`
-      // liefert dann null. Ist es da, laeuft die Aktion weiter - und dann
-      // DARF der Motor nicht stillhalten, sonst endet die laufende Aktion
-      // und es folgt keine. Genau diese zweite Haelfte ist der Grund,
-      // warum hier nicht pauschal auf "Graft laeuft" geriegelt wird.
+      // WORAN ER ERKENNT, OB DAS SIMULACRUM DA IST - an einer Datei, nicht
+      // am Verhalten (KORREKTUR 30.08.2026, 19:30, nach einem Skeptiker).
+      //
+      // Die erste Fassung prueste `!ns.bladeburner.getCurrentAction()` und
+      // las das als "Simulacrum fehlt". Das ist ein SELBSTHALTENDER
+      // Schalter: Greift der Riegel einmal, startet der Motor keine Aktion
+      // mehr, also bleibt `getCurrentAction()` null, also greift der Riegel
+      // weiter. Mit installiertem Simulacrum - dem Zustand, auf den die
+      // ganze Aenderung zielt - reicht dafuer ein einziger Reset, und den
+      // gibt es garantiert: nach jeder fertigen Black Op
+      // (`Bladeburner.ts:1081` mit `1310-1312`), bei leerem Vorrat
+      // (`:1299`), bei Ausdauer 0 (`:1370-1372`) und bei jedem Neustart
+      // durch `bn4net.js:253`. Der Motor haette dann bis zum Ende des
+      // Grafts stillgestanden - beim Simulacrum 17,6 Minuten, bei einer
+      // Augmentierung mit Multiplikatorsumme 4 rund 88.
+      //
+      // Deshalb jetzt ein Marker: `data/simulacrum.txt` wird vom
+      // Graftwerkzeug angelegt, sobald `The Blade's Simulacrum`
+      // INSTALLIERT ist. Fehlt die Datei, riegelt der Motor bei jedem Graft
+      // - lieber ein stillstehender Motor als $450 Mrd, die nicht
+      // erstattet werden. Ist sie da, riegelt er nie, weil die
+      // Bladeburner-Aktion dann ohnehin weiterlaeuft.
+      //
+      // `ns.fileExists` kostet 0,1 GB; `getOwnedAugmentations` waere mit
+      // 5 GB x 16 (SF4 Stufe 1) = 80 GB die teure Antwort auf dieselbe
+      // Frage.
       let graftRiegel = false;
       try {
         const arbeit = ns.singularity.getCurrentWork();
         if (arbeit && arbeit.type === "GRAFTING") {
-          graftRiegel = !ns.bladeburner.getCurrentAction();
+          graftRiegel = !ns.fileExists("data/simulacrum.txt", "home");
         }
       } catch { graftRiegel = false; }
       if (graftRiegel) {
+        // Den offenen Abschnitt schliessen, BEVOR die Runde ausfaellt.
+        // Sonst laeuft er durch den ganzen Graft und wird spaeter als ein
+        // Abschnitt mit der falschen Aktion und ~0 Rang verbucht -
+        // `tools/ratencheck.js:110-133` mittelt ihn in die gemessene Rate
+        // ein, und genau diese Messung traegt die Strategieentscheidungen.
+        try { schliesseAbschnitt(ns.bladeburner.getRank()); } catch { /* egal */ }
+        abschnitt = null;
         meldeLage("Grafting", "Graft laeuft ohne Simulacrum - Motor haelt still", null);
         await ns.bladeburner.nextUpdate();
         continue;

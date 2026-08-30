@@ -149,6 +149,29 @@ Zu tun:   Den Riegel von 25 auf 19 senken. Das ist eine Zahl, exakt
           Danach messen, ob Incite ueberhaupt noch ausgeloest wird - falls
           nein, ist der Vorratsnachschub neu zu betrachten.
 
+**Nachgemessen 14:42 - die Dringlichkeit faellt, und meine Tendenzaussage
+war voreilig.**
+
+    14:25   41,3
+    14:40   47,16
+    14:42   47,15   <- stabil, nicht steigend
+
+**Der Bot ist nicht die Ursache.** `data/aktionen.txt` fuehrt im gesamten
+aktuellen Protokoll **null** Incite-Violence-Abschnitte - der Riegel
+`chaosJetzt < 25` greift, wie er soll. Der Anstieg von 41,3 auf 47,2 kam
+also von den Zufallsereignissen (`Bladeburner.ts:600-694`), nicht vom Motor.
+
+Damit ist der Punkt weiterhin richtig, aber **nicht akut**: Der Riegel
+gehoert von 25 auf 19, weil er sonst beim naechsten Mal, wenn das Chaos
+unter 25 faellt, einen Durchlauf zulaesst, der bei 20 auf 50,31 landet.
+Heute passiert nichts, weil Incite ohnehin gesperrt ist.
+
+*Zur eigenen Rechnung:* Die Aussage "Tendenz steigend" stand auf **zwei**
+Messpunkten. Der dritte widerlegt sie. Das ist derselbe Fehlertyp wie bei den
+Rangraten heute - aus zwei Werten eine Richtung ableiten.
+
+Dringlichkeit: **mittel** statt hoch. Kein Schaden solange unter 50, und der
+Motor treibt es nicht.
 Dringlichkeit: **hoch.** Kein Schaden solange unter 50, aber der Abstand
           betraegt 8,7 Punkte und ein einzelner Lauf kostet 35,6.
 

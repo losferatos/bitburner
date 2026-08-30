@@ -122,6 +122,62 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Die Nachfuellphase kostet 17 Minuten am Stueck - ungemessen (30.08., 07:42)
+
+Gemessen: Ab **07:24** faellt die Rangrate von rund 280 auf **20 bis 60
+          Rang/h** und bleibt dort (Waechterreihe, 3-Minuten-Takt):
+
+              07:18  304   339 Rang/h
+              07:21  318   280
+              07:24  330   240
+              07:27  333    60   <- Bruch
+              07:30  336    60
+              07:33  337    20
+              07:36  340    60
+
+Ursache:  **Kein Fehler.** `data/blade.json` um 07:39: `aktion =
+          General/Incite Violence`, `grund = Vertragsvorrat leer`. Die
+          Diagnose bestaetigt es - alle drei Kontraktarten unter 1:
+          Tracking 0,75, Bounty Hunter 0,16, Retirement 0,42. Incite Violence
+          fuellt Vertraege und Operationen auf einen Schlag auf
+          (`Bladeburner.ts:1219-1225`, 180 Wachstumsschritte), dauert 60 s
+          und bringt **0 Rang**.
+
+          Geprueft und verworfen: Der `some`-Test in `src/blade.js:2745`
+          (`VERTRAEGE.some((name) => offen(V, name) < 3)`) sieht nach einem
+          Fehlausloeser aus, weil er auf EINEN leeren Vertrag feuert, obwohl
+          der Kommentar "und zwar der beste" sagt. Hier greift er zu Recht -
+          es sind alle drei leer. **Nicht anfassen** ohne einen Fall, in dem
+          der beste Vertrag nachweislich Vorrat hat.
+
+          Ebenfalls geprueft: `sleevediag` meldete um 07:39 `task: null`, also
+          Sleeve idle. Das ist eine Momentaufnahme waehrend der leeren Minute
+          (`SleeveBladeburnerWork.process:44-47` stoppt bei `count < 1`);
+          `data/sleeve.json` um 07:40:56 zeigt ihn wieder auf
+          `contract:Bounty Hunter`. **Selbstheilend, kein Fehler.**
+
+Erwartet: Offen ist nicht das Ob, sondern das **Wieviel**. Der Einbruch dauert
+          jetzt schon 17 Minuten - das sind rund **70 Rang Verlust** gegenueber
+          dem Trend. Wiederholt sich das stuendlich, kostet es ueber die
+          ETA von 77 h (`nodes/KURS.md`, 30.08. 07:20) einen zweistelligen
+          Prozentsatz.
+
+          Zu messen: (1) Wie lang ist eine Nachfuellphase wirklich, von der
+          ersten Incite-Violence-Minute bis zur wiederhergestellten Rate?
+          (2) In welchem Abstand kommt sie? (3) Reicht **ein** Durchlauf, oder
+          feuert der Zweig mehrfach hintereinander? Quelle ist
+          `data/aktionen.txt` ueber die Bruecke - dort steht jeder Abschnitt
+          mit `grund`.
+
+          Erst mit diesen drei Zahlen laesst sich beurteilen, ob ein frueherer
+          Ausloeser (Nachfuellen bei Vorrat 10 statt 3, waehrend die
+          Kontrakte noch laufen) etwas bringt oder nur Chaos kostet.
+          `chaos = 7,71` bei `chaosMax = 7,7` - die Grenze von 25 aus
+          `blade.js:2746` ist weit weg, Spielraum ist da.
+
+Dringlichkeit: mittel. Kein Defekt, aber der erste gemessene Ratenverlust im
+          Vollbetrieb - und der Optimierloop hat gerade keinen groesseren.
+
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

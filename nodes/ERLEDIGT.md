@@ -23,6 +23,272 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
+
+Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.
+          Chongqing stand um 11:10 bei **0**. Beides waren Staedte, in denen
+          der Motor laenger Raid gefahren hat.
+
+Erwartet: Die Bevoelkerung ist eine endliche, gemeinsam genutzte Ressource.
+          Sie geht ueber `getPopulationSuccessFactor = (pop/1e9)^0,7`
+          (`Actions/Action.ts:88-92`) in die Erfolgschance JEDER Aktion ausser
+          Black Ops ein. Wer sie verbraucht, verteuert alles andere - und zwar
+          dauerhaft, denn Nachwuchs kommt nur ueber `randomEvent` alle 240 bis
+          600 Sekunden mit 25 Prozent Wahrscheinlichkeit
+          (`Bladeburner.ts:601-694`).
+
+          Die Verbrauchsraten je Erfolg stehen in `Bladeburner.ts:806-861`:
+
+              Raid                    -1 %      der Bevoelkerung, -1 Gemeinde
+              Stealth Retirement      -0,5 %
+              Sting Operation         -0,1 %
+              Assassination           -1 Kopf
+              Bounty Hunter / Retire. -1 Kopf
+
+          Bei 1e9 Einwohnern sind das 10 Mio gegen 1. **Faktor zehn
+          Millionen** - und `beste()` sieht davon nichts.
+
+Verdacht: `src/blade.js`, `beste()`. Der Chaos-Zuschlag von 03:42 rechnet die
+          Folgekosten einer Aktion bereits in ihre Dauer ein
+          (`CHAOS_JE_LAUF`). Fuer die Bevoelkerung fehlt das Gegenstueck. Ein
+          sauberer Zuschlag waere: Wieviel Rang je Minute verliert der Motor
+          dauerhaft, wenn `pop` um `x` faellt? Ueber `(pop/1e9)^0,7` ist die
+          Ableitung bezifferbar, die verbleibende Laufzeit des Knotens auch
+          (`nodes/KURS.md`).
+
+Dringlichkeit: mittel. Seit dem Wegfall des Raid-Vorrangs (12:51) waehlt
+          `beste()` fast immer Assassination, und die kostet einen Kopf. Der
+          Fehler ist damit entschaerft, aber nicht behoben - er schlaegt wieder
+          zu, sobald Raid einmal auf der Chaos-Rechnung gewinnt.
+
+**Geaendert 29.08. um 00:55, Wirkung noch nicht gemessen.** `beste()` rechnet
+den Bevoelkerungsverbrauch jetzt als Zeitzuschlag ein, analog zum
+Chaos-Zuschlag von 03:42:
+
+    dF/F = 0,7 * dp/p     (aus `(pop/1e9)^0,7`, `Actions/Action.ts:88-92`)
+    Zuschlag = 0,7 * r * HORIZONT
+
+mit r aus `Bladeburner.ts:823-853` (Raid 1 %, Stealth Retirement 0,5 %, Sting
+0,1 %) und HORIZONT = **eine Stunde**. Raid bekommt damit 25 Sekunden auf eine
+Dauer von rund 59 - also gut 40 Prozent.
+
+**Der Horizont ist bewusst zu klein.** Rechnerisch richtig waere die
+Restlaufzeit des Knotens, und die betraegt Stunden bis Tage; mit ihr wuerde
+jede prozentuale Aktion faktisch gesperrt. Das mag sogar stimmen - Raid stand
+am 28.08. schon ohne diesen Zuschlag bei 123 Rang/min gegen 1.097 fuer
+Assassination -, aber eine Sperre, die niemand gemessen hat, ist keine
+Verbesserung. Eine Stunde ist die Zeitskala, auf der der Motor ohnehin misst.
+
+**Die Horizontfrage ist beantwortet - aus dem Quellcode, ohne auf den Betrieb
+zu warten (29.08., 08:20). Der Horizont von einer Stunde bleibt.**
+
+Der Eintrag von 00:55 nannte die Restlaufzeit des Knotens als "rechnerisch
+richtigen" Horizont und den 1-Stunden-Wert als Notbehelf. Das ist falsch
+herum: Die Restlaufzeit waere die richtige Groesse nur, wenn ein
+Bevoelkerungsverlust die gesamte kuenftige Produktion proportional daempft.
+Drei Fundstellen zeigen, dass er das nicht tut.
+
+1. **Black Ops ignorieren die Bevoelkerung vollstaendig.**
+   `Actions/BlackOperation.ts:55-57`: `getPopulationSuccessFactor()` gibt
+   fest **1** zurueck. Der Knotenausgang laeuft ueber 21 Black Ops - auf ihn
+   wirkt ein Raid gar nicht.
+
+2. **Die Erfolgschance ist bei 1 gedeckelt.**
+   `Actions/Action.ts:195`: `return Math.min(1, competence / difficulty)`.
+   Wo die Chance gesaettigt ist, kostet ein Bevoelkerungsverlust nichts - er
+   frisst nur die Reserve auf. Der Schaden setzt erst ein, wenn die Reserve
+   aufgebraucht ist, und das ist keine lineare Funktion der Zeit.
+
+3. **Die Bevoelkerung erholt sich nicht, aber sie faellt auch nicht weiter.**
+   `Bladeburner.ts:600-694`, alle Ereignisse sind **prozentual**
+   (`sourceCity.pop * percentage`); `BasePopGrowth` ist 100 Koepfe
+   (`data/Constants.ts:36`) und bei Millionen bedeutungslos. Erwartete
+   Log-Drift je Ereignis, ueber die Zweige gerechnet:
+
+       +5 %  Gemeinde neu      0,05 * ln(1,15)  = +0,0070
+       +20 % mehr Synthoiden   0,20 * ln(1,16)  = +0,0297
+       -20 % weniger           0,20 * ln(0,86)  = -0,0302
+       -5 %  Abwanderung       0,05 * ln(0,85)  = -0,0081
+                                          Summe   -0,0016
+
+   Also praktisch **driftfrei**. Ein Verlust ist damit weder dauerhaft im
+   Sinne einer wachsenden Wunde noch heilt er von selbst - er ist ein
+   Niveausprung in einem Random Walk.
+
+Zusammen heisst das: Der Zuschlag soll die Aktion verteuern, nicht sperren.
+Mit der Restlaufzeit (89-185 h laut `nodes/KURS.md`) bekaeme schon Sting mit
+seinen 0,1 Prozent einen Zuschlag von ueber vier Minuten auf eine
+30-Sekunden-Aktion - eine Sperre, die nach 1. und 2. gar nicht gerechtfertigt
+ist. Eine Stunde ist die Zeitskala, auf der der Motor misst, und sie liegt
+zwischen den beiden Fehlern. **Der Horizont bleibt, jetzt mit Begruendung.**
+
+Was offen bleibt, ist kleiner als gedacht: die Betriebsmessung, ob `beste()`
+Raid ueberhaupt noch waehlt. Sie entscheidet nichts mehr am Horizont, sondern
+belegt nur, dass der Zuschlag rechnerisch dort ankommt, wo er soll.
+
+
+**Konstanten gegen die Quelle geprueft (30.08., 00:25) - sie stimmen, aber der
+Zuschlag ignoriert die Erfolgschance.**
+
+Die Umrechnung ist richtig: `changePopulationByPercentage(p)` rechnet
+`pop * (p/100)` (`Bladeburner/City.ts:79-87`), aus `-1` wird also 1 Prozent.
+`POP_JE_ERFOLG` in `src/blade.js:2341` fuehrt Raid 0,01, Stealth Retirement
+0,005, Sting 0,001 - alle drei korrekt.
+
+**Zwei Ungenauigkeiten, beide belegt:**
+
+1. **Raid verbraucht auch bei Fehlschlag.** `Bladeburner.ts:837-843`, der
+   `else`-Zweig: `getRandomIntInclusive(-10, -5) / 10`, also -0,5 bis -1,0
+   Prozent, im Mittel **0,75 Prozent**. Der Punkt oben nannte nur den
+   Erfolgsfall.
+
+2. **Sting und Stealth Retirement verbrauchen NUR bei Erfolg.** Beide stehen
+   ausschliesslich im `if (success)`-Zweig (`:816-821` und `:846-852`). Der
+   Zuschlag rechnet aber mit der vollen Rate, unabhaengig von der Chance - bei
+   halber Erfolgschance ist er damit **doppelt so hoch wie der Erwartungswert**.
+
+**Die exakte Formel waere** (p = Erfolgschance):
+
+    Sting               p * 0,001
+    Stealth Retirement  p * 0,005
+    Raid                p * 0,01 + (1 - p) * 0,0075
+
+Bei p = 1 aendert sich nichts; bei p = 0,5 faellt der Zuschlag fuer Sting und
+Stealth Retirement auf die Haelfte, fuer Raid auf 0,875 Prozent.
+
+**Nicht umgesetzt**, weil `p` an der Stelle `src/blade.js:2345` nicht
+vorliegt - `beste()` rechnet die Chance in einer eigenen Funktion weiter oben
+(`:1745-1782`). Der Umbau ist keine Zeile, sondern das Durchreichen eines
+Wertes durch die Bewertungskette; ohne laufende Operationen laesst er sich
+auch nicht nachmessen. Der derzeitige Wert ist die **obere Schranke**, der
+Zuschlag also eher zu hoch als zu niedrig - konservativ im Sinne der Sache.
+
+**Wirkung weiterhin nicht gemessen.** Der Spieler faehrt seit dem Einbau um
+19:05 gar keine Bladeburner-Aktionen (Wiederaufbau, Restzeit 2,3 h um 00:15);
+`data/aktionen.txt` fuehrt fuer die 50 Minuten davor nur Kontrakte, die
+Regenerationskammer und Recruitment - kein Raid, aber bei Rang 0 bis 16 sagt
+das nichts. Messbar ab dem Moment, in dem `blade.js` wieder traegt.
+
+**Umgesetzt (30.08., 01:20) - die Erfolgschance lag doch vor.**
+
+Der Eintrag von 00:55 schloss mit "nicht umgesetzt, weil `p` an der Stelle
+`blade.js:2345` nicht vorliegt". Das war zu schnell geurteilt: `const s =
+spanne(typ, name)` steht in **Zeile 2152**, also 190 Zeilen VOR dem Zuschlag,
+und `s.min` ist genau die Erfolgschance - dieselbe Groesse, mit der 34 Zeilen
+spaeter der `ertrag` gerechnet wird.
+
+Eingebaut ist jetzt der Erwartungswert:
+
+    pErfolg = clamp(s.min, 0, 1)
+    Raid    p * 0,01 + (1 - p) * 0,0075
+    sonst   p * rate
+
+Wirkung, gerechnet (Zuschlag in Sekunden):
+
+    p       Raid alt   Raid neu   Sting alt   Sting neu
+    0,3       25,2       20,8        2,52        0,76
+    0,6       25,2       22,7        2,52        1,51
+    1,0       25,2       25,2        2,52        2,52
+
+Bei sicherer Aktion aendert sich nichts, bei unsicherer faellt der Zuschlag
+auf den Erwartungswert. Die alte Fassung war die obere Schranke - sie sperrte,
+statt zu verteuern.
+
+`node --check` sauber, Pruefer unveraendert SPUR, ins Spiel geschoben und
+`blade.js` neu gestartet (**verifiziert 01:22: laeuft, Rang 97**).
+
+**Wirkung im Betrieb weiterhin nicht messbar** - der Spieler faehrt seit dem
+Einbau um 19:05 keine Bladeburner-Aktionen (Restaufbau 1,2 h um 01:15). Die
+Nachmessung bleibt offen: Sobald `blade.js` traegt, in `data/aktionen.txt`
+nachsehen, ob Sting oder Stealth Retirement ueberhaupt auftauchen - vorher
+waren sie durch den zu hohen Zuschlag faktisch gesperrt.
+
+**Wiederaufbau abgeschlossen, erste Messung liegt vor (30.08., 06:47).**
+
+Der Kampfwert-Tiefstand steht wieder bei **100**, `blade.js` hat um rund
+06:26 uebernommen - 11,3 Stunden nach dem Augmentierungs-Einbau vom 29.08.,
+19:05. Rang 176.
+
+Aktionsverteilung der ersten 4,8 Minuten (`data/aktionen.txt`, 10 Abschnitte):
+
+    Contracts/Bounty Hunter                     2,8 min   59 %
+    General/Hyperbolic Regeneration Chamber     1,7 min   36 %
+    Contracts/Retirement                        0,3 min    6 %
+
+**Der Zuschlag ist damit weiterhin nicht messbar - aber jetzt weiss man,
+warum.** Er greift ausschliesslich bei Sting, Stealth Retirement und Raid,
+und das sind alles **Operationen**. Der Motor faehrt bei Rang 176 aber reine
+Kontrakte: Operationen sind zwar ab Rang 0 offen (kein `reqdRank`,
+`BlackOperation.ts:47` fuehrt ihn nur fuer Black Ops), ihr Ertrag je Sekunde
+liegt bei niedrigem Aktionslevel aber unter dem der Kontrakte.
+
+Die Messung wird also erst faellig, wenn in `data/aktionen.txt` ueberhaupt
+eine Operation auftaucht. Bis dahin ist der Zuschlag folgenlos - weder
+schaedlich noch nachweisbar.
+
+Nebenbefund fuer den Kursloop: Die Regenerationskammer frisst **36 Prozent**
+der Zeit. Der Arbeitsanteil liegt damit bei 64 Prozent statt der 18 aus der
+Startphasen-Simulation (`nodes/KURS.md`, 10:20) - die Kampfwerte 100 und die
+gekauften Faehigkeiten haben die Ausdauerbremse deutlich geloest.
+
+
+**ABGESCHLOSSEN (30.08., 07:25). Der Zuschlag ist als Ursache ausgeschlossen -
+nicht nur "nicht messbar".**
+
+Nachmessung ueber `data/aktionen.txt`, 06:39 bis 07:18 (39 Minuten, 72
+protokollierte Abschnitte plus 60 unprotokollierte Luecken, Rang 249 -> 304):
+
+    General/Hyperbolic Regeneration Chamber   1.162 s   49,5 %
+    Contracts/Retirement + Bounty Hunter      1.187 s   50,5 %   (Luecken eingerechnet)
+    Operationen                                   0 s    0,0 %
+
+**Verifiziert: 0 Operationen in 39 Minuten um 07:18.**
+
+Entscheidend ist aber nicht die Null, sondern **warum** sie den Zuschlag
+entlastet: Von den sechs Operationen sind nur drei ueberhaupt betroffen.
+`Bladeburner.ts:812-861` zeigt, dass **Investigation und Undercover die
+Bevoelkerung gar nicht anfassen** - sie rufen nur
+`improvePopulationEstimateByPercentage` beziehungsweise
+`triggerPotentialMigration`. **Assassination** kostet
+`changePopulationByCount(-1)`, also einen Kopf bei Millionen, und steht
+folgerichtig nicht in `POP_JE_ERFOLG`.
+
+Vier von sechs Operationen tragen also **keinen Zuschlag** - und trotzdem
+waehlt `beste()` keine einzige. Damit kann der Zuschlag nicht die Ursache
+sein. Es bleibt der schon am 06:47 genannte Grund: bei niedrigem Aktionslevel
+liegt der Ertrag je Sekunde unter dem der Kontrakte. Der Punkt ist beantwortet.
+
+**Korrektur am Eintrag von 06:47.** Dort stand "Regenerationskammer frisst 36
+Prozent, Arbeitsanteil 64 Prozent". Das war ueber die protokollierten
+Abschnitte gerechnet - die 60 Luecken fehlten. Sauber gerechnet (jede Luecke
+mit fallender Ausdauer ist Arbeit, alle 60 sind es) liegt der Arbeitsanteil
+bei **50,5 Prozent**, die Kammer bei 49,5.
+
+**Ein Rest bleibt als Hebel, nicht als Fehler.** Aus dem Protokoll gemessen:
+
+    Kontrakt   Ausdauerverbrauch  0,0874 /s
+    Kammer     Regeneration       0,1251 /s
+    R/V = 1,432  ->  moeglicher Arbeitsanteil 58,9 %
+
+Gemessen sind 50,5 Prozent, also 8,4 Punkte Luft. **Sie ist nicht
+abschoepfbar** - nachgeschlagen um 07:28, bevor daraus ein Punkt wurde:
+Die Kammer schuettet ihre Ausdauer als **Sprung am Ende** aus
+(`Bladeburner.ts:1201-1202`, `this.stamina += maxStamina * HrcStaminaGain/100`
+mit `HrcStaminaGain = 1`, `data/Constants.ts:52`), nicht laufend. Wer sie
+vorzeitig verlaesst, verliert den ganzen Durchlauf. Die 8,4 Punkte sind
+Ruestzeit zwischen Aktionen mit Mindestdauer, kein Hebel.
+
+Was dabei auffiel und ein Hebel ist: Von den gemessenen 0,1251 Ausdauer je
+Sekunde in der Kammer kommen nur rund 0,022 aus der Kammer selbst (1 Prozent
+von maxStamina ~43 je 20-Sekunden-Durchlauf); der Rest ist die
+Grundregeneration aus `calculateStaminaGainPerSecond` (`:1317-1325`), und die
+laeuft **auch waehrend der Arbeit**. Der Weg zu mehr Arbeitsanteil fuehrt
+deshalb ueber die Regenerationsrate - Cyber's Edge und der Stamina-Skill
+wirken dort doppelt -, nicht ueber kuerzere Kammerzeiten. Das steht bereits
+in `nodes/HEBEL.md` (Ausdauer-Paar, 30.08. 06:55).
+
+---
+
 ## 29.08.2026 - Wiederanlauf des offenen Abschnitts: im Spiel bewiesen
 
 Der Punkt nannte sein Kriterium woertlich: *"`blade.js` per `WERKZEUG

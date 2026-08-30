@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-VORANKOMMEN (Loop 2 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-VORANKOMMEN (Loop 2 von 6). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 **LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
 
@@ -28,6 +28,31 @@ vom 29.08.2026).
    **Eine Vermutung über dieses Spiel ist meistens falsch.** Fünf Minuten `grep` sind billiger als drei Stunden Messen — und billiger als ein Eintrag, der später zurückgenommen werden muss. Am 27.08. wurden vier eigene Rechenfehler auf diese Weise gefunden, drei davon in bereits geschriebenen Befunden.
 4. **Bevor du einen Punkt abhakst, zwei Fragen:**
    - *Ist es wirklich behoben?* Nach Erledigt wandert nur, was eine Zeile `Verifiziert: <Zahl> um <HH:MM>` trägt — eine Messung nach der Änderung, nicht die Änderung selbst. Ein Punkt, den du geändert, aber nicht nachgemessen hast, bleibt stehen und bekommt die Zeile `Geaendert <HH:MM>, Wirkung noch nicht gemessen`. Am 25.08. wurde ein Sofort-Punkt vier Minuten nach dem Eintrag abgehakt, während die Zahl unverändert danebenstand.
+**DREI FRAGEN, BEVOR EINE AENDERUNG AN `src/` ALS FERTIG GILT (30.08.2026).**
+Code unter `src/` laeuft unbeaufsichtigt weiter. Eine Messung danach zeigt nur
+den **Normalfall** - sie reicht nicht:
+
+1. **Welche Uhr?** Misst der Code dieselbe Zeit, in der die beobachtete Sache
+   laeuft? Echtzeit gegen Spielzeit, eigener Takt gegen fremde
+   Abschlussbedingung. Am 30.08. verfehlte ein Rueckfall sein Ziel um **eine
+   Sekunde** (Abschluss bei 61 s, eigener Takt 60 s) - jedes Mal, unendlich
+   oft, ohne dass irgendetwas es meldete.
+2. **Was bei Stillstand und Nachholen?** Gedrosselter Tab (die Engine
+   verarbeitet dann hoechstens 5 Spielsekunden je Tick), Offline-Nachholen
+   (bis 25-fach), Werkzeug neu gestartet, Datei aelter als der Takt. Greift
+   die Aenderung dann noch, zu oft, oder gar nicht? Am 30.08. haette eine
+   Zeitpruefung nach einer Offline-Nacht 25 Aktionen statt einer durchgelassen
+   und das Stadtchaos von 25 auf ueber 1000 getrieben.
+3. **Rate oder Bestand?** Speist sich die Zahl, mit der du die Aenderung
+   begruendest, aus einem Vorrat, der sich erschoepft? Am 30.08. stand die
+   Leitgroesse des Knotens acht Stunden lang auf einem Wert, der in Wahrheit
+   das Leerraeumen eines ueber Nacht gewachsenen Lagers war.
+
+Kannst du eine der drei nicht beantworten, schreib
+`Geaendert <HH:MM>, Randfaelle ungeprueft` statt `Verifiziert`. Der
+Skeptikerloop (Loop 6, alle zwei Stunden) nimmt sie sich dann vor - das ist
+kein Makel, sondern der vorgesehene Weg.
+
    - *Gab es das schon einmal?* Sieh in `nodes/ERLEDIGT.md` nach — **gezielt greppen, nicht lesen**: `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`. Die Datei ist das Archiv (seit 27.08. ausgelagert, weil die Arbeitsliste sonst die 2.000-Zeilen-Grenze des Lesewerkzeugs gerissen hätte). Findet sich ein ähnlicher Fall, wurde beim ersten Mal ein Symptom behoben und nicht die Ursache. Dann trag den **strukturellen** Punkt unter `## Offen` ein, statt den Einzelfall ein zweites Mal zu flicken. Beispiel vom 25.08.: erst `bn4life`, dann `bn4rep` — beide unterbrachen Bladeburner-Aktionen, beide wurden einzeln geflickt.
 
 5. Schreib das Ergebnis zurück. **Erledigtes wandert nach `nodes/ERLEDIGT.md`** — oben hinein, mit Datum und Commit-Kennung — auch ein abgeräumter `## Sofort`-Punkt; steht danach nichts mehr dort, schreib wieder `keine` hin. Neue Befunde kommen oben in die Liste, mit Fundstelle und Dringlichkeit.

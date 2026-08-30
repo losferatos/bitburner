@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-WACHE (Loop 1 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-WACHE (Loop 1 von 6). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 **LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
 
@@ -56,6 +56,31 @@ Handle nach dem Urteil:
   - Vor dem Commit `node tools/strategie-check.js` erneut ausführen. Wird das Urteil schlechter oder verschwindet die `URTEIL:`-Zeile: `git checkout -- <datei>` und stattdessen einen Auftrag eintragen.
   - Findest du in **zehn Minuten** keine belegte Ursache: nichts ändern. Auftrag eintragen, Turn beenden. Raten ist teurer als Warten.
   - **Was du nicht selbst behebst, wird ein Auftrag.** Oben in `nodes/BAUSTELLEN.md` unter `## Sofort` eintragen — Befund, gemessene Zahl, erwarteter Wert, Verdacht auf die Fundstelle. Steht dort schon ein Punkt mit demselben Befund, ergänze nur Messung und Uhrzeit; kein zweiter Eintrag. Ein Befund, der nur im Chat steht, ist verloren.
+**DREI FRAGEN, BEVOR EINE AENDERUNG AN `src/` ALS FERTIG GILT (30.08.2026).**
+Code unter `src/` laeuft unbeaufsichtigt weiter. Eine Messung danach zeigt nur
+den **Normalfall** - sie reicht nicht:
+
+1. **Welche Uhr?** Misst der Code dieselbe Zeit, in der die beobachtete Sache
+   laeuft? Echtzeit gegen Spielzeit, eigener Takt gegen fremde
+   Abschlussbedingung. Am 30.08. verfehlte ein Rueckfall sein Ziel um **eine
+   Sekunde** (Abschluss bei 61 s, eigener Takt 60 s) - jedes Mal, unendlich
+   oft, ohne dass irgendetwas es meldete.
+2. **Was bei Stillstand und Nachholen?** Gedrosselter Tab (die Engine
+   verarbeitet dann hoechstens 5 Spielsekunden je Tick), Offline-Nachholen
+   (bis 25-fach), Werkzeug neu gestartet, Datei aelter als der Takt. Greift
+   die Aenderung dann noch, zu oft, oder gar nicht? Am 30.08. haette eine
+   Zeitpruefung nach einer Offline-Nacht 25 Aktionen statt einer durchgelassen
+   und das Stadtchaos von 25 auf ueber 1000 getrieben.
+3. **Rate oder Bestand?** Speist sich die Zahl, mit der du die Aenderung
+   begruendest, aus einem Vorrat, der sich erschoepft? Am 30.08. stand die
+   Leitgroesse des Knotens acht Stunden lang auf einem Wert, der in Wahrheit
+   das Leerraeumen eines ueber Nacht gewachsenen Lagers war.
+
+Kannst du eine der drei nicht beantworten, schreib
+`Geaendert <HH:MM>, Randfaelle ungeprueft` statt `Verifiziert`. Der
+Skeptikerloop (Loop 6, alle zwei Stunden) nimmt sie sich dann vor - das ist
+kein Makel, sondern der vorgesehene Weg.
+
   - Melde in max. 4 Stichpunkten: Befund, Ursache, Eingriff, Erwartung.
 
 **Git** — fünf Loops schreiben in dieselben Dateien:

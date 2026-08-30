@@ -6,7 +6,7 @@ outputs in dieser Session ab, und reporte einfach nur die ETA bis zum naechsten
 Bitnode reset und die Angabe, was der naechste sein wird. 1x die Stunde reicht
 - sonst nichts."*
 
-BITBURNER-REPORT (Loop 3 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-REPORT (Loop 3 von 6). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 **Dieser Loop ist die EINZIGE Ausnahme vom Lautlos-Schalter.** `data/lautlos`
 liegt dauerhaft; Loop 1, 2, 4 und 5 schweigen deshalb vollstaendig. Du gibst

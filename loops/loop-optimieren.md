@@ -2,7 +2,7 @@
 
 *Alles ab der nächsten Zeile ist der Prompt und wird wörtlich an CronCreate übergeben.*
 
-BITBURNER-OPTIMIEREN (Loop 4 von 5). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
+BITBURNER-OPTIMIEREN (Loop 4 von 6). Arbeitsverzeichnis C:\Users\erche\Desktop\claude_projecto\bitburner.
 
 **LAUTLOS-SCHALTER — als Allererstes pruefen.** Fuehre `test -f data/lautlos && echo LAUTLOS` aus. Kommt `LAUTLOS`, gibst du in diesem Lauf **nichts im Chat aus**: kein Bericht, kein Stichpunkt, kein Wort, keine Zahl. Du arbeitest ganz normal weiter — alle Befunde und Ergebnisse gehen in die Dateien (`nodes/BAUSTELLEN.md`, `nodes/KURS.md`, `nodes/HEBEL.md`, Commits), nicht in den Chat. Per ntfy meldest du dann nur noch, was keinen Aufschub duldet: Bot steht, Pruefer abgestuerzt, BitNode-Wechsel oder Reset. Alles andere wartet bis zum Morgen. Der Schalter ist Erics Nachtruhe; die Datei wird geloescht, wenn er sich meldet.
 
@@ -62,6 +62,31 @@ Prüfe die Hypothese am Quellcode, bevor du sie umsetzt. Die meisten Vermutungen
 - Nach jeder Änderung an `tools/strategie-check.js`: `node tools/strategie-check.js` ausführen. Endet die Ausgabe nicht auf `URTEIL:`, sofort `git checkout --` und nichts committen.
 - Werkzeug im Spiel neu starten: `pushFile` nach `data/reload.txt` mit `WERKZEUG <dateiname>.js` — **die Endung gehoert dazu** (der Kanal vergleicht gegen `pr.filename`; seit 27.08. 19:46 wird sie zwar ergaenzt, aber schreib sie hin). **Danach nachsehen, ob die Änderung auch greift** — am 27.08. um 18:55 wurde ein Hebel eingebaut, neu gestartet, und die Wirkung blieb aus; erst eine Stunde später fiel auf, dass die Kaufreihenfolge ihn übersprang.
 - Findest du in **fünfzehn Minuten** keinen belegten Hebel: nichts ändern. Schreib in HEBEL.md, was du geprüft und verworfen hast, und beende den Turn. Das ist ein gültiges Ergebnis — eine erfundene Optimierung ist schlechter als keine.
+
+**DREI FRAGEN, BEVOR EINE AENDERUNG AN `src/` ALS FERTIG GILT (30.08.2026).**
+Code unter `src/` laeuft unbeaufsichtigt weiter. Eine Messung danach zeigt nur
+den **Normalfall** - sie reicht nicht:
+
+1. **Welche Uhr?** Misst der Code dieselbe Zeit, in der die beobachtete Sache
+   laeuft? Echtzeit gegen Spielzeit, eigener Takt gegen fremde
+   Abschlussbedingung. Am 30.08. verfehlte ein Rueckfall sein Ziel um **eine
+   Sekunde** (Abschluss bei 61 s, eigener Takt 60 s) - jedes Mal, unendlich
+   oft, ohne dass irgendetwas es meldete.
+2. **Was bei Stillstand und Nachholen?** Gedrosselter Tab (die Engine
+   verarbeitet dann hoechstens 5 Spielsekunden je Tick), Offline-Nachholen
+   (bis 25-fach), Werkzeug neu gestartet, Datei aelter als der Takt. Greift
+   die Aenderung dann noch, zu oft, oder gar nicht? Am 30.08. haette eine
+   Zeitpruefung nach einer Offline-Nacht 25 Aktionen statt einer durchgelassen
+   und das Stadtchaos von 25 auf ueber 1000 getrieben.
+3. **Rate oder Bestand?** Speist sich die Zahl, mit der du die Aenderung
+   begruendest, aus einem Vorrat, der sich erschoepft? Am 30.08. stand die
+   Leitgroesse des Knotens acht Stunden lang auf einem Wert, der in Wahrheit
+   das Leerraeumen eines ueber Nacht gewachsenen Lagers war.
+
+Kannst du eine der drei nicht beantworten, schreib
+`Geaendert <HH:MM>, Randfaelle ungeprueft` statt `Verifiziert`. Der
+Skeptikerloop (Loop 6, alle zwei Stunden) nimmt sie sich dann vor - das ist
+kein Makel, sondern der vorgesehene Weg.
 
 **4. Protokollieren — das ist der Teil, der diesen Loop von Bastelei trennt.**
 

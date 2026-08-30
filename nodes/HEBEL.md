@@ -66,6 +66,68 @@ Naechste Pruefung: Beim naechsten Einbau die Zeit von Tiefstand 1 bis 100
    ist heute der Ausreisser und Kandidat 1 oder 2 traegt.
 Commit: (siehe unten)
 
+**AUFGEKLAERT UND KORRIGIERT (30.08., 12:52, durch einen Pruef-Subagenten).
+Beide Zahlen in diesem Eintrag waren richtig gemessen - die Deutung war
+falsch, und zwar zweifach.**
+
+**Fehler 1: Der verglichene Multiplikator war der falsche.** Oben steht
+"der Erfahrungs-Multiplikator stieg nur von 1,548 auf 1,762, das erklaert
+Faktor 1,14". Das ist `strength_exp` - er geht **linear in die Rate**.
+Entscheidend ist aber der **Level-Multiplikator** `mults.strength` und
+Verwandte, und der geht **exponentiell in den Bedarf**
+(`PersonObjects/Person.ts:213-224`, `calculateSkill`):
+
+    exp(Ziel) = e^((Ziel/m_eff + 200)/32) - 534,6
+    m_eff     = Kampf-Mult * BN10-LevelMultiplier (0,4, `BitNode.tsx:841-845`)
+
+Der Einbau hob die Kampf-Mults von 1,408/1,951/1,478 auf 1,602/2,220/1,766.
+Diese +14 Prozent senken den Erfahrungsbedarf ueber alle vier Stats von
+394.733 auf **194.484**, also auf 49 Prozent. Mit den +14 Prozent Rate
+zusammen ergibt das **Faktor 2,31** - 7,08 h gegen 3,07 h. Voellig
+regelkonform, kein Raetsel.
+
+Das Modell trifft die heutige Messreihe punktgenau: Segment Tiefstand 60 auf
+99 sagt es 148,2 Minuten voraus, gemessen wurden **149**.
+
+**Fehler 2 - und der ist der eigentliche Befund: `tools/rueckstand.js` kann
+einen Ausfall gar nicht sehen.** Oben steht "Tab-Drosselung als Ursache
+ausgeschlossen, rueckstand.js meldet Tempo 1,000". Dieser Test ist
+konstruktionsbedingt blind: `engine.tsx:265` rechnet die gesamte Ausfallzeit
+in `numCyclesOffline`, `:283` traegt die laufende Arbeit damit nach, und
+`:345-351` schreibt die **volle Ausfallzeit in `totalPlaytime`** - genau das
+Feld, das `tools/rueckstand.js:111` liest. Ein Spiel, das 4,5 Stunden aus
+war, meldet danach Tempo 1,000 und 0,0 Minuten Rueckstand.
+
+Und aus war es. Belegt aus den eigenen Protokollen:
+
+    data/aufsicht.log   letzte Zeile 01:28:51, naechste 06:01:36
+                        ("Bruecke gestartet", "Loops stehen seit 282 min")
+    data/wache.log:4    06:04:39 PUSH "Bitburner-Tab zu oder abgestuerzt"
+    data/wache.log:8    06:13:42 PUSH "Spiel haengt wieder an der Bruecke"
+
+Die 06:26 waren also eine **Erstsichtung, keine Ankunft**. Rechnerisch war
+der Tiefstand um **02:10** bei 100. Der eigene Zwischenstand von 21:49
+(Tiefstand 82, Restaufbau 4,43 h) deckt sich mit dem Modell auf zwei
+Minuten. Der Sleeve-Stillstand und der fehlende Faehigkeitskauf haben damit
+nichts zu tun - sie beruehren die Kampferfahrung des Spielers nicht.
+
+**Was in die Einbau-Kalkulation gehoert: keine feste Zahl.** Der
+Wiederaufbau ist eine Funktion der Kampf-Level-Multiplikatoren, und die
+aendert genau der Einbau, den man bewertet:
+
+    T = SUMME ueber str,def,dex,agi von
+        [ e^((Ziel / (mult_stat * BN_LevelMult) + 200) / 32) - 534,6 ]
+        geteilt durch (10 * exp_mult)
+
+Gerechnet wird mit den Multiplikatoren **nach** dem geplanten Einbau, sonst
+ist die Schaetzung systematisch zu pessimistisch. Fuer den aktuellen Stand
+bleiben die **3,1 h** richtig; die Zahl veraltet mit jedem Einbau nach unten.
+
+Zwei Werkzeug-Baustellen daraus, beide in `nodes/BAUSTELLEN.md` eingetragen:
+`tools/tor.js:86` steigt bei `inBladeburner` aus, obwohl es genau diese
+Rechnung schon beherrscht - und `tools/rueckstand.js` braucht eine zweite,
+unabhaengige Ausfallquelle.
+
 ## Ausdauer-Paar geprueft: die Selbstregelung greift, kein Eingriff (30.08., 06:55)
 
 **Engpass im Vollbetrieb.** Seit `blade.js` um 06:26 wieder traegt, frisst die

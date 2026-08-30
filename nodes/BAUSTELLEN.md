@@ -171,6 +171,95 @@ ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
 ## Offen, nach Dringlichkeit
 
+### `tools/tor.js` steigt in der Division aus, obwohl es dort gebraucht wird (30.08., 12:52)
+
+Gemessen: `node tools/tor.js` antwortet seit dem Divisionsbeitritt nur noch
+          *"Bereits in der Division - dieses Werkzeug ist hier fertig."*
+          (`tools/tor.js:86`, Bedingung `lage.inBladeburner`).
+
+Erwartet: Das Werkzeug beherrscht genau die Rechnung, die nach **jedem**
+          Augmentierungs-Einbau gebraucht wird: Es kehrt die Skillformel um
+          (`PersonObjects/formulas/skill.ts`), leitet den Multiplikator aus
+          dem laufenden Stand zurueck und holt die Gym-Rate aus dem
+          Spielstand statt aus einem Zeitfenster.
+
+          Nach einem Einbau fallen die Kampfwerte auf 1 und werden im Gym
+          wieder aufgebaut - dieselbe Rechnung, dieselbe Formel. Weil das
+          Werkzeug hier aussteigt, musste die Dauer am 30.08. von Hand
+          geschaetzt werden, und die Schaetzung war falsch (siehe
+          `nodes/HEBEL.md`, Eintrag 12:30 und seine Korrektur 12:52).
+
+Zu tun:   Die Bedingung in `tools/tor.js:86` so aendern, dass das Werkzeug
+          auch in der Division rechnet, **solange der Tiefstand unter 100
+          liegt**. Oberhalb bleibt die bisherige Meldung richtig.
+
+          Die vollstaendige Formel steht inzwischen belegt in
+          `nodes/HEBEL.md`:
+
+              T = SUMME ueber str,def,dex,agi von
+                  [ e^((Ziel / (mult_stat * BN_LevelMult) + 200) / 32) - 534,6 ]
+                  geteilt durch (10 * exp_mult)
+
+          mit `BN_LevelMult` = 0,4 in BitNode 10 (`BitNode/BitNode.tsx:841-845`).
+          Wichtig: Der **Level**-Multiplikator (`mults.strength` usw.) gehoert
+          in die Formel, nicht `strength_exp` - der geht nur linear in die
+          Rate, waehrend der Level-Mult exponentiell im Bedarf steht. Genau
+          diese Verwechslung hat am 30.08. den Fehlschluss erzeugt.
+
+          Gegenprobe fuer die Umsetzung: Fuer den Einbau vom 30.08. 09:21
+          muss das Werkzeug **3,07 h** ausgeben; gemessen wurden 3,1 h, und
+          das Teilsegment Tiefstand 60 auf 99 sagt das Modell mit 148,2 min
+          gegen gemessene 149 voraus.
+
+Dringlichkeit: mittel. Es ist kein Fehler im Bot, sondern eine Luecke in der
+          Diagnose - aber sie faellt bei jedem Einbau an, und der kommt
+          regelmaessig.
+
+### `tools/rueckstand.js` kann einen Spielausfall nicht sehen (30.08., 12:52)
+
+Gemessen: Das Spiel war in der Nacht vom 29. auf den 30.08. zwischen rund
+          **01:30 und 06:12 aus** - belegt aus drei eigenen Protokollen:
+
+              data/aufsicht.log  letzte Zeile 01:28:51, naechste 06:01:36
+                                 ("Loops stehen seit 282 min")
+              data/wache.log:4   06:04:39 PUSH "Bitburner-Tab zu oder abgestuerzt"
+              data/wache.log:8   06:13:42 PUSH "Spiel haengt wieder an der Bruecke"
+
+          `node tools/rueckstand.js` meldete um 12:26 trotzdem: *Tempo 1,000,
+          Rueckstand 0,0 min, Trend +0,0 min je Stunde ueber 26,3 h.*
+
+Erwartet: Ein Ausfall von 4,5 Stunden muesste sichtbar sein.
+
+Ursache:  **Konstruktionsbedingt blind.** Die Spiel-Engine rechnet die
+          gesamte Ausfallzeit in `numCyclesOffline`
+          (`reference/bitburner-src/src/engine.tsx:265`), traegt die laufende
+          Arbeit damit nach (`:283`, `Player.processWork`) und schreibt die
+          **volle Ausfallzeit in `totalPlaytime`** (`:345-351`). Genau dieses
+          Feld liest `tools/rueckstand.js:111`. Nach einem Ausfall meldet das
+          Werkzeug deshalb zwangslaeufig Tempo 1,000.
+
+          Nebenbefund, der beruhigt: Weil `processWork` offline nachgetragen
+          wird, ging die Gym-Zeit vermutlich gar nicht verloren - sie wurde
+          beim Laden auf einen Schlag gutgeschrieben.
+
+Folge:    Der Test ist als Ausschlusskriterium wertlos. Am 30.08. um 12:30
+          wurde mit ihm die Tab-Drosselung "ausgeschlossen" und daraus ein
+          falscher Schluss auf die Wiederaufbaudauer gezogen
+          (`nodes/HEBEL.md`, inzwischen korrigiert). Das Werkzeug wird von
+          allen fuenf Loops als erste Diagnose bei Stagnation benutzt - es
+          wird also weiter falsch beruhigen, solange es so bleibt.
+
+Zu tun:   Eine **zweite, unabhaengige Quelle** fuer Ausfaelle. Die Wanduhr-
+          Luecke steht bereits in `data/aufsicht.log` und `data/bridge.log`
+          auf der Platte: Wo zwischen zwei Zeilen mehr Zeit liegt als der
+          Takt, war das Spiel oder der Rechner weg. `rueckstand.js` muesste
+          das mitlesen und getrennt ausweisen - "Tempo 1,000, aber 4,5 h
+          Luecke seit 01:28" ist die ehrliche Auskunft.
+
+Dringlichkeit: mittel-hoch. Kein Schaden am Bot, aber das Werkzeug erzeugt
+          falsche Sicherheit an genau der Stelle, wo die Loops sie am
+          wenigsten gebrauchen koennen.
+
 ### Zwischen Chaos 25 und 50 gibt es kein Zurueck - der Bot sitzt bei 41,37 (30.08., 12:40)
 
 Gemessen (Spielstand direkt, 12:35): Der Bladeburner operiert in **Aevum**

@@ -425,6 +425,34 @@ Nachmessung bleibt offen: Sobald `blade.js` traegt, in `data/aktionen.txt`
 nachsehen, ob Sting oder Stealth Retirement ueberhaupt auftauchen - vorher
 waren sie durch den zu hohen Zuschlag faktisch gesperrt.
 
+**Wiederaufbau abgeschlossen, erste Messung liegt vor (30.08., 06:47).**
+
+Der Kampfwert-Tiefstand steht wieder bei **100**, `blade.js` hat um rund
+06:26 uebernommen - 11,3 Stunden nach dem Augmentierungs-Einbau vom 29.08.,
+19:05. Rang 176.
+
+Aktionsverteilung der ersten 4,8 Minuten (`data/aktionen.txt`, 10 Abschnitte):
+
+    Contracts/Bounty Hunter                     2,8 min   59 %
+    General/Hyperbolic Regeneration Chamber     1,7 min   36 %
+    Contracts/Retirement                        0,3 min    6 %
+
+**Der Zuschlag ist damit weiterhin nicht messbar - aber jetzt weiss man,
+warum.** Er greift ausschliesslich bei Sting, Stealth Retirement und Raid,
+und das sind alles **Operationen**. Der Motor faehrt bei Rang 176 aber reine
+Kontrakte: Operationen sind zwar ab Rang 0 offen (kein `reqdRank`,
+`BlackOperation.ts:47` fuehrt ihn nur fuer Black Ops), ihr Ertrag je Sekunde
+liegt bei niedrigem Aktionslevel aber unter dem der Kontrakte.
+
+Die Messung wird also erst faellig, wenn in `data/aktionen.txt` ueberhaupt
+eine Operation auftaucht. Bis dahin ist der Zuschlag folgenlos - weder
+schaedlich noch nachweisbar.
+
+Nebenbefund fuer den Kursloop: Die Regenerationskammer frisst **36 Prozent**
+der Zeit. Der Arbeitsanteil liegt damit bei 64 Prozent statt der 18 aus der
+Startphasen-Simulation (`nodes/KURS.md`, 10:20) - die Kampfwerte 100 und die
+gekauften Faehigkeiten haben die Ausdauerbremse deutlich geloest.
+
 ### Wartet bis V1-Knoten: Der Erfahrungsofen (Befund B1 aus dem Bot-Audit)
 
 Der Umbau wurde am 25.08. per `git checkout` zurueckgenommen, weil die

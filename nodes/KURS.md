@@ -25,6 +25,41 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 18:20 - BitNode 10: die Leitgroesse ist der NACHSCHUB, nicht die Rate
+
+**Dritter Korrektureintrag heute, und diesmal mit einer durchgerechneten
+Zahl.** Der Eintrag von 17:15 sagte "Welche Aktion faehrt der Bot, und wie
+viele Erfolge braucht sie bis Rang 400.000?". Die Frage war richtig, die
+Antwort unvollstaendig - sie liess zwei Deckel aus.
+
+> **Leitgroesse: `max(Aktionszeit, Nachschubzeit)` bis Rang 400.000.**
+> Der Vorrat jeder Operationsart waechst mit 18,75 Stueck je Stunde
+> (`Bladeburner.ts`, `count += seconds * growthFunction() / 480`). Wer mit
+> niedriger Erfolgschance faehrt, verbrennt Vorrat statt Rang.
+
+| Aktion | Erfolge | Versuche | Aktionszeit | Nachschub | massgeblich |
+|---|---|---|---|---|---|
+| Raid | - | - | Abbruch nach 349 | - | **nicht gangbar** |
+| **Assassination** | 534 | 792 | 27,0 h | 18,9 h | **27,0 h** |
+| Stealth Retirement | 902 | 1.087 | 24,8 h | 33,9 h | 33,9 h |
+| Undercover | 1.822 | 1.839 | 20,9 h | 60,5 h | 60,5 h |
+
+*(Mit dem Graft-Paket aus `nodes/GRAFTING.md`. Ohne Grafting: 526 / 409 /
+246 h. Alle Modelle geeicht an der bbspann-Messung von 17:58.)*
+
+**Der zweite Deckel: Synthoid-Gemeinden.** Jeder erfolgreiche Raid ruft
+`--city.comms` (`Bladeburner.ts:830-836`). Ueber alle sechs Staedte gibt es
+**349**, und sie wachsen mit rund 0,007 je Stunde nach. Raid liefert damit
+83.237 Rang - 21 % des Wegs - und ist dann tot. Assassination und Stealth
+Retirement verbrauchen keine Gemeinde.
+
+**Was daraus folgt:** Der Ausgang liegt bei rund **70 Stunden** - etwa 42 h
+Graften, dann 27 h Assassination. Herleitung, Grenzen und der offene Punkt
+(das Graft-Paket ist nach Daedalus-Gewichten gebaut, nicht nach denen von
+Assassination) stehen im obersten Sofort-Punkt von `nodes/BAUSTELLEN.md`.
+
+---
+
 ## 30.08., 17:15 - BitNode 10: die Leitgroesse ist der Rang je OPERATION
 
 **Zweiter Korrektureintrag ausser der Reihe.** Der Eintrag von 14:45 ersetzte

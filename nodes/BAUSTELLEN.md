@@ -118,6 +118,89 @@ Regeln:
 
 ## Sofort
 
+### Chaos in Aevum steht bei 41,3 von 50 - zwei Incite-Laeufe kippen es (30.08., 14:25)
+
+Gemessen: Aevum (die Bladeburner-Stadt) **41,3**, Ishima **46,4**. Die
+          Schwelle ist **50** (`data/Constants.ts:31`, `ChaosThreshold`).
+
+Wirkung bei Ueberschreitung: `getChaosSuccessFactor` multipliziert die
+          Schwierigkeit mit `sqrt(1 + chaos - 50)` (`Actions/Action.ts:94-101`).
+          Ein Pruefagent hat es durchgerechnet: Chaos 60 statt 41 senkt die
+          Rangrate von 50,1 auf **15,1 je Stunde - Faktor 0,30**.
+
+Der Ausloeser ist der Bot selbst: `Incite Violence` addiert `+10` **und**
+          `+chaos/log10(chaos)` auf **jede** der sechs Staedte
+          (`Bladeburner.ts:1229-1233`). Bei Chaos 41 sind das **+35,6 je
+          Ausfuehrung** - ein einziger Lauf reisst die Schwelle.
+
+Der Rueckweg ist teuer: Diplomacy senkt bei Charisma 46 nur **1,23 Prozent
+          je 60-Sekunden-Aktion** (`getDiplomacyPercentage`,
+          `Bladeburner.ts:735-743`). Eine einzige Incite-Ausfuehrung
+          zurueckzunehmen kostet rund **51 Minuten ohne Rangertrag**.
+
+Der Riegel im Bot steht auf `chaosJetzt < 25` (`src/blade.js:2746`) und
+          haelt damit heute - aber die Rechnung dahinter war falsch, siehe den
+          korrigierten Punkt vom 12:40: Der hoechste sichere Startwert ist
+          **19**, nicht 23 und nicht 25. Bei einem Startwert von 20 landet ein
+          Durchlauf auf 50,31.
+
+Zu tun:   Den Riegel von 25 auf 19 senken. Das ist eine Zahl, exakt
+          hergeleitet, und sie steht seit 12:55 zweifach belegt in der Liste.
+          Danach messen, ob Incite ueberhaupt noch ausgeloest wird - falls
+          nein, ist der Vorratsnachschub neu zu betrachten.
+
+Dringlichkeit: **hoch.** Kein Schaden solange unter 50, aber der Abstand
+          betraegt 8,7 Punkte und ein einzelner Lauf kostet 35,6.
+
+### Die Einbau-Sperre in `bn4rep.js:683` greift nicht (30.08., 14:25)
+
+Gemessen: Um **09:21** hat `bn4rep.js` einen Augmentierungs-Einbau
+          ausgeloest. Der Einbau setzte die Kampfwerte auf 1, und der Bot hat
+          **drei Stunden** im Gym zurueckgebaut (`data/verlauf-strategie.json`,
+          Tiefstand 1 um 09:21, 99 um 12:24).
+
+Erwartet: Der Einbau haette nicht stattfinden duerfen. Die Sperre fuer
+          Kampfknoten wurde am 29.08. um 04:22 auf `n === 10` erweitert
+          (`src/bn4rep.js:683`) - genau fuer diesen Fall.
+
+Kosten:   Der Ertrag war praktisch null. Die Kampf-Multiplikatoren aenderten
+          sich kaum (str/def 1,597 -> 1,602, agi 1,677 -> 1,766), die
+          Bladeburner-Multiplikatoren gar nicht (alle vier stehen weiter auf
+          1,000). Bezahlt wurden dafuer drei Stunden Wiederaufbau plus der
+          Ratenverlust danach - ein Pruefagent beziffert den Gesamtposten auf
+          **5 bis 7 Stunden**.
+
+          `nodes/ERLEDIGT.md:1608-1640` hat denselben Fall am 29.08. schon
+          einmal gerechnet: **netto minus 90.810 Erfahrung = minus 6,6
+          Stunden**, mit dem Fazit "der Bot hat die schlechtere Option
+          gewaehlt". Es ist also der **zweite** Fehleinbau derselben Art -
+          und beim ersten Mal wurde eine Sperre eingebaut, die jetzt nicht
+          gegriffen hat.
+
+Verdacht: `src/bn4rep.js:683` und die Ausloeserkette bei `:1035-1040`. Die
+          Kette ist rein boolesch:
+
+              !ausgangSteht && wiederaufbauHilfe
+              && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
+              && (kleinsteLuecke > lueckeZuGross || nichtsMehrOffen || ...)
+              && !gesperrt
+
+          Zu pruefen ist, welches Glied durchgelassen hat - und ob `gesperrt`
+          ueberhaupt gesetzt war. **Der Auslöser kennt seinen Preis nicht:**
+          In der ganzen Datei steht kein einziger Aufruf, der den Rang oder
+          die Rangrate liest (`ns.bladeburner.*` kommt genau einmal vor, als
+          `inBladeburner()` in Zeile 714). `MINDEST_WARTESCHLANGE = 3` ist
+          eine **Stueckzahl** - drei beliebig schwache Augmentierungen loesen
+          aus, eine sehr starke nicht.
+
+Zu tun:   Erst messen, welches Glied der Kette am 09:21 wahr war (das
+          Protokoll steht in `data/bn4rep-log.txt` ueber die Bruecke). Dann
+          die Sperre reparieren - und getrennt davon pruefen, ob der
+          Ausloeser einen Preisterm bekommen sollte statt einer Stueckzahl.
+
+Dringlichkeit: **hoch.** Der naechste Fehleinbau kostet wieder 5 bis 7
+          Stunden, und er kann jederzeit kommen.
+
 ### Beide Ausgaenge gegeneinander gerechnet: Bladeburner bleibt der schnellere (30.08., 14:20)
 
 **Ergebnis der Alternativenpruefung, die Eric um 13:50 verlangt hat.** Drei

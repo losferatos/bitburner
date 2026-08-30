@@ -8,6 +8,75 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Ausdauer als Zielfunktion: geprueft, NICHT eingebaut - es gab sie schon (30.08., 15:30)
+
+**Engpass, gemessen ueber 2,6 Stunden** (`data/aktionen.txt`, 12:47-15:24,
+161 Abschnitte):
+
+    Hyperbolic Regeneration Chamber   5.878 s   62,4 %
+    Contracts/Tracking                2.757 s   29,3 %
+    Contracts/Retirement                690 s    7,3 %
+    Contracts/Bounty Hunter               0 s    0,0 %
+    Rangrate                                     41 je Stunde
+
+Der Kammeranteil ist von **49,5 Prozent** (06:47) auf **62,4** gestiegen -
+die Ausdauer bindet, und zwar staerker als heute frueh. Das ist der Engpass.
+
+**Die naheliegende Hypothese lag auf der Hand und ist falsch.** `beste()`
+sortiert nach `ertrag = rang * s.min / (dauer/60000)` - Rang je **Minute**
+(`src/blade.js:2404`). Im ausdauergebundenen Zustand ist aber Rang je
+**Ausdauerpunkt** die richtige Groesse. `bbspann.js` rechnet sie bereits als
+`zyklusrate`, und der Stand um 15:25 sieht eindeutig aus:
+
+    Vertrag           min     offen   r/Minute   Zyklusrate
+    Tracking        0,697       2,5      2,148        1,073   <- wird gefahren
+    Bounty Hunter   0,386     159,3      1,815        1,432   <- +33 %
+    Retirement      0,467     144,5      1,918        1,313
+
+Der Motor faehrt die Aktion mit der schlechtesten Zyklusrate **und** dem
+kleinsten Vorrat, waehrend 159 Bounty-Hunter-Auftraege im Regal liegen.
+
+**Warum trotzdem kein Eingriff: Genau das war schon einmal eingebaut und
+wurde mit einer Messung zurueckgedreht** (`src/blade.js:2385-2398`,
+26.08.2026, 10:15):
+
+    vorher (09:19-09:45)   55,5 % Kammer   0,926 Rang/min
+    danach (09:57-10:14)   62,3 % Kammer   0,606 Rang/min
+
+Erwartet waren mindestens 1,15, gekommen ist ein Drittel Verlust. Der
+Kommentar nennt als Ursache: **Bounty Hunter lag unter der
+Sicherheitsschwelle und lief ueber den Notvertrag-Zweig - jeder Fehlschlag
+kostet volle Ausdauer und bringt null Rang.**
+
+Heute gilt das **staerker als damals**: Bounty Hunter steht bei `min 0,386`,
+`SICHER_VERTRAG` ist 0,45. Damals waren es 44 Prozent. Die Bedingung, unter
+der die Aenderung scheiterte, ist heute deutlicher erfuellt.
+
+Und die Zyklusrate erklaert den Unterschied nicht: Sie rechnet den
+Erwartungswert (`gewinnEff * min - (1-min) * verlust`) und den vollen
+Ausdauerverbrauch je Lauf. Was sie **nicht** kennt, ist der Notvertrag-Zweig
+- ein Sonderweg mit eigener Logik. Solange nicht gemessen ist, was dort
+anders laeuft, waere ein zweiter Versuch Fehler-Ping-Pong.
+
+**Der echte Engpass ist ein anderer, und er ist neu:** Von den drei
+Vertraegen liegt nur **Tracking** ueber `SICHER_VERTRAG` (0,697), und
+Tracking hat **2,5** offene Auftraege. Retirement ist mit 0,467 knapp
+drueber und hat 144,5 - deshalb faellt der Motor darauf zurueck, wenn
+Tracking leer ist. Bounty Hunter mit 159,3 Auftraegen ist gesperrt.
+
+Der Hebel liegt damit **nicht** in der Zielfunktion, sondern in der
+**Erfolgschance**: Steigt Bounty Hunter ueber 0,45, faellt der groesste
+Vorrat des Knotens in die regulaere Auswahl. Das geht ueber Kampfwerte und
+Chance-Faehigkeiten - und in BitNode 10 sind die Kampfwerte durch
+`StrengthLevelMultiplier: 0.4` hart gedeckelt. Genau dort setzt der
+Grafting-Punkt in `nodes/BAUSTELLEN.md` an.
+
+Vorher:  41 Rang/h, Kammeranteil 62,4 % (15:24)
+Nachher: keine Aenderung - bewusst
+Naechste Pruefung: Steigt `min` von Bounty Hunter ueber 0,45, sobald die
+   Kampfwerte weiter wachsen? Dann faellt der Engpass von allein. Bleibt es
+   darunter, ist Grafting der einzige Weg.
+
 ## Der Wiederaufbau kostet 3,1 h, nicht 11,3 - die Kursrechnung steht auf der falschen Zahl (30.08., 12:30)
 
 **Engpass.** Waehrend des Wiederaufbaus nach einem Einbau liefert nur der

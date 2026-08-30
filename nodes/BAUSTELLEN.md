@@ -122,6 +122,76 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Zwischen Chaos 25 und 50 gibt es kein Zurueck - der Bot sitzt bei 41,37 (30.08., 12:40)
+
+Gemessen (Spielstand direkt, 12:35): Der Bladeburner operiert in **Aevum**
+(der Spieler-Avatar steht in Sector-12 fuers Gym - das ist korrekt und
+gewollt, Aevum hat mit 2.157 Mio die groesste Bevoelkerung).
+
+    Aevum      chaos 41,37   pop 2157M   comms 126   <- Bladeburner-Stadt
+    Ishima     chaos 46,82   pop 1085M
+    Chongqing  chaos 28,25   pop 1755M
+    New Tokyo  chaos 28,23   pop  828M
+    Sector-12  chaos 21,56   pop 1564M
+    Volhaven   chaos 20,01   pop 1831M
+
+**Kein akuter Schaden.** `getChaosSuccessFactor` gibt unterhalb von
+`ChaosThreshold = 50` exakt **1** zurueck (`Actions/Action.ts:94-101`,
+`data/Constants.ts:31`). Bei 41,37 kostet das Chaos also nichts.
+
+**Die Luecke.** Zwei Grenzen im Bot lassen ein Band offen, in dem es keinen
+billigen Weg zurueck gibt:
+
+    Incite Violence gesperrt ab   chaos >= 25   (`src/blade.js:2746`)
+    Diplomacy startet erst ab     chaos >= 50   (`CHAOS_EIN`, `blade.js:93`)
+
+Bei 41,37 ist Incite Violence gesperrt - und Incite ist der **einzige Weg des
+Spielers**, Kontrakt- und Operationsvorraete aufzufuellen
+(`Bladeburner.ts:1219-1225`). Faellt der Vorrat leer, bleibt nur der
+natuerliche Zuwachs von rund 30 Stueck je Stunde und Art.
+
+**Wie der Bot hierher kam - und das ist eine Folge des Fixes von 07:55.**
+Vorher lief kein einziger Incite-Durchlauf zu Ende (18 Abbrueche zwischen 11
+und 46 Sekunden), das Chaos blieb deshalb bei 7,7. Seit dem Fix laeuft die
+Aktion durch - und ein Durchlauf hebt das Chaos um `10 + chaos/log10(chaos)`
+in **jeder** Stadt (`Bladeburner.ts:1229-1233`). Rueckgerechnet: von rund 17
+auf 41,3. Der Fix ist richtig, die Nebenwirkung war nicht bedacht.
+
+**Der Deckel 25 ist zu hoch.** Der Kommentar an `blade.js:2746` rechnet: "Ein
+Durchlauf bringt es auf etwa 35, ein zweiter darueber - deshalb die Grenze
+bei 25." Nachgerechnet mit der echten Formel:
+
+    chaos 20  ->  20 + 10 + 20/1,301  =  45,4   noch unter 50
+    chaos 22  ->  22 + 10 + 22/1,342  =  48,4   noch unter 50
+    chaos 23  ->  23 + 10 + 23/1,362  =  49,9   knapp drunter
+    chaos 24  ->  24 + 10 + 24/1,380  =  51,4   REISST DIE SCHWELLE
+
+Der hoechste sichere Startwert ist **23**, nicht 25.
+
+**Diplomacy ist als Rueckweg zu teuer.** `getDiplomacyPercentage` ist
+`charisma^0,045 + charisma/1000` (`Bladeburner.ts:735-743`). Bei Charisma 30
+sind das **1,20 Prozent je 60 Sekunden**. Von 41,37 auf unter 25:
+
+    41,37 * 0,988^n < 25   ->   n = 42 Durchlaeufe = **42 Minuten ohne Rang**
+
+**Der billigere Rueckweg steht schon im Code, wird hier aber nicht genutzt:**
+Stealth Retirement senkt das Chaos um 1 bis 3 Prozent und zwar **auch bei
+Fehlschlag** - `changeChaosByPercentage` steht ausserhalb der
+Erfolgspruefung (`Bladeburner.ts:846-854`, im Bot bei `blade.js:100-110`
+korrekt hergeleitet). Es bringt dabei Rang. Der Bot fuehrt es aber nur unter
+`SPIEL_CHAOS_AN` als Senker, wenn `CHAOS_EIN = 50` erreicht ist.
+
+Zu tun (nicht in diesem Lauf, weil parallel ein Parameter-Audit von
+`blade.js` laeuft):
+1. Deckel von 25 auf **23** - exakt hergeleitet, eine Zahl.
+2. Pruefen, ob die Chaos-Senkung frueher anspringen sollte, wenn der
+   Vorrat knapp wird: Solange Chaos > 23 ist, kann der Spieler nicht
+   nachfuellen. Die Frage ist, ob das je bindet - dafuer muss gemessen
+   werden, wie schnell der Vorrat im Vollbetrieb faellt.
+
+Dringlichkeit: mittel. Kein Schaden solange chaos < 50 und der Vorrat haelt.
+Wird akut, sobald beides zusammenkommt.
+
 ### Sleeve-Shock steht nach dem Einbau auf 99,9 - Recovery lohnt trotzdem nicht (30.08., 12:15)
 
 Gemessen: `data/sleevediag.json` um 09:56: **shock 99,9**. Gestern vor dem

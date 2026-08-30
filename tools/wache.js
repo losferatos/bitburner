@@ -69,6 +69,12 @@ const MOTOR_MAX_ALTER = 10 * 60_000;
 // 45 Minuten sind grosszuegig: Eine Regenerationspause dauert Minuten, eine
 // lange Black Operation hoechstens eine Viertelstunde.
 const TRAEGER_STILL_MS = 45 * 60_000;
+// Ein Graft haelt den Rang absichtlich an: `blade.js` haelt still, solange
+// The Blade's Simulacrum fehlt (src/blade.js, Riegel am Schleifenanfang).
+// Das laengste Stueck im geplanten Paket dauert 2,03 h (nodes/GRAFTING.md),
+// also entschuldigt Grafting den Stillstand bis 2,5 h - danach steht etwas,
+// das nicht stehen sollte, und Eric will das wissen.
+const GRAFT_MAX_MS = 150 * 60_000;
 // bn4rep.js meldet sich ueber data/hb-rep.txt - einen reinen Zeitstempel, den
 // es ganz oben in jeder Runde schreibt.
 //
@@ -630,6 +636,31 @@ async function pruefe(zustand, jetzt) {
     // sie stehen, ist das Gym kaputt (leeres Konto, fremde Arbeit, misslungene
     // Reise) - und dann gehoert genau darueber gemeldet, mit eigenem Text.
     const imGym = typeof blade.aktion === "string" && blade.aktion.startsWith("Gym/");
+    // GRAFTING IST EIN GEWOLLTER STILLSTAND - ABER NICHT UNBEGRENZT
+    // (30.08.2026, 19:50, aus einem Skeptiker-Lauf).
+    //
+    // Der Graft-Riegel in blade.js schreibt jede Runde frische Telemetrie,
+    // die Motorfrische-Pruefung schlaegt also nicht an. Uebrig bleibt die
+    // Traegerpruefung weiter unten - und "Grafting" beginnt nicht mit
+    // "Gym/", die bestehende Ausnahme greift nicht. Ohne diesen Block
+    // erzeugt jedes Graft ueber 45 Minuten einen Push aufs Handy.
+    //
+    // Der Deckel ist die andere Haelfte: Ein Riegel, der sich verklemmt,
+    // saehe sonst genauso aus wie ein legitimer Graft - und niemand merkte
+    // es.
+    const graftet = blade.aktion === "Grafting";
+    if (graftet) { if (!zustand.graftSeit) zustand.graftSeit = jetzt; }
+    else { zustand.graftSeit = null; }
+    const graftZuLang = graftet && zustand.graftSeit
+      && (jetzt - zustand.graftSeit) > GRAFT_MAX_MS;
+    if (graftZuLang) {
+      befunde.push({
+        typ: "graft",
+        text: "Der Bot graftet seit " + minuten(jetzt - zustand.graftSeit)
+          + " min. Das laengste geplante Stueck dauert 122 min - der Riegel"
+          + " in blade.js haengt vermutlich fest.",
+      });
+    }
     let kampfSteigt = false;
     if (imGym && Number.isFinite(blade.tiefstand)) {
       messwerte.tiefstand = blade.tiefstand;
@@ -649,7 +680,7 @@ async function pruefe(zustand, jetzt) {
           + " min nicht. Konto leer, fremde Arbeit oder Reise misslungen?",
       });
     }
-    if (vorher && !gedrosselt && !imGym && blade.rang <= vorher.rang) {
+    if (vorher && !gedrosselt && !imGym && !(graftet && !graftZuLang) && blade.rang <= vorher.rang) {
       befunde.push({
         typ: "traeger",
         text: "Bladeburner-Rang steht seit " + minuten(jetzt - vorher.ts)

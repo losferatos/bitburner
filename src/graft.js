@@ -66,6 +66,26 @@ export async function main(ns) {
   }
 
   // --- 3. Pruefungen vor dem Geldausgeben -----------------------------------
+  //
+  // LAEUFT SCHON EINS? Dann auf keinen Fall ein zweites starten.
+  // `getGraftableAugmentations` hilft hier NICHT: `GraftingHelpers.ts:20`
+  // filtert nur `!Player.hasAugmentation(aug)`, und eine gerade im Graft
+  // befindliche Augmentierung steht weder in `augmentations` noch in
+  // `queuedAugmentations` - sie bleibt in der Liste. Ein zweiter Aufruf
+  // liefe also durch, `Player.startWork` (`PlayerObjectWorkMethods.ts:5-10`)
+  // riefe `finish(true)` auf dem laufenden Graft, und der Konstruktor von
+  // `GraftingWork` (`:33`) buchte den Preis ein zweites Mal ab. Zweimal
+  // "The Blade's Simulacrum" im Abstand von 30 Sekunden waeren $900 Mrd fuer
+  // eine Augmentierung - lautlos, weil der Abbruchdialog bei
+  // `singularity: true` unterdrueckt ist (`GraftingWork.tsx:75-83`).
+  let laufend = null;
+  try { laufend = ns.singularity.getCurrentWork(); } catch { laufend = null; }
+  if (laufend && laufend.type === "GRAFTING") {
+    raus.fehler = "Es laeuft bereits ein Graft ("
+      + (laufend.augmentation || "unbekannt") + ") - nichts angefasst.";
+    fertig(ns, raus);
+    return;
+  }
   if (!liste.includes(wunsch)) {
     raus.fehler = "Nicht graftbar (Name falsch, schon installiert oder isSpecial ohne Bladeburners): " + wunsch;
     fertig(ns, raus);
@@ -108,17 +128,21 @@ export async function main(ns) {
 
   // --- 5. Das Rennfenster schliessen ---------------------------------------
   //
-  // `Bladeburner.process()` laeuft nur einmal je Sekunde
-  // (`engine.tsx`, `Counters.bladeburnerProcess = 5`). Zwischen dem Graftstart
-  // und dem naechsten `process()` liefert `getCurrentAction()` noch die alte
-  // Aktion - der Riegel in blade.js liesse die Runde also durch, und
-  // `startAction` toetete das frische Graft, ohne dass ein Dialog erschiene
-  // (`GraftingWork.tsx:74-83` meldet den Abbruch nur ausserhalb von
-  // Singularity). Ein `stopBladeburnerAction()` vorweg macht das Fenster zu:
-  // Es ruft nur `resetAction` (`Bladeburner.ts:249-253`) und kostet nichts -
-  // die naechste Aktion setzt der Motor ohnehin neu.
+  // KORRIGIERTE BEGRUENDUNG (30.08.2026, 21:00, nach einem Skeptiker-Lauf).
   //
-  // Mit installiertem Simulacrum ist das unnoetig, schadet aber auch nicht.
+  // Die erste Fassung sprach von einem Rennfenster: `getCurrentAction()`
+  // liefere nach dem Graftstart noch die alte Aktion, der Riegel in blade.js
+  // liesse die Runde durch. **Das Rennen gibt es nicht mehr** - der Riegel
+  // liest seit Commit 578e750 keinen Aktionszustand, sondern die Datei
+  // `data/simulacrum.txt` (`blade.js`, Riegel am Schleifenanfang).
+  //
+  // Der Aufruf bleibt trotzdem richtig, nur aus einem anderen Grund:
+  // `Bladeburner.process()` oeffnet einen Dialog "Your Bladeburner action was
+  // cancelled...", sobald eine Spielerarbeit laeuft und eine Aktion gesetzt
+  // ist (`Bladeburner.ts:1354-1362`) - aber nur `if (this.action)`. Wer die
+  // Aktion vorher zurueckstellt, bekommt keinen Dialog. Und
+  // `stopBladeburnerAction` ruft nur `resetAction` (`Bladeburner.ts:249-253`),
+  // kostet also nichts: Die naechste Aktion setzt der Motor ohnehin neu.
   try { ns.bladeburner.stopBladeburnerAction(); } catch { /* nicht in der Division */ }
 
   // --- 6. Graften -----------------------------------------------------------

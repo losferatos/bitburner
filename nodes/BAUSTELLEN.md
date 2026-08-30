@@ -125,7 +125,9 @@ Fuenf Commits am unbeaufsichtigten Code geprueft (`a8cbe68`, `0cc22a2`,
 loeschte den Graft-Riegel wieder - ist behoben und committet. Diese vier
 bleiben; keiner richtet unbeaufsichtigt Schaden an, alle sind belegt.
 
-**1. `src/bn4rep.js`: die Graftpruefung liegt bis zu 3,5 s vor dem Einbau.**
+**1. ERLEDIGT 01:50 (Commit `[skeptiker] bn4rep: Graftpruefung unmittelbar
+vor installAugmentations`). `src/bn4rep.js`: die Graftpruefung lag bis zu
+3,5 s vor dem Einbau.**
 Zwischen der Pruefung (`:736-741`) und `installAugmentations` (`:1173`) liegen
 `await ns.sleep(50)` (bis 40-mal) und ein `await ns.sleep(1500)`. Der Messwert
 ist beim Ausfuehren also veraltet. Das Fenster ist klein, aber der Einsatz ist

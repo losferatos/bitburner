@@ -2911,6 +2911,41 @@ export async function main(ns) {
   let gewichen = false;
   for (;;) {
     try {
+      // GRAFTING HAT VORFAHRT - DER MOTOR HAELT STILL (30.08.2026, 19:15).
+      //
+      // `Bladeburner.startAction` ruft `Player.finishWork(true)`
+      // UNBEDINGT, solange `The Blade's Simulacrum` nicht installiert ist
+      // (`Bladeburner.ts:177-180`), und zwar noch vor der
+      // Verfuegbarkeitspruefung. Dieser Motor ruft `startAction` im
+      // Sekundentakt. Ein Graft waere damit abgebrochen, bevor es eine
+      // Minute laeuft - und `GraftingWork.finish(cancelled)` gibt das Geld
+      // NICHT zurueck (`Work/GraftingWork.tsx:75-83`). Beim Simulacrum
+      // selbst waeren das $450 Mrd je Versuch.
+      //
+      // Den Motor abzuschalten hilft nicht: `src/bn4net.js:253` startet
+      // ihn jede Motorrunde nach. Der Riegel muss hier drin sitzen.
+      //
+      // WORAN ER ERKENNT, OB DAS SIMULACRUM DA IST - ohne einen weiteren
+      // Singularity-Aufruf zu bezahlen: am Verhalten. Fehlt es, hat die
+      // Engine die Bladeburner-Aktion beim Graftstart selbst
+      // zurueckgesetzt (`Bladeburner.ts:1354-1365`), `getCurrentAction()`
+      // liefert dann null. Ist es da, laeuft die Aktion weiter - und dann
+      // DARF der Motor nicht stillhalten, sonst endet die laufende Aktion
+      // und es folgt keine. Genau diese zweite Haelfte ist der Grund,
+      // warum hier nicht pauschal auf "Graft laeuft" geriegelt wird.
+      let graftRiegel = false;
+      try {
+        const arbeit = ns.singularity.getCurrentWork();
+        if (arbeit && arbeit.type === "GRAFTING") {
+          graftRiegel = !ns.bladeburner.getCurrentAction();
+        }
+      } catch { graftRiegel = false; }
+      if (graftRiegel) {
+        meldeLage("Grafting", "Graft laeuft ohne Simulacrum - Motor haelt still", null);
+        await ns.bladeburner.nextUpdate();
+        continue;
+      }
+
       // WER ZU SCHWACH IST, MACHT PLATZ (25.08.2026).
       //
       // Nach einem Augmentierungs-Einbau stehen alle Kampfwerte auf 1. In

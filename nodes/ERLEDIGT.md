@@ -23,6 +23,98 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### RESET 23:02: Augmentierungs-Einbau - Wiederanlauf vollstaendig, alle Grafts ueberlebt (30.08., 23:05)
+
+**Kein Fehler, aber ein Einschnitt.** `bn4rep.js` hat eingebaut, nachdem
+`Combat Rib I` gegen 22:57 fertig war - der Graft-Riegel aus `064acef` greift
+nur waehrend eines Grafts, und danach war keins mehr offen.
+
+**Der Wiederanlauf steht** (`data/ps.json`, 23:02:57): `bn4net`, `bn4life`,
+`blade`, `bbtrain`, `homegrow`, `contracts`, `wakelock`, `popups`, `bn4rep`,
+`bn4door`, `joinrun` auf home, `sleeve` auf iron-gym. **Kein Werkzeug fehlt** -
+anders als nach dem Einbau vom 25.08., wo sechs fehlten.
+
+**Alle drei gegrafteten Augmentierungen haben ueberlebt** - erwartet, aber
+jetzt belegt: `Neuroreceptor Management Implant`, `The Blade's Simulacrum`,
+`Combat Rib I` stehen als installiert. Dazu neu aus dem Einbau:
+`Neurotrainer II`, `Embedded Netburner Module`, `EsperTech Bladeburner
+Eyewear`. **23 Augmentierungen** statt 17.
+
+`data/simulacrum.txt` steht weiterhin - richtig, das Simulacrum ist
+installiert.
+
+**Der Preis:**
+
+| | vor dem Einbau | danach |
+|---|---|---|
+| Geld | $28,4 Bio | **$32,1 Mio** |
+| Kampfwerte | str 100 def 101 dex 134 agi 113 | **str 40 def 30 dex 37 agi 28** |
+| Netz | 85/85 | 47/76 |
+| Hacking | 376 | 224 |
+
+**Drei Entropiestapel wirken jetzt sichtbar:** Die Bladeburner-Multiplikatoren
+stehen unter 1 - `chance 0,969`, `ausdauer 0,941`, `regen 0,941`,
+`analyse 0,941`. Das ist `0,98^3 = 0,941`, bei der Chance durch EsperTech
+(+3 %) auf 0,969 gehoben. Der Skeptiker hatte genau das vorhergesagt.
+
+**Was das fuer den Graftplan heisst:** `SPTN-97` kostet $14,63 Mrd, im Konto
+sind $32 Mio. Der Plan bleibt gueltig, aber er wartet auf das Geld - und das
+kommt aus dem Netz, das gerade selbst wieder aufgebaut wird. `graftnext.js`
+tut von selbst nichts, solange nichts bezahlbar ist; `graft.js` bricht bei zu
+wenig Geld mit einer Meldung ab, ohne etwas anzufassen.
+
+**Zu pruefen im naechsten Lauf:** Ob `bbtrain` den Tiefstand von 28 wieder auf
+100 bringt und `blade.js` danach uebernimmt. Das ist der bekannte
+Wiederaufbau-Pfad, kein neuer Fall.
+
+---
+
+### STAND 23:45 und was als Naechstes zu tun ist
+
+**Der Graft-Kanal ist offen und erprobt.** Drei Augmentierungen sind gegraftet
+(`Neuroreceptor Management Implant`, `The Blade's Simulacrum`, `Combat Rib I`),
+vier Riegel stehen und sind einzeln verifiziert (`578e750`, `a734b54`,
+`1787239`, `1062631`, `064acef`, `543cb6f`, `0cc22a2`), und ein Treiber
+(`tools/graftnext.js`) arbeitet die Reihenfolge aus `nodes/GRAFTPLAN.md` ab.
+**Ab dem Simulacrum kostet Graften keinen Rang** - belegt um 22:13 mit
+`Arbeit GRAFTING` und `Contracts/Tracking` gleichzeitig.
+
+**Der Einbau um 23:02 hat die Lage zurueckgesetzt**, aber nicht den Fortschritt:
+Rang 1142 steht, alle Grafts sind installiert, der Wiederanlauf war
+vollstaendig. Verloren sind Geld (auf $16.537) und die Kampfwerte (auf 70, im
+Wiederaufbau).
+
+**Was der naechste Lauf tut, in dieser Reihenfolge:**
+
+1. **Warten, bis der Tiefstand wieder ueber 100 steht.** `bbtrain.js` baut auf
+   (23:28: 70), das dauert noch. Solange greift `blade.js` nicht, und
+   `graftnext.js` findet ohnehin nichts Bezahlbares.
+2. **Sobald Geld da ist, den Treiber laufen lassen:**
+   ```
+   node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
+   node tools/graftnext.js --los     # naechstes Stueck aus dem Plan
+   ```
+   Der Treiber tut von selbst nichts, solange ein Graft laeuft oder
+   `data/bbgraft.json` aelter als 30 Minuten ist.
+3. **`violet Congruity Implant` einschieben, sobald $150 Bio da sind** - nicht
+   am Ende. Es loescht die Entropie rueckwirkend und verhindert jede weitere
+   (`AugmentationHelpers.ts:45-49`, `GraftingWork.tsx:61-64`). Begruendung in
+   `nodes/GRAFTPLAN.md`.
+
+**Die Regel fuer den Einbau, aus dem Skeptiker-Lauf von 23:25:** Nicht "nie
+einbauen", sondern **erst das Paket graften, dann Congruity, dann EINMAL
+einbauen - mit maximaler NeuroFlux-Ladung und maximalem Favor.** Der
+`NeuroFlux Governor` ist die einzige nicht graftbare Augmentierung, die dieser
+Bot erreichen kann, und mit x1,105 auf alles fuer rund 18 Minuten Einkommen
+die billigste Multiplikatorquelle im Spiel.
+
+**Nicht anfassen:** Eine Einbausperre in `bn4rep.js`. Sie wurde geprueft und
+verworfen - `bn4rep.js:1180-1195` kauft unabhaengig von der Sperre, die
+1,9er-Treppe wuechse unbegrenzt, und der Einbau ist heute das Einzige, was sie
+zurueckraeumt. Details im Archiv unter "ZURUECKGEZOGEN: die Einbausperre".
+
+---
+
 ### Charisma im Diplomacy-Kommentar ist um Faktor 4 zu hoch (30.08., 18:00)
 
 `src/blade.js` rechnet im Kommentarblock um Zeile 2244 mit "Charisma 309,

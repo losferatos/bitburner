@@ -118,93 +118,49 @@ Regeln:
 
 ## Sofort
 
-### STAND 23:45 und was als Naechstes zu tun ist
+### STAND 00:45: SPTN-97 laeuft, und der Einbau hat die Rangrate um 61 % gehoben
 
-**Der Graft-Kanal ist offen und erprobt.** Drei Augmentierungen sind gegraftet
-(`Neuroreceptor Management Implant`, `The Blade's Simulacrum`, `Combat Rib I`),
-vier Riegel stehen und sind einzeln verifiziert (`578e750`, `a734b54`,
-`1787239`, `1062631`, `064acef`, `543cb6f`, `0cc22a2`), und ein Treiber
-(`tools/graftnext.js`) arbeitet die Reihenfolge aus `nodes/GRAFTPLAN.md` ab.
-**Ab dem Simulacrum kostet Graften keinen Rang** - belegt um 22:13 mit
-`Arbeit GRAFTING` und `Contracts/Tracking` gleichzeitig.
+**Alles laeuft parallel, wie gebaut:** `Arbeit GRAFTING` (SPTN-97, seit 00:26,
+99,4 min), `blade.js` faehrt `Contracts/Tracking`, `bbtrain` haelt still. Rang
+1282 um 00:40, Hacking von 224 auf 354 erholt, Geld $221,9 Mrd.
 
-**Der Einbau um 23:02 hat die Lage zurueckgesetzt**, aber nicht den Fortschritt:
-Rang 1142 steht, alle Grafts sind installiert, der Wiederanlauf war
-vollstaendig. Verloren sind Geld (auf $16.537) und die Kampfwerte (auf 70, im
-Wiederaufbau).
+**Der Befund dieses Laufs - und er korrigiert meine Einbau-Kritik ein zweites
+Mal:**
 
-**Was der naechste Lauf tut, in dieser Reihenfolge:**
+| | Rangrate |
+|---|---|
+| 21:43-22:43 (vor dem Einbau) | **53,9 /h** |
+| 23:03-00:40 (nach dem Einbau) | **86,6 /h** |
 
-1. **Warten, bis der Tiefstand wieder ueber 100 steht.** `bbtrain.js` baut auf
-   (23:28: 70), das dauert noch. Solange greift `blade.js` nicht, und
-   `graftnext.js` findet ohnehin nichts Bezahlbares.
-2. **Sobald Geld da ist, den Treiber laufen lassen:**
-   ```
-   node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
-   node tools/graftnext.js --los     # naechstes Stueck aus dem Plan
-   ```
-   Der Treiber tut von selbst nichts, solange ein Graft laeuft oder
-   `data/bbgraft.json` aelter als 30 Minuten ist.
-3. **`violet Congruity Implant` einschieben, sobald $150 Bio da sind** - nicht
-   am Ende. Es loescht die Entropie rueckwirkend und verhindert jede weitere
-   (`AugmentationHelpers.ts:45-49`, `GraftingWork.tsx:61-64`). Begruendung in
-   `nodes/GRAFTPLAN.md`.
+**Plus 61 Prozent**, und das bei einem Tiefstand von 96 statt 101. Die drei
+gekauften Augmentierungen und der Favor-Sprung wirken sofort und dauerhaft;
+die Kampf-Multiplikatoren stehen jetzt bei str 1,796 statt 1,602.
 
-**Die Regel fuer den Einbau, aus dem Skeptiker-Lauf von 23:25:** Nicht "nie
-einbauen", sondern **erst das Paket graften, dann Congruity, dann EINMAL
-einbauen - mit maximaler NeuroFlux-Ladung und maximalem Favor.** Der
-`NeuroFlux Governor` ist die einzige nicht graftbare Augmentierung, die dieser
-Bot erreichen kann, und mit x1,105 auf alles fuer rund 18 Minuten Einkommen
-die billigste Multiplikatorquelle im Spiel.
+**Damit ist die Bilanz des Einbaus vollstaendig, und sie faellt anders aus als
+um 23:12 behauptet:**
 
-**Nicht anfassen:** Eine Einbausperre in `bn4rep.js`. Sie wurde geprueft und
-verworfen - `bn4rep.js:1180-1195` kauft unabhaengig von der Sperre, die
-1,9er-Treppe wuechse unbegrenzt, und der Einbau ist heute das Einzige, was sie
-zurueckraeumt. Details im Archiv unter "ZURUECKGEZOGEN: die Einbausperre".
+- **Kosten:** Geldrate faellt um Faktor 34, Erholung dauert Stunden (gemessen
+  00:30, `nodes/HEBEL.md`). Fuer `violet Congruity Implant` ($150 Bio) heisst
+  das Tage statt Stunden.
+- **Ertrag:** +61 % Rangrate, Favor auf sechs Faktionen (ueber +25 %
+  Reputationsrate), drei Augmentierungen.
 
-### RESET 23:02: Augmentierungs-Einbau - Wiederanlauf vollstaendig, alle Grafts ueberlebt (30.08., 23:05)
+**Der Rang ist die Leitgroesse dieses Knotens** (`nodes/KURS.md`), nicht das
+Geld. Nach dieser Zahl war der Einbau richtig - meine Kritik von 23:12 hat die
+falsche Groesse bilanziert. Was bleibt, ist die Reihenfolge: **erst graften,
+dann einbauen** - nicht, weil Einbauen schlecht waere, sondern weil ein Einbau
+mitten im Graftplan das Geld vernichtet, das der Plan braucht.
 
-**Kein Fehler, aber ein Einschnitt.** `bn4rep.js` hat eingebaut, nachdem
-`Combat Rib I` gegen 22:57 fertig war - der Graft-Riegel aus `064acef` greift
-nur waehrend eines Grafts, und danach war keins mehr offen.
+**Naechster Schritt:** Wenn SPTN-97 gegen 02:05 durch ist, hebt es die
+Kampfwerte um Faktor 9,38 - der Tiefstand steht dann bei rund 860 statt 96.
+Danach laeuft der Treiber weiter:
 
-**Der Wiederanlauf steht** (`data/ps.json`, 23:02:57): `bn4net`, `bn4life`,
-`blade`, `bbtrain`, `homegrow`, `contracts`, `wakelock`, `popups`, `bn4rep`,
-`bn4door`, `joinrun` auf home, `sleeve` auf iron-gym. **Kein Werkzeug fehlt** -
-anders als nach dem Einbau vom 25.08., wo sechs fehlten.
+```
+node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
+node tools/graftnext.js --los     # naechstes Stueck aus nodes/GRAFTPLAN.md
+```
 
-**Alle drei gegrafteten Augmentierungen haben ueberlebt** - erwartet, aber
-jetzt belegt: `Neuroreceptor Management Implant`, `The Blade's Simulacrum`,
-`Combat Rib I` stehen als installiert. Dazu neu aus dem Einbau:
-`Neurotrainer II`, `Embedded Netburner Module`, `EsperTech Bladeburner
-Eyewear`. **23 Augmentierungen** statt 17.
-
-`data/simulacrum.txt` steht weiterhin - richtig, das Simulacrum ist
-installiert.
-
-**Der Preis:**
-
-| | vor dem Einbau | danach |
-|---|---|---|
-| Geld | $28,4 Bio | **$32,1 Mio** |
-| Kampfwerte | str 100 def 101 dex 134 agi 113 | **str 40 def 30 dex 37 agi 28** |
-| Netz | 85/85 | 47/76 |
-| Hacking | 376 | 224 |
-
-**Drei Entropiestapel wirken jetzt sichtbar:** Die Bladeburner-Multiplikatoren
-stehen unter 1 - `chance 0,969`, `ausdauer 0,941`, `regen 0,941`,
-`analyse 0,941`. Das ist `0,98^3 = 0,941`, bei der Chance durch EsperTech
-(+3 %) auf 0,969 gehoben. Der Skeptiker hatte genau das vorhergesagt.
-
-**Was das fuer den Graftplan heisst:** `SPTN-97` kostet $14,63 Mrd, im Konto
-sind $32 Mio. Der Plan bleibt gueltig, aber er wartet auf das Geld - und das
-kommt aus dem Netz, das gerade selbst wieder aufgebaut wird. `graftnext.js`
-tut von selbst nichts, solange nichts bezahlbar ist; `graft.js` bricht bei zu
-wenig Geld mit einer Meldung ab, ohne etwas anzufassen.
-
-**Zu pruefen im naechsten Lauf:** Ob `bbtrain` den Tiefstand von 28 wieder auf
-100 bringt und `blade.js` danach uebernimmt. Das ist der bekannte
-Wiederaufbau-Pfad, kein neuer Fall.
+Der Treiber tut von selbst nichts, solange ein Graft laeuft.
 
 ### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
 

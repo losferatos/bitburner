@@ -1,5 +1,14 @@
 # Grafting in BitNode 10 - die geeichte Rechnung
 
+> **GESPERRT (30.08., 17:05).** Die Rechnung unten haelt - ein Skeptiker-Lauf
+> hat Preise, Zeiten, Entropie, Skill-Formel und die Simulacrum-Mechanik
+> unabhaengig nachgerechnet und bestaetigt. Gekippt ist ihre **betriebliche
+> Folge**: In der hier beschriebenen Reihenfolge wuerde das erste Graft binnen
+> Sekunden abgebrochen und $450 Mrd waeren weg. Siehe den Abschnitt
+> "Warum nicht gegraftet werden darf" am Ende. **Nicht ausfuehren, bevor die
+> drei dort genannten Codeaenderungen drin sind.**
+
+
 *30.08.2026, 16:40. Quelle: `reference/bitburner-src/src/`, gegengeprueft am
 laufenden Spiel ueber `src/bbgraft.js` -> `data/bbgraft.json`.*
 
@@ -127,3 +136,67 @@ node tools/task.js bbgraft.js      # schreibt data/bbgraft.json im Spiel
 Die Auswertung liegt als Wegwerfskript im Scratchpad und ist bewusst nicht
 eingecheckt - sie ist eine Momentaufnahme, kein Werkzeug. Wer sie neu braucht,
 baut sie aus den vier Eichungen oben neu auf.
+
+## Warum nicht gegraftet werden darf (Nachtrag 17:05)
+
+Drei Befunde aus dem Skeptiker-Lauf, jeder selbst am Quellcode nachgeprueft.
+
+**1. `blade.js` vernichtet das erste Graft in Sekunden.**
+`Bladeburner.startAction` ruft `Player.finishWork(true)` **unbedingt** und noch
+vor der Verfuegbarkeitspruefung, solange das Simulacrum nicht installiert ist
+(`Bladeburner.ts:177-180`). `src/blade.js:3285` ruft `startAction` im
+Sekundentakt. Das Geld fuer ein abgebrochenes Graft kommt nicht zurueck
+(`Work/GraftingWork.tsx:75-83`). `blade.js` abschalten hilft nicht -
+`src/bn4net.js:253` startet es jede Motorrunde nach.
+
+Das ist der Denkfehler in der urspruenglichen Fassung: Ich habe geprueft, ob
+das Simulacrum die Bladeburner-Aktion **schuetzt** (`Bladeburner.ts:1354`,
+tut es), aber nicht, was der Bot **selbst** tut, waehrend er sie noch nicht hat.
+
+**2. Das 99er-Fenster.** Das Simulacrum bringt keinen Kampfmultiplikator, seine
+Entropie senkt aber alles um 2 %: Tiefstand 101 -> **99**. Damit verlaesst
+`src/bbtrain.js:117` seine Warteschleife, reist nach Sector-12 (`:162`),
+startet Gym-Arbeit (`:244`) und ruft am Ende unbedingt
+`ns.singularity.stopAction()` (`:258`). Jedes davon killt ein laufendes Graft.
+`src/blade.js:3072` parkt zusaetzlich die Bladeburner-Aktion bei Tiefstand
+unter 100 - die Aussage "42 h Graft-Zeit kosten keinen Rang" gilt fuer dieses
+Fenster **nicht**.
+
+**3. Offline-Zeit verfaellt.** `engine.tsx:281-283` ruft `Player.processWork`
+mit den Nachholzyklen in **einem einzigen Aufruf**. `GraftingWork.process`
+meldet einmal fertig, der Ueberschuss verfaellt ersatzlos. Pro Offline-Block
+landet hoechstens **eine** Augmentierung. Ein 42-h-Plan ueberspannt zwei
+Naechte. (Gedrosselter Tab ist dagegen unkritisch - Grafting hat keinen
+Pro-Tick-Deckel wie Bladeburner. Ein Reload ueberlebt ein Graft:
+`GraftingWork` hat `toJSON`/`fromJSON`.)
+
+### Was gebaut sein muss, bevor das erste Graft startet
+
+Jedes Stueck laeuft unbeaufsichtigt, also jedes mit Skeptiker vor dem Commit.
+
+1. `src/blade.js`: Riegel gegen `startAction`, solange ein Graft laeuft und das
+   Simulacrum fehlt. Und die Tiefstandssperre (`:3072`) muss ein laufendes
+   Graft kennen.
+2. `src/bbtrain.js`: muss `type === "GRAFTING"` kennen - Warteschleife halten,
+   nicht reisen, `stopAction()` in `:258` nicht unbedingt rufen.
+3. `tools/wache.js:830-861`: unterscheidet `GRAFTING` nicht von "bbtrain
+   fehlt" und startet `bbtrain.js` alle 15 Minuten nach, samt Push an Eric.
+
+### Korrigierte Reihenfolge
+
+**`Neuroreceptor Management Implant` zuerst** ($1,6 Mrd, 14 min). Ohne sie
+kostet jeder Verlust des Fokus 20 % Grafttempo
+(`focusPenalty`, `PlayerObjectGeneralMethods.ts:622-628`) - aus 42,4 h werden
+53 h. Danach das Simulacrum und die erste Kampf-Augmentierung als **Paar**,
+weil das 99er-Fenster dazwischen der gefaehrlichste Moment des Laufs ist.
+
+### Was geprueft und nicht beanstandet wurde
+
+`bn4rep.js` startet in BitNode 10 weder Faktions- noch Firmenarbeit
+(`BLADE_KNOTEN = [6, 7, 10]`, `:70`, `:389`). `bn4life.js` begeht in der
+Division keine Verbrechen (`:369`). `blade.js` kann waehrend eines Grafts
+weder das Gym greifen noch den Spieler bewegen (`:1042-1047` prueft
+`type !== "CLASS"` vor der Reise). `sleeve.js` fasst `currentWork` nie an.
+Eine Reise bricht ein laufendes Graft **nicht** ab - New Tokyo ist nur fuer den
+Start noetig. Das Geldbudget ist unkritisch: $0,42 Bio sind bei der aktuellen
+Einnahmerate rund sechs Minuten.

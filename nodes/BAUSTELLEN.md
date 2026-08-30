@@ -118,6 +118,58 @@ Regeln:
 
 ## Sofort
 
+### GESPERRT bis drei Codeaenderungen drin sind - Graft-Kanal oeffnen (30.08., 16:40, gesperrt 17:05)
+
+**NICHT AUSFUEHREN. Wer jetzt graftet, verbrennt $450 Mrd in Sekunden.**
+
+Ein Skeptiker-Lauf hat den Plan in seiner urspruenglichen Reihenfolge gekippt.
+Drei Befunde, alle selbst am Quellcode nachgeprueft:
+
+1. **`Bladeburner.startAction` bricht jede Spielerarbeit ab** - unbedingt und
+   noch vor der Verfuegbarkeitspruefung, solange `The Blade's Simulacrum` nicht
+   installiert ist (`Bladeburner.ts:177-180`: `Player.finishWork(true)`).
+   `src/blade.js:3285` ruft `startAction` im Sekundentakt. Das Simulacrum-Graft
+   waere also abgebrochen, bevor es eine Minute laeuft - und
+   `GraftingWork.finish(cancelled)` gibt das Geld **nicht** zurueck
+   (`Work/GraftingWork.tsx:75-83`). `blade.js` killen hilft nicht:
+   `src/bn4net.js:253` startet es jede Motorrunde nach.
+2. **Das Simulacrum bringt keinen Kampfmultiplikator**, seine Entropie senkt
+   aber alle Werte um 2 %. Der Tiefstand faellt von 101 auf **99**. Damit
+   verlaesst `src/bbtrain.js:117` seine Warteschleife, reist nach Sector-12
+   (`:162`), startet Gym-Arbeit (`:244`) und ruft am Ende **unbedingt**
+   `ns.singularity.stopAction()` (`:258`) - jedes davon killt ein laufendes
+   Graft. Und `src/blade.js:3072` parkt bei Tiefstand unter 100 die
+   Bladeburner-Aktion, Simulacrum hin oder her. Die Aussage "42 h Graft-Zeit
+   kosten keinen Rang" gilt fuer dieses Fenster **nicht**.
+3. **Offline-Zeit verfaellt.** `engine.tsx:281-283` ruft `processWork` mit den
+   Nachholzyklen in **einem einzigen Aufruf**; `GraftingWork.process` meldet
+   einmal fertig, der Ueberschuss ist weg. Pro Offline-Block landet hoechstens
+   **eine** Augmentierung. Ein 42-h-Plan ueberspannt zwei Naechte.
+
+**Was vor dem ersten Graft gebaut sein muss** (jedes Stueck laeuft
+unbeaufsichtigt, also jedes mit Skeptiker vor dem Commit):
+
+- `src/blade.js`: Riegel, der `startAction` aussetzt, solange ein Graft laeuft
+  und das Simulacrum fehlt. Zusaetzlich muss die Sperre bei Tiefstand unter 100
+  (`:3072`) ein laufendes Graft kennen.
+- `src/bbtrain.js`: muss `type === "GRAFTING"` kennen - Warteschleife nicht
+  verlassen, nicht reisen, `stopAction()` in `:258` nicht unbedingt rufen.
+- `tools/wache.js:830-861`: unterscheidet `GRAFTING` nicht von "bbtrain fehlt"
+  und startet `bbtrain.js` alle 15 Minuten nach, samt Push an Eric.
+
+**Reihenfolge danach:** `Neuroreceptor Management Implant` ($1,6 Mrd, 14 min)
+**zuerst** - ohne sie kostet jeder Verlust des Fokus 20 % Grafttempo
+(`focusPenalty`, `PlayerObjectGeneralMethods.ts:622-628`), aus 42,4 h werden
+53 h. Dann Simulacrum, dann SPTN-97. Simulacrum und die erste Kampf-Aug
+gehoeren als **Paar** geplant: das 99er-Fenster dazwischen ist der
+gefaehrlichste Moment des ganzen Laufs.
+
+Die Rechnung selbst haelt - Preise, Zeiten, Entropie, Skill-Formel und die
+Simulacrum-Mechanik wurden unabhaengig nachgerechnet und bestaetigt. Gekippt
+ist nicht die Rechnung, sondern ihre **betriebliche Folge**.
+
+---
+
 ### Graft-Kanal oeffnen: 38 Augmentierungen fuer $0,42 Bio, Kampfwerte x10 bis x219 (30.08., 16:40)
 
 **Die Rechnung ist fertig und geeicht.** Vollstaendig in `nodes/GRAFTING.md` -

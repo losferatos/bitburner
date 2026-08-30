@@ -25,6 +25,57 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 17:15 - BitNode 10: die Leitgroesse ist der Rang je OPERATION
+
+**Zweiter Korrektureintrag ausser der Reihe.** Der Eintrag von 14:45 ersetzte
+"Rang je Stunde" durch "Verdopplungszeit des Rangs, Ziel unter 3 h". Auch das
+traegt nicht - eine Messung ueber 33 Verlaufspunkte in diesem Knoten zeigt
+etwas Drittes.
+
+**Was gemessen wurde** (`data/verlauf-strategie.json`, 30.08. 17:00):
+
+- Rangrate 45,7/h ueber 1,8 h, 41,9/h ueber 3,3 h, 44,6/h ueber 4,4 h. Das ist
+  **konstant**, nicht exponentiell. Rang 575 -> 771 in 4,4 h waere eine
+  Verdopplungszeit von 10,4 h, nicht 2,5-3,8 h.
+- Im 22,6-h-Mittel 34,1/h. Die Rate waechst also - aber langsam und
+  abflachend, nicht mit fester Verdopplungszeit.
+
+**Warum beide bisherigen Modelle falsch waren.** Der Ranggewinn ist
+`rankGain x rewardFac^(level-1) x BladeburnerRank` (`Bladeburner/Formulas.ts:9-28`),
+und das Level waechst wie `sqrt(2 x Erfolge)`
+(`LevelableAction.getSuccessesNeededForNextLevel`, an Tracking geeicht: Level 32
+bei 563 Erfolgen). Der Ertrag je Erfolg waechst also mit `rewardFac^sqrt(E)` -
+anfangs schnell, dann immer flacher. Weder eine konstante Rate noch eine
+konstante Verdopplungszeit beschreibt das.
+
+**Die Leitgroesse ist deshalb keine Rate, sondern eine Auswahl:**
+
+> **Welche Aktion faehrt der Bot, und wie viele Erfolge braucht sie bis
+> Rang 400.000?**
+
+| Aktion | Rang je Erfolg (Lvl 1) | netto je Level | Erfolge bis 400.000 |
+|---|---|---|---|
+| Tracking | 0,24 | 1,021 | 12.251 |
+| Bounty Hunter | 0,72 | 1,043 | 3.283 |
+| Raid | 44,0 | 1,053 | 710 |
+| **Assassination** | **35,2** | **1,076** | **532** |
+
+Der Bot faehrt derzeit ausschliesslich Vertraege - Weg: Wochen. Alle sechs
+Operationen stehen auf Level 1 mit vollen Vorraeten. Ueber Assassination sind
+es bei einem Nachschub von 18,75/h rund **28 Stunden**.
+
+**Was den Wechsel blockiert:** 20 Trefferpunkte Maximum. Ein Raid-Fehlschlag
+kostet 315,8 HP (gemessen 30.08., `bbspann.js`). Nach dem Graft-Paket waere
+`hp.max = 1.912` - das ist der eigentliche Zweck des Graftens, nicht die
+Black-Op-Chance. Herleitung und Zahlen: `nodes/BAUSTELLEN.md`, oberster
+Sofort-Punkt, und `nodes/GRAFTING.md`.
+
+**Und eine Hoffnung ist gestrichen:** Die 21 Black Ops geben zusammen nur
+113.660 Rang (`data/BlackOperations.ts`). Sie koennen den Weg zu 400.000
+nicht selbst tragen.
+
+---
+
 ## 30.08., 14:45 - BitNode 10: die Leitgroesse war die falsche Kennzahl
 
 **Korrektureintrag ausser der Reihe.** Der Eintrag von 07:20 steht auf einer

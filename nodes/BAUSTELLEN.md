@@ -118,6 +118,84 @@ Regeln:
 
 ## Sofort
 
+### Die Rangrechnung steht: ohne Operationen ist Rang 400.000 unerreichbar, mit Assassination sind es 28 h (30.08., 17:15)
+
+**Der offene Punkt "Rangrate durchrechnen" ist abgearbeitet.** Damit steht auch,
+wofuer Grafting eigentlich gut ist - und es ist nicht das, was in
+`nodes/GRAFTING.md` als Hauptnutzen stand.
+
+**Gemessen (Verlauf `data/verlauf-strategie.json`, 33 Punkte in BitNode 10):**
+
+- Rangrate **44,6/h** ueber 4,4 h, 41,9/h ueber 3,3 h, 45,7/h ueber 1,8 h -
+  praktisch **konstant**, im 22,6-h-Mittel 34,1/h.
+- **48,5 % der Zeit** steht der Bot in der Hyperbolic Regeneration Chamber.
+  Die Rangrate ist ausdauerbegrenzt, nicht chancenbegrenzt.
+- Aktionsrate rund **104 Versuche/h** (2.345 Versuche in 22,6 h).
+
+**Die Erfolgsquoten sind schlecht** (aus dem Spielstand):
+
+| Vertrag | Level | Erfolge | Fehl | Quote | Rang je Erfolg | netto je Versuch |
+|---|---|---|---|---|---|---|
+| Tracking | 32 | 563 | 407 | 58,0 % | 0,834 | 0,484 |
+| Bounty Hunter | 15 | 142 | 581 | **19,6 %** | 2,256 | 0,443 |
+| Retirement | 20 | 237 | 415 | 36,3 % | 1,588 | 0,577 |
+
+104 Versuche/h x 0,5 netto = rund 50 Rang/h. **Das Modell reproduziert die
+gemessenen 44,6/h** - es ist geeicht, nicht geschaetzt.
+
+**Alle sechs Operationen stehen auf Level 1 mit null Erfolgen** und vollen
+Vorraeten (Raid 635, Assassination 432). Sie werden nie gefahren.
+
+**Und genau dort liegt der Rang** (`Bladeburner/data/Operations.ts`,
+`Formulas.ts:9-28`: `rankGain x rewardFac^(level-1) x 0,8`):
+
+| Aktion | Rang je Erfolg (Level 1) | rewardFac / difficultyFac | netto je Level |
+|---|---|---|---|
+| Tracking | 0,24 | 1,041 / 1,020 | **1,021** |
+| Raid | **44,0** | 1,100 / 1,045 | 1,053 |
+| Assassination | **35,2** | **1,140 / 1,060** | **1,076** |
+
+Das Level waechst wie `floor(sqrt(2 x Erfolge))` (aus
+`LevelableAction.getSuccessesNeededForNextLevel`, an Tracking geeicht: Level 32
+bei 563 Erfolgen). Damit ergibt sich der Erfolgsbedarf bis Rang 400.000:
+
+| Aktion | Erfolge bis 400.000 | Endlevel | bei Nachschub 18,75/h |
+|---|---|---|---|
+| Tracking | 12.251 | 156 | - (bei 58 % Chance rund **203 h**) |
+| Bounty Hunter | 3.283 | 81 | (bei 19,6 % Chance rund 161 h) |
+| Raid | 710 | 37 | 37,9 h |
+| **Assassination** | **532** | **32** | **28,4 h** |
+
+**Damit ist die Frage beantwortet, die seit heute Mittag offen war.** Der Weg
+ueber Vertraege dauert Wochen; der Weg ueber Assassination rund 30 Stunden.
+Die abgenommenen "50-70 h" sind erreichbar - **aber nur mit Operationen.**
+
+**Nebenbefund, der eine Hoffnung streicht:** Die 21 Black Ops geben zusammen
+nur **113.660** Rang (`BlackOperations.ts`). Daedalus verlangt 400.000, um
+ueberhaupt zu starten. Die Black Ops koennen den Rang **nicht selbst tragen** -
+er muss praktisch vollstaendig aus Operationen kommen.
+
+**Was das fuer Grafting heisst - der Hauptnutzen ist ein anderer als gedacht.**
+Nicht "x26,8 auf die Black-Op-Chance", sondern: Operationen sind gesperrt, weil
+ein Fehlschlag bei 20 Trefferpunkten Maximum ins Krankenhaus fuehrt (Raid
+315,8 HP je Fehlschlag, gemessen 30.08. in `bbspann.js`). Nach dem Graft-Paket
+ist `hp.max = 1.912` und die Kampfwerte liegen bei 19.000-22.000. **Grafting
+macht Assassination fahrbar - das ist sein Wert, nicht die Black Ops.**
+
+**Offen und vor dem naechsten Schritt zu klaeren:**
+
+- Der **Vorrat** ist der Engpass, nicht die Zeit: 18,75 Nachschub je Stunde und
+  Art. Die 432 vorhandenen Assassination-Auftraege decken 81 % des Bedarfs -
+  danach begrenzt der Nachschub.
+- **Bevoelkerungsverbrauch.** Operationen rufen im Misserfolgsfall
+  `triggerPotentialMigration` (`Bladeburner.ts:809,818`). Bei Chance nahe 1
+  faellt das weg, aber es gehoert gerechnet.
+- **Chaos** steht bei 46,6, die Schwelle ist 50. Darueber greift
+  `sqrt(1+chaos-50)` auf die Schwierigkeit.
+- Die Erfolgschance bei hohem Level: Assassination Level 32 hat
+  `baseDifficulty 1500 x 1,06^31 = 9.135`. Mit den Kampfwerten nach dem Graft
+  sollte das tragen, ist aber nicht gerechnet.
+
 ### GESPERRT bis drei Codeaenderungen drin sind - Graft-Kanal oeffnen (30.08., 16:40, gesperrt 17:05)
 
 **NICHT AUSFUEHREN. Wer jetzt graftet, verbrennt $450 Mrd in Sekunden.**

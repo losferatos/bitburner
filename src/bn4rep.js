@@ -758,7 +758,17 @@ export async function main(ns) {
         loeschAufHome(INSTALL_LOCK_FILE);
         sag("Einbausperre war ueber fuenf Minuten alt - aufgehoben.");
       }
-      gesperrt = bladeSperre || lockGilt;
+      // UND SIE DARF AUCH KEINE ANDERE SPERRE AUFHEBEN (31.08.2026, 01:35,
+      // aus dem Skeptiker-Loop). Die Zuweisung heilte 2026-08-29 nur den
+      // Blade-Fall, indem sie ihn ausdruecklich mitnahm - jede SPAETER
+      // hinzugefuegte Sperre faellt wieder heraus. Genau das ist am 30.08.
+      // mit dem Graft-Riegel aus Zeile 741 passiert: Bei laufendem Graft,
+      // erfolgtem Divisionsbeitritt (bladeSperre false) und abgelaufenem
+      // Firmenschloss (lockGilt false) stand `gesperrt` danach wieder auf
+      // false, und der Einbau haette das Graft getoetet - ohne Erstattung
+      // (`Work/GraftingWork.tsx:75-83`), beim Simulacrum $450 Mrd.
+      // Deshalb ODER statt Zuweisung: eine gesetzte Sperre bleibt gesetzt.
+      gesperrt = gesperrt || bladeSperre || lockGilt;
     }
     // FAVOR-EINBAU (23.08.2026). Der Einbau ist nicht nur ein Preis, den man
     // zahlt, um weiterzukommen - er ist selbst ein Ertrag. Beim Einbau wird

@@ -47,6 +47,22 @@ export async function main(ns) {
     ns.write(MARKER, String(Date.now()), "w");
     if (ns.getHostname() !== "home") ns.scp(MARKER, "home");
   }
+  // UND WEG DAMIT, WENN DIE AUGMENTIERUNG WEG IST (30.08.2026, 21:40).
+  //
+  // `prestigeHomeComputer` (`ServerHelpers.ts:226-239`) loescht beim
+  // BitNode-Wechsel Programme und Nachrichten, **aber keine Textdateien**.
+  // Der Marker ueberlebt also, die Augmentierung nicht. Im naechsten Knoten
+  // laese `blade.js` `true`, riegelte nie - und `Bladeburner.startAction`
+  // toetete das erste Graft dort in rund einer Sekunde
+  // (`Bladeburner.ts:177-180`). Bei fuenfzehn geplanten Knoten ist das eine
+  // Mine mit Datum.
+  //
+  // Nur loeschen, wenn der Besitz auch wirklich geprueft werden konnte -
+  // sonst wuerde ein Fehler beim Lesen den Riegel abschalten statt ihn zu
+  // schaerfen.
+  if (!habeSimulacrum && !raus.fehler && ns.fileExists(MARKER, "home")) {
+    try { ns.rm(MARKER, "home"); } catch { /* dann bleibt er stehen */ }
+  }
   raus.simulacrum = habeSimulacrum;
 
   // --- 2. Lage aufnehmen ----------------------------------------------------

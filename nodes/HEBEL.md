@@ -508,6 +508,68 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Kammerzulage aus der Regenerationsmessung herausgerechnet (30.08., 18:45)
+
+Engpass: 48,5 % der Zeit steht der Bot in der Hyperbolic Regeneration Chamber
+(Stichprobe ueber 33 Verlaufspunkte). Alle Kennzahlen, die diesen Anteil
+bewerten - `arbeitsanteil` und `zyklusrate` in `data/bbspann.json` -, teilen
+durch die Regeneration R.
+
+Hypothese: R ist zu hoch gemessen. `src/bbspann.js` misst R in Kammerphasen
+und begruendete das mit "die Kammer verbraucht nichts, also ist die Differenz
+je Minute genau R". Der erste Teil stimmt, der zweite nicht: Die Kammer GIBT
+zusaetzlich `maxStamina * HrcStaminaGain / 100` je Abschluss. R faellt damit
+von 2,300 auf rund 1,77 je Minute.
+
+Beleg: `Bladeburner.ts:1200-1202` (`this.stamina += maxStamina * HrcStaminaGain/100`),
+`Bladeburner/data/Constants.ts:52` (`HrcStaminaGain: 1`). Die passive
+Regeneration laeuft davon unabhaengig in jedem Tick weiter
+(`Bladeburner.ts:1382`) - waehrend der Arbeit wirkt nur sie.
+
+Vorher: R = 2,300 ("Vorgabe"), Tracking arbeitsanteil 0,537 / Zyklusrate 1,819,
+Raid arbeitsanteil 1,000 um 18:24.
+
+Nachher: **R = 1,774, Zulage 0,526 abgezogen** um 18:45. Tracking 0,414 /
+1,403; Bounty Hunter 0,608 / 1,798; Retirement 0,528 / 1,638;
+**Raid 0,886** - also NICHT dauerhaft fahrbar, wie bisher angenommen.
+Stealth Retirement bleibt als einzige Operation bei 1,000 (Verbrauch 1,76 <
+1,774).
+
+Die Rangfolge der Aktionen aendert sich nicht, die absoluten Zahlen schon -
+und sie waren systematisch zu guenstig fuer die ausdauerteuren Aktionen,
+also in genau die Richtung, vor der der alte Kommentar selbst gewarnt hat.
+
+Nebenbefund: `regenerationQuelle` stand auf "Vorgabe" - die Messung ueber
+`data/aktionen.txt` greift derzeit nie. Der Abzug wurde deshalb aus dem
+Messzweig herausgezogen und gilt fuer beide Quellen.
+
+Commit: siehe unten
+
+### Geprueft und VERWORFEN in diesem Lauf (30.08., 18:45)
+
+- **Auswahl nach Rang je Ausdauerpunkt.** Am 26.08. um 09:57-10:14 gemessen
+  und widerlegt (62,3 % Kammer statt 55,5 %, 0,606 statt 0,926 Rang/min);
+  steht als Kommentar in `src/blade.js:2405-2432`. Die damalige Ursache
+  (Bounty Hunter unter der Sicherheitsschwelle, jeder Fehlschlag kostet volle
+  Ausdauer) gilt heute nicht mehr - Bounty Hunter steht bei 0,629. Aber ohne
+  neue Messung wird eine gemessen widerlegte Aenderung nicht wiederholt.
+- **Die rewardFac-Tabelle in `blade.js:2205-2210`.** Alle neun Werte gegen
+  `Bladeburner/data/Contracts.ts` und `Operations.ts` geprueft: **alle
+  richtig**. (Meine eigenen Rechnungen von 17:15 und 17:20 hatten dagegen
+  Retirement mit 1,041 statt 1,065 und Bounty Hunter mit 1,085 richtig - die
+  Groessenordnung bleibt, die Einzelzahlen sind dort zu niedrig.)
+- **Die Regenerationskammer selbst.** Sie ist korrekt gewaehlt: Die passive
+  Regeneration laeuft ohnehin, die Kammer legt 1 % maxStamina je Abschluss
+  drauf, und keine sicher fahrbare Aktion verbraucht weniger als R. Der Bot
+  MUSS pausieren, und die Kammer ist die beste Pause.
+- **Overclock hochziehen.** Steht auf Stufe 1 bei maxLvl 90 und wirkt auf alle
+  vier effektiven Kampfwerte - aber in `src/blade.js:458-506` ist bereits
+  durchgerechnet, dass der Gewinn "ein Zehntausendstel" betraegt, weil
+  Overclock die Aktionsdauer senkt und die Ruhezeit unveraendert laesst.
+
+---
+
+
 ### Chaos-Zuschlag gilt erst nahe der Schwelle - Raid war ausgeschaltet (29.08., 16:50)
 
 Engpass:   Ab 18:04 der Rang. `blade.js:2246` schlug bei chaoserzeugenden

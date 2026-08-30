@@ -31,9 +31,23 @@ export async function main(ns) {
   // gerechnet - und zwar zugunsten der langen Aktionen, also in die Richtung,
   // in die die Auswertung ohnehin schon zeigt. Das ist der gefaehrliche Fall.
   //
-  // Die Kammer ist die einzige Aktion, in der die Ausdauer NUR steigt: Sie
-  // verbraucht nichts (`GeneralActions.ts`, kein Eintrag in der
-  // Verbrauchsformel), also ist die Differenz je Minute genau R.
+  // ACHTUNG, DIE KAMMER MISST ZU HOCH (30.08.2026, 18:35).
+  //
+  // Bis hierher stand: "Die Kammer verbraucht nichts, also ist die
+  // Differenz je Minute genau R." Der erste Teil stimmt, der zweite nicht.
+  // Die Kammer verbraucht nichts, aber sie GIBT zusaetzlich
+  // `maxStamina * HrcStaminaGain / 100` je Abschluss
+  // (`Bladeburner.ts:1200-1202`, `data/Constants.ts:52` = 1 Prozent).
+  // In einer Kammerphase misst man also `R_passiv + Zulage`, waehrend der
+  // Arbeit wirkt nur `R_passiv`.
+  //
+  // Groessenordnung bei maxStamina 52,6 und 60 s Kammerdauer: 0,526 je
+  // Minute. Aus gemessenen 2,3 werden damit 1,77 - die Regeneration
+  // waehrend der Arbeit ist rund 23 Prozent niedriger als angenommen.
+  //
+  // Das verzerrt genau in die Richtung, vor der der alte Kommentar selbst
+  // gewarnt hat: `arbeitsanteil` und `zyklusrate` fallen zugunsten der
+  // ausdauerteuren Aktionen zu guenstig aus.
   let regeneration = 2.3;
   let regenerationQuelle = "Vorgabe";
   try {
@@ -61,6 +75,23 @@ export async function main(ns) {
         + zeit.toFixed(1) + " min";
     }
   } catch (e) { regenerationQuelle = "Vorgabe (" + String(e && e.message ? e.message : e) + ")"; }
+
+  // Der Abzug gilt fuer BEIDE Quellen. Die Vorgabe 2,3 stammt selbst aus
+  // Kammerphasen (siehe oben, 53 Phasen ueber 108 Minuten) und traegt die
+  // Zulage genauso in sich wie eine frische Messung. Am 30.08. um 18:40 stand
+  // regenerationQuelle auf "Vorgabe" - der Abzug haette im Messzweig also
+  // gar nicht gegriffen.
+  // Die Kammerzulage herausrechnen - sie wirkt nur waehrend der Kammer.
+  try {
+    const maxAusdauer = ns.bladeburner.getStamina()[1];
+    const kammerMin = ns.bladeburner.getActionTime(
+      "General", "Hyperbolic Regeneration Chamber") / 60000;
+    const zulage = (maxAusdauer * 0.01) / kammerMin;
+    if (zulage > 0 && zulage < regeneration) {
+      regeneration -= zulage;
+      regenerationQuelle += ", Kammerzulage " + zulage.toFixed(3) + " abgezogen";
+    }
+  } catch { regenerationQuelle += ", Kammerzulage NICHT abgezogen"; }
 
   const zeile = (typ, name) => {
     let min = 0, max = 0;

@@ -3168,7 +3168,26 @@ export async function main(ns) {
         // dann eben weiter im Bladeburner - `waehle()` faellt auf Training
         // zurueck. Besser langsam als gar nicht.
       }
-      if (tiefstand < BBTRAIN_ZIEL) {
+      // WAEHREND EINES GRAFTS WEICHT NIEMAND (30.08.2026, 22:05, gemessen).
+      //
+      // Um 22:03 stand die Kette still: `blade.js` wich bbtrain
+      // ("weicht bbtrain, Kampfwerte 99"), und `bbtrain.js` hielt still, weil
+      // ein Graft laeuft (seit `1062631`). Niemand arbeitete - bei einem
+      // Graft von 99,4 Minuten waeren das 99 Minuten ohne Rang.
+      //
+      // Der Grund fuers Weichen ist, dass bbtrain uebernehmen SOLL. Waehrend
+      // eines Grafts kann es das nicht, und es soll es auch nicht: Gym-Arbeit
+      // waere `startWork` und toetete das Graft. Also arbeitet der Motor
+      // weiter - mit dem Simulacrum laeuft die Bladeburner-Aktion neben dem
+      // Graft ohnehin (`Bladeburner.ts:1354`), und ohne das Simulacrum kommt
+      // die Schleife hier gar nicht an: Dann hat der Riegel am
+      // Schleifenanfang die Runde laengst uebersprungen.
+      let graftLaeuftJetzt = false;
+      try {
+        const w = ns.singularity.getCurrentWork();
+        graftLaeuftJetzt = !!w && w.type === "GRAFTING";
+      } catch { graftLaeuftJetzt = false; }
+      if (tiefstand < BBTRAIN_ZIEL && !graftLaeuftJetzt) {
         if (!gewichen) {
           sag("Kampfwerte bei " + tiefstand
             + (lohntSich ? "" : ", keine Aktion ueber ihrer Schwelle")

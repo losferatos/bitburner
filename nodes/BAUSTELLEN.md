@@ -173,6 +173,101 @@ Teil von 400.000 Rang.
 
 ## Offen, nach Dringlichkeit
 
+### Elf Fehler in der eigenen Dokumentation, gepruefte Liste (30.08., 13:05)
+
+Ein Doku-Pruefer hat die `## ENTSCHIEDEN`-Tabelle Zeile fuer Zeile, die
+neuen Punkte, `nodes/KURS.md` und die vier `doku/`-Formeldateien gegen
+`reference/bitburner-src/src/` geprueft. **Zwei der Fehler betrafen Eintraege
+von heute und sind bereits korrigiert** (Chaos-Deckel 23 statt 19,
+Shock-Recovery Faktor 2 statt 3). Die uebrigen stehen hier, schwerste zuerst.
+
+**1. `doku/auffaellige-werte.md` ist eine BN1-Momentaufnahme vom 20.08. ohne
+Warnhinweis im Kopf.** In BN10 geht jede Zahl darin durch einen
+BitNode-Multiplikator: Hacking-Ziel **6000** statt 3000
+(`ServerHelpers.ts:423` mal `WorldDaemonDifficulty` 2); Level 2500 kostet
+~3,5e19 Erfahrung statt 4,0e8 (`Person.ts:62` mal
+`HackingLevelMultiplier` 0,35); Rep-Summe **7.850.000** statt 3.925.000 und
+Aug-Runden **1.325 Mrd** statt 265 Mrd (`AugmentationHelpers.ts:158-159`);
+15 Server a 2^19 GB statt 25 a 2^20. Und die Datei behauptet "Bladeburner ist
+in BN1 gesperrt" - das gilt fuer BN1, nicht fuer den laufenden Knoten.
+**Zu tun: Warnkopf einsetzen.** Wer sie als aktuelle Grundlage liest, plant
+auf Zahlen, die um Faktor 2 bis 10^11 danebenliegen.
+
+**2. Die Aug-Kostentabelle im Punkt von 09:40 fuehrt rohe Basiswerte.**
+"EsperTech 1,3k Rep / 165 Mio" sind die Werte aus `Augmentations.ts:711-713`
+ohne `AugmentationRepCost` (2) und `AugmentationMoneyCost` (5). Real: **2.500
+Rep / 825 Mio**; Blade-Runners **40.000 Rep / 41,25 Mrd** statt 20k/8,3b. Der
+neuere Punkt von 12:58 benennt den Mechanismus richtig, die falsche Tabelle
+steht unveraendert daneben und traegt weiterhin "Dringlichkeit: hoch".
+
+**3. `doku/formeln-hacking.md` §8.4 verliert einen Faktor.** Die Formel fuer
+den Geldanteil je Thread laesst `currentNodeMults.ScriptHackMoney`
+(`Hacking.ts:53-54`) weg. In BN10 ist der 0,5, also p = **0,202 %** statt
+0,404 und **496 Threads** statt 248. §1.2 derselben Datei hat den Faktor
+korrekt - §8.4 liefert aber die Zahlen, mit denen gerechnet wird.
+
+**4. Der Hash-Punkt "Wartet bis SF9" rechnet mit einem Festpreis, den es
+nicht gibt.** `HashUpgrade.ts:72-81` rechnet `(currentLevel+1) * costPerLevel`
+je Stufe. 4.000 Stufen "Exchange for Bladeburner Rank" kosten **2,0 Mrd
+Hashes**, nicht 1 Mio - Faktor 2.000. Der Punkt wuerde nach SF9 zum "Hebel"
+hochgestuft; er ist keiner. Nur `Improve Gym Training` (erste Stufe 50) ist
+real billig.
+
+**5. `doku/formeln-boerse.md` §6 steht genau falschherum.** Behauptet: "Ein
+vollstaendiger grow auf einen Server mit vollem Geldstand trifft fast
+sicher." `NetscriptFunctions.ts:302` uebergibt die **Differenz**, und
+`PlayerInfluencing.ts:57-58` rechnet `moneyGrown / server.moneyMax` - ein
+voller Server liefert 0, die Trefferwahrscheinlichkeit ist **null**. Der
+Bauplan im Punkt "Boersen-Bot fuer BitNode 8" ("der Bot muss den Forecast
+nicht schaetzen, er setzt ihn") haengt daran.
+
+**6. `doku/formeln-hacking.md` §7.3 rechnet die Worker-Groesse zu klein.**
+`RamCalculations.ts:218-222` dedupliziert ueber den **Bezeichnernamen**,
+nicht ueber die Konstante - die vier `getServer*`-Aufrufe sind vier
+verschiedene Refs a 0,1 GB. Korrekt **2,40 GB** statt 2,10. Das RAM-Budget je
+Worker ist 14 Prozent zu niedrig; die letzte Batch-Charge bekommt kein RAM.
+
+**7. Der Boersen-Punkt nennt `stocks.js` "wiederverwendbar".** Der Wachhund
+`StockMarket.ts:47` macht Shorts und Limit-Orders **nur in BN8** frei;
+`src/stocks.js:83,150` ruft `ns.stock.sellShort` und wirft in BN10 eine
+Exception. Der Vermerk gehoert auf Long und Marktorder eingeschraenkt.
+
+**8. Der Darknet-Punkt zitiert den falschen Zweig.** `labyrinth.ts:424-427`
+ist der Zweig fuer **andere** BitNodes mit SF15; in BN15 selbst greift
+`:419-422`, und die Red Pill faellt schon beim **fuenften** Labor, nicht beim
+sechsten. Ein Einbauzyklus und rund vier Raetselloeser zuviel eingeplant.
+
+**9. `nodes/KURS.md`, Eintrag 30.08. 07:20: `a = 0,5` ist angenommen, nicht
+hergeleitet.** Beide Kanaele, ueber die der Multiplikator wirken soll, sind
+gedeckelt: Die Erfolgschance klemmt bei `min(1, competence/difficulty)`
+(`Actions/Action.ts:195`), und Overclock hat `maxLvl: 90`
+(`data/Skills.ts:51`) - die 90 Stufen kosten 5.877 Skillpunkte, also Rang
+**17.631**, vier Prozent des Weges. Danach waechst nur noch der Aktionslevel.
+**Die ETA von 77 h und die daran haengende Entscheidung "Einbau nicht jetzt"
+stehen auf einem Mechanismus, der ab Rang 17.600 nicht mehr existiert.** Der
+Kursloop muss das beim naechsten Lauf neu rechnen.
+
+**Kleinere, ebenfalls belegte Abweichungen:** `formeln-boerse.md` §5 rechnet
+den Rundlauf-Spread halb so gross wie `Stock.ts:224-232`; §4 setzt `otlkMag`
+auf "1 bis 10", `InitStockMetadata.ts` vergibt bis **19**. Der
+Darknet-Volatilitaetsmultiplikator erreicht 2,5 bei rund 2.350 Ladungen,
+nicht 4.600. Im 09:40-Punkt steht `rankLoss` "spaeter bis 10.000" - das
+Maximum ist Operation Vindictus mit **20.000** (`BlackOperations.ts:678`).
+Die Fussnote zum Divisionsbeitritt nennt vier Bedingungen; es sind fuenf, die
+SF6/SF7-Pruefung bei `:331` fehlt.
+
+**Geprueft und korrekt - nicht erneut anfassen:** die Feuerschwellen-
+Begruendung, Black-Ops-Immunitaet gegen Bevoelkerung und Chaos,
+`RankToFactionRepFactor 2`, die Summe der 21 `rankGain` = 113.660 und die
+Rechnung auf 58.928, `reqdRank: 400e3`, Gym 10 exp/s gegen Verbrechen 3,0,
+natuerlicher Vorratszuwachs 30/h, Incite als einziger Spielerweg,
+Sleeve-Infiltrate 0,5 je 60 s, Stealth-Retirement-Chaossenkung ausserhalb der
+Erfolgspruefung, alle BN8-Startbedingungen - und die beiden Punkte von
+12:55/12:58.
+
+Dringlichkeit: Punkt 1 und 9 hoch (beide koennen falsche Entscheidungen
+ausloesen), der Rest mittel. **Ein Punkt je Lauf.**
+
 ### `tools/augplan.js` rechnet die BitNode-Multiplikatoren nicht - und die Aug-Strategie steht (30.08., 12:58)
 
 Aus einem vollstaendigen Audit der Bladeburner-Augmentierungen gegen den

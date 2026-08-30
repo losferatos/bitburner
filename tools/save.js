@@ -92,7 +92,11 @@ async function main() {
   } else {
     for (const f of p.factions) {
       const d = factions[f] && (factions[f].data || factions[f]);
-      console.log("    " + f.padEnd(22) + (d ? Math.round(d.playerReputation) + " rep, "
+      // `playerReputation` FEHLT im Spielstand, wenn es 0 ist (30.08.2026, 09:35).
+      // Das Spiel laesst Default-Werte beim Serialisieren weg. Bladeburners
+      // stand deshalb nach dem Einbau mit "NaN rep" da - ausgerechnet die
+      // Fraktion, deren Rep ab jetzt die zweitwichtigste Zahl des Knotens ist.
+      console.log("    " + f.padEnd(22) + (d ? Math.round(d.playerReputation || 0) + " rep, "
         + (d.favor || 0).toFixed(1) + " favor" : "?"));
     }
   }

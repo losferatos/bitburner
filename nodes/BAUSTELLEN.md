@@ -122,6 +122,78 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Bladeburner-Augmentierungen sind ungenutzt und werden mit 0,00 bewertet (30.08., 09:40)
+
+Gemessen: Nach dem Einbau von 09:2x stehen **alle vier Bladeburner-
+          Multiplikatoren auf 1,000** (`node tools/save.js`), obwohl 17
+          Augmentierungen installiert sind:
+
+              Bladeburner-Mult  chance 1.000  ausdauer 1.000
+                                regen 1.000   analyse 1.000
+
+          `node tools/augplan.js` zeigt 18 Bladeburner-Augmentierungen, **alle
+          mit Nutzen 0.00** und dem Vermerk "zaehlt nur als Kopf fuer die
+          30er-Schwelle".
+
+Erwartet: In einem Knoten, dessen Ausgang ueber 400.000 Bladeburner-Rang
+          laeuft (`nodes/KURS.md`, 30.08. 07:20), sind das die wertvollsten
+          Multiplikatoren ueberhaupt - und der Bot bewertet sie mit null.
+
+          **Die Reputation faellt kostenlos an.**
+          `Bladeburner/Formulas.ts:46-49`:
+
+              Rep = RankToFactionRepFactor * rankGain * mults.faction_rep
+                    * (1 + favor/100)
+
+          mit `RankToFactionRepFactor = 2` (`data/Constants.ts:41`). Jeder
+          erarbeitete Rangpunkt bringt also **rund zwei Reputationspunkte**,
+          solange die Mitgliedschaft steht (`Bladeburner.ts:1277-1280`,
+          `isMember` - geprueft, `p.factions` enthaelt "Bladeburners").
+
+          Damit sind die Anforderungen klein gegen den Restweg:
+
+              EsperTech Bladeburner Eyewear    1,3k Rep =    650 Rang  $165m
+              EMS-4 Recombination              2,5k     =  1.250       $275m
+              ORION-MKIV Shoulder              6,3k     =  3.150       $550m
+              BLADE-51b Tesla Armor           12,5k     =  6.250       $1,4b
+              Hyperion Plasma Cannon V1       12,5k     =  6.250       $2,8b
+              Blade's Runners                 20,0k     = 10.000       $8,3b
+
+          Die teuerste liegt bei **2,5 Prozent** des Weges zu Rang 400.000.
+          Der Rang muss ohnehin erarbeitet werden - die Rep ist ein
+          Nebenprodukt, kein Umweg.
+
+          **Warum es dringend ist:** `data/blade.json` fuehrt die
+          Erfolgschancen der Black Ops. Die erste, Operation Typhoon bei Rang
+          2.500, steht bei **0,0326**. Ohne `bladeburner_success_chance`
+          scheitert der Bot dort systematisch - und jeder Fehlschlag kostet
+          `rankLoss` (Typhoon: 10, spaeter bis 10.000).
+
+Verdacht: Zwei Luecken, beide belegt:
+
+          1. **`tools/augplan.js`** bewertet nur Hacking und Reputation. Die
+             `bladeburner_*`-Multiplikatoren fallen durch das Raster und
+             landen bei 0,00 - in einem Kampfknoten ist das die falsche
+             Rangfolge.
+          2. **`src/kampfaugs.js`** deckt ausschliesslich str/def/dex/agi ab
+             (`KAMPF_MULT`, Zeile 55 ff.). Es war fuer das Beitritts-Tor
+             gebaut und ist dort fertig. Fuer `bladeburner_*` gibt es **kein
+             Werkzeug**.
+
+          Zu tun ist damit nicht "kaufen" - das geht erst mit Rep und Geld -,
+          sondern die **Bewertung** in Ordnung bringen, damit die richtigen
+          Augmentierungen in der Warteschlange stehen, wenn der naechste
+          Einbau ansteht.
+
+Dringlichkeit: hoch. Der naechste Einbau ist der naechste Hebel, und bis
+          dahin entscheidet die Bewertung, was gekauft wird.
+
+**Nebenbefund behoben (09:35).** `tools/save.js` zeigte fuer Bladeburners
+"NaN rep". Ursache: Das Spiel laesst `playerReputation` beim Serialisieren
+weg, wenn es 0 ist (im Spielstand hat CyberSec das Feld, Bladeburners nicht).
+`Math.round(d.playerReputation || 0)` behebt es - **verifiziert 09:36:
+"Bladeburners 0 rep, 2.1 favor"**.
+
 ### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,

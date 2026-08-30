@@ -23,6 +23,120 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Rangrate liegt im Vollbetrieb bei 30 statt 254 je Stunde (30.08., 12:45)
+
+Gemessen (Waechterreihe, 3-Minuten-Takt): Seit der Wiederaufbau um 12:26
+endete und `blade.js` wieder traegt, kommt der Rang kaum voran.
+
+    12:25  572      12:31  574        Mittel ueber 12:25-12:37:
+    12:28  574      12:34  575          (578 - 572) / 0,20 h = **30 Rang/h**
+                    12:37  578
+
+Erwartet: **254 Rang/h**, gemessen heute um 06:57-07:15 im Vollbetrieb
+(`nodes/KURS.md`, 30.08. 07:20 - die Zahl ist die Leitgroesse des Knotens).
+Der Unterschied ist **Faktor 8**, nicht Rauschen.
+
+Der Arbeitsanteil ist es nicht: Er steht bei **100 Prozent** (Fenster
+12:32-12:36, `data/aktionen.txt`, neun Abschnitte reine Kontrakte, keine
+Regenerationskammer - die Ausdauer ist nach drei Stunden Gym voll aufgeladen,
+40,27 von 45,44). Der Bot arbeitet also durchgehend und liefert trotzdem ein
+Achtel.
+
+Was sich seit 07:15 geaendert hat, in der Reihenfolge des Verdachts:
+
+1. **Die Kampfwerte sind niedriger als vor dem Einbau.** 07:15 standen sie bei
+   119/101/105/101, jetzt bei 100/100/101/100. `BBTRAIN_ZIEL = 100`
+   (`src/blade.js:3023`) beendet den Wiederaufbau bei 100 - der Bot steigt
+   also mit schlechteren Werten ein, als er vorher hatte. Das erklaert -16
+   Prozent, nicht Faktor 8, kann aber ueber die Erfolgschance nichtlinear
+   durchschlagen.
+2. **Der Sleeve steht auf shock 99,9** (Einbau setzt `shock = 100`,
+   `Sleeve.ts:251`). Geprueft und vermutlich nicht die Ursache: Der Rang
+   laeuft ueber `completeAction` ungedaempft, nur `applySleeveGains` wird mit
+   `shockBonus()` skaliert (`SleeveBladeburnerWork.ts:53-55`). Aber der
+   Sleeve lieferte heute frueh einen grossen Teil der Rate - ob seine
+   Erfolgschance mitgefallen ist, ist ungeprueft.
+3. **Chaos steht bei 41,37 in Aevum** statt 7,7. Sollte folgenlos sein:
+   `getChaosSuccessFactor` gibt unter `ChaosThreshold = 50` exakt 1 zurueck
+   (`Actions/Action.ts:94-101`). Als Ursache damit unwahrscheinlich, aber
+   nicht gemessen.
+
+Zu tun: Erfolgschancen und Rangertrag je Aktion messen und mit den Werten von
+07:15 vergleichen. `data/blade.json` fuehrt `chance`, `data/aktionen.txt` den
+Rangzuwachs je Abschnitt. Die Frage ist, ob weniger Aktionen laufen oder jede
+Aktion weniger bringt - das trennt Ursache 1 von Ursache 2.
+
+**Achtung beim Nachmessen:** Der Ausdauerpuffer aus der Gym-Phase laeuft
+gerade leer. Sobald die Regenerationskammer wieder anspringt, faellt der
+Arbeitsanteil auf die ueblichen 50 Prozent - dann ist die Rate erst recht
+zu klein. Ein Fenster von mindestens 45 Minuten abwarten, bevor man urteilt.
+
+Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
+ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
+
+## Offen, nach Dringlichkeit
+
+**AUFGEKLAERT (30.08., 12:55). Alle drei Verdachtsmomente sind widerlegt -
+und die Ausgangszahl war falsch.**
+
+**Die 254 Rang/h waren nie eine Rate. Das war Lagerabbau.**
+
+Der Kontraktnachschub ist gedeckelt: `Bladeburner.ts:1387` rechnet
+`count += seconds * growthFunction() / 480` mit `ActionCountGrowthPeriod` 480
+und `growthFunction` = `getRandomIntInclusive(5,75)/10`, Mittel 4,0
+(`data/Contracts.ts:40,74,107`) - das sind **30 Versuche je Stunde und Art,
+90 gesamt**. Und `--action.count` laeuft bei Erfolg **und** Misserfolg
+(`Bladeburner.ts:934,971`).
+
+Ueber Nacht hatte sich ein Lager angesammelt: um 06:22 standen Tracking 3,2 /
+Bounty Hunter 8,2 / **Retirement 96,3**. Genau dieses Lager wurde zwischen
+06:39 und 07:18 verfeuert - das sind die "254 Rang/h".
+
+**Der Einbruch kam um 07:20, also zwei Stunden VOR dem Einbau um 09:21.**
+Rangrate je zehn Minuten aus `data/aktionen.txt`:
+
+    06:50  224    07:20  145    08:00   55    Gym 08:33-12:32   46,7
+    07:00  210    07:30   49    08:10   16    12:32             82
+    07:10  299    07:40   80    08:30   11    12:47             92
+
+Die heutigen 82 bis 92 je Stunde liegen **ueber** dem Vor-Einbau-Zustand von
+11 bis 80 ab 07:30. Es gibt keinen Einbruch, der zu erklaeren waere.
+
+**Die drei Verdachtsmomente:**
+
+1. **Kampfwerte 119 -> 100: widerlegt.** Nachgerechnet mit
+   `Actions/Action.ts:169-197` und den echten Skillstufen: Tracking 0,920 ->
+   0,902, Retirement 0,619 -> 0,592, Bounty Hunter 0,487 -> 0,470.
+   **Faktor 1,04**, nicht 8. Der berechnete Wert 0,470 deckt sich mit den
+   0,439, die `data/blade.json` meldet.
+2. **Sleeve-Shock 99,9: folgenlos fuer den Rang.** `shockBonus()` skaliert in
+   `SleeveBladeburnerWork.ts:57` nur die Erfahrungswerte des Sleeve, nicht
+   den `changeRank`-Aufruf. Bestaetigt ist etwas anderes, siehe unten.
+3. **Chaos 41,37: widerlegt.** Bounty Hunter steht bei Chaos 7,7 und bei 41,5
+   auf demselben Wert 0,4699 - unter `ChaosThreshold = 50` gibt
+   `getChaosSuccessFactor` exakt 1 zurueck.
+
+**Zusatzbefund, den niemand gesucht hat: Die Aktionsstufen ueberleben den
+Einbau.** `Prestige.ts:153-154` ruft `Bladeburner.prestigeAugmentation()`,
+und die macht nur `resetAction()` + `joinFaction()`
+(`Bladeburner.ts:259-263`) - `LevelableActionClass.reset()` wird nie
+aufgerufen. Im Spielstand: Tracking 24/24 bei 335 Erfolgen, Bounty Hunter
+15/15 bei 141, Retirement 19/19 bei 224. Der Rang je Erfolg ist nach dem
+Einbau sogar **hoeher** als davor.
+
+**Die echte Decke, gerechnet:**
+
+    passiver Nachschub allein          67 Rang/h
+    plus ein Sleeve auf Infiltrate    135 Rang/h
+
+Ein Alarm auf "unter 200 je Stunde" wuerde also dauerhaft falsch feuern. Die
+Erwartung gehoert neu geeicht - auch in `nodes/KURS.md`, wo 254 als
+Leitgroesse steht.
+
+**Verifiziert: 92 Rang/h um 12:47** - im Rahmen der berechneten Decke.
+
+---
+
 ### Die Nachfuellphase kostet 17 Minuten am Stueck - ungemessen (30.08., 07:42)
 
 Gemessen: Ab **07:24** faellt die Rangrate von rund 280 auf **20 bis 60

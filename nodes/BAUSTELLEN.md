@@ -118,171 +118,73 @@ Regeln:
 
 ## Sofort
 
-### Beide Ausgaenge gegeneinander gerechnet: Bladeburner bleibt der schnellere (30.08., 14:20)
+### Graft-Kanal oeffnen: 38 Augmentierungen fuer $0,42 Bio, Kampfwerte x10 bis x219 (30.08., 16:40)
 
-**Ergebnis der Alternativenpruefung, die Eric um 13:50 verlangt hat.** Drei
-Agenten, drei Winkel. Das Ergebnis ist: **der bisherige Kurs stimmt** - aber
-nicht aus den Gruenden, aus denen er gewaehlt wurde, und die Zahl, mit der er
-in Frage gestellt wurde, war meine eigene falsche.
+**Die Rechnung ist fertig und geeicht.** Vollstaendig in `nodes/GRAFTING.md` -
+vier Eichungen (Preis auf 0,000000 % ueber 99 Werte, Zeit auf 96 von 99, die
+Multiplikatoren als reines Produkt ueber 14 Spielstandsfelder, die Skill-Formel
+auf alle fuenf Werte). Preise und Zeiten stammen aus dem laufenden Spiel ueber
+`src/bbgraft.js`, nicht aus einer Rechnung.
 
-**Der Vergleich, bereinigt:**
+**Was zu tun ist, in dieser Reihenfolge - die Reihenfolge ist der Kern:**
 
-    Bladeburner   30-110 h, Erwartungswert 50-70 h
-                  (Verdopplungszeitmodell, aus BN6 UND BN10 gemessen)
-    Hacking      150-250 h
-                  (Agentenrechnung, sechs Etappen, mehrere ungemessene Posten)
+1. **`The Blade's Simulacrum` graften.** $450 Mrd, 14 Minuten. Ohne sie bricht
+   JEDES Graft die Bladeburner-Aktion ab und schaltet die Automatik aus
+   (`Bladeburner.ts:1354`). Mit ihr kosten die restlichen 42 Stunden Graft-Zeit
+   keinen einzigen Rangpunkt.
+2. Nach **New Tokyo** reisen (`NetscriptFunctions/Grafting.ts:59`). Die
+   Bladeburner-Stadt ist davon unabhaengig.
+3. Die 38 Augmentierungen in der Reihenfolge aus `nodes/GRAFTING.md` graften.
+   `SPTN-97 Gene Modification` zuerst - allein x9,4 auf die Kampfwerte fuer
+   $14,6 Mrd und 1,7 Stunden.
 
-**Faktor 2 bis 4 zugunsten Bladeburner.**
+**Vorher zu klaeren, sonst wird eine falsche ETA daraus:** Faktor 27,4 auf die
+Erfolgschance ist NICHT Faktor 27,4 auf den Rang. Vertraege und Operationen
+haben schon jetzt hohe Chancen; der Gewinn liegt bei den Black Ops (Typhoon
+4,16 % -> gedeckelt bei 100 %) und beim Wegfall der Fehlschlaege (die maximalen
+Trefferpunkte steigen von 20 auf rund 1.900, weil `hp.max = 10 + defense/10`).
+**Erst die Rangrate rechnen, dann eine Zahl nennen.**
 
-**Warum der dritte Agent das Gegenteil berichtet hat:** Ich habe ihn mit
-"gemessene Rangrate 42,5/h, also 334 Tage" beauftragt. Das war die lineare
-Fortschreibung eines Post-Reset-Lochs auf einer Exponentialkurve - derselbe
-Fehler, den ich heute schon zweimal gemacht hatte. Er hat korrekt gegen die
-falsche Vorgabe gerechnet. **Ein Auftrag, der eine Zahl vorgibt, vererbt
-seinen Fehler an den Bericht** - das gehoert in die Auftragsregeln fuer
-Subagenten.
+**Ein Werkzeug gibt es nicht.** `src/buyaugs.js:291,586` kennt Grafting nur als
+Kategorie "ueber den normalen Kauf nicht erreichbar" und uebergeht solche
+Augmentierungen. Was gebaut wird, laeuft unbeaufsichtigt und braucht deshalb
+einen Skeptiker vor dem Commit.
 
-**Was aus den Berichten trotzdem bleibt, verifiziert:**
-
-**1. Reputation wird beim Kauf nicht abgezogen.** `FactionHelpers.tsx:118-120`
-ruft ausschliesslich `Player.loseMoney(augCosts.moneyCost)`. Rep ist eine
-**Schwelle, keine Waehrung** - wer 5 Mio Rep hat, kauft damit beliebig viele
-Augmentierungen, solange das Geld reicht. Nur die teuerste Stufe je Charge
-zaehlt, nicht die Summe.
-
-**2. The Red Pill kostet in BN10 fuenf Millionen Rep, nicht 2,5.**
-`Augmentations.ts:1954` gibt `repCost: 2.5e6`, und `getAugCost` multipliziert
-mit `AugmentationRepCost: 2`. Der Wert stand in mehreren Projektdateien
-falsch.
-
-**3. Der Labyrinth-Weg ist tot.** Das siebte Labor gaebe TRP an Daedalus
-vorbei (`labyrinth.ts:403-429`), aber `FinalLab` verlangt **Charisma 4000**.
-Bei `CharismaLevelMultiplier: 0.4` sind das 1,1e68 Erfahrung. Der
-Labyrinth-Punkt aus dem 24.08.-Audit ist damit erledigt, ohne dass jemand ihn
-weiter untersuchen muss.
-
-**4. NeuroFlux gibt 1,0198 je Stufe, nicht 1,01.** Empirisch aus dem
-laufenden Spielstand geklammert (`hacking_grow` 1,60199 ueber 24 Stufen). Der
-Referenzquellcode weicht hier von der laufenden Fassung ab - ueber 60 Stufen
-macht das Faktor 2,4. **Wer mit NFG rechnet, misst am Spielstand, nicht am
-Quellcode.**
-
-**Und die eigentliche Erkenntnis: Die Wege schliessen sich nicht aus.**
-`Bladeburner.prestigeAugmentation()` (`Bladeburner.ts:259-263`) setzt nur die
-laufende Aktion zurueck - **der Rang ueberlebt jeden Augmentierungs-Einbau**.
-Mit `The Blade's Simulacrum` bricht Fraktionsarbeit den Bladeburner nicht ab
-(`Bladeburner.ts:178-180`, `:1354-1360`). Der Aug-Aufbau kann also
-**nebenherlaufen**, ohne den Rangweg zu kosten.
-
-Damit ist die Frage nicht "welcher Weg", sondern: **Wie macht man den
-Bladeburner-Weg schneller, ohne ihn zu unterbrechen?** Und dafuer liefern die
-Berichte drei konkrete Posten - siehe die Punkte zu Fahigkeitspunkten, zum
-ueberfluessigen Einbau und zum Chaos-Risiko.
-
-**Grafting bleibt wertvoll, aber mit anderer Begruendung.** Nicht als Ausweg
-aus dem Bladeburner-Weg, sondern als einziger Kanal, der die in BN10 hart
-gedeckelten **Kampfwerte** hebt (`StrengthLevelMultiplier: 0.4`) - ohne
-Reputation und ohne den fuenffachen Geldaufschlag. Die Erfolgschance jeder
-Bladeburner-Aktion haengt daran.
-
-Offen und ungeprueft bleibt die Graft-Rechnung selbst (welche Augs, welcher
-Multiplikator, welche Zeit) - sie gehoert nachgerechnet und geeicht, bevor
-irgendein Werkzeug gebaut wird.
-
-### Grafting ist der ungenutzte Kanal - Augmentierungen ohne Reputation und ohne BitNode-Aufschlag (30.08., 14:10)
-
-**Die Antwort auf Erics Frage nach einer Alternative.** Ein Suchagent hat den
-Mechanismus gefunden, zwei Kernbehauptungen habe ich selbst am Quellcode
-nachgeprueft - eine haelt, eine nicht.
-
-**VERIFIZIERT: Der Preisunterschied ist real und gross.**
-
-    Grafting:  cost = augmentation.baseCost * AugmentationGraftingCostMult
-               (`Grafting/GraftableAugmentation.ts:20-22`, `Constants.ts:96` = 3)
-
-    Kaufen:    moneyCost = baseCost * multiplier * AugmentationMoneyCost
-                           * getGenericAugmentationPriceMultiplier()
-               repCost   = baseRepRequirement * AugmentationRepCost
-               (`AugmentationHelpers.ts:135-136,157-158`)
-
-Grafting kennt **weder** den Knotenfaktor (in BN10 **x5** aufs Geld, **x2**
-auf die Rep) **noch** die Stapeltreppe `1,9^k` **noch ueberhaupt eine
-Reputationsanforderung**. Es kostet schlicht das Dreifache des Basispreises.
-
-**VERIFIZIERT: Gegraftete Augmentierungen zaehlen voll.** `GraftingWork.tsx:51`
-ruft `applyAugmentation({name, level: 1})` - dieselbe Funktion wie beim Kauf.
-Sie landen also in `Player.augmentations` und zaehlen fuer
-`haveAugmentations(30)`, das Tor zu Daedalus.
-
-Voraussetzungen: `Player.city === NewTokyo` und SF10 >= 1 **oder** BitNode 10
-(`PlayerObjectGeneralMethods.ts:577-579`) - beides erfuellt, der Bot steht in
-BN10. Vollstaendig skriptbar ueber `NetscriptFunctions/Grafting.ts`.
-Entropie (0,98 je Graft, `GraftingWork.tsx:62`) wird beim naechsten Einbau auf
-0 zurueckgesetzt (`AugmentationHelpers.ts:47`) - mehrere Graft-Einbau-Zyklen
-sind verlustfrei.
-
-**Die Rechnung des Agenten** (von mir nicht nachgerechnet, als offen
-markiert): 23 Hacking-Augmentierungen graften kostet **$0,18 Bio** und hebt
-`mults.hacking` von 1,4 auf **13,08**. Mit QLink (Basis $25 Bio, also $75 Bio
-gegraftet statt 3,75 Mio Illuminati-Rep plus $125 Bio gekauft) auf **22,89**.
-Der Erfahrungsbedarf fuer Hacking 6000 faellt damit von 10^160 auf
-**7,5 * 10^12**. Grafting-Zeit fuer die 24 Stueck: 25 bis 35 Stunden,
-parallel zu allem anderen.
-
-**WIDERLEGT: "The Red Pill wird nicht gebraucht."** Der Agent schrieb,
-`ns.nuke("w0r1d_d43m0n")` funktioniere ohne TRP, weil `getNormalServer` per
-Hostname aufloese. Selbst nachgesehen - `NetscriptHelpers.tsx`, `getServer`:
-
-    const server = GetServer(host);
-    if (server != null && (server.serversOnNetwork.length > 0 || ...)) {
-      return [server, host];
-    }
-    ...
-    throw errorMessage(ctx, `Invalid host: ${str}`);
-
-Ohne TRP hat der WD-Server **keine** Netzkante - `Prestige.ts:173-181` haengt
-ihn erst bei installiertem TRP an Daedalus. `serversOnNetwork.length === 0`,
-die Bedingung ist falsch, es faellt durch bis zum `throw`. **TRP bleibt
-Pflicht**, und `nodes/KNOTEN-VORBEREITUNG.md` ist an dieser Stelle richtig.
-
-**Was der Fund strategisch bedeutet:** Grafting loest die teuerste Huerde des
-Hacking-Weges - die 30 Augmentierungen fuer Daedalus, bisher gedacht als
-30 mal Fraktionsreputation in einem Knoten mit `AugmentationRepCost: 2`.
-Uebrig bleiben dann `haveMoney(100e9)` (erfuellt), Hacking 2500 oder
-Kampfwerte 1500 (mit dem gegrafteten Multiplikator in Reichweite) und
-2,5 Mio Daedalus-Rep fuer TRP selbst.
-
-**Und: Der Mechanismus war bekannt, nur falsch einsortiert.**
-`nodes/ROADMAP.md:407` beschreibt ihn exakt richtig - "Augmentierungen **ohne
-jede Reputation**, `baseCost x 3`" - aber als **"das Werkzeug fuer BN8"**.
-Dass er den laufenden Knoten selbst verbilligt, stand nirgends. Im Code gibt
-es dazu passend **kein einziges Werkzeug**: `src/buyaugs.js:291,586` kennt
-Grafting nur als Kategorie "ueber den normalen Kauf nicht erreichbar" und
-uebergeht solche Augmentierungen.
-
-**Zweiter Fund desselben Agenten, ungeprueft:** The Covenant (dauerhafte
-Sleeves, +5 moeglich, ueberlebt jedes Prestige) gilt in `## ENTSCHIEDEN` als
-unerreichbar, weil Kampfwert 850 bei festem Multiplikator 2,06e23 Erfahrung
-braucht. Der Agent rechnet vor, dass 22 gegraftete Kampf-Augs (26 h,
-$154 Mrd) den Multiplikator so heben, dass 850 in **0,15 h Gym** erreichbar
-waeren. **Das ist derselbe Fehlertyp wie in drei anderen Faellen heute: ein
-Multiplikator wurde als Konstante behandelt.** Wenn es traegt, ist BN10 die
-einzige Gelegenheit im ganzen Projekt - Sleeve-Memory und Covenant-Sleeves
-sind nur hier kaufbar und ueberleben alle Folgelaeufe.
-
-Zu tun, in dieser Reihenfolge:
-1. Die Graft-Rechnung nachrechnen und **eichen** (welche Augs, welcher
-   Multiplikator, welcher Preis, welche Zeit) - bevor irgendetwas gebaut wird.
-2. Den ENTSCHIEDEN-Eintrag zu Covenant pruefen: Er steht auf einer Rechnung
-   mit festem Multiplikator.
-3. Erst dann ein Graft-Werkzeug. Es gibt heute keines.
-
-Dringlichkeit: **hoch.** Grafting ist an BN10 gebunden; nach dem
-Knotenwechsel braucht es SF10, das erst der Abschluss liefert.
-
----
+**Kein Widerspruch zum ENTSCHIEDEN-Eintrag "Einbau vor dem Divisionsbeitritt:
+nie".** Grafting ist kein Einbau: `GraftingWork.finish` ruft `applyAugmentation`
+direkt, es gibt kein Prestige und keinen Verlust der Kampfwerte.
 
 ## Offen, nach Dringlichkeit
+
+### `reference/` ist nicht das laufende Spiel - drei belegte Abweichungen (30.08., 16:40)
+
+Bei der Graft-Eichung fielen **drei von 98 Augmentierungen** auf, deren
+Multiplikatoren in `reference/bitburner-src/src/Augmentation/Augmentations.ts`
+nicht denen des laufenden Spiels entsprechen:
+
+| Augmentierung | Referenz | Spiel | Zeitabweichung |
+|---|---|---|---|
+| Synthetic Heart | charisma 1,15 | charisma **1,3** | 2,0 % |
+| DermaForce Particle Barrier | - | - | 0,7 % |
+| The Illustrated Primer | - | - | **8,3 %** |
+
+Gefunden ueber eine Probe, die nichts kostet: Die Graft-Zeit ist eine Funktion
+der Multiplikatorsumme. Stimmt die berechnete Zeit mit der des Spiels ueberein,
+sind die Multiplikatoren vollstaendig gelesen - stimmt sie nicht, fehlt oder
+irrt einer. Diese Art Gegenprobe gehoert in jede Rechnung aus fremdem
+Quellcode.
+
+Alle drei betreffen charisma, also nichts, was hier zaehlt. **Der Befund ist
+trotzdem allgemein:** Wer aus `reference/` rechnet, hat eine Version vor sich
+(v3.0.2), die nicht in jedem Wert dem installierten Spiel entspricht. Wo es auf
+eine Zahl ankommt, gehoert sie ueber die Netscript-API aus dem laufenden Spiel
+geholt - `ns.singularity.getAugmentationStats` fuer Multiplikatoren,
+`ns.grafting.getAugmentationGraftPrice`/`-Time` fuer Preis und Dauer.
+
+**Offen:** Die Voraussetzungsketten (`prereqs`) kommen in der Graft-Rechnung
+weiterhin aus `reference/`. `ns.singularity.getAugmentationPrereq` waere die
+belastbare Quelle. Bei drei Abweichungen von 98 ist das ein kleines, aber
+echtes Restrisiko.
 
 ### Der Einbau-Ausloeser in `bn4rep.js` kennt seinen Preis nicht (30.08., 15:45)
 

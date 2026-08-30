@@ -23,6 +23,98 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Beide Ausgaenge gegeneinander gerechnet: Bladeburner bleibt der schnellere (30.08., 14:20)
+
+**Ergebnis der Alternativenpruefung, die Eric um 13:50 verlangt hat.** Drei
+Agenten, drei Winkel. Das Ergebnis ist: **der bisherige Kurs stimmt** - aber
+nicht aus den Gruenden, aus denen er gewaehlt wurde, und die Zahl, mit der er
+in Frage gestellt wurde, war meine eigene falsche.
+
+**Der Vergleich, bereinigt:**
+
+    Bladeburner   30-110 h, Erwartungswert 50-70 h
+                  (Verdopplungszeitmodell, aus BN6 UND BN10 gemessen)
+    Hacking      150-250 h
+                  (Agentenrechnung, sechs Etappen, mehrere ungemessene Posten)
+
+**Faktor 2 bis 4 zugunsten Bladeburner.**
+
+**Warum der dritte Agent das Gegenteil berichtet hat:** Ich habe ihn mit
+"gemessene Rangrate 42,5/h, also 334 Tage" beauftragt. Das war die lineare
+Fortschreibung eines Post-Reset-Lochs auf einer Exponentialkurve - derselbe
+Fehler, den ich heute schon zweimal gemacht hatte. Er hat korrekt gegen die
+falsche Vorgabe gerechnet. **Ein Auftrag, der eine Zahl vorgibt, vererbt
+seinen Fehler an den Bericht** - das gehoert in die Auftragsregeln fuer
+Subagenten.
+
+**Was aus den Berichten trotzdem bleibt, verifiziert:**
+
+**1. Reputation wird beim Kauf nicht abgezogen.** `FactionHelpers.tsx:118-120`
+ruft ausschliesslich `Player.loseMoney(augCosts.moneyCost)`. Rep ist eine
+**Schwelle, keine Waehrung** - wer 5 Mio Rep hat, kauft damit beliebig viele
+Augmentierungen, solange das Geld reicht. Nur die teuerste Stufe je Charge
+zaehlt, nicht die Summe.
+
+**2. The Red Pill kostet in BN10 fuenf Millionen Rep, nicht 2,5.**
+`Augmentations.ts:1954` gibt `repCost: 2.5e6`, und `getAugCost` multipliziert
+mit `AugmentationRepCost: 2`. Der Wert stand in mehreren Projektdateien
+falsch.
+
+**3. Der Labyrinth-Weg ist tot.** Das siebte Labor gaebe TRP an Daedalus
+vorbei (`labyrinth.ts:403-429`), aber `FinalLab` verlangt **Charisma 4000**.
+Bei `CharismaLevelMultiplier: 0.4` sind das 1,1e68 Erfahrung. Der
+Labyrinth-Punkt aus dem 24.08.-Audit ist damit erledigt, ohne dass jemand ihn
+weiter untersuchen muss.
+
+**4. NeuroFlux gibt 1,0198 je Stufe, nicht 1,01.** Empirisch aus dem
+laufenden Spielstand geklammert (`hacking_grow` 1,60199 ueber 24 Stufen). Der
+Referenzquellcode weicht hier von der laufenden Fassung ab - ueber 60 Stufen
+macht das Faktor 2,4. **Wer mit NFG rechnet, misst am Spielstand, nicht am
+Quellcode.**
+
+**Und die eigentliche Erkenntnis: Die Wege schliessen sich nicht aus.**
+`Bladeburner.prestigeAugmentation()` (`Bladeburner.ts:259-263`) setzt nur die
+laufende Aktion zurueck - **der Rang ueberlebt jeden Augmentierungs-Einbau**.
+Mit `The Blade's Simulacrum` bricht Fraktionsarbeit den Bladeburner nicht ab
+(`Bladeburner.ts:178-180`, `:1354-1360`). Der Aug-Aufbau kann also
+**nebenherlaufen**, ohne den Rangweg zu kosten.
+
+Damit ist die Frage nicht "welcher Weg", sondern: **Wie macht man den
+Bladeburner-Weg schneller, ohne ihn zu unterbrechen?** Und dafuer liefern die
+Berichte drei konkrete Posten - siehe die Punkte zu Fahigkeitspunkten, zum
+ueberfluessigen Einbau und zum Chaos-Risiko.
+
+**Grafting bleibt wertvoll, aber mit anderer Begruendung.** Nicht als Ausweg
+aus dem Bladeburner-Weg, sondern als einziger Kanal, der die in BN10 hart
+gedeckelten **Kampfwerte** hebt (`StrengthLevelMultiplier: 0.4`) - ohne
+Reputation und ohne den fuenffachen Geldaufschlag. Die Erfolgschance jeder
+Bladeburner-Aktion haengt daran.
+
+Offen und ungeprueft bleibt die Graft-Rechnung selbst (welche Augs, welcher
+Multiplikator, welche Zeit) - sie gehoert nachgerechnet und geeicht, bevor
+irgendein Werkzeug gebaut wird.
+
+**ABGESCHLOSSEN (30.08., 16:10).** Der Eintrag war eine Synthese, kein
+Arbeitsauftrag - und die drei Posten, auf die er verwies, sind inzwischen
+alle bearbeitet:
+
+- **Faehigkeitspunkte:** Aenderung gebaut und von einem Skeptiker gestoppt.
+  `CHANCE_SKILLS` wird zur Laufzeit von `blackOpArbeit` ueberschrieben, die
+  Aenderung waere wirkungslos und inhaltlich falsch gewesen (Digital Observer
+  wirkt ueber `SuccessChanceOperation` auf alle 21 Black Ops). Eigener Punkt
+  unter `## Offen`.
+- **Einbau-Sperre:** Der Befund war falsch. Die Sperre gilt nur vor dem
+  Divisionsbeitritt und hat korrekt gearbeitet; der Einbau von 09:21 hat
+  seinen eigenen Wiederaufbau von 7,08 auf 3,07 h halbiert. Der richtige Kern
+  - der Ausloeser kennt seinen Preis nicht - steht als eigener Punkt.
+- **Chaos:** Behoben. Der Riegel steht auf 19 statt 25, verifiziert 15:11:40.
+
+Der Kern des Eintrags bleibt gueltig und ist in `nodes/KURS.md` (14:45)
+eingearbeitet: Bladeburner 50-70 h gegen Hacking 150-250 h, und die Wege
+schliessen sich nicht aus.
+
+---
+
 ### Die Einbau-Sperre in `bn4rep.js:683` greift nicht (30.08., 14:25)
 
 *(Der urspruengliche Text steht unten. Er war in zwei Punkten falsch - siehe

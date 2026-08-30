@@ -257,19 +257,6 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
-### Charisma im Diplomacy-Kommentar ist um Faktor 4 zu hoch (30.08., 18:00)
-
-`src/blade.js` rechnet im Kommentarblock um Zeile 2244 mit "Charisma 309,
-Diplomacy -1,603 % je 60 s". Im Spielstand steht **Charisma 76**, also
-`76^0,045 + 76/1000 = 1,291 %` (`Bladeburner.ts:735-743`). Alle daraus
-abgeleiteten Erholzeiten in den Kommentaren sind rund **24 % zu kurz**.
-
-Nur Dokumentation, kein Code haengt daran - aber die Zahl wird beim naechsten
-Mal wieder als Grundlage genommen. Von einem Skeptiker-Lauf am 30.08. gefunden.
-
-Beim Beheben gleich pruefen, ob die 309 aus einem frueheren BitNode stammen;
-dann gehoert ein Satz dazu, dass Charisma beim Knotenwechsel zurueckfaellt.
-
 ### `reference/` ist nicht das laufende Spiel - drei belegte Abweichungen (30.08., 16:40)
 
 Bei der Graft-Eichung fielen **drei von 98 Augmentierungen** auf, deren

@@ -25,6 +25,53 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 19:30 - BitNode 10
+
+**Ausgangsbedingung:** `destroyW0r1dD43m0n` (`NetscriptFunctions/Singularity.ts:1146-1165`)
+prueft zwei Wege mit ODER. Der Hackingweg verlangt `Player.skills.hacking >=
+wd.requiredHackingSkill` **und** Adminrechte auf `w0r1d_d43m0n`; bei
+`HackingLevelMultiplier 0.35` (`BitNode.tsx` case 10) ist das Level 6.000, also
+10^175 Erfahrung - verworfen und im ENTSCHIEDEN-Kopf von `BAUSTELLEN.md`
+festgehalten. Bleibt `numBlackOpsComplete >= 21`, und die 21. ist Operation
+Daedalus mit `reqdRank: 400e3` (`Bladeburner/data/BlackOperations.ts:708`).
+
+**Engpass:** Bladeburner-Rang **907 von 400.000 = 0,23 %**.
+
+**Restweg netto:** 399.093 minus 73.660, die unterwegs aus den `rankGain`-Werten
+der ersten zwanzig Black Ops anfallen (`BlackOperations.ts`, Summe aller 21 ist
+113.660, davon Daedalus selbst 40.000) = **325.433**. Die zwanzig sind
+allerdings nur einloesbar, wenn ihre Erfolgschancen tragen - heute liegt schon
+Typhoon bei 4,6 %.
+
+**Rate:** gemessen ueber `data/verlauf-strategie.json`: 49,8/h ueber 0,8 h,
+56,1/h ueber 1,7 h, **49,5/h ueber 4,8 h**. Die Rate ist ueber alle drei Fenster
+stabil - kein exponentielles Wachstum, wie es der Eintrag von 14:45 annahm.
+
+**ETA:**
+- **Ohne Eingriff: 325.433 / 49,5 = 6.575 Stunden.** Das ist die ehrliche
+  Fortschreibung des Ist-Zustands und der Grund, warum ein Zwischenschritt
+  noetig ist.
+- **Mit dem Graft-Paket: rund 63 Stunden** - 42 h Graften plus 21,1 h
+  Assassination. Herleitung im Eintrag von 18:45 und im obersten Sofort-Punkt
+  von `nodes/BAUSTELLEN.md`. Vorlauf 18:45: 63 h, unveraendert.
+
+**Leitgroesse:** `max(Aktionszeit / Arbeitsanteil, Nachschubzeit)` bis Rang
+400.000, mit Arbeitsanteil `min(1, R / Ausdauerverbrauch)` und R = 1,774 je
+Minute. Fuer Assassination sind das 21,1 h; jede Aenderung wird daran gemessen.
+
+**Entscheidung: Zwischenschritt - das Graft-Paket.** Der Faktor zwischen 6.575
+und 63 Stunden ist zu gross, um ihn zu diskutieren. Die drei Codeaenderungen,
+die vorher stehen muessen, sind eingetragen; die erste (`src/blade.js`) ist
+seit 19:15 drin (`578e750`).
+
+**Naechste Pruefung:** Ob der Graft-Riegel im Ernstfall haelt. Er ist bisher
+nur im Normalbetrieb geprueft (kein Graft laeuft). Der erste echte Test ist das
+Graften von `Neuroreceptor Management Implant` ($1,65 Mrd, 14 min) - klein
+genug, dass ein Fehlschlag nichts kostet, und es ist ohnehin das erste Stueck
+der Reihenfolge.
+
+---
+
 ## 30.08., 18:45 - BitNode 10: Assassination, 21 Stunden, Ausgang bei rund 63 h
 
 **Verfeinerung des Eintrags von 18:20, nicht sein Widerruf.** Zwei Zahlen sind

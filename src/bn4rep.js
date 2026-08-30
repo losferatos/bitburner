@@ -721,6 +721,24 @@ export async function main(ns) {
     }
 
     let gesperrt = bladeSperre;
+    // WAEHREND EINES GRAFTS WIRD NICHT EINGEBAUT (30.08.2026, 21:30).
+    //
+    // `installAugmentations` fuehrt ueber `prestigeAugmentation` zu
+    // `this.finishWork(true, true)` (`Prestige.ts:137`) - ein laufendes Graft
+    // ist damit weg, und sein Geld wird NICHT erstattet
+    // (`Work/GraftingWork.tsx:75-83`). Beim Simulacrum sind das $450 Mrd.
+    //
+    // Die bestehende Sperre traegt das nicht: `bladeSperre` ist
+    // `!inBladeburner()` (siehe oben), und der Spieler IST Mitglied - sie
+    // greift also gerade dann nicht, wenn gegraftet wird. Der Fall ist auch
+    // nicht fern: Das Paket in `nodes/GRAFTING.md` braucht rund 42 Stunden,
+    // und der Einbau feuert in dieser Zeit mit hoher Wahrscheinlichkeit.
+    let graftLaeuft = false;
+    try {
+      const arbeit = ns.singularity.getCurrentWork();
+      graftLaeuft = !!arbeit && arbeit.type === "GRAFTING";
+    } catch { graftLaeuft = false; }
+    if (graftLaeuft) gesperrt = true;
     if (bladeSperre && Date.now() - letzteBladeMeldung > 600000) {
       letzteBladeMeldung = Date.now();
       sag("Kein Einbau: Divisionsbeitritt steht aus, ein Reset wuerde die"

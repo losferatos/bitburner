@@ -476,6 +476,26 @@ Aktion durch - und ein Durchlauf hebt das Chaos um `10 + chaos/log10(chaos)`
 in **jeder** Stadt (`Bladeburner.ts:1229-1233`). Rueckgerechnet: von rund 17
 auf 41,3. Der Fix ist richtig, die Nebenwirkung war nicht bedacht.
 
+**KORREKTUR (30.08., 13:05, durch einen Doku-Pruefer): Die Nachrechnung
+unten ist falsch - der hoechste sichere Startwert ist 19, nicht 23.**
+
+`Bladeburner.ts:1229-1233` ruft `changeChaosByCount(10)` und **danach**
+`changeChaosByCount(city.chaos / Math.log10(city.chaos))`. `City.ts:88-90`
+mutiert sofort - der zweite Aufruf liest also das **bereits erhoehte**
+Chaos. Richtig ist:
+
+    c_neu = (c + 10) + (c + 10) / log10(c + 10)
+
+    c = 19  ->  29 + 29/1,4624 = 48,83   sicher
+    c = 20  ->  30 + 30/1,4771 = 50,31   REISST DIE SCHWELLE
+
+Wer 23 setzt, treibt das Chaos genau ueber `ChaosThreshold` - also in den
+Zustand, den dieser Punkt verhindern soll. Der Parameter-Audit von 12:55
+nennt unabhaengig dieselbe 19. **Es gilt die 19.** Auch die Rueckrechnung
+unten stimmt nicht: 41,37 entsteht aus rund 14, nicht aus 17.
+
+Die falsche Rechnung bleibt zur Warnung stehen:
+
 **Der Deckel 25 ist zu hoch.** Der Kommentar an `blade.js:2746` rechnet: "Ein
 Durchlauf bringt es auf etwa 35, ein zweiter darueber - deshalb die Grenze
 bei 25." Nachgerechnet mit der echten Formel:
@@ -533,6 +553,14 @@ Wirkung:  `shockBonus() = (100 - shock) / 100` (`Sleeve.ts:173-175`), bei 99,9
           nicht mehr.
 
 **Shock Recovery ist gerechnet und verworfen (12:15).**
+
+**KORREKTUR (30.08., 13:05, durch einen Doku-Pruefer):** Der Faktor ist
+**3, nicht 2**, und Recovery dauert **18,5 h, nicht 28**.
+`Sleeve.ts:269-272` zieht die 0,0001 je Zyklus bei **jeder** Arbeit ab -
+auch waehrend Recovery. `SleeveRecoveryWork.ts:13-16` kommt also obendrauf:
+0,0003 je Zyklus = 5,4 Shock je Stunde. Die Schlussfolgerung "nicht machen"
+traegt trotzdem, aber die Gegenrechnung unten ist falsch beziffert. Sie
+bleibt stehen, damit ein spaeterer Vergleich sie nicht ungeprueft uebernimmt.
 
 Die beiden Abbauraten stehen im Quellcode und unterscheiden sich um **genau
 Faktor 2**:

@@ -92,6 +92,34 @@ export async function main(ns) {
   // (`data/Constants.ts`), nicht gewaehlt; 47 ist der Ausschaltpunkt.
   const CHAOS_EIN = 50;
   const CHAOS_AUS = 47;
+  // AB WANN IST CHAOS FOLGENLOS? (30.08.2026, 17:45, gemessen)
+  //
+  // `etwasFahrbarJetzt()` hat bisher gegen SICHER_VERTRAG (0,45) und
+  // SICHER_OPERATION (0,85) geprueft und damit gefragt: "kann ich noch
+  // irgendetwas fahren?". Die Begruendung darunter ist aber eine andere:
+  // Chaos wirkt nur ueber `difficulty *= sqrt(1 + chaos - 50)`, und die
+  // Chance ist `min(1, competence/difficulty)` - solange sie **klemmt**,
+  // ist der Aufschlag folgenlos. Klemmen heisst 1,0, nicht 0,45.
+  //
+  // Gemessen am 30.08. mit `bbspann.js`, dieselbe Stadt, 32 Minuten
+  // Abstand, Chaos von 46,62 auf 51,24 (Faktor 1,496 auf die
+  // Schwierigkeit):
+  //
+  //   Tracking       0,985-1,000 -> 0,654-0,695   Rang/min 3,242 -> 2,128
+  //   Retirement     0,721-0,766 -> 0,486-0,516   Rang/min 2,959 -> 1,995
+  //   Bounty Hunter  0,598-0,635 -> 0,404-0,429   Rang/min 2,810 -> 1,897
+  //   Raid           0,216-0,230 -> 0,150-0,160
+  //
+  // Ein Drittel der Rangrate weg - und `aufraeumen` stand die ganze Zeit
+  // auf `false`, weil Tracking mit 0,654 ueber 0,45 lag. Die Regel hat
+  // genau das gemessen, was sie nicht messen sollte.
+  //
+  // Der Einwand gegen eine hohe Schwelle bleibt gueltig: Klemmt nie etwas,
+  // raeumt der Motor dauernd auf und macht keinen Rang. Dagegen steht die
+  // Hysterese - `CHAOS_AUS` ist 47, und die Senkung ist prozentual: von
+  // 51,24 auf 47 sind 8,3 %, bei 1 bis 3 % je Stealth Retirement also vier
+  // bis acht Laeufe. Fuenf bis elf Minuten fuer ein Drittel Rangrate.
+  const CHAOS_FOLGENLOS = 0.99;
   // Untergrenze der Stadtbevoelkerung, ab der Stealth Retirement als
   // Chaos-Senker abgeschaltet wird. 0,8e9 laesst `(pop/1e9)^0,7` auf 0,86
   // fallen - Raid stuende dann bei rund 0,77 statt 0,90 und bliebe fahrbar.
@@ -217,11 +245,11 @@ export async function main(ns) {
     try {
       for (const n of OPERATIONEN) {
         if (offen(O, n) < 1) continue;
-        if (spanne(O, n).min >= SICHER_OPERATION) return true;
+        if (spanne(O, n).min >= CHAOS_FOLGENLOS) return true;
       }
       for (const n of VERTRAEGE) {
         if (offen(V, n) < 1) continue;
-        if (spanne(V, n).min >= SICHER_VERTRAG) return true;
+        if (spanne(V, n).min >= CHAOS_FOLGENLOS) return true;
       }
       return false;
     } catch {

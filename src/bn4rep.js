@@ -1180,6 +1180,25 @@ export async function main(ns) {
       // boot.js kostet 4 GB, passt also immer, und startet die Kette
       // boot -> bn4net -> Werkzeuge. Mehr braucht das Callback nicht zu
       // koennen: Es muss nur den ersten Dominostein umwerfen.
+      // LETZTE GRAFTPRUEFUNG, UNMITTELBAR VOR DEM EINBAU (31.08.2026,
+      // 01:45, aus dem Skeptiker-Loop). Die Pruefung am Rundenanfang
+      // (:736-741) ist hier bis zu 3,5 Sekunden alt: dazwischen liegen
+      // bis zu vierzig `await ns.sleep(50)` und ein `await ns.sleep(1500)`.
+      // In dieser Luecke kann `graft.js` ein Graft gestartet haben, und
+      // `installAugmentations` toetet es ueber `prestigeAugmentation` ->
+      // `finishWork(true, true)` ohne Erstattung
+      // (`Work/GraftingWork.tsx:75-83`) - beim Simulacrum $450 Mrd.
+      // Die Pruefung kostet nichts; ein verpasster Einbau wird in der
+      // naechsten Runde nachgeholt, ein getoetetes Graft nie.
+      try {
+        const jetztArbeit = ns.singularity.getCurrentWork();
+        if (jetztArbeit && jetztArbeit.type === "GRAFTING") {
+          sag("Einbau abgebrochen: in den letzten Sekunden hat ein Graft"
+            + " begonnen (" + (jetztArbeit.augmentation || "unbekannt")
+            + "). Naechste Runde erneut.");
+          return;
+        }
+      } catch { /* nicht lesbar - dann gilt die Pruefung von oben */ }
       ns.singularity.installAugmentations("boot.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr
     }

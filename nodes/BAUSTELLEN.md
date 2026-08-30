@@ -118,7 +118,96 @@ Regeln:
 
 ## Sofort
 
-keine
+### Grafting ist der ungenutzte Kanal - Augmentierungen ohne Reputation und ohne BitNode-Aufschlag (30.08., 14:10)
+
+**Die Antwort auf Erics Frage nach einer Alternative.** Ein Suchagent hat den
+Mechanismus gefunden, zwei Kernbehauptungen habe ich selbst am Quellcode
+nachgeprueft - eine haelt, eine nicht.
+
+**VERIFIZIERT: Der Preisunterschied ist real und gross.**
+
+    Grafting:  cost = augmentation.baseCost * AugmentationGraftingCostMult
+               (`Grafting/GraftableAugmentation.ts:20-22`, `Constants.ts:96` = 3)
+
+    Kaufen:    moneyCost = baseCost * multiplier * AugmentationMoneyCost
+                           * getGenericAugmentationPriceMultiplier()
+               repCost   = baseRepRequirement * AugmentationRepCost
+               (`AugmentationHelpers.ts:135-136,157-158`)
+
+Grafting kennt **weder** den Knotenfaktor (in BN10 **x5** aufs Geld, **x2**
+auf die Rep) **noch** die Stapeltreppe `1,9^k` **noch ueberhaupt eine
+Reputationsanforderung**. Es kostet schlicht das Dreifache des Basispreises.
+
+**VERIFIZIERT: Gegraftete Augmentierungen zaehlen voll.** `GraftingWork.tsx:51`
+ruft `applyAugmentation({name, level: 1})` - dieselbe Funktion wie beim Kauf.
+Sie landen also in `Player.augmentations` und zaehlen fuer
+`haveAugmentations(30)`, das Tor zu Daedalus.
+
+Voraussetzungen: `Player.city === NewTokyo` und SF10 >= 1 **oder** BitNode 10
+(`PlayerObjectGeneralMethods.ts:577-579`) - beides erfuellt, der Bot steht in
+BN10. Vollstaendig skriptbar ueber `NetscriptFunctions/Grafting.ts`.
+Entropie (0,98 je Graft, `GraftingWork.tsx:62`) wird beim naechsten Einbau auf
+0 zurueckgesetzt (`AugmentationHelpers.ts:47`) - mehrere Graft-Einbau-Zyklen
+sind verlustfrei.
+
+**Die Rechnung des Agenten** (von mir nicht nachgerechnet, als offen
+markiert): 23 Hacking-Augmentierungen graften kostet **$0,18 Bio** und hebt
+`mults.hacking` von 1,4 auf **13,08**. Mit QLink (Basis $25 Bio, also $75 Bio
+gegraftet statt 3,75 Mio Illuminati-Rep plus $125 Bio gekauft) auf **22,89**.
+Der Erfahrungsbedarf fuer Hacking 6000 faellt damit von 10^160 auf
+**7,5 * 10^12**. Grafting-Zeit fuer die 24 Stueck: 25 bis 35 Stunden,
+parallel zu allem anderen.
+
+**WIDERLEGT: "The Red Pill wird nicht gebraucht."** Der Agent schrieb,
+`ns.nuke("w0r1d_d43m0n")` funktioniere ohne TRP, weil `getNormalServer` per
+Hostname aufloese. Selbst nachgesehen - `NetscriptHelpers.tsx`, `getServer`:
+
+    const server = GetServer(host);
+    if (server != null && (server.serversOnNetwork.length > 0 || ...)) {
+      return [server, host];
+    }
+    ...
+    throw errorMessage(ctx, `Invalid host: ${str}`);
+
+Ohne TRP hat der WD-Server **keine** Netzkante - `Prestige.ts:173-181` haengt
+ihn erst bei installiertem TRP an Daedalus. `serversOnNetwork.length === 0`,
+die Bedingung ist falsch, es faellt durch bis zum `throw`. **TRP bleibt
+Pflicht**, und `nodes/KNOTEN-VORBEREITUNG.md` ist an dieser Stelle richtig.
+
+**Was der Fund strategisch bedeutet:** Grafting loest die teuerste Huerde des
+Hacking-Weges - die 30 Augmentierungen fuer Daedalus, bisher gedacht als
+30 mal Fraktionsreputation in einem Knoten mit `AugmentationRepCost: 2`.
+Uebrig bleiben dann `haveMoney(100e9)` (erfuellt), Hacking 2500 oder
+Kampfwerte 1500 (mit dem gegrafteten Multiplikator in Reichweite) und
+2,5 Mio Daedalus-Rep fuer TRP selbst.
+
+**Und: Der Mechanismus war bekannt, nur falsch einsortiert.**
+`nodes/ROADMAP.md:407` beschreibt ihn exakt richtig - "Augmentierungen **ohne
+jede Reputation**, `baseCost x 3`" - aber als **"das Werkzeug fuer BN8"**.
+Dass er den laufenden Knoten selbst verbilligt, stand nirgends. Im Code gibt
+es dazu passend **kein einziges Werkzeug**: `src/buyaugs.js:291,586` kennt
+Grafting nur als Kategorie "ueber den normalen Kauf nicht erreichbar" und
+uebergeht solche Augmentierungen.
+
+**Zweiter Fund desselben Agenten, ungeprueft:** The Covenant (dauerhafte
+Sleeves, +5 moeglich, ueberlebt jedes Prestige) gilt in `## ENTSCHIEDEN` als
+unerreichbar, weil Kampfwert 850 bei festem Multiplikator 2,06e23 Erfahrung
+braucht. Der Agent rechnet vor, dass 22 gegraftete Kampf-Augs (26 h,
+$154 Mrd) den Multiplikator so heben, dass 850 in **0,15 h Gym** erreichbar
+waeren. **Das ist derselbe Fehlertyp wie in drei anderen Faellen heute: ein
+Multiplikator wurde als Konstante behandelt.** Wenn es traegt, ist BN10 die
+einzige Gelegenheit im ganzen Projekt - Sleeve-Memory und Covenant-Sleeves
+sind nur hier kaufbar und ueberleben alle Folgelaeufe.
+
+Zu tun, in dieser Reihenfolge:
+1. Die Graft-Rechnung nachrechnen und **eichen** (welche Augs, welcher
+   Multiplikator, welcher Preis, welche Zeit) - bevor irgendetwas gebaut wird.
+2. Den ENTSCHIEDEN-Eintrag zu Covenant pruefen: Er steht auf einer Rechnung
+   mit festem Multiplikator.
+3. Erst dann ein Graft-Werkzeug. Es gibt heute keines.
+
+Dringlichkeit: **hoch.** Grafting ist an BN10 gebunden; nach dem
+Knotenwechsel braucht es SF10, das erst der Abschluss liefert.
 
 ---
 

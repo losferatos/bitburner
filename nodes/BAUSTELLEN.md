@@ -118,50 +118,6 @@ Regeln:
 
 ## Sofort
 
-### Chaos-Aufraeumen greift wieder - Wirkung auf die Rangrate noch nicht nachgemessen (30.08., 17:50)
-
-**Geaendert 17:44, Wirkung auf das Chaos verifiziert, Wirkung auf die Rangrate
-offen.** Commit `f912f25`, ein Skeptiker-Lauf laeuft.
-
-**Befund:** Um 17:42 stand Chaos bei 51,24 - ueber der Spielschwelle 50 - und
-`aufraeumen` auf `false`. Gemessen mit `bbspann.js`, dieselbe Stadt, 32 Minuten
-Abstand, Chaos 46,62 -> 51,24 (Faktor 1,496 auf die Schwierigkeit):
-
-| Aktion | 17:10 | 17:42 | Rang/min |
-|---|---|---|---|
-| Tracking | 0,985-1,000 | 0,654-0,695 | 3,242 -> 2,128 |
-| Retirement | 0,721-0,766 | 0,486-0,516 | 2,959 -> 1,995 |
-| Bounty Hunter | 0,598-0,635 | 0,404-0,429 | 2,810 -> 1,897 |
-| Raid | 0,216-0,230 | 0,150-0,160 | 9,032 -> 5,577 |
-
-**Ein Drittel der Rangrate**, und der Motor tat nichts dagegen.
-
-**Ursache:** `etwasFahrbarJetzt()` (`src/blade.js:216-231`) prueft gegen
-`SICHER_VERTRAG` (0,45) und `SICHER_OPERATION` (0,85) und fragt damit "kann ich
-noch irgendetwas fahren?". Der Kommentar darunter begruendet aber etwas
-anderes: Chaos wirkt nur ueber `difficulty *= sqrt(1 + chaos - 50)`, und die
-Chance ist `min(1, competence/difficulty)` - solange sie **klemmt**, ist der
-Aufschlag folgenlos. Klemmen heisst 1,0, nicht 0,45. Tracking lag mit 0,654
-ueber der Schwelle, also galt das Chaos als folgenlos, waehrend es ein Drittel
-kostete.
-
-**Eingriff:** eigene Schwelle `CHAOS_FOLGENLOS = 0,99` fuer genau diese
-Entscheidung. `SICHER_VERTRAG` und `SICHER_OPERATION` bleiben unangetastet -
-sie steuern die Aktionswahl.
-
-**Verifiziert 17:44-17:46:** `fahrbar false`, `aufraeumen true`, Aktion
-`General/Diplomacy`, Chaos 51,22 -> 50,55 -> 49,89 in 90 Sekunden. Rund 1,3 %
-je Lauf, bis `CHAOS_AUS` (47) also etwa sieben Minuten.
-
-**Was noch fehlt:**
-
-- **Die Rangrate nach dem Aufraeumen messen.** Erwartet werden die Werte von
-  17:10 zurueck (Tracking 3,242 Rang/min). Ein `bbspann.js`-Lauf bei Chaos
-  unter 47 belegt oder widerlegt das.
-- **Der Skeptiker-Befund.** Die zentrale Frage an ihn: Kann der Motor jetzt
-  dauerhaft aufraeumen und nie wieder Rang machen? Bei den aktuellen
-  Kampfwerten (str 102, dex 125) klemmt ausser Tracking nichts bei 1,0.
-
 ### Gemessen: Raid ist der Hebel, nicht Assassination - und der Aktionsvorrat ist die harte Grenze (30.08., 17:20)
 
 **Korrigiert den eigenen Eintrag von 17:15.** Der rechnete nur mit Rang je
@@ -382,6 +338,19 @@ im Kern solide; falsch waren einzelne Zahlen und die betriebliche Folge.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Charisma im Diplomacy-Kommentar ist um Faktor 4 zu hoch (30.08., 18:00)
+
+`src/blade.js` rechnet im Kommentarblock um Zeile 2244 mit "Charisma 309,
+Diplomacy -1,603 % je 60 s". Im Spielstand steht **Charisma 76**, also
+`76^0,045 + 76/1000 = 1,291 %` (`Bladeburner.ts:735-743`). Alle daraus
+abgeleiteten Erholzeiten in den Kommentaren sind rund **24 % zu kurz**.
+
+Nur Dokumentation, kein Code haengt daran - aber die Zahl wird beim naechsten
+Mal wieder als Grundlage genommen. Von einem Skeptiker-Lauf am 30.08. gefunden.
+
+Beim Beheben gleich pruefen, ob die 309 aus einem frueheren BitNode stammen;
+dann gehoert ein Satz dazu, dass Charisma beim Knotenwechsel zurueckfaellt.
 
 ### `reference/` ist nicht das laufende Spiel - drei belegte Abweichungen (30.08., 16:40)
 

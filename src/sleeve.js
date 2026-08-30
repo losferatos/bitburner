@@ -194,6 +194,24 @@ export async function main(ns) {
               && KONTRAKTE.includes(t.actionName)) {
             laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
           }
+          // INFILTRATE GEHOERT HIER MIT REIN (30.08.2026, 12:55, nach einem
+          // Skeptiker-Lauf) - sonst schliesst der Rueckfall von 10:00 NIE ab.
+          //
+          // `SleeveInfiltrateWork` verlangt `cyclesWorked > 300` - strikt
+          // groesser (`Work/SleeveInfiltrateWork.ts:23`, `infiltrateCycles =
+          // 60000/200`). `Sleeve.process` schreibt 5 Zyklen je Sekunde
+          // (`Sleeve.ts:263-274`), der Abschluss faellt also bei **61,0 s**.
+          // `TAKT` ist 60000 ms, und weil dieser Block Infiltrate nicht
+          // erkannte, setzte das Skript bei 60,0 s neu - `startWork` wirft
+          // `cyclesWorked` auf 0 (`Sleeve.ts:526-528`). Verfehlt um eine
+          // Sekunde, jedes Mal, unendlich oft: null Nachschub.
+          //
+          // Das ist woertlich derselbe Fehler wie am 30.08. um 06:20 bei den
+          // Kontrakten - dort war die Ursache das blinde Neusetzen einer
+          // laufenden Aktion, hier dieselbe Luecke eine Aktionsart weiter.
+          if (t && t.type === "INFILTRATE") {
+            laeuftSchon = true; ok = true; was = "infiltrate";
+          }
         } catch { /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
       }
       if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {

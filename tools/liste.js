@@ -187,27 +187,36 @@ try {
     for (let i = treffer.it.line + 1; i < treffer.s.end; i++) {
       if (parsed.lines[i].startsWith("### ")) { ende = i; break; }
     }
+    // ZUERST archivieren, DANN aus der Liste nehmen. Die umgekehrte Reihenfolge
+    // hat am 30.08.2026 um 17:20 einen Punkt spurlos geloescht: `--datei` heisst
+    // beim Eintragen "Quelltext", beim Erledigen aber "Archivtext". Wer dort die
+    // Arbeitsliste selbst uebergibt, bekommt "erste Zeile muss mit '### '
+    // beginnen" - und weil die Liste schon geschrieben war, ist der Punkt weg.
+    // Ein Werkzeug, das eine Arbeitsliste pflegt, darf bei einem falschen
+    // Argument nichts verlieren.
+    const ZEILENUMBRUCH = String.fromCharCode(10);
+    const entfernt = parsed.lines.slice(treffer.it.line, ende).join(ZEILENUMBRUCH).trimEnd();
+    const archivDatei = arg("--datei");
+    let text = entfernt;
+    if (archivDatei) {
+      // Faellt das Lesen aus, wird der Originaltext archiviert statt gar nichts.
+      try { text = entryFrom(archivDatei); }
+      catch (e) { console.log("HINWEIS: " + e.message + " - archiviere den Originaltext."); }
+    }
+    const arch = parse(ARCHIVE);
+    writeChecked(ARCHIVE, arch, [
+      ...arch.lines.slice(0, arch.headEnd + 1),
+      "",
+      ...text.split(ZEILENUMBRUCH),
+      "",
+      "---",
+      ...arch.lines.slice(arch.headEnd + 1),
+    ]);
+    console.log("Ins Archiv gelegt: " + text.split(ZEILENUMBRUCH)[0].slice(4));
+
     const lines = [...parsed.lines.slice(0, treffer.it.line), ...parsed.lines.slice(ende)];
     writeChecked(LIST, parsed, lines);
     console.log("Aus '" + treffer.s.title + "' entfernt: " + treffer.it.title);
-
-    const archivDatei = arg("--datei");
-    if (archivDatei) {
-      const text = entryFrom(archivDatei);
-      const arch = parse(ARCHIVE);
-      const neu = [
-        ...arch.lines.slice(0, arch.headEnd + 1),
-        "",
-        ...text.split("\n"),
-        "",
-        "---",
-        ...arch.lines.slice(arch.headEnd + 1),
-      ];
-      writeChecked(ARCHIVE, arch, neu);
-      console.log("Ins Archiv gelegt: " + text.split("\n")[0].slice(4));
-    } else {
-      console.log("HINWEIS: ohne --datei wurde nichts archiviert - der Punkt ist nur weg.");
-    }
 
   } else {
     for (const s of parsed.sections) {

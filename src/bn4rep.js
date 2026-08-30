@@ -33,6 +33,11 @@
  */
 import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 
+// Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
+// weil die Meldung sonst jede Runde kaeme (alle 16 s) - siehe die Korrektur
+// weiter unten bei `bladeSperreArbeit()`.
+let bladeSperreGemeldet = 0;
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -1813,7 +1818,22 @@ export async function main(ns) {
       // Faktionsarbeit alle zwei Sekunden ist keine Reputation, sondern nur
       // ein Dialogfenster.
       if (bladeSperreArbeit()) {
-        if (runde % 20 === 0) {
+        // KAPUTT SEIT COMMIT 3016d1f, BEHOBEN 30.08.2026 12:55.
+        //
+        // Hier stand `if (runde % 20 === 0)`. Die Variable `runde` gibt es in
+        // dieser Datei nicht - sie stammt aus `bn4net.js`. Der Zweig wird im
+        // Kampfknoten IMMER genommen, also warf die Runde ab da jedes Mal
+        // `ReferenceError: runde is not defined` (belegt in
+        // `data/bn4rep-log.txt`, alle 16 Sekunden).
+        //
+        // Kauf und Einbau liegen davor und liefen weiter; alles danach nicht -
+        // insbesondere das Schreiben von `data/bn4rep.json`. `bn4net.js:750`
+        // fand die Datei veraltet, setzte vorsichtshalber `wartend = 99` und
+        // senkte damit `amortDeckel` von 1800 auf 600. Im Log stand deshalb
+        // "amortisiert in 760 s (Deckel 600)" - der Serverausbau war blockiert,
+        // obwohl `data/einbau.json` `wartend: 0` meldet.
+        if (Date.now() - bladeSperreGemeldet > 300000) {
+          bladeSperreGemeldet = Date.now();
           sag("Faktionsarbeit ausgesetzt: die Bladeburner-Division traegt"
             + " diesen Knoten, Arbeit wuerde ihre Aktionen abbrechen.");
         }

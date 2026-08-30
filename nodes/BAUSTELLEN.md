@@ -118,6 +118,84 @@ Regeln:
 
 ## Sofort
 
+### `SICHER_OPERATION = 0,85` sperrt 2.491 verfuegbare Aktionen, waehrend die Vertraege leer sind (30.08., 13:20)
+
+**Der groesste offene Hebel des Knotens.** Er erklaert, warum die Rangrate bei
+42 je Stunde klebt, obwohl der Bot durchgehend arbeitet.
+
+Gemessen (`node tools/spann.js` -> `data/bbspann.json`, 13:09):
+
+    Aktion                 Chance  Vorrat  Rang/Ausdauer  Rang/Minute  HP/Fehl
+    ------------------------------------------------------------------------
+    Tracking                0,874       0          0,511        2,428      0,1
+    Bounty Hunter           0,460      23          0,742        2,163      0,5
+    Retirement              0,579      19          0,671        2,311        -
+    ------------------------------------------------------------------------
+    Investigation           0,446     457          0,566        1,583      0,0
+    Undercover Operation    0,323     507          0,624        1,643      1,4
+    Sting Operation         0,228     485          0,427        0,965      1,9
+    Raid                    0,168     458          3,241        6,491     41,6
+    Stealth Retirement      0,151     298          0,677        1,180      8,5
+    Assassination           0,091     286          0,126        0,175      4,5
+
+**Alle sechs Operationen stehen auf Stufe 1 mit null Erfolgen** - in achtzehn
+Stunden BitNode 10 wurde keine einzige gefahren. Der Grund ist
+`SICHER_OPERATION = 0,85` (`src/blade.js:243`), und keine Operation kommt auch
+nur in die Naehe.
+
+**Der Punkt ist nicht, dass Operationen besser waeren - sie sind es je Aktion
+meist nicht.** Der Punkt ist der Vorrat. Die Vertraege stehen bei **0, 23 und
+19**, die Operationen bei zusammen **2.491**. Der Nachschub ist bei 30 Stueck
+je Stunde und Art gedeckelt (`Bladeburner.ts:1387`), und der Zaehler faellt
+bei Erfolg **und** Misserfolg (`:934, :971`). Der Bot faehrt deshalb die
+Regenerationskammer oder Incite Violence, waehrend 2.491 Auftraege
+danebenliegen.
+
+**Die Schwelle hat keine Herleitung im Code.** Der Kommentar bei
+`blade.js:243` gehoert zur Black-Op-Schwelle (0,80 statt 0,99, sauber
+gerechnet); die 0,85 fuer Operationen steht ohne Begruendung da. Der
+naechstgelegene Beleg ist von 26.08. 16:20: *"Alle sechs Operationen liegen
+zwischen 0,04 und 0,19"* - gemessen in **BitNode 6**. Heute liegen
+Investigation bei 0,446 und Undercover bei 0,323, also in einem voellig
+anderen Bereich. Die Begruendung ist mit dem Knotenwechsel verfallen.
+
+**Zwei Operationen sind risikofrei und sofort besser als der Leerlauf:**
+
+- **Investigation** - Chance 0,446, **null HP-Verlust**, **kein**
+  Bevoelkerungsverbrauch (`Bladeburner.ts:803-810` ruft nur
+  `improvePopulationEstimateByPercentage`), 457 Stueck Vorrat, 0,566 Rang je
+  Ausdauerpunkt gegen Tracking 0,511.
+- **Undercover Operation** - Chance 0,323, 1,4 HP je Fehlschlag, ebenfalls
+  **kein** Bevoelkerungsverbrauch (`:812-819`), 507 Stueck, 0,624 Rang je
+  Ausdauerpunkt.
+
+**Raid bleibt gesperrt, und zwar zu Recht.** Es ist mit 3,241 Rang je
+Ausdauerpunkt und 6,491 je Minute die mit Abstand ertragreichste Aktion im
+Spiel - aber es kostet **41,6 HP je Fehlschlag** bei 20 HP Maximum. Bei 83
+Prozent Fehlschlagquote landet der Spieler bei jedem zweiten Versuch im
+Krankenhaus. Dazu verbraucht es 1 Prozent der Stadtbevoelkerung je Erfolg und
+0,5 bis 1 bei Fehlschlag (`:830-844`) - bei 458 Versuchen waere Aevum leer.
+Raid ist ein eigener Punkt, kein Teil dieses hier.
+
+**Was das wert ist.** Der Bot verliert heute rund die Haelfte seiner Zeit an
+Kammer und Leerlauf, weil nichts Fahrbares da ist. Mit Investigation und
+Undercover als Rueckfall laeuft er durch. Die Nachschubdecke steigt von 90
+Versuchen je Stunde (drei Vertraege) auf 150 (fuenf Aktionen) - und der
+vorhandene Bestand von 964 Stueck traegt die ersten Stunden ohne jeden
+Nachschub.
+
+Zu tun: `SICHER_OPERATION` auf einen **gerechneten** Wert senken, der
+Investigation und Undercover einschliesst und Raid, Stealth Retirement sowie
+Assassination draussen laesst. Kandidat **0,30**. Danach messen, ob die
+Rangrate steigt und ob der HP-Stand haelt.
+
+**Vor dem Abhaken:** Die Aenderung geht in `src/blade.js`, also in Code, der
+unbeaufsichtigt weiterlaeuft. Nach der Regel vom 30.08. braucht sie einen
+Skeptiker-Lauf, bevor sie als fertig gilt - und die drei Fragen sind zu
+beantworten: Welche Uhr? Was bei Stillstand und Nachholen? Rate oder Bestand?
+
+Dringlichkeit: **hoch.** Die Leitgroesse des Knotens haengt daran.
+
 ## Offen, nach Dringlichkeit
 
 ### Elf Fehler in der eigenen Dokumentation, gepruefte Liste (30.08., 13:05)

@@ -142,10 +142,21 @@ als SPTN-97. Gestartet 22:11, Dauer 46,2 min.
 **Die Lehre aus dem Verlust steht:** Erst mit dem billigsten Stueck testen,
 dann mit dem teuren. $71 Mio als Pruefgebuehr statt $14,63 Mrd.
 
-**Naechster Schritt, sobald Combat Rib I durch ist (gegen 22:57):**
-`SPTN-97 Gene Modification`, $14,63 Mrd, 99,4 min - der groesste Einzelposten
-des Pakets (Kampf x9,38). Vorher `node tools/task.js graft.js` im Pruefmodus,
-`verfuegbar` muss von 96 auf 95 gefallen sein.
+**Ab jetzt treibt ein Werkzeug die Kette** (`3117791`, 22:43). Der
+Vorankommens-Loop ruft in jedem Lauf:
+
+```
+node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
+node tools/graftnext.js --los     # naechstes Stueck aus nodes/GRAFTPLAN.md
+```
+
+`graftnext.js` legt hoechstens EINEN Auftrag ab und tut gar nichts, solange
+ein Graft laeuft oder `data/bbgraft.json` aelter als 30 Minuten ist. Die
+Reihenfolge steht in `nodes/GRAFTPLAN.md` (38 Stuecke, Voraussetzungsketten
+eingerechnet); installierte werden uebersprungen.
+
+**Der naechste ist `SPTN-97 Gene Modification`**, $14,63 Mrd, 99,4 min - der
+groesste Einzelposten des Pakets (Kampf x9,38).
 
 ### LAEUFT: The Blade's Simulacrum ($450 Mrd), fertig gegen 21:57 (30.08., 21:43)
 

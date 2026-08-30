@@ -118,7 +118,56 @@ Regeln:
 
 ## Sofort
 
-keine
+### Die Rangrate liegt im Vollbetrieb bei 30 statt 254 je Stunde (30.08., 12:45)
+
+Gemessen (Waechterreihe, 3-Minuten-Takt): Seit der Wiederaufbau um 12:26
+endete und `blade.js` wieder traegt, kommt der Rang kaum voran.
+
+    12:25  572      12:31  574        Mittel ueber 12:25-12:37:
+    12:28  574      12:34  575          (578 - 572) / 0,20 h = **30 Rang/h**
+                    12:37  578
+
+Erwartet: **254 Rang/h**, gemessen heute um 06:57-07:15 im Vollbetrieb
+(`nodes/KURS.md`, 30.08. 07:20 - die Zahl ist die Leitgroesse des Knotens).
+Der Unterschied ist **Faktor 8**, nicht Rauschen.
+
+Der Arbeitsanteil ist es nicht: Er steht bei **100 Prozent** (Fenster
+12:32-12:36, `data/aktionen.txt`, neun Abschnitte reine Kontrakte, keine
+Regenerationskammer - die Ausdauer ist nach drei Stunden Gym voll aufgeladen,
+40,27 von 45,44). Der Bot arbeitet also durchgehend und liefert trotzdem ein
+Achtel.
+
+Was sich seit 07:15 geaendert hat, in der Reihenfolge des Verdachts:
+
+1. **Die Kampfwerte sind niedriger als vor dem Einbau.** 07:15 standen sie bei
+   119/101/105/101, jetzt bei 100/100/101/100. `BBTRAIN_ZIEL = 100`
+   (`src/blade.js:3023`) beendet den Wiederaufbau bei 100 - der Bot steigt
+   also mit schlechteren Werten ein, als er vorher hatte. Das erklaert -16
+   Prozent, nicht Faktor 8, kann aber ueber die Erfolgschance nichtlinear
+   durchschlagen.
+2. **Der Sleeve steht auf shock 99,9** (Einbau setzt `shock = 100`,
+   `Sleeve.ts:251`). Geprueft und vermutlich nicht die Ursache: Der Rang
+   laeuft ueber `completeAction` ungedaempft, nur `applySleeveGains` wird mit
+   `shockBonus()` skaliert (`SleeveBladeburnerWork.ts:53-55`). Aber der
+   Sleeve lieferte heute frueh einen grossen Teil der Rate - ob seine
+   Erfolgschance mitgefallen ist, ist ungeprueft.
+3. **Chaos steht bei 41,37 in Aevum** statt 7,7. Sollte folgenlos sein:
+   `getChaosSuccessFactor` gibt unter `ChaosThreshold = 50` exakt 1 zurueck
+   (`Actions/Action.ts:94-101`). Als Ursache damit unwahrscheinlich, aber
+   nicht gemessen.
+
+Zu tun: Erfolgschancen und Rangertrag je Aktion messen und mit den Werten von
+07:15 vergleichen. `data/blade.json` fuehrt `chance`, `data/aktionen.txt` den
+Rangzuwachs je Abschnitt. Die Frage ist, ob weniger Aktionen laufen oder jede
+Aktion weniger bringt - das trennt Ursache 1 von Ursache 2.
+
+**Achtung beim Nachmessen:** Der Ausdauerpuffer aus der Gym-Phase laeuft
+gerade leer. Sobald die Regenerationskammer wieder anspringt, faellt der
+Arbeitsanteil auf die ueblichen 50 Prozent - dann ist die Rate erst recht
+zu klein. Ein Fenster von mindestens 45 Minuten abwarten, bevor man urteilt.
+
+Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
+ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
 ## Offen, nach Dringlichkeit
 

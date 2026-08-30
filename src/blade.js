@@ -2743,7 +2743,38 @@ export async function main(ns) {
     // Tracking wieder da und bringt 2,2 - der Verlust ist nach gut dreissig
     // Sekunden wieder eingespielt.
     const vorratLeer = VERTRAEGE.some((name) => offen(V, name) < 3);
-    if (vorratLeer && chaosJetzt < 25) {
+    // DER RIEGEL STAND AUF 25 UND WAR ZU HOCH (30.08.2026, 15:15).
+    //
+    // Der Kommentar oben rechnet "Ein Durchlauf bringt es auf etwa 35, ein
+    // zweiter darueber - deshalb die Grenze bei 25". Beide Zahlen stimmen
+    // nicht. `Bladeburner.ts:1229-1233` ruft
+    //
+    //     city.changeChaosByCount(10);
+    //     city.changeChaosByCount(city.chaos / Math.log10(city.chaos));
+    //
+    // und `City.ts:88-90` mutiert **sofort** - der zweite Aufruf liest also
+    // das schon erhoehte Chaos. Die Formel ist damit
+    // `(c+10) + (c+10)/log10(c+10)`, nicht `c + 10 + c/log10(c)`.
+    //
+    // Nachgerechnet gegen `ChaosThreshold = 50` (`data/Constants.ts:31`):
+    //
+    //     c = 18     -> 47,35   sicher
+    //     c = 19     -> 48,83   sicher
+    //     c = 19,78  -> 49,98   die stetige Loesung
+    //     c = 20     -> 50,31   REISST
+    //     c = 25     -> 57,67   REISST deutlich
+    //
+    // Der alte Riegel liess also genau den Lauf zu, der alle sechs Staedte
+    // ueber die Schwelle hebt. Oberhalb von 50 multipliziert
+    // `getChaosSuccessFactor` die Schwierigkeit mit `sqrt(1 + chaos - 50)`
+    // (`Actions/Action.ts:94-101`); bei Chaos 60 faellt die Rangrate auf
+    // rund 30 Prozent. Der Rueckweg ueber Diplomacy kostet bei Charisma 46
+    // etwa 51 Minuten je Incite-Lauf, ohne jeden Rangertrag.
+    //
+    // 19 statt 19,78, weil ganzzahlig und weil die Chance-Schaetzung selbst
+    // rauscht. Der Verlust gegenueber der stetigen Loesung ist eine
+    // Vierzigstel-Einheit Chaos.
+    if (vorratLeer && chaosJetzt < 19) {
       return { typ: G, name: "Incite Violence", grund: "Vertragsvorrat leer" };
     }
 

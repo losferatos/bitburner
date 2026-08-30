@@ -118,63 +118,6 @@ Regeln:
 
 ## Sofort
 
-### Chaos in Aevum steht bei 41,3 von 50 - zwei Incite-Laeufe kippen es (30.08., 14:25)
-
-Gemessen: Aevum (die Bladeburner-Stadt) **41,3**, Ishima **46,4**. Die
-          Schwelle ist **50** (`data/Constants.ts:31`, `ChaosThreshold`).
-
-Wirkung bei Ueberschreitung: `getChaosSuccessFactor` multipliziert die
-          Schwierigkeit mit `sqrt(1 + chaos - 50)` (`Actions/Action.ts:94-101`).
-          Ein Pruefagent hat es durchgerechnet: Chaos 60 statt 41 senkt die
-          Rangrate von 50,1 auf **15,1 je Stunde - Faktor 0,30**.
-
-Der Ausloeser ist der Bot selbst: `Incite Violence` addiert `+10` **und**
-          `+chaos/log10(chaos)` auf **jede** der sechs Staedte
-          (`Bladeburner.ts:1229-1233`). Bei Chaos 41 sind das **+35,6 je
-          Ausfuehrung** - ein einziger Lauf reisst die Schwelle.
-
-Der Rueckweg ist teuer: Diplomacy senkt bei Charisma 46 nur **1,23 Prozent
-          je 60-Sekunden-Aktion** (`getDiplomacyPercentage`,
-          `Bladeburner.ts:735-743`). Eine einzige Incite-Ausfuehrung
-          zurueckzunehmen kostet rund **51 Minuten ohne Rangertrag**.
-
-Der Riegel im Bot steht auf `chaosJetzt < 25` (`src/blade.js:2746`) und
-          haelt damit heute - aber die Rechnung dahinter war falsch, siehe den
-          korrigierten Punkt vom 12:40: Der hoechste sichere Startwert ist
-          **19**, nicht 23 und nicht 25. Bei einem Startwert von 20 landet ein
-          Durchlauf auf 50,31.
-
-Zu tun:   Den Riegel von 25 auf 19 senken. Das ist eine Zahl, exakt
-          hergeleitet, und sie steht seit 12:55 zweifach belegt in der Liste.
-          Danach messen, ob Incite ueberhaupt noch ausgeloest wird - falls
-          nein, ist der Vorratsnachschub neu zu betrachten.
-
-**Nachgemessen 14:42 - die Dringlichkeit faellt, und meine Tendenzaussage
-war voreilig.**
-
-    14:25   41,3
-    14:40   47,16
-    14:42   47,15   <- stabil, nicht steigend
-
-**Der Bot ist nicht die Ursache.** `data/aktionen.txt` fuehrt im gesamten
-aktuellen Protokoll **null** Incite-Violence-Abschnitte - der Riegel
-`chaosJetzt < 25` greift, wie er soll. Der Anstieg von 41,3 auf 47,2 kam
-also von den Zufallsereignissen (`Bladeburner.ts:600-694`), nicht vom Motor.
-
-Damit ist der Punkt weiterhin richtig, aber **nicht akut**: Der Riegel
-gehoert von 25 auf 19, weil er sonst beim naechsten Mal, wenn das Chaos
-unter 25 faellt, einen Durchlauf zulaesst, der bei 20 auf 50,31 landet.
-Heute passiert nichts, weil Incite ohnehin gesperrt ist.
-
-*Zur eigenen Rechnung:* Die Aussage "Tendenz steigend" stand auf **zwei**
-Messpunkten. Der dritte widerlegt sie. Das ist derselbe Fehlertyp wie bei den
-Rangraten heute - aus zwei Werten eine Richtung ableiten.
-
-Dringlichkeit: **mittel** statt hoch. Kein Schaden solange unter 50, und der
-Motor treibt es nicht.
-Dringlichkeit: **hoch.** Kein Schaden solange unter 50, aber der Abstand
-          betraegt 8,7 Punkte und ein einzelner Lauf kostet 35,6.
-
 ### Die Einbau-Sperre in `bn4rep.js:683` greift nicht (30.08., 14:25)
 
 Gemessen: Um **09:21** hat `bn4rep.js` einen Augmentierungs-Einbau

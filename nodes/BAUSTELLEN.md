@@ -118,6 +118,50 @@ Regeln:
 
 ## Sofort
 
+### RESET 23:02: Augmentierungs-Einbau - Wiederanlauf vollstaendig, alle Grafts ueberlebt (30.08., 23:05)
+
+**Kein Fehler, aber ein Einschnitt.** `bn4rep.js` hat eingebaut, nachdem
+`Combat Rib I` gegen 22:57 fertig war - der Graft-Riegel aus `064acef` greift
+nur waehrend eines Grafts, und danach war keins mehr offen.
+
+**Der Wiederanlauf steht** (`data/ps.json`, 23:02:57): `bn4net`, `bn4life`,
+`blade`, `bbtrain`, `homegrow`, `contracts`, `wakelock`, `popups`, `bn4rep`,
+`bn4door`, `joinrun` auf home, `sleeve` auf iron-gym. **Kein Werkzeug fehlt** -
+anders als nach dem Einbau vom 25.08., wo sechs fehlten.
+
+**Alle drei gegrafteten Augmentierungen haben ueberlebt** - erwartet, aber
+jetzt belegt: `Neuroreceptor Management Implant`, `The Blade's Simulacrum`,
+`Combat Rib I` stehen als installiert. Dazu neu aus dem Einbau:
+`Neurotrainer II`, `Embedded Netburner Module`, `EsperTech Bladeburner
+Eyewear`. **23 Augmentierungen** statt 17.
+
+`data/simulacrum.txt` steht weiterhin - richtig, das Simulacrum ist
+installiert.
+
+**Der Preis:**
+
+| | vor dem Einbau | danach |
+|---|---|---|
+| Geld | $28,4 Bio | **$32,1 Mio** |
+| Kampfwerte | str 100 def 101 dex 134 agi 113 | **str 40 def 30 dex 37 agi 28** |
+| Netz | 85/85 | 47/76 |
+| Hacking | 376 | 224 |
+
+**Drei Entropiestapel wirken jetzt sichtbar:** Die Bladeburner-Multiplikatoren
+stehen unter 1 - `chance 0,969`, `ausdauer 0,941`, `regen 0,941`,
+`analyse 0,941`. Das ist `0,98^3 = 0,941`, bei der Chance durch EsperTech
+(+3 %) auf 0,969 gehoben. Der Skeptiker hatte genau das vorhergesagt.
+
+**Was das fuer den Graftplan heisst:** `SPTN-97` kostet $14,63 Mrd, im Konto
+sind $32 Mio. Der Plan bleibt gueltig, aber er wartet auf das Geld - und das
+kommt aus dem Netz, das gerade selbst wieder aufgebaut wird. `graftnext.js`
+tut von selbst nichts, solange nichts bezahlbar ist; `graft.js` bricht bei zu
+wenig Geld mit einer Meldung ab, ohne etwas anzufassen.
+
+**Zu pruefen im naechsten Lauf:** Ob `bbtrain` den Tiefstand von 28 wieder auf
+100 bringt und `blade.js` danach uebernimmt. Das ist der bekannte
+Wiederaufbau-Pfad, kein neuer Fall.
+
 ### Die Graft-Kette laeuft: Rang und Graft gleichzeitig - verifiziert (30.08., 22:14)
 
 **Nach dem Verlust von 22:06 wurde mit dem billigsten Stueck nachgetestet,

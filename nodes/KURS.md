@@ -25,6 +25,78 @@ Ausgang. Diese Datei bricht den Kreis, indem sie nur aus
 
 ---
 
+## 30.08., 14:45 - BitNode 10: die Leitgroesse war die falsche Kennzahl
+
+**Korrektureintrag ausser der Reihe.** Der Eintrag von 07:20 steht auf einer
+Modellklasse, die drei unabhaengige Pruefungen heute widerlegt haben. Weil
+vier Loops die Zeile `Leitgroesse` lesen, wird sie hier richtiggestellt statt
+erst beim naechsten regulaeren Kurslauf um 18:44.
+
+**Was falsch war: Rang je Stunde ist keine Leitgroesse, sondern ein
+Momentanwert auf einer Exponentialkurve.**
+
+Der Rangzuwachs folgt `dR/dt ~ R^a` mit **a nahe 1,0** - also **konstante
+Verdopplungszeit**, nicht konstante Rate. Die Projektakte hatte das am 29.08.
+um 01:20 bereits gemessen (Log-log-Regression ueber 142 gleitende
+Zweistundenfenster, `nodes/ERLEDIGT.md:1846-1858`); der Eintrag von 07:20 hat
+es nicht benutzt.
+
+Die Folgen waren gross: Aus einem Messwert von 42,5 Rang/h wurden per linearer
+Fortschreibung **338 Tage** - und der Messwert war zusaetzlich ein
+Post-Reset-Loch (der Einbau von 09:21 hatte die Kampfwerte auf 1 gesetzt).
+Dieselbe Fehlerklasse traf heute dreimal: 254 Rang/h waren Lagerabbau,
+30 Rang/h waren Lagerabbau, 42,5 Rang/h war ein Trog.
+
+**Die richtige Kennzahl, gemessen in beiden Knoten:**
+
+    BN10   Rang     10 ->     366    13,1 h / 5,19 Verdopplungen   T = 2,53 h
+    BN6    Rang 13.209 -> 452.411    19,2 h / 5,10 Verdopplungen   T = 3,76 h
+
+BN10 laeuft im Anlauf also **schneller** als BN6. Und BN6 brauchte fuer die
+ersten 80.000 Rang rund **40 Spielstunden**, danach nur noch **10** bis
+452.411 - der Anlauf ist der teure Teil, in beiden Knoten.
+
+Ausgangsbedingung: unveraendert - alle 21 Black Ops, Daedalus verlangt Rang
+                   400.000 (`BlackOperations.ts:708`). Der Weg dorthin ist
+                   geprueft: `destroyW0r1dD43m0n` setzt `backdoorInstalled`,
+                   sobald `numBlackOpsComplete >= 21` (`Singularity.ts:1155-1166`),
+                   SF4 liegt vor.
+Engpass:           Bladeburner-Rang **671 von 400.000**; netto 340.401 nach
+                   Abzug der 58.928 aus den Black-Ops-Ertraegen.
+Restweg:           9,28 Verdopplungen von 671 aus.
+Rate:              **Verdopplungszeit 2,53 h** (BN10, gemessen vor dem
+                   Einbau) bzw. 3,76 h (BN6-Regression). Rang je Stunde wird
+                   nicht mehr fortgeschrieben.
+ETA:               **30-110 h, Erwartungswert 50-70 h** | Vorlauf: 45-134 h
+                   (dieselbe Groessenordnung, aber auf falschem Weg erreicht).
+                   Zwei unabhaengige Modelle: Verdopplungsfortschreibung 23-46 h,
+                   mechanistische Stundensimulation aus dem Quellcode 62-113 h.
+Leitgroesse:       **Die Verdopplungszeit des Bladeburner-Rangs**, gemessen
+                   ueber mindestens zwei Verdopplungen. Ziel: unter 3 h.
+                   *Nicht* Rang je Stunde - dieser Wert steigt exponentiell
+                   und sagt ohne den Rangstand nichts.
+Entscheidung:      **weiterfahren.** Der Hacking-Weg wurde vollstaendig
+                   durchgerechnet: 150-250 h gegen 50-70 h - Faktor 2 bis 4
+                   schlechter. Bladeburner bleibt.
+Naechste Pruefung: **Rang 1.342** (eine Verdopplung ab 671). Wird er in rund
+                   2,5 h erreicht, traegt das Modell. Braucht er deutlich
+                   laenger, flacht die Kurve ab und die ETA steigt - dann
+                   gehoert der Exponent neu bestimmt, nicht die Rate.
+
+**Zwei Randbedingungen, die die Prognose kippen koennen und deshalb
+mitgemessen gehoeren:**
+
+1. **Jeder Augmentierungs-Einbau kostet 5 bis 7 Stunden** (Kampfwerte auf 1,
+   rund 3 h Gym plus Ratenverlust). Der Einbau von 09:21 war nach der
+   Aktenlage ein Fehler - die Sperre in `bn4rep.js:683` hat nicht gegriffen;
+   eigener Punkt in `nodes/BAUSTELLEN.md`.
+2. **Chaos ueber 50** multipliziert die Schwierigkeit mit `sqrt(1+chaos-50)`
+   (`Actions/Action.ts:94-101`). Aevum steht bei 47,15, stabil, und der Motor
+   treibt es nicht (null Incite-Abschnitte im Protokoll). Bei Chaos 60 faellt
+   die Rate auf 30 Prozent.
+
+---
+
 ## 30.08., 07:20 - BitNode 10: erste Messung im Vollbetrieb, ETA halbiert sich
 
 Der erste Kurslauf, der auf einer Rangreihe im **Vollbetrieb** steht statt auf

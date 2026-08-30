@@ -10,10 +10,33 @@ aus dem laufenden Spiel. Bereits installierte Stuecke werden von
 `graftnext.js` uebersprungen - die Liste muss also nicht gepflegt werden,
 wenn etwas fertig ist.
 
-**Nicht in der Liste:** `The Blade's Simulacrum` und
-`Neuroreceptor Management Implant` (beide am 30.08. gegraftet, sie mussten
-zuerst) und `violet Congruity Implant` ($150 Bio, eigene Entscheidung, siehe
-`nodes/GRAFTING.md`).
+**Nicht in der Liste:** `The Blade's Simulacrum`, `Neuroreceptor Management
+Implant` und `Combat Rib I` (alle drei am 30.08. gegraftet).
+
+## `violet Congruity Implant` - so frueh wie bezahlbar, nicht am Ende
+
+**$150 Bio, 14,1 Minuten, graftbar** (kein `isSpecial`, `factions: []`,
+`Augmentations.ts:391-399`; kaufen geht wegen `repCost: Infinity` nicht).
+
+`AugmentationHelpers.ts:45-49` setzt beim Anwenden `Player.entropy = 0` und
+ruft `applyEntropy(0)` - **die Entropie ist damit rueckwirkend geloescht**.
+Und `GraftingWork.tsx:61-64` prueft den Besitz, bevor es einen Stapel bucht:
+**nach Congruity erzeugt kein Graft mehr Entropie.**
+
+**Deshalb so frueh wie moeglich, nicht als letztes.** Das Endergebnis ist in
+beiden Faellen null Entropie - aber wer es zuerst graftet, arbeitet die
+restlichen Stuecke mit vollen Multiplikatoren ab statt mit `0,98^n`. Nach 38
+Grafts stuenden sonst `bladeburner_success_chance` bei x0,822 statt x1,771,
+`faction_rep` bei x0,888 statt x1,912 und `hacking_money` bei der Haelfte -
+und die Geldrate, aus der die $150 Bio kommen, haengt an genau diesem
+`hacking_money`.
+
+**Also:** Das Paket abarbeiten, und sobald $150 Bio auf dem Konto stehen,
+Congruity dazwischenschieben. Bei der vor dem Einbau gemessenen Nettorate von
+$4,43 Bio je Stunde sind das rund 34 Stunden - waehrend das Paket 42 braucht.
+
+*Gefunden von einem Skeptiker-Lauf am 30.08. um 23:25, nachdem
+`nodes/GRAFTING.md` es als "eigene Entscheidung" beiseitegeschoben hatte.*
 
 ## Reihenfolge
 

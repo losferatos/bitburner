@@ -118,6 +118,53 @@ Regeln:
 
 ## Sofort
 
+### Drei Nachbesserungen am Graft-Riegel, vom Skeptiker belegt (30.08., 19:35)
+
+Zwei davon sind in `578e750` behoben (Selbsthaltung, offener Abschnitt). Drei
+bleiben offen, alle mit Fundstelle:
+
+**1. `tools/wache.js` kennt `Grafting` nicht - Fehlalarm nach 45 Minuten.**
+Der Riegel schreibt jede Runde frische Telemetrie, damit die Motorfrische-
+Pruefung (`tools/wache.js:66`, `MOTOR_MAX_ALTER` 10 min) nicht anschlaegt.
+Uebrig bleibt die Traegerpruefung (`:651`): Rang 45 Minuten flach **und** nicht
+`imGym` - und `"Grafting"` beginnt nicht mit `"Gym/"` (`:632`), die Ausnahme
+greift also nicht. Beide Ausgaenge sind falsch:
+
+- Tragen die Sleeves den Rang (14,4/h, also +10,8 in 45 min), feuert nichts -
+  ein festsitzender Riegel liefe 1,5 h unbemerkt.
+- Tragen sie ihn nicht, erzeugt ein legitimer langer Graft einen **Push aufs
+  Handy**: "Bladeburner-Rang steht seit 45 min ... (Aktion: Grafting)".
+
+Zu tun: `Grafting`-Ausnahme analog zu `imGym`, plus ein harter Deckel auf die
+Riegeldauer (die Graftzeit ist bekannt, `src/bbgraft.js:44` liest sie schon).
+
+**2. Der Faehigkeitskauf faellt waehrend des Riegels aus.**
+Alles ab `src/blade.js:2947` wird uebersprungen, darunter
+`faehigkeitenKaufen()` (`:3172`). Genau der wurde am 29.08. in den
+Weichen-Zweig nachgezogen (`:3163`, "17 Punkte lagen brach"), weil die
+Sleeve-Erfolgschancen an den Multiplikatoren des **Spielers** haengen
+(`Actions/Action.ts:170-182`). Der Kauf beruehrt `Player.currentWork` nicht
+und gehoert **ueber** den Riegel. Derzeit stehen 5 Punkte offen.
+
+**3. Rennfenster von bis zu einer Sekunde beim Graftstart.**
+`Bladeburner.process()` laeuft nur einmal je Sekunde
+(`engine.tsx:193-201`, `Counters.bladeburnerProcess = 5`). Zwischen Graftstart
+und dem naechsten `process()` liefert `getCurrentAction()` noch die alte
+Aktion. Wacht `blade.js` in diesem Fenster aus einem `ns.sleep()`-Pfad auf
+(`:3131`, `:3167`, `:3364`, `:3397`), laeuft es durch und toetet das Graft -
+ohne Dialog (`GraftingWork.tsx:74-83` meldet den Abbruch nur bei
+`!this.singularity`). Der Skeptiker haelt das Restrisiko fuer klein, aber es
+ist billig zu schliessen: **Das Graftwerkzeug ruft vor `graftAugmentation`
+einmal `ns.bladeburner.stopBladeburnerAction()`** (nur `resetAction`,
+`Bladeburner.ts:249-253`, kostet nichts).
+
+**Nebenbefund, der die Reihenfolge betrifft:** Waehrend der Riegel greift,
+laeuft auch das Chaos-Aufraeumen nicht. Diplomacy senkt Chaos um 1,303 % je
+Minute (Charisma 83), der passive Abbau nur um 0,011 % - Faktor 120. Ein
+17,6-Minuten-Graft mitten im Aufraeumen verlaengert dieses um dieselbe Zeit,
+und solange Chaos ueber 50 steht, ist jede Operation teurer. **Graften also
+nach dem Aufraeumen, nicht mittendrin.**
+
 ### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
 
 **Verfeinert und ersetzt den Eintrag von 18:20.** Zwei Korrekturen sind

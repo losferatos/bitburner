@@ -161,6 +161,12 @@ export async function main(ns) {
     // Gegenchance. Die untere Schaetzgrenze ist die vorsichtige Wahl.
     const evJeVersuch = (gewinnEff != null)
       ? gewinnEff * min - (1 - min) * verlust : null;
+    // Die Schwierigkeit der Aktion auf ihrer aktuellen Stufe. Sie geht in
+    // ZWEI Groessen ein - Ausdauer je Lauf und HP je Misserfolg - und wurde
+    // bisher nur fuer die Ausdauer gerechnet (siehe unten).
+    const dd = DIFF[name];
+    const d = dd ? dd[0] * Math.pow(dd[1], Math.max(0, stufe - 1)) : null;
+    const diffMult = d != null ? Math.pow(d, 0.28) + d / 650 : null;
     const ertrag = (evJeVersuch != null && dauer)
       ? +(evJeVersuch / (dauer / 60000)).toFixed(3) : null;
     return { name, min: +min.toFixed(3), max: +max.toFixed(3),
@@ -168,17 +174,34 @@ export async function main(ns) {
       dauer, rangGewinn,
       gewinnEff: gewinnEff != null ? +gewinnEff.toFixed(3) : null,
       rangVerlust: verlust,
-      hpJeMisserfolg: +((1 - min) * (HP_VERLUST[name] ?? 0)).toFixed(1),
+      // DER SCHWIERIGKEITSFAKTOR FEHLTE HIER (30.08.2026, 13:45).
+      //
+      // Der Kommentar an der `HP_VERLUST`-Tabelle sagt seit jeher "mal
+      // difficultyMultiplier" - die Rechnung tat es nicht. Sie meldete den
+      // **Rohwert** aus `data/Operations.ts` und lag damit um den Faktor
+      // `d^0,28 + d/650` daneben, also bei den Operationen zwischen 6,5 und
+      // 9,3. Undercover stand mit 1,4 HP je Misserfolg da; echt sind
+      // 2 * 6,467 = **12,93** bei einem Maximum von 20.
+      //
+      // Gefunden von einem Skeptiker-Subagenten am 30.08., nachdem die Zahl
+      // als Beleg dafuer zitiert worden war, Undercover sei "risikofrei".
+      // Beleg: `Bladeburner.ts:981-983` (`damage = action.hpLoss *
+      // difficultyMultiplier`), `data/Constants.ts:16-17`
+      // (DiffMultExponentialFactor 0,28, DiffMultLinearFactor 650).
+      //
+      // Geeicht: Undercover Stufe 1, d = 500 (`data/Operations.ts:50`),
+      // 500^0,28 = 5,6976 plus 500/650 = 0,7692 ergibt 6,4668; mal hpLoss 2
+      // sind 12,93. Der Skeptiker kam unabhaengig auf denselben Wert.
+      hpJeMisserfolg: +((1 - min) * (HP_VERLUST[name] ?? 0)
+        * (diffMult ?? 1)).toFixed(1),
       ertragJeMinute: ertrag,
       // Ausdauer je Lauf und je Minute, plus die daraus folgende Zyklusrate.
       // `BaseStaminaLoss * difficultyMultiplier` mit
       // difficultyMultiplier = d^0,28 + d/650 (`Bladeburner.ts:913-916`,
       // Constants DiffMultExponentialFactor 0,28 / DiffMultLinearFactor 650).
       ...(() => {
-        const dd = DIFF[name];
-        if (!dd || !dauer) return {};
-        const d = dd[0] * Math.pow(dd[1], Math.max(0, stufe - 1));
-        const ausJeLauf = 0.285 * (Math.pow(d, 0.28) + d / 650);
+        if (d == null || !dauer) return {};
+        const ausJeLauf = 0.285 * diffMult;
         const min_ = dauer / 60000;
         const ausJeMin = ausJeLauf / min_;
         const R = regeneration;

@@ -233,6 +233,42 @@ ueber eine Ausnahmetabelle.
 `beste()` wirkt, laesst den Zustand inkonsistent - `etwasFahrbarJetzt` (`:220`)
 speist die Chaos- und Diplomacy-Entscheidung.
 
+**A ist behoben und verifiziert (30.08., 13:45).**
+
+`src/bbspann.js` rechnet den `difficultyMultiplier` jetzt einmal je Aktion
+(`d = baseDifficulty * difficultyFac^(stufe-1)`, dann `d^0,28 + d/650`) und
+nutzt ihn fuer **beide** Groessen - Ausdauer je Lauf wie bisher, HP je
+Misserfolg neu. Der doppelte Rechenblock weiter unten ist damit weg.
+
+*Geeicht vor dem Einbau*, wie es die Regel verlangt: Undercover Stufe 1,
+d = 500 (`data/Operations.ts:50`) ergibt 500^0,28 = 5,6976 plus 0,7692 =
+**6,4671** - der Skeptiker kam unabhaengig auf 6,4668. Abweichung in der
+vierten Nachkommastelle.
+
+**Verifiziert 13:41:46** (`node tools/spann.js`, frisch geschriebene
+`data/bbspann.json`):
+
+    Aktion                  vorher   nachher
+    Raid                      41,6     315,8      <- bei 20 HP Maximum
+    Stealth Retirement         8,5      70,6
+    Assassination              4,5      45,3
+    Sting Operation            1,9      13,3
+    Undercover Operation       1,4       8,3
+    Bounty Hunter              0,5       3,0
+    Tracking                   0,1       0,1
+
+Damit ist auch belegt, was vorher nur zufaellig richtig war: **Ein einziger
+Raid-Fehlschlag kostet mehr als das Fuenfzehnfache der maximalen
+Trefferpunkte.** Die Sperre fuer Raid stand auf einer Zahl, die um Faktor 7,6
+zu klein war - richtig, aber falsch begruendet.
+
+Kein `[skeptiker]`-Marker im Commit: `bbspann.js` laeuft nur auf Abruf, nicht
+unbeaufsichtigt, also greift die Skeptiker-Pflicht nicht. Loop 6 darf es
+trotzdem pruefen.
+
+**B und C bleiben offen** - sie sind der eigentliche Hebel und ein Umbau der
+Bewertungsfunktion, kein Einzeiler.
+
 Dringlichkeit: **A hoch** (ein Messwerkzeug, das um Faktor 8 daneben liegt,
 vergiftet jede kuenftige Rechnung). **B mittel** und der eigentliche Hebel.
 **C mittel**, heute folgenlos, aber eine gestellte Falle.

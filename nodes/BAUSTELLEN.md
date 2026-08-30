@@ -118,6 +118,40 @@ Regeln:
 
 ## Sofort
 
+### LAEUFT: The Blade's Simulacrum ($450 Mrd), fertig gegen 21:57 (30.08., 21:43)
+
+Alle drei Riegel stehen und sind einzeln verifiziert:
+
+| Riegel | Commit | verifiziert |
+|---|---|---|
+| `bbtrain.js` faellt nicht ins Gym | `1062631` | Syntax + Pruefer; wirksam erst bei Tiefstand unter 100 |
+| `bn4rep.js` baut nicht ein | `064acef` | neu gestartet 21:28, laeuft |
+| Marker wird geloescht | `543cb6f` | **21:42 am lebenden Objekt**: Marker angelegt, Pruefmodus gestartet, Marker weg |
+
+Graft gestartet 21:42:35, `data/graft.json`: `getan "gestartet"`, `fehler
+null`, `preis 450.000.000.000`, `dauerMin 14,1`. `data/blade.json` bestaetigt
+den Riegel: `aktion "Grafting"`.
+
+**Was der naechste Lauf pruefen muss:**
+
+1. **Ist das Simulacrum installiert?** `node tools/task.js graft.js`
+   (Pruefmodus) - `simulacrum` muss `true` sein und `verfuegbar` von 97 auf 96
+   fallen.
+2. **Steht `data/simulacrum.txt`?** Der Pruefmodus legt ihn an. Erst danach
+   hoert `blade.js` auf, waehrend Grafts stillzuhalten.
+3. **Der Tiefstand faellt auf 98** (zweiter Entropiestapel). Damit verlaesst
+   `bbtrain.js` seine Warteschleife und will ins Gym. Das ist **erwartet und
+   ungefaehrlich**: Das naechste Graft unterbricht das Gym, und `bbtrain`
+   haelt seit `1062631` still, sobald es laeuft.
+4. **Deshalb direkt danach `SPTN-97 Gene Modification`** ($14,63 Mrd, 1,66 h).
+   Es hebt die Kampfwerte um Faktor 9,38 und damit den Tiefstand weit ueber
+   100 - das schliesst das Fenster, in dem `bbtrain` die Figur haelt.
+   `nodes/GRAFTING.md` nennt Simulacrum und die erste Kampf-Augmentierung
+   nicht ohne Grund ein **Paar**.
+
+**Ab dem Simulacrum kostet Graften keinen Rang mehr** - der Motor laeuft
+waehrend der 1,66 h von SPTN-97 normal weiter.
+
 ### Erstes Graft durch - drei Vorhersagen exakt getroffen, eine widerlegt (30.08., 21:28)
 
 **Neuroreceptor Management Implant ist installiert.** Gestartet 21:12, fertig

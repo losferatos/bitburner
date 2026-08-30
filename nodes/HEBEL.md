@@ -508,6 +508,63 @@ Quellen, in dieser Reihenfolge:
 
 *Neueste zuoberst.*
 
+### Was ein Einbau wirklich kostet - gemessen statt geschaetzt (31.08., 00:30)
+
+Engpass: Nach dem Einbau um 23:02 steht der Graftplan still, weil Geld und
+Kampfwerte fehlen. Bisher war nur bekannt, DASS beides zurueckfaellt - nicht,
+wie lange die Erholung dauert. Ohne diese Zahl laesst sich die Frage "wann
+einbauen" nicht rechnen.
+
+Hypothese: Die Erholung ist in Minuten erledigt (so stand es sinngemaess in
+`nodes/BAUSTELLEN.md`: "das bekannte Wiederaufbau-Muster").
+
+Beleg und Messung (`data/verlauf-strategie.json`, 80 Minuten nach dem Einbau):
+
+| | vor 23:02 | 80 min danach |
+|---|---|---|
+| Geldrate | **73,8 Mrd/min** | **2,18 Mrd/min** (Faktor 34) |
+| Kampfwert-Tiefstand | 101 | 94 (aus 28) |
+| Geld | 28,40 Bio | 0,19 Bio |
+
+Die Zuwaechse je Messabschnitt zeigen die Kurve: 0,18 / 0,97 / 1,19 / 1,72 /
+12,0 Mrd je Minute. **Die Geldrate erholt sich, aber langsam - nach 80 Minuten
+steht sie bei einem Sechstel des Ausgangswerts.**
+
+Nachher: **Die Hypothese ist widerlegt.** Der Kampfwert-Wiederaufbau dauert
+rund 90 Minuten (28 -> 100 im Gym), die **Geldrate braucht ein Vielfaches
+davon**. Fuer `violet Congruity Implant` ($150 Bio) heisst das: bei der Rate
+von 23:02 waeren es 47 Tage, bei der Rate von 22:43 rund 34 Stunden. **Ein
+Einbau verschiebt das entscheidende Stueck des Graftplans um Tage, nicht um
+Stunden.**
+
+Das ist das fehlende Stueck der Rechnung von 23:12, das der Skeptiker zu Recht
+angemahnt hat: Der Einbau kostet nicht "6,4 Stunden Einkommen", sondern die
+**Zeit, bis die Rate wieder steht**. Was er einbringt (Favor auf sechs
+Faktionen, ueber 25 % Reputationsrate), bleibt davon unberuehrt - beides
+gehoert in dieselbe Bilanz, und jetzt liegen beide Zahlen vor.
+
+Commit: dieser Eintrag; kein Code geaendert.
+
+---
+
+### SPTN-97 gestartet, ueber den Treiber (31.08., 00:29)
+
+Erster Lauf von `tools/graftnext.js --los` im Echtbetrieb. Es hat den Plan
+gelesen, das erste noch graftbare Stueck gefunden, die Lage geprueft und genau
+einen Auftrag abgelegt:
+
+    Als Naechstes: SPTN-97 Gene Modification  $14.63 Mrd  99.4 min
+    -> gestartet 00:26, simulacrum true, verfuegbar 93, Geld 205 Mrd
+
+**Nicht auf den Tiefstand gewartet** (94 statt 100): SPTN-97 hebt die
+Kampfwerte um Faktor 9,38, der Tiefstand steht danach bei rund 860. Zehn
+Minuten Gym waeren durch das Graft ohnehin entwertet worden.
+
+Nachher: (offen - naechster Lauf misst, ob das Graft durchlaeuft und der
+Tiefstand danach dreistellig ist)
+
+---
+
 ### Erstes Graft gefahren, Einbau-Riegel gegen Graft-Abbruch (30.08., 21:30)
 
 Engpass: Der Ausgang aus BitNode 10 haengt an Rang 400.000 bei einer

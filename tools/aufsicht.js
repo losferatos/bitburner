@@ -63,7 +63,8 @@ function laeuft(muster) {
     const roh = execSync(
       "powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter \\\"Name='node.exe'\\\" | "
       + "Select-Object -ExpandProperty CommandLine\"",
-      { encoding: "utf8", timeout: 20000, stdio: ["ignore", "pipe", "ignore"] });
+      { encoding: "utf8", timeout: 20000, stdio: ["ignore", "pipe", "ignore"],
+        windowsHide: true });
     return roh.split("\n").some((z) => z.includes(muster));
   } catch { return false; }
 }
@@ -83,7 +84,7 @@ function antwortet(port, pfad, ms) {
 function starte(skript, name) {
   const log = fs.openSync(path.join(WURZEL, "data", name + ".log"), "a");
   const kind = spawn(process.execPath, [skript], {
-    cwd: WURZEL, detached: true, stdio: ["ignore", log, log],
+    cwd: WURZEL, detached: true, stdio: ["ignore", log, log], windowsHide: true,
   });
   kind.unref();
   return kind.pid;
@@ -165,7 +166,7 @@ async function notnagel() {
         execSync("bash \"" + process.env.USERPROFILE.replace(/\\/g, "/")
           + "/.claude/notify.sh\" --title Bitburner --tag rotating_light --priority high "
           + "\"Notnagel-Kontingent erschoepft - Loops stehen, bitte /bb-loops\"",
-          { timeout: 20000, stdio: "ignore" });
+          { timeout: 20000, stdio: "ignore", windowsHide: true });
       } catch { /* ntfy ist Beiwerk */ }
     }
     return;
@@ -238,7 +239,7 @@ async function durchgang() {
         execSync("powershell -NoProfile -Command \"Get-CimInstance Win32_Process -Filter "
           + "\\\"Name='node.exe'\\\" | Where-Object { $_.CommandLine -like '*wache.js*' } | "
           + "ForEach-Object { Stop-Process -Id $_.ProcessId -Force }\"",
-          { timeout: 20000, stdio: "ignore" });
+          { timeout: 20000, stdio: "ignore", windowsHide: true });
         sag("Stummen Waechter beendet.");
       } catch { /* schon weg */ }
     }
@@ -288,7 +289,7 @@ async function durchgang() {
       try {
         execSync("powershell -NoProfile -Command \"Start-Process 'opera' "
           + "-ArgumentList 'https://" + SPIEL_URL + "/'\"",
-          { timeout: 20000, stdio: "ignore" });
+          { timeout: 20000, stdio: "ignore", windowsHide: true });
         sag("Spiel-Tab geoeffnet (es war keiner offen).");
       } catch (e) {
         sag("Spiel-Tab konnte nicht geoeffnet werden: " + String(e.message || e));
@@ -360,7 +361,7 @@ async function durchgang() {
         execSync("bash \"" + process.env.USERPROFILE.replace(/\\/g, "/")
           + "/.claude/notify.sh\" --title Bitburner --tag warning "
           + "\"Aufsicht hat eingegriffen: " + meldenswert.join(", ") + "\"",
-          { timeout: 20000, stdio: "ignore" });
+          { timeout: 20000, stdio: "ignore", windowsHide: true });
       } catch { /* ntfy ist Beiwerk */ }
     }
   }

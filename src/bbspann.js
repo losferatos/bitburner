@@ -48,12 +48,28 @@ export async function main(ns) {
   // Das verzerrt genau in die Richtung, vor der der alte Kommentar selbst
   // gewarnt hat: `arbeitsanteil` und `zyklusrate` fallen zugunsten der
   // ausdauerteuren Aktionen zu guenstig aus.
-  let regeneration = 2.3;
-  let regenerationQuelle = "Vorgabe";
+  // Die Zulage der Kammer: `maxStamina * HrcStaminaGain / 100` je Abschluss
+  // (`Bladeburner.ts:1200-1202`, `data/Constants.ts:52` = 1 Prozent).
+  const zulageJeAbschluss = () => {
+    try { return ns.bladeburner.getStamina()[1] * 0.01; } catch { return 0; }
+  };
+  // Die alte Vorgabe war 2,3 - gemessen am 26.08. in einem ANDEREN Lauf, mit
+  // anderer Agilitaet und anderem Cyber's Edge. Sie war im heutigen Zustand
+  // schlicht ungueltig: Formel und Kammerphasen ergeben uebereinstimmend
+  // rund 1,35 (Bladeburner.ts:1317-1325, geeicht ueber maxStamina auf 14
+  // Stellen und unabhaengig ueber 16 Zwei-Abschluss-Phasen: 1,3497).
+  let regeneration = 1.35;
+  let regenerationQuelle = "Vorgabe 1,35 (26.08.-Wert 2,3 war aus einem anderen Lauf)";
   try {
-    const roh = ns.fileExists("data/aktionen.txt", "home")
+    // `ns.read` liest NUR vom eigenen Server (`NetscriptFunctions.ts:1076`),
+    // und der Autopilot startet dieses Skript auf einem fremden Rechner
+    // (`src/autopilot.js:885-893`). Ohne diese Kopie war `roh` dort immer
+    // leer, `regenerationQuelle` blieb stumm auf "Vorgabe" - und niemand
+    // sah es, weil keine Ausnahme flog.
+    try { if (ns.getHostname() !== "home") ns.scp("data/aktionen.txt", ns.getHostname(), "home"); } catch { /* dann eben Vorgabe */ }
+    const roh = ns.fileExists("data/aktionen.txt")
       ? ns.read("data/aktionen.txt") : "";
-    let zeit = 0, gewinn = 0, n = 0;
+    let zeit = 0, gewinn = 0, n = 0, abschluesse = 0;
     // Rueckwaerts, damit die JUENGSTEN Phasen zaehlen - eine gerade gekaufte
     // Faehigkeit soll sich sofort niederschlagen, nicht erst nach Stunden.
     const zeilen = roh.split(String.fromCharCode(10)).filter((z) => z.trim());
@@ -68,30 +84,30 @@ export async function main(ns) {
       // als das Signal.
       if (dt < 0.5) continue;
       zeit += dt; gewinn += r.ausdauerBis - r.ausdauerVon; n++;
+      // Die Kammer schreibt nur bei ABSCHLUSS gut (`Bladeburner.ts:1200`),
+      // und angefangene Sekunden verfallen beim Wechsel (`:187` setzt
+      // actionTimeCurrent auf 0). Eine Phase von 1,63 min hat also EINEN
+      // Abschluss, nicht 1,63. Ein flacher Abzug je Minute nimmt hier gut
+      // 14 Prozent zu viel weg.
+      abschluesse += Math.floor(dt + 0.001);
     }
     if (zeit >= 5 && gewinn > 0) {
-      regeneration = gewinn / zeit;
+      regeneration = (gewinn - abschluesse * zulageJeAbschluss()) / zeit;
       regenerationQuelle = "gemessen ueber " + n + " Kammerphasen, "
-        + zeit.toFixed(1) + " min";
+        + zeit.toFixed(1) + " min, " + abschluesse + " Abschluesse abgezogen";
     }
   } catch (e) { regenerationQuelle = "Vorgabe (" + String(e && e.message ? e.message : e) + ")"; }
 
-  // Der Abzug gilt fuer BEIDE Quellen. Die Vorgabe 2,3 stammt selbst aus
-  // Kammerphasen (siehe oben, 53 Phasen ueber 108 Minuten) und traegt die
-  // Zulage genauso in sich wie eine frische Messung. Am 30.08. um 18:40 stand
-  // regenerationQuelle auf "Vorgabe" - der Abzug haette im Messzweig also
-  // gar nicht gegriffen.
-  // Die Kammerzulage herausrechnen - sie wirkt nur waehrend der Kammer.
-  try {
-    const maxAusdauer = ns.bladeburner.getStamina()[1];
-    const kammerMin = ns.bladeburner.getActionTime(
-      "General", "Hyperbolic Regeneration Chamber") / 60000;
-    const zulage = (maxAusdauer * 0.01) / kammerMin;
-    if (zulage > 0 && zulage < regeneration) {
-      regeneration -= zulage;
-      regenerationQuelle += ", Kammerzulage " + zulage.toFixed(3) + " abgezogen";
-    }
-  } catch { regenerationQuelle += ", Kammerzulage NICHT abgezogen"; }
+  // ARBEITSANTEIL: die Zulage gehoert auf die RUHE-Seite, nicht weg
+  // (30.08.2026, 19:45, nach einem Skeptiker-Lauf).
+  //
+   // Die Kammerzulage verschwindet nicht aus der Welt, wenn man sie aus R
+  // herausrechnet - sie macht das Ruhen schneller. Im Fliessgleichgewicht
+  // gilt `Anteil = min(1, (R + Z) / (V + Z))`, nicht `min(1, R / V)`. Die
+  // erste Fassung von 18:45 hat Z aus dem Zaehler genommen, aber nicht in den
+  // Nenner gesetzt - sie war damit in der Gegenrichtung zu pessimistisch, so
+  // wie die Fassung davor zu optimistisch war.
+  const zulage = zulageJeAbschluss();
 
   const zeile = (typ, name) => {
     let min = 0, max = 0;
@@ -177,7 +193,7 @@ export async function main(ns) {
     // beobachteten Rangzuwachs vergleichbar.
     const DIFF = {
       "Tracking": [125, 1.02], "Bounty Hunter": [250, 1.04],
-      "Retirement": [200, 1.03], "Investigation": [300, 1.03],
+      "Retirement": [200, 1.03], "Investigation": [400, 1.03],
       "Undercover Operation": [500, 1.04], "Sting Operation": [650, 1.04],
       "Raid": [800, 1.045], "Stealth Retirement Operation": [1000, 1.05],
       "Assassination": [1500, 1.06],
@@ -236,7 +252,7 @@ export async function main(ns) {
         const min_ = dauer / 60000;
         const ausJeMin = ausJeLauf / min_;
         const R = regeneration;
-        const anteil = Math.min(1, R / ausJeMin);
+        const anteil = Math.min(1, (R + zulage) / (ausJeMin + zulage));
         return {
           ausdauerJeLauf: +ausJeLauf.toFixed(2),
           ausdauerJeMinute: +ausJeMin.toFixed(2),

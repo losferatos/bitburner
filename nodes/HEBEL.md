@@ -323,6 +323,41 @@ folgenlos, aber die Rekrutierungszeit ist ab jetzt keine verlorene Zeit mehr.
   verhindert, dass jemand dieselbe in zwei Wochen noch einmal probiert.
 - **Kein Hebel ohne Zahl.** „Fühlt sich besser an" ist kein Ergebnis.
 
+**NACHMESSUNG 30.08., 12:40 - die Vorhersage ist eingetroffen, der zweite
+Teil der Messung geht nicht.**
+
+Der Eintrag von 06:55 sagte voraus: *"Cyber's Edge liegt auf Platz zwei und
+wird gekauft, sobald genug Punkte da sind (2 von 4 um 06:51)."* Aus dem
+Spielstand gelesen (12:35, `getSaveFile` ueber die Bruecke):
+
+    Digital Observer   5      Blade's Intuition  4
+    Tracer             5      Cyber's Edge       2   <- war 1
+    Short-Circuit      5      Reaper             2
+    Datamancer         5      Evasive System     2
+    Hyperdrive         4      Cloak              2
+                              Overclock          1
+
+**Cyber's Edge steht auf Stufe 2.** Die Selbstregelung hat gekauft, sobald
+die Ausdauer knapp wurde - genau wie hergeleitet. Kein Eingriff noetig, die
+Wette ist gewonnen.
+
+**Der Kammeranteil laesst sich gerade nicht messen**, und der Grund ist
+lehrreich: Er steht bei **0,0 Prozent** (Fenster 12:32-12:36, 9 Abschnitte,
+reine Kontrakte). Der Bot kam eben aus drei Stunden Gym, in denen sich die
+Ausdauer voll aufgeladen hat - 40,27 von 45,44 laut Spielstand. Solange der
+Puffer haelt, faehrt er ohne Pause.
+
+Die Messung ist damit erst wieder aussagekraeftig, wenn der Puffer
+abgebaut ist. **Nach jedem Einbau gilt das gleiche** - wer den Kammeranteil
+unmittelbar nach dem Wiederaufbau misst, misst den Puffer, nicht die
+Regelung. Fuer den naechsten Lauf: mindestens 45 Minuten Vollbetrieb
+abwarten.
+
+Nebenbei aufgefallen und anderswo eingetragen: 8 Faehigkeitspunkte liegen
+brach (`skillPoints: 8`, `totalSkillPoints: 192`). Bei elf Faehigkeiten auf
+Stufe 1 bis 5 ist das plausibel - die naechste Stufe kostet mehr als 8 -,
+aber nachgerechnet ist es nicht.
+
 ## Was ein guter Hebel ist
 
 Der Engpass, nicht das Naheliegende. In BitNode 6 hängt alles am

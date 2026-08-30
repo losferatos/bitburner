@@ -2966,6 +2966,14 @@ export async function main(ns) {
         // ein, und genau diese Messung traegt die Strategieentscheidungen.
         try { schliesseAbschnitt(ns.bladeburner.getRank()); } catch { /* egal */ }
         abschnitt = null;
+        // Faehigkeitspunkte werden auch waehrend eines Grafts ausgegeben.
+        // Der Kauf fasst `Player.currentWork` nicht an, kann das Graft also
+        // nicht toeten - und er wurde am 29.08. genau deshalb schon in den
+        // Weichen-Zweig nachgezogen (`:3197`, "17 Punkte lagen brach"): Die
+        // Erfolgschancen der Sleeves haengen an den Multiplikatoren des
+        // SPIELERS (`Actions/Action.ts:170-182`), nicht an seiner Aktion.
+        // Ein 88-Minuten-Graft ohne Kauf waere dieselbe Verschwendung.
+        try { faehigkeitenKaufen(); } catch { /* egal */ }
         meldeLage("Grafting", "Graft laeuft ohne Simulacrum - Motor haelt still", null);
         await ns.bladeburner.nextUpdate();
         continue;

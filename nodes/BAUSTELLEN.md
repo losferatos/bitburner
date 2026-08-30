@@ -118,55 +118,6 @@ Regeln:
 
 ## Sofort
 
-### Die Einbau-Sperre in `bn4rep.js:683` greift nicht (30.08., 14:25)
-
-Gemessen: Um **09:21** hat `bn4rep.js` einen Augmentierungs-Einbau
-          ausgeloest. Der Einbau setzte die Kampfwerte auf 1, und der Bot hat
-          **drei Stunden** im Gym zurueckgebaut (`data/verlauf-strategie.json`,
-          Tiefstand 1 um 09:21, 99 um 12:24).
-
-Erwartet: Der Einbau haette nicht stattfinden duerfen. Die Sperre fuer
-          Kampfknoten wurde am 29.08. um 04:22 auf `n === 10` erweitert
-          (`src/bn4rep.js:683`) - genau fuer diesen Fall.
-
-Kosten:   Der Ertrag war praktisch null. Die Kampf-Multiplikatoren aenderten
-          sich kaum (str/def 1,597 -> 1,602, agi 1,677 -> 1,766), die
-          Bladeburner-Multiplikatoren gar nicht (alle vier stehen weiter auf
-          1,000). Bezahlt wurden dafuer drei Stunden Wiederaufbau plus der
-          Ratenverlust danach - ein Pruefagent beziffert den Gesamtposten auf
-          **5 bis 7 Stunden**.
-
-          `nodes/ERLEDIGT.md:1608-1640` hat denselben Fall am 29.08. schon
-          einmal gerechnet: **netto minus 90.810 Erfahrung = minus 6,6
-          Stunden**, mit dem Fazit "der Bot hat die schlechtere Option
-          gewaehlt". Es ist also der **zweite** Fehleinbau derselben Art -
-          und beim ersten Mal wurde eine Sperre eingebaut, die jetzt nicht
-          gegriffen hat.
-
-Verdacht: `src/bn4rep.js:683` und die Ausloeserkette bei `:1035-1040`. Die
-          Kette ist rein boolesch:
-
-              !ausgangSteht && wiederaufbauHilfe
-              && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
-              && (kleinsteLuecke > lueckeZuGross || nichtsMehrOffen || ...)
-              && !gesperrt
-
-          Zu pruefen ist, welches Glied durchgelassen hat - und ob `gesperrt`
-          ueberhaupt gesetzt war. **Der Auslöser kennt seinen Preis nicht:**
-          In der ganzen Datei steht kein einziger Aufruf, der den Rang oder
-          die Rangrate liest (`ns.bladeburner.*` kommt genau einmal vor, als
-          `inBladeburner()` in Zeile 714). `MINDEST_WARTESCHLANGE = 3` ist
-          eine **Stueckzahl** - drei beliebig schwache Augmentierungen loesen
-          aus, eine sehr starke nicht.
-
-Zu tun:   Erst messen, welches Glied der Kette am 09:21 wahr war (das
-          Protokoll steht in `data/bn4rep-log.txt` ueber die Bruecke). Dann
-          die Sperre reparieren - und getrennt davon pruefen, ob der
-          Ausloeser einen Preisterm bekommen sollte statt einer Stueckzahl.
-
-Dringlichkeit: **hoch.** Der naechste Fehleinbau kostet wieder 5 bis 7
-          Stunden, und er kann jederzeit kommen.
-
 ### Beide Ausgaenge gegeneinander gerechnet: Bladeburner bleibt der schnellere (30.08., 14:20)
 
 **Ergebnis der Alternativenpruefung, die Eric um 13:50 verlangt hat.** Drei
@@ -332,6 +283,69 @@ Knotenwechsel braucht es SF10, das erst der Abschluss liefert.
 ---
 
 ## Offen, nach Dringlichkeit
+
+### Der Einbau-Ausloeser in `bn4rep.js` kennt seinen Preis nicht (30.08., 15:45)
+
+**Der richtige Kern des Sperren-Befunds von 14:25**, nachdem die Behauptung
+"die Sperre greift nicht" widerlegt ist (die Sperre gilt nur vor dem
+Divisionsbeitritt und hat korrekt gearbeitet - siehe `nodes/ERLEDIGT.md`).
+
+Befund:   In `src/bn4rep.js` steht **kein einziger Aufruf, der Rang oder
+          Rangrate liest**. `ns.bladeburner.*` kommt in der ganzen Datei genau
+          einmal vor - als `inBladeburner()` in Zeile 714. Der Ausloeser bei
+          `:1035-1040` ist eine reine Boolesche Kette:
+
+              !ausgangSteht && wiederaufbauHilfe
+              && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
+              && (kleinsteLuecke > lueckeZuGross || nichtsMehrOffen || ...)
+              && !gesperrt
+
+          `MINDEST_WARTESCHLANGE = 3` (`:263`) ist eine **Stueckzahl**: Drei
+          beliebig schwache Augmentierungen loesen aus, eine einzelne sehr
+          starke nicht. `wiederaufbauHilfe` (`:978-1000`) ist ein **Flag** -
+          "liegt irgendein Stueck mit einem der zehn `WIEDERAUFBAU_MULTS`
+          ueber 1 in der Warteschlange" - ohne Betrag und ohne Zeitrechnung.
+
+          Auf der Ertragsseite spiegelt sich das: `guete = wert /
+          kostenSekunden` (`:1663-1668`) misst Kosten ausschliesslich in
+          **Reputationssekunden**. Ein Term fuer den Rangverlust waehrend des
+          Wiederaufbaus existiert nirgends.
+
+Warum es zaehlt: Ein Einbau setzt die Kampfwerte auf 1
+          (`PlayerObjectGeneralMethods.ts:88-99`). Der Wiederaufbau kostete
+          am 30.08. **3,1 Stunden**, in denen nur der Sleeve Rang liefert -
+          gemessen 82 gegen 254 Rang je Stunde im Vollbetrieb.
+
+          Der Preis ist dabei **exakt berechenbar** und steht schon in
+          `nodes/HEBEL.md`:
+
+              T = SUMME ueber str,def,dex,agi von
+                  [ e^((Ziel / (mult_stat * BN_LevelMult) + 200) / 32) - 534,6 ]
+                  geteilt durch (10 * exp_mult)
+
+          mit den Multiplikatoren **nach** dem geplanten Einbau. Fuer den
+          Einbau von 09:21 sagt die Formel 3,07 h; gemessen wurden 3,1.
+
+Dass der Einbau von 09:21 sich gelohnt hat - er halbierte seinen eigenen
+Wiederaufbau von 7,08 auf 3,07 Stunden -, war damit **Glueck, nicht
+Entscheidung**. Ein Einbau mit schwaecheren Stuecken haette bei derselben
+Stueckzahl genauso ausgeloest.
+
+Zu tun:   Den Ausloeser um einen Preisterm ergaenzen: einbauen, wenn
+          `Summe der erwarteten Ratenverbesserung x Restlaufzeit >=
+          Rangverlust des Wiederaufbaus`. Beide Seiten liegen offen - die
+          Wiederaufbau-Formel oben, die Ratenverbesserung ueber
+          `competence = SUMME w_i * stat_i^decay_i`
+          (`data/BlackOperations.ts:12-31`).
+
+          **Vorher pruefen, wo `MINDEST_WARTESCHLANGE` sonst noch gelesen
+          wird** - die Lehre aus dem CHANCE_SKILLS-Fall vom selben Tag: Eine
+          Aenderung an einer Konstante ist wertlos, wenn eine dynamische
+          Groesse sie zur Laufzeit ueberschreibt.
+
+Dringlichkeit: mittel. Kein akuter Schaden - der letzte Einbau war zufaellig
+          richtig -, aber der naechste kann jederzeit kommen und kostet dann
+          bis zu sieben Stunden ohne Gegenwert.
 
 ### CHANCE_SKILLS-Aenderung zurueckgenommen: die Tabelle wird zur Laufzeit ueberschrieben (30.08., 14:35)
 

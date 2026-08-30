@@ -23,6 +23,79 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Einbau-Sperre in `bn4rep.js:683` greift nicht (30.08., 14:25)
+
+*(Der urspruengliche Text steht unten. Er war in zwei Punkten falsch - siehe
+die Auswertung.)*
+
+Gemessen: Um **09:21** hat `bn4rep.js` einen Augmentierungs-Einbau
+          ausgeloest. Der Einbau setzte die Kampfwerte auf 1, und der Bot hat
+          **drei Stunden** im Gym zurueckgebaut.
+
+Erwartet: Der Einbau haette nicht stattfinden duerfen. Die Sperre fuer
+          Kampfknoten wurde am 29.08. um 04:22 auf `n === 10` erweitert
+          (`src/bn4rep.js:683`) - genau fuer diesen Fall.
+
+---
+
+**AUSGEWERTET (30.08., 15:45). Der Punkt war falsch - in beiden Haelften.**
+
+**1. Die Sperre ist nicht kaputt. Sie ist fuer diesen Fall gar nicht
+gedacht.** `src/bn4rep.js:711-720`:
+
+    let bladeSperre = false;
+    if (bladeburnerTraegtHier()) {
+      try { bladeSperre = !ns.bladeburner.inBladeburner(); }
+      catch { bladeSperre = true; }
+    }
+
+`bladeSperre` ist also **nur wahr, solange der Beitritt aussteht**. Der
+Kommentar direkt darueber sagt es woertlich:
+
+> *"NACH dem Beitritt ist der Einbau wieder unbedenklich - Rang und
+> Faehigkeiten der Division ueberleben ihn vollstaendig
+> (`Bladeburner.ts:259-263`). Die Sperre gilt also nur fuer das Zeitfenster
+> davor."*
+
+Die Erweiterung auf BitNode 10 vom 29.08. betraf denselben Zeitraum - **vor**
+dem Beitritt. Der Bot ist seit dem 29.08., 18:19 in der Division. Die Sperre
+hat exakt getan, was sie soll.
+
+**2. Und der Einbau war vermutlich richtig, nicht falsch.** Die Behauptung
+"Ertrag praktisch null" stammt aus einem Agentenbericht und haelt der eigenen
+Aktenlage nicht stand. `nodes/HEBEL.md` (Eintrag 12:30, korrigiert 12:52)
+rechnet vor, was der Einbau an den **Level**-Multiplikatoren geaendert hat -
+und die gehen exponentiell in den Erfahrungsbedarf:
+
+    Erfahrungsbedarf fuer den Wiederaufbau auf Kampfwert 100
+      mit den Mults VOR dem Einbau    394.733    =  7,08 h
+      mit den Mults NACH dem Einbau   194.484    =  3,07 h
+
+Gemessen wurden **3,1 h**. Der Einbau hat also seinen eigenen Wiederaufbau
+**mehr als halbiert** - er hat sich im selben Zug bezahlt, und der Vorteil
+bleibt fuer jeden weiteren Einbau bestehen.
+
+**Was bleibt: Der Ausloeser kennt seinen Preis trotzdem nicht.** Das ist der
+richtige Kern des Befunds, und er stammt aus dem Geld-Audit von 12:58: In
+`src/bn4rep.js` steht kein einziger Aufruf, der Rang oder Rangrate liest
+(`ns.bladeburner.*` kommt genau einmal vor, als `inBladeburner()` in Zeile
+714). `MINDEST_WARTESCHLANGE = 3` ist eine **Stueckzahl** - drei beliebig
+schwache Augmentierungen loesen aus, eine sehr starke nicht.
+
+Dass der Einbau von 09:21 sich gelohnt hat, war damit **Glueck, nicht
+Entscheidung**. Der Punkt wandert deshalb als eigener Eintrag nach `## Offen`
+und heisst dort, was er ist: nicht "Sperre kaputt", sondern "Ausloeser ohne
+Preisterm".
+
+**Eigener Fehler, benannt:** Ich habe aus "es gibt eine Sperre" und "es gab
+einen Einbau" auf "die Sperre hat versagt" geschlossen, **ohne den Code zu
+lesen, der drei Zeilen ueber der Fundstelle steht**. Derselbe Fehlertyp wie
+heute schon dreimal - eine Zeile gelesen, den Kontext nicht. Und ich habe die
+"Ertrag null"-Zahl eines Agenten uebernommen, obwohl die eigene HEBEL-Datei
+zwei Stunden vorher das Gegenteil ausgerechnet hatte.
+
+---
+
 ### Chaos in Aevum steht bei 41,3 von 50 - zwei Incite-Laeufe kippen es (30.08., 14:25)
 
 Gemessen: Aevum (die Bladeburner-Stadt) **41,3**, Ishima **46,4**. Die

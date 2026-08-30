@@ -166,9 +166,56 @@ export async function main(ns) {
           sleeveKampf = Math.min(sk.strength, sk.defense, sk.dexterity, sk.agility);
         } catch { sleeveKampf = 0; }
       }
-      if (inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
-        for (let n = 0; n < KONTRAKTE.length && !ok; n++) {
-          const art = KONTRAKTE[(i + n) % KONTRAKTE.length];
+      // LAEUFT SCHON EINE KONTRAKTAKTION? DANN NICHT NEU SETZEN (30.08., 06:20).
+      //
+      // `Sleeve.bladeburner()` ruft ausnahmslos
+      // `startWork(new SleeveBladeburnerWork(...))` (`Sleeve.ts:488-540`) - die
+      // Arbeit wird also NEU angelegt und `cyclesWorked` faellt auf 0. Bei
+      // TAKT = 60000 und `cyclesNeeded` von 70 Zyklen setzt dieses Skript den
+      // Sleeve damit zurueck, bevor er fertig wird, sobald der Tab gedrosselt
+      // ist und Setzen und Verarbeiten in derselben Nachhol-Runde landen.
+      //
+      // Gemessen am 30.08. um 06:15 per `ns.sleeve.getTask(0)`:
+      //   cyclesWorked 15 von 70, **tasksCompleted 0**, Aktion Tracking,
+      //   Vorrat Tracking 3,2 / Bounty Hunter 8,2 / Retirement 96,3.
+      // Der Sleeve stand also nicht still, er kam nur nie ans Ziel. Die
+      // Rangrate fiel dadurch von 14,4/h (29.08., gemessen ueber 2,16 h) auf
+      // 4,4/h ueber die Nacht - Rang 65 auf 99 in 7,7 h Spielzeit.
+      //
+      // Die 4 GB fuer `getTask` sind der Preis dafuer. Der Verzicht im
+      // Dateikopf war eine RAM-Entscheidung aus einer Zeit ohne Werkbank; er
+      // ist fuer Verbrechen harmlos (kurze Aktionen) und fuer
+      // Bladeburner-Kontrakte toedlich.
+      let laeuftSchon = false;
+      if (inDivision) {
+        try {
+          const t = ns.sleeve.getTask(i);
+          if (t && t.type === "BLADEBURNER" && t.actionType === "Contracts"
+              && KONTRAKTE.includes(t.actionName)) {
+            laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
+          }
+        } catch { /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
+      }
+      if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
+        // NACH VORRAT SORTIEREN, NICHT NACH LISTENPLATZ (30.08., 06:35).
+        //
+        // Die feste Reihenfolge nahm die erste Art mit Vorrat >= 1. Gemessen
+        // um 06:22: Tracking 3,2 - Bounty Hunter 8,2 - Retirement 96,3. Der
+        // Sleeve bekam also Tracking, verbrauchte die letzten drei und wurde
+        // vom Spiel gestoppt (`SleeveBladeburnerWork.ts:44-47`), bis dieses
+        // Skript 60 Sekunden spaeter neu setzte. Zwischen den Takten stand er.
+        //
+        // Nachschub sind rund 30 Stueck je Stunde und Art
+        // (`Bladeburner.ts:1387`, `count += seconds*growthFunction()/480`);
+        // ein Sleeve verbraucht bei 14 s je Aktion bis zu 257. Die knappste
+        // Art ist damit immer knapp - genommen wird die ergiebigste.
+        const nachVorrat = KONTRAKTE.map((art) => {
+          let v = 0;
+          try { v = ns.bladeburner.getActionCountRemaining("Contracts", art); } catch { v = 1; }
+          return { art, v };
+        }).sort((a, b) => b.v - a.v);
+        for (let n = 0; n < nachVorrat.length && !ok; n++) {
+          const art = nachVorrat[n].art;
           try {
             // VORRAT PRUEFEN, SONST STEHT DER SLEEVE STILL (29.08.2026, 22:30).
             //

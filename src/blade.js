@@ -2270,8 +2270,14 @@ export async function main(ns) {
         // Punkte je Stunde.
         //
         // Was die alte Fassung erzeugt hat, durchgerechnet mit den Zahlen von
-        // 12:56 (`data/bbspann.json`, Charisma 309, Diplomacy -1,603 % je
-        // 60 s):
+        // 12:56 (`data/bbspann.json`) - damals stand Charisma bei 309, also
+        // Diplomacy -1,603 % je 60 s. ACHTUNG, DAS IST EINE MOMENTAUFNAHME:
+        // Die Senkung ist `charisma^0,045 + charisma/1000` Prozent
+        // (`Bladeburner.ts:735-743`), und Charisma faellt bei jedem
+        // Augmentierungs-Einbau auf 1 zurueck. Am 31.08. um 00:10 stand es bei
+        // 4, die Senkung also bei **1,068 %** - zwei Drittel des hier
+        // gerechneten Werts. Wer mit diesen Zeiten weiterrechnet, rechnet zu
+        // kurz. Die Formel gilt, die Zahl nicht.
         //
         //     Chaos 47 -> 50    +6,4 %   = 2,13 Raids a 11 s  =  23 s, 538 Rang
         //     Diplomacy zurueck  ln(50/47)/0,01616 = 3,83 Laeufe = 230 s, 0 Rang
@@ -2485,8 +2491,11 @@ export async function main(ns) {
     // steigt jetzt **exogen**: `randomEvent` alle 240 bis 600 Sekunden, davon
     // 20 Prozent Synthoid-Riots mit `+1` Zaehlwert und `+5 bis +20 %`
     // (`Bladeburner.ts:679-684`), Stadt zufaellig aus sechs. Das trifft die
-    // eigene Stadt rund alle 35 Minuten und kostet bei Charisma 309
-    // (Diplomacy -1,603 % je 60 s) rund 7,3 Minuten Aufraeumen.
+    // eigene Stadt rund alle 35 Minuten und kostet rund 7,3 Minuten
+    // Aufraeumen - gerechnet mit Charisma 309 (Diplomacy -1,603 % je 60 s).
+    // Die Senkung ist `charisma^0,045 + charisma/1000`
+    // (`Bladeburner.ts:735-743`); bei Charisma 4 sind es 1,068 %, also rund
+    // 11 Minuten. Charisma faellt bei jedem Einbau auf 1 zurueck.
     //
     // Nur: Dieses Aufraeumen kauft nichts. Chaos hat im ganzen Spiel **genau
     // eine** Wirkung - `difficulty *= sqrt(1 + chaos - 50)`
@@ -2685,8 +2694,12 @@ export async function main(ns) {
     //
     //     Raid           Stufe 17   252,7 Rang je Lauf,  11 s
     //                    Chaos +1 bis +5 % (`Bladeburner.ts:844`), im Mittel
-    //                    3 %. Diplomacy senkt bei Charisma 309 um 1,603 % je
-    //                    60 s (`:735-743`), macht 1,87 Laeufe = 112 s.
+    //                    3 %. Diplomacy senkt um
+    //                    `charisma^0,045 + charisma/1000` Prozent je 60 s
+    //                    (`:735-743`) - bei den damaligen 309 waren das
+    //                    1,603 %, macht 1,87 Laeufe = 112 s. Bei Charisma 4
+    //                    (Stand 31.08., 00:10) sind es 1,068 % und 2,81
+    //                    Laeufe = 169 s.
     //                    -> 252,7 Rang je 123 s = **123 Rang/min**
     //     Assassination  Stufe 20   530,4 Rang je Lauf,  29 s
     //                    Chaos -5 bis +5 % (`:859`), im Mittel **null**.

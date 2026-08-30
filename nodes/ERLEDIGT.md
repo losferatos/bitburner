@@ -23,6 +23,63 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### STAND 01:15: Rangrate nach dem Einbau +78 %, ETA Knotenausgang 2./3.09.
+
+**Erics Frage um 01:12: "was ist aus der Rangmessung geworden, verdoppelt sie
+sich wie erwartet?"** Hier die Auswertung ueber das volle Fenster.
+
+| Fenster | Dauer | Rangrate |
+|---|---|---|
+| 21:43-22:43 (vor dem Einbau) | 1,0 h | **53,9 /h** |
+| 23:03-00:40 (nach dem Einbau) | 1,6 h | 86,6 /h |
+| **23:03-01:10 (volles Fenster)** | **2,1 h** | **96 /h  (+78 %)** |
+| 00:40-01:10 (juengstes Teilstueck) | 0,5 h | 125 /h |
+
+Rangwerte: 1282 um 00:40 (Telemetrie), 1329 um 01:02, **1346 um 01:10:44**
+(`data/blade.json`). Der Startwert 1142 fuer 23:03 ist aus der 86,6er-Messung
+zurueckgerechnet, nicht direkt abgelesen - die 96 /h sind damit eine
+abgeleitete Zahl, die 125 /h des letzten Teilstuecks sind gemessen.
+
+**Antwort: noch nicht ganz verdoppelt, aber auf dem Weg dorthin.** +78 %
+ueber 2,1 h, und die Steigung nimmt weiter zu, weil die Kampfwerte nach dem
+Prestige erst nachwachsen und die neuen Multiplikatoren (str 1,796 statt
+1,602) erst mit ihnen voll durchschlagen. Das juengste Teilstueck steht bei
+Faktor 2,3.
+
+**Die Geldrate, gemessen aus `data/verlauf-strategie.json`:**
+
+    vor dem Einbau  21:41-22:43   3.530-4.690 Mrd/h
+    Einbau 23:02    Konto auf 0,1 Mrd (Prestige)
+    23:13                            11 Mrd/h
+    00:02                           102 Mrd/h
+    01:02                           491 Mrd/h
+
+Die Erholung laeuft, aber sie ist bei Faktor 8 unter dem Vorwert. Sie
+verdoppelt sich grob je 40-60 Minuten; volle Rate also gegen 04:00.
+
+**ETA bis zum Knotenausgang, gerechnet 01:15:**
+
+| Posten | Zeit | Engpass? |
+|---|---|---|
+| Rest-Graftpaket (37 Stueck nach SPTN-97) | ~40 h | **ja, Graftzeit** |
+| Paketkosten $7,92 Bio bei $4 Bio/h | ~2 h | nein |
+| `violet Congruity Implant` $150 Bio | ~37 h | nein, laeuft parallel |
+| Assassination bis Rang 400.000 | 21 h | ja, danach |
+
+**Summe rund 61 Stunden ab jetzt, plus 2-3 h Geldrate-Erholung: Ausgang am
+2. September gegen Abend bis 3. September mittags.** Das liegt in der Spanne
+50-70 h, die Eric am 30.08. abgenommen hat.
+
+**Nicht gefunden:** Einen ausdruecklichen Auftrag "ueber 2,5 h nachmessen, ob
+sie sich verdoppelt" gibt es in keiner Datei - weder in `nodes/HEBEL.md` noch
+in `nodes/ERLEDIGT.md` mit einem Zeitstempel um 18:10. Die beiden
+Verdopplungserwartungen, die dort stehen, sind vom 26.08. und betreffen die
+Auswahlregel, nicht den Einbau. Falls Eric etwas anderes meinte, fehlt es in
+den Dateien - dann war es nur im Chat, und das ist genau der Fehler, den
+diese Liste verhindern soll.
+
+---
+
 ### RESET 23:02: Augmentierungs-Einbau - Wiederanlauf vollstaendig, alle Grafts ueberlebt (30.08., 23:05)
 
 **Kein Fehler, aber ein Einschnitt.** `bn4rep.js` hat eingebaut, nachdem

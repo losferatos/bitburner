@@ -118,49 +118,29 @@ Regeln:
 
 ## Sofort
 
-### STAND 00:45: SPTN-97 laeuft, und der Einbau hat die Rangrate um 61 % gehoben
+### Graft-Treiber weiterlaufen lassen, ein Stueck je Lauf (ab 31.08., 01:20)
 
-**Alles laeuft parallel, wie gebaut:** `Arbeit GRAFTING` (SPTN-97, seit 00:26,
-99,4 min), `blade.js` faehrt `Contracts/Tracking`, `bbtrain` haelt still. Rang
-1282 um 00:40, Hacking von 224 auf 354 erholt, Geld $221,9 Mrd.
-
-**Der Befund dieses Laufs - und er korrigiert meine Einbau-Kritik ein zweites
-Mal:**
-
-| | Rangrate |
-|---|---|
-| 21:43-22:43 (vor dem Einbau) | **53,9 /h** |
-| 23:03-00:40 (nach dem Einbau) | **86,6 /h** |
-
-**Plus 61 Prozent**, und das bei einem Tiefstand von 96 statt 101. Die drei
-gekauften Augmentierungen und der Favor-Sprung wirken sofort und dauerhaft;
-die Kampf-Multiplikatoren stehen jetzt bei str 1,796 statt 1,602.
-
-**Damit ist die Bilanz des Einbaus vollstaendig, und sie faellt anders aus als
-um 23:12 behauptet:**
-
-- **Kosten:** Geldrate faellt um Faktor 34, Erholung dauert Stunden (gemessen
-  00:30, `nodes/HEBEL.md`). Fuer `violet Congruity Implant` ($150 Bio) heisst
-  das Tage statt Stunden.
-- **Ertrag:** +61 % Rangrate, Favor auf sechs Faktionen (ueber +25 %
-  Reputationsrate), drei Augmentierungen.
-
-**Der Rang ist die Leitgroesse dieses Knotens** (`nodes/KURS.md`), nicht das
-Geld. Nach dieser Zahl war der Einbau richtig - meine Kritik von 23:12 hat die
-falsche Groesse bilanziert. Was bleibt, ist die Reihenfolge: **erst graften,
-dann einbauen** - nicht, weil Einbauen schlecht waere, sondern weil ein Einbau
-mitten im Graftplan das Geld vernichtet, das der Plan braucht.
-
-**Naechster Schritt:** Wenn SPTN-97 gegen 02:05 durch ist, hebt es die
-Kampfwerte um Faktor 9,38 - der Tiefstand steht dann bei rund 860 statt 96.
-Danach laeuft der Treiber weiter:
+SPTN-97 laeuft seit 00:26 und ist gegen 02:05 durch. Danach in JEDEM
+Vorankommens-Lauf:
 
 ```
 node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
 node tools/graftnext.js --los     # naechstes Stueck aus nodes/GRAFTPLAN.md
 ```
 
-Der Treiber tut von selbst nichts, solange ein Graft laeuft.
+Der Treiber tut von selbst nichts, solange ein Graft laeuft - er meldet dann
+"Ein Graft laeuft laut Spielstand". Kein Eingriff noetig, kein Risiko.
+
+**Die Ausnahme, die nicht vergessen werden darf:** Sobald **$150 Bio** auf
+dem Konto stehen, wird `violet Congruity Implant` dazwischengeschoben, nicht
+ans Ende gestellt (Begruendung in `nodes/GRAFTPLAN.md`: es loescht die
+Entropie rueckwirkend, und jedes danach gegraftete Stueck laeuft mit vollen
+Multiplikatoren statt mit 0,98^n). Bei der Geldrate-Erholung von 01:15
+(491 Mrd/h, verdoppelt sich je 40-60 min) ist das fruehestens gegen Mittag
+des 31.08. erreicht - also taeglich beim Treiberlauf gegen den Kontostand
+pruefen.
+
+Messgrundlage und ETA: Eintrag "STAND 01:15" in `nodes/ERLEDIGT.md`.
 
 ### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
 

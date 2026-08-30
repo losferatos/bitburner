@@ -118,43 +118,43 @@ Regeln:
 
 ## Sofort
 
-### LAEUFT GERADE: erstes Graft (Neuroreceptor Management Implant), fertig gegen 21:26 (30.08., 21:16)
+### Erstes Graft durch - drei Vorhersagen exakt getroffen, eine widerlegt (30.08., 21:28)
 
-**Das erste Graft ist gestartet und der Riegel greift im Ernstfall - beides
-verifiziert.** `data/graft.json` um 21:12:
+**Neuroreceptor Management Implant ist installiert.** Gestartet 21:12, fertig
+21:26, $1,65 Mrd, 14,1 Minuten. Gemessen:
 
-    getan "gestartet", fehler null, preis 1.650.000.000, dauerMin 14,1,
-    gereist true, stadt Sector-12 -> New Tokyo, verfuegbar 98
+| | erwartet | gemessen |
+|---|---|---|
+| graftbare Augmentierungen | 97 | **97** (vorher 98) |
+| NMI noch in der Liste | nein | **nein** |
+| Entropiestapel | 1 | **1** |
+| Tiefstand nach dem Graft | 100 | **100** (vorher 102) |
+| Motor nach dem Graft | wieder ein Vertrag | **Contracts/Tracking** |
 
-Und `data/blade.json` um 21:12:29:
+Damit ist dreierlei belegt: Der **Graft-Riegel haelt** (`aktion "Grafting"`,
+`grund "Graft laeuft ohne Simulacrum - Motor haelt still"` waehrend der
+14 Minuten) **und loest sich sauber wieder**. Und die **Entropierechnung des
+Skeptikers war exakt** - der Tiefstand faellt auf genau 100, nicht auf 99.
+Das traegt die Reihenfolge des ganzen Pakets.
 
-    aktion "Grafting", grund "Graft laeuft ohne Simulacrum - Motor haelt still"
+**Widerlegt: die eigene Erwartung, die Graft-Zeiten wuerden um 20 % fallen.**
+Die Simulacrum-Graftzeit steht unveraendert bei 845.690 ms. Grund:
+`getAugmentationGraftTime` liefert `baseTime / intBonus`
+(`GraftingHelpers.ts:27-30`) - **ohne** `focusPenalty`. Die Fokusstrafe wirkt
+erst in `GraftingWork.process` ueber `unitRate = MilliPerCycle x intBonus x
+focusBonus` (`GraftingWork.tsx:41-43`). Die gemeldete Zeit ist also immer die
+Zeit bei vollem Fokus.
 
-Damit ist die offene Frage aus `nodes/KURS.md` beantwortet: **Der Graft-Riegel
-haelt.** Er war bis dahin nur im Normalbetrieb geprueft.
+**Was NMI wirklich bringt:** nicht kuerzere Zeiten, sondern die Garantie, dass
+die gemeldete Zeit auch dann gilt, wenn der Fokus verlorengeht - und das
+passiert bei jedem Seitenwechsel (`ui/GameRoot.tsx:271-272` ruft
+`stopFocusing`). Ohne NMI waeren es 0,8 statt 1,0
+(`PlayerObjectGeneralMethods.ts:622-628`), aus 42,4 h wuerden 53 h. Der Nutzen
+ist real, nur an anderer Stelle als angenommen.
 
-**Was der naechste Lauf pruefen muss:**
-
-1. Ist `Neuroreceptor Management Implant` installiert? Test:
-   `node tools/task.js graft.js` (Pruefmodus, aendert nichts) und dann
-   `data/graft.json` lesen - `verfuegbar` muss von 98 auf 97 gefallen sein.
-2. Faehrt `blade.js` danach wieder normal? Erwartet: `aktion` wieder ein
-   Vertrag, `grund` nicht mehr "Graft laeuft".
-3. **Der Tiefstand faellt durch den Entropiestapel von 102 auf 100.** Das ist
-   gerechnet, nicht gemessen - `EntropyAccumulation.ts:7`, `0,98^1`. Bei
-   genau 100 greift `bbtrain.js` noch nicht (`tief < ZIEL`, ZIEL = 100), und
-   seit `1062631` wuerde es ohnehin kein Graft mehr unterbrechen. **Die Zahl
-   gehoert trotzdem nachgemessen** - liegt sie bei 99, war die
-   Entropierechnung falsch, und das haette Folgen fuer die ganze Reihenfolge.
-4. Der Fokus: NMI setzt `focusPenalty()` dauerhaft auf 1
-   (`PlayerObjectGeneralMethods.ts:622-628`). Die Graft-Zeiten aller weiteren
-   Stuecke muessten danach um 20 Prozent fallen - pruefbar ueber
-   `data/bbgraft.json` (`node tools/task.js bbgraft.js`), Simulacrum vorher
-   845.690 ms.
-
-**Erst danach das Simulacrum ($450 Mrd).** Vorher fehlen noch zwei Riegel aus
-dem Punkt darunter: der Einbau-Riegel in `bn4rep.js` und das Loeschen von
-`data/simulacrum.txt` beim Knotenwechsel.
+**Naechster Schritt: `The Blade's Simulacrum`, $450 Mrd, 14,1 min.** Vorher
+fehlen zwei Riegel aus dem Punkt darunter - der Einbau-Riegel in `bn4rep.js`
+und das Loeschen von `data/simulacrum.txt` beim Knotenwechsel.
 
 ### Vor dem Simulacrum ($450 Mrd) fehlen noch drei Riegel - Graft 1 ist frei (30.08., 21:05)
 

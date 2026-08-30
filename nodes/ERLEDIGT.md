@@ -23,6 +23,46 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### LAEUFT GERADE: erstes Graft (Neuroreceptor Management Implant), fertig gegen 21:26 (30.08., 21:16)
+
+**Das erste Graft ist gestartet und der Riegel greift im Ernstfall - beides
+verifiziert.** `data/graft.json` um 21:12:
+
+    getan "gestartet", fehler null, preis 1.650.000.000, dauerMin 14,1,
+    gereist true, stadt Sector-12 -> New Tokyo, verfuegbar 98
+
+Und `data/blade.json` um 21:12:29:
+
+    aktion "Grafting", grund "Graft laeuft ohne Simulacrum - Motor haelt still"
+
+Damit ist die offene Frage aus `nodes/KURS.md` beantwortet: **Der Graft-Riegel
+haelt.** Er war bis dahin nur im Normalbetrieb geprueft.
+
+**Was der naechste Lauf pruefen muss:**
+
+1. Ist `Neuroreceptor Management Implant` installiert? Test:
+   `node tools/task.js graft.js` (Pruefmodus, aendert nichts) und dann
+   `data/graft.json` lesen - `verfuegbar` muss von 98 auf 97 gefallen sein.
+2. Faehrt `blade.js` danach wieder normal? Erwartet: `aktion` wieder ein
+   Vertrag, `grund` nicht mehr "Graft laeuft".
+3. **Der Tiefstand faellt durch den Entropiestapel von 102 auf 100.** Das ist
+   gerechnet, nicht gemessen - `EntropyAccumulation.ts:7`, `0,98^1`. Bei
+   genau 100 greift `bbtrain.js` noch nicht (`tief < ZIEL`, ZIEL = 100), und
+   seit `1062631` wuerde es ohnehin kein Graft mehr unterbrechen. **Die Zahl
+   gehoert trotzdem nachgemessen** - liegt sie bei 99, war die
+   Entropierechnung falsch, und das haette Folgen fuer die ganze Reihenfolge.
+4. Der Fokus: NMI setzt `focusPenalty()` dauerhaft auf 1
+   (`PlayerObjectGeneralMethods.ts:622-628`). Die Graft-Zeiten aller weiteren
+   Stuecke muessten danach um 20 Prozent fallen - pruefbar ueber
+   `data/bbgraft.json` (`node tools/task.js bbgraft.js`), Simulacrum vorher
+   845.690 ms.
+
+**Erst danach das Simulacrum ($450 Mrd).** Vorher fehlen noch zwei Riegel aus
+dem Punkt darunter: der Einbau-Riegel in `bn4rep.js` und das Loeschen von
+`data/simulacrum.txt` beim Knotenwechsel.
+
+---
+
 ### Der Weg zu Rang 400.000 ist durchgerechnet: 27 h mit Grafting, 246-526 h ohne (30.08., 18:20)
 
 **Korrigiert und ersetzt den Eintrag von 17:20.** Der sagte "Raid ist der

@@ -142,7 +142,7 @@ function push(titel, text, tag = "warning", prioritaet = "default") {
     // jeden Netzfehler und meldete Erfolg - der Waechter verbuchte den Alarm
     // als zugestellt und schwieg danach eine Stunde.
     execFile(bash, [posix, "--title", titel, "--tag", tag,
-      "--priority", prioritaet, text], { timeout: 20_000 }, (err) => {
+      "--priority", prioritaet, text], { timeout: 20_000, windowsHide: true }, (err) => {
       if (err) log("PUSH FEHLGESCHLAGEN (" + (err.code ?? err.message) + "): " + text);
       else log("PUSH: " + text);
       fertig(!err);
@@ -259,7 +259,7 @@ function altebashProzesse(jetzt) {
     execFile("powershell", ["-NoProfile", "-Command",
       "Get-CimInstance Win32_Process -Filter \"Name='bash.exe'\""
       + " | Select-Object ProcessId,CreationDate | ConvertTo-Json -Compress"],
-      { timeout: 10000 }, (fehler, aus) => {
+      { timeout: 10000, windowsHide: true }, (fehler, aus) => {
         if (fehler || !aus) return fertig([]);
         let d;
         try { d = JSON.parse(aus); } catch { return fertig([]); }

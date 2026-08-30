@@ -281,9 +281,13 @@ Drei Befunde, alle selbst am Quellcode nachgeprueft:
 **Was vor dem ersten Graft gebaut sein muss** (jedes Stueck laeuft
 unbeaufsichtigt, also jedes mit Skeptiker vor dem Commit):
 
-- `src/blade.js`: Riegel, der `startAction` aussetzt, solange ein Graft laeuft
-  und das Simulacrum fehlt. Zusaetzlich muss die Sperre bei Tiefstand unter 100
-  (`:3072`) ein laufendes Graft kennen.
+- ~~`src/blade.js`: Riegel gegen `startAction`~~ **ERLEDIGT 19:15**, Commit
+  `db9a7c2`. Der Motor haelt still, sobald eine Arbeit vom Typ `GRAFTING`
+  laeuft und `getCurrentAction()` nichts liefert - genau der Zustand "Graft
+  laeuft, Simulacrum fehlt". Verifiziert 19:12: Normalbetrieb unveraendert
+  (Contracts/Tracking, Rang 899, Telemetrie frisch). Der Riegel selbst ist
+  erst beim ersten Graft pruefbar; ein Skeptiker-Lauf ist angesetzt. Die
+  Tiefstandssperre (`:3072`) ist mit abgedeckt - der Riegel steht davor.
 - `src/bbtrain.js`: muss `type === "GRAFTING"` kennen - Warteschleife nicht
   verlassen, nicht reisen, `stopAction()` in `:258` nicht unbedingt rufen.
 - `tools/wache.js:830-861`: unterscheidet `GRAFTING` nicht von "bbtrain fehlt"

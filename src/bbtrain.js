@@ -107,6 +107,32 @@ async function runde(ns) {
   // Gefunden hat es eine Fremdpruefung, kein Loop.
   //
   // Gewartet wird deshalb auf den Zustand, nicht auf das Ereignis.
+  // GRAFTING DARF NICHT UNTERBROCHEN WERDEN (30.08.2026, 21:15).
+  //
+  // Dieses Skript startet Gym-Arbeit und ruft `stopAction()`. Beides ist
+  // `startWork` beziehungsweise `finishWork(true)` und toetet jedes laufende
+  // Graft - das Geld dafuer wird NICHT erstattet
+  // (`Work/GraftingWork.tsx:75-83`), beim Simulacrum sind das $450 Mrd.
+  //
+  // Warum das keine ferne Moeglichkeit ist, sondern der geplante Ablauf:
+  // Jedes fertige Graft bucht einen Entropiestapel, und der senkt ALLE
+  // Multiplikatoren um zwei Prozent (`EntropyAccumulation.ts:7`). Gerechnet
+  // gegen den Spielstand vom 30.08., 20:52:
+  //
+  //     Entropie 0   str 103  def 102  dex 135  agi 115   Tiefstand 102
+  //     Entropie 1   str 101  def 100  dex 132  agi 113   Tiefstand 100
+  //     Entropie 2   str  99  def  98  dex 130  agi 111   Tiefstand  98
+  //
+  // Nach dem zweiten Graft faellt der Tiefstand unter ZIEL, dieses Skript
+  // verlaesst seine Warteschleife - und toetet ab dann jedes Graft binnen
+  // hoechstens 60 Sekunden. Genau das dritte ist die erste
+  // Kampf-Augmentierung des Pakets.
+  const graftLaeuft = () => {
+    try {
+      const w = ns.singularity.getCurrentWork();
+      return !!w && w.type === "GRAFTING";
+    } catch { return false; }
+  };
   let letzterGrund = "";
   for (;;) {
     let drin = false;
@@ -115,6 +141,11 @@ async function runde(ns) {
     const k = ns.getPlayer().skills;
     const tief = Math.min(k.strength, k.defense, k.dexterity, k.agility);
     if (tief < ZIEL) {
+      if (graftLaeuft()) {
+        sag("Kampfwerte bei " + tief + ", aber ein Graft laeuft - warte ab.");
+        await ns.sleep(60000);
+        continue;
+      }
       sag("In der Division, aber Kampfwerte bei " + tief + " - trainiere nach.");
       break;
     }
@@ -237,6 +268,14 @@ async function runde(ns) {
     letzterGrund = "";
 
     const laeuft = ns.singularity.getCurrentWork();
+    if (laeuft && laeuft.type === "GRAFTING") {
+      if (letzterGrund !== "graft") {
+        sag("Ein Graft laeuft - kein Gym, keine Reise, kein stopAction.");
+        letzterGrund = "graft";
+      }
+      await ns.sleep(60000);
+      continue;
+    }
     const trainiertSchon = laeuft && laeuft.type === "CLASS"
       && laeuft.classType === schlechtester
       && (!laeuft.location || laeuft.location === gym);
@@ -255,7 +294,10 @@ async function runde(ns) {
   }
 
   sag("Alle Kampfwerte >= " + ZIEL + " - trete bei.");
-  ns.singularity.stopAction();
+  // NICHT unbedingt: `stopAction` ist `finishWork(true)` (`Singularity.ts:562`)
+  // und wuerde ein laufendes Graft toeten. Die Gym-Arbeit, die hier beendet
+  // werden soll, kann gar nicht laufen, wenn stattdessen gegraftet wird.
+  if (!graftLaeuft()) ns.singularity.stopAction();
 
   if (ns.bladeburner.joinBladeburnerDivision()) {
     sag("BLADEBURNER-DIVISION BEIGETRETEN.");

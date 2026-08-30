@@ -118,6 +118,66 @@ Regeln:
 
 ## Sofort
 
+### Vor dem Simulacrum ($450 Mrd) fehlen noch drei Riegel - Graft 1 ist frei (30.08., 21:05)
+
+Ein Skeptiker-Lauf auf `src/graft.js` hat **Graft 1 (Neuroreceptor Management
+Implant, $1,65 Mrd, 14,1 min) freigegeben**, nachdem die Auflage - der Riegel
+gegen ein zweites Graft - eingebaut war (`ea04ff4`). Drei Befunde betreffen
+aber das **Paket**, nicht Graft 1, und der teuerste Schritt darin ist
+`The Blade's Simulacrum` fuer $450 Mrd.
+
+**1. `src/bbtrain.js` kennt `GRAFTING` nicht - und der Tiefstand faellt durch
+die Entropie.** `bbtrain.js:239-250` prueft `laeuft.type === "CLASS"`;
+`GRAFTING` faellt auf `false`, und dann laeuft **unbedingt** `gymWorkout` -
+also `startWork`, also Graft tot. `:258` ruft zusaetzlich `stopAction()` ohne
+Pruefung. Ausloeser ist `tief < 100` (`:117`, `:153`).
+
+Die Entropie (`EntropyAccumulation.ts:7`, `0,98^stapel` auf **alle**
+Multiplikatoren) wird beim **Ende** jedes Grafts gebucht. Gerechnet gegen den
+Spielstand von 20:52:
+
+| Entropie | str | def | dex | agi | Tiefstand |
+|---|---|---|---|---|---|
+| 0 (jetzt) | 103 | 102 | 135 | 115 | 102 |
+| 1 (nach NMI) | 101 | **100** (roh 100,590) | 132 | 113 | **100** |
+| 2 (nach Simulacrum) | 99 | **98** | 130 | 111 | **98** |
+
+`100 < 100` ist falsch - **Graft 1 und Graft 2 ueberleben mit 0,59 Punkten
+Reserve.** Danach steht der Tiefstand auf 98, `bbtrain` verlaesst seine
+Warteschleife und toetet **jedes ab dann gestartete Graft binnen 60 s**. Genau
+Graft 3 ist die erste Kampf-Augmentierung.
+
+**2. `src/bn4rep.js` darf mitten im Graft einbauen.** `Prestige.ts:137` ruft
+`finishWork(true, true)` - Graft weg, Geld weg. Der Aufruf
+`installAugmentations("boot.js")` (`bn4rep.js:1155`) haengt an `:1038-1044`,
+und der einzige harte Riegel dort ist `!inBladeburner()` (`:718-720`) - der
+Spieler **ist** Mitglied, der Riegel greift nicht. Stand `data/einbau.json`:
+`wartend 1, mindest 3`. Fuer 14 Minuten unwahrscheinlich, fuer 42 Stunden
+praktisch sicher. **`nodes/GRAFTING.md` fuehrt `bn4rep` faelschlich in der
+Freispruchliste** - dort steht nur, dass es keine Arbeit startet, nicht, dass
+es nicht einbaut.
+
+**3. `data/simulacrum.txt` wird nie geloescht.** `src/graft.js` legt den
+Marker nur an. `prestigeHomeComputer` (`ServerHelpers.ts:226-239`) loescht
+beim BitNode-Wechsel Programme und Nachrichten, **aber keine Textdateien**.
+Im naechsten Knoten liest `blade.js` `true`, riegelt nie, und
+`Bladeburner.startAction` toetet das erste Graft in rund einer Sekunde. Bei 15
+geplanten Knoten ist das eine Mine mit Datum. Zwei Zeilen `ns.rm`, 0,6 GB.
+
+**4. Niemand prueft nach, ob ein Graft durchlaeuft.** `graft.js` schreibt
+"gestartet" und endet. `tools/wache.js:651-662` schlaegt erst nach 150 Minuten
+an; ein nach 20 Sekunden abgebrochenes Graft sieht von aussen aus wie ein
+normal laufender Motor, und der Verlust erscheint in keiner Telemetriedatei.
+Eine Nachkontrolle nach `dauerMs` fehlt.
+
+**5. `raus.fehler` wird ueberschrieben statt gesammelt.** Wirft
+`getOwnedAugmentations`, laeuft das Skript weiter und jede spaetere Zuweisung
+ueberschreibt den Befund. Das Verhalten ist konservativ (kein Marker, also
+riegelt `blade.js`), aber der Bericht luegt.
+
+**Reihenfolge:** Graft 1 kann sofort. Punkte 1 und 2 **vor** dem Simulacrum,
+Punkt 3 vor dem naechsten BitNode-Wechsel.
+
 ### Drei Nachbesserungen am Graft-Riegel, vom Skeptiker belegt (30.08., 19:35)
 
 Zwei davon sind in `578e750` behoben (Selbsthaltung, offener Abschnitt). Drei

@@ -23,6 +23,480 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### TEILWEISE UEBERHOLT - Die Rangrechnung: ohne Operationen ist Rang 400.000 unerreichbar (30.08., 17:15)
+
+**Die Aussage "mit Assassination 28 h" ist falsch** - sie liess die
+Aktionsdauer weg. Richtig ist Raid, siehe den Punkt darueber (17:20).
+Gueltig bleibt hier alles Uebrige: die Black-Ops-Summe, die Erfolgsquoten,
+der Anteil der Regenerationszeit und die Eichung des Rangmodells.
+
+**Der offene Punkt "Rangrate durchrechnen" ist abgearbeitet.** Damit steht auch,
+wofuer Grafting eigentlich gut ist - und es ist nicht das, was in
+`nodes/GRAFTING.md` als Hauptnutzen stand.
+
+**Gemessen (Verlauf `data/verlauf-strategie.json`, 33 Punkte in BitNode 10):**
+
+- Rangrate **44,6/h** ueber 4,4 h, 41,9/h ueber 3,3 h, 45,7/h ueber 1,8 h -
+  praktisch **konstant**, im 22,6-h-Mittel 34,1/h.
+- **48,5 % der Zeit** steht der Bot in der Hyperbolic Regeneration Chamber.
+  Die Rangrate ist ausdauerbegrenzt, nicht chancenbegrenzt.
+- Aktionsrate rund **104 Versuche/h** (2.345 Versuche in 22,6 h).
+
+**Die Erfolgsquoten sind schlecht** (aus dem Spielstand):
+
+| Vertrag | Level | Erfolge | Fehl | Quote | Rang je Erfolg | netto je Versuch |
+|---|---|---|---|---|---|---|
+| Tracking | 32 | 563 | 407 | 58,0 % | 0,834 | 0,484 |
+| Bounty Hunter | 15 | 142 | 581 | **19,6 %** | 2,256 | 0,443 |
+| Retirement | 20 | 237 | 415 | 36,3 % | 1,588 | 0,577 |
+
+104 Versuche/h x 0,5 netto = rund 50 Rang/h. **Das Modell reproduziert die
+gemessenen 44,6/h** - es ist geeicht, nicht geschaetzt.
+
+**Alle sechs Operationen stehen auf Level 1 mit null Erfolgen** und vollen
+Vorraeten (Raid 635, Assassination 432). Sie werden nie gefahren.
+
+**Und genau dort liegt der Rang** (`Bladeburner/data/Operations.ts`,
+`Formulas.ts:9-28`: `rankGain x rewardFac^(level-1) x 0,8`):
+
+| Aktion | Rang je Erfolg (Level 1) | rewardFac / difficultyFac | netto je Level |
+|---|---|---|---|
+| Tracking | 0,24 | 1,041 / 1,020 | **1,021** |
+| Raid | **44,0** | 1,100 / 1,045 | 1,053 |
+| Assassination | **35,2** | **1,140 / 1,060** | **1,076** |
+
+Das Level waechst wie `floor(sqrt(2 x Erfolge))` (aus
+`LevelableAction.getSuccessesNeededForNextLevel`, an Tracking geeicht: Level 32
+bei 563 Erfolgen). Damit ergibt sich der Erfolgsbedarf bis Rang 400.000:
+
+| Aktion | Erfolge bis 400.000 | Endlevel | bei Nachschub 18,75/h |
+|---|---|---|---|
+| Tracking | 12.251 | 156 | - (bei 58 % Chance rund **203 h**) |
+| Bounty Hunter | 3.283 | 81 | (bei 19,6 % Chance rund 161 h) |
+| Raid | 710 | 37 | 37,9 h |
+| **Assassination** | **532** | **32** | **28,4 h** |
+
+**Damit ist die Frage beantwortet, die seit heute Mittag offen war.** Der Weg
+ueber Vertraege dauert Wochen; der Weg ueber Assassination rund 30 Stunden.
+Die abgenommenen "50-70 h" sind erreichbar - **aber nur mit Operationen.**
+
+**Nebenbefund, der eine Hoffnung streicht:** Die 21 Black Ops geben zusammen
+nur **113.660** Rang (`BlackOperations.ts`). Daedalus verlangt 400.000, um
+ueberhaupt zu starten. Die Black Ops koennen den Rang **nicht selbst tragen** -
+er muss praktisch vollstaendig aus Operationen kommen.
+
+**Was das fuer Grafting heisst - der Hauptnutzen ist ein anderer als gedacht.**
+Nicht "x26,8 auf die Black-Op-Chance", sondern: Operationen sind gesperrt, weil
+ein Fehlschlag bei 20 Trefferpunkten Maximum ins Krankenhaus fuehrt (Raid
+315,8 HP je Fehlschlag, gemessen 30.08. in `bbspann.js`). Nach dem Graft-Paket
+ist `hp.max = 1.912` und die Kampfwerte liegen bei 19.000-22.000. **Grafting
+macht Assassination fahrbar - das ist sein Wert, nicht die Black Ops.**
+
+**Offen und vor dem naechsten Schritt zu klaeren:**
+
+- Der **Vorrat** ist der Engpass, nicht die Zeit: 18,75 Nachschub je Stunde und
+  Art. Die 432 vorhandenen Assassination-Auftraege decken 81 % des Bedarfs -
+  danach begrenzt der Nachschub.
+- **Bevoelkerungsverbrauch.** Operationen rufen im Misserfolgsfall
+  `triggerPotentialMigration` (`Bladeburner.ts:809,818`). Bei Chance nahe 1
+  faellt das weg, aber es gehoert gerechnet.
+- **Chaos** steht bei 46,6, die Schwelle ist 50. Darueber greift
+  `sqrt(1+chaos-50)` auf die Schwierigkeit.
+- Die Erfolgschance bei hohem Level: Assassination Level 32 hat
+  `baseDifficulty 1500 x 1,06^31 = 9.135`. Mit den Kampfwerten nach dem Graft
+  sollte das tragen, ist aber nicht gerechnet.
+
+---
+
+### GESPERRT bis drei Codeaenderungen drin sind - Graft-Kanal oeffnen (30.08., 16:40, gesperrt 17:05)
+
+**NICHT AUSFUEHREN. Wer jetzt graftet, verbrennt $450 Mrd in Sekunden.**
+
+Ein Skeptiker-Lauf hat den Plan in seiner urspruenglichen Reihenfolge gekippt.
+Drei Befunde, alle selbst am Quellcode nachgeprueft:
+
+1. **`Bladeburner.startAction` bricht jede Spielerarbeit ab** - unbedingt und
+   noch vor der Verfuegbarkeitspruefung, solange `The Blade's Simulacrum` nicht
+   installiert ist (`Bladeburner.ts:177-180`: `Player.finishWork(true)`).
+   `src/blade.js:3285` ruft `startAction` im Sekundentakt. Das Simulacrum-Graft
+   waere also abgebrochen, bevor es eine Minute laeuft - und
+   `GraftingWork.finish(cancelled)` gibt das Geld **nicht** zurueck
+   (`Work/GraftingWork.tsx:75-83`). `blade.js` killen hilft nicht:
+   `src/bn4net.js:253` startet es jede Motorrunde nach.
+2. **Das Simulacrum bringt keinen Kampfmultiplikator**, seine Entropie senkt
+   aber alle Werte um 2 %. Der Tiefstand faellt von 101 auf **99**. Damit
+   verlaesst `src/bbtrain.js:117` seine Warteschleife, reist nach Sector-12
+   (`:162`), startet Gym-Arbeit (`:244`) und ruft am Ende **unbedingt**
+   `ns.singularity.stopAction()` (`:258`) - jedes davon killt ein laufendes
+   Graft. Und `src/blade.js:3072` parkt bei Tiefstand unter 100 die
+   Bladeburner-Aktion, Simulacrum hin oder her. Die Aussage "42 h Graft-Zeit
+   kosten keinen Rang" gilt fuer dieses Fenster **nicht**.
+3. **Offline-Zeit verfaellt.** `engine.tsx:281-283` ruft `processWork` mit den
+   Nachholzyklen in **einem einzigen Aufruf**; `GraftingWork.process` meldet
+   einmal fertig, der Ueberschuss ist weg. Pro Offline-Block landet hoechstens
+   **eine** Augmentierung. Ein 42-h-Plan ueberspannt zwei Naechte.
+
+**Was vor dem ersten Graft gebaut sein muss** (jedes Stueck laeuft
+unbeaufsichtigt, also jedes mit Skeptiker vor dem Commit):
+
+- ~~`src/blade.js`: Riegel gegen `startAction`~~ **ERLEDIGT 19:15**, Commit
+  `db9a7c2`. Der Motor haelt still, sobald eine Arbeit vom Typ `GRAFTING`
+  laeuft und `getCurrentAction()` nichts liefert - genau der Zustand "Graft
+  laeuft, Simulacrum fehlt". Verifiziert 19:12: Normalbetrieb unveraendert
+  (Contracts/Tracking, Rang 899, Telemetrie frisch). Der Riegel selbst ist
+  erst beim ersten Graft pruefbar; ein Skeptiker-Lauf ist angesetzt. Die
+  Tiefstandssperre (`:3072`) ist mit abgedeckt - der Riegel steht davor.
+- `src/bbtrain.js`: muss `type === "GRAFTING"` kennen - Warteschleife nicht
+  verlassen, nicht reisen, `stopAction()` in `:258` nicht unbedingt rufen.
+- `tools/wache.js:830-861`: unterscheidet `GRAFTING` nicht von "bbtrain fehlt"
+  und startet `bbtrain.js` alle 15 Minuten nach, samt Push an Eric.
+
+**Reihenfolge danach:** `Neuroreceptor Management Implant` ($1,6 Mrd, 14 min)
+**zuerst** - ohne sie kostet jeder Verlust des Fokus 20 % Grafttempo
+(`focusPenalty`, `PlayerObjectGeneralMethods.ts:622-628`), aus 42,4 h werden
+53 h. Dann Simulacrum, dann SPTN-97. Simulacrum und die erste Kampf-Aug
+gehoeren als **Paar** geplant: das 99er-Fenster dazwischen ist der
+gefaehrlichste Moment des ganzen Laufs.
+
+Ein zweiter Skeptiker hat zusaetzlich **sechs Zahlen der Rechnung** widerlegt,
+alle in `nodes/GRAFTING.md` korrigiert. Die drei, die die Bewertung aendern:
+
+- **`bladeburner_success_chance` faellt netto auf x0,822** - es stand als
+  Bruttowert x1,771 unter der Ueberschrift "nach Abzug der Entropie".
+  `max_stamina` netto 0,487, `stamina_gain` 0,507, **`analysis` 0,587** - das
+  letzte verschlechtert die Schaetzung, aus der der Bot entscheidet.
+- **Das Paket kostet $0,87 Bio (15 %), nicht $0,42 Bio (8 %)**, und hat 39-40
+  Entropiestapel statt 38: Simulacrum und NMI waren nicht mitgerechnet.
+- **`violet Congruity Implant` IST graftbar** - $150 Bio, 14 min, steht in der
+  Liste des laufenden Spiels. Sie loescht die Entropie und kostet selbst keine
+  (`GraftingWork.tsx:51` vor `:60`). Damit: competence **x106,7 statt x26,8**,
+  Daedalus **8,7 % statt 2,1 %**. $150 Bio sind rund 33 Stunden Einnahmen.
+  **Diese Abwaegung ist die naechste zu rechnende Frage**, nicht der Bau.
+
+Und: **Entropie ueberlebt einen Augmentierungs-Einbau** (`Prestige.ts:127-128`),
+zurueckgesetzt wird sie nur beim BitNode-Wechsel. Die -54,5 % begleiten also
+auch die spaeter geplante Augmentierungsrunde.
+
+Das Chancenmodell selbst wurde unabhaengig nachgebaut und gegen fuenf im Spiel
+gemessene Black-Op-Chancen geeicht (Abweichung unter 0,1 %). Die Rechnung ist
+im Kern solide; falsch waren einzelne Zahlen und die betriebliche Folge.
+
+---
+
+---
+
+### ZURUECKGEZOGEN: die Einbausperre. Drei eigene Fehler, und ein Baufehler (30.08., 23:32)
+
+**Der Vorschlag von 23:12 - `bn4rep.js` baut nicht mehr ein, solange der
+Graftplan offen ist - wird nicht gebaut.** Ein Skeptiker-Lauf hat ihn zerlegt.
+In der Sache hatte die These recht, die Begruendung war an drei Stellen falsch,
+und die Umsetzung waere schaedlich gewesen.
+
+**Meine drei Fehler, alle selbst nachgelesen:**
+
+1. **"Beim Kauf wird Reputation abgezogen" - falsch.**
+   `FactionHelpers.tsx:118-119` ruft nur `queueAugmentation` und `loseMoney`.
+   Reputation wird nirgends abgezogen, sie ist eine **Schwelle**. Der Vorteil
+   des Graftens ist, dass es die Huerde **umgeht**, nicht dass es Rep spart.
+2. **"Der Einbau setzt das Geld auf $1.262" - falsch.** `Prestige.ts:85-88`
+   zahlt fuer jede installierte Augmentierung `startingMoney` aus; CashRoot
+   Starter Kit gibt $1 Mio zurueck. Es sind **$1.001.262**.
+3. **"Mit dem Geld waere das Paket 67-mal bezahlt" - richtig gerechnet,
+   irrefuehrend argumentiert.** $28,4 Bio sind bei der gemessenen Nettorate von
+   $4,43 Bio/h **6,4 Stunden Einkommen**. Geld ist in diesem Knoten nicht der
+   Engpass. Das Paket kostet 5,7 Minuten Einkommen.
+
+**Was ich gar nicht bilanziert hatte:** Der Einbau hat **Favor auf sechs
+Faktionen gehoben** (`Faction.ts:76-79` wandelt Reputation in Favor, nur beim
+Prestige). CyberSec steht jetzt bei 104,25, Aevum 103,98, Sector-12 101,98 -
+mindestens eine Faktion sprang von unter 63,4, also **ueber 25 Prozent
+dauerhafte Reputationsratensteigerung**. Ich hatte den Einbau mit null Ertrag
+gerechnet.
+
+**Und der Baufehler, der ihn untauglich gemacht haette:** `bn4rep.js:1180-1195`
+**kauft unabhaengig von `gesperrt`**. Eine Einbausperre ohne Kaufsperre laesst
+`queuedAugmentations` monoton wachsen - und mit ihr die 1,9er-Treppe. Bei k=10
+kostet das naechste Stueck das 613-fache. Heute raeumt der Einbau die Treppe
+zurueck (`AugmentationHelpers.ts:103`); die Sperre haette diesen Reset
+entfernt und den Zaehler laufen lassen. **Schlechter als der Ist-Zustand.**
+
+Dazu: Ein Riegel an `GRAFTPLAN.md`, dessen Leerwerden nicht garantiert ist,
+kann `bn4rep`s eigenen Ausgangspfad blockieren - `The Red Pill` ist `isSpecial`
+und nicht graftbar. Genau dieser Fehler wurde am 23.08. schon einmal gebaut
+und wieder entfernt (`bn4rep.js:838-849`).
+
+**Was von der These bleibt** - und es ist nicht wenig: Fuer jede **graftbare**
+Augmentierung ist Graften billiger (`baseCost x 3` gegen `x5 x 1,9^k`, geeicht
+auf 96 von 96 Spielwerten), umgeht die Reputationshuerde und spart den Reset.
+Nur ist die richtige Regel nicht "nie einbauen", sondern:
+
+> **Erst das Paket graften, dann Congruity, dann EINMAL einbauen - mit
+> maximaler NeuroFlux-Ladung und maximalem Favor.**
+
+Der `NeuroFlux Governor` ist die einzige nicht graftbare Augmentierung, die
+dieser Bot je erreichen kann (`Augmentations.ts:1169` `isSpecial`, Faktionen
+ohne Bladeburners). Zehn Stufen kosten $4,8 Mrd und 1,28 Mio Reputation - ueber
+Spenden rund 18 Minuten Einkommen - und geben **x1,105 auf praktisch alles,
+ohne Entropie**. Das ist die billigste Multiplikatorquelle im Spiel und geht
+nur ueber den Einbau.
+
+**Kein Code geaendert.** Der einzige Eingriff aus diesem Lauf ist die Aufnahme
+von `violet Congruity Implant` in `nodes/GRAFTPLAN.md` (`883826d`).
+
+---
+
+### Die Graft-Kette laeuft: Rang und Graft gleichzeitig - verifiziert (30.08., 22:14)
+
+**Nach dem Verlust von 22:06 wurde mit dem billigsten Stueck nachgetestet,
+nicht mit dem teuersten.** `Combat Rib I` kostet $71,25 Mio - 205-mal weniger
+als SPTN-97. Gestartet 22:11, Dauer 46,2 min.
+
+**Gemessen 22:13, drei Minuten nach dem Start:**
+
+    tools/lage.js     Arbeit: GRAFTING   Fokus: JA   Stadt New Tokyo
+    data/blade.json   Aktion Contracts/Tracking, Rang 1087 (22:12:59)
+
+**Beides gleichzeitig.** Damit ist die ganze Kette belegt:
+
+1. **Das Simulacrum wirkt** - die Bladeburner-Aktion laeuft neben dem Graft
+   (`Bladeburner.ts:1354`). Ab jetzt kostet Graften keinen Rang mehr.
+2. **`bbtrain.js` unterbricht nicht mehr.** Es ist seit 22:05 in der neuen
+   Fassung (`1062631`) und hat das Graft in drei Minuten nicht angefasst -
+   die alte Fassung hatte um 22:04 nach knapp einer Minute zugeschlagen.
+3. **`blade.js` weicht nicht mehr** (`0cc22a2`). Es fuhr um 22:03 noch
+   "General/keine, weicht bbtrain"; jetzt faehrt es Vertraege.
+
+**Die Lehre aus dem Verlust steht:** Erst mit dem billigsten Stueck testen,
+dann mit dem teuren. $71 Mio als Pruefgebuehr statt $14,63 Mrd.
+
+**Ab jetzt treibt ein Werkzeug die Kette** (`3117791`, 22:43). Der
+Vorankommens-Loop ruft in jedem Lauf:
+
+```
+node tools/task.js bbgraft.js     # Lage frisch halten, rund 30 s warten
+node tools/graftnext.js --los     # naechstes Stueck aus nodes/GRAFTPLAN.md
+```
+
+`graftnext.js` legt hoechstens EINEN Auftrag ab und tut gar nichts, solange
+ein Graft laeuft oder `data/bbgraft.json` aelter als 30 Minuten ist. Die
+Reihenfolge steht in `nodes/GRAFTPLAN.md` (38 Stuecke, Voraussetzungsketten
+eingerechnet); installierte werden uebersprungen.
+
+**Der naechste ist `SPTN-97 Gene Modification`**, $14,63 Mrd, 99,4 min - der
+groesste Einzelposten des Pakets (Kampf x9,38).
+
+---
+
+### LAEUFT: The Blade's Simulacrum ($450 Mrd), fertig gegen 21:57 (30.08., 21:43)
+
+Alle drei Riegel stehen und sind einzeln verifiziert:
+
+| Riegel | Commit | verifiziert |
+|---|---|---|
+| `bbtrain.js` faellt nicht ins Gym | `1062631` | Syntax + Pruefer; wirksam erst bei Tiefstand unter 100 |
+| `bn4rep.js` baut nicht ein | `064acef` | neu gestartet 21:28, laeuft |
+| Marker wird geloescht | `543cb6f` | **21:42 am lebenden Objekt**: Marker angelegt, Pruefmodus gestartet, Marker weg |
+
+Graft gestartet 21:42:35, `data/graft.json`: `getan "gestartet"`, `fehler
+null`, `preis 450.000.000.000`, `dauerMin 14,1`. `data/blade.json` bestaetigt
+den Riegel: `aktion "Grafting"`.
+
+**Was der naechste Lauf pruefen muss:**
+
+1. **Ist das Simulacrum installiert?** `node tools/task.js graft.js`
+   (Pruefmodus) - `simulacrum` muss `true` sein und `verfuegbar` von 97 auf 96
+   fallen.
+2. **Steht `data/simulacrum.txt`?** Der Pruefmodus legt ihn an. Erst danach
+   hoert `blade.js` auf, waehrend Grafts stillzuhalten.
+3. **Der Tiefstand faellt auf 98** (zweiter Entropiestapel). Damit verlaesst
+   `bbtrain.js` seine Warteschleife und will ins Gym. Das ist **erwartet und
+   ungefaehrlich**: Das naechste Graft unterbricht das Gym, und `bbtrain`
+   haelt seit `1062631` still, sobald es laeuft.
+4. **Deshalb direkt danach `SPTN-97 Gene Modification`** ($14,63 Mrd, 1,66 h).
+   Es hebt die Kampfwerte um Faktor 9,38 und damit den Tiefstand weit ueber
+   100 - das schliesst das Fenster, in dem `bbtrain` die Figur haelt.
+   `nodes/GRAFTING.md` nennt Simulacrum und die erste Kampf-Augmentierung
+   nicht ohne Grund ein **Paar**.
+
+**Ab dem Simulacrum kostet Graften keinen Rang mehr** - der Motor laeuft
+waehrend der 1,66 h von SPTN-97 normal weiter.
+
+---
+
+### Erstes Graft durch - drei Vorhersagen exakt getroffen, eine widerlegt (30.08., 21:28)
+
+**Neuroreceptor Management Implant ist installiert.** Gestartet 21:12, fertig
+21:26, $1,65 Mrd, 14,1 Minuten. Gemessen:
+
+| | erwartet | gemessen |
+|---|---|---|
+| graftbare Augmentierungen | 97 | **97** (vorher 98) |
+| NMI noch in der Liste | nein | **nein** |
+| Entropiestapel | 1 | **1** |
+| Tiefstand nach dem Graft | 100 | **100** (vorher 102) |
+| Motor nach dem Graft | wieder ein Vertrag | **Contracts/Tracking** |
+
+Damit ist dreierlei belegt: Der **Graft-Riegel haelt** (`aktion "Grafting"`,
+`grund "Graft laeuft ohne Simulacrum - Motor haelt still"` waehrend der
+14 Minuten) **und loest sich sauber wieder**. Und die **Entropierechnung des
+Skeptikers war exakt** - der Tiefstand faellt auf genau 100, nicht auf 99.
+Das traegt die Reihenfolge des ganzen Pakets.
+
+**Widerlegt: die eigene Erwartung, die Graft-Zeiten wuerden um 20 % fallen.**
+Die Simulacrum-Graftzeit steht unveraendert bei 845.690 ms. Grund:
+`getAugmentationGraftTime` liefert `baseTime / intBonus`
+(`GraftingHelpers.ts:27-30`) - **ohne** `focusPenalty`. Die Fokusstrafe wirkt
+erst in `GraftingWork.process` ueber `unitRate = MilliPerCycle x intBonus x
+focusBonus` (`GraftingWork.tsx:41-43`). Die gemeldete Zeit ist also immer die
+Zeit bei vollem Fokus.
+
+**Was NMI wirklich bringt:** nicht kuerzere Zeiten, sondern die Garantie, dass
+die gemeldete Zeit auch dann gilt, wenn der Fokus verlorengeht - und das
+passiert bei jedem Seitenwechsel (`ui/GameRoot.tsx:271-272` ruft
+`stopFocusing`). Ohne NMI waeren es 0,8 statt 1,0
+(`PlayerObjectGeneralMethods.ts:622-628`), aus 42,4 h wuerden 53 h. Der Nutzen
+ist real, nur an anderer Stelle als angenommen.
+
+**Naechster Schritt: `The Blade's Simulacrum`, $450 Mrd, 14,1 min.** Vorher
+fehlen zwei Riegel aus dem Punkt darunter - der Einbau-Riegel in `bn4rep.js`
+und das Loeschen von `data/simulacrum.txt` beim Knotenwechsel.
+
+---
+
+### Vor dem Simulacrum ($450 Mrd) fehlen noch drei Riegel - Graft 1 ist frei (30.08., 21:05)
+
+Ein Skeptiker-Lauf auf `src/graft.js` hat **Graft 1 (Neuroreceptor Management
+Implant, $1,65 Mrd, 14,1 min) freigegeben**, nachdem die Auflage - der Riegel
+gegen ein zweites Graft - eingebaut war (`ea04ff4`). Drei Befunde betreffen
+aber das **Paket**, nicht Graft 1, und der teuerste Schritt darin ist
+`The Blade's Simulacrum` fuer $450 Mrd.
+
+**1. `src/bbtrain.js` kennt `GRAFTING` nicht - und der Tiefstand faellt durch
+die Entropie.** `bbtrain.js:239-250` prueft `laeuft.type === "CLASS"`;
+`GRAFTING` faellt auf `false`, und dann laeuft **unbedingt** `gymWorkout` -
+also `startWork`, also Graft tot. `:258` ruft zusaetzlich `stopAction()` ohne
+Pruefung. Ausloeser ist `tief < 100` (`:117`, `:153`).
+
+Die Entropie (`EntropyAccumulation.ts:7`, `0,98^stapel` auf **alle**
+Multiplikatoren) wird beim **Ende** jedes Grafts gebucht. Gerechnet gegen den
+Spielstand von 20:52:
+
+| Entropie | str | def | dex | agi | Tiefstand |
+|---|---|---|---|---|---|
+| 0 (jetzt) | 103 | 102 | 135 | 115 | 102 |
+| 1 (nach NMI) | 101 | **100** (roh 100,590) | 132 | 113 | **100** |
+| 2 (nach Simulacrum) | 99 | **98** | 130 | 111 | **98** |
+
+`100 < 100` ist falsch - **Graft 1 und Graft 2 ueberleben mit 0,59 Punkten
+Reserve.** Danach steht der Tiefstand auf 98, `bbtrain` verlaesst seine
+Warteschleife und toetet **jedes ab dann gestartete Graft binnen 60 s**. Genau
+Graft 3 ist die erste Kampf-Augmentierung.
+
+**2. `src/bn4rep.js` darf mitten im Graft einbauen.** `Prestige.ts:137` ruft
+`finishWork(true, true)` - Graft weg, Geld weg. Der Aufruf
+`installAugmentations("boot.js")` (`bn4rep.js:1155`) haengt an `:1038-1044`,
+und der einzige harte Riegel dort ist `!inBladeburner()` (`:718-720`) - der
+Spieler **ist** Mitglied, der Riegel greift nicht. Stand `data/einbau.json`:
+`wartend 1, mindest 3`. Fuer 14 Minuten unwahrscheinlich, fuer 42 Stunden
+praktisch sicher. **`nodes/GRAFTING.md` fuehrt `bn4rep` faelschlich in der
+Freispruchliste** - dort steht nur, dass es keine Arbeit startet, nicht, dass
+es nicht einbaut.
+
+**3. `data/simulacrum.txt` wird nie geloescht.** `src/graft.js` legt den
+Marker nur an. `prestigeHomeComputer` (`ServerHelpers.ts:226-239`) loescht
+beim BitNode-Wechsel Programme und Nachrichten, **aber keine Textdateien**.
+Im naechsten Knoten liest `blade.js` `true`, riegelt nie, und
+`Bladeburner.startAction` toetet das erste Graft in rund einer Sekunde. Bei 15
+geplanten Knoten ist das eine Mine mit Datum. Zwei Zeilen `ns.rm`, 0,6 GB.
+
+**4. Niemand prueft nach, ob ein Graft durchlaeuft.** `graft.js` schreibt
+"gestartet" und endet. `tools/wache.js:651-662` schlaegt erst nach 150 Minuten
+an; ein nach 20 Sekunden abgebrochenes Graft sieht von aussen aus wie ein
+normal laufender Motor, und der Verlust erscheint in keiner Telemetriedatei.
+Eine Nachkontrolle nach `dauerMs` fehlt.
+
+**5. `raus.fehler` wird ueberschrieben statt gesammelt.** Wirft
+`getOwnedAugmentations`, laeuft das Skript weiter und jede spaetere Zuweisung
+ueberschreibt den Befund. Das Verhalten ist konservativ (kein Marker, also
+riegelt `blade.js`), aber der Bericht luegt.
+
+**Reihenfolge:** Graft 1 kann sofort. Punkte 1 und 2 **vor** dem Simulacrum,
+Punkt 3 vor dem naechsten BitNode-Wechsel.
+
+---
+
+### Drei Nachbesserungen am Graft-Riegel, vom Skeptiker belegt (30.08., 19:35)
+
+Zwei davon sind in `578e750` behoben (Selbsthaltung, offener Abschnitt). Drei
+bleiben offen, alle mit Fundstelle:
+
+**1. ~~`tools/wache.js` kennt `Grafting` nicht~~ ERLEDIGT 19:46, Commit
+`a734b54`.** Ausnahme analog zu `imGym`, mit einem Deckel von 150 Minuten
+(`GRAFT_MAX_MS`) - danach faellt ein eigener Befund mit eigenem Text, weil ein
+verklemmter Riegel sonst genauso aussaehe wie ein legitimer Graft. Der
+Zeitstempel liegt in `zustand.graftSeit`, weil der Verlauf nur zwei Stunden
+haelt (`:1057`) und kein Aktionsfeld fuehrt. **Verifiziert 19:46:** Waechter
+neu gestartet (PID 13720), `graftSeit` steht im Zustand,
+`node tools/aufsicht.js` meldet "Waechter frisch".
+
+*Der urspruengliche Befund, zum Nachlesen:*
+Der Riegel schreibt jede Runde frische Telemetrie, damit die Motorfrische-
+Pruefung (`tools/wache.js:66`, `MOTOR_MAX_ALTER` 10 min) nicht anschlaegt.
+Uebrig bleibt die Traegerpruefung (`:651`): Rang 45 Minuten flach **und** nicht
+`imGym` - und `"Grafting"` beginnt nicht mit `"Gym/"` (`:632`), die Ausnahme
+greift also nicht. Beide Ausgaenge sind falsch:
+
+- Tragen die Sleeves den Rang (14,4/h, also +10,8 in 45 min), feuert nichts -
+  ein festsitzender Riegel liefe 1,5 h unbemerkt.
+- Tragen sie ihn nicht, erzeugt ein legitimer langer Graft einen **Push aufs
+  Handy**: "Bladeburner-Rang steht seit 45 min ... (Aktion: Grafting)".
+
+Zu tun: `Grafting`-Ausnahme analog zu `imGym`, plus ein harter Deckel auf die
+Riegeldauer (die Graftzeit ist bekannt, `src/bbgraft.js:44` liest sie schon).
+
+**2. ~~Der Faehigkeitskauf faellt waehrend des Riegels aus~~ ERLEDIGT 20:11.**
+`faehigkeitenKaufen()` wird jetzt im Riegel-Zweig aufgerufen, bevor die Runde
+uebersprungen wird. **Verifiziert 20:11** nach Neustart: Normalbetrieb
+unveraendert (Contracts/Tracking, Rang 964, 12 Punkte offen). Der Zweig
+selbst ist erst beim ersten Graft pruefbar.
+
+*Der urspruengliche Befund, zum Nachlesen:*
+Alles ab `src/blade.js:2947` wird uebersprungen, darunter
+`faehigkeitenKaufen()` (`:3172`). Genau der wurde am 29.08. in den
+Weichen-Zweig nachgezogen (`:3163`, "17 Punkte lagen brach"), weil die
+Sleeve-Erfolgschancen an den Multiplikatoren des **Spielers** haengen
+(`Actions/Action.ts:170-182`). Der Kauf beruehrt `Player.currentWork` nicht
+und gehoert **ueber** den Riegel. Derzeit stehen 5 Punkte offen.
+
+**3. ~~Rennfenster von bis zu einer Sekunde beim Graftstart~~ ERLEDIGT 20:41,
+Commit `2a1c1be`.** Das neue Werkzeug `src/graft.js` ruft vor
+`graftAugmentation` einmal `ns.bladeburner.stopBladeburnerAction()`.
+**Verifiziert 20:41 im Pruefmodus** (Aufruf ohne Argument): 98 graftbare
+Augmentierungen, `simulacrum false`, Geld $20,5 Bio, kein Fehler - es wurde
+nichts gegraftet. Ein Skeptiker-Lauf laeuft, bevor das erste echte Graft
+startet.
+
+*Der urspruengliche Befund, zum Nachlesen:*
+`Bladeburner.process()` laeuft nur einmal je Sekunde
+(`engine.tsx:193-201`, `Counters.bladeburnerProcess = 5`). Zwischen Graftstart
+und dem naechsten `process()` liefert `getCurrentAction()` noch die alte
+Aktion. Wacht `blade.js` in diesem Fenster aus einem `ns.sleep()`-Pfad auf
+(`:3131`, `:3167`, `:3364`, `:3397`), laeuft es durch und toetet das Graft -
+ohne Dialog (`GraftingWork.tsx:74-83` meldet den Abbruch nur bei
+`!this.singularity`). Der Skeptiker haelt das Restrisiko fuer klein, aber es
+ist billig zu schliessen: **Das Graftwerkzeug ruft vor `graftAugmentation`
+einmal `ns.bladeburner.stopBladeburnerAction()`** (nur `resetAction`,
+`Bladeburner.ts:249-253`, kostet nichts).
+
+**Nebenbefund, der die Reihenfolge betrifft:** Waehrend der Riegel greift,
+laeuft auch das Chaos-Aufraeumen nicht. Diplomacy senkt Chaos um 1,303 % je
+Minute (Charisma 83), der passive Abbau nur um 0,011 % - Faktor 120. Ein
+17,6-Minuten-Graft mitten im Aufraeumen verlaengert dieses um dieselbe Zeit,
+und solange Chaos ueber 50 steht, ist jede Operation teurer. **Graften also
+nach dem Aufraeumen, nicht mittendrin.**
+
+---
+
 ### Der Einbau von 23:02 hat $28,4 Bio vernichtet fuer Augmentierungen im Wert von $5,58 Mrd (30.08., 23:12)
 
 **`prestigeAugmentation` setzt das Geld auf 1.262 Dollar**

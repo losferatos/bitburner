@@ -161,7 +161,15 @@ Sleeve-Erfolgschancen an den Multiplikatoren des **Spielers** haengen
 (`Actions/Action.ts:170-182`). Der Kauf beruehrt `Player.currentWork` nicht
 und gehoert **ueber** den Riegel. Derzeit stehen 5 Punkte offen.
 
-**3. Rennfenster von bis zu einer Sekunde beim Graftstart.**
+**3. ~~Rennfenster von bis zu einer Sekunde beim Graftstart~~ ERLEDIGT 20:41,
+Commit `2a1c1be`.** Das neue Werkzeug `src/graft.js` ruft vor
+`graftAugmentation` einmal `ns.bladeburner.stopBladeburnerAction()`.
+**Verifiziert 20:41 im Pruefmodus** (Aufruf ohne Argument): 98 graftbare
+Augmentierungen, `simulacrum false`, Geld $20,5 Bio, kein Fehler - es wurde
+nichts gegraftet. Ein Skeptiker-Lauf laeuft, bevor das erste echte Graft
+startet.
+
+*Der urspruengliche Befund, zum Nachlesen:*
 `Bladeburner.process()` laeuft nur einmal je Sekunde
 (`engine.tsx:193-201`, `Counters.bladeburnerProcess = 5`). Zwischen Graftstart
 und dem naechsten `process()` liefert `getCurrentAction()` noch die alte

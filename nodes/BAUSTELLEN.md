@@ -367,6 +367,94 @@ Knotenwechsel braucht es SF10, das erst der Abschluss liefert.
 
 ## Offen, nach Dringlichkeit
 
+### CHANCE_SKILLS-Aenderung zurueckgenommen: die Tabelle wird zur Laufzeit ueberschrieben (30.08., 14:35)
+
+**Dritte Aenderung heute, die ein Skeptiker gestoppt hat - und diesmal war
+der Fehler grundlegender als bei den beiden davor.**
+
+Geplant war, die `abdeckung`-Werte in `CHANCE_SKILLS` (`src/blade.js:737-751`)
+von der Black-Op-Grundgesamtheit auf die Vertragsphase umzustellen: Digital
+Observer 1,0 -> 0,0, Cloak 0,17 -> 0,33, Short-Circuit 0,58 -> 0,67. Zwei
+Pruefagenten hatten unabhaengig berichtet, in Digital Observer und Datamancer
+steckten 56 wirkungslose Faehigkeitspunkte.
+
+**Der toedliche Einwand: Der Code liest die Tabelle gar nicht.**
+`src/blade.js:950-951`:
+
+    const abd = (blackOpArbeit && Number.isFinite(blackOpArbeit[name]))
+      ? blackOpArbeit[name] : c.abdeckung;
+
+`blackOpArbeit` wird bei **jedem** `beste()`-Aufruf neu gerechnet
+(`:1832-1858`) und ist genau dann besetzt, wenn irgendeine offene Black Op
+unter `SICHER_BLACKOP = 0.35` liegt (`:361`). `data/blade.json` fuehrt
+`boChancen` mit **allen 21** zwischen 0,0385 und 0,0008 - die dynamische
+Tabelle ist also durchgehend aktiv. Tatsaechlich wirksam sind derzeit:
+
+    Faehigkeit          Diff sagt    tatsaechlich (blackOpArbeit)
+    Short-Circuit          0,67           0,664
+    Cloak                  0,33           0,142
+    Digital Observer       0,0            1,0
+    Blade's Intuition      1,0            1,0
+
+Nur `Tracer` faellt auf den statischen Wert zurueck, weil er in
+`blackOpArbeit` keinen Schluessel hat - und den hatte ich nicht angefasst.
+**Die Aenderung war vollstaendig wirkungslos.** Erreichbar waere die statische
+Tabelle erst, wenn alle 21 Black Ops ueber 0,35 stehen; bei Rang 657 von
+2.500 sind das Tage.
+
+**Und sie waere auch inhaltlich falsch gewesen.** `src/blade.js:1820` haelt
+fest: `c *= m("SuccessChanceOperation"); // Black Ops zaehlen als Operation`.
+Digital Observer wirkt also auf **alle 21 Black Ops** - den Knotenausgang.
+Die Punkte darin sind keine Fehlinvestition, sondern genau die Investition,
+die der Rest der Datei ueber `blackOpArbeit` bewusst gewichtet. Die
+"56 wirkungslosen Punkte" der beiden Vorberichte sind damit widerlegt (und
+die Zahl stimmte ohnehin nicht: Digital Observer steht auf Stufe **6**, nicht
+5, das sind 43 Punkte).
+
+**Ein Nutzen von 0 waere zudem eine Sperre, kein Nachrang.** `wert()`
+(`:1157-1161`) gibt `-1` nur bei Deckel oder Preis 0; Nutzen 0 ergibt
+`0/preis = 0` und sortiert damit **vor** gedeckelten Eintraegen. Die
+Kaufschleife (`:1189-1211`) haelt aber beim ersten nicht gedeckelten Eintrag
+an, und alle elf Planeintraege haben `Infinity` als Deckel - eine Faehigkeit
+mit Nutzen 0 waere nie wieder gekauft worden.
+
+**Mein Fehler, benannt:** Ich habe eine Tabelle geaendert, ohne zu pruefen,
+**wo sie gelesen wird**. Genau diese Frage stand woertlich im Auftrag an den
+Skeptiker ("Wo wird `abdeckung` ueberhaupt benutzt?") - ich habe sie gestellt,
+aber selbst nicht beantwortet. Ein `grep abdeckung src/blade.js` haette
+gereicht und zwei Zeilen weiter unten gestanden.
+
+**Aufgenommen als eigener Punkt** (siehe unten): Der Skeptiker hat nebenbei
+einen echten Fehler gefunden, der nicht von dieser Aenderung stammt.
+
+---
+
+### `blackOpArbeit` behaelt seinen letzten Wert, wenn alle Black Ops erledigt sind (30.08., 14:35)
+
+Gemessen: Nicht gemessen - aus dem Code hergeleitet, gefunden von einem
+          Skeptiker-Subagenten am 30.08.
+
+Befund:   `src/blade.js:1833-1835`. Sind alle 21 Black Ops abgeschlossen,
+          liefert `getNextBlackOp()` null, `indexOf(undefined)` gibt **-1**,
+          und der Block wird uebersprungen. `blackOpArbeit` behaelt dann
+          seinen **letzten Wert**, statt auf null zurueckzufallen.
+
+Erwartet: Rueckfall auf die statische `CHANCE_SKILLS`-Tabelle - die ist genau
+          fuer diesen Fall da.
+
+Folge:    Der Motor gewichtet die Chance-Faehigkeiten nach einem Black-Op-Feld,
+          das es nicht mehr gibt. Das ist der Zustand unmittelbar vor dem
+          Knotenausgang, also genau dann, wenn jede Faehigkeitsentscheidung am
+          teuersten ist.
+
+Verdacht: `getNextBlackOp()` und die `indexOf`-Zeile. Ein `if (idx < 0) {
+          blackOpArbeit = null; }` waere vermutlich die ganze Reparatur -
+          **vermutlich**, denn geprueft ist nur der Befund, nicht die Loesung.
+
+Dringlichkeit: niedrig heute (Rang 657 von 2.500 bis zur ersten Black Op),
+          aber der Fall tritt in **jedem** Knoten genau einmal ein, und dann
+          an der teuersten Stelle.
+
 ### Operationen freigeben: verworfen, aber drei echte Fehler dabei gefunden (30.08., 13:35)
 
 **Zwei unabhaengige Skeptiker sagen BRICHT.** Die Aenderung (Ausnahmetabelle

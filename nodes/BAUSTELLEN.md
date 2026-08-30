@@ -118,6 +118,59 @@ Regeln:
 
 ## Sofort
 
+### Der Hacking-Ausgang aus BitNode 10 wurde nie gerechnet, nur behauptet (30.08., 12:55)
+
+**Das ist der schwerste Befund des Tages und stellt die Kursentscheidung in
+Frage.** Ein Praemissen-Skeptiker hat den Eintrag aus `## ENTSCHIEDEN`
+angegriffen: *"Ausgang aus BitNode 10 = nur Bladeburner, Hacking-Weg braucht
+Level 6.000 = 10^175 Erfahrung"*.
+
+**Die 10^175 sind keine Eigenschaft des Weges, sondern des heutigen
+Augmentierungsstands.**
+
+Die Schwelle selbst haelt: `Server/data/servers.ts:1553` gibt w0r1d_d43m0n
+`requiredHackingSkill: 3000`, `ServerHelpers.ts:422-423` multipliziert einmalig
+mit `WorldDaemonDifficulty` = 2 (`BitNode.tsx:838,880`) - **6.000, fix**, es
+skaliert nicht mit dem Fortschritt.
+
+Der Erfahrungsbedarf haengt aber am Multiplikator:
+`exp = e^((6000/m + 200)/32)` mit `m = mults.hacking * HackingLevelMultiplier`
+(0,35 in BN10, `Person.ts:224`, `skill.ts:13`):
+
+    m = 0,47  (heute)   9,3e175      <- die zitierte Zahl
+    m = 4                1,2e23
+    m = 7,6              2,7e13
+    m = 10               7,2e10
+    m = 12               3,2e9
+
+`Augmentation/Augmentations.ts` fuehrt 31 Augmentierungen mit
+Hacking-Multiplikator, Produkt 43,5; abzueglich der unkaeuflichen
+`BigDsBigBrain` (`repCost: Infinity`) bleiben **21,7**. Damit ist
+m = 0,35 x 21,7 = **7,6**, mit NeuroFlux-Stufen (`hacking: 1.01` je Stufe,
+unbegrenzt) 10 bis 12.
+
+**Und die Wege konkurrieren nicht.** `Bladeburner.prestigeAugmentation()`
+(`Bladeburner.ts:259-263`) setzt den **Rang nicht zurueck**, nur die
+Kampferfahrung. Ein Augmentierungs-Grind kostet also keinen einzigen
+Rangpunkt - beide Wege haben dieselbe Vorbedingung (Rep und Geld fuer die
+Aug-Runde), und danach kostet der Hacking-Ausgang Minuten statt 400.000 Rang.
+
+**Was offen ist - und was gemessen gehoert, bevor irgendetwas entschieden
+wird:** Ob ein Hacking-Multiplikator von 7 bis 12 in diesem Lauf bezahlbar
+ist. BN10 hat `AugmentationRepCost: 2` und `AugmentationMoneyCost: 5`. Das
+ist die einzige offene Groesse. Der Skeptiker nennt sie ausdruecklich als
+Vermutung, nicht als Beleg.
+
+Zu tun: Die Rep- und Geldkosten fuer einen Hacking-Multiplikator von 7,6
+durchrechnen - alle 30 kaufbaren Hacking-Augs mit ihren Fraktionen, Rep- und
+Geldanforderungen in BN10. Dann beide Wege nebeneinander stellen. **Bis
+dahin bleibt der Eintrag in `## ENTSCHIEDEN` stehen** - er wird nicht
+aufgrund einer unbelegten Gegenrechnung geaendert -, aber er ist als
+"nicht gerechnet" markiert.
+
+Dringlichkeit: **hoch.** Wenn der Hacking-Weg traegt, spart er den groessten
+Teil von 400.000 Rang.
+
 ### Die Rangrate liegt im Vollbetrieb bei 30 statt 254 je Stunde (30.08., 12:45)
 
 Gemessen (Waechterreihe, 3-Minuten-Takt): Seit der Wiederaufbau um 12:26
@@ -170,6 +223,185 @@ Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
 ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
 ## Offen, nach Dringlichkeit
+
+### `tools/augplan.js` rechnet die BitNode-Multiplikatoren nicht - und die Aug-Strategie steht (30.08., 12:58)
+
+Aus einem vollstaendigen Audit der Bladeburner-Augmentierungen gegen den
+Quellcode, geeicht am laufenden Spielstand (das Modell des Auditors trifft
+`maxStamina` auf 45,44 gegen echte 45,4359 und die Tracking-Aktionszeit auf
+17 s genau).
+
+**Zwei Fehler in `tools/augplan.js`:**
+
+1. Der schon bekannte: `GEWICHT` (Zeile ~110) kennt nur `hacking*`,
+   `faction_rep`, `crime`/`work`. Die vier `bladeburner_*` **und alle
+   Kampfwert-Multiplikatoren** fallen auf 0. Passende Gewichte fuer BN10, aus
+   den Elastizitaeten hergeleitet: `success_chance 1,00`,
+   `stamina_gain 0,74`, `max_stamina 0,20`, `analysis 0,00`,
+   `strength/defense/dexterity/agility je 0,25`.
+2. **Der schwerere, bisher unbenannte:** `augplan` vergleicht `a.rep <= rep`
+   und `a.money <= p.money` gegen die **rohen Basiskosten**.
+   `currentNodeMults.AugmentationRepCost` (2) und `AugmentationMoneyCost` (5)
+   fehlen, ebenso der Warteschlangenfaktor `1,9^k`
+   (`AugmentationHelpers.ts:157-158`). In BN10 meldet das Werkzeug damit
+   "KAUFBAR" bei **halber Rep-Anforderung und einem Fuenftel des Preises**,
+   und der Fehler waechst mit jedem Aug in der Warteschlange. Nebenbei:
+   Bladeburners hat 18 Augs, die Ausgabe schneidet bei 12 ab.
+
+**Die Wirkungskette, gemessen statt vermutet:**
+
+    success_chance   Elastizitaet 1,00   (linear, `Actions/Action.ts:190`)
+    stamina_gain                  0,74
+    max_stamina                   0,20   (der Aug-Mult wirkt NUR in
+                                          calculateMaxStamina, nicht doppelt
+                                          wie der Skill-Mult)
+    bladeburner_analysis          0,00   wirkt ausschliesslich auf die
+                                          Genauigkeit der Bevoelkerungs-
+                                          schaetzung in FieldAnalysis
+                                          (`Bladeburner.ts:1128`), und fuer
+                                          Black Ops ist der Kanal per
+                                          `getPopulationSuccessFactor(): 1`
+                                          hart abgeklemmt
+
+Damit sind BLADE-51b IPU und Vangelis Virus deutlich schlechter, als ihr
+Datenblatt suggeriert. Und **GOLEM Serum ist das staerkste Aug im Feld**
+(+11,7 % Rang/h) obwohl sein einziger `bladeburner_*`-Wert `gain 1,05` ist -
+die Kampfwert-Multiplikatoren gehen ueber `getEffectiveSkillLevel` in
+dieselbe `competence` ein. Ein Schema, das nur `bladeburner_*` gewichtet,
+waere der naechste Fehler nach dem jetzigen.
+
+**Rep je Rangpunkt, aus dem Live-Stand: 3,831** (`faction_rep` 1,8764,
+Gunst 2,080). Contracts haben `rankLoss = 0`, brutto ist also netto.
+
+**Die Strategie, gerechnet:**
+
+*Jetzt ist nichts zu kaufen.* Rep steht bei 490, das billigste Aug kostet in
+BN10 2.500 Rep - erreichbar ab **Rang 1.101**.
+
+*Danach genau EIN Einbau, im Fenster Rang 11.000 bis 17.000.* Nicht frueher,
+nicht in Scheiben. Die Gruende:
+
+- Der Wiederaufbau kostet ~3 h, die Amortisation ist **ratenunabhaengig**:
+  `3/X` Stunden bei X Prozent Zuwachs. Fuer das 10-Aug-Paket (X = 0,64) sind
+  das **4,7 Stunden**.
+- Der teure Teil ist nicht der Kampfwert-Reset, sondern dass
+  `Faction.prestigeAugmentation()` die **Bladeburners-Reputation auf 0**
+  setzt. Deshalb nicht bei Rang 1.101 fuer ein 4,4-%-Aug einbauen -
+  Amortisation 68 h, und 2.500 Rep waeren verbrannt.
+- Was ueberlebt, spricht fuer den Einbau: `Bladeburner.prestigeAugmentation()`
+  macht nur `resetAction()` und `joinFaction()`. **Rang, Skillpunkte,
+  Skillstufen, Aktionsstufen und Stadtdaten bleiben vollstaendig.** Es geht
+  kein Rangpunkt verloren, nur die 3 h.
+- Die verbrannte Rep kommt als **Gunst** teilweise zurueck: Einbau bei 42.500
+  Rep ergibt Gunst 50,9, und Rep je Rang steigt von 3,831 auf **5,664
+  (+48 %)**.
+- Zwei Einbauten gegen einen durchgerechnet: in Rangzeit praktisch identisch
+  (213.320 gegen 214.512), aber einer spart 3 h Wiederaufbau.
+
+**Konkret: Bei Rep 42.500 / Rang ~11.500 zehn Augs fuer $1,59t kaufen**
+(+64 % Rang/h). Wichtig - die **Geldreihenfolge innerhalb eines Einbaus ist
+absteigend nach Basispreis**, weil `1,9^k` nur aufs Geld wirkt, nicht auf die
+Rep. Bei falscher Reihenfolge kostet derselbe Satz das Vierfache.
+
+Nutzenreihenfolge je 1000 Rep: EsperTech Eyewear (1,767) - EMS-4 (0,904) -
+ORION-MKIV (0,549) - Tesla Armor (0,366) - Hyperion V1 (0,240) - Power Cells
+(0,202) - Blade's Runners (0,189) - GOLEM Serum (0,188) - Hyperion V2 (0,160).
+Omnibeam (Rang 33.080) und Vangelis 3.0 gehoeren nicht in diesen Einbau.
+
+**Nebenbefund fuer die Black Ops:** `BlackOperation` erbt `getSuccessChance`
+unveraendert; nur Bevoelkerung und Chaos sind auf 1 gesetzt, Zeitstrafe 1,5,
+Teambonus `(n+1)^0,05`. `bladeburner_success_chance` wirkt dort also **voll
+multiplikativ und linear** (p ~ 0,03 bis 0,25, weit vom Deckel). Produkt
+aller 13 success_chance-Augs: **x1,9161**. Operation Typhoon heute 0,0398 ->
+0,0762; bei Rang 2.500 mit Kampfwert 300: 0,2416 -> 0,4629.
+
+Dringlichkeit: mittel. Nichts davon ist heute kaufbar - aber `augplan.js`
+wuerde bei Rang 1.101 falsche Preise melden und einen verfruehten Einbau
+ausloesen.
+
+### Field Analysis statt Regenerationskammer: +80 Prozent auf die Rangrate (30.08., 12:55)
+
+Aus einem vollstaendigen Parameter-Audit von `src/blade.js` gegen den
+Spielquellcode. **Der groesste einzelne Hebel im aktuellen Zustand.**
+
+IST: Im Ausdauer-Band (`AUSDAUER_RUHE` 0,51 / `AUSDAUER_WEITER` 0,56,
+     `blade.js:404-405`, Rueckgabe `:1450`) faehrt der Bot
+     `General/Hyperbolic Regeneration Chamber`.
+
+SOLL: Im **Ausdauer**-Band `General/Field Analysis`. Die Kammer bleibt fuer
+     den HP-Zweig.
+
+Die Rechnung, alle Groessen belegt:
+
+    Kammer gibt maxStamina * 1/100 je 60-s-Lauf = 0,395/min ZUSAETZLICH
+      (`data/Constants.ts:52` HrcStaminaGain 1, `Bladeburner.ts:1199-1202`)
+    Die passive Regeneration (1,188/min) laeuft bei JEDER Aktion weiter
+      (`Bladeburner.ts:1382`)
+    Field Analysis kostet null Ausdauer, dauert fest 30 s und bringt
+      0,1 * BladeburnerRank = 0,08 Rang -> 0,16 Rang/min
+      (`data/GeneralActions.ts:13-21`, `Formulas.ts:12-14`)
+
+Zyklusrechnung mit Bounty Hunter:
+
+    Kammer-Politik  w = 0,3475            -> 0,151 Rang/min
+    FA-Politik      w = 1,188/4,160=0,2856 -> 0,124 (Vertrag)
+                                            + 0,714*0,16 = 0,114 (FA)
+                                            = **0,238 Rang/min**
+
+Gleichstand erst bei Erfolgschance p ~ 0,88. **+80 Prozent** (0,130 -> 0,235).
+
+Der Bot steht derzeit rechnerisch 77 Prozent der Zeit in der Kammer und
+verdient dort **exakt null**; sie kauft nur 33 Prozent mehr
+Ausdauerdurchsatz.
+
+Aus demselben Audit, in absteigender Wirkung und alle mit Fundstelle:
+
+2. **`TRUPP_ZIEL = 6`** (`blade.js:370`, Sperrzweig `:2108-2114`) ist bei
+   reinen Vertraegen wertlos: `ActionClass.getTeamSuccessBonus` gibt fuer
+   Vertraege fest 1 zurueck (`Actions/Action.ts:124-126`), der Bonus
+   `(teamCount+1)^0,05` existiert nur in `Operation` und `BlackOperation`.
+   Kosten: rund 21 Rekrutierungsversuche a ~300 s = **1,7 h Nullertrag**.
+3. **`CHANCE_SKILLS`-Abdeckungen** (`blade.js:737-751`) gewichten nach dem
+   Black-Op-Feld. Bei Vertraegen ist **Digital Observer 0** statt 1,0
+   (`SuccessChanceOperation` wirkt nur auf Operationen, Vertraege holen ihren
+   Bonus aus `SuccessChanceContract`, `Actions/Contract.ts:30-32`), und
+   **Cloak 1,0** statt 0,17 (Tracking ist `isStealth`, `data/Contracts.ts:41`).
+   Nutzen je Punkt beim Erstkauf: Cloak 2,75 gegen Digital Observer 0 -
+   **Faktor 7,6** in der falschen Reihenfolge.
+4. **`lvlPlus` bei Hyperdrive** (`blade.js:759`) laesst den
+   BN10-Levelmultiplikator 0,4 weg (`BitNode.tsx:841-845`) - Hyperdrive ist
+   damit **2,5-fach ueberbewertet** und gewinnt die Sortierung unverdient.
+   Genau der am 28.08. protokollierte Ausfall (Hyperdrive Stufe 219).
+5. **`chaosJetzt < 25`** (`blade.js:2746`) muesste **19** sein, nicht 23 wie
+   heute um 12:40 geschaetzt: Aus 20 wird 30, dann 30/1,4771 = 20,31, also
+   **50,31** - ueber der Schwelle. Stetig geloest liegt die Grenze bei 19,78.
+6. **`stern` in `einsatzSchwelle()`** (`blade.js:1736`) muss
+   `rankLoss / (BladeburnerRank * rankGain + rankLoss)` lauten - der
+   Knotenfaktor 0,8 steht nur auf dem Gewinn (`Formulas.ts:22`), nicht auf
+   dem Verlust (`:40-41`). Bei Vindictus 0,556 statt 0,500; mit der
+   gesetzten Schwelle liegt der Erwartungswert dort **im Minus**.
+7. **`feldErtrag`** (`blade.js:2699,2702`) vergisst denselben Faktor: 0,16
+   statt 0,2 in BN10.
+8. **`wert(stadt)`** (`blade.js:1956-1961`) laesst die Bevoelkerung linear
+   eingehen; richtig ist `(pop/1e9)^0,7` (`Actions/Action.ts:88-92`). Ein
+   gesetzter Vorsprung von 2,0 entspricht real nur 1,62.
+
+**Tote Parameter** (werden nirgends gelesen): `RAID_GELD_MIN`,
+`RAID_CHAOS_MAX`, `RAID_CHANCE_MIN`, `RAID_CHARISMA_MIN` (`blade.js:148-156`).
+
+**Geprueft und als richtig bestaetigt:** `CHAOS_EIN = 50`, Overclock-Deckel
+90, `BBTRAIN_ZIEL = 100`, `RANG_JE_ERFOLG`, `REWARD_FAC`, `BLACKOP_DATEN`
+(alle 21), `CHAOS_JE_LAUF`, `POP_JE_ERFOLG` inklusive Raid-Fehlschlagrate,
+der Diplomacy-Term und `blackOpChance()` Term fuer Term.
+
+**Die Einordnung des Auditors gehoert dazu:** Alle zehn Punkte zusammen heben
+die Rangrate von ~14 auf ~30 je Stunde. Der Restweg betraegt 399.440 Rang.
+Der eigentliche Hebel in diesem Zustand sind die **Kampfwerte**, nicht die
+Aktionsauswahl - die Erfolgschance skaliert mit `stat^0,91`, die
+Ausdauerkosten je Aktion sind stat-unabhaengig.
+
+Dringlichkeit: hoch fuer Punkt 1 bis 4, mittel fuer den Rest. **Ein Punkt je
+Lauf**, mit Nachmessung - nicht alle auf einmal.
 
 ### `tools/tor.js` steigt in der Division aus, obwohl es dort gebraucht wird (30.08., 12:52)
 

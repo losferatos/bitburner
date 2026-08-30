@@ -23,6 +23,151 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Die Nachfuellphase kostet 17 Minuten am Stueck - ungemessen (30.08., 07:42)
+
+Gemessen: Ab **07:24** faellt die Rangrate von rund 280 auf **20 bis 60
+          Rang/h** und bleibt dort (Waechterreihe, 3-Minuten-Takt):
+
+              07:18  304   339 Rang/h
+              07:21  318   280
+              07:24  330   240
+              07:27  333    60   <- Bruch
+              07:30  336    60
+              07:33  337    20
+              07:36  340    60
+
+Ursache:  **Kein Fehler.** `data/blade.json` um 07:39: `aktion =
+          General/Incite Violence`, `grund = Vertragsvorrat leer`. Die
+          Diagnose bestaetigt es - alle drei Kontraktarten unter 1:
+          Tracking 0,75, Bounty Hunter 0,16, Retirement 0,42. Incite Violence
+          fuellt Vertraege und Operationen auf einen Schlag auf
+          (`Bladeburner.ts:1219-1225`, 180 Wachstumsschritte), dauert 60 s
+          und bringt **0 Rang**.
+
+          Geprueft und verworfen: Der `some`-Test in `src/blade.js:2745`
+          (`VERTRAEGE.some((name) => offen(V, name) < 3)`) sieht nach einem
+          Fehlausloeser aus, weil er auf EINEN leeren Vertrag feuert, obwohl
+          der Kommentar "und zwar der beste" sagt. Hier greift er zu Recht -
+          es sind alle drei leer. **Nicht anfassen** ohne einen Fall, in dem
+          der beste Vertrag nachweislich Vorrat hat.
+
+          Ebenfalls geprueft: `sleevediag` meldete um 07:39 `task: null`, also
+          Sleeve idle. Das ist eine Momentaufnahme waehrend der leeren Minute
+          (`SleeveBladeburnerWork.process:44-47` stoppt bei `count < 1`);
+          `data/sleeve.json` um 07:40:56 zeigt ihn wieder auf
+          `contract:Bounty Hunter`. **Selbstheilend, kein Fehler.**
+
+Erwartet: Offen ist nicht das Ob, sondern das **Wieviel**. Der Einbruch dauert
+          jetzt schon 17 Minuten - das sind rund **70 Rang Verlust** gegenueber
+          dem Trend. Wiederholt sich das stuendlich, kostet es ueber die
+          ETA von 77 h (`nodes/KURS.md`, 30.08. 07:20) einen zweistelligen
+          Prozentsatz.
+
+          Zu messen: (1) Wie lang ist eine Nachfuellphase wirklich, von der
+          ersten Incite-Violence-Minute bis zur wiederhergestellten Rate?
+          (2) In welchem Abstand kommt sie? (3) Reicht **ein** Durchlauf, oder
+          feuert der Zweig mehrfach hintereinander? Quelle ist
+          `data/aktionen.txt` ueber die Bruecke - dort steht jeder Abschnitt
+          mit `grund`.
+
+          Erst mit diesen drei Zahlen laesst sich beurteilen, ob ein frueherer
+          Ausloeser (Nachfuellen bei Vorrat 10 statt 3, waehrend die
+          Kontrakte noch laufen) etwas bringt oder nur Chaos kostet.
+          `chaos = 7,71` bei `chaosMax = 7,7` - die Grenze von 25 aus
+          `blade.js:2746` ist weit weg, Spielraum ist da.
+
+Dringlichkeit: mittel. Kein Defekt, aber der erste gemessene Ratenverlust im
+          Vollbetrieb - und der Optimierloop hat gerade keinen groesseren.
+
+
+**URSACHE GEFUNDEN UND BEHOBEN (30.08., 07:55). Es war doch ein Fehler - der
+Eintrag von 07:42 hat zu frueh entwarnt.**
+
+Der Blick ins Aktionsprotokoll (`data/aktionen.txt`, 07:26 bis 07:47) zeigt
+ein Muster, das die Momentaufnahme aus `blade.json` nicht hergab:
+
+    07:26:59  38,0 s  General/Incite Violence     r 332,9
+    07:27:37  15,0 s  Contracts/Tracking          r 333,3
+    07:27:52  17,0 s  General/Incite Violence     r 333,3
+    07:28:09  26,0 s  Contracts/Retirement        r 334,6
+    07:28:35  24,0 s  Contracts/Bounty Hunter     r 334,6
+    07:28:59  46,0 s  General/Incite Violence     r 334,6
+    ... 18 Incite-Abschnitte, keiner laenger als 46 s ...
+
+**Incite Violence dauert fest 60 Sekunden** (`data/GeneralActions.ts:54`,
+`getActionTime: () => 60`), und **kein einziger Durchlauf wurde fertig**. Der
+ganze Nutzen faellt aber erst beim Abschluss an: Der `case InciteViolence`
+steht im completeAction-Zweig (`Bladeburner.ts:1219-1225`) und schreibt dort
+`60 * 3 * growthFunction()` auf jeden Vertrag und jede Operation gut. Ein
+Abbruch verliert davon **alles** - `rangVon == rangBis` in allen 18
+Abschnitten belegt es.
+
+Der Motor lief damit 21 Minuten in einem geschlossenen Zweiminutenzyklus:
+Jeder Vertrag kroch durch natuerliches Wachstum knapp ueber eine offene
+Aktion, `beste()` griff ihn, leerte ihn in 15 bis 26 Sekunden, fiel auf
+Incite Violence zurueck - und brach es beim naechsten wieder frei gewordenen
+Vertrag ab. Der Vorrat konnte sich nie fuellen.
+
+**Kosten:** 332,9 -> 351,7 Rang in 19 Minuten = **59 Rang/h gegen 280 im
+Trend.** Der Zustand endete nicht von selbst.
+
+**Eingebaut in `src/blade.js`** (vor `if (!gleich)`, 6 Zeilen Code):
+
+    const festhalten = !gleich && wahl.typ !== B && abschnitt
+      && laeuft && laeuft.type === G && laeuft.name === "Incite Violence"
+      && Date.now() - abschnitt.von < 62000;
+    if (!gleich && !festhalten) {
+
+Black Ops duerfen weiterhin unterbrechen. Ausdauer kostet Incite Violence
+keine (`GeneralActions.ts:57`), das Festhalten kann also nichts leerlaufen
+lassen.
+
+**Abgegrenzt gegen die zurueckgenommene Hysterese vom 26.08., 22:55.** Die
+war zehn Prozent schlechter und wurde zu Recht verworfen - aber sie betraf
+den Wechsel **zwischen Vertraegen**, deren Fortschritt anteilig zaehlt und
+deren Ertragsunterschied groesser ist als die verworfene Zeit. Incite
+Violence ist binaer: fertig oder wertlos. Das ist kein Wiedereinbau einer
+verworfenen Idee, sondern eine Ausnahme mit eigener Fundstelle.
+
+**Geaendert 07:55, Wirkung noch nicht gemessen.** `node --check` sauber,
+Pruefer unveraendert SPUR, ins Spiel synchronisiert und `blade.js` neu
+gestartet (verifiziert 07:49:47: laeuft, Rang 357, `Contracts/Tracking`).
+
+Nachzumessen beim naechsten Lauf: Steht in `data/aktionen.txt` ein
+Incite-Violence-Abschnitt von **60 Sekunden**? Und faellt die Zahl der
+Incite-Abschnitte je Stunde deutlich unter die 18 aus diesen 21 Minuten?
+Bleibt beides aus, greift das Festhalten nicht und die Zeilen gehoeren
+zurueckgenommen.
+**VERIFIZIERT (30.08., 07:58). Der Fix traegt.**
+
+Erster Abschnitt nach dem Neustart um 07:49:47:
+
+    07:49:52   62,0 s  General/Incite Violence   | Vertragsvorrat leer
+    07:50:54   65,0 s  Contracts/Retirement      | Vertrag
+    ... bis 07:58:34 KEIN weiteres Incite Violence ...
+
+**Verifiziert: 62 Sekunden um 07:49:52** - der erste vollstaendige Durchlauf
+ueberhaupt, gegen 18 Abbrueche zwischen 11 und 46 Sekunden davor. Und
+entscheidend: In den folgenden **neun Minuten kein einziges Incite Violence
+mehr**. Ein fertiger Durchlauf hat gereicht, den Vorrat wieder zu fuellen -
+genau wie `Bladeburner.ts:1219-1225` es vorsieht. Der Zweiminutenzyklus ist
+durchbrochen.
+
+Nebenbefund: Um 07:55 waehlte der Motor `General/Field Analysis` mit dem Grund
+"Schaetzung verdeckt Investigation (0.34-1.00 gegen 0.85)" - er prueft also
+erstmals eine **Operation**. Das ist die Lage, auf die der am selben Morgen
+geschlossene Bevoelkerungs-Punkt gewartet hat; Investigation traegt allerdings
+keinen Zuschlag (`Bladeburner.ts:812-818`).
+
+Offen bleibt die Rangrate: 357,6 -> 365,2 in 8,7 Minuten sind **52 Rang/h**,
+weiterhin weit unter den 280 von 07:20. In diesem Fenster liefen 61 Prozent
+der Zeit rangfreie Aktionen (Kammer 197 s, Field Analysis 64 s, Incite 62 s
+von 530 s). Das ist Aufbauarbeit nach der Vorratskrise und kein Fehler - aber
+wenn die Rate in zwei Stunden nicht wieder vierstellig gegen die 280 laeuft,
+gehoert der Arbeitsanteil neu untersucht.
+
+---
+
 ### `beste()` preist das Chaos, aber nicht die Bevoelkerung (12:55)
 
 Gemessen: New Tokyo popEst **1.532 Mio um 11:03 -> 223 Mio um 12:40**.

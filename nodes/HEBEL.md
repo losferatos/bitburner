@@ -8,6 +8,48 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Ausdauer-Paar geprueft: die Selbstregelung greift, kein Eingriff (30.08., 06:55)
+
+**Engpass im Vollbetrieb.** Seit `blade.js` um 06:26 wieder traegt, frisst die
+Regenerationskammer **36 Prozent** der Zeit (erste 4,8 min, 10 Abschnitte).
+Das ist der groesste Einzelposten neben der Arbeit selbst - und damit die
+Frage, ob die Ausdauer-Faehigkeiten richtig bewertet werden.
+
+**Die Regeneration haengt am Maximum, und Cyber's Edge wirkt doppelt.**
+`Bladeburner.ts:1317-1325`:
+
+    maxStaminaBonus = maxStamina / 70000                  (`data/Constants.ts:6`)
+    gain = (0,0085 + maxStaminaBonus) * effAgi^0,17
+           * getSkillMult(Stamina) * mults.bladeburner_stamina_gain
+
+Der Skill-Multiplikator steht einmal explizit im Produkt und ein zweites Mal
+implizit im `maxStamina`, das er selbst gehoben hat. Der Kommentar in
+`src/blade.js:816-840` hat das schon korrekt hergeleitet.
+
+**Die Gewichtung stimmt.** `(1 - ausdauerLuft())`, und bei Ausdauer 22,4 von
+42,6 (52,6 Prozent) ist `ausdauerLuft() = 0,065`, das Gewicht also **0,934** -
+fast voll. Gerechnet gegen die Konkurrenz, Stand 06:51:
+
+    Short-Circuit     St.3   0,590 je Punkt
+    Cyber's Edge      St.1   0,459 je Punkt   <- naechster Kauf
+    Tracer            St.3   0,446
+    Digital Observer  St.3   0,446
+    Blade's Intuition St.2   0,404
+
+Cyber's Edge liegt auf Platz zwei und wird gekauft, sobald genug Punkte da
+sind (2 von 4 um 06:51). Dass es waehrend des Wiederaufbaus auf Stufe 1
+stehenblieb, war **richtig**: Der Spieler war im Gym, die Ausdauer voll, der
+Nutzen also null. Genau die Selbstregelung, die der Kommentar von 05:40
+beschreibt - Overclock treibt, bis die Ausdauer knapp wird, dann uebernimmt
+Cyber's Edge.
+
+**Kein Eingriff.** Die Mechanik ist geprueft und arbeitet wie hergeleitet.
+
+**Nachmessung fuer den naechsten Lauf:** Steht Cyber's Edge dann auf Stufe 2
+und ist der Kammeranteil unter 36 Prozent gefallen, ist die Kette vollstaendig
+belegt. Steht es noch auf 1, obwohl Punkte da waren, greift die Sortierung
+nicht - dann ist es ein Befund.
+
 ## Der Sleeve kam nie ans Ziel - zwei Fehler, gemeinsam ein Faktor 25 (30.08., 06:25)
 
 **Engpass:** Der Sleeve liefert den gesamten Rang, solange der Spieler im

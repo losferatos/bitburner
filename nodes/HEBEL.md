@@ -8,6 +8,64 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Der Wiederaufbau kostet 3,1 h, nicht 11,3 - die Kursrechnung steht auf der falschen Zahl (30.08., 12:30)
+
+**Engpass.** Waehrend des Wiederaufbaus nach einem Einbau liefert nur der
+Sleeve Rang: gemessen 82,1 Rang/h ueber 1,96 h (Waechterreihe 09:54-11:52,
+Rang 395 -> 556) gegen 253,8 im Vollbetrieb. Der Wiederaufbau ist damit der
+teuerste einzelne Zustand des Knotens - und seine Dauer ist die Zahl, an der
+jede Einbau-Entscheidung haengt.
+
+**Befund: Die Dauer ist um Faktor 3,6 kleiner als angenommen.**
+
+Der Verlauf des heutigen Einbaus (`data/verlauf-strategie.json`):
+
+    09:21   Tiefstand   1
+    09:55               60      34 min fuer 59 Punkte
+    11:43               93     108 min fuer 33 Punkte
+    12:24               99      41 min fuer  6 Punkte
+
+Von 1 auf 100 also **3,1 Stunden**. Der Einbau der Nacht (29.08. 19:05 bis
+30.08. 06:26) brauchte **11,3 Stunden** - bei einem Erfahrungs-Multiplikator
+von 1,548 gegen heute 1,762. Die 14 Prozent Unterschied im Multiplikator
+erklaeren Faktor 1,14, nicht 3,6.
+
+**Die naheliegende Erklaerung ist geprueft und ausgeschlossen.**
+`node tools/rueckstand.js` um 12:26: *Tempo 1,000, Rueckstand 0,0 min, Trend
++0,0 min je Stunde ueber 26,3 h.* Der Tab war also nicht gedrosselt, das
+Spiel lief die Nacht synchron zur Uhr. Die naechtliche Langsamkeit ist real,
+nicht gemessen-langsam.
+
+**Was das fuer den Kurs heisst.** `nodes/KURS.md` (30.08., 07:20) begruendet
+die Entscheidung *kein Einbau* mit: "Ein Einbau kostet den
+Kampfwert-Wiederaufbau (heute Nacht 11,3 h gemessen) = rund 2.800 Rang".
+Mit 3,1 h sind es **rund 780 Rang** - ein Viertel. Ein Einbau ist damit
+deutlich attraktiver, als der Kurseintrag annimmt. Die Zahl gehoert beim
+naechsten Kurslauf korrigiert; dieser Loop aendert `KURS.md` nicht.
+
+**Kein Eingriff in dieser Runde**, weil die Ursache offen ist und ein
+Parameter, dessen Ursache man nicht kennt, kein Hebel ist. Zwei Kandidaten,
+beide ungeprueft:
+
+1. **Die Stoerungen der Nacht.** Der Sleeve stand ab 22:28 still, `blade.js`
+   kaufte im Ausweichzweig keine Faehigkeiten (behoben 22:25), und der
+   Rechner wurde um 06:13 neu gestartet. Der Wiederaufbau kann davon
+   betroffen gewesen sein, ohne dass es im Tempo sichtbar wird.
+2. **Die Gym-Rotation.** Das Gym trainiert genau einen Stat
+   (`Work/Formulas.ts`), der Tiefstand ist das Minimum ueber vier. Wie der
+   Motor rotiert, entscheidet also ueber die Gesamtdauer - eine ungleiche
+   Rotation kostet Faktor bis 4. Im Verlauf von heute wechselte er
+   str/def/dex/agi sichtbar durch; ob das in der Nacht auch so war, ist
+   nicht protokolliert.
+
+Vorher:  11,3 h angenommen (Kurs 07:20)
+Nachher: 3,1 h gemessen (30.08., 09:21-12:24)
+Naechste Pruefung: Beim naechsten Einbau die Zeit von Tiefstand 1 bis 100
+   protokollieren. Liegt sie wieder bei rund 3 h, war die Nacht der
+   Ausreisser und die Kurszahl gehoert dauerhaft auf 3 h. Liegt sie bei 11,
+   ist heute der Ausreisser und Kandidat 1 oder 2 traegt.
+Commit: (siehe unten)
+
 ## Ausdauer-Paar geprueft: die Selbstregelung greift, kein Eingriff (30.08., 06:55)
 
 **Engpass im Vollbetrieb.** Seit `blade.js` um 06:26 wieder traegt, frisst die

@@ -122,6 +122,62 @@ keine
 
 ## Offen, nach Dringlichkeit
 
+### Sleeve-Shock steht nach dem Einbau auf 99,9 - Recovery lohnt trotzdem nicht (30.08., 12:15)
+
+Gemessen: `data/sleevediag.json` um 09:56: **shock 99,9**. Gestern vor dem
+          Einbau waren es 82,2.
+
+Ursache:  Kein Fehler, sondern Mechanik. Die Reset-Routine des Sleeve setzt
+          `this.shock = 100` (`PersonObjects/Sleeve/Sleeve.ts:251`). Jeder
+          Augmentierungs-Einbau wirft den Sleeve also auf Vollschock zurueck.
+
+Wirkung:  `shockBonus() = (100 - shock) / 100` (`Sleeve.ts:173-175`), bei 99,9
+          also **0,001**. Der Sleeve bekommt ein Promille seiner
+          Erfahrungsgewinne - seine Kampfwerte stagnieren praktisch, und damit
+          auch seine Erfolgschance.
+
+          **Wichtig, damit niemand falsch schliesst:** Der Rang fuer den
+          Spieler haengt NICHT am Shock. `SleeveBladeburnerWork.process:53`
+          ruft `Player.bladeburner.completeAction(...)` ungedaempft; nur die
+          Zeile danach skaliert die Gewinne des Sleeve mit `shockBonus()`.
+          Der Sleeve liefert also weiter vollen Rang - er entwickelt sich nur
+          nicht mehr.
+
+**Shock Recovery ist gerechnet und verworfen (12:15).**
+
+Die beiden Abbauraten stehen im Quellcode und unterscheiden sich um **genau
+Faktor 2**:
+
+    Arbeiten (jede Aufgabe)   shock -= 0,0001 * intBonus * cyclesUsed   (`Sleeve.ts:269-272`)
+    Shock Recovery            shock -= 0,0002 * intBonus * cycles       (`SleeveRecoveryWork.ts:13-16`)
+
+Bei rund 5 Zyklen je Sekunde (`CyclesPerSecond = 1000 / MilliPerCycle`,
+`Sleeve.ts:265`) sind das 1,8 gegen 3,6 Shock je Stunde. Von 99,9 auf 0:
+
+    arbeitend    55 h   - nebenbei, kostet nichts
+    Recovery     28 h   - und in der Zeit **kein Rang**
+
+Recovery spart 27 Stunden Shock, kostet aber 28 Stunden Rangarbeit. Bei der
+im Vollbetrieb gemessenen Sleeve-Leistung ist das ein vierstelliger
+Rangverlust fuer einen Vorteil, den der Sleeve beim Arbeiten ohnehin
+einsammelt. **Nicht machen** - der Shock baut sich von allein ab, nur halb so
+schnell, und Arbeiten bringt zusaetzlich Rang.
+
+Das passt zur bereits entschiedenen Frage "Sleeve: sync hochziehen -
+verworfen" (`## ENTSCHIEDEN`, 29.08. 06:55): Stillstand kostet mehr als der
+Zustand wert ist.
+
+Offen bleibt eine kleinere Frage: **`takeDamage` erhoeht den Shock um 0,5,
+wenn die HP des Sleeve auf 0 fallen** (`Sleeve.ts:565-568`). Gegen 1,8 Abbau
+je Stunde heisst das: Stirbt der Sleeve oefter als **3,6 mal je Stunde**,
+steigt sein Shock netto an statt zu fallen. Der Sleeve hat 10/10 HP. Zu
+messen, sobald `blade.js` wieder traegt: Wie oft faellt er? Steht die Rate
+darueber, ist die Kontraktwahl fuer den Sleeve zu riskant - dann waere eine
+Schwelle auf die Erfolgschance faellig, nicht auf den Vorrat.
+
+Dringlichkeit: niedrig fuer den Shock selbst (er baut sich ab), mittel fuer
+          die Todesrate - die ist ungemessen und koennte den Abbau umkehren.
+
 ### Sleeve stand still, weil die Vorratsschwelle keinen Abschluss ueberlebt (30.08., 10:00)
 
 Eric hat es zweimal im Spiel gesehen (09:53 und 09:56) - beide Male meldete
@@ -280,6 +336,19 @@ Verdacht: Kein Fehler, eine fehlende Route. Hashes entstehen nur auf
 
 Dringlichkeit: niedrig, aber nicht vergessen. Die BitNode-Reihenfolge steht
           fest; dieser Punkt wird geprueft, wenn SF9 vorliegt.
+
+
+**Nachmessung 12:10 - der Rueckfall wurde nicht ausgeloest, und das ist
+selbst ein Befund.** `sleeve.json` meldet um 12:09:41 `contract:Tracking`,
+der Vorrat reicht also. Grund: Der Spieler ist seit dem Einbau im Gym und
+verbraucht **keine** Kontrakte - der Sleeve allein leert den Vorrat nicht.
+Der natuerliche Zuwachs (rund 30 je Stunde und Art) traegt ihn.
+
+Damit ist die Ausgangsannahme des Punktes zu praezisieren: Der Engpass
+entsteht erst, wenn Spieler **und** Sleeve gleichzeitig fressen - also nach
+dem Wiederaufbau, sobald `blade.js` wieder traegt. Bis dahin bleibt der
+Rueckfall ungetestet. Naechste Gelegenheit ist der Moment, in dem der
+Kampfwert-Tiefstand 100 erreicht.
 
 ### Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
 

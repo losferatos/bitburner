@@ -8,6 +8,55 @@ Jeder Eintrag braucht drei Zahlen — vorher, nachher, und wie lange dazwischen
 gemessen wurde. Ein Eintrag ohne Nachher-Messung ist kein Ergebnis, sondern eine
 offene Wette.
 
+## Der Sleeve kam nie ans Ziel - zwei Fehler, gemeinsam ein Faktor 25 (30.08., 06:25)
+
+**Engpass:** Der Sleeve liefert den gesamten Rang, solange der Spieler im
+Wiederaufbau steht. Ueber Nacht fiel die Rangrate von 14,4/h (29.08., ueber
+2,16 h gemessen) auf **4,4/h** - Rang 65 auf 99 in 7,7 h Spielzeit. Eric sah
+im Spiel "Idle", die Telemetrie meldete `contract:Tracking`.
+
+**Die Telemetrie konnte es nicht sehen.** `sleeve.js` schreibt den eigenen
+Merker (`gesetzt` = Rueckgabewert von `setToBladeburnerAction`) statt
+`getTask` - ein RAM-Verzicht, im Dateikopf begruendet. Ein Wegwerfskript
+(`src/sleevediag.js`) hat den echten Zustand gelesen, und der zeigte zwei
+unabhaengige Fehler.
+
+**Fehler 1: Das Setzen warf den Fortschritt weg.**
+`Sleeve.bladeburner()` ruft ausnahmslos `startWork(new
+SleeveBladeburnerWork(...))` (`Sleeve.ts:488-540`) - `cyclesWorked` faellt
+also auf 0, auch wenn dieselbe Aktion schon lief. Bei `TAKT = 60000` und
+`cyclesNeeded` 70 setzte `sleeve.js` den Sleeve zurueck, bevor er fertig
+wurde, sobald der Tab gedrosselt war und Setzen und Verarbeiten in dieselbe
+Nachhol-Runde fielen.
+
+    gemessen 06:15   cyclesWorked 15 von 70,  tasksCompleted 0
+
+**Fehler 2: Die knappste Kontraktart wurde genommen.** Die feste Reihenfolge
+nahm die erste Art mit Vorrat >= 1:
+
+    gemessen 06:22   Tracking 3,2 | Bounty Hunter 8,2 | Retirement 96,3
+
+Er bekam Tracking, verbrauchte die letzten drei und wurde vom Spiel gestoppt
+(`SleeveBladeburnerWork.ts:44-47`), bis der naechste Takt 60 Sekunden spaeter
+neu setzte. Nachschub sind rund 30 Stueck je Stunde und Art
+(`Bladeburner.ts:1387`); ein Sleeve verbraucht bei 14 s je Aktion bis zu 257.
+Die knappste Art ist damit immer knapp.
+
+**Behoben, beide in `src/sleeve.js`:** `getTask` (4 GB) verhindert das
+Neusetzen einer laufenden Kontraktaktion; die Arten werden nach Vorrat
+sortiert und die ergiebigste genommen.
+
+**Verifiziert:**
+
+    06:20   task Retirement, tasksCompleted 32 (vorher 0), Vorrat 96,3 -> 83,1
+    06:24   Rang 119 gegen 99 um 06:13 - 20 Rang in 11 Minuten
+
+Die 109 Rang/h aus dem kurzen Fenster sind **nicht** die belastbare Rate: Der
+Tab wurde gerade aktiv, das Spiel holt gedrosselte Zyklen schubweise nach.
+Belastbar ist der Strukturbeweis `tasksCompleted 32 statt 0` - vorher schloss
+der Sleeve **gar keine** Aktion ab. Die geglaettete Rate misst der naechste
+Lauf ueber mindestens 45 Minuten.
+
 ## KONTRAKT_MIN_KAMPF misst den Tiefstand, die Aktion misst gewichtet (30.08., 00:55)
 
 **Engpass:** Der Sleeve liefert derzeit den gesamten Rang (14,4/h, gemessen

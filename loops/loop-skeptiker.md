@@ -34,61 +34,86 @@ prueft: Wer eine Aenderung geschrieben hat, prueft sie mit denselben
 Annahmen, aus denen der Fehler entstand. Ein Subagent startet ohne diesen
 Kontext. Das ist nicht Bequemlichkeit, das ist der Wirkmechanismus.
 
+## Was er kosten darf
+
+Der Loop laeuft **alle sechs Stunden**, nicht haeufiger, und startet in den
+meisten Laeufen **gar keinen** Subagenten - weil nichts Ungepruftes da ist.
+Das ist Absicht: Die erste Fassung sah drei Agenten alle zwei Stunden vor,
+das waeren bei den heute gemessenen Agentengroessen rund **fuenf Millionen
+Token am Tag** gewesen. Erics Einwand vom 30.08.: zu teuer.
+
+Die Rechnung jetzt: vier Laeufe am Tag, davon vielleicht einer mit einem
+eng beauftragten Agenten auf einen konkreten Diff - Groessenordnung 50.000
+bis 80.000 Token. **Unter 100.000 am Tag statt fuenf Millionen.**
+
+Wer das teurer macht, muss es begruenden. Der Loop ist ein Netz, keine
+Qualitaetssicherung: Die eigentliche Pruefung passiert beim Bauen, und dort
+darf sie kosten, weil sie gezielt ist.
+
 ## Ablauf
 
-**1. Was ist seit dem letzten Lauf passiert?**
+**1. Gibt es ueberhaupt etwas zu pruefen?**
 
 ```
 date
 cd /c/Users/erche/Desktop/claude_projecto/bitburner
 cat data/skeptiker-stand.txt 2>/dev/null || echo "(erster Lauf)"
-git log --oneline --stat "$(cat data/skeptiker-stand.txt 2>/dev/null || echo 'HEAD~10')..HEAD" -- src/ tools/
+git log --format="%h %s" "$(cat data/skeptiker-stand.txt 2>/dev/null || echo HEAD~20)..HEAD" -- src/ tools/wache.js tools/aufsicht.js
 ```
 
-Interessant sind **nur Aenderungen an Code, der unbeaufsichtigt weiterlaeuft**
-— also alles unter `src/`, dazu `tools/wache.js` und `tools/aufsicht.js`.
-Aenderungen an `nodes/*.md` sind Dokumentation und nicht dein Thema; die
-prueft der Kursloop, wenn er die Zahlen benutzt.
+**Zwei Filter, und beide sind streng — der Loop soll billig sein:**
 
-Ist seit dem letzten Lauf nichts an diesen Dateien geaendert worden: nichts
-tun, Stand fortschreiben, Turn beenden. Ein Skeptiker ohne Angriffsziel ist
-kein Skeptiker.
+- **Nur Code, der unbeaufsichtigt weiterlaeuft.** Also `src/` sowie
+  `tools/wache.js` und `tools/aufsicht.js`. Alles andere ist nicht sein
+  Thema: `nodes/*.md` ist Dokumentation, die uebrigen `tools/` laufen nur,
+  wenn jemand sie aufruft.
+- **Nur Commits ohne `[skeptiker]` in der Betreffzeile.** Wer eine Aenderung
+  baut und dabei schon einen Skeptiker angesetzt hat, schreibt `[skeptiker]`
+  in den Commit-Betreff. Dieser Loop ueberspringt solche Commits — er ist
+  das Netz fuer **Vergessenes**, nicht die zweite Instanz fuer Geprueftes.
 
-**2. Drei Subagenten, drei getrennte Angriffswinkel.**
+Bleibt danach nichts uebrig: **Stand fortschreiben, Turn beenden, keinen
+Subagenten starten.** Das ist der Normalfall und soll es sein.
 
-Starte sie **parallel** in einem Zug. Jeder bekommt: die geaenderten
-Codestellen (Datei und Zeilen aus `git show`), den Auftrag **Schwachstellen
-zu finden statt zu bestaetigen**, und den Hinweis, dass der vollstaendige
-Spielquellcode unter `reference/bitburner-src/src/` liegt (v3.0.2).
+**2. EIN Subagent, drei Winkel, enger Auftrag.**
 
-**Jedem Subagenten ausdruecklich mitgeben: nichts schreiben.** Kein
+Nicht drei Agenten — einer. Und er bekommt den **konkreten Diff**
+(`git show <hash> -- src/`), nicht den Auftrag, sich selbst umzusehen. Ein
+breit beauftragter Pruefagent kostet leicht 200.000 Token; einer, der eine
+Handvoll geaenderter Zeilen gegen den Quellcode haelt, kostet einen Bruchteil.
+
+*Warum trotzdem ein Subagent und nicht du selbst:* Wer eine Aenderung
+geschrieben hat, prueft sie mit denselben Annahmen, aus denen der Fehler
+entstand. Der fremde Blick ist der Wirkmechanismus. Aber ein fremder Blick
+auf zwanzig Zeilen genuegt dafuer.
+
+**Der Auftrag an ihn — woertlich diese drei Winkel, in dieser Reihenfolge:**
+
+*A — Die Rechnung.* Jede Zahl in der Aenderung und in ihrem Kommentar gegen
+den Quellcode (`reference/bitburner-src/src/`, v3.0.2) nachrechnen. **Die
+Formel als ausfuehrbaren Code nachbauen und gegen einen unabhaengig
+bekannten Wert eichen** — erst dann gilt sie. Besonders: Lesen zwei
+aufeinanderfolgende Aufrufe denselben oder den schon veraenderten Zustand?
+Sind zwei Raten Alternativen oder kumulativ? Ist ein aehnlich benanntes Feld
+verwechselt worden? Fehlt ein Multiplikator des aktuellen BitNode
+(`BitNode/BitNode.tsx`)?
+
+*B — Zeit und Takt.* Welche Uhr misst die Aenderung, und laeuft die
+beobachtete Sache in derselben? Was bei gedrosseltem Tab (die Engine
+verarbeitet dann hoechstens 5 Spielsekunden je Tick), was beim Nachholen nach
+Offline-Zeit (bis 25-fach), was nach einem Neustart? Und: Kollidiert ein
+neuer Takt mit einer fremden Abschlussbedingung — wird etwas neu gesetzt,
+kurz bevor es fertig geworden waere?
+
+*C — Der Zustand.* Was tut die Aenderung, wenn ihre Daten veraltet oder leer
+sind? Vorrat null, HP null, Puffer voll, Rueckgabewert `true` ohne Wirkung.
+Und: Ist die Zahl, mit der die Aenderung begruendet wurde, ueberhaupt eine
+Rate — oder speist sie sich aus einem Vorrat, der sich erschoepft?
+
+**Dem Subagenten ausdruecklich mitgeben: nichts schreiben.** Kein
 `pushFile`, keine Aenderung an Projektdateien, kein Eingriff ins laufende
-Spiel. Nur lesen, rechnen, berichten.
-
-*Winkel A — Die Rechnung.* Jede Zahl in der Aenderung und in ihrem Kommentar
-gegen den Quellcode nachrechnen. **Die Formel als ausfuehrbaren Code
-nachbauen und gegen einen unabhaengig bekannten Wert eichen** (ein Feld aus
-dem Spielstand, eine gemessene Dauer) — erst dann gilt sie. Besonders pruefen:
-Lesen zwei aufeinanderfolgende Aufrufe denselben oder den schon veraenderten
-Zustand? Sind zwei Raten Alternativen oder kumulativ? Ist ein aehnlich
-benanntes Feld verwechselt worden? Fehlt ein Multiplikator der laufenden
-Umgebung (in Bitburner: `BitNode/BitNode.tsx`, der `case` des aktuellen
-Knotens)?
-
-*Winkel B — Zeit und Takt.* Welche Uhr misst die Aenderung, und laeuft die
-beobachtete Sache in derselben? Was passiert bei gedrosseltem Hintergrundtab
-(die Engine verarbeitet dann hoechstens 5 Spielsekunden je Tick), was beim
-Nachholen nach Offline-Zeit (bis zu 25-fach), was nach einem Neustart des
-Werkzeugs? Greift die Aenderung dann noch, greift sie zu oft, oder gar nicht?
-Und: Kollidiert ein neuer Takt mit einer fremden Abschlussbedingung — wird
-etwas neu gesetzt, kurz bevor es fertig geworden waere?
-
-*Winkel C — Der Zustand.* Was tut die Aenderung, wenn die Daten, auf die sie
-sich stuetzt, veraltet oder leer sind? Vorrat null, HP null, Puffer voll,
-Datei aelter als der Takt, Rueckgabewert `true` ohne dass etwas passiert ist.
-Und die Gegenfrage: Ist die **gemessene Zahl**, mit der die Aenderung
-begruendet wurde, ueberhaupt eine Rate — oder speist sie sich aus einem
-Vorrat, der sich erschoepft?
+Spiel. Nur lesen, rechnen, berichten. Und: nur belegte Einwaende, keine
+Bedenken ins Blaue.
 
 **3. Synthetisieren, nicht durchreichen.**
 

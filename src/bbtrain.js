@@ -265,8 +265,6 @@ async function runde(ns) {
       await ns.sleep(60000);
       continue;
     }
-    letzterGrund = "";
-
     const laeuft = ns.singularity.getCurrentWork();
     if (laeuft && laeuft.type === "GRAFTING") {
       if (letzterGrund !== "graft") {
@@ -276,6 +274,14 @@ async function runde(ns) {
       await ns.sleep(60000);
       continue;
     }
+    // DAS ZURUECKSETZEN GEHOERT HINTER DEN GRAFT-ZWEIG (31.08.2026, 02:45,
+    // Skeptiker-Restbefund 3). Es stand davor - damit war
+    // `letzterGrund !== "graft"` in JEDER Runde wahr und die Drosselung tot.
+    // `sag()` schreibt auch ins Terminal: bei einem Graft von 2 Stunden
+    // rund 120 Zeilen statt einer, mal 38 Stuecke des Pakets. Der
+    // "arm"-Zweig darueber funktionierte nur, weil er vor dieser Zeile
+    // `continue`t.
+    letzterGrund = "";
     const trainiertSchon = laeuft && laeuft.type === "CLASS"
       && laeuft.classType === schlechtester
       && (!laeuft.location || laeuft.location === gym);

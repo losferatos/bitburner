@@ -143,7 +143,18 @@ bei Zweifel loeschen. Praktisch selten (ohne SF4 fallen alle Riegel
 gleichzeitig aus), aber die Begruendung fuehrt die naechste Aenderung in die
 falsche Richtung.
 
-**3. `src/bbtrain.js:268`: die Drosselung der Graft-Meldung ist tot.**
+**3. GEAENDERT 02:45, im laufenden Prozess noch NICHT aktiv.
+`src/bbtrain.js:268`: die Drosselung der Graft-Meldung war tot.**
+
+Behoben durch Verschieben von `letzterGrund = ""` hinter den Graft-Zweig.
+**Bewusst KEIN Neustart ueber `data/reload.txt`:** Der reload-Kanal ist ein
+KILL, und ein Neustart mitten im 40-Stunden-Graftpaket waere mehr Risiko
+als der Terminalspam kostet. Der Punkt ist ohnehin am Verschwinden - der
+Tiefstand steht seit 02:15 bei 168 gegen ZIEL 100 und steigt mit jedem
+Graft weiter, `bbtrain.js` verlaesst seine Warteschleife also nicht mehr.
+Die Fassung greift beim naechsten natuerlichen Start (BitNode-Wechsel).
+
+*Alter Befundtext:*
 `letzterGrund = ""` steht in jeder Runde unmittelbar VOR dem Graft-Zweig, also
 ist `letzterGrund !== "graft"` immer wahr. `sag()` ruft `ns.tprint` - bei
 einem Zwei-Stunden-Graft rund 120 Terminalzeilen statt einer, und das fuer

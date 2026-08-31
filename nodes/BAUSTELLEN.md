@@ -133,7 +133,18 @@ Zwischen der Pruefung (`:736-741`) und `installAugmentations` (`:1173`) liegen
 ist beim Ausfuehren also veraltet. Das Fenster ist klein, aber der Einsatz ist
 bis $450 Mrd - die Pruefung gehoert unmittelbar vor den Aufruf wiederholt.
 
-**2. `src/graft.js:63`: der Kommentar begruendet den Riegel verkehrt herum.**
+**2. ERLEDIGT 03:15 (Commit `[skeptiker] graft.js: im Zweifel Marker
+loeschen`). `src/graft.js:63` begruendete den Riegel verkehrt herum.**
+
+`&& !raus.fehler` entfernt: Der Marker wird jetzt geloescht, sobald der
+Besitz nicht positiv bestaetigt ist. Die Asymmetrie traegt die Entscheidung -
+ein faelschlich stehender Marker kostet bis $450 Mrd (blade.js riegelt nicht,
+`Bladeburner.startAction` toetet das Graft in 1 s), ein faelschlich fehlender
+rund 8.000 Rang ueber das ganze Paket, also 2 Prozent des Wegs.
+`graft.js` wird bei jedem Treiberlauf frisch gestartet, die Fassung ist also
+ab dem naechsten Stueck aktiv - kein Neustart noetig.
+
+*Alter Befundtext:*
 `blade.js:2971` liest `graftRiegel = !ns.fileExists(...)` - **Marker
 vorhanden heisst Riegel AUS, Marker geloescht heisst Riegel SCHARF.** Der
 Kommentar behauptet, Loeschen wuerde ihn abschalten. Die Bedingung

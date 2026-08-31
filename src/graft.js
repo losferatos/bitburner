@@ -57,10 +57,21 @@ export async function main(ns) {
   // (`Bladeburner.ts:177-180`). Bei fuenfzehn geplanten Knoten ist das eine
   // Mine mit Datum.
   //
-  // Nur loeschen, wenn der Besitz auch wirklich geprueft werden konnte -
-  // sonst wuerde ein Fehler beim Lesen den Riegel abschalten statt ihn zu
-  // schaerfen.
-  if (!habeSimulacrum && !raus.fehler && ns.fileExists(MARKER, "home")) {
+  // KORRIGIERT (31.08.2026, 03:15, Skeptiker-Restbefund 2). Hier stand
+  // `&& !raus.fehler` mit der Begruendung, ein Lesefehler duerfe den Riegel
+  // nicht abschalten. Die Begruendung war genau verkehrt herum:
+  // `blade.js` liest `graftRiegel = !ns.fileExists(MARKER, "home")` -
+  // **Marker vorhanden heisst Riegel AUS, Marker geloescht heisst Riegel
+  // SCHARF.** Die alte Bedingung liess also bei einem Lesefehler einen
+  // veralteten Marker stehen und schaltete den Riegel damit ab.
+  //
+  // Die Asymmetrie entscheidet: Steht der Marker faelschlich (Simulacrum
+  // weg, etwa im naechsten BitNode), riegelt blade.js nicht und
+  // `Bladeburner.startAction` toetet jedes Graft in rund einer Sekunde -
+  // bis zu $450 Mrd, ohne Erstattung. Fehlt er faellschlich, haelt blade.js
+  // waehrend der Grafts still: rund 8.000 Rang ueber das ganze Paket, also
+  // 2 Prozent des Wegs zu 400.000. Im Zweifel wird deshalb geloescht.
+  if (!habeSimulacrum && ns.fileExists(MARKER, "home")) {
     try { ns.rm(MARKER, "home"); } catch { /* dann bleibt er stehen */ }
   }
   raus.simulacrum = habeSimulacrum;

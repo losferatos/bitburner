@@ -36,8 +36,19 @@ Kalenderzeit wäre um den Faktor der Ausschaltzeit zu niedrig und meldete
 Frage *„wann ist es soweit"* die **Kalenderzeit**, für die Frage *„läuft es
 gut"* die **Spielzeit**.
 
-Ist die Brücke tot (`URTEIL: BLIND`), einmal `node tools/aufsicht.js` — das
-startet Brücke und Wächter idempotent nach — und den Prüflauf wiederholen.
+Ist die Brücke tot (`URTEIL: BLIND`), starte **nur sie**:
+
+```bash
+cd /c/Users/erche/Desktop/claude_projecto/bitburner && node sync/bridge.js > "$TEMP/bridge.log" 2>&1 &
+```
+
+Danach fünf Sekunden warten und den Prüflauf wiederholen.
+
+**Nicht `node tools/aufsicht.js` nehmen.** Das würde den residenten Wächter
+`tools/wache.js` mitstarten, und der gehört zur alten Betriebsart: Er meldet
+per ntfy aufs Handy, wenn der Bot stillsteht — was im neuen Modell der
+Normalfall ist, sobald Eric den Rechner ausmacht. Beide wurden am 31.08.
+beendet; die Brücke läuft weiter, weil `checkin.js` sie braucht.
 
 ## 2. Nach dem Urteil handeln
 

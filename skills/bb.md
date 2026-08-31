@@ -1,6 +1,6 @@
 ---
-name: bb-check
-description: Der Besuch beim Bitburner-Bot alle paar Tage — steht der BitNode-Wechsel an, und läuft noch alles in die richtige Richtung? Nutzen bei /bb-check und wenn Eric fragt „können wir schon resetten", „wie steht's im Bot", „läuft der noch richtig", „sind wir noch on track". NICHT nutzen zum Aufsetzen von Dauerloops (das war /bb-loops, seit 31.08.2026 abgeschafft) und nicht für Umbauten am Bot — dafür sagt Eric ausdrücklich Bescheid.
+name: bb
+description: Der Besuch beim Bitburner-Bot alle paar Tage — steht der BitNode-Wechsel an, und läuft noch alles in die richtige Richtung? Nutzen bei /bb und wenn Eric fragt „können wir schon resetten", „wie steht's im Bot", „läuft der noch richtig", „sind wir noch on track". NICHT nutzen zum Aufsetzen von Dauerloops (das war /bb-loops, seit 31.08.2026 abgeschafft) und nicht für Umbauten am Bot — dafür sagt Eric ausdrücklich Bescheid.
 ---
 
 # Bitburner: der Check-in
@@ -59,6 +59,7 @@ beendet; die Brücke läuft weiter, weil `checkin.js` sie braucht.
 | `ZAEH` | Die ETA ist gegenüber dem letzten Besuch **gestiegen**. Nachsehen, woran (Abschnitt 4), aber nichts umbauen. |
 | `STEHT` | Der Rang bewegt sich nicht. Erst `node tools/rueckstand.js` — hängt das Spiel nur der Uhr hinterher, ist nichts kaputt. Sonst Abschnitt 4. |
 | `HILFE` | Der Bot hat selbst `data/hilfe.txt` geschrieben. Den Text lesen und Eric sagen, was er bedeutet. |
+| `ACHTUNG`-Zeile im Bericht | Der Rang liegt über 400.000, aber die Liste der offenen Black Ops war nicht lesbar (`blade.js` läuft gerade nicht, z. B. direkt nach einem Einbau). Nicht raten: im Spiel nachsehen oder eine Minute später erneut messen, dann behandeln wie `RESET BEREIT`. |
 | `SPIEL ZU` | Kein Fehler. Eric sagen, dass der Tab zu ist — mehr nicht. |
 | `BLIND` | Brücke starten (oben), dann neu messen. |
 
@@ -130,14 +131,21 @@ Verabredung mit Eric, nicht Teil dieses Besuchs.
 **Höchstens 5 Stichpunkte**, keine Vorrede, keine Tabellen:
 
 1. Wo wir stehen (Knoten, Rang absolut gegen 400.000, offene Black Ops)
-2. ETA in Kalenderzeit, und ob sie seit dem letzten Besuch gestiegen oder
-   gefallen ist
-3. Was der Bot gerade tut
-4. Nur falls vorhanden: was schiefläuft und was es heißt
-5. Nur falls `RESET BEREIT`: die Rückfrage aus Abschnitt 3
+2. Was der Bot gerade tut
+3. Nur falls vorhanden: was schiefläuft und was es heißt
+4. Nur falls `RESET BEREIT`: die Rückfrage aus Abschnitt 3
 
-Läuft alles, sind drei Zeilen genug. Ein knapper Check-in ist ein gutes
-Ergebnis, kein langweiliges.
+**Und als LETZTE Zeile, immer und ohne Ausnahme, die Fertig-Schätzung.**
+`checkin.js` gibt sie als `FERTIG VORAUSSICHTLICH:` aus — übernimm sie als
+Kalenderdatum, nicht als Stundenzahl, und stell sie ans Ende. Erics Ansage vom
+31.08.2026: *„am Ende vom /bb soll die aktuelle Schätzung kommen, wann der BN
+fertig sein wird."* Sie steht auch dann da, wenn das Fenster für eine frische
+Rate nicht reichte — dann eben mit der letzten bekannten Rate und dem Vermerk
+dazu. Eine weggelassene Schätzung ist keine ehrlichere Antwort, nur eine
+unbequemere.
+
+Läuft alles, sind drei Zeilen plus die Schlusszeile genug. Ein knapper Besuch
+ist ein gutes Ergebnis, kein langweiliges.
 
 ## Was dieser Skill NICHT tut
 
@@ -146,6 +154,11 @@ Ergebnis, kein langweiliges.
   erledigt.
 - **Optimieren oder umbauen.** Auch wenn ein Hebel offensichtlich aussieht:
   eintragen, weitergehen.
+- **Push-Nachrichten schicken.** Der ntfy-Kanal ist seit dem 31.08.2026
+  dauerhaft aus (`~/.claude/notify-aus`), auf Erics ausdrückliche Ansage. Auch
+  ein stehender Bot oder ein verlorener Lauf wird **nicht** gepusht — er
+  erfährt es beim nächsten `/bb`. Was nicht warten kann, gehört in
+  `nodes/BAUSTELLEN.md`, damit es beim nächsten Besuch obenauf liegt.
 - **Augmentierungen von Hand kaufen**, einen zweiten Tab auf
   bitburner-official.github.io öffnen, `b1tflum3` oder den Destroy-Knopf
   anfassen. Gilt unverändert.

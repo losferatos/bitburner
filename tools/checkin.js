@@ -154,10 +154,31 @@ async function main() {
   let resetBereit = false;
   if (inBb && offeneBo === 0) resetBereit = true;
 
+  // SICHERHEITSNETZ (31.08.2026). `boChancen` ist auch dann null, wenn
+  // `blade.js` gerade nicht laeuft - direkt nach einem Augmentierungs-Einbau
+  // etwa, wo genau das beobachtet wurde. Ein fertiger Knoten saehe dann aus
+  // wie ein unbekannter, und der teuerste Moment des Laufs ginge stillschweigend
+  // vorbei. Der Rang laesst sich nicht wegdiskutieren: Wer die 400.000 von
+  // Daedalus hat, ist am Ausgang oder einen Schritt davor.
+  const rangReicht = Number.isFinite(rang) && rang >= DAEDALUS_RANG;
+  if (rangReicht && !resetBereit) {
+    sag("ACHTUNG: Rang " + zahl(rang) + " liegt ueber den " + zahl(DAEDALUS_RANG)
+      + " von Operation Daedalus, aber die Liste der offenen Black Ops ist"
+      + " nicht lesbar (laeuft blade.js?). Der Knoten koennte fertig sein -"
+      + " im Spiel nachsehen, bevor du weiterspielst.");
+    bericht.rangReichtOhneListe = true;
+  }
+
   if (resetBereit) {
     sag("AUSGANG OFFEN: alle " + BLACKOPS_GESAMT + " Black Ops sind durch"
       + (Number.isFinite(rang) ? " (Rang " + zahl(rang) + ")" : "") + ".");
     sag("Der Knoten ist abgeschlossen - es fehlt nur noch der Sprung.");
+    sag("");
+    // Die Schlusszeile steht auch hier, damit sie in JEDEM Lauf an derselben
+    // Stelle steht. `fertigZeile()` waere hier nutzlos - es gibt nichts mehr
+    // zu schaetzen - und wuerde ausserdem auf `restNetto` in der temporalen
+    // Todeszone greifen.
+    sag("FERTIG VORAUSSICHTLICH: jetzt - der Knoten wartet nur noch auf den Sprung.");
     sag("URTEIL: RESET BEREIT");
     return ausgeben(zeilen, { ...bericht, urteil: "RESET BEREIT", resetBereit: true });
   }
@@ -245,8 +266,65 @@ async function main() {
   if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
     + " gerootet, Runde " + (netz.runde ?? "?") + ".");
 
+  // --- 6. Die Schlusszeile: wann ist der Knoten fertig? --------------------
+  //
+  // Eric am 31.08.2026: "am Ende vom /bb soll die aktuelle Schaetzung kommen,
+  // wann der BN fertig sein wird." Sie steht deshalb IMMER da, auch wenn das
+  // Fenster fuer eine frische Rate nicht reicht - dann eben mit der letzten
+  // bekannten Rate und einem ausdruecklichen Vermerk. Eine fehlende Zeile
+  // waere keine ehrlichere Antwort, sondern nur eine unbequemere.
+  sag("");
+  sag(fertigZeile());
+
   sag("URTEIL: " + urteil);
   return ausgeben(zeilen, { ...bericht, urteil });
+
+  function fertigZeile() {
+    // Die Rate: frisch gemessen, sonst die letzte bekannte aus diesem
+    // Knotenlauf.
+    let r = rate, herkunft = "gemessen seit dem letzten Besuch";
+    if (!r || r <= 0) {
+      const alt = [...punkte].reverse().find((p) =>
+        p.knoten === knoten && Number.isFinite(p.rate) && p.rate > 0);
+      if (alt) {
+        r = alt.rate;
+        herkunft = "Rate vom " + new Date(alt.ts).toLocaleDateString("de-DE")
+          + ", heute nicht neu messbar";
+      }
+    }
+    if (!r || r <= 0) {
+      return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - es fehlt eine"
+        + " Rangrate. Beim naechsten Besuch (mindestens "
+        + (MIN_FENSTER_MS / 60000) + " min Spielzeit spaeter) steht sie hier.";
+    }
+
+    const etaSpiel = restNetto / r;
+    // Vom Spielstunden-Bedarf auf ein Kalenderdatum: wie viel des Tages wird
+    // tatsaechlich gespielt? Frisch gemessen, sonst der letzte bekannte Wert.
+    let anteil = bericht.gespieltAnteil;
+    let anteilHerkunft = "aus diesem Besuch";
+    if (!(anteil > 0)) {
+      const alt = [...punkte].reverse().find((p) =>
+        p.knoten === knoten && Number.isFinite(p.gespieltAnteil) && p.gespieltAnteil > 0);
+      if (alt) { anteil = alt.gespieltAnteil; anteilHerkunft = "aus einem frueheren Besuch"; }
+    }
+    if (!(anteil > 0)) {
+      return "FERTIG VORAUSSICHTLICH: noch " + dauer(etaSpiel) + " reine Spielzeit"
+        + " (" + herkunft + "). Wann das im Kalender liegt, haengt daran, wie viel"
+        + " du spielst - dafuer fehlt noch ein Vergleichswert.";
+    }
+
+    const etaEcht = etaSpiel / anteil;
+    const ziel = new Date(Date.now() + etaEcht * 3600000);
+    const wann = ziel.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit" })
+      + ", " + ziel.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+    bericht.fertigAm = ziel.toISOString();
+    bericht.fertigInKalenderstunden = etaEcht;
+    return "FERTIG VORAUSSICHTLICH: " + wann + " (noch " + dauer(etaSpiel)
+      + " Spielzeit; bei " + (anteil * 100).toFixed(0) + " % gespielter Zeit "
+      + anteilHerkunft + " sind das " + dauer(etaEcht) + " Kalenderzeit. "
+      + herkunft + ".)";
+  }
 
   function ausgeben(z, b) {
     if (standSchreiben && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
@@ -254,6 +332,11 @@ async function main() {
         ts: Date.now(), knoten: b.knoten, rang: b.rang,
         spielzeit: Number.isFinite(spielzeit) ? spielzeit : null,
         etaSpielstunden: b.etaSpielstunden ?? null, urteil: b.urteil,
+        // Rate und Spielanteil gehoeren mit in den Stand: Kommt Eric zweimal
+        // kurz hintereinander, reicht das Fenster nicht fuer eine neue Rate -
+        // dann rechnet die Schlusszeile mit der letzten bekannten weiter,
+        // statt gar nichts zu sagen.
+        rate: b.rate ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
       });
       // Nur die letzten 50 behalten - laenger zurueck braucht niemand.
       try {

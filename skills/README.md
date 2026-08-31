@@ -9,6 +9,6 @@ Deshalb liegt hier eine Kopie. Die Regel ist dieselbe wie frueher bei
 kopieren** - nie umgekehrt. Wer eine Regel nur am aktiven Ort ergaenzt, hat
 sie nach dem naechsten Rechnerwechsel nicht mehr.
 
-- `bb-check.md` - der Besuch alle paar Tage (`/bb-check`). Loest seit dem
+- `bb.md` - der Besuch alle paar Tage (`/bb`). Loest seit dem
   31.08.2026 die sechs Dauerloops ab; die alten Loop-Prompts liegen weiter
   unter `loops/`, werden aber nicht mehr aufgesetzt.

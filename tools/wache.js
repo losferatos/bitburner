@@ -131,8 +131,29 @@ function bashPfad() {
   return null;
 }
 
+// RUHEZEIT SCHLAEGT JEDEN ALARM (31.08.2026, 02:30, auf Erics Ansage:
+// "ich will in meiner Ruhezeit keine ntfy Notes bekommen; egal was ist").
+//
+// Bisher war `data/lautlos` nur ein Schalter fuer den Chat: Die Loops
+// schwiegen dort, durften aber weiter aufs Handy pushen, wenn etwas stand.
+// Das ist genau die Ausnahme, die Eric nicht will - ein Alarm um vier Uhr
+// nachts kostet mehr als die Stunden, die eine Stoerung bis zum Morgen
+// liegen bleibt. Der Bot laeuft ohnehin autonom; was er nicht selbst
+// behebt, steht am Morgen in den Dateien.
+//
+// Der Riegel sitzt bewusst HIER, im einzigen Ausgang: Jeder Push der Wache
+// laeuft durch diese Funktion, also gibt es keinen zweiten Weg nach
+// draussen, den jemand spaeter uebersieht. Geloggt wird weiter - der
+// Befund geht nicht verloren, er wird nur nicht zugestellt.
+const RUHE_DATEI = path.join(ROOT, "data", "lautlos");
+
 function push(titel, text, tag = "warning", prioritaet = "default") {
   return new Promise((fertig) => {
+    if (existsSync(RUHE_DATEI)) {
+      log("RUHEZEIT - Push unterdrueckt: " + text);
+      fertig(true);   // true: der Alarm gilt als erledigt, kein Wiederholen
+      return;
+    }
     const bash = bashPfad();
     if (!bash || !existsSync(NOTIFY)) {
       log("PUSH NICHT MOEGLICH (" + (bash ? "notify.sh fehlt" : "kein Git-Bash") + "): " + text);

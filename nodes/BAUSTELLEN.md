@@ -206,6 +206,28 @@ pruefen.
 
 Messgrundlage und ETA: Eintrag "STAND 01:15" in `nodes/ERLEDIGT.md`.
 
+**NACHGEMESSEN 02:15 - die Prognose "Faktor 9,38" war um Faktor 5,2 zu
+hoch.** SPTN-97 ist um 02:10 fertig geworden (`verfuegbar` 93 -> 92).
+Erwartet war laut Sofort-Punkt ein Tiefstand von "rund 860 statt 96".
+Gemessen: **str 97 -> 168**, also **Faktor 1,732**.
+
+Der Quellcode sagt dasselbe: `Augmentations.ts:1514-1517` gibt SPTN-97
+`strength/defense/dexterity/agility: 1.75`. Mit dem Entropiestapel des
+Grafts (x0,98, `EntropyAccumulation.ts:7`) sind das netto **x1,715** -
+gemessene 1,732 nach Rundung und weiterlaufender Erfahrung.
+
+**Der Fehler war die Zuordnung, nicht die Rechnung:** Die 9,38 stammen aus
+der Paketwirkung aller 38 Stuecke (str x214,6) und wurden einem einzelnen
+Stueck zugeschrieben. Genau der Fehlertyp, vor dem die Projektregeln warnen.
+Fuer die ETA folgt daraus nichts - das Paket wirkt kumulativ, und die 61 h
+sind aus Graftzeit und Aktionszeit gerechnet, nicht aus Kampfwerten.
+
+**Nebenwirkung, die zaehlt:** Der Tiefstand steht mit 168 ueber ZIEL = 100,
+`bbtrain.js` ist damit endgueltig fertig. Der Traeger hat um 02:15 auf
+**Bladeburner-Rang** umgeschaltet (Phase "Black Operations", Rang 1509,
++388 in 209 min = **111/h**). Bionic Legs laeuft seit 02:11, $1,13 Mrd,
+33,2 min.
+
 ### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
 
 **Verfeinert und ersetzt den Eintrag von 18:20.** Zwei Korrekturen sind

@@ -118,6 +118,24 @@ Regeln:
 
 ## Sofort
 
+### Der Spielanteil wird systematisch zu hoch geschaetzt (31.08., 18:10)
+
+**Befund.** `tools/checkin.js` rechnet die Kalender-ETA als
+`etaSpielzeit / gespieltAnteil`, und den Anteil misst es ueber das Fenster
+seit dem letzten Check-in. Eric ruft `/bb` aber genau dann, wenn er am
+Rechner sitzt und spielt - das Fenster davor hat deshalb fast immer rund
+100 %. Gemessen um 18:06: **101 %** ueber 45 Minuten, woraus "fertig
+Mittwoch 01:16" wurde. Das unterstellt 31 Stunden Durchspielen am Stueck.
+
+**Erwartet.** Der Anteil sollte ueber ein langes Fenster laufen (etwa die
+letzten 7 Tage Kalenderzeit gegen den Zuwachs von `totalPlaytime`), nicht
+ueber das Fenster zwischen zwei Besuchen. Alternativ ein von Eric gesetzter
+Erfahrungswert ("ich spiele rund 5 h am Tag") in einer kleinen Datei.
+
+**Wirkung.** Die Spielzeit-ETA (31,4 h) bleibt richtig - nur die Umrechnung
+in ein Kalenderdatum ist zu optimistisch. Bei 5 Spielstunden am Tag waeren es
+rund sechs Tage statt eineinhalb.
+
 ### Der Bot erkennt den Black-Ops-Ausgang nicht - der Knoten endet im Stillstand (31.08., 17:10)
 
 **Befund.** `src/bn4rep.js:871` setzt `ausgangSteht = eingebauteAugs.includes(EXIT_KEY)`

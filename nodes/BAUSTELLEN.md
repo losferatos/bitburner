@@ -118,6 +118,43 @@ Regeln:
 
 ## Sofort
 
+### Der Bot erkennt den Black-Ops-Ausgang nicht - der Knoten endet im Stillstand (31.08., 17:10)
+
+**Befund.** `src/bn4rep.js:871` setzt `ausgangSteht = eingebauteAugs.includes(EXIT_KEY)`
+mit `EXIT_KEY = "The Red Pill"` (`:88`). Der Aufruf von `exit.js` haengt in
+`:891` allein daran: `if (ausgangSteht && spieler.skills.hacking >= zielLevel)`.
+
+In BitNode 10 fuehrt der Ausgang aber ueber **21 Black Ops**, nicht ueber
+The Red Pill - der Hackingweg braucht Level 6.000 und ist im ENTSCHIEDEN-Kopf
+verworfen. Faellt Operation Daedalus, bleibt `ausgangSteht` **false**.
+`exit.js` wird nie gestartet; kein anderer Ort im Projekt ruft es auf
+(`grep -rn "exit\.js" src/` trifft nur `bn4rep.js` und einen Kommentar in
+`boot.js`). `src/blade.js` kennt `getNextBlackOp()`, zieht daraus aber keine
+Ausgangsentscheidung.
+
+**Folge.** Der Knoten ist fertig, der Bot merkt es nicht und faehrt weiter
+Bladeburner-Aktionen ohne Ziel. Auch die Notrufleitung schweigt: `rufeMenschen`
+steht INNERHALB des Blocks hinter `ausgangSteht`, wird also nicht erreicht.
+Bei der ETA von 26-68 h faellt Daedalus voraussichtlich am 1./2.09. - ohne
+Eingriff gehen danach bis zu zwei Tage verloren.
+
+**Zweiter, unabhaengiger Riegel.** `data/exit-ziel.txt` enthaelt `10`, und der
+Bot steht in BitNode 10. `bn4rep.js:907` weist `zielRoh === eigenerKnoten`
+ausdruecklich ab ("NIE IN DEN EIGENEN KNOTEN AUSSTEIGEN", 24.08.). Die Roadmap
+verlangt hier aber genau das: BN10 dreimal fuer Level 3. Selbst mit
+repariertem `ausgangSteht` bliebe der Sprung blockiert.
+
+**Erwartet:** `ausgangSteht` muss den ODER-Zweig aus `destroyW0r1dD43m0n`
+(`Singularity.ts:1148-1164`) abbilden - The Red Pill ODER
+`getNextBlackOp() === null` bei `inBladeburner()`. `exit.js` selbst kann den
+Black-Ops-Weg bereits (`src/exit.js`, Abschnitt "ZWEITER WEG"), nur ruft ihn
+niemand. Der Selbstsprung-Riegel braucht eine Ausnahme fuer den Fall
+"derselbe Knoten laut Roadmap" - vermutlich ein Zusatzwort in
+`data/exit-ziel.txt` statt einer stillen Lockerung.
+
+**Nicht selbst geaendert:** Aenderung an unbeaufsichtigt laufendem Code, gehoert
+vor dem Einbau durch einen Skeptiker-Lauf.
+
 ### Vier Restbefunde aus dem ersten Skeptiker-Lauf (31.08., 01:40)
 
 Fuenf Commits am unbeaufsichtigten Code geprueft (`a8cbe68`, `0cc22a2`,

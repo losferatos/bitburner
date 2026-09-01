@@ -118,6 +118,36 @@ Regeln:
 
 ## Sofort
 
+### KURS.md gilt noch fuer BN10 Lauf 1 - neu herleiten (01.09., 16:05)
+
+Der Knotenwechsel ist um **15:59 Uhr** gelaufen: alle 21 Black Ops gefallen,
+`exit.js` hat `destroyW0r1dD43m0n(10, "boot.js")` gerufen, der Bot ist in
+**BN10 Lauf 2 von 3** angelaufen (Hacking 8, $1.262, Netz waechst wieder).
+
+`nodes/KURS.md` beschreibt noch Lauf 1. Die Ausgangsbedingung ist dieselbe
+(21 Black Ops, Daedalus bei Rang 400.000), aber Rate und Restweg sind es
+nicht: Lauf 2 hat einen dauerhaften Sleeve mehr
+(`SleeveCovenantPurchases.tsx:63`), die Roadmap veranschlagt 30 h statt 35 h.
+Lauf 1 hat real **94,9 h Kalenderzeit** gebraucht (28.08. 17:05 bis 01.09.
+15:59), davon aber nur ein Teil gespielt.
+
+### tools/tor.js liest veraltete Telemetrie (01.09., 16:05)
+
+**Befund.** Um 16:04, fuenf Minuten nach dem Knotenwechsel, meldete
+`node tools/tor.js` "Bereits in der Division - dieses Werkzeug ist hier
+fertig". Der Spieler stand zu dem Zeitpunkt bei Hacking 8 mit null
+Kampfwerten; Bladeburner verlangt 100 in allen vier.
+
+**Ursache (Verdacht).** Es liest `data/bblage.json` und prueft `inBladeburner`,
+ohne den Zeitstempel zu pruefen. Die Datei stammte vom **31.08., 16:57** -
+knapp 24 Stunden alt -, weil nach dem Wechsel weder `blade.js` noch
+`bbtrain.js` sie neu schreiben.
+
+**Erwartet.** Wie in `tools/checkin.js` am selben Tag korrigiert: Alter der
+Datei pruefen und sie ignorieren, wenn sie aelter als ein paar Minuten ist.
+Sonst faellt genau in der Anlaufphase die einzige ETA-Quelle aus, die es dort
+gibt.
+
 ### Der Spielanteil wird systematisch zu hoch geschaetzt (31.08., 18:10)
 
 **Befund.** `tools/checkin.js` rechnet die Kalender-ETA als

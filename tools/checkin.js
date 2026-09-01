@@ -113,9 +113,31 @@ async function main() {
     return ausgeben(zeilen, { ...bericht, urteil: "BLIND" });
   }
 
-  const quelle = blade || lage || netz;
-  const alter = Date.now() - Number(quelle.zeit || 0);
-  const knoten = Number((lage || netz || {}).knoten) || null;
+  // DIE FRISCHESTE QUELLE ENTSCHEIDET, NICHT DIE ERSTE (01.09.2026).
+  //
+  // Hier stand `blade || lage || netz`. Nach dem BitNode-Wechsel um 15:59
+  // schrieb blade.js nicht mehr - `prestigeSourceFile` beendet jedes Skript -,
+  // aber seine letzte Datei war vier Minuten alt und galt damit als frisch.
+  // Der Bericht meldete Rang 4.561.258 und den alten Knoten, waehrend der
+  // Motor drueben laengst bei Geld $1.262 und Runde 27 stand. Wer die alte
+  // Datei liest, sieht den alten Knoten - und haelt einen geglueckten Wechsel
+  // fuer einen gescheiterten.
+  const alterVon = (d) => (d ? Date.now() - Number(d.zeit || 0) : Infinity);
+  const quelle = [blade, lage, netz].filter(Boolean)
+    .sort((a, b) => alterVon(a) - alterVon(b))[0];
+  const alter = alterVon(quelle);
+  const knoten = Number((netz || lage || {}).knoten) || null;
+
+  // Einzelne Dateien koennen weit aelter sein als die frischeste. Sie dann
+  // stillschweigend mitzulesen erzeugt genau den Mischbericht von oben:
+  // Rang aus gestern, Geld von heute.
+  const VERALTET_MS = 3 * 60000;
+  const bladeFrisch = alterVon(blade) <= Math.max(VERALTET_MS, alter * 3);
+  if (blade && !bladeFrisch) {
+    sag("Hinweis: data/blade.json ist " + dauer(std(alterVon(blade)))
+      + " alt und wird ignoriert (laeuft blade.js?). Rang und Black-Ops-Liste"
+      + " stehen deshalb nicht zur Verfuegung.");
+  }
   bericht.knoten = knoten;
   bericht.telemetrieAlterMin = +(alter / 60000).toFixed(1);
 
@@ -141,18 +163,27 @@ async function main() {
   // Beide werden schon vom Reset-Zweig weiter unten gebraucht (ueber
   // `ausgeben`), muessen also VOR ihm stehen - sonst greift die Funktion in
   // die temporale Todeszone und stuerzt genau im wichtigsten Fall ab.
-  const spielzeit = Number((blade || {}).spielzeit);
+  const bladeGut = bladeFrisch ? blade : null;
+  const spielzeit = Number((bladeGut || {}).spielzeit);
   const stand = liesStand();
   const punkte = Array.isArray(stand.punkte) ? stand.punkte : [];
 
-  const rang = Number((blade || {}).rang ?? (lage || {}).rang);
-  const offeneBo = blade && blade.boChancen ? Object.keys(blade.boChancen).length : null;
-  const inBb = lage ? lage.inBladeburner === true : null;
+  const rang = Number((bladeGut || {}).rang ?? (alterVon(lage) <= VERALTET_MS ? lage.rang : NaN));
+  // `naechsteBlackOp === null` ist das eigentliche Signal: `getNextBlackOp()`
+  // gibt null zurueck, wenn keine offene mehr da ist. Die Liste `boChancen`
+  // taugt dafuer NICHT - blade.js schreibt bei null offenen Ops ebenfalls
+  // `null` statt eines leeren Objekts (`blade.js:1857`), also konnte
+  // `offeneBo === 0` nie eintreten. Am 01.09. fing nur das Sicherheitsnetz
+  // den fertigen Knoten ab; ohne das waere er unbemerkt geblieben.
+  const offeneBo = bladeGut && bladeGut.boChancen
+    ? Object.keys(bladeGut.boChancen).length : null;
+  const alleBoDurch = bladeGut ? bladeGut.naechsteBlackOp === null : null;
+  const inBb = alterVon(lage) <= VERALTET_MS ? lage.inBladeburner === true : null;
   bericht.rang = Number.isFinite(rang) ? rang : null;
   bericht.offeneBlackOps = offeneBo;
 
   let resetBereit = false;
-  if (inBb && offeneBo === 0) resetBereit = true;
+  if (bladeGut && alleBoDurch && Number.isFinite(rang) && rang > 0) resetBereit = true;
 
   // SICHERHEITSNETZ (31.08.2026). `boChancen` ist auch dann null, wenn
   // `blade.js` gerade nicht laeuft - direkt nach einem Augmentierungs-Einbau
@@ -197,6 +228,26 @@ async function main() {
   // "erster Check-in" - und Eric soll den Unterschied sehen.
   const juengster = [...punkte].reverse().find((p) =>
     p.knoten === knoten && Number.isFinite(p.spielzeit));
+
+  // FRISCHER KNOTEN: noch kein Bladeburner, also auch kein Rang (01.09.2026).
+  // Direkt nach einem Knotenwechsel steht der Spieler bei Hacking 8 und $1.262;
+  // die Division ist erst nach dem Kampfwerttraining offen. Ohne diesen Zweig
+  // rechnete die Schlusszeile mit `restNetto = NaN` und stuerzte in
+  // `new Date(NaN).toISOString()` ab - ausgerechnet im ersten Lauf des neuen
+  // Knotens.
+  if (!Number.isFinite(rang)) {
+    sag("BitNode " + (knoten ?? "?") + ": kein Bladeburner-Rang messbar - der"
+      + " Knoten ist frisch, die Division noch nicht offen.");
+    if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
+      + " gerootet, Runde " + (netz.runde ?? "?") + ", Geld $" + zahl(netz.geld ?? 0) + ".");
+    sag("");
+    sag("FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - bis zur Aufnahme in die"
+      + " Bladeburner-Division traegt das Kampfwerttraining, nicht der Rang."
+      + " `node tools/tor.js` rechnet diese Phase aus; danach steht die Zahl"
+      + " hier wieder.");
+    sag("URTEIL: " + (bericht.hilfe ? "HILFE" : "ANLAUF"));
+    return ausgeben(zeilen, { ...bericht, urteil: bericht.hilfe ? "HILFE" : "ANLAUF" });
+  }
 
   sag("BitNode " + (knoten ?? "?") + ", Rang " + zahl(rang) + " von " + zahl(DAEDALUS_RANG)
     + " = " + (rang / DAEDALUS_RANG * 100).toFixed(2) + " %"
@@ -259,9 +310,9 @@ async function main() {
   if (bericht.hilfe) urteil = "HILFE";
 
   // --- 5. Was der Bot gerade tut -------------------------------------------
-  if (blade && blade.aktion) {
-    sag("Aktion: " + blade.aktion + " (Chance " + ((blade.chance ?? 0) * 100).toFixed(1)
-      + " %, Ausdauer " + (blade.ausdauer ?? "?") + ", Chaos " + (blade.chaos ?? 0).toFixed(1) + ")");
+  if (bladeGut && bladeGut.aktion) {
+    sag("Aktion: " + bladeGut.aktion + " (Chance " + ((bladeGut.chance ?? 0) * 100).toFixed(1)
+      + " %, Ausdauer " + (bladeGut.ausdauer ?? "?") + ", Chaos " + (bladeGut.chaos ?? 0).toFixed(1) + ")");
   }
   if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
     + " gerootet, Runde " + (netz.runde ?? "?") + ".");
@@ -299,6 +350,10 @@ async function main() {
     }
 
     const etaSpiel = restNetto / r;
+    if (!Number.isFinite(etaSpiel)) {
+      return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - der Restweg ist"
+        + " gerade nicht bezifferbar.";
+    }
     // Vom Spielstunden-Bedarf auf ein Kalenderdatum: wie viel des Tages wird
     // tatsaechlich gespielt? Frisch gemessen, sonst der letzte bekannte Wert.
     let anteil = bericht.gespieltAnteil;
@@ -346,7 +401,7 @@ async function main() {
     }
     if (alsJson) console.log(JSON.stringify(b, null, 1));
     else console.log(z.join("\n"));
-    process.exitCode = b.urteil === "AUF KURS" || b.urteil === "RESET BEREIT" ? 0 : 1;
+    process.exitCode = ["AUF KURS", "RESET BEREIT", "ANLAUF"].includes(b.urteil) ? 0 : 1;
   }
 }
 

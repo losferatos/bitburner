@@ -118,6 +118,61 @@ Regeln:
 
 ## Sofort
 
+### sleeve.js schickt Sleeves ohne Geldpruefung ins Gym - Konto in 5 min auf -18,5 Mio (02.09., 06:00)
+
+**Befund.** Nach dem Kickstart (unten) startete `bn4net` um 05:55:55 `sleeve.js`
+auf `werk-0`. Es setzte beide Sleeves auf Powerhouse-Gym-Training
+(`src/sleeve.js:316`, keine Geldpruefung davor). Gemessen 06:00:15 bis
+06:00:41: Konto von **-16,6 auf -18,5 Mio**, also rund **-73.000 $/s**. Das
+Spiel laesst Gym-Kosten ins Minus laufen; mit negativem Konto kauft der Bot
+weder Portknacker noch Rechner - der Knoten haette erneut gestanden, diesmal
+ohne Ausweg.
+
+**Notstopp (06:01, tools/einmal/):** `sleeve-stub.js` per Bruecke als
+`sleeve.js` ins Spiel geschoben (Repo-Datei unveraendert), Kill ueber
+`data/reload.txt`, `unkick.js` setzte beide Sleeves auf Mug (06:03:49,
+beide `true`). Gleichzeitig hat `contracts.js` (05:55 gestartet) die 24
+liegengebliebenen Vertraege geloest - Konto um 06:02 bei **+86 Mio**, der
+Ausbau lief an (8 Rechner, home 128 GB bis 06:02:29).
+
+**Stand 16:39:** Der Stub ist weg - die Bruecke beobachtet `src/` und hat das
+Original zurueckgeschoben; `sleeve.js` laeuft wieder im Original, Sleeves im
+Gym. Bei 1,5 Mrd Konto ist das tragbar. **Offen bleibt:** vor
+`setToGymWorkout` dieselbe Schwelle wie `bbtrain.js:236` (`GYM_MIN_GELD`),
+sonst passiert das bei jedem Kaltstart wieder. Skeptiker-Lauf noetig.
+
+### Kampftraining lief tagsueber mit 1/19 der Gym-Rate - Ursache unbekannt (02.09., 16:52)
+
+**Gemessen.** Reines Gym-Fenster 16:41:26 bis 16:50:55 (`bblage.js`, Spieler
+`CLASS str/def @ Powerhouse Gym`): Kampferfahrung str/def/dex zusammen
+**+16.773 in 9,5 min = rund 106.000 exp/h** (Sleeves tragen per Sync bei).
+Tagesdurchschnitt 06:05 bis 16:41 dagegen: rund 5.100 exp/h ueber alle drei
+(Level 47/55/42 -> 65/64/64, ueber die Levelformel
+`floor(0,5048 * (32 ln(exp+534,6) - 200))` zurueckgerechnet). Das Spiel lief
+dabei mit Tempo 1,00 (`rueckstand.js`, 11,5 h) - die Figur war also die
+meiste Zeit **nicht im Gym**. Wer sie hatte, ist nicht mehr rekonstruierbar:
+`bn4life.js` "lag still und wurde neu gestartet" (16:32:41), sein Protokoll
+ist damit weg. Verdacht: bn4life (Slum Snakes hat 1.588 Rep - das ist
+Faktionsarbeit oder Verbrechen mit der Figur) gegen bbtrain.
+
+**Referenzpunkt fuer den naechsten /bb:** 16:50:55, exp str 35.013 / def
+33.589 / dex 32.990; Ziel je Stat **252.320** (Level 100 bei
+Levelmultiplikator 0,4 x 1,262). Rest bei 106.000 exp/h: **rund 6,2 h
+Spielzeit** bis zum Beitritt. Liegt der naechste Messwert deutlich darunter,
+zuerst `data/bn4life-log.txt` und `data/bblage.json` (`arbeit`) ansehen.
+
+### Kaltstart: Kickstart am 02.09., 05:55 gemacht
+
+`tools/einmal/kick.js` hat `werk-0` (32 GB, 8,8 Mio) ohne den 1,25-Puffer
+gekauft; um 05:56 lief `darkweb.js`, um 16:39 stand das Netz bei 85/85, home
+512 GB, 11 Rechner. Der Eintrag darunter (Kaltstart kostet das Fuenffache)
+bleibt als Reparaturauftrag stehen.
+
+**Hinweis, kein Fehler:** `bn4rep.js` (848 GB) wartet auf einen 1024-GB-Rechner.
+Der kostet in BN10 412 Mio, die Leiter verlangt das Vierfache (1,65 Mrd); bei
+rund 135 Mio/h Zuwachs ist das um 18 Uhr erreicht.
+
+
 ### Kaltstart in BN10: der erste Mietrechner kostet das Fuenffache (02.09., 05:27)
 
 **Befund.** 13,5 Stunden nach dem Knotenwechsel steht der Bot unveraendert bei

@@ -118,6 +118,45 @@ Regeln:
 
 ## Sofort
 
+### Kaltstart in BN10: der erste Mietrechner kostet das Fuenffache (02.09., 05:27)
+
+**Befund.** 13,5 Stunden nach dem Knotenwechsel steht der Bot unveraendert bei
+**8 von 70 gerooteten Rechnern, home 32 GB, Kampfwerte 1/1/1/1, keine
+Werkbank**. Nur `bn4net.js` laeuft; `blade.js`, `bbtrain.js`, `homegrow.js`,
+`bn4life.js` warten alle auf einen Mietrechner, weil sie ausserhalb von BN4
+mit Singularity-Aufrufen das 16-fache RAM brauchen. Das Konto ist von $2,09
+Mio (01.09., 17:35) auf $9,67 Mio (02.09., 05:27) gewachsen - gekauft wurde
+nichts.
+
+**Ursache (belegt).** Die Kaltstart-Leiter in `src/bn4net.js:640-651` geht bis
+32 GB hinunter und verlangt das 1,25-fache des Preises. Ihr Kommentar rechnet
+mit BN6-Preisen ("64 GB kosten 3,52m"). BN10 hat aber `CloudServerCost: 5`
+(`reference/v301/src/BitNode/BitNode.tsx:855`), und nach
+`ServerPurchases.ts:23-42` kostet 32 GB dort 32 x 55.000 x 5 = **$8,8 Mio**,
+mal 1,25 = **$11,0 Mio**. Erst dann kauft der Bot. Bei der um 05:11-05:27
+gemessenen Rate von rund 350 $/s fehlt dafuer noch etwa eine Stunde
+Spielzeit; bis dahin steht der ganze Knoten.
+
+Dazu `CloudServerMaxRam: 0.5` und `CloudServerSoftcap: 1.1` - beides trifft
+auch die spaeteren Stufen der Leiter.
+
+**Erwartet.** Im Kaltstart (null eigene Rechner) ist der Faktor 1,25 die
+falsche Bremse: Es gibt bei Hacking 69 nichts, wofuer Geld geschont werden
+muesste, und jede Stunde ohne Werkbank ist eine Stunde ohne Training. Faktor
+1,0 im Kaltstart oder eine 16-GB-Stufe ($4,4 Mio; reicht fuer `contracts.js`
+17,65 GB, nicht fuer `darkweb.js` 27,65) - das entscheidet ein Skeptiker-Lauf,
+nicht dieser Eintrag. Mindestens gehoert der Kommentar auf BN10-Zahlen.
+
+### checkin.js: URTEIL ANLAUF erkennt keinen Stillstand (02.09., 05:27)
+
+Der ANLAUF-Zweig meldet nur "Knoten frisch, Division noch nicht offen" und
+prueft nichts gegen den letzten Besuch. 13,5 Stunden bei 8/70 gerooteten
+Rechnern und home 32 GB kamen als `ANLAUF` zurueck, nicht als `STEHT`.
+Erwartet: im ANLAUF-Zweig `gerootet`, `homeRam`, `werkbank` und den
+Kampf-Tiefstand gegen den vorigen Punkt halten; bewegt sich ueber eine
+Stunde Spielzeit keiner davon, ist es `STEHT`.
+
+
 ### KURS.md gilt noch fuer BN10 Lauf 1 - neu herleiten (01.09., 16:05)
 
 Der Knotenwechsel ist um **15:59 Uhr** gelaufen: alle 21 Black Ops gefallen,

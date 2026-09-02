@@ -39,6 +39,9 @@
  * @param {NS} ns
  */
 export async function main(ns) {
+  const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
+  let letzteTelemetrie = 0;            // Wanduhr der letzten bn4life.json
+  let auftragPause = 0;                // fruehestens dann task.txt wieder lesen
   ns.disableLog("ALL");
 
   // Ereignisse anhaengen, aber gedeckelt. Eine Datei, die monatelang mit "a"
@@ -267,7 +270,7 @@ export async function main(ns) {
     // "run xyz.js" tippt - nachts also gar nicht. Das Format ist ein
     // JSON-Array, weil Faktionen "Tian Di Hui" heissen und ein Leerzeichen
     // als Trenner die Argumente verschoben haette.
-    if (ns.fileExists("data/task.txt", "home")) {
+    if (Date.now() >= auftragPause && ns.fileExists("data/task.txt", "home")) {
       const roh = ns.read("data/task.txt").trim();
       ns.write("data/task.txt", "", "w");   // sofort leeren, sonst Endlosstart
       if (roh) {
@@ -299,6 +302,16 @@ export async function main(ns) {
               + (ns.getServerMaxRam("home") - ns.getServerUsedRam("home")).toFixed(2)
               + " GB frei, das Skript braucht "
               + ns.getScriptRam(teile[0], "home").toFixed(2) + " GB.");
+          // NICHT VERFALLEN LASSEN (02.09.2026): wie in bn4net.js - ein
+          // Auftrag ohne Platz wird bis zu 30 Runden zurueckgelegt.
+          if (!pid) {
+            // Zeitbasiert (bn4life laeuft im Sekundentakt): fuenf Minuten ab
+            // dem ersten Fehlversuch, dazwischen liegen lassen.
+            const erster = auftragVersuche.get(roh) || Date.now();
+            auftragVersuche.set(roh, erster);
+            if (Date.now() - erster <= 5 * 60000) { ns.write("data/task.txt", roh, "w"); auftragPause = Date.now() + 30000; }
+            else { auftragVersuche.delete(roh); sag("Auftrag nach 5 Minuten verworfen: " + roh); }
+          } else auftragVersuche.delete(roh);
         } catch (e) {
           sag("Auftrag unlesbar: " + String(e));
         }
@@ -378,7 +391,13 @@ export async function main(ns) {
     }
 
     // --- 4. Zustand nach draussen ---------------------------------------------
-    if (runde % 10 === 0) {
+    // NACH WANDUHR, NICHT NACH RUNDEN (02.09.2026): Im gedrosselten Tab (ein
+    // Wake je Minute) kam Runde 10 erst nach ~10 min - bn4net haette das
+    // Skript fuer tot gehalten und alle paar Minuten neu gestartet. Und die
+    // Datei muss nach home: bn4net liest sie dort, bn4life laeuft nach einem
+    // Knotenwechsel aber auf der Werkbank.
+    if (Date.now() - letzteTelemetrie >= 10000) {
+      letzteTelemetrie = Date.now();
       const spieler = ns.getPlayer();
       ns.write("data/bn4life.json", JSON.stringify({
         zeit: Date.now(),
@@ -391,6 +410,9 @@ export async function main(ns) {
         tor: ns.hasTorRouter(),
         programme: PROGRAMME.filter((x) => ns.fileExists(x, "home")),
       }), "w");
+      if (ns.getHostname() !== "home") {
+        try { ns.scp("data/bn4life.json", "home", ns.getHostname()); } catch { /* egal */ }
+      }
     }
 
    } catch (e) {

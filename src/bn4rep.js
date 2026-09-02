@@ -137,6 +137,12 @@ export async function main(ns) {
         if (r > 0) return r;
       }
     } catch (e) { /* haengt noch nicht am Netz */ }
+    // Der Knoten selbst weiss es genauer als die Tabelle - BitNode 12
+    // skaliert mit 1,02^Stufe (BitNode.tsx:993). Tabelle nur als Rueckfall.
+    try {
+      const wd = Number(ns.getBitNodeMultipliers().WorldDaemonDifficulty);
+      if (wd > 0) return 3000 * wd;
+    } catch { /* kein Zugriff */ }
     return 3000 * (WD_DIFFICULTY[ns.getResetInfo().currentNode] || 2);
   })();
 

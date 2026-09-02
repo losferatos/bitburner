@@ -42,6 +42,10 @@ export async function main(ns) {
   const log = [];
   const sag = (t) => {
     log.push(new Date().toLocaleTimeString() + "  " + t);
+    // Gedeckelt (02.09.2026): die Schleife unten endet nicht mehr von selbst,
+    // und ein Protokoll, das alle 5 s komplett neu in den Spielstand
+    // geschrieben wird, darf nicht wachsen.
+    while (log.length > 200) log.shift();
     ns.write("data/boot.txt", log.join("\n") + "\n", "w");
   };
 
@@ -98,7 +102,8 @@ export async function main(ns) {
   catch { /* kein Zugriff - im Zweifel wie nach einem Wechsel raeumen */ }
   if (nachKnotenwechsel) {
     for (const datei of ["data/task.txt", "data/exit-ziel.txt",
-                         "data/simulacrum.txt", "data/exit.txt"]) {
+                         "data/simulacrum.txt", "data/exit.txt",
+                         "data/keine-hacknet.txt", "data/keine-sleeves.txt"]) {
       if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt (Knotenwechsel): " + datei); }
     }
   }
@@ -106,7 +111,21 @@ export async function main(ns) {
   // Bis zu zwanzig Minuten lang versuchen. So lange braucht es nie, aber ein
   // stiller Abbruch nach drei Fehlversuchen waere genau der Ausfall, den
   // diese Datei verhindern soll.
-  for (let runde = 0; runde < 240; runde++) {
+  // NIE AUFGEBEN (02.09.2026). Hier stand `runde < 240` und danach "Hier muss
+  // ein Mensch nachsehen". Der Fall, in dem bn4net zwanzig Minuten nicht
+  // startet, ist genau der, in dem der Rueckruf gebraucht wird - ein
+  // liegengebliebenes Skript belegt home. Deshalb: nach fuenf Minuten alles
+  // auf home beenden ausser dieser Datei, und weiter versuchen, solange das
+  // Spiel laeuft.
+  for (let runde = 0; ; runde++) {
+    if (runde > 0 && runde % 60 === 0) {
+      let beendet = 0;
+      for (const p of ns.ps("home")) {
+        if (p.filename === "boot.js") continue;
+        ns.kill(p.pid); beendet++;
+      }
+      sag("Nach fuenf Minuten ohne bn4net: " + beendet + " Prozess(e) auf home beendet.");
+    }
     const frei = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
 
     for (const datei of ["bn4net.js", "bn4life.js"]) {
@@ -116,7 +135,7 @@ export async function main(ns) {
       // getScriptRam gibt bei nicht uebersetzbarer Datei still 0 zurueck -
       // bekannte Falle in diesem Projekt. Dann lieber warten als blind
       // starten.
-      if (!(braucht > 0)) { sag(datei + ": getScriptRam gibt 0, warte."); continue; }
+      if (!(braucht > 0)) { if (runde % 12 === 0) sag(datei + ": getScriptRam gibt 0, warte."); continue; }
       if (braucht > frei) {
         if (runde % 12 === 0) {
           sag(datei + " braucht " + braucht.toFixed(1) + " GB, frei sind "
@@ -149,6 +168,4 @@ export async function main(ns) {
     }
     await ns.sleep(5000);
   }
-  sag("ABBRUCH nach zwanzig Minuten: bn4net.js liess sich nicht starten."
-    + " Hier muss ein Mensch nachsehen.");
 }

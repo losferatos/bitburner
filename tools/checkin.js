@@ -44,6 +44,13 @@ const DAEDALUS_RANG = 400000;
 // und deshalb nicht erarbeitet werden muss (Summe aller 21 = 113.660, davon
 // Daedalus selbst 40.000).
 const RANG_UNTERWEGS = 73660;
+// Der Rang je Aktion skaliert mit BladeburnerRank des Knotens
+// (Bladeburner/Formulas.ts:22-25), die 400.000 von Daedalus NICHT. Die
+// 73.660 aus den Black Ops kommen also nur mit diesem Faktor an
+// (BitNode.tsx: BN7 0,6, BN8 0, BN9 0,9, BN10 0,8, BN13 0,45, BN14 0,6,
+// BN15 0,2; alle anderen 1). Ohne den Faktor war die ETA in BN10 um
+// 14.732 Rang zu optimistisch (Zahlen-Skeptiker 02.09.).
+const BB_RANK_MULT = { 7: 0.6, 8: 0, 9: 0.9, 10: 0.8, 13: 0.45, 14: 0.6, 15: 0.2 };
 // Aelter als das, und die Telemetrie beschreibt nicht die Gegenwart. Grosszuegig,
 // weil ein gedrosselter Tab die Schreibtakte streckt.
 const FRISCH_MS = 8 * 60000;
@@ -110,6 +117,16 @@ async function main() {
   // Ausgang offen". data/verfahren.txt sagt, ob der Knoten ueber Bladeburner
   // (V2) oder Hacking (V1) laeuft - in V1-Knoten gibt es keinen Rang.
   const ausgang = await holeJson("data/ausgang.json");
+  // Sleeves holen einen Rueckstand mit 15-facher Geschwindigkeit nach
+  // (Sleeve.ts:263-275). Waehrenddessen ist jede gemessene Rate ein
+  // Bestand, keine Rate - sleeve.js schreibt den Rueckstand je Sleeve.
+  const sleeveDatei = await holeJson("data/sleeve.json");
+  const sleeveRueckstandS = (() => {
+    try {
+      if (!sleeveDatei || Date.now() - Number(sleeveDatei.zeit || 0) > 10 * 60000) return 0;
+      return Math.max(0, ...(sleeveDatei.sleeves || []).map((x) => Number(x.stored || 0) / 5));
+    } catch { return 0; }
+  })();
   const ausgangTxt = (await hole("data/ausgang.txt")) || "";
   const verfahrenTxt = ((await hole("data/verfahren.txt")) || "").trim().split(/\s+/);
 
@@ -321,10 +338,19 @@ async function main() {
     + " = " + (rang / DAEDALUS_RANG * 100).toFixed(2) + " %"
     + (offeneBo !== null ? ", " + offeneBo + " von " + BLACKOPS_GESAMT + " Black Ops offen" : ""));
 
-  const restNetto = Math.max(0, DAEDALUS_RANG - rang - RANG_UNTERWEGS);
+  // BitNode 12 skaliert mit der Stufe: 1/1,02^Stufe (BitNode.tsx:924-926, 984).
+  const bn12Stufe = knoten === 12 && ausgangGut && ausgangGut.lauf ? Number(ausgangGut.lauf.level) : 1;
+  const unterwegs = RANG_UNTERWEGS * (knoten === 12 ? 1 / Math.pow(1.02, bn12Stufe) : (BB_RANK_MULT[knoten] ?? 1));
+  const restNetto = Math.max(0, DAEDALUS_RANG - rang - unterwegs);
   let rate = null;
 
-  if (vorher && Number.isFinite(spielzeit)) {
+  if (sleeveRueckstandS > 1800) {
+    sag("Hinweis: Die Sleeves holen " + dauer(sleeveRueckstandS / 3600) + " Rueckstand mit 15-facher"
+      + " Geschwindigkeit nach - die Rangrate ist gerade ein Bestand, keine Rate."
+      + " Sie wird fuer diesen Besuch nicht gewertet.");
+    bericht.sleeveRueckstandS = sleeveRueckstandS;
+  }
+  if (vorher && Number.isFinite(spielzeit) && !(sleeveRueckstandS > 1800)) {
     const dRang = rang - vorher.rang;
     const dSpiel = std(spielzeit - vorher.spielzeit);
     const dEcht = std(Date.now() - vorher.ts);
@@ -350,7 +376,7 @@ async function main() {
   let urteil = "AUF KURS";
   if (rate && rate > 0) {
     const etaSpiel = restNetto / rate;
-    sag("Rest: " + zahl(restNetto) + " Rang netto (nach Abzug der " + zahl(RANG_UNTERWEGS)
+    sag("Rest: " + zahl(restNetto) + " Rang netto (nach Abzug der " + zahl(Math.round(unterwegs))
       + ", die aus den Black Ops selbst kommen).");
     sag("ETA: " + dauer(etaSpiel) + " reine Spielzeit"
       + (bericht.gespieltAnteil ? " - bei zuletzt " + (bericht.gespieltAnteil * 100).toFixed(0)

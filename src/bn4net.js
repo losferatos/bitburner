@@ -50,6 +50,22 @@ export async function main(ns) {
   // bn4life.js selbst (19,85 GB), sonst kann es nach einem Absturz nicht mehr
   // starten.
   let werkbankMerker = null;
+  // Groesstes Werkzeug, das in der letzten Runde nirgends Platz fand (GB).
+  // Der Ausbau (Abschnitt 1a2) liest es und zieht den GROESSTEN Rechner
+  // hoch - siehe dort.
+  let werkzeugWartetGb = 0;
+  const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
+  // Stillstandserkennung: Werkzeug -> Telemetriedatei auf home -> hoechstes
+  // erlaubtes Alter. Takte: blade/sleeve/ausgang/bbtrain 30-60 s, bn4life
+  // 15 s. Grosszuegig, weil ein gedrosselter Tab die Schreibtakte streckt.
+  const TELEMETRIE = [
+    ["blade.js", "data/blade.json", 10 * 60000],
+    ["sleeve.js", "data/sleeve.json", 10 * 60000],
+    ["bn4life.js", "data/bn4life.json", 10 * 60000],
+    ["ausgang.js", "data/ausgang.json", 10 * 60000],
+    ["bbtrain.js", "data/bbtrain.json", 10 * 60000],
+  ];
+  const werkzeugSeit = new Map();   // Werkzeug -> erstmals laufend gesehen (ms)
   // Zeitpunkt des letzten darkweb.js-Anlaufs (Abschnitt 2b1).
   let nachholMerker = 0;
   // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
@@ -259,6 +275,14 @@ export async function main(ns) {
     // Zustand laeuft. Vorher wohnte der Ausgang in bn4rep.js (848 GB
     // ausserhalb BitNode 4) und lief die halbe Laufzeit gar nicht.
     ["ausgang.js", []],
+    // Das BitNode-9-Gewerk (02.09.2026): verkauft Hashes (ohne Hacknet-Server
+    // wartet es nur) und baut den Hacknet-Server als Wirt fuer exit.js aus,
+    // wenn ausgang.js keinen findet. Steht frueh, weil es im BN9-Kaltstart
+    // die einzige Geldquelle ist.
+    ["hashes.js", []],
+    // Kaltstart-Verbrechen der Sleeves (5,7 GB): passt neben bn4net und
+    // ausgang auf ein frisches home, beendet sich, sobald sleeve.js laeuft.
+    ["sleevecrime.js", []],
     ["blade.js", []],
     // bbtrain gehoert HIERHER, nicht danebenn (25.08.2026).
     //
@@ -284,6 +308,9 @@ export async function main(ns) {
     // dieselbe Lehre steht acht Zeilen weiter oben fuer `bbtrain.js`, gezogen
     // am 25.08. nach demselben Vorfall.
     ["sleeve.js", []],
+    // Hacknet-Ausbau und Wirt fuer exit.js (BitNode 9); ohne Hacknet-Server
+    // wartet es nur.
+    ["hacknet.js", []],
     // bn4life kauft TOR und die Portprogramme. Es steht in dieser Liste und
     // nicht in boot.js, weil es voller Singularity ist und ausserhalb von
     // BitNode 4 mehrere hundert GB gross - in ein frisches home mit 32 GB
@@ -363,7 +390,13 @@ export async function main(ns) {
   // unbeaufsichtigt laeuft, muss Fehler ueberleben statt an ihnen zu sterben.
   for (let runde = 1; ; runde++) {
    try {
-    const hosts = scanAll();
+    // HACKNET-SERVER SIND KEINE ARBEITER-WIRTE (02.09.2026, Skeptiker C/D).
+    // Sie haengen mit Root an home (PlayerObjectServerMethods.ts:46-66), aber
+    // jedes Byte, das dort laeuft, drueckt die Hash-Rate ueber ramRatio
+    // (HacknetServers.ts:14) - bei 1000 von 1024 GB belegt auf 2 Prozent.
+    // In BitNode 9 ist das die einzige Einnahme. Nur ausgang.js legt dort
+    // im Sprungmoment exit.js ab.
+    const hosts = scanAll().filter((h) => !h.startsWith("hacknet-server-"));
 
 
     // --- 0. Gegenseitige Wache ------------------------------------------------
@@ -473,7 +506,19 @@ export async function main(ns) {
           // Ein Werkzeug dagegen verliert beim Abbruch seinen Arbeitsstand.
           // Geraeumt wird nur auf dem gewaehlten Wirt und nur so viel, wie der
           // Auftrag braucht.
-          if (braucht > 0 && meistFrei < braucht) {
+          // Passt der Auftrag auf den besten Rechner grundsaetzlich nicht
+          // (848 GB auf 512), wird nicht geraeumt - das haette 30 Runden lang
+          // alle Arbeiter des groessten Rechners gekostet. Stattdessen den
+          // Ausbau (1a2) anstossen und den Auftrag verwerfen.
+          const passtNie = braucht > 0
+            && ns.getServerMaxRam(wirt) - (wirt === "home" ? 2 : 0) < braucht;
+          if (passtNie) {
+            werkzeugWartetGb = Math.max(werkzeugWartetGb, braucht);
+            sag("Auftrag " + teile[0] + " (" + braucht.toFixed(1) + " GB) passt auf keinen Rechner"
+              + " (groesster " + wirt + ") - Ausbau angestossen, Auftrag verworfen.");
+            auftragVersuche.delete(roh);
+          }
+          if (!passtNie && braucht > 0 && meistFrei < braucht) {
             const vorher = meistFrei;
             for (const w of WORKER) {
               if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
@@ -487,8 +532,8 @@ export async function main(ns) {
               + vorher.toFixed(1) + " -> " + nachher.toFixed(1) + " GB frei.");
             meistFrei = nachher;
           }
-          if (wirt !== "home") ns.scp([teile[0], ...BIBLIOTHEKEN], wirt, "home");
-          const pid = ns.exec(teile[0], wirt, 1, ...teile.slice(1));
+          if (!passtNie && wirt !== "home") ns.scp([teile[0], ...BIBLIOTHEKEN], wirt, "home");
+          const pid = passtNie ? 0 : ns.exec(teile[0], wirt, 1, ...teile.slice(1));
           // ns.exec gibt bei Speichermangel still 0 zurueck - der Rueckgabewert
           // gehoert ins Log, sonst verschwindet der Auftrag spurlos.
           sag(pid ? "Auftrag gestartet: " + teile.join(" ") + " auf " + wirt
@@ -496,6 +541,15 @@ export async function main(ns) {
             : "Auftrag FEHLGESCHLAGEN: " + teile[0] + " braucht "
               + braucht.toFixed(2) + " GB, bester Wirt " + wirt + " hat "
               + meistFrei.toFixed(2) + " GB frei.");
+          // NICHT VERFALLEN LASSEN (02.09.2026): Ein Auftrag, der gerade
+          // keinen Platz findet, wird bis zu 30 Runden (5 min) zurueckgelegt
+          // statt still zu verschwinden - heute ging so wakelock.js verloren.
+          if (!pid && !passtNie) {
+            const versuche = (auftragVersuche.get(roh) || 0) + 1;
+            auftragVersuche.set(roh, versuche);
+            if (versuche <= 30) ns.write("data/task.txt", roh, "w");
+            else { auftragVersuche.delete(roh); sag("Auftrag nach " + versuche + " Versuchen verworfen: " + roh); }
+          } else auftragVersuche.delete(roh);
         } catch (e) {
           sag("Auftrag unlesbar: " + String(e));
         }
@@ -622,7 +676,36 @@ export async function main(ns) {
     const reserviert = ns.fileExists("data/geldbedarf.txt", "home")
       ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
     const eigene = ns.cloud.getServerNames();
-    if (eigene.length < ns.cloud.getServerLimit()) {
+    let a1Gekauft = false;
+    // WARTENDES WERKZEUG BEI NICHT VOLLEM PARK (02.09.2026, Substanz-
+    // Skeptiker): Die Leiter unten verlangt das Vierfache des Preises und
+    // sieht das wartende Werkzeug nicht - bbtrain (95 GB) braeuchte 140 Mio
+    // ueber die Leiter statt 53 Mio fuer einen passenden 128-GB-Rechner.
+    // Hier: die kleinste Stufe, die das Werkzeug fasst, zum Preis x2.
+    if (werkzeugWartetGb > 0 && eigene.length < ns.cloud.getServerLimit()
+        && !eigene.some((h) => ns.getServerMaxRam(h) >= werkzeugWartetGb + 4)) {
+      const limit = ns.cloud.getRamLimit();
+      let gb = 32;
+      while (gb < werkzeugWartetGb + 4 && gb * 2 <= limit) gb *= 2;
+      const preis = ns.cloud.getServerCost(gb);
+      const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
+      if (preis > 0 && preis * 2 <= geldFrei) {
+        const name = ns.cloud.purchaseServer("werk-" + eigene.length, gb);
+        if (name) {
+          sag("Rechner gekauft: " + name + " mit " + gb + " GB fuer " + (preis / 1e6).toFixed(2)
+            + "m - ein Werkzeug mit " + werkzeugWartetGb.toFixed(1) + " GB wartet auf Platz.");
+          eigene.push(name);
+          werkzeugWartetGb = 0;
+          a1Gekauft = true;
+        }
+      } else if (runde % 60 === 0) {
+        sag("Rechner fuer wartendes Werkzeug (" + werkzeugWartetGb.toFixed(1) + " GB): " + gb
+          + " GB kosten " + (preis / 1e6).toFixed(1) + "m, frei " + (geldFrei / 1e6).toFixed(0) + "m - warte auf Geld.");
+      }
+    }
+    if (a1Gekauft) {
+      // In dieser Runde nichts weiter kaufen.
+    } else if (eigene.length < ns.cloud.getServerLimit()) {
       // Groesste bezahlbare Stufe. In BitNode 4 verteuert CloudServerSoftcap
       // 1.2 die grossen Rechner ueberproportional, deshalb wird gefragt statt
       // gerechnet.
@@ -649,7 +732,12 @@ export async function main(ns) {
       // kaufen. Sobald der erste Rechner steht, gelten wieder die alten Werte.
       const kaltstart = eigene.length === 0;
       const leiter = kaltstart ? [1024, 512, 256, 128, 64, 32] : [1024, 512, 256, 128, 64];
-      const faktor = kaltstart ? 1.25 : 4;
+      // Faktor 1,0 im Kaltstart (02.09.2026): Mit 1,25 stand der Bot in
+      // BitNode 10 (CloudServerCost 5, 32 GB = 8,8 Mio) 13,5 Stunden bei
+      // 8 von 70 Rechnern, weil 11 Mio verlangt wurden. Bei null eigenen
+      // Rechnern gibt es nichts, wofuer Geld geschont werden muesste - jede
+      // Stunde ohne Werkbank ist eine Stunde ohne Werkzeuge.
+      const faktor = kaltstart ? 1.0 : 4;
       for (const gb of leiter) {
         const preis = ns.cloud.getServerCost(gb);
         if (!(preis > 0)) continue;
@@ -707,7 +795,55 @@ export async function main(ns) {
       // eines der Kriterien nicht mehr traegt; die Obergrenze von 25 ist nur
       // die Notbremse, damit eine Runde nicht beliebig lange laeuft.
       const maxGb = ns.cloud.getRamLimit();
-      for (let schritt = 0; schritt < 25; schritt++) {
+
+      // EIN WARTENDES WERKZEUG SCHLAEGT DEN AMORTISATIONSDECKEL (02.09.2026).
+      //
+      // In BitNode 10 Lauf 2 lief bn4rep.js 26 Stunden lang nicht: Der Park
+      // war voll (15 von 15, CloudServerLimit 0,6), der groesste Rechner hatte
+      // 512 GB, bn4rep braucht 847. Die Schleife unten ruestet immer den
+      // KLEINSTEN Rechner auf - und sie war in einem Kreis gefangen: ohne
+      // laufendes bn4rep ist bn4rep.json alt, `wartend` steht auf 99, der
+      // Deckel auf 600 s, und schon die billigste Stufe (627 s) fiel durch;
+      // bn4rep passte nirgends, also blieb die Datei alt. Ohne bn4rep gibt es
+      // keine Augmentierungen, und das ist mehr wert als jede Amortisation.
+      //
+      // Deshalb: Meldet der Starter (2c) ein Werkzeug, das nirgends passt,
+      // wird der GROESSTE Rechner verdoppelt, bis das Werkzeug neben dem, was
+      // dort ohne Arbeiter schon liegt, Platz hat - ohne Deckel, nur mit der
+      // Regel "halbes Guthaben bleibt".
+      if (werkzeugWartetGb > 0 && eigene.length) {
+        const groesster = eigene
+          .map((h) => ({ host: h, gb: ns.getServerMaxRam(h) }))
+          .sort((a, b) => b.gb - a.gb)[0];
+        let belegtOhneArbeiter = 0;
+        for (const pr of ns.ps(groesster.host)) {
+          if (WORKER.includes(pr.filename)) continue;
+          belegtOhneArbeiter += ns.getScriptRam(pr.filename, "home") * pr.threads;
+        }
+        const noetig = werkzeugWartetGb + belegtOhneArbeiter + 4;
+        let zielGb = groesster.gb;
+        while (zielGb < noetig && zielGb * 2 <= maxGb) zielGb *= 2;
+        if (zielGb > groesster.gb) {
+          let kosten = 0;
+          try { kosten = ns.cloud.getServerUpgradeCost(groesster.host, zielGb); } catch { kosten = 0; }
+          const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
+          if (kosten > 0 && kosten * 2 <= geldFrei) {
+            if (ns.cloud.upgradeServer(groesster.host, zielGb)) {
+              sag(groesster.host + ": " + groesster.gb + " -> " + zielGb + " GB fuer "
+                + (kosten / 1e6).toFixed(1) + "m - ein Werkzeug mit "
+                + werkzeugWartetGb.toFixed(1) + " GB wartet auf Platz.");
+              werkzeugWartetGb = 0;
+              a1Gekauft = true;   // die Amortisationsschleife dieser Runde entfaellt
+            }
+          } else if (runde % 60 === 0) {
+            sag("Ausbau fuer wartendes Werkzeug (" + werkzeugWartetGb.toFixed(1) + " GB): "
+              + groesster.host + " -> " + zielGb + " GB kostet " + (kosten / 1e6).toFixed(1)
+              + "m, frei " + (geldFrei / 1e6).toFixed(0) + "m - warte auf Geld.");
+          }
+        }
+      }
+
+      for (let schritt = 0; schritt < 25 && !a1Gekauft; schritt++) {
         const smallest = eigene
           .map((h) => ({ host: h, gb: ns.getServerMaxRam(h) }))
           .sort((a, b) => a.gb - b.gb)[0];
@@ -2562,16 +2698,58 @@ export async function main(ns) {
     // laufende Faktions- oder Firmenarbeit. Kleinere pid heisst frueher
     // gestartet - die Vergabe ist im Spiel streng aufsteigend
     // (Netscript/killWorkerScript.ts, generatePid).
+    // STILLSTAND GEHOERT IN DEN MOTOR (02.09.2026, Audit "volle Autonomie").
+    //
+    // Ein Werkzeug, das lebt, aber seit Minuten nichts mehr schreibt, sah
+    // bisher nur die Wache draussen - und ihr Neustart erzeugte eine zweite
+    // Instanz, die die Entdopplung unten binnen 10 s als "doppelt" erschlug,
+    // weil die haengende die kleinere PID hatte (17 wirkungslose Neustarts
+    // von wakelock.js in 4 h am 02.09.). Jetzt prueft bn4net das Alter der
+    // Telemetrie selbst: aelter als erlaubt, und das Werkzeug lief lange
+    // genug, um geschrieben zu haben -> alle Instanzen beenden; der Starter
+    // unten holt es in derselben Runde zurueck. Werkzeuge ohne Telemetrie
+    // auf home (contracts, popups, bn4door, homegrow, wakelock) sind nicht
+    // abgedeckt.
+    for (const [datei, telemetrie, maxAlterMs] of TELEMETRIE) {
+      const wo = orte.get(datei);
+      if (!wo || !wo.length) continue;
+      const seit = werkzeugSeit.get(datei);
+      if (!seit) { werkzeugSeit.set(datei, Date.now()); continue; }
+      if (Date.now() - seit < maxAlterMs) continue;
+      let alter = null;
+      try {
+        if (ns.fileExists(telemetrie, "home")) {
+          const d = JSON.parse(ns.read(telemetrie));
+          if (Number.isFinite(d.zeit)) alter = Date.now() - d.zeit;
+        }
+      } catch { alter = null; }
+      if (alter === null) alter = Date.now() - seit;   // nie geschrieben: seit dem Start
+      if (alter <= maxAlterMs) continue;
+      for (const w of wo) ns.kill(w.pid);
+      werkzeugSeit.delete(datei);
+      orte.delete(datei);
+      // Aus `laufend` streichen, sonst haelt der Starter unten das Werkzeug
+      // fuer vorhanden und der Neustart kaeme erst in der Folgerunde.
+      for (let i = laufend.length - 1; i >= 0; i--) if (laufend[i] === datei) laufend.splice(i, 1);
+      sag(datei + " lebt, schreibt aber seit " + Math.round(alter / 60000)
+        + " min nichts (" + telemetrie + ") - beendet, Neustart in dieser Runde.");
+    }
+    for (const datei of [...werkzeugSeit.keys()]) {
+      if (!orte.has(datei)) werkzeugSeit.delete(datei);
+    }
+
     for (const [datei, wo] of orte) {
       if (wo.length < 2) continue;
       // Bei den Steuerhaelften gewinnt IMMER die auf home - dort sucht die
-      // jeweils andere Haelfte sie. Sonst die aelteste, also die kleinste
-      // pid: sie hat den laengsten Arbeitsfortschritt hinter sich.
+      // jeweils andere Haelfte sie. Sonst die JUENGSTE (02.09.2026): Eine
+      // zweite Instanz entsteht praktisch nur durch einen Neustartversuch,
+      // und der gilt der haengenden alten. Vorher blieb die aelteste - und
+      // damit genau die, die nichts mehr tat.
       const istSteuerung = datei === "bn4life.js" || datei === "bn4net.js";
       if (istSteuerung && wo.some((w) => w.host === "home")) {
         wo.sort((a, b) => (a.host === "home" ? -1 : 0) - (b.host === "home" ? -1 : 0));
       } else {
-        wo.sort((a, b) => a.pid - b.pid);
+        wo.sort((a, b) => b.pid - a.pid);
       }
       for (const ueberzaehlig of wo.slice(1)) {
         ns.kill(ueberzaehlig.pid);
@@ -2634,6 +2812,7 @@ export async function main(ns) {
     }
 
     if (werkbank) {
+      werkzeugWartetGb = 0;   // wird unten neu gesetzt, wenn noch etwas wartet
       // IN HACKINGKNOTEN KEIN BLADEBURNER-GERUEST (02.09.2026).
       //
       // ausgang.js legt das Verfahren dieses Laufs in data/verfahren.txt ab
@@ -2650,8 +2829,22 @@ export async function main(ns) {
             && (teile[0] === "V1" || teile[0] === "V1b");
         } catch { return false; }
       })();
+      // Marker der Kaltstart-Werkzeuge: hashes.js legt data/keine-hacknet.txt
+      // ab, wenn der Knoten keine Hacknet-Server kennt; sleevecrime.js legt
+      // data/keine-sleeves.txt ab, wenn es keine Sleeves gibt. Beide tragen
+      // die Knotennummer, boot.js raeumt sie beim Wechsel.
+      const markerGilt = (datei) => {
+        try {
+          return ns.fileExists(datei, "home")
+            && Number(ns.read(datei).trim()) === ns.getResetInfo().currentNode;
+        } catch { return false; }
+      };
+      const keineHacknet = markerGilt("data/keine-hacknet.txt");
+      const keineSleeves = markerGilt("data/keine-sleeves.txt");
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d)
-        && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js")));
+        && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js"))
+        && !((d === "hashes.js" || d === "hacknet.js") && keineHacknet)
+        && !(d === "sleevecrime.js" && (keineSleeves || laufend.includes("sleeve.js"))));
       // Laufende Instanzen im Hackingknoten beenden - der Filter oben wirkt
       // nur auf den Start. Ohne das haelt ein Handstart oder eine Runde, in
       // der die Datei kurz fehlte, das Bladeburner-Geruest den ganzen Lauf am
@@ -2817,6 +3010,7 @@ export async function main(ns) {
           }
           const weg = ausweichwirt(braucht);
           if (!weg) {
+            werkzeugWartetGb = Math.max(werkzeugWartetGb, braucht);
             if (runde % 10 === 0) sag(datei + " (" + braucht.toFixed(1)
               + " GB) passt auf " + werkbank + " nie und findet auch sonst"
               + " nirgends Platz.");

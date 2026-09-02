@@ -593,12 +593,28 @@ export async function main(ns) {
   ];
 
   const sag = (t) => ns.print(t);
+  // Knotenfaktoren (02.09.2026, Zahlen-Skeptiker): BladeburnerRank skaliert
+  // den Rang je Aktion (Formulas.ts:22-25), die Levelmultiplikatoren die
+  // Kampfwerte. Beides ging bisher als 1 in die Rechnungen ein - in BitNode
+  // 10 (0,8 / 0,4) war die Einsatzschwelle zu forsch und der Hyperdrive-
+  // Nutzen um Faktor 2 zu hoch. Einmal beim Start, 4 GB.
+  let BN_MULT = {};
+  try { BN_MULT = ns.getBitNodeMultipliers(); } catch { BN_MULT = {}; }
+  const BB_RANK_MULT = Number(BN_MULT.BladeburnerRank) || 1;
   // Damit die Sparmeldung nicht bei jedem Bladeburner-Tick erneut im Log steht.
   let letzterSparziel = "";
 
   // --- Warten, bis der Beitritt steht --------------------------------------
   while (!ns.bladeburner.inBladeburner()) {
     sag("Noch nicht in der Division - warte (bbtrain.js trainiert).");
+    // Herzschlag (02.09.2026): bn4net beendet ein Werkzeug, dessen
+    // data/blade.json zu alt ist. Vor dem Beitritt schreibt meldeLage nicht -
+    // deshalb hier eine Minimalfassung, damit das Warten nicht wie ein
+    // Stillstand aussieht.
+    try {
+      ns.write("data/blade.json", JSON.stringify({ zeit: Date.now(), wartend: true, host: ns.getHostname() }), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
+    } catch { /* egal */ }
     await ns.sleep(30000);
   }
   sag("In der Division. Motor laeuft.");
@@ -787,7 +803,11 @@ export async function main(ns) {
       // `lvl = mult * (32*ln(exp+534,6) - 200)` einen festen Levelzuwachs,
       // und der wirkt mit Exponent 0,9 auf die competence.
       const a = 1 + stufe * 0.1;
-      const lvlPlus = 32 * Math.log((a + 0.1) / a);
+      // Mit dem Levelmultiplikator des Knotens (BN10: 0,4) und des Spielers -
+      // ohne ihn war der Zuwachs in BN10 mehr als doppelt so hoch angesetzt.
+      let lvlMult = Number(BN_MULT.DefenseLevelMultiplier) || 1;
+      try { lvlMult *= Number(ns.getPlayer().mults.defense) || 1; } catch { /* egal */ }
+      const lvlPlus = lvlMult * 32 * Math.log((a + 0.1) / a);
       let basis = 1;
       try { basis = Math.max(1, ns.getPlayer().skills.defense); } catch { /* egal */ }
       return 100 * (Math.pow((basis + lvlPlus) / basis, 0.9) - 1);
@@ -1764,7 +1784,8 @@ export async function main(ns) {
       // Aktionsdauer - und dann ist frueh feuern schneller als warten.
       if (ueberschuss >= e.rankLoss) return SICHER_BLACKOP;
     } catch { /* API unbekannt: unten weiter, vorsichtig */ }
-    const stern = e.rankLoss / (e.rankGain + e.rankLoss);
+    // rankGain kommt mit dem Knotenfaktor an, rankLoss nicht (Formulas.ts:39-40).
+    const stern = e.rankLoss / (e.rankGain * BB_RANK_MULT + e.rankLoss);
     return Math.min(0.95, stern + EINSATZ_ABSTAND);
   };
 
@@ -2700,7 +2721,9 @@ export async function main(ns) {
     //                    1,603 %, macht 1,87 Laeufe = 112 s. Bei Charisma 4
     //                    (Stand 31.08., 00:10) sind es 1,068 % und 2,81
     //                    Laeufe = 169 s.
-    //                    -> 252,7 Rang je 123 s = **123 Rang/min**
+    //                    -> 252,7 Rang je 180 s = **84,5 Rang/min** (bei
+    //                    Charisma 309 waren es 123 s = 123/min; die alte
+    //                    Zahl stand hier bis zum 02.09.)
     //     Assassination  Stufe 20   530,4 Rang je Lauf,  29 s
     //                    Chaos -5 bis +5 % (`:859`), im Mittel **null**.
     //                    -> **1.097 Rang/min**, Faktor 8,9

@@ -74,6 +74,15 @@ async function runde(ns) {
   ];
 
   const sag = (t) => { ns.print(t); ns.tprint("[bbtrain] " + t); };
+  // Herzschlag (02.09.2026): bn4net beendet und startet ein Werkzeug neu,
+  // dessen Telemetrie zu alt ist - bbtrain hatte keine. Steht am Kopf
+  // beider Schleifen unten.
+  const herzschlag = () => {
+    try {
+      ns.write("data/bbtrain.json", JSON.stringify({ zeit: Date.now(), host: ns.getHostname() }), "w");
+      if (ns.getHostname() !== "home") ns.scp("data/bbtrain.json", "home", ns.getHostname());
+    } catch { /* egal */ }
+  };
 
   // Schon drin? Dann gibt es hier nichts zu tun.
   // NICHT BEENDEN, SONDERN WARTEN (25.08.2026).
@@ -135,6 +144,7 @@ async function runde(ns) {
   };
   let letzterGrund = "";
   for (;;) {
+    herzschlag();
     let drin = false;
     try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
     if (!drin) break;
@@ -172,6 +182,7 @@ async function runde(ns) {
   // Ein Skript, das eine Vorbedingung nur beim Eintritt prueft, verlaesst sich
   // darauf, alleiniger Herr der Figur zu sein. Das ist es hier nie.
   for (;;) {
+    herzschlag();
     const p = ns.getPlayer();
     // Der niedrigste Wert zuerst. Das Tor ist ein Minimum ueber alle vier -
     // wer den hoechsten weitertreibt, kommt dem Ziel keinen Schritt naeher.
@@ -198,11 +209,14 @@ async function runde(ns) {
 
     const gym = GYM[stadt];
     if (!gym) {
-      // Kein Studio in dieser Stadt bekannt und die Reise ging nicht.
-      ns.write("data/hilfe.txt",
-        "bbtrain: kein Fitnessstudio fuer Stadt " + stadt + " hinterlegt und"
-        + " die Reise nach " + BESTES_GYM.stadt + " misslang.", "w");
-      sag("Kein Studio fuer " + stadt + " - Notruf gesetzt.");
+      // Kein Notruf mehr (02.09.2026): Die Reise scheitert nur am Geld
+      // (< 1 Mio), und das kommt von bn4life (Verbrechen) und dem Netz von
+      // selbst. Warten ist die Handlung.
+      if (letzterGrund !== "stadt") {
+        sag("Kein Studio fuer " + stadt + " und Reise nach " + BESTES_GYM.stadt
+          + " misslang (Konto " + (p.money / 1e6).toFixed(2) + " Mio) - warte auf Reisegeld.");
+        letzterGrund = "stadt";
+      }
       await ns.sleep(60000);
       continue;
     }
@@ -314,9 +328,10 @@ async function runde(ns) {
     // gekostet, an dem der Zwei-Stunden-Kontrollpunkt aus nodes/ROUTE.md haengt.
     if (ns.getHostname() !== "home") ns.scp("data/bbjoin.txt", "home", ns.getHostname());
   } else {
-    ns.write("data/hilfe.txt",
-      "bbtrain: Kampfwerte stehen auf " + ZIEL + ", aber der Beitritt zur"
-      + " Bladeburner-Division wurde abgelehnt.", "w");
-    sag("Beitritt abgelehnt - Notruf gesetzt.");
+    // Kein Notruf mehr (02.09.2026): Der Beitritt wird abgelehnt, wenn die
+    // Werte doch unter 100 liegen (Entropie, Einbau) oder der Knoten keine
+    // Division kennt (BitNode 8 - dort startet bn4net dieses Skript nicht).
+    // Die naechste Runde misst neu; das ist die Handlung.
+    sag("Beitritt abgelehnt - messe in einer Minute neu.");
   }
 }

@@ -69,9 +69,10 @@ export async function main(ns) {
   // Was traegt, ist das Gym. Die Erfahrung eines Sleeves geht mit `sync/100`
   // an den Spieler (`Sleeve/Work/Work.ts:22`), in BitNode 10 mindestens 25
   // Prozent, und die Gym-Rate haengt nicht an den Stufen, sondern am Gym und
-  // an den Erfahrungsmultiplikatoren. Bei gemessenen 13 Erfahrung je Sekunde
-  // beim Spieler sind das rund **+3,25/s**, also gut ein Viertel mehr - Tor 1
-  // faellt damit von 21,8 auf etwa 17,4 Stunden.
+  // an den Erfahrungsmultiplikatoren. Die Rate ist die des SLEEVES (10 exp/s
+  // im Powerhouse ohne Spielermultiplikatoren, `Work.ts:21`) mal sync: bei
+  // sync 25 also **+2,5/s je Sleeve** - nicht 3,25, das war die Spielerrate
+  // mal sync (Zahlen-Skeptiker 02.09.). Zwei Sleeves heben 12,6/s auf 17,6/s.
   // ZWEITER PARAMETER IST DER GYMNAME, NICHT DIE STADT, und die Statangabe
   // heisst "str"/"def"/"dex"/"agi" (`Work/Enums.ts:17-22`, GymType). Beides
   // um 20:53 falsch geraten - der Aufruf wurde abgelehnt und fiel still auf
@@ -109,8 +110,20 @@ export async function main(ns) {
   for (;;) {
     const stand = [];
     const keinGym = hackingweg();
-    for (let i = 0; i < MAX; i++) {
+    // Wie viele Sleeves gibt es wirklich? MAX ist nur die Schleifengrenze;
+    // der Geldboden unten rechnet mit den Koerpern, die zahlen.
+    let anzahl = 0;
+    for (let j = 0; j < MAX; j++) { try { ns.sleeve.getSleeve(j); anzahl++; } catch { break; } }
+    for (let i = 0; i < anzahl; i++) {
       let ok = false, was = "gym";
+      // Rueckstand und Werte je Sleeve: Telemetrie (tools/checkin.js wertet
+      // waehrend des Nachholbetriebs keine Rate) und Verbrechenswahl.
+      let storedCycles = 0, sleeveMin = 0;
+      try {
+        const sl = ns.sleeve.getSleeve(i);
+        storedCycles = Number(sl.storedCycles) || 0;
+        sleeveMin = Math.min(sl.skills.strength, sl.skills.defense, sl.skills.dexterity, sl.skills.agility);
+      } catch { break; }
       // NACH DEM BEITRITT FAEHRT DER SLEEVE KONTRAKTE (29.08.2026, 13:00).
       //
       // Gerechnet, nicht vermutet. `SleeveBladeburnerWork.ts:54` ruft
@@ -325,21 +338,48 @@ export async function main(ns) {
       //
       // Akut wurde das durch den Aug-Reset von 17:35: Der Sleeve steht bei
       // 14/1/1/11 und muss vier Werte gleichzeitig hochziehen.
+      // GELDBODEN UND NACHHOLBETRIEB (02.09.2026, Audit "volle Autonomie").
+      //
+      // Sleeves haben einen Zyklusdeckel von 15 je Takt (Sleeve.ts:263-275)
+      // und holen einen Rueckstand mit 15-facher Geschwindigkeit nach - im
+      // Powerhouse sind das 36.000 $/s je Sleeve. Am 02.09. um 06:00 stand
+      // das Konto nach fuenf Minuten bei -18,5 Mio; mit negativem Konto kauft
+      // der Bot weder Rechner noch Portknacker. Deshalb: Gym nur, wenn das
+      // Konto die Nachholphase ALLER Koerper plus einen Takt traegt, und
+      // darueber eine Reserve bleibt. Sonst Verbrechen - das bringt Geld.
+      //
+      // Und nicht denselben Wert wie die Figur: Ein ausgeschalteter Rechner
+      // schreibt beim Laden die zuletzt laufende Arbeit als Klumpen auf EINEN
+      // Wert (engine.tsx:280-282). Figur nimmt den niedrigsten, Sleeve i den
+      // (i+1)-niedrigsten - dann verteilt sich der Klumpen.
+      let gymGeldReicht = false;
       if (!ok && !keinGym) try {
+        const stored = Number((ns.sleeve.getSleeve(i) || {}).storedCycles) || 0;
+        const geld = ns.getPlayer().money;
+        const sekunden = stored / 5 + TAKT / 1000;
+        const koerper = anzahl + 1;   // Sleeves plus die Figur im Gym
+        gymGeldReicht = geld >= 2400 * sekunden * koerper + 20e6;
+        if (!gymGeldReicht && was === "gym") was = "arm";
+      } catch { gymGeldReicht = false; }
+      if (!ok && !keinGym && gymGeldReicht) try {
         const sk = (inDivision && sleeveSkills) ? sleeveSkills : ns.getPlayer().skills;
         const paare = [["str", sk.strength], ["def", sk.defense],
           ["dex", sk.dexterity], ["agi", sk.agility]];
         paare.sort((a, b) => a[1] - b[1]);
-        was = paare[0][0];
+        const platz = inDivision ? 0 : Math.min(i + 1, paare.length - 1);
+        was = paare[platz][0];
         ok = ns.sleeve.setToGymWorkout(i, GYM, was);
       } catch { ok = false; }
       if (!ok) {
-        // Im Hackingknoten bewusst ein Verbrechen, das Geld bringt.
-        was = keinGym ? "Mug" : VERBRECHEN;
+        // Im Hackingknoten oder bei knappem Konto bewusst ein Verbrechen,
+        // das Geld bringt: unter Kampfwert 40 ist Shoplift das bessere Geld
+        // (Chance 0,042 gegen 0,021 bei Mug), darueber Mug.
+        was = (keinGym || !gymGeldReicht) ? (sleeveMin < 40 ? "Shoplift" : "Mug") : VERBRECHEN;
         try { ok = ns.sleeve.setToCommitCrime(i, was); }
         catch { break; }   // ab hier gibt es keinen Sleeve mehr
       }
-      stand.push({ nr: i, gesetzt: ok, aufgabe: was });
+      stand.push({ nr: i, gesetzt: ok, aufgabe: was, stored: storedCycles,
+        grund: keinGym ? "hackingweg" : (!gymGeldReicht && was !== "gym" ? "arm" : "") });
     }
     ns.write("data/sleeve.json", JSON.stringify({
       zeit: Date.now(), gym: GYM, anzahl: stand.length,

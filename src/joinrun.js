@@ -89,6 +89,14 @@ export async function main(ns) {
       // Werte steigen ohnehin - bbtrain zieht sie auf 100, joinruns Ziel ist
       // 80. Es wartet einfach, bis sie da sind.
       const trainiertSchon = arbeit && arbeit.type === "CLASS";
+      // Geldboden wie in bbtrain.js (02.09.2026): unter 5 Mio kein Gym, sonst
+      // zieht das Powerhouse (2.400 $/s) das Konto ins Minus - und dann kauft
+      // niemand mehr Portknacker oder Rechner.
+      if (!trainiertSchon && ns.getPlayer().money < 5e6) {
+        sag("Konto unter 5 Mio - kein Gym, warte.");
+        await ns.sleep(60000);
+        continue;
+      }
       if (!trainiertSchon) {
         if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
         else sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);

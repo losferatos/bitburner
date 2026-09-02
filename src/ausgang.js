@@ -141,6 +141,12 @@ export async function main(ns) {
   sag("ausgang.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
   let letzterStart = 0;
+  // Nach einem Neustart die 15-Minuten-Sperre nach einem Start ohne Sprung
+  // nicht verlieren.
+  try {
+    const alt = JSON.parse(liesVonHome("data/ausgang.json"));
+    if (Number.isFinite(alt.letzterStart) && Date.now() - alt.letzterStart < 15 * TAKT_MS) letzterStart = alt.letzterStart;
+  } catch { /* keine alte Telemetrie */ }
   let overridesGemeldet = false;
   const uebersprungenGemeldet = new Set();
   const PROGRAMME = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe", "HTTPWorm.exe", "SQLInject.exe"];
@@ -152,6 +158,7 @@ export async function main(ns) {
       try { route = JSON.parse(liesVonHome("route.json")).route; } catch { route = null; }
       if (!Array.isArray(route) || !route.length) {
         if (letzteMeldung !== "route") { sag("route.json fehlt oder ist unlesbar - kein Ausgang moeglich."); letzteMeldung = "route"; }
+        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), fehler: "route.json fehlt oder unlesbar" }));
         await ns.sleep(TAKT_MS); continue;
       }
 
@@ -188,10 +195,13 @@ export async function main(ns) {
       if (plan.fertig) {
         if (letzteMeldung !== "fertig") { sag("Route abgearbeitet - kein weiterer Sprung."); letzteMeldung = "fertig"; }
         nachHome("data/fertig.txt", String(Date.now()));
+        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, fertig: true }));
         await ns.sleep(TAKT_MS); continue;
       }
       if (!plan.ziel) {
         if (letzteMeldung !== plan.grund) { sag(plan.grund); letzteMeldung = plan.grund; }
+        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, grund: plan.grund,
+          uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })) }));
         await ns.sleep(TAKT_MS); continue;
       }
       const ziel = plan.ziel;
@@ -343,6 +353,10 @@ export async function main(ns) {
       letzteMeldung = "";
     } catch (e) {
       sag("Fehler in der Runde: " + String(e));
+      // Telemetrie auch im Fehlerfall, sonst sieht bn4net nur "schreibt
+      // nichts" und startet alle 10 Minuten neu, ohne dass der Grund
+      // irgendwo steht.
+      try { nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), fehler: String(e), letzterStart })); } catch { /* egal */ }
     }
     await ns.sleep(TAKT_MS);
   }

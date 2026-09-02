@@ -118,6 +118,32 @@ Regeln:
 
 ## Sofort
 
+### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
+
+**Befund.** `lastAugReset` = `lastNodeReset` = 01.09. 15:59; 0 Augmentierungen
+installiert, 0 gekauft. `bn4rep.js` braucht 846,8 GB und meldet seit Stunden
+"passt auf werk-10 nie und findet auch sonst nirgends Platz".
+
+**Ursache (gemessen 18:00).** Der Park ist voll: 15 von 15 Rechnern
+(`CloudServerLimit 0,6` in BN10), der groesste ist werk-10 mit **512 GB**;
+home hat 1024 GB, davon 256 als Reserve frei. Der Kaufzweig der Leiter ist
+damit zu; der Ausbauzweig (`bn4net.js:750-775`) ruestet immer den
+**kleinsten** Rechner auf (werk-0 64 -> 128 GB) und haengt am
+Amortisationsdeckel - er erreicht in diesem Lauf nie 1024 GB fuer einen
+einzigen Rechner. Konto 5,7 Mrd; 2048 GB kosten 907 Mio (Ausbau von
+werk-10 ~700 Mio).
+
+**Folge.** Der ganze Lauf 2 ohne Augmentierungen: Kampfmultiplikatoren
+bleiben bei den SF-Boni 1,262, Bladeburner-Mults bei 1,0. Lauf 1 hatte die
+Runde (ENTSCHIEDEN: "erst das Paket graften, dann EINMAL einbauen").
+
+**Erwartet.** Der Ausbau muss die Werkzeuge kennen: Wartet ein Werkzeug auf
+Platz (`fehlend` mit "passt nirgends"), ist der Ausbau des GROESSTEN
+Rechners auf die noetige Groesse die richtige Handlung, unabhaengig vom
+Amortisationsdeckel - der zaehlt nur Hackertrag, nicht das, was bn4rep an
+Augmentierungen bringt. Skeptiker-Lauf noetig (bn4net, unbeaufsichtigt).
+
+
 ### ERLEDIGT 02.09., 18:05: ausgang.js + route.json - der Bot springt selbst (Umbau I.1 des Audits)
 
 `src/ausgang.js` (singularityfrei, ganz oben in der Werkzeugliste) liest

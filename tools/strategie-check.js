@@ -484,8 +484,14 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // Die Liste steht auch in src/bn4rep.js und tools/wache.js unter demselben
   // Namen - drei Prozesse ohne gemeinsamen Modulraum, aber ein grep nach
   // BLADE_KNOTEN zeigt jede Fundstelle (29.08.2026, 09:15).
-  const BLADE_KNOTEN = [6, 7, 10];
-  const bladeKnoten = BLADE_KNOTEN.includes(knotenFrueh);
+  // Seit dem 02.09.2026 sagt data/verfahren.txt (von ausgang.js), ob der
+  // Knoten ueber Bladeburner (V2) oder Hacking (V1) laeuft. Die alte Liste
+  // [6, 7, 10] galt fuer acht Knoten der Route nicht.
+  const verfahrenTxt = (await hole("data/verfahren.txt")) || "";
+  const vt = verfahrenTxt.trim().split(/\s+/);
+  const verfahrenBekannt = Number(vt[1]) === knotenFrueh && ["V1", "V1b", "V2"].includes(vt[0]);
+  const bladeKnoten = verfahrenBekannt ? vt[0] === "V2" : true;
+  const BLADE_KNOTEN = { includes: (k) => (Number(vt[1]) === k && verfahrenBekannt) ? vt[0] === "V2" : true };
 
   let bb = await frischerSteckbrief();
   const kanalWarBelegt = !!(bb && bb.__kanalBelegt);

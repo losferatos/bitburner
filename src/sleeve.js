@@ -89,8 +89,26 @@ export async function main(ns) {
   // wirft nur.
   const MAX = 3;
 
+  // IN HACKINGKNOTEN KEIN GYM (02.09.2026, Skeptiker zum Ausgang-Umbau).
+  //
+  // ausgang.js legt data/verfahren.txt auf home ab ("V1 5 2" = Hackingweg,
+  // Knoten 5, Stufe 2). In V1-Knoten (1, 5, 12, 8) tritt niemand der Division
+  // bei; Kampfwerte der Sleeves sind dort wertlos, das Gym kostet trotzdem
+  // 2.400 $/s je Koerper - in BitNode 8 ohne Hackgeld die Minus-Spirale vom
+  // 02.09., 06:00. Dort: Verbrechen (bringt Geld), kein Gym.
+  const hackingweg = () => {
+    try {
+      if (!ns.fileExists("data/verfahren.txt", "home")) return false;
+      if (ns.getHostname() !== "home") ns.scp("data/verfahren.txt", ns.getHostname(), "home");
+      const teile = ns.read("data/verfahren.txt").trim().split(/\s+/);
+      return Number(teile[1]) === ns.getResetInfo().currentNode
+        && (teile[0] === "V1" || teile[0] === "V1b");
+    } catch { return false; }
+  };
+
   for (;;) {
     const stand = [];
+    const keinGym = hackingweg();
     for (let i = 0; i < MAX; i++) {
       let ok = false, was = "gym";
       // NACH DEM BEITRITT FAEHRT DER SLEEVE KONTRAKTE (29.08.2026, 13:00).
@@ -307,7 +325,7 @@ export async function main(ns) {
       //
       // Akut wurde das durch den Aug-Reset von 17:35: Der Sleeve steht bei
       // 14/1/1/11 und muss vier Werte gleichzeitig hochziehen.
-      if (!ok) try {
+      if (!ok && !keinGym) try {
         const sk = (inDivision && sleeveSkills) ? sleeveSkills : ns.getPlayer().skills;
         const paare = [["str", sk.strength], ["def", sk.defense],
           ["dex", sk.dexterity], ["agi", sk.agility]];
@@ -316,8 +334,9 @@ export async function main(ns) {
         ok = ns.sleeve.setToGymWorkout(i, GYM, was);
       } catch { ok = false; }
       if (!ok) {
-        was = VERBRECHEN;
-        try { ok = ns.sleeve.setToCommitCrime(i, VERBRECHEN); }
+        // Im Hackingknoten bewusst ein Verbrechen, das Geld bringt.
+        was = keinGym ? "Mug" : VERBRECHEN;
+        try { ok = ns.sleeve.setToCommitCrime(i, was); }
         catch { break; }   // ab hier gibt es keinen Sleeve mehr
       }
       stand.push({ nr: i, gesetzt: ok, aufgabe: was });

@@ -118,6 +118,32 @@ Regeln:
 
 ## Sofort
 
+### ERLEDIGT 02.09., 18:05: ausgang.js + route.json - der Bot springt selbst (Umbau I.1 des Audits)
+
+`src/ausgang.js` (singularityfrei, ganz oben in der Werkzeugliste) liest
+`src/route.json` und `ns.getResetInfo()`, schreibt `data/verfahren.txt`
+(V1/V2 fuer bn4rep, bn4net, sleeve) und startet `exit.js` auf dem Wirt mit
+Platz, sobald eine der beiden Tueren offen ist. Kein Handsprung, keine
+Rueckfrage, kein `exit-ziel.txt`, kein Selbstsprung-Guard, keine
+Obergrenze 13, kein `BLADE_KNOTEN`. Drei Skeptiker (Logik, Betrieb,
+Anschluss) haben 19 Befunde geliefert, alle eingebaut oder begruendet
+abgelehnt - siehe Commit `[skeptiker]`. `node tools/test-route.js` prueft
+alle 39 Spruenge.
+
+**Offen aus dem Skeptiker-Lauf (nicht Teil dieses Umbaus):**
+- **BN9 hat fuer exit.js (519 GB mit SF4.1) meist keinen Wirt** - keine
+  Mietrechner, Fremdrechner >= 520 GB nur fulcrumtech bei 2 von 5 Wuerfen.
+  Das BN9-Gewerk (`hashes.js`, Audit I.6) muss einen Hacknet-Server auf
+  >= 640 GB bringen oder homegrow dort auf 1024 GB zielen. Bis `hashes.js`
+  liegt, ueberspringt die Route BN9 und meldet das bei jedem Laufbeginn.
+- `boerse.js` (BN8) existiert nicht - BN8 wird uebersprungen, bis es liegt.
+- Geldboden fuer Sleeves/Kurse (Audit I.2) bleibt der naechste Umbau.
+
+Damit erledigt: "Der Bot erkennt den Black-Ops-Ausgang nicht" (31.08.),
+"KURS.md gilt fuer Lauf 1" (Ziel und Verfahren kommen jetzt aus
+`data/ausgang.json`), Skill `/bb` Abschnitt 3 (Handsprung) gestrichen.
+
+
 ### AUDIT VOLLE AUTONOMIE liegt vor - Reihenfolge der Umbauten steht dort (02.09., 17:20)
 
 `nodes/AUDIT-AUTONOMIE-2026-09-02.md` (Synthese) und

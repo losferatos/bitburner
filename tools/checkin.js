@@ -105,8 +105,15 @@ async function main() {
   const lage = await holeJson("data/bblage.json");
   const netz = await holeJson("data/bn4net.json");
   const hilfe = await hole("data/hilfe.txt");
+  // Seit dem 02.09.2026 entscheidet ausgang.js ueber den Sprung; seine
+  // Telemetrie ist die erste Quelle fuer "wo stehen wir" und "ist der
+  // Ausgang offen". data/verfahren.txt sagt, ob der Knoten ueber Bladeburner
+  // (V2) oder Hacking (V1) laeuft - in V1-Knoten gibt es keinen Rang.
+  const ausgang = await holeJson("data/ausgang.json");
+  const ausgangTxt = (await hole("data/ausgang.txt")) || "";
+  const verfahrenTxt = ((await hole("data/verfahren.txt")) || "").trim().split(/\s+/);
 
-  if (!blade && !lage && !netz) {
+  if (!blade && !lage && !netz && !ausgang) {
     sag("Keine Telemetrie. Entweder laeuft die Bruecke nicht (node sync/bridge.js)");
     sag("oder das Spiel ist zu. Beides ist von hier aus nicht zu unterscheiden.");
     sag("URTEIL: BLIND");
@@ -123,10 +130,10 @@ async function main() {
   // Datei liest, sieht den alten Knoten - und haelt einen geglueckten Wechsel
   // fuer einen gescheiterten.
   const alterVon = (d) => (d ? Date.now() - Number(d.zeit || 0) : Infinity);
-  const quelle = [blade, lage, netz].filter(Boolean)
+  const quelle = [blade, lage, netz, ausgang].filter(Boolean)
     .sort((a, b) => alterVon(a) - alterVon(b))[0];
   const alter = alterVon(quelle);
-  const knoten = Number((netz || lage || {}).knoten) || null;
+  const knoten = Number((ausgang || netz || lage || {}).knoten) || null;
 
   // Einzelne Dateien koennen weit aelter sein als die frischeste. Sie dann
   // stillschweigend mitzulesen erzeugt genau den Mischbericht von oben:
@@ -147,6 +154,27 @@ async function main() {
     sag("Zum Weiterspielen: Bitburner-Tab oeffnen, der Bot laeuft von selbst an.");
     sag("URTEIL: SPIEL ZU");
     return ausgeben(zeilen, { ...bericht, urteil: "SPIEL ZU" });
+  }
+
+  // --- 1b. Der Ausgang: laeuft ausgang.js, und was sagt es? ---------------
+  const ausgangGut = ausgang && alterVon(ausgang) <= Math.max(VERALTET_MS, alter * 3) ? ausgang : null;
+  const verfahren = (Number(verfahrenTxt[1]) === knoten && ["V1", "V1b", "V2"].includes(verfahrenTxt[0]))
+    ? verfahrenTxt[0] : (ausgangGut ? ausgangGut.verfahren : null);
+  const hackingweg = verfahren === "V1" || verfahren === "V1b";
+  bericht.verfahren = verfahren;
+  if (ausgangGut) {
+    const l = ausgangGut.lauf, z = ausgangGut.ziel;
+    sag("BitNode " + knoten + (l ? " Lauf " + l.level : "") + (verfahren ? " (" + verfahren + ")" : "")
+      + (z ? ", Ziel danach BitNode " + z.node + " Stufe " + z.level : ", kein Ziel mehr in der Route") + ".");
+    for (const u of ausgangGut.uebersprungen || []) {
+      sag("Hinweis: BitNode " + u.node + " Stufe " + u.level + " wird uebersprungen - " + u.braucht + " fehlt auf home.");
+    }
+    bericht.ausgang = { offen: ausgangGut.offen, ziel: z, letzterStart: ausgangGut.letzterStart, status: ausgangGut.status };
+  } else {
+    sag("ACHTUNG: data/ausgang.json ist " + (ausgang ? dauer(std(alterVon(ausgang))) + " alt" : "nicht da")
+      + " - ausgang.js laeuft nicht. Ohne dieses Skript springt am Ende des Knotens NIEMAND."
+      + " Starten: node tools/task.js ausgang.js");
+    bericht.ausgangFehlt = true;
   }
 
   // --- 2. Hat der Bot selbst um Hilfe gerufen? -----------------------------
@@ -200,18 +228,42 @@ async function main() {
     bericht.rangReichtOhneListe = true;
   }
 
-  if (resetBereit) {
-    sag("AUSGANG OFFEN: alle " + BLACKOPS_GESAMT + " Black Ops sind durch"
-      + (Number.isFinite(rang) ? " (Rang " + zahl(rang) + ")" : "") + ".");
-    sag("Der Knoten ist abgeschlossen - es fehlt nur noch der Sprung.");
+  // DER SPRUNG IST SACHE VON ausgang.js (02.09.2026). Hier wird nur noch
+  // gelesen, ob er laeuft, klemmt oder an einem fehlenden Gewerk haengt.
+  const letzteAusgangZeile = ausgangTxt.trim().split("\n").pop() || "";
+  if (ausgangGut && ausgangGut.offen) {
+    if (ausgangGut.letzterStart > 0) {
+      sag("AUSGANG OFFEN (" + ausgangGut.status + ") - exit.js gestartet vor "
+        + dauer(std(Date.now() - ausgangGut.letzterStart)) + ". Letzte Zeile: " + letzteAusgangZeile);
+      sag("In einer Minute erneut messen: steht dann der neue Knoten, ist der Wechsel geglueckt.");
+      sag("");
+      sag("FERTIG VORAUSSICHTLICH: jetzt - der Sprung laeuft.");
+      sag("URTEIL: SPRINGT");
+      return ausgeben(zeilen, { ...bericht, urteil: "SPRINGT" });
+    }
+    if (!ausgangGut.ziel) {
+      sag("AUSGANG OFFEN, aber kein Ziel: " + letzteAusgangZeile);
+      sag("");
+      sag("FERTIG VORAUSSICHTLICH: der Knoten ist fertig - es fehlt das Gewerk fuer den naechsten.");
+      sag("URTEIL: GEWERK FEHLT");
+      return ausgeben(zeilen, { ...bericht, urteil: "GEWERK FEHLT" });
+    }
+    sag("AUSGANG OFFEN (" + ausgangGut.status + "), aber exit.js ist nicht gestartet. Letzte Zeile: " + letzteAusgangZeile);
+    if (ausgangGut.wirtFehlt) sag("Kein Rechner fuer exit.js (" + Number(ausgangGut.wirtFehlt.braucht).toFixed(1)
+      + " GB): bester Wirt " + ausgangGut.wirtFehlt.besterWirt + " mit "
+      + Number(ausgangGut.wirtFehlt.moeglich || 0).toFixed(1) + " GB. Groesserer Rechner oder home-Ausbau noetig.");
     sag("");
-    // Die Schlusszeile steht auch hier, damit sie in JEDEM Lauf an derselben
-    // Stelle steht. `fertigZeile()` waere hier nutzlos - es gibt nichts mehr
-    // zu schaetzen - und wuerde ausserdem auf `restNetto` in der temporalen
-    // Todeszone greifen.
-    sag("FERTIG VORAUSSICHTLICH: jetzt - der Knoten wartet nur noch auf den Sprung.");
-    sag("URTEIL: RESET BEREIT");
-    return ausgeben(zeilen, { ...bericht, urteil: "RESET BEREIT", resetBereit: true });
+    sag("FERTIG VORAUSSICHTLICH: jetzt - sobald exit.js Platz findet.");
+    sag("URTEIL: SPRUNG KLEMMT");
+    return ausgeben(zeilen, { ...bericht, urteil: "SPRUNG KLEMMT" });
+  }
+  if (resetBereit && !ausgangGut) {
+    sag("AUSGANG OFFEN: alle " + BLACKOPS_GESAMT + " Black Ops sind durch"
+      + (Number.isFinite(rang) ? " (Rang " + zahl(rang) + ")" : "") + " - aber ausgang.js laeuft nicht, also springt niemand.");
+    sag("");
+    sag("FERTIG VORAUSSICHTLICH: jetzt - sobald ausgang.js laeuft (node tools/task.js ausgang.js).");
+    sag("URTEIL: AUSGANG FEHLT");
+    return ausgeben(zeilen, { ...bericht, urteil: "AUSGANG FEHLT" });
   }
 
   // --- 4. Wie weit ist es noch, gemessen in Spielzeit? ---------------------
@@ -235,6 +287,21 @@ async function main() {
   // rechnete die Schlusszeile mit `restNetto = NaN` und stuerzte in
   // `new Date(NaN).toISOString()` ab - ausgerechnet im ersten Lauf des neuen
   // Knotens.
+  // HACKINGWEG (V1): kein Rang, der Traeger ist das Hacking-Level gegen
+  // w0r1d_d43m0n. ausgang.js liefert den Stand in `status`.
+  if (hackingweg) {
+    sag("Hackingweg: " + (ausgangGut ? ausgangGut.status : "kein Stand (ausgang.js laeuft nicht)")
+      + (netz && Number.isFinite(Number(netz.hacking)) ? "; Hacking laut Netz " + netz.hacking : "") + ".");
+    if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
+      + " gerootet, Runde " + (netz.runde ?? "?") + ", Geld $" + zahl(netz.geld ?? 0) + ".");
+    sag("");
+    sag("FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - fuer den Hackingweg gibt es hier"
+      + " noch keine Rate (Level gegen Ziel steht oben).");
+    const u = bericht.hilfe ? "HILFE" : bericht.ausgangFehlt ? "AUSGANG FEHLT" : "HACKINGWEG";
+    sag("URTEIL: " + u);
+    return ausgeben(zeilen, { ...bericht, urteil: u });
+  }
+
   if (!Number.isFinite(rang)) {
     sag("BitNode " + (knoten ?? "?") + ": kein Bladeburner-Rang messbar - der"
       + " Knoten ist frisch, die Division noch nicht offen.");
@@ -245,8 +312,9 @@ async function main() {
       + " Bladeburner-Division traegt das Kampfwerttraining, nicht der Rang."
       + " `node tools/tor.js` rechnet diese Phase aus; danach steht die Zahl"
       + " hier wieder.");
-    sag("URTEIL: " + (bericht.hilfe ? "HILFE" : "ANLAUF"));
-    return ausgeben(zeilen, { ...bericht, urteil: bericht.hilfe ? "HILFE" : "ANLAUF" });
+    const u = bericht.hilfe ? "HILFE" : bericht.ausgangFehlt ? "AUSGANG FEHLT" : "ANLAUF";
+    sag("URTEIL: " + u);
+    return ausgeben(zeilen, { ...bericht, urteil: u });
   }
 
   sag("BitNode " + (knoten ?? "?") + ", Rang " + zahl(rang) + " von " + zahl(DAEDALUS_RANG)
@@ -307,6 +375,7 @@ async function main() {
     sag("Der Rang steht seit dem letzten Check-in still - hier stimmt etwas nicht.");
     urteil = "STEHT";
   }
+  if (bericht.ausgangFehlt) urteil = "AUSGANG FEHLT";
   if (bericht.hilfe) urteil = "HILFE";
 
   // --- 5. Was der Bot gerade tut -------------------------------------------
@@ -401,7 +470,7 @@ async function main() {
     }
     if (alsJson) console.log(JSON.stringify(b, null, 1));
     else console.log(z.join("\n"));
-    process.exitCode = ["AUF KURS", "RESET BEREIT", "ANLAUF"].includes(b.urteil) ? 0 : 1;
+    process.exitCode = ["AUF KURS", "ANLAUF", "HACKINGWEG", "SPRINGT"].includes(b.urteil) ? 0 : 1;
   }
 }
 

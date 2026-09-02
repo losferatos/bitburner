@@ -72,8 +72,35 @@ export async function main(ns) {
   // der Zeit VOR dem Neuanlauf ist immer veraltet.
   for (const datei of ["data/install-sperre.txt", "data/beitritt-erledigt.txt",
                        "data/rep-modus.txt", "data/company-order.txt",
-                       "data/geldbedarf.txt", "data/reload.txt"]) {
+                       "data/geldbedarf.txt", "data/reload.txt", "data/hilfe.txt"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
+  }
+  // KNOTENGEBUNDENE DATEIEN NUR NACH EINEM KNOTENWECHSEL (02.09.2026).
+  //
+  // boot.js ist auch der Rueckruf von installAugmentations (bn4rep.js). Ein
+  // Auftrag in data/task.txt aus der Minute vor einem Einbau ist danach noch
+  // gueltig - nach einem Knotenwechsel nicht (derselbe Mechanismus wie
+  // reload.txt oben). Deshalb hier die Unterscheidung ueber lastNodeReset.
+  //   data/exit-ziel.txt: hat keinen Schreiber mehr, das Ziel rechnet
+  //     ausgang.js aus route.json.
+  //   data/simulacrum.txt: Augmentierungen sind beim Wechsel weg, der Marker
+  //     wuerde blade.js den Graft-Riegel loesen lassen.
+  //   data/exit.txt: Protokoll des alten Sprungs, sonst liest ausgang.js
+  //     eine fremde "letzte Zeile".
+  // data/verfahren.txt wird ABSICHTLICH nicht geloescht: alle Leser
+  // (bn4net, bn4rep, sleeve, ausgang) pruefen den Knoten in der Datei, und
+  // ausgang.js ueberschreibt sie in seiner ersten Runde. Eine Loeschung
+  // hier haette nach jedem Einbau in einem Hackingknoten blade.js und
+  // bbtrain.js in derselben synchronen bn4net-Runde gestartet, in der
+  // ausgang.js die Datei noch nicht geschrieben hatte (Skeptiker 02.09.).
+  let nachKnotenwechsel = true;
+  try { nachKnotenwechsel = Date.now() - ns.getResetInfo().lastNodeReset < 300000; }
+  catch { /* kein Zugriff - im Zweifel wie nach einem Wechsel raeumen */ }
+  if (nachKnotenwechsel) {
+    for (const datei of ["data/task.txt", "data/exit-ziel.txt",
+                         "data/simulacrum.txt", "data/exit.txt"]) {
+      if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt (Knotenwechsel): " + datei); }
+    }
   }
 
   // Bis zu zwanzig Minuten lang versuchen. So lange braucht es nie, aber ein

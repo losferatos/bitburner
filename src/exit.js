@@ -115,8 +115,13 @@ export async function main(ns) {
       if (!ns.fileExists(datei, "home")) { sag("Fehlt: " + datei); continue; }
       try { fn(WD); } catch (e) { sag(datei + ": " + e); }
     }
-    try { ns.nuke(WD); sag("Root auf " + WD + " geholt."); }
+    // nuke wirft bei zu wenig offenen Ports NICHT, es gibt false zurueck
+    // (NetscriptFunctions.ts:541-544) - der Rueckgabewert entscheidet.
+    let root = false;
+    try { root = ns.nuke(WD); }
     catch (e) { sag("nuke fehlgeschlagen: " + e); return; }
+    if (!root) { sag("nuke: zu wenig Ports offen, kein Root auf " + WD + "."); return; }
+    sag("Root auf " + WD + " geholt.");
   }
 
   if (nurPruefen) {

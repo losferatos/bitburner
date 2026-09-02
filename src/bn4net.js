@@ -250,6 +250,15 @@ export async function main(ns) {
     // bbtrain.js steht bewusst NICHT hier: Es raeumt einmalig das
     // Beitrittstor weg (alle Kampfwerte auf 100) und beendet sich danach -
     // diese Liste wuerde es ewig neu starten.
+    // DER AUSGANG STEHT GANZ OBEN (02.09.2026).
+    //
+    // ausgang.js entscheidet allein, wann und wohin der Knoten verlassen
+    // wird (route.json + ns.getResetInfo, beide Wege). Es ist
+    // singularityfrei und rund 9 GB gross - passt neben bn4net auf ein
+    // frisches 32-GB-home und ist damit das einzige Werkzeug, das in JEDEM
+    // Zustand laeuft. Vorher wohnte der Ausgang in bn4rep.js (848 GB
+    // ausserhalb BitNode 4) und lief die halbe Laufzeit gar nicht.
+    ["ausgang.js", []],
     ["blade.js", []],
     // bbtrain gehoert HIERHER, nicht danebenn (25.08.2026).
     //
@@ -2625,7 +2634,36 @@ export async function main(ns) {
     }
 
     if (werkbank) {
-      const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d));
+      // IN HACKINGKNOTEN KEIN BLADEBURNER-GERUEST (02.09.2026).
+      //
+      // ausgang.js legt das Verfahren dieses Laufs in data/verfahren.txt ab
+      // ("V1 5 2" = Hackingweg, Knoten 5, Stufe 2). In V1-Knoten (1, 5, 12,
+      // 8) tragen Black Ops nichts; bbtrain wuerde trotzdem die Figur ins
+      // Gym stellen und blade.js Speicher belegen - in BitNode 8 wird der
+      // Beitritt abgelehnt und bbtrain rief alle 30 s stopAction(). Fehlt
+      // die Datei oder gehoert sie zu einem anderen Knoten, gilt V2 (der
+      // haeufigere Fall auf der Route).
+      const verfahrenV1 = (() => {
+        try {
+          const teile = ns.read("data/verfahren.txt").trim().split(/\s+/);
+          return Number(teile[1]) === ns.getResetInfo().currentNode
+            && (teile[0] === "V1" || teile[0] === "V1b");
+        } catch { return false; }
+      })();
+      const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d)
+        && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js")));
+      // Laufende Instanzen im Hackingknoten beenden - der Filter oben wirkt
+      // nur auf den Start. Ohne das haelt ein Handstart oder eine Runde, in
+      // der die Datei kurz fehlte, das Bladeburner-Geruest den ganzen Lauf am
+      // Leben (Skeptiker 02.09.).
+      if (verfahrenV1) {
+        for (const d of ["blade.js", "bbtrain.js"]) {
+          for (const w of orte.get(d) || []) {
+            ns.kill(w.pid);
+            sag(d + " im Hackingknoten beendet (" + w.host + ", pid " + w.pid + ").");
+          }
+        }
+      }
       // WAS GILT GERADE ALS FEHLEND? (29.08.2026, 15:20)
       //
       // Am 29.08. lief sleeve.js von 12:53 bis 14:17 nicht. Im Log steht der

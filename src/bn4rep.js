@@ -67,10 +67,32 @@ export async function main(ns) {
   //
   // Die Liste steht jetzt an genau einer Stelle. Wer einen Kampfknoten
   // ergaenzt, aendert diese Zeile - und nichts sonst.
-  const BLADE_KNOTEN = [6, 7, 10];
+  // DAS VERFAHREN KOMMT AUS DER ROUTE, NICHT AUS EINER LISTE (02.09.2026).
+  //
+  // Hier stand `BLADE_KNOTEN = [6, 7, 10]`. ausgang.js legt je Runde
+  // data/verfahren.txt auf home ab: "V2 10 2" = Verfahren, Knoten, Stufe
+  // dieses Laufs - abgeleitet aus route.json und ns.getResetInfo(). Die
+  // Route faehrt Bladeburner in acht Knoten, die in der Liste nie standen
+  // (4, 9, 2, 3, 11, 13, 14, 15).
+  //
+  // RUECKFALL IST V2, NICHT DIE LISTE (Skeptiker 02.09.). Fehlt die Datei
+  // oder stammt sie aus einem anderen Knoten, laeuft ausgang.js nicht - dann
+  // soll bn4rep dasselbe annehmen wie bn4net (das blade.js und bbtrain in
+  // dem Fall startet): Kampfknoten, also Einbausperre vor dem Beitritt und
+  // keine Faktionsarbeit. Zwei verschiedene Rueckfaelle waren der Vorfall vom
+  // 25.08. (Faktionsarbeit gegen Bladeburner-Aktion im Sekundentakt) in
+  // acht neuen Knoten.
   const bladeburnerTraegtHier = () => {
-    try { return BLADE_KNOTEN.includes(ns.getResetInfo().currentNode); }
-    catch { return false; }   // kein Zugriff heisst: vorsichtig sein
+    try {
+      const knoten = ns.getResetInfo().currentNode;
+      if (ns.fileExists("data/verfahren.txt", "home")) {
+        if (ns.getHostname() !== "home") ns.scp("data/verfahren.txt", ns.getHostname(), "home");
+        const teile = ns.read("data/verfahren.txt").trim().split(/\s+/);
+        if (Number(teile[1]) === knoten && (teile[0] === "V1" || teile[0] === "V1b")) return false;
+      }
+      return true;
+    }
+    catch { return true; }   // kein Zugriff heisst: vorsichtig sein, also Kampfknoten
   };
 
   // Der Ausgangsschluessel. Steht HIER OBEN und nicht bei einzelWert weiter
@@ -336,22 +358,10 @@ export async function main(ns) {
     }
   };
 
-  // DER NOTRUF NACH DRAUSSEN.
-  //
-  // Alles, was der Bot bisher zu sagen hatte, ging ins Spiellog - und das
-  // liest nur, wer ohnehin gerade hinsieht. Fuer den einen Fall, in dem er
-  // wirklich einen Menschen braucht, ist das zu wenig: data/hilfe.txt wird
-  // von tools/wache.js alle drei Minuten gelesen und landet als Push auf dem
-  // Handy.
-  //
-  // Deshalb ist die Leitung bewusst SCHMAL. Sie ist nicht fuer Meldungen,
-  // sondern nur fuer "ohne dich geht es nicht weiter" - jede Zeile hier
-  // klingelt bei Eric. Wer sie fuer Fortschritt benutzt, hat sie kaputt
-  // gemacht, denn dann schaltet er sie ab (so ist es der Wache am 24.08.
-  // ergangen).
-  const rufeMenschen = (text) => {
-    schreibNachHome("data/hilfe.txt", text);
-  };
+  // Hier stand `rufeMenschen` - der Notruf nach draussen ueber
+  // data/hilfe.txt. Seit dem 02.09.2026 hat er keinen Aufrufer mehr: Der
+  // Ausgang wohnt in ausgang.js und kennt keinen Zustand, in dem ein Mensch
+  // gebraucht wird; die Leitung (tools/wache.js, ntfy) ist seit 31.08. aus.
 
   const geldText = (n) => {
     for (const [t, k] of [[1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
@@ -875,71 +885,22 @@ export async function main(ns) {
         + " Hacking-Level (" + spieler.skills.hacking + " von " + zielLevel + ").");
     }
 
-    // --- DEN KNOTEN VERLASSEN, WENN BEIDE BEDINGUNGEN STEHEN ----------------
+    // --- DEN KNOTEN VERLASSEN: DAS TUT SEIT DEM 02.09.2026 ausgang.js ----
     //
-    // exit.js und boot.js waren gebaut, aber niemand rief sie auf - gebaut ist
-    // nicht verdrahtet. Ohne diesen Block laege der Bot mit erfuelltem
-    // Ausgang da und arbeitete weiter an Reputation, die er nicht mehr
-    // braucht.
+    // Hier stand der Ausgang: Bedingung `The Red Pill` plus Hacking-Level,
+    // Ziel aus data/exit-ziel.txt (die nur ein Mensch schrieb), Riegel gegen
+    // den eigenen Knoten und gegen Ziele ueber 13, exec von exit.js fest auf
+    // home. Unter der Praemisse "kein Mensch" war das ein Stillstand an jedem
+    // Uebergang: Die Route verlangt 25 Spruenge in denselben Knoten und 6
+    // nach BitNode 14/15, der Black-Ops-Weg wurde gar nicht erkannt, und
+    // exit.js (519 GB mit SF4.1) passte auf kein home. Am 01.09. musste ein
+    // Mensch den fertigen Knoten abschliessen.
     //
-    // Das Ziel steht in data/exit-ziel.txt und laesst sich von aussen
-    // vorgeben. Ohne Datei gilt BitNode 5: Er hat WorldDaemonDifficulty 1,5
-    // (die niedrigste ueberhaupt), braucht keine NeuroFlux-Stufen, und SF5
-    // gibt acht Prozent je Stufe auf `hacking` UND `hacking_exp` - dazu
-    // formulas.exe zum Nulltarif und dauerhafte Intelligence, die in jedem
-    // weiteren Knoten wirkt. Begruendung in nodes/ROADMAP-KORREKTUR.md.
+    // ausgang.js (singularityfrei, ganz oben in der Werkzeugliste) kennt
+    // beide Wege, liest route.json und startet exit.js dort, wo Platz ist.
+    // bn4rep tut bei erfuelltem Hackingweg nur noch eines: nichts mehr
+    // kaufen und nichts mehr einbauen, damit der Sprung sauber kommt.
     if (ausgangSteht && spieler.skills.hacking >= zielLevel) {
-      // NIE IN DEN EIGENEN KNOTEN AUSSTEIGEN (24.08.2026).
-      //
-      // Hier stand `|| 5` als Vorgabe - gesetzt, als der Bot in BitNode 4 sass
-      // und BitNode 5 das Ziel war. Am 24.08. um 20:42 stand der Bot in
-      // BitNode 5, zwanzig Minuten vor dem Ausgang, und data/exit-ziel.txt
-      // enthielt weiterhin die 5. Der naechste Schritt waere gewesen: Knoten
-      // verlassen, in denselben Knoten zurueckkehren, alles von vorn - ohne
-      // dass irgendetwas es gemeldet haette, denn aus Sicht des Bots waere der
-      // Uebergang geglueckt.
-      //
-      // Eine Vorgabe, die zufaellig richtig war, ist keine Vorgabe. Steht
-      // nichts oder steht der eigene Knoten da, wird nicht geraten, sondern
-      // ein Mensch gerufen - der Ausgang ist der teuerste Moment des ganzen
-      // Laufs, und ein falscher Sprung kostet den Knoten zweimal.
-      const zielRoh = Number(liesVonHome("data/exit-ziel.txt"));
-      const eigenerKnoten = ns.getResetInfo().currentNode;
-      if (!Number.isInteger(zielRoh) || zielRoh < 1 || zielRoh > 13
-          || zielRoh === eigenerKnoten) {
-        rufeMenschen("AUSGANG BLOCKIERT: data/exit-ziel.txt sagt \""
-          + liesVonHome("data/exit-ziel.txt") + "\", wir sind in BitNode "
-          + eigenerKnoten + ". Zielknoten setzen, sonst geht es nicht weiter.");
-        sag("Ausgang offen, aber der Zielknoten ist unbrauchbar ("
-          + zielRoh + ") - kein Sprung. data/exit-ziel.txt setzen.");
-        await ns.sleep(15000);
-        continue;
-      }
-      const zielKnoten = zielRoh;
-      if (!ns.fileExists("exit.js", "home")) {
-        sag("AUSGANG OFFEN, aber exit.js fehlt auf home - hier muss ein"
-          + " Mensch nachsehen.");
-        // DIE NOTRUFLEITUNG (24.08.2026). Bis hierher konnte der Bot nur ins
-        // Spiellog schreiben - und das liest nur jemand, der ohnehin
-        // hinsieht. Genau dieser Fall ist aber der teuerste ueberhaupt: Der
-        // Knoten ist geschafft, der Bot koennte weiter, und er steht wegen
-        // einer fehlenden Datei. tools/wache.js liest data/hilfe.txt alle
-        // drei Minuten und schickt den Inhalt aufs Handy.
-        rufeMenschen("Knoten fertig, aber exit.js fehlt auf home."
-          + " Der Wechsel in den naechsten BitNode klemmt.");
-      } else if (!ns.ps("home").some((p) => p.filename === "exit.js")) {
-        const pid = ns.exec("exit.js", "home", 1, zielKnoten);
-        if (!pid) {
-          rufeMenschen("Knoten fertig, aber exit.js liess sich nicht"
-            + " starten (exec gab 0) - vermutlich kein Speicher auf home.");
-        }
-        sag(pid
-          ? "AUSGANG: Hacking " + spieler.skills.hacking + " reicht fuer "
-            + zielLevel + ", The Red Pill ist eingebaut. exit.js gestartet,"
-            + " naechster Knoten " + zielKnoten + " (pid " + pid + ")."
-          : "AUSGANG offen, aber exit.js liess sich nicht starten (exec gab 0).");
-        if (pid) loeschAufHome("data/hilfe.txt");
-      }
       await ns.sleep(15000);
       continue;
     }

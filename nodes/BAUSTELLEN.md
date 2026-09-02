@@ -118,6 +118,25 @@ Regeln:
 
 ## Sofort
 
+### AUDIT VOLLE AUTONOMIE liegt vor - Reihenfolge der Umbauten steht dort (02.09., 17:20)
+
+`nodes/AUDIT-AUTONOMIE-2026-09-02.md` (Synthese) und
+`nodes/audit-2026-09-02/` (fuenf Skeptiker-Berichte, 1.212 Zeilen).
+Kernaussage: **kein einziger Uebergang ist heute autonom** - Zielwahl,
+Ausgangserkennung und Selbstsprung-Schutz sind auf einen Menschen gebaut;
+27 der 40 verbleibenden Spruenge sind vom Code verboten. Dazu fehlender
+Geldboden (Sleeves/Kurse ins Minus, Deadlock), Offline-Klumpen, und drei
+Knoten ohne Gewerk (BN9 Hash-Verkauf, BN8 Boerse, BN15 Labyrinth).
+
+**Erster Umbau, vor dem Ende von BN10 L2:** `ausgang.js` + `data/route.json`
+(Abschnitt A/I.1 des Audits). Ohne ihn ist der naechste Sprung wieder
+Handarbeit. Alle Umbauten mit Skeptiker-Lauf, `[skeptiker]` im Commit.
+
+Die aelteren Sofort-Punkte unten sind im Audit enthalten und dort
+eingeordnet (Kaltstart = I.3, Sleeve-Gym = I.2, checkin/tor = I.8, Black-Ops-
+Ausgang = I.1).
+
+
 ### sleeve.js schickt Sleeves ohne Geldpruefung ins Gym - Konto in 5 min auf -18,5 Mio (02.09., 06:00)
 
 **Befund.** Nach dem Kickstart (unten) startete `bn4net` um 05:55:55 `sleeve.js`

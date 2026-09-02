@@ -60,7 +60,7 @@ sag Eric das in einem Halbsatz.
 | `AUF KURS` | Nichts. Drei Zeilen ausgeben, fertig. |
 | `SPRINGT` | `exit.js` läuft. Eine Minute warten, erneut messen: steht der neue Knoten (Lauf +1 oder anderer Knoten), ist der Wechsel geglückt. |
 | `SPRUNG KLEMMT` | Ausgang offen, aber `exit.js` findet keinen Platz oder endete ohne Sprung. `data/ausgang.txt` über die Brücke lesen, die letzte Zeile sagt warum. Eintragen. |
-| `GEWERK FEHLT` | Der Knoten ist fertig, der nächste braucht ein Gewerk, das nicht existiert (`hashes.js` für BN9, `boerse.js` für BN8). Eric sagen, was fehlt — das ist der einzige Fall, in dem der Bot wirklich auf einen Menschen wartet. |
+| `GEWERK FEHLT` | Der Knoten ist fertig, und nur noch Einträge mit fehlendem Gewerk sind offen (`boerse.js` für BN8; `hashes.js` für BN9 gibt es seit 02.09.). Eric sagen, was fehlt — das ist der einzige Fall, in dem der Bot wirklich auf einen Menschen wartet. |
 | `AUSGANG FEHLT` | `data/ausgang.json` ist alt oder fehlt: `ausgang.js` läuft nicht, also springt am Ende niemand. Starten: `node tools/task.js ausgang.js`, dann erneut messen. |
 | `HACKINGWEG` | V1-Knoten (BN1, 5, 12, 8): kein Rang, der Träger ist das Hacking-Level gegen w0r1d_d43m0n. Stand steht in der Kopfzeile. |
 | `ANLAUF` | V2-Knoten vor dem Bladeburner-Beitritt: Kampfwerttraining trägt, `node tools/tor.js` rechnet die Phase. |

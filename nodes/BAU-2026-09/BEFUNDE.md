@@ -140,6 +140,108 @@ Darunter zahlreiche Einmal-Diagnosen (`probe2.txt`, `ramtest.txt`, `sfprobe.txt`
 
 ---
 
+## W — Wachhund, aus der Skeptiker-Runde vom 04.09.2026 01:37
+
+Drei Skeptiker mit getrennten Angriffswinkeln (Prämisse / Alltagsfehlermodi /
+Substanz) auf den Brücken-Umbau. Vier echte Fehler, zwei davon schwer.
+
+### W.1 — Der Anker löschte sich selbst · UMGESETZT 04.09. 01:45
+`state.totalPlaytime` startet als `null`, und der Heartbeat schrieb es alle 30 s
+ungeprüft in die Datei. Startete die Brücke ohne hängenden Spiel-Tab — nach jeder
+Nacht, jedem Reboot, jedem Absturz der Neustartschleife — stand nach 30 Sekunden
+`totalPlaytime: null` im Anker, und Prüfung (2) übersprang sich **still**.
+Von drei Prüfungen blieben zwei, und beide lassen den Hauptfall durch: ein
+ungepatchter Klon trägt Port 12525 und denselben `identifier`.
+**Behoben:** `ankerPlaytime` hält den letzten endlichen Wert, wird beim Start aus
+der Datei übernommen, fällt ersatzweise auf `INDEX.tsv` zurück, und ein fehlender
+Anker geht als Zeile nach `## Sofort`.
+
+### W.2 — Die Freigabe hing an einem Boolean statt am Socket · UMGESETZT 04.09. 01:45
+Verifiziert wurde Socket A, geschrieben hätte die Brücke in Socket B. Übernimmt B
+während der Prüfung, findet A's Close-Handler in `gameSocket` bereits B und setzt
+nichts zurück; A's grüne Verifikation gab dann `pushAll` frei.
+**Behoben:** Die Freigabe ist eine Referenz auf genau den geprüften Socket.
+
+### W.3 — Die Lebendprüfung der zweiten Verbindung lief ins Leere · UMGESETZT 04.09. 01:45
+Sie fragte die bestehende Verbindung über `request()`, und `request()` weist im
+unverifizierten Fenster alles außer `getSaveFile` ab. `alteLebt` war dort **immer**
+false, die bestehende Verbindung wurde also immer gekillt. Der Riegel gegen den
+zweiten Tab kehrte sich genau dann um, wenn er gebraucht wird.
+
+### W.4 — Urteil „Autosave steht" feuerte garantiert falsch · UMGESETZT 04.09. 01:45
+Schwelle 5 min gegen die aktuelle Uhrzeit, aber `lastSaveAt` wird nur alle 10 min
+aufgefrischt. **Es ist eingetreten**, um 01:37, auf einem kerngesunden Spiel — der
+Eintrag steht im Log und wurde aus `## Sofort` abgeräumt.
+Derselbe Fehler wie beim alten `lastTelemetryAt`, nur spiegelverkehrt: der eine
+konnte nie feuern, der andere musste immer feuern. Beide vergiften den Kanal für
+echte Notfälle.
+
+### W.5 — `execFileSync` blockierte die Event-Loop · UMGESETZT 04.09. 01:52
+In `sofortZeile`, aufgerufen in einer Schleife. Während sie lief, beantwortete die
+Brücke keine RFA-Nachricht, kein Dashboard und keinen Timer.
+
+### W.6 — Zweit-Tab-Alarm löst nur zwei von vier Reaktionen aus · OFFEN
+Auftrag 7.1.1 verlangt nach dem Alarm zusätzlich: Sicherungstakt sofort auf 5 min
+und Sperre aller Live-Eingriffe. Beides fehlt. → Phase C, Position 1.
+
+### W.7 — Brücken-Nonce statt `totalPlaytime` als Anker · OFFEN, guter Vorschlag
+Der Skeptiker schlägt vor, statt der monotonen Uhr ein Einmal-Token in
+`data/instance.txt` auf home zu führen. Die Brücke liest es **aus derselben
+`getSaveFile`-Antwort**, die sie ohnehin holt, und rotiert es nach jeder grünen
+Verifikation. Ein Klon trägt das Token seines Zieh-Zeitpunkts und fällt durch,
+sobald das Live-Spiel weitergedreht hat.
+Das ist strikt stärker als der jetzige Anker: aus einer löschbaren Uhr wird
+Challenge-Response. → Phase C, Position 1.
+
+### W.8 — Der brückenfreie Sicherungsweg fehlt · OFFEN
+Auftrag 7.2 führt ihn als „Pflicht, nicht Kür": der Kern liest
+`data/bridge.json.lastVerifiedBackup` und ruft bei einem Alter über 90 min selbst
+`ns.singularity.exportGame()`. `grep -rn "exportGame" src/` findet nichts.
+Solange er fehlt, hängt Erics einzige absolute Bedingung an einem einzelnen
+Windows-Prozess. → Phase C, Position 1.
+
+### W.9 — Das Gegenstück des Handschlags im Spiel fehlt · OFFEN
+Die Brücken-Seite ist gebaut, `grep -rn "backup-request" src/` ist leer. Es gibt
+keinen Anforderer, also nie einen Handschlag. → Phase C, Position 2.
+
+---
+
+## E — Die ETA von BitNode 10
+
+### E.1 — `checkin.js` meldet 430 Tage Restzeit · IN PRÜFUNG
+Gemessen 04.09.2026 01:47: Rang 657 von 400.000, Rate 33 Rang je Spielstunde,
+Rest 340.415 netto, ETA **430,7 Tage**, Urteil „AUF KURS".
+
+Der Auftrag veranschlagt für die **gesamte** Restroute aus 40 Läufen 1.100–1.900
+Motorstunden, also 46–79 Tage. Ein einzelner Lauf mit 430 Tagen ist damit
+unvereinbar. Entweder ist die Rechnung falsch, oder der Bot fährt seit Tagen in
+die falsche Richtung.
+
+Zwei Verdachtsmomente, beide noch nicht entschieden:
+
+1. **Die Rechnung extrapoliert linear.** Der Auftrag 3.3 sagt, der Ranggewinn je
+   Aktion skaliere mit `BladeburnerRank`, und nennt für BN6 eine Verdopplungszeit
+   von 3,5–3,8 h. Eine lineare Hochrechnung einer exponentiell wachsenden Größe
+   ist genau der Fehler „Rate oder Bestand?".
+   **Dagegen spricht die eigene Messreihe:** 596 → 639 → 645 → 649 → 657 zwischen
+   23:58 und 01:47 ist sauber linear bei rund 33 Rang je Stunde. Der Rang wächst
+   in diesem Fenster nachweislich **nicht** exponentiell.
+2. **Der Bot fährt gerade keine ranggebende Aktion.** `checkin.js` meldet
+   „General/Hyperbolic Regeneration Chamber, Chance 0.0 %, Ausdauer 28/50". Das
+   ist eine Heilaktion. Wie groß ihr Zeitanteil ist, ist unbekannt — und genau
+   dafür verlangt der Auftrag 3.3 die drei Kennzahlen `vorrat_deckung`,
+   `rang_je_vorratseinheit` und `comms_rest`, die es noch nicht gibt.
+
+Ohne diese drei Zahlen sieht der Bot in beiden Fällen nur ein zu großes `T2_h`.
+Das ist kein Nebenbefund: **die ETA ist die letzte Zeile jedes Berichts an Eric**,
+also die eine Zahl, auf die er seine Planung stützt.
+
+### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN
+`checkin.js` rechnet mit 58.928 Rang aus den Black Ops selbst. Auftrag 8.1 nennt
+als Eichpunkt „73.660/113.660". Drei Zahlen für dieselbe Größe, keine belegt.
+
+---
+
 ## B — Bau-Sitzung
 
 ### B.1 — `/usage` in dieser Sitzung nicht abrufbar · OFFEN

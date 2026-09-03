@@ -290,13 +290,18 @@ async function main() {
   // Der juengste Punkt, der WEIT GENUG zurueckliegt - nicht einfach der
   // juengste. Sonst vergleicht ein zweiter Aufruf kurz nach dem ersten gegen
   // ein Fenster von Sekunden.
+  // DERSELBE KNOTEN IST NICHT DERSELBE LAUF (03.09.2026): BN10 wird dreimal
+  // gespielt; ohne den Lauf im Punkt rechnete die Schlusszeile mit der Rate
+  // aus Lauf 1 und meldete "fertig in 1,6 h" bei Rang 35.
+  const laufJetzt = ausgangGut && ausgangGut.lauf ? Number(ausgangGut.lauf.level) : null;
+  const gleicherLauf = (p) => p.knoten === knoten && (laufJetzt === null || p.lauf === laufJetzt);
   const vorher = [...punkte].reverse().find((p) =>
-    p.knoten === knoten && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit)
+    gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit)
     && spielzeit - p.spielzeit >= MIN_FENSTER_MS && p.rang <= rang);
   // Gibt es Punkte, aber keinen alten genug, ist das eine andere Aussage als
   // "erster Check-in" - und Eric soll den Unterschied sehen.
   const juengster = [...punkte].reverse().find((p) =>
-    p.knoten === knoten && Number.isFinite(p.spielzeit));
+    gleicherLauf(p) && Number.isFinite(p.spielzeit) && Number.isFinite(p.rang));
 
   // FRISCHER KNOTEN: noch kein Bladeburner, also auch kein Rang (01.09.2026).
   // Direkt nach einem Knotenwechsel steht der Spieler bei Hacking 8 und $1.262;
@@ -362,7 +367,7 @@ async function main() {
     if (rate) sag("Rate: " + zahl(rate) + " Rang je Spielstunde.");
     bericht.rate = rate;
     bericht.gespieltAnteil = dEcht > 0 ? dSpiel / dEcht : null;
-  } else if (juengster && Number.isFinite(spielzeit)) {
+  } else if (juengster && Number.isFinite(spielzeit) && spielzeit - juengster.spielzeit < MIN_FENSTER_MS) {
     sag("Der letzte Check-in liegt erst "
       + dauer(std(spielzeit - juengster.spielzeit)) + " Spielzeit zurueck - fuer eine"
       + " belastbare Rate braucht es " + (MIN_FENSTER_MS / 60000) + " Minuten. Komm spaeter"
@@ -386,7 +391,7 @@ async function main() {
 
     // Vergleich mit dem vorigen Check-in: steigt die ETA, laeuft etwas falsch.
     const letzteEta = [...punkte].reverse().find((p) =>
-      p.knoten === knoten && Number.isFinite(p.etaSpielstunden));
+      gleicherLauf(p) && Number.isFinite(p.etaSpielstunden));
     if (letzteEta) {
       const delta = etaSpiel - letzteEta.etaSpielstunden;
       sag("Vorlauf-ETA: " + dauer(letzteEta.etaSpielstunden)
@@ -431,7 +436,7 @@ async function main() {
     let r = rate, herkunft = "gemessen seit dem letzten Besuch";
     if (!r || r <= 0) {
       const alt = [...punkte].reverse().find((p) =>
-        p.knoten === knoten && Number.isFinite(p.rate) && p.rate > 0);
+        gleicherLauf(p) && Number.isFinite(p.rate) && p.rate > 0);
       if (alt) {
         r = alt.rate;
         herkunft = "Rate vom " + new Date(alt.ts).toLocaleDateString("de-DE")
@@ -455,7 +460,7 @@ async function main() {
     let anteilHerkunft = "aus diesem Besuch";
     if (!(anteil > 0)) {
       const alt = [...punkte].reverse().find((p) =>
-        p.knoten === knoten && Number.isFinite(p.gespieltAnteil) && p.gespieltAnteil > 0);
+        gleicherLauf(p) && Number.isFinite(p.gespieltAnteil) && p.gespieltAnteil > 0);
       if (alt) { anteil = alt.gespieltAnteil; anteilHerkunft = "aus einem frueheren Besuch"; }
     }
     if (!(anteil > 0)) {
@@ -479,7 +484,7 @@ async function main() {
   function ausgeben(z, b) {
     if (standSchreiben && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
       punkte.push({
-        ts: Date.now(), knoten: b.knoten, rang: b.rang,
+        ts: Date.now(), knoten: b.knoten, lauf: laufJetzt, rang: b.rang,
         spielzeit: Number.isFinite(spielzeit) ? spielzeit : null,
         etaSpielstunden: b.etaSpielstunden ?? null, urteil: b.urteil,
         // Rate und Spielanteil gehoeren mit in den Stand: Kommt Eric zweimal

@@ -33,3 +33,7 @@ data/lautlos
 # Einladung zu `git add -A`, das in diesem Repo verboten ist, weil fuenf
 # Loops gleichzeitig schreiben.
 data/
+
+# Pruefstand-Baulogs, gross und ohne Wert fuer die Historie
+pruefstand/logs/
+pruefstand/backups/

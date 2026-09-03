@@ -58,7 +58,7 @@ import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
 import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename } from "node:fs/promises";
 import { watch } from "node:fs";
-import { execFileSync } from "node:child_process";
+import { execFileSync, execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -73,7 +73,7 @@ import {
   textAusArgv,
   zahlAusArgv,
 } from "./instanz.js";
-import { sichere, lesenKennwerte, alterJuengsteMin } from "./backup.js";
+import { sichere, lesenKennwerte, alterJuengsteMin, letzterEintrag } from "./backup.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -185,9 +185,21 @@ const pendingRequests = new Map();
  * Das ist der Kern des Wachhunds: die Bruecke weiss beim Verbinden noch nicht,
  * WELCHES Spiel dort haengt, und alles, was sie in diesem Zustand schreibt,
  * schreibt sie moeglicherweise in den falschen Spielstand.
+ *
+ * DIE FREIGABE HAENGT AM SOCKET, NICHT AN EINEM BOOLEAN (Befund 04.09.2026).
+ * Ein globales `socketVerifiziert = true` gilt fuer die Verbindung, die
+ * gerade in `gameSocket` steht - nicht fuer die, die geprueft wurde. Ablauf:
+ * Socket A verbindet, die Verifikation laeuft; Socket B verbindet und
+ * uebernimmt `gameSocket`; As Close-Handler prueft `gameSocket === socket`,
+ * findet B und setzt nichts zurueck; As Verifikation wird gruen und startet
+ * pushAll - in den nie geprueften Socket B. Verifiziert wurde Spielstand A,
+ * geschrieben wird in Spiel B.
+ * Deshalb ist die Freigabe eine Referenz auf genau den Socket, der die drei
+ * Pruefungen bestanden hat. Wechselt gameSocket, erlischt sie von selbst.
  */
-let socketVerifiziert = false;
+let verifizierterSocket = null;
 let verifikationLaeuft = false;
+const istVerifiziert = () => gameSocket !== null && verifizierterSocket === gameSocket;
 
 const state = {
   connected: false,
@@ -196,6 +208,7 @@ const state = {
   lastTelemetryAt: null,
   lastTelemetryReadAt: null,
   lastSaveAt: null,
+  lastSaveGemessenAm: null,
   telemetry: null,
   servers: [],
   syncedFiles: [],
@@ -299,7 +312,7 @@ function request(method, params, opt = {}) {
     }
     // Der Riegel des Wachhunds. Er sitzt HIER und nicht in den Aufrufern,
     // damit ein neuer Aufrufer ihn nicht versehentlich umgeht.
-    if (!socketVerifiziert && !opt.trotzUnverified) {
+    if (!istVerifiziert() && !opt.trotzUnverified) {
       reject(new Error("Socket noch nicht verifiziert - " + method + " zurueckgestellt"));
       return;
     }
@@ -474,7 +487,7 @@ function watchScripts() {
  */
 async function schiebeStapel(stapelEingang) {
   let stapel = stapelEingang;
-  if (!gameSocket || !socketVerifiziert) {
+  if (!gameSocket || !istVerifiziert()) {
     for (const d of stapel) zurueckgestellt.add(d);
     log("warn", stapel.length + " Aenderung(en) zurueckgestellt - Socket nicht verifiziert");
     return;
@@ -559,6 +572,33 @@ async function leseHeartbeat() {
 }
 
 /**
+ * Der zuletzt GELESENE Live-Wert von totalPlaytime. Er ist der Anker der
+ * Wachhund-Pruefung (2) und darf nie durch null ueberschrieben werden.
+ *
+ * BEFUND 04.09.2026: `state.totalPlaytime` startet als null, und der Heartbeat
+ * schrieb es alle 30 s ungeprueft in die Datei. Startete die Bruecke, ohne dass
+ * ein Spiel-Tab haengt - also nach jeder Nacht mit geschlossenem Tab, nach
+ * jedem Reboot, nach jedem Absturz der Neustartschleife -, stand nach 30
+ * Sekunden `totalPlaytime: null` im Anker. Pruefung (2) verlangt
+ * `Number.isFinite` und uebersprang sich dann STILL.
+ *
+ * Damit blieben von drei Pruefungen zwei, und beide lassen genau den Hauptfall
+ * durch: ein ungepatchter Klon traegt Port 12525 (der Auftrag sagt das selbst)
+ * und denselben identifier (der wird beim Kopieren mitgenommen). Der Anker war
+ * das einzige Merkmal, das ihn gefangen haette.
+ */
+let ankerPlaytime = null;
+
+/** Anker beim Start aus der Datei uebernehmen - ein Neustart verlaere ihn sonst. */
+async function ladeAnker() {
+  const hb = await leseHeartbeat();
+  if (hb && Number.isFinite(hb.totalPlaytime)) {
+    ankerPlaytime = hb.totalPlaytime;
+    log("info", "Anker uebernommen: totalPlaytime " + (hb.totalPlaytime / 3.6e6).toFixed(2) + " h");
+  }
+}
+
+/**
  * Die drei Pruefungen vor dem ersten Schreiben.
  *
  * Pruefung 2 vergleicht gegen den ZULETZT VON DIESER ROLLE GELESENEN Wert,
@@ -570,10 +610,14 @@ async function leseHeartbeat() {
  * Das ist zusammen mit dem RFA-Port das einzige Merkmal, das Live von einer
  * Kopie trennt - der identifier ist in beiden gleich.
  */
-async function verifiziereSocket() {
+async function verifiziereSocket(kandidat) {
   if (verifikationLaeuft) return;
   verifikationLaeuft = true;
   const beginn = Date.now();
+  // Der geprueft werdende Socket wird HIER festgehalten. Alles Weitere gilt
+  // nur fuer ihn - wenn zwischendurch ein anderer uebernimmt, wird die
+  // Freigabe nicht erteilt.
+  const geprueft = kandidat || gameSocket;
   try {
     const antwort = await Promise.race([
       request("getSaveFile", undefined, { trotzUnverified: true }),
@@ -589,6 +633,7 @@ async function verifiziereSocket() {
     const k = lesenKennwerte(roh, binary);
 
     const gruende = [];
+    let keinAnker = false;
     // (1) Port
     if (k.remoteFileApiPort !== RFA_PORT) {
       gruende.push(
@@ -596,15 +641,45 @@ async function verifiziereSocket() {
           ", diese Bruecke haelt " + RFA_PORT,
       );
     }
-    // (2) Rueckwaertssprung gegen den zuletzt gelesenen Wert dieser Rolle
-    const hb = await leseHeartbeat();
-    if (hb && Number.isFinite(hb.totalPlaytime)) {
-      if (k.totalPlaytime < hb.totalPlaytime - 60000) {
+    // (2) Rueckwaertssprung gegen den zuletzt bekannten Wert dieser Rolle.
+    //
+    // Ein FEHLENDER Anker wird nicht still durchgewunken. Er heisst, dass diese
+    // Pruefung gar nicht stattfinden konnte - und ein Ausschluss gilt nur, wenn
+    // das Werkzeug den ausgeschlossenen Fall anzeigen koennte. Ersatzweise
+    // dient die juengste Zeile des Sicherungsindex; sie ist schwaecher, weil sie
+    // bis zu eine Stunde alt sein kann, aber besser als nichts. Bleibt auch die
+    // aus, wird die Verbindung angenommen UND der Zustand gemeldet.
+    let anker = ankerPlaytime;
+    let ankerQuelle = "Heartbeat";
+    if (!Number.isFinite(anker)) {
+      const hb = await leseHeartbeat();
+      if (hb && Number.isFinite(hb.totalPlaytime)) {
+        anker = hb.totalPlaytime;
+        ankerQuelle = "Heartbeat-Datei";
+      }
+    }
+    if (!Number.isFinite(anker)) {
+      const letzte = letzterEintrag(BACKUP_ORT, ROLLE.prefix);
+      if (letzte && Number.isFinite(Number(letzte.totalPlaytime))) {
+        anker = Number(letzte.totalPlaytime);
+        ankerQuelle = "INDEX.tsv (" + letzte.datei + ")";
+      }
+    }
+    if (Number.isFinite(anker)) {
+      if (k.totalPlaytime < anker - 60000) {
         gruende.push(
           "totalPlaytime " + k.totalPlaytime + " liegt mehr als 60 s hinter dem zuletzt " +
-            "gelesenen Wert " + hb.totalPlaytime + " - das ist eine aeltere Kopie oder ein Import",
+            "bekannten Wert " + anker + " (" + ankerQuelle + ") - aeltere Kopie oder Import",
         );
       }
+    } else {
+      keinAnker = true;
+      log(
+        "warn",
+        "Pruefung 2 uebersprungen: kein Anker vorhanden (weder Heartbeat noch Index). " +
+          "Die Verbindung wird nur ueber Port und identifier geprueft - beide traegt " +
+          "auch eine unveraenderte Kopie.",
+      );
     }
     // (3) identifier
     if (ROLLE.identifier && k.identifier !== ROLLE.identifier) {
@@ -618,7 +693,7 @@ async function verifiziereSocket() {
         "Ein Spiel hat sich auf Port " + RFA_PORT + " verbunden, das nicht der erwartete " +
           "Live-Stand ist. Es wurde NICHTS geschrieben. Gruende:\n\n- " + gruende.join("\n- "),
       );
-      socketVerifiziert = false;
+      if (verifizierterSocket === geprueft) verifizierterSocket = null;
       return;
     }
 
@@ -627,6 +702,7 @@ async function verifiziereSocket() {
     state.lauf = k.lauf;
     state.totalPlaytime = k.totalPlaytime;
     state.lastSaveAt = new Date(k.lastSave).toISOString();
+    state.lastSaveGemessenAm = new Date().toISOString();
     state.settings = {
       autosaveInterval: k.autosaveInterval,
       excludeRunningScriptsFromSave: k.excludeRunningScriptsFromSave,
@@ -648,12 +724,46 @@ async function verifiziereSocket() {
         "Verbindung ist verifiziert, aber die Sicherung kam nicht gruen zustande. " +
           "Es wird nichts ins Spiel geschrieben.",
       );
-      socketVerifiziert = false;
+      if (verifizierterSocket === geprueft) verifizierterSocket = null;
       return;
     }
 
-    socketVerifiziert = true;
+    // Hat waehrend der Pruefung ein anderer Socket uebernommen, wird die
+    // Freigabe NICHT erteilt. Sonst schriebe die Bruecke in eine Verbindung,
+    // die sie nie geprueft hat.
+    if (gameSocket !== geprueft) {
+      await alarm(
+        "Freigabe verweigert",
+        "Waehrend der Verifikation hat eine andere Verbindung uebernommen. " +
+          "Geprueft wurde Socket A, aktuell haengt Socket B - es wird nichts geschrieben.",
+      );
+      return;
+    }
+
+    verifizierterSocket = geprueft;
     state.verified = true;
+    // Der Anker existiert ab jetzt; die naechste Verbindung wird wieder
+    // vollstaendig geprueft.
+    ankerPlaytime = k.totalPlaytime;
+    await schreibeHeartbeat();
+
+    if (keinAnker) {
+      // Angenommen wurde die Verbindung trotzdem - eine Bruecke, die nach jedem
+      // Reboot dichtmacht, waere im unbeaufsichtigten Betrieb schlimmer als das
+      // Risiko. Aber der Zustand wird gemeldet: es ist der eine Zeitpunkt, an
+      // dem eine unveraenderte Kopie durchgekommen waere.
+      await sofortZeile(
+        "Verbindung ohne Anker angenommen",
+        "Beim Verbinden lag kein bekannter totalPlaytime-Wert vor - weder im " +
+          "Heartbeat noch im Sicherungsindex. Die Verbindung wurde deshalb nur " +
+          "ueber RFA-Port und identifier geprueft, und beide traegt auch eine " +
+          "unveraenderte Kopie des Spielstands.\\n\\nAngenommen wurde BN" +
+          k.bitNodeN + " Lauf " + k.lauf + " mit " +
+          (k.totalPlaytime / 3.6e6).toFixed(2) + " h Spielzeit, Hacking " +
+          k.hacking + ", " + k.augs + " Augmentierungen.\\n\\nWenn das nicht der " +
+          "erwartete Stand ist: Bruecke beenden und doku/spielstand-schutz.md folgen.",
+      );
+    }
     await pushAll();
 
     if (zurueckgestellt.size) {
@@ -666,9 +776,9 @@ async function verifiziereSocket() {
     // Timeout: Socket offen lassen und in 60 s erneut fragen. Ein Spiel, das
     // gerade laedt, ist kein fremdes Spiel.
     await alarm("Verifikation fehlgeschlagen", err.message);
-    socketVerifiziert = false;
+    if (verifizierterSocket === geprueft) verifizierterSocket = null;
     setTimeout(() => {
-      if (gameSocket && !socketVerifiziert) void verifiziereSocket();
+      if (gameSocket && !istVerifiziert()) void verifiziereSocket(gameSocket);
     }, 60000);
   } finally {
     verifikationLaeuft = false;
@@ -701,6 +811,7 @@ async function sichereJetzt(anlass) {
       anlass,
     };
     state.lastSaveAt = new Date(r.kennwerte.lastSave).toISOString();
+    state.lastSaveGemessenAm = new Date().toISOString();
     state.totalPlaytime = r.kennwerte.totalPlaytime;
     state.bitNode = r.kennwerte.bitNodeN;
     state.lauf = r.kennwerte.lauf;
@@ -725,7 +836,7 @@ async function sichereJetzt(anlass) {
  * data/backup-ok.txt. Das Skript wartet hoechstens 90 s darauf.
  */
 async function pruefeHandschlag() {
-  if (!socketVerifiziert) return;
+  if (!istVerifiziert()) return;
   let roh;
   try {
     roh = await request("getFile", { filename: "data/backup-request.txt", server: "home" });
@@ -776,7 +887,7 @@ async function pruefeHandschlag() {
  * als Lage ausgegeben.
  */
 async function pollTelemetry() {
-  if (!gameSocket || gameSocket.readyState !== 1 || !socketVerifiziert) return;
+  if (!gameSocket || gameSocket.readyState !== 1 || !istVerifiziert()) return;
 
   try {
     const raw = await request("getFile", { filename: "data/bn4net.json", server: "home" });
@@ -804,7 +915,7 @@ async function pollTelemetry() {
 
 /** Alle 10 min den echten lastSave holen - die einzige Sicht auf den Recovery-Modus. */
 async function pruefeLastSave() {
-  if (!socketVerifiziert) return;
+  if (!istVerifiziert()) return;
   if (Date.now() - letzteSaveAbfrage < SAVE_ALTER_MS) return;
   letzteSaveAbfrage = Date.now();
   try {
@@ -813,6 +924,7 @@ async function pruefeLastSave() {
     const roh = binary ? Buffer.from(antwort.save, "latin1") : Buffer.from(antwort.save, "base64");
     const k = lesenKennwerte(roh, binary);
     state.lastSaveAt = new Date(k.lastSave).toISOString();
+    state.lastSaveGemessenAm = new Date().toISOString();
     state.totalPlaytime = k.totalPlaytime;
     state.bitNode = k.bitNodeN;
     state.lauf = k.lauf;
@@ -829,6 +941,7 @@ async function pruefeLastSave() {
 }
 
 async function schreibeHeartbeat() {
+  if (Number.isFinite(state.totalPlaytime)) ankerPlaytime = state.totalPlaytime;
   const eintrag = {
     ts: new Date().toISOString(),
     pid: process.pid,
@@ -836,11 +949,11 @@ async function schreibeHeartbeat() {
     rfaPort: RFA_PORT,
     dashPort: DASHBOARD_PORT,
     connected: state.connected,
-    verified: socketVerifiziert,
+    verified: istVerifiziert(),
     connectedSince: state.connectedSince,
     lastTelemetryAt: state.lastTelemetryAt,
     lastSaveAt: state.lastSaveAt,
-    totalPlaytime: state.totalPlaytime,
+    totalPlaytime: ankerPlaytime,
     motorRound: state.motorRound,
     lastVerifiedBackup: state.lastVerifiedBackup,
     backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
@@ -855,7 +968,7 @@ async function schreibeHeartbeat() {
 
 /** Der Rueckkanal INS Spiel - der Kern liest ihn, um sein eigenes Netz zu kennen. */
 async function schreibeRueckkanal() {
-  if (!socketVerifiziert) return;
+  if (!istVerifiziert()) return;
   const ageMin = alterJuengsteMin(BACKUP_ORT, ROLLE.prefix);
   const inhalt = {
     ts: Date.now(),
@@ -897,9 +1010,17 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
   try {
     await mkdir(ordner, { recursive: true });
     await writeFile(datei, "### " + titel + "\n\n" + text + "\n", "utf8");
-    execFileSync("node", [path.join(ROOT, "tools", "liste.js"), "--eintragen", "sofort", "--datei", datei], {
-      cwd: ROOT,
-      encoding: "utf8",
+    // execFile statt execFileSync: die synchrone Fassung blockiert die
+    // komplette Event-Loop je Eintrag - und holeSofortEintraege ruft sie in
+    // einer Schleife auf. Waehrend sie laeuft, beantwortet die Bruecke keine
+    // RFA-Nachricht, kein Dashboard und keinen Timer. (Befund 04.09.2026.)
+    await new Promise((fertig, schiefgelaufen) => {
+      execFile(
+        "node",
+        [path.join(ROOT, "tools", "liste.js"), "--eintragen", "sofort", "--datei", datei],
+        { cwd: ROOT, encoding: "utf8" },
+        (err) => (err ? schiefgelaufen(err) : fertig()),
+      );
     });
     log("info", "Nach ## Sofort eingetragen: " + titel);
   } catch (e) {
@@ -908,7 +1029,7 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
 }
 
 async function holeSofortEintraege() {
-  if (!socketVerifiziert) return;
+  if (!istVerifiziert()) return;
   let roh;
   try {
     roh = await request("getFile", { filename: "data/sofort.json", server: "home" });
@@ -967,14 +1088,26 @@ async function faelleUrteile() {
     }
   }
 
-  // (c) Autosave steht
-  if (state.connected && state.lastSaveAt) {
-    const alter = jetzt - new Date(state.lastSaveAt).getTime();
+  // (c) Autosave steht.
+  //
+  // Das Alter wird gegen den ZEITPUNKT DER MESSUNG gerechnet, nicht gegen jetzt.
+  // `state.lastSaveAt` stammt aus pruefeLastSave, das nur alle zehn Minuten
+  // laeuft (SAVE_ALTER_MS). Eine Schwelle von fuenf Minuten gegen "jetzt" waere
+  // kleiner als der Auffrischtakt und feuerte deshalb auf einem kerngesunden
+  // Spiel - garantiert, alle sechs Stunden.
+  //
+  // Das ist derselbe Fehler wie beim alten lastTelemetryAt, nur spiegelverkehrt:
+  // statt nie zu feuern, feuert er immer. Beide vergiften denselben Kanal, den
+  // fuer echte Notfaelle. (Befund 04.09.2026.)
+  if (state.connected && state.lastSaveAt && state.lastSaveGemessenAm) {
+    const alter =
+      new Date(state.lastSaveGemessenAm).getTime() - new Date(state.lastSaveAt).getTime();
     if (alter > 5 * 60000 && jetzt - letztesUrteil.autosave > URTEIL_ABSTAND_MS) {
       letztesUrteil.autosave = jetzt;
       await sofortZeile(
         "Autosave steht",
-        "lastSave im Spielstand ist " + Math.round(alter / 60000) + " Minuten alt " +
+        "lastSave im Spielstand war bei der Messung um " + state.lastSaveGemessenAm +
+          " bereits " + Math.round(alter / 60000) + " Minuten alt " +
           "(Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder " +
           "fehlgeschlagenes IndexedDB-Schreiben.",
       );
@@ -992,7 +1125,7 @@ function publicState() {
     rfaPort: RFA_PORT,
     dashPort: DASHBOARD_PORT,
     connected: state.connected,
-    verified: socketVerifiziert,
+    verified: istVerifiziert(),
     connectedSince: state.connectedSince,
     lastTelemetryAt: state.lastTelemetryAt,
     lastTelemetryReadAt: state.lastTelemetryReadAt,
@@ -1125,7 +1258,7 @@ function startDashboard() {
         }
       }
 
-      if (!socketVerifiziert && method !== "getSaveFile") {
+      if (!istVerifiziert() && method !== "getSaveFile") {
         res.writeHead(409, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: "Socket noch nicht verifiziert" }));
         return;
@@ -1210,7 +1343,7 @@ function startRfaServer() {
       let alteLebt = false;
       try {
         await Promise.race([
-          request("getFileMetadata", { filename: "boot.js", server: "home" }),
+          request("getFileMetadata", { filename: "boot.js", server: "home" }, { trotzUnverified: true }),
           new Promise((_, rej) => setTimeout(() => rej(new Error("stumm")), 3000)),
         ]);
         alteLebt = true;
@@ -1250,7 +1383,7 @@ function startRfaServer() {
     }
 
     gameSocket = socket;
-    socketVerifiziert = false;
+    verifizierterSocket = null;
     state.verified = false;
     state.connected = true;
     state.connectedSince = new Date().toISOString();
@@ -1261,8 +1394,12 @@ function startRfaServer() {
     socket.on("close", () => {
       if (gameSocket === socket) {
         gameSocket = null;
-        socketVerifiziert = false;
         state.connected = false;
+      }
+      // Die Freigabe erlischt IMMER mit ihrem Socket, auch wenn inzwischen ein
+      // anderer in gameSocket steht.
+      if (verifizierterSocket === socket) verifizierterSocket = null;
+      if (gameSocket === null) {
         state.verified = false;
         log("warn", "Spielverbindung getrennt - warte auf neue Verbindung");
         broadcast({ type: "state", state: publicState() });
@@ -1272,7 +1409,7 @@ function startRfaServer() {
     socket.on("error", (err) => log("error", "Spielverbindung: " + err.message));
 
     // KEIN unbedingtes pushAll mehr. Erst pruefen, dann sichern, dann schieben.
-    void verifiziereSocket();
+    void verifiziereSocket(socket);
   });
 
   wss.on("error", (err) => {
@@ -1334,6 +1471,7 @@ if (NO_WATCH) console.log("  --no-watch: src/ wird nicht beobachtet");
 await startRfaServer();
 await startDashboard();
 await schreibePid();
+await ladeAnker();
 watchScripts();
 
 setInterval(() => {
@@ -1376,7 +1514,7 @@ setInterval(() => {
 
 setInterval(() => {
   if (Date.now() - letzteStundensicherung < STUNDENSICHERUNG_MS) return;
-  if (!socketVerifiziert) return;
+  if (!istVerifiziert()) return;
   letzteStundensicherung = Date.now();
   void sichereJetzt("hourly");
 }, 60000);

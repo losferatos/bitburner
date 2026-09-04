@@ -27,6 +27,8 @@
  *
  * @param {NS} ns
  */
+import { hackPercent as calcHackPercent, hackChance as calcHackChance,
+  growthLogPerThread as calcGrowthLog } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl,
   telemetrieTabelle as regTelemetrie, leseRolle, pruefeRolle } from "lib/reg.js";
 import {
@@ -98,6 +100,22 @@ export async function main(ns) {
   } catch (e) {
     regGrund = "registry.json warf: " + String(e && e.message ? e.message : e);
   }
+
+  // Die BitNode-Multiplikatoren, einmal gelesen. Sie aendern sich innerhalb
+  // eines Laufs nicht - und ein Feld, das hier fehlt, ist 1, NICHT 0. Wer
+  // fehlende Felder als 0 liest, setzt jede Beute auf null.
+  let bnScriptHackMoney = 1;
+  let bnServerGrowthRate = 1;
+  try {
+    const roh = ns.fileExists("lib/bitnodes.json", "home") ? ns.read("lib/bitnodes.json") : null;
+    const t = roh ? JSON.parse(roh) : null;
+    const n = ns.getResetInfo().currentNode;
+    const k = t && t.knoten ? t.knoten[String(n)] : null;
+    if (k) {
+      if (Number.isFinite(k.ScriptHackMoney)) bnScriptHackMoney = k.ScriptHackMoney;
+      if (Number.isFinite(k.ServerGrowthRate)) bnServerGrowthRate = k.ServerGrowthRate;
+    }
+  } catch { /* dann gelten die Standardwerte 1 */ }
 
   const TELEMETRIE_FEST = [
     ["blade.js", "data/blade.json", 10 * 60000],
@@ -1285,11 +1303,59 @@ export async function main(ns) {
     const FORTIFY_GROW = 0.004;
     const WEAKEN_POWER = 0.05;
     const MIX_MONEY_HIGH = 0.95;
+    // Die Spielerwerte fuer die eigenen Formeln, einmal je Runde. getPlayer
+    // zahlt der Kern ohnehin (Motorzeit liest totalPlaytime daraus).
+    const spielerFuerCalc = (() => {
+      try {
+        const pl = ns.getPlayer();
+        return {
+          skill: pl.skills.hacking,
+          int: pl.skills.intelligence || 0,
+          multMoney: (pl.mults && pl.mults.hacking_money) || 1,
+          multChance: (pl.mults && pl.mults.hacking_chance) || 1,
+          multGrow: (pl.mults && pl.mults.hacking_grow) || 1,
+          multSpeed: (pl.mults && pl.mults.hacking_speed) || 1,
+        };
+      } catch {
+        return { skill: 1, int: 0, multMoney: 1, multChance: 1, multGrow: 1, multSpeed: 1 };
+      }
+    })();
+
     const kennzahlen = (host, s) => {
-      const p = ns.hackAnalyze(host);
-      const chance = ns.hackAnalyzeChance(host);
-      const cycles = ns.growthAnalyze(host, 2);
-      const k = cycles > 0 ? Math.LN2 / cycles : 0;
+      // ===================================================================
+      // DIE ANALYSE-FAMILIE WIRD GERECHNET, NICHT GEFRAGT (Position C.7)
+      // ===================================================================
+      //
+      // ns.hackAnalyze, ns.hackAnalyzeChance und ns.growthAnalyze kosten je
+      // 1 GB - drei Gigabyte in einer Datei, die im Kaltstart auf ein home mit
+      // 32 GB passen muss, neben boot.js und den Arbeitern.
+      //
+      // Die Formeln stehen in lib/calc.js und sind dieselben wie im Spiel
+      // (Hacking.ts:44 fuer den Beuteanteil, :15 fuer die Chance,
+      // ServerHelpers.ts fuer das Wachstum). Alles, was sie brauchen, liegt
+      // schon vor: `s` kommt aus ns.getServer, der Spieler aus ns.getPlayer -
+      // beide zahlt der Kern ohnehin.
+      //
+      // DER BITNODE-MULTIPLIKATOR IST DER PUNKT, AN DEM DAS SCHIEFGEHT.
+      // bn4net.js:3404-3410 warnt ausdruecklich: calc.js rechnet ohne ihn, und
+      // ein naiver Import haette in BitNode 4 eine stille Verfuenffachung der
+      // Beute je Faden bedeutet (ScriptHackMoney 0,2). Er kommt deshalb aus
+      // lib/bitnodes.json, erzeugt aus dem Spielquelltext.
+      const p = calcHackPercent(
+        { sec: s.hackDifficulty, reqSkill: s.requiredHackingSkill },
+        { skill: spielerFuerCalc.skill, multMoney: spielerFuerCalc.multMoney },
+        bnScriptHackMoney);
+      const chance = calcHackChance(
+        { sec: s.hackDifficulty, reqSkill: s.requiredHackingSkill, root: s.hasAdminRights },
+        spielerFuerCalc);
+      // growthAnalyze(host, 2) liefert die Fadenzahl fuer eine Verdopplung;
+      // k ist LN2 geteilt durch sie. calc.js liefert k direkt - fuer diesen
+      // Zweck ist das gleichwertig, weil sich der additive Ein-Dollar-Anteil
+      // bei einer Verdopplung heraushebt (siehe die Begruendung bei
+      // wachstumsFaeden weiter unten).
+      const k = calcGrowthLog(
+        { sec: s.hackDifficulty, growth: s.serverGrowth },
+        spielerFuerCalc.multGrow, 1, bnServerGrowthRate);
       // Alles auf minDifficulty hochrechnen. hackAnalyze & Co. liefern immer
       // den IST-Wert; ein verschmutzter Server saehe sonst dauerhaft
       // schlechter aus, als er nach dem Saeubern waere - und wuerde vom

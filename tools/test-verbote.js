@@ -75,6 +75,16 @@ const POSITIVLISTE = [
   "worker/weaken.js",
   "worker/share.js",
   "worker/expfarm.js",
+  // ERGAENZT 04.09.2026 nach dem Lauf von tools/archivliste.js.
+  // Diese Dateien werden von lebenden Modulen aufgerufen - blade.js allein ruft
+  // sechs davon -, standen aber nicht auf der Liste. Der Grep prueft sie
+  // seither mit. Die Richtung ist Absicht: lieber eine tote Datei mitpruefen
+  // als eine lebende auslassen, denn nur die zweite Sorte kann ein Muster
+  // verstecken, das den Bot zum Stillstand bringt.
+  "astufe.js", "bbgraft.js", "bblage.js", "bbspann.js", "bitverse.js",
+  "bodauer.js", "chance.js", "geld.js", "join.js", "joinrun.js",
+  "knoten.js", "lage.js", "lib/hackaugs.js", "netburn.js", "ps.js",
+  "share.js", "skillcheck.js", "sr.js", "werkbank.js", "work.js",
 ];
 
 /** Diese Dateien sind vom Grep ausgenommen. */

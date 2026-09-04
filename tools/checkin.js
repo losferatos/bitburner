@@ -250,6 +250,24 @@ async function main() {
   // gelesen, ob er laeuft, klemmt oder an einem fehlenden Gewerk haengt.
   const letzteAusgangZeile = ausgangTxt.trim().split("\n").pop() || "";
   if (ausgangGut && ausgangGut.offen) {
+    // EIN ABGELEHNTER SPRUNG IST KEIN LAUFENDER (Skeptiker 04.09.2026).
+    //
+    // Seit exit.js sein Ziel gegen die Route prueft, kann es den Sprung
+    // ABLEHNEN - und tut das dann alle 15 Minuten aufs Neue. `letzterStart`
+    // wird bei jedem dieser Versuche gesetzt, auch wenn das Skript sofort
+    // wieder aussteigt. Ohne die Unterscheidung meldete diese Stelle einen
+    // Bot, der seit Tagen nicht vom Fleck kommt, als "URTEIL: SPRINGT".
+    if (Number.isFinite(ausgangGut.exit_abgelehnt) && ausgangGut.exit_abgelehnt > 0) {
+      sag("AUSGANG OFFEN, ABER exit.js LEHNT AB - " + ausgangGut.exit_abgelehnt
+        + " Mal in Folge.");
+      sag("Grund: " + (ausgangGut.exit_ablehnung_grund || letzteAusgangZeile));
+      sag("Das ist KEIN laufender Sprung. Entweder passen route.json und der"
+        + " Spielstand nicht zusammen, oder eine Datei fehlt auf dem Wirt.");
+      sag("");
+      sag("FERTIG VORAUSSICHTLICH: gar nicht, solange die Ablehnung steht.");
+      sag("URTEIL: BLOCKIERT");
+      return ausgeben(zeilen, { ...bericht, urteil: "BLOCKIERT" });
+    }
     if (ausgangGut.letzterStart > 0) {
       sag("AUSGANG OFFEN (" + ausgangGut.status + ") - exit.js gestartet vor "
         + dauer(std(Date.now() - ausgangGut.letzterStart)) + ". Letzte Zeile: " + letzteAusgangZeile);

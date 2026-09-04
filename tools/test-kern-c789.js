@@ -66,6 +66,18 @@ function bauMock(o = {}) {
     // haette die Runde mitten drin abgeschnitten, und der Herzschlag steht am
     // Ende (04.09.2026, erster Lauf dieses Tests).
     maxSchlaf: o.maxSchlaf ?? 400,
+    // DIE UHR MUSS LAUFEN (Skeptiker Runde 4, Testbefund 4, 04.09.2026).
+    //
+    // Ohne `beiSchlaf` laesst der Mock keine Zeit vergehen: gemessen 400
+    // Runden mit Delta-Wanduhr = 0 und Motorzeit = 0. Jeder
+    // wanduhrabhaengige Zweig des Kerns war damit eingefroren - unter anderem
+    // der Fuenf-Minuten-Verfall der Platzreservierung, die Backoffs und die
+    // Frischefenster. Vierhundert Runden waren vierhundert identische Runden.
+    //
+    // Zehn Sekunden je Schlaf ist der echte Takt des Kerns
+    // (`ns.sleep(10000)`); ueber 400 Runden sind das gut 66 Minuten, und damit
+    // laeuft die Reservierungsfrist wirklich ab.
+    beiSchlaf: o.beiSchlaf ?? ((ms, z, vor) => vor(Math.min(ms || 10000, 10000))),
     // SPEICHER KOSTET SEIT DEM 04.09.2026 ETWAS (Skeptiker Runde 3, W5).
     //
     // Der Mock bucht `exec` jetzt gegen `used`. Damit stellt sich hier eine
@@ -161,10 +173,22 @@ console.log("-- C.8: mit frischer Tabelle und vollem Park bleibt shop.js weg --"
       "werk-0": { ram: 1048576, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
     },
   });
-  // Die Mock-Wanduhr steht auf demselben Wert wie der Zeitstempel - die
-  // Tabelle ist also null Sekunden alt.
-  const gestartet = await runden(m);
-  pruefe("shop.js bleibt aus", !gestartet.includes("shop.js"),
+  // INNERHALB DES FRISCHEFENSTERS (Skeptiker Runde 4, Testbefund 4).
+  //
+  // Seit die Mock-Uhr wirklich laeuft, wird die Tabelle im Test alt - und der
+  // Kern holt shop.js nach vier Minuten voellig zu Recht zurueck. Die Aussage
+  // dieser Probe ist "bei FRISCHER Tabelle bleibt es weg", also wird sie
+  // innerhalb der vier Minuten gestellt: 20 Runden zu zehn Sekunden.
+  //
+  // Beim ersten Lauf mit laufender Uhr war diese Probe rot, und der Kern hatte
+  // recht. Das ist der Wert einer Uhr, die geht.
+  const gestartet = await runden(bauMock({
+    maxSchlaf: 20,
+    dateien: m.zustand.dateien.home,
+    server: { "werk-0": { ram: 1048576, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+  }));
+  pruefe("shop.js bleibt aus, solange die Tabelle frisch ist",
+    !gestartet.includes("shop.js"),
     "gestartet: " + [...new Set(gestartet)].join(", "));
 }
 
@@ -203,11 +227,54 @@ console.log("-- C.13: in BitNode 9 wird shop.js kaum geholt --");
       }),
     },
   });
+  // "KAUM", NICHT "NIE" - und das ist die Aussage, die der Kern wirklich macht
+  // (Skeptiker Runde 4, Testbefund 4). Bei `kaufbar: false` wartet er eine
+  // HALBE STUNDE statt vier Minuten, bevor er die Auskunft erneuert. Ganz
+  // abschalten waere falsch: `CloudServerLimit` ist eine Auskunft des Spiels,
+  // keine Konstante.
+  //
+  // Vorher stand hier "bleibt aus" - das war nur wahr, weil die Uhr stand.
+  // Jetzt wird die RATE geprueft: ueber 66 Minuten hoechstens dreimal.
   const gestartet = await runden(m);
-  pruefe("shop.js bleibt aus", !gestartet.includes("shop.js"),
-    "gestartet: " + [...new Set(gestartet)].join(", ")
-      + " - 7 GB alle fuenf Minuten fuer dieselbe Null waeren in BN9 reine"
-      + " Verschwendung");
+  const starts = m.zustand.gestartet.filter((g) => g.datei === "shop.js");
+  const minuten = (m.zustand.wall - 1700000000000) / 60000;
+  // GEMESSEN WIRD DAS ALTER DER TABELLE, nicht die Laufzeit des Tests: die
+  // Tabelle in diesem Szenario ist beim Start schon zehn Minuten alt. Beim
+  // ersten Anlauf verglich diese Probe gegen den Testbeginn und meldete
+  // "nach 20 min" als Verstoss - der Kern hatte recht, die Tabelle war da
+  // 30,2 Minuten alt.
+  const tabelleTs = 1700000000000 - 600000;
+  const ersterNachMin = starts.length
+    ? (starts[0].wall - tabelleTs) / 60000 : null;
+  console.log("       " + minuten.toFixed(0) + " Minuten simuliert, "
+    + starts.length + " shop.js-Start(s), erster bei einem Tabellenalter von "
+    + (ersterNachMin === null ? "nie" : ersterNachMin.toFixed(1) + " min"));
+
+  // GEPRUEFT WIRD DIE ENTSCHEIDUNG DES KERNS, NICHT DIE RATE.
+  //
+  // Die Rate haengt daran, dass das gestartete Gewerk seine Tabelle auch
+  // schreibt - und der Mock fuehrt Kindskripte nicht aus, sein shop.js ist ein
+  // Platzhalter. Gemessen kamen deshalb fuenf Starts in 67 Minuten heraus: der
+  // Kern startet alle drei Minuten neu (EINMAL_PAUSE_MS), weil die Tabelle nie
+  // frisch wird. Im Spiel schreibt shop.js sie in seiner ersten Runde.
+  //
+  // Was der Kern ALLEIN entscheidet und was hier gilt: der erste Start kommt
+  // in BN9 erst nach der halben Stunde, nicht nach vier Minuten.
+  pruefe("in BN9 wartet der Kern eine halbe Stunde, nicht vier Minuten",
+    ersterNachMin === null || ersterNachMin >= 30,
+    "erster Start bei Tabellenalter "
+      + (ersterNachMin === null ? "nie" : ersterNachMin.toFixed(1) + " min")
+      + " - 7 GB alle vier Minuten fuer dieselbe Null waeren in BN9"
+      + " reine Verschwendung");
+  pruefe("und zwischen zwei Starts liegen mindestens drei Minuten",
+    starts.every((g, i) => i === 0 || g.wall - starts[i - 1].wall >= 180000),
+    "EINMAL_PAUSE_MS - Abstaende: " + starts.map((g, i) => i === 0 ? "-"
+      : ((g.wall - starts[i - 1].wall) / 60000).toFixed(1)).join(", "));
+  pruefe("und in den ersten vier Minuten gar nicht",
+    !(await runden(bauMock({
+      knoten: 9, maxSchlaf: 20, dateien: m.zustand.dateien.home,
+    }))).includes("shop.js"),
+    "die Vier-Minuten-Frist gilt in BN9 nicht, dort sind es dreissig");
 }
 
 console.log("");

@@ -123,6 +123,8 @@ export function neuerMock(o = {}) {
     // Ausschalter fuer die Speicherbuchhaltung. Vorgabe ist AN; wer einen
     // Aspekt ohne Knappheit pruefen will, sagt es ausdruecklich.
     ramBuchen: o.ramBuchen !== false,
+    // Hat sich das Skript per `ns.exit()` selbst beendet? (Testbefund 5)
+    beendetSich: false,
     graftbar: o.graftbar || [],
     graftPreise: o.graftPreise || {},
     graftDauern: o.graftDauern || {},
@@ -237,6 +239,19 @@ export function neuerMock(o = {}) {
       const srv = zustand.server[host];
       const gb = ramFuer(datei, o.skriptRam) * Math.max(1, threads);
       if (!srv) return 0;
+      // OHNE ROOT LAEUFT NICHTS (Skeptiker Runde 4, Testbefund 8, 04.09.2026).
+      //
+      // Das Spiel bricht vor allem anderen ab: `NetscriptWorker.ts:280`
+      // (`if (!server.hasAdminRights) -> {success: false}`), und
+      // `runScriptFromScript` gibt dann 0 zurueck (:324-327). Der Mock prueft
+      // hier nur Datei und Speicher - und ist damit genau an der Stelle zu
+      // gutmuetig, an der die Arbeiterverteilung entschieden wird. Ein Kern,
+      // der Arbeiter auf nicht gerootete Wirte legt, saehe im Test wie ein
+      // Erfolg aus.
+      if (srv.root === false) {
+        zustand.abgelehnt.push({ datei, host, gb, grund: "kein Root", wall: zustand.wall });
+        return 0;
+      }
       if (zustand.ramBuchen !== false && srv.used + gb > srv.ram + 1e-9) {
         zustand.abgelehnt.push({ datei, host, gb, frei: srv.ram - srv.used, wall: zustand.wall });
         return 0;
@@ -269,6 +284,54 @@ export function neuerMock(o = {}) {
       (datei in dateiHost(host || "home") ? ramFuer(datei, o.skriptRam) : 0),
     getScriptIncome: () => 0,
     getScriptExpGain: () => 0,
+    // DREI FUNKTIONEN, DIE DER KERN AUFRUFT UND DER MOCK NICHT KANNTE
+    // (Skeptiker Runde 4, Testbefund 5, 04.09.2026).
+    //
+    // `ns.scriptKill` hat acht Aufrufstellen in bn4net.js, `ns.exit` eine, und
+    // `ns.share` gehoert zur Arbeitermischung. Unbekannte Top-Level-Namen sind
+    // hier schlicht `undefined` (der `nichtGebaut`-Wurf deckt nur die
+    // Namensraeume singularity/bladeburner/hacknet/formulas ab) - alle
+    // Ebene-2-Tests waren gruen, WEIL diese Pfade nie betreten wurden.
+    //
+    // Betroffen waren ausgerechnet der Werkzeug-Neustart (das ist Sprosse 1
+    // der Strafleiter) und der Selbstbeender fuer den Hot-Swap, also die
+    // Mechanik, an der Auftrag 9 haengt.
+    //
+    // `scriptKill` gibt `false` zurueck, wenn nichts lief
+    // (NetscriptFunctions.ts:1198-1215) - nicht `0`, nicht einen Wurf.
+    scriptKill: (datei, host) => {
+      const h = host || zustand.host;
+      const bleibt = [];
+      let getroffen = false;
+      for (const p of zustand.prozesse) {
+        if (p.host === h && p.filename === datei) {
+          getroffen = true;
+          frei(p);
+          zustand.getoetet.push({ ...p, wall: zustand.wall });
+        } else {
+          bleibt.push(p);
+        }
+      }
+      zustand.prozesse = bleibt;
+      return getroffen;
+    },
+
+    // `ns.exit` beendet das Skript sofort. Im Mock heisst das: die Runde
+    // abbrechen wie beim Schlafdeckel - der Test sieht `beendetSich`.
+    exit: () => {
+      zustand.beendetSich = true;
+      const e = new Error("ns.exit()");
+      e.mockAbbruch = true;
+      throw e;
+    },
+
+    // `ns.share` laeuft im Spiel zehn Sekunden und kehrt dann zurueck. Der
+    // Mock tut dasselbe wie `sleep`: er laesst die Zeit vergehen.
+    share: async () => {
+      await ns.sleep(10000);
+      return 1;
+    },
+
     killall: (host) => {
       const h = host || zustand.host;
       const bleibt = [];

@@ -186,38 +186,75 @@ const TESTS = [
  * bildet nach, was ich vom Spiel VERSTANDEN habe, und genau die Stellen, an
  * denen ich es falsch verstanden habe, bildet er falsch nach.
  */
-const LUECKEN = [
+/**
+ * Die Liste hat seit dem 04.09.2026 ZWEI Teile, und das ist der Punkt
+ * (Skeptiker Runde 4, R24).
+ *
+ * Vorher war sie eine einzige Prosaliste, die gedruckt und ignoriert wurde -
+ * die Suite endete mit Exit 0 bei neun offenen Eintraegen. Wer nur den
+ * Rueckgabewert liest (ein Skill, ein Loop), bekam gruen.
+ *
+ * Und sie vermischte zwei Dinge, die sich nicht vermischen lassen:
+ *
+ *   MESSLUECKEN sind Zahlen, die jemand erheben muss. Sie leeren sich durch
+ *   Messen, und Abnahmestufe A verlangt zu Recht, dass sie leer sind.
+ *
+ *   BAUENTSCHEIDUNGEN sind Zustaende, die sich durch Messen NIE leeren -
+ *   "Sprosse 4a ist nicht gebaut" bleibt wahr, solange sie nicht gebaut ist,
+ *   und das ist Absicht. Sie in dieselbe Liste zu schreiben erzeugt Druck,
+ *   den Eintrag zu streichen statt etwas zu messen.
+ */
+const MESSLUECKEN = [
   "EBENE 3, KALTSTART: ein echter Knotenwechsel auf 32 GB home. Der "
     + "Budgettest rechnet ihn nach, aber gerechnet ist nicht gemessen - "
     + "t_workbench gegen den Knotenpreis ist die Zahl, die zaehlt (C.7).",
   "EBENE 3, VERTRAGSKETTE: erster Vertrag geloest UND kassiert vor Minute 20. "
-    + "Die Loeser sind gegen sich selbst geprueft (verify), nicht gegen das "
-    + "Spiel - ein Versuch ist unwiederbringlich (C.8).",
+    + "Die Loeser sind gegen 360 erzeugte Instanzen und je eine unabhaengige "
+    + "Gegenprobe gehalten, aber noch nie gegen einen echten Vertrag im Spiel "
+    + "- ein Versuch ist unwiederbringlich (C.8).",
   "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
     + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
     + "laesst sich nur im Spiel stellen (C.9, C.10).",
-  "SPROSSE 4a ist nicht gebaut (C.12) und wird es auch nicht, bevor ein "
-    + "Ebene-3-Lauf zeigt, dass ein skriptausgeloester Reload keinen "
-    + "beforeunload-Dialog stehen laesst - so steht es im Auftrag. Aus dem "
-    + "Quelltext belegt sind bereits: der save-Prop existiert "
-    + "(GameRoot.tsx:536-541), und der Handler ist eine schlichte "
-    + "Zuweisung an window.onbeforeunload (index.tsx:55), also durch "
-    + "= null aufhebbar. Was fehlt, ist die MESSUNG im Browser.",
-  "SPROSSE 5 ist gebaut und verdrahtet, laeuft aber im TROCKENLAUF: der Kern "
-    + "haengt 'scharf' nur an, wenn data/punish-scharf.txt auf home liegt, und "
-    + "die legt ein Mensch. Bis dahin landet jede Ausloesung nur im Protokoll "
-    + "- das ist der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
   "BITNODE 8 UND 9 sind nur gerechnet, nie gefahren. boerse.js hat 31 Proben, "
     + "aber keine einzige gegen einen echten Markt (C.13, C.15).",
   "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "
     + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14).",
   "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
-    + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung "
-    + "(C.11).",
+    + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
+  "DIE BRUECKE hat keinen einzigen Test, obwohl Auftrag 6.1 ihn namentlich "
+    + "verlangt: Reconnect, Backup vor pushAll, Wachhund, Exit bei EADDRINUSE "
+    + "und uncaughtException, zweite Verbindung, unverified-Fenster. Sie ist "
+    + "der Prozess, der den Live-Spielstand anfassen kann (Skeptiker Runde 4).",
+  "ZWEI AUTONOMIEZAEHLER haben weiterhin keinen Schreiber: manual_actions "
+    + "(gehoert in die Bruecke - sie sieht pushFile, deleteFile und reload) "
+    + "und false_kill_count. `node tools/kpi-luecken.js` nennt sie je Feld.",
+  "DER MOCK kennt kein storedCycles und keinen Seed, obwohl Auftrag 6.1 beides "
+    + "namentlich fordert. Der Nachholklumpen ist als playtime-Sprung "
+    + "modelliert - das ist meine Vorstellung von dem, was storedCycles "
+    + "bewirkt, nicht das Feld.",
+];
+
+/**
+ * Bewusste Bauentscheidungen. Sie stehen hier, damit sie nicht in Vergessenheit
+ * geraten - aber sie sind KEINE Messluecke und blockieren Stufe A nicht.
+ */
+const ENTSCHIEDEN = [
+  "SPROSSE 4a ist nicht gebaut und wird es nicht, bevor ein Ebene-3-Lauf "
+    + "zeigt, dass ein skriptausgeloester Reload keinen beforeunload-Dialog "
+    + "stehen laesst - so steht es im Auftrag. Aus dem Quelltext belegt: der "
+    + "save-Prop existiert (GameRoot.tsx:536-541), und der Handler ist eine "
+    + "schlichte Zuweisung an window.onbeforeunload (index.tsx:55), also mit "
+    + "= null aufhebbar. Es fehlt die MESSUNG, nicht die Kenntnis.",
+  "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
+    + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
+    + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
   "NICHTS DAVON IST LIVE. Der ganze Bau liegt im Worktree; im Spiel laeuft "
     + "eine einzige Aenderung dieses Tages (wakelock.js). Vor Stufe B steht "
-    + "der Hot-Swap nach Auftrag 9 mit Kanarienvogel auf der TEST-Instanz.",
+    + "der Hot-Swap nach Auftrag 9 - die Checkliste dazu ist "
+    + "tools/hotswap.js, und sie verweigert, statt zu warnen.",
 ];
+
+const LUECKEN = MESSLUECKEN;
 
 const nurSchnell = process.argv.includes("--schnell");
 
@@ -272,10 +309,36 @@ if (rot.length) {
 }
 console.log("===========================================");
 console.log("");
-console.log("  NOCH NICHT ABGEDECKT (Auftrag 6.1):");
-for (const l of LUECKEN) console.log("    - " + l);
+console.log("  MESSLUECKEN - Zahlen, die jemand erheben muss (Auftrag 6.1):");
+for (const l of MESSLUECKEN) console.log("    - " + l);
 console.log("");
-console.log("  Stufe A verlangt Exit 0 UND eine leere Lueckenliste.");
+console.log("  BEWUSST SO GEBAUT - keine Luecke, aber nicht vergessen:");
+for (const l of ENTSCHIEDEN) console.log("    - " + l);
 console.log("");
 
-process.exit(rot.length ? 1 : 0);
+// DIE LISTE IST EIN TOR, KEINE PROSA (Skeptiker Runde 4, R24).
+//
+// Vorher wurde sie gedruckt und ignoriert: die Suite endete mit Exit 0 bei
+// neun offenen Eintraegen. Wer nur den Rueckgabewert liest - ein Skill, ein
+// Loop, ein Mensch in Eile -, bekam gruen.
+//
+// Jetzt ist Exit 0 dasselbe wie Stufe A: alle Testdateien gruen UND keine
+// offene Messluecke. Wer trotzdem nur die Tests fahren will, sagt es
+// ausdruecklich (`--nur-tests`) - eine Abkuerzung, die man tippen muss, ist
+// keine, die man aus Versehen nimmt.
+const nurTests = process.argv.includes("--nur-tests");
+const stufeA = rot.length === 0 && MESSLUECKEN.length === 0;
+
+if (nurTests) {
+  console.log("  --nur-tests: die Messluecken zaehlen fuer den Rueckgabewert nicht.");
+  console.log("");
+  process.exit(rot.length ? 1 : 0);
+}
+
+console.log("  Stufe A = alle Tests gruen UND keine offene Messluecke.");
+console.log("  Stand: " + (rot.length ? rot.length + " rote Testdatei(en)" : "Tests gruen")
+  + ", " + MESSLUECKEN.length + " offene Messluecke(n) -> "
+  + (stufeA ? "STUFE A ERREICHT" : "Stufe A NICHT erreicht"));
+console.log("");
+
+process.exit(stufeA ? 0 : 1);

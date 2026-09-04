@@ -241,6 +241,151 @@ console.log("-- der Kern fuehrt den Auftrag aus - im TROCKENLAUF --");
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- DIE NAHT: der Waechter schreibt, was punish.js liest (R1) --");
+{
+  // DER BLINDE FLECK DIESES TESTS (Skeptiker Runde 4, R1, 04.09.2026).
+  //
+  // Bis hierher ersetzte der Test punish.js durch einen Platzhalter und endete
+  // bei "punish.js wird gestartet". Der echte Vollstrecker lief nie. Drei von
+  // vier Pruefern haben unabhaengig gefunden, was dahinter lag: punish.js liest
+  // `data/penalty-order.json`, der Waechter schrieb `watchdog.json.orders`, und
+  // kein einziger Feldname ueberschnitt sich. Die Kette lief an, protokollierte
+  // "executed" und tat nichts.
+  //
+  // Hier laeuft jetzt beides hintereinander: der Waechter stellt den Auftrag,
+  // punish.js liest ihn, und geprueft wird der GRUND seiner Verweigerung. Ein
+  // "kein Sprosse-5-Auftrag" waere die Naht; alles Inhaltliche ist ein
+  // bestandener Uebergang.
+  // DER KERN MUSS MITLAUFEN. Ein Herzschlag mit festem Zeitstempel wird waehrend
+  // der simulierten Stunden alt, und dann feuert S3a (Kern haengt) und ueberholt
+  // S2. Beim ersten Lauf dieses Abschnitts stand deshalb "Deckel erreicht:
+  // 2 von 2" im Log statt eines Auftrags - der Test hat sich selbst im Weg
+  // gestanden.
+  //
+  // `motorTimeMs` waechst mit, `traegerMotorMs` NICHT: das ist genau die Lage,
+  // die S2 meint - der Motor laeuft, der Traeger nicht.
+  const kernBlock = (w, motorMs) => JSON.stringify({
+    schema: 2, wall: w, ts: w, motorTimeMs: motorMs,
+    playtime: 200 * 3600000, okRound: 5000, round: 5000, errStreak: 0,
+    lastError: null, state: "work", phase: "normal", nodeReset: W0 - 48 * 3600000,
+  });
+  const kern = kernBlock(W0, 20 * 3600000);
+  const kpi = JSON.stringify({ traeger: { name: "rang", wert: 4711,
+    motorTimeMs: 13 * 3600000 } });
+
+  const m = neuerMock({
+    host: "home", knoten: 10, wall: W0, playtime: 200 * 3600000,
+    nodeReset: W0 - 48 * 3600000, augReset: W0 - 48 * 3600000,
+    server: { home: { ram: 1024, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: {
+      "registry.json": REGISTRY, "route.json": ROUTE,
+      "guard.js": "//", "bn4net.js": "//", "punish.js": "//", "boot.js": "//",
+      "data/verfahren.txt": "V2 10 2",
+      "data/guard-modus.txt": "enforce",
+      "data/bn4net.json": kern,
+      "data/kpi.json": kpi,
+    } },
+    maxSchlaf: 900,
+    beiSchlaf: (ms, z, vor) => {
+      vor(60000);
+      // Der Kern schreibt weiter - sonst haelt der Waechter ihn fuer tot.
+      z.dateien.home["data/bn4net.json"] =
+        kernBlock(z.wall, 20 * 3600000 + (z.wall - W0));
+    },
+  });
+
+  const gw = await ladeAusBeiden(ROOT, "guard.js");
+  const zurueck = m.uhrStellen();
+  try { await gw.modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+
+  const roh = m.lies("home", "data/penalty-order.json");
+  pruefe("der Waechter schreibt data/penalty-order.json", !!roh,
+    "Log: " + m.zustand.log.slice(-3).join(" | "));
+
+  if (roh) {
+    let a = null;
+    try { a = JSON.parse(roh); } catch { /* bleibt null */ }
+    pruefe("mit rung 5", a && a.rung === 5, JSON.stringify(a));
+    pruefe("mit wall", a && Number.isFinite(a.wall));
+    pruefe("mit nodeReset", a && Number.isFinite(a.nodeReset));
+    pruefe("mit s2MotorMs", a && Number.isFinite(a.s2MotorMs),
+      "punish.js prueft damit die erste Vorbedingung");
+    pruefe("mit wirkungslos", a && Array.isArray(a.wirkungslos));
+
+    // Und jetzt der echte Vollstrecker auf denselben Dateien.
+    const pm = neuerMock({
+      host: "home", knoten: 10, wall: W0, playtime: 200 * 3600000,
+      nodeReset: W0 - 48 * 3600000, augReset: W0 - 48 * 3600000,
+      server: { home: { ram: 1024, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+      maxSchlaf: 5,
+    });
+    for (const [d, i] of Object.entries(m.zustand.dateien.home)) pm.lege("home", d, i);
+    const pw = await ladeAusBeiden(ROOT, "punish.js");
+    const zurueck2 = pm.uhrStellen();
+    try { await pw.modul.main(pm.ns); }
+    catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck2(); }
+
+    let erg = null;
+    try { erg = JSON.parse(pm.lies("home", "data/punish.json")); } catch { /* null */ }
+    pruefe("punish.js schreibt sein Ergebnis", erg !== null,
+      pm.zustand.log.slice(-3).join(" | "));
+    if (erg) {
+      console.log("       Verweigerungsgrund: " + (erg.verweigert || "(keiner)"));
+      pruefe("und findet den Auftrag - der Grund ist NICHT die Naht",
+        !/kein Sprosse-5-Auftrag/.test(String(erg.verweigert)),
+        "genau dieser Grund war der Befund R1");
+      pruefe("und auch nicht die S2-Zahl",
+        !/S2 steht erst 0 h/.test(String(erg.verweigert)),
+        "s2MotorMs kam nicht an");
+      // Dass hier "Sprosse 1 war nicht verifiziert wirkungslos" steht, ist
+      // RICHTIG: in diesem Szenario haengt nichts ausser dem Traeger, also hat
+      // die Leiter ihre billigen Mittel nie gebraucht. Genau dann soll sie
+      // nicht einbauen. Der Beleg dafuer, dass das Feld ankommt, ist der
+      // zweite Lauf unten - mit Historie.
+      pruefe("die Verweigerung ist INHALTLICH, nicht die Naht",
+        /wirkungslos|Division|Depot|Graft|Ausgang|Nachholfenster|Augmentierung/
+          .test(String(erg.verweigert)),
+        "erhalten: " + erg.verweigert);
+    }
+
+    // ZWEITER LAUF: derselbe Auftrag, aber mit Sprossenhistorie. Er belegt,
+    // dass `wirkungslos` wirklich gelesen wird und die Kette weitergeht.
+    const mitHistorie = { ...a, wirkungslos: [1, 2, 3] };
+    const pm2 = neuerMock({
+      host: "home", knoten: 10, wall: W0, playtime: 200 * 3600000,
+      nodeReset: W0 - 48 * 3600000, augReset: W0 - 48 * 3600000,
+      server: { home: { ram: 1024, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+      maxSchlaf: 5,
+    });
+    for (const [d, i] of Object.entries(m.zustand.dateien.home)) pm2.lege("home", d, i);
+    pm2.lege("home", "data/penalty-order.json", JSON.stringify(mitHistorie));
+    const pw2 = await ladeAusBeiden(ROOT, "punish.js");
+    const zurueck3 = pm2.uhrStellen();
+    try { await pw2.modul.main(pm2.ns); }
+    catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck3(); }
+    let erg2 = null;
+    try { erg2 = JSON.parse(pm2.lies("home", "data/punish.json")); } catch { /* null */ }
+    if (erg2) {
+      console.log("       mit Historie: " + (erg2.verweigert || "(keiner)"));
+      pruefe("mit Historie kommt die Kette an Vorbedingung 2 vorbei",
+        !/war nicht verifiziert wirkungslos/.test(String(erg2.verweigert)),
+        "wirkungslos wird nicht gelesen");
+      pruefe("und die S2-Bedingung haelt ebenfalls",
+        !/S2 steht erst/.test(String(erg2.verweigert)),
+        "erhalten: " + erg2.verweigert);
+      pruefe("es bleibt bei einer der acht Vorbedingungen",
+        erg2.verweigert !== null && erg2.ausgefuehrt === false,
+        "im Trockenlauf darf NIE eingebaut werden");
+    }
+  }
+}
+
 console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {

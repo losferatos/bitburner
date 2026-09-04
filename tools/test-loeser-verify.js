@@ -39,6 +39,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
+import { erzeuge } from "./mock/vertragsgenerator.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -159,6 +160,15 @@ const UNSORTIERT = new Set([
   "Sanitize Parentheses in Expression",
   "Find All Valid Math Expressions",
 ]);
+
+/** BigInt-fest kuerzen - `Square Root` liefert BigInt (SquareRoot.ts:33). */
+const ersetzer = (k, v) => (typeof v === "bigint" ? String(v) : v);
+function kurz(x, max = 90) {
+  let t;
+  try { t = JSON.stringify(x, ersetzer); } catch { t = String(x); }
+  if (t === undefined) t = String(x);
+  return t.length > max ? t.slice(0, max - 3) + "..." : t;
+}
 
 /** Zwei gegenueberliegende Ecken in eine feste Form bringen. */
 function normEcken(e) {
@@ -319,6 +329,87 @@ console.log("-- jeder Typ des Spiels hat einen Loeser MIT Gegenprobe --");
   pruefe("und jeder ist hier mit mindestens einem Beispiel vertreten",
     ohneBeispiel.length === 0,
     ohneBeispiel.length ? "ohne Beispiel: " + ohneBeispiel.join(", ") : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- gegen die ECHTEN Eingaben des Spiels (R6, R7) --");
+{
+  // DER EIGENTLICHE TEST. Alles oben laeuft gegen handgetippte Beispiele, und
+  // genau daran sind zwei Gegenproben blind vorbeigekommen:
+  //
+  //   `Total Number of Primes` hatte `if (hi - lo > 60000) return true`. Das
+  //   Spiel erzeugt Spannen von mindestens 100.000 - der Kurzschluss griff bei
+  //   HUNDERT PROZENT der echten Vertraege. Getestet wurde mit [100,200].
+  //
+  //   `Find All Valid Math Expressions` hatte `if (ziffern.length > 10) return
+  //   true`. Das Spiel erzeugt 4 bis 12 Ziffern. Getestet wurde mit drei.
+  //
+  // Beide Proben waren gruen und praktisch wertlos. Deshalb kommen die
+  // Eingaben jetzt aus tools/mock/vertragsgenerator.js - dem nachgebauten
+  // Generator des Spiels, mit denselben Spannen und Fundstellen.
+  const instanzen = erzeuge(SOLVERS, 12);
+  let geprueft = 0;
+  let gestellt = 0;
+  const abgelehnt = [];      // richtige Antwort abgelehnt
+  const durchgelassen = [];  // falsche Antwort angenommen
+  const gesperrt = [];       // vom eigenen guard abgelehnt
+  const kaputt = [];         // Generator warf
+
+  for (const [name, faelle] of Object.entries(instanzen)) {
+    const l = SOLVERS[name];
+    if (!l) continue;
+    for (const data of faelle) {
+      if (data && data.generatorFehler) { kaputt.push(name + ": " + data.generatorFehler); continue; }
+      // EIN GUARD, DER ECHTE VERTRAEGE ABLEHNT, IST SO SCHLIMM WIE EIN
+      // FALSCHES verify - nur in die andere Richtung: der Vertrag bleibt
+      // liegen. Deshalb wird hier nicht uebersprungen, sondern gezaehlt.
+      const g = typeof l.guard === "function" ? l.guard(data) : null;
+      if (g) { gesperrt.push(name + ": " + g); continue; }
+      let a;
+      try { a = l.solve(data); } catch { continue; }
+      geprueft++;
+      let ok = false;
+      try { ok = l.verify(data, a); } catch { ok = false; }
+      if (!ok) abgelehnt.push(name + " (" + kurz(data) + ")");
+
+      for (const falsch of verfaelsche(a)) {
+        if (JSON.stringify(falsch, ersetzer) === JSON.stringify(a, ersetzer)) continue;
+        if (UNSORTIERT.has(name) && Array.isArray(a) && Array.isArray(falsch)
+            && a.length === falsch.length
+            && a.every((x) => falsch.includes(x))) continue;
+        if (name === "Largest Rectangle in a Matrix"
+            && JSON.stringify(normEcken(falsch)) === JSON.stringify(normEcken(a))) continue;
+        gestellt++;
+        let angenommen = true;
+        try { angenommen = l.verify(data, falsch); } catch { angenommen = false; }
+        if (angenommen) durchgelassen.push(name + ": " + kurz(falsch) + " statt " + kurz(a));
+      }
+    }
+  }
+
+  console.log("       " + geprueft + " erzeugte Instanzen, "
+    + gestellt + " verfaelschte Antworten");
+  pruefe("keine richtige Antwort wird abgelehnt", abgelehnt.length === 0,
+    [...new Set(abgelehnt)].slice(0, 4).join(" | "));
+  pruefe("keine falsche Antwort kommt durch", durchgelassen.length === 0,
+    [...new Set(durchgelassen)].slice(0, 5).join(" | "));
+  pruefe("es waren genug erzeugte Instanzen", geprueft >= 300, "nur " + geprueft);
+  pruefe("kein guard lehnt eine echte Vertragseingabe ab", gesperrt.length === 0,
+    [...new Set(gesperrt)].slice(0, 4).join(" | "));
+  pruefe("kein Generator wirft", kaputt.length === 0,
+    [...new Set(kaputt)].slice(0, 3).join(" | "));
+
+  // WAS DIESE ZAHL INZWISCHEN AUCH BELEGT.
+  //
+  // Solange `verify` `solve(data) === answer` lautete, sagte "keine richtige
+  // Antwort wird abgelehnt" gar nichts - es verglich solve mit sich selbst.
+  // Seit C.18 ist jede der dreissig Gegenproben unabhaengig: Umkehrprobe,
+  // zweite Rechnung oder Strukturpruefung. Damit ist derselbe Satz eine
+  // Aussage ueber `solve`: 348 vom Spielgenerator erzeugte Instanzen, jede von
+  // einem zweiten Verfahren bestaetigt.
+  console.log("       (und damit zugleich: " + geprueft + " Antworten von solve,"
+    + " je von einem unabhaengigen zweiten Verfahren bestaetigt)");
 }
 
 console.log("");

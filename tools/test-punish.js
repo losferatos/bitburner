@@ -66,7 +66,10 @@ function guterFall(aenderung = {}) {
       wirkungslos: [1, 2, 3],
     }),
     "data/bn4net.json": JSON.stringify({ letzterMzGrund: null, motorTimeMs: 1e7 }),
-    "data/aug-queue.json": JSON.stringify({ nodeReset: NODE_RESET, augs: ["Aug A"] }),
+    // AUS `data/einbau.json` (Skeptiker Runde 4, R2): `data/aug-queue.json`
+    // hatte im ganzen Baum keinen Schreiber. `bn4rep.js` fuehrt die Zahl in
+    // einbau.json unter `wartend` (bn4rep.js:1041-1046).
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2 }),
     "data/blade.json": JSON.stringify({ rang: 4000 }),
     "data/verfahren.txt": "V2 10 2",
     "data/boerse.json": JSON.stringify({ posten: 0, depotWert: 0 }),
@@ -214,18 +217,31 @@ console.log("-- 3. kein Nachholfenster --");
 console.log("");
 console.log("-- 4. ohne gekaufte Augmentierung waere es ein Soft-Reset --");
 {
-  const r = await fahre(guterFall({ "data/aug-queue.json": null }), ["scharf"]);
+  const r = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 0 }),
+  }), ["scharf"]);
   pruefe("nichts eingebaut", !r.eingebaut);
   pruefe("Grund: ein Einbau ohne Aug ist ein Soft-Reset",
     /Soft-Reset/.test(String(r.ergebnis.verweigert)),
     String(r.ergebnis.verweigert));
 
-  // Und eine Warteschlange aus dem VORIGEN Knoten zaehlt nicht: nach dem
-  // Sprung ist sie leer, die Datei aber noch da.
+  // Ohne die Datei ueberhaupt: auch dann nicht. Ein fehlender Wert ist kein
+  // Freibrief - genau das war der Fehler von `aug-queue.json`, das niemand
+  // schrieb und dessen Fehlen die Bedingung dauerhaft blockierte, ohne dass
+  // es auffiel.
+  const rOhne = await fahre(guterFall({ "data/einbau.json": null }), ["scharf"]);
+  pruefe("ohne einbau.json erst recht nicht", !rOhne.eingebaut,
+    String(rOhne.ergebnis.verweigert));
+
+  // Und eine ALTE Zahl zaehlt nicht: zwischen dem Schreiben und jetzt kann ein
+  // Einbau gelaufen sein, dann waere die Warteschlange leer.
   const r2 = await fahre(guterFall({
-    "data/aug-queue.json": JSON.stringify({ nodeReset: 42, augs: ["Aug A"] }),
+    "data/einbau.json": JSON.stringify({ zeit: WALL - 45 * 60000, wartend: 3 }),
   }), ["scharf"]);
-  pruefe("eine Queue aus dem alten Knoten zaehlt nicht", !r2.eingebaut,
+  pruefe("eine 45 Minuten alte Zahl zaehlt nicht", !r2.eingebaut,
+    String(r2.ergebnis.verweigert));
+  pruefe("und der Grund nennt das Alter",
+    /aelter als 30 Minuten/.test(String(r2.ergebnis.verweigert)),
     String(r2.ergebnis.verweigert));
 }
 

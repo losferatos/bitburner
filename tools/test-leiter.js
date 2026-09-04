@@ -290,21 +290,22 @@ console.log("-- Wirkung rot: Eskalation zur naechsten GEBAUTEN Sprosse --");
   pruefe("eskaliert", r.eskaliert === true);
   pruefe("auf Sprosse 2", r.sprosse === 2, "erhalten " + r.sprosse);
 
-  // Weiter bis zum Ende. Sprosse 4a ist NICHT gebaut (kein Pruefstandsbeleg),
-  // Sprosse 5 seit dem 04.09. schon (src/punish.js) - die Kette laeuft also
-  // ueber 3 nach 5 und endet erst danach in EXHAUSTED.
+  // Weiter bis zum Ende. Das Signal ist S1 - ein Werkzeug, dessen Telemetrie
+  // steht. Sprosse 4a ist nicht gebaut, Sprosse 5 hat `ausloeser: ["S2"]`.
   //
-  // Dass 4a dabei UEBERSPRUNGEN wird und nicht blockiert, ist der Punkt:
-  // `naechste` sucht die naechste GEBAUTE Sprosse, nicht die naechste Nummer.
+  // NACH SPROSSE 3 IST DAMIT SCHLUSS, und das ist der Punkt (Skeptiker Runde
+  // 4, R3). Bis zum 04.09.2026 nahm `verifiziert` die naechste GEBAUTE
+  // Sprosse ohne Ruecksicht auf ihren Ausloeser - seit Sprosse 5 gebaut ist,
+  // haette ein stummes `hashes.js` nach 35 Minuten einen
+  // Augmentierungs-Einbau ausgeloest. Ein Einbau macht Platzmangel schlimmer,
+  // nicht besser.
   L.verifiziert(z, "a.js", false, 400000);   // -> 3
-  const nachDrei = L.verifiziert(z, "a.js", false, 500000);
-  pruefe("nach 3 kommt 5, nicht 4a", nachDrei.sprosse === 5,
-    "erhalten " + nachDrei.sprosse + " (4a ist ungebaut und wird uebersprungen)");
-  const ende = L.verifiziert(z, "a.js", false, 600000);
-  pruefe("nach der letzten gebauten Sprosse: EXHAUSTED", ende.zustand === "EXHAUSTED",
-    ende.zustand);
+  const ende = L.verifiziert(z, "a.js", false, 500000);
+  pruefe("nach Sprosse 3 kommt fuer S1 KEINE weitere", ende.zustand === "EXHAUSTED",
+    "erhalten " + ende.zustand + " auf Sprosse " + ende.sprosse
+    + " - Sprosse 5 ist nur ueber S2 erreichbar");
   pruefe("und es wird vermerkt", z.exhausted !== null);
-  const nach = L.schritt(z, sig, 700000, W0);
+  const nach = L.schritt(z, sig, 600000, W0);
   pruefe("danach passiert nichts mehr", nach.handlung === "nichts", nach.handlung);
   pruefe("aber der Grund ist lesbar", /erschoepft/.test(nach.grund));
 }
@@ -330,6 +331,42 @@ console.log("-- Sprosse 4a ist NICHT gebaut, Sprosse 5 schon --");
   pruefe("aber S2 findet jetzt seine Sprosse",
     L.sprosseFuer("S2") !== null && L.sprosseFuer("S2").nr === 5,
     "S2 war das einzige Signal ohne gebaute Sprosse");
+}
+
+console.log("");
+console.log("-- die Eskalation folgt dem AUSLOESER, nicht der Nummer (R3) --");
+{
+  // Derselbe Weg wie oben, aber mit S2 - dem Signal, fuer das Sprosse 5
+  // gebaut ist. Hier MUSS sie erreicht werden, sonst haette der Bot auf einen
+  // stehenden Traeger keine Antwort.
+  const z = L.neu(1000);
+  const sig = { sig: "S2", ziel: "fortschritt", schwere: 2,
+    alterMotorMs: 7 * 3600000, grund: "Traeger steht" };
+  const uhren = (m) => ({ guard: m, engine: m, motor: m });
+
+  // S2 steigt bei Sprosse 5 ein (sprosseFuer), nicht bei 1.
+  const ein = L.sprosseFuer("S2");
+  pruefe("S2 steigt bei Sprosse 5 ein", ein && ein.nr === 5,
+    "erhalten " + (ein && ein.nr));
+
+  L.schritt(z, sig, 0, W0, uhren(0));                       // -> SUSPECT
+  const zuFrueh = L.schritt(z, sig, 3600000, W0, uhren(3600000));
+  pruefe("eine Stunde Motorzeit reicht nicht", zuFrueh.handlung === "wartet",
+    zuFrueh.handlung + " - die Karenz betraegt sechs Stunden MOTORZEIT");
+
+  // DIE UHR IST DER PUNKT (R15). Sechs Stunden Wanduhr bei stehender
+  // Motorzeit duerfen NICHT reichen: eine Offline-Nacht ist kein Stillstand.
+  const nurWanduhr = L.schritt(z, sig, 7 * 3600000, W0 + 7 * 3600000,
+    { guard: 7 * 3600000, engine: 0, motor: 0 });
+  pruefe("sechs Stunden Waechterzeit bei stehender Motorzeit reichen NICHT",
+    nurWanduhr.handlung === "wartet",
+    nurWanduhr.handlung + " - sonst loeste eine Offline-Nacht den Einbau aus");
+
+  const jetzt = L.schritt(z, sig, 7 * 3600000, W0, uhren(7 * 3600000));
+  pruefe("sieben Stunden Motorzeit loesen aus", jetzt.handlung === "ausfuehren",
+    jetzt.handlung + ": " + jetzt.grund);
+  pruefe("und zwar Sprosse 5", jetzt.sprosse && jetzt.sprosse.nr === 5,
+    "erhalten " + (jetzt.sprosse && jetzt.sprosse.nr));
 }
 
 console.log("");

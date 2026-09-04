@@ -26,6 +26,25 @@
  * sonst noch soll - und gibt die AUSFUEHRUNG ab.
  *
  * ===========================================================================
+ * ER LAEUFT AUF ABRUF, NICHT DAUERND
+ * ===========================================================================
+ *
+ * Sieben Gigabyte dauerhaft auf `home` sind im Kaltstart ein Fuenftel des
+ * ganzen Budgets - fuer ein Gewerk, das die meiste Zeit dieselbe Preistabelle
+ * neu schreibt. Gerechnet (04.09.2026): Kern 10,80 + Waechter 6,10 +
+ * Wachhalter 2,25 + Haendler 7,00 = 26,15 von 32 GB. Es blieben 5,85 GB fuer
+ * Arbeiter, und mit `boot.js` daneben gar nichts.
+ *
+ * Deshalb beendet er sich, sobald seine Arbeit getan ist: Preise geschrieben,
+ * kein Auftrag offen, mindestens zwei Runden gelaufen. Der Kern startet ihn
+ * wieder, wenn `data/preise.json` veraltet oder ein Auftrag zu erledigen ist -
+ * die Regel steht in `bn4net.js` beim Werkzeugstarter.
+ *
+ * Ueber die Zeit gemittelt kostet er damit rund ein Fuenftel: eine Minute je
+ * fuenf. Und in genau der Minute, in der wirklich gekauft wird, bleibt er, bis
+ * es erledigt ist.
+ *
+ * ===========================================================================
  * DIE PREISTABELLE IST DER KNIFF
  * ===========================================================================
  *
@@ -255,6 +274,32 @@ export async function main(ns) {
 
       okRunden++;
       errStreak = 0;
+
+      // --- 4. Fertig? Dann Platz machen. --------------------------------------
+      //
+      // ZWEI RUNDEN MINDESTENS, nicht eine. In der ersten Runde koennte ein
+      // Auftrag unterwegs sein, den der Kern gerade schreibt, waehrend dieses
+      // Gewerk die Datei schon gelesen hat. Zwei Runden sind sechzig Sekunden
+      // und damit sechs Kernrunden - lange genug, dass ein Auftrag ankommt.
+      //
+      // Ein Auftrag, der auf Geld wartet, zaehlt als OFFEN: er soll erledigt
+      // werden, sobald das Geld da ist, und ein Neustart wuerde das Warten von
+      // vorn beginnen.
+      const nochZuTun = auftrag && !erledigt.has(auftrag.id);
+      if (!nochZuTun && runden >= 2) {
+        nachHome("data/shop.json", JSON.stringify({
+          schema: 2, ts: jetzt, wall: jetzt,
+          playtime: (() => { try { return ns.getPlayer().totalPlaytime; } catch { return 0; } })(),
+          motorTimeMs: 0,
+          round: runden, okRound: okRunden, errStreak: 0, lastError,
+          host: ns.getHostname(), version: "shop-1",
+          state: "done", blockedReason: null,
+          park: park.length, limitAnzahl, kaufbar: limitAnzahl > 0,
+        }));
+        sag("Preise geschrieben, kein Auftrag offen - beende mich und gebe "
+          + "7 GB frei. Der Kern holt mich zurueck, wenn die Preise alt werden.");
+        return;
+      }
     } catch (e) {
       errStreak++;
       const msg = String(e && e.message ? e.message : e);

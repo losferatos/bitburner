@@ -230,6 +230,10 @@ export async function main(ns) {
     ["bbtrain.js", "data/bbtrain.json", 10 * 60000],
   ];
   const werkzeugSeit = new Map();   // Werkzeug -> erstmals laufend gesehen (ms)
+  // Seit wann ein Werkzeug Platz auf home reserviert. Ueber Rundengrenzen
+  // hinweg, weil die Frist sonst in jeder Runde neu begaenne und die
+  // Reservierung nie verfiele.
+  const reservierungSeit = new Map();
   // Zeitpunkt des letzten darkweb.js-Anlaufs (Abschnitt 2b1).
   let nachholMerker = 0;
   // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
@@ -3246,9 +3250,41 @@ export async function main(ns) {
       };
       const keineHacknet = markerGilt("data/keine-hacknet.txt");
       const keineSleeves = markerGilt("data/keine-sleeves.txt");
+      // DER HAENDLER LAEUFT AUF ABRUF (04.09.2026).
+      //
+      // shop.js kostet 7,00 GB - im Kaltstart ein Fuenftel des Budgets, fuer
+      // ein Gewerk, das die meiste Zeit dieselbe Preistabelle neu schreibt.
+      // Gerechnet: Kern 10,80 + Waechter 6,10 + Wachhalter 2,25 + Haendler
+      // 7,00 = 26,15 von 32. Mit boot.js daneben bliebe fuer Arbeiter nichts.
+      //
+      // Es beendet sich deshalb selbst, sobald die Preise geschrieben und kein
+      // Auftrag offen ist. Hier steht die Gegenseite: WANN es zurueckgeholt
+      // wird. Zwei Gruende, und nur diese beiden.
+      //
+      //   1. Die Preistabelle ist aelter als vier Minuten. Der Kern verwirft
+      //      sie ab fuenf (parkLage), also muss der Nachschub vorher da sein -
+      //      sonst entstuende genau die Luecke, in der er nicht kaufen kann,
+      //      weil er keine Preise hat.
+      //   2. Ein Auftrag ist offen. Dann wird er gebraucht, egal wie alt die
+      //      Preise sind.
+      //
+      // OHNE DIESE REGEL WAERE ES EIN DEADLOCK, und zwar ein lautloser: der
+      // Kern schreibt einen Auftrag erst, wenn er Preise hat, und Preise
+      // schreibt nur shop.js. Genau diese Verklemmung stand vor der zweiten
+      // Skeptikerrunde in der Registry (als Vorbedingung auf eine Datei, die
+      // ohnehin niemand schrieb) und hatte den Rechnerkauf vollstaendig
+      // ausfallen lassen.
+      const shopNoetig = (() => {
+        if (offenerAuftrag && auftragOffen()) return true;
+        const pl = parkLage();
+        if (!pl.da) return true;                       // keine Preise: dringend
+        return !Number.isFinite(pl.alterMs) || pl.alterMs > 240000;
+      })();
+
       const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d)
         && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js"))
         && !((d === "hashes.js" || d === "hacknet.js") && keineHacknet)
+        && !(d === "shop.js" && !shopNoetig)
         && !(d === "sleevecrime.js" && (keineSleeves || laufend.includes("sleeve.js"))));
       // Laufende Instanzen im Hackingknoten beenden - der Filter oben wirkt
       // nur auf den Start. Ohne das haelt ein Handstart oder eine Runde, in
@@ -3391,6 +3427,57 @@ export async function main(ns) {
         return bester;
       };
 
+      // WIRTSPERREN DES WAECHTERS (Position C.9, 04.09.2026).
+      //
+      // Sprosse 2 der Strafleiter verschiebt ein Werkzeug auf einen anderen
+      // Wirt. Der Waechter kann den neuen Wirt nicht selbst waehlen - die
+      // Wirtwahl mit Speicherpruefung und Raeumkette steht hier -, aber er
+      // kann den bisherigen sperren. Ohne diese Zeilen liefe die Sprosse ins
+      // Leere: der Kern setzte das Werkzeug in derselben Runde auf denselben
+      // Rechner zurueck, sechsmal je sechs Stunden.
+      //
+      // Ein Eintrag verfaellt nach einer Stunde; das steht in der Datei, nicht
+      // hier - der Waechter raeumt sie selbst auf.
+      const wirtGesperrt = (() => {
+        const leer = () => false;
+        try {
+          if (!ns.fileExists("data/blocked-hosts.json", "home")) return leer;
+          const d = JSON.parse(ns.read("data/blocked-hosts.json"));
+          if (!d || !Array.isArray(d.eintraege)) return leer;
+          const jetzt = Date.now();
+          const gilt = d.eintraege.filter((e) => Number.isFinite(e.bis) && e.bis > jetzt);
+          if (!gilt.length) return leer;
+          return (werkzeug, host) => gilt.some(
+            (e) => e.werkzeug === werkzeug && e.host === host);
+        } catch { return leer; }
+      })();
+
+      // DIE PLATZRESERVIERUNG (Position C.7, 04.09.2026).
+      //
+      // Ohne sie gibt es eine klassische Prioritaetsinversion, und der
+      // Kaltstart-Budgettest hat sie schwarz auf weiss gezeigt: auf einem
+      // frischen home (32 GB) liegen Kern 10,80 + Waechter 6,10 +
+      // Wachhalter 2,25 + popups 3,30 = 22,45 GB. Es bleiben 9,55 - und
+      // `cdump.js` braucht 12,00. Es passt also nicht, wird uebersprungen, und
+      // die naechsten Eintraege der Liste belegen den Rest.
+      //
+      // Ergebnis: KEINE der drei Geldquellen des Kaltstarts (cdump, csolve,
+      // sleevecrime) findet je Platz. Der Bot steht mit vollem Speicher da und
+      // verdient nichts - in genau der Phase, in der Geld alles ist.
+      //
+      // Deshalb: passt ein Eintrag nicht auf home, wird der Platz fuer ihn
+      // FREIGEHALTEN. Alles, was in der Liste hinter ihm steht, wartet - aber
+      // nur auf home, und nur begrenzt.
+      //
+      // DIE ZEITGRENZE IST DER WICHTIGE TEIL. Eine Reservierung ohne Verfall
+      // ist eine Blockade: braeuchte ein Eintrag mehr, als home je hergibt,
+      // stuende der ganze Rest fuer immer. Nach fuenf Minuten Wanduhr faellt
+      // sie deshalb, das Gewerk wird uebersprungen, und die naechsten duerfen.
+      // Beim naechsten Anlauf beginnt die Frist von vorn - so bekommt der
+      // teure Eintrag regelmaessig eine Chance, ohne dauerhaft zu blockieren.
+      const RESERVIERUNG_MS = 300000;
+      let reserviertFuer = null;      // Dateiname oder null
+
       for (const [datei, args] of fehlend) {
         const braucht = ns.getScriptRam(datei, "home");
         // Nicht stillschweigend ueberspringen. Ein Werkzeug, das seit einer
@@ -3403,7 +3490,53 @@ export async function main(ns) {
         }
 
         let wirt = werkbank;
-        if (frei() < braucht) {
+        // Ist die Werkbank fuer dieses Werkzeug gesperrt, gilt sofort der
+        // Ausweichweg - unabhaengig davon, wieviel Platz dort waere.
+        if (wirtGesperrt(datei, werkbank)) {
+          const weg = ausweichwirt(braucht);
+          if (!weg || wirtGesperrt(datei, weg)) {
+            if (runde % 10 === 0) {
+              sag(datei + ": " + werkbank + " ist vom Waechter gesperrt, und es"
+                + " findet sich kein anderer Wirt - es bleibt aus.");
+            }
+            continue;
+          }
+          sag(datei + ": " + werkbank + " ist vom Waechter gesperrt - weiche auf "
+            + weg + " aus.");
+          wirt = weg;
+          // Auf dem Ausweichwirt raeumen - dieselbe Reihenfolge nach
+          // Verlustwert wie unten: share faengt ohne Verlust wieder an, ein
+          // abgebrochener hack wirft seine ganze Laufzeit weg.
+          if (freiAuf(wirt) < braucht) {
+            for (const w of ["worker/share.js", "worker/weaken.js",
+                             "worker/grow.js", "worker/hack.js"]) {
+              if (freiAuf(wirt) >= braucht) break;
+              if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
+              ns.scriptKill(w, wirt);
+            }
+          }
+          if (freiAuf(wirt) < braucht) {
+            if (runde % 10 === 0) {
+              sag(datei + ": Raeumen auf dem Ausweichwirt " + wirt + " brachte nur "
+                + freiAuf(wirt).toFixed(1) + " von " + braucht.toFixed(1) + " GB.");
+            }
+            continue;
+          }
+        } else if (reserviertFuer && werkbank === "home") {
+          // Ein Eintrag hoeherer Prioritaet haelt gerade Platz auf home frei.
+          // Auf einem ANDEREN Wirt darf dieser hier trotzdem starten - die
+          // Reservierung gilt nur fuer home, und ein Ausweichwirt nimmt dem
+          // Wartenden nichts weg.
+          const weg = ausweichwirt(braucht);
+          if (!weg || wirtGesperrt(datei, weg)) {
+            if (runde % 30 === 0) {
+              sag(datei + " wartet: " + reserviertFuer + " haelt Platz auf home"
+                + " frei, und es gibt keinen Ausweichwirt.");
+            }
+            continue;
+          }
+          wirt = weg;
+        } else if (frei() < braucht) {
           // Kann es auf der Werkbank ueberhaupt je passen, wenn man alle
           // Arbeiter dort raeumte? Wenn nein, ist Warten sinnlos - dann fehlt
           // nicht Geduld, sondern ein anderer Rechner.
@@ -3411,6 +3544,26 @@ export async function main(ns) {
           if (werkbankMoeglich >= braucht) {
             if (runde % 10 === 0) sag(datei + " wartet: " + werkbank + " hat "
               + frei().toFixed(1) + " von " + braucht.toFixed(1) + " GB frei.");
+            // Platz freihalten - siehe die Begruendung oben. Nur auf home und
+            // nur fuer den ERSTEN Wartenden: eine zweite Reservierung wuerde
+            // nichts hinzufuegen, weil ohnehin schon alles dahinter wartet.
+            if (werkbank === "home" && !reserviertFuer) {
+              const seit = reservierungSeit.get(datei);
+              if (!seit) {
+                reservierungSeit.set(datei, Date.now());
+                reserviertFuer = datei;
+              } else if (Date.now() - seit < RESERVIERUNG_MS) {
+                reserviertFuer = datei;
+              } else {
+                // Die Frist ist um. Uebersprungen, und der naechste Anlauf
+                // faengt von vorn an.
+                reservierungSeit.delete(datei);
+                if (runde % 30 === 0) {
+                  sag(datei + ": Reservierung nach fuenf Minuten aufgegeben -"
+                    + " die anderen duerfen wieder.");
+                }
+              }
+            }
             continue;
           }
           const weg = ausweichwirt(braucht);
@@ -3446,6 +3599,8 @@ export async function main(ns) {
         // Absturz, keine Meldung, das Werkzeug fehlt einfach.
         ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home");
         const pid = ns.exec(datei, wirt, 1, ...args);
+        // Gestartet heisst: die Reservierung hat ihren Zweck erfuellt.
+        if (pid) reservierungSeit.delete(datei);
         sag(pid ? datei + " laeuft auf " + wirt + " (pid " + pid + ")."
           : datei + " liess sich auf " + wirt + " nicht starten (exec gab 0).");
       }

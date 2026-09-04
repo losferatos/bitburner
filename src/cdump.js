@@ -1,25 +1,65 @@
 /**
- * Vertraege auslesen - die schlanke Haelfte.
+ * Vertraege auslesen UND loesen - die schlanke Haelfte der Kaltstart-Geldkette.
  *
+ * ===========================================================================
  * WARUM GETRENNT VON contracts.js
+ * ===========================================================================
  *
- * contracts.js loest im Spiel und braucht dafuer 17,65 GB (getContract allein
- * kostet 15). Nach einem BitNode-Wechsel hat home 32 GB, davon belegt bn4net
- * 16,25 - es bleiben 15,75, und das reicht nicht. Ausgerechnet in der Phase,
- * in der Vertraege die mit Abstand schnellste Geldquelle sind: Das Netz haengt
- * dann an sechs Servern ohne Portbedarf, und ohne Geld gibt es weder TOR noch
- * Portprogramme noch Mietrechner.
+ * `contracts.js` loest im Spiel und braucht dafuer 17,65 GB (`getContract`
+ * allein kostet 15). Nach einem BitNode-Wechsel hat `home` 32 GB, davon
+ * belegen Kern, Waechter und Wachhalter 19,15 - es bleiben 12,85, und das
+ * reicht nicht. Ausgerechnet in der Phase, in der Vertraege die mit Abstand
+ * schnellste Geldquelle sind (ARCHITEKTUR E9): Das Netz haengt dann an sechs
+ * Servern ohne Portbedarf, und ohne Geld gibt es weder TOR noch Portprogramme
+ * noch Mietrechner.
  *
- * Deshalb hier nur das Auslesen: getContractType und getData kosten je 5 GB,
- * zusammen also 10 statt der 15 von getContract. Geloest wird ausserhalb, die
- * Antwort kommt ueber data/cantwort.json zurueck und wird von csolve.js
- * eingereicht (attempt, 10 GB). Beide Haelften passen einzeln auf ein frisches
- * home, zusammen wuerden sie es nicht.
+ * Deshalb hier nur `getContractType` und `getData` - je 5 GB, zusammen 10
+ * statt der 15 von `getContract`. Mit dem Grundpreis sind es 12,00 GB, und die
+ * passen.
  *
- * Aufruf: node tools/task.js cdump.js
+ * ===========================================================================
+ * ES LOEST JETZT SELBST (Position C.8, 04.09.2026)
+ * ===========================================================================
+ *
+ * Bis heute schrieb diese Datei nur eine Liste, und ein MENSCH loeste sie
+ * ausserhalb - `tools/csolve.js` ueber die Bruecke, auf Zuruf. Damit war die
+ * einzige Geldquelle des Kaltstarts von jemandem abhaengig, der hinsieht. In
+ * einem Auftrag, dessen erste Zeile "maximal autonom" lautet, war das die
+ * zweitgroesste Luecke nach dem Grafting.
+ *
+ * Die Loeser stehen in `lib/loeser.js` und rechnen nur - als eigenes Modul
+ * kosten sie NULL Gigabyte. Diese Datei ist damit genauso gross wie vorher und
+ * kann trotzdem alles.
+ *
+ * ===========================================================================
+ * DIE ROTATION
+ * ===========================================================================
+ *
+ * `cdump.js` schreibt `data/cantwort.json` und beendet sich. `csolve.js`
+ * reicht ein (`attempt`, 10 GB) und LOESCHT die Datei. Erst danach laeuft
+ * `cdump.js` wieder - so sind nie beide zugleich auf `home`, und zusammen
+ * waeren sie 24,25 GB.
+ *
+ * Die Kopplung steht in der Registry als Vorbedingung: `cdump.js` verlangt,
+ * dass `data/cantwort.json` NICHT existiert, `csolve.js` verlangt, dass sie
+ * existiert. Beide Dateien haben damit einen echten Schreiber - anders als in
+ * der ersten Fassung, wo `data/contracts.json` und `data/csolve-laeuft.txt` in
+ * der Registry standen und niemand sie je schrieb.
+ *
+ * ===========================================================================
+ * WAS NICHT GERATEN WIRD
+ * ===========================================================================
+ *
+ * Ein Versuch ist unwiederbringlich. Deshalb wird jede Antwort vor dem
+ * Aufschreiben gegengeprueft (`verify` in `lib/loeser.js`), und ein Vertrag,
+ * dessen Typ unbekannt ist oder dessen Probe nicht aufgeht, wird NICHT
+ * eingereicht - er wandert mit Grund in die Liste der ausgelassenen.
  *
  * @param {NS} ns
  */
+
+import { SOLVERS } from "lib/loeser.js";
+
 export async function main(ns) {
   const gesehen = new Set(["home"]);
   const rand = ["home"];
@@ -27,15 +67,78 @@ export async function main(ns) {
     const h = rand.pop();
     for (const n of ns.scan(h)) if (!gesehen.has(n)) { gesehen.add(n); rand.push(n); }
   }
-  const raus = [];
+
+  const antworten = [];
+  const ausgelassen = [];
+  const roh = [];
+
   for (const host of gesehen) {
     for (const datei of ns.ls(host, ".cct")) {
-      let typ = "?", daten = null;
-      try { typ = ns.codingcontract.getContractType(datei, host); } catch (e) { typ = String(e); }
-      try { daten = ns.codingcontract.getData(datei, host); } catch (e) { daten = String(e); }
-      raus.push({ host, datei, typ, daten });
+      let typ = null;
+      let daten = null;
+      try { typ = ns.codingcontract.getContractType(datei, host); }
+      catch (e) { ausgelassen.push({ host, datei, grund: "Typ nicht lesbar: " + kurz(e) }); continue; }
+      try { daten = ns.codingcontract.getData(datei, host); }
+      catch (e) { ausgelassen.push({ host, datei, typ, grund: "Daten nicht lesbar: " + kurz(e) }); continue; }
+
+      roh.push({ host, datei, typ, daten });
+
+      const loeser = SOLVERS[typ];
+      if (!loeser || typeof loeser.solve !== "function") {
+        // Ein unbekannter Typ ist kein Fehler, sondern eine Luecke - meist ein
+        // neuer Vertragstyp aus einem Spielupdate. Er bleibt liegen, statt
+        // einen Versuch zu verbrennen.
+        ausgelassen.push({ host, datei, typ, grund: "kein Loeser fuer diesen Typ" });
+        continue;
+      }
+
+      let antwort;
+      try { antwort = loeser.solve(daten); }
+      catch (e) { ausgelassen.push({ host, datei, typ, grund: "Loeser warf: " + kurz(e) }); continue; }
+
+      // DIE GEGENPROBE. Sie ist der Grund, warum diese Kette ueberhaupt
+      // autonom laufen darf: ein Versuch ist unwiederbringlich, und von zehn
+      // sind meist schon welche weg. Was die Probe nicht besteht, wird nicht
+      // eingereicht.
+      if (typeof loeser.verify === "function") {
+        let ok = false;
+        try { ok = loeser.verify(daten, antwort); }
+        catch (e) { ok = false; }
+        if (!ok) {
+          ausgelassen.push({ host, datei, typ, grund: "Gegenprobe fehlgeschlagen" });
+          continue;
+        }
+      }
+
+      antworten.push({ host, datei, typ, antwort });
     }
   }
-  ns.write("data/cdump.json", JSON.stringify(raus), "w");
-  ns.tprint("Vertraege ausgelesen: " + raus.length);
+
+  // Die Rohliste bleibt - sie ist der Blick von aussen auf das, was im Netz
+  // liegt, und `tools/` liest sie.
+  ns.write("data/cdump.json", JSON.stringify(roh), "w");
+
+  // NUR SCHREIBEN, WENN ES ETWAS ZU TUN GIBT. Eine leere Antwortdatei wuerde
+  // die Rotation blockieren: `cdump.js` darf nur laufen, solange es sie NICHT
+  // gibt, und `csolve.js` startet fuer nichts.
+  if (antworten.length) {
+    ns.write("data/cantwort.json", JSON.stringify(antworten), "w");
+  }
+  ns.write("data/cdump-log.txt",
+    new Date().toLocaleTimeString() + "  " + roh.length + " Vertraege gefunden, "
+    + antworten.length + " geloest und geprueft, " + ausgelassen.length + " ausgelassen.\n"
+    + ausgelassen.map((a) => "  " + a.host + "/" + a.datei + " ("
+      + (a.typ || "?") + "): " + a.grund).join("\n") + "\n", "w");
+
+  ns.print(roh.length + " Vertraege, " + antworten.length + " geloest, "
+    + ausgelassen.length + " ausgelassen.");
+}
+
+/** Fehler und Werte kurz halten - das Protokoll wandert in den Spielstand. */
+function kurz(wert, maxLaenge = 120) {
+  let text;
+  try {
+    text = wert instanceof Error ? String(wert.message || wert) : String(wert);
+  } catch { text = "?"; }
+  return text.length > maxLaenge ? text.slice(0, maxLaenge) + "..." : text;
 }

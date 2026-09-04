@@ -252,4 +252,32 @@ export async function main(ns) {
   }
   sag("Fertig. " + gekauft + " Programm(e) gekauft, Guthaben jetzt $" + Math.round(geld())
     + ". Vorhanden: " + PROGRAMME.filter((p) => ns.fileExists(p.name, "home")).map((p) => p.name).join(", "));
+
+  // --- DIE ABSCHLUSSMARKE (Position C.8, 04.09.2026) -----------------------
+  //
+  // Die Registry hielt dieses Gewerk mit `forbidsFile:
+  // data/portknacker-komplett.txt` zurueck, sobald alle fuenf Portknacker da
+  // sind - nur schrieb die Datei niemand. Die Bedingung war damit immer
+  // erfuellt, und darkweb.js lief in jeder Runde neu an, oeffnete die
+  // Stadtkarte, klickte durch die Oberflaeche und kaufte nichts.
+  //
+  // Das ist mehr als Verschwendung: jeder Anlauf blendet die Seitenleiste um
+  // und schickt Tastendruecke an das Spiel. Im Nachtlauf ist das die Sorte
+  // Stoerung, die man am naechsten Morgen nicht mehr zuordnen kann.
+  //
+  // Formulas.exe zaehlt AUSDRUECKLICH NICHT dazu: es kostet 5 Mrd, ueberlebt
+  // keinen Reset (Prestige.ts:93 gibt es nur mit Source-File 5 zurueck) und
+  // ist kein Portknacker. Waere es Teil der Bedingung, liefe das Gewerk den
+  // ganzen Lauf lang weiter.
+  const KNACKER = PROGRAMME.filter((p) => p.name !== "Formulas.exe");
+  const fehlt = KNACKER.filter((p) => !ns.fileExists(p.name, "home"));
+  if (!fehlt.length) {
+    ns.write("data/portknacker-komplett.txt",
+      new Date().toISOString() + " alle fuenf Portknacker vorhanden\n", "w");
+    if (ns.getHostname() !== "home") {
+      ns.scp("data/portknacker-komplett.txt", "home", ns.getHostname());
+    }
+    sag("Alle fuenf Portknacker da - Marke gesetzt, dieses Gewerk ruht bis zum"
+      + " naechsten Reset.");
+  }
 }

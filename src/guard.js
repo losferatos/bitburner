@@ -84,6 +84,17 @@ export async function main(ns) {
   let leiter = ladeLeiter(liesVonHome("data/watchdog.json"), ri0.lastNodeReset);
   let strafen = liesJson("data/penalties.json") || { version: 1, eintraege: [] };
 
+  // BLOCKIERTE WIRTE (Position C.9).
+  //
+  // Sprosse 2 verschiebt ein Werkzeug auf einen anderen Wirt. Ohne Gedaechtnis
+  // waere der "andere Wirt" beim naechsten Mal wieder derselbe - und die
+  // Sprosse liefe sechsmal je sechs Stunden gegen dieselbe Wand.
+  //
+  // Der Eintrag verfaellt nach einer Stunde GUARD-Zeit: ein Wirt, der vor
+  // einer Stunde zu voll war, ist es jetzt vielleicht nicht mehr, und ein
+  // dauerhafter Ausschluss schrumpfte das Netz mit jeder Stoerung.
+  const gesperrt = new Map();   // "werkzeug|host" -> guardTimeMs des Eintrags
+
   // Fuer S2: der Traegerwert beim letzten Vergleich.
   let letzterTraegerWert = null;
   let letzterTraegerMotorMs = null;
@@ -219,10 +230,10 @@ export async function main(ns) {
 
           if (scharf) {
             sag("SPROSSE " + r.sprosse.nr + " auf " + r.ziel + ": " + r.sprosse.name);
-            // Die Ausfuehrung selbst kommt mit Position C.9. Bis dahin ist
-            // auch der scharfe Modus nur ein Protokoll - besser, als eine
-            // halbfertige Handlung auf einen laufenden Bot loszulassen.
-            sag("  (die Ausfuehrung ist noch nicht gebaut - Position C.9)");
+            const erg = fuehreAus(ns, r, eintraege, gesperrt, sag);
+            eintrag.ausgefuehrt = erg.getan;
+            eintrag.details = erg.text;
+            sag("  -> " + erg.text);
           } else {
             sag("BEOBACHTET: haette Sprosse " + r.sprosse.nr + " auf " + r.ziel
               + " ausgefuehrt (" + r.sprosse.name + ") - Grund: " + sig.grund);
@@ -304,4 +315,234 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     puls: lage.puls,
     signaleJetzt: lage.signale,
   });
+}
+
+/**
+ * DIE SPROSSEN AUSFUEHREN (Positionen C.9 und C.10).
+ *
+ * ===========================================================================
+ * WARUM DIE AUSFUEHRUNG SO SPAET KOMMT
+ * ===========================================================================
+ *
+ * Der Waechter lief zuerst im Beobachtungsmodus, und zwar ausdruecklich:
+ * `false_penalty_count = 0` ist eine Abnahmebedingung, und das ist eine Zahl,
+ * die nur VOR dem Scharfstellen guenstig zu bekommen ist. Ein Waechter, der
+ * zuerst beobachtet, kostet eine Nacht; einer, der zuerst zuschlaegt, im
+ * schlechtesten Fall einen ganzen Lauf.
+ *
+ * ===========================================================================
+ * ER IRRT IN RICHTUNG UNTAETIGKEIT
+ * ===========================================================================
+ *
+ * Jede Handlung hier ist die kleinstmoegliche, die den Befund heilen kann, und
+ * jede meldet ehrlich, wenn sie nichts getan hat. `getan: false` ist kein
+ * Fehler - es heisst, die Wirkungspruefung wird gleich rot, und die Leiter
+ * geht eine Sprosse hoeher. Das ist genau der vorgesehene Weg.
+ *
+ * Was hier NICHT steht: Sprosse 4 (Reload von innen) und Sprosse 5
+ * (Soft-Reset). Beide tragen `gebaut: false` in `lib/leiter.js`, und
+ * `sprosseFuer` liefert sie deshalb gar nicht erst - der Automat kommt nie
+ * hier an. Sprosse 4 braucht laut Auftrag erst einen Pruefstandsbeleg, dass
+ * kein `beforeunload`-Dialog stehen bleibt; ein Reload mit stehendem Dialog
+ * wuerde den Bot bis zum naechsten Menschen anhalten, und das ist das
+ * Gegenteil von dem, wofuer die Leiter da ist.
+ *
+ * @param {NS} ns
+ * @param {object} r          das Ergebnis von schritt()
+ * @param {Array} eintraege   die Registry-Auswahl mit Telemetrie
+ * @param {Map} gesperrt      "werkzeug|host" -> Zeitstempel
+ * @param {Function} sag
+ * @returns {{getan: boolean, text: string}}
+ */
+function fuehreAus(ns, r, eintraege, gesperrt, sag) {
+  const nr = r.sprosse.nr;
+
+  // --- Sprosse 0: die Umgebung ---------------------------------------------
+  //
+  // Es gibt nichts zu tun, und das ist der Punkt. Ein verdecktes Browserfenster
+  // oder eine stockende Bruecke lassen sich von innen nicht heilen. Die Sprosse
+  // steht in der Liste, damit der Befund PROTOKOLLIERT wird - handeln waere
+  // hier blinder Aktionismus.
+  //
+  // Seit dem 04.09. kommt der Automat hier ohnehin nicht mehr an: Signale mit
+  // schwere 0 speisen die Leiter gar nicht erst (lib/leiter.js, schritt).
+  // Der Zweig bleibt als Netz.
+  if (nr === 0) {
+    return { getan: false, text: "Umgebungsbefund protokolliert - von innen nicht heilbar." };
+  }
+
+  // --- Sprosse 1: das Werkzeug neu starten ----------------------------------
+  //
+  // Die kleinste wirksame Handlung: beenden, wo es laeuft, und der Kern holt
+  // es in seiner naechsten Runde zurueck. Der Waechter startet es NICHT selbst -
+  // die Wirtwahl, die Speicherpruefung und die Raeumkette stehen im Kern, und
+  // sie doppelt zu fuehren waere die sichere Art, sie auseinanderlaufen zu
+  // lassen.
+  if (nr === 1) {
+    const ziel = r.ziel;
+    let getoetet = 0;
+    const wo = [];
+    try {
+      for (const h of netz(ns)) {
+        for (const p of ns.ps(h)) {
+          if (p.filename !== ziel) continue;
+          if (ns.kill(p.pid)) { getoetet++; if (!wo.includes(h)) wo.push(h); }
+        }
+      }
+    } catch (e) {
+      return { getan: false,
+        text: "Neustart misslungen: " + String(e && e.message ? e.message : e) };
+    }
+    if (!getoetet) {
+      // Das Werkzeug laeuft nirgends. Dann ist die Telemetrie zu Recht alt,
+      // und der Kern hat es aus einem anderen Grund nicht gestartet - meist
+      // Speichermangel. Ein Kill heilt das nicht.
+      return { getan: false, text: ziel + " laeuft nirgends - nichts zu beenden."
+        + " Der Kern startet es, sobald Platz ist." };
+    }
+    return { getan: true, text: ziel + " auf " + wo.join(", ") + " beendet ("
+      + getoetet + " Instanz(en)). Der Kern holt es in seiner naechsten Runde." };
+  }
+
+  // --- Sprosse 2: ein anderer Wirt ------------------------------------------
+  //
+  // Ein Werkzeug, das nach dem Neustart wieder haengt, haengt vielleicht am
+  // WIRT und nicht an sich selbst - ein Rechner, dessen Speicher belegt ist,
+  // oder einer, der beim Ausbau gerade neu entstanden ist.
+  //
+  // Der Waechter waehlt den Wirt nicht selbst (das tut der Kern), aber er kann
+  // den bisherigen SPERREN. Die Sperre liegt in data/blocked-hosts.json.
+  if (nr === 2) {
+    const ziel = r.ziel;
+    let wirt = null;
+    try {
+      for (const h of netz(ns)) {
+        if (ns.ps(h).some((p) => p.filename === ziel)) { wirt = h; break; }
+      }
+    } catch { /* dann bleibt wirt null */ }
+    if (!wirt) {
+      return { getan: false, text: ziel + " laeuft nirgends - kein Wirt zu sperren." };
+    }
+    if (wirt === "home") {
+      // home zu sperren waere die Sorte Handlung, die alles schlimmer macht:
+      // im Kaltstart ist home der einzige Wirt, und ein Werkzeug, das dort
+      // nicht laufen darf, laeuft gar nicht.
+      return { getan: false, text: "Wirt ist home - wird nicht gesperrt."
+        + " Im Kaltstart ist es der einzige, den es gibt." };
+    }
+    gesperrt.set(ziel + "|" + wirt, Date.now());
+    schreibeSperren(ns, gesperrt);
+    let getoetet = 0;
+    try {
+      for (const p of ns.ps(wirt)) {
+        if (p.filename === ziel && ns.kill(p.pid)) getoetet++;
+      }
+    } catch { /* egal */ }
+    return { getan: true, text: wirt + " fuer " + ziel + " gesperrt (eine Stunde)"
+      + (getoetet ? " und " + getoetet + " Instanz(en) beendet." : ".") };
+  }
+
+  // --- Sprosse 3: alles beenden, boot.js starten ----------------------------
+  //
+  // Die schwerste gebaute Sprosse und die einzige, die den KERN meint. Sie
+  // kostet den Zustand aller laufenden Arbeiter - fliegende hack-, grow- und
+  // weaken-Faeden werfen ihre bisherige Laufzeit weg.
+  //
+  // Deshalb der Deckel von zweimal je sechs Stunden (lib/leiter.js) und die
+  // Karenz von zehn Minuten: ein Kern, der zehn Minuten lang keinen
+  // Herzschlag schreibt, ist wirklich tot und nicht nur langsam.
+  //
+  // DIE SCHONLISTE IST DIESELBE WIE IN boot.js, und aus demselben Grund: ein
+  // Aufraeumen, das seine eigene Aufsicht wegraeumt, macht den Fall
+  // unsichtbar, fuer den es gebaut ist. Sie kommt aus der Registry
+  // (killSafe: false), mit eingebauter Notliste.
+  if (nr === 3) {
+    const NOTLISTE = ["boot.js", "guard.js", "ausgang.js"];
+    let schonliste = NOTLISTE;
+    try {
+      const roh = ns.fileExists("registry.json", "home") ? ns.read("registry.json") : null;
+      const reg = roh ? JSON.parse(roh) : null;
+      if (reg && Array.isArray(reg.eintraege)) {
+        schonliste = [...new Set([...NOTLISTE,
+          ...reg.eintraege.filter((e) => e.killSafe === false).map((e) => e.name)])];
+      }
+    } catch { /* die Notliste traegt */ }
+
+    let beendet = 0;
+    try {
+      for (const p of ns.ps("home")) {
+        if (schonliste.includes(p.filename)) continue;
+        if (ns.kill(p.pid)) beendet++;
+      }
+    } catch (e) {
+      return { getan: false,
+        text: "Raeumen misslungen: " + String(e && e.message ? e.message : e) };
+    }
+
+    // boot.js starten, wenn es nicht schon laeuft. Es holt den Kern zurueck
+    // und beendet sich danach von selbst.
+    let pid = 0;
+    try {
+      if (ns.ps("home").some((p) => p.filename === "boot.js")) {
+        return { getan: true, text: beendet + " Prozess(e) beendet; boot.js lief schon." };
+      }
+      if (!ns.fileExists("boot.js", "home")) {
+        return { getan: false, text: beendet + " Prozess(e) beendet, aber boot.js"
+          + " liegt nicht auf home - hier muss ein Mensch nachsehen." };
+      }
+      pid = ns.exec("boot.js", "home");
+    } catch (e) {
+      return { getan: false,
+        text: "boot.js-Start warf: " + String(e && e.message ? e.message : e) };
+    }
+    return { getan: !!pid, text: beendet + " Prozess(e) beendet, boot.js "
+      + (pid ? "gestartet (pid " + pid + ")." : "liess sich nicht starten (exec gab 0).") };
+  }
+
+  return { getan: false, text: "Sprosse " + nr + " ist nicht gebaut." };
+}
+
+/**
+ * Das Netz, so weit der Waechter es sehen muss.
+ *
+ * `ns.scan` kostet 0,2 GB einmalig - der Preis faellt an, ob man einmal oder
+ * hundertmal scannt. Im Normalbetrieb wird diese Funktion nie aufgerufen: nur
+ * wenn eine Sprosse wirklich feuert.
+ */
+function netz(ns) {
+  const gesehen = new Set(["home"]);
+  const schlange = ["home"];
+  while (schlange.length) {
+    for (const n of ns.scan(schlange.shift())) {
+      if (gesehen.has(n)) continue;
+      gesehen.add(n);
+      schlange.push(n);
+    }
+  }
+  // Hacknet-Server sind keine Wirte: jedes Byte, das dort laeuft, drueckt die
+  // Hash-Rate ueber ramRatio (HacknetServers.ts:14).
+  return [...gesehen].filter((h) => !h.startsWith("hacknet-server-"));
+}
+
+/**
+ * Die Wirtsperren nach draussen, damit der Kern sie liest.
+ *
+ * Ein Eintrag verfaellt nach einer Stunde Wanduhr. Die Uhr ist hier bewusst
+ * die Wanduhr und nicht die Guard-Zeit: der Grund einer Sperre ist meist ein
+ * voller Rechner, und der leert sich in Echtzeit.
+ */
+function schreibeSperren(ns, gesperrt) {
+  const SPERRE_MS = 3600000;
+  const jetzt = Date.now();
+  for (const [k, t] of [...gesperrt]) {
+    if (jetzt - t > SPERRE_MS) gesperrt.delete(k);
+  }
+  const raus = [...gesperrt].map(([k, t]) => {
+    const teile = k.split("|");
+    return { werkzeug: teile[0], host: teile[1], seit: t, bis: t + SPERRE_MS };
+  });
+  try {
+    ns.write("data/blocked-hosts.json",
+      JSON.stringify({ version: 1, ts: jetzt, eintraege: raus }), "w");
+  } catch { /* egal */ }
 }

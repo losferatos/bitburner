@@ -12,9 +12,25 @@
 import { readFileSync } from "node:fs";
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { planeRoute } from "../src/ausgang.js";
+import { existsSync } from "node:fs";
+import { pathToFileURL } from "node:url";
 
 const hier = path.dirname(fileURLToPath(import.meta.url));
+
+// planeRoute liegt seit Position C.3 in src/lib/route.js. ausgang.js
+// re-exportiert sie weiter, laesst sich aus Node aber nicht mehr laden: seine
+// Importe stehen im Bitburner-Stil ("lib/x.js", absolut ab home), den Node
+// nicht aufloest. Der Test greift deshalb direkt auf das Modul zu - und sucht
+// es dort, wo es liegt: im Worktree, solange die Position nicht live ist.
+const routeModul = [
+  path.resolve(hier, "..", "..", "bitburner-bau", "src", "lib", "route.js"),
+  path.resolve(hier, "..", "src", "lib", "route.js"),
+].find((p) => existsSync(p));
+if (!routeModul) {
+  console.log("src/lib/route.js nicht gefunden - weder im Worktree noch live.");
+  process.exit(1);
+}
+const { planeRoute } = await import(pathToFileURL(routeModul).href);
 const { route } = JSON.parse(readFileSync(path.join(hier, "..", "src", "route.json"), "utf8"));
 
 let fehler = 0;

@@ -31,6 +31,9 @@ const TESTS = [
   },
   {
     datei: "test-verbote.js",
+    // --bau: gegen den Worktree pruefen, solange dort gebaut wird. Ein
+    // Befund, der erst nach dem Einspielen kommt, kommt zu spaet.
+    args: ["--bau"],
     deckt: "Verbotsgrep und Selbstblockade-Muster, mit Selbstprobe",
     schnell: true,
   },
@@ -45,6 +48,141 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-motorzeit.js",
+    deckt: "Motorzeit gegen Drosselung, Offline-Nacht und Nachholklumpen",
+    schnell: true,
+  },
+  {
+    datei: "test-kontrakte.js",
+    deckt: "Herzschlag v2, kpi.json-Feldliste und Ereignisstrom (C.1)",
+    schnell: true,
+  },
+  {
+    datei: "test-syntax.js",
+    deckt: "Ebene -1: jede Datei in src/ parst (acorn aus der Referenzkopie)",
+    schnell: true,
+  },
+  {
+    datei: "test-ram.js",
+    deckt: "RAM-Rechner gegen 114 Live-Messwerte, registry.json und das Tor E1",
+    schnell: true,
+  },
+  {
+    datei: "test-ram-namen.js",
+    deckt: "Namenspruefer gegen die wakelock-Fehlerklasse, mit Selbstprobe",
+    schnell: true,
+  },
+  {
+    datei: "test-zielvalidierung.js",
+    deckt: "Zielpruefung vor dem Sprung gegen die echte route.json (C.3)",
+    schnell: true,
+  },
+  {
+    datei: "test-kaltstart-budget.js",
+    deckt: "passt der Kaltstart auf 32 GB - und findet eine Geldquelle Platz? (C.7/C.8)",
+    schnell: true,
+  },
+  {
+    datei: "test-registry.js",
+    deckt: "Registry, Rollen-Riegel und der Migrationsbeweis gegen die heutige Liste (C.4)",
+    schnell: true,
+  },
+  {
+    datei: "test-graftwahl.js",
+    deckt: "Graft-Auswahl: Vorzug, Puffer, Sprungnaehe, gegen den echten Plan (C.14)",
+    schnell: true,
+  },
+  {
+    datei: "test-figur.js",
+    deckt: "Figur-Vergabepunkt: Lease, Rangfolge, Folgenummer, Knotenstempel (C.11)",
+    schnell: true,
+  },
+  {
+    datei: "test-leiter.js",
+    deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
+    schnell: true,
+  },
+  {
+    datei: "test-motor-ebene2.js",
+    deckt: "EBENE 2: der echte Kern gegen den ns-Mock, drei Pflichtproben (C.1)",
+    schnell: false,
+  },
+  {
+    datei: "test-matrix-ebene2.js",
+    deckt: "EBENE 2: Szenarienmatrix ueber alle 15 Knoten der Route",
+    schnell: false,
+  },
+  {
+    datei: "test-boerse.js",
+    deckt: "Aktienhandel: Trendschaetzung, Kommission, Schliessung vor dem Sprung (C.15)",
+    schnell: true,
+  },
+  {
+    datei: "test-kern-c789.js",
+    deckt: "EBENE 2: Platzreservierung, shop-Bedarfsbetrieb, Wirtsperren, BN9 (C.7-C.13)",
+    schnell: false,
+  },
+  {
+    datei: "test-sprosse5-kette.js",
+    deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
+    schnell: false,
+  },
+  {
+    datei: "test-loeser-verify.js",
+    deckt: "Die Gegenproben der 30 Vertragsloeser, gegen falsche Antworten (C4)",
+    schnell: true,
+  },
+  {
+    datei: "test-punish.js",
+    deckt: "Sprosse 5: die acht Vorbedingungen und die beiden Deckel (C.12)",
+    schnell: true,
+  },
+  {
+    datei: "test-graftauto-ebene2.js",
+    deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
+    schnell: false,
+  },
+  {
+    datei: "test-blade-ebene2.js",
+    deckt: "EBENE 2: das Traegergewerk fuer 30 der 40 Laeufe - Ausdauer, Chaos, Black-Op-Schwelle, Fertigkeiten, und das Tor 4 x 100 in bbtrain.js",
+    schnell: false,
+  },
+  {
+    datei: "test-sleeve-ebene2.js",
+    deckt: "EBENE 2: der Geldboden der Koerper gegen den Nachholrueckstand (storedCycles) - und der Mock, der ihn nachbildet",
+    schnell: false,
+  },
+  {
+    datei: "test-bruecke.js",
+    deckt: "EBENE 2: die Bruecke gegen ein nachgebautes Spiel - Rollentrennung, Wachhund, Sicherung vor pushAll, zweite Verbindung, belegter Port (Auftrag 6.1)",
+    schnell: false,
+  },
+  {
+    datei: "test-lader.js",
+    deckt: "DER PRUEFSTAND SELBST: Importumschreibung, Heimatordner, keine Reste unter src/, zwei gleichzeitige Laeufe (R29)",
+    schnell: false,
+  },
+  {
+    datei: "test-guard-ebene2.js",
+    deckt: "EBENE 2: der Waechter im Beobachtungsmodus, boot.js-Schonliste (C.6)",
+    schnell: false,
+  },
+  {
+    datei: "test-endspurt.js",
+    deckt: "Ausgangs-Interlock und Endspurt-Regel, inkl. ns.read-Asymmetrie (C.3)",
+    schnell: true,
+  },
+  {
+    datei: "test-reserve-eta.js",
+    deckt: "Wirtreserve mit Verfall und Restzeit gegen Nachholklumpen (C.3)",
+    schnell: true,
+  },
+  {
+    datei: "test-analyse-eichung.js",
+    deckt: "Eichung der ersetzten Analyse-Familie gegen den Spielquelltext (C.7)",
+    schnell: true,
+  },
+  {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
     schnell: true,
@@ -56,16 +194,96 @@ const TESTS = [
  * Die Liste wird ausgegeben, nicht verschwiegen: ein gruener Sammellauf, der
  * die Haelfte nicht prueft, ist gefaehrlicher als ein roter.
  */
-const LUECKEN = [
-  "Registry-Aufloesung (registry.json existiert noch nicht)",
-  "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
-  "Motorzeit gegen Offline-Spruenge und gedrosselten Tab (noch nicht gebaut)",
-  "ns-Mock und Szenarienmatrix (Ebene 2, tools/mock/ns.js fehlt)",
+/**
+ * WAS DIESE SUITE NICHT PRUEFT.
+ *
+ * Sie steht hier, weil eine leere Lueckenliste die bequemste Art ist, sich
+ * fertig zu fuehlen. Stufe A der Abnahme verlangt Exit 0 UND eine leere
+ * Liste - beides, nicht eines.
+ *
+ * Alles hier Genannte braucht das laufende Spiel (Ebene 3) oder eine
+ * Beobachtung ueber Stunden. Kein Mock der Welt ersetzt das: der ns-Mock
+ * bildet nach, was ich vom Spiel VERSTANDEN habe, und genau die Stellen, an
+ * denen ich es falsch verstanden habe, bildet er falsch nach.
+ */
+/**
+ * Die Liste hat seit dem 04.09.2026 ZWEI Teile, und das ist der Punkt
+ * (Skeptiker Runde 4, R24).
+ *
+ * Vorher war sie eine einzige Prosaliste, die gedruckt und ignoriert wurde -
+ * die Suite endete mit Exit 0 bei neun offenen Eintraegen. Wer nur den
+ * Rueckgabewert liest (ein Skill, ein Loop), bekam gruen.
+ *
+ * Und sie vermischte zwei Dinge, die sich nicht vermischen lassen:
+ *
+ *   MESSLUECKEN sind Zahlen, die jemand erheben muss. Sie leeren sich durch
+ *   Messen, und Abnahmestufe A verlangt zu Recht, dass sie leer sind.
+ *
+ *   BAUENTSCHEIDUNGEN sind Zustaende, die sich durch Messen NIE leeren -
+ *   "Sprosse 4a ist nicht gebaut" bleibt wahr, solange sie nicht gebaut ist,
+ *   und das ist Absicht. Sie in dieselbe Liste zu schreiben erzeugt Druck,
+ *   den Eintrag zu streichen statt etwas zu messen.
+ */
+const MESSLUECKEN = [
+  "EBENE 3, KALTSTART: ein echter Knotenwechsel auf 32 GB home. Der "
+    + "Budgettest rechnet ihn nach, aber gerechnet ist nicht gemessen - "
+    + "t_workbench gegen den Knotenpreis ist die Zahl, die zaehlt (C.7).",
+  "EBENE 3, VERTRAGSKETTE: erster Vertrag geloest UND kassiert vor Minute 20. "
+    + "Die Loeser sind gegen 360 erzeugte Instanzen und je eine unabhaengige "
+    + "Gegenprobe gehalten, aber noch nie gegen einen echten Vertrag im Spiel "
+    + "- ein Versuch ist unwiederbringlich (C.8).",
+  "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
+    + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
+    + "laesst sich nur im Spiel stellen (C.9, C.10).",
+  "BITNODE 8 UND 9 sind nur gerechnet, nie gefahren. boerse.js hat 31 Proben, "
+    + "aber keine einzige gegen einen echten Markt (C.13, C.15).",
+  "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "
+    + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14).",
+  "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
+    + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
+  "DIE BRUECKE ist seit dem 04.09.2026 gegen ein nachgebautes Spiel geprueft "
+    + "(tools/test-bruecke.js, 77 Proben). OFFEN bleibt der Zweig, den ein "
+    + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
+    + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
+  "JEDER KENNWERT MIT SOLL HAT JETZT EINEN SCHREIBER (04.09.2026). Offen "
+    + "bleibt die MESSUNG von next_blackop_chance: sie gilt laut Auftrag erst, "
+    + "wenn getNextBlackOp() etwas liefert (erste Operation bei 2.500 Rang, "
+    + "gemessen 596), und bis dahin steht sie zu Recht auf null. Bis der Rang "
+    + "reicht, ist die Zahl gebaut, aber nicht belegt.",
+  "DER MOCK RECHNET KEINE SPIELMECHANIK. Er kennt seit dem 04.09.2026 die "
+    + "Koerper (storedCycles), den Seed und die Division (31 Funktionen) - "
+    + "aber er leitet keine Erfolgschance aus Kampfwerten ab, er gibt "
+    + "zurueck, was der Test hineinschreibt. Geprueft ist damit die "
+    + "ENTSCHEIDUNG der Gewerke, nicht die Formel des Spiels; die hat ihren "
+    + "eigenen, gegen den Quelltext geeichten Test. Was daraus folgt: ein "
+    + "Fehler in einer Formel faellt hier NICHT auf.",
 ];
+
+/**
+ * Bewusste Bauentscheidungen. Sie stehen hier, damit sie nicht in Vergessenheit
+ * geraten - aber sie sind KEINE Messluecke und blockieren Stufe A nicht.
+ */
+const ENTSCHIEDEN = [
+  "SPROSSE 4a ist nicht gebaut und wird es nicht, bevor ein Ebene-3-Lauf "
+    + "zeigt, dass ein skriptausgeloester Reload keinen beforeunload-Dialog "
+    + "stehen laesst - so steht es im Auftrag. Aus dem Quelltext belegt: der "
+    + "save-Prop existiert (GameRoot.tsx:536-541), und der Handler ist eine "
+    + "schlichte Zuweisung an window.onbeforeunload (index.tsx:55), also mit "
+    + "= null aufhebbar. Es fehlt die MESSUNG, nicht die Kenntnis.",
+  "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
+    + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
+    + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
+  "NICHTS DAVON IST LIVE. Der ganze Bau liegt im Worktree; im Spiel laeuft "
+    + "eine einzige Aenderung dieses Tages (wakelock.js). Vor Stufe B steht "
+    + "der Hot-Swap nach Auftrag 9 - die Checkliste dazu ist "
+    + "tools/hotswap.js, und sie verweigert, statt zu warnen.",
+];
+
+const LUECKEN = MESSLUECKEN;
 
 const nurSchnell = process.argv.includes("--schnell");
 
-function fahre(datei) {
+function fahre(datei, args = []) {
   return new Promise((fertig) => {
     const p = path.join(HIER, datei);
     if (!fs.existsSync(p)) {
@@ -73,13 +291,27 @@ function fahre(datei) {
       return;
     }
     const beginn = Date.now();
-    execFile("node", [p], { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+    // ZWEI AENDERUNGEN AM 04.09.2026 (Skeptiker Runde 5, W5):
+    //
+    //   `process.execPath` statt "node" - findet die Umgebung `node` nicht auf
+    //   dem PATH (Aufgabenplanung, ein .cmd mit eigenem PATH, ein anderer
+    //   Rechner), bricht die Suite mit ENOENT ab statt zu laufen.
+    //
+    //   `timeout` - es gab keines. Haengt eine Testdatei, haengt die Suite
+    //   endlos, und niemand sieht warum. Bei Ebene-2-Tests, die echte Prozesse
+    //   und Sockets fahren, ist das die falsche Vorgabe. 180 s ist reichlich:
+    //   die langsamste Datei braucht gemessen 39 s.
+    execFile(process.execPath, [p, ...args],
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: 180000,
+        killSignal: "SIGKILL" },
       (err, out, errout) => {
+        const abgewuergt = err && err.killed;
         fertig({
           datei,
           rc: err ? (err.code ?? 1) : 0,
           ms: Date.now() - beginn,
-          ausgabe: (out || "") + (errout || ""),
+          ausgabe: (out || "") + (errout || "")
+            + (abgewuergt ? String.fromCharCode(10) + "  ABGEBROCHEN: laenger als 180 s - die Datei haengt." + String.fromCharCode(10) : ""),
         });
       });
   });
@@ -94,7 +326,7 @@ const auswahl = TESTS.filter((t) => !nurSchnell || t.schnell);
 const ergebnisse = [];
 
 for (const t of auswahl) {
-  const r = await fahre(t.datei);
+  const r = await fahre(t.datei, t.args || []);
   ergebnisse.push({ ...t, ...r });
   const zeichen = r.rc === 0 ? "gruen" : "ROT  ";
   console.log("");
@@ -116,10 +348,36 @@ if (rot.length) {
 }
 console.log("===========================================");
 console.log("");
-console.log("  NOCH NICHT ABGEDECKT (Auftrag 6.1):");
-for (const l of LUECKEN) console.log("    - " + l);
+console.log("  MESSLUECKEN - Zahlen, die jemand erheben muss (Auftrag 6.1):");
+for (const l of MESSLUECKEN) console.log("    - " + l);
 console.log("");
-console.log("  Stufe A verlangt Exit 0 UND eine leere Lueckenliste.");
+console.log("  BEWUSST SO GEBAUT - keine Luecke, aber nicht vergessen:");
+for (const l of ENTSCHIEDEN) console.log("    - " + l);
 console.log("");
 
-process.exit(rot.length ? 1 : 0);
+// DIE LISTE IST EIN TOR, KEINE PROSA (Skeptiker Runde 4, R24).
+//
+// Vorher wurde sie gedruckt und ignoriert: die Suite endete mit Exit 0 bei
+// neun offenen Eintraegen. Wer nur den Rueckgabewert liest - ein Skill, ein
+// Loop, ein Mensch in Eile -, bekam gruen.
+//
+// Jetzt ist Exit 0 dasselbe wie Stufe A: alle Testdateien gruen UND keine
+// offene Messluecke. Wer trotzdem nur die Tests fahren will, sagt es
+// ausdruecklich (`--nur-tests`) - eine Abkuerzung, die man tippen muss, ist
+// keine, die man aus Versehen nimmt.
+const nurTests = process.argv.includes("--nur-tests");
+const stufeA = rot.length === 0 && MESSLUECKEN.length === 0;
+
+if (nurTests) {
+  console.log("  --nur-tests: die Messluecken zaehlen fuer den Rueckgabewert nicht.");
+  console.log("");
+  process.exit(rot.length ? 1 : 0);
+}
+
+console.log("  Stufe A = alle Tests gruen UND keine offene Messluecke.");
+console.log("  Stand: " + (rot.length ? rot.length + " rote Testdatei(en)" : "Tests gruen")
+  + ", " + MESSLUECKEN.length + " offene Messluecke(n) -> "
+  + (stufeA ? "STUFE A ERREICHT" : "Stufe A NICHT erreicht"));
+console.log("");
+
+process.exit(stufeA ? 0 : 1);

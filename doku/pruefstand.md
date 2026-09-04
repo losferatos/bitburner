@@ -1,0 +1,260 @@
+# Der Prüfstand
+
+Stand 04.09.2026. Aufruf: `node tools/test-alles.js` (alle), `--schnell` (nur
+die kurzen). Exit 0 heißt grün; Stufe A verlangt zusätzlich eine **leere
+Lückenliste**, und die druckt derselbe Lauf am Ende aus.
+
+## Die vier Ebenen
+
+Der Prüfstand ist in Ebenen geteilt, weil jede etwas anderes kann und jede
+etwas anderes **nicht** kann. Wer das vermischt, hält eine Ebene-0-Probe für
+einen Beweis über das laufende Spiel.
+
+| Ebene | Was läuft | Was sie beweist | Was sie nicht kann |
+|---|---|---|---|
+| **0** | reine Funktionen, ohne `ns` | Formeln, Automaten, Tabellen | nichts über Abläufe |
+| **1** | Quelltext-Prüfungen (grep, AST) | Regeln über den Code selbst | nichts über Laufzeit |
+| **2** | echter Bot-Code gegen einen `ns`-Mock | Abläufe über Runden, mit steuerbarer Zeit | keine Spielmechanik |
+| **3** | echter Browser, echte Instanz | alles Übrige | braucht den Tab |
+
+**Ebene 2 ist die Ebene, die lange fehlte.** Geprüft wurden nur reine
+Funktionen und der echte Browser; dazwischen nichts. Der Motorzeit-Einbau, die
+Registry-Auflösung und der Strafleiter-Automat liegen alle in dieser Lücke.
+
+## Der ns-Mock
+
+`tools/mock/ns.js`. Er bildet die **Schnittstelle** nach, nicht die Spiellogik:
+er rechnet nicht, wie schnell ein Server wächst, und kennt keine
+Bladeburner-Wahrscheinlichkeiten. Was der Code daraus macht, ist der
+Prüfgegenstand.
+
+**Die steuerbare Zeit ist der Punkt.** `mock.vor(8 * 3600000)` lässt acht
+Stunden vergehen, ohne acht Stunden zu warten. Damit werden genau die Fälle
+prüfbar, die im echten Betrieb Tage brauchen und deshalb nie geprüft werden:
+eine Offline-Nacht, ein gedrosselter Tab, ein Nachholklumpen. Und beide Uhren
+laufen getrennt — `wall` und `playtime` —, denn ihr Auseinanderlaufen **ist**
+der Fall, den die Motorzeit erkennen muss.
+
+**Seit dem 04.09.2026 kostet Speicher etwas.** Vorher gab `getScriptRam` jedem
+Skript pauschal 2,4 GB und `exec` buchte nichts ab; alle Ebene-2-Tests prüften
+damit eine Welt ohne Speichergrenze — ausgerechnet die zur Platzreservierung.
+Jetzt kommen die Größen aus derselben `registry.json`, die auch der Kern liest,
+mit SF4-Faktor 16 (sonst hält man ein 32-GB-home für geräumig: `bn4life.js`
+misst 23,85 statt 293,85 GB). `exec` gibt bei Platzmangel `0` zurück, wie das
+Spiel.
+
+Wer einen Aspekt **ohne** Knappheit prüfen will, sagt es ausdrücklich:
+`ramBuchen: false`, oder er nennt eigene Größen in `skriptRam`.
+
+**Wo er rät, sagt er es**: jede nicht implementierte Funktion wirft mit einer
+Meldung, die den Namen nennt. Ein stiller `undefined`-Rückgabewert wäre
+schlimmer als ein Fehler — er fälscht das Ergebnis, statt es zu verhindern.
+
+### Die Körper und der Rückstand
+
+Seit dem 04.09.2026 kennt der Mock `storedCycles` — das Feld, in dem das Spiel
+den Nachholrückstand ablegt. Vorher war der Nachholklumpen nur als **Sprung der
+Spielzeit** modelliert; das ist eine Vorstellung davon, was `storedCycles`
+bewirkt, und nicht das Feld selbst. Auftrag 6.1 nennt es namentlich.
+
+Die Asymmetrie ist der Punkt:
+
+| | Regel | Quelle |
+|---|---|---|
+| Zugang | ein Zyklus je 200 ms Spielzeit | `CONSTANTS.MilliPerCycle` |
+| Abgang, Körper | höchstens **15** je Verarbeitungsschritt | `Sleeve.ts:263-275` |
+| Abgang, Division | höchstens **25** je Aufruf (5 Sekunden × 5) | `Bladeburner.ts:1377-1380` |
+
+Bei 300 Zyklen in einem Nachholschub sind das 5 % beziehungsweise 8 % — der
+Rest bleibt liegen. Genau daraus rechnet `sleeve.js` seinen Geldboden
+(2.400 $/s × (`storedCycles`/5 + Takt) je Körper). Acht Stunden verdeckter Tab
+sind 144.000 Zyklen = 28.800 Spielsekunden = **69,1 Mio $ je Körper**; die
+frühere Schwelle von 5 Mio deckte 67 Sekunden.
+
+`tools/test-sleeve-ebene2.js` fährt das: mit Rückstand und 50 Mio auf dem Konto
+darf kein Körper ins Gym, **ohne** Rückstand und mit demselben Konto muss er.
+Die zweite Probe ist die Falsifikation der ersten — ohne sie wäre auch ein
+Gewerk grün, das bei 50 Mio schlicht immer knausert.
+
+**Der Seed** (ebenfalls Auftrag 6.1) sitzt im selben Zustand: alles Zufällige
+im Mock kommt aus `mulberry32(seed)`, derselben Funktion wie im
+Vertragsgenerator. Ein Test, der einmal grün und einmal rot ist, weil sich eine
+Zufallszahl geändert hat, ist kein Test.
+
+### Die Division
+
+Seit dem 04.09.2026 kennt der Mock auch den Bladeburner-Namensraum — die 31
+Funktionen, die `blade.js`, `bbtrain.js` und `sleeve.js` wirklich rufen. Damit
+hat das **Trägergewerk für 30 der 40 Läufe** endlich eine Ebene-2-Probe
+(`tools/test-blade-ebene2.js`).
+
+**Der Mock rechnet dabei keine Spielmechanik.** Er leitet keine Erfolgschance
+aus Kampfwerten ab; er gibt zurück, was der Test hineinschreibt. Geprüft wird
+die **Entscheidung** — ruht es bei leerer Ausdauer, räumt es Chaos auf, lässt es
+eine Black Op mit 5 % Chance liegen —, nicht die Formel. Die hat ihren eigenen,
+gegen den Quelltext geeichten Test (`test-formeln.js`). Eine nachgebaute
+Spielformel im Prüfstand wäre eine zweite Wahrheit, die auseinanderläuft.
+
+Der Test hat beim Bau **zwei eigene Fehlannahmen widerlegt**, und beide Male
+hatte der Code recht:
+
+- Bei hohem Chaos fährt der Motor **Stealth Retirement**, nicht Diplomacy —
+  beide senken das Chaos prozentual, aber nur eines gibt dabei Rang (gemessen
+  im Spiel: +45 % Rang/min). Diplomacy kommt erst, wenn die Bevölkerung unter
+  0,8 Mrd fällt und Raid damit unter seine Schwelle rutscht.
+- Der Beitritt bei 4 × 100 liegt in **`bbtrain.js`**, nicht in `blade.js`.
+  `blade.js` fährt den Motor danach.
+
+Zwei Stolpersteine beim Aufbau, beide lehrreich:
+
+- **Ohne `data/bn4net.json` gilt jede Figurvergabe als „aus einem anderen
+  Lauf".** `lib/figurns.js` liest den Knotenstempel dort (nicht aus
+  `ns.getResetInfo` — das kostet 1 GB). Fehlt die Datei, ist der Stempel 0,
+  und das Gewerk wartet ewig auf die Figur. Ein Test ohne sie misst die
+  Figurwache statt der Aktionswahl.
+- **Ohne `data/figure.txt` startet `blade.js` gar nichts.** Es fragt vor jedem
+  `startAction` den Vergabepunkt, weil eine Bladeburner-Aktion jede laufende
+  Arbeit der Figur beendet — auch einen Graft für 14,63 Mrd.
+
+## Der Modul-Lader
+
+`tools/mock/lader.js`. Bitburner löst Importe absolut ab home auf
+(`import { x } from "lib/y.js"`); Node sucht dann ein Paket namens `lib`.
+Deshalb liest der Lader die Datei, schreibt die **Importzeile** um, legt das
+Ergebnis als Wegwerfdatei neben das Original und importiert von dort.
+
+Zwei Eigenschaften, die er haben muss:
+
+- **Er ändert nur die Importzeile.** Ein Lader, der den Prüfgegenstand
+  verändert, prüft etwas anderes als das, was später läuft.
+- **Er löst transitiv auf.** `graftauto.js` importiert `lib/figurns.js`, und das
+  importiert `lib/figur.js` — beim zweiten Sprung fände Node wieder ein Paket
+  namens `lib`. Bis zum 04.09. hatte kein lib-Modul eigene Importe; seither
+  schon.
+
+Die Kopien liegen neben den Originalen (damit die relativen Pfade stimmen) und
+werden im `finally` alle wieder entfernt. Jeder Ebene-2-Test prüft am Ende, dass
+kein `.mock-`-Rest in `src/` liegengeblieben ist — er ginge über die Brücke ins
+laufende Spiel.
+
+**Der Lader hat seit dem 04.09.2026 einen eigenen Test** (`tools/test-lader.js`).
+Er ist das Werkzeug, mit dem geprüft wird — ein Fehler in ihm sieht aus wie ein
+Fehler im geprüften Code, und man sucht ihn an der falschen Stelle. Zwei solche
+Fehler steckten in ihm:
+
+- Die transitiven Kopien trugen **keine Prozessnummer** im Namen. Zwei
+  gleichzeitige Läufe schrieben dieselbe Datei und löschten im `finally` die des
+  jeweils anderen. Gemessen: der alte Lader fällt in 2 von 16 Läufen um, der
+  neue in 0 von 16. Weil eine 2-von-16-Probe zu schwach für ein Tor ist, hält
+  die **Strukturprüfung** die Linie (genau eine Stelle bildet Kopienamen, und
+  sie trägt `process.pid`); der Wettlauf zeigt nur, dass sie über etwas Echtes
+  wacht.
+- Er löste Importe **ab dem Ordner der Datei** auf statt ab home. Für die großen
+  Skripte stimmte das, weil sie im Wurzelverzeichnis liegen; `lib/figurns.js`
+  suchte `lib/figur.js` dagegen unter `src/lib/lib/`.
+
+## Die Brücke
+
+`tools/test-bruecke.js`, seit dem 04.09.2026. Sie ist der **einzige Prozess des
+Projekts, der Erics Spielstand anfassen kann** — und hatte 1.560 Zeilen lang
+keinen Test.
+
+Geprüft wird gegen ein nachgebautes Spiel: ein WebSocket-Client, der `getSaveFile`
+mit einem **synthetischen** Spielstand beantwortet (gzip, Magic-Bytes,
+PlayerSave, SettingsSave). Damit lässt sich jede Prüfung gezielt verletzen.
+
+| Was | Wie |
+|---|---|
+| Rollentrennung | ohne `--instance` Code 3; jede Nicht-LIVE-Rolle auf 12525/8795 Code 3 (auch über Kreuz); LIVE aus dem Worktree Code 3 |
+| Wegwerfdateien | zwei Köder (`.mock-…​.mjs` **und** `.mock-…​.js`) unter `src/` erreichen das Spiel nicht |
+| Eingriffszähler | `pushAll` beim Verbinden zählt nicht, ein schreibender RPC zählt, ein lesender nicht |
+| Wachhund | ein Spiel, das auf `getSaveFile` schweigt, bekommt **kein** `pushFile` |
+| fremder RFA-Port | abgewiesen, nichts geschrieben |
+| Rückwärtssprung | ältere Kopie abgewiesen, nichts geschrieben |
+| Reihenfolge | Sicherung entsteht, und `getSaveFile` kommt vor dem ersten `pushFile` |
+| Wiederverbinden | die **Zahl** der Verifikationen steigt, nicht nur die Zeile ist da |
+| zweite Verbindung | wird geschlossen, solange die erste antwortet |
+| belegter Port | zweite Brücke beendet sich mit Code 2, die erste läuft weiter |
+
+Die Brücke läuft dabei als **echter Unterprozess**, nicht als importiertes
+Modul: Ihre Riegel sitzen zum Teil in `process.exit` und `wss.on("error")`, und
+beides ist nur an einem echten Prozess zu beobachten.
+
+Zwei Fallen, die beim Bau aufgefallen sind:
+
+- **Der Anker überlebt den Test.** `pruefstand/backups/INDEX.tsv` liefert
+  `totalPlaytime` als letzten Anker der Kette, auch nach einem frischen
+  Datenordner. Ein Testspielstand mit 100 h fiel deshalb zu Recht durch. Der
+  Test liest den Index jetzt und rechnet **darüber** — statt eine Sicherung zu
+  löschen, um grün zu werden.
+- **Jeder Abschnitt braucht einen eigenen Datenordner**, sonst schleppt der
+  Heartbeat den Anker des vorigen mit.
+
+## Die Testdateien
+
+30 Stück (Stand 04.09.2026). Die Liste mit einer Zeile je Datei, was sie deckt,
+steht in `tools/test-alles.js` — dort und nicht hier, damit sie nicht
+auseinanderläuft.
+
+Vier davon sind besonders erwähnenswert:
+
+- **`test-ram.js`** eicht den nachgebauten RAM-Rechner gegen 114 im Spiel
+  gemessene Werte. 113 stimmen exakt; die eine Abweichung ist eine unabhängige
+  Bestätigung — die Differenz beträgt genau 32,00 GB, also `singularity.connect`
+  bei SF4.1.
+- **`test-loeser-verify.js`** stellt den 30 Vertragslösern 219 **verfälschte**
+  Antworten und verlangt, dass jede abgelehnt wird. Er liest zusätzlich den
+  Quelltext daraufhin, ob eine Gegenprobe ihren eigenen Löser aufruft — das
+  Kennzeichen der Tautologie, und das lässt sich nicht wegtesten, nur
+  wegschreiben.
+- **`test-kaltstart-budget.js`** rechnet die Startlage nach: was passt neben
+  Kern, Wächter und Wachhalter auf ein 32-GB-home, und in welcher Reihenfolge.
+- **`test-verbote.js`** prüft Regeln über den Code selbst (Ebene 1), etwa dass
+  jedes figurberührende Gewerk vorher fragt.
+
+## Der Klon und der Zeitraffer
+
+`tools/klon.js` erzeugt aus dem Live-Spielstand einen Klon für die
+TEST-Instanz. Die TEST-Instanz läuft auf einem **eigenen RFA-Port** (12526) und
+einem eigenen Dashboard-Port (8796) — die Trennung hängt am Port, nicht am
+Identifier, denn den erbt der Klon.
+
+Die Brücke bricht ohne `--instance` ab. Es gibt keinen Standardwert; ein
+versehentliches LIVE ist damit ausgeschlossen, und schreibende RPC-Methoden
+verlangen `instance=<Rolle>` im Aufruf.
+
+### Drei Rollen, nicht zwei
+
+Seit dem 04.09.2026 gibt es **MOCK** neben LIVE und TEST. Der Grund ist
+gemessen, nicht ausgedacht.
+
+| Rolle | wofür | Sicherungen | Präfix |
+|---|---|---|---|
+| LIVE | Erics Spiel | `~/bitburner-backups` + Spiegel | `LIVE_` |
+| TEST | ein **Klon** des Spielstands, von Hand gefahren | `pruefstand/backups` | `TEST_` |
+| MOCK | ein **erfundenes** Spiel, von `tools/test-bruecke.js` | `pruefstand/mock-backups` | `MOCK_` |
+
+TEST war beides zugleich, und das ging schief. Der Brückentest muss mit einer
+Spielzeit **oberhalb** des vorhandenen Ankers arbeiten — sonst weist ihn die
+Brücke zu Recht als Rückwärtssprung ab. Jede verifizierte Verbindung schreibt
+aber eine Sicherung in denselben Index, und der Anker steigt mit. Nach wenigen
+Läufen stand er bei **6.800 Stunden** statt 369; eine echte Spielstandskopie
+wäre ab da dauerhaft abgelehnt worden, denn `rotiere()` löscht Dateien, keine
+Indexzeilen.
+
+**Erfundene Spielzeiten und echte gehören nicht in denselben Index.**
+
+Der Portriegel gilt seit demselben Tag für **alles außer LIVE** und deckt die
+Kreuzfälle ab: vorher prüfte er `RFA_PORT === 12525 || DASHBOARD_PORT === 8795`,
+ein `--rfa-port 8795` kam also durch und wurde nur durch `EADDRINUSE` gestoppt —
+also nur, solange die Live-Brücke gerade läuft.
+
+## Was der Prüfstand nicht kann
+
+Die Lückenliste am Ende von `tools/test-alles.js` ist die verbindliche Fassung.
+Sie nennt, was gemessen werden müsste und nicht gemessen ist — Ebene 3 im
+Wesentlichen: ein echter Kaltstart auf 32 GB, die Vertragskette im Spiel, je
+Sprosse ein provozierter Hänger, BitNode 8 und 9, Grafting über Stunden.
+
+Ein grüner Lauf ist kein Beweis über das Spiel. Er ist ein Beweis, dass der
+Code die Zustände richtig behandelt, die der Mock stellen kann.

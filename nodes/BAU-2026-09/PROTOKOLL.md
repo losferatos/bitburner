@@ -163,3 +163,160 @@ macht sie gleichgültig.
    Minuten alt; das Spiel speichert aber binnen 60 Sekunden von selbst. Behoben:
    die Brücke urteilt erst, wenn die Verbindung zehn Minuten steht. In einer
    Reload-Schleife wäre daraus sonst Dauerfeuer geworden.
+
+---
+
+## Phase B — Architektur mit Judge-Panel
+
+**Abgeschlossen:** Fr 04.09.2026 03:34 · `nodes/BAU-2026-09/ARCHITEKTUR.md`, 1.260 Zeilen
+
+Zwei Architekten unabhängig (Registry-getrieben, Kaltstart-getrieben), zwei
+Richter, einer davon adversarial mit Nachprüfpflicht, dann Synthese.
+
+**Elf Entscheidungen, jede mit verworfener Alternative.** Die drei wichtigsten:
+
+- **A.4 entschieden: die 20-GB-Schwelle bleibt, der Kern wird kleiner.**
+  Kern 10,75, Wächter 6,10, resident 16,85 mit 3,15 GB Luft. Mit `boot.js`
+  steht die Spitze bei 22,35 und damit unter 28.
+- **Der Wächter ist bei allem autark, was einen toten Kern betrifft.** Sprossen
+  0, 1, 3 und 4a laufen ohne ihn; nur Sprosse 2 geht als Auftrag an den Kern,
+  mit Reißleine: führt er sie nicht in drei Minuten aus, geht der Wächter direkt
+  auf Sprosse 3.
+- **Die Wirtreserve wird vor der Endspurt-Regel abgezogen.** Ohne das
+  widersprechen sich zwei Auftragsregeln direkt: die Endspurt-Regel gibt bei
+  `eta_min < 60` das Geld aus, mit dem der Wirt für `exit.js` bezahlt werden
+  muss. Ein Deadlock, den Abschnitt 5.3 ausdrücklich nicht eskaliert.
+
+**Vier Befunde, die kein Entwurf und kein Richter allein hatte:**
+
+1. **Die Covenant-Sache ist kein Bauposten.** Zusätzliche Sleeves sind nur in
+   BitNode 10 kaufbar, also nur bis zum nächsten Sprung. Aber das Tor verlangt
+   20 Augmentierungen, 75 Mrd Dollar, Hacking 850 und alle vier Kampfwerte auf
+   850. Live: 15 Augs, Hacking 345, Kampf 100 bis 112. Jetzt offener Punkt mit
+   benannter Messung, nicht Bauposition.
+2. `figure-cold.js` bestätigt tot: `prestigeSourceFile` setzt `bladeburner` auf
+   null, der Wiedereintritt verlangt wieder vier Werte auf 100.
+3. Eine Registry-Bedingung `requiresSF: {"9":1}` hätte `hashes.js` in
+   Routenposition 5 ausgesperrt — die Freischaltung prüft Knoten **oder** SF.
+4. **`location.reload()` kostet 0 GB.** Der offene Punkt aus Auftrag 1.6 ist
+   damit geschlossen, Sprosse 4a bleibt beim Wächter.
+
+**Die Baureihenfolge ist fristgetrieben, nicht ertragsgetrieben.** Die
+Wirtreserve steht vor der Registry, weil die nächste Tür in 28 bis 50 Stunden
+aufgeht. „Eine These, die einer Frist im Weg steht, weicht."
+
+**Gate B bestanden:** neun offene Punkte, keiner blockiert den Bau.
+
+---
+
+## Phase C — Bau in Gewerken
+
+### C.2 — `wakelock.js`: minus 32 GB · ABGESCHLOSSEN 04.09. 03:41
+
+Der erste Live-Eingriff nach der Checkliste aus Auftrag 9, bewusst am kleinsten
+möglichen Fall erprobt.
+
+**Ursache:** Der RAM-Rechner des Spiels läuft über den AST und nimmt bei einer
+Objektzugriffs-Ausdrucksform den Eigenschaftsnamen. Er unterscheidet damit nicht
+zwischen der Netscript-Funktion `connect` und dem Web-Audio-Aufruf gleichen
+Namens — und `connect` ist eine Singularity-Funktion, also 2 GB mal Faktor 16.
+Die Datei kostete 34,25 GB für 32 GB, die mit dem Spiel nichts zu tun haben.
+
+Vor dem Schreiben des erklärenden Kommentars wurde geprüft, dass der Rechner
+einen AST liest und keinen Text. Sonst hätte der Kommentar, der das Wort
+zwangsläufig enthält, dieselben 32 GB gekostet.
+
+**Die Checkliste, wie sie lief:**
+
+| Schritt | Ergebnis |
+|---|---|
+| (1) Zeit, `/api/state` | LIVE, verbunden, verifiziert |
+| (2) Spielstand | identifier korrekt, BN10 L2, Rang 725 |
+| (3) `pre-hotswap` | grün |
+| (4) Ausgang / Prozesse | `offen: false`, kein `exit.js`, Datei läuft nicht |
+| (5) Kanarienvogel | RAM TEST 2,25 gegen LIVE 34,25; Datei startet über den Auftragskanal; Tonanker bei 19.500 Hz |
+| (6) Einspielung | eine Datei |
+| (7) Beobachtung | RAM live 2,25, Motor läuft, kein Alarm, keine Strafen, Urteil unverändert |
+
+**Die Brücke hat sich zum ersten Mal im Ernstfall bewährt:** sie sicherte vor
+dem Schieben und schob genau eine Datei, nicht 115.
+
+### C.1 — Motorzeit · Teil 1 fertig, Einbau offen
+
+`src/lib/motorzeit.js` im Worktree, 30 Ebene-0-Prüfungen grün. Die drei
+Pflichtproben aus Auftrag 3.1 sind erfüllt: acht Stunden gedrosselt zählen als
+acht Stunden, acht Stunden Rechner aus zählen null, ein Nachholklumpen zählt
+null.
+
+Der Deckel liegt bei zwölf Takten, nicht bei zwei. Mit zwei Takten zählte eine
+gedrosselte Stunde nur zwanzig Minuten, und der Nachtbetrieb sähe im Bericht
+besser aus als der wache Tag.
+
+Offen: der Einbau in den Motor. Er berührt `bn4net.js` und braucht die volle
+Checkliste mit zwanzigminütigem Kanarienvogel.
+
+---
+
+### C.1 bis C.7 · 04.09.2026, 06:00 bis 07:25
+
+Sieben Positionen in eineinhalb Stunden, keine davon live. Der Reihe nach:
+
+**C.1 — Kontrakte und Motorzeit.** Drei Datenmodule (`herzschlag.js`,
+`kpi.js`, `events.js`), dann der Einbau in den Kern. Der Herzschlag schließt
+die Lücke, die `round` allein nicht sieht: der ganze Rundeninhalt liegt in
+einem `try`, also zählt ein Motor, der jede Runde wirft, munter weiter und
+sieht nach jedem Frischesignal gesund aus. `okRound` zählt nur, was
+vollständig durchlief.
+
+**C.3 — Zielprüfung, Interlock, Restzeit.** Drei Skeptiker haben die
+ursprüngliche Fassung zerlegt, und sie hatten recht: die Wirtreserve löste
+einen Deadlock, den es so nicht gibt. Was den Zustand „kein Wirt und kein
+Geld" erzeugt, ist `installAugmentations` — alle Rechner gelöscht, Konto auf
+1.262 $, in einem Engine-Schritt. Gegen ein genulltes Konto hilft keine
+Reserve. Sie ist zurückgebaut; an ihre Stelle trat der Interlock in
+`bn4rep.js`. Befunde in `BEFUNDE.md`, Abschnitt „Skeptikerrunde C.3".
+
+**C.4 — Registry.** Der Block in ARCHITEKTUR 3.3 war als Auszug gedacht und
+ließ **neun heute laufende Werkzeuge weg**. Der Umstieg hätte sie ohne
+Fehlermeldung stillgelegt. Gefunden hat es der Migrationsbeweis, den die
+Abnahmebedingung verlangt — gebaut, bevor umgestiegen wurde, nicht danach.
+
+**C.5 — Der Kern liest die Registry.** Beide Listen werden abgeleitet, die
+Form bleibt, die acht Nutzungsstellen bleiben unangetastet. Zwei Werkzeuge
+laufen danach anders (`sleevecrime.js` nur im Kaltstart, `hashes.js` nur mit
+SF9); beide stehen als benannte Entscheidung im Test.
+
+**C.6 — Der Wächter, im Beobachtungsmodus.** Alle sechs Signale, der ganze
+Automat, keine Ausführung. Die `boot.js`-Schonliste musste in denselben
+Commit: bis dahin beendete das Aufräumen alles auf `home` außer sich selbst —
+also auch den Wächter, die einzige Instanz, die einen nicht startenden Kern
+bemerken würde.
+
+**C.7 — Die RAM-Diät.** 17,75 → rund 10,75 GB. Drei Gigabyte durch das
+Ersetzen der Analyse-Familie, vier durch die Auslagerung der `cloud`-Familie
+nach `shop.js`. Der Kern behält die Entscheidung und gibt die Ausführung ab.
+
+**Ebene 2 existiert seit heute.** Zwischen den reinen Funktionen und dem
+echten Browser klaffte eine Lücke, in der ausgerechnet die Einbauten lagen.
+`tools/mock/lader.js` schreibt Bitburners Importstil auf Node um; damit läuft
+`bn4net.js` mit seinen 3.400 Zeilen aus Node heraus, gegen einen Mock mit
+steuerbarer Zeit. Der erste Lauf meldete „0,00 h aus 480 Runden" — ein Fehler
+des Prüfstands, nicht des Kerns: die Gewerke lesen `Date.now()` direkt.
+
+**Zwei Fehler, die nur dieser Prüfstand fand:**
+
+Die Meldung über die Herkunft der Werkzeugliste rief `sag`, das an dieser
+Stelle noch nicht existiert. Der Kern wäre in der allerersten Runde gestorben.
+
+Die vier neuen Importe standen als `"./lib/x.js"`. Das ganze Projekt nutzt
+den Bitburner-Stil `"lib/x.js"` (absolut ab home). Im Spiel wären die Skripte
+nicht gestartet.
+
+**Stand:** 16 Testdateien, 15 von 15 grün vor dem letzten Commit, 16 von 16
+danach. Zwei der drei Ebene-0-Lücken sind zu; offen bleibt die Szenarienmatrix
+über die Knotenklassen.
+
+**Offen und wichtig:** nichts davon ist eingespielt. Die Hot-Swap-Checkliste
+aus Auftrag §9 verlangt für jede dieser Positionen einen Kanarienvogel auf der
+TEST-Instanz, und für den Kern zusätzlich die volle Beobachtung. Zwei
+Skeptikerrunden auf C.5 bis C.7 laufen zum Zeitpunkt dieses Eintrags.

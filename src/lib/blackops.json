@@ -1,6 +1,6 @@
 {
  "hinweis": "ERZEUGT von tools/blackops-tabelle.js aus reference/v301/src/Bladeburner/data/BlackOperations.ts. Nicht von Hand pflegen.",
- "erzeugtAm": "2026-09-04T04:41:03.154Z",
+ "erzeugtAm": "2026-09-04T04:40:29.920Z",
  "warnung": "reqdRank ist eine FREISCHALTSCHWELLE, keine Abschlussbedingung. Wer den Rang hat, darf die Aktion angehen - erledigt hat er sie nicht. Eine Restzeit, die nur den Rang kennt, ist eine UNTERE Schranke und darf keinen Einbau blockieren.",
  "anzahl": 21,
  "hoechsterRang": 400000,

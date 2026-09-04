@@ -1,7 +1,18 @@
 # Befunde — Bau des perfekten Bots, September 2026
 
-Status je Befund: **OFFEN** / **UMGESETZT** (mit Datum) / **VERWORFEN** (mit Begründung).
-Ein OFFEN wird nie durch Schweigen ersetzt.
+Status je Befund: **UMGESETZT** (mit Datum) · **EINGEARBEITET** (kein eigener
+Bau, aber die Messung steckt in Test oder Rechnung) · **ENTSCHIEDEN** (zwei
+Zahlen standen gegeneinander, eine gilt jetzt, mit Begründung) · **ERLEDIGT**
+(war bei der Aufnahme schon gebaut) · **ZURÜCKGESTELLT** (mit Termin und Grund)
+· **VERWORFEN** (mit Begründung) · **OFFEN** — und ein OFFEN trägt seit der
+Triage vom 04.09. 14:05 **immer** in Klammern, warum es offen ist.
+
+Ein OFFEN wird nie durch Schweigen ersetzt. Das ist Abnahmebedingung der
+Stufe A („`BEFUNDE.md` ohne stilles OFFEN"), und der Unterschied zwischen einem
+begründeten und einem stillen OFFEN ist der ganze Zweck der Liste: sieben
+Befunde stehen weiter offen, und bei jedem steht, ob Code fehlt (keiner),
+eine Messung im laufenden Spiel (M.10, M.13, E.1c, M.9), eine Rechnung ohne
+Wirkung (E.2), eine entschärfte Ursache (P.1) oder die Umgebung selbst (B.1).
 
 Kennung: `M.n` eigene Messung dieser Sitzung · `L.n` aus Auftrag 1.4/1.6 ·
 `A.n`–`J.n` aus `nodes/AUDIT-AUTONOMIE-2026-09-02.md` · `S.n` aus `BAUSTELLEN.md ## Sofort` ·
@@ -11,7 +22,7 @@ Kennung: `M.n` eigene Messung dieser Sitzung · `L.n` aus Auftrag 1.4/1.6 ·
 
 ## M — Eigene Messungen, Phase 0 (04.09.2026)
 
-### M.1 — `getAllServers` liefert kein `maxRam` · OFFEN
+### M.1 — `getAllServers` liefert kein `maxRam` · EINGEARBEITET
 Die RFA-Methode gibt je Server nur `{hostname, hasAdminRights, purchasedByPlayer}` zurück
 (gemessen 04.09. 01:15, 86 Einträge). Der Auftrag verlangt in Phase 0 „`exit.js` … gegen
 `getAllServers` halten" — **das ist mit dieser Methode nicht möglich**.
@@ -19,7 +30,9 @@ Ersatzquelle: `AllServersSave` aus `getSaveFile` oder `data/bn4net.json` des Mot
 **Folge für den Bau:** Die Wirtplanung aus 4.4 darf sich nicht auf `getAllServers` stützen;
 im Spiel gilt ohnehin `ns.getServerMaxRam`.
 
-### M.2 — `ramUsed` wird im Spielstand nicht serialisiert · OFFEN
+**Stand 04.09. 14:05:** Die Wirtplanung stuetzt sich nirgends auf `getAllServers`. `ausgang.js` liest `ns.getServerMaxRam` je Rechner, `sync/backup.js` rechnet aus `AllServersSave`. Geprueft in `test-zielvalidierung.js` (38 Proben) und `test-backup.js` (48).
+
+### M.2 — `ramUsed` wird im Spielstand nicht serialisiert · EINGEARBEITET
 Ein Serverobjekt in `AllServersSave` hat 31 Felder, `ramUsed` ist keines davon
 (geprüft an `werk-0`). Das Spiel lässt Default-Werte beim Serialisieren weg — derselbe
 Mechanismus, der am 30.08. `playerReputation` verschwinden ließ.
@@ -28,7 +41,9 @@ Freier RAM ist aus einer Sicherung **nur rechnerisch** zu ermitteln:
 **Falle:** Eine naive Prüfung `s.maxRam - s.ramUsed` ergibt `NaN` und damit „kein Wirt frei" —
 ein Ausschluss, den das Werkzeug gar nicht messen konnte. Genau der Fehlertyp aus 2.3.
 
-### M.3 — `boot.js` ist 5,5 GB, nicht 4,0 · OFFEN — **Budgetverletzung**
+**Stand 04.09. 14:05:** `sync/backup.js` rechnet `frei = maxRam - Summe(ramUsage x threads)`. Die NaN-Falle hat eine eigene Probe in `test-backup.js`: eine Pruefung, die `NaN` als "kein Wirt frei" liest, ist ein Ausschluss ohne Messung.
+
+### M.3 — `boot.js` ist 5,5 GB, nicht 4,0 · ENTSCHIEDEN: Schwelle korrigiert
 Gemessen per `calculateRam` im Live-Spiel (SF4.1), 04.09. 01:15: **5,5 GB**.
 Der Auftrag führt „`boot.js` 4,0 GB geeicht" (1.3) und setzt in 4.4 das Budget
 `boot.js <= 4,0`. Ebene 1 soll rot werden, wenn „Kern + Wächter + `boot.js` > 28 GB".
@@ -37,21 +52,27 @@ den gemessenen Wert korrigiert. Nicht beides schweigend stehen lassen.
 Zu klären: Ob die 4,0 je stimmten oder ob `boot.js` seither gewachsen ist
 (`git log --follow src/boot.js`).
 
-### M.4 — `blade.js` ist 174,35 GB · OFFEN
+**Stand 04.09. 14:05:** Entschieden zugunsten des gemessenen Werts. `test-kaltstart-budget.js` rechnet den Kaltstart mit 5,5 GB durch und bleibt gruen (24 Proben); die 4,0 aus Auftrag 1.3 stammt aus einer Fassung vor dem heutigen `boot.js` und ist damit ueberholt, nicht verletzt. Abgespeckt wird nichts - die 1,5 GB kaufen die Aufraeumliste, die den Knotenwechsel ueberlebt.
+
+### M.4 — `blade.js` ist 174,35 GB · EINGEARBEITET
 Der Auftrag nennt drei Werte (162,25 / 94,85 / 27,6) und schreibt ausdrücklich:
 „die kolportierte 174 steht nirgends" (1.6). **Sie steht jetzt: gemessen 174,35 GB**
 bei SF4.1 im Live-Spiel. Keiner der drei Auftragswerte trifft.
 Die 94,85 sind vermutlich der Wert ab SF4.3 (Singularity ×1) — das ist im Klon zu prüfen,
 nicht zu unterstellen.
 
-### M.5 — `darkweb.js` ist 2,65 GB, nicht 27,65 · OFFEN
+**Stand 04.09. 14:05:** Der Messwert steht in der Eichtabelle von `test-ram.js` (114 Live-Werte). Die 94,85 fuer SF4.3 bleiben unbelegt und werden nicht unterstellt - `blade.js` ist ohnehin `phase: "normal"` und laeuft nie im Kaltstart.
+
+### M.5 — `darkweb.js` ist 2,65 GB, nicht 27,65 · EINGEARBEITET
 Faktor 10 Abweichung vom Auftragstext (1.3). Da `darkweb.js` über
 `globalThis["docu"+"ment"]` arbeitet (0 GB statt 25 GB DOM-Literal), ist der kleine Wert
 plausibel — der Auftragswert dürfte aus einer Fassung vor diesem Kniff stammen.
 **Folge:** Positiv für das Kaltstart-Budget; TOR und Portknacker sind billiger erreichbar
 als geplant.
 
-### M.6 — Weitere RAM-Abweichungen · OFFEN
+**Stand 04.09. 14:05:** In der Eichtabelle von `test-ram.js`. Das Kaltstart-Budget rechnet mit 2,65 und haelt.
+
+### M.6 — Weitere RAM-Abweichungen · EINGEARBEITET
 Alle per `calculateRam` live gemessen 04.09. 01:15, SF4.1:
 
 | Datei | Auftrag | gemessen | Δ |
@@ -76,14 +97,18 @@ Alle per `calculateRam` live gemessen 04.09. 01:15, SF4.1:
 `popups.js` ist der wichtigste Posten dieser Liste: es ist im Kaltstart-Budget als
 billige Wache eingeplant und kostet doppelt so viel wie angenommen.
 
-### M.7 — home hat 131.072 GB, nicht 65.536 · OFFEN
+**Stand 04.09. 14:05:** Alle 114 Messwerte sind die Eichgrundlage von `test-ram.js`; der Rechner wird gegen sie geprueft, nicht gegen den Auftragstext. Wo Auftrag und Messung auseinandergehen, gilt die Messung.
+
+### M.7 — home hat 131.072 GB, nicht 65.536 · EINGEARBEITET
 `data/bn4net.json` (Runde 3555) meldet `homeRam: 131072`. Der Auftrag 1.2 nennt
 65.536 GB. Der Auftrag hatte bereits korrigiert, dass die früher kolportierten
 „1024 GB" um Faktor 64 zu klein waren — die Korrektur selbst ist nun um Faktor 2 zu klein.
 **Lehre, nicht Detail:** Ein Inventarwert, der zweimal hintereinander falsch war,
 gehört zur Laufzeit gelesen und nirgends notiert (Auftrag 4.1 verlangt das ohnehin).
 
-### M.8 — Bladeburner liegt im `PlayerSave`, nicht in einem eigenen Save-Schlüssel · OFFEN
+**Stand 04.09. 14:05:** Kein Gewerk fuehrt einen home-Wert mit; gelesen wird zur Laufzeit (`ns.getServerMaxRam("home")`). Die Lehre steht in `doku/vorfaelle.md`: ein Inventarwert, der zweimal falsch war, gehoert nirgends notiert.
+
+### M.8 — Bladeburner liegt im `PlayerSave`, nicht in einem eigenen Save-Schlüssel · ERLEDIGT
 `save.data` hat 15 Schlüssel (`PlayerSave`, `AllServersSave`, `CompaniesSave`,
 `FactionsSave`, `AliasesSave`, `GlobalAliasesSave`, `StockMarketSave`, `SettingsSave`,
 `VersionSave`, `AllGangsSave`, `LastExportBonus`, `StaneksGiftSave`, `GoSave`,
@@ -93,7 +118,9 @@ Ein Werkzeug, das `save.data.BladeburnerSave` liest, bekommt `undefined` und mel
 stumm „kein Bladeburner" — in einem Knoten, dessen einziger Ausgang die Division ist.
 In `sync/backup.js` bereits korrekt umgesetzt.
 
-### M.9 — Zwei wartende Augmentierungen · OFFEN
+**Stand 04.09. 14:05:** War schon bei der Aufnahme umgesetzt (`sync/backup.js` liest `PlayerSave.data.bladeburner.data.rank`); der Status stand nur nicht nach. `test-backup.js` haelt den Pfad fest.
+
+### M.9 — Zwei wartende Augmentierungen · OFFEN (Live-Zustand, Riegel gebaut)
 `queuedAugmentations` = **2** (Augmented Targeting II, CashRoot Starter Kit),
 nicht 1 wie im Auftrag 1.2. Sie verfallen beim Knotenwechsel ersatzlos.
 Der Aug-Riegel aus 7.1.6 („kein Aug-Kauf bei `ausgang.json.offen === true`") ist damit
@@ -102,7 +129,9 @@ jede Stunde fällig werden.
 `playtimeSinceLastAug` 9,77 h zeigt außerdem: **der Bot hat gestern gegen 15:20 autonom
 eingebaut.** Das ist der Grund, warum Checkliste 9(4) `install-sperre.txt` verlangt.
 
-### M.10 — Brachanteil 83 % · OFFEN — größter Effizienzposten
+**Stand 04.09. 14:05:** Der Riegel aus 7.1.6 ist gebaut und geprueft: `punish.js` und `bn4rep.js` gehen vor jedem `installAugmentations` durch `lib/handschlag.js`, und `data/install-sperre.txt` haelt sie an, bis eine gruene Sicherung vorliegt (`test-punish.js`, `test-sprosse5-kette.js`). Der Befund selbst ist ein Zustand im laufenden Spiel, kein Codefehler - er loest sich mit dem naechsten Einbau oder dem Sprung auf und bleibt bis dahin richtigerweise offen.
+
+### M.10 — Brachanteil 83 % · OFFEN (Messung in Stufe B)
 Der Motor meldet selbst `brachAnteil: 0,8127`. Nachgerechnet aus dem Spielstand:
 **6,65 Mio GB frei von 8,00 Mio GB Netz.** Die 15 Parkrechner sind praktisch leer
 (werk-9: 670 von 524.288 GB belegt). Gleichzeitig steht `mischung.kapGesamtGb` auf
@@ -115,7 +144,9 @@ Für V1-Knoten (BN1/5/12/8, zehn der 40 Läufe) ist derselbe Befund dagegen unmi
 ausgangsrelevant.
 → Kennzahl `idle_ram_pct` aus 3.3, Alarmschwelle 20 %.
 
-### M.11 — Zwei Massenschübe am 03.09., nicht einer · OFFEN
+**Stand 04.09. 14:05:** `idle_ram_pct` ist gebaut, hat einen Schreiber und eine Feldliste in `kpi.json`. Was fehlt, ist nicht Code, sondern die Messung: ob die Brache den Ausgang aus BN10 verzoegert, entscheidet sich am Rangweg, und der laeuft ueber Bladeburner, nicht ueber Geld. Vor Stufe B waere jede Motoraenderung eine Handlung ohne Befund.
+
+### M.11 — Zwei Massenschübe am 03.09., nicht einer · EINGEARBEITET
 `bridge.log` zeigt **13:40:22Z 114 Dateien** und **21:40:55Z 106 Dateien**, dazu
 13:28:37Z 115 Dateien beim Verbinden. Der Auftrag kennt nur den Vorfall um 15:40 Ortszeit
 (= 13:40Z). Es gab also mindestens drei Massenübertragungen an einem Tag, zwei davon
@@ -123,7 +154,23 @@ ohne vorherige Sicherung.
 **Folge:** Der Wachhund aus 4.5 ist nicht gegen ein Einzelereignis gebaut, sondern gegen
 ein wiederkehrendes.
 
-### M.12 — `lastTelemetryAt`-Befund im Code bestätigt · OFFEN
+**Stand 04.09. 14:05 — TEILWEISE ZURUECKGENOMMEN.** Die Zeile zaehlte eine
+Luecke als Abdeckung. Richtig ist:
+
+- Der Inhaltsvergleich vor jedem Schub deckt alle drei Massenuebertragungen ab.
+- Der Schubdeckel deckte anfangs **nur den Watcher-Pfad**. Die Uebertragung
+  vom 03.09. um 13:28:37Z („115 Dateien beim Verbinden") lief ueber `pushAll`,
+  und der war ausgenommen — der eigene Test sicherte die Ausnahme sogar zu.
+- „Freibrief mit Verfall, alle falsifiziert" stimmte nicht: der 30-Minuten-
+  Verfall hatte keine Probe, und eine Mutation `return !!st;` waere gruen
+  geblieben.
+
+**Stand 04.09. 14:30:** Nachgezogen. `pushAll` haelt jetzt die Dateien eines
+verweigerten Schubs zurueck (`data/schub-offen.json`), der Riegel sitzt in
+`pushFile` — dem einen Punkt, durch den jeder Schreibweg laeuft —, und der
+Verfall hat eine eigene Probe mit `utimesSync`.
+
+### M.12 — `lastTelemetryAt`-Befund im Code bestätigt · ERLEDIGT
 `sync/bridge.js:238-241` setzt `state.lastTelemetryAt = new Date().toISOString()` bei
 **jedem erfolgreichen Lesen**, unabhängig vom Alter des Inhalts. Gemessen 04.09. 01:04:
 `/api/state` meldet `lastTelemetryAt` = jetzt für einen Block, dessen eigenes `t`
@@ -132,11 +179,15 @@ BN10 / Hacking 340 / 86 Server / 10,3 Bio $).
 Ein Urteil „Tab eingefroren", das auf diesem Feld aufbaut, kann per Konstruktion nie
 auslösen. Behoben mit dem Brücken-Umbau in Phase 0.
 
-### M.13 — 136 Dateien unter `data/` auf home · OFFEN
+**Stand 04.09. 14:05:** Mit dem Brueckenumbau in Phase 0 behoben; der Status stand nur nicht nach.
+
+### M.13 — 136 Dateien unter `data/` auf home · OFFEN (Aufraeumen laeuft im Spiel)
 Darunter zahlreiche Einmal-Diagnosen (`probe2.txt`, `ramtest.txt`, `sfprobe.txt`,
 `psdiag.txt`, `coreprobe.txt`, `skilltest.txt` …). Inventur gehört nach
 `doku/kontrakte.md` (Auftrag 4.6, Phase A2).
 `data/telemetry.txt` ist darunter und wird in Phase 0 per `deleteFile` entfernt.
+
+**Stand 04.09. 14:05:** `boot.js` fuehrt eine unbedingte Aufraeumliste und entfernt die bekannten Einmal-Diagnosen bei jedem Start. Die vollstaendige Inventur ist eine Messung im Spiel und gehoert damit zu Stufe B, nicht in den Worktree.
 
 ---
 
@@ -180,11 +231,13 @@ echte Notfälle.
 In `sofortZeile`, aufgerufen in einer Schleife. Während sie lief, beantwortete die
 Brücke keine RFA-Nachricht, kein Dashboard und keinen Timer.
 
-### W.6 — Zweit-Tab-Alarm löst nur zwei von vier Reaktionen aus · OFFEN
+### W.6 — Zweit-Tab-Alarm löst nur zwei von vier Reaktionen aus · UMGESETZT 04.09. 14:00
 Auftrag 7.1.1 verlangt nach dem Alarm zusätzlich: Sicherungstakt sofort auf 5 min
 und Sperre aller Live-Eingriffe. Beides fehlt. → Phase C, Position 1.
 
-### W.7 — Brücken-Nonce statt `totalPlaytime` als Anker · OFFEN, guter Vorschlag
+**Stand 04.09. 14:05:** Beide fehlenden Reaktionen gebaut: `ZWEITTAB_SICHERUNG_MS = 5 min` im Stundentimer und eine Sperre, die JEDEN schreibenden Weg ins Spiel schliesst (RPC mit 423, Watcher-Schub verweigert). Sie steht in einer DATEI, nicht im Prozess - `bridge-start.cmd` startet nach einem Absturz neu, und ein Merker im Speicher waere genau dann weg, wenn er zaehlt. Aufgehoben wird sie nur von Hand. Fuenf Proben in `test-bruecke.js`, falsifiziert.
+
+### W.7 — Brücken-Nonce statt `totalPlaytime` als Anker · ZURUECKGESTELLT nach Stufe B
 Der Skeptiker schlägt vor, statt der monotonen Uhr ein Einmal-Token in
 `data/instance.txt` auf home zu führen. Die Brücke liest es **aus derselben
 `getSaveFile`-Antwort**, die sie ohnehin holt, und rotiert es nach jeder grünen
@@ -193,16 +246,22 @@ sobald das Live-Spiel weitergedreht hat.
 Das ist strikt stärker als der jetzige Anker: aus einer löschbaren Uhr wird
 Challenge-Response. → Phase C, Position 1.
 
-### W.8 — Der brückenfreie Sicherungsweg fehlt · OFFEN
+**Stand 04.09. 14:05:** Der Vorschlag bleibt richtig, und er wird nicht dadurch schlechter, dass er wartet. Der Grund fuer das Warten: die Rotation schreibt bei jeder gruenen Verifikation eine Datei ins LAUFENDE Spiel. Das ist ein neuer Schreibweg auf Erics Spielstand, eingefuehrt am Tag vor einem 12-h-Lauf ohne Eingriff - und der jetzige Anker deckt denselben Fall bereits ab (Anker in drei Stufen, Rueckwaertssprung-Probe, und seit heute die Zweit-Tab-Sperre). Strikt staerker ist nicht dasselbe wie jetzt noetig.
+
+### W.8 — Der brückenfreie Sicherungsweg fehlt · UMGESETZT 04.09.
 Auftrag 7.2 führt ihn als „Pflicht, nicht Kür": der Kern liest
 `data/bridge.json.lastVerifiedBackup` und ruft bei einem Alter über 90 min selbst
 `ns.singularity.exportGame()`. `grep -rn "exportGame" src/` findet nichts.
 Solange er fehlt, hängt Erics einzige absolute Bedingung an einem einzelnen
 Windows-Prozess. → Phase C, Position 1.
 
-### W.9 — Das Gegenstück des Handschlags im Spiel fehlt · OFFEN
+**Stand 04.09. 14:05:** `src/export.js`: liest `data/bridge.json.lastVerifiedBackup`, ruft bei einem Alter ueber 90 min `ns.singularity.exportGame()`, hoechstens einmal je 60 min, und meldet es in den Ereignisstrom UND nach `## Sofort`. Eigenes Gewerk statt im Kern, weil `exportGame` bei SF4.1 sechzehn GB kostet und den Kaltstart spraengte. In `registry.json` mit `phase: "normal"`.
+
+### W.9 — Das Gegenstück des Handschlags im Spiel fehlt · UMGESETZT 04.09.
 Die Brücken-Seite ist gebaut, `grep -rn "backup-request" src/` ist leer. Es gibt
 keinen Anforderer, also nie einen Handschlag. → Phase C, Position 2.
+
+**Stand 04.09. 14:05:** `src/lib/handschlag.js` (0 GB): `stelle()`, `antwortDa()`, `sicherungsAlterMs()`, `handschlag()`. Aufgerufen vor jedem Sprung (`ausgang.js`) und vor jedem Einbau (`punish.js`, `bn4rep.js`). Der Unterschied ist gewollt: ein SPRUNG geht auch ohne Sicherung weiter (er ist unaufschiebbar), ein EINBAU wartet - er ist es nicht.
 
 ---
 
@@ -228,7 +287,7 @@ Der Singularity-Faktor kostet also **5.332,5 GB** über den Werkzeugkasten.
 Heute passen 30 Dateien nicht auf ein frisches home mit 32 GB, ab SF4.3 nur noch 8.
 Die Summe ist ein Bestand, keine Belastung — die Dateien laufen nie gleichzeitig.
 
-### A.4 — Der Zielwert „resident ≤ 20 GB" wurde nie geprüft · OFFEN
+### A.4 — Der Zielwert „resident ≤ 20 GB" wurde nie geprüft · ENTSCHIEDEN, geprüft
 Auftrag 4.4 nennt zwei Schwellen im selben Absatz: „Resident sind nur Kern und
 Wächter (≤ 20 GB)" und die Ebene-1-Grenzen ≤ 26 beziehungsweise ≤ 28.
 Der A1-Bericht maß nur gegen die lockereren und meldete „hält, mit 0,25 GB Luft".
@@ -237,6 +296,8 @@ Gegen die 20 reißt der heutige Stand um **5,75 GB**.
 umgehen — entweder wird der Kern kleiner oder die Schwelle wird mit Begründung
 korrigiert. Beides schweigend stehen zu lassen ist die eine Möglichkeit, die es
 nicht gibt.
+
+**Stand 04.09. 14:05:** Entschieden zugunsten der STRENGEREN Schwelle, und sie wird eingehalten: `test-ram.js` prueft "Kern + Waechter + Wachhalter <= 20 GB" gegen die gemessenen Werte und ist gruen. Moeglich wurde das dadurch, dass `shop.js` nicht mehr zur Dauerlast zaehlt - es beendet sich, sobald die Preise stehen. Die Spitze (29,45 GB) ist getrennt begruendet und steht im Test selbst, nicht in einer Fussnote.
 
 ### A.5 — Beide „Handgriffe von Eric" sind längst erledigt · GESCHLOSSEN
 `BAUSTELLEN.md ## Sofort` führt seit dem 02.09. zwei offene Handgriffe.
@@ -360,7 +421,7 @@ Der Bot fährt im Bladeburner-Teil **6 % schneller** als beim letzten Mal. Die
 Heilkammer bei Rang 657 ist kein Fehler, sondern derselbe Anlaufzustand.
 Die Sorge „der Bot fährt seit Tagen in die falsche Richtung" ist damit widerlegt.
 
-### E.1c — Zwei echte Verluste bleiben · OFFEN
+### E.1c — Zwei echte Verluste bleiben · OFFEN (1 gebaut, 1 offen mit Grund)
 1. **Kaltstart 13,9 h langsamer als Lauf 1** (39,11 h bis zum Beitritt gegen
    höchstens 25,23 h). Einmalig, Ursache steht schon in der Sofort-Liste: der
    erste Mietrechner kostet in BN10 das Fünffache. → Phase C, Kaltstart-Gewerk.
@@ -373,6 +434,8 @@ Drei weitere Vorschläge wurden **widerlegt** und werden nicht gebaut: Overclock
 (Ausdauer fällt je Aktion an, nicht je Sekunde), Field Analysis statt Heilkammer
 (bringt 9,6 gegen 20,5 Rang/h), Raid als Hebel (jeder Erfolg kostet 1 % der
 Stadtbevölkerung, und die geht mit Exponent 0,7 in jede Erfolgschance ein).
+
+**Stand 04.09. 14:05:** Verlust 1 (Kaltstart) ist das Kaltstart-Gewerk, Phase C Position 6, und es ist gebaut - `test-kaltstart-budget.js` rechnet den ersten Mietrechner zum BN10-Preis durch. Verlust 2 (Kammerphase, 12,4 Rang/h) ist NICHT gebaut: die 108 gegen 60 Sekunden sind aus dem Quelltext gerechnet, nicht gemessen, und eine Aenderung an der Handlungswahl von `blade.js` ohne Messung ist genau der Fehlertyp, den dieses Projekt sammelt. Gehoert in die Beobachtung der Stufe B.
 
 ### E.1-alt — Der ursprüngliche Befund, zur Nachvollziehbarkeit
 Gemessen 04.09.2026 01:47: Rang 657 von 400.000, Rate 33 Rang je Spielstunde,
@@ -402,15 +465,38 @@ Ohne diese drei Zahlen sieht der Bot in beiden Fällen nur ein zu großes `T2_h`
 Das ist kein Nebenbefund: **die ETA ist die letzte Zeile jedes Berichts an Eric**,
 also die eine Zahl, auf die er seine Planung stützt.
 
-### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN
+### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN — **und sie wird benutzt**
 `checkin.js` rechnet mit 58.928 Rang aus den Black Ops selbst. Auftrag 8.1 nennt
 als Eichpunkt „73.660/113.660". Drei Zahlen für dieselbe Größe, keine belegt.
+
+**Stand 04.09. 14:05 — ZURUECKGENOMMEN.** Die Zeile behauptete: „kein Gewerk
+und kein Werkzeug rechnet mehr mit einer Black-Ops-Summe". Das ist falsch, und
+zwei Zeilen Code widerlegen es. Ein Skeptiker hat es gefunden:
+
+- `tools/checkin.js:47` — `const RANG_UNTERWEGS = 73660;`
+- `tools/checkin.js:367` — `const unterwegs = RANG_UNTERWEGS * (…)`, also **aktiv**
+- `src/blade.js:338` — die Gesamtzeit rechnet mit `(400.000 − 73.660)/Raidrate`
+
+Damit speist genau die strittige Zahl die BN10-ETA, und die ETA traegt die
+Roadmap. „Offen, aber niemand benutzt sie" war als Entschaerfung nicht
+haltbar — sie ist offen **und** wird benutzt. Der Befundtext oben nennt
+ausserdem 58.928 als das, womit `checkin.js` rechne; auch das ist ueberholt.
+
+**Stand 04.09. 14:30:** OFFEN, mit Auftrag: die Summe gegen
+`reference/v301/src/Bladeburner/data/BlackOperations.ts` **als Code nachbauen
+und eichen**, nicht ueberschlagen (CLAUDE.md, „Rechnen heisst rechnen"). Bis
+dahin gilt keine der drei Zahlen als belegt, und jede Aussage ueber die
+BN10-ETA traegt diesen Vorbehalt.
+
+Dass diese Zeile ueberhaupt entstand, ist selbst der Befund: eine Triage, die
+eine Entschaerfung behauptet, ohne sie zu pruefen, ist schlimmer als ein
+offener Punkt — die naechste Sitzung baut darauf auf und prueft nicht nach.
 
 ---
 
 ## P — Aus dem Prüfstandslauf (Gate A2), 04.09.2026 02:30
 
-### P.1 — Der Dateibeobachter feuert ohne Inhaltsänderung · ENTSCHÄRFT, Ursache OFFEN
+### P.1 — Der Dateibeobachter feuert ohne Inhaltsänderung · ENTSCHÄRFT, Ursache OFFEN (jetzt untersuchbar)
 Im Echtbetrieb gemessen: `fs.watch` meldete **113 Dateien** und ein zweites Mal
 **115**, ohne dass sich an einer einzigen der Inhalt geändert hatte. Der
 Hash-Vergleich fing beide ab.
@@ -423,6 +509,8 @@ die naheliegende Erklärung fällt also aus.
 **Der Inhaltsvergleich macht die Ursache gleichgültig**, und das ist der Grund,
 warum hier nicht weiter gesucht wird: was sich nicht geändert hat, geht nicht raus.
 Die Ursachensuche bleibt als Befund offen, nicht als Aufgabe.
+
+**Stand 04.09. 14:05:** Unveraendert: der Inhaltsvergleich macht die Ursache gleichgueltig. Neu ist, dass sie sich UNTERSUCHEN liesse, ohne Erics Spiel anzufassen - seit heute gibt es `--src-dir` (fuer die Rolle LIVE gesperrt), und der Watcher hat damit erstmals Proben. Bis dahin lief jede Brueckenprobe mit `--no-watch`, also am stillsten Weg ins Spiel vorbei.
 
 ### P.2 — Die TEST-Instanz schrieb in Erics Arbeitsliste · UMGESETZT 04.09. 02:32
 Zwei Meldungen der Prüfbrücke, beide für die Kopie sachlich richtig, landeten in
@@ -473,7 +561,36 @@ reproduziert.
 
 ## B — Bau-Sitzung
 
-### B.1 — `/usage` in dieser Sitzung nicht abrufbar · OFFEN
+### B.2 — Der Pruefstand hat 41-mal in Erics laufendes Spiel geschrieben · BEHOBEN 04.09. 14:25
+
+Der Abschnitt „WEGWERFDATEIEN DES PRUEFSTANDS gehen NIE ins Spiel" in
+`tools/test-bruecke.js` legte seine beiden Koeder in den **echten**
+`src/`-Ordner — also in den, den die LIVE-Bruecke beobachtet. Der Riegel
+`NIE_SCHIEBEN` war zwar gebaut, der **laufende** Brueckenprozess stammte aber
+von vor dem Einbau. Im Brueckenprotokoll, einmal je Testlauf:
+
+```
+12:00:58  Nachgeschoben: .mock-koeder-12884.js
+12:01:59  Nachgeschoben: .mock-koeder-22856.js
+12:03:15  Nachgeschoben: .mock-koeder-10644.js
+```
+
+Gezaehlt im Spiel: **41 Dateien**. Ein Test, der die Zusicherung
+„Wegwerfdateien gehen NIE ins Spiel" prueft, hat sie beim Pruefen selbst
+verletzt — derselbe Fehlertyp wie der Sicherungsanker aus Runde 5 (A-B1): der
+Pruefstand benutzt die Ablage, die er schuetzen soll.
+
+**Behoben:** Der Abschnitt beobachtet seit 14:25 einen eigenen Ordner
+(`--src-dir`, fuer LIVE gesperrt) und prueft dieselbe Sache ohne Erics Spiel
+anzufassen. Die 41 Dateien sind aus dem Spiel entfernt (41 `deleteFile`, 0
+Fehler, gegengeprueft: 0 Treffer auf `.mock-` in `getFileNames`), und die
+Bruecke laeuft seit 14:18:21 mit dem Riegel.
+
+**Die Lehre, nicht das Detail:** Ein Riegel im Quelltext ist kein Riegel im
+Betrieb. Zwischen „gebaut" und „laeuft" liegt ein Prozessneustart, und in
+diesem Projekt startet die Bruecke nur, wenn jemand sie beendet.
+
+### B.1 — `/usage` in dieser Sitzung nicht abrufbar · OFFEN (Umgebung, nicht behebbar)
 Der Auftrag 13 verlangt den Budget-Stand „mit `/usage`, nie eine Einschätzung".
 Diese Sitzung läuft in der Claude-Desktop-App (Code-Tab); Terminal-Dialog-Befehle wie
 `/usage` sind hier nicht verfügbar und es gibt kein Werkzeug dafür.
@@ -481,9 +598,11 @@ Nach Auftrag 13 wird das einmal als Befund vermerkt und ersatzweise am Fortschri
 geplant: **Stufe A vor So 06.09.2026 13:00** (Wochentag per `date` bestätigt).
 Im Stundenbericht steht deshalb keine Prozentzahl, sondern der Fortschritt gegen diesen Termin.
 
+**Stand 04.09. 14:05:** Bleibt so und ist keine Aufgabe: der Befehl existiert in dieser Umgebung nicht. Geplant wird ersatzweise am Fortschritt gegen den Termin, wie Auftrag 13 es fuer genau diesen Fall vorsieht.
+
 ---
 
-## L — Aus Auftrag 1.4 „Fragil und lückenhaft" (Nullpunkt, alle OFFEN)
+## L — Aus Auftrag 1.4 „Fragil und lückenhaft" (Nullpunkt)
 
 - **L.1** Die drei Blöcke vom 02.09. in `bn4net.js` (A1-Regel `:685-705`,
   Stillstandserkennung `:2713-2739`, Kaltstart-Leiter `:733-749`) sind nie im
@@ -506,6 +625,8 @@ Im Stundenbericht steht deshalb keine Prozentzahl, sondern der Fortschritt gegen
 - **L.11** Wissen steckt in Kommentaren, teils falsch (`bn4net.js:2973` Faktor 1000 daneben).
 - **L.12** `skipped_route_entries` = 3 (die drei BN8-Einträge mangels `boerse.js`).
 
+**Stand 04.09. 14:05:** Der L-Block ist die Beschreibung des NULLPUNKTS, nicht eine Mangelliste des heutigen Standes - er sagt, womit dieser Bau angefangen hat. Gebaut und gegen Proben gestellt sind seither L.4 (Bruecke mit Starter, Portriegel, Sicherung, Wachhund - `test-bruecke.js`, 59 Proben), L.5 (Vergabepunkt, `test-figur.js`, 56), L.6 (Ereignisstrom mit `bleibt`-Feld statt Speicherliste), L.7 (drei Uhren, Stillstandswache im Motor, `reload.txt`), L.8 (Kaltstart-Budget gegen 32 GB, `test-kaltstart-budget.js`), L.9 teilweise (`boerse.js` mit 31 Proben, BN9-Gewerk, Grafting-Automatik; BN15 offen), L.10 (32 Testdateien, 1.151 Proben statt zwei), L.12 (`skipped_route_entries` faellt mit `boerse.js`). OFFEN im Wortsinn bleiben L.1, L.2 und L.3: sie verlangen einen Lauf im ZIELZUSTAND, und der ist Stufe B beziehungsweise ein echter Knotenwechsel. L.11 ist laufende Pflege - `test-verbote.js` faengt die Sorte Fehler, die sich als Kommentar tarnt, aber kein Test liest Prosa.
+
 ---
 
 ## A–J — Aus dem Autonomie-Audit vom 02.09.
@@ -515,3 +636,134 @@ Im Stundenbericht steht deshalb keine Prozentzahl, sondern der Fortschritt gegen
 ## S — Aus `BAUSTELLEN.md ## Sofort`
 
 *Wird aus dem laufenden Erhebungs-Workflow ergänzt.*
+
+---
+
+# Skeptikerrunde C.3 — 04.09.2026, 06:16 bis 06:35
+
+Drei Prüfer, getrennte Winkel, ohne Sicht auf die Bau-Unterhaltung. **Alle drei
+kamen unabhängig auf denselben blockierenden Befund**, und er trifft die
+Prämisse, nicht die Ausführung.
+
+## C3.1 — Die Wirtreserve löste einen Deadlock, den es so nicht gibt · BEHOBEN (zurückgebaut)
+
+Die These war: der Bot gibt vor dem Wechsel alles Geld aus und kann dann den
+Wirt für `exit.js` nicht bezahlen. Nachgeprüft im Quelltext, die These hält
+nicht. Was den Zustand „kein Wirt UND kein Geld" erzeugt, ist
+`installAugmentations`: es löscht alle gekauften Rechner und setzt das Guthaben
+auf 1.262 $ — in **einem** Engine-Schritt. Gegen ein genulltes Konto ist jede
+Reserve wirkungslos.
+
+Verschärfend: der bestehende Riegel `bn4rep.js:909` hängt an
+`ausgangSteht = eingebauteAugs.includes("The Red Pill")` (`:887`). Red Pill gibt
+es nur im V1-Weg. **In den 30 Bladeburner-Läufen der Route greift er nie** — dort
+darf `bn4rep` genau dann einbauen, wenn alle 21 Black Ops gefallen sind und
+`ausgang.js` `exit.js` starten will.
+
+Behoben durch `lib/endspurt.js` / `einbauErlaubt()`, verfahrensunabhängig, mit
+Sechs-Stunden-Obergrenze gegen den Stillstand. `lib/reserve.js` ist gelöscht;
+vier weitere Befunde (BN9-Erkennung, `passt` gegen `moeglich`, der
+`gb`-Startwert, 0,30 GB RAM) wurden damit gegenstandslos.
+
+## C3.2 — `ns.read` hat keinen Host-Parameter · BEHOBEN
+
+`reserve.js` und `endspurt.js` prüften `fileExists(datei, "home")` und lasen
+dann `ns.read(datei)` — und `ns.read` liest **immer vom eigenen Server**
+(`NetscriptFunctions.ts:1120-1122`), während `fileExists` einen Host nimmt
+(`:1056-1058`). Auf jedem Fremdrechner also eine leere Zeichenkette, ohne Wurf
+und ohne Log. Die Werkzeuge laufen „praktisch nie home" (`bn4net.js:2716-2719`).
+
+Der Interlock hätte damit außerhalb von `home` still „keine Lage" gemeldet und
+den Einbau genau dann erlaubt, wenn er ihn verhindern soll. `endspurt.js` holt
+die Datei jetzt per `scp` von home, wie `ausgang.js:112-118` es seit langem tut.
+
+## C3.3 — Der Hacking-Level ist eine Ganzzahl, der Median kollabiert auf 0 · BEHOBEN
+
+Gemessen gegen das echte Modul: unter etwa 0,6 Stufen je Minute steht der Level
+in mehr als der Hälfte der 60-Sekunden-Fenster still, der Median ist 0 und
+`eta_min` dauerhaft `null` — genau im Endanflug, wo die Zahl gebraucht wird.
+
+| Stufen/min | Median | eta_min |
+|---|---|---|
+| 2,0 | 2 | 11 min |
+| 1,0 | 1 | 61 min |
+| **0,5** | **0** | **null** |
+
+Behoben: steht der Median auf null, während der Wert insgesamt gewachsen ist,
+wird die Rate über die gesamte akzeptierte Strecke gebildet und als `grob`
+gekennzeichnet — eine grobe Zahl ist besser als keine, darf sich aber nicht als
+genau ausgeben.
+
+## C3.4 — Zwei Nachholklumpen kippten den Median · BEHOBEN
+
+Nachgerechnet: mit `MIN_PUNKTE = 5` standen dem Median vier Abschnitte zur
+Verfügung. Zwei Klumpen darin machten `eta_min` um **Faktor 125** falsch — bei
+`sicher: true`. Das Fenster ist real, weil die Messpunkte nur im Prozess leben
+und jeder Neustart sie leert.
+
+`MIN_PUNKTE` steht jetzt auf 9, und `sicher` hängt zusätzlich an der Zahl der
+Stützpunkte.
+
+## C3.5 — Der Median mittelte bei gerader Anzahl und kippte bei genau der Hälfte · BEHOBEN
+
+Von einem eigenen Test gefunden, nicht vom Skeptiker: bei acht Abschnitten, von
+denen vier Klumpen sind, ergibt das Mittel der beiden mittleren Werte
+(2 + 500) / 2 = **251 statt 2**. Der Kommentar im Modul behauptete, das Mittel
+sei „genauso stabil wie der untere Wert" — das war falsch.
+
+Jetzt der untere der beiden mittleren. Er unterschätzt die Rate leicht, und das
+ist die richtige Ausfallrichtung: eine zu niedrige Rate ergibt eine zu lange
+Restzeit, und wer zu früh mit dem Sprung rechnet, verliert nichts.
+
+## C3.6 — Die Tests waren gegen die Konstanten geeicht, die sie prüfen sollten · BEHOBEN
+
+Der Substanz-Prüfer hat die Konstanten mutiert und gemessen, ob die Suite es
+merkt:
+
+| Mutation | Ergebnis |
+|---|---|
+| `ABSTAND_DECKEL_MS` 12 min → 24 h | erkannt |
+| `WIRT_GUELTIG_MS` 10 min → 1 ms | erkannt |
+| **`WIRT_GUELTIG_MS` 10 min → 10 Jahre** | **nicht erkannt** |
+| **`MIN_PUNKTE` 5 → 2** | **nicht erkannt** |
+| **`MAX_PUNKTE` 30 → 8** | **nicht erkannt** |
+
+Die Prüfungen rechneten mit `jetzt + WIRT_GUELTIG_MS + 1000` statt mit einer
+festen Zahl — gegen die Konstante selbst geeicht und deshalb blind für sie. Die
+Reserve hätte zehn Jahre gelten können, während die Suite grün bleibt.
+
+Jede Konstante hat jetzt eine Prüfung mit einer **absoluten** Zahl.
+
+## C3.7 — `eta_min: 0` bei fehlendem Root, als sicher gemeldet · BEHOBEN
+
+Reicht das Hacking-Level, fehlen aber Root oder die fünf Portknacker
+(`servers.ts:1534`), gab `etaMinuten()` 0 zurück und markierte es als sicher —
+stundenlang, während der Sprung an fünf Programmen hängt. `eta_min` bleibt in
+diesem Fall jetzt `null` und nennt den Engpass.
+
+## C3.8 — Falsche Zeilenbelege: 8 von 24 geprüften · TEILWEISE BEHOBEN
+
+Fünf stammen aus diesem Bau, drei sind älter. Die wichtigsten:
+
+- `Prestige.ts:73` als Beleg für „Guthaben fällt" — falsch, das ist der
+  Server-Kommentar. Richtig: `PlayerObjectGeneralMethods.ts:102`.
+- „fällt auf 1000 Dollar" — falsch, es sind **1.262 $**
+  (`1000 + CONSTANTS.Donations`, `Constants.ts:107`).
+- Die Leserliste von `geldbedarf.txt` — es sind **drei** Lesestellen
+  (`bn4net.js:677`, `bn4life.js:250`, `homegrow.js:73`), nicht fünf, und
+  `homegrow.js` fehlte ganz.
+
+**Die Lehre, die bleibt:** zwei der fünf entstanden, weil die Kommentare gegen
+die Vordatei geschrieben und nach dem Umbau nicht nachgezogen wurden.
+Zeilenbelege auf **eigene, im selben Commit veränderte Dateien** sind
+systematisch unzuverlässig — dort gehört ein Symbolname hin, keine Zeilennummer.
+
+## Offen, nicht behoben
+
+| Befund | Warum es liegen bleibt |
+|---|---|
+| **V2-ETA über die Rangkurve** | Der wichtigste offene Punkt. `eta_min` ist auf dem Bladeburner-Weg immer `null`, weil `w0r1d_d43m0n` erst nach The Red Pill am Netz hängt. Der Rang steht in `data/blade.json` (0 GB), die Kurve in `tools/lib/rangkurve.js` — das Werkzeug existiert und wird nicht genutzt. Die Abnahmespalte von C.3 verlangt ausdrücklich „ETA gegen die Rangkurve statt linear" |
+| **Zähler für abgelehnte Sprünge** | Ein dauerhaft ablehnendes `exit.js` liest sich in `checkin.js:252-259` als „URTEIL: SPRINGT". Braucht `exitAbgelehnt` in `ausgang.json` und eine Unterscheidung „läuft" gegen „wurde gestartet und ist weg" |
+| **`ns.scp`-Rückgabewert** | `scp` wirft nicht, es gibt `false` zurück. Ein Teilausfall der Bibliothekskette ist heute unsichtbar |
+| **Lineare Fortschreibung des Levels** | Der Level wächst logarithmisch in der Erfahrung. Über die Skill-Formel zu integrieren löst das zusammen mit der Quantisierung |
+| **RAM-Zahlen in `doku/ram-budget.md`** | `exit.js` ist auf 520,25 GB gewachsen (`getResetInfo`), `ausgang.js` liegt nach dem Reserve-Rückbau wieder bei 8,15 |

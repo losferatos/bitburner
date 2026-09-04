@@ -301,9 +301,25 @@ function zeitstempelName(d) {
   );
 }
 
-export function dateiName(kennwerte, anlass, praefix, binary, jetzt) {
+export function dateiName(kennwerte, anlass, praefix, binary, jetzt, lauf = 1) {
   const b64 = binary ? "" : "-b64";
   const endung = binary ? ".json.gz" : ".json";
+  /**
+   * DER KOLLISIONSZUSATZ GEHOERT AN DEN ZEITSTEMPEL, NICHT ANS ENDE
+   * (04.09.2026, zweiter Anlauf).
+   *
+   * Der erste Anlauf haengte ihn hinter den Anlass: `..._connect-2.json.gz`.
+   * Das loeste zwar die Namenskollision, brach aber die ROTATION -
+   * `anlassVon` liest den Anlass mit `[a-z]+` vor der Endung, und
+   * "connect-2" passt darauf nicht. Die Datei bekam damit gar keinen Anlass
+   * mehr, fiel aus `rotiere()` heraus und blieb liegen. Gemessen nach einem
+   * halben Tag Testlaeufen: 10 ordentlich rotierte Sicherungen und 79
+   * unaufraeumbare.
+   *
+   * Am Zeitstempel stoert er niemanden: er ist ohnehin nur ein Name, und der
+   * Anlass steht weiterhin als letztes Wort vor der Endung.
+   */
+  const zusatz = lauf > 1 ? "-" + lauf : "";
   return (
     praefix +
     kennwerte.identifier +
@@ -313,6 +329,7 @@ export function dateiName(kennwerte, anlass, praefix, binary, jetzt) {
     kennwerte.lauf +
     "_" +
     zeitstempelName(jetzt) +
+    zusatz +
     "_" +
     anlass +
     b64 +
@@ -405,7 +422,33 @@ export async function sichere(opt) {
     anlass,
   });
 
-  const name = dateiName(k, anlass, praefix, geholt.binary, jetzt);
+  let name = dateiName(k, anlass, praefix, geholt.binary, jetzt);
+
+  // ZWEI SICHERUNGEN IN DERSELBEN MINUTE (Skeptiker Runde 5, W3, 04.09.2026).
+  //
+  // `zeitstempelName` hat MINUTENAUFLOESUNG. Zwei Sicherungen desselben
+  // Anlasses innerhalb einer Minute erzeugten denselben Namen: die zweite
+  // ueberschrieb die erste, und der Index bekam trotzdem ZWEI Zeilen mit
+  // verschiedenen sha256, die beide auf dieselbe Datei zeigen. Fuer mindestens
+  // eine der beiden luegt er dann, und `pruefeDatei` gegen sie schluege fehl.
+  //
+  // Gemessen an drei Indexzeilen (10:03:02.109 / .317 / .562) mit drei
+  // verschiedenen Pruefsummen und einem Dateinamen.
+  //
+  // Das trifft nicht nur Tests: `sichereJetzt("connect")` bei einem
+  // Wiederverbinden und die Sekundensicherung vor einem Sprung koennen im
+  // Betrieb genauso in dieselbe Minute fallen.
+  //
+  // Angehaengt wird -2, -3, ... an den ersten freien Namen. Der Anlass bleibt
+  // dabei am Ende des Namens stehen, damit `anlassVon` ihn weiter findet.
+  {
+    const belegt = (n) => [primaer, spiegel].filter(Boolean)
+      .some((ort) => fs.existsSync(path.join(ort, n)));
+    for (let i = 2; i < 100 && belegt(name); i++) {
+      name = dateiName(k, anlass, praefix, geholt.binary, jetzt, i);
+    }
+  }
+
   const orte = [];
   const geloescht = [];
   if (urteil.ok) {

@@ -226,6 +226,7 @@ Seit dem 04.09.2026 sichert sie selbst, und zwar bevor sie schreibt:
 | `pre-hotswap` | vor jedem Codeschub, höchstens alle 10 Minuten |
 | `pre-jump` / `pre-install` | auf Handschlag des Skripts im Spiel |
 | `emergency` | bei Verdacht auf Recovery-Modus |
+| `race` | alle 5 Minuten, solange die Zweit-Tab-Sperre steht (siehe 8) |
 
 **Schlägt eine Sicherung fehl, wird nicht geschrieben.** Der Bot läuft dann mit dem
 Code weiter, den er schon hat. Das ist kein Stillstand, nur kein Fortschritt — und es
@@ -235,3 +236,32 @@ verzögerter Codeschub Minuten.
 Fällt die Brücke ganz aus, exportiert der Bot selbst: er prüft das Alter der letzten
 Sicherung, und ist sie älter als 90 Minuten, legt er einmal je Stunde eine Kopie im
 Downloads-Ordner ab.
+
+## 8 Die Zweit-Tab-Sperre
+
+Meldet sich eine zweite RFA-Verbindung, **während die bestehende noch
+antwortet**, laufen zwei Spiele auf demselben Spielstand. Beide sichern alle
+60 Sekunden in dieselbe IndexedDB, und der letzte Schreiber gewinnt — das ist
+der Weg, auf dem ein Spielstand verschwindet, ohne dass etwas abstürzt.
+
+Die Brücke schreibt dann `data/zweittab-alarm.json`, und solange diese Datei
+liegt:
+
+- geht **nichts** ins Spiel — kein Codeschub, kein `pushAll` beim Verbinden,
+  kein Rückkanal, kein `tools/task.js` / `hand.js` / `nightshift.js`. Der
+  Riegel sitzt in `pushFile`, also in der einen Engstelle, durch die jeder
+  Schreibweg läuft. Einzige Ausnahme: `data/backup-ok.txt`, die Antwort des
+  Handschlags — ohne sie wartete der Bot vor jedem Einbau ins Leere;
+- wird alle fünf Minuten gesichert, unter dem Anlass `race`.
+
+**Aufgehoben wird sie nur von Hand** (Datei löschen; ein Brückenneustart ist
+nicht nötig und wäre selbst ein Eingriff). Vorher klären, ob wirklich ein
+zweiter Tab lief: sinkt `totalPlaytime` in `backups/INDEX.tsv` irgendwo, hat
+ein zweiter Stand geschrieben.
+
+**Ein Reconnect setzt sie NICHT.** Schweigt die alte Verbindung auf die
+Rückfrage, ist sie tot — Standby-Rückkehr, Tab-Discard, Seitenneuladen. Das
+ist der häufigste Vorgang im System, und eine Sperre, die nur ein Mensch
+aufheben kann, gehört nicht an den häufigsten harmlosen Fall. Damit tote
+Sockets überhaupt verschwinden, hält die Brücke seit dem 04.09.2026 ein
+Ping/Pong (30 s, zwei verpasste Pongs → `terminate()`).

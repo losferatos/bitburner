@@ -1,0 +1,360 @@
+/**
+ * Ebene 2: der Kern laeuft gegen einen ns-Mock.
+ *
+ * ===========================================================================
+ * DIE LUECKE, DIE DAS SCHLIESST
+ * ===========================================================================
+ *
+ * Bis heute gab es Ebene 0 (reine Funktionen) und Ebene 3 (Browser mit echtem
+ * Spiel), dazwischen nichts. Der Motorzeit-Einbau in `bn4net.js` lag genau in
+ * dieser Luecke: das Modul war mit 30 Pruefungen belegt, sein EINBAU aber
+ * nicht - und ein richtiges Modul, das an der falschen Stelle aufgerufen wird,
+ * ist genauso kaputt wie ein falsches.
+ *
+ * Hier laeuft der echte Kern. Nicht ein Nachbau, nicht ein Ausschnitt: dieselbe
+ * Datei, die das Spiel ausfuehrt, geladen ueber `tools/mock/lader.js`, der nur
+ * die Importzeilen auf Node-Schreibweise bringt.
+ *
+ * ===========================================================================
+ * WAS GEPRUEFT WIRD
+ * ===========================================================================
+ *
+ * Die drei Pflichtproben aus Auftrag 3.1, diesmal am eingebauten Zustand:
+ *
+ *   8 h gedrosselt  = 8 h Motorzeit
+ *   8 h Rechner aus = 0
+ *   Nachholklumpen  = 0
+ *
+ * Aufruf: node tools/test-motor-ebene2.js
+ */
+
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { neuerMock } from "./mock/ns.js";
+import { ladeAusBeiden } from "./mock/lader.js";
+
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HIER, "..");
+
+let gruen = 0;
+let rot = 0;
+const fehler = [];
+
+function pruefe(name, bedingung, hinweis = "") {
+  if (bedingung) {
+    gruen++;
+    console.log("  ok    " + name);
+  } else {
+    rot++;
+    fehler.push(name + (hinweis ? " - " + hinweis : ""));
+    console.log("  ROT   " + name + (hinweis ? " - " + hinweis : ""));
+  }
+}
+
+console.log("");
+console.log("=== Ebene 2: der Kern gegen den ns-Mock ===");
+
+// ---------------------------------------------------------------------------
+// Ein Netz, das gross genug ist, damit der Kern etwas zu tun findet.
+function grundzustand(extra = {}) {
+  return {
+    host: "home",
+    knoten: 10,
+    nodeReset: 1000,
+    geld: 1e9,
+    server: {
+      home: { ram: 64, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 },
+      "n00dles": { ram: 4, used: 0, root: true, geld: 1e6, cores: 1, ports: 0, hackLevel: 1 },
+      "foodnstuff": { ram: 16, used: 0, root: true, geld: 5e6, cores: 1, ports: 0, hackLevel: 5 },
+    },
+    dateien: {
+      home: {
+        "bn4net.js": "// Platzhalter, damit getScriptRam und exec etwas finden",
+        "worker/hack.js": "//", "worker/grow.js": "//", "worker/weaken.js": "//",
+        "worker/share.js": "//",
+        "data/verfahren.txt": "V2 10 2",
+      },
+    },
+    ...extra,
+  };
+}
+
+/**
+ * Faehrt den Kern fuer eine gegebene Zahl von Runden. Die Uhr steuert der
+ * Aufrufer ueber `beiSchlaf` - so laesst sich eine Nacht in Millisekunden
+ * simulieren.
+ */
+async function fahre(runden, beiSchlaf, extra = {}) {
+  const m = neuerMock({ ...grundzustand(extra), maxSchlaf: runden, beiSchlaf });
+  const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+  // Die Gewerke lesen die Wanduhr ueber Date.now(), nicht ueber ns. Ohne
+  // diesen Griff bewegt sie sich im Test nicht, und die Motorzeit saehe in
+  // jeder Runde einen Nachholklumpen.
+  const zurueck = m.uhrStellen();
+  try {
+    await modul.main(m.ns);
+  } catch (e) {
+    if (!e.mockAbbruch) throw e;
+  } finally {
+    zurueck();
+  }
+  return m;
+}
+
+function telemetrie(m) {
+  const roh = m.lies("home", "data/bn4net.json");
+  if (!roh) return null;
+  try { return JSON.parse(roh); } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Kern laeuft ueberhaupt --");
+let ersteTelemetrie = null;
+{
+  const m = await fahre(5, (ms, z, vor) => vor(ms));
+  const t = telemetrie(m);
+  ersteTelemetrie = t;
+  pruefe("Telemetrie wird geschrieben", t !== null,
+    "data/bn4net.json fehlt - der Kern kam nicht bis zum Schreiben");
+  if (t) {
+    pruefe("runde zaehlt", t.runde >= 1, "runde=" + t.runde);
+    pruefe("der Kern hat Runden vollstaendig durchlaufen", t.okRound >= 1,
+      "okRound=" + t.okRound + " bei runde=" + t.runde +
+      (t.lastError ? " - letzter Fehler: " + t.lastError.msg : ""));
+  }
+}
+
+console.log("");
+console.log("-- Herzschlag v2: die Pflichtfelder --");
+{
+  const t = ersteTelemetrie;
+  if (!t) {
+    pruefe("Telemetrie vorhanden", false, "ohne sie sind die Feldpruefungen sinnlos");
+  } else {
+    for (const feld of ["schema", "wall", "playtime", "motorTimeMs", "okRound",
+                        "errStreak", "host", "state"]) {
+      pruefe("Feld " + feld + " steht im Block", feld in t,
+        "ARCHITEKTUR 4.1 - ohne diese Felder kann der Waechter nichts entscheiden");
+    }
+    pruefe("lastError ist vorhanden (auch als null)", "lastError" in t);
+    pruefe("schema ist 2", t.schema === 2, "erhalten " + t.schema);
+    pruefe("state ist ein erlaubter Wert",
+      ["work", "wait", "blocked", "done"].includes(t.state), "erhalten " + t.state);
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- PFLICHTPROBE 1: acht Stunden gedrosselt = acht Stunden Motorzeit --");
+{
+  // Der verdeckte Tab bekommt eine Weckung je Minute. Die Spielzeit laeuft
+  // dabei mit - das Spiel rechnet, es meldet sich nur seltener.
+  const runden = 480;   // 8 h bei einer Runde je Minute
+  const m = await fahre(runden, (ms, z, vor) => vor(60000));
+  const t = telemetrie(m);
+  pruefe("Telemetrie da", t !== null);
+  if (t) {
+    const stunden = t.motorTimeMs / 3600000;
+    pruefe("rund acht Stunden Motorzeit", Math.abs(stunden - 8) < 0.2,
+      "erhalten " + stunden.toFixed(2) + " h aus " + t.runde + " Runden");
+    pruefe("keine Runde verworfen", (t.verworfeneRunden || 0) === 0,
+      "verworfen: " + t.verworfeneRunden);
+  }
+}
+
+console.log("");
+console.log("-- PFLICHTPROBE 2: acht Stunden Rechner aus = null Motorzeit --");
+{
+  let schlaefe = 0;
+  const m = await fahre(12, (ms, z, vor) => {
+    schlaefe++;
+    // Nach fuenf normalen Runden ist der Rechner acht Stunden aus. Beide Uhren
+    // springen: die Engine bucht die Abwesenheit auf totalPlaytime nach.
+    if (schlaefe === 5) vor(8 * 3600000, 8 * 3600000);
+    else vor(10000);
+  });
+  const t = telemetrie(m);
+  pruefe("Telemetrie da", t !== null);
+  if (t) {
+    const stunden = t.motorTimeMs / 3600000;
+    // 11 Runden a 10 s = rund 110 s = 0,03 h. Die acht Stunden duerfen NICHT
+    // dabei sein.
+    pruefe("die Nacht zaehlt NICHT als Motorzeit", stunden < 0.1,
+      "erhalten " + stunden.toFixed(4) + " h - erwartet unter 0,1");
+    pruefe("die Runde wurde verworfen", (t.verworfeneRunden || 0) >= 1,
+      "verworfen: " + t.verworfeneRunden);
+    pruefe("der Grund nennt den Deckel", /Deckel/.test(t.letzterMzGrund || ""),
+      t.letzterMzGrund || "kein Grund vermerkt");
+  }
+}
+
+console.log("");
+console.log("-- PFLICHTPROBE 3: der Nachholklumpen zaehlt null --");
+{
+  let schlaefe = 0;
+  const m = await fahre(12, (ms, z, vor) => {
+    schlaefe++;
+    // Die Engine verarbeitet acht Stunden Rueckstand in EINER Runde: die
+    // Wanduhr zeigt zehn Sekunden, die Spielzeit springt um acht Stunden.
+    if (schlaefe === 5) vor(10000, 8 * 3600000);
+    else vor(10000);
+  });
+  const t = telemetrie(m);
+  pruefe("Telemetrie da", t !== null);
+  if (t) {
+    const stunden = t.motorTimeMs / 3600000;
+    pruefe("der Klumpen zaehlt NICHT", stunden < 0.1,
+      "erhalten " + stunden.toFixed(4) + " h");
+    pruefe("die Runde wurde verworfen", (t.verworfeneRunden || 0) >= 1);
+    pruefe("der Grund nennt den Klumpen", /Nachholklumpen/.test(t.letzterMzGrund || ""),
+      t.letzterMzGrund || "kein Grund vermerkt");
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die Uhr ueberlebt einen Neustart --");
+{
+  // Erst eine Stunde fahren, dann den Zustand mitnehmen und neu starten.
+  const m1 = await fahre(360, (ms, z, vor) => vor(10000));
+  const gespeichert = m1.lies("home", "data/motorzeit.json");
+  pruefe("motorzeit.json wurde geschrieben", !!gespeichert,
+    "ohne sie beginnt die Uhr nach jedem Neustart bei null");
+
+  if (gespeichert) {
+    const vorher = JSON.parse(gespeichert).motorTimeMs;
+    pruefe("sie traegt eine Motorzeit", vorher > 0, "erhalten " + vorher);
+
+    const start = grundzustand();
+    start.dateien.home["data/motorzeit.json"] = gespeichert;
+    const m2 = neuerMock({ ...start, maxSchlaf: 40, beiSchlaf: (ms, z, vor) => vor(10000) });
+    const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+    const zurueck2 = m2.uhrStellen();
+    try { await modul.main(m2.ns); } catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck2(); }
+    const t = telemetrie(m2);
+    pruefe("die Motorzeit wurde uebernommen", t && t.motorTimeMs >= vorher,
+      t ? "vorher " + vorher + ", jetzt " + t.motorTimeMs : "keine Telemetrie");
+
+    // DIE AUSFALLZEIT ZWISCHEN DEN LAEUFEN DARF NICHT DAZUKOMMEN. Der Prozess
+    // war weg; diese Zeit ist keine Arbeit.
+    const dazu = t ? t.motorTimeMs - vorher : 0;
+    pruefe("die Pause zwischen den Laeufen zaehlt nicht mit", dazu < 10 * 60000,
+      "dazugekommen: " + (dazu / 60000).toFixed(1) + " min bei 39 gefahrenen Runden");
+  }
+}
+
+console.log("");
+console.log("-- der Knotenwechsel setzt die Uhr zurueck --");
+{
+  const m1 = await fahre(360, (ms, z, vor) => vor(10000));
+  const gespeichert = m1.lies("home", "data/motorzeit.json");
+  if (gespeichert) {
+    const start = grundzustand({ nodeReset: 999999 });   // anderer Lauf
+    start.dateien.home["data/motorzeit.json"] = gespeichert;
+    const m2 = neuerMock({ ...start, maxSchlaf: 20, beiSchlaf: (ms, z, vor) => vor(10000) });
+    const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+    const zurueck3 = m2.uhrStellen();
+    try { await modul.main(m2.ns); } catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck3(); }
+    const t = telemetrie(m2);
+    pruefe("die Uhr beginnt im neuen Knoten neu",
+      t && t.motorTimeMs < 10 * 60000,
+      t ? "erhalten " + (t.motorTimeMs / 60000).toFixed(1) + " min" : "keine Telemetrie");
+  } else {
+    pruefe("Vorbedingung: motorzeit.json vorhanden", false);
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- C.5: der Kern liest die Registry --");
+{
+  // Mit Registry: die Werkzeugliste kommt von dort.
+  const registry = fs.readFileSync(
+    [path.resolve(ROOT, "..", "bitburner-bau", "src", "registry.json"),
+     path.join(ROOT, "src", "registry.json")].find((p) => fs.existsSync(p)), "utf8");
+
+  const m = await fahre(5, (ms, z, vor) => vor(ms), {
+    dateien: { home: {
+      "bn4net.js": "//", "worker/hack.js": "//", "worker/grow.js": "//",
+      "worker/weaken.js": "//", "worker/share.js": "//",
+      "data/verfahren.txt": "V2 10 2",
+      "registry.json": registry,
+      // Die Werkzeuge muessen liegen, sonst filtert die Registry sie weg.
+      "blade.js": "//", "ausgang.js": "//", "sleeve.js": "//", "bbtrain.js": "//",
+      "bn4life.js": "//", "homegrow.js": "//", "contracts.js": "//",
+      "hacknet.js": "//", "popups.js": "//", "bn4rep.js": "//", "bn4door.js": "//",
+      "hashes.js": "//", "wakelock.js": "//",
+    } },
+  });
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("der Kern meldet, woher die Liste kommt", !!zeile, m.zustand.log.slice(0, 3).join(" | "));
+  if (zeile) {
+    console.log("       " + zeile.trim());
+    pruefe("und sie kommt aus der Registry", /aus registry\.json/.test(zeile), zeile);
+    pruefe("die Rolle wurde erkannt", /Rolle V2/.test(zeile), zeile);
+  }
+}
+
+console.log("");
+console.log("-- C.5: ohne Registry traegt die eingebaute Liste --");
+{
+  // DER FALL, DER SONST DEN BOT STILLLEGT: nach einem Knotenwechsel, bevor
+  // die Bruecke die Dateien nachgeschoben hat, gibt es keine registry.json.
+  const m = await fahre(5, (ms, z, vor) => vor(ms));
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("der Kern laeuft trotzdem", !!zeile);
+  if (zeile) {
+    console.log("       " + zeile.trim());
+    pruefe("und faellt auf die eingebaute Liste zurueck", /EINGEBAUT/.test(zeile), zeile);
+  }
+  const t = telemetrie(m);
+  pruefe("die Telemetrie wird weiter geschrieben", t !== null);
+}
+
+console.log("");
+console.log("-- C.5: der Rollen-Riegel greift auch im Kern --");
+{
+  const registry = fs.readFileSync(
+    [path.resolve(ROOT, "..", "bitburner-bau", "src", "registry.json"),
+     path.join(ROOT, "src", "registry.json")].find((p) => fs.existsSync(p)), "utf8");
+  // verfahren.txt steht auf Knoten 6, der Lauf ist in 10 - die Datei stammt
+  // noch aus dem vorigen Knoten.
+  const m = await fahre(5, (ms, z, vor) => vor(ms), {
+    dateien: { home: {
+      "bn4net.js": "//", "worker/weaken.js": "//",
+      "data/verfahren.txt": "V1 6 2",
+      "registry.json": registry,
+      "blade.js": "//", "ausgang.js": "//", "wakelock.js": "//",
+    } },
+  });
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("die Rolle gilt als unbekannt", !!zeile && /Rolle unbekannt/.test(zeile),
+    zeile || "keine Zeile");
+}
+
+console.log("");
+console.log("-- keine .mock-Datei bleibt liegen --");
+{
+  // Eine liegengebliebene Wegwerfdatei unter src/ ginge ueber die Bruecke ins
+  // laufende Spiel. Der Lader raeumt im finally auf; das wird hier geprueft.
+  for (const wurzel of [path.join(ROOT, "src"),
+                        path.resolve(ROOT, "..", "bitburner-bau", "src")]) {
+    if (!fs.existsSync(wurzel)) continue;
+    const reste = fs.readdirSync(wurzel).filter((f) => f.startsWith(".mock-"));
+    pruefe("keine Reste in " + path.basename(path.dirname(wurzel)) + "/src",
+      reste.length === 0, reste.join(", "));
+  }
+}
+
+console.log("");
+console.log("=== " + gruen + " gruen, " + rot + " rot ===");
+if (rot) {
+  console.log("");
+  for (const f of fehler) console.log("  ROT: " + f);
+}
+console.log("");
+process.exit(rot ? 1 : 0);

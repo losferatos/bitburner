@@ -56,7 +56,7 @@
 
 import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
-import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename } from "node:fs/promises";
+import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename, rm } from "node:fs/promises";
 import { watch } from "node:fs";
 import { execFileSync, execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -69,6 +69,7 @@ import {
   SCHONLISTE,
   BACKUP_PRIMAER,
   BACKUP_SPIEGEL,
+  BACKUP_MOCK,
   pfadGleich,
   textAusArgv,
   zahlAusArgv,
@@ -77,7 +78,7 @@ import { sichere, lesenKennwerte, alterJuengsteMin, letzterEintrag } from "./bac
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
-const SCRIPT_DIR = path.join(ROOT, "src");
+const SCRIPT_DIR_VORGABE = path.join(ROOT, "src");
 const DASHBOARD_DIR = path.join(ROOT, "dashboard");
 
 // ---------------------------------------------------------------------------
@@ -141,21 +142,66 @@ function bestimmeRolle() {
 }
 
 const ROLLE = bestimmeRolle();
+/** Vor dem Portriegel gebraucht - deshalb hier und nicht weiter unten. */
+const IST_LIVE_ROLLE = ROLLE.instance === "LIVE";
 const RFA_PORT = zahlAusArgv(argv, "--rfa-port", ROLLE.rfaPort);
 const DASHBOARD_PORT = zahlAusArgv(argv, "--dash-port", ROLLE.dashPort);
 const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDir));
 
 /**
+ * WELCHEN ORDNER DER WATCHER BEOBACHTET - und warum das ueberhaupt ein
+ * Schalter ist.
+ *
+ * Der Dateibeobachter war bis zum 04.09.2026 nicht testbar: er haengt fest an
+ * `<repo>/src`, und ein Test, der dort Dateien anlegt, schiebt sie ins ECHTE
+ * Spiel. Alle 48 Brueckenproben liefen deshalb mit `--no-watch` - also am
+ * stillsten Weg ins Spiel vorbei, den diese Bruecke hat.
+ *
+ * Der Schalter ist fuer die Rolle LIVE GESPERRT, nicht nur unueblich. Ein
+ * umgebogener Quellordner auf der Live-Bruecke waere genau der Fehler, den
+ * `--data-dir` schon einmal beinahe erzeugt haette: ein Testlauf, der in
+ * Erics laufendes Spiel schreibt.
+ */
+const SCRIPT_DIR = (() => {
+  const wunsch = textAusArgv(argv, "--src-dir", "");
+  if (!wunsch) return SCRIPT_DIR_VORGABE;
+  if (IST_LIVE_ROLLE) {
+    console.error(
+      "--src-dir ist fuer die Rolle LIVE gesperrt. Der Quellordner der " +
+        "Live-Bruecke ist immer <repo>/src.",
+    );
+    process.exit(2);
+  }
+  return path.resolve(ROOT, wunsch);
+})();
+
+/**
  * TEST weigert sich, die Live-Ports zu binden. Ein vertippter Portparameter ist
  * sonst genau der Fehler, gegen den die ganze Rollentrennung gebaut ist.
  */
-if (ROLLE.instance === "TEST" && (RFA_PORT === 12525 || DASHBOARD_PORT === 8795)) {
-  console.log("  ABBRUCH: TEST darf 12525/8795 nicht binden (angefragt " + RFA_PORT + "/" + DASHBOARD_PORT + ")");
+// ZWEI ERWEITERUNGEN AM 04.09.2026 (Skeptiker Runde 5):
+//
+//   1. Der Riegel galt nur fuer TEST. Mit MOCK gibt es eine dritte Rolle, und
+//      eine Ausnahme, die man beim Hinzufuegen einer Rolle vergessen kann, ist
+//      keine. Jetzt gilt er fuer ALLES ausser LIVE.
+//   2. Er prueft die KREUZFAELLE mit. Vorher stand da
+//      `RFA_PORT === 12525 || DASHBOARD_PORT === 8795` - ein `--rfa-port 8795`
+//      oder `--dash-port 12525` kam durch und wurde nur durch EADDRINUSE
+//      abgefangen, also nur, solange LIVE gerade laeuft. Ausgerechnet dann,
+//      wenn die Live-Bruecke steht, waere der Vertipper durchgegangen.
+if (!IST_LIVE_ROLLE
+    && [RFA_PORT, DASHBOARD_PORT].some((p) => p === 12525 || p === 8795)) {
+  console.log("  ABBRUCH: " + ROLLE.instance + " darf 12525/8795 nicht binden"
+    + " (angefragt " + RFA_PORT + "/" + DASHBOARD_PORT + ")");
   process.exit(3);
 }
 
-const IST_LIVE = ROLLE.instance === "LIVE";
-const BACKUP_ORT = IST_LIVE ? BACKUP_PRIMAER : path.join(ROOT, "pruefstand", "backups");
+const IST_LIVE = IST_LIVE_ROLLE;
+const BACKUP_ORT = IST_LIVE
+  ? BACKUP_PRIMAER
+  : (ROLLE.instance === "MOCK"
+    ? BACKUP_MOCK
+    : path.join(ROOT, "pruefstand", "backups"));
 const BACKUP_SPIEGEL_ORT = IST_LIVE ? BACKUP_SPIEGEL : null;
 
 const POLL_INTERVAL_MS = 2000;
@@ -167,6 +213,66 @@ const RUECKKANAL_MS = 60000;
 const SOFORT_MS = 60000;
 const SAVE_ALTER_MS = 10 * 60000;
 const STUNDENSICHERUNG_MS = 60 * 60000;
+/**
+ * Der Sicherungstakt, solange ein zweiter Spiel-Tab im Verdacht steht
+ * (Auftrag 7.1.1, Befund W.6).
+ *
+ * Zwei Tabs speichern beide alle 60 s in dieselbe IndexedDB, und der letzte
+ * Schreiber gewinnt. Die Gefahr ist nicht der Alarm, sondern die Zeit danach:
+ * bis jemand hinsieht, koennen Stunden vergehen, und die naechste
+ * Stundensicherung faengt womoeglich schon den ueberschriebenen Stand.
+ */
+const ZWEITTAB_SICHERUNG_MS = 5 * 60000;
+
+/**
+ * Wie oft der Sicherungstimer ueberhaupt nachsieht. Live eine Minute; im
+ * Pruefstand faellt er mit `--race-takt-ms` mit, sonst koennte eine Probe den
+ * Fuenfminutentakt nie beobachten - der Timer wuerde erst nach einer Minute
+ * zum ersten Mal aufwachen.
+ */
+const TIMER_TAKT_MS = (() => {
+  const wunsch = zahlAusArgv(argv, "--race-takt-ms", 0);
+  if (!wunsch || IST_LIVE_ROLLE) return 60000;
+  return Math.max(200, Math.min(60000, Math.floor(wunsch / 2)));
+})();
+
+/**
+ * DER RENNTAKT IST IM PRUEFSTAND EINSTELLBAR - sonst waere er nicht messbar.
+ *
+ * Ein Skeptiker hat es gefunden: `ZWEITTAB_SICHERUNG_MS` liess sich auf FUENF
+ * STUNDEN setzen, ohne dass eine der 59 Brueckenproben rot wurde. Der Test
+ * behauptete, der Takt "faellt mit der Abfrage" - geteilt ist aber nur die
+ * Abfrage, nicht die Wirkung. Eine Zusicherung ohne Probe ist eine
+ * Behauptung, und diese hier stand in der Abnahmeliste.
+ *
+ * Fuer LIVE gesperrt, wie `--src-dir`: der Renntakt der Live-Bruecke sind
+ * fuenf Minuten, und daran dreht kein Aufrufparameter.
+ */
+const RACE_TAKT_MS = (() => {
+  const wunsch = zahlAusArgv(argv, "--race-takt-ms", 0);
+  if (!wunsch) return ZWEITTAB_SICHERUNG_MS;
+  if (IST_LIVE_ROLLE) {
+    console.error("--race-takt-ms ist fuer die Rolle LIVE gesperrt.");
+    process.exit(2);
+  }
+  return wunsch;
+})();
+/**
+ * Wieviele Dateien ein einzelner Watcher-Schub hoechstens ins Spiel schiebt
+ * (Befund B.3).
+ *
+ * Der Anlass: der Bau liegt in einem zweiten Baum (`bitburner-bau`), und die
+ * Live-Bruecke beobachtet `bitburner/src`. Ein `git merge` des Baus in den
+ * Live-Baum aendert rund vierzig Dateien in einer Sekunde - der Watcher haette
+ * sie in EINEM Schub ins laufende Spiel geschoben, ohne Checkliste, ohne
+ * Kanarienvogel, ohne die Reihenfolge aus Auftrag 9. Der Merge waere die
+ * Einspielung gewesen, und niemand haette ihn so genannt.
+ *
+ * Acht ist die Grenze zwischen "jemand hat an einem Gewerk gearbeitet" und
+ * "hier kippt ein ganzer Stand um". Wer mehr will, legt `data/schub-frei.txt`
+ * an - das ist der bewusste Handgriff, den `tools/hotswap.js` verlangt.
+ */
+const SCHUB_MAX = 8;
 /** Nach einem Schub mindestens so lange keine weitere Schub-Sicherung. */
 const SCHUB_SICHERUNG_ABSTAND_MS = 10 * 60000;
 
@@ -199,6 +305,24 @@ const pendingRequests = new Map();
  */
 let verifizierterSocket = null;
 let verifikationLaeuft = false;
+/**
+ * EIN SOCKET, DER WAEHREND EINER LAUFENDEN VERIFIKATION ANKOMMT (04.09.2026).
+ *
+ * `verifiziereSocket` stieg bei `verifikationLaeuft` mit einem blossen
+ * `return` aus - ohne Meldung und ohne dass irgendetwas die Pruefung spaeter
+ * nachgeholt haette. Der neue Socket blieb damit DAUERHAFT unverifiziert: der
+ * Wachhund liess nichts hinaus, jeder Schub landete in `zurueckgestellt`, und
+ * der einzige Wiederholungsanlauf (60 s) steht im catch-Zweig, den ein
+ * stiller Ausstieg nie erreicht. Von aussen sah das aus wie eine gesunde
+ * Verbindung, die nichts tut.
+ *
+ * Das Fenster ist groesser, als es aussieht: `Verifiziert in ...` wird
+ * geloggt, BEVOR Sicherung und pushAll laufen - beide dauern zusammen leicht
+ * mehrere Sekunden. Getroffen hat es zuerst den Brueckentest unter Last
+ * (04.09.2026, voller Suitendurchlauf); im Betrieb trifft es jeden Reconnect,
+ * der in dieses Fenster faellt.
+ */
+let nachzuholen = null;
 const istVerifiziert = () => gameSocket !== null && verifizierterSocket === gameSocket;
 
 const state = {
@@ -231,6 +355,235 @@ let letzteStundensicherung = 0;
 let letzteSaveAbfrage = 0;
 /** Zurueckgestellte Schuebe aus dem unverified-Fenster. */
 const zurueckgestellt = new Set();
+
+/**
+ * MANUAL_ACTIONS - der Eingriffszaehler (04.09.2026).
+ *
+ * Abnahmestufe B verlangt 12 h mit `manual_actions = 0`, und die Zahl hatte
+ * bis heute keinen Schreiber. Sie stand dauerhaft auf null und war damit
+ * unfaelschbar - dieselbe Luecke wie bei `false_penalty_count`.
+ *
+ * SIE GEHOERT IN DIE BRUECKE, und das ist kein Umweg, sondern der einzige
+ * moegliche Ort: Der Kern laeuft IM Spiel und kann nicht sehen, dass etwas von
+ * aussen hineingeschrieben wurde. Die Bruecke ist der einzige Weg hinein, und
+ * damit die einzige Stelle, an der sich ein Eingriff ueberhaupt bemerken
+ * laesst.
+ *
+ * WAS ZAEHLT (Auftrag, Stufe B): "jede Aenderung, die das Live-Spiel erreicht
+ * - Hot-Swap, pushFile, deleteFile, task.txt, reload.txt, Neustart der
+ * Bruecke."
+ *
+ * WAS NICHT ZAEHLT:
+ *   - `pushAll` beim Verbinden. Das ist die Bruecke, die ihren eigenen Stand
+ *     wiederherstellt, kein Mensch. Der Auftrag nennt einen Brueckenausfall
+ *     ausdruecklich KEINEN Eingriff.
+ *   - Lesende Methoden. `getSaveFile` alle 60 s ist Beobachtung.
+ *
+ * Gezaehlt wird als EIN Eingriff, was in einem Schub zusammen ins Spiel geht -
+ * ein Hot-Swap von zwoelf Dateien ist ein Handgriff, nicht zwoelf. Die
+ * Gegenprobe dazu steht in der Datei: sie fuehrt die Zahl der Dateien mit.
+ */
+const MANUAL_DATEI = path.join(DATA_DIR, "manual-actions.json");
+/**
+ * Der Zweit-Tab-Alarm steht in einer DATEI, nicht in einer Variablen.
+ *
+ * `sync/bridge-start.cmd` startet die Bruecke nach jedem Absturz neu. Ein
+ * Merker im Prozess waere damit genau in dem Moment weg, in dem er zaehlt -
+ * ein Save-Rennen zwischen zwei Tabs bringt die Bruecke durchaus zum Sterben,
+ * und der Neustart haette die Sperre still aufgehoben.
+ *
+ * Aufgehoben wird sie nur von Hand: Datei loeschen. Das ist Absicht. Ein
+ * Verdacht auf ein Save-Rennen ist nichts, was sich von selbst erledigt.
+ */
+const ZWEITTAB_DATEI = path.join(DATA_DIR, "zweittab-alarm.json");
+/** Der Freibrief fuer einen grossen Schub - siehe SCHUB_MAX. */
+const SCHUB_FREI_DATEI = path.join(DATA_DIR, "schub-frei.txt");
+const SCHUB_FREI_MAX_MS = 30 * 60000;
+/**
+ * DER VERWEIGERTE SCHUB HAT EINEN NAMEN UND EINE DATEI.
+ *
+ * Ohne sie liefen `src/` und Spiel still auseinander: der Watcher verweigert,
+ * der Stapel ist weg, und nichts erinnert daran. Aufgeloest haette das
+ * spaeter `pushAll` beim naechsten Verbinden - auf die schlechteste denkbare
+ * Art, naemlich alles auf einmal und ohne Checkliste (Skeptikerrunde 6).
+ *
+ * Die Datei traegt die Liste. `pushAll` haelt sie ein, das Dashboard zeigt
+ * sie, und `tools/hotswap.js` kann daran erkennen, dass etwas ansteht.
+ */
+const SCHUB_OFFEN_DATEI = path.join(DATA_DIR, "schub-offen.json");
+const MANUAL_MAX = 200;
+
+/**
+ * Steht der Zweit-Tab-Alarm? Der Inhalt der Datei, sonst null.
+ *
+ * Wird bei jeder Abfrage frisch von Platte gelesen, damit ein Mensch die
+ * Sperre durch Loeschen der Datei aufheben kann, ohne die Bruecke neu zu
+ * starten - ein Neustart waere selbst ein Eingriff.
+ */
+let zweitTabMerker = null;
+
+/**
+ * Steht der Zweit-Tab-Alarm?
+ *
+ * FAIL-CLOSED, und zwar aus dem eigenen Grund heraus (Skeptikerrunde 6).
+ *
+ * Der erste Entwurf fing JEDEN Fehler und lieferte `null` - also "keine
+ * Sperre". Damit hob ein transienter Lesefehler die Sperre still auf:
+ * EBUSY/EPERM unter Windows (Virenscanner, offener Editor), EMFILE, oder ein
+ * `SyntaxError` auf einer halb geschriebenen Datei. Die Datei laege sichtbar
+ * im Ordner, ein Mensch hielte sie fuer die Sperre - und es gaebe keine.
+ *
+ * Das widersprach der eigenen Begruendung im RPC-Riegel: "in einen
+ * unbekannten Stand zu schreiben macht aus einem Rennen einen Schaden". Ein
+ * Lesefehler IST der unbekannte Zustand.
+ *
+ * Jetzt: `ENOENT` heisst "keine Sperre" - das ist der einzige Fehler, der
+ * eine Aussage traegt. Alles andere haelt die Sperre (oder setzt sie, wenn
+ * noch keine bekannt war) und wird protokolliert.
+ */
+async function zweitTabAlarm() {
+  try {
+    zweitTabMerker = JSON.parse(await readFile(ZWEITTAB_DATEI, "utf8"));
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      zweitTabMerker = null;
+    } else {
+      log("error", "Zweit-Tab-Sperre nicht lesbar (" + (e && (e.code || e.message))
+        + ") - sie gilt weiter, im Zweifel gesperrt");
+      if (!zweitTabMerker) {
+        zweitTabMerker = {
+          at: new Date().toISOString(), ts: Date.now(),
+          text: "Sperrdatei unlesbar (" + (e && (e.code || e.message)) + ")",
+        };
+      }
+    }
+  }
+  return zweitTabMerker;
+}
+
+/** Den Alarm setzen. Ueberschreibt einen bestehenden nicht - der erste zaehlt. */
+async function setzeZweitTabAlarm(text) {
+  if (await zweitTabAlarm()) return;
+  try {
+    // ATOMAR: erst daneben schreiben, dann umbenennen. Ein Absturz mitten im
+    // Schreiben hinterliesse sonst eine abgeschnittene Datei - und die parst
+    // nie wieder. Das Fenster ist schmal und liegt genau in dem Moment, in
+    // dem die Sperre zaehlt.
+    const tmp = ZWEITTAB_DATEI + ".tmp";
+    await writeFile(
+      tmp,
+      JSON.stringify({ at: new Date().toISOString(), ts: Date.now(), text }, null, 1),
+      "utf8",
+    );
+    await rename(tmp, ZWEITTAB_DATEI);
+    await zweitTabAlarm();
+    log(
+      "error",
+      "ZWEIT-TAB-SPERRE gesetzt: Sicherungstakt 5 min, alle schreibenden " +
+        "Eingriffe gesperrt. Aufheben: " + ZWEITTAB_DATEI + " loeschen.",
+    );
+  } catch (e) {
+    log("error", "Zweit-Tab-Sperre liess sich nicht schreiben: " + e.message);
+  }
+}
+
+/**
+ * Der Freibrief fuer einen grossen Schub - und warum er verfaellt.
+ *
+ * Eine Datei, die liegen bleibt, ist keine Freigabe mehr, sondern eine
+ * abgeschaltete Sicherung. Nach dreissig Minuten gilt sie nicht mehr; das ist
+ * lang genug fuer einen Hot-Swap in Stufen und kurz genug, dass sie niemand
+ * ueber eine Nacht vergisst.
+ */
+async function schubFrei() {
+  try {
+    const st = await stat(SCHUB_FREI_DATEI);
+    const alter = Date.now() - st.mtimeMs;
+    // NEGATIV IST NICHT JUNG (Skeptikerrunde 6). Springt die Systemuhr
+    // rueckwaerts - NTP-Korrektur, Rueckkehr aus dem Standby, VM-Resume -,
+    // wird die Differenz negativ, und ein blosses `< MAX` waere wahr. Ein
+    // Freibrief von vor drei Wochen gaelte damit wieder, und zwar fuer die
+    // Dauer des Versatzes statt fuer 30 Minuten.
+    if (alter < 0) {
+      log("warn", "schub-frei.txt liegt in der Zukunft (" + (-alter / 60000).toFixed(0)
+        + " min) - gilt NICHT");
+      return false;
+    }
+    return alter < SCHUB_FREI_MAX_MS;
+  } catch {
+    return false;
+  }
+}
+
+/**
+ * Der Freibrief ist ein EINMAL-TICKET, kein Zeitfenster.
+ *
+ * Sonst passen in dreissig Minuten mehrere Merges, und die Datei bliebe
+ * liegen: jedes Werkzeug, das die mtime anfasst - Editor, Kopieren des
+ * data/-Ordners, ein Indexer - schaltete den Deckel erneut fuer 30 min ab,
+ * ohne dass es jemand wollte.
+ */
+/** Den verweigerten Stapel festhalten - siehe SCHUB_OFFEN_DATEI. */
+async function schreibeSchubOffen(stapel) {
+  try {
+    await writeFile(SCHUB_OFFEN_DATEI, JSON.stringify({
+      at: new Date().toISOString(),
+      ts: Date.now(),
+      anzahl: stapel.length,
+      dateien: stapel.slice(0, 200),
+    }, null, 1), "utf8");
+  } catch (e) {
+    log("error", "schub-offen.json nicht schreibbar: " + e.message);
+  }
+}
+
+/** Welche Dateien warten? Leere Menge, wenn nichts ansteht. */
+async function schubOffenListe() {
+  try {
+    const o = JSON.parse(await readFile(SCHUB_OFFEN_DATEI, "utf8"));
+    return new Set(Array.isArray(o.dateien) ? o.dateien : []);
+  } catch {
+    return new Set();
+  }
+}
+
+async function verbraucheSchubFrei() {
+  try {
+    await rm(SCHUB_FREI_DATEI, { force: true });
+    log("info", "Freibrief verbraucht - der naechste grosse Schub braucht einen neuen");
+  } catch { /* dann liegt sie eben noch da, der Verfall greift trotzdem */ }
+}
+
+async function zaehleEingriff(art, was, anzahl = 1) {
+  try {
+    let buch = { version: 1, eintraege: [] };
+    try {
+      buch = JSON.parse(await readFile(MANUAL_DATEI, "utf8"));
+      if (!Array.isArray(buch.eintraege)) buch.eintraege = [];
+    } catch { /* erster Eingriff dieser Instanz */ }
+    buch.eintraege.push({
+      wall: Date.now(),
+      art,
+      was: String(was).slice(0, 200),
+      dateien: anzahl,
+      // Die Spielzeit, damit sich ein Eintrag einem LAUF zuordnen laesst -
+      // `manual_actions` ist "je Lauf", und Laeufe trennt kein Wanduhrdatum.
+      playtime: Number.isFinite(state.totalPlaytime) ? state.totalPlaytime : null,
+    });
+    // Ringpuffer. Aeltere Eintraege gehen verloren; die Zahl, die zaehlt,
+    // ist die der letzten Stunden.
+    if (buch.eintraege.length > MANUAL_MAX) {
+      buch.eintraege = buch.eintraege.slice(-MANUAL_MAX);
+    }
+    await writeFile(MANUAL_DATEI, JSON.stringify(buch, null, 1), "utf8");
+    log("info", "Eingriff " + art + ": " + was
+      + " (" + buch.eintraege.length + " im Puffer)");
+  } catch (err) {
+    // Buchhaltung darf den Betrieb nicht anhalten - aber der Ausfall gehoert
+    // ins Protokoll, sonst ist auch er lautlos.
+    log("warn", "manual-actions nicht schreibbar: " + err.message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Protokollierung: Konsole, Dashboard UND Datei
@@ -362,6 +715,24 @@ function reject_(waiting, error) {
 
 const SYNCABLE = /\.(js|jsx|ts|tsx|txt|json|script)$/;
 
+/**
+ * Dateien, die NIE ins Spiel gehen, egal wie sie enden.
+ *
+ * ES GIBT NUR EINE REGEL: der Name faengt mit einem Punkt an. Punktdateien
+ * sind in diesem Projekt durchweg Werkzeugkram - Wegwerfkopien des Laders
+ * (`.mock-<name>-<pid>.mjs`), Editorreste, Sperrdateien. Nichts davon hat im
+ * Spielstand etwas zu suchen.
+ *
+ * WARUM DAS SEIT DEM 04.09.2026 AUSDRUECKLICH DASTEHT (Skeptiker Runde 5, B3):
+ * Bis dahin hielt die Endung allein die Kopien draussen - `.mock-figur-123.mjs`
+ * faellt durch `SYNCABLE`, weil dort `.mjs` fehlt. Das stimmte, war aber ein
+ * Zufall zweier unabhaengiger Entscheidungen: die Endung waehlt `mockPfad` in
+ * `tools/mock/lader.js`, und wer sie eines Tages auf `.js` aendert, schiebt
+ * Wegwerfdateien in Erics laufendes Spiel. Ein Riegel, der nur mittelbar haelt,
+ * ist keiner.
+ */
+const NIE_SCHIEBEN = (name) => name.startsWith(".");
+
 async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
   const out = [];
   let entries;
@@ -375,7 +746,8 @@ async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
     const gameName = prefix ? prefix + "/" + entry.name : entry.name;
     if (entry.isDirectory()) {
       out.push(...(await collectScripts(full, gameName)));
-    } else if (SYNCABLE.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+    } else if (SYNCABLE.test(entry.name) && !entry.name.endsWith(".d.ts")
+      && !NIE_SCHIEBEN(entry.name)) {
       out.push({ localPath: full, gameName });
     }
   }
@@ -403,7 +775,54 @@ async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
  */
 const zuletztGeschoben = new Map();
 
+/**
+ * DIE AUSNAHME VON DER SPERRE, UND WARUM ES SIE GEBEN MUSS.
+ *
+ * `data/backup-ok.txt` ist die Antwort des Handschlags (`lib/handschlag.js`).
+ * Kommt sie nicht, wartet `punish.js` vor dem Einbau bis zum Deckel und
+ * `ausgang.js` schreibt eine Wartemarke. Eine Sperre, die diese eine Datei
+ * mitsperrt, laesst den Bot in einem Wartezustand stehen, den nur derselbe
+ * Mensch aufloest, der auch die Sperre aufhebt - also doppelt.
+ *
+ * Die Datei traegt keinen Spielzustand, nur ein Ja/Nein mit Zeitstempel.
+ */
+const TROTZ_SPERRE = new Set(["data/backup-ok.txt"]);
+
+/**
+ * Darf ueberhaupt etwas ins Spiel? Eine Antwort fuer ALLE Schreibwege.
+ *
+ * Der erste Entwurf pruefte an zwei Stellen - im Watcher-Schub und im
+ * Dashboard-RPC - und liess damit die drei lautesten offen: `pushAll` beim
+ * Verbinden (114 Dateien auf einen Schlag), den Rueckkanal (alle 60 s) und
+ * den Handschlag. Ein Skeptiker hat es gefunden und richtig eingeordnet:
+ * "gedeckelt wurden die zwei leisesten Wege, offen blieb der lauteste".
+ *
+ * Besonders schaerfend war der Fall, in dem die Sperre gerade gesetzt wurde:
+ * derselbe Socket bekam unmittelbar danach ueber `verifiziereSocket()` das
+ * komplette Dateiverzeichnis geschrieben - in einen Stand, von dem die
+ * Bruecke soeben festgestellt hatte, dass sie nicht weiss, wer ihn gewinnt.
+ *
+ * Jetzt sitzt die Pruefung in `pushFile` - dem einen Punkt, durch den jeder
+ * Schreibweg laeuft.
+ */
+async function darfSchreiben(zielName) {
+  if (TROTZ_SPERRE.has(zielName)) return true;
+  const za = await zweitTabAlarm();
+  return !za;
+}
+
 async function pushFile(localPath, gameName, nurBeiAenderung = false) {
+  // DIE ENGSTELLE. Jeder Weg ins Spiel laeuft hier durch - Watcher-Schub,
+  // pushAll beim Verbinden, Rueckkanal, Handschlag, Dashboard-RPC. Frueher
+  // sassen die Riegel weiter aussen und liessen drei von fuenf Wegen offen.
+  if (!(await darfSchreiben(gameName))) {
+    const za = zweitTabMerker;
+    log("warn", "pushFile " + gameName + " gesperrt (Zweit-Tab-Sperre seit "
+      + (za ? za.at : "?") + ")");
+    const fehler = new Error("Zweit-Tab-Sperre: " + gameName + " nicht geschrieben");
+    fehler.code = "ZWEITTAB_GESPERRT";
+    throw fehler;
+  }
   const content = await readFile(localPath, "utf8");
   if (nurBeiAenderung) {
     const fp = createHash("sha256").update(content).digest("hex");
@@ -423,8 +842,27 @@ async function pushAll() {
     return;
   }
   const files = await collectScripts();
+
+  // EIN VERWEIGERTER SCHUB BLEIBT AUCH HIER VERWEIGERT (Skeptikerrunde 6).
+  //
+  // Der Deckel sass bis heute nur im Watcher-Pfad. Damit war B.3 nicht
+  // geloest, sondern um einen Reconnect verschoben: der Merge legt vierzig
+  // Dateien in `src/`, der Watcher verweigert - und beim naechsten Verbinden
+  // (Seitenneuladen, Brueckenneustart, Standby-Rueckkehr) schob `pushAll`
+  // alles hinaus, inklusive der vierzig. Der Reconnect ist das haeufigste
+  // Ereignis im System, nicht das seltenste.
+  //
+  // Zurueckgehalten wird NUR die wartende Liste, nicht der ganze Schub: fuer
+  // alles andere ist die Uebertragung beim Verbinden richtig und noetig.
+  const wartend = (await schubFrei()) ? new Set() : await schubOffenListe();
   const done = [];
+  let gehalten = 0;
   for (const file of files) {
+    if (wartend.has(file.gameName)) {
+      gehalten++;
+      zurueckgestellt.add(file.gameName);
+      continue;
+    }
     try {
       await pushFile(file.localPath, file.gameName);
       done.push(file.gameName);
@@ -433,7 +871,8 @@ async function pushAll() {
     }
   }
   state.syncedFiles = done;
-  log("info", done.length + " Datei(en) ins Spiel uebertragen");
+  log("info", done.length + " Datei(en) ins Spiel uebertragen"
+    + (gehalten ? " - " + gehalten + " aus einem verweigerten Schub ZURUECKGEHALTEN" : ""));
   broadcast({ type: "state", state: publicState() });
 }
 
@@ -456,6 +895,9 @@ function watchScripts() {
       if (!filename) return;
       const name = filename.toString().split(path.sep).join("/");
       if (name.endsWith(".d.ts") || !SYNCABLE.test(name)) return;
+      // Auch hier, nicht nur in collectScripts: der Watcher meldet den PFAD,
+      // also muss der DATEINAME geprueft werden, nicht der Anfang des Pfades.
+      if (NIE_SCHIEBEN(name.split("/").pop())) return;
 
       // Alle Aenderungen eines Umbaus sammeln und ERST DANN gemeinsam
       // schieben. Wer jede Datei einzeln nachschiebt, liefert Zwischenstaende
@@ -516,6 +958,90 @@ async function schiebeStapel(stapelEingang) {
     return;
   }
   stapel = neu;
+
+  // DIE ZWEIT-TAB-SPERRE GILT AUCH HIER (Befund W.6). Der Watcher ist der
+  // stillste aller Wege ins Spiel - eine gespeicherte Datei genuegt.
+  {
+    const za = await zweitTabAlarm();
+    if (za) {
+      log(
+        "error",
+        "Schub verweigert: Zweit-Tab-Sperre seit " + za.at + " (" + stapel.length + " Datei(en))",
+      );
+      await sofortZeile(
+        "Schub verweigert - Zweit-Tab-Sperre",
+        stapel.length + " geaenderte Datei(en) unter src/ wurden NICHT ins Spiel " +
+          "geschoben. Seit " + za.at + " steht der Verdacht auf einen zweiten " +
+          "Spiel-Tab (" + za.text + "). Erst das Save-Rennen klaeren, dann " +
+          ZWEITTAB_DATEI + " loeschen.",
+      );
+      return;
+    }
+  }
+
+  // DER MERGE IST NICHT DIE EINSPIELUNG (Befund B.3).
+  //
+  // Der Bau liegt in `bitburner-bau`, die Bruecke beobachtet `bitburner/src`.
+  // Ein `git merge` haette hier rund vierzig Dateien in einem Schub ins
+  // laufende Spiel gelegt - unter Umgehung der Reihenfolge aus Auftrag 9 und
+  // der Checkliste in `tools/hotswap.js`, die genau dafuer gebaut ist.
+  //
+  // Der Deckel unterscheidet nicht zwischen Merge und Handarbeit; er
+  // unterscheidet zwischen "ein Gewerk" und "ein ganzer Stand". Wer den
+  // ganzen Stand einspielen will, sagt es: `data/schub-frei.txt`.
+  // Zurueckgestelltes zaehlt mit: sonst liesse sich ein grosser Schub in
+  // kleine Haeppchen zerlegen, und der Deckel waere ein Vorschlag.
+  const gesamt = new Set([...zurueckgestellt, ...stapel]).size;
+  if (gesamt > SCHUB_MAX && !(await schubFrei())) {
+    stapel = [...new Set([...zurueckgestellt, ...stapel])];
+    log(
+      "error",
+      "Schub verweigert: " + stapel.length + " Dateien > SCHUB_MAX " + SCHUB_MAX,
+    );
+    await sofortZeile(
+      // Die Dateizahl gehoert IN den Titel: er ist der Entdopplungsschluessel,
+      // und ein konstanter Titel haette jede weitere Verweigerung verschluckt.
+      "Grosser Schub verweigert (" + stapel.length + " Dateien) - sieht nach einem Merge aus",
+      stapel.length + " Dateien unter src/ haben sich gleichzeitig geaendert; " +
+        "die Grenze liegt bei " + SCHUB_MAX + ". Es wurde NICHTS ins Spiel " +
+        "geschoben.\n\nWar das ein Hot-Swap? Dann `tools/hotswap.js` fahren " +
+        "und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann " +
+        SCHUB_FREI_DATEI + " anlegen (gilt 30 min) und eine Datei erneut " +
+        "speichern.\n\nGeaendert: " + stapel.slice(0, 12).join(", ") +
+        (stapel.length > 12 ? " (+" + (stapel.length - 12) + ")" : ""),
+    );
+    // DER STAPEL BLEIBT LIEGEN (Skeptikerrunde 6).
+    //
+    // Der erste Entwurf verwarf ihn und begruendete das damit, dass "beim
+    // naechsten Mal derselbe Schub wieder auffaellt". Das stimmt nicht: der
+    // Stapel entsteht aus `geaendert`, und das Set ist beim Aufruf schon
+    // geleert. Nach einem verweigerten Vierzig-Datei-Merge bildete die
+    // NAECHSTE einzelne gespeicherte Datei einen Stapel von eins - unter dem
+    // Deckel, also durch. Ergebnis: eine Datei des neuen Standes bei
+    // neununddreissig alten. Genau der Mischzustand, gegen den der Deckel
+    // gebaut ist.
+    //
+    // Jetzt wandert er nach `zurueckgestellt` (dieselbe Ablage, die der
+    // unverifizierte Pfad benutzt) und zaehlt beim naechsten Schub mit.
+    for (const d of stapel) zurueckgestellt.add(d);
+    await schreibeSchubOffen(stapel);
+    return;
+  }
+
+  // EIN SCHUB IST EIN EINGRIFF. Er entsteht nur, weil ein Mensch oder eine
+  // Claude-Sitzung eine Datei unter src/ geaendert hat - der Bot selbst kann
+  // das nicht. Gezaehlt wird NACH der Inhaltspruefung: eine Watcher-Meldung
+  // ohne Inhaltsaenderung erreicht das Spiel nicht und ist kein Eingriff.
+  await zaehleEingriff("push", stapel.slice(0, 5).join(", ")
+    + (stapel.length > 5 ? " (+" + (stapel.length - 5) + ")" : ""), stapel.length);
+
+  // Der Freibrief ist ein Einmal-Ticket. Er wird eingeloest, sobald ein
+  // Schub ueber der Grenze wirklich hinausgeht - nicht schon beim Nachsehen.
+  if (stapel.length > SCHUB_MAX) {
+    await verbraucheSchubFrei();
+    try { await rm(SCHUB_OFFEN_DATEI, { force: true }); } catch { /* egal */ }
+    zurueckgestellt.clear();
+  }
 
   const jetzt = Date.now();
   if (jetzt - letzteSchubSicherung > SCHUB_SICHERUNG_ABSTAND_MS) {
@@ -611,7 +1137,12 @@ async function ladeAnker() {
  * Kopie trennt - der identifier ist in beiden gleich.
  */
 async function verifiziereSocket(kandidat) {
-  if (verifikationLaeuft) return;
+  if (verifikationLaeuft) {
+    // NICHT VERWERFEN, SONDERN VORMERKEN. Siehe `nachzuholen`.
+    nachzuholen = kandidat || gameSocket;
+    log("warn", "Verifikation laeuft bereits - der neue Socket wird vorgemerkt");
+    return;
+  }
   verifikationLaeuft = true;
   const beginn = Date.now();
   // Der geprueft werdende Socket wird HIER festgehalten. Alles Weitere gilt
@@ -782,6 +1313,16 @@ async function verifiziereSocket(kandidat) {
     }, 60000);
   } finally {
     verifikationLaeuft = false;
+    // Den vorgemerkten Socket jetzt pruefen - aber nur, wenn er noch der
+    // aktuelle ist und noch nicht verifiziert wurde.
+    const offen = nachzuholen;
+    nachzuholen = null;
+    if (offen && gameSocket === offen && !istVerifiziert()) {
+      log("info", "Vorgemerkten Socket nachtraeglich pruefen");
+      setTimeout(() => {
+        if (gameSocket === offen && !istVerifiziert()) void verifiziereSocket(offen);
+      }, 0);
+    }
   }
 }
 
@@ -979,6 +1520,7 @@ async function schreibeRueckkanal() {
       : null,
     settings: state.settings || null,
     alarm: state.alarm,
+    zweitTabSperre: zweitTabMerker,
   };
   try {
     await request("pushFile", {
@@ -998,12 +1540,30 @@ async function schreibeRueckkanal() {
  * quelle+titel und reicht sie an tools/liste.js weiter, den einzigen
  * zugelassenen Schreiber.
  */
-const sofortGesehen = new Set();
+/**
+ * ENTDOPPLUNG MIT VERFALL (Skeptikerrunde 6).
+ *
+ * Vorher ein Set ohne Ablauf: EINE Meldung je Titel und Prozessleben, danach
+ * Stille. Bei einem Titel, der eine Konstante ist - "Grosser Schub
+ * verweigert" -, hiess das: die zweite und dritte Verweigerung waren
+ * unsichtbar. Das ist keine Meldungsflut, es ist das Gegenteil, und das ist
+ * schlimmer: der Mensch sieht einen Vorfall und haelt ihn fuer einmalig.
+ *
+ * Sechs Stunden sind lang genug, dass ein wiederkehrender Fehler nicht in
+ * jede Zeile schreibt, und kurz genug, dass ein Vorfall am Abend nicht durch
+ * einen am Morgen gedeckelt wird.
+ */
+const SOFORT_VERFALL_MS = 6 * 3600000;
+const sofortGesehen = new Map();
 
 async function sofortZeile(titel, text, quelle = "bruecke") {
   const schluessel = quelle + "|" + titel;
+  const jetztMs = Date.now();
+  for (const [k, t] of sofortGesehen) {
+    if (jetztMs - t > SOFORT_VERFALL_MS) sofortGesehen.delete(k);
+  }
   if (sofortGesehen.has(schluessel)) return;
-  sofortGesehen.add(schluessel);
+  sofortGesehen.set(schluessel, jetztMs);
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
   /**
@@ -1177,6 +1737,7 @@ function publicState() {
     lastVerifiedBackup: state.lastVerifiedBackup,
     backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
     alarm: state.alarm,
+    zweitTabSperre: zweitTabMerker,
     serverCount: state.servers.length,
     rootedCount: state.servers.filter((s) => s.hasAdminRights).length,
     purchasedCount: state.servers.filter((s) => s.purchasedByPlayer).length,
@@ -1304,6 +1865,35 @@ function startDashboard() {
         return;
       }
 
+      // DIE ZWEIT-TAB-SPERRE (Auftrag 7.1.1, Befund W.6).
+      //
+      // Solange zwei Spiele im Verdacht stehen, denselben Spielstand zu
+      // schreiben, geht NICHTS mehr ins Spiel. Der Grund ist einfach: welcher
+      // der beiden Staende gerade gewinnt, ist unbekannt, und in einen
+      // unbekannten Stand zu schreiben macht aus einem Rennen einen Schaden.
+      //
+      // Lesen bleibt erlaubt - man muss ja nachsehen koennen, was los ist.
+      if (!LESENDE_METHODEN.has(method)) {
+        const za = await zweitTabAlarm();
+        if (za) {
+          log("warn", "423 fuer " + method + " - Zweit-Tab-Sperre steht seit " + za.at);
+          res.writeHead(423, { "Content-Type": MIME[".json"] });
+          res.end(
+            JSON.stringify({
+              error: "Zweit-Tab-Sperre: seit " + za.at + " geht nichts ins Spiel. " +
+                "Grund: " + za.text + " Aufheben: " + ZWEITTAB_DATEI + " loeschen.",
+            }),
+          );
+          return;
+        }
+      }
+
+      // Eine schreibende Methode ueber das Dashboard kommt IMMER von aussen -
+      // der Bot im Spiel benutzt diesen Weg nicht, er hat die ns-API.
+      if (!LESENDE_METHODEN.has(method)) {
+        await zaehleEingriff("rpc", method + " " + (url.searchParams.get("filename") || ""));
+      }
+
       const params = {};
       for (const [key, value] of url.searchParams) {
         if (key !== "method" && key !== "instance" && key !== "confirm") params[key] = value;
@@ -1367,12 +1957,51 @@ function startDashboard() {
 function startRfaServer() {
   return new Promise((fertig) => {
   const wss = new WebSocketServer({ port: RFA_PORT, host: "127.0.0.1" });
+
+  /**
+   * TOTE SOCKETS ERNTEN (Skeptikerrunde 6, zwei Agenten unabhaengig).
+   *
+   * Diese Bruecke hatte kein Ping/Pong. Ein Tab, der abstuerzt, verworfen
+   * wird oder aus dem Standby nicht zurueckkommt, schickt keinen Close-Frame
+   * - der Server-Socket bleibt auf `readyState === 1` stehen, bis TCP
+   * irgendwann aufgibt. `data/bridge.log` zeigt fuer den 03./04.09. SIEBEN
+   * "Spiel verbunden" und NULL "getrennt".
+   *
+   * Folge: JEDER Reconnect traf eine "lebende" alte Verbindung an und lief
+   * in den Zweit-Tab-Zweig. Der haeufigste harmlose Vorgang im System sah
+   * damit aus wie der seltenste gefaehrliche.
+   *
+   * 30 s Takt, zwei verpasste Pongs, dann `terminate()`. Das ist der uebliche
+   * Zuschnitt fuer `ws` und deutlich kuerzer als die Drei-Sekunden-Frist der
+   * Zweitverbindungspruefung - wer tot ist, ist beim naechsten Verbinden weg.
+   */
+  const PING_MS = 30000;
+  const lebt = new WeakSet();
+  const pingTimer = setInterval(() => {
+    for (const sock of wss.clients) {
+      if (sock.readyState !== 1) continue;
+      if (!lebt.has(sock)) {
+        log("warn", "Socket antwortet nicht mehr auf Ping - wird beendet");
+        try { sock.terminate(); } catch { /* egal */ }
+        continue;
+      }
+      lebt.delete(sock);
+      try { sock.ping(); } catch { /* egal */ }
+    }
+  }, PING_MS);
+  pingTimer.unref?.();
+
   wss.on("listening", () => {
     console.log("  RFA-Port:   " + RFA_PORT + "  (im Spiel unter Options -> Remote API eintragen)");
     fertig();
   });
 
   wss.on("connection", async (socket) => {
+    // Frisch verbunden gilt als lebendig, sonst raeumte der erste Ping-Lauf
+    // eine Verbindung ab, die noch gar nicht gefragt wurde.
+    lebt.add(socket);
+    socket.on("pong", () => lebt.add(socket));
+
     if (gameSocket && gameSocket.readyState === 1) {
       /**
        * Frueher gewann hier IMMER die neue Verbindung. Ein zweiter Tab haette
@@ -1389,6 +2018,48 @@ function startRfaServer() {
         alteLebt = true;
       } catch {
         alteLebt = false;
+      }
+
+      // AUFTRAG 7.1.1 VERLANGT VIER REAKTIONEN, GEBAUT WAREN ZWEI (Befund W.6).
+      //
+      // Alarm und `## Sofort`-Zeile standen hier seit dem ersten Entwurf. Was
+      // fehlte, waren die beiden, die tatsaechlich schuetzen: der kuerzere
+      // Sicherungstakt und die Sperre aller Eingriffe. Ein Alarm allein
+      // beschreibt das Rennen, er gewinnt es nicht.
+      //
+      // ABER NUR, WENN DIE ALTE VERBINDUNG ANTWORTET (Skeptikerrunde 6, zwei
+      // Agenten unabhaengig voneinander).
+      //
+      // Der erste Entwurf setzte die Sperre in BEIDEN Zweigen. Der Zweig
+      // "schweigt" ist aber die Signatur eines RECONNECTS, nicht eines
+      // zweiten Tabs: der alte Socket steht noch auf readyState 1 und
+      // antwortet nicht mehr. Das erzeugen die harmlosesten Vorgaenge -
+      // Rueckkehr aus dem Standby, Tab-Discard, ein Neuladen der Seite, ein
+      // verdeckter Tab, der wegen der Drosselung (gemessen: 1 Timer-Wake je
+      // Minute) die Drei-Sekunden-Frist reisst.
+      //
+      // Und `data/bridge.log` zeigt fuer den 03./04.09. SIEBEN "Spiel
+      // verbunden" und NULL "getrennt" - tote Sockets werden hier nie
+      // geerntet. Der Reconnect ist damit das haeufigste Ereignis im System,
+      // nicht das seltenste.
+      //
+      // Eine Sperre, die nur ein Mensch aufheben kann, im haeufigsten
+      // harmlosen Fall zu setzen, waere im Nachtbetrieb Risiko statt Schutz:
+      // der Bot laeuft weiter, aber nichts kommt mehr herein, und niemand
+      // sieht hin. Zwei Sockets, die BEIDE antworten, sind dagegen kein
+      // Verdacht mehr, sondern ein Befund.
+      if (alteLebt) {
+        await setzeZweitTabAlarm(
+          "Zweite RFA-Verbindung auf Port " + RFA_PORT + ", waehrend die " +
+            "bestehende noch antwortet - zwei Spiele auf demselben Spielstand.",
+        );
+      } else {
+        log(
+          "warn",
+          "Zweite Verbindung, aber die alte schweigt - als Reconnect gewertet, " +
+            "KEINE Sperre. (Ein Save-Rennen zeigt sich an sinkendem totalPlaytime; " +
+            "diesen Detektor traegt die Sicherungspruefung.)",
+        );
       }
 
       await alarm(
@@ -1493,6 +2164,7 @@ async function schreibePid() {
 console.log("\n=== Bitburner Bridge  [" + ROLLE.instance + "]  ===");
 if (NO_PUSH) console.log("  --no-push:  es wird NICHTS ins Spiel geschrieben");
 if (NO_WATCH) console.log("  --no-watch: src/ wird nicht beobachtet");
+if (SCRIPT_DIR !== SCRIPT_DIR_VORGABE) console.log("  --src-dir: " + SCRIPT_DIR);
 
 /**
  * ERST BINDEN, DANN ALLES ANDERE. Diese Reihenfolge ist nicht Kosmetik.
@@ -1512,6 +2184,7 @@ await startRfaServer();
 await startDashboard();
 await schreibePid();
 await ladeAnker();
+await zweitTabAlarm();
 watchScripts();
 
 setInterval(() => {
@@ -1552,9 +2225,21 @@ setInterval(() => {
   if (alter != null) letzteStundensicherung = Date.now() - alter * 60000;
 }
 
-setInterval(() => {
-  if (Date.now() - letzteStundensicherung < STUNDENSICHERUNG_MS) return;
+setInterval(async () => {
+  // Steht der Zweit-Tab-Verdacht, wird alle fuenf Minuten gesichert statt
+  // stuendlich (Auftrag 7.1.1, Befund W.6).
+  //
+  // UND UNTER EIGENEM ANLASSNAMEN (Skeptikerrunde 6). Der erste Entwurf
+  // behielt "hourly" - "damit die Rotation greift". Sie greift dann auch:
+  // `ANLAESSE.hourly` ist ein Stueckzahldeckel (48), kein Altersdeckel. Nach
+  // genau vier Stunden stehendem Alarm waere jede Sicherung von VOR dem
+  // Vorfall herausrotiert - also der Bestand, aus dem man wiederherstellt,
+  // und der Beleg, den die Alarmmeldung selbst anfordert. Die Massnahme
+  // haette unbeaufsichtigt genau das weggeraeumt, was sie schuetzen soll.
+  const rennen = !!(await zweitTabAlarm());
+  const takt = rennen ? RACE_TAKT_MS : STUNDENSICHERUNG_MS;
+  if (Date.now() - letzteStundensicherung < takt) return;
   if (!istVerifiziert()) return;
   letzteStundensicherung = Date.now();
-  void sichereJetzt("hourly");
-}, 60000);
+  void sichereJetzt(rennen ? "race" : "hourly");
+}, TIMER_TAKT_MS);

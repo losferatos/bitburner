@@ -1,0 +1,235 @@
+# Die Strafleiter
+
+Stand 04.09.2026. Quelle des Verhaltens ist der Code, nicht dieses Dokument —
+wo beides auseinandergeht, gilt `src/lib/leiter.js` und `src/guard.js`.
+
+## Wozu
+
+Ein Bot, der vierzig BitNode-Durchgänge unbeaufsichtigt schaffen soll, braucht
+eine Antwort auf die Frage „was, wenn etwas hängt". Ohne sie steht er, und
+niemand merkt es — das ist die Fehlerklasse, die dieses Projekt schon mehrfach
+Stunden gekostet hat: am 20.08. fünf Stunden Stillstand, am 25.08. dreizehneinhalb.
+
+Die Leiter ist die Antwort. Sie eskaliert von der billigsten wirksamen Handlung
+zur teuersten, prüft nach jeder Stufe die **Wirkung** und hört auf, wenn nichts
+mehr hilft.
+
+## Die Signale
+
+Sie stehen in `src/lib/leiter.js`, Funktion `signale`. Jedes trägt eine
+Schwere; **Schwere 0 speist die Leiter nicht** — sie wird nur protokolliert.
+
+| Signal | Was es bedeutet | Uhr | Schwere |
+|---|---|---|---|
+| S1 | Ein Werkzeug schreibt seine Telemetrie nicht mehr | Motor → Engine → Wand | 1 |
+| S2 | Der Träger (Hacking-Level oder Bladeburner-Rang) wächst nicht mehr | Motorzeit | 2 |
+| S3a | Der Kern schreibt seinen Herzschlag nicht mehr | Wächterzeit | 3 |
+| S3b | Die Engine tickt nicht mehr (Puls) | Enginezeit | 3 |
+| S4 | Der Tab ist verdeckt, das Spiel ist gedrosselt | — | **0** |
+| S5 | Die Brücke ist weg | — | **0** |
+| S6 | Fehlerserie im Kern (`errStreak ≥ 5`) | — | 3 |
+
+**S4 und S5 haben Schwere 0, und das ist der wichtigste Eintrag der Tabelle.**
+Ein verdeckter Tab liefert belegt genau einen Timer-Aufruf je Minute. Speisten
+S4 und S5 die Leiter, wäre jede Nacht ein garantierter EXHAUSTED-Zustand — und
+Abnahmestufe B verlangt ausdrücklich eine Nacht mit verdecktem Tab.
+
+## Die drei Uhren
+
+Das ist die Stelle, an der in diesem Projekt am häufigsten etwas schiefging.
+
+- **Wanduhr** (`Date.now()`) — läuft immer, auch wenn das Spiel steht.
+- **Enginezeit** (`totalPlaytime`) — läuft, solange das Spiel rechnet. Im
+  gedrosselten Tab langsamer, im Nachholklumpen sprunghaft.
+- **Motorzeit** — die Summe der plausiblen Rundenabstände des Kerns. Sie steht
+  still, sobald der Kern hängt.
+
+**Welche Uhr eine Frist benutzt, sagt die Sprosse selbst** (`SPROSSEN[].uhr`).
+Für die Sprossen 0 bis 3 ist es die Wächterzeit, und der Grund ist einfach:
+sobald der Kern hängt, steht seine Motorzeit — jede in ihr gemessene Frist
+liefe genau in dem Fall nie ab, für den sie gebaut wurde.
+
+Die Sprossen **4b und 5** messen dagegen in **Motorzeit**, weil ihre Bedingung
+(„der Träger wächst nicht") eine Aussage über gespielte Zeit ist: sechs Stunden
+Wanduhr, von denen fünf offline waren, sind kein Stillstand.
+
+Bis zum 04.09.2026 las dieses Feld niemand — `schritt()` maß alles in
+Wächterzeit, und Sprosse 5 löste damit nach einer Offline-Nacht aus.
+
+S1 fragt die Uhren in dieser Reihenfolge: Motorzeit, wenn das Werkzeug sie
+wirklich führt; sonst Enginezeit aus dem Herzschlag v2; sonst Wanduhr — und
+die **nur bei sichtbarem Tab**.
+
+## Die Sprossen
+
+| Nr | Handlung | Uhr | Deckel | Wirkung heißt |
+|---|---|---|---|---|
+| 0 | nichts (Befund protokollieren) | Wächter | — | Umgebung wieder in Ordnung |
+| 1 | Werkzeug beenden, der Kern holt es zurück | Wächter | 6 je 6 h | Telemetrie wird wieder frisch |
+| 2 | Wirt sperren (`data/blocked-hosts.json`, 60 min) | Wächter | 6 je 6 h | Werkzeug läuft woanders |
+| 3 | alles auf home beenden außer Schonliste, `boot.js` starten | Wächter | 2 je 6 h | `round` wächst UND `errStreak == 0` |
+| 4a | Reload von innen | Engine | 1 je 6 h | **nicht gebaut** |
+| 4b | Trägergewerk neu starten (`blade.js`) | Motor | 3 je 6 h | der Träger wächst wieder |
+| 5 | Soft-Reset durch Augmentierungs-Einbau | Motor | eigene | `lastAugReset` gesprungen, Konto > 0 |
+
+**Sprosse 4a ist nicht gebaut und wird es nicht ohne Messung.** Der Auftrag
+macht ihren Bau von einem Ebene-3-Beleg abhängig: ein skriptausgelöster Reload
+darf keinen `beforeunload`-Dialog stehen lassen. Aus dem Spielquelltext ist
+belegt, was sich ohne Browser belegen lässt — der `save`-Prop existiert
+(`GameRoot.tsx:536-541`), und der Dialog hängt an einer schlichten Zuweisung
+`window.onbeforeunload = ...` (`index.tsx:55`), ist also mit `= null` aufhebbar.
+Was fehlt, ist die Messung, nicht die Kenntnis. Die Leiter **überspringt** die
+Sprosse (`naechste` sucht die nächste **gebaute**), sie bleibt nicht daran hängen.
+
+**Sprosse 4b ist die billige Antwort auf S2** (seit 04.09.2026). Vorher lag
+zwischen „der Träger wächst seit sechs Stunden nicht" und dem Soft-Reset keine
+einzige Stufe — dabei ist der naheliegende Verdacht viel billiger: das Gewerk,
+das den Knoten trägt, hängt. Auf dem Bladeburner-Weg ist das `blade.js`, und es
+neu zu starten kostet Sekunden. Auf dem Hackingweg trägt der Kern selbst, und
+den neu zu starten *ist* Sprosse 3 — dort meldet 4b „nichts Billigeres da" und
+die Leiter geht weiter.
+
+Dass es die Stufe nicht gab, lag an einer Zielverwechslung: S2 trägt
+`ziel: "fortschritt"`, und Sprosse 1 wirkt auf **Werkzeuge**. Die Leiter konnte
+also nie auf die Idee kommen, das Trägergewerk anzufassen.
+
+**Sprosse 5 führt der Wächter nicht selbst aus.** Das ist Arithmetik, nicht
+Vorsicht: `installAugmentations` ist `SingularityFn3` und kostet bei SF4.1
+achtzig Gigabyte, der Wächter hat sechs. Er schreibt einen Auftrag nach
+`data/watchdog.json` unter `orders`, der Kern findet ihn (jünger als 15 Minuten,
+höchstens einer je Runde, nie zweimal derselbe) und startet `src/punish.js`.
+Die acht Vorbedingungen prüft `punish.js` selbst — am Zustand des Augenblicks,
+in dem es läuft, nicht am Schnappschuss des Wächters.
+
+## Der Trockenmodus — zweimal
+
+Zwei Riegel, unabhängig voneinander:
+
+1. **Der Wächter** liest `data/guard-modus.txt` in jeder Runde. Es gibt **drei**
+   Modi, nicht zwei — die Sprossen sind nicht gleichartig, und ein Schalter für
+   alle war zu grob:
+
+   | Modus | frei |
+   |---|---|
+   | `observe` (Vorgabe ohne Datei) | keine |
+   | `enforce` (setzt `boot.js`) | 0, 1, 2 und **4b** — alle umkehrbar |
+   | `enforce-alles` | zusätzlich 3 und 5 |
+
+   Sprosse 3 räumt `home` leer und wirft die Laufzeit aller fliegenden Arbeiter
+   weg, Sprosse 5 ist ein Soft-Reset. `enforce-alles` ist der Zustand, den ein
+   Mensch bewusst herstellt, wenn `false_penalty_count` über eine Nacht bei
+   null lag — und diese Zahl wird seit dem 04.09.2026 überhaupt erst gezählt.
+
+   Die Handbremse ist `data/guard-observe.txt` — legt ein Mensch sie an, fällt
+   der Wächter **sofort** in derselben Runde auf `observe` zurück, nicht erst
+   beim nächsten Wiederanlauf. Sie steht in keiner Räumliste: ein gezogener
+   Riegel bleibt über Resets gezogen.
+
+2. **Sprosse 5** läuft trocken, solange `data/punish-scharf.txt` nicht auf home
+   liegt. Der Kern hängt `scharf` nur dann an. Bis dahin landet jede Auslösung
+   nur im Protokoll — das ist der Trockenlauf, den der Auftrag vor der Schärfe
+   verlangt.
+
+## Schutz vor Fehlstrafen
+
+- **Karenz nach jedem Reset**: zehn Minuten, in denen keine Frist läuft. Der
+  Kern kann in diesem Fenster gar nicht laufen; ihn dafür zu bestrafen wäre die
+  häufigste Fehlstrafe überhaupt.
+- **Zeitsprung-Karenz**: erkennt der Uhrenvergleich einen Nachholklumpen, ruhen
+  die Fristen ebenfalls.
+- **Wirkungsprüfung mit Frische UND Reihenfolge**: grün ist eine Sprosse nur,
+  wenn die Telemetrie frisch ist **und** jünger als die Ausführung. Ohne den
+  zweiten Teil wäre sie genau dann grün, wenn eskaliert werden müsste.
+- **Deckel** je Sprosse, in der Uhr der Sprosse.
+- **EXHAUSTED** nach der letzten gebauten Sprosse, zwölf Stunden lang. Danach
+  gibt `freigeben()` das Ziel wieder frei.
+
+### Was gezählt wird, wenn es doch schiefgeht
+
+Zwei Zahlen, beide mit Soll 0, beide Abnahmebedingung — und beide hatten bis
+zum 04.09.2026 **keinen Schreiber**. Sie standen dauerhaft auf null und waren
+damit unfälschbar.
+
+| Zahl | Was sie zählt | Wo |
+|---|---|---|
+| `false_penalty_count` | eine ausgeführte Sprosse, die **ins Leere griff** — „läuft nirgends, nichts zu beenden" | `guard.js`, nach jeder Ausführung |
+| `false_kill_count` | ein Kill, der **getroffen** hat, obwohl eine **andere Uhr** dasselbe Werkzeug für frisch hält | `guard.js`, `andereUhrSagtFrisch` |
+
+Der zweite Fall ist die Fehlerklasse, die dieses Projekt am häufigsten
+getroffen hat: gegen die falsche Uhr gemessen. Ein Beispiel, das wirklich
+vorkommen kann — der Kern hängt, seine Motorzeit steht, und ein Werkzeug, das
+Motorzeit mitschreibt, sieht dadurch alt aus, obwohl sein eigener Herzschlag in
+Enginezeit im Sekundentakt frisch ist. Der Wächter erschlägt dann ein gesundes
+Werkzeug, **weil der Kern steht**.
+
+Beide Definitionen sind absichtlich **eng**. Was sie zählen, ist belegbar
+falsch; eine weite Definition wäre geraten, und eine geratene Abnahmezahl ist
+schlimmer als gar keine. `tools/test-guard-ebene2.js` stellt deshalb neben dem
+Fehlkill auch einen **echten** Hänger und verlangt, dass der nicht gezählt
+wird — sonst wäre die Zahl bloß von „nie" auf „immer" umgestellt.
+
+## Wo was steht
+
+| Was | Datei |
+|---|---|
+| Signale, Sprossen, Automat, Deckel | `src/lib/leiter.js` |
+| Der Wächter selbst, Ausführung der Sprossen | `src/guard.js` |
+| Sprosse 5 | `src/punish.js` |
+| Auftragsausführung durch den Kern | `src/bn4net.js`, Abschnitt 9c |
+| Uhren | `src/lib/uhren.js`, `src/lib/motorzeit.js` |
+| Protokoll der Strafen | `data/penalties.json` (im Spiel) |
+| Zustand der Leiter | `data/watchdog.json` (im Spiel) |
+| Ereignisse ab Sprosse 3 | `data/events.json` (im Spiel) |
+
+## Tests
+
+| Was | Datei |
+|---|---|
+| Automat, Deckel, Uhren, EXHAUSTED | `tools/test-leiter.js` |
+| Der Wächter gegen den ns-Mock | `tools/test-guard-ebene2.js` |
+| Die acht Vorbedingungen von Sprosse 5 | `tools/test-punish.js` |
+| Die Kette Wächter → Kern → punish.js | `tools/test-sprosse5-kette.js` |
+| Stillstandserkennung | `tools/test-stillstandsuhr.js` |
+
+## Was noch nicht gemessen ist
+
+Je Sprosse ein im laufenden Spiel provozierter Hänger. Der Pflichttest aus
+Auftrag 5.2 — Kern-Motorzeit eingefroren, Engine tickt weiter — lässt sich nur
+dort stellen. Bis dahin ist die Leiter gegen Mock-Zustände geprüft, nicht gegen
+das Spiel.
+
+---
+
+## NOT_EXECUTABLE — wenn keine Sprosse helfen kann
+
+Der Zustand stand seit dem ersten Entwurf in `ZUSTAENDE`, und **niemand setzte
+ihn**. Eine Zeichenkette ohne Schreiber, und damit eine Regel („NOT_EXECUTABLE
+eskaliert nie", Auftrag 5.4), die auf nichts angewendet wurde. Gefunden am
+04.09.2026 von einem Prüfer.
+
+**Der Fall:** `exit.js` passt auf keinen Rechner. Der Knoten ist erledigt, die
+Tür steht offen, der Bot kommt nicht durch — und **kein Neustart hilft**, es
+fehlt Speicher. Wer hier eskaliert, beendet der Reihe nach gesunde Werkzeuge
+(Sprosse 1), sperrt Wirte (2), räumt `home` leer (3) und baut am Ende
+Augmentierungen ein (5), ohne dass sich am Speicher etwas ändert. Alle
+Handlungen sind wirkungslos, und die letzten beiden sind teuer.
+
+Das Signal kommt von `ausgang.js` — dem einzigen Gewerk, das die Lage kennt.
+Es setzt `notExecutable` in `data/ausgang.json`, aber **erst nach einer Stunde
+ohne Wirt**: eine Runde ohne Platz ist normal (ein Mietrechner wird gerade
+gekauft), eine Stunde ist ein Befund. Dazu schreibt es eine Zeile in den
+Ereignisstrom und eine nach `## Sofort`.
+
+Davor stehen zwei Stufen, die ARCHITEKTUR 9.1 L1 verlangt und die ebenfalls
+fehlten:
+
+1. größter gerooteter Fremdrechner (war gebaut),
+2. `data/geldbedarf.txt` mit Grund `ausgang-wirt` — der Kanal, den `shop.js`
+   und `homegrow.js` lesen, damit sie wissen, wofür gespart wird,
+3. dann erst NOT_EXECUTABLE.
+
+**Es ist keine Sackgasse.** Anders als EXHAUSTED beschreibt es eine Lage, die
+sich von außen auflöst — ein gekaufter Rechner genügt. Fällt die Bedingung weg,
+fängt die Leiter für dieses Ziel **von vorn** an: die Lage hat sich geändert,
+und ein Werkzeug, das seit einer Stunde steht, verdient zuerst wieder den
+billigsten Griff.

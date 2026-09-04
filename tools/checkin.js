@@ -250,6 +250,24 @@ async function main() {
   // gelesen, ob er laeuft, klemmt oder an einem fehlenden Gewerk haengt.
   const letzteAusgangZeile = ausgangTxt.trim().split("\n").pop() || "";
   if (ausgangGut && ausgangGut.offen) {
+    // EIN ABGELEHNTER SPRUNG IST KEIN LAUFENDER (Skeptiker 04.09.2026).
+    //
+    // Seit exit.js sein Ziel gegen die Route prueft, kann es den Sprung
+    // ABLEHNEN - und tut das dann alle 15 Minuten aufs Neue. `letzterStart`
+    // wird bei jedem dieser Versuche gesetzt, auch wenn das Skript sofort
+    // wieder aussteigt. Ohne die Unterscheidung meldete diese Stelle einen
+    // Bot, der seit Tagen nicht vom Fleck kommt, als "URTEIL: SPRINGT".
+    if (Number.isFinite(ausgangGut.exit_abgelehnt) && ausgangGut.exit_abgelehnt > 0) {
+      sag("AUSGANG OFFEN, ABER exit.js LEHNT AB - " + ausgangGut.exit_abgelehnt
+        + " Mal in Folge.");
+      sag("Grund: " + (ausgangGut.exit_ablehnung_grund || letzteAusgangZeile));
+      sag("Das ist KEIN laufender Sprung. Entweder passen route.json und der"
+        + " Spielstand nicht zusammen, oder eine Datei fehlt auf dem Wirt.");
+      sag("");
+      sag("FERTIG VORAUSSICHTLICH: gar nicht, solange die Ablehnung steht.");
+      sag("URTEIL: BLOCKIERT");
+      return ausgeben(zeilen, { ...bericht, urteil: "BLOCKIERT" });
+    }
     if (ausgangGut.letzterStart > 0) {
       sag("AUSGANG OFFEN (" + ausgangGut.status + ") - exit.js gestartet vor "
         + dauer(std(Date.now() - ausgangGut.letzterStart)) + ". Letzte Zeile: " + letzteAusgangZeile);
@@ -538,6 +556,130 @@ async function main() {
   }
   if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
     + " gerootet, Runde " + (netz.runde ?? "?") + ".");
+
+  // --- 5b. Das Betriebsbild (Auftrag 11) -----------------------------------
+  //
+  // Der Auftrag nennt fuenf Quellen, die hier gelesen werden sollen:
+  // kpi.json, penalties.json, bridge-heartbeat.json, bridge-alarm.json und das
+  // Alter der letzten Sicherung, dazu die Instanz. Sie standen bis zum
+  // 04.09.2026 nicht drin - ein Check-in, das den Fortschritt meldet und die
+  // Aufsicht verschweigt, meldet die haelfte.
+  //
+  // Gedruckt wird nur, was etwas zu sagen hat. Eine Zeile "keine Strafen" in
+  // jedem Aufruf stumpft ab; eine Zeile, die nur bei Strafen erscheint, wird
+  // gelesen.
+  {
+    const kpi = await holeJson("data/kpi.json");
+    const strafen = await holeJson("data/penalties.json");
+    const wd = await holeJson("data/watchdog.json");
+
+    if (wd && wd.modus) {
+      // Der Modus gehoert immer hin: eine Leiter im Beobachtungsmodus meldet
+      // dieselben Befunde und handelt nicht. Wer das verwechselt, haelt einen
+      // stehenden Bot fuer bewacht.
+      sag("Waechter: " + wd.modus
+        + (wd.modus === "observe" ? " (beobachtet nur - er greift NICHT ein)" : " (scharf)")
+        + (Number.isFinite(wd.okRound) ? ", " + zahl(wd.okRound) + " Runden" : "")
+        + (wd.sichtbar === false ? ", Tab verdeckt" : ""));
+    }
+
+    // Strafen der letzten 24 Stunden, nach Sprosse. Sprossen ab 3 sind laut
+    // Architektur "jede ist ein Befund" - sie werden einzeln genannt.
+    if (strafen && Array.isArray(strafen.eintraege)) {
+      const seit = Date.now() - 24 * 3600000;
+      const jung = strafen.eintraege.filter((e) => Number(e.wall) >= seit);
+      if (jung.length) {
+        const nachSprosse = {};
+        for (const e of jung) nachSprosse[e.rung] = (nachSprosse[e.rung] || 0) + 1;
+        sag("Strafen (24 h): " + Object.entries(nachSprosse)
+          .sort((a, b) => a[0] - b[0])
+          .map(([r, n]) => n + "x Sprosse " + r).join(", "));
+        for (const e of jung.filter((x) => Number(x.rung) >= 3)) {
+          sag("  Sprosse " + e.rung + " auf " + e.target + " (" + e.reason + ") um "
+            + new Date(Number(e.wall)).toLocaleTimeString("de-DE")
+            + " - " + (e.result || "?"));
+        }
+      }
+    }
+
+    // Die drei Autonomie-Kennzahlen, sobald sie einen Wert haben. Sie sind
+    // seit dem 04.09. ueberhaupt erst messbar - vorher schrieb niemand die
+    // Ereignisse, aus denen sie sich rechnen.
+    if (kpi) {
+      const teile = [];
+      if (Number.isFinite(kpi.jump_latency_min)) teile.push("Sprung " + kpi.jump_latency_min.toFixed(1) + " min");
+      if (Number.isFinite(kpi.boot_latency_min)) teile.push("Anlauf " + kpi.boot_latency_min.toFixed(1) + " min");
+      if (Number.isFinite(kpi.ladder_rungs_ge3_per_week)) teile.push("Sprossen ab 3 diese Woche: " + kpi.ladder_rungs_ge3_per_week);
+      if (Number.isFinite(kpi.idle_ram_pct)) teile.push("brach " + kpi.idle_ram_pct.toFixed(0) + " %");
+      if (teile.length) sag("Autonomie: " + teile.join(", "));
+      if (kpi.exhausted) {
+        sag("ERSCHOEPFT: " + kpi.exhausted.signal + " auf Sprosse "
+          + kpi.exhausted.lastRung + " - die Leiter hat nichts mehr uebrig.");
+      }
+
+      // DIE VIER ZAHLEN MIT SOLL 0 (Skeptiker Runde 5, W2).
+      //
+      // Sie haben seit dem 04.09.2026 Schreiber - und hatten zunaechst keinen
+      // Leser. Ein Befund, den niemand abholt, ist genauso stumm wie einer,
+      // den niemand schreibt; er liegt nur eine Ebene tiefer.
+      //
+      // Gedruckt wird nur, was NICHT null ist. Eine Zeile "0 Fehlstrafen" in
+      // jedem Aufruf stumpft ab.
+      const soll0 = [];
+      if (kpi.false_penalty_count > 0) soll0.push(kpi.false_penalty_count + " Fehlstrafen");
+      if (kpi.false_kill_count > 0) {
+        soll0.push(kpi.false_kill_count + " FEHLKILLS (eine andere Uhr hielt das"
+          + " Werkzeug fuer frisch)");
+      }
+      if (kpi.contracts_silent_rounds >= 3) {
+        soll0.push("Vertragskette stumm seit " + kpi.contracts_silent_rounds
+          + " Durchlaeufen - eine Gegenprobe in lib/loeser.js ist zu streng");
+      }
+      if (kpi.negative_balance_min > 0) soll0.push(kpi.negative_balance_min + " min Konto negativ");
+      if (kpi.queued_augs_at_jump > 0) {
+        soll0.push(kpi.queued_augs_at_jump + " gekaufte Augs beim Sprung verfallen");
+      }
+      if (soll0.length) sag("BEFUNDE (Soll 0): " + soll0.join("; "));
+    }
+
+    // Die Bruecke und die Sicherungen. Beides liest sich am besten aus ihrem
+    // eigenen Zustand, nicht aus dem Spiel - deshalb ueber /api/state.
+    try {
+      const r = await fetch(new URL("/api/state", BRIDGE));
+      const st = await r.json();
+      const alter = st.backupAgeMin;
+      const zeilenteile = ["Instanz " + st.instance];
+      if (Number.isFinite(alter)) {
+        zeilenteile.push("juengste Sicherung " + alter.toFixed(0) + " min alt"
+          + (alter > 90 ? " - ZU ALT" : ""));
+      } else {
+        zeilenteile.push("Sicherungsalter unbekannt");
+      }
+      if (st.alarm) zeilenteile.push("ALARM: " + (st.alarm.titel || st.alarm));
+      sag("Bruecke: " + zeilenteile.join(", "));
+
+      // MANUAL_ACTIONS - die einzige Abnahmezahl, die AUSSERHALB des Spiels
+      // entsteht. Der Kern kann sie nicht kennen: fuer ihn sieht ein Hot-Swap
+      // aus wie eine Datei, die schon immer so war. Die Bruecke fuehrt Buch.
+      try {
+        const buchPfad = path.join(ROOT, st.instance === "TEST" ? "pruefstand" : ".",
+          "data", "manual-actions.json");
+        if (fs.existsSync(buchPfad)) {
+          const buch = JSON.parse(fs.readFileSync(buchPfad, "utf8"));
+          const seit = Date.now() - 12 * 3600000;
+          const jung = (buch.eintraege || []).filter((e) => Number(e.wall) >= seit);
+          if (jung.length) {
+            const letzte = jung[jung.length - 1];
+            sag("Eingriffe (12 h): " + jung.length + " - zuletzt " + letzte.art
+              + " " + letzte.was + " um "
+              + new Date(Number(letzte.wall)).toLocaleTimeString("de-DE"));
+            sag("  Stufe B verlangt 12 h mit NULL Eingriffen - die Uhr laeuft"
+              + " seit dem letzten neu.");
+          }
+        }
+      } catch { /* kein Buch - dann gab es keinen Eingriff seit dem Start */ }
+    } catch { /* die Bruecke antwortet nicht - das steht schon oben */ }
+  }
 
   // --- 6. Die Schlusszeile: wann ist der Knoten fertig? --------------------
   //

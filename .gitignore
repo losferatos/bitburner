@@ -38,3 +38,11 @@ data/
 pruefstand/logs/
 pruefstand/backups/
 pruefstand/browser/
+# Die MOCK-Rolle: Sicherungen aus erfundenen Spielstaenden und die
+# Datenordner, die tools/test-bruecke.js je Abschnitt anlegt. Sie werden am
+# Ende geloescht - aber ein abgebrochener Lauf laesst sie liegen, und in einem
+# Repo, in dem `git add -A` verboten ist, ist unverfolgter Muell kein
+# Schoenheitsfehler (Skeptiker Runde 5, W4).
+pruefstand/mock-backups/
+pruefstand/mock/
+pruefstand/t-*/

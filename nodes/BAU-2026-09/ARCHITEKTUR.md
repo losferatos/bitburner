@@ -710,11 +710,9 @@ nicht in einen Kommentar.
       "priority": 8,
       "evictRank": 3,
       "needsFigure": "none",
-      "needsLibs": [
-       "lib/route.js",
+      "needsLibs": ["lib/route.js",
        "lib/eta.js",
-       "lib/events.js"
-      ],
+       "lib/events.js", "lib/handschlag.js"],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -1009,6 +1007,30 @@ nicht in einen Kommentar.
       "precondition": {}
     },
     {
+      "name": "export.js",
+      "args": [],
+      "ramBaseGb": 2.25,
+      "ramSingGb": 1.0,
+      "ramMeasuredAt": "2026-09-04",
+      "verfahren": "alle",
+      "knoten": "alle",
+      "phase": "normal",
+      "telemetryFile": "data/export.json",
+      "scpToHome": true,
+      "freshnessMs": 900000,
+      "taktMs": 300000,
+      "hostRule": "any",
+      "priority": 15,
+      "evictRank": 3,
+      "needsFigure": "none",
+      "needsLibs": ["lib/events.js"],
+      "singularity": true,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {}
+    },
+    {
       "name": "popups.js",
       "args": [],
       "ramBaseGb": 3.3,
@@ -1049,11 +1071,9 @@ nicht in einen Kommentar.
       "priority": 14,
       "evictRank": 14,
       "needsFigure": "owner",
-      "needsLibs": [
-       "lib/endspurt.js",
+      "needsLibs": ["lib/endspurt.js",
        "lib/figurns.js",
-       "lib/figur.js"
-      ],
+       "lib/figur.js", "lib/handschlag.js"],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,

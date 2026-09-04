@@ -76,6 +76,18 @@ function guterFall(aenderung = {}) {
     "data/graftauto.json": JSON.stringify({ laeuft: null }),
     "data/ausgang.json": JSON.stringify({ offen: false }),
     "data/penalties.json": JSON.stringify({ version: 1, eintraege: [] }),
+    // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, seit 04.09.2026).
+    //
+    // `punish.js` stellt vor `installAugmentations` eine Sicherungsanfrage und
+    // wartet bis zu 90 s auf die Antwort der Bruecke. Im guten Fall liegt sie
+    // schon da - so bleibt der Test bei seinem Gegenstand, den ACHT
+    // Vorbedingungen, statt an einer Wartefrist zu haengen.
+    //
+    // Der Zeitstempel liegt in der Zukunft, weil `antwortDa` auf
+    // `antwort.ts >= anfrage.ts` prueft und die Anfrage erst im Lauf entsteht.
+    "data/backup-ok.txt": JSON.stringify({
+      ts: WALL + 3600000, anlass: "pre-install", datei: "TEST_vorab.json.gz",
+    }),
     ...aenderung,
   };
   // Ein Wert `null` heisst: die Datei soll FEHLEN.
@@ -85,8 +97,19 @@ function guterFall(aenderung = {}) {
   return dateien;
 }
 
-async function fahre(dateien, args = []) {
-  const m = neuerMock({ wall: WALL, nodeReset: NODE_RESET, knoten: 10, args });
+async function fahre(dateien, args = [], maxSchlaf = undefined) {
+  // `maxSchlaf` wird gebraucht, seit `punish.js` vor dem Einbau den
+  // Handschlag stellt: der wartet bis zu 90 s in Schritten von 2 s, also
+  // 45 Runden. Mit dem Standardwert braeche der Mock mitten in der Frist ab -
+  // und eine Probe, die den Abbruch als "es hat gewartet" liest, prueft die
+  // Sleep-Grenze des Mocks, nicht die Entscheidung des Gewerks.
+  const m = neuerMock({ wall: WALL, nodeReset: NODE_RESET, knoten: 10, args,
+    // OHNE `beiSchlaf` BEWEGT SICH DIE UHR NICHT. Der Mock ruecht die Zeit
+    // nur vor, wenn der Test es sagt - eine Wartefrist in `Date.now()` liefe
+    // sonst ewig, und `maxSchlaf` waere die einzige Grenze. Genau das ist beim
+    // Handschlag passiert.
+    beiSchlaf: (ms, z, vorRuecken) => vorRuecken(ms),
+    ...(maxSchlaf === undefined ? {} : { maxSchlaf }) });
   for (const [d, i] of Object.entries(dateien)) m.lege("home", d, i);
   let eingebaut = false;
   // Der Mock kennt singularity nicht - hier wird die eine Funktion ergaenzt,
@@ -378,6 +401,48 @@ console.log("-- die Deckel: einmal je Knotenstufe, einmal je 24 h --");
   }), ["scharf"]);
   pruefe("nach 30 h in einem anderen Knoten wieder", r3.eingebaut,
     String(r3.ergebnis.verweigert));
+}
+
+console.log("");
+console.log("-- DER HANDSCHLAG: ohne Sicherung wird NICHT eingebaut --");
+{
+  // Auftrag 7.2 unterscheidet hier bewusst zwischen Sprung und Einbau: der
+  // Sprung geht auch ohne Sicherung (ein offener Ausgang kostet laufend
+  // Zeit), der Einbau nicht (er ist beliebig oft nachholbar, der Verlust bei
+  // einem Fehlgriff betraegt Tage).
+  //
+  // Gestellt wird der schlimmste Fall: keine Antwort der Bruecke UND keine
+  // junge Sicherung. Der Handschlag wartet dann 90 s - der Mock bricht
+  // vorher ab, und genau das ist der Beweis, dass gewartet statt gebaut wird.
+  const ohne = guterFall({ "data/backup-ok.txt": null, "data/bridge.json": null });
+  const r = await fahre(ohne, ["scharf"], 60);
+  pruefe("es baut NICHT ein", !r.eingebaut,
+    "der Verlust bei einem Fehlgriff betraegt Tage");
+  pruefe("und es setzt die Einbausperre",
+    !!r.mock.lies("home", "data/install-sperre.txt"),
+    "sonst versuchte es der Kern in der naechsten Runde wieder");
+  pruefe("die Sperre nennt den Handschlag als Grund",
+    (() => {
+      try {
+        return JSON.parse(r.mock.lies("home", "data/install-sperre.txt")).reason
+          === "handschlag";
+      } catch { return false; }
+    })(), "ein Mensch muss sehen, WARUM gesperrt ist");
+
+  // Und die Gegenprobe zur Gegenprobe: mit einer JUNGEN Sicherung (aber ohne
+  // Antwort) DARF gebaut werden - sonst stuende der Bot bei jeder kurzen
+  // Brueckenstoerung.
+  const jung = guterFall({
+    "data/backup-ok.txt": null,
+    "data/bridge.json": JSON.stringify({
+      lastVerifiedBackup: { ts: WALL - 3600000, file: "LIVE_x.json.gz" },
+    }),
+  });
+  const r2 = await fahre(jung, ["scharf"], 60);
+  pruefe("mit einer Sicherung von vor einer Stunde baut es ein", r2.eingebaut,
+    "sonst blockiert jede kurze Brueckenstoerung den Einbau");
+  pruefe("und es setzt dann KEINE Sperre",
+    !r2.mock.lies("home", "data/install-sperre.txt"));
 }
 
 console.log("");

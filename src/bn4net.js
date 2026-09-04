@@ -151,8 +151,15 @@ export async function main(ns) {
       if (!t || !Number.isFinite(t.ts)) return leer;
       const alterMs = Date.now() - t.ts;
       // Aelter als fuenf Minuten heisst: shop.js laeuft nicht. Dann sind auch
-      // die Preise nicht mehr verlaesslich.
-      if (alterMs > 300000) return { ...leer, alterMs };
+      // die PREISE nicht mehr verlaesslich - die Auskunft, OB es in diesem
+      // Knoten ueberhaupt Mietrechner gibt, sehr wohl. `CloudServerLimit`
+      // aendert sich innerhalb eines Laufs nie (es ist ein
+      // BitNode-Multiplikator), und in BitNode 9 steht es auf 0.
+      //
+      // Die Unterscheidung ist noetig, weil sonst ein Zirkel entsteht: der
+      // Kern hielte shop.js in BN9 fuer unnoetig, sobald er weiss, dass dort
+      // nichts zu kaufen ist - und wuesste es nach fuenf Minuten nicht mehr.
+      if (alterMs > 300000) return { ...leer, alterMs, kaufbarBekannt: t.kaufbar !== false };
       // AUS DEM ALTEN KNOTEN IST NICHT "ALT GENUG" (04.09.2026).
       //
       // installAugmentations und der BitNode-Sprung loeschen JEDEN gekauften
@@ -3277,7 +3284,29 @@ export async function main(ns) {
       const shopNoetig = (() => {
         if (offenerAuftrag && auftragOffen()) return true;
         const pl = parkLage();
-        if (!pl.da) return true;                       // keine Preise: dringend
+        // Keine Preise heisst dringend - AUSSER wir wissen schon, dass es in
+        // diesem Knoten nichts zu kaufen gibt. Sonst stuende die Regel unten
+        // nie zur Debatte: `pl.da` ist ab fuenf Minuten immer false.
+        if (!pl.da && pl.kaufbarBekannt !== false) return true;
+        // BITNODE 9: ES GIBT KEINE MIETRECHNER, NIE (Position C.13).
+        //
+        // `CloudServerLimit` steht dort auf 0 (BitNode.tsx:816, verifiziert),
+        // und drei der vierzig Restlaeufe spielen in diesem Knoten. Ein
+        // Haendler, der alle fuenf Minuten 7 GB belegt, um dieselbe Null neu
+        // aufzuschreiben, ist dort reine Verschwendung - und 7 GB sind auf
+        // einem home, das den ganzen Lauf lang der wichtigste Rechner bleibt,
+        // viel Geld.
+        //
+        // Ganz abschalten waere falsch: `kaufbar` ist eine Auskunft des
+        // Spiels, keine Konstante, und eine halbe Stunde alte Auskunft ist in
+        // einem Knoten ohne Mietrechner immer noch aktuell genug.
+        // `kaufbar` gilt nur bei frischer Tabelle; `kaufbarBekannt` ueberlebt
+        // ihr Veralten, weil CloudServerLimit sich innerhalb eines Laufs nie
+        // aendert.
+        const gibtEsMietrechner = pl.da ? pl.kaufbar : pl.kaufbarBekannt;
+        if (gibtEsMietrechner === false) {
+          return !Number.isFinite(pl.alterMs) || pl.alterMs > 1800000;
+        }
         return !Number.isFinite(pl.alterMs) || pl.alterMs > 240000;
       })();
 

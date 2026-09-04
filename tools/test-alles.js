@@ -70,6 +70,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-figur.js",
+    deckt: "Figur-Vergabepunkt: Lease, Rangfolge, Folgenummer, Knotenstempel (C.11)",
+    schnell: true,
+  },
+  {
     datei: "test-leiter.js",
     deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
     schnell: true,

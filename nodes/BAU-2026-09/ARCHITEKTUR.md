@@ -710,7 +710,11 @@ nicht in einen Kommentar.
       "priority": 8,
       "evictRank": 3,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/route.js",
+       "lib/eta.js",
+       "lib/events.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -734,7 +738,10 @@ nicht in einen Kommentar.
       "priority": 10,
       "evictRank": 20,
       "needsFigure": "request",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/figurns.js",
+       "lib/figur.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -811,7 +818,9 @@ nicht in einen Kommentar.
       "evictRank": 11,
       "needsFigure": "none",
       "needsLibs": [
-       "lib/graftwahl.js"
+       "lib/graftwahl.js",
+       "lib/figurns.js",
+       "lib/figur.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -864,7 +873,10 @@ nicht in einen Kommentar.
       "priority": 11,
       "evictRank": 12,
       "needsFigure": "owner",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/figurns.js",
+       "lib/figur.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -936,7 +948,10 @@ nicht in einen Kommentar.
       "priority": 12,
       "evictRank": 13,
       "needsFigure": "owner",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/figurns.js",
+       "lib/figur.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -984,7 +999,9 @@ nicht in einen Kommentar.
       "priority": 13,
       "evictRank": 9,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/loeser.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -1032,7 +1049,11 @@ nicht in einen Kommentar.
       "priority": 14,
       "evictRank": 14,
       "needsFigure": "owner",
-      "needsLibs": [],
+      "needsLibs": [
+       "lib/endspurt.js",
+       "lib/figurns.js",
+       "lib/figur.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,

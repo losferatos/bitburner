@@ -236,6 +236,127 @@ for (const e of reg.eintraege || []) {
       }
     }
   }
+
+  // NEEDSLIBS MUSS DIE IMPORTE DECKEN (Skeptiker Runde 3, W4, 04.09.2026).
+  //
+  // Seit dem 04.09. hat das Feld einen Leser: der Kern kopiert genau diese
+  // Dateien mit, wenn er ein Gewerk auf einen Fremdrechner bringt. Damit ist
+  // eine unvollstaendige Liste kein Schoenheitsfehler mehr, sondern ein
+  // stiller Ausfall - `ns.exec` gibt bei nicht uebersetzbarem Skript 0
+  // zurueck, ohne Meldung.
+  //
+  // Geprueft wird gegen die IMPORTZEILEN des Quelltextes, transitiv: ein
+  // lib-Modul, das selbst importiert, bringt seine Abhaengigkeit mit in die
+  // Pflichtliste. `ns.scp` loest nichts auf - was nicht genannt ist, fehlt.
+  //
+  // Ausgenommen sind Gewerke mit hostRule "home": die laufen nie woanders,
+  // und dort liegen die Bibliotheken ohnehin.
+  if (!e.unbuilt && e.hostRule !== "home") {
+    const quelle = path.join(zielOrdner, e.name);
+    if (fs.existsSync(quelle)) {
+      const noetig = new Set();
+      const schlange = [quelle];
+      const gesehen = new Set([path.resolve(quelle)]);
+      while (schlange.length) {
+        const t = fs.readFileSync(schlange.shift(), "utf8");
+        for (const m of t.matchAll(/from\s+["']([^"']+)["']/g)) {
+          const rel = m[1];
+          if (rel.startsWith("node:") || rel.startsWith("@") || /^https?:/.test(rel)) continue;
+          const norm = rel.replace(/^\.\//, "");
+          if (!norm.startsWith("lib/")) continue;
+          const abs = path.resolve(zielOrdner, norm);
+          noetig.add(norm);
+          if (!gesehen.has(abs) && fs.existsSync(abs)) {
+            gesehen.add(abs);
+            schlange.push(abs);
+          }
+        }
+      }
+      const haben = new Set([...(e.needsLibs || []), "lib/hackaugs.js"]);
+      const fehlend = [...noetig].filter((x) => !haben.has(x));
+      if (fehlend.length) {
+        fehler.push(wo + ": needsLibs deckt die Importe nicht - es fehlen "
+          + fehlend.join(", ") + ". Der Kern kopiert nur, was hier steht;"
+          + " auf einem frisch gekauften Rechner liegt sonst nichts davon,"
+          + " und ns.exec gibt still 0 zurueck.");
+      }
+    }
+  }
+}
+
+// ===========================================================================
+// STEUERNDE FELDER BRAUCHEN EINEN LESER (Skeptiker Runde 3, W4, 04.09.2026)
+// ===========================================================================
+//
+// Der Befund lautete: sechs Registry-Felder haben keinen Leser. Das ist die
+// gefaehrlichste Sorte Doku - sie sieht aus wie Steuerung und ist Deko. Wer
+// `hostRule: "home"` eintraegt, glaubt danach, das Gewerk laufe auf home;
+// gemessen lief `darkweb.js` auf joesguns und foodnstuff.
+//
+// Also wird die Unterscheidung ausdruecklich gemacht und geprueft:
+//
+//   STEUERND    ein Skript liest das Feld und handelt danach. Fehlt der
+//               Leser, ist der Eintrag eine Luege - Fehler.
+//   BESCHREIBEND  das Feld dokumentiert, was das Gewerk SELBST tut. Es hat
+//               absichtlich keinen Leser in der Registry-Verarbeitung.
+//
+// Die Zuordnung steht hier und nirgends sonst. Ein neues Feld ohne Zuordnung
+// faellt auf, statt still in die dritte Kategorie zu rutschen: "gemeint war
+// steuernd, gebaut wurde nichts".
+const STEUERND = {
+  "name": "bn4net.js",
+  "args": "bn4net.js",
+  "ramBaseGb": "lib/reg.js",
+  "ramSingGb": "lib/reg.js",
+  "verfahren": "lib/reg.js",
+  "knoten": "lib/reg.js",
+  "phase": "lib/reg.js",
+  "telemetryFile": "lib/reg.js",
+  "freshnessMs": "lib/reg.js",
+  "priority": "lib/reg.js",
+  "precondition": "lib/reg.js",
+  "hostRule": "bn4net.js",
+  "restartPolicy": "bn4net.js",
+  "needsLibs": "bn4net.js",
+  "killSafe": "boot.js",
+};
+// Beschreibend - mit der Begruendung, warum kein Leser noetig ist.
+const BESCHREIBEND = {
+  "ramMeasuredAt": "Herkunftsangabe der RAM-Zahl, fuer Menschen",
+  "taktMs": "der Takt steht im Gewerk selbst; hier zum Nachschlagen",
+  "scpToHome": "das Gewerk kopiert selbst nach home (Hausform `nachHome`)",
+  "singularity": "folgt aus ramSingGb > 0; hier als lesbare Kennzeichnung",
+  "maxInstances": "der Starter laesst ueber `laufend` ohnehin nur eine zu",
+  "evictRank": "der Kern raeumt nur Arbeiter, nie Werkzeuge - kein Verdraenger gebaut",
+  "needsFigure": "der Vergabepunkt arbeitet ueber Antraege, nicht ueber die Registry",
+  "unbuilt": "Merker fuer noch nicht gebaute Gewerke",
+  "ramHeuteGb": "was die Datei im LAUFENDEN Spiel belegt - Vergleichswert zum Neubau",
+};
+
+{
+  const quellen = {};
+  for (const f of ["bn4net.js", "boot.js", "lib/reg.js"]) {
+    const q = path.join(zielOrdner, f);
+    quellen[f] = fs.existsSync(q) ? fs.readFileSync(q, "utf8") : "";
+  }
+  const gesehen = new Set();
+  for (const e of reg.eintraege) for (const k of Object.keys(e)) gesehen.add(k);
+  for (const k of gesehen) {
+    if (k in BESCHREIBEND) continue;
+    const wo2 = STEUERND[k];
+    if (!wo2) {
+      fehler.push("Feld '" + k + "': weder als steuernd noch als beschreibend"
+        + " eingeordnet. Eintragen in STEUERND oder BESCHREIBEND"
+        + " (tools/registry-bauen.js) - ein Feld ohne Zuordnung sieht aus wie"
+        + " Steuerung und ist womoeglich keine.");
+      continue;
+    }
+    if (!(quellen[wo2] || "").includes(k)) {
+      fehler.push("Feld '" + k + "' gilt als steuernd, kommt aber in " + wo2
+        + " nicht vor. Entweder den Leser nachruesten oder das Feld nach"
+        + " BESCHREIBEND verschieben.");
+    }
+  }
 }
 
 if (fehler.length) {

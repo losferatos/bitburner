@@ -78,6 +78,7 @@ BLADE-51b Tesla Armor: Power Cells Upgrade
 Vangelis Virus
 Vangelis Virus 3.0
 Power Recirculation Core
+LuminCloaking-V1 Skin Implant
 LuminCloaking-V2 Skin Implant
 ```
 
@@ -87,4 +88,17 @@ Graphene Bionic Spine Upgrade, Bionic Arms vor Graphene Bionic Arms Upgrade,
 BrachiBlades vor Graphene BrachiBlades Upgrade, Combat Rib I vor II vor III,
 BLADE-51b Tesla Armor vor allen vier Upgrades, Unibeam vor Omnibeam,
 Hyperion V1 vor V2, Vangelis Virus vor Vangelis Virus 3.0,
-LuminCloaking-V1 (installiert) vor V2.
+LuminCloaking-V1 vor V2.
+
+**V1 STEHT SEIT DEM 04.09.2026 IN DER LISTE.** Hier stand
+"LuminCloaking-V1 (installiert) vor V2" - und das galt fuer den Lauf, in dem
+dieser Plan entstand, und fuer keinen der 39 danach. `prestigeSourceFile`
+setzt beim BitNode-Wechsel `this.augmentations = []`
+(`PlayerObjectGeneralMethods.ts:143-175`); die Voraussetzung ist danach weg,
+V2 laesst sich nicht graften, und `getGraftableAugmentations` meldet es
+trotzdem als graftbar. `graftAugmentation` gibt dann still `false` zurueck -
+eine Endlosschleife am Planende, die nur an einer ausbleibenden Zahl
+auffaellt. Gefunden hat es ein Skeptiker, nicht der Betrieb.
+
+`tools/graftplan-bauen.js` prueft die Ketten seither gegen `Augmentations.ts`
+und lehnt den Plan ab, wenn eine offen ist.

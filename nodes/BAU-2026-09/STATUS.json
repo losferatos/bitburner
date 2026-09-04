@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T14:00:00",
+  "aktualisiert": "2026-09-04T15:00:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -91,9 +91,9 @@
       "offen": "graftauto.js entscheidet, graft.js fuehrt aus. 23 Ebene-2-Proben. Offen: graft_busy_pct gegen 100 im Betrieb. NICHT live."
     },
     "C.15": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "boerse.js (BN8), BN15-Tor",
-      "offen": ""
+      "offen": "boerse.js gebaut und in der Registry (21 GB, nur Knoten 8). Zwei Phasen: Schaetzung aus der Preishistorie bis 4S bezahlbar ist, danach getForecast. Depot wird vor dem Sprung geschlossen. 31 Proben. Offen: BN15-Tor, Ebene 3 mit gesetztem Knoten. NICHT live."
     }
   },
   "abnahme": {

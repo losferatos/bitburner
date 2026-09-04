@@ -1,0 +1,464 @@
+{
+ "knoten": 6,
+ "erzeugtAm": "2026-09-04T00:48:23.877Z",
+ "erzeugtVon": "tools/rangkurve-bauen.js",
+ "quellen": [
+  "data/verlauf-strategie.json",
+  "data/checkin.json"
+ ],
+ "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 6",
+ "nullpunkt": {
+  "spielzeitMs": 736039400,
+  "spielzeitH": 204.455,
+  "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
+ },
+ "punkteGesamt": 87,
+ "laeufeErkannt": 1,
+ "stuetzpunkte": 87,
+ "rangSpanne": [
+  80340,
+  452411
+ ],
+ "dauerH": 10.044,
+ "ratenSpanne": [
+  -17058.333333333278,
+  108203.44827586172
+ ],
+ "punkte": [
+  {
+   "h": 0,
+   "rang": 80340,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 0.03,
+   "rang": 80340,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 0.186,
+   "rang": 80659,
+   "aktion": "Contracts/Retirement"
+  },
+  {
+   "h": 0.194,
+   "rang": 80706,
+   "aktion": "Contracts/Retirement"
+  },
+  {
+   "h": 0.506,
+   "rang": 81935,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 0.536,
+   "rang": 81935,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 0.741,
+   "rang": 82293,
+   "aktion": "General/keine"
+  },
+  {
+   "h": 0.766,
+   "rang": 82293,
+   "aktion": "General/keine"
+  },
+  {
+   "h": 0.811,
+   "rang": 82293,
+   "aktion": "General/keine"
+  },
+  {
+   "h": 0.839,
+   "rang": 82293,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 0.876,
+   "rang": 82294,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 0.879,
+   "rang": 82294,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 0.906,
+   "rang": 82294,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.006,
+   "rang": 82295,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.093,
+   "rang": 82297,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.103,
+   "rang": 82297,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.149,
+   "rang": 82297,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.193,
+   "rang": 82297,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.21,
+   "rang": 82297,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 1.508,
+   "rang": 82299,
+   "aktion": "General/Training"
+  },
+  {
+   "h": 1.542,
+   "rang": 82299,
+   "aktion": "General/Training"
+  },
+  {
+   "h": 1.611,
+   "rang": 82299,
+   "aktion": "General/Training"
+  },
+  {
+   "h": 1.631,
+   "rang": 82299,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 1.656,
+   "rang": 82299,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 1.848,
+   "rang": 82299,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 1.998,
+   "rang": 82299,
+   "aktion": "Gym/str"
+  },
+  {
+   "h": 2.09,
+   "rang": 82299,
+   "aktion": "Gym/str"
+  },
+  {
+   "h": 2.184,
+   "rang": 82299,
+   "aktion": "Gym/str"
+  },
+  {
+   "h": 2.201,
+   "rang": 82299,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 2.504,
+   "rang": 82299,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 2.529,
+   "rang": 82299,
+   "aktion": "Gym/agi"
+  },
+  {
+   "h": 2.646,
+   "rang": 82299,
+   "aktion": "Gym/agi"
+  },
+  {
+   "h": 2.701,
+   "rang": 82769,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 2.813,
+   "rang": 82769,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 2.844,
+   "rang": 82769,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 2.91,
+   "rang": 82770,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 3.006,
+   "rang": 82771,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 3.118,
+   "rang": 82773,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 3.186,
+   "rang": 82773,
+   "aktion": "General/Field Analysis"
+  },
+  {
+   "h": 3.508,
+   "rang": 83720,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 3.523,
+   "rang": 83779,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 3.62,
+   "rang": 84294,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 3.856,
+   "rang": 85024,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 4.008,
+   "rang": 85453,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 4.123,
+   "rang": 85453,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 4.171,
+   "rang": 86408,
+   "aktion": "Operations/Stealth Retirement Operation"
+  },
+  {
+   "h": 4.195,
+   "rang": 86902,
+   "aktion": "Operations/Stealth Retirement Operation"
+  },
+  {
+   "h": 4.508,
+   "rang": 92349,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 4.52,
+   "rang": 92349,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 4.853,
+   "rang": 94664,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 5.007,
+   "rang": 96051,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 5.186,
+   "rang": 96733,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 5.532,
+   "rang": 99538,
+   "aktion": "Black Operations/Operation K"
+  },
+  {
+   "h": 5.687,
+   "rang": 101054,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 5.837,
+   "rang": 107492,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 5.958,
+   "rang": 114139,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 5.964,
+   "rang": 114139,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 6.006,
+   "rang": 114139,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 6.186,
+   "rang": 124309,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 6.506,
+   "rang": 143285,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 6.534,
+   "rang": 145399,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 6.68,
+   "rang": 157872,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 6.853,
+   "rang": 173040,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.006,
+   "rang": 187751,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.12,
+   "rang": 198840,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.186,
+   "rang": 205963,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.507,
+   "rang": 240086,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.532,
+   "rang": 242498,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.636,
+   "rang": 253994,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.692,
+   "rang": 260615,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 7.853,
+   "rang": 272186,
+   "aktion": "Black Operations/Operation Tyrell"
+  },
+  {
+   "h": 8.006,
+   "rang": 281027,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 8.28,
+   "rang": 300708,
+   "aktion": "Black Operations/Operation Hyron"
+  },
+  {
+   "h": 8.373,
+   "rang": 303845,
+   "aktion": "Black Operations/Operation Morpheus"
+  },
+  {
+   "h": 8.52,
+   "rang": 312744,
+   "aktion": "Black Operations/Operation Annihilus"
+  },
+  {
+   "h": 8.81,
+   "rang": 344123,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 8.868,
+   "rang": 353362,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 8.927,
+   "rang": 364260,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 9.09,
+   "rang": 393201,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 9.125,
+   "rang": 400234,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 9.257,
+   "rang": 395033,
+   "aktion": "Black Operations/Operation Centurion"
+  },
+  {
+   "h": 9.261,
+   "rang": 395033,
+   "aktion": "Black Operations/Operation Centurion"
+  },
+  {
+   "h": 9.621,
+   "rang": 388892,
+   "aktion": "Black Operations/Operation Vindictus"
+  },
+  {
+   "h": 9.633,
+   "rang": 408359,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 9.928,
+   "rang": 410353,
+   "aktion": "Black Operations/Operation Daedalus"
+  },
+  {
+   "h": 9.981,
+   "rang": 452411,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 10.044,
+   "rang": 452411,
+   "aktion": "Operations/Assassination"
+  }
+ ]
+}

@@ -1,6 +1,6 @@
 {
  "knoten": 10,
- "erzeugtAm": "2026-09-04T00:43:26.281Z",
+ "erzeugtAm": "2026-09-04T00:48:23.966Z",
  "erzeugtVon": "tools/rangkurve-bauen.js",
  "quellen": [
   "data/verlauf-strategie.json",
@@ -12,7 +12,7 @@
   "spielzeitH": 239.733,
   "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
  },
- "punkteGesamt": 80,
+ "punkteGesamt": 81,
  "laeufeErkannt": 2,
  "stuetzpunkte": 76,
  "rangSpanne": [

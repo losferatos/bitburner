@@ -87,9 +87,45 @@ for (const p of punkte) {
 }
 if (aktuell.length) laeufe.push(aktuell);
 
-// Der Referenzlauf ist der laengste ABGESCHLOSSENE - also nicht der letzte,
-// denn der laeuft noch.
-const kandidaten = laeufe.slice(0, -1).filter((l) => l.length >= 5);
+/**
+ * Der Referenzlauf ist der laengste ABGESCHLOSSENE.
+ *
+ * Abgeschlossen ist ein Lauf, wenn ihm ein weiterer im selben Knoten folgt ODER
+ * wenn der Bot inzwischen in einem anderen Knoten steht. Der zweite Fall fehlte
+ * zuerst und kostete die gesamte BitNode-6-Kurve: 87 Messpunkte aus einem
+ * vollstaendig gefahrenen Knoten wurden als "laeuft noch" verworfen, obwohl der
+ * Bot seit dem 01.09. in BitNode 10 sitzt.
+ *
+ * BN6 ist die wichtigste Referenz ueberhaupt: es ist der einzige gefahrene
+ * Bladeburner-Knoten mit Rangfaktor 1,0, und 30 der 40 Restlaeufe sind
+ * Bladeburner-Laeufe.
+ */
+const aktuellerKnoten = (() => {
+  // Der Motor schreibt data/bn4net.json ins SPIEL, nicht ins Projekt - von hier
+  // aus ist sie nicht lesbar. Der aktuelle Knoten steht aber im Verlauf: es ist
+  // der Knoten des juengsten Punktes ueberhaupt.
+  let juengster = null;
+  const verlauf = path.join(ROOT, "data", "verlauf-strategie.json");
+  try {
+    for (const e of JSON.parse(fs.readFileSync(verlauf, "utf8")).punkte || []) {
+      if (!juengster || e.zeit > juengster.zeit) juengster = e;
+    }
+  } catch {
+    // egal
+  }
+  const checkin = path.join(ROOT, "data", "checkin.json");
+  try {
+    for (const e of JSON.parse(fs.readFileSync(checkin, "utf8")).punkte || []) {
+      if (!juengster || e.ts > (juengster.zeit || 0)) juengster = { zeit: e.ts, knoten: e.knoten };
+    }
+  } catch {
+    // egal
+  }
+  return juengster ? Number(juengster.knoten) || null : null;
+})();
+
+const knotenVerlassen = aktuellerKnoten !== null && aktuellerKnoten !== KNOTEN;
+const kandidaten = (knotenVerlassen ? laeufe : laeufe.slice(0, -1)).filter((l) => l.length >= 5);
 const referenz = kandidaten.sort((a, b) => b.length - a.length)[0];
 
 if (!referenz) {

@@ -660,7 +660,11 @@ export async function main(ns) {
     // Beide Zahlen werden EINMAL gemessen und danach nur noch weitergereicht
     // (R13, R14). Eine je Runde neu gerechnete Kennzahl misst mit jedem
     // Kernneustart etwas anderes.
-    jumpLatencyMin: null, bootLatencyMin: null };
+    jumpLatencyMin: null, bootLatencyMin: null,
+    // R27: ob die stumme Vertragskette schon gemeldet ist. Ohne den Merker
+    // stuende der Befund in jeder Kernrunde neu im Strom - der Ringpuffer
+    // waere in einer Stunde nur noch dieser eine Satz.
+    stummGemeldet: false };
 
   // Welche Waechterauftraege dieser Prozess schon ausgefuehrt hat. Der
   // Schluessel ist der Stellzeitpunkt - ein Auftrag darf nicht zweimal laufen,
@@ -4468,6 +4472,39 @@ export async function main(ns) {
           k.queued_augs_at_jump = letzterSprung.daten.wartendeAugs;
         }
       } catch { /* kein Strom - dann bleiben die Felder, wie sie waren */ }
+
+      // --- Die stumme Vertragskette (R27) -------------------------------------
+      //
+      // Beide Vertragsgewerke fuehren `stummeRunden`: Durchlaeufe in Folge, in
+      // denen Vertraege gefunden und keiner geloest wurde. Genommen wird das
+      // MAXIMUM beider - es geht um die Frage "klemmt irgendwo eine Gegenprobe",
+      // und dafuer genuegt eines von beiden.
+      //
+      // Die Zahl bleibt null, wenn keines der beiden laeuft. Das ist richtig so:
+      // `null` heisst in dieser Datei seit R11 "nicht gezaehlt", und ein Gewerk,
+      // das gar nicht laeuft, kann nicht stumm sein - dafuer ist S1 zustaendig.
+      try {
+        let stumm = null;
+        for (const datei of ["data/cdump-stand.json", "data/contracts.json"]) {
+          if (!ns.fileExists(datei, "home")) continue;
+          const d = JSON.parse(ns.read(datei));
+          if (Number.isFinite(d.stummeRunden)) {
+            stumm = stumm === null ? d.stummeRunden : Math.max(stumm, d.stummeRunden);
+          }
+        }
+        if (stumm !== null) {
+          k.contracts_silent_rounds = stumm;
+          // Drei Durchlaeufe in Folge sind kein Zufall mehr. Einmal melden,
+          // nicht in jeder Runde - `evMerker` haelt fest, ob es schon heraus ist.
+          if (stumm >= 3 && !evMerker.stummGemeldet) {
+            evMerker.stummGemeldet = true;
+            ereignis("contract_stumm",
+              "Vertragskette: " + stumm + " Durchlaeufe mit Fund, ohne Loesung",
+              { runden: stumm });
+          }
+          if (stumm === 0) evMerker.stummGemeldet = false;
+        }
+      } catch { /* kein Stand - dann bleibt das Feld, wie es war */ }
 
       k.erzeugtAm = jetzt;
       ns.write("data/kpi.json", JSON.stringify(k), "w");

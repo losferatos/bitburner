@@ -47,6 +47,15 @@
  * der Registry standen und niemand sie je schrieb.
  *
  * ===========================================================================
+ * WAS DIESES GEWERK MELDET
+ * ===========================================================================
+ *
+ * `data/cdump-stand.json` (seit 04.09.2026, R27): gefunden, geloest,
+ * ausgelassen, die Gruende nach Haeufigkeit - und `stummeRunden`. Das ist der
+ * Zaehler fuer den einzigen Fehlermodus, den man sonst nicht sieht: es findet
+ * Vertraege, loest keinen davon, und stuerzt dabei nicht ab. Siehe unten.
+ *
+ * ===========================================================================
  * WAS NICHT GERATEN WIRD
  * ===========================================================================
  *
@@ -165,6 +174,54 @@ export async function main(ns) {
     + antworten.length + " geloest und geprueft, " + ausgelassen.length + " ausgelassen.\n"
     + ausgelassen.map((a) => "  " + a.host + "/" + a.datei + " ("
       + (a.typ || "?") + "): " + a.grund).join("\n") + "\n", "w");
+
+  // ==========================================================================
+  // DER STUMME FALL (R27, Skeptiker Runde 4, 04.09.2026)
+  // ==========================================================================
+  //
+  // Bis hierher gab es nur `data/cdump-log.txt` - Fliesstext fuer Menschen.
+  // Kein Werkzeug las ihn, kein Waechter, kein Kennzahlenblock.
+  //
+  // Das ist genau bei diesem Gewerk gefaehrlich, weil sein haeufigster
+  // Fehlermodus LEISE ist. Ist eine Gegenprobe in `lib/loeser.js` zu streng,
+  // dann stuerzt nichts ab: `cdump.js` findet zehn Vertraege, laesst zehn
+  // aus, schreibt keine `cantwort.json`, beendet sich mit Rueckgabewert 0 -
+  // und der Kern startet es fuenf Minuten spaeter wieder. Die Telemetrie
+  // bleibt frisch, S1 schweigt zu Recht, und die einzige Geldquelle des
+  // Kaltstarts steht still.
+  //
+  // Fuenf solcher zu strengen Proben sind am 04.09.2026 wirklich gefunden
+  // worden, in frisch geschriebenem Code. Der Fall ist nicht theoretisch.
+  //
+  // `stummeRunden` ist die Zahl, die das sichtbar macht: aufeinanderfolgende
+  // Laeufe, in denen Vertraege DA waren und keiner durchkam. Sie muss ueber
+  // Laeufe hinweg zaehlen, weil dieses Gewerk ein Einmallaeufer ist - also
+  // wird der Vorstand gelesen. `ns.read` kostet null Gigabyte und liefert bei
+  // fehlender Datei den leeren String; `ns.fileExists` (0,10 GB) waere hier
+  // nicht bezahlbar - `cdump.js` hat im Kaltstart 0,20 GB Luft.
+  let stummeRunden = 0;
+  try {
+    const vor = JSON.parse(ns.read("data/cdump-stand.json") || "{}");
+    if (Number.isFinite(vor.stummeRunden)) stummeRunden = vor.stummeRunden;
+  } catch { /* erster Lauf oder unlesbar - dann faengt die Zaehlung bei 0 an */ }
+  stummeRunden = (roh.length > 0 && antworten.length === 0) ? stummeRunden + 1 : 0;
+
+  // Warum welche Vertraege ausgelassen wurden, nach Grund gebuendelt. Ohne
+  // das sieht man DASS nichts durchkommt, aber nicht WO es klemmt.
+  const gruende = {};
+  for (const a of ausgelassen) gruende[a.grund] = (gruende[a.grund] || 0) + 1;
+
+  ns.write("data/cdump-stand.json", JSON.stringify({
+    ts: Date.now(),
+    gefunden: roh.length,
+    geloest: antworten.length,
+    ausgelassen: ausgelassen.length,
+    gruende,
+    stummeRunden,
+  }), "w");
+  if (ns.getHostname() !== "home") {
+    ns.scp("data/cdump-stand.json", "home", ns.getHostname());
+  }
 
   ns.print(roh.length + " Vertraege, " + antworten.length + " geloest, "
     + ausgelassen.length + " ausgelassen.");

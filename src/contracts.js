@@ -72,6 +72,19 @@ const LOGFILE = "data/contracts.txt";
 // sonst startet der Autopilot beim naechsten Auftrag munter neu und frisst
 // weiter Versuche. Loeschen erst, wenn die Ursache gefunden ist.
 const HALTFILE = "data/contracts-halt.txt";
+
+/**
+ * Der Stand fuer Kern und Waechter (R27, Skeptiker Runde 4, 04.09.2026).
+ *
+ * Dieses Gewerk hatte in der Registry `telemetryFile: null` - es lief also
+ * ausserhalb jeder Ueberwachung. Bei einem Gewerk, dessen haeufigster
+ * Fehlermodus LEISE ist (eine zu strenge Gegenprobe laesst alles aus, ohne
+ * dass etwas abstuerzt), ist das die falsche Einstellung.
+ *
+ * `data/contracts.txt` gibt es weiterhin, aber das ist Fliesstext fuer
+ * Menschen. Diese Datei ist fuer Maschinen.
+ */
+const STANDFILE = "data/contracts.json";
 // Ueber dieser Groesse wird das Protokoll vorn gekuerzt. ns.write im
 // Anhaengemodus liest den Altbestand und schreibt Alt+Neu, und danach
 // kopiert scp die ganze Datei - je Zeile. Ohne Deckel waechst der Aufwand
@@ -214,6 +227,8 @@ export async function main(ns) {
   const gesperrteTypen = new Set();
   const abgelehnteVertraege = new Set();
   let ablehnungen = 0;
+  // Aufeinanderfolgende Durchlaeufe mit Fund, aber ohne Loesung (R27).
+  let stummeRunden = 0;
 
   for (;;) {
     const zaehler = { gefunden: 0, geloest: 0, uebersprungen: 0, fehlgeschlagen: 0 };
@@ -393,6 +408,41 @@ export async function main(ns) {
         zaehler.fehlgeschlagen +
         " abgelehnt ---",
     );
+
+    // DEN STAND WEGSCHREIBEN - vor jedem Ausstieg aus der Schleife, sonst
+    // fehlt er genau in dem Lauf, der schiefging (R27).
+    //
+    // `stummeRunden` zaehlt aufeinanderfolgende Durchlaeufe, in denen
+    // Vertraege gefunden und KEINER geloest wurde. Der Fall sieht von aussen
+    // aus wie ein gesundes Gewerk: es laeuft, es schreibt, es stuerzt nicht
+    // ab. Er entsteht, wenn eine Gegenprobe in `lib/loeser.js` strenger ist
+    // als das Spiel - fuenf solcher Proben wurden am 04.09.2026 gefunden.
+    //
+    // `uebersprungen` allein taugt dafuer nicht: es zaehlt auch Vertraege,
+    // die absichtlich liegen bleiben (gesperrter Typ, schon abgelehnt,
+    // Hoechstzahl erreicht). Deshalb die Bedingung auf `geloest === 0`.
+    if (zaehler.gefunden > 0 && zaehler.geloest === 0) stummeRunden++;
+    else stummeRunden = 0;
+
+    try {
+      ns.write(STANDFILE, JSON.stringify({
+        ts: Date.now(),
+        gefunden: zaehler.gefunden,
+        geloest: zaehler.geloest,
+        uebersprungen: zaehler.uebersprungen,
+        fehlgeschlagen: zaehler.fehlgeschlagen,
+        ablehnungen,
+        gesperrteTypen: [...gesperrteTypen],
+        stummeRunden,
+        trockenlauf,
+      }), "w");
+      if (!aufHome) ns.scp(STANDFILE, "home");
+    } catch (e) {
+      // Der Stand ist Buchhaltung, keine Aufgabe. Er darf den Lauf nicht
+      // beenden - aber er soll im Protokoll auftauchen, sonst ist auch sein
+      // Ausfall lautlos.
+      protokoll("Stand nicht schreibbar: " + kurz(e));
+    }
 
     if (ablehnungen >= 2) {
       protokoll("=== Ende nach Notbremse. Erst pruefen, dann " + HALTFILE + " auf home loeschen. ===");

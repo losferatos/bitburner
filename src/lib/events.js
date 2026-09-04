@@ -57,6 +57,10 @@ export const ARTEN = {
   blocked: { bleibt: false, text: "blockiert" },
   error: { bleibt: false, text: "Ausnahme" },
   gate: { bleibt: true, text: "Tor erreicht" },
+  // R27: die Vertragskette findet Vertraege und loest keinen. Sie BLEIBT im
+  // Puffer - es ist ein Befund ueber die Loeser selbst, und wer ihn spaeter
+  // sucht, sucht ihn Tage danach.
+  contract_stumm: { bleibt: true, text: "Vertragskette stumm" },
   bridge: { bleibt: false, text: "Bruecke" },
   note: { bleibt: false, text: "Vermerk" },
 };

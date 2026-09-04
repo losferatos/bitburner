@@ -101,6 +101,14 @@ export const FELDER = {
     hinweis: "Bestwert = Knotenpreis / Kaltstart-Einkommen" },
   contract_stock_usd: { einheit: "$", uhr: "-", soll: null, art: "zahl", klasse: "effizienz",
     hinweis: "Bestand - liegengebliebene Vertraege sind KEIN Zufluss" },
+  // R27 (Skeptiker Runde 4): der einzige Fehlermodus der Vertragskette, den
+  // weder ein Absturz noch eine veraltete Telemetrie verraet. Eine zu strenge
+  // Gegenprobe laesst alle Vertraege aus, das Gewerk laeuft weiter und meldet
+  // brav - nur kommt kein Geld. Soll ist 0; ab 3 schreibt der Kern ein
+  // Ereignis, weil drei Durchlaeufe in Folge kein Zufall mehr sind.
+  contracts_silent_rounds: { einheit: "Durchlaeufe", uhr: "-", soll: 0, art: "zahl",
+    klasse: "effizienz",
+    hinweis: "Fund ohne Loesung, in Folge - zeigt eine zu strenge Gegenprobe" },
   t_gate: { einheit: "h", uhr: "motor", soll: null, art: "zahl", klasse: "effizienz",
     hinweis: "zur Laufzeit aus dem Zustand gerechnet, nie Konstante" },
   idle_ram_pct: { einheit: "%", uhr: "motor", soll: 20, art: "zahl", klasse: "effizienz",

@@ -159,13 +159,41 @@ const TESTS = [
  * Die Liste wird ausgegeben, nicht verschwiegen: ein gruener Sammellauf, der
  * die Haelfte nicht prueft, ist gefaehrlicher als ein roter.
  */
+/**
+ * WAS DIESE SUITE NICHT PRUEFT.
+ *
+ * Sie steht hier, weil eine leere Lueckenliste die bequemste Art ist, sich
+ * fertig zu fuehlen. Stufe A der Abnahme verlangt Exit 0 UND eine leere
+ * Liste - beides, nicht eines.
+ *
+ * Alles hier Genannte braucht das laufende Spiel (Ebene 3) oder eine
+ * Beobachtung ueber Stunden. Kein Mock der Welt ersetzt das: der ns-Mock
+ * bildet nach, was ich vom Spiel VERSTANDEN habe, und genau die Stellen, an
+ * denen ich es falsch verstanden habe, bildet er falsch nach.
+ */
 const LUECKEN = [
-
-
-  // Der ns-Mock steht seit dem 04.09.2026 (tools/mock/ns.js + lader.js), und
-  // der Kern laeuft damit in test-motor-ebene2.js. Was noch fehlt, ist die
-  // Breite: dieselben Proben ueber die verschiedenen Knotenklassen.
-
+  "EBENE 3, KALTSTART: ein echter Knotenwechsel auf 32 GB home. Der "
+    + "Budgettest rechnet ihn nach, aber gerechnet ist nicht gemessen - "
+    + "t_workbench gegen den Knotenpreis ist die Zahl, die zaehlt (C.7).",
+  "EBENE 3, VERTRAGSKETTE: erster Vertrag geloest UND kassiert vor Minute 20. "
+    + "Die Loeser sind gegen sich selbst geprueft (verify), nicht gegen das "
+    + "Spiel - ein Versuch ist unwiederbringlich (C.8).",
+  "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
+    + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
+    + "laesst sich nur im Spiel stellen (C.9, C.10).",
+  "SPROSSE 4a UND 5 sind nicht gebaut (C.12). 4a braucht erst den Beleg, dass "
+    + "kein beforeunload-Dialog stehen bleibt - ohne ihn wird sie laut Auftrag "
+    + "gar nicht gebaut. 5 braucht acht Vorbedingungen und einen Trockenlauf.",
+  "BITNODE 8 UND 9 sind nur gerechnet, nie gefahren. boerse.js hat 31 Proben, "
+    + "aber keine einzige gegen einen echten Markt (C.13, C.15).",
+  "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "
+    + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14).",
+  "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
+    + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung "
+    + "(C.11).",
+  "NICHTS DAVON IST LIVE. Der ganze Bau liegt im Worktree; im Spiel laeuft "
+    + "eine einzige Aenderung dieses Tages (wakelock.js). Vor Stufe B steht "
+    + "der Hot-Swap nach Auftrag 9 mit Kanarienvogel auf der TEST-Instanz.",
 ];
 
 const nurSchnell = process.argv.includes("--schnell");

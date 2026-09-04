@@ -44,6 +44,11 @@ const TESTS = [
     deckt: "Stillstandsuhr des Motors",
     schnell: true,
   },
+  {
+    datei: "test-formeln.js",
+    deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
+    schnell: true,
+  },
 ];
 
 /**
@@ -55,7 +60,6 @@ const LUECKEN = [
   "Registry-Aufloesung (registry.json existiert noch nicht)",
   "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
   "Motorzeit gegen Offline-Spruenge und gedrosselten Tab (noch nicht gebaut)",
-  "Formeln gegen die Eichpunkte aus Auftrag 8.1 (test-formeln.js fehlt)",
   "ns-Mock und Szenarienmatrix (Ebene 2, tools/mock/ns.js fehlt)",
 ];
 

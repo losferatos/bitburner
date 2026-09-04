@@ -254,3 +254,69 @@ besser aus als der wache Tag.
 
 Offen: der Einbau in den Motor. Er berührt `bn4net.js` und braucht die volle
 Checkliste mit zwanzigminütigem Kanarienvogel.
+
+---
+
+### C.1 bis C.7 · 04.09.2026, 06:00 bis 07:25
+
+Sieben Positionen in eineinhalb Stunden, keine davon live. Der Reihe nach:
+
+**C.1 — Kontrakte und Motorzeit.** Drei Datenmodule (`herzschlag.js`,
+`kpi.js`, `events.js`), dann der Einbau in den Kern. Der Herzschlag schließt
+die Lücke, die `round` allein nicht sieht: der ganze Rundeninhalt liegt in
+einem `try`, also zählt ein Motor, der jede Runde wirft, munter weiter und
+sieht nach jedem Frischesignal gesund aus. `okRound` zählt nur, was
+vollständig durchlief.
+
+**C.3 — Zielprüfung, Interlock, Restzeit.** Drei Skeptiker haben die
+ursprüngliche Fassung zerlegt, und sie hatten recht: die Wirtreserve löste
+einen Deadlock, den es so nicht gibt. Was den Zustand „kein Wirt und kein
+Geld" erzeugt, ist `installAugmentations` — alle Rechner gelöscht, Konto auf
+1.262 $, in einem Engine-Schritt. Gegen ein genulltes Konto hilft keine
+Reserve. Sie ist zurückgebaut; an ihre Stelle trat der Interlock in
+`bn4rep.js`. Befunde in `BEFUNDE.md`, Abschnitt „Skeptikerrunde C.3".
+
+**C.4 — Registry.** Der Block in ARCHITEKTUR 3.3 war als Auszug gedacht und
+ließ **neun heute laufende Werkzeuge weg**. Der Umstieg hätte sie ohne
+Fehlermeldung stillgelegt. Gefunden hat es der Migrationsbeweis, den die
+Abnahmebedingung verlangt — gebaut, bevor umgestiegen wurde, nicht danach.
+
+**C.5 — Der Kern liest die Registry.** Beide Listen werden abgeleitet, die
+Form bleibt, die acht Nutzungsstellen bleiben unangetastet. Zwei Werkzeuge
+laufen danach anders (`sleevecrime.js` nur im Kaltstart, `hashes.js` nur mit
+SF9); beide stehen als benannte Entscheidung im Test.
+
+**C.6 — Der Wächter, im Beobachtungsmodus.** Alle sechs Signale, der ganze
+Automat, keine Ausführung. Die `boot.js`-Schonliste musste in denselben
+Commit: bis dahin beendete das Aufräumen alles auf `home` außer sich selbst —
+also auch den Wächter, die einzige Instanz, die einen nicht startenden Kern
+bemerken würde.
+
+**C.7 — Die RAM-Diät.** 17,75 → rund 10,75 GB. Drei Gigabyte durch das
+Ersetzen der Analyse-Familie, vier durch die Auslagerung der `cloud`-Familie
+nach `shop.js`. Der Kern behält die Entscheidung und gibt die Ausführung ab.
+
+**Ebene 2 existiert seit heute.** Zwischen den reinen Funktionen und dem
+echten Browser klaffte eine Lücke, in der ausgerechnet die Einbauten lagen.
+`tools/mock/lader.js` schreibt Bitburners Importstil auf Node um; damit läuft
+`bn4net.js` mit seinen 3.400 Zeilen aus Node heraus, gegen einen Mock mit
+steuerbarer Zeit. Der erste Lauf meldete „0,00 h aus 480 Runden" — ein Fehler
+des Prüfstands, nicht des Kerns: die Gewerke lesen `Date.now()` direkt.
+
+**Zwei Fehler, die nur dieser Prüfstand fand:**
+
+Die Meldung über die Herkunft der Werkzeugliste rief `sag`, das an dieser
+Stelle noch nicht existiert. Der Kern wäre in der allerersten Runde gestorben.
+
+Die vier neuen Importe standen als `"./lib/x.js"`. Das ganze Projekt nutzt
+den Bitburner-Stil `"lib/x.js"` (absolut ab home). Im Spiel wären die Skripte
+nicht gestartet.
+
+**Stand:** 16 Testdateien, 15 von 15 grün vor dem letzten Commit, 16 von 16
+danach. Zwei der drei Ebene-0-Lücken sind zu; offen bleibt die Szenarienmatrix
+über die Knotenklassen.
+
+**Offen und wichtig:** nichts davon ist eingespielt. Die Hot-Swap-Checkliste
+aus Auftrag §9 verlangt für jede dieser Positionen einen Kanarienvogel auf der
+TEST-Instanz, und für den Kern zusätzlich die volle Beobachtung. Zwei
+Skeptikerrunden auf C.5 bis C.7 laufen zum Zeitpunkt dieses Eintrags.

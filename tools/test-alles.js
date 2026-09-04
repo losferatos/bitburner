@@ -50,6 +50,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-kontrakte.js",
+    deckt: "Herzschlag v2, kpi.json-Feldliste und Ereignisstrom (C.1)",
+    schnell: true,
+  },
+  {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
     schnell: true,

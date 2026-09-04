@@ -85,6 +85,10 @@ const POSITIVLISTE = [
   "bodauer.js", "chance.js", "geld.js", "join.js", "joinrun.js",
   "knoten.js", "lage.js", "lib/hackaugs.js", "netburn.js", "ps.js",
   "share.js", "skillcheck.js", "sr.js", "werkbank.js", "work.js",
+  // Phase C, Position C.1 - die Kontrakte. Reine Datenmodule ohne ns-Aufrufe;
+  // sie stehen hier, damit der Grep sie mitliest, wenn spaeter doch einer
+  // dazukommt.
+  "lib/motorzeit.js", "lib/herzschlag.js", "lib/kpi.js", "lib/events.js",
 ];
 
 /** Diese Dateien sind vom Grep ausgenommen. */
@@ -114,6 +118,7 @@ const BLOCKADEN = [
 
 let treffer = 0;
 let unregistriert = 0;
+const gebaut = [];   // Dateien, die noch im Worktree liegen
 const meldungen = [];
 
 function melde(art, datei, zeile, text, grund) {
@@ -186,14 +191,27 @@ console.log("  " + zuPruefen.length + " Datei(en) auf der Positivliste, " +
   alleDateien.length + " im Ordner");
 console.log("");
 
+// Eine Datei, die noch im Worktree gebaut wird, liegt nicht in src/ - sie soll
+// aber schon geprueft werden. Sonst prueft der Grep erst, wenn der Code live
+// ist, und der Befund kommt eine Einspielung zu spaet.
+const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
+
 for (const rel of zuPruefen) {
-  const p = path.join(SRC, rel);
+  let p = path.join(SRC, rel);
+  let woher = "";
   if (!fs.existsSync(p)) {
-    console.log("  FEHLT " + rel + " (steht auf der Positivliste, liegt aber nicht in src/)");
-    treffer++;
-    continue;
+    const imBau = path.join(WORKTREE, rel);
+    if (fs.existsSync(imBau)) {
+      p = imBau;
+      woher = " [Worktree]";
+    } else {
+      console.log("  FEHLT " + rel + " (steht auf der Positivliste, liegt weder in src/ noch im Worktree)");
+      treffer++;
+      continue;
+    }
   }
   const inhalt = fs.readFileSync(p, "utf8");
+  if (woher) gebaut.push(rel);
   const zeilen = inhalt.split("\n");
 
   for (const v of [...VERBOTE, ...BLOCKADEN]) {
@@ -247,6 +265,11 @@ if (fremde.length) {
 
 // Unregistrierte Dateien melden - eigener Befund, kein Musterverstoss.
 console.log("");
+if (gebaut.length) {
+  console.log("-- noch im Worktree, nicht live --");
+  for (const g of gebaut) console.log("  " + g);
+  console.log("");
+}
 console.log("-- unregistrierte Dateien --");
 const bekannt = new Set([...POSITIVLISTE, ...AUSNAHMEN]);
 const uebrig = alleDateien.filter((f) => !bekannt.has(f) && !AUSNAHMEN.includes(path.basename(f)));

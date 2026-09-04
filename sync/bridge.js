@@ -78,7 +78,7 @@ import { sichere, lesenKennwerte, alterJuengsteMin, letzterEintrag } from "./bac
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
-const SCRIPT_DIR = path.join(ROOT, "src");
+const SCRIPT_DIR_VORGABE = path.join(ROOT, "src");
 const DASHBOARD_DIR = path.join(ROOT, "dashboard");
 
 // ---------------------------------------------------------------------------
@@ -149,6 +149,33 @@ const DASHBOARD_PORT = zahlAusArgv(argv, "--dash-port", ROLLE.dashPort);
 const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDir));
 
 /**
+ * WELCHEN ORDNER DER WATCHER BEOBACHTET - und warum das ueberhaupt ein
+ * Schalter ist.
+ *
+ * Der Dateibeobachter war bis zum 04.09.2026 nicht testbar: er haengt fest an
+ * `<repo>/src`, und ein Test, der dort Dateien anlegt, schiebt sie ins ECHTE
+ * Spiel. Alle 48 Brueckenproben liefen deshalb mit `--no-watch` - also am
+ * stillsten Weg ins Spiel vorbei, den diese Bruecke hat.
+ *
+ * Der Schalter ist fuer die Rolle LIVE GESPERRT, nicht nur unueblich. Ein
+ * umgebogener Quellordner auf der Live-Bruecke waere genau der Fehler, den
+ * `--data-dir` schon einmal beinahe erzeugt haette: ein Testlauf, der in
+ * Erics laufendes Spiel schreibt.
+ */
+const SCRIPT_DIR = (() => {
+  const wunsch = textAusArgv(argv, "--src-dir", "");
+  if (!wunsch) return SCRIPT_DIR_VORGABE;
+  if (IST_LIVE_ROLLE) {
+    console.error(
+      "--src-dir ist fuer die Rolle LIVE gesperrt. Der Quellordner der " +
+        "Live-Bruecke ist immer <repo>/src.",
+    );
+    process.exit(2);
+  }
+  return path.resolve(ROOT, wunsch);
+})();
+
+/**
  * TEST weigert sich, die Live-Ports zu binden. Ein vertippter Portparameter ist
  * sonst genau der Fehler, gegen den die ganze Rollentrennung gebaut ist.
  */
@@ -186,6 +213,32 @@ const RUECKKANAL_MS = 60000;
 const SOFORT_MS = 60000;
 const SAVE_ALTER_MS = 10 * 60000;
 const STUNDENSICHERUNG_MS = 60 * 60000;
+/**
+ * Der Sicherungstakt, solange ein zweiter Spiel-Tab im Verdacht steht
+ * (Auftrag 7.1.1, Befund W.6).
+ *
+ * Zwei Tabs speichern beide alle 60 s in dieselbe IndexedDB, und der letzte
+ * Schreiber gewinnt. Die Gefahr ist nicht der Alarm, sondern die Zeit danach:
+ * bis jemand hinsieht, koennen Stunden vergehen, und die naechste
+ * Stundensicherung faengt womoeglich schon den ueberschriebenen Stand.
+ */
+const ZWEITTAB_SICHERUNG_MS = 5 * 60000;
+/**
+ * Wieviele Dateien ein einzelner Watcher-Schub hoechstens ins Spiel schiebt
+ * (Befund B.3).
+ *
+ * Der Anlass: der Bau liegt in einem zweiten Baum (`bitburner-bau`), und die
+ * Live-Bruecke beobachtet `bitburner/src`. Ein `git merge` des Baus in den
+ * Live-Baum aendert rund vierzig Dateien in einer Sekunde - der Watcher haette
+ * sie in EINEM Schub ins laufende Spiel geschoben, ohne Checkliste, ohne
+ * Kanarienvogel, ohne die Reihenfolge aus Auftrag 9. Der Merge waere die
+ * Einspielung gewesen, und niemand haette ihn so genannt.
+ *
+ * Acht ist die Grenze zwischen "jemand hat an einem Gewerk gearbeitet" und
+ * "hier kippt ein ganzer Stand um". Wer mehr will, legt `data/schub-frei.txt`
+ * an - das ist der bewusste Handgriff, den `tools/hotswap.js` verlangt.
+ */
+const SCHUB_MAX = 8;
 /** Nach einem Schub mindestens so lange keine weitere Schub-Sicherung. */
 const SCHUB_SICHERUNG_ABSTAND_MS = 10 * 60000;
 
@@ -297,7 +350,76 @@ const zurueckgestellt = new Set();
  * Gegenprobe dazu steht in der Datei: sie fuehrt die Zahl der Dateien mit.
  */
 const MANUAL_DATEI = path.join(DATA_DIR, "manual-actions.json");
+/**
+ * Der Zweit-Tab-Alarm steht in einer DATEI, nicht in einer Variablen.
+ *
+ * `sync/bridge-start.cmd` startet die Bruecke nach jedem Absturz neu. Ein
+ * Merker im Prozess waere damit genau in dem Moment weg, in dem er zaehlt -
+ * ein Save-Rennen zwischen zwei Tabs bringt die Bruecke durchaus zum Sterben,
+ * und der Neustart haette die Sperre still aufgehoben.
+ *
+ * Aufgehoben wird sie nur von Hand: Datei loeschen. Das ist Absicht. Ein
+ * Verdacht auf ein Save-Rennen ist nichts, was sich von selbst erledigt.
+ */
+const ZWEITTAB_DATEI = path.join(DATA_DIR, "zweittab-alarm.json");
+/** Der Freibrief fuer einen grossen Schub - siehe SCHUB_MAX. */
+const SCHUB_FREI_DATEI = path.join(DATA_DIR, "schub-frei.txt");
+const SCHUB_FREI_MAX_MS = 30 * 60000;
 const MANUAL_MAX = 200;
+
+/**
+ * Steht der Zweit-Tab-Alarm? Der Inhalt der Datei, sonst null.
+ *
+ * Wird bei jeder Abfrage frisch von Platte gelesen, damit ein Mensch die
+ * Sperre durch Loeschen der Datei aufheben kann, ohne die Bruecke neu zu
+ * starten - ein Neustart waere selbst ein Eingriff.
+ */
+let zweitTabMerker = null;
+
+async function zweitTabAlarm() {
+  try {
+    zweitTabMerker = JSON.parse(await readFile(ZWEITTAB_DATEI, "utf8"));
+  } catch {
+    zweitTabMerker = null;
+  }
+  return zweitTabMerker;
+}
+
+/** Den Alarm setzen. Ueberschreibt einen bestehenden nicht - der erste zaehlt. */
+async function setzeZweitTabAlarm(text) {
+  if (await zweitTabAlarm()) return;
+  try {
+    await writeFile(
+      ZWEITTAB_DATEI,
+      JSON.stringify({ at: new Date().toISOString(), ts: Date.now(), text }, null, 1),
+      "utf8",
+    );
+    log(
+      "error",
+      "ZWEIT-TAB-SPERRE gesetzt: Sicherungstakt 5 min, alle schreibenden " +
+        "Eingriffe gesperrt. Aufheben: " + ZWEITTAB_DATEI + " loeschen.",
+    );
+  } catch (e) {
+    log("error", "Zweit-Tab-Sperre liess sich nicht schreiben: " + e.message);
+  }
+}
+
+/**
+ * Der Freibrief fuer einen grossen Schub - und warum er verfaellt.
+ *
+ * Eine Datei, die liegen bleibt, ist keine Freigabe mehr, sondern eine
+ * abgeschaltete Sicherung. Nach dreissig Minuten gilt sie nicht mehr; das ist
+ * lang genug fuer einen Hot-Swap in Stufen und kurz genug, dass sie niemand
+ * ueber eine Nacht vergisst.
+ */
+async function schubFrei() {
+  try {
+    const st = await stat(SCHUB_FREI_DATEI);
+    return Date.now() - st.mtimeMs < SCHUB_FREI_MAX_MS;
+  } catch {
+    return false;
+  }
+}
 
 async function zaehleEingriff(art, was, anzahl = 1) {
   try {
@@ -636,6 +758,56 @@ async function schiebeStapel(stapelEingang) {
     return;
   }
   stapel = neu;
+
+  // DIE ZWEIT-TAB-SPERRE GILT AUCH HIER (Befund W.6). Der Watcher ist der
+  // stillste aller Wege ins Spiel - eine gespeicherte Datei genuegt.
+  {
+    const za = await zweitTabAlarm();
+    if (za) {
+      log(
+        "error",
+        "Schub verweigert: Zweit-Tab-Sperre seit " + za.at + " (" + stapel.length + " Datei(en))",
+      );
+      await sofortZeile(
+        "Schub verweigert - Zweit-Tab-Sperre",
+        stapel.length + " geaenderte Datei(en) unter src/ wurden NICHT ins Spiel " +
+          "geschoben. Seit " + za.at + " steht der Verdacht auf einen zweiten " +
+          "Spiel-Tab (" + za.text + "). Erst das Save-Rennen klaeren, dann " +
+          ZWEITTAB_DATEI + " loeschen.",
+      );
+      return;
+    }
+  }
+
+  // DER MERGE IST NICHT DIE EINSPIELUNG (Befund B.3).
+  //
+  // Der Bau liegt in `bitburner-bau`, die Bruecke beobachtet `bitburner/src`.
+  // Ein `git merge` haette hier rund vierzig Dateien in einem Schub ins
+  // laufende Spiel gelegt - unter Umgehung der Reihenfolge aus Auftrag 9 und
+  // der Checkliste in `tools/hotswap.js`, die genau dafuer gebaut ist.
+  //
+  // Der Deckel unterscheidet nicht zwischen Merge und Handarbeit; er
+  // unterscheidet zwischen "ein Gewerk" und "ein ganzer Stand". Wer den
+  // ganzen Stand einspielen will, sagt es: `data/schub-frei.txt`.
+  if (stapel.length > SCHUB_MAX && !(await schubFrei())) {
+    log(
+      "error",
+      "Schub verweigert: " + stapel.length + " Dateien > SCHUB_MAX " + SCHUB_MAX,
+    );
+    await sofortZeile(
+      "Grosser Schub verweigert - sieht nach einem Merge aus",
+      stapel.length + " Dateien unter src/ haben sich gleichzeitig geaendert; " +
+        "die Grenze liegt bei " + SCHUB_MAX + ". Es wurde NICHTS ins Spiel " +
+        "geschoben.\n\nWar das ein Hot-Swap? Dann `tools/hotswap.js` fahren " +
+        "und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann " +
+        SCHUB_FREI_DATEI + " anlegen (gilt 30 min) und eine Datei erneut " +
+        "speichern.\n\nGeaendert: " + stapel.slice(0, 12).join(", ") +
+        (stapel.length > 12 ? " (+" + (stapel.length - 12) + ")" : ""),
+    );
+    // Die Fingerabdruecke NICHT merken - beim naechsten Mal soll derselbe
+    // Schub wieder auffallen, nicht als "ohne Inhaltsaenderung" durchrutschen.
+    return;
+  }
 
   // EIN SCHUB IST EIN EINGRIFF. Er entsteht nur, weil ein Mensch oder eine
   // Claude-Sitzung eine Datei unter src/ geaendert hat - der Bot selbst kann
@@ -1121,6 +1293,7 @@ async function schreibeRueckkanal() {
       : null,
     settings: state.settings || null,
     alarm: state.alarm,
+    zweitTabSperre: zweitTabMerker,
   };
   try {
     await request("pushFile", {
@@ -1319,6 +1492,7 @@ function publicState() {
     lastVerifiedBackup: state.lastVerifiedBackup,
     backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
     alarm: state.alarm,
+    zweitTabSperre: zweitTabMerker,
     serverCount: state.servers.length,
     rootedCount: state.servers.filter((s) => s.hasAdminRights).length,
     purchasedCount: state.servers.filter((s) => s.purchasedByPlayer).length,
@@ -1446,6 +1620,29 @@ function startDashboard() {
         return;
       }
 
+      // DIE ZWEIT-TAB-SPERRE (Auftrag 7.1.1, Befund W.6).
+      //
+      // Solange zwei Spiele im Verdacht stehen, denselben Spielstand zu
+      // schreiben, geht NICHTS mehr ins Spiel. Der Grund ist einfach: welcher
+      // der beiden Staende gerade gewinnt, ist unbekannt, und in einen
+      // unbekannten Stand zu schreiben macht aus einem Rennen einen Schaden.
+      //
+      // Lesen bleibt erlaubt - man muss ja nachsehen koennen, was los ist.
+      if (!LESENDE_METHODEN.has(method)) {
+        const za = await zweitTabAlarm();
+        if (za) {
+          log("warn", "423 fuer " + method + " - Zweit-Tab-Sperre steht seit " + za.at);
+          res.writeHead(423, { "Content-Type": MIME[".json"] });
+          res.end(
+            JSON.stringify({
+              error: "Zweit-Tab-Sperre: seit " + za.at + " geht nichts ins Spiel. " +
+                "Grund: " + za.text + " Aufheben: " + ZWEITTAB_DATEI + " loeschen.",
+            }),
+          );
+          return;
+        }
+      }
+
       // Eine schreibende Methode ueber das Dashboard kommt IMMER von aussen -
       // der Bot im Spiel benutzt diesen Weg nicht, er hat die ns-API.
       if (!LESENDE_METHODEN.has(method)) {
@@ -1538,6 +1735,17 @@ function startRfaServer() {
       } catch {
         alteLebt = false;
       }
+
+      // AUFTRAG 7.1.1 VERLANGT VIER REAKTIONEN, GEBAUT WAREN ZWEI (Befund W.6).
+      //
+      // Alarm und `## Sofort`-Zeile standen hier seit dem ersten Entwurf. Was
+      // fehlte, waren die beiden, die tatsaechlich schuetzen: der kuerzere
+      // Sicherungstakt und die Sperre aller Eingriffe. Ein Alarm allein
+      // beschreibt das Rennen, er gewinnt es nicht.
+      await setzeZweitTabAlarm(
+        "Zweite RFA-Verbindung auf Port " + RFA_PORT + ". Bestehende Verbindung " +
+          (alteLebt ? "antwortete" : "schwieg") + ".",
+      );
 
       await alarm(
         "Zweite RFA-Verbindung",
@@ -1641,6 +1849,7 @@ async function schreibePid() {
 console.log("\n=== Bitburner Bridge  [" + ROLLE.instance + "]  ===");
 if (NO_PUSH) console.log("  --no-push:  es wird NICHTS ins Spiel geschrieben");
 if (NO_WATCH) console.log("  --no-watch: src/ wird nicht beobachtet");
+if (SCRIPT_DIR !== SCRIPT_DIR_VORGABE) console.log("  --src-dir: " + SCRIPT_DIR);
 
 /**
  * ERST BINDEN, DANN ALLES ANDERE. Diese Reihenfolge ist nicht Kosmetik.
@@ -1660,6 +1869,7 @@ await startRfaServer();
 await startDashboard();
 await schreibePid();
 await ladeAnker();
+await zweitTabAlarm();
 watchScripts();
 
 setInterval(() => {
@@ -1700,8 +1910,12 @@ setInterval(() => {
   if (alter != null) letzteStundensicherung = Date.now() - alter * 60000;
 }
 
-setInterval(() => {
-  if (Date.now() - letzteStundensicherung < STUNDENSICHERUNG_MS) return;
+setInterval(async () => {
+  // Steht der Zweit-Tab-Verdacht, wird alle fuenf Minuten gesichert statt
+  // stuendlich (Auftrag 7.1.1, Befund W.6). Der Anlassname bleibt "hourly",
+  // damit die Rotation greift - der Takt steht im Alarm, nicht im Namen.
+  const takt = (await zweitTabAlarm()) ? ZWEITTAB_SICHERUNG_MS : STUNDENSICHERUNG_MS;
+  if (Date.now() - letzteStundensicherung < takt) return;
   if (!istVerifiziert()) return;
   letzteStundensicherung = Date.now();
   void sichereJetzt("hourly");

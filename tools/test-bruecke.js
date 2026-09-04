@@ -355,6 +355,8 @@ const ZEIT = {
   zweite: BASIS + 50 * STUNDE,
   koeder: BASIS + 25 * STUNDE,
   rennen: BASIS + 55 * STUNDE,
+  sperre: BASIS + 60 * STUNDE,
+  schub: BASIS + 65 * STUNDE,
 };
 
 /**
@@ -805,9 +807,9 @@ console.log("-- eine ZWEITE Verbindung uebernimmt nicht, solange die erste lebt 
 {
   const rfa = await freierPort();
   const dash = await freierPort();
+  const datenRel = frischerDatenordner();
   const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
-    "--dash-port", String(dash), "--no-watch",
-    "--data-dir", frischerDatenordner()]);
+    "--dash-port", String(dash), "--no-watch", "--data-dir", datenRel]);
   merkeZumAufraeumen(b.proc);
   await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
 
@@ -834,6 +836,22 @@ console.log("-- eine ZWEITE Verbindung uebernimmt nicht, solange die erste lebt 
   pruefe("und die Bruecke meldet es",
     b.zeilen.some((z) => /Zweite RFA-Verbindung|zweiter/i.test(z)),
     b.zeilen.slice(-2).join(" | "));
+
+  // UND SIE SETZT DIE SPERRE (Auftrag 7.1.1, Befund W.6). Melden allein
+  // reicht nicht: bis jemand die Meldung liest, koennen Stunden vergehen, und
+  // in dieser Zeit soll nichts mehr ins Spiel gehen und alle 5 min gesichert
+  // werden. Die Datei ist der Traeger beider Wirkungen.
+  const sperrDatei = path.join(ROOT, datenRel, "zweittab-alarm.json");
+  pruefe("und setzt die Zweit-Tab-Sperre", fs.existsSync(sperrDatei),
+    "ohne sie bleibt es bei einer Meldung - Auftrag 7.1.1 verlangt vier "
+    + "Reaktionen, nicht zwei");
+  if (fs.existsSync(sperrDatei)) {
+    const sp = JSON.parse(fs.readFileSync(sperrDatei, "utf8"));
+    pruefe("  mit Zeitpunkt und Grund",
+      typeof sp.at === "string" && Number.isFinite(sp.ts)
+        && typeof sp.text === "string" && sp.text.length > 10,
+      JSON.stringify(sp));
+  }
 
   s1.schliessen();
   s2.schliessen();
@@ -919,6 +937,158 @@ console.log("-- ZWEI BRUECKEN auf einem Port: die zweite beendet sich --");
   pruefe("die erste laeuft unbeeindruckt weiter", a.proc.exitCode === null);
   a.proc.kill();
   await a.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die ZWEIT-TAB-SPERRE: kein Schreiben, solange sie steht (W.6) --");
+{
+  // AUFTRAG 7.1.1 VERLANGT VIER REAKTIONEN AUF EINEN ZWEITEN SPIEL-TAB.
+  // Gebaut waren zwei: Alarm und `## Sofort`-Zeile - beides Beschreibung.
+  // Die beiden, die tatsaechlich schuetzen, fehlten: Sicherungstakt auf
+  // 5 min und Sperre aller Eingriffe.
+  //
+  // Geprueft wird hier die Sperre, weil sie die einzige der vier ist, die
+  // sich in Sekunden statt in Stunden zeigt. Der Takt steht in derselben
+  // Abfrage (`zweitTabAlarm()`) und faellt mit ihr.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const sperrDatei = path.join(ROOT, datenRel, "zweittab-alarm.json");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", datenRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.sperre }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(1500);
+
+  const schreibe = async () => {
+    try {
+      const r = await fetch("http://127.0.0.1:" + dash
+        + "/api/rpc?method=pushFile&instance=MOCK&filename=zzz-sperre.js"
+        + "&server=home&content=%2F%2Fx");
+      return r.status;
+    } catch (e) { return String(e.message); }
+  };
+  const lies = async () => {
+    try {
+      const r = await fetch("http://127.0.0.1:" + dash
+        + "/api/rpc?method=getAllFiles&server=home");
+      return r.status;
+    } catch (e) { return String(e.message); }
+  };
+
+  pruefe("ohne Sperre kommt ein schreibender Aufruf durch",
+    (await schreibe()) === 200,
+    "sonst prueft der Rest dieses Abschnitts eine Sperre, die gar nicht wirkt");
+
+  // Die Sperre von Hand setzen - so, wie die Bruecke selbst sie schreibt.
+  fs.writeFileSync(sperrDatei, JSON.stringify({
+    at: new Date().toISOString(), ts: Date.now(), text: "Probe",
+  }), "utf8");
+  await schlaf(300);
+
+  pruefe("mit Sperre wird ein schreibender Aufruf mit 423 abgewiesen",
+    (await schreibe()) === 423);
+  pruefe("LESEN bleibt erlaubt - man muss nachsehen koennen",
+    (await lies()) === 200);
+
+  // Und sie laesst sich ohne Neustart aufheben. Das ist wichtig: ein
+  // Brueckenneustart waere selbst ein Eingriff, und die Sperre gaebe es
+  // sonst nur zusammen mit einem.
+  fs.rmSync(sperrDatei, { force: true });
+  await schlaf(300);
+  pruefe("nach dem Loeschen der Datei geht es ohne Neustart weiter",
+    (await schreibe()) === 200);
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der SCHUBDECKEL: ein Merge ist keine Einspielung (B.3) --");
+{
+  // DER STILLSTE WEG INS SPIEL, UND DER EINZIGE, DEN KEINE PROBE BETRAT.
+  //
+  // Alle 48 bisherigen Brueckenproben liefen mit `--no-watch`. Der Grund war
+  // gut: der Watcher haengt an `<repo>/src`, und ein Test, der dort Dateien
+  // anlegt, schiebt sie ins ECHTE Spiel. Seit dem 04.09.2026 gibt es
+  // `--src-dir` (fuer LIVE gesperrt), und damit ist er pruefbar.
+  //
+  // Der Befund dahinter: der Bau liegt in `bitburner-bau`, die Live-Bruecke
+  // beobachtet `bitburner/src`. Ein `git merge` haette rund vierzig Dateien
+  // in einer Sekunde ins laufende Spiel gelegt - ohne Checkliste, ohne
+  // Kanarienvogel, ohne die Reihenfolge aus Auftrag 9.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "src-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+
+  const DATEIEN = [];
+  for (let i = 1; i <= 12; i++) DATEIEN.push("w" + i + ".js");
+  const schreibeAlle = (text) => {
+    for (const d of DATEIEN) {
+      fs.writeFileSync(path.join(quellAbs, d), "// " + text + "\n", "utf8");
+    }
+  };
+  schreibeAlle("start");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel,
+    "--src-dir", quellRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.schub }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(2000);
+
+  pruefe("beim Verbinden gehen alle 12 Dateien hinaus - pushAll hat keinen Deckel",
+    DATEIEN.every((d) => spiel.dateien.has("home:" + d)),
+    [...spiel.dateien.keys()].join(", "));
+
+  // (1) Ein normaler Umbau: drei Dateien. Muss durchgehen.
+  for (const d of DATEIEN.slice(0, 3)) {
+    fs.writeFileSync(path.join(quellAbs, d), "// drei\n", "utf8");
+  }
+  await schlaf(2500);
+  pruefe("drei geaenderte Dateien gehen normal ins Spiel",
+    DATEIEN.slice(0, 3).every((d) => (spiel.dateien.get("home:" + d) || "").includes("drei")),
+    DATEIEN.slice(0, 3).map((d) => spiel.dateien.get("home:" + d)).join(" | "));
+
+  // (2) Ein Merge: alle zwoelf auf einmal. Muss verweigert werden.
+  const vorher = b.zeilen.length;
+  schreibeAlle("merge");
+  await schlaf(3000);
+  pruefe("zwoelf auf einmal werden VERWEIGERT",
+    b.zeilen.slice(vorher).some((z) => /Schub verweigert/i.test(z)),
+    b.zeilen.slice(vorher).slice(-3).join(" | "));
+  pruefe("und nichts davon erreicht das Spiel",
+    !DATEIEN.some((d) => (spiel.dateien.get("home:" + d) || "").includes("merge")),
+    DATEIEN.filter((d) => (spiel.dateien.get("home:" + d) || "").includes("merge")).join(", "));
+
+  // (3) Mit Freibrief geht derselbe Schub durch.
+  fs.writeFileSync(path.join(ROOT, datenRel, "schub-frei.txt"),
+    "Probe " + new Date().toISOString(), "utf8");
+  await schlaf(300);
+  schreibeAlle("frei");
+  await schlaf(3000);
+  pruefe("mit data/schub-frei.txt geht derselbe Schub durch",
+    DATEIEN.every((d) => (spiel.dateien.get("home:" + d) || "").includes("frei")),
+    DATEIEN.filter((d) => !(spiel.dateien.get("home:" + d) || "").includes("frei")).join(", "));
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
 }
 
 // ---------------------------------------------------------------------------

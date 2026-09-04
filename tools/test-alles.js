@@ -242,7 +242,7 @@ const MESSLUECKEN = [
   "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
     + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
   "DIE BRUECKE ist seit dem 04.09.2026 gegen ein nachgebautes Spiel geprueft "
-    + "(tools/test-bruecke.js, 48 Proben). OFFEN bleibt der Zweig, den ein "
+    + "(tools/test-bruecke.js, 77 Proben). OFFEN bleibt der Zweig, den ein "
     + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
     + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
   "JEDER KENNWERT MIT SOLL HAT JETZT EINEN SCHREIBER (04.09.2026). Offen "

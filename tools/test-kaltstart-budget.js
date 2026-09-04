@@ -314,7 +314,15 @@ console.log("-- die ALLERERSTE Kernrunde: boot.js laeuft noch (C.7) --");
   // billigeres Gewerk den Platz nimmt und die Geldquelle danach aussperrt.
   // Genau davor schuetzt die Platzreservierung, und genau das wird hier
   // geprueft.
-  const BOOT = 5.5;
+  // NICHT 5,5 HINSCHREIBEN (Skeptikerrunde 6).
+  //
+  // Hier stand ein Literal. Das ist genau die Falle, die Befund M.3 gerade
+  // erst gestellt hat: der Auftrag fuehrte `boot.js` mit 4,0 GB, gemessen
+  // waren 5,5 - und ein Test mit fest eingetragener Zahl waere gruen
+  // geblieben, waehrend die Schwelle laengst falsch war. Waechst `boot.js`
+  // morgen auf 7 GB, muss dieser Test es MERKEN, nicht nachtragen.
+  const BOOT = rechne("boot.js", { bitNode: 4 }).gb;
+  console.log("       boot.js: " + BOOT.toFixed(2) + " GB (gerechnet, nicht notiert)");
   const eng = startlage(10, "V2", [], BOOT);
   const engLaufen = eng.laufen.map(([n]) => n);
   for (const [n, gb] of eng.laufen) console.log("       laeuft:  " + String(gb).padStart(6) + " GB  " + n);

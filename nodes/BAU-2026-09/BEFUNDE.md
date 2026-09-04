@@ -154,7 +154,21 @@ ohne vorherige Sicherung.
 **Folge:** Der Wachhund aus 4.5 ist nicht gegen ein Einzelereignis gebaut, sondern gegen
 ein wiederkehrendes.
 
-**Stand 04.09. 14:05:** Gegen das WIEDERKEHRENDE gebaut, nicht gegen den Einzelfall: Inhaltsvergleich vor jedem Schub (P.1), Sicherung vor `pushAll`, und seit heute der Schubdeckel `SCHUB_MAX = 8` samt Freibrief mit Verfall (B.3). Drei Proben in `test-bruecke.js`, alle falsifiziert.
+**Stand 04.09. 14:05 — TEILWEISE ZURUECKGENOMMEN.** Die Zeile zaehlte eine
+Luecke als Abdeckung. Richtig ist:
+
+- Der Inhaltsvergleich vor jedem Schub deckt alle drei Massenuebertragungen ab.
+- Der Schubdeckel deckte anfangs **nur den Watcher-Pfad**. Die Uebertragung
+  vom 03.09. um 13:28:37Z („115 Dateien beim Verbinden") lief ueber `pushAll`,
+  und der war ausgenommen — der eigene Test sicherte die Ausnahme sogar zu.
+- „Freibrief mit Verfall, alle falsifiziert" stimmte nicht: der 30-Minuten-
+  Verfall hatte keine Probe, und eine Mutation `return !!st;` waere gruen
+  geblieben.
+
+**Stand 04.09. 14:30:** Nachgezogen. `pushAll` haelt jetzt die Dateien eines
+verweigerten Schubs zurueck (`data/schub-offen.json`), der Riegel sitzt in
+`pushFile` — dem einen Punkt, durch den jeder Schreibweg laeuft —, und der
+Verfall hat eine eigene Probe mit `utimesSync`.
 
 ### M.12 — `lastTelemetryAt`-Befund im Code bestätigt · ERLEDIGT
 `sync/bridge.js:238-241` setzt `state.lastTelemetryAt = new Date().toISOString()` bei
@@ -451,11 +465,32 @@ Ohne diese drei Zahlen sieht der Bot in beiden Fällen nur ein zu großes `T2_h`
 Das ist kein Nebenbefund: **die ETA ist die letzte Zeile jedes Berichts an Eric**,
 also die eine Zahl, auf die er seine Planung stützt.
 
-### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN (keine der drei Zahlen wird benutzt)
+### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN — **und sie wird benutzt**
 `checkin.js` rechnet mit 58.928 Rang aus den Black Ops selbst. Auftrag 8.1 nennt
 als Eichpunkt „73.660/113.660". Drei Zahlen für dieselbe Größe, keine belegt.
 
-**Stand 04.09. 14:05:** Aufgeloest ist der Widerspruch nicht, aber entschaerft: kein Gewerk und kein Werkzeug rechnet mehr mit einer Black-Ops-Summe. Die Schwelle, die zaehlt, ist die erste Operation bei 2.500 Rang (`BlackOperations.ts:11`), und `next_blackop_chance` steht bis dahin zu Recht auf null. Die Zahl nachzurechnen kostet einen Quelltextlauf ueber alle Operationen und aendert an keiner Entscheidung etwas - deshalb bleibt sie offen statt falsch geschlossen.
+**Stand 04.09. 14:05 — ZURUECKGENOMMEN.** Die Zeile behauptete: „kein Gewerk
+und kein Werkzeug rechnet mehr mit einer Black-Ops-Summe". Das ist falsch, und
+zwei Zeilen Code widerlegen es. Ein Skeptiker hat es gefunden:
+
+- `tools/checkin.js:47` — `const RANG_UNTERWEGS = 73660;`
+- `tools/checkin.js:367` — `const unterwegs = RANG_UNTERWEGS * (…)`, also **aktiv**
+- `src/blade.js:338` — die Gesamtzeit rechnet mit `(400.000 − 73.660)/Raidrate`
+
+Damit speist genau die strittige Zahl die BN10-ETA, und die ETA traegt die
+Roadmap. „Offen, aber niemand benutzt sie" war als Entschaerfung nicht
+haltbar — sie ist offen **und** wird benutzt. Der Befundtext oben nennt
+ausserdem 58.928 als das, womit `checkin.js` rechne; auch das ist ueberholt.
+
+**Stand 04.09. 14:30:** OFFEN, mit Auftrag: die Summe gegen
+`reference/v301/src/Bladeburner/data/BlackOperations.ts` **als Code nachbauen
+und eichen**, nicht ueberschlagen (CLAUDE.md, „Rechnen heisst rechnen"). Bis
+dahin gilt keine der drei Zahlen als belegt, und jede Aussage ueber die
+BN10-ETA traegt diesen Vorbehalt.
+
+Dass diese Zeile ueberhaupt entstand, ist selbst der Befund: eine Triage, die
+eine Entschaerfung behauptet, ohne sie zu pruefen, ist schlimmer als ein
+offener Punkt — die naechste Sitzung baut darauf auf und prueft nicht nach.
 
 ---
 
@@ -525,6 +560,35 @@ reproduziert.
 ---
 
 ## B — Bau-Sitzung
+
+### B.2 — Der Pruefstand hat 41-mal in Erics laufendes Spiel geschrieben · BEHOBEN 04.09. 14:25
+
+Der Abschnitt „WEGWERFDATEIEN DES PRUEFSTANDS gehen NIE ins Spiel" in
+`tools/test-bruecke.js` legte seine beiden Koeder in den **echten**
+`src/`-Ordner — also in den, den die LIVE-Bruecke beobachtet. Der Riegel
+`NIE_SCHIEBEN` war zwar gebaut, der **laufende** Brueckenprozess stammte aber
+von vor dem Einbau. Im Brueckenprotokoll, einmal je Testlauf:
+
+```
+12:00:58  Nachgeschoben: .mock-koeder-12884.js
+12:01:59  Nachgeschoben: .mock-koeder-22856.js
+12:03:15  Nachgeschoben: .mock-koeder-10644.js
+```
+
+Gezaehlt im Spiel: **41 Dateien**. Ein Test, der die Zusicherung
+„Wegwerfdateien gehen NIE ins Spiel" prueft, hat sie beim Pruefen selbst
+verletzt — derselbe Fehlertyp wie der Sicherungsanker aus Runde 5 (A-B1): der
+Pruefstand benutzt die Ablage, die er schuetzen soll.
+
+**Behoben:** Der Abschnitt beobachtet seit 14:25 einen eigenen Ordner
+(`--src-dir`, fuer LIVE gesperrt) und prueft dieselbe Sache ohne Erics Spiel
+anzufassen. Die 41 Dateien sind aus dem Spiel entfernt (41 `deleteFile`, 0
+Fehler, gegengeprueft: 0 Treffer auf `.mock-` in `getFileNames`), und die
+Bruecke laeuft seit 14:18:21 mit dem Riegel.
+
+**Die Lehre, nicht das Detail:** Ein Riegel im Quelltext ist kein Riegel im
+Betrieb. Zwischen „gebaut" und „laeuft" liegt ein Prozessneustart, und in
+diesem Projekt startet die Bruecke nur, wenn jemand sie beendet.
 
 ### B.1 — `/usage` in dieser Sitzung nicht abrufbar · OFFEN (Umgebung, nicht behebbar)
 Der Auftrag 13 verlangt den Budget-Stand „mit `/usage`, nie eine Einschätzung".

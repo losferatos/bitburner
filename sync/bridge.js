@@ -56,7 +56,7 @@
 
 import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
-import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename } from "node:fs/promises";
+import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename, rm } from "node:fs/promises";
 import { watch } from "node:fs";
 import { execFileSync, execFile } from "node:child_process";
 import { createHash } from "node:crypto";
@@ -223,6 +223,40 @@ const STUNDENSICHERUNG_MS = 60 * 60000;
  * Stundensicherung faengt womoeglich schon den ueberschriebenen Stand.
  */
 const ZWEITTAB_SICHERUNG_MS = 5 * 60000;
+
+/**
+ * Wie oft der Sicherungstimer ueberhaupt nachsieht. Live eine Minute; im
+ * Pruefstand faellt er mit `--race-takt-ms` mit, sonst koennte eine Probe den
+ * Fuenfminutentakt nie beobachten - der Timer wuerde erst nach einer Minute
+ * zum ersten Mal aufwachen.
+ */
+const TIMER_TAKT_MS = (() => {
+  const wunsch = zahlAusArgv(argv, "--race-takt-ms", 0);
+  if (!wunsch || IST_LIVE_ROLLE) return 60000;
+  return Math.max(200, Math.min(60000, Math.floor(wunsch / 2)));
+})();
+
+/**
+ * DER RENNTAKT IST IM PRUEFSTAND EINSTELLBAR - sonst waere er nicht messbar.
+ *
+ * Ein Skeptiker hat es gefunden: `ZWEITTAB_SICHERUNG_MS` liess sich auf FUENF
+ * STUNDEN setzen, ohne dass eine der 59 Brueckenproben rot wurde. Der Test
+ * behauptete, der Takt "faellt mit der Abfrage" - geteilt ist aber nur die
+ * Abfrage, nicht die Wirkung. Eine Zusicherung ohne Probe ist eine
+ * Behauptung, und diese hier stand in der Abnahmeliste.
+ *
+ * Fuer LIVE gesperrt, wie `--src-dir`: der Renntakt der Live-Bruecke sind
+ * fuenf Minuten, und daran dreht kein Aufrufparameter.
+ */
+const RACE_TAKT_MS = (() => {
+  const wunsch = zahlAusArgv(argv, "--race-takt-ms", 0);
+  if (!wunsch) return ZWEITTAB_SICHERUNG_MS;
+  if (IST_LIVE_ROLLE) {
+    console.error("--race-takt-ms ist fuer die Rolle LIVE gesperrt.");
+    process.exit(2);
+  }
+  return wunsch;
+})();
 /**
  * Wieviele Dateien ein einzelner Watcher-Schub hoechstens ins Spiel schiebt
  * (Befund B.3).
@@ -365,6 +399,18 @@ const ZWEITTAB_DATEI = path.join(DATA_DIR, "zweittab-alarm.json");
 /** Der Freibrief fuer einen grossen Schub - siehe SCHUB_MAX. */
 const SCHUB_FREI_DATEI = path.join(DATA_DIR, "schub-frei.txt");
 const SCHUB_FREI_MAX_MS = 30 * 60000;
+/**
+ * DER VERWEIGERTE SCHUB HAT EINEN NAMEN UND EINE DATEI.
+ *
+ * Ohne sie liefen `src/` und Spiel still auseinander: der Watcher verweigert,
+ * der Stapel ist weg, und nichts erinnert daran. Aufgeloest haette das
+ * spaeter `pushAll` beim naechsten Verbinden - auf die schlechteste denkbare
+ * Art, naemlich alles auf einmal und ohne Checkliste (Skeptikerrunde 6).
+ *
+ * Die Datei traegt die Liste. `pushAll` haelt sie ein, das Dashboard zeigt
+ * sie, und `tools/hotswap.js` kann daran erkennen, dass etwas ansteht.
+ */
+const SCHUB_OFFEN_DATEI = path.join(DATA_DIR, "schub-offen.json");
 const MANUAL_MAX = 200;
 
 /**
@@ -376,11 +422,41 @@ const MANUAL_MAX = 200;
  */
 let zweitTabMerker = null;
 
+/**
+ * Steht der Zweit-Tab-Alarm?
+ *
+ * FAIL-CLOSED, und zwar aus dem eigenen Grund heraus (Skeptikerrunde 6).
+ *
+ * Der erste Entwurf fing JEDEN Fehler und lieferte `null` - also "keine
+ * Sperre". Damit hob ein transienter Lesefehler die Sperre still auf:
+ * EBUSY/EPERM unter Windows (Virenscanner, offener Editor), EMFILE, oder ein
+ * `SyntaxError` auf einer halb geschriebenen Datei. Die Datei laege sichtbar
+ * im Ordner, ein Mensch hielte sie fuer die Sperre - und es gaebe keine.
+ *
+ * Das widersprach der eigenen Begruendung im RPC-Riegel: "in einen
+ * unbekannten Stand zu schreiben macht aus einem Rennen einen Schaden". Ein
+ * Lesefehler IST der unbekannte Zustand.
+ *
+ * Jetzt: `ENOENT` heisst "keine Sperre" - das ist der einzige Fehler, der
+ * eine Aussage traegt. Alles andere haelt die Sperre (oder setzt sie, wenn
+ * noch keine bekannt war) und wird protokolliert.
+ */
 async function zweitTabAlarm() {
   try {
     zweitTabMerker = JSON.parse(await readFile(ZWEITTAB_DATEI, "utf8"));
-  } catch {
-    zweitTabMerker = null;
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      zweitTabMerker = null;
+    } else {
+      log("error", "Zweit-Tab-Sperre nicht lesbar (" + (e && (e.code || e.message))
+        + ") - sie gilt weiter, im Zweifel gesperrt");
+      if (!zweitTabMerker) {
+        zweitTabMerker = {
+          at: new Date().toISOString(), ts: Date.now(),
+          text: "Sperrdatei unlesbar (" + (e && (e.code || e.message)) + ")",
+        };
+      }
+    }
   }
   return zweitTabMerker;
 }
@@ -389,11 +465,18 @@ async function zweitTabAlarm() {
 async function setzeZweitTabAlarm(text) {
   if (await zweitTabAlarm()) return;
   try {
+    // ATOMAR: erst daneben schreiben, dann umbenennen. Ein Absturz mitten im
+    // Schreiben hinterliesse sonst eine abgeschnittene Datei - und die parst
+    // nie wieder. Das Fenster ist schmal und liegt genau in dem Moment, in
+    // dem die Sperre zaehlt.
+    const tmp = ZWEITTAB_DATEI + ".tmp";
     await writeFile(
-      ZWEITTAB_DATEI,
+      tmp,
       JSON.stringify({ at: new Date().toISOString(), ts: Date.now(), text }, null, 1),
       "utf8",
     );
+    await rename(tmp, ZWEITTAB_DATEI);
+    await zweitTabAlarm();
     log(
       "error",
       "ZWEIT-TAB-SPERRE gesetzt: Sicherungstakt 5 min, alle schreibenden " +
@@ -415,10 +498,60 @@ async function setzeZweitTabAlarm(text) {
 async function schubFrei() {
   try {
     const st = await stat(SCHUB_FREI_DATEI);
-    return Date.now() - st.mtimeMs < SCHUB_FREI_MAX_MS;
+    const alter = Date.now() - st.mtimeMs;
+    // NEGATIV IST NICHT JUNG (Skeptikerrunde 6). Springt die Systemuhr
+    // rueckwaerts - NTP-Korrektur, Rueckkehr aus dem Standby, VM-Resume -,
+    // wird die Differenz negativ, und ein blosses `< MAX` waere wahr. Ein
+    // Freibrief von vor drei Wochen gaelte damit wieder, und zwar fuer die
+    // Dauer des Versatzes statt fuer 30 Minuten.
+    if (alter < 0) {
+      log("warn", "schub-frei.txt liegt in der Zukunft (" + (-alter / 60000).toFixed(0)
+        + " min) - gilt NICHT");
+      return false;
+    }
+    return alter < SCHUB_FREI_MAX_MS;
   } catch {
     return false;
   }
+}
+
+/**
+ * Der Freibrief ist ein EINMAL-TICKET, kein Zeitfenster.
+ *
+ * Sonst passen in dreissig Minuten mehrere Merges, und die Datei bliebe
+ * liegen: jedes Werkzeug, das die mtime anfasst - Editor, Kopieren des
+ * data/-Ordners, ein Indexer - schaltete den Deckel erneut fuer 30 min ab,
+ * ohne dass es jemand wollte.
+ */
+/** Den verweigerten Stapel festhalten - siehe SCHUB_OFFEN_DATEI. */
+async function schreibeSchubOffen(stapel) {
+  try {
+    await writeFile(SCHUB_OFFEN_DATEI, JSON.stringify({
+      at: new Date().toISOString(),
+      ts: Date.now(),
+      anzahl: stapel.length,
+      dateien: stapel.slice(0, 200),
+    }, null, 1), "utf8");
+  } catch (e) {
+    log("error", "schub-offen.json nicht schreibbar: " + e.message);
+  }
+}
+
+/** Welche Dateien warten? Leere Menge, wenn nichts ansteht. */
+async function schubOffenListe() {
+  try {
+    const o = JSON.parse(await readFile(SCHUB_OFFEN_DATEI, "utf8"));
+    return new Set(Array.isArray(o.dateien) ? o.dateien : []);
+  } catch {
+    return new Set();
+  }
+}
+
+async function verbraucheSchubFrei() {
+  try {
+    await rm(SCHUB_FREI_DATEI, { force: true });
+    log("info", "Freibrief verbraucht - der naechste grosse Schub braucht einen neuen");
+  } catch { /* dann liegt sie eben noch da, der Verfall greift trotzdem */ }
 }
 
 async function zaehleEingriff(art, was, anzahl = 1) {
@@ -642,7 +775,54 @@ async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
  */
 const zuletztGeschoben = new Map();
 
+/**
+ * DIE AUSNAHME VON DER SPERRE, UND WARUM ES SIE GEBEN MUSS.
+ *
+ * `data/backup-ok.txt` ist die Antwort des Handschlags (`lib/handschlag.js`).
+ * Kommt sie nicht, wartet `punish.js` vor dem Einbau bis zum Deckel und
+ * `ausgang.js` schreibt eine Wartemarke. Eine Sperre, die diese eine Datei
+ * mitsperrt, laesst den Bot in einem Wartezustand stehen, den nur derselbe
+ * Mensch aufloest, der auch die Sperre aufhebt - also doppelt.
+ *
+ * Die Datei traegt keinen Spielzustand, nur ein Ja/Nein mit Zeitstempel.
+ */
+const TROTZ_SPERRE = new Set(["data/backup-ok.txt"]);
+
+/**
+ * Darf ueberhaupt etwas ins Spiel? Eine Antwort fuer ALLE Schreibwege.
+ *
+ * Der erste Entwurf pruefte an zwei Stellen - im Watcher-Schub und im
+ * Dashboard-RPC - und liess damit die drei lautesten offen: `pushAll` beim
+ * Verbinden (114 Dateien auf einen Schlag), den Rueckkanal (alle 60 s) und
+ * den Handschlag. Ein Skeptiker hat es gefunden und richtig eingeordnet:
+ * "gedeckelt wurden die zwei leisesten Wege, offen blieb der lauteste".
+ *
+ * Besonders schaerfend war der Fall, in dem die Sperre gerade gesetzt wurde:
+ * derselbe Socket bekam unmittelbar danach ueber `verifiziereSocket()` das
+ * komplette Dateiverzeichnis geschrieben - in einen Stand, von dem die
+ * Bruecke soeben festgestellt hatte, dass sie nicht weiss, wer ihn gewinnt.
+ *
+ * Jetzt sitzt die Pruefung in `pushFile` - dem einen Punkt, durch den jeder
+ * Schreibweg laeuft.
+ */
+async function darfSchreiben(zielName) {
+  if (TROTZ_SPERRE.has(zielName)) return true;
+  const za = await zweitTabAlarm();
+  return !za;
+}
+
 async function pushFile(localPath, gameName, nurBeiAenderung = false) {
+  // DIE ENGSTELLE. Jeder Weg ins Spiel laeuft hier durch - Watcher-Schub,
+  // pushAll beim Verbinden, Rueckkanal, Handschlag, Dashboard-RPC. Frueher
+  // sassen die Riegel weiter aussen und liessen drei von fuenf Wegen offen.
+  if (!(await darfSchreiben(gameName))) {
+    const za = zweitTabMerker;
+    log("warn", "pushFile " + gameName + " gesperrt (Zweit-Tab-Sperre seit "
+      + (za ? za.at : "?") + ")");
+    const fehler = new Error("Zweit-Tab-Sperre: " + gameName + " nicht geschrieben");
+    fehler.code = "ZWEITTAB_GESPERRT";
+    throw fehler;
+  }
   const content = await readFile(localPath, "utf8");
   if (nurBeiAenderung) {
     const fp = createHash("sha256").update(content).digest("hex");
@@ -662,8 +842,27 @@ async function pushAll() {
     return;
   }
   const files = await collectScripts();
+
+  // EIN VERWEIGERTER SCHUB BLEIBT AUCH HIER VERWEIGERT (Skeptikerrunde 6).
+  //
+  // Der Deckel sass bis heute nur im Watcher-Pfad. Damit war B.3 nicht
+  // geloest, sondern um einen Reconnect verschoben: der Merge legt vierzig
+  // Dateien in `src/`, der Watcher verweigert - und beim naechsten Verbinden
+  // (Seitenneuladen, Brueckenneustart, Standby-Rueckkehr) schob `pushAll`
+  // alles hinaus, inklusive der vierzig. Der Reconnect ist das haeufigste
+  // Ereignis im System, nicht das seltenste.
+  //
+  // Zurueckgehalten wird NUR die wartende Liste, nicht der ganze Schub: fuer
+  // alles andere ist die Uebertragung beim Verbinden richtig und noetig.
+  const wartend = (await schubFrei()) ? new Set() : await schubOffenListe();
   const done = [];
+  let gehalten = 0;
   for (const file of files) {
+    if (wartend.has(file.gameName)) {
+      gehalten++;
+      zurueckgestellt.add(file.gameName);
+      continue;
+    }
     try {
       await pushFile(file.localPath, file.gameName);
       done.push(file.gameName);
@@ -672,7 +871,8 @@ async function pushAll() {
     }
   }
   state.syncedFiles = done;
-  log("info", done.length + " Datei(en) ins Spiel uebertragen");
+  log("info", done.length + " Datei(en) ins Spiel uebertragen"
+    + (gehalten ? " - " + gehalten + " aus einem verweigerten Schub ZURUECKGEHALTEN" : ""));
   broadcast({ type: "state", state: publicState() });
 }
 
@@ -789,13 +989,19 @@ async function schiebeStapel(stapelEingang) {
   // Der Deckel unterscheidet nicht zwischen Merge und Handarbeit; er
   // unterscheidet zwischen "ein Gewerk" und "ein ganzer Stand". Wer den
   // ganzen Stand einspielen will, sagt es: `data/schub-frei.txt`.
-  if (stapel.length > SCHUB_MAX && !(await schubFrei())) {
+  // Zurueckgestelltes zaehlt mit: sonst liesse sich ein grosser Schub in
+  // kleine Haeppchen zerlegen, und der Deckel waere ein Vorschlag.
+  const gesamt = new Set([...zurueckgestellt, ...stapel]).size;
+  if (gesamt > SCHUB_MAX && !(await schubFrei())) {
+    stapel = [...new Set([...zurueckgestellt, ...stapel])];
     log(
       "error",
       "Schub verweigert: " + stapel.length + " Dateien > SCHUB_MAX " + SCHUB_MAX,
     );
     await sofortZeile(
-      "Grosser Schub verweigert - sieht nach einem Merge aus",
+      // Die Dateizahl gehoert IN den Titel: er ist der Entdopplungsschluessel,
+      // und ein konstanter Titel haette jede weitere Verweigerung verschluckt.
+      "Grosser Schub verweigert (" + stapel.length + " Dateien) - sieht nach einem Merge aus",
       stapel.length + " Dateien unter src/ haben sich gleichzeitig geaendert; " +
         "die Grenze liegt bei " + SCHUB_MAX + ". Es wurde NICHTS ins Spiel " +
         "geschoben.\n\nWar das ein Hot-Swap? Dann `tools/hotswap.js` fahren " +
@@ -804,8 +1010,21 @@ async function schiebeStapel(stapelEingang) {
         "speichern.\n\nGeaendert: " + stapel.slice(0, 12).join(", ") +
         (stapel.length > 12 ? " (+" + (stapel.length - 12) + ")" : ""),
     );
-    // Die Fingerabdruecke NICHT merken - beim naechsten Mal soll derselbe
-    // Schub wieder auffallen, nicht als "ohne Inhaltsaenderung" durchrutschen.
+    // DER STAPEL BLEIBT LIEGEN (Skeptikerrunde 6).
+    //
+    // Der erste Entwurf verwarf ihn und begruendete das damit, dass "beim
+    // naechsten Mal derselbe Schub wieder auffaellt". Das stimmt nicht: der
+    // Stapel entsteht aus `geaendert`, und das Set ist beim Aufruf schon
+    // geleert. Nach einem verweigerten Vierzig-Datei-Merge bildete die
+    // NAECHSTE einzelne gespeicherte Datei einen Stapel von eins - unter dem
+    // Deckel, also durch. Ergebnis: eine Datei des neuen Standes bei
+    // neununddreissig alten. Genau der Mischzustand, gegen den der Deckel
+    // gebaut ist.
+    //
+    // Jetzt wandert er nach `zurueckgestellt` (dieselbe Ablage, die der
+    // unverifizierte Pfad benutzt) und zaehlt beim naechsten Schub mit.
+    for (const d of stapel) zurueckgestellt.add(d);
+    await schreibeSchubOffen(stapel);
     return;
   }
 
@@ -815,6 +1034,14 @@ async function schiebeStapel(stapelEingang) {
   // ohne Inhaltsaenderung erreicht das Spiel nicht und ist kein Eingriff.
   await zaehleEingriff("push", stapel.slice(0, 5).join(", ")
     + (stapel.length > 5 ? " (+" + (stapel.length - 5) + ")" : ""), stapel.length);
+
+  // Der Freibrief ist ein Einmal-Ticket. Er wird eingeloest, sobald ein
+  // Schub ueber der Grenze wirklich hinausgeht - nicht schon beim Nachsehen.
+  if (stapel.length > SCHUB_MAX) {
+    await verbraucheSchubFrei();
+    try { await rm(SCHUB_OFFEN_DATEI, { force: true }); } catch { /* egal */ }
+    zurueckgestellt.clear();
+  }
 
   const jetzt = Date.now();
   if (jetzt - letzteSchubSicherung > SCHUB_SICHERUNG_ABSTAND_MS) {
@@ -1313,12 +1540,30 @@ async function schreibeRueckkanal() {
  * quelle+titel und reicht sie an tools/liste.js weiter, den einzigen
  * zugelassenen Schreiber.
  */
-const sofortGesehen = new Set();
+/**
+ * ENTDOPPLUNG MIT VERFALL (Skeptikerrunde 6).
+ *
+ * Vorher ein Set ohne Ablauf: EINE Meldung je Titel und Prozessleben, danach
+ * Stille. Bei einem Titel, der eine Konstante ist - "Grosser Schub
+ * verweigert" -, hiess das: die zweite und dritte Verweigerung waren
+ * unsichtbar. Das ist keine Meldungsflut, es ist das Gegenteil, und das ist
+ * schlimmer: der Mensch sieht einen Vorfall und haelt ihn fuer einmalig.
+ *
+ * Sechs Stunden sind lang genug, dass ein wiederkehrender Fehler nicht in
+ * jede Zeile schreibt, und kurz genug, dass ein Vorfall am Abend nicht durch
+ * einen am Morgen gedeckelt wird.
+ */
+const SOFORT_VERFALL_MS = 6 * 3600000;
+const sofortGesehen = new Map();
 
 async function sofortZeile(titel, text, quelle = "bruecke") {
   const schluessel = quelle + "|" + titel;
+  const jetztMs = Date.now();
+  for (const [k, t] of sofortGesehen) {
+    if (jetztMs - t > SOFORT_VERFALL_MS) sofortGesehen.delete(k);
+  }
   if (sofortGesehen.has(schluessel)) return;
-  sofortGesehen.add(schluessel);
+  sofortGesehen.set(schluessel, jetztMs);
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
   /**
@@ -1712,12 +1957,51 @@ function startDashboard() {
 function startRfaServer() {
   return new Promise((fertig) => {
   const wss = new WebSocketServer({ port: RFA_PORT, host: "127.0.0.1" });
+
+  /**
+   * TOTE SOCKETS ERNTEN (Skeptikerrunde 6, zwei Agenten unabhaengig).
+   *
+   * Diese Bruecke hatte kein Ping/Pong. Ein Tab, der abstuerzt, verworfen
+   * wird oder aus dem Standby nicht zurueckkommt, schickt keinen Close-Frame
+   * - der Server-Socket bleibt auf `readyState === 1` stehen, bis TCP
+   * irgendwann aufgibt. `data/bridge.log` zeigt fuer den 03./04.09. SIEBEN
+   * "Spiel verbunden" und NULL "getrennt".
+   *
+   * Folge: JEDER Reconnect traf eine "lebende" alte Verbindung an und lief
+   * in den Zweit-Tab-Zweig. Der haeufigste harmlose Vorgang im System sah
+   * damit aus wie der seltenste gefaehrliche.
+   *
+   * 30 s Takt, zwei verpasste Pongs, dann `terminate()`. Das ist der uebliche
+   * Zuschnitt fuer `ws` und deutlich kuerzer als die Drei-Sekunden-Frist der
+   * Zweitverbindungspruefung - wer tot ist, ist beim naechsten Verbinden weg.
+   */
+  const PING_MS = 30000;
+  const lebt = new WeakSet();
+  const pingTimer = setInterval(() => {
+    for (const sock of wss.clients) {
+      if (sock.readyState !== 1) continue;
+      if (!lebt.has(sock)) {
+        log("warn", "Socket antwortet nicht mehr auf Ping - wird beendet");
+        try { sock.terminate(); } catch { /* egal */ }
+        continue;
+      }
+      lebt.delete(sock);
+      try { sock.ping(); } catch { /* egal */ }
+    }
+  }, PING_MS);
+  pingTimer.unref?.();
+
   wss.on("listening", () => {
     console.log("  RFA-Port:   " + RFA_PORT + "  (im Spiel unter Options -> Remote API eintragen)");
     fertig();
   });
 
   wss.on("connection", async (socket) => {
+    // Frisch verbunden gilt als lebendig, sonst raeumte der erste Ping-Lauf
+    // eine Verbindung ab, die noch gar nicht gefragt wurde.
+    lebt.add(socket);
+    socket.on("pong", () => lebt.add(socket));
+
     if (gameSocket && gameSocket.readyState === 1) {
       /**
        * Frueher gewann hier IMMER die neue Verbindung. Ein zweiter Tab haette
@@ -1742,10 +2026,41 @@ function startRfaServer() {
       // fehlte, waren die beiden, die tatsaechlich schuetzen: der kuerzere
       // Sicherungstakt und die Sperre aller Eingriffe. Ein Alarm allein
       // beschreibt das Rennen, er gewinnt es nicht.
-      await setzeZweitTabAlarm(
-        "Zweite RFA-Verbindung auf Port " + RFA_PORT + ". Bestehende Verbindung " +
-          (alteLebt ? "antwortete" : "schwieg") + ".",
-      );
+      //
+      // ABER NUR, WENN DIE ALTE VERBINDUNG ANTWORTET (Skeptikerrunde 6, zwei
+      // Agenten unabhaengig voneinander).
+      //
+      // Der erste Entwurf setzte die Sperre in BEIDEN Zweigen. Der Zweig
+      // "schweigt" ist aber die Signatur eines RECONNECTS, nicht eines
+      // zweiten Tabs: der alte Socket steht noch auf readyState 1 und
+      // antwortet nicht mehr. Das erzeugen die harmlosesten Vorgaenge -
+      // Rueckkehr aus dem Standby, Tab-Discard, ein Neuladen der Seite, ein
+      // verdeckter Tab, der wegen der Drosselung (gemessen: 1 Timer-Wake je
+      // Minute) die Drei-Sekunden-Frist reisst.
+      //
+      // Und `data/bridge.log` zeigt fuer den 03./04.09. SIEBEN "Spiel
+      // verbunden" und NULL "getrennt" - tote Sockets werden hier nie
+      // geerntet. Der Reconnect ist damit das haeufigste Ereignis im System,
+      // nicht das seltenste.
+      //
+      // Eine Sperre, die nur ein Mensch aufheben kann, im haeufigsten
+      // harmlosen Fall zu setzen, waere im Nachtbetrieb Risiko statt Schutz:
+      // der Bot laeuft weiter, aber nichts kommt mehr herein, und niemand
+      // sieht hin. Zwei Sockets, die BEIDE antworten, sind dagegen kein
+      // Verdacht mehr, sondern ein Befund.
+      if (alteLebt) {
+        await setzeZweitTabAlarm(
+          "Zweite RFA-Verbindung auf Port " + RFA_PORT + ", waehrend die " +
+            "bestehende noch antwortet - zwei Spiele auf demselben Spielstand.",
+        );
+      } else {
+        log(
+          "warn",
+          "Zweite Verbindung, aber die alte schweigt - als Reconnect gewertet, " +
+            "KEINE Sperre. (Ein Save-Rennen zeigt sich an sinkendem totalPlaytime; " +
+            "diesen Detektor traegt die Sicherungspruefung.)",
+        );
+      }
 
       await alarm(
         "Zweite RFA-Verbindung",
@@ -1912,11 +2227,19 @@ setInterval(() => {
 
 setInterval(async () => {
   // Steht der Zweit-Tab-Verdacht, wird alle fuenf Minuten gesichert statt
-  // stuendlich (Auftrag 7.1.1, Befund W.6). Der Anlassname bleibt "hourly",
-  // damit die Rotation greift - der Takt steht im Alarm, nicht im Namen.
-  const takt = (await zweitTabAlarm()) ? ZWEITTAB_SICHERUNG_MS : STUNDENSICHERUNG_MS;
+  // stuendlich (Auftrag 7.1.1, Befund W.6).
+  //
+  // UND UNTER EIGENEM ANLASSNAMEN (Skeptikerrunde 6). Der erste Entwurf
+  // behielt "hourly" - "damit die Rotation greift". Sie greift dann auch:
+  // `ANLAESSE.hourly` ist ein Stueckzahldeckel (48), kein Altersdeckel. Nach
+  // genau vier Stunden stehendem Alarm waere jede Sicherung von VOR dem
+  // Vorfall herausrotiert - also der Bestand, aus dem man wiederherstellt,
+  // und der Beleg, den die Alarmmeldung selbst anfordert. Die Massnahme
+  // haette unbeaufsichtigt genau das weggeraeumt, was sie schuetzen soll.
+  const rennen = !!(await zweitTabAlarm());
+  const takt = rennen ? RACE_TAKT_MS : STUNDENSICHERUNG_MS;
   if (Date.now() - letzteStundensicherung < takt) return;
   if (!istVerifiziert()) return;
   letzteStundensicherung = Date.now();
-  void sichereJetzt("hourly");
-}, 60000);
+  void sichereJetzt(rennen ? "race" : "hourly");
+}, TIMER_TAKT_MS);

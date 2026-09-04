@@ -357,6 +357,18 @@ const ZEIT = {
   rennen: BASIS + 55 * STUNDE,
   sperre: BASIS + 60 * STUNDE,
   schub: BASIS + 65 * STUNDE,
+  // DIE REIHENFOLGE HIER IST DIE REIHENFOLGE IM DATEIABLAUF, und das ist
+  // keine Kosmetik: jede verifizierte Verbindung hebt den Sicherungsanker.
+  // Ein spaeterer Abschnitt mit kleinerer Spielzeit wird als
+  // Rueckwaertssprung abgewiesen - und dann misst er nichts mehr, sondern
+  // nur noch die Ablehnung. Genau das ist beim ersten Lauf der Taktprobe
+  // passiert (04.09.2026): 80 h nach 90 h, null Rennsicherungen, und der
+  // Befund sah aus wie ein Fehler im Takt.
+  watcherSperre: BASIS + 70 * STUNDE,
+  verfall: BASIS + 75 * STUNDE,
+  grenze: BASIS + 80 * STUNDE,
+  takt: BASIS + 85 * STUNDE,
+  reconnect: BASIS + 90 * STUNDE,
 };
 
 /**
@@ -616,16 +628,48 @@ console.log("-- WEGWERFDATEIEN DES PRUEFSTANDS gehen NIE ins Spiel (B3) --");
   //
   // Verschaerft nach dem Hot-Swap: faellt der Worktree weg, schreibt jeder
   // Test in `bitburner/src` selbst.
+  //
+  // ---------------------------------------------------------------------
+  // UND GENAU DAS TAT DIESER ABSCHNITT SELBST (gefunden 04.09.2026 14:20).
+  //
+  // Er legte seine beiden Koeder bis heute in den ECHTEN `src/`-Ordner -
+  // also in den, den die LIVE-Bruecke beobachtet. Der Riegel `NIE_SCHIEBEN`
+  // ist zwar gebaut, aber der LAUFENDE Brueckenprozess stammt von VOR dem
+  // Einbau. Im Brueckenprotokoll steht die Folge, einmal je Testlauf:
+  //
+  //     12:00:58  Nachgeschoben: .mock-koeder-12884.js
+  //     12:01:59  Nachgeschoben: .mock-koeder-22856.js
+  //     12:03:15  Nachgeschoben: .mock-koeder-10644.js
+  //
+  // Ein Test, der die Zusicherung "Wegwerfdateien gehen NIE ins Spiel"
+  // prueft, hat sie beim Pruefen selbst verletzt. Das ist derselbe
+  // Fehlertyp wie der Sicherungsanker aus Runde 5 (A-B1): der Pruefstand
+  // benutzt die Ablage, die er schuetzen soll.
+  //
+  // Seit heute gibt es `--src-dir` (fuer LIVE gesperrt). Der Abschnitt
+  // beobachtet damit einen EIGENEN Ordner und prueft trotzdem dieselbe
+  // Sache - nur ohne Erics Spiel anzufassen.
+  // ---------------------------------------------------------------------
   const rfa = await freierPort();
   const dash = await freierPort();
+  const quellRel = path.join("pruefstand", "koeder-" + process.pid);
+  const srcDir = path.join(ROOT, quellRel);
+  fs.rmSync(srcDir, { recursive: true, force: true });
+  fs.mkdirSync(srcDir, { recursive: true });
+  tempOrdner.push(srcDir);
+  // Eine echte Datei muss dabei sein - sonst ist "ueberhaupt wurde
+  // geschoben" nicht zu haben, und die Probe koennte gruen werden, weil
+  // gar nichts hinausging.
+  fs.writeFileSync(path.join(srcDir, "echt.js"), "// echt" + String.fromCharCode(10), "utf8");
+
   const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
-    "--dash-port", String(dash), "--no-watch", "--data-dir", frischerDatenordner()]);
+    "--dash-port", String(dash), "--no-watch", "--data-dir", frischerDatenordner(),
+    "--src-dir", quellRel]);
   merkeZumAufraeumen(b.proc);
   await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
 
   // Zwei Koeder in den beobachteten Ordner: einer mit der Endung, die der
   // Lader heute waehlt, und einer mit der, die jemand morgen waehlen koennte.
-  const srcDir = path.join(ROOT, "src");
   const koeder = [
     path.join(srcDir, ".mock-koeder-" + process.pid + ".mjs"),
     path.join(srcDir, ".mock-koeder-" + process.pid + ".js"),
@@ -1003,6 +1047,12 @@ console.log("-- die ZWEIT-TAB-SPERRE: kein Schreiben, solange sie steht (W.6) --
   await schlaf(300);
   pruefe("nach dem Loeschen der Datei geht es ohne Neustart weiter",
     (await schreibe()) === 200);
+  // 200 allein sagt nur, dass die Bruecke geantwortet hat. Angekommen ist die
+  // Datei erst, wenn das nachgebaute Spiel sie hat (Skeptikerrunde 6, 1.6).
+  await schlaf(500);
+  pruefe("  und die Datei ist im Spiel angekommen",
+    spiel.dateien.has("home:zzz-sperre.js"),
+    [...spiel.dateien.keys()].join(", "));
 
   spiel.schliessen();
   b.proc.kill();
@@ -1069,8 +1119,12 @@ console.log("-- der SCHUBDECKEL: ein Merge ist keine Einspielung (B.3) --");
   const vorher = b.zeilen.length;
   schreibeAlle("merge");
   await schlaf(3000);
-  pruefe("zwoelf auf einmal werden VERWEIGERT",
-    b.zeilen.slice(vorher).some((z) => /Schub verweigert/i.test(z)),
+  // AUF DEN GRUND PRUEFEN, NICHT AUF DEN SATZ (Skeptikerrunde 6, 1.4).
+  // "Schub verweigert" schreibt die Bruecke an ZWEI Stellen - hier und bei
+  // der Zweit-Tab-Sperre. Ein Muster, das beide trifft, prueft nicht, welche
+  // von beiden gegriffen hat.
+  pruefe("zwoelf auf einmal werden VERWEIGERT, und zwar wegen SCHUB_MAX",
+    b.zeilen.slice(vorher).some((z) => /> SCHUB_MAX/.test(z)),
     b.zeilen.slice(vorher).slice(-3).join(" | "));
   pruefe("und nichts davon erreicht das Spiel",
     !DATEIEN.some((d) => (spiel.dateien.get("home:" + d) || "").includes("merge")),
@@ -1087,6 +1141,288 @@ console.log("-- der SCHUBDECKEL: ein Merge ist keine Einspielung (B.3) --");
     DATEIEN.filter((d) => !(spiel.dateien.get("home:" + d) || "").includes("frei")).join(", "));
 
   spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die Sperre haelt AUCH den Watcher und AUCH pushAll (R6, 1.1) --");
+{
+  // DER GEFAEHRLICHSTE DER FUENF WEGE HATTE KEINE PROBE.
+  //
+  // Ein Skeptiker hat es gefunden: `grep -rn "zweittab-alarm" tools/` traf
+  // nur den RPC-Abschnitt. Die Mutation `if (za) {` -> `if (false) {` im
+  // Schub-Pfad waere gruen geblieben - und dann ginge bei stehender Sperre
+  // jede gespeicherte Datei still ins Spiel, ueber den Weg, den der Kommentar
+  // selbst "den stillsten aller Wege" nennt.
+  //
+  // Seit Runde 6 sitzt der Riegel in `pushFile`, also in der Engstelle. Diese
+  // Proben pruefen ihn an den beiden Wegen, die ihn frueher umgingen.
+  //
+  // ZUR EHRLICHKEIT: die Eigenschaft ist doppelt gesichert - der alte Riegel
+  // im Schub-Pfad und der neue in `pushFile`. Gemessen (04.09.2026): jede
+  // EINZELNE der beiden Mutationen laesst diese Probe gruen, erst beide
+  // zusammen machen sie rot. Sie nagelt also die EIGENSCHAFT fest, nicht eine
+  // bestimmte Zeile - was hier richtig ist, aber gesagt gehoert.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "wsperre-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+  fs.writeFileSync(path.join(quellAbs, "a.js"), "// eins" + String.fromCharCode(10), "utf8");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel, "--src-dir", quellRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.watcherSperre }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(1500);
+  pruefe("ohne Sperre geht eine geaenderte Datei ins Spiel",
+    spiel.dateien.has("home:a.js"));
+
+  // Jetzt sperren und dieselbe Datei aendern.
+  fs.writeFileSync(path.join(ROOT, datenRel, "zweittab-alarm.json"), JSON.stringify({
+    at: new Date().toISOString(), ts: Date.now(), text: "Probe Watcher",
+  }), "utf8");
+  await schlaf(300);
+  fs.writeFileSync(path.join(quellAbs, "a.js"), "// zwei" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("mit Sperre erreicht die Aenderung das Spiel NICHT",
+    !(spiel.dateien.get("home:a.js") || "").includes("zwei"),
+    String(spiel.dateien.get("home:a.js")).trim());
+  pruefe("und die Bruecke sagt, warum",
+    b.zeilen.some((z) => /Zweit-Tab-Sperre/i.test(z)),
+    b.zeilen.slice(-2).join(" | "));
+
+  // Und der lauteste Weg: eine neue Verbindung, also pushAll.
+  const vorAll = spiel.dateien.size;
+  spiel.schliessen();
+  await schlaf(1000);
+  const spiel2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.watcherSperre + 60000 }));
+  await schlaf(5000);
+  pruefe("auch pushAll beim Verbinden schreibt unter Sperre nichts",
+    spiel2.dateien.size === 0,
+    spiel2.dateien.size + " Datei(en) trotz Sperre - vorher waren es " + vorAll);
+
+  spiel2.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Freibrief VERFAELLT nach 30 Minuten (R6, 1.2) --");
+{
+  // Eine Mutation `return !!st;` waere bis Runde 6 gruen geblieben. Dann
+  // waere der Freibrief unbefristet: eine einmal angelegte Datei schaltete
+  // den Deckel dauerhaft ab - "eine abgeschaltete Sicherung", wie der
+  // Entwurfskommentar es selbst nennt.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "verfall-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+  const DATEIEN = [];
+  for (let i = 1; i <= 12; i++) DATEIEN.push("v" + i + ".js");
+  const schreibeAlle = (t) => {
+    for (const d of DATEIEN) {
+      fs.writeFileSync(path.join(quellAbs, d), "// " + t + String.fromCharCode(10), "utf8");
+    }
+  };
+  schreibeAlle("start");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel, "--src-dir", quellRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.verfall }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(1500);
+
+  // Ein Freibrief, der 31 Minuten alt ist. `utimesSync` ist der einzige Weg,
+  // das zu stellen, ohne eine halbe Stunde zu warten.
+  const frei = path.join(ROOT, datenRel, "schub-frei.txt");
+  fs.writeFileSync(frei, "alt", "utf8");
+  const alt = (Date.now() - 31 * 60000) / 1000;
+  fs.utimesSync(frei, alt, alt);
+
+  const vorher = b.zeilen.length;
+  schreibeAlle("verfallen");
+  await schlaf(3000);
+  pruefe("ein 31 Minuten alter Freibrief gilt NICHT",
+    b.zeilen.slice(vorher).some((z) => /> SCHUB_MAX/.test(z)),
+    b.zeilen.slice(vorher).slice(-3).join(" | "));
+  pruefe("  und nichts davon erreicht das Spiel",
+    !DATEIEN.some((d) => (spiel.dateien.get("home:" + d) || "").includes("verfallen")));
+
+  // Gegenprobe: derselbe Freibrief, frisch.
+  fs.writeFileSync(frei, "frisch", "utf8");
+  await schlaf(300);
+  const vorher2 = b.zeilen.length;
+  schreibeAlle("frisch");
+  await schlaf(3500);
+  pruefe("ein frischer Freibrief laesst denselben Schub durch",
+    DATEIEN.every((d) => (spiel.dateien.get("home:" + d) || "").includes("frisch")),
+    DATEIEN.filter((d) => !(spiel.dateien.get("home:" + d) || "").includes("frisch")).join(", "));
+  // POSITIV pruefen, nicht nur am Ergebnis (Skeptikerrunde 6, 1.3): ein
+  // Stapel, der wegen der Entprellung in zwei Haelften zerfaellt, kaeme auch
+  // ohne Freibrief durch - und die Probe waere aus dem falschen Grund gruen.
+  pruefe("  und es war wirklich EIN grosser Stapel",
+    b.zeilen.slice(vorher2).some((z) => /12 Dateien zusammen nachgeschoben/i.test(z)),
+    b.zeilen.slice(vorher2).slice(-3).join(" | "));
+  // Einmal-Ticket: nach dem Durchgang ist er weg.
+  pruefe("  und der Freibrief ist danach verbraucht", !fs.existsSync(frei));
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die Grenze liegt bei genau 8 (R6, 1.5) --");
+{
+  // Vorher sicherte der Test nur das Intervall 3 < SCHUB_MAX < 12 - `11`
+  // haette beide Proben bestanden. Hier sind es genau acht und genau neun.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "grenze-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+  const ALLE = [];
+  for (let i = 1; i <= 9; i++) ALLE.push("g" + i + ".js");
+  for (const d of ALLE) {
+    fs.writeFileSync(path.join(quellAbs, d), "// start" + String.fromCharCode(10), "utf8");
+  }
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel, "--src-dir", quellRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.grenze }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(1500);
+
+  const acht = ALLE.slice(0, 8);
+  for (const d of acht) {
+    fs.writeFileSync(path.join(quellAbs, d), "// acht" + String.fromCharCode(10), "utf8");
+  }
+  await schlaf(3000);
+  pruefe("genau acht gehen durch",
+    acht.every((d) => (spiel.dateien.get("home:" + d) || "").includes("acht")),
+    acht.filter((d) => !(spiel.dateien.get("home:" + d) || "").includes("acht")).join(", "));
+
+  const vorher = b.zeilen.length;
+  for (const d of ALLE) {
+    fs.writeFileSync(path.join(quellAbs, d), "// neun" + String.fromCharCode(10), "utf8");
+  }
+  await schlaf(3000);
+  pruefe("genau neun werden verweigert",
+    b.zeilen.slice(vorher).some((z) => /> SCHUB_MAX/.test(z)),
+    b.zeilen.slice(vorher).slice(-3).join(" | "));
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- unter Sperre wird OEFTER gesichert, und unter eigenem Anlass (R6, 1.7) --");
+{
+  // `ZWEITTAB_SICHERUNG_MS` liess sich auf fuenf STUNDEN setzen, ohne dass
+  // eine der 59 Proben rot wurde - der Takt war eine Zusicherung ohne Probe.
+  // Messbar wird er ueber `--race-takt-ms` (fuer LIVE gesperrt).
+  //
+  // Und der Anlassname ist der zweite Teil des Befunds: unter "hourly" haette
+  // der Stueckzahldeckel (48) die Historie in vier Stunden auf vier
+  // zusammengeschnurrt.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const sperrDatei = path.join(ROOT, datenRel, "zweittab-alarm.json");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", datenRel,
+    "--race-takt-ms", "2000"]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.takt }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(2000);
+
+  const vorher = b.zeilen.filter((z) => /Sicherung race gruen/i.test(z)).length;
+  pruefe("ohne Sperre gibt es keine Rennsicherung", vorher === 0);
+
+  fs.writeFileSync(sperrDatei, JSON.stringify({
+    at: new Date().toISOString(), ts: Date.now(), text: "Probe Takt",
+  }), "utf8");
+  await schlaf(7000);
+  const nachher = b.zeilen.filter((z) => /Sicherung race gruen/i.test(z)).length;
+  pruefe("mit Sperre entstehen Sicherungen im Renntakt", nachher >= 2,
+    nachher + " Rennsicherung(en) in 7 s bei 2 s Takt");
+  pruefe("  und sie heissen NICHT hourly - sonst frisst der Deckel die Historie",
+    !b.zeilen.some((z) => /Sicherung hourly gruen/i.test(z)),
+    b.zeilen.filter((z) => /Sicherung .* gruen/i.test(z)).slice(-2).join(" | "));
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- ein RECONNECT ist kein zweiter Tab (R6, Praemisse) --");
+{
+  // Der erste Entwurf setzte die Sperre in BEIDEN Zweigen. Der Zweig, in dem
+  // die alte Verbindung SCHWEIGT, ist aber die Signatur eines Reconnects -
+  // und ohne Ping/Pong (bis heute) war das der haeufigste Vorgang im System.
+  // Eine Sperre, die nur ein Mensch aufheben kann, im haeufigsten harmlosen
+  // Fall zu setzen, waere im Nachtbetrieb Risiko statt Schutz.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", datenRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+
+  // Die erste Verbindung antwortet auf getSaveFile, aber NICHT auf
+  // getFileMetadata - genau der Zustand eines toten Tabs, der noch offen ist.
+  const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.reconnect }),
+    { stummBeiMetadata: true });
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+
+  // Hoehere Spielzeit als s1: der Anker steht nach dessen Verifikation, und
+  // ein gleich alter Stand faellt als Rueckwaertssprung durch - dann pruefte
+  // dieser Abschnitt die Ablehnung statt den Reconnect.
+  const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.reconnect + 3600000 }));
+  await schlaf(7000);
+
+  const sperrDatei = path.join(ROOT, datenRel, "zweittab-alarm.json");
+  pruefe("die schweigende alte Verbindung wird ersetzt",
+    b.zeilen.some((z) => /schwieg|ersetzt/i.test(z)),
+    b.zeilen.slice(-3).join(" | "));
+  pruefe("und es wird KEINE Sperre gesetzt", !fs.existsSync(sperrDatei),
+    "ein Reconnect darf den Bot nicht bis zum naechsten Menschen anhalten");
+  pruefe("die Bruecke sagt trotzdem, dass sie es gesehen hat",
+    b.zeilen.some((z) => /Reconnect gewertet/i.test(z)),
+    b.zeilen.slice(-3).join(" | "));
+
+  s1.schliessen();
+  s2.schliessen();
   b.proc.kill();
   await b.exit;
 }

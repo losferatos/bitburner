@@ -76,9 +76,33 @@ sag Eric das in einem Halbsatz.
 `nodes/AUDIT-ROADMAP-2026-08-24.md`. Jede Änderung braucht ein grünes
 `node tools/test-route.js`.
 
-## 3. Wenn etwas schiefläuft — die zwei Fragen, die es meistens sind
+## 3. Wenn etwas schiefläuft — die drei Fragen, die es meistens sind
 
 Bevor du irgendetwas anderes vermutest:
+
+- **Steht die Zweit-Tab-Sperre?** `data/zweittab-alarm.json` — wenn diese
+  Datei liegt, geht seit ihrem Zeitstempel **nichts** mehr ins Spiel: kein
+  Hot-Swap, kein `tools/task.js`, kein `tools/hand.js`, kein
+  `tools/nightshift.js`. Der Bot läuft im Spiel ungehindert weiter, aber von
+  außen ist er nicht mehr erreichbar, und das sieht von hier aus wie „das
+  Werkzeug antwortet nicht".
+
+  Die Brücke setzt sie nur, wenn sich eine zweite RFA-Verbindung meldet
+  **während die bestehende noch antwortet** — also wenn zwei Spiele auf
+  demselben Spielstand laufen. Das ist kein Verdacht, sondern ein Befund, und
+  der Schaden daran (zwei Instanzen autosaven alle 60 s in dieselbe
+  IndexedDB, der letzte gewinnt) ist genau der, den Eric ausgeschlossen haben
+  will.
+
+  **Aufheben darf nur ein Mensch**, und erst nachdem geklärt ist, ob wirklich
+  ein zweiter Tab offen war: `totalPlaytime` in den letzten Sicherungen
+  ansehen (`backups/INDEX.tsv`) — sinkt sie irgendwo, hat ein zweiter Stand
+  geschrieben. Sonst war es ein Fehlalarm. Danach die Datei löschen; ein
+  Brückenneustart ist dafür **nicht** nötig und wäre selbst ein Eingriff.
+
+  Solange sie steht, sichert die Brücke alle fünf Minuten unter dem Anlass
+  `race` (nicht `hourly` — sonst fräße der Stückzahldeckel in vier Stunden
+  genau die Historie weg, die man zum Nachsehen braucht).
 
 - **War der Rechner aus oder der Tab verdeckt?** Ein verdeckter Tab wird
   hart gedrosselt; ein ausgeschalteter Rechner schreibt beim Laden die

@@ -341,6 +341,56 @@ if (NUR_PRUEFEN || !dateien.length) {
 // sobald sich eine Datei unter src/ aendert - dieses Werkzeug ruehrt die
 // Dateien deshalb nur an (mtime), wartet auf die Bestaetigung und loest dann
 // den Neustart aus.
+// ---------------------------------------------------------------------------
+// DER FREIBRIEF (Skeptikerrunde 6)
+// ---------------------------------------------------------------------------
+//
+// Seit dem 04.09.2026 deckelt die Bruecke einen Watcher-Schub bei acht
+// Dateien (`SCHUB_MAX`) - gegen den Fall, dass ein `git merge` vierzig
+// Dateien in einer Sekunde ins laufende Spiel legt, ohne Checkliste und ohne
+// Reihenfolge.
+//
+// Der Kommentar dort behauptete, `data/schub-frei.txt` sei "der bewusste
+// Handgriff, den `tools/hotswap.js` verlangt". Dieses Werkzeug kannte die
+// Datei nicht einmal. Zwei Skeptiker haben es unabhaengig gefunden: der
+// Deckel haette beim ersten echten Hot-Swap zugeschlagen, und jemand haette
+// die Datei unter Zeitdruck von Hand angelegt - genau die Bedienung, die ein
+// Sicherungsmechanismus nicht haben darf.
+//
+// Jetzt legt die Checkliste ihn selbst an, und zwar ERST HIER: nach dem
+// letzten gruenen Punkt und nur, wenn wirklich eingespielt wird. Der Deckel
+// heisst damit "kein Schub, den die Checkliste nicht freigegeben hat" - das
+// ist die eigentliche Absicht - statt "kein Schub ueber acht Dateien", was
+// nur eine Stellvertretergroesse ist.
+//
+// Die Bruecke loescht ihn wieder, sobald ein grosser Schub durchgegangen ist
+// (Einmal-Ticket), und er verfaellt ohnehin nach 30 Minuten.
+const SCHUB_MAX = 8;
+if (dateien.length > SCHUB_MAX) {
+  const ziel = TEST
+    ? path.join(ROOT, "pruefstand", "data", "schub-frei.txt")
+    : path.join(ROOT, "data", "schub-frei.txt");
+  const ordner = path.dirname(ziel);
+  try {
+    fs.mkdirSync(ordner, { recursive: true });
+    fs.writeFileSync(ziel,
+      "Freigegeben von tools/hotswap.js am " + new Date().toISOString()
+      + " fuer " + dateien.length + " Datei(en):" + String.fromCharCode(10)
+      + dateien.join(String.fromCharCode(10)) + String.fromCharCode(10), "utf8");
+    console.log("  Freibrief gelegt: " + path.relative(ROOT, ziel));
+    console.log("    " + dateien.length + " Dateien liegen ueber dem Deckel ("
+      + SCHUB_MAX + "). Ohne ihn wuerde die Bruecke den Schub verweigern.");
+    console.log("    Er gilt 30 Minuten und wird nach dem ersten grossen Schub");
+    console.log("    von der Bruecke geloescht - er ist ein Einmal-Ticket.");
+    console.log("");
+  } catch (e) {
+    console.log("  ACHTUNG: Freibrief liess sich nicht legen (" + e.message + ").");
+    console.log("    Die Bruecke wird den Schub verweigern. Datei von Hand anlegen:");
+    console.log("      " + ziel);
+    console.log("");
+  }
+}
+
 console.log("  Dateien werden von der Bruecke nachgeschoben (sie beobachtet src/).");
 console.log("  Falls sie schon geschoben wurden, steht es im Protokoll:");
 console.log("");

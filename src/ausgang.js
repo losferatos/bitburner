@@ -149,6 +149,9 @@ export async function main(ns) {
   // bilden, zwischen denen der Bot gar nicht lief.
   let hackPunkte = [];
   let rangPunkte = [];
+  // Zaehlt, wie oft exit.js den Sprung ABGELEHNT hat (Zielpruefung seit C.3).
+  let exitAbgelehnt = 0;
+  let exitAblehnungGrund = "";
   let letzterKnoten = null;
 
   // Die Freischaltschwellen der 21 Black Operations. Erzeugt von
@@ -358,6 +361,8 @@ export async function main(ns) {
         ueberBlackOps, ueberHacking, status, letzterStart,
         eta_min: etaMin, eta_sicher: etaSicher, eta_quelle: etaQuelle,
         route_state: routeZustand(plan),
+        exit_abgelehnt: exitAbgelehnt,
+        exit_ablehnung_grund: exitAbgelehnt > 0 ? exitAblehnungGrund : null,
         uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })),
       }));
 
@@ -400,8 +405,34 @@ export async function main(ns) {
       // starten, sondern den Grund protokollieren und 15 Minuten warten.
       if (letzterStart > 0 && Date.now() - letzterStart < 15 * TAKT_MS) {
         const grund = liesVonHome("data/exit.txt").trim().split("\n").pop() || "(exit.txt leer)";
-        const m = "exit.js endete ohne Sprung - letzte Zeile: " + grund + " - naechster Versuch in 15 min.";
+
+        // EINE ABLEHNUNG IST ETWAS ANDERES ALS EIN FEHLSCHLAG (Skeptiker 04.09.).
+        //
+        // Seit exit.js sein Ziel gegen die Route prueft, gibt es einen neuen
+        // Ausgang: der Sprung wird ABGELEHNT. Das ist richtig so - aber ohne
+        // eigenen Zaehler sieht es aus wie jeder andere Fehlversuch, und
+        // checkin.js liest `offen && letzterStart > 0` als "der Sprung laeuft"
+        // und meldet URTEIL: SPRINGT. Ein Bot, der seit Tagen alle 15 Minuten
+        // ablehnt, saehe damit gesund aus.
+        if (/ABGELEHNT/i.test(grund)) {
+          exitAbgelehnt++;
+          exitAblehnungGrund = grund;
+        }
+
+        const m = "exit.js endete ohne Sprung - letzte Zeile: " + grund
+          + (exitAbgelehnt > 0 ? "  [" + exitAbgelehnt + ". Ablehnung]" : "")
+          + " - naechster Versuch in 15 min.";
         if (letzteMeldung !== m) { sag(m); letzteMeldung = m; }
+
+        // Nach vier Ablehnungen (also einer Stunde) ist es kein Ausrutscher
+        // mehr. Der Befund geht in die Telemetrie, damit ihn jemand findet -
+        // ein Stillstand ohne Ruf ist die Fehlerklasse, die dieser Umbau
+        // abschafft.
+        if (exitAbgelehnt === 4) {
+          sag("BEFUND: exit.js lehnt den Sprung seit einer Stunde ab. Grund: "
+            + exitAblehnungGrund + " - route.json und der Spielstand passen"
+            + " nicht zusammen, oder eine Datei fehlt auf dem Wirt.");
+        }
         await ns.sleep(TAKT_MS); continue;
       }
       const braucht = ns.getScriptRam("exit.js", "home");
@@ -422,14 +453,39 @@ export async function main(ns) {
       // fertig - dann darf auf dem groessten Rechner alles weichen ausser
       // bn4net und diesem Skript. Es geht nichts verloren, was im naechsten
       // Knoten noch etwas wert waere.
+      // RAEUMEN IN EINER REIHENFOLGE, NICHT IN DER, DIE ns.ps LIEFERT (L5).
+      //
+      // Bisher lief die Schleife in Prozessreihenfolge durch und toetete, was
+      // ihr zuerst begegnete. Das ist eine Zufallsauswahl: mal faellt ein
+      // share-Faden, mal ein hack-Faden mitten im Stapel. Ein abgebrochener
+      // hack verliert den ganzen Vorlauf aus weaken und grow; ein share
+      // verliert nichts als ein paar Prozent Reputation.
+      //
+      // Deshalb eine feste Rangfolge, billigster Verlust zuerst:
+      //   share -> weaken -> grow -> hack -> alles Uebrige
+      //
+      // SCHONLISTE (L3): drei Prozesse werden nie geraeumt. Der Kern und
+      // dieses Skript standen schon da; neu ist der Waechter, sobald es ihn
+      // gibt (Position C.6) - er ist die Instanz, die einen missglueckten
+      // Sprung ueberhaupt bemerken wuerde, und wer ihn wegraeumt, raeumt seine
+      // eigene Aufsicht weg.
+      const NIE_RAEUMEN = ["bn4net.js", "ausgang.js", "guard.js", "waechter.js"];
+      const raeumRang = (datei) => {
+        const i = WORKER.indexOf(datei);
+        return i === -1 ? WORKER.length : i;   // Unbekanntes zuletzt
+      };
       const raeume = (h, auchWerkzeuge) => {
-        for (const p of ns.ps(h)) {
+        const liste = [...ns.ps(h)]
+          .filter((p) => !NIE_RAEUMEN.includes(p.filename))
+          .filter((p) => auchWerkzeuge || WORKER.includes(p.filename))
+          .sort((a, b) => raeumRang(a.filename) - raeumRang(b.filename));
+        let getoetet = 0;
+        for (const p of liste) {
           if (frei(h) >= braucht) break;
-          const arbeiter = WORKER.includes(p.filename);
-          if (!arbeiter && !auchWerkzeuge) continue;
-          if (p.filename === "bn4net.js" || p.filename === "ausgang.js") continue;
           ns.kill(p.pid);
+          getoetet++;
         }
+        return getoetet;
       };
       if (frei(wirt) < braucht) {
         raeume(wirt, false);
@@ -469,7 +525,22 @@ export async function main(ns) {
         }));
         await ns.sleep(TAKT_MS); continue;
       }
-      if (wirt !== "home") ns.scp(["exit.js", ...BIBLIOTHEKEN], wirt, "home");
+      // ns.scp WIRFT NICHT - es gibt `false` zurueck (NetscriptFunctions.ts:803-809).
+      //
+      // Fehlt eine Datei, loggt es intern, kopiert den Rest und meldet den
+      // Teilausfall nur ueber den Rueckgabewert. Ausgewertet wurde der bisher
+      // nicht, und die Folgen sind alle dauerhaft und alle still: ohne
+      // lib/route.js startet exit.js gar nicht, ohne route.json lehnt es jeden
+      // Sprung ab, ohne lib/hackaugs.js fehlt ihm die Augmentierungslogik.
+      if (wirt !== "home") {
+        const ok = ns.scp(["exit.js", ...BIBLIOTHEKEN], wirt, "home");
+        if (!ok) {
+          const fehlend = ["exit.js", ...BIBLIOTHEKEN].filter((d) => !ns.fileExists(d, wirt));
+          sag("BEFUND: Dateien fehlen auf " + wirt + " - " +
+            (fehlend.length ? fehlend.join(", ") : "scp meldete einen Teilausfall") +
+            ". exit.js startet damit nicht oder lehnt jeden Sprung ab.");
+        }
+      }
       const pid = ns.exec("exit.js", wirt, 1, ziel.node);
       letzterStart = Date.now();
       sag(pid

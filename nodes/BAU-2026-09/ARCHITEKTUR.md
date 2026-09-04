@@ -366,7 +366,7 @@ Resident **16,85**, mit `boot.js` **22,35**.
 | Modul | Zweck | RAM 41 | RAM 43 | Abhängigkeiten | Test |
 |---|---|---:|---:|---|---|
 | `src/lib/reg.js` | reiner Registry-Leser, berührt kein `ns` | **0,00 P** | 0,00 | — | Ebene 0: Importeur wird durch den Import nicht teurer (die `lib/calc.js`-Lehre, `bn4net.js:3228-3234`, als Test statt als Kommentar) |
-| `src/shop.js` | `ns.cloud.*` — Rechnerkauf, Ausbau, Kaltstart-Leiter, `deleteServer` für die `exit.js`-Räumkette | **7,60 P** | 7,60 P | `data/buy-request.json` | Ebene 2: Preisformel gegen `ServerPurchases.ts`; Ebene 3: echter Kauf im Klon |
+| `src/shop.js` | `ns.cloud.*` — Rechnerkauf, Ausbau, Kaltstart-Leiter, `deleteServer` für die `exit.js`-Räumkette | **7,00 G** | 7,00 G | — (bedingungslos: er ist der Preislieferant) | Ebene 2: Preisformel gegen `ServerPurchases.ts`; Ebene 3: echter Kauf im Klon |
 | `src/punish.js` | Vollstrecker der Sprosse 5; liest `data/aug-queue.json` statt 80 GB für `getOwnedAugmentations` auszugeben | **82,60 P** | 7,60 P | `data/penalty-order.json`, `aug-queue.json` | Ebene 2: alle acht Vorbedingungen; Ebene 3: Trockenlauf im Klon |
 | `src/figwatch.js` | Vergleicht die vergebene mit der laufenden Handlung, meldet `figure_conflict` | **35,15 P** | 5,15 P | `data/figure.txt` | Ebene 2: Mock mit abweichender Handlung |
 | `src/boerse.js` | BN8-Gewerk | — | — | `route.json` Positionen 38–40 | Ebene 3 mit gesetztem Knoten |
@@ -465,9 +465,9 @@ nicht in einen Kommentar.
     {
       "name": "bn4net.js",
       "args": [],
-      "ramBaseGb": 10.75,
+      "ramBaseGb": 10.8,
       "ramSingGb": 0,
-      "ramMeasuredAt": "PLAN-nach-Diaet",
+      "ramMeasuredAt": "GEMESSEN-2026-09-04",
       "ramHeuteGb": 17.75,
       "verfahren": "alle",
       "knoten": "alle",
@@ -492,9 +492,9 @@ nicht in einen Kommentar.
     {
       "name": "guard.js",
       "args": [],
-      "ramBaseGb": 6.1,
+      "ramBaseGb": 3.85,
       "ramSingGb": 0,
-      "ramMeasuredAt": "PLAN-vor-Bau",
+      "ramMeasuredAt": "GEMESSEN-2026-09-04",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
@@ -523,7 +523,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
-      "telemetryFile": "data/wakelock.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 600000,
       "taktMs": 60000,
@@ -547,7 +547,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "kaltstart",
-      "telemetryFile": "data/cdump.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 300000,
@@ -573,7 +573,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "kaltstart",
-      "telemetryFile": "data/csolve.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 300000,
@@ -599,7 +599,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "kaltstart",
-      "telemetryFile": "data/darkweb.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 120000,
@@ -625,7 +625,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "kaltstart",
-      "telemetryFile": "data/sleevecrime.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 900000,
       "taktMs": 60000,
@@ -672,9 +672,9 @@ nicht in einen Kommentar.
     {
       "name": "shop.js",
       "args": [],
-      "ramBaseGb": 7.6,
+      "ramBaseGb": 7.0,
       "ramSingGb": 0,
-      "ramMeasuredAt": "PLAN-vor-Bau",
+      "ramMeasuredAt": "GEMESSEN-2026-09-04",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
@@ -691,9 +691,7 @@ nicht in einen Kommentar.
       "restartPolicy": "until-done",
       "maxInstances": 1,
       "killSafe": true,
-      "precondition": {
-        "requiresFile": "data/buy-request.json"
-      }
+      "precondition": {}
     },
     {
       "name": "ausgang.js",
@@ -852,7 +850,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
-      "telemetryFile": "data/hacknet.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 120000,
@@ -900,7 +898,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
-      "telemetryFile": "data/homegrow.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 300000,
@@ -924,7 +922,7 @@ nicht in einen Kommentar.
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "normal",
-      "telemetryFile": "data/contracts.json",
+      "telemetryFile": null,
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 300000,

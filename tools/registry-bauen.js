@@ -27,6 +27,12 @@ if (!fs.existsSync(QUELLE)) {
   process.exit(1);
 }
 
+// WOHIN GESCHRIEBEN WIRD - und wo die Quelltexte liegen, gegen die geprueft
+// wird. Beides derselbe Ordner: eine Registry, die einen Baum beschreibt und
+// in einen anderen geschrieben wird, prueft nichts.
+const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
+const zielOrdner = fs.existsSync(WORKTREE) ? WORKTREE : path.join(ROOT, "src");
+
 const md = fs.readFileSync(QUELLE, "utf8");
 const start = md.indexOf("## 3.3 `src/registry.json`");
 if (start === -1) {
@@ -92,6 +98,48 @@ for (const e of reg.eintraege || []) {
   if (!["always", "until-done", "once", "never"].includes(e.restartPolicy)) {
     fehler.push(wo + ": unbekannte restartPolicy '" + e.restartPolicy + "'");
   }
+
+  // TELEMETRIE MUSS EINEN SCHREIBER HABEN (04.09.2026, Skeptiker Substanz).
+  //
+  // Der Kern beendet ein Werkzeug, dessen Telemetriedatei zu alt ist -
+  // und wenn sie NIE geschrieben wird, gilt "seit dem Start" als Alter
+  // (bn4net.js, Abschnitt Telemetriealter). Ein erfundener Dateiname macht
+  // den Kern damit zum Totengraeber seiner eigenen Werkzeuge, im Takt der
+  // Frischefrist.
+  //
+  // In der ersten Fassung standen acht solcher Namen in der Tabelle, alle
+  // plausibel gebildet ("data/<name>.json"), keiner mit einem Schreiber.
+  // Deshalb prueft der Generator das jetzt am Quelltext statt es zu glauben.
+  if (e.telemetryFile && !e.unbuilt) {
+    const quelle = path.join(zielOrdner, e.name);
+    if (!fs.existsSync(quelle)) {
+      fehler.push(wo + ": telemetryFile gesetzt, aber die Datei " + e.name
+        + " gibt es nicht");
+    } else {
+      const txt = fs.readFileSync(quelle, "utf8");
+      // WAS ALS SCHREIBAUFRUF GILT.
+      //
+      // `ns.write` ist der einzige echte Schreibbefehl; alles andere sind
+      // Hausformen, die ihn kapseln (meist um ein `ns.scp` nach home zu
+      // ergaenzen). Im Projekt gibt es vier Namen dafuer - sie stehen hier
+      // ausdruecklich, statt sie ueber ein Muster zu erraten: ein Muster,
+      // das zu viel akzeptiert, laesst genau den Fehler durch, gegen den
+      // diese Pruefung gebaut ist.
+      //
+      // Kein Regex: der Dateiname ist ein Literal, und `includes` kann sich
+      // nicht am Escaping vertun.
+      const SCHREIBER = ["ns.write", "nachHome", "schreib", "schreibe"];
+      const schreibt = SCHREIBER.some(
+        (fn) => txt.includes(fn + '("' + e.telemetryFile + '"'));
+      if (!schreibt) {
+        fehler.push(wo + ": telemetryFile '" + e.telemetryFile
+          + "' wird von " + e.name + " nirgends geschrieben."
+          + " Entweder den Schreiber nachruesten oder das Feld auf null setzen -"
+          + " ein erfundener Name laesst den Kern das Werkzeug im Takt der"
+          + " Frischefrist erschlagen.");
+      }
+    }
+  }
 }
 
 if (fehler.length) {
@@ -109,10 +157,7 @@ reg.erzeugtAm = new Date().toISOString();
 reg.erzeugtVon = "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3";
 reg.hinweis = "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3.";
 
-const worktree = path.resolve(ROOT, "..", "bitburner-bau", "src");
-const ziel = fs.existsSync(worktree)
-  ? path.join(worktree, "registry.json")
-  : path.join(ROOT, "src", "registry.json");
+const ziel = path.join(zielOrdner, "registry.json");
 
 const neu = JSON.stringify(reg, null, 1);
 

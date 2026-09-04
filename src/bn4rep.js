@@ -32,10 +32,6 @@
  * @param {NS} ns
  */
 
-// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
-// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
-import { liesVonHome } from "lib/hostdatei.js";
-
 import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 
 // Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
@@ -53,12 +49,29 @@ export async function main(ns) {
 
   const NL = String.fromCharCode(10);
   let log = [];
+  // DAS LOG MUSS AUF home ANKOMMEN (04.09.2026, 21:10).
+  //
+  // Hier stand nur `ns.write` - und das schreibt LOKAL. Dieses Gewerk hat
+  // `hostRule: "werkbank"`; seit dem Neustart um 19:44 lief es auf werk-0,
+  // und auf home stand das Log seither still auf 18:33. Eine Stunde lang war
+  // damit unsichtbar, was das wichtigste Gewerk des Knotens tut - auch die
+  // Zeilen "GEKAUFT: ..." und "Einbausperre aufgehoben".
+  //
+  // Kopiert wird gedrosselt: `sag` laeuft im Sekundentakt, und eine
+  // Vollkopie je Zeile waere teurer als das Log wert ist. Alle 20 Sekunden
+  // genuegt fuer eine Datei, die ein Mensch liest.
+  let logZuletztKopiert = 0;
   const sag = (t) => {
     const zeile = new Date().toLocaleTimeString() + "  " + t;
     ns.print(zeile);
     log.push(zeile);
     if (log.length > 150) log = log.slice(-150);
     ns.write("data/bn4rep-log.txt", log.join(NL) + NL, "w");
+    if (ns.getHostname() !== "home" && Date.now() - logZuletztKopiert > 20000) {
+      logZuletztKopiert = Date.now();
+      try { ns.scp("data/bn4rep-log.txt", "home", ns.getHostname()); }
+      catch { /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
+    }
   };
   sag("bn4rep gestartet.");
 
@@ -97,7 +110,19 @@ export async function main(ns) {
       const knoten = ns.getResetInfo().currentNode;
       if (ns.fileExists("data/verfahren.txt", "home")) {
         if (ns.getHostname() !== "home") ns.scp("data/verfahren.txt", ns.getHostname(), "home");
-        const teile = liesVonHome(ns, "data/verfahren.txt").trim().split(/\s+/);
+        // DER EIGENE HELFER, NICHT DER IMPORTIERTE (04.09.2026, 21:10).
+        //
+        // Hier stand kurzzeitig `liesVonHome(ns, ...)`. Diese Datei hat aber
+        // einen EIGENEN `liesVonHome(datei)` weiter unten, und der
+        // ueberschattet jeden Import. Der Aufruf uebergab also `ns` als
+        // Dateinamen; `ns.fileExists(ns, "home")` warf, der aeussere catch
+        // fing es, und die Funktion gab `true` zurueck.
+        //
+        // In BitNode 10 ist `true` zufaellig die richtige Antwort - der
+        // Fehler war deshalb unsichtbar. In einem Hackingknoten (V1) haette
+        // er Faktionsarbeit unterdrueckt und den Einbau gesperrt, also genau
+        // den Vorfall vom 25.08. wieder hergestellt.
+        const teile = liesVonHome("data/verfahren.txt").trim().split(/\s+/);
         if (Number(teile[1]) === knoten && (teile[0] === "V1" || teile[0] === "V1b")) return false;
       }
       return true;

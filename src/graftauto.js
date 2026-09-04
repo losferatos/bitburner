@@ -63,10 +63,6 @@
  * @param {NS} ns
  */
 
-// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
-// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
-import { liesVonHome } from "lib/hostdatei.js";
-
 
 import { naechstes, fortschritt } from "lib/graftwahl.js";
 import { beantrage as figBeantrage } from "lib/figurns.js";
@@ -335,7 +331,10 @@ export async function main(ns) {
       let ruecklage = 0;
       try {
         ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
-          ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
+          // Der EIGENE Helfer (Signatur `(datei)`), nicht der importierte -
+          // siehe die Begruendung in bn4rep.js. Mit `(ns, ...)` las diese
+          // Zeile den Geldbedarf als "" und damit als 0.
+          ? Number(liesVonHome("data/geldbedarf.txt")) || 0 : 0;
       } catch { /* dann ohne Ruecklage - lieber graften als haengen */ }
       const geldRoh = ns.getServerMoneyAvailable("home");
       const geldFrei = Math.max(0, geldRoh - ruecklage);

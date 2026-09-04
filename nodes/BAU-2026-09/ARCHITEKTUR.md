@@ -856,8 +856,7 @@ nicht in einen Kommentar.
       "needsLibs": [
         "lib/figur.js",
         "lib/figurns.js",
-        "lib/graftwahl.js",
-        "lib/hostdatei.js"
+        "lib/graftwahl.js"
       ],
       "singularity": true,
       "restartPolicy": "always",

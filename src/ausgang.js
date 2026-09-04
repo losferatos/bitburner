@@ -148,7 +148,18 @@ export async function main(ns) {
   // einem Neustart beginnt die Messung neu, statt eine Rate aus Punkten zu
   // bilden, zwischen denen der Bot gar nicht lief.
   let hackPunkte = [];
+  let rangPunkte = [];
   let letzterKnoten = null;
+
+  // Die Freischaltschwellen der 21 Black Operations. Erzeugt von
+  // tools/blackops-tabelle.js aus dem Spielquelltext; einmal gelesen, weil sie
+  // sich innerhalb einer Spielversion nicht aendern.
+  let boZielRang = null;
+  try {
+    const roh = liesVonHome("lib/blackops.json");
+    const t = roh ? JSON.parse(roh) : null;
+    if (t && Number.isFinite(t.hoechsterRang)) boZielRang = t.hoechsterRang;
+  } catch { /* dann bleibt der Rangweg ungeschaetzt */ }
   // Nach einem Neustart die 15-Minuten-Sperre nach einem Start ohne Sprung
   // nicht verlieren.
   try {
@@ -300,6 +311,45 @@ export async function main(ns) {
             }
           }
         } catch { /* Level nicht lesbar - dann bleibt etaMin null */ }
+
+        // ================================================================
+        // DER BLADEBURNER-WEG (30 der 40 Laeufe)
+        // ================================================================
+        //
+        // Bis hierher blieb eta_min auf diesem Weg IMMER null: gemessen wurde
+        // nur das Hacking-Level gegen w0r1d_d43m0n, und der haengt erst nach
+        // dem Einbau von The Red Pill am Netz (Prestige.ts:174-182). In den
+        // Bladeburner-Laeufen gibt es Red Pill nicht - die Zahl fehlte also
+        // genau dort, wo die Route hauptsaechlich verlaeuft.
+        //
+        // Der Rang steht kostenlos in data/blade.json (blade.js schreibt ihn
+        // in jeder Lagemeldung). Ihn selbst zu holen kostete 4 GB fuer
+        // ns.bladeburner.getRank - in einer Datei mit 8,5 GB Budget.
+        //
+        // WARUM DAS EINE UNTERE SCHRANKE IST, UND WARUM DAS HIER STEHT:
+        // reqdRank ist eine FREISCHALTSCHWELLE. Wer Rang 400.000 hat, darf die
+        // letzte Black Op angehen - erledigt hat er sie damit nicht. Nach dem
+        // Rang kommt noch die Ausfuehrung der verbleibenden Aktionen, jede mit
+        // eigener Dauer und Erfolgswahrscheinlichkeit. Die Schaetzung ist
+        // deshalb IMMER zu kurz und wird nie als sicher gemeldet. Ein Riegel,
+        // der auf sie scharf reagiert, spraeche zu frueh an.
+        if (etaMin === null && boZielRang !== null) {
+          try {
+            const roh = liesVonHome("data/blade.json");
+            const bl = roh ? JSON.parse(roh) : null;
+            if (bl && Number.isFinite(bl.rang) && bl.rang > 0) {
+              rangPunkte = messe(rangPunkte, Date.now(), bl.rang);
+              const e = etaMinuten(rangPunkte, bl.rang, boZielRang);
+              if (e) {
+                etaMin = e.min;
+                etaSicher = false;   // untere Schranke, nie sicher
+                etaQuelle = "Bladeburner-Rang " + Math.round(bl.rang) + " gegen "
+                  + boZielRang + " (Median ueber " + e.punkte + " Abschnitte)"
+                  + " - UNTERE Schranke, die Ausfuehrung der Black Ops kommt hinzu";
+              }
+            }
+          } catch { /* blade.json nicht lesbar - dann bleibt etaMin null */ }
+        }
       }
 
 

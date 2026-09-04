@@ -140,6 +140,10 @@ export function lohntSich(l, dauerMin) {
   if (l.etaMin === null) return { ok: true, grund: "eta_min nicht schaetzbar - Normalbetrieb" };
   if (!Number.isFinite(dauerMin) || dauerMin <= 0) return { ok: true, grund: "Posten ohne Dauer" };
 
+  // Auch hier: eine unsichere Schaetzung (untere Schranke vom Rangweg) darf
+  // keinen Posten verhindern. Sie taugt zum Berichten, nicht zum Sperren.
+  if (!l.sicher) return { ok: true, grund: "Schaetzung unsicher - Normalbetrieb" };
+
   if (l.etaMin < dauerMin) {
     return {
       ok: false,
@@ -262,7 +266,17 @@ export function einbauErlaubt(l, jetzt, offenSeit = null) {
     };
   }
 
-  if (l.etaMin !== null && l.etaMin < WIEDERAUFBAU_MIN) {
+  // NUR EINE SICHERE SCHAETZUNG DARF EINEN EINBAU VERHINDERN.
+  //
+  // Auf dem Bladeburner-Weg ist eta_min eine UNTERE Schranke: sie misst die
+  // Zeit bis zur Rangschwelle der letzten Black Op, nicht bis zu ihrer
+  // Ausfuehrung. Sie ist also immer zu kurz. Wuerde der Riegel darauf
+  // ansprechen, blockierte er den Einbau stundenlang zu frueh - und Einbauten
+  // sind der einzige Weg, auf dem der Bot ueberhaupt besser wird.
+  //
+  // Die harte Sperre haengt deshalb allein an `offen`: das ist eine Beobachtung,
+  // keine Schaetzung.
+  if (l.etaMin !== null && l.sicher && l.etaMin < WIEDERAUFBAU_MIN) {
     return {
       ok: false,
       grund: "Sprung in etwa " + l.etaMin.toFixed(0) + " min, der Wiederaufbau nach " +

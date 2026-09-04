@@ -506,6 +506,91 @@ export async function main(ns) {
           sag("Kein Platz fuer exit.js - auf " + wirt + " alles ausser bn4net/ausgang beendet, frei jetzt " + frei(wirt).toFixed(1) + " GB.");
         }
       }
+      // ---- STUFE 2: DAS EIGENE HAUS AUSBAUEN --------------------------------
+      //
+      // Passt exit.js nirgends, ist der naechste Griff der eigene Speicher.
+      // `homegrow.js` kauft ohnehin nach, aber es richtet sich nach der
+      // Amortisation - in dieser Lage zaehlt sie nicht: ein offener Ausgang
+      // kostet laufend, und der Ausbau ist danach fuer immer da.
+      //
+      // Der Auftrag verlangt an dieser Stelle keinen eigenen Kauf, sondern
+      // dass die Lage BENANNT wird. `data/geldbedarf.txt` ist der Kanal, den
+      // shop.js und homegrow.js lesen; er sagt ihnen, wofuer gespart wird.
+      let hausAusbau = null;
+      if (frei(wirt) < braucht) {
+        try {
+          const homeRam = ns.getServerMaxRam("home");
+          hausAusbau = { homeRam, braucht };
+          nachHome("data/geldbedarf.txt", JSON.stringify({
+            ts: Date.now(),
+            grund: "ausgang-wirt",
+            braucht,
+            homeRam,
+            text: "exit.js braucht " + braucht.toFixed(0) + " GB und passt "
+              + "nirgends. home hat " + homeRam + " GB.",
+          }));
+        } catch { /* dann eben ohne Bedarfsmeldung */ }
+      }
+
+      // ---- STUFE 3: NOT_EXECUTABLE -----------------------------------------
+      //
+      // Der Zustand hat einen Namen (`lib/leiter.js`), und bis heute hat ihn
+      // NIEMAND gesetzt - er war eine Zeichenkette ohne Schreiber (Skeptiker
+      // Gesamtbild, W1). Ohne ihn kann die Strafleiter nicht wissen, dass hier
+      // kein Neustart hilft, sondern Speicher fehlt.
+      //
+      // Die Frist ist bewusst lang: eine Runde ohne Wirt ist normal (ein
+      // Mietrechner wird gerade gekauft), eine Stunde ohne Wirt ist ein
+      // Befund. Gemessen wird in WANDUHR - dieses Gewerk laeuft selbst, seine
+      // eigene Motorzeit gaebe es also immer.
+      const NOT_EXEC_NACH_MS = 3600000;
+      let notExecutable = false;
+      let notExecutableSeit = null;
+      if (frei(wirt) < braucht) {
+        try {
+          const alt3 = JSON.parse(liesVonHome("data/ausgang.json") || "null");
+          notExecutableSeit = (alt3 && Number.isFinite(alt3.notExecutableSeit))
+            ? alt3.notExecutableSeit : Date.now();
+        } catch { notExecutableSeit = Date.now(); }
+        notExecutable = Date.now() - notExecutableSeit >= NOT_EXEC_NACH_MS;
+        if (notExecutable) {
+          try {
+            const strom = evLaden(liesVonHome("data/events.json"));
+            const schon = [...strom.eintraege].reverse().find((e) =>
+              e.art === "blocked" && e.daten && e.daten.grund === "NOT_EXECUTABLE");
+            // Einmal je Knoten, nicht je Runde.
+            if (!schon || schon.daten.nodeReset !== info.lastNodeReset) {
+              evAnhaengen(strom, "blocked",
+                "NOT_EXECUTABLE: exit.js (" + braucht.toFixed(0) + " GB) passt "
+                + "seit " + ((Date.now() - notExecutableSeit) / 60000).toFixed(0)
+                + " min auf keinen Rechner",
+                { wall: Date.now() },
+                { grund: "NOT_EXECUTABLE", braucht,
+                  moeglich: Number.isFinite(meist) ? meist : null,
+                  nodeReset: info.lastNodeReset });
+              nachHome("data/events.json", JSON.stringify(strom));
+              nachHome("data/sofort.json", (() => {
+                let liste = [];
+                try { liste = JSON.parse(liesVonHome("data/sofort.json")) || []; }
+                catch { liste = []; }
+                if (!Array.isArray(liste)) liste = [];
+                liste.push({
+                  titel: "Ausgang blockiert - exit.js passt auf keinen Rechner",
+                  text: "exit.js braucht " + braucht.toFixed(0) + " GB, der "
+                    + "groesste Rechner hat "
+                    + (Number.isFinite(meist) ? meist.toFixed(0) : "?")
+                    + " GB. Der Knoten ist erledigt, die Tuer steht offen, und "
+                    + "jede weitere Stunde darin ist verloren. Ein Neustart "
+                    + "hilft hier nicht - es fehlt Speicher.",
+                  quelle: "ausgang.js",
+                });
+                return JSON.stringify(liste.slice(-20));
+              })());
+            }
+          } catch { /* Bericht, nie Steuerung */ }
+        }
+      }
+
       if (frei(wirt) < braucht) {
         const m = "Ausgang offen, aber exit.js (" + braucht.toFixed(1) + " GB) passt auf keinen Rechner (groesster hat " + (Number.isFinite(meist) ? meist.toFixed(1) : "?") + " GB) - naechste Runde.";
         if (letzteMeldung !== m) { sag(m); letzteMeldung = m; }
@@ -524,6 +609,19 @@ export async function main(ns) {
           eta_min: etaMin, eta_sicher: etaSicher, eta_quelle: etaQuelle,
           route_state: routeZustand(plan),
           wirtFehlt: { braucht, besterWirt: wirt, moeglich: Number.isFinite(meist) ? meist : null },
+          // DIE KETTE ENDETE HIER (Skeptiker Gesamtbild, W2, 04.09.2026).
+          //
+          // ARCHITEKTUR 9.1 L1 verlangt drei Stufen: groesster Fremdrechner ->
+          // sonst home ausbauen -> sonst NOT_EXECUTABLE mit Befund. Gebaut war
+          // nur die erste. Danach schrieb dieses Gewerk `wirtFehlt` und
+          // meldete "naechste Runde" - endlos, ohne dass irgendetwas
+          // eskaliert. `wirtFehlt` wurde nur GEZAEHLT.
+          //
+          // Der Zustand ist nicht harmlos: der Knoten ist erledigt, die Tuer
+          // steht offen, und jede weitere Stunde darin ist verloren.
+          notExecutable,
+          notExecutableSeit,
+          hausAusbau,
         }));
         await ns.sleep(TAKT_MS); continue;
       }
@@ -589,7 +687,7 @@ export async function main(ns) {
       let backupWartenMs = 0;
       try {
         const hs = await handschlag(ns, "jump",
-          "BN" + ziel.node + " L" + ziel.level, ri.lastNodeReset, sag);
+          "BN" + ziel.node + " L" + ziel.level, info.lastNodeReset, sag);
         backupWartenMs = hs.wartezeitMs;
         const strom = evLaden(liesVonHome("data/events.json"));
         evAnhaengen(strom, "note", "Handschlag vor dem Sprung: " + hs.grund,

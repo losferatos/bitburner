@@ -273,6 +273,11 @@ export async function main(ns) {
         if (d && typeof d.visibilityState === "string") sichtbar = d.visibilityState === "visible";
       } catch { /* kein DOM erreichbar - dann gilt sichtbar */ }
 
+      // Was `ausgang.js` ueber die Tuer weiss. Nur ein Feld wird gebraucht,
+      // aber es ist das, das die ganze Leiter stumm schaltet - deshalb wird es
+      // in JEDER Runde frisch gelesen und nicht gemerkt.
+      const ausgangLage = liesJson("data/ausgang.json");
+
       const puls = enginePuls(uhren);
 
       const sigs = signale({
@@ -349,6 +354,17 @@ export async function main(ns) {
           guard: uhren.guardTimeMs,
           engine: spieler.totalPlaytime,
           motor: motorTimeMs,
+        }, {
+          // NOT_EXECUTABLE (Auftrag 5.4). `ausgang.js` meldet, wenn `exit.js`
+          // auf keinen Rechner passt - dann steht der Bot, aber kein Neustart
+          // hilft, es fehlt Speicher. Wer hier eskaliert, beendet gesunde
+          // Werkzeuge, raeumt home leer und baut am Ende Augmentierungen ein,
+          // ohne dass sich am Speicher etwas aendert.
+          nichtAusfuehrbar: !!(ausgangLage && ausgangLage.notExecutable),
+          nichtAusfuehrbarGrund: ausgangLage && ausgangLage.wirtFehlt
+            ? "exit.js braucht " + ausgangLage.wirtFehlt.braucht + " GB, "
+              + "groesster Rechner " + ausgangLage.wirtFehlt.moeglich + " GB"
+            : null,
         });
 
         if (r.handlung === "verdacht" || r.handlung === "deckel") {

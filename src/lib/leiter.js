@@ -316,7 +316,40 @@ function uhrFuer(sprosse, uhren) {
   return Number.isFinite(uhren.guard) ? uhren.guard : null;
 }
 
-export function schritt(z, sig, jetztGuardMs, jetztWall, uhren) {
+export function schritt(z, sig, jetztGuardMs, jetztWall, uhren, lage = {}) {
+  // NOT_EXECUTABLE: EINE SPROSSE HILFT HIER NICHT (Auftrag 5.4, gebaut
+  // 04.09.2026).
+  //
+  // Der Zustand stand seit dem ersten Entwurf in `ZUSTAENDE` - und NIEMAND
+  // setzte ihn. Ein Skeptiker hat es gefunden: eine Zeichenkette ohne
+  // Schreiber, und damit eine Regel ("NOT_EXECUTABLE eskaliert nie"), die auf
+  // nichts angewendet wurde.
+  //
+  // Der Fall, fuer den er gedacht ist: `exit.js` passt auf keinen Rechner.
+  // Dann steht der Bot, aber KEIN Neustart hilft - es fehlt Speicher. Wer hier
+  // eskaliert, beendet der Reihe nach gesunde Werkzeuge, raeumt home leer und
+  // baut am Ende Augmentierungen ein, ohne dass sich am Speicher etwas
+  // aendert. Alle Handlungen sind wirkungslos, und Sprosse 3 und 5 sind teuer.
+  //
+  // Das Signal dafuer kommt von `ausgang.js` (`data/ausgang.json`,
+  // `notExecutable`) - dem einzigen Gewerk, das die Lage kennt.
+  //
+  // ES ESKALIERT NIE, aber es ist auch keine Sackgasse wie EXHAUSTED: faellt
+  // die Bedingung weg (ein Rechner wurde gekauft), geht es beim naechsten
+  // Schritt normal weiter.
+  if (lage.nichtAusfuehrbar && sig.schwere > 0) {
+    const zielN = sig.ziel;
+    if (!z.ziele[zielN]) {
+      z.ziele[zielN] = { zustand: "HEALTHY", sprosse: 0, seit: jetztGuardMs, versuche: 0 };
+    }
+    z.ziele[zielN].zustand = "NOT_EXECUTABLE";
+    z.ziele[zielN].seit = jetztGuardMs;
+    return { handlung: "nichts", sprosse: null, ziel: zielN,
+      grund: "NOT_EXECUTABLE: " + (lage.nichtAusfuehrbarGrund
+        || "exit.js passt auf keinen Rechner") + " - keine Sprosse hilft, "
+        + "es fehlt Speicher" };
+  }
+
   // ZUSTANDSSIGNALE SPEISEN DIE LEITER NICHT (04.09.2026, Skeptiker Fehlermodi).
   //
   // S4 (Tab verdeckt) und S5 (die Bruecke meldet etwas) beschreiben die
@@ -343,6 +376,24 @@ export function schritt(z, sig, jetztGuardMs, jetztWall, uhren) {
     z.ziele[ziel] = { zustand: "HEALTHY", sprosse: 0, seit: jetztGuardMs, versuche: 0 };
   }
   const s = z.ziele[ziel];
+
+  // DER AUSGANG AUS NOT_EXECUTABLE.
+  //
+  // Anders als EXHAUSTED ist er KEINE Sackgasse: er beschreibt eine Lage, die
+  // sich von aussen aufloest (ein gekaufter Rechner, ein home-Ausbau). Faellt
+  // die Bedingung weg, faengt die Leiter fuer dieses Ziel von vorn an - sonst
+  // bliebe der Zustand fuer immer stehen, und die Leiter waere danach stumm,
+  // obwohl sie wieder helfen koennte.
+  //
+  // Von vorn und nicht dort, wo sie war: die Lage hat sich geaendert, und ein
+  // Werkzeug, das seit einer Stunde nicht laeuft, verdient zuerst wieder den
+  // billigsten Griff.
+  if (s.zustand === "NOT_EXECUTABLE") {
+    s.zustand = "HEALTHY";
+    s.sprosse = 0;
+    s.versuche = 0;
+    s.seit = jetztGuardMs;
+  }
 
   // EXHAUSTED ist eine Sackgasse mit Ausgang: keine weitere Sprosse, aber der
   // Kern laeuft unveraendert weiter. Er endet erst, wenn Fortschritt messbar

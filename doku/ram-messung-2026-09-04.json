@@ -585,8 +585,8 @@
  },
  {
   "file": "autopilot.js",
-  "live41": 34.15,
-  "lokal41": 34.15,
+  "live41": 34.2,
+  "lokal41": 34.2,
   "diff": 0,
   "lokal42": 34.15,
   "lokal43": 34.15,
@@ -594,9 +594,11 @@
   "singKosten41": 0,
   "dom": 25,
   "err": null,
-  "bytes": 94520,
+  "bytes": 97258,
   "lines": 1957,
-  "sha256": "598e50dad87dba08088da9c79c3d5307889c46e4d8155c6260236b97eb6fe4d7"
+  "sha256": "db77fd8f17e1c7748c55f3518d94f21efa1d74dca52a198f4871b939793ac461",
+  "gemessenAm": "2026-09-04T18:37:34.768Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "homeram.js",
@@ -1011,8 +1013,8 @@
  },
  {
   "file": "bn4net.js",
-  "live41": 17.75,
-  "lokal41": 17.75,
+  "live41": 10.8,
+  "lokal41": 10.8,
   "diff": 0,
   "lokal42": 17.75,
   "lokal43": 17.75,
@@ -1020,9 +1022,12 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 184201,
+  "bytes": 263478,
   "lines": 3274,
-  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap.",
+  "sha256": "2170a073113bc53865a4d4753045151275dda3c77bfb649e17a8e23c433f8730",
+  "gemessenAm": "2026-09-04T18:37:34.768Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "contracts.js",

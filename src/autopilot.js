@@ -911,7 +911,20 @@ export async function main(ns) {
             // ohne Ausgabedatei, ohne Prozess. Genau so ist joinfac.js
             // spurlos verschwunden.
             const mit = new Set([datei]);
-            const quelle = ns.read(datei);
+            // GEGEN home LESEN, WIE DER REST DER FUNKTION (04.09.2026).
+            //
+            // `ns.read` liest vom EIGENEN Rechner. Alles andere hier arbeitet
+            // gegen "home" - `getScriptRam(datei, "home")`, `fileExists(pfad,
+            // "home")`, `scp(..., "home")`. Laeuft der Autopilot einmal nicht
+            // auf home, liefert diese Zeile "", es wird keine Abhaengigkeit
+            // erkannt, nur die Hauptdatei kopiert - und `exec` gibt still 0
+            // zurueck. Also genau das spurlose Verschwinden, das der
+            // Kommentar darueber beschreibt.
+            let quelle = "";
+            try {
+              if (ns.getHostname() !== "home") ns.scp(datei, ns.getHostname(), "home");
+              quelle = ns.read(datei) || "";
+            } catch { quelle = ""; }
             for (const m of quelle.matchAll(/(?:from|import)\s+["']([^"']+)["']/g)) {
               const pfad = m[1].replace(/^\.\//, "");
               if (ns.fileExists(pfad, "home")) mit.add(pfad);

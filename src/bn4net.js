@@ -4428,10 +4428,24 @@ export async function main(ns) {
       } catch { /* kein Waechter - dann bleibt der letzte Stand stehen */ }
 
       // Alter der letzten Sicherung, damit der Bericht es nennen kann.
+      //
+      // DAS FELD HIESS NIE SO (04.09.2026, 20:35 - Skeptiker). Hier stand
+      // `br.letzteSicherungTs` - die Bruecke schreibt das nirgends. Sie
+      // schreibt `lastVerifiedBackup: {file, ts, ageMin, anlass}` mit `ts`
+      // als ISO-String. `Number.isFinite` darauf ist falsch, also wurde
+      // `backup_age_h` NIE gesetzt: der Kennwert stand seit jeher auf null,
+      // und der catch hat es verschluckt.
+      //
+      // Das ist die dritte Fundstelle desselben Irrtums an einem Tag -
+      // `export.js` und `lib/handschlag.js` lasen dieselbe Datei ebenfalls
+      // ueber ein Feld, das es nicht gibt. Wenn ein Vertrag dreimal falsch
+      // gelesen wird, ist nicht der Leser das Problem.
       try {
         const br = JSON.parse(ns.read("data/bridge.json"));
-        if (br && Number.isFinite(br.letzteSicherungTs)) {
-          k.backup_age_h = Number(((jetzt - br.letzteSicherungTs) / 3600000).toFixed(2));
+        const lv = br && br.lastVerifiedBackup;
+        const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.ts));
+        if (Number.isFinite(ts) && jetzt - ts >= 0) {
+          k.backup_age_h = Number(((jetzt - ts) / 3600000).toFixed(2));
         }
       } catch { /* keine Brueckenmeldung */ }
 

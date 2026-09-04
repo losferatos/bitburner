@@ -207,7 +207,7 @@ console.log("-- Knoten- und Phasenfilter --");
   // prueft er die Vorbedingung statt des Phasenfilters.
   pruefe("cdump.js laeuft im Kaltstart",
     REG.gilt(cdump, { node: 10, verfahren: "V2", phase: "kaltstart",
-      dateiDa: (d) => d !== "data/csolve-laeuft.txt" }).gilt);
+      dateiDa: (d) => d !== "data/cantwort.json" }).gilt);
   pruefe("cdump.js laeuft NICHT im Normalbetrieb",
     !REG.gilt(cdump, { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true }).gilt);
   if (hashes) {
@@ -227,17 +227,30 @@ console.log("-- Vorbedingungen --");
     node: 10, verfahren: "V2", phase: "kaltstart",
     dateiDa: (d) => dateien.includes(d),
   });
-  pruefe("csolve wartet ohne contracts.json",
+  // DIE ROTATION (Position C.8, umgebaut am 04.09.2026).
+  //
+  // Vorher standen hier `data/contracts.json` und `data/csolve-laeuft.txt` -
+  // zwei Dateien, die KEIN Skript je schreibt. csolve.js lief damit nie, und
+  // cdump.js lief immer; die ganze Kaltstart-Geldkette war eine Attrappe.
+  // Gefunden hat es die neue Vorbedingungspruefung in tools/registry-bauen.js.
+  //
+  // Jetzt ist es eine echte Rotation ueber EINE Datei: cdump.js schreibt
+  // data/cantwort.json und darf nur laufen, solange es sie nicht gibt;
+  // csolve.js braucht sie und loescht sie nach dem Einreichen. So sind die
+  // beiden nie zugleich auf home - zusammen waeren sie 24,85 GB.
+  pruefe("csolve wartet ohne cantwort.json",
     !REG.gilt(csolve, lage(["csolve.js"])).gilt);
   pruefe("und der Grund nennt die Datei",
-    /contracts\.json/.test(REG.gilt(csolve, lage(["csolve.js"])).grund));
-  pruefe("mit contracts.json laeuft es",
-    REG.gilt(csolve, lage(["csolve.js", "data/contracts.json"])).gilt);
+    /cantwort\.json/.test(REG.gilt(csolve, lage(["csolve.js"])).grund));
+  pruefe("mit cantwort.json laeuft es",
+    REG.gilt(csolve, lage(["csolve.js", "data/cantwort.json"])).gilt);
 
   const cdump = registry.eintraege.find((e) => e.name === "cdump.js");
-  pruefe("cdump laeuft nicht, solange csolve laeuft",
-    !REG.gilt(cdump, lage(["cdump.js", "data/csolve-laeuft.txt"])).gilt,
-    "16,85 + 24,25 GB passen nicht nebeneinander auf 32");
+  pruefe("cdump laeuft nicht, solange Antworten offen sind",
+    !REG.gilt(cdump, lage(["cdump.js", "data/cantwort.json"])).gilt,
+    "12,00 + 12,85 GB passen neben Kern, Waechter und Wachhalter nicht auf 32");
+  pruefe("ohne offene Antworten laeuft cdump",
+    REG.gilt(cdump, lage(["cdump.js"])).gilt);
 }
 
 console.log("");

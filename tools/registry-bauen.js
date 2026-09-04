@@ -75,6 +75,78 @@ const PFLICHT = ["name", "verfahren", "knoten", "phase",
  * genau das prueft `tools/test-registry.js`. Eine fehlende Datei speist die
  * Strafleiter nie (E6): ein nicht gebautes Gewerk ist kein Haenger.
  */
+/**
+ * WAS ALS SCHREIBAUFRUF GILT.
+ *
+ * `ns.write` ist der einzige echte Schreibbefehl; alles andere sind
+ * Hausformen, die ihn kapseln (meist um ein `ns.scp` nach home zu ergaenzen).
+ * Im Projekt gibt es vier Namen dafuer - sie stehen hier ausdruecklich, statt
+ * sie ueber ein Muster zu erraten: ein Muster, das zu viel akzeptiert, laesst
+ * genau den Fehler durch, gegen den diese Pruefungen gebaut sind.
+ */
+const SCHREIBER = ["ns.write", "nachHome", "schreib", "schreibe"];
+
+/** Jede .js-Datei des Zielordners, einmal gelesen. */
+function alleQuellen(ordner, praefix = "") {
+  const raus = {};
+  for (const e of fs.readdirSync(ordner, { withFileTypes: true })) {
+    const rel = praefix ? praefix + "/" + e.name : e.name;
+    if (e.isDirectory()) Object.assign(raus, alleQuellen(path.join(ordner, e.name), rel));
+    else if (e.name.endsWith(".js")) {
+      raus[rel] = fs.readFileSync(path.join(ordner, e.name), "utf8");
+    }
+  }
+  return raus;
+}
+const QUELLEN = alleQuellen(zielOrdner);
+
+/**
+ * Schreibt IRGENDEIN Skript diese Datei?
+ *
+ * Das ist die Verallgemeinerung des Befunds vom 04.09.2026: `shop.js` trug die
+ * Vorbedingung `requiresFile: "data/buy-request.json"`, und diese Datei
+ * schrieb kein einziges Skript im Repo. Das Gewerk lief damit NIE - und weil
+ * es der Preislieferant war, fiel der Rechnerkauf vollstaendig aus, lautlos.
+ *
+ * Dieselbe Falle steckte in `csolve.js` (`requiresFile: data/contracts.json`)
+ * und `cdump.js` (`forbidsFile: data/csolve-laeuft.txt`). Drei von vier
+ * Vorbedingungen der ersten Fassung nannten Dateien, die es nicht gibt.
+ */
+/**
+ * Dateien, die nicht aus einem Skript stammen - und trotzdem legitim sind.
+ *
+ * Zwei Sorten, beide mit Begruendung:
+ *
+ *   1. REPO-DATEIEN. `route.json`, `graftplan.json` und `registry.json` liegen
+ *      im Repo und kommen ueber die Bruecke ins Spiel. Sie werden ausdruecklich
+ *      NICHT von einem Skript geschrieben - eine Route, die sich selbst
+ *      umschreiben kann, ist keine Route.
+ *
+ *   2. HANDBREMSEN. `data/bn4-stop.txt` setzt ein Mensch, wenn der Bot stehen
+ *      soll. Dass kein Skript sie schreibt, ist ihr Sinn: sie ist der einzige
+ *      Schalter, den der Bot nicht selbst umlegen kann.
+ *
+ * Alles andere gilt als Fehler. Die Liste ist kurz zu halten - jede Zeile hier
+ * ist eine Ausnahme von der Pruefung, die den lautlosesten Fehler dieses
+ * Projekts gefunden hat.
+ */
+const VON_AUSSEN = {
+  "route.json": "Repo-Datei, kommt ueber die Bruecke",
+  "graftplan.json": "Repo-Datei, erzeugt von tools/graftplan-bauen.js",
+  "registry.json": "Repo-Datei, erzeugt von diesem Werkzeug",
+  "data/bn4-stop.txt": "Handbremse - dass kein Skript sie schreibt, ist ihr Sinn",
+};
+
+function irgendwerSchreibt(datei) {
+  if (datei in VON_AUSSEN) return true;
+  for (const txt of Object.values(QUELLEN)) {
+    for (const fn of SCHREIBER) {
+      if (txt.includes(fn + '("' + datei + '"')) return true;
+    }
+  }
+  return false;
+}
+
 const fehler = [];
 const gesehen = new Set();
 let unbuilt = 0;
@@ -97,6 +169,31 @@ for (const e of reg.eintraege || []) {
   }
   if (!["always", "until-done", "once", "never"].includes(e.restartPolicy)) {
     fehler.push(wo + ": unbekannte restartPolicy '" + e.restartPolicy + "'");
+  }
+
+  // EINE VORBEDINGUNG MUSS ERFUELLBAR SEIN (04.09.2026).
+  //
+  // `requiresFile` auf eine Datei, die niemand schreibt, heisst: dieses Gewerk
+  // laeuft nie. Und zwar lautlos - es steht in der Registry, es sieht
+  // vollstaendig aus, und der Kern ueberspringt es in jeder Runde mit einem
+  // korrekten "wartet auf ...".
+  //
+  // `forbidsFile` auf eine solche Datei ist harmloser (die Bedingung ist immer
+  // erfuellt), aber genauso falsch: sie sollte etwas verhindern und tut es
+  // nicht. In der ersten Fassung nannten drei von vier Vorbedingungen Dateien,
+  // die kein Skript je schreibt.
+  {
+    const p = e.precondition || {};
+    if (p.requiresFile && !irgendwerSchreibt(p.requiresFile)) {
+      fehler.push(wo + ": Vorbedingung requiresFile '" + p.requiresFile
+        + "' nennt eine Datei, die kein Skript schreibt - das Gewerk"
+        + " liefe NIE, und zwar lautlos.");
+    }
+    if (p.forbidsFile && !irgendwerSchreibt(p.forbidsFile)) {
+      fehler.push(wo + ": Vorbedingung forbidsFile '" + p.forbidsFile
+        + "' nennt eine Datei, die kein Skript schreibt - die Bedingung ist"
+        + " damit immer erfuellt und verhindert nichts.");
+    }
   }
 
   // TELEMETRIE MUSS EINEN SCHREIBER HABEN (04.09.2026, Skeptiker Substanz).
@@ -128,7 +225,6 @@ for (const e of reg.eintraege || []) {
       //
       // Kein Regex: der Dateiname ist ein Literal, und `includes` kann sich
       // nicht am Escaping vertun.
-      const SCHREIBER = ["ns.write", "nachHome", "schreib", "schreibe"];
       const schreibt = SCHREIBER.some(
         (fn) => txt.includes(fn + '("' + e.telemetryFile + '"'));
       if (!schreibt) {

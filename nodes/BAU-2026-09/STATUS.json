@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T07:45:00",
+  "aktualisiert": "2026-09-04T11:30:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -23,7 +23,7 @@
     "C.1": {
       "stand": "getestet",
       "was": "kpi.json, events.json, Motorzeit im Kern, Herzschlag v2",
-      "offen": "Motorzeit und Herzschlag v2 per Ebene-2-Test am echten Kern belegt (32 Pruefungen). Offen: kpi.json und events.json haben noch keinen Schreiber. NICHT live."
+      "offen": "kpi.json hat jetzt einen Schreiber (Kern, alle 6 Runden, 0 zusaetzliche ns-Aufrufe). events.json schreiben figwatch und graftauto. NICHT live."
     },
     "C.2": {
       "stand": "abgenommen",
@@ -51,9 +51,9 @@
       "offen": "Beobachtungsmodus, 54 Pruefungen in zwei Ebenen. Offen: die Ausfuehrung der Sprossen (C.9). NICHT live."
     },
     "C.7": {
-      "stand": "gebaut",
+      "stand": "getestet",
       "was": "Kaltstart-Kern: shop.js, hackAnalyze inline, Kaltstart-Leiter",
-      "offen": "Kern von 17,75 auf rund 10,75 GB. Analyse-Familie gerechnet, cloud-Familie in shop.js. Offen: Skeptikerrunde und Ebene-3-Kaltstart. NICHT live."
+      "offen": "Skeptikerrunde 2 durch, 14 von 18 Befunden behoben. shop.js hatte eine Vorbedingung, die es nie starten liess - der Rechnerkauf war vollstaendig ausgefallen. RAM jetzt gerechnet: Kern 10,80, shop 7,00. Offen: Ebene-3-Kaltstart. NICHT live."
     },
     "C.8": {
       "stand": "offen",
@@ -71,9 +71,9 @@
       "offen": ""
     },
     "C.11": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "Figur-Vergabepunkt und figwatch.js",
-      "offen": ""
+      "offen": "Vergabepunkt im Kern, lib/figurns.js, sieben Handlungsstellen in sechs Dateien gewacht, Verbotsgrep-Regel. Kosten 0,10 GB. Offen: figure_conflict = 0 ueber 12 h (Stufe B). NICHT live."
     },
     "C.12": {
       "stand": "offen",
@@ -86,9 +86,9 @@
       "offen": ""
     },
     "C.14": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "Grafting-Automatik",
-      "offen": ""
+      "offen": "graftauto.js entscheidet, graft.js fuehrt aus. 23 Ebene-2-Proben. Offen: graft_busy_pct gegen 100 im Betrieb. NICHT live."
     },
     "C.15": {
       "stand": "offen",

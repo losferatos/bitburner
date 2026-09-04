@@ -78,6 +78,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-kaltstart-budget.js",
+    deckt: "passt der Kaltstart auf 32 GB - und findet eine Geldquelle Platz? (C.7/C.8)",
+    schnell: true,
+  },
+  {
     datei: "test-registry.js",
     deckt: "Registry, Rollen-Riegel und der Migrationsbeweis gegen die heutige Liste (C.4)",
     schnell: true,

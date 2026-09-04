@@ -492,9 +492,9 @@ nicht in einen Kommentar.
     {
       "name": "guard.js",
       "args": [],
-      "ramBaseGb": 3.9,
+      "ramBaseGb": 6.1,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js, mit Sprossen C.9/C.10)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
@@ -561,19 +561,19 @@ nicht in einen Kommentar.
       "maxInstances": 1,
       "killSafe": true,
       "precondition": {
-        "forbidsFile": "data/csolve-laeuft.txt"
+        "forbidsFile": "data/cantwort.json"
       }
     },
     {
       "name": "csolve.js",
       "args": [],
-      "ramBaseGb": 12.25,
+      "ramBaseGb": 12.85,
       "ramSingGb": 0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "kaltstart",
-      "telemetryFile": null,
+      "telemetryFile": "data/csolve.json",
       "scpToHome": true,
       "freshnessMs": 1800000,
       "taktMs": 300000,
@@ -587,7 +587,7 @@ nicht in einen Kommentar.
       "maxInstances": 1,
       "killSafe": true,
       "precondition": {
-        "requiresFile": "data/contracts.json"
+        "requiresFile": "data/cantwort.json"
       }
     },
     {
@@ -973,7 +973,7 @@ nicht in einen Kommentar.
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",
       "knoten": "alle",
-      "phase": "beide",
+      "phase": "normal",
       "telemetryFile": null,
       "scpToHome": false,
       "freshnessMs": 600000,

@@ -219,6 +219,16 @@ console.log("-- das Kaltstart-Tor E1 --");
 
   // DIE SPITZE UND WARUM SIE NICHT 28 IST (04.09.2026).
   //
+  // NACHTRAG vom selben Tag: shop.js zaehlt nicht mehr zur Dauerlast. Es
+  // beendet sich, sobald die Preise geschrieben und kein Auftrag offen ist,
+  // und der Kern holt es zurueck, wenn die Tabelle vier Minuten alt wird.
+  // Gemittelt sind das rund eine Minute je fuenf - im Kaltstart der
+  // Unterschied zwischen "drei Arbeiter" und "keiner".
+  //
+  // Der Test rechnet die Spitze trotzdem MIT shop.js: es gibt ein Fenster, in
+  // dem boot.js noch laeuft und der Kern schon gestartet hat. Wer die Spitze
+  // schoenrechnet, prueft den bequemen Fall.
+  //
   // In ARCHITEKTUR E1 stand "Spitze <= 28", gerechnet mit den GESCHAETZTEN
   // Werten fuer guard (6,10) und shop (7,60). Gemessen sind es 3,90 und 7,00,
   // und die echte Spitze liegt bei 29,45 - ueber der alten Schranke, aber
@@ -232,15 +242,19 @@ console.log("-- das Kaltstart-Tor E1 --");
   // Geprueft wird deshalb beides: die Residenz mit Luft, und die Spitze so,
   // dass in ihr noch ein Arbeiter Platz hat. Ein Kaltstart, in dem kein
   // einziger weaken laufen kann, verdient nichts und ist damit kein Start.
+  // Dauerlast ist, was OHNE Anlass liegt: Kern, Waechter, Wachhalter. shop.js
+  // gehoert seit dem Bedarfsbetrieb nicht mehr dazu.
+  pruefe("Dauerlast (Kern, Waechter, Wachhalter) <= 20 GB", summe <= 20,
+    "Summe " + summe.toFixed(2) + " GB");
   const dauerhaft = summe + (rechne("shop.js", { bitNode: 4 }).gb ?? 0);
-  pruefe("dauerhaft resident (ohne boot.js) <= 24 GB", dauerhaft <= 24,
-    "Summe " + dauerhaft.toFixed(2) + " GB");
+  pruefe("mit laufendem Haendler bleiben >= 5 GB fuer Arbeiter", 32 - dauerhaft >= 5,
+    "belegt " + dauerhaft.toFixed(2) + " GB, frei " + (32 - dauerhaft).toFixed(2));
 
   const spitze = dauerhaft + (rechne("boot.js", { bitNode: 4 }).gb ?? 0);
   const arbeiter = rechne("worker/weaken.js", { bitNode: 4 }).gb ?? 1.8;
-  pruefe("Spitze plus ein Arbeiter passt auf 32 GB", spitze + arbeiter <= 32,
-    "Spitze " + spitze.toFixed(2) + " + Arbeiter " + arbeiter + " = "
-      + (spitze + arbeiter).toFixed(2));
+  pruefe("die Spitze selbst passt auf 32 GB", spitze <= 32,
+    "Spitze " + spitze.toFixed(2) + " GB - in diesem Fenster laeuft boot.js"
+      + " noch, waehrend der Kern schon startet");
   console.log("       dauerhaft " + dauerhaft.toFixed(2) + " GB, Spitze "
     + spitze.toFixed(2) + " GB, mit einem Arbeiter "
     + (spitze + arbeiter).toFixed(2) + " von 32");

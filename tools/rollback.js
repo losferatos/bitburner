@@ -87,9 +87,22 @@ if (!ziel.length) {
   process.exit(1);
 }
 
+/**
+ * Schreibende Aufrufe per POST - sonst scheitert der Rollback genau an den
+ * grossen Dateien, und das sind die, auf die es ankommt. Gemessen am
+ * 04.09.2026: bei der ersten Einspielstufe wurden 7 von 19 abgewiesen, weil
+ * der Inhalt in der URL steckte.
+ */
 async function rpc(params) {
-  const q = new URLSearchParams({ instance: "LIVE", ...params });
-  const res = await fetch(BASE + "/api/rpc?" + q);
+  const { content, ...rest } = params;
+  const q = new URLSearchParams({ instance: "LIVE", ...rest });
+  const res = content === undefined
+    ? await fetch(BASE + "/api/rpc?" + q)
+    : await fetch(BASE + "/api/rpc?" + q, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ content }),
+    });
   const body = await res.json();
   if (body.error) throw new Error(body.error);
   return body.result;

@@ -2158,6 +2158,59 @@ function startDashboard() {
      * route.json sind der Rueckweg des Bots aus jedem Zustand.
      */
     if (url.pathname === "/api/rpc") {
+      /**
+       * =====================================================================
+       * GROSSE DATEIEN PASSEN NICHT IN EINE URL (04.09.2026, 18:00)
+       * =====================================================================
+       *
+       * Gemessen bei der ersten Stufe der Einspielung: von 19 Dateien kamen
+       * 12 an und 7 wurden mit "Unexpected end of JSON input" abgewiesen -
+       * genau die grossen (`lib/calc.js`, `lib/kpi.js`, `lib/leiter.js`,
+       * `lib/loeser.js`, `registry.json` ...). Der Inhalt steckte in der
+       * Abfragezeichenkette, und Node deckelt die Anfragezeile.
+       *
+       * Der Fehler war laut und folgenlos - abgewiesen ist nicht halb
+       * geschrieben, und die Gegenprobe je Datei hat es sofort gezeigt. Aber
+       * ein Einspielweg, der bei grossen Dateien versagt, taugt nichts: die
+       * grossen sind der Kern.
+       *
+       * Deshalb nimmt `/api/rpc` jetzt auch POST. Der Rumpf ist JSON und
+       * ergaenzt die Abfrageparameter; bei gleichem Namen gewinnt der Rumpf.
+       * Alles andere - Rollenriegel, Zweit-Tab-Sperre, Master-Riegel,
+       * Eingriffszaehler - liegt dahinter und gilt unveraendert.
+       */
+      let rumpf = {};
+      if (req.method === "POST") {
+        try {
+          const stuecke = [];
+          let laenge = 0;
+          for await (const st of req) {
+            laenge += st.length;
+            // Ein Deckel, damit ein kaputter Aufrufer die Bruecke nicht
+            // leerlaufen laesst. 8 MB sind das Vierfache der groessten
+            // Datei des Projekts.
+            if (laenge > 8 * 1024 * 1024) {
+              res.writeHead(413, { "Content-Type": MIME[".json"] });
+              res.end(JSON.stringify({ error: "Rumpf groesser als 8 MB" }));
+              return;
+            }
+            stuecke.push(st);
+          }
+          const roh = Buffer.concat(stuecke).toString("utf8");
+          rumpf = roh ? JSON.parse(roh) : {};
+          if (!rumpf || typeof rumpf !== "object" || Array.isArray(rumpf)) {
+            throw new Error("Rumpf ist kein Objekt");
+          }
+        } catch (e) {
+          res.writeHead(400, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "Rumpf unlesbar: " + e.message }));
+          return;
+        }
+        for (const [k, v] of Object.entries(rumpf)) {
+          if (typeof v === "string") url.searchParams.set(k, v);
+        }
+      }
+
       const method = url.searchParams.get("method");
       if (!method) {
         res.writeHead(400, { "Content-Type": MIME[".json"] });

@@ -63,9 +63,30 @@ if (!dateien.length) {
   process.exit(1);
 }
 
+/**
+ * Schreibende Aufrufe gehen per POST, lesende per GET.
+ *
+ * Der Grund steht in sync/bridge.js: bei der ersten Stufe der Einspielung
+ * kamen 12 von 19 Dateien an und 7 wurden abgewiesen - genau die grossen.
+ * Der Inhalt steckte in der URL, und Node deckelt die Anfragezeile. Ein
+ * Einspielweg, der bei grossen Dateien versagt, taugt nichts: die grossen
+ * sind der Kern.
+ */
 async function rpc(params) {
-  const q = new URLSearchParams({ instance: "LIVE", ...params });
-  const res = await fetch(BASE + "/api/rpc?" + q);
+  const { content, ...rest } = params;
+  if (content === undefined) {
+    const q = new URLSearchParams({ instance: "LIVE", ...rest });
+    const res = await fetch(BASE + "/api/rpc?" + q);
+    const body = await res.json();
+    if (body.error) throw new Error(body.error);
+    return body.result;
+  }
+  const q = new URLSearchParams({ instance: "LIVE", ...rest });
+  const res = await fetch(BASE + "/api/rpc?" + q, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ content }),
+  });
   const body = await res.json();
   if (body.error) throw new Error(body.error);
   return body.result;

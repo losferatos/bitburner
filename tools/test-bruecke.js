@@ -215,10 +215,16 @@ function starteSpiel(rfaPort, saveBuf, opt = {}) {
     const fehlerAus = (msg) => ws.send(JSON.stringify({ jsonrpc: "2.0", id: m.id, error: msg }));
 
     switch (m.method) {
-      case "getSaveFile":
+      case "getSaveFile": {
         if (opt.stummBeiSave) return;      // fuer die Timeout-Probe
-        antwort({ save: saveBuf.toString("latin1"), binary: true, identifier: "testtesttest01" });
+        const geben = () => antwort({ save: saveBuf.toString("latin1"),
+          binary: true, identifier: "testtesttest01" });
+        // Verzoegert antworten - damit laesst sich eine LAUFENDE Verifikation
+        // stellen, in die eine zweite Verbindung hineinplatzt.
+        if (opt.saveVerzoegerungMs) setTimeout(geben, opt.saveVerzoegerungMs);
+        else geben();
         return;
+      }
       case "pushFile":
         dateien.set(m.params.server + ":" + m.params.filename, m.params.content);
         antwort("OK");
@@ -348,6 +354,7 @@ const ZEIT = {
   rueckwaertsAlt: BASIS + 35 * STUNDE,   // 5 h hinter dem eigenen Anker
   zweite: BASIS + 50 * STUNDE,
   koeder: BASIS + 25 * STUNDE,
+  rennen: BASIS + 55 * STUNDE,
 };
 
 /**
@@ -830,6 +837,55 @@ console.log("-- eine ZWEITE Verbindung uebernimmt nicht, solange die erste lebt 
 
   s1.schliessen();
   s2.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- ein Socket, der IN eine laufende Verifikation platzt --");
+{
+  // GEFUNDEN, WEIL DER TEST UNTER LAST UMFIEL (04.09.2026).
+  //
+  // `verifiziereSocket` stieg bei laufender Verifikation mit einem blossen
+  // `return` aus. Der neue Socket blieb dauerhaft unverifiziert: der Wachhund
+  // liess nichts hinaus, jeder Schub landete in `zurueckgestellt`, und der
+  // einzige Wiederholungsanlauf steht im catch-Zweig, den ein stiller
+  // Ausstieg nie erreicht. Von aussen: eine gesunde Verbindung, die nichts tut.
+  //
+  // Das Fenster ist groesser, als es aussieht - "Verifiziert in ..." wird
+  // geloggt, BEVOR Sicherung und pushAll laufen.
+  //
+  // Hier wird es absichtlich gestellt: das erste Spiel antwortet auf
+  // getSaveFile erst nach 6 Sekunden, das zweite verbindet sich nach einer.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", frischerDatenordner()]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+
+  const langsam = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rennen }),
+    { saveVerzoegerungMs: 6000 });
+  await schlaf(1000);                       // die Verifikation laeuft jetzt
+  langsam.schliessen();
+  const zweit = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rennen }));
+
+  // Er muss ENTWEDER verifiziert ODER abgewiesen werden - nur nicht schweigen.
+  const bis = Date.now() + 40000;
+  let entschieden = false;
+  while (Date.now() < bis && !entschieden) {
+    await schlaf(200);
+    entschieden = b.zeilen.some((z) => /Verifiziert in|abgewiesen/i.test(z));
+  }
+  pruefe("die zweite Verbindung wird entschieden, nicht verschwiegen", entschieden,
+    b.zeilen.slice(-3).join(" | "));
+  pruefe("und die Bruecke sagt, dass sie ihn vorgemerkt hat",
+    b.zeilen.some((z) => /vorgemerkt|Vorgemerkten/i.test(z)),
+    "sonst hat sie ihn nur zufaellig doch noch geprueft");
+
+  zweit.schliessen();
+  langsam.schliessen();
   b.proc.kill();
   await b.exit;
 }

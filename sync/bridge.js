@@ -218,6 +218,24 @@ const pendingRequests = new Map();
  */
 let verifizierterSocket = null;
 let verifikationLaeuft = false;
+/**
+ * EIN SOCKET, DER WAEHREND EINER LAUFENDEN VERIFIKATION ANKOMMT (04.09.2026).
+ *
+ * `verifiziereSocket` stieg bei `verifikationLaeuft` mit einem blossen
+ * `return` aus - ohne Meldung und ohne dass irgendetwas die Pruefung spaeter
+ * nachgeholt haette. Der neue Socket blieb damit DAUERHAFT unverifiziert: der
+ * Wachhund liess nichts hinaus, jeder Schub landete in `zurueckgestellt`, und
+ * der einzige Wiederholungsanlauf (60 s) steht im catch-Zweig, den ein
+ * stiller Ausstieg nie erreicht. Von aussen sah das aus wie eine gesunde
+ * Verbindung, die nichts tut.
+ *
+ * Das Fenster ist groesser, als es aussieht: `Verifiziert in ...` wird
+ * geloggt, BEVOR Sicherung und pushAll laufen - beide dauern zusammen leicht
+ * mehrere Sekunden. Getroffen hat es zuerst den Brueckentest unter Last
+ * (04.09.2026, voller Suitendurchlauf); im Betrieb trifft es jeden Reconnect,
+ * der in dieses Fenster faellt.
+ */
+let nachzuholen = null;
 const istVerifiziert = () => gameSocket !== null && verifizierterSocket === gameSocket;
 
 const state = {
@@ -720,7 +738,12 @@ async function ladeAnker() {
  * Kopie trennt - der identifier ist in beiden gleich.
  */
 async function verifiziereSocket(kandidat) {
-  if (verifikationLaeuft) return;
+  if (verifikationLaeuft) {
+    // NICHT VERWERFEN, SONDERN VORMERKEN. Siehe `nachzuholen`.
+    nachzuholen = kandidat || gameSocket;
+    log("warn", "Verifikation laeuft bereits - der neue Socket wird vorgemerkt");
+    return;
+  }
   verifikationLaeuft = true;
   const beginn = Date.now();
   // Der geprueft werdende Socket wird HIER festgehalten. Alles Weitere gilt
@@ -891,6 +914,16 @@ async function verifiziereSocket(kandidat) {
     }, 60000);
   } finally {
     verifikationLaeuft = false;
+    // Den vorgemerkten Socket jetzt pruefen - aber nur, wenn er noch der
+    // aktuelle ist und noch nicht verifiziert wurde.
+    const offen = nachzuholen;
+    nachzuholen = null;
+    if (offen && gameSocket === offen && !istVerifiziert()) {
+      log("info", "Vorgemerkten Socket nachtraeglich pruefen");
+      setTimeout(() => {
+        if (gameSocket === offen && !istVerifiziert()) void verifiziereSocket(offen);
+      }, 0);
+    }
   }
 }
 

@@ -95,6 +95,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-analyse-eichung.js",
+    deckt: "Eichung der ersetzten Analyse-Familie gegen den Spielquelltext (C.7)",
+    schnell: true,
+  },
+  {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
     schnell: true,

@@ -275,17 +275,25 @@ console.log("-- DIE NAHT: der Waechter schreibt, was punish.js liest (R1) --");
   const kpi = JSON.stringify({ traeger: { name: "rang", wert: 4711,
     motorTimeMs: 13 * 3600000 } });
 
+  const basisDateien = {
+    "registry.json": REGISTRY, "route.json": ROUTE,
+    "guard.js": "//", "bn4net.js": "//", "punish.js": "//", "boot.js": "//",
+    "data/verfahren.txt": "V2 10 2",
+    "data/bn4net.json": kern,
+    "data/kpi.json": kpi,
+  };
+
   const m = neuerMock({
     host: "home", knoten: 10, wall: W0, playtime: 200 * 3600000,
     nodeReset: W0 - 48 * 3600000, augReset: W0 - 48 * 3600000,
     server: { home: { ram: 1024, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
     dateien: { home: {
-      "registry.json": REGISTRY, "route.json": ROUTE,
-      "guard.js": "//", "bn4net.js": "//", "punish.js": "//", "boot.js": "//",
-      "data/verfahren.txt": "V2 10 2",
-      "data/guard-modus.txt": "enforce",
-      "data/bn4net.json": kern,
-      "data/kpi.json": kpi,
+      ...basisDateien,
+      // `enforce-alles`, nicht `enforce` (Skeptiker Runde 4, R12): unter
+      // `enforce` sind seit dem 04.09.2026 nur die billigen Sprossen 0 bis 2
+      // freigegeben. Sprosse 5 verlangt die ausdrueckliche Freigabe - und
+      // dieser Abschnitt prueft nun einmal genau sie.
+      "data/guard-modus.txt": "enforce-alles",
     } },
     maxSchlaf: 900,
     beiSchlaf: (ms, z, vor) => {
@@ -305,6 +313,38 @@ console.log("-- DIE NAHT: der Waechter schreibt, was punish.js liest (R1) --");
   const roh = m.lies("home", "data/penalty-order.json");
   pruefe("der Waechter schreibt data/penalty-order.json", !!roh,
     "Log: " + m.zustand.log.slice(-3).join(" | "));
+
+  // DIE GEGENPROBE ZUR FEINEREN FREIGABE (R12): unter dem gewoehnlichen
+  // `enforce` darf Sprosse 5 NICHT ausfuehren. Sie ist ein Soft-Reset, und der
+  // gehoert nicht in eine Automatik, deren Fehlstrafenzahl noch keine Nacht
+  // alt ist.
+  {
+    const mZahm = neuerMock({
+      host: "home", knoten: 10, wall: W0, playtime: 200 * 3600000,
+      nodeReset: W0 - 48 * 3600000, augReset: W0 - 48 * 3600000,
+      server: { home: { ram: 1024, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+      // VOM FRISCHEN STAND, nicht vom Endstand des ersten Laufs: dort steht
+      // der Leiterzustand schon auf HEALTHY, und die Karenz begaenne von vorn.
+      dateien: { home: { ...basisDateien, "data/guard-modus.txt": "enforce" } },
+      maxSchlaf: 900,
+      beiSchlaf: (ms, z, vor) => {
+        vor(60000);
+        z.dateien.home["data/bn4net.json"] =
+          kernBlock(z.wall, 20 * 3600000 + (z.wall - W0));
+      },
+    });
+    const gz = await ladeAusBeiden(ROOT, "guard.js");
+    const zur = mZahm.uhrStellen();
+    try { await gz.modul.main(mZahm.ns); }
+    catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zur(); }
+    pruefe("unter 'enforce' bleibt Sprosse 5 in Beobachtung",
+      !mZahm.lies("home", "data/penalty-order.json"),
+      "sie braucht die ausdrueckliche Freigabe 'enforce-alles'");
+    pruefe("und das Protokoll sagt, wie man sie freigibt",
+      mZahm.zustand.log.some((z) => /enforce-alles/.test(z)),
+      "wer den Riegel sieht, soll auch wissen, wie er ihn loest");
+  }
 
   if (roh) {
     let a = null;

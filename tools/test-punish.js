@@ -266,6 +266,47 @@ console.log("-- 5. nicht vor dem Divisionsbeitritt --");
 }
 
 console.log("");
+console.log("-- 5b. auf dem Bladeburner-Weg nur mit Wiederaufbauhilfe (R9) --");
+{
+  // Der Befund aus dem Spielquelltext: `prestigeAugmentation` setzt alle
+  // Kampfwerte auf 1 (PlayerObjectGeneralMethods.ts:86-100), der Bladeburner
+  // ueberlebt aber mitsamt Rang. Die Erfolgswahrscheinlichkeit ist ein
+  // Potenzprodukt der Kampfwerte (Action.ts:169-195), ein Fehlschlag zieht
+  // Rang AB (Bladeburner.ts:1055-1059).
+  //
+  // Ein Einbau auf dem V2-Weg erzeugt also genau die Stagnation, die Sprosse 5
+  // beheben soll - es sei denn, ein wartendes Stueck verkuerzt den
+  // Wiederaufbau. Diese Frage beantwortet bn4rep.js, nicht punish.js.
+  const r = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2,
+      wiederaufbauHilfe: false }),
+  }), ["scharf"]);
+  pruefe("ohne Wiederaufbauhilfe wird auf dem V2-Weg nicht eingebaut",
+    !r.eingebaut, String(r.ergebnis.verweigert));
+  pruefe("und der Grund nennt die Kampfwerte",
+    /Kampfwerte auf 1/.test(String(r.ergebnis.verweigert)),
+    String(r.ergebnis.verweigert));
+
+  // Die Gegenprobe: MIT Hilfe geht es durch. Sonst waere die Bedingung ein
+  // stiller Riegel statt einer Abwaegung.
+  const r2 = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2,
+      wiederaufbauHilfe: true }),
+  }), ["scharf"]);
+  pruefe("mit Wiederaufbauhilfe baut es ein", r2.eingebaut,
+    String(r2.ergebnis.verweigert));
+
+  // Und ohne die Angabe (alte Datei) bleibt es beim alten Verhalten - eine
+  // Sperre, die aus einem fehlenden Feld heraus greift, waere schlimmer als
+  // ein Einbau zuviel.
+  const r3 = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2 }),
+  }), ["scharf"]);
+  pruefe("ohne die Angabe gilt die alte, grosszuegige Regel", r3.eingebaut,
+    String(r3.ergebnis.verweigert));
+}
+
+console.log("");
 console.log("-- 6. das Depot muss leer sein --");
 {
   const r = await fahre(guterFall({

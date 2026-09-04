@@ -47,6 +47,13 @@ console.log("=== Ebene 2: der Waechter gegen den ns-Mock ===");
 const W0 = 1_700_000_000_000;
 
 /** Fuer den Schonlisten-Test: guard.js und ausgang.js sind killSafe:false. */
+// Der Quelltext des Waechters - fuer die Proben, die eine Regel im Code
+// belegen statt sie ueber Stunden zu erfahren.
+const SRC_GUARD = [
+  path.resolve(ROOT, "..", "bitburner-bau", "src", "guard.js"),
+  path.join(ROOT, "src", "guard.js"),
+].find((x) => fs.existsSync(x));
+
 const REGISTRY_MIT_KILLSAFE = JSON.stringify({
   schema: 1,
   eintraege: [
@@ -168,6 +175,31 @@ console.log("-- der Modus und die Handbremse (W10 und Nachtrag) --");
   pruefe("guard-observe.txt sticht enforce sofort",
     (json(gebremst, "data/watchdog.json") || {}).modus === "observe",
     "erhalten " + (json(gebremst, "data/watchdog.json") || {}).modus);
+}
+
+console.log("");
+console.log("-- scharf ist nicht gleich scharf (R12) --");
+{
+  // Bis zum 04.09.2026 gab es einen Schalter fuer die ganze Leiter. Ein
+  // Pruefer hat das als eigenen Befund gefuehrt: Sprosse 1 und 2 sind billig
+  // und umkehrbar, Sprosse 3 raeumt home leer und Sprosse 5 ist ein
+  // Soft-Reset. Es gab keine Moeglichkeit, die unteren scharf und die oberen
+  // in Beobachtung zu halten.
+  //
+  // Geprueft wird die Freigabetabelle selbst - sie steht im Waechter, und ein
+  // Testlauf ueber Stunden waere der falsche Weg, sie zu belegen.
+  const q = fs.readFileSync(SRC_GUARD, "utf8");
+  pruefe("es gibt drei Modi", /enforce-alles/.test(q),
+    "enforce, enforce-alles, observe");
+  pruefe("bei 'enforce' sind nur die billigen Sprossen frei",
+    /SCHARFE_SPROSSEN = scharfAlles \? \[0, 1, 2, 3, 4, 5\] : \[0, 1, 2\]/.test(q),
+    "Sprosse 3 raeumt home leer, Sprosse 5 ist ein Soft-Reset");
+  pruefe("und die Ausfuehrung fragt die Tabelle",
+    /SCHARFE_SPROSSEN\.includes\(r\.sprosse\.nr\)/.test(q),
+    "sonst waere die Tabelle Zierde");
+  pruefe("die Beobachtungsmeldung nennt den Weg zur Freigabe",
+    /enforce-alles'\."/.test(q) || /enforce-alles/.test(q),
+    "wer den Riegel sieht, soll auch wissen, wie er ihn loest");
 }
 
 console.log("");

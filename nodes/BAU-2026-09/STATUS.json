@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T07:26:00",
+  "aktualisiert": "2026-09-04T07:45:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -41,9 +41,9 @@
       "offen": "22 Eintraege, Migrationsbeweis gruen (kein heutiges Werkzeug faellt weg). NICHT live."
     },
     "C.5": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "Kern liest Registry statt der zwei Arrays",
-      "offen": ""
+      "offen": "Kern leitet beide Listen aus der Registry ab, eingebaute Liste als Rueckfall. Zwei begruendete Abweichungen. NICHT live."
     },
     "C.6": {
       "stand": "getestet",
@@ -51,9 +51,9 @@
       "offen": "Beobachtungsmodus, 54 Pruefungen in zwei Ebenen. Offen: die Ausfuehrung der Sprossen (C.9). NICHT live."
     },
     "C.7": {
-      "stand": "offen",
+      "stand": "gebaut",
       "was": "Kaltstart-Kern: shop.js, hackAnalyze inline, Kaltstart-Leiter",
-      "offen": ""
+      "offen": "Kern von 17,75 auf rund 10,75 GB. Analyse-Familie gerechnet, cloud-Familie in shop.js. Offen: Skeptikerrunde und Ebene-3-Kaltstart. NICHT live."
     },
     "C.8": {
       "stand": "offen",

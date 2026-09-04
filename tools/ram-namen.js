@@ -66,11 +66,20 @@ for (const m of refText.matchAll(/^\s*(\w+)\s*:\s*RamCostConstants\.(\w+)\s*,/gm
   const wert = KONSTANTEN[m[2]];
   if (Number.isFinite(wert)) KOSTEN[m[1]] = wert;
 }
-/** Singularity-Familie: SF4Cost(...) - der Grundpreis haengt an der Stufe. */
+/**
+ * Singularity-Familie: `SF4Cost(...)` - der Grundpreis haengt an der Stufe.
+ *
+ * ZWEI SCHREIBWEISEN, und die zweite fehlte zuerst. Neben
+ * `SF4Cost(RamCostConstants.SingularityFn1)` gibt es die direkte Zahl:
+ * `getCurrentWork: SF4Cost(0.5)`. Ohne sie meldete das Werkzeug fuer
+ * `figwatch.js` 1,75 GB statt 9,75 - also ausgerechnet die Familie zu
+ * billig, deretwegen es gebaut wurde.
+ */
 const SINGULARITY = new Set();
-for (const m of refText.matchAll(/^\s*(\w+)\s*:\s*SF4Cost\(\s*(?:RamCostConstants\.)?(\w+)\s*\)/gm)) {
+for (const m of refText.matchAll(
+    /^\s*(\w+)\s*:\s*SF4Cost\(\s*(?:RamCostConstants\.(\w+)|([\d.]+))\s*\)/gm)) {
   SINGULARITY.add(m[1]);
-  const wert = KONSTANTEN[m[2]];
+  const wert = m[2] !== undefined ? KONSTANTEN[m[2]] : Number(m[3]);
   if (Number.isFinite(wert)) KOSTEN[m[1]] = wert;
 }
 

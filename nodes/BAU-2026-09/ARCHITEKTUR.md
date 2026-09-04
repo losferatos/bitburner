@@ -796,7 +796,7 @@ nicht in einen Kommentar.
     {
       "name": "bbtrain.js",
       "args": [],
-      "ramBaseGb": 6.75,
+      "ramBaseGb": 6.85,
       "ramSingGb": 5.5,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",

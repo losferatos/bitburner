@@ -31,6 +31,9 @@ const TESTS = [
   },
   {
     datei: "test-verbote.js",
+    // --bau: gegen den Worktree pruefen, solange dort gebaut wird. Ein
+    // Befund, der erst nach dem Einspielen kommt, kommt zu spaet.
+    args: ["--bau"],
     deckt: "Verbotsgrep und Selbstblockade-Muster, mit Selbstprobe",
     schnell: true,
   },
@@ -147,7 +150,7 @@ const LUECKEN = [
 
 const nurSchnell = process.argv.includes("--schnell");
 
-function fahre(datei) {
+function fahre(datei, args = []) {
   return new Promise((fertig) => {
     const p = path.join(HIER, datei);
     if (!fs.existsSync(p)) {
@@ -155,7 +158,7 @@ function fahre(datei) {
       return;
     }
     const beginn = Date.now();
-    execFile("node", [p], { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+    execFile("node", [p, ...args], { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
       (err, out, errout) => {
         fertig({
           datei,
@@ -176,7 +179,7 @@ const auswahl = TESTS.filter((t) => !nurSchnell || t.schnell);
 const ergebnisse = [];
 
 for (const t of auswahl) {
-  const r = await fahre(t.datei);
+  const r = await fahre(t.datei, t.args || []);
   ergebnisse.push({ ...t, ...r });
   const zeichen = r.rc === 0 ? "gruen" : "ROT  ";
   console.log("");

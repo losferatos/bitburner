@@ -89,6 +89,13 @@ const POSITIVLISTE = [
   // sie stehen hier, damit der Grep sie mitliest, wenn spaeter doch einer
   // dazukommt.
   "lib/motorzeit.js", "lib/herzschlag.js", "lib/kpi.js", "lib/events.js",
+  // Phase C, Stand 04.09.2026 - die neuen Gewerke und Module. `kampfaugs.js`
+  // stand nie auf der Liste, obwohl es `workForFaction` ruft: es war damit
+  // genau die Sorte Datei, gegen die die Figur-Regel gebaut ist.
+  "guard.js", "shop.js", "figwatch.js", "kampfaugs.js",
+  "lib/reg.js", "lib/leiter.js", "lib/uhren.js", "lib/eta.js",
+  "lib/endspurt.js", "lib/route.js", "lib/graftwahl.js", "lib/figur.js",
+  "lib/figurns.js", "lib/calc.js", "lib/batch.js",
 ];
 
 /** Diese Dateien sind vom Grep ausgenommen. */
@@ -167,6 +174,66 @@ function pruefeEndlosschleifen(datei, inhalt) {
   }
 }
 
+/**
+ * DIE FIGUR-REGEL (Position C.11, 04.09.2026).
+ *
+ * Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Wer sie ohne
+ * Vergabe beansprucht, bricht die Arbeit des anderen ab - und
+ * `GraftingWork.finish(cancelled)` gibt das Geld NICHT zurueck
+ * (Work/GraftingWork.tsx:75-83). Beim Simulacrum sind das 450 Mrd je Versuch.
+ *
+ * Der Vergabepunkt sitzt im Kern (bn4net.js, Abschnitt 9a). Diese Regel
+ * prueft, dass jede Datei, die eine Figurhandlung ausloest, auch fragt.
+ *
+ * SIE PRUEFT NUR DEN IMPORT, NICHT DIE STELLE. Ob die Wache an der richtigen
+ * Stelle steht und ob ihr Ergebnis beachtet wird, kann ein Grep nicht wissen -
+ * das prueft `figwatch.js` im Betrieb, indem es die vergebene Handlung mit der
+ * tatsaechlichen vergleicht. Der Grep faengt den haeufigen Fall: jemand baut
+ * ein neues Gewerk und denkt gar nicht an die Figur.
+ */
+const FIGUR_HANDLUNGEN = [
+  { muster: /ns\.singularity\.workForFaction\s*\(/, name: "workForFaction" },
+  { muster: /ns\.singularity\.workForCompany\s*\(/, name: "workForCompany" },
+  { muster: /ns\.singularity\.commitCrime\s*\(/, name: "commitCrime" },
+  { muster: /ns\.singularity\.gymWorkout\s*\(/, name: "gymWorkout" },
+  { muster: /ns\.singularity\.universityCourse\s*\(/, name: "universityCourse" },
+  { muster: /ns\.singularity\.createProgram\s*\(/, name: "createProgram" },
+  { muster: /ns\.grafting\.graftAugmentation\s*\(/, name: "graftAugmentation" },
+  { muster: /ns\.bladeburner\.startAction\s*\(/, name: "startAction" },
+];
+
+/**
+ * Ausnahmen mit Begruendung - keine Liste ohne Grund.
+ *
+ * `graft.js` wartet auf die Vergabe, statt in einer Schleife nachzufragen: es
+ * laeuft einmal und beendet sich. Es steht trotzdem NICHT hier, weil es die
+ * Wache hat.
+ */
+const FIGUR_AUSNAHMEN = {
+  "exploit3.js": "Ausnutzung eines Spielfehlers, laeuft nur auf Zuruf und nie"
+    + " im Automatikbetrieb - es hat keinen Antragsteller.",
+};
+
+function pruefeFigurWache(datei, inhalt) {
+  const basis = path.basename(datei);
+  const zeilen = inhalt.split("\n");
+  const gefunden = [];
+  for (const h of FIGUR_HANDLUNGEN) {
+    for (let i = 0; i < zeilen.length; i++) {
+      const ohneKommentar = zeilen[i].replace(/^\s*(\*|\/\/|\/\*).*$/, "");
+      if (h.muster.test(ohneKommentar)) { gefunden.push([h.name, i + 1]); break; }
+    }
+  }
+  if (!gefunden.length) return;
+  if (FIGUR_AUSNAHMEN[basis]) return;
+  if (inhalt.includes("lib/figurns.js")) return;
+  for (const [name, zeile] of gefunden) {
+    melde("Figurhandlung ohne Wache", datei, zeile, name + "(...)",
+      "beansprucht die Spielfigur, importiert aber lib/figurns.js nicht -"
+      + " ein laufender Graft waere damit verloren (Position C.11)");
+  }
+}
+
 console.log("");
 console.log("=== Ebene 0: Verbotsgrep ===");
 console.log("");
@@ -196,9 +263,25 @@ console.log("");
 // ist, und der Befund kommt eine Einspielung zu spaet.
 const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
 
+// WELCHER BAUM ZUERST (04.09.2026).
+//
+// Ohne `--bau` gilt src/ - das ist der Stand, der im Spiel laeuft, und den
+// muss der Grep pruefen. Mit `--bau` gilt der Worktree zuerst: dort entsteht
+// die naechste Fassung, und ein Befund, der erst nach dem Einspielen kommt,
+// kommt eine Einspielung zu spaet.
+//
+// `test-alles.js` ruft mit `--bau` auf, solange ein Worktree existiert. Der
+// Unterschied ist real: die Figur-Regel unten war gegen src/ siebenfach rot
+// und gegen den Worktree gruen - dieselbe Regel, zwei Staende.
+const BAUZUERST = process.argv.includes("--bau") && fs.existsSync(WORKTREE);
+
 for (const rel of zuPruefen) {
   let p = path.join(SRC, rel);
   let woher = "";
+  if (BAUZUERST && fs.existsSync(path.join(WORKTREE, rel))) {
+    p = path.join(WORKTREE, rel);
+    woher = " [Worktree]";
+  }
   if (!fs.existsSync(p)) {
     const imBau = path.join(WORKTREE, rel);
     if (fs.existsSync(imBau)) {
@@ -236,6 +319,7 @@ for (const rel of zuPruefen) {
   }
 
   if (/\.js$/.test(rel)) pruefeEndlosschleifen(rel, inhalt);
+  if (/\.js$/.test(rel)) pruefeFigurWache(rel, inhalt);
 }
 
 // destroyW0r1dD43m0n darf nur exit.js aufrufen.

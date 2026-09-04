@@ -118,41 +118,6 @@ Regeln:
 
 ## Sofort
 
-### STAND 02.09., 18:55 - Umbauten I.2 bis I.7 gebaut, mit Skeptiker-Laeufen (Commit `[skeptiker]`)
-
-Gebaut und live (BN10 L2): Ausbau fuer wartende Werkzeuge (bn4rep lief
-danach binnen Sekunden), Geldboden fuer Sleeves/joinrun (Nachholbetrieb
-15x, Koerperzahl, Shoplift unter Kampfwert 40, verschiedene Werte je
-Koerper gegen den Offline-Klumpen), Kaltstart-Leiter Faktor 1,0 und
-passender Rechner fuer wartende Werkzeuge, Stillstandserkennung im Motor
-(Telemetriealter blade/sleeve/bn4life/ausgang/bbtrain, juengste Instanz
-bleibt), Herzschlaege, boot.js ohne Aufgeben, bbtrain ohne Notruf,
-Auftragskanal mit Wiederholung, Zahlenkorrekturen (Rangfaktor je Knoten,
-Hyperdrive, Sleeve-Rate, WD-Ziel), BN9-Gewerk (hashes.js verkauft/tauscht
-Hashes, hacknet.js kauft den ersten Server nach Einbau und den Wirt fuer
-exit.js, Hacknet-Server tragen keine Arbeiter), sleevecrime.js fuer den
-Kaltstart. Berichte unter `nodes/audit-2026-09-02/skeptiker-*.md`.
-
-**Was noch offen ist (aus den Skeptiker-Laeufen, nicht gebaut):**
-- **Zwei Handgriffe von Eric:** Autoexec im Spiel auf `boot.js` (Options ->
-  System) - sonst startet nach einem Neuladen ohne laufende Skripte nichts;
-  und `Bitburner-Aufsicht.cmd` aus dem Windows-Autostart nehmen (startet
-  wache/aufsicht, die Werkzeuge doppelt starten).
-- Kaltstart: contracts.js (17,65 GB) passt nicht neben bn4net (17,75) auf
-  32 GB - bn4net um 3,4 GB verschlanken; wakelock.js (34 GB, DOM) im
-  Kaltstart nicht startbar, der Tab ist dort gedrosselt.
-- Figur-Vergabepunkt (Audit C.14) nicht gebaut; joinrun/bbtrain teilen die
-  5-Mio-Schwelle, das Ping-Pong ist damit entschaerft, nicht beseitigt.
-- Logs sind weiter Speicherlisten mit "w" (Audit C.16).
-- sleevecrime.js ohne Sleeves auf einem Mietrechner: Marker landet nicht
-  auf home (kein scp im 5,7-GB-Budget) - Neustart alle 10 s, bis sleeve.js
-  laeuft. Nur nach einem Wechsel in einen Knoten ohne Sleeves relevant.
-- BN8 (`boerse.js`) und BN15 (Labyrinth) unveraendert offen.
-- Spielanteil in checkin.js (Kalender-ETA) und der Offline-Klumpen der Figur
-  selbst (10 h Gym auf einen Wert) bleiben - dagegen hilft nur, den Rechner
-  laufen zu lassen.
-
-
 ### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
 
 **Befund.** `lastAugReset` = `lastNodeReset` = 01.09. 15:59; 0 Augmentierungen

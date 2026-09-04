@@ -1,0 +1,3414 @@
+{
+  "meta": {
+    "erzeugt": "2026-09-04 01:45 lokale Systemzeit (gemessen per date)",
+    "quelle": "reference/v301/src/BitNode/BitNode.tsx (1131 Zeilen)",
+    "spielversion": "3.0.1 (reference/v301/src/Constants.ts:7 VersionString, :10 VersionNumber 51)",
+    "defaultQuelle": "reference/v301/src/BitNode/BitNodeMultipliers.ts, 54 numerische Felder, Zeilen 10-180",
+    "verfahren": "maschinell aus dem Quelltext geparst, nicht abgetippt. Die BN12-Ausdruecke wurden im selben Kontext ausgewertet, den die Engine benutzt (inc = 1.02^lvl, dec = 1/inc, defaultMultipliers.DaedalusAugsRequirement = 30).",
+    "hinweisDevBuild": "reference/bitburner-src ist der 3.0.2-dev-Build und traegt DIESELBE VersionNumber 51 (Constants.ts:10). Ein Fehlimport ist an der Versionsnummer nicht erkennbar. Gemessener Unterschied in den Multiplikatoren, ausschliesslich zwei Zeilen: BN12 hat im dev-Build zusaetzlich DarknetLabyrinthRewardsTheRedPill: 0 (dev-Zeile 954), BN13 zusaetzlich CharismaLevelMultiplier: 0.7 (dev-Zeile 998). Beides fehlt in 3.0.1. BitNodeMultipliers.ts ist in beiden Baeumen byteweise identisch.",
+    "bn12Semantik": "getBitNodeMultipliers(n, lvl) wird von initBitNodeMultipliers() (BitNode.tsx:1129-1131) mit lvl = Player.activeSourceFileLvl(n) + 1 aufgerufen. Das in route.json gefuehrte BitNode-Level entspricht genau diesem lvl (BitNodeUtils.ts:102-104: Math.min(sfLevel + 1, bn === 12 ? MAX_VALUE : 3)).",
+    "verifikationsfragen": {
+      "welcheUhr": "Keine. Die Multiplikatoren sind Konstanten, die EINMAL beim Knoteneintritt nach currentNodeMults geschrieben werden (BitNodeMultipliers.ts:188-192, gerufen von BitNode.tsx:1130). Weder Echtzeit noch Spielzeit noch Motorzeit geht ein. Ein spaeter geaenderter SF-Stand (Dev-Menue-Override) wirkt erst beim naechsten initBitNodeMultipliers()-Aufruf.",
+      "stillstandUndNachholen": "Kein Nachholeffekt, weil nichts akkumuliert. ABER drei abgeleitete Groessen werden bei der Servererzeugung EINGEFROREN und danach nie neu gerechnet: server.moneyAvailable und server.moneyMax (Server/Server.ts:75-76) sowie w0r1d_d43m0n.requiredHackingSkill (ServerHelpers.ts:383-385). Wer currentNodeMults spaeter aendert, aendert diese drei nicht mehr.",
+      "rateOderBestand": "Die Mehrheit sind Raten- bzw. Preisfaktoren. BESTAENDE bzw. Schwellen, die nicht wie Raten behandelt werden duerfen: ServerStartingMoney und ServerStartingSecurity (einmalig bei Servererzeugung), ServerMaxMoney (Deckel), DaedalusAugsRequirement (Schwellenanzahl), CloudServerLimit und CloudServerMaxRam (Stueck- bzw. RAM-Deckel), StaneksGiftExtraSize (ADDITIVE Groesse, Default 0, nicht 1), WorldDaemonDifficulty (einmaliger Faktor auf eine Schwelle)."
+    }
+  },
+  "befunde": [
+    "BitNode.tsx kennt kein Schwierigkeitsfeld. Die Klasse BitNode (:6-37) hat nur tagline, description, sfDescription, info, name, number.",
+    "Die im Auftrag genannten Feldnamen RepToDonateToFaction und PurchasedServerSoftcap existieren in 3.0.1 nicht mehr. Sie wurden in 3.0.0 umbenannt: RepToDonateToFaction -> FavorToDonateToFaction (APIBreaks/3.0.0.ts:221-227), PurchasedServer{Cost,Softcap,Limit,MaxRam} -> CloudServer{Cost,Softcap,Limit,MaxRam} (APIBreaks/3.0.0.ts:461-498).",
+    "BN12 DaedalusAugsRequirement ist auf jeder erreichbaren Stufe 31, nicht 30 und nicht 40. Der Deckel 40 greift erst ab lvl 117 (SF12-Level 116). Der Wert 32 wird erst ab lvl 36 erreicht.",
+    "BN12 halbiert CloudServerMaxRam schon auf Stufe 1: dec = 0.98039 ergibt round(1048576*0.98039) = 1028016, und getCloudServerMaxRam() rundet auf die naechstkleinere Zweierpotenz ab (ServerPurchases.ts:100-105) -> 524288 statt 1048576. Aus 2% nominaler Daempfung werden 50% reale.",
+    "BN10 setzt weder ServerMaxMoney noch ServerStartingMoney. Der Ertragsdaempfer in BN10 ist allein ScriptHackMoney 0.5 (:864).",
+    "Zwei No-Op-Eintraege: BN4 StaneksGiftExtraSize: 0 (:656) und BN5 StaneksGiftExtraSize: 0 (:687) sind identisch mit dem Default 0 und wirken nicht.",
+    "Alle 54 Multiplikatorfelder werden von mindestens einem Knoten ueberschrieben; es gibt kein totes Feld."
+  ],
+  "defaults": {
+    "AgilityLevelMultiplier": {
+      "wert": 1,
+      "zeile": 10
+    },
+    "AugmentationMoneyCost": {
+      "wert": 1,
+      "zeile": 13
+    },
+    "AugmentationRepCost": {
+      "wert": 1,
+      "zeile": 16
+    },
+    "BladeburnerRank": {
+      "wert": 1,
+      "zeile": 19
+    },
+    "BladeburnerSkillCost": {
+      "wert": 1,
+      "zeile": 22
+    },
+    "CharismaLevelMultiplier": {
+      "wert": 1,
+      "zeile": 25
+    },
+    "ClassGymExpGain": {
+      "wert": 1,
+      "zeile": 28
+    },
+    "CodingContractMoney": {
+      "wert": 1,
+      "zeile": 31
+    },
+    "CompanyWorkExpGain": {
+      "wert": 1,
+      "zeile": 34
+    },
+    "CompanyWorkMoney": {
+      "wert": 1,
+      "zeile": 37
+    },
+    "CompanyWorkRepGain": {
+      "wert": 1,
+      "zeile": 40
+    },
+    "CorporationDivisions": {
+      "wert": 1,
+      "zeile": 43
+    },
+    "CorporationSoftcap": {
+      "wert": 1,
+      "zeile": 46
+    },
+    "CorporationValuation": {
+      "wert": 1,
+      "zeile": 49
+    },
+    "CrimeExpGain": {
+      "wert": 1,
+      "zeile": 52
+    },
+    "CrimeMoney": {
+      "wert": 1,
+      "zeile": 55
+    },
+    "CrimeSuccessRate": {
+      "wert": 1,
+      "zeile": 58
+    },
+    "DaedalusAugsRequirement": {
+      "wert": 30,
+      "zeile": 61
+    },
+    "DarknetLabyrinthRewardsTheRedPill": {
+      "wert": 1,
+      "zeile": 64
+    },
+    "DarknetMoneyMultiplier": {
+      "wert": 1,
+      "zeile": 67
+    },
+    "DefenseLevelMultiplier": {
+      "wert": 1,
+      "zeile": 70
+    },
+    "DexterityLevelMultiplier": {
+      "wert": 1,
+      "zeile": 73
+    },
+    "FactionPassiveRepGain": {
+      "wert": 1,
+      "zeile": 76
+    },
+    "FactionWorkExpGain": {
+      "wert": 1,
+      "zeile": 79
+    },
+    "FactionWorkRepGain": {
+      "wert": 1,
+      "zeile": 82
+    },
+    "FourSigmaMarketDataApiCost": {
+      "wert": 1,
+      "zeile": 85
+    },
+    "FourSigmaMarketDataCost": {
+      "wert": 1,
+      "zeile": 88
+    },
+    "GangSoftcap": {
+      "wert": 1,
+      "zeile": 91
+    },
+    "GangUniqueAugs": {
+      "wert": 1,
+      "zeile": 94
+    },
+    "GoPower": {
+      "wert": 1,
+      "zeile": 97
+    },
+    "HackExpGain": {
+      "wert": 1,
+      "zeile": 100
+    },
+    "HackingLevelMultiplier": {
+      "wert": 1,
+      "zeile": 103
+    },
+    "HackingSpeedMultiplier": {
+      "wert": 1,
+      "zeile": 106
+    },
+    "HacknetNodeMoney": {
+      "wert": 1,
+      "zeile": 112
+    },
+    "HomeComputerRamCost": {
+      "wert": 1,
+      "zeile": 115
+    },
+    "InfiltrationMoney": {
+      "wert": 1,
+      "zeile": 118
+    },
+    "InfiltrationRep": {
+      "wert": 1,
+      "zeile": 121
+    },
+    "ManualHackMoney": {
+      "wert": 1,
+      "zeile": 128
+    },
+    "CloudServerCost": {
+      "wert": 1,
+      "zeile": 131
+    },
+    "CloudServerSoftcap": {
+      "wert": 1,
+      "zeile": 134
+    },
+    "CloudServerLimit": {
+      "wert": 1,
+      "zeile": 137
+    },
+    "CloudServerMaxRam": {
+      "wert": 1,
+      "zeile": 140
+    },
+    "FavorToDonateToFaction": {
+      "wert": 1,
+      "zeile": 143
+    },
+    "ScriptHackMoney": {
+      "wert": 1,
+      "zeile": 146
+    },
+    "ScriptHackMoneyGain": {
+      "wert": 1,
+      "zeile": 153
+    },
+    "ServerGrowthRate": {
+      "wert": 1,
+      "zeile": 156
+    },
+    "ServerMaxMoney": {
+      "wert": 1,
+      "zeile": 159
+    },
+    "ServerStartingMoney": {
+      "wert": 1,
+      "zeile": 162
+    },
+    "ServerStartingSecurity": {
+      "wert": 1,
+      "zeile": 165
+    },
+    "ServerWeakenRate": {
+      "wert": 1,
+      "zeile": 168
+    },
+    "StrengthLevelMultiplier": {
+      "wert": 1,
+      "zeile": 171
+    },
+    "StaneksGiftPowerMultiplier": {
+      "wert": 1,
+      "zeile": 174
+    },
+    "StaneksGiftExtraSize": {
+      "wert": 0,
+      "zeile": 177
+    },
+    "WorldDaemonDifficulty": {
+      "wert": 1,
+      "zeile": 180
+    }
+  },
+  "nodes": {
+    "1": {
+      "nummer": 1,
+      "name": "Source Genesis",
+      "namensbeleg": null,
+      "tagline": "The original BitNode",
+      "definitionZeile": 41,
+      "caseZeile": 572,
+      "anzahlAbweichungen": 0,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {},
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:14-49",
+        "prozentJeStufe": {
+          "basisProzent": 16,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 16,
+          "stufe2": 24,
+          "stufe3": 28
+        },
+        "betroffeneMults": "hacking_chance, hacking_speed, hacking_money, hacking_grow, hacking, strength, defense, dexterity, agility, charisma, alle sechs *_exp, company_rep, faction_rep, crime_money, crime_success, hacknet_node_money, work_money je x(1+m); hacknet_node_{purchase,ram,core,level}_cost x 1/(1+m)",
+        "wirkungJeStufe": {
+          "1": "32 GB home-RAM beim Eintritt in einen neuen Knoten (Prestige.ts:248-249)",
+          "2": "keine Zusatzwirkung",
+          "3": "keine Zusatzwirkung"
+        }
+      }
+    },
+    "2": {
+      "nummer": 2,
+      "name": "Rise of the Underworld",
+      "namensbeleg": null,
+      "tagline": "From the shadows, they rose",
+      "definitionZeile": 70,
+      "caseZeile": 575,
+      "anzahlAbweichungen": 14,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 577,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.8
+        },
+        "ServerGrowthRate": {
+          "zeile": 579,
+          "default": 1,
+          "defaultZeile": 156,
+          "wert": 0.8
+        },
+        "ServerMaxMoney": {
+          "zeile": 580,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.08
+        },
+        "ServerStartingMoney": {
+          "zeile": 581,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.4
+        },
+        "CloudServerSoftcap": {
+          "zeile": 583,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.3
+        },
+        "CrimeMoney": {
+          "zeile": 585,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 3
+        },
+        "FactionPassiveRepGain": {
+          "zeile": 587,
+          "default": 1,
+          "defaultZeile": 76,
+          "wert": 0
+        },
+        "FactionWorkRepGain": {
+          "zeile": 588,
+          "default": 1,
+          "defaultZeile": 82,
+          "wert": 0.5
+        },
+        "CorporationSoftcap": {
+          "zeile": 590,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 591,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.9
+        },
+        "InfiltrationMoney": {
+          "zeile": 593,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 3
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 594,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 2
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 595,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -6
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 596,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 5
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:50-61",
+        "prozentJeStufe": {
+          "basisProzent": 24,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 24,
+          "stufe2": 36,
+          "stufe3": 42
+        },
+        "betroffeneMults": "crime_money, crime_success, charisma",
+        "wirkungJeStufe": {
+          "1": "Gangs in anderen Knoten ab Karma-Schwelle (PlayerObjectGangMethods.ts:19)",
+          "2": "keine Zusatzwirkung",
+          "3": "keine Zusatzwirkung"
+        }
+      }
+    },
+    "3": {
+      "nummer": 3,
+      "name": "Corporatocracy",
+      "namensbeleg": null,
+      "tagline": "The Price of Civilization",
+      "definitionZeile": 104,
+      "caseZeile": 599,
+      "anzahlAbweichungen": 20,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 601,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.8
+        },
+        "ServerGrowthRate": {
+          "zeile": 603,
+          "default": 1,
+          "defaultZeile": 156,
+          "wert": 0.2
+        },
+        "ServerMaxMoney": {
+          "zeile": 604,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.04
+        },
+        "ServerStartingMoney": {
+          "zeile": 605,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.2
+        },
+        "HomeComputerRamCost": {
+          "zeile": 607,
+          "default": 1,
+          "defaultZeile": 115,
+          "wert": 1.5
+        },
+        "CloudServerCost": {
+          "zeile": 609,
+          "default": 1,
+          "defaultZeile": 131,
+          "wert": 2
+        },
+        "CloudServerSoftcap": {
+          "zeile": 610,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.3
+        },
+        "CompanyWorkMoney": {
+          "zeile": 612,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.25
+        },
+        "CrimeMoney": {
+          "zeile": 613,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.25
+        },
+        "HacknetNodeMoney": {
+          "zeile": 614,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.25
+        },
+        "ScriptHackMoney": {
+          "zeile": 615,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.2
+        },
+        "FavorToDonateToFaction": {
+          "zeile": 617,
+          "default": 1,
+          "defaultZeile": 143,
+          "wert": 0.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 619,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 3
+        },
+        "AugmentationRepCost": {
+          "zeile": 620,
+          "default": 1,
+          "defaultZeile": 16,
+          "wert": 3
+        },
+        "GangSoftcap": {
+          "zeile": 622,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.9
+        },
+        "GangUniqueAugs": {
+          "zeile": 623,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.5
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 625,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.75
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 626,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -2
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 628,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.4
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 630,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:62-72",
+        "prozentJeStufe": {
+          "basisProzent": 8,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 8,
+          "stufe2": 12,
+          "stufe3": 14
+        },
+        "betroffeneMults": "charisma, work_money",
+        "wirkungJeStufe": {
+          "1": "Corporation in anderen Knoten (PlayerObjectCorporationMethods.ts:21)",
+          "2": "keine Zusatzwirkung",
+          "3": "volle Corporation-API dauerhaft (PlayerObjectCorporationMethods.ts:21)"
+        }
+      }
+    },
+    "4": {
+      "nummer": 4,
+      "name": "The Singularity",
+      "namensbeleg": null,
+      "tagline": "The Man and the Machine",
+      "definitionZeile": 139,
+      "caseZeile": 633,
+      "anzahlAbweichungen": 18,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "ServerMaxMoney": {
+          "zeile": 635,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.1125
+        },
+        "ServerStartingMoney": {
+          "zeile": 636,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.75
+        },
+        "CloudServerSoftcap": {
+          "zeile": 638,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.2
+        },
+        "CompanyWorkMoney": {
+          "zeile": 640,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.1
+        },
+        "CrimeMoney": {
+          "zeile": 641,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.2
+        },
+        "HacknetNodeMoney": {
+          "zeile": 642,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.05
+        },
+        "ScriptHackMoney": {
+          "zeile": 643,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.2
+        },
+        "ClassGymExpGain": {
+          "zeile": 645,
+          "default": 1,
+          "defaultZeile": 28,
+          "wert": 0.5
+        },
+        "CompanyWorkExpGain": {
+          "zeile": 646,
+          "default": 1,
+          "defaultZeile": 34,
+          "wert": 0.5
+        },
+        "CrimeExpGain": {
+          "zeile": 647,
+          "default": 1,
+          "defaultZeile": 52,
+          "wert": 0.5
+        },
+        "FactionWorkExpGain": {
+          "zeile": 648,
+          "default": 1,
+          "defaultZeile": 79,
+          "wert": 0.5
+        },
+        "HackExpGain": {
+          "zeile": 649,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.4
+        },
+        "FactionWorkRepGain": {
+          "zeile": 651,
+          "default": 1,
+          "defaultZeile": 82,
+          "wert": 0.75
+        },
+        "GangUniqueAugs": {
+          "zeile": 653,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.5
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 655,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 1.5
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 656,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": 0,
+          "hinweis": "No-Op: Wert entspricht dem Default, keine Wirkung"
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 658,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.4
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 660,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 3
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:73-77",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "Singularity-Funktionen ausserhalb BN4, RAM-Kosten x16",
+          "2": "RAM-Kosten x4",
+          "3": "RAM-Kosten x1"
+        }
+      }
+    },
+    "5": {
+      "nummer": 5,
+      "name": "Artificial Intelligence",
+      "namensbeleg": null,
+      "tagline": "Posthuman",
+      "definitionZeile": 170,
+      "caseZeile": 663,
+      "anzahlAbweichungen": 17,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "ServerStartingSecurity": {
+          "zeile": 665,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 2
+        },
+        "ServerStartingMoney": {
+          "zeile": 666,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.5
+        },
+        "CloudServerSoftcap": {
+          "zeile": 668,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.2
+        },
+        "CrimeMoney": {
+          "zeile": 670,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.5
+        },
+        "HacknetNodeMoney": {
+          "zeile": 671,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.2
+        },
+        "ScriptHackMoney": {
+          "zeile": 672,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.15
+        },
+        "HackExpGain": {
+          "zeile": 674,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 676,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 2
+        },
+        "InfiltrationMoney": {
+          "zeile": 678,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 1.5
+        },
+        "InfiltrationRep": {
+          "zeile": 679,
+          "default": 1,
+          "defaultZeile": 121,
+          "wert": 1.5
+        },
+        "CorporationValuation": {
+          "zeile": 681,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.75
+        },
+        "CorporationDivisions": {
+          "zeile": 682,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.75
+        },
+        "GangUniqueAugs": {
+          "zeile": 684,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.5
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 686,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 1.3
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 687,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": 0,
+          "hinweis": "No-Op: Wert entspricht dem Default, keine Wirkung"
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 689,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.7
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 691,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 1.5
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:78-92",
+        "prozentJeStufe": {
+          "basisProzent": 8,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 8,
+          "stufe2": 12,
+          "stufe3": 14
+        },
+        "betroffeneMults": "hacking_chance, hacking_speed, hacking_money, hacking_grow, hacking, hacking_exp",
+        "wirkungJeStufe": {
+          "1": "Intelligence-Stat (permanent), getBitNodeMultipliers(), Formulas.exe dauerhaft (Prestige.ts:277-279), BN-Mult-Anzeige auf der Stats-Seite; +300 Int-Exp je Knotenwechsel (Prestige.ts:362-365)",
+          "2": "keine Zusatzwirkung",
+          "3": "keine Zusatzwirkung"
+        }
+      }
+    },
+    "6": {
+      "nummer": 6,
+      "name": "Bladeburners",
+      "namensbeleg": "Quelltext schreibt FactionName.Bladeburners (Faction/Enums.ts:33 = Bladeburners)",
+      "tagline": "Like Tears in Rain",
+      "definitionZeile": 211,
+      "caseZeile": 694,
+      "anzahlAbweichungen": 20,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 696,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.35
+        },
+        "ServerMaxMoney": {
+          "zeile": 698,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.2
+        },
+        "ServerStartingMoney": {
+          "zeile": 699,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.5
+        },
+        "ServerStartingSecurity": {
+          "zeile": 700,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 1.5
+        },
+        "CloudServerSoftcap": {
+          "zeile": 702,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 2
+        },
+        "CompanyWorkMoney": {
+          "zeile": 704,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.5
+        },
+        "CrimeMoney": {
+          "zeile": 705,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.75
+        },
+        "HacknetNodeMoney": {
+          "zeile": 706,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.2
+        },
+        "ScriptHackMoney": {
+          "zeile": 707,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.75
+        },
+        "HackExpGain": {
+          "zeile": 709,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.25
+        },
+        "InfiltrationMoney": {
+          "zeile": 711,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 0.75
+        },
+        "CorporationValuation": {
+          "zeile": 713,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.2
+        },
+        "CorporationSoftcap": {
+          "zeile": 714,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 715,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.8
+        },
+        "GangSoftcap": {
+          "zeile": 717,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.7
+        },
+        "GangUniqueAugs": {
+          "zeile": 718,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.2
+        },
+        "DaedalusAugsRequirement": {
+          "zeile": 720,
+          "default": 30,
+          "defaultZeile": 61,
+          "wert": 35
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 722,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.5
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 723,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": 2
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 725,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:93-109",
+        "prozentJeStufe": {
+          "basisProzent": 8,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 8,
+          "stufe2": 12,
+          "stufe3": 14
+        },
+        "betroffeneMults": "strength, defense, dexterity, agility und deren vier *_exp",
+        "wirkungJeStufe": {
+          "1": "Zugang zur Bladeburner-Division in anderen Knoten (PlayerObjectBladeburnerMethods.ts:6-8)",
+          "2": "keine Zusatzwirkung",
+          "3": "keine Zusatzwirkung"
+        }
+      }
+    },
+    "7": {
+      "nummer": 7,
+      "name": "Bladeburners 2079",
+      "namensbeleg": "Quelltext schreibt ${FactionName.Bladeburners} 2079",
+      "tagline": "More human than humans",
+      "definitionZeile": 244,
+      "caseZeile": 728,
+      "anzahlAbweichungen": 25,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 730,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.35
+        },
+        "ServerMaxMoney": {
+          "zeile": 732,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.2
+        },
+        "ServerStartingMoney": {
+          "zeile": 733,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.5
+        },
+        "ServerStartingSecurity": {
+          "zeile": 734,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 1.5
+        },
+        "CloudServerSoftcap": {
+          "zeile": 736,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 2
+        },
+        "CompanyWorkMoney": {
+          "zeile": 738,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.5
+        },
+        "CrimeMoney": {
+          "zeile": 739,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.75
+        },
+        "HacknetNodeMoney": {
+          "zeile": 740,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.2
+        },
+        "ScriptHackMoney": {
+          "zeile": 741,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.5
+        },
+        "HackExpGain": {
+          "zeile": 743,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.25
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 745,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 3
+        },
+        "InfiltrationMoney": {
+          "zeile": 747,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 0.75
+        },
+        "FourSigmaMarketDataCost": {
+          "zeile": 749,
+          "default": 1,
+          "defaultZeile": 88,
+          "wert": 2
+        },
+        "FourSigmaMarketDataApiCost": {
+          "zeile": 750,
+          "default": 1,
+          "defaultZeile": 85,
+          "wert": 2
+        },
+        "CorporationValuation": {
+          "zeile": 752,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.2
+        },
+        "CorporationSoftcap": {
+          "zeile": 753,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 754,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.8
+        },
+        "BladeburnerRank": {
+          "zeile": 756,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.6
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 757,
+          "default": 1,
+          "defaultZeile": 22,
+          "wert": 2
+        },
+        "GangSoftcap": {
+          "zeile": 759,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.7
+        },
+        "GangUniqueAugs": {
+          "zeile": 760,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.2
+        },
+        "DaedalusAugsRequirement": {
+          "zeile": 762,
+          "default": 30,
+          "defaultZeile": 61,
+          "wert": 35
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 764,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.9
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 765,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -1
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 767,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:110-122",
+        "prozentJeStufe": {
+          "basisProzent": 8,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 8,
+          "stufe2": 12,
+          "stufe3": 14
+        },
+        "betroffeneMults": "bladeburner_max_stamina, bladeburner_stamina_gain, bladeburner_analysis, bladeburner_success_chance",
+        "wirkungJeStufe": {
+          "1": "Zugang zur Bladeburner-Division in anderen Knoten (PlayerObjectBladeburnerMethods.ts:6-8)",
+          "2": "keine Zusatzwirkung",
+          "3": "Blade's Simulacrum landet SOFORT beim Divisionsbeitritt in Player.augmentations (PlayerObjectBladeburnerMethods.ts:14-19)"
+        }
+      }
+    },
+    "8": {
+      "nummer": 8,
+      "name": "Ghost of Wall Street",
+      "namensbeleg": null,
+      "tagline": "Money never sleeps",
+      "definitionZeile": 280,
+      "caseZeile": 770,
+      "anzahlAbweichungen": 19,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "CloudServerSoftcap": {
+          "zeile": 772,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 4
+        },
+        "CompanyWorkMoney": {
+          "zeile": 774,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0
+        },
+        "CrimeMoney": {
+          "zeile": 775,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0
+        },
+        "HacknetNodeMoney": {
+          "zeile": 776,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0
+        },
+        "ManualHackMoney": {
+          "zeile": 777,
+          "default": 1,
+          "defaultZeile": 128,
+          "wert": 0
+        },
+        "ScriptHackMoney": {
+          "zeile": 778,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.3
+        },
+        "ScriptHackMoneyGain": {
+          "zeile": 779,
+          "default": 1,
+          "defaultZeile": 153,
+          "wert": 0
+        },
+        "CodingContractMoney": {
+          "zeile": 780,
+          "default": 1,
+          "defaultZeile": 31,
+          "wert": 0
+        },
+        "FavorToDonateToFaction": {
+          "zeile": 782,
+          "default": 1,
+          "defaultZeile": 143,
+          "wert": 0
+        },
+        "InfiltrationMoney": {
+          "zeile": 784,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 0
+        },
+        "CorporationValuation": {
+          "zeile": 786,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0
+        },
+        "CorporationSoftcap": {
+          "zeile": 787,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0
+        },
+        "CorporationDivisions": {
+          "zeile": 788,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0
+        },
+        "BladeburnerRank": {
+          "zeile": 790,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0
+        },
+        "DarknetLabyrinthRewardsTheRedPill": {
+          "zeile": 792,
+          "default": 1,
+          "defaultZeile": 64,
+          "wert": 0
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 793,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0
+        },
+        "GangSoftcap": {
+          "zeile": 795,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0
+        },
+        "GangUniqueAugs": {
+          "zeile": 796,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 798,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -99
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:123-132",
+        "prozentJeStufe": {
+          "basisProzent": 12,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 12,
+          "stufe2": 18,
+          "stufe3": 21
+        },
+        "betroffeneMults": "hacking_grow",
+        "wirkungJeStufe": {
+          "1": "WSE + TIX-API dauerhaft (Prestige.ts:164-167)",
+          "2": "Leerverkaeufe in anderen Knoten",
+          "3": "Limit-/Stop-Order in anderen Knoten"
+        }
+      }
+    },
+    "9": {
+      "nummer": 9,
+      "name": "Hacktocracy",
+      "namensbeleg": null,
+      "tagline": "Hacknet Unleashed",
+      "definitionZeile": 316,
+      "caseZeile": 801,
+      "anzahlAbweichungen": 27,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 803,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.5
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 804,
+          "default": 1,
+          "defaultZeile": 171,
+          "wert": 0.45
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 805,
+          "default": 1,
+          "defaultZeile": 70,
+          "wert": 0.45
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 806,
+          "default": 1,
+          "defaultZeile": 73,
+          "wert": 0.45
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 807,
+          "default": 1,
+          "defaultZeile": 10,
+          "wert": 0.45
+        },
+        "CharismaLevelMultiplier": {
+          "zeile": 808,
+          "default": 1,
+          "defaultZeile": 25,
+          "wert": 0.45
+        },
+        "ServerMaxMoney": {
+          "zeile": 810,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.01
+        },
+        "ServerStartingMoney": {
+          "zeile": 811,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.1
+        },
+        "ServerStartingSecurity": {
+          "zeile": 812,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 2.5
+        },
+        "HomeComputerRamCost": {
+          "zeile": 814,
+          "default": 1,
+          "defaultZeile": 115,
+          "wert": 5
+        },
+        "CloudServerLimit": {
+          "zeile": 816,
+          "default": 1,
+          "defaultZeile": 137,
+          "wert": 0
+        },
+        "CrimeMoney": {
+          "zeile": 818,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.5
+        },
+        "ScriptHackMoney": {
+          "zeile": 819,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.1
+        },
+        "HackExpGain": {
+          "zeile": 821,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.05
+        },
+        "FourSigmaMarketDataCost": {
+          "zeile": 823,
+          "default": 1,
+          "defaultZeile": 88,
+          "wert": 5
+        },
+        "FourSigmaMarketDataApiCost": {
+          "zeile": 824,
+          "default": 1,
+          "defaultZeile": 85,
+          "wert": 4
+        },
+        "CorporationValuation": {
+          "zeile": 826,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.5
+        },
+        "CorporationSoftcap": {
+          "zeile": 827,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.75
+        },
+        "CorporationDivisions": {
+          "zeile": 828,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.8
+        },
+        "BladeburnerRank": {
+          "zeile": 830,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.9
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 831,
+          "default": 1,
+          "defaultZeile": 22,
+          "wert": 1.2
+        },
+        "GangSoftcap": {
+          "zeile": 833,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.8
+        },
+        "GangUniqueAugs": {
+          "zeile": 834,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.25
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 836,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.5
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 837,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": 2
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 839,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.05
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 841,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:133-147",
+        "prozentJeStufe": {
+          "basisProzent": 12,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 12,
+          "stufe2": 18,
+          "stufe3": 21
+        },
+        "betroffeneMults": "hacknet_node_money x(1+m); hacknet_node_{core,level,purchase,ram}_cost x (1-m) -- ACHTUNG: (1-m), nicht 1/(1+m) wie bei SF1",
+        "wirkungJeStufe": {
+          "1": "Hacknet-Server dauerhaft freigeschaltet",
+          "2": "128 GB home-RAM beim Knoteneintritt (Prestige.ts:246-247)",
+          "3": "hochgeruesteter Gratis-Hacknet-Server beim Knoteneintritt (Prestige.ts:335-348); ausdruecklich NICHT beim Aug-Einbau (BitNode.tsx:344-345)"
+        }
+      }
+    },
+    "10": {
+      "nummer": 10,
+      "name": "Digital Carbon",
+      "namensbeleg": null,
+      "tagline": "Your body is not who you are",
+      "definitionZeile": 357,
+      "caseZeile": 844,
+      "anzahlAbweichungen": 30,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 846,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.35
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 847,
+          "default": 1,
+          "defaultZeile": 171,
+          "wert": 0.4
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 848,
+          "default": 1,
+          "defaultZeile": 70,
+          "wert": 0.4
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 849,
+          "default": 1,
+          "defaultZeile": 73,
+          "wert": 0.4
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 850,
+          "default": 1,
+          "defaultZeile": 10,
+          "wert": 0.4
+        },
+        "CharismaLevelMultiplier": {
+          "zeile": 851,
+          "default": 1,
+          "defaultZeile": 25,
+          "wert": 0.4
+        },
+        "HomeComputerRamCost": {
+          "zeile": 853,
+          "default": 1,
+          "defaultZeile": 115,
+          "wert": 1.5
+        },
+        "CloudServerCost": {
+          "zeile": 855,
+          "default": 1,
+          "defaultZeile": 131,
+          "wert": 5
+        },
+        "CloudServerSoftcap": {
+          "zeile": 856,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.1
+        },
+        "CloudServerLimit": {
+          "zeile": 857,
+          "default": 1,
+          "defaultZeile": 137,
+          "wert": 0.6
+        },
+        "CloudServerMaxRam": {
+          "zeile": 858,
+          "default": 1,
+          "defaultZeile": 140,
+          "wert": 0.5
+        },
+        "CompanyWorkMoney": {
+          "zeile": 860,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.5
+        },
+        "CrimeMoney": {
+          "zeile": 861,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.5
+        },
+        "HacknetNodeMoney": {
+          "zeile": 862,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.5
+        },
+        "ManualHackMoney": {
+          "zeile": 863,
+          "default": 1,
+          "defaultZeile": 128,
+          "wert": 0.5
+        },
+        "ScriptHackMoney": {
+          "zeile": 864,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.5
+        },
+        "CodingContractMoney": {
+          "zeile": 865,
+          "default": 1,
+          "defaultZeile": 31,
+          "wert": 0.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 867,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 5
+        },
+        "AugmentationRepCost": {
+          "zeile": 868,
+          "default": 1,
+          "defaultZeile": 16,
+          "wert": 2
+        },
+        "InfiltrationMoney": {
+          "zeile": 870,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 0.5
+        },
+        "CorporationValuation": {
+          "zeile": 872,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.5
+        },
+        "CorporationSoftcap": {
+          "zeile": 873,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 874,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.9
+        },
+        "BladeburnerRank": {
+          "zeile": 876,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.8
+        },
+        "GangSoftcap": {
+          "zeile": 878,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.9
+        },
+        "GangUniqueAugs": {
+          "zeile": 879,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.25
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 881,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.75
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 882,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -3
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 884,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.4
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 886,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:148-152",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "1 Sleeve, Sleeve- und Grafting-API",
+          "2": "ein weiterer Sleeve",
+          "3": "ein weiterer Sleeve"
+        }
+      }
+    },
+    "11": {
+      "nummer": 11,
+      "name": "The Big Crash",
+      "namensbeleg": null,
+      "tagline": "Okay. Sell it all.",
+      "definitionZeile": 391,
+      "caseZeile": 889,
+      "anzahlAbweichungen": 21,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 891,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.6
+        },
+        "ServerGrowthRate": {
+          "zeile": 893,
+          "default": 1,
+          "defaultZeile": 156,
+          "wert": 0.2
+        },
+        "ServerMaxMoney": {
+          "zeile": 894,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.01
+        },
+        "ServerStartingMoney": {
+          "zeile": 895,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.1
+        },
+        "ServerWeakenRate": {
+          "zeile": 896,
+          "default": 1,
+          "defaultZeile": 168,
+          "wert": 2
+        },
+        "CloudServerSoftcap": {
+          "zeile": 898,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 2
+        },
+        "CompanyWorkMoney": {
+          "zeile": 900,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.5
+        },
+        "CrimeMoney": {
+          "zeile": 901,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 3
+        },
+        "HacknetNodeMoney": {
+          "zeile": 902,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.1
+        },
+        "CodingContractMoney": {
+          "zeile": 903,
+          "default": 1,
+          "defaultZeile": 31,
+          "wert": 0.25
+        },
+        "HackExpGain": {
+          "zeile": 905,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 907,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 2
+        },
+        "InfiltrationMoney": {
+          "zeile": 909,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 2.5
+        },
+        "InfiltrationRep": {
+          "zeile": 910,
+          "default": 1,
+          "defaultZeile": 121,
+          "wert": 2.5
+        },
+        "FourSigmaMarketDataCost": {
+          "zeile": 912,
+          "default": 1,
+          "defaultZeile": 88,
+          "wert": 4
+        },
+        "FourSigmaMarketDataApiCost": {
+          "zeile": 913,
+          "default": 1,
+          "defaultZeile": 85,
+          "wert": 4
+        },
+        "CorporationValuation": {
+          "zeile": 915,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.1
+        },
+        "CorporationSoftcap": {
+          "zeile": 916,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 917,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.9
+        },
+        "GangUniqueAugs": {
+          "zeile": 919,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.75
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 921,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 1.5
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:153-163",
+        "prozentJeStufe": {
+          "basisProzent": 32,
+          "formel": "sum_{i=0}^{lvl-1} basis / 2^i",
+          "stufe1": 32,
+          "stufe2": 48,
+          "stufe3": 56
+        },
+        "betroffeneMults": "work_money, company_rep",
+        "wirkungJeStufe": {
+          "1": "Firmen-Favor hebt Gehalt UND Rep-Rate um 1% je Favor; zusaetzlich -4% Preisanstieg je gekaufter Aug",
+          "2": "-6% Preisanstieg",
+          "3": "-7% Preisanstieg"
+        }
+      }
+    },
+    "12": {
+      "nummer": 12,
+      "name": "The Recursion",
+      "namensbeleg": null,
+      "tagline": "Repeat.",
+      "definitionZeile": 432,
+      "caseZeile": 924,
+      "anzahlAbweichungen": 48,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "DaedalusAugsRequirement": {
+          "zeile": 929,
+          "default": 30,
+          "defaultZeile": 61,
+          "formel": "Math.floor(Math.min(defaultMultipliers.DaedalusAugsRequirement + inc, 40))",
+          "lvl1": 31,
+          "lvl2": 31,
+          "lvl3": 31,
+          "lvl10": 31
+        },
+        "HackingLevelMultiplier": {
+          "zeile": 931,
+          "default": 1,
+          "defaultZeile": 103,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 932,
+          "default": 1,
+          "defaultZeile": 171,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 933,
+          "default": 1,
+          "defaultZeile": 70,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 934,
+          "default": 1,
+          "defaultZeile": 73,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 935,
+          "default": 1,
+          "defaultZeile": 10,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CharismaLevelMultiplier": {
+          "zeile": 936,
+          "default": 1,
+          "defaultZeile": 25,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ServerGrowthRate": {
+          "zeile": 938,
+          "default": 1,
+          "defaultZeile": 156,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ServerMaxMoney": {
+          "zeile": 939,
+          "default": 1,
+          "defaultZeile": 159,
+          "formel": "dec * dec",
+          "lvl1": 0.9611687812379853,
+          "lvl2": 0.9238454260265143,
+          "lvl3": 0.8879713821861919,
+          "lvl10": 0.6729713331080575
+        },
+        "ServerStartingMoney": {
+          "zeile": 940,
+          "default": 1,
+          "defaultZeile": 162,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ServerWeakenRate": {
+          "zeile": 941,
+          "default": 1,
+          "defaultZeile": 168,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ServerStartingSecurity": {
+          "zeile": 944,
+          "default": 1,
+          "defaultZeile": 165,
+          "formel": "1.5",
+          "lvl1": 1.5,
+          "lvl2": 1.5,
+          "lvl3": 1.5,
+          "lvl10": 1.5
+        },
+        "HomeComputerRamCost": {
+          "zeile": 946,
+          "default": 1,
+          "defaultZeile": 115,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "CloudServerCost": {
+          "zeile": 948,
+          "default": 1,
+          "defaultZeile": 131,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "CloudServerSoftcap": {
+          "zeile": 949,
+          "default": 1,
+          "defaultZeile": 134,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "CloudServerLimit": {
+          "zeile": 950,
+          "default": 1,
+          "defaultZeile": 137,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CloudServerMaxRam": {
+          "zeile": 951,
+          "default": 1,
+          "defaultZeile": 140,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CompanyWorkMoney": {
+          "zeile": 953,
+          "default": 1,
+          "defaultZeile": 37,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CrimeMoney": {
+          "zeile": 954,
+          "default": 1,
+          "defaultZeile": 55,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "HacknetNodeMoney": {
+          "zeile": 955,
+          "default": 1,
+          "defaultZeile": 112,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ManualHackMoney": {
+          "zeile": 956,
+          "default": 1,
+          "defaultZeile": 128,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ScriptHackMoney": {
+          "zeile": 957,
+          "default": 1,
+          "defaultZeile": 146,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CodingContractMoney": {
+          "zeile": 958,
+          "default": 1,
+          "defaultZeile": 31,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 959,
+          "default": 1,
+          "defaultZeile": 67,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "ClassGymExpGain": {
+          "zeile": 961,
+          "default": 1,
+          "defaultZeile": 28,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CompanyWorkExpGain": {
+          "zeile": 962,
+          "default": 1,
+          "defaultZeile": 34,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CrimeExpGain": {
+          "zeile": 963,
+          "default": 1,
+          "defaultZeile": 52,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "FactionWorkExpGain": {
+          "zeile": 964,
+          "default": 1,
+          "defaultZeile": 79,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "HackExpGain": {
+          "zeile": 965,
+          "default": 1,
+          "defaultZeile": 100,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "FactionPassiveRepGain": {
+          "zeile": 967,
+          "default": 1,
+          "defaultZeile": 76,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "FactionWorkRepGain": {
+          "zeile": 968,
+          "default": 1,
+          "defaultZeile": 82,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "FavorToDonateToFaction": {
+          "zeile": 969,
+          "default": 1,
+          "defaultZeile": 143,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 971,
+          "default": 1,
+          "defaultZeile": 13,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "AugmentationRepCost": {
+          "zeile": 972,
+          "default": 1,
+          "defaultZeile": 16,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "InfiltrationMoney": {
+          "zeile": 974,
+          "default": 1,
+          "defaultZeile": 118,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "InfiltrationRep": {
+          "zeile": 975,
+          "default": 1,
+          "defaultZeile": 121,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "FourSigmaMarketDataCost": {
+          "zeile": 977,
+          "default": 1,
+          "defaultZeile": 88,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "FourSigmaMarketDataApiCost": {
+          "zeile": 978,
+          "default": 1,
+          "defaultZeile": 85,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "CorporationValuation": {
+          "zeile": 980,
+          "default": 1,
+          "defaultZeile": 49,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "CorporationSoftcap": {
+          "zeile": 981,
+          "default": 1,
+          "defaultZeile": 46,
+          "formel": "0.8",
+          "lvl1": 0.8,
+          "lvl2": 0.8,
+          "lvl3": 0.8,
+          "lvl10": 0.8
+        },
+        "CorporationDivisions": {
+          "zeile": 982,
+          "default": 1,
+          "defaultZeile": 43,
+          "formel": "0.5",
+          "lvl1": 0.5,
+          "lvl2": 0.5,
+          "lvl3": 0.5,
+          "lvl10": 0.5
+        },
+        "BladeburnerRank": {
+          "zeile": 984,
+          "default": 1,
+          "defaultZeile": 19,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 985,
+          "default": 1,
+          "defaultZeile": 22,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "GangSoftcap": {
+          "zeile": 987,
+          "default": 1,
+          "defaultZeile": 91,
+          "formel": "0.8",
+          "lvl1": 0.8,
+          "lvl2": 0.8,
+          "lvl3": 0.8,
+          "lvl10": 0.8
+        },
+        "GangUniqueAugs": {
+          "zeile": 988,
+          "default": 1,
+          "defaultZeile": 94,
+          "formel": "dec",
+          "lvl1": 0.9803921568627451,
+          "lvl2": 0.9611687812379854,
+          "lvl3": 0.9423223345470444,
+          "lvl10": 0.8203482998751551
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 990,
+          "default": 1,
+          "defaultZeile": 174,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 991,
+          "default": 0,
+          "defaultZeile": 177,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 993,
+          "default": 1,
+          "defaultZeile": 180,
+          "formel": "inc",
+          "lvl1": 1.02,
+          "lvl2": 1.0404,
+          "lvl3": 1.0612080000000002,
+          "lvl10": 1.2189944199947573
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:164-166",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "Start jedes Knotens mit NeuroFlux-Governor-Level = SF12-Level (Prestige.ts:264-270). Kein Maximallevel fuer SF12.",
+          "2": "dito",
+          "3": "dito"
+        }
+      }
+    },
+    "13": {
+      "nummer": 13,
+      "name": "They are lunatics (Quelltext: They're lunatics)",
+      "namensbeleg": null,
+      "tagline": "1 step back, 2 steps forward",
+      "definitionZeile": 448,
+      "caseZeile": 996,
+      "anzahlAbweichungen": 33,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 998,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.25
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 999,
+          "default": 1,
+          "defaultZeile": 171,
+          "wert": 0.7
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 1000,
+          "default": 1,
+          "defaultZeile": 70,
+          "wert": 0.7
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 1001,
+          "default": 1,
+          "defaultZeile": 73,
+          "wert": 0.7
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 1002,
+          "default": 1,
+          "defaultZeile": 10,
+          "wert": 0.7
+        },
+        "CloudServerSoftcap": {
+          "zeile": 1004,
+          "default": 1,
+          "defaultZeile": 134,
+          "wert": 1.6
+        },
+        "ServerMaxMoney": {
+          "zeile": 1006,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.3375
+        },
+        "ServerStartingMoney": {
+          "zeile": 1007,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.75
+        },
+        "ServerStartingSecurity": {
+          "zeile": 1008,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 3
+        },
+        "CompanyWorkMoney": {
+          "zeile": 1010,
+          "default": 1,
+          "defaultZeile": 37,
+          "wert": 0.4
+        },
+        "CrimeMoney": {
+          "zeile": 1011,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.4
+        },
+        "HacknetNodeMoney": {
+          "zeile": 1012,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.4
+        },
+        "ScriptHackMoney": {
+          "zeile": 1013,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.2
+        },
+        "CodingContractMoney": {
+          "zeile": 1014,
+          "default": 1,
+          "defaultZeile": 31,
+          "wert": 0.4
+        },
+        "ClassGymExpGain": {
+          "zeile": 1016,
+          "default": 1,
+          "defaultZeile": 28,
+          "wert": 0.5
+        },
+        "CompanyWorkExpGain": {
+          "zeile": 1017,
+          "default": 1,
+          "defaultZeile": 34,
+          "wert": 0.5
+        },
+        "CrimeExpGain": {
+          "zeile": 1018,
+          "default": 1,
+          "defaultZeile": 52,
+          "wert": 0.5
+        },
+        "FactionWorkExpGain": {
+          "zeile": 1019,
+          "default": 1,
+          "defaultZeile": 79,
+          "wert": 0.5
+        },
+        "HackExpGain": {
+          "zeile": 1020,
+          "default": 1,
+          "defaultZeile": 100,
+          "wert": 0.1
+        },
+        "FactionWorkRepGain": {
+          "zeile": 1022,
+          "default": 1,
+          "defaultZeile": 82,
+          "wert": 0.6
+        },
+        "FourSigmaMarketDataCost": {
+          "zeile": 1024,
+          "default": 1,
+          "defaultZeile": 88,
+          "wert": 10
+        },
+        "FourSigmaMarketDataApiCost": {
+          "zeile": 1025,
+          "default": 1,
+          "defaultZeile": 85,
+          "wert": 10
+        },
+        "CorporationValuation": {
+          "zeile": 1027,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.001
+        },
+        "CorporationSoftcap": {
+          "zeile": 1028,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.4
+        },
+        "CorporationDivisions": {
+          "zeile": 1029,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.4
+        },
+        "BladeburnerRank": {
+          "zeile": 1031,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.45
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 1032,
+          "default": 1,
+          "defaultZeile": 22,
+          "wert": 2
+        },
+        "GangSoftcap": {
+          "zeile": 1034,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.3
+        },
+        "GangUniqueAugs": {
+          "zeile": 1035,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.1
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 1037,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 2
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 1038,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": 1
+        },
+        "DarknetMoneyMultiplier": {
+          "zeile": 1039,
+          "default": 1,
+          "defaultZeile": 67,
+          "wert": 0.1
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 1041,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 3
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:167-169",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "Church of the Machine God erscheint in anderen Knoten (canAccessCotMG -> canAccessBitNodeFeature(13), PlayerObjectGeneralMethods.ts:603-605)",
+          "2": "groessere Gabe",
+          "3": "groessere Gabe"
+        }
+      }
+    },
+    "14": {
+      "nummer": 14,
+      "name": "IPvGO Subnet Takeover",
+      "namensbeleg": null,
+      "tagline": "Territory exists only in the 'net",
+      "definitionZeile": 479,
+      "caseZeile": 1044,
+      "anzahlAbweichungen": 28,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "GoPower": {
+          "zeile": 1046,
+          "default": 1,
+          "defaultZeile": 97,
+          "wert": 4
+        },
+        "HackingLevelMultiplier": {
+          "zeile": 1048,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.4
+        },
+        "HackingSpeedMultiplier": {
+          "zeile": 1049,
+          "default": 1,
+          "defaultZeile": 106,
+          "wert": 0.3
+        },
+        "ServerMaxMoney": {
+          "zeile": 1051,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.7
+        },
+        "ServerStartingMoney": {
+          "zeile": 1052,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.5
+        },
+        "ServerStartingSecurity": {
+          "zeile": 1053,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 1.5
+        },
+        "CrimeMoney": {
+          "zeile": 1055,
+          "default": 1,
+          "defaultZeile": 55,
+          "wert": 0.75
+        },
+        "CrimeSuccessRate": {
+          "zeile": 1056,
+          "default": 1,
+          "defaultZeile": 58,
+          "wert": 0.4
+        },
+        "HacknetNodeMoney": {
+          "zeile": 1057,
+          "default": 1,
+          "defaultZeile": 112,
+          "wert": 0.25
+        },
+        "ScriptHackMoney": {
+          "zeile": 1058,
+          "default": 1,
+          "defaultZeile": 146,
+          "wert": 0.3
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 1060,
+          "default": 1,
+          "defaultZeile": 171,
+          "wert": 0.5
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 1061,
+          "default": 1,
+          "defaultZeile": 73,
+          "wert": 0.5
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 1062,
+          "default": 1,
+          "defaultZeile": 10,
+          "wert": 0.5
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 1063,
+          "default": 1,
+          "defaultZeile": 70,
+          "wert": 0.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 1065,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 1.5
+        },
+        "InfiltrationMoney": {
+          "zeile": 1067,
+          "default": 1,
+          "defaultZeile": 118,
+          "wert": 0.75
+        },
+        "FactionWorkRepGain": {
+          "zeile": 1069,
+          "default": 1,
+          "defaultZeile": 82,
+          "wert": 0.2
+        },
+        "CompanyWorkRepGain": {
+          "zeile": 1070,
+          "default": 1,
+          "defaultZeile": 40,
+          "wert": 0.2
+        },
+        "CorporationValuation": {
+          "zeile": 1072,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.4
+        },
+        "CorporationSoftcap": {
+          "zeile": 1073,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.9
+        },
+        "CorporationDivisions": {
+          "zeile": 1074,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.8
+        },
+        "BladeburnerRank": {
+          "zeile": 1076,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.6
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 1077,
+          "default": 1,
+          "defaultZeile": 22,
+          "wert": 2
+        },
+        "GangSoftcap": {
+          "zeile": 1079,
+          "default": 1,
+          "defaultZeile": 91,
+          "wert": 0.7
+        },
+        "GangUniqueAugs": {
+          "zeile": 1080,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.4
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 1082,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.5
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 1083,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -1
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 1085,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 5
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:170-172",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "+100% Stat-Mults aus Node Power; Favor-Deckel aus Winstreaks 200k Rep-Aequivalent; 1000 Rep zu Favor",
+          "2": "go.cheat-API dauerhaft; 300k; 1500",
+          "3": "+25% additive Erfolgsrate fuer go.cheat; 400k; 2000"
+        }
+      }
+    },
+    "15": {
+      "nummer": 15,
+      "name": "The Secrets of the Dark Net",
+      "namensbeleg": null,
+      "tagline": "The rules have changed",
+      "definitionZeile": 519,
+      "caseZeile": 1089,
+      "anzahlAbweichungen": 21,
+      "schwierigkeit": null,
+      "schwierigkeitHinweis": "BEFUND: Die Klasse BitNode (BitNode.tsx:6-37) hat KEIN Schwierigkeitsfeld. In v3.0.1 existiert weder difficulty noch ein aequivalentes Feld irgendwo unter src/BitNode/. Jede Schwierigkeitsangabe ist externe Wertung, kein Quelltextwert.",
+      "multipliers": {
+        "HackingLevelMultiplier": {
+          "zeile": 1091,
+          "default": 1,
+          "defaultZeile": 103,
+          "wert": 0.6
+        },
+        "HackingSpeedMultiplier": {
+          "zeile": 1092,
+          "default": 1,
+          "defaultZeile": 106,
+          "wert": 0.6
+        },
+        "StrengthLevelMultiplier": {
+          "zeile": 1094,
+          "default": 1,
+          "defaultZeile": 171,
+          "wert": 0.7
+        },
+        "DefenseLevelMultiplier": {
+          "zeile": 1095,
+          "default": 1,
+          "defaultZeile": 70,
+          "wert": 0.7
+        },
+        "DexterityLevelMultiplier": {
+          "zeile": 1096,
+          "default": 1,
+          "defaultZeile": 73,
+          "wert": 0.7
+        },
+        "AgilityLevelMultiplier": {
+          "zeile": 1097,
+          "default": 1,
+          "defaultZeile": 10,
+          "wert": 0.7
+        },
+        "CharismaLevelMultiplier": {
+          "zeile": 1098,
+          "default": 1,
+          "defaultZeile": 25,
+          "wert": 1.1
+        },
+        "ServerMaxMoney": {
+          "zeile": 1100,
+          "default": 1,
+          "defaultZeile": 159,
+          "wert": 0.8
+        },
+        "ServerStartingMoney": {
+          "zeile": 1101,
+          "default": 1,
+          "defaultZeile": 162,
+          "wert": 0.5
+        },
+        "ServerStartingSecurity": {
+          "zeile": 1102,
+          "default": 1,
+          "defaultZeile": 165,
+          "wert": 1.5
+        },
+        "AugmentationMoneyCost": {
+          "zeile": 1104,
+          "default": 1,
+          "defaultZeile": 13,
+          "wert": 3
+        },
+        "CorporationValuation": {
+          "zeile": 1106,
+          "default": 1,
+          "defaultZeile": 49,
+          "wert": 0.2
+        },
+        "CorporationSoftcap": {
+          "zeile": 1107,
+          "default": 1,
+          "defaultZeile": 46,
+          "wert": 0.4
+        },
+        "CorporationDivisions": {
+          "zeile": 1108,
+          "default": 1,
+          "defaultZeile": 43,
+          "wert": 0.4
+        },
+        "DaedalusAugsRequirement": {
+          "zeile": 1110,
+          "default": 30,
+          "defaultZeile": 61,
+          "wert": 20
+        },
+        "BladeburnerRank": {
+          "zeile": 1112,
+          "default": 1,
+          "defaultZeile": 19,
+          "wert": 0.2
+        },
+        "BladeburnerSkillCost": {
+          "zeile": 1113,
+          "default": 1,
+          "defaultZeile": 22,
+          "wert": 3
+        },
+        "GangUniqueAugs": {
+          "zeile": 1115,
+          "default": 1,
+          "defaultZeile": 94,
+          "wert": 0.3
+        },
+        "StaneksGiftPowerMultiplier": {
+          "zeile": 1117,
+          "default": 1,
+          "defaultZeile": 174,
+          "wert": 0.7
+        },
+        "StaneksGiftExtraSize": {
+          "zeile": 1118,
+          "default": 0,
+          "defaultZeile": 177,
+          "wert": -2
+        },
+        "WorldDaemonDifficulty": {
+          "zeile": 1120,
+          "default": 1,
+          "defaultZeile": 180,
+          "wert": 2
+        }
+      },
+      "sourceFile": {
+        "belegzeile": "applySourceFile.ts:173-177",
+        "prozentJeStufe": null,
+        "betroffeneMults": "keine Multiplikatorwirkung",
+        "wirkungJeStufe": {
+          "1": "Start mit TOR-Router und DarkscapeNavigator.exe, volles Darkweb ueberall (Prestige.ts:242-244)",
+          "2": "Charisma hebt Gehalt und Firmen-Rep; +20% Authentifizierungstempo",
+          "3": "Charisma hebt Faktions-Rep; +50% XP und Geld aus .cache-Dateien"
+        }
+      }
+    }
+  },
+  "kaltstart": [
+    {
+      "node": 1,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 16384,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 26214400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 1,
+      "expfaktor": 1,
+      "startMoneyFaktor": 1
+    },
+    {
+      "node": 2,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 2048,
+      "aff1e12": 524288,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 13107200,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.08,
+      "expfaktor": 0.8,
+      "startMoneyFaktor": 0.4
+    },
+    {
+      "node": 3,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 2048,
+      "aff1e12": 262144,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 6553600,
+      "home32to1024": 2199266223,
+      "ertragsfaktor": 0.008,
+      "expfaktor": 0.8,
+      "startMoneyFaktor": 0.2
+    },
+    {
+      "node": 4,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 4096,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 26214400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.0225,
+      "expfaktor": 0.4,
+      "startMoneyFaktor": 0.75
+    },
+    {
+      "node": 5,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 4096,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 26214400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.15,
+      "expfaktor": 0.5,
+      "startMoneyFaktor": 0.5
+    },
+    {
+      "node": 6,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 1024,
+      "aff1e12": 32768,
+      "aff1e14": 262144,
+      "parkGB_1e12": 819200,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.15,
+      "expfaktor": 0.0875,
+      "startMoneyFaktor": 0.5
+    },
+    {
+      "node": 7,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 1024,
+      "aff1e12": 32768,
+      "aff1e14": 262144,
+      "parkGB_1e12": 819200,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.1,
+      "expfaktor": 0.0875,
+      "startMoneyFaktor": 0.5
+    },
+    {
+      "node": 8,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 256,
+      "aff1e12": 4096,
+      "aff1e14": 16384,
+      "parkGB_1e12": 102400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0,
+      "expfaktor": 1,
+      "startMoneyFaktor": 1
+    },
+    {
+      "node": 9,
+      "lvl": 1,
+      "limit": 0,
+      "maxRam": 1048576,
+      "parkGB": 0,
+      "aff1e9": 16384,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 0,
+      "home32to1024": 7330887410,
+      "ertragsfaktor": 0.001,
+      "expfaktor": 0.025,
+      "startMoneyFaktor": 0.1
+    },
+    {
+      "node": 10,
+      "lvl": 1,
+      "limit": 15,
+      "maxRam": 524288,
+      "parkGB": 7864320,
+      "aff1e9": 2048,
+      "aff1e12": 524288,
+      "aff1e14": 524288,
+      "parkGB_1e12": 7864320,
+      "home32to1024": 2199266223,
+      "ertragsfaktor": 0.5,
+      "expfaktor": 0.35,
+      "startMoneyFaktor": 1
+    },
+    {
+      "node": 11,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 1024,
+      "aff1e12": 32768,
+      "aff1e14": 262144,
+      "parkGB_1e12": 819200,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.01,
+      "expfaktor": 0.3,
+      "startMoneyFaktor": 0.1
+    },
+    {
+      "node": 12,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 524288,
+      "parkGB": 13107200,
+      "aff1e9": 8192,
+      "aff1e12": 524288,
+      "aff1e14": 524288,
+      "parkGB_1e12": 13107200,
+      "home32to1024": 1495501032,
+      "ertragsfaktor": 0.94232233,
+      "expfaktor": 0.96116878,
+      "startMoneyFaktor": 0.9803921568627451
+    },
+    {
+      "node": 13,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 1024,
+      "aff1e12": 65536,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 1638400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.0675,
+      "expfaktor": 0.025,
+      "startMoneyFaktor": 0.75
+    },
+    {
+      "node": 14,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 16384,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 26214400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.21,
+      "expfaktor": 0.4,
+      "startMoneyFaktor": 0.5
+    },
+    {
+      "node": 15,
+      "lvl": 1,
+      "limit": 25,
+      "maxRam": 1048576,
+      "parkGB": 26214400,
+      "aff1e9": 16384,
+      "aff1e12": 1048576,
+      "aff1e14": 1048576,
+      "parkGB_1e12": 26214400,
+      "home32to1024": 1466177482,
+      "ertragsfaktor": 0.8,
+      "expfaktor": 0.6,
+      "startMoneyFaktor": 0.5
+    },
+    {
+      "node": 12,
+      "lvl": 2,
+      "limit": 24,
+      "maxRam": 524288,
+      "parkGB": 12582912,
+      "aff1e9": 8192,
+      "aff1e12": 524288,
+      "aff1e14": 524288,
+      "parkGB_1e12": 12582912,
+      "home32to1024": 1525411052,
+      "ertragsfaktor": 0.88797138,
+      "expfaktor": 0.92384543,
+      "startMoneyFaktor": 0.9611687812379854
+    },
+    {
+      "node": 12,
+      "lvl": 3,
+      "limit": 24,
+      "maxRam": 524288,
+      "parkGB": 12582912,
+      "aff1e9": 8192,
+      "aff1e12": 524288,
+      "aff1e14": 524288,
+      "parkGB_1e12": 12582912,
+      "home32to1024": 1555919273,
+      "ertragsfaktor": 0.83675527,
+      "expfaktor": 0.88797138,
+      "startMoneyFaktor": 0.9423223345470444
+    }
+  ],
+  "route": [
+    {
+      "node": 10,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 10,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 4,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 4,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 9,
+      "level": 1,
+      "verfahren": "V2",
+      "braucht": "hashes.js"
+    },
+    {
+      "node": 9,
+      "level": 2,
+      "verfahren": "V2",
+      "braucht": "hashes.js"
+    },
+    {
+      "node": 9,
+      "level": 3,
+      "verfahren": "V2",
+      "braucht": "hashes.js"
+    },
+    {
+      "node": 1,
+      "level": 2,
+      "verfahren": "V1"
+    },
+    {
+      "node": 1,
+      "level": 3,
+      "verfahren": "V1"
+    },
+    {
+      "node": 5,
+      "level": 2,
+      "verfahren": "V1"
+    },
+    {
+      "node": 5,
+      "level": 3,
+      "verfahren": "V1"
+    },
+    {
+      "node": 12,
+      "level": 1,
+      "verfahren": "V1"
+    },
+    {
+      "node": 12,
+      "level": 2,
+      "verfahren": "V1"
+    },
+    {
+      "node": 12,
+      "level": 3,
+      "verfahren": "V1"
+    },
+    {
+      "node": 2,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 2,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 2,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 3,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 3,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 3,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 11,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 11,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 11,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 6,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 6,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 7,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 7,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 7,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 14,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 14,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 14,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 13,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 13,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 13,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 15,
+      "level": 1,
+      "verfahren": "V2"
+    },
+    {
+      "node": 15,
+      "level": 2,
+      "verfahren": "V2"
+    },
+    {
+      "node": 15,
+      "level": 3,
+      "verfahren": "V2"
+    },
+    {
+      "node": 8,
+      "level": 1,
+      "verfahren": "V1",
+      "braucht": "boerse.js"
+    },
+    {
+      "node": 8,
+      "level": 2,
+      "verfahren": "V1",
+      "braucht": "boerse.js"
+    },
+    {
+      "node": 8,
+      "level": 3,
+      "verfahren": "V1",
+      "braucht": "boerse.js"
+    }
+  ],
+  "abgeleiteteKonstanten": {
+    "CloudServerLimit_Basis": {
+      "wert": 25,
+      "beleg": "Server/data/Constants.ts:12",
+      "formel": "Math.round(25 * CloudServerLimit) -- ServerPurchases.ts:96-98"
+    },
+    "CloudServerMaxRam_Basis": {
+      "wert": 1048576,
+      "beleg": "Server/data/Constants.ts:13",
+      "formel": "1 << (31 - Math.clz32(Math.round(1048576 * CloudServerMaxRam))) -- ServerPurchases.ts:100-105, Abrundung auf Zweierpotenz"
+    },
+    "CloudServerCost_Formel": {
+      "formel": "ram * 55000 * CloudServerCost * CloudServerSoftcap^max(0, log2(ram)-6)",
+      "beleg": "ServerPurchases.ts:23-42; Basis 55000 aus Server/data/Constants.ts:4"
+    },
+    "HomeRamUpgrade_Formel": {
+      "formel": "currentRam * 32000 * 1.58^log2(currentRam) * HomeComputerRamCost",
+      "beleg": "PersonObjects/Player/PlayerObjectServerMethods.ts:30-40; Basis 32000 aus Server/data/Constants.ts:3"
+    },
+    "HomeComputerMaxRam": {
+      "wert": 1073741824,
+      "beleg": "Server/data/Constants.ts:6"
+    },
+    "WorldDaemon_Basisschwelle": {
+      "wert": 3000,
+      "beleg": "Server/data/servers.ts:1536; multipliziert mit WorldDaemonDifficulty in ServerHelpers.ts:383-385; numOpenPortsRequired 5 in servers.ts:1534"
+    },
+    "Startgeld_nach_Aug_und_Knotenwechsel": {
+      "wert": 1262,
+      "beleg": "PlayerObjectGeneralMethods.ts:102 (1000 + CONSTANTS.Donations); Constants.ts:107 Donations = 262"
+    },
+    "Startgeld_BN8": {
+      "wert": 250000000,
+      "beleg": "Prestige.ts:38 BitNode8StartingMoney, gesetzt in :160-163 und :303"
+    },
+    "Startgeld_BN13": {
+      "wert": 200000,
+      "beleg": "Prestige.ts:350-352 setzt Player.money = CONSTANTS.TravelCost; Constants.ts:28 TravelCost = 200e3"
+    },
+    "home_RAM_beim_Knoteneintritt": {
+      "ohne_SF": 8,
+      "mit_SF1_ab_Stufe1": 32,
+      "mit_SF9_ab_Stufe2": 128,
+      "beleg": "Prestige.ts:246-252"
+    },
+    "Daedalus_weitere_Bedingungen": {
+      "geld": 100000000000,
+      "hacking": 2500,
+      "oder_alle_vier_Kampfstats": 1500,
+      "beleg": "Faction/FactionInfo.tsx:138-149"
+    },
+    "Daedalus_Augzaehlung": {
+      "regel": "Fuer n>0 gilt p.augmentations.length >= n. Gezaehlt werden NUR installierte Augs, NICHT queuedAugmentations. NeuroFlux Governor ist genau EIN Arrayeintrag mit Levelfeld und zaehlt daher 1, unabhaengig vom Level.",
+      "beleg": "Faction/FactionJoinCondition.ts:116-131; der NFG-Filter in :124-128 gilt ausschliesslich fuer n === 0"
+    },
+    "BN15_Daedalus_fuehrt_kein_TheRedPill": {
+      "beleg": "Faction/FactionHelpers.tsx:204-207"
+    },
+    "BladeburnerRank_0_sperrt_die_Division": {
+      "beleg": "Locations/ui/SpecialLocation.tsx:105-107 blendet den Bewerbungsknopf aus; Augmentation/ui/PlayerMultipliers.tsx:275 gleiche Bedingung; Rangzuwachs selbst in Bladeburner/Formulas.ts:13,22,25"
+    },
+    "BladeburnerSkillCost_Formel": {
+      "formel": "Math.round(count * BladeburnerSkillCost * (baseCost + costInc * (currentLevel + (count-1)/2)))",
+      "beleg": "Bladeburner/Skill.ts:76-80"
+    }
+  }
+}

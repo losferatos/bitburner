@@ -206,6 +206,60 @@ keinen Anforderer, also nie einen Handschlag. → Phase C, Position 2.
 
 ---
 
+## A — Aus Phase A (Bestandsaufnahme), 04.09.2026 02:15
+
+### A.1 — Die RAM-Tabelle fehlte im eigenen Bericht · UMGESETZT 04.09. 02:20
+In `doku/ram-budget.md` stand an der Stelle der RAM-Tabelle die Inventur der 136
+`data/`-Dateien aus einer anderen Teilaufgabe: 138 Zeilen über ein völlig anderes
+Thema. Die Messung selbst war einwandfrei, nur der Bericht falsch zusammengesetzt.
+Ein Skeptiker fand es.
+**Behoben, und zwar strukturell:** Die Rohmessung liegt jetzt als
+`doku/ram-messung-2026-09-04.json` im Repo, und die Tabelle wird mit
+`node tools/ram-tabelle.js` **erzeugt** statt abgeschrieben. Eine erzeugte
+Tabelle kann nicht mehr vom Thema abweichen.
+
+### A.2 — Spielkopie und Plattenkopie sind identisch · GEPRÜFT, grün
+Für alle 114 Dateien wurde der Live-Wert gegen den lokal gerechneten gehalten.
+Abweichung bei allen 114 gleich null. Das war vorher nur angenommen.
+
+### A.3 — Was der Faktor 16 kostet · GEMESSEN
+Summe aller 114 Dateien bei SF4.1: 7.217,4 GB. Bei SF4.3: 1.884,9 GB.
+Der Singularity-Faktor kostet also **5.332,5 GB** über den Werkzeugkasten.
+Heute passen 30 Dateien nicht auf ein frisches home mit 32 GB, ab SF4.3 nur noch 8.
+Die Summe ist ein Bestand, keine Belastung — die Dateien laufen nie gleichzeitig.
+
+### A.4 — Der Zielwert „resident ≤ 20 GB" wurde nie geprüft · OFFEN
+Auftrag 4.4 nennt zwei Schwellen im selben Absatz: „Resident sind nur Kern und
+Wächter (≤ 20 GB)" und die Ebene-1-Grenzen ≤ 26 beziehungsweise ≤ 28.
+Der A1-Bericht maß nur gegen die lockereren und meldete „hält, mit 0,25 GB Luft".
+Gegen die 20 reißt der heutige Stand um **5,75 GB**.
+**Folge für Phase B:** Der Architekturschnitt muss die Frage entscheiden, nicht
+umgehen — entweder wird der Kern kleiner oder die Schwelle wird mit Begründung
+korrigiert. Beides schweigend stehen zu lassen ist die eine Möglichkeit, die es
+nicht gibt.
+
+### A.5 — Beide „Handgriffe von Eric" sind längst erledigt · GESCHLOSSEN
+`BAUSTELLEN.md ## Sofort` führt seit dem 02.09. zwei offene Handgriffe.
+Beide sind erledigt, mit lückenlosem Zeitnachweis:
+
+| Punkt | Zustand | Beleg |
+|---|---|---|
+| Autoexec im Spiel | `"boot.js"` | `SettingsSave.AutoexecScript`, gelesen 04.09. 01:37 |
+| Autostart-Ordner | leer bis auf `desktop.ini` | Verzeichnis gelistet, mtime 02.09. 19:07:46 |
+
+Die Registry-Schlüssel wurden mitgeprüft: zwölf Autostart-Einträge, kein Bitburner.
+**Warum der Irrtum überlebte:** `aufsicht.log` meldete bis 02.09. 19:05 alle zehn
+Minuten „Autoexec ist leer" und bricht dann ab — der Handgriff erfolgte um 19:07.
+Die Datei friert ihren letzten Irrtum ein, und wer sie liest, hält ihn für den
+aktuellen Stand. Genau deshalb steht in den Regeln, dass der Zustand der Zeuge
+ist und nicht der Terminaltext.
+
+### A.6 — Der Bericht zählte Singularity-Nutzer falsch · KORRIGIERT
+Behauptet waren 17 Dateien, die `ns.singularity` in Aufrufform nutzen. Es sind 7.
+Kein Suchmuster ergibt 17.
+
+---
+
 ## E — Die ETA von BitNode 10
 
 ### E.1 — `checkin.js` meldet 430 Tage Restzeit · IN PRÜFUNG

@@ -30,6 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { restzeitAusKurve, naechsterMeilenstein } from "./lib/rangkurve.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -379,15 +380,74 @@ async function main() {
   bericht.restNetto = restNetto;
 
   let urteil = "AUF KURS";
-  if (rate && rate > 0) {
-    const etaSpiel = restNetto / rate;
+
+  /**
+   * DIE RESTZEIT KOMMT AUS DER REFERENZKURVE, NICHT AUS DER RATE.
+   *
+   * Bis zum 04.09.2026 stand hier `restNetto / rate` - eine lineare
+   * Fortschreibung. Fuer BitNode 10 ergab das 430,7 Tage bei einem Urteil
+   * "AUF KURS", waehrend derselbe Knoten im vorigen Lauf ab derselben
+   * Rangstelle noch 28 bis 50 Stunden brauchte. Fehlfaktor 208.
+   *
+   * Der Grund ist nicht Schlamperei, sondern die Groesse selbst: die Rangrate
+   * waechst im Lauf um mehr als Faktor 5.000, weil sie an der Aktionsstufe
+   * haengt und nicht am Rang. Eine im Anlauf gemessene Rate beschreibt den
+   * Startblock, nicht die Strecke.
+   *
+   * Derselbe Fehler steht schon in nodes/ERLEDIGT.md vom 30.08.2026 - er kam
+   * zurueck, weil er damals im Bericht korrigiert wurde und nicht im Werkzeug.
+   *
+   * Die lineare Zahl bleibt sichtbar, aber als das, was sie ist: eine untere
+   * Schranke der Fahrweise, kein Termin.
+   */
+  const kurve = restzeitAusKurve(knoten, rang);
+  let etaSpiel = null;
+
+  if (kurve) {
     sag("Rest: " + zahl(restNetto) + " Rang netto (nach Abzug der " + zahl(Math.round(unterwegs))
       + ", die aus den Black Ops selbst kommen).");
-    sag("ETA: " + dauer(etaSpiel) + " reine Spielzeit"
-      + (bericht.gespieltAnteil ? " - bei zuletzt " + (bericht.gespieltAnteil * 100).toFixed(0)
-        + " % gespielter Zeit rund " + dauer(etaSpiel / bericht.gespieltAnteil) + " Kalenderzeit" : "")
-      + ".");
+    sag("ETA aus dem eigenen Referenzlauf: " + dauer(kurve.min) + " bis " + dauer(kurve.max)
+      + " Spielzeit (Mitte " + dauer(kurve.mitte) + ").");
+    sag("  Der vorige Lauf dieses Knotens stand bei Rang " + zahl(rang) + " nach "
+      + kurve.hJetzt.toFixed(1) + " h ab Bladeburner-Beitritt.");
+    etaSpiel = kurve.mitte;
     bericht.etaSpielstunden = etaSpiel;
+    bericht.etaMin = kurve.min;
+    bericht.etaMax = kurve.max;
+    bericht.etaQuelle = "referenzkurve";
+
+    if (rate && rate > 0) {
+      const linear = restNetto / rate;
+      sag("  Zum Vergleich linear fortgeschrieben: " + dauer(linear)
+        + " - das ist KEIN Termin, sondern der Startblock hochgerechnet."
+        + " Die Rangrate waechst im Lauf um mehr als Faktor 5.000.");
+    }
+
+    // Eine falsifizierbare Vorhersage schlaegt jede Beschwichtigung.
+    const ziel = naechsterMeilenstein(knoten, rang);
+    if (ziel && ziel.rateDorthin) {
+      sag("  Naechste Probe: bis Rang " + zahl(ziel.rang) + " lief die Referenz mit "
+        + zahl(Math.round(ziel.rateDorthin)) + " Rang/h. Bleibt die Rate beim naechsten"
+        + " Besuch deutlich darunter, ist DAS ein Befund.");
+    }
+  } else if (rate && rate > 0) {
+    etaSpiel = restNetto / rate;
+    sag("Rest: " + zahl(restNetto) + " Rang netto (nach Abzug der " + zahl(Math.round(unterwegs))
+      + ", die aus den Black Ops selbst kommen).");
+    sag("ETA: " + dauer(etaSpiel) + " reine Spielzeit - LINEAR fortgeschrieben.");
+    sag("  Achtung: fuer BitNode " + knoten + " gibt es keine Referenzkurve aus einem"
+      + " frueheren Lauf. Die Rangrate waechst im Lauf stark; diese Zahl ist eine"
+      + " obere Schranke, kein Termin.");
+    bericht.etaSpielstunden = etaSpiel;
+    bericht.etaQuelle = "linear";
+  }
+
+  if (etaSpiel !== null) {
+    if (bericht.gespieltAnteil) {
+      sag("  Bei zuletzt " + (bericht.gespieltAnteil * 100).toFixed(0)
+        + " % gespielter Zeit sind das rund " + dauer(etaSpiel / bericht.gespieltAnteil)
+        + " Kalenderzeit.");
+    }
 
     // Vergleich mit dem vorigen Check-in: steigt die ETA, laeuft etwas falsch.
     const letzteEta = [...punkte].reverse().find((p) =>
@@ -431,25 +491,48 @@ async function main() {
   return ausgeben(zeilen, { ...bericht, urteil });
 
   function fertigZeile() {
-    // Die Rate: frisch gemessen, sonst die letzte bekannte aus diesem
-    // Knotenlauf.
-    let r = rate, herkunft = "gemessen seit dem letzten Besuch";
-    if (!r || r <= 0) {
-      const alt = [...punkte].reverse().find((p) =>
-        gleicherLauf(p) && Number.isFinite(p.rate) && p.rate > 0);
-      if (alt) {
-        r = alt.rate;
-        herkunft = "Rate vom " + new Date(alt.ts).toLocaleDateString("de-DE")
-          + ", heute nicht neu messbar";
+    /**
+     * DIESE ZEILE IST DIE EINE ZAHL, DIE ERIC LIEST.
+     *
+     * Bis zum 04.09.2026 rechnete sie `restNetto / rate` und meldete fuer
+     * BitNode 10 den 06.11. - 428 Tage entfernt, waehrend der vorige Lauf
+     * desselben Knotens ab derselben Rangstelle noch 28 bis 50 Stunden
+     * brauchte. Eine Planung auf dieser Grundlage waere um Faktor 200 falsch
+     * gewesen, und das Urteil daneben lautete "AUF KURS".
+     *
+     * Die Referenzkurve hat Vorrang. Nur wenn es fuer den Knoten keine gibt,
+     * wird linear gerechnet - und dann steht das ausdruecklich dabei.
+     */
+    let etaSpiel = null;
+    let herkunft;
+    let spanne = null;
+
+    if (kurve) {
+      etaSpiel = kurve.mitte;
+      spanne = kurve;
+      herkunft = "aus dem eigenen vorigen Lauf dieses Knotens";
+    } else {
+      // Die Rate: frisch gemessen, sonst die letzte bekannte aus diesem
+      // Knotenlauf.
+      let r = rate;
+      herkunft = "linear fortgeschrieben, gemessen seit dem letzten Besuch";
+      if (!r || r <= 0) {
+        const alt = [...punkte].reverse().find((p) =>
+          gleicherLauf(p) && Number.isFinite(p.rate) && p.rate > 0);
+        if (alt) {
+          r = alt.rate;
+          herkunft = "linear fortgeschrieben mit der Rate vom "
+            + new Date(alt.ts).toLocaleDateString("de-DE");
+        }
       }
-    }
-    if (!r || r <= 0) {
-      return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - es fehlt eine"
-        + " Rangrate. Beim naechsten Besuch (mindestens "
-        + (MIN_FENSTER_MS / 60000) + " min Spielzeit spaeter) steht sie hier.";
+      if (!r || r <= 0) {
+        return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - es fehlt eine"
+          + " Rangrate. Beim naechsten Besuch (mindestens "
+          + (MIN_FENSTER_MS / 60000) + " min Spielzeit spaeter) steht sie hier.";
+      }
+      etaSpiel = restNetto / r;
     }
 
-    const etaSpiel = restNetto / r;
     if (!Number.isFinite(etaSpiel)) {
       return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - der Restweg ist"
         + " gerade nicht bezifferbar.";
@@ -475,10 +558,19 @@ async function main() {
       + ", " + ziel.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
     bericht.fertigAm = ziel.toISOString();
     bericht.fertigInKalenderstunden = etaEcht;
+
+    // Die Spanne wird mitgenannt, nicht weggerundet. Zwischen dem letzten
+    // Messpunkt unter der Schwelle und dem ersten darueber liegen im
+    // Referenzlauf 22 Stunden, in denen niemand gemessen hat. Eine Klammer,
+    // die das zugibt, ist ehrlicher als ein Termin, der es verschweigt.
+    const spannenText = spanne
+      ? " Spanne " + dauer(spanne.min) + " bis " + dauer(spanne.max) + "."
+      : "";
+
     return "FERTIG VORAUSSICHTLICH: " + wann + " (noch " + dauer(etaSpiel)
       + " Spielzeit; bei " + (anteil * 100).toFixed(0) + " % gespielter Zeit "
-      + anteilHerkunft + " sind das " + dauer(etaEcht) + " Kalenderzeit. "
-      + herkunft + ".)";
+      + anteilHerkunft + " sind das " + dauer(etaEcht) + " Kalenderzeit."
+      + spannenText + " " + herkunft + ".)";
   }
 
   function ausgeben(z, b) {

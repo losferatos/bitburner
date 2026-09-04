@@ -7,8 +7,28 @@
  *
  * `attempt` kostet 10 GB, `getContractType` und `getData` je 5. Zusammen mit
  * dem Grundpreis waeren das 22,25 GB - auf einem frischen `home` neben Kern,
- * Waechter und Wachhalter (19,15) unmoeglich. Getrennt passt jede Haelfte:
- * 12,00 und 12,25.
+ * Waechter und Wachhalter (19,15) unmoeglich.
+ *
+ * Getrennt passt jede Haelfte, aber KNAPP - und die Zahlen hier waren zu
+ * guenstig gerundet (Skeptiker Runde 3, C6, 04.09.2026). Gemessen mit
+ * tools/ram.js:
+ *
+ *   cdump.js   12,65 GB   Grundpreis 1,60 + getContractType 5 + getData 5
+ *                         + ls 0,20 + scan 0,20 + write/read + scp 0,60
+ *   csolve.js  12,85 GB   Grundpreis 1,60 + attempt 10 + scp 0,60
+ *                         + rm 0,60 + getHostname 0,05
+ *
+ * Hier stand "12,00 und 12,25" - es fehlte in beiden Faellen `ns.scp`, das
+ * seit dem 04.09. noetig ist, weil die Vorbedingungen auf HOME geprueft
+ * werden und ein Gewerk auch auf einem Ausweichwirt landen kann.
+ *
+ * Damit bleibt neben Kern, Waechter und Wachhalter (19,15) genau 12,85 GB,
+ * und csolve.js fuellt sie AUF DAS GIGABYTE GENAU. Das ist kein Zufall und
+ * keine Reserve: jeder weitere ns-Aufruf in dieser Datei macht die
+ * Kaltstart-Geldkette unlauffaehig. Der naechste, der hier `ns.getPlayer`
+ * fuer ein Telemetriefeld ergaenzen will, findet die Begruendung unten beim
+ * Herzschlag - genau das ist schon einmal passiert und wurde
+ * zurueckgenommen.
  *
  * `cdump.js` sucht, loest und prueft gegen; diese Datei reicht nur noch ein.
  * Sie raet NICHTS: was nicht in `data/cantwort.json` steht, wird nicht

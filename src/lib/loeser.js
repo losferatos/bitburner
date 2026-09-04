@@ -62,7 +62,26 @@ export const SOLVERS = {
       }
       return n === 1 ? fac - 1 : n;
     },
-    verify: (data, answer) => SOLVERS["Find Largest Prime Factor"].solve(data) === answer,
+    verify: (data, answer) => {
+      // UNABHAENGIG, NICHT TAUTOLOGISCH (Skeptiker Runde 3, C4).
+      //
+      // Hier stand `solve(data) === answer` - eine Probe, die genau dann
+      // besteht, wenn `solve` sich selbst gleicht. Sie faengt nichts, und die
+      // Autonomiebegruendung in cdump.js ("jede Antwort wird gegengeprueft")
+      // trug fuer zwanzig der dreissig Typen nicht.
+      //
+      // Geprueft wird stattdessen die Eigenschaft selbst: `answer` teilt
+      // `data`, ist prim, und nach dem Herausdividieren ALLER Primfaktoren
+      // bis einschliesslich `answer` bleibt 1 - dann kann es keinen groesseren
+      // geben. Der Einschluss ist der Punkt: bei data = 512 ist die Antwort 2,
+      // und wer nur die Faktoren KLEINER als 2 herausdividiert, behaelt 512
+      // uebrig und lehnt die richtige Antwort ab.
+      if (!Number.isInteger(answer) || answer < 2 || data % answer !== 0) return false;
+      for (let d = 2; d * d <= answer; d++) if (answer % d === 0) return false;
+      let n = data;
+      for (let d = 2; d <= answer; d++) while (n % d === 0) n /= d;
+      return n === 1;
+    }
   },
 
   // -- SubarrayWithMaximumSum.ts ------------------------------------------
@@ -74,7 +93,19 @@ export const SOLVERS = {
       }
       return Math.max(...nums);
     },
-    verify: (data, answer) => SOLVERS["Subarray with Maximum Sum"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Zweite, unabhaengige Rechnung: alle O(n^2) Teilfolgen durchgehen statt
+      // Kadanes Rekursion. Bei den Groessen des Spiels (bis 40 Elemente) sind
+      // das hoechstens 800 Additionen.
+      if (!Array.isArray(data) || !data.length) return false;
+      if (data.length > 2000) return true;   // zu gross fuer die Gegenprobe
+      let best = -Infinity;
+      for (let i = 0; i < data.length; i++) {
+        let sum = 0;
+        for (let j = i; j < data.length; j++) { sum += data[j]; if (sum > best) best = sum; }
+      }
+      return best === answer;
+    },
   },
 
   // -- TotalWaysToSum.ts ---------------------------------------------------
@@ -95,7 +126,23 @@ export const SOLVERS = {
       }
       return ways[data];
     },
-    verify: (data, answer) => SOLVERS["Total Ways to Sum"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Zweite Rechnung ueber eine ANDERE Rekursion: t[rest][max] zaehlt die
+      // Zerlegungen von `rest` in Teile hoechstens `max` - absteigend statt
+      // ueber ein einziges aufsummiertes Feld.
+      if (!Number.isInteger(answer) || answer < 0) return false;
+      if (!Number.isInteger(data) || data > 300) return true;
+      const t = [];
+      for (let i = 0; i <= data; i++) t.push(new Array(data + 1).fill(0));
+      for (let m = 0; m <= data; m++) t[0][m] = 1;
+      for (let rest = 1; rest <= data; rest++) {
+        for (let m = 1; m <= data; m++) {
+          t[rest][m] = t[rest][m - 1] + (m <= rest ? t[rest - m][m] : 0);
+        }
+      }
+      // Ohne den trivialen Summanden `data` selbst - das verlangt die Aufgabe.
+      return t[data][data] - 1 === answer;
+    },
   },
 
   // -- TotalWaysToSum.ts (Teil II) ----------------------------------------
@@ -119,7 +166,23 @@ export const SOLVERS = {
       }
       return ways[n];
     },
-    verify: (data, answer) => SOLVERS["Total Ways to Sum II"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Zweite Rechnung, Muenzwechsel von HINTEN: Wege, `rest` aus den
+      // Summanden ab Index i zu bilden. Andere Schleifenrichtung als solve.
+      if (!Number.isInteger(answer) || answer < 0) return false;
+      if (!Array.isArray(data) || !Number.isInteger(data[0])) return false;
+      const n = data[0];
+      const su = data[1];
+      if (n * su.length > 2e5) return true;   // zu gross fuer die Gegenprobe
+      let vorher = new Array(n + 1).fill(0);
+      vorher[0] = 1;
+      for (let i = su.length - 1; i >= 0; i--) {
+        const jetzt = vorher.slice();
+        for (let rest = su[i]; rest <= n; rest++) jetzt[rest] += jetzt[rest - su[i]];
+        vorher = jetzt;
+      }
+      return vorher[n] === answer;
+    },
   },
 
   // -- SpiralizeMatrix.ts --------------------------------------------------
@@ -171,9 +234,30 @@ export const SOLVERS = {
       return spiral;
     },
     verify: (data, answer) => {
-      const spiral = SOLVERS["Spiralize Matrix"].solve(data);
-      return spiral.length === answer.length && spiral.every((n, i) => n === answer[i]);
-    },
+      // Unabhaengig: die Antwort ZURUECK in eine Matrix legen. Jede Zahl an
+      // ihren Platz, dann muss die urspruengliche Matrix dastehen - und jede
+      // Zelle genau einmal besucht sein.
+      if (!Array.isArray(answer) || !Array.isArray(data) || !data.length) return false;
+      const h = data.length, b = data[0].length;
+      if (answer.length !== h * b) return false;
+      const belegt = data.map((z) => z.map(() => false));
+      let oben = 0, unten = h - 1, links = 0, rechts = b - 1, k = 0;
+      while (oben <= unten && links <= rechts) {
+        for (let j = links; j <= rechts; j++) { if (answer[k++] !== data[oben][j]) return false; belegt[oben][j] = true; }
+        oben++;
+        for (let i = oben; i <= unten; i++) { if (answer[k++] !== data[i][rechts]) return false; belegt[i][rechts] = true; }
+        rechts--;
+        if (oben <= unten) {
+          for (let j = rechts; j >= links; j--) { if (answer[k++] !== data[unten][j]) return false; belegt[unten][j] = true; }
+          unten--;
+        }
+        if (links <= rechts) {
+          for (let i = unten; i >= oben; i--) { if (answer[k++] !== data[i][links]) return false; belegt[i][links] = true; }
+          links++;
+        }
+      }
+      return k === h * b && belegt.every((z) => z.every(Boolean));
+    }
   },
 
   // -- ArrayJumpingGame.ts -------------------------------------------------
@@ -187,7 +271,26 @@ export const SOLVERS = {
       }
       return i === n ? 1 : 0;
     },
-    verify: (data, answer) => SOLVERS["Array Jumping Game"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: Erreichbarkeit per Breitensuche statt ueber den
+      // Greedy-Zeiger. Eine andere Denkweise, kein zweiter Aufruf.
+      if (answer !== 0 && answer !== 1) return false;
+      if (!Array.isArray(data) || !data.length) return false;
+      if (data.length > 5000) return true;
+      const gesehen = new Array(data.length).fill(false);
+      const rand = [0];
+      gesehen[0] = true;
+      let da = data.length === 1;
+      while (rand.length) {
+        const i = rand.pop();
+        for (let k = 1; k <= data[i]; k++) {
+          const j = i + k;
+          if (j >= data.length - 1) da = true;
+          if (j < data.length && !gesehen[j]) { gesehen[j] = true; rand.push(j); }
+        }
+      }
+      return (da ? 1 : 0) === answer;
+    },
   },
 
   // -- ArrayJumpingGame.ts (Teil II) --------------------------------------
@@ -214,7 +317,27 @@ export const SOLVERS = {
       }
       return jumps;
     },
-    verify: (data, answer) => SOLVERS["Array Jumping Game II"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: kuerzeste Sprungzahl per Breitensuche in Schichten.
+      // `solve` arbeitet greedy rueckwaerts - dieselbe Antwort aus einer
+      // anderen Rechnung.
+      if (!Number.isInteger(answer) || answer < 0) return false;
+      if (!Array.isArray(data) || !data.length) return false;
+      if (data.length > 5000) return true;
+      const n = data.length;
+      const dist = new Array(n).fill(-1);
+      dist[0] = 0;
+      const q = [0];
+      for (let kopf = 0; kopf < q.length; kopf++) {
+        const i = q[kopf];
+        for (let k = 1; k <= data[i] && i + k < n; k++) {
+          const j = i + k;
+          if (dist[j] === -1) { dist[j] = dist[i] + 1; q.push(j); }
+        }
+      }
+      // Unerreichbar meldet das Spiel als 0 (ArrayJumpingGameII.ts).
+      return (dist[n - 1] === -1 ? 0 : dist[n - 1]) === answer;
+    },
   },
 
   // -- MergeOverlappingIntervals.ts ---------------------------------------
@@ -245,13 +368,36 @@ export const SOLVERS = {
       return result;
     },
     verify: (data, answer) => {
-      const result = SOLVERS["Merge Overlapping Intervals"].solve(data);
-      return (
-        Array.isArray(answer) &&
-        result.length === answer.length &&
-        result.every((a, i) => Array.isArray(answer[i]) && a[0] === answer[i][0] && a[1] === answer[i][1])
-      );
-    },
+      // Unabhaengig und strukturell: die Antwort muss (1) aufsteigend und
+      // ueberschneidungsfrei sein, (2) jedes Eingabeintervall vollstaendig
+      // ueberdecken und (3) nichts ueberdecken, was nicht in der Eingabe war.
+      // Punkt (3) ist der, den ein blosser Vergleich mit solve nicht liefert.
+      if (!Array.isArray(answer) || !Array.isArray(data)) return false;
+      if (!answer.every((a) => Array.isArray(a) && a.length === 2 && a[0] <= a[1])) return false;
+      for (let i = 1; i < answer.length; i++) {
+        if (answer[i][0] <= answer[i - 1][1]) return false;   // beruehrt oder ueberlappt
+        if (answer[i][0] < answer[i - 1][0]) return false;    // nicht sortiert
+      }
+      // (2) jedes Eingabeintervall liegt in genau einem Antwortintervall
+      for (const [a, b] of data) {
+        if (!answer.some(([x, y]) => x <= a && b <= y)) return false;
+      }
+      // (3) jeder Punkt der Antwort ist durch die Eingabe gedeckt. Geprueft
+      // ueber die Randpunkte: eine Luecke im Inneren erzeugt einen Randpunkt,
+      // der von keinem Eingabeintervall getroffen wird.
+      for (const [x, y] of answer) {
+        const treffer = data.filter(([a, b]) => a <= y && x <= b)
+          .sort((u, v) => u[0] - v[0]);
+        if (!treffer.length || treffer[0][0] !== x) return false;
+        let ende = treffer[0][1];
+        for (const [a, b] of treffer) {
+          if (a > ende) return false;                 // Luecke
+          if (b > ende) ende = b;
+        }
+        if (ende !== y) return false;
+      }
+      return true;
+    }
   },
 
   // -- GenerateIPAddresses.ts ---------------------------------------------
@@ -281,9 +427,36 @@ export const SOLVERS = {
       return ret;
     },
     verify: (data, answer) => {
-      const ret = SOLVERS["Generate IP Addresses"].solve(data);
-      return Array.isArray(answer) && ret.length === answer.length && ret.every((ip) => answer.includes(ip));
-    },
+      // Unabhaengig und strukturell: jede genannte Adresse muss (1) gueltig
+      // sein und (2) nach dem Entfernen der Punkte die Eingabe ergeben; und
+      // (3) es duerfen nicht weniger sein, als eine eigene Aufzaehlung ueber
+      // alle drei Punktpositionen findet.
+      //
+      // Die Reihenfolge ist egal - das Spiel prueft mit `answer.includes`
+      // (GenerateIPAddresses.ts:67).
+      if (!Array.isArray(answer) || typeof data !== "string") return false;
+      const gueltig = (t) => {
+        const teile = t.split(".");
+        if (teile.length !== 4) return false;
+        return teile.every((x) => /^\d{1,3}$/.test(x) && Number(x) <= 255
+          && (x === "0" || x[0] !== "0"));
+      };
+      for (const t of answer) {
+        if (typeof t !== "string" || !gueltig(t)) return false;
+        if (t.split(".").join("") !== data) return false;
+      }
+      if (new Set(answer).size !== answer.length) return false;
+      // Eigene Aufzaehlung.
+      const alle = new Set();
+      for (let a = 1; a <= 3; a++) for (let b = 1; b <= 3; b++) for (let c = 1; c <= 3; c++) {
+        const d = data.length - a - b - c;
+        if (d < 1 || d > 3) continue;
+        const t = [data.slice(0, a), data.slice(a, a + b),
+          data.slice(a + b, a + b + c), data.slice(a + b + c)].join(".");
+        if (gueltig(t)) alle.add(t);
+      }
+      return alle.size === answer.length;
+    }
   },
 
   // -- AlgorithmicStockTrader.ts ------------------------------------------
@@ -298,7 +471,19 @@ export const SOLVERS = {
       }
       return maxSoFar;
     },
-    verify: (data, answer) => SOLVERS["Algorithmic Stock Trader I"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: alle Paare (kaufen, verkaufen) durchgehen. Bei den
+      // Groessen des Spiels (bis 50 Tage) sind das 1.225 Vergleiche.
+      if (!Array.isArray(data)) return false;
+      if (data.length > 3000) return true;
+      let best = 0;
+      for (let i = 0; i < data.length; i++) {
+        for (let j = i + 1; j < data.length; j++) {
+          if (data[j] - data[i] > best) best = data[j] - data[i];
+        }
+      }
+      return best === answer;
+    },
   },
 
   "Algorithmic Stock Trader II": {
@@ -309,7 +494,15 @@ export const SOLVERS = {
       }
       return profit;
     },
-    verify: (data, answer) => SOLVERS["Algorithmic Stock Trader II"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: bei unbegrenzt vielen Geschaeften ist der Gewinn die
+      // Summe aller positiven Tagesdifferenzen. Das ist eine geschlossene
+      // Aussage, keine zweite Schleife durch denselben Code.
+      if (!Array.isArray(data)) return false;
+      let summe = 0;
+      for (let i = 1; i < data.length; i++) if (data[i] > data[i - 1]) summe += data[i] - data[i - 1];
+      return summe === answer;
+    }
   },
 
   "Algorithmic Stock Trader III": {
@@ -326,7 +519,28 @@ export const SOLVERS = {
       }
       return release2;
     },
-    verify: (data, answer) => SOLVERS["Algorithmic Stock Trader III"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: zwei Geschaefte heisst "einmal links, einmal rechts vom
+      // Schnitt". Also fuer jeden Schnittpunkt das Maximum links und rechts
+      // per Einzelgeschaeft-Probe bilden - eine andere Zerlegung als die
+      // Zustandsrekursion in solve.
+      if (!Array.isArray(data)) return false;
+      if (data.length > 400) return true;
+      const einzeln = (von, bis) => {
+        let best = 0, min = Infinity;
+        for (let i = von; i <= bis; i++) {
+          if (data[i] < min) min = data[i];
+          if (data[i] - min > best) best = data[i] - min;
+        }
+        return best;
+      };
+      let best = 0;
+      for (let k = 0; k < data.length; k++) {
+        const g = einzeln(0, k) + einzeln(k, data.length - 1);
+        if (g > best) best = g;
+      }
+      return best === answer;
+    }
   },
 
   "Algorithmic Stock Trader IV": {
@@ -362,7 +576,29 @@ export const SOLVERS = {
       }
       return rele[k];
     },
-    verify: (data, answer) => SOLVERS["Algorithmic Stock Trader IV"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: Zustandsrekursion ueber (Tag, Geschaefte, im Besitz).
+      // solve rechnet ueber eine zweidimensionale Tabelle mit anderer
+      // Belegung; hier steht die Bedeutung der Zustaende explizit da.
+      if (!Array.isArray(data)) return false;
+      const k = data[0];
+      const pr = data[1];
+      if (!Array.isArray(pr) || !pr.length || k < 0) return false;
+      if (k * pr.length > 2e5) return true;
+      const kMax = Math.min(k, Math.floor(pr.length / 2));
+      // halten[j] = bester Stand mit j begonnenen Geschaeften und Aktie im
+      // Besitz; frei[j] = dasselbe ohne Aktie.
+      const halten = new Array(kMax + 1).fill(-Infinity);
+      const frei = new Array(kMax + 1).fill(-Infinity);
+      frei[0] = 0;
+      for (const preis of pr) {
+        for (let j = kMax; j >= 1; j--) {
+          halten[j] = Math.max(halten[j], frei[j - 1] - preis);
+          frei[j] = Math.max(frei[j], halten[j] + preis);
+        }
+      }
+      return Math.max(0, ...frei.filter(Number.isFinite)) === answer;
+    }
   },
 
   // -- MinimumPathSumInATriangle.ts ---------------------------------------
@@ -377,7 +613,23 @@ export const SOLVERS = {
       }
       return dp[0];
     },
-    verify: (data, answer) => SOLVERS["Minimum Path Sum in a Triangle"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: von OBEN nach unten summieren statt von unten nach oben.
+      // Andere Richtung, andere Zwischenwerte, dieselbe Antwort.
+      if (!Array.isArray(data) || !data.length) return false;
+      if (data.length > 200) return true;
+      let zeile = [data[0][0]];
+      for (let i = 1; i < data.length; i++) {
+        const neu = new Array(data[i].length);
+        for (let j = 0; j < data[i].length; j++) {
+          const links = j > 0 ? zeile[j - 1] : Infinity;
+          const rechts = j < zeile.length ? zeile[j] : Infinity;
+          neu[j] = Math.min(links, rechts) + data[i][j];
+        }
+        zeile = neu;
+      }
+      return Math.min(...zeile) === answer;
+    },
   },
 
   // -- UniquePathsInAGrid.ts ----------------------------------------------
@@ -397,7 +649,19 @@ export const SOLVERS = {
       }
       return currentRow[n - 1];
     },
-    verify: (data, answer) => SOLVERS["Unique Paths in a Grid I"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig und geschlossen: die Zahl der Wege durch ein leeres Gitter
+      // ist der Binomialkoeffizient C(n+m-2, n-1). Eine Formel statt einer
+      // Tabelle - das ist der Gegenentwurf zu solve.
+      if (!Array.isArray(data)) return false;
+      const n = data[0], m = data[1];
+      if (!Number.isInteger(n) || !Number.isInteger(m) || n < 1 || m < 1) return false;
+      if (n + m > 60) return true;   // jenseits davon wird die Formel ungenau
+      let r = 1;
+      const k = Math.min(n - 1, m - 1);
+      for (let i = 1; i <= k; i++) r = (r * (n + m - 1 - i)) / i;
+      return Math.round(r) === answer;
+    },
   },
 
   "Unique Paths in a Grid II": {
@@ -420,7 +684,25 @@ export const SOLVERS = {
       }
       return obstacleGrid[obstacleGrid.length - 1][obstacleGrid[0].length - 1];
     },
-    verify: (data, answer) => SOLVERS["Unique Paths in a Grid II"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: Zaehlen per Tiefensuche mit Merktabelle, von hinten nach
+      // vorn. solve rechnet vorwaerts ueber ein ueberschriebenes Gitter - hier
+      // bleibt das Gitter unberuehrt.
+      if (!Array.isArray(data) || !data.length) return false;
+      const h = data.length, b = data[0].length;
+      if (h * b > 4000) return true;
+      const merk = new Map();
+      const wege = (i, j) => {
+        if (i >= h || j >= b || data[i][j] === 1) return 0;
+        if (i === h - 1 && j === b - 1) return 1;
+        const k = i * b + j;
+        if (merk.has(k)) return merk.get(k);
+        const v = wege(i + 1, j) + wege(i, j + 1);
+        merk.set(k, v);
+        return v;
+      };
+      return wege(0, 0) === answer;
+    },
   },
 
   // -- ShortestPathInAGrid.ts ---------------------------------------------
@@ -571,10 +853,48 @@ export const SOLVERS = {
       return res;
     },
     verify: (data, answer) => {
-      const res = SOLVERS["Sanitize Parentheses in Expression"].solve(data);
-      if (!Array.isArray(answer) || res.length !== answer.length) return false;
-      return res.every((sol) => answer.includes(sol));
-    },
+      // Unabhaengig und strukturell: jede genannte Zeichenkette muss (1)
+      // ausbalanciert sein, (2) durch reines STREICHEN aus der Eingabe
+      // entstehen und (3) alle muessen gleich lang sein - naemlich so lang
+      // wie moeglich. Punkt (3) ist der eigentliche Inhalt der Aufgabe.
+      //
+      // Reihenfolge egal (SanitizeParenthesesInExpression.ts:113).
+      if (!Array.isArray(answer) || typeof data !== "string") return false;
+      const balanciert = (t) => {
+        let n = 0;
+        for (const c of t) { if (c === "(") n++; else if (c === ")") { n--; if (n < 0) return false; } }
+        return n === 0;
+      };
+      const teilfolge = (t) => {
+        let i = 0;
+        for (const c of data) if (i < t.length && c === t[i]) i++;
+        return i === t.length;
+      };
+      if (new Set(answer).size !== answer.length) return false;
+      for (const t of answer) {
+        if (typeof t !== "string" || !balanciert(t) || !teilfolge(t)) return false;
+        if (t.length !== answer[0].length) return false;
+      }
+      // Maximalitaet: gibt es eine LAENGERE balancierte Teilfolge, ist die
+      // Antwort falsch. Breitensuche ueber die Streichungen, von oben.
+      let ebene = new Set([data]);
+      const maxLaenge = answer.length ? answer[0].length : -1;
+      for (let laenge = data.length; laenge > maxLaenge; laenge--) {
+        for (const t of ebene) if (balanciert(t)) return false;
+        const naechste = new Set();
+        for (const t of ebene) {
+          for (let i = 0; i < t.length; i++) {
+            if (t[i] !== "(" && t[i] !== ")") continue;
+            naechste.add(t.slice(0, i) + t.slice(i + 1));
+          }
+        }
+        ebene = naechste;
+        if (ebene.size > 20000) return true;   // zu breit fuer die Gegenprobe
+      }
+      // Und vollstaendig: alle balancierten Teilfolgen dieser Laenge stehen drin.
+      const soll = new Set([...ebene].filter(balanciert));
+      return soll.size === answer.length && [...soll].every((t) => answer.includes(t));
+    }
   },
 
   // -- FindAllValidMathExpressions.ts -------------------------------------
@@ -615,11 +935,67 @@ export const SOLVERS = {
       return result;
     },
     verify: (data, answer) => {
-      const result = SOLVERS["Find All Valid Math Expressions"].solve(data);
-      if (!Array.isArray(answer) || result.length !== answer.length) return false;
-      const solutions = new Set(answer);
-      return result.every((sol) => solutions.has(sol));
-    },
+      // Unabhaengig und strukturell: jeder Ausdruck wird AUSGERECHNET (per
+      // eigenem Parser, nicht per eval) und muss das Ziel treffen; die
+      // Ziffern in Reihenfolge muessen die Eingabe ergeben; und die Anzahl
+      // muss zu einer eigenen Aufzaehlung passen.
+      //
+      // Reihenfolge egal (FindAllValidMathExpressions.ts).
+      if (!Array.isArray(answer) || !Array.isArray(data)) return false;
+      const ziffern = data[0];
+      const ziel = data[1];
+      if (typeof ziffern !== "string") return false;
+      // Auswerten: erst die Produkte, dann die Summen - Punkt vor Strich.
+      const werte = (t) => {
+        const summanden = [];
+        let vorzeichen = 1;
+        let faktoren = null;
+        let zahl = "";
+        const schliesse = () => {
+          if (zahl === "") return false;
+          if (zahl.length > 1 && zahl[0] === "0") return false;   // fuehrende Null
+          const n = Number(zahl);
+          zahl = "";
+          if (faktoren === null) faktoren = n; else faktoren *= n;
+          return true;
+        };
+        for (const c of t) {
+          if (c >= "0" && c <= "9") { zahl += c; continue; }
+          if (!schliesse()) return null;
+          if (c === "*") continue;
+          if (c === "+" || c === "-") {
+            summanden.push(vorzeichen * faktoren);
+            faktoren = null;
+            vorzeichen = c === "+" ? 1 : -1;
+            continue;
+          }
+          return null;
+        }
+        if (!schliesse()) return null;
+        summanden.push(vorzeichen * faktoren);
+        return summanden.reduce((a, b) => a + b, 0);
+      };
+      for (const t of answer) {
+        if (typeof t !== "string") return false;
+        if ([...t].filter((c) => c >= "0" && c <= "9").join("") !== ziffern) return false;
+        if (werte(t) !== ziel) return false;
+      }
+      if (new Set(answer).size !== answer.length) return false;
+      // Eigene Aufzaehlung ueber alle Operatorbelegungen.
+      if (ziffern.length > 10) return true;
+      const alle = new Set();
+      const lücken = ziffern.length - 1;
+      for (let maske = 0; maske < 4 ** lücken; maske++) {
+        let t = ziffern[0];
+        let m = maske;
+        for (let i = 1; i <= lücken; i++) {
+          t += ["", "+", "-", "*"][m % 4] + ziffern[i];
+          m = Math.floor(m / 4);
+        }
+        if (werte(t) === ziel) alle.add(t);
+      }
+      return alle.size === answer.length;
+    }
   },
 
   // -- HammingCode.ts ------------------------------------------------------
@@ -666,7 +1042,43 @@ export const SOLVERS = {
       enc[0] = parityNumber % 2 == 0 ? 0 : 1;
       return enc.join("");
     },
-    verify: (data, answer) => SOLVERS["HammingCodes: Integer to Encoded Binary"].solve(data) === answer,
+    verify: (data, answer) => {
+      // ECHTE UMKEHRPROBE: die Antwort mit dem ANDEREN Loeser dekodieren und
+      // mit der Eingabe vergleichen. Zwei getrennt geschriebene Verfahren
+      // muessten denselben Fehler machen, damit das durchgeht.
+      //
+      // Davor die Form: nur Nullen und Einsen, kein Einbitfehler (Syndrom 0),
+      // gerade Gesamtparitaet - und KEINE fuehrende Null im Datenteil.
+      //
+      // Der letzte Punkt ist nicht Kosmetik: haengt man an ein gueltiges
+      // Codewort eine Null an, stimmen Syndrom, Paritaet und Dekodierung
+      // weiterhin. Es ist trotzdem falsch, denn der Kodierer erzeugt immer
+      // die KUERZESTE Form (HammingCode.ts) - die Probe hat das eine Runde
+      // lang durchgelassen, gefunden von tools/test-loeser-verify.js.
+      if (typeof answer !== "string" || !/^[01]+$/.test(answer)) return false;
+      const bits = [...answer].map(Number);
+      let syndrom = 0;
+      for (let i = 0; i < bits.length; i++) if (bits[i]) syndrom ^= i;
+      if (syndrom !== 0) return false;
+      if (bits.reduce((a, b) => a + b, 0) % 2 !== 0) return false;
+      // Die erste Stelle, die keine Zweierpotenz ist, traegt das hoechste
+      // Datenbit. Ist es 0, war die Kodierung nicht die kuerzeste.
+      let erste = -1;
+      for (let i = 1; i < bits.length; i++) if ((i & (i - 1)) !== 0) { erste = i; break; }
+      if (erste === -1 || bits[erste] !== 1) return false;
+      // Und die LETZTE Stelle muss ebenfalls eine Datenstelle sein. Der
+      // Kodierer bricht ab, sobald das letzte Datenbit geschrieben ist
+      // (`for (let i = 1; k > 0; i++)`, HammingCode.ts) - ein Wort, das auf
+      // einer Paritaetsstelle endet, kann er gar nicht erzeugen.
+      //
+      // Ohne diese Zeile kam "111100000" fuer die 8 durch: neun Stellen statt
+      // acht, Syndrom stimmt, Paritaet stimmt, Wert stimmt - und trotzdem
+      // falsch, weil die neunte Stelle (Index 8) eine Zweierpotenz ist und
+      // nichts traegt. Gefunden von tools/test-loeser-verify.js.
+      const letzte = bits.length - 1;
+      if (letzte < 1 || (letzte & (letzte - 1)) === 0) return false;
+      return SOLVERS["HammingCodes: Encoded Binary to Integer"].solve(answer) === data;
+    }
   },
 
   "HammingCodes: Encoded Binary to Integer": {
@@ -692,7 +1104,44 @@ export const SOLVERS = {
       }
       return parseInt(ans, 2);
     },
-    verify: (data, answer) => SOLVERS["HammingCodes: Encoded Binary to Integer"].solve(data) === answer,
+    verify: (data, answer) => {
+      // ECHTE UMKEHRPROBE: die Zahl in ein Codewort DERSELBEN LAENGE
+      // zurueckschreiben und mit der Eingabe vergleichen. Hoechstens ein Bit
+      // darf abweichen - genau der Einbitfehler, den der Code korrigieren
+      // koennen soll.
+      //
+      // ZWEI FALLEN, beide beim ersten Anlauf hineingetappt:
+      //
+      //   (1) Die Laenge muss VORGEGEBEN werden. Der Kodierer aus dem anderen
+      //       Loeser erzeugt die kuerzeste Form; ein empfangenes Wort darf
+      //       laenger sein und die Zahl mit fuehrenden Nullen tragen. Ein
+      //       Vergleich ueber die kurze Form lehnt richtige Antworten ab.
+      //
+      //   (2) Die Datenbits werden von der KLEINSTEN freien Stelle aufwaerts
+      //       mit dem HOECHSTEN Bit beginnend eingetragen (HammingCode.ts,
+      //       `enc[i] = data_bits[--k]`). Wer rueckwaerts fuellt, bekommt bei
+      //       jeder Zahl ab drei Datenbits ein anderes Wort.
+      if (!Number.isInteger(answer) || answer < 0) return false;
+      if (typeof data !== "string" || !/^[01]+$/.test(data)) return false;
+      const bits = new Array(data.length).fill(0);
+      const stellen = [];
+      for (let i = 1; i < bits.length; i++) if ((i & (i - 1)) !== 0) stellen.push(i);
+      const msb = answer.toString(2);
+      if (msb.length > stellen.length) return false;   // die Zahl passt nicht hinein
+      const gefuellt = "0".repeat(stellen.length - msb.length) + msb;
+      for (let i = 0; i < stellen.length; i++) bits[stellen[i]] = Number(gefuellt[i]);
+      let paritaet = 0;
+      for (let i = 0; i < bits.length; i++) if (bits[i]) paritaet ^= i;
+      const pArray = paritaet.toString(2).split("").reverse().map(Number);
+      for (let i = 0; i < pArray.length; i++) bits[2 ** i] = pArray[i] ? 1 : 0;
+      let anzahl = 0;
+      for (const b of bits) if (b) anzahl++;
+      bits[0] = anzahl % 2 === 0 ? 0 : 1;
+
+      let abweichung = 0;
+      for (let i = 0; i < bits.length; i++) if (String(bits[i]) !== data[i]) abweichung++;
+      return abweichung <= 1;
+    }
   },
 
   // -- Proper2ColoringOfAGraph.ts -----------------------------------------
@@ -730,6 +1179,17 @@ export const SOLVERS = {
     // Woertlich aus Proper2ColoringOfAGraph.ts:78-118.
     verify: (data, answer) => {
       if (!Array.isArray(answer) || answer.some((a) => a !== 1 && a !== 0)) return false;
+      // DIE LAENGE GEHOERT DAZU (04.09.2026, tools/test-loeser-verify.js).
+      //
+      // Hier wurde nur geprueft, dass keine Kante zwei gleiche Farben
+      // verbindet - eine ZU KURZE Liste besteht das mit Leichtigkeit, weil
+      // `answer[a]` fuer fehlende Knoten `undefined` ist und `undefined !==
+      // undefined` falsch, `undefined !== 0` aber wahr ergibt. Eine Liste mit
+      // drei Farben fuer vier Knoten kam so durch.
+      //
+      // Der leere Fall bleibt erlaubt: er ist die Antwort auf einen Graphen,
+      // der sich nicht zweifaerben laesst.
+      if (answer.length !== 0 && answer.length !== data[0]) return false;
       const neighbourhood = (vertex) => {
         const adjLeft = data[1].filter(([a]) => a == vertex).map(([, b]) => b);
         const adjRight = data[1].filter(([, b]) => b == vertex).map(([a]) => a);
@@ -773,12 +1233,64 @@ export const SOLVERS = {
       out += count + plain[plain.length - 1];
       return out;
     },
-    verify: (plain, answer) => SOLVERS["Compression I: RLE Compression"].solve(plain) === answer,
+    verify: (plain, answer) => {
+      // ECHTE UMKEHRPROBE: die Antwort auspacken und mit der Eingabe
+      // vergleichen. Dazu die FORM, denn die Aufgabe verlangt die kuerzeste
+      // Kodierung: Laufzahlen 1..9, immer ein Zeichen dahinter, und ein
+      // zweites Paar mit demselben Zeichen nur dann, wenn das vorige bei 9
+      // stand. Ein blosses "packt sich richtig aus" liesse "1a1a" durchgehen.
+      if (typeof answer !== "string") return false;
+      if (answer.length % 2 !== 0) return false;
+      let aus = "";
+      let letztes = null;
+      for (let i = 0; i < answer.length; i += 2) {
+        const n = Number(answer[i]);
+        const z = answer[i + 1];
+        if (!Number.isInteger(n) || n < 1 || n > 9 || z === undefined) return false;
+        if (z === letztes && Number(answer[i - 2]) !== 9) return false;
+        aus += z.repeat(n);
+        letztes = z;
+      }
+      return aus === plain;
+    },
   },
 
   "Compression II: LZ Decompression": {
     solve: (compr) => comprLZDecode(compr) ?? "",
-    verify: (compr, answer) => SOLVERS["Compression II: LZ Decompression"].solve(compr) === answer,
+    verify: (compr, answer) => {
+      // ECHTE UMKEHRPROBE: die Eingabe mit einem SELBST geschriebenen
+      // Auspacker nachvollziehen, nicht mit demselben. Das Format wechselt
+      // zwischen zwei Bloecken: Laenge + Klartext, dann Laenge + Rueckgriff.
+      //
+      // Ist die Eingabe kaputt (kein gueltiges LZ), gibt `solve` einen leeren
+      // String zurueck - und dann darf die Probe NICHT bestehen: eine leere
+      // Antwort auf einen nicht leeren Vertrag ist immer falsch.
+      if (typeof answer !== "string" || typeof compr !== "string") return false;
+      if (compr.length > 0 && answer.length === 0) return false;
+      let aus = "";
+      let i = 0;
+      let typ = 0;   // 0 = Klartext, 1 = Rueckgriff
+      while (i < compr.length) {
+        const laenge = Number(compr[i]);
+        if (!Number.isInteger(laenge) || laenge < 0 || laenge > 9) return false;
+        i++;
+        if (laenge > 0) {
+          if (typ === 0) {
+            if (i + laenge > compr.length) return false;
+            aus += compr.slice(i, i + laenge);
+            i += laenge;
+          } else {
+            const abstand = Number(compr[i]);
+            if (!Number.isInteger(abstand) || abstand < 1 || abstand > 9) return false;
+            i++;
+            if (abstand > aus.length) return false;
+            for (let k = 0; k < laenge; k++) aus += aus[aus.length - abstand];
+          }
+        }
+        typ = 1 - typ;
+      }
+      return aus === answer;
+    }
   },
 
   "Compression III: LZ Compression": {
@@ -805,7 +1317,21 @@ export const SOLVERS = {
       [...data[0]]
         .map((a) => (a === " " ? a : String.fromCharCode(((a.charCodeAt(0) - 65 - data[1] + 26) % 26) + 65)))
         .join(""),
-    verify: (data, answer) => SOLVERS["Encryption I: Caesar Cipher"].solve(data) === answer,
+    verify: (data, answer) => {
+      // ECHTE UMKEHRPROBE: die Antwort ZURUECKverschieben muss die Eingabe
+      // ergeben. Die Verschiebung in die andere Richtung ist eine eigene
+      // Rechnung, kein zweiter Aufruf von solve.
+      if (typeof answer !== "string" || !Array.isArray(data)) return false;
+      const klar = data[0];
+      const n = data[1];
+      if (typeof klar !== "string" || answer.length !== klar.length) return false;
+      let zurueck = "";
+      for (const a of answer) {
+        zurueck += a === " " ? " "
+          : String.fromCharCode(((a.charCodeAt(0) - 65 + n) % 26) + 65);
+      }
+      return zurueck === klar;
+    },
   },
 
   "Encryption II: Vigenère Cipher": {
@@ -817,7 +1343,22 @@ export const SOLVERS = {
             : String.fromCharCode(((a.charCodeAt(0) - 2 * 65 + data[1].charCodeAt(i % data[1].length)) % 26) + 65),
         )
         .join(""),
-    verify: (data, answer) => SOLVERS["Encryption II: Vigenère Cipher"].solve(data) === answer,
+    verify: (data, answer) => {
+      // ECHTE UMKEHRPROBE: die Antwort mit demselben Schluessel ZURUECK
+      // verschieben muss den Klartext ergeben. Die Rueckrichtung ist eine
+      // eigene Rechnung, kein zweiter Aufruf von solve.
+      if (typeof answer !== "string" || !Array.isArray(data)) return false;
+      const klar = data[0];
+      const schluessel = data[1];
+      if (typeof klar !== "string" || typeof schluessel !== "string" || !schluessel.length) return false;
+      if (answer.length !== klar.length) return false;
+      let zurueck = "";
+      for (let i = 0; i < answer.length; i++) {
+        const k = schluessel.charCodeAt(i % schluessel.length) - 65;
+        zurueck += String.fromCharCode(((answer.charCodeAt(i) - 65 - k + 26) % 26) + 65);
+      }
+      return zurueck === klar;
+    }
   },
 
   // -- SquareRoot.ts -------------------------------------------------------
@@ -909,7 +1450,23 @@ export const SOLVERS = {
       }
       return primeSieve(data[0], data[1]);
     },
-    verify: (data, answer) => SOLVERS["Total Number of Primes"].solve(data) === answer,
+    verify: (data, answer) => {
+      // Unabhaengig: Probedivision je Zahl statt Sieb. Langsamer, aber ein
+      // voellig anderes Verfahren - gedeckelt auf eine Spanne, die im
+      // Millisekundenbereich bleibt.
+      if (!Number.isInteger(answer) || answer < 0) return false;
+      if (!Array.isArray(data)) return false;
+      const hi = data[1];
+      const lo = Math.max(2, data[0]);
+      if (hi - lo > 60000) return true;   // zu gross fuer die Probedivision
+      let n = 0;
+      for (let x = lo; x <= hi; x++) {
+        let prim = x >= 2;
+        for (let d = 2; d * d <= x; d++) if (x % d === 0) { prim = false; break; }
+        if (prim) n++;
+      }
+      return n === answer;
+    },
   },
 
   // -- LargestRectangle.ts -------------------------------------------------
@@ -961,38 +1518,45 @@ export const SOLVERS = {
     // Woertlich aus LargestRectangle.ts:120-158: Rechteck muss im Gitter
     // liegen, darf keine 1 enthalten und muss die Groesse des Optimums haben.
     verify: (state, answer) => {
-      if (
-        !Array.isArray(answer) ||
-        answer.length !== 2 ||
-        !answer.every((a) => Array.isArray(a) && a.length === 2 && a.every((n) => typeof n === "number"))
-      ) {
-        return false;
+      // Unabhaengig und strukturell: die genannten Ecken muessen im Gitter
+      // liegen, das aufgespannte Rechteck darf keine Eins enthalten, und es
+      // darf kein GROESSERES leeres Rechteck geben. Der letzte Teil wird
+      // durch vollstaendiges Absuchen belegt - eine andere Rechnung als der
+      // Histogrammtrick in solve.
+      //
+      // Das Spiel akzeptiert jedes gueltige groesste Rechteck, nicht nur
+      // eines bestimmtes (LargestRectangle.ts:121-132).
+      if (!Array.isArray(state) || !state.length) return false;
+      if (!Array.isArray(answer) || answer.length !== 2) return false;
+      if (!answer.every((a) => Array.isArray(a) && a.length === 2
+        && a.every((n) => Number.isInteger(n)))) return false;
+      const h = state.length, b = state[0].length;
+      const r0 = Math.min(answer[0][0], answer[1][0]);
+      const r1 = Math.max(answer[0][0], answer[1][0]);
+      const c0 = Math.min(answer[0][1], answer[1][1]);
+      const c1 = Math.max(answer[0][1], answer[1][1]);
+      if (r0 < 0 || r1 >= h || c0 < 0 || c1 >= b) return false;
+      for (let i = r0; i <= r1; i++) for (let j = c0; j <= c1; j++) {
+        if (state[i][j] !== 0) return false;
       }
-      if (
-        answer[0][0] < 0 ||
-        answer[0][0] > state.length - 1 ||
-        answer[0][1] < 0 ||
-        answer[0][1] > state[0].length - 1 ||
-        answer[1][0] < 0 ||
-        answer[1][0] > state.length - 1 ||
-        answer[1][1] < 0 ||
-        answer[1][1] > state[0].length - 1
-      ) {
-        return false;
-      }
-      const minR = Math.min(answer[0][0], answer[1][0]);
-      const maxR = Math.max(answer[0][0], answer[1][0]);
-      const minC = Math.min(answer[0][1], answer[1][1]);
-      const maxC = Math.max(answer[0][1], answer[1][1]);
-      for (let i = minR; i <= maxR; i++) {
-        if (state[i].slice(minC, maxC + 1).includes(1)) {
-          return false;
+      const flaeche = (r1 - r0 + 1) * (c1 - c0 + 1);
+      if (h * b > 2500) return true;   // zu gross fuer das Absuchen
+      // Groesstes leeres Rechteck per vollstaendiger Suche.
+      let best = 0;
+      for (let i = 0; i < h; i++) for (let j = 0; j < b; j++) {
+        if (state[i][j] !== 0) continue;
+        let maxBreite = b;
+        for (let u = i; u < h; u++) {
+          let breite = 0;
+          while (j + breite < maxBreite && state[u][j + breite] === 0) breite++;
+          maxBreite = breite;
+          if (breite === 0) break;
+          const f = breite * (u - i + 1);
+          if (f > best) best = f;
         }
       }
-      const solution = SOLVERS["Largest Rectangle in a Matrix"].solve(state);
-      const userArea = (maxR - minR + 1) * (maxC - minC + 1);
-      return userArea === (solution[1][0] - solution[0][0] + 1) * (solution[1][1] - solution[0][1] + 1);
-    },
+      return flaeche === best;
+    }
   },
 };
 

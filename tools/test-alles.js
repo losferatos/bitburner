@@ -70,6 +70,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-leiter.js",
+    deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
+    schnell: true,
+  },
+  {
     datei: "test-motor-ebene2.js",
     deckt: "EBENE 2: der echte Kern gegen den ns-Mock, drei Pflichtproben (C.1)",
     schnell: false,

@@ -29,6 +29,8 @@
  *
  * @param {NS} ns
  */
+import { zielErlaubt } from "./lib/route.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -43,6 +45,51 @@ export async function main(ns) {
 
   if (!Number.isFinite(ziel) || ziel < 1 || ziel > 15) {
     sag("Kein gueltiger Ziel-BitNode angegeben (1 bis 15). Nichts getan.");
+    return;
+  }
+
+  // =========================================================================
+  // ZIELPRUEFUNG GEGEN DIE ROUTE (Position C.3, 04.09.2026)
+  // =========================================================================
+  //
+  // Bis hierher war die einzige Pruefung "ist es eine Zahl zwischen 1 und 15".
+  // Alles andere wurde unveraendert an destroyW0r1dD43m0n durchgereicht - an
+  // zwei Stellen, im Black-Ops-Zweig und im Hackingzweig. Ein vertippter,
+  // veralteter oder aus einer alten Telemetrie gelesener Wert landete damit
+  // ungeprueft im Sprung.
+  //
+  // Ein Sprung ist die EINZIGE Handlung dieses Bots, die sich nicht
+  // zuruecknehmen laesst: der Lauf ist weg, der Knoten betreten, die Route um
+  // einen Eintrag verschoben, den niemand vorgesehen hat.
+  //
+  // Die Pruefung sitzt VOR dem Black-Ops-Zweig, weil der weiter unten an der
+  // WD-Pruefung vorbei abzweigt und sonst ungeprueft bliebe.
+  //
+  // KEIN UEBERSTIMMUNGSFLAG: die Route ist unveraenderlich. Wer woanders hin
+  // will, aendert route.json - sichtbar, versioniert, mit Commit.
+  try {
+    if (!ns.fileExists("route.json", "home") && !ns.fileExists("route.json")) {
+      sag("SPRUNG ABGELEHNT: route.json ist weder hier noch auf home zu finden."
+        + " Ohne Route laesst sich das Ziel nicht pruefen.");
+      return;
+    }
+    if (ns.getHostname() !== "home" && !ns.fileExists("route.json")) {
+      ns.scp("route.json", ns.getHostname(), "home");
+    }
+    const route = JSON.parse(ns.read("route.json")).route;
+    const info = ns.getResetInfo();
+    const p = zielErlaubt(route, info.currentNode, info.ownedSF, ziel,
+      (d) => ns.fileExists(d, "home"));
+    if (!p.ok) {
+      sag("SPRUNG ABGELEHNT: " + p.grund);
+      return;
+    }
+    sag("Ziel geprueft: BN" + ziel + " ist der naechste offene Routeneintrag"
+      + " (aus BN" + info.currentNode + ").");
+  } catch (e) {
+    // Eine nicht pruefbare Route ist kein Freibrief. Lieber steht der Bot,
+    // als dass er irgendwohin springt.
+    sag("SPRUNG ABGELEHNT: Route nicht pruefbar - " + String(e && e.message ? e.message : e));
     return;
   }
 

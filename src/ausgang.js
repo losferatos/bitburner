@@ -53,52 +53,42 @@
 const WD = "w0r1d_d43m0n";
 const TAKT_MS = 60000;
 const WORKER = ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"];
-const BIBLIOTHEKEN = ["lib/hackaugs.js"];
+// Was exit.js auf einem Fremdrechner braucht. lib/route.js ist ein IMPORT:
+// fehlt die Datei auf dem Wirt, startet das Skript gar nicht erst. route.json
+// ist die Datengrundlage der Zielpruefung - ohne sie lehnt exit.js jeden
+// Sprung ab, und zwar zu Recht, aber aus dem falschen Grund.
+const BIBLIOTHEKEN = ["lib/hackaugs.js", "lib/route.js", "route.json"];
 
 /**
- * Reine Routenlogik. `sf` ist eine Map oder ein Objekt Knoten -> Stufe;
- * `vorhanden(datei)` sagt, ob ein in `braucht` genanntes Gewerk auf home liegt.
- * Liefert { lauf, ziel, verfahren, fertig, grund, uebersprungen }.
+ * Die Routenlogik liegt seit Position C.3 in `lib/route.js`.
  *
- * `braucht` haelt den Bot NICHT an (Skeptiker 02.09.: ein Stillstand ohne
- * Ruf ist genau die Fehlerklasse, die dieser Umbau abschafft). Ein Eintrag,
- * dessen Gewerk fehlt, wird uebersprungen und steht in `uebersprungen`;
- * sobald die Datei liegt, ist er wieder der erste offene Eintrag.
+ * WARUM SIE UMGEZOGEN IST: `exit.js` braucht sie fuer die Zielpruefung vor dem
+ * Sprung. Ein Import aus DIESER Datei haette exit.js den gesamten ns-Verbrauch
+ * von ausgang.js aufgeschlagen - der RAM-Rechner laeuft ueber den AST der
+ * importierten Datei, nicht ueber den Aufrufgraphen. `lib/route.js` ruft
+ * nichts auf `ns` auf und kostet damit nichts.
+ *
+ * Der Re-Export haelt `tools/test-route.js` am Laufen, das planeRoute ueber
+ * alle 40 Uebergaenge der Route prueft.
  */
-export function planeRoute(route, cur, sf, vorhanden = () => true) {
-  const stufe = (n) => {
-    const v = sf instanceof Map ? sf.get(n) : sf[n];
-    return Number.isFinite(Number(v)) ? Number(v) : 0;
-  };
-  const nachDiesemLauf = (n) => stufe(n) + (n === cur ? 1 : 0);
-  const eintraege = Array.isArray(route) ? route : [];
-  const leer = { lauf: null, ziel: null, verfahren: "V2", fertig: false, uebersprungen: [] };
+import { planeRoute, zielErlaubt, routeZustand } from "./lib/route.js";
+export { planeRoute, zielErlaubt, routeZustand };
 
-  for (const e of eintraege) {
-    const ok = e && Number.isInteger(e.node) && e.node >= 1 && e.node <= 15
-      && [1, 2, 3].includes(e.level) && ["V1", "V2", "V1b"].includes(e.verfahren);
-    if (!ok) return { ...leer, grund: "Routeneintrag ungueltig: " + JSON.stringify(e) };
-  }
+// Position C.3: die Wirtreserve (E10) und die Restzeitschaetzung. Beide sind
+// reine Module ohne ns-Aufruf ausser den Basisfunktionen und kosten damit
+// nichts, was ausgang.js nicht ohnehin zahlt.
+import { setzeWirtReserve, loescheWirtReserve, wirtReserve } from "./lib/reserve.js";
+import { messe, etaMinuten } from "./lib/eta.js";
 
-  const lauf = eintraege.find((e) => e.node === cur && stufe(cur) < e.level) || null;
-  const letzterFuerCur = [...eintraege].reverse().find((e) => e.node === cur);
-  const verfahren = lauf ? lauf.verfahren : (letzterFuerCur ? letzterFuerCur.verfahren : "V2");
-
-  const uebersprungen = [];
-  let ziel = null;
-  for (const e of eintraege) {
-    if (!(nachDiesemLauf(e.node) < e.level)) continue;
-    if (e.braucht && !vorhanden(e.braucht)) { uebersprungen.push(e); continue; }
-    ziel = e; break;
-  }
-
-  if (!ziel) {
-    return { lauf, ziel: null, verfahren, fertig: uebersprungen.length === 0, uebersprungen,
-      grund: uebersprungen.length ? "nur noch Eintraege mit fehlendem Gewerk offen" : "Route abgearbeitet" };
-  }
-  return { lauf, ziel, verfahren, fertig: false, uebersprungen,
-    grund: lauf ? "" : "aktueller Knoten " + cur + " steht nicht offen in der Route" };
-}
+/**
+ * Ab wann die Wirtreserve gehalten wird.
+ *
+ * Nicht ab dem Sprung, sondern eine Stunde davor: ein Rechnerkauf braucht
+ * Geld, das erst verdient werden muss, und die Endspurt-Regel gibt genau in
+ * diesem Fenster alles aus (bn4net.js:766-786). Wer erst reserviert, wenn der
+ * Ausgang offen steht, reserviert von einem leeren Konto.
+ */
+const RESERVE_AB_MIN = 60;
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -141,6 +131,12 @@ export async function main(ns) {
   sag("ausgang.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
   let letzterStart = 0;
+
+  // Messpunkte fuer die Restzeitschaetzung. Sie leben nur im Prozess: nach
+  // einem Neustart beginnt die Messung neu, statt eine Rate aus Punkten zu
+  // bilden, zwischen denen der Bot gar nicht lief.
+  let hackPunkte = [];
+  let letzterKnoten = null;
   // Nach einem Neustart die 15-Minuten-Sperre nach einem Start ohne Sprung
   // nicht verlieren.
   try {
@@ -195,12 +191,18 @@ export async function main(ns) {
       if (plan.fertig) {
         if (letzteMeldung !== "fertig") { sag("Route abgearbeitet - kein weiterer Sprung."); letzteMeldung = "fertig"; }
         nachHome("data/fertig.txt", String(Date.now()));
-        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, fertig: true }));
+        // Kein Sprung mehr - die Wirtreserve gibt das Geld frei.
+        try { loescheWirtReserve(ns); } catch { /* egal */ }
+        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, fertig: true,
+          eta_min: null, route_state: routeZustand(plan) }));
         await ns.sleep(TAKT_MS); continue;
       }
       if (!plan.ziel) {
         if (letzteMeldung !== plan.grund) { sag(plan.grund); letzteMeldung = plan.grund; }
+        // Kein erreichbares Ziel - das Geld wird anderswo gebraucht.
+        try { loescheWirtReserve(ns); } catch { /* egal */ }
         nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, grund: plan.grund,
+          eta_min: null, route_state: routeZustand(plan),
           uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })) }));
         await ns.sleep(TAKT_MS); continue;
       }
@@ -237,9 +239,103 @@ export async function main(ns) {
       // egal durch welche Tuer. `verfahren` steuert nur die Werkzeuge.
       const offen = ueberBlackOps || ueberHacking;
 
+      // ===================================================================
+      // eta_min - wie lange noch bis zum Sprung (Position C.3)
+      // ===================================================================
+      //
+      // Nur der Hackingweg ist ueberhaupt schaetzbar: das Level waechst
+      // stetig und messbar. Der Black-Ops-Weg haengt an Aktionen mit
+      // Erfolgswahrscheinlichkeit und endlichen Vorraeten - eine Zahl daraus
+      // waere geraten, und geraten ist hier schlimmer als null, weil der Kern
+      // die Reserve dann zum falschen Zeitpunkt haelt.
+      //
+      // WELCHE UHR: Wanduhr mit Deckel auf den Rundenabstand. Eine
+      // Offline-Luecke wird verworfen, ein Nachholklumpen faellt aus dem
+      // Median. Beides steht in lib/eta.js und ist dort geprueft.
+      let etaMin = null;
+      let etaSicher = false;
+      let etaQuelle = "nicht schaetzbar";
+      if (cur !== letzterKnoten) {
+        // Knotenwechsel: die alten Punkte beschreiben eine Welt, die es nicht
+        // mehr gibt.
+        hackPunkte = [];
+        letzterKnoten = cur;
+      }
+      if (offen) {
+        etaMin = 0;
+        etaSicher = true;
+        etaQuelle = "Ausgang steht offen";
+      } else {
+        try {
+          if (ns.serverExists(WD)) {
+            const noetig = ns.getServerRequiredHackingLevel(WD);
+            const level = ns.getHackingLevel();
+            hackPunkte = messe(hackPunkte, Date.now(), level);
+            const e = etaMinuten(hackPunkte, level, noetig);
+            if (e) {
+              etaMin = e.min;
+              etaSicher = e.sicher;
+              etaQuelle = "Hacking-Level, Median ueber " + e.punkte + " Abschnitte";
+            }
+          }
+        } catch { /* Level nicht lesbar - dann bleibt etaMin null */ }
+      }
+
+      // ===================================================================
+      // Die Wirtreserve (ARCHITEKTUR E10)
+      // ===================================================================
+      //
+      // Der Deadlock: kurz vor dem Wechsel soll alles Geld ausgegeben werden,
+      // weil das Guthaben beim Prestige ohnehin auf 1000 Dollar faellt
+      // (bn4net.js:766-786) - aber genau dieses Geld braucht der Wirt, auf dem
+      // exit.js laeuft. Ohne Reserve stabilisiert sich der Fehler selbst:
+      // alles ausgeben, Wirt nicht bezahlen koennen, nicht springen, weiter
+      // verdienen, wieder alles ausgeben.
+      //
+      // Reserviert wird NUR, wenn wirklich kein Wirt frei ist. Heute steht ein
+      // Park aus 15 Rechnern zu je 524.288 GB - da ist die Reserve null, und
+      // sie soll null sein. Sie ist fuer den Kaltstart auf 32 GB gedacht.
+      try {
+        const nah = etaMin !== null && etaMin <= RESERVE_AB_MIN;
+        let gesetzt = false;
+        if (offen || nah) {
+          const brauchtGb = ns.getScriptRam("exit.js", "home");
+          let passt = false;
+          for (const h of netz()) {
+            if (!ns.hasRootAccess(h)) continue;
+            if (frei(h) >= brauchtGb) { passt = true; break; }
+          }
+          if (!passt && brauchtGb > 0) {
+            // Der kleinste Mietrechner, der exit.js fasst. getServerCost
+            // liefert den Preis der laufenden Umgebung samt Knotenfaktor -
+            // eine nachgebaute Formel waere genau die Falle vom 30.08.
+            let gb = 32;
+            const limit = ns.cloud.getRamLimit();
+            while (gb < brauchtGb && gb * 2 <= limit) gb *= 2;
+            const preis = gb >= brauchtGb ? ns.cloud.getServerCost(gb) : 0;
+            if (preis > 0) {
+              setzeWirtReserve(ns, preis, Date.now(),
+                "Wirt fuer exit.js (" + brauchtGb.toFixed(1) + " GB, " + gb + "-GB-Rechner)");
+              gesetzt = true;
+            }
+            // Kein Mietrechner moeglich (BN9: CloudServerLimit 0)? Dann traegt
+            // home den Sprung, und der Ausbau kostet eigenes Geld. Die Reserve
+            // dafuer setzt das BN9-Gewerk, nicht diese Stelle.
+          }
+        }
+        if (!gesetzt) loescheWirtReserve(ns);
+      } catch { /* Die Reserve ist eine Vorsichtsmassnahme, kein Abbruchgrund */ }
+
+      const reserveJetzt = wirtReserve(ns, Date.now());
+
       nachHome("data/ausgang.json", JSON.stringify({
         zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel, verfahren, offen,
         ueberBlackOps, ueberHacking, status, letzterStart,
+        eta_min: etaMin, eta_sicher: etaSicher, eta_quelle: etaQuelle,
+        route_state: routeZustand(plan),
+        wirtreserve: reserveJetzt.betrag > 0
+          ? { betrag: reserveJetzt.betrag, bis: reserveJetzt.bis, zweck: reserveJetzt.zweck }
+          : null,
         uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })),
       }));
 

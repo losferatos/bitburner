@@ -23,6 +23,11 @@
    "evictRank": 99,
    "needsFigure": "owner",
    "needsLibs": [
+    "lib/calc.js",
+    "lib/events.js",
+    "lib/figur.js",
+    "lib/kpi.js",
+    "lib/motorzeit.js",
     "lib/reg.js"
    ],
    "singularity": false,
@@ -48,7 +53,12 @@
    "priority": 2,
    "evictRank": 99,
    "needsFigure": "none",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/events.js",
+    "lib/leiter.js",
+    "lib/reg.js",
+    "lib/uhren.js"
+   ],
    "singularity": false,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -97,7 +107,9 @@
    "priority": 4,
    "evictRank": 9,
    "needsFigure": "none",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/loeser.js"
+   ],
    "singularity": false,
    "restartPolicy": "until-done",
    "maxInstances": 1,
@@ -253,10 +265,11 @@
    "evictRank": 3,
    "needsFigure": "none",
    "needsLibs": [
-    "lib/route.js",
     "lib/eta.js",
     "lib/events.js",
-    "lib/handschlag.js"
+    "lib/handschlag.js",
+    "lib/hostdatei.js",
+    "lib/route.js"
    ],
    "singularity": false,
    "restartPolicy": "always",
@@ -282,8 +295,9 @@
    "evictRank": 20,
    "needsFigure": "request",
    "needsLibs": [
+    "lib/figur.js",
     "lib/figurns.js",
-    "lib/figur.js"
+    "lib/hostdatei.js"
    ],
    "singularity": true,
    "restartPolicy": "always",
@@ -336,7 +350,10 @@
    "priority": 9,
    "evictRank": 15,
    "needsFigure": "none",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/events.js",
+    "lib/hostdatei.js"
+   ],
    "singularity": false,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -557,7 +574,7 @@
   {
    "name": "export.js",
    "args": [],
-   "ramBaseGb": 2.25,
+   "ramBaseGb": 2.35,
    "ramSingGb": 1,
    "ramMeasuredAt": "2026-09-04",
    "verfahren": "alle",
@@ -572,7 +589,8 @@
    "evictRank": 3,
    "needsFigure": "none",
    "needsLibs": [
-    "lib/events.js"
+    "lib/events.js",
+    "lib/hostdatei.js"
    ],
    "singularity": true,
    "restartPolicy": "always",
@@ -623,9 +641,11 @@
    "needsFigure": "owner",
    "needsLibs": [
     "lib/endspurt.js",
-    "lib/figurns.js",
     "lib/figur.js",
-    "lib/handschlag.js"
+    "lib/figurns.js",
+    "lib/hackaugs.js",
+    "lib/handschlag.js",
+    "lib/hostdatei.js"
    ],
    "singularity": true,
    "restartPolicy": "always",
@@ -659,7 +679,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-09-04T11:21:31.184Z",
+ "erzeugtAm": "2026-09-04T17:15:13.040Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

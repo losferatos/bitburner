@@ -46,6 +46,8 @@ const FRISCH_MS = 6 * 60000;
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+// DIESELBE Auswahl, die der Kern benutzt - nicht eine zweite daneben.
+import { auswahl } from "../src/lib/reg.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, "..");
@@ -72,6 +74,12 @@ const liesJson = async (name) => {
   const roh = await rpc({ method: "getFile", filename: name, server: "home" });
   if (typeof roh !== "string" || !roh.trim()) return null;
   try { return JSON.parse(roh); } catch { return null; }
+};
+
+/** Rohinhalt statt JSON - die Knotenmarken sind blanke Zahlen, kein JSON. */
+const liesDatei = async (name) => {
+  const roh = await rpc({ method: "getFile", filename: name, server: "home" });
+  return typeof roh === "string" ? roh : null;
 };
 
 const schlaf = (ms) => new Promise((r) => setTimeout(r, ms));
@@ -490,16 +498,113 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   let werkzeugFehlt = null;
   let werkzeugPruefungBlind = null;
 
+  /**
+   * ===========================================================================
+   * DIE SOLLLISTE IST NICHT DIE REGISTRY (04.09.2026, 18:50)
+   * ===========================================================================
+   *
+   * Hier stand ein eigener Filter: alles ausser `restartPolicy: "once"` und
+   * `phase: "kaltstart-einmal"`. Er kannte weder `knoten` noch `verfahren`
+   * noch `precondition` - also genau die drei Felder, die entscheiden, ob ein
+   * Eintrag in DIESEM Knoten ueberhaupt laufen soll.
+   *
+   * Die Folge war ein Dauerfehlalarm. Gemessen um 18:45 meldete dieser
+   * Pruefer neun fehlende Werkzeuge, waehrend der Kern in derselben Minute
+   * keines vermisste:
+   *
+   *   Pruefer: cdump, csolve, darkweb, sleevecrime, hashes, shop,
+   *            worker/weaken, boerse, hacknet
+   *   Kern   : registry-Zaehlwerk {gilt 16, running 14, absent 2}
+   *
+   * Und die Liste war in jeder Hinsicht falsch: `boerse.js` gilt nur in
+   * BitNode 8, `hashes.js` und `hacknet.js` brauchen Hacknet-Server,
+   * `sleevecrime.js` beendet sich planmaessig, sobald `sleeve.js` laeuft -
+   * `shop.js` LIEF sogar nachweislich (Kernlog 18:31:26), und
+   * `worker/weaken.js` ist ein Arbeiter, kein Werkzeug.
+   *
+   * Ein Alarm, der neunmal danebenliegt, wird ignoriert - und dann faellt der
+   * echte Ausfall mit ihm durch. Das ist derselbe Fehler, den `export.js`
+   * heute in `data/sofort.json` gemacht haette.
+   *
+   * Deshalb entscheidet jetzt `gilt()` aus `lib/reg.js` - dieselbe Funktion,
+   * die der Kern benutzt. Sie kann nicht auseinanderlaufen, weil es nur eine
+   * gibt. Die LAGE dafuer kommt so weit wie moeglich aus dem, was der Kern
+   * selbst weggeschrieben hat, statt sie ein zweites Mal herzuleiten.
+   */
   let soll = [];
+  let kernZaehlwerk = null;
+  let kpiNode = null;
+  // Was ICH mit Begruendung aus der Sollliste genommen habe. Der Kern
+  // zaehlt es weiterhin als "absent" - ohne diese Buchhaltung meldete die
+  // Gegenprobe unten jedes Mal einen Widerspruch, den es nicht gibt.
+  const ausgenommen = [];
   try {
     const reg = JSON.parse(
       fs.readFileSync(path.join(WURZEL, "src", "registry.json"), "utf8"));
-    soll = (reg.eintraege || [])
-      .filter((e) => e.name && e.restartPolicy !== "once"
-        && e.phase !== "kaltstart-einmal")
-      .map((e) => e.name);
+    const kpi = await liesJson("data/kpi.json");
+    kernZaehlwerk = kpi && kpi.registry ? kpi.registry : null;
+    kpiNode = kpi && Number.isFinite(kpi.node) ? kpi.node : null;
+
+    // Welche Dateien liegen auf home? `gilt()` braucht das fuer
+    // `precondition.requiresFile` und um "verschwunden" von "nie gebaut" zu
+    // trennen.
+    let aufHome = null;
+    try {
+      const namen = await rpc({ method: "getFileNames", server: "home" });
+      if (Array.isArray(namen)) aufHome = new Set(namen);
+    } catch { /* dann ohne Dateipruefung - siehe unten */ }
+
+    // home-Speicher fuer die Phase. Der Kern entscheidet mit
+    // `getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"`
+    // (bn4net.js:571-576).
+    const diag = await liesJson("data/startdiag.json");
+    const homeGb = diag && Number.isFinite(diag.maxHomeGb) ? diag.maxHomeGb : null;
+
+    const lage = {
+      node: kpi && Number.isFinite(kpi.node) ? kpi.node : 0,
+      verfahren: (kpi && kpi.verfahren) || "unbekannt",
+      phase: homeGb === null ? "normal" : (homeGb <= 64 ? "kaltstart" : "normal"),
+      dateiDa: aufHome ? ((d) => aufHome.has(d)) : undefined,
+    };
+    soll = auswahl(reg, lage)
+      .map((e) => e.name)
+      // ARBEITER SIND MIT DIESEM INSTRUMENT NICHT ZU SEHEN (04.09.2026).
+      //
+      // `worker/weaken.js` steht in der Registry und gilt in jedem Knoten -
+      // aber `src/ps.js` blendet die Arbeiter ausdruecklich aus (ps.js:7-17):
+      // "von denen laufen Zehntausende und sie sagen nichts aus". Die
+      // Prozessliste kann sie also gar nicht zeigen, und ein Vergleich gegen
+      // sie meldet sie zwangslaeufig als fehlend - jedes Mal, fuer immer.
+      //
+      // Ein Ausschluss ist nur gueltig, wenn das benutzte Werkzeug den
+      // ausgeschlossenen Fall ueberhaupt anzeigen koennte. Hier kann es das
+      // nicht, also gehoert der Eintrag nicht in diese Pruefung. Ob die
+      // Arbeiter laufen, sagt die Netzauslastung, nicht die Prozessliste.
+      .filter((n) => !n.startsWith("worker/"))
+      // WER ENDEN SOLL, FEHLT NICHT, WENN ER GEENDET HAT (04.09.2026).
+      //
+      // `shop.js` traegt `restartPolicy: "until-done"`: es kauft, was der Kern
+      // bestellt hat, und beendet sich. Gemessen am 04.09. lief es alle rund
+      // viereinhalb Minuten unter neuer PID (320998, 323733, 327398, 330999,
+      // 334591). Eine Momentaufnahme trifft es also meistens NICHT laufend -
+      // und meldete es prompt als Ausfall.
+      //
+      // Ob ein solches Gewerk seine Arbeit tut, sagt seine Telemetrie
+      // (`telemetryFile`, `freshnessMs`), nicht die Prozessliste.
+      .filter((n) => {
+        const e = (reg.eintraege || []).find((x) => x.name === n);
+        const behalten = !e
+          || (e.restartPolicy !== "until-done" && e.restartPolicy !== "once");
+        if (!behalten) ausgenommen.push(n);
+        return behalten;
+      });
+
+    if (!aufHome) {
+      werkzeugPruefungBlind = "die Dateiliste von home war nicht zu bekommen -"
+        + " ohne sie kann `gilt()` Vorbedingungen nicht pruefen";
+    }
   } catch (e) {
-    werkzeugPruefungBlind = "src/registry.json nicht lesbar (" + e.message + ")";
+    werkzeugPruefungBlind = "Sollliste nicht zu bilden (" + e.message + ")";
   }
 
   if (!soll.length && !werkzeugPruefungBlind) {
@@ -555,6 +660,65 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
     sag("WERKZEUG-PRUEFUNG BLIND: " + werkzeugPruefungBlind
       + " - sie kann einen stillen Ausfall gerade NICHT anzeigen.");
   }
+  /**
+   * GEGENPROBE GEGEN DEN KERN.
+   *
+   * Der Kern rechnet dasselbe mit derselben Funktion und schreibt das
+   * Ergebnis nach `data/kpi.json` (`registry.absent`). Weichen beide
+   * Zahlen ab, ist das ein Befund fuer sich: dann sieht dieser Pruefer die
+   * Lage anders als der Bot, und mindestens einer von beiden irrt.
+   *
+   * Genau das war am 04.09. um 18:45 der Fall - hier neun, im Kern keines.
+   */
+  if (kernZaehlwerk && Number.isFinite(kernZaehlwerk.absent) && !werkzeugPruefungBlind) {
+    // Blind heisst: dieser Pruefer hat gar nicht gezaehlt. Dann ist eine
+    // Abweichung kein Befund, sondern eine Selbstverstaendlichkeit - und eine
+    // Meldung darueber waere genau der Laerm, den diese Runde beseitigt.
+    const hier = (werkzeugFehlt ? werkzeugFehlt.split(", ").length : 0)
+      + ausgenommen.length;
+    if (hier !== kernZaehlwerk.absent) {
+      sag("ABWEICHUNG ZUM KERN: dieser Pruefer zaehlt " + hier
+        + " fehlende Werkzeuge (davon " + ausgenommen.length
+        + " mit Begruendung ausgenommen), der Kern " + kernZaehlwerk.absent
+        + " (data/kpi.json registry.absent). Einer von beiden irrt -"
+        + " der Kern entscheidet, dieser Pruefer meldet nur.");
+    }
+  }
+
+  /**
+   * DIE KNOTENMARKEN SIND EIN FILTER NEBEN `gilt()` (04.09.2026).
+   *
+   * `hacknet.js` und `hashes.js` gelten laut Registry ueberall - der Kern
+   * ueberspringt sie aber zusaetzlich, wenn `data/keine-hacknet.txt` die
+   * NUMMER DES LAUFENDEN KNOTENS enthaelt (bn4net.js:3348 und :3437). Diese
+   * Pruefung steht ausserhalb von `gilt()`, weshalb sogar das Zaehlwerk des
+   * Kerns sie als "absent" fuehrt, obwohl er sie mit Absicht nicht startet.
+   *
+   * In die Registry laesst sich das NICHT einfach als
+   * `precondition.forbidsFile` schreiben: `gilt()` prueft ueber `dateiDa`,
+   * und dessen Veraltungsregel (`markeVeraltet`) vergleicht ZEITSTEMPEL,
+   * waehrend in dieser Marke eine KNOTENNUMMER steht. Eine Marke aus Knoten
+   * 10 wuerde damit auch in Knoten 9 noch blocken - und dort ist hashes.js
+   * die einzige Geldquelle. Deshalb bleibt die Registry, wie sie ist, und
+   * dieser Pruefer erklaert den Fall, statt ihn zu melden.
+   */
+  if (werkzeugFehlt) {
+    const marke = await liesDatei("data/keine-hacknet.txt");
+    const knoten = kpiNode;
+    if (marke !== null && knoten !== null && String(marke).trim() === String(knoten)) {
+      const erklaert = ["hacknet.js", "hashes.js"];
+      const rest = werkzeugFehlt.split(", ").filter((d) => !erklaert.includes(d));
+      const weg = werkzeugFehlt.split(", ").filter((d) => erklaert.includes(d));
+      if (weg.length) {
+        ausgenommen.push(...weg);
+        sag("PLANMAESSIG AUS (" + weg.length + "): " + weg.join(", ")
+          + " - data/keine-hacknet.txt gilt fuer Knoten " + knoten
+          + ", es gibt hier keine Hacknet-Server. Kein Ausfall.");
+      }
+      werkzeugFehlt = rest.length ? rest.join(", ") : null;
+    }
+  }
+
   if (werkzeugFehlt) sag("WERKZEUG FEHLT: " + werkzeugFehlt
     + " - mit 'pushFile data/task.txt [\"<name>\"]' starten"
     + " (WERKZEUG in reload.txt killt nur, es startet nicht).");

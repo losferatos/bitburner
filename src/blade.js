@@ -41,6 +41,9 @@
  * @param {NS} ns
  */
 
+import { haengeAnHome } from "lib/hostdatei.js";
+
+
 // --- Die Figur-Wache (Position C.11) ---------------------------------------
 //
 // Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Ohne diesen
@@ -1420,6 +1423,33 @@ export async function main(ns) {
   const holeAusdauer = () => {
     try { return +ns.bladeburner.getStamina()[0].toFixed(3); } catch { return null; }
   };
+  /**
+   * Das Aktionsprotokoll. KEIN blosses Protokoll: `kostenAktualisieren`
+   * leitet daraus die Ausdauerkosten je Aktion ab, und die gehen in die
+   * Aktionswahl ein (`proLauf` weiter unten).
+   *
+   * =========================================================================
+   * WARUM DER DECKEL (04.09.2026, 19:20 - Skeptiker)
+   * =========================================================================
+   *
+   * Es gibt rund 576 Abschnittswechsel am Tag, und die Datei wuchs um etwa
+   * 115 KB je Tag. Sie liegt danach in JEDEM Autosave, jeder stuendlichen
+   * Sicherung und jedem 662-KB-Export - und zwar je einmal pro Rechner, auf
+   * dem blade.js jemals lief; aufgeraeumt wird sie nirgends.
+   *
+   * Gleichzeitig liest sie im Spiel NIEMAND ganz: `kostenAktualisieren`
+   * nimmt `slice(-300)`, `bbspann.js` liest rueckwaerts bis 20 Minuten.
+   * 900 Zeilen sind rund drei Tage und damit reichlich fuer beide.
+   *
+   * Die Langzeithistorie gehoert nicht in den Spielstand: sie liegt unter
+   * `archiv/aktionen-2026-09-04/` und laesst sich ueber die Bruecke jederzeit
+   * wegschreiben, ohne den Spielstand zu belasten.
+   */
+  const PROTOKOLL = "data/aktionen.txt";
+  const PROTOKOLL_MAX_ZEILEN = 900;
+  const haengeAnProtokoll = (zeile) =>
+    haengeAnHome(ns, PROTOKOLL, zeile, PROTOKOLL_MAX_ZEILEN);
+
   const schliesseAbschnitt = (jetztRang) => {
     if (!abschnitt) return;
     const dauer = Date.now() - abschnitt.von;
@@ -1431,10 +1461,7 @@ export async function main(ns) {
         ausdauerVon: abschnitt.ausdauer, ausdauerBis: holeAusdauer(),
       }) + String.fromCharCode(10);
       try {
-        ns.write("data/aktionen.txt", zeile, "a");
-        if (ns.getHostname() !== "home") {
-          ns.scp("data/aktionen.txt", "home", ns.getHostname());
-        }
+        haengeAnProtokoll(zeile);
       } catch (e) { /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
     }
     abschnitt = null;
@@ -1463,19 +1490,20 @@ export async function main(ns) {
     if (rest && rest.trim()) {
       const a = JSON.parse(rest);
       if (a.bis - a.von >= 10_000) {
-        ns.write("data/aktionen.txt", JSON.stringify({
+        // UEBER DENSELBEN WEG WIE DER ABSCHNITTSWECHSEL (04.09.2026).
+        //
+        // Hier stand dieselbe Anhaengen-und-schieben-Folge ein zweites Mal -
+        // und sie hat den Fix vom 04.09., 18:45 NICHT bekommen, weil nur die
+        // andere Stelle angefasst wurde. Ein Skeptiker hat es gefunden: auf
+        // einem Wirt ohne eigene Fassung haette dieser Zweig die Historie auf
+        // home durch eine einzige Zeile ersetzt, und zwar ausgerechnet beim
+        // WIEDERANLAUF - also genau dann, wenn blade.js gerade den Wirt
+        // gewechselt haben kann.
+        haengeAnProtokoll(JSON.stringify({
           von: a.von, bis: a.bis, aktion: a.aktion, grund: a.grund,
           rangVon: a.rang, rangBis: a.rangBis, ausdauerVon: a.ausdauer,
           ausdauerBis: null, abgebrochen: true,
-        }) + String.fromCharCode(10), "a");
-        // DIE NACHGETRAGENE ZEILE MUSS AUCH NACH HOME (29.08., 07:45).
-        // `schliesseAbschnitt` kopiert, dieser Zweig tat es nicht - laeuft
-        // blade.js nicht auf home, waere die nachgetragene Zeile genau dort
-        // gelandet, wo sie niemand liest. bn4net verteilt Werkzeuge sehr wohl
-        // auf andere Server (sleeve.js lief am 29.08. auf fulcrumtech).
-        if (ns.getHostname() !== "home") {
-          ns.scp("data/aktionen.txt", "home", ns.getHostname());
-        }
+        }) + String.fromCharCode(10));
       }
       ns.write(OFFEN, "", "w");
     }

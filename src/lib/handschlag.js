@@ -51,6 +51,9 @@
  * weil `bn4rep.js` bei SF4.1 ueber 800 GB wiegt und `punish.js` 83.
  */
 
+import { liesVonHome } from "lib/hostdatei.js";
+
+
 /** Wo die beiden Dateien liegen. Beide auf home, beide vom Kern geraeumt. */
 export const ANFRAGE = "data/backup-request.txt";
 export const ANTWORT = "data/backup-ok.txt";
@@ -107,11 +110,42 @@ export function antwortDa(ns, anfrageTs) {
  */
 export function sicherungsAlterMs(ns) {
   try {
-    const b = JSON.parse(ns.read("data/bridge.json"));
+    // ===================================================================
+    // ZWEI FEHLER, DIE SICH GEGENSEITIG VERDECKT HABEN (04.09.2026)
+    // ===================================================================
+    //
+    // (1) FALSCHES FELD. Hier stand `Date.parse(lv.zeit || lv.at)` - beide
+    //     Felder gibt es nicht. Die Bruecke schreibt
+    //     `{file, ts, ageMin, anlass}` mit `ts` als ISO-STRING
+    //     (sync/bridge.js, `ts: new Date().toISOString()`).
+    //     `Number.isFinite` auf einem String ist falsch, also lief es in
+    //     den Fallback, und der bekam `undefined`. `Date.parse(undefined)`
+    //     ist NaN.
+    //
+    // (2) FALSCHER ORT. `ns.read` liest vom EIGENEN Rechner, und
+    //     `data/bridge.json` liegt nur auf home. Die Nutzer dieser
+    //     Bibliothek - `bn4rep.js`, `ausgang.js`, `punish.js` - laufen
+    //     auf der Werkbank.
+    //
+    // Beide zusammen hiessen: diese Funktion gab IMMER null zurueck. Damit
+    // war `jung` in `handschlag()` immer falsch, und der Zweig "Bruecke
+    // antwortet nicht, aber die Sicherung ist jung - es wird gehandelt"
+    // war toter Code. Jede kurze Bruecken-Stoerung setzte stattdessen eine
+    // einstuendige Einbausperre, und ein Knotensprung wurde als "ohne
+    // Sicherung gesprungen" protokolliert, obwohl eine frische vorlag.
+    //
+    // Der zugehoerige Test konnte es nicht finden: `tools/test-punish.js`
+    // setzt `{ ts: WALL - 3600000 }` - eine ZAHL. Genau der eine Fall, in
+    // dem die alte Fassung richtig rechnete.
+    const b = JSON.parse(liesVonHome(ns, "data/bridge.json"));
     const lv = b && b.lastVerifiedBackup;
-    const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.zeit || lv.at));
+    const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.ts || lv.zeit || lv.at));
     if (!Number.isFinite(ts)) return null;
-    return Date.now() - ts;
+    const alter = Date.now() - ts;
+    // Ein Zeitstempel in der Zukunft ergibt ein negatives Alter - und damit
+    // ginge eine beliebig alte Sicherung als frisch durch. Hier haengt der
+    // Augmentierungs-Einbau daran; die sichere Seite ist "unbekannt".
+    return alter >= 0 ? alter : null;
   } catch {
     return null;
   }

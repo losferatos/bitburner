@@ -61,6 +61,7 @@
  */
 
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { liesVonHome } from "lib/hostdatei.js";
 
 /** Ab wann die Bruecke als saeumig gilt. */
 const BRUECKE_MAX_MS = 90 * 60000;
@@ -74,9 +75,41 @@ export async function main(ns) {
   ns.disableLog("ALL");
   const sag = (t) => ns.print(new Date().toLocaleTimeString() + "  " + t);
 
-  const lies = (datei) => {
-    try { return ns.read(datei) || ""; } catch { return ""; }
-  };
+  // EINE home-DATEI VON EINEM ANDEREN RECHNER LESEN (04.09.2026, 18:45).
+  //
+  // `ns.read` liest IMMER vom eigenen Rechner. Dieses Gewerk hat hostRule
+  // "any" und lief bei seinem ersten Start auf werk-0 - dort gibt es
+  // `data/bridge.json` nicht. `ns.read` gab "", `JSON.parse("")` warf, und
+  // der catch-Zweig schloss daraus "bridge.json fehlt oder ist unlesbar".
+  //
+  // Die Folge war genau die, die vermieden werden sollte: `saeumig` wurde
+  // wahr, obwohl die Bruecke tadellos sicherte, und um 18:31 stand die erste
+  // Falschmeldung in `data/sofort.json` - dem einzigen Kanal, ueber den Eric
+  // noch etwas erfaehrt, seit die Push-Nachrichten aus sind. Stuendlich
+  // wiederholt haette sie den Briefkasten (Deckel 20) in einem Tag
+  // leergeraeumt.
+  //
+  // Das ist NICHT derselbe Fehler wie der ISO-String weiter unten, sondern
+  // ein zweiter davor: der eine las das falsche Feld, dieser liest am
+  // falschen ORT. Beide muessen weg, sonst deckt einer den anderen zu.
+  //
+  // `ns.scp` kostet hier keinen zusaetzlichen Arbeitsspeicher - `nachHome`
+  // benutzt es schon.
+  /**
+   * Eine home-Datei lesen - ueber `lib/hostdatei.js`, nicht von Hand.
+   *
+   * Hier stand zuerst `ns.read(datei)` (liest LOKAL, und dieses Gewerk lief
+   * auf werk-0), dann eine eigene Fassung mit `ns.scp` in einem try/catch
+   * (`scp` wirft nicht, es gibt false zurueck - der catch war wirkungslos,
+   * und ohne `fileExists`-Waechter haette ein lokaler Altbestand still als
+   * aktueller Stand durchgehen koennen).
+   *
+   * `ausgang.js`, `figwatch.js`, `graftauto.js` und `punish.js` hatten die
+   * richtige Fassung die ganze Zeit. Sechs Kopien desselben Musters in drei
+   * Qualitaeten waren der eigentliche Fehler - jetzt gibt es eine.
+   */
+  const lies = (datei) => liesVonHome(ns, datei);
+
   const nachHome = (datei, inhalt) => {
     ns.write(datei, inhalt, "w");
     if (ns.getHostname() !== "home") {
@@ -111,15 +144,46 @@ export async function main(ns) {
       // `lv.ts` steht deshalb zuerst; die Zahlvariante bleibt fuer den Fall,
       // dass jemand spaeter einen Zeitstempel statt eines Strings schreibt.
       const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.ts || lv.zeit || lv.at));
-      if (Number.isFinite(ts)) alterMs = jetzt - ts;
-      else grund = "bridge.json ohne lastVerifiedBackup";
+
+      // KEIN HAENGENDES `else` MEHR (04.09.2026, 19:25).
+      //
+      // Um 19:10 wurde die Negativ-Alter-Wache ZWISCHEN das `if` und sein
+      // `else` gesetzt. Damit hat sie das `else` gekapert, und beide Zweige
+      // sagten das Gegenteil dessen, was sie sollten:
+      //
+      //   gesunder Fall   -> grund = "bridge.json ohne lastVerifiedBackup"
+      //   kaputter Fall   -> grund bleibt leer, und weiter unten rechnet
+      //                      `(null / 60000).toFixed(0)` die Zahl 0 aus:
+      //                      "letzte gruene Sicherung 0 min alt"
+      //
+      // Der zweite Fall ist der schlimmere: die Meldung behauptet eine
+      // taufrische Sicherung genau dann, wenn keine nachweisbar ist - und
+      // sie sieht nicht einmal kaputt aus, weil `null / 60000` nicht NaN
+      // ist, sondern 0. Gefunden hat es ein Skeptiker, keine Messung.
+      //
+      // Deshalb steht hier jetzt eine Kette ohne `else`: jeder Fall setzt
+      // seinen Grund selbst.
+      if (!Number.isFinite(ts)) {
+        grund = "bridge.json ohne lastVerifiedBackup";
+      } else if (jetzt - ts < 0) {
+        // Zeitstempel in der Zukunft. Ein negatives Alter wuerde jede
+        // Altersschwelle unterlaufen und eine beliebig alte Sicherung als
+        // frisch durchgehen lassen. Die sichere Seite ist "unbekannt".
+        grund = "lastVerifiedBackup liegt in der Zukunft";
+      } else {
+        alterMs = jetzt - ts;
+      }
     } catch {
       grund = "bridge.json fehlt oder ist unlesbar";
     }
 
     const saeumig = alterMs === null || alterMs > BRUECKE_MAX_MS;
     if (!grund && saeumig) {
-      grund = "letzte gruene Sicherung " + (alterMs / 60000).toFixed(0) + " min alt";
+      // `alterMs` ist hier zwangslaeufig eine Zahl - waere es null, haette
+      // der Block oben einen Grund gesetzt. Die Pruefung steht trotzdem da:
+      // genau diese stillschweigende Annahme hat oben "0 min alt" erzeugt.
+      grund = alterMs === null ? "Alter der Sicherung unbekannt"
+        : "letzte gruene Sicherung " + (alterMs / 60000).toFixed(0) + " min alt";
     }
 
     // Der eigene Abstand. Er steht in einer Datei und nicht in einer Variablen:

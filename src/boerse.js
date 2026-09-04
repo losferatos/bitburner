@@ -57,6 +57,10 @@
  * @param {NS} ns
  */
 
+import { liesVonHome, nachHome as schreibNachHome } from "lib/hostdatei.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+
+
 const TAKT_MS = 6000;      // ein Kursschritt dauert 6 s (msPerStockUpdate)
 
 /** Die Kommission je Transaktion (StockMarketConstants.StockMarketCommission). */
@@ -377,19 +381,38 @@ function alleVerkaufen(ns, symbole, sag) {
   return erloes;
 }
 
-/** Ein Ereignis in den Strom - er ueberlebt das Ueberschreiben der Telemetrie. */
-function ereignis(ns, nachHome, text) {
-  let strom = { version: 1, eintraege: [] };
-  try {
-    if (ns.fileExists("data/events.json", "home")) {
-      const g = JSON.parse(ns.read("data/events.json"));
-      if (g && Array.isArray(g.eintraege)) strom = g;
-    }
-  } catch { /* dann ein frischer Strom */ }
-  strom.eintraege.push({
-    art: "note", text: text.slice(0, 160),
-    wall: Date.now(), playtime: 0, motorTimeMs: 0, daten: null,
-  });
-  while (strom.eintraege.length > 400) strom.eintraege.shift();
-  nachHome("data/events.json", JSON.stringify(strom));
+/**
+ * Ein Ereignis in den Strom - er ueberlebt das Ueberschreiben der Telemetrie.
+ *
+ * ===========================================================================
+ * ZWEI FEHLER AUF EINMAL (04.09.2026, Skeptiker)
+ * ===========================================================================
+ *
+ * (1) DER STROM WURDE LOKAL GELESEN, ABER AUF home GEPRUEFT. Hier stand
+ *     `ns.fileExists("data/events.json", "home")` und direkt darunter
+ *     `ns.read("data/events.json")` - die Pruefung sah home-bewusst aus, das
+ *     Lesen war es nicht. `boerse.js` hat `hostRule: "werkbank"` und laeuft
+ *     per Konstruktion NIE auf home. Die Folge waere gewesen: beim Kauf der
+ *     4S-TIX-API haette `nachHome` den gesamten Ereignisstrom auf home durch
+ *     EINEN Eintrag ersetzt - `ns.scp` mischt nicht, es ersetzt.
+ *
+ *     `lib/events.js` nennt diese Datei die einzige Quelle fuer
+ *     `jump_latency_min`, `boot_latency_min` und `ladder_rungs_ge3_per_week`.
+ *     Alle drei sind ABSTAENDE zwischen Ereignissen und danach nicht mehr
+ *     berechenbar. Und es waere niemandem aufgefallen.
+ *
+ * (2) DER STROM WURDE VON HAND GEBAUT und mit `while (length > 400) shift()`
+ *     gestutzt. Damit fiel der Klassenschutz aus `lib/events.js` weg: ein
+ *     Knotenwechsel-Eintrag - laut dessen Kommentar "auch nach tausend Runden
+ *     noch die wichtigste Zeile der Datei" - konnte von 400 Boersennotizen
+ *     hinausgeschoben werden. `beschneiden()` haelt bleibende Eintraege
+ *     getrennt; diese Fassung kannte sie nicht.
+ *
+ * Beides ist jetzt geliehen statt nachgebaut: `lib/hostdatei.js` fuer den
+ * Ort, `lib/events.js` fuer die Form.
+ */
+function ereignis(ns, _nachHome, text) {
+  const strom = evLaden(liesVonHome(ns, "data/events.json"));
+  evAnhaengen(strom, "note", text, { wall: Date.now() });
+  schreibNachHome(ns, "data/events.json", JSON.stringify(strom));
 }

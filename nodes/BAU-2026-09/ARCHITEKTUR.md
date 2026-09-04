@@ -497,6 +497,11 @@ nicht in einen Kommentar.
       "evictRank": 99,
       "needsFigure": "owner",
       "needsLibs": [
+        "lib/calc.js",
+        "lib/events.js",
+        "lib/figur.js",
+        "lib/kpi.js",
+        "lib/motorzeit.js",
         "lib/reg.js"
       ],
       "singularity": false,
@@ -522,7 +527,12 @@ nicht in einen Kommentar.
       "priority": 2,
       "evictRank": 99,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/events.js",
+        "lib/leiter.js",
+        "lib/reg.js",
+        "lib/uhren.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -571,7 +581,9 @@ nicht in einen Kommentar.
       "priority": 4,
       "evictRank": 9,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/loeser.js"
+      ],
       "singularity": false,
       "restartPolicy": "until-done",
       "maxInstances": 1,
@@ -726,9 +738,13 @@ nicht in einen Kommentar.
       "priority": 8,
       "evictRank": 3,
       "needsFigure": "none",
-      "needsLibs": ["lib/route.js",
-       "lib/eta.js",
-       "lib/events.js", "lib/handschlag.js"],
+      "needsLibs": [
+        "lib/eta.js",
+        "lib/events.js",
+        "lib/handschlag.js",
+        "lib/hostdatei.js",
+        "lib/route.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -753,8 +769,9 @@ nicht in einen Kommentar.
       "evictRank": 20,
       "needsFigure": "request",
       "needsLibs": [
-       "lib/figurns.js",
-       "lib/figur.js"
+        "lib/figur.js",
+        "lib/figurns.js",
+        "lib/hostdatei.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -807,7 +824,10 @@ nicht in einen Kommentar.
       "priority": 9,
       "evictRank": 15,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/events.js",
+        "lib/hostdatei.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -1025,7 +1045,7 @@ nicht in einen Kommentar.
     {
       "name": "export.js",
       "args": [],
-      "ramBaseGb": 2.25,
+      "ramBaseGb": 2.35,
       "ramSingGb": 1.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",
@@ -1039,7 +1059,10 @@ nicht in einen Kommentar.
       "priority": 15,
       "evictRank": 3,
       "needsFigure": "none",
-      "needsLibs": ["lib/events.js"],
+      "needsLibs": [
+        "lib/events.js",
+        "lib/hostdatei.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -1087,9 +1110,14 @@ nicht in einen Kommentar.
       "priority": 14,
       "evictRank": 14,
       "needsFigure": "owner",
-      "needsLibs": ["lib/endspurt.js",
-       "lib/figurns.js",
-       "lib/figur.js", "lib/handschlag.js"],
+      "needsLibs": [
+        "lib/endspurt.js",
+        "lib/figur.js",
+        "lib/figurns.js",
+        "lib/hackaugs.js",
+        "lib/handschlag.js",
+        "lib/hostdatei.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,

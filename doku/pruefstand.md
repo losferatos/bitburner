@@ -81,11 +81,40 @@ im Mock kommt aus `mulberry32(seed)`, derselben Funktion wie im
 Vertragsgenerator. Ein Test, der einmal grün und einmal rot ist, weil sich eine
 Zufallszahl geändert hat, ist kein Test.
 
-**Was der Mock nicht kann:** den Bladeburner-Namensraum. `blade.js` ruft dort
-20 Funktionen, der Mock kennt eine (`getBonusTime`). Das ist eine Entscheidung,
-keine Nachlässigkeit — ein Mock, der eine Schnittstelle vollständig nachbaut
-statt der benutzten Teilmenge, wird ein zweites Spiel mit eigenen Fehlern. Die
-Folge steht trotzdem in der Messlückenliste: `blade.js` hat keine Ebene-2-Probe.
+### Die Division
+
+Seit dem 04.09.2026 kennt der Mock auch den Bladeburner-Namensraum — die 31
+Funktionen, die `blade.js`, `bbtrain.js` und `sleeve.js` wirklich rufen. Damit
+hat das **Trägergewerk für 30 der 40 Läufe** endlich eine Ebene-2-Probe
+(`tools/test-blade-ebene2.js`).
+
+**Der Mock rechnet dabei keine Spielmechanik.** Er leitet keine Erfolgschance
+aus Kampfwerten ab; er gibt zurück, was der Test hineinschreibt. Geprüft wird
+die **Entscheidung** — ruht es bei leerer Ausdauer, räumt es Chaos auf, lässt es
+eine Black Op mit 5 % Chance liegen —, nicht die Formel. Die hat ihren eigenen,
+gegen den Quelltext geeichten Test (`test-formeln.js`). Eine nachgebaute
+Spielformel im Prüfstand wäre eine zweite Wahrheit, die auseinanderläuft.
+
+Der Test hat beim Bau **zwei eigene Fehlannahmen widerlegt**, und beide Male
+hatte der Code recht:
+
+- Bei hohem Chaos fährt der Motor **Stealth Retirement**, nicht Diplomacy —
+  beide senken das Chaos prozentual, aber nur eines gibt dabei Rang (gemessen
+  im Spiel: +45 % Rang/min). Diplomacy kommt erst, wenn die Bevölkerung unter
+  0,8 Mrd fällt und Raid damit unter seine Schwelle rutscht.
+- Der Beitritt bei 4 × 100 liegt in **`bbtrain.js`**, nicht in `blade.js`.
+  `blade.js` fährt den Motor danach.
+
+Zwei Stolpersteine beim Aufbau, beide lehrreich:
+
+- **Ohne `data/bn4net.json` gilt jede Figurvergabe als „aus einem anderen
+  Lauf".** `lib/figurns.js` liest den Knotenstempel dort (nicht aus
+  `ns.getResetInfo` — das kostet 1 GB). Fehlt die Datei, ist der Stempel 0,
+  und das Gewerk wartet ewig auf die Figur. Ein Test ohne sie misst die
+  Figurwache statt der Aktionswahl.
+- **Ohne `data/figure.txt` startet `blade.js` gar nichts.** Es fragt vor jedem
+  `startAction` den Vergabepunkt, weil eine Bladeburner-Aktion jede laufende
+  Arbeit der Figur beendet — auch einen Graft für 14,63 Mrd.
 
 ## Der Modul-Lader
 

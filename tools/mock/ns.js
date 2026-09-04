@@ -191,6 +191,42 @@ export function neuerMock(o = {}) {
     seed: Number.isFinite(o.seed) ? o.seed : 1,
     /** Rueckstand der Division in Millisekunden - siehe getBonusTime. */
     bonusMs: Number.isFinite(o.bonusMs) ? o.bonusMs : 0,
+    /**
+     * DIE DIVISION (04.09.2026).
+     *
+     * `blade.js` ist das Traegergewerk fuer 30 der 40 Laeufe und hatte keine
+     * Ebene-2-Probe - der Namensraum warf schlicht "nicht gebaut". Das war die
+     * groesste verbliebene Luecke des Pruefstands.
+     *
+     * Nachgebaut sind die 31 Funktionen, die `blade.js`, `bbtrain.js` und
+     * `sleeve.js` wirklich rufen. Bewusst nicht mehr: ein Mock, der eine
+     * Schnittstelle vollstaendig nachbaut statt der benutzten Teilmenge, wird
+     * ein zweites Spiel mit eigenen Fehlern.
+     *
+     * Die Zahlen sind FREI WAEHLBAR und haben keine Spielmechanik dahinter -
+     * der Mock rechnet keine Erfolgschancen aus Kampfwerten. Das ist Absicht:
+     * geprueft wird die ENTSCHEIDUNG von blade.js (welche Aktion bei welcher
+     * Lage), nicht die Formel des Spiels. Die Formeln haben ihren eigenen
+     * Test, `tools/test-formeln.js`, gegen den Quelltext geeicht.
+     */
+    blade: {
+      drin: o.blade ? o.blade.drin !== false : false,
+      rang: (o.blade && Number.isFinite(o.blade.rang)) ? o.blade.rang : 0,
+      punkte: (o.blade && Number.isFinite(o.blade.punkte)) ? o.blade.punkte : 0,
+      ausdauer: (o.blade && o.blade.ausdauer) ? o.blade.ausdauer : [100, 100],
+      stadt: (o.blade && o.blade.stadt) || "Sector-12",
+      truppe: (o.blade && Number.isFinite(o.blade.truppe)) ? o.blade.truppe : 0,
+      aktion: (o.blade && o.blade.aktion) || null,
+      // Je Stadt: chaos, comms, pop.
+      staedte: (o.blade && o.blade.staedte) || {},
+      // Je "Typ/Name": vorrat, stufe, maxStufe, chance, dauer.
+      aktionen: (o.blade && o.blade.aktionen) || {},
+      fertigkeiten: (o.blade && o.blade.fertigkeiten) || {},
+      blackOps: (o.blade && o.blade.blackOps) || [],
+      gestartet: [],      // was blade.js gestartet hat - fuer Zusicherungen
+      gekauft: [],        // welche Fertigkeiten es hochgezogen hat
+      gereist: [],        // wohin es gereist ist
+    },
     spieler: {
       totalPlaytime: Number.isFinite(o.playtime) ? o.playtime : 100 * 3600000,
       skills: { hacking: 100, strength: 100, defense: 100, dexterity: 100, agility: 100 },
@@ -208,6 +244,9 @@ export function neuerMock(o = {}) {
    * den Test unreproduzierbar, und ein Fehler, der nur bei einem bestimmten
    * Wurf auftritt, laesst sich dann nicht nachstellen.
    */
+  /** Ein Aktionseintrag, immer ein Objekt - nie undefined. */
+  const aktion = (typ, name) => zustand.blade.aktionen[typ + "/" + name] || {};
+
   let saat = zustand.seed >>> 0;
   const zufall = () => {
     saat = (saat + 0x6D2B79F5) >>> 0;
@@ -581,6 +620,19 @@ export function neuerMock(o = {}) {
       // ausser bn4rep braucht - und ohne sie liesse sich nicht pruefen, ob ein
       // Graft laeuft. Der Test setzt sie ueber `o.arbeit`.
       getCurrentWork: () => zustand.arbeit || null,
+      /**
+       * Beendet die laufende Arbeit der Figur. `bbtrain.js` ruft es vor dem
+       * Beitritt, um die Gym-Arbeit zu beenden - und tut das ausdruecklich
+       * NICHT, wenn gerade gegraftet wird (`Singularity.ts:562`:
+       * `stopAction` ist `finishWork(true)` und wuerde den Graft toeten).
+       */
+      stopAction: () => { zustand.arbeit = null; zustand.gestoppt = true; return true; },
+      /** Die Gym-Arbeit selbst - der Mock merkt sich nur, was gewaehlt wurde. */
+      gymWorkout: (ort, stat) => {
+        zustand.arbeit = { type: "CLASS", classType: stat, location: ort };
+        return true;
+      },
+      travelToCity: (stadt) => { zustand.stadt = stadt; return true; },
     }, {
       get: (ziel, n) => (n in ziel
         ? ziel[n]
@@ -639,6 +691,101 @@ export function neuerMock(o = {}) {
        * im Nachholschub sind das 8 Prozent.
        */
       getBonusTime: () => zustand.bonusMs,
+
+      // --- Mitgliedschaft ---------------------------------------------------
+      inBladeburner: () => zustand.blade.drin,
+      joinBladeburnerDivision: () => {
+        // Das Spiel verlangt 100 in allen vier Kampfwerten
+        // (`Bladeburner.ts:1613-1620`). Der Mock prueft dieselbe Schwelle -
+        // sonst koennte ein Test einen Beitritt zeigen, den es nicht gibt.
+        const k = zustand.spieler.skills;
+        if (Math.min(k.strength, k.defense, k.dexterity, k.agility) < 100) return false;
+        zustand.blade.drin = true;
+        return true;
+      },
+
+      // --- Zustand ----------------------------------------------------------
+      getRank: () => zustand.blade.rang,
+      getSkillPoints: () => zustand.blade.punkte,
+      getStamina: () => [...zustand.blade.ausdauer],
+      getCity: () => zustand.blade.stadt,
+      getTeamSize: () => zustand.blade.truppe,
+      setTeamSize: (typ, name, n) => { zustand.blade.truppe = n; return n; },
+      switchCity: (stadt) => {
+        zustand.blade.stadt = stadt;
+        zustand.blade.gereist.push(stadt);
+        return true;
+      },
+      nextUpdate: async () => { await ns.sleep(200); return 200; },
+
+      // --- Staedte ----------------------------------------------------------
+      getCityChaos: (stadt) => (zustand.blade.staedte[stadt] || {}).chaos ?? 0,
+      getCityCommunities: (stadt) => (zustand.blade.staedte[stadt] || {}).comms ?? 0,
+      getCityEstimatedPopulation: (stadt) => (zustand.blade.staedte[stadt] || {}).pop ?? 1e9,
+
+      // --- Aktionen ---------------------------------------------------------
+      getContractNames: () => ["Tracking", "Bounty Hunter", "Retirement"],
+      getOperationNames: () => ["Investigation", "Undercover Operation",
+        "Sting Operation", "Raid", "Stealth Retirement Operation", "Assassination"],
+      getBlackOpNames: () => zustand.blade.blackOps.map((b) => b.name),
+      getBlackOpRank: (name) => {
+        const b = zustand.blade.blackOps.find((x) => x.name === name);
+        return b ? b.rank : Infinity;
+      },
+      getNextBlackOp: () => {
+        const b = zustand.blade.blackOps.find((x) => !x.erledigt);
+        return b ? { name: b.name, rank: b.rank } : null;
+      },
+      getCurrentAction: () => (zustand.blade.aktion
+        ? { type: zustand.blade.aktion.type, name: zustand.blade.aktion.name }
+        : null),
+      startAction: (typ, name) => {
+        zustand.blade.aktion = { type: typ, name };
+        zustand.blade.gestartet.push({ typ, name, wall: zustand.wall });
+        return true;
+      },
+      stopBladeburnerAction: () => { zustand.blade.aktion = null; },
+
+      getActionCountRemaining: (typ, name) => aktion(typ, name).vorrat ?? 0,
+      getActionCurrentLevel: (typ, name) => aktion(typ, name).stufe ?? 1,
+      getActionMaxLevel: (typ, name) => aktion(typ, name).maxStufe ?? 15,
+      getActionTime: (typ, name) => aktion(typ, name).dauer ?? 30000,
+      getActionCurrentTime: () => zustand.blade.aktionZeitMs ?? 0,
+      /**
+       * Das Spiel liefert hier fuer Black Ops einen BEREICH, dessen eine
+       * Grenze mit `pop/popEst` verzerrt ist (`Actions/Action.ts:144-167`);
+       * welche die wahre ist, laesst sich von aussen nicht sagen. Der Mock
+       * gibt deshalb ebenfalls ein Paar zurueck - ein Gewerk, das die Spanne
+       * ignoriert, faellt damit auf.
+       */
+      getActionEstimatedSuccessChance: (typ, name) => {
+        const a = aktion(typ, name);
+        const c = a.chance ?? 0.5;
+        const spanne = a.spanne ?? 0;
+        return [Math.max(0, c - spanne), Math.min(1, c + spanne)];
+      },
+
+      // --- Fertigkeiten -----------------------------------------------------
+      getSkillNames: () => ["Blade's Intuition", "Cloak", "Short-Circuit",
+        "Digital Observer", "Tracer", "Overclock", "Reaper", "Evasive System",
+        "Datamancer", "Cyber's Edge", "Hands of Midas", "Hyperdrive"],
+      getSkillLevel: (name) => zustand.blade.fertigkeiten[name] ?? 0,
+      getSkillUpgradeCost: (name, n = 1) => {
+        // Die echte Formel steht in `Skill.ts:70-75` und ist in
+        // `tools/lib/formeln.js` nachgebaut und geeicht. Hier genuegt ein
+        // monotoner Preis - geprueft wird, WELCHE Fertigkeit blade.js kauft,
+        // nicht was sie kostet.
+        const stufe = zustand.blade.fertigkeiten[name] ?? 0;
+        return Math.round(n * (stufe + 1) * 3);
+      },
+      upgradeSkill: (name, n = 1) => {
+        const kosten = n * ((zustand.blade.fertigkeiten[name] ?? 0) + 1) * 3;
+        if (zustand.blade.punkte < kosten) return false;
+        zustand.blade.punkte -= kosten;
+        zustand.blade.fertigkeiten[name] = (zustand.blade.fertigkeiten[name] ?? 0) + n;
+        zustand.blade.gekauft.push({ name, n });
+        return true;
+      },
     }, {
       get: (ziel, n) => (n in ziel
         ? ziel[n]

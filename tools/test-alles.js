@@ -143,6 +143,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-blade-ebene2.js",
+    deckt: "EBENE 2: das Traegergewerk fuer 30 der 40 Laeufe - Ausdauer, Chaos, Black-Op-Schwelle, Fertigkeiten, und das Tor 4 x 100 in bbtrain.js",
+    schnell: false,
+  },
+  {
     datei: "test-sleeve-ebene2.js",
     deckt: "EBENE 2: der Geldboden der Koerper gegen den Nachholrueckstand (storedCycles) - und der Mock, der ihn nachbildet",
     schnell: false,
@@ -245,15 +250,13 @@ const MESSLUECKEN = [
     + "wenn getNextBlackOp() etwas liefert (erste Operation bei 2.500 Rang, "
     + "gemessen 596), und bis dahin steht sie zu Recht auf null. Bis der Rang "
     + "reicht, ist die Zahl gebaut, aber nicht belegt.",
-  "DER MOCK KENNT DIE KOERPER, ABER NICHT DIE DIVISION. storedCycles und der "
-    + "Seed stehen seit dem 04.09.2026 drin (Auftrag 6.1), und "
-    + "test-sleeve-ebene2.js faehrt den Geldboden gegen einen echten "
-    + "Rueckstand. OFFEN bleibt der Bladeburner-Namensraum: blade.js ruft 20 "
-    + "Funktionen, von denen der Mock eine kann (getBonusTime). Ein Mock, der "
-    + "eine Schnittstelle vollstaendig nachbaut statt der benutzten "
-    + "Teilmenge, wird ein zweites Spiel mit eigenen Fehlern - deshalb ist "
-    + "das eine Entscheidung und keine Nachlaessigkeit, aber blade.js hat "
-    + "damit keine Ebene-2-Probe.",
+  "DER MOCK RECHNET KEINE SPIELMECHANIK. Er kennt seit dem 04.09.2026 die "
+    + "Koerper (storedCycles), den Seed und die Division (31 Funktionen) - "
+    + "aber er leitet keine Erfolgschance aus Kampfwerten ab, er gibt "
+    + "zurueck, was der Test hineinschreibt. Geprueft ist damit die "
+    + "ENTSCHEIDUNG der Gewerke, nicht die Formel des Spiels; die hat ihren "
+    + "eigenen, gegen den Quelltext geeichten Test. Was daraus folgt: ein "
+    + "Fehler in einer Formel faellt hier NICHT auf.",
 ];
 
 /**

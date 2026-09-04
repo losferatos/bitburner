@@ -93,7 +93,16 @@ console.log("-- ohne Plan tut es gar nichts --");
   const m = neuerMock({});
   const zurueck = m.uhrStellen();
   try { await modul.main(m.ns); } finally { zurueck(); }
-  pruefe("es beendet sich sofort", true);
+  // `pruefe(..., true)` STAND HIER UND KONNTE NICHT ROT WERDEN (Skeptiker
+  // Runde 4, R28). Haenge `main()`, wuerde der Test haengen statt zu
+  // scheitern - die Probe erhoehte nur den Gruen-Zaehler.
+  //
+  // Was sich wirklich pruefen laesst: das Gewerk hat NICHT geschlafen. Ein
+  // Einmallaeufer ohne Plan muss zurueckkehren, nicht in seine Rundenschleife
+  // gehen.
+  pruefe("es beendet sich sofort, ohne eine Runde zu schlafen",
+    m.zustand.schlafZeiten.length === 0,
+    m.zustand.schlafZeiten.length + " Schlafaufruf(e) - ohne Plan gibt es nichts zu warten");
   pruefe("kein graft.js gestartet", m.zustand.gestartet.length === 0);
   const t = JSON.parse(m.lies("home", "data/graftauto.json") || "{}");
   pruefe("und meldet den Grund", t.blockedReason === "kein Plan", t.blockedReason);

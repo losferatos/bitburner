@@ -74,8 +74,15 @@ console.log("-- die Leiter erreicht Sprosse 5 ueberhaupt --");
 {
   const s5 = L.SPROSSEN.find((s) => s.nr === 5);
   pruefe("Sprosse 5 gilt als gebaut", s5 && s5.gebaut === true);
-  pruefe("S2 findet sie", L.sprosseFuer("S2") && L.sprosseFuer("S2").nr === 5,
-    "S2 war das einzige Signal ohne Sprosse");
+  // S2 steigt seit R10 bei der BILLIGEN Sprosse 4b ein (Traegergewerk neu
+  // starten). Sprosse 5 ist die naechste danach - der Soft-Reset ist das
+  // letzte Mittel, nicht das erste.
+  pruefe("S2 steigt bei 4b ein, nicht beim Soft-Reset",
+    L.sprosseFuer("S2") && L.sprosseFuer("S2").nr === 4.5,
+    "erhalten " + (L.sprosseFuer("S2") || {}).nr);
+  const nachVierB = L.SPROSSEN.find((x) => x.nr > 4.5 && x.gebaut);
+  pruefe("und Sprosse 5 kommt danach", nachVierB && nachVierB.nr === 5,
+    "erhalten " + (nachVierB && nachVierB.nr));
   pruefe("sie laeuft in Motorzeit", s5.uhr === "motor",
     "Auftrag 5.3: S2 misst Spielfortschritt");
   pruefe("und hat keinen 6h-Deckel, sondern die Deckel in punish.js",

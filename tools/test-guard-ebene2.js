@@ -192,8 +192,11 @@ console.log("-- scharf ist nicht gleich scharf (R12) --");
   pruefe("es gibt drei Modi", /enforce-alles/.test(q),
     "enforce, enforce-alles, observe");
   pruefe("bei 'enforce' sind nur die billigen Sprossen frei",
-    /SCHARFE_SPROSSEN = scharfAlles \? \[0, 1, 2, 3, 4, 5\] : \[0, 1, 2\]/.test(q),
-    "Sprosse 3 raeumt home leer, Sprosse 5 ist ein Soft-Reset");
+    /\[0, 1, 2, 4\.5\]/.test(q),
+    "frei sind 0, 1, 2 und 4b - alle umkehrbar. Sprosse 3 raeumt home leer,"
+    + " Sprosse 5 ist ein Soft-Reset");
+  pruefe("und bei 'enforce-alles' auch die teuren",
+    /\[0, 1, 2, 3, 4, 4\.5, 5\]/.test(q));
   pruefe("und die Ausfuehrung fragt die Tabelle",
     /SCHARFE_SPROSSEN\.includes\(r\.sprosse\.nr\)/.test(q),
     "sonst waere die Tabelle Zierde");

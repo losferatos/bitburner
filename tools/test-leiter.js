@@ -328,9 +328,18 @@ console.log("-- Sprosse 4a ist NICHT gebaut, Sprosse 5 schon --");
     "S2 misst Spielfortschritt - Auftrag 5.3 woertlich");
   pruefe("sprosseFuer liefert keine ungebaute Sprosse",
     L.sprosseFuer("S3b") === null, "S3b fuehrt zu 4a, und die gibt es noch nicht");
+  // S2 steigt bei der BILLIGEN Sprosse ein, nicht beim Soft-Reset
+  // (Skeptiker Runde 4, R10). Zwischen "der Traeger steht seit sechs Stunden"
+  // und "alles wegwerfen" lag vorher keine Stufe.
   pruefe("aber S2 findet jetzt seine Sprosse",
-    L.sprosseFuer("S2") !== null && L.sprosseFuer("S2").nr === 5,
-    "S2 war das einzige Signal ohne gebaute Sprosse");
+    L.sprosseFuer("S2") !== null && L.sprosseFuer("S2").nr === 4.5,
+    "S2 war das einzige Signal ohne gebaute Sprosse - und die erste Antwort"
+    + " darauf ist das Traegergewerk, nicht der Einbau");
+  const s45 = L.SPROSSEN.find((x) => x.nr === 4.5);
+  pruefe("und sie ist billig: 45 min Karenz statt sechs Stunden",
+    s45 && s45.karenzMs === 45 * 60000, String(s45 && s45.karenzMs));
+  pruefe("mit Deckel, damit daraus keine Dauerstrafe wird",
+    s45 && s45.deckelJe6h === 3, String(s45 && s45.deckelJe6h));
 }
 
 console.log("");
@@ -344,29 +353,37 @@ console.log("-- die Eskalation folgt dem AUSLOESER, nicht der Nummer (R3) --");
     alterMotorMs: 7 * 3600000, grund: "Traeger steht" };
   const uhren = (m) => ({ guard: m, engine: m, motor: m });
 
-  // S2 steigt bei Sprosse 5 ein (sprosseFuer), nicht bei 1.
+  // S2 steigt bei der billigen Sprosse 4b ein, nicht bei 1 und nicht bei 5.
   const ein = L.sprosseFuer("S2");
-  pruefe("S2 steigt bei Sprosse 5 ein", ein && ein.nr === 5,
+  pruefe("S2 steigt bei Sprosse 4b ein", ein && ein.nr === 4.5,
     "erhalten " + (ein && ein.nr));
 
   L.schritt(z, sig, 0, W0, uhren(0));                       // -> SUSPECT
-  const zuFrueh = L.schritt(z, sig, 3600000, W0, uhren(3600000));
-  pruefe("eine Stunde Motorzeit reicht nicht", zuFrueh.handlung === "wartet",
-    zuFrueh.handlung + " - die Karenz betraegt sechs Stunden MOTORZEIT");
+  const zuFrueh = L.schritt(z, sig, 600000, W0, uhren(600000));
+  pruefe("zehn Minuten Motorzeit reichen nicht", zuFrueh.handlung === "wartet",
+    zuFrueh.handlung + " - die Karenz von 4b betraegt 45 min MOTORZEIT");
 
-  // DIE UHR IST DER PUNKT (R15). Sechs Stunden Wanduhr bei stehender
-  // Motorzeit duerfen NICHT reichen: eine Offline-Nacht ist kein Stillstand.
-  const nurWanduhr = L.schritt(z, sig, 7 * 3600000, W0 + 7 * 3600000,
-    { guard: 7 * 3600000, engine: 0, motor: 0 });
-  pruefe("sechs Stunden Waechterzeit bei stehender Motorzeit reichen NICHT",
+  // DIE UHR IST DER PUNKT (R15). Waechterzeit bei stehender Motorzeit darf
+  // NICHT reichen: eine Offline-Nacht ist kein Stillstand.
+  const nurWanduhr = L.schritt(z, sig, 3 * 3600000, W0 + 3 * 3600000,
+    { guard: 3 * 3600000, engine: 0, motor: 0 });
+  pruefe("Waechterzeit bei stehender Motorzeit reicht NICHT",
     nurWanduhr.handlung === "wartet",
-    nurWanduhr.handlung + " - sonst loeste eine Offline-Nacht den Einbau aus");
+    nurWanduhr.handlung + " - sonst loeste eine Offline-Nacht die Leiter aus");
 
-  const jetzt = L.schritt(z, sig, 7 * 3600000, W0, uhren(7 * 3600000));
-  pruefe("sieben Stunden Motorzeit loesen aus", jetzt.handlung === "ausfuehren",
+  const jetzt = L.schritt(z, sig, 3 * 3600000, W0, uhren(3 * 3600000));
+  pruefe("eine Stunde Motorzeit loest 4b aus", jetzt.handlung === "ausfuehren",
     jetzt.handlung + ": " + jetzt.grund);
-  pruefe("und zwar Sprosse 5", jetzt.sprosse && jetzt.sprosse.nr === 5,
+  pruefe("und zwar Sprosse 4b, nicht der Soft-Reset",
+    jetzt.sprosse && jetzt.sprosse.nr === 4.5,
     "erhalten " + (jetzt.sprosse && jetzt.sprosse.nr));
+
+  // Und ERST wenn 4b nichts gebracht hat, kommt der Einbau. Das ist der Punkt
+  // der ganzen Aenderung: der Soft-Reset ist das letzte Mittel, nicht das
+  // erste.
+  const danach = L.verifiziert(z, "fortschritt", false, 4 * 3600000);
+  pruefe("erst nach einer wirkungslosen 4b kommt Sprosse 5",
+    danach.sprosse === 5, "erhalten " + danach.sprosse);
 }
 
 console.log("");

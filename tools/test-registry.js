@@ -225,8 +225,16 @@ console.log("-- Knoten- und Phasenfilter --");
       dateiDa: (d) => d !== "data/cantwort.json" }).gilt);
   pruefe("cdump.js laeuft NICHT im Normalbetrieb",
     !REG.gilt(cdump, { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true }).gilt);
+  // Hier stand `if (hashes) pruefe(..., true)` - eine Probe, die bei falsy
+  // ganz entfiel und sonst nicht rot werden konnte (Skeptiker Runde 4, R28).
+  // Geprueft wird jetzt die Aussage, um die es geht: hashes.js ist ein
+  // Hacknet-Gewerk und darf auf einem Hacknet-Server nicht laufen.
+  pruefe("hashes.js steht in der Registry", !!hashes,
+    "ohne den Eintrag laeuft der Hacknet-Zweig gar nicht");
   if (hashes) {
-    pruefe("hashes.js ist bekannt", true);
+    pruefe("und gehoert nicht auf einen Hacknet-Server",
+      hashes.hostRule === "not-hacknet",
+      "hostRule ist " + hashes.hostRule);
   }
   const blade = registry.eintraege.find((e) => e.name === "blade.js");
   pruefe("blade.js laeuft nicht im Kaltstart",

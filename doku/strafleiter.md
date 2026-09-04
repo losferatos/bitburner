@@ -44,10 +44,17 @@ Das ist die Stelle, an der in diesem Projekt am häufigsten etwas schiefging.
 - **Motorzeit** — die Summe der plausiblen Rundenabstände des Kerns. Sie steht
   still, sobald der Kern hängt.
 
-**Keine Wächterfrist läuft in Motorzeit** (außer der von Sprosse 5, siehe
-unten). Der Grund ist einfach: sobald der Kern hängt, steht seine Motorzeit —
-und jede in ihr gemessene Frist liefe genau in dem Fall nie ab, für den sie
-gebaut wurde.
+**Welche Uhr eine Frist benutzt, sagt die Sprosse selbst** (`SPROSSEN[].uhr`).
+Für die Sprossen 0 bis 3 ist es die Wächterzeit, und der Grund ist einfach:
+sobald der Kern hängt, steht seine Motorzeit — jede in ihr gemessene Frist
+liefe genau in dem Fall nie ab, für den sie gebaut wurde.
+
+Die Sprossen **4b und 5** messen dagegen in **Motorzeit**, weil ihre Bedingung
+(„der Träger wächst nicht") eine Aussage über gespielte Zeit ist: sechs Stunden
+Wanduhr, von denen fünf offline waren, sind kein Stillstand.
+
+Bis zum 04.09.2026 las dieses Feld niemand — `schritt()` maß alles in
+Wächterzeit, und Sprosse 5 löste damit nach einer Offline-Nacht aus.
 
 S1 fragt die Uhren in dieser Reihenfolge: Motorzeit, wenn das Werkzeug sie
 wirklich führt; sonst Enginezeit aus dem Herzschlag v2; sonst Wanduhr — und
@@ -62,6 +69,7 @@ die **nur bei sichtbarem Tab**.
 | 2 | Wirt sperren (`data/blocked-hosts.json`, 60 min) | Wächter | 6 je 6 h | Werkzeug läuft woanders |
 | 3 | alles auf home beenden außer Schonliste, `boot.js` starten | Wächter | 2 je 6 h | `round` wächst UND `errStreak == 0` |
 | 4a | Reload von innen | Engine | 1 je 6 h | **nicht gebaut** |
+| 4b | Trägergewerk neu starten (`blade.js`) | Motor | 3 je 6 h | der Träger wächst wieder |
 | 5 | Soft-Reset durch Augmentierungs-Einbau | Motor | eigene | `lastAugReset` gesprungen, Konto > 0 |
 
 **Sprosse 4a ist nicht gebaut und wird es nicht ohne Messung.** Der Auftrag
@@ -72,6 +80,18 @@ belegt, was sich ohne Browser belegen lässt — der `save`-Prop existiert
 `window.onbeforeunload = ...` (`index.tsx:55`), ist also mit `= null` aufhebbar.
 Was fehlt, ist die Messung, nicht die Kenntnis. Die Leiter **überspringt** die
 Sprosse (`naechste` sucht die nächste **gebaute**), sie bleibt nicht daran hängen.
+
+**Sprosse 4b ist die billige Antwort auf S2** (seit 04.09.2026). Vorher lag
+zwischen „der Träger wächst seit sechs Stunden nicht" und dem Soft-Reset keine
+einzige Stufe — dabei ist der naheliegende Verdacht viel billiger: das Gewerk,
+das den Knoten trägt, hängt. Auf dem Bladeburner-Weg ist das `blade.js`, und es
+neu zu starten kostet Sekunden. Auf dem Hackingweg trägt der Kern selbst, und
+den neu zu starten *ist* Sprosse 3 — dort meldet 4b „nichts Billigeres da" und
+die Leiter geht weiter.
+
+Dass es die Stufe nicht gab, lag an einer Zielverwechslung: S2 trägt
+`ziel: "fortschritt"`, und Sprosse 1 wirkt auf **Werkzeuge**. Die Leiter konnte
+also nie auf die Idee kommen, das Trägergewerk anzufassen.
 
 **Sprosse 5 führt der Wächter nicht selbst aus.** Das ist Arithmetik, nicht
 Vorsicht: `installAugmentations` ist `SingularityFn3` und kostet bei SF4.1
@@ -85,12 +105,25 @@ in dem es läuft, nicht am Schnappschuss des Wächters.
 
 Zwei Riegel, unabhängig voneinander:
 
-1. **Der Wächter** liest `data/guard-modus.txt` in jeder Runde. Ohne die Datei
-   gilt `observe`: er protokolliert, was er täte, und tut es nicht. `boot.js`
-   setzt sie auf `enforce`. Die Handbremse ist `data/guard-observe.txt` — legt
-   ein Mensch sie an, fällt der Wächter **sofort** in derselben Runde auf
-   `observe` zurück, nicht erst beim nächsten Wiederanlauf. Sie steht in keiner
-   Räumliste: ein gezogener Riegel bleibt über Resets gezogen.
+1. **Der Wächter** liest `data/guard-modus.txt` in jeder Runde. Es gibt **drei**
+   Modi, nicht zwei — die Sprossen sind nicht gleichartig, und ein Schalter für
+   alle war zu grob:
+
+   | Modus | frei |
+   |---|---|
+   | `observe` (Vorgabe ohne Datei) | keine |
+   | `enforce` (setzt `boot.js`) | 0, 1, 2 und **4b** — alle umkehrbar |
+   | `enforce-alles` | zusätzlich 3 und 5 |
+
+   Sprosse 3 räumt `home` leer und wirft die Laufzeit aller fliegenden Arbeiter
+   weg, Sprosse 5 ist ein Soft-Reset. `enforce-alles` ist der Zustand, den ein
+   Mensch bewusst herstellt, wenn `false_penalty_count` über eine Nacht bei
+   null lag — und diese Zahl wird seit dem 04.09.2026 überhaupt erst gezählt.
+
+   Die Handbremse ist `data/guard-observe.txt` — legt ein Mensch sie an, fällt
+   der Wächter **sofort** in derselben Runde auf `observe` zurück, nicht erst
+   beim nächsten Wiederanlauf. Sie steht in keiner Räumliste: ein gezogener
+   Riegel bleibt über Resets gezogen.
 
 2. **Sprosse 5** läuft trocken, solange `data/punish-scharf.txt` nicht auf home
    liegt. Der Kern hängt `scharf` nur dann an. Bis dahin landet jede Auslösung

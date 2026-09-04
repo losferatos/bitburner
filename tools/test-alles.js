@@ -278,7 +278,7 @@ const ENTSCHIEDEN = [
   "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
     + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
     + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
-  "NICHTS DAVON IST LIVE. Der ganze Bau liegt im Worktree; im Spiel laeuft "
+    "DER BAU IST SEIT DEM 04.09.2026, 17:31 IM SPIEL. Eingespielt wurde gestuft und mit Gegenprobe je Datei (tools/einspielen.js), neu gestartet mit PID-Beleg (tools/neustart.js). Was NICHT eingespielt ist: graftplan.json - es ist der Zuender fuer graftauto.js, und der wuerde binnen 60 s einen echten Graft ausloesen (450 Mrd, bei Abbruch nicht zurueck). Das ist Erics Entscheidung, keine Bauentscheidung. data/guard-modus.txt fehlt ebenfalls - der Waechter laeuft im Beobachtungsmodus, wie Position C.6 es verlangt.",
     + "eine einzige Aenderung dieses Tages (wakelock.js). Vor Stufe B steht "
     + "der Hot-Swap nach Auftrag 9 - die Checkliste dazu ist "
     + "tools/hotswap.js, und sie verweigert, statt zu warnen.",

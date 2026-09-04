@@ -29,9 +29,11 @@
   "singKosten41": 840,
   "dom": 0,
   "err": null,
-  "bytes": 107718,
+  "bytes": 113974,
   "lines": 1940,
-  "sha256": "2e97b14dc52dcfddbda78467f804dcd66f2efa12f5f92ee16ccb25a8348567b9"
+  "sha256": "4fa154212ff060ad624287b798f193fb2ee440a304f31b76a00c86d481694679",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "exit.js",
@@ -161,9 +163,11 @@
   "singKosten41": 288,
   "dom": 0,
   "err": null,
-  "bytes": 22571,
+  "bytes": 25479,
   "lines": 438,
-  "sha256": "ec7c604b2133a67a05f9332e3521a77ef21439ccec0814d56f056d1640026612"
+  "sha256": "5018050b1cacef5aecc3054aa7b2407ada17eeccf8f3b61e68510a8fd4739698",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "brcheck.js",
@@ -287,9 +291,11 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 187718,
+  "bytes": 196725,
   "lines": 3489,
-  "sha256": "5c12ea7be175ba0772e744ae00c31f5ee51f68edb52454d1465f28c975a4f2ec"
+  "sha256": "33a99555f56f873330534138b7558ea24965f5a5df57d2df21e0c982e7e93ebe",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "augcount.js",
@@ -325,9 +331,11 @@
   "singKosten41": 144,
   "dom": 0,
   "err": null,
-  "bytes": 6041,
+  "bytes": 6381,
   "lines": 127,
-  "sha256": "1231d7becbd45320203f17df1ed22b3906996bddb8e14ef4e987f76995d06a38"
+  "sha256": "02ece0a221973e5d44ebedc821a876950172e43b14c8902756ec84798003a377",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "graft.js",
@@ -721,9 +729,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 21733,
+  "bytes": 22334,
   "lines": 396,
-  "sha256": "fa748aebc29d9d53b5e649e7c8d3c3f606989925e43e0be423d3159b9592fa12"
+  "sha256": "27986c55a5debc0050a5032b0f142b7d5de76b0cc3ba3c379878b60ca5199cc3",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "exportbonus.js",
@@ -1207,7 +1217,7 @@
   "err": null,
   "bytes": 18705,
   "lines": 364,
-  "sha256": "4ce76ae253ddd2a209b1fa64843dd3d76b29f71e4e90c5939ad626e50ad90df5"
+  "sha256": "582efa5bd62fdca347238d8c6d1c04fc54b0c4c9dcb775ca41eac923bc1aac3e"
  },
  {
   "file": "sleevecrime.js",
@@ -1265,9 +1275,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 3595,
+  "bytes": 3877,
   "lines": 77,
-  "sha256": "32f0ec9a86fd42427c489a0158733288c65fdf8477e3edf6aa778d82edeb13c4"
+  "sha256": "394c22f8a0308405f6c27d76ace3660b4f68a446d1cc8ff057a9f0c959d64fa6",
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "netburner.js",
@@ -1451,8 +1463,8 @@
  },
  {
   "file": "popups.js",
-  "live41": 3.3,
-  "lokal41": 3.3,
+  "live41": 3.95,
+  "lokal41": 3.95,
   "diff": 0,
   "lokal42": 3.3,
   "lokal43": 3.3,
@@ -1460,9 +1472,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 11188,
+  "bytes": 16827,
   "lines": 234,
-  "sha256": "448d394495f15ad35222aa0ee2aa599fb8e45f529c74e4478cd001ddf5be38c2"
+  "sha256": "e972d3820a9e724bc08d94950a2e8744a921ce153b4e365606b0323492d5c75f",
+  "gemessenAm": "2026-09-04T17:29:32.425Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
  {
   "file": "kill.js",
@@ -1853,5 +1867,75 @@
   "bytes": 19158,
   "lines": 313,
   "sha256": "0930d87d388439ef0806f798047bc28681d1bacf5ab4da0ee1832effc73ef630"
+ },
+ {
+  "file": "export.js",
+  "live41": 19.35,
+  "lokal41": 19.35,
+  "diff": 0,
+  "sha256": "529c7f8c44e95cbd9630866dd67d523ad5f328cdf65fe44761df111fe9bc5700",
+  "bytes": 14117,
+  "gemessenAm": "2026-09-04T17:29:32.425Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "boerse.js",
+  "live41": 21,
+  "lokal41": 21,
+  "diff": 0,
+  "sha256": "f53820769721f051c0e43e0e61d07f4578a5cdeae32559884d4ff8540cca0bfe",
+  "bytes": 17110,
+  "gemessenAm": "2026-09-04T17:29:32.425Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "lib/handschlag.js",
+  "live41": 2.35,
+  "lokal41": 2.35,
+  "diff": 0,
+  "sha256": "9511d8129d4ba404feb2a964563899e63af09ad674670b51f001b706540a5da8",
+  "bytes": 9507,
+  "gemessenAm": "2026-09-04T17:29:32.425Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "lib/hostdatei.js",
+  "live41": 2.35,
+  "lokal41": 2.35,
+  "diff": 0,
+  "sha256": "a161e57b59b05b51e1b0f474646773c8d7109ac5687f6ca94c1bc1d8de3efb90",
+  "bytes": 6721,
+  "gemessenAm": "2026-09-04T17:29:32.425Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "graftauto.js",
+  "live41": 24.75,
+  "lokal41": 24.75,
+  "diff": 0,
+  "sha256": "f75e4a298d967bd589f7f5af10305c869771a660898e474f0faea899bd1afc92",
+  "bytes": 20355,
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "figwatch.js",
+  "live41": 12.85,
+  "lokal41": 12.85,
+  "diff": 0,
+  "sha256": "8a89a7e89ec7ed7c05e9ec3b49f63645b108342a1db42234da6ce31b03767981",
+  "bytes": 8200,
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "guard.js",
+  "live41": 6.1,
+  "lokal41": 6.1,
+  "diff": 0,
+  "sha256": "db6365943c48e014775fa977f846c385ebc7b5f6da9a1c676788a4ed1245ab4a",
+  "bytes": 55741,
+  "gemessenAm": "2026-09-04T17:43:56.015Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  }
 ]

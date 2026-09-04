@@ -39,6 +39,27 @@
  * @param {NS} ns
  */
 
+// STEUERKANAELE WOHNEN AUF home (04.09.2026, 20:10).
+//
+// Dieses Skript hat `hostRule: "werkbank"`, laeuft also im Regelfall NICHT
+// auf home - und es liest vier Dateien, die dort wohnen. Der gefaehrlichste
+// Fall war `data/task.txt`:
+//
+//     if (ns.fileExists("data/task.txt", "home")) {   // prueft HOME
+//       const roh = ns.read("data/task.txt").trim();  // liest LOKAL -> ""
+//       ns.write("data/task.txt", "", "w");           // leert LOKAL -> nichts
+//
+// Auf einem Fremdwirt haette das den Auftrag weder ausgefuehrt NOCH geleert.
+// `task.txt` auf home waere dauerhaft belegt geblieben, und damit der
+// einzige Kanal, ueber den dem Bot von aussen etwas gesagt werden kann -
+// lautlos, ohne Fehler, ohne Logzeile. Dasselbe Muster bei `reload.txt`,
+// also dem Neustartweg.
+//
+// Heute faellt es nicht auf, weil bn4life zufaellig auf home liegt. Genau
+// solche Zufaelle sind es, die dieser Bot nicht ueberleben soll.
+import { liesVonHome, nachHome } from "lib/hostdatei.js";
+
+
 // --- Die Figur-Wache (Position C.11) ---------------------------------------
 //
 // Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Der Kern ist
@@ -179,11 +200,10 @@ export async function main(ns) {
     // im Sekundentakt und bn4net.js im Zehnsekundentakt - ein blosses
     // Stichwort erwischt deshalb fast immer die falsche. Steht ein Name
     // dabei, ist nur die gemeinte gemeint.
-    const befehl = ns.fileExists("data/reload.txt", "home")
-      ? ns.read("data/reload.txt") : "";
+    const befehl = liesVonHome(ns, "data/reload.txt");
     if (befehl.includes("SELBST")
         && (befehl.trim() === "SELBST" || befehl.includes("bn4life.js"))) {
-      ns.write("data/reload.txt", "", "w");
+      nachHome(ns, "data/reload.txt", "");
       sag("Neuladen angefordert - beende mich, die Wache holt mich zurueck.");
       ns.exit();
     }
@@ -261,7 +281,7 @@ export async function main(ns) {
         // erarbeitete Augmentierung ueberholt. Bei dicker Deckung ist das nie
         // aufgefallen, weil das Dreifache faktisch dasselbe bewirkte.
         const reserviert = ns.fileExists("data/geldbedarf.txt", "home")
-          ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+          ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
         // PROGRAMME ist aufsteigend nach Preis sortiert. Der Abbruch beim
         // ersten unbezahlbaren kauft also die billigen zuerst und wartet auf
         // das teure - richtig so, denn jedes einzelne oeffnet schon Rechner.
@@ -285,8 +305,8 @@ export async function main(ns) {
     // JSON-Array, weil Faktionen "Tian Di Hui" heissen und ein Leerzeichen
     // als Trenner die Argumente verschoben haette.
     if (Date.now() >= auftragPause && ns.fileExists("data/task.txt", "home")) {
-      const roh = ns.read("data/task.txt").trim();
-      ns.write("data/task.txt", "", "w");   // sofort leeren, sonst Endlosstart
+      const roh = liesVonHome(ns, "data/task.txt").trim();
+      nachHome(ns, "data/task.txt", "");   // sofort leeren, sonst Endlosstart
       if (roh) {
         try {
           const teile = JSON.parse(roh);
@@ -368,7 +388,7 @@ export async function main(ns) {
     // Geld, kein TOR, keine Ports, keine Werkbank, also auch nie wieder ein
     // bn4rep. Ein Zeitstempel loest diesen Knoten.
     const bremse = ns.fileExists("data/rep-modus.txt", "home")
-      ? ns.read("data/rep-modus.txt") : "";
+      ? liesVonHome(ns, "data/rep-modus.txt") : "";
     const stempel = Number(String(bremse).split("|")[1]) || 0;
     const repModus = bremse !== "" && Date.now() - stempel < 120000;
     // BLADEBURNER SCHLAEGT VERBRECHEN (25.08.2026).

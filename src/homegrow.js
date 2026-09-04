@@ -32,6 +32,11 @@
  *
  * @param {NS} ns
  */
+
+// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
+// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
+import { liesVonHome } from "lib/hostdatei.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -70,7 +75,7 @@ export async function main(ns) {
       // ist tabu. Derselbe Kanal, den auch der Serverkauf und der
       // Programmkauf lesen.
       const ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
-        ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+        ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
       const geld = ns.getServerMoneyAvailable("home") - ruecklage;
 
       // --- Kerne zuerst -----------------------------------------------------
@@ -100,7 +105,7 @@ export async function main(ns) {
       // ein Drittel des Netzes brach, wird nicht gekauft.
       let brachAnteil = 0;
       try {
-        const j = JSON.parse(ns.read("data/bn4net.json") || "{}");
+        const j = JSON.parse(liesVonHome(ns, "data/bn4net.json") || "{}");
         // Nur frische Zahlen. Eine alte Datei wuerde den Kauf entweder
         // dauerhaft sperren oder dauerhaft freigeben - beides falsch.
         if (typeof j.brachAnteil === "number" && Date.now() - (j.zeit || 0) < 120000) {

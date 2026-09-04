@@ -1972,9 +1972,58 @@ async function holeSofortEintraege() {
     return;
   }
   if (!Array.isArray(liste)) return;
+
+  /**
+   * =========================================================================
+   * DER ZUSTAND GEHOERT IN DIE DATEI, NICHT IN DEN SPEICHER (04.09.2026)
+   * =========================================================================
+   *
+   * Hier wurde nur gelesen und nie zurueckgeschrieben. Die Entdopplung lebte
+   * damit ausschliesslich in `sofortGesehen` - einer Map im Speicher DIESES
+   * Prozesses, mit sechs Stunden Verfall. Folge: jeder Eintrag ging alle
+   * sechs Stunden erneut nach `## Sofort`, und sofort nach jedem
+   * Brueckenneustart (am 03.09. zweimal an einem Tag).
+   *
+   * Ein Kanal, in dem dieselbe Meldung immer wiederkehrt, wird nach dem
+   * dritten Mal nicht mehr gelesen - und dann faellt der echte Befund mit
+   * durch. Genau das ist der Kanal, ueber den Eric seit dem Abschalten der
+   * Push-Nachrichten ueberhaupt noch etwas erfaehrt.
+   *
+   * `doku/kontrakte.md` 4.11 sieht dafuer `zugestellt` vor, "weil die
+   * Entdopplung sonst nur im Speicher der Bruecke lebt und jeden
+   * Brueckenneustart verliert". Das ist jetzt gebaut:
+   *
+   *   - Eintraege mit `zugestellt` werden uebersprungen.
+   *   - Nach der Zustellung wird der Zeitstempel IN DIE DATEI geschrieben.
+   *   - Deckel 200, zugestellte zuerst verworfen (4.11). GERAEUMT WIRD
+   *     NICHT - der Ringpuffer ueberlebt laut 4.6 ausdruecklich Einbau und
+   *     Sprung.
+   */
+  let veraendert = false;
   for (const e of liste) {
     if (!e || !e.titel) continue;
+    if (Number.isFinite(e.zugestellt)) continue;
     await sofortZeile(e.titel, e.text || "", e.quelle || "spiel");
+    e.zugestellt = Date.now();
+    veraendert = true;
+  }
+
+  if (liste.length > 200) {
+    // Zugestellte zuerst: sie sind bereits in `## Sofort` angekommen.
+    const offen = liste.filter((e) => e && !Number.isFinite(e.zugestellt));
+    const zu = liste.filter((e) => e && Number.isFinite(e.zugestellt));
+    liste = [...zu.slice(-(Math.max(0, 200 - offen.length))), ...offen];
+    veraendert = true;
+  }
+
+  if (veraendert) {
+    try {
+      await schreibeInsSpiel("data/sofort.json", JSON.stringify(liste), "bruecke");
+    } catch (e) {
+      // Nicht schlimm: beim naechsten Durchgang erneut. Schlimm waere nur,
+      // den Fehler zu verschlucken, ohne ihn zu nennen.
+      log("Konnte data/sofort.json nicht quittieren: " + (e && e.message ? e.message : e));
+    }
   }
 }
 

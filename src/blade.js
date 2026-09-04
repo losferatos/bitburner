@@ -1544,7 +1544,10 @@ export async function main(ns) {
     if (Date.now() - kostenStand < 5 * 60_000) return;
     kostenStand = Date.now();
     try {
-      const roh = ns.read("data/aktionen.txt");
+      // Auch hier von home: der lokale Stand kann beim Start fehlen oder
+      // veraltet sein, und daraus werden die Ausdauerkosten je Aktion
+      // abgeleitet - eine Entscheidung, kein Bericht.
+      const roh = liesVonHome(ns, "data/aktionen.txt");
       if (!roh) return;
       const zeilen = roh.split(String.fromCharCode(10)).filter((z) => z.trim());
       const neu = new Map();

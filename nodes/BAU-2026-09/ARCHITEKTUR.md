@@ -687,7 +687,9 @@ nicht in einen Kommentar.
       "priority": 6,
       "evictRank": 7,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/hostdatei.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -852,9 +854,10 @@ nicht in einen Kommentar.
       "evictRank": 11,
       "needsFigure": "none",
       "needsLibs": [
-       "lib/graftwahl.js",
-       "lib/figurns.js",
-       "lib/figur.js"
+        "lib/figur.js",
+        "lib/figurns.js",
+        "lib/graftwahl.js",
+        "lib/hostdatei.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -934,7 +937,9 @@ nicht in einen Kommentar.
       "priority": 11,
       "evictRank": 11,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/hostdatei.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -983,8 +988,9 @@ nicht in einen Kommentar.
       "evictRank": 13,
       "needsFigure": "owner",
       "needsLibs": [
-       "lib/figurns.js",
-       "lib/figur.js"
+        "lib/figur.js",
+        "lib/figurns.js",
+        "lib/hostdatei.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -1009,7 +1015,9 @@ nicht in einen Kommentar.
       "priority": 13,
       "evictRank": 7,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/hostdatei.js"
+      ],
       "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
@@ -1086,7 +1094,9 @@ nicht in einen Kommentar.
       "priority": 3,
       "evictRank": 2,
       "needsFigure": "none",
-      "needsLibs": [],
+      "needsLibs": [
+        "lib/hostdatei.js"
+      ],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,

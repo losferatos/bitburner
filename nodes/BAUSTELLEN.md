@@ -37,86 +37,59 @@ Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
-- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
-  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
-  beheben. Abgeraeumtes wandert nach "Erledigt".
-- **Die Reihenfolge in der Datei IST die Rangfolge.** Nicht neu bewerten, nicht
-  umsortieren. Ein Punkt, dessen Ueberschrift mit "Wartet bis <Uhrzeit>"
-  beginnt, wird uebersprungen statt angefangen.
-- Ein Punkt je Lauf. Wer fuenf Punkte gleichzeitig anfaengt, schliesst keinen.
-- **Erledigtes wandert nach `nodes/ERLEDIGT.md`, nicht nach unten** (seit
-  27.08.2026, 18:35). Es wird nie geloescht - der Verlauf ist die Begruendung
-  fuer das, was heute steht -, aber er gehoert nicht in die Arbeitsliste: Sie
-  stand bei 1.777 Zeilen, davon 81 Prozent Archiv, und das Read-Werkzeug
-  schneidet bei 2.000 stumm ab. Im Archiv wird **gegrept, nicht gelesen**:
-  `grep -n -A12 "<stichwort>" nodes/ERLEDIGT.md`.
-- Was hier nicht steht, wird nicht bearbeitet. Neue Befunde kommen zuerst hierher.
-- **Diese Datei wird mit `tools/liste.js` bearbeitet, nicht von Hand
-  geschnitten** (seit 28.08.2026, 23:18):
+- **`## Sofort
 
-      node tools/liste.js                                  Abschnitte + Punkte
-      node tools/liste.js --sofort-leeren [--vermerk "..."]
-      node tools/liste.js --eintragen sofort|offen --datei <pfad>
-      node tools/liste.js --erledigen "<anfang>" --datei <pfad>
+*Stand 04.09.2026, 20:05 - der Abschnitt ist bewusst leer.*
 
-  Es grenzt Abschnitte ueber Zeilennummern ab, erkennt eine Ueberschrift nur
-  NACH der ersten `---`-Trennlinie, und schreibt nur, wenn die Gliederung
-  danach unveraendert ist - sonst bleibt der alte Stand stehen. Der Eintrags-
-  text kommt aus einer Datei, damit Umlaute und Backticks die Shell ueberleben.
+Was hier stand, war zwei Sorten Rauschen:
 
-  *Warum es das Werkzeug gibt:* Eine Suche nach `## Sofort` oder `## Offen`
-  trifft die erste Fundstelle - also den Fliesstext in diesem Regelkopf, wo
-  beide Zeichenketten ebenfalls stehen. Am 28.08.2026 hat das die Datei
-  zweimal zerlegt (14:08 und 22:47): Eintraege landeten mitten im Kopf,
-  Abschnittsueberschriften existierten doppelt, ein abgeraeumter Punkt stand
-  wieder in der Liste. Beide Male stand die Warnung davor **hier**. Ein
-  Hinweis in dem Text, den man gerade umschreibt, wird nicht gelesen.
+- **Acht Meldungen "Grosser Schub verweigert (41-50 Dateien)"** aus der Zeit
+  von 13:13 bis 16:24. Das war der Schubdeckel, der wie vorgesehen einen
+  Merge-artigen Massenschub abgewiesen hat. Die Einspielung ist seither
+  gestuft und von Hand gefahren worden; die Meldungen sind gegenstandslos.
+- **Eine Falschmeldung "Bruecke ohne Sicherung"** von 18:31, erzeugt von
+  `export.js` beim ersten Start. Sie war ein Fehler in `export.js`, nicht ein
+  Befund ueber die Bruecke: das Gewerk lief auf werk-0 und suchte
+  `data/bridge.json` dort, wo sie nicht liegt. Repariert (`lib/hostdatei.js`),
+  und im Betrieb geeicht - `data/export.json` meldet jetzt ein echtes
+  `bridgeAlterMs` statt `null`.
 
-  Wer die Datei doch von Hand aendert, prueft danach `node tools/liste.js` -
-  die Gliederung muss lauten: ein `## Sofort`, ein
-  `## Offen, nach Dringlichkeit
+Damit sich das nicht wiederholt, hat die Bruecke jetzt eine Quittung: ein
+zugestellter Eintrag bekommt `zugestellt` **in die Datei** geschrieben
+(`doku/kontrakte.md` 4.11). Vorher lebte die Entdopplung nur im Speicher der
+Bruecke und ging bei jedem Neustart verloren - jede Meldung kehrte alle sechs
+Stunden wieder.
 
-*Der Beitritt selbst ist geprueft und braucht keinen Punkt (29.08., 11:15).*
-*`bbtrain.js:257-272` haelt bei ZIEL 100 an, ruft `stopAction()` und dann*
-*`joinBladeburnerDivision()`; bei Ablehnung schreibt es `data/hilfe.txt`, was*
-*der Pruefer als STOERUNG meldet. Der Beitrittszeitpunkt geht nach*
-*`data/bbjoin.txt` und wird nach home kopiert - wichtig, weil bbtrain auf der*
-*Werkbank laeuft. Alle vier Spielbedingungen (`NetscriptFunctions/Bladeburner.ts:335-352`)*
-*sind erfuellt: `disableBladeburner` ist false (Spielstand 11:14),*
-*`BladeburnerRank` ist 0,8 und damit ungleich 0, `Player.bladeburner` ist noch*
-*null, und die vier Kampfwerte stehen bei 86-87 von 100.*
-`, ein `## Erledigt`.
-- **Ein alter Zeitstempel ist KEIN Stillstand.** Mehrere Skripte steigen vor
-  ihrer Telemetriezeile aus der Runde aus und arbeiten trotzdem einwandfrei.
-  Die Lebenszeichen stehen woanders und sind bedingungslos:
-  `data/hb-rep.txt` fuer `bn4rep.js` (Puls), `data/rep-ziel.txt` fuer sein
-  aktuelles Ziel samt Rangliste, `data/wache-zustand.json` fuer den Waechter.
-  `data/bn4rep.json` und `data/ps.json` sind Momentaufnahmen, keine Pulse.
-  *In der Nacht zum 28.08. hat diese Falle einen Sofort-Punkt erzeugt, der
-  komplett falsch war - die Warnung stand seit dem 24.08. in `bn4rep.js:389`,
-  nur nicht dort, wo jemand sie sucht.*
-- **Die Loops entscheiden selbst. "Wartet bis Eric" ist kein Ablageort fuer
-  unbequeme Entscheidungen** (Eric, 26.08.2026, 16:05). Aus einer belegten
-  Erkenntnis wird ein **unmittelbarer Arbeitsauftrag**, nicht ein Wartestatus.
-  Wer eine Zahl gemessen hat, die eine Aenderung rechtfertigt, setzt sie um und
-  misst nach - und nimmt sie zurueck, wenn sie nicht traegt.
-  **Seit dem 27.08.2026, 05:00 ohne Ausnahme.** Eric hat den Vorbehalt fuer
-  `src/bn4net.js` und `src/boot.js` aufgehoben - mit der Auflage, dort **jede
-  Aenderung einzeln zu committen**, damit sie sich einzeln zurueckdrehen
-  laesst. Sein Ziel: "Ich will das Projekt hier nahezu vollstaendig durch
-  Loops laufen und entscheiden lassen, so dass ich eigentlich nicht noetig
-  bin."
-  **Die Reihenfolge der BitNodes bleibt unangetastet** - nicht als Vorbehalt,
-  sondern weil sie feststeht (Fables Analyse,
-  `nodes/AUDIT-ROADMAP-2026-08-24.md`). Auch Eric will dort nicht mehr
-  dazwischenfunken.
-  *Anlass: Der Raid-Befund vom 26.08. stand vier Laeufe lang auf "Wartet bis
-  Eric entscheidet", obwohl jede Zahl dafuer gemessen war. Das kostete den
-  groessten offenen Hebel des Knotens einen halben Nachmittag.*
-
----
 
 ## Sofort
+
+### Grosser Schub verweigert (51 Dateien) - sieht nach einem Merge aus
+
+51 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+39)
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (bridge.json fehlt oder ist unlesbar). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Grosser Schub verweigert (50 Dateien) - sieht nach einem Merge aus
+
+50 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+38)
+
+### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
+
+49 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+37)
 
 ### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
 

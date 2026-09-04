@@ -554,16 +554,44 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       if (Array.isArray(namen)) aufHome = new Set(namen);
     } catch { /* dann ohne Dateipruefung - siehe unten */ }
 
-    // home-Speicher fuer die Phase. Der Kern entscheidet mit
-    // `getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"`
-    // (bn4net.js:571-576).
-    const diag = await liesJson("data/startdiag.json");
-    const homeGb = diag && Number.isFinite(diag.maxHomeGb) ? diag.maxHomeGb : null;
+    // DIE PHASE KOMMT VOM KERN, NICHT AUS EINER ALTEN SONDE (04.09.2026,
+    // 19:55 - Skeptiker).
+    //
+    // Hier stand `data/startdiag.json` als Quelle fuer den home-Speicher,
+    // ohne jede Frischepruefung. `startdiag.js` ist aber eine Sonde, die von
+    // Hand angestossen wird - die Datei kann Stunden alt sein und steht in
+    // keiner Raeumliste von `boot.js`.
+    //
+    // Nach einem Knotenwechsel steht home auf 32 GB, die alte Datei sagt
+    // weiter 131072, und dieser Pruefer meldete dann ein Dutzend Gewerke als
+    // fehlend, die der Kern im Kaltstart mit Absicht nicht startet.
+    // Umgekehrt schlimmer: eine im Kaltstart entstandene Datei friert die
+    // Phase auf "kaltstart" ein, und danach faellt jeder ECHTE Ausfall
+    // durch.
+    //
+    // `data/bn4net.json` schreibt der Kern in JEDER Runde und fuehrt `phase`
+    // fertig gerechnet - dieselbe Entscheidung, die er selbst benutzt. Damit
+    // entfaellt das Nachbilden ganz. Bleibt sie aus oder ist sie alt, sagt
+    // die Pruefung das, statt zu raten.
+    const kern = await liesJson("data/bn4net.json");
+    const kernAlterMin = kern && Number.isFinite(kern.zeit)
+      ? (Date.now() - kern.zeit) / 60000 : null;
+    let phase = null;
+    if (kern && kern.phase && kernAlterMin !== null && kernAlterMin < 15) {
+      phase = kern.phase;
+    } else if (kern && Number.isFinite(kern.homeRam) && kernAlterMin !== null && kernAlterMin < 15) {
+      phase = kern.homeRam <= 64 ? "kaltstart" : "normal";
+    }
+    if (phase === null && !werkzeugPruefungBlind) {
+      werkzeugPruefungBlind = "data/bn4net.json fehlt oder ist "
+        + (kernAlterMin === null ? "unlesbar" : kernAlterMin.toFixed(0) + " min alt")
+        + " - ohne die Phase des Kerns waere jede Sollliste geraten";
+    }
 
     const lage = {
       node: kpi && Number.isFinite(kpi.node) ? kpi.node : 0,
       verfahren: (kpi && kpi.verfahren) || "unbekannt",
-      phase: homeGb === null ? "normal" : (homeGb <= 64 ? "kaltstart" : "normal"),
+      phase: phase || "normal",
       dateiDa: aufHome ? ((d) => aufHome.has(d)) : undefined,
     };
     soll = auswahl(reg, lage)

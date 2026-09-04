@@ -19,6 +19,11 @@
  *
  * @param {NS} ns
  */
+
+// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
+// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
+import { liesVonHome } from "lib/hostdatei.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
   const TAKT_MS = 10000;
@@ -31,7 +36,7 @@ export async function main(ns) {
   const liesVerfahren = () => {
     try {
       if (!ns.fileExists("data/verfahren.txt", "home")) return "";
-      const teile = ns.read("data/verfahren.txt").trim().split(/\s+/);
+      const teile = liesVonHome(ns, "data/verfahren.txt").trim().split(/\s+/);
       return Number(teile[1]) === knoten ? teile[0] : "";
     } catch { return ""; }
   };

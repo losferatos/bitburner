@@ -63,6 +63,11 @@
  * @param {NS} ns
  */
 
+// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
+// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
+import { liesVonHome } from "lib/hostdatei.js";
+
+
 import { naechstes, fortschritt } from "lib/graftwahl.js";
 import { beantrage as figBeantrage } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
@@ -330,7 +335,7 @@ export async function main(ns) {
       let ruecklage = 0;
       try {
         ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
-          ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+          ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
       } catch { /* dann ohne Ruecklage - lieber graften als haengen */ }
       const geldRoh = ns.getServerMoneyAvailable("home");
       const geldFrei = Math.max(0, geldRoh - ruecklage);

@@ -31,6 +31,11 @@
  *
  * @param {NS} ns
  */
+
+// Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
+// zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
+import { liesVonHome } from "lib/hostdatei.js";
+
 import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 
 // Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
@@ -92,7 +97,7 @@ export async function main(ns) {
       const knoten = ns.getResetInfo().currentNode;
       if (ns.fileExists("data/verfahren.txt", "home")) {
         if (ns.getHostname() !== "home") ns.scp("data/verfahren.txt", ns.getHostname(), "home");
-        const teile = ns.read("data/verfahren.txt").trim().split(/\s+/);
+        const teile = liesVonHome(ns, "data/verfahren.txt").trim().split(/\s+/);
         if (Number(teile[1]) === knoten && (teile[0] === "V1" || teile[0] === "V1b")) return false;
       }
       return true;

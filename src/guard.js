@@ -43,7 +43,7 @@
 
 import { neu as neueUhren, runde as uhrRunde, enginePuls, inKarenz, laden as ladeUhren }
   from "lib/uhren.js";
-import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere,
+import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere, freigeben,
   laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
 import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle } from "lib/reg.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
@@ -99,7 +99,19 @@ export async function main(ns) {
   // Wann eine Sprosse fuer dieses Ziel zuletzt ausgefuehrt wurde. Die
   // Wirkungspruefung braucht es: eine Telemetriedatei von VOR dem Neustart
   // beweist nichts.
-  const letzteAusfuehrung = new Map();
+  // SIE UEBERLEBEN DEN NEUSTART (Skeptiker Runde 4, R17, 04.09.2026).
+  //
+  // `letzteAusfuehrung` war prozesslokal. Der Leiterzustand ueberlebt den
+  // Neustart (data/watchdog.json), die Ausfuehrungszeitpunkte nicht - und
+  // `guard.js` traegt `restartPolicy: always`, Neustarts sind der Normalfall.
+  //
+  // Stand ein Ziel bei EXECUTED, wenn der Waechter neu startete, lieferte
+  // `letzteAusfuehrung.get(ziel) || 0` eine Null, und die Pruefung
+  // `w >= ausfuehrung` war trivial erfuellt. Damit galt wieder "Datei liegt da
+  // = geheilt" - genau der Fehler, den C.16 behoben hat, still
+  // wiederhergestellt durch jeden Neustart.
+  const letzteAusfuehrung = new Map(
+    Object.entries((leiter && leiter.letzteAusfuehrung) || {}));
 
   // Fuer S2: der Traegerwert beim letzten Vergleich.
   let letzterTraegerWert = null;
@@ -200,7 +212,7 @@ export async function main(ns) {
         // Jetzt gilt die Zahl des Kerns, solange sein Block frisch ist. Der
         // eigene Schaetzwert bleibt als Rueckfall - er wird gebraucht, wenn
         // der Kern gar nicht laeuft, und genau dann ist der Waechter dran.
-        phase: kernPhaseFrisch(kern, wall)
+        phase: kernPhaseFrisch(kern, wall, ri.lastNodeReset)
           || (ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"),
         dateiDa: (d) => ns.fileExists(d, "home"),
       };
@@ -236,17 +248,67 @@ export async function main(ns) {
 
       // Traegerwert fortschreiben - erst NACH der Auswertung, sonst vergleicht
       // S2 den Wert mit sich selbst.
+      //
+      // NUR BEI WACHSTUM (04.09.2026, gefunden vom Kettentest der Sprosse 5).
+      //
+      // Hier wurde alle 45 Minuten Motorzeit BEDINGUNGSLOS fortgeschrieben.
+      // Damit mass `dMotor` immer nur "seit dem letzten Vergleichspunkt", nie
+      // "seit der Traeger steht": ein Rang, der zehn Stunden festhing, zeigte
+      // dauerhaft 45 bis 60 Minuten.
+      //
+      // Folge: die erste Vorbedingung von Sprosse 5 - "S2 seit >= 6 h
+      // Motorzeit" - war ueber dieses Feld UNERREICHBAR. Die teuerste Sprosse
+      // der Leiter haette ihre eigene Eingangsbedingung nie erfuellt.
+      //
+      // Jetzt wandert der Vergleichspunkt nur mit, wenn der Traeger wirklich
+      // gewachsen ist. Steht er, bleibt der alte Punkt stehen und `dMotor`
+      // waechst - das ist die Zahl, die S2 meint.
       if (kpi && kpi.traeger && Number.isFinite(kpi.traeger.wert)) {
+        const gewachsen = letzterTraegerWert !== null
+          && kpi.traeger.wert > letzterTraegerWert;
         if (letzterTraegerWert === null
-            || motorTimeMs - (letzterTraegerMotorMs ?? 0) >= 45 * 60000) {
+            || (gewachsen && motorTimeMs - (letzterTraegerMotorMs ?? 0) >= 45 * 60000)) {
           letzterTraegerWert = kpi.traeger.wert;
           letzterTraegerMotorMs = motorTimeMs;
         }
       }
 
+      // --- Der Ausgang aus EXHAUSTED (Skeptiker Runde 4) -----------------------
+      //
+      // `freigeben()` wurde in C.16 ausdruecklich als "DER AUSGANG AUS DER
+      // SACKGASSE" gebaut - und hatte keinen Aufrufer. Es war in dieser Datei
+      // nicht einmal importiert. Damit blieb EXHAUSTED bis zum naechsten
+      // Knotenwechsel stehen, obwohl der Kommentar das Gegenteil versprach:
+      // derselbe Fehler eine Ebene tiefer als der, den C.16 behoben hat.
+      //
+      // Zwoelf Stunden Waechterzeit sind die Frist aus Auftrag 5.2. Danach ist
+      // ein neuer Anlauf besser als endloses Schweigen: die Lage kann sich
+      // geaendert haben (ein Rechner gekauft, home ausgebaut, ein Gewerk
+      // nachgeliefert), und die Deckel je Sprosse verhindern weiterhin, dass
+      // daraus eine Dauerstrafe wird.
+      {
+        const EXHAUSTED_MS = 12 * 3600000;
+        for (const [name, z] of Object.entries(leiter.ziele || {})) {
+          if (z.zustand !== "EXHAUSTED") continue;
+          if (uhren.guardTimeMs - z.seit < EXHAUSTED_MS) continue;
+          const frei = freigeben(leiter, name, uhren.guardTimeMs);
+          if (frei.length) {
+            sag(frei.join(", ") + " nach 12 h wieder freigegeben - die Leiter"
+              + " beginnt fuer dieses Ziel von vorn.");
+          }
+        }
+      }
+
       // --- Den Automaten fahren ------------------------------------------------
       for (const sig of sigs) {
-        const r = schritt(leiter, sig, uhren.guardTimeMs, wall);
+        // Die drei Uhren gehen mit hinein (R15). Welche gilt, entscheidet die
+        // Sprosse ueber ihr Feld `uhr` - bis zum 04.09.2026 las das niemand,
+        // und Sprosse 5 mass ihre sechs Stunden Motorzeit in Wanduhr.
+        const r = schritt(leiter, sig, uhren.guardTimeMs, wall, {
+          guard: uhren.guardTimeMs,
+          engine: spieler.totalPlaytime,
+          motor: motorTimeMs,
+        });
 
         if (r.handlung === "verdacht" || r.handlung === "deckel") {
           sag("[" + sig.sig + "] " + r.ziel + ": " + r.grund);
@@ -258,7 +320,20 @@ export async function main(ns) {
             wall, playtime: spieler.totalPlaytime, motorTime: motorTimeMs,
             guardTime: uhren.guardTimeMs, round: runden,
             node: ri.currentNode, nodeReset: ri.lastNodeReset, augReset: ri.lastAugReset,
-            result: scharf ? "executed" : "would-execute",
+            // ERST NACH DER RUECKMELDUNG (Skeptiker Runde 4, R4).
+            //
+            // Hier stand `scharf ? "executed" : "would-execute"` - gesetzt,
+            // BEVOR `fuehreAus` lief. `punish.js` liest genau dieses Protokoll
+            // fuer seinen Knotendeckel: ein Eintrag mit `rung===5 &&
+            // result==="executed"` sperrt jede weitere Sprosse 5 im Knoten.
+            //
+            // Die Folge: die erste S2-Ausloesung verbrannte das Kontingent,
+            // auch wenn punish.js mit Grund verweigert hatte. Legte danach ein
+            // Mensch `punish-scharf.txt`, bekam er "lief in diesem Knoten
+            // schon einmal".
+            //
+            // Der Wert wird unten korrigiert, sobald `getan` feststeht.
+            result: scharf ? "pending" : "would-execute",
             verifiedAt: null,
           };
           protokolliere(strafen, eintrag);
@@ -287,9 +362,48 @@ export async function main(ns) {
           if (scharf) {
             sag("SPROSSE " + r.sprosse.nr + " auf " + r.ziel + ": " + r.sprosse.name);
             letzteAusfuehrung.set(r.ziel, wall);
-            const erg = fuehreAus(ns, r, eintraege, gesperrt, sag);
+            const erg = fuehreAus(ns, r, eintraege, gesperrt, sag, {
+              wall,
+              nodeReset: ri.lastNodeReset,
+              // Wie lange S2 schon steht - in MOTORZEIT, so wie punish.js es
+              // prueft. Der Waechter fuehrt das Signal, also gibt er die Zahl
+              // mit; eine zweite Rechnung in punish.js waere eine zweite
+              // Wahrheit.
+              s2MotorMs: (sigs.find((x) => x.sig === "S2") || {}).alterMotorMs || 0,
+              // Welche Sprossen in DIESEM KNOTEN schon ausgefuehrt und
+              // verifiziert wirkungslos waren - ueber ALLE Ziele, nicht nur
+              // ueber das eigene.
+              //
+              // Das ist eine inhaltliche Entscheidung, keine Bequemlichkeit
+              // (04.09.2026). S2 traegt das Ziel "fortschritt", und fuer den
+              // Traeger gibt es die Sprossen 1 bis 3 gar nicht: sie starten
+              // Werkzeuge neu und sperren Wirte. Waere die Bedingung auf das
+              // eigene Ziel bezogen, koennte sie nie erfuellt werden, und
+              // Sprosse 5 waere unerreichbar - eine Sprosse, die man baut,
+              // testet und dokumentiert, und die dann nie feuert, ist
+              // schlimmer als keine.
+              //
+              // Der Sinn der Bedingung bleibt gewahrt: ein Soft-Reset ist eine
+              // systemweite Handlung, also gilt als Beleg auch systemweit, dass
+              // die billigen Mittel ausgeschoepft sind. Kein einziges davon
+              // gefeuert zu haben heisst: der Bot laeuft technisch rund und
+              // kommt trotzdem nicht voran - und das ist ein Strategieproblem,
+              // kein Neustartproblem.
+              wirkungslos: [...new Set((leiter.verlauf || [])
+                .filter((v) => v.sprosse < 5)
+                .map((v) => v.sprosse))].sort((a, b) => a - b),
+            });
             eintrag.ausgefuehrt = erg.getan;
             eintrag.details = erg.text;
+            // Jetzt erst steht fest, was wirklich geschah (R4).
+            //
+            // Fuer Sprosse 5 heisst `getan` allerdings nur "Auftrag gestellt" -
+            // ob eingebaut wurde, weiss erst `data/punish.json`. Deshalb bleibt
+            // sie auf "ordered", bis die Rueckmeldung da ist; der Deckel in
+            // punish.js zaehlt nur "executed".
+            eintrag.result = r.sprosse.nr === 5
+              ? (erg.getan ? "ordered" : "failed")
+              : (erg.getan ? "executed" : "failed");
             // Ein Auftrag an den Kern (bisher nur Sprosse 5). Er lebt in
             // watchdog.json und verfaellt nach 15 Minuten - ein Auftrag, den
             // der Kern nicht binnen seiner Karenz ausfuehrt, ist selbst ein
@@ -311,6 +425,10 @@ export async function main(ns) {
             : wirkungGruen(r, eintraege, kern, {
               wall,
               ausgefuehrtWall: letzteAusfuehrung.get(r.ziel) || 0,
+              // Fuer Sprosse 5 (R5): der Erfolg ist ein gesprungener
+              // Augmentierungs-Reset bei positivem Konto.
+              augReset: ri.lastAugReset,
+              geld: spieler.money,
             });
           const v = verifiziert(leiter, r.ziel, gruen, uhren.guardTimeMs);
           sag("Wirkung " + (gruen ? "gruen" : "rot") + " fuer " + r.ziel
@@ -328,6 +446,7 @@ export async function main(ns) {
       schreibeZustand(ns, uhren, leiter, strafen, {
         wall, runden, okRunden, errStreak, lastError,
         modus: modusRoh, karenz: false, motorTimeMs,
+        letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -380,13 +499,54 @@ export async function main(ns) {
  * dem Fenster ist der Waechter allein zustaendig, und dann gilt sein eigener
  * Schaetzwert.
  */
-function kernPhaseFrisch(kern, wall) {
+function kernPhaseFrisch(kern, wall, nodeReset) {
   if (!kern || (kern.phase !== "kaltstart" && kern.phase !== "normal")) return null;
+  // AUCH DER KNOTEN MUSS STIMMEN (Skeptiker Runde 4, R25, 04.09.2026).
+  //
+  // Die Frischepruefung allein liess ein Fenster von fuenf Minuten offen: die
+  // Karenz des Waechters nach einem Reset dauert zehn Minuten, die Frist hier
+  // fuenfzehn. Dazwischen - und nur dann, wenn der neue Kern noch nicht
+  // schreibt, also genau im Fall, fuer den es den Waechter gibt - lieferte der
+  // liegengebliebene Block des VORIGEN Knotens "normal", waehrend home auf
+  // 32 GB stand. Der Waechter haette die Normalphase-Gewerke gegen ihre alten
+  // Telemetriedateien geprueft, und ueber die Enginezeit (die waechst ueber
+  // Knoten hinweg) fuer mehrere Ziele zugleich gefeuert.
+  //
+  // `false_penalty_count = 0` ist Abnahmebedingung. Der Kern schreibt
+  // `nodeReset` ohnehin mit - es kostet nichts, ihn zu vergleichen.
+  if (Number.isFinite(nodeReset) && Number.isFinite(kern.nodeReset)
+      && kern.nodeReset !== nodeReset) return null;
   const w = Number.isFinite(kern.wall) ? kern.wall : (Number.isFinite(kern.zeit) ? kern.zeit : 0);
   return (w > 0 && wall - w <= 15 * 60000) ? kern.phase : null;
 }
 
 function wirkungGruen(r, eintraege, kern, lage) {
+  // SPROSSE 5 HAT IHREN EIGENEN ERFOLGSBEGRIFF (Skeptiker Runde 4, R5).
+  //
+  // Hier kannte die Funktion zwei Faelle: `ziel === "kern"` und "Ziel ist ein
+  // Registry-Eintrag". S2 traegt `ziel: "fortschritt"` - keines von beiden.
+  // `eintraege.find(...)` gab `undefined`, die Funktion `false`, und danach
+  // fand `verifiziert` keine hoehere Sprosse: EXHAUSTED, dauerhaft, bis zum
+  // naechsten Knotenwechsel.
+  //
+  // Der Fortschrittszweig war damit ab der ERSTEN sechsstuendigen Stagnation
+  // still - also ab dem ersten Mal, dass er gebraucht wurde. Und sichtbar war
+  // das nur im scharfen Betrieb: im Beobachtungsmodus erzwingt der Waechter
+  // `gruen = true`.
+  //
+  // Der deklarierte Erfolg steht seit jeher in der Sprossentabelle:
+  // "lastAugReset gesprungen und Konto > 0". Er wird jetzt auch geprueft.
+  if (r.ziel === "fortschritt") {
+    if (!lage || !Number.isFinite(lage.augReset) || !Number.isFinite(lage.ausgefuehrtWall)) {
+      return false;
+    }
+    // Der Einbau muss NACH der Ausfuehrung liegen - ein Einbau von gestern
+    // beweist nichts. Und das Konto muss wieder ueber null sein: nach
+    // `installAugmentations` stehen 1.262 Dollar, alles darueber heisst, dass
+    // der Wiederaufbau laeuft.
+    return lage.augReset > lage.ausgefuehrtWall && (lage.geld || 0) > 0;
+  }
+
   if (r.ziel === "kern") {
     // Fuer den Kern gilt weiter: er zaehlt UND wirft nicht. Ein bloss
     // zaehlender `round` ist kein Fortschrittsbeleg, deshalb `errStreak === 0`
@@ -435,6 +595,9 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
   schreib("data/penalties.json", strafen);
   schreib("data/watchdog.json", {
     ...leiter,
+    // Die Ausfuehrungszeitpunkte gehen mit hinaus (R17) - ohne sie faellt die
+    // Wirkungspruefung nach jedem Neustart auf ihr altes Verhalten zurueck.
+    letzteAusfuehrung: lage.letzteAusfuehrung || {},
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block
     // ungueltig, und der Kern wuerde den Waechter zu Recht fuer tot halten.
@@ -495,7 +658,7 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
  * @param {Function} sag
  * @returns {{getan: boolean, text: string}}
  */
-function fuehreAus(ns, r, eintraege, gesperrt, sag) {
+function fuehreAus(ns, r, eintraege, gesperrt, sag, lage) {
   const nr = r.sprosse.nr;
 
   // --- Sprosse 0: die Umgebung ---------------------------------------------
@@ -598,7 +761,19 @@ function fuehreAus(ns, r, eintraege, gesperrt, sag) {
   // unsichtbar, fuer den es gebaut ist. Sie kommt aus der Registry
   // (killSafe: false), mit eingebauter Notliste.
   if (nr === 3) {
-    const NOTLISTE = ["boot.js", "guard.js", "ausgang.js"];
+    // `wakelock.js` GEHOERT DAZU (Skeptiker Runde 4, R16, 04.09.2026).
+    //
+    // Es stand mit `killSafe: true` in der Registry, und die Schonliste nimmt
+    // nur `killSafe === false` plus diese Notliste - Sprosse 3 hat es also
+    // mitgeraeumt. Sprosse 3 feuert per Definition, wenn der Kern tot ist, und
+    // NUR der Kern startet den Wachhalter zurueck. Kann boot.js den Kern nicht
+    // anwerfen - Platzmangel, der haeufigste Grund, warum er weg war -, bleibt
+    // der Tab ohne Drosselungsbremse, und zwar genau in der Nacht, in der die
+    // Leiter arbeiten soll.
+    //
+    // 2,25 GB fuer die einzige gemessene Gegenmassnahme gegen die
+    // Tab-Drosselung sind gut angelegt.
+    const NOTLISTE = ["boot.js", "guard.js", "ausgang.js", "wakelock.js"];
     let schonliste = NOTLISTE;
     try {
       const roh = ns.fileExists("registry.json", "home") ? ns.read("registry.json") : null;
@@ -663,11 +838,48 @@ function fuehreAus(ns, r, eintraege, gesperrt, sag) {
   // UND ES BLEIBT EIN TROCKENLAUF, solange `data/punish-scharf.txt` nicht auf
   // home liegt. Der Kern haengt `scharf` nur dann an.
   if (nr === 5) {
-    return { getan: true, auftrag: {
-      sprosse: 5, ziel: r.ziel, skript: "punish.js",
-      gestellt: Date.now(), signal: r.ziel,
-    }, text: "Auftrag fuer Sprosse 5 gestellt - der Kern startet punish.js"
-      + " (Trockenlauf, solange data/punish-scharf.txt fehlt)." };
+    // EIN KANAL, NICHT ZWEI (Skeptiker Runde 4, R1, 04.09.2026).
+    //
+    // Hier stand ein Auftrag mit den Feldern `{sprosse, ziel, skript,
+    // gestellt, signal}`. `punish.js` liest aber `data/penalty-order.json` und
+    // erwartet `{rung, wall, nodeReset, s2MotorMs, wirkungslos}` - KEIN
+    // einziger Feldname ueberschnitt sich, und die Datei hatte im ganzen Baum
+    // keinen Schreiber.
+    //
+    // Drei von vier Pruefern haben denselben Befund gefunden: die C.19-Kette
+    // lief an, protokollierte "executed" und tat nichts. Genau die
+    // Fehlerklasse, gegen die C.19 antritt - eine Ebene tiefer.
+    //
+    // Jetzt schreibt der Waechter BEIDES aus einer Quelle: den Auftrag in
+    // `data/penalty-order.json` (das liest punish.js) und denselben Inhalt in
+    // `watchdog.json.orders` (das liest der Kern, um punish.js zu starten).
+    // Zwei Leser, ein Inhalt, ein Schreiber.
+    const auftrag = {
+      // Die Felder, die punish.js prueft.
+      rung: 5,
+      wall: lage.wall,
+      nodeReset: lage.nodeReset,
+      s2MotorMs: lage.s2MotorMs,
+      wirkungslos: lage.wirkungslos,
+      // Die Felder, die der Kern braucht.
+      sprosse: 5,
+      ziel: r.ziel,
+      skript: "punish.js",
+      gestellt: lage.wall,
+      signal: r.ziel,
+    };
+    try {
+      ns.write("data/penalty-order.json", JSON.stringify(auftrag), "w");
+    } catch (e) {
+      return { getan: false, text: "Auftrag nicht schreibbar: "
+        + String(e && e.message ? e.message : e) };
+    }
+    return { getan: true, auftrag,
+      text: "Auftrag fuer Sprosse 5 in data/penalty-order.json und"
+        + " watchdog.json.orders - der Kern startet punish.js"
+        + " (Trockenlauf, solange data/punish-scharf.txt fehlt)."
+        + " S2 steht bei " + (auftrag.s2MotorMs / 3600000).toFixed(1) + " h"
+        + " Motorzeit, wirkungslos: " + JSON.stringify(auftrag.wirkungslos) };
   }
 
   return { getan: false, text: "Sprosse " + nr + " ist nicht gebaut." };

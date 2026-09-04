@@ -164,15 +164,36 @@ export async function main(ns) {
   // Ohne gekaufte Augmentierung waere der Einbau ein reiner Soft-Reset: er
   // naehme alles und gaebe nichts. `ns.singularity.softReset` ist genau
   // deshalb ausdruecklich NICHT gebaut.
-  const queue = liesJson("data/aug-queue.json");
-  const wartende = queue && Array.isArray(queue.augs) ? queue.augs : [];
-  raus.bedingungen.queuedAugs = wartende.length;
-  if (!wartende.length) {
-    return fertig("keine gekaufte Augmentierung in data/aug-queue.json -"
-      + " ein Einbau ohne Aug ist ein Soft-Reset, und der ist nicht gebaut");
+  // AUS `data/einbau.json`, NICHT AUS EINER PHANTOMDATEI (Skeptiker Runde 4,
+  // R2, 04.09.2026).
+  //
+  // Hier stand `data/aug-queue.json`, und die hatte im ganzen Baum keinen
+  // Schreiber - der Kommentar behauptete, `bn4rep.js` wisse es "ohnehin", nur
+  // schrieb es das nirgends hin. Die Vorbedingung war damit dauerhaft
+  // unerfuellbar, und drei von vier Pruefern haben sie unabhaengig gefunden.
+  //
+  // `bn4rep.js` fuehrt die Zahl seit jeher in `data/einbau.json` unter
+  // `wartend` (bn4rep.js:1041-1046) - es ist die Differenz aus
+  // `getOwnedAugmentations(true)` und `(false)`, also genau "gekauft, aber
+  // noch nicht eingebaut". Diese Datei hat einen Schreiber, einen Zeitstempel
+  // und wird bei jedem Durchlauf neu geschrieben.
+  const einbau = liesJson("data/einbau.json");
+  const wartende = einbau && Number.isFinite(einbau.wartend) ? einbau.wartend : 0;
+  raus.bedingungen.queuedAugs = wartende;
+  if (!einbau) {
+    return fertig("data/einbau.json fehlt - ohne die Zahl der gekauften"
+      + " Augmentierungen wird nicht eingebaut");
   }
-  if (Number.isFinite(queue.nodeReset) && queue.nodeReset !== ri.lastNodeReset) {
-    return fertig("data/aug-queue.json stammt aus einem anderen Knoten");
+  // Eine alte Zahl ist so schlimm wie keine: zwischen dem Schreiben und hier
+  // kann ein Einbau gelaufen sein, und dann waere die Warteschlange leer.
+  if (!Number.isFinite(einbau.zeit) || jetzt - einbau.zeit > 30 * 60000) {
+    return fertig("data/einbau.json ist aelter als 30 Minuten - die Zahl der"
+      + " wartenden Augmentierungen ist nicht mehr verlaesslich");
+  }
+  if (wartende < 1) {
+    return fertig("keine gekaufte Augmentierung (data/einbau.json: wartend "
+      + wartende + ") - ein Einbau ohne Aug ist ein Soft-Reset, und der ist"
+      + " nicht gebaut");
   }
 
   // --- 5. Nicht vor dem Divisionsbeitritt ------------------------------------

@@ -227,7 +227,13 @@ export function signale(e) {
         && Number.isFinite(e.letzterTraegerMotorMs)) {
       const dMotor = e.motorTimeMs - e.letzterTraegerMotorMs;
       if (dMotor >= 45 * 60000 && t.wert <= e.letzterTraegerWert) {
+        // `alterMotorMs` GEHOERT MIT (Skeptiker Runde 4, R1). Sprosse 5
+        // prueft als erste Vorbedingung "S2 seit >= 6 h MOTORZEIT" und liest
+        // die Zahl aus dem Auftrag - der Waechter fuehrt das Signal, also gibt
+        // er sie mit. Eine zweite Rechnung in punish.js waere eine zweite
+        // Wahrheit ueber dieselbe Sache.
         s.push({ sig: "S2", ziel: "fortschritt", schwere: 2,
+          alterMotorMs: dMotor,
           grund: "Traeger '" + t.name + "' seit " + Math.round(dMotor / 60000) +
             " min Motorzeit nicht gewachsen" });
       }
@@ -252,7 +258,37 @@ export function sprosseFuer(sig) {
  *
  * @returns {{handlung: string, sprosse: object|null, ziel: string, grund: string}}
  */
-export function schritt(z, sig, jetztGuardMs, jetztWall) {
+/**
+ * Die Uhr einer Sprosse - und warum das Feld bis zum 04.09.2026 Zierde war.
+ *
+ * `SPROSSEN[].uhr` sagt, in welcher Zeit die Fristen dieser Sprosse laufen.
+ * Gelesen hat es niemand: `schritt()` mass jede Karenz und jede
+ * Wirkungsfrist in Waechterzeit. Sprosse 5 deklariert `uhr: "motor"` und
+ * `karenzMs: 6 h` - ausgefuehrt wurden sechs Stunden WANDUHR.
+ *
+ * Das ist genau die Uhrenverwechslung, gegen die `lib/uhren.js` geschrieben
+ * wurde, und sie stand in der Datei, die sie verhindern soll. Schlimmer noch:
+ * `tools/test-sprosse5-kette.js` prueft `s5.uhr === "motor"` und war gruen -
+ * ein Test auf eine Deklaration, nicht auf ein Verhalten (Skeptiker Runde 4,
+ * R15).
+ *
+ * Die Wahl der Uhr ist inhaltlich: Sprossen 0 bis 3 messen in Waechterzeit,
+ * weil sie den Kern ueberwachen und dessen Uhr stillsteht, sobald er haengt.
+ * Sprosse 5 misst in MOTORZEIT, weil ihre Bedingung "der Traeger waechst
+ * nicht" eine Aussage ueber gespielte Zeit ist - sechs Stunden Wanduhr, von
+ * denen fuenf offline waren, sind kein Stillstand.
+ *
+ * @param {object} sprosse
+ * @param {{guard: number, engine: number, motor: number}} uhren
+ */
+function uhrFuer(sprosse, uhren) {
+  if (!uhren) return null;
+  if (sprosse.uhr === "motor" && Number.isFinite(uhren.motor)) return uhren.motor;
+  if (sprosse.uhr === "engine" && Number.isFinite(uhren.engine)) return uhren.engine;
+  return Number.isFinite(uhren.guard) ? uhren.guard : null;
+}
+
+export function schritt(z, sig, jetztGuardMs, jetztWall, uhren) {
   // ZUSTANDSSIGNALE SPEISEN DIE LEITER NICHT (04.09.2026, Skeptiker Fehlermodi).
   //
   // S4 (Tab verdeckt) und S5 (die Bruecke meldet etwas) beschreiben die
@@ -317,12 +353,21 @@ export function schritt(z, sig, jetztGuardMs, jetztWall) {
     s.zustand = "SUSPECT";
     s.sprosse = kandidat.nr;
     s.seit = jetztGuardMs;
+    s.seitUhr = uhrFuer(kandidat, uhren);
+    s.signal = sig.sig;
     return { handlung: "verdacht", sprosse: kandidat, ziel,
       grund: sig.grund + " - Karenz " + Math.round(kandidat.karenzMs / 60000) + " min" };
   }
 
   if (s.zustand === "SUSPECT") {
-    const wartet = jetztGuardMs - s.seit;
+    // IN DER UHR DER SPROSSE (R15). `s.seitUhr` wird beim Setzen des Zustands
+    // in derselben Uhr genommen - sonst verglichen wir zwei verschiedene
+    // Zeitrechnungen miteinander, und das ist schlimmer als eine falsche.
+    const jetztU = uhrFuer(kandidat, uhren);
+    const seitU = Number.isFinite(s.seitUhr) ? s.seitUhr : null;
+    const wartet = (jetztU !== null && seitU !== null)
+      ? jetztU - seitU
+      : jetztGuardMs - s.seit;
     if (wartet < kandidat.karenzMs) {
       return { handlung: "wartet", sprosse: kandidat, ziel,
         grund: "noch " + Math.round((kandidat.karenzMs - wartet) / 1000) + " s Karenz" };
@@ -340,6 +385,10 @@ export function schritt(z, sig, jetztGuardMs, jetztWall) {
     s.zustand = "EXECUTED";
     s.seit = jetztGuardMs;
     s.versuche++;
+    // Das Signal wandert in den Zustand. `verifiziert` bekommt es sonst nicht
+    // zu sehen - und braucht es, um beim Eskalieren nur Sprossen zu waehlen,
+    // die fuer DIESES Signal gebaut sind (R3).
+    s.signal = sig.sig;
     return { handlung: "ausfuehren", sprosse: kandidat, ziel, grund: sig.grund };
   }
 
@@ -409,7 +458,24 @@ export function verifiziert(z, ziel, gruen, jetztGuardMs) {
     return { zustand: "HEALTHY", eskaliert: false };
   }
 
-  const naechste = SPROSSEN.find((x) => x.nr > s.sprosse && x.gebaut);
+  // DIE ESKALATION FOLGT DEM AUSLOESER (Skeptiker Runde 4, R3, 04.09.2026).
+  //
+  // Hier stand `SPROSSEN.find((x) => x.nr > s.sprosse && x.gebaut)` - die
+  // naechste GEBAUTE Sprosse, ohne Ruecksicht darauf, wofuer sie gebaut ist.
+  //
+  // Solange 4a und 5 beide ungebaut waren, endete die Kette nach 3 in
+  // EXHAUSTED, und das fiel nicht auf. Seit Sprosse 5 gebaut ist, fuehrte
+  // JEDES Signal nach Sprosse 3 zu einem Augmentierungs-Einbau. Zwei Pruefer
+  // haben unabhaengig denselben Weg nachgestellt: ein `hashes.js`, dessen
+  // Telemetrie steht, weil der Kern es aus Platzmangel nicht startet, landet
+  // nach 35 Minuten bei "Soft-Reset durch Einbau" - und ein Einbau macht
+  // Platzmangel schlimmer, nicht besser (home behaelt seinen Speicher, alles
+  // andere ist weg).
+  //
+  // Sprosse 5 hat `ausloeser: ["S2"]` und ist damit nur ueber S2 erreichbar.
+  // Das ist keine neue Regel, sondern die, die in der Tabelle schon stand.
+  const naechste = SPROSSEN.find((x) => x.nr > s.sprosse && x.gebaut
+    && (!s.signal || x.ausloeser.includes(s.signal)));
   if (!naechste) {
     s.zustand = "EXHAUSTED";
     s.seit = jetztGuardMs;

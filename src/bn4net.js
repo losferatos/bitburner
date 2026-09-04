@@ -4061,9 +4061,27 @@ export async function main(ns) {
         for (const o of orders) {
           if (!o || o.sprosse !== 5 || o.skript !== "punish.js") continue;
           if (!Number.isFinite(o.gestellt) || Date.now() - o.gestellt > 15 * 60000) continue;
+          // AUS DIESEM KNOTEN (Skeptiker Runde 4, R18, 04.09.2026).
+          //
+          // Der Kommentar oben behauptete diese Pruefung, den Code gab es
+          // nicht - und der Auftrag trug kein `nodeReset`, mit dem eine
+          // moeglich gewesen waere. `data/watchdog.json` ueberlebt beide
+          // Prestiges (Textdateien auf home tun das), boot.js raeumt sie
+          // nicht, und `auftraegeGetan` ist nach dem Sprung leer. Ein zwei
+          // Minuten alter Auftrag haette also im FRISCHEN Knoten einen
+          // Augmentierungs-Einbau ausgeloest, mitten im Kaltstart.
+          if (Number.isFinite(o.nodeReset)
+              && o.nodeReset !== ns.getResetInfo().lastNodeReset) continue;
           const schluessel = "s5-" + o.gestellt;
           if (auftraegeGetan.has(schluessel)) continue;
-          if (ns.ps("home").some((p) => p.filename === "punish.js")) break;
+          // AUF ALLEN WIRTEN SUCHEN (R26): gestartet wird punish.js auf dem
+          // Rechner mit dem meisten Platz, nicht auf home. Eine Sperre, die
+          // nur home ansieht, laesst einen zweiten Einbau zu - und der waere
+          // ein weggeworfener Lauf.
+          if (hosts.some((h) => {
+            try { return ns.ps(h).some((p) => p.filename === "punish.js"); }
+            catch { return false; }
+          })) break;
 
           if (!ns.fileExists("punish.js", "home")) {
             sag("Waechterauftrag Sprosse 5, aber punish.js liegt nicht auf home.");
@@ -4089,9 +4107,14 @@ export async function main(ns) {
             if (f > meist) { meist = f; wirt = h; }
           }
           if (!wirt || !(braucht > 0) || meist < braucht) {
-            sag("Waechterauftrag Sprosse 5: punish.js (" + braucht.toFixed(1)
-              + " GB) passt auf keinen Wirt (bester: "
-              + (Number.isFinite(meist) ? meist.toFixed(1) : "?") + " GB).");
+            // Gedrosselt wie jede andere wiederkehrende Meldung im Kern
+            // (R26): im Kaltstart passt punish.js mit 83 GB fuenfzehn Minuten
+            // lang nicht, und diese Zeile stand in JEDER Runde im Log.
+            if (runde % 10 === 0) {
+              sag("Waechterauftrag Sprosse 5: punish.js (" + braucht.toFixed(1)
+                + " GB) passt auf keinen Wirt (bester: "
+                + (Number.isFinite(meist) ? meist.toFixed(1) : "?") + " GB).");
+            }
             break;   // NICHT abhaken - beim naechsten Mal kann Platz sein
           }
           if (wirt !== "home") ns.scp(["punish.js", ...BIBLIOTHEKEN], wirt, "home");

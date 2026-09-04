@@ -981,20 +981,46 @@ export const SOLVERS = {
         if (werte(t) !== ziel) return false;
       }
       if (new Set(answer).size !== answer.length) return false;
-      // Eigene Aufzaehlung ueber alle Operatorbelegungen.
-      if (ziffern.length > 10) return true;
-      const alle = new Set();
-      const lücken = ziffern.length - 1;
-      for (let maske = 0; maske < 4 ** lücken; maske++) {
-        let t = ziffern[0];
-        let m = maske;
-        for (let i = 1; i <= lücken; i++) {
-          t += ["", "+", "-", "*"][m % 4] + ziffern[i];
-          m = Math.floor(m / 4);
+
+      // EIGENE AUFZAEHLUNG - UND OHNE DECKEL (Skeptiker Runde 4, R7).
+      //
+      // Hier stand `if (ziffern.length > 10) return true`, und das Spiel
+      // erzeugt 4 bis 12 Ziffern (FindAllValidMathExpressions.ts:34). Gemessen
+      // ueber 245 Generatorinstanzen nahmen 72 eine gekuerzte Antwort an, bei
+      // 11 und 12 Ziffern sogar die LEERE Liste. Die Vollstaendigkeit ist aber
+      // der ganze Inhalt der Aufgabe.
+      //
+      // Der alte Weg zaehlte 4^(n-1) Operatorbelegungen - bei 12 Ziffern vier
+      // Millionen Zeichenketten, jede neu zusammengesetzt und geparst. Das war
+      // der Grund fuer den Deckel.
+      //
+      // Der neue geht rueckverfolgend ueber die Ziffern und traegt den Wert
+      // mit: `wert` ist die Summe bisher, `letzter` der zuletzt addierte
+      // Summand (fuer die Punktrechnung, die ihn zurueckrechnen muss). Er
+      // erzeugt gar keine Zeichenketten und schneidet fuehrende Nullen sofort
+      // ab. Gemessen: 72 ms fuer zwoelf Ziffern.
+      //
+      // Das ist DIESELBE Rekursion, die das Spiel benutzt - aber die Aufgabe
+      // ist hier eine andere: nicht die Ausdruecke aufzaehlen, sondern sie
+      // ZAEHLEN. Verglichen wird eine Zahl mit einer Listenlaenge.
+      let anzahl = 0;
+      const gehe = (pos, wert, letzter) => {
+        if (pos === ziffern.length) { if (wert === ziel) anzahl++; return; }
+        for (let i = pos; i < ziffern.length; i++) {
+          if (i > pos && ziffern[pos] === "0") break;   // fuehrende Null
+          const teil = Number(ziffern.slice(pos, i + 1));
+          if (!Number.isSafeInteger(teil)) break;
+          if (pos === 0) gehe(i + 1, teil, teil);
+          else {
+            gehe(i + 1, wert + teil, teil);
+            gehe(i + 1, wert - teil, -teil);
+            gehe(i + 1, wert - letzter + letzter * teil, letzter * teil);
+          }
         }
-        if (werte(t) === ziel) alle.add(t);
-      }
-      return alle.size === answer.length;
+      };
+      if (ziffern.length > 16) return false;   // nicht rechenbar heisst ABLEHNEN
+      gehe(0, 0, 0);
+      return anzahl === answer.length;
     }
   },
 
@@ -1451,20 +1477,38 @@ export const SOLVERS = {
       return primeSieve(data[0], data[1]);
     },
     verify: (data, answer) => {
-      // Unabhaengig: Probedivision je Zahl statt Sieb. Langsamer, aber ein
-      // voellig anderes Verfahren - gedeckelt auf eine Spanne, die im
-      // Millisekundenbereich bleibt.
+      // Unabhaengig: EIN VOLLES Sieb bis `hi` statt des segmentierten Siebs in
+      // solve. Anderes Verfahren, andere Speicherform, dieselbe Antwort.
+      //
+      // DER DECKEL WAR DER FEHLER (Skeptiker Runde 4, R6, 04.09.2026).
+      //
+      // Hier stand eine Probedivision mit `if (hi - lo > 60000) return true`.
+      // Das Spiel erzeugt aber `low` in [0, 5e6] und `high = low + [1e5, 1e6]`
+      // (TotalPrimesInRange.ts:20-22) - die Spanne ist IMMER mindestens
+      // 100.000. Der Kurzschluss griff damit bei hundert Prozent der echten
+      // Vertraege, und die Gegenprobe nahm gemessen sechs von sechs
+      // Muellantworten an. Eine Probe, die immer besteht, ist schlimmer als
+      // keine: sie steht als Begruendung dafuer, ohne Rueckfrage einzureichen.
+      //
+      // Ein `return true` ist ausserdem die falsche Richtung. Wo eine
+      // Gegenprobe nicht rechnen kann, muss sie ABLEHNEN - ein nicht
+      // eingereichter Vertrag kostet den Vertrag, ein falsch eingereichter
+      // einen unwiederbringlichen Versuch.
+      //
+      // Kosten gemessen: das volle Sieb bis 6e6 braucht 26 ms.
       if (!Number.isInteger(answer) || answer < 0) return false;
       if (!Array.isArray(data)) return false;
       const hi = data[1];
       const lo = Math.max(2, data[0]);
-      if (hi - lo > 60000) return true;   // zu gross fuer die Probedivision
-      let n = 0;
-      for (let x = lo; x <= hi; x++) {
-        let prim = x >= 2;
-        for (let d = 2; d * d <= x; d++) if (x % d === 0) { prim = false; break; }
-        if (prim) n++;
+      if (!Number.isInteger(hi) || !Number.isInteger(data[0]) || hi < lo) return false;
+      if (hi > 2e7) return false;   // nicht rechenbar heisst ABLEHNEN, nicht durchwinken
+      const feld = new Uint8Array(hi + 1);
+      for (let i = 2; i * i <= hi; i++) {
+        if (feld[i]) continue;
+        for (let j = i * i; j <= hi; j += i) feld[j] = 1;
       }
+      let n = 0;
+      for (let x = lo; x <= hi; x++) if (!feld[x]) n++;
       return n === answer;
     },
   },
@@ -1542,13 +1586,21 @@ export const SOLVERS = {
       const flaeche = (r1 - r0 + 1) * (c1 - c0 + 1);
       if (h * b > 2500) return true;   // zu gross fuer das Absuchen
       // Groesstes leeres Rechteck per vollstaendiger Suche.
+      // DIE SCHRANKE IST EINE BREITE, KEIN SPALTENINDEX (Skeptiker Runde 4,
+      // gefunden vom Generatortest, 04.09.2026).
+      //
+      // Hier stand `while (j + breite < maxBreite && ...)`: ein absoluter
+      // Spaltenindex gegen eine BREITE verglichen. Bei kleinen Gittern faellt
+      // das nicht auf (j ist meist 0), bei den 4x4 bis 15x15 des Spiels sehr
+      // wohl - die Probe lehnte dann die eigene richtige Antwort ab, und der
+      // Vertrag waere nie eingereicht worden.
       let best = 0;
       for (let i = 0; i < h; i++) for (let j = 0; j < b; j++) {
         if (state[i][j] !== 0) continue;
-        let maxBreite = b;
+        let maxBreite = b - j;
         for (let u = i; u < h; u++) {
           let breite = 0;
-          while (j + breite < maxBreite && state[u][j + breite] === 0) breite++;
+          while (breite < maxBreite && j + breite < b && state[u][j + breite] === 0) breite++;
           maxBreite = breite;
           if (breite === 0) break;
           const f = breite * (u - i + 1);

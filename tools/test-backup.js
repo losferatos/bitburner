@@ -219,6 +219,30 @@ console.log("-- Dateinamen und Anlass-Erkennung --");
       "LIVE_x_BN1L1_2026-09-04T01-13_hourly-b64.json",
     )[1] === "hourly",
   );
+
+  // DER KOLLISIONSZUSATZ DARF DIE ROTATION NICHT BRECHEN (04.09.2026).
+  //
+  // Zwei Sicherungen derselben Minute trugen bis heute denselben Namen: die
+  // zweite ueberschrieb die erste, und der Index bekam zwei Zeilen mit
+  // verschiedenen Pruefsummen auf EINE Datei.
+  //
+  // Der erste Reparaturversuch haengte den Zusatz hinter den Anlass
+  // (`..._connect-2.json.gz`) und brach damit `anlassVon`: die Datei hatte
+  // keinen Anlass mehr, fiel aus der Rotation und blieb liegen. Gemessen nach
+  // einem halben Tag Testlaeufen: 10 rotierte Sicherungen und 79
+  // unaufraeumbare. Deshalb steht der Zusatz jetzt am Zeitstempel.
+  for (const [anlass, lauf] of [["connect", 2], ["pre-jump", 3], ["hourly", 7]]) {
+    const n = dateiName(k, anlass, "LIVE_", true, d, lauf);
+    const m = /_((?:pre-)?[a-z]+)(?:-b64)?\.json(?:\.gz)?$/.exec(n);
+    pruefe("Lauf " + lauf + ": Anlass '" + anlass + "' bleibt lesbar",
+      m && m[1] === anlass, n + " -> " + (m ? m[1] : "nichts"));
+    pruefe("  und der Name ist ein anderer als Lauf 1",
+      n !== dateiName(k, anlass, "LIVE_", true, d), n);
+  }
+  pruefe("Lauf 1 traegt keinen Zusatz",
+    dateiName(k, "connect", "LIVE_", true, d, 1)
+      === dateiName(k, "connect", "LIVE_", true, d),
+    "der Normalfall darf sich nicht aendern");
 }
 
 console.log("");

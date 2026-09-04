@@ -301,9 +301,25 @@ function zeitstempelName(d) {
   );
 }
 
-export function dateiName(kennwerte, anlass, praefix, binary, jetzt) {
+export function dateiName(kennwerte, anlass, praefix, binary, jetzt, lauf = 1) {
   const b64 = binary ? "" : "-b64";
   const endung = binary ? ".json.gz" : ".json";
+  /**
+   * DER KOLLISIONSZUSATZ GEHOERT AN DEN ZEITSTEMPEL, NICHT ANS ENDE
+   * (04.09.2026, zweiter Anlauf).
+   *
+   * Der erste Anlauf haengte ihn hinter den Anlass: `..._connect-2.json.gz`.
+   * Das loeste zwar die Namenskollision, brach aber die ROTATION -
+   * `anlassVon` liest den Anlass mit `[a-z]+` vor der Endung, und
+   * "connect-2" passt darauf nicht. Die Datei bekam damit gar keinen Anlass
+   * mehr, fiel aus `rotiere()` heraus und blieb liegen. Gemessen nach einem
+   * halben Tag Testlaeufen: 10 ordentlich rotierte Sicherungen und 79
+   * unaufraeumbare.
+   *
+   * Am Zeitstempel stoert er niemanden: er ist ohnehin nur ein Name, und der
+   * Anlass steht weiterhin als letztes Wort vor der Endung.
+   */
+  const zusatz = lauf > 1 ? "-" + lauf : "";
   return (
     praefix +
     kennwerte.identifier +
@@ -313,6 +329,7 @@ export function dateiName(kennwerte, anlass, praefix, binary, jetzt) {
     kennwerte.lauf +
     "_" +
     zeitstempelName(jetzt) +
+    zusatz +
     "_" +
     anlass +
     b64 +
@@ -427,14 +444,8 @@ export async function sichere(opt) {
   {
     const belegt = (n) => [primaer, spiegel].filter(Boolean)
       .some((ort) => fs.existsSync(path.join(ort, n)));
-    if (belegt(name)) {
-      const punkt = name.indexOf(".json");
-      const stamm = name.slice(0, punkt);
-      const rest = name.slice(punkt);
-      for (let i = 2; i < 100; i++) {
-        const kandidat = stamm + "-" + i + rest;
-        if (!belegt(kandidat)) { name = kandidat; break; }
-      }
+    for (let i = 2; i < 100 && belegt(name); i++) {
+      name = dateiName(k, anlass, praefix, geholt.binary, jetzt, i);
     }
   }
 

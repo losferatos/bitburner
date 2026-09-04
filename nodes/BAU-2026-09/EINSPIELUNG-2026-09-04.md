@@ -148,10 +148,190 @@ steht hier, damit sie niemand später für erledigt hält.
 
 ## Die Stufen
 
-*(wird während der Einspielung gefüllt)*
+Eingespielt wurde mit `tools/einspielen.js` — Datei fuer Datei, jede danach
+**wieder ausgelesen** und ueber sha256 verglichen. Neu gestartet wurde mit
+`tools/neustart.js`: PID vorher, Quittung des Kerns, PID nachher. Ein Neustart
+ohne neue PID gilt nicht als geschehen.
+
+| Stufe | Inhalt | Neustart | Ergebnis |
+|---|---|---|---|
+| 1 | 19 Module und Daten (`lib/*`, `registry.json`) | keiner noetig | 19/19 |
+| 1b | 8 folgenlose Dateien | keiner noetig | 8/8, Code nachweislich unveraendert |
+| 3 | 8 schlafende Gewerke | keiner noetig | 8/8 |
+| 4 | `popups.js` | `WERKZEUG` | pid 27 zu 310112 |
+| 5 | `exit.js` + `ausgang.js` | `WERKZEUG ausgang.js` | **fehlgeschlagen, siehe unten** |
+| 5b | `export.js` | keiner | 1/1 |
+| 6 | `bn4net.js` (der Kern) | `SELBST` | pid 2 zu 320914 |
+| 7 | `contracts.js` | `WERKZEUG` | pid 25 zu 323349 |
+| 8 | `blade.js bbtrain.js bn4life.js bn4rep.js` | vier, in der Reihenfolge | alle vier belegt |
+| 8b/8c | die Skeptiker-Reparaturen | Kern + 6 Gewerke | alle belegt |
+| 9-11 | `figwatch.js graftauto.js guard.js boot.js` | Kern | 16 Werkzeuge, 11 ueberwacht |
+
+**Nicht eingespielt, mit Absicht:**
+
+- **`graftplan.json`** — es ist der Zuender fuer `graftauto.js`. Der Code liegt
+  im Spiel und startet **nicht**: seine Vorbedingung
+  (`precondition.requiresFile`) ist genau diese Datei. Wer sie hinlegt, loest
+  binnen 60 Sekunden einen echten `graftAugmentation` aus; das Geld ist beim
+  Start weg und kommt bei Abbruch nicht zurueck (Blade`s Simulacrum: 450 Mrd).
+  Das ist Erics Entscheidung, keine Bauentscheidung.
+  *(Sie war in Stufe 1 versehentlich mitgegangen und wurde um 18:12 wieder
+  entfernt — zu einem Zeitpunkt, als `graftauto.js` noch gar nicht im Spiel
+  lag, der Zuender also ins Leere gegriffen haette.)*
+- **`data/guard-modus.txt`** — ohne sie laeuft `guard.js` im
+  Beobachtungsmodus. So verlangt es Position C.6: ein Waechter, der zuerst
+  beobachtet, kostet eine Nacht; ein Waechter, der zuerst zuschlaegt, kostet
+  im schlechtesten Fall einen ganzen Lauf.
+
+---
+
+## Was schiefging — und was es gelehrt hat
+
+### Stufe 5: `ausgang.js` war 30 Minuten tot, und es sah nach Erfolg aus
+
+`WERKZEUG ausgang.js` wurde quittiert, der Prozess war weg — und blieb weg.
+Der Kern schrieb alle zehn Sekunden dieselbe Zeile, die niemand las:
+
+```
+ausgang.js liess sich auf werk-0 nicht starten (exec gab 0).
+```
+
+Die Ursache stand im **laufenden** Kern: `const BIBLIOTHEKEN =
+["lib/hackaugs.js"]`. Er kopierte beim Start eines Werkzeugs genau eine
+Bibliothek mit. Die neue `ausgang.js` importiert vier, und keine lag auf
+werk-0. Bitburner loest Importe beim Uebersetzen auf und braucht sie auf
+**demselben** Rechner.
+
+Drei Lehren, jede teuer erkauft:
+
+1. **Der PID-Beleg hat es gefunden, nicht die Meldung.** Ohne
+   `tools/neustart.js` waere "quittiert" als Erfolg durchgegangen — bei dem
+   Werkzeug, das den BitNode-Wechsel entscheidet.
+2. **`tools/importpruefung.js` sah es nicht**, weil es gegen `home` prueft und
+   auf home alles lag. Der Unterschied zwischen "die Datei existiert" und "sie
+   existiert dort, wo das Skript startet" ist genau der Fehler.
+3. **Die Planreihenfolge hatte eine Luecke.** Der neue Kern liest `needsLibs`
+   und kopiert richtig — aber er kam eine Stufe *spaeter* als die Werkzeuge,
+   die darauf angewiesen sind.
+
+Und beim Nachziehen der `needsLibs` fiel auf, dass die Listen projektweit
+unvollstaendig waren: `bn4net.js` fuehrte 1 von 6 Bibliotheken, **`guard.js`
+0 von 4**. `guard.js` stand zu dem Zeitpunkt noch zur Einspielung an — es
+waere beim ersten Start genauso gescheitert, mit derselben stillen Logzeile.
+
+### Die Skeptikerrunde hat mehr gefunden als die Einspielung
+
+Drei Subagents mit getrennten Angriffswinkeln (Praemisse, Dauerbetrieb,
+Substanz) fanden **neun** Fehler — zwei davon in Reparaturen, die eine Stunde
+vorher entstanden waren. Der lehrreichste:
+
+> `ns.scp` **wirft nicht**, wenn die Quelldatei fehlt. Es protokolliert, setzt
+> `noFailures = false` und gibt das zurueck. Beide Reparaturen begruendeten
+> ihre Sicherheit mit einem Verhalten, das die Engine nicht hat.
+
+Und der peinlichste war meiner: eine Wache gegen negative Zeitstempel wurde
+zwischen ein `if` und sein `else` gesetzt und hat das `else` gekapert. Danach
+meldete der gesunde Fall "ohne lastVerifiedBackup" und der kaputte "letzte
+gruene Sicherung **0 min alt**" — eine taufrische Sicherung genau dann, wenn
+keine nachweisbar ist. `null / 60000` ist `0`, nicht `NaN`; es sah nicht
+einmal kaputt aus.
+
+### Eine ganze Fehlerklasse, nicht ein Fehler
+
+Der Ausloeser war `export.js`, das `data/bridge.json` auf werk-0 suchte. Die
+Suche danach (`ns.read("data/...")` in einem Gewerk, dessen `hostRule` es von
+home wegschickt) fand **neun** Gewerke. Der gefaehrlichste war `bn4life.js`:
+
+```js
+if (ns.fileExists("data/task.txt", "home")) {   // prueft HOME
+  const roh = ns.read("data/task.txt").trim();  // liest LOKAL -> ""
+  ns.write("data/task.txt", "", "w");           // leert LOKAL -> nichts
+```
+
+Auf einem Fremdwirt haette das den Auftrag weder ausgefuehrt noch geleert —
+`task.txt` auf home waere dauerhaft belegt geblieben und damit der einzige
+Kanal, ueber den dem Bot von aussen etwas gesagt werden kann. Lautlos.
+
+**Das war keine Theorie:** beim Neustart um 19:44 wanderte `bn4life.js` von
+home nach werk-0. Der Beleg, dass die Reparatur traegt, liegt im selben
+Vorgang — `neustart.js` hat danach noch viermal die Prozessliste ueber
+`data/task.txt` geholt und bekommen.
+
+Sechs handgeschriebene Fassungen desselben Musters in drei Qualitaeten waren
+die Ursache. Jetzt gibt es `src/lib/hostdatei.js`, einmal.
 
 ---
 
 ## Messungen
 
-*(wird während der Einspielung gefüllt)*
+### Der Traeger
+
+| Zeitpunkt | Bladeburner-Rang | Rate |
+|---|---|---|
+| 17:31 (vor der Einspielung) | 3.871 | 399/h |
+| 18:35 (vor Stufe 8) | 4.792 | — |
+| 19:05 | 4.971 | 616/h ueber 30 min |
+| 19:56 (Abschluss) | 5.257 | **575/h** ueber den ganzen Vorgang |
+
+Die Abnahme fuer Stufe 8 war ausdruecklich **der Rang ueber 30 Minuten**, nicht
+die Frische der Telemetrie: ein Ausfall von `blade.js` sieht nicht wie einer
+aus, weil `data/blade.json` ausserhalb der Entscheidungskette weitergeschrieben
+wird. Der Rang ist gestiegen, und die Rate liegt ueber dem Stand vor der
+Einspielung.
+
+### Der Spielstand
+
+Die Bibliotheksverteilung von 18:30 war eine noetige Kruecke, solange der alte
+Kern lief — und sie hat den Spielstand mehr als verdoppelt (entpackt 4,35 zu
+9,19 MB). Teuer war daran nicht die Platte, sondern die **Rueckfalltiefe**:
+`sync/instanz.js` deckelt Sicherungen doppelt, nach Stueckzahl (252) und nach
+Bytes (300 MB). Bei 0,83 MB je Datei band die Stueckzahl, bei 2,17 MB bindet
+das Budget — und geraeumt wird ab `pre-hotswap`, also genau der Sicherung
+unmittelbar vor einer Codeaenderung.
+
+Nach dem Rueckbau, direkt im Spiel gezaehlt:
+
+```
+home     19 Bibliotheken   279,3 KB
+werk-0    9 Bibliotheken    89,5 KB   <- nur die, die laufende Werkzeuge brauchen
+--------------------------------------
+Summe                      368,9 KB   (vorher 19 x 17 Rechner, rund 4,6 MB)
+```
+
+Gegenprobe, dass der Rueckbau traegt: nach `neustart.js blade.js` lagen
+`lib/figur.js`, `lib/figurns.js` und `lib/hostdatei.js` wieder auf werk-0 —
+`lib/kpi.js` **nicht**, weil `blade.js` sie nicht braucht.
+
+### Stand bei Abschluss (19:56)
+
+```
+BitNode 10, Lauf 2, Verfahren V2      Netz 85/85 gerootet
+16 Werkzeuge laut Registry, 15 laufen, 11 ueberwacht
+guard.js im Beobachtungsmodus         graftauto.js liegt, startet nicht
+33 von 33 Testdateien gruen           0 Fehlalarme im Strategiepruefer
+```
+
+`strategie-check.js` meldete vor dieser Sitzung neun fehlende Werkzeuge,
+waehrend der Kern keines vermisste — der eigene Filter kannte weder `knoten`
+noch `verfahren` noch `precondition`, verglich gegen eine Prozessliste, die
+Arbeiter bewusst ausblendet, und wertete ein `until-done`-Gewerk als Ausfall.
+Jetzt entscheidet `gilt()` aus `lib/reg.js`, dieselbe Funktion wie im Kern,
+und eine Gegenprobe gegen dessen Zaehlwerk meldet jede Abweichung.
+
+---
+
+## Was offen bleibt
+
+- **Der Kanarienvogel auf der TEST-Instanz** (oben unter "Der Punkt der
+  Checkliste") ist weiterhin nicht erfuellt — er braucht eine zweite
+  Spielinstanz, die nur Eric oeffnen kann.
+- **`graftplan.json`** wartet auf Erics Entscheidung (450 Mrd, unwiderruflich).
+- **Die Einbausperre `data/install-sperre.txt` steht noch.** Sie ist
+  unbefristet und wird vom Bot nicht geraeumt. Solange sie liegt, baut er
+  keine Augmentierungen ein. Sie gehoert weg, sobald Eric den Stand
+  abgenommen hat — bis dahin ist sie der Schutz, unter dem diese Einspielung
+  gefahren wurde.
+- **`doku/kontrakte.md` widerspricht sich** bei `data/sofort.json`: Zeile 339
+  fuehrt "Bruecke nach Zustellung" in der Raeumspalte, Abschnitt 4.11 sagt
+  "Raeumen: NEIN, ausdruecklich". Gebaut ist 4.11 (Quittung ueber
+  `zugestellt`, kein Raeumen). Die Zeile 339 gehoert korrigiert.

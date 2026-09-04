@@ -239,9 +239,27 @@ console.log("-- das Kaltstart-Tor E1 --");
   // shop.js. Was danach dauerhaft liegt, sind 23,95 GB - das ist die Zahl,
   // an der der Kaltstart wirklich haengt.
   //
-  // Geprueft wird deshalb beides: die Residenz mit Luft, und die Spitze so,
-  // dass in ihr noch ein Arbeiter Platz hat. Ein Kaltstart, in dem kein
-  // einziger weaken laufen kann, verdient nichts und ist damit kein Start.
+  // DIESER KOMMENTAR STAND FRUEHER IM WIDERSPRUCH ZUM TEST
+  // (Skeptiker Runde 4, Substanz-Befund 18, 04.09.2026).
+  //
+  // Hier stand: "Geprueft wird deshalb beides: die Residenz mit Luft, und die
+  // Spitze so, dass in ihr noch ein Arbeiter Platz hat. Ein Kaltstart, in dem
+  // kein einziger weaken laufen kann, verdient nichts und ist damit kein
+  // Start." Geprueft wurde `spitze <= 32`. Der Lauf gab daneben selbst aus:
+  // "mit einem Arbeiter 33.45 von 32" - genau der Fall, den der Kommentar fuer
+  // "kein Start" erklaerte - und war gruen.
+  //
+  // Richtig ist die Unterscheidung, die der Kommentar selbst zwei Absaetze
+  // weiter oben trifft: die Spitze ist ein Fenster von SEKUNDEN, in dem
+  // boot.js noch laeuft. Dass darin kein Arbeiter passt, ist unerheblich.
+  //
+  // Was zaehlt, ist der Zustand DANACH - und da ist die ehrliche Aussage
+  // unbequemer, als der alte Kommentar sie machte: neben Kern, Waechter und
+  // Wachhalter (19,15) passt ENTWEDER die Geldquelle cdump.js (12,65) ODER
+  // eine Handvoll Arbeiter, nicht beides. Der Kaltstart verdient auf 32 GB an
+  // Vertraegen, nicht am Hacken, bis home waechst. Das wird jetzt so geprueft,
+  // statt es wegzuschreiben.
+  //
   // Dauerlast ist, was OHNE Anlass liegt: Kern, Waechter, Wachhalter. shop.js
   // gehoert seit dem Bedarfsbetrieb nicht mehr dazu.
   pruefe("Dauerlast (Kern, Waechter, Wachhalter) <= 20 GB", summe <= 20,
@@ -255,9 +273,32 @@ console.log("-- das Kaltstart-Tor E1 --");
   pruefe("die Spitze selbst passt auf 32 GB", spitze <= 32,
     "Spitze " + spitze.toFixed(2) + " GB - in diesem Fenster laeuft boot.js"
       + " noch, waehrend der Kern schon startet");
+
+  // Was NACH dem Fenster gilt: die Residenz plus die Geldquelle des
+  // Kaltstarts. Sie ist die bindende Zahl - passt sie nicht, verdient der Bot
+  // in der Startlage gar nichts.
+  const geldquelle = rechne("cdump.js", { sf4: 1 }).gb ?? 12.65;
+  const nachBoot = summe + geldquelle;
+  pruefe("nach dem Fenster passt die Geldquelle neben die Residenz",
+    nachBoot <= 32,
+    "Residenz " + summe.toFixed(2) + " + cdump.js " + geldquelle.toFixed(2)
+      + " = " + nachBoot.toFixed(2) + " von 32 - das ist die bindende Zahl"
+      + " des ganzen Kaltstarts, mit " + (32 - nachBoot).toFixed(2) + " GB Luft");
+
+  // Und die Wahrheit, die der alte Kommentar verschwieg: beides zugleich geht
+  // nicht. Das ist kein Fehler, sondern die Lage - und sie gehoert benannt,
+  // weil jede Planung fuer die ersten Minuten davon abhaengt.
+  pruefe("ein Arbeiter passt NICHT auch noch daneben - das ist die Lage",
+    nachBoot + arbeiter > 32,
+    "unerwartet: es passt doch (" + (nachBoot + arbeiter).toFixed(2) + ")."
+      + " Dann ist der Kommentar hier veraltet und gehoert korrigiert.");
+
   console.log("       dauerhaft " + dauerhaft.toFixed(2) + " GB, Spitze "
-    + spitze.toFixed(2) + " GB, mit einem Arbeiter "
-    + (spitze + arbeiter).toFixed(2) + " von 32");
+    + spitze.toFixed(2) + " GB (Fenster von Sekunden)");
+  console.log("       Residenz " + summe.toFixed(2) + " + Geldquelle "
+    + geldquelle.toFixed(2) + " = " + nachBoot.toFixed(2)
+    + " von 32; ein Arbeiter (" + arbeiter.toFixed(2) + ") passt daneben nicht.");
+  console.log("       Der Kaltstart verdient an Vertraegen, nicht am Hacken.");
 }
 
 console.log("");

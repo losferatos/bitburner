@@ -5,14 +5,38 @@
  * DIE ZAHL, AN DER DER GANZE AUFTRAG HAENGT
  * ===========================================================================
  *
- * Nach jedem BitNode-Sprung und nach jedem Augmentierungs-Einbau hat `home`
- * genau 32 GB (`Prestige.ts:241-247`), es gibt keinen einzigen Mietrechner
- * (`Prestige.ts:73`) und 1.262 Dollar auf dem Konto
- * (`PlayerObjectGeneralMethods.ts:102`). In diese 32 GB muss alles passen, was
- * den Bot aus der Startlage heraustraegt - und was nicht passt, wartet.
+ * DREI KORREKTUREN AM 04.09.2026 (Skeptiker Runde 4, Substanz 13-16). Hier
+ * stand: "Nach jedem BitNode-Sprung und nach jedem Augmentierungs-Einbau hat
+ * `home` genau 32 GB", und `HOME_GB = 32` trug den Zusatz "nicht
+ * verhandelbar, nicht konfigurierbar". Alle drei Teile waren falsch:
  *
- * Vierzig Mal auf der Restroute. Ein Kaltstart, der eine Stunde laenger
- * dauert, kostet vierzig Stunden.
+ *   (1) Der AUGMENTIERUNGS-EINBAU setzt den Heimspeicher NICHT zurueck.
+ *       `prestigeAugmentation` ruft `prestigeHomeComputer`
+ *       (`Prestige.ts:60-110`), und das leert in `Server/ServerHelpers.ts:224-238`
+ *       nur Programme, Nachrichten und `ramUsed` - `setMaxRam` steht dort
+ *       nicht. Gekaufter Heimspeicher ueberlebt einen Einbau. Nur der
+ *       BitNode-Wechsel setzt zurueck.
+ *
+ *   (2) Der BitNode-Wechsel gibt 32 GB nur, solange SF9 unter Stufe 2 liegt
+ *       (`Prestige.ts:246-252`): ab SF9 Stufe 2 sind es 128, ohne SF1 waeren
+ *       es 8. `route.json` hat BN9 Level 2 als Eintrag 6 von 40 - ab Eintrag 7
+ *       startet `home` also mit 128 GB, fuer 34 der 40 Restlaeufe. Bei 128 GB
+ *       passt die ganze Kaltstart-Auswahl gleichzeitig, und die
+ *       Platzreservierung, um die es hier geht, ist gegenstandslos.
+ *
+ *   (3) `sf4: 1` war fest verdrahtet. Die Route spielt BN4 Level 2 und 3 als
+ *       Eintraege 3 und 4 - ab Eintrag 5 ist SF4 = 3 und der
+ *       Singularity-Faktor 1 statt 16. Fuer `homegrow.js` ist das der
+ *       Unterschied zwischen 148,50 und 13,50 GB.
+ *
+ * Der Test bleibt trotzdem wichtig, aber sein Gegenstand ist enger, als er
+ * behauptet hat: die ENGE Startlage betrifft die ersten Laeufe der Route, und
+ * genau die stehen als naechste an. Die Tabelle unten sagt jetzt je Eintrag,
+ * mit welchen Zahlen gerechnet wird.
+ *
+ * Unveraendert richtig: es gibt nach dem Sprung keinen einzigen Mietrechner
+ * (`Prestige.ts:73`) und 1.262 Dollar auf dem Konto
+ * (`PlayerObjectGeneralMethods.ts:102`, `1000 + Donations` mit Donations = 262).
  *
  * ===========================================================================
  * WAS DIESER TEST TUT UND WAS NICHT
@@ -43,8 +67,34 @@ const ROOT = path.resolve(HIER, "..");
 const REG = JSON.parse(fs.readFileSync(path.join(SRC, "registry.json"), "utf8"));
 const reg = await import(pathToFileURL(path.join(SRC, "lib", "reg.js")).href);
 
-/** home nach einem Reset. Nicht verhandelbar, nicht konfigurierbar. */
+/**
+ * home nach einem BitNode-Wechsel - abhaengig von SF9 und SF1
+ * (`Prestige.ts:246-252`).
+ *
+ *   SF9 >= 2  ->  128 GB
+ *   SF1 >  0  ->   32 GB      <- der Stand dieses Spielstands
+ *   sonst     ->    8 GB
+ */
 const HOME_GB = 32;
+
+/**
+ * Der Stand der Source-Files je Routeneintrag.
+ *
+ * Aus `route.json` abgeleitet, nicht behauptet: ein abgeschlossener Eintrag
+ * hebt sein Source-File auf die gespielte Stufe. `RedPill.tsx:60-77` vergibt
+ * es VOR `prestigeSourceFile`, der neue Stand gilt also sofort beim Sprung.
+ */
+function standVorEintrag(route, index) {
+  const sf = { 1: 1, 4: 1, 5: 1, 6: 1, 10: 1 };   // Stand 04.09.2026, gemessen
+  for (let i = 0; i < index; i++) {
+    const e = route[i];
+    sf[e.node] = Math.max(sf[e.node] || 0, e.level);
+  }
+  return {
+    sf4: sf[4] || 0,
+    homeGb: (sf[9] || 0) >= 2 ? 128 : ((sf[1] || 0) > 0 ? 32 : 8),
+  };
+}
 
 let gruen = 0;
 let rot = 0;
@@ -59,9 +109,16 @@ function pruefe(name, bedingung, hinweis = "") {
   }
 }
 
-/** Der gerechnete Bedarf eines Eintrags im gegebenen BitNode. */
-function bedarf(name, bitNode) {
-  const r = rechne(name, bitNode === 4 ? { bitNode: 4 } : { sf4: 1 });
+/**
+ * Der gerechnete Bedarf eines Eintrags im gegebenen BitNode.
+ *
+ * `sf4` wird jetzt DURCHGEREICHT statt fest auf 1 zu stehen (Skeptiker Runde
+ * 4, Substanz 15). Ab Routeneintrag 5 ist SF4 = 3, und dann kostet die
+ * Singularity-Familie den Grundpreis statt das Sechzehnfache - fuer 32
+ * Dateien ein Unterschied bis Faktor 16.
+ */
+function bedarf(name, bitNode, sf4 = 1) {
+  const r = rechne(name, bitNode === 4 ? { bitNode: 4 } : { sf4 });
   return r.gb;
 }
 
@@ -74,7 +131,8 @@ function bedarf(name, bitNode) {
  * erst, wenn `contracts.js` einmal gelaufen ist - im ersten Moment gibt es sie
  * also nicht, und `csolve.js` wartet zu Recht.
  */
-function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0) {
+function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0,
+  homeGb = HOME_GB, sf4 = 1) {
   const da = new Set(["registry.json", "route.json", "graftplan.json",
     ...extraDateien]);
   const lage = {
@@ -85,7 +143,7 @@ function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0) {
     features: {},
   };
   const auswahl = reg.auswahl(REG, lage);
-  let frei = HOME_GB - schonBelegt;
+  let frei = homeGb - schonBelegt;
   const laufen = [];
   const warten = [];
   // DIE RESERVIERUNG NACHBILDEN (bn4net.js, Werkzeugstarter).
@@ -101,7 +159,7 @@ function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0) {
   let reserviert = null;
   for (const e of auswahl) {
     if (e.name.startsWith("worker/")) continue;   // Arbeiter kommen zuletzt
-    const gb = bedarf(e.name, bitNode);
+    const gb = bedarf(e.name, bitNode, sf4);
     if (gb === null) { warten.push([e.name, null, "nicht rechenbar"]); continue; }
     if (reserviert) {
       warten.push([e.name, gb, "wartet: " + reserviert + " haelt Platz frei"]);
@@ -140,9 +198,16 @@ console.log("-- die Startlage in BitNode 10, Verfahren V2 --");
   console.log("       " + ohneBoot.toFixed(2).padStart(7) + " GB  danach (boot.js beendet sich)");
   // Die Zahl, die wirklich zaehlt: was bleibt fuer Geldarbeit uebrig, sobald
   // boot.js weg ist?
-  pruefe("danach bleiben mindestens 12 GB fuer Gewerke und Arbeiter",
-    HOME_GB - ohneBoot >= 12,
-    "frei " + (HOME_GB - ohneBoot).toFixed(2) + " GB");
+  // DIE BINDENDE ZAHL IST cdump.js, NICHT 12 (Substanz 17). Frei sind 12,85,
+  // gebraucht 12,65 - die Luft betraegt 0,20 GB. Eine Schwelle bei 12 haette
+  // ein Wachstum von 0,85 GB durchgewinkt, obwohl schon 0,21 GB die einzige
+  // Geldquelle des Kaltstarts aussperren.
+  const cdumpGb = bedarf("cdump.js", 10, 1);
+  pruefe("danach bleibt Platz fuer die Geldquelle",
+    HOME_GB - ohneBoot >= cdumpGb,
+    "frei " + (HOME_GB - ohneBoot).toFixed(2) + " GB, cdump.js braucht "
+    + cdumpGb.toFixed(2) + " - Luft: "
+    + (HOME_GB - ohneBoot - cdumpGb).toFixed(2) + " GB");
 }
 
 console.log("");
@@ -274,6 +339,78 @@ console.log("-- die ALLERERSTE Kernrunde: boot.js laeuft noch (C.7) --");
   pruefe("sobald boot.js weg ist, laeuft cdump.js",
     weit.laufen.map(([n]) => n).includes("cdump.js"),
     "sonst waere das Fenster kein Fenster, sondern ein Riegel");
+}
+
+console.log("");
+console.log("-- die ganze Route, mit dem jeweils richtigen Stand (Substanz 13-16) --");
+{
+  // WO IST ES WIRKLICH ENG. Der Test hat bis heute vierzig Laeufe ueber einen
+  // Kamm geschoren: 32 GB, SF4 = 1. Beides gilt nur fuer die ersten Eintraege.
+  const route = JSON.parse(fs.readFileSync(path.join(SRC, "route.json"), "utf8")).route;
+  const eng = [];
+  const zeilen = [];
+  for (let i = 0; i < route.length; i++) {
+    const e = route[i];
+    const st = standVorEintrag(route, i);
+    const s2 = startlage(e.node, e.verfahren, [], 0, st.homeGb, st.sf4);
+    const geldquellen = s2.laufen.map(([n]) => n)
+      .filter((n) => ["cdump.js", "csolve.js", "sleevecrime.js"].includes(n));
+    if (st.homeGb <= 32) eng.push(i + 1);
+    zeilen.push({ nr: i + 1, node: e.node, level: e.level, home: st.homeGb,
+      sf4: st.sf4, laufen: s2.laufen.length, frei: s2.frei,
+      geld: geldquellen.length });
+  }
+
+  // Nur die ersten acht und eine Zusammenfassung - vierzig Zeilen liest niemand.
+  for (const z of zeilen.slice(0, 8)) {
+    console.log("       " + String(z.nr).padStart(2) + ". BN" + z.node + " L" + z.level
+      + "  home " + String(z.home).padStart(3) + " GB, SF4." + z.sf4
+      + " -> " + String(z.laufen).padStart(2) + " Gewerke, "
+      + z.frei.toFixed(2).padStart(6) + " GB frei, "
+      + z.geld + " Geldquelle(n)");
+  }
+  console.log("       ... (" + (zeilen.length - 8) + " weitere)");
+
+  pruefe("die enge Startlage betrifft genau die ersten " + eng.length + " Eintraege",
+    eng.length > 0 && eng.length < route.length,
+    "eng (32 GB): " + eng.join(", "));
+  pruefe("und sie stehen als naechste an", eng[0] === 1,
+    "sonst waere dieser Test nicht der dringendste");
+
+  // In JEDEM Eintrag muss mindestens eine Geldquelle Platz finden. Das ist die
+  // Aussage, die ueber alle vierzig Laeufe gilt.
+  const ohneGeld = zeilen.filter((z) => z.geld === 0);
+  pruefe("in jedem der " + zeilen.length + " Laeufe findet eine Geldquelle Platz",
+    ohneGeld.length === 0,
+    ohneGeld.map((z) => z.nr + ". BN" + z.node).join(", "));
+
+  // Und die Gegenprobe zur Korrektur (2): ab 128 GB ist es NICHT mehr eng.
+  const weit = zeilen.find((z) => z.home === 128);
+  if (weit) {
+    pruefe("ab dem ersten 128-GB-Lauf ist Platz da", weit.frei > 10,
+      "Lauf " + weit.nr + ": " + weit.frei.toFixed(2) + " GB frei bei "
+      + weit.laufen + " Gewerken");
+  }
+}
+
+console.log("");
+console.log("-- BitNode 4: derselbe Speicher, andere Singularity-Preise --");
+{
+  // BN4 kam bisher gar nicht vor, obwohl `rechne` einen eigenen Modus dafuer
+  // hat (Substanz 16). Dort kostet die Singularity-Familie den Grundpreis -
+  // fuer homegrow.js ist das der Unterschied zwischen 148,50 und 13,50 GB.
+  const s4 = startlage(4, "V2");
+  const s10 = startlage(10, "V2");
+  const n4 = s4.laufen.map(([n]) => n);
+  pruefe("auch in BN4 laeuft der Kern", n4.includes("bn4net.js"));
+  pruefe("und der Waechter", n4.includes("guard.js"));
+  const hg4 = bedarf("homegrow.js", 4);
+  const hg10 = bedarf("homegrow.js", 10, 1);
+  pruefe("homegrow.js ist in BN4 um ein Vielfaches billiger", hg4 * 5 < hg10,
+    "BN4 " + hg4.toFixed(2) + " GB, sonst " + hg10.toFixed(2) + " GB bei SF4.1");
+  console.log("       BN4: " + s4.laufen.length + " Gewerke, "
+    + s4.frei.toFixed(2) + " GB frei; BN10: " + s10.laufen.length + " Gewerke, "
+    + s10.frei.toFixed(2) + " GB frei");
 }
 
 console.log("");

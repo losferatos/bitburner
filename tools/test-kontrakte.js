@@ -194,8 +194,16 @@ console.log("");
 console.log("-- kpi.js: leer() unterscheidet 0 von null --");
 {
   const k = KPI.leer(1000);
-  pruefe("Fehlerzaehler beginnen bei 0", k.manual_actions === 0 && k.false_kill_count === 0,
-    "0 heisst: gemessen, war null");
+  // UMGEKEHRT SEIT DEM 04.09.2026 (Skeptiker Runde 4, R11).
+  //
+  // Hier stand "Fehlerzaehler beginnen bei 0" mit der Begruendung "0 heisst:
+  // gemessen, war null". Das war der Fehler: mehrere dieser Zaehler haben gar
+  // keinen Schreiber, und eine 0, die niemand gesetzt hat, ist keine Messung,
+  // sondern eine Behauptung. Die Abnahmebedingung `false_penalty_count = 0`
+  // war damit unfaelschbar.
+  pruefe("Fehlerzaehler beginnen bei NULL, nicht bei 0",
+    k.manual_actions === null && k.false_kill_count === null,
+    "null heisst: hier hat noch niemand gezaehlt");
   pruefe("nie gemessene Werte sind null", k.t_workbench === null && k.T2_h === null,
     "null heisst: nie gemessen - eine 0 waere ein Bestwert, den niemand erreicht hat");
   pruefe("Version gesetzt", k.version === KPI.KPI_VERSION);
@@ -243,7 +251,8 @@ console.log("-- kpi.js: Wanderung v1 -> v2 --");
   const r = KPI.laden(alt);
   pruefe("gewandert ohne Schreibsperre", !r.schreibsperre && /gewandert/.test(r.befund || ""));
   pruefe("Version angehoben", r.kpi.version === KPI.KPI_VERSION);
-  pruefe("Fehlerzaehler auf 0", r.kpi.false_penalty_count === 0);
+  pruefe("Fehlerzaehler auf null", r.kpi.false_penalty_count === null,
+    "eine gewanderte Datei hat den Zaehler nie gefuehrt - 0 waere erfunden");
   pruefe("nie gemessene Werte auf null", r.kpi.T2_h === null,
     "erhalten " + JSON.stringify(r.kpi.T2_h) + " - eine Vorlagenzahl waere erfunden");
   pruefe("Bestandsfelder unangetastet", r.kpi.node === 10 && r.kpi.level === 2);
@@ -260,7 +269,8 @@ console.log("-- kpi.js: Regel 3 - neuer Lauf setzt laufbezogene Felder zurueck -
   pruefe("neuer Lauf erkannt", /neuer Lauf/.test(r.befund || ""));
   pruefe("nodeReset uebernommen", r.kpi.nodeReset === 2000);
   pruefe("Motorzeit des Laufs auf 0", r.kpi.motorTimeSinceNodeMs === 0);
-  pruefe("Autonomiezaehler auf 0", r.kpi.manual_actions === 0);
+  pruefe("Autonomiezaehler auf null", r.kpi.manual_actions === null,
+    "im neuen Lauf hat noch niemand gezaehlt");
   pruefe("Effizienzwerte auf null", r.kpi.t_workbench === null,
     "Werte des alten Laufs sind fuer den neuen bedeutungslos");
   const gleich = KPI.laden(JSON.stringify(k), 1000);

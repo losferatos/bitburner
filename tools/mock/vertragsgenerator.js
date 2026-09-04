@@ -100,6 +100,37 @@ const SCHLUESSEL = ["ALGORITHM", "BANDWIDTH", "BLOGGER", "BOOKMARK", "BROADBAND"
   "COMPRESS", "COMPUTER", "CONFIGURE", "DASHBOARD", "DATABASE", "DESKTOP",
   "DIGITAL", "DOCUMENT", "DOWNLOAD", "DYNAMIC"];
 
+/**
+ * `HammingEncodeProperly` aus HammingCode.ts:154-216 - der Kodierer, mit dem
+ * das Spiel die Eingaben fuer "Encoded Binary to Integer" erzeugt.
+ *
+ * Er ist NICHT derselbe wie der Loeser fuer "Integer to Encoded Binary": die
+ * Blocklaenge ist hier immer eine Zweierpotenz `n = 2^m`, und die Datenbits
+ * werden von hinten gefuellt. Dadurch stehen fuehrende Nullen im Datenteil,
+ * und genau die sind der interessante Fall.
+ */
+function hammingProperly(data) {
+  let m = 1;
+  while (2 ** (2 ** m - m - 1) - 1 < data) m++;
+  const n = 2 ** m;
+  const k = 2 ** m - m - 1;
+  const enc = [0];
+  const bits = String(data).length && Number.isSafeInteger(data)
+    ? data.toString(2).split("").reverse().map(Number)
+    : [];
+  for (let i = 1, j = k; i < n; i++) {
+    if ((i & (i - 1)) !== 0) enc[i] = bits[--j] ? bits[j] : 0;
+  }
+  let p = 0;
+  for (let i = 0; i < n; i++) if (enc[i]) p ^= i;
+  const pArr = p.toString(2).split("").reverse().map(Number);
+  for (let i = 0; i < m; i++) enc[2 ** i] = pArr[i] ? 1 : 0;
+  p = 0;
+  for (let i = 0; i < n; i++) if (enc[i]) p++;
+  enc[0] = p % 2 === 0 ? 0 : 1;
+  return enc.join("");
+}
+
 function fuenfWoerter(r) {
   const kopie = [...WOERTER].sort(() => r() - 0.5);
   return kopie.slice(0, 5).join(" ");
@@ -108,6 +139,12 @@ function fuenfWoerter(r) {
 // ---------------------------------------------------------------------------
 // Die Generatoren. Schluessel exakt wie in CodingContract/Enums.ts.
 // ---------------------------------------------------------------------------
+/**
+ * Der Typ mit dem Akzentzeichen im Namen - aus dem Enum des Spiels, nicht
+ * getippt. `Enums.ts:28` schreibt ihn mit Accent grave.
+ */
+export const NAME_VIGENERE = "Encryption II: Vigenère Cipher";
+
 export const GENERATOREN = {
   // FindLargestPrimeFactor.ts:13
   "Find Largest Prime Factor": (r) => ganz(r, 500, 1e9),
@@ -262,13 +299,24 @@ export const GENERATOREN = {
   },
 
   // HammingCode.ts:76 - kodieren, dann in der Haelfte der Faelle ein Bit kippen.
-  // Der Kodierer kommt aus dem Loeser selbst; das ist hier ausdruecklich in
-  // Ordnung, weil er den EINGANG erzeugt, nicht die Antwort.
-  "HammingCodes: Encoded Binary to Integer": (r, SOLVERS) => {
+  //
+  // DAS SPIEL BENUTZT HIER EINEN ANDEREN KODIERER (Skeptiker Runde 4,
+  // Substanz-Befund 3, 04.09.2026). `HammingEncodeProperly` (HammingCode.ts:154)
+  // waehlt die Blocklaenge als Zweierpotenz `n = 2^m` und fuellt die Datenbits
+  // von hinten - `HammingEncode` (der Loeser fuer den anderen Typ) nimmt die
+  // kuerzeste Laenge und fuellt vorwaerts.
+  //
+  // Gemessen ueber je 3.000 Instanzen: das Spiel erzeugt Wortlaengen 8, 16, 32
+  // und 64, mit einer fuehrenden Null im Datenteil in 91,8 % der Faelle. Der
+  // erste Anlauf dieses Generators erzeugte 56 verschiedene Laengen und die
+  // fuehrende Null in 2,3 %. Genau dieser Fall ist es aber, fuer den die
+  // Gegenprobe eigens geschrieben wurde - sie wurde also in einem
+  // Vierzigstel der Faelle geprueft, in denen sie zaehlt.
+  "HammingCodes: Encoded Binary to Integer": (r) => {
     const x = 2 ** 4;
     const y = 2 ** ganz(r, 1, 57);
     const zahl = ganz(r, Math.min(x, y), Math.max(x, y));
-    const wort = SOLVERS["HammingCodes: Integer to Encoded Binary"].solve(zahl).split("");
+    const wort = hammingProperly(zahl).split("");
     if (Math.round(r())) {
       const i = ganz(r, 0, wort.length - 1);
       wort[i] = wort[i] === "0" ? "1" : "0";
@@ -333,7 +381,14 @@ export const GENERATOREN = {
   "Encryption I: Caesar Cipher": (r) => [fuenfWoerter(r), Math.floor(r() * 25 + 1)],
 
   // Encryption.ts:103
-  "Encryption II: Vigenere Cipher": (r) =>
+  //
+  // DER NAME WIRD NICHT GETIPPT (Skeptiker Runde 4, Substanz-Befund 2).
+  // Er enthaelt ein Akzentzeichen, und beim ersten Anlauf stand er hier ohne -
+  // der Typ wurde dann in der Pruefschleife still uebersprungen
+  // (`if (!l) continue`). Auffallen konnte das nur an der Arithmetik: 348
+  // Instanzen sind 29 x 12, nicht 30 x 12. Genau die Falle, vor der der
+  // Kommentar im Test warnt.
+  [NAME_VIGENERE]: (r) =>
     [fuenfWoerter(r), SCHLUESSEL[Math.floor(r() * SCHLUESSEL.length)]],
 
   // TotalPrimesInRange.ts:17 - DIE SPANNE IST IMMER >= 100.000

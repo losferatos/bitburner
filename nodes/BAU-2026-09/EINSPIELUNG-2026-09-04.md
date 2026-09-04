@@ -262,6 +262,71 @@ die Ursache. Jetzt gibt es `src/lib/hostdatei.js`, einmal.
 
 ---
 
+### 20:06 — der Zuender ging beinahe hoch, und schuld war eine Aufraeummassnahme
+
+Der schwerste Vorfall des Tages kam nicht von der Einspielung, sondern von
+einer Verbesserung daran.
+
+**Was geschah.** Nach einem Brueckenneustart meldete die Bruecke zum
+wiederholten Mal *"Grosser Schub verweigert (53 Dateien) — sieht nach einem
+Merge aus"*. Der Grund war harmlos: `zuletztGeschoben` ist eine Map im
+Arbeitsspeicher der Bruecke, nach einem Neustart leer — und dann gilt jede
+Datei als geaendert, auch wenn im Spiel Byte fuer Byte dasselbe liegt. 52 der
+53 waren laengst eingespielt, ueber den RPC-Weg, von dem der Watcher nichts
+weiss.
+
+Ich habe die Bruecke deshalb so geaendert, dass sie im Zweifel das Spiel
+fragt, statt ihrem Gedaechtnis zu glauben. Das ist richtig. Nur:
+
+```
+53 Dateien im Rueckstau
+  - 52 als "liegt schon richtig im Spiel" herausgenommen   <- die Verbesserung
+  = 1 verbleibende Datei
+    1 <= SCHUB_MAX (8)  ->  der Deckel greift nicht mehr
+    und diese eine Datei war graftplan.json
+```
+
+`graftplan.json` ist der Zuender fuer `graftauto.js`. Liegt sie im Spiel,
+startet der Kern das Gewerk in der naechsten Runde, und es loest binnen 60
+Sekunden einen echten `graftAugmentation` aus — 450 Milliarden, beim Start
+weg, bei Abbruch nicht zurueck. Sie war den ganzen Tag mit voller Absicht
+draussen.
+
+**Was NICHT geschah.** Der Kern hatte die Datei rund zwei Minuten und ist in
+dieser Zeit nicht dazu gekommen, das Gewerk zu starten. Geprueft, nicht
+gehofft:
+
+| Beleg | Befund |
+|---|---|
+| `data/graftauto.json` | existiert nicht — das Gewerk hat nie gelaufen |
+| Kernlog | null Zeilen mit „graft" |
+| `data/figure.txt` | `owner: blade.js`, `action: bladeburner` |
+| Kontostand | 34,09 → 35,25 Mrd, also gestiegen |
+
+**Die Lehre.** Der Fehler war nicht die Bereinigung — die ist richtig. Der
+Fehler war, dass eine Datei, die *nie von selbst* ins Spiel darf, ueberhaupt
+an einer **Menge** hing. Ein Deckel, der bei 8 greift, schuetzt nicht das, was
+gefaehrlich ist, sondern das, was zahlreich ist. Und eine Aufraeummassnahme
+senkt Mengen — das ist ihr Zweck.
+
+Was gefaehrlich ist, gehoert **benannt**. Seit 20:15 gibt es
+`data/nicht-schieben.txt`: eine Zeile je Pfad, geachtet vom Watcher *und* von
+`pushAll` beim Verbinden, und auch ein Freibrief hebt sie nicht auf. Hinein
+kommt so etwas nur ueber `tools/einspielen.js`.
+
+Belegt im Betrieb um 20:26: *142 Datei(en) ins Spiel uebertragen — 1 aus einem
+verweigerten Schub ZURUECKGEHALTEN*, und `graftplan.json` liegt weiterhin
+nicht im Spiel.
+
+**Und die Probe dazu haette fast getaeuscht.** Der erste Anlauf des Tests
+schrieb eine Datei, die gar nicht in der Master-Liste des Pruefstands stand —
+sie wurde also schon vom Master-Riegel abgewiesen, und die Sperrprobe waere
+aus dem falschen Grund gruen geworden. Jetzt bekommt die Testdatei in beiden
+Faellen eine Freigabe, und eine Gegenprobe zeigt, dass sie ohne Eintrag
+sehr wohl durchgeht.
+
+---
+
 ## Messungen
 
 ### Der Traeger

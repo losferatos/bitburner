@@ -70,6 +70,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-graftwahl.js",
+    deckt: "Graft-Auswahl: Vorzug, Puffer, Sprungnaehe, gegen den echten Plan (C.14)",
+    schnell: true,
+  },
+  {
     datei: "test-figur.js",
     deckt: "Figur-Vergabepunkt: Lease, Rangfolge, Folgenummer, Knotenstempel (C.11)",
     schnell: true,

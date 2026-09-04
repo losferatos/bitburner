@@ -431,6 +431,41 @@ const SCHUB_FREI_MAX_MS = 30 * 60000;
  */
 const SCHUB_OFFEN_DATEI = path.join(DATA_DIR, "schub-offen.json");
 /**
+ * DATEIEN, DIE NIE VON SELBST INS SPIEL GEHEN.
+ *
+ * Eine Zeile je Pfad, alles ab `#` ist Kommentar. Anders als der
+ * Rueckstau ist das keine Buchhaltung ueber einen einzelnen Vorgang, sondern
+ * eine dauerhafte Ansage: diese Datei liegt in `src/`, gehoert dorthin, und
+ * darf trotzdem nur durch eine ausdrueckliche Handlung ins Spiel
+ * (`tools/einspielen.js`).
+ *
+ * Der Anlass, 04.09.2026, 20:06: `graftplan.json` ist der Zuender fuer
+ * `graftauto.js` - liegt sie im Spiel, loest das Gewerk binnen 60 Sekunden
+ * einen echten `graftAugmentation` ueber 450 Milliarden aus, und das Geld ist
+ * beim Start weg. Sie wurde deshalb aus dem Spiel genommen. Beim
+ * Brueckenneustart schob der Watcher sie WIEDER hinein - unter genau den
+ * Umstaenden, die unten beschrieben sind.
+ *
+ * Der Rueckstau allein reicht dafuer nicht: er ist an einen Vorgang gebunden
+ * und wird aufgeloest, sobald der erledigt ist. Diese Liste ist es nicht.
+ */
+const NICHT_SCHIEBEN_DATEI = path.join(DATA_DIR, "nicht-schieben.txt");
+
+/** Die Sperrliste lesen. Fehlt sie, ist nichts gesperrt. */
+async function nichtSchieben() {
+  try {
+    const roh = await readFile(NICHT_SCHIEBEN_DATEI, "utf8");
+    const raus = new Set();
+    for (const z of roh.split(/\r?\n/)) {
+      const t = z.split("#")[0].trim();
+      if (t) raus.add(t);
+    }
+    return raus;
+  } catch {
+    return new Set();
+  }
+}
+/**
  * DIE FREIGABELISTE FUER DEN HOT-SWAP.
  *
  * Sie steht neben dem Master-Riegel (siehe `inMaster`): eine Datei, die noch
@@ -1127,9 +1162,16 @@ async function pushAll() {
   // Zurueckgehalten wird NUR die wartende Liste, nicht der ganze Schub: fuer
   // alles andere ist die Uebertragung beim Verbinden richtig und noetig.
   const wartend = (await schubFrei()) ? new Set() : await schubOffenListe();
+  // Die Sperrliste gilt IMMER - auch mit Freibrief. Ein Freibrief sagt
+  // "dieser grosse Schub ist Absicht", nicht "alle Sicherungen aus".
+  const gesperrt = await nichtSchieben();
   const done = [];
   let gehalten = 0;
   for (const file of files) {
+    if (gesperrt.has(file.gameName)) {
+      gehalten++;
+      continue;
+    }
     if (wartend.has(file.gameName)) {
       gehalten++;
       zurueckgestellt.add(file.gameName);
@@ -1228,19 +1270,92 @@ async function schiebeStapel(stapelEingang) {
   // Erst pruefen, ob ueberhaupt etwas Neues dabei ist. Ohne diese Vorpruefung
   // zoege ein Watcher-Fehlalarm eine vollstaendige Sicherung nach sich - und
   // bei einem Massen-Fehlalarm eine je zehn Minuten, dauerhaft.
+  /**
+   * =========================================================================
+   * IM ZWEIFEL DAS SPIEL FRAGEN, NICHT DAS GEDAECHTNIS (04.09.2026, 20:15)
+   * =========================================================================
+   *
+   * `zuletztGeschoben` ist eine Map im Arbeitsspeicher DIESES Prozesses. Nach
+   * einem Brueckenneustart ist sie leer - und dann gilt jede Datei als
+   * geaendert, auch wenn im Spiel Byte fuer Byte dasselbe liegt.
+   *
+   * Gemessen am 04.09.: nach dem Neustart um 19:54 meldete die Bruecke
+   * "Grosser Schub verweigert (53 Dateien) - sieht nach einem Merge aus".
+   * 52 der 53 lagen zu dem Zeitpunkt bereits richtig im Spiel; die
+   * Einspielung war ueber den RPC-Weg gelaufen, von dem der Watcher nichts
+   * weiss. Der Rueckstau ueberlebt in `schub-offen.json` sogar den Neustart,
+   * also wiederholte sich der Alarm - in genau dem Kanal, ueber den Eric
+   * seit dem Abschalten der Push-Nachrichten noch etwas erfaehrt.
+   *
+   * Und die naheliegende Abhilfe waere die schlechteste gewesen: ein
+   * pauschales `schub-frei.txt` haette die 52 harmlosen Dateien
+   * durchgelassen - und die dreiundfuenfzigste mit. Das war `graftplan.json`,
+   * der Zuender fuer einen echten Graft ueber 450 Milliarden.
+   *
+   * Deshalb: fehlt der Fingerabdruck im Gedaechtnis, wird er beim Spiel
+   * geholt. Stimmt er ueberein, ist die Datei nicht geaendert, sondern nur
+   * unbekannt - und das ist etwas anderes.
+   */
+  const gehaltenRoh = await schubOffenListe();
+
   const neu = [];
   for (const datei of stapel) {
     try {
       const inhalt = await readFile(path.join(SCRIPT_DIR, datei), "utf8");
       const fp = createHash("sha256").update(inhalt).digest("hex");
-      if (zuletztGeschoben.get(datei) !== fp) neu.push(datei);
+      if (zuletztGeschoben.get(datei) === fp) continue;
+      if (!zuletztGeschoben.has(datei)) {
+        // Unbekannt - also nachsehen, statt zu raten.
+        let imSpiel = null;
+        try {
+          imSpiel = await request("getFile", { filename: datei, server: "home" });
+        } catch { imSpiel = null; }
+        if (typeof imSpiel === "string"
+            && createHash("sha256").update(imSpiel).digest("hex") === fp) {
+          zuletztGeschoben.set(datei, fp);
+          zurueckgestellt.delete(datei);
+          continue;
+        }
+      }
+      neu.push(datei);
     } catch {
       // Geloescht oder unlesbar - der Schub selbst meldet es.
       neu.push(datei);
     }
   }
+  // DEN RUECKSTAU GEGEN DAS SPIEL HALTEN - ABER NUR DEN ECHTEN.
+  //
+  // `schub-offen.json` ueberlebt den Brueckenneustart und traegt sonst
+  // Dateien mit, die laengst richtig im Spiel liegen (etwa weil sie ueber
+  // den RPC-Weg eingespielt wurden, von dem der Watcher nichts weiss). Diese
+  // Karteileichen blaehen die Zahl, an der der Deckel haengt, und erzeugen
+  // bei jedem Neustart denselben Fehlalarm.
+  //
+  // Gefragt wird nur nach der PERSISTIERTEN Liste, nicht nach der ganzen
+  // Warteschlange: die kann in einer Anlaufphase hunderte Eintraege haben,
+  // und ein Abgleich je Ereignis waere dann teurer als der Schub selbst.
+  if (gehaltenRoh.size) {
+    for (const d of gehaltenRoh) {
+      if (stapel.includes(d)) continue;
+      try {
+        const inhalt = await readFile(path.join(SCRIPT_DIR, d), "utf8");
+        const fp = createHash("sha256").update(inhalt).digest("hex");
+        const imSpiel = await request("getFile", { filename: d, server: "home" });
+        if (typeof imSpiel === "string"
+            && createHash("sha256").update(imSpiel).digest("hex") === fp) {
+          zuletztGeschoben.set(d, fp);
+          zurueckgestellt.delete(d);
+          gehaltenRoh.delete(d);
+        }
+      } catch { /* dann bleibt er drin - im Zweifel gegen den Schub */ }
+    }
+    if (gehaltenRoh.size) await schreibeSchubOffen([...gehaltenRoh]);
+    else { try { await rm(SCHUB_OFFEN_DATEI, { force: true }); } catch { /* egal */ } }
+  }
+
   if (!neu.length) {
-    log("info", stapel.length + " Watcher-Meldung(en) ohne Inhaltsaenderung - nichts geschoben");
+    log("info", stapel.length + " Watcher-Meldung(en) ohne Inhaltsaenderung - nichts geschoben"
+      + (zurueckgestellt.size ? " (" + zurueckgestellt.size + " noch zurueckgestellt)" : ""));
     return;
   }
   stapel = neu;
@@ -1392,6 +1507,41 @@ async function schiebeStapel(stapelEingang) {
     }
     letzteSchubSicherung = jetzt;
   }
+
+  /**
+   * =========================================================================
+   * DIE SPERRLISTE GILT AUCH HIER (04.09.2026, 20:15)
+   * =========================================================================
+   *
+   * Am 20:06 hat der Watcher `graftplan.json` ins Spiel geschoben - den
+   * Zuender fuer einen Graft ueber 450 Milliarden, der mit voller Absicht
+   * zurueckgehalten war. Die Kette:
+   *
+   *   1. 53 Dateien lagen im Rueckstau, 52 davon inzwischen identisch im
+   *      Spiel (ueber den RPC-Weg eingespielt, von dem der Watcher nichts
+   *      weiss).
+   *   2. Die neue Bereinigung nahm die 52 heraus - richtig, sie sind keine
+   *      Aenderung.
+   *   3. Damit fiel die Zahl von 53 auf 1, und der Deckel (8) griff nicht
+   *      mehr.
+   *   4. Die eine verbliebene Datei war die einzige, die WIRKLICH noch
+   *      fehlte.
+   *
+   * Eine Aufraeummassnahme hat also genau die Datei durchgelassen, die als
+   * einzige gefaehrlich war - weil das Aufraeumen die Schwelle senkte,
+   * hinter der sie lag. Eine Datei, die nie von selbst ins Spiel darf, darf
+   * nicht an einer MENGE haengen. Sie gehoert benannt.
+   */
+  const gesperrtImmer = await nichtSchieben();
+  const zuSchieben = [];
+  for (const datei of stapel) {
+    if (gesperrtImmer.has(datei)) {
+      log("warn", datei + " steht in nicht-schieben.txt - NICHT geschoben");
+      continue;
+    }
+    zuSchieben.push(datei);
+  }
+  stapel = zuSchieben;
 
   const erledigt = [];
   let unveraendert = 0;

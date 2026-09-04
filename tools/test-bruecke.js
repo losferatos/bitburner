@@ -1576,6 +1576,51 @@ console.log("-- DER MASTER-RIEGEL: was nicht committet ist, geht nicht hinaus --
     b.zeilen.slice(vorher2).some((z) => /verfallen/i.test(z)),
     b.zeilen.slice(vorher2).slice(-2).join(" | "));
 
+  // (6) DIE SPERRLISTE - eine Datei, die NIE von selbst ins Spiel geht.
+  //
+  // Der Anlass steht in sync/bridge.js: am 04.09.2026 um 20:06 hat der
+  // Watcher `graftplan.json` ins Spiel geschoben, den Zuender fuer einen
+  // Graft ueber 450 Milliarden. Zurueckgehalten war sie nur ueber die MENGE
+  // des verweigerten Schubs - und als eine Aufraeummassnahme die Menge
+  // senkte, fiel sie unter den Deckel und ging hinaus. Eine Datei, die nie
+  // von selbst ins Spiel darf, darf nicht an einer Menge haengen.
+  //
+  // Der Riegel muss gegen den EINZELSCHUB halten (eine Datei, weit unter
+  // dem Deckel), sonst prueft die Probe den harmlosen Fall.
+  // WICHTIG: `zuender.json` steht nicht in der Master-Liste dieses
+  // Pruefstands. Ohne Freigabe wuerde sie schon der Master-Riegel abweisen -
+  // und die Probe waere aus dem FALSCHEN Grund gruen. Sie bekommt deshalb
+  // eine Freigabe, damit wirklich nur die Sperrliste sie aufhaelt.
+  fs.writeFileSync(path.join(ROOT, datenRel, "hotswap-freigabe.txt"),
+    "zuender.json" + String.fromCharCode(10), "utf8");
+  fs.writeFileSync(path.join(ROOT, datenRel, "nicht-schieben.txt"),
+    "# Zuender, nur von Hand" + String.fromCharCode(10)
+    + "zuender.json" + String.fromCharCode(10), "utf8");
+  await schlaf(300);
+  const vorher3 = b.zeilen.length;
+  fs.writeFileSync(path.join(quellAbs, "zuender.json"), "{\"scharf\":true}" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("was in nicht-schieben.txt steht, geht NICHT ins Spiel",
+    !spiel.dateien.has("home:zuender.json"),
+    String(spiel.dateien.get("home:zuender.json") || "(nicht im Spiel - richtig)"));
+  pruefe("  und die Bruecke sagt, dass sie es gesehen hat",
+    b.zeilen.slice(vorher3).some((z) => /nicht-schieben/i.test(z)),
+    b.zeilen.slice(vorher3).slice(-3).join(" | "));
+
+  // Und die Gegenprobe: ohne Eintrag geht dieselbe Datei durch. Ohne sie
+  // wuerde ein Riegel, der ALLES blockt, als Erfolg durchgehen.
+  fs.writeFileSync(path.join(ROOT, datenRel, "hotswap-freigabe.txt"),
+    "zuender.json" + String.fromCharCode(10), "utf8");
+  fs.writeFileSync(path.join(ROOT, datenRel, "nicht-schieben.txt"),
+    "# leer" + String.fromCharCode(10), "utf8");
+  await schlaf(300);
+  fs.writeFileSync(path.join(quellAbs, "zuender.json"),
+    "{\"scharf\":false}" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("  ohne Eintrag geht dieselbe Datei durch",
+    String(spiel.dateien.get("home:zuender.json") || "").includes("false"),
+    String(spiel.dateien.get("home:zuender.json") || "(fehlt)").trim());
+
   spiel.schliessen();
   b.proc.kill();
   await b.exit;

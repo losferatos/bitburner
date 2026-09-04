@@ -1,0 +1,28 @@
+# Dateien, die NIE von selbst ins Spiel gehen.
+#
+# Eine Zeile je Pfad, alles ab '#' ist Kommentar. Weder der Watcher noch
+# pushAll beim Verbinden schieben, was hier steht - auch nicht mit einem
+# Freibrief. Hinein kommt so etwas nur ueber eine ausdrueckliche Handlung:
+#
+#     node tools/einspielen.js --stufe <n> <datei>
+#
+# ---------------------------------------------------------------------------
+
+# DER ZUENDER FUER DIE GRAFTING-AUTOMATIK.
+#
+# `graftauto.js` liegt im Spiel und laeuft NICHT: seine Vorbedingung
+# (`precondition.requiresFile` in registry.json) ist genau diese Datei. Liegt
+# sie da, startet der Kern das Gewerk in der naechsten Runde, und es loest
+# binnen 60 Sekunden einen echten `graftAugmentation` aus. Das Geld ist beim
+# Start weg und kommt bei einem Abbruch nicht zurueck - fuer Blade's
+# Simulacrum sind das 450 Milliarden.
+#
+# Das ist Erics Entscheidung, keine Bauentscheidung.
+#
+# WARUM DIESE DATEI EXISTIERT (04.09.2026, 20:06): Der Zuender war bis dahin
+# nur ueber die MENGE eines verweigerten Schubs zurueckgehalten. Als eine
+# Aufraeummassnahme die Menge von 53 auf 1 senkte, fiel er unter den Deckel
+# und ging hinaus. Gemerkt hat es niemand - der Kern hatte die Datei zwei
+# Minuten lang, bevor sie wieder entfernt wurde, und ist in dieser Zeit
+# zufaellig nicht dazu gekommen, das Gewerk zu starten.
+graftplan.json

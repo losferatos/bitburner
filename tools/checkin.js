@@ -41,10 +41,51 @@ const STAND_DATEI = path.join(ROOT, "data", "checkin.json");
 // Daedalus mit reqdRank 400.000 (`Bladeburner/data/BlackOperations.ts:708`).
 const BLACKOPS_GESAMT = 21;
 const DAEDALUS_RANG = 400000;
-// Was unterwegs aus den rankGain-Werten der ersten zwanzig Black Ops anfaellt
-// und deshalb nicht erarbeitet werden muss (Summe aller 21 = 113.660, davon
-// Daedalus selbst 40.000).
-const RANG_UNTERWEGS = 73660;
+/**
+ * Was unterwegs aus den `rankGain`-Werten der Black Ops anfaellt und deshalb
+ * nicht erarbeitet werden muss.
+ *
+ * ===========================================================================
+ * BEFUND E.2, AUFGELOEST AM 04.09.2026 - ES WAREN NIE 73.660
+ * ===========================================================================
+ *
+ * Hier stand `73660`, und daneben die Rechnung "Summe aller 21 = 113.660,
+ * davon Daedalus selbst 40.000". Beide Zahlen sind falsch, und der Fehler ist
+ * ein Lesefehler um Faktor 1000.
+ *
+ * Nachgerechnet aus `reference/v301/src/Bladeburner/data/BlackOperations.ts`,
+ * Op fuer Op (die vollstaendige Tabelle steht in `src/lib/blackops.json`):
+ *
+ *     Typhoon 50 · Zero 60 · X 75 · Titan 100 · Ares 125 · Archangel 200 ·
+ *     Juggernaut 300 · RedDragon 500 · K 750 · Deckard 1,0 · Tyrell 1,5 ·
+ *     Wallace 2,0 · ShoulderOfOrion 2,5 · Hyron 3,0 · Morpheus 4,0 ·
+ *     IonStorm 5,0 · Annihilus 7,5 · Ultron 10 · Centurion 15 ·
+ *     Vindictus 20 · Daedalus 40
+ *
+ *     Summe aller 21          =  2.271,5
+ *     Summe der ersten zwanzig =  2.231,5
+ *
+ * Die alte Zahl entsteht, wenn man die KLEINEN Werte ab Deckard als Tausender
+ * liest: 1,0 -> 1000, 1,5 -> 1500 ... 20 -> 20000. Das ergibt 71.500, plus
+ * 2.160 aus den ersten neun = **exakt 73.660**. Und "Daedalus 40.000" ist
+ * `rankGain: 40`, ebenso mal tausend. Der Rechenweg der alten Zahl laesst
+ * sich also lueckenlos nachvollziehen - er war nur falsch.
+ *
+ * WAS DAS AENDERT: Der Ausgang aus einem Kampfknoten braucht 400.000 Rang.
+ * Die alte Zahl zog davon 73.660 ab, es sind aber 2.231,5 (mal dem
+ * Knotenfaktor). In BN10 (Faktor 0,8) sind das 1.785 statt 58.928 - der Bot
+ * muss also rund 71.900 Rang MEHR erarbeiten als die bisherige ETA annahm,
+ * gut 22 % des Weges.
+ *
+ * Die Groesse selbst bleibt richtig gedacht: Rang aus Black Ops zaehlt zum
+ * selben Ziel und muss nicht ueber Aktionen verdient werden. Sie ist nur
+ * klein.
+ *
+ * Geprueft von `tools/test-blackops-summe.js` gegen den Quelltext - eine
+ * Konstante, die schon einmal um Faktor 1000 danebenlag, bekommt keinen
+ * zweiten Versuch.
+ */
+const RANG_UNTERWEGS = 2231.5;
 // Der Rang je Aktion skaliert mit BladeburnerRank des Knotens
 // (Bladeburner/Formulas.ts:22-25), die 400.000 von Daedalus NICHT. Die
 // 73.660 aus den Black Ops kommen also nur mit diesem Faktor an

@@ -465,7 +465,7 @@ Ohne diese drei Zahlen sieht der Bot in beiden Fällen nur ein zu großes `T2_h`
 Das ist kein Nebenbefund: **die ETA ist die letzte Zeile jedes Berichts an Eric**,
 also die eine Zahl, auf die er seine Planung stützt.
 
-### E.2 — Widersprüchliche Black-Ops-Summe · OFFEN — **und sie wird benutzt**
+### E.2 — Widersprüchliche Black-Ops-Summe · GELÖST 04.09. 15:58 — **alle drei Zahlen waren falsch**
 `checkin.js` rechnet mit 58.928 Rang aus den Black Ops selbst. Auftrag 8.1 nennt
 als Eichpunkt „73.660/113.660". Drei Zahlen für dieselbe Größe, keine belegt.
 
@@ -482,11 +482,40 @@ Roadmap. „Offen, aber niemand benutzt sie" war als Entschaerfung nicht
 haltbar — sie ist offen **und** wird benutzt. Der Befundtext oben nennt
 ausserdem 58.928 als das, womit `checkin.js` rechne; auch das ist ueberholt.
 
-**Stand 04.09. 14:30:** OFFEN, mit Auftrag: die Summe gegen
-`reference/v301/src/Bladeburner/data/BlackOperations.ts` **als Code nachbauen
-und eichen**, nicht ueberschlagen (CLAUDE.md, „Rechnen heisst rechnen"). Bis
-dahin gilt keine der drei Zahlen als belegt, und jede Aussage ueber die
-BN10-ETA traegt diesen Vorbehalt.
+**Stand 04.09. 15:58 — GERECHNET, nicht mehr geschätzt.** Op für Op aus
+`BlackOperations.ts` ausgelesen:
+
+| | Summe `rankGain` |
+|---|---|
+| alle 21 Operationen | **2.271,5** |
+| ohne Daedalus | **2.231,5** |
+
+Die einzelnen Werte: Typhoon 50 · Zero 60 · X 75 · Titan 100 · Ares 125 ·
+Archangel 200 · Juggernaut 300 · RedDragon 500 · K 750 · Deckard 1,0 ·
+Tyrell 1,5 · Wallace 2,0 · ShoulderOfOrion 2,5 · Hyron 3,0 · Morpheus 4,0 ·
+IonStorm 5,0 · Annihilus 7,5 · Ultron 10 · Centurion 15 · Vindictus 20 ·
+Daedalus 40.
+
+**Der Rechenweg der alten Zahl ist lückenlos rekonstruierbar** — und genau
+das macht ihn zum Lehrstück: Wer die kleinen Werte ab Deckard als Tausender
+liest (1,0 → 1000 … 20 → 20000), bekommt 71.500; plus 2.160 aus den ersten
+neun sind das **exakt 73.660**. Und „Daedalus selbst 40.000" ist
+`rankGain: 40`, ebenfalls mal tausend. Die 113.660 sind dieselbe Summe
+einschließlich der falschen 40.000.
+
+**Was das kostet.** `tools/checkin.js:367` zog 73.660 (mal Knotenfaktor 0,8 =
+58.928) von den 400.000 Rang ab, die der Ausgang verlangt. Richtig sind
+2.231,5 × 0,8 = **1.785**. Der Bot muss also rund **71.900 Rang mehr**
+erarbeiten als die bisherige ETA annahm — gut 22 % des Weges. Jede
+BN10-Restzeit vor heute war um diesen Betrag zu optimistisch.
+
+**Umgesetzt:** `RANG_UNTERWEGS = 2231.5` in `tools/checkin.js` mit dem
+Rechenweg im Kommentar, die beiden Stellen in `src/blade.js:343,349`
+mitgezogen, und `tools/test-blackops-summe.js` (10 Proben) rechnet die Summe
+bei jedem Lauf neu aus dem Quelltext — samt Größenordnungsprobe („eine Summe
+von 21 Werten, deren größter 750 ist, kann nicht 73.660 sein"). Eine
+Konstante, die schon einmal um Faktor 1000 danebenlag, bekommt keinen
+zweiten Versuch.
 
 Dass diese Zeile ueberhaupt entstand, ist selbst der Befund: eine Triage, die
 eine Entschaerfung behauptet, ohne sie zu pruefen, ist schlimmer als ein

@@ -340,13 +340,21 @@ export async function main(ns) {
   // gegen 1.234 s bei p = 0,95 - **7.577 Rang.**
   //
   // WARUM WARTEN NICHTS KOSTET: Der Engpass ist der Rang (400.000 fuer
-  // Daedalus), nicht die Zahl der abgehakten Black Ops. Ihre 73.660 Rang
-  // zaehlen zum selben Ziel, egal wann sie anfallen. Und p steigt von allein:
+  // Daedalus), nicht die Zahl der abgehakten Black Ops. Ihre 2.231,5 Rang
+  // zaehlen zum selben Ziel, egal wann sie anfallen.
+  //
+  // KORRIGIERT AM 04.09.2026 (Befund E.2): hier stand 73.660. Das war ein
+  // Lesefehler um Faktor 1000 - die kleinen rankGain-Werte ab Deckard (1,0
+  // bis 20) wurden als Tausender gelesen. Nachgerechnet Op fuer Op aus
+  // BlackOperations.ts: 2.271,5 fuer alle 21, 2.231,5 ohne Daedalus. Der
+  // Gedanke bleibt richtig, die Zahl war es nicht - und sie machte den
+  // Ausgang um gut 22 % zu nah. Und p steigt von allein:
   // `skillPoints = floor(maxRank/3)` (`Bladeburner.ts`) bei linear
   // steigenden Faehigkeitskosten (`Skill.ts:37-41`) - wer Rang sammelt,
   // sammelt Chance mit.
   //
-  // Die Gesamtzeit ist `(400.000 - 73.660)/Raidrate + Summe(Dauer_i / p_i)`.
+  // Die Gesamtzeit ist `(400.000 - 2.231,5 x Knotenfaktor)/Raidrate
+  // + Summe(Dauer_i / p_i)`.
   // Der erste Term haengt nicht davon ab, WANN die Black Ops fallen; der
   // zweite wird kleiner, je hoeher p ist. Also: so spaet wie moeglich.
   //

@@ -470,6 +470,67 @@ console.log("-- die Uhren ueberleben ebenso --");
 }
 
 console.log("");
+console.log("-- NOT_EXECUTABLE: wenn keine Sprosse helfen kann (Auftrag 5.4) --");
+{
+  // DER ZUSTAND STAND SEIT DEM ERSTEN ENTWURF IN `ZUSTAENDE` - und niemand
+  // setzte ihn. Ein Skeptiker hat es gefunden: eine Zeichenkette ohne
+  // Schreiber, und damit eine Regel, die auf nichts angewendet wurde.
+  //
+  // Der Fall: `exit.js` passt auf keinen Rechner. Der Bot steht, aber kein
+  // Neustart hilft - es fehlt Speicher. Wer hier eskaliert, beendet der Reihe
+  // nach gesunde Werkzeuge, raeumt home leer und baut am Ende Augmentierungen
+  // ein, ohne dass sich am Speicher etwas aendert.
+  // DIE UHREN MUESSEN MITLAUFEN. Ein festes `{guard: 0}` laesst jede Frist
+  // nie ablaufen - die Falsifikation unten waere dann gruen, weil NICHTS
+  // eskaliert, und nicht, weil das Merkmal wirkt.
+  const uhrenBei = (ms) => ({ guard: ms, engine: ms, motor: ms });
+  const uhren = uhrenBei(0);
+  const sig = { sig: "S1", ziel: "blade.js", schwere: 1, grund: "Telemetrie alt" };
+
+  const z1 = L.neu(1000);
+  const r1 = L.schritt(z1, sig, 0, W0, uhren, { nichtAusfuehrbar: true,
+    nichtAusfuehrbarGrund: "exit.js braucht 519 GB, groesster Rechner 128 GB" });
+  pruefe("es wird NICHTS ausgefuehrt", r1.handlung === "nichts", r1.handlung);
+  pruefe("der Zustand heisst NOT_EXECUTABLE",
+    z1.ziele["blade.js"].zustand === "NOT_EXECUTABLE",
+    z1.ziele["blade.js"].zustand);
+  pruefe("und der Grund nennt die Ursache", /Speicher/.test(r1.grund), r1.grund);
+
+  // Auch nach mehreren Runden bleibt es dabei - "eskaliert nie".
+  let letzter = r1;
+  for (let i = 0; i < 20; i++) {
+    letzter = L.schritt(z1, sig, (i + 1) * 60000, W0 + (i + 1) * 60000,
+      uhrenBei((i + 1) * 60000), { nichtAusfuehrbar: true });
+  }
+  pruefe("es eskaliert auch nach 20 Runden nicht",
+    letzter.handlung === "nichts" && z1.ziele["blade.js"].zustand === "NOT_EXECUTABLE",
+    letzter.handlung + " / " + z1.ziele["blade.js"].zustand);
+
+  // DIE FALSIFIKATION. Ohne das Merkmal muss dieselbe Folge sehr wohl
+  // eskalieren - sonst prueft die Probe oben nur, dass `schritt` nichts tut.
+  const z2 = L.neu(1000);
+  let gehandelt = false;
+  for (let i = 0; i < 20; i++) {
+    const r = L.schritt(z2, sig, i * 60000, W0 + i * 60000, uhrenBei(i * 60000));
+    if (r.handlung === "ausfuehren") { gehandelt = true; break; }
+  }
+  pruefe("ohne das Merkmal wird sehr wohl eskaliert", gehandelt,
+    "sonst misst die Probe oben nur, dass schritt() untaetig ist");
+
+  // Und der Ausgang: faellt die Bedingung weg, geht es normal weiter. Anders
+  // als EXHAUSTED ist NOT_EXECUTABLE keine Sackgasse.
+  const z3 = L.neu(1000);
+  L.schritt(z3, sig, 0, W0, uhren, { nichtAusfuehrbar: true });
+  let wiederGehandelt = false;
+  for (let i = 1; i < 20; i++) {
+    const r = L.schritt(z3, sig, i * 60000, W0 + i * 60000, uhrenBei(i * 60000));
+    if (r.handlung === "ausfuehren") { wiederGehandelt = true; break; }
+  }
+  pruefe("faellt die Bedingung weg, geht es normal weiter", wiederGehandelt,
+    "NOT_EXECUTABLE ist keine Sackgasse - ein gekaufter Rechner loest ihn auf");
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

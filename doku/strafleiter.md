@@ -197,3 +197,39 @@ Je Sprosse ein im laufenden Spiel provozierter Hänger. Der Pflichttest aus
 Auftrag 5.2 — Kern-Motorzeit eingefroren, Engine tickt weiter — lässt sich nur
 dort stellen. Bis dahin ist die Leiter gegen Mock-Zustände geprüft, nicht gegen
 das Spiel.
+
+---
+
+## NOT_EXECUTABLE — wenn keine Sprosse helfen kann
+
+Der Zustand stand seit dem ersten Entwurf in `ZUSTAENDE`, und **niemand setzte
+ihn**. Eine Zeichenkette ohne Schreiber, und damit eine Regel („NOT_EXECUTABLE
+eskaliert nie", Auftrag 5.4), die auf nichts angewendet wurde. Gefunden am
+04.09.2026 von einem Prüfer.
+
+**Der Fall:** `exit.js` passt auf keinen Rechner. Der Knoten ist erledigt, die
+Tür steht offen, der Bot kommt nicht durch — und **kein Neustart hilft**, es
+fehlt Speicher. Wer hier eskaliert, beendet der Reihe nach gesunde Werkzeuge
+(Sprosse 1), sperrt Wirte (2), räumt `home` leer (3) und baut am Ende
+Augmentierungen ein (5), ohne dass sich am Speicher etwas ändert. Alle
+Handlungen sind wirkungslos, und die letzten beiden sind teuer.
+
+Das Signal kommt von `ausgang.js` — dem einzigen Gewerk, das die Lage kennt.
+Es setzt `notExecutable` in `data/ausgang.json`, aber **erst nach einer Stunde
+ohne Wirt**: eine Runde ohne Platz ist normal (ein Mietrechner wird gerade
+gekauft), eine Stunde ist ein Befund. Dazu schreibt es eine Zeile in den
+Ereignisstrom und eine nach `## Sofort`.
+
+Davor stehen zwei Stufen, die ARCHITEKTUR 9.1 L1 verlangt und die ebenfalls
+fehlten:
+
+1. größter gerooteter Fremdrechner (war gebaut),
+2. `data/geldbedarf.txt` mit Grund `ausgang-wirt` — der Kanal, den `shop.js`
+   und `homegrow.js` lesen, damit sie wissen, wofür gespart wird,
+3. dann erst NOT_EXECUTABLE.
+
+**Es ist keine Sackgasse.** Anders als EXHAUSTED beschreibt es eine Lage, die
+sich von außen auflöst — ein gekaufter Rechner genügt. Fällt die Bedingung weg,
+fängt die Leiter für dieses Ziel **von vorn** an: die Lage hat sich geändert,
+und ein Werkzeug, das seit einer Stunde steht, verdient zuerst wieder den
+billigsten Griff.

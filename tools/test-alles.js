@@ -80,6 +80,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-guard-ebene2.js",
+    deckt: "EBENE 2: der Waechter im Beobachtungsmodus, boot.js-Schonliste (C.6)",
+    schnell: false,
+  },
+  {
     datei: "test-endspurt.js",
     deckt: "Ausgangs-Interlock und Endspurt-Regel, inkl. ns.read-Asymmetrie (C.3)",
     schnell: true,
@@ -103,7 +108,7 @@ const TESTS = [
  */
 const LUECKEN = [
 
-  "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
+
   // Der ns-Mock steht seit dem 04.09.2026 (tools/mock/ns.js + lader.js), und
   // der Kern laeuft damit in test-motor-ebene2.js. Was noch fehlt, ist die
   // Breite: dieselben Proben ueber die verschiedenen Knotenklassen.

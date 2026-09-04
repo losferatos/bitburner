@@ -1,0 +1,358 @@
+/**
+ * Ebene 2: der Waechter laeuft gegen den ns-Mock.
+ *
+ * ===========================================================================
+ * WAS HIER BEWIESEN WERDEN MUSS
+ * ===========================================================================
+ *
+ * Position C.6 liefert den Waechter im BEOBACHTUNGSMODUS aus. Der Beweis
+ * dafuer ist nicht, dass er etwas tut - sondern dass er nichts tut:
+ *
+ *   - Er erkennt einen haengenden Kern und schreibt es auf.
+ *   - Er fuehrt KEINE Sprosse aus, solange `guard-modus.txt` nicht auf
+ *     `enforce` steht.
+ *   - Er bestraft NICHT waehrend der Karenz nach einem Reset - das ist die
+ *     haeufigste Fehlstrafe ueberhaupt.
+ *   - Er laeuft nicht von selbst bis EXHAUSTED hoch. Ohne diese Regel meldete
+ *     er nach einer Nacht eine Erschoepfung, die er selbst erzeugt hat.
+ *
+ * Aufruf: node tools/test-guard-ebene2.js
+ */
+
+import path from "node:path";
+import fs from "node:fs";
+import { fileURLToPath } from "node:url";
+import { neuerMock } from "./mock/ns.js";
+import { ladeAusBeiden } from "./mock/lader.js";
+
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HIER, "..");
+
+let gruen = 0;
+let rot = 0;
+const fehler = [];
+
+function pruefe(name, bedingung, hinweis = "") {
+  if (bedingung) { gruen++; console.log("  ok    " + name); }
+  else {
+    rot++;
+    fehler.push(name + (hinweis ? " - " + hinweis : ""));
+    console.log("  ROT   " + name + (hinweis ? " - " + hinweis : ""));
+  }
+}
+
+console.log("");
+console.log("=== Ebene 2: der Waechter gegen den ns-Mock ===");
+
+const W0 = 1_700_000_000_000;
+
+/** Fuer den Schonlisten-Test: guard.js und ausgang.js sind killSafe:false. */
+const REGISTRY_MIT_KILLSAFE = JSON.stringify({
+  schema: 1,
+  eintraege: [
+    { name: "guard.js", ramBaseGb: 6.1, verfahren: "alle", knoten: "alle",
+      phase: "beide", hostRule: "home", priority: 2, evictRank: 99,
+      restartPolicy: "always", killSafe: false, precondition: {} },
+    { name: "ausgang.js", ramBaseGb: 8.15, verfahren: "alle", knoten: "alle",
+      phase: "beide", hostRule: "any", priority: 8, evictRank: 99,
+      restartPolicy: "always", killSafe: false, precondition: {} },
+    { name: "blade.js", ramBaseGb: 94.35, verfahren: "alle", knoten: "alle",
+      phase: "normal", hostRule: "werkbank", priority: 10, evictRank: 10,
+      restartPolicy: "always", killSafe: true, precondition: {} },
+  ],
+});
+
+/** Eine Registry mit genau einem ueberwachten Werkzeug - mehr braucht es nicht. */
+const REGISTRY = JSON.stringify({
+  schema: 1,
+  eintraege: [
+    { name: "blade.js", args: [], ramBaseGb: 94.35, ramSingGb: 0,
+      verfahren: "alle", knoten: "alle", phase: "beide",
+      telemetryFile: "data/blade.json", freshnessMs: 600000, taktMs: 30000,
+      hostRule: "werkbank", priority: 10, evictRank: 10,
+      restartPolicy: "always", precondition: {} },
+  ],
+});
+
+function grundzustand(extra = {}, dateienExtra = {}) {
+  return {
+    host: "home",
+    knoten: 10,
+    // Der Reset liegt weit zurueck, damit die Karenz nicht greift.
+    nodeReset: W0 - 24 * 3600000,
+    augReset: W0 - 24 * 3600000,
+    wall: W0,
+    playtime: 100 * 3600000,
+    server: { home: { ram: 64, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: {
+      home: {
+        "guard.js": "//",
+        "registry.json": REGISTRY,
+        "data/verfahren.txt": "V2 10 2",
+        "blade.js": "//",
+        ...dateienExtra,
+      },
+    },
+    ...extra,
+  };
+}
+
+async function fahre(runden, dateien = {}, extra = {}, beiSchlaf = null) {
+  const m = neuerMock({
+    ...grundzustand(extra, dateien),
+    maxSchlaf: runden,
+    beiSchlaf: beiSchlaf || ((ms, z, vor) => vor(ms)),
+  });
+  const { modul } = await ladeAusBeiden(ROOT, "guard.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  return m;
+}
+
+function json(m, datei) {
+  const roh = m.lies("home", datei);
+  if (!roh) return null;
+  try { return JSON.parse(roh); } catch { return null; }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Waechter laeuft und schreibt seinen Herzschlag --");
+let ersterZustand = null;
+{
+  const m = await fahre(5, {
+    "data/bn4net.json": JSON.stringify({ wall: W0, motorTimeMs: 3600000,
+      okRound: 100, errStreak: 0, round: 100 }),
+    "data/blade.json": JSON.stringify({ motorTimeMs: 3600000, state: "work",
+      errStreak: 0, lastError: null, ts: W0 }),
+  });
+  const w = json(m, "data/watchdog.json");
+  ersterZustand = w;
+  pruefe("watchdog.json wird geschrieben", w !== null,
+    m.zustand.log.slice(-3).join(" | "));
+  if (w) {
+    pruefe("mit Herzschlag-Pflichtfeldern",
+      "errStreak" in w && "lastError" in w && "okRound" in w && "guardTimeMs" in w);
+    pruefe("schema 2", w.schema === 2);
+    pruefe("Modus steht drin", w.modus === "observe", "erhalten " + w.modus);
+    pruefe("der Waechter selbst wirft nicht", w.errStreak === 0,
+      w.lastError ? w.lastError.msg : "");
+    pruefe("und zaehlt vollstaendige Runden", w.okRound >= 1, "okRound=" + w.okRound);
+  }
+}
+
+console.log("");
+console.log("-- ein haengender Kern wird ERKANNT --");
+{
+  // Der Kern-Herzschlag ist 30 Minuten alt -> S3a.
+  const m = await fahre(40, {
+    "data/bn4net.json": JSON.stringify({ wall: W0 - 30 * 60000, motorTimeMs: 3600000,
+      okRound: 100, errStreak: 0, round: 100 }),
+  }, {}, (ms, z, vor) => vor(30000));
+  const w = json(m, "data/watchdog.json");
+  const p = json(m, "data/penalties.json");
+  pruefe("S3a wird gemeldet",
+    !!w && (w.signaleJetzt || []).some((s) => s.sig === "S3a"),
+    JSON.stringify(w && w.signaleJetzt));
+  pruefe("und im Protokoll steht ein Eintrag",
+    !!p && p.eintraege.length > 0, "penalties.json leer");
+}
+
+console.log("");
+console.log("-- ABER: im Beobachtungsmodus wird NICHTS ausgefuehrt --");
+{
+  const m = await fahre(60, {
+    "data/bn4net.json": JSON.stringify({ wall: W0 - 30 * 60000, motorTimeMs: 3600000,
+      okRound: 100, errStreak: 0, round: 100 }),
+  }, {}, (ms, z, vor) => vor(30000));
+  const p = json(m, "data/penalties.json");
+  pruefe("Eintraege vorhanden", !!p && p.eintraege.length > 0);
+  if (p && p.eintraege.length) {
+    const alle = p.eintraege.every((e) => e.result === "would-execute");
+    pruefe("ALLE tragen result 'would-execute'", alle,
+      p.eintraege.map((e) => e.result).join(", "));
+    pruefe("kein Prozess wurde getoetet", m.zustand.getoetet.length === 0,
+      m.zustand.getoetet.map((x) => x.filename).join(", "));
+    pruefe("kein Prozess wurde gestartet", m.zustand.gestartet.length === 0,
+      m.zustand.gestartet.map((x) => x.datei).join(", "));
+  }
+  // Der Beleg fuer die Abnahme: was HAETTE er getan.
+  const w = json(m, "data/watchdog.json");
+  pruefe("der Zustand des Kerns ist vermerkt",
+    !!w && !!w.ziele && !!w.ziele["kern"], JSON.stringify(w && w.ziele));
+}
+
+console.log("");
+console.log("-- er laeuft NICHT von selbst bis EXHAUSTED hoch --");
+{
+  // Ohne diese Regel eskalierte er in einer Nacht durch alle Sprossen und
+  // meldete am Morgen eine Erschoepfung, die er selbst erzeugt hat.
+  const m = await fahre(200, {
+    "data/bn4net.json": JSON.stringify({ wall: W0 - 30 * 60000, motorTimeMs: 3600000,
+      okRound: 100, errStreak: 0, round: 100 }),
+  }, {}, (ms, z, vor) => vor(60000));
+  const w = json(m, "data/watchdog.json");
+  pruefe("kein EXHAUSTED im Beobachtungsmodus",
+    !!w && (!w.ziele["kern"] || w.ziele["kern"].zustand !== "EXHAUSTED"),
+    w && w.ziele["kern"] ? w.ziele["kern"].zustand : "kein Eintrag");
+  pruefe("und kein exhausted-Vermerk", !!w && w.exhausted === null,
+    JSON.stringify(w && w.exhausted));
+}
+
+console.log("");
+console.log("-- waehrend der Karenz wird nicht bestraft --");
+{
+  // Der haeufigste Fehlalarm ueberhaupt: unmittelbar nach einem Einbau kann
+  // der Kern gar nicht laufen. Ihn dafuer zu bestrafen erzeugt genau den
+  // Zustand, den die Strafe heilen soll.
+  const m = await fahre(20, {
+    "data/bn4net.json": JSON.stringify({ wall: W0 - 30 * 60000, motorTimeMs: 0,
+      okRound: 0, errStreak: 0, round: 0 }),
+  }, { nodeReset: W0 - 60000, augReset: W0 - 60000 }, (ms, z, vor) => vor(10000));
+  const w = json(m, "data/watchdog.json");
+  const p = json(m, "data/penalties.json");
+  pruefe("der Waechter meldet Karenz", !!w && w.state === "wait",
+    w ? w.state : "kein Zustand");
+  pruefe("und den Grund", !!w && w.blockedReason === "locked");
+  pruefe("kein einziger Straf-Eintrag", !p || p.eintraege.length === 0,
+    p ? p.eintraege.length + " Eintraege" : "");
+}
+
+console.log("");
+console.log("-- ein gesunder Bot erzeugt KEINEN Eintrag --");
+{
+  const m = await fahre(60, {
+    "data/bn4net.json": JSON.stringify({ wall: W0, motorTimeMs: 3600000,
+      okRound: 500, errStreak: 0, round: 500 }),
+    "data/blade.json": JSON.stringify({ motorTimeMs: 3600000, state: "work",
+      errStreak: 0, lastError: null, ts: W0 }),
+  }, {}, (ms, z, vor) => {
+    // Beide Uhren laufen mit - Kern und Werkzeug bleiben frisch.
+    vor(10000);
+    const k = JSON.parse(z.dateien.home["data/bn4net.json"]);
+    k.wall = z.wall; k.motorTimeMs += 10000; k.okRound++; k.round++;
+    z.dateien.home["data/bn4net.json"] = JSON.stringify(k);
+    const b = JSON.parse(z.dateien.home["data/blade.json"]);
+    b.motorTimeMs = k.motorTimeMs; b.ts = z.wall;
+    z.dateien.home["data/blade.json"] = JSON.stringify(b);
+  });
+  const p = json(m, "data/penalties.json");
+  pruefe("keine Strafe bei gesundem Bot", !p || p.eintraege.length === 0,
+    p ? JSON.stringify(p.eintraege.slice(0, 2)) : "");
+  const w = json(m, "data/watchdog.json");
+  pruefe("und keine Signale", !!w && (w.signaleJetzt || []).length === 0,
+    JSON.stringify(w && w.signaleJetzt));
+  pruefe("die Waechteruhr laeuft", !!w && w.guardTimeMs > 0,
+    w ? String(w.guardTimeMs) : "");
+}
+
+console.log("");
+console.log("-- der Zustand ueberlebt einen Neustart --");
+{
+  const dateien = {
+    "data/bn4net.json": JSON.stringify({ wall: W0 - 30 * 60000, motorTimeMs: 3600000,
+      okRound: 100, errStreak: 0, round: 100 }),
+  };
+  const m1 = await fahre(40, dateien, {}, (ms, z, vor) => vor(30000));
+  const uhren1 = json(m1, "data/watchdog-uhren.json");
+  pruefe("die Uhren werden geschrieben", uhren1 !== null && uhren1.guardTimeMs > 0);
+
+  if (uhren1) {
+    const m2 = await fahre(5, {
+      ...dateien,
+      "data/watchdog-uhren.json": JSON.stringify(uhren1),
+      "data/watchdog.json": m1.lies("home", "data/watchdog.json"),
+    }, {}, (ms, z, vor) => vor(10000));
+    const uhren2 = json(m2, "data/watchdog-uhren.json");
+    pruefe("die Waechterzeit wird uebernommen",
+      !!uhren2 && uhren2.guardTimeMs >= uhren1.guardTimeMs,
+      uhren2 ? uhren1.guardTimeMs + " -> " + uhren2.guardTimeMs : "");
+  }
+}
+
+console.log("");
+console.log("-- boot.js raeumt den Waechter NICHT weg (die Schonliste) --");
+{
+  // Der Fall: bn4net startet fuenf Minuten lang nicht, und boot.js raeumt
+  // home frei. Bis heute beendete es dabei ALLES ausser sich selbst - also
+  // auch den Waechter, die einzige Instanz, die einen nicht startenden Kern
+  // bemerken und melden wuerde.
+  const m = neuerMock({
+    host: "home", knoten: 10, wall: W0, playtime: 100 * 3600000,
+    nodeReset: W0 - 24 * 3600000, augReset: W0 - 24 * 3600000,
+    server: { home: { ram: 8, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: { "boot.js": "//", "guard.js": "//", "ausgang.js": "//",
+      "blade.js": "//", "registry.json": REGISTRY_MIT_KILLSAFE } },
+    maxSchlaf: 70,
+    beiSchlaf: (ms, z, vor) => vor(5000),
+  });
+  // Die Prozesse, die boot.js vorfindet.
+  for (const [datei, pid] of [["guard.js", 0], ["ausgang.js", 0], ["blade.js", 0]]) {
+    m.ns.exec(datei, "home", 1);
+  }
+  const vorher = m.ns.ps("home").map((p) => p.filename).sort();
+
+  const { modul } = await ladeAusBeiden(ROOT, "boot.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+
+  const getoetet = m.zustand.getoetet.map((x) => x.filename);
+  console.log("       vorher: " + vorher.join(", "));
+  console.log("       getoetet: " + (getoetet.join(", ") || "(nichts)"));
+
+  pruefe("der Waechter ueberlebt das Aufraeumen", !getoetet.includes("guard.js"),
+    "boot.js haette seine eigene Aufsicht weggeraeumt");
+  pruefe("ausgang.js ueberlebt ebenso", !getoetet.includes("ausgang.js"));
+  pruefe("aber aufgeraeumt wurde trotzdem", getoetet.includes("blade.js"),
+    "sonst raeumt boot.js gar nichts mehr und home bleibt voll");
+}
+
+console.log("");
+console.log("-- ohne Registry traegt die Notliste --");
+{
+  const m = neuerMock({
+    host: "home", knoten: 10, wall: W0, playtime: 100 * 3600000,
+    nodeReset: W0 - 24 * 3600000, augReset: W0 - 24 * 3600000,
+    server: { home: { ram: 8, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    // KEINE registry.json - der Fall nach einem Knotenwechsel, bevor die
+    // Bruecke die Dateien nachgeschoben hat.
+    dateien: { home: { "boot.js": "//", "guard.js": "//", "blade.js": "//" } },
+    maxSchlaf: 70,
+    beiSchlaf: (ms, z, vor) => vor(5000),
+  });
+  m.ns.exec("guard.js", "home", 1);
+  m.ns.exec("blade.js", "home", 1);
+  const { modul } = await ladeAusBeiden(ROOT, "boot.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const getoetet = m.zustand.getoetet.map((x) => x.filename);
+  pruefe("der Waechter ueberlebt auch ohne Registry", !getoetet.includes("guard.js"),
+    "lieber ein Prozess zu viel als der Waechter zu wenig");
+}
+
+console.log("");
+console.log("-- keine .mock-Datei bleibt liegen --");
+{
+  for (const wurzel of [path.join(ROOT, "src"),
+                        path.resolve(ROOT, "..", "bitburner-bau", "src")]) {
+    if (!fs.existsSync(wurzel)) continue;
+    const reste = fs.readdirSync(wurzel).filter((f) => f.startsWith(".mock-"));
+    pruefe("keine Reste in " + path.basename(path.dirname(wurzel)) + "/src",
+      reste.length === 0, reste.join(", "));
+  }
+}
+
+console.log("");
+console.log("=== " + gruen + " gruen, " + rot + " rot ===");
+if (rot) {
+  console.log("");
+  for (const f of fehler) console.log("  ROT: " + f);
+}
+console.log("");
+process.exit(rot ? 1 : 0);

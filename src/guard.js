@@ -163,7 +163,34 @@ export async function main(ns) {
       const modusRoh = riegel
         ? "observe"
         : (liesVonHome("data/guard-modus.txt") || "observe").trim();
-      const scharf = modusRoh === "enforce";
+
+      // SCHARF IST NICHT GLEICH SCHARF (Skeptiker Runde 4, R12, 04.09.2026).
+      //
+      // Bis heute gab es einen Schalter fuer die ganze Leiter. Ein Pruefer hat
+      // das als eigenen Befund gefuehrt, und er hat recht: die Sprossen sind
+      // nicht gleichartig.
+      //
+      //   Sprosse 1 und 2 sind billig und umkehrbar - ein Werkzeug neu starten
+      //   und einen Wirt fuer eine Stunde sperren. Faellt die Entscheidung
+      //   falsch, kostet sie Minuten.
+      //
+      //   Sprosse 3 raeumt home leer und wirft die Laufzeit aller fliegenden
+      //   Arbeiter weg. Sprosse 5 ist ein Soft-Reset.
+      //
+      // Es gab keine Moeglichkeit, die unteren scharf und die oberen in
+      // Beobachtung zu halten - und genau das ist die vernuenftige Vorgabe,
+      // solange `false_penalty_count` erst seit heute ueberhaupt gezaehlt wird.
+      //
+      //   enforce        Sprossen 1 und 2 fuehren aus, 3 und 5 beobachten.
+      //   enforce-alles  alle gebauten Sprossen fuehren aus.
+      //   observe        nichts fuehrt aus (Vorgabe ohne Datei).
+      //
+      // `enforce-alles` ist der Zustand, den ein Mensch bewusst herstellt,
+      // wenn die Fehlstrafen ueber eine Nacht bei null lagen. Das ist der Sinn
+      // der Zahl, die dieser Bau ihr endlich gegeben hat.
+      const scharfAlles = modusRoh === "enforce-alles";
+      const scharf = scharfAlles || modusRoh === "enforce";
+      const SCHARFE_SPROSSEN = scharfAlles ? [0, 1, 2, 3, 4, 5] : [0, 1, 2];
 
       // --- Karenz -------------------------------------------------------------
       //
@@ -338,7 +365,8 @@ export async function main(ns) {
             // schon einmal".
             //
             // Der Wert wird unten korrigiert, sobald `getan` feststeht.
-            result: scharf ? "pending" : "would-execute",
+            result: (scharf && SCHARFE_SPROSSEN.includes(r.sprosse.nr))
+              ? "pending" : "would-execute",
             verifiedAt: null,
           };
           protokolliere(strafen, eintrag);
@@ -364,7 +392,9 @@ export async function main(ns) {
           leiter.verlauf.push({ ziel: r.ziel, sprosse: r.sprosse.nr, wall });
           while (leiter.verlauf.length > 200) leiter.verlauf.shift();
 
-          if (scharf) {
+          // Die Sprosse muss AUCH einzeln freigegeben sein (R12).
+          const dieseScharf = scharf && SCHARFE_SPROSSEN.includes(r.sprosse.nr);
+          if (dieseScharf) {
             sag("SPROSSE " + r.sprosse.nr + " auf " + r.ziel + ": " + r.sprosse.name);
             letzteAusfuehrung.set(r.ziel, wall);
             const erg = fuehreAus(ns, r, eintraege, gesperrt, sag, {
@@ -438,7 +468,13 @@ export async function main(ns) {
             sag("  -> " + erg.text);
           } else {
             sag("BEOBACHTET: haette Sprosse " + r.sprosse.nr + " auf " + r.ziel
-              + " ausgefuehrt (" + r.sprosse.name + ") - Grund: " + sig.grund);
+              + " ausgefuehrt (" + r.sprosse.name + ") - Grund: " + sig.grund
+              + (scharf && !SCHARFE_SPROSSEN.includes(r.sprosse.nr)
+                ? ". Der Waechter ist scharf, aber Sprosse " + r.sprosse.nr
+                  + " nicht: sie kostet zu viel fuer eine Automatik, deren"
+                  + " Fehlstrafenzahl noch keine Nacht alt ist."
+                  + " Freigabe: data/guard-modus.txt auf 'enforce-alles'."
+                : ""));
           }
         }
 

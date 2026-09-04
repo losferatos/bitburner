@@ -235,6 +235,7 @@ export async function main(ns) {
       + " nicht gebaut");
   }
 
+
   // --- 5. Nicht vor dem Divisionsbeitritt ------------------------------------
   //
   // Der Einbau setzt die Kampfwerte auf 1 zurueck. Vor dem Bladeburner-Beitritt
@@ -254,6 +255,40 @@ export async function main(ns) {
     return fertig("bbtrain.js baut gerade Kampfwerte auf - der Einbau naehme"
       + " genau diese Arbeit zurueck");
   }
+
+  // --- 5b. Auf dem Bladeburner-Weg muss der Einbau den Wiederaufbau VERKUERZEN
+  //
+  // DER BEFUND, DER DIESE BEDINGUNG ERZWINGT (Skeptiker Runde 4, R9,
+  // 04.09.2026):
+  //
+  // `prestigeAugmentation` setzt alle Kampfwerte auf 1 und die Erfahrung auf 0
+  // (`PlayerObjectGeneralMethods.ts:86-100`). Der Bladeburner selbst ueberlebt
+  // - Rang und Skills bleiben, `this.bladeburner = null` steht nur in
+  // `prestigeSourceFile` (:160). Die Erfolgswahrscheinlichkeit einer Aktion ist
+  // aber ein gewichtetes Potenzprodukt der Kampfwerte
+  // (`Bladeburner/Actions/Action.ts:169-195`), und ein Fehlschlag zieht Rang AB
+  // (`Bladeburner.ts:1055-1059`).
+  //
+  // Auf dem V2-Weg erzeugt ein Einbau damit genau den Zustand, den Sprosse 5
+  // heilen soll: der Traeger waechst nicht nur nicht, er faellt - bis die
+  // Kampfwerte wieder oben sind, gemessen 6,6 Stunden. Die bisherige
+  // Vorbedingung 5 sperrte nur VOR dem Divisionsbeitritt; danach, also im
+  // gesamten Normalbetrieb der Route, war der Einbau erlaubt und garantierte
+  // sechs weitere Stunden S2.
+  //
+  // Die Ausnahme, die ihn trotzdem lohnt: wenn unter den wartenden Stuecken
+  // eines ist, das den Wiederaufbau verkuerzt (Kampf- oder
+  // Bladeburner-Multiplikatoren). Genau diese Frage beantwortet `bn4rep.js`
+  // seit jeher und schreibt sie als `wiederaufbauHilfe` mit hinaus
+  // (bn4rep.js:1000-1024) - eine zweite Rechnung hier waere eine zweite
+  // Wahrheit.
+  if (istV2 && einbau.wiederaufbauHilfe === false) {
+    return fertig("Bladeburner-Weg, und keine der wartenden Augmentierungen"
+      + " verkuerzt den Wiederaufbau: der Einbau setzt die Kampfwerte auf 1,"
+      + " die Erfolgswahrscheinlichkeit bricht zusammen, Fehlschlaege ziehen"
+      + " Rang ab - er erzeugt genau die Stagnation, die er beheben soll");
+  }
+
 
   // --- 6. Depot leer ---------------------------------------------------------
   //

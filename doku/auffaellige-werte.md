@@ -216,7 +216,7 @@ gekauft, dreizehn Mal.
 
 **Ursache — und sie ist bereits gefunden.** Nicht der Autopilot war es:
 `grep purchaseAugmentation|installAugmentations src/*.js` findet nichts. Es war
-der Seitenagent `nightshift/agent.js`, und die Rueckkopplung steht seit heute
+der Seitenagent `archiv/nightshift/agent.js`, und die Rueckkopplung steht seit heute
 09:50 im Kopf von `src/stopnight.js`: BitWire ist zu teuer → der Knopf steht auf
 `disabled` → `offeneAugs()` meldet "nichts offen" → der Agent weicht auf
 NeuroFlux aus → jeder Kauf verteuert BitWire um 90 % → und so weiter.

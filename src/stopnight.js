@@ -1,7 +1,7 @@
 /**
  * Den Nachtdienst stilllegen.
  *
- * Der Seitenagent (nightshift/agent.js) kauft NeuroFlux Governor, "bis das
+ * Der Seitenagent (archiv/nightshift/agent.js) kauft NeuroFlux Governor, "bis das
  * Geld alle ist" - nachts richtig, denn beim Install faellt das Guthaben
  * ohnehin auf 1262. Am Tag ist es eine Falle, und zwar eine, die sich selbst
  * verstaerkt:

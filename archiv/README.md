@@ -45,6 +45,20 @@ blockt den Knopf), und die Messung dazu steht in `entwurf/join/probe.js`.
 Beide sind Wissen, kein Abfall — sie liegen hier, weil sie nicht im Spiel
 laufen, nicht weil sie erledigt wären.
 
+### `nightshift/` (4 Dateien, verschoben am 04.09.2026)
+
+Der alte Seitenagent, der den Bot über das Chrome DevTools Protocol von außen
+bediente. **Nicht mehr verdrahtet:** `nacht.cmd:33` startet `tools/nightshift.js`
+— eine andere Datei in einem anderen Ordner, die diese vier nie anfasst. Ein
+Grep über den gesamten Baum fand außer Selbstbezügen nur drei Erwähnungen in
+`doku/`.
+
+**`nightshift/cdp.js` ist der Grund, warum der Ordner nicht gelöscht wird.** Er
+trägt die gemessene `isTrusted`-Erkenntnis (Zeile 72) und eine eigene
+Kommandozeile (`node archiv/nightshift/cdp.js eval|find|terminal`) — das
+Kernwissen der DOM-Bedienung ohne SF4. Wer den Weg noch einmal braucht, findet
+ihn hier und muss ihn nicht neu messen.
+
 ## Was hier NICHT liegt, obwohl es nach Kandidat aussah
 
 Die 62 unregistrierten Dateien unter `src/` (Auftrag 6.1, Liste in

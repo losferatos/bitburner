@@ -19,7 +19,7 @@
  * DIE LOESUNG
  *
  * Ein Tab, der Ton ausgibt, gilt als "audible" und wird von der Drosselung
- * ausgenommen. Der alte Nachtdienst (nightshift/agent.js:632-642) hat das
+ * ausgenommen. Der alte Nachtdienst (archiv/nightshift/agent.js:632-642) hat das
  * bereits so geloest; diese Datei holt den Kniff zurueck, nachdem er mit ihm
  * stillgelegt wurde.
  *

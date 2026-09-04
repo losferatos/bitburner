@@ -65,6 +65,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-motor-ebene2.js",
+    deckt: "EBENE 2: der echte Kern gegen den ns-Mock, drei Pflichtproben (C.1)",
+    schnell: false,
+  },
+  {
     datei: "test-endspurt.js",
     deckt: "Ausgangs-Interlock und Endspurt-Regel, inkl. ns.read-Asymmetrie (C.3)",
     schnell: true,
@@ -89,7 +94,10 @@ const TESTS = [
 const LUECKEN = [
   "Registry-Aufloesung (registry.json existiert noch nicht)",
   "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
-  "ns-Mock und Szenarienmatrix (Ebene 2, tools/mock/ns.js fehlt)",
+  // Der ns-Mock steht seit dem 04.09.2026 (tools/mock/ns.js + lader.js), und
+  // der Kern laeuft damit in test-motor-ebene2.js. Was noch fehlt, ist die
+  // Breite: dieselben Proben ueber die verschiedenen Knotenklassen.
+  "Szenarienmatrix ueber die Knotenklassen (Ebene 2 steht, die Matrix fehlt)",
 ];
 
 const nurSchnell = process.argv.includes("--schnell");

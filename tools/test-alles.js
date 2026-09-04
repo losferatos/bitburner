@@ -45,6 +45,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-motorzeit.js",
+    deckt: "Motorzeit gegen Drosselung, Offline-Nacht und Nachholklumpen",
+    schnell: true,
+  },
+  {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
     schnell: true,
@@ -59,7 +64,6 @@ const TESTS = [
 const LUECKEN = [
   "Registry-Aufloesung (registry.json existiert noch nicht)",
   "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
-  "Motorzeit gegen Offline-Spruenge und gedrosselten Tab (noch nicht gebaut)",
   "ns-Mock und Szenarienmatrix (Ebene 2, tools/mock/ns.js fehlt)",
 ];
 

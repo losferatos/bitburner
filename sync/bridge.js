@@ -454,6 +454,8 @@ const MANUAL_MAX = 200;
  * starten - ein Neustart waere selbst ein Eingriff.
  */
 let zweitTabMerker = null;
+/** Was das Dashboard ueber den Master-Riegel sagen kann. */
+let masterRiegelStand = { an: false, quelle: "unbekannt", dateien: null };
 
 /**
  * Steht der Zweit-Tab-Alarm?
@@ -1860,6 +1862,7 @@ async function schreibeRueckkanal() {
     settings: state.settings || null,
     alarm: state.alarm,
     zweitTabSperre: zweitTabMerker,
+    masterRiegel: masterRiegelStand,
   };
   try {
     await schreibeInsSpiel("data/bridge.json", JSON.stringify(inhalt), "bruecke");
@@ -2073,6 +2076,7 @@ function publicState() {
     backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
     alarm: state.alarm,
     zweitTabSperre: zweitTabMerker,
+    masterRiegel: masterRiegelStand,
     serverCount: state.servers.length,
     rootedCount: state.servers.filter((s) => s.hasAdminRights).length,
     purchasedCount: state.servers.filter((s) => s.purchasedByPlayer).length,
@@ -2543,8 +2547,15 @@ if (!MASTER_RIEGEL_AN) {
   // lief. Und der Index wird gleich WARM geladen - dann faellt ein kaputtes
   // git beim Start auf, nicht erst beim ersten Schub.
   const i = ladeMasterIndex();
-  console.log("  Master-Riegel gegen git ls-tree master -- src/  ("
-    + (i ? i.size + " Dateien" : "GIT ANTWORTET NICHT") + ")");
+  const text = "Master-Riegel gegen git ls-tree master -- src/ ("
+    + (i ? i.size + " Dateien" : "GIT ANTWORTET NICHT") + ")";
+  console.log("  " + text);
+  // UND INS PROTOKOLL, nicht nur auf die Konsole. Die Bannerzeile geht nach
+  // stdout, und stdout landet je nach Starter nirgends - `data/bridge.log`
+  // ist das, was nach einem Vorfall gelesen wird. Ein Riegel, dessen Wirken
+  // sich dort nicht belegen laesst, ist im Nachhinein kein Beleg.
+  log(i ? "info" : "error", text);
+  masterRiegelStand = { an: true, quelle: "git", dateien: i ? i.size : null };
 }
 
 /**

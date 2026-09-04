@@ -94,7 +94,24 @@ function ladeKurve(knoten) {
   return k;
 }
 
-/** Stunde, zu der der Referenzlauf diesen Rang erreichte - linear interpoliert. */
+/**
+ * Stunde, zu der der Referenzlauf diesen Rang erreichte - linear interpoliert.
+ *
+ * ACHTUNG, DIE KURVE IST NICHT ZWANGSLAEUFIG MONOTON. Der Bladeburner-Rang kann
+ * SINKEN: eine fehlgeschlagene Aktion kostet `rankLoss`
+ * (`Bladeburner.ts:1055-1059`, `changeRank(person, -1 * rankLoss)`). In der
+ * BitNode-6-Kurve stehen zwei solche Rueckgaenge, beide dicht an der
+ * 400.000er-Schwelle und beide ueber 5.000 Rang gross.
+ *
+ * Diese Suche nimmt das ERSTE Intervall, das den Rang einschliesst - also den
+ * Aufstieg und nicht den Rueckweg. Das ist die richtige Wahl fuer eine
+ * Restzeitschaetzung, aber es heisst auch: bei einer nicht-monotonen Kurve ist
+ * die Zuordnung Rang zu Stunde nicht eindeutig, und die Zahl ist eine untere
+ * Schranke.
+ *
+ * Fuer BitNode 10, die derzeit genutzte Kurve, spielt es keine Rolle: sie hat
+ * 76 Punkte und null Rueckgaenge (geprueft 04.09.2026).
+ */
 function stundeBeiRang(punkte, rang) {
   if (rang <= punkte[0].rang) return punkte[0].h;
   for (let i = 0; i < punkte.length - 1; i++) {

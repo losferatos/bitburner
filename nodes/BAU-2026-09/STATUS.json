@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T10:30:00",
+  "aktualisiert": "2026-09-04T21:05:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -58,17 +58,17 @@
     "C.8": {
       "stand": "getestet",
       "was": "Kaltstart-Geldkette: cdump/csolve, darkweb, sleevecrime",
-      "offen": "cdump.js loest selbst ueber lib/loeser.js (0 GB). NEU 04.09.: alle 30 Gegenproben sind unabhaengig - vorher waren 20 tautologisch (solve === answer). Umkehrproben, zweite Rechnungen, Strukturpruefungen. tools/test-loeser-verify.js stellt 219 verfaelschte Antworten und fand dabei fuenf Fehler in den frisch geschriebenen Proben. Offen: erster Vertrag im Spiel kassiert."
+      "offen": "cdump.js loest selbst ueber lib/loeser.js (0 GB). Alle 30 Gegenproben sind unabhaengig - vorher waren 20 tautologisch (solve === answer). tools/test-loeser-verify.js liest den Quelltext auf Tautologien, erzeugt 360 Instanzen und stellt 996 verfaelschte Antworten. Dabei fielen fuenf Fehler in den frisch geschriebenen Proben auf, darunter zwei Laufzeitbomben (Groesster Primfaktor 3.761 ms fuer 999999937, Rueckverfolgung ohne Deckel). Ein vierter Pruefer hat anschliessend 20 Vertragsdateien des Spiels transpiliert und 141.883 echte Instanzen durch validateAnswer und solver geschickt: null falsche Antworten, null falsche Ablehnungen. Offen: erster Vertrag im Spiel kassiert."
     },
     "C.9": {
       "stand": "getestet",
       "was": "Sprossen 0-2 scharf",
-      "offen": "Sprossen 0-3 gebaut, Wirtsperre, Kern beachtet sie. Die Leiter ist seit dem 04.09. SCHARF (boot.js schreibt enforce). Sprosse 2 feuert wirklich - vorher lieferte sprosseFuer immer Sprosse 1 zurueck und die Kette endete nach 15 min in EXHAUSTED. Offen: je Sprosse ein provozierter Haenger in Ebene 3."
+      "offen": "Sprossen 0-3 gebaut, Wirtsperre, Kern beachtet sie. Die Leiter ist SCHARF, aber gestuft: boot.js schreibt 'enforce', und das gibt nur die umkehrbaren Sprossen 0, 1, 2 und 4b frei - Sprosse 3 raeumt home leer, Sprosse 5 ist ein Soft-Reset, beide brauchen 'enforce-alles' von Hand. Sprosse 2 feuert wirklich - vorher lieferte sprosseFuer immer Sprosse 1 zurueck und die Kette endete nach 15 min in EXHAUSTED. Die Eskalation filtert jetzt auf 'ausloeser'; ohne das lief S1 bis zum Soft-Reset durch. Offen: je Sprosse ein provozierter Haenger in Ebene 3."
     },
     "C.10": {
-      "stand": "gebaut",
+      "stand": "getestet",
       "was": "Sprosse 3 scharf",
-      "offen": "Raeumung nach der Registry-Schonliste plus boot.js-Start. Offen: der Pflichttest aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt). NICHT live."
+      "offen": "Raeumung nach der Registry-Schonliste plus boot.js-Start, wakelock.js in der Notliste. Sprosse 3 laeuft NUR im Modus 'enforce-alles' - der Modus, den ein Mensch bewusst herstellt, wenn false_penalty_count ueber eine Nacht bei null lag. Ebene-2-Proben gruen. Offen: der Pflichttest aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt). NICHT live."
     },
     "C.11": {
       "stand": "getestet",
@@ -77,8 +77,8 @@
     },
     "C.12": {
       "stand": "getestet",
-      "was": "Sprosse 4a und 5 (punish.js)",
-      "offen": "punish.js gebaut (35 Proben) UND seit dem 04.09. verdrahtet: der Waechter beauftragt ueber watchdog.json.orders, der Kern startet punish.js. Vorher war SPROSSEN[5].gebaut = false, die Leiter endete faktisch bei 3, und S2 hatte ueberhaupt keine Sprosse. Laeuft im TROCKENLAUF, bis data/punish-scharf.txt liegt. 17 Proben fuer die Kette. Sprosse 4a bleibt ungebaut - der Auftrag macht sie von einer Ebene-3-Messung abhaengig; aus dem Quelltext belegt sind der save-Prop (GameRoot.tsx:536-541) und dass der Dialog an einer schlichten Zuweisung haengt (index.tsx:55). Es fehlt die Messung, nicht die Kenntnis."
+      "was": "Sprosse 4a, 4b und 5 (punish.js)",
+      "offen": "punish.js gebaut (41 Proben) UND verdrahtet: der Waechter beauftragt ueber watchdog.json.orders UND penalty-order.json aus einer Quelle, der Kern startet punish.js. Vorher war SPROSSEN[5].gebaut = false, die Leiter endete faktisch bei 3, und S2 hatte ueberhaupt keine Sprosse. Danach fand die vierte Skeptikerrunde, dass die Kette eine Station VOR dem Ziel endete - der Zweig im Kern lief wegen eines ReferenceError nie, den das try/catch verschluckte. tools/test-sprosse5-kette.js faehrt jetzt die ganze Naht (33 Proben). punish.js liest data/einbau.json statt der nie geschriebenen aug-queue.json. NEU: Sprosse 4b (Traegergewerk neu starten, 45 min Karenz, Deckel 3 je 6 h) schliesst die Luecke zwischen 'der Traeger steht seit sechs Stunden' und dem Soft-Reset. Laeuft im TROCKENLAUF, bis data/punish-scharf.txt liegt. Sprosse 4a bleibt ungebaut - der Auftrag macht sie von einer Ebene-3-Messung abhaengig; aus dem Quelltext belegt sind der save-Prop (GameRoot.tsx:536-541) und dass der Dialog an einer schlichten Zuweisung haengt (index.tsx:55). Es fehlt die Messung, nicht die Kenntnis."
     },
     "C.13": {
       "stand": "gebaut",
@@ -99,7 +99,7 @@
   "abnahme": {
     "stufeA": {
       "stand": "offen",
-      "was": "Tests und Skeptiker gruen, Lueckenliste leer"
+      "was": "Tests und Skeptiker gruen, Messlueckenliste leer. Gemessen 04.09.2026: 28 von 28 Testdateien gruen (node tools/test-alles.js --nur-tests -> Exit 0), aber der volle Lauf endet mit Exit 1, weil neun Messluecken offen sind. Das ist das Tor, das seit R24 wirklich schliesst - vorher lief die Suite mit denselben neun Luecken auf Exit 0 durch."
     },
     "stufeB": {
       "stand": "offen",
@@ -109,5 +109,17 @@
       "stand": "offen",
       "was": "ein beobachteter autonomer BitNode-Sprung mit Kaltstart"
     }
+  },
+  "nacharbeiten": {
+    "hinweis": "Repariert an bestehenden Positionen, keine neuen. Geht NICHT in die Prozentzahl ein - fortschritt.js liest nur vorphasen, positionen und abnahme.",
+    "C.16": "Skeptikerrunde 3, die Wichtigen (W5-W11, C.7)",
+    "C.17": "Ereignisstrom bekommt Schreiber - drei Abnahme-KPIs waren unmessbar",
+    "C.18": "die 20 tautologischen Gegenproben der Vertragsloeser ersetzt",
+    "C.19": "Sprosse 5 verdrahtet - punish.js war gebaut und an nichts angeschlossen",
+    "C.20": "Skeptikerrunde 4, die vier blockierenden Befunde (R1-R5, R15-R18)",
+    "C.21": "R11, R13, R14, R19 und zwei Laufzeitbomben in Gegenproben",
+    "C.22": "R9 und R12 - Einbau auf dem Bladeburner-Weg, drei Modi statt zwei",
+    "C.23": "R10 und R28 - Sprosse 4b, und zwei Proben, die nie rot werden konnten",
+    "befunde": "nodes/BAU-2026-09/BEFUNDE-RUNDE4.md: 27 von 30 abgehakt. Offen R23 (kein Test fuer die Bruecke, steht in der Messlueckenliste), R27 (contracts.js und cdump.js ohne telemetryFile), R29 (der Lader vertraegt keine zwei gleichzeitigen Testlaeufe)."
   }
 }

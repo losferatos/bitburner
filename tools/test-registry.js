@@ -365,6 +365,65 @@ console.log("-- die Registry stimmt mit der Architektur ueberein --");
 }
 
 console.log("");
+console.log("-- die Schreiberprobe selbst (R27, 04.09.2026) --");
+{
+  // SIE WAR BIS HEUTE UNGETESTET, und zwar aus einem strukturellen Grund:
+  // sie stand mitten in `registry-bauen.js`, einem Skript, das im Hauptteil
+  // schreibt. Ein Test konnte sie nicht importieren, ohne den Generator
+  // laufen zu lassen. Jetzt steht sie in `tools/lib/schreiberprobe.js`.
+  //
+  // Die POSITIVEN Faelle sagen wenig - der Generator faehrt sie ohnehin
+  // gegen 24 echte Dateien. Wichtig sind die negativen: die Probe ist das
+  // einzige, was einen erfundenen Dateinamen aufhaelt, und ein erfundener
+  // Name macht den Kern zum Totengraeber seines eigenen Werkzeugs.
+  const { schreiberprobe } = await import(
+    pathToFileURL(path.join(HIER, "lib", "schreiberprobe.js")).href);
+
+  const F = "data/x.json";
+
+  pruefe("Form 1: der Name steht woertlich im Aufruf",
+    schreiberprobe('ns.write("data/x.json", JSON.stringify(k), "w");', F).ok);
+
+  pruefe("Form 2: Konstante plus Aufruf mit dem Bezeichner",
+    schreiberprobe('const STAND = "data/x.json";\nns.write(STAND, "a", "w");', F).form
+      === "konstante");
+
+  // ---- und jetzt das, worauf es ankommt --------------------------------
+  pruefe("eine Konstante OHNE Schreibaufruf gilt nicht",
+    !schreiberprobe('const STAND = "data/x.json";\nns.read(STAND);', F).ok,
+    "sonst genuegte es, den Namen irgendwo hinzuschreiben");
+
+  pruefe("ein Aufruf mit FREMDEM Bezeichner gilt nicht",
+    !schreiberprobe('const STAND = "data/x.json";\nns.write(ANDERS, "a", "w");', F).ok);
+
+  pruefe("ein anderer Dateiname gilt nicht",
+    !schreiberprobe('const STAND = "data/y.json";\nns.write(STAND, "a", "w");', F).ok);
+
+  pruefe("blosse Erwaehnung im Kommentar gilt nicht",
+    !schreiberprobe('// schreibt spaeter mal data/x.json\nns.write(EGAL, "a");', F).ok,
+    "der haeufigste Fall: der Name ist gedacht, nicht gebaut");
+
+  pruefe("ein LESEN derselben Datei gilt nicht",
+    !schreiberprobe('const d = ns.read("data/x.json");', F).ok);
+
+  pruefe("`let` statt `const` gilt nicht",
+    !schreiberprobe('let STAND = "data/x.json";\nns.write(STAND, "a", "w");', F).ok,
+    "eine Variable, die neu zugewiesen werden kann, beweist nichts");
+
+  pruefe("leerer Quelltext gilt nicht",
+    !schreiberprobe("", F).ok);
+
+  // Und die beiden echten Dateien, um die es bei R27 ging.
+  for (const [datei, tele] of [["cdump.js", "data/cdump-stand.json"],
+                               ["contracts.js", "data/contracts.json"]]) {
+    const txt = fs.readFileSync(finde(datei), "utf8");
+    const r = schreiberprobe(txt, tele);
+    pruefe(datei + " schreibt " + tele + " wirklich", r.ok,
+      r.ok ? "Form: " + r.form + (r.bezeichner ? " (" + r.bezeichner + ")" : "") : "");
+  }
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

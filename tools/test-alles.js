@@ -143,6 +143,16 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-bruecke.js",
+    deckt: "EBENE 2: die Bruecke gegen ein nachgebautes Spiel - Rollentrennung, Wachhund, Sicherung vor pushAll, zweite Verbindung, belegter Port (Auftrag 6.1)",
+    schnell: false,
+  },
+  {
+    datei: "test-lader.js",
+    deckt: "DER PRUEFSTAND SELBST: Importumschreibung, Heimatordner, keine Reste unter src/, zwei gleichzeitige Laeufe (R29)",
+    schnell: false,
+  },
+  {
     datei: "test-guard-ebene2.js",
     deckt: "EBENE 2: der Waechter im Beobachtungsmodus, boot.js-Schonliste (C.6)",
     schnell: false,
@@ -221,10 +231,10 @@ const MESSLUECKEN = [
     + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14).",
   "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
     + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
-  "DIE BRUECKE hat keinen einzigen Test, obwohl Auftrag 6.1 ihn namentlich "
-    + "verlangt: Reconnect, Backup vor pushAll, Wachhund, Exit bei EADDRINUSE "
-    + "und uncaughtException, zweite Verbindung, unverified-Fenster. Sie ist "
-    + "der Prozess, der den Live-Spielstand anfassen kann (Skeptiker Runde 4).",
+  "DIE BRUECKE ist seit dem 04.09.2026 gegen ein nachgebautes Spiel geprueft "
+    + "(tools/test-bruecke.js, 28 Proben). OFFEN bleibt der Zweig, den ein "
+    + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
+    + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
   "ZWEI AUTONOMIEZAEHLER haben weiterhin keinen Schreiber: manual_actions "
     + "(gehoert in die Bruecke - sie sieht pushFile, deleteFile und reload) "
     + "und false_kill_count. `node tools/kpi-luecken.js` nennt sie je Feld.",

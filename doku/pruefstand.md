@@ -71,9 +71,60 @@ werden im `finally` alle wieder entfernt. Jeder Ebene-2-Test prüft am Ende, das
 kein `.mock-`-Rest in `src/` liegengeblieben ist — er ginge über die Brücke ins
 laufende Spiel.
 
+**Der Lader hat seit dem 04.09.2026 einen eigenen Test** (`tools/test-lader.js`).
+Er ist das Werkzeug, mit dem geprüft wird — ein Fehler in ihm sieht aus wie ein
+Fehler im geprüften Code, und man sucht ihn an der falschen Stelle. Zwei solche
+Fehler steckten in ihm:
+
+- Die transitiven Kopien trugen **keine Prozessnummer** im Namen. Zwei
+  gleichzeitige Läufe schrieben dieselbe Datei und löschten im `finally` die des
+  jeweils anderen. Gemessen: der alte Lader fällt in 2 von 16 Läufen um, der
+  neue in 0 von 16. Weil eine 2-von-16-Probe zu schwach für ein Tor ist, hält
+  die **Strukturprüfung** die Linie (genau eine Stelle bildet Kopienamen, und
+  sie trägt `process.pid`); der Wettlauf zeigt nur, dass sie über etwas Echtes
+  wacht.
+- Er löste Importe **ab dem Ordner der Datei** auf statt ab home. Für die großen
+  Skripte stimmte das, weil sie im Wurzelverzeichnis liegen; `lib/figurns.js`
+  suchte `lib/figur.js` dagegen unter `src/lib/lib/`.
+
+## Die Brücke
+
+`tools/test-bruecke.js`, seit dem 04.09.2026. Sie ist der **einzige Prozess des
+Projekts, der Erics Spielstand anfassen kann** — und hatte 1.560 Zeilen lang
+keinen Test.
+
+Geprüft wird gegen ein nachgebautes Spiel: ein WebSocket-Client, der `getSaveFile`
+mit einem **synthetischen** Spielstand beantwortet (gzip, Magic-Bytes,
+PlayerSave, SettingsSave). Damit lässt sich jede Prüfung gezielt verletzen.
+
+| Was | Wie |
+|---|---|
+| Rollentrennung | ohne `--instance` Code 3; TEST auf 12525/8795 Code 3; LIVE aus dem Worktree Code 3 |
+| Wachhund | ein Spiel, das auf `getSaveFile` schweigt, bekommt **kein** `pushFile` |
+| fremder RFA-Port | abgewiesen, nichts geschrieben |
+| Rückwärtssprung | ältere Kopie abgewiesen, nichts geschrieben |
+| Reihenfolge | Sicherung entsteht, und `getSaveFile` kommt vor dem ersten `pushFile` |
+| Wiederverbinden | die **Zahl** der Verifikationen steigt, nicht nur die Zeile ist da |
+| zweite Verbindung | wird geschlossen, solange die erste antwortet |
+| belegter Port | zweite Brücke beendet sich mit Code 2, die erste läuft weiter |
+
+Die Brücke läuft dabei als **echter Unterprozess**, nicht als importiertes
+Modul: Ihre Riegel sitzen zum Teil in `process.exit` und `wss.on("error")`, und
+beides ist nur an einem echten Prozess zu beobachten.
+
+Zwei Fallen, die beim Bau aufgefallen sind:
+
+- **Der Anker überlebt den Test.** `pruefstand/backups/INDEX.tsv` liefert
+  `totalPlaytime` als letzten Anker der Kette, auch nach einem frischen
+  Datenordner. Ein Testspielstand mit 100 h fiel deshalb zu Recht durch. Der
+  Test liest den Index jetzt und rechnet **darüber** — statt eine Sicherung zu
+  löschen, um grün zu werden.
+- **Jeder Abschnitt braucht einen eigenen Datenordner**, sonst schleppt der
+  Heartbeat den Anker des vorigen mit.
+
 ## Die Testdateien
 
-28 Stück (Stand 04.09.2026). Die Liste mit einer Zeile je Datei, was sie deckt,
+30 Stück (Stand 04.09.2026). Die Liste mit einer Zeile je Datei, was sie deckt,
 steht in `tools/test-alles.js` — dort und nicht hier, damit sie nicht
 auseinanderläuft.
 

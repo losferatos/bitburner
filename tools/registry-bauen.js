@@ -16,6 +16,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { schreiberprobe, SCHREIBER } from "./lib/schreiberprobe.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -84,7 +85,7 @@ const PFLICHT = ["name", "verfahren", "knoten", "phase",
  * sie ueber ein Muster zu erraten: ein Muster, das zu viel akzeptiert, laesst
  * genau den Fehler durch, gegen den diese Pruefungen gebaut sind.
  */
-const SCHREIBER = ["ns.write", "nachHome", "schreib", "schreibe"];
+
 
 /** Jede .js-Datei des Zielordners, einmal gelesen. */
 function alleQuellen(ordner, praefix = "") {
@@ -225,8 +226,10 @@ for (const e of reg.eintraege || []) {
       //
       // Kein Regex: der Dateiname ist ein Literal, und `includes` kann sich
       // nicht am Escaping vertun.
-      const schreibt = SCHREIBER.some(
-        (fn) => txt.includes(fn + '("' + e.telemetryFile + '"'));
+      // Die Probe selbst steht in `tools/lib/schreiberprobe.js` - sie war
+      // hier nicht testbar, weil dieser Generator im Hauptteil schreibt.
+      const probe = schreiberprobe(txt, e.telemetryFile);
+      const schreibt = probe.ok;
       if (!schreibt) {
         fehler.push(wo + ": telemetryFile '" + e.telemetryFile
           + "' wird von " + e.name + " nirgends geschrieben."

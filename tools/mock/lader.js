@@ -38,31 +38,87 @@ import { pathToFileURL } from "node:url";
  * @param {string} datei absoluter Pfad zur Skriptdatei
  * @returns {Promise<object>} das Modul
  */
+/**
+ * Der Ordner, ab dem das Spiel Importe aufloest - also `home`.
+ *
+ * DAS WAR BIS ZUM 04.09.2026 SCHLICHT `path.dirname(datei)` (gefunden beim
+ * Bau von tools/test-lader.js). Fuer die grossen Skripte stimmte das, weil
+ * sie im Wurzelverzeichnis liegen. Fuer ein Modul im Unterordner nicht:
+ * `lib/figurns.js` importiert `lib/figur.js`, und der Lader suchte das unter
+ * `src/lib/lib/figur.js`.
+ *
+ * Das Spiel kennt keine Unterordner-Wurzeln - `isAbsolutePath`
+ * (`Paths/Directory.ts:46-48`) macht aus jedem Pfad ohne fuehrenden Punkt
+ * einen ab home. Also wird hier bis zum `src` hochgelaufen.
+ */
+function heimatOrdner(datei) {
+  let o = path.dirname(path.resolve(datei));
+  for (let i = 0; i < 8; i++) {
+    if (path.basename(o) === "src") return o;
+    const hoch = path.dirname(o);
+    if (hoch === o) break;
+    o = hoch;
+  }
+  // Kein src im Pfad: dann gilt die alte Annahme. Sie ist fuer alles richtig,
+  // was direkt neben den Werkzeugen liegt.
+  return path.dirname(path.resolve(datei));
+}
+
+/** Ein Pfad, den Node als relativ erkennt (mit "/" statt Backslash). */
+function relativ(von, ziel) {
+  const r = path.relative(von, ziel).split(path.sep).join("/");
+  // NICHT nur auf einen Punkt pruefen: die Kopien heissen ".mock-...", und
+  // ".mock-figur-123.mjs" faengt zwar mit einem Punkt an, ist fuer Node aber
+  // ein Paketname und kein Pfad (ERR_INVALID_MODULE_SPECIFIER).
+  return (r.startsWith("./") || r.startsWith("../")) ? r : "./" + r;
+}
+
 export async function ladeSpielskript(datei) {
   const quelle = fs.readFileSync(datei, "utf8");
-  const ordner = path.dirname(datei);
+  // `ordner` ist die HEIMAT, nicht der Ordner der Datei - siehe oben.
+  const ordner = heimatOrdner(datei);
+  const bei = path.dirname(path.resolve(datei));
 
-  // `from "lib/x.js"` -> `from "./lib/x.js"`, aber nur, wenn der Pfad nicht
-  // schon relativ ist und kein Node-Paket meint. Bitburner-Pfade beginnen nie
-  // mit "node:" oder "@".
+  // `from "lib/x.js"` -> ein Pfad relativ zur Datei, aber aufgeloest ab
+  // HEIMAT. Nur, wenn der Pfad nicht schon relativ ist und kein Node-Paket
+  // meint - Bitburner-Pfade beginnen nie mit "node:" oder "@".
   const umgeschrieben = quelle.replace(
     /(\bfrom\s+["'])(?!\.{1,2}\/|node:|@|https?:)([^"']+)(["'])/g,
-    (_, a, pfad, z) => a + "./" + pfad + z,
+    (_, a, pfad, z) => a + relativ(bei, path.resolve(ordner, pfad)) + z,
   );
 
   // Ein Bitburner-Import darf die Endung weglassen ("lib/calc"). Node darf das
   // nicht - die fehlende Endung wird ergaenzt, wenn die Datei so existiert.
   const mitEndung = umgeschrieben.replace(
-    /(\bfrom\s+["'])(\.\/[^"']+?)(["'])/g,
+    /(\bfrom\s+["'])(\.\.?\/[^"']+?)(["'])/g,
     (ganz, a, pfad, z) => {
       if (/\.[a-z]+$/i.test(pfad)) return ganz;
-      const kandidat = path.join(ordner, pfad + ".js");
+      const kandidat = path.resolve(bei, pfad + ".js");
       return fs.existsSync(kandidat) ? a + pfad + ".js" + z : ganz;
     },
   );
 
-  const name = ".mock-" + path.basename(datei, ".js") + "-" + process.pid + ".mjs";
-  const ziel = path.join(ordner, name);
+  // DER NAME EINER KOPIE - an EINER Stelle, fuer alle Ebenen gleich
+  // (R29, Skeptiker Runde 4, 04.09.2026).
+  //
+  // Die Hauptdatei trug seit jeher die Prozessnummer im Namen, die
+  // transitiven Kopien nicht: `lib/figur.js` wurde schlicht zu
+  // `lib/figur.mjs`. Zwei gleichzeitige Testlaeufe schrieben damit dieselbe
+  // Datei und loeschten im `finally` die des jeweils anderen - mitten in
+  // dessen Import.
+  //
+  // Aufgefallen ist es nicht, weil `tools/test-alles.js` seriell laeuft. Das
+  // ist eine Eigenschaft des Laeufers, keine der Sache: wer zwei Tests in
+  // zwei Fenstern startet, bekam ein Verhalten, das aussieht wie ein Fehler
+  // im geprueften Code.
+  //
+  // Und es ist mehr als eine Unbequemlichkeit: diese Dateien liegen unter
+  // `src/`, und `src/` geht ueber die Bruecke ins laufende Spiel.
+  const mockPfad = (absPfad) => path.join(
+    path.dirname(absPfad),
+    ".mock-" + path.basename(absPfad, ".js") + "-" + process.pid + ".mjs");
+
+  const ziel = mockPfad(path.resolve(datei));
   fs.writeFileSync(ziel, mitEndung, "utf8");
 
   // TRANSITIV, NICHT NUR EINE EBENE (04.09.2026).
@@ -92,26 +148,27 @@ export async function ladeSpielskript(datei) {
       if (erledigt.has(abs) || !fs.existsSync(abs)) continue;
       erledigt.add(abs);
       schlange.push(abs);
-      // Die Kopie traegt den ORIGINALNAMEN mit .mjs-Endung, damit der
-      // umgeschriebene Import "./lib/figur.mjs" sie findet.
-      const kopie = abs.replace(/\.js$/, ".mjs");
+      const kopie = mockPfad(abs);
       const inhalt = fs.readFileSync(abs, "utf8")
         .replace(/(\bfrom\s+["'])(?!\.{1,2}\/|node:|@|https?:)([^"']+)(["'])/g,
-          (_, a, p2, z) => {
-            const p3 = /\.[a-z]+$/i.test(p2) ? p2.replace(/\.js$/, ".mjs") : p2 + ".mjs";
-            const relPfad = path.relative(path.dirname(abs), path.resolve(ordner, p3))
-              .split(path.sep).join("/");
-            return a + (relPfad.startsWith(".") ? relPfad : "./" + relPfad) + z;
+          (ganz, a, p2, z) => {
+            const zielAbs = path.resolve(ordner,
+              /\.[a-z]+$/i.test(p2) ? p2 : p2 + ".js");
+            if (!fs.existsSync(zielAbs)) return ganz;
+            return a + relativ(path.dirname(abs), mockPfad(zielAbs)) + z;
           });
       fs.writeFileSync(kopie, inhalt, "utf8");
       kopien.push(kopie);
     }
   }
-  // Die Hauptdatei muss auf die .mjs-Kopien zeigen, nicht auf die .js.
+  // Die Hauptdatei muss auf die Kopien zeigen, nicht auf die Originale.
   const vorher = fs.readFileSync(ziel, "utf8");
-  const nachher = vorher.replace(/(from\s+["']\.\/)([^"']+)\.js(["'])/g,
-    (ganz, a, p2, z) => (fs.existsSync(path.join(ordner, p2 + ".mjs"))
-      ? a + p2 + ".mjs" + z : ganz));
+  const nachher = vorher.replace(/(from\s+["'])(\.\.?\/[^"']+?)\.js(["'])/g,
+    (ganz, a, p2, z) => {
+      const zielAbs = path.resolve(bei, p2 + ".js");
+      if (!fs.existsSync(mockPfad(zielAbs))) return ganz;
+      return a + relativ(bei, mockPfad(zielAbs)) + z;
+    });
   fs.writeFileSync(ziel, nachher, "utf8");
   if (process.env.LADER_LAUT) {
     console.log("  [lader] " + kopien.length + " Kopie(n), umgeschrieben: "

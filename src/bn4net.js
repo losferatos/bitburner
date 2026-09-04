@@ -659,6 +659,11 @@ export async function main(ns) {
   const evMerker = { nodeReset: null, augReset: null,
     bootWall: null, ersteRundeWall: null };
 
+  // Welche Waechterauftraege dieser Prozess schon ausgefuehrt hat. Der
+  // Schluessel ist der Stellzeitpunkt - ein Auftrag darf nicht zweimal laufen,
+  // und `installAugmentations` zweimal waere zwei Laeufe weggeworfen.
+  const auftraegeGetan = new Set();
+
   const baueWerkzeuge = (lage) => regGeladen
     ? regAuswahl(regGeladen, lage)
         // Der Kern startet sich nicht selbst. Der WAECHTER dagegen gehoert
@@ -4023,6 +4028,96 @@ export async function main(ns) {
         JSON.stringify(e.vergabe || { owner: null, action: null, seq:
           (bisher && Number.isFinite(bisher.seq) ? bisher.seq : 0) + 1,
           wall: jetztF, nodeReset: nodeResetF, leaseBis: 0 }), "w");
+    }
+
+    // --- 9c. Auftraege des Waechters ausfuehren (Sprosse 5, Position C.12) ----
+    //
+    // WARUM DER KERN DAS TUT UND NICHT DER WAECHTER.
+    //
+    // `installAugmentations` ist `SingularityFn3` und kostet bei SF4.1 achtzig
+    // Gigabyte. Der Waechter hat sechs - er KANN Sprosse 5 nicht ausfuehren.
+    // Also beauftragt er, und der Kern startet `punish.js` auf einem Wirt, der
+    // gross genug ist.
+    //
+    // WAS DER KERN PRUEFT UND WAS NICHT. Er prueft NICHT die acht
+    // Vorbedingungen - das tut `punish.js` selbst, und zwar am Zustand des
+    // Augenblicks, in dem es laeuft. Zwischen Auftrag und Ausfuehrung koennen
+    // Minuten liegen, in denen `ausgang.json.offen` umschlaegt oder ein Graft
+    // beginnt; eine Kopie der Bedingungen hier waere eine zweite Wahrheit, die
+    // irgendwann auseinanderlaeuft.
+    //
+    // Er prueft dagegen sehr wohl, ob der AUFTRAG gilt: frisch (der Waechter
+    // laesst ihn nach 15 min verfallen, der Kern nimmt nur, was juenger ist),
+    // aus DIESEM Knoten, und noch nicht ausgefuehrt.
+    //
+    // UND ER LAEUFT TROCKEN, solange `data/punish-scharf.txt` fehlt. Das ist
+    // der Beleg, den der Auftrag verlangt: erst ein protokollierter
+    // Trockenlauf, dann die Schaerfe. Die Datei legt ein Mensch an.
+    {
+      try {
+        const w = ns.fileExists("data/watchdog.json", "home")
+          ? JSON.parse(ns.read("data/watchdog.json")) : null;
+        const orders = w && Array.isArray(w.orders) ? w.orders : [];
+        for (const o of orders) {
+          if (!o || o.sprosse !== 5 || o.skript !== "punish.js") continue;
+          if (!Number.isFinite(o.gestellt) || Date.now() - o.gestellt > 15 * 60000) continue;
+          const schluessel = "s5-" + o.gestellt;
+          if (auftraegeGetan.has(schluessel)) continue;
+          if (ns.ps("home").some((p) => p.filename === "punish.js")) break;
+
+          if (!ns.fileExists("punish.js", "home")) {
+            sag("Waechterauftrag Sprosse 5, aber punish.js liegt nicht auf home.");
+            auftraegeGetan.add(schluessel);
+            break;
+          }
+          const scharf = ns.fileExists("data/punish-scharf.txt", "home");
+          const braucht = ns.getScriptRam("punish.js", "home");
+          // Eigene Platzrechnung. `freiAuf` aus dem Werkzeugstarter ist hier
+          // NICHT sichtbar - es steht in dessen Block, und der ReferenceError
+          // waere von dem try/catch drumherum stillschweigend geschluckt
+          // worden. Gefunden von tools/test-sprosse5-kette.js, das genau
+          // deshalb existiert.
+          const freiHier = (h) => ns.getServerMaxRam(h) - ns.getServerUsedRam(h);
+          // Den groessten Wirt suchen. punish.js kostet bei SF4.1 83,35 GB
+          // (in BitNode 4 nur 8,35) - das passt auf home erst nach dem Ausbau
+          // und auf die Werkbank fast immer.
+          let wirt = null;
+          let meist = -Infinity;
+          for (const h of hosts) {
+            if (!ns.hasRootAccess(h)) continue;
+            const f = freiHier(h);
+            if (f > meist) { meist = f; wirt = h; }
+          }
+          if (!wirt || !(braucht > 0) || meist < braucht) {
+            sag("Waechterauftrag Sprosse 5: punish.js (" + braucht.toFixed(1)
+              + " GB) passt auf keinen Wirt (bester: "
+              + (Number.isFinite(meist) ? meist.toFixed(1) : "?") + " GB).");
+            break;   // NICHT abhaken - beim naechsten Mal kann Platz sein
+          }
+          if (wirt !== "home") ns.scp(["punish.js", ...BIBLIOTHEKEN], wirt, "home");
+          const pid = scharf
+            ? ns.exec("punish.js", wirt, 1, "scharf")
+            : ns.exec("punish.js", wirt, 1);
+          auftraegeGetan.add(schluessel);
+          sag("Waechterauftrag Sprosse 5 ausgefuehrt: punish.js auf " + wirt
+            + (scharf ? " SCHARF" : " im Trockenlauf")
+            + (pid ? " (pid " + pid + ")." : " - exec gab 0."));
+          break;   // hoechstens ein Auftrag je Runde
+        }
+      } catch (e) {
+        // NICHT STILL SCHLUCKEN. Dieses catch hat beim ersten Anlauf einen
+        // ReferenceError verborgen (`freiAuf` war ausserhalb seines Blocks
+        // benutzt), und der Zweig lief wochenlang nicht - ohne eine Zeile
+        // irgendwo. Genau die Fehlerklasse, gegen die der ganze Umbau steht.
+        //
+        // Ein fehlender Waechter ist trotzdem kein Fehler: dann gibt es
+        // watchdog.json nicht, `fileExists` sagt nein, und wir kommen hier gar
+        // nicht an. Was hier ankommt, ist echt.
+        if (runde % 10 === 0) {
+          sag("Waechterauftrag nicht auswertbar: "
+            + String(e && e.message ? e.message : e));
+        }
+      }
     }
 
     // --- 9b. Die Kennzahlentafel ----------------------------------------------

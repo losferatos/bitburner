@@ -38,10 +38,15 @@ export const ZUSTAENDE = ["HEALTHY", "SUSPECT", "EXECUTED", "VERIFY",
  * welcher Zeit die Fristen dieser Sprosse laufen.
  *
  * Sprosse 4a steht mit `gebaut: false` drin: sie wird laut Architektur NUR
- * gebaut, wenn ein Prüfstandslauf zeigt, dass ein skriptausgeloester Reload
- * keinen beforeunload-Dialog stehen laesst. Ohne diesen Beleg endet die Leiter
- * bei 3. Das als Datenfeld zu fuehren statt als Kommentar heisst: der Code
- * kann es pruefen.
+ * gebaut, wenn ein Pruefstandslauf zeigt, dass ein skriptausgeloester Reload
+ * keinen beforeunload-Dialog stehen laesst. Das als Datenfeld zu fuehren statt
+ * als Kommentar heisst: der Code kann es pruefen - und die Leiter ueberspringt
+ * die Sprosse, statt an ihr haengenzubleiben.
+ *
+ * Sprosse 5 steht seit dem 04.09.2026 auf `gebaut: true`: `src/punish.js` ist
+ * gebaut und mit 35 Proben belegt. Sie war vorher `false`, und damit endete
+ * die Leiter faktisch bei 3 - der Fall, fuer den sie gedacht ist (der Traeger
+ * waechst seit sechs Stunden Motorzeit nicht), hatte keine Antwort.
  */
 export const SPROSSEN = [
   { nr: 0, name: "Umgebung", uhr: "guard", gebaut: true, strafe: false,
@@ -60,7 +65,17 @@ export const SPROSSEN = [
     ausloeser: ["S3b"], karenzMs: 300000, wirkungMs: 180000,
     deckelJe6h: 1, wirkung: "Engine-Puls > 0,9 ueber 3 min",
     bedingung: "nur nach Pruefstandsbeleg, dass kein beforeunload-Dialog stehen bleibt" },
-  { nr: 5, name: "Soft-Reset durch Einbau", uhr: "motor", gebaut: false, strafe: true,
+  // Sprosse 5 IST gebaut (src/punish.js, 35 Proben in tools/test-punish.js).
+  // Sie ist trotzdem die vorsichtigste der Leiter: der Waechter fuehrt sie
+  // NICHT selbst aus - `installAugmentations` kostet bei SF4.1 achtzig
+  // Gigabyte und spraengt jeden Waechter. Er schreibt einen Auftrag, der Kern
+  // startet punish.js, und punish.js prueft die acht Vorbedingungen selbst
+  // noch einmal am aktuellen Zustand.
+  //
+  // Und sie bleibt im TROCKENMODUS, solange `data/punish-scharf.txt` nicht auf
+  // home liegt. Das ist der Beleg, den der Auftrag verlangt ("Trockenlauf im
+  // Klon"): jede Ausloesung landet erst einmal nur im Protokoll.
+  { nr: 5, name: "Soft-Reset durch Einbau", uhr: "motor", gebaut: true, strafe: true,
     ausloeser: ["S2"], karenzMs: 6 * 3600000, wirkungMs: 600000,
     deckelJe6h: null, wirkung: "lastAugReset gesprungen und Konto > 0" },
 ];

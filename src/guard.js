@@ -105,6 +105,12 @@ export async function main(ns) {
   let letzterTraegerWert = null;
   let letzterTraegerMotorMs = null;
 
+  // Auftraege an den Kern. Sie leben ueber Runden hinweg, weil der Kern seinen
+  // eigenen Takt hat - ein Auftrag, den der Waechter nur eine Runde lang
+  // anbietet, wuerde bei gedrosseltem Tab nie gesehen. Der Verfall steht unten
+  // beim Schreiben.
+  let auftraege = [];
+
   let runden = 0;
   let errStreak = 0;
   let okRunden = 0;
@@ -284,6 +290,11 @@ export async function main(ns) {
             const erg = fuehreAus(ns, r, eintraege, gesperrt, sag);
             eintrag.ausgefuehrt = erg.getan;
             eintrag.details = erg.text;
+            // Ein Auftrag an den Kern (bisher nur Sprosse 5). Er lebt in
+            // watchdog.json und verfaellt nach 15 Minuten - ein Auftrag, den
+            // der Kern nicht binnen seiner Karenz ausfuehrt, ist selbst ein
+            // Kernbefund und gehoert nicht Stunden spaeter noch ausgefuehrt.
+            if (erg.auftrag) auftraege.push(erg.auftrag);
             sag("  -> " + erg.text);
           } else {
             sag("BEOBACHTET: haette Sprosse " + r.sprosse.nr + " auf " + r.ziel
@@ -307,12 +318,19 @@ export async function main(ns) {
         }
       }
 
+      // Abgelaufene Auftraege fallen weg. Fuenfzehn Minuten Wanduhr: laenger
+      // als jede Kernrunde (10 min Frischefrist) und kuerzer als die Karenz
+      // der Sprosse, die den Auftrag erzeugt hat. Ein Auftrag, den der Kern
+      // nicht binnen dieser Zeit ausfuehrt, ist selbst ein Kernbefund - und
+      // dafuer gibt es S3a, nicht einen ewig liegenden Zettel.
+      auftraege = auftraege.filter((a) => wall - a.gestellt < 15 * 60000);
+
       schreibeZustand(ns, uhren, leiter, strafen, {
         wall, runden, okRunden, errStreak, lastError,
         modus: modusRoh, karenz: false, motorTimeMs,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
-        sichtbar,
+        sichtbar, auftraege,
       }, spieler);
 
       okRunden++;
@@ -434,6 +452,9 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     sichtbar: lage.sichtbar,
     puls: lage.puls,
     signaleJetzt: lage.signale,
+    // Was der Kern tun soll, weil der Waechter es nicht kann. Heisst `orders`,
+    // weil ARCHITEKTUR 3.1 den Kanal so nennt und tools/ ihn so liest.
+    orders: lage.auftraege || [],
   });
 }
 
@@ -617,6 +638,36 @@ function fuehreAus(ns, r, eintraege, gesperrt, sag) {
     }
     return { getan: !!pid, text: beendet + " Prozess(e) beendet, boot.js "
       + (pid ? "gestartet (pid " + pid + ")." : "liess sich nicht starten (exec gab 0).") };
+  }
+
+  // --- Sprosse 5: der Soft-Reset durch Einbau -------------------------------
+  //
+  // DER WAECHTER FUEHRT SIE NICHT SELBST AUS, und das ist keine Vorsicht,
+  // sondern Arithmetik: `installAugmentations` ist `SingularityFn3` und kostet
+  // bei SF4.1 achtzig Gigabyte. Der Waechter hat sechs. Er kann diese Sprosse
+  // nicht ausfuehren, egal wie sehr er moechte.
+  //
+  // Also der Weg, den die Architektur vorsieht: der Waechter BEAUFTRAGT, der
+  // Kern fuehrt aus. Der Auftrag steht in `data/watchdog.json` unter `orders`
+  // - dieselbe Datei, die der Waechter ohnehin je Runde schreibt und der Kern
+  // ohnehin liest. Ein eigener Kanal waere ein zweiter Ort fuer denselben
+  // Zustand.
+  //
+  // DIE VORBEDINGUNGEN PRUEFT NICHT DIESER AUFTRAG, SONDERN punish.js SELBST.
+  // Das ist der Unterschied zwischen "der Waechter hat vor einer Minute
+  // gemeint" und "es gilt jetzt": zwischen Auftrag und Ausfuehrung koennen
+  // Minuten liegen, in denen `ausgang.json.offen` umschlaegt oder ein Graft
+  // beginnt. punish.js liest alle acht Bedingungen frisch und verweigert mit
+  // Grund - deshalb steht hier keine Kopie davon.
+  //
+  // UND ES BLEIBT EIN TROCKENLAUF, solange `data/punish-scharf.txt` nicht auf
+  // home liegt. Der Kern haengt `scharf` nur dann an.
+  if (nr === 5) {
+    return { getan: true, auftrag: {
+      sprosse: 5, ziel: r.ziel, skript: "punish.js",
+      gestellt: Date.now(), signal: r.ziel,
+    }, text: "Auftrag fuer Sprosse 5 gestellt - der Kern startet punish.js"
+      + " (Trockenlauf, solange data/punish-scharf.txt fehlt)." };
   }
 
   return { getan: false, text: "Sprosse " + nr + " ist nicht gebaut." };

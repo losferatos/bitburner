@@ -30,11 +30,15 @@
 import { hackPercent as calcHackPercent, hackChance as calcHackChance,
   growthLogPerThread as calcGrowthLog } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl,
-  telemetrieTabelle as regTelemetrie, leseRolle, pruefeRolle } from "lib/reg.js";
+  telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
+  leseRolle, pruefeRolle } from "lib/reg.js";
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
 } from "lib/motorzeit.js";
+import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
+  KPI_VERSION } from "lib/kpi.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -121,7 +125,9 @@ export async function main(ns) {
   // DER RECHNERPARK LAEUFT UEBER shop.js (Position C.7)
   // =========================================================================
   //
-  // Die ns.cloud-Familie kostet 3,85 GB - mehr als ein Zehntel des
+  // Die ns.cloud-Familie kostet 4,00 GB (nachgerechnet gegen
+  // RamCostGenerator.ts:222-229; hier stand zunaechst 3,85, weil zwei
+  // Funktionen in der Aufzaehlung fehlten) - mehr als ein Zehntel des
   // Kaltstart-Budgets, fuer eine Handlung, die vielleicht einmal je Stunde
   // vorkommt. Der Kern behaelt die ENTSCHEIDUNG (er weiss als einziger, was
   // wartet und was das Geld sonst soll) und gibt die AUSFUEHRUNG ab.
@@ -145,6 +151,22 @@ export async function main(ns) {
       // Aelter als fuenf Minuten heisst: shop.js laeuft nicht. Dann sind auch
       // die Preise nicht mehr verlaesslich.
       if (alterMs > 300000) return { ...leer, alterMs };
+      // AUS DEM ALTEN KNOTEN IST NICHT "ALT GENUG" (04.09.2026).
+      //
+      // installAugmentations und der BitNode-Sprung loeschen JEDEN gekauften
+      // Rechner (Prestige.ts:73). Eine Preistabelle von vor einer Minute ist
+      // danach nicht etwa leicht veraltet, sondern vollstaendig falsch: der
+      // Park existiert nicht mehr, und im neuen Knoten gelten andere Preise
+      // (CloudServerSoftcap 1,2 in BitNode 4, CloudServerLimit 0 in BN9).
+      //
+      // Fuenf Minuten Frist haetten hier nicht getragen - der Sprung dauert
+      // Sekunden. Deshalb der harte Schnitt am Reset, nicht an der Uhr.
+      try {
+        const reset = ns.getResetInfo().lastNodeReset;
+        if (Number.isFinite(reset) && t.ts < reset) {
+          return { ...leer, alterMs, ausAltemKnoten: true };
+        }
+      } catch { /* kein getResetInfo - dann traegt die Fuenf-Minuten-Frist */ }
       return {
         da: true,
         kaufbar: t.kaufbar !== false,
@@ -494,7 +516,40 @@ export async function main(ns) {
   // Sprung also sekundenlang die Rolle des ALTEN Knotens. Passt sie nicht,
   // gilt die Rolle als unbekannt, und es starten nur Eintraege mit
   // verfahren "alle".
-  const regLage = (() => {
+  //
+  // SIE WIRD IN JEDER RUNDE NEU BESTIMMT (04.09.2026, Skeptiker Fehlermodi).
+  //
+  // Vorher stand sie EINMAL beim Start des Prozesses fest. Zwei Fehler auf
+  // einmal:
+  //
+  //   (1) Der Kern ueberlebt den Knotenwechsel nicht als Prozess, aber er
+  //       ueberlebt den Rollenwechsel INNERHALB eines Knotens sehr wohl:
+  //       ausgang.js schreibt data/verfahren.txt in seiner ersten Runde,
+  //       Sekunden nachdem der Kern schon lief. Wer die Rolle nur beim Start
+  //       liest, sieht dort "unbekannt" - und startet fuer die ganze
+  //       Prozesslebensdauer nur Eintraege mit verfahren "alle". blade.js und
+  //       bbtrain.js, also der ganze Bladeburner-Weg, fehlten damit still.
+  //
+  //   (2) `phase: "normal"` war schlicht falsch. Der Kern ist das ERSTE, was
+  //       boot.js startet - er laeuft mitten im Kaltstart. Mit der festen
+  //       Angabe hat kein einziger Eintrag mit `phase: "kaltstart"` je
+  //       gegolten: cdump, csolve, darkweb, sleevecrime. Das ist die
+  //       komplette Geldkette der Startlage (Position C.8).
+  //
+  // Die Phase wird jetzt GEMESSEN, nicht behauptet: Startlage heisst "es gibt
+  // noch keinen Park, und home ist noch klein". Beide Teile sind noetig - in
+  // BitNode 9 ist CloudServerLimit 0, dort gibt es NIE einen Park, und ohne
+  // die home-Bedingung bliebe der Knoten ewig im Kaltstart.
+  const HOME_KALTSTART_GB = 64;
+  const phaseJetzt = () => {
+    try {
+      const pl = parkLage();
+      if (pl.da && pl.park.length > 0) return "normal";
+      return ns.getServerMaxRam("home") <= HOME_KALTSTART_GB ? "kaltstart" : "normal";
+    } catch { return "kaltstart"; }
+  };
+
+  const baueLage = () => {
     let verfahren = "unbekannt";
     let node = 0;
     try {
@@ -507,26 +562,40 @@ export async function main(ns) {
     } catch { /* dann bleibt es bei unbekannt */ }
     return {
       node, verfahren,
-      // Der Kern laeuft nie im Kaltstart-Gewerk: wenn er laeuft, ist die
-      // Startlage vorbei. "normal" ist damit richtig, nicht bequem.
-      phase: "normal",
+      phase: phaseJetzt(),
       dateiDa: (d) => { try { return ns.fileExists(d, "home"); } catch { return false; } },
     };
-  })();
+  };
 
-  const WERKZEUGE = regGeladen
-    ? regAuswahl(regGeladen, regLage)
-        // Der Kern startet sich nicht selbst, und der Waechter wird von
-        // boot.js gestartet - beide gehoeren in die Registry, aber nicht in
-        // diese Liste.
-        .filter((e) => e.name !== "bn4net.js" && e.name !== "guard.js")
+  let regLage = baueLage();
+
+  const baueWerkzeuge = (lage) => regGeladen
+    ? regAuswahl(regGeladen, lage)
+        // Der Kern startet sich nicht selbst. Der WAECHTER dagegen gehoert
+        // sehr wohl in diese Liste (04.09.2026): hier stand "wird von boot.js
+        // gestartet" - boot.js nennt guard.js aber nur in seiner Schonliste
+        // und ruft es nirgends auf. Ergebnis: der ganze C.6-Bau lief nie.
+        //
+        // Jetzt startet boot.js ihn EINMAL frueh (fuer den Fall, dass der
+        // Kern gar nicht hochkommt - genau den soll der Waechter melden),
+        // und der Kern haelt ihn danach am Leben wie jedes andere Werkzeug.
+        // Doppelstarts faengt der Starter ueber `laufend` ab.
+        .filter((e) => e.name !== "bn4net.js")
         .filter((e) => !e.name.startsWith("worker/"))
         .map((e) => [e.name, e.args || []])
     : WERKZEUGE_FEST;
 
-  const TELEMETRIE = regGeladen
-    ? regTelemetrie(regGeladen, regLage).filter(([n]) => n !== "bn4net.js")
+  const baueTelemetrie = (lage) => regGeladen
+    ? regTelemetrie(regGeladen, lage).filter(([n]) => n !== "bn4net.js")
     : TELEMETRIE_FEST;
+
+  // `let`, nicht `const`: beide Listen werden neu gebaut, sobald sich Rolle,
+  // Knoten oder Phase aendern (siehe Rundenkopf). Der Schluessel merkt sich,
+  // wofuer die aktuelle Fassung gilt - ohne ihn stuende in jeder Runde
+  // dieselbe Meldung im Log.
+  let WERKZEUGE = baueWerkzeuge(regLage);
+  let TELEMETRIE = baueTelemetrie(regLage);
+  let regSchluessel = regLage.node + "|" + regLage.verfahren + "|" + regLage.phase;
 
   // Die Meldung wird hier nur GEBAUT - `sag` gibt es an dieser Stelle noch
   // nicht (es steht rund fuenfzig Zeilen weiter unten). Ein Aufruf hier warf
@@ -624,7 +693,9 @@ export async function main(ns) {
     // als Arbeitszeit - genau das unterscheidet sie von totalPlaytime.
     let mzPlaytime = 0;
     try { mzPlaytime = ns.getPlayer().totalPlaytime; } catch { /* egal */ }
-    mzRunde(mz, Date.now(), mzPlaytime);
+    // Das Ergebnis wird gebraucht: der gezaehlte Abstand ist die Grundlage
+    // fuer throttle_rounds_per_min in der Kennzahlentafel.
+    const mzErgebnis = mzRunde(mz, Date.now(), mzPlaytime);
     // HACKNET-SERVER SIND KEINE ARBEITER-WIRTE (02.09.2026, Skeptiker C/D).
     // Sie haengen mit Root an home (PlayerObjectServerMethods.ts:46-66), aber
     // jedes Byte, das dort laeuft, drueckt die Hash-Rate ueber ramRatio
@@ -632,6 +703,25 @@ export async function main(ns) {
     // In BitNode 9 ist das die einzige Einnahme. Nur ausgang.js legt dort
     // im Sprungmoment exit.js ab.
     const hosts = scanAll().filter((h) => !h.startsWith("hacknet-server-"));
+
+    // --- Die Lage neu bestimmen, wenn sie sich geaendert hat ------------------
+    // Rolle, Knoten und Phase koennen sich waehrend der Prozesslebensdauer
+    // aendern - die Rolle schon Sekunden nach dem Start, wenn ausgang.js
+    // data/verfahren.txt schreibt. Nur bei ECHTER Aenderung neu bauen, sonst
+    // stuende die Meldung in jeder Runde im Log.
+    {
+      const jetztLage = baueLage();
+      const jetztSchluessel = jetztLage.node + "|" + jetztLage.verfahren + "|" + jetztLage.phase;
+      if (jetztSchluessel !== regSchluessel) {
+        const vorher = regSchluessel;
+        regLage = jetztLage;
+        regSchluessel = jetztSchluessel;
+        WERKZEUGE = baueWerkzeuge(regLage);
+        TELEMETRIE = baueTelemetrie(regLage);
+        sag("Lage gewechselt (" + vorher + " -> " + jetztSchluessel + "): "
+          + WERKZEUGE.length + " Werkzeuge, " + TELEMETRIE.length + " ueberwacht.");
+      }
+    }
 
 
     // --- 0. Gegenseitige Wache ------------------------------------------------
@@ -3020,7 +3110,20 @@ export async function main(ns) {
       try {
         if (ns.fileExists(telemetrie, "home")) {
           const d = JSON.parse(ns.read(telemetrie));
-          if (Number.isFinite(d.zeit)) alter = Date.now() - d.zeit;
+          // DREI FELDNAMEN, WEIL ES DREI GENERATIONEN GIBT (04.09.2026).
+          //
+          // Die alten Werkzeuge schreiben `zeit`, die neuen `ts` und `wall`
+          // (ARCHITEKTUR 4.1, Herzschlag v2). Solange hier nur `zeit` stand,
+          // galt jeder Herzschlag der neuen Form als "nie geschrieben" - und
+          // das Alter wurde auf "seit dem Start" gesetzt. Der Kern haette
+          // seine eigenen Werkzeuge im Takt der Frischefrist erschlagen,
+          // dauerhaft, ohne dass etwas kaputt gewesen waere.
+          //
+          // Gefunden vom Skeptiker, nicht im Betrieb: live steht in
+          // TELEMETRIE_FEST nur, was `zeit` schreibt.
+          for (const feld of ["zeit", "ts", "wall"]) {
+            if (Number.isFinite(d[feld])) { alter = Date.now() - d[feld]; break; }
+          }
         }
       } catch { alter = null; }
       if (alter === null) alter = Date.now() - seit;   // nie geschrieben: seit dem Start
@@ -3480,6 +3583,160 @@ export async function main(ns) {
         } catch { return null; }
       })(),
     }), "w");
+
+    // --- 9b. Die Kennzahlentafel ----------------------------------------------
+    //
+    // WARUM DER KERN SIE SCHREIBT (Position C.1, 04.09.2026).
+    //
+    // `data/kpi.json` ist die einzige Datei, die S2 (kein Fortschritt) und
+    // `tools/checkin.js` lesen. Bis hierher schrieb sie NIEMAND: `lib/kpi.js`
+    // definierte den Kontrakt, und kein Skript importierte ihn. S2 war damit
+    // strukturell tot - der Waechter konnte einen stehenden Bot nicht von
+    // einem laufenden unterscheiden (Skeptiker Fehlermodi, Befund 14).
+    //
+    // Der Kern ist der richtige Ort, weil er die Zahlen ohnehin hat: er
+    // rechnet den Brachanteil, fuehrt die Motorzeit, liest die Telemetrie
+    // aller Werkzeuge und kennt Knoten und Rolle. Kein einziger zusaetzlicher
+    // ns-Aufruf.
+    //
+    // WAS ER NICHT FUELLT, BLEIBT null. Das ist ausdruecklich erlaubt
+    // (ARCHITEKTUR 5.1) und besser als eine geratene Zahl: `checkin.js`
+    // meldet ein fehlendes Feld, eine erfundene Zahl meldet niemand.
+    const schreibeKpi = () => {
+      const jetzt = Date.now();
+      const ri = ns.getResetInfo();
+
+      // Vorhandene Tafel laden und, wenn der Knoten gewechselt hat, auf einen
+      // neuen Lauf setzen. `neuerLauf` behaelt die Felder der Klasse "lauf"
+      // und nullt den Rest - Kennzahlen des alten Knotens im neuen zu fuehren
+      // waere schlimmer als gar keine.
+      let k;
+      const geladen = kpiLaden(
+        ns.fileExists("data/kpi.json", "home") ? ns.read("data/kpi.json") : null,
+        ri.lastNodeReset);
+      if (geladen.schreibsperre) {
+        // Die Datei stammt von einer NEUEREN Fassung als dieser Code. Dann
+        // wird nicht geschrieben: ein Rueckschritt im Schema zerstoert Felder,
+        // die der neuere Schreiber fuehrt.
+        if (runde % 60 === 0) sag("kpi.json: " + geladen.befund + " - nicht geschrieben.");
+        return;
+      }
+      k = geladen.kpi || kpiLeer(jetzt);
+      if (k.nodeReset !== ri.lastNodeReset) k = kpiNeuerLauf(k, ri.lastNodeReset);
+
+      // --- Zuordnung zum Lauf ------------------------------------------------
+      k.version = KPI_VERSION;
+      k.nodeReset = ri.lastNodeReset;
+      k.augReset = ri.lastAugReset;
+      k.node = ri.currentNode;
+      k.verfahren = regLage.verfahren;
+      k.motorTimeSinceNodeMs = mz.motorTimeMs;
+
+      // --- Effizienz ---------------------------------------------------------
+      // Brachanteil ist das Gegenstueck zu idle_ram_pct: der Kern rechnet ihn
+      // ohnehin fuer die Zielauswahl.
+      if (Number.isFinite(brachAnteil)) {
+        k.idle_ram_pct = Number((brachAnteil * 100).toFixed(1));
+      }
+      // Rundenrate: die einzige Zahl, die verraet, wie stark der Tab gedrosselt
+      // ist. Ohne Patch ist sie 1 (belegt: ein verdeckter Tab bekommt genau
+      // einen Zeitgeber je Minute, und das ist ein Deckel, keine Quote).
+      //
+      // Die Quelle ist der ZULETZT GEZAEHLTE Abstand aus dem Motorzeitzaehler,
+      // nicht der Sollwert TAKT_MS: gerade wenn gedrosselt wird, laufen die
+      // beiden auseinander - und genau diese Differenz ist die Aussage.
+      if (Number.isFinite(mzErgebnis.deltaMs) && mzErgebnis.deltaMs > 0) {
+        k.throttle_rounds_per_min = Number((60000 / mzErgebnis.deltaMs).toFixed(2));
+      }
+
+      // --- Der Traeger --------------------------------------------------------
+      //
+      // Die Leitgroesse haengt am Verfahren: auf dem Hackingweg das Level, auf
+      // dem Bladeburner-Weg der Rang. Den Rang rechnet der Kern NICHT - er
+      // liest ihn aus data/blade.json. `ns.bladeburner.getRank` kostet 4 GB
+      // und spraengte das Kaltstart-Budget fuer eine Zahl, die ein anderes
+      // Gewerk ohnehin schreibt.
+      let traeger = null;
+      if (regLage.verfahren === "V2") {
+        try {
+          const b = JSON.parse(ns.read("data/blade.json"));
+          if (b && Number.isFinite(b.rang)) {
+            traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs };
+          }
+        } catch { /* kein blade.json - dann kein Traeger */ }
+      }
+      if (!traeger) {
+        traeger = { name: "hacking", wert: ns.getHackingLevel(),
+          motorTimeMs: mz.motorTimeMs };
+      }
+      k.traeger = traeger;
+
+      // --- Was andere Gewerke schon geschrieben haben --------------------------
+      //
+      // GELESEN, NICHT GERECHNET. Route und Restzeit stehen in ausgang.json;
+      // sie hier zweitzurechnen hiesse, zwei Wahrheiten zu fuehren.
+      try {
+        const a = JSON.parse(ns.read("data/ausgang.json"));
+        if (a) {
+          if (typeof a.route_state === "string") k.route_state = a.route_state;
+          if (a.eta_min === null || Number.isFinite(a.eta_min)) k.eta_min = a.eta_min;
+          if (typeof a.eta_sicher === "boolean") k.eta_sicher = a.eta_sicher;
+          if (Number.isFinite(a.lauf)) k.level = a.lauf;
+        }
+      } catch { /* noch kein ausgang.json */ }
+
+      // Der Zustand der Strafleiter - erste Zeile jedes Berichts.
+      try {
+        const w = JSON.parse(ns.read("data/watchdog.json"));
+        if (w && w.ziele) {
+          const ersch = Object.entries(w.ziele)
+            .find(([, z]) => z && z.zustand === "EXHAUSTED");
+          k.exhausted = ersch
+            ? { since: ersch[1].seit, lastRung: ersch[1].sprosse, signal: ersch[0] }
+            : null;
+        }
+      } catch { /* kein Waechter - dann bleibt der letzte Stand stehen */ }
+
+      // Alter der letzten Sicherung, damit der Bericht es nennen kann.
+      try {
+        const br = JSON.parse(ns.read("data/bridge.json"));
+        if (br && Number.isFinite(br.letzteSicherungTs)) {
+          k.backup_age_h = Number(((jetzt - br.letzteSicherungTs) / 3600000).toFixed(2));
+        }
+      } catch { /* keine Brueckenmeldung */ }
+
+      // --- Das Zaehlwerk der Registry -----------------------------------------
+      if (regGeladen) {
+        try {
+          k.registry = regZaehlwerk(regGeladen, regLage,
+            (e) => laufend.includes(e.name),
+            // Frisch heisst: die Telemetriedatei ist juenger als die Frist des
+            // Eintrags. Ohne Telemetriedatei gibt es nichts zu pruefen - das
+            // gilt als frisch, nicht als degradiert (sonst zaehlte jedes
+            // gewachsene Werkzeug ohne Herzschlag als angeschlagen).
+            (e) => {
+              if (!e.telemetryFile) return true;
+              try {
+                if (!ns.fileExists(e.telemetryFile, "home")) return false;
+                const d = JSON.parse(ns.read(e.telemetryFile));
+                const w = [d.zeit, d.ts, d.wall].find((x) => Number.isFinite(x));
+                return Number.isFinite(w) && jetzt - w <= (e.freshnessMs || 600000);
+              } catch { return false; }
+            });
+        } catch { /* dann bleibt das alte Zaehlwerk stehen */ }
+      }
+
+      k.erzeugtAm = jetzt;
+      ns.write("data/kpi.json", JSON.stringify(k), "w");
+    };
+
+    if (runde % 6 === 0) {
+      try { schreibeKpi(); } catch (e) {
+        // Die Tafel darf die Runde nie zu Fall bringen - sie ist Bericht,
+        // nicht Steuerung.
+        if (runde % 60 === 0) sag("kpi.json nicht schreibbar: " + e.message);
+      }
+    }
 
     // ERST HIER gilt die Runde als vollstaendig. Alles davor kann geworfen
     // haben; `runde` waere trotzdem gewachsen. Genau diese Luecke schliesst

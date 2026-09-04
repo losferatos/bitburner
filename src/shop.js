@@ -5,13 +5,20 @@
  * WARUM DAS EIN EIGENES GEWERK IST
  * ===========================================================================
  *
- * Die `ns.cloud.*`-Familie kostet den Kern 3,85 GB:
+ * Die `ns.cloud.*`-Familie kostet den Kern 4,00 GB:
  *
  *   purchaseServer        2,25
  *   getServerNames        1,05
  *   getServerCost         0,25
  *   upgradeServer         0,25
+ *   getServerUpgradeCost  0,10
+ *   getServerLimit        0,05
  *   getRamLimit           0,05
+ *
+ * (Die Aufzaehlung stand hier zunaechst unvollstaendig und summierte sich auf
+ * 3,85 - `getServerUpgradeCost` und `getServerLimit` fehlten, und der Preis
+ * des ersten war mit 0,25 statt 0,10 angegeben. Nachgerechnet gegen
+ * RamCostGenerator.ts:222-229.)
  *
  * Das ist mehr als ein Zehntel des ganzen Kaltstart-Budgets von 32 GB, fuer
  * eine Handlung, die vielleicht einmal je Stunde vorkommt. Der Kern behaelt
@@ -32,16 +39,23 @@
  * Rechnungen falsch, jede fuer sich plausibel.
  *
  * ===========================================================================
- * EIN AUFTRAG WIRD GENAU EINMAL AUSGEFUEHRT
+ * EIN AUFTRAG WIRD GENAU EINMAL AUSGEFUEHRT - AUCH UEBER NEUSTARTS HINWEG
  * ===========================================================================
  *
- * Der Kern schreibt `data/kaufauftrag.json`, dieses Gewerk fuehrt aus und
- * loescht den Auftrag. Ohne das Loeschen kaufte es in jeder Runde einen
- * weiteren Rechner - bei 25 erlaubten waere der Park in vier Minuten voll und
- * das Geld weg.
+ * Der Kern schreibt `data/kaufauftrag.json` mit einer `id`; dieses Gewerk
+ * merkt sich die ausgefuehrten ids und ruehrt einen bekannten Auftrag nicht
+ * mehr an. Die Datei wird NICHT geloescht - `ns.rm` kostet 1 GB, und das ist
+ * ein Achtel des ganzen Gewerks fuer eine Handlung, die auch anders geht.
  *
- * Zusaetzlich traegt jeder Auftrag eine `id`; ein Auftrag mit bekannter id
- * wird nicht erneut ausgefuehrt, auch wenn die Datei liegen bleibt.
+ * Die Falle dabei (Skeptiker 04.09.2026): das Gedaechtnis lebte nur im
+ * Prozess. Nach jedem Neustart - Spiel-Reload, Augmentierungs-Einbau,
+ * boot.js-Raeumung - war es leer, die Auftragsdatei lag aber noch da, und
+ * derselbe Rechner wurde ein zweites Mal gekauft. Bei 25 Plaetzen ist das
+ * unmittelbar Geld.
+ *
+ * Deshalb wird beim Start `data/kaufergebnis.json` gelesen: dort steht die id
+ * des zuletzt ausgefuehrten Auftrags. Ein Auftrag, dessen Ergebnis schon
+ * geschrieben ist, gilt als erledigt.
  *
  * @param {NS} ns
  */
@@ -75,6 +89,27 @@ export async function main(ns) {
 
   /** Auftraege, die schon ausgefuehrt wurden - gegen Doppelkaeufe. */
   const erledigt = new Set();
+
+  // DAS GEDAECHTNIS UEBER DEN PROZESS HINAUS (04.09.2026).
+  //
+  // `erledigt` allein lebt nur, solange dieser Prozess lebt. Nach einem
+  // Neustart liegt die Auftragsdatei noch da, das Set ist leer - und derselbe
+  // Rechner wird ein zweites Mal gekauft. Das Ergebnis des letzten Auftrags
+  // steht dagegen auf der Platte und ueberlebt alles.
+  try {
+    const vorher = liesVonHome("data/kaufergebnis.json");
+    if (vorher) {
+      const e = JSON.parse(vorher);
+      // NUR bei Erfolg. Ein Auftrag, der am fehlenden Geld gescheitert ist,
+      // steht mit `erfolg: false` in der Datei und soll ausdruecklich noch
+      // einmal versucht werden - genau dafuer bleibt er offen.
+      if (e && e.id && e.erfolg) {
+        erledigt.add(e.id);
+        sag("Auftrag " + e.id + " war vor dem Neustart schon ausgefuehrt ("
+          + e.ergebnis + ") - wird nicht wiederholt.");
+      }
+    }
+  } catch { /* kein Ergebnis lesbar - dann faengt das Gedaechtnis bei null an */ }
 
   let runden = 0;
   let okRunden = 0;
@@ -117,6 +152,8 @@ export async function main(ns) {
       }));
 
       // --- 2. Auftraege ausfuehren -------------------------------------------
+      // Wird in den Geldzweigen gesetzt und unten im Herzschlag gemeldet.
+      let wartetAufGeld = false;
       const roh = liesVonHome("data/kaufauftrag.json");
       let auftrag = null;
       try { auftrag = roh ? JSON.parse(roh) : null; } catch { auftrag = null; }
@@ -153,6 +190,7 @@ export async function main(ns) {
               // Runde da sein. Ein verworfener Auftrag muesste vom Kern neu
               // gestellt werden, und der merkt sich nicht, dass er ihn schon
               // einmal gestellt hat.
+              wartetAufGeld = true;
               if (runden % 10 === 0) {
                 sag("Auftrag " + auftrag.id + ": " + gb + " GB kosten "
                   + (preis / 1e6).toFixed(1) + "m, vorhanden "
@@ -177,9 +215,12 @@ export async function main(ns) {
                 + " GB fuer " + (kosten / 1e6).toFixed(2) + "m.");
               erledigt.add(auftrag.id);
               meldeErgebnis(nachHome, auftrag, ok, ok ? ziel : "abgelehnt", jetzt);
-            } else if (runden % 10 === 0) {
-              sag("Ausbau " + ziel + " auf " + gb + " GB kostet "
-                + (kosten / 1e6).toFixed(1) + "m - warte auf Geld.");
+            } else {
+              wartetAufGeld = true;
+              if (runden % 10 === 0) {
+                sag("Ausbau " + ziel + " auf " + gb + " GB kostet "
+                  + (kosten / 1e6).toFixed(1) + "m - warte auf Geld.");
+              }
             }
           }
         }
@@ -197,8 +238,15 @@ export async function main(ns) {
         // Der Haendler wartet die meiste Zeit. Das ist KEIN Stillstand, und
         // ohne dieses Feld liefe die Frischepruefung auf einen Haenger hinaus,
         // der keiner ist.
-        state: auftrag && !erledigt.has(auftrag.id) ? "work" : "wait",
-        blockedReason: null,
+        //
+        // DREI ZUSTAENDE, NICHT ZWEI (04.09.2026). Vorher galt jeder offene
+        // Auftrag als "work" - auch der, der seit einer Stunde am fehlenden
+        // Geld haengt. Genau der Fall, fuer den das Feld gebaut wurde, war
+        // damit falsch gemeldet: ein Gewerk, das nichts tun KANN, meldete
+        // "arbeitet".
+        state: !auftrag || erledigt.has(auftrag.id) ? "wait"
+          : (wartetAufGeld ? "blocked" : "work"),
+        blockedReason: wartetAufGeld ? "money" : null,
         park: park.length,
         limitAnzahl,
         kaufbar: limitAnzahl > 0,

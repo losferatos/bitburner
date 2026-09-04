@@ -101,17 +101,56 @@ export function signale(e) {
 
   // --- S1: ein Werkzeug meldet sich nicht mehr ------------------------------
   //
-  // Gemessen in MOTORZEIT, weil die Frist den Spielfortschritt meint. Faellt
-  // der Kern aus, faellt S1 mit ihm aus - dafuer gibt es S3a.
+  // DIE UHR RICHTET SICH NACH DEM SCHREIBER (04.09.2026, Skeptiker Fehlermodi).
+  //
+  // Hier stand fest `e.motorTimeMs - t.telemetrie.motorTimeMs`. Motorzeit
+  // schreibt aber NUR der Kern: shop.js und figwatch.js tragen dort eine
+  // ehrliche 0 ein, und die zwoelf gewachsenen Werkzeuge kennen das Feld gar
+  // nicht. Mit `?? 0` wurde daraus "die gesamte Motorzeit dieses Knotens" -
+  // also immer mehr als jede Frist. S1 haette fuer JEDES Werkzeug dauerhaft
+  // gefeuert, vom ersten Moment an.
+  //
+  // Deshalb drei Uhren, in dieser Reihenfolge:
+  //   1. Motorzeit, wenn das Werkzeug sie WIRKLICH fuehrt (> 0).
+  //   2. Enginezeit (`playtime`) - die schreibt jeder Herzschlag v2, und sie
+  //      steht bei gedrosseltem Tab genauso still wie das Spiel selbst.
+  //   3. Wanduhr, nur als letzter Ausweg fuer die alten Werkzeuge - und dann
+  //      NUR bei sichtbarem Tab. Im verdeckten Tab laeuft sie weiter,
+  //      waehrend das Spiel auf einen Zeitgeber je Minute gedrosselt ist;
+  //      eine Frist in dieser Uhr waere dort reine Fehlmeldung.
   for (const t of e.eintraege || []) {
     if (!t.telemetrie) continue;
     if (t.telemetrie.state === "wait") continue;      // wartet, arbeitet nicht
     if (t.telemetrie.state === "done") continue;
-    const alter = e.motorTimeMs - (t.telemetrie.motorTimeMs ?? 0);
-    if (!Number.isFinite(alter)) continue;
-    if (alter > (t.freshnessMs ?? 600000)) {
+    if (t.telemetrie.state === "blocked") continue;   // kann nicht, nicht: tut nicht
+
+    const frist = t.freshnessMs ?? 600000;
+    const tm = t.telemetrie;
+    let alter = null;
+    let uhr = null;
+
+    if (Number.isFinite(tm.motorTimeMs) && tm.motorTimeMs > 0
+        && Number.isFinite(e.motorTimeMs)) {
+      alter = e.motorTimeMs - tm.motorTimeMs; uhr = "Motorzeit";
+    } else if (Number.isFinite(tm.playtime) && tm.playtime > 0
+        && Number.isFinite(e.playtime)) {
+      alter = e.playtime - tm.playtime; uhr = "Enginezeit";
+    } else if (e.sichtbar !== false) {
+      // `zeit` ist die Schreibweise der alten Werkzeuge, `ts`/`wall` die des
+      // Herzschlags v2.
+      const w = [tm.ts, tm.wall, tm.zeit].find((x) => Number.isFinite(x));
+      if (Number.isFinite(w) && Number.isFinite(e.wall)) {
+        alter = e.wall - w; uhr = "Wanduhr";
+      }
+    }
+
+    if (alter === null || !Number.isFinite(alter)) continue;
+    // Eine negative Differenz heisst: die Telemetrie ist NEUER als die
+    // Referenzuhr des Waechters. Das ist kein Haenger, sondern ein Vorlauf.
+    if (alter < 0) continue;
+    if (alter > frist) {
       s.push({ sig: "S1", ziel: t.name, schwere: 1,
-        grund: "Telemetrie " + Math.round(alter / 60000) + " min Motorzeit alt" });
+        grund: "Telemetrie " + Math.round(alter / 60000) + " min " + uhr + " alt" });
     }
   }
 
@@ -199,6 +238,27 @@ export function sprosseFuer(sig) {
  * @returns {{handlung: string, sprosse: object|null, ziel: string, grund: string}}
  */
 export function schritt(z, sig, jetztGuardMs, jetztWall) {
+  // ZUSTANDSSIGNALE SPEISEN DIE LEITER NICHT (04.09.2026, Skeptiker Fehlermodi).
+  //
+  // S4 (Tab verdeckt) und S5 (die Bruecke meldet etwas) beschreiben die
+  // UMGEBUNG, nicht eine Stoerung des Bots. Sie tragen `schwere: 0` und ein
+  // Ziel "umgebung", fuer das es keine Handlung gibt: kein Neustart, kein
+  // Kill, nichts, was ein verdecktes Browserfenster wieder sichtbar macht.
+  //
+  // Liefen sie trotzdem durch den Automaten, waere die Kette zwangslaeufig:
+  // HEALTHY -> SUSPECT -> ausfuehren (es gibt nichts auszufuehren) -> VERIFY
+  // -> die Wirkungspruefung kann nie gruen werden -> EXHAUSTED. Und
+  // EXHAUSTED ist eine Sackgasse: danach nimmt die Leiter fuer dieses Ziel
+  // gar nichts mehr an. Ein verdecktes Fenster - der Normalfall im
+  // Nachtlauf - haette den Waechter also nach einer Stunde stillgelegt.
+  //
+  // Sie werden weiterhin ERZEUGT und protokolliert; sie sind Kontext fuer den
+  // Bericht und fuer die Fristenverlaengerung, aber kein Anlass zu handeln.
+  if (sig.schwere === 0) {
+    return { handlung: "nichts", sprosse: null, ziel: sig.ziel,
+      grund: "Zustandssignal (" + sig.sig + "), keine Handlung: " + sig.grund };
+  }
+
   const ziel = sig.ziel;
   if (!z.ziele[ziel]) {
     z.ziele[ziel] = { zustand: "HEALTHY", sprosse: 0, seit: jetztGuardMs, versuche: 0 };

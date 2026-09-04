@@ -139,10 +139,21 @@ export async function main(ns) {
       const registry = ladeRegistry(liesVonHome("registry.json"));
       const rolle = pruefeRolle(leseRolle(liesVonHome("data/verfahren.txt") || ""),
         ri.currentNode);
+      // DIE PHASE WIRD GEMESSEN, NICHT BEHAUPTET (04.09.2026).
+      //
+      // Hier stand fest "normal" - derselbe Fehler wie im Kern. Folge: der
+      // Waechter haette die Kaltstart-Gewerke (cdump, csolve, darkweb,
+      // sleevecrime) nie in seiner Auswahl gehabt und ihren Ausfall in genau
+      // der Phase nicht bemerkt, in der sie das einzige Einkommen sind.
+      //
+      // Der Waechter kennt den Rechnerpark nicht (getServerNames kostet
+      // 1,05 GB und spraengte sein Budget), aber die home-Groesse genuegt:
+      // nach jedem Reset stehen 32 GB, und der erste Ausbau ist ein
+      // eindeutiges Zeichen, dass die Startlage vorbei ist.
       const lage = {
         node: ri.currentNode,
         verfahren: rolle.verfahren,
-        phase: "normal",
+        phase: ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal",
         dateiDa: (d) => ns.fileExists(d, "home"),
       };
       const eintraege = auswahl(registry, lage).map((e) => ({
@@ -166,6 +177,10 @@ export async function main(ns) {
       const sigs = signale({
         eintraege, kern, kpi, bridge,
         motorTimeMs, guardTimeMs: uhren.guardTimeMs, wall,
+        // Die Enginezeit ist die Uhr, in der S1 die alten Werkzeuge misst:
+        // sie steht bei gedrosseltem Tab genauso still wie das Spiel, und
+        // jeder Herzschlag v2 schreibt sie mit.
+        playtime: spieler.totalPlaytime,
         puls: puls ? puls.puls : null,
         sichtbar,
         letzterTraegerWert, letzterTraegerMotorMs,

@@ -101,9 +101,23 @@ export async function main(ns) {
   try { nachKnotenwechsel = Date.now() - ns.getResetInfo().lastNodeReset < 300000; }
   catch { /* kein Zugriff - im Zweifel wie nach einem Wechsel raeumen */ }
   if (nachKnotenwechsel) {
+    //   data/preise.json: der Rechnerpark des ALTEN Knotens. Nach dem
+    //     Wechsel gibt es keinen einzigen Mietrechner mehr
+    //     (Prestige.ts:73 loescht sie alle), aber der Kern liest die Liste
+    //     fuenf Minuten lang weiter als "da". Folge: er haelt Geisterrechner
+    //     fuer vorhanden, ueberspringt die Kaltstart-Leiter und rechnet mit
+    //     den Preisen des alten BitNodes - in BN4 sind die wegen
+    //     CloudServerSoftcap ganz andere.
+    //   data/kaufauftrag.json und data/kaufergebnis.json: Auftrag und
+    //     Ergebnis des alten Knotens. Ein liegengebliebener Auftrag ueber
+    //     2 TB wuerde im neuen Knoten als erstes ausgefuehrt - mit Geld, das
+    //     dort die ganze Startlage traegt (nach installAugmentations sind es
+    //     1.262 $).
     for (const datei of ["data/task.txt", "data/exit-ziel.txt",
                          "data/simulacrum.txt", "data/exit.txt",
-                         "data/keine-hacknet.txt", "data/keine-sleeves.txt"]) {
+                         "data/keine-hacknet.txt", "data/keine-sleeves.txt",
+                         "data/preise.json", "data/kaufauftrag.json",
+                         "data/kaufergebnis.json"]) {
       if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt (Knotenwechsel): " + datei); }
     }
   }
@@ -156,6 +170,26 @@ export async function main(ns) {
         + " Geschont: " + schonliste.join(", ") + ".");
     }
     const frei = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
+
+    // DER WAECHTER ZUERST (04.09.2026).
+    //
+    // Er steht vor dem Kern, weil genau der Fall, den nur er bemerken kann,
+    // hier passiert: bn4net startet nicht. Laeuft der Waechter erst, wenn der
+    // Kern ihn startet, ist er im einzigen Fall abwesend, fuer den er gebaut
+    // wurde.
+    //
+    // Danach uebernimmt der Kern: guard.js steht in seiner Werkzeugliste und
+    // wird von dort neu gestartet, wenn es ausfaellt. Hier wird es nur
+    // angeworfen, nicht ueberwacht - boot.js beendet sich, sobald der Kern
+    // laeuft.
+    if (!ns.ps("home").some((p) => p.filename === "guard.js")
+        && ns.fileExists("guard.js", "home")) {
+      const brauchtW = ns.getScriptRam("guard.js", "home");
+      if (brauchtW > 0 && brauchtW <= ns.getServerMaxRam("home") - ns.getServerUsedRam("home")) {
+        const pidW = ns.exec("guard.js", "home");
+        if (pidW) sag("guard.js gestartet (pid " + pidW + ").");
+      }
+    }
 
     for (const datei of ["bn4net.js", "bn4life.js"]) {
       if (ns.ps("home").some((p) => p.filename === datei)) continue;

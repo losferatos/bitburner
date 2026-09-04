@@ -27,6 +27,8 @@
  *
  * @param {NS} ns
  */
+import { laden as ladeRegistry, auswahl as regAuswahl,
+  telemetrieTabelle as regTelemetrie, leseRolle, pruefeRolle } from "lib/reg.js";
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
@@ -63,7 +65,41 @@ export async function main(ns) {
   // Stillstandserkennung: Werkzeug -> Telemetriedatei auf home -> hoechstes
   // erlaubtes Alter. Takte: blade/sleeve/ausgang/bbtrain 30-60 s, bn4life
   // 15 s. Grosszuegig, weil ein gedrosselter Tab die Schreibtakte streckt.
-  const TELEMETRIE = [
+  // =========================================================================
+  // DIE REGISTRY LOEST DIESE BEIDEN LISTEN AB (Position C.5, 04.09.2026)
+  // =========================================================================
+  //
+  // Bis heute standen dieselben Angaben an zwei Stellen: hier, was ueberwacht
+  // wird, und weiter unten in WERKZEUGE, was gestartet wird. Beide von Hand
+  // gepflegt, beide muessen zusammenpassen - und niemand merkt es, wenn sie es
+  // nicht tun. Ein Werkzeug ohne Telemetrieeintrag laeuft unbeaufsichtigt, ein
+  // Telemetrieeintrag ohne Werkzeug meldet ewig "veraltet".
+  //
+  // Beide werden jetzt aus registry.json ABGELEITET. Die Form bleibt exakt
+  // dieselbe, damit die acht Nutzungsstellen unveraendert bleiben - ein Umbau
+  // an acht Stellen waere die riskantere Aenderung.
+  //
+  // DER RUECKFALL IST DIE ENTSCHEIDENDE SICHERUNG: fehlt registry.json oder
+  // ist sie unlesbar, gelten die eingebauten Listen weiter. Ohne ihn wuerde
+  // eine fehlende Datei den Bot vollstaendig stilllegen - und genau das
+  // passiert nach einem Knotenwechsel, bevor die Bruecke die Dateien
+  // nachgeschoben hat.
+  let regGeladen = null;
+  let regGrund = "registry.json nicht gelesen";
+  try {
+    const roh = ns.fileExists("registry.json", "home") ? ns.read("registry.json") : null;
+    const r = ladeRegistry(roh);
+    if (r && Array.isArray(r.eintraege) && r.eintraege.length && !r.fehler) {
+      regGeladen = r;
+      regGrund = r.eintraege.length + " Eintraege";
+    } else {
+      regGrund = (r && r.fehler) || "registry.json leer";
+    }
+  } catch (e) {
+    regGrund = "registry.json warf: " + String(e && e.message ? e.message : e);
+  }
+
+  const TELEMETRIE_FEST = [
     ["blade.js", "data/blade.json", 10 * 60000],
     ["sleeve.js", "data/sleeve.json", 10 * 60000],
     ["bn4life.js", "data/bn4life.json", 10 * 60000],
@@ -259,7 +295,7 @@ export async function main(ns) {
   // das Netz bei den sechs Servern ohne Portbedarf stehen. homegrow baut
   // home aus, und erst ein grosses home traegt den Rest. Vertragsloeser,
   // Reputationsarbeit und die Bequemlichkeiten kommen danach.
-  const WERKZEUGE = [
+  const WERKZEUGE_FEST = [
     // DER KNOTENSPEZIFISCHE MOTOR (25.08.2026).
     //
     // In BitNode 6 und 7 fuehrt der Weg nicht ueber das Hackniveau, sondern
@@ -350,6 +386,59 @@ export async function main(ns) {
     ["bn4rep.js", []],
     ["bn4door.js", []],
   ];
+
+  // --- Die Ableitung aus der Registry ---------------------------------------
+  //
+  // Die Rolle kommt aus data/verfahren.txt, und der Rollen-Riegel aus
+  // ARCHITEKTUR 3.2 haelt sie gegen getResetInfo().currentNode: boot.js
+  // loescht die Datei beim Neuanlauf absichtlich nicht, dort steht nach einem
+  // Sprung also sekundenlang die Rolle des ALTEN Knotens. Passt sie nicht,
+  // gilt die Rolle als unbekannt, und es starten nur Eintraege mit
+  // verfahren "alle".
+  const regLage = (() => {
+    let verfahren = "unbekannt";
+    let node = 0;
+    try {
+      const ri = ns.getResetInfo();
+      node = ri.currentNode;
+      const rolle = pruefeRolle(
+        leseRolle(ns.fileExists("data/verfahren.txt", "home")
+          ? ns.read("data/verfahren.txt") : ""), node);
+      verfahren = rolle.verfahren;
+    } catch { /* dann bleibt es bei unbekannt */ }
+    return {
+      node, verfahren,
+      // Der Kern laeuft nie im Kaltstart-Gewerk: wenn er laeuft, ist die
+      // Startlage vorbei. "normal" ist damit richtig, nicht bequem.
+      phase: "normal",
+      dateiDa: (d) => { try { return ns.fileExists(d, "home"); } catch { return false; } },
+    };
+  })();
+
+  const WERKZEUGE = regGeladen
+    ? regAuswahl(regGeladen, regLage)
+        // Der Kern startet sich nicht selbst, und der Waechter wird von
+        // boot.js gestartet - beide gehoeren in die Registry, aber nicht in
+        // diese Liste.
+        .filter((e) => e.name !== "bn4net.js" && e.name !== "guard.js")
+        .filter((e) => !e.name.startsWith("worker/"))
+        .map((e) => [e.name, e.args || []])
+    : WERKZEUGE_FEST;
+
+  const TELEMETRIE = regGeladen
+    ? regTelemetrie(regGeladen, regLage).filter(([n]) => n !== "bn4net.js")
+    : TELEMETRIE_FEST;
+
+  // Die Meldung wird hier nur GEBAUT - `sag` gibt es an dieser Stelle noch
+  // nicht (es steht rund fuenfzig Zeilen weiter unten). Ein Aufruf hier warf
+  // "Cannot access 'sag' before initialization", und zwar in der allerersten
+  // Runde: der Kern waere gar nicht angelaufen. Gefunden hat das der
+  // Ebene-2-Test, nicht das Spiel.
+  const regMeldung = "Werkzeugliste: "
+    + (regGeladen ? "aus registry.json (" + regGrund + ")" : "EINGEBAUT - " + regGrund)
+    + ", " + WERKZEUGE.length + " Werkzeuge, " + TELEMETRIE.length + " ueberwacht"
+    + ", Rolle " + regLage.verfahren + " in Knoten " + regLage.node + ".";
+
   const BIBLIOTHEKEN = ["lib/hackaugs.js"];
 
   const knacker = [
@@ -387,6 +476,7 @@ export async function main(ns) {
     ns.write("data/bn4net-log.txt", log.join("\n") + "\n", "w");
   };
   sag("bn4net gestartet.");
+  sag(regMeldung);
 
   // Der ganze Rundeninhalt liegt in einem try. Ohne das beendet eine einzige
   // unerwartete Ausnahme - ein Server, der zwischen scan und getServer

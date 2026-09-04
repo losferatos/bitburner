@@ -616,6 +616,30 @@ async function main() {
         sag("ERSCHOEPFT: " + kpi.exhausted.signal + " auf Sprosse "
           + kpi.exhausted.lastRung + " - die Leiter hat nichts mehr uebrig.");
       }
+
+      // DIE VIER ZAHLEN MIT SOLL 0 (Skeptiker Runde 5, W2).
+      //
+      // Sie haben seit dem 04.09.2026 Schreiber - und hatten zunaechst keinen
+      // Leser. Ein Befund, den niemand abholt, ist genauso stumm wie einer,
+      // den niemand schreibt; er liegt nur eine Ebene tiefer.
+      //
+      // Gedruckt wird nur, was NICHT null ist. Eine Zeile "0 Fehlstrafen" in
+      // jedem Aufruf stumpft ab.
+      const soll0 = [];
+      if (kpi.false_penalty_count > 0) soll0.push(kpi.false_penalty_count + " Fehlstrafen");
+      if (kpi.false_kill_count > 0) {
+        soll0.push(kpi.false_kill_count + " FEHLKILLS (eine andere Uhr hielt das"
+          + " Werkzeug fuer frisch)");
+      }
+      if (kpi.contracts_silent_rounds >= 3) {
+        soll0.push("Vertragskette stumm seit " + kpi.contracts_silent_rounds
+          + " Durchlaeufen - eine Gegenprobe in lib/loeser.js ist zu streng");
+      }
+      if (kpi.negative_balance_min > 0) soll0.push(kpi.negative_balance_min + " min Konto negativ");
+      if (kpi.queued_augs_at_jump > 0) {
+        soll0.push(kpi.queued_augs_at_jump + " gekaufte Augs beim Sprung verfallen");
+      }
+      if (soll0.length) sag("BEFUNDE (Soll 0): " + soll0.join("; "));
     }
 
     // Die Bruecke und die Sicherungen. Beides liest sich am besten aus ihrem
@@ -633,6 +657,27 @@ async function main() {
       }
       if (st.alarm) zeilenteile.push("ALARM: " + (st.alarm.titel || st.alarm));
       sag("Bruecke: " + zeilenteile.join(", "));
+
+      // MANUAL_ACTIONS - die einzige Abnahmezahl, die AUSSERHALB des Spiels
+      // entsteht. Der Kern kann sie nicht kennen: fuer ihn sieht ein Hot-Swap
+      // aus wie eine Datei, die schon immer so war. Die Bruecke fuehrt Buch.
+      try {
+        const buchPfad = path.join(ROOT, st.instance === "TEST" ? "pruefstand" : ".",
+          "data", "manual-actions.json");
+        if (fs.existsSync(buchPfad)) {
+          const buch = JSON.parse(fs.readFileSync(buchPfad, "utf8"));
+          const seit = Date.now() - 12 * 3600000;
+          const jung = (buch.eintraege || []).filter((e) => Number(e.wall) >= seit);
+          if (jung.length) {
+            const letzte = jung[jung.length - 1];
+            sag("Eingriffe (12 h): " + jung.length + " - zuletzt " + letzte.art
+              + " " + letzte.was + " um "
+              + new Date(Number(letzte.wall)).toLocaleTimeString("de-DE"));
+            sag("  Stufe B verlangt 12 h mit NULL Eingriffen - die Uhr laeuft"
+              + " seit dem letzten neu.");
+          }
+        }
+      } catch { /* kein Buch - dann gab es keinen Eingriff seit dem Start */ }
     } catch { /* die Bruecke antwortet nicht - das steht schon oben */ }
   }
 

@@ -7,10 +7,16 @@ Alltagsbetrieb, inhaltliche Substanz, Tauglichkeit der Tests.
 Sprosse-5-Kette aus C.19 endet eine Station vor dem Ziel. Das ist die
 Fehlerklasse, gegen die C.19 selbst antritt — eine Ebene tiefer.
 
-**Stand 04.09.2026, abends: 27 von 30 abgearbeitet.** Offen bleiben R23
-(kein Test für die Brücke — steht in der Messlückenliste und blockiert damit
-Stufe A), R27 (contracts.js und cdump.js ohne `telemetryFile`) und R29 (der
-Lader verträgt keine zwei gleichzeitigen Testläufe; die Suite läuft seriell).
+**Stand 04.09.2026, 12:30 Ortszeit: alle 30 abgearbeitet.**
+
+Die letzten drei fielen in demselben Commit, in dem hier noch „offen" stand —
+ein Widerspruch, den Skeptikerrunde 5 gefunden hat (W7): R23 bekam
+`tools/test-bruecke.js`, R29 die Prozessnummer in allen Kopienamen, R27 die
+Standdateien und `tools/lib/schreiberprobe.js`. Drei erledigte Befunde, die
+jemand morgen noch einmal angefasst hätte.
+
+Die Folgerunde hat an eben diesen drei Reparaturen dann selbst 21 Befunde
+gefunden; sie stehen in `BEFUNDE-RUNDE5.md`.
 
 Ein vierter Prüfer hat die Reparaturen anschließend **gegen den echten
 Spielcode** gegengerechnet — 20 Vertragsdateien transpiliert, 141.883 Instanzen
@@ -44,13 +50,13 @@ drei behoben.
 | R20 | Tests | WICHTIG | Im Ebene-2-Kerntest steht die Wanduhr still: 400 Runden, Δwall = 0. Jeder wanduhrabhängige Zweig ist eingefroren, u. a. der 5-Minuten-Verfall der Reservierung | **BEHOBEN** - `beiSchlaf` laesst die Uhr laufen. Zwei Proben wurden dadurch sofort rot, und der Kern hatte beide Male recht |
 | R21 | Tests | WICHTIG | Der Mock kennt `ns.scriptKill`, `ns.exit` und `ns.share` nicht — acht Aufrufstellen im Kern, darunter der Werkzeug-Neustart (Sprosse 1) und der Selbstbeender für den Hot-Swap. Diese Pfade sind beweisbar unerreicht | **BEHOBEN** - `scriptKill`, `exit` und `share` im Mock |
 | R22 | Tests | WICHTIG | Der Mock-`exec` verlangt kein Root, das Spiel schon (`NetscriptWorker.ts:280`). Genau an der Stelle, an der die Arbeiterverteilung entschieden wird | **BEHOBEN** - `exec` verlangt Root wie das Spiel (NetscriptWorker.ts:280) |
-| R23 | Tests | WICHTIG | Für die Brücke gibt es keinen einzigen Test, obwohl Auftrag 6.1 ihn namentlich verlangt (Reconnect, Backup vor pushAll, Wachhund, EADDRINUSE, zweite Verbindung). Steht **nicht** in der Lückenliste | **OFFEN, in der Lueckenliste** - die Bruecke hat keinen Test. Sie ist der Prozess, der den Live-Spielstand anfassen kann; das gehoert gebaut, nicht weggeschrieben |
+| R23 | Tests | WICHTIG | Für die Brücke gibt es keinen einzigen Test, obwohl Auftrag 6.1 ihn namentlich verlangt (Reconnect, Backup vor pushAll, Wachhund, EADDRINUSE, zweite Verbindung). Steht **nicht** in der Lückenliste | **BEHOBEN** - tools/test-bruecke.js faehrt die Bruecke als echten Unterprozess gegen ein nachgebautes Spiel, 42 Proben. Skeptikerrunde 5 hat daran drei blockierende Befunde gefunden, darunter einen, den der Test selbst angerichtet hatte (siehe RUNDE5, A-B1) |
 | R24 | Tests | WICHTIG | Die Lückenliste ist Prosa, kein Tor: `test-alles.js` beendet mit Exit 0 bei neun offenen Punkten. Und drei Einträge sind Zustandsbeschreibungen, die sich durch Messen nie leeren lassen — das Kriterium "Liste leer" erzeugt Druck zum Streichen | **BEHOBEN** - zwei Listen (Messluecken und Bauentscheidungen), und Exit 0 heisst jetzt Stufe A. Gemessen: voller Lauf Exit 1, `--nur-tests` Exit 0 |
 | R25 | Fehlermodi | KLEIN | `kernPhaseFrisch` prüft nur die Wanduhr-Frische, nicht die Knotenidentität. Im Fenster zwischen 10-min-Karenz und 15-min-Frist liest der Wächter den toten Kern des **vorigen** Knotens | **BEHOBEN** (C.20) - `kernPhaseFrisch` prueft den Knoten mit |
 | R26 | Fehlermodi | KLEIN | Der Kern protokolliert "passt auf keinen Wirt" ungedrosselt (jede Runde, 15 min lang), und die Doppelstart-Sperre für `punish.js` sucht nur auf home, gestartet wird aber auf dem größten Wirt | **BEHOBEN** (C.20) - Doppelstartsperre auf allen Wirten, Wirtmeldung gedrosselt |
-| R27 | Fehlermodi | KLEIN | Ein zu strenges `verify` verstummt lautlos: `contracts.js` überspringt still, und weder `contracts.js` noch `cdump.js` haben eine `telemetryFile` | **OFFEN** - contracts.js und cdump.js haben keine telemetryFile; ein zu strenges verify verstummt lautlos. Kleiner Befund, aber ein echter |
+| R27 | Fehlermodi | KLEIN | Ein zu strenges `verify` verstummt lautlos: `contracts.js` überspringt still, und weder `contracts.js` noch `cdump.js` haben eine `telemetryFile` | **BEHOBEN** - die Standdateien gibt es, aber ausdruecklich NICHT als telemetryFile (RUNDE5, P-W1: S1 haette die Einmallaeufer bestraft, sobald der Kern haengt). Und tools/lib/schreiberprobe.js prueft nach, ob ein genannter Schreiber wirklich schreibt |
 | R28 | Tests | KLEIN | Zwei Proben, die nie rot werden können: `pruefe("es beendet sich sofort", true)` und ein `pruefe(..., true)` in einem `if`, das bei falsy ganz entfällt | **BEHOBEN** (C.23) - beide Proben pruefen jetzt etwas, das rot werden kann |
-| R29 | Tests | KLEIN | Der Lader trägt keinen Cache-Buster und keinen PID-Anteil in den transitiven `.mjs`-Kopien — zwei gleichzeitige Testläufe löschen einander die Kopien | **OFFEN** - der Lader traegt keinen PID-Anteil in den transitiven Kopien; zwei gleichzeitige Testlaeufe stoeren sich. Tritt in der Suite nicht auf (sie laeuft seriell) |
+| R29 | Tests | KLEIN | Der Lader trägt keinen Cache-Buster und keinen PID-Anteil in den transitiven `.mjs`-Kopien — zwei gleichzeitige Testläufe löschen einander die Kopien | **BEHOBEN** - mockPfad() bildet alle Kopienamen an einer Stelle, mit process.pid. Der Lader raeumt beim Start ausserdem Leichen toter Prozesse weg |
 | R30 | Prämisse | KLEIN | Das Kaltstart-Tor prüft nicht, was sein Kommentar behauptet: "die Spitze so, dass noch ein Arbeiter Platz hat" wird nur gedruckt (33,45 von 32), geprüft wird `spitze <= 32` | **BEHOBEN** (C.21) - test-ram.js prueft jetzt, was es behauptet: neben der Residenz passt die Geldquelle ODER Arbeiter, nicht beides |
 
 ## Was ausdrücklich hält

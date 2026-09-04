@@ -423,6 +423,110 @@ console.log("-- ohne Registry traegt die Notliste --");
 }
 
 console.log("");
+console.log("-- FEHLKILL: eine andere Uhr haelt das Werkzeug fuer frisch --");
+{
+  // false_kill_count HAT SOLL 0 UND IST ABNAHMEBEDINGUNG (Auftrag 5.2). Die
+  // Zahl hatte bis zum 04.09.2026 keinen Schreiber - sie stand dauerhaft auf
+  // null und war damit unfaelschbar, genau wie false_penalty_count vorher.
+  //
+  // Der gestellte Fall ist der, den dieses Projekt am haeufigsten getroffen
+  // hat: gegen die falsche Uhr gemessen. Der Kern haengt, seine MOTORZEIT
+  // steht - und blade.js, das die Motorzeit mitschreibt, sieht dadurch alt
+  // aus, obwohl sein eigener Herzschlag in ENGINEZEIT frisch ist. Der
+  // Waechter erschlaegt dann ein gesundes Werkzeug, weil der Kern steht.
+  const kernMotor = 10 * 3600000;
+  const m = neuerMock({
+    // blade.js kostet echt 94,35 GB und passt nicht auf ein 64-GB-home -
+    // der Mock bucht seit R21 gegen `used` und startet es gar nicht erst.
+    // Gegenstand dieser Probe ist die Uhrenwahl, nicht die Knappheit.
+    ...grundzustand({ skriptRam: { "blade.js": 2, "guard.js": 6.1 } }, {
+      "data/guard-modus.txt": "enforce",
+      // Der Kern lebt (kein S3a), aber seine Motorzeit ist weit vorn.
+      "data/bn4net.json": JSON.stringify({
+        wall: W0, motorTimeMs: kernMotor, okRound: 100, errStreak: 0, round: 100,
+        phase: "normal",
+      }),
+      // blade.js: in MOTORZEIT 10 h alt (weit ueber der Frist von 10 min),
+      // in ENGINEZEIT 60 s alt - also kerngesund.
+      "data/blade.json": JSON.stringify({
+        motorTimeMs: kernMotor - 10 * 3600000 + 1,
+        playtime: 100 * 3600000 - 60000,
+        ts: W0 - 60000,
+      }),
+    }),
+    maxSchlaf: 40,
+    beiSchlaf: (ms, z, vor) => vor(30000),
+  });
+  m.ns.exec("blade.js", "home", 1);
+
+  const { modul } = await ladeAusBeiden(ROOT, "guard.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+
+  const w = json(m, "data/watchdog.json");
+  const getoetet = m.zustand.getoetet.map((x) => x.filename);
+  pruefe("S1 feuert auf blade.js",
+    !!w && (w.signaleJetzt || []).some((x) => x.sig === "S1" && x.ziel === "blade.js"),
+    JSON.stringify(w && w.signaleJetzt));
+  pruefe("und der Kill trifft wirklich", getoetet.includes("blade.js"),
+    getoetet.join(", ") || "(nichts getoetet)");
+  pruefe("er wird als FEHLKILL gezaehlt",
+    !!w && w.false_kill_count > 0,
+    "false_kill_count = " + JSON.stringify(w && w.false_kill_count));
+  const p2 = json(m, "data/penalties.json");
+  const mitFehlkill = p2 ? p2.eintraege.filter((e) => e.fehlkill) : [];
+  pruefe("und der Eintrag nennt die Uhr", mitFehlkill.length > 0
+    && mitFehlkill[0].fehlkill.includes("Enginezeit"),
+    mitFehlkill.length ? mitFehlkill[0].fehlkill.join(", ") : "kein Eintrag mit fehlkill");
+}
+
+console.log("");
+console.log("-- ein ECHTER Haenger ist KEIN Fehlkill --");
+{
+  // DIE GEGENPROBE. Ohne sie wuerde die Zahl auch dann steigen, wenn der
+  // Waechter recht hatte - und eine Kennzahl, die immer anschlaegt, ist so
+  // wertlos wie eine, die nie anschlaegt.
+  //
+  // Derselbe Aufbau, nur ist blade.js jetzt in JEDER Uhr alt.
+  const kernMotor = 10 * 3600000;
+  const m = neuerMock({
+    // blade.js kostet echt 94,35 GB und passt nicht auf ein 64-GB-home -
+    // der Mock bucht seit R21 gegen `used` und startet es gar nicht erst.
+    // Gegenstand dieser Probe ist die Uhrenwahl, nicht die Knappheit.
+    ...grundzustand({ skriptRam: { "blade.js": 2, "guard.js": 6.1 } }, {
+      "data/guard-modus.txt": "enforce",
+      "data/bn4net.json": JSON.stringify({
+        wall: W0, motorTimeMs: kernMotor, okRound: 100, errStreak: 0, round: 100,
+        phase: "normal",
+      }),
+      "data/blade.json": JSON.stringify({
+        motorTimeMs: kernMotor - 10 * 3600000 + 1,
+        playtime: 100 * 3600000 - 10 * 3600000,
+        ts: W0 - 10 * 3600000,
+      }),
+    }),
+    maxSchlaf: 40,
+    beiSchlaf: (ms, z, vor) => vor(30000),
+  });
+  m.ns.exec("blade.js", "home", 1);
+
+  const { modul } = await ladeAusBeiden(ROOT, "guard.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+
+  const w = json(m, "data/watchdog.json");
+  pruefe("der Kill trifft auch hier",
+    m.zustand.getoetet.map((x) => x.filename).includes("blade.js"));
+  pruefe("aber er zaehlt NICHT als Fehlkill",
+    !!w && w.false_kill_count === 0,
+    "false_kill_count = " + JSON.stringify(w && w.false_kill_count));
+}
+
+console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {
   for (const wurzel of [path.join(ROOT, "src"),

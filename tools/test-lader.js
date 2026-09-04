@@ -33,7 +33,7 @@
 import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
-import { execFileSync } from "node:child_process";
+import { execFile } from "node:child_process";
 import { fileURLToPath } from "node:url";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -87,35 +87,20 @@ console.log("-- er schreibt den Spielstil in Node-Importe um --");
 
 // ---------------------------------------------------------------------------
 console.log("");
-console.log("-- keine Kopie bleibt liegen --");
-{
-  const reste = [];
-  const suche = (ordner, tiefe = 0) => {
-    if (tiefe > 3) return;
-    for (const e of fs.readdirSync(ordner, { withFileTypes: true })) {
-      if (e.isDirectory()) suche(path.join(ordner, e.name), tiefe + 1);
-      else if (e.name.startsWith(".mock-") || e.name.endsWith(".mjs")) {
-        reste.push(path.relative(SRC, path.join(ordner, e.name)));
-      }
-    }
-  };
-  suche(SRC);
-  pruefe("weder .mock- noch .mjs unter src/", reste.length === 0,
-    reste.join(", "));
-}
-
-// ---------------------------------------------------------------------------
-console.log("");
 console.log("-- ZWEI LAEUFE GLEICHZEITIG (R29) --");
 {
   // DIE VORFUEHRUNG. Vorher schrieben beide Laeufe `lib/figur.mjs`, und
   // wessen `finally` zuerst kam, riss dem anderen die Datei unter dem Import
   // weg.
   //
-  // WIE STARK DIESE PROBE IST - gemessen, nicht geschaetzt (04.09.2026): der
-  // alte Lader faellt in 2 von 16 Laeufen um, der neue in 0 von 16. Bei zwoelf
+  // WIE STARK DIESE PROBE IST - gemessen, nicht geschaetzt (04.09.2026): in
+  // einem gesonderten Versuch mit zwei WIRKLICH gleichzeitigen Prozessen fiel
+  // der alte Lader in 2 von 16 Laeufen um, der neue in 0 von 16. Bei zwoelf
   // Laeufen hier bleibt der alte Fehler also mit rund 20 % Wahrscheinlichkeit
   // unentdeckt. Das ist zu wenig fuer ein Tor.
+  //
+  // Und bis zum selben Tag war diese Probe ueberhaupt nicht gleichzeitig -
+  // siehe unten. Die Zahl stammte aus dem gesonderten Versuch, nicht von hier.
   //
   // Deshalb ist NICHT diese Probe die Absicherung, sondern die
   // Strukturpruefung darunter - die kann nicht durch Glueck bestehen. Diese
@@ -132,21 +117,33 @@ console.log("-- ZWEI LAEUFE GLEICHZEITIG (R29) --");
   const laderUrl = path.join(HIER, "mock", "lader.js");
   const ziel = path.join(SRC, "lib", "figurns.js");
 
+  // ECHT GLEICHZEITIG (Skeptiker Runde 5, W2).
+  //
+  // Hier stand `execFileSync` in einem `map`. Das blockiert die Event-Loop:
+  // gemessen startete der zweite Prozess exakt in dem Moment, in dem der erste
+  // endete (0->458 ms, 458->907 ms). Er sah die Kopien des ersten nie - die
+  // Kollision, die vorgefuehrt werden soll, konnte per Konstruktion nicht
+  // auftreten. Die ganze Datei brauchte 0,94 s fuer angeblich zwoelf
+  // nebenlaeufige Prozesse; das haette auffallen muessen.
+  //
+  // `process.execPath` statt "node": findet die Umgebung `node` nicht auf dem
+  // PATH, feuert bei `spawn` kein `exit`, und der Test haengt.
+  const starte = () => new Promise((res) => {
+    execFile(process.execPath, [skript, laderUrl, ziel],
+      { encoding: "utf8", cwd: ROOT, timeout: 30000 },
+      (err, out, errOut) => res({
+        ok: !err && String(out).includes("OK"),
+        text: ((out || "") + (errOut || "")).trim().slice(0, 200),
+      }));
+  });
+
   let paare = 0;
   let fehlgeschlagen = 0;
   let letzterFehler = "";
   for (let i = 0; i < 6; i++) {
-    // Zwei echte Prozesse - im selben Prozess gaebe es die Kollision nicht,
-    // weil dann beide dieselbe Prozessnummer traegen.
-    const laeufe = [0, 1].map(() => {
-      try {
-        const aus = execFileSync("node", [skript, laderUrl, ziel],
-          { encoding: "utf8", cwd: ROOT, timeout: 30000 });
-        return { ok: aus.includes("OK"), text: aus.trim() };
-      } catch (e) {
-        return { ok: false, text: ((e.stdout || "") + (e.stderr || "")).trim().slice(0, 200) };
-      }
-    });
+    // Zwei echte Prozesse, gleichzeitig gestartet - im selben Prozess gaebe es
+    // die Kollision nicht, weil dann beide dieselbe Prozessnummer traegen.
+    const laeufe = await Promise.all([starte(), starte()]);
     paare++;
     for (const l of laeufe) {
       if (!l.ok) { fehlgeschlagen++; letzterFehler = l.text; }
@@ -157,6 +154,33 @@ console.log("-- ZWEI LAEUFE GLEICHZEITIG (R29) --");
   pruefe(paare + " Paare gleichzeitiger Laeufe, keiner bricht ab",
     fehlgeschlagen === 0,
     fehlgeschlagen ? fehlgeschlagen + " Fehlschlag(e): " + letzterFehler : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Leichen frueherer Laeufe werden weggeraeumt (W1) --");
+{
+  // Das `finally` des Laders laeuft bei Strg-C, kill oder Absturz NICHT.
+  // Danach sind sechs Ebene-2-Tests rot, ohne dass am geprueften Code etwas
+  // fehlt - sie pruefen zu Recht, dass nichts unter src/ liegen bleibt.
+  //
+  // Zwei Koeder: einer mit einer Prozessnummer, die es sicher nicht gibt, und
+  // einer mit der EIGENEN. Der zweite ist die Gegenprobe - wer alles wegraeumt,
+  // was `.mock-` heisst, reisst dem gerade laufenden Nachbarlauf die Dateien
+  // unter dem Import weg. Genau das war der Fehler, den R29 behoben hat.
+  const tote = path.join(SRC, ".mock-leiche-999999.mjs");
+  const eigene = path.join(SRC, ".mock-leiche-" + process.pid + ".mjs");
+  fs.writeFileSync(tote, "// alt", "utf8");
+  fs.writeFileSync(eigene, "// meine", "utf8");
+  try {
+    const { ladeSpielskript } = await import("./mock/lader.js");
+    await ladeSpielskript(path.join(SRC, "lib", "figurns.js"));
+    pruefe("die Leiche eines toten Prozesses ist weg", !fs.existsSync(tote));
+    pruefe("die eigene Datei bleibt", fs.existsSync(eigene),
+      "sonst reisst ein Lauf dem anderen die Kopien weg");
+  } finally {
+    for (const f of [tote, eigene]) { try { fs.unlinkSync(f); } catch { /* egal */ } }
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -173,11 +197,39 @@ console.log("-- die Prozessnummer steht in JEDEM Kopienamen --");
   pruefe("es gibt genau EINE Stelle, die Kopienamen bildet",
     (txt.match(/"\.mock-" \+/g) || []).length === 1,
     "sonst laufen die Ebenen wieder auseinander");
+  // NICHT ueber 120 Zeichen hinweg suchen (Skeptiker Runde 5, K5): `.mock-`
+  // steht auch in den Kommentaren dieser Datei, und ein Treffer dort haette
+  // genuegt. Geprueft wird die Verkettung selbst, in einer Zeile.
   pruefe("und sie traegt process.pid",
-    /\.mock-[\s\S]{0,120}process\.pid/.test(txt));
+    // Zusammengesetzt, weil der Ausdruck selbst ein Escape fuer den
+    // Zeilenumbruch enthaelt - eine Regex mit echtem Umbruch darin ist keine.
+    new RegExp('"[.]mock-"[^' + "\\" + 'n]*process[.]pid').test(txt),
+    "die Namensbildung und die Prozessnummer muessen dieselbe Zeile sein");
   pruefe("kein blosses .replace(/\\.js$/, \".mjs\") mehr",
     !txt.includes('.replace(/\\.js$/, ".mjs")'),
     "das war die Zeile, die den Prozessanteil verlor");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- keine Kopie bleibt liegen (zuletzt geprueft) --");
+{
+  // DIESER ABSCHNITT STAND FRUEHER GANZ OBEN (Skeptiker Runde 5, K5) - also
+  // vor dem Wettlauf, dem Abschnitt, der am ehesten Reste hinterlaesst. Er
+  // prueft jetzt, was NACH allem uebrig ist.
+  const reste = [];
+  const suche = (ordner, tiefe = 0) => {
+    if (tiefe > 3) return;
+    for (const e of fs.readdirSync(ordner, { withFileTypes: true })) {
+      if (e.isDirectory()) suche(path.join(ordner, e.name), tiefe + 1);
+      else if (e.name.startsWith(".mock-") || e.name.endsWith(".mjs")) {
+        reste.push(path.relative(SRC, path.join(ordner, e.name)));
+      }
+    }
+  };
+  suche(SRC);
+  pruefe("weder .mock- noch .mjs unter src/", reste.length === 0,
+    reste.join(", "));
 }
 
 console.log("");

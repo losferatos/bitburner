@@ -388,7 +388,27 @@ console.log("-- die Schreiberprobe selbst (R27, 04.09.2026) --");
     schreiberprobe('const STAND = "data/x.json";\nns.write(STAND, "a", "w");', F).form
       === "konstante");
 
-  // ---- und jetzt das, worauf es ankommt --------------------------------
+  // ---- DIE GEFAEHRLICHE RICHTUNG: FALSCH-POSITIVE ----------------------
+  //
+  // Ein akzeptierter Name OHNE Schreiber ist genau der Fehler, gegen den das
+  // Modul gebaut ist. Skeptikerrunde 5 hat drei davon gemessen; jeder steht
+  // hier als eigene Probe.
+  pruefe("eine AUSKOMMENTIERTE Schreibzeile gilt nicht",
+    !schreiberprobe('// frueher: ns.write("data/x.json", d)\nlet a = 1;', F).ok,
+    "gemessen als Falsch-Positiv, Skeptikerrunde 5");
+
+  pruefe("ein Blockkommentar gilt auch nicht",
+    !schreiberprobe('/* ns.write("data/x.json", d) */\nlet a = 1;', F).ok);
+
+  pruefe("`beschreibe(...)` ist kein `schreibe(...)`",
+    !schreiberprobe('beschreibe("data/x.json", 1);', F).ok,
+    "der Aufrufname braucht eine Wortgrenze, sonst zaehlt jede Endung");
+
+  pruefe("eine beschattete Konstante gilt nicht",
+    !schreiberprobe('const S = "data/x.json";\nfunction f() { const S = "data/y.json";'
+      + ' ns.write(S, 1); }', F).ok,
+    "derselbe Bezeichner, ein anderer Wert - der Aufruf beweist nichts");
+
   pruefe("eine Konstante OHNE Schreibaufruf gilt nicht",
     !schreiberprobe('const STAND = "data/x.json";\nns.read(STAND);', F).ok,
     "sonst genuegte es, den Namen irgendwo hinzuschreiben");
@@ -399,19 +419,27 @@ console.log("-- die Schreiberprobe selbst (R27, 04.09.2026) --");
   pruefe("ein anderer Dateiname gilt nicht",
     !schreiberprobe('const STAND = "data/y.json";\nns.write(STAND, "a", "w");', F).ok);
 
-  pruefe("blosse Erwaehnung im Kommentar gilt nicht",
-    !schreiberprobe('// schreibt spaeter mal data/x.json\nns.write(EGAL, "a");', F).ok,
-    "der haeufigste Fall: der Name ist gedacht, nicht gebaut");
-
   pruefe("ein LESEN derselben Datei gilt nicht",
     !schreiberprobe('const d = ns.read("data/x.json");', F).ok);
 
-  pruefe("`let` statt `const` gilt nicht",
-    !schreiberprobe('let STAND = "data/x.json";\nns.write(STAND, "a", "w");', F).ok,
-    "eine Variable, die neu zugewiesen werden kann, beweist nichts");
-
   pruefe("leerer Quelltext gilt nicht",
     !schreiberprobe("", F).ok);
+
+  // ---- FALSCH-NEGATIVE: ein Generator, der zu Unrecht ablehnt, wird
+  //      abgeschaltet. Auch das sind gemessene Faelle.
+  pruefe("`export const` gilt - das ist die uebliche Schreibweise",
+    schreiberprobe('export const S = "data/x.json";\nns.write(S, 1, "w");', F).ok,
+    "gemessen als Falsch-Negativ, Skeptikerrunde 5");
+
+  pruefe("einfache Anfuehrungszeichen gelten",
+    schreiberprobe("ns.write('data/x.json', 1, 'w');", F).ok);
+
+  pruefe("ein Leerzeichen vor dem Komma aendert nichts",
+    schreiberprobe('const S = "data/x.json";\nns.write(S , 1);', F).ok);
+
+  pruefe("`let` statt `const` gilt weiterhin nicht",
+    !schreiberprobe('let STAND = "data/x.json";\nns.write(STAND, "a", "w");', F).ok,
+    "eine Variable, die neu zugewiesen werden kann, beweist nichts");
 
   // Und die beiden echten Dateien, um die es bei R27 ging.
   for (const [datei, tele] of [["cdump.js", "data/cdump-stand.json"],

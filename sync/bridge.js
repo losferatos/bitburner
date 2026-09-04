@@ -69,6 +69,7 @@ import {
   SCHONLISTE,
   BACKUP_PRIMAER,
   BACKUP_SPIEGEL,
+  BACKUP_MOCK,
   pfadGleich,
   textAusArgv,
   zahlAusArgv,
@@ -141,6 +142,8 @@ function bestimmeRolle() {
 }
 
 const ROLLE = bestimmeRolle();
+/** Vor dem Portriegel gebraucht - deshalb hier und nicht weiter unten. */
+const IST_LIVE_ROLLE = ROLLE.instance === "LIVE";
 const RFA_PORT = zahlAusArgv(argv, "--rfa-port", ROLLE.rfaPort);
 const DASHBOARD_PORT = zahlAusArgv(argv, "--dash-port", ROLLE.dashPort);
 const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDir));
@@ -149,13 +152,29 @@ const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDi
  * TEST weigert sich, die Live-Ports zu binden. Ein vertippter Portparameter ist
  * sonst genau der Fehler, gegen den die ganze Rollentrennung gebaut ist.
  */
-if (ROLLE.instance === "TEST" && (RFA_PORT === 12525 || DASHBOARD_PORT === 8795)) {
-  console.log("  ABBRUCH: TEST darf 12525/8795 nicht binden (angefragt " + RFA_PORT + "/" + DASHBOARD_PORT + ")");
+// ZWEI ERWEITERUNGEN AM 04.09.2026 (Skeptiker Runde 5):
+//
+//   1. Der Riegel galt nur fuer TEST. Mit MOCK gibt es eine dritte Rolle, und
+//      eine Ausnahme, die man beim Hinzufuegen einer Rolle vergessen kann, ist
+//      keine. Jetzt gilt er fuer ALLES ausser LIVE.
+//   2. Er prueft die KREUZFAELLE mit. Vorher stand da
+//      `RFA_PORT === 12525 || DASHBOARD_PORT === 8795` - ein `--rfa-port 8795`
+//      oder `--dash-port 12525` kam durch und wurde nur durch EADDRINUSE
+//      abgefangen, also nur, solange LIVE gerade laeuft. Ausgerechnet dann,
+//      wenn die Live-Bruecke steht, waere der Vertipper durchgegangen.
+if (!IST_LIVE_ROLLE
+    && [RFA_PORT, DASHBOARD_PORT].some((p) => p === 12525 || p === 8795)) {
+  console.log("  ABBRUCH: " + ROLLE.instance + " darf 12525/8795 nicht binden"
+    + " (angefragt " + RFA_PORT + "/" + DASHBOARD_PORT + ")");
   process.exit(3);
 }
 
-const IST_LIVE = ROLLE.instance === "LIVE";
-const BACKUP_ORT = IST_LIVE ? BACKUP_PRIMAER : path.join(ROOT, "pruefstand", "backups");
+const IST_LIVE = IST_LIVE_ROLLE;
+const BACKUP_ORT = IST_LIVE
+  ? BACKUP_PRIMAER
+  : (ROLLE.instance === "MOCK"
+    ? BACKUP_MOCK
+    : path.join(ROOT, "pruefstand", "backups"));
 const BACKUP_SPIEGEL_ORT = IST_LIVE ? BACKUP_SPIEGEL : null;
 
 const POLL_INTERVAL_MS = 2000;
@@ -231,6 +250,67 @@ let letzteStundensicherung = 0;
 let letzteSaveAbfrage = 0;
 /** Zurueckgestellte Schuebe aus dem unverified-Fenster. */
 const zurueckgestellt = new Set();
+
+/**
+ * MANUAL_ACTIONS - der Eingriffszaehler (04.09.2026).
+ *
+ * Abnahmestufe B verlangt 12 h mit `manual_actions = 0`, und die Zahl hatte
+ * bis heute keinen Schreiber. Sie stand dauerhaft auf null und war damit
+ * unfaelschbar - dieselbe Luecke wie bei `false_penalty_count`.
+ *
+ * SIE GEHOERT IN DIE BRUECKE, und das ist kein Umweg, sondern der einzige
+ * moegliche Ort: Der Kern laeuft IM Spiel und kann nicht sehen, dass etwas von
+ * aussen hineingeschrieben wurde. Die Bruecke ist der einzige Weg hinein, und
+ * damit die einzige Stelle, an der sich ein Eingriff ueberhaupt bemerken
+ * laesst.
+ *
+ * WAS ZAEHLT (Auftrag, Stufe B): "jede Aenderung, die das Live-Spiel erreicht
+ * - Hot-Swap, pushFile, deleteFile, task.txt, reload.txt, Neustart der
+ * Bruecke."
+ *
+ * WAS NICHT ZAEHLT:
+ *   - `pushAll` beim Verbinden. Das ist die Bruecke, die ihren eigenen Stand
+ *     wiederherstellt, kein Mensch. Der Auftrag nennt einen Brueckenausfall
+ *     ausdruecklich KEINEN Eingriff.
+ *   - Lesende Methoden. `getSaveFile` alle 60 s ist Beobachtung.
+ *
+ * Gezaehlt wird als EIN Eingriff, was in einem Schub zusammen ins Spiel geht -
+ * ein Hot-Swap von zwoelf Dateien ist ein Handgriff, nicht zwoelf. Die
+ * Gegenprobe dazu steht in der Datei: sie fuehrt die Zahl der Dateien mit.
+ */
+const MANUAL_DATEI = path.join(DATA_DIR, "manual-actions.json");
+const MANUAL_MAX = 200;
+
+async function zaehleEingriff(art, was, anzahl = 1) {
+  try {
+    let buch = { version: 1, eintraege: [] };
+    try {
+      buch = JSON.parse(await readFile(MANUAL_DATEI, "utf8"));
+      if (!Array.isArray(buch.eintraege)) buch.eintraege = [];
+    } catch { /* erster Eingriff dieser Instanz */ }
+    buch.eintraege.push({
+      wall: Date.now(),
+      art,
+      was: String(was).slice(0, 200),
+      dateien: anzahl,
+      // Die Spielzeit, damit sich ein Eintrag einem LAUF zuordnen laesst -
+      // `manual_actions` ist "je Lauf", und Laeufe trennt kein Wanduhrdatum.
+      playtime: Number.isFinite(state.totalPlaytime) ? state.totalPlaytime : null,
+    });
+    // Ringpuffer. Aeltere Eintraege gehen verloren; die Zahl, die zaehlt,
+    // ist die der letzten Stunden.
+    if (buch.eintraege.length > MANUAL_MAX) {
+      buch.eintraege = buch.eintraege.slice(-MANUAL_MAX);
+    }
+    await writeFile(MANUAL_DATEI, JSON.stringify(buch, null, 1), "utf8");
+    log("info", "Eingriff " + art + ": " + was
+      + " (" + buch.eintraege.length + " im Puffer)");
+  } catch (err) {
+    // Buchhaltung darf den Betrieb nicht anhalten - aber der Ausfall gehoert
+    // ins Protokoll, sonst ist auch er lautlos.
+    log("warn", "manual-actions nicht schreibbar: " + err.message);
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Protokollierung: Konsole, Dashboard UND Datei
@@ -362,6 +442,24 @@ function reject_(waiting, error) {
 
 const SYNCABLE = /\.(js|jsx|ts|tsx|txt|json|script)$/;
 
+/**
+ * Dateien, die NIE ins Spiel gehen, egal wie sie enden.
+ *
+ * ES GIBT NUR EINE REGEL: der Name faengt mit einem Punkt an. Punktdateien
+ * sind in diesem Projekt durchweg Werkzeugkram - Wegwerfkopien des Laders
+ * (`.mock-<name>-<pid>.mjs`), Editorreste, Sperrdateien. Nichts davon hat im
+ * Spielstand etwas zu suchen.
+ *
+ * WARUM DAS SEIT DEM 04.09.2026 AUSDRUECKLICH DASTEHT (Skeptiker Runde 5, B3):
+ * Bis dahin hielt die Endung allein die Kopien draussen - `.mock-figur-123.mjs`
+ * faellt durch `SYNCABLE`, weil dort `.mjs` fehlt. Das stimmte, war aber ein
+ * Zufall zweier unabhaengiger Entscheidungen: die Endung waehlt `mockPfad` in
+ * `tools/mock/lader.js`, und wer sie eines Tages auf `.js` aendert, schiebt
+ * Wegwerfdateien in Erics laufendes Spiel. Ein Riegel, der nur mittelbar haelt,
+ * ist keiner.
+ */
+const NIE_SCHIEBEN = (name) => name.startsWith(".");
+
 async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
   const out = [];
   let entries;
@@ -375,7 +473,8 @@ async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
     const gameName = prefix ? prefix + "/" + entry.name : entry.name;
     if (entry.isDirectory()) {
       out.push(...(await collectScripts(full, gameName)));
-    } else if (SYNCABLE.test(entry.name) && !entry.name.endsWith(".d.ts")) {
+    } else if (SYNCABLE.test(entry.name) && !entry.name.endsWith(".d.ts")
+      && !NIE_SCHIEBEN(entry.name)) {
       out.push({ localPath: full, gameName });
     }
   }
@@ -456,6 +555,9 @@ function watchScripts() {
       if (!filename) return;
       const name = filename.toString().split(path.sep).join("/");
       if (name.endsWith(".d.ts") || !SYNCABLE.test(name)) return;
+      // Auch hier, nicht nur in collectScripts: der Watcher meldet den PFAD,
+      // also muss der DATEINAME geprueft werden, nicht der Anfang des Pfades.
+      if (NIE_SCHIEBEN(name.split("/").pop())) return;
 
       // Alle Aenderungen eines Umbaus sammeln und ERST DANN gemeinsam
       // schieben. Wer jede Datei einzeln nachschiebt, liefert Zwischenstaende
@@ -516,6 +618,13 @@ async function schiebeStapel(stapelEingang) {
     return;
   }
   stapel = neu;
+
+  // EIN SCHUB IST EIN EINGRIFF. Er entsteht nur, weil ein Mensch oder eine
+  // Claude-Sitzung eine Datei unter src/ geaendert hat - der Bot selbst kann
+  // das nicht. Gezaehlt wird NACH der Inhaltspruefung: eine Watcher-Meldung
+  // ohne Inhaltsaenderung erreicht das Spiel nicht und ist kein Eingriff.
+  await zaehleEingriff("push", stapel.slice(0, 5).join(", ")
+    + (stapel.length > 5 ? " (+" + (stapel.length - 5) + ")" : ""), stapel.length);
 
   const jetzt = Date.now();
   if (jetzt - letzteSchubSicherung > SCHUB_SICHERUNG_ABSTAND_MS) {
@@ -1302,6 +1411,12 @@ function startDashboard() {
         res.writeHead(409, { "Content-Type": MIME[".json"] });
         res.end(JSON.stringify({ error: "Socket noch nicht verifiziert" }));
         return;
+      }
+
+      // Eine schreibende Methode ueber das Dashboard kommt IMMER von aussen -
+      // der Bot im Spiel benutzt diesen Weg nicht, er hat die ns-API.
+      if (!LESENDE_METHODEN.has(method)) {
+        await zaehleEingriff("rpc", method + " " + (url.searchParams.get("filename") || ""));
       }
 
       const params = {};

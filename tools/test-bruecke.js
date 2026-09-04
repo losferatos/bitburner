@@ -35,9 +35,20 @@
  * WAS DIESER TEST NIEMALS TUT
  * ===========================================================================
  *
- * Er startet KEINE LIVE-Bruecke und bindet WEDER 12525 NOCH 8795. Die Rolle
- * ist immer TEST, die Ports werden je Lauf frei gewaehlt, der Datenordner
- * liegt unter `pruefstand/`.
+ * Er startet KEINE LIVE-Bruecke und bindet WEDER 12525 NOCH 8795. Die Ports
+ * werden je Lauf frei gewaehlt, der Datenordner liegt unter `pruefstand/`.
+ *
+ * DIE ROLLE IST **MOCK**, NICHT TEST (seit 04.09.2026, Skeptiker Runde 5).
+ * Das ist kein Etikett, sondern der Kern einer Reparatur: Der Test muss mit
+ * einer Spielzeit OBERHALB des vorhandenen Ankers arbeiten - sonst weist die
+ * Bruecke ihn zu Recht als Rueckwaertssprung ab. Jede verifizierte Verbindung
+ * schreibt aber eine Sicherung in den Index, und der Anker steigt mit.
+ *
+ * Solange der Test die TEST-Rolle benutzte, hob er damit den Anker der Rolle,
+ * mit der ein Mensch einen KLON von Erics Spielstand fuehrt: gemessen von 369
+ * auf 6.800 Stunden nach wenigen Laeufen. Eine echte Kopie waere ab da
+ * dauerhaft abgelehnt worden - `rotiere()` loescht Dateien, keine Indexzeilen.
+ * Erfundene Spielzeiten und echte gehoeren nicht in denselben Index.
  *
  * Die eine LIVE-Probe (Abschnitt "die Rollentrennung") laeuft gegen den
  * WORKTREE, nicht gegen die Arbeitskopie: dort MUSS die Bruecke abbrechen,
@@ -154,7 +165,12 @@ function baueSave({ port, playtime = 100 * 3600000, identifier = "testtesttest01
  * @returns {{proc: object, zeilen: string[], exit: Promise<number>}}
  */
 function starteBruecke(args, cwd = ROOT) {
-  const proc = spawn("node", [path.join(cwd, "sync", "bridge.js"), ...args],
+  // `process.execPath` STATT "node" (Skeptiker Runde 5, W5). Findet die
+  // Umgebung `node` nicht auf dem PATH - Aufgabenplanung, ein .cmd mit eigenem
+  // PATH, ein anderer Rechner -, wirft das Kindobjekt ein `error`-Ereignis
+  // ohne Zuhoerer, und `exit` feuert NIE: `await b.exit` haengt dann
+  // unbegrenzt. Der eigene Interpreter ist immer da.
+  const proc = spawn(process.execPath, [path.join(cwd, "sync", "bridge.js"), ...args],
     { cwd, stdio: ["ignore", "pipe", "pipe"] });
   const zeilen = [];
   const sammle = (d) => {
@@ -162,7 +178,12 @@ function starteBruecke(args, cwd = ROOT) {
   };
   proc.stdout.on("data", sammle);
   proc.stderr.on("data", sammle);
-  const exit = new Promise((res) => proc.on("exit", (code) => res(code)));
+  // Ohne diesen Zuhoerer beendet ein Startfehler den ganzen Testlauf mit
+  // "Unhandled 'error' event" - vor jedem Aufraeumen.
+  const exit = new Promise((res) => {
+    proc.on("exit", (code) => res(code));
+    proc.on("error", (err) => { zeilen.push("STARTFEHLER: " + err.message); res(-1); });
+  });
   return { proc, zeilen, exit };
 }
 
@@ -235,6 +256,31 @@ const tempOrdner = [];
 function merkeZumAufraeumen(p) { aufraeumen.push(p); }
 
 /**
+ * AUFRAEUMEN AUCH BEI EINER AUSNAHME (Skeptiker Runde 5, W4).
+ *
+ * Die Schleifen am Dateiende laufen nur, wenn der Test durchlaeuft. Wirft ein
+ * Abschnitt, bleiben bis zu sechs Ordner `pruefstand/t-<pid>-<n>` liegen - und
+ * die stehen NICHT in .gitignore - sowie mehrere Brueckenprozesse, an denen
+ * unter Windows kein Job-Objekt haengt.
+ *
+ * `process.on("exit")` feuert auch nach einer unbehandelten Ausnahme. Er darf
+ * nur synchron arbeiten, deshalb `rmSync` und `kill`.
+ */
+let schonAufgeraeumt = false;
+function raeumeAuf() {
+  if (schonAufgeraeumt) return;
+  schonAufgeraeumt = true;
+  for (const p of aufraeumen) {
+    try { if (p.exitCode === null) p.kill(); } catch { /* egal */ }
+  }
+  for (const o of tempOrdner) {
+    try { fs.rmSync(o, { recursive: true, force: true }); } catch { /* egal */ }
+  }
+}
+process.on("exit", raeumeAuf);
+process.on("SIGINT", () => { raeumeAuf(); process.exit(130); });
+
+/**
  * JEDER ABSCHNITT BEKOMMT EINEN EIGENEN DATENORDNER.
  *
  * Sonst schleppt der Heartbeat den Anker des vorigen Abschnitts mit, und der
@@ -262,7 +308,7 @@ function frischerDatenordner() {
  */
 function basisPlaytime() {
   let hoechster = 0;
-  const idx = path.join(ROOT, "pruefstand", "backups", "INDEX.tsv");
+  const idx = path.join(ROOT, "pruefstand", "mock-backups", "INDEX.tsv");
   if (fs.existsSync(idx)) {
     for (const zeile of fs.readFileSync(idx, "utf8").split("\n")) {
       for (const feld of zeile.split("\t")) {
@@ -278,6 +324,31 @@ function basisPlaytime() {
 
 const BASIS = basisPlaytime();
 const STUNDE = 3600000;
+
+/**
+ * DIE SPIELZEITEN DER ABSCHNITTE STEIGEN, und das ist keine Kosmetik.
+ *
+ * Jeder Abschnitt, der eine Verbindung verifiziert, schreibt eine Sicherung -
+ * und die ist ab diesem Moment der Anker fuer den naechsten (die Kette lautet
+ * Heartbeat -> Heartbeat-Datei -> INDEX.tsv, und der Index ueberlebt einen
+ * frischen Datenordner). Ein Abschnitt mit derselben Spielzeit faellt deshalb
+ * an Pruefung 2 durch, voellig zu Recht.
+ *
+ * Gemessen am 04.09.2026: genau das ist passiert - der Eingriffszaehler-
+ * Abschnitt bekam HTTP 409, weil sein Spielstand eine Stunde hinter dem lag,
+ * den der vorige Abschnitt gerade gesichert hatte.
+ *
+ * Die Zahlen stehen deshalb ausdruecklich hier und nicht verstreut im Text.
+ */
+const ZEIT = {
+  normal: BASIS + 10 * STUNDE,
+  normalWieder: BASIS + 20 * STUNDE,
+  eingriff: BASIS + 30 * STUNDE,
+  rueckwaertsVor: BASIS + 40 * STUNDE,
+  rueckwaertsAlt: BASIS + 35 * STUNDE,   // 5 h hinter dem eigenen Anker
+  zweite: BASIS + 50 * STUNDE,
+  koeder: BASIS + 25 * STUNDE,
+};
 
 console.log("");
 console.log("=== Die Bruecke gegen ein nachgebautes Spiel ===");
@@ -305,8 +376,8 @@ console.log("-- TEST darf die Live-Ports nicht binden --");
   // wuerde den Live-Socket verdraengen und danach Testcode in die live file
   // schieben. Ein vertippter Portparameter genuegt.
   for (const [name, args] of [
-    ["RFA 12525", ["--instance", "TEST", "--rfa-port", "12525", "--dash-port", "8796"]],
-    ["Dashboard 8795", ["--instance", "TEST", "--rfa-port", "12526", "--dash-port", "8795"]],
+    ["RFA 12525", ["--instance", "MOCK", "--rfa-port", "12525", "--dash-port", "8796"]],
+    ["Dashboard 8795", ["--instance", "MOCK", "--rfa-port", "12526", "--dash-port", "8795"]],
   ]) {
     const b = starteBruecke(args);
     const code = await b.exit;
@@ -342,7 +413,7 @@ let normalPorts = null;
   const rfa = await freierPort();
   const dash = await freierPort();
   normalPorts = { rfa, dash };
-  const b = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(b.proc);
@@ -351,7 +422,7 @@ let normalPorts = null;
 
   // Ein Spiel, das auf getSaveFile SCHWEIGT. Die Bruecke darf dann nichts
   // schreiben - und zwar dauerhaft, nicht nur bis zum Timeout.
-  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS }), { stummBeiSave: true });
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.normal }), { stummBeiSave: true });
   await schlaf(3000);
 
   pruefe("die erste Frage ist getSaveFile",
@@ -359,8 +430,23 @@ let normalPorts = null;
   pruefe("und es kam KEIN pushFile",
     !spiel.gesehen.includes("pushFile"),
     spiel.gesehen.join(", ") || "(nichts)");
-  pruefe("auch sonst nichts Schreibendes",
-    !spiel.gesehen.some((m) => /^(pushFile|deleteFile|write)/.test(m || "")));
+  // Nicht "auch sonst nichts Schreibendes" - das konnte nur rot werden, wenn
+  // die Zeile darueber ohnehin rot ist (Skeptiker Runde 5, K4). Gefragt ist,
+  // ob der Riegel im RICHTIGEN Zustand haengt: unverifiziert, und der einzige
+  // Grund dafuer ist das ausbleibende getSaveFile.
+  pruefe("die Bruecke fragt weiter nach - sie gibt nicht auf",
+    spiel.gesehen.filter((m) => m === "getSaveFile").length >= 1,
+    spiel.gesehen.length + " Aufrufe insgesamt: " + spiel.gesehen.join(", "));
+  pruefe("und der Dashboard-Weg ist ebenfalls zu",
+    await (async () => {
+      try {
+        const r = await fetch("http://127.0.0.1:" + dash
+          + "/api/rpc?method=pushFile&instance=MOCK&filename=x.js&server=home&content=x");
+        return r.status === 409;
+      } catch { return false; }
+    })(),
+    "der Riegel sitzt in request(), nicht in den Aufrufern - er muss auch"
+    + " von aussen halten");
 
   spiel.schliessen();
   b.proc.kill();
@@ -373,7 +459,7 @@ console.log("-- ein Spielstand mit FREMDEM RFA-Port wird abgewiesen --");
 {
   const rfa = await freierPort();
   const dash = await freierPort();
-  const b = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(b.proc);
@@ -381,7 +467,7 @@ console.log("-- ein Spielstand mit FREMDEM RFA-Port wird abgewiesen --");
 
   // Der Port im Spielstand ist das EINZIGE Merkmal, das Live von einer Kopie
   // trennt - der identifier wandert beim Kopieren mit.
-  const spiel = starteSpiel(rfa, baueSave({ port: rfa + 999, playtime: BASIS }));
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa + 999, playtime: ZEIT.normal }));
   const abgewiesen = await warteAufZeile(b.zeilen, /abgewiesen|RemoteFileApiPort/i, 15000);
   pruefe("die Bruecke weist ab", abgewiesen,
     b.zeilen.slice(-2).join(" | "));
@@ -397,21 +483,24 @@ console.log("-- ein Spielstand mit FREMDEM RFA-Port wird abgewiesen --");
 // ---------------------------------------------------------------------------
 console.log("");
 console.log("-- der normale Weg: pruefen, sichern, DANN schieben --");
-let sicherungVorher = 0;
 {
   const rfa = await freierPort();
   const dash = await freierPort();
-  const backups = path.join(ROOT, "pruefstand", "backups");
-  sicherungVorher = fs.existsSync(backups)
-    ? fs.readdirSync(backups).filter((f) => f.startsWith("TEST_")).length : 0;
+  const backups = path.join(ROOT, "pruefstand", "mock-backups");
+  // NAMEN MERKEN, NICHT ZAEHLEN. Der Ablageort wird gedeckelt (10 je Anlass
+  // "connect", instanz.js ANLAESSE) - eine neue Sicherung kann also entstehen,
+  // waehrend die aelteste geht, und die Anzahl bleibt gleich. Am 04.09.2026
+  // hat genau das die Probe rot gemacht, obwohl die Bruecke richtig lag.
+  const vorNamen = new Set(fs.existsSync(backups)
+    ? fs.readdirSync(backups).filter((f) => f.startsWith("MOCK_")) : []);
 
-  const b = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(b.proc);
   await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
 
-  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS }));
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.normal }));
   const verifiziert = await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
   pruefe("die Verbindung wird verifiziert", verifiziert,
     b.zeilen.slice(-3).join(" | "));
@@ -422,16 +511,31 @@ let sicherungVorher = 0;
 
   // DIE REIHENFOLGE IST DER PUNKT. Eine Sicherung NACH dem ersten Schreiben
   // sichert einen Stand, den die Bruecke schon veraendert hat.
-  const nachher = fs.existsSync(backups)
-    ? fs.readdirSync(backups).filter((f) => f.startsWith("TEST_")).length : 0;
-  pruefe("eine Sicherung ist entstanden", nachher > sicherungVorher,
-    sicherungVorher + " -> " + nachher);
+  const nachNamen = fs.existsSync(backups)
+    ? fs.readdirSync(backups).filter((f) => f.startsWith("MOCK_")) : [];
+  const neueNamen = nachNamen.filter((f) => !vorNamen.has(f));
+  pruefe("eine NEUE Sicherung ist entstanden", neueNamen.length > 0,
+    neueNamen.join(", ") || "keine neue unter " + nachNamen.length + " Dateien");
 
-  const iPush = spiel.gesehen.indexOf("pushFile");
-  const iSave = spiel.gesehen.indexOf("getSaveFile");
-  pruefe("und getSaveFile kam VOR dem ersten pushFile",
-    iSave >= 0 && (iPush === -1 || iSave < iPush),
-    "getSaveFile@" + iSave + ", pushFile@" + iPush);
+  // DIE REIHENFOLGE, WIRKLICH GEPRUEFT (Skeptiker Runde 5, W5).
+  //
+  // Hier stand `getSaveFile kam VOR dem ersten pushFile`, gemessen an den
+  // Indizes der RPC-Liste. Das ist nahezu tautologisch: das RFA-Protokoll
+  // BEGINNT immer mit getSaveFile, der Wachhund-Abschnitt sichert das eine
+  // Bildschirmseite weiter oben eigens zu. `iSave` ist also stets 0, und
+  // `0 < iPush` gilt, sobald ueberhaupt geschoben wurde. Rot wuerde die Probe
+  // nur bei einem voellig anderen Fehler.
+  //
+  // Der Kommentar behauptete aber etwas anderes und Wichtigeres: dass die
+  // SICHERUNG vor dem ersten Schreiben liegt. Die Daten dafuer stehen im
+  // Protokoll der Bruecke - dort meldet sie beides mit eigener Zeile.
+  const iSicher = b.zeilen.findIndex((z) => /Sicherung connect gruen/i.test(z));
+  const iUeber = b.zeilen.findIndex((z) => /Datei\(en\) ins Spiel uebertragen/i.test(z));
+  pruefe("die Sicherung steht VOR der Uebertragung",
+    iSicher >= 0 && iUeber >= 0 && iSicher < iUeber,
+    "Sicherung@" + iSicher + ", Uebertragung@" + iUeber
+    + " - eine Sicherung DANACH sichert einen Stand, den die Bruecke schon"
+    + " veraendert hat");
 
   // ---- Wiederverbinden ----
   spiel.schliessen();
@@ -440,7 +544,7 @@ let sicherungVorher = 0;
   // ersten Verbindung schon da - eine Suche danach waere immer gruen gewesen,
   // egal ob die zweite Verbindung je geprueft wurde.
   const vorher2 = b.zeilen.filter((z) => /Verifiziert in/i.test(z)).length;
-  const spiel2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS + STUNDE }));
+  const spiel2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.normalWieder }));
   const bis = Date.now() + 25000;
   let jetzt2 = vorher2;
   while (Date.now() < bis && jetzt2 <= vorher2) {
@@ -458,25 +562,161 @@ let sicherungVorher = 0;
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- WEGWERFDATEIEN DES PRUEFSTANDS gehen NIE ins Spiel (B3) --");
+{
+  // DER EINZIGE RIEGEL, DER `.mock-*`-DATEIEN AUS ERICS SPIEL HAELT, WAR
+  // UNGEPRUEFT (Skeptiker Runde 5, B3).
+  //
+  // Jeder Ebene-2-Test legt Wegwerfkopien NEBEN die Originale unter `src/` -
+  // anders stimmen die relativen Pfade nicht. Und `src/` ist genau der Ordner,
+  // den die Live-Bruecke beobachtet. Bisher hielt sie allein die Endung
+  // draussen (`.mjs` fehlt in SYNCABLE) - ein Zufall zweier unabhaengiger
+  // Entscheidungen, denn die Endung waehlt der Lader.
+  //
+  // Verschaerft nach dem Hot-Swap: faellt der Worktree weg, schreibt jeder
+  // Test in `bitburner/src` selbst.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", frischerDatenordner()]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+
+  // Zwei Koeder in den beobachteten Ordner: einer mit der Endung, die der
+  // Lader heute waehlt, und einer mit der, die jemand morgen waehlen koennte.
+  const srcDir = path.join(ROOT, "src");
+  const koeder = [
+    path.join(srcDir, ".mock-koeder-" + process.pid + ".mjs"),
+    path.join(srcDir, ".mock-koeder-" + process.pid + ".js"),
+  ];
+  for (const k of koeder) fs.writeFileSync(k, "// Wegwerfkopie" + String.fromCharCode(10), "utf8");
+
+  try {
+    const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.koeder }));
+    const ok = await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+    pruefe("die Verbindung ist verifiziert", ok);
+    await schlaf(3000);
+
+    const geschoben = [...spiel.dateien.keys()];
+    const mockDrin = geschoben.filter((n) => n.includes(".mock-"));
+    pruefe("ueberhaupt wurde geschoben", geschoben.length > 0,
+      geschoben.length + " Datei(en)");
+    pruefe("aber KEINE Punktdatei ist dabei", mockDrin.length === 0,
+      mockDrin.join(", "));
+    pruefe("auch die mit der Endung .js nicht",
+      !geschoben.some((n) => n.endsWith(".mock-koeder-" + process.pid + ".js")),
+      "die Endung allein darf den Riegel nicht tragen");
+
+    spiel.schliessen();
+  } finally {
+    for (const k of koeder) { try { fs.unlinkSync(k); } catch { /* egal */ } }
+  }
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Eingriffszaehler: pushAll zaehlt nicht, ein RPC zaehlt --");
+{
+  // manual_actions HAT SOLL 0 UND IST ABNAHMEBEDINGUNG (Stufe B: 12 h ohne
+  // Eingriff). Die Zahl hatte bis zum 04.09.2026 keinen Schreiber - sie stand
+  // dauerhaft auf null und war damit unfaelschbar.
+  //
+  // Die beiden Proben hier sind die Grenze der Definition: das automatische
+  // pushAll beim Verbinden ist KEIN Eingriff (der Auftrag nennt einen
+  // Brueckenausfall ausdruecklich keinen), ein schreibender Aufruf ueber das
+  // Dashboard ist einer.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const datenAbs = path.join(ROOT, datenRel);
+  const buchDatei = path.join(datenAbs, "manual-actions.json");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--data-dir", datenRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.eingriff }));
+  const verifiziert = await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  pruefe("die Verbindung ist verifiziert", verifiziert,
+    "ohne Verifikation antwortet das Dashboard mit 409, und der Zaehler "
+    + "wuerde geprueft, ohne dass er je drankam");
+  await schlaf(2000);
+
+  pruefe("das pushAll beim Verbinden zaehlt NICHT als Eingriff",
+    !fs.existsSync(buchDatei),
+    spiel.gesehen.filter((m) => m === "pushFile").length
+      + " pushFile beim Verbinden, und trotzdem kein Eintrag");
+
+  // Jetzt ein schreibender Aufruf von aussen - genau das, was ein Mensch oder
+  // eine Claude-Sitzung tut.
+  let antwort = null;
+  try {
+    const r = await fetch("http://127.0.0.1:" + dash
+      + "/api/rpc?method=pushFile&instance=MOCK&filename=zzz-probe.js&server=home&content=%2F%2Fx");
+    antwort = r.status;
+  } catch (e) {
+    antwort = String(e.message);
+  }
+  await schlaf(1500);
+
+  pruefe("der Aufruf kommt durch", antwort === 200, "HTTP " + antwort);
+  pruefe("und er wird gezaehlt", fs.existsSync(buchDatei));
+  if (fs.existsSync(buchDatei)) {
+    const buch = JSON.parse(fs.readFileSync(buchDatei, "utf8"));
+    pruefe("  genau ein Eintrag", buch.eintraege.length === 1,
+      buch.eintraege.length + " Eintrag/Eintraege");
+    pruefe("  mit der Art rpc", buch.eintraege[0] && buch.eintraege[0].art === "rpc",
+      buch.eintraege[0] ? buch.eintraege[0].art + " / " + buch.eintraege[0].was : "");
+    // `!== undefined` haette auch `null` bestanden (Skeptiker Runde 5, K4).
+    // Der Zusatztext behauptet, die Spielzeit trenne die Laeufe - dann muss
+    // sie eine Zahl sein, sonst trennt sie nichts.
+    pruefe("  und mit Wanduhr UND einer echten Spielzeit",
+      Number.isFinite(buch.eintraege[0].wall)
+        && Number.isFinite(buch.eintraege[0].playtime),
+      "Laeufe trennt kein Wanduhrdatum - playtime="
+      + JSON.stringify(buch.eintraege[0].playtime));
+  }
+
+  // Und die Gegenprobe: LESEN zaehlt nicht.
+  try {
+    await fetch("http://127.0.0.1:" + dash + "/api/rpc?method=getAllFiles&server=home");
+  } catch { /* egal */ }
+  await schlaf(1200);
+  if (fs.existsSync(buchDatei)) {
+    const buch = JSON.parse(fs.readFileSync(buchDatei, "utf8"));
+    pruefe("ein LESENDER Aufruf zaehlt nicht", buch.eintraege.length === 1,
+      buch.eintraege.length + " Eintrag/Eintraege nach dem Lesen");
+  }
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- ein RUECKWAERTSSPRUNG der Spielzeit wird abgewiesen --");
 {
   const rfa = await freierPort();
   const dash = await freierPort();
-  const b = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(b.proc);
   await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
 
   // Erst ein Stand mit 200 h - er setzt den Anker.
-  const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS + 100 * STUNDE }));
+  const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rueckwaertsVor }));
   await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
   s1.schliessen();
   await warteAufZeile(b.zeilen, /getrennt/i, 10000);
 
   // Dann eine aeltere Kopie mit 100 h. Genau der Fall, gegen den Pruefung 2
   // gebaut ist: ein Klon oder ein Import.
-  const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS }));
+  const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rueckwaertsAlt }));
   const abgewiesen = await warteAufZeile(b.zeilen, /abgewiesen|hinter dem zuletzt/i, 20000);
   pruefe("die aeltere Kopie faellt durch", abgewiesen, b.zeilen.slice(-2).join(" | "));
   await schlaf(1500);
@@ -494,18 +734,28 @@ console.log("-- eine ZWEITE Verbindung uebernimmt nicht, solange die erste lebt 
 {
   const rfa = await freierPort();
   const dash = await freierPort();
-  const b = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(b.proc);
   await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
 
-  const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS }));
-  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.zweite }));
+  // DIE ERSTE VERBINDUNG MUSS VERIFIZIERT SEIN (Skeptiker Runde 5, B2).
+  //
+  // Sie war es bis zum 04.09.2026 nicht: ihre Spielzeit lag unter dem Anker,
+  // den ein frueherer Abschnitt gesetzt hatte, also wurde sie abgewiesen. Die
+  // drei Proben unten wurden trotzdem gruen, weil der Zweig fuer die zweite
+  // Verbindung nur an `gameSocket.readyState` haengt und `alteLebt` ueber
+  // `trotzUnverified` beantwortet wird. Geprueft wurde also der uninteressante
+  // Fall, und der Abschnitt bezahlte 25 s fuer eine Frist, die ablaufen MUSSTE.
+  const ersteOk = await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  pruefe("die erste Verbindung ist verifiziert", ersteOk,
+    "sonst prueft der Abschnitt den Fall nicht, um den es geht");
 
   // Ein zweiter Tab. Frueher gewann hier IMMER die neue Verbindung - der Weg,
   // auf dem zwei autosavende Instanzen denselben Spielstand ueberschreiben.
-  const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: BASIS }));
+  const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.zweite }));
   await schlaf(6000);
   pruefe("die zweite Verbindung wird geschlossen", !s2.istOffen(),
     "readyState " + s2.ws.readyState);
@@ -527,7 +777,7 @@ console.log("-- ZWEI BRUECKEN auf einem Port: die zweite beendet sich --");
   const rfa = await freierPort();
   const dash = await freierPort();
   const dash2 = await freierPort();
-  const a = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const a = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   merkeZumAufraeumen(a.proc);
@@ -535,7 +785,7 @@ console.log("-- ZWEI BRUECKEN auf einem Port: die zweite beendet sich --");
 
   // OHNE DIESEN RIEGEL laufen zwei Bruecken nebeneinander, und die zweite
   // schiebt in einen Socket, den die erste geprueft hat.
-  const b2 = starteBruecke(["--instance", "TEST", "--rfa-port", String(rfa),
+  const b2 = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
     "--dash-port", String(dash2), "--no-watch",
     "--data-dir", frischerDatenordner()]);
   const code = await Promise.race([b2.exit, schlaf(15000).then(() => "haengt")]);
@@ -552,12 +802,7 @@ console.log("-- ZWEI BRUECKEN auf einem Port: die zweite beendet sich --");
 }
 
 // ---------------------------------------------------------------------------
-for (const p of aufraeumen) {
-  try { if (p.exitCode === null) p.kill(); } catch { /* egal */ }
-}
-for (const o of tempOrdner) {
-  try { fs.rmSync(o, { recursive: true, force: true }); } catch { /* egal */ }
-}
+raeumeAuf();
 
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");

@@ -1,6 +1,6 @@
 {
-  "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T21:05:00",
+  "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Pruefungen gruen (Ebene 0 bis 2) UND Skeptikerrunde durch UND kein im Eintrag selbst genannter PFLICHTTEST offen. Der letzte Teil kam am 04.09.2026 dazu: ohne ihn steht bald bei allen 15 Positionen 'getestet', waehrend im Feld 'offen' ein namentlich benannter Pflichttest wartet - dann sagt das Wort nichts mehr. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
+  "aktualisiert": "2026-09-04T12:30:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -99,7 +99,7 @@
   "abnahme": {
     "stufeA": {
       "stand": "offen",
-      "was": "Tests und Skeptiker gruen, Messlueckenliste leer. Gemessen 04.09.2026: 28 von 28 Testdateien gruen (node tools/test-alles.js --nur-tests -> Exit 0), aber der volle Lauf endet mit Exit 1, weil neun Messluecken offen sind. Das ist das Tor, das seit R24 wirklich schliesst - vorher lief die Suite mit denselben neun Luecken auf Exit 0 durch."
+      "was": "Tests und Skeptiker gruen, Messlueckenliste leer. Gemessen 04.09.2026 12:30: 30 von 30 Testdateien gruen (node tools/test-alles.js --nur-tests -> Exit 0); der volle Lauf endet mit Exit 1, weil acht Messluecken offen sind. Das ist das Tor, das seit R24 wirklich schliesst - vorher lief die Suite mit denselben Luecken auf Exit 0 durch."
     },
     "stufeB": {
       "stand": "offen",
@@ -120,6 +120,8 @@
     "C.21": "R11, R13, R14, R19 und zwei Laufzeitbomben in Gegenproben",
     "C.22": "R9 und R12 - Einbau auf dem Bladeburner-Weg, drei Modi statt zwei",
     "C.23": "R10 und R28 - Sprosse 4b, und zwei Proben, die nie rot werden konnten",
-    "befunde": "nodes/BAU-2026-09/BEFUNDE-RUNDE4.md: 27 von 30 abgehakt. Offen R23 (kein Test fuer die Bruecke, steht in der Messlueckenliste), R27 (contracts.js und cdump.js ohne telemetryFile), R29 (der Lader vertraegt keine zwei gleichzeitigen Testlaeufe)."
+    "befunde": "BEFUNDE-RUNDE4.md: alle 30 abgehakt. BEFUNDE-RUNDE5.md: 20 von 21, offen bleibt P-W4 (Vertragsertraege in den Ereignisstrom - gehoert zu C.8).",
+    "C.24": "R27, R23, R29 - die stumme Vertragskette, der erste Test der Bruecke, der Lader unter zwei Laeufen",
+    "C.25": "Skeptikerrunde 5: drei blockierende Befunde, darunter der Schaden, den der Brueckentest an der TEST-Instanz angerichtet hatte (Anker 369 -> 6.800 h). Dritte Rolle MOCK, Namenskollision bei Sicherungen, schreiberprobe gegen acht gemessene Fehlfaelle"
   }
 }

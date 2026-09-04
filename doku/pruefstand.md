@@ -99,7 +99,9 @@ PlayerSave, SettingsSave). Damit lässt sich jede Prüfung gezielt verletzen.
 
 | Was | Wie |
 |---|---|
-| Rollentrennung | ohne `--instance` Code 3; TEST auf 12525/8795 Code 3; LIVE aus dem Worktree Code 3 |
+| Rollentrennung | ohne `--instance` Code 3; jede Nicht-LIVE-Rolle auf 12525/8795 Code 3 (auch über Kreuz); LIVE aus dem Worktree Code 3 |
+| Wegwerfdateien | zwei Köder (`.mock-…​.mjs` **und** `.mock-…​.js`) unter `src/` erreichen das Spiel nicht |
+| Eingriffszähler | `pushAll` beim Verbinden zählt nicht, ein schreibender RPC zählt, ein lesender nicht |
 | Wachhund | ein Spiel, das auf `getSaveFile` schweigt, bekommt **kein** `pushFile` |
 | fremder RFA-Port | abgewiesen, nichts geschrieben |
 | Rückwärtssprung | ältere Kopie abgewiesen, nichts geschrieben |
@@ -154,6 +156,32 @@ Identifier, denn den erbt der Klon.
 Die Brücke bricht ohne `--instance` ab. Es gibt keinen Standardwert; ein
 versehentliches LIVE ist damit ausgeschlossen, und schreibende RPC-Methoden
 verlangen `instance=<Rolle>` im Aufruf.
+
+### Drei Rollen, nicht zwei
+
+Seit dem 04.09.2026 gibt es **MOCK** neben LIVE und TEST. Der Grund ist
+gemessen, nicht ausgedacht.
+
+| Rolle | wofür | Sicherungen | Präfix |
+|---|---|---|---|
+| LIVE | Erics Spiel | `~/bitburner-backups` + Spiegel | `LIVE_` |
+| TEST | ein **Klon** des Spielstands, von Hand gefahren | `pruefstand/backups` | `TEST_` |
+| MOCK | ein **erfundenes** Spiel, von `tools/test-bruecke.js` | `pruefstand/mock-backups` | `MOCK_` |
+
+TEST war beides zugleich, und das ging schief. Der Brückentest muss mit einer
+Spielzeit **oberhalb** des vorhandenen Ankers arbeiten — sonst weist ihn die
+Brücke zu Recht als Rückwärtssprung ab. Jede verifizierte Verbindung schreibt
+aber eine Sicherung in denselben Index, und der Anker steigt mit. Nach wenigen
+Läufen stand er bei **6.800 Stunden** statt 369; eine echte Spielstandskopie
+wäre ab da dauerhaft abgelehnt worden, denn `rotiere()` löscht Dateien, keine
+Indexzeilen.
+
+**Erfundene Spielzeiten und echte gehören nicht in denselben Index.**
+
+Der Portriegel gilt seit demselben Tag für **alles außer LIVE** und deckt die
+Kreuzfälle ab: vorher prüfte er `RFA_PORT === 12525 || DASHBOARD_PORT === 8795`,
+ein `--rfa-port 8795` kam also durch und wurde nur durch `EADDRINUSE` gestoppt —
+also nur, solange die Live-Brücke gerade läuft.
 
 ## Was der Prüfstand nicht kann
 

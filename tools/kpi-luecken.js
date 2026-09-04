@@ -125,8 +125,24 @@ for (const [name, def] of Object.entries(KPI.FELDER)) {
     sicher: sicher.length > 0,
   });
   if (!wer.length) {
-    ohne.push(name);
-    if (def.soll === 0) ohneSoll0.push(name);
+    // AUSSERHALB GEMESSENE FELDER SIND KEINE LUECKE (04.09.2026).
+    //
+    // `manual_actions` kann im Spiel niemand zaehlen - der Kern sieht nicht,
+    // dass etwas von aussen hineingeschrieben wurde. Ein Feld mit `quelle`
+    // nennt seinen Schreiber selbst; es fehlt nicht, es steht woanders.
+    //
+    // Die Kennzeichnung wird GEPRUEFT, nicht geglaubt: gibt es die genannte
+    // Datei nicht, ist es doch eine Luecke.
+    if (def.quelle === "bruecke"
+        && fs.existsSync(path.join(ROOT, "sync", "bridge.js"))
+        && fs.readFileSync(path.join(ROOT, "sync", "bridge.js"), "utf8")
+          .includes("manual-actions.json")) {
+      zeilen[zeilen.length - 1].wer = "sync/bridge.js (ausserhalb des Spiels)";
+      zeilen[zeilen.length - 1].sicher = true;
+    } else {
+      ohne.push(name);
+      if (def.soll === 0) ohneSoll0.push(name);
+    }
   }
 }
 

@@ -232,12 +232,15 @@ const MESSLUECKEN = [
   "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
     + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
   "DIE BRUECKE ist seit dem 04.09.2026 gegen ein nachgebautes Spiel geprueft "
-    + "(tools/test-bruecke.js, 28 Proben). OFFEN bleibt der Zweig, den ein "
+    + "(tools/test-bruecke.js, 42 Proben). OFFEN bleibt der Zweig, den ein "
     + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
     + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
-  "ZWEI AUTONOMIEZAEHLER haben weiterhin keinen Schreiber: manual_actions "
-    + "(gehoert in die Bruecke - sie sieht pushFile, deleteFile und reload) "
-    + "und false_kill_count. `node tools/kpi-luecken.js` nennt sie je Feld.",
+  "EIN KENNWERT MIT SOLL BLEIBT OHNE SCHREIBER: next_blackop_chance (soll "
+    + "0,35). Er gilt laut Auftrag ohnehin erst, wenn getNextBlackOp "
+    + "freigeschaltet ist - bei Rang 596 ist keine Operation frei, und an "
+    + "seine Stelle treten rank_rate_per_motor_h und chaos_city. Gebaut wird "
+    + "er, wenn die erste Operation in Reichweite kommt (2.500 Rang). "
+    + "`node tools/kpi-luecken.js` fuehrt ihn.",
   "DER MOCK kennt kein storedCycles und keinen Seed, obwohl Auftrag 6.1 beides "
     + "namentlich fordert. Der Nachholklumpen ist als playtime-Sprung "
     + "modelliert - das ist meine Vorstellung von dem, was storedCycles "
@@ -276,13 +279,27 @@ function fahre(datei, args = []) {
       return;
     }
     const beginn = Date.now();
-    execFile("node", [p, ...args], { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024 },
+    // ZWEI AENDERUNGEN AM 04.09.2026 (Skeptiker Runde 5, W5):
+    //
+    //   `process.execPath` statt "node" - findet die Umgebung `node` nicht auf
+    //   dem PATH (Aufgabenplanung, ein .cmd mit eigenem PATH, ein anderer
+    //   Rechner), bricht die Suite mit ENOENT ab statt zu laufen.
+    //
+    //   `timeout` - es gab keines. Haengt eine Testdatei, haengt die Suite
+    //   endlos, und niemand sieht warum. Bei Ebene-2-Tests, die echte Prozesse
+    //   und Sockets fahren, ist das die falsche Vorgabe. 180 s ist reichlich:
+    //   die langsamste Datei braucht gemessen 39 s.
+    execFile(process.execPath, [p, ...args],
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: 180000,
+        killSignal: "SIGKILL" },
       (err, out, errout) => {
+        const abgewuergt = err && err.killed;
         fertig({
           datei,
           rc: err ? (err.code ?? 1) : 0,
           ms: Date.now() - beginn,
-          ausgabe: (out || "") + (errout || ""),
+          ausgabe: (out || "") + (errout || "")
+            + (abgewuergt ? String.fromCharCode(10) + "  ABGEBROCHEN: laenger als 180 s - die Datei haengt." + String.fromCharCode(10) : ""),
         });
       });
   });

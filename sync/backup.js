@@ -405,7 +405,39 @@ export async function sichere(opt) {
     anlass,
   });
 
-  const name = dateiName(k, anlass, praefix, geholt.binary, jetzt);
+  let name = dateiName(k, anlass, praefix, geholt.binary, jetzt);
+
+  // ZWEI SICHERUNGEN IN DERSELBEN MINUTE (Skeptiker Runde 5, W3, 04.09.2026).
+  //
+  // `zeitstempelName` hat MINUTENAUFLOESUNG. Zwei Sicherungen desselben
+  // Anlasses innerhalb einer Minute erzeugten denselben Namen: die zweite
+  // ueberschrieb die erste, und der Index bekam trotzdem ZWEI Zeilen mit
+  // verschiedenen sha256, die beide auf dieselbe Datei zeigen. Fuer mindestens
+  // eine der beiden luegt er dann, und `pruefeDatei` gegen sie schluege fehl.
+  //
+  // Gemessen an drei Indexzeilen (10:03:02.109 / .317 / .562) mit drei
+  // verschiedenen Pruefsummen und einem Dateinamen.
+  //
+  // Das trifft nicht nur Tests: `sichereJetzt("connect")` bei einem
+  // Wiederverbinden und die Sekundensicherung vor einem Sprung koennen im
+  // Betrieb genauso in dieselbe Minute fallen.
+  //
+  // Angehaengt wird -2, -3, ... an den ersten freien Namen. Der Anlass bleibt
+  // dabei am Ende des Namens stehen, damit `anlassVon` ihn weiter findet.
+  {
+    const belegt = (n) => [primaer, spiegel].filter(Boolean)
+      .some((ort) => fs.existsSync(path.join(ort, n)));
+    if (belegt(name)) {
+      const punkt = name.indexOf(".json");
+      const stamm = name.slice(0, punkt);
+      const rest = name.slice(punkt);
+      for (let i = 2; i < 100; i++) {
+        const kandidat = stamm + "-" + i + rest;
+        if (!belegt(kandidat)) { name = kandidat; break; }
+      }
+    }
+  }
+
   const orte = [];
   const geloescht = [];
   if (urteil.ok) {

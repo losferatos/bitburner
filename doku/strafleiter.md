@@ -144,6 +144,30 @@ Zwei Riegel, unabhängig voneinander:
 - **EXHAUSTED** nach der letzten gebauten Sprosse, zwölf Stunden lang. Danach
   gibt `freigeben()` das Ziel wieder frei.
 
+### Was gezählt wird, wenn es doch schiefgeht
+
+Zwei Zahlen, beide mit Soll 0, beide Abnahmebedingung — und beide hatten bis
+zum 04.09.2026 **keinen Schreiber**. Sie standen dauerhaft auf null und waren
+damit unfälschbar.
+
+| Zahl | Was sie zählt | Wo |
+|---|---|---|
+| `false_penalty_count` | eine ausgeführte Sprosse, die **ins Leere griff** — „läuft nirgends, nichts zu beenden" | `guard.js`, nach jeder Ausführung |
+| `false_kill_count` | ein Kill, der **getroffen** hat, obwohl eine **andere Uhr** dasselbe Werkzeug für frisch hält | `guard.js`, `andereUhrSagtFrisch` |
+
+Der zweite Fall ist die Fehlerklasse, die dieses Projekt am häufigsten
+getroffen hat: gegen die falsche Uhr gemessen. Ein Beispiel, das wirklich
+vorkommen kann — der Kern hängt, seine Motorzeit steht, und ein Werkzeug, das
+Motorzeit mitschreibt, sieht dadurch alt aus, obwohl sein eigener Herzschlag in
+Enginezeit im Sekundentakt frisch ist. Der Wächter erschlägt dann ein gesundes
+Werkzeug, **weil der Kern steht**.
+
+Beide Definitionen sind absichtlich **eng**. Was sie zählen, ist belegbar
+falsch; eine weite Definition wäre geraten, und eine geratene Abnahmezahl ist
+schlimmer als gar keine. `tools/test-guard-ebene2.js` stellt deshalb neben dem
+Fehlkill auch einen **echten** Hänger und verlangt, dass der nicht gezählt
+wird — sonst wäre die Zahl bloß von „nie" auf „immer" umgestellt.
+
 ## Wo was steht
 
 | Was | Datei |

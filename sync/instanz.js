@@ -70,6 +70,36 @@ export const ROLLEN = {
     identifier: null, // Kopie traegt denselben identifier - nur der Port trennt
     prefix: "TEST_",
   },
+  /**
+   * DIE DRITTE ROLLE: fuer automatisierte Tests gegen ein NACHGEBAUTES Spiel
+   * (04.09.2026, Skeptiker Runde 5, B1).
+   *
+   * Sie ist noetig, weil TEST zwei Dinge zugleich war: die Instanz, mit der
+   * ein Mensch einen KLON von Erics Spielstand fuehrt, und die Instanz, gegen
+   * die `tools/test-bruecke.js` ein erfundenes Spiel laufen laesst.
+   *
+   * Der Schaden daraus ist gemessen worden: Der Brueckentest muss mit einer
+   * Spielzeit OBERHALB des vorhandenen Ankers arbeiten (sonst weist die
+   * Bruecke ihn zu Recht ab), und jede verifizierte Verbindung schreibt eine
+   * Sicherung in denselben Index. Nach wenigen Laeufen stand der Anker der
+   * TEST-Rolle auf 6.800 Stunden - eine echte Spielstandskopie mit 369
+   * Stunden waere ab da als "Rueckwaertssprung" abgelehnt worden, und zwar
+   * dauerhaft: `rotiere()` loescht Dateien, keine Indexzeilen.
+   *
+   * MOCK hat deshalb einen eigenen Ablageort und einen eigenen Praefix.
+   * Erfundene Spielzeiten und echte gehoeren nicht in denselben Index.
+   *
+   * Die Ports haben KEINE Vorgabe: wer diese Rolle benutzt, waehlt sie
+   * bewusst und frei (`net.createServer().listen(0)` im Test).
+   */
+  MOCK: {
+    instance: "MOCK",
+    rfaPort: 0,
+    dashPort: 0,
+    dataDir: path.join(ROOT, "pruefstand", "mock"),
+    identifier: null,
+    prefix: "MOCK_",
+  },
 };
 
 /**
@@ -81,6 +111,8 @@ export const ROLLEN = {
 export const BACKUP_PRIMAER = path.join(os.homedir(), "bitburner-backups");
 export const BACKUP_SPIEGEL = path.join(ROOT, "backups");
 export const BACKUP_TEST = path.join(ROOT, "pruefstand", "backups");
+/** Eigener Ablageort der MOCK-Rolle - siehe ROLLEN.MOCK. */
+export const BACKUP_MOCK = path.join(ROOT, "pruefstand", "mock-backups");
 export const INDEX_NAME = "INDEX.tsv";
 
 /** Anlaesse und ihre Aufbewahrung. null = unbegrenzt. */

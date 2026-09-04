@@ -59,8 +59,19 @@ function heimatOrdner(datei) {
     if (hoch === o) break;
     o = hoch;
   }
-  // Kein src im Pfad: dann gilt die alte Annahme. Sie ist fuer alles richtig,
-  // was direkt neben den Werkzeugen liegt.
+  // KEIN src IM PFAD - der Rueckfall, und er ist LAUT (Skeptiker Runde 5, W6).
+  //
+  // Er stellt genau den Fehler wieder her, gegen den `heimatOrdner` gebaut ist:
+  // ein Modul im Unterordner sucht sein Geschwister dann unter `lib/lib/`. Das
+  // still zu tun hiesse, einen Testlauf auf einem anderen Rechner oder in einem
+  // anderen Ordner mit einer unerklaerlichen Fehlermeldung enden zu lassen.
+  //
+  // Der andere Randfall bleibt: liegen ZWEI Ordner namens `src` im Pfad -
+  // etwa ein Klon unter `D:\srcitburner` -, gewinnt der naechstgelegene.
+  // Das ist meist richtig und im Zweifel ueber diese Meldung erkennbar.
+  console.log("  [lader] WARNUNG: kein 'src' im Pfad von " + datei
+    + " - Importe werden ab dem Dateiordner aufgeloest. Ein Modul im"
+    + " Unterordner wird sein Geschwister nicht finden.");
   return path.dirname(path.resolve(datei));
 }
 
@@ -71,6 +82,44 @@ function relativ(von, ziel) {
   // ".mock-figur-123.mjs" faengt zwar mit einem Punkt an, ist fuer Node aber
   // ein Paketname und kein Pfad (ERR_INVALID_MODULE_SPECIFIER).
   return (r.startsWith("./") || r.startsWith("../")) ? r : "./" + r;
+}
+
+/**
+ * LEICHEN FRUEHERER LAEUFE WEGRAEUMEN (Skeptiker Runde 5, W1, 04.09.2026).
+ *
+ * Das `finally` unten laeuft bei Strg-C, `kill` oder einem Absturz NICHT.
+ * Gemessen: ein SIGTERM waehrend `await import` laesst die Kopien stehen -
+ * und danach sind sechs Ebene-2-Tests rot, ohne dass am geprueften Code etwas
+ * fehlt. Fuenf davon schauen nur in die Wurzel von `src/`, eine Leiche in
+ * `src/lib/` sieht allein `test-lader.js`.
+ *
+ * Geloescht wird nur, was den eigenen Namensstempel traegt UND zu einer
+ * Prozessnummer gehoert, die es nicht mehr gibt. `process.kill(pid, 0)`
+ * sendet kein Signal, es fragt nur nach - und wirft ESRCH, wenn der Prozess
+ * weg ist. Bei wiederverwendeter Nummer bleibt die Datei liegen; das ist die
+ * harmlose Richtung.
+ */
+function raeumeLeichen(ordner, tiefe = 0) {
+  if (tiefe > 3) return;
+  let eintraege;
+  try { eintraege = fs.readdirSync(ordner, { withFileTypes: true }); }
+  catch { return; }
+  for (const e of eintraege) {
+    const voll = path.join(ordner, e.name);
+    if (e.isDirectory()) { raeumeLeichen(voll, tiefe + 1); continue; }
+    const m = /^\.mock-.*-(\d+)\.mjs$/.exec(e.name);
+    if (!m) continue;
+    const pid = Number(m[1]);
+    if (pid === process.pid) continue;
+    let lebt = true;
+    try { process.kill(pid, 0); } catch { lebt = false; }
+    if (!lebt) {
+      try {
+        fs.unlinkSync(voll);
+        if (process.env.LADER_LAUT) console.log("  [lader] Leiche entfernt: " + e.name);
+      } catch { /* egal */ }
+    }
+  }
 }
 
 export async function ladeSpielskript(datei) {
@@ -117,6 +166,8 @@ export async function ladeSpielskript(datei) {
   const mockPfad = (absPfad) => path.join(
     path.dirname(absPfad),
     ".mock-" + path.basename(absPfad, ".js") + "-" + process.pid + ".mjs");
+
+  raeumeLeichen(ordner);
 
   const ziel = mockPfad(path.resolve(datei));
   fs.writeFileSync(ziel, mitEndung, "utf8");

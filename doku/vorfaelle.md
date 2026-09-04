@@ -205,3 +205,39 @@ in der Geld alles ist.
 Blockade: bräuchte ein Eintrag mehr, als home je hergibt, stünde der ganze Rest
 für immer. Fünf Minuten Wanduhr, dann wird übersprungen und die Frist beginnt
 beim nächsten Anlauf von vorn.
+
+---
+
+## Die Zahl, die nie falsch werden kann
+
+**04.09.2026.** Vier Abnahme-Kennzahlen mit Soll 0 hatten keinen Schreiber:
+`false_penalty_count`, `false_kill_count`, `manual_actions` und
+`contracts_silent_rounds`. Sie wurden beim Anlegen auf 0 gesetzt und nie
+angefasst. Jede Abnahme gegen sie wäre bestanden worden — im Sinne von: sie
+konnte gar nicht durchfallen.
+
+**Fehlerklasse: eine Kennzahl ohne Schreiber ist keine Messung, sondern eine
+Behauptung mit Zahlenformat.** Sie ist schlimmer als eine fehlende Zahl, weil
+sie eine Prüfung vortäuscht.
+
+Beim Nachrüsten kam die zweite Hälfte der Lehre. Für jede Zahl musste erst
+beantwortet werden, **wo sie überhaupt entstehen kann**:
+
+- `false_penalty_count` — im Wächter. Eine Sprosse, die ins Leere greift
+  („läuft nirgends"), ist belegbar falsch.
+- `false_kill_count` — ebenfalls im Wächter, aber eng: gezählt wird nur, wenn
+  eine **andere Uhr** dasselbe Werkzeug für frisch hält. Das ist die
+  Fehlerklasse, die dieses Projekt am häufigsten getroffen hat.
+- `manual_actions` — **nicht im Spiel.** Der Kern kann nicht sehen, dass etwas
+  von außen hineingeschrieben wurde; für ihn sieht ein Hot-Swap aus wie eine
+  Datei, die schon immer so war. Nur die Brücke sieht es, weil sie der einzige
+  Weg hinein ist. Das Feld trägt deshalb `quelle: "bruecke"`, und
+  `tools/kpi-luecken.js` **prüft diese Angabe nach**, statt sie zu glauben.
+- `contracts_silent_rounds` — in den Vertragsgewerken selbst.
+
+Jede der vier Definitionen ist absichtlich **eng**. Eine weite wäre geraten,
+und eine geratene Abnahmezahl ist schlimmer als gar keine.
+
+Und jede hat eine **Gegenprobe**: der Fehlkill-Test stellt neben dem Fehlkill
+auch einen echten Hänger und verlangt, dass der **nicht** gezählt wird. Ohne
+sie wäre die Zahl bloß von „nie" auf „immer" umgestellt worden.

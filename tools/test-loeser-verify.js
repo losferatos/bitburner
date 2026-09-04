@@ -46,8 +46,8 @@ const ROOT = path.resolve(HIER, "..");
 
 function finde(datei) {
   const kandidaten = [
-    path.resolve(ROOT, "..", "bitburner-bau", "src", "lib", datei),
     path.join(ROOT, "src", "lib", datei),
+    path.resolve(ROOT, "..", "bitburner-bau", "src", "lib", datei),
   ];
   const t = kandidaten.find((p) => fs.existsSync(p));
   if (!t) throw new Error("lib/" + datei + " nicht gefunden");

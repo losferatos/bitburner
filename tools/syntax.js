@@ -51,8 +51,7 @@ if (!fs.existsSync(ACORN)) {
 const acorn = await import(pathToFileURL(ACORN).href);
 
 /** Der Worktree hat Vorrang: dort wird gebaut, dort muss geprueft werden. */
-const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
-const SRC = fs.existsSync(WORKTREE) ? WORKTREE : path.join(ROOT, "src");
+const SRC = path.join(ROOT, "src");
 
 function sammle(ordner) {
   const raus = [];

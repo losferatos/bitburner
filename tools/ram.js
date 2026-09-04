@@ -62,8 +62,7 @@ import { baueBaum, kosten, Sing } from "./ramkosten.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
-const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
-export const SRC = fs.existsSync(WORKTREE) ? WORKTREE : path.join(ROOT, "src");
+export const SRC = path.join(ROOT, "src");
 
 const acornPfad = path.join(ROOT, "reference", "v301", "node_modules", "acorn", "dist", "acorn.mjs");
 const walkPfad = path.join(ROOT, "reference", "v301", "node_modules", "acorn-walk", "dist", "walk.mjs");

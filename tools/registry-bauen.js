@@ -31,8 +31,10 @@ if (!fs.existsSync(QUELLE)) {
 // WOHIN GESCHRIEBEN WIRD - und wo die Quelltexte liegen, gegen die geprueft
 // wird. Beides derselbe Ordner: eine Registry, die einen Baum beschreibt und
 // in einen anderen geschrieben wird, prueft nichts.
-const WORKTREE = path.resolve(ROOT, "..", "bitburner-bau", "src");
-const zielOrdner = fs.existsSync(WORKTREE) ? WORKTREE : path.join(ROOT, "src");
+// NACH DEM MERGE IST DER LIVE-BAUM DAS ZIEL (04.09.2026). Hier stand der
+// Worktree zuerst - richtig, solange dort gebaut wurde. Wer die Registry jetzt
+// in den Worktree schreibt, erzeugt sie neben dem Stand, der eingespielt wird.
+const zielOrdner = path.join(ROOT, "src");
 
 const md = fs.readFileSync(QUELLE, "utf8");
 const start = md.indexOf("## 3.3 `src/registry.json`");

@@ -57,8 +57,8 @@ function pruefe(was, bedingung, zusatz = "") {
 /** Der Ordner, in dem der Lader arbeitet: bevorzugt der Worktree. */
 function srcOrdner() {
   const k = [
-    path.resolve(ROOT, "..", "bitburner-bau", "src"),
     path.join(ROOT, "src"),
+    path.resolve(ROOT, "..", "bitburner-bau", "src"),
   ];
   return k.find((p) => fs.existsSync(p)) || null;
 }

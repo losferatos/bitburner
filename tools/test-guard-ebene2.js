@@ -50,8 +50,8 @@ const W0 = 1_700_000_000_000;
 // Der Quelltext des Waechters - fuer die Proben, die eine Regel im Code
 // belegen statt sie ueber Stunden zu erfahren.
 const SRC_GUARD = [
-  path.resolve(ROOT, "..", "bitburner-bau", "src", "guard.js"),
   path.join(ROOT, "src", "guard.js"),
+  path.resolve(ROOT, "..", "bitburner-bau", "src", "guard.js"),
 ].find((x) => fs.existsSync(x));
 
 const REGISTRY_MIT_KILLSAFE = JSON.stringify({

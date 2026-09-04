@@ -25,8 +25,8 @@ const ROOT = path.resolve(HIER, "..");
 // Erst im Worktree suchen, dann in der Arbeitskopie - je nachdem, wie weit die
 // Position C.1 schon live ist.
 const KANDIDATEN = [
-  path.resolve(ROOT, "..", "bitburner-bau", "src", "lib", "motorzeit.js"),
   path.join(ROOT, "src", "lib", "motorzeit.js"),
+  path.resolve(ROOT, "..", "bitburner-bau", "src", "lib", "motorzeit.js"),
 ];
 const QUELLE = KANDIDATEN.find((p) => fs.existsSync(p));
 if (!QUELLE) {

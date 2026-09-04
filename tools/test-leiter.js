@@ -32,8 +32,8 @@ const ROOT = path.resolve(HIER, "..");
 
 function finde(rel) {
   const k = [
-    path.resolve(ROOT, "..", "bitburner-bau", "src", rel),
     path.join(ROOT, "src", rel),
+    path.resolve(ROOT, "..", "bitburner-bau", "src", rel),
   ];
   const t = k.find((p) => fs.existsSync(p));
   if (!t) { console.log("\n  src/" + rel + " nicht gefunden."); process.exit(1); }

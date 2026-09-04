@@ -41,7 +41,7 @@
  * @param {NS} ns
  */
 
-import { haengeAnHome } from "lib/hostdatei.js";
+import { haengeAnHome, liesVonHome, nachHome } from "lib/hostdatei.js";
 
 
 // --- Die Figur-Wache (Position C.11) ---------------------------------------
@@ -1465,7 +1465,7 @@ export async function main(ns) {
       } catch (e) { /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
     }
     abschnitt = null;
-    try { ns.write(OFFEN, "", "w"); } catch { /* siehe oben */ }
+    try { nachHome(ns, OFFEN, ""); } catch { /* siehe oben */ }
   };
 
   // DER OFFENE ABSCHNITT UEBERLEBT JETZT EINEN NEUSTART (28.08., 23:45).
@@ -1477,8 +1477,16 @@ export async function main(ns) {
   const merkeOffen = (jetztRang) => {
     if (!abschnitt) return;
     try {
-      ns.write(OFFEN, JSON.stringify({ ...abschnitt, bis: Date.now(),
-        rangBis: jetztRang }), "w");
+      // AUCH DER OFFENE ABSCHNITT GEHOERT NACH home (04.09.2026, 19:45).
+      //
+      // Der Fix vom 28.08. sollte ihn einen Neustart ueberleben lassen. Er
+      // ueberlebte einen Neustart auf DEMSELBEN Wirt - bei `hostRule:
+      // "werkbank"` ist der Wirtswechsel aber der Normalfall, und dann war
+      // er weg. Belegt am 04.09.: `bladeoffen.txt` lag auf home, waehrend
+      // blade.js auf werk-0 lief. Die 43-Minuten-Luecke, die den Fix
+      // ausgeloest hat, konnte so weiterhin entstehen.
+      nachHome(ns, OFFEN, JSON.stringify({ ...abschnitt, bis: Date.now(),
+        rangBis: jetztRang }));
     } catch { /* Protokoll ist Beiwerk */ }
   };
   // Wiederanlauf: nachtragen, was beim letzten Lauf offen war. Ende und
@@ -1486,7 +1494,7 @@ export async function main(ns) {
   // lag der Neustart. `abgebrochen: true` markiert die Zeile, damit eine
   // Auswertung sie von einem sauber geschlossenen Abschnitt unterscheiden kann.
   try {
-    const rest = ns.read(OFFEN);
+    const rest = liesVonHome(ns, OFFEN);
     if (rest && rest.trim()) {
       const a = JSON.parse(rest);
       if (a.bis - a.von >= 10_000) {
@@ -1505,7 +1513,7 @@ export async function main(ns) {
           ausdauerBis: null, abgebrochen: true,
         }) + String.fromCharCode(10));
       }
-      ns.write(OFFEN, "", "w");
+      nachHome(ns, OFFEN, "");
     }
   } catch { /* ein kaputter Rest darf den Start nicht kosten */ }
 

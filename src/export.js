@@ -199,11 +199,29 @@ export async function main(ns) {
     let fehler = null;
     if (saeumig && jetzt - letzterExport >= ABSTAND_MS) {
       try {
-        // KEIN await - `exportGame` ist synchron (`Singularity.ts`), und ein
+        // `exportGame` IST ASYNC - der Kommentar hier war falsch (04.09.2026).
+        //
+        // Hier stand "KEIN await - exportGame ist synchron". Im Quelltext:
+        // `Singularity.ts:1211-1213` gibt `saveObject.exportGame()` zurueck,
+        // und das ist `async exportGame(): Promise<void>`
+        // (`SaveObject.ts:277`). Ohne await lief der try/catch nur ueber
+        // `checkSingularityAccess`; alles innerhalb des Promise war fuer ihn
+        // unsichtbar, und `exportiert = true` stand DAVOR.
+        //
+        // Damit meldete ausgerechnet der einzige brueckenfreie
+        // Sicherungsweg Erfolg, bevor irgendetwas geschrieben war - und ein
+        // Fehlschlag darin waere eine unbehandelte Promise-Ablehnung
+        // geworden, die niemand sieht.
+        //
+        // Der alte Kommentar sagte richtig, dass ein await auf einen
+        // Nicht-Promise nur eine Runde der Event-Loop kostet. Es ist aber
+        // ein Promise, und dann kostet das Weglassen die Fehlerbehandlung.
+        // Alter Text ab hier:
+        //
         // await auf einen Nicht-Promise wuerde nur eine Runde der Event-Loop
         // kosten. Wichtiger: der Aufruf wirft, wenn SF4 fehlt; das faengt der
         // catch, und das Gewerk meldet es, statt zu sterben.
-        ns.singularity.exportGame();
+        await ns.singularity.exportGame();
         exportiert = true;
         letzterExport = jetzt;
         sag("Spielstand exportiert - " + grund);
@@ -229,7 +247,26 @@ export async function main(ns) {
         let liste = [];
         try { liste = JSON.parse(lies("data/sofort.json")) || []; } catch { liste = []; }
         if (!Array.isArray(liste)) liste = [];
+        // DIE PFLICHTFELDER DES VERTRAGS (04.09.2026, 19:45).
+        //
+        // `doku/kontrakte.md` 4.11 legt `data/sofort.json` fest: `ts`,
+        // `nodeReset`, `quelle`, `titel`, `text` sind Pflicht ("woertlich aus
+        // 4.6"), dazu `id` als stabiler Schluessel und `zugestellt` als
+        // Zustand IN der Datei - "weil die Entdopplung sonst nur im Speicher
+        // der Bruecke lebt und jeden Brueckenneustart verliert".
+        //
+        // Geschrieben wurden bis hierher drei von fuenf. Ohne `nodeReset`
+        // laesst sich ein Eintrag aus dem vorigen BitNode nicht von einem
+        // aktuellen unterscheiden - und der Ringpuffer ueberlebt laut
+        // Vertrag ausdruecklich Einbau und Sprung. Ohne `ts` steht kein
+        // Alter drin.
+        let nodeReset = 0;
+        try { nodeReset = ns.getResetInfo().lastNodeReset || 0; } catch { nodeReset = 0; }
         liste.push({
+          ts: jetzt,
+          nodeReset,
+          id: "export.js#bruecke-ohne-sicherung",
+          zugestellt: null,
           titel: "Bruecke ohne Sicherung - Spielstand liegt in Downloads",
           text: "Der brueckenfreie Weg hat gegriffen (" + grund + "). Der Stand "
             + "liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im "

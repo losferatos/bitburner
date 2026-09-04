@@ -1045,7 +1045,7 @@ nicht in einen Kommentar.
     {
       "name": "export.js",
       "args": [],
-      "ramBaseGb": 2.35,
+      "ramBaseGb": 3.35,
       "ramSingGb": 1.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",
@@ -1072,7 +1072,7 @@ nicht in einen Kommentar.
     {
       "name": "popups.js",
       "args": [],
-      "ramBaseGb": 3.3,
+      "ramBaseGb": 3.95,
       "ramSingGb": 0.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",

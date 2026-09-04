@@ -574,7 +574,17 @@ export async function main(ns) {
                 try { liste = JSON.parse(liesVonHome("data/sofort.json")) || []; }
                 catch { liste = []; }
                 if (!Array.isArray(liste)) liste = [];
+                // Pflichtfelder nach doku/kontrakte.md 4.11 - `ts` und
+                // `nodeReset` sind woertlich aus 4.6, `id` haelt die
+                // Entdopplung ueber einen Brueckenneustart hinweg.
                 liste.push({
+                  ts: Date.now(),
+                  nodeReset: (() => {
+                    try { return ns.getResetInfo().lastNodeReset || 0; }
+                    catch { return 0; }
+                  })(),
+                  id: "ausgang.js#exit-passt-nirgends",
+                  zugestellt: null,
                   titel: "Ausgang blockiert - exit.js passt auf keinen Rechner",
                   text: "exit.js braucht " + braucht.toFixed(0) + " GB, der "
                     + "groesste Rechner hat "

@@ -58,6 +58,7 @@ const ROOT = path.resolve(HIER, "..");
 const SRC = path.join(ROOT, "src");
 const BASE = "http://localhost:8795";
 const NUR_PRUEFEN = process.argv.includes("--pruefen");
+const ENTFERNEN = process.argv.includes("--entfernen");
 
 async function rpc(params) {
   const { content, ...rest } = params;
@@ -105,6 +106,73 @@ console.log("");
 console.log("=== " + LIBS.length + " Bibliotheken auf bis zu " + kandidaten.length + " Wirte ===");
 console.log("");
 
+/**
+ * ===========================================================================
+ * DER RUECKBAU - UND WARUM ER PFLICHT IST (04.09.2026, 19:35)
+ * ===========================================================================
+ *
+ * Die Verteilung war richtig, solange der ALTE Kern lief: der kopierte nur
+ * `lib/hackaugs.js` mit, und ohne die uebrigen liess sich kein Werkzeug mit
+ * Importen starten. Seit 19:21 laeuft der neue Kern, und der kopiert
+ * `needsLibs` aus der Registry beim Start mit
+ * (bn4net.js: `ns.scp([datei, ...BIBLIOTHEKEN, ...libs], wirt, "home")`).
+ * Damit ist die Kruecke nicht nur ueberfluessig, sondern schaedlich.
+ *
+ * ZWEI GEMESSENE GRUENDE, beide von Skeptikern gefunden:
+ *
+ * (1) DER SPIELSTAND HAT SICH MEHR ALS VERDOPPELT. Gemessen 18:24 gegen
+ *     18:31: entpackt 4,35 -> 9,19 MB, gzip 0,83 -> 2,17 MB, davon `lib/*`
+ *     0,31 -> 4,51 MB. Jeder Autosave im gedrosselten Tab, jede Sicherung
+ *     und jeder Export zahlen das mit.
+ *
+ * (2) UND DAS FRISST DIE RUECKFALLTIEFE. `sync/instanz.js` deckelt die
+ *     Sicherungen doppelt: nach Stueckzahl (252 rotierbare) UND nach Bytes
+ *     (300 MB je Ort). Bei 0,83 MB je Datei band die Stueckzahl, bei 2,17 MB
+ *     bindet das Budget - 252 Dateien waeren 547 MB, also 82 Prozent
+ *     darueber. Geraeumt wird in fester Reihenfolge, und die beginnt mit
+ *     `pre-hotswap`: der Sicherung UNMITTELBAR VOR einer Codeaenderung,
+ *     also genau dem Stand, auf den man zurueckgeht, wenn eine Einspielung
+ *     schiefgeht.
+ *
+ * Das ist woertlich der Fehlermodus, den die Skeptikerrunde in
+ * `sync/instanz.js` selbst formuliert hat: "eine Massnahme zum Schutz des
+ * Spielstands haette in vier Stunden die Belege weggeraeumt, unbeaufsichtigt,
+ * ueber Nacht". Dort wurde er ueber die Stueckzahl behoben - die Verteilung
+ * stellt ihn ueber die Bytes wieder her.
+ *
+ * (3) Ausserdem macht sie aus einem lauten Fehler einen leisen: eine
+ *     GEAENDERTE Bibliothek wird nur nach home eingespielt. Ein Werkzeug
+ *     startet dann mit der ALTEN Kopie vom Fremdrechner - fehlerfrei,
+ *     ohne Logzeile, unbegrenzt unentdeckt. Fehlt sie ganz, bricht der Start
+ *     wenigstens hoerbar ab.
+ *
+ * `--entfernen` raeumt deshalb alle Bibliothekskopien ausserhalb von home
+ * wieder weg. home bleibt unangetastet - dort gehoeren sie hin.
+ */
+if (ENTFERNEN) {
+  let weg = 0, nichtDa = 0, fehlerE = 0;
+  for (const host of kandidaten) {
+    if (host === "home") continue;
+    for (const l of LIBS) {
+      try {
+        await rpc({ method: "deleteFile", filename: l, server: host });
+        weg++;
+      } catch (e) {
+        if (/not found|does not exist|Invalid hostname/i.test(e.message)) nichtDa++;
+        else { console.log("  FEHLER " + host + " " + l + ": " + e.message); fehlerE++; }
+      }
+    }
+    if (weg) console.log("  " + host.padEnd(14) + "aufgeraeumt");
+  }
+  console.log("");
+  console.log("=== " + weg + " Kopien entfernt, " + nichtDa + " lagen nicht dort, "
+    + fehlerE + " Fehler ===");
+  console.log("  home ist unangetastet. Der neue Kern kopiert `needsLibs` beim");
+  console.log("  Start jedes Werkzeugs selbst mit.");
+  console.log("");
+  process.exitCode = fehlerE ? 1 : 0;
+} else {
+
 let gelegt = 0, schonDa = 0, ohneWirt = 0, fehler = 0;
 
 for (const host of kandidaten) {
@@ -143,3 +211,4 @@ console.log("=== " + gelegt + " gelegt, " + schonDa + " lagen schon richtig, "
   + ohneWirt + " Rechner gibt es nicht, " + fehler + " Fehler ===");
 console.log("");
 process.exitCode = fehler ? 1 : 0;
+}

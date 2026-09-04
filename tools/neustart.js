@@ -109,6 +109,24 @@ async function prozesse(maxWartenMs = 900000) {
   // GELEERT. Von aussen sah das aus wie "der Auftragslaeufer antwortet
   // nicht", und der Beleg fuer den Neustart waere ausgeblieben, obwohl der
   // Kanal voellig in Ordnung ist.
+  // DER AUFTRAGSKANAL IST EIN EINZELPLATZ (04.09.2026, 19:30 - Skeptiker).
+  //
+  // `data/task.txt` haelt EINEN Auftrag. Der Kern legt einen nicht
+  // startbaren Auftrag bis zu 30 Runden zurueck und schreibt ihn dabei
+  // erneut hinein (bn4net.js, bn4life.js). Wer blind darueberschreibt,
+  // loescht ihn ersatzlos - und wird umgekehrt selbst ueberschrieben und
+  // wartet dann 15 Minuten auf eine Antwort, die nie kommt.
+  //
+  // `tools/graftnext.js` und `tools/nightshift.js` pruefen beide vorher;
+  // dieses Werkzeug war das einzige, das es nicht tat.
+  let belegt = "";
+  try { belegt = (await rpc({ method: "getFile", filename: "data/task.txt", server: "home" })) || ""; }
+  catch { belegt = ""; }
+  if (belegt.trim()) {
+    console.log("      Auftragskanal belegt (" + belegt.trim().slice(0, 60)
+      + ") - nicht angefasst. Ohne Prozessliste kein Beleg.");
+    return null;
+  }
   await rpc({
     method: "pushFile", filename: "data/task.txt", server: "home",
     content: JSON.stringify(["ps.js"]),
@@ -175,10 +193,21 @@ for (const z of ziele) {
   const bis = Date.now() + 900000;
   while (Date.now() < bis) {
     await schlaf(4000);
-    let inhalt = "";
-    try { inhalt = (await rpc({ method: "getFile", filename: "data/reload.txt", server: "home" })) || ""; }
-    catch { inhalt = ""; }
-    if (inhalt.trim() === "") { quittiert = true; break; }
+    // EIN FEHLER IST KEINE QUITTUNG (04.09.2026, 19:30 - Skeptiker).
+    //
+    // Hier stand `catch { inhalt = ""; }`, und leer galt als quittiert.
+    // Damit war JEDER Fehler eine Quittung: die Bruecke antwortet auf eine
+    // fehlende Datei mit einem error (also wirft `rpc`), und `boot.js`
+    // LOESCHT `data/reload.txt` nach jedem Einbau und jedem Knotenwechsel.
+    // Ein Bruecken-Aussetzer waehrend der 15 Minuten - am 03.09. zweimal an
+    // einem Tag - haette ebenfalls gereicht.
+    //
+    // Die Quittung ist "die Datei ist da und LEER", nicht "ich konnte nicht
+    // nachsehen". Ein Fehler heisst: weiter warten.
+    let inhalt = null;
+    try { inhalt = (await rpc({ method: "getFile", filename: "data/reload.txt", server: "home" })); }
+    catch { inhalt = null; }
+    if (typeof inhalt === "string" && inhalt.trim() === "") { quittiert = true; break; }
   }
   if (!quittiert) {
     console.log("      KEINE QUITTUNG - reload.txt steht nach 15 min noch da.");

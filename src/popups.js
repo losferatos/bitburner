@@ -39,6 +39,9 @@
  *
  * @param {NS} ns
  */
+
+import { liesVonHome, nachHome } from "lib/hostdatei.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
   const doc = globalThis["document"];
@@ -264,7 +267,15 @@ export async function main(ns) {
         if (gemeldet !== kurz) {
           gemeldet = kurz;
           try {
-            const roh = ns.read("data/events.json");
+            // DER ALARM MUSS AUF home ANKOMMEN (04.09.2026, 19:45).
+            //
+            // Hier stand `ns.read`/`ns.write` ohne jedes scp. `popups.js` lief
+            // an dem Tag auf werk-0 - der Ereignisstrom dort wird von
+            // NIEMANDEM gelesen. Ausgerechnet die Meldung "ein Dialog
+            // blockiert das Spiel", die einen Menschen an die Tastatur holen
+            // soll, waere still verschwunden. Und zwar dauerhaft unbemerkt:
+            // auffallen wuerde es nur, wenn der Bot ohnehin schon steht.
+            const roh = liesVonHome(ns, "data/events.json");
             const strom = roh ? JSON.parse(roh) : { version: 1, eintraege: [] };
             if (!Array.isArray(strom.eintraege)) strom.eintraege = [];
             strom.eintraege.push({
@@ -277,7 +288,7 @@ export async function main(ns) {
             if (strom.eintraege.length > 200) {
               strom.eintraege = strom.eintraege.slice(-200);
             }
-            ns.write("data/events.json", JSON.stringify(strom), "w");
+            nachHome(ns, "data/events.json", JSON.stringify(strom));
           } catch { /* Bericht, nie Steuerung */ }
           ns.write("data/popups-halt.txt", JSON.stringify({
             ts: Date.now(), wort: halt.wort, text: kurz,

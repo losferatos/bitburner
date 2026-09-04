@@ -366,6 +366,69 @@ als Eichpunkt „73.660/113.660". Drei Zahlen für dieselbe Größe, keine beleg
 
 ---
 
+## P — Aus dem Prüfstandslauf (Gate A2), 04.09.2026 02:30
+
+### P.1 — Der Dateibeobachter feuert ohne Inhaltsänderung · ENTSCHÄRFT, Ursache OFFEN
+Im Echtbetrieb gemessen: `fs.watch` meldete **113 Dateien** und ein zweites Mal
+**115**, ohne dass sich an einer einzigen der Inhalt geändert hatte. Der
+Hash-Vergleich fing beide ab.
+
+Das ist derselbe Vorgang, der am 03.09. **dreimal** ungefiltert ins laufende Spiel
+ging (115, 114, 106 Dateien). Die Ursache des Feuerns ist **nicht geklärt** — ein
+Lesetest mit `cat` und `grep` über `src/` löste am 04.09. 01:26 keinen Schub aus,
+die naheliegende Erklärung fällt also aus.
+
+**Der Inhaltsvergleich macht die Ursache gleichgültig**, und das ist der Grund,
+warum hier nicht weiter gesucht wird: was sich nicht geändert hat, geht nicht raus.
+Die Ursachensuche bleibt als Befund offen, nicht als Aufgabe.
+
+### P.2 — Die TEST-Instanz schrieb in Erics Arbeitsliste · UMGESETZT 04.09. 02:32
+Zwei Meldungen der Prüfbrücke, beide für die Kopie sachlich richtig, landeten in
+`nodes/BAUSTELLEN.md ## Sofort`.
+Eine Liste mit Testlaufmeldungen wird nach dem dritten Mal nicht mehr gelesen.
+Damit wäre der einzige Kanal vom Spiel zu Eric unbrauchbar geworden — durch die
+Bauarbeit, die ihn schützen soll.
+**Behoben:** nur die LIVE-Rolle erreicht die Liste, TEST schreibt nach
+`pruefstand/data/sofort-test.md`.
+
+### P.3 — Urteil „Autosave steht" feuerte nach jedem Laden · UMGESETZT 04.09. 02:32
+Eine frisch geladene Instanz trägt das `lastSave` aus ihrem Spielstand, beim Klon
+56 Minuten alt; das Spiel speichert aber binnen 60 Sekunden von selbst.
+**Behoben:** die Brücke urteilt erst, wenn die Verbindung zehn Minuten steht.
+In einer Reload-Schleife wäre daraus Dauerfeuer geworden.
+
+---
+
+## V — Aus Verbotsgrep und Archivliste, 04.09.2026 02:40
+
+### V.1 — 22 lebende Dateien wurden vom Verbotsgrep nie geprüft · UMGESETZT
+`tools/archivliste.js` findet 116 Dateien: 30 BLEIBT, 64 ARCHIV, 22 PRUEFEN.
+Die 22 werden von **lebenden** Modulen aufgerufen, standen aber nicht auf der
+Positivliste. `blade.js` allein ruft sechs davon; `lib/hackaugs.js` brauchen
+`ausgang.js`, `bn4net.js` und `bn4rep.js`.
+Der Grep hätte ein Selbstblockade-Muster in diesen Dateien nicht gefunden.
+Positivliste auf 49 erweitert, unregistriert fällt von 86 auf 66.
+
+### V.2 — Zwei Eichpunkte trafen nicht · UMGESETZT 04.09. 02:45
+Der neue Formeltest fand beim ersten Lauf zwei Fehler:
+
+1. **Eigener Fehler.** Die Hashrate nutzte `(kerne+5)/6` — die Formel für
+   Hacknet-**Nodes** — statt `1+(kerne-1)/5` für **Server**. Bei einem Kern
+   liefern beide zufällig 1,0; der Fehler wäre erst an einem ausgebauten Server
+   aufgefallen. Fehlerart „ähnliche Feldnamen verwechselt".
+2. **Irreführende Angabe im Auftragstext.** Die 252.320 exp je Kampfwert für das
+   Beitrittstor stehen dort mit dem Zusatz „Levelmult 0,4". Die Zahl entsteht
+   aber erst mit dem **Produkt** aus BitNode-LevelMultiplier 0,4 und
+   Aug-Multiplikator 1,262. Mit 0,4 allein kommt das Fünffache heraus — wer die
+   Zahl so liest, plant das Tor mit einem Fünftel der nötigen Zeit.
+
+Bestätigt wurden dagegen: Serverpreis 32 GB in BN10 gleich 8,80 Mio,
+Favor 150 gleich 462.490 Rep, die drei Gymraten und die Torzeiten 22,2 / 15,9 /
+13,9 Stunden. Auch die beiden im Auftrag als widerlegt geführten Zahlen sind
+reproduziert.
+
+---
+
 ## B — Bau-Sitzung
 
 ### B.1 — `/usage` in dieser Sitzung nicht abrufbar · OFFEN

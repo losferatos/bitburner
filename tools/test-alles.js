@@ -278,10 +278,17 @@ const ENTSCHIEDEN = [
   "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
     + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
     + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
-    "DER BAU IST SEIT DEM 04.09.2026, 17:31 IM SPIEL. Eingespielt wurde gestuft und mit Gegenprobe je Datei (tools/einspielen.js), neu gestartet mit PID-Beleg (tools/neustart.js). Was NICHT eingespielt ist: graftplan.json - es ist der Zuender fuer graftauto.js, und der wuerde binnen 60 s einen echten Graft ausloesen (450 Mrd, bei Abbruch nicht zurueck). Das ist Erics Entscheidung, keine Bauentscheidung. data/guard-modus.txt fehlt ebenfalls - der Waechter laeuft im Beobachtungsmodus, wie Position C.6 es verlangt.",
-    + "eine einzige Aenderung dieses Tages (wakelock.js). Vor Stufe B steht "
-    + "der Hot-Swap nach Auftrag 9 - die Checkliste dazu ist "
-    + "tools/hotswap.js, und sie verweigert, statt zu warnen.",
+    "DER BAU IST SEIT DEM 04.09.2026, 17:31 IM SPIEL. Eingespielt wurde "
+    + "gestuft und mit Gegenprobe je Datei (tools/einspielen.js), neu "
+    + "gestartet mit PID-Beleg (tools/neustart.js). Seit 21:00 sind auf Erics "
+    + "Ansage auch die beiden letzten Schalter um: data/guard-modus.txt steht "
+    + "auf 'enforce' (Sprosse 1 und 2 greifen ein, 3 und 5 beobachten), und "
+    + "die Einbausperre ist aufgehoben - der Bot darf die sieben wartenden "
+    + "Augmentierungen einbauen, sobald er nichts Besseres mehr kaufen kann. "
+    + "NICHT eingespielt bleibt graftplan.json: sie ist der Zuender fuer "
+    + "graftauto.js und wuerde binnen 60 s einen echten Graft ueber 450 Mrd "
+    + "ausloesen. Sie steht in data/nicht-schieben.txt und geht auch beim "
+    + "Verbinden nicht mit hinaus.",
 ];
 
 const LUECKEN = MESSLUECKEN;

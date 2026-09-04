@@ -30,7 +30,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { restzeitAusKurve, naechsterMeilenstein } from "./lib/rangkurve.js";
+import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./lib/rangkurve.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -406,29 +406,70 @@ async function main() {
   if (kurve) {
     sag("Rest: " + zahl(restNetto) + " Rang netto (nach Abzug der " + zahl(Math.round(unterwegs))
       + ", die aus den Black Ops selbst kommen).");
-    sag("ETA aus dem eigenen Referenzlauf: " + dauer(kurve.min) + " bis " + dauer(kurve.max)
-      + " Spielzeit (Mitte " + dauer(kurve.mitte) + ").");
-    sag("  Der vorige Lauf dieses Knotens stand bei Rang " + zahl(rang) + " nach "
-      + kurve.hJetzt.toFixed(1) + " h ab Bladeburner-Beitritt.");
-    etaSpiel = kurve.mitte;
+    // Bezugsgroesse ist das gemessene KNOTENENDE des Referenzlaufs, nicht der
+    // Zeitpunkt der Rangschwelle. Zwischen Rang 17.594 und 4,54 Mio liegen im
+    // Referenzlauf 22 Stunden ohne Messpunkt; wann die 400.000 fielen, ist
+    // unbekannt, wann der Lauf endete, ist gemessen. Die Zahl enthaelt damit
+    // den Nachlauf nach der Schwelle - die richtige Richtung fuer eine Planung.
+    sag("ETA aus dem eigenen vorigen Lauf: " + dauer(kurve.restH) + " Spielzeit bis zum"
+      + " Knotenende.");
+    sag("  Der Referenzlauf stand bei Rang " + zahl(rang) + " nach "
+      + kurve.hJetzt.toFixed(1) + " h und endete nach " + kurve.ende.h.toFixed(1) + " h"
+      + " bei Rang " + zahl(kurve.ende.rang) + ".");
+    if (kurve.luecke) {
+      sag("  ACHTUNG: dieser Rang liegt in einer MESSLUECKE des Referenzlaufs (h "
+        + kurve.luecke.vonH.toFixed(1) + " bis " + kurve.luecke.bisH.toFixed(1)
+        + ", Rang " + zahl(kurve.luecke.vonRang) + " bis " + zahl(kurve.luecke.bisRang)
+        + "). Die Zahl ist dort interpoliert, nicht gemessen.");
+    }
+    etaSpiel = kurve.restH;
     bericht.etaSpielstunden = etaSpiel;
-    bericht.etaMin = kurve.min;
-    bericht.etaMax = kurve.max;
     bericht.etaQuelle = "referenzkurve";
+    bericht.etaInMessluecke = !!kurve.luecke;
 
     if (rate && rate > 0) {
       const linear = restNetto / rate;
       sag("  Zum Vergleich linear fortgeschrieben: " + dauer(linear)
         + " - das ist KEIN Termin, sondern der Startblock hochgerechnet."
-        + " Die Rangrate waechst im Lauf um mehr als Faktor 5.000.");
+        + " Die Rangrate waechst im Referenzlauf von 12 auf 207.111 Rang/h.");
+    }
+
+    /**
+     * DIE EIGENTLICH WICHTIGE ZAHL. Die Restzeit oben ist eine reine Funktion
+     * des Rangs - ein Lauf, der zehnmal langsamer ist, bekaeme exakt dieselbe
+     * gemeldet. Erst der Gleichstandsvergleich merkt, dass etwas nicht stimmt.
+     * (Ein Skeptiker fand am 04.09., dass diese Funktion gebaut, aber nirgends
+     * aufgerufen war.)
+     */
+    // Die Spielzeit seit dem Knotenstart. netz.nodeReset ist ein Wanduhr-
+    // Zeitstempel, spielzeit ist Spielzeit - die Differenz taugt also nicht.
+    // Stattdessen die im Knoten verbrachte Spielzeit aus dem Spielstand, die
+    // ausgang.js bzw. der Motor mitfuehrt.
+    const hSeitKnoten = Number.isFinite(netz && netz.spielzeitImKnoten)
+      ? std(netz.spielzeitImKnoten)
+      : (Number.isFinite(bericht.spielzeitImKnotenH) ? bericht.spielzeitImKnotenH : null);
+    if (Number.isFinite(hSeitKnoten) && hSeitKnoten > 0) {
+      const v = vergleichMitReferenz(knoten, rang, hSeitKnoten);
+      if (v) {
+        const proz = Math.abs((v.faktor - 1) * 100);
+        sag("  Gleichstand: dieser Lauf braucht bis Rang " + zahl(rang) + " "
+          + v.hJetzt.toFixed(1) + " h, der Referenzlauf brauchte " + v.hReferenz.toFixed(1)
+          + " h - also " + proz.toFixed(0) + " % "
+          + (v.faktor < 1 ? "SCHNELLER" : "langsamer") + ".");
+        bericht.gleichstandFaktor = v.faktor;
+        if (v.faktor > 1.5) {
+          urteil = "ZAEH";
+          sag("  BEFUND: mehr als 50 % langsamer als der eigene vorige Lauf.");
+        }
+      }
     }
 
     // Eine falsifizierbare Vorhersage schlaegt jede Beschwichtigung.
     const ziel = naechsterMeilenstein(knoten, rang);
     if (ziel && ziel.rateDorthin) {
-      sag("  Naechste Probe: bis Rang " + zahl(ziel.rang) + " lief die Referenz mit "
-        + zahl(Math.round(ziel.rateDorthin)) + " Rang/h. Bleibt die Rate beim naechsten"
-        + " Besuch deutlich darunter, ist DAS ein Befund.");
+      sag("  Naechste Probe: bis Rang " + zahl(ziel.rang) + " (" + ziel.inH.toFixed(1)
+        + " h) lief die Referenz mit " + zahl(Math.round(ziel.rateDorthin)) + " Rang/h."
+        + " Bleibt die Rate beim naechsten Besuch deutlich darunter, ist DAS ein Befund.");
     }
   } else if (rate && rate > 0) {
     etaSpiel = restNetto / rate;
@@ -453,12 +494,33 @@ async function main() {
     const letzteEta = [...punkte].reverse().find((p) =>
       gleicherLauf(p) && Number.isFinite(p.etaSpielstunden));
     if (letzteEta) {
+      /**
+       * NUR VERGLEICHEN, WAS MIT DERSELBEN METHODE GERECHNET WURDE.
+       *
+       * Am 04.09.2026 wurde die ETA von linearer Fortschreibung auf die
+       * Referenzkurve umgestellt, und beim naechsten Lauf sprang das Urteil auf
+       * ZAEH - weil die neue Zahl groesser war als die alte. Der Bot war nicht
+       * langsamer geworden, die Rechnung war anders. Ein Methodenwechsel darf
+       * keinen Befund erzeugen; sonst misstraut man beim naechsten Mal dem
+       * Urteil und nicht der Zahl.
+       */
+      const gleicheMethode = (letzteEta.etaQuelle || "linear") === (bericht.etaQuelle || "linear");
       const delta = etaSpiel - letzteEta.etaSpielstunden;
-      sag("Vorlauf-ETA: " + dauer(letzteEta.etaSpielstunden)
-        + (delta > 0 ? "  (+" + dauer(delta) + " - die Strecke ist LAENGER geworden)"
-          : "  (" + dauer(Math.abs(delta)) + " kuerzer)"));
-      if (delta > 0) urteil = "ZAEH";
-      bericht.etaDelta = delta;
+      if (!gleicheMethode) {
+        sag("Vorlauf-ETA: " + dauer(letzteEta.etaSpielstunden)
+          + " - nicht vergleichbar, sie stammt aus einer anderen Rechenart ("
+          + (letzteEta.etaQuelle || "linear") + " gegen " + (bericht.etaQuelle || "linear")
+          + "). Der Vergleich beginnt beim naechsten Besuch neu.");
+      } else {
+        sag("Vorlauf-ETA: " + dauer(letzteEta.etaSpielstunden)
+          + (delta > 0 ? "  (+" + dauer(delta) + " - die Strecke ist LAENGER geworden)"
+            : "  (" + dauer(Math.abs(delta)) + " kuerzer)"));
+        // Erst eine deutliche Verlaengerung ist ein Befund. Die Referenzkurve
+        // hat Stuetzpunkte in unterschiedlichem Abstand; kleine Sprunge sind
+        // Interpolation, kein Fortschrittsverlust.
+        if (delta > Math.max(2, letzteEta.etaSpielstunden * 0.15)) urteil = "ZAEH";
+        bericht.etaDelta = delta;
+      }
     }
   }
 
@@ -508,7 +570,7 @@ async function main() {
     let spanne = null;
 
     if (kurve) {
-      etaSpiel = kurve.mitte;
+      etaSpiel = kurve.restH;
       spanne = kurve;
       herkunft = "aus dem eigenen vorigen Lauf dieses Knotens";
     } else {
@@ -564,7 +626,9 @@ async function main() {
     // Referenzlauf 22 Stunden, in denen niemand gemessen hat. Eine Klammer,
     // die das zugibt, ist ehrlicher als ein Termin, der es verschweigt.
     const spannenText = spanne
-      ? " Spanne " + dauer(spanne.min) + " bis " + dauer(spanne.max) + "."
+      ? (spanne.luecke
+          ? " Der Rang liegt in einer Messluecke des Referenzlaufs - die Zahl ist dort interpoliert."
+          : " Frueheste Schwelle nach " + dauer(spanne.bisSchwelleFruehestensH) + ".")
       : "";
 
     return "FERTIG VORAUSSICHTLICH: " + wann + " (noch " + dauer(etaSpiel)
@@ -584,6 +648,7 @@ async function main() {
         // dann rechnet die Schlusszeile mit der letzten bekannten weiter,
         // statt gar nichts zu sagen.
         rate: b.rate ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
+        etaQuelle: b.etaQuelle ?? null,
       });
       // Nur die letzten 50 behalten - laenger zurueck braucht niemand.
       try {

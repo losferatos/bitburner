@@ -6,186 +6,207 @@
  * DER FEHLER, DEN DIESES MODUL BEHEBT
  * ===========================================================================
  *
- * `tools/checkin.js` rechnete die Restzeit bis zum Knotenausgang als
- * `(Zielrang - Rang) / gemessene Rate`. Am 04.09.2026 ergab das fuer BitNode 10
- * eine Restzeit von **430,7 Tagen** - bei einem Urteil "AUF KURS". Der Auftrag
- * veranschlagt fuer die GESAMTE Restroute aus 40 Laeufen 46 bis 79 Tage.
+ * `tools/checkin.js` rechnete die Restzeit als `(Zielrang - Rang) / Rate`. Am
+ * 04.09.2026 ergab das fuer BitNode 10 eine Restzeit von **430,7 Tagen** bei
+ * einem Urteil "AUF KURS". Der Auftrag veranschlagt fuer die GESAMTE Restroute
+ * aus 40 Laeufen 46 bis 79 Tage.
  *
- * Die Zahl ist um Faktor 208 falsch, und der Beweis braucht kein Modell: der
- * Bot hat diesen Knoten schon einmal gefahren, und der Lauf liegt vollstaendig
- * auf Platte (`data/verlauf-strategie.json`, `data/checkin.json`).
+ * Der Beweis braucht kein Modell: der Bot hat diesen Knoten schon einmal
+ * gefahren. Der Lauf liegt in `data/verlauf-strategie.json` und
+ * `data/checkin.json`, und die erzeugte Kurve zeigt Raten von **12 bis 207.111
+ * Rang je Stunde** - Faktor 17.294 innerhalb eines Laufs.
  *
- * Rang gegen Spielzeit in BitNode 10, Lauf 1, Beitritt bei Spielstunde 239,73:
+ * Traeger ist nicht der Rang. `calculateActionRankGain` in
+ * `Bladeburner/Formulas.ts` kennt den Spielerrang gar nicht; es skaliert die
+ * AKTIONSSTUFE ueber `rewardFac^(level-1)`, und der Sprung kommt vom Wechsel
+ * von Contracts auf Operations. Eine im Anlauf gemessene Rate beschreibt den
+ * Startblock, nicht die Strecke.
  *
- *     h 19,92 ab Beitritt      Rang        655      Rate     39/h
- *     h 28,41                  Rang      1.121      Rate     66/h
- *     h 31,89                  Rang      1.509      Rate    111/h   <- 1. Operation
- *     h 46,59                  Rang      4.802      Rate    224/h
- *     h 46,65                  Rang      5.297      Rate  9.186/h
- *     h 47,79                  Rang     17.594
- *     h 69,65                  Rang  4.543.999
- *
- * Die Rate waechst um mehr als Faktor 5.000. Der Traeger ist nicht der Rang
- * selbst - `calculateActionRankGain` in `Bladeburner/Formulas.ts` kennt den
- * Spielerrang gar nicht -, sondern die Aktionsstufe ueber `rewardFac^(level-1)`
- * und der Wechsel von Contracts auf Operations. Eine Rate, die im Anlauf
- * gemessen und linear fortgeschrieben wird, misst deshalb nicht die Strecke,
- * sondern nur den Startblock.
- *
- * DERSELBE FEHLER STAND SCHON EINMAL HIER. `nodes/ERLEDIGT.md` vom 30.08.2026
- * 14:20: "gemessene Rangrate 42,5/h, also 334 Tage ... die lineare
- * Fortschreibung eines Post-Reset-Lochs auf einer Exponentialkurve". Derselbe
- * Knoten, dieselbe Stelle der Kurve, fuenf Tage frueher. Er kam zurueck, weil
- * er damals im Bericht behoben wurde und nicht im Werkzeug.
+ * DERSELBE FEHLER STAND SCHON EINMAL HIER: `nodes/ERLEDIGT.md` vom 30.08.2026,
+ * "gemessene Rangrate 42,5/h, also 334 Tage ... die lineare Fortschreibung
+ * eines Post-Reset-Lochs auf einer Exponentialkurve". Er kam zurueck, weil er
+ * damals im Bericht korrigiert wurde und nicht im Werkzeug.
  *
  * ===========================================================================
- * WAS DIESES MODUL STATTDESSEN TUT
+ * WAS EIN SKEPTIKER AN DER ERSTEN FASSSUNG FAND (04.09.2026 02:45)
  * ===========================================================================
  *
- * Es liest die eigene Vergangenheit. Fuer einen Knoten, der schon einmal
- * gefahren wurde, gibt es eine gemessene Kurve; die Restzeit ist dann keine
- * Hochrechnung, sondern ein Nachschlagen: "an dieser Rangstelle war der letzte
- * Lauf nach X Stunden, die Schwelle fiel nach Y Stunden, Rest also Y-X".
+ * Die erste Fassung hatte die Stuetzpunkte als Zahlenliste im Code. Vier Fehler:
  *
- * Das Ergebnis ist bewusst eine KLAMMER, keine Zahl. Die Stuetzpunkte liegen
- * weit auseinander; zwischen "letzter Punkt unter der Schwelle" und "erster
- * Punkt darueber" liegen in Lauf 1 knapp 22 Stunden, in denen niemand gemessen
- * hat. Eine Klammer, die das zugibt, ist ehrlicher als eine Zahl, die es
- * verschweigt - und sie ist immer noch um Faktor 200 besser als die lineare.
+ * 1. ZEILENVERSATZ. Der Punkt {h 21,39 / Rang 903} war falsch zusammengesetzt -
+ *    bei h 21,39 stand der Rang bei 713, die 903 wurden erst bei h 25,13
+ *    erreicht. Daraus errechnete die "falsifizierbare Probe" 169 Rang/h, wo
+ *    45/h zu erwarten sind: ein eingebauter Fehlalarm.
+ *    BEHOBEN, strukturell: die Kurve wird jetzt von
+ *    `tools/rangkurve-bauen.js` aus den Rohdaten ERZEUGT (76 Stuetzpunkte statt
+ *    16 abgeschriebener) und hier nur gelesen.
  *
- * Gibt es keine Referenzkurve, wird das gesagt und NICHT ersatzweise linear
- * gerechnet.
+ * 2. `min` WAR NICHT ERREICHBAR. Die untere Schranke stand auf "Zeit bis zum
+ *    letzten gemessenen Punkt unter der Schwelle" - und der liegt bei Rang
+ *    17.594, also 4,4 % des Ziels. Die Aussage "es koennen noch 27,7 h sein"
+ *    behauptete, der Knoten koenne enden, waehrend 95,6 % des Rangs fehlen.
+ *    BEHOBEN: die belastbare Zahl ist die Zeit bis zum KNOTENENDE des
+ *    Referenzlaufs - gemessen, nicht rekonstruiert.
+ *
+ * 3. IN DIE LUECKE INTERPOLIERT. Zwischen Rang 17.594 (h 47,8) und 4,54 Mio
+ *    (h 69,7) hat niemand gemessen. Die alte Fassung interpolierte trotzdem
+ *    hinein; ab Rang 341.000 meldete sie "FERTIG VORAUSSICHTLICH: jetzt".
+ *    Das haette 95,6 % des Restwegs betroffen und waere in ein bis zwei
+ *    Spieltagen scharf geworden.
+ *    BEHOBEN: innerhalb einer Messluecke wird die Unsicherheit ausgewiesen,
+ *    nicht wegskaliert.
+ *
+ * 4. LOG-INTERPOLATION WAR SCHLECHTER ALS LINEAR. Gegenprobe des Skeptikers an
+ *    den 59 ausgelassenen Messpunkten: mittlerer Fehler 0,548 h logarithmisch
+ *    gegen 0,236 h linear, groesster Fehler 4,90 h gegen 1,37 h. Die Begruendung
+ *    "die Groesse waechst multiplikativ" traegt nicht - die Rate ist stueckweise
+ *    konstant und springt an Aktionsstufen, und genau das ist die Annahme der
+ *    linearen Interpolation.
+ *    BEHOBEN: linear. Mit 76 Stuetzpunkten sind die Abstaende ohnehin klein.
  */
 
-/**
- * Gemessene Stuetzpunkte je BitNode.
- *
- * `h` ist die Spielzeit in Stunden SEIT DEM BLADEBURNER-BEITRITT, nicht seit
- * dem Knotenstart - der Kaltstart davor schwankt zu stark (Lauf 1 brauchte bis
- * 25,2 h, Lauf 2 volle 39,1 h) und wuerde die Kurve verschieben.
- *
- * Quelle: data/verlauf-strategie.json und data/checkin.json, ausgelesen
- * 04.09.2026. Beitritt Lauf 1 bei Spielstunde 239,73.
- */
-export const KURVEN = {
-  10: {
-    lauf: 1,
-    beitrittSpielstunde: 239.73,
-    schwelle: 400000,
-    quelle: "data/verlauf-strategie.json + data/checkin.json, gelesen 04.09.2026",
-    punkte: [
-      { h: 0.0, rang: 0 },
-      { h: 12.65, rang: 214 },
-      { h: 18.71, rang: 605 },
-      { h: 19.92, rang: 655 },
-      { h: 21.39, rang: 903 },
-      { h: 26.67, rang: 1020 },
-      { h: 28.41, rang: 1121 },
-      { h: 31.89, rang: 1509 },
-      { h: 32.86, rang: 1727 },
-      { h: 46.59, rang: 4802 },
-      { h: 46.65, rang: 5297 },
-      { h: 46.82, rang: 7465 },
-      { h: 47.02, rang: 10194 },
-      { h: 47.79, rang: 17594 },
-      { h: 69.65, rang: 4543999 },
-      { h: 69.67, rang: 4561258 },
-    ],
-  },
-};
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const HIER = path.dirname(fileURLToPath(import.meta.url));
+const ROOT = path.resolve(HIER, "..", "..");
 
 /**
- * Restzeit bis zur Schwelle, aus der Referenzkurve gelesen.
+ * Die Schwelle, ab der der Ausgang offensteht: Operation Daedalus verlangt
+ * Rang 400.000 (`Bladeburner/data/BlackOperations.ts`), und diese Zahl
+ * skaliert NICHT mit dem BitNode-Faktor.
+ */
+export const SCHWELLE = 400000;
+
+const geladen = new Map();
+
+function ladeKurve(knoten) {
+  if (geladen.has(knoten)) return geladen.get(knoten);
+  const p = path.join(ROOT, "doku", "rangkurve-bn" + knoten + ".json");
+  let k = null;
+  try {
+    k = JSON.parse(fs.readFileSync(p, "utf8"));
+  } catch {
+    k = null;
+  }
+  geladen.set(knoten, k);
+  return k;
+}
+
+/** Stunde, zu der der Referenzlauf diesen Rang erreichte - linear interpoliert. */
+function stundeBeiRang(punkte, rang) {
+  if (rang <= punkte[0].rang) return punkte[0].h;
+  for (let i = 0; i < punkte.length - 1; i++) {
+    const a = punkte[i];
+    const b = punkte[i + 1];
+    if (rang >= a.rang && rang <= b.rang) {
+      if (b.rang === a.rang) return a.h;
+      return a.h + ((rang - a.rang) / (b.rang - a.rang)) * (b.h - a.h);
+    }
+  }
+  return null;
+}
+
+/**
+ * Restzeit bis zum Knotenende, aus dem eigenen vorigen Lauf gelesen.
  *
- * @param {number} knoten
- * @param {number} rang aktueller Rang
- * @returns {{min:number,max:number,mitte:number,quelle:string,stuetzpunkte:number}|null}
- *          Stunden Spielzeit, oder null wenn es fuer den Knoten keine Kurve gibt.
+ * Bezugsgroesse ist bewusst das ENDE DES REFERENZLAUFS und nicht der Zeitpunkt,
+ * an dem die Rangschwelle fiel. Der Grund ist ein Messloch: zwischen Rang
+ * 17.594 und 4,54 Mio liegen 22 Stunden ohne einen einzigen Datenpunkt, weil
+ * die sechs Beobachtungsloops am 31.08. abgeschafft wurden. Wann genau die
+ * 400.000 fielen, ist damit unbekannt - wann der Lauf endete, ist gemessen.
+ *
+ * Die zurueckgegebene Zahl ist deshalb konservativ: sie enthaelt den Nachlauf
+ * nach der Schwelle (die 21 Black Ops muessen auch gewonnen werden). Das ist
+ * die richtige Richtung fuer eine Planung.
+ *
+ * @returns {{restH, bisSchwelleFruehestensH, ende, hJetzt, luecke, quelle}|null}
  */
 export function restzeitAusKurve(knoten, rang) {
-  const k = KURVEN[knoten];
-  if (!k) return null;
+  const k = ladeKurve(knoten);
+  if (!k || !Array.isArray(k.punkte) || k.punkte.length < 2) return null;
   if (!Number.isFinite(rang) || rang < 0) return null;
 
   const p = k.punkte;
-  if (rang >= k.schwelle) return { min: 0, max: 0, mitte: 0, quelle: k.quelle, stuetzpunkte: p.length };
+  const ende = p[p.length - 1];
+  const hJetzt = stundeBeiRang(p, rang);
+  if (hJetzt === null) return null;
 
-  // Wo stand der Referenzlauf bei diesem Rang? Zwischen den beiden Punkten,
-  // die ihn einschliessen, wird im Logarithmus des Rangs interpoliert - die
-  // Groesse waechst multiplikativ, nicht additiv.
-  let hJetzt = null;
+  // Liegt der Rang in einer Messluecke? Als Luecke gilt ein Abstand von mehr
+  // als zwei Stunden zwischen zwei Stuetzpunkten - dort ist jede Interpolation
+  // eine Behauptung.
+  let luecke = null;
   for (let i = 0; i < p.length - 1; i++) {
-    if (rang >= p[i].rang && rang <= p[i + 1].rang) {
-      const r0 = Math.max(1, p[i].rang);
-      const r1 = Math.max(1, p[i + 1].rang);
-      const r = Math.max(1, rang);
-      const anteil = r1 > r0 ? Math.log(r / r0) / Math.log(r1 / r0) : 0;
-      hJetzt = p[i].h + anteil * (p[i + 1].h - p[i].h);
+    if (rang >= p[i].rang && rang <= p[i + 1].rang && p[i + 1].h - p[i].h > 2) {
+      luecke = { vonH: p[i].h, bisH: p[i + 1].h, vonRang: p[i].rang, bisRang: p[i + 1].rang };
       break;
     }
   }
-  if (hJetzt === null) return null;
 
-  // Wann fiel die Schwelle? Der letzte Punkt darunter und der erste darueber
-  // spannen die Klammer auf. Dazwischen wurde nicht gemessen, und das wird
-  // nicht weginterpoliert - es ist echte Unsicherheit.
-  let letzterDarunter = null;
-  let ersterDarueber = null;
-  for (const q of p) {
-    if (q.rang < k.schwelle) letzterDarunter = q;
-    else if (ersterDarueber === null) ersterDarueber = q;
-  }
-  if (!ersterDarueber) return null;
+  // Die frueheste Stunde, zu der die Schwelle gefallen sein KANN: der letzte
+  // gemessene Punkt unter ihr. Das ist eine harte Untergrenze, kein Schaetzwert.
+  let letzterDarunter = p[0];
+  for (const q of p) if (q.rang < SCHWELLE) letzterDarunter = q;
 
   return {
-    min: Math.max(0, letzterDarunter.h - hJetzt),
-    max: Math.max(0, ersterDarueber.h - hJetzt),
-    mitte: Math.max(0, (letzterDarunter.h + ersterDarueber.h) / 2 - hJetzt),
+    restH: Math.max(0, ende.h - hJetzt),
+    bisSchwelleFruehestensH: Math.max(0, letzterDarunter.h - hJetzt),
+    schwelleZuletztUnterschritten: { h: letzterDarunter.h, rang: letzterDarunter.rang },
+    ende: { h: ende.h, rang: ende.rang },
     hJetzt,
-    quelle: k.quelle,
+    luecke,
     stuetzpunkte: p.length,
+    quelle: "doku/rangkurve-bn" + knoten + ".json, erzeugt " + (k.erzeugtAm || "?"),
   };
 }
 
 /**
  * Wie schnell laeuft der aktuelle Lauf gegen den Referenzlauf an derselben
- * Rangstelle?
+ * Rangstelle? Werte unter 1 heissen schneller.
  *
- * Das ist die eigentlich interessante Zahl - sie beantwortet "sind wir langsamer
- * als beim letzten Mal", waehrend die Restzeit nur "wie lange noch" beantwortet.
- * Ein Wert unter 1 heisst schneller als die Referenz.
+ * DAS IST DIE EIGENTLICH WICHTIGE ZAHL. Die Restzeit oben ist eine reine
+ * Funktion des Rangs - ein Lauf, der zehnmal langsamer ist, bekommt exakt
+ * dieselbe Restzeit gemeldet, nur ueber mehr Kalenderzeit verteilt. Erst
+ * dieser Vergleich merkt, dass etwas nicht stimmt.
  *
- * @returns {{faktor:number, hJetzt:number, hReferenz:number}|null}
+ * Der Skeptiker fand am 04.09., dass die Funktion zwar gebaut, aber nirgends
+ * aufgerufen war. Sie ist jetzt in checkin.js angeschlossen.
  */
-export function vergleichMitReferenz(knoten, rang, hSeitBeitritt) {
+export function vergleichMitReferenz(knoten, rang, hSeitRangbeginn) {
   const r = restzeitAusKurve(knoten, rang);
-  if (!r || !Number.isFinite(hSeitBeitritt) || hSeitBeitritt <= 0) return null;
+  if (!r || !Number.isFinite(hSeitRangbeginn) || hSeitRangbeginn <= 0) return null;
+  if (r.hJetzt <= 0) return null;
   return {
-    faktor: hSeitBeitritt / r.hJetzt,
-    hJetzt: hSeitBeitritt,
+    faktor: hSeitRangbeginn / r.hJetzt,
+    hJetzt: hSeitRangbeginn,
     hReferenz: r.hJetzt,
   };
 }
 
 /**
- * Der naechste Meilenstein der Referenzkurve - damit der Bericht eine
- * FALSIFIZIERBARE Vorhersage macht statt einer Beschwichtigung.
+ * Der naechste Meilenstein - fuer eine Vorhersage, die beim naechsten Besuch
+ * ueberprueft werden kann.
  *
- * "Bei Rang 1.509 muss die Rate ueber 100/h liegen" laesst sich beim naechsten
- * Besuch pruefen. "Das wird schon" nicht.
+ * Es wird bewusst ein Punkt gesucht, der mindestens eine Stunde entfernt liegt:
+ * die Rate zwischen zwei dicht beieinanderliegenden Messungen schwankt mit der
+ * Ausdauerphase und taugt nicht als Erwartung. Genau daran scheiterte die erste
+ * Fassung, die aus einem falschen Stuetzpunkt 169 Rang/h ableitete.
  */
 export function naechsterMeilenstein(knoten, rang) {
-  const k = KURVEN[knoten];
+  const k = ladeKurve(knoten);
   if (!k) return null;
   const p = k.punkte;
-  for (let i = 0; i < p.length - 1; i++) {
-    if (p[i + 1].rang > rang) {
-      const dh = p[i + 1].h - p[i].h;
-      const dr = p[i + 1].rang - p[i].rang;
+  const hJetzt = stundeBeiRang(p, rang);
+  if (hJetzt === null) return null;
+
+  for (const q of p) {
+    if (q.rang > rang && q.h - hJetzt >= 1) {
       return {
-        rang: p[i + 1].rang,
-        hAbBeitritt: p[i + 1].h,
-        rateDorthin: dh > 0 ? dr / dh : null,
+        rang: q.rang,
+        hAbBeginn: q.h,
+        inH: q.h - hJetzt,
+        rateDorthin: (q.rang - rang) / (q.h - hJetzt),
       };
     }
   }

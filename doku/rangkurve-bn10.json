@@ -1,0 +1,403 @@
+{
+ "knoten": 10,
+ "erzeugtAm": "2026-09-04T00:43:26.281Z",
+ "erzeugtVon": "tools/rangkurve-bauen.js",
+ "quellen": [
+  "data/verlauf-strategie.json",
+  "data/checkin.json"
+ ],
+ "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 10",
+ "nullpunkt": {
+  "spielzeitMs": 863039000,
+  "spielzeitH": 239.733,
+  "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
+ },
+ "punkteGesamt": 80,
+ "laeufeErkannt": 2,
+ "stuetzpunkte": 76,
+ "rangSpanne": [
+  0,
+  4561258
+ ],
+ "dauerH": 69.667,
+ "ratenSpanne": [
+  11.976047904191615,
+  207110.72981011213
+ ],
+ "punkte": [
+  {
+   "h": 0,
+   "rang": 0,
+   "aktion": "General/Recruitment"
+  },
+  {
+   "h": 0.334,
+   "rang": 4,
+   "aktion": "General/Recruitment"
+  },
+  {
+   "h": 0.361,
+   "rang": 5,
+   "aktion": "General/Recruitment"
+  },
+  {
+   "h": 0.434,
+   "rang": 6,
+   "aktion": "General/Recruitment"
+  },
+  {
+   "h": 0.531,
+   "rang": 10,
+   "aktion": "Contracts/Retirement"
+  },
+  {
+   "h": 12.649,
+   "rang": 214,
+   "aktion": "Gym/def"
+  },
+  {
+   "h": 12.916,
+   "rang": 281,
+   "aktion": "Contracts/Retirement"
+  },
+  {
+   "h": 12.988,
+   "rang": 304,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 13.049,
+   "rang": 322,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 13.319,
+   "rang": 341,
+   "aktion": "Contracts/Retirement"
+  },
+  {
+   "h": 13.499,
+   "rang": 357,
+   "aktion": "General/Incite Violence"
+  },
+  {
+   "h": 13.652,
+   "rang": 365,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 13.665,
+   "rang": 366,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 18.246,
+   "rang": 575,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 18.428,
+   "rang": 590,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 18.439,
+   "rang": 591,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 18.447,
+   "rang": 593,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 18.495,
+   "rang": 596,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 18.569,
+   "rang": 600,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 18.711,
+   "rang": 605,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 18.718,
+   "rang": 605,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 19.037,
+   "rang": 619,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 19.293,
+   "rang": 630,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 19.302,
+   "rang": 631,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 19.92,
+   "rang": 655,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 19.943,
+   "rang": 656,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 20.386,
+   "rang": 671,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 20.72,
+   "rang": 686,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 20.869,
+   "rang": 690,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 21.053,
+   "rang": 698,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 21.388,
+   "rang": 713,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 21.722,
+   "rang": 727,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 22.641,
+   "rang": 771,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 22.762,
+   "rang": 778,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 22.953,
+   "rang": 789,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 23.053,
+   "rang": 794,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 23.413,
+   "rang": 809,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 23.647,
+   "rang": 822,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 23.676,
+   "rang": 823,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 24.053,
+   "rang": 848,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 24.164,
+   "rang": 855,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 24.395,
+   "rang": 869,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 24.721,
+   "rang": 889,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 24.883,
+   "rang": 898,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 25.134,
+   "rang": 903,
+   "aktion": "General/Diplomacy"
+  },
+  {
+   "h": 25.158,
+   "rang": 907,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 25.39,
+   "rang": 931,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 25.395,
+   "rang": 931,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 25.468,
+   "rang": 935,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 25.719,
+   "rang": 952,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 25.858,
+   "rang": 964,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 26.054,
+   "rang": 976,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 26.663,
+   "rang": 1020,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 26.869,
+   "rang": 1034,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 27.053,
+   "rang": 1036,
+   "aktion": "Grafting"
+  },
+  {
+   "h": 27.144,
+   "rang": 1040,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 27.163,
+   "rang": 1043,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 27.375,
+   "rang": 1066,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 27.401,
+   "rang": 1067,
+   "aktion": "Grafting"
+  },
+  {
+   "h": 27.793,
+   "rang": 1072,
+   "aktion": "Contracts/Tracking"
+  },
+  {
+   "h": 28.053,
+   "rang": 1098,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 28.403,
+   "rang": 1121,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 31.89,
+   "rang": 1509,
+   "aktion": "Operations/Investigation"
+  },
+  {
+   "h": 32.053,
+   "rang": 1543,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 32.36,
+   "rang": 1606,
+   "aktion": "General/Hyperbolic Regeneration Chamber"
+  },
+  {
+   "h": 32.386,
+   "rang": 1606,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 32.719,
+   "rang": 1699,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 32.861,
+   "rang": 1727,
+   "aktion": "Contracts/Bounty Hunter"
+  },
+  {
+   "h": 46.588,
+   "rang": 4802,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 46.642,
+   "rang": 5297,
+   "aktion": "Operations/Assassination"
+  },
+  {
+   "h": 46.818,
+   "rang": 7465
+  },
+  {
+   "h": 47.013,
+   "rang": 10194
+  },
+  {
+   "h": 47.038,
+   "rang": 10202
+  },
+  {
+   "h": 47.79,
+   "rang": 17594
+  },
+  {
+   "h": 69.645,
+   "rang": 4543999
+  },
+  {
+   "h": 69.667,
+   "rang": 4561258
+  }
+ ]
+}

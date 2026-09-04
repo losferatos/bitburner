@@ -55,6 +55,16 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-syntax.js",
+    deckt: "Ebene -1: jede Datei in src/ parst (acorn aus der Referenzkopie)",
+    schnell: true,
+  },
+  {
+    datei: "test-ram.js",
+    deckt: "RAM-Rechner gegen 114 Live-Messwerte, registry.json und das Tor E1",
+    schnell: true,
+  },
+  {
     datei: "test-ram-namen.js",
     deckt: "Namenspruefer gegen die wakelock-Fehlerklasse, mit Selbstprobe",
     schnell: true,

@@ -492,9 +492,9 @@ nicht in einen Kommentar.
     {
       "name": "guard.js",
       "args": [],
-      "ramBaseGb": 3.85,
+      "ramBaseGb": 3.9,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GEMESSEN-2026-09-04",
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",

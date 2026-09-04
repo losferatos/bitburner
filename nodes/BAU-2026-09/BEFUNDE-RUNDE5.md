@@ -100,3 +100,28 @@ Dazu zwei kleinere, die dieselbe Form haben:
 - **Ein Zeitstempel aus dem Kopf ist falsch.** Neun Stunden daneben, in einer
   Datei, die den Fortschritt belegt. Die eigene CLAUDE.md sagt seit dem
   23.08.2026, dass die Systemzeit abzufragen ist.
+
+---
+
+## Nachtrag: was die Suite selbst noch gefunden hat
+
+Nach den Reparaturen fiel `test-bruecke.js` **im vollen Suitendurchlauf** um,
+einzeln aber nicht. Die Ursache ist der Fehlerklasse nach dieselbe wie A-B2:
+
+Der Rückwärtssprung-Abschnitt schloss die erste Verbindung und wartete zehn
+Sekunden auf die Meldung „getrennt" — ohne sie zuzusichern. Kam die zweite
+Verbindung, bevor die Brücke das Trennen bemerkt hatte, landete sie im Zweig
+für die **zweite** Verbindung: sie wurde geschlossen, statt geprüft zu werden.
+Die Abweisung, um die es in dem Abschnitt geht, fand nie statt.
+
+Einzeln war der Lauf schnell genug, im vollen Durchlauf nicht. Das ist genau
+die Sorte Test, die man nach dem dritten roten Lauf abschaltet, weil sie
+„manchmal halt rot ist".
+
+Behoben an beiden Stellen: das Trennen wird **gezählt und zugesichert**, mit
+20 s Frist, bevor die nächste Verbindung aufgebaut wird. Und die Abweisung
+selbst wird gezählt statt gesucht — das Wort „abgewiesen" steht nach dem
+Abschnitt mit dem fremden RFA-Port schon im Protokoll.
+
+**Die Lehre steht schon oben und gilt hier noch einmal:** eine Probe, die eine
+Zeile *sucht*, findet auch die von vorhin. Zählen ist die richtige Form.

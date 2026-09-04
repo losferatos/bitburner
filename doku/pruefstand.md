@@ -50,6 +50,43 @@ Wer einen Aspekt **ohne** Knappheit prüfen will, sagt es ausdrücklich:
 Meldung, die den Namen nennt. Ein stiller `undefined`-Rückgabewert wäre
 schlimmer als ein Fehler — er fälscht das Ergebnis, statt es zu verhindern.
 
+### Die Körper und der Rückstand
+
+Seit dem 04.09.2026 kennt der Mock `storedCycles` — das Feld, in dem das Spiel
+den Nachholrückstand ablegt. Vorher war der Nachholklumpen nur als **Sprung der
+Spielzeit** modelliert; das ist eine Vorstellung davon, was `storedCycles`
+bewirkt, und nicht das Feld selbst. Auftrag 6.1 nennt es namentlich.
+
+Die Asymmetrie ist der Punkt:
+
+| | Regel | Quelle |
+|---|---|---|
+| Zugang | ein Zyklus je 200 ms Spielzeit | `CONSTANTS.MilliPerCycle` |
+| Abgang, Körper | höchstens **15** je Verarbeitungsschritt | `Sleeve.ts:263-275` |
+| Abgang, Division | höchstens **25** je Aufruf (5 Sekunden × 5) | `Bladeburner.ts:1377-1380` |
+
+Bei 300 Zyklen in einem Nachholschub sind das 5 % beziehungsweise 8 % — der
+Rest bleibt liegen. Genau daraus rechnet `sleeve.js` seinen Geldboden
+(2.400 $/s × (`storedCycles`/5 + Takt) je Körper). Acht Stunden verdeckter Tab
+sind 144.000 Zyklen = 28.800 Spielsekunden = **69,1 Mio $ je Körper**; die
+frühere Schwelle von 5 Mio deckte 67 Sekunden.
+
+`tools/test-sleeve-ebene2.js` fährt das: mit Rückstand und 50 Mio auf dem Konto
+darf kein Körper ins Gym, **ohne** Rückstand und mit demselben Konto muss er.
+Die zweite Probe ist die Falsifikation der ersten — ohne sie wäre auch ein
+Gewerk grün, das bei 50 Mio schlicht immer knausert.
+
+**Der Seed** (ebenfalls Auftrag 6.1) sitzt im selben Zustand: alles Zufällige
+im Mock kommt aus `mulberry32(seed)`, derselben Funktion wie im
+Vertragsgenerator. Ein Test, der einmal grün und einmal rot ist, weil sich eine
+Zufallszahl geändert hat, ist kein Test.
+
+**Was der Mock nicht kann:** den Bladeburner-Namensraum. `blade.js` ruft dort
+20 Funktionen, der Mock kennt eine (`getBonusTime`). Das ist eine Entscheidung,
+keine Nachlässigkeit — ein Mock, der eine Schnittstelle vollständig nachbaut
+statt der benutzten Teilmenge, wird ein zweites Spiel mit eigenen Fehlern. Die
+Folge steht trotzdem in der Messlückenliste: `blade.js` hat keine Ebene-2-Probe.
+
 ## Der Modul-Lader
 
 `tools/mock/lader.js`. Bitburner löst Importe absolut ab home auf

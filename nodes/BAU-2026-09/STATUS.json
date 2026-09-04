@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Pruefungen gruen (Ebene 0 bis 2) UND Skeptikerrunde durch UND kein im Eintrag selbst genannter PFLICHTTEST offen. Der letzte Teil kam am 04.09.2026 dazu: ohne ihn steht bald bei allen 15 Positionen 'getestet', waehrend im Feld 'offen' ein namentlich benannter Pflichttest wartet - dann sagt das Wort nichts mehr. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T12:30:00",
+  "aktualisiert": "2026-09-04T12:50:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -99,7 +99,7 @@
   "abnahme": {
     "stufeA": {
       "stand": "offen",
-      "was": "Tests und Skeptiker gruen, Messlueckenliste leer. Gemessen 04.09.2026 12:30: 30 von 30 Testdateien gruen (node tools/test-alles.js --nur-tests -> Exit 0); der volle Lauf endet mit Exit 1, weil acht Messluecken offen sind. Das ist das Tor, das seit R24 wirklich schliesst - vorher lief die Suite mit denselben Luecken auf Exit 0 durch."
+      "was": "Tests und Skeptiker gruen, Messlueckenliste leer. Gemessen 04.09.2026 12:50: 31 von 31 Testdateien gruen (node tools/test-alles.js --nur-tests -> Exit 0); der volle Lauf endet mit Exit 1, weil neun Messluecken offen sind. Sieben davon sind Ebene 3 - sie brauchen das laufende Spiel und damit den Hot-Swap, der Erics Freigabe verlangt. Die achte ist die fehlende Ebene-2-Probe fuer blade.js."
     },
     "stufeB": {
       "stand": "offen",
@@ -122,6 +122,7 @@
     "C.23": "R10 und R28 - Sprosse 4b, und zwei Proben, die nie rot werden konnten",
     "befunde": "BEFUNDE-RUNDE4.md: alle 30 abgehakt. BEFUNDE-RUNDE5.md: 20 von 21, offen bleibt P-W4 (Vertragsertraege in den Ereignisstrom - gehoert zu C.8).",
     "C.24": "R27, R23, R29 - die stumme Vertragskette, der erste Test der Bruecke, der Lader unter zwei Laeufen",
-    "C.25": "Skeptikerrunde 5: drei blockierende Befunde, darunter der Schaden, den der Brueckentest an der TEST-Instanz angerichtet hatte (Anker 369 -> 6.800 h). Dritte Rolle MOCK, Namenskollision bei Sicherungen, schreiberprobe gegen acht gemessene Fehlfaelle"
+    "C.25": "Skeptikerrunde 5: drei blockierende Befunde, darunter der Schaden, den der Brueckentest an der TEST-Instanz angerichtet hatte (Anker 369 -> 6.800 h). Dritte Rolle MOCK, Namenskollision bei Sicherungen, schreiberprobe gegen acht gemessene Fehlfaelle",
+    "C.26": "Die letzten zwei Messluecken, die sich BAUEN liessen: storedCycles und der Seed im Mock (Auftrag 6.1, namentlich) plus tools/test-sleeve-ebene2.js fuer den Geldboden der Koerper; und next_blackop_chance bekommt einen Schreiber. Damit hat jeder Kennwert mit einem Soll einen Schreiber. Was in der Lueckenliste bleibt, laesst sich nur im laufenden Spiel messen - mit einer Ausnahme: blade.js hat keine Ebene-2-Probe, weil der Bladeburner-Namensraum 20 Funktionen umfasst und ein vollstaendig nachgebauter Mock ein zweites Spiel mit eigenen Fehlern waere."
   }
 }

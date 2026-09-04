@@ -143,6 +143,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-sleeve-ebene2.js",
+    deckt: "EBENE 2: der Geldboden der Koerper gegen den Nachholrueckstand (storedCycles) - und der Mock, der ihn nachbildet",
+    schnell: false,
+  },
+  {
     datei: "test-bruecke.js",
     deckt: "EBENE 2: die Bruecke gegen ein nachgebautes Spiel - Rollentrennung, Wachhund, Sicherung vor pushAll, zweite Verbindung, belegter Port (Auftrag 6.1)",
     schnell: false,
@@ -235,16 +240,20 @@ const MESSLUECKEN = [
     + "(tools/test-bruecke.js, 42 Proben). OFFEN bleibt der Zweig, den ein "
     + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
     + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
-  "EIN KENNWERT MIT SOLL BLEIBT OHNE SCHREIBER: next_blackop_chance (soll "
-    + "0,35). Er gilt laut Auftrag ohnehin erst, wenn getNextBlackOp "
-    + "freigeschaltet ist - bei Rang 596 ist keine Operation frei, und an "
-    + "seine Stelle treten rank_rate_per_motor_h und chaos_city. Gebaut wird "
-    + "er, wenn die erste Operation in Reichweite kommt (2.500 Rang). "
-    + "`node tools/kpi-luecken.js` fuehrt ihn.",
-  "DER MOCK kennt kein storedCycles und keinen Seed, obwohl Auftrag 6.1 beides "
-    + "namentlich fordert. Der Nachholklumpen ist als playtime-Sprung "
-    + "modelliert - das ist meine Vorstellung von dem, was storedCycles "
-    + "bewirkt, nicht das Feld.",
+  "JEDER KENNWERT MIT SOLL HAT JETZT EINEN SCHREIBER (04.09.2026). Offen "
+    + "bleibt die MESSUNG von next_blackop_chance: sie gilt laut Auftrag erst, "
+    + "wenn getNextBlackOp() etwas liefert (erste Operation bei 2.500 Rang, "
+    + "gemessen 596), und bis dahin steht sie zu Recht auf null. Bis der Rang "
+    + "reicht, ist die Zahl gebaut, aber nicht belegt.",
+  "DER MOCK KENNT DIE KOERPER, ABER NICHT DIE DIVISION. storedCycles und der "
+    + "Seed stehen seit dem 04.09.2026 drin (Auftrag 6.1), und "
+    + "test-sleeve-ebene2.js faehrt den Geldboden gegen einen echten "
+    + "Rueckstand. OFFEN bleibt der Bladeburner-Namensraum: blade.js ruft 20 "
+    + "Funktionen, von denen der Mock eine kann (getBonusTime). Ein Mock, der "
+    + "eine Schnittstelle vollstaendig nachbaut statt der benutzten "
+    + "Teilmenge, wird ein zweites Spiel mit eigenen Fehlern - deshalb ist "
+    + "das eine Entscheidung und keine Nachlaessigkeit, aber blade.js hat "
+    + "damit keine Ebene-2-Probe.",
 ];
 
 /**

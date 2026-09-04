@@ -538,8 +538,20 @@ console.log("-- der normale Weg: pruefen, sichern, DANN schieben --");
     + " veraendert hat");
 
   // ---- Wiederverbinden ----
-  spiel.schliessen();
-  await warteAufZeile(b.zeilen, /getrennt/i, 10000);
+  // Dieselbe Falle wie im Rueckwaertssprung-Abschnitt: verbindet sich die
+  // naechste, bevor die Bruecke das Trennen bemerkt hat, landet sie im Zweig
+  // fuer die ZWEITE Verbindung und wird geschlossen.
+  {
+    const vorG = b.zeilen.filter((z) => /getrennt/i.test(z)).length;
+    spiel.schliessen();
+    const bis = Date.now() + 20000;
+    let jetztG = vorG;
+    while (Date.now() < bis && jetztG <= vorG) {
+      await schlaf(100);
+      jetztG = b.zeilen.filter((z) => /getrennt/i.test(z)).length;
+    }
+    pruefe("die Verbindung ist wirklich getrennt", jetztG > vorG);
+  }
   // GEZAEHLT WIRD, NICHT GESUCHT. Die Zeile "Verifiziert in" steht nach der
   // ersten Verbindung schon da - eine Suche danach waere immer gruen gewesen,
   // egal ob die zweite Verbindung je geprueft wurde.
@@ -710,15 +722,47 @@ console.log("-- ein RUECKWAERTSSPRUNG der Spielzeit wird abgewiesen --");
 
   // Erst ein Stand mit 200 h - er setzt den Anker.
   const s1 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rueckwaertsVor }));
-  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  // DIE ERSTE VERBINDUNG SETZT DEN ANKER - ohne sie prueft der Abschnitt
+  // nichts (dieselbe Falle wie in "zweite Verbindung", Skeptiker Runde 5, B2).
+  pruefe("der hoehere Stand wird angenommen",
+    await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000),
+    "er ist der Anker, gegen den die aeltere Kopie gemessen wird");
+  // AUF DAS TRENNEN WARTEN, UND ES ZUSICHERN.
+  //
+  // Ohne das lief der Abschnitt in den Zweig fuer die ZWEITE Verbindung: die
+  // alte war noch offen, also wurde die neue geschlossen, statt geprueft zu
+  // werden - und die Abweisung, um die es hier geht, fand nie statt. Der Test
+  // war dadurch zeitabhaengig: einzeln schnell genug, im vollen
+  // Suitendurchlauf nicht (gemessen 04.09.2026).
+  const vorGetrennt = b.zeilen.filter((z) => /getrennt/i.test(z)).length;
   s1.schliessen();
-  await warteAufZeile(b.zeilen, /getrennt/i, 10000);
+  const bisTrenn = Date.now() + 20000;
+  let jetztGetrennt = vorGetrennt;
+  while (Date.now() < bisTrenn && jetztGetrennt <= vorGetrennt) {
+    await schlaf(100);
+    jetztGetrennt = b.zeilen.filter((z) => /getrennt/i.test(z)).length;
+  }
+  pruefe("die erste Verbindung ist wirklich getrennt", jetztGetrennt > vorGetrennt,
+    "sonst landet die naechste im Zweig fuer die zweite Verbindung und wird"
+    + " geschlossen, statt geprueft zu werden");
 
   // Dann eine aeltere Kopie mit 100 h. Genau der Fall, gegen den Pruefung 2
   // gebaut ist: ein Klon oder ein Import.
+  // GEZAEHLT, NICHT GESUCHT (Skeptiker Runde 5). Das Wort "abgewiesen" steht
+  // nach dem Abschnitt mit dem fremden RFA-Port schon im Protokoll - eine
+  // Suche danach waere hier immer gruen gewesen. Und die Frist war mit 20 s zu
+  // knapp: in einem vollen Suitendurchlauf ist die Verifikation langsamer, und
+  // die Probe wurde rot, obwohl die Bruecke richtig lag.
+  const vorAbw = b.zeilen.filter((z) => /abgewiesen|hinter dem zuletzt/i.test(z)).length;
   const s2 = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.rueckwaertsAlt }));
-  const abgewiesen = await warteAufZeile(b.zeilen, /abgewiesen|hinter dem zuletzt/i, 20000);
-  pruefe("die aeltere Kopie faellt durch", abgewiesen, b.zeilen.slice(-2).join(" | "));
+  const bisAbw = Date.now() + 40000;
+  let jetztAbw = vorAbw;
+  while (Date.now() < bisAbw && jetztAbw <= vorAbw) {
+    await schlaf(100);
+    jetztAbw = b.zeilen.filter((z) => /abgewiesen|hinter dem zuletzt/i.test(z)).length;
+  }
+  pruefe("die aeltere Kopie faellt durch", jetztAbw > vorAbw,
+    vorAbw + " -> " + jetztAbw + " Abweisungen | " + b.zeilen.slice(-2).join(" | "));
   await schlaf(1500);
   pruefe("und es wird nichts geschrieben", !s2.gesehen.includes("pushFile"),
     s2.gesehen.join(", "));

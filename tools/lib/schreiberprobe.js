@@ -79,7 +79,7 @@ export const SCHREIBER = ["ns.write", "nachHome", "schreib", "schreibe"];
  * Zeichenketten mit `//` darin (etwa "https://…") wuerden hier gekuerzt. Das
  * ist hingenommen: ein Dateiname im Spiel enthaelt kein `//`.
  */
-function ohneKommentare(txt) {
+export function ohneKommentare(txt) {
   return txt
     .replace(/\/\*[\s\S]*?\*\//g, " ")
     .replace(/(^|[^:])\/\/[^\n]*/g, "$1");

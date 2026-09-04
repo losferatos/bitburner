@@ -144,6 +144,53 @@ export function neuerMock(o = {}) {
       currentNode: Number.isFinite(o.knoten) ? o.knoten : 10,
       ownedSF: o.ownedSF || new Map(),
     },
+    /**
+     * DIE KOERPER UND IHR RUECKSTAND (04.09.2026).
+     *
+     * `storedCycles` ist der Nachholklumpen: das Spiel legt jeden nicht
+     * verarbeiteten Zyklus dort ab (`Sleeve.ts:267`) und arbeitet ihn mit
+     * HOECHSTENS 15 je Aufruf wieder ab (`Sleeve.ts:269`). Bei 300 Zyklen in
+     * einem Nachholschub sind das 5 Prozent - der Rest bleibt liegen.
+     *
+     * Warum das im Mock stehen MUSS: `sleeve.js` rechnet seinen Geldboden
+     * genau daraus (`2.400 $/s x (storedCycles / 5 + Takt)`). Ohne das Feld
+     * war der Nachholklumpen nur als Sprung der Spielzeit modelliert - also
+     * als meine Vorstellung von dem, was storedCycles bewirkt, statt als das
+     * Feld selbst. Auftrag 6.1 nennt es namentlich.
+     *
+     * 20 Zyklen je Sekunde Spielzeit (`MilliPerCycle = 200`, 5 je Sekunde
+     * Echtzeit x 4 - nein: 1000/200 = 5 je Sekunde). Der Mock rechnet mit
+     * `CyclesPerSecond = 5` wie das Spiel.
+     */
+    koerper: (o.koerper || []).map((k, i) => ({
+      nr: i,
+      storedCycles: Number.isFinite(k.storedCycles) ? k.storedCycles : 0,
+      shock: Number.isFinite(k.shock) ? k.shock : 0,
+      sync: Number.isFinite(k.sync) ? k.sync : 100,
+      skills: k.skills || { strength: 10, defense: 10, dexterity: 10, agility: 10 },
+      aufgabe: k.aufgabe || null,
+    })),
+    /**
+     * DER SEED (Auftrag 6.1, namentlich gefordert).
+     *
+     * Alles Zufaellige im Mock kommt hierher. Ein Test, der einmal gruen und
+     * einmal rot ist, weil sich eine Zufallszahl geaendert hat, ist kein
+     * Test - und ein Fehler, der nur bei einem bestimmten Wurf auftritt,
+     * laesst sich ohne Seed nicht nachstellen.
+     *
+     * mulberry32, dieselbe Funktion wie im Vertragsgenerator - damit beide
+     * Pruefstandshaelften denselben Zufall sprechen.
+     *
+     * EHRLICH GESAGT: heute ist im Mock nichts zufaellig. Der Seed steht
+     * trotzdem hier, und zwar mit einem Waechter (`test-sleeve-ebene2.js`
+     * prueft, dass kein `Math.random` im Mock steht). Der Grund ist die
+     * Reihenfolge: wer das erste zufaellige Verhalten einbaut, greift zum
+     * naechstliegenden Werkzeug. Liegt der gesaete Zufall schon da und ist
+     * `Math.random` verboten, wird es der richtige.
+     */
+    seed: Number.isFinite(o.seed) ? o.seed : 1,
+    /** Rueckstand der Division in Millisekunden - siehe getBonusTime. */
+    bonusMs: Number.isFinite(o.bonusMs) ? o.bonusMs : 0,
     spieler: {
       totalPlaytime: Number.isFinite(o.playtime) ? o.playtime : 100 * 3600000,
       skills: { hacking: 100, strength: 100, defense: 100, dexterity: 100, agility: 100 },
@@ -154,10 +201,45 @@ export function neuerMock(o = {}) {
   };
   if (!zustand.dateien[zustand.host]) zustand.dateien[zustand.host] = {};
 
+  /**
+   * Der Zufall des Mocks - mulberry32, aus dem Seed.
+   *
+   * Er wird HIER erzeugt und nirgends sonst. Wer `Math.random` benutzt, macht
+   * den Test unreproduzierbar, und ein Fehler, der nur bei einem bestimmten
+   * Wurf auftritt, laesst sich dann nicht nachstellen.
+   */
+  let saat = zustand.seed >>> 0;
+  const zufall = () => {
+    saat = (saat + 0x6D2B79F5) >>> 0;
+    let t = saat;
+    t = Math.imul(t ^ (t >>> 15), t | 1);
+    t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+    return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+  };
+
   /** Laesst Zeit vergehen. Beide Uhren, oder gezielt nur eine. */
   const vor = (wallMs, playtimeMs = null) => {
     zustand.wall += wallMs;
     const p = playtimeMs === null ? wallMs : playtimeMs;
+    /**
+     * DER RUECKSTAND WAECHST UND SCHRUMPFT WIE IM SPIEL.
+     *
+     * Zugang: ein Zyklus je 200 ms Spielzeit (`CONSTANTS.MilliPerCycle`).
+     * Abgang: hoechstens 15 je Verarbeitungsschritt, und ein Schritt findet
+     * je Sekunde Spielzeit statt (`Sleeve.ts:263-275`).
+     *
+     * Das ergibt genau die Asymmetrie, um die es geht: eine Stunde
+     * verdeckter Tab legt 18.000 Zyklen an, und die braucht der Koerper
+     * 20 Minuten Spielzeit lang zum Abbau - nicht eine Sekunde.
+     */
+    if (zustand.koerper.length && p > 0) {
+      const zugang = p / 200;
+      const schritte = Math.floor(p / 1000);
+      for (const k of zustand.koerper) {
+        k.storedCycles += zugang;
+        k.storedCycles = Math.max(0, k.storedCycles - schritte * 15);
+      }
+    }
     zustand.playtime += p;
     zustand.spieler.totalPlaytime = zustand.playtime;
     return zustand.wall;
@@ -504,7 +586,64 @@ export function neuerMock(o = {}) {
         ? ziel[n]
         : () => nichtGebaut("singularity." + String(n))),
     }),
-    bladeburner: new Proxy({}, { get: (_, n) => () => nichtGebaut("bladeburner." + String(n)) }),
+    /**
+     * DIE KOERPER. Fuenf Funktionen - genau die, die `src/sleeve.js` ruft.
+     *
+     * Bewusst NICHT mehr: ein Mock, der eine Schnittstelle vollstaendig
+     * nachbaut, statt die benutzte Teilmenge, wird zu einem zweiten Spiel mit
+     * eigenen Fehlern. Was fehlt, wirft - und faellt damit auf.
+     */
+    sleeve: {
+      getNumSleeves: () => zustand.koerper.length,
+      getSleeve: (i) => {
+        const k = zustand.koerper[i];
+        if (!k) return undefined;
+        return {
+          storedCycles: k.storedCycles,
+          shock: k.shock,
+          sync: k.sync,
+          skills: { ...k.skills },
+          hp: { current: 100, max: 100 },
+          city: "Sector-12",
+        };
+      },
+      getTask: (i) => (zustand.koerper[i] ? zustand.koerper[i].aufgabe : null),
+      setToGymWorkout: (i, ort, stat) => {
+        const k = zustand.koerper[i];
+        if (!k) return false;
+        k.aufgabe = { type: "CLASS", classType: stat, location: ort };
+        return true;
+      },
+      setToCommitCrime: (i, was) => {
+        const k = zustand.koerper[i];
+        if (!k) return false;
+        k.aufgabe = { type: "CRIME", crimeType: was };
+        return true;
+      },
+      setToBladeburnerAction: (i, art, name) => {
+        const k = zustand.koerper[i];
+        if (!k) return false;
+        k.aufgabe = { type: "BLADEBURNER", actionType: art, actionName: name };
+        return true;
+      },
+    },
+    bladeburner: new Proxy({
+      /**
+       * Die Bladeburner-Eigenzeit. Sie ist die Uhr, in der `T2_h` und die
+       * Vorratsdeckung gemessen werden (`lib/kpi.js`: "NICHT Motorzeit -
+       * Delta getBonusTime()").
+       *
+       * Das Spiel legt nicht verarbeitete Zyklen in `storedCycles` ab
+       * (`Bladeburner.ts:276`) und arbeitet HOECHSTENS 25 je Aufruf ab
+       * (`Bladeburner.ts:1377-1380`: 5 Sekunden a 5 Zyklen). Bei 300 Zyklen
+       * im Nachholschub sind das 8 Prozent.
+       */
+      getBonusTime: () => zustand.bonusMs,
+    }, {
+      get: (ziel, n) => (n in ziel
+        ? ziel[n]
+        : () => nichtGebaut("bladeburner." + String(n))),
+    }),
     hacknet: new Proxy({}, { get: (_, n) => () => nichtGebaut("hacknet." + String(n)) }),
     formulas: new Proxy({}, { get: (_, n) => () => nichtGebaut("formulas." + String(n)) }),
     args: o.args || [],
@@ -549,5 +688,12 @@ export function neuerMock(o = {}) {
     lege: (host, datei, inhalt) => { dateiHost(host)[datei] = String(inhalt); },
     /** Liest eine Datei von einem beliebigen Rechner - fuer Zusicherungen. */
     lies: (host, datei) => dateiHost(host)[datei],
+    /**
+     * Der gesaete Zufall des Mocks. Nach aussen gereicht, damit ein Test
+     * dieselbe Folge erzeugen kann wie der Mock selbst - und damit ein
+     * Gewerk, das kuenftig Zufall braucht, ihn hier holt statt bei
+     * `Math.random`.
+     */
+    zufall,
   };
 }

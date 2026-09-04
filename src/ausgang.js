@@ -560,7 +560,17 @@ export async function main(ns) {
             // 8,65 GB gehoben, fuer ein Feld, das niemand liest.
             wall: Date.now(), playtime: 0, motorTimeMs: 0,
           }, { von: cur, nach: ziel.node, level: ziel.level,
-            verfahren: ziel.verfahren, wirt });
+            verfahren: ziel.verfahren, wirt,
+            // Gekaufte, nicht eingebaute Augmentierungen verfallen beim
+            // Sprung ersatzlos. `queued_augs_at_jump` hat Soll 0 und hatte
+            // keinen Schreiber (R11) - die Zahl steht in data/einbau.json und
+            // ist NUR in diesem Augenblick zu haben.
+            wartendeAugs: (() => {
+              try {
+                const e = JSON.parse(liesVonHome("data/einbau.json") || "null");
+                return e && Number.isFinite(e.wartend) ? e.wartend : null;
+              } catch { return null; }
+            })() });
         nachHome("data/events.json", JSON.stringify(strom));
       } catch { /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
 

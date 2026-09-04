@@ -40,8 +40,7 @@ import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
   KPI_VERSION } from "lib/kpi.js";
 import { vergib as figVergib, antragGilt as figAntragGilt,
   vergabeGilt as figVergabeGilt } from "lib/figur.js";
-import { laden as evLaden, anhaengen as evAnhaengen,
-  abstandMin as evAbstandMin } from "lib/events.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -657,7 +656,11 @@ export async function main(ns) {
   // Prozessleben entstehen, sonst steht in jeder Minute ein Bootvorgang und
   // boot_latency_min ist immer null.
   const evMerker = { nodeReset: null, augReset: null,
-    bootWall: null, ersteRundeWall: null };
+    bootWall: null,
+    // Beide Zahlen werden EINMAL gemessen und danach nur noch weitergereicht
+    // (R13, R14). Eine je Runde neu gerechnete Kennzahl misst mit jedem
+    // Kernneustart etwas anderes.
+    jumpLatencyMin: null, bootLatencyMin: null };
 
   // Welche Waechterauftraege dieser Prozess schon ausgefuehrt hat. Der
   // Schluessel ist der Stellzeitpunkt - ein Auftrag darf nicht zweimal laufen,
@@ -4209,6 +4212,32 @@ export async function main(ns) {
         evMerker.bootWall = Date.now();
         ereignis("boot", "Kern gestartet in BitNode " + knotenJetzt,
           { node: knotenJetzt, verfahren: regLage.verfahren });
+
+        // DIE SPRUNGDAUER WIRD HIER EINGEFROREN (Skeptiker Runde 4, R13).
+        //
+        // `abstandMin(strom, "jump", "boot")` nimmt das JUENGSTE `boot`, und
+        // `boot` entsteht einmal je PROZESSLEBEN, nicht einmal je Sprung.
+        // Jeder Kernneustart im Knoten - Sprosse 1, Sprosse 3, boot.js nach
+        // einer Wartezeit - setzte die Kennzahl damit auf "Zeit seit dem
+        // Sprung". Gerechnet: 1,50 min direkt nach dem Sprung, 540 min nach
+        // einem Neustart neun Stunden spaeter. Soll ist <= 2.
+        //
+        // Der Wert gehoert also genau EINMAL gemessen: beim ersten Bootvorgang
+        // nach einem Sprung, gegen den letzten `jump`. Danach steht er fest.
+        try {
+          const strom = evLaden(ns.fileExists("data/events.json", "home")
+            ? ns.read("data/events.json") : null);
+          const letzterSprung = [...strom.eintraege].reverse()
+            .find((e) => e.art === "jump");
+          // Nur, wenn der Sprung NACH dem letzten Knotenreset liegt bzw. kurz
+          // davor - ein `jump` aus einem frueheren Knoten misst nichts.
+          if (letzterSprung && Number.isFinite(letzterSprung.wall)
+              && evMerker.bootWall - letzterSprung.wall >= 0
+              && evMerker.bootWall - letzterSprung.wall < 6 * 3600000) {
+            evMerker.jumpLatencyMin =
+              Number(((evMerker.bootWall - letzterSprung.wall) / 60000).toFixed(2));
+          }
+        } catch { /* kein Strom - dann bleibt die Zahl ungemessen */ }
       } else {
         // Ein Reset MITTEN im Prozessleben kann es nicht geben - beide
         // Prestiges toeten alle Skripte (prestigeWorkerScripts). Wenn die
@@ -4257,6 +4286,24 @@ export async function main(ns) {
       k.verfahren = regLage.verfahren;
       k.motorTimeSinceNodeMs = mz.motorTimeMs;
 
+      // --- `negative_balance_min` (R11) ---------------------------------------
+      //
+      // Soll 0, und der Zaehler hatte keinen Schreiber. Der Kern kennt den
+      // Kontostand ohnehin (er entscheidet ueber jeden Kauf damit), also
+      // zaehlt er die Minuten unter null selbst.
+      //
+      // Dass die Zahl in diesem Spiel meist 0 bleibt, ist kein Grund, sie
+      // nicht zu fuehren: ein negativer Stand entsteht sehr wohl - `hacknet`
+      // und `cloud`-Kaeufe pruefen vorher, `singularity`-Kaeufe nicht immer -,
+      // und eine gemessene 0 ist etwas anderes als eine behauptete.
+      {
+        const geldJetzt = ns.getServerMoneyAvailable("home");
+        const vorher = Number.isFinite(k.negative_balance_min) ? k.negative_balance_min : 0;
+        const dMin = Number.isFinite(mzErgebnis.deltaMs)
+          ? Math.min(mzErgebnis.deltaMs, 120000) / 60000 : 0;
+        k.negative_balance_min = Number((vorher + (geldJetzt < 0 ? dMin : 0)).toFixed(2));
+      }
+
       // --- Effizienz ---------------------------------------------------------
       // Brachanteil ist das Gegenstueck zu idle_ram_pct: der Kern rechnet ihn
       // ohnehin fuer die Zielauswahl.
@@ -4303,6 +4350,25 @@ export async function main(ns) {
       try {
         const a = JSON.parse(ns.read("data/ausgang.json"));
         if (a) {
+          // `wirt_fehlt_count` (R11): ausgang.js rechnet den Fall ohnehin -
+          // exit.js passt auf keinen Rechner. Der Zaehler stand auf 0 und
+          // hatte keinen Schreiber; jetzt zaehlt der Kern die Runden, in denen
+          // der Befund steht.
+          if (a.wirtFehlt) {
+            k.wirt_fehlt_count = (Number.isFinite(k.wirt_fehlt_count)
+              ? k.wirt_fehlt_count : 0) + 1;
+          } else if (!Number.isFinite(k.wirt_fehlt_count) && a.offen === false) {
+            // Ein geschlossener Ausgang ohne Wirtproblem ist eine echte
+            // Messung: null Mal aufgetreten.
+            k.wirt_fehlt_count = 0;
+          }
+          // `skipped_route_entries` (R11): ausgang.js fuehrt die Liste der
+          // uebersprungenen Routeneintraege ohnehin mit. Soll ist 0 - ein
+          // uebersprungener Eintrag heisst, dass ein Knoten nicht in der
+          // geplanten Stufe gespielt wurde.
+          if (Array.isArray(a.uebersprungen)) {
+            k.skipped_route_entries = a.uebersprungen.length;
+          }
           if (typeof a.route_state === "string") k.route_state = a.route_state;
           if (a.eta_min === null || Number.isFinite(a.eta_min)) k.eta_min = a.eta_min;
           if (typeof a.eta_sicher === "boolean") k.eta_sicher = a.eta_sicher;
@@ -4313,6 +4379,13 @@ export async function main(ns) {
       // Der Zustand der Strafleiter - erste Zeile jedes Berichts.
       try {
         const w = JSON.parse(ns.read("data/watchdog.json"));
+        // FEHLSTRAFEN (Skeptiker Runde 4, R11). Der Waechter zaehlt sie, der
+        // Kern schreibt die Tafel - so bleibt kpi.json bei einem Schreiber.
+        // `null` bleibt `null`: ein Waechter, der nicht laeuft, hat nicht
+        // "null Fehlstrafen", sondern gar nicht gezaehlt.
+        if (w && Number.isFinite(w.false_penalty_count)) {
+          k.false_penalty_count = w.false_penalty_count;
+        }
         if (w && w.ziele) {
           const ersch = Object.entries(w.ziele)
             .find(([, z]) => z && z.zustand === "EXHAUSTED");
@@ -4366,16 +4439,14 @@ export async function main(ns) {
         const strom = evLaden(ns.fileExists("data/events.json", "home")
           ? ns.read("data/events.json") : null);
 
-        // jump -> boot: wie lange der Wiederanlauf nach einem Sprung dauerte.
-        const jl = evAbstandMin(strom, "jump", "boot", "wall");
-        if (jl !== null) k.jump_latency_min = Number(jl.toFixed(2));
-
-        // boot -> erste volle Runde. Der Kern kennt seine eigene erste Runde:
-        // `evMerker.bootWall` steht seit dem Bootereignis dieses Prozesses.
-        if (Number.isFinite(evMerker.bootWall) && okRunden >= 1) {
-          if (!Number.isFinite(evMerker.ersteRundeWall)) evMerker.ersteRundeWall = jetzt;
-          k.boot_latency_min = Number(
-            ((evMerker.ersteRundeWall - evMerker.bootWall) / 60000).toFixed(2));
+        // Beide Zahlen sind beim Bootvorgang eingefroren worden und werden
+        // hier nur uebernommen (R13, R14). Sie einmal je Runde neu zu rechnen
+        // hiesse, sie mit jedem Kernneustart zu verfaelschen.
+        if (Number.isFinite(evMerker.jumpLatencyMin)) {
+          k.jump_latency_min = evMerker.jumpLatencyMin;
+        }
+        if (Number.isFinite(evMerker.bootLatencyMin)) {
+          k.boot_latency_min = evMerker.bootLatencyMin;
         }
 
         // Sprossen ab 3 in den letzten sieben Tagen. Der Deckel des
@@ -4385,6 +4456,17 @@ export async function main(ns) {
         const woche = jetzt - 7 * 24 * 3600000;
         k.ladder_rungs_ge3_per_week = strom.eintraege.filter((e) =>
           e.art === "penalty" && Number.isFinite(e.wall) && e.wall >= woche).length;
+
+        // `queued_augs_at_jump` (R11): wie viele gekaufte, nicht eingebaute
+        // Augmentierungen beim letzten Sprung offen waren. Sie verfallen dabei
+        // ersatzlos - Soll ist 0. `bn4rep.js` fuehrt die Zahl in
+        // data/einbau.json, und der `jump`-Eintrag traegt sie seit heute mit.
+        const letzterSprung = [...strom.eintraege].reverse()
+          .find((e) => e.art === "jump");
+        if (letzterSprung && letzterSprung.daten
+            && Number.isFinite(letzterSprung.daten.wartendeAugs)) {
+          k.queued_augs_at_jump = letzterSprung.daten.wartendeAugs;
+        }
       } catch { /* kein Strom - dann bleiben die Felder, wie sie waren */ }
 
       k.erzeugtAm = jetzt;
@@ -4406,6 +4488,24 @@ export async function main(ns) {
     // gefordert.
     okRunden++;
     errStreak = 0;
+
+    // DIE ANLAUFDAUER, AN DER RICHTIGEN STELLE (Skeptiker Runde 4, R14).
+    //
+    // Sie stand im KPI-Block, und der laeuft nur bei `runde % 6 === 0`.
+    // Gemessen wurde damit Runde 1 bis Runde 6 - das Abtastraster, nicht der
+    // Anlauf. Bei sichtbarem Tab ergab das ~0,8 min; im verdeckten Tab, wo das
+    // Spiel belegt einen Zeitgeber je Minute liefert, waeren es 5 bis 6 min
+    // gegen ein Soll von <= 5. Die Kennzahl waere in genau dem Betriebszustand
+    // durchgefallen, den Abnahmestufe B ausdruecklich verlangt - ohne dass
+    // irgendetwas kaputt ist.
+    //
+    // Hier ist der Ort: `okRunden++` heisst "eine Runde vollstaendig
+    // durchgelaufen". Genau das ist "der Motor laeuft".
+    if (!Number.isFinite(evMerker.bootLatencyMin)
+        && Number.isFinite(evMerker.bootWall)) {
+      evMerker.bootLatencyMin =
+        Number(((Date.now() - evMerker.bootWall) / 60000).toFixed(2));
+    }
 
     // Die Uhr alle 30 Runden (rund 5 Minuten) wegschreiben. Jede Runde waere
     // unnoetig, nie waere sie nach einem Neustart verloren.

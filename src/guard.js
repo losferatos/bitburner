@@ -123,6 +123,11 @@ export async function main(ns) {
   // beim Schreiben.
   let auftraege = [];
 
+  // Fehlstrafen dieses Laufs (R11). Sie gehen in watchdog.json hinaus, und
+  // der Kern uebernimmt sie in die Kennzahlentafel - der Waechter schreibt
+  // kpi.json nicht selbst, das taeten dann zwei.
+  let fehlstrafen = 0;
+
   let runden = 0;
   let errStreak = 0;
   let okRunden = 0;
@@ -395,6 +400,27 @@ export async function main(ns) {
             });
             eintrag.ausgefuehrt = erg.getan;
             eintrag.details = erg.text;
+            // FEHLSTRAFEN ZAEHLEN (Skeptiker Runde 4, R11, 04.09.2026).
+            //
+            // `false_penalty_count` hat Soll 0 und ist Abnahmebedingung - und
+            // hatte keinen Schreiber. Bis heute war die Zahl null, weil sie
+            // beim Anlegen auf 0 gesetzt und nie angefasst wurde; die
+            // Bedingung war damit unfaelschbar.
+            //
+            // Was zaehlt als Fehlstrafe: eine ausgefuehrte Sprosse, die ins
+            // LEERE griff. Sprosse 1 und 2 melden das ehrlich - "laeuft
+            // nirgends - nichts zu beenden". Der Waechter hat dann auf ein
+            // Phantom eingeschlagen: die Telemetrie war zu Recht alt, weil das
+            // Werkzeug gar nicht lief, und der Kern startet es, sobald Platz
+            // ist. Eine Strafe war dafuer die falsche Antwort.
+            //
+            // Das ist eine enge Definition, und sie ist absichtlich eng: eine
+            // weite waere geraten. Was sie zaehlt, ist belegbar falsch.
+            if (erg.getan === false && /laeuft nirgends/.test(String(erg.text))) {
+              fehlstrafen++;
+              sag("FEHLSTRAFE: Sprosse " + r.sprosse.nr + " auf " + r.ziel
+                + " griff ins Leere (" + fehlstrafen + " in diesem Lauf).");
+            }
             // Jetzt erst steht fest, was wirklich geschah (R4).
             //
             // Fuer Sprosse 5 heisst `getan` allerdings nur "Auftrag gestellt" -
@@ -447,6 +473,7 @@ export async function main(ns) {
         wall, runden, okRunden, errStreak, lastError,
         modus: modusRoh, karenz: false, motorTimeMs,
         letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
+        fehlstrafen,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -598,6 +625,8 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     // Die Ausfuehrungszeitpunkte gehen mit hinaus (R17) - ohne sie faellt die
     // Wirkungspruefung nach jedem Neustart auf ihr altes Verhalten zurueck.
     letzteAusfuehrung: lage.letzteAusfuehrung || {},
+    // Der Zaehler fuer false_penalty_count (R11). Der Kern liest ihn.
+    false_penalty_count: lage.fehlstrafen ?? null,
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block
     // ungueltig, und der Kern wuerde den Waechter zu Recht fuer tot halten.
@@ -616,7 +645,13 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     puls: lage.puls,
     signaleJetzt: lage.signale,
     // Was der Kern tun soll, weil der Waechter es nicht kann. Heisst `orders`,
-    // weil ARCHITEKTUR 3.1 den Kanal so nennt und tools/ ihn so liest.
+    // weil ARCHITEKTUR 3.1 den Kanal so nennt.
+    //
+    // Der frueher hier stehende Zusatz "und tools/ ihn so liest" war falsch -
+    // null Treffer im ganzen Werkzeugordner (Skeptiker Runde 4, R19). Gelesen
+    // wird er vom KERN, in bn4net.js Abschnitt 9c. Ein Kommentar, der einen
+    // Leser behauptet, den es nicht gibt, ist derselbe Fehler wie ein Feld
+    // ohne Leser - nur schwerer zu finden.
     orders: lage.auftraege || [],
   });
 }

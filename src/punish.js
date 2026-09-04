@@ -97,6 +97,45 @@ export async function main(ns) {
       ns.write("data/punish.json", JSON.stringify(raus), "w");
       if (ns.getHostname() !== "home") ns.scp("data/punish.json", "home", ns.getHostname());
     } catch { /* egal */ }
+
+    // DER TROCKENLAUF MUSS BEOBACHTBAR SEIN (Skeptiker Runde 4, R19,
+    // 04.09.2026).
+    //
+    // Der Auftrag verlangt einen protokollierten Trockenlauf als Beleg, bevor
+    // Sprosse 5 scharf wird. Bis heute schrieb diese Datei ihr Ergebnis nach
+    // `data/punish.json` - und die las NIEMAND: kein Skript, kein Werkzeug,
+    // und `punish.js` steht in keiner Registry, hat also auch keine
+    // Frischeueberwachung. Der Beleg war unauffindbar.
+    //
+    // Der Ereignisstrom ist der richtige Ort: ihn liest der Kern, er geht in
+    // `kpi.json` und damit in `checkin.js`, und er ueberlebt als Ringpuffer
+    // auch den naechsten Lauf. Die Art `penalty` bleibt, was sie ist - hier
+    // steht dazu, ob wirklich eingebaut wurde.
+    try {
+      const roh = lies("data/events.json");
+      let strom = { version: 1, eintraege: [] };
+      if (roh) {
+        try {
+          const g = JSON.parse(roh);
+          if (g && Array.isArray(g.eintraege)) strom = g;
+        } catch { /* frischer Strom */ }
+      }
+      strom.eintraege.push({
+        art: "penalty",
+        text: ("Sprosse 5 " + (raus.ausgefuehrt ? "AUSGEFUEHRT"
+          : (scharf ? "verweigert" : "Trockenlauf")) + ": "
+          + (grund || "eingebaut")).slice(0, 160),
+        wall: Date.now(), playtime: 0, motorTimeMs: 0,
+        daten: { rung: 5, scharf, ausgefuehrt: raus.ausgefuehrt,
+          verweigert: grund || null },
+      });
+      while (strom.eintraege.length > 460) strom.eintraege.shift();
+      ns.write("data/events.json", JSON.stringify(strom), "w");
+      if (ns.getHostname() !== "home") {
+        ns.scp("data/events.json", "home", ns.getHostname());
+      }
+    } catch { /* Bericht, nie Steuerung */ }
+
     if (grund) ns.print("Sprosse 5 VERWEIGERT: " + grund);
   };
 

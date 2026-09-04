@@ -157,9 +157,7 @@ export function leer(jetzt = 0) {
   const k = { version: KPI_VERSION, erzeugtAm: jetzt };
   for (const [name, def] of Object.entries(FELDER)) {
     if (name === "version") continue;
-    if (def.klasse === "autonomie" && def.art === "zahl" && def.soll === 0) {
-      k[name] = 0;          // ein Fehlerzaehler beginnt gemessen bei null
-    } else if (def.art === "objekt") {
+    if (def.art === "objekt") {
       k[name] = null;
     } else {
       k[name] = null;       // nie gemessen
@@ -270,7 +268,8 @@ export function wandere(k, von) {
     // (sie wurden nie gemessen - eine 0 waere hier eine Behauptung).
     for (const [name, def] of Object.entries(FELDER)) {
       if (name in aus) continue;
-      aus[name] = (def.klasse === "autonomie" && def.art === "zahl" && def.soll === 0) ? 0 : null;
+      // Auch beim Wandern gilt: `null` heisst "nicht gemessen" (R11).
+      aus[name] = null;
     }
   }
   aus.version = KPI_VERSION;
@@ -283,9 +282,22 @@ export function neuerLauf(k, nodeResetJetzt) {
   const aus = { ...k };
   aus.nodeReset = nodeResetJetzt;
   aus.motorTimeSinceNodeMs = 0;
+  // NULL HEISST "NICHT GEMESSEN", NICHT "NULL MAL PASSIERT"
+  // (Skeptiker Runde 4, R11, 04.09.2026).
+  //
+  // Hier stand `aus[name] = 0`. Damit standen alle Soll-0-Kennzahlen nach
+  // jedem Knotenwechsel auf 0 - und weil mehrere von ihnen ueberhaupt keinen
+  // Schreiber haben, blieben sie es. Ein Pruefer hat es so zusammengefasst:
+  // "alle Soll-0-Kennzahlen sind null per Konstruktion". Die Abnahmebedingung
+  // `false_penalty_count = 0` war damit unfaelschbar, und die Begruendung, den
+  // Waechter erst nach ihrer Messung scharfzustellen, ins Leere gelaufen.
+  //
+  // `null` ist der ehrliche Anfangswert: es heisst "hier hat noch niemand
+  // gezaehlt". Wer zaehlt, setzt eine Zahl - und erst dann ist eine 0 eine
+  // Aussage. `checkin.js` und `tools/kpi-luecken.js` melden den Unterschied.
   for (const [name, def] of Object.entries(FELDER)) {
     if (def.klasse !== "autonomie") continue;
-    if (def.art === "zahl" && def.soll === 0) aus[name] = 0;
+    if (def.art === "zahl" && def.soll === 0) aus[name] = null;
   }
   // Effizienzwerte des alten Laufs sind fuer den neuen bedeutungslos.
   for (const [name, def] of Object.entries(FELDER)) {

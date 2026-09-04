@@ -76,11 +76,36 @@ export const SOLVERS = {
       // geben. Der Einschluss ist der Punkt: bei data = 512 ist die Antwort 2,
       // und wer nur die Faktoren KLEINER als 2 herausdividiert, behaelt 512
       // uebrig und lehnt die richtige Antwort ab.
+      // DIE SCHLEIFE LAEUFT BIS sqrt(data), NICHT BIS answer (Skeptiker
+      // Runde 4, Substanz-Befund 1, 04.09.2026).
+      //
+      // Hier stand `for (let d = 2; d <= answer; d++)`. `answer` ist der
+      // GROESSTE Primfaktor - bei einer Primzahl also `data` selbst, und das
+      // Spiel erzeugt bis 1e9 (FindLargestPrimeFactor.ts:14).
+      //
+      // Gemessen ueber 300 echte Generatorinstanzen: 103 ms im Mittel, 634 ms
+      // im p95, 2.886 ms im schlimmsten Fall - fuer die Primzahl 999999937
+      // waren es 3.761 ms. Das ist Standbild im Browser, und zwar mitten in
+      // der Kaltstart-Geldkette. Der `guard` erlaubt bis 1e12; dort waere es
+      // rund eine Stunde gewesen.
+      //
+      // Die Lehre dahinter ist allgemeiner: alle guard-Grenzen dieser Datei
+      // sind gegen die Laufzeit von `solve` bemessen. Die Arbeit, die `verify`
+      // seit C.18 zusaetzlich leistet, war nirgends eingerechnet.
+      //
+      // Richtig ist dieselbe Aussage in O(sqrt(data)): alle Primfaktoren bis
+      // sqrt herausdividieren; was uebrig bleibt, ist entweder 1 (dann war der
+      // groesste Faktor <= sqrt und muss `answer` sein) oder selbst der
+      // groesste Primfaktor. Rund 0,2 ms.
       if (!Number.isInteger(answer) || answer < 2 || data % answer !== 0) return false;
       for (let d = 2; d * d <= answer; d++) if (answer % d === 0) return false;
       let n = data;
-      for (let d = 2; d <= answer; d++) while (n % d === 0) n /= d;
-      return n === 1;
+      let groesster = 1;
+      for (let d = 2; d * d <= n; d++) {
+        while (n % d === 0) { n /= d; groesster = d; }
+      }
+      if (n > 1) groesster = n;   // der Rest ist selbst prim
+      return groesster === answer;
     }
   },
 
@@ -1378,10 +1403,23 @@ export const SOLVERS = {
       const schluessel = data[1];
       if (typeof klar !== "string" || typeof schluessel !== "string" || !schluessel.length) return false;
       if (answer.length !== klar.length) return false;
+      // LEERZEICHEN WIE IN solve (Skeptiker Runde 4, Substanz-Befund 5).
+      //
+      // `solve` laesst sie stehen; diese Probe rechnete jedes Zeichen zurueck.
+      // Heute folgenlos - das Spiel fuegt den Vigenere-Klartext mit `join("")`
+      // zusammen -, aber ein Leerzeichen wuerde die richtige Antwort ablehnen
+      // und der Vertrag bliebe liegen. Ein Fehler, der auf eine Aenderung im
+      // Spiel wartet, ist einer.
+      // DER SCHLUESSELINDEX IST DIE ZEICHENPOSITION, nicht die Zahl der
+      // Buchstaben: ein Leerzeichen ruecht den Schluessel im Spiel MIT
+      // (Encryption.ts:235, `data[1].charCodeAt(i % data[1].length)`). Beim
+      // ersten Anlauf dieser Reparatur stand hier ein eigener Zaehler, der
+      // Leerzeichen uebersprang - das waere eine andere Chiffre gewesen.
       let zurueck = "";
       for (let i = 0; i < answer.length; i++) {
-        const k = schluessel.charCodeAt(i % schluessel.length) - 65;
-        zurueck += String.fromCharCode(((answer.charCodeAt(i) - 65 - k + 26) % 26) + 65);
+        if (answer[i] === " ") { zurueck += " "; continue; }
+        const v = schluessel.charCodeAt(i % schluessel.length) - 65;
+        zurueck += String.fromCharCode(((answer.charCodeAt(i) - 65 - v + 26) % 26) + 65);
       }
       return zurueck === klar;
     }

@@ -217,6 +217,49 @@ console.log("-- die Rechnung des Kerns ist billiger --");
 }
 
 console.log("");
+console.log("-- der Kern fasst die cloud-Familie nicht mehr an --");
+{
+  // ns.cloud.* kostet 3,85 GB: purchaseServer 2,25, getServerNames 1,05,
+  // getServerCost 0,25, upgradeServer 0,25, getRamLimit 0,05. Das ist mehr
+  // als ein Zehntel des Kaltstart-Budgets fuer eine Handlung, die vielleicht
+  // einmal je Stunde vorkommt.
+  const kern = fs.readFileSync(finde("bn4net.js"), "utf8")
+    .replace(/\/\*[\s\S]*?\*\//g, " ")
+    .replace(/(^|[^:])\/\/.*$/gm, "$1 ");
+  for (const f of ["cloud.purchaseServer", "cloud.getServerNames", "cloud.getServerCost",
+                   "cloud.upgradeServer", "cloud.getRamLimit", "cloud.getServerLimit",
+                   "cloud.getServerUpgradeCost"]) {
+    pruefe("der Kern ruft ns." + f + " nicht mehr auf", !kern.includes("ns." + f));
+  }
+  pruefe("er liest stattdessen die Preistabelle", /data\/preise\.json/.test(kern));
+  pruefe("und stellt Auftraege", /data\/kaufauftrag\.json/.test(kern));
+
+  // shop.js MUSS sie dafuer haben - sonst kauft niemand mehr.
+  const shop = fs.readFileSync(finde("shop.js"), "utf8");
+  pruefe("shop.js kauft", /ns\.cloud\.purchaseServer/.test(shop));
+  pruefe("shop.js baut aus", /ns\.cloud\.upgradeServer/.test(shop));
+  pruefe("shop.js schreibt die Preistabelle", /data\/preise\.json/.test(shop));
+  pruefe("und meldet jedes Ergebnis zurueck", /data\/kaufergebnis\.json/.test(shop),
+    "sonst wartet der Kern ewig auf einen Rechner, den es nie geben wird");
+}
+
+console.log("");
+console.log("-- der Ausbaupreis ist eine Preisdifferenz --");
+{
+  // getServerUpgradeCost kostet 0,25 GB und liefert dasselbe wie die
+  // Differenz zweier Rechnerpreise (ServerPurchases.ts). Der Kern rechnet
+  // sie jetzt aus der Tabelle.
+  const preise = { 64: 3.52e6, 128: 7.04e6, 256: 14.08e6 };
+  const diff = (von, nach) => Math.max(0, (preise[nach] || 0) - (preise[von] || 0));
+  pruefe("64 -> 128 kostet die Differenz", diff(64, 128) === 3.52e6);
+  pruefe("128 -> 256 ebenso", diff(128, 256) === 7.04e6);
+  pruefe("ein Rueckbau kostet nichts (nicht negativ)", diff(256, 64) === 0,
+    "eine negative Zahl haette jede Pruefung 'kosten > 0' bestanden");
+  pruefe("eine unbekannte Groesse ergibt 0", diff(64, 999) === 0,
+    "und wird damit nicht gekauft - richtig, denn der Preis ist unbekannt");
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

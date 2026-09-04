@@ -109,3 +109,57 @@ Der Ausbauzweig gehört nach Phase C.
 ### Offene Punkte am Ende von Phase 0
 
 Siehe `BEFUNDE.md`. Kein Punkt blockiert den Übergang nach Phase A2.
+
+---
+
+## Phase A2 — Prüfstand (Pflicht-Gate vor dem ersten Modul)
+
+**Abgeschlossen:** Fr 04.09.2026 02:30
+
+| Bauteil | Zustand | Beleg |
+|---|---|---|
+| v3.0.1 production | gebaut | `reference/v301`, webpack 278 s, Titel im Browser: `Bitburner v3.0.1 (3162fd2)` |
+| v3.0.1 development | gebaut | `reference/v301-dev`, mit Dev-Menü für die Fixtures |
+| `serve.js` parametriert | ja | 8799 prod / 8798 dev, Brücken-Ports gesperrt (Exit 3 auf 8795) |
+| Zweite Brücke | läuft | `--instance TEST --rfa-port 12526 --dash-port 8796 --data-dir pruefstand/data` |
+| Klon mit gepatchtem Port | ja | `tools/klon.js`, Prüfung eingebaut, Klon wird bei roter Prüfung gelöscht |
+| CDP-Client | neu | `pruefstand/cdp.js`, drei Riegel, Selbsttest 5 von 5 |
+| Prüfstand-Browser | läuft | Chrome 152, Debug-Port 9333, Profil unter `pruefstand/browser`, 4 Kerne |
+
+### Der Wachhund-Beweis
+
+Ein Klon des Live-Spielstands (Port auf 12526 gepatcht) wurde über den CDP-Client
+in die IndexedDB von `localhost:8799` geschrieben und die Seite neu geladen.
+
+| Prüfung | Erwartet | Gemessen |
+|---|---|---|
+| Testinstanz verbindet auf | 12526 (TEST) | **12526** |
+| Zweite Verbindung im LIVE-Log | keine | **keine** |
+| Alarm auf der LIVE-Seite | keiner | **`alarm: null`** |
+| TEST-Brücke verifiziert | ja | in 193 ms, BN10 L2 |
+| Live-Motor läuft weiter | ja | Runde 3987 → 4009 |
+
+**Gate A2 ist damit bestanden.** Ab hier sind Eingriffe in `src/` zulässig,
+sofern die Checkliste aus Auftrag 9 vollständig durchlaufen wird.
+
+### Was der Lauf nebenbei bewies
+
+Der Hash-Vergleich vor jedem Schub fing im Echtbetrieb **113 Dateien** ab, die
+der Dateibeobachter ohne jede Inhaltsänderung schieben wollte — dazu ein zweites
+Mal 115. Das ist derselbe Vorgang, der am 03.09. dreimal ungefiltert ins laufende
+Spiel ging. Die Ursache des Watcher-Feuerns bleibt ungeklärt; der Inhaltsvergleich
+macht sie gleichgültig.
+
+### Zwei Fehler, die erst dieser Lauf zeigte
+
+1. **Die TEST-Instanz schrieb in Erics Arbeitsliste.** Zwei Meldungen, beide für
+   die Kopie sachlich richtig, landeten in `nodes/BAUSTELLEN.md ## Sofort`. Eine
+   Liste mit Testlaufmeldungen wird nach dem dritten Mal nicht mehr gelesen —
+   damit wäre der einzige Kanal vom Spiel zu Eric unbrauchbar geworden, und zwar
+   durch die Bauarbeit, die ihn schützen soll. Behoben: nur die LIVE-Rolle
+   erreicht die Liste, TEST schreibt nach `pruefstand/data/sofort-test.md`.
+2. **Das Urteil „Autosave steht" feuerte sofort nach dem Laden.** Eine frisch
+   geladene Instanz trägt das `lastSave` aus ihrem Spielstand, beim Klon 56
+   Minuten alt; das Spiel speichert aber binnen 60 Sekunden von selbst. Behoben:
+   die Brücke urteilt erst, wenn die Verbindung zehn Minuten steht. In einer
+   Reload-Schleife wäre daraus sonst Dauerfeuer geworden.

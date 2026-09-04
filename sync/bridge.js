@@ -1005,6 +1005,36 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
   if (sofortGesehen.has(schluessel)) return;
   sofortGesehen.add(schluessel);
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
+
+  /**
+   * NUR DIE LIVE-ROLLE SCHREIBT IN ERICS ARBEITSLISTE.
+   *
+   * Belegt am 04.09.2026 02:27: die frisch aufgesetzte TEST-Instanz meldete
+   * "Verbindung ohne Anker angenommen" und "Autosave steht" - beides in der
+   * Sache richtig FUER DIE TESTKOPIE - und trug beides in nodes/BAUSTELLEN.md
+   * ein, also in die Liste, an der Eric seine echte Arbeit ablesen soll.
+   *
+   * Eine Liste, in der Testlaufmeldungen stehen, wird nach dem dritten Mal
+   * nicht mehr gelesen. Damit waere der einzige Kanal vom Spiel zu Eric
+   * unbrauchbar - und zwar durch die Bauarbeit selbst, die ihn schuetzen soll.
+   * TEST schreibt deshalb in eine eigene Datei unter pruefstand/.
+   */
+  if (!IST_LIVE) {
+    try {
+      const ziel = path.join(DATA_DIR, "sofort-test.md");
+      await mkdir(DATA_DIR, { recursive: true });
+      await appendFile(
+        ziel,
+        "\n### " + titel + "  (" + new Date().toISOString() + ", " + quelle + ")\n\n" + text + "\n",
+        "utf8",
+      );
+      log("info", "TEST-Meldung nach " + ziel + " (nicht nach ## Sofort): " + titel);
+    } catch (e) {
+      log("error", "TEST-Meldung nicht schreibbar: " + e.message);
+    }
+    return;
+  }
+
   const ordner = path.join(ROOT, "nodes", "BAU-2026-09", "sofort");
   const datei = path.join(ordner, ts + "-" + quelle + ".md");
   try {
@@ -1099,7 +1129,17 @@ async function faelleUrteile() {
   // Das ist derselbe Fehler wie beim alten lastTelemetryAt, nur spiegelverkehrt:
   // statt nie zu feuern, feuert er immer. Beide vergiften denselben Kanal, den
   // fuer echte Notfaelle. (Befund 04.09.2026.)
-  if (state.connected && state.lastSaveAt && state.lastSaveGemessenAm) {
+  //
+  // Zusaetzlich muss die Verbindung STEHEN. Belegt am 04.09.2026 02:27: eine
+  // frisch geladene Instanz traegt das `lastSave` aus ihrem Spielstand, das
+  // beliebig alt sein kann - beim Klon war es 56 Minuten. Das Urteil feuerte
+  // deshalb SOFORT nach dem Laden, obwohl das Spiel nur noch keine Minute
+  // gelaufen war und binnen 60 Sekunden von selbst speichert.
+  // In einer Reload-Schleife waere daraus Dauerfeuer geworden.
+  const verbunden = state.connectedSince
+    ? jetzt - new Date(state.connectedSince).getTime()
+    : 0;
+  if (state.connected && verbunden > 10 * 60000 && state.lastSaveAt && state.lastSaveGemessenAm) {
     const alter =
       new Date(state.lastSaveGemessenAm).getTime() - new Date(state.lastSaveAt).getTime();
     if (alter > 5 * 60000 && jetzt - letztesUrteil.autosave > URTEIL_ABSTAND_MS) {

@@ -192,10 +192,18 @@ export class PruefstandCdp {
           ", das Ziel ist aber " + this.zielUrl,
       );
     }
-    const zahlen = Array.from(gzBytes);
+    /**
+     * Base64 statt Zahlenliste. Ein Spielstand hat rund 660.000 Bytes; als
+     * JSON-Zahlenarray waeren das ueber 2 MB Ausdruckstext, die als eine
+     * WebSocket-Nachricht durch die Debug-Verbindung muessten. Base64 kostet
+     * ein Drittel davon und wird in der Seite dekodiert.
+     */
+    const b64 = Buffer.from(gzBytes).toString("base64");
     const ausdruck = `
       (async () => {
-        const bytes = new Uint8Array(${JSON.stringify(zahlen)});
+        const roh = atob(${JSON.stringify(b64)});
+        const bytes = new Uint8Array(roh.length);
+        for (let i = 0; i < roh.length; i++) bytes[i] = roh.charCodeAt(i);
         const db = await new Promise((ok, nein) => {
           const a = indexedDB.open("bitburnerSave", 2);
           a.onsuccess = () => ok(a.result);

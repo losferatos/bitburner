@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T07:15:00",
+  "aktualisiert": "2026-09-04T07:26:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -46,9 +46,9 @@
       "offen": ""
     },
     "C.6": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "guard.js im Beobachtungsmodus plus boot.js-Schonliste",
-      "offen": ""
+      "offen": "Beobachtungsmodus, 54 Pruefungen in zwei Ebenen. Offen: die Ausfuehrung der Sprossen (C.9). NICHT live."
     },
     "C.7": {
       "stand": "offen",

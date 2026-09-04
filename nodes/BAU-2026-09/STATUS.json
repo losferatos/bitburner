@@ -1,0 +1,35 @@
+{
+  "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
+  "aktualisiert": "2026-09-04T06:20:00",
+  "vorphasen": {
+    "phase0": { "stand": "abgenommen", "was": "Boden legen, Spielstand-Schutz, Bruecke" },
+    "phaseA": { "stand": "abgenommen", "was": "Bestandsaufnahme, RAM-Budget, Knotentabelle" },
+    "phaseA2": { "stand": "abgenommen", "was": "Pruefstand mit TEST-Instanz, Wachhund-Beweis" },
+    "phaseB": { "stand": "abgenommen", "was": "Architektur mit Judge-Panel, Gate B bestanden" }
+  },
+  "positionen": {
+    "C.1": { "stand": "gebaut", "was": "kpi.json, events.json, Motorzeit im Kern, Herzschlag v2",
+      "offen": "Einbau in bn4net.js; die drei Kontraktmodule stehen und sind geprueft" },
+    "C.2": { "stand": "abgenommen", "was": "wakelock.js minus 32 GB",
+      "offen": "" },
+    "C.3": { "stand": "gebaut", "was": "Zielpruefung, Wirtreserve, eta_min, route_state, Raeumkette",
+      "offen": "Skeptikerrunde laeuft; Raeumkette L2/L3/L5 noch nicht gebaut; noch nicht live" },
+    "C.4": { "stand": "offen", "was": "registry.json und lib/reg.js", "offen": "" },
+    "C.5": { "stand": "offen", "was": "Kern liest Registry statt der zwei Arrays", "offen": "" },
+    "C.6": { "stand": "offen", "was": "guard.js im Beobachtungsmodus plus boot.js-Schonliste", "offen": "" },
+    "C.7": { "stand": "offen", "was": "Kaltstart-Kern: shop.js, hackAnalyze inline, Kaltstart-Leiter", "offen": "" },
+    "C.8": { "stand": "offen", "was": "Kaltstart-Geldkette: cdump/csolve, darkweb, sleevecrime", "offen": "" },
+    "C.9": { "stand": "offen", "was": "Sprossen 0-2 scharf", "offen": "" },
+    "C.10": { "stand": "offen", "was": "Sprosse 3 scharf", "offen": "" },
+    "C.11": { "stand": "offen", "was": "Figur-Vergabepunkt und figwatch.js", "offen": "" },
+    "C.12": { "stand": "offen", "was": "Sprosse 4a und 5 (punish.js)", "offen": "" },
+    "C.13": { "stand": "offen", "was": "BN9-Gewerk", "offen": "" },
+    "C.14": { "stand": "offen", "was": "Grafting-Automatik", "offen": "" },
+    "C.15": { "stand": "offen", "was": "boerse.js (BN8), BN15-Tor", "offen": "" }
+  },
+  "abnahme": {
+    "stufeA": { "stand": "offen", "was": "Tests und Skeptiker gruen, Lueckenliste leer" },
+    "stufeB": { "stand": "offen", "was": "12 h live ohne Eingriff" },
+    "stufeC": { "stand": "offen", "was": "ein beobachteter autonomer BitNode-Sprung mit Kaltstart" }
+  }
+}

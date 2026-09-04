@@ -78,6 +78,7 @@ export { planeRoute, zielErlaubt, routeZustand };
 // reine Module ohne ns-Aufruf ausser den Basisfunktionen und kosten damit
 // nichts, was ausgang.js nicht ohnehin zahlt.
 import { messe, etaMinuten } from "lib/eta.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 /**
  * KEINE WIRTRESERVE MEHR (Skeptikerrunde 04.09.2026).
@@ -541,6 +542,28 @@ export async function main(ns) {
             ". exit.js startet damit nicht oder lehnt jeden Sprung ab.");
         }
       }
+      // DER SPRUNG GEHOERT IN DEN EREIGNISSTROM - UND ZWAR VORHER
+      // (04.09.2026). `jump_latency_min` ist der Abstand zwischen diesem
+      // Eintrag und dem naechsten `boot`; nach dem Sprung kann ihn niemand
+      // mehr schreiben, weil beide Prestiges alle Skripte toeten
+      // (Prestige.ts, prestigeWorkerScripts). Die Zeile MUSS also vor dem
+      // exec stehen, auch wenn der Sprung danach scheitert - ein `jump` ohne
+      // folgenden `boot` ist selbst der Befund.
+      try {
+        const strom = evLaden(liesVonHome("data/events.json"));
+        evAnhaengen(strom, "jump", "exit.js gestartet: BitNode " + cur
+          + " -> " + ziel.node + " Stufe " + ziel.level, {
+            // NUR DIE WANDUHR. `jump_latency_min` steht ausdruecklich in
+            // Wanduhr (ARCHITEKTUR 4.2) - sie misst, wie lange der Bot
+            // brauchte, nicht wie lange er arbeitete. `ns.getPlayer` haette
+            // 0,50 GB gekostet und dieses Gewerk im Kaltstart von 8,15 auf
+            // 8,65 GB gehoben, fuer ein Feld, das niemand liest.
+            wall: Date.now(), playtime: 0, motorTimeMs: 0,
+          }, { von: cur, nach: ziel.node, level: ziel.level,
+            verfahren: ziel.verfahren, wirt });
+        nachHome("data/events.json", JSON.stringify(strom));
+      } catch { /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
+
       const pid = ns.exec("exit.js", wirt, 1, ziel.node);
       letzterStart = Date.now();
       sag(pid

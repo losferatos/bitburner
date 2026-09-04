@@ -90,10 +90,34 @@ export async function main(ns) {
   //     eine gekaufte Werkbank, also Geld, also das Netz, das die Knacker erst
   //     aufschliessen). Genau dieser Zirkel hat am 25.08. dreizehneinhalb
   //     Stunden gekostet.
+  //   data/blocked-hosts.json: die Wirtsperren des Waechters (Skeptiker
+  //     Runde 3, K2). Sie stand in keiner Raeumliste. Nach einem Reset heisst
+  //     `werk-0` ein voellig anderer Rechner - der alte ist geloescht
+  //     (prestigeAllServers), der neue bekommt denselben Namen beim naechsten
+  //     Kauf. Eine Sperre aus dem alten Lauf haette also bis zu eine Stunde
+  //     lang (bis zum Verfall) einen unschuldigen Rechner ausgeschlossen,
+  //     und zwar den einzigen, den es in der Startlage gibt.
+  //   data/preise.json, data/kaufauftrag.json, data/kaufergebnis.json:
+  //     der Rechnerpark und die offenen Auftraege. Sie standen bis zum
+  //     04.09.2026 unten bei den knotengebundenen Dateien - das war falsch
+  //     (Skeptiker Runde 3, K5). `prestigeAugmentation` ruft
+  //     `prestigeAllServers()` und setzt `purchasedServers = []`
+  //     (Prestige.ts:55-75); nach einem Augmentierungs-Einbau ist der Park
+  //     also genauso weg wie nach einem Sprung.
+  //
+  //     Die Folge des alten Standes: `shop.js` merkt sich ueber den Neustart
+  //     nur ERFOLGREICHE Auftraege. Ein auf Geld wartender Auftrag ueberlebte
+  //     den Einbau und wurde danach ausgefuehrt - mit dem Geld der neuen
+  //     Startlage, fuer einen Rechner, den der Kern in der neuen Lage
+  //     vielleicht gar nicht mehr so bestellt haette. Und die Preistabelle
+  //     beschrieb einen Park, den es nicht mehr gab.
   for (const datei of ["data/install-sperre.txt", "data/beitritt-erledigt.txt",
                        "data/rep-modus.txt", "data/company-order.txt",
                        "data/geldbedarf.txt", "data/reload.txt", "data/hilfe.txt",
-                       "data/portknacker-komplett.txt"]) {
+                       "data/portknacker-komplett.txt",
+                       "data/preise.json", "data/kaufauftrag.json",
+                       "data/kaufergebnis.json",
+                       "data/blocked-hosts.json"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }
   // KNOTENGEBUNDENE DATEIEN NUR NACH EINEM KNOTENWECHSEL (02.09.2026).
@@ -118,23 +142,12 @@ export async function main(ns) {
   try { nachKnotenwechsel = Date.now() - ns.getResetInfo().lastNodeReset < 300000; }
   catch { /* kein Zugriff - im Zweifel wie nach einem Wechsel raeumen */ }
   if (nachKnotenwechsel) {
-    //   data/preise.json: der Rechnerpark des ALTEN Knotens. Nach dem
-    //     Wechsel gibt es keinen einzigen Mietrechner mehr
-    //     (Prestige.ts:73 loescht sie alle), aber der Kern liest die Liste
-    //     fuenf Minuten lang weiter als "da". Folge: er haelt Geisterrechner
-    //     fuer vorhanden, ueberspringt die Kaltstart-Leiter und rechnet mit
-    //     den Preisen des alten BitNodes - in BN4 sind die wegen
-    //     CloudServerSoftcap ganz andere.
-    //   data/kaufauftrag.json und data/kaufergebnis.json: Auftrag und
-    //     Ergebnis des alten Knotens. Ein liegengebliebener Auftrag ueber
-    //     2 TB wuerde im neuen Knoten als erstes ausgefuehrt - mit Geld, das
-    //     dort die ganze Startlage traegt (nach installAugmentations sind es
-    //     1.262 $).
+    // Die drei Kaufdateien standen hier bis zum 04.09.2026. Sie sind nach
+    // OBEN gewandert, in die unbedingte Liste - die Begruendung steht dort
+    // (K5): beide Prestiges loeschen den Park, nicht nur der Sprung.
     for (const datei of ["data/task.txt", "data/exit-ziel.txt",
                          "data/simulacrum.txt", "data/exit.txt",
-                         "data/keine-hacknet.txt", "data/keine-sleeves.txt",
-                         "data/preise.json", "data/kaufauftrag.json",
-                         "data/kaufergebnis.json"]) {
+                         "data/keine-hacknet.txt", "data/keine-sleeves.txt"]) {
       if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt (Knotenwechsel): " + datei); }
     }
   }

@@ -46,6 +46,7 @@ import { neu as neueUhren, runde as uhrRunde, enginePuls, inKarenz, laden as lad
 import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere,
   laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
 import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle } from "lib/reg.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 10000;
 
@@ -255,6 +256,25 @@ export async function main(ns) {
             verifiedAt: null,
           };
           protokolliere(strafen, eintrag);
+          // AB SPROSSE 3 IN DEN EREIGNISSTROM (04.09.2026).
+          //
+          // `ladder_rungs_ge3_per_week` hat Soll 0 und lautet in der
+          // Architektur "jede ist ein Befund". Gerechnet wird sie aus
+          // `data/events.json` - und dorthin schrieb den Vorgang niemand.
+          // `data/penalties.json` fuehrt zwar dieselbe Zeile, hat aber einen
+          // eigenen Deckel und wird nach einem Reset nicht mit den Spruengen
+          // zusammengefuehrt; die KPI braucht beides in EINER Zeitachse.
+          //
+          // Erst ab Sprosse 3, weil 1 und 2 der Normalbetrieb sind: ein
+          // Neustart und eine Wirtsperre sind das, wofuer die Leiter gebaut
+          // ist. Ab 3 greift sie in den Spielstand ein.
+          if (r.sprosse.nr >= 3) {
+            ereignisAnhaengen(ns, "penalty", "Sprosse " + r.sprosse.nr + " auf "
+              + r.ziel + " (" + sig.sig + ")", {
+                wall, playtime: spieler.totalPlaytime, motorTimeMs,
+              }, { rung: r.sprosse.nr, target: r.ziel, signal: sig.sig,
+                scharf, node: ri.currentNode });
+          }
           leiter.verlauf.push({ ziel: r.ziel, sprosse: r.sprosse.nr, wall });
           while (leiter.verlauf.length > 200) leiter.verlauf.shift();
 
@@ -374,6 +394,21 @@ function wirkungGruen(r, eintraege, kern, lage) {
 }
 
 /** Schreibt Uhren, Leiterzustand und Strafenprotokoll - drei getrennte Dateien. */
+/**
+ * Ein Ereignis an `data/events.json` haengen - lesen, anhaengen, schreiben.
+ *
+ * Der Waechter laeuft auf home, deshalb ohne scp. Der Ringpuffer sitzt in
+ * `lib/events.js`; hier wird nur durchgereicht.
+ */
+function ereignisAnhaengen(ns, art, text, uhren, daten) {
+  try {
+    const strom = evLaden(ns.fileExists("data/events.json", "home")
+      ? ns.read("data/events.json") : null);
+    evAnhaengen(strom, art, text, uhren, daten);
+    ns.write("data/events.json", JSON.stringify(strom), "w");
+  } catch { /* Bericht, nie Steuerung */ }
+}
+
 function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
   const schreib = (datei, obj) => {
     try { ns.write(datei, JSON.stringify(obj), "w"); } catch { /* egal */ }

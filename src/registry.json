@@ -252,7 +252,11 @@
    "priority": 8,
    "evictRank": 3,
    "needsFigure": "none",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/route.js",
+    "lib/eta.js",
+    "lib/events.js"
+   ],
    "singularity": false,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -276,7 +280,10 @@
    "priority": 10,
    "evictRank": 20,
    "needsFigure": "request",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/figurns.js",
+    "lib/figur.js"
+   ],
    "singularity": true,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -353,7 +360,9 @@
    "evictRank": 11,
    "needsFigure": "none",
    "needsLibs": [
-    "lib/graftwahl.js"
+    "lib/graftwahl.js",
+    "lib/figurns.js",
+    "lib/figur.js"
    ],
    "singularity": true,
    "restartPolicy": "always",
@@ -406,7 +415,10 @@
    "priority": 11,
    "evictRank": 12,
    "needsFigure": "owner",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/figurns.js",
+    "lib/figur.js"
+   ],
    "singularity": true,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -478,7 +490,10 @@
    "priority": 12,
    "evictRank": 13,
    "needsFigure": "owner",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/figurns.js",
+    "lib/figur.js"
+   ],
    "singularity": true,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -526,7 +541,9 @@
    "priority": 13,
    "evictRank": 9,
    "needsFigure": "none",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/loeser.js"
+   ],
    "singularity": false,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -574,7 +591,11 @@
    "priority": 14,
    "evictRank": 14,
    "needsFigure": "owner",
-   "needsLibs": [],
+   "needsLibs": [
+    "lib/endspurt.js",
+    "lib/figurns.js",
+    "lib/figur.js"
+   ],
    "singularity": true,
    "restartPolicy": "always",
    "maxInstances": 1,
@@ -607,7 +628,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-09-04T07:35:01.716Z",
+ "erzeugtAm": "2026-09-04T07:50:02.009Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

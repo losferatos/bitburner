@@ -40,7 +40,8 @@ import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
   KPI_VERSION } from "lib/kpi.js";
 import { vergib as figVergib, antragGilt as figAntragGilt,
   vergabeGilt as figVergabeGilt } from "lib/figur.js";
-import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { laden as evLaden, anhaengen as evAnhaengen,
+  abstandMin as evAbstandMin } from "lib/events.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -170,9 +171,21 @@ export async function main(ns) {
       //
       // Fuenf Minuten Frist haetten hier nicht getragen - der Sprung dauert
       // Sekunden. Deshalb der harte Schnitt am Reset, nicht an der Uhr.
+      //
+      // BEIDE PRESTIGES, NICHT NUR DER SPRUNG (Skeptiker Runde 3, K3,
+      // 04.09.2026). Hier stand allein `lastNodeReset`. `prestigeAugmentation`
+      // ruft aber `prestigeAllServers()` und setzt `purchasedServers = []`
+      // (Prestige.ts:55-75, PlayerObjectGeneralMethods.ts:109) - nach jedem
+      // Augmentierungs-Einbau ist der Park also genauso weg wie nach einem
+      // Sprung. Bis die Fuenf-Minuten-Frist griff, rechnete der Kern vier bis
+      // fuenf Minuten lang mit einem Geisterpark: er hielt Werkbaenke fuer
+      // vorhanden, die es nicht gab, und uebersprang deshalb die
+      // Kaltstart-Leiter - genau in den Minuten nach einem Einbau, in denen
+      // sie gebraucht wird.
       try {
-        const reset = ns.getResetInfo().lastNodeReset;
-        if (Number.isFinite(reset) && t.ts < reset) {
+        const ri = ns.getResetInfo();
+        const reset = Math.max(ri.lastNodeReset || 0, ri.lastAugReset || 0);
+        if (reset > 0 && t.ts < reset) {
           return { ...leer, alterMs, ausAltemKnoten: true };
         }
       } catch { /* kein getResetInfo - dann traegt die Fuenf-Minuten-Frist */ }
@@ -639,6 +652,13 @@ export async function main(ns) {
 
   let regLage = baueLage();
 
+  // Merker fuer den Ereignisstrom: was dieser PROZESS schon gemeldet hat.
+  // Nicht in der Runde deklarieren - der `boot`-Eintrag darf genau einmal je
+  // Prozessleben entstehen, sonst steht in jeder Minute ein Bootvorgang und
+  // boot_latency_min ist immer null.
+  const evMerker = { nodeReset: null, augReset: null,
+    bootWall: null, ersteRundeWall: null };
+
   const baueWerkzeuge = (lage) => regGeladen
     ? regAuswahl(regGeladen, lage)
         // Der Kern startet sich nicht selbst. Der WAECHTER dagegen gehoert
@@ -653,8 +673,8 @@ export async function main(ns) {
         .filter((e) => e.name !== "bn4net.js")
         .filter((e) => !e.name.startsWith("worker/"))
         .map((e) => [e.name, e.args || [], e.restartPolicy || "always",
-          e.hostRule || "any"])
-    : WERKZEUGE_FEST.map(([n, a]) => [n, a, "always", "any"]);
+          e.hostRule || "any", Array.isArray(e.needsLibs) ? e.needsLibs : []])
+    : WERKZEUGE_FEST.map(([n, a]) => [n, a, "always", "any", []]);
 
   const baueTelemetrie = (lage) => regGeladen
     ? regTelemetrie(regGeladen, lage).filter(([n]) => n !== "bn4net.js")
@@ -3597,7 +3617,7 @@ export async function main(ns) {
       const RESERVIERUNG_MS = 300000;
       let reserviertFuer = null;      // Dateiname oder null
 
-      for (const [datei, args] of fehlend) {
+      for (const [datei, args, , , libs] of fehlend) {
         const braucht = ns.getScriptRam(datei, "home");
         // Nicht stillschweigend ueberspringen. Ein Werkzeug, das seit einer
         // halben Stunde fehlt, ohne dass irgendwo steht warum, ist genau das
@@ -3749,7 +3769,26 @@ export async function main(ns) {
         // fehlt eine importierte Datei auf dem Zielrechner, laesst sich das
         // Skript dort nicht uebersetzen und ns.exec gibt still 0 zurueck. Kein
         // Absturz, keine Meldung, das Werkzeug fehlt einfach.
-        ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home");
+        //
+        // `needsLibs` AUS DER REGISTRY (Skeptiker Runde 3, W4, 04.09.2026).
+        //
+        // Hier stand nur die feste Liste `BIBLIOTHEKEN` - eine einzige Datei,
+        // lib/hackaugs.js. Jedes Gewerk auf der Werkbank, das etwas anderes
+        // importiert, war damit auf gut Glueck unterwegs: graftauto.js braucht
+        // lib/graftwahl.js und lib/figurns.js, figwatch.js braucht lib/figur.js,
+        // blade.js seine blackops.json. Auf einem frisch gekauften Rechner
+        // liegt nichts davon.
+        //
+        // Das Feld stand seit dem ersten Entwurf in der Registry und hatte
+        // keinen Leser. Jetzt hat es einen - und es ist der Ort, an dem die
+        // Angabe hingehoert: neben dem einzigen scp, das ein Gewerk je auf
+        // einen Fremdrechner bringt.
+        //
+        // Transitiv wird NICHT aufgeloest: ein lib-Modul, das selbst
+        // importiert, muss seine Abhaengigkeit im needsLibs des Gewerks stehen
+        // haben. `tools/registry-bauen.js` prueft genau das gegen den
+        // Quelltext, damit die Liste nicht auseinanderlaeuft.
+        ns.scp([datei, ...BIBLIOTHEKEN, ...libs], wirt, "home");
         const pid = ns.exec(datei, wirt, 1, ...args);
         // Gestartet heisst: die Reservierung hat ihren Zweck erfuellt.
         if (pid) {
@@ -4004,6 +4043,72 @@ export async function main(ns) {
     // WAS ER NICHT FUELLT, BLEIBT null. Das ist ausdruecklich erlaubt
     // (ARCHITEKTUR 5.1) und besser als eine geratene Zahl: `checkin.js`
     // meldet ein fehlendes Feld, eine erfundene Zahl meldet niemand.
+    // DER EREIGNISSTROM BEKOMMT ENDLICH SCHREIBER (04.09.2026).
+    //
+    // `lib/events.js` war importiert und wurde nie benutzt - eine tote
+    // Einfuhrzeile. Geschrieben haben in `data/events.json` nur boerse.js,
+    // figwatch.js und graftauto.js, und die alle mit der Art "note".
+    //
+    // Die Arten `jump`, `install`, `boot` und `penalty` schrieb NIEMAND. Genau
+    // aus ihnen rechnen sich aber drei Abnahmekennzahlen, und alle drei sind
+    // Abstaende zwischen Ereignissen, also aus der Telemetrie prinzipiell
+    // nicht rekonstruierbar:
+    //   jump_latency_min          (jump -> boot, Soll <= 2)
+    //   boot_latency_min          (boot -> erste volle Runde, Soll <= 5)
+    //   ladder_rungs_ge3_per_week (penalty ab Sprosse 3, Soll 0)
+    //
+    // Ohne Schreiber waren sie nicht "noch nicht gemessen", sondern
+    // unmessbar - und Stufe C verlangt einen beobachteten Sprung.
+    //
+    // Kein zusaetzlicher ns-Aufruf: read, write und fileExists stehen ohnehin
+    // im Budget des Kerns. Die Datei bleibt durch den Ringpuffer in
+    // `lib/events.js` gedeckelt.
+    const ereignis = (art, text, daten = null) => {
+      try {
+        const strom = evLaden(ns.fileExists("data/events.json", "home")
+          ? ns.read("data/events.json") : null);
+        evAnhaengen(strom, art, text, {
+          wall: Date.now(),
+          playtime: mzPlaytime,
+          motorTimeMs: mz.motorTimeMs,
+        }, daten);
+        ns.write("data/events.json", JSON.stringify(strom), "w");
+      } catch { /* der Strom ist Bericht, nie Steuerung - nie die Runde kippen */ }
+    };
+
+    // Die Ereignisse, die nur der Kern sieht. Alle drei feuern hoechstens
+    // einmal je Lauf beziehungsweise Prozessleben - deshalb die Merker.
+    {
+      const ri0 = ns.getResetInfo();
+      const knotenJetzt = ri0.currentNode;
+      const nrJetzt = ri0.lastNodeReset || 0;
+      const arJetzt = ri0.lastAugReset || 0;
+      if (evMerker.nodeReset === null) {
+        // Der erste Durchlauf dieses Prozesses. Er ist der Bootvorgang - und
+        // der Abstand zum letzten `jump` ist jump_latency_min.
+        evMerker.nodeReset = nrJetzt;
+        evMerker.augReset = arJetzt;
+        evMerker.bootWall = Date.now();
+        ereignis("boot", "Kern gestartet in BitNode " + knotenJetzt,
+          { node: knotenJetzt, verfahren: regLage.verfahren });
+      } else {
+        // Ein Reset MITTEN im Prozessleben kann es nicht geben - beide
+        // Prestiges toeten alle Skripte (prestigeWorkerScripts). Wenn die
+        // Zahlen sich trotzdem aendern, ist das ein Befund und gehoert in den
+        // Strom.
+        if (nrJetzt !== evMerker.nodeReset) {
+          ereignis("jump", "Knotenreset ohne Prozessende - in BitNode " + knotenJetzt,
+            { node: knotenJetzt, vorher: evMerker.nodeReset });
+          evMerker.nodeReset = nrJetzt;
+        }
+        if (arJetzt !== evMerker.augReset) {
+          ereignis("install", "Augmentierungs-Reset ohne Prozessende",
+            { node: knotenJetzt });
+          evMerker.augReset = arJetzt;
+        }
+      }
+    }
+
     const schreibeKpi = () => {
       const jetzt = Date.now();
       const ri = ns.getResetInfo();
@@ -4127,6 +4232,42 @@ export async function main(ns) {
             });
         } catch { /* dann bleibt das alte Zaehlwerk stehen */ }
       }
+
+      // --- Die drei Kennzahlen aus dem Ereignisstrom ---------------------------
+      //
+      // Sie sind Abstaende zwischen Ereignissen und lassen sich aus keiner
+      // Telemetrie rekonstruieren - der naechste Schreibvorgang ueberschreibt
+      // sie. Bis zum 04.09.2026 hatte der Strom fuer diese drei Arten keinen
+      // Schreiber, die Felder blieben also dauerhaft null. Jetzt hat er einen
+      // (Abschnitt oben und guard.js), und hier werden sie ausgewertet.
+      //
+      // ALLE DREI IN WANDUHR (ARCHITEKTUR 4.2): sie messen, wie lange der Bot
+      // brauchte, nicht wie lange er arbeitete. Eine Offline-Nacht mitten im
+      // Sprung ist genau das - drei Stunden ohne Bot.
+      try {
+        const strom = evLaden(ns.fileExists("data/events.json", "home")
+          ? ns.read("data/events.json") : null);
+
+        // jump -> boot: wie lange der Wiederanlauf nach einem Sprung dauerte.
+        const jl = evAbstandMin(strom, "jump", "boot", "wall");
+        if (jl !== null) k.jump_latency_min = Number(jl.toFixed(2));
+
+        // boot -> erste volle Runde. Der Kern kennt seine eigene erste Runde:
+        // `evMerker.bootWall` steht seit dem Bootereignis dieses Prozesses.
+        if (Number.isFinite(evMerker.bootWall) && okRunden >= 1) {
+          if (!Number.isFinite(evMerker.ersteRundeWall)) evMerker.ersteRundeWall = jetzt;
+          k.boot_latency_min = Number(
+            ((evMerker.ersteRundeWall - evMerker.bootWall) / 60000).toFixed(2));
+        }
+
+        // Sprossen ab 3 in den letzten sieben Tagen. Der Deckel des
+        // Ringpuffers (60 bleibende Eintraege) kann die Zahl nur nach UNTEN
+        // verfaelschen - bei Soll 0 ist das die harmlose Richtung, und ein
+        // Ueberlauf faellt an den 60 selbst auf.
+        const woche = jetzt - 7 * 24 * 3600000;
+        k.ladder_rungs_ge3_per_week = strom.eintraege.filter((e) =>
+          e.art === "penalty" && Number.isFinite(e.wall) && e.wall >= woche).length;
+      } catch { /* kein Strom - dann bleiben die Felder, wie sie waren */ }
 
       k.erzeugtAm = jetzt;
       ns.write("data/kpi.json", JSON.stringify(k), "w");

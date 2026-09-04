@@ -109,6 +109,8 @@ export async function main(ns) {
 
   /** Auftraege, die schon ausgefuehrt wurden - gegen Doppelkaeufe. */
   const erledigt = new Set();
+  // Wie oft das Spiel einen Auftrag schon abgelehnt hat (K1).
+  const abgelehnt = new Map();
 
   // DAS GEDAECHTNIS UEBER DEN PROZESS HINAUS (04.09.2026).
   //
@@ -202,8 +204,27 @@ export async function main(ns) {
                 erledigt.add(auftrag.id);
                 meldeErgebnis(nachHome, auftrag, true, name, jetzt);
               } else {
-                sag("Kauf abgelehnt vom Spiel (" + gb + " GB) - Auftrag bleibt offen.");
-                meldeErgebnis(nachHome, auftrag, false, "abgelehnt", jetzt);
+                // EIN ABGELEHNTER KAUF DARF NICHT EWIG OFFEN BLEIBEN
+                // (Skeptiker Runde 3, K1, 04.09.2026).
+                //
+                // `purchaseServer` gibt bei Ablehnung "" zurueck - kein
+                // Fehler, keine Begruendung. Hier stand nur eine Meldung:
+                // weder `erledigt` noch `wartetAufGeld` wurden gesetzt, der
+                // Herzschlag meldete `state: "work"`, und das Gewerk beendete
+                // sich nie. Es hielt damit 7,00 GB auf home fest - im
+                // Kaltstart ein Viertel des Speichers, fuer nichts.
+                //
+                // Drei Versuche, dann gilt der Auftrag als gescheitert. Der
+                // Kern stellt ihn neu, wenn er ihn noch will; das ist der
+                // Weg, auf dem eine geaenderte Lage einfliesst.
+                const n = (abgelehnt.get(auftrag.id) || 0) + 1;
+                abgelehnt.set(auftrag.id, n);
+                sag("Kauf abgelehnt vom Spiel (" + gb + " GB, " + n + ". Versuch).");
+                if (n >= 3) {
+                  sag("Auftrag " + auftrag.id + " nach drei Ablehnungen aufgegeben.");
+                  erledigt.add(auftrag.id);
+                  meldeErgebnis(nachHome, auftrag, false, "abgelehnt", jetzt);
+                }
               }
             } else {
               // NICHT als erledigt markieren: das Geld kann in der naechsten

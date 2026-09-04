@@ -312,9 +312,9 @@
   {
    "name": "boerse.js",
    "args": [],
-   "ramBaseGb": null,
-   "ramSingGb": null,
-   "ramMeasuredAt": null,
+   "ramBaseGb": 21,
+   "ramSingGb": 0,
+   "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
    "verfahren": "V1",
    "knoten": [
     8
@@ -323,7 +323,7 @@
    "telemetryFile": "data/boerse.json",
    "scpToHome": true,
    "freshnessMs": 600000,
-   "taktMs": 30000,
+   "taktMs": 6000,
    "hostRule": "werkbank",
    "priority": 9,
    "evictRank": 15,
@@ -333,8 +333,7 @@
    "restartPolicy": "always",
    "maxInstances": 1,
    "killSafe": true,
-   "precondition": {},
-   "unbuilt": true
+   "precondition": {}
   },
   {
    "name": "graftauto.js",
@@ -582,7 +581,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-09-04T06:35:57.334Z",
+ "erzeugtAm": "2026-09-04T06:49:58.631Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

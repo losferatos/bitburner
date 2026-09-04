@@ -27,6 +27,11 @@
  *
  * @param {NS} ns
  */
+import {
+  runde as mzRunde, motorStunden as mzStunden,
+  zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
+} from "./lib/motorzeit.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -388,8 +393,49 @@ export async function main(ns) {
   // verschwindet, eine Zahl, die das Spiel nicht mag - die Schleife und damit
   // die Netzhaelfte fuer den Rest des Monats. Ein Bot, der monatelang
   // unbeaufsichtigt laeuft, muss Fehler ueberleben statt an ihnen zu sterben.
+  // =========================================================================
+  // MOTORZEIT UND HERZSCHLAG v2 (Position C.1, 04.09.2026)
+  // =========================================================================
+  //
+  // Drei Zaehler, die es bisher nicht gab, und ohne die der Waechter nichts
+  // entscheiden kann:
+  //
+  //   okRunden   vollstaendig durchlaufene Runden. `runde` allein zaehlt nur
+  //              die VERSUCHE - der ganze Rundeninhalt liegt in einem try,
+  //              also zaehlt ein Motor, der jede Runde wirft, munter weiter
+  //              und sieht nach jeder Frischepruefung gesund aus.
+  //   errStreak  aufeinanderfolgende Ausnahmen. Gibt der Sache eine Richtung:
+  //              drei Fehler in drei Tagen sind etwas anderes als drei in
+  //              drei Runden.
+  //   mz         die Motorzeit - wie lange der Bot WIRKLICH gearbeitet hat.
+  //              Weder Date.now() (laeuft bei ausgeschaltetem Rechner weiter)
+  //              noch totalPlaytime (zaehlt Offline-Zeit voll mit) taugen
+  //              dafuer. Die Regeln stehen in lib/motorzeit.js.
+  //
+  // Der Zustand liegt in data/motorzeit.json auf home und ueberlebt damit
+  // einen Neustart des Skripts. Beim Knotenwechsel wird er zurueckgesetzt -
+  // Fristen und Raten beziehen sich immer auf den laufenden Lauf.
+  let mz = mzLaden(
+    ns.fileExists("data/motorzeit.json", "home") ? ns.read("data/motorzeit.json") : null,
+    10000);
+  let okRunden = 0;
+  let errStreak = 0;
+  let lastError = null;
+  let mzNodeReset = null;
+  try { mzNodeReset = ns.getResetInfo().lastNodeReset; } catch { /* egal */ }
+  if (Number.isFinite(mz.nodeReset) && mz.nodeReset !== mzNodeReset) {
+    mzZuruecksetzen(mz, "Knotenwechsel");
+  }
+  mz.nodeReset = mzNodeReset;
+
   for (let runde = 1; ; runde++) {
    try {
+    // Die Uhr zuerst: sie muss auch dann laufen, wenn die Runde spaeter wirft.
+    // Ein Rundenabstand ueber dem Deckel oder ein Nachholklumpen zaehlen NICHT
+    // als Arbeitszeit - genau das unterscheidet sie von totalPlaytime.
+    let mzPlaytime = 0;
+    try { mzPlaytime = ns.getPlayer().totalPlaytime; } catch { /* egal */ }
+    mzRunde(mz, Date.now(), mzPlaytime);
     // HACKNET-SERVER SIND KEINE ARBEITER-WIRTE (02.09.2026, Skeptiker C/D).
     // Sie haengen mit Root an home (PlayerObjectServerMethods.ts:46-66), aber
     // jedes Byte, das dort laeuft, drueckt die Hash-Rate ueber ramRatio
@@ -3088,6 +3134,23 @@ export async function main(ns) {
     ns.write("data/bn4net.json", JSON.stringify({
       zeit: Date.now(),
       runde,
+      // --- Herzschlag v2 (Position C.1) ------------------------------------
+      // Ein Block ohne errStreak und lastError gilt ab jetzt als UNGUELTIG und
+      // damit als veraltet. Das ist zugleich die Migration: ein alter
+      // Schreiber faellt auf, statt still weiterzulaufen.
+      schema: 2,
+      wall: Date.now(),
+      playtime: mzPlaytime,
+      motorTimeMs: mz.motorTimeMs,
+      motorStunden: Number(mzStunden(mz).toFixed(4)),
+      okRound: okRunden,
+      errStreak,
+      lastError,
+      verworfeneRunden: mz.verworfeneRunden,
+      letzterMzGrund: mz.letzterGrund,
+      host: ns.getHostname(),
+      state: "work",
+      blockedReason: null,
       netz: hosts.length,
       gerootet: gerootet.length,
       // Feld "ziel" bedeutet weiterhin das BESTE Geldziel (bisheriger Name
@@ -3164,8 +3227,31 @@ export async function main(ns) {
       })(),
     }), "w");
 
+    // ERST HIER gilt die Runde als vollstaendig. Alles davor kann geworfen
+    // haben; `runde` waere trotzdem gewachsen. Genau diese Luecke schliesst
+    // okRunden - und nur mit ihr ist die Wirkungspruefung der Strafleiter
+    // ("round waechst UND errStreak == 0") ueberhaupt pruefbar statt nur
+    // gefordert.
+    okRunden++;
+    errStreak = 0;
+
+    // Die Uhr alle 30 Runden (rund 5 Minuten) wegschreiben. Jede Runde waere
+    // unnoetig, nie waere sie nach einem Neustart verloren.
+    if (runde % 30 === 0) {
+      try {
+        ns.write("data/motorzeit.json", JSON.stringify(mz), "w");
+      } catch { /* egal - die Uhr laeuft im Speicher weiter */ }
+    }
+
    } catch (e) {
-    sag("RUNDENFEHLER: " + String(e));
+    // errStreak zaehlt AUFEINANDERFOLGENDE Fehler. Er wird am Ende einer
+    // erfolgreichen Runde auf null gesetzt (siehe okRunden weiter oben im
+    // try), nicht hier - sonst zaehlte er nur den letzten Fehler.
+    errStreak++;
+    const msg = String(e && e.message ? e.message : e);
+    lastError = { cls: (e && e.name) || "Error",
+      msg: msg.length > 200 ? msg.slice(0, 197) + "..." : msg, at: Date.now() };
+    sag("RUNDENFEHLER (" + errStreak + " in Folge): " + String(e));
    }
     await ns.sleep(10000);
   }

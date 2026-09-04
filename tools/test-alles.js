@@ -65,6 +65,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-registry.js",
+    deckt: "Registry, Rollen-Riegel und der Migrationsbeweis gegen die heutige Liste (C.4)",
+    schnell: true,
+  },
+  {
     datei: "test-motor-ebene2.js",
     deckt: "EBENE 2: der echte Kern gegen den ns-Mock, drei Pflichtproben (C.1)",
     schnell: false,
@@ -92,7 +97,7 @@ const TESTS = [
  * die Haelfte nicht prueft, ist gefaehrlicher als ein roter.
  */
 const LUECKEN = [
-  "Registry-Aufloesung (registry.json existiert noch nicht)",
+
   "Strafleiter-Automat mit simulierten Uhren (Waechter noch nicht gebaut)",
   // Der ns-Mock steht seit dem 04.09.2026 (tools/mock/ns.js + lader.js), und
   // der Kern laeuft damit in test-motor-ebene2.js. Was noch fehlt, ist die

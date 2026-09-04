@@ -80,6 +80,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-matrix-ebene2.js",
+    deckt: "EBENE 2: Szenarienmatrix ueber alle 15 Knoten der Route",
+    schnell: false,
+  },
+  {
     datei: "test-guard-ebene2.js",
     deckt: "EBENE 2: der Waechter im Beobachtungsmodus, boot.js-Schonliste (C.6)",
     schnell: false,
@@ -117,7 +122,7 @@ const LUECKEN = [
   // Der ns-Mock steht seit dem 04.09.2026 (tools/mock/ns.js + lader.js), und
   // der Kern laeuft damit in test-motor-ebene2.js. Was noch fehlt, ist die
   // Breite: dieselben Proben ueber die verschiedenen Knotenklassen.
-  "Szenarienmatrix ueber die Knotenklassen (Ebene 2 steht, die Matrix fehlt)",
+
 ];
 
 const nurSchnell = process.argv.includes("--schnell");

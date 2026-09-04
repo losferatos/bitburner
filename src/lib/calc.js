@@ -227,8 +227,25 @@ export function growthLogPerThread(server, multGrow = 1, cores = 1, bnGrowthRate
  * @param {number} cores
  * @returns {number} ganze Zahl an Threads
  */
-export function growThreads(server, targetMoney, startMoney, p, cores = 1) {
-  const k = growthLogPerThread(server, p.multGrow, cores);
+/**
+ * @param {number} bnGrowthRate  BitNodeMultipliers.ServerGrowthRate.
+ *
+ * DER PARAMETER FEHLTE (04.09.2026, Skeptiker Substanz). Hier stand
+ * `growthLogPerThread(server, p.multGrow, cores)` - ohne den letzten
+ * Parameter, der damit auf seinen Vorgabewert 1 fiel. In BitNode 2 (0,8),
+ * BitNode 3 (0,2) und BitNode 11 (0,2) rechnete die Fadenzahl damit um bis zu
+ * Faktor 5 zu klein: der Server waere nach dem grow nicht voll gewesen, und
+ * der darauf gebaute hack haette einen Bruchteil geerntet.
+ *
+ * `bn4net.js` war nicht betroffen - es hat sein eigenes `growFaeden`, dem `k`
+ * von aussen gereicht wird. Betroffen sind `lib/batch.js` und `autopilot.js`.
+ *
+ * Die Vorgabe bleibt 1, damit die vorhandenen Aufrufe unveraendert richtig
+ * bleiben, solange sie in einem Knoten ohne Wachstumsmalus laufen - aber ein
+ * Aufrufer, der den Faktor kennt, kann ihn jetzt reichen.
+ */
+export function growThreads(server, targetMoney, startMoney, p, cores = 1, bnGrowthRate = 1) {
+  const k = growthLogPerThread(server, p.multGrow, cores, bnGrowthRate);
   if (!(k > 0)) return Infinity;
 
   if (startMoney < 0) startMoney = 0;

@@ -38,6 +38,8 @@ import {
 } from "lib/motorzeit.js";
 import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
   KPI_VERSION } from "lib/kpi.js";
+import { vergib as figVergib, antragGilt as figAntragGilt,
+  vergabeGilt as figVergabeGilt } from "lib/figur.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 export async function main(ns) {
@@ -3583,6 +3585,69 @@ export async function main(ns) {
         } catch { return null; }
       })(),
     }), "w");
+
+    // --- 9a. Der Figur-Vergabepunkt (Position C.11) ---------------------------
+    //
+    // WARUM DIE ENTSCHEIDUNG IM KERN LIEGT.
+    //
+    // Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie: bn4rep
+    // (Faktion und Firma), blade (Bladeburner), bbtrain (Gym), bn4life
+    // (Verbrechen, Programme), graft und kampfaugs. Ohne Schiedsrichter
+    // gewinnt, wer zuletzt schreibt - und `singularity.commitCrime` bricht
+    // einen laufenden Graft wortlos ab. Ein Graft kostet bis zu 14,63 Mrd und
+    // ist erst mit dem letzten Prozent etwas wert; ein abgebrochener ist
+    // vollstaendig verloren.
+    //
+    // Der Kern ist der Schiedsrichter, weil er als einziger alles sieht. Er
+    // fuehrt die Handlung NICHT aus - er schreibt nur, wer darf. Jedes Gewerk
+    // legt seinen Antrag in einer eigenen Datei ab (kein gemeinsamer
+    // Schreibzugriff, kein Rennen), und der Kern legt das Ergebnis in
+    // data/figure.txt.
+    //
+    // Kostet nichts: nur Dateien lesen und schreiben.
+    {
+      const jetztF = Date.now();
+      let nodeResetF = 0;
+      try { nodeResetF = ns.getResetInfo().lastNodeReset; } catch { /* egal */ }
+
+      // Die Antraege einsammeln. Ein Gewerk, das nicht laeuft, hat keinen -
+      // seine alte Datei laeuft ueber die TTL von einer Minute ab.
+      //
+      // GESUCHT WIRD UEBER DAS DATEIMUSTER, NICHT UEBER DIE WERKZEUGLISTE.
+      // Zwei der sechs figurfaehigen Gewerke stehen gar nicht in der Registry
+      // (graft.js und kampfaugs.js werden von bn4life.js bzw. von Hand
+      // gestartet). Wer nur die Werkzeugliste abfragt, uebersieht ausgerechnet
+      // das Gewerk mit dem groessten Einzelrisiko - ein abgebrochener Graft
+      // kostet bis zu 14,63 Mrd. `ns.ls` kostet 0,2 GB und ist im Kern
+      // ohnehin bezahlt.
+      const antraege = [];
+      for (const d of ns.ls("home", "figure-request-")) {
+        try {
+          const a = JSON.parse(ns.read(d));
+          if (figAntragGilt(a, jetztF, nodeResetF)) antraege.push(a);
+        } catch { /* unlesbarer Antrag zaehlt nicht */ }
+      }
+
+      let bisher = null;
+      try {
+        if (ns.fileExists("data/figure.txt", "home")) {
+          bisher = JSON.parse(ns.read("data/figure.txt"));
+        }
+      } catch { bisher = null; }
+
+      const e = figVergib(antraege, bisher, jetztF, nodeResetF);
+      if (e.wechsel || !figVergabeGilt(bisher, jetztF, nodeResetF)) {
+        sag("Figur: " + (e.vergabe ? e.vergabe.owner + " -> " + e.vergabe.action : "frei")
+          + " (" + e.grund + ", " + antraege.length + " Antrag/Antraege)");
+      }
+      // AUCH DIE LEERE VERGABE WIRD GESCHRIEBEN. Sonst bliebe die letzte
+      // gueltige Datei stehen, und ein Gewerk, das seinen Antrag laengst
+      // zurueckgezogen hat, haelt sich weiter fuer berechtigt.
+      ns.write("data/figure.txt",
+        JSON.stringify(e.vergabe || { owner: null, action: null, seq:
+          (bisher && Number.isFinite(bisher.seq) ? bisher.seq : 0) + 1,
+          wall: jetztF, nodeReset: nodeResetF, leaseBis: 0 }), "w");
+    }
 
     // --- 9b. Die Kennzahlentafel ----------------------------------------------
     //

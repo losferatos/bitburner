@@ -28,6 +28,15 @@
  *
  * @param {NS} ns
  */
+
+// --- Die Figur-Wache (Position C.11) ---------------------------------------
+//
+// Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Ohne diesen
+// Riegel gewinnt, wer zuletzt schreibt. Der Kern ist der Schiedsrichter
+// (Abschnitt 9a in bn4net.js); hier wird nur beantragt und nachgesehen.
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
   // Aeussere Schleife: Nach jedem Augmentierungs-Einbau faellt der Beitritt
@@ -181,6 +190,10 @@ async function runde(ns) {
   //
   // Ein Skript, das eine Vorbedingung nur beim Eintritt prueft, verlaesst sich
   // darauf, alleiniger Herr der Figur zu sein. Das ist es hier nie.
+  // Fuer die Figur-Wache: die zuletzt gesehene Folgenummer der Vergabe und
+  // der zuletzt gemeldete Grund - sonst stuende jede Runde dieselbe Zeile.
+  let figSeq = null;
+  let figGrundLetzt = null;
   for (;;) {
     herzschlag();
     const p = ns.getPlayer();
@@ -300,6 +313,21 @@ async function runde(ns) {
       && laeuft.classType === schlechtester
       && (!laeuft.location || laeuft.location === gym);
     if (!trainiertSchon) {
+      // DIE FIGUR-WACHE. `gymWorkout` beendet jede laufende Arbeit der Figur -
+      // Faktionsarbeit, Verbrechen, und vor allem einen laufenden Graft.
+      figBeantrage(ns, "bbtrain.js", FIG_PRIO.gym, "gym",
+        schlechtester, "Kampfwerte auf 100 fuer den Bladeburner-Beitritt");
+      const figW = figDarf(ns, "bbtrain.js", figSeq);
+      if (figW.seq !== null) figSeq = figW.seq;
+      if (!figW.darf) {
+        if (figGrundLetzt !== figW.grund) {
+          sag("Figur nicht frei: " + figW.grund + " - warte.");
+          figGrundLetzt = figW.grund;
+        }
+        await ns.sleep(15000);
+        continue;
+      }
+      figGrundLetzt = null;
       if (!ns.singularity.gymWorkout(gym, schlechtester, false)) {
         sag("gymWorkout abgelehnt (" + schlechtester + " in " + gym + ").");
         await ns.sleep(30000);

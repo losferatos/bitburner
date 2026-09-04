@@ -38,6 +38,15 @@
  *
  * @param {NS} ns
  */
+
+// --- Die Figur-Wache (Position C.11) ---------------------------------------
+//
+// Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Der Kern ist
+// der Schiedsrichter (bn4net.js, Abschnitt 9a); hier wird nur beantragt und
+// nachgesehen.
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
   let letzteTelemetrie = 0;            // Wanduhr der letzten bn4life.json
@@ -71,6 +80,11 @@ export async function main(ns) {
   let letzterEinkauf = 0;
   let letzteReise = 0;
   let letztesVerbrechen = "";
+  // Fuer die Figur-Wache: zuletzt gesehene Folgenummer und zuletzt gemeldeter
+  // Grund. bn4life taktet im Sekundentakt - ohne den Merker stuende jede
+  // Sekunde dieselbe Zeile im Log.
+  let figSeq = null;
+  let figGrundLetzt = null;
 
   // Wie in bn4net.js: eine Ausnahme darf nicht den halben Bot beenden.
   for (let runde = 1; ; runde++) {
@@ -381,11 +395,28 @@ export async function main(ns) {
 
     if (!repModus && !inDivision && (!arbeit || arbeit.crimeType)) {
       if (!arbeit || arbeit.crimeType !== verbrechen) {
+        // DIE FIGUR-WACHE. `commitCrime` bricht einen laufenden Graft wortlos
+        // ab, und `GraftingWork.finish(cancelled)` gibt das Geld NICHT zurueck
+        // (Work/GraftingWork.tsx:75-83). Beim Simulacrum waeren das 450 Mrd.
+        // Verbrechen haben deshalb die NIEDRIGSTE Prioritaet der sechs
+        // Gewerke - sie sind Beiwerk, kein Traeger.
+        figBeantrage(ns, "bn4life.js", FIG_PRIO.verbrechen, "verbrechen",
+          verbrechen, "Kampfwerte und Geld nebenbei");
+        const figW = figDarf(ns, "bn4life.js", figSeq);
+        if (figW.seq !== null) figSeq = figW.seq;
+        if (!figW.darf) {
+          if (figGrundLetzt !== figW.grund) {
+            sag("Kein Verbrechen: " + figW.grund);
+            figGrundLetzt = figW.grund;
+          }
+        } else {
+        figGrundLetzt = null;
         ns.singularity.commitCrime(verbrechen, true);
         if (verbrechen !== letztesVerbrechen) {
           sag("Verbrechen jetzt: " + verbrechen + " (Kampfwert "
             + kampfwert.toFixed(0) + ").");
           letztesVerbrechen = verbrechen;
+        }
         }
       }
     }

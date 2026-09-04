@@ -37,6 +37,15 @@
  *
  * @param {NS} ns
  */
+
+// --- Die Figur-Wache (Position C.11) ---------------------------------------
+//
+// Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Der Kern ist
+// der Schiedsrichter (bn4net.js, Abschnitt 9a); hier wird nur beantragt und
+// nachgesehen.
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
   const nurPruefen = ns.args.includes("--pruefen");
@@ -183,7 +192,16 @@ export async function main(ns) {
   // Bot vor einer Liste, die er nie abarbeiten kann.
   if (!gekauft && fehltRep && !nurPruefen) {
     try {
-      if (ns.singularity.workForFaction(fehltRep.fak, "hacking", true)) {
+      // DIE FIGUR-WACHE. Dieses Werkzeug laeuft auf Zuruf und einmal - es
+      // beantragt die Figur, sieht einmal nach und laesst es sonst. Warten
+      // waere hier falsch: niemand wartet auf sein Ergebnis, und die Arbeit
+      // holt das naechste Mal jemand nach.
+      figBeantrage(ns, "kampfaugs.js", FIG_PRIO.faktion, "faktion",
+        fehltRep.fak, "Reputation fuer eine Kampfaugmentierung");
+      const figW = figDarf(ns, "kampfaugs.js");
+      if (!figW.darf) {
+        sag("Figur nicht frei (" + figW.grund + ") - keine Faktionsarbeit begonnen.");
+      } else if (ns.singularity.workForFaction(fehltRep.fak, "hacking", true)) {
         sag("Arbeite fuer " + fehltRep.fak + " - es fehlen "
           + Math.round(fehltRep.repReq - fehltRep.rep) + " Reputation.");
       }

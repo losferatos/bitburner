@@ -39,6 +39,8 @@ import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 let bladeSperreGemeldet = 0;
 
 import { lage as endspurtLage, einbauErlaubt } from "lib/endspurt.js";
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -405,6 +407,30 @@ export async function main(ns) {
   // weder vor noch nach dem Beitritt. bn4rep behaelt alles andere: Kaufen und
   // Einbauen brauchen keine Arbeit, nur Geld und vorhandene Reputation.
   const bladeSperreArbeit = bladeburnerTraegtHier;
+
+  // --- Die Figur-Wache (Position C.11) --------------------------------------
+  //
+  // `workForFaction` und `workForCompany` beenden jede laufende Arbeit der
+  // Figur - auch einen Graft, der bis zu 14,63 Mrd gekostet hat und erst mit
+  // dem letzten Prozent etwas wert ist. Der Kern entscheidet, wer darf
+  // (bn4net.js, Abschnitt 9a); hier wird beantragt und nachgesehen.
+  //
+  // Der Antrag wird in JEDEM Aufruf erneuert. Er laeuft nach einer Minute ab -
+  // ein Gewerk, das nicht mehr laeuft, gibt die Figur damit von selbst frei,
+  // ohne dass jemand aufraeumen muss.
+  let figSeq = null;
+  let figGrundLetzt = null;
+  const figFrei = (aktion, detail, grund) => {
+    figBeantrage(ns, "bn4rep.js", FIG_PRIO.faktion, aktion, detail, grund);
+    const w = figDarf(ns, "bn4rep.js", figSeq);
+    if (w.seq !== null) figSeq = w.seq;
+    if (w.darf) { figGrundLetzt = null; return true; }
+    if (figGrundLetzt !== w.grund) {
+      sag("Figur nicht frei: " + w.grund + " - Arbeit ausgesetzt.");
+      figGrundLetzt = w.grund;
+    }
+    return false;
+  };
 
   // WAS DIE REPUTATION WIRKLICH KOSTET, WIRD GEMESSEN (27.08.2026, 09:50).
   //
@@ -1328,7 +1354,9 @@ export async function main(ns) {
           if (bladeSperreArbeit()) {
             // Siehe die Begruendung bei workForFaction weiter unten: In BN6/7
             // bricht jede Arbeit die laufende Bladeburner-Aktion ab.
-          } else if (ns.singularity.workForCompany(companyTarget, true)) {
+          } else if (figFrei("arbeit", companyTarget,
+                       "Firmenreputation fuer den Backdoor-Rabatt")
+                     && ns.singularity.workForCompany(companyTarget, true)) {
             sag("Arbeite fuer " + companyTarget + " als " + job + ": "
               + Math.round(companyRep) + " von " + companyRepGoal(companyTarget) + " Firmenreputation.");
           }
@@ -1879,7 +1907,9 @@ export async function main(ns) {
           sag("Faktionsarbeit ausgesetzt: die Bladeburner-Division traegt"
             + " diesen Knoten, Arbeit wuerde ihre Aktionen abbrechen.");
         }
-      } else if (ns.singularity.workForFaction(ziel.faktion, art, true)) {
+      } else if (figFrei("faktion", ziel.faktion,
+                   "Reputation fuer " + (ziel.aug || "die Spendenschwelle"))
+                 && ns.singularity.workForFaction(ziel.faktion, art, true)) {
         // Ein Schwellenziel traegt den Namen der billigsten offenen
         // Augmentierung, aber die Reputationsmarke der Spendenschwelle. Wer
         // das nicht weiss, liest "Synfibril Muscle: 31918 von 458941" und

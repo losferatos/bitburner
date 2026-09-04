@@ -21,6 +21,17 @@
  *
  * Ergebnis nach data/graft.json.
  * @param {NS} ns */
+
+// --- Die Figur-Wache (Position C.11) ---------------------------------------
+//
+// Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Ohne diesen
+// Riegel gewinnt, wer zuletzt schreibt: `commitCrime` bricht einen laufenden
+// Graft wortlos ab, `gymWorkout` beendet die Faktionsarbeit, und
+// `startAction` raeumt beides weg. Der Kern ist der Schiedsrichter (Abschnitt
+// 9a in bn4net.js); hier wird nur beantragt und nachgesehen.
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   const SIMULACRUM = "The Blade's Simulacrum";
   const MARKER = "data/simulacrum.txt";
@@ -171,6 +182,34 @@ export async function main(ns) {
   // `stopBladeburnerAction` ruft nur `resetAction` (`Bladeburner.ts:249-253`),
   // kostet also nichts: Die naechste Aktion setzt der Motor ohnehin neu.
   try { ns.bladeburner.stopBladeburnerAction(); } catch { /* nicht in der Division */ }
+
+  // --- 5b. Die Figur beantragen und abwarten --------------------------------
+  //
+  // ERST DER ANTRAG, DANN DIE HANDLUNG. Ein Graft ist erst mit dem letzten
+  // Prozent etwas wert und kostet bis zu 14,63 Mrd - wer ihn ohne Vergabe
+  // beginnt, riskiert, dass bn4life in derselben Minute ein Verbrechen
+  // startet und alles wegwirft.
+  //
+  // graft.js laeuft EINMAL und beendet sich; es kann also nicht in jeder
+  // Runde neu beantragen. Deshalb wird hier bis zu 60 s gewartet - der Kern
+  // taktet alle 10 s, und die Antrags-TTL betraegt eine Minute.
+  figBeantrage(ns, "graft.js", FIG_PRIO.graft, "graft", wunsch,
+    "Graft " + wunsch);
+  let figOk = false;
+  let figGrund = "";
+  for (let i = 0; i < 6; i++) {
+    const w = figDarf(ns, "graft.js");
+    if (w.darf) { figOk = true; break; }
+    figGrund = w.grund;
+    await ns.sleep(10000);
+    figBeantrage(ns, "graft.js", FIG_PRIO.graft, "graft", wunsch, "Graft " + wunsch);
+  }
+  if (!figOk) {
+    raus.fehler = "Figur nicht freigegeben: " + figGrund;
+    raus.getan = "NICHT gestartet";
+    fertig(ns, raus);
+    return;
+  }
 
   // --- 6. Graften -----------------------------------------------------------
   let ok = false;

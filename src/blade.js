@@ -40,6 +40,17 @@
  *
  * @param {NS} ns
  */
+
+// --- Die Figur-Wache (Position C.11) ---------------------------------------
+//
+// Es gibt genau EINE Spielfigur, und sechs Gewerke wollen sie. Ohne diesen
+// Riegel gewinnt, wer zuletzt schreibt: `commitCrime` bricht einen laufenden
+// Graft wortlos ab, `gymWorkout` beendet die Faktionsarbeit, und
+// `startAction` raeumt beides weg. Der Kern ist der Schiedsrichter (Abschnitt
+// 9a in bn4net.js); hier wird nur beantragt und nachgesehen.
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -1075,6 +1086,18 @@ export async function main(ns) {
   //     Augmentierungen.
   //   - Der niedrigste Wert wird trainiert. Die Schwellen haengen an allen
   //     vier, wer den hoechsten weitertreibt, kommt nicht naeher.
+  // Fuer die Figur-Wache: die zuletzt gesehene Folgenummer der Vergabe (gegen
+  // das Rennen zwischen Werkbank und home) und der zuletzt gemeldete Grund
+  // (damit nicht jede Sekunde dieselbe Zeile im Log steht).
+  //
+  // SIE STEHEN HIER OBEN, NICHT BEI DER SCHLEIFE. `gymGreifen` benutzt sie
+  // ebenfalls und ist weiter oben definiert; eine Deklaration weiter unten
+  // waere in der zeitlichen Totzone gelandet - genau der Fehler, den am
+  // 04.09. schon `sag` im Kern hatte ("Cannot access before initialization",
+  // in der allerersten Runde).
+  let figSeq = null;
+  let figGrundLetzt = null;
+
   const GYM_STADT = "Sector-12";
   const GYM_NAME = "Powerhouse Gym";
   const GYM_MIN_GELD = 5e6;
@@ -1095,6 +1118,18 @@ export async function main(ns) {
         return kurz;   // laeuft schon richtig, nicht neu starten
       }
       if (laeuft && laeuft.type !== "CLASS") return null;   // fremde Arbeit
+
+      // DIE FIGUR-WACHE (Position C.11). Auch das Gymnasium beansprucht die
+      // Figur: `gymWorkout` beendet jede laufende Arbeit, ein Graft
+      // eingeschlossen. Der Antrag laeuft unter derselben Prioritaet wie das
+      // Bladeburner-Geruest, denn er kommt aus demselben Gewerk und dient
+      // demselben Zweck - der Ausdauer, ohne die die Aktionen ausfallen.
+      figBeantrage(ns, "blade.js", FIG_PRIO.gym, "gym", kurz,
+        "Kampfwert " + kurz + " ist der niedrigste");
+      const figG = figDarf(ns, "blade.js", figSeq);
+      if (figG.seq !== null) figSeq = figG.seq;
+      if (!figG.darf) return null;
+
       if (p.city !== GYM_STADT && !ns.singularity.travelToCity(GYM_STADT)) return null;
       try { ns.bladeburner.stopBladeburnerAction(); } catch { /* nichts lief */ }
       return ns.singularity.gymWorkout(GYM_NAME, kurz, false) ? kurz : null;
@@ -3436,20 +3471,42 @@ export async function main(ns) {
             if (mann > 0) ns.bladeburner.setTeamSize(B, wahl.name, mann);
           } catch { /* alte Fassung ohne setTeamSize */ }
         }
-        if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
-          let r = null;
-          try { r = ns.bladeburner.getRank(); } catch { /* egal */ }
-          schliesseAbschnitt(r);
-          abschnitt = { von: Date.now(), aktion: wahl.typ + "/" + wahl.name,
-            grund: wahl.grund, rang: r, ausdauer: holeAusdauer() };
-          const kennung = wahl.typ + "/" + wahl.name;
-          if (kennung !== letzte) {
-            sag(kennung + "  (" + wahl.grund + ")");
-            letzte = kennung;
+        // DIE FIGUR-WACHE. Eine Bladeburner-Aktion beendet jede laufende
+        // Arbeit der Figur - auch einen Graft, der 14,63 Mrd gekostet hat und
+        // erst mit dem letzten Prozent etwas wert ist. Der Antrag wird in
+        // jeder Runde erneuert; ohne Vergabe wird nicht gestartet.
+        figBeantrage(ns, "blade.js", FIG_PRIO.bladeburner, "bladeburner",
+          wahl.typ + "/" + wahl.name, wahl.grund || "Rangaufbau");
+        const figW = figDarf(ns, "blade.js", figSeq);
+        if (figW.seq !== null) figSeq = figW.seq;
+        //
+        // KEIN `continue` HIER. Die Stelle liegt tief in verschachtelten
+        // Bloecken; ein `continue` waere von der Schleifenstruktur abhaengig
+        // und damit von jeder kuenftigen Umstellung. Die if/else-Kette ist
+        // gegen Umbauten unempfindlich.
+        if (!figW.darf) {
+          if (figGrundLetzt !== figW.grund) {
+            sag("Figur nicht frei: " + figW.grund + " - warte.");
+            figGrundLetzt = figW.grund;
           }
-        } else {
-          sag("startAction abgelehnt: " + wahl.typ + "/" + wahl.name);
           await ns.sleep(5000);
+        } else {
+          figGrundLetzt = null;
+          if (ns.bladeburner.startAction(wahl.typ, wahl.name)) {
+            let r = null;
+            try { r = ns.bladeburner.getRank(); } catch { /* egal */ }
+            schliesseAbschnitt(r);
+            abschnitt = { von: Date.now(), aktion: wahl.typ + "/" + wahl.name,
+              grund: wahl.grund, rang: r, ausdauer: holeAusdauer() };
+            const kennung = wahl.typ + "/" + wahl.name;
+            if (kennung !== letzte) {
+              sag(kennung + "  (" + wahl.grund + ")");
+              letzte = kennung;
+            }
+          } else {
+            sag("startAction abgelehnt: " + wahl.typ + "/" + wahl.name);
+            await ns.sleep(5000);
+          }
         }
       }
 

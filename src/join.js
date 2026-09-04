@@ -1,5 +1,5 @@
 /**
- * entwurf/join/join.js — Faktionsbeitritt ohne menschlichen Klick.
+ * archiv/entwurf/join/join.js — Faktionsbeitritt ohne menschlichen Klick.
  *
  * ============================================================================
  * WARUM DAS GEHT

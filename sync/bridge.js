@@ -745,6 +745,15 @@ async function collectScripts(dir = SCRIPT_DIR, prefix = "") {
     const full = path.join(dir, entry.name);
     const gameName = prefix ? prefix + "/" + entry.name : entry.name;
     if (entry.isDirectory()) {
+      // `archiv/` GEHT NIE INS SPIEL (04.09.2026, Auftrag 6.1).
+      //
+      // Das Archiv liegt bewusst NEBEN src/, nicht darin - `collectScripts`
+      // laeuft rekursiv und haette einen Ordner `src/archiv/` mitgeschoben,
+      // also genau die Dateien, die gerade als tot ausgemustert wurden. Zwei
+      // Werkzeuge (test-verbote.js, archivliste.js) ueberspringen ein
+      // `src/archiv` bereits; die Bruecke tat es nicht, und sie ist die
+      // einzige, die wirklich schreibt.
+      if (entry.name === "archiv") continue;
       out.push(...(await collectScripts(full, gameName)));
     } else if (SYNCABLE.test(entry.name) && !entry.name.endsWith(".d.ts")
       && !NIE_SCHIEBEN(entry.name)) {

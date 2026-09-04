@@ -1,5 +1,5 @@
 /**
- * entwurf/homeram/homeram.js — Arbeitsspeicher und Rechenkerne von `home`
+ * archiv/entwurf/homeram/homeram.js — Arbeitsspeicher und Rechenkerne von `home`
  * ueber die Spieloberflaeche kaufen, ohne dass ein Mensch klickt.
  *
  * ============================================================================
@@ -157,7 +157,7 @@
  * WARUM EIN ECHTER .click() UND KEIN AUFRUF DER REACT-PROPS
  * ============================================================================
  *
- * entwurf/join/join.js muss den Handler direkt aus den React-Props holen, weil
+ * archiv/entwurf/join/join.js muss den Handler direkt aus den React-Props holen, weil
  * dort `isTrusted` im Weg steht. Hier ist das nicht noetig — und es waere
  * SCHAEDLICH:
  *

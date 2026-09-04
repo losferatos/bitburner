@@ -1,5 +1,5 @@
 /**
- * entwurf/join/probe.js — misst nach, ob der Beitrittsweg aus join.js traegt.
+ * archiv/entwurf/join/probe.js — misst nach, ob der Beitrittsweg aus join.js traegt.
  *
  * ============================================================================
  * WAS DU DAMIT MACHST

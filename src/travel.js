@@ -1,5 +1,5 @@
 /**
- * entwurf/travel/travel.js — zwischen Staedten reisen und Faktionen beitreten,
+ * archiv/entwurf/travel/travel.js — zwischen Staedten reisen und Faktionen beitreten,
  * ohne dass ein Mensch klickt.
  *
  * ============================================================================
@@ -34,7 +34,7 @@
  *
  * 1. DAS EINLADUNGSFENSTER NENNT AUCH DIE FEINDE.
  *
- *    entwurf/join/join.js sucht das Einladungsfenster so:
+ *    archiv/entwurf/join/join.js sucht das Einladungsfenster so:
  *
  *        if (!text.includes(factionName)) continue;      // join.js:266
  *
@@ -217,7 +217,7 @@
  * PRUEFSTAND
  * ============================================================================
  *
- *   node entwurf/travel/selftest.mjs
+ *   node archiv/entwurf/travel/selftest.mjs
  *
  * 25 Pruefungen ohne Spiel und ohne Browser: die Trockenlaeufe samt aller
  * Abbruchpfade, und die Entscheidungsfunktionen gegen einen Mini-DOM. Darunter
@@ -329,7 +329,7 @@ function splitList(s) {
 }
 
 // ---------------------------------------------------------------------------
-// DOM-Handwerk. Uebernommen aus entwurf/join/join.js und entwurf/homeram/homeram.js.
+// DOM-Handwerk. Uebernommen aus archiv/entwurf/join/join.js und archiv/entwurf/homeram/homeram.js.
 // ---------------------------------------------------------------------------
 
 /**
@@ -946,7 +946,7 @@ function cardOf(btn) {
  * `CorruptibleText` greift nur bei unbekannten.
  *
  * Es gibt hier bewusst KEINEN Teilstring-Ersatzweg wie in
- * entwurf/join/join.js:249. Ein Fehlgriff sperrt sofort alle Feinde der
+ * archiv/entwurf/join/join.js:249. Ein Fehlgriff sperrt sofort alle Feinde der
  * getroffenen Faktion (FactionHelpers.tsx:44-46) und ist bis zur naechsten
  * Augmentierung unumkehrbar. Lieber ein sauberer Fehlschlag.
  */
@@ -989,7 +989,7 @@ export function findPageJoinButton(doc, factionName) {
  *
  * NUR ueber den fett gesetzten Namen (FactionInvitationManager.tsx:66). Der
  * uebrige Text des Fensters listet die FEINDE der Faktion auf (:69-79) — eine
- * `includes`-Pruefung auf den Faktionsnamen, wie sie entwurf/join/join.js:266
+ * `includes`-Pruefung auf den Faktionsnamen, wie sie archiv/entwurf/join/join.js:266
  * benutzt, wuerde beim Sector-12-Fenster auf "Chongqing" anschlagen und beim
  * Klick SECTOR-12 beitreten. Das ist der teuerste denkbare Fehlgriff.
  *

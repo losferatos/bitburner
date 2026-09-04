@@ -1,5 +1,5 @@
 /**
- * entwurf/augs/buyaugs.js — Augmentations optimal einkaufen, ohne Hand am Knopf.
+ * archiv/entwurf/augs/buyaugs.js — Augmentations optimal einkaufen, ohne Hand am Knopf.
  *
  * AUFRUF (der Autopilot sucht sich einen Rechner mit genug Speicher):
  *
@@ -158,7 +158,7 @@
  * Locations/ui/SlumsLocation.tsx:25, Programs/ui/ProgramsRoot.tsx:96 und :108.
  * (Ein 15. Treffer steht in Documentation/doc/en/changelog-v0.md:510 und ist
  * blosser Fliesstext.) Ein gewoehnlicher .click() genuegt hier also — anders
- * als beim Beitritt (siehe entwurf/join/join.js), der den Handler direkt
+ * als beim Beitritt (siehe archiv/entwurf/join/join.js), der den Handler direkt
  * aufrufen muss.
  *
  * Der Kauf laeuft ueber zwei Knoepfe:
@@ -268,7 +268,7 @@
  * Der Bezeichner `document` kommt ausserhalb von main() nicht vor — er kostet
  * pauschal 25 GB (RamCostGenerator.ts:12) und der RAM-Rechner bucht rein
  * namensbasiert (RamCalculations.ts:185-192). Das Dokument wird ueberall als
- * Parameter `doc` hereingereicht, genau wie in entwurf/join/join.js.
+ * Parameter `doc` hereingereicht, genau wie in archiv/entwurf/join/join.js.
  *
  * Speicherbedarf, aufgeschluesselt (RamCostGenerator.ts):
  *   1.6 Grundpreis + 25 document + 0.5 getPlayer (SingularityFn1/4, :661)
@@ -919,7 +919,7 @@ function aufArbeitsseite(doc) {
 
 /**
  * Benennt den Spielzustand, wenn die Faktionsseite unerreichbar ist.
- * Wortgleich uebernommen aus entwurf/join/join.js — dieselben sechs Seiten
+ * Wortgleich uebernommen aus archiv/entwurf/join/join.js — dieselben sechs Seiten
  * rendern die Seitenleiste gar nicht (GameRoot.tsx:309-334 und :492-496), und
  * dort haengt auch kein Alt+F-Handler (SidebarRoot.tsx:303).
  */

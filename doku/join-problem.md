@@ -7,12 +7,12 @@ Alle Zeilenangaben beziehen sich auf diesen Stand.
 Ereignis zu erzeugen — das geht nicht und wird auch nie gehen. Der Weg ist,
 das Ereignis wegzulassen: der `onClick`-Handler des Join!-Knopfes liegt als
 gewoehnliche JavaScript-Funktion offen im DOM und laesst sich mit einem
-selbstgebauten Objekt aufrufen. Fertige Funktion: `entwurf/join/join.js`.
+selbstgebauten Objekt aufrufen. Fertige Funktion: `archiv/entwurf/join/join.js`.
 
 **Stand der Pruefung:** alles unten ist am Quellcode hergeleitet und gegen die
 echten Fassungen von `react-dom@17.0.2` und `@mui/material@5.18.0` gegengelesen.
 Am LAUFENDEN Spiel gemessen ist es noch nicht — dafuer ist
-`entwurf/join/probe.js` da. Bis diese Messung vorliegt, gilt der Weg als
+`archiv/entwurf/join/probe.js` da. Bis diese Messung vorliegt, gilt der Weg als
 belegt, aber nicht bewiesen.
 
 Dieser Abschnitt loest ausserdem die Schlussfolgerung aus
@@ -103,7 +103,7 @@ schlichtes `.click()` genuegt.
 **Warum das trotzdem nicht die Loesung ist:** der Weg haengt an einem
 fluechtigen Zustand, den ein einziger versehentlicher Escape oder ein
 `Decide later` fuer immer zerstoert — und genau das ist passiert. Er wird in
-`entwurf/join/join.js` als *Weg A* mitgenommen (billiger, kein Seitenwechsel),
+`archiv/entwurf/join/join.js` als *Weg A* mitgenommen (billiger, kein Seitenwechsel),
 aber Weg B faengt ihn ab.
 
 ---
@@ -142,9 +142,9 @@ Belegt ist das an drei Stellen:
 | MUI reicht `onClick` unveraendert durch | `@mui/material@5.18.0 ButtonBase.js`, Wurzel: `onClick: onClick`; die Tastaturpfade rufen `onClick` nur bei `isNonNativeButton()` |
 | React 17 legt Props am DOM-Knoten ab | `package.json:42`; `react-dom@17 ReactDOMComponentTree.js`, `__reactProps$` |
 
-`entwurf/join/join.js` nimmt zusaetzlich die Fiber-Kette oberhalb des Knopfes
+`archiv/entwurf/join/join.js` nimmt zusaetzlich die Fiber-Kette oberhalb des Knopfes
 als Rueckfallebene mit, falls eine spaetere MUI-Fassung den Handler doch
-einpackt. Messung dazu: `entwurf/join/probe.js`, Punkt 2.
+einpackt. Messung dazu: `archiv/entwurf/join/probe.js`, Punkt 2.
 
 ---
 
@@ -294,14 +294,14 @@ weil gar kein Ereignis mehr gesendet wird.
 
 ## 7. Was zu tun ist
 
-1. `entwurf/join/join.js` als `join.js` **und** `entwurf/join/probe.js` als
+1. `archiv/entwurf/join/join.js` als `join.js` **und** `archiv/entwurf/join/probe.js` als
    `probe.js` nach `home` bringen (probe.js importiert join.js fest — ein
    dynamisches `import()` gibt es in Bitburner nicht). Faktionsseite oeffnen
    (Alt+F), dann `run probe.js`. Die Punkte 1, 2 und 4 bestaetigen oder
    widerlegen die Annahmen oben in der laufenden Fassung. Am aussagekraeftigsten
    ist die Messung, wenn gerade eine Einladung offen ist — sonst gibt es
    keinen `Join!`-Knopf zu vermessen.
-2. Bei gruener Messung `entwurf/join/join.js` in `src/hand.js` einbauen; der
+2. Bei gruener Messung `archiv/entwurf/join/join.js` in `src/hand.js` einbauen; der
    Einbau steht als Kopiervorlage im Kopf der Datei (`!join <Faktion>`).
 3. `Suppress faction invites` einschalten.
 4. Den Autopiloten nach jedem Reset einmal `!join` fuer jede offene Einladung

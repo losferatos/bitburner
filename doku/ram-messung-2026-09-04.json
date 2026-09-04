@@ -455,7 +455,7 @@
   "err": null,
   "bytes": 68792,
   "lines": 1673,
-  "sha256": "346a7051dc20b68bea29d78e038bea9a657cc35b01a6c17e4313579e932c1e69"
+  "sha256": "a6d803375407031db67c4cf4a4a7e62aeefd49f43fb88949f3573dbb4f8ac248"
  },
  {
   "file": "keepalive.js",
@@ -524,7 +524,7 @@
   "err": null,
   "bytes": 10400,
   "lines": 220,
-  "sha256": "f973ebf62716a442505a8ec3c3fc84d0aa233bc9ae9b0a37db909e14f95c763b"
+  "sha256": "3c95758dfaece9b28a82f494c4996c50ddfc047293c773aff8fd6c9af39a20ae"
  },
  {
   "file": "joinfac.js",
@@ -603,7 +603,7 @@
   "err": null,
   "bytes": 52096,
   "lines": 1179,
-  "sha256": "619319167ba86ba365642d82391b86dbc43601a6e3eb3ca51f06bee2e90ebf8f"
+  "sha256": "904e0a3586894b319507e1a68c6f2f1939b21c6e51e58abb9feb99f070363678"
  },
  {
   "file": "sr.js",
@@ -693,7 +693,7 @@
   "err": null,
   "bytes": 104471,
   "lines": 1932,
-  "sha256": "2b7c5dd4135691b345d469ea624c2b4ab1a92bddb0dfc688bfe148638aa376a5"
+  "sha256": "e6cd8fef7b5110dc4496e1bd50046de72ea84434cf8e4995364cd19b253092e7"
  },
  {
   "file": "install.js",
@@ -1807,7 +1807,7 @@
   "err": null,
   "bytes": 23964,
   "lines": 586,
-  "sha256": "5431943bb8dd884e07cfbc3062fe3256dd86ad95cbdd532ba8b8a0dfd6301e7d"
+  "sha256": "e03b470caed2b05e4bc292843d16da3db003511b390aebf124656fba98b78b4f"
  },
  {
   "file": "lib/batch.js",

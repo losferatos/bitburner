@@ -939,7 +939,7 @@ Und `joinFaction` selbst prueft **nur** `if (faction.isMember) return;`
 (`Faction/FactionHelpers.tsx:35-36`) — die gesamte Zugangslogik liegt in der UI und ist dort
 dreimal unterschiedlich implementiert.
 
-**Aufwand.** Die vorhandene `entwurf/join/join.js` verallgemeinern.
+**Aufwand.** Die vorhandene `archiv/entwurf/join/join.js` verallgemeinern.
 
 **Urteil.** Hoechster Hebel fuer den Klickpfad, sehr geringer Aufwand, an einem folgenlosen
 Knopf sofort messbar (Krankenhaus "Get treatment": kostet Geld nur bei fehlenden HP).

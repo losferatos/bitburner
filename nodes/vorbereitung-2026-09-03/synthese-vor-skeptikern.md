@@ -49,7 +49,7 @@ ultracode — Baue für Eric den perfekten Bitburner-Bot: maximal autonom und ma
 
 ## 1.5 Tot (nicht portieren, nicht reparieren)
 
-Alle BN1-Ära-DOM-Skripte (`autopilot.js`, `buyaugs.js`, `travel.js`, `homeram.js`, `hand.js`, `install.js`, `join*.js`, `keepalive.js`, `telemetry.js` — die Brücke pollt `data/telemetry.txt` trotzdem, `bridge.js:234-255`), `stocks.js`/`stockaccess.js` (verlangt 4S), `lib/calc.js`, `lib/batch.js`, `nightshift/*`, `entwurf/*`, ~60 Einmal-/Diagnosewerkzeuge, `tools/watch.js`, `tools/plan.js`, `tools/wache.js`, `tools/aufsicht.js`. Je Datei `git log --follow`; bleiben bis zur Abnahme im Repo, dann eigener Commit nach `archiv/`; Leichen im Spiel per `deleteFile`.
+Alle BN1-Ära-DOM-Skripte (`autopilot.js`, `buyaugs.js`, `travel.js`, `homeram.js`, `hand.js`, `install.js`, `join*.js`, `keepalive.js`, `telemetry.js` — die Brücke pollt `data/telemetry.txt` trotzdem, `bridge.js:234-255`), `stocks.js`/`stockaccess.js` (verlangt 4S), `lib/calc.js`, `lib/batch.js`, `nightshift/*`, `archiv/entwurf/*`, ~60 Einmal-/Diagnosewerkzeuge, `tools/watch.js`, `tools/plan.js`, `tools/wache.js`, `tools/aufsicht.js`. Je Datei `git log --follow`; bleiben bis zur Abnahme im Repo, dann eigener Commit nach `archiv/`; Leichen im Spiel per `deleteFile`.
 
 ## 1.6 Widersprüchliche oder unbelegte Zahlen — vor jeder Rechnung nachmessen
 

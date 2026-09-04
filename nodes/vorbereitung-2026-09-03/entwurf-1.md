@@ -61,7 +61,7 @@ ultracode — Baue für Eric den perfekten Bitburner-Bot: maximal autonom und ma
 
 ### 1.5 Was tot ist (nicht portieren, nicht reparieren)
 
-`autopilot.js`, `invest.js`, `xp.js`, `telemetry.js`, `keepalive.js`, `install.js`, `buyaugs.js`, `buyone.js`, `join.js`/`joinfac.js`/`probe.js`, `travel.js`, `work.js`, `homeram.js`, `stocks.js`/`stockaccess.js`, `hand.js`, `restart.js`, `kill.js`, `killui.js`, `stopnight.js`, `stopwork.js`, `share.js` (Wurzel), `scan.js`, `path.js`, `backdoor.js`, `bn4start.js`, `bitverse.js`, `donate.js`, `exportbonus.js`, `netburner.js`, `nightshift/*`, `entwurf/*`, `tools/watch.js`, `tools/plan.js`, `tools/wache.js`, `tools/aufsicht.js`. Sie bleiben im Repo, bis der neue Bot abgenommen ist; dann verschiebst du sie in einem eigenen Commit nach `archiv/` (kein Löschen, `src/` muss aber sauber sein, weil die Brücke alles in `src/` ins Spiel schiebt).
+`autopilot.js`, `invest.js`, `xp.js`, `telemetry.js`, `keepalive.js`, `install.js`, `buyaugs.js`, `buyone.js`, `join.js`/`joinfac.js`/`probe.js`, `travel.js`, `work.js`, `homeram.js`, `stocks.js`/`stockaccess.js`, `hand.js`, `restart.js`, `kill.js`, `killui.js`, `stopnight.js`, `stopwork.js`, `share.js` (Wurzel), `scan.js`, `path.js`, `backdoor.js`, `bn4start.js`, `bitverse.js`, `donate.js`, `exportbonus.js`, `netburner.js`, `nightshift/*`, `archiv/entwurf/*`, `tools/watch.js`, `tools/plan.js`, `tools/wache.js`, `tools/aufsicht.js`. Sie bleiben im Repo, bis der neue Bot abgenommen ist; dann verschiebst du sie in einem eigenen Commit nach `archiv/` (kein Löschen, `src/` muss aber sauber sein, weil die Brücke alles in `src/` ins Spiel schiebt).
 
 ### 1.6 Belegte Lücken (die Zielliste des Baus)
 

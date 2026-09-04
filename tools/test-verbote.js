@@ -65,6 +65,14 @@ const AUS_REGISTRY = (() => {
       // lieferte die Registry deshalb nur elf statt fuenfundzwanzig Namen.
       if (e.name) raus.add(e.name);
       for (const l of e.needsLibs || []) raus.add(l);
+      // Eine Vorbedingung ist eine Abhaengigkeit. `graftauto.js` startet gar
+      // nicht erst ohne `graftplan.json` (registry.json, precondition) - eine
+      // Datei, die eine Startbedingung IST, ist nicht tot.
+      const vor = e.precondition && e.precondition.requiresFile;
+      // ABER NUR QUELLDATEIEN. `data/…` entsteht zur Laufzeit IM SPIEL und
+      // liegt nie unter src/ - als Positivlisteneintrag erzeugte sie prompt
+      // ein "FEHLT data/cantwort.json".
+      if (vor && !vor.startsWith("data/")) raus.add(vor);
     }
     // Die Registry selbst und die Daten, die sie beschreibt, gehoeren dazu -
     // sie stehen naturgemaess nicht als Eintrag in sich selbst.
@@ -116,6 +124,36 @@ const HANDLISTE = [
   "bodauer.js", "chance.js", "geld.js", "join.js", "joinrun.js",
   "knoten.js", "lage.js", "lib/hackaugs.js", "netburn.js", "ps.js",
   "share.js", "skillcheck.js", "sr.js", "werkbank.js", "work.js",
+  /**
+   * DATENDATEIEN, DIE LEBENDER CODE LIEST (Kritikerrunde zum Aufraeumen,
+   * 04.09.2026).
+   *
+   * Sie standen auf der Archivliste, obwohl der Bot ohne sie nicht arbeitet -
+   * und zwar deshalb, weil der Kandidaten-Grep nach `exec|run|import` sucht.
+   * Eine Datei, die per `ns.read` GELESEN wird, taucht darin nie auf. Das ist
+   * genau die Sorte Ausschluss, vor der CLAUDE.md warnt: das Werkzeug konnte
+   * den Fall nicht anzeigen, also galt er als nicht vorhanden.
+   *
+   * Zwei der drei liegen NICHT im Spiel. Ein Verschieben nach `archiv/` haette
+   * sie endgueltig aus der Reichweite der Bruecke genommen.
+   */
+  // `src/bn4net.js:116` - ns.read("lib/bitnodes.json"), die BitNode-Tabelle
+  // des Motors. Liegt nicht im Spiel.
+  "lib/bitnodes.json",
+  // `src/ausgang.js:164` - ns.read("lib/blackops.json"). `src/bn4net.js:3791`
+  // nennt sie ausserdem als Abhaengigkeit von blade.js, wo sie in needsLibs
+  // fehlt.
+  "lib/blackops.json",
+  // Sprosse 5 der Strafleiter. Gestartet von `src/bn4net.js:4069 ff.` und
+  // beauftragt von `src/guard.js:1087`; sie steht in KEINER Registry, weil
+  // der Kern sie ad hoc startet. Liegt nicht im Spiel - aus archiv/ waere sie
+  // gebaut, getestet und dauerhaft tot gewesen.
+  "punish.js",
+  // Bewusst sichtbar gehaltene Totdatei: `tools/ram-namen.js:105-110` fuehrt
+  // sie als Beispiel, und `tools/test-ram-namen.js:118-120` prueft, dass sie
+  // in der Ausgabe erscheint. Verschieben macht test-ram-namen.js rot und
+  // damit Stufe A unerreichbar.
+  "keepalive.js",
   // Phase C, Position C.1 - die Kontrakte. Reine Datenmodule ohne ns-Aufrufe;
   // sie stehen hier, damit der Grep sie mitliest, wenn spaeter doch einer
   // dazukommt.

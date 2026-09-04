@@ -4339,6 +4339,24 @@ export async function main(ns) {
           if (b && Number.isFinite(b.rang)) {
             traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs };
           }
+          // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem
+          // Soll, der keinen Schreiber hatte.
+          //
+          // Gerechnet wird er nicht hier: `blade.js` fuehrt in `boChancen`
+          // eine Tabelle Name -> Chance, aus den Gewichten gerechnet statt
+          // aus `getActionEstimatedSuccessChance` (die liefert fuer Black Ops
+          // einen Bereich, dessen eine Grenze verzerrt ist). Hier wird nur
+          // der Eintrag der NAECHSTEN Operation herausgegriffen.
+          //
+          // Bleibt `null`, solange keine Operation freigeschaltet ist - und
+          // das ist richtig so: der Auftrag laesst die Bedingung ausdruecklich
+          // erst gelten, wenn `getNextBlackOp()` etwas liefert (erste Op bei
+          // 2.500 Rang). Bis dahin treten rank_rate und chaos_city an ihre
+          // Stelle. `null` heisst "nicht gezaehlt", nicht "null Prozent".
+          if (b && b.naechsteBlackOp && b.boChancen
+              && Number.isFinite(b.boChancen[b.naechsteBlackOp])) {
+            k.next_blackop_chance = +b.boChancen[b.naechsteBlackOp].toFixed(3);
+          }
         } catch { /* kein blade.json - dann kein Traeger */ }
       }
       if (!traeger) {

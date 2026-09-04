@@ -46,3 +46,14 @@ pruefstand/browser/
 pruefstand/mock-backups/
 pruefstand/mock/
 pruefstand/t-*/
+pruefstand/src-*/
+pruefstand/koeder-*/
+pruefstand/wsperre-*/
+pruefstand/verfall-*/
+pruefstand/grenze-*/
+pruefstand/blind-*/
+pruefstand/master-*/
+pruefstand/rt*/
+# Der master-Schnappschuss, den tools/test-bruecke.js je Lauf erzeugt, damit
+# der Pruefstand nicht am Commit-Zustand des Arbeitsverzeichnisses haengt.
+pruefstand/master-*.txt

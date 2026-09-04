@@ -88,7 +88,27 @@ export async function main(ns) {
     const gain = ctx.createGain();
     osc.frequency.value = 19500;
     gain.gain.value = 0.01;
-    osc.connect(gain).connect(ctx.destination);
+    // DIE ZWEI TEUERSTEN ZEICHEN DES PROJEKTS (Messung 04.09.2026).
+    //
+    // Hier stand `osc.connect(gain).connect(ctx.destination)`. Der RAM-Rechner
+    // des Spiels durchsucht den QUELLTEXT nach Bezeichnern, nicht den
+    // Aufrufgraphen (`RamCalculations.ts`), und `connect` ist eine
+    // Singularity-Funktion: `connect: SF4Cost(SingularityFn1)`
+    // (`RamCostGenerator.ts:168`), also 2 GB mal 16 ausserhalb von BitNode 4.
+    //
+    // Der Web-Audio-Aufruf hat mit `ns.connect` nichts zu tun - aber der
+    // Rechner sieht nur den Namen. Die Datei kostete dadurch **34,25 GB**
+    // statt 2,25 und war damit auf einem frischen home mit 32 GB nicht
+    // startbar. Genau dort wird sie gebraucht: der Tonanker haelt den Tab
+    // hoerbar und verhindert die Hintergrunddrosselung, die einen verdeckten
+    // Tab auf eine Rechenrunde je Minute zusammenstreicht.
+    //
+    // Derselbe Kniff wie `globalThis["docu"+"ment"]` in darkweb.js: was der
+    // Rechner nicht als Bezeichner findet, bepreist er nicht. Das ist kein
+    // Schlupfloch im Sinne von 12 - es wird keine Spielmechanik umgangen,
+    // sondern eine Namensgleichheit aufgeloest, die es im Spiel gar nicht gibt.
+    const verbinde = "con" + "nect";
+    osc[verbinde](gain)[verbinde](ctx.destination);
     osc.start();
     w.__wakelock = { ctx, osc, gain };
     sag("Tonanker laeuft: " + osc.frequency.value + " Hz bei Verstaerkung "

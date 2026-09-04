@@ -123,6 +123,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-sprosse5-kette.js",
+    deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
+    schnell: false,
+  },
+  {
     datei: "test-loeser-verify.js",
     deckt: "Die Gegenproben der 30 Vertragsloeser, gegen falsche Antworten (C4)",
     schnell: true,
@@ -191,9 +196,17 @@ const LUECKEN = [
   "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
     + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
     + "laesst sich nur im Spiel stellen (C.9, C.10).",
-  "SPROSSE 4a UND 5 sind nicht gebaut (C.12). 4a braucht erst den Beleg, dass "
-    + "kein beforeunload-Dialog stehen bleibt - ohne ihn wird sie laut Auftrag "
-    + "gar nicht gebaut. 5 braucht acht Vorbedingungen und einen Trockenlauf.",
+  "SPROSSE 4a ist nicht gebaut (C.12) und wird es auch nicht, bevor ein "
+    + "Ebene-3-Lauf zeigt, dass ein skriptausgeloester Reload keinen "
+    + "beforeunload-Dialog stehen laesst - so steht es im Auftrag. Aus dem "
+    + "Quelltext belegt sind bereits: der save-Prop existiert "
+    + "(GameRoot.tsx:536-541), und der Handler ist eine schlichte "
+    + "Zuweisung an window.onbeforeunload (index.tsx:55), also durch "
+    + "= null aufhebbar. Was fehlt, ist die MESSUNG im Browser.",
+  "SPROSSE 5 ist gebaut und verdrahtet, laeuft aber im TROCKENLAUF: der Kern "
+    + "haengt 'scharf' nur an, wenn data/punish-scharf.txt auf home liegt, und "
+    + "die legt ein Mensch. Bis dahin landet jede Ausloesung nur im Protokoll "
+    + "- das ist der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
   "BITNODE 8 UND 9 sind nur gerechnet, nie gefahren. boerse.js hat 31 Proben, "
     + "aber keine einzige gegen einen echten Markt (C.13, C.15).",
   "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "

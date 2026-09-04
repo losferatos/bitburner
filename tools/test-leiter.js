@@ -290,29 +290,46 @@ console.log("-- Wirkung rot: Eskalation zur naechsten GEBAUTEN Sprosse --");
   pruefe("eskaliert", r.eskaliert === true);
   pruefe("auf Sprosse 2", r.sprosse === 2, "erhalten " + r.sprosse);
 
-  // Weiter bis zum Ende: Sprosse 4 und 5 sind NICHT gebaut, also endet es
-  // nach 3 in EXHAUSTED - und nicht bei einem Reload, den niemand belegt hat.
+  // Weiter bis zum Ende. Sprosse 4a ist NICHT gebaut (kein Pruefstandsbeleg),
+  // Sprosse 5 seit dem 04.09. schon (src/punish.js) - die Kette laeuft also
+  // ueber 3 nach 5 und endet erst danach in EXHAUSTED.
+  //
+  // Dass 4a dabei UEBERSPRUNGEN wird und nicht blockiert, ist der Punkt:
+  // `naechste` sucht die naechste GEBAUTE Sprosse, nicht die naechste Nummer.
   L.verifiziert(z, "a.js", false, 400000);   // -> 3
-  const ende = L.verifiziert(z, "a.js", false, 500000);
+  const nachDrei = L.verifiziert(z, "a.js", false, 500000);
+  pruefe("nach 3 kommt 5, nicht 4a", nachDrei.sprosse === 5,
+    "erhalten " + nachDrei.sprosse + " (4a ist ungebaut und wird uebersprungen)");
+  const ende = L.verifiziert(z, "a.js", false, 600000);
   pruefe("nach der letzten gebauten Sprosse: EXHAUSTED", ende.zustand === "EXHAUSTED",
     ende.zustand);
   pruefe("und es wird vermerkt", z.exhausted !== null);
-  const nach = L.schritt(z, sig, 600000, W0);
+  const nach = L.schritt(z, sig, 700000, W0);
   pruefe("danach passiert nichts mehr", nach.handlung === "nichts", nach.handlung);
   pruefe("aber der Grund ist lesbar", /erschoepft/.test(nach.grund));
 }
 
 console.log("");
-console.log("-- Sprosse 4a und 5 sind NICHT gebaut --");
+console.log("-- Sprosse 4a ist NICHT gebaut, Sprosse 5 schon --");
 {
   const s4 = L.SPROSSEN.find((s) => s.nr === 4);
   const s5 = L.SPROSSEN.find((s) => s.nr === 5);
   pruefe("4a steht als nicht gebaut in der Tabelle", s4 && s4.gebaut === false,
     "sie wird nur nach Pruefstandsbeleg gebaut - das ist kein Verhandlungspunkt");
   pruefe("und nennt ihre Bedingung", /beforeunload/.test(s4.bedingung || ""));
-  pruefe("5 steht als nicht gebaut", s5 && s5.gebaut === false);
+  // Seit dem 04.09.2026: punish.js ist gebaut und mit 35 Proben belegt.
+  // Vorher endete die Leiter faktisch bei 3, und der Zustand, fuer den sie
+  // gedacht ist (der Traeger waechst seit sechs Stunden Motorzeit nicht),
+  // hatte keine Antwort.
+  pruefe("5 steht als GEBAUT", s5 && s5.gebaut === true,
+    "src/punish.js, tools/test-punish.js");
+  pruefe("5 laeuft in MOTORZEIT", s5.uhr === "motor",
+    "S2 misst Spielfortschritt - Auftrag 5.3 woertlich");
   pruefe("sprosseFuer liefert keine ungebaute Sprosse",
     L.sprosseFuer("S3b") === null, "S3b fuehrt zu 4a, und die gibt es noch nicht");
+  pruefe("aber S2 findet jetzt seine Sprosse",
+    L.sprosseFuer("S2") !== null && L.sprosseFuer("S2").nr === 5,
+    "S2 war das einzige Signal ohne gebaute Sprosse");
 }
 
 console.log("");

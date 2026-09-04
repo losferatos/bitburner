@@ -119,12 +119,41 @@ export async function main(ns) {
   // Spiel laeuft.
   for (let runde = 0; ; runde++) {
     if (runde > 0 && runde % 60 === 0) {
+      // DIE SCHONLISTE (Position C.6, 04.09.2026).
+      //
+      // Hier stand nur "ausser boot.js selbst". Das beendete auch den
+      // Waechter - also genau die Instanz, die einen nicht startenden Kern
+      // ueberhaupt bemerken und melden wuerde. Ein Aufraeumen, das seine
+      // eigene Aufsicht wegraeumt, macht den Fall unsichtbar, fuer den es
+      // gebaut ist.
+      //
+      // Die Namen stehen NICHT als Literal hier, sondern kommen aus
+      // registry.json: `killSafe: false` heisst "nicht beenden". Ein
+      // zweiter Ort fuer dieselbe Liste liefe unweigerlich auseinander.
+      // Faellt die Registry aus, greift die eingebaute Notliste - lieber ein
+      // Prozess zu viel als der Waechter zu wenig.
+      const NOTLISTE = ["boot.js", "guard.js", "ausgang.js"];
+      let schonliste = NOTLISTE;
+      try {
+        const roh = ns.fileExists("registry.json", "home") ? ns.read("registry.json") : null;
+        const reg = roh ? JSON.parse(roh) : null;
+        if (reg && Array.isArray(reg.eintraege)) {
+          const ausReg = reg.eintraege
+            .filter((e) => e.killSafe === false)
+            .map((e) => e.name);
+          // Die Notliste bleibt immer dabei: boot.js darf sich nie selbst
+          // beenden, und der Waechter ist der Grund fuer diese Aenderung.
+          schonliste = [...new Set([...NOTLISTE, ...ausReg])];
+        }
+      } catch { /* Registry unlesbar - die Notliste traegt */ }
+
       let beendet = 0;
       for (const p of ns.ps("home")) {
-        if (p.filename === "boot.js") continue;
+        if (schonliste.includes(p.filename)) continue;
         ns.kill(p.pid); beendet++;
       }
-      sag("Nach fuenf Minuten ohne bn4net: " + beendet + " Prozess(e) auf home beendet.");
+      sag("Nach fuenf Minuten ohne bn4net: " + beendet + " Prozess(e) auf home beendet."
+        + " Geschont: " + schonliste.join(", ") + ".");
     }
     const frei = ns.getServerMaxRam("home") - ns.getServerUsedRam("home");
 

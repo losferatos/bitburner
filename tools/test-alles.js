@@ -113,6 +113,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-kern-c789.js",
+    deckt: "EBENE 2: Platzreservierung, shop-Bedarfsbetrieb, Wirtsperren, BN9 (C.7-C.13)",
+    schnell: false,
+  },
+  {
     datei: "test-graftauto-ebene2.js",
     deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
     schnell: false,

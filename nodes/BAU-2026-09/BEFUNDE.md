@@ -305,6 +305,48 @@ gerechnet.
 Der Bericht nennt jetzt außerdem eine **falsifizierbare Vorhersage**: bis Rang
 903 lief die Referenz mit 169 Rang/h.
 
+### E.1a — Vier Fehler in der eigenen Korrektur · UMGESETZT 04.09. 02:48
+Die Korrektur war richtig in der Richtung und falsch im Detail. Drei Skeptiker
+fanden vier Fehler, alle belegt:
+
+1. **Zeilenversatz.** Der Stützpunkt bei Stunde 21,39 trug Rang 903; tatsächlich
+   stand der Rang dort bei 713, die 903 fielen erst bei Stunde 25,13. Daraus
+   errechnete die „falsifizierbare Probe" 169 Rang je Stunde, wo 45 zu erwarten
+   sind — **ein eingebauter Fehlalarm**, der beim nächsten Check-in einen
+   gesunden Lauf als Befund gemeldet hätte.
+   **Behoben, strukturell:** `tools/rangkurve-bauen.js` erzeugt die Kurve aus den
+   Rohdaten, 76 Stützpunkte statt 16 abgeschriebener. Dieselbe Lehre wie bei
+   A.1 am selben Tag: was erzeugt wird, kann nicht abweichen.
+2. **Die Untergrenze war nicht erreichbar.** Sie stand auf der Zeit bis zum
+   letzten gemessenen Punkt unter der Schwelle — und der liegt bei Rang 17.594,
+   also 4,4 % des Ziels. Die Aussage „es können noch 27,7 Stunden sein"
+   behauptete, der Knoten könne enden, während 95,6 % des Rangs fehlen.
+   **Behoben:** Bezugsgröße ist jetzt das gemessene Knotenende des
+   Referenzlaufs. Ergebnis 49 statt 38,6 Stunden — konservativer, weil der
+   Nachlauf nach der Schwelle enthalten ist.
+3. **In die Messlücke hinein interpoliert.** Zwischen Rang 17.594 und 4,54 Mio
+   hat niemand gemessen; die sechs Beobachtungsloops wurden am 31.08. abgeschafft.
+   Die alte Fassung interpolierte trotzdem, und ab Rang 341.000 meldete sie
+   **„FERTIG VORAUSSICHTLICH: jetzt"**. Das hätte 95,6 % des Restwegs betroffen
+   und wäre in ein bis zwei Spieltagen scharf geworden.
+4. **Logarithmische Interpolation war schlechter als lineare.** Gegenprobe an
+   den 59 ausgelassenen Messpunkten: mittlerer Fehler 0,548 gegen 0,236 Stunden,
+   größter 4,90 gegen 1,37. Die Begründung „wächst multiplikativ" trägt nicht —
+   die Rate ist stückweise konstant und springt an Aktionsstufen.
+
+Zwei eigene Funde beim Nachziehen:
+
+- `vergleichMitReferenz` war gebaut, aber **nirgends aufgerufen**. Das ist die
+  eigentlich wichtige Zahl: die Restzeit ist eine reine Funktion des Rangs, ein
+  zehnmal langsamerer Lauf bekäme exakt dieselbe gemeldet. Jetzt angeschlossen.
+- Der **Methodenwechsel selbst** löste das Urteil „ZÄH" aus, weil die neue Zahl
+  größer war als die alte. Der Bot war nicht langsamer, die Rechnung war anders.
+  Jetzt wird nur verglichen, was mit derselben Methode gerechnet wurde.
+
+Offen geblieben, ohne Wirkung auf die Zahl: der Nullpunkt der Kurve ist der
+erste Messpunkt mit Rang, nicht belegbar der Beitrittszeitpunkt. Für die
+Restzeit unerheblich, weil nur Differenzen gebildet werden.
+
 ### E.1b — Lauf 2 ist schneller als Lauf 1 · GESCHLOSSEN
 Der Gleichstandsvergleich an derselben Rangstelle:
 

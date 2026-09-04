@@ -55,6 +55,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-ram-namen.js",
+    deckt: "Namenspruefer gegen die wakelock-Fehlerklasse, mit Selbstprobe",
+    schnell: true,
+  },
+  {
     datei: "test-zielvalidierung.js",
     deckt: "Zielpruefung vor dem Sprung gegen die echte route.json (C.3)",
     schnell: true,

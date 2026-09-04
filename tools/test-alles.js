@@ -65,6 +65,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-endspurt.js",
+    deckt: "Ausgangs-Interlock und Endspurt-Regel, inkl. ns.read-Asymmetrie (C.3)",
+    schnell: true,
+  },
+  {
     datei: "test-reserve-eta.js",
     deckt: "Wirtreserve mit Verfall und Restzeit gegen Nachholklumpen (C.3)",
     schnell: true,

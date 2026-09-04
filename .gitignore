@@ -37,3 +37,4 @@ data/
 # Pruefstand-Baulogs, gross und ohne Wert fuer die Historie
 pruefstand/logs/
 pruefstand/backups/
+pruefstand/browser/

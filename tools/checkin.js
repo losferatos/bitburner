@@ -557,6 +557,85 @@ async function main() {
   if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
     + " gerootet, Runde " + (netz.runde ?? "?") + ".");
 
+  // --- 5b. Das Betriebsbild (Auftrag 11) -----------------------------------
+  //
+  // Der Auftrag nennt fuenf Quellen, die hier gelesen werden sollen:
+  // kpi.json, penalties.json, bridge-heartbeat.json, bridge-alarm.json und das
+  // Alter der letzten Sicherung, dazu die Instanz. Sie standen bis zum
+  // 04.09.2026 nicht drin - ein Check-in, das den Fortschritt meldet und die
+  // Aufsicht verschweigt, meldet die haelfte.
+  //
+  // Gedruckt wird nur, was etwas zu sagen hat. Eine Zeile "keine Strafen" in
+  // jedem Aufruf stumpft ab; eine Zeile, die nur bei Strafen erscheint, wird
+  // gelesen.
+  {
+    const kpi = await holeJson("data/kpi.json");
+    const strafen = await holeJson("data/penalties.json");
+    const wd = await holeJson("data/watchdog.json");
+
+    if (wd && wd.modus) {
+      // Der Modus gehoert immer hin: eine Leiter im Beobachtungsmodus meldet
+      // dieselben Befunde und handelt nicht. Wer das verwechselt, haelt einen
+      // stehenden Bot fuer bewacht.
+      sag("Waechter: " + wd.modus
+        + (wd.modus === "observe" ? " (beobachtet nur - er greift NICHT ein)" : " (scharf)")
+        + (Number.isFinite(wd.okRound) ? ", " + zahl(wd.okRound) + " Runden" : "")
+        + (wd.sichtbar === false ? ", Tab verdeckt" : ""));
+    }
+
+    // Strafen der letzten 24 Stunden, nach Sprosse. Sprossen ab 3 sind laut
+    // Architektur "jede ist ein Befund" - sie werden einzeln genannt.
+    if (strafen && Array.isArray(strafen.eintraege)) {
+      const seit = Date.now() - 24 * 3600000;
+      const jung = strafen.eintraege.filter((e) => Number(e.wall) >= seit);
+      if (jung.length) {
+        const nachSprosse = {};
+        for (const e of jung) nachSprosse[e.rung] = (nachSprosse[e.rung] || 0) + 1;
+        sag("Strafen (24 h): " + Object.entries(nachSprosse)
+          .sort((a, b) => a[0] - b[0])
+          .map(([r, n]) => n + "x Sprosse " + r).join(", "));
+        for (const e of jung.filter((x) => Number(x.rung) >= 3)) {
+          sag("  Sprosse " + e.rung + " auf " + e.target + " (" + e.reason + ") um "
+            + new Date(Number(e.wall)).toLocaleTimeString("de-DE")
+            + " - " + (e.result || "?"));
+        }
+      }
+    }
+
+    // Die drei Autonomie-Kennzahlen, sobald sie einen Wert haben. Sie sind
+    // seit dem 04.09. ueberhaupt erst messbar - vorher schrieb niemand die
+    // Ereignisse, aus denen sie sich rechnen.
+    if (kpi) {
+      const teile = [];
+      if (Number.isFinite(kpi.jump_latency_min)) teile.push("Sprung " + kpi.jump_latency_min.toFixed(1) + " min");
+      if (Number.isFinite(kpi.boot_latency_min)) teile.push("Anlauf " + kpi.boot_latency_min.toFixed(1) + " min");
+      if (Number.isFinite(kpi.ladder_rungs_ge3_per_week)) teile.push("Sprossen ab 3 diese Woche: " + kpi.ladder_rungs_ge3_per_week);
+      if (Number.isFinite(kpi.idle_ram_pct)) teile.push("brach " + kpi.idle_ram_pct.toFixed(0) + " %");
+      if (teile.length) sag("Autonomie: " + teile.join(", "));
+      if (kpi.exhausted) {
+        sag("ERSCHOEPFT: " + kpi.exhausted.signal + " auf Sprosse "
+          + kpi.exhausted.lastRung + " - die Leiter hat nichts mehr uebrig.");
+      }
+    }
+
+    // Die Bruecke und die Sicherungen. Beides liest sich am besten aus ihrem
+    // eigenen Zustand, nicht aus dem Spiel - deshalb ueber /api/state.
+    try {
+      const r = await fetch(new URL("/api/state", BRIDGE));
+      const st = await r.json();
+      const alter = st.backupAgeMin;
+      const zeilenteile = ["Instanz " + st.instance];
+      if (Number.isFinite(alter)) {
+        zeilenteile.push("juengste Sicherung " + alter.toFixed(0) + " min alt"
+          + (alter > 90 ? " - ZU ALT" : ""));
+      } else {
+        zeilenteile.push("Sicherungsalter unbekannt");
+      }
+      if (st.alarm) zeilenteile.push("ALARM: " + (st.alarm.titel || st.alarm));
+      sag("Bruecke: " + zeilenteile.join(", "));
+    } catch { /* die Bruecke antwortet nicht - das steht schon oben */ }
+  }
+
   // --- 6. Die Schlusszeile: wann ist der Knoten fertig? --------------------
   //
   // Eric am 31.08.2026: "am Ende vom /bb soll die aktuelle Schaetzung kommen,

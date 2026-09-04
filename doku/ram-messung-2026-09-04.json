@@ -30,7 +30,8 @@
   "dom": 0,
   "err": null,
   "bytes": 107718,
-  "lines": 1940
+  "lines": 1940,
+  "sha256": "2e97b14dc52dcfddbda78467f804dcd66f2efa12f5f92ee16ccb25a8348567b9"
  },
  {
   "file": "exit.js",
@@ -46,7 +47,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5779,
-  "lines": 143
+  "lines": 143,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "kampfaugs.js",
@@ -68,7 +70,8 @@
   "dom": 0,
   "err": null,
   "bytes": 10985,
-  "lines": 249
+  "lines": 249,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "joinrun.js",
@@ -91,7 +94,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6211,
-  "lines": 145
+  "lines": 145,
+  "sha256": "9676395f78628f297c260f38092b5c7802ff1da30a6b314db6916166085bc746"
  },
  {
   "file": "netburn.js",
@@ -112,7 +116,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3797,
-  "lines": 96
+  "lines": 96,
+  "sha256": "3fdd30bb10570d121b54ccc7aa84e26f5702c651ec18acde4bd9579596cab2b2"
  },
  {
   "file": "cheap.js",
@@ -133,7 +138,8 @@
   "dom": 0,
   "err": null,
   "bytes": 4045,
-  "lines": 81
+  "lines": 81,
+  "sha256": "ba8e47cb0bc46058b19dab8e48f1b293585c7fa668f4ae6cf0e9a95936d4fe5d"
  },
  {
   "file": "bn4life.js",
@@ -156,7 +162,8 @@
   "dom": 0,
   "err": null,
   "bytes": 22571,
-  "lines": 438
+  "lines": 438,
+  "sha256": "ec7c604b2133a67a05f9332e3521a77ef21439ccec0814d56f056d1640026612"
  },
  {
   "file": "brcheck.js",
@@ -177,7 +184,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1394,
-  "lines": 31
+  "lines": 31,
+  "sha256": "125901a3851c3a0f7eb1ec967906a1f7f9cbe4519ea1f88a2d9057febe7118b9"
  },
  {
   "file": "wbgrow.js",
@@ -197,7 +205,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5601,
-  "lines": 117
+  "lines": 117,
+  "sha256": "289f389662341eaf80bdf6c5ccdda3882b668873cc9b3cd90d86779d5ec6db28"
  },
  {
   "file": "kaufplan.js",
@@ -217,7 +226,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3869,
-  "lines": 92
+  "lines": 92,
+  "sha256": "ee2d2088412e9b861db1a1a4be385aab7545defb3b0c39ae67c925c92bb137f8"
  },
  {
   "file": "stat.js",
@@ -237,7 +247,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1468,
-  "lines": 31
+  "lines": 31,
+  "sha256": "a61f9018d20bd071d9aa8faf456dd4a040ce24270740d616dec3fcb5f5a4297d"
  },
  {
   "file": "favorweg.js",
@@ -257,7 +268,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3513,
-  "lines": 78
+  "lines": 78,
+  "sha256": "a351296485f814865dc434c601102aab236f5702c8fdbf199bc44b36687d3164"
  },
  {
   "file": "blade.js",
@@ -276,7 +288,8 @@
   "dom": 0,
   "err": null,
   "bytes": 187718,
-  "lines": 3489
+  "lines": 3489,
+  "sha256": "702bf77017261e227815e8e3ddcf11e0d12f2df286279b7311daae92261fda96"
  },
  {
   "file": "augcount.js",
@@ -293,7 +306,8 @@
   "dom": 0,
   "err": null,
   "bytes": 4416,
-  "lines": 104
+  "lines": 104,
+  "sha256": "26567078b7de167158106468ef27895b83d6e0b2e56ca27012519ae8b0da7eed"
  },
  {
   "file": "homegrow.js",
@@ -312,7 +326,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6041,
-  "lines": 127
+  "lines": 127,
+  "sha256": "1231d7becbd45320203f17df1ed22b3906996bddb8e14ef4e987f76995d06a38"
  },
  {
   "file": "graft.js",
@@ -330,7 +345,8 @@
   "dom": 0,
   "err": null,
   "bytes": 8884,
-  "lines": 194
+  "lines": 194,
+  "sha256": "7994b23d470220ed1a6d7386f396d49a0dca63c69347403b71e2833d774de3f3"
  },
  {
   "file": "augcheck.js",
@@ -347,7 +363,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2161,
-  "lines": 54
+  "lines": 54,
+  "sha256": "bd124b7b98cfc6e38a8896d2ebc453a035752d2d24b293001f9dfd81ca8d3004"
  },
  {
   "file": "exploit3.js",
@@ -364,7 +381,8 @@
   "dom": 0,
   "err": null,
   "bytes": 4949,
-  "lines": 125
+  "lines": 125,
+  "sha256": "b316101790772a426b68987ebecbb40e072d115b21adc0c9ec87c8ed71eb25f2"
  },
  {
   "file": "bn4door.js",
@@ -382,7 +400,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6143,
-  "lines": 157
+  "lines": 157,
+  "sha256": "e0f7cef83a42fe17d6f590d045506bff888e14e64c2424bb6991cfb1f9184dfe"
  },
  {
   "file": "bbgraft.js",
@@ -398,7 +417,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2587,
-  "lines": 63
+  "lines": 63,
+  "sha256": "2a5a570525c14d975ad3864bc2383b98e72cd263ff8d887e975e488f0ede6418"
  },
  {
   "file": "bbtrain.js",
@@ -417,7 +437,8 @@
   "dom": 0,
   "err": null,
   "bytes": 15845,
-  "lines": 338
+  "lines": 338,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "travel.js",
@@ -433,7 +454,8 @@
   "dom": 25,
   "err": null,
   "bytes": 68792,
-  "lines": 1673
+  "lines": 1673,
+  "sha256": "346a7051dc20b68bea29d78e038bea9a657cc35b01a6c17e4313579e932c1e69"
  },
  {
   "file": "keepalive.js",
@@ -449,7 +471,8 @@
   "dom": 50,
   "err": null,
   "bytes": 13862,
-  "lines": 291
+  "lines": 291,
+  "sha256": "1ee8cab8aa655a06337a7edadeb1ea58d39a99d0ef6870c4af8b49b7c5fc6ad0"
  },
  {
   "file": "daedalus.js",
@@ -465,7 +488,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3074,
-  "lines": 66
+  "lines": 66,
+  "sha256": "3715beb1ef87566fd1f8fb19b1177ca836e6d5ff6484583bc817a77ff0caa845"
  },
  {
   "file": "bn4start.js",
@@ -482,7 +506,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5166,
-  "lines": 122
+  "lines": 122,
+  "sha256": "430fda2d89fe4fcda9a8c5ecbc83ac8735a42fa61e617a89d96515efccf4d445"
  },
  {
   "file": "probe.js",
@@ -498,7 +523,8 @@
   "dom": 25,
   "err": null,
   "bytes": 10400,
-  "lines": 220
+  "lines": 220,
+  "sha256": "f973ebf62716a442505a8ec3c3fc84d0aa233bc9ae9b0a37db909e14f95c763b"
  },
  {
   "file": "joinfac.js",
@@ -514,7 +540,8 @@
   "dom": 25,
   "err": null,
   "bytes": 2509,
-  "lines": 62
+  "lines": 62,
+  "sha256": "7b55faf12676b5358a18b252fdfba283a2238f968f90e55840d35ec5e2f7a5bc"
  },
  {
   "file": "bbspann.js",
@@ -528,7 +555,8 @@
   "dom": 0,
   "err": null,
   "bytes": 22480,
-  "lines": 424
+  "lines": 424,
+  "sha256": "0ff42b94c5341f646b9d1e5db6d9965c020197e3c043d40ac6c9552f1b36a8c7"
  },
  {
   "file": "wakelock.js",
@@ -544,7 +572,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6831,
-  "lines": 154
+  "lines": 154,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "autopilot.js",
@@ -558,7 +587,8 @@
   "dom": 25,
   "err": null,
   "bytes": 94520,
-  "lines": 1957
+  "lines": 1957,
+  "sha256": "598e50dad87dba08088da9c79c3d5307889c46e4d8155c6260236b97eb6fe4d7"
  },
  {
   "file": "homeram.js",
@@ -572,7 +602,8 @@
   "dom": 25,
   "err": null,
   "bytes": 52096,
-  "lines": 1179
+  "lines": 1179,
+  "sha256": "619319167ba86ba365642d82391b86dbc43601a6e3eb3ca51f06bee2e90ebf8f"
  },
  {
   "file": "sr.js",
@@ -586,7 +617,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1417,
-  "lines": 31
+  "lines": 31,
+  "sha256": "b7a709644da6a60ce5394f75c578c1c776918f38e44ac7d72a8c537b5727b876"
  },
  {
   "file": "stufentest.js",
@@ -600,7 +632,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1350,
-  "lines": 32
+  "lines": 32,
+  "sha256": "204eed7e8d01f05d7752db9336523a76d3f0dc0a7f222720f7753b96ee95442c"
  },
  {
   "file": "trupp.js",
@@ -614,7 +647,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1486,
-  "lines": 38
+  "lines": 38,
+  "sha256": "4f10ea58d72849857213b4b258b490af188a1baef00468233a8b101bcb35c28f"
  },
  {
   "file": "backdoor.js",
@@ -628,7 +662,8 @@
   "dom": 25,
   "err": null,
   "bytes": 4357,
-  "lines": 103
+  "lines": 103,
+  "sha256": "5ef0a46ba2ad411a99d8a4be7d42922d4cb1d4db902f0f6691a051928ac9193b"
  },
  {
   "file": "hand.js",
@@ -642,7 +677,8 @@
   "dom": 25,
   "err": null,
   "bytes": 11077,
-  "lines": 230
+  "lines": 230,
+  "sha256": "af0ae37f00dba759d3dd6f839730d397dd9ef6cd1253490981550d41be6ce96e"
  },
  {
   "file": "buyaugs.js",
@@ -656,7 +692,8 @@
   "dom": 25,
   "err": null,
   "bytes": 104471,
-  "lines": 1932
+  "lines": 1932,
+  "sha256": "2b7c5dd4135691b345d469ea624c2b4ab1a92bddb0dfc688bfe148638aa376a5"
  },
  {
   "file": "install.js",
@@ -670,7 +707,8 @@
   "dom": 25,
   "err": null,
   "bytes": 5628,
-  "lines": 119
+  "lines": 119,
+  "sha256": "7fa3fad28e2d68a0d6e12d15abff16ee0153af42ff05fb86b854d908e152fe38"
  },
  {
   "file": "sleeve.js",
@@ -684,7 +722,8 @@
   "dom": 0,
   "err": null,
   "bytes": 21733,
-  "lines": 396
+  "lines": 396,
+  "sha256": "fa748aebc29d9d53b5e649e7c8d3c3f606989925e43e0be423d3159b9592fa12"
  },
  {
   "file": "exportbonus.js",
@@ -698,7 +737,8 @@
   "dom": 25,
   "err": null,
   "bytes": 3136,
-  "lines": 68
+  "lines": 68,
+  "sha256": "511738959abee12ccc1b33d1af7d609f09e5e698a67046b13d8788688b09b671"
  },
  {
   "file": "work.js",
@@ -712,7 +752,8 @@
   "dom": 25,
   "err": null,
   "bytes": 11078,
-  "lines": 225
+  "lines": 225,
+  "sha256": "77a0efefb6d2f3db79678acfb9c5e199aec047f35de608a3a3a7caa21c353197"
  },
  {
   "file": "boprobe.js",
@@ -726,7 +767,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1008,
-  "lines": 25
+  "lines": 25,
+  "sha256": "c1afc3dff645b442b0ce2c24a1f69040785af1a4a3c41cad03932e7c943903e5"
  },
  {
   "file": "probe3.js",
@@ -740,7 +782,8 @@
   "dom": 25,
   "err": null,
   "bytes": 3774,
-  "lines": 88
+  "lines": 88,
+  "sha256": "3e84c7a94c61d211daed1710b810fb1534827d765c2bec2beda2ab0e7f2a82a5"
  },
  {
   "file": "donate.js",
@@ -754,7 +797,8 @@
   "dom": 25,
   "err": null,
   "bytes": 6223,
-  "lines": 143
+  "lines": 143,
+  "sha256": "d75aa9a416419382b1ecd8908387354098a74ffd90a16863d1904f84c53cff53"
  },
  {
   "file": "stockaccess.js",
@@ -768,7 +812,8 @@
   "dom": 25,
   "err": null,
   "bytes": 6328,
-  "lines": 131
+  "lines": 131,
+  "sha256": "04e40633a1878abcac062eef14a02dd7427be5b5dceca63eb8e68b25b7b474b2"
  },
  {
   "file": "torprobe.js",
@@ -782,7 +827,8 @@
   "dom": 25,
   "err": null,
   "bytes": 2701,
-  "lines": 72
+  "lines": 72,
+  "sha256": "00f63e9a2cad897f1002744854679bcf658c153c4a58445e47bd7319b015ffed"
  },
  {
   "file": "bitverse.js",
@@ -796,7 +842,8 @@
   "dom": 25,
   "err": null,
   "bytes": 2373,
-  "lines": 60
+  "lines": 60,
+  "sha256": "98a2fc92f33c1b25ab40b6185bccd2c191b2a44a1fec34ecf00499823305717a"
  },
  {
   "file": "buyone.js",
@@ -810,7 +857,8 @@
   "dom": 25,
   "err": null,
   "bytes": 5377,
-  "lines": 112
+  "lines": 112,
+  "sha256": "766186bfc863c73248c73c70306dac843f1fdbb2aa701743fccd7099cf0e5f51"
  },
  {
   "file": "hacktimer.js",
@@ -824,7 +872,8 @@
   "dom": 25,
   "err": null,
   "bytes": 11210,
-  "lines": 276
+  "lines": 276,
+  "sha256": "4f5b5cadd8338f693a4f1fd29bfc7b78831f9677e0c0103c08f6f6262b4cc99a"
  },
  {
   "file": "probe2.js",
@@ -838,7 +887,8 @@
   "dom": 25,
   "err": null,
   "bytes": 2333,
-  "lines": 54
+  "lines": 54,
+  "sha256": "be706775f7cbceb645d6472787a1e113f000cf16c4db2ddbc663fb46a789c84a"
  },
  {
   "file": "sonde.js",
@@ -852,7 +902,8 @@
   "dom": 25,
   "err": null,
   "bytes": 5718,
-  "lines": 153
+  "lines": 153,
+  "sha256": "55a4b0e80833bb98678ca377c32f4cd463293d72b5963a1c9afe4f505fff901b"
  },
  {
   "file": "stopnight.js",
@@ -866,7 +917,8 @@
   "dom": 25,
   "err": null,
   "bytes": 1662,
-  "lines": 45
+  "lines": 45,
+  "sha256": "23802c2ce9ff33812005cc7f5c5aa417aadba96c5dd3bee919cfd313198188ce"
  },
  {
   "file": "stopwork.js",
@@ -880,7 +932,8 @@
   "dom": 25,
   "err": null,
   "bytes": 2250,
-  "lines": 56
+  "lines": 56,
+  "sha256": "5439e8956b3279e2e16d5c7c4b792f0b7a965e81ecb72a2cd1b9e2a02390a8c3"
  },
  {
   "file": "stocks.js",
@@ -894,7 +947,8 @@
   "dom": 0,
   "err": null,
   "bytes": 9292,
-  "lines": 209
+  "lines": 209,
+  "sha256": "293cc547b4b4b2f3c4b962ecb6ede5a89d579a7fa9806341646f755331b3cb2a"
  },
  {
   "file": "formcheck.js",
@@ -910,7 +964,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5911,
-  "lines": 139
+  "lines": 139,
+  "sha256": "c71f8c2eedb416c012730e932e0f93d4f2c53d8322c7b953150f8fba401ad1cb"
  },
  {
   "file": "chance.js",
@@ -924,7 +979,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5414,
-  "lines": 122
+  "lines": 122,
+  "sha256": "932023606881eea6eb38af581735add7bafb4c0917b81aa93658ef6fe64d38ee"
  },
  {
   "file": "bblage.js",
@@ -940,7 +996,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2067,
-  "lines": 49
+  "lines": 49,
+  "sha256": "6d68c46faf5be77e10c6eaf5ca7432e4d3007dd6fa1bf957e5505e7479049723"
  },
  {
   "file": "bn4net.js",
@@ -954,7 +1011,8 @@
   "dom": 0,
   "err": null,
   "bytes": 184201,
-  "lines": 3274
+  "lines": 3274,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "contracts.js",
@@ -968,7 +1026,8 @@
   "dom": 0,
   "err": null,
   "bytes": 54487,
-  "lines": 1507
+  "lines": 1507,
+  "sha256": "33c276b1644d44826b506fbdd5f200a1a384d6f1b0b375de5e0bb1321752948b"
  },
  {
   "file": "astufe.js",
@@ -982,7 +1041,8 @@
   "dom": 0,
   "err": null,
   "bytes": 595,
-  "lines": 14
+  "lines": 14,
+  "sha256": "1848abfa58091055b669fea94490f3d87bc7c7f4a85a189f44864e0552914542"
  },
  {
   "file": "bodauer.js",
@@ -996,7 +1056,8 @@
   "dom": 0,
   "err": null,
   "bytes": 816,
-  "lines": 22
+  "lines": 22,
+  "sha256": "1446af5dbe13f6f69041949cf35077493ca492f4ad68244b934dc406378ead32"
  },
  {
   "file": "srtest.js",
@@ -1010,7 +1071,8 @@
   "dom": 0,
   "err": null,
   "bytes": 563,
-  "lines": 14
+  "lines": 14,
+  "sha256": "2696a19ea43d60626ded3c2486549498629b65765fa5df3a32eb98659c19d7e5"
  },
  {
   "file": "bbtick.js",
@@ -1024,7 +1086,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3167,
-  "lines": 74
+  "lines": 74,
+  "sha256": "6f860f9be61608b46eacc849df6381e72f3529e35f0e4fba851ecbe88039a75b"
  },
  {
   "file": "blackops.js",
@@ -1038,7 +1101,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1581,
-  "lines": 36
+  "lines": 36,
+  "sha256": "eb43ffd432a3f7f558fb1559514146ed02e583a37ebc7460b6ae26aab911b826"
  },
  {
   "file": "skillcheck.js",
@@ -1052,7 +1116,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3563,
-  "lines": 85
+  "lines": 85,
+  "sha256": "4a51228dda7f61ee03f49e2f00550b67d92c790f544446bf0177c35c2cd8eead"
  },
  {
   "file": "sleevediag.js",
@@ -1066,7 +1131,8 @@
   "dom": 0,
   "err": null,
   "bytes": 673,
-  "lines": 15
+  "lines": 15,
+  "sha256": "6cb7ceff60b4c290d66f3eabeb38f077b639811da74d981475ea1f2765613d26"
  },
  {
   "file": "csolve.js",
@@ -1080,7 +1146,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1583,
-  "lines": 41
+  "lines": 41,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "cdump.js",
@@ -1094,7 +1161,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1672,
-  "lines": 42
+  "lines": 42,
+  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap."
  },
  {
   "file": "invest.js",
@@ -1108,7 +1176,8 @@
   "dom": 0,
   "err": null,
   "bytes": 9166,
-  "lines": 217
+  "lines": 217,
+  "sha256": "95d496dceaddaae0065038c038a4cec17f87092aaa68553f8cca0647daa6a0e9"
  },
  {
   "file": "hacknet.js",
@@ -1122,7 +1191,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6385,
-  "lines": 126
+  "lines": 126,
+  "sha256": "b478062be71bdabe9c226d095755813e3a27342ff5c3daf08c1dd61025d04976"
  },
  {
   "file": "ausgang.js",
@@ -1136,7 +1206,8 @@
   "dom": 0,
   "err": null,
   "bytes": 18705,
-  "lines": 364
+  "lines": 364,
+  "sha256": "4ce76ae253ddd2a209b1fa64843dd3d76b29f71e4e90c5939ad626e50ad90df5"
  },
  {
   "file": "sleevecrime.js",
@@ -1150,7 +1221,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2547,
-  "lines": 67
+  "lines": 67,
+  "sha256": "8b60e892860fb65c27d3d1fdd89fb2085efadfd4ac30d1448c909841c65618be"
  },
  {
   "file": "kerne.js",
@@ -1164,7 +1236,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2330,
-  "lines": 50
+  "lines": 50,
+  "sha256": "5b6158ed4a8213771f2560815f3ba14810ecdc9d3aad25c6ded8a0f5079ddc3a"
  },
  {
   "file": "lage.js",
@@ -1178,7 +1251,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1270,
-  "lines": 34
+  "lines": 34,
+  "sha256": "a34ee3939dff8d88b97a80285073112150e228f6fa731d82773a794201f0d561"
  },
  {
   "file": "hashes.js",
@@ -1192,7 +1266,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3595,
-  "lines": 77
+  "lines": 77,
+  "sha256": "32f0ec9a86fd42427c489a0158733288c65fdf8477e3edf6aa778d82edeb13c4"
  },
  {
   "file": "netburner.js",
@@ -1206,7 +1281,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3888,
-  "lines": 92
+  "lines": 92,
+  "sha256": "e834edf3382ed823e87b0c6766cc916dcd23e67cd111487d9c990c3d05eb8c5b"
  },
  {
   "file": "vorrat.js",
@@ -1220,7 +1296,8 @@
   "dom": 0,
   "err": null,
   "bytes": 834,
-  "lines": 24
+  "lines": 24,
+  "sha256": "1eb248f6e998b2975ce124beb1f169cef9c76afca1fde474bdc898aa9fb3a063"
  },
  {
   "file": "boot.js",
@@ -1234,7 +1311,8 @@
   "dom": 0,
   "err": null,
   "bytes": 8645,
-  "lines": 172
+  "lines": 172,
+  "sha256": "d7590e8a680841a405c271920664f17e125b4a5aeaa564c9c649993ee93ab845"
  },
  {
   "file": "calccheck.js",
@@ -1248,7 +1326,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5574,
-  "lines": 134
+  "lines": 134,
+  "sha256": "70dc641206197042cab351eb4e2641d0e778ca94187349bf59bd4e73c5083d35"
  },
  {
   "file": "netz.js",
@@ -1262,7 +1341,8 @@
   "dom": 0,
   "err": null,
   "bytes": 814,
-  "lines": 22
+  "lines": 22,
+  "sha256": "0d655a9701f04a361446f23580da53555f7e4c924a904061f72742a6e5700abf"
  },
  {
   "file": "restart.js",
@@ -1276,7 +1356,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2219,
-  "lines": 59
+  "lines": 59,
+  "sha256": "177c9f19ca19212582aff1de670be342e3a93595090ef347bd43e37d2c756849"
  },
  {
   "file": "xp.js",
@@ -1290,7 +1371,8 @@
   "dom": 0,
   "err": null,
   "bytes": 6251,
-  "lines": 142
+  "lines": 142,
+  "sha256": "030b385c4584de347ab28df464c34ac76ff611326d344d51cb1ec71e848bed2f"
  },
  {
   "file": "share.js",
@@ -1304,7 +1386,8 @@
   "dom": 0,
   "err": null,
   "bytes": 862,
-  "lines": 22
+  "lines": 22,
+  "sha256": "c2e82265909efe31d4011a588a54bf47b07ef4fe6b2583a66e3d447bdc181ba4"
  },
  {
   "file": "worker/share.js",
@@ -1318,7 +1401,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1121,
-  "lines": 28
+  "lines": 28,
+  "sha256": "096081e6929a9cd64f4a668f719a682f0bdb0e290022e6845338159e8979fcbd"
  },
  {
   "file": "geld.js",
@@ -1332,7 +1416,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2410,
-  "lines": 62
+  "lines": 62,
+  "sha256": "af46b79a4e6091af9db018c26513900f650f52763e80423170894db6cc8f1f6e"
  },
  {
   "file": "joinplan.js",
@@ -1346,7 +1431,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2184,
-  "lines": 48
+  "lines": 48,
+  "sha256": "1bf72df1e845d2265a28e8c00233a9362806ec3f10bc17c24addc6f4b8f4bdd0"
  },
  {
   "file": "knoten.js",
@@ -1360,7 +1446,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2640,
-  "lines": 60
+  "lines": 60,
+  "sha256": "fc85f0654ff1a74bf1af9af42534496c21633b9094595e491aa72495a696c74f"
  },
  {
   "file": "popups.js",
@@ -1374,7 +1461,8 @@
   "dom": 0,
   "err": null,
   "bytes": 11188,
-  "lines": 234
+  "lines": 234,
+  "sha256": "448d394495f15ad35222aa0ee2aa599fb8e45f529c74e4478cd001ddf5be38c2"
  },
  {
   "file": "kill.js",
@@ -1388,7 +1476,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2172,
-  "lines": 61
+  "lines": 61,
+  "sha256": "9577ccf8d42fca81d532e00511acfef807340696765d88fa5b9fc2f4a6743b96"
  },
  {
   "file": "killrep.js",
@@ -1402,7 +1491,8 @@
   "dom": 0,
   "err": null,
   "bytes": 963,
-  "lines": 25
+  "lines": 25,
+  "sha256": "e7d9f57c9bb44befd6e97f384f1aba870207035219f616efe1a82fa791099322"
  },
  {
   "file": "killui.js",
@@ -1416,7 +1506,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2151,
-  "lines": 56
+  "lines": 56,
+  "sha256": "8048ea7395af8c2ab8ba8a53190ea5250cafd43b9d5adc604397b69659f810fe"
  },
  {
   "file": "reboot.js",
@@ -1430,7 +1521,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1270,
-  "lines": 37
+  "lines": 37,
+  "sha256": "0142bb265818e88fb02775279b2538ea69f51ef154d8ee0e52c45c7fa1b24fb2"
  },
  {
   "file": "werkbank.js",
@@ -1444,7 +1536,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2430,
-  "lines": 61
+  "lines": 61,
+  "sha256": "0ef6a23a2c0b7096df7175a4b42cbbd8c3746ba0cddf0657c2630661a369e60a"
  },
  {
   "file": "telemetry.js",
@@ -1458,7 +1551,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2735,
-  "lines": 101
+  "lines": 101,
+  "sha256": "5eb416f062ddd3371fc5a4800f1bcbb3f35caa63b9a86aa81d14a73731527417"
  },
  {
   "file": "darkweb.js",
@@ -1472,7 +1566,8 @@
   "dom": 0,
   "err": null,
   "bytes": 13224,
-  "lines": 256
+  "lines": 256,
+  "sha256": "1cb53486fd5ca2998c4174e3b43a15bc91923f162c1bc2a4483a02bbd7391788"
  },
  {
   "file": "preis.js",
@@ -1486,7 +1581,8 @@
   "dom": 0,
   "err": null,
   "bytes": 492,
-  "lines": 13
+  "lines": 13,
+  "sha256": "ffae4424bbbae16faa3c628e44422ba8e55aa74a73724a4d12e3a3099fd4416c"
  },
  {
   "file": "ps.js",
@@ -1500,7 +1596,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1220,
-  "lines": 26
+  "lines": 26,
+  "sha256": "b460fc92b65e77f98c8492de14786852feb9e912f78a1adabfc95229d464ced0"
  },
  {
   "file": "scan.js",
@@ -1514,7 +1611,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1969,
-  "lines": 64
+  "lines": 64,
+  "sha256": "ac3da260994ff6946780f2204f7e3cdfe79ebcf4ec26333edeb15511507c08ac"
  },
  {
   "file": "ramcheck.js",
@@ -1528,7 +1626,8 @@
   "dom": 0,
   "err": null,
   "bytes": 453,
-  "lines": 12
+  "lines": 12,
+  "sha256": "ad8ed606d00136491ad380ccead9bc806c68a1e944e0fa1dc73d9a9b81591288"
  },
  {
   "file": "audiocheck.js",
@@ -1542,7 +1641,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1375,
-  "lines": 36
+  "lines": 36,
+  "sha256": "0132d6a9118aa85299e0ad060ed34d1a06fc28eab9567f1b2b27739cce0f14a2"
  },
  {
   "file": "echoargs.js",
@@ -1556,7 +1656,8 @@
   "dom": 0,
   "err": null,
   "bytes": 306,
-  "lines": 8
+  "lines": 8,
+  "sha256": "7228e373fdf33641258457df06b69482e39b4d42c4b7f76048b8e7e845fef890"
  },
  {
   "file": "kanaltest.js",
@@ -1570,7 +1671,8 @@
   "dom": 0,
   "err": null,
   "bytes": 489,
-  "lines": 16
+  "lines": 16,
+  "sha256": "624949beb62a4d8389c755e2cbdc4dfd362fe6a232877bc57f64c74d5ba716ba"
  },
  {
   "file": "timerzwang.js",
@@ -1584,7 +1686,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1164,
-  "lines": 32
+  "lines": 32,
+  "sha256": "b5d6f0a1dec683f4cfcfe0748b228d45c44269fbef3cf38a6cc8fb15ad1996c1"
  },
  {
   "file": "path.js",
@@ -1598,7 +1701,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1639,
-  "lines": 51
+  "lines": 51,
+  "sha256": "334bb2170f67c56a03e76ecb8dc5c2d376e2f5b93ebf88414fd8ec713f7bf6c9"
  },
  {
   "file": "worker/grow.js",
@@ -1612,7 +1716,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1016,
-  "lines": 30
+  "lines": 30,
+  "sha256": "9c8271f8e568fe5c1dff5a0359e4d0e60fbbea10bc1d0f3d68b172848650e06d"
  },
  {
   "file": "worker/weaken.js",
@@ -1626,7 +1731,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1207,
-  "lines": 32
+  "lines": 32,
+  "sha256": "a2fde275f76cf5ed87397d98d62893fe989d5afab8c55b874febaea793c23e1a"
  },
  {
   "file": "worker/expfarm.js",
@@ -1640,7 +1746,8 @@
   "dom": 0,
   "err": null,
   "bytes": 2762,
-  "lines": 63
+  "lines": 63,
+  "sha256": "12a9a4c5511fe4edc7b3a8e06fc54c139f40c7aa1c9c08983f8dc2541491c4b0"
  },
  {
   "file": "worker/hack.js",
@@ -1654,7 +1761,8 @@
   "dom": 0,
   "err": null,
   "bytes": 3734,
-  "lines": 75
+  "lines": 75,
+  "sha256": "a294fceaebd6464409b90c0b22c34ad3571525ba2e51f34a53be7452fe02c590"
  },
  {
   "file": "exploit.js",
@@ -1668,7 +1776,8 @@
   "dom": 0,
   "err": null,
   "bytes": 1743,
-  "lines": 39
+  "lines": 39,
+  "sha256": "0e278b23f4ff055fd42d4e78a13449ef1e4beddaa0941ebc229861a2e350a588"
  },
  {
   "file": "exploit2.js",
@@ -1682,7 +1791,8 @@
   "dom": 0,
   "err": null,
   "bytes": 5250,
-  "lines": 119
+  "lines": 119,
+  "sha256": "209b234d5f276673d179c9b9e8675909f27a1a451f4b134a1a74cfc71f9319d3"
  },
  {
   "file": "join.js",
@@ -1696,7 +1806,8 @@
   "dom": 0,
   "err": null,
   "bytes": 23964,
-  "lines": 586
+  "lines": 586,
+  "sha256": "5431943bb8dd884e07cfbc3062fe3256dd86ad95cbdd532ba8b8a0dfd6301e7d"
  },
  {
   "file": "lib/batch.js",
@@ -1710,7 +1821,8 @@
   "dom": 0,
   "err": null,
   "bytes": 13235,
-  "lines": 282
+  "lines": 282,
+  "sha256": "cca47b26e4aedec6d5b3b3a575e2c3b9b3780aa2c70691761cd9ea45c8b5c716"
  },
  {
   "file": "lib/calc.js",
@@ -1724,7 +1836,8 @@
   "dom": 0,
   "err": null,
   "bytes": 14989,
-  "lines": 370
+  "lines": 370,
+  "sha256": "3d2ea2aa1f4fe08bf783f2a6141e6c47c5c2f8f861655a44165ca4897ef183ec"
  },
  {
   "file": "lib/hackaugs.js",
@@ -1738,6 +1851,7 @@
   "dom": 0,
   "err": null,
   "bytes": 19158,
-  "lines": 313
+  "lines": 313,
+  "sha256": "0930d87d388439ef0806f798047bc28681d1bacf5ab4da0ee1832effc73ef630"
  }
 ]

@@ -20,6 +20,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { createHash } from "node:crypto";
 import { rechne, SRC } from "./ram.js";
 import { baueBaum, kosten } from "./ramkosten.js";
 
@@ -102,21 +103,72 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
   if (fs.existsSync(mess)) {
     const daten = JSON.parse(fs.readFileSync(mess, "utf8"));
     const wurzel = path.join(ROOT, "src");
+
+    /**
+     * EINE EICHUNG BRAUCHT EIN VERFALLSDATUM (04.09.2026, nach dem Merge).
+     *
+     * Vorher stand hier "mindestens 112 von 114 exakt, zwei Ausreisser sind
+     * der Spielraum". Das war ein Spielraum ohne Begriff: er unterschied
+     * nicht zwischen "der Rechner liegt falsch" (Fehler) und "die Datei hat
+     * sich seit der Messung geaendert" (kein Fehler, aber auch kein Beleg
+     * mehr). Nach dem Merge des Bauzweigs waren es sieben, und der Test wurde
+     * rot, ohne dass am Rechner etwas falsch war.
+     *
+     * Jetzt traegt jede Zeile den sha256 des Inhalts, der den gemessenen Wert
+     * erzeugt hat. Stimmt er, MUSS die Rechnung exakt treffen - kein
+     * Spielraum. Stimmt er nicht, ist die Zeile VERALTET: sie belegt nichts
+     * mehr und wird als Messluecke gemeldet, statt als Abweichung zu zaehlen.
+     *
+     * Der Unterschied ist genau der aus Befund M.3: dort ueberlebte eine
+     * falsche Schwelle (4,0 statt 5,5 GB), weil niemand merkte, dass die
+     * Grundlage veraltet war.
+     */
     let gleich = 0;
+    let veraltet = 0;
     const ab = [];
+    const alt = [];
     for (const d of daten) {
+      const datei = path.join(wurzel, d.file);
+      const jetztHash = fs.existsSync(datei)
+        ? createHash("sha256").update(fs.readFileSync(datei)).digest("hex")
+        : null;
+      const stimmtNoch = d.sha256 && jetztHash === d.sha256;
+      if (!stimmtNoch) {
+        veraltet++;
+        alt.push(d.file);
+        continue;
+      }
       const r = rechne(d.file, { sf4: 1, wurzel });
       if (r.gb !== null && Math.abs(r.gb - d.live41) < 0.005) gleich++;
       else ab.push(d.file + " (live " + d.live41 + ", gerechnet " + r.gb + ")");
     }
-    // WARUM NICHT 114 VON 114 VERLANGT WIRD: die Messung ist ein Standbild vom
-    // 04.09.2026, der Hauptbaum lebt weiter. `wakelock.js` hat seither seinen
-    // `connect`-Aufruf verloren (Commit 2460ce3) - eine echte Aenderung, kein
-    // Rechenfehler. Zwei Ausreisser sind der Spielraum dafuer; mehr heisst,
-    // dass der Rechner falsch liegt.
-    pruefe("mindestens 112 von 114 exakt", gleich >= 112,
-      gleich + " von " + daten.length + "; abweichend: " + ab.join(", "));
-    console.log("       " + gleich + " von " + daten.length + " auf 0,00 GB gleich");
+
+    pruefe("jede Zeile mit gueltigem Inhaltsstempel trifft EXAKT",
+      ab.length === 0,
+      ab.join(", ") + " - hier liegt der Rechner falsch, nicht die Datei");
+    console.log("       " + gleich + " Zeilen geeicht, " + veraltet + " veraltet");
+
+    /**
+     * WIEVIELE ZEILEN VERALTEN DUERFEN, OHNE DASS JEMAND HINSIEHT: KEINE MEHR
+     * ALS DIE, DIE HIER STEHEN.
+     *
+     * Der Merge vom 04.09.2026 hat sieben Dateien veraendert; ihre Eichung
+     * gilt bis zu einer neuen `calculateRam`-Messung im Spiel nicht mehr, und
+     * die geht erst nach dem Hot-Swap. Wird die achte veraltet, ohne dass
+     * jemand diese Liste anfasst, wird der Test rot - und das ist gewollt:
+     * eine schrumpfende Eichung, die niemandem auffaellt, ist genau der
+     * Zustand, aus dem Befund M.3 entstanden ist.
+     */
+    const VERALTET_ERLAUBT = [
+      "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
+      "bn4net.js", "csolve.js", "cdump.js",
+    ];
+    const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
+    pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
+      unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "
+      + "Liste VERALTET_ERLAUBT in dieser Datei bewusst erweitern");
+    pruefe("die Eichung traegt noch mindestens 100 Zeilen", gleich >= 100,
+      gleich + " Zeilen - darunter ist sie kein Beleg mehr, sondern eine Stichprobe");
   }
 }
 

@@ -118,6 +118,22 @@ Regeln:
 
 ## Sofort
 
+### Grosser Schub verweigert (42 Dateien) - sieht nach einem Merge aus
+
+42 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+30)
+
+### Grosser Schub verweigert (41 Dateien) - sieht nach einem Merge aus
+
+41 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+29)
+
 ### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
 
 **Befund.** `lastAugReset` = `lastNodeReset` = 01.09. 15:59; 0 Augmentierungen

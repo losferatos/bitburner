@@ -55,6 +55,16 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-zielvalidierung.js",
+    deckt: "Zielpruefung vor dem Sprung gegen die echte route.json (C.3)",
+    schnell: true,
+  },
+  {
+    datei: "test-reserve-eta.js",
+    deckt: "Wirtreserve mit Verfall und Restzeit gegen Nachholklumpen (C.3)",
+    schnell: true,
+  },
+  {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
     schnell: true,

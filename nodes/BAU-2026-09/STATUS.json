@@ -1,6 +1,6 @@
 {
   "hinweis": "Fortschrittsstand des Baus. Wird von tools/fortschritt.js gelesen. Stufen: offen | gebaut | getestet | live | abgenommen. 'gebaut' heisst: Code existiert. 'getestet' heisst: Ebene-0-Pruefungen gruen UND Skeptikerrunde durch. 'live' heisst: im laufenden Spiel eingespielt und beobachtet. 'abgenommen' heisst: die Abnahmebedingung aus ARCHITEKTUR 9 ist gemessen erfuellt.",
-  "aktualisiert": "2026-09-04T11:30:00",
+  "aktualisiert": "2026-09-04T14:00:00",
   "vorphasen": {
     "phase0": {
       "stand": "abgenommen",
@@ -53,22 +53,22 @@
     "C.7": {
       "stand": "getestet",
       "was": "Kaltstart-Kern: shop.js, hackAnalyze inline, Kaltstart-Leiter",
-      "offen": "Skeptikerrunde 2 durch, 14 von 18 Befunden behoben. shop.js hatte eine Vorbedingung, die es nie starten liess - der Rechnerkauf war vollstaendig ausgefallen. RAM jetzt gerechnet: Kern 10,80, shop 7,00. Offen: Ebene-3-Kaltstart. NICHT live."
+      "offen": "Skeptikerrunde 2 durch. shop.js laeuft jetzt auf Abruf statt dauernd; der Kern haelt Platz frei statt zu ueberspringen (Prioritaetsinversion). Kaltstart-Budget gemessen: 22,55 von 32 belegt, cdump passt. Offen: Ebene-3-Kaltstart. NICHT live."
     },
     "C.8": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "Kaltstart-Geldkette: cdump/csolve, darkweb, sleevecrime",
-      "offen": ""
+      "offen": "Loeser in lib/loeser.js (0 GB), cdump loest und prueft selbst, csolve reicht ein und schliesst die Rotation. darkweb setzt seine Abschlussmarke. Budgettest belegt: eine Geldquelle findet Platz. Offen: Ebene 3 im Kaltstart-Klon. NICHT live."
     },
     "C.9": {
-      "stand": "offen",
+      "stand": "getestet",
       "was": "Sprossen 0-2 scharf",
-      "offen": ""
+      "offen": "Ausfuehrung gebaut, Wirtsperre ueber data/blocked-hosts.json, Kern beachtet sie - 11 Ebene-2-Proben am echten Kern. Offen: je Sprosse ein provozierter Haenger in Ebene 3. NICHT live."
     },
     "C.10": {
-      "stand": "offen",
+      "stand": "gebaut",
       "was": "Sprosse 3 scharf",
-      "offen": ""
+      "offen": "Raeumung nach der Registry-Schonliste plus boot.js-Start. Offen: der Pflichttest aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt). NICHT live."
     },
     "C.11": {
       "stand": "getestet",
@@ -81,9 +81,9 @@
       "offen": ""
     },
     "C.13": {
-      "stand": "offen",
+      "stand": "gebaut",
       "was": "BN9-Gewerk",
-      "offen": ""
+      "offen": "shop.js schweigt in BN9 (kaufbarBekannt ueberlebt das Veralten der Preistabelle). Die Werkbankwahl war schon BN9-tauglich - sie nimmt den groessten gerooteten FREMDrechner, nicht den gekauften. Offen: home-Ausbau ueber homegrow priorisieren, Raeumkette L1 in exit.js, Ebene 3 mit gesetztem Knoten. NICHT live."
     },
     "C.14": {
       "stand": "getestet",

@@ -13,7 +13,7 @@
  *   V2 (30 der 40 Laeufe)  Bladeburner traegt, w0r1d_d43m0n haengt nicht am Netz
  *   V1 (10 Laeufe)         Hacking traegt, Red Pill oeffnet den Ausgang
  *   BN9                    CloudServerLimit 0 - es gibt KEINE Mietrechner
- *   BN8                    Boerse; boerse.js ist nicht gebaut
+ *   BN8                    Boerse - die einzige Geldquelle dieses Knotens
  *   BN4                    Singularity kostet Faktor 1 statt 16
  *
  * Geprueft wird nicht, ob der Bot in jeder Klasse GUT spielt - das kann nur
@@ -134,22 +134,25 @@ console.log("-- BitNode 9: keine Mietrechner --");
 }
 
 console.log("");
-console.log("-- BitNode 8: boerse.js ist nicht gebaut --");
+console.log("-- BitNode 8: die Boerse ist die einzige Geldquelle --");
 {
+  // Hier stand "boerse.js ist nicht gebaut". Seit Position C.15 ist es gebaut,
+  // und der Test prueft jetzt das Richtige: dass es in BN8 auch WIRKLICH
+  // startet. In diesem Knoten steht jede andere Geldquelle auf null
+  // (BitNode.tsx:770-800) - ohne dieses Gewerk stuende der Lauf.
   const lage = { node: 8, verfahren: "V1", phase: "normal", dateiDa: () => true };
   const namen = REG.auswahl(registry, lage).map((e) => e.name);
-  pruefe("boerse.js wird NICHT gestartet", !namen.includes("boerse.js"));
-  const b = registry.eintraege.find((e) => e.name === "boerse.js");
-  const g = REG.gilt(b, lage);
-  pruefe("und der Grund ist 'nicht gebaut'", /nicht gebaut/.test(g.grund), g.grund);
+  pruefe("boerse.js wird in BN8 gestartet", namen.includes("boerse.js"),
+    "gestartet: " + namen.join(", "));
 
-  // Das Entscheidende: ein nicht gebautes Gewerk speist die Strafleiter NIE.
-  const z = REG.zaehlwerk(registry, lage, () => false, () => true);
-  pruefe("es zaehlt als unbuilt, nicht als absent", z.unbuilt >= 1, JSON.stringify(z));
+  // Und NUR dort: der Eintrag traegt knoten: [8].
+  const anderswo = REG.auswahl(registry,
+    { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true })
+    .map((e) => e.name);
+  pruefe("und nirgends sonst", !anderswo.includes("boerse.js"),
+    "21 GB fuer einen Markt, an dem ausserhalb von BN8 nichts zu holen ist");
 
-  // Und der Bot bleibt trotzdem nicht stehen: ausgang.js ueberspringt den
-  // Eintrag und geht zum naechsten offenen.
-  pruefe("in BN8 laufen trotzdem Werkzeuge", namen.length > 0);
+  pruefe("in BN8 laufen auch andere Werkzeuge", namen.length > 1);
 }
 
 console.log("");

@@ -770,9 +770,9 @@ nicht in einen Kommentar.
     {
       "name": "boerse.js",
       "args": [],
-      "ramBaseGb": null,
-      "ramSingGb": null,
-      "ramMeasuredAt": null,
+      "ramBaseGb": 21,
+      "ramSingGb": 0,
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
       "verfahren": "V1",
       "knoten": [
         8
@@ -781,7 +781,7 @@ nicht in einen Kommentar.
       "telemetryFile": "data/boerse.json",
       "scpToHome": true,
       "freshnessMs": 600000,
-      "taktMs": 30000,
+      "taktMs": 6000,
       "hostRule": "werkbank",
       "priority": 9,
       "evictRank": 15,

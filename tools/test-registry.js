@@ -184,17 +184,32 @@ console.log("-- Telemetrie kommt aus derselben Quelle wie die Startliste --");
 console.log("");
 console.log("-- ein nicht gebautes Gewerk ist kein Haenger (E6) --");
 {
+  // DER PRUEFLING IST KUENSTLICH, NICHT REAL (04.09.2026).
+  //
+  // Hier stand `boerse.js` - solange es das einzige ungebaute Gewerk war,
+  // ging das gut. Seit es gebaut ist (Position C.15), pruefte der Test das
+  // Gegenteil dessen, was er sollte, und wurde rot. Ein Test, der an einem
+  // Eintrag haengt, der sich planmaessig aendert, prueft den Zeitpunkt statt
+  // der Regel.
   const lage = { node: 8, verfahren: "V1", phase: "beide", dateiDa: () => true };
-  const boerse = registry.eintraege.find((e) => e.name === "boerse.js");
-  pruefe("boerse.js steht in der Registry", !!boerse);
-  if (boerse) {
-    const g = REG.gilt(boerse, lage);
-    pruefe("gilt NICHT, weil noch nicht gebaut", !g.gilt);
-    pruefe("und der Grund sagt genau das", /nicht gebaut/.test(g.grund), g.grund);
-  }
-  const z = REG.zaehlwerk(registry, lage, () => false, () => true);
-  pruefe("das Zaehlwerk fuehrt es als unbuilt", z.unbuilt >= 1, JSON.stringify(z));
-  pruefe("und NICHT als absent", z.absent < registry.eintraege.length);
+  const kuenstlich = {
+    name: "gibtsnochnicht.js", verfahren: "alle", knoten: "alle", phase: "beide",
+    hostRule: "any", priority: 99, evictRank: 99, restartPolicy: "always",
+    ramBaseGb: null,
+  };
+  const g = REG.gilt(kuenstlich, lage);
+  pruefe("ein Eintrag ohne ramBaseGb gilt NICHT", !g.gilt);
+  pruefe("und der Grund sagt genau das", /nicht gebaut/.test(g.grund), g.grund);
+
+  const mitKuenstlich = { ...registry, eintraege: [...registry.eintraege, kuenstlich] };
+  const z = REG.zaehlwerk(mitKuenstlich, lage, () => false, () => true);
+  pruefe("das Zaehlwerk fuehrt ihn als unbuilt", z.unbuilt >= 1, JSON.stringify(z));
+  pruefe("und NICHT als absent", z.absent < mitKuenstlich.eintraege.length);
+
+  // Die Gegenprobe an der echten Registry: es darf KEIN Eintrag mehr ungebaut
+  // sein, ohne dass jemand es merkt. Diese Zahl steht im Bericht.
+  const echt = REG.zaehlwerk(registry, lage, () => false, () => true);
+  console.log("       echte Registry: " + echt.unbuilt + " ungebaute Eintraege");
 }
 
 console.log("");
@@ -261,9 +276,20 @@ console.log("-- die Datei fehlt: vanished, nicht unbuilt --");
   const g = REG.gilt(blade, lage);
   pruefe("gilt nicht", !g.gilt);
   pruefe("Grund: Datei fehlt", /liegt nicht auf home/.test(g.grund), g.grund);
-  const z = REG.zaehlwerk(registry, lage, () => false, () => true);
+  // Auch hier ein KUENSTLICHER ungebauter Eintrag statt eines realen: seit
+  // Position C.15 gibt es in der echten Registry keinen mehr, und der Test
+  // haette den Zeitpunkt geprueft statt der Regel.
+  const mit = { ...registry, eintraege: [...registry.eintraege, {
+    name: "gibtsnochnicht.js", verfahren: "alle", knoten: "alle", phase: "beide",
+    hostRule: "any", priority: 99, evictRank: 99, restartPolicy: "always",
+    ramBaseGb: null,
+  }] };
+  const z = REG.zaehlwerk(mit, lage, () => false, () => true);
   pruefe("das Zaehlwerk trennt vanished von unbuilt",
     z.vanished > 0 && z.unbuilt > 0, JSON.stringify(z));
+  pruefe("und beide zusammen sind alle Eintraege",
+    z.vanished + z.unbuilt === mit.eintraege.length,
+    JSON.stringify(z) + " bei " + mit.eintraege.length + " Eintraegen");
 }
 
 console.log("");

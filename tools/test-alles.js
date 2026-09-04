@@ -113,6 +113,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-boerse.js",
+    deckt: "Aktienhandel: Trendschaetzung, Kommission, Schliessung vor dem Sprung (C.15)",
+    schnell: true,
+  },
+  {
     datei: "test-kern-c789.js",
     deckt: "EBENE 2: Platzreservierung, shop-Bedarfsbetrieb, Wirtsperren, BN9 (C.7-C.13)",
     schnell: false,

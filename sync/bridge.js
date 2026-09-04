@@ -57,7 +57,7 @@
 import { WebSocketServer } from "ws";
 import { createServer } from "node:http";
 import { readFile, readdir, writeFile, mkdir, appendFile, stat, rename, rm } from "node:fs/promises";
-import { watch } from "node:fs";
+import { watch, readFileSync as fsReadSync } from "node:fs";
 import { execFileSync, execFile } from "node:child_process";
 import { createHash } from "node:crypto";
 import path from "node:path";
@@ -162,6 +162,25 @@ const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDi
  * `--data-dir` schon einmal beinahe erzeugt haette: ein Testlauf, der in
  * Erics laufendes Spiel schreibt.
  */
+/**
+ * WOHER DER MASTER-RIEGEL SEINE LISTE NIMMT.
+ *
+ * Live: aus `git ls-tree master -- src/`. Im Pruefstand: aus einer Datei,
+ * denn ein Testordner hat kein `master`, gegen das er sich messen koennte.
+ *
+ * Fuer LIVE gesperrt, wie `--src-dir` und `--race-takt-ms`. Der Riegel der
+ * Live-Bruecke fragt git, und daran dreht kein Aufrufparameter.
+ */
+const MASTER_LISTE_DATEI = (() => {
+  const wunsch = textAusArgv(argv, "--master-liste", "");
+  if (!wunsch) return null;
+  if (IST_LIVE_ROLLE) {
+    console.error("--master-liste ist fuer die Rolle LIVE gesperrt.");
+    process.exit(2);
+  }
+  return path.resolve(ROOT, wunsch);
+})();
+
 const SCRIPT_DIR = (() => {
   const wunsch = textAusArgv(argv, "--src-dir", "");
   if (!wunsch) return SCRIPT_DIR_VORGABE;
@@ -411,6 +430,20 @@ const SCHUB_FREI_MAX_MS = 30 * 60000;
  * sie, und `tools/hotswap.js` kann daran erkennen, dass etwas ansteht.
  */
 const SCHUB_OFFEN_DATEI = path.join(DATA_DIR, "schub-offen.json");
+/**
+ * DIE FREIGABELISTE FUER DEN HOT-SWAP.
+ *
+ * Sie steht neben dem Master-Riegel (siehe `inMaster`): eine Datei, die noch
+ * nicht committet ist, geht nicht ins Spiel - ausser sie steht hier drin. Das
+ * ist der Weg fuer den Hot-Swap selbst, der ja gerade neue Staende einspielt.
+ *
+ * Geschrieben von `tools/hotswap.js`, geleert von der Bruecke, sobald die
+ * gelisteten Dateien durch sind. Sie verfaellt ausserdem - eine liegen
+ * gebliebene Freigabe ist keine Freigabe mehr, sondern ein abgeschalteter
+ * Riegel.
+ */
+const FREIGABE_DATEI = path.join(DATA_DIR, "hotswap-freigabe.txt");
+const FREIGABE_MAX_MS = 30 * 60000;
 const MANUAL_MAX = 200;
 
 /**
@@ -523,6 +556,170 @@ async function schubFrei() {
  * data/-Ordners, ein Indexer - schaltete den Deckel erneut fuer 30 min ab,
  * ohne dass es jemand wollte.
  */
+/**
+ * ===========================================================================
+ * DER MASTER-RIEGEL: WAS NICHT COMMITTET IST, GEHT NICHT INS SPIEL
+ * ===========================================================================
+ *
+ * Der Anlass ist ein Ausrutscher vom 04.09.2026, 06:40: eine Datei landete
+ * im Live-Baum statt im Worktree und war 400 ms spaeter im laufenden Spiel.
+ * Diesmal war es `lib/blackops.json` und harmlos. Ein halbfertiges Skript
+ * waere es nicht gewesen.
+ *
+ * Der Worktree schuetzt nur, solange jeder Agent den richtigen Baum trifft -
+ * und einmal hat es schon nicht geklappt. Ein Riegel, der nicht davon
+ * abhaengt, ist besser als eine Regel, an die man sich erinnern muss.
+ *
+ * DIE REGEL: eine Datei unter `src/` wird nur geschoben, wenn ihr PFAD im
+ * Git-Index von `master` steht - oder wenn sie ausdruecklich freigegeben ist
+ * (`data/hotswap-freigabe.txt`).
+ *
+ * Der Riegel arbeitet auf PFADebene, nicht auf Inhaltsebene. Das ist Absicht:
+ * eine Aenderung an einer bekannten Datei ist der Alltag und darf nicht
+ * blockiert werden; eine NEUE, unbekannte Datei ist der Fehlgriff, gegen den
+ * er gebaut ist.
+ *
+ * IM ZWEIFEL GESCHLOSSEN. Antwortet git nicht, geht nichts hinaus, und es
+ * steht laut im Protokoll. Der Bot im Spiel laeuft ohnehin weiter - was
+ * ausbleibt, ist eine Aktualisierung, nicht der Betrieb.
+ */
+let masterIndex = null;
+let masterIndexAlter = 0;
+/**
+ * WANN NACH EINEM FEHLSCHLAG FRUEHESTENS WIEDER GEFRAGT WIRD.
+ *
+ * Eigener Zustand, nicht `masterIndexAlter` (Skeptikerrunde 7, Nachtrag N1).
+ * Der erste Versuch setzte nur die Alterszahl zurueck - gelesen wurde sie
+ * aber in einer Bedingung, die ein WAHRES `masterIndex` verlangt, und das ist
+ * im Fehlerfall `null`. Der Negativ-Cache war damit wirkungslos: nachgerechnet
+ * 142 git-Aufrufe statt einem. Ein Wachtposten, der auf den Erfolg schaut,
+ * kann einen Misserfolg nicht merken.
+ */
+let masterIndexFehlerBis = 0;
+const MASTER_INDEX_TTL_MS = 30000;
+const MASTER_INDEX_FEHLER_MS = 5000;
+
+/**
+ * WANN DER RIEGEL UEBERHAUPT GILT.
+ *
+ * Immer - ausser der Quellordner ist umgebogen (`--src-dir`) und es wurde
+ * keine Ersatzliste mitgegeben. Ein Testordner hat kein `master`, gegen das
+ * er sich messen koennte; ohne diese Ausnahme waere jede Probe rot, die mit
+ * einem eigenen Quellordner arbeitet.
+ *
+ * Die Ausnahme ist LAUT: sie schreibt beim Start eine Zeile ins Protokoll.
+ * Ein stiller Riegel, der aus ist, waere schlimmer als keiner - man verliesse
+ * sich auf ihn.
+ */
+const MASTER_RIEGEL_AN = !(SCRIPT_DIR !== SCRIPT_DIR_VORGABE && !MASTER_LISTE_DATEI);
+
+function ladeMasterIndex() {
+  if (masterIndex && Date.now() - masterIndexAlter < MASTER_INDEX_TTL_MS) {
+    return masterIndex;
+  }
+  // Der Negativ-Cache. Er steht VOR dem Lesen, nicht danach.
+  if (Date.now() < masterIndexFehlerBis) return null;
+  // Der Pruefstandsweg: eine Datei statt git.
+  if (MASTER_LISTE_DATEI) {
+    try {
+      const roh = fsReadSync(MASTER_LISTE_DATEI, "utf8");
+      masterIndex = new Set(roh.split(/\r?\n/).map((z) => z.trim())
+        .filter((z) => z && !z.startsWith("#")));
+      masterIndexAlter = Date.now();
+    } catch (e) {
+      log("error", "--master-liste nicht lesbar: " + e.message);
+      masterIndex = null;
+    }
+    return masterIndex;
+  }
+  try {
+    const aus = execFileSync("git",
+      ["ls-tree", "-r", "--name-only", "master", "--", "src/"],
+      { cwd: ROOT, encoding: "utf8", timeout: 3000 });
+    const menge = new Set();
+    for (const zeile of aus.split("\n")) {
+      const t = zeile.trim();
+      if (t.startsWith("src/")) menge.add(t.slice(4));
+    }
+    if (!menge.size) throw new Error("git ls-tree lieferte keine Datei unter src/");
+    masterIndex = menge;
+    masterIndexAlter = Date.now();
+  } catch (e) {
+    /**
+     * AUCH DER FEHLSCHLAG WIRD GEMERKT (Skeptikerrunde 7).
+     *
+     * Vorher wurde `masterIndexAlter` nur im Erfolgsfall gesetzt. Nach einem
+     * Fehler war `masterIndex === null`, die Cache-Bedingung damit falsch -
+     * und es lief JE DATEI ein neues `execFileSync`. Gemessen: 42 ms warm,
+     * 142 Dateien unter src/. Bei langsamem git (Virenscanner auf .git, ein
+     * laufendes `gc`) waeren das 142 Aufrufe synchron hintereinander, im
+     * Grenzfall 142 x 3 s = sieben Minuten blockierter Event-Loop - in einem
+     * Prozess, der WebSocket, RFA und HTTP bedient. Kein Herzschlag, keine
+     * Sicherung, keine Antwort ans Spiel; die Neustartschleife haelt die
+     * Bruecke fuer tot.
+     *
+     * Fuenf Sekunden Sperrfrist sind kurz genug, dass eine vorbeiziehende
+     * Stoerung nicht lange nachwirkt, und lang genug, dass ein Stapel von
+     * 142 Dateien EINEN Versuch macht, nicht 142.
+     */
+    log("error", "Master-Index nicht lesbar (" + e.message.slice(0, 120)
+      + ") - es geht NICHTS ins Spiel, bis git wieder antwortet");
+    masterIndex = null;
+    masterIndexFehlerBis = Date.now() + MASTER_INDEX_FEHLER_MS;
+    void sofortZeile(
+      "Master-Riegel blind: git antwortet nicht",
+      "`git ls-tree master -- src/` schlug fehl (" + e.message.slice(0, 200)
+        + "). Solange das so bleibt, geht KEINE Datei mehr ins Spiel - der "
+        + "Bot laeuft weiter, bekommt aber keine Aktualisierung. Pruefen: "
+        + "liegt `master` noch vor, ist `.git` heil, findet der Prozess `git` "
+        + "im PATH?",
+    );
+  }
+  return masterIndex;
+}
+
+/** Die Freigabeliste, mit Verfall. Leere Menge, wenn keine gilt. */
+async function freigabeListe() {
+  try {
+    const st = await stat(FREIGABE_DATEI);
+    const alter = Date.now() - st.mtimeMs;
+    if (alter < 0) {
+      log("warn", "hotswap-freigabe.txt liegt in der Zukunft - gilt NICHT");
+      return new Set();
+    }
+    if (alter >= FREIGABE_MAX_MS) {
+      log("warn", "hotswap-freigabe.txt ist " + (alter / 60000).toFixed(0)
+        + " min alt - verfallen");
+      return new Set();
+    }
+    const roh = await readFile(FREIGABE_DATEI, "utf8");
+    return new Set(roh.split(/\r?\n/).map((z) => z.trim())
+      .filter((z) => z && !z.startsWith("#")));
+  } catch {
+    return new Set();
+  }
+}
+
+/**
+ * Wurde seit dem letzten Leeren eine Freigabe wirklich EINGELOEST?
+ *
+ * Ohne diesen Merker war `leereFreigabe()` toter Code - der einzige Treffer
+ * im ganzen Projekt war die Definition (Skeptikerrunde 7, Befund 5). Folge:
+ * die Freigabe war kein Einmal-Ticket, sondern ein Blankoschein ueber
+ * dreissig Minuten, und in dieser Zeit galt sie fuer JEDEN Weg - auch fuer
+ * `pushAll` beim naechsten Verbinden, und ein Reconnect ist das haeufigste
+ * Ereignis im System.
+ */
+let freigabeBenutzt = false;
+
+/** Den Freibrief leeren, sobald die freigegebenen Dateien durch sind. */
+async function leereFreigabe() {
+  try {
+    await writeFile(FREIGABE_DATEI, "", "utf8");
+    log("info", "hotswap-freigabe.txt geleert - die Freigabe ist verbraucht");
+  } catch { /* dann greift der Verfall */ }
+}
+
 /** Den verweigerten Stapel festhalten - siehe SCHUB_OFFEN_DATEI. */
 async function schreibeSchubOffen(stapel) {
   try {
@@ -820,27 +1017,91 @@ async function darfSchreiben(zielName) {
   return !za;
 }
 
-async function pushFile(localPath, gameName, nurBeiAenderung = false) {
-  // DIE ENGSTELLE. Jeder Weg ins Spiel laeuft hier durch - Watcher-Schub,
-  // pushAll beim Verbinden, Rueckkanal, Handschlag, Dashboard-RPC. Frueher
-  // sassen die Riegel weiter aussen und liessen drei von fuenf Wegen offen.
+/**
+ * ===========================================================================
+ * DIE EINE STELLE, DURCH DIE JEDER SCHREIBVORGANG LAEUFT
+ * ===========================================================================
+ *
+ * Der Riegel sass bis zum 04.09.2026 16:40 in `pushFile` - und der Kommentar
+ * dort nannte das "die eine Engstelle". Das stimmte nicht: ZWEI Wege riefen
+ * `request("pushFile", ...)` direkt und kamen daran vorbei.
+ *
+ *   `data/backup-ok.txt`  - die Antwort des Handschlags (`:1416`)
+ *   `data/bridge.json`    - der Rueckkanal, alle 60 Sekunden (`:1535`)
+ *
+ * Beim ersten ist das gewollt (sonst wartete der Bot vor jedem Einbau ins
+ * Leere), beim zweiten war es Zufall. Ein Zufall, der genau so aussieht wie
+ * eine Entscheidung, ist die schlechteste Sorte - deshalb laufen jetzt beide
+ * hier durch, und die Ausnahme steht als Ausnahme da.
+ *
+ * `herkunft` unterscheidet, was geprueft wird:
+ *   "src"     - eine Datei aus dem Quellordner. Zweit-Tab-Sperre UND
+ *               Master-Riegel.
+ *   "bruecke" - die Bruecke schreibt ihren eigenen Zustand. Nur die
+ *               Zweit-Tab-Sperre; ein Master-Riegel waere hier sinnlos, die
+ *               Datei liegt nicht unter src/.
+ *
+ * @returns {Promise<boolean>} true, wenn wirklich geschrieben wurde
+ */
+async function schreibeInsSpiel(gameName, content, herkunft) {
   if (!(await darfSchreiben(gameName))) {
     const za = zweitTabMerker;
-    log("warn", "pushFile " + gameName + " gesperrt (Zweit-Tab-Sperre seit "
+    log("warn", "Schreiben von " + gameName + " gesperrt (Zweit-Tab-Sperre seit "
       + (za ? za.at : "?") + ")");
     const fehler = new Error("Zweit-Tab-Sperre: " + gameName + " nicht geschrieben");
     fehler.code = "ZWEITTAB_GESPERRT";
     throw fehler;
   }
+
+  if (herkunft === "src" && MASTER_RIEGEL_AN) {
+    /**
+     * DIE FREIGABE WIRD ZUERST GEFRAGT (Skeptikerrunde 7, Befund 1).
+     *
+     * Vorher stand die Indexpruefung davor und warf bei `!index` sofort - die
+     * Freigabe wurde nie erreicht. Damit fuehrte der Notausgang gegen eine
+     * Wand: `tools/hotswap.js` faellt bei einem git-Fehler ausdruecklich AUF
+     * ("alle Dateien werden vorsorglich freigegeben") und legt eine Freigabe,
+     * die die Bruecke in genau dieser Lage nicht gelesen haette.
+     *
+     * Zwei Werkzeuge mit gegenlaeufiger Fehlerrichtung sind schlimmer als
+     * eines mit der falschen.
+     */
+    const frei = await freigabeListe();
+    if (!frei.has(gameName)) {
+      const index = ladeMasterIndex();
+      if (!index) {
+        const fehler = new Error("Master-Index nicht lesbar - " + gameName
+          + " nicht geschrieben");
+        fehler.code = "KEIN_INDEX";
+        throw fehler;
+      }
+      if (!index.has(gameName)) {
+        log("error", "NICHT IN MASTER: " + gameName + " steht weder im Git-Index "
+          + "noch in " + path.basename(FREIGABE_DATEI) + " - es wird NICHT geschoben");
+        const fehler = new Error("nicht in master und nicht freigegeben: " + gameName);
+        fehler.code = "NICHT_IN_MASTER";
+        throw fehler;
+      }
+    } else {
+      log("info", "Freigegeben trotz fehlendem Master-Eintrag: " + gameName);
+      freigabeBenutzt = true;
+    }
+  }
+
+  await request("pushFile", { filename: gameName, content, server: "home" });
+  return true;
+}
+
+async function pushFile(localPath, gameName, nurBeiAenderung = false) {
   const content = await readFile(localPath, "utf8");
   if (nurBeiAenderung) {
     const fp = createHash("sha256").update(content).digest("hex");
     if (zuletztGeschoben.get(gameName) === fp) return null;
-    await request("pushFile", { filename: gameName, content, server: "home" });
+    await schreibeInsSpiel(gameName, content, "src");
     zuletztGeschoben.set(gameName, fp);
     return gameName;
   }
-  await request("pushFile", { filename: gameName, content, server: "home" });
+  await schreibeInsSpiel(gameName, content, "src");
   zuletztGeschoben.set(gameName, createHash("sha256").update(content).digest("hex"));
   return gameName;
 }
@@ -879,6 +1140,20 @@ async function pushAll() {
       log("error", "Konnte " + file.gameName + " nicht uebertragen: " + err.message);
     }
   }
+  // DAS FREIGABE-FLAG LECKT SONST AUS pushAll HERAUS (Nachtrag N2).
+  //
+  // Es wurde nur in `schiebeStapel` geleert. Zwei Folgen: eine beim Reconnect
+  // eingeloeste Freigabe blieb die vollen 30 Minuten liegen - also genau das
+  // Blankoscheck-Loch, gegen das das Einmal-Ticket gebaut ist -, und das Flag
+  // stand danach dauerhaft auf `true`. Der naechste Watcher-Stapel, Stunden
+  // spaeter und ohne eigene Freigabe, haette dann eine frisch geschriebene
+  // `hotswap-freigabe.txt` geloescht, BEVOR ihre Dateien geschoben waren. Ein
+  // Hot-Swap waere scheinbar grundlos fehlgeschlagen.
+  if (freigabeBenutzt) {
+    freigabeBenutzt = false;
+    await leereFreigabe();
+  }
+
   state.syncedFiles = done;
   log("info", done.length + " Datei(en) ins Spiel uebertragen"
     + (gehalten ? " - " + gehalten + " aus einem verweigerten Schub ZURUECKGEHALTEN" : ""));
@@ -1037,6 +1312,50 @@ async function schiebeStapel(stapelEingang) {
     return;
   }
 
+  /**
+   * ENTWEDER ALLE ODER KEINE (Skeptikerrunde 7, Befund 4).
+   *
+   * Der Master-Riegel griff bis hierher PRO DATEI, mitten in der Schleife -
+   * nach Eingriffszaehlung und Sicherung. Ein Hot-Swap aus drei Dateien, von
+   * denen eine neu ist: zwei gehen hinaus, eine nicht. Das ist genau der
+   * Mischzustand, gegen den zwanzig Zeilen weiter oben der Schubdeckel
+   * gebaut ist ("eine Datei des neuen Standes bei neununddreissig alten") -
+   * der Riegel unterlief ihn.
+   *
+   * Jetzt wird der ganze Stapel VORHER gegen Index und Freigabe gehalten.
+   * Faellt eine Datei durch, geht keine.
+   */
+  if (MASTER_RIEGEL_AN) {
+    const frei = await freigabeListe();
+    const index = ladeMasterIndex();
+    const abgewiesen = [];
+    for (const datei of stapel) {
+      if (frei.has(datei)) continue;
+      if (!index) { abgewiesen.push(datei + " (kein Index)"); continue; }
+      if (!index.has(datei)) abgewiesen.push(datei);
+    }
+    if (abgewiesen.length) {
+      log("error", "Schub verweigert: " + abgewiesen.length + " von " + stapel.length
+        + " Datei(en) stehen nicht in master und sind nicht freigegeben: "
+        + abgewiesen.slice(0, 10).join(", "));
+      await sofortZeile(
+        "Schub verweigert (" + abgewiesen.length + " nicht in master) - Fehlgriff?",
+        abgewiesen.length + " von " + stapel.length + " geaenderten Dateien unter "
+          + "src/ stehen weder im Git-Index von master noch in "
+          + path.basename(FREIGABE_DATEI) + ". Es wurde NICHTS ins Spiel "
+          + "geschoben - entweder alle oder keine.\n\nBetroffen: "
+          + abgewiesen.slice(0, 20).join(", ")
+          + "\n\nWar das Absicht? Dann committen (dann steht der Pfad in "
+          + "master) oder `tools/hotswap.js` fahren, das legt die Freigabe "
+          + "selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, "
+          + "dann ist genau dafuer dieser Riegel gebaut.",
+      );
+      for (const d of stapel) zurueckgestellt.add(d);
+      await schreibeSchubOffen(stapel);
+      return;
+    }
+  }
+
   // EIN SCHUB IST EIN EINGRIFF. Er entsteht nur, weil ein Mensch oder eine
   // Claude-Sitzung eine Datei unter src/ geaendert hat - der Bot selbst kann
   // das nicht. Gezaehlt wird NACH der Inhaltspruefung: eine Watcher-Meldung
@@ -1080,9 +1399,20 @@ async function schiebeStapel(stapelEingang) {
       if (r) erledigt.push(datei);
       else unveraendert++;
     } catch (err) {
-      // Geloeschte Dateien landen auch hier, das ist kein echter Fehler.
-      log("warn", datei + ": " + err.message);
+      // GELOESCHTE DATEIEN LANDEN AUCH HIER - das ist kein echter Fehler.
+      // Die beiden Riegelfehler dagegen schon, und sie muessen sich
+      // unterscheiden lassen (Skeptikerrunde 7, Befund 3): ein Schub, von dem
+      // alles abgewiesen wurde, war vorher im Protokoll praktisch stumm.
+      if (err.code === "NICHT_IN_MASTER" || err.code === "KEIN_INDEX") {
+        log("error", "ABGEWIESEN " + datei + ": " + err.message);
+      } else {
+        log("warn", datei + ": " + err.message);
+      }
     }
+  }
+  if (freigabeBenutzt) {
+    freigabeBenutzt = false;
+    await leereFreigabe();
   }
   if (unveraendert) {
     log("info", unveraendert + " Datei(en) unveraendert - nicht geschoben");
@@ -1413,11 +1743,11 @@ async function pruefeHandschlag() {
   log("info", "Handschlag angefragt: " + anfrage.reason + " -> " + anlass);
   const gruen = await sichereJetzt(anlass);
   if (!gruen) return;
-  await request("pushFile", {
-    filename: "data/backup-ok.txt",
-    content: JSON.stringify({ ts: Date.now(), anlass, datei: state.lastVerifiedBackup.file }),
-    server: "home",
-  });
+  await schreibeInsSpiel(
+    "data/backup-ok.txt",
+    JSON.stringify({ ts: Date.now(), anlass, datei: state.lastVerifiedBackup.file }),
+    "bruecke",
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -1532,11 +1862,7 @@ async function schreibeRueckkanal() {
     zweitTabSperre: zweitTabMerker,
   };
   try {
-    await request("pushFile", {
-      filename: "data/bridge.json",
-      content: JSON.stringify(inhalt),
-      server: "home",
-    });
+    await schreibeInsSpiel("data/bridge.json", JSON.stringify(inhalt), "bruecke");
   } catch {
     // naechster Durchlauf
   }
@@ -1897,6 +2223,39 @@ function startDashboard() {
         }
       }
 
+      /**
+       * AUCH DER DASHBOARD-WEG BEKOMMT DEN MASTER-RIEGEL (Runde 7, Befund 7).
+       *
+       * `filename` ist hier ein freier Abfrageparameter. Zehn Werkzeuge
+       * benutzen den Weg - und sie schreiben ausnahmslos Steuerdateien unter
+       * `data/`, fuer die ein Master-Riegel sinnlos waere. Aber nichts hielt
+       * einen Aufruf mit `filename=lib/kern.js` auf, und das ist derselbe
+       * Bautyp, den `schreibeInsSpiel` weiter oben als "ein Zufall, der genau
+       * so aussieht wie eine Entscheidung" verurteilt.
+       *
+       * Die Regel ist schmal: alles unter `data/` geht durch wie bisher,
+       * alles andere muss in master stehen oder freigegeben sein.
+       */
+      if (method === "pushFile" && MASTER_RIEGEL_AN) {
+        const ziel = String(url.searchParams.get("filename") || "");
+        if (ziel && !ziel.startsWith("data/")) {
+          const frei = await freigabeListe();
+          const index = ladeMasterIndex();
+          const drin = frei.has(ziel) || (index && index.has(ziel));
+          if (!drin) {
+            log("error", "423 fuer pushFile " + ziel + " - nicht in master und "
+              + "nicht freigegeben (Dashboard-Weg)");
+            res.writeHead(423, { "Content-Type": MIME[".json"] });
+            res.end(JSON.stringify({
+              error: ziel + " steht weder im Git-Index von master noch in "
+                + path.basename(FREIGABE_DATEI) + ". Steuerdateien unter data/ "
+                + "sind davon nicht betroffen.",
+            }));
+            return;
+          }
+        }
+      }
+
       // Eine schreibende Methode ueber das Dashboard kommt IMMER von aussen -
       // der Bot im Spiel benutzt diesen Weg nicht, er hat die ns-API.
       if (!LESENDE_METHODEN.has(method)) {
@@ -2174,6 +2533,19 @@ console.log("\n=== Bitburner Bridge  [" + ROLLE.instance + "]  ===");
 if (NO_PUSH) console.log("  --no-push:  es wird NICHTS ins Spiel geschrieben");
 if (NO_WATCH) console.log("  --no-watch: src/ wird nicht beobachtet");
 if (SCRIPT_DIR !== SCRIPT_DIR_VORGABE) console.log("  --src-dir: " + SCRIPT_DIR);
+if (!MASTER_RIEGEL_AN) {
+  console.log("  Master-Riegel AUS (--src-dir ohne --master-liste)");
+} else if (MASTER_LISTE_DATEI) {
+  console.log("  Master-Riegel gegen " + MASTER_LISTE_DATEI);
+} else {
+  // EIN STILLER RIEGEL, DER AN IST, ist genauso schlecht wie einer, der aus
+  // ist: nach einem Vorfall laesst sich am Protokoll nicht belegen, dass er
+  // lief. Und der Index wird gleich WARM geladen - dann faellt ein kaputtes
+  // git beim Start auf, nicht erst beim ersten Schub.
+  const i = ladeMasterIndex();
+  console.log("  Master-Riegel gegen git ls-tree master -- src/  ("
+    + (i ? i.size + " Dateien" : "GIT ANTWORTET NICHT") + ")");
+}
 
 /**
  * ERST BINDEN, DANN ALLES ANDERE. Diese Reihenfolge ist nicht Kosmetik.

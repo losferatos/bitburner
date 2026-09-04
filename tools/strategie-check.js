@@ -53,6 +53,9 @@ const verlaufPfad = path.join(WURZEL, VERLAUF);
 
 async function rpc(params) {
   const url = new URL("/api/rpc", BRIDGE);
+  // Schreibende Methoden verlangen seit f6a61e5 die Instanz (Schreibschranke
+  // der Bruecke). Ohne sie antwortet sie mit 403.
+  url.searchParams.set("instance", "LIVE");
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const ctl = new AbortController();
   const t = setTimeout(() => ctl.abort(), 8000);
@@ -445,21 +448,112 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // von keinem Werkzeug gelesen. Ein stiller Ausfall ist schlimmer als ein
   // lauter, und dieser traf ausgerechnet den groessten Hebel des Knotens.
   //
-  // Die Sollliste wird aus `src/bn4net.js` geparst statt hier kopiert - eine
-  // zweite Liste waere binnen Tagen veraltet.
+  /**
+   * =========================================================================
+   * DIESE PRUEFUNG WAR DOPPELT TOT (gefunden 04.09.2026 von einem Skeptiker)
+   * =========================================================================
+   *
+   * Sie wurde nach dem Vorfall vom 29.08. gebaut und hat seither vermutlich
+   * nie angeschlagen - aus zwei unabhaengigen Gruenden, von denen jeder
+   * allein gereicht haette:
+   *
+   * (1) DIE QUELLE WAR STUMM. `data/ps.json` schreibt nur `src/ps.js`, und
+   *     das ist ein Einmalskript, das ueber `data/task.txt` gestartet wird.
+   *     Der einzige Starter im ganzen Baum war `loops/loop-wache.md` - der
+   *     am 31.08.2026 abgeschaffte Wache-Loop. Seither steht die Datei still,
+   *     das Alterstor `< 15 min` ist damit dauerhaft zu, und die Pruefung
+   *     laeuft nie.
+   *
+   * (2) DIE SOLLLISTE WAR LEER. Gesucht wurde `const WERKZEUGE = [` in
+   *     `src/bn4net.js`. Diese Zeichenkette gibt es dort nicht - der Kern
+   *     fuehrt `const WERKZEUGE_FEST = [` und baut daraus zur Laufzeit
+   *     `let WERKZEUGE = baueWerkzeuge(regLage)`. `indexOf` liefert also -1,
+   *     `slice(-1)` das LETZTE ZEICHEN der Datei, und die Sollliste hat null
+   *     Eintraege. Ohne Soll kein Fehlen, ohne Fehlen kein Alarm. Der `catch`
+   *     schweigt dazu ausdruecklich ("kein Grund zu laermen").
+   *
+   * Das ist genau der Fall aus CLAUDE.md: *ein Ausschluss ist nur gueltig,
+   * wenn das benutzte Werkzeug den ausgeschlossenen Fall ueberhaupt anzeigen
+   * koennte.* Diese Pruefung konnte nie einen anzeigen und meldete
+   * stattdessen Ruhe - nach einem Vorfall, bei dem 87 Minuten lang das
+   * groesste Gewerk des Knotens tot war.
+   *
+   * BEHOBEN:
+   * - Die Sollliste kommt aus `src/registry.json` (`eintraege[].name`) -
+   *   maschinenlesbar, vom Generator gepflegt, und genau die Liste, nach der
+   *   der Kern seine Gewerke startet.
+   * - Fehlt `data/ps.json` oder ist sie alt, sagt die Pruefung das LAUT,
+   *   statt still zu ueberspringen. Eine Pruefung, die schweigt, weil ihr die
+   *   Daten fehlen, ist von einer bestandenen nicht zu unterscheiden.
+   */
   const ps = await liesJson("data/ps.json");
   let werkzeugFehlt = null;
-  if (ps && Array.isArray(ps.gesehen) && Date.now() - ps.zeit < 15 * 60000) {
+  let werkzeugPruefungBlind = null;
+
+  let soll = [];
+  try {
+    const reg = JSON.parse(
+      fs.readFileSync(path.join(WURZEL, "src", "registry.json"), "utf8"));
+    soll = (reg.eintraege || [])
+      .filter((e) => e.name && e.restartPolicy !== "once"
+        && e.phase !== "kaltstart-einmal")
+      .map((e) => e.name);
+  } catch (e) {
+    werkzeugPruefungBlind = "src/registry.json nicht lesbar (" + e.message + ")";
+  }
+
+  if (!soll.length && !werkzeugPruefungBlind) {
+    werkzeugPruefungBlind = "die Sollliste aus registry.json ist leer";
+  } else if (!ps || !Array.isArray(ps.gesehen)) {
+    werkzeugPruefungBlind = "data/ps.json fehlt - `node tools/task.js \"ps.js\"` "
+      + "absetzen und in einer Minute erneut messen";
+  } else if (Date.now() - ps.zeit >= 15 * 60000) {
+    werkzeugPruefungBlind = "data/ps.json ist "
+      + ((Date.now() - ps.zeit) / 60000).toFixed(0) + " min alt - "
+      + "`node tools/task.js \"ps.js\"` absetzen und erneut messen";
+  } else {
+    /**
+     * DAS SOLL AUS DER REGISTRY IST DER ZIELZUSTAND, NICHT DER LAUFENDE.
+     *
+     * Beim ersten Lauf meldete die reparierte Pruefung dreizehn fehlende
+     * Werkzeuge - und die Haelfte davon (`export.js`, `graftauto.js`,
+     * `boerse.js`, `figwatch.js`, `shop.js`) liegt gar nicht im Spiel: sie
+     * gehoeren zum neu gebauten Stand, der noch auf den Hot-Swap wartet.
+     *
+     * Ein Alarm, der die Einspielung als Ausfall meldet, wird nach dem
+     * zweiten Mal ignoriert - und dann faellt der echte Ausfall mit ihm
+     * durch. Deshalb zwei getrennte Listen:
+     *
+     *   NICHT IM SPIEL - der Hot-Swap steht aus. Das ist ein Hinweis, kein
+     *                    Alarm; der Bot kann nicht starten, was nicht da ist.
+     *   LIEGT, LAEUFT   - die Datei ist im Spiel und laeuft trotzdem nicht.
+     *   ABER NICHT        Das ist der stille Ausfall, gegen den die Pruefung
+     *                     gebaut wurde (29.08.: sleeve.js 87 Minuten tot).
+     */
+    const da = ps.gesehen.map((x) => x.datei);
+    const fehlt = soll.filter((d) => !da.includes(d));
+    let imSpiel = null;
     try {
-      const quelle = fs.readFileSync(path.join(WURZEL, "src", "bn4net.js"), "utf8");
-      const teil = quelle.slice(quelle.indexOf("const WERKZEUGE = ["));
-      const ende = teil.indexOf("\n  ];");
-      const soll = [...teil.slice(0, ende > 0 ? ende : 4000)
-        .matchAll(/\["([\w.]+\.js)"/g)].map((m) => m[1]);
-      const da = ps.gesehen.map((x) => x.datei);
-      const fehlt = soll.filter((d) => !da.includes(d));
-      if (fehlt.length) werkzeugFehlt = fehlt.join(", ");
-    } catch { /* ohne Sollliste keine Pruefung - kein Grund zu laermen */ }
+      const namen = await rpc({ method: "getFileNames", server: "home" });
+      if (Array.isArray(namen)) imSpiel = new Set(namen);
+    } catch { /* dann eben ohne die Trennung */ }
+
+    if (fehlt.length && imSpiel) {
+      const nichtDa = fehlt.filter((d) => !imSpiel.has(d));
+      const daAberTot = fehlt.filter((d) => imSpiel.has(d));
+      if (nichtDa.length) {
+        sag("NOCH NICHT IM SPIEL (" + nichtDa.length + "): " + nichtDa.join(", ")
+          + " - der Hot-Swap steht aus, das ist kein Ausfall.");
+      }
+      if (daAberTot.length) werkzeugFehlt = daAberTot.join(", ");
+    } else if (fehlt.length) {
+      werkzeugFehlt = fehlt.join(", ");
+    }
+  }
+
+  if (werkzeugPruefungBlind) {
+    sag("WERKZEUG-PRUEFUNG BLIND: " + werkzeugPruefungBlind
+      + " - sie kann einen stillen Ausfall gerade NICHT anzeigen.");
   }
   if (werkzeugFehlt) sag("WERKZEUG FEHLT: " + werkzeugFehlt
     + " - mit 'pushFile data/task.txt [\"<name>\"]' starten"
@@ -487,7 +581,15 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
   // Seit dem 02.09.2026 sagt data/verfahren.txt (von ausgang.js), ob der
   // Knoten ueber Bladeburner (V2) oder Hacking (V1) laeuft. Die alte Liste
   // [6, 7, 10] galt fuer acht Knoten der Route nicht.
-  const verfahrenTxt = (await hole("data/verfahren.txt")) || "";
+  // `hole` gab es nie (gefunden 04.09.2026). Dieses Werkzeug ist an dieser
+  // Zeile bei JEDEM Aufruf mit einem ReferenceError abgestuerzt - seit dem
+  // 02.09., als die Zeile hinzukam. Es war damit nicht "still", sondern tot,
+  // und alles danach (Verfahren, Steckbrief, Werkzeugpruefung, Urteil) lief
+  // nie. Der Leser heisst `rpc` und liefert schon ueberall sonst in dieser
+  // Datei den Dateiinhalt.
+  const verfahrenTxt = (await rpc({
+    method: "getFile", filename: "data/verfahren.txt", server: "home",
+  })) || "";
   const vt = verfahrenTxt.trim().split(/\s+/);
   const verfahrenBekannt = Number(vt[1]) === knotenFrueh && ["V1", "V1b", "V2"].includes(vt[0]);
   const bladeKnoten = verfahrenBekannt ? vt[0] === "V2" : true;

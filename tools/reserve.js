@@ -28,7 +28,7 @@ const geld = (n) => {
 };
 
 async function rpc(method, params = {}) {
-  const q = new URLSearchParams({ method, ...params });
+  const q = new URLSearchParams({ method, instance: "LIVE", ...params });
   const res = await fetch(BASE + "/api/rpc?" + q);
   const body = await res.json();
   if (body.error) throw new Error(body.error);

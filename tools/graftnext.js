@@ -27,7 +27,7 @@ const BASE = "http://localhost:8795";
 const PLAN = "nodes/GRAFTPLAN.md";
 
 async function rpc(method, params = {}) {
-  const res = await fetch(BASE + "/api/rpc?" + new URLSearchParams({ method, ...params }));
+  const res = await fetch(BASE + "/api/rpc?" + new URLSearchParams({ method, instance: "LIVE", ...params }));
   const body = await res.json();
   if (body.error) throw new Error(body.error);
   return body.result;

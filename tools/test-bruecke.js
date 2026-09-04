@@ -62,7 +62,7 @@ import path from "node:path";
 import fs from "node:fs";
 import net from "node:net";
 import zlib from "node:zlib";
-import { spawn } from "node:child_process";
+import { spawn, execFileSync } from "node:child_process";
 import { fileURLToPath } from "node:url";
 import { WebSocket } from "ws";
 
@@ -164,7 +164,45 @@ function baueSave({ port, playtime = 100 * 3600000, identifier = "testtesttest01
  * Startet eine TEST-Bruecke und sammelt ihre Ausgabe.
  * @returns {{proc: object, zeilen: string[], exit: Promise<number>}}
  */
+/**
+ * DER PRUEFSTAND BLEIBT HERMETISCH (Skeptikerrunde 7).
+ *
+ * Seit dem Master-Riegel haengt jede Bruecke, die ohne `--master-liste`
+ * startet, am COMMIT-Zustand des Arbeitsverzeichnisses: `git ls-tree master`.
+ * Vierzehn der zwanzig Abschnitte liefen so. Heute passt es (142 Dateien auf
+ * Platte, 142 in master) - aber wer waehrend einer Bau-Sitzung eine Datei
+ * unter `src/` anlegt und dann testet, bekaeme rote oder, schlimmer,
+ * anders-gruene Laeufe. Ein Test, dessen Ergebnis vom Commit-Zustand abhaengt,
+ * misst nicht mehr den Code.
+ *
+ * Deshalb bekommt JEDE Bruecke ohne eigene Liste eine erzeugte: den heutigen
+ * Stand von master, einmal beim Start dieses Laufs eingefroren.
+ */
+const MASTER_SNAPSHOT = (() => {
+  const ziel = path.join(ROOT, "pruefstand", "master-" + process.pid + ".txt");
+  try {
+    const aus = execFileSync("git",
+      ["ls-tree", "-r", "--name-only", "master", "--", "src/"],
+      { cwd: ROOT, encoding: "utf8", timeout: 10000 });
+    const namen = aus.split("\n").map((z) => z.trim()).filter(Boolean)
+      .map((z) => z.replace(/^src\//, ""));
+    fs.mkdirSync(path.dirname(ziel), { recursive: true });
+    fs.writeFileSync(ziel, namen.join("\n") + "\n", "utf8");
+    tempDateien.push(ziel);
+    return path.relative(ROOT, ziel);
+  } catch (e) {
+    console.log("  HINWEIS: master-Schnappschuss nicht moeglich (" + e.message + ")");
+    return null;
+  }
+})();
+
 function starteBruecke(args, cwd = ROOT) {
+  // Ohne eigene Liste und ohne eigenen Quellordner: den Schnappschuss
+  // mitgeben, damit der Lauf nicht am Commit-Zustand haengt.
+  if (MASTER_SNAPSHOT && !args.includes("--master-liste")
+      && !args.includes("--src-dir")) {
+    args = [...args, "--master-liste", MASTER_SNAPSHOT];
+  }
   // `process.execPath` STATT "node" (Skeptiker Runde 5, W5). Findet die
   // Umgebung `node` nicht auf dem PATH - Aufgabenplanung, ein .cmd mit eigenem
   // PATH, ein anderer Rechner -, wirft das Kindobjekt ein `error`-Ereignis
@@ -259,6 +297,7 @@ function starteSpiel(rfaPort, saveBuf, opt = {}) {
 
 const aufraeumen = [];
 const tempOrdner = [];
+const tempDateien = [];
 function merkeZumAufraeumen(p) { aufraeumen.push(p); }
 
 /**
@@ -281,6 +320,9 @@ function raeumeAuf() {
   }
   for (const o of tempOrdner) {
     try { fs.rmSync(o, { recursive: true, force: true }); } catch { /* egal */ }
+  }
+  for (const d of tempDateien) {
+    try { fs.rmSync(d, { force: true }); } catch { /* egal */ }
   }
 }
 process.on("exit", raeumeAuf);
@@ -369,6 +411,7 @@ const ZEIT = {
   grenze: BASIS + 80 * STUNDE,
   takt: BASIS + 85 * STUNDE,
   reconnect: BASIS + 90 * STUNDE,
+  master: BASIS + 95 * STUNDE,
 };
 
 /**
@@ -740,7 +783,11 @@ console.log("-- der Eingriffszaehler: pushAll zaehlt nicht, ein RPC zaehlt --");
   let antwort = null;
   try {
     const r = await fetch("http://127.0.0.1:" + dash
-      + "/api/rpc?method=pushFile&instance=MOCK&filename=zzz-probe.js&server=home&content=%2F%2Fx");
+      // NACH data/ - das ist der realistische Fall (alle zehn Werkzeuge, die
+      // diesen Weg benutzen, schreiben Steuerdateien) UND der einzige, den
+      // der Master-Riegel seit dem 04.09.2026 durchlaesst: ein Skriptpfad,
+      // der nicht in master steht, wird hier mit 423 abgewiesen.
+      + "/api/rpc?method=pushFile&instance=MOCK&filename=data/zzz-probe.txt&server=home&content=x");
     antwort = r.status;
   } catch (e) {
     antwort = String(e.message);
@@ -1012,8 +1059,8 @@ console.log("-- die ZWEIT-TAB-SPERRE: kein Schreiben, solange sie steht (W.6) --
   const schreibe = async () => {
     try {
       const r = await fetch("http://127.0.0.1:" + dash
-        + "/api/rpc?method=pushFile&instance=MOCK&filename=zzz-sperre.js"
-        + "&server=home&content=%2F%2Fx");
+        + "/api/rpc?method=pushFile&instance=MOCK&filename=data/zzz-sperre.txt"
+        + "&server=home&content=x");
       return r.status;
     } catch (e) { return String(e.message); }
   };
@@ -1051,8 +1098,8 @@ console.log("-- die ZWEIT-TAB-SPERRE: kein Schreiben, solange sie steht (W.6) --
   // Datei erst, wenn das nachgebaute Spiel sie hat (Skeptikerrunde 6, 1.6).
   await schlaf(500);
   pruefe("  und die Datei ist im Spiel angekommen",
-    spiel.dateien.has("home:zzz-sperre.js"),
-    [...spiel.dateien.keys()].join(", "));
+    spiel.dateien.has("home:data/zzz-sperre.txt"),
+    [...spiel.dateien.keys()].filter((k) => k.includes("zzz")).join(", "));
 
   spiel.schliessen();
   b.proc.kill();
@@ -1423,6 +1470,179 @@ console.log("-- ein RECONNECT ist kein zweiter Tab (R6, Praemisse) --");
 
   s1.schliessen();
   s2.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- DER MASTER-RIEGEL: was nicht committet ist, geht nicht hinaus --");
+{
+  // DER ANLASS IST EIN AUSRUTSCHER, KEIN GEDANKENSPIEL.
+  //
+  // Am 04.09.2026 um 06:40 landete eine Datei im Live-Baum statt im Worktree
+  // und war 400 ms spaeter im laufenden Spiel. Diesmal war es
+  // `lib/blackops.json` und harmlos; ein halbfertiges Skript waere es nicht
+  // gewesen. Der Worktree schuetzt nur, solange jeder Agent den richtigen
+  // Baum trifft - und einmal hat es schon nicht geklappt.
+  //
+  // Der Riegel arbeitet auf PFADebene: eine Aenderung an einer bekannten
+  // Datei ist der Alltag und darf nicht blockiert werden, eine NEUE
+  // unbekannte Datei ist der Fehlgriff.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "master-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+
+  // `bekannt.js` steht in der Ersatz-Masterliste, `fremd.js` nicht.
+  fs.writeFileSync(path.join(quellAbs, "bekannt.js"), "// eins" + String.fromCharCode(10), "utf8");
+  fs.writeFileSync(path.join(quellAbs, "fremd.js"), "// fremd" + String.fromCharCode(10), "utf8");
+  // Die Liste liegt NEBEN dem Quellordner, nicht darin - sonst beobachtet der
+  // Watcher sie mit und meldet sie brav als "nicht in master".
+  const listeRel = path.join(datenRel, "MASTER.txt");
+  fs.writeFileSync(path.join(ROOT, listeRel),
+    "bekannt.js" + String.fromCharCode(10), "utf8");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel,
+    "--src-dir", quellRel, "--master-liste", listeRel]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.master }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(2500);
+
+  // (1) pushAll beim Verbinden - der lauteste Weg.
+  pruefe("die bekannte Datei geht beim Verbinden hinaus",
+    spiel.dateien.has("home:bekannt.js"),
+    [...spiel.dateien.keys()].join(", "));
+  pruefe("die UNBEKANNTE nicht - auch nicht ueber pushAll",
+    !spiel.dateien.has("home:fremd.js"),
+    "pushAll war frueher der Weg, der an jedem Riegel vorbeikam");
+  pruefe("und die Bruecke sagt, warum",
+    b.zeilen.some((z) => /NICHT IN MASTER/.test(z)),
+    b.zeilen.slice(-3).join(" | "));
+
+  // (2) Der Watcher-Weg - der leiseste.
+  const vorher = b.zeilen.length;
+  fs.writeFileSync(path.join(quellAbs, "fremd.js"), "// zweiter Anlauf" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("auch der Watcher schiebt die unbekannte Datei nicht",
+    !spiel.dateien.has("home:fremd.js"));
+  // Seit Runde 7 wird der GANZE Stapel vorab geprueft und als Ganzes
+  // abgewiesen - sonst entstuende genau der Mischzustand, gegen den der
+  // Schubdeckel gebaut ist. Die Meldung nennt deshalb Zahl und Namen.
+  pruefe("  und meldet es erneut, mit Zahl und Namen",
+    b.zeilen.slice(vorher).some((z) => /stehen nicht in master/.test(z)
+      && /fremd\.js/.test(z)),
+    b.zeilen.slice(vorher).slice(-2).join(" | "));
+
+  // (3) Eine Aenderung an der BEKANNTEN Datei muss weiter durchgehen -
+  // sonst waere der Riegel eine Vollbremsung statt einer Sperre.
+  fs.writeFileSync(path.join(quellAbs, "bekannt.js"), "// zwei" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("eine Aenderung an der bekannten Datei geht durch",
+    (spiel.dateien.get("home:bekannt.js") || "").includes("zwei"),
+    String(spiel.dateien.get("home:bekannt.js")).trim());
+
+  // (4) Die Freigabeliste - der Weg fuer den Hot-Swap.
+  fs.writeFileSync(path.join(ROOT, datenRel, "hotswap-freigabe.txt"),
+    "# von tools/hotswap.js" + String.fromCharCode(10)
+    + "fremd.js" + String.fromCharCode(10), "utf8");
+  await schlaf(300);
+  fs.writeFileSync(path.join(quellAbs, "fremd.js"), "// freigegeben" + String.fromCharCode(10), "utf8");
+  await schlaf(2500);
+  pruefe("mit Freigabe geht dieselbe Datei durch",
+    (spiel.dateien.get("home:fremd.js") || "").includes("freigegeben"),
+    String(spiel.dateien.get("home:fremd.js")).trim());
+
+  // (5) Und eine verfallene Freigabe gilt nicht.
+  const freigabe = path.join(ROOT, datenRel, "hotswap-freigabe.txt");
+  fs.writeFileSync(freigabe, "andere.js" + String.fromCharCode(10), "utf8");
+  const alt = (Date.now() - 31 * 60000) / 1000;
+  fs.utimesSync(freigabe, alt, alt);
+  fs.writeFileSync(path.join(quellAbs, "andere.js"), "// verfallen" + String.fromCharCode(10), "utf8");
+  const vorher2 = b.zeilen.length;
+  await schlaf(2500);
+  pruefe("eine 31 Minuten alte Freigabe gilt NICHT",
+    !spiel.dateien.has("home:andere.js"),
+    "eine liegen gebliebene Freigabe ist ein abgeschalteter Riegel");
+  pruefe("  und die Bruecke nennt den Verfall",
+    b.zeilen.slice(vorher2).some((z) => /verfallen/i.test(z)),
+    b.zeilen.slice(vorher2).slice(-2).join(" | "));
+
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Riegel BLIND: keine Liste heisst kein Schreiben (R7, N1) --");
+{
+  // DER FEHLERZWEIG HATTE KEINE PROBE.
+  //
+  // Alle fuenf Riegelproben laufen ueber `--master-liste` und treffen damit
+  // nur den Gutfall. Was passiert, wenn die Quelle der Liste ausfaellt - git
+  // haengt, `.git` ist kaputt, `master` fehlt -, war ungeprueft. Und der
+  // erste Anlauf des Negativ-Caches war genau dort falsch: er setzte eine
+  // Sperrfrist, die eine Bedingung las, die im Fehlerfall nie wahr ist.
+  //
+  // Gestellt wird der Fall ueber eine `--master-liste`, die es nicht gibt.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const datenRel = frischerDatenordner();
+  const quellRel = path.join("pruefstand", "blind-" + process.pid);
+  const quellAbs = path.join(ROOT, quellRel);
+  fs.rmSync(quellAbs, { recursive: true, force: true });
+  fs.mkdirSync(quellAbs, { recursive: true });
+  tempOrdner.push(quellAbs);
+  fs.writeFileSync(path.join(quellAbs, "egal.js"), "// eins" + String.fromCharCode(10), "utf8");
+
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--data-dir", datenRel,
+    "--src-dir", quellRel,
+    "--master-liste", path.join(datenRel, "GIBTESNICHT.txt")]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /Beobachte src/i, 15000);
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.master + 3600000 }));
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  await schlaf(2500);
+
+  pruefe("ohne lesbare Liste geht NICHTS ins Spiel",
+    !spiel.dateien.has("home:egal.js"),
+    [...spiel.dateien.keys()].join(", ") + " - im Zweifel geschlossen");
+  pruefe("und die Bruecke sagt es laut",
+    b.zeilen.some((z) => /nicht lesbar/i.test(z)),
+    b.zeilen.slice(-3).join(" | "));
+  // Der Negativ-Cache: ohne ihn liefe je Datei ein neuer Versuch. Ein Stapel
+  // aus zehn Dateien darf nicht zehn Fehlermeldungen erzeugen.
+  const vorher = b.zeilen.filter((z) => /nicht lesbar/i.test(z)).length;
+  for (let i = 1; i <= 10; i++) {
+    fs.writeFileSync(path.join(quellAbs, "m" + i + ".js"), "// x" + String.fromCharCode(10), "utf8");
+  }
+  await schlaf(2500);
+  const nachher = b.zeilen.filter((z) => /nicht lesbar/i.test(z)).length;
+  // ZUR EHRLICHKEIT: was diese Probe misst und was nicht.
+  //
+  // Gemessen wird die EIGENSCHAFT "ein Stapel erzeugt nicht einen Lesefehler
+  // je Datei". Sie wird heute von ZWEI Dingen getragen: der Vorabpruefung des
+  // ganzen Stapels (Befund 4) und dem Negativ-Cache (N1). Die Probe kann
+  // nicht unterscheiden, welches von beiden greift - sie faellt erst, wenn
+  // BEIDE weg sind. Der Negativ-Cache allein ist damit hier nicht angenagelt;
+  // seine Wirkung zeigt sich erst, wenn ein Weg ohne Vorabpruefung dazukommt.
+  pruefe("ein Stapel aus zehn Dateien erzeugt hoechstens zwei Fehlversuche",
+    nachher - vorher <= 2,
+    (nachher - vorher) + " Versuche - ohne Vorabpruefung UND ohne "
+    + "Negativ-Cache waeren es zehn, jeder mit einem synchronen git-Aufruf "
+    + "im Event-Loop");
+
+  spiel.schliessen();
   b.proc.kill();
   await b.exit;
 }

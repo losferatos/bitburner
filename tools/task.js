@@ -13,7 +13,7 @@
 const BASE = "http://localhost:8795";
 
 async function rpc(method, params = {}) {
-  const body = await (await fetch(BASE + "/api/rpc?" + new URLSearchParams({ method, ...params }))).json();
+  const body = await (await fetch(BASE + "/api/rpc?" + new URLSearchParams({ method, instance: "LIVE", ...params }))).json();
   if (body.error) throw new Error(body.error);
   return body.result;
 }

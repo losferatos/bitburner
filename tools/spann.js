@@ -25,6 +25,8 @@ const WARTE_MAX = 60000;  // harte Grenze - lieber ein Fehlschlag als ein Haenge
 
 async function rpc(method, params) {
   const url = new URL(BRIDGE);
+  // Schreibende Methoden verlangen seit f6a61e5 die Instanz.
+  url.searchParams.set("instance", "LIVE");
   url.searchParams.set("method", method);
   for (const [k, v] of Object.entries(params)) url.searchParams.set(k, v);
   const ctrl = new AbortController();

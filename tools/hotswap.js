@@ -365,6 +365,60 @@ if (NUR_PRUEFEN || !dateien.length) {
 //
 // Die Bruecke loescht ihn wieder, sobald ein grosser Schub durchgegangen ist
 // (Einmal-Ticket), und er verfaellt ohnehin nach 30 Minuten.
+// ---------------------------------------------------------------------------
+// DIE FREIGABE FUER DEN MASTER-RIEGEL
+// ---------------------------------------------------------------------------
+//
+// Seit dem 04.09.2026 schiebt die Bruecke eine Datei nur, wenn ihr Pfad im
+// Git-Index von `master` steht - oder wenn sie hier freigegeben ist. Der
+// Anlass war ein Ausrutscher: eine Datei landete im Live-Baum statt im
+// Worktree und war 400 ms spaeter im Spiel.
+//
+// Fuer den Hot-Swap heisst das: eine NEUE Datei (noch nie committet) braucht
+// diese Freigabe. Eine geaenderte bekannte Datei nicht - der Riegel arbeitet
+// auf Pfadebene, damit der Alltag weiterlaeuft.
+//
+// Geschrieben wird sie erst HIER, nach dem letzten gruenen Punkt. Die Bruecke
+// leert sie wieder, und sie verfaellt nach 30 Minuten.
+{
+  const ziel = TEST
+    ? path.join(ROOT, "pruefstand", "data", "hotswap-freigabe.txt")
+    : path.join(ROOT, "data", "hotswap-freigabe.txt");
+  // Nur die Dateien, die der Riegel wirklich aufhalten wuerde.
+  let unbekannt = [];
+  try {
+    const imIndex = new Set(
+      execSync("git ls-tree -r --name-only master -- src/", { cwd: ROOT, encoding: "utf8" })
+        .split(String.fromCharCode(10)).map((z) => z.trim()).filter(Boolean)
+        .map((z) => z.replace(/^src\//, "")),
+    );
+    unbekannt = dateien.filter((d) => !imIndex.has(d));
+  } catch (e) {
+    console.log("  ACHTUNG: git ls-tree schlug fehl (" + e.message + ")");
+    console.log("    Alle Dateien werden vorsorglich freigegeben.");
+    unbekannt = dateien.slice();
+  }
+  if (unbekannt.length) {
+    try {
+      fs.mkdirSync(path.dirname(ziel), { recursive: true });
+      fs.writeFileSync(ziel,
+        "# tools/hotswap.js, " + new Date().toISOString() + String.fromCharCode(10)
+        + unbekannt.join(String.fromCharCode(10)) + String.fromCharCode(10), "utf8");
+      console.log("  Master-Freigabe gelegt: " + path.relative(ROOT, ziel));
+      for (const d of unbekannt) console.log("    " + d + "  (noch nicht in master)");
+      console.log("    Gilt 30 Minuten und wird von der Bruecke geleert.");
+      console.log("");
+    } catch (e) {
+      console.log("  ACHTUNG: Freigabe liess sich nicht legen (" + e.message + ").");
+      console.log("    Die Bruecke wird diese Dateien abweisen. Besser: committen.");
+      console.log("");
+    }
+  } else {
+    console.log("  Alle Dateien stehen bereits in master - keine Freigabe noetig.");
+    console.log("");
+  }
+}
+
 const SCHUB_MAX = 8;
 if (dateien.length > SCHUB_MAX) {
   const ziel = TEST

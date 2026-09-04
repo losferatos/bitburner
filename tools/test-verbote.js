@@ -38,14 +38,45 @@ const ROOT = path.resolve(HIER, "..");
 const SRC = path.join(ROOT, "src");
 
 /**
- * Die Positivliste. Sie kommt spaeter aus src/registry.json; bis die Registry
- * gebaut ist, steht sie hier - mit dem Datum, an dem sie zuletzt gegen den
- * Ordner abgeglichen wurde.
+ * DIE REGISTRY IST DIE POSITIVLISTE (seit dem Merge am 04.09.2026 15:13).
  *
- * Stand 04.09.2026: die Dateien, die der Auftrag in 1.3 unter "bewaehrt" oder
- * in 4.1/4.3 als Gewerk fuehrt.
+ * Vorher stand hier eine handgepflegte Liste, und der Kommentar sagte selbst:
+ * "sie kommt spaeter aus src/registry.json". Das "spaeter" war heute, und
+ * solange es nicht kam, hatte der Befund "unregistriert" einen falschen
+ * Nenner: `punish.js`, `export.js`, `graftauto.js` und `boerse.js` standen
+ * darin, obwohl sie in der Registry stehen - also ausgerechnet die neu
+ * gebauten Gewerke.
+ *
+ * Das ist nicht nur unsauber, es ist gefaehrlich: Auftrag 6.1 verlangt, dass
+ * unregistrierte Dateien nach `archiv/` wandern. Wer diese Liste als
+ * Loeschliste benutzt haette, haette den neuen Bot archiviert.
+ *
+ * Die Handliste bleibt als ERGAENZUNG stehen (nicht als Ersatz): sie enthaelt
+ * Dateien, die der Auftrag in 1.3 als "bewaehrt" fuehrt und die noch kein
+ * Registry-Eintrag hat. Vereinigt werden beide.
  */
-const POSITIVLISTE = [
+const REGISTRY_DATEI = path.join(SRC, "registry.json");
+const AUS_REGISTRY = (() => {
+  try {
+    const r = JSON.parse(fs.readFileSync(REGISTRY_DATEI, "utf8"));
+    const raus = new Set();
+    for (const e of r.eintraege || []) {
+      // Der Schluessel heisst `name`, nicht `datei` - beim ersten Anlauf
+      // lieferte die Registry deshalb nur elf statt fuenfundzwanzig Namen.
+      if (e.name) raus.add(e.name);
+      for (const l of e.needsLibs || []) raus.add(l);
+    }
+    // Die Registry selbst und die Daten, die sie beschreibt, gehoeren dazu -
+    // sie stehen naturgemaess nicht als Eintrag in sich selbst.
+    raus.add("registry.json");
+    return [...raus];
+  } catch {
+    console.log("  HINWEIS: src/registry.json nicht lesbar - nur die Handliste gilt");
+    return [];
+  }
+})();
+
+const HANDLISTE = [
   "boot.js",
   "bn4net.js",
   "exit.js",
@@ -122,6 +153,34 @@ const BLOCKADEN = [
   { muster: /ns\.prompt\s*\(/, name: "ns.prompt(", grund: "wartet ewig auf eine Antwort, die niemand gibt" },
   { muster: /nextPortWrite\s*\(/, name: "nextPortWrite(", grund: "wartet ewig auf einen Schreibvorgang" },
 ];
+
+/**
+ * BENANNTE AUSNAHMEN - eine Datei, ein Muster, ein Grund.
+ *
+ * Keine Wildcards, keine Ordner, kein "ab hier ist alles erlaubt". Wer eine
+ * Zeile hinzufuegt, schreibt daneben, warum ausgerechnet diese Datei dieses
+ * Wort tragen darf; sonst waechst hier die Liste, die den Grep entwertet.
+ *
+ * `export.js` ist der zweite, brueckenfreie Sicherungsweg (Auftrag 7.2). Er
+ * ruft `ns.singularity.exportGame()`, und das Spiel legt die Datei unter
+ * `bitburnerSave_<epoch>_BN<n>x<level>.json.gz` ab. Die Meldung an den
+ * Menschen nennt diesen Namen, damit er sie im Downloads-Ordner findet - das
+ * ist der Zweck der Meldung. Das Muster `bitburnerSave` faengt sonst Code,
+ * der an der Spielstand-Datenbank herumschreibt; eine Zeichenkette in einem
+ * Meldetext ist das Gegenteil davon.
+ */
+const AUSNAHMEN_MUSTER = [
+  {
+    datei: "export.js",
+    muster: "bitburnerSave",
+    grund: "nennt den Dateinamen in der Meldung an Eric - das IST der Zweck "
+      + "des brueckenfreien Sicherungswegs (Auftrag 7.2)",
+  },
+];
+
+function istAusnahme(datei, musterName) {
+  return AUSNAHMEN_MUSTER.some((a) => a.datei === datei && a.muster === musterName);
+}
 
 let treffer = 0;
 let unregistriert = 0;
@@ -252,7 +311,10 @@ function sammle(dir, prefix = "") {
 }
 sammle(SRC);
 
+const POSITIVLISTE = [...new Set([...HANDLISTE, ...AUS_REGISTRY])];
 const zuPruefen = process.argv.includes("--alle") ? alleDateien : POSITIVLISTE;
+console.log("  Positivliste: " + HANDLISTE.length + " von Hand + "
+  + AUS_REGISTRY.length + " aus der Registry = " + POSITIVLISTE.length);
 
 console.log("  " + zuPruefen.length + " Datei(en) auf der Positivliste, " +
   alleDateien.length + " im Ordner");
@@ -301,9 +363,23 @@ for (const rel of zuPruefen) {
     for (let i = 0; i < zeilen.length; i++) {
       // Kommentarzeilen zaehlen nicht: die Vorfallsdokumentation im Code nennt
       // die verbotenen Namen absichtlich.
-      const z = zeilen[i];
+      //
+      // DAS HAT BIS ZUM 04.09.2026 NICHT FUNKTIONIERT, und zwar in KEINER
+      // Datei. `.` trifft in JavaScript keine Zeilenendezeichen - und `\r`
+      // ist eines. Jede Datei dieses Repos steht unter CRLF (git schreibt sie
+      // beim Auschecken so), also endete jede Zeile auf `\r`, `.*$` traf
+      // nicht bis zum Ende, und der Ausdruck ersetzte gar nichts.
+      //
+      // Die Richtung war harmlos - der Grep war STRENGER als gedacht, nicht
+      // schwaecher -, aber die Zusicherung im Kommentar war schlicht falsch,
+      // und aufgefallen ist es erst, als `export.js` dazukam: eine Datei,
+      // deren Aufgabe der Spielstand-Export ist und die den Dateinamen
+      // deshalb in der Dokumentation nennt.
+      const z = zeilen[i].replace(/\r$/, "");
       const ohneKommentar = z.replace(/^\s*(\*|\/\/|\/\*).*$/, "");
-      if (v.muster.test(ohneKommentar)) melde(v.name, rel, i + 1, z, v.grund);
+      if (v.muster.test(ohneKommentar) && !istAusnahme(rel, v.name)) {
+        melde(v.name, rel, i + 1, z, v.grund);
+      }
     }
   }
 
@@ -403,6 +479,69 @@ let probeFehler = 0;
     } else {
       probeFehler++;
       console.log("  ROT   findet " + name + " NICHT in: " + zeile);
+    }
+  }
+
+  /**
+   * DER KOMMENTAR-STRIPPER, MIT UND OHNE CARRIAGE RETURN.
+   *
+   * Er war seit dem ersten Entwurf wirkungslos, und niemand hat es gemerkt:
+   * `.` trifft in JavaScript kein `\r`, jede Datei dieses Repos steht unter
+   * CRLF, also traf `.*$` nie bis zum Zeilenende und der Ausdruck ersetzte
+   * nichts. Der Grep war dadurch strenger als dokumentiert - die harmlose
+   * Richtung, aber die Zusicherung im Kommentar war falsch.
+   *
+   * Die zweite Zeile hier ist die eigentliche Probe. Ohne sie faellt die
+   * naechste Fassung wieder in dieselbe Falle.
+   */
+  {
+    const strippe = (z) => z.replace(/\r$/, "").replace(/^\s*(\*|\/\/|\/\*).*$/, "");
+    const faelle = [
+      [" * const k = " + JSON.stringify("bitburnerSave"), "Kommentar ohne CR"],
+      [" * const k = " + JSON.stringify("bitburnerSave") + "\r", "Kommentar MIT CR (der Normalfall hier)"],
+      ["// indexedDB.open(x)\r", "Zeilenkommentar mit CR"],
+    ];
+    for (const [zeile, was] of faelle) {
+      if (strippe(zeile) === "") {
+        console.log("  ok    Kommentar-Stripper: " + was);
+      } else {
+        probeFehler++;
+        console.log("  ROT   Kommentar-Stripper laesst stehen (" + was + "): "
+          + JSON.stringify(strippe(zeile)));
+      }
+    }
+    // Und die Gegenprobe: echter Code darf NICHT gestrippt werden.
+    const echt = "const k = " + JSON.stringify("bitburnerSave") + ";\r";
+    if (strippe(echt).includes("bitburnerSave")) {
+      console.log("  ok    echter Code bleibt stehen");
+    } else {
+      probeFehler++;
+      console.log("  ROT   der Stripper frisst echten Code: " + JSON.stringify(strippe(echt)));
+    }
+  }
+
+  /**
+   * DIE AUSNAHMEN MUESSEN AUF ETWAS ZEIGEN.
+   *
+   * Eine Ausnahme fuer eine Datei, die es nicht mehr gibt, oder fuer ein
+   * Muster, das nicht mehr existiert, ist ein stiller Freibrief: sie faellt
+   * niemandem auf und deckt beim naechsten Umbau womoeglich etwas ganz
+   * anderes zu.
+   */
+  {
+    const alleNamen = [...VERBOTE, ...BLOCKADEN].map((v) => v.name);
+    for (const a of AUSNAHMEN_MUSTER) {
+      const dateiDa = fs.existsSync(path.join(SRC, a.datei))
+        || fs.existsSync(path.join(WORKTREE, a.datei));
+      const musterDa = alleNamen.includes(a.muster);
+      if (dateiDa && musterDa) {
+        console.log("  ok    Ausnahme " + a.datei + " / " + a.muster + " zeigt auf etwas");
+      } else {
+        probeFehler++;
+        console.log("  ROT   Ausnahme ins Leere: " + a.datei + " / " + a.muster
+          + (dateiDa ? "" : " - Datei fehlt")
+          + (musterDa ? "" : " - Muster gibt es nicht mehr"));
+      }
     }
   }
 

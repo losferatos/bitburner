@@ -241,6 +241,9 @@ export async function main(ns) {
   // hinweg, weil die Frist sonst in jeder Runde neu begaenne und die
   // Reservierung nie verfiele.
   const reservierungSeit = new Map();
+  // Wann ein Einmallaeufer zuletzt gestartet wurde - gegen den Neustart im
+  // Rundentakt. Ueber Rundengrenzen hinweg.
+  const einmalGestartet = new Map();
   // Zeitpunkt des letzten darkweb.js-Anlaufs (Abschnitt 2b1).
   let nachholMerker = 0;
   // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
@@ -576,8 +579,62 @@ export async function main(ns) {
     return {
       node, verfahren,
       phase: phaseJetzt(),
-      dateiDa: (d) => { try { return ns.fileExists(d, "home"); } catch { return false; } },
+      dateiDa: (d) => {
+        try {
+          if (!ns.fileExists(d, "home")) return false;
+          return !markeVeraltet(d);
+        } catch { return false; }
+      },
     };
+  };
+
+  /**
+   * Gilt diese Marke noch, oder stammt sie aus einem Zustand, den es nicht
+   * mehr gibt?
+   *
+   * DER FALL, DER DAS NOETIG MACHT (Skeptiker Fehlermodi, 04.09.2026).
+   *
+   * `data/portknacker-komplett.txt` laesst `darkweb.js` ruhen, sobald alle
+   * fuenf Portknacker da sind. Die Marke ist eine TEXTDATEI und ueberlebt
+   * jedes Prestige - die Programme nicht: `prestigeHomeComputer` leert die
+   * Liste und legt nur NUKE zurueck (`Server/ServerHelpers.ts:224-234`),
+   * gerufen sowohl vom Augmentierungs-Einbau als auch vom Knotenwechsel
+   * (`Prestige.ts:55,74` und `:203,225`).
+   *
+   * Ohne diese Pruefung liefe `darkweb.js` nach dem ersten vollstaendigen Satz
+   * in ALLEN rund vierzig Restlaeufen nie wieder - und es ist die einzige
+   * kaltstartfaehige Knackerquelle. Der Zirkel dahinter hat am 25.08.
+   * dreizehneinhalb Stunden gekostet.
+   *
+   * WARUM HIER UND NICHT IN darkweb.js: die Marke SPERRT das Gewerk. Eine
+   * Pruefung im Gewerk selbst liefe nie - es startet ja nicht. Nur wer die
+   * Sperre auswertet, kann sie auch verwerfen.
+   *
+   * WARUM HIER UND NICHT NUR IN boot.js: boot.js raeumt sie ebenfalls, und das
+   * ist die erste Sicherung. Diese hier haengt nicht daran, DASS boot.js
+   * gelaufen ist - nach einem Einbau ueber die Spieloberflaeche laeuft es
+   * nicht.
+   *
+   * Kostet nichts: `ns.read` ist gratis, und `getResetInfo` hat der Kern
+   * ohnehin.
+   */
+  const MARKEN_MIT_ZEITSTEMPEL = new Set([
+    "data/portknacker-komplett.txt",
+    "data/simulacrum.txt",
+  ]);
+  const markeVeraltet = (d) => {
+    if (!MARKEN_MIT_ZEITSTEMPEL.has(d)) return false;
+    try {
+      const roh = String(ns.read(d) || "").trim();
+      // Zwei Schreibweisen im Bestand: ISO-Zeitstempel (darkweb.js) und blanke
+      // Millisekunden (graft.js). Beide muessen erkannt werden.
+      const erstes = roh.split(/\s+/)[0];
+      const t = /^\d+$/.test(erstes) ? Number(erstes) : Date.parse(erstes);
+      if (!Number.isFinite(t)) return false;    // unlesbar: lieber gelten lassen
+      const ri = ns.getResetInfo();
+      const juengster = Math.max(ri.lastNodeReset || 0, ri.lastAugReset || 0);
+      return t < juengster;
+    } catch { return false; }
   };
 
   let regLage = baueLage();
@@ -595,8 +652,9 @@ export async function main(ns) {
         // Doppelstarts faengt der Starter ueber `laufend` ab.
         .filter((e) => e.name !== "bn4net.js")
         .filter((e) => !e.name.startsWith("worker/"))
-        .map((e) => [e.name, e.args || []])
-    : WERKZEUGE_FEST;
+        .map((e) => [e.name, e.args || [], e.restartPolicy || "always",
+          e.hostRule || "any"])
+    : WERKZEUGE_FEST.map(([n, a]) => [n, a, "always", "any"]);
 
   const baueTelemetrie = (lage) => regGeladen
     ? regTelemetrie(regGeladen, lage).filter(([n]) => n !== "bn4net.js")
@@ -3310,7 +3368,39 @@ export async function main(ns) {
         return !Number.isFinite(pl.alterMs) || pl.alterMs > 240000;
       })();
 
-      const fehlend = WERKZEUGE.filter(([d]) => !laufend.includes(d)
+      // EINMALLAEUFER NICHT IM SEKUNDENTAKT WIEDERHOLEN (Skeptiker Fehlermodi,
+      // 04.09.2026).
+      //
+      // `restartPolicy: "until-done"` stand in der Registry und hatte keinen
+      // Leser. Gemessen wurden 41 Starts in 41 Runden fuer `cdump.js` und
+      // `darkweb.js` - beide sind Einmallaeufer, beide beenden sich nach
+      // Sekunden, und der Starter holte sie sofort zurueck. Jeder
+      // cdump-Neustart zwingt den Kern ausserdem, auf home eine Arbeiterart
+      // zu erschlagen, um die 12 GB freizubekommen. Alle zehn Sekunden.
+      //
+      // Ein Einmallaeufer wird deshalb nur alle drei Minuten neu angesetzt.
+      // Das ist kein Kompromiss, sondern die richtige Zahl: `cdump.js` findet
+      // in drei Minuten Netzzeit keine nennenswert anderen Vertraege, und
+      // `darkweb.js` kann in drei Minuten kein Geld gesammelt haben, das
+      // vorher fehlte.
+      //
+      // Die Ausnahme ist ein OFFENER AUFTRAG: `csolve.js` laeuft, sobald
+      // Antworten da sind, und `shop.js` regelt seinen Bedarf ueber
+      // `shopNoetig` weiter oben - beide werden hier nicht gebremst.
+      const EINMAL_PAUSE_MS = 180000;
+      // Name -> hostRule, damit die Schleife unten sie ohne zweite Suche hat.
+      const eintragRegel = new Map(WERKZEUGE.map(([n, , , h]) => [n, h]));
+
+      const einmalBremse = (d, policy) => {
+        if (policy === "always") return false;
+        if (d === "shop.js") return false;              // eigene Bedarfsregel
+        if (d === "csolve.js") return false;            // Vorbedingung regelt es
+        const zuletzt = einmalGestartet.get(d);
+        return !!zuletzt && Date.now() - zuletzt < EINMAL_PAUSE_MS;
+      };
+
+      const fehlend = WERKZEUGE.filter(([d, , policy]) => !laufend.includes(d)
+        && !einmalBremse(d, policy)
         && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js"))
         && !((d === "hashes.js" || d === "hacknet.js") && keineHacknet)
         && !(d === "shop.js" && !shopNoetig)
@@ -3518,10 +3608,41 @@ export async function main(ns) {
           continue;
         }
 
-        let wirt = werkbank;
+        // DIE WIRTREGEL DURCHSETZEN (Skeptiker Fehlermodi, 04.09.2026).
+        //
+        // `hostRule` stand in der Registry und hatte keinen Leser - gemessen
+        // lief `darkweb.js` (hostRule "home") auf `joesguns` und `foodnstuff`.
+        // Das ist nicht nur unordentlich: mehrere Gewerke schreiben Dateien,
+        // die andere auf HOME erwarten, und `dateiDa` schaut nirgends sonst
+        // hin. Ein Gewerk am falschen Ort arbeitet ins Leere, ohne dass etwas
+        // auffaellt.
+        //
+        //   "home"        muss auf home laufen
+        //   "werkbank"    gehoert auf die Werkbank (das ist der Normalfall)
+        //   "not-hacknet" ueberall ausser auf Hacknet-Servern
+        //   "any"         egal
+        const regel = eintragRegel.get(datei) || "any";
+        let wirt = regel === "home" ? "home" : werkbank;
+
+        // Ein "home"-Gewerk weicht nicht aus. Passt es dort nicht, wartet es -
+        // und die Platzreservierung oben haelt ihm den Platz frei.
+        if (regel === "home" && freiAuf("home") < braucht) {
+          if (runde % 10 === 0) {
+            sag(datei + " gehoert auf home und findet dort nur "
+              + freiAuf("home").toFixed(1) + " von " + braucht.toFixed(1) + " GB.");
+          }
+          if (!reserviertFuer) {
+            const seit = reservierungSeit.get(datei);
+            if (!seit) { reservierungSeit.set(datei, Date.now()); reserviertFuer = datei; }
+            else if (Date.now() - seit < RESERVIERUNG_MS) reserviertFuer = datei;
+            else reservierungSeit.delete(datei);
+          }
+          continue;
+        }
+
         // Ist die Werkbank fuer dieses Werkzeug gesperrt, gilt sofort der
         // Ausweichweg - unabhaengig davon, wieviel Platz dort waere.
-        if (wirtGesperrt(datei, werkbank)) {
+        if (regel !== "home" && wirtGesperrt(datei, werkbank)) {
           const weg = ausweichwirt(braucht);
           if (!weg || wirtGesperrt(datei, weg)) {
             if (runde % 10 === 0) {
@@ -3551,6 +3672,8 @@ export async function main(ns) {
             }
             continue;
           }
+        } else if (regel === "home") {
+          // Schon oben behandelt: es passt, und der Wirt steht fest.
         } else if (reserviertFuer && werkbank === "home") {
           // Ein Eintrag hoeherer Prioritaet haelt gerade Platz auf home frei.
           // Auf einem ANDEREN Wirt darf dieser hier trotzdem starten - die
@@ -3629,7 +3752,10 @@ export async function main(ns) {
         ns.scp([datei, ...BIBLIOTHEKEN], wirt, "home");
         const pid = ns.exec(datei, wirt, 1, ...args);
         // Gestartet heisst: die Reservierung hat ihren Zweck erfuellt.
-        if (pid) reservierungSeit.delete(datei);
+        if (pid) {
+          reservierungSeit.delete(datei);
+          einmalGestartet.set(datei, Date.now());
+        }
         sag(pid ? datei + " laeuft auf " + wirt + " (pid " + pid + ")."
           : datei + " liess sich auf " + wirt + " nicht starten (exec gab 0).");
       }
@@ -3692,6 +3818,18 @@ export async function main(ns) {
       verworfeneRunden: mz.verworfeneRunden,
       letzterMzGrund: mz.letzterGrund,
       host: ns.getHostname(),
+      // DIE PHASE GEHT MIT HINAUS (Skeptiker Runde 3, W6, 04.09.2026).
+      //
+      // Kern und Waechter hatten je eine eigene Phasendefinition: der Kern
+      // zaehlt einen gekauften Rechner als "normal", der Waechter kennt den
+      // Park nicht und sah bei home = 32 GB weiter "kaltstart". Mit gekauftem
+      // Rechner UND kleinem home ueberwachte er damit genau die Gewerke, die
+      // der Kern absichtlich nicht mehr startet - eine Fehlstrafe je Runde,
+      // und false_penalty_count = 0 ist Abnahmebedingung.
+      //
+      // Zwei Definitionen fuer denselben Begriff sind nie zu synchronisieren.
+      // Also gibt es nur noch eine: der Kern misst, der Waechter liest mit.
+      phase: regLage.phase,
       state: "work",
       blockedReason: null,
       netz: hosts.length,
@@ -3819,7 +3957,22 @@ export async function main(ns) {
         }
       } catch { bisher = null; }
 
-      const e = figVergib(antraege, bisher, jetztF, nodeResetF);
+      // WER NICHT MEHR LAEUFT, HAELT AUCH NICHTS (Skeptiker Runde 3, W9).
+      //
+      // Der Kern kennt die laufenden Prozesse ohnehin - er verwaltet sie. Die
+      // Auskunft wird hier hereingereicht, damit eine Lease nach einem Absturz
+      // oder einem Speicherverdraengen sofort frei wird statt erst nach 15
+      // Minuten (bei einem Graft: nach zwei Stunden).
+      //
+      // Gesucht wird ueber ALLE Wirte, nicht nur home: die figurberuehrenden
+      // Gewerke laufen ueberwiegend auf der Werkbank.
+      const lebendig = new Set();
+      try {
+        for (const h of hosts) for (const p of ns.ps(h)) lebendig.add(p.filename);
+      } catch { /* dann ohne Lebendpruefung - alte Regel gilt weiter */ }
+      const lebt = lebendig.size ? (t) => lebendig.has(t) : undefined;
+
+      const e = figVergib(antraege, bisher, jetztF, nodeResetF, lebt);
       if (e.wechsel || !figVergabeGilt(bisher, jetztF, nodeResetF)) {
         sag("Figur: " + (e.vergabe ? e.vergabe.owner + " -> " + e.vergabe.action : "frei")
           + " (" + e.grund + ", " + antraege.length + " Antrag/Antraege)");

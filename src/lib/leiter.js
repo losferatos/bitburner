@@ -273,7 +273,26 @@ export function schritt(z, sig, jetztGuardMs, jetztWall) {
       grund: "erschoepft seit " + Math.round((jetztGuardMs - s.seit) / 60000) + " min" };
   }
 
-  const kandidat = sprosseFuer(sig.sig);
+  // WELCHE SPROSSE IST DRAN? (Skeptiker Fehlermodi, 04.09.2026)
+  //
+  // Hier stand nur `sprosseFuer(sig.sig)` - und das liefert fuer S1 IMMER
+  // Sprosse 1. `verifiziert` zaehlt `s.sprosse` zwar brav auf 2 und 3 hoch,
+  // aber niemand las den Wert: die naechste Runde begann wieder bei 1, die
+  // Wirkungspruefung scheiterte wieder, und nach drei Durchlaeufen fand
+  // `verifiziert` keine hoehere gebaute Sprosse mehr und setzte EXHAUSTED.
+  //
+  // Gemessen im Trockenlauf: Sprosse 1 bei 2, 7 und 12 Minuten, dann
+  // EXHAUSTED nach 15 Minuten Guard-Zeit. Sprosse 2 feuerte NIE - und damit
+  // war die ganze C.9-Maschinerie tot: die Wirtsperren, `blocked-hosts.json`
+  // und der Ausweichzweig im Kern.
+  //
+  // Richtig ist: `sprosseFuer` bestimmt den EINSTIEG, der Zustand die
+  // Fortsetzung. Ein Ziel, das schon auf Sprosse 2 steht, faellt nicht auf 1
+  // zurueck, nur weil dasselbe Signal noch einmal kommt.
+  const einstieg = sprosseFuer(sig.sig);
+  const kandidat = (s.sprosse > 0 && s.zustand !== "HEALTHY")
+    ? (SPROSSEN.find((x) => x.nr === s.sprosse && x.gebaut) || einstieg)
+    : einstieg;
   if (!kandidat) {
     return { handlung: "nichts", sprosse: null, ziel,
       grund: "keine gebaute Sprosse fuer " + sig.sig };
@@ -328,6 +347,41 @@ export function schritt(z, sig, jetztGuardMs, jetztWall) {
  * Gruen setzt den Zaehler des ZIELS zurueck, nicht den globalen - ein
  * geheiltes Werkzeug soll nicht die Vorgeschichte eines anderen erben.
  */
+/**
+ * Ein erschoepftes Ziel wieder freigeben.
+ *
+ * DER AUSGANG AUS DER SACKGASSE (Skeptiker Fehlermodi, 04.09.2026). Der
+ * Kommentar bei EXHAUSTED versprach ihn ("endet erst, wenn Fortschritt
+ * messbar ist oder ein Reset passiert") - im Code gab es ihn nicht. Nur ein
+ * Knotenwechsel setzte zurueck, ueber `laden()`.
+ *
+ * Das ist der Unterschied zwischen "der Waechter hoert auf zu strafen" und
+ * "der Waechter ist bis zum naechsten BitNode abgeschaltet". Der Auftrag meint
+ * das erste.
+ *
+ * @param {object} z
+ * @param {string} ziel     null = alle Ziele
+ * @param {number} jetztGuardMs
+ * @returns {string[]} die freigegebenen Ziele
+ */
+export function freigeben(z, ziel, jetztGuardMs) {
+  const raus = [];
+  for (const [name, s] of Object.entries(z.ziele || {})) {
+    if (ziel !== null && name !== ziel) continue;
+    if (s.zustand !== "EXHAUSTED") continue;
+    s.zustand = "HEALTHY";
+    s.sprosse = 0;
+    s.versuche = 0;
+    s.seit = jetztGuardMs;
+    raus.push(name);
+  }
+  if (raus.length && z.exhausted
+      && (ziel === null || z.exhausted.signal === ziel)) {
+    z.exhausted = null;
+  }
+  return raus;
+}
+
 export function verifiziert(z, ziel, gruen, jetztGuardMs) {
   const s = z.ziele[ziel];
   if (!s) return { zustand: "HEALTHY", eskaliert: false };

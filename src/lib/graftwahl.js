@@ -21,12 +21,27 @@
  * DIE DREI REGELN
  * ===========================================================================
  *
- * 1. VIOLET CONGRUITY ZUERST, sobald bezahlbar. Es loescht die Entropie
- *    rueckwirkend (`AugmentationHelpers.ts:45-49`), und danach erzeugt kein
- *    Graft mehr welche (`GraftingWork.tsx:61-64`). Das Endergebnis ist in
- *    beiden Faellen null Entropie - aber wer es ZUERST graftet, arbeitet den
- *    Rest mit vollen Multiplikatoren ab statt mit 0,98^n. Nach 38 Grafts
- *    stuenden sonst bladeburner_success_chance bei x0,822 statt x1,771.
+ * 1. VIOLET CONGRUITY, SOBALD BEZAHLBAR - ABER NIEMAND WARTET AUF IHN.
+ *
+ *    Es loescht die Entropie rueckwirkend (`AugmentationHelpers.ts:45-49`),
+ *    und danach erzeugt kein Graft mehr welche (`GraftingWork.tsx:61-64`).
+ *
+ *    KORRIGIERTE BEGRUENDUNG (04.09.2026, Skeptiker Substanz). Hier stand:
+ *    "wer zuerst graftet, arbeitet den Rest mit vollen Multiplikatoren ab
+ *    statt mit 0,98^n". Das ist falsch. `applyEntropy` ruft
+ *    `reapplyAllAugmentations()` und rechnet die Multiplikatoren JEDES MAL von
+ *    Grund auf neu (`PlayerObjectAugmentationMethods.ts:8-25`,
+ *    `EntropyAccumulation.ts:6-7`) - das Endergebnis ist reihenfolgeunabhaengig.
+ *
+ *    Und der Preis des Wartens ist gewaltig: Congruity kostet als Graft
+ *    150 Billionen (`Augmentations.ts:391`, dreifacher Grundpreis nach
+ *    `GraftableAugmentation.ts:21`), mit dem Puffer also 300 Billionen. Die
+ *    restlichen 38 Stuecke kosten zusammen 0,42 Billionen - Faktor 360
+ *    weniger. Wer auf Congruity wartet, graftet monatelang gar nichts.
+ *
+ *    Deshalb: WENN bezahlbar, dann zuerst - der Vorteil waehrend der
+ *    Graftphase ist real, wenn auch voruebergehend. Wenn nicht, wird die Liste
+ *    abgearbeitet, und Congruity kommt, wenn das Geld da ist.
  *
  * 2. DANN DIE LISTE, der Reihe nach. Sie ist greedy nach Zuwachs der
  *    Erfolgschance je Stunde hergeleitet, mit eingerechneten
@@ -60,6 +75,9 @@ export const PUFFER_FAKTOR = 2;
  */
 export function naechstes(lage) {
   const plan = lage.plan || {};
+  // Warum der Vorzug diesmal nicht drankam - fuer den Bericht, nicht fuer die
+  // Entscheidung.
+  let grundVorzug = null;
   const liste = Array.isArray(plan.reihenfolge) ? plan.reihenfolge : [];
   const besitzt = new Set(lage.besitzt || []);
   const preise = lage.preise || {};
@@ -83,10 +101,19 @@ export function naechstes(lage) {
         if (z.ok) return { name: v.name, grund: v.regel || "Vorzug", wartet: false };
         return { name: null, grund: v.name + ": " + z.grund, wartet: true };
       }
-      // WARTEN, NICHT UEBERSPRINGEN. Der ganze Sinn des Vorzugs ist, dass er
-      // VOR den anderen kommt - wer bei Geldmangel zum naechsten weitergeht,
-      // hat ihn faktisch ans Ende geschoben.
-      return { name: null, grund: v.name + ": " + pruefung.grund, wartet: true };
+      // WEITERGEHEN, NICHT WARTEN (04.09.2026, Skeptiker Substanz).
+      //
+      // Hier stand das Gegenteil, mit der Begruendung, der Vorzug muesse VOR
+      // den anderen kommen. Der Grund dafuer war falsch (siehe Regel 1 oben:
+      // das Entropie-Endergebnis ist reihenfolgeunabhaengig), und die Folge
+      // waere schwer gewesen: Congruity kostet mit Puffer 300 Billionen, die
+      // restlichen 38 Stuecke zusammen 0,42 - das Gewerk haette ab der ersten
+      // Runde stillgestanden, bis ein Betrag zusammen ist, den der Bot auf
+      // dieser Route nie erreicht.
+      //
+      // `wartet` bleibt trotzdem false: das Gewerk WARTET nicht, es geht
+      // weiter. Der Zustand "blocked" waere hier eine Fehlmeldung.
+      grundVorzug = v.name + ": " + pruefung.grund + " - die Liste geht vor";
     }
     // Nicht graftbar (noch nicht freigeschaltet): dann geht es weiter.
   }
@@ -102,7 +129,12 @@ export function naechstes(lage) {
     }
     const z = passtInDieZeit(dauern[name], lage);
     if (!z.ok) return { name: null, grund: name + ": " + z.grund, wartet: true };
-    return { name, grund: "naechster offener Eintrag", wartet: false };
+    return {
+      name,
+      grund: "naechster offener Eintrag"
+        + (grundVorzug ? " (" + grundVorzug + ")" : ""),
+      wartet: false,
+    };
   }
 
   return { name: null, grund: "alles gegraftet, was der Plan kennt", wartet: false };

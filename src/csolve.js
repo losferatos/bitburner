@@ -84,8 +84,30 @@ export async function main(ns) {
   // ergaben am 02.09. 86 Mio, das Modell erwartete deutlich mehr. Solange
   // niemand den echten Wert je Vertrag aufschreibt, bleibt das eine Vermutung,
   // und die Zeitplanung des Kaltstarts (`t_workbench`) haengt daran.
+  // HERZSCHLAG v2, NICHT NUR EINE ERTRAGSZEILE (Skeptiker Runde 3, W7).
+  //
+  // Hier standen nur Zeit und Ertrag. Der Waechter erkennt einen
+  // Einmallaeufer aber an `state`: bei "done" laesst S1 ihn in Ruhe, ohne
+  // das Feld faellt er durch die ganze Uhrenkaskade bis zur Wanduhr - und
+  // schlaegt dann Alarm ueber ein Gewerk, das seine Arbeit getan hat und
+  // sich planmaessig beendet.
+  //
+  // KEIN `playtime` HIER - und das ist eine Budgetentscheidung, keine
+  // Nachlaessigkeit. `ns.getPlayer` kostet 0,50 GB, und dieses Gewerk laeuft
+  // im Kaltstart neben Kern, Waechter und Wachhalter auf 32 GB home; bei
+  // 12,85 GB bleiben davon exakt 0,00 GB uebrig. Ein halbes Gigabyte fuer ein
+  // Feld, das ohnehin nur greift, wenn `state` fehlt, waere der falsche
+  // Tausch: mit `state: "done"` ueberspringt S1 den Eintrag, bevor irgendeine
+  // Uhr befragt wird (`lib/signale.js`, Skip-Liste wait/done/blocked).
   ns.write("data/csolve.json", JSON.stringify({
+    schema: 2,
     zeit: Date.now(), ts: Date.now(), wall: Date.now(),
+    playtime: 0,
+    motorTimeMs: 0,
+    round: 1, okRound: 1,
+    errStreak: 0, lastError: null,
+    host: ns.getHostname(), version: "csolve-2",
+    state: "done", blockedReason: null,
     versuche: liste.length,
     erfolge,
     ertrag,

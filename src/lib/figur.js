@@ -59,11 +59,47 @@ export const PRIO = {
   verbrechen: 50,
 };
 
-/** Wie lange eine Vergabe ohne Erneuerung gilt. */
+/**
+ * Wie lange eine Vergabe ohne Erneuerung gilt.
+ *
+ * NICHT GENUG FUER EINEN GRAFT (Skeptiker Fehlermodi, 04.09.2026). Die
+ * Graftdauer ist `(3600000 * log2(Summe der Multiplikatoren) + 1800000) / 2`
+ * geteilt durch den Intelligenzbonus (`GraftableAugmentation.ts:25-29`) - das
+ * MINIMUM sind 15 Minuten, gemessen wurden 17,6 bis 88.
+ *
+ * Der Lease lief damit bei JEDEM Graft mitten drin ab, und die Figur ging an
+ * den naechsten Antragsteller. Dass dabei noch kein Geld verbrannt ist, lag
+ * nicht am Vergabepunkt, sondern an den handgepflegten `type ===
+ * "GRAFTING"`-Bremsen in vier Dateien - also genau an dem, was C.11 abloesen
+ * sollte.
+ *
+ * Deshalb hat `graft` einen eigenen Lease. Zwei Stunden decken auch das
+ * teuerste Stueck; laenger darf er nicht sein, denn ein toter Antragsteller
+ * parkt die Figur genau so lange.
+ */
 export const LEASE_MS = 15 * 60000;
+export const LEASE_GRAFT_MS = 2 * 3600000;
 
-/** Wie lange ein Antrag gilt, wenn er keine eigene TTL nennt. */
-export const ANTRAG_TTL_MS = 60000;
+
+/** Der Lease fuer eine bestimmte Handlung. */
+export function leaseFuer(action) {
+  return action === "graft" ? LEASE_GRAFT_MS : LEASE_MS;
+}
+
+/**
+ * Wie lange ein Antrag gilt, wenn er keine eigene TTL nennt.
+ *
+ * ZWEIEINHALB TAKTE, NICHT EINER (04.09.2026). Hier stand 60 s - genau der
+ * Takt von `bbtrain.js`, `bn4rep.js` und `graftauto.js`. Im verdeckten Tab
+ * wird aus `sleep(60000)` real 60 bis 120 s (ein Timer-Wake je Minute ist ein
+ * harter Deckel), ihre Antraege waren beim Lesen des Kerns also oefter
+ * abgelaufen als nicht.
+ *
+ * Das ist dieselbe Fehlerklasse wie "eine Sekunde daneben, jedes Mal" vom
+ * 30.08.: eine Frist, die genauso gross ist wie der Abstand, den sie
+ * ueberbruecken soll, greift im Mittel in der Haelfte aller Faelle nicht.
+ */
+export const ANTRAG_TTL_MS = 150000;
 
 /**
  * Baut einen Antrag. Das Gewerk schreibt ihn nach
@@ -101,14 +137,44 @@ export function antragGilt(a, jetzt, nodeReset) {
  * genau das Ping-Pong, das hier aufhoeren soll - zwei Gewerke mit derselben
  * Prioritaet wechselten sich sonst im Sekundentakt ab.
  *
+ * EIN TOTER BESITZER HAELT NICHTS MEHR (Skeptiker Runde 3, W9, 04.09.2026).
+ *
+ * Bisher lief eine Lease immer bis zum Zeitablauf - auch dann, wenn der
+ * Besitzer laengst nicht mehr lief. Bei 15 Minuten war das eine Viertelstunde
+ * Stillstand nach jedem Absturz und jedem Speicherverdraengen; seit die
+ * Graft-Lease zwei Stunden betraegt (B2), waeren es zwei Stunden gewesen, in
+ * denen kein anderes Gewerk die Figur bekommt.
+ *
+ * Der Vergabepunkt im Kern kennt die laufenden Prozesse ohnehin (`ns.ps`) und
+ * reicht die Auskunft als `lebt` herein. Fehlt sie, bleibt es beim alten
+ * Verhalten - so kann kein Aufrufer, der die Prozessliste nicht hat, aus
+ * Versehen jede Lease brechen.
+ *
  * @param {Array} antraege
  * @param {object|null} bisher aktuelle Vergabe aus figure.txt
  * @param {number} jetzt
  * @param {number} nodeReset
+ * @param {(tool: string) => boolean} [lebt] laeuft dieses Werkzeug noch?
  * @returns {{vergabe: object|null, grund: string, wechsel: boolean}}
  */
-export function vergib(antraege, bisher, jetzt, nodeReset) {
+export function vergib(antraege, bisher, jetzt, nodeReset, lebt) {
   const gueltig = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset));
+
+  // Der tote Besitzer: die Lease wird sofort fallengelassen, und die Vergabe
+  // laeuft weiter, als haette es sie nie gegeben. Ein Antrag des Toten steht
+  // in der Regel noch in der Liste - er faellt mit, weil `antragGilt` nach
+  // ANTRAG_TTL_MS (150 s) greift und ein toter Antragsteller nicht erneuert.
+  if (typeof lebt === "function" && bisher && bisher.owner && !lebt(bisher.owner)) {
+    const uebrig = gueltig.filter((a) => a.tool !== bisher.owner);
+    if (!uebrig.length) {
+      return { vergabe: null, grund: "Besitzer " + bisher.owner + " laeuft nicht mehr", wechsel: true };
+    }
+    return {
+      vergabe: neueVergabe(besterAntrag(uebrig), jetzt, nodeReset, (bisher.seq || 0) + 1),
+      grund: "Besitzer " + bisher.owner + " laeuft nicht mehr - neu vergeben",
+      wechsel: true,
+    };
+  }
 
   // Laeuft die bisherige Vergabe noch, und hat ihr Besitzer einen geltenden
   // Antrag? Dann bleibt sie - eine Lease wird durch einen neuen Antrag
@@ -120,7 +186,7 @@ export function vergib(antraege, bisher, jetzt, nodeReset) {
     if (!besserer) {
       if (eigener) {
         return {
-          vergabe: { ...bisher, leaseBis: jetzt + LEASE_MS, wall: jetzt },
+          vergabe: { ...bisher, leaseBis: jetzt + leaseFuer(bisher.action), wall: jetzt },
           grund: "Lease verlaengert",
           wechsel: false,
         };
@@ -145,9 +211,7 @@ export function vergib(antraege, bisher, jetzt, nodeReset) {
     return { vergabe: null, grund: "kein geltender Antrag", wechsel: !!bisher };
   }
 
-  // Kleinste prio gewinnt; bei Gleichstand der aeltere Antrag.
-  const sortiert = [...gueltig].sort((a, b) => (a.prio - b.prio) || (a.wall - b.wall));
-  const gewinner = sortiert[0];
+  const gewinner = besterAntrag(gueltig);
   const seq = (bisher && Number.isFinite(bisher.seq) ? bisher.seq : 0) + 1;
   return {
     vergabe: neueVergabe(gewinner, jetzt, nodeReset, seq),
@@ -156,14 +220,19 @@ export function vergib(antraege, bisher, jetzt, nodeReset) {
   };
 }
 
+/** Kleinste prio gewinnt; bei Gleichstand der AELTERE Antrag (kein Ping-Pong). */
+function besterAntrag(gueltig) {
+  return [...gueltig].sort((a, b) => (a.prio - b.prio) || (a.wall - b.wall))[0];
+}
+
 function neueVergabe(a, jetzt, nodeReset, seq) {
   return {
     owner: a.tool,
     action: a.action,
     prio: a.prio,
     since: jetzt,
-    leaseMs: LEASE_MS,
-    leaseBis: jetzt + LEASE_MS,
+    leaseMs: leaseFuer(a.action),
+    leaseBis: jetzt + leaseFuer(a.action),
     wall: jetzt,
     nodeReset,
     seq,

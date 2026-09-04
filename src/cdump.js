@@ -116,13 +116,49 @@ export async function main(ns) {
 
   // Die Rohliste bleibt - sie ist der Blick von aussen auf das, was im Netz
   // liegt, und `tools/` liest sie.
-  ns.write("data/cdump.json", JSON.stringify(roh), "w");
+  //
+  // DER ERSETZER IST NICHT ZIERDE (Skeptiker Substanz, 04.09.2026).
+  //
+  // `ns.codingcontract.getData` liefert bei *Square Root* einen BIGINT
+  // (`SquareRoot.ts:33-36`, ueber `structuredClone` in
+  // `NetscriptFunctions/CodingContract.ts:100-104`). `JSON.stringify` wirft
+  // darauf "Do not know how to serialize a BigInt" - ungefangen, mitten in
+  // main.
+  //
+  // Die Folge waere die schlimmste, die dieses Gewerk haben kann: weder
+  // cdump.json noch cantwort.json wuerden geschrieben, die Rotation ruecke nie
+  // vor, csolve.js liefe nie - und der Kern startete cdump.js alle fuenf
+  // Minuten neu, wo es wieder stuerbe. Sobald irgendwo im Netz ein
+  // Square-Root-Vertrag liegt, waere die einzige Geldquelle des Kaltstarts
+  // dauerhaft tot.
+  //
+  // Der Vorgaenger hatte den Ersetzer (contracts.js:101). Beim Herausloesen
+  // der Loeser ging er verloren - eine Zeile, die beim Lesen wie Kosmetik
+  // aussieht und es nicht ist.
+  const ohneBigInt = (k, v) => (typeof v === "bigint" ? String(v) : v);
+  ns.write("data/cdump.json", JSON.stringify(roh, ohneBigInt), "w");
+  if (ns.getHostname() !== "home") {
+    ns.scp("data/cdump.json", "home", ns.getHostname());
+  }
 
   // NUR SCHREIBEN, WENN ES ETWAS ZU TUN GIBT. Eine leere Antwortdatei wuerde
   // die Rotation blockieren: `cdump.js` darf nur laufen, solange es sie NICHT
   // gibt, und `csolve.js` startet fuer nichts.
   if (antworten.length) {
-    ns.write("data/cantwort.json", JSON.stringify(antworten), "w");
+    ns.write("data/cantwort.json", JSON.stringify(antworten, ohneBigInt), "w");
+    // NACH HOME KOPIEREN (Skeptiker Fehlermodi, 04.09.2026).
+    //
+    // Die Vorbedingung von `csolve.js` prueft `data/cantwort.json` auf HOME -
+    // `dateiDa` im Kern schaut nirgends sonst hin. Legt der Starter `cdump.js`
+    // auf einen Ausweichwirt (und das tut er, sobald home voll ist), bliebe
+    // die Datei dort liegen: `csolve.js` liefe nie, die Rotation ruecke nicht
+    // vor, und `cdump.js` loeste dieselben Vertraege endlos neu. Lautlos.
+    //
+    // Die Registry sagt das seit jeher (`scpToHome: true`) - nur las es
+    // niemand.
+    if (ns.getHostname() !== "home") {
+      ns.scp("data/cantwort.json", "home", ns.getHostname());
+    }
   }
   ns.write("data/cdump-log.txt",
     new Date().toLocaleTimeString() + "  " + roh.length + " Vertraege gefunden, "

@@ -43,23 +43,29 @@
  * nicht wissen.
  *
  * ===========================================================================
- * DER VORZUG WARTET, ER WIRD NICHT UEBERSPRUNGEN
+ * DER VORZUG BLOCKIERT NICHT
  * ===========================================================================
  *
  * `Violet Congruity Implant` loescht die Entropie rueckwirkend
  * (`AugmentationHelpers.ts:45-49`), und danach erzeugt kein Graft mehr welche
- * (`GraftingWork.tsx:61-64`). Das Endergebnis ist in beiden Faellen null
- * Entropie - aber wer es ZUERST graftet, arbeitet die restlichen 38 Stuecke
- * mit vollen Multiplikatoren ab statt mit 0,98^n. Nach 38 Grafts stuende
- * bladeburner_success_chance sonst bei x0,822 statt x1,771.
+ * (`GraftingWork.tsx:61-64`). Hier stand deshalb, auf ihn werde GEWARTET.
  *
- * Deshalb wird auf ihn GEWARTET, wenn das Geld nicht reicht. Die Entscheidung
- * steht in `lib/graftwahl.js` und ist dort ohne Spiel geprueft.
+ * Das war falsch (04.09.2026, Skeptiker Substanz), und zwar doppelt:
+ * `applyEntropy` rechnet die Multiplikatoren ueber `reapplyAllAugmentations()`
+ * jedes Mal neu (`PlayerObjectAugmentationMethods.ts:8-25`), das Endergebnis
+ * haengt also gar nicht an der Reihenfolge - und Congruity kostet als Graft
+ * 150 Billionen gegen 0,42 Billionen fuer alle 38 anderen zusammen. Die alte
+ * Regel haette dieses Gewerk ab der ersten Runde stillgelegt.
+ *
+ * Jetzt gilt: wenn bezahlbar, dann zuerst; sonst geht die Liste vor. Die
+ * Entscheidung steht in `lib/graftwahl.js` und ist dort ohne Spiel geprueft.
  *
  * @param {NS} ns
  */
 
 import { naechstes, fortschritt } from "lib/graftwahl.js";
+import { beantrage as figBeantrage } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
 
 const TAKT_MS = 60000;
 
@@ -125,6 +131,13 @@ export async function main(ns) {
   let abgebrochen = 0;
   let letztesLaufendes = null;
   let letzterGrund = null;
+  let letzteRuecklage = -1;
+  // Stuecke, die graft.js nicht starten konnte - Name -> Zahl der Versuche.
+  // Ueber Rundengrenzen hinweg, aber nicht ueber Prozessgrenzen: nach einem
+  // Neustart darf jedes Stueck wieder zweimal versucht werden, denn die
+  // Ursache kann inzwischen behoben sein (ein Vorgaenger eingebaut, Geld da).
+  const fehlversuche = new Map();
+  let letzteGraftMeldung = 0;
 
   sag("graftauto gestartet. " + plan.reihenfolge.length + " Eintraege im Plan"
     + (plan.vorzug ? ", Vorzug: " + plan.vorzug.name : "") + ".");
@@ -177,6 +190,24 @@ export async function main(ns) {
         const w = ns.singularity.getCurrentWork();
         if (w && w.type === "GRAFTING") laeuft = w.augmentation || "unbekannt";
       } catch { /* nicht lesbar */ }
+
+      // --- DEN ANTRAG ERNEUERN, SOLANGE DER GRAFT LAEUFT --------------------
+      //
+      // DER FALL (Skeptiker Fehlermodi, 04.09.2026). `graft.js` beantragt die
+      // Figur, startet den Graft und BEENDET SICH. Danach erneuert niemand den
+      // Antrag - er laeuft nach zweieinhalb Minuten ab, der Lease nach zwei
+      // Stunden, und dazwischen kann jeder mit hoeherer Prioritaet die Figur
+      // uebernehmen. Ein abgebrochener Graft ist vollstaendig verloren
+      // (`GraftingWork.tsx:75-83` erstattet nicht), beim Simulacrum 450 Mrd.
+      //
+      // Dieses Gewerk laeuft die ganze Graftdauer mit und ist damit der
+      // einzige, der den Antrag halten kann. Es beantragt AUF DEN NAMEN
+      // graft.js - sonst gaebe es zwei Antragsteller fuer dieselbe Handlung,
+      // und die Vergabe wechselte im Minutentakt zwischen ihnen.
+      if (laeuft) {
+        figBeantrage(ns, "graft.js", FIG_PRIO.graft, "graft", laeuft,
+          "laufender Graft, Antrag erneuert");
+      }
 
       // --- Die Beschaeftigungsquote ------------------------------------------
       if (motorJetzt !== null && letzteMotorzeit !== null && motorJetzt >= letzteMotorzeit) {
@@ -242,9 +273,76 @@ export async function main(ns) {
         ...(plan.vorzug && !graftbar.includes(plan.vorzug.name) ? [plan.vorzug.name] : []),
       ];
 
+      // --- Was schon gescheitert ist, wird nicht ewig wiederholt ------------
+      //
+      // DER FALL (Skeptiker Substanz, 04.09.2026): `getGraftableAugmentations`
+      // filtert NICHT nach Voraussetzungen - das tut erst `graftAugmentation`,
+      // und zwar still mit `return false` (`Grafting.ts:76-79` ->
+      // `FactionHelpers.tsx:56-58`). Ein Stueck, dessen Vorgaenger fehlt, steht
+      // also auf der Liste, laesst sich aber nicht graften.
+      //
+      // Und der Vorgaenger fehlt nach JEDEM Knotensprung: `prestigeSourceFile`
+      // setzt `this.augmentations = []`
+      // (`PlayerObjectGeneralMethods.ts:143-175`). Im Plan steht
+      // `LuminCloaking-V2 Skin Implant`, dessen V1 im aktuellen Lauf installiert
+      // ist - im naechsten nicht mehr.
+      //
+      // Ohne diese Sperre meldete das Gewerk jede Minute "Graft gestartet",
+      // graft.js gaebe still `false` zurueck, und niemand laese es. Eine
+      // Endlosschleife am Planende, die nur an der ausbleibenden Zahl im
+      // Bericht auffiele.
+      //
+      // ZWEI FEHLVERSUCHE, nicht einer: der erste kann am Geld liegen, das
+      // zwischen Entscheidung und Ausfuehrung weg war.
+      try {
+        const g = JSON.parse(liesVonHome("data/graft.json") || "{}");
+        if (g && g.wunsch && g.getan === "NICHT gestartet"
+            && Number.isFinite(g.zeit) && g.zeit > letzteGraftMeldung) {
+          letzteGraftMeldung = g.zeit;
+          const n = (fehlversuche.get(g.wunsch) || 0) + 1;
+          fehlversuche.set(g.wunsch, n);
+          sag("graft.js hat " + g.wunsch + " NICHT gestartet (" + n + ". Mal): "
+            + String(g.fehler || "ohne Grund").slice(0, 120));
+          if (n >= 2) {
+            sag("  -> " + g.wunsch + " wird uebersprungen. Meist fehlt eine"
+              + " Voraussetzung; die Liste filtert sie nicht.");
+            ereignis("graft_uebersprungen", g.wunsch);
+          }
+        }
+      } catch { /* kein graft.json - dann gibt es nichts zu lernen */ }
+
+      // Gescheiterte Stuecke zaehlen wie besessen: sie werden uebersprungen,
+      // und der naechste offene Eintrag kommt dran.
+      for (const [name, n] of fehlversuche) if (n >= 2) besitzt.push(name);
+
+      // DIE RUECKLAGE WIRD ABGEZOGEN (Skeptiker Runde 3, W8, 04.09.2026).
+      //
+      // `data/geldbedarf.txt` ist der Kanal, ueber den `bn4rep.js` sagt, wieviel
+      // Geld fuer die naechste Augmentierungsrunde zurueckgelegt ist. Der
+      // Serverkauf im Kern (bn4net.js:1072) und der Programmkauf in bn4life.js
+      // (:263) ziehen ihn ab; das Grafting war der einzige Geldausgeber, der
+      // ihn nicht kannte - und mit Abstand der teuerste.
+      //
+      // Ein Graft ueber der Ruecklage haette also genau das Geld verbraucht,
+      // das fuer den Einbau gedacht war. Der Einbau ist der Schritt, der die
+      // Multiplikatoren mitnimmt; ein Graft ist ein einzelnes Stueck. Im
+      // Zweifel gewinnt der Einbau.
+      let ruecklage = 0;
+      try {
+        ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
+          ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
+      } catch { /* dann ohne Ruecklage - lieber graften als haengen */ }
+      const geldRoh = ns.getServerMoneyAvailable("home");
+      const geldFrei = Math.max(0, geldRoh - ruecklage);
+      if (ruecklage > 0 && ruecklage !== letzteRuecklage) {
+        sag("Ruecklage fuer Augmentierungen: " + (ruecklage / 1e9).toFixed(2)
+          + " Mrd - verfuegbar bleiben " + (geldFrei / 1e9).toFixed(2) + " Mrd.");
+        letzteRuecklage = ruecklage;
+      }
+
       const wahl = naechstes({
         plan, besitzt, preise, dauern,
-        geld: ns.getServerMoneyAvailable("home"),
+        geld: geldFrei,
         etaMin, etaSicher,
         laeuft,
       });

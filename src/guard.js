@@ -95,6 +95,11 @@ export async function main(ns) {
   // dauerhafter Ausschluss schrumpfte das Netz mit jeder Stoerung.
   const gesperrt = new Map();   // "werkzeug|host" -> guardTimeMs des Eintrags
 
+  // Wann eine Sprosse fuer dieses Ziel zuletzt ausgefuehrt wurde. Die
+  // Wirkungspruefung braucht es: eine Telemetriedatei von VOR dem Neustart
+  // beweist nichts.
+  const letzteAusfuehrung = new Map();
+
   // Fuer S2: der Traegerwert beim letzten Vergleich.
   let letzterTraegerWert = null;
   let letzterTraegerMotorMs = null;
@@ -121,7 +126,19 @@ export async function main(ns) {
       // Je Runde gelesen, nicht beim Start: so laesst sich der Waechter
       // scharfstellen und wieder entschaerfen, ohne ihn neu zu starten - und
       // ohne dass er dabei seinen Zustand verliert.
-      const modusRoh = (liesVonHome("data/guard-modus.txt") || "observe").trim();
+      // DIE HANDBREMSE WIRKT SOFORT (Skeptiker Runde 3, Nachtrag, 04.09.2026).
+      //
+      // `data/guard-observe.txt` ist der Riegel, den ein Mensch legt. Ihn nur
+      // in `boot.js` auszuwerten hiesse: er wirkt erst beim naechsten
+      // Wiederanlauf. Ausgerechnet die Notbremse haette also Stunden gebraucht.
+      // Sie wird deshalb HIER gelesen, in derselben Runde, in der sie liegt.
+      //
+      // 0,10 GB (`fileExists`) - der Waechter hat sie, `liesVonHome` benutzt
+      // die Funktion ohnehin.
+      const riegel = ns.fileExists("data/guard-observe.txt", "home");
+      const modusRoh = riegel
+        ? "observe"
+        : (liesVonHome("data/guard-modus.txt") || "observe").trim();
       const scharf = modusRoh === "enforce";
 
       // --- Karenz -------------------------------------------------------------
@@ -164,7 +181,20 @@ export async function main(ns) {
       const lage = {
         node: ri.currentNode,
         verfahren: rolle.verfahren,
-        phase: ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal",
+        // DIE PHASE KOMMT VOM KERN (Skeptiker Runde 3, W6, 04.09.2026).
+        //
+        // Der Waechter kennt den Rechnerpark nicht (getServerNames kostet
+        // 1,05 GB und spraengte sein Budget). Der Kern kennt ihn und zaehlt
+        // einen gekauften Rechner als Ende der Startlage - der Waechter tat
+        // das nicht. Mit gekauftem Rechner und home noch auf 32 GB standen
+        // also zwei verschiedene Phasen nebeneinander, und der Waechter
+        // ueberwachte Gewerke, die der Kern absichtlich nicht mehr startet.
+        //
+        // Jetzt gilt die Zahl des Kerns, solange sein Block frisch ist. Der
+        // eigene Schaetzwert bleibt als Rueckfall - er wird gebraucht, wenn
+        // der Kern gar nicht laeuft, und genau dann ist der Waechter dran.
+        phase: kernPhaseFrisch(kern, wall)
+          || (ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"),
         dateiDa: (d) => ns.fileExists(d, "home"),
       };
       const eintraege = auswahl(registry, lage).map((e) => ({
@@ -230,6 +260,7 @@ export async function main(ns) {
 
           if (scharf) {
             sag("SPROSSE " + r.sprosse.nr + " auf " + r.ziel + ": " + r.sprosse.name);
+            letzteAusfuehrung.set(r.ziel, wall);
             const erg = fuehreAus(ns, r, eintraege, gesperrt, sag);
             eintrag.ausgefuehrt = erg.getan;
             eintrag.details = erg.text;
@@ -245,7 +276,11 @@ export async function main(ns) {
           // wurde ja nichts getan, also darf der Waechter auch nicht
           // eskalieren. Sonst liefe er in einer Nacht bis EXHAUSTED hoch und
           // meldete am Morgen eine Erschoepfung, die er selbst erzeugt hat.
-          const gruen = !scharf ? true : wirkungGruen(r, eintraege, kern);
+          const gruen = !scharf ? true
+            : wirkungGruen(r, eintraege, kern, {
+              wall,
+              ausgefuehrtWall: letzteAusfuehrung.get(r.ziel) || 0,
+            });
           const v = verifiziert(leiter, r.ziel, gruen, uhren.guardTimeMs);
           sag("Wirkung " + (gruen ? "gruen" : "rot") + " fuer " + r.ziel
             + " -> " + v.zustand);
@@ -280,12 +315,62 @@ export async function main(ns) {
  * das pruefbar statt nur gefordert. Ein Motor, der jede Runde wirft, zaehlt
  * `round` weiter und saehe sonst geheilt aus.
  */
-function wirkungGruen(r, eintraege, kern) {
+/**
+ * Hat die Sprosse gewirkt?
+ *
+ * FRISCHE, NICHT EXISTENZ (Skeptiker Fehlermodi, 04.09.2026).
+ *
+ * Hier stand `!!(t && t.telemetrie)` - die Datei liegt da. Sie liegt aber auch
+ * da, wenn das Werkzeug seit einer Stunde nichts schreibt; genau das WAR ja
+ * der Befund, der die Sprosse ausgeloest hat. Gruen war die Pruefung damit
+ * ausgerechnet dann, wenn eskaliert werden muesste.
+ *
+ * Gemessen im Trockenlauf: Sprosse 1 sechsmal in 28 Minuten, dann der Deckel,
+ * dann fuenfeinhalb Stunden Pause, dann wieder sechsmal - fuer ein Werkzeug,
+ * das nie zurueckkam.
+ *
+ * Geprueft wird jetzt dasselbe wie in S1, mit derselben Uhrenkaskade: die
+ * Telemetrie muss JUENGER sein als die Frist des Eintrags. Und zusaetzlich
+ * mindestens so jung wie der Zeitpunkt, an dem die Sprosse ausgefuehrt wurde -
+ * eine Datei von VOR dem Neustart beweist gar nichts.
+ */
+/**
+ * Die Phase des Kerns - aber nur, wenn sein Block frisch ist.
+ *
+ * Ein liegengebliebener Block aus dem VORIGEN Knoten wuerde sonst "normal"
+ * behaupten, waehrend home nach dem Sprung wieder auf 32 GB steht. Genau in
+ * dem Fenster ist der Waechter allein zustaendig, und dann gilt sein eigener
+ * Schaetzwert.
+ */
+function kernPhaseFrisch(kern, wall) {
+  if (!kern || (kern.phase !== "kaltstart" && kern.phase !== "normal")) return null;
+  const w = Number.isFinite(kern.wall) ? kern.wall : (Number.isFinite(kern.zeit) ? kern.zeit : 0);
+  return (w > 0 && wall - w <= 15 * 60000) ? kern.phase : null;
+}
+
+function wirkungGruen(r, eintraege, kern, lage) {
   if (r.ziel === "kern") {
+    // Fuer den Kern gilt weiter: er zaehlt UND wirft nicht. Ein bloss
+    // zaehlender `round` ist kein Fortschrittsbeleg, deshalb `errStreak === 0`
+    // daneben.
     return !!kern && Number.isFinite(kern.okRound) && kern.errStreak === 0;
   }
   const t = eintraege.find((x) => x.name === r.ziel);
-  return !!(t && t.telemetrie);
+  if (!t || !t.telemetrie) return false;
+
+  const tm = t.telemetrie;
+  const frist = t.freshnessMs ?? 600000;
+  // Ein Werkzeug, das ausdruecklich wartet, ist geheilt - es laeuft ja.
+  if (tm.state === "wait" || tm.state === "done" || tm.state === "blocked") return true;
+
+  const w = [tm.ts, tm.wall, tm.zeit].find((x) => Number.isFinite(x));
+  if (!Number.isFinite(w)) return false;
+
+  // Juenger als die Frist UND juenger als die Ausfuehrung. Der zweite Teil ist
+  // der wichtige: sonst genuegte eine Datei, die schon vor dem Neustart da war.
+  const ausfuehrung = lage && Number.isFinite(lage.ausgefuehrtWall)
+    ? lage.ausgefuehrtWall : 0;
+  return (lage.wall - w) <= frist && w >= ausfuehrung;
 }
 
 /** Schreibt Uhren, Leiterzustand und Strafenprotokoll - drei getrennte Dateien. */

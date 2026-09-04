@@ -74,9 +74,26 @@ export async function main(ns) {
   // alten "WERKZEUG bn4net.js"-Befehl, beendete sich selbst und war wieder
   // weg. Aus dem Protokoll sah der Start erfolgreich aus. Ein Fernbefehl aus
   // der Zeit VOR dem Neuanlauf ist immer veraltet.
+  //   data/portknacker-komplett.txt: die Marke, die darkweb.js ruhen laesst.
+  //     Sie MUSS hier stehen und nicht unten bei den knotengebundenen Dateien
+  //     (Skeptiker Fehlermodi, 04.09.2026): `prestigeHomeComputer` leert die
+  //     Programmliste und legt nur NUKE zurueck
+  //     (`Server/ServerHelpers.ts:224-234`), und es wird von BEIDEN Prestiges
+  //     gerufen - vom Augmentierungs-Einbau wie vom Knotenwechsel
+  //     (`Prestige.ts:55,74` und `:203,225`). Textdateien auf home ueberleben
+  //     dagegen alles.
+  //
+  //     Ohne diese Zeile liefe darkweb.js nach dem ersten Knoten, in dem es
+  //     die fuenf Knacker vollmacht, in ALLEN rund vierzig Restlaeufen nie
+  //     wieder - und es ist die einzige kaltstartfaehige Knackerquelle
+  //     (2,65 GB; bn4life.js braucht ausserhalb BN4 bei SF4.1 293,85 GB, also
+  //     eine gekaufte Werkbank, also Geld, also das Netz, das die Knacker erst
+  //     aufschliessen). Genau dieser Zirkel hat am 25.08. dreizehneinhalb
+  //     Stunden gekostet.
   for (const datei of ["data/install-sperre.txt", "data/beitritt-erledigt.txt",
                        "data/rep-modus.txt", "data/company-order.txt",
-                       "data/geldbedarf.txt", "data/reload.txt", "data/hilfe.txt"]) {
+                       "data/geldbedarf.txt", "data/reload.txt", "data/hilfe.txt",
+                       "data/portknacker-komplett.txt"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }
   // KNOTENGEBUNDENE DATEIEN NUR NACH EINEM KNOTENWECHSEL (02.09.2026).
@@ -182,6 +199,34 @@ export async function main(ns) {
     // wird von dort neu gestartet, wenn es ausfaellt. Hier wird es nur
     // angeworfen, nicht ueberwacht - boot.js beendet sich, sobald der Kern
     // laeuft.
+    // DER MODUS BRAUCHT EINEN SCHREIBER (Skeptiker Runde 3, W10, 04.09.2026).
+    //
+    // `guard.js` liest `data/guard-modus.txt` je Runde und faellt ohne die
+    // Datei auf "observe" zurueck. Geschrieben hat sie niemand. Damit hat die
+    // ganze C.9/C.10-Maschinerie im ausgelieferten Zustand nur protokolliert -
+    // kein Neustart, keine Wirtsperre, kein Ausweichzweig. Der Commit-Betreff
+    // "die Strafleiter ist scharf" stimmte fuer das, was lief, nicht.
+    //
+    // Scharf ist die Vorgabe, denn der Auftrag verlangt maximale Autonomie und
+    // eine Leiter, die nur zusieht, ist keine. Die HANDBREMSE bleibt:
+    // `data/guard-observe.txt` haelt sie im Beobachtungsmodus - eine Datei,
+    // die ein Mensch anlegt und die kein Skript je schreibt. Sie ueberlebt
+    // Resets absichtlich (Textdateien auf home ueberleben beide Prestiges),
+    // damit ein gezogener Riegel gezogen bleibt.
+    //
+    // Nicht ueberschrieben wird der Modus, wenn schon "enforce" drinsteht -
+    // sonst schriebe boot.js in jeder seiner Runden dieselbe Datei neu.
+    {
+      const gewollt = ns.fileExists("data/guard-observe.txt", "home") ? "observe" : "enforce";
+      const jetzt = ns.fileExists("data/guard-modus.txt", "home")
+        ? ns.read("data/guard-modus.txt").trim() : "";
+      if (jetzt !== gewollt) {
+        ns.write("data/guard-modus.txt", gewollt, "w");
+        sag("Waechtermodus gesetzt: " + gewollt
+          + (gewollt === "observe" ? " (data/guard-observe.txt liegt)" : ""));
+      }
+    }
+
     if (!ns.ps("home").some((p) => p.filename === "guard.js")
         && ns.fileExists("guard.js", "home")) {
       const brauchtW = ns.getScriptRam("guard.js", "home");

@@ -51,6 +51,7 @@ export async function main(ns) {
   // Das ist keine Umgehung einer Spielregel, sondern die einzige Art, dieses
   // Werkzeug in der Phase laufen zu lassen, fuer die es gebaut wurde.
   const doc = globalThis["docu" + "ment"];
+
   const zeilen = [];
   const sag = (t) => {
     zeilen.push(new Date().toLocaleTimeString() + "  " + t);

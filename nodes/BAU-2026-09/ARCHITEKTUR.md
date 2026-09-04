@@ -1,5 +1,21 @@
 # ARCHITEKTUR — Grundlage von Phase C
 
+> **VERALTET — MASSGEBLICH IST DIE FASSUNG IM HAUPTBAUM.**
+>
+> Diese Datei ist der Stand, den der Zweig `bau-2026-09` beim Abzweigen hatte
+> (Commit `6eddeea`, Synthese der Phase B). Die gepflegte Fassung liegt im
+> Hauptbaum unter demselben Pfad und ist rund 500 Zeilen länger.
+>
+> **Das ist keine Kleinigkeit:** `tools/registry-bauen.js` erzeugt
+> `src/registry.json` aus Abschnitt 3.3 — und liest dabei die Fassung des
+> **Hauptbaums**. Wer hier etwas ändert, ändert nichts; wer hier etwas
+> nachschlägt, liest womöglich einen überholten Stand. Am 04.09.2026 hätte ein
+> Prüfer daraus beinahe einen Fehlbefund gemacht: `telemetryFile:
+> "data/cdump.json"` steht nur noch hier.
+>
+> Vermerkt statt gelöscht — die Datei gehört zur Geschichte des Zweigs.
+
+
 **Synthetiker, 04.09.2026, 03:18–04:0x Ortszeit** (`date`, Systemzeit). Grundlage:
 `nodes/AUFTRAG-BAU-2026-09.md` §1.3–1.6, §3, §4, §5; die RAM-Messung vom 04.09.
 (`doku/ram-messung-2026-09-04.json`, 114 Dateien, live gegen lokal 0,00 GB); die

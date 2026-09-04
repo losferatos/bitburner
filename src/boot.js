@@ -117,6 +117,14 @@ export async function main(ns) {
                        "data/portknacker-komplett.txt",
                        "data/preise.json", "data/kaufauftrag.json",
                        "data/kaufergebnis.json",
+                       // Der Stummzaehler der Vertragskette (Skeptiker Runde 5,
+                       // B2). Er zaehlt AUFEINANDERFOLGENDE Laeufe - ein Wert
+                       // aus der Zeit vor einem Neustart beschreibt eine andere
+                       // Lage. Ohne diese Zeile ueberlebte er jeden Boot, jeden
+                       // Einbau und jeden Sprung, und `cdump.js` (nur
+                       // Kaltstartphase) konnte ihn danach nie wieder auf null
+                       // setzen.
+                       "data/cdump-stand.json", "data/contracts.json",
                        "data/blocked-hosts.json"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }

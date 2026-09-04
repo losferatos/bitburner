@@ -55,6 +55,23 @@
  * Zaehler fuer den einzigen Fehlermodus, den man sonst nicht sieht: es findet
  * Vertraege, loest keinen davon, und stuerzt dabei nicht ab. Siehe unten.
  *
+ * SIE IST AUSDRUECKLICH KEINE `telemetryFile` (Skeptiker Runde 5, W1,
+ * 04.09.2026). Zwischenzeitlich stand sie als solche in der Registry, und
+ * das war ein Fehler mit Folgen:
+ *
+ * `signale()` in `lib/leiter.js` kennt keine Prozessliste. S1 feuert auf
+ * veraltete Telemetrie, unabhaengig davon, ob das Werkzeug ueberhaupt
+ * laeuft. Beide Vertragsgewerke sind aber kurzlebige Einmallaeufer: ihre
+ * Datei bleibt nur frisch, SOLANGE DER KERN SIE NACHSTARTET. "Kern tot"
+ * und "Telemetrie alt" sind fuer sie dasselbe Ereignis - und der Waechter
+ * haette es als Schuld des Gewerks gelesen: S1 -> Sprosse 1 -> "laeuft
+ * nirgends" -> Fehlstrafe. `false_penalty_count` hat Soll 0 und ist die
+ * Bedingung, unter der die Leiter ueberhaupt scharf gestellt wird.
+ *
+ * Und der Eintrag kauft nichts: der Kern liest diese Datei ueber ihren
+ * Literalpfad, nicht ueber die Registry. Der ganze Nutzen bleibt, der
+ * Fehlstrafenpfad entfaellt.
+ *
  * ===========================================================================
  * WAS NICHT GERATEN WIRD
  * ===========================================================================
@@ -158,10 +175,23 @@ export async function main(ns) {
     // NACH HOME KOPIEREN (Skeptiker Fehlermodi, 04.09.2026).
     //
     // Die Vorbedingung von `csolve.js` prueft `data/cantwort.json` auf HOME -
-    // `dateiDa` im Kern schaut nirgends sonst hin. Legt der Starter `cdump.js`
-    // auf einen Ausweichwirt (und das tut er, sobald home voll ist), bliebe
-    // die Datei dort liegen: `csolve.js` liefe nie, die Rotation ruecke nicht
-    // vor, und `cdump.js` loeste dieselben Vertraege endlos neu. Lautlos.
+    // `dateiDa` im Kern schaut nirgends sonst hin. Laege `cdump.js` auf einem
+    // Ausweichwirt, bliebe die Datei dort: `csolve.js` liefe nie, die Rotation
+    // ruecke nicht vor, und `cdump.js` loeste dieselben Vertraege endlos neu.
+    // Lautlos.
+    //
+    // ZWEI STELLEN WIDERSPRACHEN SICH (Skeptiker Runde 5, K3). Hier stand
+    // "und das tut er, sobald home voll ist". Das stimmt seit dem 04.09.2026
+    // nicht mehr: `hostRule: "home"` bindet wirklich, der Kern legt dieses
+    // Gewerk nirgendwo anders hin (gemessen an `darkweb.js`, das vorher auf
+    // joesguns landete). Der Zweig ist damit totes Netz - er bleibt stehen,
+    // weil `scp` und `getHostname` ohnehin im Budget stehen und ihn zu
+    // entfernen nichts spart.
+    //
+    // Der Unterschied ist nicht kosmetisch: waere die alte Aussage wahr,
+    // laese `stummeRunden` weiter unten auf dem Ausweichwirt einen leeren
+    // Vorstand und faenge still bei null an - ein Wirtwechsel wuerde die
+    // Zaehlung unsichtbar zuruecksetzen.
     //
     // Die Registry sagt das seit jeher (`scpToHome: true`) - nur las es
     // niemand.
@@ -199,17 +229,31 @@ export async function main(ns) {
   // wird der Vorstand gelesen. `ns.read` kostet null Gigabyte und liefert bei
   // fehlender Datei den leeren String; `ns.fileExists` (0,10 GB) waere hier
   // nicht bezahlbar - `cdump.js` hat im Kaltstart 0,20 GB Luft.
+  // Warum welche Vertraege ausgelassen wurden, nach Grund gebuendelt. Ohne
+  // das sieht man DASS nichts durchkommt, aber nicht WO es klemmt.
+  const gruende = {};
+  for (const a of ausgelassen) gruende[a.grund] = (gruende[a.grund] || 0) + 1;
+
+  // DER AUSLOESER IST DER GRUND, NICHT DIE ROHE NULL (Skeptiker Runde 5, W3).
+  //
+  // Zuerst stand hier `gefunden > 0 && geloest === 0`. Das zaehlt auch
+  // Situationen mit, in denen alles richtig laeuft: ein Typ ohne Loeser, ein
+  // Vertrag ohne Versuche, eine Sperre nach einer Ablehnung. Die Zahl haette
+  // dauerhaft ueber der Schwelle gestanden, ohne dass etwas kaputt ist - und
+  // eine Kennzahl mit Soll 0, die im Normalbetrieb anschlaegt, wird nach drei
+  // Tagen ignoriert.
+  //
+  // Gesucht ist EIN Fall: die Gegenprobe lehnt eine Antwort ab, die der Loeser
+  // selbst errechnet hat. Der steht seit jeher in `gruende` - er wurde nur
+  // nicht gelesen.
+  const abgelehnt = gruende["Gegenprobe fehlgeschlagen"] || 0;
+
   let stummeRunden = 0;
   try {
     const vor = JSON.parse(ns.read("data/cdump-stand.json") || "{}");
     if (Number.isFinite(vor.stummeRunden)) stummeRunden = vor.stummeRunden;
   } catch { /* erster Lauf oder unlesbar - dann faengt die Zaehlung bei 0 an */ }
-  stummeRunden = (roh.length > 0 && antworten.length === 0) ? stummeRunden + 1 : 0;
-
-  // Warum welche Vertraege ausgelassen wurden, nach Grund gebuendelt. Ohne
-  // das sieht man DASS nichts durchkommt, aber nicht WO es klemmt.
-  const gruende = {};
-  for (const a of ausgelassen) gruende[a.grund] = (gruende[a.grund] || 0) + 1;
+  stummeRunden = (abgelehnt > 0 && antworten.length === 0) ? stummeRunden + 1 : 0;
 
   ns.write("data/cdump-stand.json", JSON.stringify({
     ts: Date.now(),
@@ -217,6 +261,7 @@ export async function main(ns) {
     geloest: antworten.length,
     ausgelassen: ausgelassen.length,
     gruende,
+    abgelehnt,
     stummeRunden,
   }), "w");
   if (ns.getHostname() !== "home") {

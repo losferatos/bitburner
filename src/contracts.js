@@ -83,6 +83,23 @@ const HALTFILE = "data/contracts-halt.txt";
  *
  * `data/contracts.txt` gibt es weiterhin, aber das ist Fliesstext fuer
  * Menschen. Diese Datei ist fuer Maschinen.
+ *
+ * SIE IST AUSDRUECKLICH KEINE `telemetryFile` (Skeptiker Runde 5, W1,
+ * 04.09.2026). Zwischenzeitlich stand sie als solche in der Registry, und
+ * das war ein Fehler mit Folgen:
+ *
+ * `signale()` in `lib/leiter.js` kennt keine Prozessliste. S1 feuert auf
+ * veraltete Telemetrie, unabhaengig davon, ob das Werkzeug ueberhaupt
+ * laeuft. Beide Vertragsgewerke sind aber kurzlebige Einmallaeufer: ihre
+ * Datei bleibt nur frisch, SOLANGE DER KERN SIE NACHSTARTET. "Kern tot"
+ * und "Telemetrie alt" sind fuer sie dasselbe Ereignis - und der Waechter
+ * haette es als Schuld des Gewerks gelesen: S1 -> Sprosse 1 -> "laeuft
+ * nirgends" -> Fehlstrafe. `false_penalty_count` hat Soll 0 und ist die
+ * Bedingung, unter der die Leiter ueberhaupt scharf gestellt wird.
+ *
+ * Und der Eintrag kauft nichts: der Kern liest diese Datei ueber ihren
+ * Literalpfad, nicht ueber die Registry. Der ganze Nutzen bleibt, der
+ * Fehlstrafenpfad entfaellt.
  */
 const STANDFILE = "data/contracts.json";
 // Ueber dieser Groesse wird das Protokoll vorn gekuerzt. ns.write im
@@ -227,11 +244,41 @@ export async function main(ns) {
   const gesperrteTypen = new Set();
   const abgelehnteVertraege = new Set();
   let ablehnungen = 0;
-  // Aufeinanderfolgende Durchlaeufe mit Fund, aber ohne Loesung (R27).
+
+  // AUFEINANDERFOLGENDE DURCHLAEUFE - UEBER PROZESSGRENZEN HINWEG
+  // (Skeptiker Runde 5, B1, 04.09.2026).
+  //
+  // Hier stand `let stummeRunden = 0`, prozesslokal. Das konnte nie ueber 1
+  // steigen: die Registry startet dieses Gewerk ohne `--loop`
+  // (`registry.json`, "args": []), und ohne die Angabe endet die Schleife nach
+  // EINEM Durchlauf (`if (!schleife) break;`). Der Zaehler wurde also in jedem
+  // Prozess neu bei null angefangen und beim naechsten Start weggeworfen.
+  //
+  // Die Schwelle im Kern liegt bei 3. Die Normalbetriebs-Haelfte von R27 war
+  // damit tot geboren - gemeldet haette ausschliesslich `cdump.js`, ein
+  // Gewerk der Kaltstartphase.
+  //
+  // Gelesen wird wie in `cdump.js` der Vorstand. `ns.read` kostet null
+  // Gigabyte und liefert bei fehlender Datei den leeren String.
+  //
+  // GELESEN WIRD DER LOKALE STAND, nicht der auf home. Dieses Gewerk laeuft
+  // auf der Werkbank (`hostRule: "werkbank"`), und `ns.read` ohne Wirt liest
+  // dort. Wechselt die Werkbank, faengt die Zaehlung bei null an - das ist
+  // richtig so: ein Wirtwechsel heisst Neustart, und "drei Durchlaeufe in
+  // Folge" bezieht sich auf einen Lauf, nicht auf eine Lebenszeit. Der Kern
+  // liest die nach home kopierte Fassung.
   let stummeRunden = 0;
+  try {
+    const vor = JSON.parse(ns.read(STANDFILE) || "{}");
+    if (Number.isFinite(vor.stummeRunden)) stummeRunden = vor.stummeRunden;
+  } catch { /* erster Lauf oder unlesbar */ }
 
   for (;;) {
-    const zaehler = { gefunden: 0, geloest: 0, uebersprungen: 0, fehlgeschlagen: 0 };
+    const zaehler = { gefunden: 0, geloest: 0, uebersprungen: 0, fehlgeschlagen: 0,
+      // Antworten, die der eigene Loeser errechnet und die eigene Gegenprobe
+      // verworfen hat. Das ist das Signal fuer eine zu strenge Probe - und es
+      // ist etwas anderes als `uebersprungen`.
+      gegenprobeAbgelehnt: 0 };
     const rechnerliste = nurRechner ? [nurRechner] : alleRechner(ns);
     let genug = false;
 
@@ -346,6 +393,10 @@ export async function main(ns) {
         if (!bestanden) {
           protokoll("VERWORFEN " + kopf + "  -> Gegenprobe fehlgeschlagen, Antwort=" + kurz(antwort));
           zaehler.uebersprungen++;
+          // Eigens gezaehlt (R27): das ist der Fall, in dem der eigene Loeser
+          // gerechnet hat und die eigene Gegenprobe das Ergebnis verwirft.
+          // Alles andere unter `uebersprungen` ist ein bewusstes Auslassen.
+          zaehler.gegenprobeAbgelehnt++;
           continue;
         }
 
@@ -418,10 +469,17 @@ export async function main(ns) {
     // ab. Er entsteht, wenn eine Gegenprobe in `lib/loeser.js` strenger ist
     // als das Spiel - fuenf solcher Proben wurden am 04.09.2026 gefunden.
     //
-    // `uebersprungen` allein taugt dafuer nicht: es zaehlt auch Vertraege,
-    // die absichtlich liegen bleiben (gesperrter Typ, schon abgelehnt,
-    // Hoechstzahl erreicht). Deshalb die Bedingung auf `geloest === 0`.
-    if (zaehler.gefunden > 0 && zaehler.geloest === 0) stummeRunden++;
+    // DER AUSLOESER IST DIE ABGELEHNTE GEGENPROBE, NICHT "nichts geloest"
+    // (Skeptiker Runde 5, W3).
+    //
+    // `zaehler.gefunden` wird VOR jedem Filter hochgezaehlt - vor `--type`,
+    // vor der Typsperre, vor der Loeserwahl, vor der guard-Grenze. Ein
+    // korrekt gesperrter Typ erzeugt damit dauerhaft "gefunden > 0, geloest
+    // 0", obwohl die Sperre genau das Richtige tut.
+    //
+    // Gesucht ist der eine Fall, den R27 meint: die Gegenprobe lehnt eine
+    // Antwort ab, die der eigene Loeser errechnet hat.
+    if (zaehler.gegenprobeAbgelehnt > 0 && zaehler.geloest === 0) stummeRunden++;
     else stummeRunden = 0;
 
     try {
@@ -431,6 +489,7 @@ export async function main(ns) {
         geloest: zaehler.geloest,
         uebersprungen: zaehler.uebersprungen,
         fehlgeschlagen: zaehler.fehlgeschlagen,
+        gegenprobeAbgelehnt: zaehler.gegenprobeAbgelehnt,
         ablehnungen,
         gesperrteTypen: [...gesperrteTypen],
         stummeRunden,

@@ -4387,6 +4387,9 @@ export async function main(ns) {
         // Kern schreibt die Tafel - so bleibt kpi.json bei einem Schreiber.
         // `null` bleibt `null`: ein Waechter, der nicht laeuft, hat nicht
         // "null Fehlstrafen", sondern gar nicht gezaehlt.
+        if (w && Number.isFinite(w.false_kill_count)) {
+          k.false_kill_count = w.false_kill_count;
+        }
         if (w && Number.isFinite(w.false_penalty_count)) {
           k.false_penalty_count = w.false_penalty_count;
         }
@@ -4488,6 +4491,16 @@ export async function main(ns) {
         for (const datei of ["data/cdump-stand.json", "data/contracts.json"]) {
           if (!ns.fileExists(datei, "home")) continue;
           const d = JSON.parse(ns.read(datei));
+          // ALTERSPRUEFUNG (Skeptiker Runde 5, B2). Ohne sie friert ein
+          // einziger Klemmzustand die Zahl fuer immer ein: `cdump.js` laeuft
+          // nur im Kaltstart, und nach dem ersten gekauften Rechner kann
+          // niemand mehr null hineinschreiben. `contracts_silent_rounds`
+          // meldete dann bis zum Ende der Route einen laengst behobenen
+          // Fehler - in JEDEM weiteren BitNode.
+          //
+          // Sechs Stunden Wanduhr. Die Gewerke takten alle fuenf Minuten; was
+          // aelter ist, gehoert zu einer anderen Lage.
+          if (!Number.isFinite(d.ts) || jetzt - d.ts > 6 * 3600000) continue;
           if (Number.isFinite(d.stummeRunden)) {
             stumm = stumm === null ? d.stummeRunden : Math.max(stumm, d.stummeRunden);
           }
@@ -4496,6 +4509,13 @@ export async function main(ns) {
           k.contracts_silent_rounds = stumm;
           // Drei Durchlaeufe in Folge sind kein Zufall mehr. Einmal melden,
           // nicht in jeder Runde - `evMerker` haelt fest, ob es schon heraus ist.
+          // EIN EREIGNIS JE KERNPROZESS, und das ist Absicht (Skeptiker
+          // Runde 5, K2). Der Ruecksetzer unten greift nur bei exakt 0; faellt
+          // `stumm` von 5 auf 2 (cdump loest wieder, contracts faengt an),
+          // bleibt der Merker stehen. Das ist die richtige Richtung: der
+          // Befund lautet "eine Gegenprobe klemmt", und den zweimal in einer
+          // Stunde zu melden hilft niemandem. Sobald wirklich alles wieder
+          // durchlaeuft, faellt die Zahl auf 0 und der Merker mit ihr.
           if (stumm >= 3 && !evMerker.stummGemeldet) {
             evMerker.stummGemeldet = true;
             ereignis("contract_stumm",

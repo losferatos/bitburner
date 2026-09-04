@@ -127,6 +127,11 @@ export async function main(ns) {
   // der Kern uebernimmt sie in die Kennzahlentafel - der Waechter schreibt
   // kpi.json nicht selbst, das taeten dann zwei.
   let fehlstrafen = 0;
+  // FEHLKILLS (04.09.2026). Der zweite Abnahmezaehler mit Soll 0, der bis
+  // heute keinen Schreiber hatte. Er zaehlt etwas ANDERES als fehlstrafen:
+  // dort griff die Sprosse ins Leere, hier hat sie getroffen - nur war das
+  // Getroffene gesund. Die Definition steht bei `andereUhrSagtFrisch`.
+  let fehlkills = 0;
 
   let runden = 0;
   let errStreak = 0;
@@ -456,6 +461,21 @@ export async function main(ns) {
               sag("FEHLSTRAFE: Sprosse " + r.sprosse.nr + " auf " + r.ziel
                 + " griff ins Leere (" + fehlstrafen + " in diesem Lauf).");
             }
+            // FEHLKILL: die Sprosse hat GETROFFEN, aber eine andere Uhr haelt
+            // dasselbe Werkzeug fuer frisch. Nur Sprosse 1 - sie ist die
+            // einzige, die ein einzelnes Werkzeug beendet.
+            if (erg.getan === true && r.sprosse.nr === 1) {
+              const andere = andereUhrSagtFrisch(
+                (eintraege || []).find((x) => x.name === r.ziel),
+                { wall, playtime: spieler.totalPlaytime, motorTimeMs,
+                  sichtbar });
+              if (andere.length) {
+                fehlkills++;
+                eintrag.fehlkill = andere;
+                sag("FEHLKILL: " + r.ziel + " galt nach " + andere.join(" und ")
+                  + " als frisch (" + fehlkills + " in diesem Lauf).");
+              }
+            }
             // Jetzt erst steht fest, was wirklich geschah (R4).
             //
             // Fuer Sprosse 5 heisst `getan` allerdings nur "Auftrag gestellt" -
@@ -521,6 +541,7 @@ export async function main(ns) {
         modus: modusRoh, karenz: false, motorTimeMs,
         letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
         fehlstrafen,
+        fehlkills,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -681,6 +702,9 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     letzteAusfuehrung: lage.letzteAusfuehrung || {},
     // Der Zaehler fuer false_penalty_count (R11). Der Kern liest ihn.
     false_penalty_count: lage.fehlstrafen ?? null,
+    // Der zweite Abnahmezaehler mit Soll 0 (04.09.2026). Siehe
+    // `andereUhrSagtFrisch` - gezaehlt wird nur, was belegbar falsch ist.
+    false_kill_count: lage.fehlkills ?? null,
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block
     // ungueltig, und der Kern wuerde den Waechter zu Recht fuer tot halten.
@@ -747,6 +771,59 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
  * @param {Function} sag
  * @returns {{getan: boolean, text: string}}
  */
+/**
+ * WAR DIESER KILL EINE FEHLENTSCHEIDUNG?
+ *
+ * `false_kill_count` hat Soll 0 und ist Abnahmebedingung (Auftrag 5.2). Bis
+ * zum 04.09.2026 hatte die Zahl keinen Schreiber - sie stand dauerhaft auf
+ * null und war damit unfaelschbar, genau wie `false_penalty_count` vorher.
+ *
+ * DIE DEFINITION IST ENG, UND ZWAR ABSICHTLICH.
+ *
+ * `signale` waehlt fuer S1 EINE Uhr aus dreien, in fester Reihenfolge:
+ * Motorzeit, wenn das Werkzeug sie wirklich fuehrt; sonst Enginezeit; sonst
+ * Wanduhr (und die nur bei sichtbarem Tab). Gezaehlt wird hier der Fall, dass
+ * eine ANDERE dieser Uhren dasselbe Werkzeug fuer FRISCH haelt.
+ *
+ * Das ist kein Randfall, sondern die Fehlerklasse, die dieses Projekt am
+ * haeufigsten getroffen hat: gegen die falsche Uhr gemessen. Ein Beispiel, das
+ * wirklich vorkommen kann - der Kern haengt, seine Motorzeit steht, und ein
+ * Werkzeug, das Motorzeit mitschreibt, sieht dadurch alt aus, obwohl sein
+ * eigener Herzschlag (Enginezeit) im Sekundentakt frisch ist. Der Waechter
+ * erschlaegt dann ein gesundes Werkzeug, weil der KERN steht.
+ *
+ * Was NICHT gezaehlt wird: ein Kill, den keine Uhr fuer falsch haelt. Der kann
+ * trotzdem unnoetig gewesen sein - aber das waere geraten, und eine geratene
+ * Abnahmezahl ist schlimmer als gar keine.
+ *
+ * @returns {string[]} die Uhren, die das Werkzeug fuer frisch halten
+ */
+function andereUhrSagtFrisch(eintrag, lage) {
+  if (!eintrag || !eintrag.telemetrie) return [];
+  const tm = eintrag.telemetrie;
+  const frist = eintrag.freshnessMs ?? 600000;
+  const frisch = [];
+
+  const pruefe = (name, jetzt, dann) => {
+    if (!Number.isFinite(jetzt) || !Number.isFinite(dann) || dann <= 0) return;
+    const alter = jetzt - dann;
+    if (alter >= 0 && alter <= frist) frisch.push(name);
+  };
+
+  pruefe("Motorzeit", lage.motorTimeMs, tm.motorTimeMs);
+  pruefe("Enginezeit", lage.playtime, tm.playtime);
+  // Die Wanduhr zaehlt nur bei sichtbarem Tab - im verdeckten laeuft sie
+  // weiter, waehrend das Spiel gedrosselt ist. Sie wuerde dort JEDES Werkzeug
+  // fuer alt halten und koennte deshalb nie "frisch" melden; sie hier ohne
+  // die Bedingung zu fragen, hiesse eine Uhr zu befragen, die den gesuchten
+  // Fall gar nicht anzeigen kann.
+  if (lage.sichtbar !== false) {
+    const w = [tm.ts, tm.wall, tm.zeit].find((x) => Number.isFinite(x));
+    pruefe("Wanduhr", lage.wall, w);
+  }
+  return frisch;
+}
+
 function fuehreAus(ns, r, eintraege, gesperrt, sag, lage) {
   const nr = r.sprosse.nr;
 

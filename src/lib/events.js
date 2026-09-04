@@ -57,10 +57,18 @@ export const ARTEN = {
   blocked: { bleibt: false, text: "blockiert" },
   error: { bleibt: false, text: "Ausnahme" },
   gate: { bleibt: true, text: "Tor erreicht" },
-  // R27: die Vertragskette findet Vertraege und loest keinen. Sie BLEIBT im
-  // Puffer - es ist ein Befund ueber die Loeser selbst, und wer ihn spaeter
-  // sucht, sucht ihn Tage danach.
-  contract_stumm: { bleibt: true, text: "Vertragskette stumm" },
+  // R27: die Vertragskette lehnt ihre eigenen Antworten ab.
+  //
+  // SIE BLEIBT NICHT (Skeptiker Runde 5, B2). Zuerst stand hier
+  // `bleibt: true`. Der bleibende Teil des Ringpuffers hat 60 Plaetze, und die
+  // teilt sich diese Art mit `jump`, `install`, `penalty` und `gate` - der
+  // Deckel ist ausdruecklich auf "40 Spruenge, die ganze Restroute" bemessen.
+  // Da der Merker je KERNPROZESS lebt, haette jeder Boot, jeder Einbau und
+  // jede Sprosse 3 einen weiteren bleibenden Eintrag erzeugt und die Spruenge
+  // verdraengt, aus denen `jump_latency_min` und `queued_augs_at_jump`
+  // gerechnet werden. Eine Soll-0-Kennzahl haette dann leiser gelesen als die
+  // Wahrheit.
+  contract_stumm: { bleibt: false, text: "Vertragskette stumm" },
   bridge: { bleibt: false, text: "Bruecke" },
   note: { bleibt: false, text: "Vermerk" },
 };

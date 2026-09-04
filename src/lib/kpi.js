@@ -61,7 +61,19 @@ export const FELDER = {
   motorTimeSinceAugMs: { einheit: "ms", uhr: "motor", soll: null, art: "zahl", klasse: "lauf" },
 
   // --- Autonomie (Ziel null bzw. unter Schwelle) ----------------------------
-  manual_actions: { einheit: "Zahl je Lauf", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
+  // AUSSERHALB DES SPIELS GEMESSEN (04.09.2026), und das ist keine Bequemlichkeit.
+  //
+  // Der Kern laeuft IM Spiel. Er kann nicht sehen, dass eine Datei von aussen
+  // hineingeschrieben wurde - fuer ihn sieht ein Hot-Swap aus wie eine Datei,
+  // die schon immer so war. Die Bruecke ist der einzige Weg hinein und damit
+  // die einzige Stelle, an der sich ein Eingriff bemerken laesst.
+  //
+  // `quelle: "bruecke"` sagt `tools/kpi-luecken.js`, dass hier kein Schreiber
+  // im Spiel FEHLT, sondern keiner hingehoert. Ohne diese Kennzeichnung stuende
+  // das Feld dauerhaft in der Luecken-Liste und waere damit unheilbar.
+  manual_actions: { einheit: "Zahl je Lauf", uhr: "-", soll: 0, art: "zahl",
+    klasse: "autonomie", quelle: "bruecke",
+    hinweis: "sync/bridge.js zaehlt in <DATA_DIR>/manual-actions.json; tools/checkin.js liest" },
   jump_latency_min: { einheit: "min", uhr: "wand", soll: 2, art: "zahl", klasse: "autonomie",
     hinweis: "abzueglich backup_wait_min" },
   backup_wait_min: { einheit: "min", uhr: "wand", soll: null, art: "zahl", klasse: "autonomie",

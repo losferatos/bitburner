@@ -1,13 +1,13 @@
 /**
- * Ebene 0: Wirtreserve und Restzeitschaetzung (Phase C, Position C.3).
+ * Ebene 0: die Restzeitschaetzung (Phase C, Position C.3).
  *
- * Beide loesen einen Fehler, der sich SELBST STABILISIERT und deshalb nie als
- * Fehler auffaellt:
+ * Sie loest einen Fehler, der sich SELBST STABILISIERT: ein Nachholklumpen
+ * liest sich als Rakete, und jede Entscheidung, die an der Restzeit haengt,
+ * faellt zum falschen Zeitpunkt.
  *
- *   - Ohne Reserve gibt der Bot kurz vor dem Sprung alles aus, kann den Wirt
- *     nicht bezahlen, springt nicht, verdient weiter, gibt wieder alles aus.
- *   - Ohne robuste Rate liest ein Nachholklumpen sich als Rakete, und die
- *     Reserve wird zum falschen Zeitpunkt gehalten.
+ * Die Wirtreserve, die hier ebenfalls geprueft wurde, ist am 04.09.2026 nach
+ * einer Skeptikerrunde entfallen - sie loeste einen Deadlock, der so nicht
+ * existiert. Ihre Aufgabe traegt jetzt der Interlock in lib/endspurt.js.
  *
  * Aufruf: node tools/test-reserve-eta.js
  */
@@ -32,7 +32,6 @@ function finde(rel) {
   return t;
 }
 
-const RES = await import(pathToFileURL(finde("lib/reserve.js")).href);
 const ETA = await import(pathToFileURL(finde("lib/eta.js")).href);
 
 let gruen = 0;
@@ -50,117 +49,8 @@ function pruefe(name, bedingung, hinweis = "") {
   }
 }
 
-/**
- * Ein Mini-ns mit einem Dateisystem im Speicher. Er kennt genau die vier
- * Funktionen, die reserve.js benutzt - mehr waere ein Mock, der etwas anderes
- * prueft als den Code.
- */
-function mockNs(dateien = {}, geld = 0, host = "home") {
-  return {
-    _dateien: dateien,
-    _geschrieben: [],
-    fileExists: (d) => d in dateien,
-    read: (d) => dateien[d] ?? "",
-    write: (d, inhalt) => { dateien[d] = inhalt; },
-    scp: () => true,
-    getHostname: () => host,
-    getServerMoneyAvailable: () => geld,
-  };
-}
-
 console.log("");
-console.log("=== Ebene 0: Wirtreserve und ETA (C.3) ===");
-
-console.log("");
-console.log("-- reserve.js: die beiden Kanaele sind getrennt --");
-{
-  pruefe("Augmentierungskanal ist geldbedarf.txt", RES.KANAL_AUG === "data/geldbedarf.txt",
-    "der bestehende Vertrag mit bn4rep.js:1205");
-  pruefe("Wirtkanal ist eine ANDERE Datei", RES.KANAL_WIRT !== RES.KANAL_AUG,
-    "ein zweiter Schreiber auf derselben Datei ueberschriebe den ersten still");
-}
-
-console.log("");
-console.log("-- reserve.js: Augmentierungsreserve unveraendert lesbar --");
-{
-  const ns = mockNs({ "data/geldbedarf.txt": "5000000000" });
-  pruefe("nackte Zahl wird gelesen", RES.augReserve(ns) === 5e9);
-  pruefe("fehlende Datei ergibt 0", RES.augReserve(mockNs({})) === 0);
-  pruefe("Unsinn ergibt 0", RES.augReserve(mockNs({ "data/geldbedarf.txt": "viel" })) === 0);
-  pruefe("negative Zahl ergibt 0", RES.augReserve(mockNs({ "data/geldbedarf.txt": "-5" })) === 0);
-}
-
-console.log("");
-console.log("-- reserve.js: die Wirtreserve verfaellt --");
-{
-  const jetzt = 1_700_000_000_000;
-  const ns = mockNs({});
-  RES.setzeWirtReserve(ns, 412e6, jetzt, "Wirt fuer exit.js");
-  const frisch = RES.wirtReserve(ns, jetzt + 60000);
-  pruefe("frische Reserve gilt", frisch.betrag === 412e6, JSON.stringify(frisch));
-  pruefe("Zweck steht drin", /exit\.js/.test(frisch.zweck));
-
-  // DER FALL, DER SONST EWIG GELD SPERRT: der Schreiber ist tot, die Datei
-  // liegt noch da. Ohne Verfall bleibt das Geld fuer immer reserviert - und
-  // niemand sucht danach, weil der Kontostand ja stimmt.
-  const alt = RES.wirtReserve(ns, jetzt + RES.WIRT_GUELTIG_MS + 1000);
-  pruefe("abgelaufene Reserve zaehlt NULL", alt.betrag === 0);
-  pruefe("und meldet sich als abgelaufen", alt.abgelaufen === true);
-
-  const genauAufDerGrenze = RES.wirtReserve(ns, jetzt + RES.WIRT_GUELTIG_MS);
-  pruefe("genau auf der Grenze gilt sie noch", genauAufDerGrenze.betrag === 412e6);
-}
-
-console.log("");
-console.log("-- reserve.js: Erneuern und Loeschen --");
-{
-  const jetzt = 1_700_000_000_000;
-  const ns = mockNs({});
-  RES.setzeWirtReserve(ns, 100, jetzt);
-  RES.setzeWirtReserve(ns, 200, jetzt + 300000);
-  const r = RES.wirtReserve(ns, jetzt + 300000 + 60000);
-  pruefe("Erneuern verschiebt das Verfallsdatum", r.betrag === 200);
-  RES.loescheWirtReserve(ns);
-  pruefe("Loeschen setzt auf 0", RES.wirtReserve(ns, jetzt + 300000).betrag === 0);
-  RES.setzeWirtReserve(ns, 0, jetzt);
-  pruefe("Betrag 0 loescht statt zu setzen", RES.wirtReserve(ns, jetzt).betrag === 0);
-  RES.setzeWirtReserve(ns, -5, jetzt);
-  pruefe("negativer Betrag loescht", RES.wirtReserve(ns, jetzt).betrag === 0);
-}
-
-console.log("");
-console.log("-- reserve.js: Summe und freies Geld --");
-{
-  const jetzt = 1_700_000_000_000;
-  const ns = mockNs({ "data/geldbedarf.txt": "1000000000" }, 5e9);
-  RES.setzeWirtReserve(ns, 412e6, jetzt);
-  pruefe("Summe addiert beide Kanaele", RES.gesamt(ns, jetzt) === 1e9 + 412e6,
-    "erhalten " + RES.gesamt(ns, jetzt));
-  pruefe("frei() zieht beide ab", RES.frei(ns, jetzt) === 5e9 - 1e9 - 412e6);
-
-  // Nach dem Verfall gehoert das Geld wieder dem Bot - sonst ist die Reserve
-  // ein Speicherleck in Geldform.
-  pruefe("nach dem Verfall bleibt nur die Augmentierungsreserve",
-    RES.gesamt(ns, jetzt + RES.WIRT_GUELTIG_MS + 1) === 1e9);
-}
-
-console.log("");
-console.log("-- reserve.js: unlesbare Datei sperrt kein Geld --");
-{
-  const ns = mockNs({ "data/wirtreserve.txt": "{kaputt" });
-  pruefe("unlesbare Wirtreserve zaehlt 0", RES.wirtReserve(ns, 1).betrag === 0,
-    "ein Parserfehler darf nicht dazu fuehren, dass der Bot nichts mehr kauft");
-}
-
-console.log("");
-console.log("-- reserve.js: gilt() als reine Funktion --");
-{
-  pruefe("gueltige Reserve", RES.gilt({ betrag: 5, bis: 100 }, 50));
-  pruefe("abgelaufene Reserve", !RES.gilt({ betrag: 5, bis: 100 }, 101));
-  pruefe("Betrag 0", !RES.gilt({ betrag: 0, bis: 100 }, 50));
-  pruefe("kein Objekt", !RES.gilt(null, 50));
-  pruefe("bis fehlt", !RES.gilt({ betrag: 5 }, 50));
-}
+console.log("=== Ebene 0: Restzeitschaetzung (C.3) ===");
 
 // ===========================================================================
 console.log("");
@@ -273,10 +163,94 @@ console.log("-- eta.js: Ringpuffer und Reset --");
 }
 
 console.log("");
+console.log("-- eta.js: die QUANTISIERUNGSFALLE (Skeptiker 04.09.) --");
+{
+  // Der Hacking-Level ist eine GANZZAHL im 60-s-Takt. Waechst er langsamer als
+  // etwa 0,6 Stufen je Minute, steht er in mehr als der Haelfte der Fenster
+  // still - der Median ist dann 0 und die Restzeit faellt auf null. Genau im
+  // Endanflug, wo die Zahl gebraucht wird.
+  const reihe = (proMin, n = 30) => {
+    let p = [];
+    for (let i = 0; i < n; i++) p = ETA.messe(p, i * 60000, 100 + Math.floor(i * proMin));
+    return p;
+  };
+  for (const [proMin, name] of [[0.5, "0,5"], [0.3, "0,3"], [0.1, "0,1"]]) {
+    const p = reihe(proMin);
+    const r = ETA.rateJeMinute(p);
+    pruefe("bei " + name + " Stufen/min kommt eine Rate heraus",
+      r !== null && r.rate > 0, r ? "Rate " + r.rate : "null");
+    if (r) {
+      pruefe("  und sie ist als grob gekennzeichnet", r.grob === true,
+        "eine grobe Zahl ist besser als keine, aber sie darf sich nicht als genau ausgeben");
+      // KEINE ENGE TOLERANZ, und das ist kein Nachgeben. Bei 0,1 Stufen je
+      // Minute liefert ein GANZZAHLIGER Zaehler in 29 Minuten 2 Stufen statt
+      // 2,9 - die Quantisierung deckelt die erreichbare Genauigkeit auf rund
+      // 30 %, egal wie gut die Rechnung ist. Geprueft wird deshalb die
+      // Groessenordnung: die Zahl muss brauchbar sein, nicht genau.
+      pruefe("  und liegt in der richtigen Groessenordnung (" + name + ")",
+        r.rate > proMin / 2.5 && r.rate < proMin * 2.5,
+        "erhalten " + r.rate.toFixed(3) + " - Quantisierung deckelt die Genauigkeit");
+    }
+  }
+  const e = ETA.etaMinuten(reihe(0.5), 109, 200);
+  pruefe("die ETA daraus gilt NICHT als sicher", e !== null && e.sicher === false,
+    "sie stammt aus einer Notrechnung ueber die Gesamtstrecke");
+  // Ein wirklich stehender Wert darf weiterhin null ergeben - sonst waere die
+  // Notrechnung ein Freibrief fuer erfundene Zahlen.
+  let steht = [];
+  for (let i = 0; i < 20; i++) steht = ETA.messe(steht, i * 60000, 100);
+  pruefe("ein wirklich stehender Wert ergibt weiter null",
+    ETA.rateJeMinute(steht) === null || ETA.rateJeMinute(steht).rate === 0);
+}
+
+console.log("");
+console.log("-- eta.js: der Median bei WENIGEN Punkten (Skeptiker 04.09.) --");
+{
+  // Nachgerechnet: mit MIN_PUNKTE 5 standen dem Median vier Abschnitte zur
+  // Verfuegung, und zwei Klumpen darin machten die ETA um Faktor 125 falsch -
+  // bei sicher:true. Das Fenster ist real, weil die Punkte nur im Prozess
+  // leben und jeder Neustart sie leert.
+  const mitKlumpen = (gesamt, klumpen) => {
+    let p = [];
+    let wert = 100;
+    for (let i = 0; i < gesamt; i++) {
+      p = ETA.messe(p, i * 60000, wert);
+      wert += (i < klumpen) ? 500 : 2;
+    }
+    return p;
+  };
+  pruefe("MIN_PUNKTE ist mindestens 9", ETA.MIN_PUNKTE >= 9,
+    "erhalten " + ETA.MIN_PUNKTE + " - mit 5 kippt der Median schon bei zwei Klumpen");
+  const p = mitKlumpen(ETA.MIN_PUNKTE, 2);
+  const r = ETA.rateJeMinute(p);
+  pruefe("zwei Klumpen kippen den Median nicht mehr",
+    r !== null && Math.abs(r.rate - 2) < 0.001, r ? "erhalten " + r.rate : "null");
+  const p4 = mitKlumpen(ETA.MIN_PUNKTE, 4);
+  const r4 = ETA.rateJeMinute(p4);
+  pruefe("auch vier Klumpen nicht", r4 !== null && Math.abs(r4.rate - 2) < 0.001,
+    r4 ? "erhalten " + r4.rate : "null");
+}
+
+console.log("");
+console.log("-- die Konstanten selbst, mit ABSOLUTEN Zahlen --");
+{
+  // Der Skeptiker hat belegt, dass die alten Pruefungen gegen die Konstanten
+  // GEEICHT waren: `jetzt + WIRT_GUELTIG_MS + 1000` bleibt gruen, egal ob die
+  // Konstante 10 Minuten oder 10 Jahre betraegt. Eine Konstante prueft man nur
+  // gegen eine Zahl, die woanders steht.
+  pruefe("ABSTAND_DECKEL_MS sind 12 Minuten", ETA.ABSTAND_DECKEL_MS === 720000,
+    "erhalten " + ETA.ABSTAND_DECKEL_MS + " - 12x der 60-s-Takt von ausgang.js");
+  pruefe("MAX_PUNKTE ist 30", ETA.MAX_PUNKTE === 30, "erhalten " + ETA.MAX_PUNKTE);
+  pruefe("MIN_PUNKTE ist 9", ETA.MIN_PUNKTE === 9, "erhalten " + ETA.MIN_PUNKTE);
+  pruefe("MAX_PUNKTE traegt MIN_PUNKTE mit Abstand", ETA.MAX_PUNKTE >= ETA.MIN_PUNKTE * 3);
+}
+
+console.log("");
 console.log("-- eta.js: median --");
 {
   pruefe("ungerade Anzahl", ETA.median([3, 1, 2]) === 2);
-  pruefe("gerade Anzahl", ETA.median([1, 2, 3, 4]) === 2.5);
+  pruefe("gerade Anzahl: der UNTERE der beiden mittleren", ETA.median([1, 2, 3, 4]) === 2,
+    "das Mittel waere 2,5 - und bei vier Klumpen von acht 251 statt 2");
   pruefe("ein Ausreisser verschiebt nicht", ETA.median([2, 2, 2, 2, 99999]) === 2);
 }
 

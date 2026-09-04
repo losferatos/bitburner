@@ -515,3 +515,134 @@ Im Stundenbericht steht deshalb keine Prozentzahl, sondern der Fortschritt gegen
 ## S — Aus `BAUSTELLEN.md ## Sofort`
 
 *Wird aus dem laufenden Erhebungs-Workflow ergänzt.*
+
+---
+
+# Skeptikerrunde C.3 — 04.09.2026, 06:16 bis 06:35
+
+Drei Prüfer, getrennte Winkel, ohne Sicht auf die Bau-Unterhaltung. **Alle drei
+kamen unabhängig auf denselben blockierenden Befund**, und er trifft die
+Prämisse, nicht die Ausführung.
+
+## C3.1 — Die Wirtreserve löste einen Deadlock, den es so nicht gibt · BEHOBEN (zurückgebaut)
+
+Die These war: der Bot gibt vor dem Wechsel alles Geld aus und kann dann den
+Wirt für `exit.js` nicht bezahlen. Nachgeprüft im Quelltext, die These hält
+nicht. Was den Zustand „kein Wirt UND kein Geld" erzeugt, ist
+`installAugmentations`: es löscht alle gekauften Rechner und setzt das Guthaben
+auf 1.262 $ — in **einem** Engine-Schritt. Gegen ein genulltes Konto ist jede
+Reserve wirkungslos.
+
+Verschärfend: der bestehende Riegel `bn4rep.js:909` hängt an
+`ausgangSteht = eingebauteAugs.includes("The Red Pill")` (`:887`). Red Pill gibt
+es nur im V1-Weg. **In den 30 Bladeburner-Läufen der Route greift er nie** — dort
+darf `bn4rep` genau dann einbauen, wenn alle 21 Black Ops gefallen sind und
+`ausgang.js` `exit.js` starten will.
+
+Behoben durch `lib/endspurt.js` / `einbauErlaubt()`, verfahrensunabhängig, mit
+Sechs-Stunden-Obergrenze gegen den Stillstand. `lib/reserve.js` ist gelöscht;
+vier weitere Befunde (BN9-Erkennung, `passt` gegen `moeglich`, der
+`gb`-Startwert, 0,30 GB RAM) wurden damit gegenstandslos.
+
+## C3.2 — `ns.read` hat keinen Host-Parameter · BEHOBEN
+
+`reserve.js` und `endspurt.js` prüften `fileExists(datei, "home")` und lasen
+dann `ns.read(datei)` — und `ns.read` liest **immer vom eigenen Server**
+(`NetscriptFunctions.ts:1120-1122`), während `fileExists` einen Host nimmt
+(`:1056-1058`). Auf jedem Fremdrechner also eine leere Zeichenkette, ohne Wurf
+und ohne Log. Die Werkzeuge laufen „praktisch nie home" (`bn4net.js:2716-2719`).
+
+Der Interlock hätte damit außerhalb von `home` still „keine Lage" gemeldet und
+den Einbau genau dann erlaubt, wenn er ihn verhindern soll. `endspurt.js` holt
+die Datei jetzt per `scp` von home, wie `ausgang.js:112-118` es seit langem tut.
+
+## C3.3 — Der Hacking-Level ist eine Ganzzahl, der Median kollabiert auf 0 · BEHOBEN
+
+Gemessen gegen das echte Modul: unter etwa 0,6 Stufen je Minute steht der Level
+in mehr als der Hälfte der 60-Sekunden-Fenster still, der Median ist 0 und
+`eta_min` dauerhaft `null` — genau im Endanflug, wo die Zahl gebraucht wird.
+
+| Stufen/min | Median | eta_min |
+|---|---|---|
+| 2,0 | 2 | 11 min |
+| 1,0 | 1 | 61 min |
+| **0,5** | **0** | **null** |
+
+Behoben: steht der Median auf null, während der Wert insgesamt gewachsen ist,
+wird die Rate über die gesamte akzeptierte Strecke gebildet und als `grob`
+gekennzeichnet — eine grobe Zahl ist besser als keine, darf sich aber nicht als
+genau ausgeben.
+
+## C3.4 — Zwei Nachholklumpen kippten den Median · BEHOBEN
+
+Nachgerechnet: mit `MIN_PUNKTE = 5` standen dem Median vier Abschnitte zur
+Verfügung. Zwei Klumpen darin machten `eta_min` um **Faktor 125** falsch — bei
+`sicher: true`. Das Fenster ist real, weil die Messpunkte nur im Prozess leben
+und jeder Neustart sie leert.
+
+`MIN_PUNKTE` steht jetzt auf 9, und `sicher` hängt zusätzlich an der Zahl der
+Stützpunkte.
+
+## C3.5 — Der Median mittelte bei gerader Anzahl und kippte bei genau der Hälfte · BEHOBEN
+
+Von einem eigenen Test gefunden, nicht vom Skeptiker: bei acht Abschnitten, von
+denen vier Klumpen sind, ergibt das Mittel der beiden mittleren Werte
+(2 + 500) / 2 = **251 statt 2**. Der Kommentar im Modul behauptete, das Mittel
+sei „genauso stabil wie der untere Wert" — das war falsch.
+
+Jetzt der untere der beiden mittleren. Er unterschätzt die Rate leicht, und das
+ist die richtige Ausfallrichtung: eine zu niedrige Rate ergibt eine zu lange
+Restzeit, und wer zu früh mit dem Sprung rechnet, verliert nichts.
+
+## C3.6 — Die Tests waren gegen die Konstanten geeicht, die sie prüfen sollten · BEHOBEN
+
+Der Substanz-Prüfer hat die Konstanten mutiert und gemessen, ob die Suite es
+merkt:
+
+| Mutation | Ergebnis |
+|---|---|
+| `ABSTAND_DECKEL_MS` 12 min → 24 h | erkannt |
+| `WIRT_GUELTIG_MS` 10 min → 1 ms | erkannt |
+| **`WIRT_GUELTIG_MS` 10 min → 10 Jahre** | **nicht erkannt** |
+| **`MIN_PUNKTE` 5 → 2** | **nicht erkannt** |
+| **`MAX_PUNKTE` 30 → 8** | **nicht erkannt** |
+
+Die Prüfungen rechneten mit `jetzt + WIRT_GUELTIG_MS + 1000` statt mit einer
+festen Zahl — gegen die Konstante selbst geeicht und deshalb blind für sie. Die
+Reserve hätte zehn Jahre gelten können, während die Suite grün bleibt.
+
+Jede Konstante hat jetzt eine Prüfung mit einer **absoluten** Zahl.
+
+## C3.7 — `eta_min: 0` bei fehlendem Root, als sicher gemeldet · BEHOBEN
+
+Reicht das Hacking-Level, fehlen aber Root oder die fünf Portknacker
+(`servers.ts:1534`), gab `etaMinuten()` 0 zurück und markierte es als sicher —
+stundenlang, während der Sprung an fünf Programmen hängt. `eta_min` bleibt in
+diesem Fall jetzt `null` und nennt den Engpass.
+
+## C3.8 — Falsche Zeilenbelege: 8 von 24 geprüften · TEILWEISE BEHOBEN
+
+Fünf stammen aus diesem Bau, drei sind älter. Die wichtigsten:
+
+- `Prestige.ts:73` als Beleg für „Guthaben fällt" — falsch, das ist der
+  Server-Kommentar. Richtig: `PlayerObjectGeneralMethods.ts:102`.
+- „fällt auf 1000 Dollar" — falsch, es sind **1.262 $**
+  (`1000 + CONSTANTS.Donations`, `Constants.ts:107`).
+- Die Leserliste von `geldbedarf.txt` — es sind **drei** Lesestellen
+  (`bn4net.js:677`, `bn4life.js:250`, `homegrow.js:73`), nicht fünf, und
+  `homegrow.js` fehlte ganz.
+
+**Die Lehre, die bleibt:** zwei der fünf entstanden, weil die Kommentare gegen
+die Vordatei geschrieben und nach dem Umbau nicht nachgezogen wurden.
+Zeilenbelege auf **eigene, im selben Commit veränderte Dateien** sind
+systematisch unzuverlässig — dort gehört ein Symbolname hin, keine Zeilennummer.
+
+## Offen, nicht behoben
+
+| Befund | Warum es liegen bleibt |
+|---|---|
+| **V2-ETA über die Rangkurve** | Der wichtigste offene Punkt. `eta_min` ist auf dem Bladeburner-Weg immer `null`, weil `w0r1d_d43m0n` erst nach The Red Pill am Netz hängt. Der Rang steht in `data/blade.json` (0 GB), die Kurve in `tools/lib/rangkurve.js` — das Werkzeug existiert und wird nicht genutzt. Die Abnahmespalte von C.3 verlangt ausdrücklich „ETA gegen die Rangkurve statt linear" |
+| **Zähler für abgelehnte Sprünge** | Ein dauerhaft ablehnendes `exit.js` liest sich in `checkin.js:252-259` als „URTEIL: SPRINGT". Braucht `exitAbgelehnt` in `ausgang.json` und eine Unterscheidung „läuft" gegen „wurde gestartet und ist weg" |
+| **`ns.scp`-Rückgabewert** | `scp` wirft nicht, es gibt `false` zurück. Ein Teilausfall der Bibliothekskette ist heute unsichtbar |
+| **Lineare Fortschreibung des Levels** | Der Level wächst logarithmisch in der Erfahrung. Über die Skill-Formel zu integrieren löst das zusammen mit der Quantisierung |
+| **RAM-Zahlen in `doku/ram-budget.md`** | `exit.js` ist auf 520,25 GB gewachsen (`getResetInfo`), `ausgang.js` liegt nach dem Reserve-Rückbau wieder bei 8,15 |

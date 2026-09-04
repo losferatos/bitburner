@@ -65,6 +65,34 @@ export const SPROSSEN = [
     ausloeser: ["S3b"], karenzMs: 300000, wirkungMs: 180000,
     deckelJe6h: 1, wirkung: "Engine-Puls > 0,9 ueber 3 min",
     bedingung: "nur nach Pruefstandsbeleg, dass kein beforeunload-Dialog stehen bleibt" },
+  // SPROSSE 4b: DIE BILLIGE ANTWORT AUF S2 (Skeptiker Runde 4, R10,
+  // 04.09.2026).
+  //
+  // Ein Pruefer hat gefragt, was die Leiter auf einen stehenden Traeger
+  // ANTWORTET - und die Antwort war: nichts, bis zum Soft-Reset. Zwischen "der
+  // Rang waechst seit sechs Stunden nicht" und "alles wegwerfen und neu
+  // anfangen" lag keine einzige Stufe.
+  //
+  // Dabei ist der naechstliegende Verdacht viel billiger: das Gewerk, das den
+  // Knoten traegt, haengt. Auf dem Bladeburner-Weg ist das `blade.js`. Es neu
+  // zu starten kostet Sekunden und ist vollstaendig umkehrbar - der Kern holt
+  // es in seiner naechsten Runde zurueck, genau wie bei Sprosse 1.
+  //
+  // Dass es diese Stufe nicht gab, lag an einer Zielverwechslung: S2 traegt
+  // `ziel: "fortschritt"`, und Sprosse 1 wirkt auf WERKZEUGE. Die Leiter hat
+  // also nie auf die Idee kommen koennen, das Traegergewerk anzufassen.
+  //
+  // Auf dem Hackingweg (V1) traegt der Kern selbst - und den neu zu starten
+  // IST Sprosse 3. Dort meldet diese Sprosse "nichts Billigeres da", und die
+  // Leiter geht weiter zu 5.
+  //
+  // Die Nummer 4.5 statt 4b: `verifiziert` sucht ueber `x.nr > s.sprosse`, und
+  // eine Zahl dazwischen fuegt sich ohne Umnummerierung ein. Umnummerieren
+  // waere gefaehrlich - `data/penalties.json` fuehrt Sprossennummern.
+  { nr: 4.5, name: "Traegergewerk neu starten", uhr: "motor", gebaut: true, strafe: true,
+    ausloeser: ["S2"], karenzMs: 45 * 60000, wirkungMs: 45 * 60000,
+    deckelJe6h: 3, wirkung: "der Traeger waechst wieder" },
+
   // Sprosse 5 IST gebaut (src/punish.js, 35 Proben in tools/test-punish.js).
   // Sie ist trotzdem die vorsichtigste der Leiter: der Waechter fuehrt sie
   // NICHT selbst aus - `installAugmentations` kostet bei SF4.1 achtzig

@@ -190,7 +190,11 @@ export async function main(ns) {
       // der Zahl, die dieser Bau ihr endlich gegeben hat.
       const scharfAlles = modusRoh === "enforce-alles";
       const scharf = scharfAlles || modusRoh === "enforce";
-      const SCHARFE_SPROSSEN = scharfAlles ? [0, 1, 2, 3, 4, 5] : [0, 1, 2];
+      // 4.5 gehoert zu den billigen: ein Gewerk neu starten, umkehrbar,
+      // Sekunden. Genau wie Sprosse 1, nur mit dem Traegergewerk als Ziel.
+      const SCHARFE_SPROSSEN = scharfAlles
+        ? [0, 1, 2, 3, 4, 4.5, 5]
+        : [0, 1, 2, 4.5];
 
       // --- Karenz -------------------------------------------------------------
       //
@@ -404,6 +408,7 @@ export async function main(ns) {
               // prueft. Der Waechter fuehrt das Signal, also gibt er die Zahl
               // mit; eine zweite Rechnung in punish.js waere eine zweite
               // Wahrheit.
+              verfahren: rolle.verfahren,
               s2MotorMs: (sigs.find((x) => x.sig === "S2") || {}).alterMotorMs || 0,
               // Welche Sprossen in DIESEM KNOTEN schon ausgefuehrt und
               // verifiziert wirkungslos waren - ueber ALLE Ziele, nicht nur
@@ -491,6 +496,12 @@ export async function main(ns) {
               // Augmentierungs-Reset bei positivem Konto.
               augReset: ri.lastAugReset,
               geld: spieler.money,
+              // Fuer Sprosse 4b: ist der Traeger seit der Ausfuehrung
+              // gewachsen? Die Zahl fuehrt der Waechter ohnehin.
+              traegerGewachsen: !!(kpi && kpi.traeger
+                && Number.isFinite(kpi.traeger.wert)
+                && Number.isFinite(letzterTraegerWert)
+                && kpi.traeger.wert > letzterTraegerWert),
             });
           const v = verifiziert(leiter, r.ziel, gruen, uhren.guardTimeMs);
           sag("Wirkung " + (gruen ? "gruen" : "rot") + " fuer " + r.ziel
@@ -599,6 +610,13 @@ function wirkungGruen(r, eintraege, kern, lage) {
   //
   // Der deklarierte Erfolg steht seit jeher in der Sprossentabelle:
   // "lastAugReset gesprungen und Konto > 0". Er wird jetzt auch geprueft.
+  if (r.ziel === "fortschritt" && r.sprosse && r.sprosse.nr === 4.5) {
+    // Der Erfolg von Sprosse 4b ist einfach: der Traeger waechst wieder. Die
+    // Zahl fuehrt der Waechter ohnehin (letzterTraegerWert), und die
+    // Wirkungsfrist von 45 Minuten Motorzeit ist dieselbe Spanne, in der S2
+    // ueberhaupt erst anschlaegt.
+    return !!(lage && lage.traegerGewachsen);
+  }
   if (r.ziel === "fortschritt") {
     if (!lage || !Number.isFinite(lage.augReset) || !Number.isFinite(lage.ausgefuehrtWall)) {
       return false;
@@ -884,6 +902,44 @@ function fuehreAus(ns, r, eintraege, gesperrt, sag, lage) {
     }
     return { getan: !!pid, text: beendet + " Prozess(e) beendet, boot.js "
       + (pid ? "gestartet (pid " + pid + ")." : "liess sich nicht starten (exec gab 0).") };
+  }
+
+  // --- Sprosse 4b: das Traegergewerk neu starten ----------------------------
+  //
+  // Die billige Antwort auf S2 (Skeptiker Runde 4, R10). Zwischen "der Traeger
+  // waechst seit sechs Stunden nicht" und dem Soft-Reset lag keine Stufe -
+  // dabei ist der naechstliegende Verdacht, dass das Gewerk haengt, das den
+  // Knoten traegt.
+  //
+  // Auf dem Bladeburner-Weg ist das `blade.js`. Auf dem Hackingweg traegt der
+  // Kern selbst, und den neu zu starten IST Sprosse 3 - dort gibt es hier
+  // nichts Billigeres, und die Leiter geht weiter.
+  if (nr === 4.5) {
+    const traeger = lage && lage.verfahren === "V2" ? "blade.js" : null;
+    if (!traeger) {
+      return { getan: false, text: "auf dem Hackingweg traegt der Kern selbst -"
+        + " ihn neu zu starten ist Sprosse 3, hier gibt es nichts Billigeres." };
+    }
+    let getoetet = 0;
+    const wo = [];
+    try {
+      for (const h of netz(ns)) {
+        for (const p of ns.ps(h)) {
+          if (p.filename !== traeger) continue;
+          if (ns.kill(p.pid)) { getoetet++; if (!wo.includes(h)) wo.push(h); }
+        }
+      }
+    } catch (e) {
+      return { getan: false, text: "Neustart von " + traeger + " misslungen: "
+        + String(e && e.message ? e.message : e) };
+    }
+    if (!getoetet) {
+      return { getan: false, text: traeger + " laeuft nirgends - dann ist der"
+        + " stehende Traeger nicht seine Schuld." };
+    }
+    return { getan: true, text: traeger + " auf " + wo.join(", ") + " beendet ("
+      + getoetet + " Instanz(en)). Der Kern holt es in seiner naechsten Runde;"
+      + " waechst der Traeger danach wieder, war es das." };
   }
 
   // --- Sprosse 5: der Soft-Reset durch Einbau -------------------------------

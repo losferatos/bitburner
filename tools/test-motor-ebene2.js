@@ -270,6 +270,73 @@ console.log("-- der Knotenwechsel setzt die Uhr zurueck --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- C.5: der Kern liest die Registry --");
+{
+  // Mit Registry: die Werkzeugliste kommt von dort.
+  const registry = fs.readFileSync(
+    [path.resolve(ROOT, "..", "bitburner-bau", "src", "registry.json"),
+     path.join(ROOT, "src", "registry.json")].find((p) => fs.existsSync(p)), "utf8");
+
+  const m = await fahre(5, (ms, z, vor) => vor(ms), {
+    dateien: { home: {
+      "bn4net.js": "//", "worker/hack.js": "//", "worker/grow.js": "//",
+      "worker/weaken.js": "//", "worker/share.js": "//",
+      "data/verfahren.txt": "V2 10 2",
+      "registry.json": registry,
+      // Die Werkzeuge muessen liegen, sonst filtert die Registry sie weg.
+      "blade.js": "//", "ausgang.js": "//", "sleeve.js": "//", "bbtrain.js": "//",
+      "bn4life.js": "//", "homegrow.js": "//", "contracts.js": "//",
+      "hacknet.js": "//", "popups.js": "//", "bn4rep.js": "//", "bn4door.js": "//",
+      "hashes.js": "//", "wakelock.js": "//",
+    } },
+  });
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("der Kern meldet, woher die Liste kommt", !!zeile, m.zustand.log.slice(0, 3).join(" | "));
+  if (zeile) {
+    console.log("       " + zeile.trim());
+    pruefe("und sie kommt aus der Registry", /aus registry\.json/.test(zeile), zeile);
+    pruefe("die Rolle wurde erkannt", /Rolle V2/.test(zeile), zeile);
+  }
+}
+
+console.log("");
+console.log("-- C.5: ohne Registry traegt die eingebaute Liste --");
+{
+  // DER FALL, DER SONST DEN BOT STILLLEGT: nach einem Knotenwechsel, bevor
+  // die Bruecke die Dateien nachgeschoben hat, gibt es keine registry.json.
+  const m = await fahre(5, (ms, z, vor) => vor(ms));
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("der Kern laeuft trotzdem", !!zeile);
+  if (zeile) {
+    console.log("       " + zeile.trim());
+    pruefe("und faellt auf die eingebaute Liste zurueck", /EINGEBAUT/.test(zeile), zeile);
+  }
+  const t = telemetrie(m);
+  pruefe("die Telemetrie wird weiter geschrieben", t !== null);
+}
+
+console.log("");
+console.log("-- C.5: der Rollen-Riegel greift auch im Kern --");
+{
+  const registry = fs.readFileSync(
+    [path.resolve(ROOT, "..", "bitburner-bau", "src", "registry.json"),
+     path.join(ROOT, "src", "registry.json")].find((p) => fs.existsSync(p)), "utf8");
+  // verfahren.txt steht auf Knoten 6, der Lauf ist in 10 - die Datei stammt
+  // noch aus dem vorigen Knoten.
+  const m = await fahre(5, (ms, z, vor) => vor(ms), {
+    dateien: { home: {
+      "bn4net.js": "//", "worker/weaken.js": "//",
+      "data/verfahren.txt": "V1 6 2",
+      "registry.json": registry,
+      "blade.js": "//", "ausgang.js": "//", "wakelock.js": "//",
+    } },
+  });
+  const zeile = m.zustand.log.find((z) => z.includes("Werkzeugliste"));
+  pruefe("die Rolle gilt als unbekannt", !!zeile && /Rolle unbekannt/.test(zeile),
+    zeile || "keine Zeile");
+}
+
+console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {
   // Eine liegengebliebene Wegwerfdatei unter src/ ginge ueber die Bruecke ins

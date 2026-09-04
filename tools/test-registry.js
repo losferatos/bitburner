@@ -108,7 +108,14 @@ console.log("-- DER MIGRATIONSBEWEIS: kein laufendes Werkzeug faellt weg --");
     "gefunden: " + heute.length);
   console.log("       heute in bn4net.js: " + heute.join(", "));
 
-  const lage = { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true };
+  // `dateiDa` bildet den NORMALBETRIEB nach: die Skripte liegen, die
+  // Sperrdateien nicht. Ein pauschales `() => true` meldet auch
+  // data/bn4-stop.txt als vorhanden und legt damit blade.js still - das waere
+  // ein Artefakt des Tests, kein Befund am Code.
+  const SPERRDATEIEN = ["data/bn4-stop.txt", "data/keine-hacknet.txt",
+    "data/csolve-laeuft.txt", "data/portknacker-komplett.txt"];
+  const lage = { node: 10, verfahren: "V2", phase: "normal",
+    dateiDa: (d) => !SPERRDATEIEN.includes(d) };
   const ausRegistry = new Set(REG.auswahl(registry, lage).map((e) => e.name));
   // Auch die Kaltstart-Eintraege gelten als "bekannt" - sie laufen nur in
   // einer anderen Phase, sind aber nicht vergessen.
@@ -119,10 +126,38 @@ console.log("-- DER MIGRATIONSBEWEIS: kein laufendes Werkzeug faellt weg --");
     vergessen.length ? "vergessen: " + vergessen.join(", ") +
       " - der Umstieg auf die Registry legt sie still" : "");
 
+  // ZWEITE HAELFTE DES BEWEISES: was faellt beim Umstieg aus dem
+  // Normalbetrieb heraus? "Steht in der Registry" genuegt nicht - ein Eintrag
+  // mit phase "kaltstart" ist im Normalbetrieb genauso still wie ein
+  // fehlender.
+  //
+  // Jede Abweichung braucht einen EINTRAG HIER. Damit ist sie eine
+  // Entscheidung statt eines Versehens, und wer sie aendert, muss diese Liste
+  // anfassen.
+  const GEWOLLT_STILL = {
+    "sleevecrime.js": "Kaltstart-Gewerk (ARCHITEKTUR 3.3, phase 'kaltstart'). Im "
+      + "Normalbetrieb macht sleeve.js die Arbeit; sleevecrime verdient Geld in "
+      + "der Startlage, wo es sonst keines gibt.",
+    "hashes.js": "braucht Hacknet-SERVER, also BitNode 9 oder SF9 >= 1 "
+      + "(ARCHITEKTUR E7). In BN10 ohne SF9 startet es heute mit und tut nichts - "
+      + "die Registry ist hier STRENGER als die eingebaute Liste, und das ist "
+      + "eine Verbesserung: 5,95 GB, die im Kaltstart fehlen wuerden.",
+  };
   const stillgelegt = heute.filter((n) => !ausRegistry.has(n) && alleNamen.has(n));
-  if (stillgelegt.length) {
-    console.log("       nur in anderer Phase/Rolle: " + stillgelegt.join(", "));
+  for (const n of stillgelegt) {
+    const grund = registry.eintraege.find((e) => e.name === n);
+    pruefe("  " + n + " faellt weg - und das ist eine Entscheidung",
+      !!GEWOLLT_STILL[n],
+      "Grund laut Registry: " + (grund ? REG.gilt(grund, lage).grund : "?") +
+      " - steht das so in GEWOLLT_STILL? Wenn nicht, legt der Umstieg es"
+      + " unbeabsichtigt still.");
+    if (GEWOLLT_STILL[n]) console.log("       " + n + ": " + GEWOLLT_STILL[n]);
   }
+  // Die Zahl der Abweichungen ist kein Guetekriterium - ihre BEGRUENDUNG ist
+  // es. Zwei belegte Aenderungen sind besser als eine unbelegte.
+  const unbegruendet = stillgelegt.filter((n) => !GEWOLLT_STILL[n]);
+  pruefe("jede Abweichung ist begruendet", unbegruendet.length === 0,
+    "ohne Eintrag in GEWOLLT_STILL: " + unbegruendet.join(", "));
   for (const n of heute) {
     const e = registry.eintraege.find((x) => x.name === n);
     if (!e) continue;

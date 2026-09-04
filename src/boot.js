@@ -125,6 +125,16 @@ export async function main(ns) {
                        // Kaltstartphase) konnte ihn danach nie wieder auf null
                        // setzen.
                        "data/cdump-stand.json", "data/contracts.json",
+                       // DER HANDSCHLAG IST LAUFGEBUNDEN (Auftrag 7.2).
+                       //
+                       // Eine Anfrage aus der Minute vor dem Einbau ist danach
+                       // gegenstandslos, und eine liegengebliebene ANTWORT
+                       // waere schlimmer: der naechste Handschlag saehe sie
+                       // als "schon beantwortet" und spraenge ohne Sicherung.
+                       // Der ts-Vergleich faengt das zwar ab, aber eine Datei,
+                       // die nur durch einen Vergleich harmlos ist, gehoert
+                       // weggeraeumt.
+                       "data/backup-request.txt", "data/backup-ok.txt",
                        "data/blocked-hosts.json"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }

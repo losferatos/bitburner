@@ -41,6 +41,7 @@ let bladeSperreGemeldet = 0;
 import { lage as endspurtLage, einbauErlaubt } from "lib/endspurt.js";
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { handschlag } from "lib/handschlag.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -1219,6 +1220,31 @@ export async function main(ns) {
         }
         if (erlaubt.grund) sag(erlaubt.grund);
       } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+
+      // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
+      //
+      // Die Brueckenseite stand seit heute frueh, die Spielseite nicht - ein
+      // Skeptiker hat es gefunden: `grep -rn "backup-request" src/` war leer.
+      // Damit entstand die Sicherungsklasse `pre-install`, die als einzige
+      // neben `pre-jump` NIE rotiert wird, ueberhaupt nie.
+      //
+      // Kommt keine Antwort und ist die letzte gruene Sicherung aelter als
+      // sechs Stunden, wird NICHT eingebaut: ein Einbau ist beliebig oft
+      // nachholbar, der Verlust bei einem Fehlgriff betraegt Tage.
+      // `handschlag` setzt dann selbst `data/install-sperre.txt`.
+      {
+        const hs = await handschlag(ns, "install", "bn4rep",
+            ns.getResetInfo().lastNodeReset, sag);
+        if (!hs.darf) {
+          sag("Einbau ausgesetzt: " + hs.grund);
+          return;
+        }
+        if (!hs.gesichert) {
+          sag("HINWEIS: Einbau ohne frische Sicherung, letzte gruene "
+            + (Number.isFinite(hs.alterMs)
+              ? (hs.alterMs / 3600000).toFixed(1) + " h alt" : "unbekannt"));
+        }
+      }
 
       ns.singularity.installAugmentations("boot.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr

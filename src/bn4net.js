@@ -4124,7 +4124,14 @@ export async function main(ns) {
             }
             break;   // NICHT abhaken - beim naechsten Mal kann Platz sein
           }
-          if (wirt !== "home") ns.scp(["punish.js", ...BIBLIOTHEKEN], wirt, "home");
+          // `lib/handschlag.js` MUSS MIT (04.09.2026). punish.js steht nicht
+          // in der Registry - der Kern startet es unmittelbar -, also greift
+          // die needsLibs-Pruefung des Generators hier nicht. Fehlt die
+          // Bibliothek auf dem Wirt, gibt `ns.exec` still 0 zurueck, und
+          // Sprosse 5 waere gebaut, verdrahtet, getestet und trotzdem tot.
+          if (wirt !== "home") {
+            ns.scp(["punish.js", "lib/handschlag.js", ...BIBLIOTHEKEN], wirt, "home");
+          }
           const pid = scharf
             ? ns.exec("punish.js", wirt, 1, "scharf")
             : ns.exec("punish.js", wirt, 1);

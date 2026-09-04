@@ -65,6 +65,8 @@
 /** Wie lange der Auftrag des Waechters gilt. Aelter heisst: verworfen. */
 const AUFTRAG_TTL_MS = 600000;
 
+import { handschlag } from "lib/handschlag.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -364,7 +366,35 @@ export async function main(ns) {
   // Der Rueckruf ist `boot.js`: es raeumt die knotengebundenen Dateien und
   // startet den Kern. Ohne Rueckruf laeuft nach dem Einbau gar nichts, und der
   // Bot stuende bis zum naechsten Menschen.
-  ns.print("SPROSSE 5: baue " + wartende.length + " Augmentierung(en) ein. "
+  // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
+  //
+  // Anders als beim Sprung wird hier NICHT gehandelt, wenn keine Sicherung
+  // zustande kommt: ein Einbau ist beliebig oft nachholbar, der Verlust bei
+  // einem Fehlgriff betraegt Tage. `handschlag` setzt in dem Fall selbst
+  // `data/install-sperre.txt`.
+  //
+  // Das gilt fuer Sprosse 5 ausdruecklich genauso wie fuer bn4rep.js - der
+  // Auftrag nennt beide Stellen (7.2: "der Einbau (bn4rep.js:1169, ebenso
+  // Sprosse 5) setzt install-sperre.txt und wartet").
+  {
+    const hs = await handschlag(ns, "install",
+      String(wartende) + " Augmentierung(en)", ri.lastNodeReset,
+      (t) => ns.print(t));
+    if (!hs.darf) {
+      return fertig("Einbau ausgesetzt: " + hs.grund
+        + " (gewartet " + Math.round(hs.wartezeitMs / 1000) + " s)");
+    }
+    if (!hs.gesichert) {
+      ns.print("HINWEIS: Einbau ohne frische Sicherung - letzte gruene ist "
+        + (Number.isFinite(hs.alterMs) ? (hs.alterMs / 3600000).toFixed(1) + " h" : "unbekannt")
+        + " alt.");
+    }
+  }
+
+  // `wartende` IST EINE ZAHL, keine Liste (Skeptiker, Gesamtbild). Hier stand
+  // `wartende.length` - das Protokoll der teuersten Handlung des Bots meldete
+  // "baue undefined Augmentierung(en) ein".
+  ns.print("SPROSSE 5: baue " + wartende + " Augmentierung(en) ein. "
     + "Rueckruf boot.js.");
   try {
     ns.singularity.installAugmentations("boot.js");

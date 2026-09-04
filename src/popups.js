@@ -49,6 +49,63 @@ export async function main(ns) {
   // keiner da, gibt es nichts zu tun - dann bleibt die Escape-Taste in Ruhe.
   const dialogOffen = () => !!doc.querySelector(".MuiModal-root");
 
+  /**
+   * DIALOGE, DIE NICHT GESCHLOSSEN WERDEN DUERFEN (Auftrag 5.3, Sprosse 0,
+   * gebaut 04.09.2026).
+   *
+   * Dieses Gewerk hat bis heute JEDEN Dialog blind weggeklickt - zwei
+   * Escape-Schlaege aufs Dokument, und `AlertManager.tsx` leert daraufhin die
+   * GANZE Warteschlange (`setAlerts([])`). Ein Skeptiker hat es gefunden:
+   * keiner der vier Texte, die der Auftrag namentlich nennt, wurde geprueft.
+   *
+   * Der schlimmste davon ist `Cannot save game`. Er ist das EINZIGE
+   * unmittelbare Zeichen dafuer, dass das Schreiben in die IndexedDB
+   * fehlgeschlagen ist - also dass Erics Spielstand gerade NICHT gesichert
+   * wird. Ihn wegzuklicken macht daraus einen stillen Fehler, und still ist
+   * genau die Eigenschaft, die dieses Projekt seit Wochen bekaempft.
+   *
+   * Die anderen drei: `REMOVED FUNCTION` (eine API, die es nicht mehr gibt -
+   * der Bot ruft veralteten Code), `Recovery` (der Wiederherstellungsmodus des
+   * Spiels, aus dem ein Klick auf gut Glueck herausfuehrt) und `Delete` (jeder
+   * Loeschdialog).
+   *
+   * Kleinschreibung, weil der Vergleich in Kleinschreibung stattfindet.
+   */
+  const NICHT_SCHLIESSEN = [
+    "cannot save game",
+    "removed function",
+    "recovery",
+    "delete",
+  ];
+
+  /** Der Text eines Dialogs, gekuerzt - so wie er ins Protokoll geht. */
+  const dialogText = (modal) => {
+    try { return (modal.textContent || "").replace(/\s+/g, " ").trim(); }
+    catch { return ""; }
+  };
+
+  /**
+   * Steht ein Dialog offen, der bleiben MUSS?
+   *
+   * @returns {{halt: boolean, wort: string, text: string}}
+   */
+  const haltebefund = () => {
+    for (const modal of doc.querySelectorAll(".MuiModal-root")) {
+      const text = dialogText(modal);
+      const klein = text.toLowerCase();
+      const wort = NICHT_SCHLIESSEN.find((w) => klein.includes(w));
+      if (wort) return { halt: true, wort, text };
+    }
+    return { halt: false, wort: "", text: "" };
+  };
+
+  /**
+   * Was gemeldet wurde - damit derselbe Dialog nicht in jeder Runde eine neue
+   * Zeile erzeugt. Der Takt betraegt 10 Sekunden; ohne diesen Merker waere
+   * `data/events.json` nach einer Stunde nur noch dieser eine Satz.
+   */
+  let gemeldet = "";
+
   // React 17 legt die Host-Props als __reactProps$<zufall> auf den DOM-Knoten.
   // Ein .click() geht bei MUI-Knoepfen oft ins Leere (im Projekt 22-mal am
   // TOR-Knopf belegt, src/darkweb.js:178-184), der Aufruf des Handlers nicht.
@@ -189,6 +246,60 @@ export async function main(ns) {
       // Zuerst die Zwischensequenz: sie ist KEIN Modal (Router.toPage, nicht
       // MuiModal-root) und wird von der Escape-Logik unten nicht erfasst.
       sequenzWeiterklicken();
+
+      // DIE HALTEPRUEFUNG STEHT VOR ALLEM ANDEREN.
+      //
+      // Nicht nur vor dem Escape-Schlag, sondern auch vor `einladungAnnehmen`:
+      // beide Wege schliessen Dialoge, und `AlertManager.tsx` leert bei
+      // Escape die ganze Warteschlange - ein "Cannot save game", das hinter
+      // einer Faktionseinladung wartet, waere damit weg, bevor es jemand
+      // gesehen hat.
+      const halt = haltebefund();
+      if (halt.halt) {
+        // Die ersten 120 Zeichen in den Ereignisstrom, wie der Auftrag es
+        // verlangt. `lib/events.js` waere hier zu teuer (dieses Gewerk wiegt
+        // 3,30 GB und laeuft alle 10 s), deshalb der Ringpuffer von Hand -
+        // und die Datei traegt denselben Namen, damit tools/ sie findet.
+        const kurz = halt.text.slice(0, 120);
+        if (gemeldet !== kurz) {
+          gemeldet = kurz;
+          try {
+            const roh = ns.read("data/events.json");
+            const strom = roh ? JSON.parse(roh) : { version: 1, eintraege: [] };
+            if (!Array.isArray(strom.eintraege)) strom.eintraege = [];
+            strom.eintraege.push({
+              wall: Date.now(),
+              art: "blocked",
+              text: "Dialog bleibt offen (" + halt.wort + ")",
+              daten: { wort: halt.wort, text: kurz },
+              bleibt: true,
+            });
+            if (strom.eintraege.length > 200) {
+              strom.eintraege = strom.eintraege.slice(-200);
+            }
+            ns.write("data/events.json", JSON.stringify(strom), "w");
+          } catch { /* Bericht, nie Steuerung */ }
+          ns.write("data/popups-halt.txt", JSON.stringify({
+            ts: Date.now(), wort: halt.wort, text: kurz,
+          }), "w");
+          ns.tprint("POPUPS: Dialog bleibt OFFEN (" + halt.wort + "): " + kurz);
+        }
+        // NICHTS ANFASSEN. Kein Escape, kein Knopf, keine Einladung. Der
+        // Dialog gehoert einem Menschen.
+        await ns.sleep(TAKT_MS);
+        continue;
+      }
+      // Kein Haltegrund mehr - der Merker darf zurueck, sonst bliebe ein
+      // spaeterer Dialog mit demselben Text ungemeldet.
+      if (gemeldet) {
+        gemeldet = "";
+        // UEBERSCHREIBEN STATT LOESCHEN. `ns.rm` kostet 0,60 GB - fuer eine
+        // Marke, die genauso gut leer sein kann. Dieses Gewerk laeuft alle
+        // zehn Sekunden und soll klein bleiben.
+        ns.write("data/popups-halt.txt", JSON.stringify({
+          ts: Date.now(), wort: null, text: null,
+        }), "w");
+      }
 
       if (dialogOffen()) {
         // Einladungen ZUERST, vor dem Escape-Schlag. Der keydown-Handler in

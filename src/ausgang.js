@@ -79,6 +79,7 @@ export { planeRoute, zielErlaubt, routeZustand };
 // nichts, was ausgang.js nicht ohnehin zahlt.
 import { messe, etaMinuten } from "lib/eta.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { handschlag } from "lib/handschlag.js";
 
 /**
  * KEINE WIRTRESERVE MEHR (Skeptikerrunde 04.09.2026).
@@ -573,6 +574,34 @@ export async function main(ns) {
             })() });
         nachHome("data/events.json", JSON.stringify(strom));
       } catch { /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
+
+      // DER HANDSCHLAG VOR DEM SPRUNG (Auftrag 7.2, gebaut 04.09.2026).
+      //
+      // Ein Knotenwechsel ist unwiderruflich. Die Sicherungsklasse `pre-jump`
+      // wird als einzige neben `pre-install` NIE rotiert - sie ist der letzte
+      // Stand vor der Tuer. Bis heute entstand sie nie: die Brueckenseite war
+      // gebaut, die Spielseite nicht (Skeptiker, Gesamtbild B1).
+      //
+      // Der Sprung geht auch OHNE Antwort - ein offener Ausgang kostet
+      // laufend Zeit, und der Knoten ist erledigt. Die Wartezeit wird
+      // protokolliert, damit sie aus `jump_latency_min` herausgerechnet
+      // werden kann (Auftrag: `backup_wait_min` ist kein Fehler).
+      let backupWartenMs = 0;
+      try {
+        const hs = await handschlag(ns, "jump",
+          "BN" + ziel.node + " L" + ziel.level, ri.lastNodeReset, sag);
+        backupWartenMs = hs.wartezeitMs;
+        const strom = evLaden(liesVonHome("data/events.json"));
+        evAnhaengen(strom, "note", "Handschlag vor dem Sprung: " + hs.grund,
+          { wall: Date.now() },
+          { reason: "jump", gesichert: hs.gesichert,
+            wartezeitMs: hs.wartezeitMs, alterMs: hs.alterMs });
+        nachHome("data/events.json", JSON.stringify(strom));
+      } catch (e) {
+        sag("Handschlag misslungen (" + String(e && e.message ? e.message : e)
+          + ") - der Sprung geht trotzdem.");
+      }
+      ns.write("data/backup-wait.txt", String(backupWartenMs), "w");
 
       const pid = ns.exec("exit.js", wirt, 1, ziel.node);
       letzterStart = Date.now();

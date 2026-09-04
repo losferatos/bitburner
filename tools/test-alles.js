@@ -108,6 +108,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-graftauto-ebene2.js",
+    deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
+    schnell: false,
+  },
+  {
     datei: "test-guard-ebene2.js",
     deckt: "EBENE 2: der Waechter im Beobachtungsmodus, boot.js-Schonliste (C.6)",
     schnell: false,

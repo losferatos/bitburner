@@ -57,6 +57,11 @@ export function neuerMock(o = {}) {
       home: { ram: 32, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
       ...(o.server || {}),
     },
+    // Grafting-Zustand, den der Test steuert.
+    graftbar: o.graftbar || [],
+    graftPreise: o.graftPreise || {},
+    graftDauern: o.graftDauern || {},
+    arbeit: o.arbeit || null,
     prozesse: [],          // {pid, filename, host, threads, args}
     naechstePid: 1,
     log: [],
@@ -196,7 +201,13 @@ export function neuerMock(o = {}) {
     hasRootAccess: (h) => !!(zustand.server[h] && zustand.server[h].root),
     getServerMaxRam: (h) => (zustand.server[h] ? zustand.server[h].ram : 0),
     getServerUsedRam: (h) => (zustand.server[h] ? zustand.server[h].used : 0),
-    getServerMoneyAvailable: (h) => (zustand.server[h] ? zustand.server[h].geld : 0),
+    // `geld` im Mock-Aufruf setzt BEIDES: das Spielerkonto und das Guthaben
+    // auf home. Im Spiel sind das dieselbe Zahl (Player.money), im Mock waren
+    // es zwei - und ein Test, der `geld: 500e9` setzt und dann 0 misst, prueft
+    // seine eigene Verdrahtung statt des Prueflings (04.09.2026).
+    getServerMoneyAvailable: (h) => (h === "home"
+      ? zustand.spieler.money
+      : (zustand.server[h] ? zustand.server[h].geld : 0)),
     getServerRequiredHackingLevel: (h) => (zustand.server[h] ? zustand.server[h].hackLevel : 1),
     getServerNumPortsRequired: (h) => (zustand.server[h] ? zustand.server[h].ports : 0),
     getHostname: () => zustand.host,
@@ -304,8 +315,47 @@ export function neuerMock(o = {}) {
       upgradeServer: () => false,
     },
 
+    // --- Grafting, so weit die Automatik es braucht ---------------------------
+    //
+    // NUR DIE DREI ABFRAGEN, NICHT DAS GRAFTEN SELBST. `graftauto.js`
+    // entscheidet und startet `graft.js`; die Ausfuehrung liegt dort und
+    // gehoert in Ebene 3. Was hier gebraucht wird, ist die Antwort auf "was
+    // ist graftbar, was kostet es, wie lange dauert es".
+    //
+    // `getGraftableAugmentations` liefert im Spiel alles, was der Spieler noch
+    // NICHT hat - einschliesslich der gekauften, noch nicht eingebauten
+    // (Person.ts:233-241). Der Mock bildet das ab, indem der Test die Liste
+    // direkt setzt: `o.graftbar`.
+    grafting: {
+      getGraftableAugmentations: () => {
+        if (o.graftingZugriff === false) {
+          throw new Error("You do not have grafting API access");
+        }
+        return [...(zustand.graftbar || [])];
+      },
+      getAugmentationGraftPrice: (n) => {
+        const p = (zustand.graftPreise || {})[n];
+        if (!Number.isFinite(p)) throw new Error("Invalid aug: " + n);
+        return p;
+      },
+      getAugmentationGraftTime: (n) => {
+        const t = (zustand.graftDauern || {})[n];
+        if (!Number.isFinite(t)) throw new Error("Invalid aug: " + n);
+        return t;
+      },
+    },
+
     // --- Was es im Mock nicht gibt ------------------------------------------
-    singularity: new Proxy({}, { get: (_, n) => () => nichtGebaut("singularity." + String(n)) }),
+    singularity: new Proxy({
+      // getCurrentWork ist die einzige Singularity-Abfrage, die ein Gewerk
+      // ausser bn4rep braucht - und ohne sie liesse sich nicht pruefen, ob ein
+      // Graft laeuft. Der Test setzt sie ueber `o.arbeit`.
+      getCurrentWork: () => zustand.arbeit || null,
+    }, {
+      get: (ziel, n) => (n in ziel
+        ? ziel[n]
+        : () => nichtGebaut("singularity." + String(n))),
+    }),
     bladeburner: new Proxy({}, { get: (_, n) => () => nichtGebaut("bladeburner." + String(n)) }),
     hacknet: new Proxy({}, { get: (_, n) => () => nichtGebaut("hacknet." + String(n)) }),
     formulas: new Proxy({}, { get: (_, n) => () => nichtGebaut("formulas." + String(n)) }),

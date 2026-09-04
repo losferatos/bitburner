@@ -794,6 +794,34 @@ nicht in einen Kommentar.
       "precondition": {}
     },
     {
+      "name": "graftauto.js",
+      "args": [],
+      "ramBaseGb": 16.75,
+      "ramSingGb": 0.5,
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
+      "verfahren": "alle",
+      "knoten": "alle",
+      "phase": "normal",
+      "telemetryFile": "data/graftauto.json",
+      "scpToHome": true,
+      "freshnessMs": 900000,
+      "taktMs": 60000,
+      "hostRule": "werkbank",
+      "priority": 11,
+      "evictRank": 11,
+      "needsFigure": "none",
+      "needsLibs": [
+       "lib/graftwahl.js"
+      ],
+      "singularity": true,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {
+        "requiresFile": "graftplan.json"
+      }
+    },
+    {
       "name": "bbtrain.js",
       "args": [],
       "ramBaseGb": 6.85,

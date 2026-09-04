@@ -92,7 +92,25 @@ export async function main(ns) {
     try {
       const b = JSON.parse(lies("data/bridge.json"));
       const lv = b && b.lastVerifiedBackup;
-      const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.zeit || lv.at));
+      // `lv.ts` IST DER ISO-STRING - nicht `zeit`, nicht `at` (04.09.2026).
+      //
+      // Hier stand `Date.parse(lv.zeit || lv.at)`, und beide Felder gibt es
+      // nicht: die Bruecke schreibt {file, ts, ageMin, anlass} mit `ts` als
+      // ISO-String. `Number.isFinite("2026-09-04T16:01:38.106Z")` ist falsch,
+      // also lief es in den Fallback, und der bekam `undefined`. Ergebnis:
+      // `ts` war IMMER NaN, `saeumig` IMMER wahr.
+      //
+      // Das waere nicht harmlos gewesen. Das Gewerk haette stuendlich
+      // exportiert (bei ~662 KB je Datei) und stuendlich "Bruecke ohne
+      // Sicherung" nach `data/sofort.json` geschrieben - in den einzigen
+      // Kanal, ueber den Eric ueberhaupt noch etwas erfaehrt, seit die
+      // Push-Nachrichten aus sind. Bei einem Deckel von 20 Eintraegen waere
+      // der Briefkasten nach einem Tag nur noch Fehlalarm gewesen, und ein
+      // echter Befund darunter begraben.
+      //
+      // `lv.ts` steht deshalb zuerst; die Zahlvariante bleibt fuer den Fall,
+      // dass jemand spaeter einen Zeitstempel statt eines Strings schreibt.
+      const ts = lv && (Number.isFinite(lv.ts) ? lv.ts : Date.parse(lv.ts || lv.zeit || lv.at));
       if (Number.isFinite(ts)) alterMs = jetzt - ts;
       else grund = "bridge.json ohne lastVerifiedBackup";
     } catch {

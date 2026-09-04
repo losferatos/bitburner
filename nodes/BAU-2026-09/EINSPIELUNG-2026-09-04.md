@@ -56,20 +56,41 @@ Mensch. Sie liegt nicht.
 
 ### 2. Ein byte-genauer Rollback existiert
 
-**Und er sieht anders aus, als der Auftrag annimmt.** Gemessen um 17:45:
+**Und er sieht anders aus, als der Auftrag annimmt.**
 
-| Datei | im Spiel | Commit vor dem Merge | |
-|---|---|---|---|
-| `bn4net.js` | `dc0075c7e610` | `fb3466fd63d7` | **Abweichung** |
-| `wakelock.js` | `55b09f562b62` | `950597d469ed` | **Abweichung** |
-| `boot.js` | `3f789382c43e` | `3f789382c43e` | gleich |
-| `popups.js` | `d6ccd79fee51` | `d6ccd79fee51` | gleich |
+Der im Auftrag genannte Rollback-Weg ist `git checkout <hash> -- src/<datei>`.
+Der gibt nicht zurück, was im Spiel **lag**: was im Spiel liegt, ist der Stand
+des letzten erfolgreichen Schubs, und der fällt nicht mit einem Commit
+zusammen. Im Notfall, unter Zeitdruck, spielte er eine dritte, nie gelaufene
+Fassung ein — und es fiele niemandem auf.
 
-Zwei von vier Stichproben wichen ab: die Spielfassung ist **älter** als der
-Commit. Der im Auftrag genannte Rollback-Weg
-(`git checkout <hash> -- src/<datei>`) hätte dort also nicht zurückgerollt,
-sondern eine dritte, nie gelaufene Fassung eingespielt — im Notfall, unter
-Zeitdruck, und ohne dass es auffällt.
+> **Korrektur (04.09.2026, 18:40).** Hier stand eine Tabelle mit vier
+> Stichproben, die das belegen sollte („`bn4net.js` im Spiel `dc0075c7e610`,
+> Commit `fb3466fd63d7`"). **Diese Zahlen sind nicht reproduzierbar.** Für
+> `bn4net.js` wurde beim Einspielen `fb3466fd63d7` als Spielstand gemessen —
+> übereinstimmend vom Archiv und vom Einspielwerkzeug, das die Datei
+> überschrieb. Der Vergleich gegen den Commit ist zudem schwerer als er
+> aussieht: Git speichert LF, Spiel und Archiv haben CRLF (ohne
+> Normalisierung weicht *alles* ab), und nach einem Fast-Forward ist
+> `<merge>^` nicht der alte Master-Stand, sondern ein Commit des Bauzweigs.
+> Die Tabelle ist deshalb entfernt statt korrigiert.
+
+Die **Aussage** bleibt, weil sie sich anders und besser belegen lässt:
+`tools/archivpruefung.js` vergleicht die Archivfassung jeder noch **nicht**
+eingespielten Datei mit dem, was gerade im Spiel liegt. Dort muss Gleichheit
+herrschen, wenn das Archiv eine Spielaufnahme ist.
+
+```
+blade.js      Archiv e3266a3d9639   Spiel e3266a3d9639   gleich
+bbtrain.js    Archiv 2a65edf0af57   Spiel 2a65edf0af57   gleich
+bn4life.js    Archiv 397e5e5faddd   Spiel 397e5e5faddd   gleich
+bn4rep.js     Archiv 7ac3b1678f90   Spiel 7ac3b1678f90   gleich
+contracts.js  Archiv 7eb5e2577863   Spiel 7eb5e2577863   gleich
+boot.js       Archiv 3f789382c43e   Spiel 3f789382c43e   gleich
+```
+
+6 von 6 — das Archiv ist eine Spielaufnahme, und die Prüfung lässt sich
+jederzeit wiederholen, statt einer Tabelle glauben zu müssen.
 
 Der Grund ist banal: was im Spiel liegt, ist der Stand des letzten
 erfolgreichen Schubs, und der fällt nicht mit einem Commit zusammen.

@@ -117,6 +117,87 @@ export async function main(ns) {
     }
   } catch { /* dann gelten die Standardwerte 1 */ }
 
+  // =========================================================================
+  // DER RECHNERPARK LAEUFT UEBER shop.js (Position C.7)
+  // =========================================================================
+  //
+  // Die ns.cloud-Familie kostet 3,85 GB - mehr als ein Zehntel des
+  // Kaltstart-Budgets, fuer eine Handlung, die vielleicht einmal je Stunde
+  // vorkommt. Der Kern behaelt die ENTSCHEIDUNG (er weiss als einziger, was
+  // wartet und was das Geld sonst soll) und gibt die AUSFUEHRUNG ab.
+  //
+  // Die Preise kommen aus data/preise.json, das shop.js alle 30 s schreibt -
+  // gefragt, nicht gerechnet: in BitNode 4 verteuert CloudServerSoftcap 1,2
+  // die grossen Rechner ueberproportional, und eine nachgebaute Formel waere
+  // genau die Falle vom 30.08.
+  //
+  // OHNE preise.json GIBT ES KEINEN PARK. Das ist Absicht: lieber gar nicht
+  // kaufen als auf geratenen Preisen. Der Bot laeuft dann mit dem, was er hat,
+  // und meldet es - er steht nicht.
+  const parkLage = () => {
+    const leer = { da: false, kaufbar: false, limitAnzahl: 0, limitRam: 0,
+      park: [], preise: {}, alterMs: null };
+    try {
+      if (!ns.fileExists("data/preise.json", "home")) return leer;
+      const t = JSON.parse(ns.read("data/preise.json"));
+      if (!t || !Number.isFinite(t.ts)) return leer;
+      const alterMs = Date.now() - t.ts;
+      // Aelter als fuenf Minuten heisst: shop.js laeuft nicht. Dann sind auch
+      // die Preise nicht mehr verlaesslich.
+      if (alterMs > 300000) return { ...leer, alterMs };
+      return {
+        da: true,
+        kaufbar: t.kaufbar !== false,
+        limitAnzahl: Number(t.limitAnzahl) || 0,
+        limitRam: Number(t.limitRam) || 0,
+        park: Array.isArray(t.park) ? t.park : [],
+        preise: t.preise || {},
+        alterMs,
+      };
+    } catch { return leer; }
+  };
+
+  /**
+   * Einen Kaufauftrag stellen. Er wird von shop.js genau einmal ausgefuehrt.
+   *
+   * Der Kern erfaehrt das Ergebnis erst in der naechsten Runde ueber
+   * data/kaufergebnis.json - und das ist besser als der alte Weg: ein Kauf,
+   * der scheitert, weil das Geld gerade nicht reicht, bleibt als Auftrag
+   * stehen und wird nachgeholt, statt in jeder Runde neu entschieden zu
+   * werden.
+   */
+  let offenerAuftrag = null;
+  const beauftrage = (art, gb, grund, host = null) => {
+    const id = "a" + Date.now() + "-" + Math.floor(Math.random() * 1000);
+    const auftrag = { id, art, gb, grund, host, ts: Date.now() };
+    try {
+      ns.write("data/kaufauftrag.json", JSON.stringify(auftrag), "w");
+      offenerAuftrag = auftrag;
+      return true;
+    } catch { return false; }
+  };
+
+  /** Steht noch ein Auftrag offen? Dann wird in dieser Runde nichts Neues bestellt. */
+  const auftragOffen = () => {
+    if (!offenerAuftrag) return false;
+    try {
+      if (!ns.fileExists("data/kaufergebnis.json", "home")) {
+        // Ein Auftrag ohne Ergebnis gilt zehn Minuten als offen. Danach ist
+        // shop.js vermutlich tot, und der Kern darf es erneut versuchen -
+        // sonst wartet er ewig auf eine Antwort, die nie kommt.
+        return Date.now() - offenerAuftrag.ts < 600000;
+      }
+      const e = JSON.parse(ns.read("data/kaufergebnis.json"));
+      if (e && e.id === offenerAuftrag.id) {
+        sag("Auftrag " + e.id + ": " + (e.erfolg ? "erledigt (" + e.ergebnis + ")"
+          : "nicht ausgefuehrt (" + e.ergebnis + ")"));
+        offenerAuftrag = null;
+        return false;
+      }
+      return Date.now() - offenerAuftrag.ts < 600000;
+    } catch { return false; }
+  };
+
   const TELEMETRIE_FEST = [
     ["blade.js", "data/blade.json", 10 * 60000],
     ["sleeve.js", "data/sleeve.json", 10 * 60000],
@@ -804,7 +885,7 @@ export async function main(ns) {
         // (`blade.js` allein ist groesser als der Rest), und bn4net wuerde
         // sich den eigenen Speicher wegnehmen. Die Meldung soll den Anwender
         // warnen, nicht der Motor sich selbst gefaehrden.
-        const hatWerkbank = ns.cloud.getServerNames().length > 0;
+        const hatWerkbank = parkLage().park.length > 0;
         sag(getroffen > 0
           ? name + ": " + getroffen + " Instanz(en) beendet"
             + (hatWerkbank
@@ -829,26 +910,29 @@ export async function main(ns) {
     // Was bn4rep.js fuer verdiente Augmentierungen braucht, ist tabu.
     const reserviert = ns.fileExists("data/geldbedarf.txt", "home")
       ? Number(ns.read("data/geldbedarf.txt")) || 0 : 0;
-    const eigene = ns.cloud.getServerNames();
-    let a1Gekauft = false;
+    const pl = parkLage();
+    const eigene = pl.park.map((x) => x.host);
+    const parkRam = new Map(pl.park.map((x) => [x.host, x.ram]));
+    // Ohne Preistabelle wird nicht gekauft - lieber gar nicht als auf
+    // geratenen Preisen. Ein offener Auftrag blockiert ebenso: sonst
+    // bestellte der Kern in jeder Runde einen weiteren Rechner.
+    const kaufMoeglich = pl.da && pl.kaufbar && !auftragOffen();
+    let a1Gekauft = !kaufMoeglich;
     // WARTENDES WERKZEUG BEI NICHT VOLLEM PARK (02.09.2026, Substanz-
     // Skeptiker): Die Leiter unten verlangt das Vierfache des Preises und
     // sieht das wartende Werkzeug nicht - bbtrain (95 GB) braeuchte 140 Mio
     // ueber die Leiter statt 53 Mio fuer einen passenden 128-GB-Rechner.
     // Hier: die kleinste Stufe, die das Werkzeug fasst, zum Preis x2.
-    if (werkzeugWartetGb > 0 && eigene.length < ns.cloud.getServerLimit()
-        && !eigene.some((h) => ns.getServerMaxRam(h) >= werkzeugWartetGb + 4)) {
-      const limit = ns.cloud.getRamLimit();
+    if (kaufMoeglich && werkzeugWartetGb > 0 && eigene.length < pl.limitAnzahl
+        && !eigene.some((h) => (parkRam.get(h) || 0) >= werkzeugWartetGb + 4)) {
       let gb = 32;
-      while (gb < werkzeugWartetGb + 4 && gb * 2 <= limit) gb *= 2;
-      const preis = ns.cloud.getServerCost(gb);
+      while (gb < werkzeugWartetGb + 4 && gb * 2 <= pl.limitRam) gb *= 2;
+      const preis = Number(pl.preise[gb]) || 0;
       const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
       if (preis > 0 && preis * 2 <= geldFrei) {
-        const name = ns.cloud.purchaseServer("werk-" + eigene.length, gb);
-        if (name) {
-          sag("Rechner gekauft: " + name + " mit " + gb + " GB fuer " + (preis / 1e6).toFixed(2)
+        if (beauftrage("kauf", gb, "Werkzeug mit " + werkzeugWartetGb.toFixed(1) + " GB wartet")) {
+          sag("Rechner bestellt: " + gb + " GB fuer " + (preis / 1e6).toFixed(2)
             + "m - ein Werkzeug mit " + werkzeugWartetGb.toFixed(1) + " GB wartet auf Platz.");
-          eigene.push(name);
           werkzeugWartetGb = 0;
           a1Gekauft = true;
         }
@@ -859,7 +943,7 @@ export async function main(ns) {
     }
     if (a1Gekauft) {
       // In dieser Runde nichts weiter kaufen.
-    } else if (eigene.length < ns.cloud.getServerLimit()) {
+    } else if (eigene.length < pl.limitAnzahl) {
       // Groesste bezahlbare Stufe. In BitNode 4 verteuert CloudServerSoftcap
       // 1.2 die grossen Rechner ueberproportional, deshalb wird gefragt statt
       // gerechnet.
@@ -893,12 +977,13 @@ export async function main(ns) {
       // Stunde ohne Werkbank ist eine Stunde ohne Werkzeuge.
       const faktor = kaltstart ? 1.0 : 4;
       for (const gb of leiter) {
-        const preis = ns.cloud.getServerCost(gb);
+        const preis = Number(pl.preise[gb]) || 0;
         if (!(preis > 0)) continue;
         if (ns.getServerMoneyAvailable("home") - reserviert < preis * faktor) continue;
-        const name = ns.cloud.purchaseServer("werk-" + eigene.length, gb);
-        if (name) sag("Rechner gekauft: " + name + " mit " + gb + " GB fuer "
-          + (preis / 1e6).toFixed(2) + "m.");
+        if (beauftrage("kauf", gb, kaltstart ? "Kaltstart-Leiter" : "Amortisationsleiter")) {
+          sag("Rechner bestellt: " + gb + " GB fuer " + (preis / 1e6).toFixed(2)
+            + "m" + (kaltstart ? " (Kaltstart, Faktor 1,0)" : "") + ".");
+        }
         break;
       }
     } else {
@@ -948,7 +1033,7 @@ export async function main(ns) {
       // die es keinen Grund gibt. Die Schleife bricht von selbst ab, sobald
       // eines der Kriterien nicht mehr traegt; die Obergrenze von 25 ist nur
       // die Notbremse, damit eine Runde nicht beliebig lange laeuft.
-      const maxGb = ns.cloud.getRamLimit();
+      const maxGb = pl.limitRam;
 
       // EIN WARTENDES WERKZEUG SCHLAEGT DEN AMORTISATIONSDECKEL (02.09.2026).
       //
@@ -965,9 +1050,9 @@ export async function main(ns) {
       // wird der GROESSTE Rechner verdoppelt, bis das Werkzeug neben dem, was
       // dort ohne Arbeiter schon liegt, Platz hat - ohne Deckel, nur mit der
       // Regel "halbes Guthaben bleibt".
-      if (werkzeugWartetGb > 0 && eigene.length) {
+      if (kaufMoeglich && werkzeugWartetGb > 0 && eigene.length) {
         const groesster = eigene
-          .map((h) => ({ host: h, gb: ns.getServerMaxRam(h) }))
+          .map((h) => ({ host: h, gb: parkRam.get(h) || 0 }))
           .sort((a, b) => b.gb - a.gb)[0];
         let belegtOhneArbeiter = 0;
         for (const pr of ns.ps(groesster.host)) {
@@ -978,12 +1063,17 @@ export async function main(ns) {
         let zielGb = groesster.gb;
         while (zielGb < noetig && zielGb * 2 <= maxGb) zielGb *= 2;
         if (zielGb > groesster.gb) {
-          let kosten = 0;
-          try { kosten = ns.cloud.getServerUpgradeCost(groesster.host, zielGb); } catch { kosten = 0; }
+          // Der Ausbaupreis ist die DIFFERENZ zweier Rechnerpreise
+          // (ServerPurchases.ts): was der Zielausbau kostet, minus was der
+          // vorhandene wert ist. Damit laesst er sich aus der Preistabelle
+          // rechnen, ohne getServerUpgradeCost (0,25 GB) zu bezahlen.
+          const kosten = Math.max(0,
+            (Number(pl.preise[zielGb]) || 0) - (Number(pl.preise[groesster.gb]) || 0));
           const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
           if (kosten > 0 && kosten * 2 <= geldFrei) {
-            if (ns.cloud.upgradeServer(groesster.host, zielGb)) {
-              sag(groesster.host + ": " + groesster.gb + " -> " + zielGb + " GB fuer "
+            if (beauftrage("upgrade", zielGb,
+                "Werkzeug mit " + werkzeugWartetGb.toFixed(1) + " GB wartet", groesster.host)) {
+              sag(groesster.host + ": " + groesster.gb + " -> " + zielGb + " GB bestellt fuer rund "
                 + (kosten / 1e6).toFixed(1) + "m - ein Werkzeug mit "
                 + werkzeugWartetGb.toFixed(1) + " GB wartet auf Platz.");
               werkzeugWartetGb = 0;
@@ -999,16 +1089,18 @@ export async function main(ns) {
 
       for (let schritt = 0; schritt < 25 && !a1Gekauft; schritt++) {
         const smallest = eigene
-          .map((h) => ({ host: h, gb: ns.getServerMaxRam(h) }))
+          .map((h) => ({ host: h, gb: parkRam.get(h) || 0 }))
           .sort((a, b) => a.gb - b.gb)[0];
         // Nichts mehr aufzuruesten: kein gekaufter Rechner da, oder der
         // kleinste ist schon am Maximum von 2^20 GB.
         if (!smallest || !(smallest.gb > 0) || smallest.gb >= maxGb) break;
         const zielGb = smallest.gb * 2;
         const zusatzGb = zielGb - smallest.gb;
-        let kosten = 0;
-        try { kosten = ns.cloud.getServerUpgradeCost(smallest.host, zielGb); }
-        catch { kosten = 0; }   // wirft, wenn der Rechner kein gekaufter ist
+        // Preisdifferenz statt getServerUpgradeCost (0,25 GB): der Ausbau
+        // kostet, was der Zielausbau kostet, minus was der vorhandene wert
+        // ist (ServerPurchases.ts). Beide Werte stehen in der Preistabelle.
+        const kosten = Math.max(0,
+          (Number(pl.preise[zielGb]) || 0) - (Number(pl.preise[smallest.gb]) || 0));
 
         // Ertrag je GB und Sekunde aus der letzten Runde. Massgeblich ist der
         // GRENZERTRAG genau dieses Schrittes: was die zusatzGb bringen, die
@@ -1063,11 +1155,17 @@ export async function main(ns) {
         const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
 
         if (kosten > 0 && amortSek <= amortDeckel && kosten * 2 <= geldFrei) {
-          if (!ns.cloud.upgradeServer(smallest.host, zielGb)) break;
-          sag(smallest.host + ": " + smallest.gb + " -> " + zielGb + " GB fuer "
+          // EIN AUFTRAG JE RUNDE. Die Schleife lief bisher bis zu 25 Schritte
+          // und kaufte in einer Runde mehrfach; ueber Auftraege geht das
+          // nicht, weil das Ergebnis erst in der naechsten Runde vorliegt.
+          // Der Park waechst dadurch langsamer - aber ein Auftrag je 10 s ist
+          // immer noch schneller, als das Guthaben nachwaechst.
+          if (!beauftrage("upgrade", zielGb, "Amortisation in "
+              + Math.round(amortSek) + " s", smallest.host)) break;
+          sag(smallest.host + ": " + smallest.gb + " -> " + zielGb + " GB bestellt fuer rund "
             + (kosten / 1e6).toFixed(1) + "m, amortisiert in "
             + Math.round(amortSek) + " s.");
-          continue;
+          break;
         }
         // Nicht stillschweigend nichts tun. Ein Ausbau, der seit einer Stunde
         // nicht stattfindet, muss von aussen erklaerbar sein. Nur beim ersten

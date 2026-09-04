@@ -80,19 +80,46 @@ const REF_RAM = ".^SPECIAL_ramOverride";
 const OBJ_PROTO = Object.getOwnPropertyNames(Object.prototype);
 
 /**
- * Wie Bitburner Importe aufloest: absolut von home aus.
+ * Wie Bitburner Importe aufloest.
  *
- * `from "lib/x.js"` meint `lib/x.js` auf home - NICHT relativ zur
- * importierenden Datei. `./lib/x.js` funktioniert im Spiel NICHT; genau daran
- * waeren am 04.09. vier neue Module gescheitert, weil sie nach Node-Gewohnheit
- * geschrieben waren.
+ * `from "lib/x.js"` meint `lib/x.js` auf home - der Pfad gilt ABSOLUT, nicht
+ * relativ zur importierenden Datei (`isAbsolutePath` in
+ * `Paths/Directory.ts:46-48`: absolut ist alles, was keine "./"- oder
+ * "../"-Teile enthaelt).
+ *
+ * KORREKTUR (Skeptiker Runde 3, C5, 04.09.2026). Hier stand: "`./lib/x.js`
+ * funktioniert im Spiel NICHT". Das ist falsch. `resolveFilePath`
+ * (`Paths/FilePath.ts:61-74`) loest einen relativen Pfad gegen das Verzeichnis
+ * der importierenden Datei auf - fuer ein Skript auf der obersten Ebene ist
+ * das die Wurzel, und `./lib/x.js` landet genau dort, wo `lib/x.js` landet.
+ *
+ * Folgenlos war der Fehler, weil im Projekt keine Datei die "./"-Form
+ * benutzt. Aber eine Doku, die eine funktionierende Schreibweise verbietet,
+ * ist ein Fallstrick fuer den naechsten, der eine Datei anlegt - und das
+ * Basismodul wurde tatsaechlich ignoriert, was in einem Unterverzeichnis
+ * einen falschen Namen ergeben haette.
+ *
+ * @param {string} rohName der Pfad, wie er im import steht
+ * @param {string} basis das importierende Modul (fuer relative Pfade)
  */
-function loeseModul(rohName) {
+function loeseModul(rohName, basis = "") {
   let n = String(rohName);
-  if (n.startsWith("./")) n = n.slice(2);
-  if (n.startsWith("/")) n = n.slice(1);
-  if (!/\.(js|jsx|ts|tsx)$/.test(n)) n += ".js";
-  return n;
+  if (n.startsWith("/")) return endung(n.slice(1));
+  if (!/(^|\/)\.{1,2}\//.test(n)) return endung(n);   // absolut - so wie das Spiel es sieht
+  // Relativ: gegen das VERZEICHNIS des importierenden Moduls aufloesen.
+  const ordner = String(basis).replace(/[^/]+$/, "");
+  const teile = (ordner + n).split("/");
+  const raus = [];
+  for (const t of teile) {
+    if (t === "." || t === "") continue;
+    if (t === "..") { raus.pop(); continue; }
+    raus.push(t);
+  }
+  return endung(raus.join("/"));
+}
+
+function endung(n) {
+  return /\.(js|jsx|ts|tsx)$/.test(n) ? n : n + ".js";
 }
 
 /** Der Abhaengigkeitsgraph eines Moduls, nach parseOnlyCalculateDeps. */
@@ -176,7 +203,7 @@ function abhaengigkeiten(ast, modul) {
 
   walk.recursive(ast, { key: globalKey }, Object.assign({
     ImportDeclaration: (node, st) => {
-      const name = loeseModul(node.source.value);
+      const name = loeseModul(node.source.value, modul);
       weitereModule.push(name);
       karte[st.key].add(name + GLOBAL);
       for (const spec of node.specifiers) {
@@ -199,8 +226,8 @@ function abhaengigkeiten(ast, modul) {
         const exportName = modul + "." + spec.exported.name;
         if (node.source != null && typeof node.source.value === "string"
             && spec.local.type === "Identifier") {
-          addRef(exportName, spec.local.name, loeseModul(node.source.value));
-          weitereModule.push(loeseModul(node.source.value));
+          addRef(exportName, spec.local.name, loeseModul(node.source.value, modul));
+          weitereModule.push(loeseModul(node.source.value, modul));
         } else if (spec.local.type === "Identifier" && spec.exported.name !== spec.local.name) {
           addRef(exportName, spec.local.name);
         }

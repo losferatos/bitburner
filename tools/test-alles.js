@@ -123,6 +123,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-loeser-verify.js",
+    deckt: "Die Gegenproben der 30 Vertragsloeser, gegen falsche Antworten (C4)",
+    schnell: true,
+  },
+  {
     datei: "test-punish.js",
     deckt: "Sprosse 5: die acht Vorbedingungen und die beiden Deckel (C.12)",
     schnell: true,

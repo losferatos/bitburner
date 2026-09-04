@@ -45,6 +45,24 @@ export const HOECHSTALTER_MS = 15 * 60000;
 export const VERDERBLICH_AB_MIN = 60;
 
 /**
+ * Holt eine Datei von home und liest sie - der einzige verlaessliche Weg.
+ *
+ * Dieselbe Hilfe hat `ausgang.js:112-118` seit langem; sie fehlte hier, und
+ * das waere der stillste Fehler des ganzen Umbaus geworden.
+ *
+ * @returns {string|null} null, wenn es die Datei auf home nicht gibt
+ */
+function liesVonHome(ns, datei) {
+  try {
+    if (!ns.fileExists(datei, "home")) return null;
+    if (ns.getHostname() !== "home") ns.scp(datei, ns.getHostname(), "home");
+    return ns.read(datei);
+  } catch {
+    return null;
+  }
+}
+
+/**
  * Liest die Lage aus `data/ausgang.json`.
  *
  * @param {NS} ns
@@ -57,12 +75,23 @@ export function lage(ns, jetzt) {
     gilt: false, etaMin: null, sicher: false, offen: false,
     routeState: "open", alterMs: null, grund: "",
   };
-  if (!ns.fileExists("data/ausgang.json", "home")) {
-    return { ...unbekannt, grund: "ausgang.json fehlt" };
-  }
+  // LESEN VON home, NICHT VOM EIGENEN RECHNER.
+  //
+  // `ns.read` hat KEINEN Host-Parameter - es liest immer vom Server des
+  // aufrufenden Skripts (`NetscriptFunctions.ts:1120-1122`), waehrend
+  // `ns.fileExists` einen nimmt (`:1056-1058`). Wer auf "home" prueft und dann
+  // lokal liest, bekommt auf jedem Fremdrechner eine leere Zeichenkette -
+  // ohne Wurf, ohne Log. `Number("")` ist 0, `JSON.parse("")` wirft.
+  //
+  // Das ist keine Randbedingung: die Werkzeuge laufen auf der Werkbank,
+  // "praktisch nie home" (`bn4net.js:2716-2719`). Ein Interlock, der dort
+  // still "keine Lage" meldet, erlaubt den Einbau genau dann, wenn er ihn
+  // verhindern soll.
+  const roh = liesVonHome(ns, "data/ausgang.json");
+  if (roh === null) return { ...unbekannt, grund: "ausgang.json fehlt" };
   let a;
   try {
-    a = JSON.parse(ns.read("data/ausgang.json"));
+    a = JSON.parse(roh);
   } catch {
     return { ...unbekannt, grund: "ausgang.json unlesbar" };
   }

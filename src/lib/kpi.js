@@ -82,6 +82,12 @@ export const FELDER = {
   graft_aborted: { einheit: "Zahl", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
   skipped_route_entries: { einheit: "Zahl", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
   route_state: { einheit: "open|done|blocked", uhr: "-", soll: null, art: "text", klasse: "autonomie" },
+  // Nachgetragen 04.09.2026: ausgang.js schreibt das Feld, der Kontrakt kannte
+  // es nicht. Ein Feld ohne Kontrakteintrag faellt bei checkin.js still durch
+  // die Feldpruefung - es kann wochenlang falsch sein, ohne aufzufallen.
+  eta_min: { einheit: "min", uhr: "wand", soll: null, art: "zahl", klasse: "autonomie",
+    hinweis: "null heisst nicht schaetzbar - nie eine geratene Zahl" },
+  eta_sicher: { einheit: "ja|nein", uhr: "-", soll: null, art: "bool", klasse: "autonomie" },
   blocked_dialog: { einheit: "Text", uhr: "-", soll: null, art: "text-oder-null", klasse: "autonomie" },
   wasted_money_at_jump: { einheit: "$", uhr: "-", soll: null, art: "zahl", klasse: "autonomie",
     hinweis: "> 10 % Knotenumsatz = Befund" },

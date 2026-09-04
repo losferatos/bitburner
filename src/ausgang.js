@@ -77,18 +77,30 @@ export { planeRoute, zielErlaubt, routeZustand };
 // Position C.3: die Wirtreserve (E10) und die Restzeitschaetzung. Beide sind
 // reine Module ohne ns-Aufruf ausser den Basisfunktionen und kosten damit
 // nichts, was ausgang.js nicht ohnehin zahlt.
-import { setzeWirtReserve, loescheWirtReserve, wirtReserve } from "lib/reserve.js";
 import { messe, etaMinuten } from "lib/eta.js";
 
 /**
- * Ab wann die Wirtreserve gehalten wird.
+ * KEINE WIRTRESERVE MEHR (Skeptikerrunde 04.09.2026).
  *
- * Nicht ab dem Sprung, sondern eine Stunde davor: ein Rechnerkauf braucht
- * Geld, das erst verdient werden muss, und die Endspurt-Regel gibt genau in
- * diesem Fenster alles aus (bn4net.js:766-786). Wer erst reserviert, wenn der
- * Ausgang offen steht, reserviert von einem leeren Konto.
+ * Hier stand ein Block, der vor dem Sprung Geld fuer einen Mietrechner
+ * zuruecklegte. Drei unabhaengige Pruefer haben ihn zerlegt, und die
+ * Gegenpruefung im Quelltext gab ihnen recht:
+ *
+ *  - Der Deadlock, den er loesen sollte, entsteht nicht durchs Ausgeben,
+ *    sondern durch `installAugmentations`: das loescht alle gekauften Rechner
+ *    und setzt das Guthaben auf 1.262 Dollar, in EINEM Engine-Schritt. Gegen
+ *    ein genulltes Konto hilft keine Reserve. Der Riegel dagegen sitzt jetzt
+ *    in bn4rep.js (lib/endspurt.js, einbauErlaubt).
+ *  - Die Reserve hatte keinen Leser. Die vier Ausgabestellen lesen
+ *    data/geldbedarf.txt; wirtreserve.txt las niemand.
+ *  - Sie haette in 30 der 40 Laeufe ohnehin nie gegriffen, weil eta_min dort
+ *    immer null ist (w0r1d_d43m0n haengt erst nach The Red Pill am Netz).
+ *  - Sie kostete `cloud.getRamLimit` + `cloud.getServerCost` = 0,30 GB in
+ *    einer Datei, die im Kaltstart auf 32 GB noch 0,75 GB Luft hat.
+ *
+ * Falls der Kaltstart (Position C.7) eine Reserve braucht, wird sie dort mit
+ * dem dann gemessenen Bedarf gebaut - nicht auf Vorrat.
  */
-const RESERVE_AB_MIN = 60;
 
 /** @param {NS} ns */
 export async function main(ns) {
@@ -191,16 +203,12 @@ export async function main(ns) {
       if (plan.fertig) {
         if (letzteMeldung !== "fertig") { sag("Route abgearbeitet - kein weiterer Sprung."); letzteMeldung = "fertig"; }
         nachHome("data/fertig.txt", String(Date.now()));
-        // Kein Sprung mehr - die Wirtreserve gibt das Geld frei.
-        try { loescheWirtReserve(ns); } catch { /* egal */ }
         nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, fertig: true,
           eta_min: null, route_state: routeZustand(plan) }));
         await ns.sleep(TAKT_MS); continue;
       }
       if (!plan.ziel) {
         if (letzteMeldung !== plan.grund) { sag(plan.grund); letzteMeldung = plan.grund; }
-        // Kein erreichbares Ziel - das Geld wird anderswo gebraucht.
-        try { loescheWirtReserve(ns); } catch { /* egal */ }
         nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel: null, verfahren, grund: plan.grund,
           eta_min: null, route_state: routeZustand(plan),
           uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })) }));
@@ -271,71 +279,35 @@ export async function main(ns) {
             const noetig = ns.getServerRequiredHackingLevel(WD);
             const level = ns.getHackingLevel();
             hackPunkte = messe(hackPunkte, Date.now(), level);
-            const e = etaMinuten(hackPunkte, level, noetig);
-            if (e) {
-              etaMin = e.min;
-              etaSicher = e.sicher;
-              etaQuelle = "Hacking-Level, Median ueber " + e.punkte + " Abschnitte";
+            if (level >= noetig) {
+              // DAS LEVEL REICHT, DER SPRUNG GEHT TROTZDEM NICHT. Dann fehlt
+              // Root oder es fehlen Portknacker (numOpenPortsRequired 5,
+              // servers.ts:1534). etaMinuten() gaebe hier 0 zurueck und wuerde
+              // das auch noch als "sicher" melden - stundenlang, waehrend der
+              // Sprung an fuenf Programmen haengt, die niemand kauft. Eine
+              // Restzeit, die den eigentlichen Engpass nicht kennt, ist keine.
+              etaMin = null;
+              etaQuelle = "Hacking-Level reicht, aber Root/Portknacker fehlen"
+                + " - Restzeit haengt an einem anderen Engpass";
+            } else {
+              const e = etaMinuten(hackPunkte, level, noetig);
+              if (e) {
+                etaMin = e.min;
+                etaSicher = e.sicher;
+                etaQuelle = "Hacking-Level, Median ueber " + e.punkte + " Abschnitte"
+                  + (e.grob ? " (grob: der Zaehler steht in den meisten Fenstern still)" : "");
+              }
             }
           }
         } catch { /* Level nicht lesbar - dann bleibt etaMin null */ }
       }
 
-      // ===================================================================
-      // Die Wirtreserve (ARCHITEKTUR E10)
-      // ===================================================================
-      //
-      // Der Deadlock: kurz vor dem Wechsel soll alles Geld ausgegeben werden,
-      // weil das Guthaben beim Prestige ohnehin auf 1000 Dollar faellt
-      // (bn4net.js:766-786) - aber genau dieses Geld braucht der Wirt, auf dem
-      // exit.js laeuft. Ohne Reserve stabilisiert sich der Fehler selbst:
-      // alles ausgeben, Wirt nicht bezahlen koennen, nicht springen, weiter
-      // verdienen, wieder alles ausgeben.
-      //
-      // Reserviert wird NUR, wenn wirklich kein Wirt frei ist. Heute steht ein
-      // Park aus 15 Rechnern zu je 524.288 GB - da ist die Reserve null, und
-      // sie soll null sein. Sie ist fuer den Kaltstart auf 32 GB gedacht.
-      try {
-        const nah = etaMin !== null && etaMin <= RESERVE_AB_MIN;
-        let gesetzt = false;
-        if (offen || nah) {
-          const brauchtGb = ns.getScriptRam("exit.js", "home");
-          let passt = false;
-          for (const h of netz()) {
-            if (!ns.hasRootAccess(h)) continue;
-            if (frei(h) >= brauchtGb) { passt = true; break; }
-          }
-          if (!passt && brauchtGb > 0) {
-            // Der kleinste Mietrechner, der exit.js fasst. getServerCost
-            // liefert den Preis der laufenden Umgebung samt Knotenfaktor -
-            // eine nachgebaute Formel waere genau die Falle vom 30.08.
-            let gb = 32;
-            const limit = ns.cloud.getRamLimit();
-            while (gb < brauchtGb && gb * 2 <= limit) gb *= 2;
-            const preis = gb >= brauchtGb ? ns.cloud.getServerCost(gb) : 0;
-            if (preis > 0) {
-              setzeWirtReserve(ns, preis, Date.now(),
-                "Wirt fuer exit.js (" + brauchtGb.toFixed(1) + " GB, " + gb + "-GB-Rechner)");
-              gesetzt = true;
-            }
-            // Kein Mietrechner moeglich (BN9: CloudServerLimit 0)? Dann traegt
-            // home den Sprung, und der Ausbau kostet eigenes Geld. Die Reserve
-            // dafuer setzt das BN9-Gewerk, nicht diese Stelle.
-          }
-        }
-        if (!gesetzt) loescheWirtReserve(ns);
-      } catch { /* Die Reserve ist eine Vorsichtsmassnahme, kein Abbruchgrund */ }
-
-      const reserveJetzt = wirtReserve(ns, Date.now());
 
       nachHome("data/ausgang.json", JSON.stringify({
         zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel, verfahren, offen,
         ueberBlackOps, ueberHacking, status, letzterStart,
         eta_min: etaMin, eta_sicher: etaSicher, eta_quelle: etaQuelle,
         route_state: routeZustand(plan),
-        wirtreserve: reserveJetzt.betrag > 0
-          ? { betrag: reserveJetzt.betrag, bis: reserveJetzt.bis, zweck: reserveJetzt.zweck }
-          : null,
         uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })),
       }));
 
@@ -436,6 +408,13 @@ export async function main(ns) {
           zeit: Date.now(), knoten: cur, lauf: plan.lauf, ziel, verfahren, offen,
           ueberBlackOps, ueberHacking, status, letzterStart,
           uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })),
+          // Die Pflichtfelder gehoeren AUCH hierhin. Das ist der Zweig, in dem
+          // exit.js auf keinen Rechner passt - also der interessanteste
+          // Zustand ueberhaupt. Ohne sie verschwinden route_state und eta_min
+          // genau dann aus der Telemetrie, wenn man sie braucht; ein Leser
+          // sieht ein Loch, nicht einen Wert.
+          eta_min: etaMin, eta_sicher: etaSicher, eta_quelle: etaQuelle,
+          route_state: routeZustand(plan),
           wirtFehlt: { braucht, besterWirt: wirt, moeglich: Number.isFinite(meist) ? meist : null },
         }));
         await ns.sleep(TAKT_MS); continue;

@@ -71,14 +71,14 @@ const BIBLIOTHEKEN = ["lib/hackaugs.js", "lib/route.js", "route.json"];
  * Der Re-Export haelt `tools/test-route.js` am Laufen, das planeRoute ueber
  * alle 40 Uebergaenge der Route prueft.
  */
-import { planeRoute, zielErlaubt, routeZustand } from "./lib/route.js";
+import { planeRoute, zielErlaubt, routeZustand } from "lib/route.js";
 export { planeRoute, zielErlaubt, routeZustand };
 
 // Position C.3: die Wirtreserve (E10) und die Restzeitschaetzung. Beide sind
 // reine Module ohne ns-Aufruf ausser den Basisfunktionen und kosten damit
 // nichts, was ausgang.js nicht ohnehin zahlt.
-import { setzeWirtReserve, loescheWirtReserve, wirtReserve } from "./lib/reserve.js";
-import { messe, etaMinuten } from "./lib/eta.js";
+import { setzeWirtReserve, loescheWirtReserve, wirtReserve } from "lib/reserve.js";
+import { messe, etaMinuten } from "lib/eta.js";
 
 /**
  * Ab wann die Wirtreserve gehalten wird.

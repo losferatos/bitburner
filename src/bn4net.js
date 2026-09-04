@@ -30,7 +30,7 @@
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
-} from "./lib/motorzeit.js";
+} from "lib/motorzeit.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");

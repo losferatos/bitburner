@@ -29,7 +29,7 @@
  *
  * @param {NS} ns
  */
-import { zielErlaubt } from "./lib/route.js";
+import { zielErlaubt } from "lib/route.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");

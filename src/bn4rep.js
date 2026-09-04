@@ -38,6 +38,8 @@ import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 // weiter unten bei `bladeSperreArbeit()`.
 let bladeSperreGemeldet = 0;
 
+import { lage as endspurtLage, einbauErlaubt } from "lib/endspurt.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -1166,6 +1168,32 @@ export async function main(ns) {
           return;
         }
       } catch { /* nicht lesbar - dann gilt die Pruefung von oben */ }
+      // AUSGANGS-INTERLOCK (Position C.3, 04.09.2026).
+      //
+      // Der Riegel weiter oben (:909) haengt an `ausgangSteht`, und das ist
+      // `eingebauteAugs.includes("The Red Pill")` (:887). Red Pill gibt es nur
+      // im V1-Weg. In den 30 Bladeburner-Laeufen der Route greift er also NIE -
+      // und genau dort darf bn4rep in dem Moment einbauen, in dem alle 21
+      // Black Ops gefallen sind und ausgang.js exit.js starten will.
+      //
+      // Was dann passiert, ist kein Geldproblem, sondern ein Engine-Schritt:
+      // installAugmentations loescht ueber prestigeAugmentation ALLE gekauften
+      // Rechner (Prestige.ts:73) und setzt das Guthaben auf 1000 Dollar. Damit
+      // ist weder ein Wirt fuer die 519 GB von exit.js da noch das Geld, einen
+      // zu kaufen. Gegen ein genulltes Konto hilft keine Reserve.
+      //
+      // Dieser Riegel ist verfahrensunabhaengig: er fragt data/ausgang.json,
+      // nicht welche Tuer offen steht.
+      try {
+        const lg = endspurtLage(ns, Date.now());
+        const erlaubt = einbauErlaubt(lg, Date.now(), lg.offenSeit ?? null);
+        if (!erlaubt.ok) {
+          sag("Einbau ausgesetzt. " + erlaubt.grund);
+          return;
+        }
+        if (erlaubt.grund) sag(erlaubt.grund);
+      } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+
       ns.singularity.installAugmentations("boot.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr
     }

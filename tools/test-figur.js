@@ -75,7 +75,27 @@ console.log("-- eine einfache Vergabe --");
   const r = F.vergib(a, null, W0, NR);
   pruefe("der einzige Antrag gewinnt", r.vergabe && r.vergabe.owner === "graft.js");
   pruefe("die Handlung steht drin", r.vergabe.action === "graft");
-  pruefe("die Lease laeuft 15 Minuten", r.vergabe.leaseBis === W0 + F.LEASE_MS);
+  // ZWEI STUNDEN FUER EINEN GRAFT, nicht fuenfzehn Minuten (04.09.2026,
+  // Skeptiker Fehlermodi). Die Graftdauer ist
+  // (3600000 * log2(Summe der Multiplikatoren) + 1800000) / 2 geteilt durch
+  // den Intelligenzbonus (GraftableAugmentation.ts:25-29) - das MINIMUM sind
+  // 15 Minuten, gemessen wurden 17,6 bis 88. Der alte Lease lief damit bei
+  // JEDEM Graft mitten drin ab.
+  pruefe("die Lease fuer einen Graft laeuft zwei Stunden",
+    r.vergabe.leaseBis === W0 + F.LEASE_GRAFT_MS,
+    "erhalten " + (r.vergabe.leaseBis - W0) / 60000 + " min");
+  pruefe("und sie ist laenger als das laengste gemessene Graft",
+    F.LEASE_GRAFT_MS > 88 * 60000);
+
+  // Fuer alles andere bleibt es bei fuenfzehn Minuten: ein toter Besitzer
+  // parkt die Figur genau so lange, und Gym oder Faktionsarbeit lassen sich
+  // ohne Verlust unterbrechen.
+  const bb = [F.antrag("bbtrain.js", F.PRIO.gym, "gym", "str", "Kampfwerte",
+    uhren(W0))];
+  const rb = F.vergib(bb, null, W0, NR);
+  pruefe("fuer alles andere gelten 15 Minuten",
+    rb.vergabe.leaseBis === W0 + F.LEASE_MS,
+    "erhalten " + (rb.vergabe.leaseBis - W0) / 60000 + " min");
   pruefe("die Folgenummer beginnt bei 1", r.vergabe.seq === 1);
   pruefe("es ist ein Wechsel", r.wechsel === true);
 }
@@ -249,6 +269,55 @@ console.log("-- der Dateiname des Antrags --");
   pruefe("und fuehrt nicht aus data/ heraus",
     boese.startsWith("data/") && !boese.slice(5).includes("/") && !boese.includes("\\"),
     boese);
+}
+
+console.log("");
+console.log("-- ein TOTER Besitzer haelt die Figur nicht (W9) --");
+{
+  // Der Anlass: eine Lease laeuft immer bis zum Zeitablauf, auch wenn der
+  // Besitzer laengst weg ist (Absturz, verdraengt, gekillt). Bei 15 Minuten
+  // war das eine Viertelstunde Stillstand; bei der Graft-Lease von zwei
+  // Stunden waeren es zwei Stunden.
+  const a = [F.antrag("graftauto.js", F.PRIO.graft, "graft", {},
+    "graftplan", uhren(W0))];
+  const v = F.vergib(a, null, W0, NR).vergabe;
+  pruefe("Ausgangslage: graftauto.js hat die Figur", v.owner === "graftauto.js");
+
+  // Fuenf Minuten spaeter: der Besitzer laeuft nicht mehr, ein anderer will.
+  const W5 = W0 + 5 * 60000;
+  const spaeter = [F.antrag("blade.js", F.PRIO.bladeburner, "bladeburner", {},
+    "Feldarbeit", uhren(W5))];
+
+  // OHNE Lebendpruefung bleibt es beim alten Verhalten - das ist die
+  // Rueckfallgarantie fuer Aufrufer ohne Prozessliste.
+  const ohne = F.vergib(spaeter, v, W5, NR);
+  pruefe("ohne Lebendpruefung haelt die Lease weiter",
+    ohne.vergabe && ohne.vergabe.owner === "graftauto.js",
+    "Besitzer: " + (ohne.vergabe && ohne.vergabe.owner));
+
+  // MIT Lebendpruefung geht sie an den naechsten Antragsteller.
+  const lebt = (t) => t !== "graftauto.js";
+  const mit = F.vergib(spaeter, v, W5, NR, lebt);
+  pruefe("mit Lebendpruefung geht sie weiter",
+    mit.vergabe && mit.vergabe.owner === "blade.js",
+    "Besitzer: " + (mit.vergabe && mit.vergabe.owner));
+  pruefe("und der Grund nennt den toten Besitzer",
+    /graftauto\.js/.test(mit.grund) && /laeuft nicht mehr/.test(mit.grund),
+    mit.grund);
+  pruefe("es ist ein Wechsel", mit.wechsel === true);
+
+  // Kein Nachfolger da: dann wird die Figur FREI, nicht an den Toten vergeben.
+  const leer = F.vergib([], v, W5, NR, lebt);
+  pruefe("ohne Nachfolger wird die Figur frei", leer.vergabe === null, leer.grund);
+
+  // Und die Gegenprobe, damit die Regel nicht zu scharf ist: ein LEBENDER
+  // Besitzer mit erneuertem Antrag behaelt sie gegen einen schlechteren.
+  const eigen = [F.antrag("graftauto.js", F.PRIO.graft, "graft", {}, "weiter", uhren(W5)),
+    ...spaeter];
+  const bleibt = F.vergib(eigen, v, W5, NR, () => true);
+  pruefe("ein lebender Besitzer behaelt sie",
+    bleibt.vergabe && bleibt.vergabe.owner === "graftauto.js",
+    "Besitzer: " + (bleibt.vergabe && bleibt.vergabe.owner));
 }
 
 console.log("");

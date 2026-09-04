@@ -74,7 +74,7 @@ function bedarf(name, bitNode) {
  * erst, wenn `contracts.js` einmal gelaufen ist - im ersten Moment gibt es sie
  * also nicht, und `csolve.js` wartet zu Recht.
  */
-function startlage(bitNode, verfahren, extraDateien = []) {
+function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0) {
   const da = new Set(["registry.json", "route.json", "graftplan.json",
     ...extraDateien]);
   const lage = {
@@ -85,7 +85,7 @@ function startlage(bitNode, verfahren, extraDateien = []) {
     features: {},
   };
   const auswahl = reg.auswahl(REG, lage);
-  let frei = HOME_GB;
+  let frei = HOME_GB - schonBelegt;
   const laufen = [];
   const warten = [];
   // DIE RESERVIERUNG NACHBILDEN (bn4net.js, Werkzeugstarter).
@@ -232,6 +232,48 @@ console.log("-- BitNode 9: kein Mietrechner, nie --");
   console.log("       frei nach der Startlage: " + s.frei.toFixed(2) + " GB");
   console.log("       (In BN9 gibt es nie eine Werkbank - CloudServerLimit 0."
     + " Position C.13 baut das Gewerk dafuer.)");
+}
+
+console.log("");
+console.log("-- die ALLERERSTE Kernrunde: boot.js laeuft noch (C.7) --");
+{
+  // WARUM DAS EINE EIGENE PROBE BRAUCHT (Skeptiker Runde 3, C7).
+  //
+  // Der Test oben rechnet mit 19,15 GB Belegung - also mit einem boot.js, das
+  // sich schon beendet hat. In der ersten Kernrunde ist es aber noch da:
+  // boot.js startet den Kern und wartet, bis er laeuft. Dann sind 24,65 GB
+  // belegt und nur 7,35 GB frei, und `cdump.js` (12,65) passt NICHT.
+  //
+  // Die Frage ist nicht, ob es passt - es passt nicht, das ist Arithmetik.
+  // Die Frage ist, ob dieses Fenster einen SCHADEN anrichtet: naemlich ob ein
+  // billigeres Gewerk den Platz nimmt und die Geldquelle danach aussperrt.
+  // Genau davor schuetzt die Platzreservierung, und genau das wird hier
+  // geprueft.
+  const BOOT = 5.5;
+  const eng = startlage(10, "V2", [], BOOT);
+  const engLaufen = eng.laufen.map(([n]) => n);
+  for (const [n, gb] of eng.laufen) console.log("       laeuft:  " + String(gb).padStart(6) + " GB  " + n);
+  console.log("       frei: " + eng.frei.toFixed(2) + " GB, reserviert fuer: " + eng.reserviert);
+
+  pruefe("cdump.js passt in diesem Fenster nicht", !engLaufen.includes("cdump.js"),
+    "7,35 GB frei, 12,65 gebraucht - das ist der Anlass der Probe");
+  pruefe("und der Platz wird fuer cdump.js reserviert", eng.reserviert === "cdump.js",
+    "reserviert war: " + eng.reserviert);
+  pruefe("darkweb.js nimmt den Platz NICHT weg",
+    !engLaufen.includes("darkweb.js"),
+    "ohne die Reservierung liefe darkweb (2,65 GB) hier los und cdump waere"
+    + " danach mit 10,20 GB freiem home dauerhaft ausgesperrt");
+  pruefe("auch sonst startet in diesem Fenster kein Gewerk",
+    engLaufen.filter((n) => !["bn4net.js", "guard.js", "wakelock.js"].includes(n)).length === 0,
+    "gestartet: " + engLaufen.join(", "));
+
+  // Und der Beleg, dass es sich von selbst aufloest: sobald boot.js weg ist,
+  // passt die Geldquelle. Die Reservierung verfaellt nach 5 Minuten - sie
+  // haelt also lange genug und nicht laenger.
+  const weit = startlage(10, "V2", [], 0);
+  pruefe("sobald boot.js weg ist, laeuft cdump.js",
+    weit.laufen.map(([n]) => n).includes("cdump.js"),
+    "sonst waere das Fenster kein Fenster, sondern ein Riegel");
 }
 
 console.log("");

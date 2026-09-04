@@ -39,6 +39,66 @@
  * schlimmer als ein Fehler - er faelscht das Ergebnis, statt es zu verhindern.
  */
 
+// DER SPEICHER KOSTET JETZT ETWAS (Skeptiker Runde 3, W5, 04.09.2026).
+//
+// Bis hierher gab `getScriptRam` jedem Skript pauschal 2,4 GB zurueck, und
+// `exec` buchte gar nichts ab. Damit prueften alle Ebene-2-Tests eine Welt, in
+// der Speicher unbegrenzt ist - ausgerechnet die Tests zur Platzreservierung
+// und zur Verdraengung, deren ganzer Gegenstand die Knappheit ist. Der Zweig,
+// um den es ging, war praktisch unerreichbar.
+//
+// Die Zahlen kommen aus derselben Registry, die auch der Kern liest. Ein
+// zweiter Ort fuer dieselbe Tabelle liefe unweigerlich auseinander, und die
+// Registry ist ihrerseits aus ARCHITEKTUR.md erzeugt und gegen tools/ram.js
+// geeicht.
+import fs from "node:fs";
+import path from "node:path";
+import { fileURLToPath } from "node:url";
+
+const MOCK_HIER = path.dirname(fileURLToPath(import.meta.url));
+const RAM_TABELLE = (() => {
+  const t = Object.create(null);
+  for (const kandidat of [
+    path.resolve(MOCK_HIER, "..", "..", "..", "bitburner-bau", "src", "registry.json"),
+    path.resolve(MOCK_HIER, "..", "..", "src", "registry.json"),
+  ]) {
+    if (!fs.existsSync(kandidat)) continue;
+    try {
+      const reg = JSON.parse(fs.readFileSync(kandidat, "utf8"));
+      // DER SF4-FAKTOR GEHOERT DAZU. `ramSingGb` ist der Preis bei SF4.3;
+      // bei SF4.1 - dem Stand dieses Spielstands - kostet die
+      // Singularity-Familie das SECHZEHNFACHE (`SF4Cost` in
+      // `RamCostGenerator.ts`). Wer ihn weglaesst, misst bn4life.js mit
+      // 23,85 GB statt 293,85 und haelt ein 32-GB-home fuer geraeumig.
+      const SF4 = 16;
+      for (const e of reg.eintraege || []) {
+        if (Number.isFinite(e.ramBaseGb)) {
+          t[e.name] = e.ramBaseGb + SF4 * (Number.isFinite(e.ramSingGb) ? e.ramSingGb : 0);
+        }
+      }
+      break;
+    } catch { /* dann die naechste Quelle */ }
+  }
+  // Was nicht in der Registry steht, weil es kein Gewerk ist. Gemessen mit
+  // tools/ram.js am 04.09.2026.
+  t["worker/weaken.js"] = 1.8;
+  t["worker/grow.js"] = 1.8;
+  t["worker/hack.js"] = 1.75;
+  t["boot.js"] = 5.5;
+  t["graft.js"] = 17.15;
+  return t;
+})();
+
+/** Was ein Skript belegt - Registry zuerst, dann der Testwert, dann pauschal. */
+function ramFuer(datei, eigene) {
+  if (eigene && Number.isFinite(eigene[datei])) return eigene[datei];
+  if (Number.isFinite(RAM_TABELLE[datei])) return RAM_TABELLE[datei];
+  // Unbekannt heisst hier ausdruecklich "klein": ein Testskript, das die
+  // Registry nicht kennt, soll nicht am Speicher scheitern. Wer Knappheit
+  // pruefen will, nennt die Zahl in `skriptRam`.
+  return 2.4;
+}
+
 /**
  * @param {object} o Startzustand
  * @param {string} o.host Rechner, auf dem das Skript laeuft
@@ -58,6 +118,11 @@ export function neuerMock(o = {}) {
       ...(o.server || {}),
     },
     // Grafting-Zustand, den der Test steuert.
+    // Abgelehnte exec-Aufrufe (kein Platz) - fuer Tests, die genau das pruefen.
+    abgelehnt: [],
+    // Ausschalter fuer die Speicherbuchhaltung. Vorgabe ist AN; wer einen
+    // Aspekt ohne Knappheit pruefen will, sagt es ausdruecklich.
+    ramBuchen: o.ramBuchen !== false,
     graftbar: o.graftbar || [],
     graftPreise: o.graftPreise || {},
     graftDauern: o.graftDauern || {},
@@ -109,6 +174,13 @@ export function neuerMock(o = {}) {
    */
   const nachholklumpen = (stunden = 8, taktMs = 10000) => vor(taktMs, stunden * 3600000);
 
+  /** Speicher eines beendeten Prozesses zurueckgeben. */
+  const frei = (p) => {
+    if (zustand.ramBuchen === false) return;
+    const srv = zustand.server[p.host];
+    if (srv && Number.isFinite(p.gb)) srv.used = Math.max(0, srv.used - p.gb);
+  };
+
   const dateiHost = (h) => {
     if (!zustand.dateien[h]) zustand.dateien[h] = {};
     return zustand.dateien[h];
@@ -159,14 +231,26 @@ export function neuerMock(o = {}) {
       .map((p) => ({ ...p })),
     exec: (datei, host, threads = 1, ...args) => {
       if (!(datei in dateiHost(host))) return 0;
+      // KEIN PLATZ, KEIN START - wie im Spiel (`NetscriptFunctions.ts`, exec
+      // gibt 0 zurueck). Vorher gab der Mock hier immer eine PID aus, und
+      // jeder Test lief in einer Welt ohne Speichergrenze.
+      const srv = zustand.server[host];
+      const gb = ramFuer(datei, o.skriptRam) * Math.max(1, threads);
+      if (!srv) return 0;
+      if (zustand.ramBuchen !== false && srv.used + gb > srv.ram + 1e-9) {
+        zustand.abgelehnt.push({ datei, host, gb, frei: srv.ram - srv.used, wall: zustand.wall });
+        return 0;
+      }
+      if (zustand.ramBuchen !== false) srv.used += gb;
       const pid = zustand.naechstePid++;
-      zustand.prozesse.push({ pid, filename: datei, host, threads, args });
+      zustand.prozesse.push({ pid, filename: datei, host, threads, args, gb });
       zustand.gestartet.push({ datei, host, threads, args, wall: zustand.wall });
       return pid;
     },
     kill: (pid) => {
       const i = zustand.prozesse.findIndex((p) => p.pid === pid);
       if (i === -1) return false;
+      frei(zustand.prozesse[i]);
       zustand.getoetet.push({ ...zustand.prozesse[i], wall: zustand.wall });
       zustand.prozesse.splice(i, 1);
       return true;
@@ -181,14 +265,15 @@ export function neuerMock(o = {}) {
         (args.length === 0 || args.every((a, i) => String(p.args[i]) === String(a))));
     },
     getRunningScript: () => null,
-    getScriptRam: (datei) => (datei in dateiHost("home") ? 2.4 : 0),
+    getScriptRam: (datei, host) =>
+      (datei in dateiHost(host || "home") ? ramFuer(datei, o.skriptRam) : 0),
     getScriptIncome: () => 0,
     getScriptExpGain: () => 0,
     killall: (host) => {
       const h = host || zustand.host;
       const bleibt = [];
       for (const p of zustand.prozesse) {
-        if (p.host === h) zustand.getoetet.push({ ...p, wall: zustand.wall });
+        if (p.host === h) { frei(p); zustand.getoetet.push({ ...p, wall: zustand.wall }); }
         else bleibt.push(p);
       }
       zustand.prozesse = bleibt;

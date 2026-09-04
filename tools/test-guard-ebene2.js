@@ -144,6 +144,33 @@ let ersterZustand = null;
 }
 
 console.log("");
+console.log("-- der Modus und die Handbremse (W10 und Nachtrag) --");
+{
+  // Ohne Datei: observe. Das ist der Rueckfall und bleibt so - ein Waechter,
+  // der ohne jede Angabe zuschlaegt, waere die falsche Vorgabe.
+  const ohne = await fahre(3, {});
+  pruefe("ohne guard-modus.txt bleibt es bei observe",
+    (json(ohne, "data/watchdog.json") || {}).modus === "observe");
+
+  // Mit "enforce": scharf. Das ist der Zustand, den boot.js seit W10 setzt.
+  const scharf = await fahre(3, { "data/guard-modus.txt": "enforce" });
+  pruefe("mit enforce wird er scharf",
+    (json(scharf, "data/watchdog.json") || {}).modus === "enforce");
+
+  // DIE HANDBREMSE. `data/guard-observe.txt` sticht "enforce" - und zwar in
+  // derselben Runde, in der sie liegt, nicht erst beim naechsten boot.js.
+  // Der Riegel wirkt sonst erst nach dem naechsten Wiederanlauf, und
+  // ausgerechnet eine Notbremse darf nicht auf einen Neustart warten.
+  const gebremst = await fahre(3, {
+    "data/guard-modus.txt": "enforce",
+    "data/guard-observe.txt": "1",
+  });
+  pruefe("guard-observe.txt sticht enforce sofort",
+    (json(gebremst, "data/watchdog.json") || {}).modus === "observe",
+    "erhalten " + (json(gebremst, "data/watchdog.json") || {}).modus);
+}
+
+console.log("");
 console.log("-- ein haengender Kern wird ERKANNT --");
 {
   // Der Kern-Herzschlag ist 30 Minuten alt -> S3a.
@@ -283,6 +310,18 @@ console.log("-- boot.js raeumt den Waechter NICHT weg (die Schonliste) --");
     host: "home", knoten: 10, wall: W0, playtime: 100 * 3600000,
     nodeReset: W0 - 24 * 3600000, augReset: W0 - 24 * 3600000,
     server: { home: { ram: 8, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    // EIGENE GROESSEN STATT DER REGISTRY (Skeptiker Runde 3, W5).
+    //
+    // Seit der Mock `exec` gegen `used` bucht, waeren die echten Zahlen hier
+    // im Weg: blade.js kostet bei SF4.1 174,35 GB und liesse sich auf einem
+    // 8-GB-home gar nicht erst starten - die drei Prozesse, die boot.js hier
+    // vorfinden SOLL, gaebe es dann nicht.
+    //
+    // Der Gegenstand dieser Probe ist die Schonliste, nicht die Knappheit:
+    // home ist klein, drei Werkzeuge halten es besetzt, der Kern passt nicht
+    // mehr hinein. Genau diese Lage wird hier gestellt - 3 x 2 GB von 8, und
+    // die 10,80 des Kerns passen nicht in die restlichen 2.
+    skriptRam: { "guard.js": 2, "ausgang.js": 2, "blade.js": 2, "bn4net.js": 10.8 },
     dateien: { home: { "boot.js": "//", "guard.js": "//", "ausgang.js": "//",
       "blade.js": "//", "registry.json": REGISTRY_MIT_KILLSAFE } },
     maxSchlaf: 70,
@@ -318,6 +357,18 @@ console.log("-- ohne Registry traegt die Notliste --");
     host: "home", knoten: 10, wall: W0, playtime: 100 * 3600000,
     nodeReset: W0 - 24 * 3600000, augReset: W0 - 24 * 3600000,
     server: { home: { ram: 8, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    // EIGENE GROESSEN STATT DER REGISTRY (Skeptiker Runde 3, W5).
+    //
+    // Seit der Mock `exec` gegen `used` bucht, waeren die echten Zahlen hier
+    // im Weg: blade.js kostet bei SF4.1 174,35 GB und liesse sich auf einem
+    // 8-GB-home gar nicht erst starten - die drei Prozesse, die boot.js hier
+    // vorfinden SOLL, gaebe es dann nicht.
+    //
+    // Der Gegenstand dieser Probe ist die Schonliste, nicht die Knappheit:
+    // home ist klein, drei Werkzeuge halten es besetzt, der Kern passt nicht
+    // mehr hinein. Genau diese Lage wird hier gestellt - 3 x 2 GB von 8, und
+    // die 10,80 des Kerns passen nicht in die restlichen 2.
+    skriptRam: { "guard.js": 2, "ausgang.js": 2, "blade.js": 2, "bn4net.js": 10.8 },
     // KEINE registry.json - der Fall nach einem Knotenwechsel, bevor die
     // Bruecke die Dateien nachgeschoben hat.
     dateien: { home: { "boot.js": "//", "guard.js": "//", "blade.js": "//" } },

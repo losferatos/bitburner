@@ -84,16 +84,32 @@ console.log("-- der Vorzug kommt zuerst --");
 }
 
 console.log("");
-console.log("-- der Vorzug WARTET, statt uebersprungen zu werden --");
+console.log("-- der Vorzug BLOCKIERT NICHT, wenn das Geld fehlt --");
 {
-  // Der ganze Sinn ist, dass er VOR den anderen kommt. Wer bei Geldmangel zum
-  // naechsten weitergeht, hat ihn faktisch ans Ende geschoben - und damit die
-  // Entropie fuer alle 38 Stuecke mitgenommen.
+  // KORRIGIERT am 04.09.2026 (Skeptiker Substanz). Hier stand das Gegenteil:
+  // "der Vorzug WARTET, statt uebersprungen zu werden", mit der Begruendung,
+  // sonst nehme man die Entropie fuer alle 38 Stuecke mit.
+  //
+  // Die Begruendung war falsch. `applyEntropy` ruft
+  // `reapplyAllAugmentations()` und rechnet die Multiplikatoren jedes Mal von
+  // Grund auf neu (PlayerObjectAugmentationMethods.ts:8-25) - das Endergebnis
+  // haengt nicht an der Reihenfolge.
+  //
+  // Und der Preis des Wartens: Congruity kostet als Graft 150 Billionen, mit
+  // Puffer 300. Die restlichen 38 Stuecke zusammen 0,42 Billionen. Die alte
+  // Regel haette das Gewerk ab der ersten Runde stillgelegt, bis ein Betrag
+  // zusammen ist, den der Bot auf dieser Route nie erreicht.
   const r = G.naechstes(lage({ geld: 10 * MRD }));
-  pruefe("nichts wird gegraftet", r.name === null);
-  pruefe("und es gilt als Warten", r.wartet === true);
-  pruefe("der Grund nennt Preis und Bestand", /150\.00 Mrd.*10\.00 Mrd/.test(r.grund),
+  pruefe("es wird trotzdem gegraftet", r.name === "A", r.name);
+  pruefe("und es gilt NICHT als Warten", r.wartet === false);
+  pruefe("der Grund nennt trotzdem, warum der Vorzug ausfiel",
+    /Violet Congruity/.test(r.grund) && /150\.00 Mrd/.test(r.grund),
     r.grund);
+
+  // Und die Gegenprobe: mit Geld kommt er sehr wohl zuerst.
+  const mitGeld = G.naechstes(lage({ geld: 1000 * MRD }));
+  pruefe("mit Geld kommt er zuerst", mitGeld.name === "Violet Congruity Implant",
+    mitGeld.name);
 }
 
 console.log("");
@@ -177,7 +193,11 @@ console.log("-- gegen den ECHTEN Plan --");
   pruefe("graftplan.json ist lesbar", Array.isArray(PLAN.reihenfolge));
   console.log("       " + PLAN.anzahl + " Eintraege, Vorzug: "
     + (PLAN.vorzug ? PLAN.vorzug.name : "keiner"));
-  pruefe("er hat 38 Eintraege", PLAN.reihenfolge.length === 38,
+  // 39 seit dem 04.09.2026: LuminCloaking-V1 kam dazu. Es stand vorher nur als
+  // Kommentar "(installiert)" im Plan - und das galt fuer den Lauf, in dem der
+  // Plan entstand, und fuer keinen der 39 danach (prestigeSourceFile leert
+  // Player.augmentations).
+  pruefe("er hat 39 Eintraege", PLAN.reihenfolge.length === 39,
     "erhalten " + PLAN.reihenfolge.length);
   pruefe("keiner doppelt",
     new Set(PLAN.reihenfolge).size === PLAN.reihenfolge.length);

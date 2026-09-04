@@ -66,9 +66,26 @@ function bauMock(o = {}) {
     // haette die Runde mitten drin abgeschnitten, und der Herzschlag steht am
     // Ende (04.09.2026, erster Lauf dieses Tests).
     maxSchlaf: o.maxSchlaf ?? 400,
+    // SPEICHER KOSTET SEIT DEM 04.09.2026 ETWAS (Skeptiker Runde 3, W5).
+    //
+    // Der Mock bucht `exec` jetzt gegen `used`. Damit stellt sich hier eine
+    // Frage, die vorher gar nicht existierte: wieviel home hat dieser Test?
+    //
+    // 32 GB waeren der Kaltstart - und dort passt nach dem Kern (10,80),
+    // Waechter (6,10) und Wachhalter (2,25) fast nichts mehr. Diese Datei
+    // prueft aber NICHT die Knappheit, sondern die Kernzweige C.7 bis C.13:
+    // ob shop.js bei fehlender Tabelle geholt wird, ob eine Wirtsperre wirkt.
+    // Sie an der Speichergrenze zu fahren hiesse, jeden dieser Zweige hinter
+    // einer zweiten, unbeabsichtigten Bedingung zu verstecken.
+    //
+    // Also 1 TB - ein home im Spaetspiel - und die Knappheit hat ihren
+    // eigenen Test (tools/test-kaltstart-budget.js, Abschnitt "die
+    // ALLERERSTE Kernrunde"). `used` startet bei 10,80: den Platz belegt der
+    // Kern selbst, und den bucht der Mock nicht ab, weil er nicht per exec
+    // gestartet wurde.
     server: {
-      home: { ram: o.homeRam ?? 32, used: 0, root: true, geld: o.geld ?? 1e9,
-        cores: 1, ports: 0, hackLevel: 1 },
+      home: { ram: o.homeRam ?? 1048576, used: o.homeUsed ?? 10.8, root: true,
+        geld: o.geld ?? 1e9, cores: 1, ports: 0, hackLevel: 1 },
       ...(o.server || {}),
     },
     ...o.mock,

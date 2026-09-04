@@ -127,11 +127,17 @@ console.log("-- der Vorzug kommt zuerst --");
 }
 
 console.log("");
-console.log("-- bei zu wenig Geld WARTET es auf den Vorzug --");
+console.log("-- bei zu wenig Geld GEHT ES WEITER, statt zu warten --");
 {
-  // Der ganze Sinn des Vorzugs ist, dass er VOR den anderen kommt. Wer bei
-  // Geldmangel zum naechsten Eintrag weitergeht, hat ihn ans Ende geschoben -
-  // und damit die Entropie fuer alle 38 Stuecke mitgenommen.
+  // KORRIGIERT am 04.09.2026 (Skeptiker Substanz). Hier stand das Gegenteil.
+  //
+  // Die alte Begruendung ("wer weitergeht, nimmt die Entropie fuer alle 38
+  // Stuecke mit") ist falsch: applyEntropy rechnet ueber
+  // reapplyAllAugmentations jedes Mal von Grund auf neu
+  // (PlayerObjectAugmentationMethods.ts:8-25), das Endergebnis haengt nicht an
+  // der Reihenfolge. Und Congruity kostet als Graft 150 Billionen gegen 0,42
+  // Billionen fuer alle anderen zusammen - die alte Regel haette das Gewerk ab
+  // der ersten Runde stillgelegt.
   const m = neuerMock({
     geld: 10 * MRD,
     graftbar: ["Aug A", "Violet Congruity Implant"],
@@ -139,14 +145,15 @@ console.log("-- bei zu wenig Geld WARTET es auf den Vorzug --");
     graftDauern: { "Aug A": 600000, "Violet Congruity Implant": 846000 },
   });
   m.lege("home", "graftplan.json", JSON.stringify(PLAN));
+  m.lege("home", "graft.js", "// Platzhalter");
   await fahre(m, modul, 1);
-  pruefe("nichts gestartet",
-    m.zustand.gestartet.filter((g) => g.datei === "graft.js").length === 0);
+  const start = m.zustand.gestartet.find((g) => g.datei === "graft.js");
+  pruefe("Aug A wird gestartet", !!start && start.args[0] === "Aug A",
+    start ? String(start.args[0]) : "gar nicht gestartet");
   const t = JSON.parse(m.lies("home", "data/graftauto.json") || "{}");
-  pruefe("state ist 'blocked', nicht 'wait'", t.state === "blocked", t.state);
-  pruefe("und der Grund nennt Preis und Bestand",
-    /150\.00 Mrd/.test(t.blockedReason || "") && /10\.00 Mrd/.test(t.blockedReason || ""),
-    t.blockedReason);
+  pruefe("state ist 'wait', nicht 'blocked'", t.state === "wait", t.state);
+  pruefe("und der Grund nennt trotzdem, warum der Vorzug ausfiel",
+    /Violet Congruity/.test(t.grund || ""), t.grund);
 }
 
 console.log("");

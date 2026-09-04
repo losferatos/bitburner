@@ -65,6 +65,59 @@ export async function ladeSpielskript(datei) {
   const ziel = path.join(ordner, name);
   fs.writeFileSync(ziel, mitEndung, "utf8");
 
+  // TRANSITIV, NICHT NUR EINE EBENE (04.09.2026).
+  //
+  // Hier wurde nur die geladene Datei umgeschrieben. Importiert sie ein Modul,
+  // das SEINERSEITS im Spielstil importiert - `lib/figurns.js` holt
+  // `lib/figur.js` -, findet Node beim zweiten Sprung wieder ein Paket namens
+  // "lib". Der Test bricht dann mit ERR_MODULE_NOT_FOUND ab, und zwar erst,
+  // wenn jemand eine solche Kette baut: bis zum 04.09. hatte kein lib-Modul
+  // eigene Importe.
+  //
+  // Die Kopien liegen NEBEN den Originalen, damit die relativen Pfade
+  // stimmen, und werden im finally alle wieder entfernt.
+  const kopien = [ziel];
+  const erledigt = new Set([path.resolve(datei)]);
+  const schlange = [datei];
+  while (schlange.length) {
+    const aktuell = schlange.shift();
+    const quelleJetzt = fs.readFileSync(aktuell, "utf8");
+    for (const m of quelleJetzt.matchAll(
+      /\bfrom\s+["'](?!\.{1,2}\/|node:|@|https?:)([^"']+)["']/g)) {
+      let rel = m[1];
+      if (!/\.[a-z]+$/i.test(rel)) rel += ".js";
+      // Bitburner loest absolut ab home auf - also ab dem Ordner der
+      // urspruenglich geladenen Datei.
+      const abs = path.resolve(ordner, rel);
+      if (erledigt.has(abs) || !fs.existsSync(abs)) continue;
+      erledigt.add(abs);
+      schlange.push(abs);
+      // Die Kopie traegt den ORIGINALNAMEN mit .mjs-Endung, damit der
+      // umgeschriebene Import "./lib/figur.mjs" sie findet.
+      const kopie = abs.replace(/\.js$/, ".mjs");
+      const inhalt = fs.readFileSync(abs, "utf8")
+        .replace(/(\bfrom\s+["'])(?!\.{1,2}\/|node:|@|https?:)([^"']+)(["'])/g,
+          (_, a, p2, z) => {
+            const p3 = /\.[a-z]+$/i.test(p2) ? p2.replace(/\.js$/, ".mjs") : p2 + ".mjs";
+            const relPfad = path.relative(path.dirname(abs), path.resolve(ordner, p3))
+              .split(path.sep).join("/");
+            return a + (relPfad.startsWith(".") ? relPfad : "./" + relPfad) + z;
+          });
+      fs.writeFileSync(kopie, inhalt, "utf8");
+      kopien.push(kopie);
+    }
+  }
+  // Die Hauptdatei muss auf die .mjs-Kopien zeigen, nicht auf die .js.
+  const vorher = fs.readFileSync(ziel, "utf8");
+  const nachher = vorher.replace(/(from\s+["']\.\/)([^"']+)\.js(["'])/g,
+    (ganz, a, p2, z) => (fs.existsSync(path.join(ordner, p2 + ".mjs"))
+      ? a + p2 + ".mjs" + z : ganz));
+  fs.writeFileSync(ziel, nachher, "utf8");
+  if (process.env.LADER_LAUT) {
+    console.log("  [lader] " + kopien.length + " Kopie(n), umgeschrieben: "
+      + (vorher !== nachher));
+  }
+
   try {
     // Der Zeitstempel im Namen umgeht Nodes Modul-Zwischenspeicher, damit ein
     // Test die Datei nach einer Aenderung erneut laden kann.
@@ -72,7 +125,9 @@ export async function ladeSpielskript(datei) {
   } finally {
     // Immer aufraeumen, auch wenn der Import wirft. Eine liegengebliebene
     // .mock-Datei unter src/ ginge ueber die Bruecke ins laufende Spiel.
-    try { fs.unlinkSync(ziel); } catch { /* egal */ }
+    for (const k of kopien) {
+      try { fs.unlinkSync(k); } catch { /* egal */ }
+    }
   }
 }
 

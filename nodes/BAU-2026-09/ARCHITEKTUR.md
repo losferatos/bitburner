@@ -541,7 +541,7 @@ nicht in einen Kommentar.
     {
       "name": "cdump.js",
       "args": [],
-      "ramBaseGb": 12.0,
+      "ramBaseGb": 12.65,
       "ramSingGb": 0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",
@@ -820,6 +820,32 @@ nicht in einen Kommentar.
       "precondition": {
         "requiresFile": "graftplan.json"
       }
+    },
+    {
+      "name": "figwatch.js",
+      "args": [],
+      "ramBaseGb": 4.85,
+      "ramSingGb": 0.5,
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
+      "verfahren": "alle",
+      "knoten": "alle",
+      "phase": "normal",
+      "telemetryFile": "data/figwatch.json",
+      "scpToHome": true,
+      "freshnessMs": 600000,
+      "taktMs": 15000,
+      "hostRule": "werkbank",
+      "priority": 14,
+      "evictRank": 18,
+      "needsFigure": "none",
+      "needsLibs": [
+       "lib/figur.js"
+      ],
+      "singularity": true,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {}
     },
     {
       "name": "bbtrain.js",

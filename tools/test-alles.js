@@ -123,6 +123,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-punish.js",
+    deckt: "Sprosse 5: die acht Vorbedingungen und die beiden Deckel (C.12)",
+    schnell: true,
+  },
+  {
     datei: "test-graftauto-ebene2.js",
     deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
     schnell: false,

@@ -262,7 +262,77 @@ Kein Suchmuster ergibt 17.
 
 ## E — Die ETA von BitNode 10
 
-### E.1 — `checkin.js` meldet 430 Tage Restzeit · IN PRÜFUNG
+### E.1 — Die 430 Tage waren um Faktor 208 falsch · UMGESETZT 04.09. 02:48
+
+**Aufgelöst.** Der Beweis brauchte kein Modell: der Bot hat BitNode 10 schon
+einmal gefahren, und Lauf 1 liegt vollständig auf Platte.
+
+Rang gegen Spielzeit ab Bladeburner-Beitritt, Lauf 1:
+
+| Spielzeit | Rang | Rate/h | Aktion |
+|---:|---:|---:|---|
+| 19,9 h | 655 | 39 | Heilkammer ← **hier steht Lauf 2 heute** |
+| 28,4 h | 1.121 | 66 | Heilkammer |
+| 31,9 h | 1.509 | **111** | erste Operation |
+| 46,6 h | 4.802 | 224 | Assassination |
+| 46,7 h | 5.297 | **9.186** | Assassination |
+| 47,8 h | 17.594 | | |
+| 69,7 h | 4.543.999 | | |
+
+Die Rate wächst um mehr als Faktor 5.000. Träger ist **nicht** der Rang —
+`calculateActionRankGain` kennt den Spielerrang gar nicht — sondern die
+Aktionsstufe über `rewardFac^(level-1)` und der Wechsel von Contracts auf
+Operations.
+
+**Der Auftragstext begründet das in 3.3 falsch.** Er sagt, der Ranggewinn je
+Aktion skaliere mit `BladeburnerRank`. Das ist der BitNode-Faktor, in BN10 gleich
+0,8, nicht der Spielerrang. Die Superlinearität ist echt, die genannte Ursache
+nicht. → Korrektur gehört in den Auftragstext.
+
+**Derselbe Fehler stand schon einmal hier.** `nodes/ERLEDIGT.md` vom 30.08.2026,
+14:20: „gemessene Rangrate 42,5/h, also 334 Tage … die lineare Fortschreibung
+eines Post-Reset-Lochs auf einer Exponentialkurve". Derselbe Knoten, dieselbe
+Stelle der Kurve, fünf Tage früher. Er kam zurück, weil er damals **im Bericht**
+korrigiert wurde und nicht **im Werkzeug**. Das ist die eigentliche Lehre.
+
+**Behoben:** `tools/lib/rangkurve.js` hält die gemessenen Stützpunkte. Die
+Restzeit wird nachgeschlagen statt hochgerechnet, das Ergebnis ist eine Klammer
+von 27,7 Stunden bis 2,1 Tagen. Zwischen dem letzten Punkt unter der Schwelle
+und dem ersten darüber liegen 22 ungemessene Stunden; die Klammer gibt das zu.
+Für einen Knoten ohne Kurve wird das gesagt und **nicht** ersatzweise linear
+gerechnet.
+
+Der Bericht nennt jetzt außerdem eine **falsifizierbare Vorhersage**: bis Rang
+903 lief die Referenz mit 169 Rang/h.
+
+### E.1b — Lauf 2 ist schneller als Lauf 1 · GESCHLOSSEN
+Der Gleichstandsvergleich an derselben Rangstelle:
+
+| | Lauf 1 | Lauf 2 |
+|---|---:|---:|
+| Beitritt bis Rang 657 | 19,99 h | **18,71 h** |
+| Rate dort | 34–45/h | 32,9/h |
+| Operationen bei Rang 657 | 0 | 0 |
+
+Der Bot fährt im Bladeburner-Teil **6 % schneller** als beim letzten Mal. Die
+Heilkammer bei Rang 657 ist kein Fehler, sondern derselbe Anlaufzustand.
+Die Sorge „der Bot fährt seit Tagen in die falsche Richtung" ist damit widerlegt.
+
+### E.1c — Zwei echte Verluste bleiben · OFFEN
+1. **Kaltstart 13,9 h langsamer als Lauf 1** (39,11 h bis zum Beitritt gegen
+   höchstens 25,23 h). Einmalig, Ursache steht schon in der Sofort-Liste: der
+   erste Mietrechner kostet in BN10 das Fünffache. → Phase C, Kaltstart-Gewerk.
+2. **32,9 Rang/h gegen eine eigene Decke von 45,3.** Die Kammerphase dauert
+   108 Sekunden, gutgeschrieben werden nur 60. Die übrigen 48 Sekunden je Zyklus
+   bringen weder Rang noch Ausdauer. Kosten: 12,4 Rang/h, also rund 298 pro Tag.
+   → Phase C, `blade.js`, mittleres Risiko, Skeptiker vor dem Einbau.
+
+Drei weitere Vorschläge wurden **widerlegt** und werden nicht gebaut: Overclock
+(Ausdauer fällt je Aktion an, nicht je Sekunde), Field Analysis statt Heilkammer
+(bringt 9,6 gegen 20,5 Rang/h), Raid als Hebel (jeder Erfolg kostet 1 % der
+Stadtbevölkerung, und die geht mit Exponent 0,7 in jede Erfolgschance ein).
+
+### E.1-alt — Der ursprüngliche Befund, zur Nachvollziehbarkeit
 Gemessen 04.09.2026 01:47: Rang 657 von 400.000, Rate 33 Rang je Spielstunde,
 Rest 340.415 netto, ETA **430,7 Tage**, Urteil „AUF KURS".
 

@@ -350,6 +350,26 @@ const ZEIT = {
   koeder: BASIS + 25 * STUNDE,
 };
 
+/**
+ * DER ABLAGEORT DER TEST-ROLLE, VOR UND NACH DEM LAUF.
+ *
+ * Der Schaden aus Skeptikerrunde 5 (A-B1) bestand nicht aus falschem Code,
+ * sondern aus falschen DATEN: dieser Test schrieb erfundene Spielzeiten in
+ * denselben Sicherungsindex wie die echten Kopien von Erics Spielstand und hob
+ * dessen Anker von 369 auf 6.800 Stunden. Eine echte Kopie waere ab da
+ * dauerhaft als Rueckwaertssprung abgelehnt worden.
+ *
+ * Behoben ist das durch die eigene Rolle MOCK. Diese Zusicherung ist der
+ * Waechter darueber - denn die Rolle steht an sieben Stellen in dieser Datei,
+ * und eine vergessene genuegt.
+ */
+function testAblage() {
+  const o = path.join(ROOT, "pruefstand", "backups");
+  if (!fs.existsSync(o)) return [];
+  return fs.readdirSync(o).sort();
+}
+const ABLAGE_VORHER = testAblage();
+
 console.log("");
 console.log("=== Die Bruecke gegen ein nachgebautes Spiel ===");
 
@@ -847,6 +867,18 @@ console.log("-- ZWEI BRUECKEN auf einem Port: die zweite beendet sich --");
 
 // ---------------------------------------------------------------------------
 raeumeAuf();
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die TEST-Ablage ist unberuehrt (A-B1) --");
+{
+  const nachher = testAblage();
+  const neu = nachher.filter((f) => !ABLAGE_VORHER.includes(f));
+  pruefe("dieser Lauf hat NICHTS in pruefstand/backups geschrieben",
+    neu.length === 0,
+    neu.join(", ") + " - erfundene Spielzeiten gehoeren nicht in denselben"
+    + " Index wie echte Spielstandskopien");
+}
 
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");

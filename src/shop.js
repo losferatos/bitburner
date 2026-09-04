@@ -44,8 +44,9 @@
  *
  * Der Kern schreibt `data/kaufauftrag.json` mit einer `id`; dieses Gewerk
  * merkt sich die ausgefuehrten ids und ruehrt einen bekannten Auftrag nicht
- * mehr an. Die Datei wird NICHT geloescht - `ns.rm` kostet 1 GB, und das ist
- * ein Achtel des ganzen Gewerks fuer eine Handlung, die auch anders geht.
+ * mehr an. Die Datei wird NICHT geloescht - `ns.rm` kostet 0,60 GB (es teilt
+ * sich die Konstante mit scp), und das Gedaechtnis unten deckt denselben Fall
+ * vollstaendig ab - auch den, in dem das Loeschen selbst fehlschlaegt.
  *
  * Die Falle dabei (Skeptiker 04.09.2026): das Gedaechtnis lebte nur im
  * Prozess. Nach jedem Neustart - Spiel-Reload, Augmentierungs-Einbau,

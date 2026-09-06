@@ -113,9 +113,23 @@ export async function main(ns) {
   const letzteAusfuehrung = new Map(
     Object.entries((leiter && leiter.letzteAusfuehrung) || {}));
 
-  // Fuer S2: der Traegerwert beim letzten Vergleich.
-  let letzterTraegerWert = null;
-  let letzterTraegerMotorMs = null;
+  // Fuer S2: der Traegerwert beim letzten Vergleich. PERSISTENT seit dem
+  // 06.09.2026: vorher prozesslokal, also nach jedem Waechter-Neustart
+  // (restartPolicy always, und Sprosse 3 startet ihn selbst neu) fuer 45 min
+  // Motorzeit blind - und in dieser Blindheit haette die Entwarnung jeden
+  // persistierten Verdacht geloescht. Die Werte wandern mit watchdog.json.
+  let letzterTraegerWert = Number.isFinite(leiter && leiter.letzterTraegerWert)
+    ? leiter.letzterTraegerWert : null;
+  let letzterTraegerMotorMs = Number.isFinite(leiter && leiter.letzterTraegerMotorMs)
+    ? leiter.letzterTraegerMotorMs : null;
+  // Wanduhr des Vergleichspunkts - die Fehlversuch-Buchung aus blade.js
+  // traegt eine Wanduhr, und nur ein Fehlversuch NACH dem Vergleichspunkt
+  // darf angerechnet werden.
+  let letzterTraegerWall = Number.isFinite(leiter && leiter.letzterTraegerWall)
+    ? leiter.letzterTraegerWall : null;
+  // Entwarnungen dieses Laufs - der Beleg, dass die Hysterese richtig sitzt.
+  let entwarnungen = Number.isFinite(leiter && leiter.stand_down_count)
+    ? leiter.stand_down_count : 0;
 
   // Auftraege an den Kern. Sie leben ueber Runden hinweg, weil der Kern seinen
   // eigenen Takt hat - ein Auftrag, den der Waechter nur eine Runde lang
@@ -211,6 +225,9 @@ export async function main(ns) {
         schreibeZustand(ns, uhren, leiter, strafen, {
           wall, runden, okRunden, errStreak, lastError,
           modus: modusRoh, karenz: true, motorTimeMs: 0, signale: [],
+          letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
+          fehlstrafen, fehlkills,
+          letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall, entwarnungen,
         }, spieler);
         okRunden++;
         errStreak = 0;
@@ -289,8 +306,24 @@ export async function main(ns) {
         playtime: spieler.totalPlaytime,
         puls: puls ? puls.puls : null,
         sichtbar,
-        letzterTraegerWert, letzterTraegerMotorMs,
+        letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
       });
+
+      // Welche Ziele waren diese Runde ueberhaupt AUSWERTBAR? Nur fuer die
+      // darf ein ausgebliebenes Signal als Entwarnung gelten. "fortschritt"
+      // (S2) braucht kpi.json mit Traeger UND einen Vergleichspunkt; nach
+      // einem Neustart ohne persistierten Wert ist das Ziel blind, nicht
+      // gesund. Werkzeug-Ziele (S1) sind auswertbar, sobald ihre Telemetrie
+      // vorliegt; "kern" braucht den Kern-Herzschlag.
+      const auswertbar = new Set();
+      if (kpi && kpi.traeger && Number.isFinite(kpi.traeger.wert)
+          && Number.isFinite(letzterTraegerWert)
+          && Number.isFinite(letzterTraegerMotorMs)
+          && motorTimeMs - letzterTraegerMotorMs >= 45 * 60000) {
+        auswertbar.add("fortschritt");
+      }
+      if (kern) auswertbar.add("kern");
+      for (const t of eintraege || []) if (t.telemetrie) auswertbar.add(t.name);
 
       // Traegerwert fortschreiben - erst NACH der Auswertung, sonst vergleicht
       // S2 den Wert mit sich selbst.
@@ -310,12 +343,27 @@ export async function main(ns) {
       // gewachsen ist. Steht er, bleibt der alte Punkt stehen und `dMotor`
       // waechst - das ist die Zahl, die S2 meint.
       if (kpi && kpi.traeger && Number.isFinite(kpi.traeger.wert)) {
+        // DIE BUCHUNG (06.09.2026): Liegt ein gewollter Fehlversuch NACH dem
+        // Vergleichspunkt, wird dessen Verlust vom Vergleichspunkt abgezogen -
+        // genau einmal, danach zaehlt der Vergleichspunkt als "nach dem
+        // Fehlversuch". So bleibt `rang` der Traeger, und ein Rang, der nach
+        // dem Verlust wieder ueber (alt - Verlust) liegt, gilt als Wachstum.
+        const f = kpi.traeger.fehlversuch;
+        if (f && Number.isFinite(f.verlust) && f.verlust > 0
+            && Number.isFinite(f.wall) && Number.isFinite(letzterTraegerWall)
+            && f.wall > letzterTraegerWall && Number.isFinite(letzterTraegerWert)) {
+          letzterTraegerWert -= f.verlust;
+          letzterTraegerWall = f.wall;
+          sag("Fehlversuch gebucht: -" + Math.round(f.verlust) + " Rang, Vergleichspunkt jetzt "
+            + Math.round(letzterTraegerWert) + ".");
+        }
         const gewachsen = letzterTraegerWert !== null
           && kpi.traeger.wert > letzterTraegerWert;
         if (letzterTraegerWert === null
             || (gewachsen && motorTimeMs - (letzterTraegerMotorMs ?? 0) >= 45 * 60000)) {
           letzterTraegerWert = kpi.traeger.wert;
           letzterTraegerMotorMs = motorTimeMs;
+          letzterTraegerWall = wall;
         }
       }
 
@@ -555,9 +603,23 @@ export async function main(ns) {
       // Ende, EXHAUSTED und NOT_EXECUTABLE haben eigene Ausgaenge.
       {
         const mitSignal = new Set(sigs.filter((x) => x.schwere > 0).map((x) => x.ziel));
-        const entwarnt = entwarnung(leiter, mitSignal, uhren.guardTimeMs);
-        if (entwarnt.length) {
-          sag("Entwarnung fuer " + entwarnt.join(", ") + " - das Signal liegt nicht mehr an.");
+        const vorher = Object.fromEntries(Object.entries(leiter.ziele || {})
+          .map(([n, s]) => [n, { sprosse: s.sprosse, signal: s.signal }]));
+        const entwarnt = entwarnung(leiter, mitSignal, uhren.guardTimeMs, auswertbar);
+        for (const ziel of entwarnt) {
+          entwarnungen++;
+          const v = vorher[ziel] || {};
+          sag("Entwarnung fuer " + ziel + " (war Sprosse " + v.sprosse + ", " + v.signal
+            + ") - das Signal blieb 10 min aus.");
+          // Der Beleg gehoert in penalties.json, sonst verschwindet der
+          // Verdacht spurlos und die Hysterese ist nach zwei Wochen nicht
+          // pruefbar.
+          try {
+            protokolliere(strafen, { rung: v.sprosse ?? null, target: ziel,
+              reason: v.signal ?? null, grund: "Entwarnung nach 10 min ohne Signal",
+              wall, playtime: spieler.totalPlaytime, motorTime: motorTimeMs,
+              guardTime: uhren.guardTimeMs, round: runden, result: "stood-down" });
+          } catch { /* Protokoll ist Beiwerk */ }
         }
       }
 
@@ -574,6 +636,7 @@ export async function main(ns) {
         letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
         fehlstrafen,
         fehlkills,
+        letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall, entwarnungen,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -737,6 +800,13 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     // Der zweite Abnahmezaehler mit Soll 0 (04.09.2026). Siehe
     // `andereUhrSagtFrisch` - gezaehlt wird nur, was belegbar falsch ist.
     false_kill_count: lage.fehlkills ?? null,
+    // Der Vergleichspunkt von S2 ueberlebt den Neustart (06.09.2026) - sonst
+    // ist der Waechter nach jedem Start 45 min blind, und die Entwarnung
+    // loescht in dieser Blindheit jeden persistierten Verdacht.
+    letzterTraegerWert: lage.letzterTraegerWert ?? null,
+    letzterTraegerMotorMs: lage.letzterTraegerMotorMs ?? null,
+    letzterTraegerWall: lage.letzterTraegerWall ?? null,
+    stand_down_count: lage.entwarnungen ?? 0,
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block
     // ungueltig, und der Kern wuerde den Waechter zu Recht fuer tot halten.

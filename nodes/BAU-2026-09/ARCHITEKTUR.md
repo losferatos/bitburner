@@ -856,6 +856,7 @@ nicht in einen Kommentar.
       "needsLibs": [
         "lib/figur.js",
         "lib/figurns.js",
+        "lib/hostdatei.js",
         "lib/graftwahl.js"
       ],
       "singularity": true,
@@ -911,7 +912,8 @@ nicht in einen Kommentar.
       "needsFigure": "owner",
       "needsLibs": [
        "lib/figurns.js",
-       "lib/figur.js"
+       "lib/figur.js",
+       "lib/hostdatei.js"
       ],
       "singularity": true,
       "restartPolicy": "always",

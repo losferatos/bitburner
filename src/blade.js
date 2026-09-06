@@ -1306,9 +1306,15 @@ export async function main(ns) {
   // also, ob der Bot vorankommt, nicht, ob er gerade einen Wurf verloren
   // hat. Ein Rang, der ueber Stunden unter seinem Hoch bleibt, faellt
   // weiterhin auf: dann waechst das Hoch nicht, und S2 feuert zu Recht.
-  // Nach Knotenwechsel oder Einbau startet boot.js blade.js ohnehin neu,
-  // deshalb wird der Stand nicht persistiert.
+  // ZURUECKGENOMMEN AM SELBEN TAG: Drei Skeptiker fanden, dass der Hochstand
+  // als Traeger S2 blind fuer echten Rueckschritt macht und bei jedem
+  // Neustart von blade.js (also gerade durch Sprosse 4.5) auf null faellt.
+  // `rangHoch` bleibt als Anzeigewert in blade.json; der Traeger ist wieder
+  // `rang`, und der Fehlversuch geht als BUCHUNG hinaus (`fehlversuch`,
+  // gesetzt in schliesseAbschnitt): der Waechter rechnet den Verlust auf
+  // seinen Vergleichspunkt an.
   let rangHoch = null;
+  let fehlversuch = null;
   const meldeLage = (aktion, grund, chance) => {
     let ausdauer = "?", hp = null, spielzeit = null, rang = null, punkte = null;
     try {
@@ -1383,6 +1389,15 @@ export async function main(ns) {
       rangHoch: (rangHoch = Number.isFinite(rang)
         ? Math.max(rang, Number.isFinite(rangHoch) ? rangHoch : rang)
         : rangHoch),
+      // Der letzte gewollte Black-Op-Fehlversuch mit seinem Rangverlust -
+      // die Buchung fuer den Waechter (S2). Bleibt stehen, bis der naechste
+      // Abschnitt mit Verlust endet; der Waechter entscheidet per `wall`, ob
+      // er ihn schon angerechnet hat.
+      fehlversuch,
+      // Was die Figur WIRKLICH tut - gegen `aktion` (den Wunsch) gehalten.
+      // 4,5 h lang stand hier "Vindictus", waehrend die Figur Recruitment
+      // machte; der Unterschied war von aussen nicht sichtbar.
+      istAktion: (() => { try { const c = ns.bladeburner.getCurrentAction(); return c ? c.type + "/" + c.name : null; } catch { return null; } })(),
       // Der Puls der Spielengine. Netscript und die Engine sind zwei
       // Schleifen; totalPlaytime waechst nur in updateGame. Steht die Zahl
       // zwischen zwei Messungen still, ist die Engine tot, und dann hilft
@@ -1476,6 +1491,21 @@ export async function main(ns) {
   const schliesseAbschnitt = (jetztRang) => {
     if (!abschnitt) return;
     const dauer = Date.now() - abschnitt.von;
+    // DIE BUCHUNG DES FEHLVERSUCHS (06.09.2026, Skeptiker gegen die Ratsche).
+    //
+    // Endet ein Black-Op-Abschnitt mit weniger Rang als er begann, war das
+    // ein gewollter Fehlversuch (Schwelle 0,35, ENTSCHIEDEN). Der Waechter
+    // bekommt den Verlust als Gutschrift auf seinen Vergleichspunkt - so
+    // bleibt `rang` der Traeger und echter Rueckschritt sichtbar, waehrend
+    // der Fehlversuch entschuldbar ist. Eine erste Fassung fuehrte statt
+    // dessen einen Hochwasserstand als Traeger; drei Skeptiker fanden, dass
+    // der S2 blind fuer echten Rueckschritt machte und bei jedem Neustart
+    // von blade.js (also gerade bei Sprosse 4.5) auf null fiel.
+    if (Number.isFinite(jetztRang) && Number.isFinite(abschnitt.rang)
+        && abschnitt.aktion.startsWith(B + "/") && jetztRang < abschnitt.rang) {
+      fehlversuch = { wall: Date.now(), aktion: abschnitt.aktion,
+        verlust: abschnitt.rang - jetztRang, rangVor: abschnitt.rang };
+    }
     // Abschnitte unter zehn Sekunden sind Umschaltzucken, keine Arbeit.
     if (dauer >= 10_000) {
       const zeile = JSON.stringify({

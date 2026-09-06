@@ -252,11 +252,17 @@ export async function ladeSpielskript(datei) {
  * Datei nicht hat - also praktisch nie.
  */
 export async function ladeAusBeiden(root, rel) {
-  const kandidaten = [
-    path.join(root, "src", rel),
-    path.resolve(root, "..", "bitburner-bau", "src", rel),
-  ];
-  const t = kandidaten.find((p) => fs.existsSync(p));
-  if (!t) throw new Error("src/" + rel + " nicht gefunden (weder Worktree noch live)");
+  const live = path.join(root, "src", rel);
+  const bau = path.resolve(root, "..", "bitburner-bau", "src", rel);
+  // Ein Testlader darf nicht raten, welchen Baum er prueft (Skeptiker
+  // 06.09.): existieren beide und unterscheiden sie sich, ist das ein
+  // Fehler, kein Vorrang.
+  if (fs.existsSync(live) && fs.existsSync(bau)
+      && !fs.readFileSync(live).equals(fs.readFileSync(bau))) {
+    throw new Error("src/" + rel + " liegt in ZWEI Baeumen mit verschiedenem Inhalt: "
+      + live + " und " + bau + " - erst den Worktree aufloesen oder angleichen");
+  }
+  const t = [live, bau].find((p) => fs.existsSync(p));
+  if (!t) throw new Error("src/" + rel + " nicht gefunden (weder live noch Worktree)");
   return { modul: await ladeSpielskript(t), pfad: t };
 }

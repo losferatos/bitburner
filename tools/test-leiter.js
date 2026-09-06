@@ -234,21 +234,26 @@ console.log("-- S2 ist stumm, wenn die Route fertig ist --");
   pruefe("bei wachsendem Traeger kein S2",
     !L.signale(waechst).some((x) => x.sig === "S2"));
 
-  // DER FEHLVERSUCH (06.09.2026): Der Kern gibt als Traeger den
-  // Hoechststand des Laufs weiter, nicht den Augenblickswert. Ein Rang, der
-  // durch eine misslungene Black Op um 15.000 faellt, senkt den Traeger
-  // also NICHT - und darf kein S2 ausloesen, solange das Hoch juenger als
-  // 45 min ist. Der Test bildet den Kontrakt ab: der Traegerwert steigt
-  // (1000 -> 1050), obwohl der Augenblicksrang unter dem alten Hoch liegt.
-  const fehlversuch = { ...basis, letzterTraegerWert: 1000,
-    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1050 } } };
-  pruefe("ein Hoch ueber dem letzten Vergleichspunkt ist Wachstum, kein S2",
-    !L.signale(fehlversuch).some((x) => x.sig === "S2"));
-  const steht = { ...basis, letzterTraegerWert: 1050,
-    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1050 } } };
-  pruefe("ein Hoch, das 2 h nicht steigt, ist Stillstand - S2",
-    L.signale(steht).some((x) => x.sig === "S2"),
-    "Fehlversuche duerfen echten Stillstand nicht verdecken");
+  // DER FEHLVERSUCH ALS BUCHUNG (06.09.2026): Ein gewollter Black-Op-
+  // Fehlversuch (-15.000 Rang) kommt mit Zeitstempel im Traeger mit. Liegt er
+  // NACH dem Vergleichspunkt, wird der Verlust gutgeschrieben: der Traeger
+  // muss dann nur ueber (alt - Verlust) liegen. Ein Rang, der ohne Buchung
+  // unter dem alten Wert bleibt, ist weiterhin Stillstand.
+  const buchung = { ...basis, letzterTraegerWert: 1000, letzterTraegerWall: W0 - 3600000,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 990,
+      fehlversuch: { wall: W0 - 60000, verlust: 15000 } } } };
+  pruefe("Rang unter dem Vergleichspunkt, aber Fehlversuch gebucht: kein S2",
+    !L.signale(buchung).some((x) => x.sig === "S2"));
+  const alteBuchung = { ...buchung, letzterTraegerWall: W0,
+    kpi: { ...buchung.kpi, traeger: { ...buchung.kpi.traeger,
+      fehlversuch: { wall: W0 - 60000, verlust: 15000 } } } };
+  pruefe("ein Fehlversuch VOR dem Vergleichspunkt zaehlt nicht mehr",
+    L.signale(alteBuchung).some((x) => x.sig === "S2"));
+  const ohne = { ...basis, letzterTraegerWert: 1000, letzterTraegerWall: W0 - 3600000,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 990 } } };
+  pruefe("ohne Buchung ist Rueckschritt Stillstand - S2",
+    L.signale(ohne).some((x) => x.sig === "S2"),
+    "die Buchung darf echten Rueckschritt nicht verdecken");
 }
 
 // ===========================================================================
@@ -277,32 +282,50 @@ console.log("-- der Zustandsautomat: Karenz vor der Strafe --");
 }
 
 console.log("");
-console.log("-- Entwarnung: ein Verdacht ohne Signal faellt zurueck auf HEALTHY --");
+console.log("-- Entwarnung: erst nach 10 min ohne Signal, nur wenn auswertbar --");
 {
   // 06.09.2026: S2 setzte "fortschritt" auf SUSPECT(5); ab 11:45 wuchs der
   // Rang wieder, das Signal blieb aus - und das Ziel stand sechs Stunden auf
-  // SUSPECT, weil es keinen Weg zurueck gab ausser der Karenz der teuersten
-  // Sprosse.
+  // SUSPECT. Drei Skeptiker verlangten fuer den Rueckweg Hysterese (ein
+  // 10-s-Takt ohne Signal darf keine Stundenkarenz loeschen) und Messbarkeit
+  // (Blindheit ist keine Entwarnung).
   const z = L.neu(1000);
   const sig = { sig: "S2", ziel: "fortschritt", grund: "steht", schwere: 2 };
-  L.schritt(z, sig, 0, W0, { guard: 0, engine: 0, motor: 0 });
+  const U = (g) => ({ guard: g, engine: 0, motor: 0 });
+  L.schritt(z, sig, 0, W0, U(0));
   pruefe("Verdacht steht", z.ziele["fortschritt"].zustand === "SUSPECT");
-  const raus = L.entwarnung(z, new Set(), 60000);
-  pruefe("ohne Signal wird entwarnt", raus.length === 1 && raus[0] === "fortschritt");
-  pruefe("Zustand HEALTHY, Sprosse 0", z.ziele["fortschritt"].zustand === "HEALTHY"
-    && z.ziele["fortschritt"].sprosse === 0);
 
-  // Liegt das Signal weiter an, bleibt der Verdacht.
-  L.schritt(z, sig, 120000, W0, { guard: 120000, engine: 0, motor: 0 });
-  const bleibt = L.entwarnung(z, new Set(["fortschritt"]), 130000);
-  pruefe("mit Signal bleibt SUSPECT", bleibt.length === 0
+  const alle = new Set(["fortschritt"]);
+  let raus = L.entwarnung(z, new Set(), 10000, alle);
+  pruefe("ein Takt ohne Signal entwarnt NICHT", raus.length === 0
     && z.ziele["fortschritt"].zustand === "SUSPECT");
+  raus = L.entwarnung(z, new Set(), 10000 + L.ENTWARNUNG_MS - 1, alle);
+  pruefe("kurz vor der Frist noch nicht", raus.length === 0);
+  // Flackern: das Signal kommt einmal zurueck - die Frist beginnt neu.
+  L.entwarnung(z, new Set(["fortschritt"]), 10000 + L.ENTWARNUNG_MS, alle);
+  raus = L.entwarnung(z, new Set(), 10000 + L.ENTWARNUNG_MS + 5000, alle);
+  pruefe("nach einem Flackern beginnt die Frist neu", raus.length === 0
+    && z.ziele["fortschritt"].zustand === "SUSPECT");
+  const t0 = 10000 + L.ENTWARNUNG_MS + 5000;
+  raus = L.entwarnung(z, new Set(), t0 + L.ENTWARNUNG_MS, alle);
+  pruefe("nach 10 min durchgehend ohne Signal wird entwarnt",
+    raus.length === 1 && z.ziele["fortschritt"].zustand === "HEALTHY");
+  pruefe("die erreichte Sprosse bleibt im Gedaechtnis",
+    z.ziele["fortschritt"].letzteSprosse === 4.5, String(z.ziele["fortschritt"].letzteSprosse));
 
-  // EXECUTED wird nicht entwarnt - die Wirkungspruefung laeuft zu Ende.
+  // Blindheit: das Ziel war nicht auswertbar (kein Vergleichspunkt) -
+  // keine Entwarnung, egal wie lange.
+  const z2 = L.neu(1000);
+  L.schritt(z2, sig, 0, W0, U(0));
+  L.entwarnung(z2, new Set(), 10000, new Set());
+  raus = L.entwarnung(z2, new Set(), 10000 + 2 * L.ENTWARNUNG_MS, new Set());
+  pruefe("nicht auswertbar = keine Entwarnung", raus.length === 0
+    && z2.ziele["fortschritt"].zustand === "SUSPECT");
+
+  // EXECUTED wird nicht entwarnt.
   z.ziele["x"] = { zustand: "EXECUTED", sprosse: 1, seit: 0, versuche: 1 };
-  const nichtX = L.entwarnung(z, new Set(), 200000);
-  pruefe("EXECUTED bleibt stehen", !nichtX.includes("x")
-    && z.ziele["x"].zustand === "EXECUTED");
+  const nichtX = L.entwarnung(z, new Set(), 10 * L.ENTWARNUNG_MS, new Set(["x"]));
+  pruefe("EXECUTED bleibt stehen", !nichtX.includes("x") && z.ziele["x"].zustand === "EXECUTED");
 }
 
 console.log("");

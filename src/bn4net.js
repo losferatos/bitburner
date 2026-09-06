@@ -4344,13 +4344,20 @@ export async function main(ns) {
         try {
           const b = JSON.parse(ns.read("data/blade.json"));
           if (b && Number.isFinite(b.rang)) {
-            // Als Traeger zaehlt der HOECHSTSTAND des Laufs, nicht der
-            // Augenblickswert (06.09.2026): ein gewollter Black-Op-Fehlversuch
-            // senkt den Rang um ~15.000, und S2 hielt das fuer Stillstand -
-            // Sprosse 4.5 beendete blade.js mitten in den letzten zwei Black
-            // Ops. Fehlt `rangHoch` (aeltere blade.js-Fassung), gilt `rang`.
-            const wert = Number.isFinite(b.rangHoch) ? Math.max(b.rangHoch, b.rang) : b.rang;
-            traeger = { name: "rang", wert, motorTimeMs: mz.motorTimeMs };
+            // Der Traeger ist der Augenblicksrang - und dazu die BUCHUNG des
+            // letzten gewollten Black-Op-Fehlversuchs (06.09.2026). Eine erste
+            // Fassung nahm den Hochstand als Traeger; drei Skeptiker fanden,
+            // dass das S2 blind fuer echten Rueckschritt macht. Jetzt reicht
+            // der Kern `fehlversuch` durch, und der Waechter rechnet den
+            // Verlust auf seinen Vergleichspunkt an. Nur uebernehmen, wenn
+            // blade.json frisch ist (10 min wie TELEMETRIE_FEST) - ein alter
+            // Wert aus dem vorigen Lauf ist kein Traeger.
+            const frisch = Number.isFinite(b.zeit) && Date.now() - b.zeit < 10 * 60000;
+            if (frisch) {
+              traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
+                fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
+                  ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null };
+            }
           }
           // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem
           // Soll, der keinen Schreiber hatte.

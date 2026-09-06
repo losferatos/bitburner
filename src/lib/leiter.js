@@ -254,7 +254,22 @@ export function signale(e) {
     if (!stumm && Number.isFinite(e.letzterTraegerWert)
         && Number.isFinite(e.letzterTraegerMotorMs)) {
       const dMotor = e.motorTimeMs - e.letzterTraegerMotorMs;
-      if (dMotor >= 45 * 60000 && t.wert <= e.letzterTraegerWert) {
+      // DIE GUTSCHRIFT FUER DEN FEHLVERSUCH (06.09.2026). Ein gewollter
+      // Black-Op-Fehlversuch (Schwelle 0,35, ENTSCHIEDEN) kostet ~15.000
+      // Rang. Heute Morgen hielt S2 zwei davon fuer Stillstand und liess
+      // Sprosse 4.5 blade.js beenden - mitten in den letzten zwei Black Ops.
+      // Der Verlust kommt als Buchung mit (kpi.traeger.fehlversuch) und wird
+      // auf den Vergleichspunkt angerechnet, wenn er nach dem Vergleichspunkt
+      // liegt: der Traeger muss dann nur ueber (alt - Verlust) liegen.
+      // `rang` bleibt der Traeger; echter Rueckschritt bleibt sichtbar.
+      let gutschrift = 0;
+      const f = t.fehlversuch;
+      if (f && Number.isFinite(f.verlust) && f.verlust > 0
+          && Number.isFinite(f.wall) && Number.isFinite(e.letzterTraegerWall)
+          && f.wall > e.letzterTraegerWall) {
+        gutschrift = f.verlust;
+      }
+      if (dMotor >= 45 * 60000 && t.wert + gutschrift <= e.letzterTraegerWert) {
         // `alterMotorMs` GEHOERT MIT (Skeptiker Runde 4, R1). Sprosse 5
         // prueft als erste Vorbedingung "S2 seit >= 6 h MOTORZEIT" und liest
         // die Zahl aus dem Auftrag - der Waechter fuehrt das Signal, also gibt
@@ -509,17 +524,33 @@ export function schritt(z, sig, jetztGuardMs, jetztWall, uhren, lage = {}) {
  * @param {number} jetztGuardMs
  * @returns {string[]} die entwarnten Ziele
  */
-export function entwarnung(z, zieleMitSignal, jetztGuardMs) {
+export const ENTWARNUNG_MS = 10 * 60000;
+
+export function entwarnung(z, zieleMitSignal, jetztGuardMs, auswertbar = null) {
   const raus = [];
   for (const [name, s] of Object.entries(z.ziele || {})) {
     if (s.zustand !== "SUSPECT") continue;
-    if (zieleMitSignal && zieleMitSignal.has(name)) continue;
+    // NUR WAS MESSBAR WAR (Skeptiker 06.09.): Ein Signal, das diese Runde
+    // nicht erzeugt werden KONNTE (kpi.json nicht lesbar, Vergleichspunkt
+    // nach Neustart noch leer), ist kein ausgebliebenes Signal. Blindheit
+    // ist keine Entwarnung.
+    if (auswertbar && !auswertbar.has(name)) { s.ohneSignalSeit = null; continue; }
+    if (zieleMitSignal && zieleMitSignal.has(name)) { s.ohneSignalSeit = null; continue; }
+    // HYSTERESE (Skeptiker 06.09.): Der Waechter laeuft alle 10 s; ein
+    // einzelner Takt ohne Signal darf eine Karenz von Stunden nicht loeschen.
+    // Das Signal muss zehn Minuten Waechterzeit durchgehend ausbleiben.
+    if (!Number.isFinite(s.ohneSignalSeit)) { s.ohneSignalSeit = jetztGuardMs; continue; }
+    if (jetztGuardMs - s.ohneSignalSeit < ENTWARNUNG_MS) continue;
+    // Die erreichte Stufe bleibt im Gedaechtnis: springt dasselbe Signal
+    // wieder an, beginnt die Leiter nicht bei der billigsten Sprosse.
+    s.letzteSprosse = s.sprosse;
     s.zustand = "HEALTHY";
     s.sprosse = 0;
     s.versuche = 0;
     s.seit = jetztGuardMs;
     s.seitUhr = null;
     s.signal = null;
+    s.ohneSignalSeit = null;
     raus.push(name);
   }
   return raus;

@@ -39,6 +39,41 @@ Regeln:
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
 
+### ETA-Kurve rechnet gegen das Laufende statt gegen den Ausgang
+
+`restzeitAusKurve` in `tools/lib/rangkurve.js:169` gibt `ende.h - hJetzt`
+zurueck - also die Zeit bis zum ENDE des Referenzlaufs. Der Referenzlauf von
+BitNode 10 Lauf 1 endete bei Rang 4.561.258 (`doku/rangkurve-bn10.json`,
+letzter Punkt h=69.7). Gebraucht werden aber nur 400.000 Rang plus die 21
+gewonnenen Black Ops - das Elffache lief der Bot damals nur, weil `ausgang.js`
+noch nicht existierte und der Sprung von Hand kam.
+
+Wirkung, beobachtet am 06.09.2026: Bei Rang 409.436 mit 19 von 21 gefallenen
+Black Ops und voller Ausdauer meldete `checkin.js` "noch 20.0 h Spielzeit,
+fertig Montag 05:02". Tatsaechlich fehlten zwei Black Operations. Am Vortag
+hatte dasselbe Werkzeug bei Rang 50.353 "Sonntag 12:27" gesagt - die Prognose
+ist also zurueckgesprungen, waehrend der Bot sich beschleunigte (672 -> 1.187
+-> 3.344 -> 5.170 Rang/h). Beides ist dieselbe Ursache.
+
+Verschaerft wird es durch die Messluecke: zwischen h=47.8 (Rang 17.594) und
+h=69.6 (Rang 4.543.999) liegt kein einziger Stuetzpunkt, weil die sechs
+Beobachtungsloops am 31.08.2026 abgeschafft wurden. Jeder Rang dazwischen wird
+linear interpoliert - und genau dort steht der Bot in der entscheidenden Phase
+jedes V2-Laufs.
+
+Vorschlag (nicht gebaut, braucht Skeptiker-Lauf):
+
+  - Bezugspunkt aendern: nicht `ende.h`, sondern die Stunde, in der im
+    Referenzlauf die letzte Black Op fiel. Die steht heute nirgends - die
+    Kurve fuehrt nur Rang gegen Stunde. Also entweder beim Erzeugen der Kurve
+    `getNextBlackOp()` mitschreiben, oder ersatzweise den ersten Punkt ueber
+    400.000 nehmen und den Nachlauf als Spanne ausweisen.
+  - Solange die Zahl aus der Messluecke kommt, keine Uhrzeit ausgeben, sondern
+    die belastbare Aussage: wieviele Black Ops offen sind, deren reqdRank und
+    die aktuelle Erfolgschance. `ausgang.json.status` hat den Text bereits
+    ("BlackOps offen: Operation Vindictus").
+  - Betrifft alle 30 V2-Laeufe der Route, nicht nur BitNode 10.
+
 *Stand 04.09.2026, 20:05 - der Abschnitt ist bewusst leer.*
 
 Was hier stand, war zwei Sorten Rauschen:

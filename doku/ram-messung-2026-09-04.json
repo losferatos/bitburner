@@ -291,11 +291,11 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 196725,
-  "lines": 3489,
-  "sha256": "33a99555f56f873330534138b7558ea24965f5a5df57d2df21e0c982e7e93ebe",
-  "gemessenAm": "2026-09-04T17:43:56.015Z",
-  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+  "bytes": 198053,
+  "lines": 3616,
+  "sha256": "f31d986c1778572be9c542c7fe30e7a92f3493f4acdc47adb2df4d905f80b2f5",
+  "gemessenAm": "2026-09-06T09:53:00.000Z",
+  "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
  {
   "file": "augcount.js",
@@ -1022,12 +1022,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 263478,
-  "lines": 3274,
-  "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap.",
-  "sha256": "2170a073113bc53865a4d4753045151275dda3c77bfb649e17a8e23c433f8730",
-  "gemessenAm": "2026-09-04T18:37:34.768Z",
-  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+  "bytes": 263955,
+  "lines": 4734,
+  "sha256": "4e464a2b18bbbe3a0f0a5784c308c60041c6824313b0d21a9934932d42dcd203",
+  "gemessenAm": "2026-09-06T09:53:00.000Z",
+  "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
  {
   "file": "contracts.js",

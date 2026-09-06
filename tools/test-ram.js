@@ -161,7 +161,7 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
      */
     const VERALTET_ERLAUBT = [
       "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
-      "bn4net.js", "csolve.js", "cdump.js",
+      "csolve.js", "cdump.js",
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,

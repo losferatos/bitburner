@@ -41,6 +41,33 @@
  */
 
 import { antrag, antragsDatei, darfFigur } from "lib/figur.js";
+import { liesVonHome } from "lib/hostdatei.js";
+
+/**
+ * Die Kerndatei lesen - von JEDEM Wirt aus.
+ *
+ * VORFALL 06.09.2026, 05:50 bis 10:40: Die beiden Leser darunter prueften die
+ * Datei auf home und lasen sie dann LOKAL (`ns.read` hat keinen
+ * Host-Parameter). Auf home ist das dasselbe; auf der Werkbank gibt es die
+ * Datei nicht, also kamen nodeReset 0 und motorTimeMs 0 zurueck. Solange
+ * blade.js auf home lief, fiel das nie auf. Um 05:50 beendete der Waechter
+ * blade.js (Sprosse 4.5), der Kern startete es auf der Werkbank neu - und ab
+ * da trug jeder Antrag den Stempel 0, den `antragGilt` gegen den echten
+ * Knotenstempel verwirft. 575 verworfene Antraege in 4,5 h, die Figur ohne
+ * Besitzer auf "Recruitment", die letzten zwei Black Ops standen still, und
+ * blade.json zeigte trotzdem "Operation Vindictus", weil es die gewuenschte
+ * Aktion meldet. Genau die Fehlerklasse, die lib/hostdatei.js am 04.09. fuer
+ * neun andere Gewerke abgeraeumt hat - dieses Modul fehlte in der Liste.
+ *
+ * @param {NS} ns
+ * @returns {object|null}
+ */
+function kerndatei(ns) {
+  try {
+    const roh = liesVonHome(ns, "data/bn4net.json");
+    return roh ? JSON.parse(roh) : null;
+  } catch { return null; }
+}
 
 /**
  * Der Knotenstempel, wie ihn der Kern schreibt.
@@ -49,11 +76,8 @@ import { antrag, antragsDatei, darfFigur } from "lib/figur.js";
  * @returns {number} lastNodeReset, oder 0 wenn unbekannt
  */
 export function knotenStempel(ns) {
-  try {
-    if (!ns.fileExists("data/bn4net.json", "home")) return 0;
-    const d = JSON.parse(ns.read("data/bn4net.json"));
-    return Number.isFinite(d.nodeReset) ? d.nodeReset : 0;
-  } catch { return 0; }
+  const d = kerndatei(ns);
+  return d && Number.isFinite(d.nodeReset) ? d.nodeReset : 0;
 }
 
 /**
@@ -62,11 +86,8 @@ export function knotenStempel(ns) {
  * @param {NS} ns
  */
 export function motorzeit(ns) {
-  try {
-    if (!ns.fileExists("data/bn4net.json", "home")) return 0;
-    const d = JSON.parse(ns.read("data/bn4net.json"));
-    return Number.isFinite(d.motorTimeMs) ? d.motorTimeMs : 0;
-  } catch { return 0; }
+  const d = kerndatei(ns);
+  return d && Number.isFinite(d.motorTimeMs) ? d.motorTimeMs : 0;
 }
 
 /**

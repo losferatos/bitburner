@@ -485,6 +485,47 @@ export function schritt(z, sig, jetztGuardMs, jetztWall, uhren, lage = {}) {
 }
 
 /**
+ * Entwarnung: ein Verdacht, dessen Signal nicht mehr anliegt, faellt zurueck
+ * auf HEALTHY.
+ *
+ * DER FEHLENDE RUECKWEG (06.09.2026, gefunden am eigenen Vorfall).
+ *
+ * Der Automat kannte nur einen Weg nach HEALTHY: eine Sprosse ausfuehren und
+ * die Wirkung gruen pruefen. Ein Ziel, das in SUSPECT stand, blieb dort, bis
+ * die Karenz ablief - auch wenn der Grund laengst weg war. Heute Morgen: S2
+ * um 05:05, Sprosse 4.5 um 05:50, Wirkung rot um 06:35 -> SUSPECT(5). Ab
+ * 11:45 wuchs der Rang wieder mit 30.000 je Stunde, und das Ziel stand
+ * trotzdem sechs Stunden lang auf "SUSPECT, Sprosse 5" - die Karenz der
+ * teuersten Sprosse lief weiter, waehrend der Bot laengst arbeitete.
+ *
+ * Ein Verdacht, der sich nicht bestaetigt, ist kein Verdacht mehr. Der
+ * Waechter ruft das je Runde fuer jedes Ziel auf, dessen Signal in dieser
+ * Runde NICHT erzeugt wurde. Nur SUSPECT faellt zurueck: EXECUTED und VERIFY
+ * laufen zu Ende (die Wirkungspruefung ist die ehrlichere Antwort), EXHAUSTED
+ * hat seinen eigenen Ausgang (`freigeben`), NOT_EXECUTABLE ebenfalls.
+ *
+ * @param {object} z
+ * @param {Set<string>} zieleMitSignal   Ziele, fuer die diese Runde ein Signal kam
+ * @param {number} jetztGuardMs
+ * @returns {string[]} die entwarnten Ziele
+ */
+export function entwarnung(z, zieleMitSignal, jetztGuardMs) {
+  const raus = [];
+  for (const [name, s] of Object.entries(z.ziele || {})) {
+    if (s.zustand !== "SUSPECT") continue;
+    if (zieleMitSignal && zieleMitSignal.has(name)) continue;
+    s.zustand = "HEALTHY";
+    s.sprosse = 0;
+    s.versuche = 0;
+    s.seit = jetztGuardMs;
+    s.seitUhr = null;
+    s.signal = null;
+    raus.push(name);
+  }
+  return raus;
+}
+
+/**
  * Ergebnis der Wirkungspruefung einarbeiten.
  *
  * Gruen setzt den Zaehler des ZIELS zurueck, nicht den globalen - ein

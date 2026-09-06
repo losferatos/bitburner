@@ -37,7 +37,29 @@ Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
-- **`## Sofort
+- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
+  Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
+  beheben. Abgeraeumtes wandert nach "Erledigt".
+- **Acht Meldungen "Grosser Schub verweigert (41-50 Dateien)"** aus der Zeit
+  von 13:13 bis 16:24. Das war der Schubdeckel, der wie vorgesehen einen
+  Merge-artigen Massenschub abgewiesen hat. Die Einspielung ist seither
+  gestuft und von Hand gefahren worden; die Meldungen sind gegenstandslos.
+- **Eine Falschmeldung "Bruecke ohne Sicherung"** von 18:31, erzeugt von
+  `export.js` beim ersten Start. Sie war ein Fehler in `export.js`, nicht ein
+  Befund ueber die Bruecke: das Gewerk lief auf werk-0 und suchte
+  `data/bridge.json` dort, wo sie nicht liegt. Repariert (`lib/hostdatei.js`),
+  und im Betrieb geeicht - `data/export.json` meldet jetzt ein echtes
+  `bridgeAlterMs` statt `null`.
+
+Damit sich das nicht wiederholt, hat die Bruecke jetzt eine Quittung: ein
+zugestellter Eintrag bekommt `zugestellt` **in die Datei** geschrieben
+(`doku/kontrakte.md` 4.11). Vorher lebte die Entdopplung nur im Speicher der
+Bruecke und ging bei jedem Neustart verloren - jede Meldung kehrte alle sechs
+Stunden wieder.
+
+---
+
+## Sofort
 
 ### ETA-Kurve rechnet gegen das Laufende statt gegen den Ausgang
 
@@ -78,101 +100,9 @@ Vorschlag (nicht gebaut, braucht Skeptiker-Lauf):
 
 Was hier stand, war zwei Sorten Rauschen:
 
-- **Acht Meldungen "Grosser Schub verweigert (41-50 Dateien)"** aus der Zeit
-  von 13:13 bis 16:24. Das war der Schubdeckel, der wie vorgesehen einen
-  Merge-artigen Massenschub abgewiesen hat. Die Einspielung ist seither
-  gestuft und von Hand gefahren worden; die Meldungen sind gegenstandslos.
-- **Eine Falschmeldung "Bruecke ohne Sicherung"** von 18:31, erzeugt von
-  `export.js` beim ersten Start. Sie war ein Fehler in `export.js`, nicht ein
-  Befund ueber die Bruecke: das Gewerk lief auf werk-0 und suchte
-  `data/bridge.json` dort, wo sie nicht liegt. Repariert (`lib/hostdatei.js`),
-  und im Betrieb geeicht - `data/export.json` meldet jetzt ein echtes
-  `bridgeAlterMs` statt `null`.
-
-Damit sich das nicht wiederholt, hat die Bruecke jetzt eine Quittung: ein
-zugestellter Eintrag bekommt `zugestellt` **in die Datei** geschrieben
-(`doku/kontrakte.md` 4.11). Vorher lebte die Entdopplung nur im Speicher der
-Bruecke und ging bei jedem Neustart verloren - jede Meldung kehrte alle sechs
-Stunden wieder.
-
-
-## Sofort
-
-### Grosser Schub verweigert (51 Dateien) - sieht nach einem Merge aus
-
-51 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+39)
-
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (bridge.json fehlt oder ist unlesbar). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Grosser Schub verweigert (50 Dateien) - sieht nach einem Merge aus
-
-50 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+38)
-
-### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
-
-49 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+37)
-
-### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
-
-49 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+37)
-
-### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
-
-49 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, buyaugs.js, cdump.js, contracts.js, csolve.js (+37)
-
-### Grosser Schub verweigert (49 Dateien) - sieht nach einem Merge aus
-
-49 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+37)
-
-### Grosser Schub verweigert (47 Dateien) - sieht nach einem Merge aus
-
-47 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+35)
-
-### Grosser Schub verweigert (42 Dateien) - sieht nach einem Merge aus
-
-42 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+30)
-
-### Grosser Schub verweigert (41 Dateien) - sieht nach einem Merge aus
-
-41 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bbtrain.js, blade.js, bn4life.js, bn4net.js, bn4rep.js, boerse.js, boot.js, cdump.js, contracts.js, csolve.js, darkweb.js (+29)
 
 ### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
 

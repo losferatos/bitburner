@@ -1289,6 +1289,26 @@ export async function main(ns) {
   // Die Ursache ist die Duplikation selbst. Diese Funktion holt sich alles,
   // was jeder Zustand gemeinsam hat, selbst - ein neuer Zweig kann damit
   // nichts mehr vergessen ausser dem Aufruf. Und der faellt beim Lesen auf.
+  //
+  // DER HOCHWASSERSTAND DES RANGS (06.09.2026, Vorfall 05:05 bis 11:45).
+  //
+  // Ein misslungener Black-Op-Versuch kostet Rang - Vindictus zweimal je
+  // rund 15.000 - und ist bei Schwelle 0,35 GEWOLLT (ENTSCHIEDEN-Liste). Der
+  // Waechter sah darin "Traeger seit 45 min nicht gewachsen" (S2), beendete
+  // blade.js (Sprosse 4.5), der Kern startete es auf der Werkbank neu, und
+  // dort griff ein zweiter Fehler (lib/figurns.js las die Kerndatei lokal):
+  // 4,5 Stunden ohne Black Op. Zwei Bauteile derselben Sitzung, die nichts
+  // voneinander wussten.
+  //
+  // Deshalb meldet blade.json neben `rang` den bisherigen Hoechststand des
+  // Prozesslaufs (`rangHoch`). Der Kern gibt DEN als Traeger an den Waechter:
+  // ein Fehlversuch senkt ihn nicht, echtes Wachstum hebt ihn - S2 misst
+  // also, ob der Bot vorankommt, nicht, ob er gerade einen Wurf verloren
+  // hat. Ein Rang, der ueber Stunden unter seinem Hoch bleibt, faellt
+  // weiterhin auf: dann waechst das Hoch nicht, und S2 feuert zu Recht.
+  // Nach Knotenwechsel oder Einbau startet boot.js blade.js ohnehin neu,
+  // deshalb wird der Stand nicht persistiert.
+  let rangHoch = null;
   const meldeLage = (aktion, grund, chance) => {
     let ausdauer = "?", hp = null, spielzeit = null, rang = null, punkte = null;
     try {
@@ -1360,6 +1380,9 @@ export async function main(ns) {
       zeit: Date.now(),
       chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
       rang, punkte, ausdauer, hp, tiefstand,
+      rangHoch: (rangHoch = Number.isFinite(rang)
+        ? Math.max(rang, Number.isFinite(rangHoch) ? rangHoch : rang)
+        : rangHoch),
       // Der Puls der Spielengine. Netscript und die Engine sind zwei
       // Schleifen; totalPlaytime waechst nur in updateGame. Steht die Zahl
       // zwischen zwei Messungen still, ist die Engine tot, und dann hilft

@@ -240,13 +240,21 @@ export async function ladeSpielskript(datei) {
 }
 
 /**
- * Sucht ein Skript im Worktree oder in der Live-Arbeitskopie und laedt es.
- * Der Worktree hat Vorrang, solange eine Position dort noch gebaut wird.
+ * Sucht ein Skript in der Live-Arbeitskopie und laedt es.
+ *
+ * Bis zum 06.09.2026 stand der Bau-Worktree `../bitburner-bau/src` VORN in
+ * dieser Liste - richtig, solange dort gebaut wurde. Seit dem Merge am
+ * 04.09. ist der Zweig vollstaendig in master; der Worktree blieb aber
+ * stehen, 15 Commits hinter master, ohne `lib/hostdatei.js`. Jeder gruene
+ * Ebene-2-Lauf seit dem 04.09. 17:45 hat damit den ALTEN Baum geprueft, und
+ * genau die Reparatur, die am 06.09. den Haenger geloest hat, war darin
+ * nicht enthalten. Der Worktree wird nur noch genommen, wenn `src/` die
+ * Datei nicht hat - also praktisch nie.
  */
 export async function ladeAusBeiden(root, rel) {
   const kandidaten = [
-    path.resolve(root, "..", "bitburner-bau", "src", rel),
     path.join(root, "src", rel),
+    path.resolve(root, "..", "bitburner-bau", "src", rel),
   ];
   const t = kandidaten.find((p) => fs.existsSync(p));
   if (!t) throw new Error("src/" + rel + " nicht gefunden (weder Worktree noch live)");

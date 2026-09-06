@@ -44,7 +44,7 @@
 import { neu as neueUhren, runde as uhrRunde, enginePuls, inKarenz, laden as ladeUhren }
   from "lib/uhren.js";
 import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere, freigeben,
-  laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
+  entwarnung, laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
 import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle } from "lib/reg.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
@@ -542,6 +542,22 @@ export async function main(ns) {
           const v = verifiziert(leiter, r.ziel, gruen, uhren.guardTimeMs);
           sag("Wirkung " + (gruen ? "gruen" : "rot") + " fuer " + r.ziel
             + " -> " + v.zustand);
+        }
+      }
+
+      // --- Entwarnung (06.09.2026) ---------------------------------------------
+      //
+      // Ein Verdacht, dessen Signal in dieser Runde nicht mehr anliegt, ist
+      // keiner mehr. Ohne diesen Schritt blieb "fortschritt" heute sechs
+      // Stunden in SUSPECT(5), waehrend der Rang laengst wieder wuchs - die
+      // Karenz der teuersten Sprosse lief weiter gegen einen Bot, der arbeitete.
+      // Nur SUSPECT faellt zurueck; EXECUTED/VERIFY pruefen ihre Wirkung zu
+      // Ende, EXHAUSTED und NOT_EXECUTABLE haben eigene Ausgaenge.
+      {
+        const mitSignal = new Set(sigs.filter((x) => x.schwere > 0).map((x) => x.ziel));
+        const entwarnt = entwarnung(leiter, mitSignal, uhren.guardTimeMs);
+        if (entwarnt.length) {
+          sag("Entwarnung fuer " + entwarnt.join(", ") + " - das Signal liegt nicht mehr an.");
         }
       }
 

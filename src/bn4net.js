@@ -4344,7 +4344,13 @@ export async function main(ns) {
         try {
           const b = JSON.parse(ns.read("data/blade.json"));
           if (b && Number.isFinite(b.rang)) {
-            traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs };
+            // Als Traeger zaehlt der HOECHSTSTAND des Laufs, nicht der
+            // Augenblickswert (06.09.2026): ein gewollter Black-Op-Fehlversuch
+            // senkt den Rang um ~15.000, und S2 hielt das fuer Stillstand -
+            // Sprosse 4.5 beendete blade.js mitten in den letzten zwei Black
+            // Ops. Fehlt `rangHoch` (aeltere blade.js-Fassung), gilt `rang`.
+            const wert = Number.isFinite(b.rangHoch) ? Math.max(b.rangHoch, b.rang) : b.rang;
+            traeger = { name: "rang", wert, motorTimeMs: mz.motorTimeMs };
           }
           // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem
           // Soll, der keinen Schreiber hatte.

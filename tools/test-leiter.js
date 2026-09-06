@@ -233,6 +233,22 @@ console.log("-- S2 ist stumm, wenn die Route fertig ist --");
   const waechst = { ...basis, letzterTraegerWert: 900 };
   pruefe("bei wachsendem Traeger kein S2",
     !L.signale(waechst).some((x) => x.sig === "S2"));
+
+  // DER FEHLVERSUCH (06.09.2026): Der Kern gibt als Traeger den
+  // Hoechststand des Laufs weiter, nicht den Augenblickswert. Ein Rang, der
+  // durch eine misslungene Black Op um 15.000 faellt, senkt den Traeger
+  // also NICHT - und darf kein S2 ausloesen, solange das Hoch juenger als
+  // 45 min ist. Der Test bildet den Kontrakt ab: der Traegerwert steigt
+  // (1000 -> 1050), obwohl der Augenblicksrang unter dem alten Hoch liegt.
+  const fehlversuch = { ...basis, letzterTraegerWert: 1000,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1050 } } };
+  pruefe("ein Hoch ueber dem letzten Vergleichspunkt ist Wachstum, kein S2",
+    !L.signale(fehlversuch).some((x) => x.sig === "S2"));
+  const steht = { ...basis, letzterTraegerWert: 1050,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1050 } } };
+  pruefe("ein Hoch, das 2 h nicht steigt, ist Stillstand - S2",
+    L.signale(steht).some((x) => x.sig === "S2"),
+    "Fehlversuche duerfen echten Stillstand nicht verdecken");
 }
 
 // ===========================================================================
@@ -258,6 +274,35 @@ console.log("-- der Zustandsautomat: Karenz vor der Strafe --");
 
   const e = L.schritt(z, sig, 200000 + 200000, W0);
   pruefe("dann geprueft", e.handlung === "pruefen", e.handlung);
+}
+
+console.log("");
+console.log("-- Entwarnung: ein Verdacht ohne Signal faellt zurueck auf HEALTHY --");
+{
+  // 06.09.2026: S2 setzte "fortschritt" auf SUSPECT(5); ab 11:45 wuchs der
+  // Rang wieder, das Signal blieb aus - und das Ziel stand sechs Stunden auf
+  // SUSPECT, weil es keinen Weg zurueck gab ausser der Karenz der teuersten
+  // Sprosse.
+  const z = L.neu(1000);
+  const sig = { sig: "S2", ziel: "fortschritt", grund: "steht", schwere: 2 };
+  L.schritt(z, sig, 0, W0, { guard: 0, engine: 0, motor: 0 });
+  pruefe("Verdacht steht", z.ziele["fortschritt"].zustand === "SUSPECT");
+  const raus = L.entwarnung(z, new Set(), 60000);
+  pruefe("ohne Signal wird entwarnt", raus.length === 1 && raus[0] === "fortschritt");
+  pruefe("Zustand HEALTHY, Sprosse 0", z.ziele["fortschritt"].zustand === "HEALTHY"
+    && z.ziele["fortschritt"].sprosse === 0);
+
+  // Liegt das Signal weiter an, bleibt der Verdacht.
+  L.schritt(z, sig, 120000, W0, { guard: 120000, engine: 0, motor: 0 });
+  const bleibt = L.entwarnung(z, new Set(["fortschritt"]), 130000);
+  pruefe("mit Signal bleibt SUSPECT", bleibt.length === 0
+    && z.ziele["fortschritt"].zustand === "SUSPECT");
+
+  // EXECUTED wird nicht entwarnt - die Wirkungspruefung laeuft zu Ende.
+  z.ziele["x"] = { zustand: "EXECUTED", sprosse: 1, seit: 0, versuche: 1 };
+  const nichtX = L.entwarnung(z, new Set(), 200000);
+  pruefe("EXECUTED bleibt stehen", !nichtX.includes("x")
+    && z.ziele["x"].zustand === "EXECUTED");
 }
 
 console.log("");

@@ -1024,7 +1024,7 @@
   "err": null,
   "bytes": 263955,
   "lines": 4734,
-  "sha256": "e1bf12c554430328c24e4259534778dc67cbab8fd887be420f156712c6d0fff5",
+  "sha256": "7a374d9b978c708698ef4a3cfad2236a429e561e93250e26f6291e355e556741",
   "gemessenAm": "2026-09-06T09:53:00.000Z",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },

@@ -29,7 +29,7 @@
  */
 import { hackPercent as calcHackPercent, hackChance as calcHackChance,
   growthLogPerThread as calcGrowthLog } from "lib/calc.js";
-import { laden as ladeRegistry, auswahl as regAuswahl,
+import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
   leseRolle, pruefeRolle } from "lib/reg.js";
 import {
@@ -3431,7 +3431,26 @@ export async function main(ns) {
         return !!zuletzt && Date.now() - zuletzt < EINMAL_PAUSE_MS;
       };
 
+      // DIE VORBEDINGUNG GILT JE RUNDE, NICHT JE LISTENBAU (06.09.2026, Kaltstart
+      // BN10 L3). WERKZEUGE wird nur neu gebaut, wenn Knoten, Rolle oder Phase
+      // wechseln - `requiresFile`/`forbidsFile` aus der Registry wurden also
+      // EINMAL geprueft und danach nie wieder. Folge um 12:31: csolve.js
+      // (requiresFile data/cantwort.json, Datei fehlt) stand in der Liste,
+      // "Vorbedingung regelt es" oben liess es durch, der Kern startete es
+      // alle 10 s, raeumte dafuer jedes Mal Arbeiter auf home und liess
+      // ausgang.js keinen Platz. Jetzt fragt der Filter die Registry je
+      // Runde - dieselbe Funktion, die auch die Liste baut.
+      const vorbedingungGilt = (d) => {
+        if (!regGeladen) return true;
+        const e = (regGeladen.eintraege || []).find((x) => x.name === d);
+        if (!e) return true;
+        const g = regGilt(e, regLage);
+        if (!g.gilt && runde % 30 === 0) sag(d + " wartet: " + g.grund + ".");
+        return g.gilt;
+      };
+
       const fehlend = WERKZEUGE.filter(([d, , policy]) => !laufend.includes(d)
+        && vorbedingungGilt(d)
         && !einmalBremse(d, policy)
         && !(verfahrenV1 && (d === "blade.js" || d === "bbtrain.js"))
         && !((d === "hashes.js" || d === "hacknet.js") && keineHacknet)

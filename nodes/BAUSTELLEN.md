@@ -61,6 +61,36 @@ Stunden wieder.
 
 ## Sofort
 
+### Waechter misst in der V2-Anlaufphase den falschen Traeger (06.09.2026, 21:25)
+
+`kpi.traeger` steht auf `hacking`, solange `blade.js` wartet - in BN10 ist
+Hacking aber nicht der Fortschritt, sondern ein Nebenprodukt (Level 126,
+BitNode-Mult 0,4). Der echte Traeger vor dem Bladeburner-Beitritt ist das
+Kampf-Exp, und das waechst sauber mit ~16-20k/h je Wert.
+
+Folge: der Waechter meldete 19:48 S2 "Traeger hacking seit 405 min nicht
+gewachsen" und stand auf Sprosse 5 (Soft-Reset), Zustand EXHAUSTED. Nur weil
+Sprosse 5 in `enforce` nicht scharf ist, blieb es beim Beobachten. In
+`enforce-alles` - dem Modus, der am 06.09. um 12:54 fuer 6 Minuten stand, um
+den toten Kern zu holen - haette er einen Lauf weggeworfen, der planmaessig
+laeuft.
+
+Fix: der Kern muss in V2 vor dem Beitritt das Kampf-Exp als Traeger melden
+(Minimum der vier Werte), nicht Hacking. Ersatzweise: S2 ruht, solange
+`blade.json.wartend` gesetzt ist. Skeptiker vor dem Einbau.
+
+### bblage.js fehlt in der Registry - tor.js rechnet mit 48 h alten Daten (06.09.2026, 21:25)
+
+`data/bblage.json` ist vom 04.09. und stammt aus BN10 Lauf 2: sie sagt
+`inBladeburner: true` und `rang: 5837`. `tools/tor.js` liest sie ohne
+Frischepruefung und bricht mit "Bereits in der Division - dieses Werkzeug ist
+hier fertig" ab. Genau dieses Werkzeug soll der /bb-Skill im Urteil ANLAUF
+zum Rechnen der Phase aufrufen; es ist dort also blind.
+
+Ursache: `bblage.js` steht in `src/registry.json` gar nicht - der Kern
+startet es nie. Zwei Fehler, beide zu beheben: Eintrag in die Registry (mit
+`ARCHITEKTUR.md` 3.3), und `tor.js` muss das Alter von `bblage.json` gegen
+`nodeReset` pruefen und bei Ueberalterung BLIND melden statt FERTIG.
 ### Kaltstart: cdump/csolve verklemmt - Werkzeugliste bakt Vorbedingungen ein (06.09.2026, 13:05)
 
 `baueWerkzeuge` in `src/bn4net.js` baut WERKZEUGE ueber `regAuswahl`, und

@@ -61,6 +61,20 @@ Stunden wieder.
 
 ## Sofort
 
+### Kaltstart: SELBST bn4net.js hat keinen Rueckholer (06.09.2026, 12:40)
+
+`data/reload.txt` mit `SELBST bn4net.js` beendet den Kern; zurueckholen
+sollen ihn bn4life.js oder popups.js. Im Kaltstart laeuft keiner von beiden
+(bn4life.js braucht 293 GB, popups.js ist Phase `normal`). Der Kern lag
+12:40-13:00 tot. Geholt hat ihn Sprosse 3 des Waechters - aber nur, weil
+`data/guard-modus.txt` von Hand auf `enforce-alles` stand (in `enforce`
+beobachtet Sprosse 3 nur). Danach zurueck auf `enforce`.
+
+Zu tun: der SELBST-Zweig im Kern muss im Kaltstart einen Rueckholer
+sicherstellen (boot.js vorher starten, oder ns.spawn statt exit), ODER
+Sprosse 3 gehoert bei S3a auch in `enforce` scharf - ein toter Kern ist
+kein Fall zum Beobachten. Skeptiker vor dem Einbau.
+
 ### ETA-Kurve rechnet gegen das Laufende statt gegen den Ausgang
 
 `restzeitAusKurve` in `tools/lib/rangkurve.js:169` gibt `ende.h - hJetzt`

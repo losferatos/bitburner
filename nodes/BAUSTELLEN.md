@@ -61,6 +61,25 @@ Stunden wieder.
 
 ## Sofort
 
+### Kaltstart: cdump/csolve verklemmt - Werkzeugliste bakt Vorbedingungen ein (06.09.2026, 13:05)
+
+`baueWerkzeuge` in `src/bn4net.js` baut WERKZEUGE ueber `regAuswahl`, und
+die filtert mit `gilt()` INKLUSIVE Datei-Vorbedingung. Die Liste wird nur
+neu gebaut, wenn node|verfahren|phase wechselt. Beim Kernstart 13:00:02 gab
+es kein `data/cantwort.json` -> csolve.js (requiresFile) fiel aus der Liste,
+cdump.js kam hinein. cdump schrieb die Antworten, ist seitdem korrekt
+blockiert (Pruefung je Runde seit f5026c4) - aber csolve.js steht nicht in
+der Liste und startet nie. Beleg: Log 13:04:52 "cdump.js wartet: blockiert
+durch data/cantwort.json", `fehlend:` nennt csolve.js nicht, zwei Antworten
+liegen bereit. Der Umkehrfall zum Churn von 12:39 (damals lag die Datei beim
+Bau, csolve in der Liste, cdump nicht).
+
+Fix: WERKZEUGE ohne Datei-Vorbedingung bauen (gilt() mit einer Lage, die
+die precondition ueberspringt, oder Auswahl-Variante in lib/reg.js) und die
+Vorbedingung NUR je Runde in `vorbedingungGilt` pruefen. Dann sind beide
+Faelle weg. Loest sich von selbst beim Phasenwechsel (erster Mietrechner).
+Skeptiker vor dem Einbau; bis dahin ist der Contract-Zyklus im Kaltstart tot.
+
 ### Kaltstart: SELBST bn4net.js hat keinen Rueckholer (06.09.2026, 12:40)
 
 `data/reload.txt` mit `SELBST bn4net.js` beendet den Kern; zurueckholen

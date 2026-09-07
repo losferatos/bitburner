@@ -61,6 +61,44 @@ Stunden wieder.
 
 ## Sofort
 
+### Nach dem Aug-Reset verklemmt sich der Speicher: blade.js sperrt bbtrain.js aus (07.09.2026, 05:40)
+
+Der Bot hat gegen 03:48 neun Augmentierungen eingebaut - regulaer, nicht
+durch Sprosse 5 (die stand um 19:48 auf would-execute). Danach sind die
+Kampfwerte wieder 1/1/1/1, der Bladeburner-Beitritt bleibt.
+
+Lage 05:40: home 512 GB, Reserve 128, FREI 12,55 GB. Es laufen bn4life.js
+(293 GB durch Singularity x16) und blade.js (94 GB). blade.js kann nichts
+tun - Chance 0,0 %, Ausdauer 1/1, weil die Kampfwerte bei 1 stehen. Genau
+das Werkzeug, das sie hochzoege, findet keinen Platz: bbtrain.js braucht
+94,8 GB und hat prio 11 gegen blade.js mit prio 10. Ebenso sleeve.js
+(27,9 GB). Der Kern meldet das seit 05:20 in jeder Runde.
+
+Das ist derselbe Klassenfehler wie beim Traeger-Befund vom 06.09.: das
+Gewerk, das den Fortschritt erzeugt, kommt nicht dran, waehrend das Gewerk,
+das den Fortschritt VERBRAUCHT, den Speicher haelt.
+
+Fix: blade.js gehoert hinter bbtrain.js, solange die Kampfwerte unter der
+Einsatzschwelle liegen - entweder ueber eine Vorbedingung (Mindestwerte)
+oder indem blade.js sich bei Chance 0 selbst beendet statt zu warten.
+Skeptiker vor dem Einbau.
+
+Loest sich von selbst, sobald der erste Mietrechner mit 95 GB steht - aber
+das Geld steht bei $1.262, der Park bei 0, gerootet 8 von 70. Bis dahin
+waechst weder Rang noch Kampfwert.
+
+### Waechter straft Werkzeuge, die aus Platzmangel nicht laufen (07.09.2026, 05:40)
+
+Um 05:36 meldet der Waechter S1 fuer bbtrain.js, sleeve.js, bn4door.js und
+export.js ("Telemetrie 108 min alt") und setzt bn4rep.js auf EXHAUSTED. Die
+Ursache ist aber kein haengendes Werkzeug, sondern fehlender Speicher - der
+Kern schreibt das ausdruecklich in jede Runde. Sprosse 1 startet etwas neu,
+das nirgends Platz findet; das ist eine Fehlstrafe je Runde.
+
+Fix: S1 muss ruhen, solange der Kern fuer dasselbe Werkzeug "findet nirgends
+Platz" meldet. Der Kern kennt den Grund bereits und koennte ihn in die
+Telemetrie schreiben (z. B. `wartetAufRam: [namen]` in bn4net.json), der
+Waechter liest ihn. Skeptiker vor dem Einbau.
 ### Waechter misst in der V2-Anlaufphase den falschen Traeger (06.09.2026, 21:25)
 
 `kpi.traeger` steht auf `hacking`, solange `blade.js` wartet - in BN10 ist

@@ -61,6 +61,41 @@ Stunden wieder.
 
 ## Sofort
 
+### VOLLSTAENDIGER STILLSTAND seit dem Aug-Reset - der Bot laeuft NICHT von selbst wieder an (07.09.2026, 16:06)
+
+Nachtrag zum Eintrag von 05:40. Die dortige Einschaetzung "loest sich von
+selbst, sobald der erste Mietrechner steht" ist WIDERLEGT. Nach 10,5 Stunden
+reiner Spielzeit steht jeder Wert exakt dort, wo er um 05:38 stand:
+
+  Geld       $1.262   (auf den Dollar identisch - es kommt kein Cent herein)
+  gerootet   8 von 70
+  Kampfwerte 1 / 1 / 1 / 1
+  homeFrei   12,55 GB bei 512 GB und Reserve 128
+  Rang       0, Chance 0,0 %, Ausdauer 1/1
+
+Nur Hacking waechst (65 -> 91) - das ist Erfahrung aus den Worker-Resten,
+kein Geld. checkin.js urteilt STEHT, `tools/rueckstand.js` zeigt Tempo 1,000
+und Rueckstand -0,0 min: das Spiel LAEUFT, es kommt nur nichts dabei heraus.
+
+Die Schleife: bn4life.js belegt 293 GB (5,85 + 18 x 16 ohne SF4) und
+blade.js 94 GB. Damit sind 387 der 512 GB weg, und mit den kleinen Gewerken
+bleibt nichts fuer Hack-Worker uebrig. Ohne Worker kein Geld, ohne Geld kein
+Mietrechner, ohne Mietrechner kein Platz - und blade.js, das den Speicher
+haelt, kann bei Kampfwert 1 ohnehin nichts tun.
+
+Das ist kein Selbstheilungsfall. Ohne Eingriff steht der Lauf beliebig lange.
+
+Naechstliegender Eingriff (Betrieb, ohne src/-Aenderung): blade.js im Spiel
+beenden, damit bbtrain.js die 94,8 GB bekommt und die Kampfwerte anlaufen.
+Der Kern startet blade.js allerdings mit restartPolicy `always` sofort neu -
+es braucht also entweder `data/bn4-stop.txt` (die dokumentierte Vorbedingung
+von blade.js) als Bremse, oder den Fix unten.
+
+Fix (src/, mit Skeptiker): blade.js braucht eine Vorbedingung auf
+Mindestkampfwerte, und bn4life.js gehoert in dieser Lage hinter die
+Geldbeschaffung. Solange kein Geld hereinkommt, ist ein 293-GB-Gewerk fuer
+Faktionsarbeit die falsche Belegung.
+
 ### Nach dem Aug-Reset verklemmt sich der Speicher: blade.js sperrt bbtrain.js aus (07.09.2026, 05:40)
 
 Der Bot hat gegen 03:48 neun Augmentierungen eingebaut - regulaer, nicht

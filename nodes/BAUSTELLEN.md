@@ -61,6 +61,30 @@ Stunden wieder.
 
 ## Sofort
 
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 520 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 488 Minuten nichts geschrieben (Inhaltsstempel 2026-09-09T19:05:41.577Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-09T14:32:24.976Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 90 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 629 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Autosave steht
+
+lastSave im Spielstand war bei der Messung um 2026-09-07T14:05:01.030Z bereits 589 Minuten alt (Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder fehlgeschlagenes IndexedDB-Schreiben.
+
 ### VOLLSTAENDIGER STILLSTAND seit dem Aug-Reset - der Bot laeuft NICHT von selbst wieder an (07.09.2026, 16:06)
 
 Nachtrag zum Eintrag von 05:40. Die dortige Einschaetzung "loest sich von
@@ -154,6 +178,11 @@ Fix: der Kern muss in V2 vor dem Beitritt das Kampf-Exp als Traeger melden
 
 ### bblage.js fehlt in der Registry - tor.js rechnet mit 48 h alten Daten (06.09.2026, 21:25)
 
+**REPRODUZIERT am 10.09.2026, 15:30.** `node tools/tor.js` meldet im frischen
+BN4 erneut "Bereits in der Division - dieses Werkzeug ist hier fertig",
+obwohl die Kampfwerte auf 1 stehen. Der /bb-Skill ruft genau dieses Werkzeug
+im Urteil ANLAUF auf; es ist dort weiterhin blind.
+
 `data/bblage.json` ist vom 04.09. und stammt aus BN10 Lauf 2: sie sagt
 `inBladeburner: true` und `rang: 5837`. `tools/tor.js` liest sie ohne
 Frischepruefung und bricht mit "Bereits in der Division - dieses Werkzeug ist
@@ -165,6 +194,13 @@ startet es nie. Zwei Fehler, beide zu beheben: Eintrag in die Registry (mit
 `ARCHITEKTUR.md` 3.3), und `tor.js` muss das Alter von `bblage.json` gegen
 `nodeReset` pruefen und bei Ueberalterung BLIND melden statt FERTIG.
 ### Kaltstart: cdump/csolve verklemmt - Werkzeugliste bakt Vorbedingungen ein (06.09.2026, 13:05)
+
+**REPRODUZIERT beim Sprung nach BN4 am 10.09.2026, 13:52.** Im frischen
+Knoten steht wieder "cdump.js wartet: blockiert durch data/cantwort.json",
+cantwort.json liegt mit einer Antwort, und csolve.js kommt im ganzen Kernlog
+nicht ein einziges Mal vor - es ist also nicht in der Werkzeugliste. Die
+Diagnose von 06.09. ist damit bestaetigt: die Liste bakt die Vorbedingung
+beim Bau ein. Tritt bei JEDEM Knotenwechsel auf.
 
 `baueWerkzeuge` in `src/bn4net.js` baut WERKZEUGE ueber `regAuswahl`, und
 die filtert mit `gilt()` INKLUSIVE Datei-Vorbedingung. Die Liste wird nur

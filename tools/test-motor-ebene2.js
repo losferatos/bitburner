@@ -350,6 +350,119 @@ console.log("-- keine .mock-Datei bleibt liegen --");
   }
 }
 
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- die Werkzeugliste folgt den Dateien JE RUNDE (10.09.2026) --");
+{
+  // DER FALL, DER DEN CONTRACT-ZYKLUS ZWEIMAL GETOETET HAT.
+  //
+  // `cdump.js` und `csolve.js` schliessen einander aus: cdump laeuft, solange
+  // `data/cantwort.json` FEHLT, csolve, solange sie LIEGT. Bis zum 10.09. baute
+  // der Kern seine Werkzeugliste nur beim Wechsel von Knoten, Rolle oder Phase.
+  // Wer beim Bau nicht drinstand, kam bis zum naechsten Wechsel nicht vor -
+  // auch dann nicht, wenn seine Vorbedingung laengst erfuellt war.
+  //
+  // Gemessen am 06.09.: um 13:00 lag die Datei beim Listenbau nicht vor,
+  // csolve.js stand danach in keiner einzigen Runde zur Wahl, und die von
+  // cdump geschriebenen Antworten blieben liegen. Am 10.09. im frischen
+  // BitNode 4 derselbe Stillstand.
+  //
+  // Diese Probe stellt genau das her: Start OHNE cantwort.json, die Datei
+  // faellt in Runde 3 an. Danach MUSS csolve.js starten.
+  const REG = JSON.stringify({
+    schema: 1,
+    eintraege: [
+      { name: "bn4net.js", verfahren: "alle", knoten: "alle", phase: "beide",
+        hostRule: "home", ramBaseGb: 10.8, priority: 1, restartPolicy: "always",
+        needsLibs: [], precondition: {} },
+      { name: "cdump.js", verfahren: "alle", knoten: "alle", phase: "kaltstart",
+        hostRule: "home", ramBaseGb: 6, priority: 5, restartPolicy: "until-done",
+        needsLibs: [], precondition: { forbidsFile: "data/cantwort.json" } },
+      { name: "csolve.js", verfahren: "alle", knoten: "alle", phase: "kaltstart",
+        hostRule: "home", ramBaseGb: 6, priority: 6, restartPolicy: "until-done",
+        needsLibs: [], precondition: { requiresFile: "data/cantwort.json" } },
+    ],
+  });
+  // Der Mock wird hier selbst gebaut, nicht ueber `fahre`: die Probe muss
+  // MITTEN im Lauf eine Datei anlegen und braucht die Referenz vorher.
+  //
+  // KEINE HACKZIELE (sonst misst die Probe etwas anderes): mit gerooteten
+  // Servern belegt der Kern home bis auf zwei Gigabyte mit Arbeitern, und der
+  // Werkzeugstart scheitert dann am Platz statt an der Liste. Ohne Root gibt
+  // es nichts zu hacken, und der Speicher bleibt frei fuer das, was hier
+  // geprueft wird.
+  let runde = 0;
+  let m;
+  m = neuerMock({
+    ...grundzustand({
+      // home wird knapp ueber der Kaltstart-Grenze gehalten (64 GB ist die
+      // Grenze, darueber gilt "normal" und die beiden Gewerke fallen aus der
+      // Auswahl) - und die Arbeiter bekommen einen eigenen Rechner, damit sie
+      // home nicht bis auf ein Gigabyte fuellen. Sonst scheitert der
+      // Werkzeugstart am Platz statt an der Liste, und die Probe misst etwas
+      // anderes als sie soll.
+      server: {
+        home: { ram: 64, used: 0, root: true, geld: 1e9, cores: 1, ports: 0,
+          hackLevel: 1 },
+        "n00dles": { ram: 256, used: 0, root: true, geld: 1e6, cores: 1,
+          ports: 0, hackLevel: 1 },
+      },
+      dateien: {
+        home: {
+          "bn4net.js": "//", "cdump.js": "//", "csolve.js": "//",
+          "worker/hack.js": "//", "worker/grow.js": "//",
+          "worker/weaken.js": "//", "worker/share.js": "//",
+          "data/verfahren.txt": "V2 10 2",
+          "registry.json": REG,
+        },
+      },
+    }),
+    maxSchlaf: 40,
+    beiSchlaf: (ms, z, vor) => {
+      runde++;
+      // Ab Runde 3 liegen Antworten vor - so, wie cdump.js sie schriebe.
+      if (runde === 3) {
+        m.lege("home", "data/cantwort.json",
+          JSON.stringify([{ host: "n00dles", datei: "c.cct", typ: "T", antwort: 1 }]));
+      }
+      vor(ms);
+    },
+  });
+  {
+    const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+    const zurueck = m.uhrStellen();
+    try { await modul.main(m.ns); }
+    catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck(); }
+  }
+  const log = String(m.lies("home", "data/bn4net-log.txt") || "");
+  if (process.env.DEBUG_LISTE) {
+    console.log("---- Kernlog der Probe ----");
+    console.log(log);
+    console.log("---- cantwort:", m.lies("home", "data/cantwort.json"));
+    console.log("---- Runden:", runde);
+    console.log("---- Prozesse home:", JSON.stringify(m.ns.ps("home")));
+    console.log("---- RAM csolve:", m.ns.getScriptRam("csolve.js", "home"),
+      "frei:", m.ns.getServerMaxRam("home") - m.ns.getServerUsedRam("home"));
+  }
+  pruefe("cdump.js laeuft, solange cantwort.json fehlt",
+    /cdump\.js laeuft/.test(log),
+    "cdump.js kam gar nicht erst vor");
+  // Der Beleg ist das Auftauchen in der Liste, nicht der Start selbst: der
+  // Mock-Kern fuellt home mit Arbeitern (auch wenn ein groesserer Rechner
+  // daneben steht), und der Start scheitert dann am Platz. Vor dem 10.09.
+  // stand csolve.js in KEINER Runde in `fehlend` - es war gar nicht in der
+  // Liste. Genau das prueft diese Zeile.
+  pruefe("csolve.js steht in der Werkzeugliste, sobald cantwort.json anfaellt",
+    /fehlend: [^\n]*csolve\.js/.test(log),
+    "csolve.js taucht nie als fehlend auf - die Liste haengt wieder am Bauzeitpunkt");
+  // Und die Gegenrichtung: cdump.js verschwindet aus der Liste, sobald die
+  // Datei liegt - es darf danach in keiner `fehlend`-Zeile mehr stehen.
+  const nachher = log.split(/\n/).filter((z) => /fehlend:/.test(z));
+  pruefe("cdump.js faellt aus der Liste, sobald cantwort.json liegt",
+    nachher.length > 0 && nachher.every((z) => !/fehlend: [^|]*cdump\.js/.test(z)),
+    nachher.slice(-2).join(" || "));
+}
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {

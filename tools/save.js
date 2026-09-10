@@ -57,6 +57,72 @@ async function main() {
 
   const arg = process.argv[2];
 
+  // --json: derselbe Spielstand, aber maschinenlesbar (10.09.2026).
+  //
+  // WARUM DAS HIER STEHT UND NICHT IM SPIEL
+  //
+  // `tools/tor.js` brauchte Kampfwerte, Kampf-Erfahrung und die Frage "schon
+  // in der Division?" und holte sie aus `data/bblage.json`. Diese Datei
+  // schreibt `src/bblage.js`, und das steht in keiner Registry - es laeuft
+  // also nur, wenn ein Mensch es von Hand startet. Am 10.09. war die Datei
+  // 48 h alt und stammte aus dem VORIGEN Lauf: sie meldete `inBladeburner:
+  // true` und Rang 5837, waehrend die Kampfwerte im frischen Knoten auf 1
+  // standen. tor.js brach daraufhin mit "Bereits in der Division - dieses
+  // Werkzeug ist hier fertig" ab, und zwar genau in der Phase, fuer die es
+  // gebaut wurde.
+  //
+  // Der Spielstand kennt all das ohne ein einziges Byte Skript-RAM im Spiel,
+  // und dieses Werkzeug liest ihn ohnehin schon. Damit haengt tor.js an einer
+  // Quelle, die nicht veralten KANN - sie wird bei jedem Aufruf frisch aus
+  // IndexedDB geholt.
+  //
+  // `bladeburner` ist im Spielstand `null`, solange man nicht beigetreten ist
+  // (geprueft am 10.09. im frischen BitNode 4: `bladeburner: None`), und ein
+  // Objekt danach. Das ist das verlaessliche Kennzeichen.
+  //
+  // Die Uhr ist `playtimeSinceLastBitnode`, NICHT die Wanduhr: Erfahrung
+  // waechst in Spielzeit. Ein ausgeschalteter Rechner laesst die Wanduhr
+  // laufen und die Erfahrung stehen - eine daraus gerechnete Rate ist kein
+  // Fortschritt, sondern eine Pause.
+  if (arg === "--json") {
+    const s = p.skills, e = p.exp;
+    console.log(JSON.stringify({
+      wall: Date.now(),
+      spielzeitMs: p.playtimeSinceLastBitnode,
+      // Die Uhr SEIT DEM LETZTEN EINBAU. Ein Augmentierungs-Einbau nullt die
+      // Kampf-Erfahrung, laesst `playtimeSinceLastBitnode` aber weiterlaufen.
+      // Wer eine Erfahrungsrate ueber ein Fenster misst, das einen Einbau
+      // enthaelt, teilt den Zuwachs NACH dem Einbau durch die Zeit VOR ihm.
+      spielzeitSeitAugMs: p.playtimeSinceLastAug,
+      knoten: p.bitNodeN,
+      stadt: p.city,
+      geld: Math.round(p.money),
+      inBladeburner: p.bladeburner !== null && p.bladeburner !== undefined,
+      kampf: { str: s.strength, def: s.defense, dex: s.dexterity, agi: s.agility },
+      kampfExp: {
+        str: Math.round(e.strength), def: Math.round(e.defense),
+        dex: Math.round(e.dexterity), agi: Math.round(e.agility),
+      },
+      tiefstand: Math.min(s.strength, s.defense, s.dexterity, s.agility),
+      // Der Erfahrungs-Multiplikator, den tor.js fuer die Gym-Rate braucht.
+      // `strength_exp` ist der richtige - `strength` geht in den BEDARF, nicht
+      // in die Rate (Verwechslung vom 30.08., dort Punkt 3).
+      expMult: {
+        str: p.mults.strength_exp, def: p.mults.defense_exp,
+        dex: p.mults.dexterity_exp, agi: p.mults.agility_exp,
+      },
+      // Und der LEVEL-Multiplikator, der in die Skill-Formel geht. Das ist
+      // ein ANDERES Feld, auch wenn beide oft gleich aussehen: `strength`
+      // bestimmt, wie viel Erfahrung ein Level kostet, `strength_exp`, wie
+      // schnell Erfahrung anfaellt. Am 30.08. wurde genau das verwechselt.
+      levelMult: {
+        str: p.mults.strength, def: p.mults.defense,
+        dex: p.mults.dexterity, agi: p.mults.agility,
+      },
+    }));
+    return;
+  }
+
   console.log("");
   console.log("  Hacking   " + p.skills.hacking + "      Geld " + geld(p.money)
     + "      Stadt " + p.city);
@@ -135,4 +201,13 @@ async function main() {
   console.log("");
 }
 
-main().catch((e) => console.log("Fehler: " + e.message));
+// FEHLER GEHEN AUF stderr UND SETZEN DEN EXIT-CODE (10.09.2026).
+//
+// Vorher: `console.log(...)` und Exit 0. Ein Aufrufer, der die Ausgabe
+// weiterverarbeitet, bekam damit den Fehlertext als vermeintliches Ergebnis
+// und einen Erfolg gemeldet. `tools/tor.js` faengt das seit heute ueber
+// `JSON.parse` ab - jeder andere Aufrufer nicht.
+main().catch((e) => {
+  console.error("Fehler: " + (e && e.message ? e.message : e));
+  process.exit(1);
+});

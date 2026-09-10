@@ -61,6 +61,38 @@ Stunden wieder.
 
 ## Sofort
 
+### hashes.js kann in KEINEM Knoten starten - requiresFeature ist tot (10.09.2026)
+
+`src/registry.json` gibt `hashes.js` die Vorbedingung
+`{"requiresFeature": 9, "forbidsFile": "data/keine-hacknet.txt"}`. `gilt()`
+in `src/lib/reg.js` prueft das als `(lage.features || {})[p.requiresFeature]`
+- und `baueLage()` in `src/bn4net.js` liefert ueberhaupt kein `features`.
+Der Ausdruck ist damit immer `undefined`, die Vorbedingung immer verletzt.
+
+Folge: das BN9-Gewerk, das am 02.09. eigens gebaut wurde, ist seither in
+jedem Knoten aus der Auswahl gefallen. Es ist nie gelaufen und kann nicht
+laufen. Gefunden am 10.09. von einem Skeptiker beim Umbau der Werkzeugliste;
+der Fehler ist AELTER als dieser Umbau und wurde davon weder verursacht noch
+behoben.
+
+Zu tun: `baueLage` muss die Source Files melden (`ns.getResetInfo().ownedSF`
+ist eine Map SF-Nummer -> Stufe). Dabei klaeren, ob `requiresFeature: 9`
+"SF9 besessen" oder "Hacknet-Server verfuegbar" heissen soll - in BitNode 9
+selbst gibt es die Server ohne SF9. Skeptiker vor dem Einbau.
+
+### tor.js ist in BitNode 12 dauerhaft blind (10.09.2026)
+
+Der Kampf-Multiplikator von BitNode 12 ist keine Konstante, sondern
+`dec = 1/1,02^SF12-Stufe` (`BitNode.tsx`, case 12). `tools/tor.js` hat ihn
+deshalb nicht in seiner Tabelle und faellt dort auf die Rueckrechnung
+zurueck - die unter 10.000 Erfahrung nicht traegt. Im frischen BitNode 12
+meldet das Werkzeug daher BLIND statt einer Zahl.
+
+Das ist die richtige Reihenfolge (lieber nichts sagen als etwas Falsches),
+aber es bleibt eine Luecke. BitNode 12 ist laut Route ein V1-Knoten
+(Hackingweg), das Urteil ANLAUF kann dort also gar nicht fallen - geprueft
+gehoert es trotzdem, bevor die Route dort ankommt.
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 520 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
@@ -175,49 +207,6 @@ laeuft.
 Fix: der Kern muss in V2 vor dem Beitritt das Kampf-Exp als Traeger melden
 (Minimum der vier Werte), nicht Hacking. Ersatzweise: S2 ruht, solange
 `blade.json.wartend` gesetzt ist. Skeptiker vor dem Einbau.
-
-### bblage.js fehlt in der Registry - tor.js rechnet mit 48 h alten Daten (06.09.2026, 21:25)
-
-**REPRODUZIERT am 10.09.2026, 15:30.** `node tools/tor.js` meldet im frischen
-BN4 erneut "Bereits in der Division - dieses Werkzeug ist hier fertig",
-obwohl die Kampfwerte auf 1 stehen. Der /bb-Skill ruft genau dieses Werkzeug
-im Urteil ANLAUF auf; es ist dort weiterhin blind.
-
-`data/bblage.json` ist vom 04.09. und stammt aus BN10 Lauf 2: sie sagt
-`inBladeburner: true` und `rang: 5837`. `tools/tor.js` liest sie ohne
-Frischepruefung und bricht mit "Bereits in der Division - dieses Werkzeug ist
-hier fertig" ab. Genau dieses Werkzeug soll der /bb-Skill im Urteil ANLAUF
-zum Rechnen der Phase aufrufen; es ist dort also blind.
-
-Ursache: `bblage.js` steht in `src/registry.json` gar nicht - der Kern
-startet es nie. Zwei Fehler, beide zu beheben: Eintrag in die Registry (mit
-`ARCHITEKTUR.md` 3.3), und `tor.js` muss das Alter von `bblage.json` gegen
-`nodeReset` pruefen und bei Ueberalterung BLIND melden statt FERTIG.
-### Kaltstart: cdump/csolve verklemmt - Werkzeugliste bakt Vorbedingungen ein (06.09.2026, 13:05)
-
-**REPRODUZIERT beim Sprung nach BN4 am 10.09.2026, 13:52.** Im frischen
-Knoten steht wieder "cdump.js wartet: blockiert durch data/cantwort.json",
-cantwort.json liegt mit einer Antwort, und csolve.js kommt im ganzen Kernlog
-nicht ein einziges Mal vor - es ist also nicht in der Werkzeugliste. Die
-Diagnose von 06.09. ist damit bestaetigt: die Liste bakt die Vorbedingung
-beim Bau ein. Tritt bei JEDEM Knotenwechsel auf.
-
-`baueWerkzeuge` in `src/bn4net.js` baut WERKZEUGE ueber `regAuswahl`, und
-die filtert mit `gilt()` INKLUSIVE Datei-Vorbedingung. Die Liste wird nur
-neu gebaut, wenn node|verfahren|phase wechselt. Beim Kernstart 13:00:02 gab
-es kein `data/cantwort.json` -> csolve.js (requiresFile) fiel aus der Liste,
-cdump.js kam hinein. cdump schrieb die Antworten, ist seitdem korrekt
-blockiert (Pruefung je Runde seit f5026c4) - aber csolve.js steht nicht in
-der Liste und startet nie. Beleg: Log 13:04:52 "cdump.js wartet: blockiert
-durch data/cantwort.json", `fehlend:` nennt csolve.js nicht, zwei Antworten
-liegen bereit. Der Umkehrfall zum Churn von 12:39 (damals lag die Datei beim
-Bau, csolve in der Liste, cdump nicht).
-
-Fix: WERKZEUGE ohne Datei-Vorbedingung bauen (gilt() mit einer Lage, die
-die precondition ueberspringt, oder Auswahl-Variante in lib/reg.js) und die
-Vorbedingung NUR je Runde in `vorbedingungGilt` pruefen. Dann sind beide
-Faelle weg. Loest sich von selbst beim Phasenwechsel (erster Mietrechner).
-Skeptiker vor dem Einbau; bis dahin ist der Contract-Zyklus im Kaltstart tot.
 
 ### Kaltstart: SELBST bn4net.js hat keinen Rueckholer (06.09.2026, 12:40)
 
@@ -453,23 +442,6 @@ nicht: Lauf 2 hat einen dauerhaften Sleeve mehr
 (`SleeveCovenantPurchases.tsx:63`), die Roadmap veranschlagt 30 h statt 35 h.
 Lauf 1 hat real **94,9 h Kalenderzeit** gebraucht (28.08. 17:05 bis 01.09.
 15:59), davon aber nur ein Teil gespielt.
-
-### tools/tor.js liest veraltete Telemetrie (01.09., 16:05)
-
-**Befund.** Um 16:04, fuenf Minuten nach dem Knotenwechsel, meldete
-`node tools/tor.js` "Bereits in der Division - dieses Werkzeug ist hier
-fertig". Der Spieler stand zu dem Zeitpunkt bei Hacking 8 mit null
-Kampfwerten; Bladeburner verlangt 100 in allen vier.
-
-**Ursache (Verdacht).** Es liest `data/bblage.json` und prueft `inBladeburner`,
-ohne den Zeitstempel zu pruefen. Die Datei stammte vom **31.08., 16:57** -
-knapp 24 Stunden alt -, weil nach dem Wechsel weder `blade.js` noch
-`bbtrain.js` sie neu schreiben.
-
-**Erwartet.** Wie in `tools/checkin.js` am selben Tag korrigiert: Alter der
-Datei pruefen und sie ignorieren, wenn sie aelter als ein paar Minuten ist.
-Sonst faellt genau in der Anlaufphase die einzige ETA-Quelle aus, die es dort
-gibt.
 
 ### Der Spielanteil wird systematisch zu hoch geschaetzt (31.08., 18:10)
 

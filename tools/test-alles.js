@@ -103,6 +103,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-tor.js",
+    deckt: "tor.js gegen praeparierte Spielstaende: Multiplikator, Verlauf, Gym-Rate",
+    schnell: true,
+  },
+  {
     datei: "test-motor-ebene2.js",
     deckt: "EBENE 2: der echte Kern gegen den ns-Mock, drei Pflichtproben (C.1)",
     schnell: false,

@@ -1494,6 +1494,58 @@ zu klein. Ein Fenster von mindestens 45 Minuten abwarten, bevor man urteilt.
 Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
 ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
+## 10.09.2026 - Werkzeugliste des Kerns und tools/tor.js
+
+Verifiziert: 41 Testdateien gruen, davon 18 neue Proben in `tools/test-tor.js`.
+
+**Kaltstart-Verklemmung cdump/csolve.** Der Kern baute WERKZEUGE und
+TELEMETRIE nur beim Wechsel von Knoten, Rolle oder Phase. `gilt()` prueft
+darin aber Datei-Vorbedingungen, die sich im Minutentakt aendern - damit
+backte der Zustand eines Augenblicks fuer Stunden fest, welche Gewerke
+ueberhaupt vorkamen. Am 06.09. fiel so csolve.js aus der Auswahl und der
+Contract-Zyklus stand still, am 10.09. im frischen BitNode 4 erneut. Beide
+Listen werden jetzt JE RUNDE gebaut - die Bauform, die `guard.js` seit dem
+04.09. benutzt.
+
+Der erste Versuch (Datei-Vorbedingungen beim Listenbau weglassen) wurde nach
+drei Skeptiker-Laeufen verworfen: er haette auch die Existenzpruefung der
+Skriptdatei abgeschaltet, Gewerke unueberwacht laufen lassen und Speicher
+fuer dauerhaft blockierte Gewerke zurueckgehalten.
+
+**tor.js rechnete mit 48 h alten Daten** (offen seit dem 01.09., am 06.09.
+versehentlich ein zweites Mal eingetragen). Es las `data/bblage.json` ohne
+Frischepruefung - eine Datei, die nur auf Anforderung von
+`strategie-check.js` geschrieben wird - und meldete daraufhin im frischen
+Knoten "Bereits in der Division". Die Lage kommt jetzt aus
+`tools/save.js --json`, also aus dem Spielstand selbst; die Quelle kann
+nicht veralten.
+
+Dabei fielen vier weitere Fehler auf, alle aelter als der Umbau:
+
+- Die Ratenmessung hat NIE gegriffen: `verlauf[0]` ist nach `unshift` der
+  juengste Eintrag, gemeint war der aelteste. Das Fenster war immer der
+  Abstand zum vorigen Aufruf und fiel unter die 20-Minuten-Schwelle -
+  `data/tor.json` stand ueber alle Laeufe auf "keine zweite Messung".
+- Der Multiplikator wurde aus (Skill, Erfahrung) zurueckgerechnet. Am
+  unteren Rand traegt das nicht, weil `calculateSkill` auf 1 klemmt: im
+  frischen Knoten ergab die Rueckrechnung 1,517 statt 1,2616. Jetzt Tabelle
+  je BitNode, an vier Sicherungspunkten geeicht, Rueckrechnung nur noch als
+  Gegenprobe mit Warnung bei Abweichung.
+- Die Rate galt an der Wanduhr statt in Spielzeit und rechnete Zeiten mit,
+  in denen der Rechner aus war. Ein Verlaufseintrag ueberlebte ausserdem
+  Knotenwechsel und Augmentierungs-Einbau.
+- Der Ortsfaktor 10 galt fest fuer das Powerhouse Gym, obwohl `bbtrain.js`
+  bei gescheiterter Reise in Gyms mit 5 oder 4 trainiert; und der
+  Erfahrungs-Multiplikator von Staerke galt fuer alle vier Kampfwerte.
+
+Neu ist die Warnung, wenn das Konto unter $5 Mio steht: `bbtrain.js`
+trainiert dann gar nicht (`bbtrain.js:263`), und eine ETA aus der Gym-Rate
+verspricht sonst ein Training, das nicht stattfindet.
+
+Offen geblieben und getrennt eingetragen: `requiresFeature` wirkt nirgends,
+weil `baueLage` kein `features` liefert - `hashes.js` kann dadurch in keinem
+Knoten starten.
+
 ## Offen, nach Dringlichkeit
 
 **AUFGEKLAERT (30.08., 12:55). Alle drei Verdachtsmomente sind widerlegt -

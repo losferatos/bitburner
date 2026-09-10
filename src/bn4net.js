@@ -812,15 +812,55 @@ export async function main(ns) {
     // aendern - die Rolle schon Sekunden nach dem Start, wenn ausgang.js
     // data/verfahren.txt schreibt. Nur bei ECHTER Aenderung neu bauen, sonst
     // stuende die Meldung in jeder Runde im Log.
+    // BEIDE LISTEN WERDEN JE RUNDE NEU GEBAUT (10.09.2026).
+    //
+    // Vorher wurden sie nur beim Wechsel von Knoten, Rolle oder Phase gebaut.
+    // `gilt()` prueft aber auch Datei-Vorbedingungen (`requiresFile`,
+    // `forbidsFile`) und die Existenz der Werkzeugdatei selbst - lauter
+    // Dinge, die sich im Minutentakt aendern. Damit backte der Zustand EINES
+    // Augenblicks fuer Stunden fest, welche Gewerke ueberhaupt vorkommen.
+    //
+    // Beide Richtungen sind belegt, beide am selben Paar:
+    //   06.09., 12:39  cantwort.json lag beim Bau -> csolve.js in der Liste,
+    //                  cdump.js nicht. csolve raeumte die Datei weg und wurde
+    //                  danach jede Runde neu gestartet (Churn).
+    //   06.09., 13:00  cantwort.json lag NICHT beim Bau -> cdump.js drin,
+    //                  csolve.js nicht. cdump schrieb Antworten, war danach
+    //                  korrekt blockiert - und csolve.js stand in keiner
+    //                  einzigen Runde zur Wahl. Der Contract-Zyklus war tot.
+    //   10.09., 15:21  im frischen BitNode 4 woertlich derselbe Stillstand.
+    //
+    // Der erste Versuch (10.09., verworfen) liess die Datei-Vorbedingungen
+    // beim Listenbau einfach weg und ueberliess sie `vorbedingungGilt`. Drei
+    // Skeptiker haben das zerlegt, und sie hatten recht:
+    //   - `gilt()` prueft ueber dieselbe Funktion auch, ob das Skript
+    //     ueberhaupt auf home liegt (`lib/reg.js:107`) - das waere mit
+    //     weggefallen.
+    //   - Die TELEMETRIE-Liste haette weiter die alte Regel gebraucht. Ein
+    //     Gewerk, das startet, aber in keiner Telemetrieliste steht, laeuft
+    //     unbeaufsichtigt: der Stillstands-Killer unten fasst nur an, was in
+    //     TELEMETRIE steht. csolve.js waere genau in diesen Zustand geraten.
+    //   - `reserveHome` und `werkbankReserve` summieren ueber WERKZEUGE. Eine
+    //     Liste mit dauerhaft blockierten Gewerken haelt Speicher zurueck,
+    //     den niemand braucht.
+    //
+    // Je Runde neu bauen loest alle drei auf einmal und ist die Bauform, die
+    // der Waechter seit dem 04.09. benutzt (`guard.js:275`, `dateiDa` gegen
+    // `ns.fileExists`). Die Kosten sind ein Set-Lookup und rund 30
+    // `ns.fileExists` je Runde - `regAuswahl` rechnet, es ruft nichts Teures.
+    //
+    // Gemeldet wird weiterhin NUR beim Schluesselwechsel: die Laengen
+    // schwanken jetzt absichtlich von Runde zu Runde, und eine Zeile je
+    // Aenderung waere genau der Logspam, den der Schluessel verhindern soll.
     {
       const jetztLage = baueLage();
       const jetztSchluessel = jetztLage.node + "|" + jetztLage.verfahren + "|" + jetztLage.phase;
+      regLage = jetztLage;
+      WERKZEUGE = baueWerkzeuge(regLage);
+      TELEMETRIE = baueTelemetrie(regLage);
       if (jetztSchluessel !== regSchluessel) {
         const vorher = regSchluessel;
-        regLage = jetztLage;
         regSchluessel = jetztSchluessel;
-        WERKZEUGE = baueWerkzeuge(regLage);
-        TELEMETRIE = baueTelemetrie(regLage);
         sag("Lage gewechselt (" + vorher + " -> " + jetztSchluessel + "): "
           + WERKZEUGE.length + " Werkzeuge, " + TELEMETRIE.length + " ueberwacht.");
       }

@@ -61,6 +61,12 @@ Stunden wieder.
 
 ## Sofort
 
+- **blade.js: Black-Op-Schwelle 35 % (11.09.2026 19:30).** Operation Typhoon wurde bei 39 % Chance gestartet; ein Fehlschlag kostet Rang und HP. Pruefen, ob 35 % fuer Black Ops zu niedrig ist (Vertraege/Ops sind wiederholbar, Black Ops nicht) und ob der Skript-Grund die Rangkosten des Fehlschlags einrechnet.
+- **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 556 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
 ### RAM-Stempel: bytes/lines werden nicht mitgeschrieben (11.09.2026, KLEIN)
 
 `tools/eichung-stempeln.js` aktualisiert nur `sha256`; `bytes` und `lines`

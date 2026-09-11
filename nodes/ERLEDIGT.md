@@ -1494,6 +1494,24 @@ zu klein. Ein Fenster von mindestens 45 Minuten abwarten, bevor man urteilt.
 Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
 ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
+## 11.09.2026 - S2-Vergleichspunkt ueberlebte den Knotenwechsel
+
+Verifiziert: 42 Testdateien gruen, 5 neue Proben in test-guard-ebene2.js;
+im Spiel 06:14:47 "Vergleichspunkt aus einem anderen Knoten verworfen
+(Rang 444908)", danach Punkt auf BN4-Rang und S2 aus.
+
+Gefunden beim Einspielen des Chaos-Fixes: die Aufraeum-Ruhe griff nicht,
+weil dMotor bei 943 min stand. Ursache: der Punkt wurde am 10.09. um 14:02
+auf 444.908 (BitNode 10) gesetzt - zehn Minuten nach dem Sprung, weil der
+Kern das alte blade.json noch als "frisch" durchreichte. Er erklaert alle
+S2-Meldungen und Sprosse-5-Beobachtungen seit dem Sprung.
+
+Fix an drei Stellen: blade.json traegt lastNodeReset (+1 GB, nachgezogen),
+der Kern prueft ihn, guard.js verwirft den Punkt bei fremdem oder fehlendem
+Stempel und setzt bei Knotenwechsel JE RUNDE den ganzen Leiterzustand
+zurueck (Skeptiker: guard.js ueberlebt Spruenge in der Schonliste, vorher
+blieb alles aus dem alten Knoten im Speicher).
+
 ## 11.09.2026 - Chaos-Teufelskreis in blade.js, drei Fixes
 
 Verifiziert: 42 Testdateien gruen; neue Proben in test-blade-ebene2.js

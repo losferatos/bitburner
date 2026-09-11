@@ -61,6 +61,15 @@ Stunden wieder.
 
 ## Sofort
 
+### RAM-Stempel: bytes/lines werden nicht mitgeschrieben (11.09.2026, KLEIN)
+
+`tools/eichung-stempeln.js` aktualisiert nur `sha256`; `bytes` und `lines`
+in `doku/ram-messung-2026-09-04.json` bleiben auf dem Stand der
+Ursprungsmessung (blade.js: 198053/3616 bei realen 206210/3743). Reine
+Anzeigedaten, test-ram prueft nur den Hash - aber ein Stempel, der eine
+Datei "bestaetigt", die es so nicht gibt, ist irrefuehrend. Entweder
+mitschreiben oder die Felder streichen.
+
 ### Nach dem Chaos-Fix offen: drei Staedte bleiben durch die Bevoelkerungsschaetzung gesperrt (11.09.2026)
 
 Zahlen-Skeptiker zum Chaos-Fix: Bei Chaos 47 (nach dem Aufraeumen) liegt

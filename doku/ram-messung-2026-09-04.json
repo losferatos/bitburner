@@ -277,8 +277,8 @@
  },
  {
   "file": "blade.js",
-  "live41": 174.35,
-  "lokal41": 174.35,
+  "live41": 175.35,
+  "lokal41": 175.35,
   "diff": 0,
   "lokal42": 114.35,
   "lokal43": 99.35,
@@ -291,10 +291,10 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 198053,
-  "lines": 3616,
-  "sha256": "49e1da4b18133a2c19fc983dcc22b55a4c4cb1413d370673f6837d7eb35bd347",
-  "gemessenAm": "2026-09-06T09:53:00.000Z",
+  "bytes": 206210,
+  "lines": 3743,
+  "sha256": "dd242dcdd19106a5c42b355bbdb1121e5e8c1190e0c243975038e9e05c2fd032",
+  "gemessenAm": "2026-09-11T06:10 calculateRam im Spiel (100.35 mit SF4, 175.35 ohne)",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
  {
@@ -1024,7 +1024,7 @@
   "err": null,
   "bytes": 263955,
   "lines": 4734,
-  "sha256": "f1836cf061b6b59bc8a3d20d1e9e7bd4b2681a77b5f529c5cee33524bdc9c369",
+  "sha256": "4f292ea526ce40890dca094f9955edf14a83807031be3a2f01c4072a004f260d",
   "gemessenAm": "2026-09-06T09:53:00.000Z",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -1937,7 +1937,7 @@
   "live41": 6.1,
   "lokal41": 6.1,
   "diff": 0,
-  "sha256": "47d40fca90015dcf94d84548810f9f366bf67f8612350e37bd8582cce2d11ecf",
+  "sha256": "d77e06b387c92ce9785978d9aa45f73c40dc1af190ff2a862248bbcae4a7fa6f",
   "bytes": 55741,
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"

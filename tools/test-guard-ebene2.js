@@ -335,6 +335,57 @@ console.log("-- der Zustand ueberlebt einen Neustart --");
 }
 
 console.log("");
+console.log("-- der Vergleichspunkt von S2 ueberlebt KEINEN Knotenwechsel (11.09.2026) --");
+{
+  // DER FALL VOM 10.09.: Sprung BN10 -> BN4. Der Kern reichte das alte
+  // blade.json zehn Minuten lang als "frisch" durch, der Waechter setzte den
+  // Vergleichspunkt auf Rang 444.908 aus BN10 - und schleppte ihn danach
+  // ueber jeden Neustart aus watchdog.json weiter. Gegen 444.908 waechst ein
+  // Rang von 464 nie: S2 stand seit dem Sprung durchgehend an, Sprosse 4.5
+  // startete blade.js dreimal grundlos neu, Sprosse 5 lag dreimal auf
+  // "would-execute".
+  //
+  // `leiter.laden()` setzt bei anderem watchdog.nodeReset ALLES zurueck - im
+  // Vorfall war watchdog.nodeReset aber schon der neue Knoten, nur der
+  // Traegerpunkt stammte aus dem alten. Genau das stellt diese Probe her.
+  const kern = JSON.stringify({ wall: W0, motorTimeMs: 3600000,
+    okRound: 100, errStreak: 0, round: 100 });
+  const kpi = JSON.stringify({ traeger: { name: "rang", wert: 464 },
+    route_state: "open", bestwertStatus: "geeicht" });
+  const wd = (traeger) => JSON.stringify({ version: 1, nodeReset: W0 - 24 * 3600000,
+    ziele: {}, verlauf: [], blockedHosts: {}, exhausted: null, ...traeger });
+
+  const fremd = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    "data/watchdog.json": wd({ letzterTraegerWert: 444908, letzterTraegerMotorMs: 600000,
+      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 48 * 3600000 }) });
+  const wf = json(fremd, "data/watchdog.json");
+  pruefe("ein Vergleichspunkt aus einem anderen Knoten wird verworfen",
+    wf && wf.letzterTraegerWert === 464, "letzterTraegerWert=" + (wf ? wf.letzterTraegerWert : "?"));
+  pruefe("mit dem Stempel des aktuellen Knotens",
+    wf && wf.letzterTraegerNodeReset === W0 - 24 * 3600000,
+    "letzterTraegerNodeReset=" + (wf ? wf.letzterTraegerNodeReset : "?"));
+  pruefe("das wird gemeldet", fremd.zustand.log.some((z) => /anderen Knoten verworfen/.test(z)),
+    fremd.zustand.log.slice(-4).join(" | "));
+
+  const eigen = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    // Motorabstand 10 min: unter den 45 min, ab denen die Setzregel einen
+    // gewachsenen Traeger als neuen Punkt nimmt. Sonst misst die Probe die
+    // Setzregel statt die Erhaltung.
+    "data/watchdog.json": wd({ letzterTraegerWert: 400, letzterTraegerMotorMs: 3000000,
+      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000 }) });
+  const we = json(eigen, "data/watchdog.json");
+  pruefe("aus demselben Knoten bleibt der Punkt erhalten (sonst 45 min blind)",
+    we && we.letzterTraegerWert === 400, "letzterTraegerWert=" + (we ? we.letzterTraegerWert : "?"));
+
+  const alt = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    "data/watchdog.json": wd({ letzterTraegerWert: 444908, letzterTraegerMotorMs: 600000,
+      letzterTraegerWall: W0 - 3600000 }) });
+  const wo = json(alt, "data/watchdog.json");
+  pruefe("ohne Stempel (Altbestand von vor dem 11.09.) wird der Punkt verworfen",
+    wo && wo.letzterTraegerWert === 464, "letzterTraegerWert=" + (wo ? wo.letzterTraegerWert : "?"));
+}
+
+console.log("");
 console.log("-- boot.js raeumt den Waechter NICHT weg (die Schonliste) --");
 {
   // Der Fall: bn4net startet fuenf Minuten lang nicht, und boot.js raeumt

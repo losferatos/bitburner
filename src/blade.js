@@ -620,6 +620,11 @@ export async function main(ns) {
   // Kampfwerte. Beides ging bisher als 1 in die Rechnungen ein - in BitNode
   // 10 (0,8 / 0,4) war die Einsatzschwelle zu forsch und der Hyperdrive-
   // Nutzen um Faktor 2 zu hoch. Einmal beim Start, 4 GB.
+  // Der Knoten, in dem dieses Skript laeuft - kommt in jede blade.json, damit
+  // der Kern eine Datei aus dem vorigen Knoten erkennt (11.09.2026). Einmal
+  // beim Start; blade.js ueberlebt keinen Knotenwechsel (exit.js killt alles).
+  let knotenStempel = null;
+  try { knotenStempel = ns.getResetInfo().lastNodeReset; } catch { /* egal */ }
   let BN_MULT = {};
   try { BN_MULT = ns.getBitNodeMultipliers(); } catch { BN_MULT = {}; }
   const BB_RANK_MULT = Number(BN_MULT.BladeburnerRank) || 1;
@@ -1384,6 +1389,13 @@ export async function main(ns) {
     } catch { /* General-Aktionen haben keine Stufe */ }
     ns.write("data/blade.json", JSON.stringify({
       zeit: Date.now(),
+      // DER KNOTENSTEMPEL (11.09.2026). Der Kern haelt diese Datei zehn
+      // Minuten lang fuer frisch - auch ueber einen Knotenwechsel hinweg. Am
+      // 10.09. reichte er so den Rang 444.908 aus BitNode 10 als Traeger in
+      // BitNode 4 durch, und der Waechter nahm ihn als Vergleichspunkt: S2
+      // stand seit dem Sprung durchgehend an. Mit dem Stempel kann der Kern
+      // eine Datei aus dem alten Knoten erkennen, egal wie jung sie ist.
+      nodeReset: knotenStempel,
       chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
       rang, punkte, ausdauer, hp, tiefstand,
       rangHoch: (rangHoch = Number.isFinite(rang)

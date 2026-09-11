@@ -118,15 +118,37 @@ export async function main(ns) {
   // (restartPolicy always, und Sprosse 3 startet ihn selbst neu) fuer 45 min
   // Motorzeit blind - und in dieser Blindheit haette die Entwarnung jeden
   // persistierten Verdacht geloescht. Die Werte wandern mit watchdog.json.
-  let letzterTraegerWert = Number.isFinite(leiter && leiter.letzterTraegerWert)
+  // DER VERGLEICHSPUNKT GILT NUR IM KNOTEN, IN DEM ER GESETZT WURDE
+  // (11.09.2026). `leiter.laden()` setzt beim Knotenwechsel die Ziele
+  // zurueck - diese drei Werte aber nicht, sie wanderten ungeprueft aus
+  // watchdog.json weiter. Gemessen nach dem Sprung BN10 -> BN4 am 10.09.:
+  // Vergleichspunkt Rang 444.908 (BN10, Motorminute 10, gesetzt 14:02 -
+  // zehn Minuten nach dem Sprung, weil der Kern das alte blade.json noch
+  // als "frisch" durchreichte). Gegen 444.908 kann ein Rang von 464 nie
+  // wachsen: S2 stand seit dem Sprung durchgehend an, Sprosse 4.5 startete
+  // blade.js dreimal grundlos neu, Sprosse 5 lag dreimal auf "would-
+  // execute" - im Scharfmodus waere der Lauf weggeworfen worden.
+  //
+  // Der Punkt traegt jetzt den Knotenstempel und verfaellt mit ihm.
+  const traegerKnoten = leiter && Number.isFinite(leiter.letzterTraegerNodeReset)
+    ? leiter.letzterTraegerNodeReset : null;
+  const traegerGilt = traegerKnoten !== null && traegerKnoten === ri0.lastNodeReset;
+  let letzterTraegerWert = traegerGilt && Number.isFinite(leiter && leiter.letzterTraegerWert)
     ? leiter.letzterTraegerWert : null;
-  let letzterTraegerMotorMs = Number.isFinite(leiter && leiter.letzterTraegerMotorMs)
+  let letzterTraegerMotorMs = traegerGilt && Number.isFinite(leiter && leiter.letzterTraegerMotorMs)
     ? leiter.letzterTraegerMotorMs : null;
   // Wanduhr des Vergleichspunkts - die Fehlversuch-Buchung aus blade.js
   // traegt eine Wanduhr, und nur ein Fehlversuch NACH dem Vergleichspunkt
   // darf angerechnet werden.
-  let letzterTraegerWall = Number.isFinite(leiter && leiter.letzterTraegerWall)
+  let letzterTraegerWall = traegerGilt && Number.isFinite(leiter && leiter.letzterTraegerWall)
     ? leiter.letzterTraegerWall : null;
+  // Der Knotenstempel des Vergleichspunkts - wird mit ihm gesetzt und mit
+  // ihm geschrieben. Ist er nicht der aktuelle Knoten, gilt der Punkt nicht.
+  let letzterTraegerNodeReset = traegerGilt ? traegerKnoten : null;
+  if (leiter && Number.isFinite(leiter.letzterTraegerWert) && !traegerGilt) {
+    sag("Vergleichspunkt aus einem anderen Knoten verworfen (Rang "
+      + Math.round(leiter.letzterTraegerWert) + ").");
+  }
   // Entwarnungen dieses Laufs - der Beleg, dass die Hysterese richtig sitzt.
   let entwarnungen = Number.isFinite(leiter && leiter.stand_down_count)
     ? leiter.stand_down_count : 0;
@@ -160,6 +182,27 @@ export async function main(ns) {
       const wall = Date.now();
       const spieler = ns.getPlayer();
       const ri = ns.getResetInfo();
+
+      // EIN KNOTENWECHSEL SETZT DEN GANZEN LEITERZUSTAND ZURUECK - AUCH IM
+      // LAUFENDEN PROZESS (11.09.2026, Skeptiker-Befund).
+      //
+      // `ladeLeiter` prueft den Knoten nur beim Start. guard.js steht aber
+      // in der Schonliste von boot.js und kann einen Sprung ueberleben; dann
+      // blieben Ziele, Sperren, Verlauf und der S2-Vergleichspunkt aus dem
+      // alten Knoten im Speicher und wurden mit dem NEUEN Stempel
+      // zurueckgeschrieben - "konsistent falsch". Deshalb hier je Runde:
+      // ist der Knoten ein anderer als der im Zustand, faengt der Waechter
+      // von vorn an, wie nach einem Neustart.
+      if (Number.isFinite(leiter.nodeReset) && Number.isFinite(ri.lastNodeReset)
+          && leiter.nodeReset !== ri.lastNodeReset) {
+        sag("Knotenwechsel erkannt - Leiterzustand und Vergleichspunkt verworfen.");
+        leiter = neueLeiter(ri.lastNodeReset);
+        letzterTraegerWert = null;
+        letzterTraegerMotorMs = null;
+        letzterTraegerWall = null;
+        letzterTraegerNodeReset = null;
+        letzteAusfuehrung.clear();
+      }
 
       // --- Die eigene Uhr, vor allem anderen ---------------------------------
       uhrRunde(uhren, wall, spieler.totalPlaytime);
@@ -227,7 +270,8 @@ export async function main(ns) {
           modus: modusRoh, karenz: true, motorTimeMs: 0, signale: [],
           letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
           fehlstrafen, fehlkills,
-          letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall, entwarnungen,
+          letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
+          letzterTraegerNodeReset, entwarnungen,
         }, spieler);
         okRunden++;
         errStreak = 0;
@@ -307,6 +351,7 @@ export async function main(ns) {
         puls: puls ? puls.puls : null,
         sichtbar,
         letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
+        letzterTraegerNodeReset,
       });
 
       // Welche Ziele waren diese Runde ueberhaupt AUSWERTBAR? Nur fuer die
@@ -364,6 +409,7 @@ export async function main(ns) {
           letzterTraegerWert = kpi.traeger.wert;
           letzterTraegerMotorMs = motorTimeMs;
           letzterTraegerWall = wall;
+          letzterTraegerNodeReset = ri.lastNodeReset;
         }
       }
 
@@ -636,7 +682,8 @@ export async function main(ns) {
         letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
         fehlstrafen,
         fehlkills,
-        letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall, entwarnungen,
+        letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
+        letzterTraegerNodeReset, entwarnungen,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -806,6 +853,9 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     letzterTraegerWert: lage.letzterTraegerWert ?? null,
     letzterTraegerMotorMs: lage.letzterTraegerMotorMs ?? null,
     letzterTraegerWall: lage.letzterTraegerWall ?? null,
+    // Und der Knoten, in dem er gesetzt wurde (11.09.2026) - ohne ihn
+    // ueberlebte der Punkt den Sprung und verglich BN4 gegen BN10.
+    letzterTraegerNodeReset: lage.letzterTraegerNodeReset ?? null,
     stand_down_count: lage.entwarnungen ?? 0,
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block

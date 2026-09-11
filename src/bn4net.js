@@ -4412,7 +4412,15 @@ export async function main(ns) {
             // blade.json frisch ist (10 min wie TELEMETRIE_FEST) - ein alter
             // Wert aus dem vorigen Lauf ist kein Traeger.
             const frisch = Number.isFinite(b.zeit) && Date.now() - b.zeit < 10 * 60000;
-            if (frisch) {
+            // UND AUS DIESEM KNOTEN (11.09.2026). Zehn Minuten nach dem Sprung
+            // BN10 -> BN4 war blade.json aus BN10 noch "frisch" und lieferte
+            // Rang 444.908 als Traeger; der Waechter setzte darauf seinen
+            // Vergleichspunkt und meldete danach den ganzen Knoten lang S2.
+            // Eine Datei ohne Stempel (Altbestand) gilt als fremd - lieber
+            // zehn Minuten ohne Traeger als ein Knoten mit dem falschen.
+            const ausDiesemKnoten = Number.isFinite(b.nodeReset)
+              && b.nodeReset === mzNodeReset;
+            if (frisch && ausDiesemKnoten) {
               traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
                 fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
                   ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null,

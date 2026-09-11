@@ -400,7 +400,7 @@ Resident **16,85**, mit `boot.js` **22,35**.
 | `src/hashes.js` | 5,95 | 5,95 | nein | not-hacknet |
 | `src/ausgang.js` | 8,15 | 8,15 | nein | any |
 | `src/contracts.js` | 17,65 | 17,65 | nein | werkbank |
-| `src/blade.js` | 174,35 | 99,35 | nein | werkbank |
+| `src/blade.js` | 175,35 | 100,35 | nein | werkbank |
 | `src/bn4rep.js` | 850,75 | 63,25 | nein | werkbank |
 | `src/graft.js` | 145,45 | 32,95 | nein | werkbank |
 | `src/exit.js` | 519,25 | 39,25 | nein | eigener Wirt (E10) |
@@ -756,7 +756,7 @@ nicht in einen Kommentar.
     {
       "name": "blade.js",
       "args": [],
-      "ramBaseGb": 94.35,
+      "ramBaseGb": 95.35,
       "ramSingGb": 5.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "V2",

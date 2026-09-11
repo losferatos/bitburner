@@ -346,6 +346,37 @@ console.log("-- eine Black Op mit zu kleiner Chance wird NICHT angegangen --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- vor dem Endspiel feuert erst 0,90, im Endspiel schon 0,35 (11.09.2026) --");
+{
+  // Der Mock rechnet keine Chance aus Kampfwerten (Intelligenz fehlt, die
+  // Formel liefert NaN), also gilt die Spanne aus aktionLage. Die Liste
+  // enthaelt Daedalus, damit die Schranke lesbar ist.
+  const liste = [
+    { name: "Operation Typhoon", rank: 2500 },
+    { name: "Operation Daedalus", rank: 400000 },
+  ];
+  const lage = (chance) => ({ je: { "Black Operations/Operation Typhoon":
+    { chance, spanne: 0, vorrat: 1 } } });
+  const m1 = await fahre({ rang: 9000, blackOps: liste, aktionLage: lage(0.60) });
+  pruefe("Rang 9.000, Chance 0,60: die Black Op bleibt liegen (Boden 0,90)",
+    !gestartet(m1).some((x) => x.startsWith("Black Operations/")),
+    gestartet(m1).join(", ") || "(nichts)");
+  const m2 = await fahre({ rang: 9000, blackOps: liste, aktionLage: lage(0.95) });
+  pruefe("Rang 9.000, Chance 0,95: die Black Op wird gefahren",
+    gestartet(m2).some((x) => x.startsWith("Black Operations/")),
+    gestartet(m2).join(", ") || "(nichts)");
+  const m3 = await fahre({ rang: 400000, blackOps: liste, aktionLage: lage(0.60) });
+  pruefe("Rang 400.000 (Endspiel), Chance 0,60: die Black Op wird gefahren (Boden 0,35)",
+    gestartet(m3).some((x) => x.startsWith("Black Operations/")),
+    gestartet(m3).join(", ") || "(nichts)");
+  const m4 = await fahre({ rang: 9000, blackOps: [liste[0]], aktionLage: lage(0.60) });
+  pruefe("ohne lesbare Daedalus-Schranke gilt 'frueh': bleibt liegen",
+    !gestartet(m4).some((x) => x.startsWith("Black Operations/")),
+    gestartet(m4).join(", ") || "(nichts)");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- ohne Rang gar keine Black Op --");
 {
   const m = await fahre({

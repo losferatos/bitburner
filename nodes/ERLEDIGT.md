@@ -23,6 +23,41 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Black-Op-Schwelle: 0,35 nur im Endspiel
+
+**Behoben 11.09.2026 19:53, mit drei Skeptikern (Praemisse, Betrieb, Substanz).**
+
+Befund 19:30: Operation Typhoon in BitNode 4 bei Rang 6.700 mit Chance 0,393
+gestartet (Schwelle 0,35). Die 0,35 war am 28.08. fuer BitNode 6 mit drei
+offenen Black Ops hergeleitet ("Rang nach dem letzten Schuss ist wertlos");
+vor der Daedalus-Schranke ist der Rang aber der Engpass, und ein Versuch ist
+bei jeder Schwelle rang-negativ (Substanz-Skeptiker, gerechnet: 204-237 s
+Dauer = 130-151 Rang aus Operationen gegen 13 Rang Ertrag bei 0,39).
+
+Eingebaut in `src/blade.js`: `SICHER_BLACKOP_FRUEH` 0,90 solange
+`getRank() < getBlackOpRank("Operation Daedalus")`, danach wie bisher 0,35;
+Skillkauf-Gewichte rechnen gegen dieselbe Schwelle; blade.json meldet
+`boSchwelle`/`boEndspiel`; ein unlesbarer Schrankenwert wird einmal gemeldet.
+
+Was die Skeptiker ausserdem fanden und korrigiert wurde: Krankenhauskosten
+sind 115 Mio je Fehlschlag (hpLoss x difficultyMultiplier 11,48, zweiter
+Term der min greift), nicht 2,1 Mrd; die Daedalus-Schranke traegt keinen
+Knotenfaktor; die Summe der Black-Op-Raenge ist 113.660 (73.660 ohne
+Daedalus), nicht 2.231 - Befund E.2 vom 04.09. war der Fehler.
+
+Nicht geaendert: der Gym-Zweig kann jetzt greifen, wenn nichts ueber Schwelle
+liegt und die Black Op zwischen 0,35 und 0,90 steht - dort waechst der Rang
+nicht, S2 kann nach 45 min ansprechen (Sprosse 4.5 startet blade.js neu, das
+ist harmlos). Vorher haette der Bot in dieser Lage die Black Op gefeuert;
+genau das war der Befund. Als Beobachtungspunkt eingetragen.
+
+Gemessen 19:53 nach `neustart.js blade.js`: boSchwelle 0,90, boEndspiel
+false, Operation Zero bei 0,23 wartet, Bot faehrt Assassination (0,89).
+Tests: 42 Dateien gruen, 4 neue Proben in test-blade-ebene2.js, RAM-Stempel
+blade.js nachgezogen (Rechnung trifft den Messwert, kein neuer Aufruf).
+
+---
+
 ### Verbindung ohne Anker angenommen
 
 **Eintrag der TEST-Instanz, nicht des Live-Spiels. Behoben 04.09.2026 02:32.**
@@ -1601,7 +1636,8 @@ Offen geblieben und getrennt eingetragen: `requiresFeature` wirkt nirgends,
 weil `baueLage` kein `features` liefert - `hashes.js` kann dadurch in keinem
 Knoten starten.
 
-## Offen, nach Dringlichkeit
+## Offen, nach Dringlichkeit
+
 
 **AUFGEKLAERT (30.08., 12:55). Alle drei Verdachtsmomente sind widerlegt -
 und die Ausgangszahl war falsch.**

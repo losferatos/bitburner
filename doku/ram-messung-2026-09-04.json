@@ -293,7 +293,7 @@
   "err": null,
   "bytes": 206210,
   "lines": 3743,
-  "sha256": "dd242dcdd19106a5c42b355bbdb1121e5e8c1190e0c243975038e9e05c2fd032",
+  "sha256": "31f3d72377b4efd5830df764acc214d88ac695d955a9fea88882683d107cd4ce",
   "gemessenAm": "2026-09-11T06:10 calculateRam im Spiel (100.35 mit SF4, 175.35 ohne)",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },

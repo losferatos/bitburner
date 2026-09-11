@@ -346,17 +346,18 @@ export async function main(ns) {
   // Daedalus), nicht die Zahl der abgehakten Black Ops. Ihre 2.231,5 Rang
   // zaehlen zum selben Ziel, egal wann sie anfallen.
   //
-  // KORRIGIERT AM 04.09.2026 (Befund E.2): hier stand 73.660. Das war ein
-  // Lesefehler um Faktor 1000 - die kleinen rankGain-Werte ab Deckard (1,0
-  // bis 20) wurden als Tausender gelesen. Nachgerechnet Op fuer Op aus
-  // BlackOperations.ts: 2.271,5 fuer alle 21, 2.231,5 ohne Daedalus. Der
-  // Gedanke bleibt richtig, die Zahl war es nicht - und sie machte den
-  // Ausgang um gut 22 % zu nah. Und p steigt von allein:
+  // ZWEIMAL KORRIGIERT. Am 04.09.2026 (Befund E.2) wurde aus 73.660 die
+  // 2.231,5 - das war der Fehler, nicht die Korrektur. Am 11.09.2026 mit
+  // ausfuehrbarem Code ueber BlackOperations.ts summiert (21 Eintraege):
+  // **113.660 fuer alle 21, 73.660 ohne Daedalus**, rankLoss zusammen
+  // 42.075. Die Black Ops sind also rund 18 % des Wegs zu 400.000, kein
+  // Rundungsposten. Am Gedanken aendert das nichts: Der Rang kommt so oder
+  // so, nur der Zeitpunkt haengt an der Schwelle. Und p steigt von allein:
   // `skillPoints = floor(maxRank/3)` (`Bladeburner.ts`) bei linear
   // steigenden Faehigkeitskosten (`Skill.ts:37-41`) - wer Rang sammelt,
   // sammelt Chance mit.
   //
-  // Die Gesamtzeit ist `(400.000 - 2.231,5 x Knotenfaktor)/Raidrate
+  // Die Gesamtzeit ist `(400.000 - 73.660 x Knotenfaktor)/Raidrate
   // + Summe(Dauer_i / p_i)`.
   // Der erste Term haengt nicht davon ab, WANN die Black Ops fallen; der
   // zweite wird kleiner, je hoeher p ist. Also: so spaet wie moeglich.
@@ -411,8 +412,61 @@ export async function main(ns) {
   // bei 6,4 Milliarden also 640 Millionen je Fehlschlag. Bei zwei bis drei
   // erwarteten Fehlschlaegen rund ein Viertel des Guthabens - in BitNode 6
   // (`ScriptHackMoney` 0,75) verschmerzbar und kein Traeger des Ausgangs.
+  // DIE 0,35 GILT NUR IM ENDSPIEL (11.09.2026, 19:45 - Befund Operation
+  // Typhoon bei 0,393 in BitNode 4, Rang 6.700 von 400.000).
+  //
+  // Die Herleitung von 0,35 oben rechnet mit DREI offenen Black Ops und
+  // einem Knoten, der eine Stunde spaeter zu Ende ist: "Rang nach dem
+  // letzten Schuss ist wertlos", die Groesse ist die Zeit bis zum Fall der
+  // Aktion. Das stimmt genau dann, wenn der Rang nicht mehr der Engpass ist -
+  // also wenn er die Schranke von Operation Daedalus (reqdRank 400.000,
+  // eine rohe Konstante ohne Knotenfaktor - `Actions/BlackOperation.ts:40`;
+  // der Faktor wirkt nur auf rankGain, `Formulas.ts:22`) schon
+  // ueberschritten hat. Davor gilt die
+  // Herleitung vom 27.08., 21:55 unveraendert: der Engpass ist der Rang, die
+  // 2.231,5 Rang aller Black Ops zaehlen zum selben Ziel, egal wann sie
+  // fallen, und p steigt mit jedem Rang von allein - **warten kostet
+  // nichts, ein Fehlschlag kostet Zeit und Geld.**
+  //
+  // Was ein Versuch wirklich kostet (Skeptiker 11.09., gerechnet mit
+  // `Actions/Action.ts:104-120`, `Bladeburner.ts:1059-1063`,
+  // `Hospital.ts:4-10`, Werte vom 11.09.: agi 258, dex 339, 2.300 Rang/h,
+  // 21,3 Mrd Guthaben):
+  //
+  //   Dauer Typhoon      204-237 s  (Overclock 14 bzw. 0)
+  //   entgangener Rang   130-151    aus Operationen in derselben Zeit
+  //   erwarteter Ertrag  p=0,39: 13 Rang    p=0,90: 44 Rang
+  //   Schaden            hpLoss 100 x difficultyMultiplier 11,48 = 1.148 HP
+  //   Krankenhaus        min(Geld*0,1, 1.148*100.000) = 115 Mio je Fehlschlag
+  //                      (der Geldterm greift erst unter 1,15 Mrd Guthaben)
+  //
+  // Ein Black-Op-Versuch ist bei JEDER Schwelle rang-negativ - Black Ops
+  // sind Tore, keine Rangquelle. Die Schwelle entscheidet nur, wie teuer das
+  // Durchschreiten ist: bei 0,90 rund 30 Rang und 59 Mio je Versuch weniger
+  // als bei 0,39. Das Geld ist dabei Beiwerk (0,3 % des Guthabens), der
+  // Kern ist: Warten kostet nichts, weil die Chance aus Skillpunkten kommt,
+  // die Skillpunkte aus maxRank (`Bladeburner.ts:1265-1290`, faellt nie),
+  // und jeder Rang ohnehin Richtung 400.000 zaehlt. Fruehes Feuern kauft
+  // nichts, was spaeter nicht billiger zu haben waere.
+  //
+  // Deshalb zwei Boeden: SICHER_BLACKOP_FRUEH = 0,90 (die Zahl vom 27.08.,
+  // dort mit Ares und Red Dragon durchgerechnet: 669 und 7.577 Rang
+  // gespart), solange der Rang unter der Daedalus-Schranke liegt;
+  // SICHER_BLACKOP = 0,35 danach. `einsatzSchwelle()` liegt in beiden
+  // Faellen darueber, wenn der Vorsprung den Verlust nicht traegt. Der
+  // Raid-Vorrats-Zweig (SICHER_BLACKOP_OHNE_RAID 0,40) ist vor dem Endspiel
+  // ohne Wirkung - 0,90 liegt ohnehin darueber -, er zaehlt erst danach.
+  // Ist die Schranke nicht lesbar (API-Fehler, Name unbekannt), gilt
+  // "frueh" - lieber warten als teuer feuern; das wird einmal gemeldet.
+  //
+  // Fussnote fuer andere Knoten: rankGain traegt den BladeburnerRank-Faktor,
+  // rankLoss nicht (`Formulas.ts:22-25` gegen `:29-42`). In BN7/8/9 (0,6 /
+  // 0,45 / 0,2) ist ein Fehlschlag relativ teurer - 0,90 ist dort eher zu
+  // niedrig als zu hoch.
   const SICHER_BLACKOP = 0.35;
+  const SICHER_BLACKOP_FRUEH = 0.90;
   const SICHER_BLACKOP_OHNE_RAID = 0.40;
+  const DAEDALUS = "Operation Daedalus";
   // Ab wieviel Gemeinden ueber ALLE Staedte sich das Warten noch lohnt. 20
   // sind bei Stufe 9 rund 2.360 Rang - genug, um die Wartezeit auf eine
   // bessere Black-Op-Chance zu ueberbruecken.
@@ -802,6 +856,11 @@ export async function main(ns) {
   // solange `blackOpArbeit` noch nichts gerechnet hat (erster Durchlauf) oder
   // wenn keine offene Black Op mehr Arbeit uebrig hat.
   let blackOpArbeit = null;   // { "Short-Circuit": 0.13, "Cloak": 0.02, ... }
+  // Zuletzt in `waehle()` gerechnete Black-Op-Schwelle und Endspiel-Lage -
+  // fuer blade.json, damit ein Warten unter der Schwelle von aussen nicht
+  // wie ein stiller Stillstand aussieht (Skeptiker 11.09.2026).
+  let boSchwelleZuletzt = null;
+  let boEndspielZuletzt = false;
   // Die aus erster Hand gerechneten Chancen aller noch offenen Black Ops,
   // damit sie in `data/blade.json` sichtbar werden. Warum das noetig ist,
   // steht bei "Der gemeldete Bereich ist fuer Black Ops unbrauchbar" weiter
@@ -1431,6 +1490,10 @@ export async function main(ns) {
       boChancen,
       naechsteBlackOp: bo ? bo.name : null,
       blackOpRang: bo ? bo.rank : null,
+      // Damit ein Warten unter der Schwelle von aussen sichtbar ist und nicht
+      // wie ein stiller Stillstand aussieht (Skeptiker 11.09.).
+      boSchwelle: boSchwelleZuletzt,
+      boEndspiel: boEndspielZuletzt,
     }), "w");
     if (ns.getHostname() !== "home") {
       try { ns.scp("data/blade.json", "home", ns.getHostname()); } catch { /* egal */ }
@@ -1936,7 +1999,28 @@ export async function main(ns) {
     return Math.min(0.95, stern + EINSATZ_ABSTAND);
   };
 
+  // Endspiel = der Rang traegt schon die letzte Black Op. Erst dann ist
+  // "Zeit bis zum Fall der Aktion" die richtige Groesse (Block bei
+  // SICHER_BLACKOP_FRUEH).
+  let endspielFehlerGemeldet = false;
+  const imEndspiel = () => {
+    try {
+      const schranke = ns.bladeburner.getBlackOpRank(DAEDALUS);
+      return Number.isFinite(schranke) && ns.bladeburner.getRank() >= schranke;
+    } catch (e) {
+      // Einmal sagen, sonst faehrt der Bot wochenlang still mit 0,90 auch
+      // fuer die letzten Black Ops (Skeptiker 11.09.).
+      if (!endspielFehlerGemeldet) {
+        endspielFehlerGemeldet = true;
+        sag("Daedalus-Schranke nicht lesbar (" + String(e).slice(0, 80)
+          + ") - Black-Op-Schwelle bleibt bei " + SICHER_BLACKOP_FRUEH);
+      }
+      return false;
+    }
+  };
+
   const blackOpSchwelle = (name) => {
+    if (!imEndspiel()) return Math.max(SICHER_BLACKOP_FRUEH, einsatzSchwelle(name));
     if (!RAID_AN) return Math.max(SICHER_BLACKOP_OHNE_RAID, einsatzSchwelle(name));
     let gesamt = 0;
     try {
@@ -2009,7 +2093,10 @@ export async function main(ns) {
           const ch = blackOpChance(nm);
           if (!Number.isFinite(ch) || ch <= 0) continue;
           gerechnet[nm] = +ch.toFixed(4);
-          const w = Math.max(0, Math.log(SICHER_BLACKOP / ch));
+          // Gegen die Schwelle, die fuer DIESE Op wirklich gilt - sonst hat
+          // die Op, auf die der Bot gerade wartet (0,39 gegen 0,90), das
+          // Gewicht 0 und treibt den Skillkauf nicht (Skeptiker 11.09.).
+          const w = Math.max(0, Math.log(blackOpSchwelle(nm) / ch));
           summe += w;
           if (d.isKill) kill += w;
           if (d.isStealth) stealth += w;
@@ -2037,6 +2124,8 @@ export async function main(ns) {
         // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
         const chance = gerechnet !== null ? gerechnet : s.min;
         const schwelle = blackOpSchwelle(bo.name);
+        boSchwelleZuletzt = +schwelle.toFixed(2);
+        boEndspielZuletzt = imEndspiel();
         if (chance >= schwelle) {
           return { typ: B, name: bo.name,
             grund: "Black Op (Chance " + chance.toFixed(3)

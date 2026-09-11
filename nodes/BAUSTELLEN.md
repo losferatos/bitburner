@@ -20,7 +20,7 @@ Beide Male ging es gut, aber Nachrechnen ist Zufall, kein Mechanismus.
 
 | Entschieden | Wert | Beleg | Wann |
 |---|---|---|---|
-| Feuerschwelle Black Ops | **0,35**, nicht 0,90 | Rangverlust ist Zeit, kein Bestand (`Bladeburner.ts:1273,1283-1291`); Kosten `T_op + L/(m*Rangrate)` = 6,8 min gegen 80 min Warten | 28.08. 16:00, bestaetigt 29.08. 03:55 und 07:20 |
+| Feuerschwelle Black Ops | **0,90 vor dem Endspiel, 0,35 ab Rang >= Daedalus-Schranke** (11.09.) | Vor 400.000 ist der Rang der Engpass: ein Versuch ist bei jeder Schwelle rang-negativ (Typhoon 204-237 s = 130-151 Rang Operationen gegen 13 Rang Ertrag bei p=0,39, 44 bei 0,90), Warten kostet nichts (`Bladeburner.ts:1265-1290`, maxRank faellt nie). Die 0,35 galt fuer 3 offene Black Ops in BN6 und gilt ab der Schranke weiter. Summe der Black-Op-Raenge 113.660 / 73.660 ohne Daedalus (E.2 vom 04.09. war falsch). | 28.08. 16:00, 11.09. 19:50 mit Skeptiker |
 | Bevoelkerungs-Horizont in `beste()` | **1 Stunde**, nicht die Restlaufzeit | Black Ops ignorieren pop (`BlackOperation.ts:55`), Chance bei 1 gedeckelt (`Action.ts:195`), Ereignisse driftfrei (-0,0016/Ereignis) | 29.08. 08:20 |
 | Einbau vor dem Divisionsbeitritt | **nie** | Prestige setzt Kampfwerte auf 1; am 29.08. 04:15 kostete es netto 90.810 Erfahrung = 6,6 h | 25.08., erzwungen 29.08. 04:25 und 06:20 |
 | Augmentierungsrunde vor Tor 1 | **verworfen** | Gym allein 18,6 h gegen 20,3 h; nur Combat Rib I hebt str/def, der Rest wirkt auf dex/agi | 28.08. 22:52 |
@@ -61,7 +61,7 @@ Stunden wieder.
 
 ## Sofort
 
-- **blade.js: Black-Op-Schwelle 35 % (11.09.2026 19:30).** Operation Typhoon wurde bei 39 % Chance gestartet; ein Fehlschlag kostet Rang und HP. Pruefen, ob 35 % fuer Black Ops zu niedrig ist (Vertraege/Ops sind wiederholbar, Black Ops nicht) und ob der Skript-Grund die Rangkosten des Fehlschlags einrechnet.
+- **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
 - **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 

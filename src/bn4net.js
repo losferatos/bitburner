@@ -4415,7 +4415,11 @@ export async function main(ns) {
             if (frisch) {
               traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
                 fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
-                  ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null };
+                  ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null,
+                // Und ob blade.js gerade Chaos abbaut (11.09.2026): Diplomacy
+                // gibt null Rang, und der Waechter darf das nicht fuer
+                // Stillstand halten. Nur durchreichen - entscheiden tut leiter.js.
+                aufraeumen: b.aufraeumen === true };
             }
           }
           // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem

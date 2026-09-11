@@ -269,7 +269,22 @@ export function signale(e) {
           && f.wall > e.letzterTraegerWall) {
         gutschrift = f.verlust;
       }
-      if (dMotor >= 45 * 60000 && t.wert + gutschrift <= e.letzterTraegerWert) {
+      // AUFRAEUMEN IST KEIN STILLSTAND (11.09.2026, Skeptiker-Befund).
+      //
+      // Diplomacy senkt das Chaos und gibt dabei null Rang - und von Aevum
+      // 75 auf 47 sind das bei Charisma 15 rund 41 Laeufe zu 60 s, mit dem
+      // Gegenwind der Sleeve-Kontrakte deutlich mehr. Das ist laenger als
+      // die 45 Minuten, nach denen S2 den stehenden Rang fuer Stillstand
+      // haelt. Sprosse 4.5 haette blade.js dann mitten im Aufraeumen neu
+      // gestartet und den Lauf von vorn beginnen lassen - jedes Mal.
+      //
+      // Deshalb reicht blade.js `aufraeumen` im Traeger durch, und solange es
+      // gesetzt ist, ruht S2. Gedeckelt: hoechstens AUFRAEUM_RUHE_MS am
+      // Stueck, gemessen an der Motorzeit seit dem Vergleichspunkt. Ein
+      // Bot, der drei Stunden "aufraeumt", ohne dass sich etwas tut, ist
+      // wieder ein Haenger - dann greift S2 wie zuvor.
+      const raeumtAuf = t.aufraeumen === true && dMotor < AUFRAEUM_RUHE_MS;
+      if (!raeumtAuf && dMotor >= 45 * 60000 && t.wert + gutschrift <= e.letzterTraegerWert) {
         // `alterMotorMs` GEHOERT MIT (Skeptiker Runde 4, R1). Sprosse 5
         // prueft als erste Vorbedingung "S2 seit >= 6 h MOTORZEIT" und liest
         // die Zahl aus dem Auftrag - der Waechter fuehrt das Signal, also gibt
@@ -525,6 +540,15 @@ export function schritt(z, sig, jetztGuardMs, jetztWall, uhren, lage = {}) {
  * @returns {string[]} die entwarnten Ziele
  */
 export const ENTWARNUNG_MS = 10 * 60000;
+
+/**
+ * Wie lange S2 hoechstens ruht, solange der Traeger `aufraeumen` meldet
+ * (11.09.2026). Von Chaos 75 auf 47 sind es bei Charisma 15 rund 41
+ * Diplomacy-Laeufe; mit Sleeve-Gegenwind und Riots das Doppelte. Drei
+ * Stunden decken das mit Reserve - und danach ist es kein Aufraeumen mehr,
+ * sondern ein Haenger, der so heisst.
+ */
+export const AUFRAEUM_RUHE_MS = 3 * 3600000;
 
 export function entwarnung(z, zieleMitSignal, jetztGuardMs, auswertbar = null) {
   const raus = [];

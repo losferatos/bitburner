@@ -2190,6 +2190,146 @@ export async function main(ns) {
       } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
     }
 
+    // CHAOS UEBER 50 HALBIERT ALLE ERFOLGSCHANCEN (26.08.2026, 15:20).
+    //
+    // Gemessen um 14:49: Sector-12 stand bei Chaos 53,89, und die Chancen
+    // waren gegenueber 13:22 auf die Haelfte gefallen - Tracking 0,778 auf
+    // 0,357, Retirement 0,468 auf 0,219, Bounty Hunter 0,388 auf 0,182. Die
+    // Rangrate fiel von 0,841 auf 0,625 je Minute.
+    //
+    // Der Grund steht in `Actions/Action.ts:94-101`: Ueber `ChaosThreshold`
+    // (50) wird die SCHWIERIGKEIT mit `sqrt(1 + (chaos - 50))` multipliziert,
+    // hier `sqrt(4,89) = 2,21`. Das deckt sich mit dem gemessenen Faktor 2,18.
+    // Unter 50 ist der Faktor exakt 1 - der Schaden setzt schlagartig ein und
+    // verschwindet ebenso schlagartig.
+    //
+    // Diplomacy senkt das Chaos PROZENTUAL um `charisma^0,045 + charisma/1000`
+    // (`Bladeburner.ts:735-743`, `:1185-1187`), dauert 60 Sekunden und kostet
+    // **keine Ausdauer** (`data/GeneralActions.ts:37-44`). Bei niedrigem
+    // Charisma sind das gut ein Prozent je Durchlauf - von 53,89 auf unter 50
+    // also rund sieben Minuten. Danach arbeitet jede Aktion wieder mit der
+    // doppelten Chance, und zwar dauerhaft.
+    //
+    // Die Hysterese ist knapp gewaehlt (ein ab 50, aus bei 47), weil die
+    // Senkung prozentual und damit langsam ist: Von 50 auf 40 waeren es
+    // siebzehn Durchlaeufe. Drei Prozentpunkte Abstand halten die Schwelle
+    // sicher unterschritten, ohne die Arbeit lange zu unterbrechen.
+    //
+    // WARUM VOR DER AKTIONSWAHL: Der Wert, den `beste()` vergleicht, ist
+    // bereits durch das Chaos verdorben. Wer erst waehlt und dann aufraeumt,
+    // waehlt auf Basis halbierter Zahlen.
+    // AUFGERAEUMT WIRD ERST, WENN DAS CHAOS AUCH WEHTUT (28.08.2026, 13:40).
+    //
+    // Gemessen `data/aktionen.txt` ab 13:05, 14,7 protokollierte Minuten:
+    //
+    //     Operations/Assassination   10,5 min   71,3 %   12.626 Rang
+    //     General/Diplomacy           4,2 min   28,7 %        0 Rang
+    //
+    // Raid kam nicht mehr vor - der Chaos-Zuschlag von 13:00 wirkt. Das Chaos
+    // steigt jetzt **exogen**: `randomEvent` alle 240 bis 600 Sekunden, davon
+    // 20 Prozent Synthoid-Riots mit `+1` Zaehlwert und `+5 bis +20 %`
+    // (`Bladeburner.ts:679-684`), Stadt zufaellig aus sechs. Das trifft die
+    // eigene Stadt rund alle 35 Minuten und kostet rund 7,3 Minuten
+    // Aufraeumen - gerechnet mit Charisma 309 (Diplomacy -1,603 % je 60 s).
+    // Die Senkung ist `charisma^0,045 + charisma/1000`
+    // (`Bladeburner.ts:735-743`); bei Charisma 4 sind es 1,068 %, also rund
+    // 11 Minuten. Charisma faellt bei jedem Einbau auf 1 zurueck.
+    //
+    // Nur: Dieses Aufraeumen kauft nichts. Chaos hat im ganzen Spiel **genau
+    // eine** Wirkung - `difficulty *= sqrt(1 + chaos - 50)`
+    // (`Actions/Action.ts:94-102` fuer Vertraege, `Actions/Operation.ts:52-61`
+    // fuer Operationen; Black Ops sind immun, `BlackOperation.ts:59-61` gibt
+    // fest 1 zurueck). Und die Erfolgschance ist
+    // `Math.min(1, competence/difficulty)` (`Action.ts:196`) - sie **klemmt**.
+    // Solange sie klemmt, ist der Aufschlag wirkungslos.
+    //
+    // Wie gross die Reserve ist, steht in `data/bbspann.json` von 12:40: In
+    // Sector-12 stand das Chaos bei **101,67** - Faktor 7,26 auf die
+    // Schwierigkeit - und Raid trotzdem bei **0,997**. In New Tokyo stehen bei
+    // Chaos um 50 alle sechs Operationen und alle drei Vertraege auf 1,000.
+    //
+    // DIESER ABSATZ BESCHRIEB BIS ZUM 11.09.2026 EINE REGEL, DIE ES NICHT
+    // GIBT. Er behauptete: "Solange irgendeine Operation oder ein Vertrag
+    // ueber seiner Sicherheitsschwelle steht, wird nicht aufgeraeumt." Der
+    // Code darunter entscheidet seit dem 30.08. allein am Chaosstand
+    // (Hysterese CHAOS_EIN 50 / CHAOS_AUS 47); `fahrbarStand` wird nur noch
+    // als Telemetrie geschrieben. Ein Skeptiker hat den Widerspruch am
+    // 11.09. gefunden. Die Regel, wie sie im Code steht, ist die richtige:
+    // ueber 50 kostet Chaos beweisbar, darunter beweisbar nicht - siehe den
+    // Block bei CHAOS_EIN.
+    //
+    // WARUM DIESER BLOCK JETZT VOR RECRUITMENT UND ASSASSINATION-AUFBAU
+    // STEHT (11.09.2026, nach dem Skeptiker-Lauf).
+    //
+    // Er stand hinter vier Zweigen, die frueher zurueckkehren: Black Op,
+    // Field Analysis, Assassination-Aufbau, Recruitment. Drei davon sind
+    // harmlos - Black Ops sind chaos-immun, der Aufbau verlangt Chance 0,85
+    // und Field Analysis begrenzt sich selbst. Recruitment nicht: Es kehrt
+    // bedingungslos zurueck, solange der Trupp unter TRUPP_ZIEL liegt, und
+    // nach einem Einbau ist der Trupp immer weg. Mit Chaos ueber 50 haette
+    // die Figur dann rekrutiert - null Rang, null Kampferfahrung, null
+    // Chaossenkung, bei Charisma 1 ueber Stunden - statt aufzuraeumen.
+    //
+    // Der Chaos-Block gehoert deshalb VOR beide: Solange das Chaos jede
+    // Aktion um sqrt(1 + chaos - 50) erschwert, ist Aufraeumen die einzige
+    // Arbeit, die alles andere billiger macht. Die Black Op bleibt davor -
+    // sie ist immun und der Zweck des Knotens.
+    if (SPIEL_CHAOS_AN) {
+      // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR.
+      // `chaosMessen()` schreibt `chaosStand`, `fahrbarStand` und die
+      // Hochwassermarke; ohne sie liesse sich "es wird nicht aufgeraeumt"
+      // nicht von "es gab nichts aufzuraeumen" unterscheiden - genau die
+      // Verwechslung, die den Einbau-Riegel am 28.08. um 11:40 unpruefbar
+      // gemacht hat.
+      chaosMessen();
+      if (chaosStand > CHAOS_EIN) chaosAufraeumen = true;
+      if (chaosStand < CHAOS_AUS) chaosAufraeumen = false;
+      if (chaosAufraeumen) {
+        // STEALTH RETIREMENT STATT DIPLOMACY (27.08.2026, 20:42).
+        //
+        // Beide senken das Chaos **prozentual** - Diplomacy um
+        // `charisma^0,045 + charisma/1000` (`Bladeburner.ts:1185-1187`),
+        // Stealth Retirement um 1 bis 3 Prozent (`Bladeburner.ts:853`).
+        // Nur eines von beiden gibt dabei Rang. Gemessen 20:41 im Spiel
+        // (`src/sr.js`), Charisma 287, Chaos 50,8:
+        //
+        //     Raid       lvl 9  Chance 0,900  73 s  118 Rang  Chaos +3 %
+        //     Stealth R. lvl 5  Chance 0,999  78 s   33 Rang  Chaos -2 %
+        //     Diplomacy                       60 s    0 Rang  Chaos -1,58 %
+        //
+        // Ein Raid hebt bei Chaos 50 um 1,5 Punkte. Zum Ausgleich braucht es
+        // 1,5 Stealth Retirements (je -1,0) oder 1,9 Diplomacy-Laeufe
+        // (je -0,79):
+        //
+        //     Raid + 1,5 SR    190 s fuer 156 Rang  =  49,3 Rang/min
+        //     Raid + 1,9 Dipl. 187 s fuer 106 Rang  =  34,0 Rang/min
+        //
+        // **Plus 45 Prozent.** Diplomacy ist strikt dominiert, solange die
+        // SR-Chance hoch ist.
+        //
+        // DIE GRENZE IST DIE BEVOELKERUNG, nicht die Chance: SR senkt sie um
+        // 0,5 Prozent je Erfolg (`Bladeburner.ts:848`), und sie wirkt ueber
+        // `(pop/1e9)^0,7` auf die Erfolgschance jeder Operation
+        // (`Action.ts`, `getPopulationSuccessFactor`). Unter 0,8e9 faellt
+        // Raid unter seine Schwelle - dann wieder Diplomacy, die nichts
+        // verbraucht.
+        let srTauglich = false;
+        try {
+          const stadt = ns.bladeburner.getCity();
+          const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
+          const ch = ns.bladeburner.getActionEstimatedSuccessChance(
+            "Operations", "Stealth Retirement Operation");
+          srTauglich = pop >= SR_POP_MIN && ch[0] >= SR_CHANCE_MIN;
+        } catch { srTauglich = false; }
+        if (srTauglich) {
+          return { typ: O, name: "Stealth Retirement Operation",
+            grund: "Chaos " + chaosLage().toFixed(1) + " (senkt und gibt Rang)" };
+        }
+        return { typ: G, name: "Diplomacy",
+          grund: "Chaos " + chaosLage().toFixed(1) };
+      }
+    }
+
     // 2c. ASSASSINATION AUF STUFE BRINGEN, SOLANGE RAID NOCH TRAEGT
     //     (27.08.2026, 23:42).
     //
@@ -2608,132 +2748,6 @@ export async function main(ns) {
       return treffer;
     };
 
-    // CHAOS UEBER 50 HALBIERT ALLE ERFOLGSCHANCEN (26.08.2026, 15:20).
-    //
-    // Gemessen um 14:49: Sector-12 stand bei Chaos 53,89, und die Chancen
-    // waren gegenueber 13:22 auf die Haelfte gefallen - Tracking 0,778 auf
-    // 0,357, Retirement 0,468 auf 0,219, Bounty Hunter 0,388 auf 0,182. Die
-    // Rangrate fiel von 0,841 auf 0,625 je Minute.
-    //
-    // Der Grund steht in `Actions/Action.ts:94-101`: Ueber `ChaosThreshold`
-    // (50) wird die SCHWIERIGKEIT mit `sqrt(1 + (chaos - 50))` multipliziert,
-    // hier `sqrt(4,89) = 2,21`. Das deckt sich mit dem gemessenen Faktor 2,18.
-    // Unter 50 ist der Faktor exakt 1 - der Schaden setzt schlagartig ein und
-    // verschwindet ebenso schlagartig.
-    //
-    // Diplomacy senkt das Chaos PROZENTUAL um `charisma^0,045 + charisma/1000`
-    // (`Bladeburner.ts:735-743`, `:1185-1187`), dauert 60 Sekunden und kostet
-    // **keine Ausdauer** (`data/GeneralActions.ts:37-44`). Bei niedrigem
-    // Charisma sind das gut ein Prozent je Durchlauf - von 53,89 auf unter 50
-    // also rund sieben Minuten. Danach arbeitet jede Aktion wieder mit der
-    // doppelten Chance, und zwar dauerhaft.
-    //
-    // Die Hysterese ist knapp gewaehlt (ein ab 50, aus bei 47), weil die
-    // Senkung prozentual und damit langsam ist: Von 50 auf 40 waeren es
-    // siebzehn Durchlaeufe. Drei Prozentpunkte Abstand halten die Schwelle
-    // sicher unterschritten, ohne die Arbeit lange zu unterbrechen.
-    //
-    // WARUM VOR DER AKTIONSWAHL: Der Wert, den `beste()` vergleicht, ist
-    // bereits durch das Chaos verdorben. Wer erst waehlt und dann aufraeumt,
-    // waehlt auf Basis halbierter Zahlen.
-    // AUFGERAEUMT WIRD ERST, WENN DAS CHAOS AUCH WEHTUT (28.08.2026, 13:40).
-    //
-    // Gemessen `data/aktionen.txt` ab 13:05, 14,7 protokollierte Minuten:
-    //
-    //     Operations/Assassination   10,5 min   71,3 %   12.626 Rang
-    //     General/Diplomacy           4,2 min   28,7 %        0 Rang
-    //
-    // Raid kam nicht mehr vor - der Chaos-Zuschlag von 13:00 wirkt. Das Chaos
-    // steigt jetzt **exogen**: `randomEvent` alle 240 bis 600 Sekunden, davon
-    // 20 Prozent Synthoid-Riots mit `+1` Zaehlwert und `+5 bis +20 %`
-    // (`Bladeburner.ts:679-684`), Stadt zufaellig aus sechs. Das trifft die
-    // eigene Stadt rund alle 35 Minuten und kostet rund 7,3 Minuten
-    // Aufraeumen - gerechnet mit Charisma 309 (Diplomacy -1,603 % je 60 s).
-    // Die Senkung ist `charisma^0,045 + charisma/1000`
-    // (`Bladeburner.ts:735-743`); bei Charisma 4 sind es 1,068 %, also rund
-    // 11 Minuten. Charisma faellt bei jedem Einbau auf 1 zurueck.
-    //
-    // Nur: Dieses Aufraeumen kauft nichts. Chaos hat im ganzen Spiel **genau
-    // eine** Wirkung - `difficulty *= sqrt(1 + chaos - 50)`
-    // (`Actions/Action.ts:94-102` fuer Vertraege, `Actions/Operation.ts:52-61`
-    // fuer Operationen; Black Ops sind immun, `BlackOperation.ts:59-61` gibt
-    // fest 1 zurueck). Und die Erfolgschance ist
-    // `Math.min(1, competence/difficulty)` (`Action.ts:196`) - sie **klemmt**.
-    // Solange sie klemmt, ist der Aufschlag wirkungslos.
-    //
-    // Wie gross die Reserve ist, steht in `data/bbspann.json` von 12:40: In
-    // Sector-12 stand das Chaos bei **101,67** - Faktor 7,26 auf die
-    // Schwierigkeit - und Raid trotzdem bei **0,997**. In New Tokyo stehen bei
-    // Chaos um 50 alle sechs Operationen und alle drei Vertraege auf 1,000.
-    //
-    // Die Schwellen `CHAOS_EIN`/`CHAOS_AUS` sind absolut gesetzt, obwohl der
-    // Schaden relativ ist. Deshalb entscheidet jetzt die Wirkung: Solange
-    // irgendeine Operation oder ein Vertrag ueber seiner Sicherheitsschwelle
-    // steht, ist das Chaos folgenlos und es wird nicht aufgeraeumt. Faellt
-    // alles darunter, greift die alte Hysterese unveraendert - dann kostet
-    // das Chaos wirklich etwas.
-    //
-    // Der Ausstieg haengt damit nicht mehr allein an `CHAOS_AUS`: Sobald
-    // wieder etwas fahrbar ist, hoert das Aufraeumen auf. Das ist wichtig,
-    // weil die Senkung prozentual ist - von einem hohen Stand auf 47 waeren es
-    // Stunden, waehrend die ersten Laeufe schon reichen, um die Schwierigkeit
-    // unter die Klemmgrenze zu druecken.
-    if (SPIEL_CHAOS_AN) {
-      // EINE REGEL, DEREN GREIFEN NIEMAND SIEHT, IST NICHT NACHMESSBAR.
-      // `chaosMessen()` schreibt `chaosStand`, `fahrbarStand` und die
-      // Hochwassermarke; ohne sie liesse sich "es wird nicht aufgeraeumt"
-      // nicht von "es gab nichts aufzuraeumen" unterscheiden - genau die
-      // Verwechslung, die den Einbau-Riegel am 28.08. um 11:40 unpruefbar
-      // gemacht hat.
-      chaosMessen();
-      if (chaosStand > CHAOS_EIN) chaosAufraeumen = true;
-      if (chaosStand < CHAOS_AUS) chaosAufraeumen = false;
-      if (chaosAufraeumen) {
-        // STEALTH RETIREMENT STATT DIPLOMACY (27.08.2026, 20:42).
-        //
-        // Beide senken das Chaos **prozentual** - Diplomacy um
-        // `charisma^0,045 + charisma/1000` (`Bladeburner.ts:1185-1187`),
-        // Stealth Retirement um 1 bis 3 Prozent (`Bladeburner.ts:853`).
-        // Nur eines von beiden gibt dabei Rang. Gemessen 20:41 im Spiel
-        // (`src/sr.js`), Charisma 287, Chaos 50,8:
-        //
-        //     Raid       lvl 9  Chance 0,900  73 s  118 Rang  Chaos +3 %
-        //     Stealth R. lvl 5  Chance 0,999  78 s   33 Rang  Chaos -2 %
-        //     Diplomacy                       60 s    0 Rang  Chaos -1,58 %
-        //
-        // Ein Raid hebt bei Chaos 50 um 1,5 Punkte. Zum Ausgleich braucht es
-        // 1,5 Stealth Retirements (je -1,0) oder 1,9 Diplomacy-Laeufe
-        // (je -0,79):
-        //
-        //     Raid + 1,5 SR    190 s fuer 156 Rang  =  49,3 Rang/min
-        //     Raid + 1,9 Dipl. 187 s fuer 106 Rang  =  34,0 Rang/min
-        //
-        // **Plus 45 Prozent.** Diplomacy ist strikt dominiert, solange die
-        // SR-Chance hoch ist.
-        //
-        // DIE GRENZE IST DIE BEVOELKERUNG, nicht die Chance: SR senkt sie um
-        // 0,5 Prozent je Erfolg (`Bladeburner.ts:848`), und sie wirkt ueber
-        // `(pop/1e9)^0,7` auf die Erfolgschance jeder Operation
-        // (`Action.ts`, `getPopulationSuccessFactor`). Unter 0,8e9 faellt
-        // Raid unter seine Schwelle - dann wieder Diplomacy, die nichts
-        // verbraucht.
-        let srTauglich = false;
-        try {
-          const stadt = ns.bladeburner.getCity();
-          const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
-          const ch = ns.bladeburner.getActionEstimatedSuccessChance(
-            "Operations", "Stealth Retirement Operation");
-          srTauglich = pop >= SR_POP_MIN && ch[0] >= SR_CHANCE_MIN;
-        } catch { srTauglich = false; }
-        if (srTauglich) {
-          return { typ: O, name: "Stealth Retirement Operation",
-            grund: "Chaos " + chaosLage().toFixed(1) + " (senkt und gibt Rang)" };
-        }
-        return { typ: G, name: "Diplomacy",
-          grund: "Chaos " + chaosLage().toFixed(1) };
-      }
-    }
-
     // RAID - DIE EINZIGE OPERATION, DIE SICH RECHNET (26.08.2026, 16:20).
     //
     // `SICHER_OPERATION` steht auf 0,85 und schliesst damit die gesamte
@@ -2944,7 +2958,42 @@ export async function main(ns) {
     // des Notvertrags (Bounty Hunter, 0,567 Rang je Minute). Danach ist
     // Tracking wieder da und bringt 2,2 - der Verlust ist nach gut dreissig
     // Sekunden wieder eingespielt.
-    const vorratLeer = VERTRAEGE.some((name) => offen(V, name) < 3);
+    // INCITE VIOLENCE IST EIN VORSCHLAGHAMMER (11.09.2026, aus der Sicherung
+    // nachgerechnet). Es hebt das Chaos in ALLEN Staedten um 10 PLUS
+    // `chaos / log10(chaos)` - sequenziell, der zweite Aufruf liest den schon
+    // erhoehten Stand (Rechnung im Absatz darunter, 30.08.). Ein Lauf ist
+    // gegen die Schwelle 50 abgesichert; ZWEI Laeufe kurz nacheinander waren
+    // es nicht, und genau die gab es:
+    //
+    //     2,0  ->  25,1  ->  60,4      (gerechnet, sequenzielle Formel)
+    //     2,0  ->    ?   ->  50-68     (Sicherungen 01:15 / 02:15, alle sechs)
+    //
+    // Der Riegel `< 19` sperrte den zweiten Lauf nicht, weil dazwischen ein
+    // anderer Vertrag knapp wurde: `vorratLeer` stand auf `.some()`, eine
+    // einzige Art unter 3 genuegte, und zwischen zwei Messungen lagen
+    // Vertraege, die den Stand von 25 nicht sichtbar machten. Ab 60 war jede
+    // Aktion in jeder Stadt um Faktor 2,6 bis 4 schwerer, und der Motor stand
+    // zehn Stunden im Gym.
+    //
+    // Zwei Laeufe bleiben NIE unter 50 (nachgerechnet: dazu muesste der Start
+    // unter 1,5 liegen, und das kommt im Betrieb nicht vor). Ein Riegel gegen
+    // den Stand allein kann den zweiten Lauf also nicht verhindern - er muss
+    // den ANLASS verriegeln. Deshalb zwei Aenderungen:
+    //
+    //   1. Die Grenze faellt von 19 auf 8. Ein einzelner Lauf endet dann bei
+    //      rund 32 statt 49 - mit Luft fuer Riots und Abschluesse, bevor die
+    //      Schwelle reisst. Von 19 aus lag der Rest bei 1,2 Punkten.
+    //   2. "Vorrat leer" heisst ALLE drei Arten unter 3, nicht eine. Der
+    //      zweite Lauf findet damit erst statt, wenn die Sleeves ueber
+    //      Stunden nichts nachgefuellt haben - und nicht schon, weil EINE
+    //      Art knapp wurde, waehrend die anderen beiden voll sind.
+    //
+    // Nicht eine Art, sondern alle:
+    // solange eine Art Vorrat hat, faehrt der Motor die, statt fuer die leere
+    // alle Staedte zu vergiften. Nachschub kommt von den Sleeves ueber
+    // Infiltrate Synthoids - das kostet kein Chaos (`sleeve.js`).
+    const INCITE_CHAOS_MAX = 8;
+    const vorratLeer = VERTRAEGE.every((name) => offen(V, name) < 3);
     // DER RIEGEL STAND AUF 25 UND WAR ZU HOCH (30.08.2026, 15:15).
     //
     // Der Kommentar oben rechnet "Ein Durchlauf bringt es auf etwa 35, ein
@@ -2976,7 +3025,7 @@ export async function main(ns) {
     // 19 statt 19,78, weil ganzzahlig und weil die Chance-Schaetzung selbst
     // rauscht. Der Verlust gegenueber der stetigen Loesung ist eine
     // Vierzigstel-Einheit Chaos.
-    if (vorratLeer && chaosJetzt < 19) {
+    if (vorratLeer && chaosJetzt < INCITE_CHAOS_MAX) {
       return { typ: G, name: "Incite Violence", grund: "Vertragsvorrat leer" };
     }
 
@@ -3293,6 +3342,43 @@ export async function main(ns) {
               if (chance >= blackOpSchwelle(bo.name)) lohntSich = true;
             }
           } catch { /* keine Black Op lesbar: dann bleibt es beim Gym */ }
+        }
+        // CHAOS UEBER DER SCHWELLE IST SELBST EIN GRUND ZU ARBEITEN
+        // (11.09.2026, 05:40 - dritte Luecke derselben Bauart).
+        //
+        // Der Gym-Zweig steht VOR `waehle()`, und nur `waehle()` kennt das
+        // Aufraeumen (Regel bei CHAOS_EIN: Stealth Retirement oder Diplomacy,
+        // bis das Chaos unter CHAOS_AUS faellt). Wer hier nicht `lohntSich`
+        // bekommt, erreicht diese Regel nie. Am 28.08. wurden aus genau dem
+        // Grund die Black Ops (09:08) und Field Analysis (09:42) nachgetragen -
+        // das Chaos fehlte weiterhin.
+        //
+        // Das ist ein Teufelskreis: Chaos ueber 50 drueckt jede Chance mit
+        // sqrt(1 + chaos - 50), damit faellt der letzte Vertrag unter
+        // SICHER_VERTRAG, `lohntSich` wird falsch, die Figur geht ins Gym -
+        // und das Chaos bleibt stehen, weil der passive Abbau 0,0001 je
+        // Sekunde betraegt (`Bladeburner.ts:1397`). Einmal drin, nie wieder
+        // raus.
+        //
+        // Gemessen 11.09., 05:15, BitNode 4 Lauf 2, aus der Sicherung:
+        //     Chaos    Aevum 75  Sector-12 61  Volhaven 56  Rest 52-54
+        //     Vertraege  Bounty Hunter  74 Erfolge /  768 Fehlschlaege
+        //                Retirement    119 Erfolge /  746 Fehlschlaege
+        //     blade.json "Gym/def", Grund "nichts ueber Schwelle", tiefstand 140
+        //     Rangrate   36 je Stunde ueber 10,4 h - bei Ausdauer 59/59
+        //
+        // Diplomacy braucht KEINE Chance, sie gelingt immer und kostet nur
+        // Zeit (`Bladeburner.ts:1185-1187`). Sie ist damit die eine Aktion,
+        // die in dieser Lage garantiert etwas bewegt. Der Gym-Zweig darf sie
+        // nicht verdraengen - also zaehlt Chaos ueber CHAOS_EIN hier als
+        // "lohnt sich", und `waehle()` faellt dann von selbst in seine
+        // Aufraeumregel.
+        //
+        // Die Hysterese bleibt bei `waehle()`: Hier reicht die Einschalt-
+        // schwelle, denn sobald das Chaos unter CHAOS_AUS liegt, greift oben
+        // wieder die normale Vertragsschwelle, und die ist dann erfuellbar.
+        if (!lohntSich && SPIEL_CHAOS_AN && chaosLage() > CHAOS_EIN) {
+          lohntSich = true;
         }
       } catch { lohntSich = true; }   // im Zweifel weiterarbeiten
       // GEWICHEN WIRD NUR, WENN JEMAND UEBERNIMMT (28.08.2026, 07:53).

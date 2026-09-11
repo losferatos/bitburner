@@ -248,6 +248,53 @@ console.log("-- Chaos ueber der Schwelle: aufraeumen --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- Chaos hoch UND kein Vertrag ueber der Schwelle: Diplomacy, nicht Gym --");
+{
+  // DER FALL VOM 11.09.2026 (BitNode 4 Lauf 2, aus der Sicherung 05:15):
+  // Chaos 52-75 in allen sechs Staedten, jede Vertragschance unter
+  // SICHER_VERTRAG (0,45), Kampfwerte 140, Ausdauer voll. Die Probe oben
+  // faehrt Chaos 80 mit Vertragschance 0,9 - dort sagt `lohntSich` noch ja,
+  // und `waehle()` wird erreicht. HIER sagt es nein, und bis zum 11.09. ging
+  // die Figur dann ins Gym: Rang 36 je Stunde ueber 10,4 h, Chaos stand.
+  //
+  // Erwartet: die Figur raeumt auf. Stealth Retirement scheidet mit Chance
+  // 0,40 aus (SR_CHANCE_MIN 0,70), also Diplomacy - und KEIN Gym.
+  const m = await fahre({
+    stadtLage: { chaos: 56 },
+    aktionLage: { vertragChance: 0.40, opChance: 0.40 },
+    skills: { strength: 140, defense: 140, dexterity: 144, agility: 140 },
+  });
+  const g = gestartet(m);
+  const l = lage(m);
+  pruefe("kein Gym - das Chaos ist der Grund zu arbeiten",
+    !(m.zustand.arbeit && m.zustand.arbeit.type === "CLASS")
+      && !(l && /^Gym\//.test(String(l.aktion))),
+    l ? "aktion=" + l.aktion + " grund=" + l.grund : "keine Lage");
+  pruefe("Diplomacy wird gefahren",
+    g.some((x) => /Diplomacy/.test(x)), g.join(", ") || "(nichts)");
+  pruefe("und der Aufraeummodus ist gemeldet", !!l && l.aufraeumen === true,
+    l ? String(l.aufraeumen) : "?");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Gegenprobe: Chaos unter der Schwelle, nichts fahrbar -> Gym ist richtig --");
+{
+  // Ohne Chaos ist "nichts ueber Schwelle" ein echter Grund fuers Gym: es
+  // gibt nichts aufzuraeumen und nichts zu verdienen. Der neue Fall darf
+  // hier NICHT greifen.
+  const m = await fahre({
+    stadtLage: { chaos: 20 },
+    aktionLage: { vertragChance: 0.40, opChance: 0.40 },
+    skills: { strength: 140, defense: 140, dexterity: 144, agility: 140 },
+  });
+  const g = gestartet(m);
+  pruefe("bei Chaos 20 keine Diplomacy",
+    !g.some((x) => /Diplomacy/.test(x)), g.join(", ") || "(nichts)");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- ...aber bei duenner Bevoelkerung doch Diplomacy --");
 {
   // DIE GRENZE IST DIE BEVOELKERUNG, nicht die Chance. Stealth Retirement

@@ -1494,6 +1494,43 @@ zu klein. Ein Fenster von mindestens 45 Minuten abwarten, bevor man urteilt.
 Dringlichkeit: **hoch.** Die Leitgroesse des Knotens steht bei einem Achtel
 ihres gemessenen Werts, und die ETA von 77 h haengt an ihr.
 
+## 11.09.2026 - Chaos-Teufelskreis in blade.js, drei Fixes
+
+Verifiziert: 42 Testdateien gruen; neue Proben in test-blade-ebene2.js
+(Chaos hoch UND nichts fahrbar -> Diplomacy, nicht Gym; Gegenprobe bei
+Chaos 20) und test-leiter.js (S2 ruht waehrend `aufraeumen`, deckelt bei
+AUFRAEUM_RUHE_MS).
+
+**Befund.** Seit dem Einbau um 04:27 stand die Figur zehn Stunden im Gym
+("nichts ueber Schwelle") bei Kampfwerten 140 und Ausdauer 59/59; Rang
+36/h. Chaos in allen sechs Staedten 52-75. Ursache in drei Schichten:
+
+1. **Der Gym-Zweig stand vor `waehle()`, und nur dort sass die
+   Aufraeumregel.** Sobald Chaos jeden Vertrag unter SICHER_VERTRAG
+   drueckt, wurde `lohntSich` falsch, die Figur ging ins Gym, und das Chaos
+   blieb (passiver Abbau 0,0001/s). Am 28.08. waren aus demselben Grund
+   schon Black Ops und Field Analysis nachgetragen worden - Chaos fehlte.
+   Fix: Chaos ueber CHAOS_EIN gilt im Gym-Zweig als "lohnt sich".
+2. **In `waehle()` kehrte Recruitment vor der Aufraeumregel zurueck** -
+   nach einem Einbau ist der Trupp leer, und die Figur haette rekrutiert
+   statt aufgeraeumt (Skeptiker 1). Fix: Chaos-Block vor Assassination-
+   Aufbau und Recruitment verschoben; ein irrefuehrender Kommentar, der
+   eine nicht existierende Regel beschrieb, ist ersetzt.
+3. **Der Waechter haette das Aufraeumen gekillt** (Skeptiker 2): Diplomacy
+   gibt null Rang, S2 feuert nach 45 min, Sprosse 4.5 startet blade.js
+   neu. Fix: blade.js reicht `aufraeumen` ueber den Kern in kpi.traeger
+   durch, leiter.js laesst S2 ruhen - gedeckelt auf 3 h Motorzeit.
+
+**Und die eigentliche Quelle des Chaos** (Zahlen-Skeptiker aus der
+Stundenreihe): kein Schleichen, sondern zwei Incite-Violence-Laeufe
+zwischen 01:15 und 02:15 - 2,0 -> 25 -> 60 mit der sequenziellen Formel.
+Der Riegel `< 19` sicherte EINEN Lauf gegen die Schwelle 50, aber
+`vorratLeer` stand auf `.some()` und liess den zweiten zu. Fix: Grenze 8
+(ein Lauf endet bei 32), und "leer" heisst alle drei Vertragsarten.
+
+Erwartung nach dem Zahlen-Skeptiker: Zyklus 47 -> 50 -> 47 braucht ~0,9 h
+Arbeit und 5 Diplomacy-Laeufe, netto rund 100 Rang/h statt 10.
+
 ## 10.09.2026 - Werkzeugliste des Kerns und tools/tor.js
 
 Verifiziert: 41 Testdateien gruen, davon 18 neue Proben in `tools/test-tor.js`.

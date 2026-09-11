@@ -254,6 +254,24 @@ console.log("-- S2 ist stumm, wenn die Route fertig ist --");
   pruefe("ohne Buchung ist Rueckschritt Stillstand - S2",
     L.signale(ohne).some((x) => x.sig === "S2"),
     "die Buchung darf echten Rueckschritt nicht verdecken");
+
+  // AUFRAEUMEN IST KEIN STILLSTAND (11.09.2026). blade.js faehrt Diplomacy,
+  // der Rang steht - und das ist gewollt. Solange der Traeger `aufraeumen`
+  // meldet, ruht S2, aber nur bis AUFRAEUM_RUHE_MS Motorzeit seit dem
+  // Vergleichspunkt. Danach ist es ein Haenger, der so heisst.
+  const raeumt = { ...basis,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1000, aufraeumen: true } } };
+  pruefe("waehrend des Aufraeumens kein S2 (2 h stehender Rang)",
+    !L.signale(raeumt).some((x) => x.sig === "S2"),
+    "Diplomacy gibt null Rang - das ist kein Stillstand");
+  const zuLang = { ...raeumt, motorTimeMs: L.AUFRAEUM_RUHE_MS + 60000 };
+  pruefe("aber nach AUFRAEUM_RUHE_MS greift S2 wieder",
+    L.signale(zuLang).some((x) => x.sig === "S2"),
+    "ein Aufraeumen ohne Ende ist ein Haenger");
+  const nichtRaeumt = { ...basis,
+    kpi: { ...basis.kpi, traeger: { name: "rang", wert: 1000, aufraeumen: false } } };
+  pruefe("aufraeumen=false aendert nichts am S2",
+    L.signale(nichtRaeumt).some((x) => x.sig === "S2"));
 }
 
 // ===========================================================================

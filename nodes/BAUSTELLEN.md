@@ -61,6 +61,37 @@ Stunden wieder.
 
 ## Sofort
 
+### Alle sechs Staedte ueber Chaos 50 - blade.js weicht ins Gym aus und raeumt nicht auf (11.09.2026, 05:25)
+
+Rangrate seit dem Bladeburner-Beitritt: 36 Rang je Spielstunde, Rang 443
+nach 10,4 h. Die Figur steht im Gym ("Gym/def", Grund "nichts ueber
+Schwelle"), obwohl die Kampfwerte bei 140 liegen und Ausdauer 59/59.
+
+Ursache aus der Sicherung 05:15: Chaos in JEDER Stadt ueber der Schwelle
+50, ab der `getChaosSuccessFactor` die Aktionen um sqrt(1 + chaos - 50)
+erschwert - Aevum 75, Sector-12 61, Volhaven 56, Chongqing 54, Ishima 53,
+New Tokyo 52. Die Kontraktbilanz zeigt die Folge: Bounty Hunter 74 Erfolge
+gegen 768 Fehlschlaege, Retirement 119 gegen 746, Tracking 371 gegen 486.
+Jeder Fehlschlag kostet Rang, und jeder Abschluss hebt das Chaos weiter.
+
+`blade.js` kennt die Schwelle (CHAOS_EIN 50, CHAOS_AUS 47), aber
+`aufraeumen` steht auf false und `fahrbar` auf true. Die Diplomacy-Phase
+greift offenbar nur, wenn ein Kontrakt ueber der Chance-Schwelle liegt -
+und genau die liegt wegen des Chaos nirgends mehr. Der Zweig "nichts ueber
+Schwelle -> Gym" gewinnt und laesst das Chaos stehen: 0,0001/s passiver
+Abbau, also nie. Ein Stadtwechsel hilft nicht, es gibt keine saubere Stadt
+mehr (Volhaven war bei 49,4 und ist nach dem Wechsel dorthin um 04:27
+binnen einer Stunde auf 55,9).
+
+Zu klaeren: warum die Aufraeum-Entscheidung ("entschieden wird allein am
+Chaosstand", Kommentar bei CHAOS_EIN) nicht feuert, obwohl der Stand 49,4
+in Volhaven beim Start unter 50 lag und jetzt darueber ist. Vermutlich
+sieht `chaosMessen()` nur die Stadt, in der die Figur steht, und die
+Gym-Abzweigung liegt VOR der Chaos-Pruefung. Fix: bei tiefstand >= 100 und
+chaos > CHAOS_EIN zuerst Diplomacy, nicht Gym. Skeptiker vor dem Einbau.
+
+Bis dahin waechst der Rang mit 36/h; die 400.000 waeren so 459 Tage weg.
+
 ### hashes.js kann in KEINEM Knoten starten - requiresFeature ist tot (10.09.2026)
 
 `src/registry.json` gibt `hashes.js` die Vorbedingung

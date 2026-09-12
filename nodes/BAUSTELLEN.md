@@ -61,6 +61,11 @@ Stunden wieder.
 
 ## Sofort
 
+- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
 - **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
 - **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads

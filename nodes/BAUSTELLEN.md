@@ -61,7 +61,23 @@ Stunden wieder.
 
 ## Sofort
 
-- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 682 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 446 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 395 Minuten nichts geschrieben (Inhaltsstempel 2026-09-13T20:44:55.912Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-12T04:45:55.640Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still).
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.

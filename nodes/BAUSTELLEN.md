@@ -61,6 +61,11 @@ Stunden wieder.
 
 ## Sofort
 
+- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 578 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 682 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.

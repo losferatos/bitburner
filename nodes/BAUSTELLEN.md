@@ -61,6 +61,26 @@ Stunden wieder.
 
 ## Sofort
 
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 589 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 585 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 534 Minuten nichts geschrieben (Inhaltsstempel 2026-09-16T17:57:28.755Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-16T14:05:41.165Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 1029 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
 - **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
@@ -82,7 +102,7 @@ Das Spiel ist verbunden, aber der Motor hat seit 395 Minuten nichts geschrieben 
 
 Die Bruecke laeuft, aber seit 2026-09-12T04:45:55.640Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
 
-- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still).
+- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still). **Nachtrag 17.09.:** Verdacht Sprung reicht nicht - um 15:42 per Start-Process gestartet, letzte Logzeile 15:44 'Sicherung hourly gruen', um 16:30 kein Prozess mehr, stderr leer, Rechner lief durch, kein Sprung, kein Reset. Die Bruecke stirbt also auch im Normalbetrieb binnen Minuten. Erste Frage: beendet die Werkzeug-Shell von Claude Code ihre Kindprozesse beim Turn-Ende (Start-Process aus PowerShell-Tool)? Gegenprobe: Bruecke aus einem eigenen Terminal-Fenster starten.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.

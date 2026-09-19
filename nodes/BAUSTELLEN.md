@@ -61,6 +61,11 @@ Stunden wieder.
 
 ## Sofort
 
+- **hashes.js laeuft in BN9 nie (19.09.2026, Hash-Speicher voll bei 1,28 Mio).** data/hashes.json stammt vom 02.09. (aktiv false), data/hashes.txt endet mit 'Keine Hacknet-Server in diesem Knoten - warte'; in data/ps.json nur hacknet.js. Folge: kein Rang-Tausch in Lauf 1, der Ueberlauf wird vom Spiel zu 4 Hashes/1 Mio verkauft (HacknetHelpers.tsx:419-429), nichts geht verloren, aber der Vorrat liegt brach. Vermutlich derselbe Fehler wie der offene Punkt 'hashes.js requiresFeature tot' in der Registry. Dazu ein Hebel, den hashes.js nicht kennt: 'Improve Gym Training' (+20 % Gym-EXP je Stufe, Kosten 50*n, wirkt auf Spieler UND Sleeves, Work/Formulas.ts:113, haelt bis zum naechsten Install) - mit 1,28 Mio Hashes sind 225 Stufen = +4.500 % drin; die Anlaufphase (tor.js: 11,2 h) schrumpft damit auf Minuten.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 505 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.

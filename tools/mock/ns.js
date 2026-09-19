@@ -138,6 +138,13 @@ export function neuerMock(o = {}) {
     gestartet: [],
     geschrieben: [],
     schlafZeiten: [],
+    hacknet: {
+      hashes: (o.hacknet || {}).hashes ?? 0,
+      kapazitaet: (o.hacknet || {}).kapazitaet ?? 0,
+      serverModus: (o.hacknet || {}).serverModus ?? true,
+      stufen: { ...((o.hacknet || {}).stufen || {}) },
+      ausgegeben: [],
+    },
     resetInfo: {
       lastNodeReset: Number.isFinite(o.nodeReset) ? o.nodeReset : 0,
       lastAugReset: Number.isFinite(o.augReset) ? o.augReset : 0,
@@ -791,7 +798,33 @@ export function neuerMock(o = {}) {
         ? ziel[n]
         : () => nichtGebaut("bladeburner." + String(n))),
     }),
-    hacknet: new Proxy({}, { get: (_, n) => () => nichtGebaut("hacknet." + String(n)) }),
+    // HACKNET-SERVER UND HASHES (19.09.2026, fuer hashes.js).
+    // Option `hacknet: { hashes, kapazitaet, serverModus, stufen }`. Preise
+    // nach HashUpgrade.ts:72-81 (costPerLevel * (Stufe+1)), Sell for Money
+    // konstant 4 (HashUpgradesMetadata.tsx:11). Ohne Option: kapazitaet 0,
+    // maxNumNodes 20 (Server-Modus) - so sieht ein frischer BN9 aus.
+    hacknet: new Proxy({
+      numHashes: () => zustand.hacknet.hashes,
+      hashCapacity: () => zustand.hacknet.kapazitaet,
+      maxNumNodes: () => (zustand.hacknet.serverModus ? 20 : 30),
+      getHashUpgradeLevel: (n) => zustand.hacknet.stufen[n] || 0,
+      hashCost: (n, count = 1) => {
+        const je = { "Sell for Money": null, "Exchange for Bladeburner Rank": 250,
+          "Exchange for Bladeburner SP": 250, "Improve Gym Training": 50, "Improve Studying": 50 };
+        if (!(n in je)) throw new Error("unbekanntes Hash-Upgrade: " + n);
+        if (je[n] === null) return 4 * count;
+        const l = zustand.hacknet.stufen[n] || 0;
+        return je[n] * 0.5 * count * (count + 2 * l + 1);
+      },
+      spendHashes: (n) => {
+        const preis = ns.hacknet.hashCost(n);
+        if (zustand.hacknet.hashes < preis) return false;
+        zustand.hacknet.hashes -= preis;
+        zustand.hacknet.stufen[n] = (zustand.hacknet.stufen[n] || 0) + 1;
+        zustand.hacknet.ausgegeben.push(n);
+        return true;
+      },
+    }, { get: (ziel, n) => (n in ziel ? ziel[n] : () => nichtGebaut("hacknet." + String(n))) }),
     formulas: new Proxy({}, { get: (_, n) => () => nichtGebaut("formulas." + String(n)) }),
     args: o.args || [],
   };

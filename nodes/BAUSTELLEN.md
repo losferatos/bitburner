@@ -61,6 +61,19 @@ Stunden wieder.
 
 ## Sofort
 
+- **Hash-Verwendung pruefen: Coding Contracts (19.09.2026, Skeptiker).** 'Generate Coding Contract' kostet 25*(L+1) Hashes; ein Vertrag bringt ueber contracts.js Geld. Gegen Sell for Money (4 Hashes = 1 Mio) rechnen, sobald hashes.js eine Woche gelaufen ist und data/hashes.json Zahlen liefert.
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 357 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 344 Minuten nichts geschrieben (Inhaltsstempel 2026-09-19T01:03:54.399Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-18T13:49:17.633Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
 ### Schub verweigert (1 nicht in master) - Fehlgriff?
 
 1 von 1 geaenderten Dateien unter src/ stehen weder im Git-Index von master noch in hotswap-freigabe.txt. Es wurde NICHTS ins Spiel geschoben - entweder alle oder keine.
@@ -69,7 +82,6 @@ Betroffen: hashgym.js
 
 War das Absicht? Dann committen (dann steht der Pfad in master) oder `tools/hotswap.js` fahren, das legt die Freigabe selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, dann ist genau dafuer dieser Riegel gebaut.
 
-- **hashes.js laeuft in BN9 nie (19.09.2026, Hash-Speicher voll bei 1.280).** data/hashes.json stammt vom 02.09. (aktiv false), data/hashes.txt endet mit 'Keine Hacknet-Server in diesem Knoten - warte'; in data/ps.json nur hacknet.js. Folge: kein Rang-Tausch in Lauf 1, der Ueberlauf wird vom Spiel zu 4 Hashes/1 Mio verkauft (HacknetHelpers.tsx:419-429), nichts geht verloren, aber der Vorrat liegt brach. Vermutlich derselbe Fehler wie der offene Punkt 'hashes.js requiresFeature tot' in der Registry. Dazu ein Hebel, den hashes.js nicht kennt: 'Improve Gym Training' (+20 % Gym-EXP je Stufe, Kosten 50*n, wirkt auf Spieler UND Sleeves, Work/Formulas.ts:113, haelt bis zum naechsten Install) - KORREKTUR 02:47: der Vorrat waren 1.280 Hashes, nicht 1,28 Mio (Anzeige '1.280k' falsch gelesen). hashgym.js kaufte 6 Stufen, Gym-Faktor 2,20 - die Anlaufphase halbiert sich etwa. Als laufende Regel in hashes.js lohnt es trotzdem: jede Anlaufphase nach einem Sprung beginnt mit vollem Gratis-Server.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
@@ -168,25 +180,6 @@ Sleeves rund 0,3 je Minute gegen 0,54 Abbau bei Chaos 47 - das Aufraeumen
 gewinnt, verliert aber gut die Haelfte seiner Wirkung, und bei acht Sleeves
 kippt es. Fix: sleeve.js sollte waehrend `blade.json.aufraeumen === true`
 auf Tracking (+0 Chaos) oder Infiltrate ausweichen. Skeptiker vor dem Einbau.
-
-### hashes.js kann in KEINEM Knoten starten - requiresFeature ist tot (10.09.2026)
-
-`src/registry.json` gibt `hashes.js` die Vorbedingung
-`{"requiresFeature": 9, "forbidsFile": "data/keine-hacknet.txt"}`. `gilt()`
-in `src/lib/reg.js` prueft das als `(lage.features || {})[p.requiresFeature]`
-- und `baueLage()` in `src/bn4net.js` liefert ueberhaupt kein `features`.
-Der Ausdruck ist damit immer `undefined`, die Vorbedingung immer verletzt.
-
-Folge: das BN9-Gewerk, das am 02.09. eigens gebaut wurde, ist seither in
-jedem Knoten aus der Auswahl gefallen. Es ist nie gelaufen und kann nicht
-laufen. Gefunden am 10.09. von einem Skeptiker beim Umbau der Werkzeugliste;
-der Fehler ist AELTER als dieser Umbau und wurde davon weder verursacht noch
-behoben.
-
-Zu tun: `baueLage` muss die Source Files melden (`ns.getResetInfo().ownedSF`
-ist eine Map SF-Nummer -> Stufe). Dabei klaeren, ob `requiresFeature: 9`
-"SF9 besessen" oder "Hacknet-Server verfuegbar" heissen soll - in BitNode 9
-selbst gibt es die Server ohne SF9. Skeptiker vor dem Einbau.
 
 ### tor.js ist in BitNode 12 dauerhaft blind (10.09.2026)
 

@@ -300,6 +300,43 @@ console.log("-- C.5: der Kern liest die Registry --");
 }
 
 console.log("");
+console.log("-- C.5: der Kern meldet Feature 9 - hashes.js nur in BN9 oder mit SF9 --");
+{
+  // DER BEFUND VOM 10.09.: baueLage() lieferte kein `features`, hashes.js
+  // stand in KEINEM Knoten in der Werkzeugliste. Belegt wird das Auftauchen
+  // in `fehlend:` (der Mock-Kern fuellt home mit Arbeitern, der Start selbst
+  // scheitert am Platz - siehe die csolve-Probe oben).
+  const registry = fs.readFileSync(
+    [path.resolve(ROOT, "..", "bitburner-bau", "src", "registry.json"),
+     path.join(ROOT, "src", "registry.json")].find((p) => fs.existsSync(p)), "utf8");
+  const dateien = {
+    "bn4net.js": "//", "worker/hack.js": "//", "worker/grow.js": "//",
+    "worker/weaken.js": "//", "worker/share.js": "//",
+    "registry.json": registry, "hashes.js": "//", "hacknet.js": "//",
+    "ausgang.js": "//", "bn4life.js": "//", "popups.js": "//", "wakelock.js": "//",
+  };
+  const lauf = async (knoten, ownedSF, verfahren) => {
+    const m = await fahre(3, (ms, z, vor) => vor(ms), {
+      knoten, ownedSF,
+      dateien: { home: { ...dateien, "data/verfahren.txt": verfahren } },
+    });
+    return String(m.lies("home", "data/bn4net-log.txt") || "") + "\n" + m.zustand.log.join("\n");
+  };
+  // Passt es auf home (im Mock ja: 5,95 GB), startet der Kern es sofort -
+  // dann steht "hashes.js laeuft" im Log statt "fehlend".
+  const gelistet = (text) => /hashes\.js laeuft|fehlend: [^\n]*hashes\.js/.test(text);
+  const inBn9 = await lauf(9, new Map(), "V2 9 1");
+  pruefe("in BitNode 9 steht hashes.js in der Liste",
+    gelistet(inBn9), "hashes.js taucht nie als fehlend auf");
+  const inBn10ohne = await lauf(10, new Map(), "V2 10 2");
+  pruefe("in BitNode 10 ohne SF9 steht es NICHT in der Liste",
+    !gelistet(inBn10ohne), "hashes.js in BN10 ohne SF9 gelistet");
+  const inBn10mit = await lauf(10, new Map([[9, 1]]), "V2 10 2");
+  pruefe("in BitNode 10 MIT SF9 steht es in der Liste",
+    gelistet(inBn10mit), "SF9 wird nicht als Feature erkannt");
+}
+
+console.log("");
 console.log("-- C.5: ohne Registry traegt die eingebaute Liste --");
 {
   // DER FALL, DER SONST DEN BOT STILLLEGT: nach einem Knotenwechsel, bevor

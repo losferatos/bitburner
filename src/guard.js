@@ -45,7 +45,7 @@ import { neu as neueUhren, runde as uhrRunde, enginePuls, inKarenz, laden as lad
   from "lib/uhren.js";
 import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere, freigeben,
   entwarnung, laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
-import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle } from "lib/reg.js";
+import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 10000;
@@ -317,6 +317,10 @@ export async function main(ns) {
         phase: kernPhaseFrisch(kern, wall, ri.lastNodeReset)
           || (ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"),
         dateiDa: (d) => ns.fileExists(d, "home"),
+        // Ohne das fiel hashes.js aus der Soll-Liste des Waechters - er
+        // haette es nach einem Absturz nie neu gestartet (Skeptiker 19.09.).
+        // `ri` ist oben schon geholt, kostet also nichts.
+        features: merkmaleAusReset(ri),
       };
       const eintraege = auswahl(registry, lage).map((e) => ({
         name: e.name,

@@ -23,6 +23,47 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### hashes.js laeuft - Feature 9 an einer Stelle, Gym-Training im Anlauf
+
+**Behoben 19.09.2026, mit drei Skeptikern (Praemisse, Betrieb, Substanz).**
+
+Befund vom 10.09. (Skeptiker beim Werkzeuglisten-Umbau): die Registry gab
+hashes.js `requiresFeature: 9`, `gilt()` las `lage.features[9]`, und keine
+der drei Lagen (Kern, Waechter, strategie-check) lieferte `features`. Das
+BN9-Gewerk lief seit dem 02.09. nirgends - zwei BN9-Laeufe lang stand der
+Hash-Speicher am Deckel, das Spiel verkaufte den Ueberlauf still.
+
+Eingebaut:
+- `lib/reg.js` `merkmale(lage)` / `merkmaleAusReset(ri)`: Feature 9 =
+  `node === 9 || SF9 aktiv`, nicht `disableHacknetServer` (HacknetHelpers.tsx:34).
+  `gilt()` leitet es selbst ab, wenn die Lage kein `features` hat - ein
+  vierter Leser kann nicht mehr still danebenliegen. Kern und Waechter
+  liefern es aus `getResetInfo()`, strategie-check aus `bn4net.json.feature9`.
+- `hashes.js`: im Anlauf (V2, nicht in der Division) "Improve Gym Training",
+  aber erst ab 50 Mio Konto (bbtrain ab 5 Mio, sleeve ab 20 Mio - sonst
+  multiplizierte der Faktor nichts) und hoechstens 6 Stufen (Break-even
+  gegen 10 h Anlauf gerechnet; ohne Deckel liefe es bis Stufe 20 = 10,4 h
+  Produktion fuer +4 %). Stufe aus dem Preis (50*(L+1)) statt
+  getHashUpgradeLevel - RAM bleibt 5,95. Herzschlag `state: "wait"` im
+  Wartezweig (sonst S1-Killschleife des Waechters). BitNode 8 sperrt sich
+  sofort (HacknetNodeMoney 0, keine Hashes).
+- Mock `ns.hacknet` (Preise nach HashUpgrade.ts), `tools/test-hashes-ebene2.js`
+  (28 Proben), Proben in test-registry, test-motor-ebene2 (Feature in BN9 /
+  BN10 ohne SF9 / BN10 mit SF9), test-kaltstart-budget rechnet SF9 je Route.
+
+Von den Skeptikern verworfen und deshalb NICHT gebaut: Gym ohne Geldboden
+(Konto beim Eintritt 1.000 $), Gym ohne Stufendeckel, Coding-Contract-
+Kauf als Alternative (25 Hashes je Vertrag - offen, siehe Sofort).
+
+Nicht geaendert: `keine-hacknet.txt` ist mit SF9 ausser in BN8 toter Weg
+(maxNumNodes ist dann immer 20) - unschaedlich, kostet 5,95 GB in Knoten
+ohne gekauften Server, die Marke wird beim Sprung geraeumt.
+
+Gemessen: 42 Testdateien gruen, RAM-Stempel bn4net/guard/hashes ohne neue
+Messung (keine neue Funktion).
+
+---
+
 ### Black-Op-Schwelle: 0,35 nur im Endspiel
 
 **Behoben 11.09.2026 19:53, mit drei Skeptikern (Praemisse, Betrieb, Substanz).**

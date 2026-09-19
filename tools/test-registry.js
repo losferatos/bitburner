@@ -236,6 +236,36 @@ console.log("-- Knoten- und Phasenfilter --");
       hashes.hostRule === "not-hacknet",
       "hostRule ist " + hashes.hostRule);
   }
+  // FEATURE 9 (19.09.2026). Bis dahin lieferte der Kern kein `features`,
+  // und hashes.js fiel in jedem Knoten durch - auch in BitNode 9. Die drei
+  // Faelle: Feature gesetzt, Feature falsch, Feature fehlt ganz.
+  if (hashes) {
+    // dateiDa muss das SKRIPT bejahen (gilt() prueft, ob die Datei da ist)
+    // und die Sperrdatei verneinen - sonst prueft die Probe die falsche Stelle.
+    const grund = { node: 9, verfahren: "V2", phase: "normal",
+      dateiDa: (d) => d !== "data/keine-hacknet.txt" };
+    pruefe("hashes.js gilt mit features[9] = true",
+      REG.gilt(hashes, { ...grund, features: { 9: true } }).gilt);
+    pruefe("hashes.js gilt NICHT mit features[9] = false",
+      !REG.gilt(hashes, { ...grund, features: { 9: false } }).gilt);
+    // Ohne `features` leitet gilt() das Merkmal aus node/ownedSF ab - so
+    // kann kein dritter Leser der Registry mehr still danebenliegen.
+    pruefe("hashes.js gilt in Knoten 9 auch ohne features (abgeleitet)",
+      REG.gilt(hashes, grund).gilt);
+    pruefe("hashes.js gilt NICHT in Knoten 10 ohne SF9",
+      !REG.gilt(hashes, { ...grund, node: 10 }).gilt);
+    pruefe("hashes.js gilt in Knoten 10 mit SF9 (Map)",
+      REG.gilt(hashes, { ...grund, node: 10, ownedSF: new Map([[9, 1]]) }).gilt);
+    pruefe("hashes.js gilt in Knoten 10 mit SF9 (Objekt)",
+      REG.gilt(hashes, { ...grund, node: 10, ownedSF: { 9: 1 } }).gilt);
+    pruefe("und NICHT, wenn Hacknet-Server per Option abgeschaltet sind",
+      !REG.gilt(hashes, { ...grund, hacknetServerAus: true }).gilt);
+    pruefe("merkmaleAusReset liest bitNodeOptions.disableHacknetServer",
+      REG.merkmaleAusReset({ currentNode: 9, ownedSF: new Map(),
+        bitNodeOptions: { disableHacknetServer: true } })[9] === false);
+    pruefe("und bleibt blockiert, solange data/keine-hacknet.txt liegt",
+      !REG.gilt(hashes, { ...grund, features: { 9: true }, dateiDa: () => true }).gilt);
+  }
   const blade = registry.eintraege.find((e) => e.name === "blade.js");
   pruefe("blade.js laeuft nicht im Kaltstart",
     !REG.gilt(blade, { node: 10, verfahren: "V2", phase: "kaltstart", dateiDa: () => true }).gilt,

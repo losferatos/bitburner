@@ -31,7 +31,7 @@ import { hackPercent as calcHackPercent, hackChance as calcHackChance,
   growthLogPerThread as calcGrowthLog } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
-  leseRolle, pruefeRolle } from "lib/reg.js";
+  leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
@@ -580,9 +580,23 @@ export async function main(ns) {
   const baueLage = () => {
     let verfahren = "unbekannt";
     let node = 0;
+    // FEATURE 9 = HACKNET-SERVER VERFUEGBAR (19.09.2026, Befund vom 10.09.).
+    //
+    // `gilt()` in lib/reg.js prueft `requiresFeature: 9` gegen
+    // `lage.features[9]` - und diese Lage lieferte nie ein `features`. Der
+    // Ausdruck war immer undefined, hashes.js fiel in JEDEM Knoten aus der
+    // Auswahl, auch in BitNode 9 selbst (zwei Laeufe lang, der Hash-Speicher
+    // stand am Deckel). Semantik nach ARCHITEKTUR E7 =
+    // `canAccessBitNodeFeature(9)` (`BitNodeUtils.ts:17-19`):
+    // `bitNodeN === 9 || activeSourceFileLvl(9) > 0`, dazu die BitNode-Option
+    // disableHacknetServer (HacknetHelpers.tsx:34-36). Die Ableitung steht in
+    // lib/reg.js `merkmaleAusReset`, damit Waechter und strategie-check
+    // dieselbe benutzen. Kostet nichts: getResetInfo hat der Kern ohnehin.
+    let features = { 9: false };
     try {
       const ri = ns.getResetInfo();
       node = ri.currentNode;
+      features = merkmaleAusReset(ri);
       const rolle = pruefeRolle(
         leseRolle(ns.fileExists("data/verfahren.txt", "home")
           ? ns.read("data/verfahren.txt") : ""), node);
@@ -591,6 +605,7 @@ export async function main(ns) {
     return {
       node, verfahren,
       phase: phaseJetzt(),
+      features,
       dateiDa: (d) => {
         try {
           if (!ns.fileExists(d, "home")) return false;
@@ -3995,6 +4010,9 @@ export async function main(ns) {
       // frueheste und verlaesslichste Quelle, die es gibt.
       knoten: ns.getResetInfo().currentNode,
       nodeReset: ns.getResetInfo().lastNodeReset,
+      // Feature 9 fuer strategie-check, das die Registry ausserhalb des
+      // Spiels auswertet und ownedSF nicht sieht (19.09.2026).
+      feature9: !!(regLage.features && regLage.features[9]),
       // DIE KAMPFWERTE GEHOEREN AUCH HIERHER (28.08.2026, 19:10).
       //
       // In BitNode 10 traegt der Knoten ueber Bladeburner

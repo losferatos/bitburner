@@ -593,6 +593,9 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       verfahren: (kpi && kpi.verfahren) || "unbekannt",
       phase: phase || "normal",
       dateiDa: aufHome ? ((d) => aufHome.has(d)) : undefined,
+      // Feature 9 kommt vom Kern (bn4net.json `feature9`), der ownedSF
+      // sieht; von hier aus ist nur der Knoten bekannt (Skeptiker 19.09.).
+      features: { 9: (net && net.feature9 === true) || (kpi && kpi.node === 9) },
     };
     soll = auswahl(reg, lage)
       .map((e) => e.name)

@@ -93,6 +93,7 @@ function standVorEintrag(route, index) {
   return {
     sf4: sf[4] || 0,
     homeGb: (sf[9] || 0) >= 2 ? 128 : ((sf[1] || 0) > 0 ? 32 : 8),
+    sf9: sf[9] || 0,
   };
 }
 
@@ -132,7 +133,7 @@ function bedarf(name, bitNode, sf4 = 1) {
  * also nicht, und `csolve.js` wartet zu Recht.
  */
 function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0,
-  homeGb = HOME_GB, sf4 = 1) {
+  homeGb = HOME_GB, sf4 = 1, sf9 = 0) {
   const da = new Set(["registry.json", "route.json", "graftplan.json",
     ...extraDateien]);
   const lage = {
@@ -140,7 +141,10 @@ function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0,
     verfahren,
     phase: "kaltstart",
     dateiDa: (d) => da.has(d) || /\.js$/.test(d),
-    features: {},
+    // Feature 9 = Hacknet-Server: in BitNode 9 selbst und ab dem ersten
+    // SF9 in jedem Knoten. Bis 19.09. stand hier `features: {}` - hashes.js
+    // fiel damit in allen 40 Routeneintraegen aus dem Test (Skeptiker).
+    ownedSF: { 9: sf9 },
   };
   const auswahl = reg.auswahl(REG, lage);
   let frei = homeGb - schonBelegt;
@@ -360,7 +364,7 @@ console.log("-- die ganze Route, mit dem jeweils richtigen Stand (Substanz 13-16
   for (let i = 0; i < route.length; i++) {
     const e = route[i];
     const st = standVorEintrag(route, i);
-    const s2 = startlage(e.node, e.verfahren, [], 0, st.homeGb, st.sf4);
+    const s2 = startlage(e.node, e.verfahren, [], 0, st.homeGb, st.sf4, st.sf9);
     const geldquellen = s2.laufen.map(([n]) => n)
       .filter((n) => ["cdump.js", "csolve.js", "sleevecrime.js"].includes(n));
     if (st.homeGb <= 32) eng.push(i + 1);

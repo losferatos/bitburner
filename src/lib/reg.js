@@ -94,6 +94,37 @@ export function pruefeRolle(rolle, currentNode) {
  *   - `features` z. B. {sf9: 1} fuer knotenunabhaengige Freischaltungen
  * @returns {{gilt: boolean, grund: string}}
  */
+/**
+ * Feature 9 = Hacknet-Server verfuegbar (ARCHITEKTUR E7, `hasHacknetServers`
+ * in Hacknet/HacknetHelpers.tsx:34-36): `bitNodeN === 9 || SF9 aktiv`, und
+ * nicht per BitNode-Option abgeschaltet.
+ *
+ * EINE STELLE FUER ALLE DREI LESER (Skeptiker 19.09.2026). Kern, Waechter
+ * und strategie-check bauen je eine eigene Lage fuer `auswahl()`. Bis zum
+ * 19.09. lieferte keine davon `features`, und hashes.js fiel ueberall durch.
+ * Damit das nicht beim naechsten Leser wieder passiert, wird das Merkmal
+ * hier aus dem abgeleitet, was die Lage ohnehin hat: `features` (fertig),
+ * sonst `node` + `ownedSF` (Map oder Objekt) + `hacknetServerAus`.
+ */
+export function merkmale(lage) {
+  if (lage && lage.features && typeof lage.features === "object") return lage.features;
+  const o = lage && lage.ownedSF;
+  let sf9 = 0;
+  try {
+    sf9 = (o && typeof o.get === "function") ? Number(o.get(9) || 0) : Number((o || {})[9] || 0);
+  } catch { sf9 = 0; }
+  const node = Number(lage && lage.node) || 0;
+  const aus = !!(lage && lage.hacknetServerAus);
+  return { 9: !aus && (node === 9 || sf9 > 0) };
+}
+
+/** Dasselbe direkt aus `ns.getResetInfo()` - fuer Kern und Waechter. */
+export function merkmaleAusReset(ri) {
+  const opt = (ri && ri.bitNodeOptions) || {};
+  return merkmale({ node: ri && ri.currentNode, ownedSF: ri && ri.ownedSF,
+    hacknetServerAus: opt.disableHacknetServer === true });
+}
+
 export function gilt(e, lage) {
   if (!e || !e.name) return { gilt: false, grund: "Eintrag ohne Namen" };
 
@@ -145,7 +176,7 @@ export function gilt(e, lage) {
     }
   }
   if (p.requiresFeature) {
-    const f = (lage.features || {})[p.requiresFeature];
+    const f = merkmale(lage)[p.requiresFeature];
     if (!f) return { gilt: false, grund: "Freischaltung fehlt: " + p.requiresFeature };
   }
 

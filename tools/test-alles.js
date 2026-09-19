@@ -153,6 +153,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-hashes-ebene2.js",
+    deckt: "EBENE 2: hashes.js - Marker ohne Server, Gym-Training im Anlauf, Rang in der Division, Deckelregel",
+    schnell: true,
+  },
+  {
     datei: "test-sleeve-ebene2.js",
     deckt: "EBENE 2: der Geldboden der Koerper gegen den Nachholrueckstand (storedCycles) - und der Mock, der ihn nachbildet",
     schnell: false,

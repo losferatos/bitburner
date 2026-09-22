@@ -319,12 +319,74 @@ export async function main(ns) {
           const braucht = ns.getScriptRam(teile[0], "home");
           let wirt = "home", meistFrei = -1;
           for (const host of netzListe(ns)) {
+            // HACKNET-SERVER SIND KEINE WIRTE (22.09.2026). Sie haben
+            // adminRights ab Konstruktion (PlayerObjectServerMethods.ts:50)
+            // und kaemen deshalb durch die Root-Pruefung. Belegter Speicher
+            // kostet dort direkt Hashes: die Rate haengt linear an
+            // ramRatio = 1 - ramUsed/maxRam (HacknetServers.ts:15), bei
+            // einem frischen 1-GB-Server (HacknetServer.ts:60) also alles.
+            // bn4net.js:823 nimmt sie aus demselben Grund aus.
+            if (host.startsWith("hacknet-server-")) continue;
             if (!ns.hasRootAccess(host)) continue;
             const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
               - (host === "home" ? 8 : 0);
             if (frei > meistFrei) { meistFrei = frei; wirt = host; }
           }
-          if (wirt !== "home") ns.scp(teile[0], wirt, "home");
+          // DIE BIBLIOTHEKEN MUESSEN MIT (22.09.2026).
+          //
+          // Hier stand nur das Skript selbst. Fehlt eine importierte Datei
+          // auf dem Ziel, ist das Skript dort UNGUELTIG: Bitburner kann
+          // seinen Speicherbedarf nicht berechnen und ns.exec gibt still 0
+          // zurueck - kein Absturz, keine Meldung.
+          //
+          // Am 22.09.2026 hat das nach dem Sprung nach BN9 L3 eine Stunde
+          // gekostet: autopilot.js importiert lib/calc und lib/batch, auf
+          // fulcrumtech lag nur lib/hackaugs.js. Ueber die Bruecke gemessen:
+          //   calculateRam autopilot.js auf fulcrumtech
+          //     vorher : "Cannot calculate RAM usage of an invalid script"
+          //     nachher: 34.2
+          // Nach dem Nachschieben der beiden Dateien startete es sofort.
+          //
+          // bn4net.js:3859 loest das ueber needsLibs aus registry.json.
+          // Das genuegt hier nicht: autopilot.js steht gar nicht in der
+          // Registry, und der Auftragskanal soll JEDES Skript starten
+          // koennen. Deshalb werden die Importe aus der Quelle gelesen.
+          //
+          // TRANSITIV, anders als bn4net: lib/batch.js importiert
+          // selbst lib/calc. Die Tiefe ist auf 4 begrenzt, damit ein
+          // Ringimport die Runde nicht aufhaengt; `gesehen` faengt ihn
+          // ohnehin ab und dient zugleich als Ergebnisliste.
+          //
+          // liesVonHome statt ns.read, weil bn4life fast nie auf home
+          // sitzt und ns.read IMMER lokal liest - genau der Fehler, der
+          // in lib/hostdatei.js dokumentiert ist. Kostet nichts extra:
+          // die Funktion ist oben schon importiert.
+          const libsVon = (datei, tiefe, gesehen) => {
+            if (tiefe > 4) return gesehen;
+            const quelle = liesVonHome(ns, datei) || "";
+            for (const m of quelle.matchAll(/from\s+["']([^"']+)["']/g)) {
+              let lib = m[1];
+              if (!/\.(js|json|txt)$/.test(lib)) lib += ".js";
+              if (gesehen.has(lib)) continue;
+              gesehen.add(lib);
+              libsVon(lib, tiefe + 1, gesehen);
+            }
+            return gesehen;
+          };
+          const libs = [...libsVon(teile[0], 0, new Set())];
+          if (wirt !== "home") {
+            const ok = ns.scp([teile[0], ...libs], wirt, "home");
+            // ns.scp WIRFT NICHT, wenn eine Quelldatei fehlt - es meldet
+            // den Teilausfall nur im Rueckgabewert (NetscriptFunctions.ts:
+            // 803-808). Ohne diese Zeile waere der Fehlschlag wieder still.
+            if (!ok) {
+              const fehlend = [teile[0], ...libs]
+                .filter((d) => !ns.fileExists(d, wirt));
+              sag("BEFUND: scp nach " + wirt + " unvollstaendig - fehlt: "
+                + (fehlend.join(", ") || "(scp meldete Teilausfall)")
+                + ". ns.exec wird gleich still 0 geben.");
+            }
+          }
           const pid = ns.exec(teile[0], wirt, 1, ...teile.slice(1));
           if (pid) sag("Wirt: " + wirt + " (" + meistFrei.toFixed(1)
             + " GB frei, gebraucht " + braucht.toFixed(2) + ").");
@@ -332,7 +394,25 @@ export async function main(ns) {
           // Fehlermodus, der in BitNode 1 achtmal durchgerutscht ist, weil
           // niemand den Rueckgabewert angesehen hat.
           sag(pid ? "Gestartet: " + teile.join(" ") + " (pid " + pid + ")."
-            : "FEHLSCHLAG: " + teile[0] + " liess sich nicht starten - home hat "
+            // DEN ECHTEN WIRT NENNEN (22.09.2026).
+            //
+            // Hier stand fest home samt dessen freiem Speicher, obwohl
+            // ns.exec auf `wirt` lief. Am 22.09. meldete die Zeile
+            //   "home hat 12.95 GB frei, das Skript braucht 34.20 GB"
+            // waehrend der tatsaechliche Wirt 212 GB frei hatte und der
+            // Grund ein fehlender Import war. Die Meldung hat die
+            // Fehlersuche zweimal in die falsche Richtung geschickt.
+            //
+            // getScriptRam auf dem ZIEL ist der entscheidende Zusatz: es
+            // gibt dort 0 zurueck, wenn das Skript wegen eines fehlenden
+            // Imports ungueltig ist. Damit unterscheidet die Meldung die
+            // beiden Faelle, die vorher gleich aussahen.
+            : "FEHLSCHLAG: " + teile[0] + " liess sich auf " + wirt
+              + " nicht starten - dort " + meistFrei.toFixed(2)
+              + " GB frei, gebraucht " + braucht.toFixed(2) + " GB"
+              + (ns.getScriptRam(teile[0], wirt) === 0
+                  ? " - UND das Skript ist auf " + wirt + " ungueltig (fehlender Import?), deshalb gibt exec 0."
+                  : ".") + " home haette "
               + (ns.getServerMaxRam("home") - ns.getServerUsedRam("home")).toFixed(2)
               + " GB frei, das Skript braucht "
               + ns.getScriptRam(teile[0], "home").toFixed(2) + " GB.");

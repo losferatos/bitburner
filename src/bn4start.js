@@ -91,6 +91,17 @@ export async function main(ns) {
         : "worker/hack.js";
 
     for (const host of hosts) {
+      // HACKNET-SERVER BEKOMMEN KEINE ARBEITER (22.09.2026).
+      //
+      // Hier stuerzt nichts ab - scp und exec gehen auf ihnen. Genau
+      // deshalb ist es teuer: belegter Speicher drueckt die Hash-Rate
+      // linear (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:15).
+      // Ein frisch gekaufter Server hat 1 GB (HacknetServer.ts:60) - ein
+      // einziger Arbeiterfaden setzt seine Rate damit auf null.
+      //
+      // bn4start ist der KALTSTART: dort kauft hacknet.js die ersten
+      // Server, und dort wuerde dieses Skript sie sofort lahmlegen.
+      if (host.startsWith("hacknet-server-")) continue;
       if (!ns.hasRootAccess(host)) continue;
       // Auf home eine Reserve lassen. Wer allen Speicher belegt, hungert den
       // naechsten Auftrag aus - und ns.exec gibt dann still 0 zurueck, ohne

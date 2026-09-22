@@ -18,6 +18,16 @@ export async function main(ns) {
   const out = [];
 
   for (const [host, path] of routes) {
+    // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
+    // Sie haengen an home und kommen aus ns.scan mit heraus. 24
+    // ns-Funktionen werfen auf ihnen (getNormalServer,
+    // NetscriptHelpers.tsx:575-589); hasRootAccess gehoert NICHT dazu und
+    // gibt true (PlayerObjectServerMethods.ts:50) - eine Root-Pruefung
+    // allein schuetzt also nicht.
+    // Hier wirft getServerNumPortsRequired sechs Zeilen weiter. Ein
+    // Hacknet-Server gehoert ohnehin nicht in die Netzkarte: er ist
+    // weder Hackziel noch Sprungstation.
+    if (host.startsWith("hacknet-server-")) continue;
     out.push({
       host,
       // Weg von home aus, damit wir spaeter gezielt hinspringen koennen.

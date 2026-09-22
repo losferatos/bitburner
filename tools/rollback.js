@@ -73,7 +73,12 @@ const EINGESPIELT = [
   "boerse.js", "boot.js", "buyaugs.js", "cdump.js", "contracts.js", "csolve.js",
   "darkweb.js", "exit.js", "export.js", "figwatch.js", "graft.js", "graftauto.js",
   "graftplan.json", "guard.js", "hashes.js", "homeram.js", "join.js", "kampfaugs.js",
+  // lib/hostdatei.js und lib/hackaugs.js nachgetragen (22.09.2026). Beide
+  // fehlten seit dem 04.09., obwohl inzwischen elf Gewerke von hostdatei
+  // abhaengen: ein rollback --alles haette genau die Datei nicht
+  // wiederhergestellt, ohne die die anderen gar nicht erst starten.
   "lib/bitnodes.json", "lib/calc.js", "lib/endspurt.js", "lib/eta.js", "lib/events.js",
+  "lib/batch.js", "lib/blackops.json", "lib/hackaugs.js", "lib/hostdatei.js",
   "lib/figur.js", "lib/figurns.js", "lib/graftwahl.js", "lib/handschlag.js",
   "lib/herzschlag.js", "lib/kpi.js", "lib/leiter.js", "lib/loeser.js",
   "lib/motorzeit.js", "lib/reg.js", "lib/route.js", "lib/uhren.js", "popups.js",

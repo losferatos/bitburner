@@ -62,6 +62,16 @@ export async function main(ns) {
     // Zehntausendfache. Entscheidend ist der Quotient: Erfahrung je Sekunde.
     let ziel = null;
     for (const host of netz) {
+      // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
+      // Sie haengen an home und kommen aus ns.scan mit heraus. 24
+      // ns-Funktionen werfen auf ihnen (getNormalServer,
+      // NetscriptHelpers.tsx:575-589); hasRootAccess gehoert NICHT dazu und
+      // gibt true (PlayerObjectServerMethods.ts:50) - eine Root-Pruefung
+      // allein schuetzt also nicht.
+      // Hier faellt es sofort aus: getServerRequiredHackingLevel in der
+      // naechsten Zeile wirft. Als Erfahrungsziel taugen sie auch nicht,
+      // sie haben keine Sicherheitsstufe, gegen die weaken liefe.
+      if (host.startsWith("hacknet-server-")) continue;
       if (!ns.hasRootAccess(host)) continue;
       if (ns.getServerRequiredHackingLevel(host) > ns.getHackingLevel()) continue;
       const schwer = ns.getServerBaseSecurityLevel(host);
@@ -79,6 +89,12 @@ export async function main(ns) {
     let ramTotal = 0;
     let ramIdle = 0;
     for (const host of netz) {
+      // Hacknet-Server raus (22.09.2026). Hier wirft nichts - aber ihr
+      // Speicher zaehlte in ramTotal und ramIdle mit, und aus dem
+      // Verhaeltnis wird der Anteil der Muehle berechnet. Da sie
+      // dauerhaft leer sind, hob das den gemessenen Leerlauf und liess
+      // die Muehle mehr Faeden starten, als das Netz wirklich frei hat.
+      if (host.startsWith("hacknet-server-")) continue;
       if (!ns.hasRootAccess(host)) continue;
       const max = ns.getServerMaxRam(host);
       if (max <= 0) continue;
@@ -98,6 +114,12 @@ export async function main(ns) {
 
     let gestartet = 0;
     for (const host of netz) {
+      // Hacknet-Server raus (22.09.2026). Auch hier wirft nichts, und
+      // genau deshalb ist es teuer: die Muehle wuerde dort share-Faeden
+      // starten. Belegter Speicher drueckt die Hash-Rate linear
+      // (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:15); bei einem
+      // frischen 1-GB-Server (HacknetServer.ts:60) auf null.
+      if (host.startsWith("hacknet-server-")) continue;
       if (!ns.hasRootAccess(host)) continue;
       const max = ns.getServerMaxRam(host);
       if (max <= 0) continue;

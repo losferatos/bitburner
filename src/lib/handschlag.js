@@ -45,7 +45,17 @@
  * KOSTEN
  * ===========================================================================
  *
- * `ns.read` und `ns.write` kosten null. `ns.fileExists` kostet 0,10 GB und
+ * WAS DIESES MODUL KOSTET (berichtigt 22.09.2026)
+ *
+ * Hier stand, fileExists werde nicht benutzt und das Modul sei damit
+ * gratis. Das stimmt seit dem 04.09.2026 nicht mehr: ueber
+ * lib/hostdatei.js kommen fileExists (0,10 GB) und scp (0,60 GB) herein,
+ * das Modul kostet also 0,70 GB. Bei bn4rep.js, das mit SF4.1 ueber
+ * 800 GB wiegt, ist das kein Detail - und eine falsche Angabe genau an
+ * der Stelle, an der jemand eine RAM-Entscheidung nachschlaegt, ist
+ * schlimmer als keine.
+ *
+ * `ns.read` und `ns.write` kosten weiterhin null. `ns.fileExists` kostet 0,10 GB und
  * wird deshalb NICHT benutzt: `ns.read` liefert bei fehlender Datei den
  * leeren String, und das genuegt. Dieses Modul ist damit gratis - wichtig,
  * weil `bn4rep.js` bei SF4.1 ueber 800 GB wiegt und `punish.js` 83.
@@ -100,11 +110,27 @@ export function stelle(ns, reason, target, nodeReset) {
  * `>` waere trotzdem richtig - aber eine Antwort mit exakt gleichem
  * Millisekundenwert waere ein Fehlschlag ohne Grund.
  *
+ *
+ * DER ANLASS MUSS PASSEN (22.09.2026).
+ *
+ * install (bn4rep) und jump (ausgang) teilen sich dieselben zwei
+ * Dateien. Geprueft wurde nur der Zeitstempel - eine pre-install-Antwort
+ * galt damit auch als Beleg fuer eine pre-jump-Sicherung. Das ist kein
+ * theoretischer Fall: sync/backup.js:261-266 macht pre-jump rot, solange
+ * gekaufte Augmentierungen warten, pre-install dagegen nicht. Ein Sprung
+ * haette sich also an einer Sicherung festgehalten, die genau die
+ * Pruefung umgeht, die fuer ihn gilt.
+ *
+ * Seit dem 22.09. landet die Anfrage ueberhaupt erst zuverlaessig auf
+ * home - vorher lag sie auf dem Wirt und die Bruecke sah sie nie. Damit
+ * wird diese Verwechslung von einer Theorie zu einer Moeglichkeit.
+ *
  * @param {NS} ns
  * @param {number} anfrageTs
+ * @param {"install"|"jump"} [reason] wenn gesetzt, muss die Antwort dazu passen
  * @returns {object|null} die Antwort, oder null
  */
-export function antwortDa(ns, anfrageTs) {
+export function antwortDa(ns, anfrageTs, reason) {
   try {
     // VON HOME, NICHT LOKAL (22.09.2026). Gegenstueck zu stelle(): die
     // Bruecke legt die Antwort auf home ab (sync/bridge.js:1899). Ein
@@ -113,7 +139,14 @@ export function antwortDa(ns, anfrageTs) {
     const roh = liesVonHome(ns, ANTWORT);
     if (!roh) return null;
     const a = JSON.parse(roh);
-    return (a && Number.isFinite(a.ts) && a.ts >= anfrageTs) ? a : null;
+    if (!a || !Number.isFinite(a.ts) || a.ts < anfrageTs) return null;
+    // Die Bruecke schreibt den Anlass, nicht den Grund: install ->
+    // "pre-install", alles andere -> "pre-jump" (sync/bridge.js:1893).
+    if (reason) {
+      const erwartet = reason === "install" ? "pre-install" : "pre-jump";
+      if (a.anlass && a.anlass !== erwartet) return null;
+    }
+    return a;
   } catch {
     return null;
   }
@@ -192,7 +225,7 @@ export async function handschlag(ns, reason, target, nodeReset, sag = () => {}) 
   // grosszuegig - deshalb wird alle zwei Sekunden nachgesehen.
   let antwort = null;
   while (Date.now() - beginn < WARTE_MAX_MS) {
-    antwort = antwortDa(ns, anfrageTs);
+    antwort = antwortDa(ns, anfrageTs, reason);
     if (antwort) break;
     await ns.sleep(2000);
   }

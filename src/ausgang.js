@@ -438,13 +438,56 @@ export async function main(ns) {
         await ns.sleep(TAKT_MS); continue;
       }
       const braucht = ns.getScriptRam("exit.js", "home");
+      // WER OHNE RAEUMEN PASST, GEWINNT (22.09.2026).
+      //
+      // Hier wurde ueber `frei(h) + arbeiter` maximiert, also ueber
+      // RUECKGEWINNBAREN statt freien Speicher. Das waehlt zuverlaessig den
+      // groessten Arbeitsrechner - und damit genau den, um den sich
+      // ausgang.js mit bn4net streiten muss. Gerechnet mit den Zahlen vom
+      // 22.09.2026:
+      //     blade            6,25 frei + 505,75 Arbeiter = 512
+      //     hacknet-server-0  256 frei +      0          = 256
+      // blade gewann deterministisch, wurde geraeumt, und bn4net hatte den
+      // Platz 90 Sekunden spaeter wieder belegt (10-s-Takt, bn4net.js:4726).
+      // Der Sprung nach BN9 L3 klemmte daran ueber eine Stunde.
+      //
+      // Jetzt in zwei Stufen. Erste Stufe: ein Rechner, auf dem exit.js
+      // JETZT schon passt. Dort ist nichts zu toeten, es gibt kein Fenster,
+      // in dem der Platz zurueckfallen koennte, und kein Arbeiter verliert
+      // seinen Vorlauf. Unter gleich geeigneten gewinnt der KNAPPESTE:
+      // ein grosser Rechner ist fuer die Arbeiter mehr wert, und exit.js
+      // braucht nur seine 40 GB.
+      //
+      // Zweite Stufe, nur wenn nirgends Platz ist: wie bisher der mit dem
+      // meisten rueckgewinnbaren Speicher. Dann wird geraeumt - mit dem
+      // Nachraeumen direkt vor dem exec als Absicherung.
+      //
+      // bn4net.js:817-823 haelt die Hacknet-Server ausdruecklich frei:
+      //     "Nur ausgang.js legt dort im Sprungmoment exit.js ab."
+      // Diese Absicht wird erst durch Stufe 1 wirksam - vorher stand sie
+      // nur auf der Seite von bn4net, und ausgang.js hat sie nie genutzt.
+      // Ob ein Hacknet-Server tatsaechlich reicht, entscheidet allein sein
+      // Speicher: frisch hat er 1 GB (HacknetServer.ts:60), am 22.09. lagen
+      // sie bei 16 GB - exit.js braucht 40,25. Deshalb ist das hier keine
+      // Sonderregel fuer Hacknet, sondern schlicht die Frage, wo es passt.
       let wirt = null, meist = -Infinity;
+      let sofort = null, sofortFrei = Infinity;
       for (const h of hosts) {
         if (!ns.hasRootAccess(h)) continue;
+        const freiJetzt = frei(h);
+        if (freiJetzt >= braucht && freiJetzt < sofortFrei) {
+          sofortFrei = freiJetzt; sofort = h;
+        }
         let arbeiter = 0;
         for (const p of ns.ps(h)) if (WORKER.includes(p.filename)) arbeiter += ns.getScriptRam(p.filename, "home") * p.threads;
-        const moeglich = frei(h) + arbeiter;
+        const moeglich = freiJetzt + arbeiter;
         if (moeglich > meist) { meist = moeglich; wirt = h; }
+      }
+      if (sofort) {
+        wirt = sofort;
+        sag("Wirt fuer exit.js: " + wirt + " (" + sofortFrei.toFixed(1)
+          + " GB frei, noetig " + braucht.toFixed(1)
+          + ") - passt ohne Raeumen.");
       }
       if (!wirt || !(braucht > 0)) {
         const m = "Ausgang offen, aber exit.js ist nicht lesbar (getScriptRam " + braucht + ") - naechste Runde.";
@@ -521,14 +564,32 @@ export async function main(ns) {
         try {
           const homeRam = ns.getServerMaxRam("home");
           hausAusbau = { homeRam, braucht };
-          nachHome("data/geldbedarf.txt", JSON.stringify({
-            ts: Date.now(),
-            grund: "ausgang-wirt",
-            braucht,
-            homeRam,
-            text: "exit.js braucht " + braucht.toFixed(0) + " GB und passt "
-              + "nirgends. home hat " + homeRam + " GB.",
-          }));
+          // NICHT MEHR IN data/geldbedarf.txt (22.09.2026).
+          //
+          // Hier stand ein nachHome(...JSON.stringify({...})) in genau den
+          // Kanal, den fuenf Stellen als NACKTE ZAHL lesen:
+          //     bn4net.js:1160   Number(ns.read(...)) || 0
+          //     bn4life.js:284   Number(liesVonHome(...)) || 0
+          //     graftauto.js:337, homegrow.js:78  ebenso
+          // Aus JSON macht Number() NaN, und `|| 0` daraus eine Null. Der
+          // Kanal traegt die Augmentierungs-RUECKLAGE in Dollar, die
+          // bn4rep.js:1315 als String(Math.round(bedarf)) hineinschreibt.
+          // Sobald diese Stufe griff, war die Ruecklage fuer alle Leser
+          // geloescht - der Bot durfte Geld ausgeben, das fuer gekaufte
+          // Augmentierungen zurueckgelegt war.
+          //
+          // Zwei Fehler in einer Zeile: das Format (JSON statt Zahl) und
+          // die Einheit (GIGABYTE statt Dollar). Selbst als Zahl waere es
+          // falsch gewesen - ein RAM-Bedarf in einem Geldkanal.
+          //
+          // Der Auftrag verlangt, dass die Lage BENANNT wird, nicht dass
+          // sie in diesen Kanal geht. Sie steht jetzt im eigenen Log und
+          // in data/ausgang.json (Feld hausAusbau, Zeile 677), wo sie
+          // ohnehin schon landet und niemanden ueberschreibt.
+          sag("BEFUND: exit.js braucht " + braucht.toFixed(0)
+            + " GB und passt nirgends. home hat " + homeRam
+            + " GB - ein Ausbau wuerde den Sprung freimachen."
+            + " (Steht in data/ausgang.json unter hausAusbau.)");
         } catch { /* dann eben ohne Bedarfsmeldung */ }
       }
 

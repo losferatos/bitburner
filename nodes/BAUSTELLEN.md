@@ -38,6 +38,30 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
+### autopilot.js stirbt an Hacknet-Servern (22.09.2026, im Spiel aufgetreten)
+
+    RUNTIME ERROR
+    getServerMaxMoney: Cannot be executed on hacknet-server-0.
+    Stack: autopilot.js:L670@main
+
+autopilot.js:667-670 laeuft ueber alle Hosts und ruft getServerMaxMoney,
+ohne Hacknet-Server auszunehmen. Sobald hacknet.js den ersten gekauft hat,
+stirbt der Kaltstart-Verwalter.
+
+bn4net.js:823 macht es richtig:
+    const hosts = scanAll().filter((h) => !h.startsWith("hacknet-server-"));
+In autopilot.js kommt die Zeichenkette "hacknet-server" KEIN EINZIGES MAL
+vor. Derselbe Filter fehlt dort schlicht.
+
+Nicht kritisch, solange bn4net.js laeuft - autopilot.js ist nur der
+Kaltstart-Ersatz, und am 22.09. lief der Kern weiter. Kritisch wird es, wenn
+der Bot in einem frischen Knoten auf autopilot.js angewiesen ist, WEIL
+bn4net noch nicht steht: genau dann kauft hacknet.js die ersten Server, und
+genau dann faellt der Verwalter aus, der das Geld dafuer verdienen soll.
+
+Fix ist der gleiche Filter wie in bn4net.js:823 - aber als src/-Aenderung mit
+Skeptiker, nicht nebenbei.
+
 ### install-sperre.txt hat zwei Vertraege und einen Schreiber am falschen Ort (22.09.2026)
 
 Latenter Fehler, NICHT durch den Umbau vom 22.09. entstanden - der Versuch,

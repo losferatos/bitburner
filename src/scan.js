@@ -19,7 +19,7 @@ export async function main(ns) {
 
   for (const [host, path] of routes) {
     // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
-    // Sie haengen an home und kommen aus ns.scan mit heraus. 24
+    // Sie haengen an home und kommen aus ns.scan mit heraus. Gut zwei Dutzend
     // ns-Funktionen werfen auf ihnen (getNormalServer,
     // NetscriptHelpers.tsx:575-589); hasRootAccess gehoert NICHT dazu und
     // gibt true (PlayerObjectServerMethods.ts:50) - eine Root-Pruefung

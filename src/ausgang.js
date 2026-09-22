@@ -471,12 +471,34 @@ export async function main(ns) {
       // sie bei 16 GB - exit.js braucht 40,25. Deshalb ist das hier keine
       // Sonderregel fuer Hacknet, sondern schlicht die Frage, wo es passt.
       let wirt = null, meist = -Infinity;
-      let sofort = null, sofortFrei = Infinity;
+      // HACKNET-SERVER ZUERST (Skeptiker, 22.09.2026).
+      //
+      // Die erste Fassung nahm unter den passenden schlicht den knappsten.
+      // Das arbeitet gegen die eigene Begruendung: bn4net.js:817-823 haelt
+      // die Hacknet-Server fuer genau diesen Augenblick frei, und ein
+      // freigehaltener Rechner hat per Definition den MEISTEN freien
+      // Speicher - "knappster" waehlt ihn also ab, sobald irgendein anderer
+      // auch passt.
+      //
+      // Jetzt in dieser Reihenfolge:
+      //   1. ein Hacknet-Server, auf dem exit.js passt (dafuer sind sie da;
+      //      die paar Sekunden Hashverlust bis zum Prestige sind belanglos)
+      //   2. sonst der knappste sonstige Rechner, auf dem es passt - ein
+      //      grosser Rechner ist fuer die Arbeiter mehr wert
+      //   3. sonst wie bisher der mit dem meisten rueckgewinnbaren Speicher,
+      //      dann wird geraeumt
+      let sofort = null, sofortFrei = Infinity, sofortHacknet = false;
       for (const h of hosts) {
         if (!ns.hasRootAccess(h)) continue;
         const freiJetzt = frei(h);
-        if (freiJetzt >= braucht && freiJetzt < sofortFrei) {
-          sofortFrei = freiJetzt; sofort = h;
+        if (freiJetzt >= braucht) {
+          const istHacknet = h.startsWith("hacknet-server-");
+          // Ein Hacknet-Server schlaegt jeden Nicht-Hacknet. Unter gleichen
+          // entscheidet der knappste.
+          const besser = sofort === null
+            || (istHacknet && !sofortHacknet)
+            || (istHacknet === sofortHacknet && freiJetzt < sofortFrei);
+          if (besser) { sofortFrei = freiJetzt; sofort = h; sofortHacknet = istHacknet; }
         }
         let arbeiter = 0;
         for (const p of ns.ps(h)) if (WORKER.includes(p.filename)) arbeiter += ns.getScriptRam(p.filename, "home") * p.threads;
@@ -485,9 +507,15 @@ export async function main(ns) {
       }
       if (sofort) {
         wirt = sofort;
-        sag("Wirt fuer exit.js: " + wirt + " (" + sofortFrei.toFixed(1)
-          + " GB frei, noetig " + braucht.toFixed(1)
-          + ") - passt ohne Raeumen.");
+        // Ueber letzteMeldung entdoppelt: nach einem exec == 0 bleibt
+        // letzterStart auf 0, die Runde erreicht diese Stelle also jede
+        // Minute erneut. Ohne die Entdopplung schriebe sie im Minutentakt
+        // dieselbe Zeile in genau das Protokoll, in dem man den Fehlschlag
+        // sucht.
+        const m = "Wirt fuer exit.js: " + wirt + " (" + sofortFrei.toFixed(1)
+          + " GB frei, noetig " + braucht.toFixed(1) + ")"
+          + (sofortHacknet ? " - Hacknet-Server, dafuer freigehalten." : " - passt ohne Raeumen.");
+        if (letzteMeldung !== m) { sag(m); letzteMeldung = m; }
       }
       if (!wirt || !(braucht > 0)) {
         const m = "Ausgang offen, aber exit.js ist nicht lesbar (getScriptRam " + braucht + ") - naechste Runde.";

@@ -95,8 +95,8 @@ export async function main(ns) {
       //
       // Hier stuerzt nichts ab - scp und exec gehen auf ihnen. Genau
       // deshalb ist es teuer: belegter Speicher drueckt die Hash-Rate
-      // linear (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:15).
-      // Ein frisch gekaufter Server hat 1 GB (HacknetServer.ts:60) - ein
+      // linear (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:14).
+      // Ein frisch gekaufter Server hat 1 GB (HacknetServer.ts:61) - ein
       // einziger Arbeiterfaden setzt seine Rate damit auf null.
       //
       // bn4start ist der KALTSTART: dort kauft hacknet.js die ersten

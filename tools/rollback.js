@@ -73,12 +73,26 @@ const EINGESPIELT = [
   "boerse.js", "boot.js", "buyaugs.js", "cdump.js", "contracts.js", "csolve.js",
   "darkweb.js", "exit.js", "export.js", "figwatch.js", "graft.js", "graftauto.js",
   "graftplan.json", "guard.js", "hashes.js", "homeram.js", "join.js", "kampfaugs.js",
-  // lib/hostdatei.js und lib/hackaugs.js nachgetragen (22.09.2026). Beide
-  // fehlten seit dem 04.09., obwohl inzwischen elf Gewerke von hostdatei
-  // abhaengen: ein rollback --alles haette genau die Datei nicht
-  // wiederhergestellt, ohne die die anderen gar nicht erst starten.
+  // NICHT ERGAENZEN, AUCH WENN BIBLIOTHEKEN ZU FEHLEN SCHEINEN (22.09.2026).
+  //
+  // Diese Liste ist der Dateisatz EINES Schubs (04.09.2026, 17:45), nicht
+  // die Liste aller Bibliotheken des Projekts. Der Unterschied entscheidet:
+  // fuer jede Datei OHNE Kopie in archiv/rollback-2026-09-04/ stellt dieses
+  // Werkzeug nicht wieder her, sondern LOESCHT - die Annahme ist, sie sei
+  // mit diesem Schub ueberhaupt erst entstanden.
+  //
+  // Am 22.09.2026 wurden hier lib/batch.js, lib/blackops.json,
+  // lib/hackaugs.js und lib/hostdatei.js ergaenzt, weil eine Gegenprobe
+  // gegen src/lib sie als fehlend meldete. Das war falsch und gefaehrlich:
+  // keine der vier liegt im Archiv, ein rollback --alles haette sie also
+  // GELOESCHT. lib/batch.js gibt es seit dem 20.08. (449a07e),
+  // lib/hackaugs.js seit dem 21.08. (1fe4490) - beide lagen lange vor dem
+  // Schub im Spiel. Ohne lib/hackaugs.js werden exit.js und bn4rep.js
+  // ungueltig, und der Bot kaeme durch keine BitNode-Tuer mehr.
+  //
+  // Die Gegenprobe, die hier taugt, ist archiv/rollback-2026-09-04/ plus
+  // die Liste der damals geloeschten Dateien - beides steht im Kopf.
   "lib/bitnodes.json", "lib/calc.js", "lib/endspurt.js", "lib/eta.js", "lib/events.js",
-  "lib/batch.js", "lib/blackops.json", "lib/hackaugs.js", "lib/hostdatei.js",
   "lib/figur.js", "lib/figurns.js", "lib/graftwahl.js", "lib/handschlag.js",
   "lib/herzschlag.js", "lib/kpi.js", "lib/leiter.js", "lib/loeser.js",
   "lib/motorzeit.js", "lib/reg.js", "lib/route.js", "lib/uhren.js", "popups.js",

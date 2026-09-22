@@ -63,7 +63,7 @@ export async function main(ns) {
     let ziel = null;
     for (const host of netz) {
       // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
-      // Sie haengen an home und kommen aus ns.scan mit heraus. 24
+      // Sie haengen an home und kommen aus ns.scan mit heraus. Gut zwei Dutzend
       // ns-Funktionen werfen auf ihnen (getNormalServer,
       // NetscriptHelpers.tsx:575-589); hasRootAccess gehoert NICHT dazu und
       // gibt true (PlayerObjectServerMethods.ts:50) - eine Root-Pruefung
@@ -115,10 +115,11 @@ export async function main(ns) {
     let gestartet = 0;
     for (const host of netz) {
       // Hacknet-Server raus (22.09.2026). Auch hier wirft nichts, und
-      // genau deshalb ist es teuer: die Muehle wuerde dort share-Faeden
-      // starten. Belegter Speicher drueckt die Hash-Rate linear
-      // (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:15); bei einem
-      // frischen 1-GB-Server (HacknetServer.ts:60) auf null.
+      // genau deshalb ist es teuer: die Muehle wuerde dort Faeden von
+      // worker/weaken.js starten (WORKER, Zeile 42 - NICHT share, das stand
+      // hier zuerst falsch). Belegter Speicher drueckt die Hash-Rate linear
+      // (ramRatio = 1 - ramUsed/maxRam, HacknetServers.ts:14); bei einem
+      // frischen 1-GB-Server (HacknetServer.ts:61) auf null.
       if (host.startsWith("hacknet-server-")) continue;
       if (!ns.hasRootAccess(host)) continue;
       const max = ns.getServerMaxRam(host);

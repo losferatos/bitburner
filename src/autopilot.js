@@ -668,7 +668,7 @@ export async function main(ns) {
       // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
       //
       // Sie haengen wie jeder andere Rechner an home und kommen aus
-      // ns.scan mit heraus - aber 24 ns-Funktionen WERFEN auf ihnen, weil
+      // ns.scan mit heraus - aber gut zwei Dutzend ns-Funktionen WERFEN auf ihnen, weil
       // sie keine Server im Sinne von Server.ts sind (getNormalServer,
       // NetscriptHelpers.tsx:575-589). getServerMaxMoney zwei Zeilen
       // weiter unten ist der erste solche Aufruf in dieser Schleife;
@@ -698,7 +698,7 @@ export async function main(ns) {
       // Als Hackziel scheiden sie mangels Geld ohnehin aus, als
       // Arbeiter-Wirt sind sie nicht vorgesehen (bn4net.js:817-823) - und
       // belegtes RAM kostet dort direkt Hashes, weil die Rate linear an
-      // ramRatio = 1 - ramUsed/maxRam haengt (HacknetServers.ts:15).
+      // ramRatio = 1 - ramUsed/maxRam haengt (HacknetServers.ts:14).
       // Sie aus `servers` herauszuhalten ist also beides: noetig und richtig.
       if (host.startsWith("hacknet-server-")) continue;
       const root = ns.hasRootAccess(host);

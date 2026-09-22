@@ -323,8 +323,8 @@ export async function main(ns) {
             // adminRights ab Konstruktion (PlayerObjectServerMethods.ts:50)
             // und kaemen deshalb durch die Root-Pruefung. Belegter Speicher
             // kostet dort direkt Hashes: die Rate haengt linear an
-            // ramRatio = 1 - ramUsed/maxRam (HacknetServers.ts:15), bei
-            // einem frischen 1-GB-Server (HacknetServer.ts:60) also alles.
+            // ramRatio = 1 - ramUsed/maxRam (HacknetServers.ts:14), bei
+            // einem frischen 1-GB-Server (HacknetServer.ts:61) also alles.
             // bn4net.js:823 nimmt sie aus demselben Grund aus.
             if (host.startsWith("hacknet-server-")) continue;
             if (!ns.hasRootAccess(host)) continue;
@@ -361,12 +361,37 @@ export async function main(ns) {
           // sitzt und ns.read IMMER lokal liest - genau der Fehler, der
           // in lib/hostdatei.js dokumentiert ist. Kostet nichts extra:
           // die Funktion ist oben schon importiert.
+          // DIE REGEX LIEST AUCH KOMMENTARE (Skeptiker, 22.09.2026).
+          //
+          // Ein Bot, dessen Kommentare Code zitieren, hat davon reichlich:
+          // join.js:58 und lib/figurns.js:17-18 enthalten Importzeilen in
+          // Prosa. Heute sind das gueltige Dateinamen, also folgenlos. Ein
+          // Kommentar wie `... from "der Bruecke"` ergaebe dagegen den Pfad
+          // "der Bruecke.js", und ns.scp WIRFT bei einem ungueltigen Pfad
+          // (NetscriptFunctions.ts:745-757 ueber helpers.filePath). Der Wurf
+          // landet im catch weiter unten als "Auftrag unlesbar" - der
+          // Auftragskanal waere fuer dieses Skript dauerhaft tot.
+          //
+          // Deshalb wird jeder Treffer verworfen, der ein in Dateipfaden
+          // verbotenes Zeichen enthaelt. Die Liste stammt aus
+          // Paths/Directory.ts:28 (dort ohne "/", das hier als Trenner
+          // erlaubt bleibt) plus Leerraum.
+          //
+          // Endungen: validScriptExtensions sind .js/.jsx/.ts/.tsx
+          // (ScriptFilePath.ts:20). Nur wenn KEINE davon dransteht, wird
+          // ".js" angehaengt - sonst wuerde aus "lib/x.tsx" ein
+          // "lib/x.tsx.js". .json und .txt sind KEINE gueltigen
+          // Importziele (TextFilePath.ts:8 trennt sie ab); eine Datei, die
+          // eine JSON liest, laedt sie zur Laufzeit und muss sie darum wie
+          // exit.js von Hand fuehren - siehe ausgang.js:60.
+          const VERBOTEN = /[\s*?[\]!\\~|#"']/;
           const libsVon = (datei, tiefe, gesehen) => {
             if (tiefe > 4) return gesehen;
             const quelle = liesVonHome(ns, datei) || "";
             for (const m of quelle.matchAll(/from\s+["']([^"']+)["']/g)) {
               let lib = m[1];
-              if (!/\.(js|json|txt)$/.test(lib)) lib += ".js";
+              if (!lib || VERBOTEN.test(lib)) continue;
+              if (!/\.(js|jsx|ts|tsx)$/.test(lib)) lib += ".js";
               if (gesehen.has(lib)) continue;
               gesehen.add(lib);
               libsVon(lib, tiefe + 1, gesehen);

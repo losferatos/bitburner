@@ -45,20 +45,37 @@
  * KOSTEN
  * ===========================================================================
  *
- * WAS DIESES MODUL KOSTET (berichtigt 22.09.2026)
+ * GEMESSEN AM 22.09.2026 mit tools/ram.js, nicht geschaetzt:
  *
- * Hier stand, fileExists werde nicht benutzt und das Modul sei damit
- * gratis. Das stimmt seit dem 04.09.2026 nicht mehr: ueber
- * lib/hostdatei.js kommen fileExists (0,10 GB) und scp (0,60 GB) herein,
- * das Modul kostet also 0,70 GB. Bei bn4rep.js, das mit SF4.1 ueber
- * 800 GB wiegt, ist das kein Detail - und eine falsche Angabe genau an
- * der Stelle, an der jemand eine RAM-Entscheidung nachschlaegt, ist
- * schlimmer als keine.
+ *     lib/handschlag.js isoliert   2,35 GB
+ *       davon baseCost             1,60
+ *       getHostname                0,05
+ *       scp                        0,60
+ *       fileExists                 0,10
+ *     ------------------------------------
+ *     eigener ns-Anteil            0,75 GB
  *
- * `ns.read` und `ns.write` kosten weiterhin null. `ns.fileExists` kostet 0,10 GB und
- * wird deshalb NICHT benutzt: `ns.read` liefert bei fehlender Datei den
- * leeren String, und das genuegt. Dieses Modul ist damit gratis - wichtig,
- * weil `bn4rep.js` bei SF4.1 ueber 800 GB wiegt und `punish.js` 83.
+ * ABER: der AUFSCHLAG in den Gewerken ist NULL. Gemessen, indem der
+ * handschlag-Import durch Stubs ersetzt und neu gerechnet wurde:
+ *
+ *     ausgang.js   8,15 -> 8,15    Delta 0,00
+ *     bn4rep.js  850,75 -> 850,75  Delta 0,00
+ *     punish.js   83,35 -> 83,35   Delta 0,00
+ *
+ * Der Grund steht in lib/hostdatei.js:61-63: Bitburner bildet die
+ * Vereinigungsmenge ueber den Modulgraphen, und alle drei Gewerke rufen
+ * fileExists, scp und getHostname ohnehin selbst auf. Wer dieses Modul
+ * einbindet, zahlt dafuer also nichts extra.
+ *
+ * `ns.read` und `ns.write` kosten null.
+ *
+ * HIER STAND BIS ZUM 22.09.2026 das Gegenteil: fileExists werde nicht
+ * benutzt, das Modul sei gratis. Seit dem 04.09. kommt es ueber
+ * lib/hostdatei.js herein, der Satz war also stale. Der erste Versuch,
+ * ihn zu berichtigen, nannte 0,70 GB (getHostname vergessen) und
+ * behauptete, bei bn4rep.js sei das kein Detail - auch das war falsch,
+ * der Aufschlag ist dort exakt null. Beide Zahlen stehen jetzt gemessen
+ * da. Wer sie aendert, misst vorher.
  */
 
 import { liesVonHome, nachHome } from "lib/hostdatei.js";

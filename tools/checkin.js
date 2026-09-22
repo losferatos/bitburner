@@ -217,6 +217,15 @@ async function main() {
 
   // --- 1b. Der Ausgang: laeuft ausgang.js, und was sagt es? ---------------
   const ausgangGut = ausgang && alterVon(ausgang) <= Math.max(VERALTET_MS, alter * 3) ? ausgang : null;
+  // MUSS HIER STEHEN, NICHT ERST IN ABSCHNITT 4 (22.09.2026).
+  // ausgeben() schreibt laufJetzt in den Stand und wird von JEDEM fruehen
+  // Rueckgabepfad in Abschnitt 3 gerufen - BLOCKIERT, SPRINGT, GEWERK
+  // FEHLT, AUSGANG OFFEN ohne Start, AUSGANG FEHLT. Stand die Deklaration
+  // erst danach, warf jeder dieser Pfade einen ReferenceError aus der
+  // temporalen Totzone: das Werkzeug war genau im Knotenwechsel blind,
+  // fuer den es gebaut ist. Gefunden am 22.09.2026, als der Sprung nach
+  // BN9 L3 klemmte und /bb die Lage per curl aus der Bruecke holen musste.
+  const laufJetzt = ausgangGut && ausgangGut.lauf ? Number(ausgangGut.lauf.level) : null;
   const verfahren = (Number(verfahrenTxt[1]) === knoten && ["V1", "V1b", "V2"].includes(verfahrenTxt[0]))
     ? verfahrenTxt[0] : (ausgangGut ? ausgangGut.verfahren : null);
   const hackingweg = verfahren === "V1" || verfahren === "V1b";
@@ -353,7 +362,6 @@ async function main() {
   // DERSELBE KNOTEN IST NICHT DERSELBE LAUF (03.09.2026): BN10 wird dreimal
   // gespielt; ohne den Lauf im Punkt rechnete die Schlusszeile mit der Rate
   // aus Lauf 1 und meldete "fertig in 1,6 h" bei Rang 35.
-  const laufJetzt = ausgangGut && ausgangGut.lauf ? Number(ausgangGut.lauf.level) : null;
   const gleicherLauf = (p) => p.knoten === knoten && (laufJetzt === null || p.lauf === laufJetzt);
   const vorher = [...punkte].reverse().find((p) =>
     gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit)

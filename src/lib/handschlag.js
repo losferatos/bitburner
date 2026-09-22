@@ -51,7 +51,7 @@
  * weil `bn4rep.js` bei SF4.1 ueber 800 GB wiegt und `punish.js` 83.
  */
 
-import { liesVonHome } from "lib/hostdatei.js";
+import { liesVonHome, nachHome } from "lib/hostdatei.js";
 
 
 /** Wo die beiden Dateien liegen. Beide auf home, beide vom Kern geraeumt. */
@@ -75,7 +75,20 @@ export const SICHERUNG_MAX_MS = 6 * 3600000;
  */
 export function stelle(ns, reason, target, nodeReset) {
   const ts = Date.now();
-  ns.write(ANFRAGE, JSON.stringify({ reason, target, ts, nodeReset }), "w");
+  // NACH HOME, NICHT LOKAL (22.09.2026). Die Bruecke liest die Anfrage mit
+  // server: "home" (sync/bridge.js:1874). ausgang.js laeuft aber fast nie
+  // auf home - am 22.09. lag es auf fulcrumtech, und dort lag auch die
+  // Anfrage. Die Bruecke hat sie deshalb NIE gesehen: im Brueckenlog steht
+  // seit Bestehen kein einziger "jump"-Handschlag, und eine pre-jump-
+  // Sicherung gab es nie - genau die Klasse, die nie rotiert wird.
+  // Der Einbau lief nur dann, wenn sein Gewerk GERADE auf home sass -
+  // bn4rep.js hat hostRule "werkbank" und wandert ebenfalls. Beim letzten
+  // geglueckten install-Handschlag (22.09. 02:14) lag es auf home,
+  // seither auf fulcrumtech, und seither steht auch kein install-
+  // Handschlag mehr im Brueckenlog. Es sind also nicht 26 gelungene
+  // Einbau-Handschlaege gegen 0 Sprung-Handschlaege, weil der Einbau
+  // anders gebaut waere - beide haengen am selben Zufall.
+  nachHome(ns, ANFRAGE, JSON.stringify({ reason, target, ts, nodeReset }));
   return ts;
 }
 
@@ -93,7 +106,11 @@ export function stelle(ns, reason, target, nodeReset) {
  */
 export function antwortDa(ns, anfrageTs) {
   try {
-    const roh = ns.read(ANTWORT);
+    // VON HOME, NICHT LOKAL (22.09.2026). Gegenstueck zu stelle(): die
+    // Bruecke legt die Antwort auf home ab (sync/bridge.js:1899). Ein
+    // ns.read haette sie auf einem Fremdwirt nie gefunden, also waere der
+    // Handschlag auch mit richtiger Anfrage in die 90 s gelaufen.
+    const roh = liesVonHome(ns, ANTWORT);
     if (!roh) return null;
     const a = JSON.parse(roh);
     return (a && Number.isFinite(a.ts) && a.ts >= anfrageTs) ? a : null;
@@ -211,6 +228,22 @@ export async function handschlag(ns, reason, target, nodeReset, sag = () => {}) 
   // DER EINBAU WARTET. Er ist beliebig oft nachholbar.
   sag("Bruecke antwortet nicht und keine junge Sicherung - EINBAU WIRD "
     + "AUSGESETZT, install-sperre.txt gesetzt.");
+  // HIER BEWUSST ns.write UND NICHT nachHome (22.09.2026).
+  //
+  // Es sieht nach demselben Fehler aus wie oben, ist aber keiner, den man
+  // hier beheben darf: bn4rep.js:829 liest diese Datei als
+  // "FIRMENPHASE|<zeitstempel>" und zieht den Stempel mit split("|")[1].
+  // Auf das JSON, das hier geschrieben wird, angewandt ergibt das
+  // undefined -> NaN, und bn4rep.js:830 macht aus einem nicht lesbaren
+  // Stempel ausdruecklich lockGilt = true. Die Sperre waere damit NIE
+  // wieder aufhebbar - sie ODERt sich in bn4rep.js:846 dauerhaft fest,
+  // und aufgeraeumt wird sie nur von boot.js:114, also nach einem Reset,
+  // den genau diese Sperre verhindert.
+  //
+  // Lokal geschrieben ist sie wirkungslos, das ist ein eigener Fehler und
+  // steht in nodes/BAUSTELLEN.md. Ihn hier mitzunehmen haette aus einer
+  // wirkungslosen Sperre eine unaufhebbare gemacht - schlimmer als der
+  // Zustand, den er heilen sollte. Gefunden vom Skeptiker am 22.09.2026.
   ns.write("data/install-sperre.txt", JSON.stringify({
     ts: Date.now(),
     reason: "handschlag",

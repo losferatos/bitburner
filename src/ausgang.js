@@ -711,8 +711,74 @@ export async function main(ns) {
       }
       ns.write("data/backup-wait.txt", String(backupWartenMs), "w");
 
+      // ================================================================
+      // NACHRAEUMEN DIREKT VOR DEM exec (22.09.2026)
+      // ================================================================
+      //
+      // Geraeumt wird oben, rund 250 Zeilen frueher. Dazwischen liegt der
+      // Handschlag, und der wartet bis zu 90 Sekunden auf die Bruecke.
+      // In diesem Fenster rollt bn4net seine Arbeiter wieder aus - es
+      // sieht freien Speicher und fuellt ihn, das ist seine Aufgabe.
+      //
+      // Am 22.09.2026 lief das viermal hintereinander so ab, im Abstand
+      // von genau 90 Sekunden zwischen Raeumen und Fehlschlag:
+      //   09:45:20  Arbeiter auf blade geraeumt, frei jetzt 58.8 GB.
+      //   09:45:20  Handschlag gestellt (jump -> BN9 L3) ...
+      //   09:46:50  Bruecke antwortet nicht ...
+      //   09:46:50  exit.js liess sich auf blade nicht starten (exec gab 0)
+      //
+      // exit.js braucht 40,25 GB; blade hat 512 und war nach dem Warten
+      // wieder voll mit hack-Faeden. Der Knoten war erledigt, der Bot kam
+      // trotzdem eine Stunde lang nicht durch die Tuer.
+      //
+      // Der Handschlag-Fehler selbst ist in lib/handschlag.js behoben (die
+      // Anfrage lag auf dem Wirt, die Bruecke las auf home). Das VERKUERZT
+      // das Fenster, es schliesst es nicht: die Bruecke sieht die Anfrage
+      // erst beim naechsten Takt (SOFORT_MS = 60000, sync/bridge.js:232),
+      // also nach 0 bis 60 Sekunden. bn4net verteilt alle 10 Sekunden
+      // (bn4net.js:4726), und gemessen ging blade in 90 Sekunden von
+      // 58,8 GB frei auf 0,85 GB - fuer 40,25 GB reichen also schon rund
+      // 30 Sekunden Fenster. Diese Pruefung ist damit NICHT die billige
+      // Absicherung, als die sie hier zuerst stand, sondern der Teil, der
+      // den Start tatsaechlich rettet.
+      if (frei(wirt) < braucht) {
+        const vorher = frei(wirt);
+        raeume(wirt, false);
+        sag("Vor dem Start war " + wirt + " wieder belegt ("
+          + vorher.toFixed(1) + " GB frei, noetig " + braucht.toFixed(1)
+          + ") - nachgeraeumt, frei jetzt " + frei(wirt).toFixed(1) + " GB.");
+      }
+      // Reicht es immer noch nicht, ist das ein Befund und kein stilles
+      // exec 0: die Meldung unten saehe sonst genauso aus wie eine fehlende
+      // Datei oder ein doppelt laufendes Skript.
+      if (frei(wirt) < braucht) {
+        sag("BEFUND: " + wirt + " hat nur " + frei(wirt).toFixed(1)
+          + " GB frei, exit.js braucht " + braucht.toFixed(1)
+          + " GB - der Start wird gleich fehlschlagen.");
+      }
       const pid = ns.exec("exit.js", wirt, 1, ziel.node);
-      letzterStart = Date.now();
+      // NUR BEI ECHTEM START (22.09.2026, aus drei Skeptiker-Laeufen).
+      //
+      // Hier stand letzterStart = Date.now() unbedingt, also auch bei
+      // pid === 0. Zwei Folgen, beide schlecht:
+      //
+      // (1) Die Wartezeit. Zeile 408 liest letzterStart > 0 als 'exit.js
+      //     lief und ist zu Ende' und wartet dann 15 Minuten. Nach einem
+      //     exec, der gar nicht gestartet ist, gehoert aber der naechste
+      //     Takt, nicht eine Viertelstunde.
+      //
+      // (2) Die Luege im Protokoll. Dieselbe Zeile schreibt danach
+      //     'exit.js endete ohne Sprung - letzte Zeile: (exit.txt leer)'.
+      //     Es lief nie ein exit.js; data/exit.txt existiert nicht einmal.
+      //     Und checkin.js:322 liest offen && letzterStart > 0 als 'der
+      //     Sprung laeuft' und meldet URTEIL: SPRINGT mit Rueckgabewert 0.
+      //
+      // Genau das ist am 22.09.2026 passiert: der Bot stand ab 08:55 vor
+      // einer Tuer, die er nicht aufbekam, und /bb meldete eine Stunde lang
+      // 'der Sprung laeuft'. Der Kommentar 14 Zeilen ueber Zeile 408
+      // beschreibt dieselbe Fehlerklasse - sie wurde am 04.09. fuer
+      // Ablehnungen abgeraeumt und fuer exec == 0 uebersehen.
+      if (pid) letzterStart = Date.now();
       sag(pid
         ? "AUSGANG: " + status + " - exit.js gestartet auf " + wirt + " (pid " + pid + "), Ziel BitNode " + ziel.node + " Stufe " + ziel.level + ", Verfahren dort " + ziel.verfahren + "."
         : "exit.js liess sich auf " + wirt + " nicht starten (exec gab 0) - naechste Runde.");

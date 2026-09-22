@@ -258,12 +258,17 @@ export function pruefeKennwerte(k, erwartung = {}) {
   if (erwartung.lauf != null && k.lauf !== erwartung.lauf) {
     gruende.push(`Lauf ${k.lauf} statt ${erwartung.lauf}`);
   }
-  if (erwartung.anlass === "pre-jump" && k.queuedAugs > 0) {
-    gruende.push(
-      `queuedAugmentations ${k.queuedAugs} bei Anlass pre-jump - ` +
-        "gekaufte, nicht eingebaute Augs verfallen beim Sprung",
-    );
-  }
+  // KEIN GRUND MEHR: WARTENDE AUGS VOR DEM SPRUNG (22.09.2026, BAUSTELLEN
+  // Zeile 237). Hier stand eine Pruefung, die pre-jump rot machte, sobald
+  // gekaufte Augs warteten ("verfallen beim Sprung"). Die Praemisse traegt
+  // nicht: ein Sprung leert auch die EINGEBAUTEN (prestigeSourceFile,
+  // PlayerObjectGeneralMethods.ts:174 `augmentations = []`) - einbauen vor
+  // dem Sprung rettet also nichts. Die Folge war dagegen real: keine
+  // pre-jump-Sicherung, backup-ok.txt blieb aus, ausgang.js wartete 90 s und
+  // sprang ohne sie, und die Bruecke sicherte jede Minute erneut und
+  // verwarf wieder. Die verschwendeten Kaeufe zaehlt weiter der Kennwert
+  // `queued_augs_at_jump` - das ist ein Befund ueber bn4rep.js, kein Grund,
+  // den letzten Stand vor der Tuer nicht zu sichern.
 
   return { ok: gruende.length === 0, gruende };
 }

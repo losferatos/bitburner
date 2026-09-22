@@ -229,7 +229,10 @@ const REQUEST_TIMEOUT_MS = 15000;
 const VERIFY_TIMEOUT_MS = 15000;
 const HEARTBEAT_MS = 30000;
 const RUECKKANAL_MS = 60000;
-const SOFORT_MS = 60000;
+// Nur fuer den Pruefstand verkuerzbar (--sofort-ms, 22.09.2026): die
+// Handschlag-Probe in tools/test-bruecke.js muesste sonst je Runde eine
+// Minute warten. Die LIVE-Rolle ignoriert den Schalter.
+const SOFORT_MS = IST_LIVE_ROLLE ? 60000 : Math.max(1000, zahlAusArgv(argv, "--sofort-ms", 60000));
 const SAVE_ALTER_MS = 10 * 60000;
 const STUNDENSICHERUNG_MS = 60 * 60000;
 /**
@@ -1883,18 +1886,48 @@ async function pruefeHandschlag() {
     return;
   }
   if (!anfrage || !anfrage.ts) return;
-  // Schon beantwortet?
+  const anlass = anfrage.reason === "install" ? "pre-install" : "pre-jump";
+  // Schon beantwortet? NUR MIT PASSENDEM ANLASS (22.09.2026, BAUSTELLEN
+  // Zeile 41). Bisher reichte der Zeitstempel: kam eine jump-Anfrage,
+  // waehrend die install-Antwort gerade entstand, galt sie als beantwortet -
+  // und lib/handschlag.js lehnte die pre-install-Antwort danach zu Recht ab.
+  // ausgang.js wartete 90 s und sprang ohne pre-jump-Sicherung.
   try {
-    const ok = await request("getFile", { filename: "data/backup-ok.txt", server: "home" });
-    if (ok && JSON.parse(ok).ts >= anfrage.ts) return;
+    const ok = JSON.parse(await request("getFile", { filename: "data/backup-ok.txt", server: "home" }));
+    if (ok && ok.ts >= anfrage.ts && (!ok.anlass || ok.anlass === anlass)) return;
   } catch {
     // noch keine Antwort
   }
+  // NUR EINE FRISCHE ANFRAGE (22.09.2026, Skeptiker B4/B5). Das Spiel wartet
+  // hoechstens 90 s auf die Antwort (lib/handschlag.js, WARTE_MAX_MS) und
+  // handelt dann ohne sie. Eine aeltere Anfrage zu sichern hiesse, den Stand
+  // NACH dem Sprung oder Einbau als "pre-jump"/"pre-install" abzulegen.
+  // Die Grenze gilt auch ueber einen Neustart der Bruecke hinweg - anders
+  // als der Zaehler darunter, der nur im Speicher lebt.
+  if (Date.now() - Number(anfrage.ts) > 3 * 60000) return;
+  // NICHT ENDLOS NEU VERSUCHEN (22.09.2026). Scheitert die Sicherung, bleibt
+  // die Anfrage liegen, bis boot.js sie wegraeumt - und hier wurde jede
+  // Minute neu gesichert, neu verworfen und der einzige Alarm-Slot
+  // ueberschrieben. Drei Versuche je Anfrage, dann Ruhe bis zur naechsten.
+  const schluessel = anfrage.ts + "|" + anlass;
+  const versuche = state.handschlagVersuche?.get(schluessel) || 0;
+  if (versuche >= 3) return;
+  if (!state.handschlagVersuche) state.handschlagVersuche = new Map();
+  state.handschlagVersuche.set(schluessel, versuche + 1);
+  if (state.handschlagVersuche.size > 50) {
+    state.handschlagVersuche.delete(state.handschlagVersuche.keys().next().value);
+  }
 
-  const anlass = anfrage.reason === "install" ? "pre-install" : "pre-jump";
-  log("info", "Handschlag angefragt: " + anfrage.reason + " -> " + anlass);
+  log("info", "Handschlag angefragt: " + anfrage.reason + " -> " + anlass
+    + (versuche ? " (Versuch " + (versuche + 1) + " von 3)" : ""));
   const gruen = await sichereJetzt(anlass);
-  if (!gruen) return;
+  if (!gruen) {
+    if (versuche + 1 >= 3) {
+      log("warn", "Handschlag " + anlass + ": drei Sicherungen gescheitert - keine"
+        + " weiteren Versuche fuer diese Anfrage.");
+    }
+    return;
+  }
   await schreibeInsSpiel(
     "data/backup-ok.txt",
     JSON.stringify({ ts: Date.now(), anlass, datei: state.lastVerifiedBackup.file }),
@@ -2044,6 +2077,18 @@ async function schreibeRueckkanal() {
 const SOFORT_VERFALL_MS = 6 * 3600000;
 const sofortGesehen = new Map();
 
+// MOMENTAUFNAHMEN, DIE SICH GEGENSEITIG ERSETZEN (22.09.2026). Diese drei
+// Meldungen beschreiben einen Zustand, keinen Vorfall: die juengste sagt
+// alles, die aelteren sind ueberholt. Bis heute standen 34 Kopien davon im
+// Sofort-Abschnitt. NUR diese Titel ersetzen einander (Skeptiker B2): eine
+// zweite "Schub verweigert" traegt eine eigene Dateiliste, die nicht
+// verloren gehen darf.
+const MOMENTAUFNAHMEN = new Set([
+  "Spiel-Tab nicht verbunden",
+  "Telemetrie veraltet",
+  "Bruecke ohne Sicherung - Spielstand liegt in Downloads",
+]);
+
 async function sofortZeile(titel, text, quelle = "bruecke") {
   const schluessel = quelle + "|" + titel;
   const jetztMs = Date.now();
@@ -2095,7 +2140,8 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
     await new Promise((fertig, schiefgelaufen) => {
       execFile(
         "node",
-        [path.join(ROOT, "tools", "liste.js"), "--eintragen", "sofort", "--datei", datei],
+        [path.join(ROOT, "tools", "liste.js"), "--eintragen", "sofort", "--datei", datei,
+          ...(MOMENTAUFNAHMEN.has(titel) ? ["--ersetzen"] : [])],
         { cwd: ROOT, encoding: "utf8" },
         (err) => (err ? schiefgelaufen(err) : fertig()),
       );

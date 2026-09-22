@@ -76,8 +76,9 @@ try {
   process.exit(2);
 }
 
-// Anlass aus dem Dateinamen ableiten, wenn er nicht uebergeben wurde - die
-// pre-jump-Regel (keine wartenden Augs) haengt daran.
+// Anlass aus dem Dateinamen ableiten, wenn er nicht uebergeben wurde. (Die
+// pre-jump-Regel "keine wartenden Augs" hing daran; sie ist seit dem
+// 22.09.2026 gestrichen, siehe sync/backup.js.)
 const anlass =
   anlassFlag || (/_((?:pre-)?[a-z]+)(?:-b64)?\.json(?:\.gz)?$/.exec(name) || [])[1] || null;
 

@@ -126,9 +126,19 @@ if (!lage || !lage.kampfExp || !Number.isFinite(lage.spielzeitMs)) {
   console.log("URTEIL: BLIND");
   process.exit(1);
 }
-if (lage.inBladeburner) {
-  console.log("Bereits in der Division - dieses Werkzeug ist hier fertig.");
+// IN DER DIVISION IST DAS WERKZEUG NUR FERTIG, WENN DIE KAMPFWERTE STEHEN
+// (22.09.2026, BAUSTELLEN Zeile 1851). Nach einem Augmentierungs-Einbau
+// bleibt die Mitgliedschaft erhalten, die Kampfwerte fallen auf 1 - und
+// blade.js weicht bbtrain.js, bis der Tiefstand wieder 100 erreicht. Genau
+// diese Phase rechnet dieses Werkzeug; am 22.09. stieg es darin aus
+// ("Bereits in der Division"), und data/tor.json blieb vom Vormittag stehen.
+if (lage.inBladeburner && Number.isFinite(lage.tiefstand) && lage.tiefstand >= ZIEL) {
+  console.log("In der Division, Kampfwerte >= " + ZIEL + " - dieses Werkzeug ist hier fertig.");
   process.exit(0);
+}
+if (lage.inBladeburner) {
+  console.log("In der Division, aber Tiefstand " + lage.tiefstand
+    + " < " + ZIEL + " - Wiederaufbau nach einem Einbau, gerechnet wird weiter.");
 }
 
 // Die Formelrate steht erst jetzt fest - sie braucht Stadt und

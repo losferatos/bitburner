@@ -273,10 +273,20 @@ console.log("-- Die Gegenprobe gegen die Tabelle --");
 console.log("");
 console.log("-- Der Abbruch, wenn die Division schon steht --");
 {
-  const r = lauf(lage({ inBladeburner: true }));
-  pruefe("in der Division: sauberer Abbruch mit Code 0",
-    r.aus.includes("Bereits in der Division") && r.code === 0,
+  const r = lauf(lage({ inBladeburner: true,
+    kampf: { str: 120, def: 110, dex: 105, agi: 101 } }));
+  pruefe("in der Division mit Kampfwerten >= 100: sauberer Abbruch mit Code 0",
+    r.aus.includes("dieses Werkzeug ist hier fertig") && r.code === 0,
     "exit " + r.code + ": " + r.aus.trim());
+}
+{
+  // SEIT 22.09.2026: in der Division, aber nach einem Einbau mit Kampfwerten
+  // unter 100 - das ist der Wiederaufbau, und den soll das Werkzeug rechnen
+  // (BAUSTELLEN Zeile 1851).
+  const r = lauf(lage({ inBladeburner: true }));
+  pruefe("in der Division mit Tiefstand < 100: es wird weitergerechnet",
+    r.aus.includes("gerechnet wird weiter") && /Tor in/.test(r.aus),
+    "exit " + r.code + ": " + r.aus.trim().slice(0, 200));
 }
 
 aufraeumen();

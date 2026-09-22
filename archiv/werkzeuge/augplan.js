@@ -1,3 +1,9 @@
+// ARCHIVIERT AM 22.09.2026 (BAUSTELLEN Zeile 1672). Das Werkzeug rechnete
+// rohe Kosten ohne die BitNode-Multiplikatoren (AugmentationRepCost,
+// AugmentationMoneyCost) und ohne den Warteschlangenfaktor 1,9^k, und es
+// bewertete Bladeburner-Augs mit 0,00. Kein Skript und kein Skill rief es
+// auf; die Spielskripte fragen Preise in der API ab (kampfaugs.js,
+// bn4rep.js). Liegen gelassen, zeigte es nur falsche Zahlen.
 /**
  * Was fehlt uns zu 30 Augmentierungen - und was kostet es?
  *

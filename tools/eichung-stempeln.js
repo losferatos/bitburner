@@ -73,7 +73,8 @@ for (const e of daten) {
     fehlt.push(e.file);
     continue;
   }
-  const jetzt = createHash("sha256").update(fs.readFileSync(datei)).digest("hex");
+  const inhalt = fs.readFileSync(datei);
+  const jetzt = createHash("sha256").update(inhalt).digest("hex");
   if (e.sha256 === jetzt) continue;          // gilt schon, nichts zu tun
 
   const r = rechne(e.file, { sf4: 1, wurzel: WURZEL });
@@ -81,6 +82,12 @@ for (const e of daten) {
     gestempelt.push(e.file);
     if (SCHREIB) {
       e.sha256 = jetzt;
+      // Groesse und Zeilen gehoeren zum Stempel (22.09.2026, BAUSTELLEN
+      // Zeile 615): bisher blieben die Zahlen vom Messtag stehen, und die
+      // Zeile beschrieb einen Inhalt, den der sha256 laengst nicht mehr
+      // meinte. Gleiche Zaehlweise wie eichung-messen.js.
+      if ("bytes" in e) e.bytes = inhalt.length;
+      if ("lines" in e) e.lines = inhalt.toString("utf8").split("\n").length;
       delete e.veraltet;
     }
   } else {

@@ -175,24 +175,18 @@ console.log("-- pruefeKennwerte: jeder Ablehnungsgrund MUSS rot werden --");
   pruefe("(d) falscher Lauf -> rot", !pruefeKennwerte(k, { lauf: 3 }).ok);
 }
 {
+  // SEIT 22.09.2026 UMGEKEHRT: wartende Augs machen pre-jump NICHT mehr rot.
+  // Ein Sprung leert auch die eingebauten Augs (prestigeSourceFile,
+  // PlayerObjectGeneralMethods.ts:174) - die Regel schuetzte nichts, verhinderte
+  // aber die Sicherung vor der Tuer (BAUSTELLEN Zeile 237).
   const k = lesenKennwerte(gz(baueSave({ queued: [{ name: "X" }, { name: "Y" }] })));
   pruefe(
-    "(e) wartende Augs bei pre-jump -> rot",
-    !pruefeKennwerte(k, { anlass: "pre-jump" }).ok,
+    "(e) wartende Augs bei pre-jump -> gruen (kein Sperrgrund mehr)",
+    pruefeKennwerte(k, { anlass: "pre-jump" }).ok,
   );
   pruefe(
     "(e) wartende Augs bei hourly -> gruen",
     pruefeKennwerte(k, { anlass: "hourly" }).ok,
-  );
-}
-{
-  // Der Live-Stand hat heute genau diesen Zustand: zwei wartende Augs.
-  // Ein pre-jump waere also JETZT rot - das ist gewollt und muss auffallen.
-  const k = lesenKennwerte(gz(baueSave({ queued: [{ name: "Augmented Targeting II" }, { name: "CashRoot Starter Kit" }] })));
-  const u = pruefeKennwerte(k, { anlass: "pre-jump" });
-  pruefe(
-    "Live-Zustand 04.09. (2 wartende Augs) wuerde pre-jump ablehnen",
-    !u.ok && /queuedAugmentations 2/.test(u.gruende.join(" ")),
   );
 }
 

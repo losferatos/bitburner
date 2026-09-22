@@ -278,6 +278,12 @@ function starteSpiel(rfaPort, saveBuf, opt = {}) {
         antwort([]);
         return;
       case "getFile":
+        // Vorgegebene Dateien (22.09.2026, Handschlag-Probe): was der Test in
+        // opt.lesbar ablegt, liefert das Spiel aus - sonst "not found".
+        if (opt.lesbar && opt.lesbar.has(m.params.filename)) {
+          antwort(opt.lesbar.get(m.params.filename));
+          return;
+        }
         fehlerAus("not found");
         return;
       case "getDefinitionFile":
@@ -391,6 +397,9 @@ const STUNDE = 3600000;
 const ZEIT = {
   normal: BASIS + 10 * STUNDE,
   normalWieder: BASIS + 20 * STUNDE,
+  handschlag: BASIS + 22 * STUNDE,     // Handschlag-Probe (22.09.2026)
+  handschlagOk: BASIS + 23 * STUNDE,
+  handschlagAlt: BASIS + 24 * STUNDE,
   eingriff: BASIS + 30 * STUNDE,
   rueckwaertsVor: BASIS + 40 * STUNDE,
   rueckwaertsAlt: BASIS + 35 * STUNDE,   // 5 h hinter dem eigenen Anker
@@ -654,6 +663,84 @@ console.log("-- der normale Weg: pruefen, sichern, DANN schieben --");
   spiel2.schliessen();
   b.proc.kill();
   await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der HANDSCHLAG: eine Antwort mit FREMDEM Anlass zaehlt nicht (22.09.2026) --");
+{
+  // BAUSTELLEN Zeile 41. Liegt eine pre-install-Antwort, die juenger ist als
+  // die jump-Anfrage, galt die Anfrage bisher als beantwortet - die Bruecke
+  // sicherte nicht, und ausgang.js sprang nach 90 s ohne pre-jump-Sicherung.
+  const rfa = await freierPort();
+  const dash = await freierPort();
+  const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+    "--dash-port", String(dash), "--no-watch", "--sofort-ms", "1500",
+    "--data-dir", frischerDatenordner()]);
+  merkeZumAufraeumen(b.proc);
+  await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+  const T = Date.now();
+  const lesbar = new Map([
+    ["data/backup-request.txt", JSON.stringify({ reason: "jump", target: "BN1 L2", ts: T })],
+    ["data/backup-ok.txt", JSON.stringify({ ts: T + 1000, anlass: "pre-install", datei: "x" })],
+  ]);
+  const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: ZEIT.handschlag }), { lesbar });
+  await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+  const angefragt = await warteAufZeile(b.zeilen, /Handschlag angefragt: jump -> pre-jump/i, 15000);
+  pruefe("die jump-Anfrage wird trotz juengerer pre-install-Antwort bearbeitet", angefragt,
+    b.zeilen.slice(-4).join(" | "));
+  const bis = Date.now() + 15000;
+  let ok = null;
+  while (Date.now() < bis && !ok) {
+    await schlaf(200);
+    const roh = spiel.dateien.get("home:data/backup-ok.txt");
+    if (roh) { try { ok = JSON.parse(roh); } catch { ok = null; } }
+  }
+  pruefe("und mit einer pre-jump-Antwort quittiert", !!ok && ok.anlass === "pre-jump",
+    ok ? JSON.stringify(ok) : "keine backup-ok.txt geschrieben");
+  spiel.schliessen();
+  b.proc.kill();
+  await b.exit;
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der HANDSCHLAG: passender Anlass gilt als beantwortet, alte Anfragen nicht (22.09.2026) --");
+{
+  // Die Gegenstuecke zur Probe oben (Skeptiker Paket C, B7): eine Antwort
+  // MIT passendem Anlass beendet den Handschlag - sonst saehe man hier nur,
+  // dass die Bruecke IMMER sichert. Und eine Anfrage, die aelter ist als das
+  // Wartefenster des Spiels, wird nicht mehr gesichert (B4/B5).
+  const fahreHandschlag = async (zeit, lesbar) => {
+    const rfa = await freierPort();
+    const dash = await freierPort();
+    const b = starteBruecke(["--instance", "MOCK", "--rfa-port", String(rfa),
+      "--dash-port", String(dash), "--no-watch", "--sofort-ms", "1500",
+      "--data-dir", frischerDatenordner()]);
+    merkeZumAufraeumen(b.proc);
+    await warteAufZeile(b.zeilen, /RFA|lauscht|Bruecke|Dashboard/i, 15000);
+    const spiel = starteSpiel(rfa, baueSave({ port: rfa, playtime: zeit }), { lesbar });
+    await warteAufZeile(b.zeilen, /Verifiziert in/i, 25000);
+    // Vier Takte abwarten - lang genug, dass ein Handschlag sicher faellig war.
+    await schlaf(6500);
+    const angefragt = b.zeilen.some((z) => /Handschlag angefragt/i.test(z));
+    spiel.schliessen();
+    b.proc.kill();
+    await b.exit;
+    return angefragt;
+  };
+  const T = Date.now();
+  const beantwortet = await fahreHandschlag(ZEIT.handschlagOk, new Map([
+    ["data/backup-request.txt", JSON.stringify({ reason: "jump", target: "BN1 L2", ts: T })],
+    ["data/backup-ok.txt", JSON.stringify({ ts: T + 1000, anlass: "pre-jump", datei: "x" })],
+  ]));
+  pruefe("eine Antwort mit PASSENDEM Anlass beendet den Handschlag", !beantwortet,
+    "die Bruecke sicherte trotzdem - dann saehe die Probe oben nur 'sichert immer'");
+  const alt = await fahreHandschlag(ZEIT.handschlagAlt, new Map([
+    ["data/backup-request.txt", JSON.stringify({ reason: "jump", target: "BN1 L2", ts: Date.now() - 10 * 60000 })],
+  ]));
+  pruefe("eine zehn Minuten alte Anfrage wird NICHT mehr gesichert", !alt,
+    "das Spiel wartet 90 s - danach saehe die Sicherung den Stand NACH dem Sprung");
 }
 
 // ---------------------------------------------------------------------------

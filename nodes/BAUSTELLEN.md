@@ -487,54 +487,13 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 336 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 310 Minuten nichts geschrieben (Inhaltsstempel 2026-09-22T00:39:41.588Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-21T08:13:05.097Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 603 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 579 Minuten nichts geschrieben (Inhaltsstempel 2026-09-20T18:32:26.715Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-20T04:06:59.353Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 497 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 453 Minuten nichts geschrieben (Inhaltsstempel 2026-09-19T17:32:56.962Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-19T06:47:32.820Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+*Aufgeraeumt am 22.09.2026: 34 automatische Momentaufnahmen (Bruecke ohne Sicherung / Telemetrie veraltet / Spiel-Tab nicht verbunden) entfernt - alle ueberholt. tools/liste.js ersetzt gleiche Ueberschriften seitdem, statt zu doppeln.*
 
 - **Hash-Verwendung pruefen: Coding Contracts (19.09.2026, Skeptiker).** 'Generate Coding Contract' kostet 25*(L+1) Hashes; ein Vertrag bringt ueber contracts.js Geld. Gegen Sell for Money (4 Hashes = 1 Mio) rechnen, sobald hashes.js eine Woche gelaufen ist und data/hashes.json Zahlen liefert.
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 357 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 344 Minuten nichts geschrieben (Inhaltsstempel 2026-09-19T01:03:54.399Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-18T13:49:17.633Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain.
+- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still). **Nachtrag 17.09.:** Verdacht Sprung reicht nicht - um 15:42 per Start-Process gestartet, letzte Logzeile 15:44 'Sicherung hourly gruen', um 16:30 kein Prozess mehr, stderr leer, Rechner lief durch, kein Sprung, kein Reset. Die Bruecke stirbt also auch im Normalbetrieb binnen Minuten. Erste Frage: beendet die Werkzeug-Shell von Claude Code ihre Kindprozesse beim Turn-Ende (Start-Process aus PowerShell-Tool)? Gegenprobe: Bruecke aus einem eigenen Terminal-Fenster starten. **Nachtrag 18.09.:** Shell-Verdacht widerlegt - die Bruecke vom 17.09. 16:31 lief 12 h, ueberlebte einen Install (18:24) und eine Trennung (20:04), verband 04:09 neu und war um 05:11 tot; letzte Zeilen 04:10:31 'Bruecke ohne Sicherung' + 'Sicherung hourly gruen'. Auffaellig: der Tod folgt jedes Mal kurz nach einer Sicherung direkt nach einem (Wieder-)Verbinden.
+- **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
+- **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
 
 ### Schub verweigert (1 nicht in master) - Fehlgriff?
 
@@ -543,74 +502,6 @@ Die Bruecke laeuft, aber seit 2026-09-18T13:49:17.633Z haengt kein Spiel am RFA-
 Betroffen: hashgym.js
 
 War das Absicht? Dann committen (dann steht der Pfad in master) oder `tools/hotswap.js` fahren, das legt die Freigabe selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, dann ist genau dafuer dieser Riegel gebaut.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 505 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 485 Minuten nichts geschrieben (Inhaltsstempel 2026-09-17T18:04:43.768Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-17T14:31:23.632Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 589 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 585 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 534 Minuten nichts geschrieben (Inhaltsstempel 2026-09-16T17:57:28.755Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-16T14:05:41.165Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 1029 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain.
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 578 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 682 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 446 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 395 Minuten nichts geschrieben (Inhaltsstempel 2026-09-13T20:44:55.912Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-12T04:45:55.640Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-- **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still). **Nachtrag 17.09.:** Verdacht Sprung reicht nicht - um 15:42 per Start-Process gestartet, letzte Logzeile 15:44 'Sicherung hourly gruen', um 16:30 kein Prozess mehr, stderr leer, Rechner lief durch, kein Sprung, kein Reset. Die Bruecke stirbt also auch im Normalbetrieb binnen Minuten. Erste Frage: beendet die Werkzeug-Shell von Claude Code ihre Kindprozesse beim Turn-Ende (Start-Process aus PowerShell-Tool)? Gegenprobe: Bruecke aus einem eigenen Terminal-Fenster starten. **Nachtrag 18.09.:** Shell-Verdacht widerlegt - die Bruecke vom 17.09. 16:31 lief 12 h, ueberlebte einen Install (18:24) und eine Trennung (20:04), verband 04:09 neu und war um 05:11 tot; letzte Zeilen 04:10:31 'Bruecke ohne Sicherung' + 'Sicherung hourly gruen'. Auffaellig: der Tod folgt jedes Mal kurz nach einer Sicherung direkt nach einem (Wieder-)Verbinden.
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 93 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-- **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
-- **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 556 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
 ### RAM-Stempel: bytes/lines werden nicht mitgeschrieben (11.09.2026, KLEIN)
 
@@ -655,26 +546,6 @@ Das ist die richtige Reihenfolge (lieber nichts sagen als etwas Falsches),
 aber es bleibt eine Luecke. BitNode 12 ist laut Route ein V1-Knoten
 (Hackingweg), das Urteil ANLAUF kann dort also gar nicht fallen - geprueft
 gehoert es trotzdem, bevor die Route dort ankommt.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 520 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 488 Minuten nichts geschrieben (Inhaltsstempel 2026-09-09T19:05:41.577Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-09-09T14:32:24.976Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 90 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 629 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
 ### Autosave steht
 
@@ -823,10 +694,6 @@ Vorschlag (nicht gebaut, braucht Skeptiker-Lauf):
 *Stand 04.09.2026, 20:05 - der Abschnitt ist bewusst leer.*
 
 Was hier stand, war zwei Sorten Rauschen:
-
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
-
-Der brueckenfreie Weg hat gegriffen (bridge.json fehlt oder ist unlesbar). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
 ### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
 

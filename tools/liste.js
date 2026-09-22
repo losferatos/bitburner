@@ -156,15 +156,44 @@ try {
     // Neue Punkte kommen OBEN in den Abschnitt: die Reihenfolge ist die
     // Rangfolge, und ein frischer Befund ist der dringendste, bis jemand
     // etwas anderes belegt. Bei 'sofort' ersetzt er ausserdem ein "keine".
+    //
+    // --ersetzen: GLEICHE UEBERSCHRIFT ERSETZT, STATT ZU DOPPELN (22.09.2026,
+    // BAUSTELLEN Zeile 481). Die Bruecke meldet "Bruecke ohne Sicherung",
+    // "Telemetrie veraltet" und "Spiel-Tab nicht verbunden" bei jedem
+    // geschlossenen Tab neu; im Sofort-Abschnitt standen 18 + 8 + 8 Kopien
+    // derselben Momentaufnahme. Mit --ersetzen fallen die aelteren weg.
+    //
+    // NUR MIT SCHALTER, UND NUR UEBERSCHRIFT PLUS ERSTER ABSATZ (Skeptiker
+    // B1/B2). Die erste Fassung loeschte alles bis zur naechsten `### `-Zeile
+    // - darunter standen aber von Hand geschriebene Aufzaehlungspunkte, und
+    // die waeren beim naechsten geschlossenen Tab still verschwunden. Eine
+    // automatische Meldung ist genau: Ueberschrift, Leerzeile, ein Absatz.
+    // Und ersetzen darf nur, wer es ausdruecklich verlangt - die Bruecke tut
+    // es nur fuer die drei Momentaufnahmen; alles andere bleibt Stueck fuer
+    // Stueck erhalten.
+    const titel = text.split("\n")[0].slice(4).trim();
+    const weg = new Set();
+    if (argv.includes("--ersetzen")) {
+      for (const it of items(parsed, s)) {
+        if (it.title.trim() !== titel) continue;
+        let i = it.line + 1;
+        while (i < s.end && parsed.lines[i].trim() === "") i++;       // Leerzeilen
+        while (i < s.end && parsed.lines[i].trim() !== ""
+               && !parsed.lines[i].startsWith("### ")) i++;           // ein Absatz
+        for (let k = it.line; k < i; k++) weg.add(k);
+      }
+    }
+    const rest = parsed.lines.map((l, i) => (weg.has(i) ? null : l));
     let ab = s.start + 1;
-    while (ab < s.end && (parsed.lines[ab].trim() === "" || parsed.lines[ab].trim() === "keine")) ab++;
+    while (ab < s.end && (rest[ab] === null || rest[ab].trim() === "" || rest[ab].trim() === "keine")) ab++;
     const lines = [
       ...parsed.lines.slice(0, s.start + 1),
       "",
       ...text.split("\n"),
       "",
-      ...parsed.lines.slice(ab),
+      ...rest.slice(ab).filter((l) => l !== null),
     ];
+    if (weg.size) console.log("Ersetzt: " + titel + " (vorher " + items(parsed, s).filter((it) => it.title.trim() === titel).length + "x)");
     writeChecked(LIST, parsed, lines);
     console.log("Eingetragen in '" + s.title + "': " + text.split("\n")[0].slice(4));
 

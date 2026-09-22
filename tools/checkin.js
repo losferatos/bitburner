@@ -402,7 +402,31 @@ async function main() {
       + " Bladeburner-Division traegt das Kampfwerttraining, nicht der Rang."
       + " `node tools/tor.js` rechnet diese Phase aus; danach steht die Zahl"
       + " hier wieder.");
-    const u = bericht.hilfe ? "HILFE" : bericht.ausgangFehlt ? "AUSGANG FEHLT" : "ANLAUF";
+    // STILLSTAND AUCH IM ANLAUF ERKENNEN (22.09.2026, BAUSTELLEN Zeile 986).
+    // Bisher gab dieser Zweig immer ANLAUF aus, egal ob sich seit dem letzten
+    // Besuch etwas bewegt hatte. Verglichen wird jetzt der Traeger, an dem
+    // auch der Waechter misst (kpi.json) - aber nur gegen einen Punkt mit
+    // demselben Traegernamen und mindestens einer Spielstunde Abstand; ein
+    // kuerzeres Fenster sagt nichts.
+    let anlaufSteht = false;
+    try {
+      const kpiA = await holeJson("data/kpi.json");
+      const tr = kpiA && kpiA.traeger;
+      if (tr && Number.isFinite(tr.wert)) {
+        bericht.traegerName = tr.name;
+        bericht.traegerWert = tr.wert;
+        const vorher = [...punkte].reverse().find((q) => gleicherLauf(q)
+          && q.traegerName === tr.name && Number.isFinite(q.traegerWert)
+          && Number.isFinite(q.spielzeit));
+        if (vorher && Number.isFinite(spielzeit) && spielzeit - vorher.spielzeit >= 3600000) {
+          anlaufSteht = !(tr.wert > vorher.traegerWert);
+          sag("Traeger " + tr.name + ": " + zahl(vorher.traegerWert) + " -> " + zahl(tr.wert)
+            + " in " + ((spielzeit - vorher.spielzeit) / 3600000).toFixed(1) + " h Spielzeit"
+            + (anlaufSteht ? " - STEHT." : "."));
+        }
+      }
+    } catch { /* ohne kpi.json kein Vergleich */ }
+    const u = bericht.hilfe ? "HILFE" : bericht.ausgangFehlt ? "AUSGANG FEHLT" : anlaufSteht ? "STEHT" : "ANLAUF";
     sag("URTEIL: " + u);
     return ausgeben(zeilen, { ...bericht, urteil: u });
   }
@@ -840,6 +864,7 @@ async function main() {
         // statt gar nichts zu sagen.
         rate: b.rate ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
         etaQuelle: b.etaQuelle ?? null,
+        traegerName: b.traegerName ?? null, traegerWert: b.traegerWert ?? null,
       });
       // Nur die letzten 50 behalten - laenger zurueck braucht niemand.
       try {

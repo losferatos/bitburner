@@ -234,7 +234,9 @@ schreiben und hotswap.js auf dieselbe Lesart bringen - nicht ein zweiter
 Vertrag fuer dieselbe Datei. Das ist die Konstellation, aus der der Befund
 ueberhaupt entstanden ist.
 
-### pre-jump-Sicherung scheitert, solange Augmentierungen warten (22.09.2026)
+### ERLEDIGT 22.09.2026: pre-jump-Sicherung scheitert, solange Augmentierungen warten (22.09.2026)
+
+*Regel in sync/backup.js gestrichen (ein Sprung leert auch die eingebauten Augs); Commit 724da41.*
 
 sync/backup.js:261-266 macht die Pruefung bei anlass "pre-jump" und
 queuedAugs > 0 rot; sync/bridge.js:1897 steigt dann ohne backup-ok.txt aus.
@@ -472,13 +474,17 @@ traegt rang; der steht, und bbtrain wartet ebenfalls (graftLaeuft). Nach
 90 min beendet 4.5 blade.js - mehrfach je Graft. Bestand schon vor dem
 22.09.; derselbe Fehlertyp wie der behobene.
 
-### /bb-Skill: Brueckenbefehl veraltet (22.09.2026)
+### ERLEDIGT 22.09.2026: /bb-Skill: Brueckenbefehl veraltet (22.09.2026)
+
+*~/.claude/skills/bb/SKILL.md nennt jetzt --instance LIVE.*
 
 ~/.claude/skills/bb/SKILL.md nennt `node sync/bridge.js` - die Bruecke
 bricht ohne `--instance LIVE` ab. Skilltext anpassen (Regelaenderung =
 eigener Auftrag, zusammen mit der Arbeitsauftrag-Regel vom 22.09.).
 
-### Sofort-Abschnitt voller Doppelmeldungen (22.09.2026)
+### ERLEDIGT 22.09.2026: Sofort-Abschnitt voller Doppelmeldungen (22.09.2026)
+
+*34 Momentaufnahmen entfernt; tools/liste.js --ersetzen, die Bruecke nutzt es nur fuer die drei Momentaufnahmen; Commit 724da41.*
 
 Unter ## Sofort stehen dieselben drei automatischen Meldungen (Bruecke ohne
 Sicherung, Telemetrie veraltet, Tab nicht verbunden) viele Male - je eine
@@ -495,7 +501,9 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 - **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
 - **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
 
-### Schub verweigert (1 nicht in master) - Fehlgriff?
+### UEBERHOLT 22.09.2026: Schub verweigert (1 nicht in master) - Fehlgriff?
+
+*src/hashgym.js ist mit 44fe9b6 eingecheckt.*
 
 1 von 1 geaenderten Dateien unter src/ stehen weder im Git-Index von master noch in hotswap-freigabe.txt. Es wurde NICHTS ins Spiel geschoben - entweder alle oder keine.
 
@@ -503,7 +511,9 @@ Betroffen: hashgym.js
 
 War das Absicht? Dann committen (dann steht der Pfad in master) oder `tools/hotswap.js` fahren, das legt die Freigabe selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, dann ist genau dafuer dieser Riegel gebaut.
 
-### RAM-Stempel: bytes/lines werden nicht mitgeschrieben (11.09.2026, KLEIN)
+### ERLEDIGT 22.09.2026: RAM-Stempel: bytes/lines werden nicht mitgeschrieben (11.09.2026, KLEIN)
+
+*tools/eichung-stempeln.js zieht bytes/lines mit; Commit 724da41.*
 
 `tools/eichung-stempeln.js` aktualisiert nur `sha256`; `bytes` und `lines`
 in `doku/ram-messung-2026-09-04.json` bleiben auf dem Stand der
@@ -547,11 +557,15 @@ aber es bleibt eine Luecke. BitNode 12 ist laut Route ein V1-Knoten
 (Hackingweg), das Urteil ANLAUF kann dort also gar nicht fallen - geprueft
 gehoert es trotzdem, bevor die Route dort ankommt.
 
-### Autosave steht
+### UEBERHOLT 22.09.2026: Autosave steht
+
+*Momentaufnahme vom 07.09.; Sicherungen laufen stuendlich, autosaveInterval 60.*
 
 lastSave im Spielstand war bei der Messung um 2026-09-07T14:05:01.030Z bereits 589 Minuten alt (Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder fehlgeschlagenes IndexedDB-Schreiben.
 
-### VOLLSTAENDIGER STILLSTAND seit dem Aug-Reset - der Bot laeuft NICHT von selbst wieder an (07.09.2026, 16:06)
+### UEBERHOLT 22.09.2026: VOLLSTAENDIGER STILLSTAND seit dem Aug-Reset - der Bot laeuft NICHT von selbst wieder an (07.09.2026, 16:06)
+
+*Mit SF4.3 ist der Singularity-Faktor 1; bn4life.js 24 GB statt 293. Der Einbau um 16:21 lief ohne Stillstand an.*
 
 Nachtrag zum Eintrag von 05:40. Die dortige Einschaetzung "loest sich von
 selbst, sobald der erste Mietrechner steht" ist WIDERLEGT. Nach 10,5 Stunden
@@ -695,7 +709,9 @@ Vorschlag (nicht gebaut, braucht Skeptiker-Lauf):
 
 Was hier stand, war zwei Sorten Rauschen:
 
-### bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
+### ERLEDIGT 22.09.2026: bn4rep.js laeuft in BN10 L2 seit 26 h nicht - kein Einbau, keine Augmentierung, und der Ausbau wird es nie loesen (02.09., 18:02)
+
+*werkzeugWartetGb + Ausbau ohne Amortisationsdeckel (bn4net.js, 1302cd6); belegt durch pre-install-Sicherungen aus BN10 L2.*
 
 **Befund.** `lastAugReset` = `lastNodeReset` = 01.09. 15:59; 0 Augmentierungen
 installiert, 0 gekauft. `bn4rep.js` braucht 846,8 GB und meldet seit Stunden
@@ -747,7 +763,9 @@ Damit erledigt: "Der Bot erkennt den Black-Ops-Ausgang nicht" (31.08.),
 `data/ausgang.json`), Skill `/bb` Abschnitt 3 (Handsprung) gestrichen.
 
 
-### AUDIT VOLLE AUTONOMIE liegt vor - Reihenfolge der Umbauten steht dort (02.09., 17:20)
+### ERLEDIGT 22.09.2026: AUDIT VOLLE AUTONOMIE liegt vor - Reihenfolge der Umbauten steht dort (02.09., 17:20)
+
+*Umbauten I.1-I.7 gebaut (9160c75, 1302cd6); Spruenge laufen autonom bis BN9 L3.*
 
 `nodes/AUDIT-AUTONOMIE-2026-09-02.md` (Synthese) und
 `nodes/audit-2026-09-02/` (fuenf Skeptiker-Berichte, 1.212 Zeilen).
@@ -766,7 +784,9 @@ eingeordnet (Kaltstart = I.3, Sleeve-Gym = I.2, checkin/tor = I.8, Black-Ops-
 Ausgang = I.1).
 
 
-### sleeve.js schickt Sleeves ohne Geldpruefung ins Gym - Konto in 5 min auf -18,5 Mio (02.09., 06:00)
+### ERLEDIGT 22.09.2026: sleeve.js schickt Sleeves ohne Geldpruefung ins Gym - Konto in 5 min auf -18,5 Mio (02.09., 06:00)
+
+*Geldboden in sleeve.js (gymGeldReicht), 1302cd6.*
 
 **Befund.** Nach dem Kickstart (unten) startete `bn4net` um 05:55:55 `sleeve.js`
 auf `werk-0`. Es setzte beide Sleeves auf Powerhouse-Gym-Training
@@ -789,7 +809,9 @@ Gym. Bei 1,5 Mrd Konto ist das tragbar. **Offen bleibt:** vor
 `setToGymWorkout` dieselbe Schwelle wie `bbtrain.js:236` (`GYM_MIN_GELD`),
 sonst passiert das bei jedem Kaltstart wieder. Skeptiker-Lauf noetig.
 
-### Kampftraining lief tagsueber mit 1/19 der Gym-Rate - Ursache unbekannt (02.09., 16:52)
+### UEBERHOLT 22.09.2026: Kampftraining lief tagsueber mit 1/19 der Gym-Rate - Ursache unbekannt (02.09., 16:52)
+
+*Momentaufnahme aus BN10 L2, Ursache nicht mehr rekonstruierbar; der vermutete Figurenstreit ist seit lib/figur.js geregelt.*
 
 **Gemessen.** Reines Gym-Fenster 16:41:26 bis 16:50:55 (`bblage.js`, Spieler
 `CLASS str/def @ Powerhouse Gym`): Kampferfahrung str/def/dex zusammen
@@ -809,7 +831,9 @@ Levelmultiplikator 0,4 x 1,262). Rest bei 106.000 exp/h: **rund 6,2 h
 Spielzeit** bis zum Beitritt. Liegt der naechste Messwert deutlich darunter,
 zuerst `data/bn4life-log.txt` und `data/bblage.json` (`arbeit`) ansehen.
 
-### Kaltstart: Kickstart am 02.09., 05:55 gemacht
+### UEBERHOLT 22.09.2026: Kaltstart: Kickstart am 02.09., 05:55 gemacht
+
+*Momentaufnahme aus BN10 L2.*
 
 `tools/einmal/kick.js` hat `werk-0` (32 GB, 8,8 Mio) ohne den 1,25-Puffer
 gekauft; um 05:56 lief `darkweb.js`, um 16:39 stand das Netz bei 85/85, home
@@ -821,7 +845,9 @@ Der kostet in BN10 412 Mio, die Leiter verlangt das Vierfache (1,65 Mrd); bei
 rund 135 Mio/h Zuwachs ist das um 18 Uhr erreicht.
 
 
-### Kaltstart in BN10: der erste Mietrechner kostet das Fuenffache (02.09., 05:27)
+### ERLEDIGT 22.09.2026: Kaltstart in BN10: der erste Mietrechner kostet das Fuenffache (02.09., 05:27)
+
+*Kaltstart-Faktor 1,0, Preise aus pl.preise (bn4net.js, 1302cd6).*
 
 **Befund.** 13,5 Stunden nach dem Knotenwechsel steht der Bot unveraendert bei
 **8 von 70 gerooteten Rechnern, home 32 GB, Kampfwerte 1/1/1/1, keine
@@ -850,7 +876,9 @@ muesste, und jede Stunde ohne Werkbank ist eine Stunde ohne Training. Faktor
 17,65 GB, nicht fuer `darkweb.js` 27,65) - das entscheidet ein Skeptiker-Lauf,
 nicht dieser Eintrag. Mindestens gehoert der Kommentar auf BN10-Zahlen.
 
-### checkin.js: URTEIL ANLAUF erkennt keinen Stillstand (02.09., 05:27)
+### ERLEDIGT 22.09.2026: checkin.js: URTEIL ANLAUF erkennt keinen Stillstand (02.09., 05:27)
+
+*Im ANLAUF-Zweig wird jetzt der Traeger aus kpi.json gegen den letzten Besuch mit gleichem Traegernamen gehalten (ab 1 h Spielzeit Abstand); steht er, heisst das Urteil STEHT.*
 
 Der ANLAUF-Zweig meldet nur "Knoten frisch, Division noch nicht offen" und
 prueft nichts gegen den letzten Besuch. 13,5 Stunden bei 8/70 gerooteten
@@ -860,7 +888,9 @@ Kampf-Tiefstand gegen den vorigen Punkt halten; bewegt sich ueber eine
 Stunde Spielzeit keiner davon, ist es `STEHT`.
 
 
-### KURS.md gilt noch fuer BN10 Lauf 1 - neu herleiten (01.09., 16:05)
+### UEBERHOLT 22.09.2026: KURS.md gilt noch fuer BN10 Lauf 1 - neu herleiten (01.09., 16:05)
+
+*Den Kurs-Loop gibt es seit 31.08. nicht mehr; kein Code liest KURS.md.*
 
 Der Knotenwechsel ist um **15:59 Uhr** gelaufen: alle 21 Black Ops gefallen,
 `exit.js` hat `destroyW0r1dD43m0n(10, "boot.js")` gerufen, der Bot ist in
@@ -873,7 +903,9 @@ nicht: Lauf 2 hat einen dauerhaften Sleeve mehr
 Lauf 1 hat real **94,9 h Kalenderzeit** gebraucht (28.08. 17:05 bis 01.09.
 15:59), davon aber nur ein Teil gespielt.
 
-### Der Spielanteil wird systematisch zu hoch geschaetzt (31.08., 18:10)
+### UNKLAR 22.09.2026: Der Spielanteil wird systematisch zu hoch geschaetzt (31.08., 18:10)
+
+*Praemisse traegt nicht: das Spiel schreibt Offline-Zeit auf totalPlaytime, der Anteil liegt fast immer bei ~100 %. Offen ist nur, ob Bladeburner die Offline-Bonuszeit wirklich in Rang umsetzt - das waere zu messen.*
 
 **Befund.** `tools/checkin.js` rechnet die Kalender-ETA als
 `etaSpielzeit / gespieltAnteil`, und den Anteil misst es ueber das Fenster
@@ -891,7 +923,9 @@ Erfahrungswert ("ich spiele rund 5 h am Tag") in einer kleinen Datei.
 in ein Kalenderdatum ist zu optimistisch. Bei 5 Spielstunden am Tag waeren es
 rund sechs Tage statt eineinhalb.
 
-### Der Bot erkennt den Black-Ops-Ausgang nicht - der Knoten endet im Stillstand (31.08., 17:10)
+### ERLEDIGT 22.09.2026: Der Bot erkennt den Black-Ops-Ausgang nicht - der Knoten endet im Stillstand (31.08., 17:10)
+
+*ausgang.js prueft getNextBlackOp() === null; belegt durch die Selbstspruenge seit BN10.*
 
 **Befund.** `src/bn4rep.js:871` setzt `ausgangSteht = eingebauteAugs.includes(EXIT_KEY)`
 mit `EXIT_KEY = "The Red Pill"` (`:88`). Der Aufruf von `exit.js` haengt in
@@ -928,7 +962,9 @@ niemand. Der Selbstsprung-Riegel braucht eine Ausnahme fuer den Fall
 **Nicht selbst geaendert:** Aenderung an unbeaufsichtigt laufendem Code, gehoert
 vor dem Einbau durch einen Skeptiker-Lauf.
 
-### Vier Restbefunde aus dem ersten Skeptiker-Lauf (31.08., 01:40)
+### ERLEDIGT 22.09.2026: Vier Restbefunde aus dem ersten Skeptiker-Lauf (31.08., 01:40)
+
+*Punkte 1-5 umgesetzt; Rest ist ein Kommentar in bbtrain.js:144 ohne Wirkung.*
 
 Fuenf Commits am unbeaufsichtigten Code geprueft (`a8cbe68`, `0cc22a2`,
 `543cb6f`, `064acef`, `1062631`). Der Fehler der Klasse a - die Firmensperre
@@ -1014,7 +1050,9 @@ kein BN10-Aufschlag beim Graften), die Markersemantik gegen
 (keiner haelt sich selbst), und dass `blade.js:3171` `gymGreifen()` vor dem
 Riegel ruft, aber bei GRAFTING `null` liefert, bevor es reist.
 
-### Graft-Treiber weiterlaufen lassen, ein Stueck je Lauf (ab 31.08., 01:20)
+### UEBERHOLT 22.09.2026: Graft-Treiber weiterlaufen lassen, ein Stueck je Lauf (ab 31.08., 01:20)
+
+*Ersetzt durch src/graftauto.js (fcd51bb).*
 
 SPTN-97 laeuft seit 00:26 und ist gegen 02:05 durch. Danach in JEDEM
 Vorankommens-Lauf:
@@ -1060,7 +1098,9 @@ sind aus Graftzeit und Aktionszeit gerechnet, nicht aus Kampfwerten.
 +388 in 209 min = **111/h**). Bionic Legs laeuft seit 02:11, $1,13 Mrd,
 33,2 min.
 
-### Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
+### UEBERHOLT 22.09.2026: Der Weg steht: Assassination, 21 Stunden - und das Graft-Paket ist bereits maximal (30.08., 18:45)
+
+*Plan fuer BN6, Knoten verlassen.*
 
 **Verfeinert und ersetzt den Eintrag von 18:20.** Zwei Korrekturen sind
 eingeflossen: das maximale Graft-Paket beim heutigen Geldstand und die
@@ -1204,7 +1244,9 @@ Dringlichkeit: mittel. Kein akuter Schaden - der letzte Einbau war zufaellig
           richtig -, aber der naechste kann jederzeit kommen und kostet dann
           bis zu sieben Stunden ohne Gegenwert.
 
-### CHANCE_SKILLS-Aenderung zurueckgenommen: die Tabelle wird zur Laufzeit ueberschrieben (30.08., 14:35)
+### UEBERHOLT 22.09.2026: CHANCE_SKILLS-Aenderung zurueckgenommen: die Tabelle wird zur Laufzeit ueberschrieben (30.08., 14:35)
+
+*Protokoll einer verworfenen Aenderung; der Folgefehler hat einen eigenen Eintrag (blackOpArbeit).*
 
 **Dritte Aenderung heute, die ein Skeptiker gestoppt hat - und diesmal war
 der Fehler grundlegender als bei den beiden davor.**
@@ -1536,7 +1578,9 @@ Erfolgspruefung, alle BN8-Startbedingungen - und die beiden Punkte von
 Dringlichkeit: Punkt 1 und 9 hoch (beide koennen falsche Entscheidungen
 ausloesen), der Rest mittel. **Ein Punkt je Lauf.**
 
-### `tools/augplan.js` rechnet die BitNode-Multiplikatoren nicht - und die Aug-Strategie steht (30.08., 12:58)
+### ERLEDIGT 22.09.2026: `tools/augplan.js` rechnet die BitNode-Multiplikatoren nicht - und die Aug-Strategie steht (30.08., 12:58)
+
+*Werkzeug ins Archiv (archiv/werkzeuge/augplan.js), kein Aufrufer; Commit 724da41.*
 
 Aus einem vollstaendigen Audit der Bladeburner-Augmentierungen gegen den
 Quellcode, geeicht am laufenden Spielstand (das Modell des Auditors trifft
@@ -1715,7 +1759,9 @@ Ausdauerkosten je Aktion sind stat-unabhaengig.
 Dringlichkeit: hoch fuer Punkt 1 bis 4, mittel fuer den Rest. **Ein Punkt je
 Lauf**, mit Nachmessung - nicht alle auf einmal.
 
-### `tools/tor.js` steigt in der Division aus, obwohl es dort gebraucht wird (30.08., 12:52)
+### ERLEDIGT 22.09.2026: `tools/tor.js` steigt in der Division aus, obwohl es dort gebraucht wird (30.08., 12:52)
+
+*Aussteigen nur noch bei Tiefstand >= 100; Commit 724da41.*
 
 Gemessen: `node tools/tor.js` antwortet seit dem Divisionsbeitritt nur noch
           *"Bereits in der Division - dieses Werkzeug ist hier fertig."*
@@ -1804,7 +1850,9 @@ Dringlichkeit: mittel-hoch. Kein Schaden am Bot, aber das Werkzeug erzeugt
           falsche Sicherheit an genau der Stelle, wo die Loops sie am
           wenigsten gebrauchen koennen.
 
-### Zwischen Chaos 25 und 50 gibt es kein Zurueck - der Bot sitzt bei 41,37 (30.08., 12:40)
+### ERLEDIGT 22.09.2026: Zwischen Chaos 25 und 50 gibt es kein Zurueck - der Bot sitzt bei 41,37 (30.08., 12:40)
+
+*INCITE_CHAOS_MAX = 8, Incite nur bei leeren Vertraegen, Nachschub ueber Infiltrate (ba7f31f).*
 
 Gemessen (Spielstand direkt, 12:35): Der Bladeburner operiert in **Aevum**
 (der Spieler-Avatar steht in Sector-12 fuers Gym - das ist korrekt und
@@ -1896,6 +1944,8 @@ Wird akut, sobald beides zusammenkommt.
 
 ### Sleeve-Shock steht nach dem Einbau auf 99,9 - Recovery lohnt trotzdem nicht (30.08., 12:15)
 
+*Nachtrag 22.09.2026 (Erics Frage: sollen die Sleeves Shock abbauen, damit ihr Training beim Spieler ankommt?). Beim Spieler kommt Sleeve-Erfahrung x (1 - Shock/100) x Sync/100 an (Work.ts:17-25). Live: Shock 97-100, Sync 1 %, Memory 1 - also praktisch nichts. Voll ausbauen kostet je Sleeve ~18 h Recovery + ~28 h Synchronize (Sleeve.ts:269, SleeveSynchroWork.ts:16), nacheinander, und JEDER Einbau setzt Shock auf 100 und Sync auf Memory zurueck (Sleeve.ts:251-253). In BN9 mit Einbau etwa taeglich lohnt es nicht; erst mit Memory-Upgrades (Covenant) oder seltenen Einbauten. Die Einbau-Kadenz selbst ist der groessere Hebel (Sperre im Kampfknoten, 22.09.).*
+
 Gemessen: `data/sleevediag.json` um 09:56: **shock 99,9**. Gestern vor dem
           Einbau waren es 82,2.
 
@@ -1958,7 +2008,9 @@ Schwelle auf die Erfolgschance faellig, nicht auf den Vorrat.
 Dringlichkeit: niedrig fuer den Shock selbst (er baut sich ab), mittel fuer
           die Todesrate - die ist ungemessen und koennte den Abbau umkehren.
 
-### Sleeve stand still, weil die Vorratsschwelle keinen Abschluss ueberlebt (30.08., 10:00)
+### ERLEDIGT 22.09.2026: Sleeve stand still, weil die Vorratsschwelle keinen Abschluss ueberlebt (30.08., 10:00)
+
+*sleeve.js Vorrat < 2 + Infiltrate-Rueckfall (21be785); live belegt.*
 
 Eric hat es zweimal im Spiel gesehen (09:53 und 09:56) - beide Male meldete
 `data/sleeve.json` brav `gesetzt: true, contract:Retirement`, waehrend
@@ -2017,7 +2069,9 @@ alle drei Arten unter 2 fallen. Beim naechsten Lauf in `data/sleeve.json`
 nachsehen, ob `aufgabe: "infiltrate"` je auftaucht, und ob der Vorrat danach
 wieder steigt.
 
-### Bladeburner-Augmentierungen sind ungenutzt und werden mit 0,00 bewertet (30.08., 09:40)
+### ERLEDIGT 22.09.2026: Bladeburner-Augmentierungen sind ungenutzt und werden mit 0,00 bewertet (30.08., 09:40)
+
+*bn4rep.js rechnet in Kampfknoten KAMPF_GEWICHT * combatNutzen inkl. bladeburner_success_chance (08d07be).*
 
 Gemessen: Nach dem Einbau von 09:2x stehen **alle vier Bladeburner-
           Multiplikatoren auf 1,000** (`node tools/save.js`), obwohl 17
@@ -2089,7 +2143,9 @@ weg, wenn es 0 ist (im Spielstand hat CyberSec das Feld, Bladeburners nicht).
 `Math.round(d.playerReputation || 0)` behebt es - **verifiziert 09:36:
 "Bladeburners 0 rep, 2.1 favor"**.
 
-### Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
+### ERLEDIGT 22.09.2026: Wartet bis SF9: Hash-Upgrades sind eine ungenutzte Waehrung fuer Kampfknoten
+
+*src/hashes.js tauscht Hashes gegen Rang und Improve Gym Training (8371519, 1302cd6); nicht gebaut: Tausch gegen Faehigkeitspunkte.*
 
 Gemessen: Spielstand 29.08. um 00:58 - `sourceFiles {1,4,5,6}`, kein SF9,
           `hashManager` mit capacity 0 und allen Upgrades auf 0. In diesem
@@ -2130,7 +2186,9 @@ dem Wiederaufbau, sobald `blade.js` wieder traegt. Bis dahin bleibt der
 Rueckfall ungetestet. Naechste Gelegenheit ist der Moment, in dem der
 Kampfwert-Tiefstand 100 erreicht.
 
-### Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
+### ERLEDIGT 22.09.2026: Wartet bis BitNode 7: Diplomacy frisst 28,7 Prozent der Zeit fuer einen Schaden, den es nicht gibt (13:33)
+
+*Chaos-Regel mit Fahrbarkeitstest im Code; gemessen BN9 16.-22.09.: Diplomacy 2 von 3529 Minuten.*
 
 Gemessen: `data/aktionen.txt`, alle Abschnitte ab 13:05 (14,7 protokollierte
           Minuten):

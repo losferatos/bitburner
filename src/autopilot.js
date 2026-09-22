@@ -665,6 +665,42 @@ export async function main(ns) {
     // --- 2. Lage aufnehmen -------------------------------------------------
     const servers = [];
     for (const host of hosts) {
+      // HACKNET-SERVER UEBERSPRINGEN (22.09.2026).
+      //
+      // Sie haengen wie jeder andere Rechner an home und kommen aus
+      // ns.scan mit heraus - aber 24 ns-Funktionen WERFEN auf ihnen, weil
+      // sie keine Server im Sinne von Server.ts sind (getNormalServer,
+      // NetscriptHelpers.tsx:575-589). getServerMaxMoney zwei Zeilen
+      // weiter unten ist der erste solche Aufruf in dieser Schleife;
+      // hasRootAccess und getServerMaxRam davor geben still zurueck.
+      //
+      // Am 22.09.2026 starb der Verwalter genau hier, unmittelbar nach dem
+      // Sprung nach BN9 L3:
+      //     RUNTIME ERROR
+      //     getServerMaxMoney: Cannot be executed on hacknet-server-0.
+      //     Stack: autopilot.js:L670@main
+      // Gerettet hat nur, dass bn4net.js schon stand. Im echten Kaltstart
+      // steht es nicht - und dann faellt das Gewerk aus, das das Geld fuer
+      // die Hacknet-Server verdient, die es gerade umgebracht haben.
+      //
+      // DER FILTER SITZT HIER UND NICHT IN scanAll (Skeptiker, 22.09.):
+      // `hosts` wird auch von oberflaecheLaeuft() (:439) benutzt, und das
+      // MUSS Hacknet-Server sehen. Oberflaechenskripte startet naemlich
+      // bn4life.js:321-326 nach meistem freiem Speicher, und dessen
+      // netzListe (bn4life.js:477-488) filtert nicht. Hacknet-Server haben
+      // adminRights ab Konstruktion (PlayerObjectServerMethods.ts:50) und
+      // sind hochgeruestet gross genug, um diesen Vergleich zu gewinnen -
+      // am 22.09. lagen sie bei 256 GB. Waeren sie aus `hosts` gefiltert,
+      // uebersaehe der Autopilot ein dort laufendes work.js oder buyaugs.js
+      // und vergaebe einen zweiten Oberflaechenauftrag: genau der
+      // Seitenklau, gegen den der Block bei :429-437 gebaut wurde.
+      //
+      // Als Hackziel scheiden sie mangels Geld ohnehin aus, als
+      // Arbeiter-Wirt sind sie nicht vorgesehen (bn4net.js:817-823) - und
+      // belegtes RAM kostet dort direkt Hashes, weil die Rate linear an
+      // ramRatio = 1 - ramUsed/maxRam haengt (HacknetServers.ts:15).
+      // Sie aus `servers` herauszuhalten ist also beides: noetig und richtig.
+      if (host.startsWith("hacknet-server-")) continue;
       const root = ns.hasRootAccess(host);
       const ram = ns.getServerMaxRam(host);
       const moneyMax = ns.getServerMaxMoney(host);

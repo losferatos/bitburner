@@ -38,6 +38,54 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
+### bn4life startet kein Skript mit Bibliotheken auf einem Fremdwirt (22.09.2026)
+
+DAS war der Grund, warum autopilot.js nach dem Sprung stundenlang nicht
+startete - nicht Speichermangel.
+
+bn4life.js:327 kopiert bei einem Auftrag aus data/task.txt nur die eine
+Datei:
+    if (wirt !== "home") ns.scp(teile[0], wirt, "home");
+    const pid = ns.exec(teile[0], wirt, 1, ...teile.slice(1));
+Die Bibliotheken des Skripts gehen NICHT mit. autopilot.js importiert
+lib/calc und lib/batch; auf fulcrumtech lag nur lib/hackaugs.js.
+
+Ein Skript mit unaufloesbarem Import ist fuer Bitburner ein ungueltiges
+Skript - der RAM laesst sich nicht berechnen, und ns.exec gibt still 0
+zurueck. Messbar ueber die Bruecke:
+    calculateRam autopilot.js auf fulcrumtech
+      vorher : "Cannot calculate RAM usage of an invalid script"
+      nachher: 34.2
+Nach dem Nachschieben von lib/calc.js und lib/batch.js startete es sofort.
+
+Das betrifft JEDEN Auftrag ueber task.txt, nicht nur autopilot.js - also den
+einzigen Fernkanal ins Spiel. bn4net.js macht es richtig: es fuehrt
+BIBLIOTHEKEN und zieht needsLibs aus registry.json (bn4net.js:3877).
+bn4life.js kennt beides nicht.
+
+Fix: denselben Weg wie bn4net gehen, also needsLibs aus der Registry lesen
+und mitkopieren. Fuer Skripte ausserhalb der Registry (autopilot.js steht
+nicht drin) braucht es einen Rueckfall - im Zweifel die Importzeilen lesen.
+
+### bn4life meldet beim Fehlschlag home statt des Wirts (22.09.2026, verschaerft)
+
+Frueher hier als "irrefuehrend" notiert - es ist schlimmer. bn4life.js:335-338
+setzt in den Fehlertext fest home ein:
+    ns.getServerMaxRam("home") - ns.getServerUsedRam("home")
+waehrend ns.exec auf `wirt` lief, dem Rechner mit dem meisten freien
+Speicher. Die Meldung
+    "FEHLSCHLAG: autopilot.js liess sich nicht starten - home hat 12.95 GB
+     frei, das Skript braucht 34.20 GB."
+nennt also einen Rechner, auf dem gar nicht gestartet wurde, und eine
+Speicherzahl, die mit dem Fehlschlag nichts zu tun hat. Der echte Wirt hatte
+212 GB frei; der Grund war ein fehlender Import.
+
+Am 22.09. hat diese Zeile die Fehlersuche zweimal in die falsche Richtung
+geschickt und die Ursache um Stunden verzoegert. Der Text muss `wirt` und
+`meistFrei` nennen - beide stehen drei Zeilen darueber bereits berechnet -
+und bei exec == 0 zusaetzlich pruefen, ob das Skript auf dem Ziel ueberhaupt
+gueltig ist (ns.getScriptRam(datei, wirt) gibt dort 0 zurueck).
+
 ### Hacknet-Luecke: drei weitere Fundstellen offen (22.09.2026)
 
 autopilot.js ist gefixt (Commit vom 22.09.). Dieselbe Klasse steht noch an
@@ -89,18 +137,16 @@ home-Problem aus, tatsaechlich war das ganze Netz mit 2442 Arbeiterfaeden
 belegt. Der Text sollte `wirt` und `meistFrei` nennen, die beide direkt
 darueber schon berechnet sind.
 
-### autopilot.js: Fix eingespielt, aber noch nie gelaufen (22.09.2026)
+### autopilot.js: Fix eingespielt UND im Betrieb belegt (22.09.2026) - ERLEDIGT
 
-Der Hacknet-Filter ist seit dem 22.09. im Spiel (autopilot.js Zeile 703
-aktiv, per Schieber uebertragen). Gelaufen ist er nicht: autopilot.js
-braucht 34,20 GB und findet seit dem Sprung nach BN9 L3 keinen Wirt, weil
-die Arbeiter alles belegen. Der Bot arbeitet trotzdem - autopilot.js ist der
-Kaltstart-Verwalter, im laufenden Betrieb traegt bn4net.
+Der Hacknet-Filter ist seit dem 22.09. im Spiel (autopilot.js Zeile 703).
+Um 12:52 gestartet, 160 s ohne Absturz gelaufen, mit SECHS Hacknet-Servern
+im Netz - also genau unter der Bedingung, die den Absturz ausgeloest hat.
+Das ist der Betriebsbeleg, nicht nur die Codepruefung.
 
-Das heisst: Die Zeile ist geprueft (Syntax, RAM unveraendert, Skeptiker),
-aber nicht im Betrieb belegt. Der Beleg kommt beim naechsten Kaltstart - und
-genau dort zaehlt sie. Wer vorher hinsieht: data/bn4life-log.txt muss dann
-"Gestartet: autopilot.js" zeigen statt eines RUNTIME ERROR auf L670.
+Der frueher hier stehende Vermerk "eingespielt, aber nie gelaufen" ist damit
+ueberholt. Er beruhte auf der falschen Annahme, autopilot.js finde keinen
+Wirt - siehe den naechsten Punkt, das war ein ganz anderer Fehler.
 
 ### autopilot.js stirbt an Hacknet-Servern (22.09.2026, im Spiel aufgetreten)
 

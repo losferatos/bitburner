@@ -37,7 +37,50 @@ Regeln:
 - **Ein Arbeitspunkt ist eine Zeile, die mit `### ` beginnt.** Nur solche Zeilen
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
-- **`## Sofort` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
+- **`## Sofort
+### checkin.js stuerzt ab, sobald der Ausgang offen ist (22.09.2026, 09:06)
+
+ReferenceError: Cannot access 'laufJetzt' before initialization, in ausgeben()
+bei tools/checkin.js:826, gerufen aus main() bei Zeile 319.
+
+Ursache: laufJetzt wird erst in Zeile 356 deklariert (const), ausgeben() ist
+eine Closure darueber und wird von JEDEM fruehen Rueckgabepfad in Abschnitt 3
+gerufen - BLOCKIERT (Z. 311), SPRINGT (Z. 319), GEWERK FEHLT (Z. 326),
+AUSGANG OFFEN ohne Start (Z. 337), AUSGANG FEHLT (Z. 343). Alle fuenf liegen
+vor der Deklaration, also greift die temporale Totzone.
+
+Wirkung: Das Messwerkzeug ist genau in dem Zustand blind, fuer den es gebaut
+wurde - beim Knotenwechsel. Kein Bericht, kein Urteil, kein Stand wird
+fortgeschrieben. /bb kann die Lage dann nur noch per curl aus der Bruecke
+lesen.
+
+Nicht repariert - Werkzeugaenderung ist eine eigene Verabredung mit Eric.
+Der Einzeiler waere, die Deklaration von laufJetzt vor Abschnitt 3 zu ziehen.
+
+### Sprung nach BN9 Stufe 3 klemmt (22.09.2026, 09:06)
+
+Der Knoten ist durch: alle 21 Black Ops gefallen, Rang 675.013 von 400.000,
+data/ausgang.json meldet offen=true, ueberBlackOps=true, Ziel BN9 L3.
+
+data/ausgang.txt, die letzten Zeilen:
+  08:55:50  Arbeiter auf blade geraeumt, frei jetzt 48.4 GB.
+  08:55:50  Handschlag gestellt (jump -> BN9 L3), warte auf die Bruecke.
+  08:57:20  Bruecke antwortet nicht, aber die letzte Sicherung ist 0.1 h alt
+            - es wird gehandelt.
+  08:57:20  exit.js liess sich auf blade nicht starten (exec gab 0)
+            - naechste Runde.
+  08:58:20  exit.js endete ohne Sprung - letzte Zeile: (exit.txt leer)
+            - naechster Versuch in 15 min.
+
+Zwei Sachen stecken da drin, die getrennt gehoeren:
+1. exec gab 0 auf blade, obwohl vorher 48.4 GB freigeraeumt wurden.
+2. Der Handschlag lief ins Leere, weil die Bruecke in dem Moment nicht
+   antwortete - ausgang.js hat trotzdem gehandelt, gestuetzt auf das Alter
+   der letzten Sicherung.
+
+exit_abgelehnt steht auf 0, die Route ist also nicht das Problem.
+Der Bot versucht es von selbst alle 15 Minuten erneut.
+` hat Vorrang vor `## Offen`**, ohne Abwaegung. Dort tragen der
   Reportloop und die Wache ein, was sie kaputt vorfinden aber nicht selbst
   beheben. Abgeraeumtes wandert nach "Erledigt".
 - **Acht Meldungen "Grosser Schub verweigert (41-50 Dateien)"** aus der Zeit
@@ -60,6 +103,42 @@ Stunden wieder.
 ---
 
 ## Sofort
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 336 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 310 Minuten nichts geschrieben (Inhaltsstempel 2026-09-22T00:39:41.588Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-21T08:13:05.097Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 603 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 579 Minuten nichts geschrieben (Inhaltsstempel 2026-09-20T18:32:26.715Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-20T04:06:59.353Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 497 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 453 Minuten nichts geschrieben (Inhaltsstempel 2026-09-19T17:32:56.962Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
+### Spiel-Tab nicht verbunden
+
+Die Bruecke laeuft, aber seit 2026-09-19T06:47:32.820Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
 
 - **Hash-Verwendung pruefen: Coding Contracts (19.09.2026, Skeptiker).** 'Generate Coding Contract' kostet 25*(L+1) Hashes; ein Vertrag bringt ueber contracts.js Geld. Gegen Sell for Money (4 Hashes = 1 Mio) rechnen, sobald hashes.js eine Woche gelaufen ist und data/hashes.json Zahlen liefert.
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads

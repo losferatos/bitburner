@@ -145,6 +145,20 @@ export async function main(ns) {
   // Der Knotenstempel des Vergleichspunkts - wird mit ihm gesetzt und mit
   // ihm geschrieben. Ist er nicht der aktuelle Knoten, gilt der Punkt nicht.
   let letzterTraegerNodeReset = traegerGilt ? traegerKnoten : null;
+  // DER NAME DES TRAEGERS GEHOERT ZUM VERGLEICHSPUNKT (22.09.2026).
+  //
+  // Der Punkt trug bisher nur einen Knotenstempel. Das reichte, solange
+  // es je Verfahren genau einen Traeger gab. Seit dem 22.09. wechselt der
+  // V2-Traeger innerhalb eines Knotens: in der Anlaufphase traegt der
+  // Kampfwert-Tiefstand, danach der Rang (bn4net.js, Abschnitt Traeger).
+  //
+  // Ohne den Namen verglichen beide gegen denselben gespeicherten Wert -
+  // ein Tiefstand von 73 gegen einen Rang von 60.000 haette S2 dauerhaft
+  // anstehen lassen, und beim Rueckwechsel ein Rang von 0 gegen einen
+  // Kampfwert von 100. Das ist dieselbe Fehlerklasse, die der
+  // Knotenstempel am 11.09. behoben hat, nur eine Ebene tiefer.
+  let letzterTraegerName = traegerGilt && typeof leiter?.letzterTraegerName === "string"
+    ? leiter.letzterTraegerName : null;
   if (leiter && Number.isFinite(leiter.letzterTraegerWert) && !traegerGilt) {
     sag("Vergleichspunkt aus einem anderen Knoten verworfen (Rang "
       + Math.round(leiter.letzterTraegerWert) + ").");
@@ -201,6 +215,7 @@ export async function main(ns) {
         letzterTraegerMotorMs = null;
         letzterTraegerWall = null;
         letzterTraegerNodeReset = null;
+        letzterTraegerName = null;
         letzteAusfuehrung.clear();
       }
 
@@ -271,7 +286,7 @@ export async function main(ns) {
           letzteAusfuehrung: Object.fromEntries(letzteAusfuehrung),
           fehlstrafen, fehlkills,
           letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
-          letzterTraegerNodeReset, entwarnungen,
+          letzterTraegerNodeReset, letzterTraegerName, entwarnungen,
         }, spieler);
         okRunden++;
         errStreak = 0;
@@ -406,6 +421,20 @@ export async function main(ns) {
           sag("Fehlversuch gebucht: -" + Math.round(f.verlust) + " Rang, Vergleichspunkt jetzt "
             + Math.round(letzterTraegerWert) + ".");
         }
+        // WECHSELT DER TRAEGER, BEGINNT DER PUNKT NEU (22.09.2026).
+        //
+        // Zwei verschiedene Groessen sind nicht vergleichbar. Beim Wechsel
+        // zwischen `kampfwerte` (Anlaufphase) und `rang` wird der alte
+        // Punkt deshalb verworfen und sofort neu gesetzt - S2 beginnt
+        // dann wieder bei null zu messen, statt gegen eine fremde Zahl
+        // zu halten.
+        if (letzterTraegerName !== null && letzterTraegerName !== kpi.traeger.name) {
+          sag("Traeger gewechselt: " + letzterTraegerName + " -> "
+            + kpi.traeger.name + " - Vergleichspunkt neu gesetzt.");
+          letzterTraegerWert = null;
+          letzterTraegerMotorMs = null;
+          letzterTraegerWall = null;
+        }
         const gewachsen = letzterTraegerWert !== null
           && kpi.traeger.wert > letzterTraegerWert;
         if (letzterTraegerWert === null
@@ -414,6 +443,7 @@ export async function main(ns) {
           letzterTraegerMotorMs = motorTimeMs;
           letzterTraegerWall = wall;
           letzterTraegerNodeReset = ri.lastNodeReset;
+          letzterTraegerName = kpi.traeger.name;
         }
       }
 
@@ -687,7 +717,7 @@ export async function main(ns) {
         fehlstrafen,
         fehlkills,
         letzterTraegerWert, letzterTraegerMotorMs, letzterTraegerWall,
-        letzterTraegerNodeReset, entwarnungen,
+        letzterTraegerNodeReset, letzterTraegerName, entwarnungen,
         signale: sigs.map((s) => ({ sig: s.sig, ziel: s.ziel })),
         puls: puls ? Number(puls.puls.toFixed(3)) : null,
         sichtbar, auftraege,
@@ -860,6 +890,11 @@ function schreibeZustand(ns, uhren, leiter, strafen, lage, spieler) {
     // Und der Knoten, in dem er gesetzt wurde (11.09.2026) - ohne ihn
     // ueberlebte der Punkt den Sprung und verglich BN4 gegen BN10.
     letzterTraegerNodeReset: lage.letzterTraegerNodeReset ?? null,
+    // Und WELCHER Traeger es war (22.09.2026). Seit die Anlaufphase eines
+    // V2-Knotens den Kampfwert traegt und der Rest den Rang, wechselt die
+    // Groesse innerhalb eines Knotens. Ohne den Namen ueberlebte ein
+    // Kampfwert-Punkt den Wechsel und der Rang haette gegen ihn zu wachsen.
+    letzterTraegerName: lage.letzterTraegerName ?? null,
     stand_down_count: lage.entwarnungen ?? 0,
     // Der Herzschlag des Waechters selbst - nach demselben Schema wie alle
     // anderen (ARCHITEKTUR 4.1). Ohne errStreak und lastError waere der Block

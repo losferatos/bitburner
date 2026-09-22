@@ -4439,13 +4439,49 @@ export async function main(ns) {
             const ausDiesemKnoten = Number.isFinite(b.nodeReset)
               && b.nodeReset === mzNodeReset;
             if (frisch && ausDiesemKnoten) {
-              traeger = { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
-                fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
-                  ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null,
-                // Und ob blade.js gerade Chaos abbaut (11.09.2026): Diplomacy
-                // gibt null Rang, und der Waechter darf das nicht fuer
-                // Stillstand halten. Nur durchreichen - entscheiden tut leiter.js.
-                aufraeumen: b.aufraeumen === true };
+              // IN DER ANLAUFPHASE TRAEGT DER KAMPFWERT, NICHT DER RANG
+              // (22.09.2026).
+              //
+              // Solange blade.js die Figur an bbtrain.js abgibt (Kampfwert-
+              // Tiefstand unter seinem BBTRAIN_ZIEL), laeuft KEINE
+              // Bladeburner-Aktion. Der Rang kann dann nicht wachsen - er ist
+              // in dieser Zeit ueberhaupt kein Traeger.
+              //
+              // Am 22.09.2026 um 17:52 hielt S2 genau das fuer einen Haenger
+              // und liess Sprosse 4.5 blade.js beenden, waehrend blade.json
+              // daneben "weicht bbtrain, Kampfwerte 73" meldete. Nach dem
+              // Neustart weicht blade.js sofort wieder: die Strafe wiederholt
+              // sich alle 90 Minuten, den ganzen Anlauf lang, in jedem
+              // verbleibenden V2-Knoten.
+              //
+              // WARUM WECHSELN UND NICHT RUHEN: Ein Ruhegrund (wie
+              // `aufraeumen`) haette S2 fuer die Dauer des Anlaufs stumm
+              // geschaltet - Stunden, in denen NICHTS ueberwacht waere. Die
+              // naheliegende Absicherung "bbtrain faellt ja unter S1" traegt
+              // nicht: dessen Herzschlag ist nur {zeit, host}, ohne
+              // motorTimeMs faellt S1 auf den Wanduhr-Zweig, und der ist im
+              // verdeckten Tab abgeschaltet - also genau im Normalbetrieb.
+              // Der Kampfwert dagegen WAECHST waehrend des Anlaufs. Er ist
+              // ein echtes Fortschrittsmass, und ein Anlauf, der wirklich
+              // haengt, faellt damit weiterhin auf.
+              //
+              // `tiefstand` ist das Minimum der vier Kampfwerte (blade.js),
+              // also monoton steigend, solange trainiert wird - und faellt
+              // nur beim Augmentierungs-Einbau, der ohnehin einen neuen
+              // Vergleichspunkt erzwingt.
+              const imAnlauf = b.weichtTraining === true
+                && Number.isFinite(b.tiefstand);
+              traeger = imAnlauf
+                ? { name: "kampfwerte", wert: b.tiefstand,
+                    motorTimeMs: mz.motorTimeMs, fehlversuch: null,
+                    aufraeumen: false }
+                : { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
+                    fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
+                      ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null,
+                    // Und ob blade.js gerade Chaos abbaut (11.09.2026): Diplomacy
+                    // gibt null Rang, und der Waechter darf das nicht fuer
+                    // Stillstand halten. Nur durchreichen - entscheiden tut leiter.js.
+                    aufraeumen: b.aufraeumen === true };
             }
           }
           // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem

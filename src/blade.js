@@ -229,6 +229,28 @@ export async function main(ns) {
   const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
     "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;
+  // WEICHT DER MOTOR GERADE DEM KAMPFWERTTRAINING? (22.09.2026)
+  //
+  // In der Anlaufphase eines V2-Knotens ueberlaesst blade.js die Figur
+  // bbtrain.js, solange der Kampfwert-Tiefstand unter BBTRAIN_ZIEL
+  // liegt (Zeile 3548 ff.). Dann laeuft KEINE Bladeburner-Aktion, und
+  // der Rang kann nicht wachsen - er ist in dieser Zeit kein Traeger.
+  //
+  // Der Waechter misst ihn trotzdem und hielt den planmaessigen
+  // Stillstand fuer einen Haenger: am 22.09. um 17:52 beendete Sprosse
+  // 4.5 blade.js mit der Begruendung 'Traeger rang seit 90 min
+  // Motorzeit nicht gewachsen', waehrend blade.json daneben
+  // 'weicht bbtrain, Kampfwerte 73' meldete. Das wiederholt sich alle
+  // 90 Minuten, den ganzen Anlauf lang, in jedem V2-Knoten.
+  //
+  // Diese Flagge wird im Traeger durchgereicht; lib/leiter.js laesst S2
+  // daraufhin ruhen - dasselbe Muster wie `aufraeumen` bei Diplomacy.
+  //
+  // HIER OBEN deklariert und nicht unten bei `gewichen` (Zeile 3232):
+  // meldeLage ist eine Closure ab Zeile 1382 und wird frueher gerufen,
+  // als `gewichen` deklariert ist. Ein Zugriff von dort waere ein
+  // ReferenceError aus der temporalen Totzone.
+  let weichtTraining = false;
   let chaosStand = null;
   let fahrbarStand = null;
   // Hoechster Chaosstand, der je gemessen wurde, WAEHREND etwas fahrbar war
@@ -1479,6 +1501,8 @@ export async function main(ns) {
       chaos: Number.isFinite(chaosStand) ? +chaosStand.toFixed(2) : null,
       fahrbar: fahrbarStand,
       aufraeumen: chaosAufraeumen,
+      // Anlaufphase: der Motor weicht bbtrain, der Rang steht planmaessig.
+      weichtTraining,
       chaosMax: Number.isFinite(chaosMaxFahrbar) ? +chaosMaxFahrbar.toFixed(2) : null,
       // Erste Hand statt Schaetzung: `getActionEstimatedSuccessChance` liefert
       // fuer Black Ops einen Bereich, dessen eine Grenze mit dem Verhaeltnis
@@ -3231,6 +3255,24 @@ export async function main(ns) {
   let ruhend = false;
   let gewichen = false;
   for (;;) {
+    // KEIN LATCH (Skeptiker, 22.09.2026).
+    //
+    // `weichtTraining` sagt dem Waechter, dass der Rang gerade planmaessig
+    // steht, und schaltet damit S2 stumm. Eine Flagge mit dieser Wirkung
+    // darf NICHT ueber Runden stehenbleiben.
+    //
+    // Der erste Entwurf zog sie im Gleichlauf mit `gewichen` hoch und
+    // runter. Das reicht nicht: der Graft-Riegel weiter unten nimmt einen
+    // `continue` am Schleifenanfang, VOR allen drei Zuweisungsstellen. Laeuft
+    // ein Graft ohne Simulacrum, haette die Flagge auf ihrem letzten Wert
+    // gestanden - und bbtrain.js haelt bei laufendem Graft ebenfalls still
+    // (bbtrain.js:297-300). Niemand arbeitet, die Flagge behauptet
+    // planmaessiges Weichen, und der Waechter waere blind. Genau dieser
+    // Zustand steht als Vorfall vom 30.08.2026, 22:03 im Kommentar unten.
+    //
+    // Deshalb faellt sie zu Beginn JEDER Runde auf false und wird nur dort
+    // gesetzt, wo wirklich zugunsten von bbtrain gewichen wird.
+    weichtTraining = false;
     try {
       // GRAFTING HAT VORFAHRT - DER MOTOR HAELT STILL (30.08.2026, 19:15).
       //
@@ -3517,6 +3559,7 @@ export async function main(ns) {
         const wert = gymGreifen();
         if (wert) {
           gewichen = false;
+          weichtTraining = false;
           meldeLage("Gym/" + wert, "nichts ueber Schwelle, Powerhouse statt"
             + " Bladeburner-Training (Tiefstand " + tiefstand + ")");
           await ns.sleep(30000);
@@ -3551,6 +3594,7 @@ export async function main(ns) {
             + (lohntSich ? "" : ", keine Aktion ueber ihrer Schwelle")
             + " - ueberlasse die Figur bbtrain.js.");
           gewichen = true;
+          weichtTraining = true;
           try { ns.bladeburner.stopBladeburnerAction(); } catch {}
         }
         // FAEHIGKEITEN WERDEN AUCH IM AUSWEICHZWEIG GEKAUFT (29.08.2026, 22:25).
@@ -3578,6 +3622,7 @@ export async function main(ns) {
         continue;
       }
       gewichen = false;
+      weichtTraining = false;
 
       faehigkeitenKaufen();
       kostenAktualisieren();

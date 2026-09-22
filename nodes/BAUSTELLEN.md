@@ -38,6 +38,110 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
+### Wirtwahl fuer exit.js nimmt den umkaempften statt den freien Rechner (22.09.2026)
+
+DAS IST DIE EIGENTLICHE URSACHE des klemmenden Sprungs; das Nachraeumen vor
+dem exec (eingebaut 22.09.) ist die Absicherung, nicht die Heilung.
+
+ausgang.js:441-448 waehlt den Wirt ueber
+    moeglich = frei(h) + arbeiter
+also ueber RUECKGEWINNBAREN statt freien Speicher. Damit gewinnt blade jedes
+Mal deterministisch:
+    hacknet-server-0 = 256 +   0 = 256
+    blade            = 6,25 + 505,75 = 512
+Gewaehlt wird also genau der Rechner, um den sich ausgang.js mit bn4net
+streiten muss - und gemieden werden die drei, die bn4net nachweislich nie
+anfasst.
+
+bn4net.js:817-823 sagt das ausdruecklich:
+    "HACKNET-SERVER SIND KEINE ARBEITER-WIRTE ...
+     Nur ausgang.js legt dort im Sprungmoment exit.js ab."
+    const hosts = scanAll().filter((h) => !h.startsWith("hacknet-server-"));
+
+Die Absicht ist also gebaut - auf der falschen Seite. Die Hacknet-Server
+haengen mit Root an home, haben 256 GB und 0 Prozesse; exit.js braucht
+40,25 GB. Kein Raeumen, kein Wettlauf, kein Zeitfenster.
+Kosten: HacknetServers.ts:14 rechnet ramRatio = 1 - ramUsed/maxRam, also
+-15,7 % Hash-Ertrag auf EINEM von drei Servern fuer die Sekunden bis zum
+Prestige.
+
+Nicht gebaut, weil es eine Aenderung an der Wirtwahl ist und der Sprung am
+22.09. anders freigeraeumt wurde (Einbau der wartenden Augs, danach war
+blade leer). Gehoert vor den naechsten Knotenwechsel.
+
+### backup_wait_min: Kennwert ohne Leser, Schreiber auf dem falschen Rechner (22.09.2026)
+
+ausgang.js:712 schreibt data/backup-wait.txt mit ns.write, also lokal auf den
+Wirt - und der wird beim Sprung geloescht (prestigeAllServers). Selbst
+richtig nach home geschrieben holte sie niemand ab: repoweite Suche findet
+den Kennwert in vier Auftrags- und Architekturdokumenten
+(AUFTRAG-BAU-2026-09.md, BAU-2026-09/ABNAHME-C.md, ARCHITEKTUR.md,
+ENTWURF-B1.md), im Schreiber ausgang.js:712 und in der Definition
+lib/kpi.js:79 - und in KEINER auswertenden Stelle.
+
+Folge: jump_latency_min (lib/kpi.js:78, "abzueglich backup_wait_min") kann
+nie um die Wartezeit bereinigt werden. Abnahmekriterium C1/C2 ist damit
+nicht erfuellbar. Entweder Leser bauen oder den Kennwert streichen.
+
+### punish.js bekommt lib/hostdatei.js nicht mitkopiert (Altlast seit 04.09.2026)
+
+bn4net.js:4210 kopiert ["punish.js", "lib/handschlag.js", ...BIBLIOTHEKEN],
+und BIBLIOTHEKEN = ["lib/hackaugs.js"] (bn4net.js:728). punish.js hat genau
+einen Import (punish.js:68 -> handschlag -> hostdatei). Fehlt hostdatei auf
+dem Wirt, gibt ns.exec still 0 zurueck. punish.js steht nicht in
+registry.json, der needsLibs-Pfad (bn4net.js:3877) greift also nicht.
+ausgang.js und bn4rep.js sind sauber - beide fuehren lib/hostdatei.js dort.
+
+Und kein Test kann das fangen: tools/test-punish.js ist vor wie nach der
+Aenderung 46/46 gruen, weil er zustand.host nie setzt und damit auf home
+laeuft - der einen Konfiguration, in der lokal und home dasselbe sind. Der
+Mock kann die Asymmetrie (tools/mock/ns.js:328-345), die Tests nutzen sie
+nicht. bn4net.js:4183-4191 startet punish.js auf dem groessten Wirt, also
+faktisch nie home.
+
+### tools/rollback.js kennt lib/hostdatei.js nicht (22.09.2026)
+
+Die Liste EINGESPIELT (tools/rollback.js:71-82) fuehrt 17 lib-Dateien, aber
+weder lib/hostdatei.js noch lib/hackaugs.js. Ein rollback --alles stellt
+also die eine Datei nicht her, von der inzwischen elf Gewerke abhaengen.
+Stale seit 04.09.2026.
+
+### Handschlag: antwortDa() prueft den Anlass nicht (22.09.2026)
+
+lib/handschlag.js:110 akzeptiert jede Antwort mit a.ts >= anfrageTs, ohne
+reason-Abgleich. install (bn4rep) und jump (ausgang) teilen sich
+backup-request.txt und backup-ok.txt. Seit die Anfrage wirklich auf home
+landet (Fix vom 22.09.), kann ausgang.js eine pre-install-Antwort als
+pre-jump-Beleg nehmen - und umgeht damit genau die Pruefung, die pre-jump
+bei wartenden Augmentierungen rot macht (sync/backup.js:261-266).
+
+### Kopfkommentar von lib/handschlag.js:46-51 ist falsch (22.09.2026)
+
+Dort steht, ns.fileExists werde nicht benutzt und "dieses Modul ist damit
+gratis". Ueber lib/hostdatei.js kostet es 0,7 GB (fileExists 0,1 + scp 0,6).
+Stale seit 04.09.2026, und es steht direkt ueber der Datei, die als naechstes
+jemand fuer eine RAM-Entscheidung liest - bei bn4rep.js (850,75 GB bei
+SF4.1) ist das kein Detail.
+
+### pre-jump-Sicherungen werden nie rotiert (22.09.2026)
+
+sync/instanz.js:150-151 nimmt pre-jump und pre-install von der Rotation aus,
+sync/backup.js:374-390 zusaetzlich vom 300-MB-Budget. Bisher entstand
+pre-jump nie (siehe den Handschlag-Fehler). Ab jetzt entsteht sie bei jedem
+Sprung, rund 662 KB. Klemmt ein Sprung und stellt ausgang.js alle 15 min
+einen Handschlag, waechst eine unloeschbare Klasse - bei einer Nacht
+Stillstand rund 48 Stueck an zwei Orten.
+
+### test-ram.js verlangt Neueichung nach dem Einspielen (22.09.2026)
+
+tools/test-ram.js ist rot: ausgang.js und lib/handschlag.js haben seit dem
+22.09. neue Inhaltsstempel, ihre Eichzeile gilt bis zu einer neuen
+calculateRam-Messung IM SPIEL nicht mehr. Gerechnet ist der Bedarf
+unveraendert (tools/ram.js, 18 Kombinationen ueber sf4 1/2/3), gemessen noch
+nicht - und gerechnet ist nicht gemessen. Nach dem naechsten Einspielen:
+messen und die Eichdatei nachziehen, NICHT die Liste VERALTET_ERLAUBT
+erweitern.
+
 ### checkin.js stuerzt ab, sobald der Ausgang offen ist (22.09.2026, 09:06)
 
 ReferenceError: Cannot access 'laufJetzt' before initialization, in ausgeben()

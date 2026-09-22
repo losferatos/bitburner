@@ -3589,12 +3589,21 @@ export async function main(ns) {
         graftLaeuftJetzt = !!w && w.type === "GRAFTING";
       } catch { graftLaeuftJetzt = false; }
       if (tiefstand < BBTRAIN_ZIEL && !graftLaeuftJetzt) {
+        // JEDE RUNDE, NICHT NUR BEIM ERSTEN WEICHEN (22.09.2026, gemessen).
+        //
+        // Die Flagge stand zuerst im `if (!gewichen)`-Block darunter. Der
+        // laeuft nur in der ersten Ausweichrunde; ab der zweiten ist
+        // `gewichen` schon true, der Rundenkopf hat die Flagge aber wieder
+        // auf false gesetzt. Im Spiel stand danach "weicht bbtrain,
+        // Kampfwerte 81" neben `weichtTraining: false` - der Waechter haette
+        // weiter gestraft. Gefunden erst im Betrieb, weil kein Test mehr als
+        // eine Runde fuhr; `tools/test-blade-ebene2.js` faehrt jetzt vier.
+        weichtTraining = true;
         if (!gewichen) {
           sag("Kampfwerte bei " + tiefstand
             + (lohntSich ? "" : ", keine Aktion ueber ihrer Schwelle")
             + " - ueberlasse die Figur bbtrain.js.");
           gewichen = true;
-          weichtTraining = true;
           try { ns.bladeburner.stopBladeburnerAction(); } catch {}
         }
         // FAEHIGKEITEN WERDEN AUCH IM AUSWEICHZWEIG GEKAUFT (29.08.2026, 22:25).

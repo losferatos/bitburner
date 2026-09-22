@@ -763,10 +763,22 @@ export async function main(ns) {
             // Sprung ersatzlos. `queued_augs_at_jump` hat Soll 0 und hatte
             // keinen Schreiber (R11) - die Zahl steht in data/einbau.json und
             // ist NUR in diesem Augenblick zu haben.
+            //
+            // NUR EINE ZAHL VON NACH DEM LETZTEN EINBAU ZAEHLT (22.09.2026).
+            // Um 10:51 stand hier `wartendeAugs: 2`, und /bb meldete seitdem
+            // "2 gekaufte Augs beim Sprung verfallen". Die Sicherung
+            // pre-jump von 10:51 zeigt eine LEERE Warteschlange - die beiden
+            // waren um 10:19 eingebaut worden. Nach dem Einbau waren alle
+            // Skripte tot, bn4rep.js lief beim Sprung noch nicht wieder, und
+            // einbau.json war der Stand von davor. Eine Zahl, die vor dem
+            // letzten Einbau geschrieben wurde, beschreibt eine Warteschlange,
+            // die es nicht mehr gibt - dann lieber `null` (nicht gezaehlt).
             wartendeAugs: (() => {
               try {
                 const e = JSON.parse(liesVonHome("data/einbau.json") || "null");
-                return e && Number.isFinite(e.wartend) ? e.wartend : null;
+                if (!e || !Number.isFinite(e.wartend)) return null;
+                if (!Number.isFinite(e.zeit) || e.zeit <= info.lastAugReset) return null;
+                return e.wartend;
               } catch { return null; }
             })() });
         nachHome("data/events.json", JSON.stringify(strom));

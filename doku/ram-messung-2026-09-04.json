@@ -31,7 +31,7 @@
   "err": null,
   "bytes": 115455,
   "lines": 1940,
-  "sha256": "edc87c670b6eed9243cc7fbfc9df6267cd37b9125272ffe40d3742ef0e9021c0",
+  "sha256": "c782d3aef9b3714e6d02ddf84824b178e4583753840d8bd8709d94813a6d0bc2",
   "gemessenAm": "2026-09-04T19:09:09.232Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
@@ -165,7 +165,7 @@
   "err": null,
   "bytes": 25479,
   "lines": 438,
-  "sha256": "5018050b1cacef5aecc3054aa7b2407ada17eeccf8f3b61e68510a8fd4739698",
+  "sha256": "f9c3b6e12ccfd0c1940d2896483dc9bdf9fb0ba25c87fdcea55b01a56098747a",
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
@@ -293,7 +293,7 @@
   "err": null,
   "bytes": 206210,
   "lines": 3743,
-  "sha256": "31f3d72377b4efd5830df764acc214d88ac695d955a9fea88882683d107cd4ce",
+  "sha256": "39429e6070b2a70648e526ad1a292868c0161090a080419204cecf18a1df6672",
   "gemessenAm": "2026-09-11T06:10 calculateRam im Spiel (100.35 mit SF4, 175.35 ohne)",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -515,7 +515,7 @@
   "err": null,
   "bytes": 5166,
   "lines": 122,
-  "sha256": "430fda2d89fe4fcda9a8c5ecbc83ac8735a42fa61e617a89d96515efccf4d445"
+  "sha256": "ff9137daf56b1568ee86f0ff79d89e6b58bedd7d8dcba70f4ee913c882f1c1b0"
  },
  {
   "file": "probe.js",
@@ -596,7 +596,7 @@
   "err": null,
   "bytes": 97258,
   "lines": 1957,
-  "sha256": "db77fd8f17e1c7748c55f3518d94f21efa1d74dca52a198f4871b939793ac461",
+  "sha256": "b57cf37dcdb4ff1d9cf6803e9ed913ddcf5983805246373970c54514f2687089",
   "gemessenAm": "2026-09-04T18:37:34.768Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },
@@ -1024,7 +1024,7 @@
   "err": null,
   "bytes": 263955,
   "lines": 4734,
-  "sha256": "d566ddfa11842f2455a56cafb1d74cabd89319c7aa6036dd145f3f734652d254",
+  "sha256": "816a9b765d81c7148d25c34f89f0d54b286b3f5fb1d0f85d2262266f41ac5a47",
   "gemessenAm": "2026-09-06T09:53:00.000Z",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -1221,7 +1221,7 @@
   "err": null,
   "bytes": 18705,
   "lines": 364,
-  "sha256": "582efa5bd62fdca347238d8c6d1c04fc54b0c4c9dcb775ca41eac923bc1aac3e"
+  "sha256": "ed80b77e56595ce59352f66075e87b779435993f138b4adb6e1bea4cfe8143a4"
  },
  {
   "file": "sleevecrime.js",
@@ -1388,7 +1388,7 @@
   "err": null,
   "bytes": 6251,
   "lines": 142,
-  "sha256": "030b385c4584de347ab28df464c34ac76ff611326d344d51cb1ec71e848bed2f"
+  "sha256": "7cb4e5a82b7b74a51e83d9e413b52a887a395870bf1f54f9139b471b5ff16525"
  },
  {
   "file": "share.js",
@@ -1630,7 +1630,7 @@
   "err": null,
   "bytes": 1969,
   "lines": 64,
-  "sha256": "ac3da260994ff6946780f2204f7e3cdfe79ebcf4ec26333edeb15511507c08ac"
+  "sha256": "b215788ef2e86f0ea7a990902d0934819b5fcda6cdc90518a7bcc8cbd3650252"
  },
  {
   "file": "ramcheck.js",
@@ -1897,7 +1897,7 @@
   "live41": 2.35,
   "lokal41": 2.35,
   "diff": 0,
-  "sha256": "9511d8129d4ba404feb2a964563899e63af09ad674670b51f001b706540a5da8",
+  "sha256": "ed626cba1e924ad049a47316a753a26938fa9ef13a916cdcb9833a59e48e1495",
   "bytes": 9507,
   "gemessenAm": "2026-09-04T17:29:32.425Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
@@ -1937,7 +1937,7 @@
   "live41": 6.1,
   "lokal41": 6.1,
   "diff": 0,
-  "sha256": "feff89a6d4de9e73196aed08c2a236171a3047550a35965cd50fe408832d9ffc",
+  "sha256": "a0e0e602d722df4332c17443ed3eb6d4a2e560408c56620877ae41ed7eec87c2",
   "bytes": 55741,
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"

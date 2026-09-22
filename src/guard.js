@@ -360,6 +360,48 @@ export async function main(ns) {
 
       const puls = enginePuls(uhren);
 
+      // DER PUNKT MUSS ZUM TRAEGER PASSEN - UND ZWAR VOR DER AUSWERTUNG
+      // (22.09.2026).
+      //
+      // (1) WECHSELT DER TRAEGER, BEGINNT DER PUNKT NEU. Zwei verschiedene
+      // Groessen sind nicht vergleichbar: `hacking` (vor dem Beitritt),
+      // `kampfwerte` (Anlaufphase) und `rang` wechseln einander innerhalb
+      // eines Knotens ab (bn4net.js, Abschnitt Traeger).
+      //
+      // EIN PUNKT OHNE NAMEN GILT ALS FREMD. Die erste Fassung pruefte
+      // `letzterTraegerName !== null` und liess damit jeden Punkt aus der
+      // Zeit vor dem Namensfeld durch. Im Spiel stand danach ein Punkt von
+      // 137 - gesetzt um ~16:17, als vor dem Bladeburner-Beitritt noch das
+      // Hacking-Level trug - gegen einen Rang von 8. Bis der Rang ueber 137
+      // lag, stand S2 an, und Sprosse 4.5 beendete blade.js alle 90 Minuten.
+      //
+      // (2) EIN EINBAU ENTWERTET DEN PUNKT (Skeptiker B1). Der Einbau setzt
+      // Kampfwerte und Hacking auf 1 zurueck, der Name bleibt aber derselbe.
+      // Ein Punkt `kampfwerte 95` von vor dem Einbau gegen einen Tiefstand
+      // von 20 danach waere Stunden lang nicht zu erreichen. Die Wanduhr des
+      // Punkts genuegt als Stempel: liegt der letzte Einbau DANACH, ist er
+      // verfallen. Fuer `rang` (ueberlebt den Einbau) kostet das ein Fenster.
+      //
+      // WARUM HIER UND NICHT BEIM FORTSCHREIBEN (Skeptiker B2). Die erste
+      // Fassung verwarf den Punkt erst nach `signale()`. In der Wechselrunde
+      // mass S2 damit den neuen Traeger gegen den Punkt des alten - "rang 5
+      // <= kampfwerte 99" - und setzte einen Verdacht, der danach 45 min
+      // lang nicht entwarnt werden konnte.
+      if (kpi && kpi.traeger && letzterTraegerWert !== null) {
+        const fremd = letzterTraegerName !== kpi.traeger.name;
+        const vorEinbau = Number.isFinite(ri.lastAugReset)
+          && Number.isFinite(letzterTraegerWall) && letzterTraegerWall < ri.lastAugReset;
+        if (fremd || vorEinbau) {
+          sag(fremd
+            ? "Traeger gewechselt: " + (letzterTraegerName ?? "(ohne Namen)") + " -> "
+              + kpi.traeger.name + " - Vergleichspunkt neu gesetzt."
+            : "Augmentierungs-Einbau nach dem Vergleichspunkt - Punkt neu gesetzt.");
+          letzterTraegerWert = null;
+          letzterTraegerMotorMs = null;
+          letzterTraegerWall = null;
+        }
+      }
+
       const sigs = signale({
         eintraege, kern, kpi, bridge,
         motorTimeMs, guardTimeMs: uhren.guardTimeMs, wall,
@@ -421,20 +463,8 @@ export async function main(ns) {
           sag("Fehlversuch gebucht: -" + Math.round(f.verlust) + " Rang, Vergleichspunkt jetzt "
             + Math.round(letzterTraegerWert) + ".");
         }
-        // WECHSELT DER TRAEGER, BEGINNT DER PUNKT NEU (22.09.2026).
-        //
-        // Zwei verschiedene Groessen sind nicht vergleichbar. Beim Wechsel
-        // zwischen `kampfwerte` (Anlaufphase) und `rang` wird der alte
-        // Punkt deshalb verworfen und sofort neu gesetzt - S2 beginnt
-        // dann wieder bei null zu messen, statt gegen eine fremde Zahl
-        // zu halten.
-        if (letzterTraegerName !== null && letzterTraegerName !== kpi.traeger.name) {
-          sag("Traeger gewechselt: " + letzterTraegerName + " -> "
-            + kpi.traeger.name + " - Vergleichspunkt neu gesetzt.");
-          letzterTraegerWert = null;
-          letzterTraegerMotorMs = null;
-          letzterTraegerWall = null;
-        }
+        // (Der Abgleich von Traegername und Einbau steht VOR `signale()`,
+        // siehe "DER PUNKT MUSS ZUM TRAEGER PASSEN" weiter oben.)
         const gewachsen = letzterTraegerWert !== null
           && kpi.traeger.wert > letzterTraegerWert;
         if (letzterTraegerWert === null

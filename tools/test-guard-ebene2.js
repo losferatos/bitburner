@@ -372,10 +372,63 @@ console.log("-- der Vergleichspunkt von S2 ueberlebt KEINEN Knotenwechsel (11.09
     // gewachsenen Traeger als neuen Punkt nimmt. Sonst misst die Probe die
     // Setzregel statt die Erhaltung.
     "data/watchdog.json": wd({ letzterTraegerWert: 400, letzterTraegerMotorMs: 3000000,
-      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000 }) });
+      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000,
+      letzterTraegerName: "rang" }) });
   const we = json(eigen, "data/watchdog.json");
   pruefe("aus demselben Knoten bleibt der Punkt erhalten (sonst 45 min blind)",
     we && we.letzterTraegerWert === 400, "letzterTraegerWert=" + (we ? we.letzterTraegerWert : "?"));
+
+  // DER FALL VOM 22.09.2026: Punkt 137, gesetzt als noch das Hacking-Level
+  // trug, gegen einen Rang von 8 nach dem Bladeburner-Beitritt. Gleicher
+  // Knoten, also griff der Knotenstempel nicht; der Name fehlte, also griff
+  // auch der Namensvergleich nicht. S2 stand an, bis der Rang ueber 137 lag.
+  const ohneName = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    "data/watchdog.json": wd({ letzterTraegerWert: 137000, letzterTraegerMotorMs: 3000000,
+      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000 }) });
+  const wn = json(ohneName, "data/watchdog.json");
+  pruefe("ein Punkt OHNE Namen (Altbestand vor dem 22.09.) wird verworfen",
+    wn && wn.letzterTraegerWert === 464, "letzterTraegerWert=" + (wn ? wn.letzterTraegerWert : "?"));
+  pruefe("und traegt danach den Namen des aktuellen Traegers",
+    wn && wn.letzterTraegerName === "rang", "letzterTraegerName=" + (wn ? wn.letzterTraegerName : "?"));
+
+  const anderer = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    "data/watchdog.json": wd({ letzterTraegerWert: 137000, letzterTraegerMotorMs: 3000000,
+      letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000,
+      letzterTraegerName: "hacking" }) });
+  const wa = json(anderer, "data/watchdog.json");
+  pruefe("ein Punkt eines ANDEREN Traegers (hacking -> rang) wird verworfen",
+    wa && wa.letzterTraegerWert === 464, "letzterTraegerWert=" + (wa ? wa.letzterTraegerWert : "?"));
+  pruefe("und der Wechsel wird gemeldet",
+    anderer.zustand.log.some((z) => /Traeger gewechselt: hacking -> rang/.test(z)),
+    anderer.zustand.log.slice(-4).join(" | "));
+
+  // SKEPTIKER B1: Ein Einbau setzt Kampfwerte und Hacking zurueck, der Name
+  // bleibt. Ein Punkt von VOR dem letzten Einbau ist verfallen.
+  const einbau = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
+    "data/watchdog.json": wd({ letzterTraegerWert: 137000, letzterTraegerMotorMs: 3000000,
+      letzterTraegerWall: W0 - 3 * 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000,
+      letzterTraegerName: "rang" }) }, { augReset: W0 - 2 * 3600000 });
+  const we2 = json(einbau, "data/watchdog.json");
+  pruefe("ein Punkt von VOR dem letzten Einbau wird verworfen",
+    we2 && we2.letzterTraegerWert === 464, "letzterTraegerWert=" + (we2 ? we2.letzterTraegerWert : "?"));
+
+  // SKEPTIKER B2: In der Wechselrunde darf S2 den neuen Traeger NICHT gegen
+  // den Punkt des alten messen. Punkt alt genug (60 min Motorzeit), sonst
+  // wuerde die Probe nur die 45-min-Schwelle messen.
+  const s2Probe = async (name) => {
+    const m = await fahre(1, { "data/bn4net.json": kern,
+      "data/kpi.json": JSON.stringify({ traeger: { name: "rang", wert: 5 },
+        route_state: "open", bestwertStatus: "geeicht" }),
+      "data/watchdog.json": wd({ letzterTraegerWert: 99, letzterTraegerMotorMs: 0,
+        letzterTraegerWall: W0 - 3600000, letzterTraegerNodeReset: W0 - 24 * 3600000,
+        letzterTraegerName: name }) });
+    const w = json(m, "data/watchdog.json");
+    return !!(w && w.ziele && w.ziele.fortschritt);
+  };
+  pruefe("Gegenprobe: gleicher Traeger, Rang 5 gegen 99 -> S2 schlaegt an",
+    await s2Probe("rang") === true, "sonst misst die Probe unten nichts");
+  pruefe("in der Wechselrunde kampfwerte -> rang KEIN S2-Verdacht",
+    await s2Probe("kampfwerte") === false);
 
   const alt = await fahre(3, { "data/bn4net.json": kern, "data/kpi.json": kpi,
     "data/watchdog.json": wd({ letzterTraegerWert: 444908, letzterTraegerMotorMs: 600000,

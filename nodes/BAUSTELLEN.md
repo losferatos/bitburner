@@ -351,7 +351,11 @@ Sprung, rund 662 KB. Klemmt ein Sprung und stellt ausgang.js alle 15 min
 einen Handschlag, waechst eine unloeschbare Klasse - bei einer Nacht
 Stillstand rund 48 Stueck an zwei Orten.
 
-### test-ram.js verlangt Neueichung nach dem Einspielen (22.09.2026)
+### ERLEDIGT 22.09.2026: test-ram.js verlangt Neueichung nach dem Einspielen
+
+Nachgestempelt mit tools/eichung-stempeln.js --schreib: bei allen elf
+geaenderten Dateien trifft der Rechner den gemessenen Wert weiter (der
+Bedarf hat sich nicht bewegt). test-ram.js gruen. Alter Text:
 
 tools/test-ram.js ist rot: ausgang.js und lib/handschlag.js haben seit dem
 22.09. neue Inhaltsstempel, ihre Eichzeile gilt bis zu einer neuen
@@ -423,6 +427,62 @@ zugestellter Eintrag bekommt `zugestellt` **in die Datei** geschrieben
 Bruecke und ging bei jedem Neustart verloren - jede Meldung kehrte alle sechs
 Stunden wieder.
 
+### ERLEDIGT 22.09.2026: Waechter strafte blade.js alle 90 min im Anlauf
+
+Drei Fehler uebereinander, zwei davon in meinem eigenen Fix eb1700f:
+(1) blade.js setzte weichtTraining nur in der ERSTEN Ausweichrunde, der
+Rundenkopf setzte es danach zurueck. (2) guard.js liess einen Vergleichspunkt
+OHNE Traegernamen durch - im Spiel stand ein Punkt von 137 (Hacking-Level
+vor dem Beitritt) gegen Rang 8; das war vermutlich die eigentliche Ursache
+des 90-Minuten-Takts. (3) Skeptiker: der Namensabgleich lief erst NACH
+signale(), und ein Einbau entwertete einen Punkt nicht, obwohl er
+Kampfwerte und Hacking zuruecksetzt. Alles in guard.js vor signale()
+gezogen; Tests in test-blade-ebene2.js (vier Runden) und
+test-guard-ebene2.js, jeder neue Test rot gegen den alten Code.
+
+### ERLEDIGT 22.09.2026: "2 gekaufte Augs beim Sprung verfallen" war falsch
+
+ausgang.js las data/einbau.json ohne Frischepruefung; beim Sprung 10:51
+war das der Stand von vor dem Einbau um 10:19. Sicherung pre-jump 10:51:
+Warteschlange leer. Jetzt zaehlt die Zahl nur, wenn einbau.json nach
+lastAugReset geschrieben wurde. DIE ANZEIGE IN /bb BLEIBT BIS ZUM NAECHSTEN
+SPRUNG STEHEN - der Kern leitet sie aus dem alten jump-Ereignis ab.
+Rest (Skeptiker): ist einbau.json veraltet, steht jetzt null statt einer
+Zahl; kauft kampfaugs.js/buyaugs.js nach einem Einbau, ohne dass bn4rep
+laeuft, bleibt ein echter Verlust damit stumm. Vorher meldete dieselbe Lage
+eine falsche Zahl - also keine Verschlechterung, aber auch nicht dicht.
+
+### Anlauf: blade.js weicht, auch wenn bbtrain gar nicht trainiert (22.09.2026, Skeptiker B3)
+
+blade.js weicht allein wegen Tiefstand < 100 (blade.js ~3591) und stoppt
+dabei jede eigene Aktion. bbtrain.js haelt aber still bei Konto < 5 Mio
+(GYM_MIN_GELD - seine Meldung "blade.js trainiert gratis weiter" ist
+falsch), bei nicht freier Figur, ohne Gym in der Stadt oder wenn es nicht
+laeuft. Dann arbeitet niemand. S2 erkennt das jetzt richtig (kampfwerte
+steht), aber Sprosse 4.5 startet blade.js neu, nicht bbtrain.js -
+wirkungslos bis Sprosse 5. Loesungsidee: blade.js weicht nur, wenn die
+Figur wirklich im Gym steht, sonst Bladeburner-Training (gratis). Vorsicht:
+startAction ohne Simulacrum beendet die Gym-Arbeit (Bladeburner.ts:177) -
+das Wechselspiel zwischen beiden braucht einen eigenen Entwurf mit Test.
+
+### Graft ohne Simulacrum im Anlauf wird von S2 bestraft (22.09.2026, Skeptiker B4)
+
+Waehrend eines Grafts steht weichtTraining auf false (Rundenkopf), also
+traegt rang; der steht, und bbtrain wartet ebenfalls (graftLaeuft). Nach
+90 min beendet 4.5 blade.js - mehrfach je Graft. Bestand schon vor dem
+22.09.; derselbe Fehlertyp wie der behobene.
+
+### /bb-Skill: Brueckenbefehl veraltet (22.09.2026)
+
+~/.claude/skills/bb/SKILL.md nennt `node sync/bridge.js` - die Bruecke
+bricht ohne `--instance LIVE` ab. Skilltext anpassen (Regelaenderung =
+eigener Auftrag, zusammen mit der Arbeitsauftrag-Regel vom 22.09.).
+
+### Sofort-Abschnitt voller Doppelmeldungen (22.09.2026)
+
+Unter ## Sofort stehen dieselben drei automatischen Meldungen (Bruecke ohne
+Sicherung, Telemetrie veraltet, Tab nicht verbunden) viele Male - je eine
+je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 ---
 
 ## Sofort

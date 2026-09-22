@@ -447,6 +447,36 @@ console.log("-- Fertigkeitspunkte werden ausgegeben, nicht gehortet --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- Anlaufphase: weichtTraining steht in JEDER Ausweichrunde (22.09.2026) --");
+{
+  // DER WAECHTER LIEST DIESE FLAGGE, um in der Anlaufphase den Kampfwert-
+  // Tiefstand statt des Rangs als Traeger zu nehmen (bn4net.js). Sie stand
+  // zuerst nur in der ERSTEN Ausweichrunde auf true; ab der zweiten setzte
+  // der Rundenkopf sie zurueck, und niemand setzte sie wieder. Im Spiel stand
+  // "weicht bbtrain, Kampfwerte 81" neben `weichtTraining: false`.
+  //
+  // Eine Runde haette das nicht gezeigt. Deshalb vier: das Weichen schlaeft
+  // 30 s je Runde, die Probe laeuft also sicher ueber mehrere Rundenkoepfe.
+  const niedrig = { strength: 80, defense: 85, dexterity: 90, agility: 81 };
+  const m = await fahre({ skills: niedrig, runden: 4, schrittMs: 30000 });
+  const l = lage(m);
+  pruefe("es weicht (Grund nennt bbtrain)", !!l && /weicht bbtrain/.test(String(l.grund)),
+    l ? "grund=" + l.grund : "keine Lage");
+  pruefe("und meldet weichtTraining: true auch nach mehreren Runden",
+    !!l && l.weichtTraining === true, l ? String(l.weichtTraining) : "keine Lage");
+  pruefe("der Tiefstand steht daneben (der Waechter braucht ihn als Traeger)",
+    !!l && l.tiefstand === 80, l ? "tiefstand=" + l.tiefstand : "?");
+
+  // GEGENPROBE: ohne sie waere die Probe oben auch gruen, wenn die Flagge
+  // immer true waere - und dann waere der Rang als Traeger nie zurueck.
+  const hoch = await fahre({ runden: 4, schrittMs: 30000 });
+  const lh = lage(hoch);
+  pruefe("bei Kampfwerten >= 100 steht sie auf false",
+    !!lh && lh.weichtTraining === false, lh ? String(lh.weichtTraining) : "keine Lage");
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {
   for (const ordner of [path.join(ROOT, "src"),

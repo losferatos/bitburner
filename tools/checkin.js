@@ -675,6 +675,28 @@ async function main() {
       }
     }
 
+    // WAS SEIT UEBER EINER STUNDE FEHLT (22.09.2026, Skeptiker Runde 2, H3).
+    // Der Waechter straft Werkzeuge, die nirgends laufen, nicht mehr - er
+    // fuehrt sie aber in data/fehlend.json. Hier wird daraus eine Zeile,
+    // sonst waere ein Werkzeug, das nie startet, aus jeder Sicht verschwunden.
+    {
+      const fehlt = await holeJson("data/fehlend.json");
+      if (fehlt && typeof fehlt === "object") {
+        const lang = Object.entries(fehlt)
+          .filter(([, seit]) => Number.isFinite(seit) && Date.now() - seit > 3600000)
+          .map(([name, seit]) => name + " seit " + Math.round((Date.now() - seit) / 60000) + " min");
+        if (lang.length) sag("FEHLT: " + lang.join(", ") + " (laeuft nirgends - Speicher? Bibliothek?)");
+      }
+      // Das Gym-Fenster (Skeptiker Runde 2, M1): der Rang steht dort
+      // planmaessig, S2 misst die Erfahrung. Ab drei Stunden ist es trotzdem
+      // eine Zeile wert.
+      const bl = await holeJson("data/blade.json");
+      if (bl && Number.isFinite(bl.gymSeit) && Date.now() - bl.gymSeit > 3 * 3600000) {
+        sag("GYM-FENSTER: blade.js steht seit " + ((Date.now() - bl.gymSeit) / 3600000).toFixed(1)
+          + " h im Gym (nichts ueber Schwelle) - kein Rang in dieser Zeit.");
+      }
+    }
+
     // Die drei Autonomie-Kennzahlen, sobald sie einen Wert haben. Sie sind
     // seit dem 04.09. ueberhaupt erst messbar - vorher schrieb niemand die
     // Ereignisse, aus denen sie sich rechnen.

@@ -128,6 +128,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-kernwache.js",
+    deckt: "EBENE 2: SELBST-Neustart des Kerns nur mit Wache, sonst verschieben; Lebenswache in guard.js",
+    schnell: false,
+  },
+  {
     datei: "test-sprosse5-kette.js",
     deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
     schnell: false,

@@ -1363,6 +1363,24 @@ async function schiebeStapel(stapelEingang) {
   }
   stapel = neu;
 
+  // DIE SPERRLISTE ZUERST (22.09.2026). Sie griff bisher erst ganz unten,
+  // NACH Eingriffszaehlung und pre-hotswap-Sicherung. Jeder Watcher-Anstoss
+  // an graftplan.json (etwa ein Testlauf, der src/ beruehrt) buchte damit
+  // "Eingriff push: graftplan.json", zog eine Sicherung und setzte die
+  // 12-h-Uhr der Stufe B zurueck - obwohl nichts hinausging (bridge.log
+  // 22.09., 19:38). Eine gesperrte Datei ist kein Schub. Der Filter unten
+  // bleibt als zweite Linie fuer Zurueckgestelltes, das spaeter dazukommt.
+  {
+    const gesperrt = await nichtSchieben();
+    const frei = [];
+    for (const datei of stapel) {
+      if (gesperrt.has(datei)) log("warn", datei + " steht in nicht-schieben.txt - NICHT geschoben");
+      else frei.push(datei);
+    }
+    if (!frei.length) return;
+    stapel = frei;
+  }
+
   // DIE ZWEIT-TAB-SPERRE GILT AUCH HIER (Befund W.6). Der Watcher ist der
   // stillste aller Wege ins Spiel - eine gespeicherte Datei genuegt.
   {

@@ -53,6 +53,12 @@ const TAKT_MS = 10000;
 export async function main(ns) {
   ns.disableLog("ALL");
 
+  // Fehlgeschlagene Kern-Starts in Folge (Lebenswache) - fuer die
+  // gedrosselte Meldung.
+  let kernVerfehlt = 0;
+  // Kern-Neustarts durch die Wache und wann zuletzt ein Ereignis ging.
+  let kernNeustarts = 0;
+  let kernEreignisWall = 0;
   const log = [];
   const sag = (t) => {
     log.push(new Date().toLocaleTimeString() + "  " + t);
@@ -217,6 +223,56 @@ export async function main(ns) {
         letzterTraegerNodeReset = null;
         letzterTraegerName = null;
         letzteAusfuehrung.clear();
+      }
+
+      // --- Lebenswache ueber den Kern (22.09.2026) ---------------------------
+      //
+      // BAUSTELLEN "Kaltstart: SELBST bn4net.js hat keinen Rueckholer": der
+      // Kern beendet sich auf `SELBST bn4net.js` und verliess sich darauf,
+      // dass popups.js oder bn4life.js ihn zurueckholen. Im Kaltstart laeuft
+      // keins von beiden; am 06.09. lag der Kern 20 min tot.
+      //
+      // Der Waechter laeuft in jeder Phase auf home und bezahlt ps, exec und
+      // fileExists ohnehin - die Wache kostet hier 0 GB. Ein eigener
+      // Rueckholer (erster Entwurf) haette im Kaltstart 3,75 GB gebraucht,
+      // wo home 0,20 GB frei hat.
+      //
+      // Das ist KEINE Sprosse und haengt deshalb nicht am Modus: einen
+      // fehlenden Kern zu starten ist genau das, was popups.js seit dem
+      // 23.08. bedingungslos tut. Es steht VOR der Karenz, weil der Kaltstart
+      // gerade die ersten Minuten nach einem Reset sind. Ein Doppelstart ist
+      // harmlos (Pruefen und exec ohne await dazwischen, und der Kern beendet
+      // eine juengere Doppelinstanz selbst). data/bn4-stop.txt bremst wie
+      // ueberall.
+      if (!ns.fileExists("data/bn4-stop.txt", "home")
+          && ns.fileExists("bn4net.js", "home")
+          && !ns.ps("home").some((pr) => pr.filename === "bn4net.js")) {
+        const kernPid = ns.exec("bn4net.js", "home");
+        if (kernPid) {
+          kernNeustarts++;
+          sag("bn4net.js lief nicht - neu gestartet (pid " + kernPid + "), "
+            + kernNeustarts + ". Mal seit Waechterstart.");
+          kernVerfehlt = 0;
+          // INS EREIGNISPROTOKOLL (Skeptiker M1, 22.09.2026). Ohne diese
+          // Zeile waere ein Kern, der stuendlich stirbt, unsichtbar: die
+          // Wache holt ihn in <= 10 s zurueck, S3a feuert nie, und
+          // guard-log.txt ist nach 200 Zeilen abgeschnitten. Gedrosselt auf
+          // einmal je 10 min, damit eine Absturzschleife den Ringpuffer
+          // nicht flutet - die Zahl im Eintrag zaehlt trotzdem jeden Start.
+          if (wall - kernEreignisWall >= 10 * 60000) {
+            kernEreignisWall = wall;
+            ereignisAnhaengen(ns, "note", "Waechter hat bn4net.js neu gestartet ("
+              + kernNeustarts + ". Mal)", uhren,
+              { reason: "kern-neustart", pid: kernPid, anzahl: kernNeustarts });
+          }
+        } else if (kernVerfehlt++ % 30 === 0) {
+          // Einmal je ~5 min statt jede Runde: kein Platz auf home. Ohne
+          // GB-Angabe - getServerMaxRam/UsedRam kosteten 0,05 GB, und der
+          // Waechter muss in den Kaltstart passen.
+          sag("bn4net.js laeuft nicht und passt nicht auf home - naechster Versuch jede Runde.");
+        }
+      } else {
+        kernVerfehlt = 0;
       }
 
       // --- Die eigene Uhr, vor allem anderen ---------------------------------

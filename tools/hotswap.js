@@ -453,7 +453,7 @@ console.log("      node -e \"fetch('" + BASE + "/api/state').then(r=>r.json())"
 console.log("");
 console.log("  Danach je Werkzeug den Neustart ausloesen. `reload.txt` nennt");
 console.log("  ENTWEDER `SELBST bn4net.js` (der Kern beendet sich selbst und");
-console.log("  boot.js holt ihn zurueck) ODER `WERKZEUG <name>.js`:");
+console.log("  die Wache in guard.js holt ihn zurueck) ODER `WERKZEUG <name>.js`:");
 console.log("");
 for (const d of dateien) {
   const b = path.basename(d);

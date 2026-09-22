@@ -291,9 +291,9 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 226879,
-  "lines": 4101,
-  "sha256": "55b22a1a74a258fcb9ca65b0d2372d91bc41a8c69010c554e4b31f97ebaa01db",
+  "bytes": 229980,
+  "lines": 4145,
+  "sha256": "6e5af142ca649a00945a88f3519301d2fbf7cdc0428c6b3f1f1974d5e4237b0d",
   "gemessenAm": "2026-09-11T06:10 calculateRam im Spiel (100.35 mit SF4, 175.35 ohne)",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -1024,9 +1024,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 278649,
-  "lines": 4957,
-  "sha256": "3b77e28b0108575245e602f1fd587626dc20ea901861273fc798587bb2138ddb",
+  "bytes": 275998,
+  "lines": 4998,
+  "sha256": "6c6da072a9539f2f12a63e99fa22e75488a4d4c48a60d8ed23b9fa2855d164a9",
   "gemessenAm": "2026-09-06T09:53:00.000Z",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -1221,9 +1221,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 50170,
-  "lines": 917,
-  "sha256": "63bde2a51781aa9af4535e449454b0e7a65b175cb7b5a5e1320f2cc95b5741ba"
+  "bytes": 49602,
+  "lines": 922,
+  "sha256": "aa35ac2be413124fdd9d92a318c227964f40eccbba1572e66cca3214c6151045"
  },
  {
   "file": "sleevecrime.js",
@@ -1939,8 +1939,8 @@
   "live41": 6.1,
   "lokal41": 6.1,
   "diff": 0,
-  "sha256": "0a5497095aa7b7a7f38d1d4b9cd4cba818a3ac1092446ae3497a7df528e5b827",
-  "bytes": 70621,
+  "sha256": "93b033a78dfa49a41b59d902fc67694cb8fbb7514b71b624b9e01506d551e335",
+  "bytes": 73665,
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  }

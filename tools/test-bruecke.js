@@ -1693,6 +1693,16 @@ console.log("-- DER MASTER-RIEGEL: was nicht committet ist, geht nicht hinaus --
   pruefe("  und die Bruecke sagt, dass sie es gesehen hat",
     b.zeilen.slice(vorher3).some((z) => /nicht-schieben/i.test(z)),
     b.zeilen.slice(vorher3).slice(-3).join(" | "));
+  // KEIN EINGRIFF, KEINE SICHERUNG (22.09.2026). Die Sperrliste griff erst
+  // nach Eingriffszaehlung und pre-hotswap-Sicherung: jeder Watcher-Anstoss
+  // an graftplan.json buchte "Eingriff push" und setzte die 12-h-Uhr der
+  // Stufe B zurueck, obwohl nichts hinausging (bridge.log 22.09., 19:38).
+  pruefe("  und bucht dafuer keinen Eingriff",
+    !b.zeilen.slice(vorher3).some((z) => /Eingriff push: zuender\.json/.test(z)),
+    b.zeilen.slice(vorher3).filter((z) => /Eingriff/.test(z)).join(" | "));
+  pruefe("  und zieht keine pre-hotswap-Sicherung",
+    !b.zeilen.slice(vorher3).some((z) => /pre-hotswap/.test(z)),
+    b.zeilen.slice(vorher3).filter((z) => /pre-hotswap/.test(z)).join(" | "));
 
   // Und die Gegenprobe: ohne Eintrag geht dieselbe Datei durch. Ohne sie
   // wuerde ein Riegel, der ALLES blockt, als Erfolg durchgehen.

@@ -1777,6 +1777,9 @@ beschrieben. Nach fuenfzehn Raids ist der Effekt vorbei.
      rutscht und JEDE Aktion ausser Black Ops schwaecher macht.
   3. Chaos - Raid hebt es prozentual. Ueber 50 greift die Diplomacy-Regel und
      frisst Arbeitszeit; ueber `RAID_CHAOS_MAX` schaltet sich Raid selbst ab.
+     *Nachtrag 22.09.2026: `RAID_CHAOS_MAX` war seit dem Umbau auf Ertragsvergleich
+     tot und ist gestrichen - der Chaos- und Bevoelkerungspreis steckt jetzt im
+     Ertrag (CHAOS_JE_LAUF, popErwartet), ueber CHAOS_EIN raeumt der Bot auf.*
 
 Abbruchkriterium: Faellt popEst unter 1,0e9 oder steigt das Chaos ueber 55,
 gehoert `RAID_AN` zurueck auf `false` - dann kostet der Hebel mehr, als er

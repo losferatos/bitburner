@@ -156,6 +156,10 @@ async function fahre(o = {}) {
       blackOps: o.blackOps || [{ name: "Operation Typhoon", rank: 2500 }],
     },
   });
+  // Knotenfaktoren: der Mock kennt getBitNodeMultipliers nicht, blade.js
+  // faellt dann auf Faktor 1 zurueck. Wer einen anderen Knoten braucht,
+  // nennt ihn hier.
+  if (o.bnMult) m.ns.getBitNodeMultipliers = () => ({ ...o.bnMult });
   if (o.skills) Object.assign(m.zustand.spieler.skills, o.skills);
   if (o.exp) m.zustand.spieler.exp = { ...(m.zustand.spieler.exp || {}), ...o.exp };
   if (o.hp) m.zustand.spieler.hp = o.hp;
@@ -612,6 +616,35 @@ console.log("-- Operation gegen Vertrag: der hoehere Ertrag gewinnt (22.09.2026)
 }
 
 console.log("");
+console.log("-- Operation gegen Vertrag: der Rangverlust zaehlt mit (22.09.2026) --");
+{
+  // Nur Assassination ist offen (p 0,86), Knotenfaktor BladeburnerRank 0,2
+  // (BN15, der kleinste echte). Ohne Verlust: 44 x 0,86 = 37,8 Rang je
+  // Versuch, mit Verlust 37,8 - 4/0,2 x 0,14 = 35,0 (-7,4 %). Die Dauer
+  // (21,7 min, empirisch: neu kippt bei 20,8, alt erst bei 22,5) legt den
+  // Vertrag (Bounty Hunter, 0,95) genau dazwischen. Schmales Fenster, aber
+  // der Mock ist deterministisch. In der Praxis verschiebt der Abzug bei
+  // SICHER_OPERATION 0,85 den Ertrag nur um 1-8 % (Skeptiker, 22.09.).
+  const lage = { vertragChance: 0.95, opChance: 0.86, je: {} };
+  for (const n of ["Investigation", "Undercover Operation", "Sting Operation", "Raid",
+    "Stealth Retirement Operation"]) {
+    lage.je["Operations/" + n] = { vorrat: 0 };
+  }
+  lage.je["Operations/Assassination"] = { vorrat: 100, stufe: 1, maxStufe: 15,
+    chance: 0.86, dauer: 1300000 };
+  const m = await fahre({ aktionLage: lage, bnMult: { BladeburnerRank: 0.2 } });
+  const g = gestartet(m);
+  pruefe("mit Verlustabzug gewinnt der Vertrag",
+    g.some((x) => x.startsWith("Contracts/")) && !g.some((x) => x.startsWith("Operations/")),
+    g.join(", ") || "(nichts)");
+  // Gegenprobe: bei Faktor 1 ist der Verlust klein, die Operation gewinnt.
+  const m2 = await fahre({ aktionLage: lage });
+  const g2 = gestartet(m2);
+  pruefe("bei Faktor 1 gewinnt dieselbe Operation",
+    g2.some((x) => x.startsWith("Operations/")), g2.join(", ") || "(nichts)");
+}
+
+console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {
   for (const ordner of [path.join(ROOT, "src"),
@@ -629,6 +662,18 @@ console.log("-- keine .mock-Datei bleibt liegen --");
     pruefe("keine Reste in " + path.basename(path.dirname(ordner)) + "/src",
       reste.length === 0, reste.join(", "));
   }
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Stadtwahl: aus der ausgebrannten Stadt wird gewechselt --");
+{
+  const wechsel = (m) => JSON.stringify([m.zustand.log, m.zustand.ausgabe])
+    .match(/Stadtwechsel nach [A-Za-z-]+[^"]*Bevoelkerung je Chaos-Faktor/g) || [];
+  const leer = await fahre({ stadtLage: { pop: 1.2e9, chaos: 10,
+    je: { "Sector-12": { chaos: 10, comms: 60, pop: 0 } } } });
+  pruefe("popEst 0 hier - jede bewohnte Stadt gewinnt", wechsel(leer).length >= 1,
+    "gereist: " + JSON.stringify(leer.zustand.blade.gereist));
 }
 
 console.log("");

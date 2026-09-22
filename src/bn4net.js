@@ -689,6 +689,10 @@ export async function main(ns) {
   // ein exec mit pid 0 wird wiederholt, aber nicht endlos.
   const waechterVersuche = new Map();
   const waechterPauseBis = new Map();
+  // Einmal melden, dass ein SELBST-Neuladen mangels Wache wartet - nicht
+  // alle zehn Sekunden (22.09.2026). Zurueckgesetzt, sobald kein
+  // SELBST-Auftrag mehr ansteht.
+  let selbstVerschobenGemeldet = false;
 
   const baueWerkzeuge = (lage) => regGeladen
     ? regAuswahl(regGeladen, lage)
@@ -923,9 +927,38 @@ export async function main(ns) {
       ? ns.read("data/reload.txt") : "";
     if (befehl.includes("SELBST")
         && (befehl.trim() === "SELBST" || befehl.includes("bn4net.js"))) {
-      ns.write("data/reload.txt", "", "w");
-      sag("Neuladen angefordert - beende mich, die Wache holt mich zurueck.");
-      ns.exit();
+      // NUR BEENDEN, WENN JEMAND ZURUECKHOLT (22.09.2026, BAUSTELLEN
+      // "Kaltstart: SELBST bn4net.js hat keinen Rueckholer").
+      //
+      // "Die Wache holt mich zurueck" stimmte nur, wenn popups.js oder
+      // bn4life.js lief - im Kaltstart keins von beiden, und am 06.09. lag
+      // der Kern 20 min tot. Seitdem hat guard.js eine Lebenswache ueber den
+      // Kern. Laeuft KEINER der drei, wird das Neuladen verschoben statt den
+      // Kern ohne Rueckweg zu beenden: reload.txt bleibt stehen, die naechste
+      // Runde fragt wieder.
+      // MIT BREMSDATEI ZAEHLT NUR popups.js (Skeptiker M3). guard.js und
+      // bn4life.js respektieren data/bn4-stop.txt und holen den Kern dann
+      // NICHT zurueck; popups.js prueft sie nicht. Liegt die Bremse (etwa
+      // um blade.js anzuhalten, waehrend der Kern weiterlaufen soll), waere
+      // ein Ende auf guard.js hin ein Ende ohne Rueckweg.
+      const holer = ns.fileExists("data/bn4-stop.txt", "home")
+        ? ["popups.js"]
+        : ["guard.js", "popups.js", "bn4life.js"];
+      const holerDa = hosts.some((h) => {
+        try { return ns.ps(h).some((pr) => holer.includes(pr.filename)); }
+        catch { return false; }
+      });
+      if (holerDa) {
+        ns.write("data/reload.txt", "", "w");
+        sag("Neuladen angefordert - beende mich, die Wache holt mich zurueck.");
+        ns.exit();
+      } else if (!selbstVerschobenGemeldet) {
+        selbstVerschobenGemeldet = true;
+        sag("Neuladen angefordert, aber keine Wache laeuft (guard/popups/bn4life)"
+          + " - verschoben, bis eine da ist.");
+      }
+    } else {
+      selbstVerschobenGemeldet = false;
     }
     // --- 0b2. Auftragslaeufer, ersatzweise ------------------------------------
     // data/task.txt ist der einzige Weg, von aussen ein Skript im Spiel zu
@@ -4731,9 +4764,17 @@ export async function main(ns) {
         // data/einbau.json, und der `jump`-Eintrag traegt sie seit heute mit.
         const letzterSprung = [...strom.eintraege].reverse()
           .find((e) => e.art === "jump");
-        if (letzterSprung && letzterSprung.daten
-            && Number.isFinite(letzterSprung.daten.wartendeAugs)) {
-          k.queued_augs_at_jump = letzterSprung.daten.wartendeAugs;
+        // NUR GEPRUEFTE ZAHLEN (22.09.2026). Bis zum Nachmittag schrieb
+        // ausgang.js die Zahl ungeprueft - auch dann, wenn einbau.json vom
+        // Stand VOR dem letzten Einbau war. Der Sprung vom Vormittag des 22.09. traegt so
+        // eine falsche 2 (die Warteschlange war leer, belegt durch die
+        // pre-jump-Sicherung). Seit der Pruefung stempelt ausgang.js das
+        // Feld `wartendeGeprueft`; ungestempelte Spruenge gelten als
+        // unbelegt und setzen den Kennwert auf null statt auf eine Zahl.
+        if (letzterSprung && letzterSprung.daten) {
+          const d = letzterSprung.daten;
+          k.queued_augs_at_jump = (d.wartendeGeprueft === true && Number.isFinite(d.wartendeAugs))
+            ? d.wartendeAugs : null;
         }
         // `backup_wait_min` (22.09.2026): die Wartezeit des letzten Handschlags
         // vor einem Sprung - ausgang.js schreibt sie ins Ereignis, nicht in

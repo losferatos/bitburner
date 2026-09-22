@@ -187,18 +187,17 @@ export async function main(ns) {
   // `getPopulationSuccessFactor = (pop/1e9)^0,7` (`Actions/Action.ts:88-92`)
   // und wirkt damit auf JEDE Aktion ausser Black Ops - Sector-12 steht bei
   // popEst 1,109e9, also Faktor 1,075. Faellt die Bevoelkerung unter 1e9,
-  // dreht der Hebel ins Minus. Deshalb bleibt `RAID_CHAOS_MAX` scharf, und
-  // die Nachmessung in `nodes/HEBEL.md` prueft ausdruecklich popEst mit.
+  // dreht der Hebel ins Minus.
+  //
+  // KEINE RAID-RIEGEL MEHR (22.09.2026, BAUSTELLEN "Tote Parameter"). Hier
+  // standen RAID_GELD_MIN, RAID_CHAOS_MAX, RAID_CHANCE_MIN und
+  // RAID_CHARISMA_MIN - gelesen hat sie seit dem Umbau auf Ertragsvergleich
+  // niemand, und der Kommentar "RAID_CHAOS_MAX bleibt scharf" behauptete
+  // eine Sperre, die es nicht gab. Der Preis steckt stattdessen im Ertrag:
+  // CHAOS_JE_LAUF und der Bevoelkerungszuschlag (popErwartet) verlaengern
+  // die bewertete Dauer, und ueber CHAOS_EIN uebernimmt das Aufraeumen.
   const RAID_AN = true;
-  const RAID_GELD_MIN = 2e9;
-  const RAID_CHAOS_MAX = 50;
-  const RAID_CHANCE_MIN = 0.08;
   const RAID_VORRAT_MIN = 3;
-  // Charisma-Riegel entschaerft: Er sollte die Truppkosten abbilden, nicht
-  // Raid selbst. Bei 264 steht die Rekrutierungschance auf 1,00 (die Formel
-  // klemmt erst ab zwoelf Mitgliedern), also ist die Bedingung erfuellt,
-  // sobald ueberhaupt rekrutiert werden kann.
-  const RAID_CHARISMA_MIN = 200;
   // Ab wieviel Gemeinden sich ein Stadtwechsel lohnt. Zehn sind rund 970 Rang
   // bei Raid-Stufe 7 - genug, um die Diplomacy-Phase zu bezahlen, die der
   // Wechsel nach sich zieht.
@@ -2383,6 +2382,17 @@ export async function main(ns) {
     const STADT_VORSPRUNG = 2;
     try {
       const hier = ns.bladeburner.getCity();
+      // LINEAR, MIT ABSICHT (22.09.2026, Parameter-Audit Punkt 8 geprueft
+      // und verworfen). Die Spielformel ist `(pop/1e9)^0,7`
+      // (`Actions/Action.ts:88-92`), der Vorsprung 2 entspricht hier also
+      // nur 1,62 in der Chance. Die "richtige" Formel wurde gebaut und vom
+      // Skeptiker gekippt: `getCityEstimatedPopulation` liefert popEst, das
+      // in fremden Staedten frei veraltet (nur pop wandert), `bbspann.js`
+      // hat genau diese Guete am 26.08. als WIDERLEGT markiert, und mit ^0,7
+      // haette das heilbare Chaos staerker gezaehlt als die unheilbare
+      // Bevoelkerung - der Bot waere laenger in fast leeren Staedten
+      // geblieben. Der richtige Weg ist Proben-Wechsel wie in bbspann.js
+      // (BAUSTELLEN). Bis dahin bleibt die grobe, aber bewaehrte Regel.
       const wert = (stadt) => {
         const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
         const chaos = ns.bladeburner.getCityChaos(stadt);
@@ -2715,6 +2725,21 @@ export async function main(ns) {
       "Investigation": 2.2, "Undercover Operation": 4.4, "Sting Operation": 5.5,
       "Stealth Retirement Operation": 22, "Assassination": 44, "Raid": 55,
     };
+    // DER VERLUST GEHOERT IN DEN ERTRAG (22.09.2026, Skeptiker zu Paket A).
+    //
+    // Operationen verlieren bei Fehlschlag `rankLoss * rewardFac^(stufe-1)`
+    // Rang, OHNE den Knotenfaktor (`Formulas.ts:30-41`, Abzug in
+    // `Bladeburner.ts:1053-1057`); Vertraege verlieren nichts (kein rankLoss
+    // in `data/Contracts.ts`). Seit Paket A vergleicht waehle() Vertrag
+    // gegen Operation nach Ertrag - ohne diesen Abzug war die Operation dort
+    // ueberbewertet, in Knoten mit BladeburnerRank < 1 umso mehr. Die Werte
+    // hier sind wie RANG_JE_ERFOLG ohne Knotenfaktor; der Verlust wird durch
+    // BB_RANK_MULT geteilt, damit beide in derselben Einheit stehen.
+    // rankLoss-Werte aus reference/bitburner-src/src/Bladeburner/data/Operations.ts.
+    const RANG_JE_FEHLSCHLAG = {
+      "Investigation": 0.2, "Undercover Operation": 0.4, "Sting Operation": 0.5,
+      "Raid": 2.5, "Stealth Retirement Operation": 2, "Assassination": 4,
+    };
     const beste = (liste, typ, schwelle) => {
       let treffer = null;
       for (const name of liste) {
@@ -2991,13 +3016,18 @@ export async function main(ns) {
         // liefert weiter Daten, und die naechste Hypothese kann darauf
         // aufbauen, statt wieder bei null anzufangen.
         const proLauf = kosten.get(typ + "/" + name) ?? kostenSchnitt;
-        const ertrag = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
+        // Netto je Versuch: Gewinn bei Erfolg minus Verlust bei Fehlschlag,
+        // beide mit der vorsichtigen Untergrenze s.min gerechnet.
+        const verlust = (RANG_JE_FEHLSCHLAG[name] || 0) * Math.pow(fac, Math.max(0, stufe - 1))
+          / (BB_RANK_MULT > 0 ? BB_RANK_MULT : 1);
+        const netto = rang ? rang * s.min - verlust * (1 - s.min) : 0;
+        const ertrag = (rang && dauer) ? netto / (dauer / 60000) : s.min;
         // proMinute wird MITGEFUEHRT, auch wenn nach Ausdauer ausgewaehlt
         // wird: Der Vergleich mit General-Aktionen (Field Analysis, Training)
         // geht nur ueber die Zeit, denn die kosten gar keine Ausdauer. Ohne
         // diese zweite Zahl vergleicht man Aepfel mit Birnen - genau das ist
         // um 09:55 passiert, und der Motor landete prompt auf Field Analysis.
-        const proMinute = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
+        const proMinute = (rang && dauer) ? netto / (dauer / 60000) : s.min;
         if (!treffer || ertrag > treffer.ertrag) {
           treffer = { name, min: s.min, ertrag, proMinute, gerechnet: !!(rang && dauer) };
         }
@@ -3052,6 +3082,13 @@ export async function main(ns) {
     // das richtige Ergebnis geliefert. Genau dieser Fehler hat am 26.08. um
     // 12:55 einen falschen Auftrag erzeugt. Solange `beste()` brutto rechnet,
     // entscheiden hier feste Grenzen - das ist ehrlicher.
+    //
+    // UEBERHOLT (22.09.2026): `beste()` rechnet inzwischen Levelfaktor
+    // (27.08.), Chaos- und Bevoelkerungszuschlag (28.08.) und Rangverlust
+    // (22.09., RANG_JE_FEHLSCHLAG) ein, und waehle() vergleicht Vertrag gegen
+    // Operation nach Ertrag. Die festen RAID_*-Grenzen, von denen dieser
+    // Absatz spricht, las schon laenger niemand; sie sind gestrichen. Der
+    // Absatz bleibt als Herleitung stehen.
     // WARUM EINE CHARISMA-SCHWELLE (26.08.2026, 16:50)
     //
     // Raid erzeugt selbst das Chaos, das ihn ausbremst:
@@ -3181,6 +3218,13 @@ export async function main(ns) {
     // kein Rangverlust und kein Toter. Deshalb gilt hier der Ertragsvergleich.
     // Operationen (Teamverluste) und Black Ops (Tod) behalten ihre
     // Sicherheitsschwellen unangetastet.
+    // OHNE KNOTENFAKTOR, UND DAS IST RICHTIG (22.09.2026, Parameter-Audit
+    // Punkt 7). Das Spiel gibt 0,1 * BladeburnerRank (`Formulas.ts:13`) -
+    // aber `proMinute` der Vertraege rechnet ebenfalls mit den Basiswerten
+    // aus RANG_JE_ERFOLG, ohne den Faktor. Beide Seiten tragen ihn gleich
+    // und er kuerzt sich heraus; ihn nur hier einzusetzen, verschoebe den
+    // Vergleich. Anders bei `stern`: dort steht der Verlust OHNE Faktor
+    // gegen den Gewinn MIT, deshalb gehoert er dort hinein.
     let feldErtrag = 0.2;
     try {
       const t = ns.bladeburner.getActionTime(G, "Field Analysis");

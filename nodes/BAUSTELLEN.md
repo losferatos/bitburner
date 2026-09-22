@@ -510,7 +510,7 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 *Aufgeraeumt am 22.09.2026: 34 automatische Momentaufnahmen (Bruecke ohne Sicherung / Telemetrie veraltet / Spiel-Tab nicht verbunden) entfernt - alle ueberholt. tools/liste.js ersetzt gleiche Ueberschriften seitdem, statt zu doppeln.*
 
 - **Hash-Verwendung pruefen: Coding Contracts (19.09.2026, Skeptiker).** 'Generate Coding Contract' kostet 25*(L+1) Hashes; ein Vertrag bringt ueber contracts.js Geld. Gegen Sell for Money (4 Hashes = 1 Mio) rechnen, sobald hashes.js eine Woche gelaufen ist und data/hashes.json Zahlen liefert.
-- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain. **GEBAUT 22.09.2026 (Paket A):** bn4rep sperrt den Einbau in Kampfknoten, solange die Kampfwerte im Aufbau sind (tiefstand < 100) und bis mindestens max(12 h, 2 x Aufbaudauer) seit dem letzten Einbau vergangen sind (lib/endspurt.js kampfEinbauSperre, Uhr in data/einbau-uhr.json); punish.js haelt sich daran. Im Spiel: einbau.json kampfAufbau=true. bn4door-ERSCHOEPFT sollte verschwinden, seit seine Telemetrie auf home liegt - beim naechsten /bb pruefen, dann diesen Punkt streichen.
+- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain. **GEBAUT 22.09.2026 (Paket A):** bn4rep sperrt den Einbau in Kampfknoten, solange die Kampfwerte im Aufbau sind (tiefstand < 100) und bis mindestens max(12 h, 2 x Aufbaudauer) seit dem letzten Einbau vergangen sind (lib/endspurt.js kampfEinbauSperre, Uhr in data/einbau-uhr.json); punish.js haelt sich daran. Im Spiel: einbau.json kampfAufbau=true. Die Meldung '2 gekaufte Augs beim Sprung verfallen' stammte aus einer ungeprueften Zahl im Sprung vom 22.09. vormittags; seit Paket B zaehlen nur gestempelte Spruenge (wartendeGeprueft). bn4door-ERSCHOEPFT sollte verschwinden, seit seine Telemetrie auf home liegt - beim naechsten /bb pruefen, dann diesen Punkt streichen.
 - **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still). **Nachtrag 17.09.:** Verdacht Sprung reicht nicht - um 15:42 per Start-Process gestartet, letzte Logzeile 15:44 'Sicherung hourly gruen', um 16:30 kein Prozess mehr, stderr leer, Rechner lief durch, kein Sprung, kein Reset. Die Bruecke stirbt also auch im Normalbetrieb binnen Minuten. Erste Frage: beendet die Werkzeug-Shell von Claude Code ihre Kindprozesse beim Turn-Ende (Start-Process aus PowerShell-Tool)? Gegenprobe: Bruecke aus einem eigenen Terminal-Fenster starten. **Nachtrag 18.09.:** Shell-Verdacht widerlegt - die Bruecke vom 17.09. 16:31 lief 12 h, ueberlebte einen Install (18:24) und eine Trennung (20:04), verband 04:09 neu und war um 05:11 tot; letzte Zeilen 04:10:31 'Bruecke ohne Sicherung' + 'Sicherung hourly gruen'. Auffaellig: der Tod folgt jedes Mal kurz nach einer Sicherung direkt nach einem (Wieder-)Verbinden.
 - **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
 - **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
@@ -678,7 +678,10 @@ Fix: der Kern muss in V2 vor dem Beitritt das Kampf-Exp als Traeger melden
 (Minimum der vier Werte), nicht Hacking. Ersatzweise: S2 ruht, solange
 `blade.json.wartend` gesetzt ist. Skeptiker vor dem Einbau.
 
-### Kaltstart: SELBST bn4net.js hat keinen Rueckholer (06.09.2026, 12:40)
+### ERLEDIGT 22.09.2026: Kaltstart: SELBST bn4net.js hat keinen Rueckholer (06.09.2026, 12:40)
+
+guard.js hat eine Lebenswache ueber den Kern (0 GB, vor der Karenz, respektiert bn4-stop.txt, Ereignis `note`/kern-neustart gedrosselt je 10 min). Der Kern beendet sich auf SELBST nur, wenn guard/popups/bn4life laeuft (mit Bremsdatei nur popups), sonst verschiebt er. Ein eigener rueckholer.js (erster Entwurf) war im Kaltstart ohne Platz und ist verworfen. Im Spiel belegt 22:44:57: Wache holte den Kern nach SELBST zurueck (pid 2405 -> 7035). **Einspielregel:** guard.js VOR bn4net.js neu starten - ein alter guard ohne Wache zaehlt sonst als Rueckholer.
+
 
 `data/reload.txt` mit `SELBST bn4net.js` beendet den Kern; zurueckholen
 sollen ihn bn4life.js oder popups.js. Im Kaltstart laeuft keiner von beiden
@@ -1174,6 +1177,16 @@ Graften, dann 21 h Assassination.
 Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
+
+### test-bruecke.js wackelt in der Suite: Probe "Riegel BLIND" (22.09.2026)
+
+Einmal von drei Laeufen rot, einzeln immer gruen (96/96). Die Bruecke wies
+die Spielverbindung ab: "totalPlaytime 694458000000 liegt mehr als 60 s hinter
+dem zuletzt bekannten Wert 698133600000 (INDEX.tsv (MOCK_testtesttest01_...
+_connect.json.gz))" - eine Sicherung eines ANDEREN Pruefstands (parallel
+laufende Testdatei) stand in derselben INDEX.tsv. Damit kam die Bruecke nie
+zum Schieben, und "nicht lesbar" fehlte. Zu tun: den Sicherungsordner je
+Pruefstand trennen (oder die Probe mit eigener Playtime-Basis fahren).
 
 ### `reference/` ist nicht das laufende Spiel - drei belegte Abweichungen (30.08., 16:40)
 
@@ -1772,6 +1785,41 @@ Aus demselben Audit, in absteigender Wirkung und alle mit Fundstelle:
 
 **Tote Parameter** (werden nirgends gelesen): `RAID_GELD_MIN`,
 `RAID_CHAOS_MAX`, `RAID_CHANCE_MIN`, `RAID_CHARISMA_MIN` (`blade.js:148-156`).
+
+**Stand 22.09.2026 (Restpunkte, mit Skeptiker):**
+- Punkt 7 `feldErtrag`: **kein Fehler.** Auch `proMinute` der Vertraege
+  rechnet ohne BladeburnerRank (RANG_JE_ERFOLG ist Basiswert), der Faktor
+  kuerzt sich; `feldErtrag` wird nur gegen Vertraege (ohne rankLoss)
+  verglichen. Kommentar im Code.
+- Punkt 8 `wert(stadt)`: `^0,7` gebaut und **vom Skeptiker gekippt** -
+  `getCityEstimatedPopulation` ist popEst (veraltet in fremden Staedten frei),
+  `bbspann.js:369-389` hat genau diese Guete am 26.08. als WIDERLEGT markiert,
+  und mit `^0,7` zaehlt das heilbare Chaos staerker als die unheilbare
+  Bevoelkerung (Bot bliebe laenger in fast leeren Staedten). Linear bleibt,
+  Kommentar im Code. Der richtige Weg steht unten als Verbesserung.
+- Tote RAID-Konstanten: gestrichen, HEBEL.md nachgetragen.
+
+### Verbesserung: Stadtwahl nach Proben statt nach popEst (22.09.2026, Skeptiker)
+
+`switchCity` setzt nur ein Feld (`NetscriptFunctions/Bladeburner.ts:314-319`)
+- ein Probewechsel kostet nichts. Wie `src/bbspann.js`: je Stadt wechseln,
+`getActionEstimatedSuccessChance` der tatsaechlich gefahrenen Aktion lesen,
+zurueck. Chaos dabei als EINMALIGE Diplomacy-Kosten (20-64 min, Tabelle beim
+Rundreise-Kommentar in blade.js) statt als Dauerfaktor ansetzen. Erst bauen,
+wenn eine Messung zeigt, dass der Bot in einer schlechten Stadt festsitzt.
+
+### ERLEDIGT 22.09.2026: Operation gegen Vertrag: Rangverlust fehlt im Ertrag der Operation (22.09.2026, Skeptiker)
+
+Gebaut (RANG_JE_FEHLSCHLAG, netto = rang*p - verlust*(1-p)/BB_RANK_MULT), per Monte Carlo gegen die Spielformel geeicht. Wirkung bei SICHER_OPERATION 0,85 nur 1-8 %.
+
+
+`op.ertrag` in `beste()` (blade.js ~3005) zieht den Fehlschlag-Verlust nicht
+ab (`rankLoss`, ohne Knotenfaktor, `Formulas.ts:30-41`). Im Vergleich
+`vt.ertrag > op.ertrag` (Paket A) kuerzt sich der Faktor deshalb nicht: in
+Knoten mit BladeburnerRank < 1 ist die Operation ueberbewertet. Die Richtung
+ist konservativ (vor Paket A gewann die Operation immer). Beheben: Ertrag
+der Operation = rang*p - rankLoss*(1-p)/BB_RANK_MULT, gegen den Quelltext
+eichen.
 
 **Geprueft und als richtig bestaetigt:** `CHAOS_EIN = 50`, Overclock-Deckel
 90, `BBTRAIN_ZIEL = 100`, `RANG_JE_ERFOLG`, `REWARD_FAC`, `BLACKOP_DATEN`

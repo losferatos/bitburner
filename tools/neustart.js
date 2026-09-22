@@ -45,8 +45,11 @@
  * wuerde sich selbst beenden, und ob jemand zurueckkommt, haengt dann an der
  * Wache in `popups.js`. Genau daran ist am 25.08. um 05:59 ein Wiederanlauf
  * gescheitert. Fuer den Kern gibt es `SELBST bn4net.js` - das beendet ihn an
- * definierter Stelle, und `bn4life.js` holt ihn zurueck. Dieses Werkzeug
- * waehlt den richtigen Kanal von selbst.
+ * definierter Stelle, und die Lebenswache in `guard.js` (oder popups.js /
+ * bn4life.js) holt ihn zurueck. Laeuft keine davon, verschiebt der Kern das
+ * Neuladen und quittiert nicht - dann meldet dieses Werkzeug nach der Frist
+ * "keine Quittung" (22.09.2026). Dieses Werkzeug waehlt den richtigen Kanal
+ * von selbst.
  *
  * ===========================================================================
  * AUFRUF
@@ -211,7 +214,10 @@ for (const z of ziele) {
   }
   if (!quittiert) {
     console.log("      KEINE QUITTUNG - reload.txt steht nach 15 min noch da.");
-    console.log("      Der Kern liest sie nicht. Neustart NICHT belegt.");
+    console.log(kern
+      ? "      Entweder liest der Kern sie nicht, oder er hat verschoben, weil keine"
+        + " Wache (guard/popups/bn4life) laeuft - Kernprotokoll ansehen. Neustart NICHT belegt."
+      : "      Der Kern liest sie nicht. Neustart NICHT belegt.");
     fehler++;
     continue;
   }

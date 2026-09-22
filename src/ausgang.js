@@ -788,7 +788,12 @@ export async function main(ns) {
                 if (!Number.isFinite(e.zeit) || e.zeit <= info.lastAugReset) return null;
                 return e.wartend;
               } catch { return null; }
-            })() });
+            })(),
+            // Stempel: diese Zahl ist gegen den letzten Einbau geprueft. Der
+            // Kern zaehlt nur gestempelte Spruenge (22.09.2026) - das
+            // Sprung-Ereignis vom Vormittag des 22.09. traegt noch die ungepruefte 2 und stuende
+            // sonst bis zum naechsten Sprung als Befund im /bb.
+            wartendeGeprueft: true });
         nachHome("data/events.json", JSON.stringify(strom));
       } catch { /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
 

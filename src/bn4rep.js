@@ -799,7 +799,10 @@ export async function main(ns) {
     // WAEHREND EINES GRAFTS WIRD NICHT EINGEBAUT (30.08.2026, 21:30).
     //
     // `installAugmentations` fuehrt ueber `prestigeAugmentation` zu
-    // `this.finishWork(true, true)` (`Prestige.ts:137`) - ein laufendes Graft
+    // `this.finishWork(true, true)`
+    // (`PersonObjects/Player/PlayerObjectGeneralMethods.ts:137` - hier stand
+    // bis zum 22.09.2026 `Prestige.ts:137`, dieselbe Zeilennummer in der
+    // falschen Datei) - ein laufendes Graft
     // ist damit weg, und sein Geld wird NICHT erstattet
     // (`Work/GraftingWork.tsx:75-83`). Beim Simulacrum sind das $450 Mrd.
     //

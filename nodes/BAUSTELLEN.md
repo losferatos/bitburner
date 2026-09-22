@@ -38,7 +38,44 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
-### bn4life startet kein Skript mit Bibliotheken auf einem Fremdwirt (22.09.2026)
+### Handschlag: ein Postfach fuer zwei Absender (22.09.2026)
+
+lib/handschlag.js prueft seit dem 22.09. den Anlass, damit eine
+pre-install-Antwort nicht als pre-jump-Beleg durchgeht. Die Ursache bleibt:
+ANFRAGE und ANTWORT sind je EINE Datei, die sich install (bn4rep) und jump
+(ausgang) teilen.
+
+Folge: Stellt ausgang eine jump-Anfrage, waehrend die Bruecke noch die
+install-Anfrage abarbeitet, greift bridge.js:1888 (ok.ts >= anfrage.ts ->
+return) und es wird nie eine pre-jump-Antwort geschrieben. Der Wartelauf
+laeuft dann 90 s leer und faellt auf sicherungsAlterMs zurueck. Das ist
+besser als die frueher falsch akzeptierte Antwort, aber immer noch kein
+Handschlag.
+
+Sauber waere ein Postfach je Anlass: backup-request-install.txt und
+backup-request-jump.txt, entsprechend die Antworten. Beruehrt die Bruecke
+(pruefeHandschlag) und beide Aufrufer.
+
+Ausserdem ungetestet: tools/test-punish.js:89 prueft nur den Durchlassfall
+(anlass "pre-install" bei reason install). Der neue Negativpfad - falscher
+Anlass wird abgelehnt - hat keinen Test.
+
+### bn4life: Laufzeitdaten werden nicht mitkopiert (22.09.2026)
+
+Der Fix vom 22.09. loest die IMPORTE eines Auftragsskripts auf und kopiert
+sie mit. Dateien, die ein Skript erst zur Laufzeit liest, erfasst das nicht:
+libsVon("exit.js") liefert lib/route.js, aber nicht route.json und nicht
+lib/hackaugs.js - beide fuehrt ausgang.js:60 von Hand in BIBLIOTHEKEN.
+
+Heute folgenlos, weil exit.js ueber ausgang.js startet und nicht ueber
+task.txt. Faellig, sobald jemand ein Skript mit Datendatei per
+node tools/task.js startet: es laeuft an und findet seine Daten nicht.
+
+Moeglicher Weg: needsLibs aus registry.json zusaetzlich lesen, wo es einen
+Eintrag gibt (bn4net.js:3859 macht genau das), und die Importaufloesung als
+Rueckfall fuer alles andere behalten.
+
+### ERLEDIGT 22.09.2026: bn4life startete kein Skript mit Bibliotheken
 
 DAS war der Grund, warum autopilot.js nach dem Sprung stundenlang nicht
 startete - nicht Speichermangel.
@@ -67,7 +104,7 @@ Fix: denselben Weg wie bn4net gehen, also needsLibs aus der Registry lesen
 und mitkopieren. Fuer Skripte ausserhalb der Registry (autopilot.js steht
 nicht drin) braucht es einen Rueckfall - im Zweifel die Importzeilen lesen.
 
-### bn4life meldet beim Fehlschlag home statt des Wirts (22.09.2026, verschaerft)
+### ERLEDIGT 22.09.2026: bn4life meldete beim Fehlschlag home statt des Wirts
 
 Frueher hier als "irrefuehrend" notiert - es ist schlimmer. bn4life.js:335-338
 setzt in den Fehlertext fest home ein:
@@ -86,7 +123,7 @@ geschickt und die Ursache um Stunden verzoegert. Der Text muss `wirt` und
 und bei exec == 0 zusaetzlich pruefen, ob das Skript auf dem Ziel ueberhaupt
 gueltig ist (ns.getScriptRam(datei, wirt) gibt dort 0 zurueck).
 
-### Hacknet-Luecke: drei weitere Fundstellen offen (22.09.2026)
+### ERLEDIGT 22.09.2026: Hacknet-Luecke in scan.js, xp.js, bn4start.js
 
 autopilot.js ist gefixt (Commit vom 22.09.). Dieselbe Klasse steht noch an
 drei Stellen. Grundlage: 24 ns-Funktionen werfen auf Hacknet-Servern, weil
@@ -125,7 +162,7 @@ SICHER, geprueft:
   telemetry.js:88, bn4net.js:1113  ungefiltert, rufen aber nur nicht-werfende
                   Funktionen.
 
-### bn4life meldet den falschen Rechner, wenn ein Start scheitert (22.09.2026)
+### ERLEDIGT 22.09.2026 (Doppeleintrag zum vorigen): falscher Rechner in der Meldung
 
 bn4life.js:320-326 sucht den Wirt mit dem meisten freien Speicher im ganzen
 Netz. Der Fehlertext bei exec == 0 ist aber hart auf home formuliert:
@@ -148,7 +185,7 @@ Der frueher hier stehende Vermerk "eingespielt, aber nie gelaufen" ist damit
 ueberholt. Er beruhte auf der falschen Annahme, autopilot.js finde keinen
 Wirt - siehe den naechsten Punkt, das war ein ganz anderer Fehler.
 
-### autopilot.js stirbt an Hacknet-Servern (22.09.2026, im Spiel aufgetreten)
+### ERLEDIGT 22.09.2026: autopilot.js starb an Hacknet-Servern
 
     RUNTIME ERROR
     getServerMaxMoney: Cannot be executed on hacknet-server-0.
@@ -220,7 +257,7 @@ der Alarmkanal ist fuer die Dauer blind.
 
 Richtige Reihenfolge vor einem Sprung: erst einbauen, dann handschlagen.
 
-### Wirtwahl fuer exit.js nimmt den umkaempften statt den freien Rechner (22.09.2026)
+### ERLEDIGT 22.09.2026: Wirtwahl fuer exit.js nahm den umkaempften Rechner
 
 DAS IST DIE EIGENTLICHE URSACHE des klemmenden Sprungs; das Nachraeumen vor
 dem exec (eingebaut 22.09.) ist die Absicherung, nicht die Heilung.
@@ -281,14 +318,14 @@ Mock kann die Asymmetrie (tools/mock/ns.js:328-345), die Tests nutzen sie
 nicht. bn4net.js:4183-4191 startet punish.js auf dem groessten Wirt, also
 faktisch nie home.
 
-### tools/rollback.js kennt lib/hostdatei.js nicht (22.09.2026)
+### VERWORFEN 22.09.2026: rollback.js NICHT ergaenzen - der Befund war falsch
 
 Die Liste EINGESPIELT (tools/rollback.js:71-82) fuehrt 17 lib-Dateien, aber
 weder lib/hostdatei.js noch lib/hackaugs.js. Ein rollback --alles stellt
 also die eine Datei nicht her, von der inzwischen elf Gewerke abhaengen.
 Stale seit 04.09.2026.
 
-### Handschlag: antwortDa() prueft den Anlass nicht (22.09.2026)
+### ERLEDIGT 22.09.2026: antwortDa() prueft jetzt den Anlass
 
 lib/handschlag.js:110 akzeptiert jede Antwort mit a.ts >= anfrageTs, ohne
 reason-Abgleich. install (bn4rep) und jump (ausgang) teilen sich
@@ -297,7 +334,7 @@ landet (Fix vom 22.09.), kann ausgang.js eine pre-install-Antwort als
 pre-jump-Beleg nehmen - und umgeht damit genau die Pruefung, die pre-jump
 bei wartenden Augmentierungen rot macht (sync/backup.js:261-266).
 
-### Kopfkommentar von lib/handschlag.js:46-51 ist falsch (22.09.2026)
+### ERLEDIGT 22.09.2026: Kopfkommentar von lib/handschlag.js, jetzt gemessen
 
 Dort steht, ns.fileExists werde nicht benutzt und "dieses Modul ist damit
 gratis". Ueber lib/hostdatei.js kostet es 0,7 GB (fileExists 0,1 + scp 0,6).
@@ -324,7 +361,7 @@ nicht - und gerechnet ist nicht gemessen. Nach dem naechsten Einspielen:
 messen und die Eichdatei nachziehen, NICHT die Liste VERALTET_ERLAUBT
 erweitern.
 
-### checkin.js stuerzt ab, sobald der Ausgang offen ist (22.09.2026, 09:06)
+### ERLEDIGT 22.09.2026: checkin.js stuerzte ab, sobald der Ausgang offen war
 
 ReferenceError: Cannot access 'laufJetzt' before initialization, in ausgeben()
 bei tools/checkin.js:826, gerufen aus main() bei Zeile 319.
@@ -343,7 +380,7 @@ lesen.
 Nicht repariert - Werkzeugaenderung ist eine eigene Verabredung mit Eric.
 Der Einzeiler waere, die Deklaration von laufJetzt vor Abschnitt 3 zu ziehen.
 
-### Sprung nach BN9 Stufe 3 klemmt (22.09.2026, 09:06)
+### ERLEDIGT 22.09.2026: Sprung nach BN9 Stufe 3 klemmte - gesprungen um 10:52
 
 Der Knoten ist durch: alle 21 Black Ops gefallen, Rang 675.013 von 400.000,
 data/ausgang.json meldet offen=true, ueberBlackOps=true, Ziel BN9 L3.

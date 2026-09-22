@@ -38,6 +38,70 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
+### Hacknet-Luecke: drei weitere Fundstellen offen (22.09.2026)
+
+autopilot.js ist gefixt (Commit vom 22.09.). Dieselbe Klasse steht noch an
+drei Stellen. Grundlage: 24 ns-Funktionen werfen auf Hacknet-Servern, weil
+sie keine Server im Sinne von Server.ts sind (getNormalServer,
+NetscriptHelpers.tsx:575-589). getServerMaxRam, getServerUsedRam,
+hasRootAccess, ps, scp und exec werfen NICHT - deshalb faellt es nur dort
+auf, wo Geld oder Sicherheit abgefragt wird.
+
+STUERZT AB, wird aber von niemandem gestartet (reine Handwerkzeuge):
+  scan.js:27-33   mapNetwork (:48-60) ungefiltert, vier werfende Aufrufe.
+  xp.js:65-69     :65 prueft hasRootAccess - Hacknet-Server HABEN Root
+                  (PlayerObjectServerMethods.ts:50), also laufen sie durch,
+                  und :66 getServerRequiredHackingLevel wirft.
+
+STUERZT NICHT AB, kostet aber Hashes:
+  bn4start.js:101-105  Die Zielwahl (:68-81) ist ueber !s.moneyMax sicher,
+                  die Arbeiterverteilung nicht: "if (!ns.hasRootAccess(host))
+                  continue" laesst Hacknet-Server durch, dann scp + exec.
+                  bn4start ist der KALTSTART - dort werden also Arbeiter auf
+                  Hacknet-Server gelegt, und belegtes RAM drueckt die
+                  Hash-Rate linear (ramRatio = 1 - ramUsed/maxRam,
+                  HacknetServers.ts:15). Bei einem frischen Server mit 1 GB
+                  (HacknetServer.ts:60) vollstaendig auf null.
+  bn4life.js:477-488  netzListe filtert nicht, und :321-326 waehlt den Wirt
+                  nach meistem freiem Speicher. Ein hochgeruesteter
+                  Hacknet-Server gewinnt diesen Vergleich und bekommt dann
+                  Oberflaechenskripte - mit demselben Hash-Verlust.
+
+SICHER, geprueft:
+  lage.js         HacknetServer.ts:54 setzt purchasedByPlayer = true, und
+                  lage.js:13 prueft das als Erstes. (Die frueher vermutete
+                  moneyMax-Pruefung haette auch gehalten, greift aber spaeter.)
+  worker/hack|grow|weaken.js  Das Ziel kommt aus autopilot.js:1876 bzw.
+                  bn4start.js:105, beide ueber moneyMax gefiltert.
+  guard.js:1267   hat den Filter.
+  telemetry.js:88, bn4net.js:1113  ungefiltert, rufen aber nur nicht-werfende
+                  Funktionen.
+
+### bn4life meldet den falschen Rechner, wenn ein Start scheitert (22.09.2026)
+
+bn4life.js:320-326 sucht den Wirt mit dem meisten freien Speicher im ganzen
+Netz. Der Fehlertext bei exec == 0 ist aber hart auf home formuliert:
+    "FEHLSCHLAG: autopilot.js liess sich nicht starten - home hat 12.95 GB
+     frei, das Skript braucht 34.20 GB."
+Gemeint ist der BESTE Wirt, nicht home. Am 22.09. hat die Meldung die
+Fehlersuche in die falsche Richtung geschickt - es sah nach einem
+home-Problem aus, tatsaechlich war das ganze Netz mit 2442 Arbeiterfaeden
+belegt. Der Text sollte `wirt` und `meistFrei` nennen, die beide direkt
+darueber schon berechnet sind.
+
+### autopilot.js: Fix eingespielt, aber noch nie gelaufen (22.09.2026)
+
+Der Hacknet-Filter ist seit dem 22.09. im Spiel (autopilot.js Zeile 703
+aktiv, per Schieber uebertragen). Gelaufen ist er nicht: autopilot.js
+braucht 34,20 GB und findet seit dem Sprung nach BN9 L3 keinen Wirt, weil
+die Arbeiter alles belegen. Der Bot arbeitet trotzdem - autopilot.js ist der
+Kaltstart-Verwalter, im laufenden Betrieb traegt bn4net.
+
+Das heisst: Die Zeile ist geprueft (Syntax, RAM unveraendert, Skeptiker),
+aber nicht im Betrieb belegt. Der Beleg kommt beim naechsten Kaltstart - und
+genau dort zaehlt sie. Wer vorher hinsieht: data/bn4life-log.txt muss dann
+"Gestartet: autopilot.js" zeigen statt eines RUNTIME ERROR auf L670.
+
 ### autopilot.js stirbt an Hacknet-Servern (22.09.2026, im Spiel aufgetreten)
 
     RUNTIME ERROR

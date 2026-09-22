@@ -141,6 +141,38 @@ const uhr = (ts) => new Date(ts).toLocaleString("sv-SE").slice(5, 16);
     if (tempo < 0.9) {
       console.log("WARNUNG: Das Spiel laeuft langsamer als die Uhr.");
     }
+    // AUSFAELLE SIND IM TEMPO UNSICHTBAR (22.09.2026, BAUSTELLEN
+    // "rueckstand.js kann einen Spielausfall nicht sehen"). Das Spiel schreibt
+    // Offline-Zeit beim Laden voll auf totalPlaytime (engine.tsx:343-351) -
+    // ein Fenster, in dem der Tab zu oder der Rechner aus war, liefert
+    // deshalb Tempo 1,0. Die Bruecke protokolliert aber jedes Trennen und
+    // Verbinden mit Zeitstempel; daraus werden die Ausfaelle im Fenster
+    // gezaehlt. Eine Luecke ganz ohne Protokollzeile (Bruecke selbst tot)
+    // ist nicht belegbar und wird nur als solche genannt.
+    try {
+      const log = fs.readFileSync(path.join(WURZEL, "data", "bridge.log"), "utf8").split(/\r?\n/);
+      let aus = 0, offenSeit = null, stumm = 0, letzte = null;
+      for (const z of log) {
+        const m = /^(\d{4}-\d\d-\d\dT[\d:.]+Z)\t\w+\t(.*)$/.exec(z);
+        if (!m) continue;
+        const t = Date.parse(m[1]);
+        if (!(t >= vorher.ts && t <= jetzt)) continue;
+        if (letzte !== null && t - letzte > 65 * 60000 && offenSeit === null) stumm += t - letzte;
+        letzte = t;
+        if (/Spielverbindung getrennt/.test(m[2])) offenSeit = t;
+        else if (/Spiel verbunden/.test(m[2]) && offenSeit !== null) { aus += t - offenSeit; offenSeit = null; }
+      }
+      if (offenSeit !== null) aus += jetzt - offenSeit;
+      if (aus > 0) {
+        console.log("Davon " + (aus / 60000).toFixed(0) + " min Spiel GETRENNT (Tab zu oder"
+          + " Rechner aus) - diese Zeit hat das Spiel beim Laden als Spielzeit"
+          + " nachgetragen; das Tempo darin belegt KEIN Laufen.");
+      }
+      if (stumm > 0) {
+        console.log("Dazu " + (stumm / 60000).toFixed(0) + " min ohne jede Brueckenzeile"
+          + " (Bruecke tot?) - ob das Spiel lief, ist fuer diese Zeit nicht belegbar.");
+      }
+    } catch { /* ohne bridge.log keine Ausfallrechnung */ }
   }
 
   // --- Bewertung -----------------------------------------------------------

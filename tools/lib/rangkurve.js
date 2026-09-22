@@ -128,8 +128,8 @@ function stundeBeiRang(punkte, rang) {
 /**
  * Restzeit bis zum Knotenende, aus dem eigenen vorigen Lauf gelesen.
  *
- * Bezugsgroesse ist bewusst das ENDE DES REFERENZLAUFS und nicht der Zeitpunkt,
- * an dem die Rangschwelle fiel. Der Grund ist ein Messloch: zwischen Rang
+ * (Bis 22.09.2026:) Bezugsgroesse war bewusst das ENDE DES REFERENZLAUFS und nicht der Zeitpunkt,
+ * an dem die Rangschwelle fiel - jetzt der erste Punkt ueber der Schwelle, siehe unten. Der Grund ist ein Messloch: zwischen Rang
  * 17.594 und 4,54 Mio liegen 22 Stunden ohne einen einzigen Datenpunkt, weil
  * die sechs Beobachtungsloops am 31.08. abgeschafft wurden. Wann genau die
  * 400.000 fielen, ist damit unbekannt - wann der Lauf endete, ist gemessen.
@@ -166,8 +166,16 @@ export function restzeitAusKurve(knoten, rang) {
   let letzterDarunter = p[0];
   for (const q of p) if (q.rang < SCHWELLE) letzterDarunter = q;
 
+  // BEZUG IST DIE SCHWELLE, NICHT DAS LAUFENDE (22.09.2026, BAUSTELLEN
+  // "ETA-Kurve rechnet gegen das Laufende"). Der Referenzlauf BN10 L1 lief
+  // bis Rang 4,56 Mio, weil der Sprung damals von Hand kam - gebraucht werden
+  // 400.000. Genommen wird jetzt der erste gemessene Punkt ueber der
+  // Schwelle; liegt er in einer Messluecke, faellt er mit dem Laufende
+  // zusammen, und `luecke` sagt das. Der Nachlauf danach steht getrennt.
+  const ersterDrueber = p.find((q) => q.rang >= SCHWELLE) || ende;
   return {
-    restH: Math.max(0, ende.h - hJetzt),
+    restH: Math.max(0, ersterDrueber.h - hJetzt),
+    nachlaufH: Math.max(0, ende.h - ersterDrueber.h),
     bisSchwelleFruehestensH: Math.max(0, letzterDarunter.h - hJetzt),
     schwelleZuletztUnterschritten: { h: letzterDarunter.h, rang: letzterDarunter.rang },
     ende: { h: ende.h, rang: ende.rang },

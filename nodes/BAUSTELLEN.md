@@ -38,6 +38,54 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
+### install-sperre.txt hat zwei Vertraege und einen Schreiber am falschen Ort (22.09.2026)
+
+Latenter Fehler, NICHT durch den Umbau vom 22.09. entstanden - der Versuch,
+ihn dort mitzunehmen, wurde zurueckgenommen (siehe den Kommentar in
+lib/handschlag.js:231-246).
+
+Die Datei wird von zwei Stellen mit unvereinbaren Erwartungen gelesen:
+  bn4rep.js:829   Number(lockInhalt.split("|")[1])     -> Format FIRMENPHASE|<ts>
+  hotswap.js:217  liest das Feld "bis"                 -> Format JSON
+Geschrieben wird sie von lib/handschlag.js:247 als JSON - und zwar mit
+ns.write, also lokal auf den Wirt. Dort sieht sie niemand, deshalb ist sie
+heute folgenlos.
+
+Die Falle: Wer den Schreiber "repariert", indem er ihn nach home schreiben
+laesst, macht die Sperre nicht wirksam, sondern UNAUFHEBBAR. bn4rep.js:830
+macht aus einem nicht lesbaren Stempel ausdruecklich lockGilt = true, und
+aufgeraeumt wird die Datei nur von boot.js:114 - also nach einem Reset, den
+genau diese Sperre verhindert. bn4rep.js:767 haelt fest, dass der Einbau das
+Einzige ist, was den Multiplikator hebt.
+
+Sauber waere EIN Vertrag: das vorhandene Tag-Format HANDSCHLAG <ts>|<ms>
+schreiben und hotswap.js auf dieselbe Lesart bringen - nicht ein zweiter
+Vertrag fuer dieselbe Datei. Das ist die Konstellation, aus der der Befund
+ueberhaupt entstanden ist.
+
+### pre-jump-Sicherung scheitert, solange Augmentierungen warten (22.09.2026)
+
+sync/backup.js:261-266 macht die Pruefung bei anlass "pre-jump" und
+queuedAugs > 0 rot; sync/bridge.js:1897 steigt dann ohne backup-ok.txt aus.
+ausgang.js wartet daraufhin die vollen 90 s - also genau das Fenster, das
+der Handschlag-Fix schliessen sollte, bleibt in diesem Fall offen.
+
+Kein Randfall: am 22.09. lagen 2 gekaufte Augs (Blade's Runners, GOLEM
+Serum), und BAUSTELLEN.md hat frueher schon einmal 8 gemeldet. Am 22.09.
+wurde es geloest, indem VOR dem Sprung eingebaut wurde - danach war
+queuedAugs 0 und die Sicherung gruen.
+
+Dazu eine Schleife, die man kennen muss: liegt eine unbeantwortete Anfrage
+auf home, sieht pruefeHandschlag sie in JEDEM Takt neu (SOFORT_MS = 60000)
+und erzeugt je Minute einen vollen RFA-Save, eine Ablehnung und einen Alarm.
+alarm() hat genau einen Slot (bridge.js:856-860, bridge-alarm.json) - die
+Schleife ueberschreibt also jeden anderen Alarm. Am 22.09. fuenfmal
+beobachtet, bis die Anfragedatei entfernt wurde. Abgelehnte Sicherungen
+landen nicht auf Platte (backup.js:452), es entsteht also kein Muell - aber
+der Alarmkanal ist fuer die Dauer blind.
+
+Richtige Reihenfolge vor einem Sprung: erst einbauen, dann handschlagen.
+
 ### Wirtwahl fuer exit.js nimmt den umkaempften statt den freien Rechner (22.09.2026)
 
 DAS IST DIE EIGENTLICHE URSACHE des klemmenden Sprungs; das Nachraeumen vor

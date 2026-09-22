@@ -93,9 +93,28 @@ import { rechne } from "./ram.js";
 // `export.js` standen sich 19,35 GB (Spiel) und 4,35 GB (Grundpreis)
 // gegenueber - derselbe Wert, nur einmal mit und einmal ohne den
 // Multiplikator aus `RamCostGenerator.ts`.
-const rechneRam = (name) => {
-  const r = rechne(name, { sf4: 1 });
+const rechneRam = (name, sf4 = 1) => {
+  const r = rechne(name, { sf4 });
   return typeof r === "number" ? r : (r && Number.isFinite(r.gb) ? r.gb : null);
+};
+//
+// DAS SPIEL STEHT NICHT MEHR AUF SF4.1 (22.09.2026). Seit BN4 dreimal
+// abgeschlossen ist, meldet `ns.getScriptRam` den Preis bei SF4.3 (x1) -
+// fuer bn4door.js 10,5 GB statt 100,5. Der Vergleich gegen Stufe 1 lehnte
+// damit JEDE Singularity-Datei als "Befund" ab, obwohl Rechner und Spiel
+// uebereinstimmten. Die Sonde kennt die Stufe nicht (getResetInfo kostet
+// 1 GB), also wird sie hier bestimmt: die Stufe, bei der der Rechner den
+// Spielwert exakt trifft. Die drei Stufen liefern bei Singularity-Dateien
+// drei verschiedene Werte (x16, x4, x1), ein Treffer ist also eindeutig;
+// ohne Singularity sind sie gleich, und dann ist die Stufe egal.
+// Gebucht wird weiter der Wert bei Stufe 1 - das Format der Eichung.
+const passendeStufe = (name, spielGb) => {
+  for (const sf4 of [1, 2, 3]) {
+    let gb = null;
+    try { gb = rechneRam(name, sf4); } catch { gb = null; }
+    if (Number.isFinite(gb) && Math.abs(gb - spielGb) <= 0.001) return sf4;
+  }
+  return null;
 };
 
 console.log("");
@@ -143,41 +162,44 @@ for (const z of diag.zeilen || []) {
   const h = sha(inhalt);
   const alt = nachName.get(name);
 
-  if (alt && alt.sha256 === h && alt.live41 === z.ramGb) {
-    console.log("  schon richtig " + name.padEnd(20) + z.ramGb + " GB");
+  // Der Waechter: trifft der lokale Rechner den Spielwert auf keiner
+  // SF4-Stufe, ist das ein Befund.
+  const stufe = passendeStufe(name, z.ramGb);
+  let wert41 = null;
+  try { wert41 = rechneRam(name, 1); } catch { wert41 = null; }
+  if (stufe === null || !Number.isFinite(wert41)) {
+    console.log("  ABGELEHNT     " + name.padEnd(20) + "Spiel " + z.ramGb
+      + " GB, Rechner (SF4.1/2/3) " + [1, 2, 3].map((n) => {
+        try { return rechneRam(name, n); } catch { return "?"; }
+      }).join("/") + " GB - das ist ein BEFUND, keine Buchung.");
+    abgelehnt++;
+    continue;
+  }
+  const bei = stufe === 1 ? "" : "  (gemessen bei SF4." + stufe + " = " + z.ramGb + " GB)";
+
+  if (alt && alt.sha256 === h && alt.live41 === wert41) {
+    console.log("  schon richtig " + name.padEnd(20) + wert41 + " GB" + bei);
     unveraendert++;
     continue;
   }
 
-  // Der Waechter: weicht der lokale Rechner ab, ist das ein Befund.
-  if (rechneRam) {
-    let lokal = null;
-    try { lokal = rechneRam(name); } catch { lokal = null; }
-    if (Number.isFinite(lokal) && Math.abs(lokal - z.ramGb) > 0.001) {
-      console.log("  ABGELEHNT     " + name.padEnd(20) + "Spiel " + z.ramGb
-        + " GB, Rechner " + lokal + " GB - das ist ein BEFUND, keine Buchung.");
-      abgelehnt++;
-      continue;
-    }
-  }
-
   console.log("  UEBERNEHMEN   " + name.padEnd(20)
-    + (alt ? alt.live41 + " -> " : "(neu) ") + z.ramGb + " GB");
+    + (alt ? alt.live41 + " -> " : "(neu) ") + wert41 + " GB" + bei);
   if (SCHREIB) {
     if (alt) {
-      alt.live41 = z.ramGb;
-      alt.lokal41 = z.ramGb;
+      alt.live41 = wert41;
+      alt.lokal41 = wert41;
       alt.diff = 0;
       alt.sha256 = h;
       alt.bytes = Buffer.byteLength(inhalt, "utf8");
       alt.gemessenAm = new Date(diag.zeit).toISOString();
-      alt.quelle = "startdiag.js (ns.getScriptRam im Spiel)";
+      alt.quelle = "startdiag.js (ns.getScriptRam im Spiel, SF4." + stufe + ")";
     } else {
       eichung.push({
-        file: name, live41: z.ramGb, lokal41: z.ramGb, diff: 0,
+        file: name, live41: wert41, lokal41: wert41, diff: 0,
         sha256: h, bytes: Buffer.byteLength(inhalt, "utf8"),
         gemessenAm: new Date(diag.zeit).toISOString(),
-        quelle: "startdiag.js (ns.getScriptRam im Spiel)",
+        quelle: "startdiag.js (ns.getScriptRam im Spiel, SF4." + stufe + ")",
       });
     }
   }

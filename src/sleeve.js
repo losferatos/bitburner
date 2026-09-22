@@ -222,12 +222,26 @@ export async function main(ns) {
       // Dateikopf war eine RAM-Entscheidung aus einer Zeit ohne Werkbank; er
       // ist fuer Verbrechen harmlos (kurze Aktionen) und fuer
       // Bladeburner-Kontrakte toedlich.
+      // WAEHREND BLADE.JS AUFRAEUMT, KEIN CHAOS NACHLEGEN (22.09.2026,
+      // BAUSTELLEN "Sleeves arbeiten gegen das Aufraeumen"). Bounty Hunter
+      // legt je Erfolg +0,02 Chaos nach, Retirement +0,04 - in der Stadt, in
+      // der gerade aufgeraeumt wird (Bladeburner.ts:878-885). Tracking legt
+      // keines nach. Solange blade.json `aufraeumen` meldet, bleibt also nur
+      // Tracking erlaubt; zwei Sleeves duerfen denselben Vertrag nicht fahren,
+      // die uebrigen gehen auf Infiltrate (fuellt den Vorrat, kein Chaos).
+      let chaosRunde = false;
+      try {
+        const bj = JSON.parse(liesVonHome(ns, "data/blade.json") || "null");
+        chaosRunde = !!bj && bj.aufraeumen === true
+          && Number.isFinite(bj.zeit) && Date.now() - bj.zeit < 10 * 60000;
+      } catch { chaosRunde = false; }
+      const erlaubteKontrakte = chaosRunde ? ["Tracking"] : KONTRAKTE;
       let laeuftSchon = false;
       if (inDivision) {
         try {
           const t = ns.sleeve.getTask(i);
           if (t && t.type === "BLADEBURNER" && t.actionType === "Contracts"
-              && KONTRAKTE.includes(t.actionName)) {
+              && erlaubteKontrakte.includes(t.actionName)) {
             laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
           }
           // INFILTRATE GEHOERT HIER MIT REIN (30.08.2026, 12:55, nach einem
@@ -263,7 +277,7 @@ export async function main(ns) {
         // (`Bladeburner.ts:1387`, `count += seconds*growthFunction()/480`);
         // ein Sleeve verbraucht bei 14 s je Aktion bis zu 257. Die knappste
         // Art ist damit immer knapp - genommen wird die ergiebigste.
-        const nachVorrat = KONTRAKTE.map((art) => {
+        const nachVorrat = erlaubteKontrakte.map((art) => {
           let v = 0;
           try { v = ns.bladeburner.getActionCountRemaining("Contracts", art); } catch { v = 1; }
           return { art, v };

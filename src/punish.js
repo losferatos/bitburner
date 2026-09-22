@@ -284,6 +284,21 @@ export async function main(ns) {
   // seit jeher und schreibt sie als `wiederaufbauHilfe` mit hinaus
   // (bn4rep.js:1000-1024) - eine zweite Rechnung hier waere eine zweite
   // Wahrheit.
+  // --- 5c. Die Einbausperre aus bn4rep.js gilt auch hier (22.09.2026) -------
+  //
+  // bn4rep.js sperrt im Kampfknoten jeden Einbau, solange der Wiederaufbau
+  // laeuft oder seit seinem Ende weniger als max(12 h, 2 x seine Dauer)
+  // vergangen sind (lib/endspurt.js, kampfEinbauSperre) - gegen den
+  // Kreislauf Einbau alle ~4 h bei ~7 h Wiederaufbau (BN9, 22.09.). Sprosse 5
+  // wuerde sonst genau daran vorbei einbauen (Skeptiker Runde 2, M4). Die
+  // Bedingung `bbtrain.trainiert` oben ist tot - bbtrain.json schreibt das
+  // Feld nicht; `kampfAufbau` deckt denselben Fall ab.
+  if (istV2 && (einbau.kampfAufbau === true || einbau.kampfZuFrueh === true)) {
+    return fertig(einbau.kampfAufbau === true
+      ? "Wiederaufbau der Kampfwerte laeuft - ein Einbau wuerde ihn von vorn beginnen"
+      : "der letzte Wiederaufbau hat sich noch nicht bezahlt gemacht (Einbausperre"
+        + " im Kampfknoten, lib/endspurt.js)");
+  }
   if (istV2 && einbau.wiederaufbauHilfe === false) {
     return fertig("Bladeburner-Weg, und keine der wartenden Augmentierungen"
       + " verkuerzt den Wiederaufbau: der Einbau setzt die Kampfwerte auf 1,"

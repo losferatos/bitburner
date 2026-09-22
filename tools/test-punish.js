@@ -330,6 +330,31 @@ console.log("-- 5b. auf dem Bladeburner-Weg nur mit Wiederaufbauhilfe (R9) --");
 }
 
 console.log("");
+console.log("-- die Einbausperre aus bn4rep.js gilt auch fuer Sprosse 5 (22.09.2026) --");
+{
+  // Skeptiker Runde 2, M4: Wiederaufbau laeuft oder hat sich noch nicht
+  // bezahlt gemacht -> kein Einbau, auch nicht scharf.
+  const auf = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2,
+      wiederaufbauHilfe: true, kampfAufbau: true, kampfZuFrueh: false }),
+  }), ["scharf"]);
+  pruefe("im Wiederaufbau baut Sprosse 5 nicht ein", !auf.eingebaut,
+    String(auf.ergebnis.verweigert));
+  const frueh = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2,
+      wiederaufbauHilfe: true, kampfAufbau: false, kampfZuFrueh: true }),
+  }), ["scharf"]);
+  pruefe("vor Ablauf der Sperrfrist ebenfalls nicht", !frueh.eingebaut,
+    String(frueh.ergebnis.verweigert));
+  const frei = await fahre(guterFall({
+    "data/einbau.json": JSON.stringify({ zeit: WALL, wartend: 2,
+      wiederaufbauHilfe: true, kampfAufbau: false, kampfZuFrueh: false }),
+  }), ["scharf"]);
+  pruefe("Gegenprobe: beide frei -> es baut ein", frei.eingebaut,
+    String(frei.ergebnis.verweigert));
+}
+
+console.log("");
 console.log("-- 6. das Depot muss leer sein --");
 {
   const r = await fahre(guterFall({

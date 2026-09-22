@@ -587,6 +587,50 @@ console.log("-- FEHLKILL: eine andere Uhr haelt das Werkzeug fuer frisch --");
 }
 
 console.log("");
+console.log("-- was NIRGENDS laeuft, bekommt kein S1 (22.09.2026) --");
+{
+  // BAUSTELLEN "Waechter straft Werkzeuge, die aus Platzmangel nicht laufen":
+  // nach dem Einbau um 20:38 passte blade.js nicht auf home; seine Telemetrie
+  // war zu Recht alt, und S1 haette bis EXHAUSTED eskaliert. Derselbe Aufbau
+  // wie die Probe oben - blade.js in JEDER Uhr alt -, aber NICHT gestartet.
+  const kernMotor = 10 * 3600000;
+  const m = neuerMock({
+    ...grundzustand({ skriptRam: { "blade.js": 2, "guard.js": 6.1 } }, {
+      "data/guard-modus.txt": "enforce",
+      "data/bn4net.json": JSON.stringify({
+        wall: W0, motorTimeMs: kernMotor, okRound: 100, errStreak: 0, round: 100,
+        phase: "normal",
+      }),
+      "data/blade.json": JSON.stringify({
+        motorTimeMs: kernMotor - 10 * 3600000 + 1,
+        playtime: 100 * 3600000 - 10 * 3600000,
+        ts: W0 - 10 * 3600000,
+      }),
+    }),
+    maxSchlaf: 40,
+    beiSchlaf: (ms, z, vor) => vor(30000),
+  });
+  // Ein ANDERES Werkzeug laeuft - sonst griffe der Rueckfall "ps liefert nichts".
+  m.ns.exec("guard.js", "home", 1);
+  const { modul } = await ladeAusBeiden(ROOT, "guard.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const w = json(m, "data/watchdog.json");
+  pruefe("kein S1 auf das nicht laufende blade.js",
+    !!w && !(w.signaleJetzt || []).some((x) => x.sig === "S1" && x.ziel === "blade.js"),
+    JSON.stringify(w && w.signaleJetzt));
+  const p2 = json(m, "data/penalties.json");
+  const fehlt = json(m, "data/fehlend.json");
+  pruefe("aber es steht in data/fehlend.json (Skeptiker Runde 2, H3)",
+    !!fehlt && Number.isFinite(fehlt["blade.js"]) && !("guard.js" in fehlt), JSON.stringify(fehlt));
+  pruefe("und keine Strafe auf blade.js",
+    !(p2 && (p2.eintraege || []).some((e) => e.target === "blade.js")),
+    p2 ? JSON.stringify(p2.eintraege.slice(-2)) : "keine penalties.json");
+}
+
+console.log("");
 console.log("-- ein ECHTER Haenger ist KEIN Fehlkill --");
 {
   // DIE GEGENPROBE. Ohne sie wuerde die Zahl auch dann steigen, wenn der

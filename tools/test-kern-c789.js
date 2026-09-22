@@ -313,11 +313,47 @@ console.log("-- C.9: ein gesperrter Wirt wird gemieden --");
   });
   m.zustand.netz = { home: ["werk-0"] };
   await runden(m);
+  // NUR WAEHREND DIE SPERRE GILT (22.09.2026). Der Mock faehrt ueber eine
+  // Stunde hinaus; bei +62 min ist die Sperre (bis +60) abgelaufen, und ein
+  // Start auf werk-0 ist dann richtig. Bisher fiel das nicht auf, weil
+  // blade.js in der Startfolge vor bbtrain.js lag und werk-0 schon belegte.
   const bbAufWerk0 = m.zustand.gestartet.some(
-    (g) => g.datei === "bbtrain.js" && g.host === "werk-0");
+    (g) => g.datei === "bbtrain.js" && g.host === "werk-0"
+      && g.wall < 1700000000000 + 3600000);
   pruefe("bbtrain.js landet NICHT auf dem gesperrten Wirt", !bbAufWerk0,
     "sonst liefe die Sprosse 2 der Strafleiter ins Leere - der Kern setzte das"
       + " Werkzeug in derselben Runde zurueck");
+}
+
+console.log("");
+console.log("-- C.9: die Sperre gilt auch, wenn die Werkbank ein ANDERER Rechner ist (22.09.2026) --");
+{
+  // Der Ausweichweg "passt nicht auf die Werkbank" pruefte die Sperre nicht.
+  // Hier ist werk-1 die Werkbank (groesster Rechner) und voll, home ebenfalls;
+  // der einzige Ausweichwirt ist der gesperrte werk-0.
+  const m = bauMock({
+    homeUsed: 1048576 - 1,
+    server: {
+      // werk-0 gross genug fuer blade.js UND bbtrain.js - sonst belegt blade.js
+      // (Prioritaet 10) den Platz, und die Probe misst die Knappheit.
+      "werk-1": { ram: 2048, used: 2047, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
+      "werk-0": { ram: 1024, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
+    },
+    dateien: {
+      "data/blocked-hosts.json": JSON.stringify({
+        version: 1, ts: 1700000000000,
+        eintraege: [{ werkzeug: "bbtrain.js", host: "werk-0",
+          seit: 1700000000000, bis: 1700000000000 + 3600000 }],
+      }),
+    },
+    maxSchlaf: 60,
+  });
+  m.zustand.netz = { home: ["werk-1", "werk-0"] };
+  await runden(m);
+  const aufWerk0 = m.zustand.gestartet.filter((g) => g.datei === "bbtrain.js"
+    && g.host === "werk-0" && g.wall < 1700000000000 + 3600000);
+  pruefe("bbtrain.js weicht nicht auf den gesperrten Rechner aus", aufWerk0.length === 0,
+    "gestartet: " + m.zustand.gestartet.filter((g) => g.datei === "bbtrain.js").map((g) => g.host).join(", "));
 }
 
 console.log("");

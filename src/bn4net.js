@@ -685,6 +685,10 @@ export async function main(ns) {
   // Schluessel ist der Stellzeitpunkt - ein Auftrag darf nicht zweimal laufen,
   // und `installAugmentations` zweimal waere zwei Laeufe weggeworfen.
   const auftraegeGetan = new Set();
+  // Fehlgeschlagene Starts je Auftrag (22.09.2026, BAUSTELLEN Zeile 305):
+  // ein exec mit pid 0 wird wiederholt, aber nicht endlos.
+  const waechterVersuche = new Map();
+  const waechterPauseBis = new Map();
 
   const baueWerkzeuge = (lage) => regGeladen
     ? regAuswahl(regGeladen, lage)
@@ -3624,11 +3628,16 @@ export async function main(ns) {
         }
         return gb;
       };
-      const ausweichwirt = (braucht) => {
+      // `erlaubt` (22.09.2026, Skeptiker B4): ein Filter je Rechner. Die
+      // Waechtersperre wird so VOR der Wahl angewendet - vorher wurde der
+      // beste Rechner gewaehlt und, war er gesperrt, gar keiner genommen,
+      // obwohl der zweitbeste gepasst haette.
+      const ausweichwirt = (braucht, erlaubt = null) => {
         let bester = null, meist = -1;
         for (const h of hosts) {
           if (!ns.hasRootAccess(h)) continue;
           if (h === werkbank) continue;
+          if (erlaubt && !erlaubt(h)) continue;
           // HOME IST KEIN TABU MEHR, SONDERN EINE RECHNUNG (27.08.2026, 06:10).
           //
           // Hier stand `if (h === "home") continue` mit der Begruendung, ein
@@ -3749,8 +3758,8 @@ export async function main(ns) {
         // Ist die Werkbank fuer dieses Werkzeug gesperrt, gilt sofort der
         // Ausweichweg - unabhaengig davon, wieviel Platz dort waere.
         if (regel !== "home" && wirtGesperrt(datei, werkbank)) {
-          const weg = ausweichwirt(braucht);
-          if (!weg || wirtGesperrt(datei, weg)) {
+          const weg = ausweichwirt(braucht, (h) => !wirtGesperrt(datei, h));
+          if (!weg) {
             if (runde % 10 === 0) {
               sag(datei + ": " + werkbank + " ist vom Waechter gesperrt, und es"
                 + " findet sich kein anderer Wirt - es bleibt aus.");
@@ -3785,8 +3794,8 @@ export async function main(ns) {
           // Auf einem ANDEREN Wirt darf dieser hier trotzdem starten - die
           // Reservierung gilt nur fuer home, und ein Ausweichwirt nimmt dem
           // Wartenden nichts weg.
-          const weg = ausweichwirt(braucht);
-          if (!weg || wirtGesperrt(datei, weg)) {
+          const weg = ausweichwirt(braucht, (h) => !wirtGesperrt(datei, h));
+          if (!weg) {
             if (runde % 30 === 0) {
               sag(datei + " wartet: " + reserviertFuer + " haelt Platz auf home"
                 + " frei, und es gibt keinen Ausweichwirt.");
@@ -3824,7 +3833,12 @@ export async function main(ns) {
             }
             continue;
           }
-          const weg = ausweichwirt(braucht);
+          // AUCH HIER DIE WAECHTERSPERRE (22.09.2026). Die beiden Ausweichwege
+          // oben pruefen sie, dieser nicht: ist die Werkbank gerade eine andere
+          // als der gesperrte Rechner, fand das Werkzeug ihn hier als
+          // Ausweichwirt wieder - Sprosse 2 lief ins Leere. Aufgedeckt vom
+          // C.9-Test, als bbtrain.js in der Startfolge vor blade.js rueckte.
+          const weg = ausweichwirt(braucht, (h) => !wirtGesperrt(datei, h));
           if (!weg) {
             werkzeugWartetGb = Math.max(werkzeugWartetGb, braucht);
             if (runde % 10 === 0) sag(datei + " (" + braucht.toFixed(1)
@@ -4158,6 +4172,7 @@ export async function main(ns) {
               && o.nodeReset !== ns.getResetInfo().lastNodeReset) continue;
           const schluessel = "s5-" + o.gestellt;
           if (auftraegeGetan.has(schluessel)) continue;
+          if (Date.now() < (waechterPauseBis.get(schluessel) || 0)) continue;
           // AUF ALLEN WIRTEN SUCHEN (R26): gestartet wird punish.js auf dem
           // Rechner mit dem meisten Platz, nicht auf home. Eine Sperre, die
           // nur home ansieht, laesst einen zweiten Einbau zu - und der waere
@@ -4207,15 +4222,31 @@ export async function main(ns) {
           // Bibliothek auf dem Wirt, gibt `ns.exec` still 0 zurueck, und
           // Sprosse 5 waere gebaut, verdrahtet, getestet und trotzdem tot.
           if (wirt !== "home") {
-            ns.scp(["punish.js", "lib/handschlag.js", ...BIBLIOTHEKEN], wirt, "home");
+            // UND lib/hostdatei.js (22.09.2026): lib/handschlag.js importiert sie
+            // seit dem 22.09. - ohne sie ist punish.js auf dem Wirt ungueltig,
+            // und exec gibt still 0 zurueck. Verdeckt war das nur, weil blade.js
+            // und bbtrain.js die Datei auf der Werkbank meist schon abgelegt hatten.
+            ns.scp(["punish.js", "lib/handschlag.js", "lib/hostdatei.js", ...BIBLIOTHEKEN],
+              wirt, "home");
           }
           const pid = scharf
             ? ns.exec("punish.js", wirt, 1, "scharf")
             : ns.exec("punish.js", wirt, 1);
-          auftraegeGetan.add(schluessel);
+          // NUR BEI ERFOLG ABHAKEN (22.09.2026). Bisher galt auch pid 0 als
+          // erledigt: der Auftrag war verbraucht, im Log stand nur "exec gab 0".
+          // Jetzt bis zu fuenf Versuche; danach wird abgehakt, damit ein
+          // dauerhaft ungueltiges punish.js nicht jede Runde neu anlaeuft.
+          const versuche = (waechterVersuche.get(schluessel) || 0) + 1;
+          waechterVersuche.set(schluessel, versuche);
+          if (pid || versuche >= 5) auftraegeGetan.add(schluessel);
+          // Mindestens drei Minuten bis zum naechsten Versuch (Skeptiker B7):
+          // fuenf Versuche in fuenf aufeinanderfolgenden Runden ueberbruecken
+          // keinen voruebergehenden Grund. Drei, nicht fuenf: der Auftrag gilt
+          // 15 min, und alle fuenf Versuche sollen hineinpassen.
+          else waechterPauseBis.set(schluessel, Date.now() + 3 * 60000);
           sag("Waechterauftrag Sprosse 5 ausgefuehrt: punish.js auf " + wirt
             + (scharf ? " SCHARF" : " im Trockenlauf")
-            + (pid ? " (pid " + pid + ")." : " - exec gab 0."));
+            + (pid ? " (pid " + pid + ")." : " - exec gab 0 (Versuch " + versuche + " von 5)."));
           break;   // hoechstens ein Auftrag je Runde
         }
       } catch (e) {
@@ -4429,7 +4460,13 @@ export async function main(ns) {
             // Verlust auf seinen Vergleichspunkt an. Nur uebernehmen, wenn
             // blade.json frisch ist (10 min wie TELEMETRIE_FEST) - ein alter
             // Wert aus dem vorigen Lauf ist kein Traeger.
-            const frisch = Number.isFinite(b.zeit) && Date.now() - b.zeit < 10 * 60000;
+            // UND NACH DEM LETZTEN EINBAU GESCHRIEBEN (22.09.2026, Skeptiker
+            // Runde 2, M3). Ein Einbau aendert lastNodeReset nicht; eine
+            // blade.json von Sekunden davor galt zehn Minuten lang als frisch
+            // und konnte mit dem Wert von VOR dem Einbau zum Vergleichspunkt
+            // werden - der echte Wert danach laege stundenlang darunter.
+            const nachEinbau = !Number.isFinite(ri.lastAugReset) || b.zeit > ri.lastAugReset;
+            const frisch = Number.isFinite(b.zeit) && Date.now() - b.zeit < 10 * 60000 && nachEinbau;
             // UND AUS DIESEM KNOTEN (11.09.2026). Zehn Minuten nach dem Sprung
             // BN10 -> BN4 war blade.json aus BN10 noch "frisch" und lieferte
             // Rang 444.908 als Traeger; der Waechter setzte darauf seinen
@@ -4471,7 +4508,28 @@ export async function main(ns) {
               // Vergleichspunkt erzwingt.
               const imAnlauf = b.weichtTraining === true
                 && Number.isFinite(b.tiefstand);
-              traeger = imAnlauf
+              // GRAFT OHNE SIMULACRUM (22.09.2026, Skeptiker B4): der Motor
+              // haelt still, Rang und Kampfwerte stehen planmaessig. Der
+              // Fortschritt ist dann das Graft selbst (`cyclesWorked`,
+              // monoton). Geht vor dem Anlauf, weil bbtrain waehrend eines
+              // Grafts ebenfalls stillhaelt.
+              //
+              // BEWUSST: `cyclesWorked` waechst mit jedem Spieltakt, solange
+              // das Graft laeuft - es misst, dass das Graft laeuft, nicht, dass
+              // Rang entsteht. Eine Kette von Grafts ohne Simulacrum ist damit
+              // fuer S2 kein Stillstand. So gewollt: die Grafts plant
+              // graftauto.js, und dessen Telemetrie ueberwacht S1 (Skeptiker
+              // B6, 22.09.2026).
+              const imGraft = Number.isFinite(b.graftFortschritt);
+              traeger = imGraft
+                ? { name: "graft " + (b.graftAug || "?"), wert: b.graftFortschritt,
+                    motorTimeMs: mz.motorTimeMs, fehlversuch: null,
+                    aufraeumen: false }
+                : imAnlauf && Number.isFinite(b.kampfExp)
+                ? { name: "kampfexp", wert: b.kampfExp,
+                    motorTimeMs: mz.motorTimeMs, fehlversuch: null,
+                    aufraeumen: false }
+                : imAnlauf
                 ? { name: "kampfwerte", wert: b.tiefstand,
                     motorTimeMs: mz.motorTimeMs, fehlversuch: null,
                     aufraeumen: false }
@@ -4482,6 +4540,32 @@ export async function main(ns) {
                     // gibt null Rang, und der Waechter darf das nicht fuer
                     // Stillstand halten. Nur durchreichen - entscheiden tut leiter.js.
                     aufraeumen: b.aufraeumen === true };
+            }
+          }
+          // VOR DEM BEITRITT TRAEGT DER KAMPFWERT (22.09.2026, BAUSTELLEN
+          // Zeile 756). blade.js wartet dann auf die Division und schreibt
+          // keinen Rang; bisher fiel der Traeger unten auf das Hacking-Level
+          // zurueck. Das waechst in V2 aber nicht verlaesslich (Netz gerootet,
+          // Figur im Gym) - waehrend der Kampfwert-Tiefstand genau das ist,
+          // woran bbtrain.js arbeitet. Gleiche Frische- und Knotenpruefung wie
+          // oben.
+          //
+          // Reihenfolge wie nach dem Beitritt (Skeptiker B1, B2): ein
+          // laufender Graft zuerst, dann die stetige Kampf-Erfahrung, der
+          // ganzzahlige Tiefstand nur als Rueckfall.
+          if (!traeger && b && b.wartend === true
+              && Number.isFinite(b.zeit) && Date.now() - b.zeit < 10 * 60000
+              && (!Number.isFinite(ri.lastAugReset) || b.zeit > ri.lastAugReset)
+              && Number.isFinite(b.nodeReset) && b.nodeReset === mzNodeReset) {
+            if (Number.isFinite(b.graftFortschritt)) {
+              traeger = { name: "graft " + (b.graftAug || "?"), wert: b.graftFortschritt,
+                motorTimeMs: mz.motorTimeMs, fehlversuch: null, aufraeumen: false };
+            } else if (Number.isFinite(b.kampfExp)) {
+              traeger = { name: "kampfexp", wert: b.kampfExp,
+                motorTimeMs: mz.motorTimeMs, fehlversuch: null, aufraeumen: false };
+            } else if (Number.isFinite(b.tiefstand)) {
+              traeger = { name: "kampfwerte", wert: b.tiefstand,
+                motorTimeMs: mz.motorTimeMs, fehlversuch: null, aufraeumen: false };
             }
           }
           // NEXT_BLACKOP_CHANCE (04.09.2026) - der letzte Kennwert mit einem
@@ -4651,6 +4735,13 @@ export async function main(ns) {
             && Number.isFinite(letzterSprung.daten.wartendeAugs)) {
           k.queued_augs_at_jump = letzterSprung.daten.wartendeAugs;
         }
+        // `backup_wait_min` (22.09.2026): die Wartezeit des letzten Handschlags
+        // vor einem Sprung - ausgang.js schreibt sie ins Ereignis, nicht in
+        // eine eigene Datei. Sie wird von jump_latency_min abgezogen gelesen
+        // (lib/kpi.js: "abzueglich backup_wait_min").
+        const letzterHs = [...strom.eintraege].reverse().find((e) => e.art === "note"
+          && e.daten && e.daten.reason === "jump" && Number.isFinite(e.daten.wartezeitMs));
+        if (letzterHs) k.backup_wait_min = +(letzterHs.daten.wartezeitMs / 60000).toFixed(2);
       } catch { /* kein Strom - dann bleiben die Felder, wie sie waren */ }
 
       // --- Die stumme Vertragskette (R27) -------------------------------------

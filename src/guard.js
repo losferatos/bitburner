@@ -337,11 +337,49 @@ export async function main(ns) {
         // `ri` ist oben schon geholt, kostet also nichts.
         features: merkmaleAusReset(ri),
       };
+      // WAS NIRGENDS LAEUFT, IST FUER S1 NICHT AUSWERTBAR (22.09.2026,
+      // BAUSTELLEN "Waechter straft Werkzeuge, die aus Platzmangel nicht
+      // laufen"). Die Telemetrie eines Werkzeugs, das der Kern mangels
+      // Speicher nicht starten kann, ist zu Recht alt. Bisher feuerte S1
+      // trotzdem, die Sprossen griffen ins Leere ("laeuft nirgends"), und
+      // die Leiter eskalierte bis EXHAUSTED - danach war das Werkzeug zwoelf
+      // Stunden ohne Aufsicht. Am 22.09. um 20:38 genau so fuer blade.js:
+      // nach dem Einbau passte es nicht auf home (128 GB).
+      //
+      // Ohne Telemetrie ist das Ziel nicht auswertbar: kein Signal, aber auch
+      // keine Entwarnung. Dass es fehlt, ist Sache des Kerns (Registry
+      // `absent`, Serverkauf ueber werkzeugWartetGb). Liefert ps() gar
+      // nichts, gilt die alte Regel - lieber eine Fehlstrafe als blind.
+      const laufend = new Set();
+      try { for (const h of netz(ns)) for (const pr of ns.ps(h)) laufend.add(pr.filename); }
+      catch { laufend.clear(); }
       const eintraege = auswahl(registry, lage).map((e) => ({
         name: e.name,
+        restartPolicy: e.restartPolicy || "always",
         freshnessMs: e.freshnessMs || 600000,
-        telemetrie: e.telemetryFile ? liesJson(e.telemetryFile) : null,
+        telemetrie: e.telemetryFile && (laufend.size === 0 || laufend.has(e.name))
+          ? liesJson(e.telemetryFile) : null,
       }));
+      // WAS FEHLT, WIRD WENIGSTENS GEMELDET (Skeptiker Runde 2, H3). Ohne
+      // Telemetrie gibt es fuer ein Werkzeug, das nie laeuft, weder S1 noch
+      // Entwarnung - es waere aus der Aufsicht verschwunden (exec gibt 0 bei
+      // fehlender Bibliothek, oder es stirbt sofort wieder). Der Waechter
+      // fuehrt deshalb, seit wann ein ausgewaehltes Werkzeug fehlt, und
+      // tools/checkin.js meldet alles ueber 60 min. Nur Meldung, keine Sprosse.
+      if (laufend.size > 0) {
+        let fehlt = {};
+        try { fehlt = JSON.parse(ns.read("data/fehlend.json") || "{}") || {}; } catch { fehlt = {}; }
+        const neu = {};
+        for (const e of eintraege) {
+          if (laufend.has(e.name)) continue;
+          // Nur was IMMER laufen soll (Skeptiker Runde 3, Befund 5): shop.js
+          // (until-done) oder Arbeiter (never) fehlen planmaessig und haetten
+          // jede /bb-Ausgabe mit einer Dauermeldung verstopft.
+          if (e.restartPolicy !== "always") continue;
+          neu[e.name] = Number.isFinite(fehlt[e.name]) ? fehlt[e.name] : wall;
+        }
+        try { ns.write("data/fehlend.json", JSON.stringify(neu), "w"); } catch { /* egal */ }
+      }
 
       // S4 liest der Waechter SELBST, nicht aus einer Datei: im Kaltstart
       // schreibt niemand sonde.json, und genau dann ist die Frage am

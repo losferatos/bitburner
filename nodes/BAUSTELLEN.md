@@ -38,7 +38,9 @@ Regeln:
   zaehlen. Steht unter einer Ueberschrift keine `### `-Zeile, ist der Abschnitt
   leer - Erklaerungen und Fliesstext sind keine Arbeit.
 - **`## Sofort
-### Handschlag: ein Postfach fuer zwei Absender (22.09.2026)
+### TEILWEISE ERLEDIGT 22.09.2026: Handschlag: ein Postfach fuer zwei Absender (22.09.2026)
+
+*Die Bruecke prueft jetzt den Anlass (Commit 724da41, Probe in test-bruecke.js). Offen bleibt nur: stelle() ueberschreibt eine noch unbeantwortete Anfrage. Bewusst nicht gebaut - dafuer muessten Einbau- und Sprunganfrage in dieselben 90 s fallen, und einbauErlaubt (lib/endspurt.js) sperrt Einbauten kurz vor dem Ausgang.*
 
 lib/handschlag.js prueft seit dem 22.09. den Anlass, damit eine
 pre-install-Antwort nicht als pre-jump-Beleg durchgeht. Die Ursache bleibt:
@@ -209,7 +211,9 @@ genau dann faellt der Verwalter aus, der das Geld dafuer verdienen soll.
 Fix ist der gleiche Filter wie in bn4net.js:823 - aber als src/-Aenderung mit
 Skeptiker, nicht nebenbei.
 
-### install-sperre.txt hat zwei Vertraege und einen Schreiber am falschen Ort (22.09.2026)
+### ERLEDIGT 22.09.2026: install-sperre.txt hat zwei Vertraege und einen Schreiber am falschen Ort (22.09.2026)
+
+bn4rep liest JSON `bis`/`ts` und TAG|ms; eine unlesbare Sperre wird mit Meldung geloescht statt ewig zu gelten. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 Latenter Fehler, NICHT durch den Umbau vom 22.09. entstanden - der Versuch,
 ihn dort mitzunehmen, wurde zurueckgenommen (siehe den Kommentar in
@@ -290,7 +294,9 @@ Nicht gebaut, weil es eine Aenderung an der Wirtwahl ist und der Sprung am
 22.09. anders freigeraeumt wurde (Einbau der wartenden Augs, danach war
 blade leer). Gehoert vor den naechsten Knotenwechsel.
 
-### backup_wait_min: Kennwert ohne Leser, Schreiber auf dem falschen Rechner (22.09.2026)
+### ERLEDIGT 22.09.2026: backup_wait_min: Kennwert ohne Leser, Schreiber auf dem falschen Rechner (22.09.2026)
+
+bn4net liest den Wert aus dem Ereignisstrom; backup-wait.txt ist weg. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 ausgang.js:712 schreibt data/backup-wait.txt mit ns.write, also lokal auf den
 Wirt - und der wird beim Sprung geloescht (prestigeAllServers). Selbst
@@ -304,7 +310,9 @@ Folge: jump_latency_min (lib/kpi.js:78, "abzueglich backup_wait_min") kann
 nie um die Wartezeit bereinigt werden. Abnahmekriterium C1/C2 ist damit
 nicht erfuellbar. Entweder Leser bauen oder den Kennwert streichen.
 
-### punish.js bekommt lib/hostdatei.js nicht mitkopiert (Altlast seit 04.09.2026)
+### ERLEDIGT 22.09.2026: punish.js bekommt lib/hostdatei.js nicht mitkopiert (Altlast seit 04.09.2026)
+
+scp nimmt lib/hostdatei.js mit; exec mit pid 0 wird bis zu fuenfmal mit 3 min Pause wiederholt. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 bn4net.js:4210 kopiert ["punish.js", "lib/handschlag.js", ...BIBLIOTHEKEN],
 und BIBLIOTHEKEN = ["lib/hackaugs.js"] (bn4net.js:728). punish.js hat genau
@@ -344,7 +352,9 @@ Stale seit 04.09.2026, und es steht direkt ueber der Datei, die als naechstes
 jemand fuer eine RAM-Entscheidung liest - bei bn4rep.js (850,75 GB bei
 SF4.1) ist das kein Detail.
 
-### pre-jump-Sicherungen werden nie rotiert (22.09.2026)
+### ENTSCHIEDEN 22.09.2026: pre-jump-Sicherungen werden nie rotiert (22.09.2026)
+
+Die Flut ist gebremst: ausgang.js stellt hoechstens alle 15 min einen Handschlag, und nur nach gelungener Sicherung. Die Rotation bleibt absichtlich aus - ein klemmender Sprung ist selbst ein Befund und steht im checkin. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 sync/instanz.js:150-151 nimmt pre-jump und pre-install von der Rotation aus,
 sync/backup.js:374-390 zusaetzlich vom 300-MB-Budget. Bisher entstand
@@ -454,7 +464,9 @@ Zahl; kauft kampfaugs.js/buyaugs.js nach einem Einbau, ohne dass bn4rep
 laeuft, bleibt ein echter Verlust damit stumm. Vorher meldete dieselbe Lage
 eine falsche Zahl - also keine Verschlechterung, aber auch nicht dicht.
 
-### Anlauf: blade.js weicht, auch wenn bbtrain gar nicht trainiert (22.09.2026, Skeptiker B3)
+### ERLEDIGT 22.09.2026: Anlauf: blade.js weicht, auch wenn bbtrain gar nicht trainiert (22.09.2026, Skeptiker B3)
+
+weichtTraining jede Runde; Gym-Zweig setzt weichtTraining + gymSeit, checkin meldet GYM-FENSTER > 3 h. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 blade.js weicht allein wegen Tiefstand < 100 (blade.js ~3591) und stoppt
 dabei jede eigene Aktion. bbtrain.js haelt aber still bei Konto < 5 Mio
@@ -467,7 +479,9 @@ Figur wirklich im Gym steht, sonst Bladeburner-Training (gratis). Vorsicht:
 startAction ohne Simulacrum beendet die Gym-Arbeit (Bladeburner.ts:177) -
 das Wechselspiel zwischen beiden braucht einen eigenen Entwurf mit Test.
 
-### Graft ohne Simulacrum im Anlauf wird von S2 bestraft (22.09.2026, Skeptiker B4)
+### ERLEDIGT 22.09.2026: Graft ohne Simulacrum im Anlauf wird von S2 bestraft (22.09.2026, Skeptiker B4)
+
+Traeger 'graft <aug>' (cyclesWorked) hat Vorrang vor kampfexp; blade.json meldet graftFortschritt/graftAug. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 Waehrend eines Grafts steht weichtTraining auf false (Rundenkopf), also
 traegt rang; der steht, und bbtrain wartet ebenfalls (graftLaeuft). Nach
@@ -496,7 +510,7 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 *Aufgeraeumt am 22.09.2026: 34 automatische Momentaufnahmen (Bruecke ohne Sicherung / Telemetrie veraltet / Spiel-Tab nicht verbunden) entfernt - alle ueberholt. tools/liste.js ersetzt gleiche Ueberschriften seitdem, statt zu doppeln.*
 
 - **Hash-Verwendung pruefen: Coding Contracts (19.09.2026, Skeptiker).** 'Generate Coding Contract' kostet 25*(L+1) Hashes; ein Vertrag bringt ueber contracts.js Geld. Gegen Sell for Money (4 Hashes = 1 Mio) rechnen, sobald hashes.js eine Woche gelaufen ist und data/hashes.json Zahlen liefert.
-- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain.
+- **BN9: Augmentierungsrunde kostet einen ganzen Tag Anlauf (16.09.2026).** Am 15.09. 15:55 stand der Bot 3,6 h vor dem Bladeburner-Beitritt (Kampfwerte 88/123/122/67). Am 16.09. 16:05: in Bladeburner, aber Rang 95, Kampfwerte 90/138/90/89, spielzeitSeitAug 20,6 h - dazwischen wurde installiert, die Werte fielen auf 1 und wurden neu hochtrainiert (bbtrain, blade.js 'weicht bbtrain'). In BN9 zaehlen Kampfwerte nur 0,45; der Weg bis 100 dauert ~20 h. Pruefen, ob die Install-Regel in BN9 (und anderen Knoten mit kleinem StrengthLevelMultiplier) vor dem ersten Rang ueberhaupt zuenden darf. Dazu: checkin meldet '8 gekaufte Augs beim Sprung verfallen', obwohl kein Sprung war (Lauf weiter BN9 L1) - Zaehler `queued_augs_at_jump` pruefen; und Waechter ERSCHOEPFT auf bn4door.js Sprosse 2 seit 15.09. **Nachtrag 18.09.:** dritter Install in BN9 am 17.09. 18:24 (nach dem vom 17.09. ~15:45); Rang in 36 h nur 95 -> 10.355, der Bot steht nach jedem Install wieder bei Kampfwerten ~1 und wartet auf bbtrain. **GEBAUT 22.09.2026 (Paket A):** bn4rep sperrt den Einbau in Kampfknoten, solange die Kampfwerte im Aufbau sind (tiefstand < 100) und bis mindestens max(12 h, 2 x Aufbaudauer) seit dem letzten Einbau vergangen sind (lib/endspurt.js kampfEinbauSperre, Uhr in data/einbau-uhr.json); punish.js haelt sich daran. Im Spiel: einbau.json kampfAufbau=true. bn4door-ERSCHOEPFT sollte verschwinden, seit seine Telemetrie auf home liegt - beim naechsten /bb pruefen, dann diesen Punkt streichen.
 - **Bruecke stirbt still (12.09.2026, zweimal binnen 12 h).** Um 04:52 tot vorgefunden (letzter Lebenszeichen unbekannt), per Start-Process neu gestartet; um 06:45 wieder tot - letzte Logzeile 03:53:36 'Sicherung hourly gruen', kein Fehler in stdout/stderr, danach nichts. Der Prozess endet ohne Meldung zwischen zwei Stundensicherungen. Nachsehen: unbehandelte Promise-Rejection / RFA-Socket-Ende ohne Reconnect? Log liegt in %TEMP%ridge.log. Solange offen: Bruecke bei jedem /bb pruefen. **Nachtrag 14.09.:** dritter Tod, diesmal mit Spur - letzte Zeilen 16:44:32 'Handschlag angefragt: install -> pre-install' und 16:44:33 'Sicherung pre-install gruen', danach nichts; der Sprung BN4 -> BN9 lag zwischen 16:44 und 17:15. Verdacht: die Bruecke stirbt beim Reset/Sprung (RFA-Verbindung bricht, kein Reconnect, Prozess endet still). **Nachtrag 17.09.:** Verdacht Sprung reicht nicht - um 15:42 per Start-Process gestartet, letzte Logzeile 15:44 'Sicherung hourly gruen', um 16:30 kein Prozess mehr, stderr leer, Rechner lief durch, kein Sprung, kein Reset. Die Bruecke stirbt also auch im Normalbetrieb binnen Minuten. Erste Frage: beendet die Werkzeug-Shell von Claude Code ihre Kindprozesse beim Turn-Ende (Start-Process aus PowerShell-Tool)? Gegenprobe: Bruecke aus einem eigenen Terminal-Fenster starten. **Nachtrag 18.09.:** Shell-Verdacht widerlegt - die Bruecke vom 17.09. 16:31 lief 12 h, ueberlebte einen Install (18:24) und eine Trennung (20:04), verband 04:09 neu und war um 05:11 tot; letzte Zeilen 04:10:31 'Bruecke ohne Sicherung' + 'Sicherung hourly gruen'. Auffaellig: der Tod folgt jedes Mal kurz nach einer Sicherung direkt nach einem (Wieder-)Verbinden.
 - **Beobachten: Gym-Fenster unter der Black-Op-Schwelle (11.09.2026).** Seit 0,90 vor dem Endspiel kann der Bot ins Gym gehen, wenn nichts ueber Schwelle liegt und die Black Op zwischen 0,35 und 0,90 steht; der Rang steht dann, S2 spricht nach 45 min an. Beim naechsten /bb pruefen, ob Strafen 'Sprosse 4.5 auf fortschritt' mit Aktion Gym/* auftauchen. Falls ja: dem Waechter die Wartelage melden (wie `aufraeumen`).
 - **checkin.js: Datum aus alter Rate (11.09.2026).** Bei ~0 Spielzeit seit dem letzten Besuch wurde die gespeicherte Stillstandsrate weiterverwendet und 'FERTIG VORAUSSICHTLICH: 14.12.2027' ausgegeben. Ohne neue Spielzeit soll das Werkzeug kein Datum nennen.
@@ -535,7 +549,9 @@ Schwelle` (Zeile ~3270) - das ist erfuellt, muesste also funktionieren.
 Beim naechsten /bb pruefen, ob der Motor nach dem Aufraeumen in Sector-12
 wirklich Field Analysis faehrt oder wieder ins Gym faellt.
 
-### Sleeves arbeiten gegen das Aufraeumen (11.09.2026)
+### ERLEDIGT 22.09.2026: Sleeves arbeiten gegen das Aufraeumen (11.09.2026)
+
+Waehrend blade aufraeumt, laufen Sleeves nur Tracking (kein Chaos); der Rest geht infiltrieren. Der Mock erzwingt eindeutige Vertraege. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 `sleeve.js` faehrt Retirement (+0,04 Chaos je Erfolg) und Bounty Hunter
 (+0,02) in derselben Stadt, waehrend die Figur Diplomacy faehrt. Bei drei
@@ -600,7 +616,9 @@ Mindestkampfwerte, und bn4life.js gehoert in dieser Lage hinter die
 Geldbeschaffung. Solange kein Geld hereinkommt, ist ein 293-GB-Gewerk fuer
 Faktionsarbeit die falsche Belegung.
 
-### Nach dem Aug-Reset verklemmt sich der Speicher: blade.js sperrt bbtrain.js aus (07.09.2026, 05:40)
+### ENTSCHIEDEN 22.09.2026 (nicht gebaut): Nach dem Aug-Reset verklemmt sich der Speicher: blade.js sperrt bbtrain.js aus (07.09.2026, 05:40)
+
+*Mit SF4.3 ist bbtrain.js ~12 GB; es startet nach einem Einbau immer. Dass blade.js (100 GB) dann nicht passt (live am 22.09. um 20:38, home 128 GB), stoert nur, solange das Konto unter 5 Mio liegt - dann trainiert niemand. Gemessen dauert diese Phase ~15 min (3,4 -> 5,5 Mio). Ein Prioritaetstausch verschiebt das Problem nur (Skeptiker B3: bbtrain beendet sich nie und blockiert danach blade.js); Bladeburner-Training in bbtrain.js kostet +5 GB genau dann, wenn Speicher am knappsten ist. Die echte Loesung waere Verdraengung nach evictRank - das Feld wird bisher nirgends ausgewertet. Erst angehen, wenn die Ohne-Geld-Phase messbar laenger dauert.*
 
 Der Bot hat gegen 03:48 neun Augmentierungen eingebaut - regulaer, nicht
 durch Sprosse 5 (die stand um 19:48 auf would-execute). Danach sind die
@@ -626,7 +644,9 @@ Loest sich von selbst, sobald der erste Mietrechner mit 95 GB steht - aber
 das Geld steht bei $1.262, der Park bei 0, gerootet 8 von 70. Bis dahin
 waechst weder Rang noch Kampfwert.
 
-### Waechter straft Werkzeuge, die aus Platzmangel nicht laufen (07.09.2026, 05:40)
+### ERLEDIGT 22.09.2026: Waechter straft Werkzeuge, die aus Platzmangel nicht laufen (07.09.2026, 05:40)
+
+guard.js: Werkzeug laeuft nirgends -> Telemetrie null, keine S1-Strafe; data/fehlend.json nennt nur restartPolicy 'always' (checkin: FEHLT > 60 min). bn4door schiebt seine Telemetrie nach home. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 Um 05:36 meldet der Waechter S1 fuer bbtrain.js, sleeve.js, bn4door.js und
 export.js ("Telemetrie 108 min alt") und setzt bn4rep.js auf EXHAUSTED. Die
@@ -638,7 +658,9 @@ Fix: S1 muss ruhen, solange der Kern fuer dasselbe Werkzeug "findet nirgends
 Platz" meldet. Der Kern kennt den Grund bereits und koennte ihn in die
 Telemetrie schreiben (z. B. `wartetAufRam: [namen]` in bn4net.json), der
 Waechter liest ihn. Skeptiker vor dem Einbau.
-### Waechter misst in der V2-Anlaufphase den falschen Traeger (06.09.2026, 21:25)
+### ERLEDIGT 22.09.2026: Waechter misst in der V2-Anlaufphase den falschen Traeger (06.09.2026, 21:25)
+
+Traeger jetzt graft > kampfexp > kampfwerte > rang; kampfExp waechst nur, solange die Figur wirklich trainiert. Im Spiel: kpi.traeger.name = kampfexp. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 `kpi.traeger` steht auf `hacking`, solange `blade.js` wartet - in BN10 ist
 Hacking aber nicht der Fortschritt, sondern ein Nebenprodukt (Level 126,
@@ -670,7 +692,9 @@ sicherstellen (boot.js vorher starten, oder ns.spawn statt exit), ODER
 Sprosse 3 gehoert bei S3a auch in `enforce` scharf - ein toter Kern ist
 kein Fall zum Beobachten. Skeptiker vor dem Einbau.
 
-### ETA-Kurve rechnet gegen das Laufende statt gegen den Ausgang
+### ERLEDIGT 22.09.2026: ETA-Kurve rechnet gegen das Laufende statt gegen den Ausgang
+
+Commit 865ba14: restH = erster Punkt >= 400.000 plus Nachlauf.
 
 `restzeitAusKurve` in `tools/lib/rangkurve.js:169` gibt `ende.h - hJetzt`
 zurueck - also die Zeit bis zum ENDE des Referenzlaufs. Der Referenzlauf von
@@ -1308,7 +1332,9 @@ einen echten Fehler gefunden, der nicht von dieser Aenderung stammt.
 
 ---
 
-### `blackOpArbeit` behaelt seinen letzten Wert, wenn alle Black Ops erledigt sind (30.08., 14:35)
+### ERLEDIGT 22.09.2026: `blackOpArbeit` behaelt seinen letzten Wert, wenn alle Black Ops erledigt sind (30.08., 14:35)
+
+blackOpArbeit/boChancen = null, sobald keine Black Op mehr offen ist. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 Gemessen: Nicht gemessen - aus dem Code hergeleitet, gefunden von einem
           Skeptiker-Subagenten am 30.08.
@@ -1334,7 +1360,9 @@ Dringlichkeit: niedrig heute (Rang 657 von 2.500 bis zur ersten Black Op),
           aber der Fall tritt in **jedem** Knoten genau einmal ein, und dann
           an der teuersten Stelle.
 
-### Operationen freigeben: verworfen, aber drei echte Fehler dabei gefunden (30.08., 13:35)
+### ERLEDIGT 22.09.2026: Operationen freigeben: verworfen, aber drei echte Fehler dabei gefunden (30.08., 13:35)
+
+B und C gebaut: Migration bei Fehlschlag (Investigation 0,10, Undercover 0,15, je x 0,099) geht in die Bewertung ein; ein Vertrag schlaegt eine Operation, wenn beide gerechnet sind und er mehr bringt. *Paket A, eingespielt 22.09.2026 gegen 21:35, alle sieben Werkzeuge mit neuer PID; im Spiel belegt um 21:47.*
 
 **Zwei unabhaengige Skeptiker sagen BRICHT.** Die Aenderung (Ausnahmetabelle
 fuer Investigation und Undercover auf Schwelle 0,30) war gebaut, nie aktiv,
@@ -1805,7 +1833,9 @@ Dringlichkeit: mittel. Es ist kein Fehler im Bot, sondern eine Luecke in der
           Diagnose - aber sie faellt bei jedem Einbau an, und der kommt
           regelmaessig.
 
-### `tools/rueckstand.js` kann einen Spielausfall nicht sehen (30.08., 12:52)
+### ERLEDIGT 22.09.2026: `tools/rueckstand.js` kann einen Spielausfall nicht sehen (30.08., 12:52)
+
+Commit 865ba14: Trenn-/Verbindungszeilen aus bridge.log werden im Messfenster gezaehlt.
 
 Gemessen: Das Spiel war in der Nacht vom 29. auf den 30.08. zwischen rund
           **01:30 und 06:12 aus** - belegt aus drei eigenen Protokollen:

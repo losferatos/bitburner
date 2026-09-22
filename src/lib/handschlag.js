@@ -132,11 +132,12 @@ export function stelle(ns, reason, target, nodeReset) {
  *
  * install (bn4rep) und jump (ausgang) teilen sich dieselben zwei
  * Dateien. Geprueft wurde nur der Zeitstempel - eine pre-install-Antwort
- * galt damit auch als Beleg fuer eine pre-jump-Sicherung. Das ist kein
- * theoretischer Fall: sync/backup.js:261-266 macht pre-jump rot, solange
- * gekaufte Augmentierungen warten, pre-install dagegen nicht. Ein Sprung
- * haette sich also an einer Sicherung festgehalten, die genau die
- * Pruefung umgeht, die fuer ihn gilt.
+ * galt damit auch als Beleg fuer eine pre-jump-Sicherung - ein Sprung
+ * haette sich an einer Sicherung festgehalten, die fuer einen Einbau
+ * gemacht wurde, mit anderem Zeitpunkt und anderem Zweck. (Die fruehere
+ * Begruendung, sync/backup.js mache pre-jump bei wartenden Augs rot, gilt
+ * seit dem 22.09. abends nicht mehr - die Regel ist gestrichen.) Die
+ * Bruecke prueft den Anlass inzwischen auch auf ihrer Seite.
  *
  * Seit dem 22.09. landet die Anfrage ueberhaupt erst zuverlaessig auf
  * home - vorher lag sie auf dem Wirt und die Bruecke sah sie nie. Damit

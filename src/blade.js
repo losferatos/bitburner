@@ -243,14 +243,66 @@ export async function main(ns) {
   // 'weicht bbtrain, Kampfwerte 73' meldete. Das wiederholt sich alle
   // 90 Minuten, den ganzen Anlauf lang, in jedem V2-Knoten.
   //
-  // Diese Flagge wird im Traeger durchgereicht; lib/leiter.js laesst S2
-  // daraufhin ruhen - dasselbe Muster wie `aufraeumen` bei Diplomacy.
+  // Steht die Flagge, nimmt bn4net.js statt des Rangs die Kampf-Erfahrung
+  // als Traeger (name "kampfexp", Rueckfall "kampfwerte" = Tiefstand) - S2
+  // misst dann weiter, nur die richtige Groesse. Sie ruht NICHT; ein Anlauf, der wirklich haengt,
+  // faellt weiterhin auf.
   //
   // HIER OBEN deklariert und nicht unten bei `gewichen` (Zeile 3232):
   // meldeLage ist eine Closure ab Zeile 1382 und wird frueher gerufen,
   // als `gewichen` deklariert ist. Ein Zugriff von dort waere ein
   // ReferenceError aus der temporalen Totzone.
   let weichtTraining = false;
+  // DER GRAFT ALS TRAEGER (22.09.2026, Skeptiker B4).
+  //
+  // Laeuft ein Graft ohne The Blade's Simulacrum, haelt der Motor still
+  // (Graft-Riegel am Schleifenanfang), und bbtrain.js wartet ebenfalls.
+  // Rang und Kampfwerte stehen - planmaessig. Der Waechter hielt das fuer
+  // einen Haenger und beendete blade.js nach 90 min, mehrfach je Graft.
+  //
+  // Der Fortschritt in dieser Zeit IST das Graft: `cyclesWorked` aus
+  // getCurrentWork() waechst monoton, solange es laeuft, und bleibt stehen,
+  // wenn es haengt. bn4net.js nimmt es dann als Traeger (name "graft").
+  // Faellt je Runde auf null und wird nur im Riegel-Zweig gesetzt - kein
+  // Latch, dieselbe Regel wie bei `weichtTraining`.
+  let graftFortschritt = null;
+  // Welche Augmentierung gerade gegraftet wird. Gehoert zum Traegernamen:
+  // folgen zwei Grafts direkt aufeinander, faellt cyclesWorked auf 0, und
+  // ohne neuen Namen hielte der Waechter die 0 gegen den alten Stand.
+  let graftAug = null;
+  // DIE ERFAHRUNG ZAEHLT NUR, WAEHREND DIE FIGUR SELBST TRAINIERT (22.09.2026,
+  // Skeptiker Runde 2, H1). Sleeves geben ihre Erfahrung an den Spieler
+  // weiter (Sleeve/Work/Work.ts:17-24) - bei jedem Vertrag, jedem Verbrechen.
+  // Die rohe Summe waechst deshalb auch dann, wenn bbtrain.js haengt oder
+  // niemand die Figur trainiert, und S2 bliebe gruen. Gemeldet wird darum ein
+  // Stand, der nur fortgeschrieben wird, solange die Figur im Gym (CLASS)
+  // oder im Bladeburner-Training steht. Sonst bleibt er stehen - und S2
+  // schlaegt nach 45 min an, wie es soll. Der erste Wert nach dem Start ist
+  // ein Ausgangspunkt, damit der Traegername nicht zwischen kampfexp und
+  // kampfwerte springt.
+  let kampfExpGemeldet = null;
+  // Seit wann der Motor im Gym-Zweig steht (Skeptiker Runde 2, M1). Der Rang
+  // steht dort planmaessig, S2 misst die Erfahrung - ein stundenlanges
+  // Gym-Fenster soll aber in /bb sichtbar sein (tools/checkin.js).
+  let gymSeit = null;
+  // Schwelle mit Abstand fuer den Ohne-Geld-Zweig (Skeptiker Runde 2): wer
+  // unter 5 Mio selbst trainiert, gibt erst ab 10 Mio wieder frei - sonst
+  // pendelt die Figur im Minutentakt zwischen blade.js und bbtrain.js.
+  let armZuletzt = false;
+  const kampfExpFortschreiben = (summe) => {
+    if (!Number.isFinite(summe)) return kampfExpGemeldet;
+    let trainiert = false;
+    try { const w = ns.singularity.getCurrentWork(); trainiert = !!w && w.type === "CLASS"; }
+    catch { trainiert = false; }
+    if (!trainiert) {
+      try {
+        const a = ns.bladeburner.getCurrentAction();
+        trainiert = !!a && a.type === "General" && a.name === "Training";
+      } catch { /* nicht in der Division */ }
+    }
+    if (kampfExpGemeldet === null || trainiert) kampfExpGemeldet = Math.round(summe);
+    return kampfExpGemeldet;
+  };
   let chaosStand = null;
   let fahrbarStand = null;
   // Hoechster Chaosstand, der je gemessen wurde, WAEHREND etwas fahrbar war
@@ -701,6 +753,23 @@ export async function main(ns) {
   // beim Start; blade.js ueberlebt keinen Knotenwechsel (exit.js killt alles).
   let knotenStempel = null;
   try { knotenStempel = ns.getResetInfo().lastNodeReset; } catch { /* egal */ }
+  // DER GEMELDETE ERFAHRUNGSSTAND UEBERLEBT DEN NEUSTART (22.09.2026,
+  // Skeptiker Runde 3, Befund 1). Ohne das waere nach jedem Neustart die
+  // rohe Summe der neue Ausgangspunkt - samt allem, was die Sleeves in der
+  // Zwischenzeit beigetragen haben. Fuer den Waechter ein Sprung nach oben
+  // unter demselben Traegernamen, also Wachstum: die Sprosse, die blade.js
+  // neu startet, haette S2 damit selbst wieder gruen gemacht, alle 45 min.
+  // Uebernommen wird nur ein Wert aus DIESEM Knoten und von NACH dem letzten
+  // Einbau (ein Einbau setzt die Erfahrung auf 0).
+  try {
+    if (ns.getHostname() !== "home") ns.scp("data/blade.json", ns.getHostname(), "home");
+    const alt = JSON.parse(ns.read("data/blade.json") || "null");
+    const ar = ns.getResetInfo().lastAugReset;
+    if (alt && Number.isFinite(alt.kampfExp) && alt.nodeReset === knotenStempel
+        && Number.isFinite(alt.zeit) && alt.zeit > ar) {
+      kampfExpGemeldet = alt.kampfExp;
+    }
+  } catch { /* dann eben ein neuer Ausgangspunkt */ }
   let BN_MULT = {};
   try { BN_MULT = ns.getBitNodeMultipliers(); } catch { BN_MULT = {}; }
   const BB_RANK_MULT = Number(BN_MULT.BladeburnerRank) || 1;
@@ -715,7 +784,35 @@ export async function main(ns) {
     // deshalb hier eine Minimalfassung, damit das Warten nicht wie ein
     // Stillstand aussieht.
     try {
-      ns.write("data/blade.json", JSON.stringify({ zeit: Date.now(), wartend: true, host: ns.getHostname() }), "w");
+      // TIEFSTAND UND KNOTEN AUCH VOR DEM BEITRITT (22.09.2026, BAUSTELLEN
+      // Zeile 756). Ohne `rang` fiel der Kern bisher auf das Hacking-Level
+      // als Traeger zurueck - vor dem Beitritt waechst aber der Kampfwert
+      // (bbtrain.js), und das Hacking-Level steht, sobald das Netz gerootet
+      // ist. Mit Tiefstand und Knotenstempel nimmt bn4net.js den Kampfwert.
+      let tiefWartend = null, expWartend = null;
+      try {
+        const pw = ns.getPlayer();
+        const s = pw.skills;
+        tiefWartend = Math.min(s.strength, s.defense, s.dexterity, s.agility);
+        const x = pw.exp || {};
+        const summe = Number(x.strength) + Number(x.defense) + Number(x.dexterity) + Number(x.agility);
+        expWartend = kampfExpFortschreiben(summe);
+      } catch { tiefWartend = null; }
+      // AUCH VOR DEM BEITRITT KANN EIN GRAFT LAUFEN (Skeptiker B1): dann
+      // haelt bbtrain.js still, und die Erfahrung steht planmaessig. Der
+      // Graft-Fortschritt geht deshalb auch hier mit.
+      let graftWartend = null, graftAugWartend = null;
+      try {
+        const w = ns.singularity.getCurrentWork();
+        if (w && w.type === "GRAFTING" && Number.isFinite(w.cyclesWorked)) {
+          graftWartend = w.cyclesWorked;
+          graftAugWartend = typeof w.augmentation === "string" ? w.augmentation : null;
+        }
+      } catch { /* egal */ }
+      ns.write("data/blade.json", JSON.stringify({ zeit: Date.now(), wartend: true,
+        host: ns.getHostname(), tiefstand: tiefWartend, kampfExp: expWartend,
+        graftFortschritt: graftWartend, graftAug: graftAugWartend,
+        nodeReset: knotenStempel }), "w");
       if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
     } catch { /* egal */ }
     await ns.sleep(30000);
@@ -1408,6 +1505,7 @@ export async function main(ns) {
       ausdauer = Math.round(a) + "/" + Math.round(amax);
     } catch { /* nicht in der Division */ }
     let tiefstand = null;
+    let kampfExp = null;
     try {
       const p = ns.getPlayer();
       spielzeit = p.totalPlaytime;
@@ -1424,6 +1522,16 @@ export async function main(ns) {
       // eine Protokollzeichenkette bricht still.
       const k = p.skills;
       tiefstand = Math.min(k.strength, k.defense, k.dexterity, k.agility);
+      // DIE SUMME DER KAMPF-ERFAHRUNG (22.09.2026, Skeptiker B2). Der
+      // Tiefstand ist ganzzahlig und steigt beim Bladeburner-Training nur
+      // alle ~110 min um eins - laenger als die 45 min, nach denen S2
+      // anschlaegt. Die Erfahrung waechst stetig, bei jedem Training und bei
+      // jeder Kampfhandlung. bn4net.js nimmt sie als Traeger "kampfexp".
+      // Fortgeschrieben wird sie nur, solange die Figur selbst trainiert
+      // (kampfExpFortschreiben oben, Skeptiker Runde 2 H1).
+      const x = p.exp || {};
+      const summe = Number(x.strength) + Number(x.defense) + Number(x.dexterity) + Number(x.agility);
+      kampfExp = kampfExpFortschreiben(summe);
     } catch { /* egal */ }
     try { rang = Math.round(ns.bladeburner.getRank()); } catch { /* egal */ }
     try { punkte = ns.bladeburner.getSkillPoints(); } catch { /* egal */ }
@@ -1478,7 +1586,7 @@ export async function main(ns) {
       // eine Datei aus dem alten Knoten erkennen, egal wie jung sie ist.
       nodeReset: knotenStempel,
       chance: Number.isFinite(chance) ? +chance.toFixed(3) : null,
-      rang, punkte, ausdauer, hp, tiefstand,
+      rang, punkte, ausdauer, hp, tiefstand, kampfExp,
       rangHoch: (rangHoch = Number.isFinite(rang)
         ? Math.max(rang, Number.isFinite(rangHoch) ? rangHoch : rang)
         : rangHoch),
@@ -1503,6 +1611,10 @@ export async function main(ns) {
       aufraeumen: chaosAufraeumen,
       // Anlaufphase: der Motor weicht bbtrain, der Rang steht planmaessig.
       weichtTraining,
+      gymSeit,
+      // Graft ohne Simulacrum: dessen Fortschritt statt des Rangs.
+      graftFortschritt,
+      graftAug,
       chaosMax: Number.isFinite(chaosMaxFahrbar) ? +chaosMaxFahrbar.toFixed(2) : null,
       // Erste Hand statt Schaetzung: `getActionEstimatedSuccessChance` liefert
       // fuer Black Ops einen Bereich, dessen eine Grenze mit dem Verhaeltnis
@@ -2134,6 +2246,12 @@ export async function main(ns) {
           }
           : null;
         boChancen = Object.keys(gerechnet).length ? gerechnet : null;
+      } else {
+        // Alle Black Ops erledigt (getNextBlackOp null -> indexOf -1): keine
+        // Arbeit mehr, also auch keine Gewichte. Ohne diesen Zweig blieb der
+        // letzte Wert stehen (BAUSTELLEN Zeile 1402).
+        blackOpArbeit = null;
+        boChancen = null;
       }
     } catch { blackOpArbeit = null; }
 
@@ -2822,8 +2940,22 @@ export async function main(ns) {
         // aendert sich nichts. Die alte Fassung war die obere Schranke, also
         // konservativ - der Fehler sperrte, statt zu verteuern.
         const pErfolg = (s && Number.isFinite(s.min)) ? Math.max(0, Math.min(1, s.min)) : 1;
+        // INVESTIGATION UND UNDERCOVER KOSTEN BEI FEHLSCHLAG (22.09.2026,
+        // BAUSTELLEN "Operationen freigeben", Fehler B). Bei Erfolg
+        // verbessern sie nur die Schaetzung; der else-Zweig ruft aber
+        // triggerPotentialMigration(city, 0,10 bzw. 0,15)
+        // (Bladeburner.ts:802-819). Eine Migration schiebt im Erwartungswert
+        // 9,9 % der Bevoelkerung weg - aus triggerMigration (:564-587)
+        // exakt nachgerechnet UND per Monte Carlo gegengeprueft (0,09900 /
+        // 0,09904). Undercover ist damit die bevoelkerungsteuerste Aktion
+        // des Knotens (~0,96 % je Versuch bei p = 0,355) - bisher stand sie
+        // hier mit null Kosten.
+        const MIGRATION_BEI_FEHLSCHLAG = { "Investigation": 0.10, "Undercover Operation": 0.15 };
+        const MIGRATION_ANTEIL = 0.099;
         const popErwartet = (name === "Raid")
           ? pErfolg * 0.01 + (1 - pErfolg) * 0.0075
+          : (name in MIGRATION_BEI_FEHLSCHLAG)
+            ? (1 - pErfolg) * MIGRATION_BEI_FEHLSCHLAG[name] * MIGRATION_ANTEIL
           : pErfolg * popAnteil;
         if (popErwartet > 0 && dauer > 0) dauer += 0.7 * popErwartet * POP_HORIZONT_MS;
         // Fehlt eine der beiden Zahlen, faellt die Aktion auf die alte
@@ -2867,7 +2999,7 @@ export async function main(ns) {
         // um 09:55 passiert, und der Motor landete prompt auf Field Analysis.
         const proMinute = (rang && dauer) ? rang * s.min / (dauer / 60000) : s.min;
         if (!treffer || ertrag > treffer.ertrag) {
-          treffer = { name, min: s.min, ertrag, proMinute };
+          treffer = { name, min: s.min, ertrag, proMinute, gerechnet: !!(rang && dauer) };
         }
       }
       return treffer;
@@ -3014,10 +3146,22 @@ export async function main(ns) {
     // `OPERATIONEN` und wird von `beste()` mitbewertet - samt Chaos-Zuschlag.
     // Gewinnt Raid dort, kommt es weiterhin dran.
 
+    // OPERATION UND VERTRAG WERDEN VERGLICHEN, NICHT GEREIHT (22.09.2026,
+    // BAUSTELLEN "Operationen freigeben", Fehler C). Hier stand: gibt es
+    // eine Operation ueber der Schwelle, wird sie genommen - unbedingt, auch
+    // wenn das eigene Mass (`ertrag`, Rang je Minute inkl. Bevoelkerungs-
+    // und Chaoszuschlag) die Vertraege klar vorne sieht. Jetzt gewinnt der
+    // hoehere Ertrag. Nur wenn BEIDE aus Rang und Dauer gerechnet sind -
+    // der Rueckfall `ertrag = s.min` steht auf einer anderen Skala, und zwei
+    // Einheiten im selben Vergleich sind kein Vergleich (26.08.2026). Dann
+    // bleibt es bei der alten Reihenfolge.
     const op = beste(OPERATIONEN, O, SICHER_OPERATION);
-    if (op) return { typ: O, name: op.name, grund: "Operation" };
-
     const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
+    if (op && vt && op.gerechnet && vt.gerechnet && vt.ertrag > op.ertrag) {
+      return { typ: V, name: vt.name, grund: "Vertrag (Ertrag " + vt.ertrag.toFixed(2)
+        + " vor Operation " + op.name + " " + op.ertrag.toFixed(2) + ")" };
+    }
+    if (op) return { typ: O, name: op.name, grund: "Operation" };
     if (vt) return { typ: V, name: vt.name, grund: "Vertrag" };
 
     // EIN UNSICHERER VERTRAG SCHLAEGT FIELD ANALYSIS UM LAENGEN
@@ -3273,6 +3417,11 @@ export async function main(ns) {
     // Deshalb faellt sie zu Beginn JEDER Runde auf false und wird nur dort
     // gesetzt, wo wirklich zugunsten von bbtrain gewichen wird.
     weichtTraining = false;
+    graftFortschritt = null;
+    // gymSeit lebt nur, solange der Gym-Zweig Runde fuer Runde genommen wird.
+    const gymVorher = gymSeit;
+    gymSeit = null;
+    graftAug = null;
     try {
       // GRAFTING HAT VORFAHRT - DER MOTOR HAELT STILL (30.08.2026, 19:15).
       //
@@ -3315,13 +3464,17 @@ export async function main(ns) {
       // 5 GB x 16 (SF4 Stufe 1) = 80 GB die teure Antwort auf dieselbe
       // Frage.
       let graftRiegel = false;
+      let graftZyklen = null;
       try {
         const arbeit = ns.singularity.getCurrentWork();
         if (arbeit && arbeit.type === "GRAFTING") {
           graftRiegel = !ns.fileExists("data/simulacrum.txt", "home");
+          graftZyklen = arbeit.cyclesWorked;
+          graftAug = typeof arbeit.augmentation === "string" ? arbeit.augmentation : null;
         }
       } catch { graftRiegel = false; }
       if (graftRiegel) {
+        graftFortschritt = Number.isFinite(graftZyklen) ? graftZyklen : null;
         // Den offenen Abschnitt schliessen, BEVOR die Runde ausfaellt.
         // Sonst laeuft er durch den ganzen Graft und wird spaeter als ein
         // Abschnitt mit der falschen Aktion und ~0 Rang verbucht -
@@ -3559,7 +3712,12 @@ export async function main(ns) {
         const wert = gymGreifen();
         if (wert) {
           gewichen = false;
-          weichtTraining = false;
+          // IM GYM STEHT DER RANG PLANMAESSIG (22.09.2026, BAUSTELLEN 495):
+          // nichts liegt ueber seiner Schwelle, der Motor baut Kampfwerte
+          // auf. Fortschritt ist dann die Kampf-Erfahrung - dieselbe Flagge
+          // wie im Anlauf, damit S2 nicht nach 45 min den Rang anmahnt.
+          weichtTraining = true;
+          gymSeit = gymVorher ?? Date.now();
           meldeLage("Gym/" + wert, "nichts ueber Schwelle, Powerhouse statt"
             + " Bladeburner-Training (Tiefstand " + tiefstand + ")");
           await ns.sleep(30000);
@@ -3584,10 +3742,21 @@ export async function main(ns) {
       // die Schleife hier gar nicht an: Dann hat der Riegel am
       // Schleifenanfang die Runde laengst uebersprungen.
       let graftLaeuftJetzt = false;
+      let graftArbeit = null;
       try {
         const w = ns.singularity.getCurrentWork();
         graftLaeuftJetzt = !!w && w.type === "GRAFTING";
+        if (graftLaeuftJetzt) graftArbeit = w;
       } catch { graftLaeuftJetzt = false; }
+      // GRAFT MIT SIMULACRUM IM ANLAUF (Skeptiker Runde 3, Befund 2): der
+      // Riegel am Schleifenanfang greift nicht (Simulacrum da), bbtrain.js
+      // haelt waehrend des Grafts still, und die Figur gehoert dem Graft.
+      // Niemand trainiert - planmaessig. Dann traegt der Graft-Fortschritt,
+      // wie ohne Simulacrum.
+      if (tiefstand < BBTRAIN_ZIEL && graftArbeit && Number.isFinite(graftArbeit.cyclesWorked)) {
+        graftFortschritt = graftArbeit.cyclesWorked;
+        graftAug = typeof graftArbeit.augmentation === "string" ? graftArbeit.augmentation : null;
+      }
       if (tiefstand < BBTRAIN_ZIEL && !graftLaeuftJetzt) {
         // JEDE RUNDE, NICHT NUR BEIM ERSTEN WEICHEN (22.09.2026, gemessen).
         //
@@ -3625,6 +3794,51 @@ export async function main(ns) {
         // keinen Grund, den Kauf an eine laufende Aktion zu binden.
         faehigkeitenKaufen();
         kostenAktualisieren();
+        // OHNE GELD TRAINIERT BBTRAIN NICHT - DANN DER MOTOR (22.09.2026,
+        // Skeptiker B3).
+        //
+        // Unter 5 Mio haelt bbtrain.js still (GYM_MIN_GELD dort, gleicher
+        // Wert hier) und meldete "blade.js trainiert gratis weiter". Das war
+        // falsch: dieser Zweig hat die eigene Aktion gerade gestoppt und
+        // weicht weiter. Niemand trainierte - nach einem Einbau in BN9 mit
+        // leerem Konto ein realistischer Zustand.
+        //
+        // Jetzt faehrt der Motor in genau diesem Fall Bladeburner-Training:
+        // gratis, hebt alle vier Kampfwerte (`Bladeburner.ts:1091-1105`),
+        // nur ohne den Ortsmultiplikator des Gyms.
+        //
+        // NUR BEI LEEREM KONTO, nicht bei "bbtrain arbeitet gerade nicht".
+        // Der Figur-Antrag des Motors (prio 20) schlaegt den des Gyms
+        // (prio 40, lib/figur.js). Wer hier bei jeder Luecke selbst
+        // trainierte, bekaeme die Figur dauerhaft, und das 2,5-mal
+        // schnellere Gym kaeme nie wieder dran. Ist das Konto wieder ueber
+        // der Schwelle, stellt dieser Zweig seinen Antrag ein, die Lease
+        // laeuft aus, und bbtrain.js uebernimmt.
+        const BBTRAIN_GYM_MIN_GELD = 5e6;
+        let arm = false;
+        try {
+          const geldJetzt = ns.getPlayer().money;
+          arm = geldJetzt < BBTRAIN_GYM_MIN_GELD || (armZuletzt && geldJetzt < 2 * BBTRAIN_GYM_MIN_GELD);
+        } catch { arm = false; }
+        armZuletzt = arm;
+        if (arm) {
+          figBeantrage(ns, "blade.js", FIG_PRIO.bladeburner, "bladeburner",
+            "General/Training", "Anlauf ohne Geld fuer das Gym");
+          const figT = figDarf(ns, "blade.js", figSeq);
+          if (figT.seq !== null) figSeq = figT.seq;
+          if (figT.darf) {
+            let laeuftT = null;
+            try { laeuftT = ns.bladeburner.getCurrentAction(); } catch { laeuftT = null; }
+            if (!laeuftT || laeuftT.type !== "General" || laeuftT.name !== "Training") {
+              ns.bladeburner.startAction("General", "Training");
+            }
+            meldeLage("General/Training", "bbtrain ohne Geld fuer das Gym -"
+              + " Bladeburner-Training, Kampfwerte " + tiefstand);
+            await ns.sleep(30000);
+            continue;
+          }
+          // Figur nicht frei (Graft, Geld-Deadlock): dann wie bisher weichen.
+        }
         meldeLage("General/keine", "weicht bbtrain, Kampfwerte " + tiefstand
           + (lohntSich ? "" : ", nichts ueber Schwelle"));
         await ns.sleep(30000);

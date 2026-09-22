@@ -501,6 +501,68 @@ console.log("-- die Werkzeugliste folgt den Dateien JE RUNDE (10.09.2026) --");
     nachher.slice(-2).join(" || "));
 }
 console.log("");
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- der Traeger folgt der Lage aus blade.json (22.09.2026) --");
+{
+  // DIE KETTE blade.js -> bn4net.js -> guard.js hatte bis heute an der
+  // mittleren Stelle keinen Test. blade.js meldet, was die Figur tut; der
+  // Kern waehlt daraus die Groesse, an der der Waechter Fortschritt misst.
+  // Eine falsche Wahl heisst: Sprosse 4.5 beendet blade.js alle 90 min,
+  // waehrend alles planmaessig laeuft (so am 22.09. im Spiel).
+  const W = 1_700_000_000_000;
+  const traegerBei = async (blade, mockExtra = {}) => {
+    // Zehn Runden: kpi.json entsteht nicht in der ersten (gemessen: bei 3 fehlt es).
+    const m = await fahre(10, (ms, z, vor) => vor(ms), {
+      wall: W,
+      ...mockExtra,
+      dateien: { home: {
+        ...grundzustand().dateien.home,
+        "data/blade.json": JSON.stringify({ zeit: W, nodeReset: 1000,
+          rang: 25, tiefstand: 84, ...blade }),
+      } },
+    });
+    const roh = m.lies("home", "data/kpi.json");
+    try { return JSON.parse(roh).traeger || null; } catch { return null; }
+  };
+  const normal = await traegerBei({});
+  pruefe("ohne Sonderlage traegt der Rang",
+    !!normal && normal.name === "rang" && normal.wert === 25, JSON.stringify(normal));
+  const anlauf = await traegerBei({ weichtTraining: true });
+  pruefe("im Anlauf (weichtTraining) traegt der Kampfwert-Tiefstand",
+    !!anlauf && anlauf.name === "kampfwerte" && anlauf.wert === 84, JSON.stringify(anlauf));
+  const graft = await traegerBei({ graftFortschritt: 1234, graftAug: "Aug A" });
+  pruefe("im Graft ohne Simulacrum traegt der Graft-Fortschritt",
+    !!graft && graft.name === "graft Aug A" && graft.wert === 1234, JSON.stringify(graft));
+  const beides = await traegerBei({ weichtTraining: true, graftFortschritt: 5, graftAug: "Aug B" });
+  pruefe("Graft geht vor Anlauf (bbtrain haelt waehrend eines Grafts still)",
+    !!beides && beides.name === "graft Aug B", JSON.stringify(beides));
+  // SKEPTIKER B2: mit Erfahrungssumme traegt die stetige Groesse.
+  const anlaufExp = await traegerBei({ weichtTraining: true, kampfExp: 26000 });
+  pruefe("im Anlauf mit kampfExp traegt die Erfahrungssumme",
+    !!anlaufExp && anlaufExp.name === "kampfexp" && anlaufExp.wert === 26000, JSON.stringify(anlaufExp));
+  const wartenExp = await traegerBei({ wartend: true, rang: undefined, tiefstand: 42, kampfExp: 999 });
+  pruefe("vor dem Beitritt mit kampfExp ebenfalls",
+    !!wartenExp && wartenExp.name === "kampfexp" && wartenExp.wert === 999, JSON.stringify(wartenExp));
+  // SKEPTIKER B1: ein Graft vor dem Beitritt geht vor.
+  const wartenGraft = await traegerBei({ wartend: true, rang: undefined, tiefstand: 42,
+    kampfExp: 999, graftFortschritt: 55, graftAug: "Aug W" });
+  pruefe("vor dem Beitritt: ein laufender Graft traegt",
+    !!wartenGraft && wartenGraft.name === "graft Aug W" && wartenGraft.wert === 55, JSON.stringify(wartenGraft));
+  // SKEPTIKER RUNDE 2, M3: eine blade.json von VOR dem letzten Einbau traegt nicht.
+  const vorEinbau = await traegerBei({ weichtTraining: true, kampfExp: 26000 }, { augReset: W + 5000 });
+  pruefe("eine blade.json von vor dem Einbau wird nicht genommen",
+    !!vorEinbau && vorEinbau.name === "hacking", JSON.stringify(vorEinbau));
+  // VOR DEM BEITRITT (BAUSTELLEN Zeile 756): blade.js wartet, kein Rang.
+  const warten = await traegerBei({ wartend: true, rang: undefined, tiefstand: 42 });
+  pruefe("vor dem Beitritt traegt der Kampfwert, nicht das Hacking-Level",
+    !!warten && warten.name === "kampfwerte" && warten.wert === 42, JSON.stringify(warten));
+  const wartenFremd = await traegerBei({ wartend: true, rang: undefined, tiefstand: 42, nodeReset: 999 });
+  pruefe("...aber nicht aus einer Datei eines anderen Knotens",
+    !!wartenFremd && wartenFremd.name === "hacking", JSON.stringify(wartenFremd));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

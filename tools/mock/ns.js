@@ -682,6 +682,18 @@ export function neuerMock(o = {}) {
       setToBladeburnerAction: (i, art, name) => {
         const k = zustand.koerper[i];
         if (!k) return false;
+        // Wie im Spiel (NetscriptFunctions/Sleeve.ts:283-293, 22.09.2026 in
+        // den Mock uebernommen): zwei Sleeves duerfen nicht denselben Vertrag
+        // fahren - der Aufruf WIRFT.
+        if (art === "Take on contracts") {
+          for (const andere of zustand.koerper) {
+            if (andere === k || !andere.aufgabe) continue;
+            if (andere.aufgabe.type === "BLADEBURNER" && andere.aufgabe.actionName === name) {
+              throw new Error("Sleeve " + i + " cannot take on contracts because Sleeve "
+                + andere.nr + " is already performing that action.");
+            }
+          }
+        }
         k.aufgabe = { type: "BLADEBURNER", actionType: art, actionName: name };
         return true;
       },

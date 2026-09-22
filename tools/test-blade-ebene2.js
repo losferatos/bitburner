@@ -136,8 +136,13 @@ async function fahre(o = {}) {
       }),
       ...(o.dateien || {}),
     } },
+    arbeit: o.arbeit || null,
     maxSchlaf: o.runden ?? 3,
-    beiSchlaf: (ms, z, vorRuecken) => vorRuecken(o.schrittMs ?? 1000),
+    beiSchlaf: (ms, z, vorRuecken) => {
+      // Erfahrung, die von AUSSEN kommt (wie die geteilte Sleeve-Erfahrung).
+      if (o.expVonAussen && z.spieler && z.spieler.exp) z.spieler.exp.strength += o.expVonAussen;
+      vorRuecken(o.schrittMs ?? 1000);
+    },
     blade: {
       drin: o.drin !== false,
       rang: o.rang ?? 1000,
@@ -152,6 +157,7 @@ async function fahre(o = {}) {
     },
   });
   if (o.skills) Object.assign(m.zustand.spieler.skills, o.skills);
+  if (o.exp) m.zustand.spieler.exp = { ...(m.zustand.spieler.exp || {}), ...o.exp };
   if (o.hp) m.zustand.spieler.hp = o.hp;
 
   const { modul } = await ladeAusBeiden(ROOT, "blade.js");
@@ -473,9 +479,138 @@ console.log("-- Anlaufphase: weichtTraining steht in JEDER Ausweichrunde (22.09.
   const lh = lage(hoch);
   pruefe("bei Kampfwerten >= 100 steht sie auf false",
     !!lh && lh.weichtTraining === false, lh ? String(lh.weichtTraining) : "keine Lage");
+  // SKEPTIKER B3: unter 5 Mio haelt bbtrain.js still. Dann faehrt der Motor
+  // selbst Bladeburner-Training, statt zu weichen und niemanden arbeiten zu
+  // lassen.
+  const arm = await fahre({ skills: niedrig, runden: 4, schrittMs: 30000, geld: 1e6 });
+  const la = lage(arm);
+  pruefe("ohne Geld fuers Gym: der Motor faehrt Bladeburner-Training",
+    gestartet(arm).includes("General/Training"), gestartet(arm).join(", ") || "(nichts)");
+  pruefe("und meldet das statt 'weicht bbtrain'",
+    !!la && la.aktion === "General/Training", la ? "aktion=" + la.aktion + " grund=" + la.grund : "?");
+  pruefe("die Flagge bleibt true - der Kampfwert ist weiter der Traeger",
+    !!la && la.weichtTraining === true, la ? String(la.weichtTraining) : "?");
+  // Gegenprobe: MIT Geld startet der Motor NICHTS - sonst naehme er dem
+  // 2,5-mal schnelleren Gym ueber die Figur-Prioritaet dauerhaft den Platz.
+  pruefe("mit Geld startet der Motor im Anlauf keine eigene Aktion",
+    gestartet(m).length === 0, gestartet(m).join(", "));
+
+  // SKEPTIKER B4: Graft ohne Simulacrum - der Motor haelt still, der
+  // Graft-Fortschritt wird gemeldet (bn4net.js nimmt ihn als Traeger).
+  const graft = await fahre({ runden: 3, arbeit: { type: "GRAFTING",
+    augmentation: "Aug A", cyclesWorked: 1234 } });
+  const lg = lage(graft);
+  pruefe("im Graft ohne Simulacrum wird der Fortschritt gemeldet",
+    !!lg && lg.graftFortschritt === 1234 && lg.graftAug === "Aug A",
+    lg ? "graftFortschritt=" + lg.graftFortschritt + " graftAug=" + lg.graftAug : "keine Lage");
+  pruefe("und der Motor startet dabei nichts", gestartet(graft).length === 0,
+    gestartet(graft).join(", "));
+  const mitSim = await fahre({ runden: 3, arbeit: { type: "GRAFTING",
+    augmentation: "Aug A", cyclesWorked: 1234 },
+    dateien: { "data/simulacrum.txt": "ja" } });
+  const ls = lage(mitSim);
+  pruefe("MIT Simulacrum kein Graft-Traeger (der Motor arbeitet ja)",
+    !!ls && ls.graftFortschritt === null, ls ? String(ls.graftFortschritt) : "?");
+
+  // VOR DEM BEITRITT (BAUSTELLEN Zeile 756): der Warte-Herzschlag traegt
+  // Tiefstand und Knotenstempel, damit der Kern den Kampfwert als Traeger
+  // nehmen kann statt des Hacking-Levels.
+  // SKEPTIKER B2: die stetige Kampf-Erfahrung geht mit, im Anlauf und davor.
+  const mitExp = await fahre({ skills: niedrig, exp: { strength: 5000, defense: 6000, dexterity: 7000, agility: 8000 }, runden: 3, schrittMs: 30000 });
+  const le = lage(mitExp);
+  pruefe("die Lage traegt die Summe der Kampf-Erfahrung",
+    !!le && le.kampfExp === 26000, le ? "kampfExp=" + le.kampfExp : "keine Lage");
+  // SKEPTIKER RUNDE 2, H1: Erfahrung von aussen zaehlt nicht, solange die
+  // Figur nicht selbst trainiert - sonst waere S2 blind fuer einen haengenden
+  // Anlauf, weil die Sleeves die Summe weiter heben.
+  const fremd = await fahre({ skills: niedrig, exp: {strength:5000,defense:6000,dexterity:7000,agility:8000}, runden: 4, schrittMs: 30000, expVonAussen: 1000 });
+  const lf = lage(fremd);
+  pruefe("Erfahrung von aussen hebt den gemeldeten Stand NICHT (Figur weicht, trainiert nicht)",
+    !!lf && lf.kampfExp === 26000, lf ? "kampfExp=" + lf.kampfExp : "keine Lage");
+  const selbst = await fahre({ skills: niedrig, exp: {strength:5000,defense:6000,dexterity:7000,agility:8000}, runden: 4, schrittMs: 30000, expVonAussen: 1000, geld: 1e6 });
+  const ls2 = lage(selbst);
+  pruefe("im eigenen Bladeburner-Training waechst er",
+    !!ls2 && ls2.kampfExp > 26000, ls2 ? "kampfExp=" + ls2.kampfExp + " aktion=" + ls2.aktion : "keine Lage");
+  // SKEPTIKER RUNDE 3, Befund 1: nach einem Neustart gilt der ZULETZT
+  // gemeldete Stand, nicht die rohe Summe (die enthaelt die Sleeve-Anteile).
+  const neustart = await fahre({ skills: niedrig, exp: { strength: 5000, defense: 6000, dexterity: 7000, agility: 8000 },
+    runden: 3, schrittMs: 30000,
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0 - 1000, nodeReset: W0 - 24 * 3600000, kampfExp: 20000 }) } });
+  const ln = lage(neustart);
+  pruefe("nach dem Neustart wird der letzte gemeldete Stand uebernommen",
+    !!ln && ln.kampfExp === 20000, ln ? "kampfExp=" + ln.kampfExp : "keine Lage");
+  const fremdKnoten = await fahre({ skills: niedrig, exp: { strength: 5000, defense: 6000, dexterity: 7000, agility: 8000 },
+    runden: 3, schrittMs: 30000,
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0 - 1000, nodeReset: 123, kampfExp: 20000 }) } });
+  const lk = lage(fremdKnoten);
+  pruefe("...aber nicht aus einem anderen Knoten",
+    !!lk && lk.kampfExp === 26000, lk ? "kampfExp=" + lk.kampfExp : "keine Lage");
+  // SKEPTIKER RUNDE 3, Befund 2: Graft MIT Simulacrum im Anlauf traegt ebenfalls.
+  const simGraft = await fahre({ skills: niedrig, runden: 3,
+    arbeit: { type: "GRAFTING", augmentation: "Aug S", cyclesWorked: 555 },
+    dateien: { "data/simulacrum.txt": "ja" } });
+  const lsg = lage(simGraft);
+  pruefe("Graft mit Simulacrum im Anlauf: der Graft-Fortschritt wird gemeldet",
+    !!lsg && lsg.graftFortschritt === 555, lsg ? "graftFortschritt=" + lsg.graftFortschritt : "keine Lage");
+  const draussenExp = await fahre({ drin: false, skills: niedrig, exp: { strength: 5000, defense: 6000, dexterity: 7000, agility: 8000 }, runden: 2 });
+  const lde = lage(draussenExp);
+  pruefe("auch der Warte-Herzschlag traegt sie",
+    !!lde && lde.kampfExp === 26000, lde ? JSON.stringify(lde) : "keine Lage");
+  // SKEPTIKER B1: ein Graft VOR dem Beitritt steht im Warte-Herzschlag.
+  const draussenGraft = await fahre({ drin: false, skills: niedrig, runden: 2,
+    arbeit: { type: "GRAFTING", augmentation: "Aug W", cyclesWorked: 77 } });
+  const ldg = lage(draussenGraft);
+  pruefe("vor dem Beitritt: ein laufender Graft wird gemeldet",
+    !!ldg && ldg.graftFortschritt === 77 && ldg.graftAug === "Aug W",
+    ldg ? JSON.stringify(ldg) : "keine Lage");
+  // BAUSTELLEN 495: im Gym (nichts ueber Schwelle, Kampfwerte >= 100)
+  // steht der Rang planmaessig - die Flagge geht hoch.
+  const gym = await fahre({ runden: 3, schrittMs: 30000,
+    aktionLage: { vertragChance: 0.10, opChance: 0.10 },
+    skills: { strength: 140, defense: 140, dexterity: 144, agility: 140 } });
+  const lgy = lage(gym);
+  pruefe("im Gym-Zweig steht weichtTraining auf true",
+    !!lgy && /^Gym\//.test(String(lgy.aktion)) && lgy.weichtTraining === true,
+    lgy ? "aktion=" + lgy.aktion + " weicht=" + lgy.weichtTraining : "keine Lage");
+
+  const draussen = await fahre({ drin: false, skills: niedrig, runden: 2 });
+  const ld = lage(draussen);
+  pruefe("vor dem Beitritt: Herzschlag mit Tiefstand und Knotenstempel",
+    !!ld && ld.wartend === true && ld.tiefstand === 80 && Number.isFinite(ld.nodeReset),
+    ld ? JSON.stringify(ld) : "keine Lage");
 }
 
 // ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Operation gegen Vertrag: der hoehere Ertrag gewinnt (22.09.2026) --");
+{
+  // BAUSTELLEN "Operationen freigeben", Fehler C: eine Operation ueber der
+  // Schwelle wurde UNBEDINGT genommen. Hier dauert jede Operation 50 Minuten:
+  // Raid (55 Rang) bringt dann ~1,1 Rang/min, Bounty Hunter (0,9 in 30 s)
+  // ~1,7 - der Vertrag bringt mehr. (Bei nur zehnfacher Dauer gewinnt Raid
+  // mit ~11 Rang/min zu Recht - so stand die Probe im ersten Entwurf, falsch.)
+  const langeOps = { vertragChance: 0.95, opChance: 0.97, je: {} };
+  for (const n of ["Investigation", "Undercover Operation", "Sting Operation", "Raid",
+    "Stealth Retirement Operation", "Assassination"]) {
+    langeOps.je["Operations/" + n] = { vorrat: 100, stufe: 1, maxStufe: 15, chance: 0.97, dauer: 3000000 };
+  }
+  const m = await fahre({ aktionLage: langeOps });
+  const g = gestartet(m);
+  pruefe("bei 50 min Operationsdauer faehrt der Motor einen Vertrag",
+    g.some((x) => x.startsWith("Contracts/")) && !g.some((x) => x.startsWith("Operations/")),
+    g.join(", ") || "(nichts)");
+  // Gegenprobe: gleich lang - dann darf die Operation (mehr Rang je Lauf) gewinnen.
+  const gleich = { vertragChance: 0.95, opChance: 0.97, je: {} };
+  for (const n of ["Investigation", "Undercover Operation", "Sting Operation", "Raid",
+    "Stealth Retirement Operation", "Assassination"]) {
+    gleich.je["Operations/" + n] = { vorrat: 100, stufe: 1, maxStufe: 15, chance: 0.97, dauer: 30000 };
+  }
+  const m2 = await fahre({ aktionLage: gleich });
+  const g2 = gestartet(m2);
+  pruefe("bei gleicher Dauer darf eine Operation gewinnen",
+    g2.some((x) => x.startsWith("Operations/")), g2.join(", ") || "(nichts)");
+}
+
 console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {

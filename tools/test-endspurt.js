@@ -237,6 +237,36 @@ console.log("-- zeile(): der Grund steht im Protokoll --");
 }
 
 console.log("");
+console.log("-- kampfEinbauSperre(): kein Einbau im Wiederaufbau, und erst nach 2x seiner Dauer mit Rang (22.09.2026) --");
+{
+  const H = 3600000;
+  const k = (s, d, x, a) => ({ strength: s, defense: d, dexterity: x, agility: a });
+  // Die beiden Einbauten vom 22.09. (Sicherungen pre-install):
+  const f1 = E.kampfEinbauSperre(k(100, 100, 100, 100), { aufbauDauerMs: 5 * H, seitAufbauMs: 0.2 * H });
+  pruefe("16:21 - Kampfwerte gerade 100, Rang 0: gesperrt (Wiederaufbau eben erst fertig)",
+    f1.gesperrt && f1.zuFrueh && !f1.aufbau, JSON.stringify(f1));
+  const f2 = E.kampfEinbauSperre(k(90, 89, 89, 89), {});
+  pruefe("20:38 - Tiefstand 89 (Wiederaufbau laeuft): gesperrt",
+    f2.gesperrt && f2.aufbau, JSON.stringify(f2));
+  // Skeptiker Runde 2, H2: 20 h Wiederaufbau -> 40 h mit Rang noetig.
+  const lang = E.kampfEinbauSperre(k(150, 150, 150, 150), { aufbauDauerMs: 20 * H, seitAufbauMs: 25 * H });
+  pruefe("20 h Wiederaufbau, erst 25 h Rang seitdem: gesperrt (40 h noetig)",
+    lang.gesperrt && lang.noetigMs === 40 * H, JSON.stringify(lang));
+  const kurz = E.kampfEinbauSperre(k(150, 150, 150, 150), { aufbauDauerMs: 2 * H, seitAufbauMs: 11 * H });
+  pruefe("kurzer Wiederaufbau: trotzdem mindestens 12 h", kurz.gesperrt && kurz.noetigMs === 12 * H,
+    JSON.stringify(kurz));
+  // Gegenproben - sonst waere alles oben auch gruen, wenn die Sperre immer griffe.
+  const frei = E.kampfEinbauSperre(k(250, 240, 260, 230), { aufbauDauerMs: 7 * H, seitAufbauMs: 15 * H });
+  pruefe("7 h Wiederaufbau, 15 h Rang seitdem: frei", !frei.gesperrt, JSON.stringify(frei));
+  const grenze = E.kampfEinbauSperre(k(100, 100, 100, 100), { aufbauDauerMs: 7 * H, seitAufbauMs: 14 * H });
+  pruefe("genau 2x Dauer: frei (Mindestabstand)", !grenze.gesperrt, JSON.stringify(grenze));
+  const ohne = E.kampfEinbauSperre(k(300, 300, 300, 300), {});
+  pruefe("ohne Uhr sperrt nur der Wiederaufbau", !ohne.gesperrt, JSON.stringify(ohne));
+  const nul = E.kampfEinbauSperre(k(300, 300, 300, 300), { aufbauDauerMs: null, seitAufbauMs: null });
+  pruefe("auch null (Lesefehler in bn4rep.js) sperrt nicht fuer immer", !nul.gesperrt, JSON.stringify(nul));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

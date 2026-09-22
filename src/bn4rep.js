@@ -39,7 +39,7 @@ import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 // weiter unten bei `bladeSperreArbeit()`.
 let bladeSperreGemeldet = 0;
 
-import { lage as endspurtLage, einbauErlaubt } from "lib/endspurt.js";
+import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre } from "lib/endspurt.js";
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
@@ -817,6 +817,78 @@ export async function main(ns) {
       graftLaeuft = !!arbeit && arbeit.type === "GRAFTING";
     } catch { graftLaeuft = false; }
     if (graftLaeuft) gesperrt = true;
+
+    // IM KAMPFKNOTEN: KEIN EINBAU WAEHREND DES WIEDERAUFBAUS, UND ERST, WENN ER
+    // SICH BEZAHLT GEMACHT HAT (22.09.2026).
+    //
+    // Die Blade-Sperre oben greift nur bis zum Divisionsbeitritt - und die
+    // Mitgliedschaft UEBERLEBT jeden Einbau. Danach hielt nichts mehr auf.
+    // Gemessen in BitNode 9 Lauf 3 (Sicherungen pre-install):
+    //   16:21  11 Stueck eingebaut, Kampfwerte 100/100/100/100, Rang 0
+    //   20:38   6 Stueck eingebaut, Kampfwerte 90/89/89/89, Rang 60
+    // Der zweite Einbau kam 10 Punkte vor dem Ende des Wiederaufbaus, der
+    // rund 7 Stunden kostet (tools/tor.js), und warf ihn ganz weg - fuer
+    // Augmented Targeting II, Speech Processor, CashRoot und 3x NeuroFlux.
+    // Nach jedem Einbau sind Augmentierungen billig, drei Stueck liegen
+    // schnell in der Warteschlange: ein Kreislauf, in dem der Knoten nie
+    // ueber den Anlauf hinauskommt ("Rang in 36 h nur 95", BAUSTELLEN 493).
+    //
+    // Zwei Bedingungen (Regel und Begruendung: lib/endspurt.js):
+    //   1. Der Wiederaufbau ist fertig (Tiefstand der Kampfwerte >= 100).
+    //   2. Seit seinem ENDE ist mindestens max(12 h, 2 x seine Dauer)
+    //      Spielzeit vergangen. Eine Schranke gegen den Kreislauf, keine
+    //      gerechnete Optimalstelle.
+    // Gemessen in totalPlaytime - und die zaehlt Offline-Zeit mit
+    // (engine.tsx:346-352). Eine Nacht mit ausgeschaltetem Rechner verbraucht
+    // die Sperre also, obwohl Rang erst nach dem Laden aus den gespeicherten
+    // Bonuszyklen entsteht (Skeptiker Runde 3, Befund 3). Das schwaecht die
+    // Sperre, macht sie aber nie endlos - bewusst so hingenommen.
+    // Gekauft wird weiter; die Stuecke warten und gehen beim naechsten
+    // erlaubten Einbau gemeinsam hinein.
+    // Die Regel selbst steht in lib/endspurt.js (kampfEinbauSperre), wo sie
+    // ohne Spiel geprueft wird.
+    //
+    // DIE SPIELZEIT SEIT DEM EINBAU MUSS MAN SICH SELBST MERKEN. ns.getPlayer()
+    // liefert `playtimeSinceLastAug` NICHT (NetscriptFunctions.ts:1371-1389,
+    // nur totalPlaytime) - eine Regel darauf waere still nie wirksam gewesen.
+    // Also: beim ersten Blick nach einem Einbau (erkannt am neuen
+    // lastAugReset) die totalPlaytime festhalten und die Differenz rechnen.
+    // Startet bn4rep nach einem Einbau erst spaeter (Speicher), faellt die
+    // gemessene Dauer des Wiederaufbaus zu KURZ aus und die Sperre damit
+    // grosszuegiger - die Untergrenze von 12 h faengt das ab (Skeptiker
+    // Runde 3, Befund 4).
+    let kampfAufbau = false, kampfZuFrueh = false;
+    if (bladeburnerTraegtHier()) {
+      // Zwei Zeitpunkte je Einbau: der erste Blick danach (`playtime`) und
+      // der erste Blick mit Tiefstand >= 100 (`fertig`) - daraus Dauer des
+      // Wiederaufbaus und Spielzeit seit seinem Ende (lib/endspurt.js).
+      const uhrWerte = {};
+      try {
+        const riE = ns.getResetInfo();
+        let uhr = null;
+        try { uhr = JSON.parse(liesVonHome("data/einbau-uhr.json") || "null"); } catch { uhr = null; }
+        let geaendert = false;
+        if (!uhr || uhr.augReset !== riE.lastAugReset || !Number.isFinite(uhr.playtime)) {
+          uhr = { augReset: riE.lastAugReset, playtime: spieler.totalPlaytime, fertig: null };
+          geaendert = true;
+        }
+        const kw = spieler.skills;
+        if (!Number.isFinite(uhr.fertig)
+            && Math.min(kw.strength, kw.defense, kw.dexterity, kw.agility) >= 100) {
+          uhr.fertig = spieler.totalPlaytime;
+          geaendert = true;
+        }
+        if (geaendert) schreibNachHome("data/einbau-uhr.json", JSON.stringify(uhr));
+        if (Number.isFinite(uhr.fertig)) {
+          uhrWerte.aufbauDauerMs = uhr.fertig - uhr.playtime;
+          uhrWerte.seitAufbauMs = spieler.totalPlaytime - uhr.fertig;
+        }
+      } catch { /* ohne Uhr sperrt nur der laufende Wiederaufbau */ }
+      const ks = kampfEinbauSperre(spieler.skills, uhrWerte);
+      kampfAufbau = ks.aufbau;
+      kampfZuFrueh = ks.zuFrueh;
+      if (ks.gesperrt) gesperrt = true;
+    }
     if (bladeSperre && Date.now() - letzteBladeMeldung > 600000) {
       letzteBladeMeldung = Date.now();
       sag("Kein Einbau: Divisionsbeitritt steht aus, ein Reset wuerde die"
@@ -829,12 +901,33 @@ export async function main(ns) {
       // `bladeSperre` true war, der Divisionsbeitritt also noch aussteht.
       // Genau dieser Einbau hat am 29.08. um 04:15 6,6 Stunden gekostet.
       // Die beiden Sperren sind unabhaengig: es reicht, wenn eine greift.
-      const lockStempel = Number(lockInhalt.split("|")[1]);
-      const lockGilt = !Number.isFinite(lockStempel)
-        || Date.now() - lockStempel < INSTALL_LOCK_MAX_AGE;
+      // ZWEI FORMATE, UND KEINES SPERRT FUER IMMER (22.09.2026, BAUSTELLEN
+      // "install-sperre.txt hat zwei Vertraege"). Gelesen wurde nur
+      // "TAG|<ms>". JSON - so steht es in der Anleitung von tools/hotswap.js
+      // ({ts, reason, bis}) und so schreibt lib/handschlag.js - ergab NaN, und
+      // NaN galt als gueltige Sperre OHNE Verfall: wer der Anleitung folgte,
+      // haette den Einbau dauerhaft abgeschaltet, und aufgeraeumt wurden nur
+      // Sperren mit FIRMENPHASE-Praefix. Jetzt: JSON mit `bis` gilt bis dahin,
+      // JSON mit `ts` und "TAG|ms" fuenf Minuten ab dem Stempel. Was gar
+      // nicht lesbar ist, wird weggeraeumt und gemeldet.
+      let lockBis = NaN;
+      const roh = String(lockInhalt).trim();
+      if (roh.startsWith("{")) {
+        try {
+          const j = JSON.parse(roh);
+          lockBis = Number.isFinite(Number(j.bis)) ? Number(j.bis)
+            : Number.isFinite(Number(j.ts)) ? Number(j.ts) + INSTALL_LOCK_MAX_AGE : NaN;
+        } catch { lockBis = NaN; }
+      } else {
+        const stempel = Number(roh.split("|")[1]);
+        if (Number.isFinite(stempel)) lockBis = stempel + INSTALL_LOCK_MAX_AGE;
+      }
+      const lockGilt = Number.isFinite(lockBis) && Date.now() < lockBis;
       if (!lockGilt) {
         loeschAufHome(INSTALL_LOCK_FILE);
-        sag("Einbausperre war ueber fuenf Minuten alt - aufgehoben.");
+        sag(Number.isFinite(lockBis)
+          ? "Einbausperre abgelaufen - aufgehoben."
+          : "Einbausperre ohne lesbaren Stempel (" + roh.slice(0, 40) + ") - aufgehoben.");
       }
       // UND SIE DARF AUCH KEINE ANDERE SPERRE AUFHEBEN (31.08.2026, 01:35,
       // aus dem Skeptiker-Loop). Die Zuweisung heilte 2026-08-29 nur den
@@ -1087,6 +1180,9 @@ export async function main(ns) {
         // Wiederaufbau. Auch sie muss von aussen sichtbar sein, sonst ist sie
         // nicht nachmessbar.
         wiederaufbauHilfe,
+        // Die Kampfknoten-Sperre (22.09.2026): Wiederaufbau laeuft noch, oder
+        // der letzte Wiederaufbau hat sich noch nicht bezahlt gemacht.
+        kampfAufbau, kampfZuFrueh,
         gesperrtOhneHilfe: kampfKnotenEinbau && !wiederaufbauHilfe
           && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme),
       }));

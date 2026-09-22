@@ -1138,7 +1138,7 @@ nicht in einen Kommentar.
     {
       "name": "bn4door.js",
       "args": [],
-      "ramBaseGb": 3.85,
+      "ramBaseGb": 4.5,
       "ramSingGb": 6.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",

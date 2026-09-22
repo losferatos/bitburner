@@ -67,6 +67,7 @@ async function fahre(o) {
     augReset: W0 - 24 * 3600000,
     geld: o.geld,
     koerper: o.koerper,
+    blade: o.blade,
     server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
     dateien: { home: { "data/verfahren.txt": o.verfahren || "V2 10 2", ...(o.dateien || {}) } },
     maxSchlaf: o.runden ?? 2,
@@ -259,6 +260,43 @@ console.log("-- keine .mock-Datei bleibt liegen --");
     pruefe("keine Reste in " + path.basename(path.dirname(ordner)) + "/src",
       reste.length === 0, reste.join(", "));
   }
+}
+
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- waehrend blade.js aufraeumt, legen die Sleeves kein Chaos nach (22.09.2026) --");
+{
+  // Bounty Hunter +0,02 und Retirement +0,04 Chaos je Erfolg, Tracking keines
+  // (Bladeburner.ts:872-885). Zwei Sleeves duerfen nicht denselben Vertrag
+  // fahren - einer bekommt Tracking, der andere Infiltrate.
+  const kampf = { strength: 200, defense: 200, dexterity: 200, agility: 200 };
+  const vertraege = {
+    "Contracts/Tracking": { vorrat: 100, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Bounty Hunter": { vorrat: 200, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Retirement": { vorrat: 300, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+  };
+  const lauf = (aufraeumen) => fahre({
+    geld: 1e12,
+    koerper: [{ skills: kampf }, { skills: kampf }],
+    blade: { drin: true, aktionen: vertraege },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0, aufraeumen }) },
+  });
+  const auf = stand(await lauf(true));
+  const aufgaben = auf ? auf.sleeves.map((x) => x.aufgabe) : [];
+  pruefe("beim Aufraeumen kein Bounty Hunter und kein Retirement",
+    aufgaben.length === 2 && !aufgaben.some((a) => /Bounty Hunter|Retirement/.test(String(a))),
+    aufgaben.join(", ") || "kein Stand");
+  pruefe("einer faehrt Tracking, der andere Infiltrate",
+    aufgaben.includes("contract:Tracking") && aufgaben.includes("infiltrate"),
+    aufgaben.join(", "));
+  // Gegenprobe: ohne Aufraeumen duerfen die chaostreibenden Vertraege wieder.
+  const frei = stand(await lauf(false));
+  const aufgabenFrei = frei ? frei.sleeves.map((x) => x.aufgabe) : [];
+  // Retirement hat den groessten Vorrat - ohne Aufraeumen waehlt der Code danach.
+  pruefe("ohne Aufraeumen: Retirement und Bounty Hunter (nach Vorrat)",
+    aufgabenFrei.includes("contract:Retirement") && aufgabenFrei.includes("contract:Bounty Hunter"),
+    aufgabenFrei.join(", ") || "kein Stand");
 }
 
 console.log("");

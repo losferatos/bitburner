@@ -147,6 +147,14 @@ export async function main(ns) {
       erledigt: [...erledigt],
       offen: ZIELE.filter((z) => !erledigt.has(z)),
     }), "w");
+    // NACH HOME (22.09.2026). bn4door.js laeuft auf der Werkbank, nicht auf
+    // home - `ns.write` schreibt aber immer auf den eigenen Rechner. Der
+    // Waechter las deshalb auf home eine Datei von 08:23 und strafte das
+    // laufende Werkzeug ueber S1 bis zur Erschoepfung ("ERSCHOEPFT:
+    // bn4door.js auf Sprosse 2" in jedem /bb). Das Registry-Feld
+    // `scpToHome` wertet niemand aus; jedes Werkzeug muss selbst liefern -
+    // gleiches Muster wie bbtrain.js und sleeve.js.
+    if (ns.getHostname() !== "home") ns.scp("data/bn4door.json", "home", ns.getHostname());
    } catch (e) {
     sag("RUNDENFEHLER: " + String(e));
     try { ns.singularity.connect("home"); } catch { /* egal */ }

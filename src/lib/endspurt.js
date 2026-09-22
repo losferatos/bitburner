@@ -286,3 +286,48 @@ export function einbauErlaubt(l, jetzt, offenSeit = null) {
 
   return { ok: true, grund: "" };
 }
+
+/**
+ * DIE EINBAUSPERRE IM KAMPFKNOTEN (22.09.2026).
+ *
+ * Im Bladeburner-Knoten setzt jeder Einbau die vier Kampfwerte auf 1, und der
+ * Wiederaufbau kostet Stunden (BitNode 9: je nach Augmentierungen 5-20 h).
+ * Nach einem Einbau sind Augmentierungen billig, drei Stueck liegen schnell
+ * in der Warteschlange - am 22.09. baute der Bot um 16:21 (Kampfwerte 100,
+ * Rang 0) und um 20:38 (Kampfwerte 89) ein. Ein Knoten kommt so nie ueber den
+ * Anlauf hinaus.
+ *
+ * Gesperrt ist, solange
+ *   (1) der Wiederaufbau laeuft (Tiefstand < 100), oder
+ *   (2) seit seinem ENDE weniger Spielzeit vergangen ist als
+ *       max(12 h, 2 x Dauer des Wiederaufbaus).
+ * Gezaehlt wird ab dem Ende, nicht ab dem Einbau (Skeptiker Runde 2, H2):
+ * bei 20 h Wiederaufbau liessen "24 h ab Einbau" nur 4 h mit Rang uebrig, und
+ * der Einbau direkt beim Erreichen von 100 (16:21, Rang 0) bliebe erlaubt.
+ * Mit dem Faktor 2 entsteht in mindestens zwei Dritteln der Zeit Rang. Das ist
+ * eine Schranke gegen den Kreislauf, keine gerechnete Optimalstelle.
+ *
+ * Gemessen in totalPlaytime. Die zaehlt Offline-Zeit mit (engine.tsx:346-352):
+ * eine Nacht offline verbraucht die Sperre, obwohl Rang erst nach dem Laden
+ * aus Bonuszyklen entsteht. Das schwaecht sie, macht sie aber nie endlos.
+ * ns.getPlayer() liefert keine Spielzeit seit dem Einbau; bn4rep.js fuehrt
+ * sie selbst (data/einbau-uhr.json). Unbekannte Zeiten (null) sperren nicht -
+ * dann gilt nur (1).
+ *
+ * Rein, ohne ns - damit tools/test-endspurt.js sie ohne Spiel prueft.
+ *
+ * @param {{strength:number, defense:number, dexterity:number, agility:number}} skills
+ * @param {{aufbauDauerMs?: number|null, seitAufbauMs?: number|null}} uhr
+ */
+export const KAMPF_EINBAU_MIN_MS = 12 * 3600000;
+export function kampfEinbauSperre(skills, uhr = {}) {
+  const k = skills || {};
+  const tief = Math.min(Number(k.strength), Number(k.defense), Number(k.dexterity), Number(k.agility));
+  const aufbau = Number.isFinite(tief) && tief < 100;
+  const zahl = (x) => (x == null ? NaN : Number(x));
+  const dauer = zahl(uhr && uhr.aufbauDauerMs);
+  const seit = zahl(uhr && uhr.seitAufbauMs);
+  const noetig = Math.max(KAMPF_EINBAU_MIN_MS, Number.isFinite(dauer) ? 2 * dauer : 0);
+  const zuFrueh = !aufbau && Number.isFinite(seit) && seit < noetig;
+  return { aufbau, zuFrueh, noetigMs: noetig, gesperrt: aufbau || zuFrueh };
+}

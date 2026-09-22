@@ -145,6 +145,14 @@ export async function main(ns) {
   sag("ausgang.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
   let letzterStart = 0;
+  // Wann zuletzt ein Handschlag vor dem Sprung gestellt wurde (22.09.2026,
+  // Skeptiker Paket C, B3). Seit `letzterStart` nur noch bei erfolgreichem
+  // exec gesetzt wird, laeuft ein klemmender Sprung jede Runde erneut hier
+  // durch - und jeder Handschlag erzeugt eine pre-jump-Sicherung, die nie
+  // rotiert wird (~662 KB, zwei Ablageorte, etwa alle 2 min). Eine
+  // Sicherung je 15 min genuegt: der Stand vor der Tuer aendert sich in
+  // der Zeit nicht wesentlich. Gesetzt nur nach einer gelungenen Sicherung.
+  let letzterHandschlag = 0;
 
   // Messpunkte fuer die Restzeitschaetzung. Sie leben nur im Prozess: nach
   // einem Neustart beginnt die Messung neu, statt eine Rate aus Punkten zu
@@ -796,9 +804,16 @@ export async function main(ns) {
       // protokolliert, damit sie aus `jump_latency_min` herausgerechnet
       // werden kann (Auftrag: `backup_wait_min` ist kein Fehler).
       let backupWartenMs = 0;
-      try {
+      if (Date.now() - letzterHandschlag < 15 * 60000) {
+        sag("Handschlag vor " + Math.round((Date.now() - letzterHandschlag) / 60000)
+          + " min schon gestellt - keine neue pre-jump-Sicherung.");
+      } else try {
         const hs = await handschlag(ns, "jump",
           "BN" + ziel.node + " L" + ziel.level, info.lastNodeReset, sag);
+        // Nur eine GELUNGENE Sicherung zaehlt (Skeptiker Runde 2): scheitert
+        // der Handschlag, darf die naechste Runde es erneut versuchen - sonst
+        // spraenge der Bot 15 min lang ohne pre-jump-Sicherung.
+        if (hs.gesichert) letzterHandschlag = Date.now();
         backupWartenMs = hs.wartezeitMs;
         const strom = evLaden(liesVonHome("data/events.json"));
         evAnhaengen(strom, "note", "Handschlag vor dem Sprung: " + hs.grund,
@@ -810,7 +825,12 @@ export async function main(ns) {
         sag("Handschlag misslungen (" + String(e && e.message ? e.message : e)
           + ") - der Sprung geht trotzdem.");
       }
-      ns.write("data/backup-wait.txt", String(backupWartenMs), "w");
+      // backup-wait.txt ENTFAELLT (22.09.2026, BAUSTELLEN "backup_wait_min:
+      // Kennwert ohne Leser"). Die Datei landete per ns.write auf dem Wirt,
+      // nicht auf home, und niemand las sie. Die Wartezeit steht ohnehin im
+      // Ereignis "Handschlag vor dem Sprung" (daten.wartezeitMs); bn4net.js
+      // traegt sie von dort als backup_wait_min in kpi.json ein.
+      void backupWartenMs;
 
       // ================================================================
       // NACHRAEUMEN DIREKT VOR DEM exec (22.09.2026)

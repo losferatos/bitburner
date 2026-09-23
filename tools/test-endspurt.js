@@ -267,6 +267,27 @@ console.log("-- kampfEinbauSperre(): kein Einbau im Wiederaufbau, und erst nach 
 }
 
 console.log("");
+console.log("-- Aug-Ruecklage: nur erreichbare Stuecke (23.09.2026) --");
+{
+  pruefe("augRuecklage ist exportiert", typeof E.augRuecklage === "function");
+  if (typeof E.augRuecklage === "function") {
+    // Der Fall vom 23.09.: Simulacrum 150 Mrd * 613 neben zwei erreichbaren.
+    const kand = [
+      { aug: "Blade's Simulacrum", preis: 150e9 * 613, rep: 1815, repReq: 1250 },
+      { aug: "A", preis: 6e9, rep: 10, repReq: 5 },
+      { aug: "B", preis: 3e9, rep: 10, repReq: 5 },
+      { aug: "C (nicht verdient)", preis: 1e9, rep: 1, repReq: 5 },
+    ];
+    const r = E.augRuecklage(kand, 1e9);
+    pruefe("Simulacrum (92 Billionen) zaehlt nicht, A+B schon: 9 Mrd", r === 9e9, String(r));
+    pruefe("unverdiente zaehlen nie", E.augRuecklage([kand[3]], 1e12) === 0);
+    pruefe("Konto 0 (nach Einbau): nichts reserviert", E.augRuecklage(kand, 0) === 0);
+    pruefe("Grenze genau 10x zaehlt noch", E.augRuecklage([{ preis: 10e9, rep: 1, repReq: 1 }], 1e9) === 10e9);
+    pruefe("unlesbare Preise zaehlen nicht", E.augRuecklage([{ preis: NaN, rep: 1, repReq: 1 }], 1e9) === 0);
+  }
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

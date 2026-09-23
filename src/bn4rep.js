@@ -39,7 +39,7 @@ import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
 // weiter unten bei `bladeSperreArbeit()`.
 let bladeSperreGemeldet = 0;
 
-import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre } from "lib/endspurt.js";
+import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } from "lib/endspurt.js";
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
@@ -1408,9 +1408,9 @@ export async function main(ns) {
     // Steht seit dem 22.08.2026 VOR der Arbeitsentscheidung statt danach: In
     // der Firmenphase und bei leerer Zielliste wurde die Meldung sonst gar
     // nicht mehr geschrieben, und bn4net haette das Kaufgeld verbaut.
-    const bedarf = kandidaten
-      .filter((k) => k.rep >= k.repReq)
-      .reduce((n, k) => n + k.preis, 0);
+    // Nur erreichbare Stuecke (23.09.2026) - siehe augRuecklage in
+    // lib/endspurt.js: die Summe aller verdienten stand bei 92 Billionen.
+    const bedarf = augRuecklage(kandidaten, ns.getServerMoneyAvailable("home"));
     ns.write("data/geldbedarf.txt", String(Math.round(bedarf)), "w");
     if (ns.getHostname() !== "home") ns.scp("data/geldbedarf.txt", "home", ns.getHostname());
 

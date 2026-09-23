@@ -331,3 +331,29 @@ export function kampfEinbauSperre(skills, uhr = {}) {
   const zuFrueh = !aufbau && Number.isFinite(seit) && seit < noetig;
   return { aufbau, zuFrueh, noetigMs: noetig, gesperrt: aufbau || zuFrueh };
 }
+
+/**
+ * Die Aug-Ruecklage: was bn4rep.js fuer verdiente Augmentierungen zurueckhaelt
+ * (data/geldbedarf.txt). Sechs Gewerke lesen sie und geben nur aus, was
+ * darueber liegt (bn4net, homegrow, bn4life, graftauto, hashes, hacknet).
+ *
+ * NUR ERREICHBARE STUECKE (23.09.2026). Bis heute war es die Summe ALLER
+ * verdienten Augs. Am 23.09. 08:57 stand sie bei 92 Billionen gegen 1-2 Mrd
+ * Konto - fast alles ein einziges Stueck: Blade's Simulacrum (Grundpreis
+ * 150 Mrd, Augmentations.ts:286, nur 1.250 Bladeburner-Ruf) mal 1,9^10 = 613
+ * fuer zehn wartende Stuecke. Eine solche Summe wird nie erreicht und sperrte
+ * alle sechs Leser fuer den ganzen Zyklus; die billigen, erreichbaren Augs
+ * waren darin nur Rauschen. Jetzt zaehlt jedes Stueck einzeln, und nur, wenn
+ * es hoechstens das RUECKLAGE_REICHWEITE-fache des Kontos kostet - bei
+ * ~1 Mrd Konto und ~5 Mrd/h aus Hashes rund zwei Stunden Sparen.
+ *
+ * @param {{preis:number, rep:number, repReq:number}[]} kandidaten
+ * @param {number} geld aktuelles Konto
+ */
+export const RUECKLAGE_REICHWEITE = 10;
+export function augRuecklage(kandidaten, geld) {
+  const grenze = RUECKLAGE_REICHWEITE * Math.max(0, Number(geld) || 0);
+  return (kandidaten || [])
+    .filter((k) => k && k.rep >= k.repReq && Number.isFinite(k.preis) && k.preis <= grenze)
+    .reduce((n, k) => n + k.preis, 0);
+}

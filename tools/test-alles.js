@@ -138,6 +138,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-kampfaugs.js",
+    deckt: "EBENE 0: Kampfknoten kauft nur nuetzliche Augs; Namen gegen den Spielquelltext",
+    schnell: true,
+  },
+  {
     datei: "test-sprosse5-kette.js",
     deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
     schnell: false,

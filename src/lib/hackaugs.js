@@ -310,3 +310,41 @@ export function combatNutzen(name) {
   }
   return wert;
 }
+
+// ---------------------------------------------------------------------------
+// WAS IN EINEM KAMPFKNOTEN UEBERHAUPT GEKAUFT WIRD (23.09.2026)
+// ---------------------------------------------------------------------------
+//
+// bn4rep.js kaufte jedes verdiente Stueck. Jedes gekaufte verteuert aber jedes
+// weitere im selben Zyklus um Faktor 1,9 (AugmentationHelpers getAugCost),
+// und die Aug-Ruecklage haelt dafuer Geld zurueck, das in BN9 sonst ueber
+// Hashes zu Rang wird. Am 23.09. sparte der Bot zwei Stunden Hash-Einnahmen
+// (~45.000 Hashes) fuer ADR-V1 Pheromone Gene - Firmen- und Faktionsruf x1,1,
+// im Kampfknoten fast wertlos - und haette danach jedes Kampfstueck 1,9-mal
+// teurer bezahlt. Erics Vorgabe: autonom, im Sinne von Effizienz.
+//
+// Nuetzlich im Kampfknoten ist: was Kampfwerte oder die Bladeburner-Chance
+// hebt (combatNutzen > 0), The Blade's Simulacrum (Bladeburner-Aktionen
+// neben anderer Arbeit), The Red Pill (die zweite Ausgangstuer), und ueberall
+// dort, wo es Hacknet-Server gibt (BN9 oder SF9), die Hacknet-Stuecke -
+// hashes.js tauscht Hashes in jedem V2-Knoten in Rang (Skeptiker 23.09.).
+// Reine Ruf-Stuecke sind bewusst NICHT dabei. faction_rep hebt zwar auch den
+// Bladeburner-Faktionsruf aus Rang (Bladeburner/Formulas.ts:48), aber der ist
+// dort billig; 10 % Ruf wiegen den Faktor 1,9 auf alle folgenden
+// Kampfstuecke nicht auf. Hack-Geld-Stuecke ausserhalb von BN9 sind eine
+// Setzung ohne Messung (BAUSTELLEN).
+
+export const HACKNET_AUGS = new Set([
+  "Hacknet Node CPU Architecture Neural-Upload",
+  "Hacknet Node Cache Architecture Neural-Upload",
+  "Hacknet Node NIC Architecture Neural-Upload",
+  "Hacknet Node Kernel Direct-Neural Interface",
+  "Hacknet Node Core Direct-Neural Interface",
+]);
+
+/** @param {string} name  @param {boolean} mitHashes Hacknet-Server vorhanden (BN9 oder SF9) */
+export function kampfknotenNuetzlich(name, mitHashes) {
+  if (name === "The Red Pill" || name === "The Blade's Simulacrum") return true;
+  if (combatNutzen(name) > 0) return true;
+  return mitHashes === true && HACKNET_AUGS.has(name);
+}

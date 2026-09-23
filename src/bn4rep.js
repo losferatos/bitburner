@@ -32,7 +32,7 @@
  * @param {NS} ns
  */
 
-import { hackNutzen, levelNutzen, combatNutzen } from "lib/hackaugs.js";
+import { hackNutzen, levelNutzen, combatNutzen, kampfknotenNuetzlich } from "lib/hackaugs.js";
 
 // Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
 // weil die Meldung sonst jede Runde kaeme (alle 16 s) - siehe die Korrektur
@@ -565,11 +565,33 @@ export async function main(ns) {
     }
 
     // --- 1. Alle erreichbaren Augmentierungen sammeln -------------------------
+    // IM KAMPFKNOTEN NUR NUETZLICHE (23.09.2026, lib/hackaugs.js
+    // kampfknotenNuetzlich): jedes Stueck verteuert jedes weitere um 1,9.
+    // Der Filter wirkt schon hier, damit Kauf, Ruecklage, Einbauzeitpunkt und
+    // Zielwahl dieselbe Liste sehen. Er verlangt den POSITIVEN Nachweis V2
+    // fuer diesen Knoten - bladeburnerTraegtHier() sagt im Zweifel "ja", und
+    // ein Fehlgriff dort wuerde in einem Hackingknoten alle Hack-Stuecke sperren.
+    const kaufInfo = ns.getResetInfo();
+    const kaufKnoten = kaufInfo.currentNode;
+    // Hacknet-Server gibt es in BN9 und mit SF9 ueberall (HacknetHelpers.tsx:34-35).
+    const mitHashes = kaufKnoten === 9 || (() => {
+      const sf = kaufInfo.ownedSF;
+      if (sf instanceof Map) return (sf.get(9) || 0) > 0;
+      if (Array.isArray(sf)) return sf.some((e) => (Array.isArray(e) ? e[0] : e && e.n) === 9);
+      return !!(sf && sf[9]);
+    })();
+    const nurKampfStuecke = (() => {
+      try {
+        const t = liesVonHome("data/verfahren.txt").trim().split(/\s+/);
+        return t[0] === "V2" && Number(t[1]) === kaufKnoten;
+      } catch { return false; }
+    })();
     const kandidaten = [];
     for (const faktion of spieler.factions) {
       const rep = ns.singularity.getFactionRep(faktion);
       for (const aug of ns.singularity.getAugmentationsFromFaction(faktion)) {
         if (aug === NFG || besitz.has(aug)) continue;
+        if (nurKampfStuecke && !kampfknotenNuetzlich(aug, mitHashes)) continue;
         kandidaten.push({
           aug, faktion, rep,
           repReq: ns.singularity.getAugmentationRepReq(aug),
@@ -613,7 +635,13 @@ export async function main(ns) {
     let companyTarget = null;
     if (orderActive && COMPANIES.includes(orderName)) {
       companyTarget = orderName;
-    } else if (orderName !== "off"
+    } else if (orderName !== "off" && !nurKampfStuecke
+        // KEINE AUTOMATISCHE FIRMENPHASE IM GEFILTERTEN KAMPFKNOTEN (Skeptiker
+        // 23.09.2026): bisher hielten reine Hack-Stuecke offeneNuetzliche
+        // gefuellt; mit dem Filter waere die Liste nach jedem Einbau leer,
+        // und bn4rep haette eine Firma zum Ziel genommen, die die Figur wegen
+        // der Bladeburner-Sperre nie bearbeitet. Ein ausdruecklicher Auftrag
+        // (orderActive, oben) gilt weiter.
         && (naechsteNuetzlicheLuecke === null || naechsteNuetzlicheLuecke > COMPANY_GAP)
         && wartend < MINDEST_WARTESCHLANGE) {
       for (const c of COMPANIES) {

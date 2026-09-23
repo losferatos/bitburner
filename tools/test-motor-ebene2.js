@@ -511,7 +511,7 @@ console.log("-- der Traeger folgt der Lage aus blade.json (22.09.2026) --");
   // Eine falsche Wahl heisst: Sprosse 4.5 beendet blade.js alle 90 min,
   // waehrend alles planmaessig laeuft (so am 22.09. im Spiel).
   const W = 1_700_000_000_000;
-  const traegerBei = async (blade, mockExtra = {}) => {
+  const traegerBei = async (blade, mockExtra = {}, extraDateien = {}) => {
     // Zehn Runden: kpi.json entsteht nicht in der ersten (gemessen: bei 3 fehlt es).
     const m = await fahre(10, (ms, z, vor) => vor(ms), {
       wall: W,
@@ -520,14 +520,26 @@ console.log("-- der Traeger folgt der Lage aus blade.json (22.09.2026) --");
         ...grundzustand().dateien.home,
         "data/blade.json": JSON.stringify({ zeit: W, nodeReset: 1000,
           rang: 25, tiefstand: 84, ...blade }),
+        ...extraDateien,
       } },
     });
     const roh = m.lies("home", "data/kpi.json");
     try { return JSON.parse(roh).traeger || null; } catch { return null; }
   };
   const normal = await traegerBei({});
-  pruefe("ohne Sonderlage traegt der Rang",
-    !!normal && normal.name === "rang" && normal.wert === 25, JSON.stringify(normal));
+  pruefe("ohne Sonderlage traegt der Rang (rang-netto, ohne Hash-Rang)",
+    !!normal && normal.name === "rang-netto" && normal.wert === 25, JSON.stringify(normal));
+  // RANG AUS HASHES (23.09.2026): der Kern zieht ihn ab, wenn der
+  // augReset-Stempel zum laufenden Einbauzyklus passt.
+  const EINBAU = W - 3600000;
+  const mitHash = await traegerBei({ rang: 625 }, { augReset: EINBAU },
+    { "data/hashes.json": JSON.stringify({ zeit: W, knoten: 10, rangAusHashes: 600, augReset: EINBAU }) });
+  pruefe("Rang aus Hashes wird abgezogen (625 - 600 = 25)",
+    !!mitHash && mitHash.name === "rang-netto" && mitHash.wert === 25, JSON.stringify(mitHash));
+  const alterZyklus = await traegerBei({ rang: 625 }, { augReset: EINBAU },
+    { "data/hashes.json": JSON.stringify({ zeit: W, knoten: 10, rangAusHashes: 600, augReset: EINBAU - 1 }) });
+  pruefe("Hash-Rang aus einem frueheren Einbauzyklus wird nicht abgezogen",
+    !!alterZyklus && alterZyklus.wert === 625, JSON.stringify(alterZyklus));
   const anlauf = await traegerBei({ weichtTraining: true });
   pruefe("im Anlauf (weichtTraining) traegt der Kampfwert-Tiefstand",
     !!anlauf && anlauf.name === "kampfwerte" && anlauf.wert === 84, JSON.stringify(anlauf));

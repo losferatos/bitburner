@@ -71,6 +71,12 @@ export async function main(ns) {
       if (letzteMeldung === "keine" || letzteMeldung === "erster") letzteMeldung = "";
 
       const geld = ns.getServerMoneyAvailable("home");
+      // Die Aug-Ruecklage von bn4rep.js ist tabu (Skeptiker 23.09.2026): alle
+      // Ausbauten unten rechnen vom freien Konto. Nur der Wirt fuer exit.js
+      // (Punkt 1) darf das ganze Konto sehen - der Sprung verwirft die
+      // gekauften Augs ohnehin.
+      const ruecklage = Number(liesVonHome("data/geldbedarf.txt")) || 0;
+      const frei = Math.max(0, geld - ruecklage);
       const n = ns.hacknet.numNodes();
 
       // 1. Wirt fuer exit.js
@@ -100,9 +106,40 @@ export async function main(ns) {
       try { knoten = ns.getResetInfo().currentNode; } catch { knoten = 0; }
       if (knoten !== 9) { await ns.sleep(TAKT_MS); continue; }
       let gekauft = "";
-      if (n < ns.hacknet.maxNumNodes()) {
+      // 2a. CACHE FUER DEN RANGTAUSCH (23.09.2026). hashes.js tauscht Hashes
+      // in Bladeburner-Rang; Stufe L kostet 250*(L+1) Hashes, und der Kauf
+      // muss auf einmal in den Speicher passen. Cache c fasst 32*2^c
+      // (HacknetServer.ts:121-122), der Ausbau kostet 10 Mio * 1,85^(c-1)
+      // (formulas/HacknetServers.ts:90-110). Bis heute baute niemand den
+      // Cache aus: 9 Server mit Cache 1 = 576, der Rangtausch stand ab
+      // Stufe 2 (750) still, und 4,47 Hashes/s gingen in den Verkauf statt
+      // in rund 100 Rang je Stufe. hashes.js meldet den Bedarf in
+      // data/hashes.json (bedarfKapazitaet); hier wird der kleinste Cache
+      // ausgebaut, solange er hoechstens 5 % des freien Kontos kostet (ohne
+      // die Aug-Ruecklage aus data/geldbedarf.txt). Nur mit
+      // frischer Meldung aus diesem Knoten - sonst baut niemand auf Vorrat.
+      try {
+        const h = JSON.parse(liesVonHome("data/hashes.json") || "null");
+        const frisch = h && h.knoten === knoten && Number.isFinite(h.zeit) && Date.now() - h.zeit < 5 * 60000;
+        if (frisch && Number.isFinite(h.bedarfKapazitaet) && h.bedarfKapazitaet > kapazitaet) {
+          let bester = -1, besterCache = Infinity;
+          for (let i = 0; i < n; i++) {
+            const c = ns.hacknet.getNodeStats(i).cache;
+            if (Number.isFinite(c) && c < besterCache) { besterCache = c; bester = i; }
+          }
+          if (bester >= 0) {
+            const k = ns.hacknet.getCacheUpgradeCost(bester, 1);
+            if (Number.isFinite(k) && k > 0 && k <= frei * ANTEIL_NEUER_SERVER && ns.hacknet.upgradeCache(bester, 1)) {
+              gekauft = "Cache auf Server " + bester + " (" + besterCache + " -> " + (besterCache + 1)
+                + ") fuer " + (k / 1e6).toFixed(1) + "m - Rangtausch braucht " + h.bedarfKapazitaet
+                + " Hashes Speicher, hat " + kapazitaet;
+            }
+          }
+        }
+      } catch { /* dann eben kein Cache in dieser Runde */ }
+      if (!gekauft && n < ns.hacknet.maxNumNodes()) {
         const preis = ns.hacknet.getPurchaseNodeCost();
-        if (preis > 0 && preis <= geld * ANTEIL_NEUER_SERVER && ns.hacknet.purchaseNode() >= 0) gekauft = "Server " + n + " fuer " + (preis / 1e6).toFixed(1) + "m";
+        if (preis > 0 && preis <= frei * ANTEIL_NEUER_SERVER && ns.hacknet.purchaseNode() >= 0) gekauft = "Server " + n + " fuer " + (preis / 1e6).toFixed(1) + "m";
       }
       // Reihenfolge nach Preis (nachgerechnet 02.09.): RAM ist am billigsten
       // (1 -> 2 GB 200k, +7 %), Kerne mittel (Kern 11 = 51,6 Mio, +5.000 $/s,
@@ -110,11 +147,11 @@ export async function main(ns) {
       // (Level 101 = 6,9 Mrd). Kerne deshalb bis 5 % des Kontos.
       for (let i = 0; i < n && !gekauft; i++) {
         const r = ns.hacknet.getRamUpgradeCost(i, 1);
-        if (Number.isFinite(r) && r > 0 && r <= geld * ANTEIL_AUSBAU && ns.hacknet.upgradeRam(i, 1)) { gekauft = "RAM auf Server " + i; break; }
+        if (Number.isFinite(r) && r > 0 && r <= frei * ANTEIL_AUSBAU && ns.hacknet.upgradeRam(i, 1)) { gekauft = "RAM auf Server " + i; break; }
         const c = ns.hacknet.getCoreUpgradeCost(i, 1);
-        if (Number.isFinite(c) && c > 0 && c <= geld * ANTEIL_NEUER_SERVER && ns.hacknet.upgradeCore(i, 1)) { gekauft = "Kern auf Server " + i; break; }
+        if (Number.isFinite(c) && c > 0 && c <= frei * ANTEIL_NEUER_SERVER && ns.hacknet.upgradeCore(i, 1)) { gekauft = "Kern auf Server " + i; break; }
         const l = ns.hacknet.getLevelUpgradeCost(i, 1);
-        if (Number.isFinite(l) && l > 0 && l <= geld * ANTEIL_AUSBAU && ns.hacknet.upgradeLevel(i, 1)) { gekauft = "Level auf Server " + i; break; }
+        if (Number.isFinite(l) && l > 0 && l <= frei * ANTEIL_AUSBAU && ns.hacknet.upgradeLevel(i, 1)) { gekauft = "Level auf Server " + i; break; }
       }
       if (gekauft) sag("Ausbau: " + gekauft + ".");
     } catch (e) {

@@ -1024,9 +1024,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 275998,
-  "lines": 4998,
-  "sha256": "6c6da072a9539f2f12a63e99fa22e75488a4d4c48a60d8ed23b9fa2855d164a9",
+  "bytes": 282076,
+  "lines": 5015,
+  "sha256": "911ff7b73bf0f271273d6f1c5f5293da378b566bec9e7f9b06e7ec0dd068e1f7",
   "gemessenAm": "2026-09-06T09:53:00.000Z",
   "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
  },
@@ -1197,8 +1197,8 @@
  },
  {
   "file": "hacknet.js",
-  "live41": 9.45,
-  "lokal41": 9.45,
+  "live41": 10.45,
+  "lokal41": 10.45,
   "diff": 0,
   "lokal42": 9.45,
   "lokal43": 9.45,
@@ -1206,9 +1206,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 6385,
+  "bytes": 8931,
   "lines": 126,
-  "sha256": "b478062be71bdabe9c226d095755813e3a27342ff5c3daf08c1dd61025d04976"
+  "sha256": "7ddaf0fd1e470a214af2d4216e3db05811add3465d9a42723e5534b68c4ddc7f",
+  "gemessenAm": "2026-09-23T06:46:26.521Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
   "file": "ausgang.js",
@@ -1281,9 +1283,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 3877,
-  "lines": 77,
-  "sha256": "2dc21c95ddcf70a77d2e4504dc1cee24bacce6a611d2e5ffb6fd8d259ce1de88",
+  "bytes": 14948,
+  "lines": 264,
+  "sha256": "df4eca68e6644484893708d597fdd2ad7f8a904393a2ad8cdca9fa180162946a",
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },

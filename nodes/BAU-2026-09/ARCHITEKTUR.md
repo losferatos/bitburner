@@ -950,9 +950,9 @@ nicht in einen Kommentar.
     {
       "name": "hacknet.js",
       "args": [],
-      "ramBaseGb": 9.45,
+      "ramBaseGb": 10.45,
       "ramSingGb": 0.0,
-      "ramMeasuredAt": "2026-09-04",
+      "ramMeasuredAt": "2026-09-23",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",

@@ -133,6 +133,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-hacknet-ebene2.js",
+    deckt: "EBENE 2: hacknet.js baut den Cache aus, wenn der Rangtausch nicht in den Speicher passt",
+    schnell: false,
+  },
+  {
     datei: "test-sprosse5-kette.js",
     deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
     schnell: false,

@@ -53,7 +53,7 @@ async function fahre(o) {
     server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
     dateien: { home: { "data/verfahren.txt": o.verfahren || "V2 9 1", ...(o.dateien || {}) } },
     maxSchlaf: o.runden ?? 1,
-    beiSchlaf: (ms, z, vorRuecken) => vorRuecken(1),
+    beiSchlaf: o.beiSchlaf || ((ms, z, vorRuecken) => vorRuecken(1)),
   });
   if (o.inDivision) m.zustand.blade.drin = true;
   const { modul } = await ladeAusBeiden(ROOT, "hashes.js");
@@ -203,6 +203,94 @@ console.log("-- 4b. verfahren.txt aus einem anderen Knoten zaehlt nicht --");
   const m = await fahre({ knoten: 9, verfahren: "V2 4 3", hacknet: { hashes: 400, kapazitaet: 1280 } });
   pruefe("ohne gueltige Rolle: Verkauf", zaehle(m, "Sell for Money") === 100);
   pruefe("kein Gym", zaehle(m, "Improve Gym Training") === 0);
+}
+
+// ---------------------------------------------------------------------------
+// WIEDERAUFBAU IN DER DIVISION (23.09.2026). Die Division ueberlebt einen
+// Einbau, die Kampfwerte nicht - der Spielstand vom 23.09. zeigte Improve
+// Gym Training Stufe 0 nach einem ganzen Wiederaufbau.
+const bladeFrisch = (tiefstand, zeit = W0 - 60000) => ({
+  "data/blade.json": JSON.stringify({ zeit, tiefstand, rang: 400 }),
+});
+
+console.log("");
+console.log("-- 5. Kampfaufbau IN der Division: Gym vor Rang --");
+{
+  const m = await fahre({ inDivision: true, geld: 2e9, hacknet: { hashes: 1000, kapazitaet: 1280 },
+    dateien: bladeFrisch(60) });
+  pruefe("kauft Improve Gym Training", zaehle(m, "Improve Gym Training") >= 1,
+    "gym: " + zaehle(m, "Improve Gym Training"));
+  pruefe("und keinen Rang, solange Gym ansteht", zaehle(m, "Exchange for Bladeburner Rank") === 0,
+    "rang: " + zaehle(m, "Exchange for Bladeburner Rank"));
+  pruefe("Telemetrie meldet aufbau", stand(m) && stand(m).aufbau === true, JSON.stringify(stand(m)));
+}
+
+console.log("");
+console.log("-- 5a. Division, Kampfwerte bei 100: kein Gym, Rang --");
+{
+  const m = await fahre({ inDivision: true, geld: 2e9, hacknet: { hashes: 1000, kapazitaet: 1280 },
+    dateien: bladeFrisch(100) });
+  pruefe("kein Gym", zaehle(m, "Improve Gym Training") === 0);
+  pruefe("Rang", zaehle(m, "Exchange for Bladeburner Rank") === 2);
+}
+
+console.log("");
+console.log("-- 5b. blade.json von VOR dem letzten Einbau zaehlt nicht --");
+{
+  // augReset liegt bei W0 - 1 h; ein Stand von W0 - 2 h ist vom alten Leben.
+  const m = await fahre({ inDivision: true, geld: 2e9, hacknet: { hashes: 1000, kapazitaet: 1280 },
+    dateien: bladeFrisch(5, W0 - 2 * 3600000) });
+  pruefe("kein Gym auf alter Lage", zaehle(m, "Improve Gym Training") === 0);
+}
+
+console.log("");
+console.log("-- 5c. Gym-Deckel mit gemessener Rate: ueber Stufe 6 hinaus --");
+{
+  // Runde 1 misst noch nichts (Deckel 6, Stufe 6 steht) und verkauft; im
+  // Schlaf kommen 500 Hashes in 10 s dazu = 50/s. Runde 2 rechnet damit:
+  // Stufe 6 kostet 350 Hashes = 7 s und spart 1.364 s - kaufen.
+  const m = await fahre({ inDivision: true, geld: 1e8, runden: 3,
+    hacknet: { hashes: 100, kapazitaet: 1280, stufen: { "Improve Gym Training": 6 } },
+    dateien: bladeFrisch(60),
+    beiSchlaf: (ms, z, vor) => { z.hacknet.hashes += 500; vor(10000); } });
+  pruefe("kauft Stufe 7 (ueber dem alten Deckel)", zaehle(m, "Improve Gym Training") >= 1,
+    "gym: " + zaehle(m, "Improve Gym Training") + ", rate " + (stand(m) && stand(m).rate));
+}
+
+console.log("");
+console.log("-- 6. Rangtausch passt nicht in den Speicher: verkaufen und Bedarf melden --");
+{
+  // Der Fall aus dem Spielstand vom 23.09.: Rang-Stufe 2 (750), Speicher 576.
+  const m = await fahre({ inDivision: true, geld: 2e9,
+    hacknet: { hashes: 576, kapazitaet: 576, stufen: { "Exchange for Bladeburner Rank": 2 } },
+    dateien: bladeFrisch(100) });
+  pruefe("verkauft statt zu warten", zaehle(m, "Sell for Money") === 144,
+    "verkauft: " + zaehle(m, "Sell for Money"));
+  pruefe("keine Skillpunkte (Ausweich vom Skeptiker gekippt)", zaehle(m, "Exchange for Bladeburner SP") === 0);
+  pruefe("meldet bedarfKapazitaet 750", stand(m) && stand(m).bedarfKapazitaet === 750,
+    JSON.stringify(stand(m)));
+  pruefe("und rangAusHashes 200 mit augReset-Stempel",
+    stand(m) && stand(m).rangAusHashes === 200 && stand(m).augReset === W0 - 3600000,
+    JSON.stringify(stand(m)));
+}
+
+console.log("");
+console.log("-- 6b. Aug-Ruecklage ist tabu: kein Rang, solange Konto - Ruecklage < 1 Mrd --");
+{
+  const m = await fahre({ inDivision: true, geld: 2e9, hacknet: { hashes: 1000, kapazitaet: 1280 },
+    dateien: { ...bladeFrisch(100), "data/geldbedarf.txt": "9680000000" } });
+  pruefe("kein Rang", zaehle(m, "Exchange for Bladeburner Rank") === 0,
+    "rang: " + zaehle(m, "Exchange for Bladeburner Rank"));
+  pruefe("verkauft fuer die Ruecklage", zaehle(m, "Sell for Money") === 250);
+  pruefe("und meldet keinen Cache-Bedarf", stand(m) && stand(m).bedarfKapazitaet === null);
+}
+
+console.log("");
+console.log("-- 6c. Kampfwerte 100, blade weicht aber fuers Training: Gym zaehlt --");
+{
+  const m = await fahre({ inDivision: true, geld: 2e9, hacknet: { hashes: 1000, kapazitaet: 1280 },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0 - 60000, tiefstand: 100, weichtTraining: true }) } });
+  pruefe("kauft Gym", zaehle(m, "Improve Gym Training") >= 1, "gym: " + zaehle(m, "Improve Gym Training"));
 }
 
 console.log("");

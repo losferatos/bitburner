@@ -144,6 +144,11 @@ export function neuerMock(o = {}) {
       serverModus: (o.hacknet || {}).serverModus ?? true,
       stufen: { ...((o.hacknet || {}).stufen || {}) },
       ausgegeben: [],
+      // Optional: einzelne Server {cache, ram, cores, level}. Sind sie
+      // gesetzt, ergibt sich die Kapazitaet aus den Caches (32*2^c,
+      // HacknetServer.ts:121-122) statt aus "kapazitaet" (23.09.2026).
+      server: ((o.hacknet || {}).server || null),
+      kaeufe: [],
     },
     resetInfo: {
       lastNodeReset: Number.isFinite(o.nodeReset) ? o.nodeReset : 0,
@@ -817,7 +822,43 @@ export function neuerMock(o = {}) {
     // maxNumNodes 20 (Server-Modus) - so sieht ein frischer BN9 aus.
     hacknet: new Proxy({
       numHashes: () => zustand.hacknet.hashes,
-      hashCapacity: () => zustand.hacknet.kapazitaet,
+      hashCapacity: () => (zustand.hacknet.server
+        ? zustand.hacknet.server.reduce((a, x) => a + 32 * Math.pow(2, x.cache), 0)
+        : zustand.hacknet.kapazitaet),
+      numNodes: () => (zustand.hacknet.server ? zustand.hacknet.server.length : 0),
+      getNodeStats: (i) => {
+        const x = (zustand.hacknet.server || [])[i];
+        if (!x) throw new Error("kein Hacknet-Server " + i);
+        return { name: "hacknet-server-" + i, cache: x.cache, ram: x.ram ?? 1,
+          cores: x.cores ?? 1, level: x.level ?? 1, hashCapacity: 32 * Math.pow(2, x.cache) };
+      },
+      // Cache-Preis nach formulas/HacknetServers.ts:90-110 (Basis 10 Mio,
+      // Faktor 1,85, Deckel 15). Die anderen Ausbauten kosten im Mock
+      // unendlich - wer sie pruefen will, baut sie nach.
+      getCacheUpgradeCost: (i, n = 1) => {
+        const x = (zustand.hacknet.server || [])[i];
+        if (!x || x.cache + n > 15) return Infinity;
+        let k = 0;
+        for (let j = 0; j < n; j++) k += Math.pow(1.85, x.cache + j - 1);
+        return k * 10e6;
+      },
+      upgradeCache: (i, n = 1) => {
+        const x = (zustand.hacknet.server || [])[i];
+        const k = ns.hacknet.getCacheUpgradeCost(i, n);
+        if (!x || !(k < Infinity) || zustand.spieler.money < k) return false;
+        zustand.spieler.money -= k;
+        x.cache += n;
+        zustand.hacknet.kaeufe.push({ art: "cache", i, kosten: k });
+        return true;
+      },
+      getPurchaseNodeCost: () => Infinity,
+      purchaseNode: () => -1,
+      getRamUpgradeCost: () => Infinity,
+      upgradeRam: () => false,
+      getCoreUpgradeCost: () => Infinity,
+      upgradeCore: () => false,
+      getLevelUpgradeCost: () => Infinity,
+      upgradeLevel: () => false,
       maxNumNodes: () => (zustand.hacknet.serverModus ? 20 : 30),
       getHashUpgradeLevel: (n) => zustand.hacknet.stufen[n] || 0,
       hashCost: (n, count = 1) => {

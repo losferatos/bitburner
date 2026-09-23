@@ -38,6 +38,43 @@
  *     Cache 1 = 64 Hashes Speicher, dort reicht es fuer eine Stufe.
  *     Uebersteigt der Stufenpreis den Hash-Speicher, faellt es auf Verkauf
  *     zurueck - sonst laege der Vorrat fuer immer am Deckel.
+ *   - WIEDERAUFBAU IN DER DIVISION (23.09.2026, Erics Frage "gerade nach
+ *     einem Reset muesste Improve Gym Training attraktiv sein"). Die
+ *     Division ueberlebt einen Einbau, die Kampfwerte nicht: nach den
+ *     Einbauten vom 22.09. (16:21, 20:38) standen sie wieder bei 1, und der
+ *     Bot trainierte stundenlang - aber Gym kaufte dieses Gewerk nur
+ *     "nicht in der Division". Gemessen im Spielstand vom 23.09. 07:26:
+ *     Improve Gym Training Stufe 0. Jetzt gilt auch ein KAMPFAUFBAU in der
+ *     Division als Anlauf: data/blade.json frisch (juenger als der letzte
+ *     Einbau und als 15 min) und tiefstand < 100 oder weichtTraining (blade
+ *     trainiert auch ueber 100 weiter, wenn nichts ueber der Schwelle liegt).
+ *   - DER STUFENDECKEL RECHNET MIT DER GEMESSENEN RATE UND DER RESTZEIT.
+ *     Die Grenze 6 war fuer 0,28 Hashes/s und volle 10 h gerechnet; am
+ *     23.09. waren es 4,47/s. Stufe L lohnt, solange 50*(L+1)/rate kleiner
+ *     ist als T * 0,2 / (f*(f+0,2)) mit T = 36.000 s mal dem Rest der noch
+ *     noetigen Erfahrung. Der Rest folgt der Skill-Kurve
+ *     exp ~ e^(lvl/(32*m)) (formulas/skill.ts, m ~ 0,6 = 1,339 * 0,45 in
+ *     BN9): bei Tiefstand 75 fehlen 73 %, bei 90 41 %, bei 99 5 %
+ *     (gegen eine unabhaengige Nachrechnung des Skeptikers geeicht). Ohne
+ *     Rate gilt die alte 6. Die Einheiten (Sekunden Hash-Produktion gegen
+ *     Sekunden Training) sind eine gesetzte Gleichwertigkeit, keine Physik.
+ *   - DER RANGTAUSCH HING AM SPEICHER (23.09.2026). Stufe L kostet
+ *     250*(L+1) Hashes (HashUpgrade.ts:72-81) fuer 100 Rang und damit rund
+ *     33 Skillpunkte (RanksPerSkillPoint 3). Der Speicher fasste 576 (9
+ *     Server, Cache 1 = 64 je Server), ab Stufe 2 (750) passte nichts mehr,
+ *     und das Gewerk wartete ewig auf einen Kauf, der nie kommen konnte.
+ *     Jetzt: passt er nicht, meldet es bedarfKapazitaet (hacknet.js baut
+ *     darauf den Cache aus) und verkauft bis dahin. Ein Ausweichen in
+ *     Skillpunkte wurde gebaut und vom Skeptiker gekippt: gleiche Preise,
+ *     10 SP statt 100 Rang + 33 SP, und das stehende Konto blockierte den
+ *     Cache-Ausbau (12-h-Simulation: 2.800 statt 3.800 Rang).
+ *   - DAS GELD FUER AUGS IST TABU (Skeptiker 23.09.2026). Getauscht wird nur,
+ *     was ueber data/geldbedarf.txt (Ruecklage von bn4rep.js fuer verdiente
+ *     Augmentierungen) hinaus 1 Mrd uebrig ist - sonst haette der Rangtausch
+ *     die 9,68 Mrd Ruecklage vom 23.09. nie wachsen lassen.
+ *   - Der Rang aus Hashes steht als rangAusHashes (mit augReset-Stempel) in
+ *     data/hashes.json. bn4net.js zieht ihn vom Traeger ab: sonst verdeckten
+ *     100 Rang alle paar Minuten einen stehenden Motor vor dem Waechter.
  *   - Ohne Hacknet-Server: ist der Knoten im Server-Modus (maxNumNodes 20,
  *     Hacknet.ts:57-62), wartet es auf hacknet.js, das den ersten kauft;
  *     sonst schreibt es data/keine-hacknet.txt mit der Knotennummer und
@@ -58,7 +95,12 @@ export async function main(ns) {
   const GYM = "Improve Gym Training";
   const RANG_AB_GELD = 1e9;
   const GYM_AB_GELD = 50e6;
-  const GYM_MAX_STUFE = 6;
+  const GYM_MAX_STUFE = 6;           // ohne gemessene Rate
+  const GYM_MAX_STUFE_HART = 20;     // auch mit Rate nie hoeher
+  const AUFBAU_ZEIT_S = 36000;       // voller Anlauf, wie oben gerechnet
+  const BLADE_FRISCH_MS = 15 * 60000;
+  const RANG_PREIS_JE_STUFE = 250;
+  const RANG_JE_STUFE = 100;
   const GYM_PREIS_JE_STUFE = 50;
   const gymStufe = (preis) => Math.round(preis / GYM_PREIS_JE_STUFE) - 1;
 
@@ -94,6 +136,41 @@ export async function main(ns) {
   if (knoten === 8) { sperren("BitNode 8: Hacknet erzeugt keine Hashes (HacknetNodeMoney 0)"); return; }
 
   let verkauft = 0, getauscht = 0, gym = 0, letzteMeldung = "";
+  // Hash-Rate aus dem eigenen Takt: Zuwachs zwischen dem Ende einer Runde
+  // und dem Anfang der naechsten (dazwischen gibt niemand aus). Gewertet nur,
+  // wenn der Speicher dabei nicht voll war - ein voller Speicher verkauft
+  // den Ueberlauf selbst, und der Zuwachs waere zu klein.
+  let hashesEnde = null, wallEnde = 0, rate = null;
+
+  /** Anteil der Erfahrung bis Kampfwert 100, die noch fehlt (0..1). */
+  const restAnteil = (tiefstand) => {
+    if (!Number.isFinite(tiefstand)) return 1;
+    const m = 0.6;
+    const e = (l) => Math.exp(l / (32 * m));
+    const t = Math.max(1, Math.min(100, tiefstand));
+    return (e(100) - e(t)) / (e(100) - e(1));
+  };
+
+  /** Lohnt Gym-Stufe "stufe" (die naechste zu kaufende)? */
+  const gymLohnt = (stufe, tiefstand) => {
+    if (!(rate > 0)) return stufe < GYM_MAX_STUFE;
+    if (stufe >= GYM_MAX_STUFE_HART) return false;
+    const f = 1 + 0.2 * stufe;
+    const kostenS = GYM_PREIS_JE_STUFE * (stufe + 1) / rate;
+    // Untergrenze 0,1: blade trainiert auch ueber 100 weiter (weichtTraining).
+    const restS = AUFBAU_ZEIT_S * Math.max(0.1, restAnteil(tiefstand));
+    return kostenS < restS * 0.2 / (f * (f + 0.2));
+  };
+
+  /** Kampfaufbau in der Division? blade.json muss frisch sein. */
+  const kampfLage = (letzterEinbau) => {
+    try {
+      const b = JSON.parse(liesVonHome(ns, "data/blade.json") || "null");
+      if (!b || !Number.isFinite(b.zeit) || !Number.isFinite(b.tiefstand)) return null;
+      if (b.zeit <= letzterEinbau || Date.now() - b.zeit > BLADE_FRISCH_MS) return null;
+      return { aufbau: b.tiefstand < 100 || b.weichtTraining === true, tiefstand: b.tiefstand };
+    } catch { return null; }
+  };
   while (true) {
     try {
       let kapazitaet = 0, serverModus = false;
@@ -110,37 +187,74 @@ export async function main(ns) {
       }
       letzteMeldung = "";
 
+      const jetztH = ns.hacknet.numHashes();
+      const jetztW = Date.now();
+      if (hashesEnde !== null && jetztW > wallEnde && hashesEnde < kapazitaet * 0.9
+          && jetztH < kapazitaet * 0.9 && jetztH >= hashesEnde) {
+        const messung = (jetztH - hashesEnde) / ((jetztW - wallEnde) / 1000);
+        rate = rate === null ? messung : 0.8 * rate + 0.2 * messung;
+      }
+      let letzterEinbau = 0;
+      try { letzterEinbau = ns.getResetInfo().lastAugReset || 0; } catch { letzterEinbau = 0; }
+      const geld = ns.getServerMoneyAvailable("home");
+      let ruecklage = 0;
+      try {
+        ruecklage = ns.fileExists("data/geldbedarf.txt", "home")
+          ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
+      } catch { ruecklage = 0; }
+
       let inDivision = false;
       try { inDivision = ns.bladeburner.inBladeburner(); } catch { inDivision = false; }
       const v2 = liesVerfahren() === "V2";
-      const rangTausch = inDivision && v2 && ns.getServerMoneyAvailable("home") > RANG_AB_GELD;
-      // Anlauf: V2, aber noch nicht in der Division - Gym-Training, solange
-      // eine Stufe in den Speicher passt (sonst bliebe der Vorrat am Deckel).
+      const lage = v2 && inDivision ? kampfLage(letzterEinbau) : null;
+      const aufbau = !!(lage && lage.aufbau);
+      const tiefstand = lage ? lage.tiefstand : NaN;
+      // Anlauf: V2 vor der Division ODER Kampfaufbau in der Division -
+      // Gym-Training, solange eine Stufe in den Speicher passt (sonst bliebe
+      // der Vorrat am Deckel) und sich laut Rate und Restzeit lohnt.
       let gymKauf = false;
-      if (v2 && !inDivision && ns.getServerMoneyAvailable("home") >= GYM_AB_GELD) {
+      if (v2 && (!inDivision || aufbau) && geld >= GYM_AB_GELD) {
         let gymPreis = 0;
         try { gymPreis = ns.hacknet.hashCost(GYM); } catch { gymPreis = 0; }
         // Die Stufe steckt im Preis: 50*(Stufe+1) (HashUpgrade.ts:72-81,
         // costPerLevel 50 in HashUpgradesMetadata.tsx:72). So bleibt
         // getHashUpgradeLevel ungenutzt - das waeren 0,5 GB mehr und eine
         // neue RAM-Messung.
-        gymKauf = gymPreis > 0 && gymPreis <= kapazitaet && gymStufe(gymPreis) < GYM_MAX_STUFE;
+        gymKauf = gymPreis > 0 && gymPreis <= kapazitaet && gymLohnt(gymStufe(gymPreis), tiefstand);
       }
-      const art = rangTausch ? RANG : gymKauf ? GYM : VERKAUF;
+      // Rang erst, wenn keine lohnende Gym-Stufe mehr ansteht, und nur aus
+      // dem, was ueber der Aug-Ruecklage liegt.
+      let rangTausch = false, bedarfKapazitaet = null;
+      const rangPreis = ns.hacknet.hashCost(RANG);
+      if (!gymKauf && inDivision && v2 && geld - ruecklage > RANG_AB_GELD) {
+        if (rangPreis > 0 && rangPreis <= kapazitaet) rangTausch = true;
+        else bedarfKapazitaet = rangPreis;
+      }
+      const art = gymKauf ? GYM : rangTausch ? RANG : VERKAUF;
       for (let i = 0; i < 1000; i++) {
         const preis = ns.hacknet.hashCost(art);
         if (!(preis > 0) || ns.hacknet.numHashes() < preis) break;
         if (!ns.hacknet.spendHashes(art)) break;
-        if (rangTausch) getauscht++; else if (gymKauf) gym++; else verkauft++;
-        // Gym: jede Stufe ist teurer - passt die naechste nicht mehr in den
-        // Speicher oder ist der Deckel erreicht, ist hier Schluss; der Rest
-        // geht in der naechsten Runde in den Verkauf.
+        if (gymKauf) gym++; else if (rangTausch) getauscht++; else verkauft++;
+        // Gym und Rang: jede Stufe ist teurer - passt die naechste nicht mehr
+        // in den Speicher (oder lohnt Gym nicht mehr), ist hier Schluss; die
+        // naechste Runde entscheidet neu.
         if (gymKauf) {
           const naechster = ns.hacknet.hashCost(GYM);
-          if (naechster > kapazitaet || gymStufe(naechster) >= GYM_MAX_STUFE) break;
+          if (naechster > kapazitaet || !gymLohnt(gymStufe(naechster), tiefstand)) break;
+        } else if (rangTausch) {
+          const naechster = ns.hacknet.hashCost(RANG);
+          if (naechster > kapazitaet) { bedarfKapazitaet = naechster; break; }
         }
       }
-      schreibeStand({ state: "work", hashes: ns.hacknet.numHashes(), kapazitaet, verkauft, getauscht, gym, art });
+      hashesEnde = ns.hacknet.numHashes();
+      wallEnde = Date.now();
+      // Rang aus Hashes in diesem Einbauzyklus: die Stufe steckt im Preis
+      // 250*(Stufe+1), und die Stufen fallen beim Einbau auf 0.
+      const rangStufe = Math.max(0, Math.round(ns.hacknet.hashCost(RANG) / RANG_PREIS_JE_STUFE) - 1);
+      schreibeStand({ state: "work", hashes: hashesEnde, kapazitaet, verkauft, getauscht, gym, art,
+        aufbau, rate: rate === null ? null : Number(rate.toFixed(3)), bedarfKapazitaet,
+        rangAusHashes: rangStufe * RANG_JE_STUFE, augReset: letzterEinbau });
     } catch (e) {
       ns.print("Fehler in der Runde: " + String(e));
     }

@@ -4554,6 +4554,23 @@ export async function main(ns) {
               // graftauto.js, und dessen Telemetrie ueberwacht S1 (Skeptiker
               // B6, 22.09.2026).
               const imGraft = Number.isFinite(b.graftFortschritt);
+              // RANG AUS HASHES ZAEHLT NICHT ALS MOTOR (23.09.2026, Skeptiker
+              // zum Hash-Umbau). hashes.js tauscht Hashes in Rang, 100 je
+              // Stufe, anfangs alle paar Minuten. Ohne Abzug saehe S2 Rang
+              // wachsen, auch wenn blade.js lebend nichts tut. Abgezogen wird
+              // nur der Rang aus DIESEM Einbauzyklus (die Stufen fallen beim
+              // Einbau auf 0, der augReset-Stempel muss passen). Der Name
+              // "rang-netto" setzt den Vergleichspunkt des Waechters beim
+              // Einspielen einmal zurueck - sonst laese S2 den Sprung nach
+              // unten als Stillstand.
+              const rangAusHashes = () => {
+                try {
+                  const h = JSON.parse(ns.read("data/hashes.json") || "null");
+                  const ri = ns.getResetInfo();
+                  return h && h.augReset === ri.lastAugReset && Number.isFinite(h.rangAusHashes)
+                    ? h.rangAusHashes : 0;
+                } catch { return 0; }
+              };
               traeger = imGraft
                 ? { name: "graft " + (b.graftAug || "?"), wert: b.graftFortschritt,
                     motorTimeMs: mz.motorTimeMs, fehlversuch: null,
@@ -4566,7 +4583,7 @@ export async function main(ns) {
                 ? { name: "kampfwerte", wert: b.tiefstand,
                     motorTimeMs: mz.motorTimeMs, fehlversuch: null,
                     aufraeumen: false }
-                : { name: "rang", wert: b.rang, motorTimeMs: mz.motorTimeMs,
+                : { name: "rang-netto", wert: b.rang - rangAusHashes(), motorTimeMs: mz.motorTimeMs,
                     fehlversuch: b.fehlversuch && Number.isFinite(b.fehlversuch.verlust)
                       ? { wall: b.fehlversuch.wall, verlust: b.fehlversuch.verlust } : null,
                     // Und ob blade.js gerade Chaos abbaut (11.09.2026): Diplomacy

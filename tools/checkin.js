@@ -200,11 +200,6 @@ async function main() {
   // Rang aus gestern, Geld von heute.
   const VERALTET_MS = 3 * 60000;
   const bladeFrisch = alterVon(blade) <= Math.max(VERALTET_MS, alter * 3);
-  if (blade && !bladeFrisch) {
-    sag("Hinweis: data/blade.json ist " + dauer(std(alterVon(blade)))
-      + " alt und wird ignoriert (laeuft blade.js?). Rang und Black-Ops-Liste"
-      + " stehen deshalb nicht zur Verfuegung.");
-  }
   bericht.knoten = knoten;
   bericht.telemetrieAlterMin = +(alter / 60000).toFixed(1);
 
@@ -231,6 +226,13 @@ async function main() {
     ? verfahrenTxt[0] : (ausgangGut ? ausgangGut.verfahren : null);
   const hackingweg = verfahren === "V1" || verfahren === "V1b";
   bericht.verfahren = verfahren;
+  // Im Hackingweg laeuft blade.js nicht - die alte Datei stammt aus dem
+  // letzten V2-Knoten und ist dort kein Befund, nur Rauschen (25.09.2026).
+  if (blade && !bladeFrisch && !hackingweg) {
+    sag("Hinweis: data/blade.json ist " + dauer(std(alterVon(blade)))
+      + " alt und wird ignoriert (laeuft blade.js?). Rang und Black-Ops-Liste"
+      + " stehen deshalb nicht zur Verfuegung.");
+  }
   if (ausgangGut) {
     const l = ausgangGut.lauf, z = ausgangGut.ziel;
     sag("BitNode " + knoten + (l ? " Lauf " + l.level : "") + (verfahren ? " (" + verfahren + ")" : "")

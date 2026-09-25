@@ -31,6 +31,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./lib/rangkurve.js";
+import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -384,9 +385,62 @@ async function main() {
       + (netz && Number.isFinite(Number(netz.hacking)) ? "; Hacking laut Netz " + netz.hacking : "") + ".");
     if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
       + " gerootet, Runde " + (netz.runde ?? "?") + ", Geld $" + zahl(netz.geld ?? 0) + ".");
+    // FERTIG-SCHAETZUNG AUS DER V1-REFERENZKURVE (25.09.2026). Bis dahin stand
+    // hier immer "noch nicht schaetzbar" - Erics Vorgabe (Schlusszeile mit
+    // Datum) war im Hackingweg nie erfuellt. Traeger ist der Hoechststand des
+    // Levels im Lauf gegen einen abgeschlossenen Lauf desselben Knotens,
+    // gemessen in Online-Stunden (Begruendung in tools/lib/v1kurve.js).
+    let v1 = null, v1Grund = null;
+    try {
+      const refPfad = path.join(ROOT, "data", "v1kurve-BN" + knoten + ".json");
+      let ref = fs.existsSync(refPfad) ? JSON.parse(fs.readFileSync(refPfad, "utf8")) : null;
+      if (laufJetzt === null) v1Grund = "Lauf unbekannt (data/ausgang.json)";
+      else {
+        // Der vorige Lauf desselben Knotens ist abgeschlossen, aber noch nicht
+        // Referenz: jetzt bauen, bevor seine Sicherungen rotieren (~48 h).
+        if ((!ref || ref.lauf < laufJetzt - 1) && laufJetzt > 1) {
+          const b = baueKurve(ROOT, knoten, laufJetzt - 1);
+          if (b.kurve) { ref = b.kurve; sag("Referenzkurve BN" + knoten + "." + (laufJetzt - 1) + " gebaut (" + b.kurve.punkte.length + " Punkte)."); }
+          else if (!ref) v1Grund = b.grund;
+        }
+        if (ref && ref.lauf === laufJetzt) v1Grund = "die Referenz ist dieser Lauf selbst";
+        else if (ref) {
+          const zeilen = indexZeilen(fs.readFileSync(path.join(ROOT, "backups", "INDEX.tsv"), "utf8"));
+          const { start } = laufGrenzen(zeilen, knoten, laufJetzt);
+          const fenster = offlineFenster(fs.readFileSync(path.join(ROOT, "data", "bridge.log"), "utf8"));
+          let max = Number(netz && netz.hacking) || 0;
+          for (const z of zeilen.filter((z) => z.knoten === knoten && z.lauf === laufJetzt)) {
+            try { max = Math.max(max, levelAusSicherung(path.join(ROOT, "backups", z.datei))); } catch { /* auslassen */ }
+          }
+          const r = restzeitV1(ref, max);
+          const w = restzeitV1(ref, max, "wand");
+          if (!start) v1Grund = "Beginn dieses Laufs nicht im Sicherungsindex";
+          else if (!r) v1Grund = "Referenzkurve unlesbar";
+          else v1 = { ...r, restWandH: w ? w.restH : null, max, ref, onlineH: onlineStunden(start, Date.now(), fenster) };
+        } else if (!v1Grund) v1Grund = "kein abgeschlossener Lauf von BitNode " + knoten + " als Referenz";
+      }
+    } catch (e) { v1 = null; v1Grund = "Fehler: " + String(e && e.message || e).slice(0, 80); }
     sag("");
-    sag("FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - fuer den Hackingweg gibt es hier"
-      + " noch keine Rate (Level gegen Ziel steht oben).");
+    if (v1) {
+      const wann = (h) => {
+        const ziel = new Date(Date.now() + h * 3600000);
+        return ziel.toLocaleDateString("de-DE", { weekday: "long", day: "2-digit", month: "2-digit" })
+          + ", " + ziel.toLocaleTimeString("de-DE", { hour: "2-digit", minute: "2-digit" });
+      };
+      sag("Referenz BN" + v1.ref.knoten + "." + v1.ref.lauf + ": Hoechststand " + v1.max + " nach "
+        + v1.refH.toFixed(1) + " h online, fertig nach " + v1.ref.gesamtH.toFixed(1) + " h online / "
+        + v1.ref.wandH.toFixed(1) + " h Wanduhr. Dieser Lauf: " + v1.onlineH.toFixed(1) + " h online"
+        + (v1.onlineH < v1.refH ? " - schneller als die Referenz." : ".")
+        + (v1.jenseits ? " Ueber dem Hoechststand der Referenz: nur noch die Schlussphase." : ""));
+      const spanne = v1.restWandH !== null && v1.restWandH > v1.restH + 0.25;
+      sag("FERTIG VORAUSSICHTLICH: " + wann(v1.restH)
+        + (spanne ? " bis " + wann(v1.restWandH) : "")
+        + " (noch " + dauer(v1.restH) + (spanne ? " bis " + dauer(v1.restWandH) : "")
+        + " bei offenem Tab; Referenz BN" + v1.ref.knoten + "." + v1.ref.lauf
+        + (spanne ? ", Spanne = ihre Offline-Zeit nicht bzw. voll gezaehlt" : "") + ".)");
+    } else {
+      sag("FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - " + (v1Grund || "keine Referenz") + ".");
+    }
     const u = bericht.hilfe ? "HILFE" : bericht.ausgangFehlt ? "AUSGANG FEHLT" : "HACKINGWEG";
     sag("URTEIL: " + u);
     return ausgeben(zeilen, { ...bericht, urteil: u });

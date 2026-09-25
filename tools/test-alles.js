@@ -143,6 +143,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-v1kurve.js",
+    deckt: "EBENE 0: V1-Referenzkurve - Offline-Fenster, Hoechststand, Restzeit fuer checkin",
+    schnell: true,
+  },
+  {
     datei: "test-sprosse5-kette.js",
     deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
     schnell: false,

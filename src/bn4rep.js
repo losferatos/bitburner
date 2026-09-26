@@ -1409,34 +1409,102 @@ export async function main(ns) {
       // das Tor wird jetzt jede Runde erneut befragt statt einmal vor dem
       // Prozessende, und "EINBAU" alle 15 s ohne Einbau waere Laerm, der den
       // naechsten Leser des Logs in die Irre fuehrt.
-      {
-        let torGrund = null;
+      //
+      // GEGENPRUEFUNG G1 (26.09.2026): dasselbe Tor wird DREIMAL befragt -
+      // vor dem Handschlag, nach dem Handschlag und unmittelbar vor
+      // `installAugmentations`. Der Handschlag wartet bis zu 90 s auf die
+      // Bruecke (lib/handschlag.js WARTE_MAX_MS), und graft.js hat die hoehere
+      // Figurprioritaet (lib/figur.js: graft 10, faktion 30) - es kann in
+      // dieser Zeit ein Graft starten. Die "letzte Graftpruefung" stand bis
+      // hierher VOR dem Handschlag und sah genau diese 90 s nicht.
+      const torGrundJetzt = () => {
         try {
           const jetztArbeit = ns.singularity.getCurrentWork();
           if (jetztArbeit && jetztArbeit.type === "GRAFTING") {
-            torGrund = "ein Graft laeuft (" + (jetztArbeit.augmentation || "unbekannt") + ")";
+            return "ein Graft laeuft (" + (jetztArbeit.augmentation || "unbekannt") + ")";
           }
         } catch { /* nicht lesbar - dann gilt die Pruefung vom Rundenanfang */ }
-        if (torGrund === null) {
-          try {
-            const lg = endspurtLage(ns, Date.now());
-            const erlaubt = einbauErlaubt(lg, Date.now(), lg.offenSeit ?? null);
-            if (!erlaubt.ok) torGrund = erlaubt.grund;
-            else if (erlaubt.grund) sag(erlaubt.grund);
-          } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+        try {
+          const lg = endspurtLage(ns, Date.now());
+          const erlaubt = einbauErlaubt(lg, Date.now(), lg.offenSeit ?? null);
+          if (!erlaubt.ok) return erlaubt.grund;
+          if (erlaubt.grund) sag(erlaubt.grund);
+        } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+        return null;
+      };
+      // Warten am Tor: Meldung (gedrosselt, ausser nach Handschlag und NFG -
+      // dort ist der Abbruch selten und gehoert ins Log) und 15 s Pause.
+      const amTorWarten = async (torGrund, immerMelden) => {
+        if (immerMelden || Date.now() - letzteAussetzMeldung > 300000) {
+          letzteAussetzMeldung = Date.now();
+          sag("Einbau faellig (" + einbauGrund + "), aber ausgesetzt: "
+            + torGrund + ". Naechste Runde erneut.");
         }
-        if (torGrund !== null) {
-          if (Date.now() - letzteAussetzMeldung > 300000) {
-            letzteAussetzMeldung = Date.now();
-            sag("Einbau faellig (" + einbauGrund + "), aber ausgesetzt vor jedem Kauf: "
-              + torGrund + ". Naechste Runde erneut.");
-          }
-          await ns.sleep(15000);
-          continue;
-        }
+        await ns.sleep(15000);
+      };
+      {
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, false); continue; }
       }
       sag("EINBAU: " + wartend + " Augmentierungen. Grund: " + einbauGrund
         + ". bn4life.js startet danach von selbst.");
+
+      // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
+      //
+      // Die Brueckenseite stand seit heute frueh, die Spielseite nicht - ein
+      // Skeptiker hat es gefunden: `grep -rn "backup-request" src/` war leer.
+      // Damit entstand die Sicherungsklasse `pre-install`, die als einzige
+      // neben `pre-jump` NIE rotiert wird, ueberhaupt nie.
+      //
+      // Kommt keine Antwort und ist die letzte gruene Sicherung aelter als
+      // sechs Stunden, wird NICHT eingebaut: ein Einbau ist beliebig oft
+      // nachholbar, der Verlust bei einem Fehlgriff betraegt Tage.
+      // `handschlag` setzt dann selbst `data/install-sperre.txt`.
+      //
+      // VOR DER NFG-SCHLEIFE, NICHT DAHINTER (Gegenpruefung G1, 26.09.2026).
+      // Der Handschlag ist das dritte Tor, das den Einbau verweigern kann -
+      // und er stand als einziges noch hinter dem Geldausgeben. Verweigerte
+      // er, lagen die eben gekauften NFG-Stufen (15:12 waren es 7, 17:19 6)
+      // in der Warteschlange, und jedes weitere Stueck des Zyklus kostete je
+      // Stufe x1,9 mehr (`getGenericAugmentationPriceMultiplier`) - fuer
+      // einen Einbau, der erst nach Ablauf der Sperre (1 h) wieder gefragt
+      // wird. Die Sicherung zeigt damit den Stand vor den NFG-Kaeufen; das
+      // Zurueckspielen gibt das Geld dafuer zurueck, verliert also nichts.
+      {
+        const hs = await handschlag(ns, "install", "bn4rep",
+            ns.getResetInfo().lastNodeReset, sag);
+        if (!hs.darf) {
+          sag("Einbau ausgesetzt: " + hs.grund);
+          // SKEPTIKER-EINWAND 5: weiterlaufen statt Prozessende, und die
+          // Sperre auf home spiegeln. `handschlag` schreibt
+          // data/install-sperre.txt mit `ns.write` LOKAL (lib/handschlag.js,
+          // dort selbst als wirkungslos auf der Werkbank vermerkt); bn4rep
+          // liest sie mit `liesVonHome` - ohne diese Zeile saehe die naechste
+          // Runde auf der Werkbank keine Sperre und stellte den Handschlag
+          // alle 15 s neu. Das JSON mit `bis` liest der Sperrblock oben
+          // (`roh.startsWith("{")`) korrekt; es laeuft nach 1 h ab, und
+          // `boot.js` raeumt es beim naechsten Reset.
+          try {
+            schreibNachHome(INSTALL_LOCK_FILE, JSON.stringify({
+              ts: Date.now(), reason: "handschlag", bis: Date.now() + 3600000,
+              text: "Keine Sicherung vor dem Einbau - gespiegelt von bn4rep.",
+            }));
+          } catch { /* der lokale Eintrag aus handschlag.js bleibt */ }
+          await ns.sleep(15000);
+          continue;   // main nicht verlassen: Kauf, Spende, Arbeit, Telemetrie laufen weiter
+        }
+        if (!hs.gesichert) {
+          sag("HINWEIS: Einbau ohne frische Sicherung, letzte gruene "
+            + (Number.isFinite(hs.alterMs)
+              ? (hs.alterMs / 3600000).toFixed(1) + " h alt" : "unbekannt"));
+        }
+      }
+      // Die bis zu 90 s des Handschlags sind vorbei - Graft und Ausgang
+      // koennen sich darin geaendert haben. Noch ist kein Geld ausgegeben.
+      {
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
+      }
 
       // NEUROFLUX ZULETZT (22.08.2026). NFG ist der einzige Multiplikator,
       // der sich rein mit Geld kaufen laesst - jede Stufe gibt x1,01 auf
@@ -1537,65 +1605,17 @@ export async function main(ns) {
       // boot.js kostet 4 GB, passt also immer, und startet die Kette
       // boot -> bn4net -> Werkzeuge. Mehr braucht das Callback nicht zu
       // koennen: Es muss nur den ersten Dominostein umwerfen.
-      // LETZTE GRAFTPRUEFUNG, UNMITTELBAR VOR DEM EINBAU (31.08.2026,
-      // 01:45, aus dem Skeptiker-Loop). Die Pruefung oben (Tore vor dem
-      // Geldausgeben) ist hier bis zu 3,5 Sekunden alt: dazwischen liegen
-      // bis zu vierzig `await ns.sleep(50)` und ein `await ns.sleep(1500)`.
-      // In dieser Luecke kann `graft.js` ein Graft gestartet haben. Die
+      // LETZTE TORPRUEFUNG, UNMITTELBAR VOR DEM EINBAU (31.08.2026, 01:45,
+      // aus dem Skeptiker-Loop; seit der Gegenpruefung G1 dasselbe Tor wie
+      // oben, also Graft UND Ausgang). Dazwischen liegen bis zu vierzig
+      // `await ns.sleep(50)` der NFG-Schleife und ein `await ns.sleep(1500)`;
+      // in dieser Luecke kann `graft.js` ein Graft gestartet haben. Die
       // Pruefung kostet nichts; ein verpasster Einbau wird in der naechsten
-      // Runde nachgeholt, ein getoetetes Graft nie. `continue` statt
-      // `return` (Skeptiker-Einwand 5): der Satz "naechste Runde erneut"
-      // stimmte vorher nicht, der Prozess war zu Ende.
-      try {
-        const jetztArbeit = ns.singularity.getCurrentWork();
-        if (jetztArbeit && jetztArbeit.type === "GRAFTING") {
-          sag("Einbau abgebrochen: in den letzten Sekunden hat ein Graft"
-            + " begonnen (" + (jetztArbeit.augmentation || "unbekannt")
-            + "). Naechste Runde erneut.");
-          await ns.sleep(15000);
-          continue;
-        }
-      } catch { /* nicht lesbar - dann gilt die Pruefung von oben */ }
-
-      // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
-      //
-      // Die Brueckenseite stand seit heute frueh, die Spielseite nicht - ein
-      // Skeptiker hat es gefunden: `grep -rn "backup-request" src/` war leer.
-      // Damit entstand die Sicherungsklasse `pre-install`, die als einzige
-      // neben `pre-jump` NIE rotiert wird, ueberhaupt nie.
-      //
-      // Kommt keine Antwort und ist die letzte gruene Sicherung aelter als
-      // sechs Stunden, wird NICHT eingebaut: ein Einbau ist beliebig oft
-      // nachholbar, der Verlust bei einem Fehlgriff betraegt Tage.
-      // `handschlag` setzt dann selbst `data/install-sperre.txt`.
+      // Runde nachgeholt, ein getoetetes Graft nie. Zwischen dieser Pruefung
+      // und `installAugmentations` steht kein `await` mehr.
       {
-        const hs = await handschlag(ns, "install", "bn4rep",
-            ns.getResetInfo().lastNodeReset, sag);
-        if (!hs.darf) {
-          sag("Einbau ausgesetzt: " + hs.grund);
-          // SKEPTIKER-EINWAND 5: weiterlaufen statt Prozessende, und die
-          // Sperre auf home spiegeln. `handschlag` schreibt
-          // data/install-sperre.txt mit `ns.write` LOKAL (lib/handschlag.js,
-          // dort selbst als wirkungslos auf der Werkbank vermerkt); bn4rep
-          // liest sie mit `liesVonHome` - ohne diese Zeile saehe die naechste
-          // Runde auf der Werkbank keine Sperre und stellte den Handschlag
-          // alle 15 s neu. Das JSON mit `bis` liest der Sperrblock oben
-          // (`roh.startsWith("{")`) korrekt; es laeuft nach 1 h ab, und
-          // `boot.js` raeumt es beim naechsten Reset.
-          try {
-            schreibNachHome(INSTALL_LOCK_FILE, JSON.stringify({
-              ts: Date.now(), reason: "handschlag", bis: Date.now() + 3600000,
-              text: "Keine Sicherung vor dem Einbau - gespiegelt von bn4rep.",
-            }));
-          } catch { /* der lokale Eintrag aus handschlag.js bleibt */ }
-          await ns.sleep(15000);
-          continue;   // main nicht verlassen: Kauf, Spende, Arbeit, Telemetrie laufen weiter
-        }
-        if (!hs.gesichert) {
-          sag("HINWEIS: Einbau ohne frische Sicherung, letzte gruene "
-            + (Number.isFinite(hs.alterMs)
-              ? (hs.alterMs / 3600000).toFixed(1) + " h alt" : "unbekannt"));
-        }
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
       }
 
       ns.singularity.installAugmentations("boot.js");

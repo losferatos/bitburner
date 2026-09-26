@@ -33,7 +33,7 @@
 
 import path from "node:path";
 import fs from "node:fs";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 import { ladeSpielskript } from "./mock/lader.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -93,6 +93,9 @@ function baueWelt(o) {
     bnMults: { FactionWorkRepGain: 1, DaedalusAugsRequirement: 30, WorldDaemonDifficulty: 1.5,
       ...(o.bnMults || {}) },
     schlafBudget: o.schlafBudget ?? 40,
+    // Wird bei jedem ns.sleep gerufen - fuer das, was im Spiel NEBEN bn4rep
+    // geschieht (Bruecke antwortet, graft.js startet, ausgang.js schreibt).
+    beiSchlaf: o.beiSchlaf || null,
     // Protokoll fuer die Zusicherungen
     schlaf: [],
     kaeufe: [],
@@ -143,6 +146,7 @@ function baueNs(w) {
     sleep: async (ms) => {
       w.schlaf.push(ms);
       w.uhr += ms;
+      if (w.beiSchlaf) w.beiSchlaf(w);
       if (w.schlaf.length > w.schlafBudget) throw new Error(STOP);
     },
     getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: 1, lastAugReset: 2,
@@ -457,6 +461,98 @@ const weltFokus = (o = {}) => baueWelt({
     erster ? "erster Aufruf nach " + ((erster.uhr - w.start) / 1000) + " s" : "gar kein Aufruf");
   pruefe("danach wird er zurueckgeholt (Rate nicht dauerhaft bei 80 %)", w.fokus === true,
     "fokus=" + w.fokus);
+}
+
+// ===========================================================================
+// GEGENPRUEFUNG (nodes/audit-2026-09-26/skeptiker-A.md, Abschnitt
+// "Gegenpruefung"): Luecken der Nacharbeit, je ROT auf fe3e911.
+// ===========================================================================
+
+// ---------------------------------------------------------------------------
+console.log("\n-- Gegenpruefung G1: Handschlag scheitert, NFG waere kaufbar --");
+{
+  // Wie "Handschlag scheitert" oben, aber Daedalus fuehrt NFG. Der Handschlag
+  // ist das dritte Tor, das den Einbau verweigern kann - stand er hinter der
+  // NFG-Schleife, lag nach der Verweigerung eine Handvoll Stufen in der
+  // Warteschlange, und jedes weitere Stueck des Zyklus kostete je Stufe x1,9
+  // mehr (AugmentationHelpers.ts getGenericAugmentationPriceMultiplier),
+  // ohne dass ein Einbau folgte (Sperre 1 h, danach dasselbe).
+  const w = welt1903({ geld: 1e9, einkommen: 0, schlafBudget: 80 });
+  w.faktionen.Daedalus.rep = 1.2e6;
+  w.faktionen.Daedalus.augs.push(NFG);
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+    rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  const handschlaege = r.log.split("\n").filter((z) => z.includes("Handschlag gestellt")).length;
+  pruefe("der Handschlag wurde gestellt und verweigert", handschlaege === 1
+    && r.log.includes("Einbau ausgesetzt"), "Handschlaege: " + handschlaege);
+  const nfg = w.kaeufe.filter((k) => k.a === NFG).length;
+  pruefe("keine NFG-Stufe gekauft, wenn der Handschlag den Einbau verweigert", nfg === 0,
+    "NFG-Kaeufe: " + nfg);
+  pruefe("kein installAugmentations", w.installAufrufe === 0);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- Gegenpruefung G1: Graft beginnt waehrend des Handschlags --");
+{
+  // Der Handschlag wartet bis zu 90 s auf die Bruecke. graft.js hat die
+  // hoehere Figurprioritaet (lib/figur.js: graft 10, faktion 30) und kann in
+  // dieser Zeit ein Graft starten. installAugmentations toetet es ohne
+  // Erstattung (Work/GraftingWork.tsx:75-83). Die letzte Graftpruefung stand
+  // VOR dem Handschlag - hier antwortet die Bruecke nach 10 s, und im selben
+  // Augenblick beginnt das Graft.
+  let beantwortet = false;
+  const w = welt1903({
+    geld: 1e9, einkommen: 0, schlafBudget: 60,
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || beantwortet) return;
+      if (welt.uhr - JSON.parse(anfrage).ts < 10000) return;
+      beantwortet = true;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+      welt.arbeit = { type: "GRAFTING", augmentation: "QLink" };
+    },
+  });
+  w.faktionen.Daedalus.rep = 1.2e6;
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+    rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("die Bruecke hat geantwortet (Handschlag erlaubt)", beantwortet
+    && r.log.includes("Sicherung gruen"), "beantwortet=" + beantwortet);
+  pruefe("kein installAugmentations, solange das Graft laeuft", w.installAufrufe === 0,
+    "installAugmentations: " + w.installAufrufe);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- Gegenpruefung G1: der Normalfall baut weiter ein, NFG nach dem Handschlag --");
+{
+  // Waechter fuer die neue Reihenfolge: Bruecke antwortet, kein Graft, kein
+  // Ausgang - der Einbau muss kommen, mit NFG-Stufen, und die Stufen muessen
+  // NACH der Sicherung gekauft sein (sonst waere G1 nur verschoben).
+  let anfrageTs = null;
+  const w = welt1903({
+    geld: 1e9, einkommen: 0, schlafBudget: 60,
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || anfrageTs !== null) return;
+      anfrageTs = JSON.parse(anfrage).ts;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+    },
+  });
+  w.faktionen.Daedalus.rep = 1.2e6;
+  w.faktionen.Daedalus.augs.push(NFG);
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+    rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("genau ein installAugmentations, danach endet main", w.installAufrufe === 1
+    && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
+  const nfg = w.kaeufe.filter((k) => k.a === NFG);
+  pruefe("NFG-Stufen vor dem Einbau gekauft", nfg.length > 0, "NFG-Kaeufe: " + nfg.length);
+  pruefe("alle NFG-Stufen NACH der Sicherungsanfrage", anfrageTs !== null
+    && nfg.every((k) => k.uhr >= anfrageTs),
+    "Anfrage " + anfrageTs + ", erste Stufe " + (nfg[0] && nfg[0].uhr));
 }
 
 console.log("");

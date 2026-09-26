@@ -449,3 +449,309 @@ Offen bleibt, was nur das Spiel zeigen kann:
 - die Rundendauer im verdeckten Tab (die Frist folgt dem gemessenen Takt,
   gedeckelt bei 120 s);
 - die Messung von bn4net.js und expfarm.js mit calculateRam.
+
+---
+
+## Gegenpruefung (26.09.2026, dritter Durchgang: unabhaengiger Skeptiker)
+
+Geprueft: `cloud-skeptiker-b` bis `15ac86a` (Fix-Stand oben) gegen den Stand
+davor `70ad9ba`. Behoben auf demselben Zweig: `4f44576` (Zielwahl, Anlauf),
+`5bc7934` (Ofenfrist). Spielquelle `reference/bitburner-src` (dev, 3.0.2).
+
+### Methode: der echte Kern gegen nachgebaute Spielmechanik
+
+Die Nachrechnungen im Fix-Stand riefen `targetMetrics/targetRank/
+selectMoneyTargets` einzeln auf und bauten die Runde darum herum nach
+(Momentaufnahmen, keine Zeit). Hier laeuft stattdessen `bn4net.js` selbst
+(`tools/mock/lader.js`, unveraendert bis auf einen lesenden
+Beobachtungshaken) ueber 540-1.080 Runden gegen einen Spielzustand aus den
+echten Spielstaenden. Die Mechanik dazwischen ist aus der Spielquelle
+nachgebaut (Wegwerfskript, nicht im Repo):
+- Dauer beim Aufruf festgelegt (`Hacking.ts` calculateHackingTime x 1 / 3,2 / 4),
+  Landung nach dem Arbeiterprotokoll max(landAt, jetzt + Dauer);
+- Wirkung beim Abschluss: weaken/grow `NetscriptFunctions.ts:262-377`,
+  hack `NetscriptHelpers.tsx:590-690` (Chance als Erwartungswert),
+  `ServerHelpers.ts` processSingleServerGrowth / numCycleForGrowthCorrected,
+  `formulas/grow.ts`, `Server.ts` capDifficulty;
+- Erfahrung -> Level `formulas/skill.ts`, Intelligenz `formulas/intelligence.ts`;
+- Mietrechner zum echten Preis (`ServerPurchases.ts:22-40`, BN5 Softcap 1,2),
+  Portprogramme werden gekauft, sobald das Geld reicht;
+- Ofen je Fassung: `70ad9ba` endlos + Kill je Runde, Zweig und Fix mit Frist.
+
+Szenarien: Einspielen 18:04 und 19:03 (Zustand wie gespeichert), 19:04 nach
+Einbau (wie gespeichert und mit Erfahrung 0), Knotenwechsel aus den
+Serverlisten 19:04 und 18:04 (Sicherheit = baseDifficulty, Guthaben =
+moneyMax x 0,5/25 = 2 %, keine Mietrechner, home 128 GB wegen SF9.3
+`Prestige.ts:242-247`, nur NUKE, Mult 1,28 / 1,4336 / 1,8). Dazu ein
+"Hybrid" = Zweig ohne die Zielwahl aus S-2, um S-2 allein zu messen.
+Grenzen: keine anderen Gewerke (bn4life, bn4rep) ausser ihrem Speicher auf
+home; Runden exakt 10 s ausser im Streuungsversuch.
+
+### Befunde
+
+| Nr | Stufe | Befund | Stand |
+|---|---|---|---|
+| G-1 | SHOULD-FIX | Anlauffrist zaehlte ueber eine Stapelphase hinweg: vorbereitete Ziele wurden bei der Rueckkehr sofort 30 min gesperrt | behoben `4f44576` |
+| G-2 | SHOULD-FIX | Vorbereitungszeit rechnete grow als EINE Welle, egal wie viel wachsen muss | behoben `4f44576` (RAM-Basis siehe G-6) |
+| G-3 | SHOULD-FIX | Offene Geldziele pendelten jede Runde am achten Unvorbereitet-Platz | behoben `4f44576` |
+| G-4 | SHOULD-FIX | Ofenfrist nach dem LETZTEN Takt: nach einer langen Runde haelt der Ofen seinen Speicher ueber die naechste Zaehlung | behoben `5bc7934` |
+| G-5 | MINOR | Ofenfaden ohne gueltige Frist laeuft ewig (Einspielen in zwei Schritten, Uhr zurueck) | behoben `5bc7934` |
+| G-6 | MINOR | RAM-Basis der Vorbereitung (30 % des Netzes) nach Knotenwechsel vielfach zu optimistisch | nicht behoben, Abwaegung unten |
+| G-7 | MINOR | Nach Knotenwechsel kreist der dritte Stapelplatz durch die Stillstandssperre | nicht behoben, vorbestehend |
+| G-8 | MINOR | Der S-2-Nutzen "17 statt 1 arbeitende Geldziele" (18:04, 19:03) zeigt sich nicht im Einkommen | nur Bericht |
+| G-9 | MINOR | test-b6: 2 der 6 "roten" Proben vor dem Fix sind Telemetrie-Artefakte | nur Bericht |
+| G-10 | MINOR | BN12 ab Stufe 4 Tabellenwert der Stufe 3; weaken-Faeden ohne ServerWeakenRate; tools/ram.js unter Linux | nur Bericht |
+
+#### G-1 (SHOULD-FIX) Anlauffrist ueber eine Stapelphase - `4f44576`
+
+`anlaufSeit` wurde nur im offenen Betrieb geloescht (Dauerbetrieb, Gate,
+Frist). Wurde ein Ziel waehrend des Anlaufs Stapelziel oder fiel es aus der
+Liste, blieb der Zeitstempel stehen. Nachgespielt (Knotenwechsel 19:04, Mult
+1,4336): sigma-cosmetics lief 140-370 s an, war bis 3.040 s Stapelziel
+(vorbereitet, verdiente), fiel auf ein offenes Ziel zurueck und stand in
+derselben Runde "Anlauf nach 48 min ohne Erfolg abgebrochen, 30 min
+gesperrt" - joesguns genauso bei 3.390 s ("50 min"). Die Sperren verkleinerten
+die Kandidatenliste, dadurch sank die Zahl der Stapelplaetze
+(BATCH_MIN_OFFENE_ZIELE), was die naechste Verdraengung ausloeste. Ueber
+sechs Knotenwechsel-Laeufe zu 3 h: 2-5 solche veralteten Sperren je Lauf
+(Stand `70ad9ba`: 3-8). Der Fehler ist aelter als Paket B; der Zweig hat mit
+`anlaufFrist` eine zweite Karte mit derselben Luecke dazugebaut.
+
+Fix: `anlaufZuletzt` je Ziel; war es laenger als 5 min nicht im Anlauf,
+beginnt die Frist neu. Pendeln im Rundentakt setzt sie nicht zurueck (sonst
+liefe ein Ziel, das jede zweite Runde herausfaellt, ewig an). Eine unendliche
+Schaetzung (k = 0) faellt auf die festen 20 min zurueck. Nach dem Fix bleiben
+0-3 Sperren je Lauf, deren Ziel im Fristfenster kurz (unter 5 min, die
+Stillstandswache greift nach 30 Runden) Stapelziel war - gewollt, dort ging
+es auch nicht voran.
+Rot/Gruen `tools/test-b7-zielwahl-gegenpruefung.js` C: Stand vorher "x: Anlauf
+nach 25 min ohne Erfolg abgebrochen" nach 25 min Stapelphase, jetzt keine
+Sperre; Gegenproben (21 min am Stueck, Pendeln im Rundentakt) sperren
+weiterhin.
+
+#### G-2 (SHOULD-FIX) grow als eine Welle - `4f44576`
+
+`targetMetrics` addierte bei Guthaben < 75 % pauschal `4 x hackTimeMin`. Nach
+einem Knotenwechsel steht jeder Server auf 2 % (`Server.ts:76-77`, BN5
+ServerStartingMoney 0,5 gegen das 25-fache Maximum). hong-fang-tea (wachstum
+20, min 10) braucht bei Level 250 und Mult 1,4336 log(0,95/0,02)/k =
+4.495 grow-Faeden + 0,08 weaken je Faden = 8.739 GB; das Netz hatte 884 GB.
+Die Schaetzung sagte 53 s ("vorbereitet", unter 60 s); in der Nachspielung
+stand das Ziel nach 20 min Anlauf bei 2,8 % Guthaben (8-22 grow-Faeden in
+der Luft) und wurde gesperrt - dreimal in 3 h.
+
+Fix: Faeden wie planMix (`log(MIX_MONEY_HIGH/Guthaben)/kMin` plus weaken fuer
+die grow-Sicherheit) in Wellen zu `prepRamGb`, wie beim weaken. Bei hohem
+Level unveraendert eine Welle (18:04/19:03/19:04 rechnen identisch).
+hong-fang-tea jetzt 33 Wellen = 1.760 s -> Rang 0 als neues Ziel.
+Rot/Gruen test-b7 A: vorher prepSec 53,3 s und Rang 506, jetzt 1.760 s und
+Rang 0; `test-b1` rechnet im kleinen Netz jetzt 2 weaken- und 5 grow-Wellen.
+
+#### G-3 (SHOULD-FIX) Pendeln am achten Platz - `4f44576`
+
+`selectMoneyTargets` teilte nach dem AUGENBLICKSwert von prepSec ein, der
+Rang nach dem Rest der Eintrittsschaetzung. Ein laufendes Stapelziel steht
+zwischen zwei landenden weaken-Wellen kurz ueber Minimum + 1 und hatte dann
+94-122 s "Vorbereitung" (clarkinc, 4sigma, b-and-a um 19:03). In solchen
+Runden belegte es einen der 8 Unvorbereitet-Plaetze, der achte Kandidat fiel
+heraus und verdraengte beim Zurueckkommen das letzte vorbereitete Ziel.
+Gemessen in 90 min: 532 (18:04), 746 (19:03), 744 (19:04) Ein-/Austritte bei
+25 Geldzielen, galactic-cyber und hong-fang-tea je 72-mal, rho-construction
+55-mal - und rho-construction blieb dabei 90 min auf Sicherheit 100 (jede
+zweite Runde Anlauf, nie genug Anlaufspeicher). Stand `70ad9ba`: 0-68.
+
+Fix: `effectivePrepSec(prepSec, amtierend)` in lib/calc.js, von `targetRank`
+und der Einteilung gemeinsam benutzt. Ergebnis: 24 / 26 / 78 / 98
+Ein-/Austritte (18:04 / 19:03 / 19:04 / 19:04 mit Erfahrung 0); Server auf
+Sicherheit 100 nach 90 min um 18:04: 33 (Zweig) -> 25 (Stand vorher 29).
+Kosten: mehr parallele Anlaeufe; gegen den Zweig ueber 90 min Erfahrung
+-1,6 bis +1,1 %, Geld -0,35 bis +0,5 %.
+Rot/Gruen test-b7 B: Kern im Mock, b0 jede zweite Runde 3 ueber Minimum;
+vorher u7 10 Wechsel in 11 Runden (Folge 10101010101), jetzt 0 und
+durchgehend bedient, u8 bleibt draussen.
+
+#### G-4 (SHOULD-FIX) Ofenfrist nach dem letzten Takt - `5bc7934`
+
+Die Kosten sind ungleich: endet der Ofen zu frueh, liegt Speicher ein paar
+hundert ms brach; endet er zu spaet, ist sein Speicher bei der Zaehlung
+belegt, wird in der Runde nicht neu vergeben und liegt danach fast eine Runde
+brach. Nach einer langen Runde (Speicherbereinigung, 1-s-Raster eines Tabs im
+Hintergrund) war die naechste Frist genau um die Differenz zu lang.
+Nachgespielt, 18:04, 30 min, Takt 10 s + gleichverteilte Streuung, nur diese
+Aenderung gegen den Zweig:
+
+| Streuung | Zweig (letzter Takt) | kuerzester der letzten 6 |
+|---|---|---|
+| 0-300 ms | +0,9 % | -0,4 % |
+| 0-600 ms | -2,5 % | -2,2 % |
+| 0-1 s | -10,6 % | -1,0 % |
+| 0-2 s | -19,6 % | -4,9 % |
+| alle 15 Runden 3 s Stau | -5,3 % | -2,8 % |
+
+(Erfahrung je Sekunde gegen 0 ms Streuung; Geld jeweils innerhalb 1,5 %.) Die
+Motorzeit 18:04 zeigt 10,015 s je Runde im Mittel, die Streuung im
+sichtbaren Tab ist also meist klein; im verdeckten Tab faellt ohnehin alles
+auf den Minutentakt. Ein Takt ist nie kuerzer als `ns.sleep(10000)`, der
+kuerzeste der letzten sechs liegt nur um die Streuung unter dem Mittel.
+Rot/Gruen `tools/test-b8-ofen-gegenpruefung.js` D (Runden 10/12/10/12 s):
+vorher 9 Starts mit Frist 1.750 ms nach der naechsten Zaehlung und Takt
+12.000; jetzt 0 und 10.000.
+
+#### G-5 (MINOR) Ofenfaden ohne Frist - `5bc7934`
+
+Seit der Kern den Ofen nicht mehr toetet, endet ein Faden nur ueber seine
+Frist. Im Spiel liegt bis zum Einspielen `worker/expfarm.js` von master
+(`for(;;)`, liest nur args[0]). Wird der neue Kern gestartet, bevor die neue
+expfarm.js liegt (Einspielen in zwei Schritten, Neustart dazwischen), bindet
+jeder Start seinen Speicher fuer immer, jede Runde mehr. Dasselbe fuer eine
+Frist weit voraus (Uhr zurueckgestellt). Fix: Durchgang 1 raeumt Ofenfaeden
+ohne Frist oder mit Frist mehr als 2 x 120 s voraus (`ns.ps`/`ns.kill` zahlt
+der Kern schon, die ps-Liste dient zugleich der share-Zaehlung). Rot/Gruen
+test-b8 E: vorher bleiben beide fristlosen Faeden, jetzt geraeumt; gueltige
+und eigene bleiben.
+
+#### G-6 (MINOR, nicht behoben) RAM-Basis der Vorbereitung
+
+`prepRamGb = 0,3 x ramTotal`. Tatsaechlich bekommt ein Anlaufziel je Runde
+hoechstens 15 % des Durchgang-2-Budgets, alle zusammen 30 %; nach einem
+Knotenwechsel nehmen Erfahrungsbudget (180 Faeden = 324 GB) und
+Stapelvorbereitung (60 %) vorher fast alles. Gemessen: Budget 47-135 GB bei
+1.172 GB Netz; nectar-net hatte bei 644 GB Netz 3-33 weaken-Faeden
+(5-60 GB) in der Luft statt der angenommenen 193 GB je Welle. Echte Anlaufabbrueche (Frist 1,5 x Schaetzung
+ueberschritten) nach dem Fix: 5-12 je 3 h (Zweig 8-20, `70ad9ba` 15-27).
+Versuch mit der Basis "15 % des Vorrundenbudgets je Runde, ueber die
+Wellendauer": Abbrueche 1-6, Erfahrung +0 bis +19 %, aber Geld in 3 von 6
+Laeufen -13 bis -26 %. Nicht uebernommen: Geld gegen Erfahrung in der
+Fruehphase ist eine Abwaegung fuer eine Messung im Spiel; die Frist mit
+Sperre begrenzt den Schaden, und ein gesperrtes Ziel behaelt seinen
+Fortschritt.
+
+#### G-7 (MINOR, nicht behoben) Stillstandssperre im Kreis
+
+Nach einem Knotenwechsel passen oft nur zwei Stapel ins Netz; der dritte
+Stapelplatz (BATCH_ZIELE fest 3) steht 5 min ohne Stapel, wird 10 min
+gesperrt, das naechste Ziel rueckt nach - alle ~15 min. Sperren in sechs
+3-h-Laeufen: `70ad9ba` 7, Zweig 25, Fix 14. Vorbestehende Mechanik des
+Stapelbetriebs, nicht Paket B; die neue Zielwahl bringt nur haeufiger ein
+Ziel auf den dritten Platz, das dort nicht passt.
+
+#### G-8 (MINOR) S-2 bei hohem Level nicht messbar, nach Knotenwechsel entscheidend
+
+Der Fix-Stand begruendet S-2 mit "18:04: 17 statt 1 arbeitende Geldziele
+(Summe steadyEff 1,97e6 statt 2,37e5)". Im Einkommen zeigt sich das nicht:
+90 min ab 18:04 `70ad9ba` 8,62e14, Zweig 8,54e14, Fix 8,51e14; 19:03 alle
+1,74e15. Das Einkommen kommt aus den drei Stapelzielen (bei allen dieselben),
+die offenen Ziele sind durch KAP_ABZUG gedeckelt. Nach einem Knotenwechsel
+ist S-2 dagegen der groesste Hebel: der Hybrid (Zweig ohne S-2-Zielwahl)
+verdient zum ersten Mal nach 6.150-6.160 s, 2,6e6 in 3 h; mit S-2 nach
+300-420 s, 7,2e9-1,8e10.
+
+#### G-9 (MINOR) test-b6 zaehlt Telemetrie als Verhalten
+
+Die Laufzeitproben lesen `bnWerte` aus `data/bn4net.json` - ein Feld, das es
+vorher nicht gab. Von den 6 roten Proben gegen `70ad9ba` sind "BN12 Stufe 1"
+und "BN5" nur deshalb rot; der alte Kern rechnete dort mit denselben Werten.
+Echte Aenderungen: BN12.2/12.3 und das Kommentarkomma. Nicht geaendert.
+
+#### G-10 (MINOR) Kleinigkeiten ohne Laufzeitfolge heute
+
+- BN12 ab Stufe 4 liest den Tabellenwert der Stufe 3 (1,02^-3 statt ^-4,
+  +2 % Beute); die Route endet bei 12.3.
+- `weakenThreads` in der Vorbereitung kennt ServerWeakenRate nicht (BN12:
+  1,02^-Stufe, 2-6 % zu wenig Faeden) und keine Kerne (vorsichtig).
+- `tools/ram.js` rechnet unter Linux nichts: der Hauptblock vergleicht
+  `import.meta.url` mit `"file:///" + argv[1]`, das gibt vier Schraegstriche.
+  Gerechnet wurde hier ueber den Export `rechne`.
+
+### Was gehalten hat
+
+- **Ofen, Mechanik (Punkt 1):** Erfahrung gibt es je Faden beim Abschluss
+  (`NetscriptFunctions.ts:334-377`, `expGain = calculateHackingExpGain x
+  threads` im `.then`), unabhaengig von der Sicherheitsabnahme - weaken am
+  Minimum bringt die volle Erfahrung. Frist in der Vergangenheit oder fehlend:
+  genau ein Aufruf (`do ... while`). Endlos nur ohne Frist (G-5, jetzt
+  geraeumt) oder bei rueckwaerts laufender Uhr (ebenfalls). Steigendes Level
+  verkuerzt weaken, die gemessene Vordauer ist dann eine obere Schranke;
+  sinken kann es nur durch Einbau, der alle Skripte beendet. Gleiche Argumente
+  zweimal auf einem Rechner sind erlaubt (`NetscriptWorker.ts:329-340`, nur
+  mit preventDuplicates gesperrt). Kernneustart: Takt 10 s vorbelegt, alte
+  Faeden enden an ihrer Frist; Neuladen des Spiels startet Faeden mit alter
+  Frist -> ein Aufruf. Minutentakt im verdeckten Tab: alle Zeitgeber auf
+  demselben Tick, der Ofen (faellig t + 0,72 s) vor dem Kernschlaf
+  (t + 10 s) - ein Aufruf je Minute, wie die Einwegwelle. Zweig gegen
+  `70ad9ba` bei hohem Level: Erfahrung -5,1 % (18:04), -3,4 % (19:04),
+  -2,9 % (19:04 Erfahrung 0), +0,2 % (19:03); davon Frist gegen Kill allein
+  (Hybrid ohne S-2): -1,6 % (18:04), -2,1 % (19:04 Erfahrung 0). Nach
+  Knotenwechsel 1,3- bis 7,4-mal mehr Erfahrung als `70ad9ba` in 3 h.
+- **Stapelsatz und Hysterese (Punkt 2):** bei hohem Level 0-4 Stapelwechsel in
+  90 min, dieselben wie `70ad9ba` (Levelspruenge, Portprogramme). Kein
+  Zeitpunkt ohne Geldziel: bei Level 1 bleibt n00dles (126 s), sonst greift
+  der Rueckfall aufs Erfahrungsziel. Der 20-min-Schnitt leert die Liste nie.
+  Erstes Geld nach Knotenwechsel: `70ad9ba` 130-190 s, Zweig 300-420 s, Fix
+  190-410 s - dafuer in den ersten 30 min der Zweig 1,6- bis 7,6-mal, der
+  Fix 33- bis 570-mal so viel Geld je Sekunde wie `70ad9ba`.
+- **RAM (Punkt 3):** alle 139 Dateien in src/ vor und nach jedem Commit
+  gleich (bn4net.js 10,80, lib/calc.js 0, expfarm.js 1,75). `calccheck.js`
+  (import *) und `lib/batch.js` unberuehrt. registry.json = ARCHITEKTUR.md 3.3.
+- **BN12-Stufe (Punkt 4):** `getResetInfo().ownedSF` = activeSourceFiles mit
+  Stufe > 0 (`NetscriptFunctions.ts:1440-1454`), Knotenstufe =
+  activeSourceFileLvl + 1 (`BitNodeUtils.ts:102-104`, `BitNode.tsx:1125`).
+  Die Abbildung `min(SF+1, 3)` stimmt bis 12.3.
+- **Freiraum, Auftragslaeufer, ausgang (Punkt 5):** Pfad `worker/expfarm.js`
+  ueberall gleich geschrieben; der Auftragslaeufer raeumt per scriptKill (alle
+  Instanzen, Argumente egal - gewollt), ausgang.js per pid in Kostenfolge.
+  Der 64-GB-Block liegt nur auf platz[0] und bremst nur den Ofen, nicht die
+  Geldziele (deren Wuensche stehen vorn). Die Schonfrist-Karte fuer bn4life
+  (`clear()` ab 50 pids) verlaengert hoechstens eine Runde - kein Befund.
+- **Generator (Punkt 6):** `getBitNodeMultipliers` aus `BitNode.tsx`
+  AUSGEFUEHRT (nicht per Regex gelesen) fuer BN1-15 x Stufe 1-3 x 54 Felder
+  gegen `src/lib/bitnodes.json`: 3.240 Werte, 0 Abweichungen. Laufzeitleser
+  nur bn4net.js; die Tests lesen tolerant.
+- **Rot/Gruen des Fix-Stands (Punkt 7):** gegen `70ad9ba` nachgefahren, exakt
+  wie behauptet (b1 5/4, b2 9/11, b3 3/1, b6 18/6) - mit der Einschraenkung
+  G-9.
+
+### Tests
+
+| Datei | Stand 15ac86a | nach 4f44576 / 5bc7934 |
+|---|---|---|
+| test-b7-zielwahl-gegenpruefung.js (neu) | 5 gruen, 7 rot | 17 gruen, 0 rot |
+| test-b8-ofen-gegenpruefung.js (neu) | 3 gruen, 4 rot | 7 gruen, 0 rot |
+| test-b1-security100.js | 20/0 | 20/0 (Wellenprobe auf grow-Wellen umgestellt) |
+| test-b2 / test-b3 / test-b6 | 20/0, 4/0, 24/0 | unveraendert |
+| test-motor-ebene2.js | 56/56 | 56/56 |
+| test-alles.js --schnell | 30 von 31 gruen | 32 von 33 gruen |
+
+Rot bleibt nur `test-ram.js` (dieselben 32 veralteten Eichzeilen fremder
+Dateien, auf dem Ausgangsstand genauso). Ausserhalb von --schnell gruen:
+test-kern-c789 14, test-sprosse5-kette 33, test-kernwache 23,
+test-matrix-ebene2 117, test-guard-ebene2 57, test-lader 9.
+
+### Kennzahlen der Nachspielung (`70ad9ba` / Zweig `15ac86a` / Fix `5bc7934`)
+
+Hohes Level, 90 min:
+
+| Lage | Geld | Erfahrung | Ein-/Austritte Geldziele |
+|---|---|---|---|
+| 18:04 Einspielen | 8,62e14 / 8,54e14 / 8,51e14 | 6,77e9 / 6,42e9 / 6,32e9 | 0 / 532 / 24 |
+| 19:03 Einspielen | 1,74e15 / 1,74e15 / 1,74e15 | 1,84e10 / 1,85e10 / 1,87e10 | 0 / 746 / 26 |
+| 19:04 nach Einbau | 1,86e15 / 1,85e15 / 1,86e15 | 1,60e10 / 1,55e10 / 1,53e10 | 48 / 744 / 78 |
+| 19:04, Erfahrung 0 | 1,84e15 / 1,83e15 / 1,83e15 | 1,57e10 / 1,53e10 / 1,52e10 | 68 / 744 / 98 |
+
+Knotenwechsel, 3 h (Anlaufabbrueche echt + veraltet):
+
+| Lage | Geld | Erfahrung | Level | Abbrueche |
+|---|---|---|---|---|
+| 19:04-Server, Mult 1,28 | 2,3e6 / 3,4e9 / 3,5e9 | 1,7e5 / 8,2e5 / 1,6e6 | 237 / 301 / 329 | 19+7 / 8+5 / 5+0 |
+| 18:04-Server, Mult 1,28 | 3,3e6 / 9,6e9 / 1,3e10 | 1,7e5 / 1,3e6 / 1,9e6 | 238 / 320 / 337 | 20+8 / 11+4 / 6+1 |
+| 19:04-Server, Mult 1,4336 | 1,8e8 / 7,2e9 / 6,3e9 | 3,3e5 / 1,3e6 / 1,8e6 | 296 / 357 / 375 | 26+4 / 10+3 / 5+0 |
+| 18:04-Server, Mult 1,4336 | 2,0e8 / 1,8e10 / 2,4e10 | 3,3e5 / 2,1e6 / 2,8e6 | 296 / 380 / 394 | 27+4 / 20+2 / 11+0 |
+| 19:04-Server, Mult 1,8 | 9,8e9 / 1,7e10 / 2,2e10 | 1,6e6 / 2,0e6 / 2,8e6 | 461 / 476 / 495 | 15+3 / 10+5 / 8+3 |
+| 18:04-Server, Mult 1,8 | 2,3e10 / 4,2e10 / 5,8e10 | 2,3e6 / 4,0e6 / 5,5e6 | 483 / 515 / 533 | 22+4 / 20+4 / 12+0 |
+
+("veraltet" zaehlt jeden Abbruch, dessen Ziel im Fristfenster Stapelziel oder
+mehr als 6 Runden draussen war; ab dem Fix sind das nur noch die gewollten
+Faelle mit weniger als 5 min Luecke.)
+
+Offen fuer eine Messung im Spiel: die echte Streuung der Rundenlaenge
+(`mischung.rundenTaktMs` steht in der Telemetrie), G-6 und G-7.

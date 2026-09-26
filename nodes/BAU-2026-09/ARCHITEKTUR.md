@@ -1122,6 +1122,7 @@ nicht in einen Kommentar.
       "evictRank": 14,
       "needsFigure": "owner",
       "needsLibs": [
+        "lib/einbau.js",
         "lib/endspurt.js",
         "lib/figur.js",
         "lib/figurns.js",

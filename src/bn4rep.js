@@ -43,6 +43,14 @@ import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } 
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
+// AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
+// Entscheidungsfunktionen, ohne ns, einzeln in tools/test-bn4rep-einbau.js
+// geprueft. Siehe die Begruendung je Funktion in lib/einbau.js.
+import {
+  donationRepGainFaktor, daedalusSchwelle, zaehlplatzWert as zaehlplatzWertBerechnen,
+  sollFuellstueckSofortKaufen, redPillWartetAufEinbau, unbezahlbarInHorizont,
+  favorZaehltFuerFaktion,
+} from "lib/einbau.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -156,12 +164,27 @@ export async function main(ns) {
   // stand faelschlich 2. BitNode 12 skaliert mit der Knotenstufe und faellt
   // ebenfalls auf 1 zurueck; das ist dort nur eine Schaetzung fuer die
   // Rangfolge, kein Grenzwert.
-  // FactionWorkRepGain je BitNode - nur die Knoten, die ihn ueberhaupt setzen
-  // (BitNode.tsx), alle uebrigen lassen ihn bei 1. Steht HIER OBEN, weil die
-  // Einbau-Schwelle ihn 450 Zeilen frueher braucht als die Spendenrechnung;
-  // eine const-Definition weiter unten landete in der temporalen Totzone.
-  // Das ist am 23.08.2026 dreimal passiert, jedes Mal mit demselben Muster.
+  // FactionWorkRepGain je BitNode - NUR NOCH RUECKFALL (A2, 26.09.2026). Bis
+  // heute war das die einzige Quelle, mit der falschen Behauptung, SF5 fehle
+  // (siehe die korrigierte Stelle bei knotenRepFaktor weiter unten). SF5 ist
+  // vorhanden, deshalb liest `donationRepGainFaktor()` jetzt zuerst
+  // `ns.getBitNodeMultipliers().FactionWorkRepGain` live und faellt nur bei
+  // einem Fehler (kein SF5, o.ae.) auf diese Tabelle zurueck. Ohne BitNode 12,
+  // wo der Faktor mit der Knotenstufe skaliert - live gelesen ist das kein
+  // Problem, die Tabelle waere dafuer ohnehin nur eine grobe Naeherung.
+  // Steht HIER OBEN, weil die Einbau-Schwelle sie 450 Zeilen frueher braucht
+  // als die Spendenrechnung; eine const-Definition weiter unten landete in
+  // der temporalen Totzone. Das ist am 23.08.2026 dreimal passiert, jedes Mal
+  // mit demselben Muster.
   const FACTION_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
+
+  // A3: Daedalus-Schwelle als Rueckfall, wenn `ns.getBitNodeMultipliers()`
+  // fehlschlaegt. BitNode.tsx setzt sie nur in drei Knoten abweichend vom
+  // Vorgabewert 30: BitNode 6 und 7 auf 35, BitNode 15 auf 20. BitNode 12
+  // skaliert mit der Knotenstufe (floor(min(30 + 1,02^Stufe, 40))) - ohne
+  // Live-Wert bleibt dort der alte, zu niedrige Wert 30 stehen; das ist ein
+  // Rueckfall fuer einen Fehlerfall, kein Normalbetrieb (SF5 ist vorhanden).
+  const DAEDALUS_SCHWELLE_FALLBACK = { 6: 35, 7: 35, 15: 20 };
 
   const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 1,
     9: 2, 10: 2, 11: 1.5, 12: 1, 13: 3, 14: 5, 15: 2 };
@@ -573,6 +596,14 @@ export async function main(ns) {
     // ein Fehlgriff dort wuerde in einem Hackingknoten alle Hack-Stuecke sperren.
     const kaufInfo = ns.getResetInfo();
     const kaufKnoten = kaufInfo.currentNode;
+    // A2/A3 (26.09.2026): EINMAL je Runde live lesen, ueberall wiederverwenden
+    // statt an drei Stellen (grobRate, NFG-Spende, Hauptspendenweg) je eine
+    // eigene statische Tabelle zu befragen. `getBitNodeMultipliers()` braucht
+    // SF5 (vorhanden, siehe Auftrag) oder BitNode 5 - schlaegt der Aufruf
+    // trotzdem fehl, bleibt `bnMults` null und jede Fundstelle faellt auf ihre
+    // eigene Tabelle zurueck (donationRepGainFaktor/daedalusSchwelle).
+    let bnMults = null;
+    try { bnMults = ns.getBitNodeMultipliers(); } catch { bnMults = null; }
     // Hacknet-Server gibt es in BN9 und mit SF9 ueberall (HacknetHelpers.tsx:34-35).
     const mitHashes = kaufKnoten === 9 || (() => {
       const sf = kaufInfo.ownedSF;
@@ -1064,7 +1095,7 @@ export async function main(ns) {
     // einbauen).
     const grobRate = Math.max(1,
       5 * spieler.skills.hacking / 975 * spieler.mults.faction_rep
-        * (FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1));
+        * donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN));
     const lueckeZuGross = grobRate * 60 * LUECKE_ZU_GROSS_MINUTEN;
 
     const ausgangSteht = eingebauteAugs.includes(EXIT_KEY);
@@ -1275,13 +1306,13 @@ export async function main(ns) {
       // getGenericAugmentationPriceMultiplier (AugmentationHelpers.ts:32-37).
       // Bei rund 100 Bio Guthaben sind das etwa 14 Stufen je Zyklus, also
       // x1,15 auf den Multiplikator - drei Zyklen von 9,13 auf 14.
-      // Beide Werte hier LOKAL, nicht aus dem Block weiter unten: dort stehen
-      // sie erst ab Zeile ~910, und ein const-Zugriff von hier oben liefe in
-      // die temporale Totzone - ReferenceError mitten im Einbau. Genau dieser
-      // Fehler ist am 22.08. schon einmal passiert.
+      // A2 (26.09.2026): dieselbe Tabelle wie oben, nur noch als Rueckfall -
+      // `bnMults` ist oben (kaufKnoten) schon einmal je Runde gelesen, hier
+      // wiederverwendet statt einer eigenen zweiten Tabelle NFG_REP_GAIN mit
+      // identischem Inhalt (die frueher hier stand und in BitNode 12 denselben
+      // Fehler machte wie die Hauptspendenformel weiter unten).
       const nfgSpendenSchwelle = ns.getFavorToDonate();
-      const NFG_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
-      const nfgKnotenFaktor = NFG_REP_GAIN[ns.getResetInfo().currentNode] || 1;
+      const nfgKnotenFaktor = donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN);
       const nfgGeldFuerRep = (fehlend) =>
         fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / nfgKnotenFaktor;
 
@@ -1619,7 +1650,22 @@ export async function main(ns) {
     // jetzt so viel wie ein sehr schwaches Stueck - das ist richtig herum,
     // denn die 30er-Huerde ist laengst erfuellt.
     const NUTZEN_GEWICHT = 1;
-    const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
+    // A3-KORREKTUR (26.09.2026). Hier stand `alleAugs.length < 30`. Zwei
+    // Fehler auf einmal: `alleAugs` ist `getOwnedAugmentations(true)`, zaehlt
+    // also auch WARTENDE Stuecke mit, waehrend Daedalus nur INSTALLIERTE
+    // zaehlt (`FactionJoinCondition.ts haveAugmentations`:
+    // `p.augmentations.length >= n`) - und jede gekaufte, noch nicht
+    // eingebaute NeuroFlux-Stufe steht dort als EIGENER Eintrag
+    // (`queueAugmentation`, NFG ist von der Mehrfachsperre ausdruecklich
+    // ausgenommen), waehrend installiert IMMER nur ein NFG-Eintrag existiert
+    // (`applyAugmentation` aktualisiert nur `level`). `eingebauteAugs.length`
+    // (`getOwnedAugmentations(false)`) ist also schon die richtige Zahl, ohne
+    // eigene Entdopplung. Die feste 30 war ausserdem in BitNode 12 falsch (die
+    // Schwelle liegt dort bei 31), in BitNode 6/7 bei 35 und in BitNode 15 bei
+    // 20 (BitNode.tsx) - `daedalusSchwelle()` liest sie jetzt live.
+    const zaehlplatzWert = zaehlplatzWertBerechnen(
+      eingebauteAugs.length,
+      daedalusSchwelle(bnMults, kaufKnoten, DAEDALUS_SCHWELLE_FALLBACK));
     // DER AUSGANGSSCHLUESSEL (23.08.2026). The Red Pill hat keinerlei Werte
     // (Augmentations.ts:1946-1953, stats: ""), faellt also durch jede
     // Nutzenrechnung: hackNutzen ist null, und der Zaehlplatz-Bonus greift nur
@@ -1744,13 +1790,17 @@ export async function main(ns) {
     // jede Spende um ein Drittel zu billig - und `kosten + preis <= geld`
     // weiter unten wird zu frueh wahr, der Kauf schlaegt dann fehl.
     //
-    // ns.getBitNodeMultipliers() gibt es nur mit SF5 oder in BitNode 5, wir
-    // haben beides nicht. Deshalb die Werte aus dem Quelltext, und zwar nur
-    // fuer die Knoten, die den Faktor ueberhaupt setzen - alle uebrigen lassen
-    // ihn bei 1. BitNode 12 skaliert ihn mit der Knotenstufe; dort greift
-    // bewusst der sichere Wert 1, weil eine zu hoch geschaetzte Spende nur
-    // Geld kostet, eine zu niedrig geschaetzte dagegen den Kauf verfehlt.
-    const knotenRepFaktor = FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1;
+    // A2-KORREKTUR (26.09.2026): Hier stand "ns.getBitNodeMultipliers() gibt
+    // es nur mit SF5 oder in BitNode 5, wir haben beides nicht" - das war
+    // schlicht falsch, SF5 ist vorhanden (Auftrag, gegengeprueft in
+    // NetscriptFunctions.ts: `canAccessBitNodeFeature(5)`). Mit der alten
+    // Tabelle war BitNode 12 der einzige Knoten, der den Faktor UEBERHAUPT mit
+    // der Stufe skaliert, UND der einzige ohne Tabelleneintrag - der
+    // "sichere Wert 1" war also gerade dort am weitesten daneben (0,9804 bei
+    // Stufe 2, 0,9612 bei Stufe 3 statt 1: der Kauf schlaegt fehl, nicht die
+    // Spende wird zu teuer, Audit 3#7). Jetzt live gelesen, Tabelle nur noch
+    // Rueckfall fuer den Fehlerfall.
+    const knotenRepFaktor = donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN);
     const geldFuerRep = (fehlend) =>
       fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / knotenRepFaktor;
 

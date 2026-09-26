@@ -203,6 +203,12 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-bn4rep-einbau.js",
+    deckt: "lib/einbau.js: BN12-Spendenformel, Daedalus-Schwelle, Spendenrecht- und"
+      + " Red-Pill-Einbauzwang, Horizont-Unbezahlbarkeit, Favor-Relevanz (Audit A2-A7)",
+    schnell: true,
+  },
+  {
     datei: "test-reserve-eta.js",
     deckt: "Wirtreserve mit Verfall und Restzeit gegen Nachholklumpen (C.3)",
     schnell: true,

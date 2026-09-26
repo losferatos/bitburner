@@ -312,13 +312,46 @@ const FIGUR_HANDLUNGEN = [
  * Der Grep sucht deshalb zusaetzlich nach `const/let/var X = ns.<obj>` im
  * Dateiinhalt und laesst `X.<methode>(` als denselben Treffer gelten wie
  * `ns.<obj>.<methode>(`.
+ *
+ * ZWEI WEITERE ZUGRIFFSFORMEN ENTGEHEN DEMSELBEN PRAEFIX (26.09.2026, Paket-C-
+ * Nacharbeit): `ns["singularity"]` (Klammerzugriff statt Punkt - JS kennt
+ * beide, das Objekt ist dasselbe) und `const { gymWorkout } = ns.singularity`
+ * (Destrukturierung holt die Methode direkt heraus, der Aufruf danach heisst
+ * nur noch `gymWorkout(...)` OHNE jedes Objektpraefix). Beides faellt
+ * `ns\.<obj>\.<methode>\(` und dem Alias-Muster oben ebenso durch die Lueckte
+ * wie `const s = ns.singularity` es tat.
  */
 function objektAliase(inhalt, obj) {
   const aliase = new Set();
-  const muster = new RegExp("\\b(?:const|let|var)\\s+(\\w+)\\s*=\\s*ns\\." + obj + "\\b", "g");
+  // Punktzugriff: const s = ns.singularity
+  const musterPunkt = new RegExp("\\b(?:const|let|var)\\s+(\\w+)\\s*=\\s*ns\\." + obj + "\\b", "g");
   let m;
-  while ((m = muster.exec(inhalt))) aliase.add(m[1]);
+  while ((m = musterPunkt.exec(inhalt))) aliase.add(m[1]);
+  // Klammerzugriff: const s = ns["singularity"] (oder mit einfachen Anfuehrungszeichen)
+  const musterKlammer = new RegExp(
+    "\\b(?:const|let|var)\\s+(\\w+)\\s*=\\s*ns\\s*\\[\\s*[\"']" + obj + "[\"']\\s*\\]", "g");
+  while ((m = musterKlammer.exec(inhalt))) aliase.add(m[1]);
   return aliase;
+}
+
+/**
+ * DESTRUKTURIERUNG HOLT DIE METHODE OHNE OBJEKTPRAEFIX HERAUS (26.09.2026,
+ * Paket-C-Nacharbeit).
+ *
+ * `const { gymWorkout } = ns.singularity;` gefolgt von `gymWorkout(...)` ruft
+ * dieselbe Funktion wie `ns.singularity.gymWorkout(...)` auf, aber KEIN
+ * Praefix (weder `ns.singularity` noch ein Alias-Name) steht mehr vor dem
+ * Methodennamen - das Muster in `pruefeFigurWache` braucht deshalb einen
+ * eigenen, praefixlosen Treffer fuer genau diesen Fall. Nur die
+ * unumbenannte Form (`{ methode }`, nicht `{ methode: x }`) wird erkannt -
+ * ein Alias auf die Methode selbst ist bisher in keiner Datei aufgetaucht.
+ */
+function methodeDestrukturiert(inhalt, obj, methode) {
+  const musterPunkt = new RegExp(
+    "\\{[^}]*\\b" + methode + "\\b[^}]*\\}\\s*=\\s*ns\\." + obj + "\\b");
+  const musterKlammer = new RegExp(
+    "\\{[^}]*\\b" + methode + "\\b[^}]*\\}\\s*=\\s*ns\\s*\\[\\s*[\"']" + obj + "[\"']\\s*\\]");
+  return musterPunkt.test(inhalt) || musterKlammer.test(inhalt);
 }
 
 /**
@@ -340,9 +373,20 @@ function pruefeFigurWache(datei, inhalt) {
   const aliasCache = new Map();   // obj -> Set der Aliasnamen
   for (const h of FIGUR_HANDLUNGEN) {
     if (!aliasCache.has(h.obj)) aliasCache.set(h.obj, objektAliase(inhalt, h.obj));
-    const praefixe = ["ns\\." + h.obj,
-      ...[...aliasCache.get(h.obj)].map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))];
-    const muster = new RegExp("\\b(?:" + praefixe.join("|") + ")\\." + h.methode + "\\s*\\(");
+    const praefixe = [
+      "ns\\." + h.obj,
+      // Klammerzugriff: ns["singularity"].gymWorkout( - dasselbe Objekt, nur
+      // ohne Punktnotation (26.09.2026, Paket-C-Nacharbeit).
+      "ns\\s*\\[\\s*[\"']" + h.obj + "[\"']\\s*\\]",
+      ...[...aliasCache.get(h.obj)].map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")),
+    ];
+    let musterListe = ["\\b(?:" + praefixe.join("|") + ")\\." + h.methode + "\\s*\\("];
+    // Destrukturierung: const { gymWorkout } = ns.singularity - danach steht
+    // KEIN Praefix mehr vor dem Aufruf (26.09.2026, Paket-C-Nacharbeit).
+    if (methodeDestrukturiert(inhalt, h.obj, h.methode)) {
+      musterListe.push("(?<![.\\w])" + h.methode + "\\s*\\(");
+    }
+    const muster = new RegExp(musterListe.join("|"));
     for (let i = 0; i < zeilen.length; i++) {
       const ohneKommentar = zeilen[i].replace(/^\s*(\*|\/\/|\/\*).*$/, "");
       if (muster.test(ohneKommentar)) { gefunden.push([h.methode, i + 1]); break; }
@@ -647,6 +691,78 @@ let probeFehler = 0;
       treffer = vorherAlias2;
       meldungen.pop();
       console.log("  ROT   meldet aliasiertes gymWorkout faelschlich trotz Wache");
+    }
+  }
+
+  // DESTRUKTURIERUNG UND KLAMMERZUGRIFF MUESSEN DIESELBE WACHE FINDEN
+  // (26.09.2026, Paket-C-Nacharbeit): weder `const { gymWorkout } =
+  // ns.singularity` noch `ns["singularity"]` tragen den woertlichen Praefix
+  // `ns.singularity.gymWorkout(`, den die Grundregel kennt.
+  {
+    const vorherDestr = treffer;
+    pruefeFigurWache("(probe-destrukturiert-ohne-wache)", [
+      "export async function main(ns) {",
+      "  const { gymWorkout } = ns.singularity;",
+      "  gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer > vorherDestr) {
+      console.log("  ok    findet gymWorkout(...) bei 'const { gymWorkout } = ns.singularity'");
+      treffer = vorherDestr;
+      meldungen.pop();
+    } else {
+      probeFehler++;
+      console.log("  ROT   findet destrukturiertes gymWorkout NICHT - dieselbe Luecke wie 6#4, nur ohne Objektpraefix");
+    }
+
+    // Gegenprobe: mit Wache importiert, meldet die Destrukturierung nichts.
+    const vorherDestr2 = treffer;
+    pruefeFigurWache("(probe-destrukturiert-mit-wache)", [
+      "import { beantrage } from \"lib/figurns.js\";",
+      "export async function main(ns) {",
+      "  const { gymWorkout } = ns.singularity;",
+      "  gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer === vorherDestr2) {
+      console.log("  ok    meldet destrukturiertes gymWorkout nicht, wenn lib/figurns.js importiert ist");
+    } else {
+      probeFehler++;
+      treffer = vorherDestr2;
+      meldungen.pop();
+      console.log("  ROT   meldet destrukturiertes gymWorkout faelschlich trotz Wache");
+    }
+
+    const vorherKlammer = treffer;
+    pruefeFigurWache("(probe-klammerzugriff-ohne-wache)", [
+      "export async function main(ns) {",
+      "  ns[\"singularity\"].gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer > vorherKlammer) {
+      console.log("  ok    findet gymWorkout(...) bei 'ns[\"singularity\"]'");
+      treffer = vorherKlammer;
+      meldungen.pop();
+    } else {
+      probeFehler++;
+      console.log("  ROT   findet gymWorkout ueber Klammerzugriff NICHT");
+    }
+
+    // Gegenprobe: mit Wache importiert, meldet der Klammerzugriff nichts.
+    const vorherKlammer2 = treffer;
+    pruefeFigurWache("(probe-klammerzugriff-mit-wache)", [
+      "import { beantrage } from \"lib/figurns.js\";",
+      "export async function main(ns) {",
+      "  ns[\"singularity\"].gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer === vorherKlammer2) {
+      console.log("  ok    meldet Klammerzugriff nicht, wenn lib/figurns.js importiert ist");
+    } else {
+      probeFehler++;
+      treffer = vorherKlammer2;
+      meldungen.pop();
+      console.log("  ROT   meldet Klammerzugriff faelschlich trotz Wache");
     }
   }
 

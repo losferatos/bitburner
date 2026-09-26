@@ -154,9 +154,10 @@ statt vier SF-Spalten. Der Wert zur Laufzeit:
 
 **Verifiziert:** `RamCostGenerator.ts:82-96` ist wörtlich diese Fallunterscheidung,
 und die Messdatei trägt die Zerlegung selbst — `bn4rep.js` hat `singKosten41: 843,2`
-bei `lokal41: 853,95`, also `ramSingGb = 843,2/16 = 52,70` und `ramBaseGb = 10,75`;
-`lokal43` = 63,45 = 10,75 + 52,70 (Stand 26.09.2026, Audit-Fix A1: `isFocused`/
-`setFocus` kamen dazu, vorher 850,75 / 63,25). Über alle 114 Dateien trägt die
+bei `lokal41: 854,05`, also `ramSingGb = 843,2/16 = 52,70` und `ramBaseGb = 10,85`;
+`lokal43` = 63,55 = 10,85 + 52,70 (Stand 26.09.2026, Audit-Fix A1: `isFocused`/
+`setFocus` kamen dazu, +0,2 Sing; Skeptiker-Nacharbeit A5: `getTotalScriptIncome`,
++0,1 Basis; vorher 850,75 / 63,25). Über alle 114 Dateien trägt die
 Messung diese zwei Zahlen; vier Spalten wären vier Gelegenheiten zu widersprechen.
 
 **Und:** die Registry ist der **Planwert**, `ns.getScriptRam` (0,10 GB, im
@@ -402,7 +403,7 @@ Resident **16,85**, mit `boot.js` **22,35**.
 | `src/ausgang.js` | 8,15 | 8,15 | nein | any |
 | `src/contracts.js` | 17,65 | 17,65 | nein | werkbank |
 | `src/blade.js` | 175,35 | 100,35 | nein | werkbank |
-| `src/bn4rep.js` | 853,95 | 63,45 | nein | werkbank |
+| `src/bn4rep.js` | 854,05 | 63,55 | nein | werkbank |
 | `src/graft.js` | 145,45 | 32,95 | nein | werkbank |
 | `src/exit.js` | 519,25 | 39,25 | nein | eigener Wirt (E10) |
 | `src/worker/{hack,grow,weaken,share}.js` | 1,75/1,80/1,80/4,00 | gleich | nein | not-hacknet |
@@ -1108,7 +1109,7 @@ nicht in einen Kommentar.
     {
       "name": "bn4rep.js",
       "args": [],
-      "ramBaseGb": 10.75,
+      "ramBaseGb": 10.85,
       "ramSingGb": 52.7,
       "ramMeasuredAt": "2026-09-26",
       "verfahren": "alle",

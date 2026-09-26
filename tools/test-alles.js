@@ -206,7 +206,16 @@ const TESTS = [
     datei: "test-bn4rep-einbau.js",
     deckt: "lib/einbau.js: Fokus-Ruecknahme, BN12-Spendenformel, Daedalus-Schwelle,"
       + " Spendenrecht- und Red-Pill-Einbauzwang, Horizont-Unbezahlbarkeit,"
-      + " Favor-Relevanz (Audit A1-A7)",
+      + " Favor-Relevanz (Audit A1-A7), mit echten Spielstandzahlen und"
+      + " echten Aug-Namen (Skeptiker-Nacharbeit)",
+    schnell: true,
+  },
+  {
+    datei: "test-bn4rep-ebene2.js",
+    deckt: "EBENE 2: bn4rep.js-Hauptlauf gegen nachgebauten Spielzustand -"
+      + " erste Runde nach Neustart (BN5.2 19:03), Handschlag/Interlock ohne"
+      + " Prozessende und ohne NFG-Kauf, Fuellstueck nicht im Kampfknoten,"
+      + " Fokus mit Karenz und NMI nur eingebaut (Skeptiker-Nacharbeit A)",
     schnell: true,
   },
   {

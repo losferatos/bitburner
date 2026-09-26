@@ -1,0 +1,15 @@
+import fs from "node:fs";
+const r = JSON.parse(fs.readFileSync(process.argv[2]));
+const p = r.player;
+console.log("bitNodeN", p.bitNodeN, "srcFiles", JSON.stringify(p.sourceFiles), "bnOpts", JSON.stringify(p.bitNodeOptions||null));
+console.log("skills", JSON.stringify(p.skills));
+console.log("exp", JSON.stringify(p.exp));
+console.log("mults", JSON.stringify(p.mults));
+console.log("money", p.money, "playtimeSinceLastAug", p.playtimeSinceLastAug, "playtimeSinceLastBitnode", p.playtimeSinceLastBitnode);
+console.log("augs", p.augmentations.length, "queued", p.queuedAugmentations.length);
+console.log("moneySourceA", JSON.stringify(p.moneySourceA));
+const S = r.servers;
+const names = Object.keys(S);
+console.log("servers", names.length);
+const home = S.home.data;
+console.log("home keys", Object.keys(home).join(","));

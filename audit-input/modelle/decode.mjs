@@ -1,0 +1,10 @@
+import zlib from "node:zlib"; import fs from "node:fs";
+const f = process.argv[2];
+const save = JSON.parse(zlib.gunzipSync(fs.readFileSync(f)).toString("utf8"));
+const out = process.argv[3];
+const d = save.data;
+const res = { keys: Object.keys(d) };
+res.player = JSON.parse(d.PlayerSave).data;
+res.servers = JSON.parse(d.AllServersSave);
+fs.writeFileSync(out, JSON.stringify(res));
+console.log(Object.keys(d));

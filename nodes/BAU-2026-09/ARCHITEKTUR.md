@@ -471,6 +471,15 @@ nicht in einen Kommentar.
 
 ## 3.3 `src/registry.json` — 22 Einträge
 
+**`graftauto.js` steht seit 26.09.2026 auf `verfahren: "V2"`** (vorher `"alle"`,
+Audit-Fund 1#1/5#5). `graftplan.json` kennt ausschließlich Kampf- und
+Bladeburner-Stücke, und `lib/figur.js:53-60` gibt `graft` (Prio 10) Vorrang vor
+`faktion` (Prio 30) — sobald `graftplan.json` von `data/nicht-schieben.txt`
+gelöst wird, würde graftauto in jedem V1-Knoten (BN5.3, BN12.1-12.3) der Figur
+die Daedalus-Reputationsarbeit für Augs wegnehmen, die zum Hacking-Ausgang
+nichts beitragen (11-57 h nach der gemessenen Daedalus-Rate). Ein eigener
+Hacking-Graftplan für V1 ist eine offene, ungerechnete Folgefrage (Bericht 5#5).
+
 ```json
 {
   "schema": 1,
@@ -842,7 +851,7 @@ nicht in einen Kommentar.
       "ramBaseGb": 16.75,
       "ramSingGb": 0.5,
       "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
-      "verfahren": "alle",
+      "verfahren": "V2",
       "knoten": "alle",
       "phase": "normal",
       "telemetryFile": "data/graftauto.json",

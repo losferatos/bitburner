@@ -368,7 +368,7 @@
    "ramBaseGb": 16.75,
    "ramSingGb": 0.5,
    "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
-   "verfahren": "alle",
+   "verfahren": "V2",
    "knoten": "alle",
    "phase": "normal",
    "telemetryFile": "data/graftauto.json",

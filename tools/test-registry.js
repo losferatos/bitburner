@@ -270,6 +270,29 @@ console.log("-- Knoten- und Phasenfilter --");
   pruefe("blade.js laeuft nicht im Kaltstart",
     !REG.gilt(blade, { node: 10, verfahren: "V2", phase: "kaltstart", dateiDa: () => true }).gilt,
     "94 GB passen nicht auf ein frisches home");
+
+  // GRAFTAUTO NUR IN V2 (Audit-Fund 1#1/5#5, 26.09.2026, Paket C.1).
+  //
+  // graftplan.json kennt ausschliesslich Kampf- und Bladeburner-Stuecke, und
+  // lib/figur.js:53-60 gibt graft (Prio 10) Vorrang vor faktion (Prio 30) -
+  // in einem V1-Knoten haette graftauto der Figur die Daedalus-Arbeit fuer
+  // Augs weggenommen, die zum Hacking-Ausgang nichts beitragen. Vorher stand
+  // hier "verfahren": "alle", und die Registry haette es auch in BN5.3/
+  // BN12.1-12.3 gestartet, sobald jemand graftplan.json von
+  // data/nicht-schieben.txt loest.
+  const graftauto = registry.eintraege.find((e) => e.name === "graftauto.js");
+  pruefe("graftauto.js steht in der Registry", !!graftauto);
+  if (graftauto) {
+    pruefe("verfahren ist V2, nicht mehr 'alle'", graftauto.verfahren === "V2",
+      "verfahren ist " + JSON.stringify(graftauto.verfahren));
+    pruefe("gilt NICHT in einem V1-Knoten, auch wenn graftplan.json vorliegt",
+      !REG.gilt(graftauto, { node: 5, verfahren: "V1", phase: "normal", dateiDa: () => true }).gilt);
+    pruefe("und der Grund nennt das Verfahren",
+      /gilt nur fuer V2/.test(
+        REG.gilt(graftauto, { node: 5, verfahren: "V1", phase: "normal", dateiDa: () => true }).grund));
+    pruefe("gilt weiterhin in einem V2-Knoten",
+      REG.gilt(graftauto, { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true }).gilt);
+  }
 }
 
 console.log("");

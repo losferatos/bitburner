@@ -233,6 +233,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b6-bitnodes-tabelle.js",
+    deckt: "B6 (Audit 26.09.2026 2#6/1#4): negative Literale und BN12-Stufen im Generator",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

@@ -226,3 +226,226 @@ Server, auf die die neue Zielwahl wartet. Im Bericht nennen, nicht verstecken.
   StaneksGiftExtraSize negativ ergaenzt); einziger Laufzeitleser bn4net.js:116-124 behandelt
   fehlende Knoten/Felder als 1, test-analyse-eichung nutzt `|| {}` - Schema rueckwaertskompatibel.
   BN12 Stufe 1 jetzt richtig (0,9804 statt 1).
+
+---
+
+## Fix-Stand (26.09.2026, zweiter Durchgang: umgesetzt statt nur gemeldet)
+
+Commits auf `cloud-skeptiker-b`:
+- `82910e5` Skeptiker B 4: bitnodes-tabelle.js verliert kein Feld mehr still
+- `4500041` Skeptiker B 1-3, 5-8, 10: Ofen mit Frist, Zielwahl mit Vorbereitung und Hysterese
+
+Gerechnet mit denselben Wegwerfskripten wie oben (Nachbau Hacking.ts,
+NetscriptFunctions.ts, calculateSkill). Die Nachspielung der Zielwahl ruft
+DIREKT `targetMetrics/targetRank/selectMoneyTargets` aus `src/lib/calc.js`
+auf, also den Code, den der Kern ausfuehrt.
+
+Einspielen nur zusammen: `bn4net.js`, `lib/calc.js`, `worker/expfarm.js`,
+`ausgang.js`, `lib/bitnodes.json`. bn4net importiert neue Exporte aus calc;
+ein altes calc im Spiel liesse den Kern beim Import sterben.
+
+### B-1 (BLOCKER, B2) - behoben, `4500041`
+
+Bauform: **Frist statt Kill.** `worker/expfarm.js [ziel, frist, runde]` macht
+den ersten weaken immer und jeden weiteren nur, wenn er nach der GEMESSENEN
+Dauer des vorigen vor der Frist endet. Danach endet der Faden selbst. Die
+Frist ist die naechste Speicherzaehlung des Kerns (gemessener Takt zwischen
+zwei Zaehlungen, gedeckelt auf 2-120 s, minus 250 ms). bn4net toetet den Ofen
+nicht mehr.
+
+- Lange Aktion: genau die alte Einwegwelle.
+- Kurze Aktion: Dauerlaeufer, dessen Speicher zur naechsten Zaehlung frei ist,
+  ohne verworfenen Aufruf.
+- Die Dauer wird gemessen statt mit `ns.getWeakenTime` erfragt. Damit bleibt
+  der Faden bei 1,75 GB; 0,05 GB mehr waeren bei 63.000 Faeden ~3 % des Ofens.
+
+Warum nicht die anderen Bauformen:
+- Kill (Stand vorher) liefert bei Aktion > Runde null.
+- Die Einwegwelle verschenkt bei hohem Level 90 % der Rundenzeit.
+- Ein reiner Umschalter an einer Schwelle muesste die Rundendauer schaetzen
+  und verliert an der Schwelle.
+
+Die Frist deckt beide Enden mit einer Regel.
+
+Simulation (5-ms-Raster, Wartungswelle eingerechnet, Rundendauer 10,02 s):
+
+| Lage | alt (Einweg) | Kill (vorher) | Frist (neu) |
+|---|---|---|---|
+| nach Einbau, 19:04-Mults, 110.844 GB, Level 10 -> 2800 | 50,9 s | 53,4 s | 50,9 s |
+| nach Einbau, Level nach 120 s | 3423 | 4277 | 4282 |
+| Mitte Zyklus 18:04, 42.907 GB, Level 3895 | 1,03e5 exp/s | 1,49e6 exp/s | 1,45e6 exp/s (x14,1) |
+| nach Knotenwechsel BN5.3 (Mult 1,4336), 1000 GB, Level nach 5/15/30 min | 156/237/274 | 28/78/117 | 157/238/275 |
+| dito 100 GB | 67/131/172 | 28/78/117 | 67/132/173 |
+
+Nach dem Knotenwechsel ist die Frist nie schlechter als die Einwegwelle: sie
+braucht 1,75 statt 1,80 GB je Faden, also +2,9 % Faeden. Bei hohem Level ist
+sie x14 gegen die Einwegwelle und -3 % gegen den Kill (Rand 250 ms plus
+ganzzahlige Abschluesse).
+
+Rot/Gruen `tools/test-b2-expfarm-dauerlaeufer.js` (echter Worker mit
+vorgetaeuschter Uhr, T = 0,72 / 41,2 / 138,1 s; echter Kern im Mock):
+- vor dem Fix **11 rot**, u. a. "0 Abschluesse, vom Kern getoetet" bei 41,2 s
+  und 138,1 s, 15 Kills in 6 Runden, keine Frist;
+- danach **20 gruen, 0 rot**.
+
+### S-1 (B2, weaken vs grow; Erfahrungsziel nicht ruinieren) - behoben, `4500041`
+
+- Die Kommentare in bn4net.js, der Kopf von expfarm.js, test-b2 und der
+  Commit sagen einheitlich weaken, mit Begruendung.
+- Die Wartungswelle (bis 180 Faeden) auf dem eigenen Erfahrungsziel macht
+  jetzt **nur weaken**. Der hack/grow/weaken-Ternaer gilt nur noch im
+  Ein-Ziel-Fall, in dem das Erfahrungsziel zugleich Geldziel ist. Sonst ist
+  das Erfahrungsziel nie Geldziel (das war schon getrennt).
+- Warum, in Zahlen:
+  - Der hack-Anteil je Faden auf foodnstuff betraegt 0,648 % (18:04) bis
+    0,716 % (19:04). x180 = 117-129 %, also leer (18:04: 0,0 % Geld).
+  - grow von 0 auf 5e7 braucht 9.420 Zyklen = +37,7 Sicherheit (16:57/17:19:
+    44 statt 7). Die weaken-Dauer steigt dadurch um den Faktor 1,18.
+  - Mit weaken allein bleibt die Sicherheit am Minimum (der Ofen weakent
+    selbst) und das Guthaben unberuehrt. Die 1,45e6 exp/s oben gelten fuer
+    Sicherheit 7.
+- Rot/Gruen: test-b2 A2 "Wartungswelle auf expziel ist ausschliesslich
+  weaken.js" war vorher rot (`worker/hack.js`) und ist jetzt gruen.
+
+### S-2 (B1, Vorbereitung und Hysterese) - behoben, `4500041`
+
+- `kennzahlen` ist jetzt eine duenne Huelle um `targetMetrics` (lib/calc.js).
+  Das liefert zusaetzlich `prepSec`: weaken bei IST-Sicherheit (in so vielen
+  Wellen, wie 30 % des Netzes fassen), dazu grow/weaken bei min, wenn das
+  Guthaben unter 75 % liegt.
+- `targetRank`:
+  - neues Ziel: steadyEff x (1 - prep/1800 s); Rang 0 bei mehr als 1200 s
+    Vorbereitung;
+  - amtierendes Ziel: steadyEff x Bonus x (1 - Rest/1800 s), wobei Rest =
+    Eintrittsschaetzung minus vergangene Zeit;
+  - Bonus 1,3 fuer Stapelziele, 1,05 fuer offene. Mit einem gemeinsamen Bonus
+    hob sich die Huerde auf, sobald ein Herausforderer eine Runde lang offenes
+    Ziel war; im Nachspielen verdraengte so ein 1,1-facher Ertrag zwei
+    Stapelziele.
+- `selectMoneyTargets`: unvorbereitete Ziele (> 60 s) bekommen hoechstens
+  max(8, 25 - vorbereitete) Plaetze - nach einem Einbau also alle.
+- Die Anlauffrist betraegt beim Anlaufbeginn max(20 min, 1,5 x Vorbereitung).
+
+Nachgespielt mit echten Spielstaenden (vorher = Stand
+origin/worktree-agent-a693114a22f784410):
+
+| Lage | vorher | nachher |
+|---|---|---|
+| Einspielen 18:04: Geldziele, die schon arbeiten (von 25) | 1 (Summe steadyEff 2,37e5) | 17 (1,97e6) |
+| Einspielen 19:03: dito | 3 (8,50e5) | 17 (2,27e6) |
+| nach Einbau (19:04, Portprogramme einzeln): Stapelwechsel | 5 | 4, jeder mit >= 1,6-fachem 30-min-Ertrag nach Vorbereitung (der 1,1-fache entfaellt) |
+| nach Knotenwechsel (19:04-Server, Mult 1,4336, 2.340 GB, Level 50-2000): Geldziele mit > 20 min Vorbereitung | bis 22 (bis 202 min) | 0 |
+
+Der Stapel wechselt um 18:04 weiterhin sofort auf 4sigma/ecorp/clarkinc
+(471-636 s Vorbereitung). Das ist gewollt: deren 30-min-Ertrag ist nach Abzug
+der Vorbereitung das 10- bis 13-fache. Neu ist, dass die 17 arbeitenden Ziele
+dabei Geldziele bleiben.
+
+Rot/Gruen `tools/test-b1-security100.js`:
+- vor dem Fix **4 rot**: Export fehlt; Arbeiter auf dem 61-min-Ziel;
+  vorbereitete Ziele ohne hack-Faeden; Stapel wechselt fuer +15 %;
+- danach **20 gruen, 0 rot**.
+
+### M-1 (B6, Kommentar mit Komma) - behoben, `82910e5`
+
+- Kommentare werden vor dem Zerlegen entfernt.
+- Neuer Riegel: verschwindet gegenueber der bisherigen Tabelle ein Knoten oder
+  Feld, bricht der Generator ab (gewollt nur mit `--wegfall-erlaubt`).
+- Regeneriert: BN12 ServerStartingSecurity 1.5 ist wieder da (flach und in
+  allen drei Stufen), BN1 wieder als leerer Eintrag.
+- Zeilenweise Gegenprobe gegen die echte BitNode.tsx: 299 Literale,
+  0 Abweichungen. Diff zur master-Tabelle: kein Feld verloren, BN5
+  unveraendert.
+
+### M-2 (B6, BN12 Stufe 2/3 zur Laufzeit) - behoben, `4500041`
+
+- bn4net nimmt `knotenLevel[n][min(SF+1, hoechste Stufe)]`. Das SF-Level
+  kommt aus `getResetInfo().ownedSF` (1 GB, schon bezahlt);
+  `getBitNodeMultipliers` haette 4 GB gekostet.
+- Stufe und Werte gehen als `bnWerte` in die Telemetrie.
+- BN12.3: 0,9423 statt 0,9804; BN5 unveraendert 0,15.
+
+Rot/Gruen `tools/test-b6-bitnodes-tabelle.js`. Der Test laeuft jetzt auch
+gegen die echte reference/bitburner-src (mit Meldung UEBERSPRUNGEN, wenn sie
+fehlt), immer gegen die eingecheckte Tabelle, und faehrt den Laufzeitleser im
+Mock in BN12.3, BN12.1 und BN5:
+- vor dem Fix **6 rot**;
+- danach **24 gruen, 0 rot**.
+
+### M-3 (ausgang.js) - behoben, `4500041`
+
+`worker/expfarm.js` steht in `WORKER` direkt hinter share (zweitbilligster
+Verlust: ein angefangener weaken ohne Kette). Damit zaehlt er bei der
+Wirtswahl als rueckgewinnbar und wird von `raeume(h, false)` und vom
+Nachraeumen vor dem exec erfasst. test-route, test-endspurt und test-punish
+sind gruen.
+
+### M-4 (Fremdstarter) - behoben, `4500041`
+
+- 64 GB Freiraum auf dem groessten Rechner (hoechstens 10 % des
+  Ueberschusses), aber nur, wenn die Ofenaktion kuerzer als die Runde ist.
+- Bei langer Aktion arbeitet der Ofen als Einwegwelle und haelt den Speicher
+  wie vor B2. Ein Freiraum kostete dort nach einem Knotenwechsel 6,4 %
+  Erfahrung, ohne dass sich fuer die Fremdstarter etwas aendert.
+- Um 19:04 sind 64 GB 0,06 % des Ueberschusses.
+- Der Auftragslaeufer in bn4net raeumt `worker/expfarm.js` vor den anderen
+  Arbeitern.
+- test-b2 "auf home bleiben >= 64 GB frei" war vorher rot ([1,0,0,...]) und
+  ist jetzt gruen.
+
+### M-5 (B3, alte Telemetrie) - behoben, `4500041`
+
+Ein bn4life-Prozess, den der Kern zum ersten Mal sieht (je pid), gilt 2 min
+lang als "kauft selbst". Danach greift der Notnagel wieder (haengender Prozess
+wie am 25.08.2026).
+
+Rot/Gruen `tools/test-b3-darkweb-fokus.js`:
+- vorher 1 rot (darkweb.js in Runde 1 gestartet);
+- jetzt 4 gruen, inklusive der Gegenprobe "nach 160 s ohne Telemetrie startet
+  darkweb.js doch".
+
+### M-6 (Programmkauf ueber die Reservierung) - bewusst NICHT geaendert
+
+- `bn4life.js` rechnet mit `Geld - reserviert`, damit eine von bn4rep schon
+  erarbeitete Augmentierung nicht von Einkaeufen ueberholt wird (23.08.2026,
+  bewusst so gebaut).
+- Portprogramme davon auszunehmen hiesse, diese Reihenfolge umzudrehen. Das
+  ist eine Abwaegung zwischen Einbau-Zeitpunkt und Einkommensrampe, die eine
+  Messung im Spiel braucht, und sie liegt in bn4life.js, nicht im
+  Hacking-Motor.
+- Mit S-2 ist die Wirkung ausserdem kleiner: die neuen Ziele werden erst
+  gewaehlt, wenn sie gerootet sind, und bis dahin arbeiten die vorbereiteten
+  weiter.
+
+### Tests (Einwand 10)
+
+| Datei | vor dem Fix (Stand a693114a) | nach dem Fix |
+|---|---|---|
+| test-b1-security100.js | 5 gruen, 4 rot | 20 gruen, 0 rot |
+| test-b2-expfarm-dauerlaeufer.js | 9 gruen, 11 rot | 20 gruen, 0 rot |
+| test-b3-darkweb-fokus.js | 3 gruen, 1 rot | 4 gruen, 0 rot |
+| test-b6-bitnodes-tabelle.js | 18 gruen, 6 rot | 24 gruen, 0 rot |
+| test-motor-ebene2.js | 56/56 | 56/56 |
+| test-alles.js --schnell | 30 gruen, 1 rot (test-ram) | 30 gruen, 1 rot (test-ram) |
+
+"vor dem Fix" heisst: die neuen Tests gegen `git archive
+origin/worktree-agent-a693114a22f784410`.
+
+- test-ram.js ist dort genauso rot: 32 veraltete Eichzeilen fremder Dateien,
+  Eichung unter 100 Zeilen.
+- Die vier hier geaenderten Dateien stehen jetzt in `VERALTET_ERLAUBT`.
+  tools/ram.js rechnet unveraendert: bn4net.js 10,80 GB, expfarm.js 1,75 GB,
+  lib/calc.js 0.
+- `node tools/registry-bauen.js --pruefen`: registry.json stimmt mit
+  ARCHITEKTUR.md 3.3 ueberein (25 Eintraege).
+- Ausserhalb von --schnell zusaetzlich gruen: test-kern-c789,
+  test-sprosse5-kette, test-kernwache, test-verbote, test-matrix-ebene2
+  (117/117), test-guard-ebene2, test-analyse-eichung, test-endspurt,
+  test-punish, test-reserve-eta, test-v1kurve.
+- test-bruecke bricht in der Cloud mit ERR_MODULE_NOT_FOUND ab, auf dem Stand
+  a693114a genauso (Umgebung).
+
+Offen bleibt, was nur das Spiel zeigen kann:
+- die Rundendauer im verdeckten Tab (die Frist folgt dem gemessenen Takt,
+  gedeckelt bei 120 s);
+- die Messung von bn4net.js und expfarm.js mit calculateRam.

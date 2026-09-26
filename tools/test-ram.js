@@ -158,10 +158,31 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
      * jemand diese Liste anfasst, wird der Test rot - und das ist gewollt:
      * eine schrumpfende Eichung, die niemandem auffaellt, ist genau der
      * Zustand, aus dem Befund M.3 entstanden ist.
+     *
+     * 2026-09-26 (Auftrag C, Paket-C-Nacharbeit): der Audit "perfekter Bot"
+     * und die Pakete A-D haben seit dem 04.09. deutlich mehr als sieben
+     * Dateien angefasst (u.a. C1 graftauto.js, C2 joinrun.js/bn4life.js, C3
+     * hacknet.js/hashes.js, C4 bn4rep.js, dazu zahlreiche Fixes aus BAUSTELLEN
+     * und den Audit-Paketen A-D). Alle unten sind erst durch DIESE Aenderungen
+     * neu veraltet (Diff gegen den 04.09.-Stand ungleich Null) - keine stille
+     * Drift, sondern derselbe Vertrag wie beim 04.09.-Merge: die Zahlen
+     * bleiben gueltig, bis eine LIVE-Nachmessung (`calculateRam` im Spiel)
+     * nach dem naechsten Einspielen ("Hot-Swap") sie bestaetigt oder
+     * widerlegt. Dieser Cloud-Auftrag hat keinen Spielzugriff (siehe
+     * Auftragsbeschreibung) und kann diese Nachmessung nicht selbst liefern.
      */
     const VERALTET_ERLAUBT = [
       "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
       "csolve.js", "cdump.js",
+      // 2026-09-26, live-Nachmessung nach Einspielen:
+      "bn4rep.js", "joinrun.js", "cheap.js", "bn4life.js", "blade.js",
+      "homegrow.js", "graft.js", "keepalive.js", "autopilot.js", "hand.js",
+      "sleeve.js", "stockaccess.js", "buyone.js", "probe2.js", "stocks.js",
+      "formcheck.js", "bn4net.js", "contracts.js", "hacknet.js", "hashes.js",
+      "netburner.js", "boot.js", "calccheck.js", "xp.js", "popups.js",
+      "darkweb.js", "lib/batch.js", "lib/calc.js", "lib/hackaugs.js",
+      "export.js", "boerse.js", "lib/handschlag.js", "graftauto.js",
+      "figwatch.js", "guard.js",
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,

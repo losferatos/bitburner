@@ -1,9 +1,10 @@
 /**
  * Ebene 0: `lib/einbau.js` - die sieben Fehlausloeser aus dem Audit
  * "perfekter Bot" (26.09.2026, nodes/audit-2026-09-26/3-progression.md,
- * 1-bitnode-regeln.md #3, 6-orchestrierung.md #1), Paket A (A2-A7; A1 braucht
- * `ns.singularity.isFocused/setFocus` und ist damit nicht in reine Funktionen
- * zu fassen - dafuer gibt es keinen eigenen Test hier).
+ * 1-bitnode-regeln.md #3, 6-orchestrierung.md #1), Paket A (A1-A7). A1 braucht
+ * dafuer zusaetzlich `ns.singularity.isFocused/setFocus` (in bn4rep.js selbst,
+ * ungetestet - die reine ENTSCHEIDUNG, ob der Aufruf lohnt, steht als
+ * `sollFokusZurueckholen` in lib/einbau.js und wird hier geprueft).
  *
  * JEDE Pruefung unten baut die ALTE Formel aus `bn4rep.js` (Stand vor dem
  * Audit-Fix) lokal nach und zeigt sie ROT gegen dieselben Eingaben, gegen die
@@ -51,7 +52,29 @@ function pruefe(name, bedingung, hinweis = "") {
 }
 
 console.log("");
-console.log("=== lib/einbau.js: Audit-Fixes A2-A7 ===");
+console.log("=== lib/einbau.js: Audit-Fixes A1-A7 ===");
+
+// ---------------------------------------------------------------------------
+// A1: Fokus zurueckholen, waehrend die Faktionsarbeit schon laeuft
+// ---------------------------------------------------------------------------
+console.log("\n-- A1: Fokus zurueckholen (darkweb.js loescht ihn sonst dauerhaft) --");
+
+// ALT: kein Aufruf von isFocused/setFocus in der ganzen Datei - die
+// Entscheidung existierte schlicht nicht (immer "nein, nichts tun").
+const altHoltNieZurueck = () => false;
+
+{
+  pruefe("ALT: holt den Fokus nie zurueck (ROT erwartet)",
+    altHoltNieZurueck() === false);
+  pruefe("NEU: Arbeit laeuft, kein Fokus, kein NMI -> zurueckholen",
+    M.sollFokusZurueckholen({ arbeitetSchon: true, istFokussiert: false, hatNmi: false }) === true);
+  pruefe("NEU: schon fokussiert -> kein weiterer Aufruf noetig",
+    M.sollFokusZurueckholen({ arbeitetSchon: true, istFokussiert: true, hatNmi: false }) === false);
+  pruefe("NEU: Neuroreceptor Management Implant vorhanden -> Strafe existiert nicht, nichts tun",
+    M.sollFokusZurueckholen({ arbeitetSchon: true, istFokussiert: false, hatNmi: true }) === false);
+  pruefe("NEU: keine Faktionsarbeit im Gang -> nichts zurueckzuholen",
+    M.sollFokusZurueckholen({ arbeitetSchon: false, istFokussiert: false, hatNmi: false }) === false);
+}
 
 // ---------------------------------------------------------------------------
 // A2: donationRepGainFaktor - BN12 lebt jetzt von ns.getBitNodeMultipliers()

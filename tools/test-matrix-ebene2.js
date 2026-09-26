@@ -163,8 +163,10 @@ console.log("-- BitNode 4: Singularity kostet Faktor 1 --");
   if (bn4rep) {
     const inBn4 = REG.ramBedarf(bn4rep, { node: 4, ownedSF: { 4: 0 } });
     const inBn10 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 1 } });
-    pruefe("in BN4 kostet es 63,25", Math.abs(inBn4 - 63.25) < 0.01, "erhalten " + inBn4);
-    pruefe("in BN10 mit SF4.1 kostet es 850,75", Math.abs(inBn10 - 850.75) < 0.01,
+    // A1, 26.09.2026: +0,2 GB ramSingGb (isFocused/setFocus), vorher 63,25 /
+    // 850,75 - siehe ARCHITEKTUR.md 3.3 und tools/test-registry.js.
+    pruefe("in BN4 kostet es 63,45", Math.abs(inBn4 - 63.45) < 0.01, "erhalten " + inBn4);
+    pruefe("in BN10 mit SF4.1 kostet es 853,95", Math.abs(inBn10 - 853.95) < 0.01,
       "erhalten " + inBn10);
     pruefe("das Verhaeltnis ist 16", Math.abs(inBn10 / inBn4 - 13.45) < 1,
       "erhalten " + (inBn10 / inBn4).toFixed(2) + " - nicht genau 16, weil der"

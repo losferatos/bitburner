@@ -158,6 +158,36 @@ export function unbezahlbarInHorizont({
 }
 
 /**
+ * A1: Waehrend die Figur schon fuer die Zielfaktion arbeitet, aber gerade
+ * nicht fokussiert ist, lohnt sich `setFocus(true)` - ausser das Neuroreceptor
+ * Management Implant ist schon (auch nur gekauft) vorhanden, dann hebt das
+ * Spiel die Fokusstrafe unabhaengig vom Fokus ganz auf
+ * (`PlayerObjectGeneralMethods.ts:622-628`, `hasAugmentation(..., true)`
+ * zaehlt die Warteschlange mit) und ein `setFocus`-Aufruf waere nur
+ * DOM-Umschalten ohne Ratengewinn.
+ *
+ * Bot vorher: kein Aufruf von `isFocused`/`setFocus` in der ganzen Datei -
+ * jede Navigation weg von der Arbeitsseite (`darkweb.js` alle 5 min, solange
+ * ein Portprogramm fehlt) loescht den Fokus, und niemand holt ihn zurueck.
+ * Belegt in BN5.2: 14 von 25 stuendlichen Sicherungen mit laufender
+ * Faktionsarbeit standen auf `focus:false`, bis zu 3,8 h am Stueck (Audit
+ * 3#1, doppelt in 6#1: Ursache dort naeher belegt).
+ *
+ * `ns.singularity.isFocused()`/`setFocus(true)` bleiben in bn4rep.js - diese
+ * Funktion entscheidet nur, OB der Aufruf sich lohnt, damit die Entscheidung
+ * ohne Spielmock testbar ist.
+ *
+ * @param {object} p
+ * @param {boolean} p.arbeitetSchon Faktionsarbeit fuer das aktuelle Ziel laeuft
+ * @param {boolean} p.istFokussiert `ns.singularity.isFocused()`
+ * @param {boolean} p.hatNmi Neuroreceptor Management Implant besessen (auch gekauft)
+ * @returns {boolean}
+ */
+export function sollFokusZurueckholen({ arbeitetSchon, istFokussiert, hatNmi }) {
+  return !!arbeitetSchon && !istFokussiert && !hatNmi;
+}
+
+/**
  * A7: `favorLohnt` darf nur Faktionen zaehlen, bei denen Favor noch etwas
  * bringt. Ab der Spendenschwelle ist Reputation dort schon eine reine
  * Geldfrage (Favor wirkt nur auf die ARBEITSRATE, `reputation.ts:8-14`,

@@ -204,8 +204,9 @@ const TESTS = [
   },
   {
     datei: "test-bn4rep-einbau.js",
-    deckt: "lib/einbau.js: BN12-Spendenformel, Daedalus-Schwelle, Spendenrecht- und"
-      + " Red-Pill-Einbauzwang, Horizont-Unbezahlbarkeit, Favor-Relevanz (Audit A2-A7)",
+    deckt: "lib/einbau.js: Fokus-Ruecknahme, BN12-Spendenformel, Daedalus-Schwelle,"
+      + " Spendenrecht- und Red-Pill-Einbauzwang, Horizont-Unbezahlbarkeit,"
+      + " Favor-Relevanz (Audit A1-A7)",
     schnell: true,
   },
   {

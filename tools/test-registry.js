@@ -336,13 +336,15 @@ console.log("-- RAM-Bedarf mit dem Singularity-Faktor --");
   const bn4rep = registry.eintraege.find((e) => e.name === "bn4rep.js");
   pruefe("bn4rep.js hat einen Singularity-Anteil", bn4rep && bn4rep.ramSingGb > 0);
   if (bn4rep) {
-    // Die Messung: 850,75 bei SF4.1, 63,25 bei SF4.3.
+    // Die Messung: 853,95 bei SF4.1, 63,45 bei SF4.3 (A1, 26.09.2026: +0,2 GB
+    // ramSingGb durch `isFocused`/`setFocus`, siehe ARCHITEKTUR.md 3.3 und
+    // die Zeile davor mit der Herleitung 10,75 + 52,70). Vorher 850,75/63,25.
     const sf1 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 1 } });
     const sf3 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 3 } });
     const inBn4 = REG.ramBedarf(bn4rep, { node: 4, ownedSF: { 4: 0 } });
-    pruefe("SF4.1 ergibt 850,75", Math.abs(sf1 - 850.75) < 0.01, "erhalten " + sf1);
-    pruefe("SF4.3 ergibt 63,25", Math.abs(sf3 - 63.25) < 0.01, "erhalten " + sf3);
-    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 63.25) < 0.01, "erhalten " + inBn4);
+    pruefe("SF4.1 ergibt 853,95", Math.abs(sf1 - 853.95) < 0.01, "erhalten " + sf1);
+    pruefe("SF4.3 ergibt 63,45", Math.abs(sf3 - 63.45) < 0.01, "erhalten " + sf3);
+    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 63.45) < 0.01, "erhalten " + inBn4);
   }
   const wakelock = registry.eintraege.find((e) => e.name === "wakelock.js");
   pruefe("wakelock.js kostet ueberall 2,25",

@@ -49,7 +49,7 @@ import { handschlag } from "lib/handschlag.js";
 import {
   donationRepGainFaktor, daedalusSchwelle, zaehlplatzWert as zaehlplatzWertBerechnen,
   sollFuellstueckSofortKaufen, redPillWartetAufEinbau, unbezahlbarInHorizont,
-  favorZaehltFuerFaktion,
+  favorZaehltFuerFaktion, sollFokusZurueckholen,
 } from "lib/einbau.js";
 
 export async function main(ns) {
@@ -382,6 +382,7 @@ export async function main(ns) {
   // fuellt sie bei 15-Sekunden-Runden das Log.
   let letzteAusgangsmeldung = 0;
   let letzteBladeMeldung = 0;
+  let letzterFokusHinweis = 0;
   const INSTALL_LOCK_MAX_AGE = 300000;
 
   // Der Aussenschalter. Inhalt:
@@ -2161,6 +2162,58 @@ export async function main(ns) {
         sag("workForFaction(" + ziel.faktion + ", " + art + ") abgelehnt.");
         try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
       }
+    } else {
+      // A1-FIX (26.09.2026, Audit 3#1 + 6#1, doppelt belegt). Die
+      // Faktionsarbeit laeuft schon (workForFaction startet sie MIT Fokus,
+      // Singularity.ts:533-551) - aber jede Navigation weg von der
+      // Arbeitsseite loescht ihn wieder (`Player.stopFocusing()`,
+      // `ui/GameRoot.tsx:271-273`), und bis heute holt ihn niemand zurueck.
+      // Ausloeser ist `darkweb.js` (alt+w/alt+t) alle 5 Minuten, solange ein
+      // Portprogramm fehlt - unabhaengig davon greift die Wiederherstellung
+      // hier gegen JEDE Ursache, nicht nur gegen darkweb.js.
+      //
+      // Belegt in BN5.2: 14 von 25 stuendlichen Sicherungen mit laufender
+      // Faktionsarbeit standen auf `focus:false`, ueber Strecken bis 3,8 h am
+      // Stueck (09:04-12:53). `focusPenalty()` ist ohne Fokus 0,8 auf Rep UND
+      // Erfahrung der Faktionsarbeit (`PlayerObjectGeneralMethods.ts:622-628`,
+      // `Work/FactionWork.tsx:37-45`) - rund 46 min verlorene Arbeitszeit
+      // allein in dieser einen Strecke.
+      //
+      // GEPRUEFT, DASS DAS KEIN UI-SKRIPT STOERT: `darkweb.js` navigiert ueber
+      // Tastenkuerzel (alt+w Stadtkarte, alt+t Terminal), die unabhaengig von
+      // der aktuell offenen Seite feuern - es braucht die Work-Seite nicht
+      // offen, um zu funktionieren, und `popups.js` schliesst Dialoge per
+      // Escape, ebenfalls seitenunabhaengig. Dass `setFocus(true)` danach die
+      // Seite zurueck auf "Work" holt, ist hier der Zweck, kein Nebenschaden.
+      //
+      // NMI AUSGENOMMEN: Mit installiertem ODER GEKAUFTEM Neuroreceptor
+      // Management Implant faellt die Strafe laut Spiel unabhaengig vom Fokus
+      // ganz weg (`focusPenalty()`: `hasAugmentation(..., true)` - `true`
+      // zaehlt auch die Warteschlange, PlayerObjectGeneralMethods.ts:622-628).
+      // `setFocus` waere dann nur DOM-Laerm ohne Ratengewinn.
+      //
+      // KEIN EIGENER FIGUR-ANTRAG NOETIG: `setFocus` bewegt die Figur nicht
+      // zu einer anderen Handlung (kein `startWork`), es schaltet nur die
+      // Oberflaeche der schon laufenden Arbeit um - der bestehende
+      // `faktion`-Antrag von weiter oben deckt das mit ab.
+      //
+      // Die Entscheidung selbst steht als reine Funktion in lib/einbau.js
+      // (`sollFokusZurueckholen`), damit sie ohne Spielmock testbar ist -
+      // hier bleiben nur die beiden ns-Aufrufe, die sie nicht ersetzen kann.
+      try {
+        const istFokussiert = ns.singularity.isFocused();
+        if (sollFokusZurueckholen({
+          arbeitetSchon, istFokussiert,
+          hatNmi: besitz.has("Neuroreceptor Management Implant"),
+        })) {
+          ns.singularity.setFocus(true);
+          if (Date.now() - letzterFokusHinweis > 300000) {
+            letzterFokusHinweis = Date.now();
+            sag("Fokus zurueckgeholt (" + ziel.faktion + ") - Rate stand"
+              + " ohne ihn bei 80 Prozent.");
+          }
+        }
+      } catch { /* Aufruf selten verfuegbar (SF4) - kein Grund zum Abbruch */ }
     }
 
     // Summe ueber alle Faktionen. Die Reputation des aktuellen Ziels taugt

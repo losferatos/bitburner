@@ -3449,10 +3449,28 @@ export async function main(ns) {
     // wegziehen, waehrend jemand zusieht. Es beendet sich von selbst, sobald
     // das Geld fuer das naechste Programm nicht reicht - der Wiederanlauf
     // holt dann das nach, was inzwischen bezahlbar geworden ist.
+    //
+    // NUR NOCH DER NOTNAGEL, NICHT MEHR DER REGELFALL (Fix B3, Audit
+    // 26.09.2026 6#1). Der obige Grund ("bn4life ist ausserhalb BN4 293,8 GB
+    // gross") galt vor SF4.3 - seit bn4life mit Singularity laeuft, kauft es
+    // dieselben Portprogramme selbst, alle 20 s, aus data/geldbedarf.txt
+    // bereinigt (bn4life.js:251-297). darkweb.js klickt dabei "Do something
+    // else simultaneously" (:93-94) und alt+w/alt+t (:106, :219) - das
+    // reisst laufende Faktionsarbeit aus dem Fokus. Belegt: 14 von 25
+    // BN5-Spielstaenden mit Faktionsarbeit ohne Fokus, weil darkweb.js
+    // dazwischenfunkte, macht die Rep-Rate 0,8x fuer im Schnitt 12,6 % der
+    // Zykluszeit.
+    //
+    // Deshalb nur noch starten, wenn bn4life NICHT laeuft (per Lebenszeichen
+    // `lifeLaeuft`, nicht per blossem ps-Treffer - ein haengender Prozess
+    // ohne frische Telemetrie zaehlt nicht als "laeuft", genau die Falle vom
+    // 25.08.2026 bei task.txt). Das ist der echte Kaltstart-/Absturzfall, in
+    // dem der Oberflaechenweg tatsaechlich der einzige ist.
     const PORTPROGRAMME = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe",
                            "HTTPWorm.exe", "SQLInject.exe"];
     const NACHHOL_ABSTAND_MS = 300000;
-    if (PORTPROGRAMME.some((d) => !ns.fileExists(d, "home"))
+    if (!lifeLaeuft
+        && PORTPROGRAMME.some((d) => !ns.fileExists(d, "home"))
         && Date.now() - nachholMerker > NACHHOL_ABSTAND_MS
         && !hosts.some((h) => {
           try { return ns.ps(h).some((pr) => pr.filename === "darkweb.js"); }

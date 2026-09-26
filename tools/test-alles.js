@@ -228,6 +228,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b3-darkweb-fokus.js",
+    deckt: "EBENE 2: B3 (Audit 26.09.2026 6#1): darkweb.js nur ohne lebendiges bn4life",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

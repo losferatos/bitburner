@@ -14,6 +14,21 @@
  * und ein Leser, der ein fehlendes Feld als 1 liest, rechnete in BN12 mit
  * den falschen Standardwerten statt mit 0,98 (Stufe 1) bis 0,94 (Stufe 3).
  *
+ * NACHTRAG Skeptiker B (Einwaende 4, 5, 10): Die Nachbildung allein hat den
+ * Rueckfall der Regeneration nicht gesehen - in der echten BitNode.tsx steht
+ * vor `ServerStartingSecurity: 1.5` (BN12) ein Kommentar MIT KOMMA, der das
+ * Feld zerschnitt; die Tabelle verlor es still. Deshalb jetzt zusaetzlich:
+ *   - die Nachbildung traegt genau diesen Kommentar,
+ *   - der echte Generator laeuft gegen die ECHTE reference/bitburner-src
+ *     (gesucht im Repo und in der Hauptarbeitskopie; fehlt sie, wird das
+ *     laut als UEBERSPRUNGEN gemeldet), und eine unabhaengige, zeilenweise
+ *     Gegenprobe vergleicht jedes Literal jedes Knotens,
+ *   - die eingecheckte src/lib/bitnodes.json wird gegen die Spielformel fuer
+ *     BN12 (1,02^-Stufe) und gegen ServerStartingSecurity geprueft - das geht
+ *     immer, auch ohne Referenz,
+ *   - der Laufzeitleser (bn4net.js) wird im Mock in BN12 Stufe 3 gefahren und
+ *     muss 0,9423 statt des Stufe-1-Werts 0,9804 nehmen.
+ *
  * DIESER TEST baut eine kleine, echte Kopie von `BitNode.tsx` und
  * `BitNodeMultipliers.ts` nach (nicht die echten Dateien - die liegen
  * ausserhalb des Worktrees unter reference/bitburner-src, siehe
@@ -64,6 +79,7 @@ class BitNodeMultipliers {
   HackingLevelMultiplier = 1;
   StaneksGiftExtraSize = 1;
   DaedalusAugsRequirement = 30;
+  ServerStartingSecurity = 1;
 }
 `;
 
@@ -93,6 +109,9 @@ export function getBitNodeMultipliers(n, lvl) {
         ServerGrowthRate: dec,
         ServerWeakenRate: dec,
         HackingLevelMultiplier: dec,
+
+        //Does not scale, otherwise security might start at 300+
+        ServerStartingSecurity: 1.5,
       });
     }
     default: {
@@ -166,6 +185,9 @@ if (ausgabe) {
       Math.abs(kl12["3"].ScriptHackMoney - 0.9423) < 5e-5,
       "erhalten " + kl12["3"].ScriptHackMoney);
   }
+  pruefe("BN12 ServerStartingSecurity 1.5 hinter einem Kommentar mit Komma kommt an",
+    k12 && k12.ServerStartingSecurity === 1.5 && kl12 && kl12["3"].ServerStartingSecurity === 1.5,
+    "flach " + (k12 && k12.ServerStartingSecurity));
   pruefe("DaedalusAugsRequirement (verschachtelter Ausdruck mit eigenem Komma) wird ausgewertet",
     kl12 && kl12["1"].DaedalusAugsRequirement === Math.floor(Math.min(30 + 1.02, 40)),
     "erhalten " + (kl12 && kl12["1"].DaedalusAugsRequirement));
@@ -202,6 +224,125 @@ console.log("-- ein nicht-literales Feld in einem ANDEREN Knoten bricht laut ab 
 }
 
 if (tmp) fs.rmSync(tmp, { recursive: true, force: true });
+
+// ---------------------------------------------------------------------------
+// Gegen die ECHTE Spielquelle
+// ---------------------------------------------------------------------------
+const ERWARTUNG12 = (lvl) => 1 / Math.pow(1.02, lvl);
+const echteRef = [
+  path.join(ROOT, "reference", "bitburner-src", "src", "BitNode"),
+  // Worktree unter .claude/worktrees/<name>: die Hauptarbeitskopie drei hoeher.
+  path.resolve(ROOT, "..", "..", "..", "reference", "bitburner-src", "src", "BitNode"),
+].find((d) => fs.existsSync(path.join(d, "BitNode.tsx")) && fs.existsSync(path.join(d, "BitNodeMultipliers.ts")));
+
+/** Unabhaengige Gegenprobe: jede Zeile "Name: Zahl," je case-Block. */
+function literaleJeKnoten(tsx) {
+  const aus = {};
+  const body = tsx.slice(tsx.indexOf("export function getBitNodeMultipliers"));
+  for (const [, n, block] of body.matchAll(/case (\d+): \{([\s\S]*?)\n    \}/g)) {
+    aus[n] = {};
+    for (const [, f, w] of block.matchAll(/^\s*(\w+):\s*(-?[\d.]+),?\s*$/gm)) aus[n][f] = Number(w);
+  }
+  return aus;
+}
+
+console.log("");
+console.log("-- der echte Generator gegen die echte reference/bitburner-src --");
+if (!echteRef) {
+  console.log("  UEBERSPRUNGEN: reference/bitburner-src nicht gefunden (Repo und Hauptarbeitskopie).");
+  console.log("  Holen: siehe tools/bitnodes-tabelle.js, Kopfkommentar.");
+} else {
+  let tmp3 = null;
+  try {
+    tmp3 = fs.mkdtempSync(path.join(os.tmpdir(), "b6-echt-"));
+    fs.mkdirSync(path.join(tmp3, "tools"), { recursive: true });
+    fs.mkdirSync(path.join(tmp3, "reference", "bitburner-src", "src", "BitNode"), { recursive: true });
+    fs.mkdirSync(path.join(tmp3, "src", "lib"), { recursive: true });
+    fs.copyFileSync(path.join(ROOT, "tools", "bitnodes-tabelle.js"), path.join(tmp3, "tools", "bitnodes-tabelle.js"));
+    for (const d of ["BitNode.tsx", "BitNodeMultipliers.ts"]) {
+      fs.copyFileSync(path.join(echteRef, d), path.join(tmp3, "reference", "bitburner-src", "src", "BitNode", d));
+    }
+    let lauf = null;
+    try {
+      execFileSync(process.execPath, [path.join(tmp3, "tools", "bitnodes-tabelle.js")], { cwd: tmp3, encoding: "utf8" });
+      lauf = JSON.parse(fs.readFileSync(path.join(tmp3, "src", "lib", "bitnodes.json"), "utf8"));
+    } catch (e) {
+      pruefe("Generator laeuft gegen die echte Quelle durch", false, (e.stdout || "") + String(e.message || e));
+    }
+    if (lauf) {
+      const quelle = literaleJeKnoten(fs.readFileSync(path.join(echteRef, "BitNode.tsx"), "utf8"));
+      const fehlt = [];
+      for (const [n, felder] of Object.entries(quelle)) {
+        for (const [f, w] of Object.entries(felder)) {
+          if (!(f in lauf.standard)) continue;
+          const ist = (lauf.knoten[n] || {})[f];
+          if (ist !== w) fehlt.push("BN" + n + " " + f + " soll " + w + " ist " + ist);
+        }
+      }
+      pruefe("jedes Literal jedes Knotens der echten BitNode.tsx steht in der Tabelle ("
+        + Object.values(quelle).reduce((a, x) => a + Object.keys(x).length, 0) + " Zeilen)",
+        fehlt.length === 0, fehlt.slice(0, 5).join("; "));
+      const eingecheckt = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "lib", "bitnodes.json"), "utf8"));
+      pruefe("die eingecheckte src/lib/bitnodes.json ist genau diese Erzeugung",
+        JSON.stringify({ ...eingecheckt, erzeugtAm: 0 }) === JSON.stringify({ ...lauf, erzeugtAm: 0 }),
+        "neu erzeugen: node tools/bitnodes-tabelle.js");
+    }
+  } finally {
+    if (tmp3) fs.rmSync(tmp3, { recursive: true, force: true });
+  }
+}
+
+console.log("");
+console.log("-- die eingecheckte Tabelle gegen die Spielformel (immer) --");
+{
+  const t = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "lib", "bitnodes.json"), "utf8"));
+  const k12 = t.knoten["12"] || {};
+  pruefe("BN12 ServerStartingSecurity = 1.5 (BitNode.tsx, 'Does not scale')", k12.ServerStartingSecurity === 1.5,
+    "ist " + k12.ServerStartingSecurity);
+  const kl = (t.knotenLevel || {})["12"] || {};
+  for (const lvl of [1, 2, 3]) {
+    const st = kl[String(lvl)] || {};
+    const ok = ["ScriptHackMoney", "ServerGrowthRate", "ServerWeakenRate", "HackExpGain"]
+      .every((f) => Math.abs((st[f] ?? NaN) - ERWARTUNG12(lvl)) < 1e-12);
+    pruefe("BN12 Stufe " + lvl + ": ScriptHackMoney/ServerGrowthRate/ServerWeakenRate/HackExpGain = 1,02^-" + lvl,
+      ok, JSON.stringify({ shm: st.ScriptHackMoney, sgr: st.ServerGrowthRate }));
+  }
+  pruefe("BN5 unveraendert: ScriptHackMoney 0.15, ServerStartingSecurity 2",
+    t.knoten["5"] && t.knoten["5"].ScriptHackMoney === 0.15 && t.knoten["5"].ServerStartingSecurity === 2);
+}
+
+// ---------------------------------------------------------------------------
+// Der Laufzeitleser: bn4net.js im Mock, BN12 Stufe 3 (SF12 auf 2)
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- bn4net.js liest die Stufe (BN12.3) statt des flachen Stufe-1-Werts --");
+{
+  const { neuerMock } = await import("./mock/ns.js");
+  const { ladeAusBeiden } = await import("./mock/lader.js");
+  const tabelle = fs.readFileSync(path.join(ROOT, "src", "lib", "bitnodes.json"), "utf8");
+  const fahre = async (knoten, ownedSF) => {
+    const m = neuerMock({
+      host: "home", wall: 1_700_000_000_000, knoten, nodeReset: 1000, geld: 1e9, maxSchlaf: 1, ownedSF,
+      server: { home: { ram: 4096, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+      dateien: { home: { "bn4net.js": "//", "lib/bitnodes.json": tabelle, "data/verfahren.txt": "V1 " + knoten + " 1",
+        "worker/hack.js": "//", "worker/grow.js": "//", "worker/weaken.js": "//", "worker/share.js": "//" } },
+    });
+    const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+    const zurueck = m.uhrStellen();
+    try { await modul.main(m.ns); } catch (e) { if (!e.mockAbbruch) throw e; } finally { zurueck(); }
+    const tel = JSON.parse(m.lies("home", "data/bn4net.json") || "null");
+    return tel && tel.bnWerte ? tel.bnWerte : null;
+  };
+  const w123 = await fahre(12, new Map([[12, 2], [1, 3]]));
+  pruefe("BN12 mit SF12.2 (Stufe 3): ScriptHackMoney 0,9423",
+    w123 && Math.abs(w123.scriptHackMoney - ERWARTUNG12(3)) < 1e-12, JSON.stringify(w123));
+  const w121 = await fahre(12, new Map([[1, 3]]));
+  pruefe("BN12 ohne SF12 (Stufe 1): ScriptHackMoney 0,9804",
+    w121 && Math.abs(w121.scriptHackMoney - ERWARTUNG12(1)) < 1e-12, JSON.stringify(w121));
+  const w5 = await fahre(5, new Map([[5, 1], [1, 3]]));
+  pruefe("BN5 (keine Stufentabelle): ScriptHackMoney 0,15 wie bisher",
+    w5 && w5.scriptHackMoney === 0.15, JSON.stringify(w5));
+}
 
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");

@@ -17,6 +17,11 @@
  * beiden Faellen.
  *
  * Aufruf: node tools/test-b3-darkweb-fokus.js
+ *
+ * NACHTRAG Skeptiker B, Einwand 8 (26.09.2026): ein bn4life-Prozess, den der
+ * Kern zum ersten Mal sieht, gilt 2 min lang als "kauft selbst", auch wenn
+ * seine Telemetrie aelter als 5 min ist (Knotenwechsel mit langem Handschlag,
+ * Offline-Nacht). Haengt er laenger, greift der Notnagel wieder.
  */
 
 import path from "node:path";
@@ -116,6 +121,46 @@ console.log("-- bn4life LAEUFT (frische Telemetrie + Prozess) --");
   const gestartet = m.zustand.gestartet.some((g) => g.datei === "darkweb.js");
   pruefe("darkweb.js wird NICHT gestartet - bn4life kauft schon selbst", !gestartet,
     "gestartet: " + JSON.stringify(m.zustand.gestartet.map((g) => g.datei)));
+}
+
+// ---------------------------------------------------------------------------
+// Skeptiker B, Einwand 8: Telemetrie alt, Prozess frisch.
+// ---------------------------------------------------------------------------
+// Nach einem Knotenwechsel mit langem Handschlag oder einer Offline-Nacht ist
+// data/bn4life.json aelter als 5 min, obwohl bn4life gerade (neu) laeuft.
+// Vor dem Fix startete darkweb.js dann in Runde 1 einmal und riss den Fokus.
+// Ein haengender bn4life (25.08.2026) soll nach der Schonfrist (2 min) aber
+// weiter als tot gelten - der Notnagel darf nicht dauerhaft verschwinden.
+async function fahreAlt(runden) {
+  const g = grundzustand(true);
+  g.dateien.home["data/bn4life.json"] = JSON.stringify({ zeit: g.wall - 10 * 60000 });
+  const m = neuerMock({ ...g, maxSchlaf: runden, beiSchlaf: (ms, z, vor) => vor(10000) });
+  m.zustand.prozesse.push({ pid: 999, filename: "bn4life.js", host: "home", threads: 1, args: [], gb: 0 });
+  const { modul } = await ladeAusBeiden(ROOT, "bn4net.js");
+  const zurueck = m.uhrStellen();
+  try {
+    await modul.main(m.ns);
+  } catch (e) {
+    if (!e.mockAbbruch) throw e;
+  } finally {
+    zurueck();
+  }
+  return m;
+}
+
+console.log("");
+console.log("-- bn4life-Prozess neu gesehen, Telemetrie 10 min alt --");
+{
+  const m = await fahreAlt(3);
+  const starts = m.zustand.gestartet.filter((g) => g.datei === "darkweb.js");
+  pruefe("darkweb.js startet in den ersten 30 s NICHT (Schonfrist 2 min)", starts.length === 0,
+    starts.length + " Starts");
+}
+{
+  const m = await fahreAlt(16);
+  const starts = m.zustand.gestartet.filter((g) => g.datei === "darkweb.js");
+  pruefe("haengt bn4life laenger als 2 min ohne Telemetrie, greift der Notnagel wieder",
+    starts.length >= 1, starts.length + " Starts nach 160 s");
 }
 
 console.log("");

@@ -1644,6 +1644,11 @@ export async function main(ns) {
     const ramHack = ns.getScriptRam("worker/hack.js", "home");
     const ramGrow = ns.getScriptRam("worker/grow.js", "home");
     const ramWeaken = ns.getScriptRam("worker/weaken.js", "home");
+    // Fix B2 (Audit 26.09.2026, 2#1): der Dauerlaeufer fuer den
+    // Erfahrungsofen - siehe worker/expfarm.js und der Ueberschuss-Zweig
+    // weiter unten, wo er tatsaechlich verdrahtet wird.
+    const EXPFARM_SKRIPT = "worker/expfarm.js";
+    const ramExpfarm = ns.getScriptRam(EXPFARM_SKRIPT, "home");
 
     // --- Kennzahlen je Ziel ---------------------------------------------------
     // Zwei Zahlen je Server, beide fuer den SAUBEREN Dauerbetrieb gerechnet
@@ -2330,6 +2335,31 @@ export async function main(ns) {
         };
       };
 
+      // ERST RAEUMEN, DANN VERTEILEN (Fix B2, Audit 26.09.2026 2#1). Der
+      // Erfahrungsofen laeuft seit diesem Fix als Dauerlaeufer
+      // (worker/expfarm.js, ns.grow) statt als Einwegwelle - er wuerde sonst
+      // zwischen den Runden liegen bleiben (siehe Kopfkommentar dort: 5-10 %
+      // Auslastung, gemessen). Ein Dauerlaeufer haelt seinen Speicher aber
+      // BELEGT, solange niemand ihn beendet - und ns.getServerUsedRam kann
+      // nicht unterscheiden, ob das belegte GB einem Geldziel oder dem Ofen
+      // gehoert. Ohne diesen Schritt wuerde jede GB, die der Ofen einmal
+      // bekommen hat, fuer Geld- und Stapelziele in JEDER folgenden Runde
+      // unsichtbar bleiben - genau das Verhungern, vor dem der Auftrag warnt.
+      //
+      // Deshalb wird der Ofen JEDE Runde VOR der Speicherzaehlung komplett
+      // beendet und erst ganz am Ende (Ueberschuss-Zweig) mit dem dann noch
+      // freien Speicher neu aufgebaut - dasselbe Muster wie worker/share.js
+      // weiter unten ("Ganz raeumen und im naechsten Durchgang gedeckelt neu
+      // aufbauen"), nur netzweit und ohne Budgetpruefung, weil der Ofen ohne
+      // jeden Deckel den kompletten Rest bekommt. Money- und Stapelziele
+      // sehen den vollen Netzspeicher dieser Runde, IMMER zuerst - der Ofen
+      // bekommt nachrangig, was uebrig bleibt, exakt wie vorher, nur nicht
+      // mehr als tote Fadenleiche zwischen den Runden.
+      for (const host of hosts) {
+        if (!ns.hasRootAccess(host)) continue;
+        try { ns.scriptKill(EXPFARM_SKRIPT, host); } catch { /* Host weg - naechste Runde */ }
+      }
+
       // Durchgang 1: share und Erfahrungsziel je Rechner, wie bisher. Was
       // danach frei bleibt, wird nur GEMERKT statt sofort vergeben - die
       // Geldziele brauchen im Durchgang 2 den Gesamtbetrag, um ihre
@@ -2342,7 +2372,13 @@ export async function main(ns) {
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
           - (host === "home" ? reserveHome() : 0)
           - (host === werkbank ? werkbankReserve : 0);
-        if (host !== "home") ns.scp(WORKER, host, "home");
+        // EXPFARM_SKRIPT extra dazu (Fix B2): es steht bewusst nicht in
+        // WORKER - WORKER zaehlt auch mit, was schon je Geldziel FLIEGT
+        // (flight-Zaehlung weiter unten), und der Ofen soll dort NICHT
+        // mitgezaehlt werden. Er hat sein eigenes Budget (den kompletten
+        // Ueberschuss) und keine Kapazitaetsgrenze - eine Vermischung mit der
+        // Geldziel-Zaehlung wuerde deren Kennzahlen verfaelschen.
+        if (host !== "home") ns.scp([...WORKER, EXPFARM_SKRIPT], host, "home");
 
         // Home bleibt verschont, genau wie die Werkbank oben: Es ist die
         // Steuerung selbst und die Reserve dort ist schon knapp genug
@@ -3163,16 +3199,39 @@ export async function main(ns) {
         //
         // Erfahrung saettigt nicht: calculateHackingExpGain (Hacking.ts:29-38)
         // haengt allein an baseDifficulty und wird von hack, grow UND weaken
-        // gleichermassen vergeben - der Zustand des Servers ist ihr egal, ein
-        // leergehacktes Ziel liefert genauso viel wie ein volles. Deshalb
-        // braucht dieser Zweig keinen Deckel; er nimmt, was sonst niemand
-        // will.
-        if (budget >= expRam && expTarget && expScript && expRam > 0) {
-          const dauer = actionTime(expTarget, expScript);
+        // gleichermassen vergeben - der Zustand des Servers ist ihr egal.
+        // FUER GROW UND WEAKEN STIMMT DAS UNEINGESCHRAENKT (NetscriptFunctions.ts
+        // :291, :366 - keine Erfolgspruefung). Fuer hack NICHT: Ein leergehacktes
+        // Ziel (moneyDrained === 0) gibt seit jeher nur ein VIERTEL
+        // (NetscriptHelpers.tsx:639-641) - hier stand bis zum Fix B2 (Audit
+        // 26.09.2026 2#1) das Gegenteil ("liefert genauso viel wie ein
+        // volles"). Der Ofen unten nutzt deshalb bewusst NUR grow: Erfahrung
+        // bedingungslos, und auf einem vollen Ziel erhoeht grow die Sicherheit
+        // gar nicht erst (ServerHelpers.ts:209-214 - Sicherheit steigt nur mit
+        // den Zyklen, die tatsaechlich etwas nachwachsen lassen), also braucht
+        // dieser Zweig auch keine Gegen-weaken-Faeden. Deshalb braucht dieser
+        // Zweig keinen Deckel; er nimmt, was sonst niemand will.
+        //
+        // DAUERLAEUFER STATT EINWEGWELLE (Fix B2). Hier stand eine einzelne
+        // exec-Welle mit expScript (hack/grow/weaken je nach Zustand des
+        // Ziels, pickScript oben) - die Aktion dauert bei hohem Level oft nur
+        // Sekundenbruchteile, das Skript endet, und der Speicher liegt bis zur
+        // naechsten Runde (mindestens zehn Sekunden) tot. Gemessen: 5-10 %
+        // Auslastung auf der Haelfte des Netzes (siehe worker/expfarm.js,
+        // Kopfkommentar). worker/expfarm.js laeuft dagegen in einer
+        // Endlosschleife und ruft ns.grow wieder und wieder, bis diese Runde
+        // es beendet (siehe der Raeum-Schritt vor Durchgang 1 oben) - RAM
+        // bleibt fuer die GANZE Rundendauer ausgelastet, nicht nur fuer eine
+        // Aktion.
+        if (budget >= ramExpfarm && expTarget && ramExpfarm > 0) {
           wuensche.push({
-            ziel: expTarget, skript: expScript, ram: expRam,
-            offen: Math.floor(budget / expRam),
-            dauer: Math.round(dauer), landAt: Math.round(Date.now() + dauer),
+            ziel: expTarget, skript: EXPFARM_SKRIPT, ram: ramExpfarm,
+            offen: Math.floor(budget / ramExpfarm),
+            // dauer/landAt sind fuer expfarm.js bedeutungslos (main() liest
+            // nur ns.args[0]) - hier trotzdem gesetzt, weil die
+            // Platzierungsschleife unten alle Wuensche ueber dasselbe
+            // exec-Protokoll schickt.
+            dauer: 0, landAt: Date.now(),
           });
           ueberschussGb = Math.round(budget);
           budget = 0;

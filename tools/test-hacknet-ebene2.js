@@ -173,6 +173,28 @@ console.log("-- 5. der ERSTE Server: nur in BitNode 9 (26.09.2026, Audit-Fund 5#
 }
 
 console.log("");
+console.log("-- 6. ausserhalb BN9 ohne Kapazitaet: Marker setzen und beenden (26.09.2026, Audit-Fund 5#6, C3-Nachtrag) --");
+{
+  // Der SF9.3-Gratis-Server ist weg (kapazitaet 0), und ausserhalb BN9 kauft
+  // dieses Skript nie einen neuen ("NUR in BitNode 9", s. Docstring). Vorher
+  // lief es hier bis zum naechsten Sprung leer weiter (5 min Takt) und hielt
+  // dafuer dauerhaft ~9 GB auf der Werkbank - jetzt setzt es denselben Marker
+  // wie hashes.js und beendet sich, `maxSchlaf: 1` genuegt also schon.
+  const m = await fahre({ knoten: 5, server: [], hashesJson: null, runden: 1 });
+  const marker = m.lies("home", "data/keine-hacknet.txt");
+  pruefe("data/keine-hacknet.txt wird geschrieben", !!marker, String(marker));
+  pruefe("mit der Knotennummer", String(marker || "").trim() === "5", String(marker));
+}
+
+console.log("");
+console.log("-- 6b. in BitNode 9 bleibt es dagegen im Wartezweig (kein Marker) --");
+{
+  const m = await fahre({ knoten: 9, server: [], hashesJson: null, runden: 1 });
+  pruefe("kein Marker in BN9 - hacknet.js kauft dort noch selbst",
+    !m.lies("home", "data/keine-hacknet.txt"));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

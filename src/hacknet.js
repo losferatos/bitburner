@@ -47,6 +47,17 @@ export async function main(ns) {
   sag("hacknet.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
 
+  // DER MARKER, DEN hashes.js SCHON KENNT (26.09.2026, Audit-Fund 5#6, C3
+  // Nachtrag). bn4net.js:3428-3433 liest ihn und startet weder hashes.js
+  // noch hacknet.js erneut in diesem Knoten - ohne diesen Aufruf haette
+  // hacknet.js sonst geschrieben "wartet" und wuerde ewig weiterlaufen.
+  const sperren = () => {
+    let knotenFuerMarke = 0;
+    try { knotenFuerMarke = ns.getResetInfo().currentNode; } catch { knotenFuerMarke = 0; }
+    ns.write("data/keine-hacknet.txt", String(knotenFuerMarke), "w");
+    if (ns.getHostname() !== "home") { try { ns.scp("data/keine-hacknet.txt", "home", ns.getHostname()); } catch { /* egal */ } }
+  };
+
   while (true) {
     try {
       // DER KNOTEN WIRD ZUERST GEPRUEFT (26.09.2026, Audit-Fund 5#6/C3).
@@ -80,10 +91,27 @@ export async function main(ns) {
           if (letzteMeldung !== "erster") { sag("Kein Hacknet-Server - der erste kostet " + (preis / 1e6).toFixed(2) + "m, warte auf Geld."); letzteMeldung = "erster"; }
           await ns.sleep(TAKT_MS); continue;
         }
+        if (knoten !== 9) {
+          // AUSSERHALB BN9 OHNE KAPAZITAET HEISST: KEIN SF9.3-GRATIS-SERVER
+          // (MEHR) DA (26.09.2026, Audit-Fund 5#6, C3-Nachtrag).
+          //
+          // `kapazitaet > 0` (oben) faengt den Gratis-Server aus SF9.3 ab,
+          // solange er lebt (er entsteht bei jedem Sprung, verschwindet erst
+          // beim ersten Einbau, PlayerObjectGeneralMethods.ts:130-131) - dann
+          // verkauft hashes.js seine Hashes ganz normal, unabhaengig vom
+          // Knoten. Ist die Kapazitaet hier 0, ist dieser Server also weg,
+          // und ausserhalb BN9 kauft dieses Skript nie einen neuen (s.o.,
+          // "NUR in BitNode 9"). Ohne Ausstieg liefe es bis zum naechsten
+          // Sprung leer weiter und haette dafuer dauerhaft ~9 GB auf der
+          // Werkbank reserviert. Der Marker ist derselbe, den hashes.js
+          // schon setzt - bn4net.js startet dann keins von beiden erneut in
+          // diesem Knoten.
+          sag("BitNode " + knoten + ": kein Hacknet-Server mehr (SF9.3-Gratis-Server weg) - beende mich, nur BN9 kauft neu.");
+          sperren();
+          return;
+        }
         if (letzteMeldung !== "keine") {
-          sag(knoten === 9
-            ? "Keine Hacknet-Server in diesem Knoten - warte."
-            : "BitNode " + knoten + ": Hacknet-Server zahlen sich hier nicht aus (nur BN9) - kein Kauf.");
+          sag("Keine Hacknet-Server in diesem Knoten - warte.");
           letzteMeldung = "keine";
         }
         await ns.sleep(TAKT_OHNE_SERVER_MS); continue;

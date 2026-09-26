@@ -108,6 +108,23 @@ console.log("-- 1c. BitNode 8: keine Hashes moeglich, Marker und Ende --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- 1d. ausserhalb BN9, Server-Modus, aber kein Server: Marker und Ende (26.09.2026, Audit-Fund 5#6, C3-Nachtrag) --");
+{
+  // `serverModus` ist wahr, sobald SF9 (oder BitNode 9 selbst) das Feature
+  // freischaltet - UNABHAENGIG vom aktuellen Knoten. Vor diesem Fix wartete
+  // hashes.js hier wie in 1b ewig auf hacknet.js, das den ersten Server aber
+  // "NUR in BitNode 9" kauft (hacknet.js) - der SF9.3-Gratis-Server ist weg
+  // (verschwindet beim ersten Einbau), und ausserhalb BN9 kommt kein neuer.
+  const m = await fahre({ knoten: 5, verfahren: "V1 5 1",
+    hacknet: { kapazitaet: 0, serverModus: true } });
+  const marker = m.lies("home", "data/keine-hacknet.txt");
+  pruefe("data/keine-hacknet.txt wird geschrieben", !!marker, String(marker));
+  pruefe("mit der Knotennummer", String(marker || "").trim() === "5", String(marker));
+  pruefe("und nichts wird ausgegeben", m.zustand.hacknet.ausgegeben.length === 0);
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- 2. Anlauf (V2, nicht in der Division): Gym-Training --");
 {
   // 1.280 Hashes, Speicher 1.280 - die Lage vom 19.09. 02:47. Stufen 1-6

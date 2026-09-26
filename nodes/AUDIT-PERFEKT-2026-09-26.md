@@ -71,3 +71,7 @@ Die Branches liegen lokal und auf origin:
 - `worktree-agent-a39c89a13692a6bc8` Paket C. Skeptiker FERTIG: C1, C3, C4 halten. C2 BLOCKER (PRIO.gym 40 verliert immer gegen faktion 30 -> neue Stufe PRIO.beitritt 25; Daedalus-Tor nach joinrun.js statt bn4life +9 GB; Verhaltenstests 29/30/31/BN12/wirft). C5 zurueckstellen (Kern bn4net und Waechter muessen dieselbe Kaltstart-Funktion nutzen). test-ram: geaenderte Dateien in VERALTET_ERLAUBT mit Datum. Nacharbeit lief an und ist UNCOMMITTET im Worktree (bn4life.js, joinrun.js, lib/figur.js, tools/test-figur.js) - pruefen, fertigstellen, committen.
 
 Danach: mergen, `tools/einspielen.js --pruefen`, `tools/neustart.js` mit PID-Beleg, im Spiel nachmessen (Fokus-Anteil, Zielwahl BN5, exp/s), Statusliste abhaken.
+
+## NEU 26.09. 20:40 - SOFORT (vor Ende BN5.3 beheben)
+
+- [ ] F1 bn4door.js hat `w0r1d_d43m0n` in ZIELE (bn4door.js:63-64). installBackdoor auf w0r1d_d43m0n schickt das Spiel auf die BitVerse-Auswahl (Singularity.ts:525-526) statt ueber destroyW0r1dD43m0n mit Zielknoten zu springen. BN5.2 endete so gegen 19:22: Hacking 4504, Red Pill drin, alle Skripte aus, keine pre-jump-Sicherung, ausgang.txt ohne Sprungzeile - das Spiel stand auf der Auswahl, bis Eric von Hand BN5 waehlte. In BN1.2/1.3 gewann exit.js das Rennen (60-s-Takt). Fix: w0r1d_d43m0n aus ZIELE nehmen (Skeptiker Pflicht, laeuft unbeaufsichtigt).

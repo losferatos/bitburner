@@ -50,39 +50,6 @@ import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 10000;
 
-/**
- * Schwelle fuer den Kaltstart-Rueckfall des Waechters (26.09.2026,
- * Audit-Fund 6#7, Paket C.5).
- *
- * Der Waechter kennt seine Phase nur ueber `kernPhaseFrisch()` (der Kern
- * schreibt sie) - fehlt ein frischer Kernblock (Kern tot, oder das kurze
- * Fenster direkt nach einem Sprung), faellt er auf die home-RAM-Groesse
- * zurueck: "<=64 GB" hiess bisher "kaltstart".
- *
- * DAS GALT NUR, SOLANGE HOME NACH EINEM RESET BEI 32 GB STARTET.
- * `Prestige.ts:241-242` setzt home ab Source-File 9 Stufe 2 auf 128 GB -
- * Eric hat SF9.3. Die Schwelle "<=64" war damit in JEDEM Fenster, in dem der
- * Waechter allein zustaendig ist, nie wahr: home stand sofort bei 128 GB, der
- * Waechter haette "normal" angenommen und die Kaltstart-Gewerke (cdump,
- * csolve, darkweb, sleevecrime) genau dann nicht ueberwacht, wenn sie das
- * einzige Einkommen sind.
- *
- * `bn4net.js:571-577` traegt dieselbe Schwelle mit demselben Fehler - siehe
- * den Bericht zu diesem Fix fuer den dortigen Patchvorschlag (bn4net.js ist
- * in dieser Aenderung nicht angefasst, ein anderer Bau haelt die Datei).
- *
- * @param {Map|object|null|undefined} ownedSF aus getResetInfo().ownedSF
- * @returns {number} die Home-RAM-Grenze in GB, bis zu der "kaltstart" gilt
- */
-export function homeKaltstartSchwelleGb(ownedSF) {
-  let sf9 = 0;
-  try {
-    sf9 = (ownedSF && typeof ownedSF.get === "function")
-      ? Number(ownedSF.get(9) || 0) : Number((ownedSF || {})[9] || 0);
-  } catch { sf9 = 0; }
-  return sf9 >= 2 ? 128 : 64;
-}
-
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -418,13 +385,8 @@ export async function main(ns) {
         // Jetzt gilt die Zahl des Kerns, solange sein Block frisch ist. Der
         // eigene Schaetzwert bleibt als Rueckfall - er wird gebraucht, wenn
         // der Kern gar nicht laeuft, und genau dann ist der Waechter dran.
-        //
-        // Die Schwelle ist SF9-abhaengig (26.09.2026, Audit-Fund 6#7): ab
-        // SF9 Stufe 2 startet home nach jedem Reset mit 128 GB statt 32 -
-        // "<=64" waere dann in diesem Fenster nie mehr wahr gewesen.
         phase: kernPhaseFrisch(kern, wall, ri.lastNodeReset)
-          || (ns.getServerMaxRam("home") <= homeKaltstartSchwelleGb(ri.ownedSF)
-            ? "kaltstart" : "normal"),
+          || (ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"),
         dateiDa: (d) => ns.fileExists(d, "home"),
         // Ohne das fiel hashes.js aus der Soll-Liste des Waechters - er
         // haette es nach einem Absturz nie neu gestartet (Skeptiker 19.09.).

@@ -203,11 +203,6 @@ const TESTS = [
     schnell: false,
   },
   {
-    datei: "test-guard-kaltstart-schwelle.js",
-    deckt: "EBENE 0: guard.js homeKaltstartSchwelleGb - SF9>=2 setzt home auf 128 GB, die alte Schwelle 64 griff nie mehr (C.5, 6#7)",
-    schnell: true,
-  },
-  {
     datei: "test-endspurt.js",
     deckt: "Ausgangs-Interlock und Endspurt-Regel, inkl. ns.read-Asymmetrie (C.3)",
     schnell: true,

@@ -1680,8 +1680,6 @@ export async function main(ns) {
     // Fuer phantasy ergibt das rund 1400 GB - und genau in dieser
     // Groessenordnung lief es vor dem Ausbau sauber (934 GB, 313 $/GB*s).
     const KAP_ABZUG = 0.2;
-    const SERVER_MAX_GROWTH_LOG = 0.00349388925425578;
-    const wachstumsLog = (hd) => Math.min(Math.log1p(0.03 / hd), SERVER_MAX_GROWTH_LOG);
     const FORTIFY_HACK = 0.002;
     const FORTIFY_GROW = 0.004;
     const WEAKEN_POWER = 0.05;
@@ -1739,26 +1737,39 @@ export async function main(ns) {
       const k = calcGrowthLog(
         { sec: s.hackDifficulty, growth: s.serverGrowth },
         spielerFuerCalc.multGrow, 1, bnServerGrowthRate);
-      // Alles auf minDifficulty hochrechnen. hackAnalyze & Co. liefern immer
-      // den IST-Wert; ein verschmutzter Server saehe sonst dauerhaft
-      // schlechter aus, als er nach dem Saeubern waere - und wuerde vom
-      // Nutzen-Gate aus dem falschen Grund verworfen. Jeder Faktor haengt
-      // bekannt von der Sicherheit ab:
-      //   p, chance  ~ (100 - hackDifficulty)      (Hacking.ts:50, :15)
-      //   hackTime   ~ 2.5*req*hackDifficulty+500  (Hacking.ts:64-70)
-      //   k          ~ min(log1p(0.03/hd), ServerMaxGrowthLog)
-      //                (grow.ts:16-19, Constants.ts:8)
-      // Der Deckel ServerMaxGrowthLog greift ab hackDifficulty <= 8.571;
-      // ohne ihn waere die Umrechnung fuer omega-net (min 9), silver-helix
-      // (10) und iron-gym (10) falsch.
+      // Alles auf minDifficulty rechnen - NICHT vom IST-Wert hochskalieren
+      // (Fix B1, Audit 26.09.2026 2#2). Hier stand frueher eine Skalierung
+      // "sauber = (100-hdMin)/(100-hdIst)", angewandt auf das schon am
+      // IST-Wert berechnete p/chance. Das geht schief, sobald hdIst >= 100:
+      // BN5 verdoppelt ServerStartingSecurity (Server.ts:79-83 klemmt auf
+      // 100), und bei sec >= 100 geben hackPercent/hackChance am IST-Wert
+      // exakt 0 zurueck (Hacking.ts:13, :46 pruefen sec>=100 explizit) - 0
+      // mal ein beliebiger Skalierungsfaktor bleibt 0. Belegt: 46 von 63
+      // Geldservern in BN5 (99,8 % des moneyMax) standen deshalb dauerhaft
+      // auf steadyEff=null und waren fuer die Zielwahl unsichtbar, obwohl
+      // sie nach dem Saeubern die mit Abstand besten Ziele sind (Faktor 19
+      // gegen das beste sichtbare Ziel, vis.mjs).
+      //
+      // Der Stapel und die offene Mischung landen ihre Auftraege ohnehin auf
+      // minDifficulty, also wird direkt dort gerechnet: dieselben Formeln
+      // wie fuer p/chance/k oben, nur mit sec = hdMin statt hdIst. Das ist
+      // keine Naeherung, sondern dieselbe Quelle (lib/calc.js) am anderen
+      // Punkt ausgewertet - kein zweiter Formelsatz, der auseinanderlaufen
+      // kann.
       const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
-      const sauber = (100 - hdIst) > 0 ? (100 - hdMin) / (100 - hdIst) : 1;
-      const pMin = Math.min(1, p * sauber);
-      const chanceMin = Math.min(1, chance * sauber);
+      const pMin = calcHackPercent(
+        { sec: hdMin, reqSkill: s.requiredHackingSkill },
+        { skill: spielerFuerCalc.skill, multMoney: spielerFuerCalc.multMoney },
+        bnScriptHackMoney);
+      const chanceMin = calcHackChance(
+        { sec: hdMin, reqSkill: s.requiredHackingSkill, root: s.hasAdminRights },
+        spielerFuerCalc);
+      const kMin = calcGrowthLog(
+        { sec: hdMin, growth: s.serverGrowth },
+        spielerFuerCalc.multGrow, 1, bnServerGrowthRate);
       const zeitIst = 2.5 * s.requiredHackingSkill * hdIst + 500;
       const zeitMin = 2.5 * s.requiredHackingSkill * hdMin + 500;
       const hackTimeMin = ns.getHackTime(host) * (zeitIst > 0 ? zeitMin / zeitIst : 1) / 1000;
-      const kMin = k * (wachstumsLog(hdIst) > 0 ? wachstumsLog(hdMin) / wachstumsLog(hdIst) : 1);
       // grow dauert das 3,2-fache, weaken das 4-fache eines hack
       // (Hacking.ts:81-95).
       const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
@@ -1766,11 +1777,11 @@ export async function main(ns) {
       const gbSekProEinheit = hackTimeMin
         * (ramHack + 3.2 * gphMin * ramGrow + 4 * wphMin * ramWeaken);
       const beute = pMin * chanceMin;
-      // null statt 0, wenn sich nichts bestimmen laesst: Bei hackDifficulty
-      // >= 100 gibt hackAnalyze 0 zurueck (Hacking.ts:46). Ein Gate, das
-      // darauf mit "unrentabel" antwortet, wuerde genau diesen Server fuer
-      // immer ungesaeubert liegen lassen. Unbekannt heisst: durchlassen.
-      const brauchbar = p > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
+      // brauchbar haengt jetzt an pMin/chanceMin (dem Zustand, in dem der
+      // Server tatsaechlich bearbeitet wird), nicht mehr am IST-Wert p - das
+      // war der eigentliche Filter-Bug: p war bei hdIst>=100 immer 0, egal
+      // wie gut der Server bei minDifficulty waere.
+      const brauchbar = pMin > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
       return {
         p, chance, k,
         // Dieselben Groessen im VORBEREITETEN Zustand. Der Stapelbetrieb

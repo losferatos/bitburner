@@ -218,6 +218,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b1-security100.js",
+    deckt: "B1 (Audit 26.09.2026 2#2): Server bei Sicherheit 100 bleiben fuer die Zielwahl sichtbar",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

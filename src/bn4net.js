@@ -455,6 +455,9 @@ export async function main(ns) {
   // Speicher wieder hergegeben haben.
   let letzteVerteilung = 0;
   let rundenTaktMs = 10000;
+  // Die letzten gemessenen Takte - die Frist nimmt den KUERZESTEN davon
+  // (Gegenpruefung Skeptiker B, siehe Taktmessung vor Durchgang 1).
+  const taktProben = [];
   // Zielwahl mit Hysterese (Skeptiker B, Einwand 3): die amtierenden Geld-
   // und Stapelziele mit Eintrittszeit und der beim Eintritt geschaetzten
   // Vorbereitung (host -> {start, prepSec}). Nach einem Neustart leer - dann
@@ -2436,9 +2439,24 @@ export async function main(ns) {
       // Dafuer wird hier der Takt gemessen: von dieser Stelle bis zu ihr in
       // der naechsten Runde. Gedeckelt, damit ein einzelner Aussetzer (Tab im
       // Hintergrund, eine Minute Takt) die Frist nicht auf Dauer verzieht.
+      //
+      // DER KUERZESTE DER LETZTEN SECHS TAKTE, NICHT DER LETZTE (Gegenpruefung
+      // Skeptiker B, 26.09.2026). Die Kosten sind ungleich verteilt: endet der
+      // Ofen zu frueh, liegt der Speicher bis zur Zaehlung ein paar hundert
+      // ms brach; endet er zu spaet, ist sein Speicher bei der Zaehlung noch
+      // belegt, wird in dieser Runde nicht neu vergeben und liegt danach fast
+      // eine ganze Runde brach. Mit dem letzten Takt machte schon eine
+      // einzelne lange Runde (Speicherbereinigung, 1-s-Raster eines verdeckten
+      // Tabs) die naechste Frist zu lang. Nachgespielt mit dem echten Kern
+      // (Spielstand 18:04, 30 min): Rundenlaenge 10 s + gleichverteilt 0-1 s
+      // kostete 10,6 % Erfahrung, 0-2 s 19,6 %; mit dem kuerzesten der letzten
+      // sechs 1,0 % und 4,9 %. Ein Takt ist nie kuerzer als ns.sleep(10000),
+      // der Kuerzeste liegt also nur um die Streuung unter dem Mittel.
       const jetztVerteilung = Date.now();
       if (letzteVerteilung > 0) {
-        rundenTaktMs = Math.min(120000, Math.max(2000, jetztVerteilung - letzteVerteilung));
+        taktProben.push(Math.min(120000, Math.max(2000, jetztVerteilung - letzteVerteilung)));
+        if (taktProben.length > 6) taktProben.shift();
+        rundenTaktMs = Math.min(...taktProben);
       }
       letzteVerteilung = jetztVerteilung;
 
@@ -2449,6 +2467,23 @@ export async function main(ns) {
       const restFrei = new Map();
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
+        // OFENFAEDEN OHNE GUELTIGE FRIST RAEUMEN (Gegenpruefung Skeptiker B,
+        // 26.09.2026). Seit der Kern den Ofen nicht mehr toetet, beendet sich
+        // ein Ofenfaden NUR ueber seine Frist (worker/expfarm.js). Laeuft einer
+        // ohne - die Fassung vor dem Umbau (for(;;), liest nur args[0]) liegt
+        // bis zum Einspielen im Spiel, und ein Einspielen in zwei Schritten
+        // oder ein Neustart des Kerns dazwischen startet sie mit dem neuen
+        // Protokoll -, haelt er seinen Speicher fuer immer, und jede Runde
+        // kaeme neuer dazu. Dasselbe fuer eine Frist weit in der Zukunft
+        // (Uhr zurueckgestellt). Grenze: zwei gedeckelte Takte (2 x 120 s).
+        // ns.ps und ns.kill zahlt der Kern ohnehin; die Liste dient unten
+        // auch der share-Zaehlung.
+        const prozesseHier = ns.ps(host);
+        for (const pr of prozesseHier) {
+          if (pr.filename !== EXPFARM_SKRIPT) continue;
+          const frist = Number(pr.args[1]);
+          if (!(frist > 1e12) || frist > jetztVerteilung + 240000) ns.kill(pr.pid);
+        }
         // Die Werkbank ist nicht mehr pauschal ausgenommen, sondern nur noch
         // um ihren gemessenen Werkzeugbedarf gekuerzt (siehe 1c).
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
@@ -2479,7 +2514,7 @@ export async function main(ns) {
         // endlos, ein neues exec je Runde stapelt also alle zehn Sekunden
         // Faeden obendrauf - und wenn die Faktionsarbeit endet, laufen die
         // alten fuer immer weiter und blockieren Speicher ohne jeden Nutzen.
-        const shareLaeuft = ns.ps(host)
+        const shareLaeuft = prozesseHier
           .filter((pr) => pr.filename === "worker/share.js")
           .reduce((n, pr) => n + pr.threads, 0);
 

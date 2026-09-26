@@ -243,6 +243,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b8-ofen-gegenpruefung.js",
+    deckt: "EBENE 2: Gegenpruefung Skeptiker B - Ofenfrist nach dem kuerzesten Takt, Ofenfaeden ohne Frist werden geraeumt",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

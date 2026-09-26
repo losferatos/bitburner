@@ -340,3 +340,198 @@ frueh im Zyklus (echter Geldmangel) feuert die Regel weiter wie die alte - kein 
 - Merge-Probe: gegen `origin/master` (5e4c51c, F1 bn4door) konfliktfrei; gegen Paket C
   nur `src/registry.json` (erzeugte Datei, Konflikt bestand schon zwischen A und C - nach dem
   Merge `node tools/registry-bauen.js`).
+
+---
+
+## Gegenpruefung (26.09.2026, zweiter Skeptiker auf `cloud-skeptiker-a`)
+
+Geprueft: die Nacharbeit fe3e911 (988e16f, d1f0db9) gegen 33d405d. Spielquelle wie oben
+(`dev` 6f930b5, package.json 3.0.2). Alles gerechnet, nichts geschaetzt - mit
+Wegwerfskripten (nicht committet): die 8 Staende dekodiert, A5 ueber alle 8 Staende
+nachgespielt (Kandidaten wie bn4rep: beigetretene Faktionen, Katalog aus
+`Augmentation/Augmentations.ts`, Preis Basis x AugmentationMoneyCost x 1,9^q), alle 136
+Augmentierungen der Quelle durch `istEinbauWertvoll` geschickt, RAM mit `rechne` aus
+`tools/ram.js`, beide Testdateien per `BN4REP_SRC` gegen 33d405d und gegen fe3e911 gefahren.
+
+| # | Stufe | Befund (ein Satz) | Stand |
+|---|---|---|---|
+| G1 | SHOULD-FIX | Der Handschlag - das dritte Tor, das den Einbau verweigern kann - stand weiter HINTER der NFG-Schleife, und die "letzte Graftpruefung" VOR seinen bis zu 90 s Wartezeit. | behoben **685ad40** |
+| G2 | SHOULD-FIX | Seit `return` -> `continue` endet jede Runde am offenen Ausgang vor der Telemetrie; der scharfe Waechter haette bn4rep nach 30 min neu gestartet und dann seinen Wirt gesperrt. | behoben **1769cc1** |
+| G3 | MINOR | Das Einkommen ist ein Zyklusmittel und reagiert traege auf einen Einbruch auf null. | nicht behoben |
+| G4 | MINOR | Zwischen 10x Konto (Ruecklage) und Konto + 600 s Zufluss liegt eine Zone ohne Ruecklage und ohne Einbau; in BN8 haelt boerse.js 85 % in Aktien. | nicht behoben |
+| G5 | MINOR | Die `offenSeit`-Klausel bleibt tot: ein offener, nie genommener Ausgang sperrt den Einbau fuer immer (wie auf master). | nicht behoben |
+| G6 | MINOR | Runden am Tor erneuern `data/geldbedarf.txt` nicht (wie auf master). | nicht behoben |
+| G7 | MINOR | "vorher 32 ROT" (Einwand 7) ist ueberzeichnet: mindestens 9 der 32 pruefen Verhalten, das 33d405d schon hatte. | hier richtiggestellt |
+| G8 | MINOR, ausserhalb Paket A | Die Firmenphase (`continue` im Abschnitt 2b) schreibt `data/bn4rep.json` ebenfalls nicht - dieselbe Waechterfrist, vorbestehend. | nicht behoben |
+
+### G1 - SHOULD-FIX - Handschlag hinter dem Geldausgeben, Graftfenster im Handschlag (behoben 685ad40)
+
+- **Code (fe3e911):** Reihenfolge Tor (Graft, Ausgang) -> EINBAU -> NFG-Schleife (bis 40
+  Stufen samt Spenden) -> Graftpruefung -> `handschlag()` (bis 90 s, `WARTE_MAX_MS`) ->
+  `installAugmentations`. Einwand 5 verlangte "Tore vor dem Geldausgeben"; der Handschlag
+  ist aber selbst ein Tor (`darf: false` bei stummer Bruecke und Sicherung > 6 h,
+  `lib/handschlag.js:279-305`) und blieb dahinter. Folgerichtig war die Ebene-2-Pruefung
+  "Handschlag scheitert" gruen: Daedalus fuehrte dort kein NFG.
+- **Folge 1:** Verweigert er, liegen die NFG-Stufen in der Warteschlange (Staende: 15:12
+  sieben, 17:19 sechs Stufen), jedes weitere Stueck kostet x1,9 je Stufe
+  (`AugmentationHelpers.ts:32-37`), und die Sperre fragt erst nach 1 h wieder - dann kauft
+  die Schleife erneut. Offline-Fenster der Bruecke von 2-10 h stehen in `bridge.log`
+  (z.B. 09-07 04:16 -> 14:04).
+- **Folge 2:** `graft.js` hat die hoehere Figurprioritaet (`lib/figur.js`: graft 10,
+  faktion 30), `graftauto.js` kennt keinen Einbau. Ein Graft, das in den 90 s des
+  Handschlags beginnt, sah keine Pruefung mehr; `installAugmentations` toetet es ohne
+  Erstattung (`Work/GraftingWork.tsx:75-83`). Vorbestehend (master hatte dieselbe
+  Reihenfolge), aber genau im umgebauten Block.
+- **Beleg ROT -> GRUEN** (`tools/test-bn4rep-ebene2.js`, Gegenprobe
+  `BN4REP_SRC=<fe3e911>/src`): Handschlag verweigert mit NFG im Katalog: 6 NFG-Kaeufe -> 0;
+  Bruecke antwortet nach 10 s und im selben Moment beginnt ein Graft: `installAugmentations`
+  1 -> 0; Waechter fuer den Normalfall: Einbau genau einmal, alle NFG-Stufen NACH der
+  Sicherungsanfrage (vorher davor).
+- **Fix:** Tor -> EINBAU -> Handschlag -> Tor -> NFG -> Tor -> `installAugmentations`,
+  zwischen letzter Pruefung und Einbau kein `await`. Das Tor ist eine Funktion
+  (`torGrundJetzt`), die letzte Pruefung fragt jetzt auch den Ausgang. Die pre-install-
+  Sicherung zeigt damit den Stand vor den NFG-Kaeufen - Zurueckspielen gibt das Geld
+  zurueck, verliert also nichts.
+
+### G2 - SHOULD-FIX - Warten am Tor ohne Telemetrie weckt den Waechter (behoben 1769cc1)
+
+- **Code (fe3e911):** `await ns.sleep(15000); continue;` am Tor, vor
+  `ns.write("data/bn4rep.json", ...)` am Rundenende.
+- **Waechter:** `registry.json` fuehrt bn4rep mit `telemetryFile: data/bn4rep.json`,
+  `freshnessMs: 1800000`; `lib/leiter.js` S1 feuert, wenn `zeit` aelter ist (Wanduhr bei
+  sichtbarem Tab), `guard.js:328-330` macht im Modus `enforce` (so steht
+  `data/guard-modus.txt` in den Staenden) Sprosse 1 (Neustart) und 2 (Wirt eine Stunde
+  sperren) scharf. Solange `return` galt, war bn4rep an dieser Stelle meist gar nicht am
+  Laufen, und die Leiter griff ins Leere (so sieht das in den `penalties.json` der Staende
+  aus: "bn4rep.js laeuft nirgends - nichts zu beenden", 06.09., andere Ursache). Mit
+  `continue` laeuft es und wird nach 30 min offenem Ausgang bestraft.
+- **Beleg ROT -> GRUEN:** Ausgang 37 min offen (ausgang.js erneuert `ausgang.json`), die
+  Telemetrie der Vorrunde 15 s alt. 685ad40: Datei 38 min alt, das echte `signale()` aus
+  `lib/leiter.js` meldet S1. 1769cc1: frisch, `state: "wait"`, `wartend: 3`, kein S1.
+- **Fix:** jede Runde am Tor schreibt die letzte volle Telemetrie mit frischer Zeit,
+  Knoten, Warteschlange, Geld und `state: "wait"` / `blockedReason: "locked"` /
+  `warteGrund` (`lib/herzschlag.js`: lebendig ohne Fortschrittspflicht; S1 ueberspringt
+  `wait`). Die naechste volle Runde schreibt die Datei wieder ohne `state`. Kein neuer
+  ns-Aufruf.
+
+### G3 - MINOR - Zyklusmittel reagiert traege auf einen Einkommenseinbruch
+
+- `i(t) = S / t` mit stehendem `scriptProdSinceLastAug`. Faellt das Einkommen auf null
+  (Stapel zerfallen, Ziel wird vorbereitet), feuert die Regel erst, wenn
+  `600 S / t < preis - geld`. Gerechnet mit S und Spielzeit der Staende: 19:03 DMA nach
+  46 min (alt: sofort), 16:57 Neuralstimulator nach 90 min, 00:23 DMA nach 69 min.
+  Mit auch nur einem Teil des Einkommens ist das Stueck vorher bezahlt (Konto waechst),
+  der Fall ist also nur der volle Einbruch; die uebrigen Einbaugruende
+  (`lueckeZuGross`, Favor, Spendenrecht) bleiben unberuehrt.
+- **Nicht behoben:** eine juengere Rate braeuchte wieder einen eigenen Schaetzer mit
+  Aufwaermphase - genau das Problem von Einwand 1. `getTotalScriptIncome()[0]` taugt nicht
+  (Einmal-Arbeiter). Die Richtung ist die sichere (hoechstens alte 4x-Regel).
+
+### G4 - MINOR - Zone ohne Ruecklage; BN8
+
+- `augRuecklage` (`lib/endspurt.js:354`) reserviert nur verdiente Stuecke bis 10x Konto;
+  die Horizontregel schweigt bis Konto + 600 s x Zufluss. Liegt ein verdientes Stueck
+  dazwischen (moeglich, wenn Konto < 66,7 s x Zufluss - nach Spenden haeufig, 16:57:10
+  stand das Konto bei 7 s Zufluss), duerfen bn4net, homegrow, hacknet, graftauto das Geld
+  ausgeben, waehrend bn4rep auf es wartet. Dass sie mithalten koennen, zeigt der
+  15:12-Zyklus: 522 Mrd von 807 Mrd Hackgeld gingen in Server (moneySourceA.servers); in
+  den fuenf anderen Zyklen waren es 0,3-2,7 Mrd. Im Replay der 8 Staende lag kein
+  verdientes wertvolles Stueck in der Zone (dort griff ausserdem die Spendenpause) - nicht
+  beobachtet, und die Folge ist Verzug, bis bn4net keine lohnenden Stufen mehr findet und
+  das Konto die 10x-Grenze erreicht, kein Dauerzustand. BN8: `boerse.js` haelt nur `BARBESTAND` 15 % bar und
+  liest `geldbedarf.txt` nicht; `scriptProdSinceLastAug` enthaelt dort Verkaufsgewinne
+  (`BuyingAndSelling.tsx:176,365`) - das Konto bleibt klein, der Zufluss gross.
+- **Nicht behoben:** die Ruecklage ist ein Vertrag mit sechs Lesern; sie an die
+  Horizontregel zu koppeln ist eine eigene Entscheidung (lib/endspurt.js), kein lokaler Fix.
+
+### G5 - MINOR - `offenSeit` bleibt tot (bestaetigt)
+
+`lage()` liefert kein `offenSeit`, bn4rep fuehrt es nicht; die Aufgabe nach
+`SPERRE_HOECHSTENS_MS` greift nie. Ein offener, abgelehnter Ausgang (`exit_abgelehnt`)
+sperrt den Einbau fuer immer - wie auf master, dort mit Neustartschleife, jetzt als
+sichtbarer Wartezustand (G2: `state wait`, `warteGrund`, Logzeile alle 5 min). Die
+Entscheidung, ob nach 6 h bei offenem Ausgang eingebaut wird (Rechnerpark und Konto weg,
+exit.js braucht beides), bleibt wie im Fix-Stand bei ausgang/endspurt.
+
+### G6 - MINOR - `geldbedarf.txt` am Tor nicht erneuert
+
+Die Runde endet vor `augRuecklage(...)`; die zuletzt geschriebene Ruecklage bleibt stehen,
+waehrend der Ausgang offen ist, und bn4net/homegrow sparen fuer Augmentierungen, die beim
+Sprung ohnehin verfallen, statt fuer den exit.js-Wirt. Identisch auf master (`return` vor
+derselben Zeile). Ob die Ruecklage bei offenem Ausgang fallen soll, ist die Endspurt-Regel
+("Wirtreserve fuer exit.js ... vor dieser Regel", `lib/endspurt.js`), die bn4rep heute gar
+nicht liest (`lohntSich`/`geldIstVerderblich` ohne Aufrufer ausser blade.js) - nicht Paket A.
+
+### G7 - MINOR - "vorher 32 ROT" ist ueberzeichnet
+
+Nachgefahren: 32 ROT gegen 33d405d stimmt, aber `test-bn4rep-einbau.js` kann "Funktion
+fehlt" nicht von "Verhalten war falsch" trennen. Mindestens 9 der 32 pruefen Verhalten,
+das 33d405d schon hatte (gerechnet mit `levelNutzen`/`combatNutzen` und dem alten
+`sollFokusZurueckholen`): Red Pill wertvoll, PCMatrix 0,0748 und Neuralstimulator 0,1331
+wertvoll, LuminCloaking-V1 0 im Hackingknoten, Synfibril 0 / Kampf 0,133, Stanek Genesis
+-1,88, Einbausperre -> kein Fuellstueck (alte Aufrufstelle `!gesperrt &&`), NMI eingebaut
+-> nicht holen, ohne Arbeit -> nicht holen. Die Aussage in Einwand 7 gilt fuer die
+Ebene-2-Datei (9 ROT gegen 33d405d, alle echtes Verhalten - nachgefahren).
+
+### G8 - MINOR, ausserhalb Paket A - Firmenphase ohne Telemetrie
+
+Abschnitt 2b endet mit `sleep(15000); continue` vor derselben Telemetriezeile; eine
+Firmenphase ueber 30 min loest dieselbe S1-Strafe aus. In `penalties.json` (Stand 19:04)
+stehen gegen bn4rep.js 9 S1-Entwarnungen ("stood-down", 08.-23.09.) und 2 Fehlschlaege
+("laeuft nirgends", 06.09.), keine Ausfuehrung; welche Runde die Datei jeweils altern
+liess, ist dort nicht vermerkt. Mit `amTorWarten`
+liegt das Muster jetzt bereit; die Firmenphase ist aber kein Warten, sondern Arbeit - ob
+dort `state: "wait"` oder ein eigener Zustand gilt, gehoert zur Firmenphase.
+
+### Gehalten
+
+1. **`getTotalScriptIncome()[1]`** (`NetscriptFunctions.ts:1240-1251`):
+   `scriptProdSinceLastAug / (playtimeSinceLastAug / 1000)`, nicht endlich -> 0. Gezaehlt
+   wird nur Skript-Hackgeld (`NetscriptHelpers.tsx:655`, nach ScriptHackMoneyGain),
+   Aktienverkaufsgewinn aus Skripten (netto, auch negativ, `BuyingAndSelling.tsx:176,365`)
+   und Offline-Ertrag je laufendem Skript (`ScriptHelpers.ts:67`) - kein Hacknet, keine
+   Corp, keine Gang, keine Arbeit, keine Vertraege; der Offline-Hackertrag der Engine geht
+   nur ins Konto (`engine.tsx:274-280`). Null gesetzt in `prestigeAugmentation`
+   (`PlayerObjectGeneralMethods.ts:125-127`), das auch der Knotensprung aufruft (`:143-145`).
+   Direkt nach Einbau/Sprung 0 -> alte 4x-Regel; Neustart von bn4rep mitten im Zyklus
+   aendert nichts (Spielerfeld); nach Offline-Zeit waechst nur die Spielzeit
+   (`engine.tsx:351-355`) -> Unterschaetzung, sichere Richtung. Werte der Staende: 00:23
+   750,3 / 00:39 140,3 / 15:12 96,8 / 16:57 353,9 / 17:19 771,4 / 18:04 2468,9 /
+   19:03 1040,1 / 19:04 0,007 Mio/s.
+   **Nie strenger als alt:** `max(4 g, g + 600 i) >= 4 g`; das Replay ueber alle 8 Staende
+   (echte Kandidaten, neues Wertmass) feuert nirgends, wo die alte Regel still war. Kein
+   Stillstand frueh im Zyklus (i ~ 0 -> alte Regel).
+2. **Tor-Wartezustand:** Nur `offen` sperrt praktisch - eine sichere eta gibt es erst mit
+   w0r1d_d43m0n am Netz, also nach eingebautem Red Pill, wo `ausgangSteht` den Einbau
+   ohnehin sperrt; der Graft-Fall dauert eine Runde (danach `graftLaeuft` -> `gesperrt`).
+   Puls `hb-rep.txt`, `knoten.json` und `einbau.json` stehen VOR dem Tor (wache.js misst
+   den Puls). bn4net nimmt bei alter Datei `wartend = 99` (vorsichtig); bn4life ersetzt
+   laufende Faktionsarbeit auch ohne `rep-modus.txt` nicht (`bn4life.js:495-521`), und im
+   Kampfknoten gibt es keine. Offen blieb nur G2 (behoben).
+3. **Sperre:** gespiegelt mit `bis` (1 h), geloescht beim Ablauf auf home UND lokal
+   (`loeschAufHome`) und bei jedem Start von boot.js (`boot.js:114-139`, Rueckruf jedes
+   Einbaus) - keine Altsperre ueber Einbau oder Sprung. Die Firmenphase kann sie
+   ueberschreiben und raeumt dann ihre eigene weg: hoechstens ein Handschlag mehr.
+4. **`istEinbauWertvoll`:** `HACK_AUGS` stimmt fuer alle Hack-/Ruf-Multiplikatoren mit der
+   Quelle ueberein; gegen "einer der 7 Multiplikatoren > 1" weichen nur BigD's Big ... Brain
+   und The B1ade of Solomonoff (beide `factions: []`, nicht kaeuflich) und The Red Pill
+   (gewollt) ab. NFG ist nie Kandidat, Red Pill (Preis 0) nie "unbezahlbar".
+5. **A4-Vorbedingungen:** `kampfKnoten` = `bladeburnerTraegtHier()`, falsch nur mit
+   `verfahren.txt` "V1/V1b <aktueller Knoten>" - fehlt oder veraltet die Datei, gilt
+   Kampfknoten (kein Kauf). Red Pill ueber `getOwnedAugmentations(false)`. NMI:
+   `Person.ts:232-239` `ignoreQueued` und `focusPenalty` (`:622-628`) bestaetigt.
+6. **Tests:** Ebene 2 9 ROT gegen 33d405d nachgefahren (alle Verhalten), Ebene 0 siehe G7.
+7. **RAM:** `rechne` aus `tools/ram.js`: 853,95 -> 854,05 GB (SF4.1), 63,45 -> 63,55 GB
+   (SF4.3/BN4), Basis 10,85 = registry.json, `registry-bauen.js --pruefen` gruen. G1/G2
+   aendern nichts (854,05 / 63,55). Nebenbei: `node tools/ram.js` gibt unter Linux nichts
+   aus - die Hauptprobe `import.meta.url === "file:///" + process.argv[1]` ergibt dort
+   `file:////...`; gerechnet wurde deshalb ueber `rechne` direkt.
+
+### Tests nach der Gegenpruefung (1769cc1)
+
+- `node tools/test-bn4rep-einbau.js`: 46/46.
+- `node tools/test-bn4rep-ebene2.js`: 42/42 (gegen fe3e911: 6 rot, gegen 685ad40: 3 rot).
+- `node tools/test-alles.js --schnell`: 27 von 29, rot nur test-ram.js und test-boerse.js
+  (vorbestehend, wie im Fix-Stand).
+- Zusaetzlich: test-matrix-ebene2 117/117, test-guard-ebene2 57/57, test-registry 86/86,
+  test-leiter 96/96.

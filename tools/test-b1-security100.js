@@ -90,11 +90,16 @@ if (exportiert) {
   pruefe("Vorbereitung = weaken bei 100 + grow/weaken bei min (" + soll.toFixed(0) + " s)",
     Math.abs(kz.prepSec - soll) < 1e-6, "prepSec=" + kz.prepSec);
   // Kleines Netz: 680 weaken-Faeden (34 Sicherheit / 0,05) x 1,8 GB = 1.224 GB
-  // passen nicht in 700 GB -> zwei Wellen hintereinander.
+  // passen nicht in 700 GB -> zwei Wellen hintereinander. Seit der
+  // Gegenpruefung (26.09.2026) geht auch das Wachsen in Wellen: von 2 % auf
+  // 95 % sind log(0,95/0,02)/kMin grow-Faeden plus 0,08 weaken je Faden -
+  // bei ecorp rund 1.650 Faeden = 3,2 TB, in 700 GB also fuenf Wellen.
   const kzKlein = C.targetMetrics(ECORP, SP, tIst, { ...CFG, prepRamGb: 700 });
-  pruefe("kleines Netz: zwei weaken-Wellen statt einer",
-    Math.abs(kzKlein.prepSec - (kz.prepSec + 4 * tIst)) < 1e-6,
-    "klein " + kzKlein.prepSec + " gross " + kz.prepSec);
+  const growGb = Math.log(0.95 / 0.02) / kz.kMin * (1.8 + (0.004 / 0.05) * 1.8);
+  const growWellen = Math.ceil(growGb / 700);
+  pruefe("kleines Netz: zwei weaken-Wellen und " + growWellen + " grow-Wellen statt je einer",
+    growWellen >= 2 && Math.abs(kzKlein.prepSec - (2 * 4 * tIst + growWellen * 4 * tMin)) < 1e-6,
+    "klein " + kzKlein.prepSec + " gross " + kz.prepSec + " growGb " + growGb.toFixed(0));
 
   const OPT = { horizonSec: 1800, prepMaxSec: 1200 };
   pruefe("neues Ziel mit Vorbereitung > 20 min: Rang 0 (Brennen-und-Sperren ausgeschlossen)",

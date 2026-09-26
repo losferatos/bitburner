@@ -27,7 +27,7 @@
  *
  * @param {NS} ns
  */
-import { targetMetrics, targetRank, selectMoneyTargets } from "lib/calc.js";
+import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
   leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
@@ -463,6 +463,13 @@ export async function main(ns) {
   // Anlauffrist je Ziel, beim Anlaufbeginn aus der Vorbereitungszeit
   // festgelegt (siehe FRIST unten).
   const anlaufFrist = new Map();
+  // Wann ein Ziel zuletzt IM ANLAUF gesehen wurde (Gegenpruefung Skeptiker
+  // B, 26.09.2026) - Ziel -> Zeitstempel. anlaufSeit wurde nur geloescht, wenn
+  // das Ziel als offenes Geldziel im Dauerbetrieb, am Nutzen-Gate oder an der
+  // Frist vorbeikam. Wurde es dazwischen Stapelziel oder fiel es aus der
+  // Liste, blieb der alte Zeitstempel stehen, und bei der Rueckkehr stand
+  // die Frist sofort als abgelaufen da (siehe FRIST unten).
+  const anlaufZuletzt = new Map();
   // Wann dieser Kern welchen bn4life-Prozess zum ersten Mal gesehen hat
   // (Skeptiker B, Einwand 8) - pid -> Zeitstempel.
   const lifeErstGesehen = new Map();
@@ -1848,13 +1855,18 @@ export async function main(ns) {
       try { kz = kennzahlen(host, s); } catch { kz = null; }
       if (kz && kz.steadyEff > 0) {
         const amt = zielSeit.get(host);
-        const rang = targetRank(kz, ZIELWAHL, amt ? {
+        const amtierend = amt ? {
           restSec: amt.prepSec - (Date.now() - amt.start) / 1000,
           bonus: batchStand.has(host) ? ZIELWAHL.bonusBatch : ZIELWAHL.bonusMoney,
-        } : null);
+        } : null;
+        const rang = targetRank(kz, ZIELWAHL, amtierend);
         if (rang > 0) {
+          // prepSec bleibt die Schaetzung am jetzigen Zustand (sie wird beim
+          // Eintritt in zielSeit gemerkt); prepWahl ist das, was davon fuer
+          // ein amtierendes Ziel noch zaehlt - danach teilt selectMoneyTargets
+          // in vorbereitet/unvorbereitet ein (siehe effectivePrepSec).
           moneyCandidates.push({ host, moneyValue: kz.steadyEff, kapazitaet: kz.kapazitaet,
-            rank: rang, prepSec: kz.prepSec });
+            rank: rang, prepSec: kz.prepSec, prepWahl: effectivePrepSec(kz.prepSec, amtierend) });
         }
       }
     }
@@ -1874,8 +1886,12 @@ export async function main(ns) {
     // bekommen nur einen Teil der Plaetze, solange vorbereitete da sind -
     // sonst verdraengen sie beim Wechsel alle Ziele, die gerade verdienen
     // (18:04 nachgerechnet: 1 von 25 statt 17 von 18 arbeitend).
+    // Eingeteilt wird nach prepWahl, nicht nach dem Augenblickswert: ein
+    // laufendes Stapelziel zwischen zwei Wellen ist nicht unvorbereitet
+    // (Gegenpruefung Skeptiker B - sonst pendelt der achte Platz).
     let moneyTargets = selectMoneyTargets(
-      moneyCandidates.filter((c) => c.host !== expTarget && !gesperrtBis.has(c.host)),
+      moneyCandidates.filter((c) => c.host !== expTarget && !gesperrtBis.has(c.host))
+        .map((c) => ({ host: c.host, rank: c.rank, prepSec: c.prepWahl })),
       { maxTargets: MONEY_TARGET_COUNT, maxUnprepared: ZIELWAHL.maxUnprepared,
         unpreparedSec: ZIELWAHL.unpreparedSec });
 
@@ -3169,14 +3185,37 @@ export async function main(ns) {
             // gesperrt und kam danach als Bestes zurueck. Jetzt gilt beim
             // Anlaufbeginn max(20 min, 1,5 x geschaetzte Vorbereitung); die
             // Zielwahl laesst ohnehin nichts ueber 20 min Vorbereitung herein.
+            //
+            // DIE FRIST ZAEHLT NUR ZUSAMMENHAENGENDEN ANLAUF (Gegenpruefung
+            // Skeptiker B, 26.09.2026). Nachgespielt mit dem echten Kern nach
+            // einem Knotenwechsel: sigma-cosmetics lief 4 min an, war dann
+            // 45 min Stapelziel (vorbereitet, verdiente), fiel auf ein
+            // offenes Ziel zurueck und wurde in derselben Runde "nach 48 min
+            // ohne Erfolg" fuer 30 min gesperrt - joesguns genauso nach 50 min.
+            // Der Zeitstempel stammte aus der ersten Anlaufrunde. Jetzt
+            // beginnt die Frist neu, wenn das Ziel laenger als ANLAUF_LUECKE_MS
+            // nicht im Anlauf war. Kurzes Pendeln (eine Runde draussen) setzt
+            // sie NICHT zurueck - sonst liefe ein Ziel, das jede zweite Runde
+            // herausfaellt, ewig an.
+            const ANLAUF_LUECKE_MS = 5 * 60000;
+            const zuletzt = anlaufZuletzt.get(ziel);
+            if (zuletzt != null && Date.now() - zuletzt > ANLAUF_LUECKE_MS) {
+              anlaufSeit.delete(ziel);
+              anlaufFrist.delete(ziel);
+            }
+            anlaufZuletzt.set(ziel, Date.now());
             const seit = anlaufSeit.get(ziel);
             if (seit == null) {
               anlaufSeit.set(ziel, Date.now());
-              anlaufFrist.set(ziel, Math.max(ANLAUF_FRIST_MS, 1500 * (plan.prepSec || 0)));
+              // Eine unendliche Schaetzung (kein Wachstum, k = 0) darf die
+              // Frist nicht abschaffen - dann gilt die feste.
+              const prepMs = 1500 * (plan.prepSec || 0);
+              anlaufFrist.set(ziel, Math.max(ANLAUF_FRIST_MS, Number.isFinite(prepMs) ? prepMs : 0));
             } else if (Date.now() - seit > (anlaufFrist.get(ziel) || ANLAUF_FRIST_MS)) {
               gesperrtBis.set(ziel, Date.now() + ANLAUF_SPERRE_MS);
               anlaufSeit.delete(ziel);
               anlaufFrist.delete(ziel);
+              anlaufZuletzt.delete(ziel);
               sag(ziel + ": Anlauf nach " + Math.round((Date.now() - seit) / 60000)
                 + " min ohne Erfolg abgebrochen, " + Math.round(ANLAUF_SPERRE_MS / 60000)
                 + " min gesperrt.");

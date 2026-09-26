@@ -463,7 +463,25 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
     const wellen = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbWelle / cfg.prepRamGb)) : 1;
     prepSec += wellen * WEAKEN_TIME_FACTOR * hackTimeIstSec;
   }
-  if (moneyFrac < cfg.moneyLow) prepSec += WEAKEN_TIME_FACTOR * hackTimeMin;
+  // GROW IN WELLEN, NICHT EINE WELLE PAUSCHAL (Gegenpruefung Skeptiker B,
+  // 26.09.2026). Hier stand eine einzige grow/weaken-Dauer, egal wie viel
+  // wachsen muss. Nach einem Knotenwechsel steht aber jeder Server auf 2 %
+  // Guthaben (BN5: ServerStartingMoney 0,5 gegen 25-faches Maximum,
+  // Server.ts:76-77), und bei wachstum 20 und Level 290 braucht hong-fang-tea
+  // bis 95 % rund 4.500 grow-Faeden = 8,7 TB - in einem Netz von 1 TB. Die
+  // alte Rechnung gab 47 s ("vorbereitet"), die Nachspielung mit dem echten
+  // Kern sah das Ziel nach 20 min bei 2,8 % und in der Anlaufsperre.
+  // Faedenzahl wie planMix in bn4net.js (log(MIX_MONEY_HIGH/Guthaben)/k, k
+  // am Minimum), plus das weaken fuer die grow-Sicherheit (0,004/0,05 je
+  // Faden), in Wellen zu cfg.prepRamGb wie beim weaken oben.
+  if (moneyFrac < cfg.moneyLow) {
+    const growFaeden = kMin > 0
+      ? Math.log(cfg.mixMoneyHigh / Math.max(moneyFrac, 1e-9)) / kMin : Infinity;
+    const gbGrow = growFaeden
+      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / SERVER_WEAKEN_AMOUNT) * cfg.ramWeakenT);
+    const wellenGrow = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbGrow / cfg.prepRamGb)) : 1;
+    prepSec += wellenGrow * WEAKEN_TIME_FACTOR * hackTimeMin;
+  }
 
   return {
     p: pct, chance, k,
@@ -471,6 +489,29 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
     steadyEff: brauchbar ? (s.moneyMax * cfg.mixMoneyHigh * beute) / gbSekProEinheit : null,
     kapazitaet: brauchbar ? (cfg.kapAbzug * gbSekProEinheit) / (hackTimeMin * beute) : 0,
   };
+}
+
+/**
+ * Die Vorbereitung, die fuer ein Ziel NOCH zaehlt: fuer ein neues Ziel die
+ * geschaetzte, fuer ein amtierendes nur der Rest seiner Eintrittsschaetzung
+ * (nie mehr als der Zustand jetzt verlangt, nie unter 0).
+ *
+ * WARUM EINE EIGENE FUNKTION (Gegenpruefung Skeptiker B, 26.09.2026). Der
+ * Rang rechnete schon so, die Einteilung "vorbereitet / unvorbereitet" in
+ * selectMoneyTargets aber mit dem Augenblickswert. Ein laufendes Stapelziel
+ * steht zwischen zwei landenden weaken-Wellen kurz ueber Minimum + 1 und
+ * hatte dann 94-122 s "Vorbereitung": es belegte fuer eine Runde einen der
+ * acht Plaetze fuer unvorbereitete Ziele, das achte fiel heraus und kam in
+ * der naechsten Runde zurueck. Nachgespielt mit dem echten Kern (Spielstand
+ * 19:03, 90 min): 746 Ein- und Austritte bei 25 Geldzielen, einzelne Server
+ * pendelten 72-mal. Rang und Einteilung lesen jetzt dieselbe Zahl.
+ *
+ * @param {number} prepSec geschaetzte Vorbereitung im jetzigen Zustand
+ * @param {null | {restSec: number}} incumbent null fuer ein neues Ziel
+ */
+export function effectivePrepSec(prepSec, incumbent = null) {
+  if (!incumbent) return prepSec;
+  return Math.max(0, Math.min(prepSec, incumbent.restSec));
 }
 
 /**
@@ -507,7 +548,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
 export function targetRank(kz, opts, incumbent = null) {
   if (!(kz.steadyEff > 0)) return 0;
   if (incumbent) {
-    const rest = Math.max(0, Math.min(kz.prepSec, incumbent.restSec));
+    const rest = effectivePrepSec(kz.prepSec, incumbent);
     return kz.steadyEff * (incumbent.bonus || 1) * Math.max(0, 1 - rest / opts.horizonSec);
   }
   if (kz.prepSec > opts.prepMaxSec) return 0;

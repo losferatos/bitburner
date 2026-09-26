@@ -507,13 +507,14 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 11 Minuten nichts geschrieben (Inhaltsstempel 2026-09-26T17:25:02.326Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 438 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 388 Minuten nichts geschrieben (Inhaltsstempel 2026-09-24T23:35:17.979Z). Entweder steht der Motor oder der Tab ist eingefroren.
 
 ### Spiel-Tab nicht verbunden
 

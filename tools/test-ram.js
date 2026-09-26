@@ -162,10 +162,6 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     const VERALTET_ERLAUBT = [
       "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
       "csolve.js", "cdump.js",
-      // 26.09.2026, Paket A + Skeptiker-Nacharbeit: isFocused/setFocus (+0,2
-      // Sing), getTotalScriptIncome (+0,1 Basis) - gerechnet 854,05 / 63,55,
-      // Registry und ARCHITEKTUR.md 3.3 nachgezogen; Live-Messung steht aus.
-      "bn4rep.js",
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,

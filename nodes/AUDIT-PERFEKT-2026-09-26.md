@@ -60,3 +60,14 @@ Reihenfolge = Wirkung auf die naechsten Knoten (BN5.3, BN12.1-3 sind V1).
 - [ ] E8 levelNutzen bis Red Pill: Ruf ist der Engpass (3#10)
 
 VERWORFEN: Sleeves in V1 umbelegen (5#3, 3: unter 0,4 % Wirkung).
+
+## PAUSE 26.09.2026 abends (Wochenkontingent 93 %) - hier morgen weitermachen
+
+Nichts davon ist im Spiel; der Live-Bot laeuft unveraendert auf master.
+Die Branches liegen lokal und auf origin:
+
+- `worktree-agent-a835831a3142b1944` Paket A (A1-A7, 3 Commits, Test tools/test-bn4rep-einbau.js 34 gruen). Skeptiker lief an, abgebrochen, NEU STARTEN. Schwerpunkte: setFocus alle 15 s gegen DOM-Skripte (popups, punish, backdoor, shop, travel ...); A5-Horizont darf frueh im Knoten keinen Stillstand erzeugen; A6 Red-Pill-Zwangseinbau. Dazu nachtragen: bn4rep.js ~1396 `return` in main bei Handschlag-Fehlschlag -> weiterlaufen statt Prozessende (Begleiter zu C4).
+- `worktree-agent-a693114a22f784410` Paket B (B1, B2, B3, B6). Skeptiker abgebrochen, NEU STARTEN. Eigener Verdacht B2: expfarm wird jede ~10-s-Runde getoetet und neu gestartet; ist grow-Zeit > Rundenlaenge (direkt nach Einbau), liefert der Ofen NULL Erfahrung - mit echten Spielstandzahlen rechnen. B1: Vorbereitungskosten (weaken 100->min) in der Zielwahl? Nullfenster nach Einbau?
+- `worktree-agent-a39c89a13692a6bc8` Paket C. Skeptiker FERTIG: C1, C3, C4 halten. C2 BLOCKER (PRIO.gym 40 verliert immer gegen faktion 30 -> neue Stufe PRIO.beitritt 25; Daedalus-Tor nach joinrun.js statt bn4life +9 GB; Verhaltenstests 29/30/31/BN12/wirft). C5 zurueckstellen (Kern bn4net und Waechter muessen dieselbe Kaltstart-Funktion nutzen). test-ram: geaenderte Dateien in VERALTET_ERLAUBT mit Datum. Nacharbeit lief an und ist UNCOMMITTET im Worktree (bn4life.js, joinrun.js, lib/figur.js, tools/test-figur.js) - pruefen, fertigstellen, committen.
+
+Danach: mergen, `tools/einspielen.js --pruefen`, `tools/neustart.js` mit PID-Beleg, im Spiel nachmessen (Fokus-Anteil, Zielwahl BN5, exp/s), Statusliste abhaken.

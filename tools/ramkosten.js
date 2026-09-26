@@ -42,7 +42,7 @@
 
 import fs from "node:fs";
 import path from "node:path";
-import { fileURLToPath } from "node:url";
+import { fileURLToPath, pathToFileURL } from "node:url";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -137,7 +137,12 @@ export function alleNamen(baum) {
 }
 
 // --- Aufruf von der Kommandozeile ------------------------------------------
-if (import.meta.url === "file:///" + process.argv[1].replace(/\\/g, "/")) {
+// PORTABEL STATT "file:///" + argv[1] (26.09.2026, Nacharbeit Auftrag C,
+// Begruendung in tools/ram.js an derselben Stelle): unter POSIX haette der
+// alte Vergleich wegen des doppelten Slashes nie gestimmt und den ganzen
+// Block stumm uebersprungen. `pathToFileURL` liefert auf jeder Plattform die
+// URL, die `import.meta.url` fuer dieselbe Datei auch liefert.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const baum = baueBaum();
   const args = process.argv.slice(2);
   if (!args.length) {

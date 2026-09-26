@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { rechne, SRC } from "./ram.js";
 import { baueBaum, kosten } from "./ramkosten.js";
 
@@ -372,6 +373,48 @@ console.log("-- das Kaltstart-Tor E1 --");
     + geldquelle.toFixed(2) + " = " + nachBoot.toFixed(2)
     + " von 32; ein Arbeiter (" + arbeiter.toFixed(2) + ") passt daneben nicht.");
   console.log("       Der Kaltstart verdient an Vertraegen, nicht am Hacken.");
+}
+
+console.log("");
+console.log("-- ram.js/ramkosten.js als Hauptmodul (26.09.2026, Nacharbeit Auftrag C) --");
+{
+  /**
+   * DIE ALTE HAUPTMODUL-ERKENNUNG LIEF UNTER POSIX NIE.
+   *
+   * `import.meta.url === "file:///" + process.argv[1].replace(...)` baut
+   * unter POSIX vier Slashes ("file:////home/...", weil `process.argv[1]`
+   * dort schon mit einem fuehrenden Slash beginnt), `import.meta.url` liefert
+   * aber drei ("file:///home/..."). Der ganze CLI-Block in beiden Dateien lief
+   * dadurch NIE - und zwar STUMM: kein Fehler, keine Ausgabe, exit 0. Genau
+   * das ist der gefaehrliche Fall: `node tools/ram.js --registry` sah aus wie
+   * ein Aufruf, lieferte aber nichts, und ohne diesen Test waere das erst
+   * aufgefallen, wenn jemand die (leere) Ausgabe tatsaechlich brauchte.
+   *
+   * Reine Funktionspruefung reicht hier nicht, weil der Fehler GENAU im
+   * `if`, das den CLI-Block betritt, sass - ein echter Subprozess-Aufruf ist
+   * der einzige Weg, das zu pruefen (dasselbe Muster wie
+   * tools/test-ram-namen.js und tools/test-lader.js).
+   */
+  const laufe = (datei, args) => {
+    try {
+      return { code: 0, aus: execFileSync("node", [path.join(ROOT, "tools", datei), ...args],
+        { encoding: "utf8", cwd: ROOT }) };
+    } catch (e) {
+      return { code: e.status ?? 1, aus: (e.stdout || "") + (e.stderr || "") };
+    }
+  };
+
+  const reg = laufe("ram.js", ["--registry"]);
+  pruefe("ram.js --registry gibt etwas aus (Hauptmodul-Erkennung greift)",
+    reg.aus.includes("registry.json gegen den Rechner"),
+    "Ausgabe war leer oder unerwartet: " + JSON.stringify(reg.aus.slice(0, 200)));
+  pruefe("und meldet Erfolg (exit 0)", reg.code === 0, "exit " + reg.code);
+
+  const kosten2 = laufe("ramkosten.js", ["hack"]);
+  pruefe("ramkosten.js hack gibt etwas aus (Hauptmodul-Erkennung greift)",
+    kosten2.aus.includes("hack"),
+    "Ausgabe war leer oder unerwartet: " + JSON.stringify(kosten2.aus.slice(0, 200)));
+  pruefe("und meldet Erfolg (exit 0)", kosten2.code === 0, "exit " + kosten2.code);
 }
 
 console.log("");

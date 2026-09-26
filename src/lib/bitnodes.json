@@ -1,6 +1,6 @@
 {
  "hinweis": "ERZEUGT von tools/bitnodes-tabelle.js aus reference/bitburner-src/src/BitNode/. Nicht von Hand pflegen.",
- "erzeugtAm": "2026-09-26T16:42:51.375Z",
+ "erzeugtAm": "2026-09-26T19:16:13.096Z",
  "warnung": "Ein Feld, das hier fehlt, ist 1 - NICHT 0. Wer fehlende Felder als 0 liest, setzt jede Beute auf null.",
  "standard": {
   "AgilityLevelMultiplier": 1,
@@ -59,6 +59,7 @@
   "WorldDaemonDifficulty": 1
  },
  "knoten": {
+  "1": {},
   "2": {
    "HackingLevelMultiplier": 0.8,
    "ServerGrowthRate": 0.8,
@@ -291,6 +292,7 @@
    "WorldDaemonDifficulty": 1.5
   },
   "12": {
+   "ServerStartingSecurity": 1.5,
    "DarknetLabyrinthRewardsTheRedPill": 0,
    "CorporationSoftcap": 0.8,
    "CorporationDivisions": 0.5,
@@ -433,6 +435,7 @@
  "knotenLevel": {
   "12": {
    "1": {
+    "ServerStartingSecurity": 1.5,
     "DarknetLabyrinthRewardsTheRedPill": 0,
     "CorporationSoftcap": 0.8,
     "CorporationDivisions": 0.5,
@@ -483,6 +486,7 @@
     "WorldDaemonDifficulty": 1.02
    },
    "2": {
+    "ServerStartingSecurity": 1.5,
     "DarknetLabyrinthRewardsTheRedPill": 0,
     "CorporationSoftcap": 0.8,
     "CorporationDivisions": 0.5,
@@ -533,6 +537,7 @@
     "WorldDaemonDifficulty": 1.0404
    },
    "3": {
+    "ServerStartingSecurity": 1.5,
     "DarknetLabyrinthRewardsTheRedPill": 0,
     "CorporationSoftcap": 0.8,
     "CorporationDivisions": 0.5,

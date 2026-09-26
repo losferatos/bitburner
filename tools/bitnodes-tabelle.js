@@ -112,6 +112,21 @@ function zerlegeFelder(inhalt) {
   return paare;
 }
 
+/**
+ * Entfernt Kommentare aus einem Objektinhalt, BEVOR er an Kommata zerlegt wird
+ * (Skeptiker B, Einwand 4). In BN12 steht
+ *   //Does not scale, otherwise security might start at 300+
+ *   ServerStartingSecurity: 1.5,
+ * - das Komma im Kommentar zerschnitt das Feld, das Reststueck
+ * "otherwise ... ServerStartingSecurity: 1.5" passte auf keine Feldregex, und
+ * ServerStartingSecurity fiel still weg (in der alten Tabelle stand es noch).
+ * In den Multiplikatorobjekten stehen keine Zeichenketten, ein "//" kann also
+ * nur ein Kommentar sein.
+ */
+function ohneKommentare(inhalt) {
+  return inhalt.replace(/\/\*[\s\S]*?\*\//g, " ").replace(/\/\/[^\n]*/g, " ");
+}
+
 /** Findet den Inhalt von `new BitNodeMultipliers({ ... })`, klammertreu. */
 function findeMultiplierObjekt(block) {
   const anker = block.indexOf("new BitNodeMultipliers(");
@@ -141,8 +156,15 @@ for (let i = 0; i < faelle.length; i++) {
   const ab = faelle[i].index;
   const bis = i + 1 < faelle.length ? faelle[i + 1].index : tsx.length;
   const block = tsx.slice(ab, bis);
-  const objektInhalt = findeMultiplierObjekt(block);
-  if (objektInhalt === null) continue;
+  const objektRoh = findeMultiplierObjekt(block);
+  if (objektRoh === null) {
+    // `return new BitNodeMultipliers();` ohne Objekt (BN1): der Knoten hat
+    // nur Standardwerte. Als leerer Eintrag behalten wie in der Tabelle vor
+    // dem 26.09.2026 - ein Leser, der den Knoten nachschlaegt, findet ihn.
+    if (/new BitNodeMultipliers\(\s*\)/.test(block) && !knoten[n]) knoten[n] = {};
+    continue;
+  }
+  const objektInhalt = ohneKommentare(objektRoh);
   const paare = zerlegeFelder(objektInhalt);
 
   const literale = {};
@@ -239,6 +261,29 @@ const worktree = path.resolve(ROOT, "..", "bitburner-bau", "src", "lib");
 const ziel = fs.existsSync(worktree)
   ? path.join(worktree, "bitnodes.json")
   : path.join(ROOT, "src", "lib", "bitnodes.json");
+
+// KEIN FELD DARF STILL VERSCHWINDEN (Skeptiker B, Einwand 4). Die Regeneration
+// vom 26.09.2026 verlor BN12 ServerStartingSecurity, und niemand merkte es,
+// weil der Test eine Nachbildung statt der echten Quelle las. Steht in der
+// bisherigen Tabelle ein Feld, das die neue nicht mehr hat, wird abgebrochen.
+// Ein gewollter Wegfall (das Spiel hat ein Feld gestrichen) geht nur mit
+// --wegfall-erlaubt - dann steht es im Aufruf und nicht im Zufall.
+if (fs.existsSync(ziel) && !process.argv.includes("--wegfall-erlaubt")) {
+  let alt = null;
+  try { alt = JSON.parse(fs.readFileSync(ziel, "utf8")); } catch { alt = null; }
+  const weg = [];
+  for (const [kn, felder] of Object.entries((alt && alt.knoten) || {})) {
+    if (!knoten[kn]) { weg.push("Knoten " + kn); continue; }
+    for (const f of Object.keys(felder)) if (!(f in knoten[kn])) weg.push("BN" + kn + " " + f);
+  }
+  if (weg.length) {
+    console.log("");
+    console.log("ABBRUCH: gegenueber der bisherigen Tabelle fehlen " + weg.length + " Eintraege:");
+    for (const w of weg) console.log("  " + w);
+    console.log("Gewollt? Dann mit --wegfall-erlaubt. src/lib/bitnodes.json wird NICHT geschrieben.");
+    process.exit(1);
+  }
+}
 fs.writeFileSync(ziel, JSON.stringify(ausgabe, null, 1), "utf8");
 
 console.log("");

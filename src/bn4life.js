@@ -163,28 +163,21 @@ export async function main(ns) {
     const letzterEinbau = ns.getResetInfo().lastAugReset;
     const markeGilt = ns.fileExists(BEITRITT_MARKE, "home")
       && Number(ns.read(BEITRITT_MARKE)) >= letzterEinbau;
-    // DIE DAEDALUS-SCHWELLE LEBEND PRUEFEN (26.09.2026, Audit-Fund 3#6/6#4,
-    // Paket C.2).
+    // DIE DAEDALUS-SCHWELLE LEBT IN joinrun.js, NICHT HIER (26.09.2026,
+    // Skeptiker-Rework nach Paket C.2).
     //
-    // Bisher startete dieser Block nach JEDEM Einbau, sobald zwei der vier
-    // Faktionen fehlten - ohne jeden Blick auf die installierten Augs. In
-    // BN5.2 waren seit 16:57 ueber 32 Augs installiert (die 30er-Schwelle
-    // laengst erreicht), joinrun startete um 17:19 trotzdem erneut und
-    // erntete bis zum naechsten Sprung nur noch "gymWorkout abgelehnt" (die
-    // Figur war unterwegs nach Aevum). `DaedalusAugsRequirement` ist die
-    // ECHTE Schwelle (BN12: 31, nicht die oft angenommenen 30) und kommt mit
-    // SF5 live aus `getBitNodeMultipliers()`. Ohne SF5/Formulas.exe bleibt es
-    // beim alten Verhalten (starten) - das war schon vorher der Normalfall
-    // und ist die unkritische Seite eines Trainingslaufs.
-    let daedalusOffen = true;
-    try {
-      const installiert = ns.singularity.getOwnedAugmentations(false).length;
-      const schwelle = Number(ns.getBitNodeMultipliers().DaedalusAugsRequirement);
-      if (Number.isFinite(schwelle)) daedalusOffen = installiert < schwelle;
-    } catch { /* SF5/Formulas.exe fehlt - dann nicht blockieren */ }
+    // Ein erster Durchgang hatte den Blick hierher gebaut
+    // (ns.singularity.getOwnedAugmentations + ns.getBitNodeMultipliers) -
+    // bn4life.js ist aber ein Dauerlaeufer, der direkt nach jedem Einbau auf
+    // einem knappen home steht, und der Skeptiker mass dort +4/+5 GB. Die
+    // Pruefung braucht ausserdem nur EINMAL zu laufen, am Anfang von
+    // joinrun.js: dort kostet sie nichts Zusaetzliches (293+ GB Singularity
+    // ohnehin), und joinrun.js setzt BEITRITT_MARKE selbst, wenn die
+    // Schwelle schon erreicht ist - `markeGilt` oben faengt den naechsten
+    // Start dieses Zyklus dann genauso ab, wie es ein direkter Blick hier
+    // getan haette.
     if (!ns.fileExists("data/bn4-stop.txt", "home")
         && !markeGilt
-        && daedalusOffen
         && !ns.isRunning("joinrun.js", "home")
         && !ns.isRunning("netburn.js", "home")) {
       const drin = ns.getPlayer().factions;

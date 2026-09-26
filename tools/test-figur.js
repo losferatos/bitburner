@@ -60,7 +60,13 @@ console.log("");
 console.log("-- die Rangfolge --");
 {
   pruefe("Graft schlaegt Bladeburner", F.PRIO.graft < F.PRIO.bladeburner);
-  pruefe("Bladeburner schlaegt Faktionsarbeit", F.PRIO.bladeburner < F.PRIO.faktion);
+  pruefe("Bladeburner schlaegt Faktionsbeitritt", F.PRIO.bladeburner < F.PRIO.beitritt);
+  // PRIO.beitritt (26.09.2026, Skeptiker-Rework nach Paket C.2): joinrun.js
+  // beantragte mit PRIO.gym (40) und verlor damit IMMER gegen laufende
+  // Faktionsarbeit (30) - in einem V1-Knoten der einzige Gym-Trainer, also
+  // faktisch nie trainiert. beitritt (25) gewinnt gegen faktion, verliert
+  // weiterhin gegen graft und bladeburner.
+  pruefe("Faktionsbeitritt schlaegt Faktionsarbeit", F.PRIO.beitritt < F.PRIO.faktion);
   pruefe("Faktionsarbeit schlaegt Gym", F.PRIO.faktion < F.PRIO.gym);
   pruefe("Gym schlaegt Verbrechen", F.PRIO.gym < F.PRIO.verbrechen);
   pruefe("der Geld-Deadlock schlaegt ALLES", F.PRIO.deadlock < F.PRIO.graft,

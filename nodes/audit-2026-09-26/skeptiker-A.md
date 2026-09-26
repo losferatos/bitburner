@@ -256,3 +256,87 @@ beide unabhaengig vom Branch (Eichung gegen v301, Cloud-Umgebung ohne `reference
   BitRunners 165,1; leerer Black-Hand-Katalog).
 - **A4 im Hackingknoten:** q = 0 beim Kauf, Einbau folgt in der naechsten Runde ueber
   `spendenAusnahme`; keine Kollision mit der Red-Pill-Reserve (A4 nur bei leerer Warteschlange).
+
+---
+
+## Fix-Stand (26.09.2026, Nacharbeit auf `cloud-skeptiker-a`)
+
+Commits: **988e16f** (Code, Registry, Tests), **d1f0db9** (test-ram.js-Eintrag
+zurueckgenommen, siehe unten). Gegenprobe gegen den Stand VOR der Nacharbeit:
+`git archive origin/worktree-agent-a835831a3142b1944 src` in einen Wegwerfordner,
+dann `BN4REP_SRC=<ordner>/src node tools/test-bn4rep-einbau.js` bzw.
+`... tools/test-bn4rep-ebene2.js`. Beide Testdateien laden den Pruefling aus
+`BN4REP_SRC`; fehlt dort eine Funktion, ist das ROT, kein Absturz.
+
+| # | Stufe | Stand | Beleg ROT (vorher) -> GRUEN (nachher) |
+|---|---|---|---|
+| 1 | BLOCKER | behoben 988e16f | Ebene 2, Stand BN5.2 19:03 auf werk-0: vorher "EINBAU: 3 Augmentierungen. Grund: naechstes Stueck (PCMatrix) kostet 27436m bei 13808m" in Runde 1, nachher kein EINBAU (einbau.json belegt, dass die Entscheidung erreicht wurde). Ebene 0: "19:03 ohne Einkommen still wie alt" vorher `true`. |
+| 2 | SHOULD-FIX | behoben 988e16f | Ebene 0 mit `HACK_AUGS`: Magnetism nicht wertvoll, DMA wertvoll, Synfibril nur im Kampfknoten, Auswahl 19:03 = PCMatrix statt Magnetism - vorher 9x ROT (Funktion fehlte, `levelNutzen` gab Magnetism 0,0477). `wertlosGilt` entfernt. |
+| 3 | SHOULD-FIX | behoben 988e16f | Ebene 2, BN6 ohne V1-Marke, Spendenrecht Tian Di Hui faellig: vorher 1 NFG gekauft ("FUELLSTUECK:"), nachher 0; Gegenprobe BN5: Stufe wird weiter gekauft. Ebene 0: Kampfknoten/Red Pill/Sperre/fehlender Parameter vorher 4x ROT. |
+| 4 | SHOULD-FIX | behoben 988e16f | Ebene 2, NMI nur in der Warteschlange: vorher 0 setFocus, nachher >= 1. NMI eingebaut: in beiden 0 (Waechter). |
+| 5 | SHOULD-FIX | behoben 988e16f | Ebene 2, Handschlag ohne Antwort auf werk-0: vorher `main` endet (return), keine Sperre auf home; nachher laeuft weiter, `data/install-sperre.txt` mit `bis` auf home, genau 1 Handschlag im Budget. Ausgang offen: vorher 6 NFG-Stufen gekauft und return, nachher 0 NFG, laeuft weiter, Meldung auf 5 min gedrosselt. |
+| 6 | SHOULD-FIX | behoben 988e16f (mit 1) | Ebene 0: BN5.2 15:12, 120 Mrd bei 41,12 Mrd / 96,8 Mio/s - vorher `true`, nachher still; Gitter 150 Punkte "nie strenger als alt" vorher verletzt (41 Mrd / 120 Mrd / 100 Mio/s). |
+| 7 | SHOULD-FIX | behoben 988e16f | Attrappen entfernt. `test-bn4rep-einbau.js`: 46 Pruefungen, vorher **32 ROT**, nachher 46/46. Neu `test-bn4rep-ebene2.js` (echter Hauptlauf, Nachbau mit Preisen 1,9^q, Spenden, Fokus, Dateien je Rechner; jeder echte RUNDENFEHLER macht das Szenario rot): 26 Pruefungen, vorher **9 ROT**, nachher 26/26. Die in beiden Staenden gruenen Pruefungen sind Waechter (A2/A3/A6/A7, Vorfaelle mit echtem Einkommen, "Nachbau vollstaendig"). |
+| 8 | MINOR | behoben 988e16f | 30 s Karenz (`fokusEntscheidung`, `FOKUS_KARENZ_MS`), Kommentar korrigiert. Ebene 2: vorher erster setFocus nach 0 s, nachher erst nach >= 30 s und dann sicher. Rest: eine UI-Klickfolge ueber 30 s wird weiter unterbrochen; eine `isRunning`-Abfrage je UI-Skript kostete RAM und kennt die Handwerkzeuge auf anderen Wirten nicht - bewusst nicht gebaut. |
+| 9 | MINOR | behoben 988e16f | `spendePausiert`, 60 s Wandzeit. Ebene 0: 19:02:50 -> 19:03:08 (3 Runden) greift - vorher 3x ROT. |
+| 10 | MINOR | teilweise 988e16f | Kommentar korrigiert ("nicht immer erreichbar", BN5.2-Zahlen), Fehlschlag gedrosselt im Log. NICHT gebaut: das Arbeitsziel auf den NFG-Repbedarf umstellen - das ist ein Eingriff in die Zielwahl (`offen`/`guete`), kein lokaler Fix. |
+| 11 | MINOR | behoben 988e16f | `einbauGrundText`. Ebene 2, BN5 Fuellstueck: vorher "Grund: Favor bei BitRunners ...", nachher "Spendenrecht bei BitRunners faellig"; Ebene 0 zweimal vorher ROT. Die EINBAU-Zeile steht jetzt HINTER den Toren (kein "EINBAU" alle 15 s ohne Einbau). |
+| 12 | MINOR | uebersprungen | Graft-Tor: Paket C1 (6201916) setzt graftauto.js auf `verfahren: V2`, Red Pill gibt es nur in V1 - dort laeuft graftauto dann gar nicht; ein eigenes Tor hier waere doppelt und erzeugte einen Konflikt in graftauto.js. A6-Aufschub bis "verdientes Stueck binnen 2 min bezahlbar": fuegt dem Zwangsweg eine Wartebedingung hinzu, Verlust laut Audit Minuten und fuer den Endanstieg wertlose Stuecke (DMA) - nicht gebaut. |
+| 13 | MINOR | behoben 988e16f | `lib/einbau.js` (Spende zu KLEIN), `bn4rep.js` Daedalus-Kommentare (`DaedalusAugsRequirement` statt "30 VERSCHIEDENE"), falsche Zeilenangabe `Singularity.ts:533-551` beim workForFaction. |
+
+**Nicht umgesetzt aus Einwand 5:** die `offenSeit`-Klausel des Interlocks bleibt tot. Sie
+zu beleben hiesse, nach `SPERRE_HOECHSTENS_MS` bei OFFENEM Ausgang einzubauen - eine
+Entscheidung fuer ausgang/endspurt, nicht fuer Paket A.
+
+**Verhalten, das sich durch Einwand 5 aendert (bewusst):** Solange der Ausgang offen ist
+und ein Einbau faellig waere, endet jede Runde nach dem Tor mit `sleep(15000); continue`
+- Kauf, Spende, Arbeit und `data/bn4rep.json` ruhen in dieser Lage (vorher: Prozessende,
+also dasselbe plus Neustart). Der Ausgang wird ueblicherweise binnen einer Minute genommen.
+
+**Zusammenspiel mit Paket C:** C4 (e0956e1) schreibt die Handschlag-Sperre in
+`lib/handschlag.js` selbst per `nachHome`. Die Spiegelung in bn4rep.js ist dann doppelt,
+aber gleichlautend und harmlos - sie bleibt, weil die Pakete in beliebiger Reihenfolge
+gemergt werden koennen.
+
+### Replay A5 mit den echten Spielstaenden
+
+Einkommen = `scriptProdSinceLastAug / playtimeSinceLastAug` aus dem Stand (= was
+`getTotalScriptIncome()[1]` im Spiel geliefert haette), Geld bei den Vorfaellen aus dem
+bn4rep-Log im Moment des Fehl-Einbaus, sonst aus dem Stand. "Branch R1" = erste Fassung
+in der ersten Runde nach einem Neustart (Einkommen 0).
+
+| Fall | Preis | Geld | Einkommen | master 4x | Branch R1 | Branch eingeschw. | **Fix** |
+|---|---|---|---|---|---|---|---|
+| Vorfall 16:57 Neuralstimulator | 41,15 Mrd | 2,598 Mrd | 353,9 M/s | feuert | feuert | still | **still** |
+| Vorfall 19:03 PCMatrix | 27,44 Mrd | 13,808 Mrd | 1040,1 M/s | still | feuert | still | **still** |
+| Vorfall 19:03 DMA (Ausloeser auf master) | 96,03 Mrd | 13,808 Mrd | 1040,1 M/s | feuert | feuert | still | **still** |
+| Vorfall 00:23 PCMatrix | 13,72 Mrd | 1,502 Mrd | 750,3 M/s | feuert | feuert | still | **still** |
+| Vorfall 00:23 DMA (Ausloeser auf master) | 48,01 Mrd | 1,502 Mrd | 750,3 M/s | feuert | feuert | still | **still** |
+| 15:12, Stueck zu 120 Mrd | 120 Mrd | 41,124 Mrd | 96,8 M/s | still | feuert | feuert | **still** |
+| 17:19, Stueck zu 400 Mrd | 400 Mrd | 116,762 Mrd | 771,4 M/s | still | feuert | still | **still** |
+| 18:04, Stueck zu 20 Bio | 20 Bio | 6,662 Bio | 2468,9 M/s | still | feuert | feuert | **still** |
+| 19:04 frueh, PCMatrix Grundpreis | 4 Mrd | 1,09 Mio | 0,007 M/s | feuert | feuert | feuert | **feuert** |
+| 19:04 frueh, CSP Gen I Grundpreis | 140 Mio | 1,09 Mio | 0,007 M/s | feuert | feuert | feuert | **feuert** |
+
+Alle fuenf Vorfaelle still, jeder Fall, in dem die alte Regel still war, bleibt still;
+frueh im Zyklus (echter Geldmangel) feuert die Regel weiter wie die alte - kein Stillstand
+(bei `wartend = 0` baut ohnehin nichts ein).
+
+### Tests
+
+- `node tools/test-bn4rep-einbau.js`: **46/46 gruen** (vorher-Stand: 32 rot).
+- `node tools/test-bn4rep-ebene2.js`: **26/26 gruen** (vorher-Stand: 9 rot). In
+  `test-alles.js` als `schnell` eingetragen.
+- `node tools/test-alles.js --schnell`: **2 rote Dateien, test-ram.js und test-boerse.js**.
+  Beide sind auf `origin/worktree-agent-a835831a3142b1944` identisch rot (gleicher Lauf im
+  ausgepackten Baum mit derselben `reference/`): test-ram "34 Dateien veraltet unbemerkt /
+  Eichung 81 < 100 Zeilen", test-boerse "Shorts in BitNode 8". Vorbestehend, nicht Paket A.
+- RAM: `tools/ram.js` (`rechne`) ergibt fuer bn4rep.js 854,05 (SF4.1) / 63,55 (SF4.3):
+  +0,1 GB Basis durch `getTotalScriptIncome`. ARCHITEKTUR.md 3.3 und registry.json
+  (`registry-bauen.js`, `--pruefen` gruen), test-registry.js 86/86, test-matrix-ebene2.js
+  117/117 nachgezogen. Den Eintrag in `VERALTET_ERLAUBT` (test-ram.js) nimmt Paket C
+  (f0f4b88) mit 33 weiteren Dateien vor; ein eigener Eintrag hier erzeugte nur einen
+  Merge-Konflikt und wurde zurueckgenommen (d1f0db9).
+- Merge-Probe: gegen `origin/master` (5e4c51c, F1 bn4door) konfliktfrei; gegen Paket C
+  nur `src/registry.json` (erzeugte Datei, Konflikt bestand schon zwischen A und C - nach dem
+  Merge `node tools/registry-bauen.js`).

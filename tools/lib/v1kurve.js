@@ -87,10 +87,21 @@ export function laufGrenzen(zeilen, knoten, lauf) {
   // Beginn = die letzte pre-jump-Sicherung des VORIGEN Laufs vor dem ersten
   // eigenen Eintrag. Fehlt sie, gilt der erste eigene Eintrag (spaeter als der
   // echte Beginn - die Online-Zeit wird dann unterschaetzt, nie ueberschaetzt).
-  const sprungHinein = zeilen.filter((z) => z.anlass === "pre-jump" && z.ts <= erste
-    && !(z.knoten === knoten && z.lauf === lauf)).pop();
+  // Massgeblich ist die LETZTE fremde Zeile vor dem ersten eigenen Eintrag:
+  // nur wenn sie ein pre-jump ist, markiert sie den Sprung. Ein aelterer
+  // pre-jump weiter zurueck gehoert zu einem frueheren Wechsel (BN5.3 haette
+  // sonst ab dem BN1.3-Sprung gezaehlt, weil BN5.2 ohne pre-jump endete).
+  const vorher = zeilen.filter((z) => z.ts <= erste && !(z.knoten === knoten && z.lauf === lauf)).pop();
+  const sprungHinein = vorher && vorher.anlass === "pre-jump" ? vorher : null;
   const sprungHinaus = eigene.filter((z) => z.anlass === "pre-jump").pop();
-  return { start: sprungHinein ? sprungHinein.ts : erste, ende: sprungHinaus ? sprungHinaus.ts : null };
+  // Ohne pre-jump (BN5.2, 26.09.2026: Sprung ueber die BitVerse-Auswahl von
+  // Hand, keine Sicherung): gilt der Lauf als beendet, sobald ein SPAETERER
+  // Lauf im Index steht, und sein Ende ist die letzte eigene Sicherung. Das
+  // ueberschaetzt die Laufzeit um hoechstens den Abstand zur letzten Sicherung.
+  const letzte = eigene[eigene.length - 1].ts;
+  const spaeter = zeilen.some((z) => z.ts > letzte && !(z.knoten === knoten && z.lauf === lauf));
+  const ende = sprungHinaus ? sprungHinaus.ts : (spaeter ? letzte : null);
+  return { start: sprungHinein ? sprungHinein.ts : erste, ende };
 }
 
 /** Hacking-Level aus einer gzip-Sicherung. */

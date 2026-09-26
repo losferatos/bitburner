@@ -28,6 +28,10 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") ns.scp("data/backdoor.txt", "home", ns.getHostname());
   };
   if (!ziel) return sag("Kein Zielrechner angegeben.");
+  // Nie auf w0r1d_d43m0n (26.09.2026): der Backdoor dort schickt auf die
+  // BitVerse-Auswahl statt ueber exit.js in den Routenknoten - danach laeuft
+  // kein Skript mehr, bis jemand die Seite neu laedt.
+  if (ziel === "w0r1d_d43m0n") return sag("w0r1d_d43m0n: abgelehnt - den Ausgang macht exit.js.");
 
   // Schon erledigt? Dann gar nicht erst anfassen.
   try {

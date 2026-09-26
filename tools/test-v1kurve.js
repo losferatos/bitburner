@@ -73,6 +73,16 @@ const g = V.laufGrenzen(V.indexZeilen(idx), 1, 2);
 pruefe("Lauf BN1.2: Beginn = Sprung aus BN9, Ende = eigener pre-jump", g.start === T0 && g.ende === T0 + 5 * H, JSON.stringify(g));
 const g3 = V.laufGrenzen(V.indexZeilen(idx), 1, 3);
 pruefe("laufender Lauf BN1.3: Beginn = Sprung aus BN1.2, kein Ende", g3.start === T0 + 5 * H && g3.ende === null);
+// Lauf ohne pre-jump, aber mit Nachfolger: Ende = letzte eigene Sicherung.
+const idx2 = ["ts\tdatei\tsha\tid\tbitNode\tlauf\ttotalPlaytime\tanlass",
+  iso(T0) + "\ta\tx\ty\t1\t3\t1\tpre-jump",
+  iso(T0 + H) + "\tb\tx\ty\t5\t2\t1\thourly",
+  iso(T0 + 4 * H) + "\tc\tx\ty\t5\t2\t1\thourly",
+  iso(T0 + 6 * H) + "\td\tx\ty\t5\t3\t1\thourly"].join("\n");
+const g52 = V.laufGrenzen(V.indexZeilen(idx2), 5, 2);
+pruefe("ohne pre-jump, Nachfolger da: Ende = letzte eigene Sicherung", g52.ende === T0 + 4 * H, JSON.stringify(g52));
+pruefe("ohne pre-jump, kein Nachfolger: kein Ende", V.laufGrenzen(V.indexZeilen(idx2), 5, 3).ende === null);
+pruefe("Nachfolger eines Laufs ohne pre-jump beginnt nicht beim aelteren Sprung", V.laufGrenzen(V.indexZeilen(idx2), 5, 3).start === T0 + 6 * H);
 
 // Die echte Referenz, falls gebaut: monoton und mit Ende hinter dem letzten Punkt.
 const echt = path.join(ROOT, "data", "v1kurve-BN1.json");

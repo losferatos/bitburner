@@ -148,6 +148,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-kein-wd-backdoor.js",
+    deckt: "EBENE 0: nur exit.js beendet w0r1d_d43m0n - kein Backdoor-Skript schickt aufs BitVerse (F1)",
+    schnell: true,
+  },
+  {
     datei: "test-sprosse5-kette.js",
     deckt: "EBENE 2: Waechter beauftragt, Kern startet punish.js - im Trockenlauf (C.12)",
     schnell: false,

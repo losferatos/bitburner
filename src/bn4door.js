@@ -59,9 +59,16 @@ export async function main(ns) {
   // 100.000 Reputation weniger, bei gemessenen 110 je Sekunde also rund eine
   // Viertelstunde - dreimal, und der Rabatt gilt fuer jeden weiteren Durchlauf
   // dieses BitNodes mit.
+  //
+  // w0r1d_d43m0n steht NICHT in der Liste (26.09.2026). installBackdoor auf
+  // ihn schickt das Spiel auf die BitVerse-Auswahl (Singularity.ts:525-526)
+  // statt ueber destroyW0r1dD43m0n in den naechsten Knoten der Route. Dort
+  // laufen keine Skripte mehr, und nach der Auswahl von Hand fehlt der
+  // Startaufruf fuer boot.js - BN5.2 stand so ueber eine Stunde still. Den
+  // Ausgang macht allein exit.js (gestartet von ausgang.js).
   const ZIELE = ["CSEC", "avmnite-02h", "I.I.I.I", "run4theh111z", "fulcrumassets",
     "clarkinc", "omnitek", "ecorp", "nwo", "blade",
-    "The-Cave", "w0r1d_d43m0n"];
+    "The-Cave"];
 
   const NL = String.fromCharCode(10);
   let log = [];

@@ -160,6 +160,7 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
      * Zustand, aus dem Befund M.3 entstanden ist.
      */
     const VERALTET_ERLAUBT = [
+      "bn4door.js", "backdoor.js", // 26.09.2026: w0r1d_d43m0n gesperrt (F1), keine neue ns-Funktion
       "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
       "csolve.js", "cdump.js",
     ];

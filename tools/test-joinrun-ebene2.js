@@ -121,6 +121,21 @@ async function fahre(o = {}) {
   m.ns.singularity.getAugmentationRepReq = () => 0;
   m.ns.singularity.getOwnedAugmentations = () => [];
 
+  // DIE DAEDALUS-SCHWELLE (Ebene 2, siehe unten): der Mock kennt weder
+  // `getResetInfo().ownedAugs` noch `getBitNodeMultipliers` von Haus aus.
+  // `ownedAugsSize` setzt die installierten Augs direkt in resetInfo (ein
+  // flacher Spread in `getPlayer`-Manier, siehe tools/mock/ns.js); ohne
+  // `bnMult` bleibt `ns.getBitNodeMultipliers` schlicht undefiniert und der
+  // Aufruf `ns.getBitNodeMultipliers()` wirft von selbst (TypeError) - genau
+  // der "kein SF5/BN5"-Fall, den joinrun.js abfaengt.
+  if (Number.isFinite(o.ownedAugsSize)) {
+    m.zustand.resetInfo.ownedAugs = new Map(
+      Array.from({ length: o.ownedAugsSize }, (_, i) => ["Aug" + i, 1]));
+  }
+  if (Number.isFinite(o.bnMult)) {
+    m.ns.getBitNodeMultipliers = () => ({ DaedalusAugsRequirement: o.bnMult });
+  }
+
   const { modul } = await ladeAusBeiden(ROOT, "joinrun.js");
   const zurueck = m.uhrStellen();
   try { await modul.main(m.ns); }
@@ -171,6 +186,50 @@ console.log("-- 3. UND BEHAELT sie: kein Ping-Pong ueber mehrere Ticks --");
     m.zustand.arbeit && m.zustand.arbeit.type === "CLASS", JSON.stringify(m.zustand.arbeit));
   pruefe("hoechstens die ERSTE Runde meldet 'Figur nicht frei' (Anlauf, bevor die erste Vergabe steht)",
     nichtFrei <= 1, "Meldungen: " + nichtFrei + "\n" + log);
+}
+
+console.log("");
+console.log("-- 4. die Daedalus-Schwelle: 29/30/31 gegen BN12 (31), throws -> fail open --");
+{
+  /**
+   * DIE URSPRUENGLICHE AUFTRAGSLAGE (Paket C, Punkt 2) VERLANGTE GENAU DIESE
+   * DREI ZAHLEN GEGEN BN12 (31) UND DEN THROW-FALL - bislang nur durch
+   * Quelltext-Review belegt (FactionJoinCondition.ts:130 `p.augmentations
+   * .length >= n`, BitNode.tsx:922 `Math.floor(Math.min(30 + 1.02^lvl, 40))`
+   * = 31 fuer BN12 Stufe 1-3), NICHT durch einen Ebene-2-Lauf von joinrun.js
+   * selbst. Das war eine Luecke im ersten Durchgang - hier geschlossen.
+   */
+  const einZug = { runden: 2 };   // ein bis zwei Ticks reichen fuer den Entscheid am Start
+
+  const m29 = await fahre({ ...einZug, ownedAugsSize: 29, bnMult: 31 });
+  pruefe("29 von 31 (BN12-Schwelle): Daedalus offen, joinrun trainiert",
+    m29.zustand.arbeit && m29.zustand.arbeit.type === "CLASS",
+    "arbeit=" + JSON.stringify(m29.zustand.arbeit));
+
+  const m30 = await fahre({ ...einZug, ownedAugsSize: 30, bnMult: 31 });
+  pruefe("30 von 31 (BN12-Schwelle): Daedalus offen, joinrun trainiert",
+    m30.zustand.arbeit && m30.zustand.arbeit.type === "CLASS",
+    "arbeit=" + JSON.stringify(m30.zustand.arbeit));
+
+  const m31 = await fahre({ ...einZug, ownedAugsSize: 31, bnMult: 31 });
+  pruefe("31 von 31 (BN12-Schwelle erreicht): Daedalus zu, KEIN Training",
+    !m31.zustand.arbeit, "arbeit=" + JSON.stringify(m31.zustand.arbeit));
+  const marke31 = m31.lies("home", "data/beitritt-erledigt.txt");
+  pruefe("und die Marke wird sofort gesetzt (bn4life.js liest sie vor dem naechsten Start)",
+    !!marke31, "Marke: " + JSON.stringify(marke31));
+  const log31 = m31.lies("home", "data/joinrun.txt") || "";
+  pruefe("mit der erwarteten Meldung", log31.includes("kein Training noetig"), log31);
+
+  // FAIL OPEN: der Aufruf wirft (kein SF5/BN5 im Mock, `bnMult` bewusst
+  // weggelassen) - selbst bei 31 von 31 Augs (Schwelle laengst erreicht,
+  // WAERE sie bekannt) bleibt `daedalusOffen` auf seinem Startwert `true`
+  // (joinrun.js: "dann wird NICHT blockiert - die alte, unkritische Seite").
+  // Ohne Ausbau blockiert ein Gewerk, dem die Schwelle unbekannt ist, sonst
+  // grundlos ein Training, das anderswo (BN ohne SF5/BN5) noch noetig ist.
+  const mWirft = await fahre({ ...einZug, ownedAugsSize: 31 });   // kein bnMult -> wirft
+  pruefe("ohne SF5/BN5 (Aufruf wirft): fail open, joinrun trainiert trotz 31 Augs",
+    mWirft.zustand.arbeit && mWirft.zustand.arbeit.type === "CLASS",
+    "arbeit=" + JSON.stringify(mWirft.zustand.arbeit));
 }
 
 console.log("");

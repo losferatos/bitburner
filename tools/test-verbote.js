@@ -289,15 +289,37 @@ function pruefeEndlosschleifen(datei, inhalt) {
  * ein neues Gewerk und denkt gar nicht an die Figur.
  */
 const FIGUR_HANDLUNGEN = [
-  { muster: /ns\.singularity\.workForFaction\s*\(/, name: "workForFaction" },
-  { muster: /ns\.singularity\.workForCompany\s*\(/, name: "workForCompany" },
-  { muster: /ns\.singularity\.commitCrime\s*\(/, name: "commitCrime" },
-  { muster: /ns\.singularity\.gymWorkout\s*\(/, name: "gymWorkout" },
-  { muster: /ns\.singularity\.universityCourse\s*\(/, name: "universityCourse" },
-  { muster: /ns\.singularity\.createProgram\s*\(/, name: "createProgram" },
-  { muster: /ns\.grafting\.graftAugmentation\s*\(/, name: "graftAugmentation" },
-  { muster: /ns\.bladeburner\.startAction\s*\(/, name: "startAction" },
+  { obj: "singularity", methode: "workForFaction" },
+  { obj: "singularity", methode: "workForCompany" },
+  { obj: "singularity", methode: "commitCrime" },
+  { obj: "singularity", methode: "gymWorkout" },
+  { obj: "singularity", methode: "universityCourse" },
+  { obj: "singularity", methode: "createProgram" },
+  { obj: "grafting", methode: "graftAugmentation" },
+  { obj: "bladeburner", methode: "startAction" },
 ];
+
+/**
+ * ALIASIERTE HANDLES ENTGEHEN DEM WOERTLICHEN PRAEFIX (26.09.2026,
+ * Audit-Fund 6#4, Paket C.2).
+ *
+ * `joinrun.js` schrieb `const s = ns.singularity;` und rief danach
+ * `s.gymWorkout(...)` - das Muster oben kennt nur `ns.singularity.gymWorkout(`
+ * woertlich und uebersah den Aufruf vollstaendig. Die Datei importierte
+ * `lib/figurns.js` auch nicht, aber weil `gefunden` leer blieb, meldete die
+ * Regel gar nichts: ein Figur-Akteur ohne Wache blieb Jahre unentdeckt.
+ *
+ * Der Grep sucht deshalb zusaetzlich nach `const/let/var X = ns.<obj>` im
+ * Dateiinhalt und laesst `X.<methode>(` als denselben Treffer gelten wie
+ * `ns.<obj>.<methode>(`.
+ */
+function objektAliase(inhalt, obj) {
+  const aliase = new Set();
+  const muster = new RegExp("\\b(?:const|let|var)\\s+(\\w+)\\s*=\\s*ns\\." + obj + "\\b", "g");
+  let m;
+  while ((m = muster.exec(inhalt))) aliase.add(m[1]);
+  return aliase;
+}
 
 /**
  * Ausnahmen mit Begruendung - keine Liste ohne Grund.
@@ -315,10 +337,15 @@ function pruefeFigurWache(datei, inhalt) {
   const basis = path.basename(datei);
   const zeilen = inhalt.split("\n");
   const gefunden = [];
+  const aliasCache = new Map();   // obj -> Set der Aliasnamen
   for (const h of FIGUR_HANDLUNGEN) {
+    if (!aliasCache.has(h.obj)) aliasCache.set(h.obj, objektAliase(inhalt, h.obj));
+    const praefixe = ["ns\\." + h.obj,
+      ...[...aliasCache.get(h.obj)].map((a) => a.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))];
+    const muster = new RegExp("\\b(?:" + praefixe.join("|") + ")\\." + h.methode + "\\s*\\(");
     for (let i = 0; i < zeilen.length; i++) {
       const ohneKommentar = zeilen[i].replace(/^\s*(\*|\/\/|\/\*).*$/, "");
-      if (h.muster.test(ohneKommentar)) { gefunden.push([h.name, i + 1]); break; }
+      if (muster.test(ohneKommentar)) { gefunden.push([h.methode, i + 1]); break; }
     }
   }
   if (!gefunden.length) return;
@@ -580,6 +607,46 @@ let probeFehler = 0;
           + (dateiDa ? "" : " - Datei fehlt")
           + (musterDa ? "" : " - Muster gibt es nicht mehr"));
       }
+    }
+  }
+
+  // ALIASIERTE SINGULARITY-HANDLES MUESSEN DIE FIGUR-WACHE GENAUSO FINDEN
+  // (26.09.2026, Audit-Fund 6#4, Paket C.2) - joinrun.js schrieb
+  // `const s = ns.singularity` und entging damit dem woertlichen Praefix.
+  {
+    const vorherAlias = treffer;
+    pruefeFigurWache("(probe-alias-ohne-wache)", [
+      "export async function main(ns) {",
+      "  const s = ns.singularity;",
+      "  s.gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer > vorherAlias) {
+      console.log("  ok    findet s.gymWorkout(...) bei 'const s = ns.singularity'");
+      treffer = vorherAlias;
+      meldungen.pop();
+    } else {
+      probeFehler++;
+      console.log("  ROT   findet aliasiertes gymWorkout NICHT (audit 6#4) - genau die Luecke, die joinrun.js hatte");
+    }
+
+    // Und die Gegenprobe: mit lib/figurns.js importiert, darf derselbe
+    // aliasierte Aufruf nicht gemeldet werden.
+    const vorherAlias2 = treffer;
+    pruefeFigurWache("(probe-alias-mit-wache)", [
+      "import { beantrage } from \"lib/figurns.js\";",
+      "export async function main(ns) {",
+      "  const s = ns.singularity;",
+      "  s.gymWorkout(\"Powerhouse Gym\", \"str\", true);",
+      "}",
+    ].join("\n"));
+    if (treffer === vorherAlias2) {
+      console.log("  ok    meldet aliasiertes gymWorkout nicht, wenn lib/figurns.js importiert ist");
+    } else {
+      probeFehler++;
+      treffer = vorherAlias2;
+      meldungen.pop();
+      console.log("  ROT   meldet aliasiertes gymWorkout faelschlich trotz Wache");
     }
   }
 

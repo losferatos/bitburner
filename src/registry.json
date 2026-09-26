@@ -500,9 +500,9 @@
   {
    "name": "bn4life.js",
    "args": [],
-   "ramBaseGb": 5.85,
-   "ramSingGb": 18,
-   "ramMeasuredAt": "2026-09-04",
+   "ramBaseGb": 9.85,
+   "ramSingGb": 23,
+   "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, nach Paket C.2: ns.getBitNodeMultipliers() +4, ns.singularity.getOwnedAugmentations +5)",
    "verfahren": "alle",
    "knoten": "alle",
    "phase": "normal",

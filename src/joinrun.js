@@ -20,6 +20,9 @@
  *
  * @param {NS} ns
  */
+import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
+import { PRIO as FIG_PRIO } from "lib/figur.js";
+
 export async function main(ns) {
   ns.disableLog("ALL");
   const s = ns.singularity;
@@ -27,6 +30,8 @@ export async function main(ns) {
   const FRIST_MS = 45 * 60 * 1000;
   const start = Date.now();
   const z = [];
+  let figSeq = null;
+  let figGrundLetzt = null;
 
   const sag = (t) => {
     z.push(`${new Date().toTimeString().slice(0, 8)} ${t}`);
@@ -98,6 +103,28 @@ export async function main(ns) {
         continue;
       }
       if (!trainiertSchon) {
+        // DIE FIGUR-WACHE (26.09.2026, Audit-Fund 3#6/6#4, Paket C.2).
+        //
+        // Hier stand `s.gymWorkout(...)` ohne jede Ruecksicht auf die
+        // Figur-Vergabe (lib/figur.js). Der Alias `const s = ns.singularity`
+        // liess den Lint in tools/test-verbote.js daran vorbei - er kannte
+        // nur den woertlichen Praefix `ns.singularity.gymWorkout(`. Ein
+        // laufendes Graft wird durch gymWorkout beendet und NICHT erstattet
+        // (`GraftingWork.tsx:75-83`), beim Simulacrum 450 Mrd. bbtrain.js
+        // (:318-320) fragt schon so, hier fehlte es ganz.
+        figBeantrage(ns, "joinrun.js", FIG_PRIO.gym, "gym",
+          naechst.kurz, "Kampfwerte fuer Slum Snakes/Tetrads/Tian Di Hui");
+        const figW = figDarf(ns, "joinrun.js", figSeq);
+        if (figW.seq !== null) figSeq = figW.seq;
+        if (!figW.darf) {
+          if (figGrundLetzt !== figW.grund) {
+            sag("Figur nicht frei: " + figW.grund + " - warte.");
+            figGrundLetzt = figW.grund;
+          }
+          await ns.sleep(15000);
+          continue;
+        }
+        figGrundLetzt = null;
         if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
         else sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
       }

@@ -480,12 +480,19 @@ die Daedalus-Reputationsarbeit für Augs wegnehmen, die zum Hacking-Ausgang
 nichts beitragen (11-57 h nach der gemessenen Daedalus-Rate). Ein eigener
 Hacking-Graftplan für V1 ist eine offene, ungerechnete Folgefrage (Bericht 5#5).
 
-**`bn4life.js` steht seit 26.09.2026 auf `ramBaseGb: 9.85` / `ramSingGb: 23`**
-(vorher 5.85/18, Paket C.2). Die Daedalus-Torwache prüft jetzt live
-`ns.getBitNodeMultipliers().DaedalusAugsRequirement` (+4 GB Basis) und
-`ns.singularity.getOwnedAugmentations(false).length` (+5 GB Singularity), statt
-`joinrun.js` nach jedem Einbau blind zu starten. Mit `tools/ram.js`
-nachgerechnet (SF4.1: 377.85 GB gesamt = 9.85 + 23·16).
+**`bn4life.js` steht seit 26.09.2026 wieder auf `ramBaseGb: 5.85` /
+`ramSingGb: 18`** (zwischenzeitlich 9.85/23, C.2-Nacharbeit/Skeptiker-Rework).
+Ein erster Durchgang hatte die Daedalus-Torwache
+(`ns.getBitNodeMultipliers().DaedalusAugsRequirement`,
+`ns.singularity.getOwnedAugmentations(false).length`) hier eingebaut - aber
+`bn4life.js` ist ein Dauerlaeufer, der direkt nach jedem Einbau auf einem
+knappen home steht, waehrend `joinrun.js` die Singularity-Familie ohnehin
+zahlt (293+ GB) und nur kurz laeuft. Die Pruefung lebt jetzt in `joinrun.js`
+selbst (am Anfang, per `ns.getResetInfo().ownedAugs.size` statt
+`getOwnedAugmentations` - 1 GB statt der Singularity-Familie), setzt dort die
+Marke `data/beitritt-erledigt.txt`, die `bn4life.js` vor dem naechsten Start
+prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
+18·16).
 
 ```json
 {
@@ -990,9 +997,9 @@ nachgerechnet (SF4.1: 377.85 GB gesamt = 9.85 + 23·16).
     {
       "name": "bn4life.js",
       "args": [],
-      "ramBaseGb": 9.85,
-      "ramSingGb": 23.0,
-      "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, nach Paket C.2: ns.getBitNodeMultipliers() +4, ns.singularity.getOwnedAugmentations +5)",
+      "ramBaseGb": 5.85,
+      "ramSingGb": 18.0,
+      "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, C.2-Nacharbeit: Daedalus-Torwache nach joinrun.js verschoben, hier zurueck auf den Stand vor Paket C.2)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "normal",

@@ -98,6 +98,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-joinrun-ebene2.js",
+    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4)",
+    schnell: true,
+  },
+  {
     datei: "test-leiter.js",
     deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
     schnell: true,

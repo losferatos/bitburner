@@ -279,28 +279,33 @@ export async function handschlag(ns, reason, target, nodeReset, sag = () => {}) 
   // DER EINBAU WARTET. Er ist beliebig oft nachholbar.
   sag("Bruecke antwortet nicht und keine junge Sicherung - EINBAU WIRD "
     + "AUSGESETZT, install-sperre.txt gesetzt.");
-  // HIER BEWUSST ns.write UND NICHT nachHome (22.09.2026).
+  // JETZT nachHome, NICHT MEHR ns.write (26.09.2026, Audit-Fund 6#5,
+  // Paket C.4).
   //
-  // Es sieht nach demselben Fehler aus wie oben, ist aber keiner, den man
-  // hier beheben darf: bn4rep.js:829 liest diese Datei als
-  // "FIRMENPHASE|<zeitstempel>" und zieht den Stempel mit split("|")[1].
-  // Auf das JSON, das hier geschrieben wird, angewandt ergibt das
-  // undefined -> NaN, und bn4rep.js:830 macht aus einem nicht lesbaren
-  // Stempel ausdruecklich lockGilt = true. Die Sperre waere damit NIE
-  // wieder aufhebbar - sie ODERt sich in bn4rep.js:846 dauerhaft fest,
-  // und aufgeraeumt wird sie nur von boot.js:114, also nach einem Reset,
-  // den genau diese Sperre verhindert.
+  // Bis zum 22.09.2026 stand hier bewusst ein lokales `ns.write`, weil
+  // bn4rep.js die Datei damals nur als "TAG|<ms>" las (`String(...).split
+  // ("|")[1]`) - ein per `nachHome` verteiltes JSON-Objekt haette dort NaN
+  // ergeben und die Sperre unaufhebbar gemacht (schlimmer als lokal und
+  // wirkungslos).
   //
-  // Lokal geschrieben ist sie wirkungslos, das ist ein eigener Fehler und
-  // steht in nodes/BAUSTELLEN.md. Ihn hier mitzunehmen haette aus einer
-  // wirkungslosen Sperre eine unaufhebbare gemacht - schlimmer als der
-  // Zustand, den er heilen sollte. Gefunden vom Skeptiker am 22.09.2026.
-  ns.write("data/install-sperre.txt", JSON.stringify({
+  // Seit Paket A (22.09.2026, BAUSTELLEN "install-sperre.txt hat zwei
+  // Vertraege") liest bn4rep.js (:942-951) BEIDE Formate: JSON mit `bis`
+  // gilt bis dahin, "TAG|ms" weiterhin fuenf Minuten ab dem Stempel. Der
+  // Grund fuer das lokale Schreiben ist damit entfallen - und das lokale
+  // Schreiben selbst ist der Fehler, den Bericht 6#5 gemessen hat: `bn4rep`
+  // hat `hostRule: "werkbank"` und sitzt fast nie auf home, `handschlag()`
+  // ebenso. Ein `ns.write` ohne `scp` legt die Sperre dann nur auf dem
+  // Wirt ab, auf dem `bn4rep` GERADE lief - `liesVonHome` in bn4rep.js:797
+  // sieht sie auf home nie, die Stunde Sperre wirkt nie, und der Prozess
+  // (der bei `!hs.darf` per `return` endet, siehe bn4rep.js:1395-1397)
+  // haemmert im ~100-s-Neustarttakt des Kerns gegen dieselbe tote Bruecke -
+  // gemessen in der Nacht 24./25.09.2026 6,5 h lang.
+  nachHome(ns, "data/install-sperre.txt", JSON.stringify({
     ts: Date.now(),
     reason: "handschlag",
     bis: Date.now() + 3600000,
     text: "Keine Sicherung vor dem Einbau - die Bruecke hat nicht geantwortet.",
-  }), "w");
+  }));
   return { darf: false, grund: "keine Sicherung, Einbau ausgesetzt", wartezeitMs,
     gesichert: false, alterMs };
 }

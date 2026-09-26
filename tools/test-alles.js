@@ -163,6 +163,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-handschlag-nachhome.js",
+    deckt: "EBENE 2: lib/handschlag.js setzt die Einbausperre per nachHome - erreicht home auch von der Werkbank aus (C.4)",
+    schnell: true,
+  },
+  {
     datei: "test-graftauto-ebene2.js",
     deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
     schnell: false,

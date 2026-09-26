@@ -410,6 +410,11 @@ export async function main(ns) {
   // ausgesetzte Einbau (Einwand 5 - frueher beendete sich das Skript dort).
   let letzteFuellMeldung = 0;
   let letzteAussetzMeldung = 0;
+  // Die zuletzt geschriebene Telemetrie (data/bn4rep.json). Eine Runde, die
+  // am Einbau-Tor wartet, endet vor der Telemetriezeile; sie schreibt dann
+  // diesen Stand mit frischer Zeit und `state: "wait"` erneut (Gegenpruefung
+  // G2, Begruendung bei `amTorWarten` im Einbaublock).
+  let letzteTelemetrie = null;
 
   // Der Aussenschalter. Inhalt:
   //   "off"                    - nie Firmenarbeit (Notbremse)
@@ -1432,14 +1437,40 @@ export async function main(ns) {
         } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
         return null;
       };
-      // Warten am Tor: Meldung (gedrosselt, ausser nach Handschlag und NFG -
-      // dort ist der Abbruch selten und gehoert ins Log) und 15 s Pause.
+      // WARTEN AM TOR HAELT DIE TELEMETRIE FRISCH (Gegenpruefung G2).
+      //
+      // Seit `return` -> `continue` bleibt bn4rep hier am Leben und endet
+      // jede Runde vor der Telemetriezeile. Der Waechter (guard.js, Modus
+      // enforce: Sprosse 1 "neu starten" und 2 "anderer Wirt" scharf) misst
+      // data/bn4rep.json gegen freshnessMs = 30 min (registry.json) und
+      // bestrafte ein absichtlich wartendes bn4rep nach 30 min offenem
+      // Ausgang - Neustart, dann eine Stunde Wirtssperre. Vorher war der
+      // Prozess hier zu Ende, und die Leiter fand meist "laeuft nirgends".
+      // `state: "wait"` ist der vereinbarte Zustand dafuer (lib/herzschlag.js:
+      // lebendig, aber ohne Fortschrittspflicht; lib/leiter.js S1 ueberspringt
+      // ihn). Die uebrigen Felder bleiben die der letzten vollen Runde, nur
+      // Zeit, Knoten, Warteschlange und Geld sind frisch - bn4net liest
+      // `wartend` daraus fuer seinen Amortisationsdeckel.
+      // Die Meldung bleibt gedrosselt, ausser nach Handschlag und NFG
+      // (`immerMelden`) - dort ist der Abbruch selten und gehoert ins Log.
       const amTorWarten = async (torGrund, immerMelden) => {
         if (immerMelden || Date.now() - letzteAussetzMeldung > 300000) {
           letzteAussetzMeldung = Date.now();
           sag("Einbau faellig (" + einbauGrund + "), aber ausgesetzt: "
             + torGrund + ". Naechste Runde erneut.");
         }
+        try {
+          const ri = ns.getResetInfo();
+          ns.write("data/bn4rep.json", JSON.stringify({
+            ...(letzteTelemetrie || {}),
+            zeit: Date.now(),
+            knoten: ri.currentNode, nodeReset: ri.lastNodeReset, augReset: ri.lastAugReset,
+            zielLevel, hacking: spieler.skills.hacking, multHacking: spieler.mults.hacking,
+            redPill: ausgangSteht, wartend, geld: ns.getServerMoneyAvailable("home"),
+            state: "wait", blockedReason: "locked", warteGrund: String(torGrund).slice(0, 200),
+          }), "w");
+          if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());
+        } catch { /* ohne Telemetrie wartet es trotzdem */ }
         await ns.sleep(15000);
       };
       {
@@ -2485,7 +2516,9 @@ export async function main(ns) {
     const repGesamt = spieler.factions
       .reduce((n, f) => n + ns.singularity.getFactionRep(f), 0);
 
-    ns.write("data/bn4rep.json", JSON.stringify({
+    // Gemerkt fuer `amTorWarten` (Gegenpruefung G2): eine Runde am Einbau-Tor
+    // schreibt diesen Stand mit frischer Zeit und `state: "wait"` erneut.
+    letzteTelemetrie = {
       zeit: Date.now(),
       // Fuer tools/wache.js: woran erkennt man von aussen einen
       // Knotenwechsel? getResetInfo ist hier ohnehin schon aufgerufen
@@ -2534,7 +2567,8 @@ export async function main(ns) {
       teuerstesVerdiente,
       bedarf,
       geld,
-    }), "w");
+    };
+    ns.write("data/bn4rep.json", JSON.stringify(letzteTelemetrie), "w");
     if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());
    } catch (e) {
     sag("RUNDENFEHLER: " + String(e));

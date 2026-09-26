@@ -465,7 +465,7 @@ const weltFokus = (o = {}) => baueWelt({
 
 // ===========================================================================
 // GEGENPRUEFUNG (nodes/audit-2026-09-26/skeptiker-A.md, Abschnitt
-// "Gegenpruefung"): Luecken der Nacharbeit, je ROT auf fe3e911.
+// "Gegenpruefung"): Luecken der Nacharbeit, je ROT auf fe3e911 (G1) bzw. 685ad40 (G2).
 // ===========================================================================
 
 // ---------------------------------------------------------------------------
@@ -553,6 +553,51 @@ console.log("\n-- Gegenpruefung G1: der Normalfall baut weiter ein, NFG nach dem
   pruefe("alle NFG-Stufen NACH der Sicherungsanfrage", anfrageTs !== null
     && nfg.every((k) => k.uhr >= anfrageTs),
     "Anfrage " + anfrageTs + ", erste Stufe " + (nfg[0] && nfg[0].uhr));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- Gegenpruefung G2: Ausgang 37 min offen - der Waechter bleibt ruhig --");
+{
+  // Seit `return` -> `continue` endet jede Runde bei offenem Ausgang am Tor
+  // und schreibt data/bn4rep.json nicht mehr. Der Waechter (guard.js,
+  // Modus enforce: Sprosse 1 und 2 scharf) misst diese Datei gegen
+  // freshnessMs 30 min (registry.json) und haette bn4rep nach 30 min neu
+  // gestartet und danach seinen Wirt eine Stunde gesperrt - fuer ein
+  // Skript, das absichtlich wartet. Vorher war der Prozess an dieser Stelle
+  // zu Ende, und die Leiter fand ihn meist gar nicht ("laeuft nirgends").
+  // ausgang.js erneuert ausgang.json alle paar Sekunden (sonst gilt die Lage
+  // nach 15 min als veraltet und der Riegel faellt, lib/endspurt.js).
+  const { signale } = await import(pathToFileURL(path.join(SRC, "lib", "leiter.js")).href);
+  const w = welt1903({
+    geld: 1e9, einkommen: 0, schlafBudget: 150,
+    beiSchlaf: (welt) => {
+      welt.dateien.home["data/ausgang.json"] = JSON.stringify({ zeit: welt.uhr, offen: true });
+    },
+  });
+  w.faktionen.Daedalus.rep = 1.2e6;
+  w.faktionen.Daedalus.augs.push(NFG);
+  w.dateien.home["data/ausgang.json"] = JSON.stringify({ zeit: w.uhr, offen: true });
+  // Die Telemetrie aus der letzten Runde VOR dem Oeffnen des Ausgangs.
+  w.dateien.home["data/bn4rep.json"] = JSON.stringify({ zeit: w.uhr - 15000, wartend: 3 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+    rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("der Lauf stand ueber 30 min am Tor", w.uhr - w.start > 1800000
+    && w.installAufrufe === 0 && w.kaeufe.length === 0,
+    ((w.uhr - w.start) / 60000).toFixed(1) + " min, Kaeufe " + w.kaeufe.length);
+  let tele = null;
+  try { tele = JSON.parse(w.dateien.home["data/bn4rep.json"] || "null"); } catch { tele = null; }
+  pruefe("data/bn4rep.json auf home ist frisch", !!tele && w.uhr - tele.zeit <= 60000,
+    tele ? "Alter " + ((w.uhr - tele.zeit) / 60000).toFixed(1) + " min" : "fehlt");
+  pruefe("und sagt, dass bn4rep wartet (state wait, wartend 3)", !!tele && tele.state === "wait"
+    && tele.wartend === 3, JSON.stringify(tele).slice(0, 160));
+  // Die echte Signalrechnung des Waechters (lib/leiter.js) auf genau diese Datei.
+  const sig = signale({
+    eintraege: [{ name: "bn4rep.js", freshnessMs: 1800000, telemetrie: tele }],
+    wall: w.uhr, sichtbar: true, kern: null, puls: null, kpi: null, bridge: null,
+  }).filter((s) => s.sig === "S1");
+  pruefe("lib/leiter.js signale(): kein S1 gegen bn4rep.js", sig.length === 0,
+    sig.map((s) => s.grund).join(" | "));
 }
 
 console.log("");

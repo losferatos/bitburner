@@ -62,6 +62,28 @@ if (fs.existsSync(enumPfad)) {
   console.log("  (Spielquelltext fehlt - Namensprobe uebersprungen)");
 }
 
+// SKEPTIKER-AUDIT 26.09.2026, FUND 7: der Kampf-Levelfaktor des Knotens war
+// hart auf `knoten === 10 ? 0,4 : 1` codiert (ENTSCHIEDEN "nie eine
+// Knotennummer im Code"). Die Zahlen selbst sind in test-formeln.js gegen
+// `expFuerStufe` geeicht (11.255 vs. 267.800, Faktor 23,8 in BN14) - hier nur
+// die Gegenprobe gegen die tatsaechliche Datei: kein hartcodierter Knoten
+// mehr, und `getBitNodeMultipliers` wird tatsaechlich aufgerufen.
+console.log("");
+console.log("=== Kampfknoten: Kampf-Levelfaktor nicht mehr hartcodiert ===");
+{
+  const quelltext = fs.readFileSync(path.join(ROOT, "src", "kampfaugs.js"), "utf8");
+  pruefe(
+    "kein 'knoten === 10' mehr im Code (Fund 7)",
+    !/knoten\s*===\s*10/.test(quelltext),
+    "die alte Zeile waere zurueck",
+  );
+  pruefe(
+    "der Kampf-Levelfaktor kommt aus ns.getBitNodeMultipliers()",
+    /getBitNodeMultipliers/.test(quelltext) && /LevelMultiplier/.test(quelltext),
+    "erwartet: live gelesen wie blade.js:773",
+  );
+}
+
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const x of fehler) console.log("  ROT: " + x); }

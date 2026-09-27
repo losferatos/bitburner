@@ -229,11 +229,21 @@ export async function main(ns) {
   // der ist das Tor. Alles andere waere ein Bauchgefuehl.
   try {
     const sp2 = ns.getPlayer();
-    const knoten = ns.getResetInfo().currentNode;
-    // Kampffaktor des Knotens: BitNode 10 daempft auf 0,4 (`BitNode.tsx`,
-    // case 10). Ausserhalb bekannter Faelle vorsichtig mit 1 rechnen.
-    const KNOTENFAKTOR = knoten === 10 ? 0.4 : 1;
-    const expNoetig = (m) => Math.exp((100 / (m * KNOTENFAKTOR) + 200) / 32) - 534.6;
+    // SKEPTIKER-AUDIT 26.09.2026, FUND 7 (audit-2026-09-26/4-bladeburner.md#7):
+    // hier stand `KNOTENFAKTOR` hart auf 0,4 fuer Knoten 10, sonst 1 - eine
+    // Knotennummer im Code, Verstoss gegen ENTSCHIEDEN "nie eine
+    // Knotennummer im Code". BitNode.tsx kennt den Kampf-LevelMultiplier
+    // auch fuer BN9 (0,45), BN13 (0,7), BN14 (0,5) und BN15 (0,7) - je
+    // Kampfwert einzeln, nicht als ein Wert fuer alle vier. `expNoetig(1)`
+    // fuer Kampfwert 100 stand in BN14 elffach zu optimistisch (11.255 statt
+    // richtig 267.800), und "EINBAU LOHNT" waere dort falsch gefeuert.
+    // Fix wie blade.js:773/1012 - SF5 ist vorhanden, deshalb direkt live
+    // gelesen statt aus src/lib/bitnodes.json (das Werkzeug laeuft nur von
+    // Hand, RAM ist hier kein Engpass).
+    let bnMult = {};
+    try { bnMult = ns.getBitNodeMultipliers(); } catch { bnMult = {}; }
+    const knotenFaktor = (stat) => Number(bnMult[stat[0].toUpperCase() + stat.slice(1) + "LevelMultiplier"]) || 1;
+    const expNoetig = (m, stat) => Math.exp((100 / (m * knotenFaktor(stat)) + 200) / 32) - 534.6;
 
     const werte = ["strength", "defense", "dexterity", "agility"];
     const jetztMult = werte.map((w) => sp2.mults[w]);
@@ -251,8 +261,8 @@ export async function main(ns) {
       sp2.exp.dexterity, sp2.exp.agility];
     let restOhne = 0, restMit = 0;
     for (let i = 0; i < 4; i++) {
-      restOhne = Math.max(restOhne, expNoetig(jetztMult[i]) - expJetzt[i]);
-      restMit = Math.max(restMit, expNoetig(nachher[i]));
+      restOhne = Math.max(restOhne, expNoetig(jetztMult[i], werte[i]) - expJetzt[i]);
+      restMit = Math.max(restMit, expNoetig(nachher[i], werte[i]));
     }
     sag("Einbaurechnung: ohne Einbau noch " + Math.round(restOhne)
       + " Erfahrung, mit Einbau " + Math.round(restMit)

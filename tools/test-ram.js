@@ -182,7 +182,14 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // lib/einbau.js: einbauLandetEinsUnterSchwelle/waehleDaedalusFuellstueck).
     // Live-Nachmessung nach Einspielen noetig, dieser Auftrag hat keinen
     // Spielzugriff.
-    const VERALTET_ERLAUBT = ["bn4rep.js"];
+    //
+    // 2026-09-27 (Sleeves im Hackingweg auf Faktionsarbeit): sleeve.js ruft
+    // jetzt ns.sleeve.setToFactionWork - eine neue Sleeve-Funktion, +4 GB
+    // (RamCostGenerator.ts, sleeve.* je 4 GB). tools/ram.js rechnet 31,85 GB
+    // statt der gemessenen 27,85; registry.json ramBaseGb ist nachgezogen.
+    // Live-Nachmessung nach dem Einspielen noetig, dieser Auftrag hat keinen
+    // Spielzugriff.
+    const VERALTET_ERLAUBT = ["bn4rep.js", "sleeve.js"];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

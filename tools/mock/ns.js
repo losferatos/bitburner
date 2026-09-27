@@ -201,6 +201,9 @@ export function neuerMock(o = {}) {
      * `Math.random` verboten, wird es der richtige.
      */
     seed: Number.isFinite(o.seed) ? o.seed : 1,
+    /** Faktionsmitgliedschaft und angebotene Arbeitsarten (sleeve.setToFactionWork). */
+    faktionen: Array.isArray(o.faktionen) ? o.faktionen.slice() : [],
+    faktionsArten: o.faktionsArten || {},
     /** Rueckstand der Division in Millisekunden - siehe getBonusTime. */
     bonusMs: Number.isFinite(o.bonusMs) ? o.bonusMs : 0,
     /**
@@ -542,6 +545,8 @@ export function neuerMock(o = {}) {
       ...zustand.spieler,
       totalPlaytime: zustand.playtime,
       skills: { ...zustand.spieler.skills },
+      // Wie im Spiel (NetscriptFunctions.ts:1385): die Mitgliedsliste.
+      factions: zustand.faktionen.slice(),
     }),
     getResetInfo: () => ({ ...zustand.resetInfo }),
     getHackingLevel: () => zustand.spieler.skills.hacking,
@@ -696,6 +701,31 @@ export function neuerMock(o = {}) {
         const k = zustand.koerper[i];
         if (!k) return false;
         k.aufgabe = { type: "CRIME", crimeType: was };
+        return true;
+      },
+      // FAKTIONSARBEIT (27.09.2026, fuer den Hackingweg in sleeve.js).
+      // Regeln wie im Spiel (NetscriptFunctions/Sleeve.ts:141-174 und
+      // Sleeve.ts:418-434): kein Mitglied -> WIRFT (auch fuer Namen, die gar
+      // keine Faktion sind, etwa eine Firma aus rep-modus.txt); ein ANDERER
+      // Sleeve arbeitet schon dort -> WIRFT; Art nicht angeboten -> false.
+      // `faktionen` ist die Mitgliedsliste, `faktionsArten` je Faktion die
+      // angebotenen Arten (fehlt der Eintrag: alle drei).
+      setToFactionWork: (i, faktion, art) => {
+        const k = zustand.koerper[i];
+        if (!k) throw new Error("Invalid sleeve number: " + i);
+        if (!zustand.faktionen.includes(faktion)) {
+          throw new Error("Cannot work for faction " + faktion + " without being a member.");
+        }
+        for (const andere of zustand.koerper) {
+          if (andere === k || !andere.aufgabe) continue;
+          if (andere.aufgabe.type === "FACTION" && andere.aufgabe.factionName === faktion) {
+            throw new Error("Sleeve " + i + " cannot work for faction " + faktion
+              + " because Sleeve " + andere.nr + " is already working for them.");
+          }
+        }
+        const arten = zustand.faktionsArten[faktion] || ["hacking", "field", "security"];
+        if (!arten.includes(art)) return false;
+        k.aufgabe = { type: "FACTION", factionName: faktion, factionWorkType: art };
         return true;
       },
       setToBladeburnerAction: (i, art, name) => {

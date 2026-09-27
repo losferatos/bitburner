@@ -949,7 +949,7 @@ prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
     {
       "name": "sleeve.js",
       "args": [],
-      "ramBaseGb": 27.85,
+      "ramBaseGb": 31.85,
       "ramSingGb": 0.0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",

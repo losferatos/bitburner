@@ -399,7 +399,22 @@ console.log("-- die ganze Route, mit dem jeweils richtigen Stand (Substanz 13-16
   // Und die Gegenprobe zur Korrektur (2): ab 128 GB ist es NICHT mehr eng.
   const weit = zeilen.find((z) => z.home === 128);
   if (weit) {
-    pruefe("ab dem ersten 128-GB-Lauf ist Platz da", weit.frei > 10,
+    // SCHWELLE 10 -> 9 (27.09.2026, bewusst, nicht still). sleeve.js ruft seit
+    // dem Hackingweg-Umbau ns.sleeve.setToFactionWork (+4 GB, 27,85 -> 31,85
+    // GB). Gerechnet: im ersten 128-GB-Lauf (BN9 L3) laufen weiter ALLE 12
+    // ausgewaehlten Gewerke, keines wartet - es fehlt nur Luft fuer Arbeiter:
+    // 9,00 statt 13,00 GB frei. Eine Einsparung von >= 1 GB in sleeve.js gibt
+    // es ohne Funktionsverlust nicht (getResetInfo prueft den Knoten gegen
+    // verfahren.txt, getPlayer liefert Geld, Kampfwerte und Mitgliedschaft,
+    // scp/fileExists braucht liesVonHome; alle vier getrennten sleeve.*-
+    // Setzer sind in ihrem Zweig noetig).
+    //
+    // DIE 32-GB-ENGE: Auf einem 32-GB-Wirt laesst sleeve.js allein nur noch
+    // 0,15 GB frei - auf einem frischen home startet es also praktisch nie
+    // neben dem Kern. Die Sleeves im Kaltstart traegt deshalb weiter
+    // sleevecrime.js (7,65 GB); sleeve.js kommt, sobald ein Wirt mit Platz da
+    // ist. Die Registry-Zahl ist gerechnet, die Live-Messung steht aus.
+    pruefe("ab dem ersten 128-GB-Lauf ist Platz da", Math.round(weit.frei * 100) / 100 >= 9,
       "Lauf " + weit.nr + ": " + weit.frei.toFixed(2) + " GB frei bei "
       + weit.laufen + " Gewerken");
   }

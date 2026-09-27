@@ -176,7 +176,13 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // (src/startdiag.js + tools/eichung-messen.js --schreib, 44 Dateien, 0
     // abgelehnt). Die Liste ist wieder leer - jede neue Abweichung ist ein
     // Befund, keine Ausnahme.
-    const VERALTET_ERLAUBT = [];
+    //
+    // 2026-09-27 (H2-Fix Daedalus-Schwelle, bn12-bericht.md MINOR #3):
+    // bn4rep.js hat neuen Code bekommen (Fuellstueck-Gate vor dem Einbau,
+    // lib/einbau.js: einbauLandetEinsUnterSchwelle/waehleDaedalusFuellstueck).
+    // Live-Nachmessung nach Einspielen noetig, dieser Auftrag hat keinen
+    // Spielzugriff.
+    const VERALTET_ERLAUBT = ["bn4rep.js"];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

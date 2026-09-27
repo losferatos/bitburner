@@ -55,6 +55,7 @@ import {
   sollFuellstueckSofortKaufen, redPillWartetAufEinbau, unbezahlbarInHorizont,
   favorZaehltFuerFaktion, fokusEntscheidung, einkommenAusScriptIncome, spendePausiert,
   istEinbauWertvoll, waehleEinbauGeldziele, einbauGrundText,
+  einbauLandetEinsUnterSchwelle, waehleDaedalusFuellstueck,
 } from "lib/einbau.js";
 
 export async function main(ns) {
@@ -1536,6 +1537,53 @@ export async function main(ns) {
       {
         const torGrund = torGrundJetzt();
         if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
+      }
+
+      // H2-FIX (27.09.2026, nodes/audit-2026-09-26/bn12-bericht.md, MINOR
+      // #3). `daedalusSchwelle()` (A3) wird bisher nur bei der ZIELWAHL
+      // gelesen (`zaehlplatzWert` unten), nicht hier am Ausloeser. Landet
+      // dieser Einbau bei genau schwelle-1 installierten Stuecken (BN12:
+      // 30 von 31), laedt Daedalus nie ein - ein ganzer weiterer Zyklus
+      // (~1,7 h) fuer die letzte Stufe. Deshalb vorher versuchen, ein
+      // weiteres UNTERSCHIEDLICHES Stueck zu kaufen; gelingt das nicht,
+      // baut der Bot trotzdem ein (`einbauLandetEinsUnterSchwelle`/
+      // `waehleDaedalusFuellstueck` liefern nur die Entscheidung, nie eine
+      // Sperre - siehe lib/einbau.js).
+      {
+        const schwelleJetzt = daedalusSchwelle(bnMults, kaufKnoten, DAEDALUS_SCHWELLE_FALLBACK);
+        const alleJetzt = ns.singularity.getOwnedAugmentations(true);
+        const installiertJetzt = ns.singularity.getOwnedAugmentations(false).length;
+        const distinktNachEinbau = new Set(alleJetzt).size;
+        if (einbauLandetEinsUnterSchwelle(installiertJetzt, distinktNachEinbau, schwelleJetzt)) {
+          const nfgVorhanden = alleJetzt.includes(NFG);
+          const geldJetzt = ns.getServerMoneyAvailable("home");
+          const besitzJetzt = new Set(alleJetzt);
+          const kandidaten = [];
+          for (const f of spieler.factions) {
+            for (const a of ns.singularity.getAugmentationsFromFaction(f)) {
+              if (a === NFG || besitzJetzt.has(a)) continue;
+              const repReq = ns.singularity.getAugmentationRepReq(a);
+              const rep = ns.singularity.getFactionRep(f);
+              if (rep < repReq) continue;
+              const p = ns.singularity.getAugmentationPrice(a);
+              if (p > geldJetzt) continue;
+              kandidaten.push({ aug: a, faction: f, preis: p, rep, repReq });
+            }
+          }
+          const wahl = waehleDaedalusFuellstueck(kandidaten, nfgVorhanden);
+          if (wahl && wahl.typ === "stueck") {
+            const k = kandidaten.find((x) => x.aug === wahl.aug);
+            if (k && ns.singularity.purchaseAugmentation(k.faction, k.aug)) {
+              sag("Daedalus-Fuellstueck: " + k.aug + " gekauft (" + k.faction
+                + "), sonst haette der Einbau bei " + (schwelleJetzt - 1) + "/"
+                + schwelleJetzt + " Stuecken gehangen.");
+            }
+          }
+          // wahl.typ === "nfg" oder null: die NFG-Schleife gleich danach
+          // versucht ohnehin, eine Stufe zu kaufen, wenn moeglich - kein
+          // eigener Kaufpfad noetig. Bleibt auch das erfolglos, baut der
+          // Bot trotzdem ein (keine Sperre, siehe Begruendung oben).
+        }
       }
 
       // NEUROFLUX ZULETZT (22.08.2026). NFG ist der einzige Multiplikator,

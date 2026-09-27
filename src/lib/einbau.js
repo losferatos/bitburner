@@ -96,6 +96,64 @@ export function zaehlplatzWert(installierteZahl, schwelle) {
 }
 
 /**
+ * H2 (BN12-Korrektheit, nodes/audit-2026-09-26/bn12-bericht.md, MINOR #3):
+ * `daedalusSchwelle()` liest die Anforderung jetzt live (A3), aber nur die
+ * ZIELWAHL (`zaehlplatzWert`) nutzte sie bisher - der Einbau-Ausloeser
+ * (unten in bn4rep.js) fragte gar nicht, wie viele Stuecke DIESER Einbau
+ * am Ende zaehlt. Landet er genau bei schwelle-1 installierten Stuecken
+ * (Zaehlung wie im Spiel, siehe `zaehlplatzWert`), laedt Daedalus nicht ein
+ * - der Bot braucht einen ganzen weiteren Zyklus (~1,7 h im Schnitt) fuer
+ * die letzte fehlende Stufe. In BN5 (Schwelle 30) kam dieser Fall in den
+ * Audit-Laeufen nie vor; bei BN12 (Schwelle 31, ungerade gegen die ueblichen
+ * Rundzahlen) ist er nicht mehr nur theoretisch.
+ *
+ * `distinktNachEinbau` ist die Zahl UNTERSCHIEDLICHER Stuecke, die dieser
+ * Einbau am Ende zaehlt - also `new Set(getOwnedAugmentations(true)).size`:
+ * installierte plus wartende, NFG dort ausdruecklich nur einmal (wie
+ * `zaehlplatzWert` oben begruendet).
+ *
+ * @param {number} installiert eingebauteAugs.length (vor diesem Einbau)
+ * @param {number} distinktNachEinbau Zahl unterschiedlicher Stuecke nach diesem Einbau
+ * @param {number} schwelle Ergebnis von daedalusSchwelle()
+ * @returns {boolean} true = vor dem Einbau erst versuchen, ein weiteres Stueck zu kaufen
+ */
+export function einbauLandetEinsUnterSchwelle(installiert, distinktNachEinbau, schwelle) {
+  if (!(installiert < schwelle)) return false;
+  return distinktNachEinbau === schwelle - 1;
+}
+
+/**
+ * H2, zweiter Teil: welches Stueck fuer den Zusatzplatz versucht wird, wenn
+ * `einbauLandetEinsUnterSchwelle()` true meldet. Reine Auswahl - das Kaufen
+ * selbst (`ns.singularity.purchaseAugmentation`, ggf. Spenden fuer NFG-Rep)
+ * bleibt in bn4rep.js, dort stehen die bestehenden Kaufpfade schon (Zeile
+ * um die NFG-Schleife und die Fuellstueck-Logik).
+ *
+ * Reihenfolge: zuerst das billigste kaufbare Stueck mit erfuellter
+ * Reputation (`kandidaten` wird vom Aufrufer schon auf "Rep erfuellt,
+ * bezahlbar, nicht schon besessen" gefiltert erwartet, hier zur Sicherheit
+ * nochmal geprueft) - das ist ein zusaetzlicher DISTINCT-Platz ohne
+ * Nebenwirkung. Erst wenn keins kaufbar ist und NFG weder installiert noch
+ * in der Warteschlange steht, gilt eine erste NFG-Stufe als Fallback (sie
+ * zaehlt als GENAU EIN Distinct-Platz, egal wie viele Stufen spaeter
+ * dazukommen). Ist nichts davon moeglich, liefert die Funktion `null` - der
+ * Aufrufer baut dann trotzdem ein, damit der Bot nie haengen bleibt.
+ *
+ * @param {{aug:string, preis:number, rep:number, repReq:number}[]} kandidaten
+ * @param {boolean} nfgVorhanden NFG bereits installiert ODER in der Warteschlange
+ * @returns {{typ:"stueck", aug:string}|{typ:"nfg"}|null}
+ */
+export function waehleDaedalusFuellstueck(kandidaten, nfgVorhanden) {
+  const liste = Array.isArray(kandidaten) ? kandidaten : [];
+  const kaufbar = liste
+    .filter((k) => k.rep >= k.repReq && Number(k.preis) >= 0)
+    .sort((a, b) => a.preis - b.preis)[0];
+  if (kaufbar) return { typ: "stueck", aug: kaufbar.aug };
+  if (!nfgVorhanden) return { typ: "nfg" };
+  return null;
+}
+
+/**
  * A4: Ist das Spendenrecht faellig (Favor erreicht die Donation-Schwelle) und
  * liegt nichts in der Warteschlange, wartet der Bot bisher auf ein zufaellig
  * verdientes Stueck - belegt 37 min Stillstand in BN5.2 (Audit 3#2). Diese

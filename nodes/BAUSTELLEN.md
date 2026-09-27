@@ -1210,6 +1210,56 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
+### Audit 27.09. Rest
+
+Reste aus dem Skeptiker-Durchgang vom 27.09.2026 auf `integ-2026-09-27`, die
+nicht Teil der Fixes 1-5 dort waren (C5 revertiert, joinrun/blade/B5/H2
+behoben) - hier nur vermerkt, keine Codeaenderung.
+
+- **C5-Neuentwurf**: der Kaltstart-Ansatz aus dem revertierten `lib/
+  kaltstart.js` (Park/Netzgroesse statt home-RAM) war in der Herleitung
+  richtig, aber falsch gekoppelt - er kippte nach JEDER Aug-Einbau-
+  Installation, nicht nur nach einem echten Knotenwechsel. Ein Neuentwurf
+  muesste: die Kaltstart-Erkennung an den Node-Reset koppeln (`ns.
+  getResetInfo().lastNodeReset`), statt an Park/Netzgroesse allein;
+  `bn4rep.js`/`bn4door.js` in der Registry auf `phase: "beide"` setzen, damit
+  sie nach einem Aug-Einbau nicht bis zum ersten neuen Park-Rechner stillstehen;
+  die darkweb-Sperre (B3) im Starter-Zweig `fehlend` selbst greifen, statt sich
+  auf die Kaltstart-Phase zu verlassen; und eine Wache-Ausnahme fuer
+  `sleevecrime.js` (Kaltstart-Gewerk, phase "kaltstart"), das die Kopplung
+  an den Node-Reset sonst genauso faelschlich verlieren wuerde.
+
+- **joinrun vs. bn4life Aevum-Pingpong**: `bn4life.js` reist fuer die Aevum-
+  Faktion, `joinrun.js` fuer Sector-12 (Slum Snakes/Tetrads/Tian Di Hui) -
+  beide unter derselben Figur-Lease, keiner kennt das Reiseziel des anderen.
+  test-joinrun-ebene2.js Abschnitt 8 deckt den Fall ab, in dem `joinrun`
+  selbst unter der Lease zurueckreist; ungeprueft bleibt die Gegenrichtung
+  (bn4life reist waehrend `joinrun` gerade unterwegs zum Gym ist) und ob sich
+  beide wiederholt gegenseitig die Stadt umstellen, ohne dass eines von
+  beiden je trainiert.
+
+- **`truppAnfrage` hat keinen Leser**: irgendwo schreibt der Bot eine
+  Sleeve-Rekrutierungsanfrage (`data/trupp-anfrage.txt` o. ae. - Name
+  gegenpruefen), aber kein Gewerk liest sie. Es fehlt ein Sleeve-Rekrutier-
+  Haken, der die Anfrage aufnimmt und tatsaechlich rekrutiert
+  (`ns.sleeve.recruit` o. ae.) statt dass sie folgenlos liegen bleibt.
+
+- **Doppelte Konstanten `F_LEITER`/`F_NETZANTEIL`**: `bn4net.js` hat seinen
+  eigenen `stapelPlan`/`F_LEITER`-Suchlauf fuer die TAKTUNG (siehe
+  Begruendung in `lib/calc.js` beim B5-Block), `lib/calc.js` exportiert
+  `BATCH_F_LEITER`/`BATCH_F_NETZANTEIL` fuer die AUSWAHL - bewusst getrennt
+  gehalten (siehe Kommentar dort), aber KEIN Test stellt sicher, dass beide
+  Konstantensaetze bei einer kuenftigen Aenderung noch uebereinstimmen. Ein
+  Vergleichstest (beide Listen elementweise gleich) fehlt.
+
+- **`cycleCost`/`prepSeconds` ohne die weaken-Rate**: H1 (27.09.2026,
+  `test-h1-weakenrate.js`) hat `ServerWeakenRate` in Vorbereitung, Mischung
+  und Stapeltakt eingerechnet - ungeprueft bleibt, ob jede Stelle, die
+  `cycleCost` oder eine eigene `prepSeconds`-Schaetzung rechnet (auszuserhalb
+  der schon gefixten Pfade in `bn4net.js`), denselben Faktor kennt. Ein Grep
+  nach `prepSeconds`/`cycleCost` gegen `bnServerWeakenRate`/`bnWeakenRate`
+  quer durch `src/` und `lib/` stuende noch aus.
+
 ### test-bruecke.js wackelt in der Suite: Probe "Riegel BLIND" (22.09.2026)
 
 Einmal von drei Laeufen rot, einzeln immer gruen (96/96). Die Bruecke wies

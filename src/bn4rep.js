@@ -1567,17 +1567,38 @@ export async function main(ns) {
               if (rep < repReq) continue;
               const p = ns.singularity.getAugmentationPrice(a);
               if (p > geldJetzt) continue;
+              // H2 (Skeptiker-Fund 5, 27.09.2026): unerfuellte Voraussetzungen
+              // vorher ausschliessen. purchaseAugmentation() lehnt ein Stueck
+              // mit fehlendem Vorgaenger kommentarlos ab (false), und ohne
+              // diesen Filter waere der Fuellversuch dann fuer den ganzen
+              // Zyklus verpufft, statt das naechstguenstige Stueck zu
+              // versuchen - derselbe Fehlermodus wie ohne den Kauf-Ruecklauf
+              // unten.
+              const prereq = ns.singularity.getAugmentationPrereq(a);
+              if (prereq.some((v) => !besitzJetzt.has(v))) continue;
               kandidaten.push({ aug: a, faction: f, preis: p, rep, repReq });
             }
           }
-          const wahl = waehleDaedalusFuellstueck(kandidaten, nfgVorhanden);
-          if (wahl && wahl.typ === "stueck") {
-            const k = kandidaten.find((x) => x.aug === wahl.aug);
-            if (k && ns.singularity.purchaseAugmentation(k.faction, k.aug)) {
+          // H2, KAUF-RUECKLAUF (Skeptiker-Fund 5): `waehleDaedalusFuellstueck`
+          // waehlt nur das (nach Preis) beste Stueck - schlaegt der Kauf
+          // trotzdem fehl (Preis seit der Auswahl gestiegen, oder ein anderer
+          // Grund ausserhalb der hier bekannten Felder), versuchte der alte
+          // Code kein zweites Stueck mehr. Jetzt: das gescheiterte Stueck aus
+          // der Liste nehmen und erneut waehlen, bis eins klappt oder nichts
+          // mehr uebrig ist.
+          let restKandidaten = kandidaten;
+          for (;;) {
+            const wahl = waehleDaedalusFuellstueck(restKandidaten, nfgVorhanden);
+            if (!wahl || wahl.typ !== "stueck") break;
+            const k = restKandidaten.find((x) => x.aug === wahl.aug);
+            if (!k) break;
+            if (ns.singularity.purchaseAugmentation(k.faction, k.aug)) {
               sag("Daedalus-Fuellstueck: " + k.aug + " gekauft (" + k.faction
                 + "), sonst haette der Einbau bei " + (schwelleJetzt - 1) + "/"
                 + schwelleJetzt + " Stuecken gehangen.");
+              break;
             }
+            restKandidaten = restKandidaten.filter((x) => x.aug !== k.aug);
           }
           // wahl.typ === "nfg" oder null: die NFG-Schleife gleich danach
           // versucht ohnehin, eine Stufe zu kaufen, wenn moeglich - kein

@@ -99,6 +99,9 @@ function baueWelt(o) {
     // Protokoll fuer die Zusicherungen
     schlaf: [],
     kaeufe: [],
+    // H2/Skeptiker-Fund 5: Namen, deren purchaseAugmentation() trotz
+    // erfuellter Vorbedingungen mit false antwortet (Testhaken, s.o.).
+    kaufSperre: o.kaufSperre ? new Set(o.kaufSperre) : null,
     spenden: [],
     setFocus: [],
     installAufrufe: 0,
@@ -171,9 +174,19 @@ function baueNs(w) {
       getAugmentationsFromFaction: (f) => [...w.faktionen[f].augs],
       getAugmentationRepReq: (a) => w.augs[a].repReq,
       getAugmentationPrice: (a) => preis(w, a),
+      // H2/Skeptiker-Fund 5 (27.09.2026): AugmentationHelpers.tsx prueft
+      // Vorgaenger-Stuecke vor dem Kauf. `w.augs[a].prereq` ist die
+      // Namensliste, Vorgabe leer (kein Test kannte das bisher, weil
+      // bn4rep.js die Funktion vor diesem Fix nie rief).
+      getAugmentationPrereq: (a) => [...(w.augs[a].prereq || [])],
       // FactionHelpers.tsx purchaseAugmentation: Mitglied, im Katalog, Rep,
       // Geld, nicht schon besessen (NFG ausgenommen).
       purchaseAugmentation: (f, a) => {
+        // Testhaken fuer den Kauf-Ruecklauf (H2, Skeptiker-Fund 5): simuliert
+        // einen Kaufversuch, der trotz erfuellter Rep/Preis/Prereq-Pruefung
+        // scheitert (im echten Spiel z. B., weil der Preis sich zwischen
+        // Auswahl und Kauf durch einen parallelen Kauf schon erhoeht hat).
+        if (w.kaufSperre && w.kaufSperre.has(a)) return false;
         const fk = w.faktionen[f];
         if (!fk || !fk.augs.includes(a)) return false;
         if (a !== NFG && (w.installiert.includes(a) || w.warteschlange.includes(a))) return false;
@@ -686,6 +699,99 @@ console.log("\n-- H2: Daedalus-Fuellstueck vor dem Einbau (BN12, Schwelle 31, bn
   pruefe("kein Fuellstueck-Kauf, wenn die Schwelle ohnehin getroffen wird (31 von 31)",
     !r.log.includes("Daedalus-Fuellstueck"), r.log.slice(0, 400));
   pruefe("installAugmentations laeuft trotzdem", w.installAufrufe === 1 && r.ende === "return");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- H2/Skeptiker-Fund 5: unerfuellte Vorbedingung wird uebersprungen --");
+{
+  // Wie oben (29 installiert, Red Pill wartend -> Gate greift), aber
+  // "Gesperrt" ist BILLIGER als "Teurer" und haette ohne den Prereq-Filter
+  // gewonnen (waehleDaedalusFuellstueck sortiert nach Preis) - es fehlt ihm
+  // aber "Vorstufe", die weder installiert noch in der Warteschlange steht.
+  // Ohne den Fix versucht der Bot "Gesperrt" zu kaufen, purchaseAugmentation
+  // lehnt wegen des Vorgaengers ab (im echten Spiel: AugmentationHelpers.tsx),
+  // und der Zyklus verpufft ganz - hier im Mock waere das sogar noch
+  // schlimmer sichtbar, weil "Gesperrt" gar nicht im Faktionskatalog fehlt,
+  // sondern nur am Prereq scheitert (die Rueckrufkette VOR dem Fix kennt
+  // diesen Grund gar nicht und probiert nichts anderes).
+  const AUGS_BN12 = {
+    "The Red Pill": { repReq: 2.5e6, basis: 0 },
+    Gesperrt: { repReq: 5e4, basis: 1e6, prereq: ["Vorstufe"] },
+    Teurer: { repReq: 5e4, basis: 2e6 },
+    [NFG]: { repReq: 1000, basis: 1e6 },
+  };
+  const w = baueWelt({
+    host: "werk-0", knoten: 12, moneyMult: 1,
+    geld: 5e9, einkommen: 1e6,
+    bnMults: { DaedalusAugsRequirement: 31 },
+    faktionen: { Daedalus: { favor: 150.6, rep: 3e6, augs: ["The Red Pill", "Gesperrt", "Teurer", NFG] } },
+    augs: AUGS_BN12,
+    installiert: Array.from({ length: 29 }, (_, i) => "Alt-" + i),
+    warteschlange: ["The Red Pill"],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": "V1 12", "data/company-order.txt": "off" } },
+    schlafBudget: 30,
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+    },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig (kein echter Rundenfehler)", rundenfehler(r.log).length === 0
+    && r.ende !== "fehler", rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("'Gesperrt' (Vorstufe fehlt) wurde NICHT gekauft",
+    !w.kaeufe.some((k) => k.a === "Gesperrt"), JSON.stringify(w.kaeufe));
+  pruefe("stattdessen 'Teurer' (kein Prereq) wurde gekauft",
+    r.log.includes("Daedalus-Fuellstueck: Teurer"), r.log.slice(0, 400));
+  pruefe("der Einbau selbst lief (installAugmentations, Ende return)",
+    w.installAufrufe === 1 && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- H2/Skeptiker-Fund 5: Kauf-Ruecklauf, wenn das billigste Stueck trotzdem scheitert --");
+{
+  // "Billig" erfuellt Rep/Preis/Prereq, aber purchaseAugmentation() lehnt es
+  // trotzdem ab (kaufSperre - im echten Spiel z. B. ein Preisanstieg
+  // zwischen Auswahl und Kauf). Ohne Ruecklauf versucht der alte Code kein
+  // zweites Stueck mehr in dieser Runde.
+  const AUGS_BN12 = {
+    "The Red Pill": { repReq: 2.5e6, basis: 0 },
+    Billig: { repReq: 5e4, basis: 1e6 },
+    Teurer: { repReq: 5e4, basis: 2e6 },
+    [NFG]: { repReq: 1000, basis: 1e6 },
+  };
+  const w = baueWelt({
+    host: "werk-0", knoten: 12, moneyMult: 1,
+    geld: 5e9, einkommen: 1e6,
+    bnMults: { DaedalusAugsRequirement: 31 },
+    faktionen: { Daedalus: { favor: 150.6, rep: 3e6, augs: ["The Red Pill", "Billig", "Teurer", NFG] } },
+    augs: AUGS_BN12,
+    installiert: Array.from({ length: 29 }, (_, i) => "Alt-" + i),
+    warteschlange: ["The Red Pill"],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": "V1 12", "data/company-order.txt": "off" } },
+    schlafBudget: 30,
+    kaufSperre: ["Billig"],
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+    },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig (kein echter Rundenfehler)", rundenfehler(r.log).length === 0
+    && r.ende !== "fehler", rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("'Billig' wurde versucht, aber nicht tatsaechlich gekauft",
+    !w.kaeufe.some((k) => k.a === "Billig"), JSON.stringify(w.kaeufe));
+  pruefe("stattdessen 'Teurer' wurde gekauft (Kauf-Ruecklauf statt Abbruch)",
+    r.log.includes("Daedalus-Fuellstueck: Teurer"), r.log.slice(0, 400));
+  pruefe("der Einbau selbst lief (installAugmentations, Ende return)",
+    w.installAufrufe === 1 && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
 }
 
 console.log("");

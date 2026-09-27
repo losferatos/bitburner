@@ -208,6 +208,11 @@ const TESTS = [
     schnell: false,
   },
   {
+    datei: "test-sleeve-hackingweg.js",
+    deckt: "EBENE 2: Sleeves im Hackingweg (V1) - Faktionsarbeit statt Shoplift, Mug/Shoplift wie Crime.ts gerechnet, BN8 ohne Verbrechensgeld, Schockerholung bis 65 stehenlassen, Rueckfall nie Leerlauf",
+    schnell: false,
+  },
+  {
     datei: "test-bruecke.js",
     deckt: "EBENE 2: die Bruecke gegen ein nachgebautes Spiel - Rollentrennung, Wachhund, Sicherung vor pushAll, zweite Verbindung, belegter Port (Auftrag 6.1)",
     schnell: false,

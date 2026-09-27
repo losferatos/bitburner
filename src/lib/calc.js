@@ -745,28 +745,77 @@ export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM, bnWe
     || !(kz.hackTimeMin > 0) || !(moneyMax > 0)) return null;
 
   const tWeakenMs = kz.hackTimeMin * WEAKEN_TIME_FACTOR * 1000;
-  const kalenderPlaetze = Math.max(1, Math.floor(tWeakenMs / (4 * BATCH_GAP_MS)));
+  // Kalenderplaetze SIND ganzzahlig (ein Stapel bekommt keinen halben Platz)
+  // - fuer die diskreten Felder unten (fraction/ram/ramCeiling, identisch zum
+  // Kerntakt) bleibt es deshalb bei floor(). Fuer die GEGLAETTETE
+  // Auswahlkennzahl perS wird stattdessen die UNGERUNDETE Platzzahl verwendet
+  // (slotsCont) - sonst waere bei kleinen Platzzahlen (1 -> 2 ist +100 %!)
+  // schon die Rundung selbst ein Sprung, den keine f-Interpolation heilen
+  // kann (Skeptiker B5, Einwand 2b, Gegenprobe: mit floor() blieb bei
+  // kalenderPlaetze 1->2 ein Sprung von Faktor 1,92 stehen).
+  const slotsCont = Math.max(1, tWeakenMs / (4 * BATCH_GAP_MS));
+  const kalenderPlaetze = Math.max(1, Math.floor(slotsCont));
   const wunschGb = ramTotal * BATCH_F_NETZANTEIL;
+  const stapelSec = (4 * BATCH_GAP_MS) / 1000;
 
-  // Kleinstes f, dessen voller Kalender den Netzanteil erreicht - identisch
-  // zum Suchlauf im Kerntakt. Bleibt der Kalender darunter (wenige Plaetze),
-  // laeuft die Schleife bis zum Ende durch und "fraction" bleibt bei der
-  // hoechsten Sprosse: genau die Kalendergrenze, die die alte Auswahl blind
-  // gemacht hat.
-  let fraction = BATCH_F_LEITER[BATCH_F_LEITER.length - 1];
-  let plan = stapelPlan(fraction, kz, moneyMax, costs, bnWeakenRate);
-  for (const f of BATCH_F_LEITER) {
-    const pl = stapelPlan(f, kz, moneyMax, costs, bnWeakenRate);
-    fraction = f;
-    plan = pl;
-    if (pl.ram * kalenderPlaetze >= wunschGb) break;
+  // Alle Sprossen einmal rechnen (8 Stueck, billig) - fuer die DISKRETE Wahl
+  // (identisch zum Kerntakt, siehe fraction/ram/ramCeiling unten) UND fuer
+  // die GEGLAETTETE Auswahlkennzahl perS.
+  const plaene = BATCH_F_LEITER.map((f) => stapelPlan(f, kz, moneyMax, costs, bnWeakenRate));
+  let idx = BATCH_F_LEITER.length - 1;
+  for (let i = 0; i < BATCH_F_LEITER.length; i++) {
+    if (plaene[i].ram * kalenderPlaetze >= wunschGb) { idx = i; break; }
+  }
+  const fraction = BATCH_F_LEITER[idx];
+  const plan = plaene[idx];
+
+  // GEGLAETTETE perS (Skeptiker B5, 27.09.2026, Einwand 2b). Die diskrete
+  // Sprosse oben klemmt an der Kalendergrenze: eine winzige Aenderung von
+  // hackTimeMin (ein einziger Levelaufstieg) kann kalenderPlaetze um 1
+  // verschieben und damit "idx" um eine ganze Sprosse springen lassen -
+  // gemessen bis zu Faktor 2,5 in perS (F_LEITER 0.02 vs 0.05), waehrend
+  // ZIELWAHL.bonusBatch nur 1,3 vertraegt. Ein amtierendes Stapelziel waere
+  // so schon durch einen Levelpunkt verdraengbar gewesen - und beim
+  // naechsten Levelpunkt zurueckgetauscht: Flattern im unbeaufsichtigten
+  // Betrieb.
+  //
+  // Statt der Sprosse selbst wird deshalb LINEAR zwischen den zwei Sprossen
+  // interpoliert, zwischen denen wunschGb tatsaechlich liegt (ramCeiling
+  // waechst mit f, die Interpolation ist also wohldefiniert) - so wie ein
+  // KONTINUIERLICHES f es taete, wenn man f fein genug raster koennte. Mit
+  // slotsCont statt kalenderPlaetze bleibt auch die Kalendergroesse selbst
+  // stetig.
+  //
+  // KEINE VIRTUELLE SPROSSE UNTER F_LEITER[0] (Gegenpruefung nach der ersten
+  // Fassung): reicht schon die KLEINSTE Sprosse (0.02) allein weit ueber
+  // wunschGb hinaus - ein Ziel mit riesigem Kalender wie ein Konzernserver -,
+  // haette eine Interpolation gegen einen Nullpunkt den Durchsatz auf einen
+  // winzigen Bruchteil herunterskaliert, obwohl der Kerntakt dort ganz normal
+  // die volle Sprosse 0.02 faehrt. idxGlatt = 0 liefert deshalb den vollen,
+  // UNSKALIERTEN Wert dieser Sprosse - das ist ohnehin stetig zum Nachbarfall
+  // (idxGlatt = 1): am Uebergang naehert sich dessen Interpolation exakt
+  // diesem Wert (t -> 0), weil dort ceilUnten (Sprosse 0) gegen wunschGb
+  // laeuft.
+  let idxGlatt = BATCH_F_LEITER.length - 1;
+  for (let i = 0; i < BATCH_F_LEITER.length; i++) {
+    if (plaene[i].ram * slotsCont >= wunschGb) { idxGlatt = i; break; }
+  }
+  const planGlatt = plaene[idxGlatt];
+  let perS = planGlatt.geld / stapelSec;
+  if (idxGlatt > 0) {
+    const ceilOben = planGlatt.ram * slotsCont;
+    const ceilUnten = plaene[idxGlatt - 1].ram * slotsCont;
+    const geldUnten = plaene[idxGlatt - 1].geld;
+    if (ceilOben > ceilUnten) {
+      const t = Math.min(1, Math.max(0, (wunschGb - ceilUnten) / (ceilOben - ceilUnten)));
+      perS = (geldUnten + t * (planGlatt.geld - geldUnten)) / stapelSec;
+    }
   }
 
-  const stapelSec = (4 * BATCH_GAP_MS) / 1000;
   return {
     fraction, kalenderPlaetze,
     ram: plan.ram,
     ramCeiling: plan.ram * kalenderPlaetze,
-    perS: plan.geld / stapelSec,
+    perS,
   };
 }

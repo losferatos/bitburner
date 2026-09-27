@@ -299,6 +299,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b5-flattern.js",
+    deckt: "B5-Skeptiker, Einwand 2b: keine Sprossen-Sprünge in batchThroughput über ZIELWAHL.bonusBatch hinaus",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

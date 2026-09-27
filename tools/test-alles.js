@@ -294,6 +294,21 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b5-stapeldurchsatz.js",
+    deckt: "EBENE 2: B5 (Audit 26.09.2026 2#4): Stapelziele nach erreichbarem Stapeldurchsatz statt nach Rang",
+    schnell: true,
+  },
+  {
+    datei: "test-h1-weakenrate.js",
+    deckt: "H1 (Audit bn12-bericht SHOULD-FIX #1): ServerWeakenRate in Vorbereitung, Mischung, Stapeltakt",
+    schnell: true,
+  },
+  {
+    datei: "test-b5-flattern.js",
+    deckt: "B5-Skeptiker, Einwand 2b: keine Sprossen-Sprünge in batchThroughput über ZIELWAHL.bonusBatch hinaus",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

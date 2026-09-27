@@ -279,12 +279,21 @@ export function growThreads(server, targetMoney, startMoney, p, cores = 1, bnGro
 
 /**
  * Wie viele weaken-Threads senken die Security um so viel?
+ *
+ * H1 (Audit 26.09.2026, bn12-bericht SHOULD-FIX #1): bnWeakenRate ist
+ * BitNodeMultipliers.ServerWeakenRate (ServerHelpers.ts:322 multipliziert
+ * sie in den Sicherheitsabbau je Faden ein). Vorgabe 1 - ausserhalb von
+ * BN12 unveraendert. In BN12 ist sie < 1 (0,9804/0,9612/0,9423 je Stufe):
+ * jeder Faden senkt WENIGER, es werden also MEHR Faeden gebraucht.
+ *
  * @param {number} secDelta
  * @param {number} cores
+ * @param {number} bnWeakenRate
  */
-export function weakenThreads(secDelta, cores = 1) {
+export function weakenThreads(secDelta, cores = 1, bnWeakenRate = 1) {
   if (secDelta <= 0) return 0;
-  return Math.ceil(secDelta / (SERVER_WEAKEN_AMOUNT * coreBonus(cores)));
+  const rate = bnWeakenRate > 0 ? bnWeakenRate : 1;
+  return Math.ceil(secDelta / (SERVER_WEAKEN_AMOUNT * coreBonus(cores) * rate));
 }
 
 /**
@@ -416,6 +425,10 @@ export function expectedYield(s, p, ramFree, horizon = 900, costs = WORKER_RAM) 
  *          secOk: number, moneyLow: number, prepRamGb: number}} cfg
  */
 export function targetMetrics(s, p, hackTimeIstSec, cfg) {
+  // H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1 (BN5 hat keinen
+  // Eintrag). Siehe weakenThreads oben fuer die Begruendung.
+  const bnWeakenRate = Number.isFinite(cfg.bnServerWeakenRate) && cfg.bnServerWeakenRate > 0
+    ? cfg.bnServerWeakenRate : 1;
   const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
   const req = s.requiredHackingSkill;
   const pct = hackPercent({ sec: hdIst, reqSkill: req }, { skill: p.skill, multMoney: p.multMoney },
@@ -436,7 +449,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
   const hackTimeMin = hackTimeIstSec * (zeitIst > 0 ? zeitMin / zeitIst : 1);
   const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
   const wphMin = (SERVER_FORTIFY_AMOUNT * chanceMin + GROW_FORTIFY_AMOUNT * gphMin)
-    / SERVER_WEAKEN_AMOUNT;
+    / (SERVER_WEAKEN_AMOUNT * bnWeakenRate);
   const gbSekProEinheit = hackTimeMin
     * (cfg.ramHackT + GROW_TIME_FACTOR * gphMin * cfg.ramGrowT
       + WEAKEN_TIME_FACTOR * wphMin * cfg.ramWeakenT);
@@ -459,7 +472,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
   // Normalfall (Sicherheit 100 -> 35 sind 1.300 Faeden, 2,3 TB).
   let prepSec = 0;
   if (secOver > cfg.secOk) {
-    const gbWelle = weakenThreads(secOver) * cfg.ramWeakenT;
+    const gbWelle = weakenThreads(secOver, 1, bnWeakenRate) * cfg.ramWeakenT;
     const wellen = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbWelle / cfg.prepRamGb)) : 1;
     prepSec += wellen * WEAKEN_TIME_FACTOR * hackTimeIstSec;
   }
@@ -478,7 +491,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
     const growFaeden = kMin > 0
       ? Math.log(cfg.mixMoneyHigh / Math.max(moneyFrac, 1e-9)) / kMin : Infinity;
     const gbGrow = growFaeden
-      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / SERVER_WEAKEN_AMOUNT) * cfg.ramWeakenT);
+      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / (SERVER_WEAKEN_AMOUNT * bnWeakenRate)) * cfg.ramWeakenT);
     const wellenGrow = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbGrow / cfg.prepRamGb)) : 1;
     prepSec += wellenGrow * WEAKEN_TIME_FACTOR * hackTimeMin;
   }
@@ -593,4 +606,216 @@ export function selectMoneyTargets(sorted, opts) {
     gewaehlt.push(c.host);
   }
   return gewaehlt;
+}
+
+// ===========================================================================
+// STAPELDURCHSATZ FUER DIE ZIELAUSWAHL (B5, Audit 26.09.2026 2#4) - 27.09.2026
+// ===========================================================================
+//
+// WARUM: Stapelziele (bn4net.js "batchTargets") wurden bisher als die ersten
+// BATCH_ZIELE Eintraege der nach targetRank sortierten Liste gewaehlt -
+// derselbe Rang, nach dem auch die OFFENE Mischung sortiert. targetRank sagt
+// aber nur, wie GUT ein Ziel pro Gigabyte ist (steadyEff), nicht, wieviel
+// Gigabyte es als STAPELZIEL ueberhaupt sinnvoll aufnehmen kann. Ein Ziel mit
+// kurzer weaken-Zeit hat wenige Kalenderplaetze (Stapel duerfen nur alle
+// GAP_MS landen, siehe bn4net.js-Kerntakt): mehr Speicher als
+// plan.ram*kalenderPlaetze bringt dort NICHTS mehr, der Ertrag klemmt fest,
+// egal wie viel RAM zugeteilt wird.
+//
+// Belegt an BN5L2 19:04 (Level 3012, eigene Rechnung mit batchThroughput
+// gegen scratchpad/audit/rows1904.json+s1904.json): phantasy (3
+// Kalenderplaetze bei f=0.5) und max-hardware (2) sind unter den ersten drei
+// nach steadyEff/targetRank, liefern zusammen aber nur 265 Mio $/s und
+// saettigen dabei schon bei zusammen ~2,4 TB - waehrend johnson-ortho (27)
+// und omega-net (8), die im alten Rang weiter hinten stehen, beim GLEICHEN
+// Netzanteil (F_NETZANTEIL) ueber 1 Mrd $/s liefern wuerden. Der Kalenderdeckel
+// kommt in steadyEff schlicht nicht vor.
+//
+// DIE KENNZAHL HIER IST DESHALB NICHT steadyEff, SONDERN DERSELBE
+// LEITER-SUCHLAUF WIE DER KERNTAKT (bn4net.js "batchTargets"-Abschnitt,
+// stapelPlan/F_LEITER): das kleinste f, dessen VOLLER Kalender den
+// Netzanteil erreicht - bleibt der Kalender darunter, endet die Suche bei
+// f=0.5 und der Durchsatz ist die echte Kalendergrenze. Damit ist die
+// AUSWAHL genau das, was der Kerntakt danach ohnehin tut - vorher konnten
+// beide auseinanderlaufen.
+//
+// Bewusst NICHT der Kerntakt selbst umgebaut: bn4net.js hat sein eigenes
+// growFaeden (nimmt k direkt, 0 GB, seit dem 22.08.2026 Faden-fuer-Faden im
+// laufenden Spiel erprobt) und seinen eigenen stapelPlan/F_LEITER-Suchlauf
+// fuer die TAKTUNG (Kalender, Drifterkennung, Platzierung). Daran wird hier
+// nichts angefasst. Diese Datei bekommt eine zweite, gleichwertige Rechnung
+// (growThreadsFromK, stapelPlan, batchThroughput) fuer die AUSWAHL, mit
+// denselben Konstanten (BATCH_*) wie der Kerntakt - beide Seiten importieren
+// diese Konstanten, damit sie nie auseinanderlaufen.
+
+export const BATCH_GAP_MS = 400;
+export const BATCH_F_LEITER = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5];
+export const BATCH_F_NETZANTEIL = 0.15;
+export const BATCH_WEAKEN_MARGIN = 1.5;
+export const BATCH_GROW_MARGIN = 1.15;
+
+/**
+ * growThreads-Loesung, wenn der Wachstumsexponent k schon bekannt ist (z. B.
+ * kMin aus targetMetrics) - dieselbe Newton-Raphson-Gleichung wie
+ * growThreads, nur ohne die Herleitung von k aus einem Server-Objekt. Ein
+ * Aufrufer, der k fuer denselben Server mehrmals braucht (Stapeldurchsatz
+ * ueber die ganze F_LEITER), muss es so nur einmal rechnen.
+ *
+ * Eigenstaendig gehalten statt growThreads intern umzubauen: growThreads
+ * traegt die Korrektur vom 04.09.2026 (fehlender bnGrowthRate-Parameter,
+ * Skeptiker Substanz) und wird von lib/batch.js und autopilot.js benutzt -
+ * ein Umbau dort ist nicht Teil von B5.
+ *
+ * @param {number} k
+ * @param {number} moneyMax
+ * @param {number} startMoney
+ * @param {number} targetMoney
+ * @returns {number} ganze Faeden, 0 wenn nichts noetig ist
+ */
+export function growThreadsFromK(k, moneyMax, startMoney, targetMoney) {
+  if (!(k > 0)) return 0;
+  const o = Math.max(0, startMoney);
+  const n = Math.min(targetMoney, moneyMax);
+  if (!(n > o)) return 0;
+
+  let x = (n - o) / (1 + (n / 16 + (15 * o) / 16) * k);
+  let diff = Infinity;
+  let guard = 0;
+  while (Math.abs(diff) > 1 && guard++ < 60) {
+    const ox = o + x;
+    const newX = (x - ox * Math.log(ox / n)) / (1 + ox * k);
+    diff = newX - x;
+    x = newX;
+  }
+  if (!Number.isFinite(x) || x < 0) return 0;
+
+  let threads = Math.ceil(x);
+  if (threads > 0) {
+    const check = (t) => (o + t) * Math.exp(k * t);
+    if (check(threads - 1) >= n) threads--;
+    else if (check(threads) < n) threads++;
+  }
+  return Math.max(0, threads);
+}
+
+/**
+ * Ein Stapel bei Erntanteil f, im vorbereiteten Zustand (Sicherheit am
+ * Minimum) gerechnet - dieselbe Formel wie stapelPlan im Kerntakt von
+ * bn4net.js (dort mit dem dortigen growFaeden statt growThreadsFromK).
+ *
+ * @param {number} f
+ * @param {{pMin:number, chanceMin:number, kMin:number}} kz aus targetMetrics
+ * @param {number} moneyMax
+ * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ * @param {number} bnWeakenRate H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1
+ */
+export function stapelPlan(f, kz, moneyMax, costs = WORKER_RAM, bnWeakenRate = 1) {
+  const rate = bnWeakenRate > 0 ? bnWeakenRate : 1;
+  const hackT = Math.max(1, Math.floor(f / kz.pMin));
+  // Ein Block mit n Faeden nimmt p*n vom AKTUELLEN Guthaben - linear, nicht
+  // multiplikativ (NetscriptHelpers.tsx:629).
+  const echt = Math.min(0.99, kz.pMin * hackT);
+  const growT = Math.max(1, Math.ceil(
+    growThreadsFromK(kz.kMin, moneyMax, moneyMax * (1 - echt), moneyMax) * BATCH_GROW_MARGIN));
+  const w1 = Math.max(1, Math.ceil(hackT * SERVER_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / (SERVER_WEAKEN_AMOUNT * rate)));
+  const w2 = Math.max(1, Math.ceil(growT * GROW_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / (SERVER_WEAKEN_AMOUNT * rate)));
+  return {
+    hackT, growT, w1, w2, echt,
+    ram: hackT * costs.hackT + growT * costs.growT + (w1 + w2) * costs.weakenT,
+    geld: echt * moneyMax * kz.chanceMin,
+  };
+}
+
+/**
+ * Erreichbarer Stapeldurchsatz eines Ziels, WENN es Stapelziel waere - die
+ * AUSWAHLKENNZAHL fuer B5 (statt steadyEff/targetRank). Siehe Dateikopf oben
+ * fuer die Begruendung und den belegten Fall (phantasy/max-hardware gegen
+ * johnson-ortho/omega-net).
+ *
+ * @param {{pMin:number, chanceMin:number, kMin:number, hackTimeMin:number}} kz aus targetMetrics
+ * @param {number} moneyMax
+ * @param {number} ramTotal Gesamtspeicher des Netzes, in GB (derselbe Wert,
+ *   aus dem auch der Kerntakt seinen Netzanteil bildet)
+ * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ * @param {number} bnWeakenRate H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1
+ * @returns {null | {fraction:number, kalenderPlaetze:number, ram:number, ramCeiling:number, perS:number}}
+ */
+export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM, bnWeakenRate = 1) {
+  if (!(kz.pMin > 0) || !(kz.kMin > 0) || !(kz.chanceMin > 0)
+    || !(kz.hackTimeMin > 0) || !(moneyMax > 0)) return null;
+
+  const tWeakenMs = kz.hackTimeMin * WEAKEN_TIME_FACTOR * 1000;
+  // Kalenderplaetze SIND ganzzahlig (ein Stapel bekommt keinen halben Platz)
+  // - fuer die diskreten Felder unten (fraction/ram/ramCeiling, identisch zum
+  // Kerntakt) bleibt es deshalb bei floor(). Fuer die GEGLAETTETE
+  // Auswahlkennzahl perS wird stattdessen die UNGERUNDETE Platzzahl verwendet
+  // (slotsCont) - sonst waere bei kleinen Platzzahlen (1 -> 2 ist +100 %!)
+  // schon die Rundung selbst ein Sprung, den keine f-Interpolation heilen
+  // kann (Skeptiker B5, Einwand 2b, Gegenprobe: mit floor() blieb bei
+  // kalenderPlaetze 1->2 ein Sprung von Faktor 1,92 stehen).
+  const slotsCont = Math.max(1, tWeakenMs / (4 * BATCH_GAP_MS));
+  const kalenderPlaetze = Math.max(1, Math.floor(slotsCont));
+  const wunschGb = ramTotal * BATCH_F_NETZANTEIL;
+  const stapelSec = (4 * BATCH_GAP_MS) / 1000;
+
+  // Alle Sprossen einmal rechnen (8 Stueck, billig) - fuer die DISKRETE Wahl
+  // (identisch zum Kerntakt, siehe fraction/ram/ramCeiling unten) UND fuer
+  // die GEGLAETTETE Auswahlkennzahl perS.
+  const plaene = BATCH_F_LEITER.map((f) => stapelPlan(f, kz, moneyMax, costs, bnWeakenRate));
+  let idx = BATCH_F_LEITER.length - 1;
+  for (let i = 0; i < BATCH_F_LEITER.length; i++) {
+    if (plaene[i].ram * kalenderPlaetze >= wunschGb) { idx = i; break; }
+  }
+  const fraction = BATCH_F_LEITER[idx];
+  const plan = plaene[idx];
+
+  // GEGLAETTETE perS (Skeptiker B5, 27.09.2026, Einwand 2b). Die diskrete
+  // Sprosse oben klemmt an der Kalendergrenze: eine winzige Aenderung von
+  // hackTimeMin (ein einziger Levelaufstieg) kann kalenderPlaetze um 1
+  // verschieben und damit "idx" um eine ganze Sprosse springen lassen -
+  // gemessen bis zu Faktor 2,5 in perS (F_LEITER 0.02 vs 0.05), waehrend
+  // ZIELWAHL.bonusBatch nur 1,3 vertraegt. Ein amtierendes Stapelziel waere
+  // so schon durch einen Levelpunkt verdraengbar gewesen - und beim
+  // naechsten Levelpunkt zurueckgetauscht: Flattern im unbeaufsichtigten
+  // Betrieb.
+  //
+  // Statt der Sprosse selbst wird deshalb LINEAR zwischen den zwei Sprossen
+  // interpoliert, zwischen denen wunschGb tatsaechlich liegt (ramCeiling
+  // waechst mit f, die Interpolation ist also wohldefiniert) - so wie ein
+  // KONTINUIERLICHES f es taete, wenn man f fein genug raster koennte. Mit
+  // slotsCont statt kalenderPlaetze bleibt auch die Kalendergroesse selbst
+  // stetig.
+  //
+  // KEINE VIRTUELLE SPROSSE UNTER F_LEITER[0] (Gegenpruefung nach der ersten
+  // Fassung): reicht schon die KLEINSTE Sprosse (0.02) allein weit ueber
+  // wunschGb hinaus - ein Ziel mit riesigem Kalender wie ein Konzernserver -,
+  // haette eine Interpolation gegen einen Nullpunkt den Durchsatz auf einen
+  // winzigen Bruchteil herunterskaliert, obwohl der Kerntakt dort ganz normal
+  // die volle Sprosse 0.02 faehrt. idxGlatt = 0 liefert deshalb den vollen,
+  // UNSKALIERTEN Wert dieser Sprosse - das ist ohnehin stetig zum Nachbarfall
+  // (idxGlatt = 1): am Uebergang naehert sich dessen Interpolation exakt
+  // diesem Wert (t -> 0), weil dort ceilUnten (Sprosse 0) gegen wunschGb
+  // laeuft.
+  let idxGlatt = BATCH_F_LEITER.length - 1;
+  for (let i = 0; i < BATCH_F_LEITER.length; i++) {
+    if (plaene[i].ram * slotsCont >= wunschGb) { idxGlatt = i; break; }
+  }
+  const planGlatt = plaene[idxGlatt];
+  let perS = planGlatt.geld / stapelSec;
+  if (idxGlatt > 0) {
+    const ceilOben = planGlatt.ram * slotsCont;
+    const ceilUnten = plaene[idxGlatt - 1].ram * slotsCont;
+    const geldUnten = plaene[idxGlatt - 1].geld;
+    if (ceilOben > ceilUnten) {
+      const t = Math.min(1, Math.max(0, (wunschGb - ceilUnten) / (ceilOben - ceilUnten)));
+      perS = (geldUnten + t * (planGlatt.geld - geldUnten)) / stapelSec;
+    }
+  }
+
+  return {
+    fraction, kalenderPlaetze,
+    ram: plan.ram,
+    ramCeiling: plan.ram * kalenderPlaetze,
+    perS,
+  };
 }

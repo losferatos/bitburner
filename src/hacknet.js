@@ -47,8 +47,34 @@ export async function main(ns) {
   sag("hacknet.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
 
+  // DER MARKER, DEN hashes.js SCHON KENNT (26.09.2026, Audit-Fund 5#6, C3
+  // Nachtrag). bn4net.js:3428-3433 liest ihn und startet weder hashes.js
+  // noch hacknet.js erneut in diesem Knoten - ohne diesen Aufruf haette
+  // hacknet.js sonst geschrieben "wartet" und wuerde ewig weiterlaufen.
+  const sperren = () => {
+    let knotenFuerMarke = 0;
+    try { knotenFuerMarke = ns.getResetInfo().currentNode; } catch { knotenFuerMarke = 0; }
+    ns.write("data/keine-hacknet.txt", String(knotenFuerMarke), "w");
+    if (ns.getHostname() !== "home") { try { ns.scp("data/keine-hacknet.txt", "home", ns.getHostname()); } catch { /* egal */ } }
+  };
+
   while (true) {
     try {
+      // DER KNOTEN WIRD ZUERST GEPRUEFT (26.09.2026, Audit-Fund 5#6/C3).
+      //
+      // Hier stand die Knotenpruefung erst bei Punkt 2, NACH dem Kauf des
+      // ersten Servers weiter unten. Das Hacknet-Server-Feature ist aber
+      // nicht an BitNode 9 gebunden - `hasHacknetServers` gilt ab SF9 in
+      // JEDEM Knoten (lib/reg.js:merkmale) -, und der Server faellt bei
+      // JEDEM Augmentierungs-Einbau weg (PlayerObjectGeneralMethods.ts:130-131),
+      // nicht nur beim Knotenwechsel. Ohne diese Sperre kaufte hacknet.js
+      // also nach jedem Einbau in JEDEM V1-Knoten einen ersten Server fuer
+      // rund 19.000 $, der 0,0005 H/s = 125 $/s Verkaufswert bringt und
+      // danach nur noch RAM belegt (Bericht 5#6) - Hacking bringt dort das
+      // Tausendfache (Punkt 2 unten), der Kauf zahlt sich nie zurueck.
+      let knoten = 0;
+      try { knoten = ns.getResetInfo().currentNode; } catch { knoten = 0; }
+
       let kapazitaet = 0, serverModus = false;
       try { kapazitaet = ns.hacknet.hashCapacity(); serverModus = ns.hacknet.maxNumNodes() === 20; } catch { kapazitaet = 0; }
       if (!(kapazitaet > 0)) {
@@ -56,8 +82,8 @@ export async function main(ns) {
         // ist der Gratis-Server weg (Prestige.ts legt ihn nur beim
         // Knotenwechsel an). Im Server-Modus (maxNumNodes 20) den ersten
         // ohne Prozentregel kaufen - 50.000 $, und er ist in BitNode 9 die
-        // einzige Einnahme.
-        if (serverModus && ns.hacknet.numNodes() === 0) {
+        // einzige Einnahme. NUR DORT: anderswo ist er wertlos (s.o.).
+        if (serverModus && knoten === 9 && ns.hacknet.numNodes() === 0) {
           const preis = ns.hacknet.getPurchaseNodeCost();
           if (preis > 0 && preis <= ns.getServerMoneyAvailable("home")) {
             if (ns.hacknet.purchaseNode() >= 0) { sag("Ersten Hacknet-Server gekauft fuer " + (preis / 1e6).toFixed(2) + "m."); continue; }
@@ -65,7 +91,29 @@ export async function main(ns) {
           if (letzteMeldung !== "erster") { sag("Kein Hacknet-Server - der erste kostet " + (preis / 1e6).toFixed(2) + "m, warte auf Geld."); letzteMeldung = "erster"; }
           await ns.sleep(TAKT_MS); continue;
         }
-        if (letzteMeldung !== "keine") { sag("Keine Hacknet-Server in diesem Knoten - warte."); letzteMeldung = "keine"; }
+        if (knoten !== 9) {
+          // AUSSERHALB BN9 OHNE KAPAZITAET HEISST: KEIN SF9.3-GRATIS-SERVER
+          // (MEHR) DA (26.09.2026, Audit-Fund 5#6, C3-Nachtrag).
+          //
+          // `kapazitaet > 0` (oben) faengt den Gratis-Server aus SF9.3 ab,
+          // solange er lebt (er entsteht bei jedem Sprung, verschwindet erst
+          // beim ersten Einbau, PlayerObjectGeneralMethods.ts:130-131) - dann
+          // verkauft hashes.js seine Hashes ganz normal, unabhaengig vom
+          // Knoten. Ist die Kapazitaet hier 0, ist dieser Server also weg,
+          // und ausserhalb BN9 kauft dieses Skript nie einen neuen (s.o.,
+          // "NUR in BitNode 9"). Ohne Ausstieg liefe es bis zum naechsten
+          // Sprung leer weiter und haette dafuer dauerhaft ~9 GB auf der
+          // Werkbank reserviert. Der Marker ist derselbe, den hashes.js
+          // schon setzt - bn4net.js startet dann keins von beiden erneut in
+          // diesem Knoten.
+          sag("BitNode " + knoten + ": kein Hacknet-Server mehr (SF9.3-Gratis-Server weg) - beende mich, nur BN9 kauft neu.");
+          sperren();
+          return;
+        }
+        if (letzteMeldung !== "keine") {
+          sag("Keine Hacknet-Server in diesem Knoten - warte.");
+          letzteMeldung = "keine";
+        }
         await ns.sleep(TAKT_OHNE_SERVER_MS); continue;
       }
       if (letzteMeldung === "keine" || letzteMeldung === "erster") letzteMeldung = "";
@@ -102,8 +150,7 @@ export async function main(ns) {
       // 2. Ausbau in kleinen Happen - NUR in BitNode 9 (Skeptiker C/D):
       //    anderswo bringt Hacking das Tausendfache, und die Stufen zahlen
       //    sich nie zurueck (Level 101 = 6,9 Mrd fuer 700 $/s).
-      let knoten = 0;
-      try { knoten = ns.getResetInfo().currentNode; } catch { knoten = 0; }
+      //    `knoten` kommt schon von oben (Audit-Fund 5#6/C3).
       if (knoten !== 9) { await ns.sleep(TAKT_MS); continue; }
       let gekauft = "";
       // 2a. CACHE FUER DEN RANGTAUSCH (23.09.2026). hashes.js tauscht Hashes

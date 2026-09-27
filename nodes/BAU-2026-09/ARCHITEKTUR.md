@@ -153,10 +153,12 @@ statt vier SF-Spalten. Der Wert zur Laufzeit:
     f   = (bitNodeN === 4) ? 1 : (sf4 <= 1) ? 16 : (sf4 === 2) ? 4 : 1
 
 **Verifiziert:** `RamCostGenerator.ts:82-96` ist wörtlich diese Fallunterscheidung,
-und die Messdatei trägt die Zerlegung selbst — `bn4rep.js` hat `singKosten41: 840`
-bei `lokal41: 850,75`, also `ramSingGb = 840/16 = 52,50` und `ramBaseGb = 10,75`;
-`lokal43` = 63,25 = 10,75 + 52,50. Über alle 114 Dateien trägt die Messung diese
-zwei Zahlen; vier Spalten wären vier Gelegenheiten zu widersprechen.
+und die Messdatei trägt die Zerlegung selbst — `bn4rep.js` hat `singKosten41: 843,2`
+bei `lokal41: 854,05`, also `ramSingGb = 843,2/16 = 52,70` und `ramBaseGb = 10,85`;
+`lokal43` = 63,55 = 10,85 + 52,70 (Stand 26.09.2026, Audit-Fix A1: `isFocused`/
+`setFocus` kamen dazu, +0,2 Sing; Skeptiker-Nacharbeit A5: `getTotalScriptIncome`,
++0,1 Basis; vorher 850,75 / 63,25). Über alle 114 Dateien trägt die
+Messung diese zwei Zahlen; vier Spalten wären vier Gelegenheiten zu widersprechen.
 
 **Und:** die Registry ist der **Planwert**, `ns.getScriptRam` (0,10 GB, im
 Kernbudget) ist die **Wahrheit**. Weicht sie um mehr als 0,05 GB ab, geht der
@@ -401,7 +403,7 @@ Resident **16,85**, mit `boot.js` **22,35**.
 | `src/ausgang.js` | 8,15 | 8,15 | nein | any |
 | `src/contracts.js` | 17,65 | 17,65 | nein | werkbank |
 | `src/blade.js` | 175,35 | 100,35 | nein | werkbank |
-| `src/bn4rep.js` | 850,75 | 63,25 | nein | werkbank |
+| `src/bn4rep.js` | 854,05 | 63,55 | nein | werkbank |
 | `src/graft.js` | 145,45 | 32,95 | nein | werkbank |
 | `src/exit.js` | 519,25 | 39,25 | nein | eigener Wirt (E10) |
 | `src/worker/{hack,grow,weaken,share}.js` | 1,75/1,80/1,80/4,00 | gleich | nein | not-hacknet |
@@ -470,6 +472,29 @@ mehr Einträge gleichzeitig bewertet — also gehört der Riegel in die Gate-Fun
 nicht in einen Kommentar.
 
 ## 3.3 `src/registry.json` — 22 Einträge
+
+**`graftauto.js` steht seit 26.09.2026 auf `verfahren: "V2"`** (vorher `"alle"`,
+Audit-Fund 1#1/5#5). `graftplan.json` kennt ausschließlich Kampf- und
+Bladeburner-Stücke, und `lib/figur.js:53-60` gibt `graft` (Prio 10) Vorrang vor
+`faktion` (Prio 30) — sobald `graftplan.json` von `data/nicht-schieben.txt`
+gelöst wird, würde graftauto in jedem V1-Knoten (BN5.3, BN12.1-12.3) der Figur
+die Daedalus-Reputationsarbeit für Augs wegnehmen, die zum Hacking-Ausgang
+nichts beitragen (11-57 h nach der gemessenen Daedalus-Rate). Ein eigener
+Hacking-Graftplan für V1 ist eine offene, ungerechnete Folgefrage (Bericht 5#5).
+
+**`bn4life.js` steht seit 26.09.2026 wieder auf `ramBaseGb: 5.85` /
+`ramSingGb: 18`** (zwischenzeitlich 9.85/23, C.2-Nacharbeit/Skeptiker-Rework).
+Ein erster Durchgang hatte die Daedalus-Torwache
+(`ns.getBitNodeMultipliers().DaedalusAugsRequirement`,
+`ns.singularity.getOwnedAugmentations(false).length`) hier eingebaut - aber
+`bn4life.js` ist ein Dauerlaeufer, der direkt nach jedem Einbau auf einem
+knappen home steht, waehrend `joinrun.js` die Singularity-Familie ohnehin
+zahlt (293+ GB) und nur kurz laeuft. Die Pruefung lebt jetzt in `joinrun.js`
+selbst (am Anfang, per `ns.getResetInfo().ownedAugs.size` statt
+`getOwnedAugmentations` - 1 GB statt der Singularity-Familie), setzt dort die
+Marke `data/beitritt-erledigt.txt`, die `bn4life.js` vor dem naechsten Start
+prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
+18·16).
 
 ```json
 {
@@ -842,7 +867,7 @@ nicht in einen Kommentar.
       "ramBaseGb": 16.75,
       "ramSingGb": 0.5,
       "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
-      "verfahren": "alle",
+      "verfahren": "V2",
       "knoten": "alle",
       "phase": "normal",
       "telemetryFile": "data/graftauto.json",
@@ -976,7 +1001,7 @@ nicht in einen Kommentar.
       "args": [],
       "ramBaseGb": 5.85,
       "ramSingGb": 18.0,
-      "ramMeasuredAt": "2026-09-04",
+      "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, C.2-Nacharbeit: Daedalus-Torwache nach joinrun.js verschoben, hier zurueck auf den Stand vor Paket C.2)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "normal",
@@ -1107,9 +1132,9 @@ nicht in einen Kommentar.
     {
       "name": "bn4rep.js",
       "args": [],
-      "ramBaseGb": 10.75,
-      "ramSingGb": 52.5,
-      "ramMeasuredAt": "2026-09-04",
+      "ramBaseGb": 10.85,
+      "ramSingGb": 52.7,
+      "ramMeasuredAt": "2026-09-26",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "normal",
@@ -1122,6 +1147,7 @@ nicht in einen Kommentar.
       "evictRank": 14,
       "needsFigure": "owner",
       "needsLibs": [
+        "lib/einbau.js",
         "lib/endspurt.js",
         "lib/figur.js",
         "lib/figurns.js",

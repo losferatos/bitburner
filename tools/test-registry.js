@@ -270,6 +270,29 @@ console.log("-- Knoten- und Phasenfilter --");
   pruefe("blade.js laeuft nicht im Kaltstart",
     !REG.gilt(blade, { node: 10, verfahren: "V2", phase: "kaltstart", dateiDa: () => true }).gilt,
     "94 GB passen nicht auf ein frisches home");
+
+  // GRAFTAUTO NUR IN V2 (Audit-Fund 1#1/5#5, 26.09.2026, Paket C.1).
+  //
+  // graftplan.json kennt ausschliesslich Kampf- und Bladeburner-Stuecke, und
+  // lib/figur.js:53-60 gibt graft (Prio 10) Vorrang vor faktion (Prio 30) -
+  // in einem V1-Knoten haette graftauto der Figur die Daedalus-Arbeit fuer
+  // Augs weggenommen, die zum Hacking-Ausgang nichts beitragen. Vorher stand
+  // hier "verfahren": "alle", und die Registry haette es auch in BN5.3/
+  // BN12.1-12.3 gestartet, sobald jemand graftplan.json von
+  // data/nicht-schieben.txt loest.
+  const graftauto = registry.eintraege.find((e) => e.name === "graftauto.js");
+  pruefe("graftauto.js steht in der Registry", !!graftauto);
+  if (graftauto) {
+    pruefe("verfahren ist V2, nicht mehr 'alle'", graftauto.verfahren === "V2",
+      "verfahren ist " + JSON.stringify(graftauto.verfahren));
+    pruefe("gilt NICHT in einem V1-Knoten, auch wenn graftplan.json vorliegt",
+      !REG.gilt(graftauto, { node: 5, verfahren: "V1", phase: "normal", dateiDa: () => true }).gilt);
+    pruefe("und der Grund nennt das Verfahren",
+      /gilt nur fuer V2/.test(
+        REG.gilt(graftauto, { node: 5, verfahren: "V1", phase: "normal", dateiDa: () => true }).grund));
+    pruefe("gilt weiterhin in einem V2-Knoten",
+      REG.gilt(graftauto, { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true }).gilt);
+  }
 }
 
 console.log("");
@@ -336,13 +359,15 @@ console.log("-- RAM-Bedarf mit dem Singularity-Faktor --");
   const bn4rep = registry.eintraege.find((e) => e.name === "bn4rep.js");
   pruefe("bn4rep.js hat einen Singularity-Anteil", bn4rep && bn4rep.ramSingGb > 0);
   if (bn4rep) {
-    // Die Messung: 850,75 bei SF4.1, 63,25 bei SF4.3.
+    // Die Messung: 854,05 bei SF4.1, 63,55 bei SF4.3 (A1, 26.09.2026: +0,2 GB
+    // ramSingGb durch `isFocused`/`setFocus`, siehe ARCHITEKTUR.md 3.3 und
+    // die Zeile davor mit der Herleitung 10,85 + 52,70; +0,1 GB Basis durch `getTotalScriptIncome`, Skeptiker-Nacharbeit A5). Vorher 850,75/63,25.
     const sf1 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 1 } });
     const sf3 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 3 } });
     const inBn4 = REG.ramBedarf(bn4rep, { node: 4, ownedSF: { 4: 0 } });
-    pruefe("SF4.1 ergibt 850,75", Math.abs(sf1 - 850.75) < 0.01, "erhalten " + sf1);
-    pruefe("SF4.3 ergibt 63,25", Math.abs(sf3 - 63.25) < 0.01, "erhalten " + sf3);
-    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 63.25) < 0.01, "erhalten " + inBn4);
+    pruefe("SF4.1 ergibt 854,05", Math.abs(sf1 - 854.05) < 0.01, "erhalten " + sf1);
+    pruefe("SF4.3 ergibt 63,55", Math.abs(sf3 - 63.55) < 0.01, "erhalten " + sf3);
+    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 63.55) < 0.01, "erhalten " + inBn4);
   }
   const wakelock = registry.eintraege.find((e) => e.name === "wakelock.js");
   pruefe("wakelock.js kostet ueberall 2,25",

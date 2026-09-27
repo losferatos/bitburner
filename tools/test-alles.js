@@ -98,6 +98,21 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-joinrun-ebene2.js",
+    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4), auch ueber die 15-min-Lease hinaus (Integration 27.09.)",
+    schnell: true,
+  },
+  {
+    datei: "test-ofen-raeumung.js",
+    deckt: "EBENE 2: der Werkzeugstarter des Kerns raeumt auch den Erfahrungsofen (worker/expfarm.js), wenn ein Werkzeug Platz braucht (Integration 27.09.)",
+    schnell: true,
+  },
+  {
+    datei: "test-bn4life-beitritt.js",
+    deckt: "EBENE 2: bn4life.js startet joinrun/netburn erst ab dem Gym-Geldboden - nach dem Sprung bleibt home fuer shop.js frei (Integration 27.09.)",
+    schnell: true,
+  },
+  {
     datei: "test-leiter.js",
     deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
     schnell: true,
@@ -168,6 +183,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-handschlag-nachhome.js",
+    deckt: "EBENE 2: lib/handschlag.js setzt die Einbausperre per nachHome - erreicht home auch von der Werkbank aus (C.4)",
+    schnell: true,
+  },
+  {
     datei: "test-graftauto-ebene2.js",
     deckt: "EBENE 2: Grafting-Automatik - Vorzug, Abbrucherkennung, Motorzeit-Quote (C.14)",
     schnell: false,
@@ -208,6 +228,22 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-bn4rep-einbau.js",
+    deckt: "lib/einbau.js: Fokus-Ruecknahme, BN12-Spendenformel, Daedalus-Schwelle,"
+      + " Spendenrecht- und Red-Pill-Einbauzwang, Horizont-Unbezahlbarkeit,"
+      + " Favor-Relevanz (Audit A1-A7), mit echten Spielstandzahlen und"
+      + " echten Aug-Namen (Skeptiker-Nacharbeit)",
+    schnell: true,
+  },
+  {
+    datei: "test-bn4rep-ebene2.js",
+    deckt: "EBENE 2: bn4rep.js-Hauptlauf gegen nachgebauten Spielzustand -"
+      + " erste Runde nach Neustart (BN5.2 19:03), Handschlag/Interlock ohne"
+      + " Prozessende und ohne NFG-Kauf, Fuellstueck nicht im Kampfknoten,"
+      + " Fokus mit Karenz und NMI nur eingebaut (Skeptiker-Nacharbeit A)",
+    schnell: true,
+  },
+  {
     datei: "test-reserve-eta.js",
     deckt: "Wirtreserve mit Verfall und Restzeit gegen Nachholklumpen (C.3)",
     schnell: true,
@@ -220,6 +256,36 @@ const TESTS = [
   {
     datei: "test-formeln.js",
     deckt: "Die entscheidungstragenden Formeln gegen unabhaengige Eichpunkte",
+    schnell: true,
+  },
+  {
+    datei: "test-b1-security100.js",
+    deckt: "B1 (Audit 26.09.2026 2#2): Server bei Sicherheit 100 bleiben fuer die Zielwahl sichtbar",
+    schnell: true,
+  },
+  {
+    datei: "test-b2-expfarm-dauerlaeufer.js",
+    deckt: "EBENE 2: B2 (Audit 26.09.2026 2#1): Erfahrungsofen als Dauerlaeufer, Geldziele nicht verhungert",
+    schnell: true,
+  },
+  {
+    datei: "test-b3-darkweb-fokus.js",
+    deckt: "EBENE 2: B3 (Audit 26.09.2026 6#1): darkweb.js nur ohne lebendiges bn4life",
+    schnell: true,
+  },
+  {
+    datei: "test-b6-bitnodes-tabelle.js",
+    deckt: "B6 (Audit 26.09.2026 2#6/1#4): negative Literale und BN12-Stufen im Generator",
+    schnell: true,
+  },
+  {
+    datei: "test-b7-zielwahl-gegenpruefung.js",
+    deckt: "EBENE 2: Gegenpruefung Skeptiker B - grow-Wellen in der Vorbereitung, kein Pendeln am achten Platz, Anlauffrist ueber eine Stapelphase",
+    schnell: true,
+  },
+  {
+    datei: "test-b8-ofen-gegenpruefung.js",
+    deckt: "EBENE 2: Gegenpruefung Skeptiker B - Ofenfrist nach dem kuerzesten Takt, Ofenfaeden ohne Frist werden geraeumt",
     schnell: true,
   },
   {

@@ -60,11 +60,78 @@ console.log("");
 console.log("-- die Rangfolge --");
 {
   pruefe("Graft schlaegt Bladeburner", F.PRIO.graft < F.PRIO.bladeburner);
-  pruefe("Bladeburner schlaegt Faktionsarbeit", F.PRIO.bladeburner < F.PRIO.faktion);
+  pruefe("Bladeburner schlaegt Faktionsbeitritt", F.PRIO.bladeburner < F.PRIO.beitritt);
+  // PRIO.beitritt (26.09.2026, Skeptiker-Rework nach Paket C.2): joinrun.js
+  // beantragte mit PRIO.gym (40) und verlor damit IMMER gegen laufende
+  // Faktionsarbeit (30) - in einem V1-Knoten der einzige Gym-Trainer, also
+  // faktisch nie trainiert. beitritt (25) gewinnt gegen faktion, verliert
+  // weiterhin gegen graft und bladeburner.
+  pruefe("Faktionsbeitritt schlaegt Faktionsarbeit", F.PRIO.beitritt < F.PRIO.faktion);
   pruefe("Faktionsarbeit schlaegt Gym", F.PRIO.faktion < F.PRIO.gym);
   pruefe("Gym schlaegt Verbrechen", F.PRIO.gym < F.PRIO.verbrechen);
   pruefe("der Geld-Deadlock schlaegt ALLES", F.PRIO.deadlock < F.PRIO.graft,
     "Sprosse 0 mit prio 0 - sonst muesste sie die Figur entreissen");
+}
+
+console.log("");
+console.log("-- C2-BLOCKER: joinrun gegen eine DAUERHAFTE Faktionsarbeit (26.09.2026) --");
+{
+  /**
+   * DER EIGENTLICHE FEHLER, NICHT NUR DIE KONSTANTE.
+   *
+   * bn4rep.js beantragt PRIO.faktion (30) praktisch pausenlos, sobald eine
+   * Faktion Arbeit hat - in einem V1-Knoten ist das der Normalfall, nicht die
+   * Ausnahme. joinrun beantragte bisher mit PRIO.gym (40): `vergib()`
+   * waehlt bei jedem Tick den kleineren Wert, 30 < 40, also gewinnt bn4rep
+   * IMMER, joinrun bekommt die Figur nie - kein Sonderfall, sondern der
+   * Dauerzustand in jedem V1-Knoten. Diese Probe stellt genau diese Lage
+   * nach: bn4rep haelt eine LAUFENDE Vergabe (Lease aktiv), joinrun stellt
+   * parallel seinen Antrag. Getestet wird `vergib()` selbst - dieselbe
+   * Funktion, die auch der Kern (bn4net.js) aufruft -, nicht nur die
+   * Konstanten.
+   */
+  const bn4rep30 = (wall) => F.antrag("bn4rep.js", F.PRIO.faktion, "faktion",
+    "irgendeine Faktion", "Faktionsarbeit", { wall, motorTimeMs: 0, nodeReset: NR });
+  const joinrunMit = (prio, wall) => F.antrag("joinrun.js", prio, "gym",
+    "str", "Kampfwerte fuer Slum Snakes/Tetrads/Tian Di Hui",
+    { wall, motorTimeMs: 0, nodeReset: NR });
+
+  // bn4rep haelt bereits eine LAUFENDE Vergabe (Lease aktiv seit W0) - der
+  // Regelfall in einem V1-Knoten, in dem bn4rep quasi nie pausiert.
+  const bnAntragW0 = bn4rep30(W0);
+  const vergabeBn4rep = F.vergib([bnAntragW0], null, W0, NR).vergabe;
+  pruefe("Ausgangslage: bn4rep haelt die Figur (Faktionsarbeit)",
+    vergabeBn4rep && vergabeBn4rep.owner === "bn4rep.js");
+
+  // RED: joinrun beantragt mit der ALTEN Prioritaet 40 (PRIO.gym) - bn4rep
+  // erneuert seinen Antrag im selben Tick (W0+1000), die Lease laeuft noch.
+  const rot = F.vergib(
+    [bn4rep30(W0 + 1000), joinrunMit(40, W0 + 1000)],
+    vergabeBn4rep, W0 + 1000, NR,
+  );
+  pruefe("RED (PRIO 40 = altes PRIO.gym): joinrun bekommt die Figur NICHT",
+    rot.vergabe && rot.vergabe.owner === "bn4rep.js",
+    "owner=" + (rot.vergabe && rot.vergabe.owner) + " - das war genau der Blocker (Audit 3#6/6#4)");
+
+  // GREEN: derselbe Ablauf, joinrun beantragt jetzt mit PRIO.beitritt (25).
+  const gruenR = F.vergib(
+    [bn4rep30(W0 + 1000), joinrunMit(F.PRIO.beitritt, W0 + 1000)],
+    vergabeBn4rep, W0 + 1000, NR,
+  );
+  pruefe("GREEN (PRIO.beitritt = 25): joinrun BEKOMMT die Figur",
+    gruenR.vergabe && gruenR.vergabe.owner === "joinrun.js",
+    "owner=" + (gruenR.vergabe && gruenR.vergabe.owner));
+
+  // UND behaelt sie im naechsten Tick, solange bn4rep weiter bei 30 bleibt
+  // (kein Ping-Pong): joinrun erneuert seinen Antrag, bn4rep bleibt auf 30 -
+  // 25 gewinnt weiterhin, die Lease wird verlaengert statt neu vergeben.
+  const weiter = F.vergib(
+    [bn4rep30(W0 + 16000), joinrunMit(F.PRIO.beitritt, W0 + 16000)],
+    gruenR.vergabe, W0 + 16000, NR,
+  );
+  pruefe("und BEHAELT sie im naechsten Tick (kein Ping-Pong)",
+    weiter.vergabe && weiter.vergabe.owner === "joinrun.js" && !weiter.wechsel,
+    "owner=" + (weiter.vergabe && weiter.vergabe.owner) + " wechsel=" + weiter.wechsel);
 }
 
 console.log("");

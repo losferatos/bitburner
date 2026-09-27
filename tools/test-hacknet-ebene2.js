@@ -130,6 +130,71 @@ console.log("-- 4. ausserhalb von BitNode 9: nichts --");
 }
 
 console.log("");
+console.log("-- 5. der ERSTE Server: nur in BitNode 9 (26.09.2026, Audit-Fund 5#6/C3) --");
+{
+  // DAS FEATURE HAENGT NICHT AN BITNODE 9. `hasHacknetServers` gilt ab SF9 in
+  // JEDEM Knoten (lib/reg.js:merkmale), und der Server faellt bei JEDEM
+  // Augmentierungs-Einbau weg - nicht nur beim Knotenwechsel. Vorher kaufte
+  // hacknet.js den ersten Server ungeachtet des Knotens, sobald `serverModus`
+  // (SF9) vorlag und `numNodes()` bei 0 stand - in einem V1-Knoten fuer
+  // 19.000 $ ein Server, der 125 $/s Verkaufswert bringt und danach nur noch
+  // RAM belegt.
+  //
+  // Der Mock stubbt `getPurchaseNodeCost`/`purchaseNode` sonst auf
+  // Infinity/-1 (kein Server-Kauf im Repertoire) - hier werden sie fuer
+  // genau diese Probe ueberschrieben, um den VERSUCH zu zaehlen.
+  async function ersterServerVersuche(knoten) {
+    const m = neuerMock({
+      host: "home", knoten, wall: W0, playtime: 100 * 3600000,
+      nodeReset: W0 - 3600000, augReset: W0 - 3600000, geld: 2e9,
+      hacknet: { hashes: 0, server: [], serverModus: true },
+      server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+      maxSchlaf: 2,
+      beiSchlaf: (ms, z, vor) => vor(ms),
+    });
+    let versucht = 0;
+    m.ns.hacknet.getPurchaseNodeCost = () => 19000;
+    m.ns.hacknet.purchaseNode = () => { versucht++; return -1; };
+    const { modul } = await ladeAusBeiden(ROOT, "hacknet.js");
+    const zurueck = m.uhrStellen();
+    try { await modul.main(m.ns); }
+    catch (e) { if (!e.mockAbbruch) throw e; }
+    finally { zurueck(); }
+    return versucht;
+  }
+
+  const ausserhalb = await ersterServerVersuche(5);
+  pruefe("BitNode 5 (kein BN9, aber SF9-Feature vorhanden): kein Kaufversuch",
+    ausserhalb === 0, "Versuche: " + ausserhalb);
+
+  const bn9 = await ersterServerVersuche(9);
+  pruefe("BitNode 9: kauft den ersten Server weiterhin (Regression)",
+    bn9 >= 1, "Versuche: " + bn9);
+}
+
+console.log("");
+console.log("-- 6. ausserhalb BN9 ohne Kapazitaet: Marker setzen und beenden (26.09.2026, Audit-Fund 5#6, C3-Nachtrag) --");
+{
+  // Der SF9.3-Gratis-Server ist weg (kapazitaet 0), und ausserhalb BN9 kauft
+  // dieses Skript nie einen neuen ("NUR in BitNode 9", s. Docstring). Vorher
+  // lief es hier bis zum naechsten Sprung leer weiter (5 min Takt) und hielt
+  // dafuer dauerhaft ~9 GB auf der Werkbank - jetzt setzt es denselben Marker
+  // wie hashes.js und beendet sich, `maxSchlaf: 1` genuegt also schon.
+  const m = await fahre({ knoten: 5, server: [], hashesJson: null, runden: 1 });
+  const marker = m.lies("home", "data/keine-hacknet.txt");
+  pruefe("data/keine-hacknet.txt wird geschrieben", !!marker, String(marker));
+  pruefe("mit der Knotennummer", String(marker || "").trim() === "5", String(marker));
+}
+
+console.log("");
+console.log("-- 6b. in BitNode 9 bleibt es dagegen im Wartezweig (kein Marker) --");
+{
+  const m = await fahre({ knoten: 9, server: [], hashesJson: null, runden: 1 });
+  pruefe("kein Marker in BN9 - hacknet.js kauft dort noch selbst",
+    !m.lies("home", "data/keine-hacknet.txt"));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

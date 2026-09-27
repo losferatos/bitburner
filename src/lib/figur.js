@@ -55,9 +55,31 @@ export const PRIO = {
   graft: 10,
   bladeburner: 20,
   faktion: 30,
+  beitritt: 25,
   gym: 40,
   verbrechen: 50,
 };
+
+/**
+ * WARUM `beitritt` ZWISCHEN `faktion` UND `gym` STEHT (26.09.2026,
+ * Skeptiker-Rework nach Paket C.2).
+ *
+ * `joinrun.js` beantragte die Figur bisher mit `gym` (40) - und verlor damit
+ * IMMER gegen laufende Faktionsarbeit (`faktion`, 30), die bn4rep in einem
+ * V1-Knoten praktisch pausenlos anfragt. joinrun war dort der einzige
+ * Gym-Trainer und trainierte damit faktisch nie.
+ *
+ * `beitritt` (25) gewinnt gegen `faktion` (30), verliert aber weiterhin
+ * gegen `graft` (10) und `bladeburner` (20) - ein laufender Graft oder eine
+ * Bladeburner-Aktion wird also nicht unterbrochen. Der Preis ist begrenzt:
+ * joinrun haelt sich hoechstens `FRIST_MS` (45 min) an der Figur fest, dann
+ * gibt es auf. Das ist der Tausch, den der Auftrag ausdruecklich zulaesst -
+ * Faktionsarbeit verliert fuer maximal 45 Minuten, nicht auf Dauer.
+ *
+ * `bbtrain.js` bleibt bewusst bei `gym` (40): es traegt 30 der 40
+ * BitNode-Laeufe (Bladeburner-Weg) und hat dort KEINEN Konkurrenten um Prio
+ * 30 - eine Anhebung dort wuerde nur Risiko ohne Nutzen hinzufuegen.
+ */
 
 /**
  * Wie lange eine Vergabe ohne Erneuerung gilt.

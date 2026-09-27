@@ -32,7 +32,7 @@
  * @param {NS} ns
  */
 
-import { hackNutzen, levelNutzen, combatNutzen, kampfknotenNuetzlich } from "lib/hackaugs.js";
+import { hackNutzen, levelNutzen, combatNutzen, kampfknotenNuetzlich, HACK_AUGS } from "lib/hackaugs.js";
 
 // Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
 // weil die Meldung sonst jede Runde kaeme (alle 16 s) - siehe die Korrektur
@@ -43,6 +43,19 @@ import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } 
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
+// AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
+// Entscheidungsfunktionen, ohne ns, einzeln in tools/test-bn4rep-einbau.js
+// geprueft. Siehe die Begruendung je Funktion in lib/einbau.js.
+// Skeptiker-Nacharbeit (nodes/audit-2026-09-26/skeptiker-A.md): Einkommen,
+// Spendenpause, Wertmass, Fokus und Grundtext kamen als eigene Funktionen
+// dazu, damit tools/test-bn4rep-einbau.js sie mit echten Zahlen prueft und
+// tools/test-bn4rep-ebene2.js den Hauptlauf dagegen faehrt.
+import {
+  donationRepGainFaktor, daedalusSchwelle, zaehlplatzWert as zaehlplatzWertBerechnen,
+  sollFuellstueckSofortKaufen, redPillWartetAufEinbau, unbezahlbarInHorizont,
+  favorZaehltFuerFaktion, fokusEntscheidung, einkommenAusScriptIncome, spendePausiert,
+  istEinbauWertvoll, waehleEinbauGeldziele, einbauGrundText,
+} from "lib/einbau.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -156,12 +169,27 @@ export async function main(ns) {
   // stand faelschlich 2. BitNode 12 skaliert mit der Knotenstufe und faellt
   // ebenfalls auf 1 zurueck; das ist dort nur eine Schaetzung fuer die
   // Rangfolge, kein Grenzwert.
-  // FactionWorkRepGain je BitNode - nur die Knoten, die ihn ueberhaupt setzen
-  // (BitNode.tsx), alle uebrigen lassen ihn bei 1. Steht HIER OBEN, weil die
-  // Einbau-Schwelle ihn 450 Zeilen frueher braucht als die Spendenrechnung;
-  // eine const-Definition weiter unten landete in der temporalen Totzone.
-  // Das ist am 23.08.2026 dreimal passiert, jedes Mal mit demselben Muster.
+  // FactionWorkRepGain je BitNode - NUR NOCH RUECKFALL (A2, 26.09.2026). Bis
+  // heute war das die einzige Quelle, mit der falschen Behauptung, SF5 fehle
+  // (siehe die korrigierte Stelle bei knotenRepFaktor weiter unten). SF5 ist
+  // vorhanden, deshalb liest `donationRepGainFaktor()` jetzt zuerst
+  // `ns.getBitNodeMultipliers().FactionWorkRepGain` live und faellt nur bei
+  // einem Fehler (kein SF5, o.ae.) auf diese Tabelle zurueck. Ohne BitNode 12,
+  // wo der Faktor mit der Knotenstufe skaliert - live gelesen ist das kein
+  // Problem, die Tabelle waere dafuer ohnehin nur eine grobe Naeherung.
+  // Steht HIER OBEN, weil die Einbau-Schwelle sie 450 Zeilen frueher braucht
+  // als die Spendenrechnung; eine const-Definition weiter unten landete in
+  // der temporalen Totzone. Das ist am 23.08.2026 dreimal passiert, jedes Mal
+  // mit demselben Muster.
   const FACTION_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
+
+  // A3: Daedalus-Schwelle als Rueckfall, wenn `ns.getBitNodeMultipliers()`
+  // fehlschlaegt. BitNode.tsx setzt sie nur in drei Knoten abweichend vom
+  // Vorgabewert 30: BitNode 6 und 7 auf 35, BitNode 15 auf 20. BitNode 12
+  // skaliert mit der Knotenstufe (floor(min(30 + 1,02^Stufe, 40))) - ohne
+  // Live-Wert bleibt dort der alte, zu niedrige Wert 30 stehen; das ist ein
+  // Rueckfall fuer einen Fehlerfall, kein Normalbetrieb (SF5 ist vorhanden).
+  const DAEDALUS_SCHWELLE_FALLBACK = { 6: 35, 7: 35, 15: 20 };
 
   const WD_DIFFICULTY = { 1: 1, 2: 5, 3: 2, 4: 3, 5: 1.5, 6: 2, 7: 2, 8: 1,
     9: 2, 10: 2, 11: 1.5, 12: 1, 13: 3, 14: 5, 15: 2 };
@@ -359,7 +387,34 @@ export async function main(ns) {
   // fuellt sie bei 15-Sekunden-Runden das Log.
   let letzteAusgangsmeldung = 0;
   let letzteBladeMeldung = 0;
+  let letzterFokusHinweis = 0;
   const INSTALL_LOCK_MAX_AGE = 300000;
+
+  // A5 (26.09.2026, Skeptiker-Nacharbeit): Wandzeit der letzten EIGENEN
+  // Spende. Waehrend einer Spendenphase ist ein leeres Konto die Ursache,
+  // kein Zeitproblem - `spendePausiert` in lib/einbau.js setzt die
+  // Unbezahlbar-Pruefung dann 60 s aus. Frueher zaehlte hier ein
+  // Rundenzaehler "< 2 Runden", und zwei Runden sind nach `sleep(1000);
+  // continue` oft nur 1-3 s (Einwand 9). Das Einkommen selbst wird nicht mehr
+  // aus Rundendifferenzen geschaetzt, sondern je Runde aus
+  // `ns.getTotalScriptIncome()` gelesen (Einwand 1: der Schaetzer startete
+  // bei 0 und machte die erste Runde nach jedem Neustart strenger als die
+  // alte Regel).
+  let letzteSpendeMs = null;
+  // A1 (Einwand 8): seit wann der Fokus fehlt - erst nach der Karenz wird er
+  // zurueckgeholt, damit darkweb.js und die Handwerkzeuge ihre Klickfolge
+  // zu Ende bringen koennen (Begruendung bei `fokusEntscheidung`).
+  let fokusFehltSeit = null;
+  // Drosseln fuer zwei Meldungen, die sonst jede Runde kaemen: das
+  // Fuellstueck, das gerade nicht kaufbar ist (Einwand 10), und der
+  // ausgesetzte Einbau (Einwand 5 - frueher beendete sich das Skript dort).
+  let letzteFuellMeldung = 0;
+  let letzteAussetzMeldung = 0;
+  // Die zuletzt geschriebene Telemetrie (data/bn4rep.json). Eine Runde, die
+  // am Einbau-Tor wartet, endet vor der Telemetriezeile; sie schreibt dann
+  // diesen Stand mit frischer Zeit und `state: "wait"` erneut (Gegenpruefung
+  // G2, Begruendung bei `amTorWarten` im Einbaublock).
+  let letzteTelemetrie = null;
 
   // Der Aussenschalter. Inhalt:
   //   "off"                    - nie Firmenarbeit (Notbremse)
@@ -546,6 +601,20 @@ export async function main(ns) {
     const besitz = new Set(alleAugs);
     const wartend = alleAugs.length - eingebauteAugs.length;
     const geld = ns.getServerMoneyAvailable("home");
+    // A5 (Skeptiker-Einwand 1): Zufluss aus dem Spiel, nicht aus der
+    // Differenz zweier Rundenstaende. `getTotalScriptIncome()[1]` ist das
+    // Skripteinkommen seit dem letzten Einbau - sofort nach jedem Neustart
+    // gueltig und von eigenen Spenden/Kaeufen unberuehrt. 0,1 GB, die
+    // Registry traegt sie. Warum der zweite und nicht der erste Wert: siehe
+    // `einkommenAusScriptIncome` in lib/einbau.js.
+    let einkommenProSek = 0;
+    try { einkommenProSek = einkommenAusScriptIncome(ns.getTotalScriptIncome()); }
+    catch { einkommenProSek = 0; }   // 0 heisst: die alte 4x-Regel gilt allein
+    // Waehrend gerade fuer eine spendenberechtigte Faktion gespendet wird, ist
+    // ein knappes Konto die URSACHE, nicht ein Zeitproblem - siehe die drei
+    // belegten Vorfaelle bei `unbezahlbarInHorizont` in lib/einbau.js.
+    // Gemessen in Wandzeit (Einwand 9), nicht in Runden.
+    const spendetGeradeAnSchwellenfaktion = spendePausiert(letzteSpendeMs, Date.now());
 
     // Favor je Faktion mitzaehlen. Ab 150 (Constants.ts BaseFavorToDonate, in
     // BitNode 4 mit Multiplikator 1) faellt die Trennung zwischen Geld und
@@ -573,6 +642,14 @@ export async function main(ns) {
     // ein Fehlgriff dort wuerde in einem Hackingknoten alle Hack-Stuecke sperren.
     const kaufInfo = ns.getResetInfo();
     const kaufKnoten = kaufInfo.currentNode;
+    // A2/A3 (26.09.2026): EINMAL je Runde live lesen, ueberall wiederverwenden
+    // statt an drei Stellen (grobRate, NFG-Spende, Hauptspendenweg) je eine
+    // eigene statische Tabelle zu befragen. `getBitNodeMultipliers()` braucht
+    // SF5 (vorhanden, siehe Auftrag) oder BitNode 5 - schlaegt der Aufruf
+    // trotzdem fehl, bleibt `bnMults` null und jede Fundstelle faellt auf ihre
+    // eigene Tabelle zurueck (donationRepGainFaktor/daedalusSchwelle).
+    let bnMults = null;
+    try { bnMults = ns.getBitNodeMultipliers(); } catch { bnMults = null; }
     // Hacknet-Server gibt es in BN9 und mit SF9 ueberall (HacknetHelpers.tsx:34-35).
     const mitHashes = kaufKnoten === 9 || (() => {
       const sf = kaufInfo.ownedSF;
@@ -748,10 +825,40 @@ export async function main(ns) {
     // ueberlebt den Einbau nicht, nur Favor.
     // Deshalb hier derselbe Test auf das NAECHSTE Stueck statt nur auf die
     // schon verdienten. Fuer die Bewertung zaehlt der Preis, nicht die Naehe.
-    const naechstes = kandidaten
-      .filter((k) => k.rep < k.repReq)
-      .sort((a, b) => (a.repReq - a.rep) - (b.repReq - b.rep))[0];
-    const naechstesUnbezahlbar = !!naechstes && naechstes.preis > geld * 4;
+    //
+    // A5-FIX (26.09.2026, Audit 3#3): nur Stuecke mit echtem Nutzen duerfen
+    // ueberhaupt als "naechstes" gelten - OHNE den Zaehlplatz-Bonus, der fuer
+    // die Zielwahl waehrend der Arbeit zaehlt, nicht dafuer, ob ein Einbau
+    // JETZT lohnt. Sonst loest ein wertloses Stueck (Audit: Magnetism
+    // Amplifier, nur company_rep, und LuminCloaking-V1) einen Einbau aus,
+    // obwohl es zum Knotenabschluss nichts beitraegt.
+    //
+    // SKEPTIKER-EINWAND 2: das Mass ist NICHT mehr `levelNutzen > 0`. Das
+    // zaehlte company_rep mit (Magnetism 0,0477 galt als wertvoll) und gab ENM
+    // Direct Memory Access 0 (hacking_money 1,4). `istEinbauWertvoll` in
+    // lib/einbau.js liest dieselbe Tabelle HACK_AUGS, zaehlt aber nur, was den
+    // Knoten schneller abschliesst: Hacking-Level/-Tempo/-Ertrag und
+    // Faktionsruf; im Kampfknoten zusaetzlich combatNutzen.
+    const kampfNutzenHier = bladeburnerTraegtHier();
+    const hatEchtenWert = (k) => istEinbauWertvoll({
+      aug: k.aug, stats: HACK_AUGS[k.aug], exitKey: EXIT_KEY,
+      kampfNutzen: kampfNutzenHier ? combatNutzen(k.aug) : 0,
+    });
+    const { naechstes, teuerstesVerdienteWertvoll } = waehleEinbauGeldziele(kandidaten, hatEchtenWert);
+    // A5-FIX, zweiter Teil: gegen Kassenstand PLUS Zufluss ueber einen kurzen
+    // Horizont pruefen statt gegen den Kassenstand direkt nach der eigenen
+    // Spende, und waehrend einer laufenden Spendenphase ganz aussetzen -
+    // Begruendung mit den drei belegten Vorfaellen in `unbezahlbarInHorizont`
+    // (lib/einbau.js). 10 Minuten decken den belegten Fall (9,9 min Wartezeit).
+    // Seit der Skeptiker-Nacharbeit (Einwaende 1 und 6) gilt zusaetzlich die
+    // alte 4x-Regel als Untergrenze: die Horizontregel darf nur NOCH stiller
+    // sein als die alte, nie strenger - ein kurzer Horizont richtet deshalb
+    // keinen Schaden an, auch wenn ein Wiederaufbau laenger dauert.
+    const UNBEZAHLBAR_HORIZONT_SEK = 600;
+    const naechstesUnbezahlbar = !!naechstes && unbezahlbarInHorizont({
+      preis: naechstes.preis, geld, einkommenProSek,
+      horizontSek: UNBEZAHLBAR_HORIZONT_SEK, spendetGeradeAnSchwellenfaktion,
+    });
     // "Nichts mehr offen" ist nur dann ein Einbaugrund, wenn auch nichts mehr
     // zu KAUFEN ist. Sonst baute der Bot ein, waehrend eine verdiente und
     // bezahlbare Augmentierung noch im Regal liegt - und die waere nach dem
@@ -765,16 +872,27 @@ export async function main(ns) {
     // verdient und kostete 480 Millionen bei 9 Millionen Guthaben. Der Einbau
     // setzt den Faktor zurueck, die Reputation bleibt - was jetzt unbezahlbar
     // ist, ist danach der Normalpreis.
+    //
+    // `teuerstesVerdiente` bleibt UNGEFILTERT - es reserviert weiter unten
+    // (Zeile mit `verfuegbar = geld - teuerstesVerdiente`) Geld fuer ALLES,
+    // was der Kaufblock gleich abraeumt, auch Wertloses. Das ist Absicht und
+    // kein Widerspruch zum Wertmass (Skeptiker-Einwand 2): vor der
+    // Daedalus-Schwelle ist jedes Stueck ein Zaehlplatz, und der Kaufblock
+    // kauft deshalb alles Verdiente. Fuer die Einbau-Entscheidung selbst
+    // zaehlt nur der wertvolle Teil (`teuerstesVerdienteWertvoll` oben).
     const teuerstesVerdiente = Math.max(0, ...kandidaten
       .filter((k) => k.rep >= k.repReq).map((k) => k.preis));
-    // Faktor 4, nicht 10. Gemessen am laufenden Spiel: Eine verdiente
-    // Augmentierung kostete 483 Millionen bei 65 Millionen Guthaben und einem
-    // Zufluss von 557.000 je Minute - zwoelfeinhalb Stunden Warten. Ein
-    // Einbau kostet dagegen rund eine halbe Stunde Wiederaufbau und setzt den
-    // Preisfaktor 1,9 je wartendem Stueck auf eins zurueck, womit dieselbe
-    // Augmentierung wieder ihren Grundpreis kostet. Ab etwa dem Vierfachen
-    // des Guthabens ist Warten das schlechtere Geschaeft.
-    const geldWegZu = teuerstesVerdiente > geld * 4;
+    // Faktor 4, nicht 10 - bleibt als Untergrenze, dazu der Zufluss (oben).
+    // Gemessen am laufenden Spiel: Eine verdiente Augmentierung kostete 483
+    // Millionen bei 65 Millionen Guthaben und einem Zufluss von 557.000 je
+    // Minute - zwoelfeinhalb Stunden Warten. Ein Einbau kostet dagegen rund
+    // eine halbe Stunde Wiederaufbau und setzt den Preisfaktor 1,9 je
+    // wartendem Stueck auf eins zurueck, womit dieselbe Augmentierung wieder
+    // ihren Grundpreis kostet.
+    const geldWegZu = unbezahlbarInHorizont({
+      preis: teuerstesVerdienteWertvoll, geld, einkommenProSek,
+      horizontSek: UNBEZAHLBAR_HORIZONT_SEK, spendetGeradeAnSchwellenfaktion,
+    });
 
     // TUERSCHLOSS, 22.08.2026 umgedreht. Vorher stand hier
     // fileExists("data/install-frei.txt") - eine Freigabedatei, die KEIN
@@ -994,6 +1112,16 @@ export async function main(ns) {
     // Ueber alle Faktionen, nicht nur ueber das aktuelle Ziel: das Ziel steht
     // an dieser Stelle noch nicht fest, und der Einbau hebt ohnehin den Favor
     // JEDER Faktion, bei der Reputation liegt. Massgeblich ist die beste.
+    // A7-FIX (26.09.2026, Audit 3#5): nur Faktionen zaehlen, bei denen Favor
+    // noch etwas BRINGT - unter der Spendenschwelle (darueber ist Reputation
+    // dort schon eine reine Geldfrage, Favor wirkt nur auf die Arbeitsrate)
+    // UND mit mindestens einem unbesessenen Stueck von echtem Nutzen (ein
+    // leerer Katalog hat nichts mehr, das von der hoeheren Rate profitieren
+    // koennte). Vorher zaehlte jede Faktion mit >= 1000 Reputation, egal ob
+    // sie schon spendenberechtigt war (BitRunners Favor 171 im Audit-Stand)
+    // oder ihr Katalog laengst leer war (Sector-12, The Black Hand) -
+    // haeufigster Einbaugrund im Audit (21 von 31 Einbauten).
+    const fuerFavorSchwelle = ns.getFavorToDonate();
     let favorGewinn = 1;
     let favorFaktion = "";
     for (const f of spieler.factions) {
@@ -1001,6 +1129,11 @@ export async function main(ns) {
       const kumuliert = 25000 * Math.expm1(0.019802627296179712 * alt);
       const jetzt = ns.singularity.getFactionRep(f);
       if (jetzt < 1000) continue;   // unter tausend lohnt die Rechnung nicht
+      const hatUnbesessenesWertvollesStueck = kandidaten
+        .some((k) => k.faktion === f && hatEchtenWert(k));
+      if (!favorZaehltFuerFaktion({
+        favorJetzt: alt, spendenSchwelle: fuerFavorSchwelle, hatUnbesessenesWertvollesStueck,
+      })) continue;
       const neu = Math.log1p((kumuliert + jetzt) / 25000) / 0.019802627296179712;
       const gewinn = (1 + neu / 100) / (1 + alt / 100);
       if (gewinn > favorGewinn) { favorGewinn = gewinn; favorFaktion = f; }
@@ -1018,7 +1151,9 @@ export async function main(ns) {
     // false zurueck (Singularity.ts:203-206), und die Zeile danach beendet
     // dieses Skript bedingungslos.
     const REP_ZUM_SPENDEN = 25000 * Math.expm1(0.019802627296179712 * ns.getFavorToDonate());
-    const spendenrechtFaellig = spieler.factions.some((f) => {
+    // `find` statt `some`, damit der Einbaugrund die Faktion nennen kann
+    // (Skeptiker-Einwand 11) - die Bedingung selbst ist unveraendert.
+    const spendenFaktion = spieler.factions.find((f) => {
       if ((favor[f] || 0) >= ns.getFavorToDonate()) return false;
       const kumuliert = 25000 * Math.expm1(0.019802627296179712 * (favor[f] || 0));
       if (kumuliert + ns.singularity.getFactionRep(f) < REP_ZUM_SPENDEN) return false;
@@ -1028,6 +1163,7 @@ export async function main(ns) {
       return ns.singularity.getAugmentationsFromFaction(f)
         .some((a) => a !== NFG && !besitz.has(a));
     });
+    const spendenrechtFaellig = spendenFaktion !== undefined;
 
     // --- ENDSPIEL-RIEGEL (23.08.2026) ---------------------------------------
     //
@@ -1064,7 +1200,7 @@ export async function main(ns) {
     // einbauen).
     const grobRate = Math.max(1,
       5 * spieler.skills.hacking / 975 * spieler.mults.faction_rep
-        * (FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1));
+        * donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN));
     const lueckeZuGross = grobRate * 60 * LUECKE_ZU_GROSS_MINUTEN;
 
     const ausgangSteht = eingebauteAugs.includes(EXIT_KEY);
@@ -1120,6 +1256,19 @@ export async function main(ns) {
     const kampfKnotenEinbau = bladeburnerTraegtHier();
     const spendenAusnahme = spendenrechtFaellig
       && wartend >= (kampfKnotenEinbau ? MINDEST_WARTESCHLANGE : 1);
+
+    // A6-FIX (26.09.2026, Audit 3#4): The Red Pill gekauft, aber nicht
+    // eingebaut, erzwingt den Einbau UNABHAENGIG von der Mindestwarteschlange
+    // und vom Spendenrecht. Ohne diese Ausnahme kann der Bot beliebig lange
+    // an wertlosen Fuellstuecken vorbeiarbeiten (Befund 4 nennt PCMatrix,
+    // Wert 0,075, als das Stueck, das in zwei Laeufen knapp ueber den Einbau
+    // entschied) und dabei die Firmenphase beginnen, die den Einbau selbst
+    // sperrt (`:1530-1531` weiter unten) - ohne Red Pill haengt w0r1d_d43m0n
+    // nie am Netz (Prestige.ts:173-181), ein Stillstandsrisiko fuer den
+    // ganzen Knoten. Gilt auch im Kampfknoten: Red Pill kommt nur ueber
+    // Daedalus, also nie in den 30 Bladeburner-Laeufen der Route - dort bleibt
+    // die Variable false und aendert nichts.
+    const redPillWartet = redPillWartetAufEinbau(alleAugs, eingebauteAugs, EXIT_KEY);
 
     // IM KAMPFKNOTEN MUSS DIE WARTESCHLANGE DEN WIEDERAUFBAU VERKUERZEN
     // (28.08.2026, 13:15).
@@ -1200,6 +1349,7 @@ export async function main(ns) {
         kampfknoten: kampfKnotenEinbau,
         spendenrechtFaellig,
         spendenAusnahme,
+        redPillWartet,
         // Das ist die Zahl, die die Sperre belegt: faellig, aber zu wenige
         // Stuecke - genau dann haette die alte Fassung eingebaut.
         gesperrt: kampfKnotenEinbau && spendenrechtFaellig
@@ -1218,23 +1368,176 @@ export async function main(ns) {
 
     if (!ausgangSteht
         && wiederaufbauHilfe
-        && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme)
+        && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme || redPillWartet)
         && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
-            || spendenrechtFaellig)
+            || spendenrechtFaellig || redPillWartet)
         && !gesperrt) {
-      sag("EINBAU: " + wartend + " Augmentierungen. Grund: "
-        + (favorLohnt ? "Favor bei " + favorFaktion + " hebt die Reputationsrate um "
-            + Math.round((favorGewinn - 1) * 100) + " Prozent"
-          : geldWegZu ? "naechstes Stueck kostet "
-            + Math.round(teuerstesVerdiente / 1e6) + "m bei "
-            + Math.round(geld / 1e6) + "m Guthaben"
-          : naechstesUnbezahlbar ? "naechstes Stueck (" + naechstes.aug + ") kostet "
-              + Math.round(naechstes.preis / 1e6) + "m bei "
-              + Math.round(geld / 1e6) + "m Guthaben - Arbeit daran waere vergeblich"
-          : nichtsMehrOffen ? "nichts mehr offen in den beigetretenen Faktionen"
-          : "naechste Huerde erst in " + Math.round(kleinsteLuecke) + " Reputation") + ". "
-        + "bn4life.js startet danach von selbst.");
+      // Der Grund aus der tatsaechlich wahren Bedingung (Skeptiker-Einwand
+      // 11): frueher fiel das Spendenrecht auf "naechste Huerde erst in ..."
+      // zurueck und `geldWegZu` nannte den ungefilterten Preis.
+      const einbauGrund = einbauGrundText({
+        redPillWartet, spendenrechtFaellig, spendenFaktion,
+        favorLohnt, favorFaktion, favorGewinn,
+        geldWegZu, teuerstesVerdienteWertvoll,
+        naechstesUnbezahlbar, naechstesAug: naechstes && naechstes.aug,
+        naechstesPreis: naechstes && naechstes.preis,
+        geld, einkommenProSek, horizontSek: UNBEZAHLBAR_HORIZONT_SEK,
+        nichtsMehrOffen, kleinsteLuecke,
+      });
+
+      // DIE TORE VOR DEM GELDAUSGEBEN (Skeptiker-Einwand 5, 26.09.2026).
+      //
+      // Graft- und Ausgangspruefung standen HINTER der NFG-Schleife: jeder
+      // Anlauf kaufte bis zu 40 Stufen (samt Spenden) und brach dann ab - bei
+      // offenem Ausgang mit genau dem Geld, das der Interlock fuer exit.js
+      // schuetzen soll. Und sie beendeten mit `return` den ganzen Prozess
+      // (`main` liegt direkt ueber dieser Schleife): kein Kauf, keine
+      // Spende, keine Telemetrie mehr bis zum Neustart durch bn4net. Jetzt
+      // vor der Schleife, und bei Nein weiter in der naechsten Runde.
+      //
+      // Graft: `installAugmentations` toetet ein laufendes Graft ueber
+      // `prestigeAugmentation` -> `finishWork(true, true)` ohne Erstattung
+      // (`Work/GraftingWork.tsx:75-83`) - beim Simulacrum $450 Mrd.
+      //
+      // AUSGANGS-INTERLOCK (Position C.3, 04.09.2026). Der Riegel weiter oben
+      // haengt an `ausgangSteht` = The Red Pill eingebaut, und Red Pill gibt es
+      // nur im V1-Weg. In den 30 Bladeburner-Laeufen der Route greift er also
+      // NIE - und genau dort darf bn4rep in dem Moment einbauen, in dem alle
+      // 21 Black Ops gefallen sind und ausgang.js exit.js starten will.
+      // installAugmentations loescht ueber prestigeAugmentation ALLE gekauften
+      // Rechner (Prestige.ts:73) und setzt das Guthaben auf 1000 Dollar - weder
+      // ein Wirt fuer exit.js noch das Geld fuer einen bliebe. Der Riegel fragt
+      // data/ausgang.json, nicht welche Tuer offen steht.
+      //
+      // Die Meldung ist auf 5 min gedrosselt und ersetzt die EINBAU-Zeile:
+      // das Tor wird jetzt jede Runde erneut befragt statt einmal vor dem
+      // Prozessende, und "EINBAU" alle 15 s ohne Einbau waere Laerm, der den
+      // naechsten Leser des Logs in die Irre fuehrt.
+      //
+      // GEGENPRUEFUNG G1 (26.09.2026): dasselbe Tor wird DREIMAL befragt -
+      // vor dem Handschlag, nach dem Handschlag und unmittelbar vor
+      // `installAugmentations`. Der Handschlag wartet bis zu 90 s auf die
+      // Bruecke (lib/handschlag.js WARTE_MAX_MS), und graft.js hat die hoehere
+      // Figurprioritaet (lib/figur.js: graft 10, faktion 30) - es kann in
+      // dieser Zeit ein Graft starten. Die "letzte Graftpruefung" stand bis
+      // hierher VOR dem Handschlag und sah genau diese 90 s nicht.
+      const torGrundJetzt = () => {
+        try {
+          const jetztArbeit = ns.singularity.getCurrentWork();
+          if (jetztArbeit && jetztArbeit.type === "GRAFTING") {
+            return "ein Graft laeuft (" + (jetztArbeit.augmentation || "unbekannt") + ")";
+          }
+        } catch { /* nicht lesbar - dann gilt die Pruefung vom Rundenanfang */ }
+        try {
+          const lg = endspurtLage(ns, Date.now());
+          const erlaubt = einbauErlaubt(lg, Date.now(), lg.offenSeit ?? null);
+          if (!erlaubt.ok) return erlaubt.grund;
+          if (erlaubt.grund) sag(erlaubt.grund);
+        } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+        return null;
+      };
+      // WARTEN AM TOR HAELT DIE TELEMETRIE FRISCH (Gegenpruefung G2).
+      //
+      // Seit `return` -> `continue` bleibt bn4rep hier am Leben und endet
+      // jede Runde vor der Telemetriezeile. Der Waechter (guard.js, Modus
+      // enforce: Sprosse 1 "neu starten" und 2 "anderer Wirt" scharf) misst
+      // data/bn4rep.json gegen freshnessMs = 30 min (registry.json) und
+      // bestrafte ein absichtlich wartendes bn4rep nach 30 min offenem
+      // Ausgang - Neustart, dann eine Stunde Wirtssperre. Vorher war der
+      // Prozess hier zu Ende, und die Leiter fand meist "laeuft nirgends".
+      // `state: "wait"` ist der vereinbarte Zustand dafuer (lib/herzschlag.js:
+      // lebendig, aber ohne Fortschrittspflicht; lib/leiter.js S1 ueberspringt
+      // ihn). Die uebrigen Felder bleiben die der letzten vollen Runde, nur
+      // Zeit, Knoten, Warteschlange und Geld sind frisch - bn4net liest
+      // `wartend` daraus fuer seinen Amortisationsdeckel.
+      // Die Meldung bleibt gedrosselt, ausser nach Handschlag und NFG
+      // (`immerMelden`) - dort ist der Abbruch selten und gehoert ins Log.
+      const amTorWarten = async (torGrund, immerMelden) => {
+        if (immerMelden || Date.now() - letzteAussetzMeldung > 300000) {
+          letzteAussetzMeldung = Date.now();
+          sag("Einbau faellig (" + einbauGrund + "), aber ausgesetzt: "
+            + torGrund + ". Naechste Runde erneut.");
+        }
+        try {
+          const ri = ns.getResetInfo();
+          ns.write("data/bn4rep.json", JSON.stringify({
+            ...(letzteTelemetrie || {}),
+            zeit: Date.now(),
+            knoten: ri.currentNode, nodeReset: ri.lastNodeReset, augReset: ri.lastAugReset,
+            zielLevel, hacking: spieler.skills.hacking, multHacking: spieler.mults.hacking,
+            redPill: ausgangSteht, wartend, geld: ns.getServerMoneyAvailable("home"),
+            state: "wait", blockedReason: "locked", warteGrund: String(torGrund).slice(0, 200),
+          }), "w");
+          if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());
+        } catch { /* ohne Telemetrie wartet es trotzdem */ }
+        await ns.sleep(15000);
+      };
+      {
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, false); continue; }
+      }
+      sag("EINBAU: " + wartend + " Augmentierungen. Grund: " + einbauGrund
+        + ". bn4life.js startet danach von selbst.");
+
+      // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
+      //
+      // Die Brueckenseite stand seit heute frueh, die Spielseite nicht - ein
+      // Skeptiker hat es gefunden: `grep -rn "backup-request" src/` war leer.
+      // Damit entstand die Sicherungsklasse `pre-install`, die als einzige
+      // neben `pre-jump` NIE rotiert wird, ueberhaupt nie.
+      //
+      // Kommt keine Antwort und ist die letzte gruene Sicherung aelter als
+      // sechs Stunden, wird NICHT eingebaut: ein Einbau ist beliebig oft
+      // nachholbar, der Verlust bei einem Fehlgriff betraegt Tage.
+      // `handschlag` setzt dann selbst `data/install-sperre.txt`.
+      //
+      // VOR DER NFG-SCHLEIFE, NICHT DAHINTER (Gegenpruefung G1, 26.09.2026).
+      // Der Handschlag ist das dritte Tor, das den Einbau verweigern kann -
+      // und er stand als einziges noch hinter dem Geldausgeben. Verweigerte
+      // er, lagen die eben gekauften NFG-Stufen (15:12 waren es 7, 17:19 6)
+      // in der Warteschlange, und jedes weitere Stueck des Zyklus kostete je
+      // Stufe x1,9 mehr (`getGenericAugmentationPriceMultiplier`) - fuer
+      // einen Einbau, der erst nach Ablauf der Sperre (1 h) wieder gefragt
+      // wird. Die Sicherung zeigt damit den Stand vor den NFG-Kaeufen; das
+      // Zurueckspielen gibt das Geld dafuer zurueck, verliert also nichts.
+      {
+        const hs = await handschlag(ns, "install", "bn4rep",
+            ns.getResetInfo().lastNodeReset, sag);
+        if (!hs.darf) {
+          sag("Einbau ausgesetzt: " + hs.grund);
+          // SKEPTIKER-EINWAND 5: weiterlaufen statt Prozessende, und die
+          // Sperre auf home spiegeln. Seit Paket C.4 schreibt `handschlag`
+          // data/install-sperre.txt selbst per `nachHome` (lib/handschlag.js);
+          // die Zeile hier ist seit dem Zusammenfuehren doppelt, aber im
+          // selben JSON-Format ({ts, reason, bis}) und damit harmlos - sie
+          // bleibt als Rueckfall, falls `nachHome` scheitert (Integrations-
+          // pruefung 27.09.2026). Ohne Sperre auf home stellte die naechste
+          // Runde auf der Werkbank den Handschlag alle 15 s neu. Das JSON mit `bis` liest der Sperrblock oben
+          // (`roh.startsWith("{")`) korrekt; es laeuft nach 1 h ab, und
+          // `boot.js` raeumt es beim naechsten Reset.
+          try {
+            schreibNachHome(INSTALL_LOCK_FILE, JSON.stringify({
+              ts: Date.now(), reason: "handschlag", bis: Date.now() + 3600000,
+              text: "Keine Sicherung vor dem Einbau - gespiegelt von bn4rep.",
+            }));
+          } catch { /* der lokale Eintrag aus handschlag.js bleibt */ }
+          await ns.sleep(15000);
+          continue;   // main nicht verlassen: Kauf, Spende, Arbeit, Telemetrie laufen weiter
+        }
+        if (!hs.gesichert) {
+          sag("HINWEIS: Einbau ohne frische Sicherung, letzte gruene "
+            + (Number.isFinite(hs.alterMs)
+              ? (hs.alterMs / 3600000).toFixed(1) + " h alt" : "unbekannt"));
+        }
+      }
+      // Die bis zu 90 s des Handschlags sind vorbei - Graft und Ausgang
+      // koennen sich darin geaendert haben. Noch ist kein Geld ausgegeben.
+      {
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
+      }
+
       // NEUROFLUX ZULETZT (22.08.2026). NFG ist der einzige Multiplikator,
       // der sich rein mit Geld kaufen laesst - jede Stufe gibt x1,01 auf
       // hacking, und die Stufen sind unbegrenzt. Der Bot hat NFG bisher
@@ -1275,13 +1578,13 @@ export async function main(ns) {
       // getGenericAugmentationPriceMultiplier (AugmentationHelpers.ts:32-37).
       // Bei rund 100 Bio Guthaben sind das etwa 14 Stufen je Zyklus, also
       // x1,15 auf den Multiplikator - drei Zyklen von 9,13 auf 14.
-      // Beide Werte hier LOKAL, nicht aus dem Block weiter unten: dort stehen
-      // sie erst ab Zeile ~910, und ein const-Zugriff von hier oben liefe in
-      // die temporale Totzone - ReferenceError mitten im Einbau. Genau dieser
-      // Fehler ist am 22.08. schon einmal passiert.
+      // A2 (26.09.2026): dieselbe Tabelle wie oben, nur noch als Rueckfall -
+      // `bnMults` ist oben (kaufKnoten) schon einmal je Runde gelesen, hier
+      // wiederverwendet statt einer eigenen zweiten Tabelle NFG_REP_GAIN mit
+      // identischem Inhalt (die frueher hier stand und in BitNode 12 denselben
+      // Fehler machte wie die Hauptspendenformel weiter unten).
       const nfgSpendenSchwelle = ns.getFavorToDonate();
-      const NFG_REP_GAIN = { 2: 0.5, 4: 0.75, 13: 0.6, 14: 0.2 };
-      const nfgKnotenFaktor = NFG_REP_GAIN[ns.getResetInfo().currentNode] || 1;
+      const nfgKnotenFaktor = donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN);
       const nfgGeldFuerRep = (fehlend) =>
         fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / nfgKnotenFaktor;
 
@@ -1304,6 +1607,7 @@ export async function main(ns) {
             if (kosten + preis > geldJetzt) continue;
             if (!ns.singularity.donateToFaction(f, kosten)) continue;
             nfgGespendet += kosten;
+            letzteSpendeMs = Date.now();   // A5: Wandzeit, siehe Deklaration oben
           }
           if (ns.singularity.purchaseAugmentation(f, NFG)) { nfgStufen++; gekauft = true; break; }
         }
@@ -1333,74 +1637,17 @@ export async function main(ns) {
       // boot.js kostet 4 GB, passt also immer, und startet die Kette
       // boot -> bn4net -> Werkzeuge. Mehr braucht das Callback nicht zu
       // koennen: Es muss nur den ersten Dominostein umwerfen.
-      // LETZTE GRAFTPRUEFUNG, UNMITTELBAR VOR DEM EINBAU (31.08.2026,
-      // 01:45, aus dem Skeptiker-Loop). Die Pruefung am Rundenanfang
-      // (:736-741) ist hier bis zu 3,5 Sekunden alt: dazwischen liegen
-      // bis zu vierzig `await ns.sleep(50)` und ein `await ns.sleep(1500)`.
-      // In dieser Luecke kann `graft.js` ein Graft gestartet haben, und
-      // `installAugmentations` toetet es ueber `prestigeAugmentation` ->
-      // `finishWork(true, true)` ohne Erstattung
-      // (`Work/GraftingWork.tsx:75-83`) - beim Simulacrum $450 Mrd.
-      // Die Pruefung kostet nichts; ein verpasster Einbau wird in der
-      // naechsten Runde nachgeholt, ein getoetetes Graft nie.
-      try {
-        const jetztArbeit = ns.singularity.getCurrentWork();
-        if (jetztArbeit && jetztArbeit.type === "GRAFTING") {
-          sag("Einbau abgebrochen: in den letzten Sekunden hat ein Graft"
-            + " begonnen (" + (jetztArbeit.augmentation || "unbekannt")
-            + "). Naechste Runde erneut.");
-          return;
-        }
-      } catch { /* nicht lesbar - dann gilt die Pruefung von oben */ }
-      // AUSGANGS-INTERLOCK (Position C.3, 04.09.2026).
-      //
-      // Der Riegel weiter oben (:909) haengt an `ausgangSteht`, und das ist
-      // `eingebauteAugs.includes("The Red Pill")` (:887). Red Pill gibt es nur
-      // im V1-Weg. In den 30 Bladeburner-Laeufen der Route greift er also NIE -
-      // und genau dort darf bn4rep in dem Moment einbauen, in dem alle 21
-      // Black Ops gefallen sind und ausgang.js exit.js starten will.
-      //
-      // Was dann passiert, ist kein Geldproblem, sondern ein Engine-Schritt:
-      // installAugmentations loescht ueber prestigeAugmentation ALLE gekauften
-      // Rechner (Prestige.ts:73) und setzt das Guthaben auf 1000 Dollar. Damit
-      // ist weder ein Wirt fuer die 519 GB von exit.js da noch das Geld, einen
-      // zu kaufen. Gegen ein genulltes Konto hilft keine Reserve.
-      //
-      // Dieser Riegel ist verfahrensunabhaengig: er fragt data/ausgang.json,
-      // nicht welche Tuer offen steht.
-      try {
-        const lg = endspurtLage(ns, Date.now());
-        const erlaubt = einbauErlaubt(lg, Date.now(), lg.offenSeit ?? null);
-        if (!erlaubt.ok) {
-          sag("Einbau ausgesetzt. " + erlaubt.grund);
-          return;
-        }
-        if (erlaubt.grund) sag(erlaubt.grund);
-      } catch { /* keine Lage lesbar - dann gilt Normalbetrieb */ }
-
-      // DER HANDSCHLAG VOR DEM EINBAU (Auftrag 7.2, gebaut 04.09.2026).
-      //
-      // Die Brueckenseite stand seit heute frueh, die Spielseite nicht - ein
-      // Skeptiker hat es gefunden: `grep -rn "backup-request" src/` war leer.
-      // Damit entstand die Sicherungsklasse `pre-install`, die als einzige
-      // neben `pre-jump` NIE rotiert wird, ueberhaupt nie.
-      //
-      // Kommt keine Antwort und ist die letzte gruene Sicherung aelter als
-      // sechs Stunden, wird NICHT eingebaut: ein Einbau ist beliebig oft
-      // nachholbar, der Verlust bei einem Fehlgriff betraegt Tage.
-      // `handschlag` setzt dann selbst `data/install-sperre.txt`.
+      // LETZTE TORPRUEFUNG, UNMITTELBAR VOR DEM EINBAU (31.08.2026, 01:45,
+      // aus dem Skeptiker-Loop; seit der Gegenpruefung G1 dasselbe Tor wie
+      // oben, also Graft UND Ausgang). Dazwischen liegen bis zu vierzig
+      // `await ns.sleep(50)` der NFG-Schleife und ein `await ns.sleep(1500)`;
+      // in dieser Luecke kann `graft.js` ein Graft gestartet haben. Die
+      // Pruefung kostet nichts; ein verpasster Einbau wird in der naechsten
+      // Runde nachgeholt, ein getoetetes Graft nie. Zwischen dieser Pruefung
+      // und `installAugmentations` steht kein `await` mehr.
       {
-        const hs = await handschlag(ns, "install", "bn4rep",
-            ns.getResetInfo().lastNodeReset, sag);
-        if (!hs.darf) {
-          sag("Einbau ausgesetzt: " + hs.grund);
-          return;
-        }
-        if (!hs.gesichert) {
-          sag("HINWEIS: Einbau ohne frische Sicherung, letzte gruene "
-            + (Number.isFinite(hs.alterMs)
-              ? (hs.alterMs / 3600000).toFixed(1) + " h alt" : "unbekannt"));
-        }
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
       }
 
       ns.singularity.installAugmentations("boot.js");
@@ -1427,6 +1674,68 @@ export async function main(ns) {
       }
     }
     if (gekauft) { await ns.sleep(2000); continue; }   // Preise haben sich verschoben
+
+    // A4-FIX (26.09.2026, Audit 3#2): Spendenrecht faellig, Warteschlange
+    // leer. Der Einbau-Trigger weiter oben verlangt fuer den
+    // Spendenrecht-Zweig `wartend >= 1` (`spendenAusnahme`) - mit `wartend
+    // === 0` wird also gar nicht erst geprueft, ob ein Einbau sich lohnt, und
+    // der Bot wartet, bis zufaellig ein regulaeres Stueck verdient ist. Belegt
+    // in BN5.2: 37 min Stillstand zwischen "NFG-Stufe waere kaufbar" (~16:00)
+    // und dem ersten (zufaelligen) Kauf, der die Warteschlange fuellte.
+    //
+    // Eine einzelne NeuroFlux-Stufe fuellt die Warteschlange sofort. Sie ist
+    // aber NICHT immer erreichbar (Skeptiker-Einwand 10, Korrektur des
+    // frueheren Satzes "IMMER erreichbar"): noetig ist eine Mitgliedsfaktion
+    // mit Reputation >= NFG-Bedarf (Stufe 44: 139.920) ODER eine Faktion mit
+    // Favor >= Spendenschwelle, bei der die Luecke gekauft werden kann. In
+    // BN5.2 hatte vor 16:37 keine Faktion Favor 150 - A4 greift dort also erst
+    // gegen 16:00, nicht an der Schwelle 15:42. Scheitert der Kauf, sagt das
+    // Log es jetzt (gedrosselt), statt still zu warten.
+    //
+    // Nur EIN Versuch je Runde, nicht die 40-Stufen-Schleife aus dem
+    // Einbaublock: hier geht es nur darum, `wartend` von 0 auf 1 zu heben,
+    // damit die naechste Runde den Trigger ueberhaupt erreicht - und deshalb
+    // nur unter den Vorbedingungen dieses Einbaus (Skeptiker-Einwand 3: nicht
+    // im Kampfknoten, nicht nach eingebautem Red Pill, nicht bei Sperre;
+    // Begruendung bei `sollFuellstueckSofortKaufen`).
+    if (sollFuellstueckSofortKaufen({
+      spendenrechtFaellig, wartend, ausgangSteht, kampfKnoten: kampfKnotenEinbau, gesperrt,
+    })) {
+      const fuellSchwelle = ns.getFavorToDonate();
+      const fuellKnotenFaktor = donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN);
+      let fuellGekauft = false;
+      for (const f of spieler.factions) {
+        if (!ns.singularity.getAugmentationsFromFaction(f).includes(NFG)) continue;
+        const geldJetzt = ns.getServerMoneyAvailable("home");
+        const preis = ns.singularity.getAugmentationPrice(NFG);
+        if (geldJetzt < preis) continue;
+        const noetig = ns.singularity.getAugmentationRepReq(NFG);
+        const habe = ns.singularity.getFactionRep(f);
+        if (noetig > habe) {
+          if ((favor[f] || 0) < fuellSchwelle) continue;   // hier keine Spende moeglich
+          const kosten = (noetig - habe) * 1e6
+            / Math.max(0.01, spieler.mults.faction_rep) / fuellKnotenFaktor * 1.02;
+          if (kosten + preis > geldJetzt) continue;
+          if (!ns.singularity.donateToFaction(f, kosten)) continue;
+          letzteSpendeMs = Date.now();   // A5: Wandzeit, siehe Deklaration oben
+        }
+        if (ns.singularity.purchaseAugmentation(f, NFG)) {
+          fuellGekauft = true;
+          sag("FUELLSTUECK: NeuroFlux-Stufe bei " + f + " gekauft - Spendenrecht"
+            + " war faellig, die Warteschlange leer (Audit 3#2).");
+          break;
+        }
+      }
+      if (fuellGekauft) { await ns.sleep(1500); continue; }
+      if (Date.now() - letzteFuellMeldung > 300000) {
+        letzteFuellMeldung = Date.now();
+        sag("FUELLSTUECK nicht kaufbar: Spendenrecht bei " + spendenFaktion
+          + " faellig, aber keine Faktion hat die NFG-Reputation ("
+          + Math.round(ns.singularity.getAugmentationRepReq(NFG))
+          + ") oder das Spendenrecht fuer die Luecke, oder das Geld reicht"
+          + " nicht - der Einbau wartet auf das naechste verdiente Stueck.");
+      }
+    }
 
     // Geldbedarf nach home melden. bn4net.js kauft sonst Rechner von dem Geld,
     // das hier fuer eine bereits verdiente Augmentierung gebraucht wird - und
@@ -1575,8 +1884,9 @@ export async function main(ns) {
     // fuer Hacking 9000 nichts beitraegt.
     //
     // Der Summand 0.15 sorgt dafuer, dass nutzlose Stuecke nicht voellig
-    // liegenbleiben: Daedalus verlangt 30 VERSCHIEDENE Augmentierungen
-    // (BitNodeMultipliers.ts:61), und ohne Daedalus gibt es keine Red Pill und
+    // liegenbleiben: Daedalus verlangt `DaedalusAugsRequirement` INSTALLIERTE
+    // Augmentierungen (meist 30, BN12 31, BN6/7 35, BN15 20 - BitNode.tsx;
+    // Stand 26.09.2026 live gelesen, siehe `zaehlplatzWert` unten), und ohne Daedalus gibt es keine Red Pill und
     // damit keinen Zugang zu w0r1d_d43m0n. Sie sind also nicht wertlos, nur
     // nachrangig.
     // Zweistufig statt gewichtet. Eine gemeinsame Guetezahl aus Nutzen und
@@ -1585,8 +1895,8 @@ export async function main(ns) {
     // klare Rangordnung - erst alles, was Hacking staerkt, und darunter nach
     // Naehe; der Rest kommt nur dran, wenn nichts Nuetzliches erreichbar ist.
     //
-    // Ganz weglassen darf man den Rest nicht: Daedalus verlangt 30
-    // VERSCHIEDENE Augmentierungen, und ohne Daedalus gibt es keine Red Pill
+    // Ganz weglassen darf man den Rest nicht: Daedalus verlangt
+    // `DaedalusAugsRequirement` installierte Augmentierungen, und ohne Daedalus gibt es keine Red Pill
     // und keinen Zugang zu w0r1d_d43m0n.
     // 22.08.2026 ERSETZT. Die zweistufige Rangordnung war unter einer
     // Annahme richtig, die nicht mehr gilt: dass nuetzliche und nutzlose
@@ -1598,8 +1908,8 @@ export async function main(ns) {
     //
     // Jetzt eine gemeinsame Guetezahl: Reputationskosten je Fortschritt.
     // Fortschritt ist zweierlei, und beides zaehlt fuer den Knotenabschluss:
-    //   - ein Zaehlplatz Richtung der 30 verschiedenen Augmentierungen, die
-    //     Daedalus verlangt (ohne Daedalus keine Red Pill, kein Zugang zu
+    //   - ein Zaehlplatz Richtung der installierten Augmentierungen, die
+    //     Daedalus verlangt (`DaedalusAugsRequirement`, meist 30; ohne Daedalus keine Red Pill, kein Zugang zu
     //     w0r1d_d43m0n)
     //   - der Hacking-Multiplikator, der das Level ueberhaupt erreichbar macht
     //
@@ -1619,7 +1929,22 @@ export async function main(ns) {
     // jetzt so viel wie ein sehr schwaches Stueck - das ist richtig herum,
     // denn die 30er-Huerde ist laengst erfuellt.
     const NUTZEN_GEWICHT = 1;
-    const zaehlplatzWert = alleAugs.length < 30 ? 1 : 0;
+    // A3-KORREKTUR (26.09.2026). Hier stand `alleAugs.length < 30`. Zwei
+    // Fehler auf einmal: `alleAugs` ist `getOwnedAugmentations(true)`, zaehlt
+    // also auch WARTENDE Stuecke mit, waehrend Daedalus nur INSTALLIERTE
+    // zaehlt (`FactionJoinCondition.ts haveAugmentations`:
+    // `p.augmentations.length >= n`) - und jede gekaufte, noch nicht
+    // eingebaute NeuroFlux-Stufe steht dort als EIGENER Eintrag
+    // (`queueAugmentation`, NFG ist von der Mehrfachsperre ausdruecklich
+    // ausgenommen), waehrend installiert IMMER nur ein NFG-Eintrag existiert
+    // (`applyAugmentation` aktualisiert nur `level`). `eingebauteAugs.length`
+    // (`getOwnedAugmentations(false)`) ist also schon die richtige Zahl, ohne
+    // eigene Entdopplung. Die feste 30 war ausserdem in BitNode 12 falsch (die
+    // Schwelle liegt dort bei 31), in BitNode 6/7 bei 35 und in BitNode 15 bei
+    // 20 (BitNode.tsx) - `daedalusSchwelle()` liest sie jetzt live.
+    const zaehlplatzWert = zaehlplatzWertBerechnen(
+      eingebauteAugs.length,
+      daedalusSchwelle(bnMults, kaufKnoten, DAEDALUS_SCHWELLE_FALLBACK));
     // DER AUSGANGSSCHLUESSEL (23.08.2026). The Red Pill hat keinerlei Werte
     // (Augmentations.ts:1946-1953, stats: ""), faellt also durch jede
     // Nutzenrechnung: hackNutzen ist null, und der Zaehlplatz-Bonus greift nur
@@ -1744,13 +2069,17 @@ export async function main(ns) {
     // jede Spende um ein Drittel zu billig - und `kosten + preis <= geld`
     // weiter unten wird zu frueh wahr, der Kauf schlaegt dann fehl.
     //
-    // ns.getBitNodeMultipliers() gibt es nur mit SF5 oder in BitNode 5, wir
-    // haben beides nicht. Deshalb die Werte aus dem Quelltext, und zwar nur
-    // fuer die Knoten, die den Faktor ueberhaupt setzen - alle uebrigen lassen
-    // ihn bei 1. BitNode 12 skaliert ihn mit der Knotenstufe; dort greift
-    // bewusst der sichere Wert 1, weil eine zu hoch geschaetzte Spende nur
-    // Geld kostet, eine zu niedrig geschaetzte dagegen den Kauf verfehlt.
-    const knotenRepFaktor = FACTION_REP_GAIN[ns.getResetInfo().currentNode] || 1;
+    // A2-KORREKTUR (26.09.2026): Hier stand "ns.getBitNodeMultipliers() gibt
+    // es nur mit SF5 oder in BitNode 5, wir haben beides nicht" - das war
+    // schlicht falsch, SF5 ist vorhanden (Auftrag, gegengeprueft in
+    // NetscriptFunctions.ts: `canAccessBitNodeFeature(5)`). Mit der alten
+    // Tabelle war BitNode 12 der einzige Knoten, der den Faktor UEBERHAUPT mit
+    // der Stufe skaliert, UND der einzige ohne Tabelleneintrag - der
+    // "sichere Wert 1" war also gerade dort am weitesten daneben (0,9804 bei
+    // Stufe 2, 0,9612 bei Stufe 3 statt 1: der Kauf schlaegt fehl, nicht die
+    // Spende wird zu teuer, Audit 3#7). Jetzt live gelesen, Tabelle nur noch
+    // Rueckfall fuer den Fehlerfall.
+    const knotenRepFaktor = donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN);
     const geldFuerRep = (fehlend) =>
       fehlend * 1e6 / Math.max(0.01, spieler.mults.faction_rep) / knotenRepFaktor;
 
@@ -2014,6 +2343,7 @@ export async function main(ns) {
       const uebrig = Math.min(noetig, verfuegbar);
       if (uebrig > 1e9) {
         if (ns.singularity.donateToFaction(ziel.faktion, uebrig)) {
+          letzteSpendeMs = Date.now();   // A5: Wandzeit, siehe Deklaration oben
           sag("GESPENDET: " + Math.round(uebrig / 1e6) + "m an " + ziel.faktion
             + " fuer " + Math.round(fehlt) + " fehlende Reputation"
             + " (Favor " + Math.round(favor[ziel.faktion]) + ").");
@@ -2033,6 +2363,9 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") ns.scp("data/rep-modus.txt", "home", ns.getHostname());
 
     if (!arbeitetSchon) {
+      // Neue oder keine Faktionsarbeit: die Fokus-Karenz beginnt von vorn
+      // (workForFaction startet mit Fokus, siehe `fokusEntscheidung`).
+      fokusFehltSeit = null;
       // Bremse VOR dem Arbeitsbeginn setzen, nicht danach: Zwischen Start und
       // Datei liegt sonst ein Fenster, in dem bn4life ein Verbrechen
       // dazwischenschiebt.
@@ -2111,6 +2444,69 @@ export async function main(ns) {
         sag("workForFaction(" + ziel.faktion + ", " + art + ") abgelehnt.");
         try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
       }
+    } else {
+      // A1-FIX (26.09.2026, Audit 3#1 + 6#1, doppelt belegt). Die
+      // Faktionsarbeit laeuft schon (workForFaction startet sie MIT Fokus,
+      // `workForFaction(..., true)` weiter oben) - aber jede Navigation weg von der
+      // Arbeitsseite loescht ihn wieder (`Player.stopFocusing()`,
+      // `ui/GameRoot.tsx:271-273`), und bis heute holt ihn niemand zurueck.
+      // Ausloeser ist `darkweb.js` (alt+w/alt+t) alle 5 Minuten, solange ein
+      // Portprogramm fehlt - unabhaengig davon greift die Wiederherstellung
+      // hier gegen JEDE Ursache, nicht nur gegen darkweb.js.
+      //
+      // Belegt in BN5.2: 14 von 25 stuendlichen Sicherungen mit laufender
+      // Faktionsarbeit standen auf `focus:false`, ueber Strecken bis 3,8 h am
+      // Stueck (09:04-12:53). `focusPenalty()` ist ohne Fokus 0,8 auf Rep UND
+      // Erfahrung der Faktionsarbeit (`PlayerObjectGeneralMethods.ts:622-628`,
+      // `Work/FactionWork.tsx:37-45`) - rund 46 min verlorene Arbeitszeit
+      // allein in dieser einen Strecke.
+      //
+      // DIE UI-SKRIPTE BRAUCHEN EINE KARENZ (Skeptiker-Einwand 8 - hier stand
+      // vorher "geprueft, stoert kein UI-Skript", und das war falsch).
+      // `darkweb.js` klickt "Do something else simultaneously" und navigiert
+      // dann per alt+w/alt+t. Auf der Arbeitsseite gibt es keine Seitenleiste
+      // (`ui/GameRoot.tsx:328-331`), und bei fokussierter Arbeit verwirft das
+      // Spiel jedes Tastenkuerzel (`Sidebar/ui/SidebarRoot.tsx:285-306`). Ein
+      // `setFocus` mitten in seiner Klickfolge bricht den Lauf ab ("Terminal
+      // nicht erreichbar"); dasselbe gilt fuer die Handwerkzeuge ueber den
+      // Auftragskanal (exportbonus, travel, join, homeram, stockaccess).
+      // Deshalb erst zurueckholen, wenn der Fokus seit 30 s fehlt - laenger
+      // als jede dieser Klickfolgen. `popups.js` ist seitenunabhaengig
+      // (Escape am document, Modalknoepfe) und braucht keine Ruecksicht.
+      //
+      // NMI AUSGENOMMEN - ABER NUR EINGEBAUT (Skeptiker-Einwand 4). Das Spiel
+      // prueft `hasAugmentation(NMI, true)` (`PlayerObjectGeneralMethods.ts:
+      // 622-628`), und der zweite Parameter heisst `ignoreQueued`
+      // (`Person.ts:232-239`): ein nur GEKAUFTES NMI hebt die Strafe x0,8
+      // NICHT auf. Hier stand vorher `besitz` (inkl. Warteschlange) mit dem
+      // umgekehrten Kommentar - nach dem Kauf haette der Bot fuer den Rest des
+      // Zyklus nichts mehr zurueckgeholt.
+      //
+      // KEIN EIGENER FIGUR-ANTRAG NOETIG: `setFocus` bewegt die Figur nicht
+      // zu einer anderen Handlung (kein `startWork`), es schaltet nur die
+      // Oberflaeche der schon laufenden Arbeit um - der bestehende
+      // `faktion`-Antrag von weiter oben deckt das mit ab.
+      //
+      // Die Entscheidung selbst steht als reiner Zustandsautomat in
+      // lib/einbau.js (`fokusEntscheidung`), damit sie ohne Spielmock testbar
+      // ist - hier bleiben nur die beiden ns-Aufrufe.
+      try {
+        const istFokussiert = ns.singularity.isFocused();
+        const fokus = fokusEntscheidung({
+          arbeitetSchon, istFokussiert,
+          nmiEingebaut: eingebauteAugs.includes("Neuroreceptor Management Implant"),
+          unfokussiertSeit: fokusFehltSeit, jetzt: Date.now(),
+        });
+        fokusFehltSeit = fokus.unfokussiertSeit;
+        if (fokus.holen) {
+          ns.singularity.setFocus(true);
+          if (Date.now() - letzterFokusHinweis > 300000) {
+            letzterFokusHinweis = Date.now();
+            sag("Fokus zurueckgeholt (" + ziel.faktion + ") - Rate stand"
+              + " ohne ihn bei 80 Prozent.");
+          }
+        }
+      } catch { /* Aufruf selten verfuegbar (SF4) - kein Grund zum Abbruch */ }
     }
 
     // Summe ueber alle Faktionen. Die Reputation des aktuellen Ziels taugt
@@ -2121,7 +2517,9 @@ export async function main(ns) {
     const repGesamt = spieler.factions
       .reduce((n, f) => n + ns.singularity.getFactionRep(f), 0);
 
-    ns.write("data/bn4rep.json", JSON.stringify({
+    // Gemerkt fuer `amTorWarten` (Gegenpruefung G2): eine Runde am Einbau-Tor
+    // schreibt diesen Stand mit frischer Zeit und `state: "wait"` erneut.
+    letzteTelemetrie = {
       zeit: Date.now(),
       // Fuer tools/wache.js: woran erkennt man von aussen einen
       // Knotenwechsel? getResetInfo ist hier ohnehin schon aufgerufen
@@ -2170,7 +2568,8 @@ export async function main(ns) {
       teuerstesVerdiente,
       bedarf,
       geld,
-    }), "w");
+    };
+    ns.write("data/bn4rep.json", JSON.stringify(letzteTelemetrie), "w");
     if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());
    } catch (e) {
     sag("RUNDENFEHLER: " + String(e));

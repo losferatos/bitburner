@@ -76,9 +76,11 @@
  *     data/hashes.json. bn4net.js zieht ihn vom Traeger ab: sonst verdeckten
  *     100 Rang alle paar Minuten einen stehenden Motor vor dem Waechter.
  *   - Ohne Hacknet-Server: ist der Knoten im Server-Modus (maxNumNodes 20,
- *     Hacknet.ts:57-62), wartet es auf hacknet.js, das den ersten kauft;
- *     sonst schreibt es data/keine-hacknet.txt mit der Knotennummer und
- *     beendet sich - bn4net startet es in diesem Knoten dann nicht mehr.
+ *     Hacknet.ts:57-62) UND BitNode 9 (dort kauft hacknet.js den ersten),
+ *     wartet es; sonst - kein Server-Modus, ODER ausserhalb BN9 ohne den
+ *     SF9.3-Gratis-Server (26.09.2026, Audit-Fund 5#6, C3-Nachtrag) -
+ *     schreibt es data/keine-hacknet.txt mit der Knotennummer und beendet
+ *     sich - bn4net startet weder es noch hacknet.js in diesem Knoten neu.
  *
  * @param {NS} ns
  */
@@ -177,6 +179,17 @@ export async function main(ns) {
       try { kapazitaet = ns.hacknet.hashCapacity(); serverModus = ns.hacknet.maxNumNodes() === 20; } catch { kapazitaet = 0; }
       if (!(kapazitaet > 0)) {
         if (!serverModus) { sperren("Keine Hacknet-Server in BitNode " + knoten); return; }
+        // AUSSERHALB BN9 KAUFT NIEMAND EINEN NEUEN (26.09.2026, Audit-Fund
+        // 5#6, C3-Nachtrag). `serverModus` ist wahr, sobald SF9 (oder BN9
+        // selbst) das Feature freischaltet - UNABHAENGIG vom aktuellen
+        // Knoten. `kapazitaet === 0` heisst hier: der SF9.3-Gratis-Server
+        // (entsteht bei jedem Sprung, verschwindet beim ersten Einbau,
+        // PlayerObjectGeneralMethods.ts:130-131) ist weg. hacknet.js kauft
+        // den ersten Server "NUR in BitNode 9" (siehe dort) - ausserhalb
+        // wartete dieses Skript sonst bis zum naechsten Sprung im
+        // "wait"-Herzschlag auf einen Kauf, der nie kommt, und hielt dafuer
+        // dauerhaft ~6 GB auf der Werkbank fest.
+        if (knoten !== 9) { sperren("BitNode " + knoten + ": SF9.3-Gratis-Server weg, nur BN9 kauft neu"); return; }
         if (letzteMeldung !== "warte") { ns.print("Server-Modus, aber noch kein Hacknet-Server - hacknet.js kauft den ersten."); letzteMeldung = "warte"; }
         // HERZSCHLAG AUCH BEIM WARTEN (Skeptiker 19.09.2026). Ohne Telemetrie
         // hielte der Waechter das Gewerk nach 15 min fuer tot (S1), killte es

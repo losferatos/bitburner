@@ -175,17 +175,37 @@ function baueSave({ port, playtime = 100 * 3600000, identifier = "testtesttest01
  * anders-gruene Laeufe. Ein Test, dessen Ergebnis vom Commit-Zustand abhaengt,
  * misst nicht mehr den Code.
  *
- * Deshalb bekommt JEDE Bruecke ohne eigene Liste eine erzeugte: den heutigen
- * Stand von master, einmal beim Start dieses Laufs eingefroren.
+ * Deshalb bekommt JEDE Bruecke ohne eigene Liste eine erzeugte, einmal beim
+ * Start dieses Laufs eingefroren.
+ *
+ * ZWEI FEHLER BIS 27.09.2026 (Integrationspruefung, gefunden an der roten
+ * Probe "Sicherung VOR der Uebertragung", Uebertragung@-1):
+ *   1. Der Schnappschuss entstand NIE. `tempDateien` war erst weiter unten
+ *      deklariert; der Zugriff hier warf "Cannot access 'tempDateien' before
+ *      initialization", der catch meldete nur einen HINWEIS, und jede Bruecke
+ *      fragte doch `git ls-tree master`. Die Deklaration steht jetzt hier.
+ *   2. Die Quelle war master. Paket A hat `src/lib/einbau.js` neu angelegt;
+ *      solange der Integrationszweig nicht in master liegt, wies die Bruecke
+ *      sie ab ("NICHT IN MASTER") - genau die Abhaengigkeit vom Commit-
+ *      Zustand, vor der dieser Absatz warnt. Jetzt der gepruefte Baum selbst
+ *      (src/ auf Platte). Der Master-Riegel hat eigene Proben mit eigener
+ *      Liste. Belegt: einbau.js beiseite 96/96, mit ihr 95/96.
  */
+const tempDateien = [];
 const MASTER_SNAPSHOT = (() => {
   const ziel = path.join(ROOT, "pruefstand", "master-" + process.pid + ".txt");
   try {
-    const aus = execFileSync("git",
-      ["ls-tree", "-r", "--name-only", "master", "--", "src/"],
-      { cwd: ROOT, encoding: "utf8", timeout: 10000 });
-    const namen = aus.split("\n").map((z) => z.trim()).filter(Boolean)
-      .map((z) => z.replace(/^src\//, ""));
+    const srcWurzel = path.join(ROOT, "src");
+    const namen = [];
+    const lauf = (dir) => {
+      for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+        const voll = path.join(dir, e.name);
+        if (e.isDirectory()) lauf(voll);
+        else namen.push(path.relative(srcWurzel, voll).replace(/\\/g, "/"));
+      }
+    };
+    lauf(srcWurzel);
+    if (!namen.length) throw new Error("src/ ist leer");
     fs.mkdirSync(path.dirname(ziel), { recursive: true });
     fs.writeFileSync(ziel, namen.join("\n") + "\n", "utf8");
     tempDateien.push(ziel);
@@ -303,7 +323,6 @@ function starteSpiel(rfaPort, saveBuf, opt = {}) {
 
 const aufraeumen = [];
 const tempOrdner = [];
-const tempDateien = [];
 function merkeZumAufraeumen(p) { aufraeumen.push(p); }
 
 /**

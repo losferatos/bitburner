@@ -360,7 +360,22 @@ export function rechne(datei, lage = {}) {
 // Kommandozeile
 // ===========================================================================
 
-if (import.meta.url === "file:///" + process.argv[1].replace(/\\/g, "/")) {
+// HAUPTMODUL-ERKENNUNG PORTABEL (26.09.2026, Nacharbeit Auftrag C).
+//
+// Hier stand `import.meta.url === "file:///" + process.argv[1].replace(...)`.
+// Das geht unter POSIX schief: `process.argv[1]` ist dort bereits
+// "/home/.../ram.js" (mit fuehrendem Slash), und "file:///" + das ergibt
+// "file:////home/..." - VIER Slashes statt drei, `import.meta.url` liefert
+// aber "file:///home/..." mit drei. Der Vergleich ist also unter POSIX IMMER
+// falsch, und der ganze CLI-Block lief nie (stumm - kein Fehler, nur keine
+// Ausgabe). `pathToFileURL` baut aus einem Dateisystempfad die korrekte
+// file://-URL fuer die jeweilige Plattform - unter POSIX ohne die
+// Verdopplung, unter Windows mit Backslash- und Laufwerksbuchstaben-Wandlung
+// ("C:\...\ram.js" -> "file:///C:/.../ram.js"), also weiterhin richtig auf
+// Erics Windows-Rechner. `process.argv[1]` ist von Node in beiden Faellen
+// bereits der absolute Pfad (auch bei relativem Aufruf wie `node tools/ram.js`
+// oder `node .\tools\ram.js`), ein erneutes `path.resolve` ist nicht noetig.
+if (import.meta.url === pathToFileURL(process.argv[1]).href) {
   const args = process.argv.slice(2);
   const sf4Arg = args.find((a) => a.startsWith("--sf4="));
   const bnArg = args.find((a) => a.startsWith("--bn="));

@@ -139,3 +139,4 @@ Laufen als Branches (je Worktree, danach Opus-Skeptiker):
 - 13:00 Wochenlimit riss alle Auftraege ab; fortgesetzt (sparsam): BN12-Pruefung, G, B4, B5, D-a, D-b, E1.
 - ZURUECKGESTELLT: Vorab-Pruefung BN2/BN3/BN11 und BN8 (Auftragstexte stehen im Verlauf; vor BN2 bzw. BN8 neu ansetzen).
 - BN12-Pruefung fertig (nodes/audit-2026-09-26/bn12-bericht.md): kein BLOCKER. Offen H1 ServerWeakenRate in der Vorbereitung (bn4net WEAKEN_POWER, 2-6 % zu viel, mehr Wellen); H2 Einbau-Trigger kennt die 31 nicht (bn4rep :1369-1375, ein Zyklus ~1,7 h wenn der Einbau genau bei 30 landet); Rest MINOR.
+- E1 Urteil (bcb49c6): (a) Gratis-Server nach Sprung -> Increase Maximum Money schlaegt Verkauf deutlich (3 h: 5,3 Mrd vs 0,24 Mrd), relativ klein (~5 % Zykluseinkommen); (b) Hacknet-Kauf in V1 nicht fertig gerechnet. Nicht gebaut - naechste Runde, mit Skeptiker.

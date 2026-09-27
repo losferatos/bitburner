@@ -1024,24 +1024,108 @@ export async function main(ns) {
       return 100 * (Math.pow((basis + lvlPlus) / basis, 0.9) - 1);
     }
     if (name === "Reaper" || name === "Evasive System") {
-      // Diese beiden heben nicht die Chance, sondern den EFFEKTIVEN Kampfwert
-      // (`data/Skills.ts:54-72`, Reaper 2 Prozent auf alle vier, Evasive
-      // System 4 auf dex und agi). Der wirkt ueber
-      // `competence += weights * effSkill^decay` (`Actions/Action.ts:173`),
-      // bei Black Ops mit Gewicht 0,2 und Decay 0,8 je Kampfwert - also
-      // gedaempft und von den aktuellen Werten abhaengig.
+      // SKEPTIKER-AUDIT 26.09.2026, FUND 3 (audit-2026-09-26/4-bladeburner.md#3):
+      // zwei Fehler, beide hier gefixt.
+      //
+      // FEHLER 1 - ADDITIV STATT MULTIPLIKATIV. Diese beiden heben nicht die
+      // Chance, sondern den EFFEKTIVEN Kampfwert (`data/Skills.ts:54-72`:
+      // Reaper 2 % auf EffStr/EffDef/EffDex/EffAgi, Evasive System 4 % zusaetzlich
+      // auf EffDex/EffAgi). Das Spiel baut daraus PRO ZIEL einen Multiplikator,
+      // indem jede Faehigkeit ihren eigenen Faktor DRAUFMULTIPLIZIERT
+      // (`Bladeburner.ts:774-784 updateSkillMultipliers`:
+      // `skillMultipliers[name] = getSkillMult(name) * (1+basis*stufe/100)`).
+      // Hier stand `b = 1 + 0,02*R + 0,04*E` (Summe). Bei R 90 / E 93 ist der
+      // wahre EffDex-Faktor (1+0,02*90)*(1+0,04*93) = 2,80 x 4,72 = 13,22 gegen
+      // 6,52 additiv - Faktor 2 daneben, und die Luecke waechst mit jeder Stufe.
+      //
+      // FEHLER 2 - DIE DAUERWIRKUNG FEHLTE GANZ. `getActionTime` teilt die
+      // Basisdauer durch `statFac(effAgi, effDex)` (`Action.ts:105-122`) -
+      // DIESELBE Rechenposition, ueber die Overclock per `skillFac` wirkt
+      // (Zeile 119: `baseTime*skillFac/statFac`). Jede Stufe Reaper/Evasive
+      // macht Aktionen also nicht nur wahrscheinlicher, sondern auch KUERZER,
+      // bei Vertraegen, Operationen UND Black Ops gleichermassen.
+      //
+      // FIX: `comp()` baut EffStr/EffDef/EffDex/EffAgi jetzt multiplikativ ueber
+      // `effFaktor()`, mit denselben Gewichten/Decays wie Operation Daedalus in
+      // `BLACKOP_DATEN` (die letzte von 21 Black Ops, immer vorhanden - ein
+      // fester Bezugspunkt, der nicht mit `getNextBlackOp()` hin- und
+      // herspringt; hier als eigene Konstante, `BLACKOP_DATEN` selbst steckt in
+      // `waehle()` und ist von hier aus nicht erreichbar). Intelligenzbonus,
+      // Ausdauerstrafe, Truppbonus und die
+      // Chance-Skill-/Aug-Multiplikatoren (`Action.ts:175-190`) fehlen absichtlich:
+      // sie sind fuer R/E-Stufen konstant und kuerzen sich im Verhaeltnis
+      // danach/jetzt exakt heraus (gegen `skillwert.js` geeicht - voller und
+      // verkuerzter Bruch liefern dieselbe Ratio). NICHT ueber `blackOpChance()`
+      // selbst gerechnet: die liest nur den JETZT-Stand, und dieser Fund lief
+      // parallel zum Bauauftrag an der Erfolgschance.
+      //
+      // Der Nutzen ist die Summe aus Chance- und Zeitanteil, log-additiv wie von
+      // Overclock verlangt (`ln` statt `ratio-1`, weil beides unabhaengige
+      // multiplikative Faktoren derselben Rangrate sind). Die Zeitwirkung wird
+      // wie bei Overclock ueber `ausdauerLuft()` gedaempft: Reaper/Evasive kuerzen
+      // die Dauer ueber DIESELBE Stelle wie Overclock - bindet die Ausdauer,
+      // bringt eine kuerzere Aktion keinen Rang mehr, nur schnelleren Verbrauch.
+      //
+      // Eichung: `tools/lib/formeln.js` (`reaperEvasiveChanceProzent`,
+      // `reaperEvasiveZeitProzent`), kalibriert in `tools/test-formeln.js` gegen
+      // `skillwert.js`/`zeitfaktor.js` (Stand BN6 28.08. 16:08, ERLEDIGT.md:3843):
+      // Reaper 0,5630 %/Zeit 0,228 %, Evasive 0,5287 %/Zeit 0,270 % je Stufe -
+      // Evasive liegt damit VOR Blade's Intuition (0,7557 %), nicht dahinter.
       const sk = ns.getPlayer().skills;
       const r = ns.bladeburner.getSkillLevel("Reaper");
       const e = ns.bladeburner.getSkillLevel("Evasive System");
+      const rNeu = name === "Reaper" ? r + 1 : r;
+      const eNeu = name === "Evasive System" ? e + 1 : e;
+      // Baut EffStr/EffDef/EffDex/EffAgi wie `updateSkillMultipliers`: jede
+      // Faehigkeit, die auf `stat` wirkt, multipliziert ihren eigenen Faktor
+      // drauf (Start bei 1) - PRODUKT, nicht Summe.
+      const effFaktor = (rr, ee, stat) => {
+        let m = 1;
+        if (stat === "strength" || stat === "defense" || stat === "dexterity" || stat === "agility") {
+          m *= 1 + 0.02 * rr;
+        }
+        if (stat === "dexterity" || stat === "agility") m *= 1 + 0.04 * ee;
+        return m;
+      };
+      // Operation Daedalus' Gewichte/Decays direkt hier, NICHT aus
+      // `BLACKOP_DATEN` (die Tabelle steckt in `waehle()`, einer anderen
+      // Funktion - `relNutzen` kommt nicht an sie heran, geprueft ueber einen
+      // Mock-Lauf: "BLACKOP_DATEN is not defined"). Dieselben sieben Zahlen
+      // wie dort, gegen `reference/bitburner-src/.../BlackOperations.ts`
+      // erzeugt (15 von 21 Black Ops teilen dieses Muster).
+      const daten = {
+        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+      };
       const comp = (rr, ee) => {
-        const a = 1 + rr * 0.02, b = 1 + rr * 0.02 + ee * 0.04;
-        return Math.pow(sk.strength * a, 0.8) + Math.pow(sk.defense * a, 0.8)
-          + Math.pow(sk.dexterity * b, 0.8) + Math.pow(sk.agility * b, 0.8);
+        const eff = {
+          hacking: sk.hacking,
+          strength: sk.strength * effFaktor(rr, ee, "strength"),
+          defense: sk.defense * effFaktor(rr, ee, "defense"),
+          dexterity: sk.dexterity * effFaktor(rr, ee, "dexterity"),
+          agility: sk.agility * effFaktor(rr, ee, "agility"),
+          intelligence: sk.intelligence,
+        };
+        let c = 0;
+        for (const stat of Object.keys(daten.weights)) {
+          if (!daten.weights[stat]) continue;
+          c += daten.weights[stat] * Math.pow(Math.max(0, eff[stat] ?? 0), daten.decays[stat]);
+        }
+        return c;
       };
       const jetzt = comp(r, e);
       if (!(jetzt > 0)) return 0;
-      const danach = name === "Reaper" ? comp(r + 1, e) : comp(r, e + 1);
-      return 100 * (danach / jetzt - 1);
+      const chanceProzent = 100 * (comp(rNeu, eNeu) / jetzt - 1);
+
+      // Zeitwirkung ueber denselben statFac wie `Action.ts:112-117` (Konstanten
+      // dort 0,04 / 0,035 / 1e4 / 1e4 - BitNode-unabhaengig, keine BN_MULT noetig).
+      const statFac = (agi, dex) => 0.5 * (Math.pow(agi, 0.04) + Math.pow(dex, 0.035)
+        + agi / 1e4 + dex / 1e4);
+      const facAlt = statFac(sk.agility * effFaktor(r, e, "agility"), sk.dexterity * effFaktor(r, e, "dexterity"));
+      const facNeu = statFac(sk.agility * effFaktor(rNeu, eNeu, "agility"), sk.dexterity * effFaktor(rNeu, eNeu, "dexterity"));
+      const zeitProzent = facAlt > 0 ? 100 * Math.log(facNeu / facAlt) * ausdauerLuft() : 0;
+
+      return chanceProzent + zeitProzent;
     }
     if (name === "Datamancer") {
       // DIE FAEHIGKEIT, DIE HEUTE 87 MINUTEN GEKOSTET HAT (28.08.2026, 09:55).

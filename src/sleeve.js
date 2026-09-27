@@ -236,6 +236,63 @@ export async function main(ns) {
           && Number.isFinite(bj.zeit) && Date.now() - bj.zeit < 10 * 60000;
       } catch { chaosRunde = false; }
       const erlaubteKontrakte = chaosRunde ? ["Tracking"] : KONTRAKTE;
+
+      // SKEPTIKER-AUDIT 26.09.2026, FUND 5 (audit-2026-09-26/4-bladeburner.md#5):
+      // in der Op-Phase faehrt der Spieler eine OPERATION (z. B.
+      // Assassination), keine Vertraege - deren Vorrat waechst also nur, und
+      // dieser Block liess Sleeves bis heute IMMER auf Vertraegen bleiben,
+      // obwohl `Infiltrate Synthoids` genauso auf JEDE Operation wirkt
+      // (`Bladeburner.ts:1251-1263 infiltrateSynthoidCommunities`,
+      // `amt = infilSleeves^-0,5/2` je 61 s auf jede Vertrags- UND
+      // Operationsart).
+      //
+      // GERECHNET, nicht geraten: natuerliches Wachstum von Assassination
+      // 7,9/h (`data/Operations.ts`, Mittel 1,05 je 480 s). Spielerverbrauch
+      // gemessen 160-200/h (1.412 Rang/min bei 424-530 Rang je Lauf, Stufe
+      // 20). Infiltrate-Ertrag je Stunde bei N Sleeves: `amt` faellt N mal je
+      // 61 s an, `amt = N^-0,5/2`, macht ueber 3600/61 Vollzyklen ungefaehr
+      // `59*N*amt = 29,5*sqrt(N)` je Stunde - bei N=3 also 51/h, bei N=8 (mehr
+      // als ohne Covenant-Kaeufe erreichbar) 83/h. GEGEN 160-200/h Bedarf
+      // deckt das den Verbrauch bei KEINER erreichbaren Sleeve-Zahl - der
+      // Befund "160-200/h Bedarf gegen 7,9/h Nachwuchs" bleibt bestehen.
+      //
+      // Aber: Infiltrate SENKT die Nettoabflussrate um bis zu ein Drittel
+      // (N=3: 152-192/h Nettoverlust ohne Hilfe -> 101-141/h mit) und
+      // verlaengert damit proportional das Zeitfenster, bevor der Vorrat auf
+      // 0 faellt und der Bot auf eine schlechtere Aktion zurueckfaellt
+      // (beobachtet 01.09. 04:05: Undercover Operation direkt nach dem
+      // letzten Assassination-Lauf). Der Tausch kostet die
+      // Sleeve-Vertragsrate (~43 Rang/min ALLER Sleeves zusammen, gemessen
+      // 31.08. waehrend Recruitment) gegen ein laengeres Fenster auf
+      // 1.412 Rang/min Spielerrate - selbst ein Drittel mehr Laufzeit auf der
+      // hohen Rate wiegt die 43 Rang/min um Groessenordnungen auf.
+      //
+      // DESHALB NICHT DAUERHAFT, NUR BEI ECHTER KNAPPHEIT: Ein staendiger
+      // Umstieg wuerde die 43 Rang/min verschenken, solange noch Vorrat da
+      // ist - das waere derselbe Fehler wie der feste 0,85-Schwellwert in
+      // blade.js (Fund 4). Die Schwelle ist deshalb an die Operation
+      // gekoppelt, die der SPIELER gerade tatsaechlich faehrt (`blade.json`
+      // `istAktion`, nicht `aktion` - das ist nur der Wunsch, siehe blade.js
+      // Kommentar "Was die Figur WIRKLICH tut"): faellt ihr Vorrat unter das
+      // Produkt aus der (konservativ oberen) Verbrauchsschaetzung und einer
+      // Vorlaufzeit von zwei Stunden, geht JEDER Sleeve auf Infiltrate, auch
+      // wenn Vertraege selbst noch reichlich Vorrat haetten.
+      const OP_VERBRAUCH_STUENDLICH = 200;   // konservativ, obere Audit-Grenze
+      const OP_RUNWAY_STUNDEN = 2;
+      let knappeOperation = null;
+      try {
+        const bj = JSON.parse(liesVonHome(ns, "data/blade.json") || "null");
+        const ist = bj && typeof bj.istAktion === "string" ? bj.istAktion : null;
+        if (ist && ist.startsWith("Operations/")) {
+          const opName = ist.slice("Operations/".length);
+          // Dieselbe Funktion wie oben fuer Contracts - kostet keine
+          // zusaetzlichen 4 GB (Bitburner zaehlt je FunktionsNAME einmal).
+          const rest = ns.bladeburner.getActionCountRemaining("Operations", opName);
+          if (Number.isFinite(rest) && rest < OP_VERBRAUCH_STUENDLICH * OP_RUNWAY_STUNDEN) {
+            knappeOperation = opName;
+          }
+        }
+      } catch { knappeOperation = null; }
       let laeuftSchon = false;
       if (inDivision) {
         try {
@@ -265,6 +322,13 @@ export async function main(ns) {
         } catch { /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
       }
       if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
+        if (knappeOperation) {
+          // FUND 5: die Operation, die der Spieler faehrt, ist knapp - dann
+          // NICHT erst Vertraege versuchen (die haetten ohnehin Vorrat, siehe
+          // oben), sondern direkt unten in den Infiltrate-Zweig durchfallen.
+          // (Kein eigenes Log hier - sleeve.js hat keinen `sag`/`ns.print`-Kanal,
+          // der Zustand steht wie ueberall sonst in data/sleeve.json.)
+        } else {
         // NACH VORRAT SORTIEREN, NICHT NACH LISTENPLATZ (30.08., 06:35).
         //
         // Die feste Reihenfolge nahm die erste Art mit Vorrat >= 1. Gemessen
@@ -317,6 +381,7 @@ export async function main(ns) {
             ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts", art);
             if (ok) was = "contract:" + art;
           } catch { ok = false; }
+        }
         }
 
         // KEIN KONTRAKT DA? NACHFUELLEN STATT STILLSTEHEN (30.08., 10:00).

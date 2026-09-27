@@ -22,6 +22,9 @@ import {
   repFuerFavor,
   hashRate,
   rangGewinn,
+  effKampfFaktor,
+  reaperEvasiveChanceProzent,
+  reaperEvasiveZeitProzent,
 } from "./lib/formeln.js";
 
 let gruen = 0;
@@ -110,6 +113,33 @@ pruefe(
   "Hoeherer Kampf-Mult senkt den exp-Bedarf",
   expFuerStufe(100, 0.4 * 2.0) < expFuerStufe(100, 0.4 * 1.262),
   "sonst waere die Wirkungsrichtung vertauscht",
+);
+
+// SKEPTIKER-AUDIT 26.09.2026, FUND 7 (audit-2026-09-26/4-bladeburner.md#7):
+// src/kampfaugs.js hatte `KNOTENFAKTOR = knoten === 10 ? 0,4 : 1` fest im
+// Code - ausserhalb BN10 rechnete es also IMMER mit 1, auch in BN9/13/14/15,
+// wo BitNode.tsx eigene Kampf-LevelMultiplier hat (0,45/0,7/0,5/0,7). Beide
+// Seiten hier sind derselbe `expFuerStufe`, nur mit dem BitNode-Faktor, den
+// die alte bzw. die neue kampfaugs.js-Rechnung tatsaechlich einsetzt -
+// `expNoetig(m, stat)` in kampfaugs.js ist `expFuerStufe(100, m*knotenFaktor(stat))`.
+eiche(
+  "kampfaugs.js VOR dem Fix in BN14 (KNOTENFAKTOR hart auf 1, da knoten!==10)",
+  expFuerStufe(100, 1 * 1),
+  11255,
+  { rel: 1e-3 },
+  "audit-2026-09-26/4-bladeburner.md#7 - 'gerechnet 11.255'",
+);
+eiche(
+  "kampfaugs.js NACH dem Fix in BN14 (DexterityLevelMultiplier 0,5 live gelesen)",
+  expFuerStufe(100, 1 * 0.5),
+  267800,
+  { rel: 1e-3 },
+  "audit-2026-09-26/4-bladeburner.md#7 - 'richtig 267.800'",
+);
+pruefe(
+  "die alte Rechnung war in BN14 um Faktor ~23,8 zu optimistisch",
+  expFuerStufe(100, 1 * 0.5) / expFuerStufe(100, 1 * 1) > 20,
+  "Faktor " + (expFuerStufe(100, 1 * 0.5) / expFuerStufe(100, 1 * 1)).toFixed(1),
 );
 
 console.log("");
@@ -246,6 +276,76 @@ console.log("-- Bladeburner --");
   );
   eiche("BitNode-Faktor BN10 wirkt linear", rangGewinn(10, 1, 1.1, 0.8), 8, { rel: 0.001 },
     "BladeburnerRank 0,8");
+}
+
+console.log("");
+console.log("-- Bladeburner: Reaper/Evasive System multiplikativ (Skeptiker-Audit 26.09.2026, Fund 3) --");
+// Eichpunkte aus nodes/audit-2026-09-26/4-bladeburner.md#3, unabhaengig
+// nachgerechnet in den Rechenskripten skillwert.js (Eichung der Skillkosten
+// gegen Hyperdrive St.219->549, Digital Observer St.43->92, Blade's
+// Intuition St.65->140 - alle drei aus blade.js-Kommentaren) und
+// zeitfaktor.js. Stand BN6 28.08.2026 16:08 (ERLEDIGT.md:3843): Digital
+// Observer 104, Blade's Intuition 99, Evasive 93, Reaper 90; Kampfwerte
+// str/def 387, dex/agi 450/420 (angenommen, gemaess Audit).
+{
+  const SK = { strength: 387, defense: 387, dexterity: 450, agility: 420, hacking: 300, intelligence: 150 };
+
+  eiche(
+    "EffDex bei Reaper 90 / Evasive 93 ist das PRODUKT (2,80 x 4,72)",
+    effKampfFaktor(90, 93, "dexterity"),
+    13.216,
+    { rel: 1e-4 },
+    "Bladeburner.ts:774-784 - additiv (1+0,02*90+0,04*93) waere nur 6,52",
+  );
+
+  const chanceReaper = reaperEvasiveChanceProzent(SK, 90, 93, "Reaper");
+  const chanceEvasive = reaperEvasiveChanceProzent(SK, 90, 93, "Evasive System");
+  eiche("Reaper: Chance-Zuwachs je Stufe (competence Daedalus)", chanceReaper, 0.5630,
+    { rel: 1e-3 }, "skillwert.js 'wahr'-Spalte");
+  eiche("Evasive System: Chance-Zuwachs je Stufe (competence Daedalus)", chanceEvasive, 0.5287,
+    { rel: 1e-3 }, "skillwert.js 'wahr'-Spalte");
+
+  // GEGENPROBE: die ALTE additive Rechnung aus blade.js vor dem Fix (nur zur
+  // Dokumentation der Abweichung - kein Aufruf von Bot-Code, blade.js bleibt
+  // aussen vor). Belegt, dass der Fehler real und nicht rundungsklein ist.
+  const alteAdditiveComp = (rr, ee) => {
+    const a = 1 + rr * 0.02, b = 1 + rr * 0.02 + ee * 0.04;
+    return Math.pow(SK.strength * a, 0.8) + Math.pow(SK.defense * a, 0.8)
+      + Math.pow(SK.dexterity * b, 0.8) + Math.pow(SK.agility * b, 0.8);
+  };
+  const altJetzt = alteAdditiveComp(90, 93);
+  const altEvasive = 100 * (alteAdditiveComp(90, 94) / altJetzt - 1);
+  eiche("ROT waere die alte additive Formel gegen denselben Eichpunkt", altEvasive, 0.3352,
+    { rel: 1e-3 }, "blade.js vor dem Fix (skillwert.js 'bot'-Spalte) - zum Vergleich, nicht als Sollwert");
+  pruefe(
+    "die additive und die multiplikative Rechnung liegen spuerbar auseinander (nicht rundungsklein)",
+    Math.abs(chanceEvasive - altEvasive) / chanceEvasive > 0.3,
+    "wahr " + chanceEvasive.toFixed(4) + " % gegen additiv " + altEvasive.toFixed(4) + " %",
+  );
+
+  const zeitReaper = reaperEvasiveZeitProzent(SK, 90, 93, "Reaper");
+  const zeitEvasive = reaperEvasiveZeitProzent(SK, 90, 93, "Evasive System");
+  eiche("Reaper: Zeitgewinn je Stufe (statFac, Action.ts:112-119)", zeitReaper, 0.228,
+    { rel: 1e-2 }, "zeitfaktor.js: Dauer -0,228 % je Stufe");
+  eiche("Evasive System: Zeitgewinn je Stufe (statFac, Action.ts:112-119)", zeitEvasive, 0.270,
+    { rel: 1e-2 }, "zeitfaktor.js: Dauer -0,270 % je Stufe");
+
+  // DIE KERNAUSSAGE DES FUNDES: mit Zeitwirkung liegt Evasive System VOR
+  // Blade's Intuition (0,7557 % je Stufe, unveraendert - dessen relNutzen war
+  // nie der Fehler). Ohne die Zeitwirkung (0,5287 % allein) waere das falsch
+  // herum - das ist der Kern von Fund 3, nicht nur die additiv/multiplikativ-
+  // Differenz.
+  const evasiveGesamt = chanceEvasive + zeitEvasive;
+  pruefe(
+    "Evasive System (Chance+Zeit) liegt vor Blade's Intuition (0,7557 %/Stufe)",
+    evasiveGesamt > 0.7557,
+    "Evasive gesamt " + evasiveGesamt.toFixed(4) + " % gegen BI 0,7557 %",
+  );
+  pruefe(
+    "OHNE Zeitwirkung waere die Reihenfolge noch falsch - die Zeitwirkung ist kein Nebeneffekt",
+    chanceEvasive < 0.7557,
+    "Chance allein " + chanceEvasive.toFixed(4) + " % liegt HINTER Blade's Intuition",
+  );
 }
 
 console.log("");

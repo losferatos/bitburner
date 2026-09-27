@@ -226,6 +226,115 @@ export function skillKosten(baseCost, aktuellesLevel, costInc, bitNodeSkillCost 
   return Math.floor(baseCost * Math.pow(costInc, aktuellesLevel) * bitNodeSkillCost);
 }
 
+/**
+ * Effektiver Kampfwert-Multiplikator aus Reaper/Evasive System
+ * (`Bladeburner/data/Skills.ts:54-72`, `Bladeburner.ts:774-784
+ * updateSkillMultipliers`). Reaper hebt EffStr/EffDef/EffDex/EffAgi um je 2 %
+ * je Stufe, Evasive System zusaetzlich EffDex/EffAgi um 4 % je Stufe.
+ *
+ * SKEPTIKER-AUDIT 26.09.2026 (audit-2026-09-26/4-bladeburner.md#3): das Spiel
+ * baut daraus PRO ZIEL einen einzigen Multiplikator, indem jede Faehigkeit,
+ * die auf dieses Ziel wirkt, ihren eigenen Faktor DRAUFMULTIPLIZIERT
+ * (`skillMultipliers[name] = getSkillMult(name) * (1+basis*stufe/100)`,
+ * Start bei 1). EffDex/EffAgi sind also PRODUKTE aus beiden Faehigkeiten,
+ * nicht ihre Summe - bei Reaper 90 / Evasive 93 ist das 2,80 x 4,72 = 13,22
+ * gegen eine additive Rechnung mit 6,52, Faktor 2 daneben und wachsend.
+ */
+export function effKampfFaktor(reaperLvl, evasiveLvl, stat) {
+  let m = 1;
+  if (stat === "strength" || stat === "defense" || stat === "dexterity" || stat === "agility") {
+    m *= 1 + 0.02 * reaperLvl;
+  }
+  if (stat === "dexterity" || stat === "agility") {
+    m *= 1 + 0.04 * evasiveLvl;
+  }
+  return m;
+}
+
+// Gewichte/Decays der meisten Black Ops (15 von 21, darunter Operation
+// Daedalus - die letzte, immer vorhandene) `Bladeburner/data/BlackOperations.ts`,
+// gegenprobiert in `src/blade.js` `BLACKOP_DATEN["Operation Daedalus"]`.
+export const DAEDALUS_GEWICHTE = {
+  hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1,
+};
+export const DAEDALUS_DECAYS = {
+  hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75,
+};
+
+/**
+ * Competence einer Black-Op-artigen Aktion (`Actions/Action.ts:169-182`),
+ * NUR der gewichtete Kampfwert-Summand - Intelligenzbonus, Ausdauerstrafe,
+ * Truppbonus, Chance-Skill- und Aug-Multiplikatoren fehlen ABSICHTLICH: sie
+ * sind fuer Reaper/Evasive-Stufen konstant und kuerzen sich in einem
+ * Verhaeltnis danach/jetzt exakt heraus (gegen `skillwert.js` geeicht - der
+ * volle und der verkuerzte Bruch liefern dieselbe Ratio).
+ */
+export function bladeburnerCompetence(sk, reaperLvl, evasiveLvl, weights = DAEDALUS_GEWICHTE, decays = DAEDALUS_DECAYS) {
+  const eff = {
+    hacking: sk.hacking,
+    strength: sk.strength * effKampfFaktor(reaperLvl, evasiveLvl, "strength"),
+    defense: sk.defense * effKampfFaktor(reaperLvl, evasiveLvl, "defense"),
+    dexterity: sk.dexterity * effKampfFaktor(reaperLvl, evasiveLvl, "dexterity"),
+    agility: sk.agility * effKampfFaktor(reaperLvl, evasiveLvl, "agility"),
+    intelligence: sk.intelligence,
+  };
+  let c = 0;
+  for (const stat of Object.keys(weights)) {
+    if (!weights[stat]) continue;
+    c += weights[stat] * Math.pow(Math.max(0, eff[stat] ?? 0), decays[stat]);
+  }
+  return c;
+}
+
+/**
+ * Prozentualer Chance-/Competence-Zuwachs einer weiteren Stufe Reaper oder
+ * Evasive System - der multiplikative Ersatz fuer `blade.js` `relNutzen`.
+ * `faehigkeit` ist "Reaper" oder "Evasive System".
+ */
+export function reaperEvasiveChanceProzent(sk, reaperLvl, evasiveLvl, faehigkeit, weights, decays) {
+  const jetzt = bladeburnerCompetence(sk, reaperLvl, evasiveLvl, weights, decays);
+  if (!(jetzt > 0)) return 0;
+  const rNeu = faehigkeit === "Reaper" ? reaperLvl + 1 : reaperLvl;
+  const eNeu = faehigkeit === "Evasive System" ? evasiveLvl + 1 : evasiveLvl;
+  const danach = bladeburnerCompetence(sk, rNeu, eNeu, weights, decays);
+  return 100 * (danach / jetzt - 1);
+}
+
+/**
+ * `Action.ts:105-122 getActionTime`: die Aktionsdauer wird durch `statFac`
+ * geteilt - BitNode-unabhaengige Konstanten (`Bladeburner/data/Constants.ts`:
+ * `EffAgiExponentialFactor` 0,04, `EffDexExponentialFactor` 0,035,
+ * `EffAgiLinearFactor`/`EffDexLinearFactor` je 1e4). Groesser = kuerzere
+ * Aktion, also mehr Rang je Minute.
+ */
+export function bladeburnerStatFac(effAgility, effDexterity) {
+  return 0.5 * (Math.pow(effAgility, 0.04) + Math.pow(effDexterity, 0.035)
+    + effAgility / 1e4 + effDexterity / 1e4);
+}
+
+/**
+ * Zeitgewinn (in Prozent, log-additiv wie von `relNutzen` fuer alle
+ * Faehigkeiten verlangt) einer weiteren Stufe Reaper/Evasive System ueber
+ * `statFac` - dieselbe Rechenposition, die Overclock via `skillFac` bedient
+ * (`Action.ts:119`: `baseTime = baseTime*skillFac/statFac`). `ln` statt
+ * `ratio-1`, weil Chance- und Zeitgewinn zwei UNABHAENGIGE multiplikative
+ * Faktoren derselben Rangrate sind - ihre Logarithmen addieren sich exakt,
+ * ihre Prozentwerte nur naeherungsweise.
+ */
+export function reaperEvasiveZeitProzent(sk, reaperLvl, evasiveLvl, faehigkeit) {
+  const rNeu = faehigkeit === "Reaper" ? reaperLvl + 1 : reaperLvl;
+  const eNeu = faehigkeit === "Evasive System" ? evasiveLvl + 1 : evasiveLvl;
+  const facAlt = bladeburnerStatFac(
+    sk.agility * effKampfFaktor(reaperLvl, evasiveLvl, "agility"),
+    sk.dexterity * effKampfFaktor(reaperLvl, evasiveLvl, "dexterity"),
+  );
+  const facNeu = bladeburnerStatFac(
+    sk.agility * effKampfFaktor(rNeu, eNeu, "agility"),
+    sk.dexterity * effKampfFaktor(rNeu, eNeu, "dexterity"),
+  );
+  return facAlt > 0 ? 100 * Math.log(facNeu / facAlt) : 0;
+}
+
 // ---------------------------------------------------------------------------
 // Hacking
 // ---------------------------------------------------------------------------

@@ -299,6 +299,50 @@ console.log("-- waehrend blade.js aufraeumt, legen die Sleeves kein Chaos nach (
     aufgabenFrei.join(", ") || "kein Stand");
 }
 
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Skeptiker-Audit 26.09.2026 Fund 5: knappe Operation schlaegt Vertrag --");
+{
+  // In der Op-Phase faehrt der Spieler eine Operation (Assassination), keine
+  // Vertraege - deren Vorrat waechst dann nur, und Sleeves blieben bislang
+  // IMMER auf Vertraegen, obwohl Infiltrate genauso auf Operationen wirkt
+  // (Bladeburner.ts:1251-1263). Gerechnet in src/sleeve.js (Kommentar beim
+  // neuen Block): 160-200/h Verbrauch gegen 7,9/h Nachwuchs plus bis zu
+  // ~80/h aus Infiltrate - kein voller Ausgleich, aber eine Nettoabflussrate
+  // um bis zu ein Drittel niedriger, deshalb die Schwelle: unter 2 h Vorrat
+  // (200/h * 2h = 400) geht der Sleeve auf Infiltrate, obwohl Vertraege noch
+  // reichlich Vorrat haetten.
+  const kampf = { strength: 200, defense: 200, dexterity: 200, agility: 200 };
+  const vertraegeUndOps = (assassinationVorrat) => ({
+    "Contracts/Tracking": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Bounty Hunter": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Retirement": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Operations/Assassination": { vorrat: assassinationVorrat, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+  });
+  const lauf = (assassinationVorrat) => fahre({
+    geld: 1e12,
+    koerper: [{ skills: kampf }, { skills: kampf }],
+    blade: { drin: true, aktionen: vertraegeUndOps(assassinationVorrat) },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0, istAktion: "Operations/Assassination" }) },
+  });
+
+  const knapp = stand(await lauf(50));   // 50 < 400 = 200/h * 2h
+  const aufgabenKnapp = knapp ? knapp.sleeves.map((x) => x.aufgabe) : [];
+  pruefe(
+    "Assassination knapp (50 von 400 Vorlauf): beide Sleeves gehen auf Infiltrate, NICHT auf Vertrag",
+    aufgabenKnapp.length === 2 && aufgabenKnapp.every((a) => a === "infiltrate"),
+    aufgabenKnapp.join(", ") || "kein Stand",
+  );
+
+  const reichlich = stand(await lauf(5000));   // weit ueber der Schwelle
+  const aufgabenReichlich = reichlich ? reichlich.sleeves.map((x) => x.aufgabe) : [];
+  pruefe(
+    "Assassination reichlich (5.000): Sleeves fahren wieder Vertraege wie zuvor",
+    aufgabenReichlich.length === 2 && aufgabenReichlich.every((a) => /^contract:/.test(String(a))),
+    aufgabenReichlich.join(", ") || "kein Stand",
+  );
+}
+
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {

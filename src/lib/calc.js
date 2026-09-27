@@ -279,12 +279,21 @@ export function growThreads(server, targetMoney, startMoney, p, cores = 1, bnGro
 
 /**
  * Wie viele weaken-Threads senken die Security um so viel?
+ *
+ * H1 (Audit 26.09.2026, bn12-bericht SHOULD-FIX #1): bnWeakenRate ist
+ * BitNodeMultipliers.ServerWeakenRate (ServerHelpers.ts:322 multipliziert
+ * sie in den Sicherheitsabbau je Faden ein). Vorgabe 1 - ausserhalb von
+ * BN12 unveraendert. In BN12 ist sie < 1 (0,9804/0,9612/0,9423 je Stufe):
+ * jeder Faden senkt WENIGER, es werden also MEHR Faeden gebraucht.
+ *
  * @param {number} secDelta
  * @param {number} cores
+ * @param {number} bnWeakenRate
  */
-export function weakenThreads(secDelta, cores = 1) {
+export function weakenThreads(secDelta, cores = 1, bnWeakenRate = 1) {
   if (secDelta <= 0) return 0;
-  return Math.ceil(secDelta / (SERVER_WEAKEN_AMOUNT * coreBonus(cores)));
+  const rate = bnWeakenRate > 0 ? bnWeakenRate : 1;
+  return Math.ceil(secDelta / (SERVER_WEAKEN_AMOUNT * coreBonus(cores) * rate));
 }
 
 /**
@@ -416,6 +425,10 @@ export function expectedYield(s, p, ramFree, horizon = 900, costs = WORKER_RAM) 
  *          secOk: number, moneyLow: number, prepRamGb: number}} cfg
  */
 export function targetMetrics(s, p, hackTimeIstSec, cfg) {
+  // H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1 (BN5 hat keinen
+  // Eintrag). Siehe weakenThreads oben fuer die Begruendung.
+  const bnWeakenRate = Number.isFinite(cfg.bnServerWeakenRate) && cfg.bnServerWeakenRate > 0
+    ? cfg.bnServerWeakenRate : 1;
   const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
   const req = s.requiredHackingSkill;
   const pct = hackPercent({ sec: hdIst, reqSkill: req }, { skill: p.skill, multMoney: p.multMoney },
@@ -436,7 +449,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
   const hackTimeMin = hackTimeIstSec * (zeitIst > 0 ? zeitMin / zeitIst : 1);
   const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
   const wphMin = (SERVER_FORTIFY_AMOUNT * chanceMin + GROW_FORTIFY_AMOUNT * gphMin)
-    / SERVER_WEAKEN_AMOUNT;
+    / (SERVER_WEAKEN_AMOUNT * bnWeakenRate);
   const gbSekProEinheit = hackTimeMin
     * (cfg.ramHackT + GROW_TIME_FACTOR * gphMin * cfg.ramGrowT
       + WEAKEN_TIME_FACTOR * wphMin * cfg.ramWeakenT);
@@ -459,7 +472,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
   // Normalfall (Sicherheit 100 -> 35 sind 1.300 Faeden, 2,3 TB).
   let prepSec = 0;
   if (secOver > cfg.secOk) {
-    const gbWelle = weakenThreads(secOver) * cfg.ramWeakenT;
+    const gbWelle = weakenThreads(secOver, 1, bnWeakenRate) * cfg.ramWeakenT;
     const wellen = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbWelle / cfg.prepRamGb)) : 1;
     prepSec += wellen * WEAKEN_TIME_FACTOR * hackTimeIstSec;
   }
@@ -478,7 +491,7 @@ export function targetMetrics(s, p, hackTimeIstSec, cfg) {
     const growFaeden = kMin > 0
       ? Math.log(cfg.mixMoneyHigh / Math.max(moneyFrac, 1e-9)) / kMin : Infinity;
     const gbGrow = growFaeden
-      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / SERVER_WEAKEN_AMOUNT) * cfg.ramWeakenT);
+      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / (SERVER_WEAKEN_AMOUNT * bnWeakenRate)) * cfg.ramWeakenT);
     const wellenGrow = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbGrow / cfg.prepRamGb)) : 1;
     prepSec += wellenGrow * WEAKEN_TIME_FACTOR * hackTimeMin;
   }
@@ -694,16 +707,18 @@ export function growThreadsFromK(k, moneyMax, startMoney, targetMoney) {
  * @param {{pMin:number, chanceMin:number, kMin:number}} kz aus targetMetrics
  * @param {number} moneyMax
  * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ * @param {number} bnWeakenRate H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1
  */
-export function stapelPlan(f, kz, moneyMax, costs = WORKER_RAM) {
+export function stapelPlan(f, kz, moneyMax, costs = WORKER_RAM, bnWeakenRate = 1) {
+  const rate = bnWeakenRate > 0 ? bnWeakenRate : 1;
   const hackT = Math.max(1, Math.floor(f / kz.pMin));
   // Ein Block mit n Faeden nimmt p*n vom AKTUELLEN Guthaben - linear, nicht
   // multiplikativ (NetscriptHelpers.tsx:629).
   const echt = Math.min(0.99, kz.pMin * hackT);
   const growT = Math.max(1, Math.ceil(
     growThreadsFromK(kz.kMin, moneyMax, moneyMax * (1 - echt), moneyMax) * BATCH_GROW_MARGIN));
-  const w1 = Math.max(1, Math.ceil(hackT * SERVER_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / SERVER_WEAKEN_AMOUNT));
-  const w2 = Math.max(1, Math.ceil(growT * GROW_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / SERVER_WEAKEN_AMOUNT));
+  const w1 = Math.max(1, Math.ceil(hackT * SERVER_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / (SERVER_WEAKEN_AMOUNT * rate)));
+  const w2 = Math.max(1, Math.ceil(growT * GROW_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / (SERVER_WEAKEN_AMOUNT * rate)));
   return {
     hackT, growT, w1, w2, echt,
     ram: hackT * costs.hackT + growT * costs.growT + (w1 + w2) * costs.weakenT,
@@ -722,9 +737,10 @@ export function stapelPlan(f, kz, moneyMax, costs = WORKER_RAM) {
  * @param {number} ramTotal Gesamtspeicher des Netzes, in GB (derselbe Wert,
  *   aus dem auch der Kerntakt seinen Netzanteil bildet)
  * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ * @param {number} bnWeakenRate H1: BitNodeMultipliers.ServerWeakenRate, Vorgabe 1
  * @returns {null | {fraction:number, kalenderPlaetze:number, ram:number, ramCeiling:number, perS:number}}
  */
-export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM) {
+export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM, bnWeakenRate = 1) {
   if (!(kz.pMin > 0) || !(kz.kMin > 0) || !(kz.chanceMin > 0)
     || !(kz.hackTimeMin > 0) || !(moneyMax > 0)) return null;
 
@@ -738,9 +754,9 @@ export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM) {
   // hoechsten Sprosse: genau die Kalendergrenze, die die alte Auswahl blind
   // gemacht hat.
   let fraction = BATCH_F_LEITER[BATCH_F_LEITER.length - 1];
-  let plan = stapelPlan(fraction, kz, moneyMax, costs);
+  let plan = stapelPlan(fraction, kz, moneyMax, costs, bnWeakenRate);
   for (const f of BATCH_F_LEITER) {
-    const pl = stapelPlan(f, kz, moneyMax, costs);
+    const pl = stapelPlan(f, kz, moneyMax, costs, bnWeakenRate);
     fraction = f;
     plan = pl;
     if (pl.ram * kalenderPlaetze >= wunschGb) break;

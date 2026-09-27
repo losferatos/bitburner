@@ -112,6 +112,17 @@ export async function main(ns) {
   // fehlende Felder als 0 liest, setzt jede Beute auf null.
   let bnScriptHackMoney = 1;
   let bnServerGrowthRate = 1;
+  // H1 (Audit 26.09.2026, bn12-bericht SHOULD-FIX #1): ServerWeakenRate wurde
+  // ueberall ignoriert, WEAKEN_POWER stand fest auf 0.05. Das Spiel
+  // multipliziert die Rate mit ein (ServerHelpers.ts:322: ServerWeakenAmount
+  // x threads x coreBonus x ServerWeakenRate) - in BN12 ist sie < 1
+  // (0,9804/0,9612/0,9423 auf den drei Stufen), jeder weaken-Faden senkt die
+  // Sicherheit also WENIGER, und jede Vorbereitung, die die Faedenzahl aus
+  // WEAKEN_POWER herleitet, war zu knapp gerechnet - nach jedem Einbau und
+  // jedem Knotenwechsel in BN12 zu wenig Faeden fuer dieselbe Sicherheits-
+  // senkung, also zusaetzliche, ungeplante Wellen. BN5 hat keinen Eintrag
+  // (Vorgabe 1, Standardtabelle) - dort aendert sich nichts.
+  let bnServerWeakenRate = 1;
   // Die Knotenstufe, nach der die Werte gewaehlt wurden - geht in die
   // Telemetrie, damit ein falscher Stufenwert von aussen sichtbar ist.
   let bnStufe = 1;
@@ -138,6 +149,7 @@ export async function main(ns) {
     if (k) {
       if (Number.isFinite(k.ScriptHackMoney)) bnScriptHackMoney = k.ScriptHackMoney;
       if (Number.isFinite(k.ServerGrowthRate)) bnServerGrowthRate = k.ServerGrowthRate;
+      if (Number.isFinite(k.ServerWeakenRate)) bnServerWeakenRate = k.ServerWeakenRate;
     }
   } catch { /* dann gelten die Standardwerte 1 */ }
 
@@ -1772,7 +1784,10 @@ export async function main(ns) {
     const KAP_ABZUG = 0.2;
     const FORTIFY_HACK = 0.002;
     const FORTIFY_GROW = 0.004;
-    const WEAKEN_POWER = 0.05;
+    // H1: 0.05 x ServerWeakenRate (1 ausserhalb von BN12) - EIN Punkt, wirkt
+    // in Vorbereitung (weakenNoetig), Mischung (weakenNeed/weakenPerHack) und
+    // im Stapeltakt (w1/w2 unten), weil alle fuenf denselben Bezeichner lesen.
+    const WEAKEN_POWER = 0.05 * bnServerWeakenRate;
     const MIX_MONEY_HIGH = 0.95;
     // Zielband der Mischung. Stand frueher erst weiter unten bei planMix;
     // seit die Kennzahlen auch die Vorbereitungszeit liefern (Skeptiker B,
@@ -1824,7 +1839,7 @@ export async function main(ns) {
       // 46 von 63 Geldservern waren dadurch unsichtbar.
       return targetMetrics(s, spielerFuerCalc, ns.getHackTime(host) / 1000, {
         ramHackT: ramHack, ramGrowT: ramGrow, ramWeakenT: ramWeaken,
-        bnScriptHackMoney, bnServerGrowthRate,
+        bnScriptHackMoney, bnServerGrowthRate, bnServerWeakenRate,
         mixMoneyHigh: MIX_MONEY_HIGH, kapAbzug: KAP_ABZUG,
         secOk: MIX_SEC_OK, moneyLow: MIX_MONEY_LOW,
         // Speicher, den die Anlaufphase hoechstens bekommt (ANLAUF_ANTEIL_
@@ -2017,7 +2032,7 @@ export async function main(ns) {
       if (!c) return 0;
       const d = batchThroughput(
         { pMin: c.pMin, chanceMin: c.chanceMin, kMin: c.kMin, hackTimeMin: c.hackTimeMin },
-        c.moneyMax, ramTotal, { hackT: ramHack, growT: ramGrow, weakenT: ramWeaken });
+        c.moneyMax, ramTotal, { hackT: ramHack, growT: ramGrow, weakenT: ramWeaken }, bnServerWeakenRate);
       return d ? d.perS : 0;
     };
     const batchTargets = BATCH_ZIELE > 0
@@ -4365,7 +4380,8 @@ export async function main(ns) {
       batchModus: batchTargets.length > 0,
       batchZiele: batchTargets,
       // BitNode-Werte, mit denen gerechnet wird (Skeptiker B, Einwand 5).
-      bnWerte: { stufe: bnStufe, scriptHackMoney: bnScriptHackMoney, serverGrowthRate: bnServerGrowthRate },
+      bnWerte: { stufe: bnStufe, scriptHackMoney: bnScriptHackMoney, serverGrowthRate: bnServerGrowthRate,
+        serverWeakenRate: bnServerWeakenRate },
       stapel: batchStat,
       // Was in dieser Runde je Aktion neu vergeben wurde, plus die Zahl der
       // Ziele in der Anlaufphase und der nicht vergebene Netzspeicher.

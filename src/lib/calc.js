@@ -819,3 +819,40 @@ export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM, bnWe
     perS,
   };
 }
+
+/**
+ * Vorbereitungsabschlag fuer die Stapelziel-AUSWAHL (B5-Nacharbeit,
+ * Skeptiker-Fund 4, 27.09.2026).
+ *
+ * WARUM: batchThroughput() rechnet den Durchsatz IM VORBEREITETEN Zustand
+ * (stapelPlan geht von Sicherheit am Minimum aus) - fuer ein unvorbereitetes
+ * Ziel ist das der Durchsatz NACH der Vorbereitung, nicht ab jetzt. Die
+ * Auswahl in bn4net.js verglich diesen Wert bisher direkt gegen ein bereits
+ * vorbereitetes amtierendes Ziel: ein Herausforderer mit 1,3-fachem
+ * theoretischem Durchsatz, aber eigener Vorbereitungszeit, verdraengte so ein
+ * Ziel, das SOFORT lieferte - waehrend der Herausforderer selbst erst nach
+ * seiner Vorbereitung ueberhaupt etwas eintrug.
+ *
+ * ENTSCHIEDUNG (Variante "Abschlag", nicht "nur ranlassen, wenn kein
+ * vorbereiteter Platz frei ist"): ein reiner Ausschluss haette einen
+ * Herausforderer mit KURZER Vorbereitung (wenige Sekunden) genauso hart
+ * gesperrt wie einen mit zwanzig Minuten - dabei ist "SOFORT gegen BALD"
+ * eine Frage des Ausmasses, keine Ja/Nein-Entscheidung. Der Abschlag
+ * T/(T+prepSec) bildet das stetig ab: prepSec=0 -> Faktor 1 (voller Wert,
+ * ein vorbereitetes Ziel verliert nichts), prepSec=T -> Faktor 0,5, prepSec
+ * -> unendlich -> Faktor 0. T ist bewusst ZIELWAHL.horizonSec (1800 s, 30
+ * min) - derselbe Horizont, den targetRank() fuer die ALLGEMEINE Rangfolge
+ * schon benutzt (kz.steadyEff * (1 - prepSec/horizonSec)); zwei verschiedene
+ * Vorbereitungs-Zeitbegriffe fuer dieselbe Auswahl waeren nur eine zweite
+ * Zahl fuer denselben Zweck gewesen.
+ *
+ * @param {number} prepSec effektive Vorbereitung (targetMetrics/prepSec,
+ *   fuer ein amtierendes Ziel schon durch effectivePrepSec() gekuerzt)
+ * @param {number} horizonSec T, sinnvollerweise ZIELWAHL.horizonSec
+ * @returns {number} Faktor in (0, 1]
+ */
+export function prepDiscount(prepSec, horizonSec) {
+  const p = Math.max(0, prepSec || 0);
+  const t = horizonSec > 0 ? horizonSec : 1800;
+  return t / (t + p);
+}

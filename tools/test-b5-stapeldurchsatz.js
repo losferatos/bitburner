@@ -126,6 +126,63 @@ if (exportiert) {
 // ---------------------------------------------------------------------------
 // B. Der Kern selbst, ueber den Mock
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// C. Vorbereitungsabschlag (Skeptiker-Fund 4, 27.09.2026)
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- C. Vorbereitungsabschlag: ein unvorbereiteter 1,3x-Herausforderer verdraengt kein sofort lieferndes Ziel --");
+{
+  // BEFUND: batchThroughput() rechnet den Durchsatz IM VORBEREITETEN Zustand
+  // (stapelPlan setzt Sicherheit am Minimum voraus) - die Auswahl in
+  // bn4net.js verglich diesen Wert bisher direkt gegen ein amtierendes Ziel,
+  // ohne dass ein Herausforderer fuer seine EIGENE Vorbereitung etwas zahlte.
+  //
+  // Zwei fast baugleiche Server, INCUMBENT bereits vorbereitet (amtierendes
+  // Stapelziel), CHALLENGER mit ~1,46x hoeherem THEORETISCHEM Durchsatz -
+  // beide Zahlen unten mit denselben C.targetMetrics/C.batchThroughput
+  // gerechnet wie in Abschnitt A, kein Kopfwert.
+  const BONUS_BATCH = 1.3;   // ZIELWAHL.bonusBatch in bn4net.js (unveraendert)
+  const HORIZON_SEC = 1800;  // ZIELWAHL.horizonSec in bn4net.js (unveraendert)
+  const INCUMBENT = { hackDifficulty: 5, minDifficulty: 5, requiredHackingSkill: 50, serverGrowth: 40,
+    moneyMax: 5e7, moneyAvailable: 4.9e7, hasAdminRights: true };
+  const CHALLENGER = { hackDifficulty: 5, minDifficulty: 5, requiredHackingSkill: 50, serverGrowth: 45,
+    moneyMax: 7e7, moneyAvailable: 6.9e7, hasAdminRights: true };
+  const kzI = C.targetMetrics(INCUMBENT, SP, C.hackTime({ reqSkill: 50, sec: 5 }, SP), CFG);
+  const kzC = C.targetMetrics(CHALLENGER, SP, C.hackTime({ reqSkill: 50, sec: 5 }, SP), CFG);
+  const btI = C.batchThroughput(kzI, INCUMBENT.moneyMax, RAM_TOTAL, COSTS);
+  const btC = C.batchThroughput(kzC, CHALLENGER.moneyMax, RAM_TOTAL, COSTS);
+
+  pruefe("Vorbedingung: der Herausforderer hat gut 1,3x hoeheren rohen Durchsatz",
+    btC.perS > 1.3 * btI.perS, "ratio=" + (btC.perS / btI.perS));
+
+  const scoreIncumbent = btI.perS * BONUS_BATCH;   // amtierend, bereits vorbereitet
+  const scoreChallengerAlt = btC.perS;             // ALTER Code: kein Abschlag
+  // Herausforderer braucht selbst 30 min Vorbereitung (= HORIZON_SEC) -
+  // realistisch fuer den Kalenderdeckel-Fall aus Abschnitt A.
+  const prepChallenger = HORIZON_SEC;
+  const scoreChallengerNeu = btC.perS * C.prepDiscount(prepChallenger, HORIZON_SEC);
+
+  pruefe("ALTER Code (kein Abschlag): der Herausforderer haette das amtierende Ziel verdraengt",
+    scoreChallengerAlt > scoreIncumbent,
+    "alt=" + scoreChallengerAlt + " incumbent(bonus)=" + scoreIncumbent);
+  pruefe("NEUER Code (mit prepDiscount): derselbe Herausforderer verdraengt das amtierende Ziel NICHT mehr",
+    scoreChallengerNeu < scoreIncumbent,
+    "neu=" + scoreChallengerNeu + " incumbent(bonus)=" + scoreIncumbent);
+  pruefe("prepDiscount(0, T) = 1: ein bereits vorbereitetes Ziel verliert nichts",
+    C.prepDiscount(0, HORIZON_SEC) === 1);
+  pruefe("prepDiscount waechst monoton mit sinkender Vorbereitung",
+    C.prepDiscount(60, HORIZON_SEC) > C.prepDiscount(HORIZON_SEC, HORIZON_SEC));
+
+  // Wiring: bn4net.js muss den Abschlag TATSAECHLICH auf c.prepWahl anwenden
+  // (effectivePrepSec-Ergebnis), nicht nur lib/calc.js ihn anbieten - sonst
+  // waere Abschnitt A/C hier gruen, aber der Kern liefe unveraendert weiter.
+  const quelleBn4 = fs.readFileSync(path.join(ROOT, "src", "bn4net.js"), "utf8");
+  pruefe("bn4net.js importiert prepDiscount aus lib/calc.js",
+    /import\s*\{[^}]*\bprepDiscount\b[^}]*\}\s*from\s*"lib\/calc\.js"/.test(quelleBn4));
+  pruefe("batchDurchsatz() multipliziert d.perS mit prepDiscount(c.prepWahl, ZIELWAHL.horizonSec)",
+    /d\.perS\s*\*\s*prepDiscount\(\s*c\.prepWahl\s*,\s*ZIELWAHL\.horizonSec\s*\)/.test(quelleBn4));
+}
+
 console.log("");
 console.log("-- B. Kern (bn4net.js) waehlt Stapelziele ueber batchThroughput --");
 

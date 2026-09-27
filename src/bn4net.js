@@ -28,7 +28,7 @@
  * @param {NS} ns
  */
 import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec,
-  batchThroughput } from "lib/calc.js";
+  batchThroughput, prepDiscount } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
   leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
@@ -2027,13 +2027,26 @@ export async function main(ns) {
     // die allgemeine Rangfolge schon benutzt. Ohne diesen Bonus wechselte der
     // Stapelsatz mit jeder kleinen Durchsatzaenderung.
     const kzByHost = new Map(moneyCandidates.map((c) => [c.host, c]));
+    // B5-NACHARBEIT (Skeptiker-Fund 4, 27.09.2026): batchThroughput() rechnet
+    // den Durchsatz IM VORBEREITETEN Zustand (stapelPlan setzt Sicherheit am
+    // Minimum voraus) - ohne Abschlag verglich die Auswahl diesen Wert direkt
+    // gegen ein bereits vorbereitetes amtierendes Ziel. Ein unvorbereiteter
+    // Herausforderer mit z. B. 1,3-fachem THEORETISCHEM Durchsatz haette so
+    // ein Ziel verdraengt, das SOFORT lieferte, waehrend der Herausforderer
+    // selbst erst nach seiner eigenen Vorbereitung ueberhaupt etwas eintraegt.
+    // prepDiscount(c.prepWahl, ZIELWAHL.horizonSec) skaliert stetig mit
+    // T/(T+prepSec) - derselbe Horizont, den targetRank() fuer die
+    // allgemeine Rangfolge schon benutzt (siehe lib/calc.js, Begruendung
+    // dort). c.prepWahl ist effectivePrepSec(kz.prepSec, amtierend) - fuer
+    // das AMTIERENDE Stapelziel selbst also schon auf den Rest gekuerzt, statt
+    // die volle urspruengliche Schaetzung erneut abzuziehen.
     const batchDurchsatz = (host) => {
       const c = kzByHost.get(host);
       if (!c) return 0;
       const d = batchThroughput(
         { pMin: c.pMin, chanceMin: c.chanceMin, kMin: c.kMin, hackTimeMin: c.hackTimeMin },
         c.moneyMax, ramTotal, { hackT: ramHack, growT: ramGrow, weakenT: ramWeaken }, bnServerWeakenRate);
-      return d ? d.perS : 0;
+      return d ? d.perS * prepDiscount(c.prepWahl, ZIELWAHL.horizonSec) : 0;
     };
     const batchTargets = BATCH_ZIELE > 0
       ? batchKandidaten

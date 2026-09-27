@@ -450,6 +450,16 @@ export async function main(ns) {
   // sie braucht - weiter unten deklariert waere sie dort noch nicht
   // initialisiert (temporal dead zone) und wuerde die Runde werfen.
   const EXPFARM_SKRIPT = "worker/expfarm.js";
+  // Was der Werkzeugstarter fuer ein fehlendes Werkzeug raeumen darf, nach
+  // Verlustwert (27.09.2026, Integrationspruefung Paket B gegen den Kern).
+  // Der Ofen steht direkt hinter share wie in ausgang.js (Skeptiker B,
+  // Einwand 6): bis Paket B lief er als worker/weaken.js und war damit
+  // raeumbar; als worker/expfarm.js fehlte er hier, und ein Werkzeug galt
+  // auf einer vom Ofen belegten Werkbank als "passt nie"
+  // (tools/test-ofen-raeumung.js). Sein Verlust ist ein angefangener
+  // weaken-Aufruf ohne Folgekosten.
+  const RAEUM_REIHENFOLGE = ["worker/share.js", EXPFARM_SKRIPT,
+    "worker/weaken.js", "worker/grow.js", "worker/hack.js"];
   // Rundentakt fuer die Ofenfrist (Skeptiker B, Einwand 1): gemessen von
   // Speicherzaehlung zu Speicherzaehlung, denn genau dort muss der Ofen seinen
   // Speicher wieder hergegeben haben.
@@ -3908,7 +3918,7 @@ export async function main(ns) {
           const braucht = ns.getScriptRam(datei, "home");
           if (!(braucht > 0) || frei() >= braucht) continue;
           let geraeumt = 0;
-          for (const w of ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"]) {
+          for (const w of RAEUM_REIHENFOLGE) {
             if (frei() >= braucht) break;
             if (!ns.ps(werkbank).some((pr) => pr.filename === w)) continue;
             ns.scriptKill(w, werkbank);
@@ -3946,7 +3956,7 @@ export async function main(ns) {
       const arbeiterGbAuf = (h) => {
         let gb = 0;
         for (const pr of ns.ps(h)) {
-          if (!WORKER.includes(pr.filename)) continue;
+          if (!RAEUM_REIHENFOLGE.includes(pr.filename)) continue;
           gb += ns.getScriptRam(pr.filename, "home") * pr.threads;
         }
         return gb;
@@ -4096,8 +4106,7 @@ export async function main(ns) {
           // Verlustwert wie unten: share faengt ohne Verlust wieder an, ein
           // abgebrochener hack wirft seine ganze Laufzeit weg.
           if (freiAuf(wirt) < braucht) {
-            for (const w of ["worker/share.js", "worker/weaken.js",
-                             "worker/grow.js", "worker/hack.js"]) {
+            for (const w of RAEUM_REIHENFOLGE) {
               if (freiAuf(wirt) >= braucht) break;
               if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
               ns.scriptKill(w, wirt);
@@ -4173,7 +4182,7 @@ export async function main(ns) {
           // Auf dem Ausweichwirt selbst raeumen - der Block oben raeumt nur
           // die Werkbank.
           if (freiAuf(wirt) < braucht) {
-            for (const w of ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"]) {
+            for (const w of RAEUM_REIHENFOLGE) {
               if (freiAuf(wirt) >= braucht) break;
               if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
               ns.scriptKill(w, wirt);

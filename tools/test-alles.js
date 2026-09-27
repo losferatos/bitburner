@@ -103,6 +103,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-ofen-raeumung.js",
+    deckt: "EBENE 2: der Werkzeugstarter des Kerns raeumt auch den Erfahrungsofen (worker/expfarm.js), wenn ein Werkzeug Platz braucht (Integration 27.09.)",
+    schnell: true,
+  },
+  {
     datei: "test-bn4life-beitritt.js",
     deckt: "EBENE 2: bn4life.js startet joinrun/netburn erst ab dem Gym-Geldboden - nach dem Sprung bleibt home fuer shop.js frei (Integration 27.09.)",
     schnell: true,

@@ -507,6 +507,14 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
+### Grosser Schub verweigert (14 Dateien) - sieht nach einem Merge aus
+
+14 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
+
+War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
+
+Geaendert: ausgang.js, bn4life.js, bn4net.js, bn4rep.js, hacknet.js, hashes.js, joinrun.js, lib/bitnodes.json, lib/calc.js, lib/einbau.js, lib/figur.js, lib/handschlag.js (+2)
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
 Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 542 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.

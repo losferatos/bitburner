@@ -507,18 +507,21 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 11 Minuten nichts geschrieben (Inhaltsstempel 2026-09-26T17:25:02.326Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 438 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 542 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 530 Minuten nichts geschrieben (Inhaltsstempel 2026-09-26T20:16:37.371Z). Entweder steht der Motor oder der Tab ist eingefroren.
 
 ### Spiel-Tab nicht verbunden
 
-Die Bruecke laeuft, aber seit 2026-09-24T20:44:07.500Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+Die Bruecke laeuft, aber seit 2026-09-26T18:41:27.593Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+
+
+
 
 *Aufgeraeumt am 22.09.2026: 34 automatische Momentaufnahmen (Bruecke ohne Sicherung / Telemetrie veraltet / Spiel-Tab nicht verbunden) entfernt - alle ueberholt. tools/liste.js ersetzt gleiche Ueberschriften seitdem, statt zu doppeln.*
 

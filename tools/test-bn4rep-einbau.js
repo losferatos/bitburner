@@ -336,6 +336,48 @@ console.log("\n-- A2/A3/A6/A7 (unveraendert, echte Funktionen) --");
     M.favorZaehltFuerFaktion({ favorJetzt: 46.5, spendenSchwelle: 150, hatUnbesessenesWertvollesStueck: false }) === false);
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n-- H2: Einbau-Ausloeser darf nicht bei schwelle-1 haengen bleiben (BN12) --");
+{
+  // 29 installiert, 1 wartend (nicht NFG), Schwelle 31 (BN12): distinkt
+  // nach dem Einbau waere 30 = 31-1 - der Fall aus dem Audit-Bericht.
+  pruefe("29 installiert + 1 wartend, Schwelle 31: Gate greift",
+    ruf("einbauLandetEinsUnterSchwelle", 29, 30, 31) === true);
+  // 30 installiert, 1 wartend, Schwelle 31: distinkt nach dem Einbau 31 -
+  // trifft die Schwelle genau, kein Grund, den Einbau aufzuhalten.
+  pruefe("30 installiert + 1 wartend, Schwelle 31: kein Gate (trifft die Schwelle genau)",
+    ruf("einbauLandetEinsUnterSchwelle", 30, 31, 31) === false);
+  // Schwelle schon erreicht (>=): egal was die Warteschlange sagt, kein Gate.
+  pruefe("installiert >= Schwelle: kein Gate",
+    ruf("einbauLandetEinsUnterSchwelle", 31, 32, 31) === false
+      && ruf("einbauLandetEinsUnterSchwelle", 35, 36, 31) === false);
+  // BN5 (Schwelle 30) mit demselben Muster wie BN12: das Gate ist
+  // schwellenunabhaengig, nicht an eine Rundzahl gebunden.
+  pruefe("dasselbe Muster bei Schwelle 30 (BN5) greift genauso",
+    ruf("einbauLandetEinsUnterSchwelle", 28, 29, 30) === true);
+  // Weit unter der Schwelle: kein Sonderfall.
+  pruefe("weit unter der Schwelle: kein Gate (10 von 31)",
+    ruf("einbauLandetEinsUnterSchwelle", 10, 10, 31) === false);
+
+  // Auswahl: billigstes kaufbares Stueck vor NFG, NFG nur als Fallback.
+  const K = [
+    { aug: "Teuer", preis: 5e9, rep: 1e6, repReq: 1e5 },
+    { aug: "Billig", preis: 1e6, rep: 1e6, repReq: 1e5 },
+    { aug: "RepFehlt", preis: 1, rep: 100, repReq: 1e5 },
+  ];
+  const w1 = ruf("waehleDaedalusFuellstueck", K, false);
+  pruefe("mit kaufbaren Kandidaten: das billigste, nicht NFG",
+    w1 !== FEHLT && w1.typ === "stueck" && w1.aug === "Billig", JSON.stringify(w1));
+  const w2 = ruf("waehleDaedalusFuellstueck", [K[2]], false);
+  pruefe("nur Rep-fehlende Kandidaten, NFG noch nicht vorhanden: NFG-Fallback",
+    w2 !== FEHLT && w2.typ === "nfg", JSON.stringify(w2));
+  const w3 = ruf("waehleDaedalusFuellstueck", [K[2]], true);
+  pruefe("nichts kaufbar UND NFG schon vorhanden: nichts zu tun (Einbau geht trotzdem weiter)",
+    w3 === null, JSON.stringify(w3));
+  const w4 = ruf("waehleDaedalusFuellstueck", [], true);
+  pruefe("leere Kandidatenliste, NFG vorhanden: nichts zu tun", w4 === null, JSON.stringify(w4));
+}
+
 console.log("");
 console.log(gruen + " ok, " + rot + " rot von " + (gruen + rot));
 if (rot) {

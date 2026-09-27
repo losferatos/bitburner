@@ -600,6 +600,94 @@ console.log("\n-- Gegenpruefung G2: Ausgang 37 min offen - der Waechter bleibt r
     sig.map((s) => s.grund).join(" | "));
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n-- H2: Daedalus-Fuellstueck vor dem Einbau (BN12, Schwelle 31, bn12-bericht.md MINOR #3) --");
+{
+  // 29 installiert + The Red Pill gekauft, nicht eingebaut -> redPillWartet
+  // erzwingt den Einbau UNABHAENGIG von jeder Kauf-/Firmenlogik (A6), noch
+  // BEVOR Abschnitt 2 ("Kaufen, was bezahlt und verdient ist") in dieser
+  // Runde ueberhaupt drankaeme - genau das macht dieses Szenario zur echten
+  // Probe fuer den NEUEN Ausloeser-Riegel statt fuer die laengst bestehende
+  // Kaufschleife. Ohne den H2-Fix wuerde dieser Einbau bei 30 von 31
+  // installierten Stuecken haengen bleiben (distinkt: 29 installiert + Red
+  // Pill wartend = 30); Zusatzstueck steht bei derselben Faktion bereit
+  // (Rep erfuellt, billig) und muss VOR dem Einbau gekauft werden.
+  const AUGS_BN12 = {
+    "The Red Pill": { repReq: 2.5e6, basis: 0 },
+    Zusatzstueck: { repReq: 5e4, basis: 1e6 },
+    [NFG]: { repReq: 1000, basis: 1e6 },
+  };
+  const w = baueWelt({
+    host: "werk-0", knoten: 12, moneyMult: 1,
+    geld: 5e9, einkommen: 1e6,
+    bnMults: { DaedalusAugsRequirement: 31 },
+    faktionen: { Daedalus: { favor: 150.6, rep: 3e6, augs: ["The Red Pill", "Zusatzstueck", NFG] } },
+    augs: AUGS_BN12,
+    installiert: Array.from({ length: 29 }, (_, i) => "Alt-" + i),
+    warteschlange: ["The Red Pill"],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    // "V1 12" (nicht "V1 5" wie welt1903): bladeburnerTraegtHier() prueft
+    // Verfahren GEGEN den Knoten dieses Szenarios (12) - stimmt die Zahl
+    // nicht, gilt BN12 faelschlich als Kampfknoten (bladeburnerTraegtHier()
+    // faellt auf `true` zurueck), wiederaufbauHilfe bleibt dann false und
+    // der ganze Einbau bleibt gesperrt (erste Fassung dieses Tests lief
+    // deshalb ins Schlafbudget, ohne je die Einbauzeile zu erreichen).
+    // Firmenphase abgeschaltet (data/company-order.txt "off"): dieses
+    // Szenario prueft den Einbau-Ausloeser, nicht die Firmenwahl.
+    dateien: { home: { "data/verfahren.txt": "V1 12", "data/company-order.txt": "off" } },
+    schlafBudget: 30,
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+    },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig (kein echter Rundenfehler)", rundenfehler(r.log).length === 0
+    && r.ende !== "fehler", rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("das Fuellstueck wurde gekauft, bevor eingebaut wurde (nicht die alte Kaufschleife)",
+    r.log.includes("Daedalus-Fuellstueck: Zusatzstueck"), r.log.slice(0, 400));
+  pruefe("der Einbau selbst lief (installAugmentations, Ende return)",
+    w.installAufrufe === 1 && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
+}
+{
+  // Gegenprobe: 30 installiert + Red Pill wartend -> distinkt ist bereits 31,
+  // trifft die Schwelle genau. Kein Fuellstueck-Kauf noetig, obwohl
+  // Zusatzstueck weiterhin bereitstuende.
+  const AUGS_BN12 = {
+    "The Red Pill": { repReq: 2.5e6, basis: 0 },
+    Zusatzstueck: { repReq: 5e4, basis: 1e6 },
+    [NFG]: { repReq: 1000, basis: 1e6 },
+  };
+  const w = baueWelt({
+    host: "werk-0", knoten: 12, moneyMult: 1,
+    geld: 5e9, einkommen: 1e6,
+    bnMults: { DaedalusAugsRequirement: 31 },
+    faktionen: { Daedalus: { favor: 150.6, rep: 3e6, augs: ["The Red Pill", "Zusatzstueck", NFG] } },
+    augs: AUGS_BN12,
+    installiert: Array.from({ length: 30 }, (_, i) => "Alt-" + i),
+    warteschlange: ["The Red Pill"],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": "V1 12", "data/company-order.txt": "off" } },
+    schlafBudget: 30,
+    beiSchlaf: (welt) => {
+      const anfrage = welt.dateien.home["data/backup-request.txt"];
+      if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+      welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+        ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+    },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+    rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+  pruefe("kein Fuellstueck-Kauf, wenn die Schwelle ohnehin getroffen wird (31 von 31)",
+    !r.log.includes("Daedalus-Fuellstueck"), r.log.slice(0, 400));
+  pruefe("installAugmentations laeuft trotzdem", w.installAufrufe === 1 && r.ende === "return");
+}
+
 console.log("");
 console.log(gruen + " ok, " + rot + " rot von " + (gruen + rot));
 if (rot) {

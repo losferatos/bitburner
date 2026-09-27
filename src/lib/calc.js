@@ -594,3 +594,163 @@ export function selectMoneyTargets(sorted, opts) {
   }
   return gewaehlt;
 }
+
+// ===========================================================================
+// STAPELDURCHSATZ FUER DIE ZIELAUSWAHL (B5, Audit 26.09.2026 2#4) - 27.09.2026
+// ===========================================================================
+//
+// WARUM: Stapelziele (bn4net.js "batchTargets") wurden bisher als die ersten
+// BATCH_ZIELE Eintraege der nach targetRank sortierten Liste gewaehlt -
+// derselbe Rang, nach dem auch die OFFENE Mischung sortiert. targetRank sagt
+// aber nur, wie GUT ein Ziel pro Gigabyte ist (steadyEff), nicht, wieviel
+// Gigabyte es als STAPELZIEL ueberhaupt sinnvoll aufnehmen kann. Ein Ziel mit
+// kurzer weaken-Zeit hat wenige Kalenderplaetze (Stapel duerfen nur alle
+// GAP_MS landen, siehe bn4net.js-Kerntakt): mehr Speicher als
+// plan.ram*kalenderPlaetze bringt dort NICHTS mehr, der Ertrag klemmt fest,
+// egal wie viel RAM zugeteilt wird.
+//
+// Belegt an BN5L2 19:04 (Level 3012, eigene Rechnung mit batchThroughput
+// gegen scratchpad/audit/rows1904.json+s1904.json): phantasy (3
+// Kalenderplaetze bei f=0.5) und max-hardware (2) sind unter den ersten drei
+// nach steadyEff/targetRank, liefern zusammen aber nur 265 Mio $/s und
+// saettigen dabei schon bei zusammen ~2,4 TB - waehrend johnson-ortho (27)
+// und omega-net (8), die im alten Rang weiter hinten stehen, beim GLEICHEN
+// Netzanteil (F_NETZANTEIL) ueber 1 Mrd $/s liefern wuerden. Der Kalenderdeckel
+// kommt in steadyEff schlicht nicht vor.
+//
+// DIE KENNZAHL HIER IST DESHALB NICHT steadyEff, SONDERN DERSELBE
+// LEITER-SUCHLAUF WIE DER KERNTAKT (bn4net.js "batchTargets"-Abschnitt,
+// stapelPlan/F_LEITER): das kleinste f, dessen VOLLER Kalender den
+// Netzanteil erreicht - bleibt der Kalender darunter, endet die Suche bei
+// f=0.5 und der Durchsatz ist die echte Kalendergrenze. Damit ist die
+// AUSWAHL genau das, was der Kerntakt danach ohnehin tut - vorher konnten
+// beide auseinanderlaufen.
+//
+// Bewusst NICHT der Kerntakt selbst umgebaut: bn4net.js hat sein eigenes
+// growFaeden (nimmt k direkt, 0 GB, seit dem 22.08.2026 Faden-fuer-Faden im
+// laufenden Spiel erprobt) und seinen eigenen stapelPlan/F_LEITER-Suchlauf
+// fuer die TAKTUNG (Kalender, Drifterkennung, Platzierung). Daran wird hier
+// nichts angefasst. Diese Datei bekommt eine zweite, gleichwertige Rechnung
+// (growThreadsFromK, stapelPlan, batchThroughput) fuer die AUSWAHL, mit
+// denselben Konstanten (BATCH_*) wie der Kerntakt - beide Seiten importieren
+// diese Konstanten, damit sie nie auseinanderlaufen.
+
+export const BATCH_GAP_MS = 400;
+export const BATCH_F_LEITER = [0.02, 0.05, 0.1, 0.15, 0.2, 0.3, 0.4, 0.5];
+export const BATCH_F_NETZANTEIL = 0.15;
+export const BATCH_WEAKEN_MARGIN = 1.5;
+export const BATCH_GROW_MARGIN = 1.15;
+
+/**
+ * growThreads-Loesung, wenn der Wachstumsexponent k schon bekannt ist (z. B.
+ * kMin aus targetMetrics) - dieselbe Newton-Raphson-Gleichung wie
+ * growThreads, nur ohne die Herleitung von k aus einem Server-Objekt. Ein
+ * Aufrufer, der k fuer denselben Server mehrmals braucht (Stapeldurchsatz
+ * ueber die ganze F_LEITER), muss es so nur einmal rechnen.
+ *
+ * Eigenstaendig gehalten statt growThreads intern umzubauen: growThreads
+ * traegt die Korrektur vom 04.09.2026 (fehlender bnGrowthRate-Parameter,
+ * Skeptiker Substanz) und wird von lib/batch.js und autopilot.js benutzt -
+ * ein Umbau dort ist nicht Teil von B5.
+ *
+ * @param {number} k
+ * @param {number} moneyMax
+ * @param {number} startMoney
+ * @param {number} targetMoney
+ * @returns {number} ganze Faeden, 0 wenn nichts noetig ist
+ */
+export function growThreadsFromK(k, moneyMax, startMoney, targetMoney) {
+  if (!(k > 0)) return 0;
+  const o = Math.max(0, startMoney);
+  const n = Math.min(targetMoney, moneyMax);
+  if (!(n > o)) return 0;
+
+  let x = (n - o) / (1 + (n / 16 + (15 * o) / 16) * k);
+  let diff = Infinity;
+  let guard = 0;
+  while (Math.abs(diff) > 1 && guard++ < 60) {
+    const ox = o + x;
+    const newX = (x - ox * Math.log(ox / n)) / (1 + ox * k);
+    diff = newX - x;
+    x = newX;
+  }
+  if (!Number.isFinite(x) || x < 0) return 0;
+
+  let threads = Math.ceil(x);
+  if (threads > 0) {
+    const check = (t) => (o + t) * Math.exp(k * t);
+    if (check(threads - 1) >= n) threads--;
+    else if (check(threads) < n) threads++;
+  }
+  return Math.max(0, threads);
+}
+
+/**
+ * Ein Stapel bei Erntanteil f, im vorbereiteten Zustand (Sicherheit am
+ * Minimum) gerechnet - dieselbe Formel wie stapelPlan im Kerntakt von
+ * bn4net.js (dort mit dem dortigen growFaeden statt growThreadsFromK).
+ *
+ * @param {number} f
+ * @param {{pMin:number, chanceMin:number, kMin:number}} kz aus targetMetrics
+ * @param {number} moneyMax
+ * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ */
+export function stapelPlan(f, kz, moneyMax, costs = WORKER_RAM) {
+  const hackT = Math.max(1, Math.floor(f / kz.pMin));
+  // Ein Block mit n Faeden nimmt p*n vom AKTUELLEN Guthaben - linear, nicht
+  // multiplikativ (NetscriptHelpers.tsx:629).
+  const echt = Math.min(0.99, kz.pMin * hackT);
+  const growT = Math.max(1, Math.ceil(
+    growThreadsFromK(kz.kMin, moneyMax, moneyMax * (1 - echt), moneyMax) * BATCH_GROW_MARGIN));
+  const w1 = Math.max(1, Math.ceil(hackT * SERVER_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / SERVER_WEAKEN_AMOUNT));
+  const w2 = Math.max(1, Math.ceil(growT * GROW_FORTIFY_AMOUNT * BATCH_WEAKEN_MARGIN / SERVER_WEAKEN_AMOUNT));
+  return {
+    hackT, growT, w1, w2, echt,
+    ram: hackT * costs.hackT + growT * costs.growT + (w1 + w2) * costs.weakenT,
+    geld: echt * moneyMax * kz.chanceMin,
+  };
+}
+
+/**
+ * Erreichbarer Stapeldurchsatz eines Ziels, WENN es Stapelziel waere - die
+ * AUSWAHLKENNZAHL fuer B5 (statt steadyEff/targetRank). Siehe Dateikopf oben
+ * fuer die Begruendung und den belegten Fall (phantasy/max-hardware gegen
+ * johnson-ortho/omega-net).
+ *
+ * @param {{pMin:number, chanceMin:number, kMin:number, hackTimeMin:number}} kz aus targetMetrics
+ * @param {number} moneyMax
+ * @param {number} ramTotal Gesamtspeicher des Netzes, in GB (derselbe Wert,
+ *   aus dem auch der Kerntakt seinen Netzanteil bildet)
+ * @param {{hackT:number, growT:number, weakenT:number}} costs Speicherbedarf je Arbeiterfaden
+ * @returns {null | {fraction:number, kalenderPlaetze:number, ram:number, ramCeiling:number, perS:number}}
+ */
+export function batchThroughput(kz, moneyMax, ramTotal, costs = WORKER_RAM) {
+  if (!(kz.pMin > 0) || !(kz.kMin > 0) || !(kz.chanceMin > 0)
+    || !(kz.hackTimeMin > 0) || !(moneyMax > 0)) return null;
+
+  const tWeakenMs = kz.hackTimeMin * WEAKEN_TIME_FACTOR * 1000;
+  const kalenderPlaetze = Math.max(1, Math.floor(tWeakenMs / (4 * BATCH_GAP_MS)));
+  const wunschGb = ramTotal * BATCH_F_NETZANTEIL;
+
+  // Kleinstes f, dessen voller Kalender den Netzanteil erreicht - identisch
+  // zum Suchlauf im Kerntakt. Bleibt der Kalender darunter (wenige Plaetze),
+  // laeuft die Schleife bis zum Ende durch und "fraction" bleibt bei der
+  // hoechsten Sprosse: genau die Kalendergrenze, die die alte Auswahl blind
+  // gemacht hat.
+  let fraction = BATCH_F_LEITER[BATCH_F_LEITER.length - 1];
+  let plan = stapelPlan(fraction, kz, moneyMax, costs);
+  for (const f of BATCH_F_LEITER) {
+    const pl = stapelPlan(f, kz, moneyMax, costs);
+    fraction = f;
+    plan = pl;
+    if (pl.ram * kalenderPlaetze >= wunschGb) break;
+  }
+
+  const stapelSec = (4 * BATCH_GAP_MS) / 1000;
+  return {
+    fraction, kalenderPlaetze,
+    ram: plan.ram,
+    ramCeiling: plan.ram * kalenderPlaetze,
+    perS: plan.geld / stapelSec,
+  };
+}

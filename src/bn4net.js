@@ -27,7 +27,8 @@
  *
  * @param {NS} ns
  */
-import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec } from "lib/calc.js";
+import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec,
+  batchThroughput } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
   leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
@@ -1878,8 +1879,14 @@ export async function main(ns) {
           // Eintritt in zielSeit gemerkt); prepWahl ist das, was davon fuer
           // ein amtierendes Ziel noch zaehlt - danach teilt selectMoneyTargets
           // in vorbereitet/unvorbereitet ein (siehe effectivePrepSec).
+          // pMin/chanceMin/kMin/hackTimeMin/moneyMax werden fuer die
+          // Stapelziel-AUSWAHL weiter unten gebraucht (B5, batchThroughput) -
+          // hier mitgenommen, statt kennzahlen() fuer dieselben Hosts ein
+          // zweites Mal aufzurufen.
           moneyCandidates.push({ host, moneyValue: kz.steadyEff, kapazitaet: kz.kapazitaet,
-            rank: rang, prepSec: kz.prepSec, prepWahl: effectivePrepSec(kz.prepSec, amtierend) });
+            rank: rang, prepSec: kz.prepSec, prepWahl: effectivePrepSec(kz.prepSec, amtierend),
+            pMin: kz.pMin, chanceMin: kz.chanceMin, kMin: kz.kMin, hackTimeMin: kz.hackTimeMin,
+            moneyMax: s.moneyMax });
         }
       }
     }
@@ -1983,7 +1990,46 @@ export async function main(ns) {
     const batchKandidaten = moneyTargets.filter((h) => h !== expTarget);
     const batchPlaetze = Math.max(0,
       Math.min(BATCH_ZIELE, batchKandidaten.length - BATCH_MIN_OFFENE_ZIELE));
-    const batchTargets = BATCH_ZIELE > 0 ? batchKandidaten.slice(0, batchPlaetze) : [];
+    // B5 (Audit 26.09.2026 2#4): NICHT mehr die ersten batchPlaetze der nach
+    // Rang (steadyEff, Vorbereitung, Hysterese) sortierten Liste - das waehlt
+    // nach $/GB*s, blind fuer die Kalendergrenze kurzer Ziele. phantasy und
+    // max-hardware standen so vorn (guter $/GB*s bei kleinem f) und klebten
+    // als Stapelziele an f=0.5 fest (265 Mio $/s zusammen, saettigt bei
+    // ~2,4 TB), waehrend johnson-ortho/omega-net beim gleichen Netzanteil
+    // ueber 1 Mrd $/s gegeben haetten (batchThroughput, geeicht in
+    // scratchpad/audit/batchmodel.mjs gegen BN5L2 19:04).
+    //
+    // batchThroughput (lib/calc.js) rechnet denselben Leiter-Suchlauf wie der
+    // Kerntakt weiter unten (kleinstes f, dessen voller Kalender den
+    // Netzanteil erreicht) und liefert damit den Durchsatz, den ein Ziel als
+    // Stapelziel TATSAECHLICH braechte - nicht nur, wie gut es pro Gigabyte
+    // ist. kzByHost traegt die dafuer noetigen Werte aus der ersten
+    // kennzahlen()-Rechnung weiter, damit sie nicht doppelt gerechnet werden.
+    //
+    // Hysterese bleibt erhalten (Skeptiker B, Einwand 3): ein amtierendes
+    // Stapelziel behaelt seinen Platz, bis ein Herausforderer um
+    // ZIELWAHL.bonusBatch besser ist - derselbe Faktor, den targetRank fuer
+    // die allgemeine Rangfolge schon benutzt. Ohne diesen Bonus wechselte der
+    // Stapelsatz mit jeder kleinen Durchsatzaenderung.
+    const kzByHost = new Map(moneyCandidates.map((c) => [c.host, c]));
+    const batchDurchsatz = (host) => {
+      const c = kzByHost.get(host);
+      if (!c) return 0;
+      const d = batchThroughput(
+        { pMin: c.pMin, chanceMin: c.chanceMin, kMin: c.kMin, hackTimeMin: c.hackTimeMin },
+        c.moneyMax, ramTotal, { hackT: ramHack, growT: ramGrow, weakenT: ramWeaken });
+      return d ? d.perS : 0;
+    };
+    const batchTargets = BATCH_ZIELE > 0
+      ? batchKandidaten
+        .map((host) => {
+          const perS = batchDurchsatz(host);
+          return { host, score: batchStand.has(host) ? perS * ZIELWAHL.bonusBatch : perS };
+        })
+        .sort((a, b) => b.score - a.score)
+        .slice(0, batchPlaetze)
+        .map((c) => c.host)
+      : [];
     if (batchTargets.length) {
       moneyTargets = moneyTargets.filter((h) => !batchTargets.includes(h));
     }

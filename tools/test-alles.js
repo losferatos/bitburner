@@ -289,6 +289,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b5-stapeldurchsatz.js",
+    deckt: "EBENE 2: B5 (Audit 26.09.2026 2#4): Stapelziele nach erreichbarem Stapeldurchsatz statt nach Rang",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

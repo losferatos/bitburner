@@ -1229,6 +1229,19 @@ behoben) - hier nur vermerkt, keine Codeaenderung.
   `sleevecrime.js` (Kaltstart-Gewerk, phase "kaltstart"), das die Kopplung
   an den Node-Reset sonst genauso faelschlich verlieren wuerde.
 
+- **Sleeve-Faktionswahl verfeinern** (27.09., seit 18:03 live: Sleeves im
+  Hackingweg auf Faktionsarbeit, `src/sleeve.js`, Rechnung in
+  `tools/sleeve-rechnung.js`). Zwei Luecken: (1) `offenJeFaktion` in
+  `bn4rep.js` zaehlt ein Stueck bei JEDER Faktion, die es fuehrt - NiteSec
+  bekam einen Sleeve fuer DataJack, den auch BitRunners (Spielerfaktion)
+  fuehrt. Stuecke nur der Faktion zurechnen, bei der sie am naechsten sind.
+  (2) Sortierung "groesster Rep-Bedarf zuerst" ist fragwuerdig: ein Sleeve
+  schafft ~1-3k rep/h, also im Einbauzyklus eher 22k (Slum Snakes) als 173k
+  (Black Hand). Kriterium rechnen (erreichbare Stuecke je Zyklus, Wert der
+  Stuecke), nicht raten. Dritter Punkt, bewusst hingenommen: sleevecrime.js
+  ueberschreibt die Schockerholung nach Knotenstart/Einbau (~200 statt ~411
+  rep/h je Sleeve ueber 12 h); Fix kostet 4 GB.
+
 - **joinrun vs. bn4life Aevum-Pingpong**: `bn4life.js` reist fuer die Aevum-
   Faktion, `joinrun.js` fuer Sector-12 (Slum Snakes/Tetrads/Tian Di Hui) -
   beide unter derselben Figur-Lease, keiner kennt das Reiseziel des anderen.

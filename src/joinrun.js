@@ -273,7 +273,22 @@ export async function main(ns) {
       // statt ihn der Figur-Wache zu ueberlassen (27.09.2026, Audit
       // G-Ueberschiessen) - derselbe Grund wie beim aktiven Stopp oben, nur
       // fuer den Ausstieg ueber FRIST_MS statt ueber "Ziel erreicht".
-      if (eigenesTraining) { s.stopAction(); eigenesTraining = false; }
+      //
+      // GUARD (27.09.2026, Skeptiker-Fund 2): `eigenesTraining` ist nur ein
+      // Merker in DIESEM Skript und wird nicht zurueckgesetzt, wenn waehrend
+      // des letzten 15-s-Schlafs (oben) ein FREMDES Graft die Figur uebernimmt
+      // (Prioritaet 10, schlaegt joinruns eigene Anfrage mit 25 - lib/
+      // figur.js). Lief die Frist in genau diesem Fenster ab, hielt der Merker
+      // trotzdem `true`, und `stopAction()` haette dann NICHT das eigene
+      // (laengst verdraengte) Training beendet, sondern das laufende Graft
+      // gekillt - ohne Erstattung (`Singularity.ts:562`, `GraftingWork.tsx:
+      // 75-83`). Erst die TATSAECHLICHE Arbeit der Figur entscheidet.
+      const arbeitAmEnde = s.getCurrentWork();
+      if (eigenesTraining && arbeitAmEnde && arbeitAmEnde.type === "CLASS"
+          && ["str", "def", "dex", "agi"].includes(arbeitAmEnde.classType)) {
+        s.stopAction();
+      }
+      eigenesTraining = false;
       const w = werte();
       sag(`Training beendet: ${JSON.stringify(w)}`);
     } else {

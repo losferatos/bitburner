@@ -436,6 +436,65 @@ console.log("-- 8. Stadt wird unter der Lease nachgezogen (Audit G2/6#4) --");
 }
 
 console.log("");
+console.log("-- 9. Frist ab UND fremder Graft im 15s-Fenster: kein stopAction (Skeptiker-Fund 2, 27.09.2026) --");
+{
+  /**
+   * `if (eigenesTraining) s.stopAction()` nach der Frist (Zeile ~276) kannte
+   * bisher nur das EIGENE Merkerfeld, nicht die tatsaechliche Arbeit der
+   * Figur. Startet waehrend des letzten 15-s-Schlafs (Zeile 269) ein FREMDES
+   * Graft (Prioritaet 10, schlaegt joinruns eigene Anfrage mit 25 - lib/
+   * figur.js), bleibt `eigenesTraining` trotzdem `true` (kein Code-Pfad
+   * setzt es zurueck, wenn ein anderes Skript die Figur uebernimmt). Die
+   * Frist laeuft im selben Moment ab, die Schleife bricht ab und der alte
+   * Code ruft `stopAction()` - das beendet den LAUFENDEN GRAFT, nicht das
+   * (laengst verdraengte) eigene Training, und der Graft wird NICHT
+   * erstattet (`Singularity.ts:562`, `GraftingWork.tsx:75-83`).
+   *
+   * Belegt hier durch einen echten Lauf ueber den ns-Mock, nicht nur durch
+   * Quelltext-Lesen: das eigene Training beginnt normal (agi), im naechsten
+   * Schlaf wird die Figur unabhaengig vom Skript auf ein Graft umgestellt
+   * UND im selben Tick die Frist ueberschritten - genau das 15-s-Fenster aus
+   * dem Fund.
+   */
+  const ZIEL_TEST = 20;
+  const m = neuerMock({
+    host: "home", knoten: 5, wall: W0, playtime: 100 * 3600000, nodeReset: NR,
+    augReset: W0 - 3600000, geld: 5e9, args: [ZIEL_TEST],
+    server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: {} },
+    maxSchlaf: 6,
+    beiSchlaf: (ms, z, vor) => {
+      baueSchiedsrichter({ konkurrenz: false })(ms, z, vor);
+      // Sobald joinrun selbst "agi" trainiert: ein fremdes Graft uebernimmt
+      // die Figur (unabhaengig vom Skript, wie im echten Spiel durch
+      // graftauto.js), UND die 45-min-Frist ist in diesem Moment abgelaufen.
+      if (!z.__graftGestartet && z.arbeit && z.arbeit.classType === "agi") {
+        z.arbeit = { type: "GRAFTING", augmentation: "Neuroreceptor Management Implant" };
+        z.wall += 45 * 60 * 1000; // FRIST_MS aus joinrun.js
+        z.__graftGestartet = true;
+      }
+    },
+  });
+  m.zustand.spieler.city = "Sector-12";
+  m.zustand.spieler.factions = [];
+  m.zustand.spieler.skills = { strength: ZIEL_TEST, defense: ZIEL_TEST, dexterity: ZIEL_TEST, agility: 5, hacking: 100 };
+  m.ns.singularity.checkFactionInvitations = () => [];
+  m.ns.singularity.joinFaction = () => false;
+  m.ns.singularity.getAugmentationsFromFaction = () => [];
+  m.ns.singularity.getAugmentationRepReq = () => 0;
+  m.ns.singularity.getOwnedAugmentations = () => [];
+  const { modul } = await ladeAusBeiden(ROOT, "joinrun.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  pruefe("stopAction wurde NICHT aufgerufen - der fremde Graft blieb unangetastet",
+    m.zustand.gestoppt !== true, "gestoppt=" + m.zustand.gestoppt);
+  pruefe("am Ende laeuft weiterhin das Graft, nicht 'nichts'",
+    m.zustand.arbeit && m.zustand.arbeit.type === "GRAFTING", JSON.stringify(m.zustand.arbeit));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

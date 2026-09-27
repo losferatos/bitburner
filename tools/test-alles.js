@@ -99,7 +99,7 @@ const TESTS = [
   },
   {
     datei: "test-joinrun-ebene2.js",
-    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4), auch ueber die 15-min-Lease hinaus (Integration 27.09.)",
+    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4), auch ueber die 15-min-Lease hinaus (Integration 27.09.); ausserdem G-Ueberschiessen (eigenes Training stoppt aktiv am Ziel) und G2 (Stadt wird unter der Lease nachgezogen, kein Haemmern) (Audit-Nachmessung 27.09.)",
     schnell: true,
   },
   {
@@ -109,7 +109,7 @@ const TESTS = [
   },
   {
     datei: "test-bn4life-beitritt.js",
-    deckt: "EBENE 2: bn4life.js startet joinrun/netburn erst ab dem Gym-Geldboden - nach dem Sprung bleibt home fuer shop.js frei (Integration 27.09.)",
+    deckt: "EBENE 2: bn4life.js startet joinrun/netburn erst ab dem Gym-Geldboden - nach dem Sprung bleibt home fuer shop.js frei (Integration 27.09.); ausserdem G1 (Beitrittsmarke landet zuverlaessig auf home, auch von einem Fremdwirt aus, und ein laufendes joinrun.js mit Ziel 80 verhindert einen zweiten Start) (Audit-Nachmessung 27.09.)",
     schnell: true,
   },
   {

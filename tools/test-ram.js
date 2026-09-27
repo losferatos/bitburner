@@ -176,7 +176,19 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // (src/startdiag.js + tools/eichung-messen.js --schreib, 44 Dateien, 0
     // abgelehnt). Die Liste ist wieder leer - jede neue Abweichung ist ein
     // Befund, keine Ausnahme.
-    const VERALTET_ERLAUBT = [];
+    const VERALTET_ERLAUBT = [
+      // 2026-09-27: G1 (Doppellauf), G2 (Haemmern/falsche Stadt) und
+      // Ueberschiessen behoben (Audit-Nachmessung "Nachmessung nach dem
+      // Einspielen"). joinrun.js: +1,00 GB durch s.stopAction() (aktiver
+      // Stopp des eigenen Trainings, siehe test-joinrun-ebene2.js Abschnitt
+      // 7/8) - live-Nachmessung im Spiel steht noch aus. bn4life.js:
+      // ramBaseGb/ramSingGb unveraendert (liesVonHome/nachHome sind dort
+      // schon importiert und fuer data/reload.txt bzw. data/task.txt in
+      // Benutzung; weitere Aufrufstellen derselben Funktionen kosten laut
+      // tools/ram.js nichts zusaetzlich), aber der Dateiinhalt und damit der
+      // sha256 hat sich geaendert.
+      "joinrun.js", "bn4life.js",
+    ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

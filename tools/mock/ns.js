@@ -658,7 +658,7 @@ export function neuerMock(o = {}) {
         zustand.arbeit = { type: "CLASS", classType: stat, location: ort };
         return true;
       },
-      travelToCity: (stadt) => { zustand.stadt = stadt; return true; },
+      travelToCity: (stadt) => { zustand.stadt = stadt; zustand.spieler.city = stadt; return true; },
     }, {
       get: (ziel, n) => (n in ziel
         ? ziel[n]

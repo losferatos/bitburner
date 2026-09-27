@@ -31,6 +31,12 @@ export async function main(ns) {
   const s = ns.singularity;
   const ZIEL = Number(ns.args[0] || 80);
   const FRIST_MS = 45 * 60 * 1000;
+  // KEIN HAEMMERN MEHR (27.09.2026, Audit G2): laengstens alle 2 min erneut
+  // versuchen, statt stur alle 15 s. Beleg aus der Sicherung von heute
+  // (Backup 11:08, data/joinrun.txt): 10:08:39 bis 10:29:24, 84 mal
+  // "gymWorkout(dex) abgelehnt." im 15-Sekunden-Takt (21 Minuten), waehrend
+  // die Figur-Vergabe laut Protokoll die ganze Zeit bei joinrun.js lag.
+  const RUECKZUG_DECKEL_MS = 2 * 60 * 1000;
   const start = Date.now();
   const z = [];
   let figSeq = null;
@@ -38,6 +44,9 @@ export async function main(ns) {
   // Laeuft der Kurs, den joinrun selbst gestartet hat? Nur dann wird der
   // Figur-Antrag waehrend des Trainings erneuert (Begruendung in der Schleife).
   let eigenesTraining = false;
+  // Aufeinanderfolgende Ablehnungen (Reise oder gymWorkout) TROTZ gehaltener
+  // Lease - siehe RUECKZUG_DECKEL_MS.
+  let ablehnungenInFolge = 0;
 
   const sag = (t) => {
     z.push(`${new Date().toTimeString().slice(0, 8)} ${t}`);
@@ -105,12 +114,23 @@ export async function main(ns) {
     // Daedalus nichts zu tun haben. Ein Vollausstieg hier haette sie
     // mitgerissen (Skeptiker-Fund).
     if (daedalusOffen) {
-      // Sector-12 hat mit "Powerhouse Gym" das beste Studio. Von Aevum aus ist
-      // die Reise billig, und Sector-12 ist ohnehin schon Heimatfaktion.
-      if (ns.getPlayer().city !== "Sector-12") {
-        if (s.travelToCity("Sector-12")) sag("Nach Sector-12 gereist.");
-        else sag("Reise nach Sector-12 fehlgeschlagen.");
-      }
+      // DIE STADT WIRD JETZT UNTER DER LEASE NACHGEZOGEN, NICHT MEHR HIER
+      // EINMALIG (27.09.2026, Audit G2/6#4).
+      //
+      // Hier stand die Reise nur an dieser Stelle, vor der Schleife. Zieht
+      // bn4life.js die Figur spaeter nach Aevum (Abschnitt "1b" dort, ohne
+      // Lease-Pruefung - Reisen laeuft dort bewusst ausserhalb der
+      // Figur-Wache), driftet joinrun.js mit ab und holt die Reise nie nach.
+      // Beleg aus der Sicherung von heute (Backup 11:08, data/joinrun.txt):
+      // 10:08:39 bis 10:29:24, 84 mal "gymWorkout(dex) abgelehnt." im
+      // 15-Sekunden-Takt (21 Minuten), OHNE ein weiteres "Figur nicht frei"
+      // dazwischen - die Lease lag laut Protokoll die ganze Zeit bei
+      // joinrun.js. `gymWorkout` prueft die Stadt VOR jeder Wirkung
+      // (Singularity.ts:302-336: bei falscher Stadt nur ein Log und
+      // `return false`, `Player.currentWork` bleibt unberuehrt) - lehnte
+      // hier also 21 Minuten denselben Aufruf ab, ohne dass etwas die Stadt
+      // korrigiert haette. Jetzt steht die Reise weiter unten, direkt vor dem
+      // Trainingsstart, unter der bereits gehaltenen Lease.
 
       // gymWorkout erwartet die Kurzform ("str"/"def"/"dex"/"agi"), der
       // Spielerdatensatz nennt die Werte ausgeschrieben. Deshalb beides.
@@ -124,9 +144,34 @@ export async function main(ns) {
         bremse();
         const w = werte();
         const offen = REIHE.filter((k) => w[k.feld] < ZIEL);
+        const arbeit = s.getCurrentWork();
+        const trainiertSchonVorab = arbeit && arbeit.type === "CLASS";
+
+        // UEBERSCHIESSEN AKTIV STOPPEN (27.09.2026, Audit G-Ueberschiessen).
+        //
+        // Hier fehlte der aktive Stopp: die Schleife hat nur `offen.length`
+        // beim naechsten Durchlauf geprueft, aber `gymWorkout` laeuft im
+        // Spiel WEITER, bis etwas anderes die Figur uebernimmt -
+        // `Player.currentWork` ist an kein Skript gebunden und ueberlebt
+        // sogar das Ende von joinrun.js selbst. Belegt an der Sicherung von
+        // heute (08:08/09:08/11:08-Backups): ein Lauf trainierte 45 Minuten
+        // reine Staerke (1 -> 199 statt Ziel 80), waehrend Verteidigung bei 1
+        // stehen blieb - `naechst` wechselt nie, solange `trainiertSchon`
+        // true bleibt, und nichts hat das eigene Training je aktiv beendet.
+        // Ein spaeterer Lauf trieb Verteidigung ebenso auf 166-197. Jetzt
+        // wird das EIGENE Training aktiv gestoppt, sobald sein Wert das Ziel
+        // erreicht hat - der naechste Durchlauf (ohne Wartezeit) entscheidet
+        // dann ueber den naechsten Wert oder das Ende.
+        if (eigenesTraining && trainiertSchonVorab && arbeit.classType
+            && !offen.some((k) => k.kurz === arbeit.classType)) {
+          s.stopAction();
+          sag(`${arbeit.classType} erreicht ${ZIEL} - Kurs beendet: ${JSON.stringify(w)}.`);
+          eigenesTraining = false;
+          continue;
+        }
+
         if (!offen.length) { sag(`Alle Kampfwerte >= ${ZIEL}: ${JSON.stringify(w)}`); break; }
         const naechst = offen.sort((a, b) => w[a.feld] - w[b.feld])[0];
-        const arbeit = s.getCurrentWork();
         // ZWEI TRAINER SIND EINER ZU VIEL (25.08.2026, 22:46).
         //
         // Hier stand eine Pruefung auf GENAU diese Kurzform: Trainierte die
@@ -143,7 +188,9 @@ export async function main(ns) {
         // Jetzt: Laeuft IRGENDEIN Kurs, laesst joinrun die Finger davon. Die
         // Werte steigen ohnehin - bbtrain zieht sie auf 100, joinruns Ziel ist
         // 80. Es wartet einfach, bis sie da sind.
-        const trainiertSchon = arbeit && arbeit.type === "CLASS";
+        // (aus dem Ueberschiessen-Check oben uebernommen, `arbeit` hat sich
+        // seither nicht veraendert)
+        const trainiertSchon = trainiertSchonVorab;
         // DAS EIGENE TRAINING HAELT DIE FIGUR (27.09.2026, Integrationspruefung).
         //
         // Der Antrag wurde nur gestellt, solange KEIN Kurs lief. Lief das
@@ -198,15 +245,35 @@ export async function main(ns) {
             continue;
           }
           figGrundLetzt = null;
-          if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
-          else {
-            eigenesTraining = true;
-            sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
+
+          // STADT UNTER DER LEASE NACHZIEHEN (27.09.2026, Audit G2/6#4).
+          // Begruendung oben am Schleifenanfang - frueher stand die Reise nur
+          // einmal, vor der Schleife, und driftete unbemerkt weg.
+          if (ns.getPlayer().city !== "Sector-12" && !s.travelToCity("Sector-12")) {
+            sag("Reise nach Sector-12 fehlgeschlagen - warte.");
+            ablehnungenInFolge++;
+            await ns.sleep(Math.min(15000 * 2 ** ablehnungenInFolge, RUECKZUG_DECKEL_MS));
+            continue;
           }
+
+          if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) {
+            sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
+            ablehnungenInFolge++;
+            await ns.sleep(Math.min(15000 * 2 ** ablehnungenInFolge, RUECKZUG_DECKEL_MS));
+            continue;
+          }
+          ablehnungenInFolge = 0;
+          eigenesTraining = true;
+          sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
         }
         await ns.sleep(15000);
       }
 
+      // FRIST ABGELAUFEN WAEHREND NOCH TRAINIERT WURDE: eigenen Kurs beenden
+      // statt ihn der Figur-Wache zu ueberlassen (27.09.2026, Audit
+      // G-Ueberschiessen) - derselbe Grund wie beim aktiven Stopp oben, nur
+      // fuer den Ausstieg ueber FRIST_MS statt ueber "Ziel erreicht".
+      if (eigenesTraining) { s.stopAction(); eigenesTraining = false; }
       const w = werte();
       sag(`Training beendet: ${JSON.stringify(w)}`);
     } else {

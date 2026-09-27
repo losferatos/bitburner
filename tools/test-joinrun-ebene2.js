@@ -322,6 +322,120 @@ console.log("-- 6. fremdes Training (bbtrain) wird NICHT beantragt --");
 }
 
 console.log("");
+console.log("-- 7. Ueberschiessen: das eigene Training endet aktiv, sobald sein Ziel erreicht ist --");
+{
+  /**
+   * AUDIT G-UEBERSCHIESSEN (27.09.2026). Die Schleife hat `offen.length`
+   * bisher nur beim NAECHSTEN Durchlauf geprueft, aber `gymWorkout` laeuft im
+   * Spiel WEITER, bis etwas anderes die Figur uebernimmt - `Player.
+   * currentWork` ist an kein Skript gebunden. Belegt an der Sicherung von
+   * heute: Staerke 1 -> ~199 statt Ziel 80 in einem einzigen Lauf. Nur
+   * Agilitaet fehlt hier zu Beginn; nachdem das Spiel sie (unabhaengig vom
+   * Skript) ueber das Ziel getrieben hat, muss joinrun den eigenen Kurs aktiv
+   * beenden statt ihn weiterlaufen zu lassen.
+   */
+  const ZIEL_TEST = 20;
+  const m = neuerMock({
+    host: "home", knoten: 5, wall: W0, playtime: 100 * 3600000, nodeReset: NR,
+    augReset: W0 - 3600000, geld: 5e9, args: [ZIEL_TEST],
+    server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: {} },
+    maxSchlaf: 6,
+    beiSchlaf: (ms, z, vor) => {
+      baueSchiedsrichter({ konkurrenz: false })(ms, z, vor);
+      // Sobald joinrun selbst "agi" trainiert, treibt das Spiel den Wert
+      // (unabhaengig vom Skript) ueber das Ziel - genau der Beleg von heute.
+      if (!z.__ueberschossen && z.arbeit && z.arbeit.classType === "agi") {
+        z.spieler.skills.agility = ZIEL_TEST + 5;
+        z.__ueberschossen = true;
+      }
+    },
+  });
+  m.zustand.spieler.city = "Sector-12";
+  m.zustand.spieler.factions = [];
+  m.zustand.spieler.skills = { strength: ZIEL_TEST, defense: ZIEL_TEST, dexterity: ZIEL_TEST, agility: 5, hacking: 100 };
+  m.ns.singularity.checkFactionInvitations = () => [];
+  m.ns.singularity.joinFaction = () => false;
+  m.ns.singularity.getAugmentationsFromFaction = () => [];
+  m.ns.singularity.getAugmentationRepReq = () => 0;
+  m.ns.singularity.getOwnedAugmentations = () => [];
+  const { modul } = await ladeAusBeiden(ROOT, "joinrun.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  pruefe("stopAction wurde aufgerufen, sobald Agilitaet das Ziel erreichte",
+    m.zustand.gestoppt === true, "gestoppt=" + m.zustand.gestoppt);
+  pruefe("am Ende laeuft KEIN Kurs mehr (kein Weitertrainieren ueber das Ziel hinaus)",
+    !m.zustand.arbeit, JSON.stringify(m.zustand.arbeit));
+  const log = m.lies("home", "data/joinrun.txt") || "";
+  pruefe("das Log nennt das erreichte Ziel fuer agi",
+    log.includes("agi erreicht"), log);
+}
+
+console.log("");
+console.log("-- 8. Stadt wird unter der Lease nachgezogen (Audit G2/6#4) --");
+{
+  /**
+   * Beleg aus der Sicherung von heute: 10:08:39 bis 10:29:24, 84 mal
+   * "gymWorkout(dex) abgelehnt." im 15-Sekunden-Takt, OHNE dass joinrun die
+   * Figur je verlor - `gymWorkout` lehnt bei falscher Stadt ab
+   * (Singularity.ts:302-336), und die Reise stand bisher nur EINMAL vor der
+   * Schleife. Die alte Reise VOR der Schleife faengt eine Drift zum Start ab
+   * - der eigentliche Fehler zeigt sich erst, wenn die Stadt WAEHREND des
+   * Laufs wegdriftet (bn4life.js reist fuer die Aevum-Faktion, ohne
+   * Lease-Pruefung). Hier startet die Figur richtig in Sector-12, trainiert
+   * Fingerfertigkeit (dex) bis zum Ziel - und GENAU IN DEM MOMENT, in dem das
+   * Ziel erreicht ist, "reist" bn4life sie nach Aevum, bevor joinrun den
+   * naechsten Wert (Agilitaet) angehen kann.
+   */
+  const ZIEL_TEST = 20;
+  const m = neuerMock({
+    host: "home", knoten: 5, wall: W0, playtime: 100 * 3600000, nodeReset: NR,
+    augReset: W0 - 3600000, geld: 5e9, args: [ZIEL_TEST],
+    server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: {} },
+    maxSchlaf: 8,
+    beiSchlaf: (ms, z, vor) => {
+      baueSchiedsrichter({ konkurrenz: false })(ms, z, vor);
+      // dex erreicht das Ziel UND die Figur driftet im selben Moment ab -
+      // bn4life.js reist unabhaengig von der Figur-Lease (Abschnitt "1b").
+      if (!z.__abgedriftet && z.arbeit && z.arbeit.classType === "dex") {
+        z.spieler.skills.dexterity = ZIEL_TEST;
+        z.spieler.city = "Aevum";
+        z.__abgedriftet = true;
+      }
+    },
+  });
+  m.zustand.spieler.city = "Sector-12";
+  m.zustand.spieler.factions = [];
+  m.zustand.spieler.skills = { strength: ZIEL_TEST, defense: ZIEL_TEST, dexterity: 5, agility: 5, hacking: 100 };
+  m.ns.singularity.checkFactionInvitations = () => [];
+  m.ns.singularity.joinFaction = () => false;
+  m.ns.singularity.getAugmentationsFromFaction = () => [];
+  m.ns.singularity.getAugmentationRepReq = () => 0;
+  m.ns.singularity.getOwnedAugmentations = () => [];
+  // Der Mock kennt die Stadtpruefung von Haus aus nicht (er merkt sich nur,
+  // was gewaehlt wurde) - hier nachgebaut, wie es das Spiel tatsaechlich tut.
+  const echtGymWorkout = m.ns.singularity.gymWorkout.bind(m.ns.singularity);
+  m.ns.singularity.gymWorkout = (ort, stat, focus) =>
+    m.zustand.spieler.city === "Sector-12" ? echtGymWorkout(ort, stat, focus) : false;
+
+  const { modul } = await ladeAusBeiden(ROOT, "joinrun.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const log = m.lies("home", "data/joinrun.txt") || "";
+  pruefe("joinrun reist unter der Lease selbst zurueck nach Sector-12",
+    m.zustand.spieler.city === "Sector-12", "Stadt: " + m.zustand.spieler.city);
+  pruefe("und trainiert Agilitaet danach erfolgreich - kein einziges 'abgelehnt' im Log",
+    !log.includes("abgelehnt"), log);
+  pruefe("am Ende laeuft der Kurs fuer agi",
+    m.zustand.arbeit && m.zustand.arbeit.classType === "agi", JSON.stringify(m.zustand.arbeit));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

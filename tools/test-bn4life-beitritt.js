@@ -89,6 +89,83 @@ console.log("=== bn4life.js: Beitrittslauf erst mit Gym-Geld (Integration 27.09.
 }
 
 console.log("");
+console.log("-- G1: die Beitrittsmarke landet auf home, auch wenn bn4life NICHT dort laeuft --");
+{
+  /**
+   * bn4life.js hat `hostRule: "werkbank"` und laeuft im Regelfall NICHT auf
+   * home. Belegt im Spielstand der 09:08-Sicherung vom 27.09.2026
+   * (AllServersSave, home.runningScripts): bn4life.js lief dort auf
+   * "I.I.I.I", waehrend ZWEI joinrun.js-Prozesse gleichzeitig auf home
+   * standen - die Marke war nie auf home angekommen. Hier steht bn4life.js
+   * ebenso auf einem Fremdwirt.
+   */
+  const m = neuerMock({
+    host: "I.I.I.I",
+    knoten: 1,
+    wall: W0,
+    playtime: 60000,
+    nodeReset: W0 - 60000,
+    augReset: W0 - 60000,
+    geld: 6e6,
+    server: {
+      home: { ram: 128, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
+      "I.I.I.I": { ram: 64, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 },
+    },
+    dateien: { home: { "joinrun.js": "//", "netburn.js": "//", "bn4net.js": "//" }, "I.I.I.I": {} },
+    maxSchlaf: 1,
+  });
+  m.zustand.spieler.factions = [];
+  const { modul } = await ladeAusBeiden(ROOT, "bn4life.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const gestartet = m.zustand.gestartet.map((g) => g.datei);
+  pruefe("joinrun.js wird trotzdem gestartet (bn4life laeuft auf I.I.I.I, nicht home)",
+    gestartet.includes("joinrun.js"), gestartet.join(", "));
+  pruefe("die Marke landet auf HOME - nicht nur lokal auf I.I.I.I",
+    !!m.lies("home", "data/beitritt-erledigt.txt"),
+    "home: " + JSON.stringify(m.lies("home", "data/beitritt-erledigt.txt"))
+      + " | I.I.I.I: " + JSON.stringify(m.lies("I.I.I.I", "data/beitritt-erledigt.txt")));
+}
+
+console.log("");
+console.log("-- G1: ein schon laufendes joinrun.js (Ziel 80) wird nicht doppelt gestartet --");
+{
+  /**
+   * `ns.isRunning("joinrun.js", "home")` OHNE Argumente prueft im Spiel auf
+   * eine LEERE Argumentliste (NetscriptHelpers.tsx, scriptIdentifier) -
+   * joinrun.js laeuft aber immer mit dem Zielwert 80. Belegt im Spielstand
+   * der 09:08-Sicherung: ZWEI joinrun.js-Prozesse gleichzeitig auf home,
+   * beide mit Argument 80 - die alte Pruefung haette das nie verhindert.
+   */
+  const m = neuerMock({
+    host: "home",
+    knoten: 1,
+    wall: W0,
+    playtime: 60000,
+    nodeReset: W0 - 60000,
+    augReset: W0 - 60000,
+    geld: 6e6,
+    server: { home: { ram: 128, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: { "joinrun.js": "//", "netburn.js": "//", "bn4net.js": "//" } },
+    maxSchlaf: 1,
+  });
+  m.zustand.spieler.factions = [];
+  // Ein joinrun.js laeuft schon - mit dem echten Zielwert, wie bn4life.js es
+  // selbst startet.
+  m.zustand.prozesse.push({ pid: 999, filename: "joinrun.js", host: "home", threads: 1, args: [80], gb: 1 });
+  const { modul } = await ladeAusBeiden(ROOT, "bn4life.js");
+  const zurueck = m.uhrStellen();
+  try { await modul.main(m.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const gestartet = m.zustand.gestartet.map((g) => g.datei);
+  pruefe("kein zweiter joinrun.js-Start, obwohl einer schon mit Ziel 80 laeuft",
+    !gestartet.includes("joinrun.js"), gestartet.join(", "));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

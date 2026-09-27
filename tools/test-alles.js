@@ -99,7 +99,12 @@ const TESTS = [
   },
   {
     datei: "test-joinrun-ebene2.js",
-    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4)",
+    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4), auch ueber die 15-min-Lease hinaus (Integration 27.09.)",
+    schnell: true,
+  },
+  {
+    datei: "test-bn4life-beitritt.js",
+    deckt: "EBENE 2: bn4life.js startet joinrun/netburn erst ab dem Gym-Geldboden - nach dem Sprung bleibt home fuer shop.js frei (Integration 27.09.)",
     schnell: true,
   },
   {

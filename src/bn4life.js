@@ -160,6 +160,8 @@ export async function main(ns) {
     // Jetzt traegt die Marke den Zeitpunkt des Einbaus, gegen den sie gilt.
     // Ist seither ein neuer Einbau gelaufen, ist sie ungueltig.
     const BEITRITT_MARKE = "data/beitritt-erledigt.txt";
+    // Derselbe Boden wie in joinrun.js vor gymWorkout (dort 5e6).
+    const JOINRUN_GELD_BODEN = 5e6;
     const letzterEinbau = ns.getResetInfo().lastAugReset;
     const markeGilt = ns.fileExists(BEITRITT_MARKE, "home")
       && Number(ns.read(BEITRITT_MARKE)) >= letzterEinbau;
@@ -176,8 +178,19 @@ export async function main(ns) {
     // Schwelle schon erreicht ist - `markeGilt` oben faengt den naechsten
     // Start dieses Zyklus dann genauso ab, wie es ein direkter Blick hier
     // getan haette.
+    //
+    // ERST AB DEM GYM-GELDBODEN STARTEN (27.09.2026, Integrationspruefung).
+    // joinrun.js trainiert erst ab 5 Mio ("Konto unter 5 Mio - kein Gym")
+    // und wartete nach einem Sprung (1.262 $) bis zu 45 min untaetig - mit
+    // netburn.js zusammen 58,2 GB auf home (tools/ram.js, SF4.3). Auf dem
+    // 128-GB-home nach dem Sprung blieben so 0,55 GB frei, und shop.js
+    // (7 GB, hostRule home, einziger Preislieferant fuer den Rechnerkauf)
+    // fand keinen Platz (tools/test-bn4life-beitritt.js). Die Marke wird
+    // erst beim Start gesetzt - der Lauf entfaellt nicht, er kommt spaeter,
+    // und seine 45-Minuten-Frist geht nicht mehr mit Warten verloren.
     if (!ns.fileExists("data/bn4-stop.txt", "home")
         && !markeGilt
+        && geld >= JOINRUN_GELD_BODEN
         && !ns.isRunning("joinrun.js", "home")
         && !ns.isRunning("netburn.js", "home")) {
       const drin = ns.getPlayer().factions;

@@ -636,9 +636,9 @@
   {
    "name": "bn4rep.js",
    "args": [],
-   "ramBaseGb": 10.75,
-   "ramSingGb": 52.5,
-   "ramMeasuredAt": "2026-09-04",
+   "ramBaseGb": 10.85,
+   "ramSingGb": 52.7,
+   "ramMeasuredAt": "2026-09-26",
    "verfahren": "alle",
    "knoten": "alle",
    "phase": "normal",
@@ -651,6 +651,7 @@
    "evictRank": 14,
    "needsFigure": "owner",
    "needsLibs": [
+    "lib/einbau.js",
     "lib/endspurt.js",
     "lib/figur.js",
     "lib/figurns.js",
@@ -690,7 +691,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-09-22T18:35:34.724Z",
+ "erzeugtAm": "2026-09-26T19:17:00.399Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

@@ -124,4 +124,15 @@ Integration (skeptiker-integration.md):
 - OFFEN G1: joinrun lief in EINEM Einbauzyklus zweimal (08:19 und 09:44) - vermutlich hat der bn4life-Neustart beim Einspielen die Beitrittsmarke nicht gesehen. Zweiter Lauf trainierte Staerke bis 209 bei Ziel 80 (Ueberschiessen?).
 - OFFEN G2: 10:08-10:15 lehnte das Spiel gymWorkout alle 15 s ab, waehrend bn4rep die Figur hielt (joinrun wartet nicht still, sondern haemmert).
 - OFFEN G3: Erwartete exp-Steigerung (Plan: x14 bei ausgebautem Netz) noch nicht sichtbar - in dieser Phase ist das Netz klein (ueberschussGb 0). Bei naechstem /bb mit Level-Kurve gegen BN5.2 vergleichen.
-- OFFEN: RAM live messen (Plan 4.12), Kanarienvogel-Pruefung wurde uebersprungen.
+- ERLEDIGT c0aeb3d: RAM live gemessen (44 Dateien, 0 abgelehnt), test-ram gruen mit 121 Zeilen. Kanarienvogel-Pruefung wurde uebersprungen (bewusst: Einspielung lief gestuft mit Einbausperre und Rueckweg).
+
+## Runde 27.09. ab 12:25 (Kontingentrest vor dem Wochenreset)
+
+Laufen als Branches (je Worktree, danach Opus-Skeptiker):
+- D-a blade.js: D2 exakte Erfolgschance, D1 kein Spieler-Rekrutieren / Trupp 0, D4 Rang/min statt 0,85
+- D-b blade.js-Skills (D3 multiplikativ + Dauer), sleeve.js D5 (nur mit Rechnung), kampfaugs.js D6
+- B4 Ausbau nach Erfahrungswert (nur mit Rechnung) + C5 gemeinsame Kaltstart-Definition
+- B5 Stapelziele nach Durchsatz, B7 Nullfenster pruefen, E2 share nach Wert (nur mit Rechnung)
+- G joinrun: G1 einmal je Zyklus, G2 kein Haemmern / Ursache "abgelehnt", Ueberschiessen, Wertrechnung
+- E1 Hashes in V1: Urteil mit Zahlen, Bau nur bei klarem Gewinn
+- BN12-Einstiegspruefung (Opus, nur lesen)

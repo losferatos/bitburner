@@ -117,3 +117,11 @@ Integration (skeptiker-integration.md):
 - I#6: joinrun zahlt 4 GB fuer getBitNodeMultipliers statt lib/bitnodes.json - aendert an keiner gerechneten Startlage etwas, Live-Wert war eine bewusste Entscheidung (A3).
 - I#7: test-ram rot (76 statt >= 100 Eichzeilen) - nur mit calculateRam im Spiel heilbar.
 - I#2 Rest: ab 5 Mio belegen joinrun+netburn weiter 58,2 GB auf home und koennen shop.js auf einem 128-GB-home bis zu 45 min verdraengen - Entwurfsfrage (anderer Wirt, netburn nur in BN9).
+
+## Nachmessung nach dem Einspielen (27.09. 11:15, Stand 55759f3 im Spiel)
+
+- ok: Fokus wird zurueckgeholt, darkweb.js startet nicht, Netz-RAM kaum brach, Fortschritt gleichauf mit BN5.2 (Hoechststand 464 nach 5,7 h vs 5,6 h). Kein Einbau seit 07:47 - BN5.2 hatte in dieser Phase ebenfalls 2-3-h-Zyklen, also kein Rueckschritt belegt.
+- OFFEN G1: joinrun lief in EINEM Einbauzyklus zweimal (08:19 und 09:44) - vermutlich hat der bn4life-Neustart beim Einspielen die Beitrittsmarke nicht gesehen. Zweiter Lauf trainierte Staerke bis 209 bei Ziel 80 (Ueberschiessen?).
+- OFFEN G2: 10:08-10:15 lehnte das Spiel gymWorkout alle 15 s ab, waehrend bn4rep die Figur hielt (joinrun wartet nicht still, sondern haemmert).
+- OFFEN G3: Erwartete exp-Steigerung (Plan: x14 bei ausgebautem Netz) noch nicht sichtbar - in dieser Phase ist das Netz klein (ueberschussGb 0). Bei naechstem /bb mit Level-Kurve gegen BN5.2 vergleichen.
+- OFFEN: RAM live messen (Plan 4.12), Kanarienvogel-Pruefung wurde uebersprungen.

@@ -172,25 +172,11 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
      * widerlegt. Dieser Cloud-Auftrag hat keinen Spielzugriff (siehe
      * Auftragsbeschreibung) und kann diese Nachmessung nicht selbst liefern.
      */
-    const VERALTET_ERLAUBT = [
-      "bn4door.js", "backdoor.js", // 26.09.2026: w0r1d_d43m0n gesperrt (F1), keine neue ns-Funktion
-      "exit.js", "kampfaugs.js", "bbtrain.js", "wakelock.js",
-      "csolve.js", "cdump.js",
-      // 26.09.2026 Skeptiker B: Ofen mit Frist, Zielwahl nach lib/calc.js,
-      // ausgang raeumt den Ofen. tools/ram.js rechnet unveraendert (bn4net
-      // 10,80, expfarm 1,75, calc 0) - keine neue ns-Funktion, Messung im
-      // Spiel steht aus.
-      "worker/expfarm.js", "ausgang.js", // bn4net.js/lib/calc.js stehen unten
-      // 2026-09-26, live-Nachmessung nach Einspielen:
-      "bn4rep.js", "joinrun.js", "cheap.js", "bn4life.js", "blade.js",
-      "homegrow.js", "graft.js", "keepalive.js", "autopilot.js", "hand.js",
-      "sleeve.js", "stockaccess.js", "buyone.js", "probe2.js", "stocks.js",
-      "formcheck.js", "bn4net.js", "contracts.js", "hacknet.js", "hashes.js",
-      "netburner.js", "boot.js", "calccheck.js", "xp.js", "popups.js",
-      "darkweb.js", "lib/batch.js", "lib/calc.js", "lib/hackaugs.js",
-      "export.js", "boerse.js", "lib/handschlag.js", "graftauto.js",
-      "figwatch.js", "guard.js",
-    ];
+    // 27.09.2026: alle bisher erlaubten Zeilen im Spiel nachgemessen
+    // (src/startdiag.js + tools/eichung-messen.js --schreib, 44 Dateien, 0
+    // abgelehnt). Die Liste ist wieder leer - jede neue Abweichung ist ein
+    // Befund, keine Ausnahme.
+    const VERALTET_ERLAUBT = [];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

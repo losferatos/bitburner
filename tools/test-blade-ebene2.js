@@ -457,6 +457,62 @@ console.log("-- Fertigkeitspunkte werden ausgegeben, nicht gehortet --");
 
 // ---------------------------------------------------------------------------
 console.log("");
+console.log("-- Skeptiker-Audit 26.09.2026 Fund 3: relNutzen fuer Reaper/Evasive multiplikativ --");
+{
+  // Szenario aus dem Audit (audit-2026-09-26/4-bladeburner.md#3, dieselben
+  // Zahlen wie in tools/test-formeln.js geeicht): Stand BN6 28.08. 16:08
+  // (ERLEDIGT.md:3843) - Digital Observer 104, Blade's Intuition 99, Evasive
+  // 93, Reaper 90, Kampfwerte str/def 387, dex/agi 450/420.
+  //
+  // Alle UEBRIGEN dynamischen Faehigkeiten werden robust neutralisiert, nicht
+  // nur klein gehalten: Overclock steht am Deckel (90, sortiert sich per
+  // `stufe >= deckel` selbst aus); Hyperdrive/Short-Circuit/Cloak/Tracer/
+  // Datamancer stehen auf Stufe 1000 - abnehmender Grenznutzen UND ein Preis
+  // von ueber 3000 (der Mock rechnet `(Stufe+1)*3`), zwei Groessenordnungen
+  // ueber Blade's Intuition/Digital Observer/Reaper/Evasive (270-320). Selbst
+  // im ungeeichten Extremfall (Short-Circuit/Cloak-Abdeckung 1,0 statt 0 -
+  // die Restarbeit an den Black Ops haengt an Code aus einem parallelen
+  // Bauauftrag) bleibt ihr Wert je Punkt um Faktor ~80 zu klein, um zu
+  // gewinnen. Cyber's Edge steht auf volle Ausdauer (`ausdauerLuft()=1`,
+  // Faktor `1-1=0`) - unabhaengig von seiner Stufe exakt null.
+  //
+  // Damit entscheidet nur noch der Vierervergleich, um den es in Fund 3 geht.
+  // Gerechnet (Mock-Preis `(Stufe+1)*3`, `tools/test-formeln.js` fuer die
+  // relNutzen-Werte):
+  //   VORHER (additiv):  BI 0,7557/300=2,52e-3  DO 0,7752/315=2,46e-3
+  //                      Reaper 0,3484/273=1,28e-3  Evasive 0,3352/282=1,19e-3
+  //                      -> erste Wahl Blade's Intuition
+  //   NACHHER (multipl.+Zeit): Reaper 0,7913/273=2,90e-3  Evasive 0,7995/282=2,84e-3
+  //                      BI 2,52e-3  DO 2,46e-3
+  //                      -> erste Wahl Reaper (Evasive dicht dahinter)
+  const m = await fahre({
+    punkte: 1000,
+    rang: 50000,
+    ausdauer: [100, 100],
+    skills: { strength: 387, defense: 387, dexterity: 450, agility: 420, hacking: 300, intelligence: 150 },
+    fertigkeiten: {
+      "Blade's Intuition": 99, "Digital Observer": 104, "Reaper": 90, "Evasive System": 93,
+      "Overclock": 90, "Hyperdrive": 1000, "Short-Circuit": 1000, "Cloak": 1000,
+      "Tracer": 1000, "Datamancer": 1000, "Cyber's Edge": 0,
+    },
+  });
+  const gekauft = m.zustand.blade.gekauft.map((k) => k.name);
+  pruefe(
+    "erste gekaufte Faehigkeit ist Reaper oder Evasive System, NICHT mehr Blade's Intuition",
+    gekauft.length > 0 && (gekauft[0] === "Reaper" || gekauft[0] === "Evasive System"),
+    "gekauft: " + (gekauft.slice(0, 4).join(", ") || "(nichts)"),
+  );
+  const indexVon = (n) => { const i = gekauft.indexOf(n); return i < 0 ? Infinity : i; };
+  pruefe(
+    "Evasive System wird VOR Blade's Intuition UND Digital Observer gekauft (Reaper liegt hauchduenn davor)",
+    indexVon("Evasive System") < indexVon("Blade's Intuition")
+      && indexVon("Evasive System") < indexVon("Digital Observer"),
+    "gekauft: " + (gekauft.slice(0, 6).join(", ") || "(nichts)"),
+  );
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
 console.log("-- Anlaufphase: weichtTraining steht in JEDER Ausweichrunde (22.09.2026) --");
 {
   // DER WAECHTER LIEST DIESE FLAGGE, um in der Anlaufphase den Kampfwert-

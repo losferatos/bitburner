@@ -1507,12 +1507,13 @@ export async function main(ns) {
         if (!hs.darf) {
           sag("Einbau ausgesetzt: " + hs.grund);
           // SKEPTIKER-EINWAND 5: weiterlaufen statt Prozessende, und die
-          // Sperre auf home spiegeln. `handschlag` schreibt
-          // data/install-sperre.txt mit `ns.write` LOKAL (lib/handschlag.js,
-          // dort selbst als wirkungslos auf der Werkbank vermerkt); bn4rep
-          // liest sie mit `liesVonHome` - ohne diese Zeile saehe die naechste
-          // Runde auf der Werkbank keine Sperre und stellte den Handschlag
-          // alle 15 s neu. Das JSON mit `bis` liest der Sperrblock oben
+          // Sperre auf home spiegeln. Seit Paket C.4 schreibt `handschlag`
+          // data/install-sperre.txt selbst per `nachHome` (lib/handschlag.js);
+          // die Zeile hier ist seit dem Zusammenfuehren doppelt, aber im
+          // selben JSON-Format ({ts, reason, bis}) und damit harmlos - sie
+          // bleibt als Rueckfall, falls `nachHome` scheitert (Integrations-
+          // pruefung 27.09.2026). Ohne Sperre auf home stellte die naechste
+          // Runde auf der Werkbank den Handschlag alle 15 s neu. Das JSON mit `bis` liest der Sperrblock oben
           // (`roh.startsWith("{")`) korrekt; es laeuft nach 1 h ab, und
           // `boot.js` raeumt es beim naechsten Reset.
           try {

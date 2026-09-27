@@ -297,7 +297,8 @@ export async function handschlag(ns, reason, target, nodeReset, sag = () => {}) 
   // ebenso. Ein `ns.write` ohne `scp` legt die Sperre dann nur auf dem
   // Wirt ab, auf dem `bn4rep` GERADE lief - `liesVonHome` in bn4rep.js:797
   // sieht sie auf home nie, die Stunde Sperre wirkt nie, und der Prozess
-  // (der bei `!hs.darf` per `return` endet, siehe bn4rep.js:1395-1397)
+  // (der bei `!hs.darf` damals per `return` endete - seit Paket A laeuft er
+  // weiter und spiegelt die Sperre zusaetzlich selbst nach home)
   // haemmert im ~100-s-Neustarttakt des Kerns gegen dieselbe tote Bruecke -
   // gemessen in der Nacht 24./25.09.2026 6,5 h lang.
   nachHome(ns, "data/install-sperre.txt", JSON.stringify({

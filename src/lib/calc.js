@@ -384,3 +384,213 @@ export function expectedYield(s, p, ramFree, horizon = 900, costs = WORKER_RAM) 
   const harvestTime = Math.max(0, horizon - prep);
   return rate * harvestTime;
 }
+
+// ===========================================================================
+// ZIELWAHL DES KERNS (bn4net.js) - aus bn4net.js herausgeloest, 26.09.2026
+// ===========================================================================
+//
+// WARUM HIER UND NICHT IN bn4net.js (Skeptiker B, Einwand 10). Die Kennzahlen
+// standen als Closure in main() und waren damit nur ueber einen ganzen
+// Kernlauf pruefbar. Der Test dazu (test-b1) hat sie deshalb im Test
+// nachgebaut und ALT gegen NEU verglichen - ein Rueckfall im Kern waere gruen
+// geblieben. Als reine Funktionen hier ruft der Kern, der Test und jede
+// Nachrechnung mit echten Spielstaenden DIESELBE Stelle auf. Kostet 0 GB:
+// keine ns-Funktion, und kein Bezeichner heisst wie eine (siehe WORKER_RAM
+// oben - `.hack`/`.grow`/`.weaken` als Eigenschaft wuerden gebucht).
+//
+// Warum nicht eine neue Datei lib/zielwahl.js: bn4net.js importiert
+// lib/calc.js schon, sie liegt also sicher im Spiel. Eine neue Datei, die beim
+// Einspielen vergessen wird, laesst den Kern beim Import sterben.
+
+/**
+ * Kennzahlen eines Geldziels im VORBEREITETEN Zustand plus die Zeit bis
+ * dahin. Rechnung unveraendert aus bn4net.js kennzahlen (Fix B1: direkt bei
+ * minDifficulty, nicht vom IST-Wert hochskaliert - bei Sicherheit 100 war
+ * der IST-Wert 0 und jedes Vielfache davon auch).
+ *
+ * @param {object} s ns.getServer-Objekt
+ * @param {{skill: number, int: number, multMoney: number, multChance: number, multGrow: number, multSpeed: number}} p
+ * @param {number} hackTimeIstSec ns.getHackTime(host)/1000 - vom Spiel, beim IST-Wert
+ * @param {{ramHackT: number, ramGrowT: number, ramWeakenT: number, bnScriptHackMoney: number,
+ *          bnServerGrowthRate: number, mixMoneyHigh: number, kapAbzug: number,
+ *          secOk: number, moneyLow: number, prepRamGb: number}} cfg
+ */
+export function targetMetrics(s, p, hackTimeIstSec, cfg) {
+  const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
+  const req = s.requiredHackingSkill;
+  const pct = hackPercent({ sec: hdIst, reqSkill: req }, { skill: p.skill, multMoney: p.multMoney },
+    cfg.bnScriptHackMoney);
+  const chance = hackChance({ sec: hdIst, reqSkill: req, root: s.hasAdminRights }, p);
+  const k = growthLogPerThread({ sec: hdIst, growth: s.serverGrowth }, p.multGrow, 1,
+    cfg.bnServerGrowthRate);
+  const pMin = hackPercent({ sec: hdMin, reqSkill: req }, { skill: p.skill, multMoney: p.multMoney },
+    cfg.bnScriptHackMoney);
+  const chanceMin = hackChance({ sec: hdMin, reqSkill: req, root: s.hasAdminRights }, p);
+  const kMin = growthLogPerThread({ sec: hdMin, growth: s.serverGrowth }, p.multGrow, 1,
+    cfg.bnServerGrowthRate);
+  // Die Laufzeit kommt vom Spiel (getHackTime am IST-Wert) und wird nur
+  // linear auf minDifficulty umgerechnet: hackTime ~ 2.5*req*sec+500
+  // (Hacking.ts:64-70). So bleibt jeder Spielfaktor drin, den calc nicht kennt.
+  const zeitIst = 2.5 * req * hdIst + 500;
+  const zeitMin = 2.5 * req * hdMin + 500;
+  const hackTimeMin = hackTimeIstSec * (zeitIst > 0 ? zeitMin / zeitIst : 1);
+  const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
+  const wphMin = (SERVER_FORTIFY_AMOUNT * chanceMin + GROW_FORTIFY_AMOUNT * gphMin)
+    / SERVER_WEAKEN_AMOUNT;
+  const gbSekProEinheit = hackTimeMin
+    * (cfg.ramHackT + GROW_TIME_FACTOR * gphMin * cfg.ramGrowT
+      + WEAKEN_TIME_FACTOR * wphMin * cfg.ramWeakenT);
+  const beute = pMin * chanceMin;
+  const brauchbar = pMin > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
+
+  // VORBEREITUNGSZEIT (Skeptiker B, Einwand 3). Die Zielwahl sortierte rein
+  // nach dem Ertrag NACH dem Saeubern - ein Server auf Sicherheit 100
+  // brauchte dafuer bei Level 3012 bis 681 s, nach einem Knotenwechsel bei
+  // Level 500 rund 39 min, und das stand nirgends in der Rechnung. Genaehert
+  // wie die Anlaufphase in bn4net.js arbeitet: erst EINE weaken-Welle (Dauer
+  // am IST-Wert, beim Aufruf festgelegt - viele Faeden kosten keine Zeit),
+  // dann grow auf das Maximum mit dem nachlaufenden weaken (grow 3,2 + das
+  // weaken dahinter landet nach ~4 hackTime am Minimum).
+  const secOver = Math.max(0, hdIst - hdMin);
+  const moneyFrac = s.moneyMax > 0 ? s.moneyAvailable / s.moneyMax : 0;
+  // Passt die weaken-Welle nicht in den Speicher, den die Anlaufphase
+  // bekommt (cfg.prepRamGb, in bn4net 30 % des Netzes), braucht es mehrere
+  // Wellen hintereinander - nach einem Knotenwechsel mit kleinem Netz der
+  // Normalfall (Sicherheit 100 -> 35 sind 1.300 Faeden, 2,3 TB).
+  let prepSec = 0;
+  if (secOver > cfg.secOk) {
+    const gbWelle = weakenThreads(secOver) * cfg.ramWeakenT;
+    const wellen = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbWelle / cfg.prepRamGb)) : 1;
+    prepSec += wellen * WEAKEN_TIME_FACTOR * hackTimeIstSec;
+  }
+  // GROW IN WELLEN, NICHT EINE WELLE PAUSCHAL (Gegenpruefung Skeptiker B,
+  // 26.09.2026). Hier stand eine einzige grow/weaken-Dauer, egal wie viel
+  // wachsen muss. Nach einem Knotenwechsel steht aber jeder Server auf 2 %
+  // Guthaben (BN5: ServerStartingMoney 0,5 gegen 25-faches Maximum,
+  // Server.ts:76-77), und bei wachstum 20 und Level 290 braucht hong-fang-tea
+  // bis 95 % rund 4.500 grow-Faeden = 8,7 TB - in einem Netz von 1 TB. Die
+  // alte Rechnung gab 47 s ("vorbereitet"), die Nachspielung mit dem echten
+  // Kern sah das Ziel nach 20 min bei 2,8 % und in der Anlaufsperre.
+  // Faedenzahl wie planMix in bn4net.js (log(MIX_MONEY_HIGH/Guthaben)/k, k
+  // am Minimum), plus das weaken fuer die grow-Sicherheit (0,004/0,05 je
+  // Faden), in Wellen zu cfg.prepRamGb wie beim weaken oben.
+  if (moneyFrac < cfg.moneyLow) {
+    const growFaeden = kMin > 0
+      ? Math.log(cfg.mixMoneyHigh / Math.max(moneyFrac, 1e-9)) / kMin : Infinity;
+    const gbGrow = growFaeden
+      * (cfg.ramGrowT + (GROW_FORTIFY_AMOUNT / SERVER_WEAKEN_AMOUNT) * cfg.ramWeakenT);
+    const wellenGrow = cfg.prepRamGb > 0 ? Math.max(1, Math.ceil(gbGrow / cfg.prepRamGb)) : 1;
+    prepSec += wellenGrow * WEAKEN_TIME_FACTOR * hackTimeMin;
+  }
+
+  return {
+    p: pct, chance, k,
+    pMin, chanceMin, kMin, hackTimeMin, prepSec,
+    steadyEff: brauchbar ? (s.moneyMax * cfg.mixMoneyHigh * beute) / gbSekProEinheit : null,
+    kapazitaet: brauchbar ? (cfg.kapAbzug * gbSekProEinheit) / (hackTimeMin * beute) : 0,
+  };
+}
+
+/**
+ * Die Vorbereitung, die fuer ein Ziel NOCH zaehlt: fuer ein neues Ziel die
+ * geschaetzte, fuer ein amtierendes nur der Rest seiner Eintrittsschaetzung
+ * (nie mehr als der Zustand jetzt verlangt, nie unter 0).
+ *
+ * WARUM EINE EIGENE FUNKTION (Gegenpruefung Skeptiker B, 26.09.2026). Der
+ * Rang rechnete schon so, die Einteilung "vorbereitet / unvorbereitet" in
+ * selectMoneyTargets aber mit dem Augenblickswert. Ein laufendes Stapelziel
+ * steht zwischen zwei landenden weaken-Wellen kurz ueber Minimum + 1 und
+ * hatte dann 94-122 s "Vorbereitung": es belegte fuer eine Runde einen der
+ * acht Plaetze fuer unvorbereitete Ziele, das achte fiel heraus und kam in
+ * der naechsten Runde zurueck. Nachgespielt mit dem echten Kern (Spielstand
+ * 19:03, 90 min): 746 Ein- und Austritte bei 25 Geldzielen, einzelne Server
+ * pendelten 72-mal. Rang und Einteilung lesen jetzt dieselbe Zahl.
+ *
+ * @param {number} prepSec geschaetzte Vorbereitung im jetzigen Zustand
+ * @param {null | {restSec: number}} incumbent null fuer ein neues Ziel
+ */
+export function effectivePrepSec(prepSec, incumbent = null) {
+  if (!incumbent) return prepSec;
+  return Math.max(0, Math.min(prepSec, incumbent.restSec));
+}
+
+/**
+ * Rangwert fuer die Zielwahl: Ertrag ueber einen Horizont nach Abzug der
+ * Vorbereitung, mit Bonus fuer das amtierende Ziel.
+ *
+ *   neu         steadyEff x (1 - prepSec/horizonSec). Der Ertrag ueber den
+ *               Horizont zaehlt nur fuer die Zeit NACH der Vorbereitung.
+ *   amtierend   steadyEff x bonus x (1 - restSec/horizonSec). restSec
+ *               ist die RESTLICHE Vorbereitung: die beim Eintritt geschaetzte
+ *               minus der seither vergangenen Zeit (der Zustand allein
+ *               zeigt eine laufende weaken-Welle erst, wenn sie landet). Der
+ *               Bonus haelt die Wahl bei zwei fast gleichen Zielen fest
+ *               (18:04: ecorp 5,66e6 gegen 4sigma 5,59e6) - sonst wuerde
+ *               batchStand bei jedem Levelsprung weggeworfen. Er ist je ROLLE
+ *               verschieden (bn4net: Stapelziel 1,3, offenes Geldziel 1,05):
+ *               mit einem gemeinsamen Bonus hob sich die Huerde auf, sobald
+ *               ein Herausforderer eine Runde als offenes Ziel in der Liste
+ *               stand - im Nachspielen 19:04 verdraengten nova-med und zb-def
+ *               so phantasy und the-hub mit nur 1,1-fachem Ertrag.
+ *               Die Vorbereitung wird dem Amtierenden NICHT erlassen: sonst
+ *               waere ein Ziel, das eine Runde lang als offenes Ziel in der
+ *               Liste stand, in der naechsten ohne jede Vorbereitungskosten
+ *               ins Stapelrennen gegangen (im Nachspielen 19:04 so passiert).
+ *   zu teuer    0, wenn ein NEUES Ziel mehr als prepMaxSec braucht: es wird
+ *               nicht angefasst, bis das Level die Vorbereitung billig genug
+ *               macht (weaken-Dauer faellt mit 1/(Level+50)). Sonst liefe es
+ *               in die Anlauffrist und wuerde gesperrt - Brennen und Sperren.
+ *
+ * @param {{steadyEff: number|null, prepSec: number}} kz
+ * @param {{horizonSec: number, prepMaxSec: number}} opts
+ * @param {null | {restSec: number, bonus: number}} incumbent null fuer ein neues Ziel
+ */
+export function targetRank(kz, opts, incumbent = null) {
+  if (!(kz.steadyEff > 0)) return 0;
+  if (incumbent) {
+    const rest = effectivePrepSec(kz.prepSec, incumbent);
+    return kz.steadyEff * (incumbent.bonus || 1) * Math.max(0, 1 - rest / opts.horizonSec);
+  }
+  if (kz.prepSec > opts.prepMaxSec) return 0;
+  return kz.steadyEff * Math.max(0, 1 - kz.prepSec / opts.horizonSec);
+}
+
+/**
+ * Waehlt die Geldziele aus den nach Rang absteigend sortierten Kandidaten.
+ *
+ * UNVORBEREITETE ZIELE BEKOMMEN NUR EINEN TEIL DER PLAETZE. Ohne diese Grenze
+ * verdraengten beim Einspielen um 18:04 die 44 frisch sichtbaren Server auf
+ * Sicherheit 100 alle vorbereiteten: von 25 Geldzielen haette 1 gearbeitet
+ * (vorher 17 von 18), und die Ertragsluecke dauert die ganze Vorbereitung
+ * (471-740 s). Jetzt bleiben vorbereitete Ziele auf ihren Plaetzen, bis ein
+ * Nachfolger fertig ist; unvorbereitete bekommen hoechstens
+ * max(maxUnprepared, maxTargets - Zahl der vorbereiteten Kandidaten) - nach
+ * einem Einbau (nichts vorbereitet) also wie bisher alle.
+ *
+ *
+ * "Unvorbereitet" heisst: mehr als opts.unpreparedSec Vorbereitung. Ein Ziel im
+ * Dauerbetrieb steht zwischen zwei Wellen oft kurz unter 75 % Guthaben und
+ * hat dann ein paar Sekunden grow vor sich - das ist Betrieb, keine
+ * Vorbereitung, und darf keinen der knappen Plaetze kosten.
+ *
+ * @param {Array<{host: string, rank: number, prepSec: number}>} sorted
+ * @param {{maxTargets: number, maxUnprepared: number, unpreparedSec: number}} opts
+ * @returns {string[]} Hosts, weiter nach Rang sortiert
+ */
+export function selectMoneyTargets(sorted, opts) {
+  const grenzeSek = opts.unpreparedSec ?? 60;
+  const unvorb = (c) => c.prepSec > grenzeSek;
+  const vorbereitet = sorted.filter((c) => !unvorb(c)).length;
+  const grenzeUnvorbereitet = Math.max(opts.maxUnprepared, opts.maxTargets - vorbereitet);
+  const gewaehlt = [];
+  let unvorbereitet = 0;
+  for (const c of sorted) {
+    if (gewaehlt.length >= opts.maxTargets) break;
+    if (unvorb(c)) {
+      if (unvorbereitet >= grenzeUnvorbereitet) continue;
+      unvorbereitet++;
+    }
+    gewaehlt.push(c.host);
+  }
+  return gewaehlt;
+}

@@ -239,6 +239,36 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-b1-security100.js",
+    deckt: "B1 (Audit 26.09.2026 2#2): Server bei Sicherheit 100 bleiben fuer die Zielwahl sichtbar",
+    schnell: true,
+  },
+  {
+    datei: "test-b2-expfarm-dauerlaeufer.js",
+    deckt: "EBENE 2: B2 (Audit 26.09.2026 2#1): Erfahrungsofen als Dauerlaeufer, Geldziele nicht verhungert",
+    schnell: true,
+  },
+  {
+    datei: "test-b3-darkweb-fokus.js",
+    deckt: "EBENE 2: B3 (Audit 26.09.2026 6#1): darkweb.js nur ohne lebendiges bn4life",
+    schnell: true,
+  },
+  {
+    datei: "test-b6-bitnodes-tabelle.js",
+    deckt: "B6 (Audit 26.09.2026 2#6/1#4): negative Literale und BN12-Stufen im Generator",
+    schnell: true,
+  },
+  {
+    datei: "test-b7-zielwahl-gegenpruefung.js",
+    deckt: "EBENE 2: Gegenpruefung Skeptiker B - grow-Wellen in der Vorbereitung, kein Pendeln am achten Platz, Anlauffrist ueber eine Stapelphase",
+    schnell: true,
+  },
+  {
+    datei: "test-b8-ofen-gegenpruefung.js",
+    deckt: "EBENE 2: Gegenpruefung Skeptiker B - Ofenfrist nach dem kuerzesten Takt, Ofenfaeden ohne Frist werden geraeumt",
+    schnell: true,
+  },
+  {
     datei: "test-blackops-summe.js",
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,

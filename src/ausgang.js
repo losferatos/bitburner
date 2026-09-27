@@ -52,7 +52,13 @@
 
 const WD = "w0r1d_d43m0n";
 const TAKT_MS = 60000;
-const WORKER = ["worker/share.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"];
+// worker/expfarm.js steht direkt hinter share (Skeptiker B, Einwand 6): der
+// Erfahrungsofen haelt seit dem 26.09.2026 den groessten Teil des freien
+// Speichers, und ohne ihn in dieser Liste zaehlte die Wirtswahl ihn nicht als
+// rueckgewinnbar, und `raeume(h, false)` - auch das Nachraeumen direkt vor dem
+// exec - konnte ihn nicht beenden. Sein Verlust ist ein angefangener weaken-
+// Aufruf ohne Folgekosten (kein Stapel, keine Kette), also der zweitbilligste.
+const WORKER = ["worker/share.js", "worker/expfarm.js", "worker/weaken.js", "worker/grow.js", "worker/hack.js"];
 // Was exit.js auf einem Fremdrechner braucht. lib/route.js ist ein IMPORT:
 // fehlt die Datei auf dem Wirt, startet das Skript gar nicht erst. route.json
 // ist die Datengrundlage der Zielpruefung - ohne sie lehnt exit.js jeden

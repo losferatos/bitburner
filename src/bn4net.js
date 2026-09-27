@@ -27,8 +27,7 @@
  *
  * @param {NS} ns
  */
-import { hackPercent as calcHackPercent, hackChance as calcHackChance,
-  growthLogPerThread as calcGrowthLog } from "lib/calc.js";
+import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
   leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
@@ -112,11 +111,29 @@ export async function main(ns) {
   // fehlende Felder als 0 liest, setzt jede Beute auf null.
   let bnScriptHackMoney = 1;
   let bnServerGrowthRate = 1;
+  // Die Knotenstufe, nach der die Werte gewaehlt wurden - geht in die
+  // Telemetrie, damit ein falscher Stufenwert von aussen sichtbar ist.
+  let bnStufe = 1;
   try {
     const roh = ns.fileExists("lib/bitnodes.json", "home") ? ns.read("lib/bitnodes.json") : null;
     const t = roh ? JSON.parse(roh) : null;
-    const n = ns.getResetInfo().currentNode;
-    const k = t && t.knoten ? t.knoten[String(n)] : null;
+    const info = ns.getResetInfo();
+    const n = info.currentNode;
+    // STUFE DES KNOTENS (Skeptiker B, Einwand 5). BN12 skaliert fast jedes
+    // Feld mit 1,02^Stufe (BitNode.tsx case 12); die flache Tabelle traegt
+    // nur Stufe 1. Die Stufe ist die des Spiels: aktives SF-Level + 1
+    // (BitNodeUtils.ts:102-104 getBitNodeLevel, ohne Deckel nur in BN12) -
+    // ownedSF aus getResetInfo, das ohnehin bezahlt ist. Fuer Stufen jenseits
+    // der Tabelle gilt die hoechste vorhandene; die Route endet bei 12.3.
+    const stufen = t && t.knotenLevel ? t.knotenLevel[String(n)] : null;
+    let k = t && t.knoten ? t.knoten[String(n)] : null;
+    if (stufen) {
+      const sf = info.ownedSF && typeof info.ownedSF.get === "function"
+        ? (info.ownedSF.get(n) || 0) : 0;
+      const vorhanden = Object.keys(stufen).map(Number).filter(Number.isFinite);
+      const stufe = Math.min(sf + 1, Math.max(...vorhanden));
+      if (stufen[String(stufe)]) { k = stufen[String(stufe)]; bnStufe = stufe; }
+    }
     if (k) {
       if (Number.isFinite(k.ScriptHackMoney)) bnScriptHackMoney = k.ScriptHackMoney;
       if (Number.isFinite(k.ServerGrowthRate)) bnServerGrowthRate = k.ServerGrowthRate;
@@ -426,6 +443,39 @@ export async function main(ns) {
     return Math.min(wunsch, bedarf, verteilbar / 2);
   };
   const WORKER = ["worker/weaken.js", "worker/grow.js", "worker/hack.js", "worker/share.js"];
+  // Der Erfahrungsofen (worker/expfarm.js) steht bewusst NICHT in WORKER:
+  // WORKER zaehlt auch, was je Geldziel fliegt (flight weiter unten), und der
+  // Ofen gehoert dort nicht hinein. Die Konstante steht hier oben und nicht
+  // bei den Arbeiterpreisen, weil schon der Auftragslaeufer (Abschnitt 0c)
+  // sie braucht - weiter unten deklariert waere sie dort noch nicht
+  // initialisiert (temporal dead zone) und wuerde die Runde werfen.
+  const EXPFARM_SKRIPT = "worker/expfarm.js";
+  // Rundentakt fuer die Ofenfrist (Skeptiker B, Einwand 1): gemessen von
+  // Speicherzaehlung zu Speicherzaehlung, denn genau dort muss der Ofen seinen
+  // Speicher wieder hergegeben haben.
+  let letzteVerteilung = 0;
+  let rundenTaktMs = 10000;
+  // Die letzten gemessenen Takte - die Frist nimmt den KUERZESTEN davon
+  // (Gegenpruefung Skeptiker B, siehe Taktmessung vor Durchgang 1).
+  const taktProben = [];
+  // Zielwahl mit Hysterese (Skeptiker B, Einwand 3): die amtierenden Geld-
+  // und Stapelziele mit Eintrittszeit und der beim Eintritt geschaetzten
+  // Vorbereitung (host -> {start, prepSec}). Nach einem Neustart leer - dann
+  // entscheidet allein der Zustand (ein vorbereitetes Ziel hat prepSec 0).
+  const zielSeit = new Map();
+  // Anlauffrist je Ziel, beim Anlaufbeginn aus der Vorbereitungszeit
+  // festgelegt (siehe FRIST unten).
+  const anlaufFrist = new Map();
+  // Wann ein Ziel zuletzt IM ANLAUF gesehen wurde (Gegenpruefung Skeptiker
+  // B, 26.09.2026) - Ziel -> Zeitstempel. anlaufSeit wurde nur geloescht, wenn
+  // das Ziel als offenes Geldziel im Dauerbetrieb, am Nutzen-Gate oder an der
+  // Frist vorbeikam. Wurde es dazwischen Stapelziel oder fiel es aus der
+  // Liste, blieb der alte Zeitstempel stehen, und bei der Rueckkehr stand
+  // die Frist sofort als abgelaufen da (siehe FRIST unten).
+  const anlaufZuletzt = new Map();
+  // Wann dieser Kern welchen bn4life-Prozess zum ersten Mal gesehen hat
+  // (Skeptiker B, Einwand 8) - pid -> Zeitstempel.
+  const lifeErstGesehen = new Map();
 
   // Die Werkzeugliste steht hier oben statt unten bei ihrer Verwendung, weil
   // seit dem 22.08.2026 schon die RAM-Verteilung sie braucht: Die Werkbank
@@ -1040,7 +1090,10 @@ export async function main(ns) {
           }
           if (!passtNie && braucht > 0 && meistFrei < braucht) {
             const vorher = meistFrei;
-            for (const w of WORKER) {
+            // Der Erfahrungsofen gehoert dazu (Skeptiker B, Einwand 7): er
+            // verliert nur den laufenden weaken-Aufruf, und er haelt seit dem
+            // Umbau den groessten Teil des freien Speichers.
+            for (const w of [EXPFARM_SKRIPT, ...WORKER]) {
               if (!ns.ps(wirt).some((pr) => pr.filename === w)) continue;
               ns.scriptKill(w, wirt);
               const frei = ns.getServerMaxRam(wirt) - ns.getServerUsedRam(wirt)
@@ -1596,6 +1649,28 @@ export async function main(ns) {
     // nicht mehr: Der Wasserfall gibt ihm nur, was die besseren nicht
     // aufnehmen konnten - und dieser Speicher laege sonst brach.
     const MONEY_TARGET_COUNT = 25;
+    // Zielwahl mit Vorbereitungszeit und Hysterese (Skeptiker B, Einwand 3,
+    // gerechnet mit den Spielstaenden 18:04, 19:03 und 19:04):
+    //   horizonSec    30 min. Ein Wechsel muss sich binnen dieser Zeit
+    //                 bezahlen. Kuerzer als der Median der Einbauabstaende in
+    //                 BN5L2 (~97 min), weil es auch 20-min-Zyklen gab (16:37,
+    //                 16:57, 17:19) - lieber ein Ziel zu vorsichtig als eines,
+    //                 dessen Vorbereitung den Zyklus frisst.
+    //   prepMaxSec    20 min = ANLAUF_FRIST_MS. Was laenger braucht, wuerde in
+    //                 die Anlauffrist laufen und gesperrt (Brennen und Sperren).
+    //   bonusBatch    1,3 fuer ein amtierendes Stapelziel, bonusMoney 1,05 fuer
+    //                 ein amtierendes offenes Ziel. Die besten Ziele liegen oft
+    //                 wenige Prozent auseinander (18:04: ecorp 5,66e6, 4sigma
+    //                 5,59e6); ohne Bonus wechselte der Stapel mit jedem
+    //                 Levelsprung und warf batchStand weg. Ein offenes Ziel,
+    //                 das Stapelziel werden will, muss also um 1,3/1,05 = 1,24
+    //                 besser sein; ein neues um 1,3 nach Abzug der Vorbereitung.
+    //   maxUnprepared 8 von 25. Die Anlaufdeckel (15 % je Ziel, 30 % gesamt)
+    //                 bedienen ohnehin nur eine Handvoll Anlaufziele auf einmal.
+    //   unpreparedSec 60 s. Darunter ist es Betrieb (ein grow zwischen zwei
+    //                 Wellen), keine Vorbereitung.
+    const ZIELWAHL = { horizonSec: 1800, prepMaxSec: 1200, bonusBatch: 1.3, bonusMoney: 1.05,
+      maxUnprepared: 8, unpreparedSec: 60 };
 
     // War bisher EIN Ziel nach Erfahrung je Sekunde fuer ALLE Arbeiter - das
     // liess das Geldeinkommen um Faktor 70 einbrechen (545.000 auf 8.000 je
@@ -1644,6 +1719,10 @@ export async function main(ns) {
     const ramHack = ns.getScriptRam("worker/hack.js", "home");
     const ramGrow = ns.getScriptRam("worker/grow.js", "home");
     const ramWeaken = ns.getScriptRam("worker/weaken.js", "home");
+    // Fix B2 (Audit 26.09.2026, 2#1): der Erfahrungsofen - siehe
+    // worker/expfarm.js und der Ueberschuss-Zweig weiter unten, wo er
+    // tatsaechlich verdrahtet wird. EXPFARM_SKRIPT steht oben bei WORKER.
+    const ramExpfarm = ns.getScriptRam(EXPFARM_SKRIPT, "home");
 
     // --- Kennzahlen je Ziel ---------------------------------------------------
     // Zwei Zahlen je Server, beide fuer den SAUBEREN Dauerbetrieb gerechnet
@@ -1680,12 +1759,16 @@ export async function main(ns) {
     // Fuer phantasy ergibt das rund 1400 GB - und genau in dieser
     // Groessenordnung lief es vor dem Ausbau sauber (934 GB, 313 $/GB*s).
     const KAP_ABZUG = 0.2;
-    const SERVER_MAX_GROWTH_LOG = 0.00349388925425578;
-    const wachstumsLog = (hd) => Math.min(Math.log1p(0.03 / hd), SERVER_MAX_GROWTH_LOG);
     const FORTIFY_HACK = 0.002;
     const FORTIFY_GROW = 0.004;
     const WEAKEN_POWER = 0.05;
     const MIX_MONEY_HIGH = 0.95;
+    // Zielband der Mischung. Stand frueher erst weiter unten bei planMix;
+    // seit die Kennzahlen auch die Vorbereitungszeit liefern (Skeptiker B,
+    // Einwand 3), brauchen schon sie die Grenzen - eine Quelle fuer beide.
+    const MIX_MONEY_LOW = 0.75;   // darunter: Anlaufphase
+    const MIX_SEC_OK = 1.0;       // bis hierher gilt die Sicherheit als am Minimum
+    const MIX_SEC_BAD = 5.0;      // darueber: Anlaufphase
     // Die Spielerwerte fuer die eigenen Formeln, einmal je Runde. getPlayer
     // zahlt der Kern ohnehin (Motorzeit liest totalPlaytime daraus).
     const spielerFuerCalc = (() => {
@@ -1711,77 +1794,33 @@ export async function main(ns) {
       //
       // ns.hackAnalyze, ns.hackAnalyzeChance und ns.growthAnalyze kosten je
       // 1 GB - drei Gigabyte in einer Datei, die im Kaltstart auf ein home mit
-      // 32 GB passen muss, neben boot.js und den Arbeitern.
-      //
-      // Die Formeln stehen in lib/calc.js und sind dieselben wie im Spiel
-      // (Hacking.ts:44 fuer den Beuteanteil, :15 fuer die Chance,
-      // ServerHelpers.ts fuer das Wachstum). Alles, was sie brauchen, liegt
-      // schon vor: `s` kommt aus ns.getServer, der Spieler aus ns.getPlayer -
-      // beide zahlt der Kern ohnehin.
+      // 32 GB passen muss, neben boot.js und den Arbeitern. Die Formeln stehen
+      // in lib/calc.js (Hacking.ts:44, :15, ServerHelpers.ts) - seit dem
+      // 26.09.2026 auch die ganze Kennzahlenrechnung selbst (targetMetrics),
+      // damit Kern, Test und Nachrechnung mit echten Spielstaenden dieselbe
+      // Stelle aufrufen (Skeptiker B, Einwand 10).
       //
       // DER BITNODE-MULTIPLIKATOR IST DER PUNKT, AN DEM DAS SCHIEFGEHT.
-      // bn4net.js:3404-3410 warnt ausdruecklich: calc.js rechnet ohne ihn, und
-      // ein naiver Import haette in BitNode 4 eine stille Verfuenffachung der
-      // Beute je Faden bedeutet (ScriptHackMoney 0,2). Er kommt deshalb aus
-      // lib/bitnodes.json, erzeugt aus dem Spielquelltext.
-      const p = calcHackPercent(
-        { sec: s.hackDifficulty, reqSkill: s.requiredHackingSkill },
-        { skill: spielerFuerCalc.skill, multMoney: spielerFuerCalc.multMoney },
-        bnScriptHackMoney);
-      const chance = calcHackChance(
-        { sec: s.hackDifficulty, reqSkill: s.requiredHackingSkill, root: s.hasAdminRights },
-        spielerFuerCalc);
-      // growthAnalyze(host, 2) liefert die Fadenzahl fuer eine Verdopplung;
-      // k ist LN2 geteilt durch sie. calc.js liefert k direkt - fuer diesen
-      // Zweck ist das gleichwertig, weil sich der additive Ein-Dollar-Anteil
-      // bei einer Verdopplung heraushebt (siehe die Begruendung bei
-      // wachstumsFaeden weiter unten).
-      const k = calcGrowthLog(
-        { sec: s.hackDifficulty, growth: s.serverGrowth },
-        spielerFuerCalc.multGrow, 1, bnServerGrowthRate);
-      // Alles auf minDifficulty hochrechnen. hackAnalyze & Co. liefern immer
-      // den IST-Wert; ein verschmutzter Server saehe sonst dauerhaft
-      // schlechter aus, als er nach dem Saeubern waere - und wuerde vom
-      // Nutzen-Gate aus dem falschen Grund verworfen. Jeder Faktor haengt
-      // bekannt von der Sicherheit ab:
-      //   p, chance  ~ (100 - hackDifficulty)      (Hacking.ts:50, :15)
-      //   hackTime   ~ 2.5*req*hackDifficulty+500  (Hacking.ts:64-70)
-      //   k          ~ min(log1p(0.03/hd), ServerMaxGrowthLog)
-      //                (grow.ts:16-19, Constants.ts:8)
-      // Der Deckel ServerMaxGrowthLog greift ab hackDifficulty <= 8.571;
-      // ohne ihn waere die Umrechnung fuer omega-net (min 9), silver-helix
-      // (10) und iron-gym (10) falsch.
-      const hdIst = s.hackDifficulty, hdMin = s.minDifficulty;
-      const sauber = (100 - hdIst) > 0 ? (100 - hdMin) / (100 - hdIst) : 1;
-      const pMin = Math.min(1, p * sauber);
-      const chanceMin = Math.min(1, chance * sauber);
-      const zeitIst = 2.5 * s.requiredHackingSkill * hdIst + 500;
-      const zeitMin = 2.5 * s.requiredHackingSkill * hdMin + 500;
-      const hackTimeMin = ns.getHackTime(host) * (zeitIst > 0 ? zeitMin / zeitIst : 1) / 1000;
-      const kMin = k * (wachstumsLog(hdIst) > 0 ? wachstumsLog(hdMin) / wachstumsLog(hdIst) : 1);
-      // grow dauert das 3,2-fache, weaken das 4-fache eines hack
-      // (Hacking.ts:81-95).
-      const gphMin = kMin > 0 ? (pMin * chanceMin) / kMin : 0;
-      const wphMin = (FORTIFY_HACK * chanceMin + FORTIFY_GROW * gphMin) / WEAKEN_POWER;
-      const gbSekProEinheit = hackTimeMin
-        * (ramHack + 3.2 * gphMin * ramGrow + 4 * wphMin * ramWeaken);
-      const beute = pMin * chanceMin;
-      // null statt 0, wenn sich nichts bestimmen laesst: Bei hackDifficulty
-      // >= 100 gibt hackAnalyze 0 zurueck (Hacking.ts:46). Ein Gate, das
-      // darauf mit "unrentabel" antwortet, wuerde genau diesen Server fuer
-      // immer ungesaeubert liegen lassen. Unbekannt heisst: durchlassen.
-      const brauchbar = p > 0 && gbSekProEinheit > 0 && beute > 0 && hackTimeMin > 0;
-      return {
-        p, chance, k,
-        // Dieselben Groessen im VORBEREITETEN Zustand. Der Stapelbetrieb
-        // braucht genau sie: seine Auftraege landen auf einem Server, der auf
-        // Mindestsicherheit steht, also gelten dort pMin/chanceMin/kMin - und
-        // zwar fuer jeden Stapel dieselben, sonst verschiebt sich die Kette
-        // mit jeder Ablesung der Momentansicherheit selbst.
-        pMin, chanceMin, kMin, hackTimeMin,
-        steadyEff: brauchbar ? (s.moneyMax * MIX_MONEY_HIGH * beute) / gbSekProEinheit : null,
-        kapazitaet: brauchbar ? (KAP_ABZUG * gbSekProEinheit) / (hackTimeMin * beute) : 0,
-      };
+      // calc.js rechnet ohne ihn, und ein naiver Import haette in BitNode 4
+      // eine stille Verfuenffachung der Beute je Faden bedeutet
+      // (ScriptHackMoney 0,2). Er kommt deshalb aus lib/bitnodes.json, erzeugt
+      // aus dem Spielquelltext - seit dem 26.09.2026 je Stufe (BN12).
+      //
+      // Fix B1 (Audit 26.09.2026 2#2) steckt in targetMetrics: pMin, chanceMin
+      // und kMin werden direkt bei minDifficulty gerechnet. Die fruehere
+      // Skalierung vom IST-Wert ergab bei Sicherheit 100 (BN5 verdoppelt
+      // ServerStartingSecurity, Server.ts:79-83 klemmt auf 100) immer 0 -
+      // 46 von 63 Geldservern waren dadurch unsichtbar.
+      return targetMetrics(s, spielerFuerCalc, ns.getHackTime(host) / 1000, {
+        ramHackT: ramHack, ramGrowT: ramGrow, ramWeakenT: ramWeaken,
+        bnScriptHackMoney, bnServerGrowthRate,
+        mixMoneyHigh: MIX_MONEY_HIGH, kapAbzug: KAP_ABZUG,
+        secOk: MIX_SEC_OK, moneyLow: MIX_MONEY_LOW,
+        // Speicher, den die Anlaufphase hoechstens bekommt (ANLAUF_ANTEIL_
+        // GESAMT unten, 30 %) - bestimmt, in wie vielen Wellen ein Server von
+        // Sicherheit 100 herunterkommt.
+        prepRamGb: ramTotal * 0.3,
+      });
     };
 
     let expTarget = null, expBestValue = 0;
@@ -1804,13 +1843,37 @@ export async function main(ns) {
       // iron-gym stand darin auf Rang 5 und bekam nach dem Serverausbau
       // 11.609 GB, obwohl es im Gleichgewicht nur 154 $/GB*s bringt - halb
       // so viel wie phantasy.
+      //
+      // SEIT DEM 26.09.2026 NACH RANG, NICHT NACH NACKTEM steadyEff
+      // (Skeptiker B, Einwand 3). Mit Fix B1 wurden 44-46 Server auf
+      // Sicherheit 100 sichtbar, die im Gleichgewicht 15- bis 25-mal mehr
+      // bringen - aber erst nach 447-740 s Vorbereitung (Level 3012-3895),
+      // nach einem Knotenwechsel bei Level 500 nach rund 39 min. Die Sortierung
+      // kannte diese Zeit nicht, und ohne Hysterese wechselte der Stapelsatz
+      // mit jedem gekauften Portprogramm. targetRank (lib/calc.js) zieht die
+      // Vorbereitung ueber einen Horizont ab, gibt dem amtierenden Ziel einen
+      // Bonus und laesst Ziele mit zu langer Vorbereitung liegen, bis das
+      // Level sie billig macht.
       let kz = null;
       try { kz = kennzahlen(host, s); } catch { kz = null; }
       if (kz && kz.steadyEff > 0) {
-        moneyCandidates.push({ host, moneyValue: kz.steadyEff, kapazitaet: kz.kapazitaet });
+        const amt = zielSeit.get(host);
+        const amtierend = amt ? {
+          restSec: amt.prepSec - (Date.now() - amt.start) / 1000,
+          bonus: batchStand.has(host) ? ZIELWAHL.bonusBatch : ZIELWAHL.bonusMoney,
+        } : null;
+        const rang = targetRank(kz, ZIELWAHL, amtierend);
+        if (rang > 0) {
+          // prepSec bleibt die Schaetzung am jetzigen Zustand (sie wird beim
+          // Eintritt in zielSeit gemerkt); prepWahl ist das, was davon fuer
+          // ein amtierendes Ziel noch zaehlt - danach teilt selectMoneyTargets
+          // in vorbereitet/unvorbereitet ein (siehe effectivePrepSec).
+          moneyCandidates.push({ host, moneyValue: kz.steadyEff, kapazitaet: kz.kapazitaet,
+            rank: rang, prepSec: kz.prepSec, prepWahl: effectivePrepSec(kz.prepSec, amtierend) });
+        }
       }
     }
-    moneyCandidates.sort((a, b) => b.moneyValue - a.moneyValue);
+    moneyCandidates.sort((a, b) => b.rank - a.rank);
 
     // Erfahrungsziel ausschliessen: es hat sein eigenes festes Fadenbudget
     // (EXP_THREAD_BUDGET weiter unten) und soll nicht zusaetzlich als Geldziel
@@ -1822,10 +1885,18 @@ export async function main(ns) {
     // Abgelaufene Sperren werden im selben Durchgang aufgeraeumt, damit die
     // Karte nicht ueber Tage waechst.
     for (const [host, bis] of gesperrtBis) if (Date.now() >= bis) gesperrtBis.delete(host);
-    let moneyTargets = moneyCandidates
-      .filter((c) => c.host !== expTarget && !gesperrtBis.has(c.host))
-      .slice(0, MONEY_TARGET_COUNT)
-      .map((c) => c.host);
+    // Zuschnitt ueber selectMoneyTargets statt slice: unvorbereitete Ziele
+    // bekommen nur einen Teil der Plaetze, solange vorbereitete da sind -
+    // sonst verdraengen sie beim Wechsel alle Ziele, die gerade verdienen
+    // (18:04 nachgerechnet: 1 von 25 statt 17 von 18 arbeitend).
+    // Eingeteilt wird nach prepWahl, nicht nach dem Augenblickswert: ein
+    // laufendes Stapelziel zwischen zwei Wellen ist nicht unvorbereitet
+    // (Gegenpruefung Skeptiker B - sonst pendelt der achte Platz).
+    let moneyTargets = selectMoneyTargets(
+      moneyCandidates.filter((c) => c.host !== expTarget && !gesperrtBis.has(c.host))
+        .map((c) => ({ host: c.host, rank: c.rank, prepSec: c.prepWahl })),
+      { maxTargets: MONEY_TARGET_COUNT, maxUnprepared: ZIELWAHL.maxUnprepared,
+        unpreparedSec: ZIELWAHL.unpreparedSec });
 
     // Randbedingung: kein eigenstaendiges Geldziel gefunden (z. B. ganz am
     // Anfang, wenn ausser dem Erfahrungsziel noch nichts erreichbar ist) -
@@ -1912,6 +1983,18 @@ export async function main(ns) {
     for (const h of [...batchStand.keys()]) {
       if (!batchTargets.includes(h)) { batchStand.delete(h); batchKalender.delete(h); }
     }
+    // Merken fuer die Hysterese der naechsten Runde (siehe targetRank): wer
+    // neu dazukommt, bekommt Eintrittszeit und geschaetzte Vorbereitung; wer
+    // herausfaellt, verliert beides.
+    {
+      const jetzt = new Set([...moneyTargets, ...batchTargets]);
+      for (const h of jetzt) {
+        if (zielSeit.has(h)) continue;
+        const c = moneyCandidates.find((x) => x.host === h);
+        zielSeit.set(h, { start: Date.now(), prepSec: c ? c.prepSec : 0 });
+      }
+      for (const h of [...zielSeit.keys()]) if (!jetzt.has(h)) zielSeit.delete(h);
+    }
 
     let fehlstart = 0;
     let mixStat = null;
@@ -1929,19 +2012,33 @@ export async function main(ns) {
     // Mass dafuer, ob sich weiterer Serverausbau ueberhaupt noch lohnt.
     let ueberschussGb = 0;
     if (expTarget || moneyTargets.length || batchTargets.length) {
-      // Aktionswahl fuer das ERFAHRUNGSziel: hier bleibt es beim Dreifach-
-      // Ternaer. Erfahrung haengt allein am Server und an der Fadenzahl -
-      // calculateHackingExpGain (Hacking.ts:29-38) unterscheidet die drei
-      // Aktionen ueberhaupt nicht. Es gibt dort also nichts zu mischen; der
-      // Ternaer haelt den Server nebenbei entschaerft, damit die Aktionsdauer
-      // nicht davonlaeuft.
+      // Aktionswahl fuer das ERFAHRUNGSziel. Der Dreifach-Ternaer gilt seit
+      // dem 26.09.2026 nur noch im Ein-Ziel-Fall (sameTarget, dann ist das
+      // Erfahrungsziel zugleich Geldziel); sonst immer weaken - Begruendung
+      // mit Zahlen direkt unter pickScript.
       const pickScript = (host) => {
         const s = ns.getServer(host);
         return s.hackDifficulty > s.minDifficulty + 5 ? "worker/weaken.js"
           : s.moneyAvailable < s.moneyMax * 0.9 ? "worker/grow.js"
             : "worker/hack.js";
       };
-      const expScript = expTarget ? pickScript(expTarget) : null;
+      // NUR IM EIN-ZIEL-FALL DER TERNAER, SONST IMMER weaken (Skeptiker B,
+      // Einwand 2). Die Wartungswelle (EXP_THREAD_BUDGET, bis 180 Faeden) auf
+      // dem eigenen Erfahrungsziel hackte es bei vollem Guthaben leer:
+      // calculatePercentMoneyHacked auf foodnstuff 0,648 % (18:04) bis 0,716 %
+      // (19:04) je Faden, x180 = 117-129 % - der Spielstand 18:04 zeigt
+      // foodnstuff mit 0,0 % Geld. Danach waehlte der Ternaer grow, und ein
+      // grow von 0 auf 5e7 braucht 9.420 Zyklen = +37,7 Sicherheit
+      // (ServerHelpers.ts:209-214) - genau die 39-44 statt 7, die 16:57,
+      // 17:19 und 19:03 zeigen. Das verlangsamte den Erfahrungsofen um den
+      // Faktor (2,5*44,5+500)/(2,5*7+500) = 1,18. Erfahrung je Faden ist fuer
+      // hack, grow und weaken dieselbe (Hacking.ts:29-38), das Geld dieses
+      // Servers braucht niemand (er ist kein Geldziel) - also nur weaken:
+      // Sicherheit bleibt am Minimum, das Guthaben unberuehrt voll.
+      // Im Ein-Ziel-Fall (sameTarget) IST das Erfahrungsziel das Geldziel,
+      // dort bleibt der Ternaer, weil dann das Geld zaehlt.
+      const expScript = expTarget
+        ? (sameTarget ? pickScript(expTarget) : "worker/weaken.js") : null;
       const expRam = expScript ? ns.getScriptRam(expScript, "home") : 0;
 
       // STUFE 1 (22.08.2026): Landezeit und Aktionsdauer statt 0, 0, 0 an die
@@ -2195,9 +2292,9 @@ export async function main(ns) {
       // calculateGrowMoney (grow.ts:44-52) bei moneyMax abschneidet. Etwas
       // Luft nach oben zu lassen kostet 5 % Beute je Faden und spart mehr
       // als das an weggeworfenen grow-Faeden.
-      const MIX_MONEY_LOW = 0.75;   // darunter: Anlaufphase
-      const MIX_SEC_OK = 1.0;       // bis hierher gilt die Sicherheit als am Minimum
-      const MIX_SEC_BAD = 5.0;      // darueber: Anlaufphase
+      // MIX_MONEY_LOW, MIX_SEC_OK und MIX_SEC_BAD stehen seit dem 26.09.2026
+      // oben bei MIX_MONEY_HIGH - die Vorbereitungszeit der Zielwahl braucht
+      // dieselben Grenzen.
       const clamp01 = (x) => (x < 0 ? 0 : x > 1 ? 1 : x);
 
       // p, chance und k kommen aus dem Spiel selbst statt aus nachgebauten
@@ -2282,7 +2379,7 @@ export async function main(ns) {
           const nurSaeubern = secOver > MIX_SEC_OK;
           return {
             anlauf: true,
-            steadyEff: kz.steadyEff, kapazitaet: kz.kapazitaet,
+            steadyEff: kz.steadyEff, kapazitaet: kz.kapazitaet, prepSec: kz.prepSec,
             bedarf: {
               hack: 0,
               grow: nurSaeubern ? 0 : Math.max(0, growNeed - f.grow),
@@ -2319,6 +2416,50 @@ export async function main(ns) {
         };
       };
 
+      // DER OFEN WIRD NICHT MEHR GETOETET (Skeptiker B, Einwand 1). Hier
+      // stand bis zum 26.09.2026 ein scriptKill aller worker/expfarm.js vor
+      // jeder Speicherzaehlung. Erfahrung gibt es aber nur beim ABSCHLUSS
+      // eines Aufrufs (NetscriptFunctions.ts:354-374, im .then nach
+      // netscriptDelay); ein Kill verwirft den laufenden Aufruf
+      // (killWorkerScript.ts:62-63). Dauert ein weaken laenger als die Runde
+      // (~10 s), lieferte der ganze Ueberschuss still NULL: nach einem Einbau
+      // die ersten ~41 s (Level 10: 41,2 s), nach einem Knotenwechsel mit
+      // Mult 1,43 bis Level 612-654, also stundenlang - waehrend die alte
+      // Einwegwelle dort lieferte.
+      //
+      // Stattdessen bekommt jeder Ofenfaden eine FRIST (worker/expfarm.js):
+      // er ruft weaken nur, solange der naechste Aufruf vor der Frist fertig
+      // wird, und endet dann selbst. Die Frist ist die naechste Speicherzaehlung
+      // (diese Stelle eine Runde spaeter) minus einem Rand. Kurze Aktionen: der
+      // Speicher ist zur naechsten Zaehlung wieder frei, Geld- und Stapelziele
+      // sehen ihn zuerst - wie beim Kill, nur ohne verworfenen Aufruf. Lange
+      // Aktionen: genau ein Aufruf, der Speicher bleibt bis zum Abschluss
+      // belegt - wie die alte Einwegwelle, die dort das Richtige tat.
+      //
+      // Dafuer wird hier der Takt gemessen: von dieser Stelle bis zu ihr in
+      // der naechsten Runde. Gedeckelt, damit ein einzelner Aussetzer (Tab im
+      // Hintergrund, eine Minute Takt) die Frist nicht auf Dauer verzieht.
+      //
+      // DER KUERZESTE DER LETZTEN SECHS TAKTE, NICHT DER LETZTE (Gegenpruefung
+      // Skeptiker B, 26.09.2026). Die Kosten sind ungleich verteilt: endet der
+      // Ofen zu frueh, liegt der Speicher bis zur Zaehlung ein paar hundert
+      // ms brach; endet er zu spaet, ist sein Speicher bei der Zaehlung noch
+      // belegt, wird in dieser Runde nicht neu vergeben und liegt danach fast
+      // eine ganze Runde brach. Mit dem letzten Takt machte schon eine
+      // einzelne lange Runde (Speicherbereinigung, 1-s-Raster eines verdeckten
+      // Tabs) die naechste Frist zu lang. Nachgespielt mit dem echten Kern
+      // (Spielstand 18:04, 30 min): Rundenlaenge 10 s + gleichverteilt 0-1 s
+      // kostete 10,6 % Erfahrung, 0-2 s 19,6 %; mit dem kuerzesten der letzten
+      // sechs 1,0 % und 4,9 %. Ein Takt ist nie kuerzer als ns.sleep(10000),
+      // der Kuerzeste liegt also nur um die Streuung unter dem Mittel.
+      const jetztVerteilung = Date.now();
+      if (letzteVerteilung > 0) {
+        taktProben.push(Math.min(120000, Math.max(2000, jetztVerteilung - letzteVerteilung)));
+        if (taktProben.length > 6) taktProben.shift();
+        rundenTaktMs = Math.min(...taktProben);
+      }
+      letzteVerteilung = jetztVerteilung;
+
       // Durchgang 1: share und Erfahrungsziel je Rechner, wie bisher. Was
       // danach frei bleibt, wird nur GEMERKT statt sofort vergeben - die
       // Geldziele brauchen im Durchgang 2 den Gesamtbetrag, um ihre
@@ -2326,12 +2467,35 @@ export async function main(ns) {
       const restFrei = new Map();
       for (const host of hosts) {
         if (!ns.hasRootAccess(host)) continue;
+        // OFENFAEDEN OHNE GUELTIGE FRIST RAEUMEN (Gegenpruefung Skeptiker B,
+        // 26.09.2026). Seit der Kern den Ofen nicht mehr toetet, beendet sich
+        // ein Ofenfaden NUR ueber seine Frist (worker/expfarm.js). Laeuft einer
+        // ohne - die Fassung vor dem Umbau (for(;;), liest nur args[0]) liegt
+        // bis zum Einspielen im Spiel, und ein Einspielen in zwei Schritten
+        // oder ein Neustart des Kerns dazwischen startet sie mit dem neuen
+        // Protokoll -, haelt er seinen Speicher fuer immer, und jede Runde
+        // kaeme neuer dazu. Dasselbe fuer eine Frist weit in der Zukunft
+        // (Uhr zurueckgestellt). Grenze: zwei gedeckelte Takte (2 x 120 s).
+        // ns.ps und ns.kill zahlt der Kern ohnehin; die Liste dient unten
+        // auch der share-Zaehlung.
+        const prozesseHier = ns.ps(host);
+        for (const pr of prozesseHier) {
+          if (pr.filename !== EXPFARM_SKRIPT) continue;
+          const frist = Number(pr.args[1]);
+          if (!(frist > 1e12) || frist > jetztVerteilung + 240000) ns.kill(pr.pid);
+        }
         // Die Werkbank ist nicht mehr pauschal ausgenommen, sondern nur noch
         // um ihren gemessenen Werkzeugbedarf gekuerzt (siehe 1c).
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
           - (host === "home" ? reserveHome() : 0)
           - (host === werkbank ? werkbankReserve : 0);
-        if (host !== "home") ns.scp(WORKER, host, "home");
+        // EXPFARM_SKRIPT extra dazu (Fix B2): es steht bewusst nicht in
+        // WORKER - WORKER zaehlt auch mit, was schon je Geldziel FLIEGT
+        // (flight-Zaehlung weiter unten), und der Ofen soll dort NICHT
+        // mitgezaehlt werden. Er hat sein eigenes Budget (den kompletten
+        // Ueberschuss) und keine Kapazitaetsgrenze - eine Vermischung mit der
+        // Geldziel-Zaehlung wuerde deren Kennzahlen verfaelschen.
+        if (host !== "home") ns.scp([...WORKER, EXPFARM_SKRIPT], host, "home");
 
         // Home bleibt verschont, genau wie die Werkbank oben: Es ist die
         // Steuerung selbst und die Reserve dort ist schon knapp genug
@@ -2350,7 +2514,7 @@ export async function main(ns) {
         // endlos, ein neues exec je Runde stapelt also alle zehn Sekunden
         // Faeden obendrauf - und wenn die Faktionsarbeit endet, laufen die
         // alten fuer immer weiter und blockieren Speicher ohne jeden Nutzen.
-        const shareLaeuft = ns.ps(host)
+        const shareLaeuft = prozesseHier
           .filter((pr) => pr.filename === "worker/share.js")
           .reduce((n, pr) => n + pr.threads, 0);
 
@@ -3048,12 +3212,45 @@ export async function main(ns) {
             // fuer ANLAUF_SPERRE_MS beiseitegelegt. Die Sperre ist kein
             // Urteil ueber den Server, sondern ueber die Lage: Sie laeuft ab,
             // und dann wird es mit dem dann gueltigen Netz neu versucht.
+            //
+            // DIE FRIST RICHTET SICH NACH DER VORBEREITUNG (Skeptiker B,
+            // Einwand 3). Fest 20 min war kuerzer als eine einzige weaken-
+            // Welle auf Sicherheit 100 nach einem Knotenwechsel (Level 500:
+            // 39 min): das Ziel band 20 min Anlaufspeicher, wurde 30 min
+            // gesperrt und kam danach als Bestes zurueck. Jetzt gilt beim
+            // Anlaufbeginn max(20 min, 1,5 x geschaetzte Vorbereitung); die
+            // Zielwahl laesst ohnehin nichts ueber 20 min Vorbereitung herein.
+            //
+            // DIE FRIST ZAEHLT NUR ZUSAMMENHAENGENDEN ANLAUF (Gegenpruefung
+            // Skeptiker B, 26.09.2026). Nachgespielt mit dem echten Kern nach
+            // einem Knotenwechsel: sigma-cosmetics lief 4 min an, war dann
+            // 45 min Stapelziel (vorbereitet, verdiente), fiel auf ein
+            // offenes Ziel zurueck und wurde in derselben Runde "nach 48 min
+            // ohne Erfolg" fuer 30 min gesperrt - joesguns genauso nach 50 min.
+            // Der Zeitstempel stammte aus der ersten Anlaufrunde. Jetzt
+            // beginnt die Frist neu, wenn das Ziel laenger als ANLAUF_LUECKE_MS
+            // nicht im Anlauf war. Kurzes Pendeln (eine Runde draussen) setzt
+            // sie NICHT zurueck - sonst liefe ein Ziel, das jede zweite Runde
+            // herausfaellt, ewig an.
+            const ANLAUF_LUECKE_MS = 5 * 60000;
+            const zuletzt = anlaufZuletzt.get(ziel);
+            if (zuletzt != null && Date.now() - zuletzt > ANLAUF_LUECKE_MS) {
+              anlaufSeit.delete(ziel);
+              anlaufFrist.delete(ziel);
+            }
+            anlaufZuletzt.set(ziel, Date.now());
             const seit = anlaufSeit.get(ziel);
             if (seit == null) {
               anlaufSeit.set(ziel, Date.now());
-            } else if (Date.now() - seit > ANLAUF_FRIST_MS) {
+              // Eine unendliche Schaetzung (kein Wachstum, k = 0) darf die
+              // Frist nicht abschaffen - dann gilt die feste.
+              const prepMs = 1500 * (plan.prepSec || 0);
+              anlaufFrist.set(ziel, Math.max(ANLAUF_FRIST_MS, Number.isFinite(prepMs) ? prepMs : 0));
+            } else if (Date.now() - seit > (anlaufFrist.get(ziel) || ANLAUF_FRIST_MS)) {
               gesperrtBis.set(ziel, Date.now() + ANLAUF_SPERRE_MS);
               anlaufSeit.delete(ziel);
+              anlaufFrist.delete(ziel);
+              anlaufZuletzt.delete(ziel);
               sag(ziel + ": Anlauf nach " + Math.round((Date.now() - seit) / 60000)
                 + " min ohne Erfolg abgebrochen, " + Math.round(ANLAUF_SPERRE_MS / 60000)
                 + " min gesperrt.");
@@ -3152,16 +3349,60 @@ export async function main(ns) {
         //
         // Erfahrung saettigt nicht: calculateHackingExpGain (Hacking.ts:29-38)
         // haengt allein an baseDifficulty und wird von hack, grow UND weaken
-        // gleichermassen vergeben - der Zustand des Servers ist ihr egal, ein
-        // leergehacktes Ziel liefert genauso viel wie ein volles. Deshalb
-        // braucht dieser Zweig keinen Deckel; er nimmt, was sonst niemand
-        // will.
-        if (budget >= expRam && expTarget && expScript && expRam > 0) {
-          const dauer = actionTime(expTarget, expScript);
+        // gleichermassen vergeben - der Zustand des Servers ist ihr egal.
+        // FUER GROW UND WEAKEN STIMMT DAS UNEINGESCHRAENKT (NetscriptFunctions.ts
+        // :291, :366 - keine Erfolgspruefung). Fuer hack NICHT: Ein leergehacktes
+        // Ziel (moneyDrained === 0) gibt nur ein VIERTEL
+        // (NetscriptHelpers.tsx:639-641).
+        //
+        // DER OFEN MACHT weaken, NICHT grow (Skeptiker B, Einwand 2). Hier
+        // stand bis zum 26.09.2026 "der Ofen nutzt bewusst NUR grow ... auf
+        // einem vollen Ziel erhoeht grow die Sicherheit gar nicht" - waehrend
+        // worker/expfarm.js seit dem 24.08. weaken ruft. Die grow-Praemisse
+        // war ausserdem falsch: das Ziel war nicht voll, die Wartungswelle
+        // hackte es leer (18:04: 0,0 % Geld), und jede grow-Auffuellung von 0
+        // hob die Sicherheit um 37,7 (16:57/17:19: 44 statt 7). weaken ist
+        // 20 % langsamer je Aufruf (4 statt 3,2 hackTime), haelt dafuer die
+        // Sicherheit - und damit die Dauer jedes Aufrufs - am Minimum, ohne
+        // jede Gegenrechnung.
+        //
+        // DAUERLAEUFER MIT FRIST STATT EINWEGWELLE ODER KILL (Fix B2 und
+        // Skeptiker B, Einwand 1). Die Einwegwelle liess den Speicher bei hohem
+        // Level nach einer Sekunde Arbeit neun Sekunden tot liegen (5-10 %
+        // Auslastung). Der erste Dauerlaeufer wurde jede Runde getoetet und
+        // lieferte bei Aktionen ueber ~10 s gar nichts. Jetzt ruft jeder
+        // Ofenfaden weaken, solange der naechste Aufruf vor der Frist fertig
+        // wird (siehe Taktmessung vor Durchgang 1), und mindestens einmal.
+        // Gerechnet mit den echten Spielstaenden (skeptiker-B.md, Fix-Stand):
+        // Mitte des Zyklus x13 gegen die Einwegwelle, nach einem
+        // Knotenwechsel mindestens so gut wie sie.
+        //
+        // FREIRAUM FUER FREMDSTARTER (Skeptiker B, Einwand 7). Der Ofen nimmt
+        // sonst ALLES Freie, und der Auftragslaeufer (data/task.txt) sowie
+        // bn4life.js:415 suchen "den Rechner mit dem meisten freien Speicher" -
+        // vorher lag bei hohem Level ~90 % der Rundenzeit Speicher brach
+        // (brachAnteil 0,84 um 19:04), jetzt nie. Deshalb bleibt auf dem
+        // groessten Rechner ein Block frei: 64 GB (exit.js braucht 40,25,
+        // autopilot.js 34,2), hoechstens ein Zehntel des Ueberschusses.
+        // NUR WENN DIE OFENAKTION KUERZER IST ALS DIE RUNDE: sonst arbeitet der
+        // Ofen ohnehin als Einwegwelle und haelt den Speicher genau so lange
+        // wie vorher - ein Freiraum kostete dann nur Erfahrung (nach einem
+        // Knotenwechsel bei 1000 GB Ueberschuss 6,4 %), ohne dass sich fuer
+        // die Fremdstarter gegenueber dem alten Stand etwas aendert.
+        const OFEN_RAND_MS = 250;
+        let ofenKurz = false;
+        try { ofenKurz = expTarget ? ns.getWeakenTime(expTarget) < rundenTaktMs : false; }
+        catch { ofenKurz = false; }
+        const ofenFreiraumGb = ofenKurz ? Math.min(64, budget * 0.1) : 0;
+        if (budget - ofenFreiraumGb >= ramExpfarm && expTarget && ramExpfarm > 0) {
+          // Die naechste Speicherzaehlung liegt einen Takt nach dieser Runde.
+          const frist = Math.round(jetztVerteilung + rundenTaktMs - OFEN_RAND_MS);
           wuensche.push({
-            ziel: expTarget, skript: expScript, ram: expRam,
-            offen: Math.floor(budget / expRam),
-            dauer: Math.round(dauer), landAt: Math.round(Date.now() + dauer),
+            ziel: expTarget, skript: EXPFARM_SKRIPT, ram: ramExpfarm,
+            offen: Math.floor((budget - ofenFreiraumGb) / ramExpfarm),
+            freiraumGb: ofenFreiraumGb,
+            // Eigenes Protokoll (worker/expfarm.js): [ziel, frist, runde].
+            argumente: [expTarget, frist, runde],
           });
           ueberschussGb = Math.round(budget);
           budget = 0;
@@ -3174,12 +3415,17 @@ export async function main(ns) {
         for (const w of wuensche) {
           for (const eintrag of platz) {
             if (w.offen < 1) break;
-            const passt = Math.floor(eintrag[1] / w.ram);
+            // Der Freiraum des Ofens liegt auf dem groessten Rechner (platz[0])
+            // als EIN Block - ein Fremdstarter braucht zusammenhaengenden Platz.
+            const sperre = w.freiraumGb && eintrag === platz[0] ? w.freiraumGb : 0;
+            const passt = Math.floor((eintrag[1] - sperre) / w.ram);
             if (passt < 1) continue;
             const n = Math.min(w.offen, passt);
             // Argumentreihenfolge unveraendert: (ziel, verzoegerung, landezeit,
-            // dauer, runde) - siehe worker/hack.js:38-42.
-            if (ns.exec(w.skript, eintrag[0], n, w.ziel, 0, w.landAt, w.dauer, runde) === 0) {
+            // dauer, runde) - siehe worker/hack.js:38-42. Der Ofen bringt sein
+            // eigenes Protokoll mit (argumente).
+            const args = w.argumente || [w.ziel, 0, w.landAt, w.dauer, runde];
+            if (ns.exec(w.skript, eintrag[0], n, ...args) === 0) {
               fehlstart++;
               continue;
             }
@@ -3206,6 +3452,10 @@ export async function main(ns) {
           budgetGb: Math.round(budgetStart),
           verfuegbarGb: Math.round(verfuegbarGb),
           expStandGb: Math.round(expRamAssigned),
+          // Ofentakt nach aussen (Skeptiker B, Einwand 1): war die Frist je
+          // kuerzer als eine weaken-Aktion, liefert der Ofen Einwegwellen -
+          // das soll von aussen zu sehen sein, nicht nur zu errechnen.
+          rundenTaktMs: Math.round(rundenTaktMs),
           gesperrt: [...gesperrtBis.keys()],
         };
       }
@@ -3379,10 +3629,50 @@ export async function main(ns) {
     // wegziehen, waehrend jemand zusieht. Es beendet sich von selbst, sobald
     // das Geld fuer das naechste Programm nicht reicht - der Wiederanlauf
     // holt dann das nach, was inzwischen bezahlbar geworden ist.
+    //
+    // NUR NOCH DER NOTNAGEL, NICHT MEHR DER REGELFALL (Fix B3, Audit
+    // 26.09.2026 6#1). Der obige Grund ("bn4life ist ausserhalb BN4 293,8 GB
+    // gross") galt vor SF4.3 - seit bn4life mit Singularity laeuft, kauft es
+    // dieselben Portprogramme selbst, alle 20 s, aus data/geldbedarf.txt
+    // bereinigt (bn4life.js:251-297). darkweb.js klickt dabei "Do something
+    // else simultaneously" (:93-94) und alt+w/alt+t (:106, :219) - das
+    // reisst laufende Faktionsarbeit aus dem Fokus. Belegt: 14 von 25
+    // BN5-Spielstaenden mit Faktionsarbeit ohne Fokus, weil darkweb.js
+    // dazwischenfunkte, macht die Rep-Rate 0,8x fuer im Schnitt 12,6 % der
+    // Zykluszeit.
+    //
+    // Deshalb nur noch starten, wenn bn4life NICHT laeuft (per Lebenszeichen
+    // `lifeLaeuft`, nicht per blossem ps-Treffer - ein haengender Prozess
+    // ohne frische Telemetrie zaehlt nicht als "laeuft", genau die Falle vom
+    // 25.08.2026 bei task.txt). Das ist der echte Kaltstart-/Absturzfall, in
+    // dem der Oberflaechenweg tatsaechlich der einzige ist.
+    //
+    // SCHONFRIST FUER EIN FRISCH GESTARTETES bn4life (Skeptiker B, Einwand 8).
+    // `lifeLaeuft` verlangt Telemetrie juenger als 5 min. Nach einem Einbau
+    // genuegt die von vorher; nach einem Knotenwechsel mit langem Handschlag
+    // oder nach einer Offline-Nacht ist sie aelter - dann startete darkweb.js
+    // in Runde 1 einmal, obwohl bn4life in derselben Runde (Abschnitt 0a)
+    // gerade anlief und in Sekunden selbst kauft. Ein bn4life-Prozess, den
+    // dieser Kern erst seit weniger als 2 min kennt, gilt deshalb als "kauft
+    // selbst". Ein haengender Prozess (25.08.2026) faellt nach 2 min wieder
+    // heraus - die Schonfrist gilt je pid, nicht je Kernlauf.
+    const LIFE_SCHONFRIST_MS = 120000;
+    let lifeJung = false;
+    for (const h of hosts) {
+      let prozesse = [];
+      try { prozesse = ns.ps(h); } catch { prozesse = []; }
+      for (const pr of prozesse) {
+        if (pr.filename !== "bn4life.js") continue;
+        if (!lifeErstGesehen.has(pr.pid)) lifeErstGesehen.set(pr.pid, Date.now());
+        if (Date.now() - lifeErstGesehen.get(pr.pid) < LIFE_SCHONFRIST_MS) lifeJung = true;
+      }
+    }
+    if (lifeErstGesehen.size > 50) lifeErstGesehen.clear();
     const PORTPROGRAMME = ["BruteSSH.exe", "FTPCrack.exe", "relaySMTP.exe",
                            "HTTPWorm.exe", "SQLInject.exe"];
     const NACHHOL_ABSTAND_MS = 300000;
-    if (PORTPROGRAMME.some((d) => !ns.fileExists(d, "home"))
+    if (!lifeLaeuft && !lifeJung
+        && PORTPROGRAMME.some((d) => !ns.fileExists(d, "home"))
         && Date.now() - nachholMerker > NACHHOL_ABSTAND_MS
         && !hosts.some((h) => {
           try { return ns.ps(h).some((pr) => pr.filename === "darkweb.js"); }
@@ -4019,6 +4309,8 @@ export async function main(ns) {
       // Umbau ueberhaupt gegen den einfachen Betrieb messen zu koennen.
       batchModus: batchTargets.length > 0,
       batchZiele: batchTargets,
+      // BitNode-Werte, mit denen gerechnet wird (Skeptiker B, Einwand 5).
+      bnWerte: { stufe: bnStufe, scriptHackMoney: bnScriptHackMoney, serverGrowthRate: bnServerGrowthRate },
       stapel: batchStat,
       // Was in dieser Runde je Aktion neu vergeben wurde, plus die Zahl der
       // Ziele in der Anlaufphase und der nicht vergebene Netzspeicher.

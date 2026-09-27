@@ -335,11 +335,13 @@ export async function main(ns) {
     try {
       for (const n of OPERATIONEN) {
         if (offen(O, n) < 1) continue;
-        if (spanne(O, n).min >= SICHER_OPERATION) return true;
+        // D2: exakt statt s.min, wenn eine Black Op offen ist (siehe
+        // spanneGenau weiter unten) - sonst unveraendert die alte Spanne.
+        if (spanneGenau(O, n).min >= SICHER_OPERATION) return true;
       }
       for (const n of VERTRAEGE) {
         if (offen(V, n) < 1) continue;
-        if (spanne(V, n).min >= SICHER_VERTRAG) return true;
+        if (spanneGenau(V, n).min >= SICHER_VERTRAG) return true;
       }
       return false;
     } catch {
@@ -984,6 +986,11 @@ export async function main(ns) {
   // steht bei "Der gemeldete Bereich ist fuer Black Ops unbrauchbar" weiter
   // unten in `blackOpChance`.
   let boChancen = null;
+  // D1 (Audit 4#1, 26.09.2026): meldet nur noch, OB ein Trupp fehlen wuerde -
+  // der Spieler rekrutiert selbst nicht mehr (siehe TRUPP_ZIEL-Block weiter
+  // unten). Ein zukuenftiger sleeve.js-Hook kann hierauf reagieren (siehe
+  // Bericht: Sleeve.ts:505-511 erlaubt Recruitment als Sleeve-Aktion).
+  let truppAnfrage = false;
   const CHANCE_SKILLS = {
     "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll, 12/12
     "Short-Circuit": { proz: 5.5, abdeckung: 0.58 },      // isKill, 7/12
@@ -1333,12 +1340,21 @@ export async function main(ns) {
     const sonden = [];
     try {
       const bo = ns.bladeburner.getNextBlackOp();
-      if (bo) sonden.push(ns.bladeburner.getActionEstimatedSuccessChance(B, bo.name)[0]);
+      // D2: blackOpChance() ist fuer Black Ops die exakte Zahl (Bevoelkerungs-
+      // faktor immer 1) - genauer als die geschaetzte Spanne, die diese Sonde
+      // vorher las. blackOpChance() ist unten definiert, aber als const im
+      // selben main()-Rumpf laengst initialisiert, sobald diese Funktion
+      // (erst aus der Hauptschleife heraus) tatsaechlich aufgerufen wird.
+      if (bo) {
+        const genau = blackOpChance(bo.name);
+        sonden.push(Number.isFinite(genau)
+          ? genau : ns.bladeburner.getActionEstimatedSuccessChance(B, bo.name)[0]);
+      }
     } catch { /* keine Black Op mehr: dann zaehlt nur die Operation */ }
     for (const n of ["Assassination", "Raid", "Stealth Retirement Operation"]) {
       try {
         if (offen(O, n) < 1) continue;
-        sonden.push(ns.bladeburner.getActionEstimatedSuccessChance(O, n)[0]);
+        sonden.push(spanneGenau(O, n).min);
         break;
       } catch { /* naechste */ }
     }
@@ -1629,6 +1645,10 @@ export async function main(ns) {
       // wie ein stiller Stillstand aussieht (Skeptiker 11.09.).
       boSchwelle: boSchwelleZuletzt,
       boEndspiel: boEndspielZuletzt,
+      // D1: Trupp faellt der naechsten Black Op OHNE Trupp bereits unter die
+      // Schwelle? Der Spieler rekrutiert deswegen nicht mehr selbst - ein
+      // Sleeve-Hook (noch nicht gebaut, siehe Bericht) kann hier ansetzen.
+      truppAnfrage,
     }), "w");
     if (ns.getHostname() !== "home") {
       try { ns.scp("data/blade.json", "home", ns.getHostname()); } catch { /* egal */ }
@@ -2213,6 +2233,69 @@ export async function main(ns) {
       } catch { return null; }
     };
 
+    // D2: EXAKTE CHANCE STATT SPANNENMINIMUM, WENN EINE BLACK OP OFFEN IST
+    // (Audit 4#2, 26.09.2026).
+    //
+    // getSuccessRange (Action.ts:144-167) ist deterministisch: aus
+    // [est-d, est+d] wird GENAU eine Grenze mit r = pop/popEst verzerrt - bei
+    // r<1 die untere (der schaedliche Fall, s.min faellt gegen 0), sonst die
+    // obere (nach oben bei 1 geklemmt). Black Ops haben Bevoelkerungsfaktor
+    // immer 1 (BlackOperation.ts:55-61), ihr Paar ist also [real*r, real]
+    // bzw. [real, real*r] - und `real` kennt der Bot fuer sie schon exakt
+    // (blackOpChance oben, gegen Action.ts:169-196 geprueft). Aus dem Paar
+    // und `real` folgt r rueckwaerts, und mit r ist die wahre Chance jeder
+    // anderen Aktion DERSELBEN STADT geschlossen bestimmbar (die
+    // Bevoelkerungsschaetzung ist je Stadt gespeichert, nicht je Aktion).
+    //
+    // Geeicht in tools/test-d2-wahre-chance.js (Monte Carlo gegen einen
+    // lokalen Nachbau von Action.ts, wie im Audit mit scratchpad/audit/
+    // spanne2.js: 0 Fehler > 1e-9 unter den "sicheren" Faellen). Der
+    // Bruchteil, der nicht bestimmbar ist (Black-Op-Obergrenze bei r>=1 auf 1
+    // geklemmt - `sicher: false` unten), war dort 14 % und ist gerade der
+    // Fall, in dem `s.min` ohnehin schon unverzerrt ist.
+    // Reine Funktion, ohne ns-Zugriff - so extrahiert und geeicht in
+    // tools/test-d2-wahre-chance.js (Monte Carlo, 100.000 Faelle).
+    const rAusBlackOp = (bo, boReal) => {
+      const EPS = 1e-12;
+      if (bo.min < boReal - EPS) return { r: bo.min / boReal, sicher: true };
+      if (bo.max > boReal + EPS && bo.max < 1) return { r: bo.max / boReal, sicher: true };
+      if (bo.max >= 1 && boReal < 1) return { r: 1 / boReal, sicher: false };
+      return { r: 1, sicher: true };
+    };
+    // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der
+    // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
+    // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
+    // der Aufrufer faellt dann auf spanne(typ, name).min zurueck.
+    const chanceAusR = (r, sicher, s) => {
+      if (!sicher) return null;
+      if (r < 1) return s.min > 0 ? (s.min / r + s.max) / 2 : null;
+      if (s.max < 1) return (s.max / r + s.min) / 2;
+      return s.min;   // Obergrenze geklemmt: s.min ist bereits die beste bekannte Untergrenze
+    };
+    const wahreChance = (typ, name) => {
+      if (typ === B) {
+        // Black Ops brauchen den Umweg ueber r gar nicht - ihre Chance ist
+        // schon exakt (Bevoelkerungsfaktor immer 1, s.o.).
+        const c = blackOpChance(name);
+        return Number.isFinite(c) ? c : null;
+      }
+      try {
+        const bo = ns.bladeburner.getNextBlackOp();
+        if (!bo) return null;
+        const boReal = blackOpChance(bo.name);
+        if (!Number.isFinite(boReal) || boReal <= 0) return null;
+        const rr = rAusBlackOp(spanne(B, bo.name), boReal);
+        return chanceAusR(rr.r, rr.sicher, spanne(typ, name));
+      } catch { return null; }
+    };
+    // Wie spanne(), aber mit wahreChance() aufgeloest, wenn moeglich - sonst
+    // unveraendert die gemeldete (vorsichtige) Spanne. Ueberall einsetzen, wo
+    // bisher an spanne(...).min oder .max entschieden wurde.
+    const spanneGenau = (typ, name) => {
+      const exakt = wahreChance(typ, name);
+      return exakt === null ? spanne(typ, name) : { min: exakt, max: exakt };
+    };
+
     // Abdeckung nach verbleibender Arbeit (Begruendung oben bei
     // `blackOpArbeit`). Laeuft bei jedem Aufruf von `beste()` mit; die
     // Rechnung ist eine Schleife ueber hoechstens 21 Eintraege.
@@ -2570,9 +2653,9 @@ export async function main(ns) {
         try {
           const stadt = ns.bladeburner.getCity();
           const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
-          const ch = ns.bladeburner.getActionEstimatedSuccessChance(
-            "Operations", "Stealth Retirement Operation");
-          srTauglich = pop >= SR_POP_MIN && ch[0] >= SR_CHANCE_MIN;
+          // D2: exakt statt der geschaetzten Spanne, wenn moeglich.
+          const ch = spanneGenau(O, "Stealth Retirement Operation");
+          srTauglich = pop >= SR_POP_MIN && ch.min >= SR_CHANCE_MIN;
         } catch { srTauglich = false; }
         if (srTauglich) {
           return { typ: O, name: "Stealth Retirement Operation",
@@ -2642,7 +2725,7 @@ export async function main(ns) {
       try {
         const stufe = ns.bladeburner.getActionMaxLevel(O, "Assassination");
         if (stufe < ASSASSIN_ZIEL_STUFE && offen(O, "Assassination") >= 1) {
-          const s = spanne(O, "Assassination");
+          const s = spanneGenau(O, "Assassination");   // D2: exakt, wenn moeglich
           if (s.min >= SICHER_OPERATION) {
             return { typ: O, name: "Assassination",
               grund: "Stufenaufbau " + stufe + "/" + ASSASSIN_ZIEL_STUFE
@@ -2682,16 +2765,31 @@ export async function main(ns) {
     // 1 zurueck (`Actions/BlackOperation.ts:63-65`), aber solange die Chance
     // auf 1,00 steht, kostet jeder Ersatz genau einen Lauf.
     //
-    // NICHT waehrend einer Black Op und nicht bei knapper Ausdauer - der
-    // Block steht deshalb NACH der Black-Op-Pruefung. Recruitment selbst
-    // verbraucht keine Ausdauer (`data/GeneralActions.ts:33-34`).
+    // D1 (Audit 4#1, 26.09.2026): DER SPIELER REKRUTIERT NICHT MEHR SELBST.
+    //
+    // `blackOpChance()` liest `getTeamSize(B, name)` - den Trupp DIESER Op,
+    // nicht den Pool - und der steht vor dem ersten `setTeamSize`-Aufruf fuer
+    // sie auf 0 (Actions/Operation.ts:23). Die Feuerentscheidung lief also
+    // immer OHNE Trupp; das Auffuellen oben brachte ihr nichts. Gemessen ueber
+    // das Aktionsprotokoll: 35-40 % der Spielerzeit in Op-Phase/Endspiel gingen
+    // an Recruitment (General/Recruitment-Abschnitte in `fenster.js`), und bei
+    // 6 von 7 der letzten Black Ops traegt die Chance OHNE Trupp die Schwelle
+    // schon - dort kostete der Einsatz nur Maenner (mindestens 1 Toter je
+    // Erfolg, TeamCasualties.ts:29-62), die dann wieder aufgefuellt wurden.
+    //
+    // Diese Zeile hier kehrt deshalb nie mehr mit Recruitment zurueck. Statt
+    // dessen nur noch Telemetrie: reicht der Pool (`getTeamSize()`, ohne
+    // Argumente - Erics Bericht: Sleeve.ts:505-511 erlaubt Recruitment als
+    // SLEEVE-Aktion, ein kuenftiger sleeve.js-Hook kann `truppAnfrage` lesen)?
+    // Der eigentliche Truppeinsatz - nur wenn eine Black Op ihn wirklich
+    // braucht - steht jetzt kurz vor `startAction`, siehe dort.
     if (TRUPP_ZIEL > 0) {
-      let trupp = -1;
-      try { trupp = ns.bladeburner.getTeamSize(); } catch { /* alte Fassung */ }
-      if (trupp >= 0 && trupp < TRUPP_ZIEL) {
-        return { typ: G, name: "Recruitment",
-          grund: "Trupp auffuellen (" + trupp + "/" + TRUPP_ZIEL + ")" };
-      }
+      try {
+        const trupp = ns.bladeburner.getTeamSize();
+        truppAnfrage = trupp >= 0 && trupp < TRUPP_ZIEL;
+      } catch { truppAnfrage = false; }
+    } else {
+      truppAnfrage = false;
     }
 
     {
@@ -2740,12 +2838,16 @@ export async function main(ns) {
       "Investigation": 0.2, "Undercover Operation": 0.4, "Sting Operation": 0.5,
       "Raid": 2.5, "Stealth Retirement Operation": 2, "Assassination": 4,
     };
+    // D4 (Audit 4#4, 26.09.2026): `schwelle === null` heisst "keine feste
+    // Chance-Schwelle - der Ertragsvergleich entscheidet allein" (siehe
+    // `geldKnapp` weiter unten). Der fruehe Filter faellt dafuer weg; ob eine
+    // Aktion zaehlt, wird erst NACH dem Ertrag entschieden (weiter unten).
     const beste = (liste, typ, schwelle) => {
       let treffer = null;
       for (const name of liste) {
         if (offen(typ, name) < 1) continue;
-        const s = spanne(typ, name);
-        if (s.min < schwelle) continue;
+        const s = spanneGenau(typ, name);   // D2: exakt, wenn eine Black Op offen ist
+        if (schwelle !== null && s.min < schwelle) continue;
         // DIE STUFE GEHOERT IN DEN ERTRAG (27.08.2026, 14:19).
         //
         // `RANG_JE_ERFOLG` sind die BASISwerte. Der tatsaechliche Gewinn
@@ -3028,7 +3130,13 @@ export async function main(ns) {
         // diese zweite Zahl vergleicht man Aepfel mit Birnen - genau das ist
         // um 09:55 passiert, und der Motor landete prompt auf Field Analysis.
         const proMinute = (rang && dauer) ? netto / (dauer / 60000) : s.min;
-        if (!treffer || ertrag > treffer.ertrag) {
+        // D4: ohne feste Schwelle (schwelle === null) gilt eine Aktion nur,
+        // wenn sie ueberhaupt Rang bringt - eine schwache Chance ist dann
+        // kein Ausschlussgrund mehr, ein NEGATIVER Erwartungswert bleibt es.
+        // Mit fester Schwelle (Vertraege, oder Operationen bei knapper Kasse)
+        // ist das schon durch den fruehen Filter oben entschieden.
+        const zulaessig = schwelle === null ? ertrag > 0 : true;
+        if (zulaessig && (!treffer || ertrag > treffer.ertrag)) {
           treffer = { name, min: s.min, ertrag, proMinute, gerechnet: !!(rang && dauer) };
         }
       }
@@ -3192,7 +3300,44 @@ export async function main(ns) {
     // der Rueckfall `ertrag = s.min` steht auf einer anderen Skala, und zwei
     // Einheiten im selben Vergleich sind kein Vergleich (26.08.2026). Dann
     // bleibt es bei der alten Reihenfolge.
-    const op = beste(OPERATIONEN, O, SICHER_OPERATION);
+    // D4 (Audit 4#4, 26.09.2026): DIE FESTE 0,85 GILT NUR BEI KNAPPER KASSE.
+    //
+    // `ns.singularity.hospitalize()` (blade.js, Regenerationskammer-Block
+    // weiter unten) heilt HP fuer `min(Guthaben*0,1, fehlendeHP*100.000)`
+    // (`Hospital.ts:12`, `CONSTANTS.HospitalCostPerHp = 1e5`;
+    // `PlayerObjectGeneralMethods.ts:281-290` ruft dieselbe Formel ueber
+    // `getHospitalizationCost`). Die zweite Haelfte ist ein FESTER Betrag -
+    // HP-Werte bleiben zweistellig/klein, also hoechstens ein paar Millionen -
+    // und damit gegen ein Guthaben im Milliardenbereich trivial. Erst wenn
+    // `Guthaben*0,1` UNTER diesen festen Betrag faellt, wird ein Fehlschlag zu
+    // einem echten Kassenposten: genau 10 % des GEGENWAERTIGEN Guthabens, egal
+    // wie klein es ist. Die alte, feste 0,85 war fuer GENAU diesen Fall
+    // gedacht ("Jeder Fehlschlag bedeutet Krankenhaus", ERLEDIGT 28.08.
+    // 06:47) - sie schloss aber auch die lange Vorphase aus, in der das
+    // Krankenhaus nichts kostet (Guthaben im Milliardenbereich, Fund 4#4:
+    // "fast nur Tracking/Retirement, 4,3 Rang/min, Operationen 0,2 %").
+    //
+    // Obergrenze statt Nachbau der Schadensformel (hpLoss*difficultyMultiplier,
+    // Bladeburner.ts:981-988): der schlimmste denkbare Fall ist der GANZE
+    // Ausdauerbalken, `hp.max*HOSPITAL_KOSTEN_JE_HP` - eine sichere
+    // Obergrenze (echte Kosten sind nie hoeher), ohne eine zweite, hier nicht
+    // geeichte Rechnung zu brauchen. "Keep it simple": Geld bleibt ein
+    // Ja/Nein-Schalter fuer die alte Schwelle, wie ueberall sonst in dieser
+    // Datei (GYM_MIN_GELD, `money > 10e6` bei der Kammer) - es wird NICHT in
+    // die Rang-Ertragsrechnung umgerechnet, denn dafuer fehlt ein begruendeter
+    // Wechselkurs Geld-gegen-Rang (das Geld ist bei Black Ops "Beiwerk", siehe
+    // `einsatzSchwelle` oben - hier gilt dieselbe Haltung).
+    const HOSPITAL_KOSTEN_JE_HP = 100000;
+    const geldKnapp = (() => {
+      try {
+        const geld = ns.getPlayer().money;
+        if (!(geld > 0)) return true;
+        const hp = ns.getPlayer().hp;
+        const hpMax = (hp && hp.max > 0) ? hp.max : 100;
+        return geld * 0.1 < hpMax * HOSPITAL_KOSTEN_JE_HP;
+      } catch { return true; }   // ohne Messung lieber die alte, vorsichtige Regel
+    })();
+    const op = beste(OPERATIONEN, O, geldKnapp ? SICHER_OPERATION : null);
     const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
     if (op && vt && op.gerechnet && vt.gerechnet && vt.ertrag > op.ertrag) {
       return { typ: V, name: vt.name, grund: "Vertrag (Ertrag " + vt.ertrag.toFixed(2)
@@ -3372,7 +3517,11 @@ export async function main(ns) {
     // Dauerzustand wie heute frueh ist damit ausgeschlossen.
     for (const name of [...OPERATIONEN, ...VERTRAEGE]) {
       const istOp = OPERATIONEN.includes(name);
-      const s = spanne(istOp ? O : V, name);
+      // D2: mit spanneGenau wird min=max=exakt, sobald eine Black Op offen
+      // ist - die Bedingung unten ist dann nie erfuellt (nichts UNSCHARF
+      // mehr zu schliessen), und Field Analysis faellt fuer diese Aktion von
+      // selbst weg, wie im Audit-Fund 4#2 vorhergesagt ("fast tot").
+      const s = spanneGenau(istOp ? O : V, name);
       const schwelle = istOp ? SICHER_OPERATION : SICHER_VERTRAG;
       if (s.max >= schwelle && s.min < schwelle) {
         const jetztMs = Date.now();
@@ -4066,8 +4215,30 @@ export async function main(ns) {
         // die Chance, nicht der Truppbestand.
         if (wahl.typ === B) {
           try {
-            const mann = ns.bladeburner.getTeamSize();
-            if (mann > 0) ns.bladeburner.setTeamSize(B, wahl.name, mann);
+            // D1 (Audit 4#1): Pool ZUERST lesen, dann erst auf 0 setzen - ein
+            // fruehere Tick (Figur noch nicht frei, `figDarf` verweigert) kann
+            // fuer DIESE Op schon eine Zahl > 0 hinterlassen haben, und
+            // `blackOpChance()` liest genau dieses Feld. Ohne den Reset waere
+            // "Chance ohne Trupp" ab dem zweiten Versuch die Chance MIT dem
+            // alten Trupp - und die Pruefung darunter wertlos.
+            const mannPool = ns.bladeburner.getTeamSize();
+            ns.bladeburner.setTeamSize(B, wahl.name, 0);
+            const ohneTrupp = blackOpChance(wahl.name);
+            const schwelle = blackOpSchwelle(wahl.name);
+            // Traegt die Chance OHNE Trupp die Schwelle schon (der Normalfall,
+            // 6 von 7 gemessen), bleibt der Einsatz auf 0 - jeder Mann kostet
+            // sonst nur Ersatzrekrutierung fuer einen Bonus, den die
+            // Feuerentscheidung nie sah. Liesse sich die Chance nicht rechnen
+            // (blackOpChance() liefert null), gilt die alte, vorsichtige
+            // Regel: Trupp einsetzen, wenn einer da ist.
+            const truppNoetig = !(Number.isFinite(ohneTrupp) && ohneTrupp >= schwelle);
+            if (truppNoetig && mannPool > 0) {
+              ns.bladeburner.setTeamSize(B, wahl.name, mannPool);
+            }
+            // Trupp waere noetig, aber der Pool ist leer: der Spieler
+            // rekrutiert nicht mehr selbst (s.o.) - das ist der Fall, fuer den
+            // ein Sleeve-Hook lohnen wuerde.
+            if (truppNoetig && mannPool <= 0) truppAnfrage = true;
           } catch { /* alte Fassung ohne setTeamSize */ }
         }
         // DIE FIGUR-WACHE. Eine Bladeburner-Aktion beendet jede laufende

@@ -313,6 +313,21 @@ const TESTS = [
     deckt: "Die Black-Ops-Summe gegen den Quelltext (E.2 - drei Zahlen, alle falsch)",
     schnell: true,
   },
+  {
+    datei: "test-d2-wahre-chance.js",
+    deckt: "D2 (Audit 4#2): wahre Chance statt s.min, wenn eine Black Op offen ist - Monte Carlo gegen einen Action.ts-Nachbau",
+    schnell: true,
+  },
+  {
+    datei: "test-d1-recruitment.js",
+    deckt: "D1 (Audit 4#1): der Spieler rekrutiert nicht mehr selbst; Trupp nur bei echtem Bedarf und ohne den Pool zu ueberschreiben",
+    schnell: false,
+  },
+  {
+    datei: "test-d4-op-schwelle.js",
+    deckt: "D4 (Audit 4#4): die feste 0,85 fuer Operationen gilt nur bei knapper Kasse - sonst entscheidet EV_Rang/min",
+    schnell: false,
+  },
 ];
 
 /**

@@ -47,7 +47,6 @@ import { neu as neueLeiter, signale, schritt, verifiziert, protokolliere, freige
   entwarnung, laden as ladeLeiter, SPROSSEN } from "lib/leiter.js";
 import { laden as ladeRegistry, auswahl, leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
-import { phaseAus } from "lib/kaltstart.js";
 
 const TAKT_MS = 10000;
 
@@ -367,34 +366,27 @@ export async function main(ns) {
       // sleevecrime) nie in seiner Auswahl gehabt und ihren Ausfall in genau
       // der Phase nicht bemerkt, in der sie das einzige Einkommen sind.
       //
-      // Der Waechter kennt den Rechnerpark nicht ueber `ns.cloud`/
-      // Singularity (eine neue Klasse waere ein staendiger RAM-Aufschlag
-      // fuer ein Skript, das frueh in ein kleines home passen muss) - siehe
-      // `phaseSchaetzung()` fuer den billigen Ersatz (data/preise.json,
-      // genau wie `parkLage()` im Kern).
+      // Der Waechter kennt den Rechnerpark nicht (getServerNames kostet
+      // 1,05 GB und spraengte sein Budget), aber die home-Groesse genuegt:
+      // nach jedem Reset stehen 32 GB, und der erste Ausbau ist ein
+      // eindeutiges Zeichen, dass die Startlage vorbei ist.
       const lage = {
         node: ri.currentNode,
         verfahren: rolle.verfahren,
         // DIE PHASE KOMMT VOM KERN (Skeptiker Runde 3, W6, 04.09.2026).
         //
-        // Der Kern kennt den Park und zaehlt einen gekauften Rechner als
-        // Ende der Startlage - der Waechter tat das lange nicht und verglich
-        // stattdessen nur die home-Groesse gegen eine feste Zahl (64 GB).
-        // Mit gekauftem Rechner und home noch klein standen so zwei
-        // verschiedene Phasen nebeneinander, und der Waechter ueberwachte
-        // Gewerke, die der Kern absichtlich nicht mehr startet.
+        // Der Waechter kennt den Rechnerpark nicht (getServerNames kostet
+        // 1,05 GB und spraengte sein Budget). Der Kern kennt ihn und zaehlt
+        // einen gekauften Rechner als Ende der Startlage - der Waechter tat
+        // das nicht. Mit gekauftem Rechner und home noch auf 32 GB standen
+        // also zwei verschiedene Phasen nebeneinander, und der Waechter
+        // ueberwachte Gewerke, die der Kern absichtlich nicht mehr startet.
         //
         // Jetzt gilt die Zahl des Kerns, solange sein Block frisch ist. Der
         // eigene Schaetzwert bleibt als Rueckfall - er wird gebraucht, wenn
         // der Kern gar nicht laeuft, und genau dann ist der Waechter dran.
-        //
-        // BEIDE SCHAETZWERTE TEILEN SICH JETZT EINE DEFINITION (C.5,
-        // Audit-Fund 6#7, 26./27.09.2026): `lib/kaltstart.js`, statt einer
-        // zweiten, unabhaengig gepflegten Zahl hier. Die feste Schwelle
-        // "home <= 64 GB" traf seit SF9 Stufe 2 (home startet mit 128 GB,
-        // `Prestige.ts:246-251`) in genau diesem Rueckfall-Fenster nie mehr
-        // zu - belegt am eigenen BN5L3-Sprung, siehe `lib/kaltstart.js`.
-        phase: kernPhaseFrisch(kern, wall, ri.lastNodeReset) || phaseSchaetzung(ns, ri),
+        phase: kernPhaseFrisch(kern, wall, ri.lastNodeReset)
+          || (ns.getServerMaxRam("home") <= 64 ? "kaltstart" : "normal"),
         dateiDa: (d) => ns.fileExists(d, "home"),
         // Ohne das fiel hashes.js aus der Soll-Liste des Waechters - er
         // haette es nach einem Absturz nie neu gestartet (Skeptiker 19.09.).
@@ -1432,64 +1424,6 @@ function netz(ns) {
   // Hacknet-Server sind keine Wirte: jedes Byte, das dort laeuft, drueckt die
   // Hash-Rate ueber ramRatio (HacknetServers.ts:14).
   return [...gesehen].filter((h) => !h.startsWith("hacknet-server-"));
-}
-
-/**
- * Ersatz fuer die Kern-Phase, wenn `kernPhaseFrisch()` nichts liefert - Kern
- * tot, oder (der haeufigere Fall) das kurze Fenster direkt nach einem
- * KNOTENWECHSEL, bis der Kern seinen ersten frischen Block schreibt
- * (`kernPhaseFrisch` prueft `nodeReset`). C.5, Audit-Fund 6#7, 26./27.09.2026.
- *
- * NICHT ABGEDECKT (vorbestehende Luecke, nicht Teil dieses Fixes):
- * `kernPhaseFrisch` prueft nur `nodeReset`, nicht `lastAugReset` - nach einem
- * reinen Augmentierungs-Einbau (ohne Knotenwechsel) kann ein bis zu 15 min
- * alter, vom VOR dem Einbau geschriebener "normal"-Block des Kerns weiter
- * gelten, obwohl der Einbau den Park geloescht hat (`Prestige.ts:55-75`).
- * Diese Funktion hier wird in dem Fall also NICHT aufgerufen. Gehoert zu
- * `kernPhaseFrisch()`, nicht zur Kaltstart-Definition selbst.
- *
- * DIESELBE DEFINITION WIE IM KERN (`lib/kaltstart.js`), nur die BESCHAFFUNG
- * der zwei Werte ist anders, weil sich der Waechter keine neue
- * Singularity-Klasse leisten darf (ein Skript, das frueh in ein kleines
- * home passen muss, siehe Kopf der Datei).
- *
- *   hatPark  aus `data/preise.json`, genau wie `parkLage()` in bn4net.js -
- *            und aus demselben Grund gegen den Reset geprueft: eine
- *            Preistabelle von VOR dem Sprung/Einbau zeigt einen Park, den es
- *            nicht mehr gibt (`Prestige.ts:55-75` loescht jeden gekauften
- *            Rechner bei JEDEM Einbau, nicht nur beim Knotenwechsel - im
- *            Zweifel gilt "kein Park", das ist die sichere Richtung).
- *            ABSICHTLICH OHNE die zusaetzliche 5-Minuten-Alterspruefung, die
- *            `parkLage()` im Kern hat (Park existiert weiter, auch wenn
- *            shop.js seit Minuten tot ist - das ist ein Grund, ihn zu
- *            reparieren, keiner, ihn fuer nichtig zu erklaeren).
- *   netzGb   ueber das ohnehin vorhandene `netz()` (0,2 GB, laengst bezahlt)
- *            plus `hasRootAccess` (NEU, 0,05 GB) und `getServerMaxRam` -
- *            exakt dieselbe Summe wie bn4net.js `ramTotal`.
- *
- * RAM-BILANZ (mit `tools/ram.js guard.js` nachgerechnet, 6,10 -> 6,15 GB):
- * `ns.fileExists` ist bereits Teil der Kosten dieser Datei (u. a. `dateiDa`
- * oben), `ns.scan` ebenso (`netz()`). `ns.getServerMaxRam` stand vorher NUR
- * in der jetzt entfernten Zeile `ns.getServerMaxRam("home") <= 64` - es faellt
- * dort weg und kommt hier neu hinzu, macht also per Saldo 0 GB. Einzig
- * `hasRootAccess` ist ein echter Neuzugang (+0,05 GB).
- */
-function phaseSchaetzung(ns, ri) {
-  let hatPark = false;
-  try {
-    if (ns.fileExists("data/preise.json", "home")) {
-      const t = JSON.parse(ns.read("data/preise.json"));
-      const reset = Math.max(ri.lastNodeReset || 0, ri.lastAugReset || 0);
-      if (Number.isFinite(t.ts) && t.ts >= reset) {
-        hatPark = Array.isArray(t.park) && t.park.length > 0;
-      }
-    }
-  } catch { /* dann gilt kein Park - die sichere Richtung */ }
-  let netzGb = 0;
-  try {
-    for (const h of netz(ns)) if (ns.hasRootAccess(h)) netzGb += ns.getServerMaxRam(h);
-  } catch { /* dann bleibt netzGb 0 - ebenfalls die sichere Richtung */ }
-  return phaseAus(hatPark, netzGb);
 }
 
 /**

@@ -83,11 +83,6 @@ const TESTS = [
     schnell: true,
   },
   {
-    datei: "test-kaltstart.js",
-    deckt: "lib/kaltstart.js: gemeinsame Kaltstart-Definition Kern/Waechter, Park/Netzgroesse statt home-RAM (C.5, 6#7)",
-    schnell: true,
-  },
-  {
     datei: "test-registry.js",
     deckt: "Registry, Rollen-Riegel und der Migrationsbeweis gegen die heutige Liste (C.4)",
     schnell: true,

@@ -86,16 +86,7 @@ sich nicht selbst neu starten kann.
 
 ## E2 — Der Wächter kostet 6,10 GB und ist bei allem autark, was einen toten Kern betrifft
 
-**Historischer Entwurfsstand, nicht die aktuelle Zahl** (27.09.2026 nachgetragen,
-Skeptiker-Fund C.5): Die Zerlegung unten ist der Stand VOR `scan`/`netz()`
-(04.09.), VOR `fileExists`/`scp`/`getHostname` und VOR `hasRootAccess`
-(27.09., C.5) - `scriptKill` steht hier noch drin, ist im heutigen `guard.js`
-aber gar nicht mehr referenziert. Der aktuelle, mit `tools/ram.js` gerechnete
-und gegen `registry.json` geprüfte Wert ist **6,15 GB** (§3.3). Diese Sektion
-bleibt als Entwurfsbeleg von damals stehen statt nachtraeglich umgeschrieben
-zu werden - fuer die laufende Zahl gilt §3.3, nicht diese Tabelle.
-
-**Es gilt (Entwurfsstand 04.09.2026):** `src/guard.js`, **6,10 GB**, singularityfrei, SF4-invariant:
+**Es gilt:** `src/guard.js`, **6,10 GB**, singularityfrei, SF4-invariant:
 
     Base                      1,60
     getPlayer                 0,50   (SingularityFn1/4, KEIN SF4Cost - :650)
@@ -505,21 +496,6 @@ Marke `data/beitritt-erledigt.txt`, die `bn4life.js` vor dem naechsten Start
 prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
 18·16).
 
-**`guard.js` steht seit 27.09.2026 auf `ramBaseGb: 6.15`** (vorher 6.1,
-Audit-Fund 6#7, Paket C.5). Kern und Waechter teilten sich bisher NICHT eine
-Kaltstart-Definition, nur denselben falschen Wert (`home <= 64 GB`, seit
-SF9 Stufe 2 nie mehr wahr - `Prestige.ts:246-251` setzt home dann auf
-128 GB). Die neue, gemeinsame Definition steht in `lib/kaltstart.js`
-(Park/Netzgroesse statt home-RAM, Herleitung und Beleg am eigenen
-BN5L3-Sprung dort). `guard.js` darf sich `ns.getPurchasedServers`/`ns.cloud`
-nicht leisten und schaetzt den Park deshalb wie `bn4net.js` aus
-`data/preise.json`; fuer die Netzgroesse kommt `hasRootAccess` neu dazu
-(+0,05 GB) - der Rest (`scan`, `getServerMaxRam`, `fileExists`) war ueber
-`netz()`/die S1-Grundpruefung bereits bezahlt. `bn4net.js` bleibt bei
-`ramBaseGb: 10.8` (nur `lib/kaltstart.js` neu importiert, keine neue
-`ns`-Funktion - der Import ist eine reine Funktion ohne `ns`-Bezug und
-kostet 0 GB, siehe Kopfkommentar dort).
-
 ```json
 {
   "schema": 1,
@@ -549,7 +525,6 @@ kostet 0 GB, siehe Kopfkommentar dort).
         "lib/calc.js",
         "lib/events.js",
         "lib/figur.js",
-        "lib/kaltstart.js",
         "lib/kpi.js",
         "lib/motorzeit.js",
         "lib/reg.js"
@@ -563,9 +538,9 @@ kostet 0 GB, siehe Kopfkommentar dort).
     {
       "name": "guard.js",
       "args": [],
-      "ramBaseGb": 6.15,
+      "ramBaseGb": 6.1,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GERECHNET-2026-09-27 (tools/ram.js, C.5: hasRootAccess fuer die Kaltstart-Schaetzung)",
+      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js, mit Sprossen C.9/C.10)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "beide",
@@ -579,7 +554,6 @@ kostet 0 GB, siehe Kopfkommentar dort).
       "needsFigure": "none",
       "needsLibs": [
         "lib/events.js",
-        "lib/kaltstart.js",
         "lib/leiter.js",
         "lib/reg.js",
         "lib/uhren.js"

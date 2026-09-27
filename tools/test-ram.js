@@ -190,6 +190,13 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
       "darkweb.js", "lib/batch.js", "lib/calc.js", "lib/hackaugs.js",
       "export.js", "boerse.js", "lib/handschlag.js", "graftauto.js",
       "figwatch.js", "guard.js",
+      // 2026-09-27: blade.js zusaetzlich fuer D1/D2/D4 (Audit 4#1/4#2/4#4)
+      // geaendert (Recruitment nur noch bei echtem Bedarf, wahre Chance statt
+      // s.min ueber die naechste Black Op, feste 0,85 fuer Operationen nur
+      // bei knapper Kasse). Keine neue ns-Funktion (setTeamSize/getTeamSize/
+      // getNextBlackOp/getPlayer waren bereits referenziert) - die Zeile
+      // "blade.js" steht schon oben (26.09.), diese Notiz haengt den
+      // zusaetzlichen Grund an, damit er nicht verloren geht.
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,

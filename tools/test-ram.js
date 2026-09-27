@@ -190,6 +190,13 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
       "darkweb.js", "lib/batch.js", "lib/calc.js", "lib/hackaugs.js",
       "export.js", "boerse.js", "lib/handschlag.js", "graftauto.js",
       "figwatch.js", "guard.js",
+      // 2026-09-27, C.5 (Audit-Fund 6#7): gemeinsame Kaltstart-Definition
+      // (lib/kaltstart.js, neu, reine Funktion, kein ns - taucht deshalb gar
+      // nicht in der 04.09.-Messung auf). bn4net.js/guard.js stehen oben
+      // bereits (26.09.); guard.js kostet seit heute 6,15 statt 6,10 GB
+      // (+hasRootAccess fuer die Netzgroesse) - mit tools/ram.js nachgerechnet
+      // und gegen registry.json gruen (ramBaseGb stimmt), Live-Nachmessung
+      // steht wie beim Rest der Liste noch aus.
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,

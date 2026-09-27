@@ -40,6 +40,7 @@ import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
 import { vergib as figVergib, antragGilt as figAntragGilt,
   vergabeGilt as figVergabeGilt } from "lib/figur.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { phaseAus } from "lib/kaltstart.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -369,6 +370,12 @@ export async function main(ns) {
   // als Bremse: Wer Speicher kauft, obwohl der vorhandene brachliegt,
   // verbrennt Geld.
   let ueberschussMerker = 0;
+  // Gerooteter Netzspeicher der LETZTEN Runde (C.5, 26.09.2026/27.09.2026).
+  // `phaseJetzt()` unten braucht ihn fuer den Kaltstart-Rueckfall, `ramTotal`
+  // selbst steht aber erst nach dem Rooten fest (Abschnitt 0b, ~Zeile 1162) -
+  // also nach `baueLage()`. Eine Runde Verzoegerung ist unschaedlich, genau
+  // wie bei `ueberschussMerker` oben: die Phase kippt nicht rundenweise.
+  let ramTotalMerker = 0;
   // ABSOLUT STATT ANTEILIG (23.08.2026). Der Viertelanteil stammt aus der
   // Zeit, in der home 32 GB hatte - acht Gigabyte freizuhalten war da
   // vernuenftig. Bei einem Petabyte sperrt dieselbe Formel 262.144 GB, um
@@ -624,16 +631,26 @@ export async function main(ns) {
   //       gegolten: cdump, csolve, darkweb, sleevecrime. Das ist die
   //       komplette Geldkette der Startlage (Position C.8).
   //
-  // Die Phase wird jetzt GEMESSEN, nicht behauptet: Startlage heisst "es gibt
-  // noch keinen Park, und home ist noch klein". Beide Teile sind noetig - in
+  // Die Phase wird GEMESSEN, nicht behauptet: Startlage heisst "es gibt noch
+  // keinen Park, und das Netz ist noch klein". Beide Teile sind noetig - in
   // BitNode 9 ist CloudServerLimit 0, dort gibt es NIE einen Park, und ohne
-  // die home-Bedingung bliebe der Knoten ewig im Kaltstart.
-  const HOME_KALTSTART_GB = 64;
+  // die Netz-Bedingung bliebe der Knoten ewig im Kaltstart.
+  //
+  // NICHT MEHR HOME-RAM (C.5, Audit-Fund 6#7, 26./27.09.2026). Hier stand
+  // `ns.getServerMaxRam("home") <= 64` - das galt nur, solange home nach
+  // jedem Reset mit 32 GB startet. Ab Source-File 9 Stufe 2 startet home mit
+  // 128 GB (Prestige.ts:246-251, Eric hat SF9.3): "<=64" war damit direkt
+  // nach jedem Sprung/Einbau falsch, belegt am eigenen BN5L3-Sprung
+  // (26.09. 20:41, `data/bn4net.json` zeigte "phase":"normal" schon in der
+  // ersten Sekunde, 0 Park, 245 GB Netz gesamt). Die neue, gemeinsam mit
+  // guard.js benutzte Definition steht in `lib/kaltstart.js` (dort auch die
+  // Herleitung der Schwelle und warum ein erster Versuch mit nur einer neuen
+  // Zahl statt einer neuen Grundlage zurueckgenommen wurde, b16e381/11eb9a6).
   const phaseJetzt = () => {
     try {
       const pl = parkLage();
-      if (pl.da && pl.park.length > 0) return "normal";
-      return ns.getServerMaxRam("home") <= HOME_KALTSTART_GB ? "kaltstart" : "normal";
+      const hatPark = pl.da && pl.park.length > 0;
+      return phaseAus(hatPark, ramTotalMerker);
     } catch { return "kaltstart"; }
   };
 
@@ -724,6 +741,32 @@ export async function main(ns) {
     } catch { return false; }
   };
 
+  // KALTSTART-RUECKFALL DARF NICHT MIT EINER FALSCHEN NULL STARTEN (C.5,
+  // Skeptiker-Fund 27.09.2026). `baueLage()` (naechste Zeile) ruft
+  // `phaseJetzt()`, das ohne Park auf `ramTotalMerker` zurueckfaellt - mit 0
+  // initialisiert waere das bei JEDEM Neustart MITTEN IM LAUF (Bruecke,
+  // Hotswap) eine Runde lang faelschlich "kaltstart", sobald gleichzeitig
+  // kein Park erkannt wird (BitNode 9, oder `data/preise.json` ist noch
+  // nicht frisch). Nach einem ECHTEN Reset aendert diese Vorabrechnung
+  // nichts (der Park ist dann ohnehin leer, und der wahre Netzwert ist klein
+  // - Prestige.ts:73 loescht die gekauften Rechner, nicht die Weltserver).
+  // Dieselbe Formel wie Abschnitt 0b (~ramTotal unten), einmalig vorgezogen,
+  // weil `scanAll`/`hosts` erst spaeter im Skript definiert werden.
+  {
+    const gesehenVorab = new Set(["home"]);
+    const schlangeVorab = ["home"];
+    while (schlangeVorab.length) {
+      for (const n of ns.scan(schlangeVorab.shift())) {
+        if (gesehenVorab.has(n)) continue;
+        gesehenVorab.add(n);
+        schlangeVorab.push(n);
+      }
+    }
+    for (const h of gesehenVorab) {
+      if (h.startsWith("hacknet-server-")) continue;
+      if (ns.hasRootAccess(h)) ramTotalMerker += ns.getServerMaxRam(h);
+    }
+  }
   let regLage = baueLage();
 
   // Merker fuer den Ereignisstrom: was dieser PROZESS schon gemeldet hat.
@@ -1160,6 +1203,10 @@ export async function main(ns) {
     // Serveraufruestung (1a2) und spaeter das Erfahrungsbudget brauchen -
     // und weil er erst NACH dem Rooten stimmt.
     const ramTotal = hosts.reduce((a, h) => a + (ns.hasRootAccess(h) ? ns.getServerMaxRam(h) : 0), 0);
+    // Fuer die NAECHSTE Runde: phaseJetzt() (Abschnitt "Ableitung aus der
+    // Registry", oben) braucht ihn frueher, als er in DIESER Runde feststeht
+    // (C.5) - siehe Kommentar bei der Deklaration von ramTotalMerker.
+    ramTotalMerker = ramTotal;
 
     // --- 0c. Werkzeug auf der Werkbank neu laden -------------------------------
     // Die Werkzeuge (Vertragsloeser, Reputationssteuerung, Backdoors) laufen

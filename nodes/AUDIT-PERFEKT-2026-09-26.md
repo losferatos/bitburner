@@ -25,7 +25,7 @@ Reihenfolge = Wirkung auf die naechsten Knoten (BN5.3, BN12.1-3 sind V1).
 - [x] B1 (ERLEDIGT 51ad022, 4500041, 4f44576: mit Vorbereitungskosten und Hysterese (lib/calc.js)) Server mit Startsicherheit 100 (BN5: 46 von 63 Geldservern, 99,8 % moneyMax) fuer die Zielwahl unsichtbar: kennzahlen skaliert 0 hoch (2#2)
 - [x] B2 (ERLEDIGT c143bd2, 4500041, 5bc7934, b97595e: Ofen mit Frist, der Kern raeumt ihn fuer Werkzeuge; exp/s im Spiel nachmessen) Erfahrungsofen nur Einwegwelle je Runde, 43-57 TB brach; Dauer-grow auf foodnstuff x11,5 exp/s (2#1)
 - [x] B3 (ERLEDIGT 62bf7c0, 4500041: nur ohne lebendes bn4life, 2 min Schonfrist) bn4net startet darkweb.js alle 5 min, obwohl bn4life per Singularity kauft (6#1, Ursache von A1)
-- [ ] B4 (OFFEN: nicht Teil von Paket B; Park-/home-Ausbau nach Erfahrung braucht ein Wertmodell) Parkausbau/home-Ausbau bewerten nur Geld, nie Erfahrung (2#3, 1#5)
+- [ ] B4 (OFFEN, 27.09.2026 gerechnet, KEINE CODEAENDERUNG - Verdikt unten unter "Bewusst nicht umgesetzt") Parkausbau/home-Ausbau bewerten nur Geld, nie Erfahrung (2#3, 1#5)
 - [ ] B5 (OFFEN: nicht Teil von Paket B; Stapelziele weiter nach Mischguete) Stapelziele nach Mischguete statt Stapeldurchsatz (2#4)
 - [x] B6 (ERLEDIGT b320024, 82910e5, 4500041: inkl. BN12 Stufe 2/3 zur Laufzeit) lib/bitnodes.json verliert BN12-inc/dec und negative Werte (2#6, 1#4)
 - [x] B7 (ERLEDIGT 4500041, 4f44576: gerechnet: nach Knotenwechsel erstes Geld nach 300-420 s statt 6.150 s (Skeptiker B G-8); Live-Beleg offen) Nullfenster 11-25 min nach Reset (6#2)
@@ -99,6 +99,39 @@ Paket A (bn4rep, Skeptiker A):
 - G8: Firmenphase ohne Telemetrie (S1-Risiko nach 30 min) - gehoert zur Firmenphase, Muster amTorWarten liegt bereit.
 
 Paket B (bn4net, Skeptiker B):
+- B4 (27.09.2026, gerechnet gegen echte Spielstaende, KEINE Codeaenderung):
+  Die Chance ist real und nachgerechnet, nicht nur behauptet - `expmodel.mjs`
+  gegen die Spielstaende 17:04/17:19 (BN5L2) neu gelaufen (nicht nur die
+  Audit-Zahl gelesen): 25x64-TB-Park kostet 5,579e11 $ (16:04 lagen 6,44e11 $
+  auf der Hand), mit grow-Dauerlaeufer auf foodnstuff 3,27e7 exp/s ->
+  Level 4500 bei Mult 7,166 in **1,47 h statt 406,8 h** - ein Faktor 277.
+  Das ist aber ein SPAETPHASEN-Fall: Mult 7,17, Level 2871, kein Aug mehr
+  offen. Am eigenen, gerade laufenden BN5L3-Lauf (27.09., Level 501,
+  Mult 1,876, 14 Augs installiert) zeigt sich das GEGENTEIL: Geld schwankt
+  zwischen 12,5 und 21,0 Mrd. $ (l3start 13,1 Mio -> prev 21,0 Mrd ->
+  now 12,5 Mrd, decodiert aus den BN5L3-Backups), weil bn4rep.js in EINER
+  Stunde 8 Augmentierungen kaufte/einbaute (6 -> 14, jeweils mit Reset des
+  Parks, `Prestige.ts:55-75`) - hier ist Geld sichtbar NICHT idle, sondern
+  wird laufend fuer Augs verbraucht, und jeder dieser Augs hebt den Mult UND
+  damit sofort den LEVEL (der "Level-Sprung bei jedem Einbau" aus der
+  Auftragsbeschreibung), was exp-Ansammlung strukturell schlaegt (Level ist
+  linear in Mult, nur logarithmisch in Exp).
+  Eine Kaufregel muesste also unterscheiden: "echtes Spaetphasen-Idle-Geld,
+  keine Augs mehr in Aussicht" (dort lohnt sich Parkausbau extrem) gegen
+  "Geld ist naechste Runde fuer den naechsten Aug verplant" (dort waere
+  Parkausbau eine Fehlallokation, die den Einbauzyklus verlangsamt). Dieses
+  Unterscheidungsmerkmal (Endspiel-Riegel/keine wartenden Augs mehr) lebt in
+  `lib/endspurt.js`/`bn4rep.js` - ausdruecklich NICHT im Auftrag dieser
+  Aenderung ("Stay in the purchase/expansion code ... and homegrow.js, to
+  keep merges clean", ein paralleler Bau haelt bn4rep.js/lib/calc.js). Die
+  vorhandene 5-%-Bremse (`bn4net.js` grenzErtrag/ertrag) kennt diese
+  Unterscheidung nicht und ist damit als Signalquelle ungeeignet - sie
+  loeste in BEIDEN Phasen gleich aus (das ist ja Befund 2#3 selbst).
+  **Verdikt: keine Aenderung an bn4net.js/homegrow.js.** Ein sicherer Fix
+  braucht ein Signal "keine Augmentierung mehr in Aussicht" aus
+  `lib/endspurt.js`, das `data/geldbedarf.txt` oder eine neue Datei
+  zusaetzlich meldet - das ist eine Folgeauftrag fuer das Paket, das
+  bn4rep.js/endspurt.js haelt, nicht fuer diesen.
 - B#9 (M-6): Portprogramme bleiben hinter der Augmentierungs-Reservierung in bn4life - Abwaegung Einbauzeitpunkt gegen Einkommensrampe, braucht eine Messung.
 - G-6: RAM-Basis der Vorbereitung (0,3 x ramTotal) zu gross geschaetzt - der bessere Ansatz kostete in 3 von 6 Laeufen 13-26 % Geld, Abwaegung fuer eine Messung.
 - G-7: Stillstandssperre im Kreis am dritten Stapelplatz nach Knotenwechsel - vorbestehende Stapelmechanik (BATCH_ZIELE fest 3), nicht Paket B.

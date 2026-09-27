@@ -2344,6 +2344,14 @@ export async function main(ns) {
       if (bo.min < boReal - EPS) return { r: bo.min / boReal, sicher: true };
       if (bo.max > boReal + EPS && bo.max < 1) return { r: bo.max / boReal, sicher: true };
       if (bo.max >= 1 && boReal < 1) return { r: 1 / boReal, sicher: false };
+      // SKEPTIKER-FUND 3 (27.09.2026): boReal selbst schon >= 1 (voller
+      // Erfolg) UND die gemeldete Spanne ebenfalls auf 1 geklemmt
+      // (bo.min >= boReal) - r ist hier UNSICHTBAR, weil jedes r>=1 nach der
+      // eigenen Klemmung ebenfalls bo.min=bo.max=1 erzeugt haette. Ohne diese
+      // Zeile fiel dieser Fall in den Fallback darunter (r:1, sicher:true)
+      // und chanceAusR() ueberschaetzte andere Aktionen derselben Stadt
+      // (Beleg im Audit: 0.705 statt tatsaechlich 0.6).
+      if (boReal >= 1 - EPS && bo.min >= boReal - EPS) return { r: 1, sicher: false };
       return { r: 1, sicher: true };
     };
     // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der

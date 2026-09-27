@@ -236,6 +236,18 @@ console.log("-- rAusBlackOp: die drei Faelle aus der Herleitung --");
   const r3 = rAusBlackOp({ min: 0.5, max: 1 }, 0.5);
   pruefe("Fall r>=1 (geklemmt) ist als unsicher markiert",
     r3.sicher === false, JSON.stringify(r3));
+
+  // Fall 4 (Skeptiker-Fund 3, 27.09.2026): die REALE Chance selbst ist schon
+  // >= 1 (voller Erfolg), UND die gemeldete Spanne ist ebenfalls auf 1
+  // geklemmt (bo.min >= boReal). r ist hier UNSICHTBAR - jedes r>=1 haette
+  // ebenfalls bo.min=bo.max=1 erzeugt (die Verzerrung selbst wird ja wieder
+  // auf 1 geklemmt), also gibt es keine Information, aus der r=1 folgt. Vor
+  // dem Fix lieferte der Fallback faelschlich {r:1, sicher:true}, was
+  // chanceAusR() dazu brachte, eine andere Aktion derselben Stadt zu
+  // ueberschaetzen (Beispiel aus dem Fund: 0.705 statt tatsaechlich 0.6).
+  const r4 = rAusBlackOp({ min: 1, max: 1 }, 1);
+  pruefe("Fall boReal>=1 mit bo.min>=boReal (voll geklemmt) ist als unsicher markiert",
+    r4.sicher === false, JSON.stringify(r4));
 }
 
 console.log("");

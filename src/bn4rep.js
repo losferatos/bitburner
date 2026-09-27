@@ -2632,6 +2632,19 @@ export async function main(ns) {
       repReq: Math.round(ziel.repReq),
       preis: ziel.preis,
       offen: offen.length,
+      // OFFENE STUECKE JE FAKTION (27.09.2026, fuer sleeve.js). Die Sleeves
+      // arbeiten im Hackingweg fuer Faktionen - aber nur Reputation bei einer
+      // Faktion, die noch etwas Unverdientes anbietet, ist etwas wert
+      // (CyberSec hatte im BN5L3 alles eingebaut und band trotzdem einen
+      // Sleeve). `kandidaten` ist hier schon da (alles Unbesessene ausser
+      // NFG), die Zeile kostet also kein RAM. `fehlt` = hoechster
+      // Rep-Bedarf minus Bestand.
+      offenJeFaktion: kandidaten.filter((k) => k.rep < k.repReq).reduce((m, k) => {
+        const e = m[k.faktion] || (m[k.faktion] = { anzahl: 0, fehlt: 0 });
+        e.anzahl++;
+        e.fehlt = Math.max(e.fehlt, Math.round(k.repReq - k.rep));
+        return m;
+      }, {}),
       kaufbereit: kandidaten.filter((k) => k.rep >= k.repReq).length,
       wartend,
       teuerstesVerdiente,

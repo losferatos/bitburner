@@ -151,65 +151,85 @@ export async function main(ns) {
 
   // HACKINGKNOTEN: FAKTIONSARBEIT STATT VERBRECHEN (27.09.2026).
   //
-  // GERECHNET, NICHT GESCHAETZT: tools/sleeve-rechnung.js baut
-  // SleeveFactionWork, getHackingWorkRepGain, calculateFactionExp,
-  // applySleeveGains (inkl. sync-Teilung), den Schockabbau aus
-  // Sleeve.process/SleeveRecoveryWork und die BN-Multiplikatoren fuer BN1,
-  // 5, 8 und 12 nach und ist gegen die BN5L3-Backups geeicht: der
-  // Schockabbau ergibt fuer alle drei Sleeves dieselbe GANZE Zyklenzahl
-  // (7205 und 10810, auf 1e-10 genau), die Spieler-Rep-Rate fuer BitRunners
-  // (36.977 rep/h) liegt im Formelband, sobald man den Share-Bonus (1,27-1,29)
-  // mitnimmt - gegengeprueft an der security-Arbeit fuer Slum Snakes.
+  // GERECHNET: tools/sleeve-rechnung.js baut SleeveFactionWork,
+  // getHackingWorkRepGain, calculateFactionExp, applySleeveGains (inkl.
+  // sync-Teilung), den Schockabbau aus Sleeve.process/SleeveRecoveryWork und
+  // die BN-Multiplikatoren fuer BN1, 5, 8 und 12 nach.
   //
-  // Ergebnis je Sleeve (BN5, Stand 16:08: Schock 64, dex/agi 102, hack 1):
+  // WAS DARAN GEEICHT IST UND WAS NICHT (Skeptiker 27.09.): Gegen die
+  // BN5L3-Backups geeicht sind nur (1) die Stufenformel aus Exp (Spieler
+  // hack 759, Sleeve dex 102 exakt), (2) der GRUND-Schockabbau 0,0001 *
+  // intBonus(int, 0,75) je Zyklus (alle drei Sleeves ergeben dieselbe ganze
+  // Zyklenzahl, 7205 und 10810, auf 1e-10) und (3) der Share-Bonus 1,27-1,29
+  // aus der Spieler-Rep-Rate (36.977 rep/h BitRunners), gegengeprueft an
+  // security fuer Slum Snakes. Die Recovery-ZUSATZrate und die
+  // Sleeve-Rep-Formel selbst sind NUR aus dem Quellcode gelesen - kein
+  // Sleeve hat im Messzeitraum Faktionsarbeit oder Recovery gemacht.
   //
-  //     Aufgabe             3 h        12 h        24 h
-  //     Shoplift            0 rep/h    0           0        13,5 Mio $/h
-  //     Mug                 0          0           0        16,2 Mio $/h
-  //     Faktion hacking     679        1.336       2.036    rep/h
-  //     Faktion security    591        1.016       1.518
-  //     Uni 1 h, dann Fak.  723        1.437       2.117    (-1,2 Mio $/h, +4 GB)
-  //     Recovery 2 h, dann  204        1.010       1.700
-  //     Synchronize 3 h     0            783       1.452
+  // Ergebnis je Sleeve (BN5, Stand 16:08: Schock 64, dex/agi 102, hack 1,
+  // Favor 0 - mit dem echten Favor 53-81 der Zielfaktionen liegt alles um
+  // den Faktor 1,5-2 hoeher, z.B. hacking bei Favor 53: 1.041/2.047/3.121):
+  //
+  //     Aufgabe                    3 h        12 h        24 h
+  //     Shoplift                   0 rep/h    0           0        13,5 Mio $/h
+  //     Mug                        0          0           0        16,2 Mio $/h
+  //     Faktion hacking            679        1.336       2.036    rep/h
+  //     Faktion security           591        1.016       1.518
+  //     Uni Rothman 1 h, hacking   723        1.437       2.117
+  //     Uni ZB 3 h, hacking        0          1.535       2.302    (+Reise)
+  //     Recovery 2 h, hacking      197        1.329       2.189
+  //     Recovery 4 h, hacking      0          1.214       2.278
+  //     Synchronize 3 h, hacking   0          1.024       1.876
   //
   // Drei Sleeves auf Faktionsarbeit sind 5-15 % der Spielerrate (36.977
   // rep/h) - klein, aber die 40 Mio $/h aus Verbrechen sind bei $19 Mrd auf
   // dem Konto gar nichts. In BN8 bringt Verbrechen ohnehin null Dollar
-  // (CrimeMoney 0), in BN1/12 gilt dasselbe Bild wie in BN5 (BN12 -2 %).
+  // (CrimeMoney 0), in BN1/12 gilt dasselbe Bild wie in BN5 (BN12 -4 %).
   //
   // WARUM HACKING VOR SECURITY, obwohl security fuer DIESEN Sleeve im ersten
   // Moment mehr bringt (dex/agi 102 aus dem Shoplift-Erbe gegen hack 1):
   // Hacking-Exp startet bei null und die Stufe waechst logarithmisch
   // (32*ln(exp+534,6)-200) - nach einer Stunde liegt hack bei ~60, und ab da
-  // ueberholt die hacking-Rate. Die Rechnung "jetzt die beste Art" liegt ueber
-  // 24 h 23 % unter "immer hacking" (1.567 gegen 2.036). Security nur dort,
-  // wo die Faktion kein hacking anbietet (Slum Snakes, Tetrads) - dann liefert
+  // ueberholt die hacking-Rate. "Jetzt die beste Art" liegt ueber 24 h 23 %
+  // unter "immer hacking" (1.567 gegen 2.036). Security nur dort, wo die
+  // Faktion kein hacking anbietet (Slum Snakes, Tetrads) - dann liefert
   // setToFactionWork `false` (`Sleeve.ts:418-434`), und die naechste Art wird
   // versucht.
   //
-  // WARUM KEINE UNI: +3 bis +8 % Rep ueber 12-24 h, aber
-  // setToUniversityCourse kostet 4 GB mehr, und in BN8 kostet der Kurs Geld,
-  // das es dort nicht gibt. Nicht wert.
+  // WARUM KEINE UNI: Das ZB Institute (Volhaven, expMult 4) braechte je
+  // Sleeve +9 bis +16 % ueber 24/12 h, absolut rund 200 rep/h. Verworfen
+  // wegen RAM: setToUniversityCourse und die Reise (ns.sleeve.travel) kosten
+  // zusammen 8 GB, und sleeve.js steht schon bei 31,85. Nicht wegen des
+  // Ertrags.
   //
-  // SCHOCK: DIE AUTOMATISCHE ERHOLUNG STEHENLASSEN. Beim Knotenwechsel und
-  // bei jedem Einbau setzt das Spiel die Sleeves selbst auf Shock Recovery
-  // (`PlayerObjectGeneralMethods.ts:118`, und `Sleeve.prestige` setzt
-  // Schock 100). Die alte Fassung hat das binnen 60 s ueberschrieben. Rep UND
-  // Exp sind beide mit (100-Schock)/100 skaliert, der Ertrag geht also mit
-  // dem QUADRAT des Schockbonus - und Recovery baut dreimal so schnell ab
-  // (0,0003 statt 0,0001 je Zyklus mal intBonus(int, 0,75)). Vom Knotenstart
-  // (Schock 100) gerechnet:
+  // SCHOCK. Das Spiel setzt die Sleeves bei jedem Einbau selbst auf Shock
+  // Recovery, solange Schock > 0 (`PlayerObjectGeneralMethods.ts:118`); beim
+  // Knotenwechsel setzt `Sleeve.prestige` zusaetzlich Schock auf 100
+  // (`Sleeve.ts:251`). Recovery baut dreimal so schnell ab (0,0003 statt
+  // 0,0001 je Zyklus mal intBonus(int, 0,75)). Rep ~ Schockbonus * Stufe,
+  // und die Stufe waechst selbst mit Schockbonus-gewichteter Exp - deshalb
+  // lohnt die Erholung bei hohem Schock:
   //
-  //     Recovery bis Schock   12 h: rep/h   24 h: rep/h
-  //     gar nicht (100)           200            611
-  //     75                        438          1.082
-  //     65                        411          1.194
-  //     50                        243          1.271
+  //     vom Knotenstart (100)       12 h: rep/h   24 h: rep/h
+  //     Recovery gar nicht              200            611
+  //     bis 65                          411          1.194
+  //     bis 50                          243          1.271
+  //     vom Stand 64 aus
+  //     gar nicht                     1.334          2.034
+  //     bis 50                        1.306          2.217  (+9 %)
+  //     bis 40                        1.180          2.284  (+12 %)
   //
-  // 65 liegt in beiden Horizonten bei 94 % des jeweils besten Werts. Unter 65
-  // wird die Erholung NICHT fortgesetzt (vom Stand 64 aus bringt sie ueber
-  // 12 h nichts), und neu gesetzt wird sie nie - dafuer braucht es
-  // setToShockRecovery und damit weitere 4 GB. getTask ist ohnehin geladen.
+  // SCHOCK_ZIEL = 50 (Skeptiker): Der Knoten dauert in V1 12-24 h, und das
+  // Spiel setzt die Recovery nach JEDEM Einbau gratis neu - also wird auf
+  // den laengeren Horizont optimiert. Neu SETZEN kann dieses Skript sie
+  // nicht (setToShockRecovery waeren 4 GB mehr); es laesst sie nur stehen.
+  //
+  // EHRLICH: DAS GREIFT SELTEN. sleevecrime.js (gestartet von bn4net.js:548)
+  // ueberschreibt nach Knotenwechsel UND Einbau die Recovery sofort mit
+  // Shoplift - danach steht keine Recovery mehr, die man stehenlassen
+  // koennte. Der Verlust vom Knotenstart (~200 statt ~411 rep/h je Sleeve
+  // ueber 12 h) ist bewusst hingenommen: kein zusaetzliches RAM dafuer,
+  // weder hier noch in sleevecrime.js (Entscheidung 27.09.).
   //
   // AUG-EINBAU SETZT DIE SLEEVES NICHT ZURUECK (Quellcode und Backup):
   // prestigeAugmentation aendert nur die Aufgabe; Exp, Schock und sync
@@ -217,29 +237,56 @@ export async function main(ns) {
   // Der Horizont ist also der ganze Knoten (12-24 h in V1), nicht der
   // Einbauzyklus (2-3,4 h laut backups/INDEX.tsv).
   //
-  // GELDBODEN BLEIBT: Nach jedem Einbau steht das Konto bei 1.000 $, und
-  // dann traegt ein Verbrechen (Mug bei dex/agi 102: 4.500 $/s je Sleeve in
-  // BN5) tatsaechlich etwas bei. Unter GELD_KNAPP also Verbrechen - ausser in
-  // BN8, wo es nichts bringt, und ausser waehrend der Schockerholung, die
-  // sonst fuer den Rest des Knotens weg waere.
-  const SCHOCK_ZIEL = 65;
+  // GELDBODEN MIT HYSTERESE: Nach jedem Einbau steht das Konto bei 1.000 $,
+  // und dann traegt ein Verbrechen (Mug bei dex/agi 102: 4.500 $/s je Sleeve
+  // in BN5) tatsaechlich etwas bei. Unter GELD_KNAPP also Verbrechen, und
+  // zurueck zur Faktion erst ueber GELD_FREI - sonst flattert der Sleeve an
+  // der Schwelle zwischen beidem hin und her. Ausser in BN8, wo Verbrechen
+  // nichts bringt, und ausser waehrend einer noch stehenden Schockerholung.
+  //
+  // KARMA: Sleeve-Verbrechen senken das Karma des Spielers nur mal syncBonus
+  // (`SleeveCrimeWork.ts`, `Player.karma -= crime.karma * syncBonus`), bei
+  // sync 1 % also praktisch gar nicht. Der Wegfall von Shoplift kostet kein
+  // Karma.
+  const SCHOCK_ZIEL = 50;
   const GELD_KNAPP = 10e6;
+  const GELD_FREI = 20e6;
+  const REP_MODUS_FRISCH_MS = 5 * 60000;
   const OHNE_VERBRECHENSGELD = [8];   // BitNode.tsx:769 CrimeMoney 0
   const FAKTION_ARTEN = ["hacking", "security", "field"];
+  let geldKnappMerker = false;        // Hysterese-Zustand, lebt ueber die Takte
 
-  // Wofuer arbeiten? Zuerst das, woran der Spieler gerade arbeitet
-  // (rep-modus.txt von bn4rep.js; steht dort eine Firma, wirft der Aufruf und
-  // die naechste Faktion kommt), dann die Faktionen aus bn4reps Rangliste,
-  // dann alle uebrigen Mitgliedschaften nach Favor (mehr Favor = mehr Rep je
-  // Stunde und naeher an der Spendenschwelle). Zwei Sleeves duerfen nicht fuer
-  // dieselbe Faktion arbeiten (`NetscriptFunctions/Sleeve.ts:152-164`), der
-  // Spieler und ein Sleeve schon - das Spiel prueft es nicht.
+  // Wofuer arbeiten? Nur Faktionen, in denen der Spieler JETZT Mitglied ist
+  // (ns.getPlayer().factions, 0 GB mehr - getPlayer ist geladen; nach einem
+  // Einbau ist die Liste leer, bis neu beigetreten wird), und nur solche mit
+  // noch unverdienten Stuecken (bn4rep.json `offenJeFaktion`). Reihenfolge:
+  //   1. rep-modus.txt - woran der Spieler gerade arbeitet, aber nur, wenn der
+  //      Stempel juenger als 5 min ist (sonst ist die Datei ein Rest).
+  //      Steht dort eine Firma, faellt sie durch den Mitgliedsfilter - AUSSER
+  //      es gibt eine gleichnamige Faktion (Clarke Incorporated, OmniTek, ...),
+  //      in der der Spieler Mitglied ist: dann arbeitet der Sleeve fuer diese
+  //      Faktion, und das ist in Ordnung, solange sie Offenes hat.
+  //   2. zielFaktion und Rangliste aus bn4rep.json.
+  //   3. alle uebrigen Faktionen mit Offenem, groesster Rep-Bedarf zuerst.
+  // Faktionen OHNE Offenes binden keinen Sleeve (CyberSec im BN5L3: alles
+  // eingebaut, Favor 102 - die alte Favor-Sortierung setzte genau dort einen
+  // Sleeve hin). Fehlt `offenJeFaktion` (bn4rep.js aelter als dieser
+  // Umbau), gelten nur Punkt 1 und 2.
+  // Zwei Sleeves duerfen nicht fuer dieselbe Faktion arbeiten
+  // (`NetscriptFunctions/Sleeve.ts:152-164`), der Spieler und ein Sleeve
+  // schon - das Spiel prueft es nicht.
   const faktionsKandidaten = () => {
+    let mitglied = null;
+    try { mitglied = new Set(ns.getPlayer().factions || []); } catch { mitglied = null; }
     const liste = [];
     try {
-      const f = String(liesVonHome(ns, "data/rep-modus.txt") || "").split("|")[0].trim();
-      if (f) liste.push(f);
-    } catch { /* keine Datei - dann nur die Rangliste */ }
+      const [f, stempel] = String(liesVonHome(ns, "data/rep-modus.txt") || "").split("|");
+      const alter = Date.now() - Number(stempel);
+      if (f && f.trim() && Number.isFinite(alter) && alter >= 0 && alter < REP_MODUS_FRISCH_MS) {
+        liste.push(f.trim());
+      }
+    } catch { /* keine Datei - dann nur bn4rep.json */ }
+    let offen = null;
     try {
       const j = JSON.parse(liesVonHome(ns, "data/bn4rep.json") || "null");
       if (j) {
@@ -247,13 +294,17 @@ export async function main(ns) {
         for (const r of (Array.isArray(j.rangliste) ? j.rangliste : [])) {
           if (r && typeof r.faktion === "string") liste.push(r.faktion);
         }
-        const fav = j.favor || {};
-        const rest = (Array.isArray(j.faktionen) ? j.faktionen : []).slice()
-          .sort((a, b) => (Number(fav[b]) || 0) - (Number(fav[a]) || 0));
-        liste.push(...rest);
+        if (j.offenJeFaktion && typeof j.offenJeFaktion === "object") {
+          offen = j.offenJeFaktion;
+          const rest = Object.keys(offen)
+            .sort((a, b) => (Number(offen[b].fehlt) || 0) - (Number(offen[a].fehlt) || 0));
+          liste.push(...rest);
+        }
       }
     } catch { /* kaputtes JSON - dann eben weniger Kandidaten */ }
-    return [...new Set(liste.filter((x) => typeof x === "string" && x))];
+    return [...new Set(liste.filter((x) => typeof x === "string" && x))]
+      .filter((f) => !mitglied || mitglied.has(f))
+      .filter((f) => !offen || (offen[f] && Number(offen[f].anzahl) > 0));
   };
 
   // Teilt ALLE Sleeves eines Takts auf einmal zu - einzeln ginge es nicht,
@@ -273,7 +324,9 @@ export async function main(ns) {
     let knoten = 0, geld = Infinity;
     try { knoten = ns.getResetInfo().currentNode; } catch { knoten = 0; }
     try { geld = ns.getPlayer().money; } catch { geld = Infinity; }
-    const geldKnapp = !OHNE_VERBRECHENSGELD.includes(knoten) && geld < GELD_KNAPP;
+    if (OHNE_VERBRECHENSGELD.includes(knoten)) geldKnappMerker = false;
+    else if (geld < GELD_KNAPP) geldKnappMerker = true;
+    else if (geld > GELD_FREI) geldKnappMerker = false;
     // 1. Laufende Schockerholung stehenlassen, solange ueber dem Ziel.
     for (let j = 0; j < anzahl; j++) {
       if (tasks[j] && tasks[j].type === "RECOVERY" && schock[j] > SCHOCK_ZIEL) {
@@ -281,13 +334,15 @@ export async function main(ns) {
       }
     }
     // 2. Geld knapp: Verbrechen (der Hauptteil waehlt welches).
-    if (geldKnapp) {
+    if (geldKnappMerker) {
       for (let j = 0; j < anzahl; j++) if (!erg[j].ok) erg[j].v1 = "geld-knapp";
       return erg;
     }
     // 3. Faktionsarbeit. Wer schon auf einer der obersten Faktionen arbeitet,
     //    bleibt dort (kein neues startWork, keine Konflikte beim Tauschen);
-    //    die uebrigen bekommen die naechste freie.
+    //    die uebrigen bekommen die naechste freie. `oben` wird ERST NACH dem
+    //    Mitglieds- und Offen-Filter gebildet, sonst belegten Faktionen, die
+    //    gleich wieder herausfallen, die vorderen Plaetze.
     const kandidaten = faktionsKandidaten();
     const oben = kandidaten.slice(0, anzahl);
     const vergeben = new Set();
@@ -303,6 +358,13 @@ export async function main(ns) {
       if (erg[j].ok) continue;
       for (const f of kandidaten) {
         if (vergeben.has(f)) continue;
+        // Arbeitet dieser Sleeve schon dort, nicht neu setzen.
+        const t = tasks[j];
+        if (t && t.type === "FACTION" && t.factionName === f) {
+          vergeben.add(f);
+          erg[j] = { ok: true, was: "faction:" + f + "/" + t.factionWorkType, v1: "faktion", faktion: f };
+          break;
+        }
         let gesetzt = null;
         for (const art of FAKTION_ARTEN) {
           // false = Art nicht angeboten -> naechste Art. Wurf = kein Mitglied,
@@ -406,8 +468,13 @@ export async function main(ns) {
       // `Sleeve.ts:215-225` nullt bei **jeder** Installation saemtliche
       // Erfahrungswerte - das stand im Quellcode und wurde vor dem Kauf nicht
       // gelesen. Der Kauf-Block ist zurueckgenommen; diese Schwelle bleibt,
-      // weil derselbe Zustand nach jedem Augmentierungs-Einbau des Spielers
-      // ohnehin eintritt.
+      // weil derselbe Zustand nach jedem KNOTENWECHSEL ohnehin eintritt.
+      // KORREKTUR 27.09.2026: Hier stand "nach jedem Augmentierungs-Einbau
+      // des Spielers". Das ist falsch - `prestigeAugmentation`
+      // (`PlayerObjectGeneralMethods.ts:118`) setzt nur die AUFGABE der
+      // Sleeves; Exp, Schock und sync bleiben (Backup BN5L3 15:32 -> 16:08
+      // ueber einen Einbau: dex-Exp 11.430 -> 12.176). Genullt wird erst in
+      // `prestigeSourceFile` -> `Sleeve.prestige()` (`Sleeve.ts:228-256`).
       const KONTRAKT_MIN_KAMPF = 40;
       let sleeveKampf = 0, sleeveSkills = null;
       if (inDivision) {
@@ -669,12 +736,33 @@ export async function main(ns) {
         was = paare[platz][0];
         ok = ns.sleeve.setToGymWorkout(i, GYM, was);
       } catch { ok = false; }
-      if (!ok) {
-        // Im Hackingknoten (Geld knapp oder keine Faktion zu haben) oder bei
-        // knappem Konto bewusst ein Verbrechen - welches, rechnet
-        // besteVerbrechen wie das Spiel (oben). Die Konstante VERBRECHEN ist
-        // nur noch der Rueckfall, falls die Werte nicht lesbar waren.
+      if (!ok && keinGym) {
+        // HACKINGWEG (Geld knapp oder keine Faktion zu haben): welches
+        // Verbrechen, rechnet besteVerbrechen wie das Spiel (oben). Laeuft
+        // dasselbe schon, wird es NICHT neu gesetzt - setToCommitCrime legt
+        // eine neue SleeveCrimeWork an und wirft den angefangenen Versuch weg
+        // (Mug 4 s von 60 s Takt = 7 %). getTask ist ohnehin geladen.
         was = sleeveSk ? besteVerbrechen(sleeveSk) : VERBRECHEN;
+        let laeuft = false;
+        try {
+          const t = ns.sleeve.getTask(i);
+          laeuft = !!t && t.type === "CRIME" && t.crimeType === was;
+        } catch { laeuft = false; }
+        if (laeuft) ok = true;
+        else {
+          try { ok = ns.sleeve.setToCommitCrime(i, was); }
+          catch { break; }   // ab hier gibt es keinen Sleeve mehr
+        }
+      }
+      if (!ok) {
+        // AUSSERHALB DES HACKINGWEGS UNVERAENDERT (Skeptiker 27.09.): bei
+        // knappem Konto unter Kampfwert 40 Shoplift, darueber Mug; faellt nur
+        // das Gym aus, VERBRECHEN. Dort trainiert das Gym alle vier Werte,
+        // die Shoplift-Klemme des Hackingwegs tritt so nicht auf - und V2 ist
+        // nicht Gegenstand dieses Umbaus.
+        const sleeveMin = sleeveSk
+          ? Math.min(sleeveSk.strength, sleeveSk.defense, sleeveSk.dexterity, sleeveSk.agility) : 0;
+        was = !gymGeldReicht ? (sleeveMin < 40 ? "Shoplift" : "Mug") : VERBRECHEN;
         try { ok = ns.sleeve.setToCommitCrime(i, was); }
         catch { break; }   // ab hier gibt es keinen Sleeve mehr
       }

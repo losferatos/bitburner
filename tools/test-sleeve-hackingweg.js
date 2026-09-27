@@ -79,6 +79,18 @@ const BN4REP = JSON.stringify({
     { aug: "SmartSonar Implant", faktion: "Slum Snakes" },
     { aug: "Artificial Bio-neural Network Implant", faktion: "BitRunners" },
   ],
+  // Offene Stuecke je Faktion (bn4rep.js schreibt das seit 27.09.). Anzahlen
+  // wie im Backup 17:25 (Skeptiker): CyberSec 0 (fehlt hier ganz), NiteSec
+  // 1, The Black Hand 6, Tetrads 4, Tian Di Hui 2; `fehlt` gesetzt.
+  offenJeFaktion: {
+    "Slum Snakes": { anzahl: 2, fehlt: 9000 },
+    "BitRunners": { anzahl: 6, fehlt: 423000 },
+    "The Black Hand": { anzahl: 6, fehlt: 150000 },
+    "NiteSec": { anzahl: 1, fehlt: 90000 },
+    "Tetrads": { anzahl: 4, fehlt: 10000 },
+    "Tian Di Hui": { anzahl: 2, fehlt: 6000 },
+    "Sector-12": { anzahl: 1, fehlt: 12000 },
+  },
 });
 
 async function fahre(o) {
@@ -88,8 +100,8 @@ async function fahre(o) {
   }));
   const dateien = { "data/verfahren.txt": o.verfahren || ("V1 " + (o.knoten ?? 5) + " 3") };
   if (o.mitRep !== false) {
-    dateien["data/bn4rep.json"] = BN4REP;
-    dateien["data/rep-modus.txt"] = (o.repModus ?? "Slum Snakes") + "|" + W0;
+    dateien["data/bn4rep.json"] = o.bn4rep ?? BN4REP;
+    dateien["data/rep-modus.txt"] = (o.repModus ?? "Slum Snakes") + "|" + (W0 - (o.repModusAlterMs ?? 0));
   }
   const m = neuerMock({
     host: "home",
@@ -105,8 +117,9 @@ async function fahre(o) {
     server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
     dateien: { home: dateien },
     maxSchlaf: o.runden ?? 2,
-    beiSchlaf: (ms, z, vorRuecken) => vorRuecken(1),
+    beiSchlaf: (ms, z, vorRuecken) => { vorRuecken(1); if (o.nachTakt) o.nachTakt(z); },
   });
+  if (o.vorLauf) o.vorLauf(m);
   const modul = argDatei ? await ladeSpielskript(argDatei)
     : (await ladeAusBeiden(ROOT, "sleeve.js")).modul;
   const zurueck = m.uhrStellen();
@@ -142,8 +155,10 @@ console.log("-- BN5, genug Geld: Faktionsarbeit statt Shoplift --");
     a[0].factionName === "Slum Snakes" && a[0].factionWorkType === "security", kurz(m));
   pruefe("Sleeve 1 nimmt die naechste Ranglisten-Faktion mit hacking (BitRunners)",
     a[1].factionName === "BitRunners" && a[1].factionWorkType === "hacking", kurz(m));
-  pruefe("Sleeve 2 danach die mit dem meisten Favor (CyberSec 102)",
-    a[2].factionName === "CyberSec", kurz(m));
+  pruefe("Sleeve 2 danach die Faktion mit dem groessten offenen Rep-Bedarf (The Black Hand)",
+    a[2].factionName === "The Black Hand", kurz(m));
+  pruefe("CyberSec (alles eingebaut, Favor 102) bindet KEINEN Sleeve",
+    !namen.includes("CyberSec"), namen.join(", "));
   const s = stand(m);
   pruefe("die Telemetrie nennt Aufgabe, Faktion und Grund",
     !!s && s.sleeves.every((x) => /^faction:/.test(String(x.aufgabe)) && x.v1 === "faktion"
@@ -190,30 +205,32 @@ console.log("-- BN8: Verbrechen bringt null Dollar, also auch bei knappem Konto 
 
 // ---------------------------------------------------------------------------
 console.log("");
-console.log("-- Schockerholung ueber 65 stehenlassen, darunter arbeiten --");
+console.log("-- Schockerholung ueber 50 stehenlassen, darunter arbeiten --");
 {
-  // Das Spiel setzt beim Knotenwechsel und bei jedem Einbau selbst Recovery.
-  // Ueber Schock 65 ist das die bessere Aufgabe (Rep und Exp gehen mit dem
-  // Quadrat des Schockbonus; Recovery baut dreimal so schnell ab).
+  // Das Spiel setzt bei jedem Einbau selbst Recovery (solange Schock > 0).
+  // Ueber Schock 50 ist das auf den Knotenhorizont (24 h) die bessere
+  // Aufgabe (Recovery baut dreimal so schnell ab). Siehe sleeve.js
+  // "SCHOCK" - in der Praxis greift es selten, weil sleevecrime.js die
+  // Recovery meist schon ueberschrieben hat.
   const hoch = await fahre({ geld: 1e6, koerper: [
     { shock: 90, aufgabe: { type: "RECOVERY" } },
-    { shock: 90, aufgabe: { type: "RECOVERY" } },
     { shock: 60, aufgabe: { type: "RECOVERY" } },
+    { shock: 45, aufgabe: { type: "RECOVERY" } },
   ] });
   const a = aufg(hoch);
-  pruefe("Schock 90 in Recovery: bleibt in Recovery, auch bei knappem Konto",
+  pruefe("Schock 90 und 60 in Recovery: bleiben in Recovery, auch bei knappem Konto",
     a[0].type === "RECOVERY" && a[1].type === "RECOVERY", kurz(hoch));
-  pruefe("Schock 60 in Recovery: wird umgesetzt (hier aufs Verbrechen, Konto knapp)",
+  pruefe("Schock 45 in Recovery: wird umgesetzt (hier aufs Verbrechen, Konto knapp)",
     a[2].type === "CRIME", kurz(hoch));
   const s = stand(hoch);
   pruefe("Telemetrie: recovery mit Schockwert",
     !!s && s.sleeves[0].v1 === "recovery" && s.sleeves[0].schock === 90,
     s ? JSON.stringify(s.sleeves[0]) : "kein Stand");
-  const reich = await fahre({ koerper: [{ shock: 60, aufgabe: { type: "RECOVERY" } }] });
-  pruefe("Schock 60 mit Geld: Faktionsarbeit",
+  const reich = await fahre({ koerper: [{ shock: 45, aufgabe: { type: "RECOVERY" } }] });
+  pruefe("Schock 45 mit Geld: Faktionsarbeit",
     aufg(reich)[0].type === "FACTION", kurz(reich));
   // Und nie selbst Recovery SETZEN - wer nicht darin ist, wird nicht zurueck-
-  // gesetzt (es gibt auch keinen setToShockRecovery-Aufruf, 4 GB gespart).
+  // geholt (es gibt keinen setToShockRecovery-Aufruf, 4 GB gespart).
   const schockNichtRecovery = await fahre({ koerper: [{ shock: 90 }] });
   pruefe("Schock 90 ohne laufende Recovery: Faktionsarbeit (kein Zurueckholen)",
     aufg(schockNichtRecovery)[0].type === "FACTION", kurz(schockNichtRecovery));
@@ -227,41 +244,115 @@ console.log("-- Rueckfall: nie Leerlauf --");
   pruefe("ohne bn4rep-Dateien: Verbrechen, nicht Leerlauf",
     aufg(ohne).every((x) => x.type === "CRIME"), kurz(ohne));
   const keinMitglied = await fahre({ faktionen: [] });
-  pruefe("ohne Mitgliedschaft (Aufruf wirft): Verbrechen, nicht Leerlauf",
+  pruefe("ohne Mitgliedschaft (direkt nach dem Einbau): Verbrechen, nicht Leerlauf",
     aufg(keinMitglied).every((x) => x.type === "CRIME"), kurz(keinMitglied));
   const s = stand(keinMitglied);
   pruefe("und als Rueckfall gekennzeichnet, aber gesetzt",
     !!s && s.sleeves.every((x) => x.gesetzt === true && x.v1 === "rueckfall"),
     s ? JSON.stringify(s.sleeves.map((x) => [x.gesetzt, x.v1])) : "kein Stand");
   const firma = await fahre({ repModus: "Clarke Incorporated", koerper: [{}] });
-  pruefe("steht in rep-modus.txt eine Firma, wird sie uebersprungen",
+  pruefe("steht in rep-modus.txt eine Firma (keine Mitgliedschaft), wird sie uebersprungen",
     aufg(firma)[0].type === "FACTION" && aufg(firma)[0].factionName === "Slum Snakes", kurz(firma));
 }
 
 // ---------------------------------------------------------------------------
 console.log("");
-console.log("-- laufende Faktionsarbeit wird nicht umgeworfen, Aussenseiter umgesetzt --");
+console.log("-- Kandidaten: Mitgliedschaft, offene Stuecke, frischer rep-modus --");
 {
-  const m = await fahre({ koerper: [
-    { aufgabe: { type: "FACTION", factionName: "CyberSec", factionWorkType: "hacking" } },
-    { aufgabe: { type: "FACTION", factionName: "Netburners", factionWorkType: "hacking" } },
-    { aufgabe: { type: "FACTION", factionName: "BitRunners", factionWorkType: "hacking" } },
-  ] });
-  const a = aufg(m);
-  pruefe("CyberSec und BitRunners bleiben (unter den obersten drei)",
-    a[0].factionName === "CyberSec" && a[2].factionName === "BitRunners", kurz(m));
-  pruefe("Netburners (nicht oben) wird auf die freie Spitze gesetzt: Slum Snakes",
-    a[1].factionName === "Slum Snakes", kurz(m));
-  pruefe("keine Faktion doppelt", new Set(a.map((x) => x.factionName)).size === 3, kurz(m));
+  // Mitgliedschaft wird VOR `oben` gefiltert: ohne BitRunners rueckt die
+  // naechste Faktion mit Offenem nach, statt dass Sleeve 1 in den Rueckfall
+  // faellt.
+  const ohneBR = await fahre({ faktionen: FAKTIONEN.filter((f) => f !== "BitRunners") });
+  const a = aufg(ohneBR);
+  pruefe("ohne Mitgliedschaft BitRunners: kein Sleeve dort, alle drei auf Faktionen",
+    a.every((x) => x.type === "FACTION") && !a.some((x) => x.factionName === "BitRunners"), kurz(ohneBR));
+  pruefe("und die Luecke fuellt die naechste mit Offenem (The Black Hand, NiteSec)",
+    a[1].factionName === "The Black Hand" && a[2].factionName === "NiteSec", kurz(ohneBR));
+  const frisch = await fahre({ repModus: "Tian Di Hui", repModusAlterMs: 60000, koerper: [{}] });
+  pruefe("rep-modus 1 min alt: Sleeve 0 arbeitet dort (Tian Di Hui)",
+    aufg(frisch)[0].factionName === "Tian Di Hui", kurz(frisch));
+  const alt = await fahre({ repModus: "Tian Di Hui", repModusAlterMs: 10 * 60000, koerper: [{}] });
+  pruefe("rep-modus 10 min alt: ignoriert, es gilt die zielFaktion (Slum Snakes)",
+    aufg(alt)[0].factionName === "Slum Snakes", kurz(alt));
+  // Ohne offenJeFaktion (altes bn4rep.js): nur rep-modus, Ziel, Rangliste.
+  const altesBn4rep = JSON.parse(BN4REP);
+  delete altesBn4rep.offenJeFaktion;
+  const ohneOffen = await fahre({ bn4rep: JSON.stringify(altesBn4rep) });
+  const b = aufg(ohneOffen);
+  pruefe("ohne offenJeFaktion: Slum Snakes und BitRunners, der dritte Rueckfall (kein CyberSec)",
+    b[0].factionName === "Slum Snakes" && b[1].factionName === "BitRunners" && b[2].type === "CRIME",
+    kurz(ohneOffen));
 }
 
 // ---------------------------------------------------------------------------
 console.log("");
-console.log("-- ausserhalb des Hackingwegs aendert sich nichts --");
+console.log("-- laufende Arbeit wird nicht neu gesetzt, Aussenseiter umgesetzt --");
+{
+  const m = await fahre({ koerper: [
+    { aufgabe: { type: "FACTION", factionName: "The Black Hand", factionWorkType: "hacking", marke: 1 } },
+    { aufgabe: { type: "FACTION", factionName: "CyberSec", factionWorkType: "hacking" } },
+    { aufgabe: { type: "FACTION", factionName: "BitRunners", factionWorkType: "hacking", marke: 3 } },
+  ] });
+  const a = aufg(m);
+  pruefe("The Black Hand und BitRunners bleiben - dasselbe Objekt, kein neues startWork",
+    a[0].marke === 1 && a[2].marke === 3, kurz(m));
+  pruefe("CyberSec (nichts offen) wird auf die freie Spitze gesetzt: Slum Snakes",
+    a[1].factionName === "Slum Snakes", kurz(m));
+  pruefe("keine Faktion doppelt", new Set(a.map((x) => x.factionName)).size === 3, kurz(m));
+  // Dasselbe Verbrechen laeuft schon: nicht neu setzen (Mug-Versuch bleibt).
+  const v = await fahre({ geld: 1e6, koerper: [
+    { aufgabe: { type: "CRIME", crimeType: "Mug", marke: 7 } }] });
+  pruefe("laufendes Mug bei knappem Konto: dasselbe Objekt, nicht neu gesetzt",
+    aufg(v)[0].marke === 7 && aufg(v)[0].crimeType === "Mug", kurz(v));
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Geldboden mit Hysterese: knapp unter 10 Mio, frei erst ueber 20 Mio --");
+{
+  const verlauf = [];
+  let takt = 0;
+  const folge = [5e6, 15e6, 25e6, 15e6];
+  const m = await fahre({
+    geld: folge[0], runden: folge.length, koerper: [{}],
+    nachTakt: (z) => {
+      const a = z.koerper[0].aufgabe || {};
+      verlauf.push(a.type);
+      takt++;
+      if (takt < folge.length) z.spieler.money = folge[takt];
+    },
+  });
+  pruefe("5 Mio: Verbrechen; 15 Mio: weiter Verbrechen; 25 Mio: Faktion; 15 Mio: bleibt Faktion",
+    JSON.stringify(verlauf) === JSON.stringify(["CRIME", "CRIME", "FACTION", "FACTION"]),
+    JSON.stringify(verlauf) + " " + kurz(m));
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- ausserhalb des Hackingwegs exakt wie vorher --");
 {
   const m = await fahre({ verfahren: "V2 10 2", knoten: 10, koerper: [{}, {}] });
   pruefe("V2 mit Geld: Gym wie bisher, keine Faktionsarbeit",
     aufg(m).every((x) => x.type === "CLASS"), kurz(m));
+  // V2 bei knappem Konto (Rueckstand frisst das Gymgeld): die ALTE Regel,
+  // sleeveMin < 40 -> Shoplift, auch wenn Mug hier sicher waere.
+  const arm = await fahre({ verfahren: "V2 10 2", knoten: 10, geld: 50e6,
+    koerper: [{ storedCycles: 144000 }] });
+  pruefe("V2 arm, str/def 1, dex/agi 102: Shoplift wie im alten Code (nicht Mug)",
+    aufg(arm)[0].type === "CRIME" && aufg(arm)[0].crimeType === "Shoplift", kurz(arm));
+  const armStark = await fahre({ verfahren: "V2 10 2", knoten: 10, geld: 50e6,
+    koerper: [{ storedCycles: 144000, skills: { hacking: 1, strength: 60, defense: 60,
+      dexterity: 60, agility: 60, charisma: 1, intelligence: 24 } }] });
+  pruefe("V2 arm, alle Kampfwerte 60: Mug wie im alten Code",
+    aufg(armStark)[0].crimeType === "Mug", kurz(armStark));
+  // Gym-Fehlschlag bei genug Geld: die Konstante VERBRECHEN (Shoplift),
+  // obwohl besteVerbrechen hier Mug waehlen wuerde.
+  const gymKaputt = await fahre({ verfahren: "V2 10 2", knoten: 10, geld: 1e9,
+    koerper: [{ skills: { hacking: 1, strength: 200, defense: 200, dexterity: 200, agility: 200,
+      charisma: 1, intelligence: 24 } }],
+    vorLauf: (mm) => { mm.ns.sleeve.setToGymWorkout = () => false; } });
+  pruefe("V2 Gym-Fehlschlag: VERBRECHEN = Shoplift wie im alten Code",
+    aufg(gymKaputt)[0].crimeType === "Shoplift", kurz(gymKaputt));
 }
 
 console.log("");

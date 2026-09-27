@@ -545,6 +545,8 @@ export function neuerMock(o = {}) {
       ...zustand.spieler,
       totalPlaytime: zustand.playtime,
       skills: { ...zustand.spieler.skills },
+      // Wie im Spiel (NetscriptFunctions.ts:1385): die Mitgliedsliste.
+      factions: zustand.faktionen.slice(),
     }),
     getResetInfo: () => ({ ...zustand.resetInfo }),
     getHackingLevel: () => zustand.spieler.skills.hacking,

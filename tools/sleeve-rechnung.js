@@ -141,6 +141,9 @@ export const crimeGeldJeSek = (sk, name, bn) =>
 
 // ClassWork.tsx Algorithms (hackExp 4, 320 $), Rothman costMult 3 expMult 2
 const UNI = { hackExp: 4, geld: 320, expMult: 2, costMult: 3 };
+// ZB Institute of Technology, Volhaven: expMult 4, costMult 5
+// (LocationsMetadata.ts:421-426) - braucht eine Reise (ns.sleeve.travel, +4 GB).
+const UNI_ZB = { hackExp: 4, geld: 320, expMult: 4, costMult: 5 };
 
 // --- Simulation -------------------------------------------------------------
 //
@@ -155,8 +158,8 @@ function neu(start) {
     int: start.int, shock: start.shock, sync: start.sync };
 }
 
-function zyklusExp(sl, typ, bn) {
-  if (typ === "uni") return { hacking: UNI.hackExp * UNI.expMult / CPS };
+function zyklusExp(sl, typ, bn, uni = UNI) {
+  if (typ === "uni") return { hacking: uni.hackExp * uni.expMult / CPS };
   if (typ.startsWith("crime:")) return null;   // stueckweise, siehe unten
   const e = {};
   for (const [k, v] of Object.entries(FAKTION_EXP[typ])) e[k] = v * bn.FactionWorkExpGain / CPS;
@@ -168,7 +171,7 @@ function zyklusExp(sl, typ, bn) {
  *                      | "sync" | "crime:Shoplift" | "crime:Mug" | "best"
  * "best" = die Faktionsart mit der hoechsten Rate jetzt (so baut es sleeve.js).
  */
-export function simuliere({ start, policy, bn, stunden, n = 3, favor = 0, arten = ["hacking", "security", "field"], spielerInt = 147, share = 1 }) {
+export function simuliere({ start, policy, bn, stunden, n = 3, favor = 0, arten = ["hacking", "security", "field"], spielerInt = 147, share = 1, uni = UNI }) {
   const sl = neu(start);
   let rep = 0, geld = 0, crimeRest = 0;
   const schritte = Math.round(stunden * 3600);
@@ -205,9 +208,9 @@ export function simuliere({ start, policy, bn, stunden, n = 3, favor = 0, arten 
       }
       continue;
     }
-    const e = zyklusExp(sl, typ, bn);
+    const e = zyklusExp(sl, typ, bn, uni);
     for (const [k, v] of Object.entries(e)) sl.exp[k] += v * shockB * zyk * teiler;
-    if (typ === "uni") { geld -= UNI.geld * UNI.costMult / CPS * zyk; continue; }
+    if (typ === "uni") { geld -= uni.geld * uni.costMult / CPS * zyk; continue; }
     rep += repJeZyklus(sk, typ, favor, bn, 1, share) * shockB * zyk;
   }
   return { repJeStunde: rep / stunden, geldJeStunde: geld / stunden, ende: { ...skills(sl, bn), shock: sl.shock, sync: sl.sync } };
@@ -324,6 +327,10 @@ function vergleich(e) {
   const f = (x) => Math.round(x).toLocaleString("de-DE");
   const k = (n) => (n.startsWith("crime") ? n : n);
 
+  // FAVOR 0 IN DEN TABELLEN: Die Zeilen rechnen mit Favor 0. Die echten
+  // Zielfaktionen haben mehr (BitRunners 53, NiteSec 81, Backup 16:08); die
+  // Rep-Rate skaliert mit (1 + Favor/100), der Sleeve-Anteil ist also um den
+  // Faktor 1,5-2 unterschaetzt. Eine Zeile mit Favor 53 steht zum Vergleich.
   for (const [lage, start, favor] of [["JETZT (BN5L3, Backup 16:08, Schock 64, dex/agi 102)", jetzt, 0],
     ["KNOTENSTART (Schock 100, alles 1)", bnStart, 0]]) {
     console.log("\n== " + lage + " ==");
@@ -342,11 +349,20 @@ function vergleich(e) {
         lauf("Faktion security", () => "security");
         lauf("Faktion beste Art", () => "best");
         lauf("Faktion nur hacking-Art (BitRunners)", () => "best", { arten: ["hacking"] });
-        lauf("Uni 1h, dann beste", (t) => (t < 1 ? "uni" : "best"));
-        lauf("Uni 3h, dann beste", (t) => (t < 3 ? "uni" : "best"));
-        lauf("Recovery 2h, dann beste", (t) => (t < 2 ? "recovery" : "best"));
-        lauf("Recovery bis 0, dann beste", (t, sl) => (sl.shock > 0 ? "recovery" : "best"));
-        lauf("Synchronize 3h, dann beste", (t) => (t < 3 ? "sync" : "best"));
+        // Folgepolitik ist "hacking", nicht "best": "best" ist kurzsichtig
+        // (waehlt security, solange dex/agi vorn liegen) und lag selbst ueber
+        // 24 h 23 % unter "immer hacking" - sie haette jede Vorphase
+        // schlechtgerechnet (Skeptiker 27.09.).
+        lauf("Uni Rothman 1h, dann hacking", (t) => (t < 1 ? "uni" : "hacking"));
+        lauf("Uni Rothman 3h, dann hacking", (t) => (t < 3 ? "uni" : "hacking"));
+        lauf("Uni ZB 1h, dann hacking (+Reise)", (t) => (t < 1 ? "uni" : "hacking"), { uni: UNI_ZB });
+        lauf("Uni ZB 3h, dann hacking (+Reise)", (t) => (t < 3 ? "uni" : "hacking"), { uni: UNI_ZB });
+        lauf("Recovery 2h, dann hacking", (t) => (t < 2 ? "recovery" : "hacking"));
+        lauf("Recovery 4h, dann hacking", (t) => (t < 4 ? "recovery" : "hacking"));
+        lauf("Recovery bis 50, dann hacking", (t, sl) => (sl.shock > 50 ? "recovery" : "hacking"));
+        lauf("Recovery bis 0, dann hacking", (t, sl) => (sl.shock > 0 ? "recovery" : "hacking"));
+        lauf("Synchronize 3h, dann hacking", (t) => (t < 3 ? "sync" : "hacking"));
+        lauf("Faktion hacking, Favor 53 (BitRunners)", () => "hacking", { favor: 53.28 });
         console.log("    Horizont " + h + " h  (je Sleeve; Spieler BN5 gemessen " + f(spieler) + " rep/h)");
         for (const [name, r] of zeilen) {
           console.log("      " + k(name).padEnd(38) + (" rep/h " + f(r.repJeStunde)).padEnd(16)

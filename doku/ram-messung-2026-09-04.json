@@ -1,8 +1,8 @@
 [
  {
   "file": "bn4rep.js",
-  "live41": 854.05,
-  "lokal41": 854.05,
+  "live41": 934.05,
+  "lokal41": 934.05,
   "diff": 0,
   "lokal42": 220.75,
   "lokal43": 63.25,
@@ -29,10 +29,10 @@
   "singKosten41": 840,
   "dom": 0,
   "err": null,
-  "bytes": 148301,
+  "bytes": 152456,
   "lines": 2181,
-  "sha256": "26dbbf755496f391ed779511ab278153bd62aef7297e89b7d92a4a7ac88e0659",
-  "gemessenAm": "2026-09-27T10:25:44.776Z",
+  "sha256": "393b65abb3cd156bfce544a2811925dbde6c58bf701a1eb0c026bc5f0a93d4e8",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -57,8 +57,8 @@
  },
  {
   "file": "kampfaugs.js",
-  "live41": 387.95,
-  "lokal41": 387.95,
+  "live41": 390.95,
+  "lokal41": 390.95,
   "diff": 0,
   "lokal42": 99.85,
   "lokal43": 27.85,
@@ -74,17 +74,17 @@
   "singKosten41": 384,
   "dom": 0,
   "err": null,
-  "bytes": 12203,
+  "bytes": 12994,
   "lines": 249,
   "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap.",
-  "sha256": "f4be5aac4fab5ddcf44b3c31d274376d76ad6c3413a136088ea7362a766d6bd6",
-  "gemessenAm": "2026-09-27T10:26:18.061Z",
+  "sha256": "01f64221b744a0255a394ac7a52d4ba54479c003cf20e25b981136cd2ad72e47",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
   "file": "joinrun.js",
-  "live41": 376.45,
-  "lokal41": 376.45,
+  "live41": 392.45,
+  "lokal41": 392.45,
   "diff": 0,
   "lokal42": 95.35,
   "lokal43": 26.35,
@@ -101,10 +101,10 @@
   "singKosten41": 368,
   "dom": 0,
   "err": null,
-  "bytes": 13382,
+  "bytes": 18336,
   "lines": 145,
-  "sha256": "4ff0c3c66cbfc296c2ad4eb9a73140064c679f75e93389d15c1f422fea495a66",
-  "gemessenAm": "2026-09-27T10:25:44.776Z",
+  "sha256": "a22efa53ccb75ee88757b9e53c4ad8a91b9036710d2fb4fbb19e0b3c286d5c4a",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -171,10 +171,10 @@
   "singKosten41": 288,
   "dom": 0,
   "err": null,
-  "bytes": 33336,
+  "bytes": 35674,
   "lines": 438,
-  "sha256": "a85b40d56c4834b556d37168975069a661c031cf47d737ff685f978b5d4b2b12",
-  "gemessenAm": "2026-09-27T10:25:44.776Z",
+  "sha256": "6f2b027dc83f039c2bcec3fbfbb622cb018bc3b0f59ecc0f0d6d217eb6567232",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -299,11 +299,11 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 229980,
+  "bytes": 246521,
   "lines": 4145,
-  "sha256": "6e5af142ca649a00945a88f3519301d2fbf7cdc0428c6b3f1f1974d5e4237b0d",
-  "gemessenAm": "2026-09-11T06:10 calculateRam im Spiel (100.35 mit SF4, 175.35 ohne)",
-  "quelle": "calculateRam per Bruecke (RPC) nach dem Hot-Swap vom 06.09.2026"
+  "sha256": "46720abd1f041ba1a22220d629b47ba6d98dae963829e7a55791aa2b8aad376b",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
   "file": "augcount.js",
@@ -749,11 +749,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 23257,
+  "bytes": 27345,
   "lines": 415,
-  "sha256": "8c3f7189f8ff096b69b037d50eff0c385cc412ba052fa5d6420ada98d4d897b4",
-  "gemessenAm": "2026-09-04T17:43:56.015Z",
-  "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+  "sha256": "6dee2a0c4d5cb6aaa68d11c8f9990c260d9dc0d65e2b56214e6b5a165ec96fdc",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
   "file": "exportbonus.js",
@@ -1040,10 +1040,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 301934,
+  "bytes": 306749,
   "lines": 5015,
-  "sha256": "6f3bed3002cc38ef829c86f6ddc72459b042558d6cf43ebae1f4d9f80de75ccf",
-  "gemessenAm": "2026-09-27T10:25:44.776Z",
+  "sha256": "683dd9e252462286672ffa4c083df2a4df368ce40d74efabe0aed5f55a5e9f0d",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
@@ -1883,10 +1883,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 28140,
+  "bytes": 41779,
   "lines": 370,
-  "sha256": "72be9f6d90205363df975e748219d0dd0146c48a859b35f60af51c935709fd28",
-  "gemessenAm": "2026-09-27T10:26:18.061Z",
+  "sha256": "723585409a088cba92d5caca8557f0095519607410961e06ee43dc7732272409",
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
@@ -1973,5 +1973,15 @@
   "bytes": 73665,
   "gemessenAm": "2026-09-04T17:43:56.015Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
+ },
+ {
+  "file": "lib/einbau.js",
+  "live41": 1.6,
+  "lokal41": 1.6,
+  "diff": 0,
+  "sha256": "5a3fa91cc9bc81a391465bcbbe1bf9df604a10271fd2681dd8851f4725a41246",
+  "bytes": 23796,
+  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  }
 ]

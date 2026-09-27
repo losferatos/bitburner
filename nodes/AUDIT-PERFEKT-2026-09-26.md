@@ -173,3 +173,9 @@ Laufen als Branches (je Worktree, danach Opus-Skeptiker):
 - ZURUECKGESTELLT: Vorab-Pruefung BN2/BN3/BN11 und BN8 (Auftragstexte stehen im Verlauf; vor BN2 bzw. BN8 neu ansetzen).
 - BN12-Pruefung fertig (nodes/audit-2026-09-26/bn12-bericht.md): kein BLOCKER. Offen H1 ServerWeakenRate in der Vorbereitung (bn4net WEAKEN_POWER, 2-6 % zu viel, mehr Wellen); H2 Einbau-Trigger kennt die 31 nicht (bn4rep :1369-1375, ein Zyklus ~1,7 h wenn der Einbau genau bei 30 landet); Rest MINOR.
 - E1 Urteil (bcb49c6): (a) Gratis-Server nach Sprung -> Increase Maximum Money schlaegt Verkauf deutlich (3 h: 5,3 Mrd vs 0,24 Mrd), relativ klein (~5 % Zykluseinkommen); (b) Hacknet-Kauf in V1 nicht fertig gerechnet. Nicht gebaut - naechste Runde, mit Skeptiker.
+
+## Einspielung 27.09. 14:31 (master 985ff09 + Eichung)
+
+Im Spiel: B5 Stapelziele nach Durchsatz (+19..41 % gerechnet, mit Vorbereitungsabschlag und ohne Flattern), H1 ServerWeakenRate (BN12), H2 Daedalus-Fuellstueck bei Schwelle-1 (BN12: 31), G joinrun (Marke auf home, isRunning mit Arg, Reise in der Schleife, kein Ueberschiessen, kein fremder Stopp), D-a/D-b Bladeburner (wirkt erst in V2 ab BN2). Neustarts mit PID-Beleg: bn4net, bn4rep, bn4life, sleeve. RAM live gemessen (bn4rep 68,55, joinrun 32,45 GB), test-ram gruen mit 122 Zeilen.
+Zurueckgenommen: C5 (zwei Blocker im Integrationsskeptiker) - Neuentwurf steht in BAUSTELLEN "Audit 27.09. Rest".
+Verworfen mit Zahlen: B4 (Geld in Augs statt RAM, solange Augs kommen), E2 share (gehoert zur RAM-Wertfrage), E1 nur Urteil (Gratis-Server lohnt Max-Money, klein).

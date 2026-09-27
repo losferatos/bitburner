@@ -136,3 +136,5 @@ Laufen als Branches (je Worktree, danach Opus-Skeptiker):
 - G joinrun: G1 einmal je Zyklus, G2 kein Haemmern / Ursache "abgelehnt", Ueberschiessen, Wertrechnung
 - E1 Hashes in V1: Urteil mit Zahlen, Bau nur bei klarem Gewinn
 - BN12-Einstiegspruefung (Opus, nur lesen)
+- 13:00 Wochenlimit riss alle Auftraege ab; fortgesetzt (sparsam): BN12-Pruefung, G, B4, B5, D-a, D-b, E1.
+- ZURUECKGESTELLT: Vorab-Pruefung BN2/BN3/BN11 und BN8 (Auftragstexte stehen im Verlauf; vor BN2 bzw. BN8 neu ansetzen).

@@ -408,9 +408,23 @@ export function neuerMock(o = {}) {
     isRunning: (was, host, ...args) => {
       // Zwei Aufrufformen wie im Spiel: per PID oder per Dateiname.
       if (typeof was === "number") return zustand.prozesse.some((p) => p.pid === was);
+      // GENAUE ARGUMENTLISTE, AUCH WENN LEER (27.09.2026, Audit G1).
+      //
+      // Hier stand `args.length === 0 || args.every(...)` - ohne Argumente
+      // galt das als Treffer auf JEDEN laufenden Prozess mit passendem Namen
+      // und Wirt, egal mit welchen Argumenten er lief. Das Spiel prueft anders
+      // (NetscriptHelpers.tsx, scriptIdentifier: `_args === undefined ? [] :
+      // ...` - keine Argumente heisst LEERE Liste, nicht "beliebig"). Ein
+      // Skript, das mit einem Argument laeuft (`ns.exec("joinrun.js","home",
+      // 1,80)`), wird von `ns.isRunning("joinrun.js","home")` im echten Spiel
+      // NIE gefunden - genau der Fehler, den bn4life.js hatte (Audit G1: zwei
+      // gleichzeitige joinrun.js-Prozesse auf home, belegt im Spielstand der
+      // 09:08-Sicherung vom 27.09.2026). Ein Mock, der das glaettet, haette
+      // diesen Fehler nie zeigen koennen.
       return zustand.prozesse.some((p) => p.filename === was &&
         (host === undefined || p.host === host) &&
-        (args.length === 0 || args.every((a, i) => String(p.args[i]) === String(a))));
+        p.args.length === args.length &&
+        args.every((a, i) => String(p.args[i]) === String(a)));
     },
     getRunningScript: () => null,
     getScriptRam: (datei, host) =>

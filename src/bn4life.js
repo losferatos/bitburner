@@ -162,9 +162,33 @@ export async function main(ns) {
     const BEITRITT_MARKE = "data/beitritt-erledigt.txt";
     // Derselbe Boden wie in joinrun.js vor gymWorkout (dort 5e6).
     const JOINRUN_GELD_BODEN = 5e6;
+    // Derselbe Zielwert, mit dem joinrun.js unten gestartet wird (Audit G1) -
+    // eine einzige Konstante statt zweier Literale, die auseinanderlaufen
+    // koennten.
+    const JOINRUN_ZIEL = 80;
     const letzterEinbau = ns.getResetInfo().lastAugReset;
-    const markeGilt = ns.fileExists(BEITRITT_MARKE, "home")
-      && Number(ns.read(BEITRITT_MARKE)) >= letzterEinbau;
+    // NACHHOME/LIESVONHOME STATT ns.fileExists/ns.read (27.09.2026, Audit G1).
+    //
+    // Hier stand `ns.fileExists(BEITRITT_MARKE, "home")` (prueft home) neben
+    // `Number(ns.read(BEITRITT_MARKE))` OHNE Host-Parameter - `ns.read` liest
+    // IMMER vom eigenen Rechner (NetscriptFunctions.ts:1120ff, siehe
+    // lib/hostdatei.js, dort steht `boerse.js` als genau dieselbe
+    // Fehlerklasse: "Waechter auf home, gelesen wird LOKAL - falsch"). Der
+    // Schreiber (weiter unten) hatte dasselbe Loch: `ns.write(...)` ohne Host
+    // schreibt lokal, nicht auf home.
+    //
+    // bn4life.js hat `hostRule: "werkbank"` und lief zum Vorfallszeitpunkt auf
+    // "I.I.I.I", nicht auf home - belegt im Spielstand der 09:08-Sicherung
+    // vom 27.09.2026 (AllServersSave, home.runningScripts): dort liefen ZWEI
+    // joinrun.js-Prozesse gleichzeitig auf home, waehrend bn4life.js selbst
+    // auf I.I.I.I stand. Die Marke landete beim Schreiben also nie auf home,
+    // `markeGilt` blieb fuer immer false, und joinrun.js startete nach jedem
+    // natuerlichen Fristablauf (FRIST_MS, 45 min) erneut - ganz ohne dass ein
+    // bn4life-Neustart noetig gewesen waere. `liesVonHome`/`nachHome` sind
+    // oben schon importiert (fuer data/reload.txt und data/task.txt) und
+    // kosten hier nichts zusaetzlich.
+    const markeRoh = liesVonHome(ns, BEITRITT_MARKE);
+    const markeGilt = markeRoh !== "" && Number(markeRoh) >= letzterEinbau;
     // DIE DAEDALUS-SCHWELLE LEBT IN joinrun.js, NICHT HIER (26.09.2026,
     // Skeptiker-Rework nach Paket C.2).
     //
@@ -188,10 +212,19 @@ export async function main(ns) {
     // fand keinen Platz (tools/test-bn4life-beitritt.js). Die Marke wird
     // erst beim Start gesetzt - der Lauf entfaellt nicht, er kommt spaeter,
     // und seine 45-Minuten-Frist geht nicht mehr mit Warten verloren.
+    // DIESELBE ARGUMENTLISTE WIE BEIM START (27.09.2026, Audit G1).
+    //
+    // `ns.isRunning(script, host)` OHNE weitere Argumente prueft auf eine
+    // LEERE Argumentliste (NetscriptHelpers.tsx, scriptIdentifier: `_args ===
+    // undefined ? [] : scriptArgs(...)`) - joinrun.js laeuft aber immer mit
+    // dem Zielwert 80 (`ns.exec("joinrun.js", "home", 1, JOINRUN_ZIEL)`
+    // unten). Die Pruefung fand das laufende Skript deshalb NIE, egal ob es
+    // lief oder nicht - direkt belegt im Spielstand der 09:08-Sicherung:
+    // ZWEI joinrun.js-Prozesse gleichzeitig auf home, beide mit Argument 80.
     if (!ns.fileExists("data/bn4-stop.txt", "home")
         && !markeGilt
         && geld >= JOINRUN_GELD_BODEN
-        && !ns.isRunning("joinrun.js", "home")
+        && !ns.isRunning("joinrun.js", "home", JOINRUN_ZIEL)
         && !ns.isRunning("netburn.js", "home")) {
       const drin = ns.getPlayer().factions;
       const fehlend = ["Netburners", "Tetrads", "Tian Di Hui", "Slum Snakes"]
@@ -200,14 +233,16 @@ export async function main(ns) {
       // bn4rep beim naechsten Ziel ohnehin mit, und der Trainingslauf haelt
       // die Faktionsarbeit an.
       if (fehlend.length >= 2 && ns.fileExists("joinrun.js", "home")) {
-        const pid = ns.exec("joinrun.js", "home", 1, 80);
+        const pid = ns.exec("joinrun.js", "home", 1, JOINRUN_ZIEL);
         if (pid) {
           sag("Nach Einbau: " + fehlend.length + " Faktionen fehlen ("
             + fehlend.join(", ") + ") - joinrun.js gestartet (pid " + pid + ").");
           if (ns.fileExists("netburn.js", "home")) ns.exec("netburn.js", "home");
           // Der Zeitstempel des EINBAUS, nicht die aktuelle Uhrzeit - nur so
-          // wird die Marke beim naechsten Einbau von selbst ungueltig.
-          ns.write(BEITRITT_MARKE, String(letzterEinbau), "w");
+          // wird die Marke beim naechsten Einbau von selbst ungueltig. UEBER
+          // nachHome (Audit G1): sonst verpufft der Schreibvorgang auf der
+          // Werkbank, siehe Begruendung oben bei markeGilt.
+          nachHome(ns, BEITRITT_MARKE, String(letzterEinbau));
         }
       }
     }

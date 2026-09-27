@@ -35,6 +35,9 @@ export async function main(ns) {
   const z = [];
   let figSeq = null;
   let figGrundLetzt = null;
+  // Laeuft der Kurs, den joinrun selbst gestartet hat? Nur dann wird der
+  // Figur-Antrag waehrend des Trainings erneuert (Begruendung in der Schleife).
+  let eigenesTraining = false;
 
   const sag = (t) => {
     z.push(`${new Date().toTimeString().slice(0, 8)} ${t}`);
@@ -141,6 +144,21 @@ export async function main(ns) {
         // Werte steigen ohnehin - bbtrain zieht sie auf 100, joinruns Ziel ist
         // 80. Es wartet einfach, bis sie da sind.
         const trainiertSchon = arbeit && arbeit.type === "CLASS";
+        // DAS EIGENE TRAINING HAELT DIE FIGUR (27.09.2026, Integrationspruefung).
+        //
+        // Der Antrag wurde nur gestellt, solange KEIN Kurs lief. Lief das
+        // eigene Training, verfiel er nach ANTRAG_TTL_MS (150 s), die Lease
+        // nach LEASE_MS (15 min) - dann bekam bn4rep (faktion, 30) die Figur,
+        // workForFaction beendete das Gym, und joinrun holte sie sich 15 s
+        // spaeter mit 25 zurueck: Ping-Pong im 15-Minuten-Takt mit
+        // Kursneustart (tools/test-joinrun-ebene2.js, Abschnitt 5). Ein
+        // FREMDER Kurs (bbtrain.js, gym 40) wird bewusst nicht beantragt -
+        // sonst nahme joinrun ihm die Figur weg, ohne selbst etwas zu tun.
+        if (trainiertSchon && eigenesTraining) {
+          figBeantrage(ns, "joinrun.js", FIG_PRIO.beitritt, "gym",
+            arbeit.classType || naechst.kurz, "Kampfwerte fuer Slum Snakes/Tetrads/Tian Di Hui");
+        }
+        if (!trainiertSchon) eigenesTraining = false;
         // Geldboden wie in bbtrain.js (02.09.2026): unter 5 Mio kein Gym, sonst
         // zieht das Powerhouse (2.400 $/s) das Konto ins Minus - und dann kauft
         // niemand mehr Portknacker oder Rechner.
@@ -181,7 +199,10 @@ export async function main(ns) {
           }
           figGrundLetzt = null;
           if (!s.gymWorkout("Powerhouse Gym", naechst.kurz, true)) sag(`gymWorkout(${naechst.kurz}) abgelehnt.`);
-          else sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
+          else {
+            eigenesTraining = true;
+            sag(`Training ${naechst.feld} (${w[naechst.feld]} von ${ZIEL}).`);
+          }
         }
         await ns.sleep(15000);
       }

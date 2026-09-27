@@ -233,6 +233,95 @@ console.log("-- 4. die Daedalus-Schwelle: 29/30/31 gegen BN12 (31), throws -> fa
 }
 
 console.log("");
+console.log("-- 5. ueber die Lease hinaus: joinrun haelt sein eigenes Training (Integration, 27.09.2026) --");
+{
+  /**
+   * DER FALL, DEN ABSCHNITT 3 NICHT SIEHT. Abschnitt 3 laeuft 10 Ticks zu
+   * 15 s = 150 s - weit unter LEASE_MS (15 min). joinrun erneuerte seinen
+   * Antrag nur, solange KEIN Kurs lief (`if (!trainiertSchon)`); sobald sein
+   * eigenes Training stand, verfiel der Antrag nach ANTRAG_TTL_MS (150 s), die
+   * Lease lief 15 min nach der letzten Erneuerung ab, und der naechste
+   * bn4rep-Antrag (faktion, 30) bekam die Figur. bn4rep ruft dann
+   * workForFaction - das beendet das Gym. joinrun beantragt 15 s spaeter
+   * wieder mit 25 und gewinnt: ein Ping-Pong im 15-Minuten-Takt, genau das,
+   * was lib/figur.js verhindern soll.
+   *
+   * Hier spielt der Schiedsrichter bn4rep MIT seiner Handlung nach: haelt
+   * bn4rep die Figur und laeuft keine Faktionsarbeit, startet es sie (so wie
+   * bn4rep.js :2374ff. nach `figFrei`). 90 Ticks = 22,5 min > 15 min Lease.
+   */
+  let gymStarts = 0;
+  let bn4repUebernahmen = 0;
+  const schiri = baueSchiedsrichter({ konkurrenz: true });
+  const m = await fahre({
+    konkurrenz: true,
+    runden: 90,
+    beiSchlaf: (ms, z, vor) => {
+      schiri(ms, z, vor);
+      const dh = z.dateien.home || {};
+      let v = null;
+      try { v = dh["data/figure.txt"] ? JSON.parse(dh["data/figure.txt"]) : null; } catch { v = null; }
+      if (v && v.owner === "bn4rep.js" && !(z.arbeit && z.arbeit.type === "FACTION")) {
+        z.arbeit = { type: "FACTION", factionName: "CyberSec", factionWorkType: "hacking" };
+        bn4repUebernahmen++;
+      }
+    },
+  });
+  // gymWorkout zaehlen: der Mock kennt keinen Zaehler, also am Ende aus dem
+  // Protokoll von joinrun.js lesen ("Training <feld> (...)").
+  const log = m.lies("home", "data/joinrun.txt") || "";
+  gymStarts = (log.match(/Training (strength|defense|dexterity|agility) \(/g) || []).length;
+  pruefe("bn4rep bekommt die Figur waehrend joinrun trainiert NIE (kein Ablauf der Lease)",
+    bn4repUebernahmen === 0, bn4repUebernahmen + " Uebernahme(n) durch bn4rep in 22,5 min");
+  pruefe("genau EIN Gym-Start in 22,5 min (kein 15-Minuten-Ping-Pong)",
+    gymStarts === 1, gymStarts + " Gym-Starts\n" + log);
+  pruefe("am Ende trainiert joinrun noch",
+    m.zustand.arbeit && m.zustand.arbeit.type === "CLASS", JSON.stringify(m.zustand.arbeit));
+}
+
+console.log("");
+console.log("-- 6. fremdes Training (bbtrain) wird NICHT beantragt --");
+{
+  // Laeuft schon ein Kurs, den joinrun NICHT gestartet hat (bbtrain.js mit
+  // PRIO.gym 40), darf joinrun ihn nicht mit 25 an sich reissen - sonst
+  // verlore bbtrain die Figur an einen Antragsteller, der gar nichts tut.
+  const m = await fahre({
+    konkurrenz: false,
+    runden: 4,
+    dateien: {},
+  });
+  // Vorbelegung nach dem Start ist im Mock nicht vorgesehen - deshalb hier
+  // der einfachste Beleg: ein Lauf, der mit laufendem Kurs BEGINNT.
+  const m2 = neuerMock({
+    host: "home", knoten: 5, wall: W0, playtime: 100 * 3600000, nodeReset: NR,
+    augReset: W0 - 3600000, geld: 5e9,
+    server: { home: { ram: 128, used: 0, root: true, geld: 1e9, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: {} },
+    maxSchlaf: 4,
+    beiSchlaf: baueSchiedsrichter({ konkurrenz: false }),
+  });
+  m2.zustand.spieler.city = "Sector-12";
+  m2.zustand.spieler.factions = [];
+  m2.zustand.spieler.skills = { strength: 10, defense: 10, dexterity: 10, agility: 10, hacking: 100 };
+  m2.zustand.arbeit = { type: "CLASS", classType: "agi", location: "Powerhouse Gym" };
+  m2.ns.singularity.checkFactionInvitations = () => [];
+  m2.ns.singularity.joinFaction = () => false;
+  m2.ns.singularity.getAugmentationsFromFaction = () => [];
+  m2.ns.singularity.getAugmentationRepReq = () => 0;
+  m2.ns.singularity.getOwnedAugmentations = () => [];
+  const { modul } = await ladeAusBeiden(ROOT, "joinrun.js");
+  const zurueck = m2.uhrStellen();
+  try { await modul.main(m2.ns); }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  pruefe("kein joinrun-Antrag, solange ein fremder Kurs laeuft",
+    !m2.lies("home", "data/figure-request-joinrun.js.json"),
+    String(m2.lies("home", "data/figure-request-joinrun.js.json")));
+  pruefe("(Gegenprobe) ohne fremden Kurs beantragt joinrun",
+    !!m.lies("home", "data/figure-request-joinrun.js.json"));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }
 console.log("");

@@ -98,6 +98,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-joinrun-ebene2.js",
+    deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4)",
+    schnell: true,
+  },
+  {
     datei: "test-leiter.js",
     deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
     schnell: true,
@@ -165,6 +170,11 @@ const TESTS = [
   {
     datei: "test-punish.js",
     deckt: "Sprosse 5: die acht Vorbedingungen und die beiden Deckel (C.12)",
+    schnell: true,
+  },
+  {
+    datei: "test-handschlag-nachhome.js",
+    deckt: "EBENE 2: lib/handschlag.js setzt die Einbausperre per nachHome - erreicht home auch von der Werkbank aus (C.4)",
     schnell: true,
   },
   {

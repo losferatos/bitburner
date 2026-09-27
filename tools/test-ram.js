@@ -21,6 +21,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { createHash } from "node:crypto";
+import { execFileSync } from "node:child_process";
 import { rechne, SRC } from "./ram.js";
 import { baueBaum, kosten } from "./ramkosten.js";
 
@@ -158,6 +159,18 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
      * jemand diese Liste anfasst, wird der Test rot - und das ist gewollt:
      * eine schrumpfende Eichung, die niemandem auffaellt, ist genau der
      * Zustand, aus dem Befund M.3 entstanden ist.
+     *
+     * 2026-09-26 (Auftrag C, Paket-C-Nacharbeit): der Audit "perfekter Bot"
+     * und die Pakete A-D haben seit dem 04.09. deutlich mehr als sieben
+     * Dateien angefasst (u.a. C1 graftauto.js, C2 joinrun.js/bn4life.js, C3
+     * hacknet.js/hashes.js, C4 bn4rep.js, dazu zahlreiche Fixes aus BAUSTELLEN
+     * und den Audit-Paketen A-D). Alle unten sind erst durch DIESE Aenderungen
+     * neu veraltet (Diff gegen den 04.09.-Stand ungleich Null) - keine stille
+     * Drift, sondern derselbe Vertrag wie beim 04.09.-Merge: die Zahlen
+     * bleiben gueltig, bis eine LIVE-Nachmessung (`calculateRam` im Spiel)
+     * nach dem naechsten Einspielen ("Hot-Swap") sie bestaetigt oder
+     * widerlegt. Dieser Cloud-Auftrag hat keinen Spielzugriff (siehe
+     * Auftragsbeschreibung) und kann diese Nachmessung nicht selbst liefern.
      */
     const VERALTET_ERLAUBT = [
       "bn4door.js", "backdoor.js", // 26.09.2026: w0r1d_d43m0n gesperrt (F1), keine neue ns-Funktion
@@ -167,7 +180,16 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
       // ausgang raeumt den Ofen. tools/ram.js rechnet unveraendert (bn4net
       // 10,80, expfarm 1,75, calc 0) - keine neue ns-Funktion, Messung im
       // Spiel steht aus.
-      "bn4net.js", "lib/calc.js", "worker/expfarm.js", "ausgang.js",
+      "worker/expfarm.js", "ausgang.js", // bn4net.js/lib/calc.js stehen unten
+      // 2026-09-26, live-Nachmessung nach Einspielen:
+      "bn4rep.js", "joinrun.js", "cheap.js", "bn4life.js", "blade.js",
+      "homegrow.js", "graft.js", "keepalive.js", "autopilot.js", "hand.js",
+      "sleeve.js", "stockaccess.js", "buyone.js", "probe2.js", "stocks.js",
+      "formcheck.js", "bn4net.js", "contracts.js", "hacknet.js", "hashes.js",
+      "netburner.js", "boot.js", "calccheck.js", "xp.js", "popups.js",
+      "darkweb.js", "lib/batch.js", "lib/calc.js", "lib/hackaugs.js",
+      "export.js", "boerse.js", "lib/handschlag.js", "graftauto.js",
+      "figwatch.js", "guard.js",
     ];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
@@ -357,6 +379,48 @@ console.log("-- das Kaltstart-Tor E1 --");
     + geldquelle.toFixed(2) + " = " + nachBoot.toFixed(2)
     + " von 32; ein Arbeiter (" + arbeiter.toFixed(2) + ") passt daneben nicht.");
   console.log("       Der Kaltstart verdient an Vertraegen, nicht am Hacken.");
+}
+
+console.log("");
+console.log("-- ram.js/ramkosten.js als Hauptmodul (26.09.2026, Nacharbeit Auftrag C) --");
+{
+  /**
+   * DIE ALTE HAUPTMODUL-ERKENNUNG LIEF UNTER POSIX NIE.
+   *
+   * `import.meta.url === "file:///" + process.argv[1].replace(...)` baut
+   * unter POSIX vier Slashes ("file:////home/...", weil `process.argv[1]`
+   * dort schon mit einem fuehrenden Slash beginnt), `import.meta.url` liefert
+   * aber drei ("file:///home/..."). Der ganze CLI-Block in beiden Dateien lief
+   * dadurch NIE - und zwar STUMM: kein Fehler, keine Ausgabe, exit 0. Genau
+   * das ist der gefaehrliche Fall: `node tools/ram.js --registry` sah aus wie
+   * ein Aufruf, lieferte aber nichts, und ohne diesen Test waere das erst
+   * aufgefallen, wenn jemand die (leere) Ausgabe tatsaechlich brauchte.
+   *
+   * Reine Funktionspruefung reicht hier nicht, weil der Fehler GENAU im
+   * `if`, das den CLI-Block betritt, sass - ein echter Subprozess-Aufruf ist
+   * der einzige Weg, das zu pruefen (dasselbe Muster wie
+   * tools/test-ram-namen.js und tools/test-lader.js).
+   */
+  const laufe = (datei, args) => {
+    try {
+      return { code: 0, aus: execFileSync("node", [path.join(ROOT, "tools", datei), ...args],
+        { encoding: "utf8", cwd: ROOT }) };
+    } catch (e) {
+      return { code: e.status ?? 1, aus: (e.stdout || "") + (e.stderr || "") };
+    }
+  };
+
+  const reg = laufe("ram.js", ["--registry"]);
+  pruefe("ram.js --registry gibt etwas aus (Hauptmodul-Erkennung greift)",
+    reg.aus.includes("registry.json gegen den Rechner"),
+    "Ausgabe war leer oder unerwartet: " + JSON.stringify(reg.aus.slice(0, 200)));
+  pruefe("und meldet Erfolg (exit 0)", reg.code === 0, "exit " + reg.code);
+
+  const kosten2 = laufe("ramkosten.js", ["hack"]);
+  pruefe("ramkosten.js hack gibt etwas aus (Hauptmodul-Erkennung greift)",
+    kosten2.aus.includes("hack"),
+    "Ausgabe war leer oder unerwartet: " + JSON.stringify(kosten2.aus.slice(0, 200)));
+  pruefe("und meldet Erfolg (exit 0)", kosten2.code === 0, "exit " + kosten2.code);
 }
 
 console.log("");

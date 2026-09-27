@@ -473,6 +473,29 @@ nicht in einen Kommentar.
 
 ## 3.3 `src/registry.json` — 22 Einträge
 
+**`graftauto.js` steht seit 26.09.2026 auf `verfahren: "V2"`** (vorher `"alle"`,
+Audit-Fund 1#1/5#5). `graftplan.json` kennt ausschließlich Kampf- und
+Bladeburner-Stücke, und `lib/figur.js:53-60` gibt `graft` (Prio 10) Vorrang vor
+`faktion` (Prio 30) — sobald `graftplan.json` von `data/nicht-schieben.txt`
+gelöst wird, würde graftauto in jedem V1-Knoten (BN5.3, BN12.1-12.3) der Figur
+die Daedalus-Reputationsarbeit für Augs wegnehmen, die zum Hacking-Ausgang
+nichts beitragen (11-57 h nach der gemessenen Daedalus-Rate). Ein eigener
+Hacking-Graftplan für V1 ist eine offene, ungerechnete Folgefrage (Bericht 5#5).
+
+**`bn4life.js` steht seit 26.09.2026 wieder auf `ramBaseGb: 5.85` /
+`ramSingGb: 18`** (zwischenzeitlich 9.85/23, C.2-Nacharbeit/Skeptiker-Rework).
+Ein erster Durchgang hatte die Daedalus-Torwache
+(`ns.getBitNodeMultipliers().DaedalusAugsRequirement`,
+`ns.singularity.getOwnedAugmentations(false).length`) hier eingebaut - aber
+`bn4life.js` ist ein Dauerlaeufer, der direkt nach jedem Einbau auf einem
+knappen home steht, waehrend `joinrun.js` die Singularity-Familie ohnehin
+zahlt (293+ GB) und nur kurz laeuft. Die Pruefung lebt jetzt in `joinrun.js`
+selbst (am Anfang, per `ns.getResetInfo().ownedAugs.size` statt
+`getOwnedAugmentations` - 1 GB statt der Singularity-Familie), setzt dort die
+Marke `data/beitritt-erledigt.txt`, die `bn4life.js` vor dem naechsten Start
+prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
+18·16).
+
 ```json
 {
   "schema": 1,
@@ -844,7 +867,7 @@ nicht in einen Kommentar.
       "ramBaseGb": 16.75,
       "ramSingGb": 0.5,
       "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
-      "verfahren": "alle",
+      "verfahren": "V2",
       "knoten": "alle",
       "phase": "normal",
       "telemetryFile": "data/graftauto.json",
@@ -978,7 +1001,7 @@ nicht in einen Kommentar.
       "args": [],
       "ramBaseGb": 5.85,
       "ramSingGb": 18.0,
-      "ramMeasuredAt": "2026-09-04",
+      "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, C.2-Nacharbeit: Daedalus-Torwache nach joinrun.js verschoben, hier zurueck auf den Stand vor Paket C.2)",
       "verfahren": "alle",
       "knoten": "alle",
       "phase": "normal",

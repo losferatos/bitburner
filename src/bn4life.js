@@ -163,6 +163,19 @@ export async function main(ns) {
     const letzterEinbau = ns.getResetInfo().lastAugReset;
     const markeGilt = ns.fileExists(BEITRITT_MARKE, "home")
       && Number(ns.read(BEITRITT_MARKE)) >= letzterEinbau;
+    // DIE DAEDALUS-SCHWELLE LEBT IN joinrun.js, NICHT HIER (26.09.2026,
+    // Skeptiker-Rework nach Paket C.2).
+    //
+    // Ein erster Durchgang hatte den Blick hierher gebaut
+    // (ns.singularity.getOwnedAugmentations + ns.getBitNodeMultipliers) -
+    // bn4life.js ist aber ein Dauerlaeufer, der direkt nach jedem Einbau auf
+    // einem knappen home steht, und der Skeptiker mass dort +4/+5 GB. Die
+    // Pruefung braucht ausserdem nur EINMAL zu laufen, am Anfang von
+    // joinrun.js: dort kostet sie nichts Zusaetzliches (293+ GB Singularity
+    // ohnehin), und joinrun.js setzt BEITRITT_MARKE selbst, wenn die
+    // Schwelle schon erreicht ist - `markeGilt` oben faengt den naechsten
+    // Start dieses Zyklus dann genauso ab, wie es ein direkter Blick hier
+    // getan haette.
     if (!ns.fileExists("data/bn4-stop.txt", "home")
         && !markeGilt
         && !ns.isRunning("joinrun.js", "home")

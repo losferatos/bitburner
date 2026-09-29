@@ -107,10 +107,17 @@ export function makeTerrain(world, textures) {
         vec3 grass = mix(grassA, grassB, dryness);
         grass = mix(grass, macchia, smoothstep(0.55, 0.75, nz2.b) * 0.7);
         grass *= 0.78 + 0.44 * nz3.a;
-        vec3 rock = mix(vec3(0.34, 0.31, 0.27), vec3(0.58, 0.54, 0.47), nz2.b);
-        rock *= 0.8 + 0.35 * nz3.r;
+        // Fels: triplanar, damit Steilwände nicht verzerrt sind
+        vec3 bw = pow(abs(tN), vec3(4.0)); bw /= dot(bw, vec3(1.0));
+        vec3 wq = vTerrWorld;
+        float rA = texture(uNoise, wq.zy * 0.045).b * bw.x + texture(uNoise, wq.xy * 0.045).b * bw.z + texture(uNoise, wq.xz * 0.045).b * bw.y;
+        float rB = texture(uNoise, wq.zy * 0.19).r * bw.x + texture(uNoise, wq.xy * 0.19).r * bw.z + texture(uNoise, wq.xz * 0.19).r * bw.y;
+        float rC = texture(uNoise, wq.zy * 0.9).a * bw.x + texture(uNoise, wq.xy * 0.9).a * bw.z + texture(uNoise, wq.xz * 0.9).a * bw.y;
+        vec3 rock = mix(vec3(0.33, 0.3, 0.27), vec3(0.56, 0.52, 0.46), nz2.b);
+        rock *= 0.55 + 0.55 * rA + 0.25 * (rB - 0.5) + 0.15 * (rC - 0.5);
         rock *= 0.93 + 0.07 * sin(th * 0.45 + nz2.r * 9.0 + nz.g * 12.0);
-        rock *= 0.82;
+        rock = mix(rock, vec3(0.2, 0.24, 0.12) * (0.7 + 0.6 * rB), smoothstep(0.62, 0.8, rB * 0.6 + nz2.g * 0.6) * 0.55);
+        rock *= 0.85;
         vec3 sand = vec3(0.66, 0.58, 0.44) * (0.9 + 0.18 * nz3.a);
         float wet = smoothstep(1.1, 0.2, th);
         sand = mix(sand, sand * 0.55, wet);
@@ -125,7 +132,7 @@ export function makeTerrain(world, textures) {
         diffuseColor.rgb = col;
         float tRough = mix(0.92, 0.78, rockW);
         tRough = mix(tRough, 0.45, wet * sandW);
-        float tBump = nz3.r * 0.6 + texture(uNoise, wp * 1.7).a * 0.4;`)
+        float tBump = mix(nz3.r * 0.6 + texture(uNoise, wp * 1.7).a * 0.4, rA * 3.2 + rB * 0.9 + rC * 0.15, rockW);`)
       .replace('#include <roughnessmap_fragment>', 'float roughnessFactor = tRough;')
       .replace('#include <normal_fragment_maps>', /* glsl */ `
         normal = normalize((viewMatrix * vec4(tN, 0.0)).xyz);
@@ -133,7 +140,7 @@ export function makeTerrain(world, textures) {
           vec3 vSigmaX = dFdx(-vViewPosition), vSigmaY = dFdy(-vViewPosition);
           vec3 R1 = cross(vSigmaY, normal), R2 = cross(normal, vSigmaX);
           float fDet = dot(vSigmaX, R1);
-          vec2 dB = vec2(dFdx(tBump), dFdy(tBump)) * mix(1.4, 0.4, rockW);
+          vec2 dB = vec2(dFdx(tBump), dFdy(tBump)) * mix(1.2, 1.0, rockW);
           vec3 vGrad = sign(fDet) * (dB.x * R1 + dB.y * R2);
           normal = normalize(abs(fDet) * normal - vGrad);
         }`);

@@ -16,7 +16,7 @@ const q = new URLSearchParams(query);
 if (q.has('js')) await page.evaluate(q.get('js'));
 if (js) await page.evaluate(js);
 await page.waitForTimeout(+wait * 1000);
-await page.screenshot({ path: out });
+await page.screenshot({ path: out, timeout: 180000 });
 const info = await page.evaluate(() => { const d = window.__demo; if (!d) return null; const i = d.renderer.info; return { calls: i.render.calls, tris: i.render.triangles, cam: d.director.name, hour: d.sky.hour.toFixed(2), fps: document.getElementById('hud-fps').textContent }; });
 console.log(JSON.stringify(info));
 console.log(logs.filter(l => !l.includes('GPU stall')).slice(0, 30).join('\n'));

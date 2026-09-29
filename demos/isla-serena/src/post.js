@@ -6,6 +6,60 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
 import { ShaderPass } from 'three/examples/jsm/postprocessing/ShaderPass.js';
+import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js';
+
+// Bewegungsunschärfe aus Tiefenpuffer-Reprojektion. Pixel am Auto werden mit dem Auto mitbewegt,
+// sodass der Wagen in Verfolgerperspektiven scharf bleibt und die Umgebung verwischt.
+class MotionBlurPass extends Pass {
+  constructor(reversed) {
+    super();
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tDepth: { value: null },
+        uInvViewProj: { value: new THREE.Matrix4() }, uPrevViewProj: { value: new THREE.Matrix4() },
+        uCarPos: { value: new THREE.Vector3() }, uCarDelta: { value: new THREE.Vector3() },
+        uStrength: { value: 0.5 }, uReversed: { value: reversed ? 1 : 0 },
+      },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse; uniform highp sampler2D tDepth;
+        uniform mat4 uInvViewProj, uPrevViewProj; uniform vec3 uCarPos, uCarDelta; uniform float uStrength; uniform int uReversed;
+        varying vec2 vUv;
+        float hash(vec2 p){ return fract(sin(dot(p, vec2(12.9898, 78.233))) * 43758.5453); }
+        void main(){
+          float d = texture2D(tDepth, vUv).r;
+          float z = uReversed == 1 ? max(d, 1e-7) : min(d, 0.9999999) * 2.0 - 1.0;
+          vec4 wp = uInvViewProj * vec4(vUv * 2.0 - 1.0, z, 1.0);
+          vec3 p = wp.xyz / wp.w;
+          vec3 rel = p - uCarPos;
+          float onCar = 1.0 - smoothstep(0.0, 0.25, length(rel / vec3(2.7, 1.6, 2.7)) - 0.85);
+          vec3 prevP = p - uCarDelta * onCar;
+          vec4 pc = uPrevViewProj * vec4(prevP, 1.0);
+          vec2 puv = pc.xy / pc.w * 0.5 + 0.5;
+          vec2 vel = (vUv - puv) * uStrength;
+          float l = length(vel);
+          if (l > 0.035) vel *= 0.035 / l;
+          vec4 base = texture2D(tDiffuse, vUv);
+          if (l < 0.0006) { gl_FragColor = base; return; }
+          const int N = 10;
+          vec3 acc = vec3(0.0);
+          float j = hash(vUv * 1000.0) - 0.5;
+          for (int i = 0; i < N; i++) {
+            float t = (float(i) + 0.5 + j) / float(N) - 0.5;
+            acc += texture2D(tDiffuse, vUv - vel * t).rgb;
+          }
+          gl_FragColor = vec4(acc / float(N), base.a);
+        }`,
+    });
+    this.fsQuad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    this.material.uniforms.tDiffuse.value = readBuffer.texture;
+    this.material.uniforms.tDepth.value = readBuffer.depthTexture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.fsQuad.render(renderer);
+  }
+}
 
 const GodRaysShader = {
   uniforms: {
@@ -103,6 +157,8 @@ export function makePost(renderer, scene, camera) {
   const composer = new EffectComposer(renderer, rt);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+  const mblur = new MotionBlurPass(renderer.capabilities.reversedDepthBuffer);
+  composer.addPass(mblur);
   const rays = new ShaderPass(GodRaysShader);
   composer.addPass(rays);
   const size = renderer.getSize(new THREE.Vector2());
@@ -115,7 +171,28 @@ export function makePost(renderer, scene, camera) {
   composer.addPass(grade);
 
   const sunW = new THREE.Vector3();
+  const vp = new THREE.Matrix4();
+  const prevVP = new THREE.Matrix4();
+  const prevCar = new THREE.Vector3();
+  let firstFrame = true;
   return {
+    mblur,
+    // vor composer.render aufrufen (Kamera und Auto für diesen Frame schon gesetzt)
+    updateMotion(carPos, enabled, strength = 0.5) {
+      camera.updateMatrixWorld();
+      vp.multiplyMatrices(camera.projectionMatrix, camera.matrixWorldInverse);
+      const u = mblur.material.uniforms;
+      u.uInvViewProj.value.copy(vp).invert();
+      u.uPrevViewProj.value.copy(firstFrame ? vp : prevVP);
+      u.uCarPos.value.copy(carPos).add(new THREE.Vector3(0, 0.6, 0));
+      u.uCarDelta.value.copy(carPos).sub(firstFrame ? carPos : prevCar);
+      u.uStrength.value = strength;
+      mblur.enabled = enabled;
+      prevVP.copy(vp);
+      prevCar.copy(carPos);
+      firstFrame = false;
+    },
+    cut() { firstFrame = true; },
     composer,
     bloom,
     rays,

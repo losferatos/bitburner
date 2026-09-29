@@ -20,11 +20,11 @@ export class Director {
     this.orbit = { yaw: 2.6, pitch: 0.18, dist: 8.5 };
     this.lastInput = 0;
     this.shots = [
-      { name: 'Verfolgung', len: 11, fn: (t, s) => this.chase(t, s) },
+      { name: 'Verfolgung', len: 11, fn: (t, s, dt) => this.chase(t, s, dt) },
       { name: 'Straßenrand', len: 8, init: (s) => this.initRoadside(s), fn: (t, s) => this.roadside(t, s) },
       { name: 'Frontkamera', len: 7, fn: (t, s) => this.rigid(t, s, [0.0, 0.62, -2.7], [0, 0.9, 3], 58) },
       { name: 'Drohne', len: 11, init: (s) => { s.a0 = Math.random() * 6.28; }, fn: (t, s) => this.drone(t, s) },
-      { name: 'Seitenfahrt', len: 8, init: (s) => { s.side = Math.random() < 0.5 ? -1 : 1; }, fn: (t, s) => this.sideTrack(t, s) },
+      { name: 'Seitenfahrt', len: 8, init: (s) => { s.side = Math.random() < 0.5 ? -1 : 1; }, fn: (t, s, dt) => this.sideTrack(t, s, dt) },
       { name: 'Radkamera', len: 7, fn: (t, s) => this.rigid(t, s, [-1.25, 0.42, 2.6], [-0.6, 0.55, -6], 68) },
       { name: 'Panorama', len: 12, init: (s) => { s.a0 = Math.random() * 6.28; }, fn: (t, s) => this.aerial(t, s) },
       { name: 'Heckkamera', len: 7, fn: (t, s) => this.rigid(t, s, [0.0, 1.05, 3.8], [0, 0.7, -8], 62) },
@@ -61,6 +61,7 @@ export class Director {
   }
 
   cut(i) {
+    this.cutFlag = true;
     this.manual = false;
     this.idx = ((i % this.shots.length) + this.shots.length) % this.shots.length;
     this.shotTime = 0;
@@ -77,12 +78,12 @@ export class Director {
     return v3().set(...local).applyMatrix4(this.driver.car.root.matrixWorld);
   }
 
-  chase(t, s) {
+  chase(t, s, dt) {
     const d = this.driver;
     const back = d.fwd.clone().multiplyScalar(-7.2);
     const target = d.pos.clone().add(back).add(v3().set(0, 2.1, 0));
     if (s.first) { this.pos.copy(target); s.first = false; }
-    this.pos.lerp(target, 0.08);
+    this.pos.lerp(target, 1 - Math.exp(-dt * 5));
     this.look.copy(d.pos).addScaledVector(d.fwd, 4).add(v3().set(0, 0.9, 0));
     this.camera.fov = 52;
   }
@@ -120,12 +121,12 @@ export class Director {
     this.camera.fov = 48;
   }
 
-  sideTrack(t, s) {
+  sideTrack(t, s, dt) {
     const d = this.driver;
     const rx = -d.fwd.z, rz = d.fwd.x;
     const target = d.pos.clone().add(v3().set(rx * s.side * 5.5, 0.9, rz * s.side * 5.5)).addScaledVector(d.fwd, 1.5 - t * 0.25);
     if (s.first) { this.pos.copy(target); s.first = false; }
-    this.pos.lerp(target, 0.2);
+    this.pos.lerp(target, 1 - Math.exp(-dt * 12));
     this.look.copy(d.pos).add(v3().set(0, 0.55, 0));
     this.camera.fov = 40;
   }
@@ -159,7 +160,7 @@ export class Director {
     if (!this.manual) {
       this.shotTime += dt;
       if (this.auto && this.shotTime > this.shotLen) this.next();
-      this.shots[this.idx].fn(this.shotTime, this.state);
+      this.shots[this.idx].fn(this.shotTime, this.state, dt);
     }
     if (this.debugCam) {
       const c = this.debugCam;

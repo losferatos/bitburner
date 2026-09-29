@@ -18,9 +18,9 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 
 const QUALITY = {
-  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, lodBias: 1.6 },
-  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, lodBias: 1.0 },
-  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, lodBias: 0.75 },
+  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, lodBias: 1.6 },
+  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, lodBias: 1.0 },
+  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, lodBias: 0.75 },
 };
 let qLevel = Number(params.get('q')) || 2;
 let Q = QUALITY[qLevel];
@@ -44,6 +44,10 @@ async function boot() {
     $('load-status').textContent = 'Dein Browser unterstützt keine Float-Rendertargets (EXT_color_buffer_float).';
     return;
   }
+  // Grafikchip erkennen: integrierte/mobile GPUs starten mit niedriger Qualität
+  const dbgInfo = gl.getExtension('WEBGL_debug_renderer_info');
+  const gpuName = dbgInfo ? String(gl.getParameter(dbgInfo.UNMASKED_RENDERER_WEBGL)) : '';
+  if (!params.get('q') && /Intel|UHD|Iris|Mali|Adreno|PowerVR|Apple GPU|SwiftShader|llvmpipe|Microsoft Basic/i.test(gpuName)) { qLevel = 1; Q = QUALITY[1]; }
   renderer.shadowMap.enabled = true;
   renderer.shadowMap.type = THREE.PCFShadowMap;
   renderer.toneMapping = THREE.ACESFilmicToneMapping;
@@ -103,7 +107,7 @@ async function boot() {
 
   let paint = 0;
   let timeRunning = true;
-  let paused = false;
+  let paused = params.has('still');
   let hudVisible = true;
   let letterbox = false;
   let renderScale = 1;
@@ -195,7 +199,7 @@ async function boot() {
   let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16;
   const sunCol = new THREE.Color();
   const debug = params.has('debug');
-  window.__demo = { plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
+  window.__demo = { gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
 
   renderer.info.autoReset = false;
   function frame() {
@@ -246,6 +250,9 @@ async function boot() {
     const camDist = camera.position.distanceTo(driver.pos);
     audio.update(dt, driver, camDist, THREE.MathUtils.smoothstep(-world.heightAt(camera.position.x, camera.position.z), -40, 5));
 
+    // Bei Schnitten keine Unschärfe über den Bildwechsel
+    if (director.cutFlag) { post.cut(); director.cutFlag = false; }
+    post.updateMotion(driver.root ? driver.root.position : car.root.position, Q.mblur && !paused, 0.55);
     post.composer.render(dt);
 
     // HUD

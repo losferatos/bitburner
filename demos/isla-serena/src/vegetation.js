@@ -8,6 +8,100 @@ import { N, CELL, HALF, ROAD_HALF } from './world.js';
 
 const tmpC = new THREE.Color();
 
+// Atlas: TL Kiefernnadeln, TR Laubblätter, BL Zypressenschuppen, BR opak weiß (Stämme, Kerne)
+const ATLAS = { pine: [0, 0.5], leaf: [0.5, 0.5], cypress: [0, 0] };
+function solidUV(n) {
+  const a = new Float32Array(n * 2);
+  for (let i = 0; i < n; i++) { a[i * 2] = 0.75; a[i * 2 + 1] = 0.25; }
+  return new THREE.BufferAttribute(a, 2);
+}
+
+function makeLeafAtlas() {
+  const S = 512, H = S / 2;
+  const cv = document.createElement('canvas');
+  cv.width = cv.height = S;
+  const g = cv.getContext('2d');
+  g.clearRect(0, 0, S, S);
+  const grey = (l, a = 1) => `rgba(${l | 0},${l | 0},${l | 0},${a})`;
+  // Kiefernnadel-Büschel (oben links im Canvas = v 0.5..1)
+  g.save(); g.translate(0, 0);
+  for (let b = 0; b < 7; b++) {
+    const bx = H * (0.2 + rand() * 0.6), by = H * (0.25 + rand() * 0.5);
+    for (let i = 0; i < 70; i++) {
+      const a = rand() * Math.PI * 2, L = H * (0.12 + rand() * 0.2);
+      g.strokeStyle = grey(140 + rand() * 115);
+      g.lineWidth = 1.3 + rand() * 1.2;
+      g.beginPath(); g.moveTo(bx, by);
+      g.quadraticCurveTo(bx + Math.cos(a) * L * 0.5, by + Math.sin(a) * L * 0.5 - 4, bx + Math.cos(a) * L, by + Math.sin(a) * L);
+      g.stroke();
+    }
+  }
+  g.restore();
+  // Laubblätter (oben rechts)
+  for (let i = 0; i < 170; i++) {
+    const r = H * 0.44 * Math.sqrt(rand()), a = rand() * Math.PI * 2;
+    const x = H + H / 2 + Math.cos(a) * r, y = H / 2 + Math.sin(a) * r;
+    g.save(); g.translate(x, y); g.rotate(rand() * Math.PI);
+    g.fillStyle = grey(130 + rand() * 125);
+    g.beginPath(); g.ellipse(0, 0, 3 + rand() * 3, 9 + rand() * 6, 0, 0, Math.PI * 2); g.fill();
+    g.restore();
+  }
+  // Zypressenschuppen (unten links): dichte, fransige Fläche
+  for (let i = 0; i < 900; i++) {
+    const r = H * 0.47 * Math.pow(rand(), 0.6), a = rand() * Math.PI * 2;
+    const x = H / 2 + Math.cos(a) * r, y = H + H / 2 + Math.sin(a) * r;
+    g.fillStyle = grey(110 + rand() * 145);
+    g.beginPath(); g.ellipse(x, y, 2 + rand() * 2.5, 4 + rand() * 4, rand() * Math.PI, 0, Math.PI * 2); g.fill();
+  }
+  // opak (unten rechts)
+  g.fillStyle = '#fff';
+  g.fillRect(H + 8, H + 8, H - 16, H - 16);
+  const tex = new THREE.CanvasTexture(cv);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  tex.anisotropy = 4;
+  tex.flipY = true;
+  return tex;
+}
+
+// Laubkarten auf der Oberfläche eines Ellipsoids
+function cards(radius, sx, sy, sz, cx, cy, cz, color, count, kind, size, seed = 0) {
+  const pos = [], nrm = [], col = [], uv = [];
+  const [u0, v0] = ATLAS[kind];
+  const ga = Math.PI * (3 - Math.sqrt(5));
+  const tmp = new THREE.Vector3(), t1 = new THREE.Vector3(), t2 = new THREE.Vector3(), n = new THREE.Vector3(), up = new THREE.Vector3(0, 1, 0);
+  for (let i = 0; i < count; i++) {
+    const y = 1 - (i + 0.5) / count * 2;
+    const rr = Math.sqrt(1 - y * y);
+    const th = i * ga + seed;
+    const dx = Math.cos(th) * rr, dz = Math.sin(th) * rr;
+    const d = 0.72 + rand() * 0.38;
+    const px = cx + dx * radius * sx * d, py = cy + y * radius * sy * d, pz = cz + dz * radius * sz * d;
+    n.set(dx / sx, y / sy, dz / sz).normalize();
+    // Karte grob nach außen gerichtet, zufällig gedreht und gekippt
+    tmp.set(n.x + (rand() - 0.5) * 0.9, n.y + (rand() - 0.5) * 0.9 + 0.2, n.z + (rand() - 0.5) * 0.9).normalize();
+    t1.crossVectors(tmp, Math.abs(tmp.y) > 0.9 ? new THREE.Vector3(1, 0, 0) : up).normalize();
+    t2.crossVectors(tmp, t1).normalize();
+    const rot = rand() * Math.PI * 2, c = Math.cos(rot), s2 = Math.sin(rot);
+    const a = t1.clone().multiplyScalar(c).addScaledVector(t2, s2).multiplyScalar(size * (0.8 + rand() * 0.4));
+    const b = t1.clone().multiplyScalar(-s2).addScaledVector(t2, c).multiplyScalar(size * (0.8 + rand() * 0.4));
+    const corners = [[-1, -1], [1, -1], [1, 1], [-1, -1], [1, 1], [-1, 1]];
+    const shade = 0.5 + 0.5 * (y * 0.5 + 0.5);
+    tmpC.copy(color).multiplyScalar(shade * (0.85 + rand() * 0.3));
+    for (const [ca, cb] of corners) {
+      pos.push(px + a.x * ca + b.x * cb, py + a.y * ca + b.y * cb, pz + a.z * ca + b.z * cb);
+      nrm.push(n.x, n.y, n.z);
+      col.push(tmpC.r, tmpC.g, tmpC.b);
+      uv.push(u0 + (ca * 0.5 + 0.5) * 0.5, v0 + (cb * 0.5 + 0.5) * 0.5);
+    }
+  }
+  const g = new THREE.BufferGeometry();
+  g.setAttribute('position', new THREE.Float32BufferAttribute(pos, 3));
+  g.setAttribute('normal', new THREE.Float32BufferAttribute(nrm, 3));
+  g.setAttribute('color', new THREE.Float32BufferAttribute(col, 3));
+  g.setAttribute('uv', new THREE.Float32BufferAttribute(uv, 2));
+  return g;
+}
+
 function blob(radius, detail, sx, sy, sz, cx, cy, cz, color, seed, bump = 0.22) {
   const g = new THREE.IcosahedronGeometry(radius, detail);
   const p = g.attributes.position;
@@ -29,7 +123,7 @@ function blob(radius, detail, sx, sy, sz, cx, cy, cz, color, seed, bump = 0.22) 
   }
   g.setAttribute('normal', new THREE.BufferAttribute(nrm, 3));
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.deleteAttribute('uv');
+  g.setAttribute('uv', solidUV(p.count));
   return g;
 }
 
@@ -51,7 +145,7 @@ function trunk(pts, r0, r1, sides, color) {
     col.set([color.r, color.g, color.b], i * 3);
   }
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.deleteAttribute('uv');
+  g.setAttribute('uv', solidUV(p.count));
   return g;
 }
 
@@ -61,7 +155,7 @@ function prism(h, r, sides, color, y0 = 0) {
   const col = new Float32Array(g.attributes.position.count * 3);
   for (let i = 0; i < col.length; i += 3) col.set([color.r, color.g, color.b], i);
   g.setAttribute('color', new THREE.BufferAttribute(col, 3));
-  g.deleteAttribute('uv');
+  g.setAttribute('uv', solidUV(g.attributes.position.count));
   return g;
 }
 
@@ -89,22 +183,27 @@ function makeSpecies() {
   }
   pineParts.forEach(([x, y, z, r], k) => {
     const c = pineGreen.clone().multiplyScalar(0.85 + rand() * 0.35);
-    pineHi.push(blob(r, 1, 1.3, 0.55, 1.3, x, y, z, c, k * 3.1, 0.3));
+    pineHi.push(blob(r * 0.72, 0, 1.3, 0.5, 1.3, x, y, z, c.clone().multiplyScalar(0.35), k * 3.1, 0.2));
+    pineHi.push(cards(r, 1.3, 0.55, 1.3, x, y, z, c, 24, 'pine', r * 0.62, k));
   });
   const pineLo = [prism(8.2, 0.3, 4, bark, -0.4), blob(3.6, 0, 1.3, 0.45, 1.3, 0.4, 8.4, -0.2, pineGreen, 1, 0.12)];
 
   // Zypresse
-  const cypHi = [prism(1.6, 0.22, 6, bark, -0.3), blob(1.25, 2, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen, 5, 0.12)];
+  const cypHi = [prism(1.6, 0.22, 6, bark, -0.3), blob(1.0, 1, 1.0, 5.0, 1.0, 0, 6.1, 0, cypGreen.clone().multiplyScalar(0.4), 5, 0.1),
+    cards(1.25, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen, 110, 'cypress', 0.62, 2)];
   const cypLo = [blob(1.25, 0, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen, 5, 0.05)];
 
   // Olivenbaum
   const oliveHi = [trunk([[0, -0.3, 0], [0.3, 1.2, -0.2], [0.1, 2.4, 0.2], [0.4, 3.2, 0.1]], 0.32, 0.18, 6, barkGrey)];
-  [[0.4, 3.7, 0.1, 1.9], [-0.8, 3.3, 0.6, 1.4], [1.3, 3.2, -0.6, 1.4], [0.1, 4.4, -0.6, 1.3]].forEach(([x, y, z, r], k) =>
-    oliveHi.push(blob(r, 1, 1.15, 0.8, 1.15, x, y, z, oliveGreen, 10 + k, 0.3)));
+  [[0.4, 3.7, 0.1, 1.9], [-0.8, 3.3, 0.6, 1.4], [1.3, 3.2, -0.6, 1.4], [0.1, 4.4, -0.6, 1.3]].forEach(([x, y, z, r], k) => {
+    oliveHi.push(blob(r * 0.7, 0, 1.15, 0.8, 1.15, x, y, z, oliveGreen.clone().multiplyScalar(0.38), 10 + k, 0.2));
+    oliveHi.push(cards(r, 1.15, 0.8, 1.15, x, y, z, oliveGreen, 30, 'leaf', r * 0.55, k * 2));
+  });
   const oliveLo = [prism(3, 0.3, 4, barkGrey, -0.3), blob(2.6, 0, 1.15, 0.75, 1.15, 0.3, 3.7, 0, oliveGreen, 11, 0.1)];
 
   // Busch
-  const shrubHi = [blob(1.1, 1, 1.3, 0.75, 1.1, 0, 0.55, 0, shrubGreen, 20, 0.35), blob(0.8, 1, 1.2, 0.8, 1.2, 0.8, 0.45, 0.4, shrubGreen, 21, 0.35)];
+  const shrubHi = [blob(0.85, 0, 1.3, 0.7, 1.1, 0, 0.5, 0, shrubGreen.clone().multiplyScalar(0.4), 20, 0.3),
+    cards(1.1, 1.3, 0.75, 1.1, 0, 0.55, 0, shrubGreen, 22, 'leaf', 0.6, 3), cards(0.8, 1.2, 0.8, 1.2, 0.8, 0.45, 0.4, shrubGreen, 14, 'leaf', 0.5, 5)];
   const shrubLo = [blob(1.4, 0, 1.3, 0.6, 1.1, 0.3, 0.5, 0.1, shrubGreen, 22, 0.1)];
 
   // Fels
@@ -121,8 +220,11 @@ function makeSpecies() {
   ];
 }
 
+let leafAtlas = null;
 function makeMaterial(sp, isLo, lod) {
-  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: sp.leaf ? 0.82 : 0.9, metalness: 0 });
+  if (!leafAtlas) leafAtlas = makeLeafAtlas();
+  const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: sp.leaf ? 0.82 : 0.9, metalness: 0, map: leafAtlas, alphaTest: 0.42, side: isLo ? THREE.FrontSide : THREE.DoubleSide });
+  mat.shadowSide = THREE.DoubleSide;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = U.uTime;
     shader.uniforms.uSunLight = U.uSunLight;

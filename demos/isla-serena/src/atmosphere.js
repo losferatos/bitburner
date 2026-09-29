@@ -289,11 +289,11 @@ export class Sky {
       this.lightDir = this.sun;
     } else {
       this.light.color.setRGB(0.62, 0.72, 1.0);
-      this.light.intensity = 0.32 * moonW;
+      this.light.intensity = 0.55 * moonW;
       this.lightDir = this.moon;
     }
     U.uSunLight.value.copy(this.light.color).multiplyScalar(this.light.intensity);
-    this.hemi.intensity = 0.25 * night;
+    this.hemi.intensity = 0.4 * night;
     this.hemi.color.setRGB(0.25, 0.32, 0.55);
 
     // Schatten folgt dem Fokus (Auto)

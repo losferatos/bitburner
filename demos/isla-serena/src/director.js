@@ -5,7 +5,8 @@ import { roadFrame } from './road.js';
 const v3 = () => new THREE.Vector3();
 
 export class Director {
-  constructor(camera, driver, world, dom) {
+  constructor(camera, driver, world, dom, veg) {
+    this.veg = veg;
     this.camera = camera;
     this.driver = driver;
     this.world = world;
@@ -94,12 +95,15 @@ export class Director {
 
   initRoadside(s) {
     const d = this.driver;
-    s.s = d.s + 85;
-    const f = roadFrame(d.road, s.s, {});
-    const side = Math.random() < 0.6 ? 1 : -1;
-    const off = side * (9 + Math.random() * 6);
-    s.p = v3().set(f.x - f.tz * off, 0, f.z + f.tx * off);
-    s.p.y = Math.max(this.world.heightAt(s.p.x, s.p.z), 0.5) + 1.2 + Math.random() * 1.5;
+    for (let tries = 0; tries < 12; tries++) {
+      s.s = d.s + 75 + Math.random() * 40;
+      const f = roadFrame(d.road, s.s, {});
+      const side = Math.random() < 0.5 ? 1 : -1;
+      const off = side * (8.5 + Math.random() * 7);
+      s.p = v3().set(f.x - f.tz * off, 0, f.z + f.tx * off);
+      s.p.y = Math.max(this.world.heightAt(s.p.x, s.p.z), 0.5) + 1.1 + Math.random() * 1.6;
+      if (this.veg.obstacleTop(s.p.x, s.p.z, 1.5) < s.p.y - 3) break;
+    }
   }
   roadside(t, s) {
     this.pos.copy(s.p);
@@ -161,6 +165,12 @@ export class Director {
       const c = this.debugCam;
       this.pos.set(c[0], c[1], c[2]); this.look.set(c[3], c[4], c[5]); this.camera.fov = c[6] || 50;
     }
+    // Baumkronen ausweichen (nicht bei starr am Auto befestigten Kameras)
+    if (this.manual || ['Drohne', 'Panorama', 'Seitenfahrt'].includes(this.shots[this.idx].name)) {
+      const top = this.veg.obstacleTop(this.pos.x, this.pos.z, 1.2);
+      this.avoid = Math.max((this.avoid || 0) * 0.96, top > this.pos.y - 0.5 ? top + 1.2 - this.pos.y : 0);
+      this.pos.y += this.avoid;
+    } else this.avoid = 0;
     // nicht unter das Gelände / Wasser
     const gh = Math.max(this.world.heightAt(this.pos.x, this.pos.z), 0.6);
     if (this.pos.y < gh + 0.35) this.pos.y = gh + 0.35;

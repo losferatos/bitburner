@@ -161,7 +161,7 @@ function makeMaterial(sp, isLo, lod) {
   return mat;
 }
 
-export function makeVegetation(world, quality) {
+export function makeVegetation(world, quality, exclude = () => false) {
   const species = makeSpecies();
   const inst = species.map(() => []);
   const road = world.road;
@@ -176,7 +176,7 @@ export function makeVegetation(world, quality) {
       const o = side * (ROAD_HALF + 7 + rand() * 2);
       const x = road.X[m] + rx * o, z = road.Z[m] + rz * o;
       const h = world.heightAt(x, z);
-      if (h < 2 || world.normalYAt(x, z) < 0.8) continue;
+      if (h < 2 || world.normalYAt(x, z) < 0.8 || exclude(x, z)) continue;
       inst[1].push([x, h - 0.2, z, rand() * 6.28, 0.85 + rand() * 0.35]);
     }
   }
@@ -189,7 +189,7 @@ export function makeVegetation(world, quality) {
       const h = world.heightAt(px, pz);
       if (h < 1.6) continue;
       const rd = world.roadDistAt(px, pz);
-      if (rd < ROAD_HALF + 4.5) continue;
+      if (rd < ROAD_HALF + 4.5 || exclude(px, pz)) continue;
       const ny = world.normalYAt(px, pz);
       const forest = simplex(px * 0.0024, pz * 0.0024) * 0.6 + simplex(px * 0.011, pz * 0.011) * 0.4;
       const alt = h / 400;
@@ -284,6 +284,23 @@ export function makeVegetation(world, quality) {
       t.hi.instanceColor.needsUpdate = true;
     }
   }
+  // Höchster Baumwipfel in der Nähe eines Punktes (für die Kamera)
+  const canopyR = [4.2, 1.5, 2.8, 1.6, 1.4];
+  function obstacleTop(x, z, pad = 1.0) {
+    let top = -1e9;
+    const bi0 = Math.floor((x - 8 + HALF) / BUCK), bi1 = Math.floor((x + 8 + HALF) / BUCK);
+    const bj0 = Math.floor((z - 8 + HALF) / BUCK), bj1 = Math.floor((z + 8 + HALF) / BUCK);
+    types.forEach((t, k) => {
+      for (let bj = Math.max(0, bj0); bj <= Math.min(NB - 1, bj1); bj++) for (let bi = Math.max(0, bi0); bi <= Math.min(NB - 1, bi1); bi++) {
+        for (const i of t.buckets[bj * NB + bi]) {
+          const p = t.list[i];
+          const r = canopyR[k] * p[4] + pad;
+          if ((p[0] - x) ** 2 + (p[2] - z) ** 2 < r * r) top = Math.max(top, p[1] + t.sp.height * p[4] * 1.1);
+        }
+      }
+    });
+    return top;
+  }
   const counts = types.map((t) => `${t.sp.name}:${t.list.length}`).join(' ');
-  return { group, update, counts, lod };
+  return { group, update, counts, lod, obstacleTop };
 }

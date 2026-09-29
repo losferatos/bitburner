@@ -10,6 +10,7 @@ import { makeVegetation } from './vegetation.js';
 import { makeGrass } from './grass.js';
 import { loadCar, Driver, PAINTS } from './car.js';
 import { Director } from './director.js';
+import { planLandmarks, makeLandmarks } from './landmarks.js';
 import { makePost } from './post.js';
 import { CarAudio } from './audio.js';
 
@@ -76,8 +77,12 @@ async function boot() {
 
   progress(0.96, 'Vegetation wird gepflanzt');
   await new Promise((r) => setTimeout(r, 0));
-  const veg = makeVegetation(world, Q);
+  const plan = planLandmarks(world);
+  const veg = makeVegetation(world, Q, plan.exclude);
   scene.add(veg.group);
+
+  const landmarks = makeLandmarks(world, plan);
+  scene.add(landmarks.group);
 
   const grass = makeGrass(QUALITY[3].grass);
   grass.setCount(Q.grass);
@@ -89,7 +94,7 @@ async function boot() {
   const driver = new Driver(car, world.road, world.heightAt);
   driver.update(0.016);
 
-  const director = new Director(camera, driver, world, canvas);
+  const director = new Director(camera, driver, world, canvas, veg);
   const post = makePost(renderer, scene, camera);
   const audio = new CarAudio();
 
@@ -190,7 +195,7 @@ async function boot() {
   let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16;
   const sunCol = new THREE.Color();
   const debug = params.has('debug');
-  window.__demo = { renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
+  window.__demo = { plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
 
   renderer.info.autoReset = false;
   function frame() {
@@ -220,6 +225,7 @@ async function boot() {
 
     const night = U.uNight.value;
     road.update(night);
+    landmarks.update(U.uTime.value, night);
     // Lichter am Auto
     const lightsOn = THREE.MathUtils.smoothstep(night, 0.15, 0.45);
     for (const h of car.heads) h.intensity = lightsOn * 55;

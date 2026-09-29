@@ -38,7 +38,26 @@ const GodRaysShader = {
       }
       acc /= float(S);
       float falloff = exp(-distSun * 2.2);
-      gl_FragColor = vec4(base.rgb + uTint * acc * uStrength * falloff, base.a);
+      vec3 col = base.rgb + uTint * acc * uStrength * falloff;
+      // Linsenreflexe: Geister entlang der Achse Sonne -> Bildmitte, nur wenn die Sonne sichtbar ist
+      vec3 sunC = texture2D(tDiffuse, uSun).rgb;
+      float vis = smoothstep(4.0, 30.0, dot(sunC, vec3(0.333)));
+      if (vis > 0.0) {
+        vec2 axis = uSun - vec2(0.5);
+        const float gp[5] = float[5](-0.35, -0.7, -1.0, 0.45, -1.35);
+        const float gs[5] = float[5](0.035, 0.06, 0.02, 0.025, 0.09);
+        for (int g = 0; g < 5; g++) {
+          vec2 c = vec2(0.5) + axis * gp[g];
+          float d = length((vUv - c) * vec2(uAspect, 1.0));
+          float ring = smoothstep(gs[g], gs[g] * 0.7, d) * (0.35 + 0.65 * smoothstep(gs[g] * 0.4, gs[g], d));
+          vec3 tint = g == 1 ? vec3(0.3, 0.6, 1.0) : g == 3 ? vec3(1.0, 0.5, 0.2) : vec3(0.7, 1.0, 0.6);
+          col += tint * ring * vis * uStrength * 0.18;
+        }
+        // Halo-Ring
+        float hd = length((vUv - vec2(0.5) - axis * -0.25) * vec2(uAspect, 1.0));
+        col += vec3(1.0, 0.75, 0.5) * smoothstep(0.02, 0.0, abs(hd - 0.32)) * vis * uStrength * 0.08;
+      }
+      gl_FragColor = vec4(col, base.a);
     }`,
 };
 

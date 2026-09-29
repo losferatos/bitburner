@@ -18,9 +18,9 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 
 const QUALITY = {
-  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, lodBias: 1.6 },
-  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, lodBias: 1.0 },
-  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, lodBias: 0.75 },
+  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, dof: false, lodBias: 1.6 },
+  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, dof: true, lodBias: 1.0 },
+  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, dof: true, lodBias: 0.75 },
 };
 let qLevel = Number(params.get('q')) || 2;
 let Q = QUALITY[qLevel];
@@ -184,6 +184,9 @@ async function boot() {
   $('loader').classList.add('ready');
   const begin = (withSound) => {
     if (withSound) audio.start();
+    canvas.focus();
+    // Eröffnung: Panoramaflug, danach übernimmt die Regie
+    if (!params.has('cam')) director.cut(6);
     $('loader').classList.add('gone');
     setTimeout(() => { $('keys').classList.remove('open'); }, 9000);
     $('keys').classList.add('open');
@@ -252,7 +255,8 @@ async function boot() {
 
     // Bei Schnitten keine Unschärfe über den Bildwechsel
     if (director.cutFlag) { post.cut(); director.cutFlag = false; }
-    post.updateMotion(driver.root ? driver.root.position : car.root.position, Q.mblur && !paused, 0.55);
+    post.updateDof(director.focus || camDist, director.dof || 0, Q.dof && !params.has('nodof'));
+    post.updateMotion(driver.root ? driver.root.position : car.root.position, Q.mblur && !paused && !params.has('nomb'), 0.55);
     post.composer.render(dt);
 
     // HUD

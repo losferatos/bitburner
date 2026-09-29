@@ -23,7 +23,7 @@ export async function loadCar() {
   const gltf = await loader.parseAsync(buf, '');
   const model = gltf.scene.children[0];
 
-  const bodyMat = new THREE.MeshPhysicalMaterial({ color: PAINTS[0].color, metalness: 0.6, roughness: 0.38, clearcoat: 1.0, clearcoatRoughness: 0.03, envMapIntensity: 1.2 });
+  const bodyMat = new THREE.MeshPhysicalMaterial({ color: PAINTS[0].color, metalness: 0.55, roughness: 0.3, clearcoat: 1.0, clearcoatRoughness: 0.03, envMapIntensity: 1.2 });
   const detailsMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 1.0, roughness: 0.28 });
   const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0a0c0f, metalness: 0.1, roughness: 0.02, transparent: true, opacity: 0.55, clearcoat: 1, envMapIntensity: 1.5 });
   const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4e0, emissiveIntensity: 0.0, roughness: 0.1, metalness: 0.3 });
@@ -38,7 +38,7 @@ export async function loadCar() {
     else if (/^rim_|trim$|^trim/.test(n)) o.material = detailsMat;
     else if (n === 'glass') o.material = glassMat;
     else if (n === 'lights') o.material = headMat;
-    else if (n === 'lights_red') o.material = tailMat;
+    else if (n === 'lights_red' || n === 'leds') o.material = tailMat;
     if (n === 'glass') o.castShadow = false;
     hookFog(o.material);
   });
@@ -83,10 +83,10 @@ export async function loadCar() {
   const beamMat = new THREE.ShaderMaterial({
     transparent: true, depthWrite: false, blending: THREE.AdditiveBlending, side: THREE.DoubleSide,
     uniforms: { uI: { value: 0 } },
-    vertexShader: /* glsl */ `varying float vL; varying vec3 vN; varying vec3 vV;
-      void main(){ vL = -position.y / 26.0; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); gl_Position = projectionMatrix * mv; }`,
-    fragmentShader: /* glsl */ `uniform float uI; varying float vL; varying vec3 vN; varying vec3 vV;
-      void main(){ float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6); float a = (1.0 - smoothstep(0.0, 1.0, vL)) * smoothstep(0.0, 0.04, vL) * edge * uI;
+    vertexShader: /* glsl */ `varying float vL; varying vec3 vN; varying vec3 vV; varying float vD;
+      void main(){ vL = -position.y / 26.0; vec4 mv = modelViewMatrix * vec4(position,1.0); vN = normalize(normalMatrix * normal); vV = normalize(-mv.xyz); vD = -mv.z; gl_Position = projectionMatrix * mv; }`,
+    fragmentShader: /* glsl */ `uniform float uI; varying float vL; varying vec3 vN; varying vec3 vV; varying float vD;
+      void main(){ float edge = pow(abs(dot(normalize(vN), normalize(vV))), 1.6); float a = (1.0 - smoothstep(0.0, 1.0, vL)) * smoothstep(0.0, 0.04, vL) * edge * uI * smoothstep(2.0, 9.0, vD);
         gl_FragColor = vec4(vec3(1.0, 0.94, 0.82) * a * 0.09, 1.0); }`,
   });
   const beamGeo = new THREE.ConeGeometry(4.6, 26, 24, 1, true);

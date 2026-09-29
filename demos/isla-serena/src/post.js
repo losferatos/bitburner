@@ -10,6 +10,95 @@ import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js'
 
 // Bewegungsunschärfe aus Tiefenpuffer-Reprojektion. Pixel am Auto werden mit dem Auto mitbewegt,
 // sodass der Wagen in Verfolgerperspektiven scharf bleibt und die Umgebung verwischt.
+const shared = { depth: null };
+class GrabDepthPass extends Pass {
+  constructor() { super(); this.needsSwap = false; }
+  render(renderer, writeBuffer, readBuffer) { shared.depth = readBuffer.depthTexture; }
+}
+
+// Tiefenunschärfe: Sammel-Bokeh mit 28 Abtastpunkten auf einer goldenen Spirale
+class DofPass extends Pass {
+  constructor(reversed) {
+    super();
+    this.material = new THREE.ShaderMaterial({
+      uniforms: {
+        tDiffuse: { value: null }, tDepth: { value: null },
+        uProjInv: { value: new THREE.Matrix4() }, uFocus: { value: 10 }, uAperture: { value: 0 }, uTexel: { value: new THREE.Vector2() },
+        uReversed: { value: reversed ? 1 : 0 },
+      },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: /* glsl */ `
+        uniform sampler2D tDiffuse; uniform highp sampler2D tDepth; uniform mat4 uProjInv;
+        uniform float uFocus, uAperture; uniform vec2 uTexel; uniform int uReversed;
+        varying vec2 vUv;
+        float viewZ(vec2 uv) {
+          float d = texture2D(tDepth, uv).r;
+          float z = uReversed == 1 ? max(d, 1e-7) : min(d, 0.9999999) * 2.0 - 1.0;
+          vec4 v = uProjInv * vec4(uv * 2.0 - 1.0, z, 1.0);
+          return -v.z / v.w;
+        }
+        float coc(float d) { return min(uAperture * abs(d - uFocus) / max(d, 0.1), 22.0); }
+        void main(){
+          vec4 base = texture2D(tDiffuse, vUv);
+          float c0 = coc(viewZ(vUv));
+          if (c0 < 0.6) { gl_FragColor = base; return; }
+          vec3 acc = base.rgb; float wsum = 1.0;
+          const int N = 28;
+          for (int i = 1; i < N; i++) {
+            float r = sqrt(float(i) / float(N));
+            float a = float(i) * 2.39996;
+            vec2 o = vec2(cos(a), sin(a)) * r * c0;
+            vec2 uv = vUv + o * uTexel;
+            float cs = coc(viewZ(uv));
+            float w = smoothstep(r * c0 - 1.5, r * c0, cs);
+            vec3 c = texture2D(tDiffuse, uv).rgb;
+            // helle Punkte leicht bevorzugen (Bokeh-Kringel)
+            w *= 1.0 + smoothstep(1.5, 6.0, dot(c, vec3(0.333))) * 1.5;
+            acc += c * w; wsum += w;
+          }
+          gl_FragColor = vec4(acc / wsum, base.a);
+        }`,
+    });
+    this.fsQuad = new FullScreenQuad(this.material);
+  }
+  render(renderer, writeBuffer, readBuffer) {
+    this.material.uniforms.tDiffuse.value = readBuffer.texture;
+    this.material.uniforms.tDepth.value = shared.depth;
+    this.material.uniforms.uTexel.value.set(1 / readBuffer.width, 1 / readBuffer.height);
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.fsQuad.render(renderer);
+  }
+}
+
+// DoF und Bewegungsunschärfe in einem Pass: das Zwischenergebnis landet in einem eigenen Puffer,
+// damit nie in das Ziel geschrieben wird, dessen Tiefentextur gerade gelesen wird.
+class CinemaPass extends Pass {
+  constructor(dof, mblur) {
+    super();
+    this.dof = dof; this.mblur = mblur;
+    this.tmp = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
+    this.copy = new FullScreenQuad(new THREE.ShaderMaterial({
+      uniforms: { tDiffuse: { value: null } },
+      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }`,
+    }));
+  }
+  setSize(w, h) { this.tmp.setSize(w, h); }
+  render(renderer, writeBuffer, readBuffer) {
+    const useDof = this.dof.enabled, useMb = this.mblur.enabled;
+    if (useDof && useMb) {
+      this.dof.render(renderer, this.tmp, readBuffer);
+      this.mblur.render(renderer, writeBuffer, this.tmp);
+    } else if (useDof) this.dof.render(renderer, writeBuffer, readBuffer);
+    else if (useMb) this.mblur.render(renderer, writeBuffer, readBuffer);
+    else {
+      this.copy.material.uniforms.tDiffuse.value = readBuffer.texture;
+      renderer.setRenderTarget(writeBuffer);
+      this.copy.render(renderer);
+    }
+  }
+}
+
 class MotionBlurPass extends Pass {
   constructor(reversed) {
     super();
@@ -55,7 +144,7 @@ class MotionBlurPass extends Pass {
   }
   render(renderer, writeBuffer, readBuffer) {
     this.material.uniforms.tDiffuse.value = readBuffer.texture;
-    this.material.uniforms.tDepth.value = readBuffer.depthTexture;
+    this.material.uniforms.tDepth.value = shared.depth;
     renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
     this.fsQuad.render(renderer);
   }
@@ -157,8 +246,11 @@ export function makePost(renderer, scene, camera) {
   const composer = new EffectComposer(renderer, rt);
   const renderPass = new RenderPass(scene, camera);
   composer.addPass(renderPass);
+  composer.addPass(new GrabDepthPass());
+  const dof = new DofPass(renderer.capabilities.reversedDepthBuffer);
   const mblur = new MotionBlurPass(renderer.capabilities.reversedDepthBuffer);
-  composer.addPass(mblur);
+  const cinema = new CinemaPass(dof, mblur);
+  composer.addPass(cinema);
   const rays = new ShaderPass(GodRaysShader);
   composer.addPass(rays);
   const size = renderer.getSize(new THREE.Vector2());
@@ -188,11 +280,22 @@ export function makePost(renderer, scene, camera) {
       u.uCarDelta.value.copy(carPos).sub(firstFrame ? carPos : prevCar);
       u.uStrength.value = strength;
       mblur.enabled = enabled;
+      cinema.enabled = mblur.enabled || dof.enabled;
       prevVP.copy(vp);
       prevCar.copy(carPos);
       firstFrame = false;
     },
     cut() { firstFrame = true; },
+    // Fokusabstand (m) und Blendenstärke (0 = aus)
+    updateDof(focus, strength, enabled) {
+      const u = dof.material.uniforms;
+      u.uProjInv.value.copy(camera.projectionMatrixInverse);
+      u.uFocus.value += (focus - u.uFocus.value) * 0.25;
+      const h = renderer.getDrawingBufferSize(new THREE.Vector2()).y;
+      u.uAperture.value = strength * h * 0.012;
+      dof.enabled = enabled && strength > 0.01;
+      cinema.enabled = mblur.enabled || dof.enabled;
+    },
     composer,
     bloom,
     rays,

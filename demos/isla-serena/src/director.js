@@ -22,7 +22,7 @@ export class Director {
     this.shots = [
       { name: 'Verfolgung', len: 11, fn: (t, s, dt) => this.chase(t, s, dt) },
       { name: 'Straßenrand', len: 8, init: (s) => this.initRoadside(s), fn: (t, s) => this.roadside(t, s) },
-      { name: 'Frontkamera', len: 7, fn: (t, s) => this.rigid(t, s, [0.0, 0.62, -2.7], [0, 0.9, 3], 58) },
+      { name: 'Frontkamera', len: 7, fn: (t, s) => this.rigid(t, s, [0.35, 0.75, -7.5], [0, 0.65, 0.4], 42) },
       { name: 'Drohne', len: 11, init: (s) => { s.a0 = Math.random() * 6.28; }, fn: (t, s) => this.drone(t, s) },
       { name: 'Seitenfahrt', len: 8, init: (s) => { s.side = Math.random() < 0.5 ? -1 : 1; }, fn: (t, s, dt) => this.sideTrack(t, s, dt) },
       { name: 'Radkamera', len: 7, fn: (t, s) => this.rigid(t, s, [-1.25, 0.42, 2.6], [-0.6, 0.55, -6], 68) },
@@ -94,23 +94,46 @@ export class Director {
     this.camera.fov = fov;
   }
 
+  // Sichtlinie frei von Gelände und Baumkronen?
+  clearLine(a, b) {
+    const d = a.distanceTo(b);
+    const n = Math.ceil(d / 2.5);
+    for (let i = 1; i < n; i++) {
+      const t = i / n;
+      const x = a.x + (b.x - a.x) * t, y = a.y + (b.y - a.y) * t, z = a.z + (b.z - a.z) * t;
+      if (this.world.heightAt(x, z) > y - 0.2) return false;
+      if (this.veg.obstacleTop(x, z, 0.2) > y) return false;
+    }
+    return true;
+  }
+
   initRoadside(s) {
     const d = this.driver;
-    for (let tries = 0; tries < 12; tries++) {
-      s.s = d.s + 75 + Math.random() * 40;
+    let best = null;
+    for (let tries = 0; tries < 24; tries++) {
+      s.s = d.s + 70 + Math.random() * 50;
       const f = roadFrame(d.road, s.s, {});
       const side = Math.random() < 0.5 ? 1 : -1;
-      const off = side * (8.5 + Math.random() * 7);
-      s.p = v3().set(f.x - f.tz * off, 0, f.z + f.tx * off);
-      s.p.y = Math.max(this.world.heightAt(s.p.x, s.p.z), 0.5) + 1.1 + Math.random() * 1.6;
-      if (this.veg.obstacleTop(s.p.x, s.p.z, 1.5) < s.p.y - 3) break;
+      const off = side * (8.5 + Math.random() * 8);
+      const p = v3().set(f.x - f.tz * off, 0, f.z + f.tx * off);
+      p.y = Math.max(this.world.heightAt(p.x, p.z), 0.5) + 1.1 + Math.random() * 1.8;
+      if (this.veg.obstacleTop(p.x, p.z, 1.5) > p.y - 3) continue;
+      // Sicht auf das anfahrende Auto an mehreren Stellen prüfen
+      let ok = 0;
+      for (const back of [70, 40, 15]) {
+        const g = roadFrame(d.road, s.s - back, {});
+        if (this.clearLine(p, v3().set(g.x - g.tz * 2.2, g.y + 0.8, g.z + g.tx * 2.2))) ok++;
+      }
+      if (!best || ok > best.ok) best = { p, ok, s: s.s };
+      if (ok === 3) break;
     }
+    s.p = best.p; s.s = best.s;
   }
   roadside(t, s) {
     this.pos.copy(s.p);
     this.look.copy(this.driver.pos).add(v3().set(0, 0.7, 0));
     const dist = this.pos.distanceTo(this.driver.pos);
-    this.camera.fov = THREE.MathUtils.clamp(dist * 0.55, 18, 55);
+    this.camera.fov = THREE.MathUtils.clamp(1300 / Math.max(dist, 1), 11, 50);
   }
 
   drone(t, s) {
@@ -157,6 +180,7 @@ export class Director {
       if (this.auto && performance.now() - this.lastInput > 25000) this.cut(this.idx + 1);
       else this.manualCam();
     }
+    this.dof = 0;
     if (!this.manual) {
       this.shotTime += dt;
       if (this.auto && this.shotTime > this.shotLen) this.next();
@@ -177,6 +201,11 @@ export class Director {
     if (this.pos.y < gh + 0.35) this.pos.y = gh + 0.35;
     this.camera.position.copy(this.pos);
     this.camera.lookAt(this.look);
+    // Schärfe auf das Auto; lange Brennweiten bekommen mehr Unschärfe
+    this.focus = this.pos.distanceTo(this.driver.pos);
+    const name = this.manual ? '' : this.shots[this.idx].name;
+    const dofByShot = { 'Straßenrand': 1.0, 'Seitenfahrt': 0.55, 'Drohne': 0.3, 'Frontkamera': 0.45, 'Radkamera': 0.25, 'Heckkamera': 0.2 };
+    this.dof = (dofByShot[name] || 0) * THREE.MathUtils.clamp(50 / this.camera.fov, 0.6, 3.5) * 0.5;
     this.camera.updateProjectionMatrix();
   }
 }

@@ -23,7 +23,7 @@ export class WaterReflection {
     if (this.rt.width !== w || this.rt.height !== h) this.rt.setSize(w, h);
   }
 
-  update(camera, clipUniform) {
+  update(camera, clipUniform, shadowLight) {
     if (!this.enabled) return;
     this.resize();
     const cam = this.cam;
@@ -43,7 +43,8 @@ export class WaterReflection {
     const prevAuto = r.shadowMap.autoUpdate;
     const prevAlpha = r.getClearAlpha();
     const prevColor = r.getClearColor(new THREE.Color());
-    r.shadowMap.autoUpdate = false;
+    // Schatten aus dem Hauptbild wiederverwenden – außer die Schattenkarte existiert noch nicht
+    r.shadowMap.autoUpdate = !(shadowLight && shadowLight.shadow.map);
     clipUniform.value = -0.25;
     r.setRenderTarget(this.rt);
     r.setClearColor(0x000000, 0);

@@ -196,8 +196,10 @@ async function boot() {
     // Eröffnung: Panoramaflug, danach übernimmt die Regie
     if (!params.has('cam')) director.cut(6);
     $('loader').classList.add('gone');
-    setTimeout(() => { $('keys').classList.remove('open'); }, 9000);
-    $('keys').classList.add('open');
+    document.body.classList.add('intro');
+    $('titlecard').classList.add('play');
+    setTimeout(() => { document.body.classList.remove('intro'); $('keys').classList.add('open'); }, 7200);
+    setTimeout(() => { $('keys')?.classList.remove('open'); }, 16000);
   };
   $('start-sound').addEventListener('click', () => begin(true));
   $('start-quiet').addEventListener('click', () => begin(false));
@@ -236,6 +238,7 @@ async function boot() {
     sky.dome.position.copy(camera.position);
     terrain.update(camera, Q.lodBias);
     veg.update(camera);
+    veg.updateCasters(driver.pos);
     ocean.update(camera);
 
     const night = U.uNight.value;
@@ -262,7 +265,7 @@ async function boot() {
     reflection.enabled = Q.refl && camera.position.y < 400;
     reflection.scale = qLevel === 3 ? 0.6 : 0.42;
     if (reflection.enabled) {
-      reflection.update(camera, terrainUniforms.uClipY);
+      reflection.update(camera, terrainUniforms.uClipY, sky.light);
       ocean.uniforms.uReflMat.value.copy(reflection.matrix);
     }
     ocean.uniforms.uReflOn.value = reflection.enabled ? 1 : 0;

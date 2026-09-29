@@ -35,6 +35,13 @@ body.hud-off #hud { opacity: 0; }
 #keys dt { color: var(--amber); white-space: nowrap; }
 #keys dd { margin: 0; color: var(--paper); }
 
+#titlecard { position: fixed; left: max(22px, 7vw); bottom: 22vh; pointer-events: none; opacity: 0; text-shadow: 0 2px 30px rgba(0, 0, 0, 0.55); }
+#titlecard.play { animation: tc 7.5s ease-in-out forwards; }
+@keyframes tc { 0% { opacity: 0; transform: translateY(8px); } 18% { opacity: 1; transform: none; } 78% { opacity: 1; } 100% { opacity: 0; } }
+.tc-eyebrow { margin: 0 0 6px; font-size: 11px; letter-spacing: 0.3em; text-transform: uppercase; color: var(--amber); }
+.tc-title { margin: 0; font-family: var(--display); font-style: italic; font-weight: 300; font-size: clamp(54px, 9vw, 120px); line-height: 0.9; letter-spacing: -0.015em; }
+.tc-sub { margin: 10px 0 0; font-family: var(--display); font-size: clamp(15px, 1.6vw, 20px); color: var(--dim); }
+body.intro #hud { opacity: 0; }
 #toast { position: fixed; left: 50%; top: 22%; transform: translate(-50%, 6px); font-family: var(--display); font-style: italic; font-size: 26px; opacity: 0; transition: opacity 0.35s, transform 0.35s; pointer-events: none; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6); white-space: nowrap; }
 #toast.show { opacity: 1; transform: translate(-50%, 0); }
 
@@ -64,4 +71,5 @@ body.hud-off #hud { opacity: 0; }
 }
 @media (prefers-reduced-motion: reduce) {
   #keys, #toast, #loader, #load-bar { transition: none; }
+  #titlecard.play { animation-duration: 0.01s; }
 }

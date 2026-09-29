@@ -123,6 +123,22 @@ const fogParsFragment = /* glsl */ `
     float s = pow(max(dot(rd, uFogSunDir), 0.0), uFogParams.z);
     return mix(col, mix(uFogColor, uFogSunColor, s), clamp(f, 0.0, uFogParams.w));
   }
+  // Wolkenschatten: gleiche Dichtefunktion wie die Wolkenschicht am Himmel
+  uniform sampler2D uCloudNoise;
+  uniform float uCloudTime;
+  uniform float uCloudCov;
+  float cloudShadowAt(vec3 wp) {
+    vec3 sd = uFogSunDir;
+    if (sd.y < 0.02) return 1.0;
+    float t = (1900.0 - wp.y) / sd.y;
+    vec2 p = (wp.xz + sd.xz * t) / 1000.0;
+    vec2 w = vec2(uCloudTime * 0.0035, uCloudTime * 0.0011);
+    float n = texture2D(uCloudNoise, p * 0.045 + w).r * 0.62
+            + texture2D(uCloudNoise, p * 0.13 - w * 1.6).b * 0.30
+            + texture2D(uCloudNoise, p * 0.41 + w * 2.4).g * 0.14;
+    float d = clamp((n - (1.02 - uCloudCov * 0.62)) * 3.2, 0.0, 1.0);
+    return 1.0 - smoothstep(0.0, 0.6, d) * 0.62;
+  }
 #endif`;
 const fogFragment = /* glsl */ `
 #ifdef USE_FOG
@@ -133,6 +149,13 @@ THREE.ShaderChunk.fog_pars_vertex = fogParsVertex;
 THREE.ShaderChunk.fog_vertex = fogVertex;
 THREE.ShaderChunk.fog_pars_fragment = fogParsFragment;
 THREE.ShaderChunk.fog_fragment = fogFragment;
+THREE.ShaderChunk.lights_fragment_begin = THREE.ShaderChunk.lights_fragment_begin.replace(
+  'getDirectionalLightInfo( directionalLight, directLight );',
+  `getDirectionalLightInfo( directionalLight, directLight );
+		#ifdef USE_FOG
+		directLight.color *= cloudShadowAt( vFogWorldPos );
+		#endif`
+);
 
 // Material an den gemeinsamen Nebel anschließen (behält vorhandenes onBeforeCompile)
 export function hookFog(material) {
@@ -144,6 +167,9 @@ export function hookFog(material) {
     shader.uniforms.uFogSunColor = U.uFogSunColor;
     shader.uniforms.uFogSunDir = U.uSunDir;
     shader.uniforms.uFogParams = U.uFogParams;
+    shader.uniforms.uCloudNoise = U.uNoise;
+    shader.uniforms.uCloudTime = U.uTime;
+    shader.uniforms.uCloudCov = U.uCloudCover;
     if (prev) prev.call(material, shader, renderer);
   };
   const prevKey = material.customProgramCacheKey?.bind(material);
@@ -226,6 +252,7 @@ export class Sky {
     this.light.shadow.bias = -0.0004;
     this.light.shadow.normalBias = 0.06;
     this.light.shadow.radius = 3;
+    this.light.shadow.camera.layers.enable(3); // Schattenwerfer der Vegetation
     scene.add(this.light, this.light.target);
     this.hemi = new THREE.HemisphereLight(0x8899bb, 0x223322, 0.0);
     scene.add(this.hemi);

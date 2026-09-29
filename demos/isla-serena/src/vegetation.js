@@ -6,6 +6,8 @@ import { simplex, rand } from './noise.js';
 import { hookFog, U } from './atmosphere.js';
 import { N, CELL, HALF, ROAD_HALF } from './world.js';
 
+export const SHADOW_LAYER = 3;
+
 const tmpC = new THREE.Color();
 
 // Atlas: TL Kiefernnadeln, TR Laubblätter, BL Zypressenschuppen, BR opak weiß (Stämme, Kerne)
@@ -354,11 +356,19 @@ export function makeVegetation(world, quality, exclude = () => false) {
     const hi = new THREE.InstancedMesh(sp.hi, makeMaterial(sp, false, lod), Math.max(1, maxHi));
     hi.count = 0;
     hi.frustumCulled = false;
-    hi.castShadow = true;
+    hi.castShadow = false;
     hi.receiveShadow = true;
     hi.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, maxHi) * 3), 3);
     group.add(hi);
-    return { sp, list, hi, maxHi, mats, cols };
+    // Schattenwerfer: nur Bäume im Schattenbereich um das Auto, nur im Schatten-Pass sichtbar (Ebene 3)
+    const maxCast = Math.min(list.length, 900);
+    const caster = new THREE.InstancedMesh(sp.hi, hi.material, Math.max(1, maxCast));
+    caster.count = 0;
+    caster.frustumCulled = false;
+    caster.castShadow = true;
+    caster.layers.set(SHADOW_LAYER);
+    group.add(caster);
+    return { sp, list, hi, maxHi, mats, cols, caster, maxCast };
   });
 
   // Gitter-Buckets für die schnelle Nahbereichsauswahl
@@ -434,6 +444,28 @@ export function makeVegetation(world, quality, exclude = () => false) {
     });
     return top;
   }
+  // Schattenwerfer um den Fokuspunkt neu sammeln
+  const lastF = { x: 1e9, z: 1e9 };
+  function updateCasters(focus, R = 95) {
+    if (Math.hypot(focus.x - lastF.x, focus.z - lastF.z) < 6) return;
+    lastF.x = focus.x; lastF.z = focus.z;
+    const b0i = Math.floor((focus.x - R + HALF) / BUCK), b1i = Math.floor((focus.x + R + HALF) / BUCK);
+    const b0j = Math.floor((focus.z - R + HALF) / BUCK), b1j = Math.floor((focus.z + R + HALF) / BUCK);
+    for (const t of types) {
+      let n = 0;
+      const arr = t.caster.instanceMatrix.array;
+      for (let bj = Math.max(0, b0j); bj <= Math.min(NB - 1, b1j); bj++) for (let bi = Math.max(0, b0i); bi <= Math.min(NB - 1, b1i); bi++) {
+        for (const i of t.buckets[bj * NB + bi]) {
+          const p = t.list[i];
+          if ((p[0] - focus.x) ** 2 + (p[2] - focus.z) ** 2 > R * R || n >= t.maxCast) continue;
+          for (let k = 0; k < 16; k++) arr[n * 16 + k] = t.mats[i * 16 + k];
+          n++;
+        }
+      }
+      t.caster.count = n;
+      t.caster.instanceMatrix.needsUpdate = true;
+    }
+  }
   const counts = types.map((t) => `${t.sp.name}:${t.list.length}`).join(' ');
-  return { group, update, counts, lod, obstacleTop };
+  return { group, update, updateCasters, counts, lod, obstacleTop };
 }

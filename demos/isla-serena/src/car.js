@@ -100,7 +100,7 @@ export async function loadCar() {
     body.add(b);
   }
 
-  return { root, body, model, wheels, bodyMat, headMat, tailMat, heads, beamMat, ao };
+  return { root, body, model, wheels, bodyMat, detailsMat, glassMat, headMat, tailMat, heads, beamMat, beamGeo, ao, aoMat: ao.material };
 }
 
 // Fahrdynamik: Geschwindigkeit nach Kurvenkrümmung, Lenkung, Wanken, Federung, Gänge für den Sound

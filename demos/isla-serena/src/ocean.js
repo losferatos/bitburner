@@ -156,7 +156,7 @@ export function makeOcean(waterNormalsTex) {
         float shore = smoothstep(2.4, 0.0, depth);
         float bands = smoothstep(0.55, 0.95, sin(depth * 4.5 - t * 1.4 + nz.r * 6.0) * 0.5 + 0.5);
         float foam = shore * (bands * 0.8 + smoothstep(0.6, 0.0, depth)) * smoothstep(0.25, 0.65, nz.b + texture(uNoise, p * 0.3).a * 0.4);
-        foam += smoothstep(0.35, 0.75, vWaveH) * smoothstep(0.55, 0.8, texture(uNoise, p * 0.08 - t * 0.02).b) * 0.35;
+        foam += smoothstep(0.45, 0.8, vWaveH) * smoothstep(0.62, 0.85, texture(uNoise, p * vec2(0.05, 0.14) - t * 0.02).b) * smoothstep(0.4, 0.7, texture(uNoise, p * 0.9).a) * 0.3;
         foam = clamp(foam, 0.0, 1.0);
         col = mix(col, vec3(0.85, 0.9, 0.92) * (uAmbient + uSunLight * (0.3 + 0.7 * sunUp)), foam * 0.85);
         // Scheinwerferkegel des Autos (nachts)

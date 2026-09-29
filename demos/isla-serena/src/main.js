@@ -12,6 +12,7 @@ import { loadCar, Driver, PAINTS } from './car.js';
 import { Director } from './director.js';
 import { planLandmarks, makeLandmarks } from './landmarks.js';
 import { WaterReflection, REFLECT_LAYER } from './reflection.js';
+import { makeTraffic, makeBoats } from './life.js';
 import { terrainUniforms } from './terrain.js';
 import { makePost } from './post.js';
 import { CarAudio } from './audio.js';
@@ -97,6 +98,11 @@ async function boot() {
   progress(0.98, 'Wagen wird vorgefahren');
   const car = await loadCar();
   scene.add(car.root);
+  const traffic = makeTraffic(car, world.road, 3);
+  scene.add(traffic.group);
+  traffic.update(0);
+  const boats = makeBoats(world, 5);
+  scene.add(boats.group);
   const driver = new Driver(car, world.road, world.heightAt);
   driver.update(0.016);
 
@@ -106,7 +112,7 @@ async function boot() {
 
   // Spiegelung: was im Wasser erscheinen soll, liegt zusätzlich auf einer eigenen Ebene
   const reflection = new WaterReflection(renderer, scene);
-  const reflectables = [terrain.group, veg.group, landmarks.group, sky.light, sky.hemi];
+  const reflectables = [terrain.group, veg.group, landmarks.group, boats.group, sky.light, sky.hemi];
   for (const g of reflectables) g.traverse((o) => o.layers.enable(REFLECT_LAYER));
   ocean.uniforms.uRefl.value = reflection.rt.texture;
 
@@ -214,7 +220,7 @@ async function boot() {
   let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16, slowAtMin = 0;
   const sunCol = new THREE.Color();
   const debug = params.has('debug');
-  window.__demo = { gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
+  window.__demo = { traffic, boats, gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
 
   renderer.info.autoReset = false;
   function frame() {
@@ -228,6 +234,7 @@ async function boot() {
 
     if (!paused) {
       driver.update(dt);
+      traffic.update(dt);
       U.uTime.value += dt;
       if (timeRunning) {
         const golden = Math.abs(sky.sun.y) < 0.28;
@@ -246,6 +253,7 @@ async function boot() {
     const night = U.uNight.value;
     road.update(night);
     landmarks.update(U.uTime.value, night);
+    boats.update(U.uTime.value, night);
     // Lichter am Auto
     const lightsOn = THREE.MathUtils.smoothstep(night, 0.15, 0.45);
     for (const h of car.heads) h.intensity = lightsOn * 55;

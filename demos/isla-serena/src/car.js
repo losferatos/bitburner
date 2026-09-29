@@ -24,10 +24,44 @@ export async function loadCar() {
   const model = gltf.scene.children[0];
 
   const bodyMat = new THREE.MeshPhysicalMaterial({ color: PAINTS[0].color, metalness: 0.55, roughness: 0.3, clearcoat: 1.0, clearcoatRoughness: 0.03, envMapIntensity: 1.2 });
+  // Radhausschalen und Unterboden gehören im Modell zur Karosserie: nach unten zeigende Flächen abdunkeln
+  const wheelUniform = { value: [new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3(), new THREE.Vector3()] };
+  bodyMat.onBeforeCompile = (shader) => {
+    shader.uniforms.uWheelC = wheelUniform;
+    shader.vertexShader = shader.vertexShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBodyW;')
+      .replace('#include <begin_vertex>', '#include <begin_vertex>\nvBodyW = (modelMatrix * vec4(transformed, 1.0)).xyz;');
+    shader.fragmentShader = shader.fragmentShader
+      .replace('#include <common>', '#include <common>\nvarying vec3 vBodyW;\nuniform vec3 uWheelC[4];')
+      .replace('#include <lights_physical_fragment>', `#include <lights_physical_fragment>
+      {
+        vec3 nW = inverseTransformDirection(normal, viewMatrix);
+        // Radhausschalen: Flächen nahe einer Radmitte, die zum Rad hin zeigen
+        float liner = 0.0;
+        for (int i = 0; i < 4; i++) {
+          vec3 d = uWheelC[i] - vBodyW;
+          float r = length(d);
+          liner = max(liner, (1.0 - smoothstep(0.5, 0.62, r)) * smoothstep(0.0, 0.25, dot(nW, d / max(r, 1e-3))));
+        }
+        float under = max(smoothstep(-0.02, -0.4, nW.y), liner);
+        material.diffuseColor *= 1.0 - 0.93 * under;
+        material.specularColor = mix(material.specularColor, vec3(0.03), under);
+        material.roughness = mix(material.roughness, 0.85, under);
+        #ifdef USE_CLEARCOAT
+          material.clearcoat *= 1.0 - under;
+        #endif
+      }`);
+  };
+  bodyMat.customProgramCacheKey = () => 'carbody';
   const detailsMat = new THREE.MeshStandardMaterial({ color: 0xdddddd, metalness: 1.0, roughness: 0.28 });
   const glassMat = new THREE.MeshPhysicalMaterial({ color: 0x0a0c0f, metalness: 0.1, roughness: 0.02, transparent: true, opacity: 0.55, clearcoat: 1, envMapIntensity: 1.5 });
   const headMat = new THREE.MeshStandardMaterial({ color: 0xffffff, emissive: 0xfff4e0, emissiveIntensity: 0.0, roughness: 0.1, metalness: 0.3 });
   const tailMat = new THREE.MeshStandardMaterial({ color: 0x550000, emissive: 0xff1a0a, emissiveIntensity: 0.4, roughness: 0.2 });
+  const carbonMat = new THREE.MeshPhysicalMaterial({ color: 0x141517, metalness: 0.3, roughness: 0.35, clearcoat: 0.8, clearcoatRoughness: 0.1 });
+  const carpetMat = new THREE.MeshStandardMaterial({ color: 0x1e1e20, roughness: 1 });
+  const tireMat = new THREE.MeshStandardMaterial({ color: 0x0c0c0d, roughness: 0.92, metalness: 0 });
+  const darkMetalMat = new THREE.MeshStandardMaterial({ color: 0x2a2b2d, roughness: 0.55, metalness: 0.7 });
+  const plasticMat = new THREE.MeshStandardMaterial({ color: 0x111213, roughness: 0.8, metalness: 0 });
 
   model.traverse((o) => {
     if (!o.isMesh) return;
@@ -35,10 +69,17 @@ export async function loadCar() {
     o.receiveShadow = true;
     const n = o.name;
     if (n === 'body') o.material = bodyMat;
-    else if (/^rim_|trim$|^trim/.test(n)) o.material = detailsMat;
+    else if (/^rim_/.test(n) || n === 'trim') o.material = detailsMat;
     else if (n === 'glass') o.material = glassMat;
     else if (n === 'lights') o.material = headMat;
     else if (n === 'lights_red' || n === 'leds') o.material = tailMat;
+    // Materialien ohne ihre Originaltexturen wären weiß: Carbon und Teppich dunkel einfärben
+    const mn = o.material.name;
+    if (mn === 'Carbon_Fiber') o.material = carbonMat;
+    else if (mn === 'Carpet') o.material = carpetMat;
+    else if (mn === 'Tires') o.material = tireMat;
+    else if (mn === 'metal_gray' && !/^rim_/.test(n)) o.material = darkMetalMat;
+    else if (mn === 'plastic_gray' || mn === 'Interior_light') o.material = plasticMat;
     if (n === 'glass') o.castShadow = false;
     hookFog(o.material);
   });
@@ -100,7 +141,7 @@ export async function loadCar() {
     body.add(b);
   }
 
-  return { root, body, model, wheels, bodyMat, detailsMat, glassMat, headMat, tailMat, heads, beamMat, beamGeo, ao, aoMat: ao.material };
+  return { wheelUniform, root, body, model, wheels, bodyMat, detailsMat, glassMat, headMat, tailMat, heads, beamMat, beamGeo, ao, aoMat: ao.material };
 }
 
 // Fahrdynamik: Geschwindigkeit nach Kurvenkrümmung, Lenkung, Wanken, Federung, Gänge für den Sound
@@ -176,6 +217,8 @@ export class Driver {
       w[i].rotation.x = this.spin;
       w[i].rotation.y = i < 2 ? this.steer : 0;
     }
+    this.car.root.updateMatrixWorld(true);
+    for (let i = 0; i < 4; i++) w[i].getWorldPosition(this.car.wheelUniform.value[i]);
 
     // Gänge / Drehzahl (für den Motorsound)
     const ratios = [0, 3.2, 2.3, 1.75, 1.4, 1.15, 0.95, 0.8];

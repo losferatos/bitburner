@@ -220,7 +220,7 @@ async function boot() {
   let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16, slowAtMin = 0;
   const sunCol = new THREE.Color();
   const debug = params.has('debug');
-  window.__demo = { traffic, boats, gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
+  window.__demo = { car, traffic, boats, gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
 
   renderer.info.autoReset = false;
   function frame() {

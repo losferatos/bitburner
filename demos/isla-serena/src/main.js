@@ -11,6 +11,8 @@ import { makeGrass } from './grass.js';
 import { loadCar, Driver, PAINTS } from './car.js';
 import { Director } from './director.js';
 import { planLandmarks, makeLandmarks } from './landmarks.js';
+import { WaterReflection, REFLECT_LAYER } from './reflection.js';
+import { terrainUniforms } from './terrain.js';
 import { makePost } from './post.js';
 import { CarAudio } from './audio.js';
 
@@ -18,9 +20,9 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 
 const QUALITY = {
-  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, dof: false, lodBias: 1.6 },
-  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, dof: true, lodBias: 1.0 },
-  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, dof: true, lodBias: 0.75 },
+  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, dof: false, refl: false, lodBias: 1.6 },
+  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, dof: true, refl: true, lodBias: 1.0 },
+  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, dof: true, refl: true, lodBias: 0.75 },
 };
 let qLevel = Number(params.get('q')) || 2;
 let Q = QUALITY[qLevel];
@@ -101,6 +103,12 @@ async function boot() {
   const director = new Director(camera, driver, world, canvas, veg);
   const post = makePost(renderer, scene, camera);
   const audio = new CarAudio();
+
+  // Spiegelung: was im Wasser erscheinen soll, liegt zusätzlich auf einer eigenen Ebene
+  const reflection = new WaterReflection(renderer, scene);
+  const reflectables = [terrain.group, veg.group, landmarks.group, sky.light, sky.hemi];
+  for (const g of reflectables) g.traverse((o) => o.layers.enable(REFLECT_LAYER));
+  ocean.uniforms.uRefl.value = reflection.rt.texture;
 
   // Materialien ohne eigenen Hook (z. B. aus dem glTF) an den Nebel anschließen
   scene.traverse((o) => { if (o.material) [].concat(o.material).forEach(hookFog); });
@@ -249,6 +257,15 @@ async function boot() {
     sunCol.copy(sky.light.color);
     post.update(U.uTime.value, sky.sun, sunCol, night, camera.aspect, Q.rays);
     post.grade.uniforms.uLetterbox.value += ((letterbox ? 1 : 0) - post.grade.uniforms.uLetterbox.value) * Math.min(1, dt * 4);
+
+    // Wasserspiegelung (vor dem Hauptbild)
+    reflection.enabled = Q.refl && camera.position.y < 400;
+    reflection.scale = qLevel === 3 ? 0.6 : 0.42;
+    if (reflection.enabled) {
+      reflection.update(camera, terrainUniforms.uClipY);
+      ocean.uniforms.uReflMat.value.copy(reflection.matrix);
+    }
+    ocean.uniforms.uReflOn.value = reflection.enabled ? 1 : 0;
 
     const camDist = camera.position.distanceTo(driver.pos);
     audio.update(dt, driver, camDist, THREE.MathUtils.smoothstep(-world.heightAt(camera.position.x, camera.position.z), -40, 5));

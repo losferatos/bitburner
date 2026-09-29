@@ -53,6 +53,7 @@ export const terrainUniforms = {
   uHeight: { value: null },
   uNormalTex: { value: null },
   uTerr: { value: new THREE.Vector3(HALF, CELL, N) },
+  uClipY: { value: -1e9 },
 };
 
 export const terrainParsGLSL = /* glsl */ `
@@ -89,8 +90,9 @@ export function makeTerrain(world, textures) {
         vTerrWorld = vec3(tWXZ.x, transformed.y, tWXZ.y);`);
 
     shader.fragmentShader = shader.fragmentShader
-      .replace('#include <common>', `#include <common>\n${terrainParsGLSL}\nuniform sampler2D uNoise;\nuniform float uNight;\nvarying vec3 vTerrWorld;`)
+      .replace('#include <common>', `#include <common>\n${terrainParsGLSL}\nuniform sampler2D uNoise;\nuniform float uNight;\nuniform float uClipY;\nvarying vec3 vTerrWorld;`)
       .replace('#include <map_fragment>', /* glsl */ `
+        if (vTerrWorld.y < uClipY) discard;
         vec2 wp = vTerrWorld.xz;
         float th = vTerrWorld.y;
         vec4 tNrm = texture(uNormalTex, terrUV(wp));

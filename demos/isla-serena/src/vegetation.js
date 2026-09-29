@@ -322,19 +322,34 @@ export function makeVegetation(world, quality, exclude = () => false) {
   const m4 = new THREE.Matrix4(), q = new THREE.Quaternion(), v = new THREE.Vector3(), s3 = new THREE.Vector3();
   const up = new THREE.Vector3(0, 1, 0);
   const col = new THREE.Color();
+  // Fern-LOD in 4×4 Zellen (je 1 km), damit ganze Zellen außerhalb des Sichtfelds wegfallen
+  const CELLS = 4, CS = (HALF * 2) / CELLS;
   const types = species.map((sp, k) => {
     const list = inst[k];
-    const lo = new THREE.InstancedMesh(sp.lo, makeMaterial(sp, true, lod), Math.max(1, list.length));
+    const loMat = makeMaterial(sp, true, lod);
+    const mats = new Float32Array(list.length * 16), cols = new Float32Array(list.length * 3);
     const tint = (i) => { const r = list[i][0] * 12.9898 + list[i][2] * 78.233; const f = (Math.sin(r) * 43758.5453) % 1; return 0.8 + Math.abs(f) * 0.4; };
+    const cellLists = Array.from({ length: CELLS * CELLS }, () => []);
     list.forEach((t, i) => {
       m4.compose(v.set(t[0], t[1], t[2]), q.setFromAxisAngle(up, t[3]), s3.setScalar(t[4]));
-      lo.setMatrixAt(i, m4);
+      m4.toArray(mats, i * 16);
       const g = tint(i); col.setRGB(g, g * (0.95 + 0.1 * Math.abs(Math.sin(i))), g * 0.95);
-      lo.setColorAt(i, col);
+      col.toArray(cols, i * 3);
+      const ci = Math.min(CELLS - 1, Math.max(0, Math.floor((t[0] + HALF) / CS)));
+      const cj = Math.min(CELLS - 1, Math.max(0, Math.floor((t[2] + HALF) / CS)));
+      cellLists[cj * CELLS + ci].push(i);
     });
-    lo.count = list.length;
-    lo.frustumCulled = false;
-    lo.receiveShadow = true;
+    for (const cl of cellLists) {
+      if (!cl.length) continue;
+      const lo = new THREE.InstancedMesh(sp.lo, loMat, cl.length);
+      cl.forEach((i, n) => {
+        for (let e = 0; e < 16; e++) lo.instanceMatrix.array[n * 16 + e] = mats[i * 16 + e];
+        lo.setColorAt(n, col.fromArray(cols, i * 3));
+      });
+      lo.receiveShadow = true;
+      lo.computeBoundingSphere();
+      group.add(lo);
+    }
     const maxHi = Math.min(list.length, quality.treesNear);
     const hi = new THREE.InstancedMesh(sp.hi, makeMaterial(sp, false, lod), Math.max(1, maxHi));
     hi.count = 0;
@@ -342,8 +357,8 @@ export function makeVegetation(world, quality, exclude = () => false) {
     hi.castShadow = true;
     hi.receiveShadow = true;
     hi.instanceColor = new THREE.InstancedBufferAttribute(new Float32Array(Math.max(1, maxHi) * 3), 3);
-    group.add(lo, hi);
-    return { sp, list, lo, hi, maxHi, tint };
+    group.add(hi);
+    return { sp, list, hi, maxHi, mats, cols };
   });
 
   // Gitter-Buckets für die schnelle Nahbereichsauswahl
@@ -357,23 +372,39 @@ export function makeVegetation(world, quality, exclude = () => false) {
     });
   }
 
-  const last = new THREE.Vector2(1e9, 1e9);
+  // Nahbereich: nur Bäume im horizontalen Sichtkegel (plus Rundum-Radius für Schatten)
+  const last = { x: 1e9, z: 1e9, yaw: 1e9, fov: 0 };
+  const fwd = new THREE.Vector3();
   function update(camera) {
     const cx = camera.position.x, cz = camera.position.z;
-    if (Math.hypot(cx - last.x, cz - last.y) < 12) return;
-    last.set(cx, cz);
+    camera.getWorldDirection(fwd);
+    const yaw = Math.atan2(fwd.x, fwd.z);
+    let dy = Math.abs(yaw - last.yaw); if (dy > Math.PI) dy = 2 * Math.PI - dy;
+    if (Math.hypot(cx - last.x, cz - last.z) < 3 && dy < 0.05 && camera.fov === last.fov) return;
+    last.x = cx; last.z = cz; last.yaw = yaw; last.fov = camera.fov;
     const R = lod.value.z;
     lod.value.x = cx; lod.value.y = cz;
+    const hf = Math.atan(Math.tan(THREE.MathUtils.degToRad(camera.fov) / 2) * camera.aspect);
+    const flen = Math.hypot(fwd.x, fwd.z);
+    const lookDown = flen < 0.35; // steil nach unten: alles ringsum nehmen
+    const fx = fwd.x / (flen || 1), fz = fwd.z / (flen || 1);
+    const cosLim = Math.cos(Math.min(Math.PI, hf + 0.45));
     const b0i = Math.floor((cx - R + HALF) / BUCK), b1i = Math.floor((cx + R + HALF) / BUCK);
     const b0j = Math.floor((cz - R + HALF) / BUCK), b1j = Math.floor((cz + R + HALF) / BUCK);
     for (const t of types) {
       let n = 0;
-      const arr = t.hi.instanceMatrix.array, carr = t.hi.instanceColor.array, lm = t.lo.instanceMatrix.array, lc = t.lo.instanceColor.array;
+      const arr = t.hi.instanceMatrix.array, carr = t.hi.instanceColor.array, lm = t.mats, lc = t.cols;
       for (let bj = Math.max(0, b0j); bj <= Math.min(NB - 1, b1j); bj++) {
         for (let bi = Math.max(0, b0i); bi <= Math.min(NB - 1, b1i); bi++) {
           for (const i of t.buckets[bj * NB + bi]) {
             const p = t.list[i];
-            if ((p[0] - cx) ** 2 + (p[2] - cz) ** 2 >= R * R) continue;
+            const dx = p[0] - cx, dz = p[2] - cz;
+            const d2 = dx * dx + dz * dz;
+            if (d2 >= R * R) continue;
+            if (!lookDown && d2 > 65 * 65) {
+              const d = Math.sqrt(d2);
+              if ((dx * fx + dz * fz) / d < cosLim) continue;
+            }
             if (n >= t.maxHi) break;
             for (let k = 0; k < 16; k++) arr[n * 16 + k] = lm[i * 16 + k];
             carr[n * 3] = lc[i * 3]; carr[n * 3 + 1] = lc[i * 3 + 1]; carr[n * 3 + 2] = lc[i * 3 + 2];

@@ -69,6 +69,9 @@ export function makeOcean(waterNormalsTex) {
     uAmbient: U.uAmbient,
     uSunLight: U.uSunLight,
     uHeadlight: { value: new THREE.Vector4(0, 0, 0, 0) },
+    uRefl: { value: null },
+    uReflMat: { value: new THREE.Matrix4() },
+    uReflOn: { value: 0 },
   };
 
   const mat = new THREE.ShaderMaterial({
@@ -101,6 +104,9 @@ export function makeOcean(waterNormalsTex) {
       uniform vec3 uAmbient;
       uniform vec3 uSunLight;
       uniform vec4 uHeadlight;
+      uniform sampler2D uRefl;
+      uniform mat4 uReflMat;
+      uniform float uReflOn;
       varying vec3 vWorld;
       varying vec3 vNrm;
       varying float vDepth;
@@ -122,6 +128,12 @@ export function makeOcean(waterNormalsTex) {
         vec3 R = reflect(-V, N);
         R.y = abs(R.y) + 0.002;
         vec3 refl = skyColor(vWorld, normalize(R), false);
+        if (uReflOn > 0.0) {
+          vec4 rp = uReflMat * vec4(vWorld.x, 0.0, vWorld.z, 1.0);
+          vec2 ruv = rp.xy / rp.w + N.xz * vec2(0.035, 0.05) * clamp(40.0 / dist, 0.15, 1.0);
+          vec4 pl = texture2D(uRefl, clamp(ruv, vec2(0.001), vec2(0.999)));
+          refl = mix(refl, pl.rgb, pl.a * uReflOn);
+        }
         // Sonnenglitzern
         vec3 H = normalize(V + uSunDir);
         float NdH = max(dot(N, H), 0.0);

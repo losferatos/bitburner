@@ -227,6 +227,7 @@ function makeMaterial(sp, isLo, lod) {
   if (!leafAtlas) leafAtlas = makeLeafAtlas();
   const mat = new THREE.MeshStandardMaterial({ vertexColors: true, roughness: sp.leaf ? 0.82 : 0.9, metalness: 0, map: leafAtlas, alphaTest: 0.42, side: isLo ? THREE.FrontSide : THREE.DoubleSide });
   mat.shadowSide = THREE.DoubleSide;
+  mat.alphaToCoverage = !isLo;
   mat.onBeforeCompile = (shader) => {
     shader.uniforms.uTime = U.uTime;
     shader.uniforms.uSunLight = U.uSunLight;

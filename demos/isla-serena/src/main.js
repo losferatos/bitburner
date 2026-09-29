@@ -20,9 +20,9 @@ const $ = (id) => document.getElementById(id);
 const params = new URLSearchParams(location.search);
 
 const QUALITY = {
-  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, dof: false, refl: false, lodBias: 1.6 },
-  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, dof: true, refl: true, lodBias: 1.0 },
-  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, dof: true, refl: true, lodBias: 0.75 },
+  1: { name: 'Niedrig', prCap: 0.8, shadow: 1024, grass: 0, treesNear: 1400, rays: false, mblur: false, dof: false, refl: false, msaa: 0, lodBias: 1.6 },
+  2: { name: 'Mittel', prCap: 1.0, shadow: 2048, grass: 110000, treesNear: 2600, rays: true, mblur: true, dof: true, refl: true, msaa: 4, lodBias: 1.0 },
+  3: { name: 'Hoch', prCap: 1.5, shadow: 4096, grass: 200000, treesNear: 4200, rays: true, mblur: true, dof: true, refl: true, msaa: 4, lodBias: 0.75 },
 };
 let qLevel = Number(params.get('q')) || 2;
 let Q = QUALITY[qLevel];
@@ -121,6 +121,8 @@ async function boot() {
   let renderScale = 1;
 
   function resize() {
+    post.scenePass.setSamples(Q.msaa);
+    post.smaa.enabled = Q.msaa === 0;
     const pr = Math.min(window.devicePixelRatio || 1, Q.prCap) * renderScale;
     renderer.setPixelRatio(pr);
     renderer.setSize(innerWidth, innerHeight, false);
@@ -209,7 +211,7 @@ async function boot() {
 
   // ---------- Hauptschleife ----------
   let lastT = performance.now();
-  let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16;
+  let fpsAcc = 0, fpsN = 0, hudT = 0, fps = 60, adaptT = 0, ftAvg = 16, slowAtMin = 0;
   const sunCol = new THREE.Color();
   const debug = params.has('debug');
   window.__demo = { gpuName, plan, renderer, scene, camera, sky, director, driver, world, post, veg, U, setQuality, info: () => renderer.info };
@@ -298,8 +300,12 @@ async function boot() {
     adaptT += rawDt;
     if (adaptT > 1.5 && !noAdapt) {
       adaptT = 0;
-      if (ftAvg > 30 && renderScale > 0.55) { renderScale = Math.max(0.55, renderScale - 0.1); resize(); }
-      else if (ftAvg < 19 && renderScale < 1) { renderScale = Math.min(1, renderScale + 0.05); resize(); }
+      if (ftAvg > 30 && renderScale > 0.55) { renderScale = Math.max(0.55, renderScale - 0.1); resize(); slowAtMin = 0; }
+      else if (ftAvg > 34 && renderScale <= 0.55 && qLevel > 1) {
+        // auch bei minimaler Auflösung zu langsam: eine Qualitätsstufe zurück
+        if (++slowAtMin >= 3) { slowAtMin = 0; setQuality(qLevel - 1); toast(`Qualität automatisch auf ${Q.name} gesenkt`); }
+      }
+      else if (ftAvg < 19 && renderScale < 1) { renderScale = Math.min(1, renderScale + 0.05); resize(); slowAtMin = 0; }
     }
     requestAnimationFrame(frame);
   }

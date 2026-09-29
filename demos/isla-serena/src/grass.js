@@ -73,7 +73,7 @@ export function makeGrass(count, tile = 66) {
         {
           vec3 vd = normalize(vGrassW - cameraPosition);
           float back = pow(max(dot(vd, uSunDir), 0.0), 4.0);
-          totalEmissiveRadiance += diffuseColor.rgb * uSunLight * back * 0.8 * vGrassH;
+          totalEmissiveRadiance += diffuseColor.rgb * uSunLight * back * 0.4 * vGrassH;
         }`);
   };
   mat.customProgramCacheKey = () => 'grass';

@@ -1,7 +1,6 @@
 // Nachbearbeitung: Lichtstrahlen, Bloom, Tonemapping, SMAA, Farbgebung/Vignette/Körnung.
 import * as THREE from 'three';
 import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js';
-import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js';
 import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js';
 import { OutputPass } from 'three/examples/jsm/postprocessing/OutputPass.js';
 import { SMAAPass } from 'three/examples/jsm/postprocessing/SMAAPass.js';
@@ -11,9 +10,39 @@ import { Pass, FullScreenQuad } from 'three/examples/jsm/postprocessing/Pass.js'
 // Bewegungsunschärfe aus Tiefenpuffer-Reprojektion. Pixel am Auto werden mit dem Auto mitbewegt,
 // sodass der Wagen in Verfolgerperspektiven scharf bleibt und die Umgebung verwischt.
 const shared = { depth: null };
-class GrabDepthPass extends Pass {
-  constructor() { super(); this.needsSwap = false; }
-  render(renderer, writeBuffer, readBuffer) { shared.depth = readBuffer.depthTexture; }
+
+const copyShader = () => new THREE.ShaderMaterial({
+  uniforms: { tDiffuse: { value: null } },
+  vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
+  fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }`,
+});
+
+// Szene in ein eigenes (MSAA-)Ziel mit Float-Tiefentextur rendern; Tiefe steht danach allen Pässen zur Verfügung
+class ScenePass extends Pass {
+  constructor(scene, camera, samples) {
+    super();
+    this.scene = scene; this.camera = camera;
+    this.rt = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, samples });
+    this.rt.depthTexture = new THREE.DepthTexture(1, 1, THREE.FloatType);
+    this.copy = new FullScreenQuad(copyShader());
+    this.w = 1; this.h = 1;
+  }
+  setSamples(n) {
+    if (this.rt.samples === n) return;
+    this.rt.dispose();
+    this.rt = new THREE.WebGLRenderTarget(this.w, this.h, { type: THREE.HalfFloatType, samples: n });
+    this.rt.depthTexture = new THREE.DepthTexture(this.w, this.h, THREE.FloatType);
+  }
+  setSize(w, h) { this.w = w; this.h = h; this.rt.setSize(w, h); }
+  render(renderer, writeBuffer) {
+    renderer.setRenderTarget(this.rt);
+    renderer.clear();
+    renderer.render(this.scene, this.camera);
+    shared.depth = this.rt.depthTexture;
+    this.copy.material.uniforms.tDiffuse.value = this.rt.texture;
+    renderer.setRenderTarget(this.renderToScreen ? null : writeBuffer);
+    this.copy.render(renderer);
+  }
 }
 
 // Tiefenunschärfe: Sammel-Bokeh mit 28 Abtastpunkten auf einer goldenen Spirale
@@ -77,11 +106,7 @@ class CinemaPass extends Pass {
     super();
     this.dof = dof; this.mblur = mblur;
     this.tmp = new THREE.WebGLRenderTarget(1, 1, { type: THREE.HalfFloatType, depthBuffer: false });
-    this.copy = new FullScreenQuad(new THREE.ShaderMaterial({
-      uniforms: { tDiffuse: { value: null } },
-      vertexShader: `varying vec2 vUv; void main(){ vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4(position,1.0); }`,
-      fragmentShader: `uniform sampler2D tDiffuse; varying vec2 vUv; void main(){ gl_FragColor = texture2D(tDiffuse, vUv); }`,
-    }));
+    this.copy = new FullScreenQuad(copyShader());
   }
   setSize(w, h) { this.tmp.setSize(w, h); }
   render(renderer, writeBuffer, readBuffer) {
@@ -239,14 +264,12 @@ const GradeShader = {
 };
 
 export function makePost(renderer, scene, camera) {
-  // Float-Tiefenpuffer: zusammen mit Reversed-Z praktisch kein Z-Fighting bis zum Horizont
+  // Ping-Pong-Ziele ohne Tiefe; die Szene selbst rendert der ScenePass (Float-Tiefe + Reversed-Z, optional MSAA)
   const sz = renderer.getDrawingBufferSize(new THREE.Vector2());
-  const rt = new THREE.WebGLRenderTarget(sz.x, sz.y, { type: THREE.HalfFloatType });
-  rt.depthTexture = new THREE.DepthTexture(sz.x, sz.y, THREE.FloatType);
+  const rt = new THREE.WebGLRenderTarget(sz.x, sz.y, { type: THREE.HalfFloatType, depthBuffer: false });
   const composer = new EffectComposer(renderer, rt);
-  const renderPass = new RenderPass(scene, camera);
-  composer.addPass(renderPass);
-  composer.addPass(new GrabDepthPass());
+  const scenePass = new ScenePass(scene, camera, 4);
+  composer.addPass(scenePass);
   const dof = new DofPass(renderer.capabilities.reversedDepthBuffer);
   const mblur = new MotionBlurPass(renderer.capabilities.reversedDepthBuffer);
   const cinema = new CinemaPass(dof, mblur);
@@ -268,6 +291,7 @@ export function makePost(renderer, scene, camera) {
   const prevCar = new THREE.Vector3();
   let firstFrame = true;
   return {
+    scenePass,
     mblur,
     // vor composer.render aufrufen (Kamera und Auto für diesen Frame schon gesetzt)
     updateMotion(carPos, enabled, strength = 0.5) {

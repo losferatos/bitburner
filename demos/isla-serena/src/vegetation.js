@@ -186,12 +186,12 @@ function makeSpecies() {
     pineHi.push(blob(r * 0.72, 0, 1.3, 0.5, 1.3, x, y, z, c.clone().multiplyScalar(0.35), k * 3.1, 0.2));
     pineHi.push(cards(r, 1.3, 0.55, 1.3, x, y, z, c, 24, 'pine', r * 0.62, k));
   });
-  const pineLo = [prism(8.2, 0.3, 4, bark, -0.4), blob(3.6, 0, 1.3, 0.45, 1.3, 0.4, 8.4, -0.2, pineGreen, 1, 0.12)];
+  const pineLo = [prism(8.2, 0.3, 4, bark, -0.4), blob(3.6, 0, 1.3, 0.45, 1.3, 0.4, 8.4, -0.2, pineGreen.clone().multiplyScalar(0.6), 1, 0.12)];
 
   // Zypresse
   const cypHi = [prism(1.6, 0.22, 6, bark, -0.3), blob(1.0, 1, 1.0, 5.0, 1.0, 0, 6.1, 0, cypGreen.clone().multiplyScalar(0.4), 5, 0.1),
     cards(1.25, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen, 110, 'cypress', 0.62, 2)];
-  const cypLo = [blob(1.25, 0, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen, 5, 0.05)];
+  const cypLo = [blob(1.25, 0, 1.0, 5.2, 1.0, 0, 6.2, 0, cypGreen.clone().multiplyScalar(0.62), 5, 0.05)];
 
   // Olivenbaum
   const oliveHi = [trunk([[0, -0.3, 0], [0.3, 1.2, -0.2], [0.1, 2.4, 0.2], [0.4, 3.2, 0.1]], 0.32, 0.18, 6, barkGrey)];
@@ -199,12 +199,12 @@ function makeSpecies() {
     oliveHi.push(blob(r * 0.7, 0, 1.15, 0.8, 1.15, x, y, z, oliveGreen.clone().multiplyScalar(0.38), 10 + k, 0.2));
     oliveHi.push(cards(r, 1.15, 0.8, 1.15, x, y, z, oliveGreen, 30, 'leaf', r * 0.55, k * 2));
   });
-  const oliveLo = [prism(3, 0.3, 4, barkGrey, -0.3), blob(2.6, 0, 1.15, 0.75, 1.15, 0.3, 3.7, 0, oliveGreen, 11, 0.1)];
+  const oliveLo = [prism(3, 0.3, 4, barkGrey, -0.3), blob(2.6, 0, 1.15, 0.75, 1.15, 0.3, 3.7, 0, oliveGreen.clone().multiplyScalar(0.6), 11, 0.1)];
 
   // Busch
   const shrubHi = [blob(0.85, 0, 1.3, 0.7, 1.1, 0, 0.5, 0, shrubGreen.clone().multiplyScalar(0.4), 20, 0.3),
     cards(1.1, 1.3, 0.75, 1.1, 0, 0.55, 0, shrubGreen, 22, 'leaf', 0.6, 3), cards(0.8, 1.2, 0.8, 1.2, 0.8, 0.45, 0.4, shrubGreen, 14, 'leaf', 0.5, 5)];
-  const shrubLo = [blob(1.4, 0, 1.3, 0.6, 1.1, 0.3, 0.5, 0.1, shrubGreen, 22, 0.1)];
+  const shrubLo = [blob(1.4, 0, 1.3, 0.6, 1.1, 0.3, 0.5, 0.1, shrubGreen.clone().multiplyScalar(0.62), 22, 0.1)];
 
   // Fels
   const rockHi = [blob(1.0, 2, 1.3, 0.75, 1.0, 0, 0.25, 0, rockCol, 30, 0.35)];

@@ -245,6 +245,11 @@ export class Sky {
     const mth = th + Math.PI * 0.94;
     this.moon.set(Math.cos(mth) * 0.9, Math.sin(mth) * Math.cos(tilt) * 0.9 + 0.12, Math.sin(mth) * Math.sin(tilt) - 0.2).normalize();
     U.uSunDir.value.copy(this.sun);
+    // Morgendunst: dichter, bodennaher Nebel zwischen Sonnenaufgang und Vormittag
+    const h24 = ((this.hour % 24) + 24) % 24;
+    const mist = THREE.MathUtils.smoothstep(h24, 4.8, 6.3) * (1 - THREE.MathUtils.smoothstep(h24, 7.8, 9.8));
+    U.uFogParams.value.x = 0.00042 * (1 + 4.5 * mist);
+    U.uFogParams.value.y = 0.0035 * (1 + 3.0 * mist);
     U.uMoonDir.value.copy(this.moon);
 
     const s = [this.sun.x, this.sun.y, this.sun.z];

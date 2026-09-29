@@ -80,10 +80,10 @@ vec3 skyColor(vec3 ro, vec3 rd, bool withSun) {
   if (uNight > 0.0) col += starField(rd) * uNight * horizonFade * 0.9;
   // Mond
   float md = dot(rd, uMoonDir);
-  float moon = smoothstep(0.99955, 0.99965, md);
+  float moon = smoothstep(0.99983, 0.99987, md);
   if (moon > 0.0) {
     vec3 mp = rd - uMoonDir;
-    float maria = texture(uNoise, mp.xy * 22.0 + 0.3).r;
+    float maria = texture(uNoise, mp.xy * 45.0 + 0.3).r;
     col += vec3(0.9, 0.93, 1.0) * moon * (1.6 + 0.8 * maria) * (0.2 + uNight * 2.0);
   }
   col += vec3(0.5, 0.6, 0.8) * pow(max(md, 0.0), 800.0) * 0.4 * uNight;

@@ -1,0 +1,58 @@
+<canvas id="view" tabindex="0" aria-label="Echtzeit-3D-Szene: ein Sportwagen auf einer Küstenstraße"></canvas>
+
+<div id="hud" aria-live="off">
+  <div class="hud-title">
+    <span class="brand">Isla Serena</span>
+    <span class="sub">Strada Costiera · 8,2 km Rundkurs</span>
+  </div>
+  <div class="hud-dash">
+    <div class="dial">
+      <span class="lbl">Uhrzeit</span>
+      <span class="val" id="hud-time">--:--</span>
+    </div>
+    <div class="dial">
+      <span class="lbl">km/h</span>
+      <span class="val" id="hud-speed">0</span>
+    </div>
+    <div class="dial small">
+      <span class="lbl">Gang</span>
+      <span class="val" id="hud-gear">-</span>
+    </div>
+  </div>
+  <div class="hud-meta">
+    <span id="hud-cam">Verfolgung</span>
+    <span id="hud-fps">-</span>
+    <button id="help-btn" type="button" aria-label="Tastenbelegung anzeigen">Tasten</button>
+  </div>
+</div>
+
+<div id="keys" role="dialog" aria-label="Tastenbelegung">
+  <dl>
+    <dt>C / →</dt><dd>nächste Kamera</dd>
+    <dt>Maus ziehen</dt><dd>freie Kamera, Rad = Abstand</dd>
+    <dt>A</dt><dd>automatische Regie an/aus</dd>
+    <dt>N</dt><dd>nächste Stimmung (Morgen … Nacht)</dd>
+    <dt>T · + / −</dt><dd>Zeit anhalten · ±30 Minuten</dd>
+    <dt>P</dt><dd>Lackfarbe wechseln</dd>
+    <dt>L</dt><dd>Kino-Balken 2,35:1</dd>
+    <dt>1 · 2 · 3</dt><dd>Qualität niedrig · mittel · hoch</dd>
+    <dt>M · F · H</dt><dd>Ton · Vollbild · Anzeige aus</dd>
+    <dt>Leertaste</dt><dd>Pause</dd>
+  </dl>
+</div>
+
+<div id="toast" role="status"></div>
+
+<div id="loader">
+  <div class="load-inner">
+    <p class="eyebrow">Echtzeit-Demo · WebGL 2</p>
+    <h1>Isla Serena</h1>
+    <p class="lede">Eine Küstenfahrt über eine prozedural erzeugte Mittelmeerinsel, vom späten Nachmittag bis in die Nacht.</p>
+    <div class="load-track"><div id="load-bar"></div></div>
+    <p id="load-status">Starte …</p>
+    <div class="start">
+      <button id="start-sound" type="button">Losfahren mit Ton</button>
+      <button id="start-quiet" type="button" class="ghost">Ohne Ton</button>
+    </div>
+  </div>
+</div>

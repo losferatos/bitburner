@@ -1,0 +1,67 @@
+/* Eine bewusst einzige, dunkle Kino-Optik: Titelkarten-Typografie über dem Bild */
+:root {
+  --ink: #0a0c0f;
+  --paper: #f3ede3;
+  --dim: rgba(243, 237, 227, 0.62);
+  --faint: rgba(243, 237, 227, 0.22);
+  --amber: #f0b36a;
+  --display: 'Fraunces', 'Iowan Old Style', 'Palatino Linotype', Georgia, serif;
+  --mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, Consolas, monospace;
+  color-scheme: dark;
+}
+html, body { height: 100%; margin: 0; background: var(--ink); color: var(--paper); overflow: hidden; }
+body { font-family: var(--mono); font-size: 13px; -webkit-font-smoothing: antialiased; }
+#view { position: fixed; inset: 0; width: 100%; height: 100%; display: block; outline: none; cursor: grab; touch-action: none; }
+#view:active { cursor: grabbing; }
+
+#hud { position: fixed; inset: 0; pointer-events: none; padding: max(18px, env(safe-area-inset-top, 0px)) 22px max(18px, env(safe-area-inset-bottom, 0px)); display: grid; grid-template-rows: auto 1fr auto; grid-template-columns: 1fr auto; text-shadow: 0 1px 12px rgba(0, 0, 0, 0.45); transition: opacity 0.4s; }
+body.hud-off #hud { opacity: 0; }
+.hud-title { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 2px; }
+.brand { font-family: var(--display); font-style: italic; font-weight: 300; font-size: 30px; letter-spacing: 0.01em; line-height: 1; }
+.sub { font-size: 11px; letter-spacing: 0.14em; text-transform: uppercase; color: var(--dim); }
+.hud-dash { grid-row: 3; grid-column: 1; display: flex; gap: 26px; align-items: flex-end; }
+.dial { display: flex; flex-direction: column; gap: 2px; min-width: 64px; }
+.dial .lbl { font-size: 10px; letter-spacing: 0.16em; text-transform: uppercase; color: var(--dim); }
+.dial .val { font-family: var(--display); font-weight: 600; font-size: 34px; line-height: 1; font-variant-numeric: tabular-nums; }
+.dial.small .val { font-size: 24px; color: var(--amber); }
+.hud-meta { grid-row: 3; grid-column: 2; align-self: end; justify-self: end; display: flex; flex-direction: column; align-items: flex-end; gap: 4px; font-size: 11px; color: var(--dim); letter-spacing: 0.04em; font-variant-numeric: tabular-nums; }
+#hud-cam { color: var(--paper); font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; }
+#help-btn { pointer-events: auto; font: inherit; color: var(--paper); background: transparent; border: 1px solid var(--faint); border-radius: 2px; padding: 4px 10px; cursor: pointer; letter-spacing: 0.1em; text-transform: uppercase; font-size: 10px; }
+#help-btn:hover, #help-btn:focus-visible { border-color: var(--amber); color: var(--amber); outline: none; }
+
+#keys { position: fixed; right: 22px; top: 18px; background: rgba(10, 12, 15, 0.72); backdrop-filter: blur(6px); border: 1px solid var(--faint); padding: 14px 16px; opacity: 0; transform: translateY(-6px); transition: opacity 0.3s, transform 0.3s; pointer-events: none; max-width: calc(100vw - 44px); box-sizing: border-box; }
+#keys.open { opacity: 1; transform: none; }
+#keys dl { display: grid; grid-template-columns: auto 1fr; gap: 5px 14px; margin: 0; font-size: 11.5px; }
+#keys dt { color: var(--amber); white-space: nowrap; }
+#keys dd { margin: 0; color: var(--paper); }
+
+#toast { position: fixed; left: 50%; top: 22%; transform: translate(-50%, 6px); font-family: var(--display); font-style: italic; font-size: 26px; opacity: 0; transition: opacity 0.35s, transform 0.35s; pointer-events: none; text-shadow: 0 2px 20px rgba(0, 0, 0, 0.6); white-space: nowrap; }
+#toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+#loader { position: fixed; inset: 0; display: grid; place-items: center; background: radial-gradient(ellipse at 50% 120%, rgba(240, 179, 106, 0.18), transparent 60%), var(--ink); transition: opacity 1.2s ease, visibility 1.2s; padding: 0 16px; }
+#loader.ready { background: radial-gradient(ellipse at 50% 120%, rgba(240, 179, 106, 0.12), transparent 60%), rgba(10, 12, 15, 0.55); }
+#loader.gone { opacity: 0; visibility: hidden; }
+.load-inner { width: min(560px, 100%); display: flex; flex-direction: column; gap: 14px; }
+.eyebrow { margin: 0; font-size: 11px; letter-spacing: 0.2em; text-transform: uppercase; color: var(--amber); }
+#loader h1 { margin: 0; font-family: var(--display); font-weight: 300; font-style: italic; font-size: clamp(48px, 10vw, 96px); line-height: 0.95; letter-spacing: -0.01em; text-wrap: balance; }
+.lede { margin: 0; font-family: var(--display); font-size: 17px; line-height: 1.5; color: var(--dim); max-width: 46ch; }
+.load-track { height: 1px; background: var(--faint); margin-top: 18px; overflow: hidden; }
+#load-bar { height: 100%; background: var(--amber); transform-origin: left; transform: scaleX(0); transition: transform 0.3s; }
+#load-status { margin: 0; font-size: 11px; letter-spacing: 0.08em; color: var(--dim); min-height: 1.4em; }
+.start { display: flex; gap: 10px; flex-wrap: wrap; opacity: 0; pointer-events: none; transition: opacity 0.6s; }
+#loader.ready .start { opacity: 1; pointer-events: auto; }
+.start button { font: inherit; font-size: 12px; letter-spacing: 0.12em; text-transform: uppercase; padding: 12px 20px; border-radius: 2px; cursor: pointer; border: 1px solid var(--amber); background: var(--amber); color: var(--ink); }
+.start button.ghost { background: transparent; color: var(--paper); border-color: var(--faint); }
+.start button:hover, .start button:focus-visible { filter: brightness(1.12); outline: 2px solid var(--paper); outline-offset: 2px; }
+
+@media (max-width: 640px) {
+  .brand { font-size: 22px; }
+  .dial .val { font-size: 24px; }
+  .hud-dash { gap: 16px; }
+  .hud-meta { grid-row: 1; grid-column: 2; align-self: start; }
+  .hud-title { grid-column: 1; }
+  #keys { right: 16px; left: 16px; }
+}
+@media (prefers-reduced-motion: reduce) {
+  #keys, #toast, #loader, #load-bar { transition: none; }
+}

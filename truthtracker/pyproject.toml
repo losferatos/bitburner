@@ -1,0 +1,18 @@
+[project]
+name = "truthtracker"
+version = "0.1.0"
+description = "Metadaten-Tracker für das Postingverhalten von @realDonaldTrump auf Truth Social"
+requires-python = ">=3.12"
+readme = "README.md"
+
+[tool.pytest.ini_options]
+pythonpath = ["src", "tests"]
+testpaths = ["tests"]
+addopts = "-ra"
+markers = [
+    "browser: braucht einen Chromium-Browser (wird übersprungen, wenn keiner da ist)",
+]
+
+[tool.ruff]
+line-length = 120
+target-version = "py312"

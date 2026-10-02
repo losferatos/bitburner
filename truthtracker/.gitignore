@@ -1,0 +1,14 @@
+# Virtuelle Umgebung
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Laufzeitdaten: Datenbank, Browserprofil, Temp-Ordner, Logs, Exporte.
+# Gehören nie ins Repo (Browserprofil enthält Cookies, die DB ist persönlich).
+laufzeit/
+daten/
+exporte/
+
+# Lokale Konfiguration, falls jemand eine eigene neben config.toml anlegt
+config.local.toml

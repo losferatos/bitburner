@@ -1,0 +1,61 @@
+# Konfiguration des Truth-Social-Metadaten-Trackers.
+# Zeiten in Sekunden, Fenster in Tagen bzw. Wochen. Relative Pfade gelten ab diesem Ordner.
+
+[konto]
+# Handle ohne @. Die numerische ID wird beim ersten Lauf per Lookup ermittelt und gemerkt.
+handle = "realDonaldTrump"
+
+[zugriff]
+# auto:    erst direkt per curl_cffi; zeigt Cloudflare eine Prüfung, öffnet sich der Browser,
+#          du löst die Prüfung, und der Lauf geht im Browser weiter.
+# curl:    nur direkt (bei einer Prüfung bricht der Lauf ab).
+# browser: immer über den Browser.
+weg = "auto"
+# auto probiert Opera, Opera GX, Chrome, Edge. Alternativ einer dieser Namen oder ein Pfad zur .exe.
+browser = "auto"
+# curl_cffi-Ziel für die Browser-Imitation; "chrome" = neueste Chrome-Fassung der installierten curl_cffi.
+impersonate = "chrome"
+# So lange wartet der Lauf, bis du eine Cloudflare-Prüfung im Browserfenster gelöst hast.
+warte_challenge_s = 300
+# Posts pro Seite (Mastodon erlaubt höchstens 40; Truth Social liefert eventuell weniger).
+seitengroesse = 40
+
+[pausen]
+# Zufällige Pause vor jeder API-Anfrage (gleichverteilt zwischen min und max).
+api_min_s = 2.0
+api_max_s = 6.0
+# Pause vor jedem Abruf eines Bildes bzw. Vorschaubildes (für die Hashes).
+medien_min_s = 1.0
+medien_max_s = 3.0
+
+[erfassung]
+# Erster Lauf: so viele Wochen zurück nachholen.
+backfill_wochen = 4
+# Posts dieser letzten Tage werden bei jedem Lauf auf Löschungen geprüft.
+loeschpruefung_tage = 7
+# Fenster der Duplikat-Erkennung.
+duplikat_fenster_tage = 14
+# Bis zu diesem Alter bekommt ein Post bei jedem Lauf einen neuen Engagement-Snapshot.
+snapshot_grenze_h = 24
+# Notbremse gegen endlose Pagination.
+max_seiten_pro_lauf = 120
+# Höchstzahl gezielter Einzelabrufe pro Lauf (Löschprüfung, erneuter Medien-Versuch).
+max_einzelabrufe_pro_lauf = 40
+
+[duplikate]
+# Höchster Hamming-Abstand der 64-Bit-pHashes für "Medien wahrscheinlich identisch".
+phash_max_abstand = 6
+# Videos/GIFs: erlaubte Abweichung der Dauer in Sekunden.
+dauer_toleranz_s = 1.0
+# Erlaubte relative Abweichung des Seitenverhältnisses.
+seitenverhaeltnis_toleranz = 0.02
+
+[speicher]
+datenbank = "daten/truthtracker.sqlite"
+exporte = "exporte"
+
+[dashboard]
+# "America/New_York" oder "Europe/Berlin"
+zeitzone = "Europe/Berlin"
+# Posts mit weniger Abstand als diese Minuten gelten als Serie (im Dashboard änderbar).
+serien_schwelle_min = 10

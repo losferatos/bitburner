@@ -33,7 +33,7 @@ Nur wenn kein Browser gefunden wird: in `config.toml` unter `[zugriff]` bei `bro
 |---|---|
 | `run_spike.bat` | Zugriffs-Spike: prüft, ob und wie Truth Social von diesem Rechner aus erreichbar ist |
 | `run_crawl.bat` | Ein Lauf: neue Posts, Engagement, Duplikate, Löschungen |
-| `run_dashboard.bat` | Dashboard im Browser öffnen (http://localhost:8501) |
+| `run_dashboard.bat` | Dashboard im Browser öffnen (meist http://localhost:8501; ist der Port belegt, nimmt Streamlit den nächsten freien und nennt ihn im Fenster) |
 | `run_pruefung.bat` | Prüft DB, Logs, Temp-Ordner und Browserprofil auf Inhaltsreste |
 | `run_tests.bat` | Alle automatischen Tests |
 
@@ -64,9 +64,38 @@ Alles geht auch auf der Kommandozeile: `python -m truthtracker crawl|pruefen|spi
   - Zwei Läufe direkt hintereinander erzeugen keine doppelten Posts.
 * Ein Lauf dauert meist **3–5 Minuten** (Pausen von 10–15 s zwischen den Anfragen). Am Ende steht
   eine Zusammenfassung: Anfragen, neue Posts, Snapshots, Löschungen, Edits, Duplikate.
-* Dashboard: `run_dashboard.bat`. Es liest die Datenbank nur und kann parallel offen bleiben.
+* Dashboard: `run_dashboard.bat` (siehe unten). Es liest die Datenbank nur und kann parallel
+  offen bleiben.
 * Export: im Dashboard (Reiter „Tabelle“, CSV-Knopf) oder `python -m truthtracker export`
   (schreibt nach `exporte\`).
+
+## Dashboard
+
+Seitenleiste (gilt für alle Reiter): Zeitraum, Zeitzone (New York oder Berlin, Sommerzeit
+korrekt), Post-Typ, Format, Serien-Schwelle X Minuten, Messalter-Bereich für Engagement (Standard
+18–24 h), „Backfill einbeziehen“ (aus), „Gelöschte einbeziehen“ (an).
+
+| Reiter | Inhalt |
+|---|---|
+| Überblick | Posts pro Tag gestapelt nach Typ, Anteil Retruths vs. eigene Posts im Zeitverlauf |
+| Tageszeiten | Heatmap Wochentag × Stunde |
+| Abstände & Serien | Verteilung der Abstände, Posting-Serien (Anzahl, Länge, Uhrzeit), längste Pause je Tag |
+| Formate | Formatmix im Zeitverlauf, Verteilung der Zeichenanzahl |
+| Engagement | Replies/Retruths/Likes (und weitere Zähler) nach Typ, Format, Uhrzeit – nur Messungen im gewählten Messalter; optional „pro Stunde seit Post“; Wachstumskurven aus den Snapshots |
+| Retruth-Quellen | Top-Accounts, Anteil Selbst-Retruths, Retruth-Latenz |
+| Duplikate | Rate, Art, zeitlicher Abstand, alle Treffer mit Zusatz (z. B. „Medien wahrscheinlich gleich“) |
+| Löschungen & Edits | Anzahl, Zeit bis zur Löschung (als Intervall zwischen „zuletzt gesehen“ und „erstmals vermisst“), Edits |
+| Account | Follower, Following, Postzahl als Zeitreihe |
+| Tabelle | alle Posts mit allen Metadaten, Link zum Post, CSV-Export |
+| Läufe | Laufprotokoll: Start, Ende, Anfragen, neue/aktualisierte Posts, Fehler, Cloudflare |
+
+Das Messalter steht überall dabei („gemessen nach 17,3 h“); Backfill-Posts heißen „Endstand nach
+X Tagen“ und sind standardmäßig aus Engagement-Vergleichen ausgeschlossen. Ausgewertet wird der
+Erfassungsbereich (Backfill-Grenze bis letzter Lauf); ältere Posts (etwa ein alter gepinnter)
+stehen nur in der Tabelle.
+
+**CSV** (für deutsches Excel): UTF-8 mit BOM, Semikolon, Dezimalkomma, IDs als Text (sonst rundet
+Excel die 18-stelligen IDs), Texte mit `= + - @` am Anfang mit Apostroph davor (Formelschutz).
 
 ## Was ein Lauf tut
 
@@ -114,15 +143,22 @@ Alles geht auch auf der Kommandozeile: `python -m truthtracker crawl|pruefen|spi
 
 Logs: `laufzeit\logs\crawl-<Datum>.log` (nur IDs und Zählwerte).
 
-## Datenschutz
+## Datenschutz und Prüfung auf Inhaltsreste
 
 * Datenbank, Logs, Exporte und Dashboard enthalten keine Texte, keine Medien, keine Medien-URLs,
   keine Kommentare – nur IDs, Post-URLs, Zeiten, Zahlen, Hashes, Link-Domains, Account-Metadaten.
 * Medien werden nur in den Speicher geladen; bei Videos nur das Vorschaubild.
 * Das Browserprofil behält nur Cookies und Einstellungen; Cache und Verlauf werden vor und nach
   jedem Lauf gelöscht.
-* `run_pruefung.bat` prüft das. Mit `run_pruefung.bat --marker "ein Satz aus einem echten Post"`
-  lässt sich gezielt nach einem bekannten Text suchen.
+* **`run_pruefung.bat`** prüft Datenbank (jede Spalte nach einer Positivliste und die Rohdatei),
+  Logs, Temp-Ordner, Browserprofil, Exporte und Spike-Berichte. Ergebnis: „keine Inhaltsreste
+  gefunden“ (Exit-Code 0), Funde mit Ort und Art (1) oder „Prüfung nicht möglich“ (2). Der Bericht
+  nennt nie den gefundenen Inhalt selbst.
+* **Eigene Stichprobe:** In einer Eingabeaufforderung im Ordner `run_pruefung.bat --abfragen`
+  ausführen und z. B. einen Satz aus einem echten Post einfügen; er darf nirgends gefunden werden.
+  (`--marker "Text"` geht auch, landet aber im Befehlsverlauf.)
+* Nach einem abgestürzten Lauf sind Funde im Temp-Ordner oder Browserprofil möglich; der nächste
+  Lauf räumt sie beim Start weg.
 
 ## Tests
 

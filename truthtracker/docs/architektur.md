@@ -73,8 +73,12 @@ class Transport(Protocol):
 
 `hole_json` pausiert zufällig (`[pausen] api_*`) vor jeder Anfrage außer der ersten, zählt
 Anfragen und wirft `transport.Abbruch(bewertung)` bei Challenge, Block, Geoblock, 429 und
-403. Im Modus `auto` wird bei einer Challenge einmalig auf den Browser gewechselt: Fenster
-öffnet sich, Mensch löst, Lauf geht im Browser weiter (`fetch` aus der Seite heraus).
+403. 401 („Login nötig“) betrifft nur die einzelne Abfrage. Im Modus `auto` wird bei einer Challenge
+einmalig auf den Browser gewechselt: Er startet normal (fester DevTools-Port, eigenes Profil) mit der
+Konto-Abfrage als Startseite; solange Cloudflare prüft, werden nur Tab-Titel über `/json/list`
+gelesen; erst nach der Freigabe verbindet sich Playwright, schaltet den Cache ab, sperrt Bilder und
+Videos, und der Lauf geht per `fetch` aus der Seite weiter. `hole_bytes` prüft Status,
+`Content-Type` und `Content-Length`, bevor es eine Antwort liest.
 
 ## Klassifikation (Regeln)
 
@@ -92,11 +96,17 @@ Retruth-Arten vor Reply vor Quote vor eigenem Post.
 **Retruth:** `original_id = reblog.id`, `original_created_at = reblog.created_at`,
 `retruth_latenz_s = created_at − original_created_at` (Sekunden, ganzzahlig).
 
-**URL:** bei eigenen Posts `status.url`; bei Retruths `reblog.url` (die Seite des Originals, der
-Retruth selbst hat keine). Fehlt die URL: `{basis_url}/@{acct}/{id}`.
+**URL:** immer in der Form `{basis_url}/@{name}/{id}`: aus `url`, ersatzweise `uri`
+(`/users/{name}/statuses/{id}`), wenn der Host truthsocial.com bzw. die Basis ist und die ID passt;
+sonst lokaler Handle plus ID. Bei Retruths zuerst das Original (die Seite des retruthed Posts), dann
+der Retruth selbst. Fremde (föderierte) Adressen werden nie übernommen. Ohne Handle bleibt sie leer.
 
-**Gepinnt:** `True`, wenn die ID in der Liste der gepinnten Posts steht; ist die Liste bekannt,
-sonst `False`; ohne Liste der Wert von `status.pinned`, falls bool.
+**Gepinnt:** Ist die Liste der gepinnten Posts bekannt, `True` genau für ihre IDs, sonst `False`.
+Ohne Liste `True` nur bei `pinned: true`, sonst `None` (unbekannt, denn `pinned` ist ausgeloggt immer
+`false`); die DB behält dann den bisherigen Wert.
+
+**Revision:** Feld `version` des Status (Zahl ≥ 1 oder Ziffernfolge) → `PostDaten.revision`. Die DB
+zählt Edits als Maximum aus beobachteten Edits und `revision − 1`.
 
 **Zähler:** `replies_count`, `reblogs_count`, `favourites_count` → `Zaehler.replies/retruths/likes`.
 Alle weiteren ganzzahligen Felder auf oberster Ebene, die auf `_count` enden (z. B.
@@ -116,17 +126,25 @@ bzw. weglassen. Bei Retruths: `zaehler` aus dem Wrapper, `zaehler_original` aus 
 **Text** (`text.analysiere`, Eingabe: `content`-HTML der Inhaltsquelle):
 * Sichtbarer Text: HTML entfernen; `<p>` = Absatz (Leerzeile), `<br>` = Zeilenumbruch; Entities
   dekodieren; Elemente mit Klasse `quote-inline` (Quote-Fallback „RE: …“) entfernen; Spannen mit
-  `invisible`/`ellipsis` bleiben vollständig (der Link zählt mit seiner ganzen URL); Anfang und
-  Ende trimmen.
+  `invisible`/`ellipsis` bleiben vollständig (der Link zählt mit seiner ganzen URL). Leerraum am Rand
+  jedes Absatzes und jeder Zeile entfällt, leere Absätze entfallen. `div`, `blockquote`, `pre`,
+  Listen und Überschriften trennen wie `<p>`, `<li>` wie `<br>`; `script`, `style`, `template` sind
+  unsichtbar.
 * `zeichen`: Graphem-Cluster (`regex`, `\X`) des sichtbaren Texts, Zeilenumbrüche zählen mit.
-* URLs: jedes `<a href>`, das kein Mention- oder Hashtag-Link ist (Klasse `mention`/`hashtag`
-  oder Pfad `/@…` bzw. `/tags/…` auf truthsocial.com), plus nackte `http(s)://`-URLs im Text.
-  Links auf das zitierte Original eines Quotes zählen nicht.
-* `zeichen_ohne_urls`: sichtbarer Text ohne die URL-Texte, Mehrfach-Leerzeichen zu einem,
-  getrimmt, als Grapheme gezählt.
-* `link_domains`: Hosts der URLs ohne `www.`, kleingeschrieben, ohne truthsocial.com und dessen
-  Subdomains, sortiert, ohne Dubletten.
-* `n_mentions`: Mention-Links im HTML; enthält das HTML keine, die Länge von `mentions`.
+* URLs: jedes `<a href>` mit sichtbarem Text, das kein Mention- oder Hashtag-Link ist (Klasse
+  `mention`/`hashtag`, oder auf einem eigenen Host eine Profilseite `/@name` bzw. `/tags/…`), plus
+  nackte `http(s)://`-URLs im Text (ohne Satzzeichen am Ende). Ein Link auf einen Truth-Social-Post
+  (`/@name/<id>`) ist eine URL ohne externe Domain. Links auf das zitierte Original eines Quotes
+  (erkannt über URL oder Status-ID, Vergleich ohne Schema, `www.`, Fragment, Schrägstrich am Ende)
+  gehören wie der `quote-inline`-Fallback weder zu den URLs noch zum sichtbaren Text.
+* `zeichen_ohne_urls`: sichtbarer Text ohne die URL-Texte; Leerraum an der Nahtstelle einer
+  entfernten URL wird zu einem Leerzeichen, eine Zeile nur aus URLs entfällt samt Umbruch; als
+  Grapheme gezählt. Ohne URLs ist `zeichen_ohne_urls == zeichen`.
+* `link_domains`: Hosts der URLs ohne `www.`, kleingeschrieben, IDN als Punycode, nur echte Hosts
+  (mit Punkt und Buchstaben-TLD oder IPv4), ohne truthsocial.com und dessen Subdomains, sortiert,
+  ohne Dubletten.
+* `n_mentions`: Mention-Links im HTML; enthält das HTML keine, die Einträge von `mentions` (ohne
+  den Platzhalter `-99`).
 * `n_hashtags`: Hashtag-Links im HTML; enthält das HTML keine, die Länge von `tags`.
 * `text_hash`: SHA-256 (hex) des normalisierten Texts: sichtbarer Text, Unicode NFC, jede Folge
   von Leerraum (inkl. Zeilenumbrüchen) zu einem Leerzeichen, getrimmt. Leerer Text → `None`.
@@ -147,16 +165,21 @@ bzw. weglassen. Bei Retruths: `zaehler` aus dem Wrapper, `zaehler_original` aus 
 **Medien:** `image` → Bild, `video` und `tv` → Video, `gifv` → GIF, `audio` → Audio,
 sonst → sonstig. Abmessungen und Dauer aus `meta.original.width/height/duration`.
 
-**Medien-Hash:** Bilder: SHA-256 und pHash der Originaldatei (`url`, ersatzweise `preview_url`).
-Video, GIF: SHA-256 und pHash des Vorschaubilds (`preview_url`); der exakte Vergleichsschlüssel
-enthält zusätzlich Dauer und Abmessungen (`MedienDaten.exakt_schluessel`). Audio und Medien
-ohne Vorschaubild: kein Hash (`uebersprungen`, Schlüssel `art:ohne-hash:medien_id`). Cache nach
-`medien_id` in `medien_cache`: dasselbe Medium wird nie zweimal geladen.
-`medien_hash` = SHA-256 über die sortierten Schlüssel aller Medien; fehlt einer (Download
-gescheitert), ist `medien_hash = None` und `medien_vollstaendig = False`.
+**Medien-Hash:** Bilder: SHA-256 und pHash der Originaldatei (`url`, nur ohne `url` die
+`preview_url`; scheitert der Download des Originals, wird nicht auf die Vorschau ausgewichen).
+Video, GIF, sonstige: SHA-256 und pHash des Vorschaubilds (`preview_url`); eine Vorschauadresse, die
+vereinheitlicht der Datei selbst entspricht (`url`, `remote_url`, `text_url`) oder auf eine Video-/
+Audioendung endet, wird nicht geladen (`uebersprungen`). Der exakte Vergleichsschlüssel enthält bei
+Video/GIF zusätzlich Dauer und Abmessungen (`MedienDaten.exakt_schluessel`). Audio und Medien ohne
+Vorschaubild: kein Hash (`uebersprungen`, Schlüssel `art:ohne-hash:<medien_id>`, ohne ID
+`art:ohne-hash:<inhalts_id>:<position>`). Leere Antworten und Antworten, die mit `<`, `{` oder `[`
+beginnen, sind Download-Fehler. Cache nach `medien_id` in `medien_cache`: dasselbe Medium wird nie
+zweimal geladen. `medien_hash` = SHA-256 über die sortierten Schlüssel aller Medien (mit `\n`
+verbunden; Positionen 0-basiert); fehlt einer (Status `offen`/`fehler`), ist `medien_hash = None` und
+`medien_vollstaendig = False`.
 
-**Fingerabdruck:** SHA-256 über `t=<text_hash>|m=<medien_hash>|q=<quote_id>`; `None`, wenn Text
-und Medien leer sind oder die Medien unvollständig.
+**Fingerabdruck:** SHA-256 über `t=<text_hash>|m=<medien_hash>|q=<quote_id>` (fehlende Teile als
+leere Zeichenkette); `None`, wenn Text und Medien leer sind oder die Medien unvollständig.
 
 ## 24h-Messlogik
 
@@ -194,7 +217,9 @@ Tabelle `abdeckung` hält ID-Bereiche `[von, bis]`, die lückenlos paginiert wur
 * Bricht die Pagination ab, gilt nur der bis dahin lückenlos abgerufene Bereich.
 * Taucht ein als gelöscht markierter Post wieder auf, wird die Markierung entfernt.
 * Edits (nur eigene Posts, keine Retruths): geändertes `edited_at` oder geänderter Text-Hash
-  bzw. (bei vollständigen Medien) Medien-Hash → Zeile in `edits`, `edit_anzahl + 1`.
+  bzw. (bei vollständigen Medien) Medien-Hash → Zeile in `edits`. `edit_anzahl` = Maximum aus
+  beobachteten Edits und `version − 1`. Ist ein Post schon beim ersten Sehen bearbeitet
+  (`edited_at` gesetzt), gibt es eine `edits`-Zeile mit dem Zeitpunkt aus `edited_at`.
 
 ## Duplikate (14 Tage)
 
@@ -211,16 +236,34 @@ jeden früheren Post Q mit `P.t − 14 d ≤ Q.t < P.t` (gleiche Sekunde: kleine
 
 Je Kategorie wird der zeitlich nächste frühere Post gespeichert (`duplikate`), die stärkste
 Kategorie bekommt `primaer = 1`. Zeit = `created_at` des Posts (bei Retruths die Retruth-Zeit).
-`dup_abdeckung_vollstaendig` sagt, ob die 14 Tage davor vollständig in der DB liegen.
+Präzisierungen: Ein Paar mit gleicher Inhalts-ID zählt nur als Fall 1. Gleicher Text bzw. gleiche
+Medien mit anderem Quote-Ziel ergibt 3a bzw. 3b mit `details.quote_verschieden` (bei gleichem Text
+*und* gleichen Medien genau eine Zeile 3a mit `medien_gleich`). Erfüllt ein 3a-Paar zugleich Fall 4,
+bekommt die 3a-Zeile `details.medien_aehnlich` und `phash_abstand_max`. Bei unvollständigen Medien
+gilt 3a nur bei verschiedener Medienzahl oder verschiedenem Quote-Ziel.
+`dup_abdeckung_vollstaendig` = 1, wenn die 14 Tage davor lückenlos in der DB liegen und der Post
+selbst vollständig gehasht ist. Noch nie bewertete Posts (`dup_geprueft_utc` leer) werden bei jedem
+Lauf bewertet; `db.post_speichern` leert das Feld, wenn sich Vergleichsrelevantes ändert.
 
 ## Dashboard
 
 Streamlit, deutsch, nur lesender DB-Zugriff. Globale Filter in der Seitenleiste: Zeitraum,
-Zeitzone (New York/Berlin), Post-Typ, Format. Engagement nur mit Messalter-Filter; Backfill
-standardmäßig ausgeschlossen. Alle Berechnungen in `auswertung.py` (getestet).
+Zeitzone (New York/Berlin), Post-Typ, Format, dazu Serien-Schwelle, Messalter-Bereich (Standard
+18–24 h), Backfill (aus), Gelöschte (an). Engagement nur mit Messalter-Filter; Backfill
+standardmäßig ausgeschlossen. Ausgewertet wird nur der Erfassungsbereich (Backfill-Grenze bis letzter
+Lauf); ältere Posts stehen nur in der Tabelle. Alle Berechnungen in `auswertung.py` (getestet); die
+fachlichen Definitionen (Abstände in echter Zeit, Serie strikt < X Minuten, Pause gehört zum Endtag,
+Duplikat-Rate nur mit vollständigem Fenster, Löschzeit als Intervall) stehen im Docstring von
+`auswertung.py`. Theme in `.streamlit/config.toml`, eine andere Konfiguration per Umgebungsvariable
+`TRUTHTRACKER_CONFIG`.
 
 ## Prüfskript
 
-`python -m truthtracker pruefen` sucht in DB (Spalten und Rohdatei inkl. WAL), Logs,
-Temp-Ordner, Browserprofil, Exporten und Spike-Berichten nach Inhaltsresten (HTML, Medien-URLs,
-fremde URLs, lange Freitexte) und meldet jeden Fund. Exit-Code 1 bei Funden.
+`python -m truthtracker pruefen` (bzw. `run_pruefung.bat`) sucht in DB (Spalten nach Positivliste
+je Spaltenname, Rohdatei inkl. `-wal`/`-shm`/`-journal`), Logs, Temp-Ordner, Browserprofil
+(Positivliste `browser.im_profil_erlaubt`), Exporten und Spike-Berichten nach Inhaltsresten: HTML,
+Medien-URLs, fremde URLs, Freitext (mehr als 8 Wörter, die in keinem Meldungstext des Trackers
+vorkommen). Stichproben mit `--abfragen`, `--marker-datei`, `--marker`. Der Bericht nennt nie den
+Fund selbst. Exit-Code 0 sauber, 1 Funde, 2 Prüfung nicht möglich. Neue Meldungstexte müssen als
+Zeichenkette direkt an der Ausgabestelle stehen (`log.*`, `meldung`, `print`, `raise` …), damit ihre
+Wörter zum bekannten Wortschatz zählen.

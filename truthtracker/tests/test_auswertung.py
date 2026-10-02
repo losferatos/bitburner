@@ -1137,3 +1137,13 @@ def test_utc_zeitpunkte_bleiben_beim_laden_utc(con, lauf):
     speichere(con, post(erstellt), lauf, 1)
     wert = auswertung.lade_daten(con).posts["created_at_utc"].iloc[0]
     assert wert.to_pydatetime() == erstellt
+
+
+def test_dup_zusatz_aus_details():
+    from truthtracker import auswertung as a
+
+    assert a.dup_zusatz('{"medien_aehnlich": true, "phash_abstand_max": 3}') == (
+        "Medien wahrscheinlich gleich (pHash-Abstand 3)"
+    )
+    assert a.dup_zusatz('{"quote_verschieden": true, "medien_gleich": true}') == "Medien gleich, anderes Quote-Ziel"
+    assert a.dup_zusatz("{}") == "" and a.dup_zusatz("kaputt") == "" and a.dup_zusatz(None) == ""

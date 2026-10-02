@@ -889,6 +889,13 @@ def _reiter_duplikate(df: pd.DataFrame, daten: auswertung.Daten, stil: Stil) -> 
         return
     st.subheader("Duplikate nach Art")
     st.caption("Je Post zählt die stärkste Art (gleiches Original vor exakt vor nur Text/Medien vor ähnlich).")
+    text_mit_aehnlichen = d.liste.loc[
+        d.liste["primaer"] & d.liste["geprueft"] & (d.liste["art"] == "nur_text")
+        & d.liste["zusatz"].str.contains("wahrscheinlich gleich", regex=False)
+    ]
+    if not text_mit_aehnlichen.empty:
+        st.caption(f"Davon {zahl(len(text_mit_aehnlichen))} × „nur Text gleich“ mit wahrscheinlich gleichen, "
+                   "vom Server neu kodierten Medien (siehe Spalte „Zusatz“ unten).")
     arten = d.nach_art.loc[d.nach_art["primaer"] > 0]
     if arten.empty:
         _leer("Keine Duplikate bei geprüften Posts.")
@@ -915,6 +922,7 @@ def _reiter_duplikate(df: pd.DataFrame, daten: auswertung.Daten, stil: Stil) -> 
         "Post-ID": d.liste["post_id"], "Art": d.liste["art"].map(lambda x: DUP_BESCHRIFTUNG.get(x, x)),
         "stärkste Art": d.liste["primaer"], "Fenster vollständig": d.liste["geprueft"],
         "Früherer Post-ID": d.liste["frueherer_post_id"], "Abstand (h)": d.liste["abstand_h"].round(2),
+        "Zusatz": d.liste["zusatz"],
     }), titel="Alle Duplikat-Treffer")
 
 

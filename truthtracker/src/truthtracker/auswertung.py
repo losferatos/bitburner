@@ -197,7 +197,8 @@ def _lade(con: sqlite3.Connection) -> Daten:
     snapshots = _abfrage(con, "SELECT * FROM snapshots ORDER BY post_id, gemessen_utc, id")
     quellen = _abfrage(con, "SELECT * FROM quellen ORDER BY post_id, rolle")
     duplikate = _abfrage(
-        con, "SELECT post_id, art, frueherer_post_id, abstand_s, primaer FROM duplikate ORDER BY post_id, art"
+        con,
+        "SELECT post_id, art, frueherer_post_id, abstand_s, primaer, details FROM duplikate ORDER BY post_id, art",
     )
     edits = _abfrage(con, "SELECT * FROM edits ORDER BY erkannt_utc, id")
     laeufe = _abfrage(con, "SELECT * FROM laeufe ORDER BY id")
@@ -1151,8 +1152,34 @@ class DuplikatAuswertung:
     ohne_abdeckung: int  # Posts der Auswahl, deren Fenster nicht vollständig in der DB liegt
     mit_duplikat_ohne_abdeckung: int  # davon trotzdem mit gefundenem Duplikat (nicht in Rate und Verteilungen)
     nach_art: pd.DataFrame  # art, beschriftung, primaer, alle, anteil_gepruefte, primaer_ohne_abdeckung
-    liste: pd.DataFrame  # je Duplikat-Zeile: post_id, art, primaer, frueherer_post_id, abstand_h, geprueft
+    liste: pd.DataFrame  # je Duplikat-Zeile: post_id, art, primaer, frueherer_post_id, abstand_h, geprueft, zusatz
     abstand_verteilung: pd.DataFrame  # Zeilen Abstandsklasse, Spalten Art (stärkste Art, nur geprüfte Posts)
+
+
+def dup_zusatz(details: object) -> str:
+    """Kurzer deutscher Zusatz aus der Spalte ``details`` einer Duplikat-Zeile (nur Metadaten).
+
+    Wichtig vor allem bei „nur Text gleich“: Hat der Server dasselbe Bild neu kodiert, sind die
+    Medien nicht byte-gleich, aber wahrscheinlich gleich; das steht dann hier.
+    """
+    if isinstance(details, str):
+        try:
+            details = json.loads(details)
+        except ValueError:
+            return ""
+    if not isinstance(details, dict):
+        return ""
+    teile = []
+    if details.get("medien_gleich"):
+        teile.append("Medien gleich")
+    if details.get("medien_aehnlich"):
+        abstand = details.get("phash_abstand_max")
+        teile.append("Medien wahrscheinlich gleich" + (f" (pHash-Abstand {abstand})" if abstand is not None else ""))
+    elif details.get("phash_abstand_max") is not None:
+        teile.append(f"pHash-Abstand {details['phash_abstand_max']}")
+    if details.get("quote_verschieden"):
+        teile.append("anderes Quote-Ziel")
+    return ", ".join(teile)
 
 
 def duplikat_auswertung(df: pd.DataFrame, duplikate: pd.DataFrame) -> DuplikatAuswertung:
@@ -1184,7 +1211,10 @@ def duplikat_auswertung(df: pd.DataFrame, duplikate: pd.DataFrame) -> DuplikatAu
         columns=["art", "beschriftung", "primaer", "alle", "anteil_gepruefte", "primaer_ohne_abdeckung"],
     )
     dups["abstand_h"] = pd.to_numeric(dups["abstand_s"], errors="coerce").astype(float) / 3600
-    liste = dups[["post_id", "art", "primaer", "frueherer_post_id", "abstand_h", "geprueft"]].reset_index(drop=True)
+    dups["zusatz"] = (dups["details"] if "details" in dups else pd.Series("", index=dups.index)).map(dup_zusatz)
+    liste = dups[["post_id", "art", "primaer", "frueherer_post_id", "abstand_h", "geprueft", "zusatz"]].reset_index(
+        drop=True
+    )
     namen = [name for _, name in DUP_ABSTAND_KLASSEN_H]
     verteilung = pd.DataFrame(index=pd.Index(namen, name="klasse"))
     for art in _reihenfolge(primaer["art"], DUP_ARTEN):

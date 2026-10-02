@@ -160,6 +160,7 @@ class PostDaten:
     medien_vollstaendig: bool = True
     fingerabdruck: str | None = None
     edited_at: datetime | None = None
+    revision: int | None = None  # Feld "version" der API: 1 = unbearbeitet, 2 = einmal bearbeitet …
     sichtbarkeit: str | None = None
     zaehler: Zaehler = field(default_factory=Zaehler)
     zaehler_original: Zaehler | None = None

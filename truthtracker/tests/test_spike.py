@@ -41,8 +41,13 @@ def test_weg_a_funktioniert_und_bericht_ohne_inhalte(eigene_laufzeit):
     a = daten["wege"]["a"]
     assert a["ergebnis"] == "funktioniert"
     assert daten["fazit"]["empfehlung"] == "a"
-    # lookup + 3 Seiten + gepinnt + einzelpost + Replies-Probe + 404-Probe + Vorschaubild
-    assert a["anfragen"] == 9 == len(anfragen)
+    # Client-Matrix (4) + lookup + 3 Seiten + gepinnt + einzelpost + Replies-Probe + 404-Probe + Vorschaubild
+    assert a["anfragen"] == 13 == len(anfragen)
+    assert [c["client"] for c in a["client_matrix"]] == [
+        "python-urllib", "curl_cffi:chrome", "curl_cffi:safari", "curl_cffi:firefox"
+    ]
+    assert all(c["art"] == "ok" for c in a["client_matrix"])
+    assert a["impersonate_gewaehlt"] == "chrome"
     assert a["probe_mit_replies"] == {"art": "login_noetig", "status": 401}
     timeline = [x for x in anfragen if x["pfad"].endswith("/statuses") and "max_id" not in x["params"]]
     assert timeline[0]["params"]["exclude_replies"] == "true"
@@ -74,20 +79,20 @@ def test_weg_a_bricht_bei_challenge_sofort_ab(eigene_laufzeit):
     z.challenge_ohne_cookie = True
     with FakeTruthSocial(z) as fake:
         daten = spike.fuehre_aus(_einstellungen(fake.url, wege=("a",)))
-        assert len(fake.zustand.anfragen) == 1
+        assert len(fake.zustand.anfragen) == 4  # nur die Client-Matrix, danach keine Anfrage mehr
     a = daten["wege"]["a"]
-    assert a["ergebnis"] == "abgebrochen"
-    assert a["abbruch"]["art"] == "challenge" and a["abbruch"]["schritt"] == "konto_lookup"
+    assert a["ergebnis"] == "kein_client_kam_durch"
+    assert {c["art"] for c in a["client_matrix"]} == {"challenge"}
     assert daten["fazit"]["empfehlung"] == "keiner"
     assert list((pfade.docs_ordner() / "zugriff-messungen").glob("*.json"))
 
 
 def test_weg_a_bricht_bei_429_ab_und_behaelt_bisheriges(eigene_laufzeit):
     z = _zustand_mit_posts(100)
-    z.ratelimit_ab = 3  # die dritte API-Anfrage bekommt 429; Lookup und erste Seite gehen durch
+    z.ratelimit_ab = 7  # Matrix (4), Lookup, erste Seite gehen durch, die siebte Anfrage bekommt 429
     with FakeTruthSocial(z) as fake:
         daten = spike.fuehre_aus(_einstellungen(fake.url, wege=("a",)))
-        assert len(fake.zustand.api_anfragen()) == 3
+        assert len(fake.zustand.api_anfragen()) == 7
     a = daten["wege"]["a"]
     assert a["ergebnis"] == "abgebrochen" and a["abbruch"]["art"] == "ratelimit"
     assert "status" in daten["feldkataloge"]  # erste Seite wurde erfasst
@@ -99,7 +104,9 @@ def test_weg_a_geoblock(eigene_laufzeit):
     z.geoblock = True
     with FakeTruthSocial(z) as fake:
         daten = spike.fuehre_aus(_einstellungen(fake.url, wege=("a",)))
-    assert daten["wege"]["a"]["abbruch"]["art"] == "geoblock"
+    a = daten["wege"]["a"]
+    assert a["ergebnis"] == "kein_client_kam_durch"
+    assert {c["art"] for c in a["client_matrix"]} == {"geoblock"}
 
 
 def test_weg_a_netzwerkfehler(eigene_laufzeit):
@@ -108,6 +115,15 @@ def test_weg_a_netzwerkfehler(eigene_laufzeit):
     with FakeTruthSocial(z) as fake:
         daten = spike.fuehre_aus(_einstellungen(fake.url, wege=("a",)))
     assert daten["wege"]["a"]["abbruch"]["art"] == "netzwerkfehler"
+
+
+def test_client_matrix_waehlt_funktionierendes_ziel(eigene_laufzeit):
+    z = _zustand_mit_posts(30)
+    with FakeTruthSocial(z) as fake:
+        daten = spike.fuehre_aus(_einstellungen(fake.url, wege=("a",), impersonate="edge"))
+    a = daten["wege"]["a"]
+    assert a["impersonate_gewaehlt"] == "chrome"  # "edge" war nicht in der Matrix, also das erste erfolgreiche
+    assert 'impersonate = "chrome"' in daten["fazit"]["begruendung"]
 
 
 def test_garantiert_fehlende_id_liegt_vor_dem_start_von_truth_social():

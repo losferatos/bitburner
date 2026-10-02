@@ -31,7 +31,14 @@ def chromium_pfad() -> Path | None:
         gefunden = shutil.which(name)
         if gefunden:
             kandidaten.append(Path(gefunden))
-    return next((k for k in kandidaten if k.is_file()), None)
+    treffer = next((k for k in kandidaten if k.is_file()), None)
+    if treffer is None and sys.platform == "win32":
+        # Unter Windows ohne Playwright-Chromium: Edge oder Chrome (headless, mit Wegwerf-Profil).
+        from truthtracker import browser
+
+        fund = browser.finde_browser("edge") or browser.finde_browser("chrome")
+        treffer = fund.pfad if fund else None
+    return treffer
 
 
 def browser_argumente_fuer_tests() -> list[str]:

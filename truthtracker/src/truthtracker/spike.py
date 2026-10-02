@@ -45,6 +45,7 @@ GARANTIERT_FEHLENDE_ID = str(int(datetime(2020, 1, 1, tzinfo=UTC).timestamp() * 
 KOPFZEILEN_WERTE = (
     "content-type",
     "server",
+    "x-powered-by",
     "cf-cache-status",
     "cf-mitigated",
     "retry-after",
@@ -215,6 +216,68 @@ def erster_medienanhang(posts: list[dict]) -> dict | None:
 # Weg a: curl_cffi
 
 
+MATRIX_ZIELE = ("chrome", "safari", "firefox")
+BROWSER_UA = (
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36"
+)
+
+
+def client_matrix(einst: Einstellungen, weg: dict[str, Any], pause: Pausierer) -> list[str]:
+    """Je eine Konto-Abfrage mit verschiedenen Clients. Gibt die curl_cffi-Ziele zurück, die durchkamen.
+
+    Zeigt, ob schon ein gewöhnlicher HTTP-Client reicht oder welcher TLS-Fingerabdruck nötig ist.
+    Bei 429 endet die Matrix (und Weg a) sofort.
+    """
+    import urllib.error
+    import urllib.request
+
+    from curl_cffi import requests as cffi_requests
+
+    basis = einst.basis_url.rstrip("/")
+    url = f"{basis}/api/v1/accounts/lookup?{urlencode({'acct': einst.konto})}"
+    kopf = {"Accept": "application/json, text/plain, */*", "Referer": f"{basis}/@{einst.konto}"}
+    ergebnisse: list[dict[str, Any]] = []
+    weg["client_matrix"] = ergebnisse
+    erfolgreich: list[str] = []
+
+    def eintragen(client: str, status: int | None, headers: Any, body: bytes | None, t0: float, fehler: str = ""):
+        bewertung = cloudflare.bewerte(status, headers or {}, body)
+        eintrag = {"client": client, "status": status, "art": bewertung.art, "dauer_s": round(time.monotonic() - t0, 2)}
+        if fehler:
+            eintrag["fehlerklasse"] = fehler
+        ergebnisse.append(eintrag)
+        weg["anfragen"] += 1
+        if bewertung.art == cloudflare.RATELIMIT:
+            raise Abbruch(bewertung, f"client_matrix_{client}")
+        return bewertung
+
+    pause()
+    t0 = time.monotonic()
+    try:
+        anfrage = urllib.request.Request(url, headers={**kopf, "User-Agent": BROWSER_UA, "Accept-Language": "de-DE,de;q=0.9"})
+        with urllib.request.urlopen(anfrage, timeout=30) as antwort:
+            eintragen("python-urllib", antwort.status, dict(antwort.headers.items()), antwort.read(), t0)
+    except urllib.error.HTTPError as fehler:
+        eintragen("python-urllib", fehler.code, dict(fehler.headers.items()), fehler.read(), t0)
+    except Exception as fehler:  # noqa: BLE001
+        eintragen("python-urllib", None, {}, None, t0, type(fehler).__name__)
+
+    for ziel in MATRIX_ZIELE:
+        pause()
+        t0 = time.monotonic()
+        try:
+            with cffi_requests.Session(impersonate=ziel, timeout=30) as sitzung:
+                antwort = sitzung.get(url, headers=kopf)
+            bewertung = eintragen(f"curl_cffi:{ziel}", antwort.status_code, antwort.headers, antwort.content, t0)
+        except Abbruch:
+            raise
+        except Exception as fehler:  # noqa: BLE001
+            bewertung = eintragen(f"curl_cffi:{ziel}", None, {}, None, t0, type(fehler).__name__)
+        if bewertung.ok:
+            erfolgreich.append(ziel)
+    return erfolgreich
+
+
 def weg_a(einst: Einstellungen, bericht: Bericht) -> None:
     from curl_cffi import requests as cffi_requests
 
@@ -222,10 +285,23 @@ def weg_a(einst: Einstellungen, bericht: Bericht) -> None:
     bericht.wege["a"] = weg
     start = time.monotonic()
     pause = Pausierer(einst.pause_min, einst.pause_max)
-    sitzung = cffi_requests.Session(impersonate=einst.impersonate, timeout=30)
     basis = einst.basis_url.rstrip("/")
-
     referer = f"{basis}/@{einst.konto}"
+
+    try:
+        erfolgreich = client_matrix(einst, weg, pause)
+    except Abbruch as abbruch:
+        weg["ergebnis"] = "abgebrochen"
+        weg["abbruch"] = {"schritt": abbruch.schritt, "art": abbruch.bewertung.art, "meldung": cloudflare.melde(abbruch.bewertung)}
+        weg["dauer_s"] = round(time.monotonic() - start, 1)
+        return
+    if not erfolgreich:
+        weg["ergebnis"] = "kein_client_kam_durch"
+        weg["dauer_s"] = round(time.monotonic() - start, 1)
+        return
+    ziel = einst.impersonate if einst.impersonate in erfolgreich else erfolgreich[0]
+    weg["impersonate_gewaehlt"] = ziel
+    sitzung = cffi_requests.Session(impersonate=ziel, timeout=30)
 
     def hole(schritt: str, pfad: str, params: dict | None = None, accept: str = "application/json, text/plain, */*"):
         pause()
@@ -649,6 +725,10 @@ def ziehe_fazit(bericht: Bericht) -> dict[str, Any]:
     if a.get("ergebnis") == "funktioniert":
         fazit["empfehlung"] = "a"
         fazit["begruendung"] = "Die JSON-API antwortet direkt per curl_cffi; kein Browser nötig."
+        gewaehlt = a.get("impersonate_gewaehlt")
+        if gewaehlt and gewaehlt != bericht.einstellungen.get("impersonate"):
+            fazit["begruendung"] += f' In config.toml [zugriff] impersonate = "{gewaehlt}" setzen.'
+        fazit["impersonate"] = gewaehlt
     elif b.get("ergebnis") == "funktioniert":
         fazit["empfehlung"] = "b2"
         fazit["begruendung"] = (
@@ -703,7 +783,8 @@ def als_markdown(daten: dict[str, Any]) -> str:
         z.append(f"- Ergebnis: **{weg.get('ergebnis')}**, eigene Anfragen: {weg.get('anfragen')}, Dauer: {weg.get('dauer_s')} s")
         if "abbruch" in weg:
             z.append(f"- Abbruch bei `{weg['abbruch']['schritt']}`: {weg['abbruch']['meldung']}")
-        for schluessel in ("browser", "browser_version", "challenge", "profilseite_status", "b1_passiv", "b2_fetch",
+        for schluessel in ("client_matrix", "impersonate_gewaehlt", "browser", "browser_version", "challenge",
+                           "profilseite_status", "b1_passiv", "b2_fetch",
                            "html_time_elemente", "lookup_art", "posts_gesamt", "gepinnt", "einzelpost",
                            "probe_mit_replies", "nicht_gefunden_probe", "b2_nicht_gefunden_probe", "medien_vorschau",
                            "fehler"):

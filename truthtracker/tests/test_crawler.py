@@ -505,6 +505,44 @@ def test_alter_gepinnter_post_stoert_die_erkennung_neuer_posts_nicht(tmp_path):
         con.close()
 
 
+def test_alter_post_oben_ohne_pinned_liste_beendet_pagination_nicht(tmp_path):
+    """Fällt die Pinned-Liste aus und steht ein alter Post (unerkannter Pin) oben auf Seite 1, darf er
+    die Stopp-Entscheidung nicht bestimmen. Sonst gälte alles bis zu ihm als abgedeckt, und neue
+    Posts unterhalb von Seite 1 würden nie geholt."""
+    z = Zustand()
+    alt = status(JETZT - timedelta(days=200))
+    z.setze_posts([*_zeitreihe(30, timedelta(hours=5)), alt])
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT))
+        neu = [status(JETZT + timedelta(hours=1 + i)) for i in range(25)]
+        for p in neu:
+            z.posts[p["id"]] = p
+        k.zugriff.seitengroesse = 10
+        handler = fake.server.RequestHandlerClass
+        original = handler._timeline
+
+        def timeline(self, konto_id, params):
+            if params.get("pinned") == "true":
+                self._json(500, {"error": "kaputt"})
+                return
+            if "max_id" not in params:
+                neueste = sorted((p for p in z.posts.values() if p is not alt), key=lambda p: int(p["id"]),
+                                 reverse=True)
+                self._json(200, [alt, *neueste[: int(params.get("limit", 20))]])
+                return
+            original(self, konto_id, params)
+
+        handler._timeline = timeline
+        try:
+            zweiter = _lauf(k, Uhr(JETZT + timedelta(hours=30)))
+        finally:
+            handler._timeline = original
+    assert zweiter.status == "ok"
+    assert any("Gepinnte Posts nicht abrufbar" in m for m in zweiter.meldungen)
+    assert {p["id"] for p in neu} <= _ids(k)
+
+
 def test_werbung_in_der_timeline_wird_uebersprungen(tmp_path):
     z = Zustand()
     posts = _zeitreihe(10, timedelta(hours=5))

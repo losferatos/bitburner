@@ -264,16 +264,24 @@ class _Lauf:
         gefiltert, dort steht ein gepinnter Post an seiner zeitlichen Stelle und zählt mit.
         Werbung zählt nie.
         """
-        ergebnis = []
-        for p in posts:
-            sid = str(p.get("id", ""))
-            if not sid.isdigit() or klassifikation.ist_werbung(p, self.trump_id):
-                continue
-            if max_id is None and self._ist_gepinnt(p):
-                continue
-            if max_id is not None and int(sid) >= max_id:
-                continue
-            ergebnis.append(p)
+        kandidaten = [
+            p for p in posts
+            if str(p.get("id", "")).isdigit() and not klassifikation.ist_werbung(p, self.trump_id)
+        ]
+        if max_id is not None:
+            return [p for p in kandidaten if int(p["id"]) < max_id]
+        kandidaten = [p for p in kandidaten if not self._ist_gepinnt(p)]
+        # Zusätzliche Sicherung, falls die Liste der gepinnten Posts fehlt: Auf Seite 1 zählt ein Post
+        # nur, wenn seine ID größer ist als alle folgenden. Ein alter Post, der außer der Reihe oben
+        # steht, fällt dadurch heraus.
+        ergebnis: list[dict] = []
+        groesste_folgende = -1
+        for p in reversed(kandidaten):
+            sid = int(p["id"])
+            if sid > groesste_folgende:
+                ergebnis.append(p)
+            groesste_folgende = max(groesste_folgende, sid)
+        ergebnis.reverse()
         return ergebnis
 
     def _segment(self, start_max_id: int | None, untergrenze: int) -> bool:
@@ -311,6 +319,9 @@ class _Lauf:
                     break
                 seiten_min = min(int(p["id"]) for p in normale)
                 tiefste = seiten_min
+                if start_max_id is None and max_id is None:
+                    # Geht die Uhr des PCs nach, liegen die neuesten IDs über der aus der Uhrzeit berechneten Grenze.
+                    oben = max(oben, max(int(p["id"]) for p in normale))
                 if seiten_min <= untergrenze:
                     break
                 max_id = seiten_min

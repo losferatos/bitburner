@@ -491,13 +491,23 @@ def post_speichern(
     alt = post_lesen(con, post.id)
     with con:
         if alt is None:
+            vorab_editiert = not post.ist_retruth and neu["edited_at_utc"] is not None
+            edits = _edits_aus_revision(post)
+            if vorab_editiert:
+                edits = max(edits, 1)
             spalten = ["id", "id_num", "zuerst_gesehen_utc", "zuletzt_gesehen_utc", "erster_lauf_id",
-                       "letzter_lauf_id", "backfill", *_POST_SPALTEN]
-            werte = [post.id, int(post.id), gesehen_text, gesehen_text, lauf_id, lauf_id, int(backfill)]
+                       "letzter_lauf_id", "backfill", "edit_anzahl", *_POST_SPALTEN]
+            werte = [post.id, int(post.id), gesehen_text, gesehen_text, lauf_id, lauf_id, int(backfill), edits]
             werte += [neu[s] for s in _POST_SPALTEN]
             con.execute(
                 f"INSERT INTO posts ({', '.join(spalten)}) VALUES ({', '.join('?' * len(spalten))})", werte
             )
+            if vorab_editiert:
+                # Schon beim ersten Sehen bearbeitet: Zeitpunkt aus edited_at, erkannt jetzt.
+                con.execute(
+                    "INSERT INTO edits (post_id, lauf_id, erkannt_utc, edited_at_utc, art) VALUES (?, ?, ?, ?, ?)",
+                    (post.id, lauf_id, gesehen_text, neu["edited_at_utc"], "edited_at"),
+                )
             _medien_und_quellen_speichern(con, post, gesehen_text)
             return Speicherergebnis(neu=True, geaendert=True, edit_erkannt=False, war_geloescht=False)
 
@@ -510,12 +520,13 @@ def post_speichern(
             for spalte in ("medien_hash", "medien_vollstaendig", "fingerabdruck"):
                 neu[spalte] = alt[spalte]
         zuweisungen = ", ".join(f"{s} = ?" for s in _POST_SPALTEN)
+        edits = max(alt["edit_anzahl"] + (1 if edit else 0), _edits_aus_revision(post))
         con.execute(
             f"""UPDATE posts SET {zuweisungen}, zuletzt_gesehen_utc = ?, letzter_lauf_id = ?,
                     geloescht = 0, vermisst_seit_utc = NULL, loeschung_bestaetigt_utc = NULL,
-                    edit_anzahl = edit_anzahl + ?
+                    edit_anzahl = ?
                 WHERE id = ?""",
-            [*(neu[s] for s in _POST_SPALTEN), gesehen_text, lauf_id, 1 if edit else 0, post.id],
+            [*(neu[s] for s in _POST_SPALTEN), gesehen_text, lauf_id, edits, post.id],
         )
         if edit:
             con.execute(
@@ -529,6 +540,13 @@ def post_speichern(
     return Speicherergebnis(
         neu=False, geaendert=geaendert, edit_erkannt=edit is not None, war_geloescht=bool(alt["geloescht"])
     )
+
+
+def _edits_aus_revision(post: PostDaten) -> int:
+    """Truth Social zählt Revisionen im Feld ``version``; Edits = Revision − 1 (nur eigene Posts)."""
+    if post.ist_retruth or post.revision is None or post.revision < 1:
+        return 0
+    return post.revision - 1
 
 
 def _medien_und_quellen_speichern(con: sqlite3.Connection, post: PostDaten, gesehen_text: str) -> None:

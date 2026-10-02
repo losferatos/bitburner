@@ -272,15 +272,28 @@ class LaufenderBrowser:
         return f"http://127.0.0.1:{self.port}"
 
 
+def _freier_port() -> int:
+    with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as sock:
+        sock.bind(("127.0.0.1", 0))
+        return int(sock.getsockname()[1])
+
+
 def starte_browser(
     fund: BrowserFund,
     profil: Path,
     cache_ordner: Path,
     *,
+    start_url: str = "about:blank",
     headless: bool = False,
     zusatz_argumente: tuple[str, ...] = (),
     timeout_s: float = 45.0,
 ) -> LaufenderBrowser:
+    """Startet den Browser wie von Hand, nur mit eigenem Profil und lokalem DevTools-Port.
+
+    Der Port ist fest gewählt (ein gerade freier), nicht 0: Mit ``--remote-debugging-port=0``
+    schaltet Chromium ``navigator.webdriver`` ein, und Cloudflare lässt die Prüfung dann
+    endlos kreisen. Mit festem Port verhält sich der Browser wie ein normal gestarteter.
+    """
     profil.mkdir(parents=True, exist_ok=True)
     cache_ordner.mkdir(parents=True, exist_ok=True)
     if profil_in_benutzung(profil):
@@ -288,13 +301,12 @@ def starte_browser(
             "Das Tracker-Browserprofil ist noch geöffnet. Bitte das Browserfenster des Trackers schließen "
             "und erneut starten."
         )
-    port_datei = profil / "DevToolsActivePort"
-    port_datei.unlink(missing_ok=True)
-
+    (profil / "DevToolsActivePort").unlink(missing_ok=True)
+    port = _freier_port()
     argumente = [
         str(fund.pfad),
         f"--user-data-dir={profil}",
-        "--remote-debugging-port=0",
+        f"--remote-debugging-port={port}",
         "--no-first-run",
         "--no-default-browser-check",
         f"--disk-cache-dir={cache_ordner}",
@@ -303,34 +315,88 @@ def starte_browser(
     if headless:
         argumente.append("--headless=new")
     argumente.extend(zusatz_argumente)
-    argumente.append("about:blank")
+    argumente.append(start_url)
 
     prozess = subprocess.Popen(argumente, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, stdin=subprocess.DEVNULL)
 
     ende = time.monotonic() + timeout_s
-    port: int | None = None
-    version = ""
     while time.monotonic() < ende:
-        if port is None and port_datei.exists():
-            try:
-                erste_zeile = port_datei.read_text(encoding="utf-8").splitlines()[0].strip()
-                port = int(erste_zeile)
-            except (OSError, ValueError, IndexError):
-                port = None
-        if port is not None:
-            info = _hole_lokal(f"http://127.0.0.1:{port}/json/version")
-            if info:
-                version = str(info.get("Browser", ""))
-                break
+        info = _hole_lokal(f"http://127.0.0.1:{port}/json/version")
+        if info:
+            return LaufenderBrowser(
+                fund=fund, prozess=prozess, port=port, profil=profil, version=str(info.get("Browser", ""))
+            )
         time.sleep(0.3)
-    else:
-        if prozess.poll() is None:
-            prozess.terminate()
-        raise BrowserFehler(
-            f"{fund.name} hat innerhalb von {timeout_s:.0f} s keinen DevTools-Port geöffnet. "
-            "Läuft vielleicht noch ein Fenster mit dem Tracker-Profil? Dann bitte schließen."
-        )
-    return LaufenderBrowser(fund=fund, prozess=prozess, port=port, profil=profil, version=version)
+    if prozess.poll() is None:
+        prozess.terminate()
+    raise BrowserFehler(
+        f"{fund.name} hat innerhalb von {timeout_s:.0f} s keinen DevTools-Port geöffnet. "
+        "Läuft vielleicht noch ein Fenster mit dem Tracker-Profil? Dann bitte schließen."
+    )
+
+
+CHALLENGE_TITEL = ("just a moment", "einen moment", "un instant", "un momento", "checking your browser")
+SPERR_TITEL = ("attention required",)
+
+
+def offene_seiten(lauf: LaufenderBrowser) -> list[dict]:
+    """Titel und Adressen der offenen Tabs, gelesen über den HTTP-Endpunkt von DevTools.
+
+    Das hängt nichts an die Seite an (kein CDP-Sitzungsaufbau); während Cloudflare prüft,
+    bleibt der Browser dadurch unberührt.
+    """
+    seiten = _hole_lokal(f"http://127.0.0.1:{lauf.port}/json/list")
+    return [s for s in seiten or [] if isinstance(s, dict) and s.get("type") == "page"]
+
+
+@dataclass
+class Freigabe:
+    geloest: bool
+    challenge_gesehen: bool
+    sperrseite: bool
+    wartezeit_s: float
+
+
+def warte_auf_freigabe(
+    lauf: LaufenderBrowser,
+    host: str,
+    *,
+    timeout_s: float,
+    melden,
+    ruhe_s: float = 3.0,
+) -> Freigabe:
+    """Wartet, bis der Tab auf ``host`` keine Cloudflare-Prüfung mehr zeigt.
+
+    Gilt als frei, wenn der Titel ``ruhe_s`` lang keine Prüfung anzeigt. Eine Seite mit
+    "Attention Required" (meist eine Sperre, selten eine alte Captcha-Prüfung) beendet das
+    Warten; der Aufrufer prüft danach den Seitentext.
+    """
+    start = time.monotonic()
+    gesehen = False
+    gemeldet = False
+    ruhig_seit: float | None = None
+    while time.monotonic() - start < timeout_s:
+        seiten = [s for s in offene_seiten(lauf) if host in str(s.get("url", ""))]
+        titel = [str(s.get("title", "")).lower() for s in seiten]
+        if any(any(m in t for m in SPERR_TITEL) for t in titel):
+            return Freigabe(False, gesehen, True, time.monotonic() - start)
+        if any(any(m in t for m in CHALLENGE_TITEL) for t in titel):
+            gesehen = True
+            ruhig_seit = None
+            if not gemeldet:
+                melden(
+                    "\n>>> Cloudflare-Prüfung im Browserfenster. Bitte dort lösen "
+                    f"(höchstens {timeout_s / 60:.0f} Minuten). Der Lauf wartet.\n"
+                )
+                gemeldet = True
+        elif seiten:
+            ruhig_seit = ruhig_seit or time.monotonic()
+            if time.monotonic() - ruhig_seit >= ruhe_s:
+                if gemeldet:
+                    melden("Prüfung gelöst, es geht weiter.")
+                return Freigabe(True, gesehen, False, time.monotonic() - start)
+        time.sleep(1.0)
+    return Freigabe(False, gesehen, False, time.monotonic() - start)
 
 
 def beende_browser(lauf: LaufenderBrowser, playwright_browser=None, timeout_s: float = 20.0) -> bool:
@@ -407,12 +473,15 @@ __all__ = [
     "BrowserFund",
     "LaufenderBrowser",
     "Aufraeumbericht",
+    "Freigabe",
     "beende_browser",
     "browser_verfuegbar",
     "ermittle_browser_pid",
     "finde_browser",
+    "offene_seiten",
     "profil_in_benutzung",
     "raeume_cache_ordner_auf",
     "raeume_profil_auf",
     "starte_browser",
+    "warte_auf_freigabe",
 ]

@@ -19,11 +19,17 @@ impersonate = "chrome"
 warte_challenge_s = 300
 # Posts pro Seite (Mastodon erlaubt höchstens 40; Truth Social liefert eventuell weniger).
 seitengroesse = 40
+# Antworten an andere Accounts: Ohne Login gibt Truth Social die Timeline nur ohne sie heraus
+# (Antworten an sich selbst, also Threads, sind immer dabei).
+# auto: einmal pro Woche probieren, ob es doch geht; an: immer probieren; aus: nie.
+replies_anderer = "auto"
 
 [pausen]
 # Zufällige Pause vor jeder API-Anfrage (gleichverteilt zwischen min und max).
-api_min_s = 2.0
-api_max_s = 6.0
+# Ohne Login wurden etwa 6 Anfragen pro Minute beobachtet, bevor Truth Social mit 429 antwortet;
+# 10–15 s bleiben sicher darunter. Ein täglicher Lauf braucht so etwa 3–5 Minuten.
+api_min_s = 10.0
+api_max_s = 15.0
 # Pause vor jedem Abruf eines Bildes bzw. Vorschaubildes (für die Hashes).
 medien_min_s = 1.0
 medien_max_s = 3.0

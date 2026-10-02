@@ -15,7 +15,8 @@ Feldnamen mit Typen und Häufigkeiten, Zählwerte und Zeitspannen. Keine Texte, 
 Medien, keine Medien-URLs. Antworten werden nur im Speicher ausgewertet und verworfen.
 
 Schonend: höchstens rund ein Dutzend eigene Anfragen pro Weg, zufällige Pausen von
-2–6 s, nichts parallel. Bei Challenge, Sperre oder 429 bricht der jeweilige Weg sofort ab.
+10–15 s (ohne Login wurden etwa 6 Anfragen pro Minute vor einem 429 beobachtet), nichts
+parallel. Bei Challenge, Sperre oder 429 bricht der jeweilige Weg sofort ab.
 """
 
 from __future__ import annotations
@@ -34,6 +35,7 @@ from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 
 from truthtracker import __version__, browser, cloudflare, pfade, temp
+from truthtracker.transport import FETCH_JS, Pausierer, seite_zeigt_challenge, seite_zeigt_sperre
 from truthtracker.feldkatalog import Feldkatalog
 
 # Ein Zeitpunkt vor dem Start von Truth Social (Februar 2022) als Snowflake-ID: so eine ID
@@ -70,8 +72,8 @@ class Einstellungen:
     konto: str = "realDonaldTrump"
     seiten: int = 5
     limit: int = 40
-    pause_min: float = 2.0
-    pause_max: float = 6.0
+    pause_min: float = 10.0
+    pause_max: float = 15.0
     wege: tuple[str, ...] = ("a", "b")
     browser: str = "auto"
     headless: bool = False
@@ -207,20 +209,6 @@ def erster_medienanhang(posts: list[dict]) -> dict | None:
             if isinstance(anhang, dict) and anhang.get("preview_url"):
                 return anhang
     return None
-
-
-class Pausierer:
-    def __init__(self, minimum: float, maximum: float):
-        self.minimum = minimum
-        self.maximum = maximum
-        self._erste = True
-
-    def __call__(self) -> None:
-        if self._erste:
-            self._erste = False
-            return
-        if self.maximum > 0:
-            time.sleep(random.uniform(self.minimum, self.maximum))
 
 
 # ---------------------------------------------------------------------------
@@ -409,46 +397,6 @@ def beschreibe_nicht_gefunden(bew: cloudflare.Bewertung) -> dict[str, Any]:
 # Weg b: echter Browser über CDP
 
 
-_FETCH_JS = """async (url) => {
-  const antwort = await fetch(url, {credentials: 'include', headers: {'Accept': 'application/json, text/plain, */*'}});
-  const text = await antwort.text();
-  const kopf = {};
-  antwort.headers.forEach((wert, name) => { kopf[name] = wert; });
-  return {status: antwort.status, kopf: kopf, text: text};
-}"""
-
-_CHALLENGE_TITEL = ("just a moment", "einen moment", "un instant", "un momento", "attention required")
-_CHALLENGE_SELEKTOR = (
-    "iframe[src*='challenges.cloudflare.com'], #challenge-form, #challenge-stage, #cf-challenge-running, "
-    "#turnstile-wrapper, script[src*='/cdn-cgi/challenge-platform/']"
-)
-
-
-def seite_zeigt_challenge(seite) -> bool:
-    try:
-        titel = (seite.title() or "").lower()
-    except Exception:  # noqa: BLE001 - während einer Navigation wirft title()
-        return True
-    if any(m in titel for m in _CHALLENGE_TITEL):
-        return True
-    try:
-        return seite.locator(_CHALLENGE_SELEKTOR).count() > 0
-    except Exception:  # noqa: BLE001
-        return True
-
-
-def seite_zeigt_sperre(seite) -> str | None:
-    try:
-        text = (seite.locator("body").inner_text(timeout=3000) or "").lower()
-    except Exception:  # noqa: BLE001
-        return None
-    if "unavailable in your area" in text:
-        return cloudflare.GEOBLOCK
-    if "you have been blocked" in text or "error 1020" in text:
-        return cloudflare.BLOCKIERT
-    return None
-
-
 def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
     weg: dict[str, Any] = {"name": "Echter Browser über CDP", "anfragen": 0, "ergebnis": "unvollstaendig"}
     bericht.wege["b"] = weg
@@ -466,18 +414,36 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
     cache = pfade.temp_ordner() / f"browser-cache-{int(time.time())}"
     lauf: browser.LaufenderBrowser | None = None
     pw_browser = None
+    basis = einst.basis_url.rstrip("/")
+    host = urlparse(basis).hostname or ""
     try:
+        # Wie von Hand: Browser mit der Profilseite starten. Solange Cloudflare prüft, hängt sich
+        # nichts an den Browser (nur die Tab-Titel werden gelesen), damit die Prüfung nicht kreist.
         lauf = browser.starte_browser(
-            fund, profil, cache, headless=einst.headless, zusatz_argumente=einst.browser_argumente
+            fund, profil, cache, start_url=f"{basis}/@{einst.konto}", headless=einst.headless,
+            zusatz_argumente=einst.browser_argumente,
         )
+        weg["anfragen"] += 1
         weg["browser_version"] = lauf.version
+        freigabe = browser.warte_auf_freigabe(
+            lauf, host, timeout_s=einst.warte_challenge_s, melden=lambda text: print(text, flush=True)
+        )
+        weg["challenge"] = {
+            "gesehen": freigabe.challenge_gesehen,
+            "geloest": freigabe.geloest,
+            "sperrseite": freigabe.sperrseite,
+            "wartezeit_s": round(freigabe.wartezeit_s, 1),
+        }
+        if not freigabe.geloest and not freigabe.sperrseite:
+            raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, None), "startseite")
         from playwright.sync_api import sync_playwright
 
         with sync_playwright() as pw:
             pw_browser = pw.chromium.connect_over_cdp(lauf.cdp_url)
             lauf.browser_pid = browser.ermittle_browser_pid(pw_browser)
             kontext = pw_browser.contexts[0] if pw_browser.contexts else pw_browser.new_context()
-            seite = kontext.pages[0] if kontext.pages else kontext.new_page()
+            passende = [s for s in kontext.pages if host in s.url]
+            seite = passende[0] if passende else (kontext.pages[0] if kontext.pages else kontext.new_page())
             try:
                 cdp = kontext.new_cdp_session(seite)
                 cdp.send("Network.enable")
@@ -488,8 +454,8 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
 
             def sperre_medien(route) -> None:
                 anfrage = route.request
-                host = urlparse(anfrage.url).hostname or ""
-                if anfrage.resource_type in ("image", "media") and "cloudflare" not in host:
+                ziel = urlparse(anfrage.url).hostname or ""
+                if anfrage.resource_type in ("image", "media") and "cloudflare" not in ziel:
                     route.abort()
                 else:
                     route.continue_()
@@ -527,48 +493,30 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         if urlparse(antwort.url).path.startswith("/api/"):
             mitgeschnitten.append(antwort)
 
-    seite.on("response", merke)
+    sperre = seite_zeigt_sperre(seite)
+    if sperre:
+        raise Abbruch(cloudflare.Bewertung(sperre, None), "profilseite")
+    if seite_zeigt_challenge(seite):
+        # Ältere Captcha-Variante unter "Attention Required": angehängt weiter auf den Menschen warten.
+        print("\n>>> Cloudflare-Prüfung im Browserfenster. Bitte dort lösen.\n", flush=True)
+        ende = time.monotonic() + einst.warte_challenge_s
+        while time.monotonic() < ende and seite_zeigt_challenge(seite):
+            seite.wait_for_timeout(2000)
+        if seite_zeigt_challenge(seite):
+            raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, None), "profilseite")
+        weg["challenge"]["geloest"] = True
 
-    # b1: Profilseite öffnen, wie ein Mensch es tun würde.
+    # b1: Profilseite neu laden, diesmal mit Mitschnitt der API-Antworten der Web-App.
+    seite.on("response", merke)
     t0 = time.monotonic()
     weg["anfragen"] += 1
     try:
-        hauptantwort = seite.goto(f"{basis}/@{einst.konto}", wait_until="domcontentloaded", timeout=60_000)
+        hauptantwort = seite.reload(wait_until="domcontentloaded", timeout=60_000)
         weg["profilseite_status"] = hauptantwort.status if hauptantwort else None
         if hauptantwort is not None:
             weg["profilseite_kopfzeilen"] = kopf_auszug(hauptantwort.headers)
     except Exception as fehler:  # noqa: BLE001
         weg["profilseite_fehler"] = type(fehler).__name__
-
-    challenge = {"gesehen": False, "geloest": None, "wartezeit_s": 0.0, "von_selbst_geloest": False}
-    weg["challenge"] = challenge
-    kopf = weg.get("profilseite_kopfzeilen", {})
-    if kopf.get("cf-mitigated", "").lower() == "challenge":
-        challenge["gesehen"] = True
-    seite.wait_for_timeout(1500)
-    if seite_zeigt_challenge(seite):
-        challenge["gesehen"] = True
-        print(
-            "\n>>> Cloudflare-Prüfung im Browserfenster. Bitte dort lösen "
-            f"(höchstens {einst.warte_challenge_s / 60:.0f} Minuten). Das Skript wartet.\n",
-            flush=True,
-        )
-        ende = time.monotonic() + einst.warte_challenge_s
-        while time.monotonic() < ende:
-            seite.wait_for_timeout(2000)
-            if not seite_zeigt_challenge(seite):
-                challenge["geloest"] = True
-                break
-        else:
-            challenge["geloest"] = False
-        challenge["wartezeit_s"] = round(time.monotonic() - t0, 1)
-        if not challenge["geloest"]:
-            raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, weg.get("profilseite_status")), "profilseite")
-    elif challenge["gesehen"]:
-        # Nicht-interaktive Prüfung: Cloudflare hat den Browser ohne Zutun durchgelassen.
-        challenge["geloest"] = True
-        challenge["von_selbst_geloest"] = True
-
     sperre = seite_zeigt_sperre(seite)
     if sperre:
         raise Abbruch(cloudflare.Bewertung(sperre, weg.get("profilseite_status")), "profilseite")
@@ -626,7 +574,7 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         t1 = time.monotonic()
         weg["anfragen"] += 1
         try:
-            roh = seite.evaluate(_FETCH_JS, basis + pfad)
+            roh = seite.evaluate(FETCH_JS, basis + pfad)
         except Exception as fehler:  # noqa: BLE001
             bewertung = cloudflare.Bewertung(cloudflare.NETZWERKFEHLER, None, hinweis=type(fehler).__name__)
             schritte.append({"schritt": schritt, "pfad": pfad_vorlage(pfad), "art": bewertung.art,
@@ -895,8 +843,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--limit", type=int, default=40, help="Posts pro Seite anfragen (Standard 40)")
     parser.add_argument("--nur", choices=["a", "b"], help="nur einen Weg prüfen")
     parser.add_argument("--browser", default="auto", help="auto, opera, opera_gx, chrome, edge oder Pfad zur .exe")
-    parser.add_argument("--pause-min", type=float, default=2.0)
-    parser.add_argument("--pause-max", type=float, default=6.0)
+    parser.add_argument("--pause-min", type=float, default=10.0, help="Sekunden (Standard 10)")
+    parser.add_argument("--pause-max", type=float, default=15.0, help="Sekunden (Standard 15)")
     parser.add_argument("--warte-challenge", type=float, default=300.0, help="Sekunden für das Lösen der Prüfung")
     parser.add_argument("--impersonate", default="chrome", help="curl_cffi-Ziel, Standard: neueste Chrome-Fassung")
     parser.add_argument("--basis-url", default="https://truthsocial.com", help=argparse.SUPPRESS)

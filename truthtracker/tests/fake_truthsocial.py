@@ -58,11 +58,13 @@ class Zustand:
     ratelimit_ab: int | None = None  # die n-te API-Anfrage (ab 1 gezählt) und alle weiteren bekommen 429
     fehler_pfade: dict[str, int] = field(default_factory=dict)  # Regex -> Statuscode
     abbruch_pfade: list[str] = field(default_factory=list)  # Regex -> Verbindung kappen
+    challenge_pfade: list[str] = field(default_factory=list)  # Regex -> Cloudflare-Challenge, auch mit Cookie
     geoblock: bool = False
     max_seiten_ohne_login: int | None = None
     # Wie im veröffentlichten Server-Code: ohne Login Timeline nur mit exclude_replies/only_media/pinned,
     # Einzelabruf nur für Posts, die kein Reply sind.
     login_regeln: bool = True
+    werbung: list[dict[str, Any]] = field(default_factory=list)  # wird auf Seite 1 eingestreut
     anfragen: list[dict[str, Any]] = field(default_factory=list)
 
     def setze_posts(self, posts: list[dict[str, Any]]) -> None:
@@ -117,7 +119,9 @@ class _Handler(BaseHTTPRequestHandler):
             self._json(403, {"error": "Truth Social is unavailable in your area."})
             return
 
-        if z.challenge_ohne_cookie and "cf_clearance" not in cookie:
+        if any(re.search(muster, pfad) for muster in z.challenge_pfade) or (
+            z.challenge_ohne_cookie and "cf_clearance" not in cookie
+        ):
             koerper = (CHALLENGE_HTML % {"verzoegerung": z.challenge_verzoegerung_ms}).encode()
             self._senden(403, koerper, "text/html; charset=UTF-8", {"cf-mitigated": "challenge"})
             return
@@ -203,13 +207,15 @@ class _Handler(BaseHTTPRequestHandler):
         if seite_nr == 1 and z.gepinnt_in_timeline:
             gepinnt = [p for p in sichtbar if p.get("pinned") and p not in seite]
             seite = sorted(gepinnt, key=lambda p: int(p["id"]), reverse=True) + seite
+        if seite_nr == 1 and z.werbung:
+            seite = seite[:1] + list(z.werbung) + seite[1:]
         if z.max_seiten_ohne_login is not None and "max_id" in params:
             tiefe = sum(1 for a in z.api_anfragen() if a["pfad"].endswith("/statuses") and "max_id" in a["params"])
             if tiefe > z.max_seiten_ohne_login:
                 self._json(200, [])
                 return
         kopf = {}
-        normale = [p for p in seite if not p.get("pinned")] or seite
+        normale = [p for p in seite if not p.get("pinned") and not p.get("sponsored")] or seite
         if seite:
             kleinste = min(int(p["id"]) for p in normale)
             kopf["Link"] = (

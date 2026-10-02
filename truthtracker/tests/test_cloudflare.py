@@ -74,3 +74,9 @@ def test_401_ist_login_noetig_und_kein_abbruch():
     bew = cf.bewerte(401, {}, b'{"error":"This method requires an authenticated user"}')
     assert bew.art == cf.LOGIN_NOETIG and not bew.abbruch
     assert cf.bewerte(401, {}, b"<html>Unauthorized</html>").art == cf.LOGIN_NOETIG
+
+
+def test_cloudflare_1015_ist_ratelimit():
+    html = b"<html><title>Access denied | truthsocial.com used Cloudflare to restrict access</title>Error 1015</html>"
+    assert cf.bewerte(429, {}, html).art == cf.RATELIMIT
+    assert cf.bewerte(403, {}, html).art == cf.RATELIMIT

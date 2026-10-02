@@ -125,6 +125,7 @@ def status(
     reblog: dict[str, Any] | None = None,
     quote: dict[str, Any] | None = None,
     antwort_auf: tuple[str, str] | None = None,
+    antwort_auf_status: dict[str, Any] | None = None,
     karte_: dict[str, Any] | None = None,
     erwaehnungen: list[dict[str, Any]] | None = None,
     hashtags: list[str] | None = None,
@@ -137,6 +138,12 @@ def status(
     if text is None:
         text = f"{MARKER} Beitrag {status_id}"
     inhalt = "" if reblog is not None else (f"<p>{text}</p>" if text else "")
+    if antwort_auf_status is not None and antwort_auf is None:
+        antwort_auf = (antwort_auf_status["id"], antwort_auf_status["account"]["id"])
+    eingebettet = None
+    if antwort_auf_status is not None:
+        # So bettet Truth Social das Ziel eines Replies ein: Zähler als -1-Platzhalter.
+        eingebettet = dict(antwort_auf_status, replies_count=-1, reblogs_count=-1, favourites_count=-1)
     return {
         "id": status_id,
         "created_at": iso(zeit),
@@ -157,7 +164,7 @@ def status(
         "card": karte_,
         "group": None,
         "quote": quote,
-        "in_reply_to": None,
+        "in_reply_to": eingebettet,
         "reblog": reblog,
         "sponsored": False,
         "replies_count": zaehler[0],
@@ -173,6 +180,15 @@ def status(
         "poll": None,
         "emojis": [],
         "edited_at": iso(editiert) if editiert else None,
+        # Felder, die die Live-API zusätzlich liefert (laut Recherche, Stand 2026-09)
+        "editable": False,
+        "version": "1",
+        "votable": True,
+        "reaction": None,
+        "title": None,
+        "embedded_announcement": None,
+        "next_status": None,
+        "signature": f"{MARKER}-signatur-{status_id}-{next(_zaehler)}",
     }
 
 

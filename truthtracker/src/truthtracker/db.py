@@ -237,6 +237,8 @@ def oeffne(pfad: Path | str, *, nur_lesen: bool = False) -> sqlite3.Connection:
         con = sqlite3.connect(pfad, timeout=30)
     con.row_factory = sqlite3.Row
     con.execute("PRAGMA foreign_keys = ON")
+    # Gelöschte Daten werden mit Nullen überschrieben statt in freien Seiten liegen zu bleiben.
+    con.execute("PRAGMA secure_delete = ON")
     if not nur_lesen:
         con.execute("PRAGMA journal_mode = WAL")
         con.execute("PRAGMA synchronous = NORMAL")

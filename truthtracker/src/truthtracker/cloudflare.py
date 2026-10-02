@@ -51,9 +51,9 @@ _BLOCK_MARKER = (
     "attention required! | cloudflare",
     "error code: 1020",
     "error 1020",
-    "error 1015",
-    "error code: 1015",
 )
+# Cloudflare 1015: "You are being rate limited" – inhaltlich ein 429, nur als HTML-Seite.
+_RATE_MARKER = ("error 1015", "error code: 1015", "you are being rate limited")
 _GEO_MARKER = ("unavailable in your area",)
 
 
@@ -133,6 +133,8 @@ def bewerte(status: int | None, headers: Any, body: bytes | str | None) -> Bewer
     text = roh[:200_000].decode("utf-8", "replace").lower()
     if any(m in text for m in _GEO_MARKER):
         return Bewertung(GEOBLOCK, status)
+    if any(m in text for m in _RATE_MARKER):
+        return Bewertung(RATELIMIT, status)
     if any(m in text for m in _BLOCK_MARKER):
         return Bewertung(BLOCKIERT, status)
     if any(m in text for m in _CHALLENGE_MARKER):

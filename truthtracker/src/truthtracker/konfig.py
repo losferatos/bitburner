@@ -28,12 +28,16 @@ class ZugriffKonfig:
     impersonate: str = "chrome"
     warte_challenge_s: float = 300.0
     seitengroesse: int = 40
+    replies_anderer: str = "auto"
+    # Nur für Tests und Fehlersuche, nicht in config.toml dokumentiert:
+    headless: bool = False
+    browser_argumente: list = field(default_factory=list)
 
 
 @dataclass
 class PausenKonfig:
-    api_min_s: float = 2.0
-    api_max_s: float = 6.0
+    api_min_s: float = 10.0
+    api_max_s: float = 15.0
     medien_min_s: float = 1.0
     medien_max_s: float = 3.0
 
@@ -95,6 +99,10 @@ class Konfig:
         z, p, e, d = self.zugriff, self.pausen, self.erfassung, self.duplikate
         if z.weg not in ("auto", "curl", "browser"):
             raise KonfigFehler(f"[zugriff] weg muss auto, curl oder browser sein, nicht {z.weg!r}")
+        if z.replies_anderer not in ("auto", "an", "aus"):
+            raise KonfigFehler(f"[zugriff] replies_anderer muss auto, an oder aus sein, nicht {z.replies_anderer!r}")
+        if not all(isinstance(a, str) for a in z.browser_argumente):
+            raise KonfigFehler("[zugriff] browser_argumente muss eine Liste von Texten sein")
         if not 1 <= z.seitengroesse <= 80:
             raise KonfigFehler("[zugriff] seitengroesse muss zwischen 1 und 80 liegen")
         for name, a, b in (("api", p.api_min_s, p.api_max_s), ("medien", p.medien_min_s, p.medien_max_s)):

@@ -234,3 +234,33 @@ def test_nur_lesen_kann_nicht_schreiben(tmp_path):
     with pytest.raises(Exception):
         lesend.execute("INSERT INTO meta VALUES ('x', 'y')")
     lesend.close()
+
+
+def test_unbekannter_gepinnt_status_ueberschreibt_nicht(con):
+    post = _post(T0, gepinnt=True)
+    lauf = _lauf(con, T0)
+    db.post_speichern(con, post, lauf_id=lauf, gesehen=T0, backfill=False)
+    erg = db.post_speichern(con, _post(T0, gepinnt=None), lauf_id=lauf, gesehen=T0, backfill=False)
+    assert db.post_lesen(con, post.id)["gepinnt"] == 1 and not erg.geaendert
+
+
+def test_relevante_aenderung_setzt_duplikat_pruefung_zurueck(con):
+    post = _post(T0)
+    lauf = _lauf(con, T0)
+    db.post_speichern(con, post, lauf_id=lauf, gesehen=T0, backfill=False)
+    con.execute("UPDATE posts SET dup_geprueft_utc = ?", (zeit.utc_text(T0),))
+    db.post_speichern(con, _post(T0, zaehler=Zaehler(99)), lauf_id=lauf, gesehen=T0, backfill=False)
+    assert db.post_lesen(con, post.id)["dup_geprueft_utc"] == zeit.utc_text(T0)  # Zähler sind egal
+    db.post_speichern(con, _post(T0, text=TextMetriken(text_hash="9" * 64)), lauf_id=lauf, gesehen=T0, backfill=False)
+    assert db.post_lesen(con, post.id)["dup_geprueft_utc"] is None
+
+
+def test_fehlgeschlagener_medienabruf_ist_keine_aenderung(con):
+    fertig = MedienDaten(position=0, medien_id="1", art="bild", sha256="c" * 64, phash="0" * 16, hash_status="ok")
+    post = _post(T0, medien=[fertig], n_bilder=1, medien_hash="d" * 64)
+    lauf = _lauf(con, T0)
+    db.post_speichern(con, post, lauf_id=lauf, gesehen=T0, backfill=False)
+    kaputt = MedienDaten(position=0, medien_id="1", art="bild", hash_status="fehler")
+    erg = db.post_speichern(con, _post(T0, medien=[kaputt], n_bilder=1, medien_hash=None, medien_vollstaendig=False,
+                                       fingerabdruck=None), lauf_id=lauf, gesehen=T0, backfill=False)
+    assert not erg.geaendert and not erg.edit_erkannt

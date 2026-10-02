@@ -108,9 +108,12 @@ class Konfig:
         for name, a, b in (("api", p.api_min_s, p.api_max_s), ("medien", p.medien_min_s, p.medien_max_s)):
             if a < 0 or b < a:
                 raise KonfigFehler(f"[pausen] {name}_min_s muss >= 0 und <= {name}_max_s sein")
-        for name in ("backfill_wochen", "loeschpruefung_tage", "duplikat_fenster_tage", "snapshot_grenze_h"):
-            if getattr(e, name) <= 0:
-                raise KonfigFehler(f"[erfassung] {name} muss größer als 0 sein")
+        for name, hoechstens in (
+            ("backfill_wochen", 520), ("loeschpruefung_tage", 365), ("duplikat_fenster_tage", 365),
+            ("snapshot_grenze_h", 24 * 365),
+        ):
+            if not 0 < getattr(e, name) <= hoechstens:
+                raise KonfigFehler(f"[erfassung] {name} muss größer als 0 und höchstens {hoechstens} sein")
         if e.max_seiten_pro_lauf < 1 or e.max_einzelabrufe_pro_lauf < 0:
             raise KonfigFehler("[erfassung] max_seiten_pro_lauf >= 1 und max_einzelabrufe_pro_lauf >= 0")
         if not 0 <= d.phash_max_abstand <= 32:

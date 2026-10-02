@@ -49,3 +49,8 @@ def test_werte_und_relative_pfade(tmp_path):
 def test_fehlerhafte_konfiguration(tmp_path, inhalt):
     with pytest.raises(konfig.KonfigFehler):
         konfig.lade(_schreibe(tmp_path, inhalt))
+
+
+def test_obergrenzen(tmp_path):
+    with pytest.raises(konfig.KonfigFehler):
+        konfig.lade(_schreibe(tmp_path, "[erfassung]\nduplikat_fenster_tage = 800000\n"))

@@ -154,6 +154,11 @@ def finde_browser(wunsch: str = "auto") -> BrowserFund | None:
 # Profil aufräumen
 
 
+def im_profil_erlaubt(relativ: Path) -> bool:
+    """Positivliste: Darf diese Datei (relativ zum Profilordner) nach dem Aufräumen bleiben?"""
+    return _behalten(relativ)
+
+
 def _behalten(relativ: Path) -> bool:
     teile = relativ.parts
     name = teile[-1]
@@ -478,6 +483,7 @@ __all__ = [
     "browser_verfuegbar",
     "ermittle_browser_pid",
     "finde_browser",
+    "im_profil_erlaubt",
     "offene_seiten",
     "profil_in_benutzung",
     "raeume_cache_ordner_auf",

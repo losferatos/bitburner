@@ -68,3 +68,8 @@ def test_snowflake_grenzen_und_rueckrechnung():
     assert zeit.zeit_aus_id(str(oben)) == dt
     # Bekannte Konto-ID von @realDonaldTrump: angelegt im Februar 2022
     assert zeit.zeit_aus_id("107780257626128497").strftime("%Y-%m") == "2022-02"
+
+
+def test_utc_text_vierstelliges_jahr_und_extreme_werte():
+    assert zeit.utc_text(datetime(999, 1, 2, 3, 4, 5, tzinfo=UTC)) == "0999-01-02T03:04:05Z"
+    assert zeit.parse_utc("0001-01-01T00:00:00+01:00") is None

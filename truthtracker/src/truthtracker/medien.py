@@ -99,7 +99,7 @@ _DREHUNGEN = {
 }
 _MAX_KANTE_PX = 100_000
 _HEXZIFFERN = frozenset(string.hexdigits)
-_MEDIEN_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
+_MEDIEN_ID = re.compile(r"[0-9]{1,19}")
 
 _PHASH_KANTE = 32
 _PHASH_BLOCK = 8
@@ -433,7 +433,11 @@ def _medien_id(wert: object) -> str | None:
     if isinstance(wert, bool) or not isinstance(wert, (str, int)):
         return None
     text = str(wert).strip()
-    return text if _MEDIEN_ID.fullmatch(text) else None
+    if not _MEDIEN_ID.fullmatch(text):
+        return None
+    # Mastodon-IDs sind positive Ziffernfolgen in 64 Bit; so prüfen es auch Klassifikation und Prüfskript.
+    zahl = int(text)
+    return str(zahl) if 1 <= zahl < 2**63 else None
 
 
 @cache

@@ -46,7 +46,10 @@ def parse_utc(wert: object) -> datetime | None:
         return None
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=UTC)
-    return dt.astimezone(UTC)
+    try:
+        return dt.astimezone(UTC)
+    except (OverflowError, ValueError):
+        return None
 
 
 def utc_text(dt: datetime | None) -> str | None:
@@ -55,7 +58,10 @@ def utc_text(dt: datetime | None) -> str | None:
         return None
     if dt.tzinfo is None:
         raise ValueError("Zeitpunkt ohne Zeitzone")
-    return dt.astimezone(UTC).strftime("%Y-%m-%dT%H:%M:%SZ")
+    utc = dt.astimezone(UTC)
+    # Jahr ausdrücklich vierstellig: strftime("%Y") lässt unter Linux führende Nullen weg,
+    # dann stimmte die Textsortierung in der DB nicht mehr.
+    return f"{utc.year:04d}" + utc.strftime("-%m-%dT%H:%M:%SZ")
 
 
 def alter_in_stunden(erstellt: datetime, gemessen: datetime) -> float:

@@ -166,7 +166,19 @@ class _Handler(BaseHTTPRequestHandler):
             else:
                 self._json(404, {"error": "Record not found"})
             return
+        if pfad == "/media/riesig.png":
+            # Kündigt 30 MB an, schickt aber fast nichts: Der Client muss schon am Kopf ablehnen.
+            self.send_response(200)
+            self.send_header("Content-Type", "image/png")
+            self.send_header("Content-Length", str(30_000_000))
+            self.end_headers()
+            self.wfile.write(b"\x89PNG")
+            self.close_connection = True
+            return
         treffer = re.fullmatch(r"/media/(?:original|small)/([\w.\-]+)", pfad)
+        if treffer and treffer.group(1).endswith((".mp4", ".m3u8")):
+            self._senden(200, b"\x00" * 200_000, "video/mp4")
+            return
         if treffer:
             datei = treffer.group(1)
             if datei not in z.medien:

@@ -96,6 +96,28 @@ def _ist_http_url(url: str) -> bool:
     return urlparse(url).scheme in ("http", "https")
 
 
+def _laenge(kopf: dict[str, str]) -> int:
+    try:
+        return int(kopf.get("content-length", "0") or 0)
+    except ValueError:
+        return 0
+
+
+def _lies_begrenzt(antwort, grenze: int, *, abbrechen: bool) -> bytes:
+    """Liest höchstens ``grenze`` Bytes. Mit ``abbrechen`` ist mehr ein Fehler, sonst wird gekürzt."""
+    teile: list[bytes] = []
+    groesse = 0
+    for teil in antwort.iter_content():
+        groesse += len(teil)
+        if groesse > grenze:
+            if abbrechen:
+                raise _medien_fehler("Mediendatei größer als erlaubt")
+            teile.append(teil[: grenze - (groesse - len(teil))])
+            break
+        teile.append(teil)
+    return b"".join(teile)
+
+
 # ---------------------------------------------------------------------------
 # curl_cffi
 
@@ -134,8 +156,6 @@ class CurlTransport:
             raise _medien_fehler("Medienadresse ist keine http(s)-Adresse")
         self._medien_pause()
         self._zaehler.anfragen_medien += 1
-        teile: list[bytes] = []
-        groesse = 0
         try:
             antwort = self._sitzung.request(
                 "GET", url, headers={"Accept": BILD_ACCEPT, "Referer": self._basis + "/"}, stream=True
@@ -143,11 +163,13 @@ class CurlTransport:
             try:
                 status = antwort.status_code
                 kopf = cloudflare.kopfzeilen(antwort.headers)
-                for teil in antwort.iter_content():
-                    groesse += len(teil)
-                    if groesse > MAX_MEDIEN_BYTES:
-                        raise _medien_fehler("Mediendatei größer als erlaubt")
-                    teile.append(teil)
+                # Erst die Kopfzeilen prüfen: Ein Video oder eine zu große Datei wird gar nicht erst gelesen.
+                if _laenge(kopf) > MAX_MEDIEN_BYTES:
+                    raise _medien_fehler("Mediendatei größer als erlaubt")
+                ist_bild = status == 200 and kopf.get("content-type", "").lower().startswith("image/")
+                if status == 200 and not ist_bild:
+                    raise _medien_fehler("Antwort ist kein Bild")
+                daten = _lies_begrenzt(antwort, MAX_MEDIEN_BYTES if ist_bild else 65_536, abbrechen=ist_bild)
             finally:
                 antwort.close()
         except Exception as fehler:  # noqa: BLE001
@@ -156,7 +178,6 @@ class CurlTransport:
             if isinstance(fehler, MedienFehler):
                 raise
             raise _medien_fehler(f"Netzwerkfehler beim Medienabruf ({type(fehler).__name__})") from None
-        daten = b"".join(teile)
         return self._bewerte_medien(status, kopf, daten)
 
     def _bewerte_medien(self, status: int, kopf: dict[str, str], daten: bytes) -> bytes:
@@ -384,16 +405,23 @@ class BrowserTransport:
             kontext = self._seite.context
             self._medien_seite = kontext.new_page()
             self._cache_aus(kontext, self._medien_seite)
+            # Spielt eine Adresse doch ein Video ab, lädt es nicht nach.
+            self._medien_seite.route(
+                "**/*", lambda route: route.abort() if route.request.resource_type == "media" else route.continue_()
+            )
         try:
             # Als eigenes Dokument geöffnet, gilt keine CORS-Beschränkung; der Netzwerkstapel ist der des Browsers.
-            antwort = self._medien_seite.goto(url, wait_until="load", timeout=60_000)
+            antwort = self._medien_seite.goto(url, wait_until="commit", timeout=60_000)
             if antwort is None:
                 raise _medien_fehler("Medienabruf ohne Antwort")
             status = antwort.status
             kopf = cloudflare.kopfzeilen(antwort.headers)
-            laenge = int(kopf.get("content-length", "0") or 0)
-            if laenge > MAX_MEDIEN_BYTES:
+            if _laenge(kopf) > MAX_MEDIEN_BYTES:
                 raise _medien_fehler("Mediendatei größer als erlaubt")
+            ist_bild = status == 200 and kopf.get("content-type", "").lower().startswith("image/")
+            if status == 200 and not ist_bild:
+                raise _medien_fehler("Antwort ist kein Bild")
+            antwort.finished()
             daten = antwort.body()
         except Exception as fehler:  # noqa: BLE001
             from truthtracker.medien import MedienFehler
@@ -408,9 +436,9 @@ class BrowserTransport:
                 pass
         if len(daten) > MAX_MEDIEN_BYTES:
             raise _medien_fehler("Mediendatei größer als erlaubt")
-        if status == 200 and kopf.get("content-type", "").lower().startswith("image/"):
+        if ist_bild:
             return daten
-        bewertung = cloudflare.bewerte(status, kopf, daten)
+        bewertung = cloudflare.bewerte(status, kopf, daten[:65_536])
         if bewertung.art in (cloudflare.CHALLENGE, cloudflare.RATELIMIT) or bewertung.art in _SPERR_ARTEN:
             self._medien_gesperrt = bewertung.art
             log.warning("Medienabruf gestoppt: %s", cloudflare.melde(bewertung))

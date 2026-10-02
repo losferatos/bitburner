@@ -372,8 +372,8 @@ class _Lauf:
         if self.dup_erledigt:
             return
         self.dup_erledigt = True
-        if not self.betroffene:
-            return
+        # Auch ohne neue oder geänderte Posts aufrufen: Die Funktion holt noch nie bewertete Posts nach
+        # (etwa nach einem Absturz vor diesem Schritt) und zieht das Abdeckungs-Flag nach.
         self.dup_bericht = duplikate.aktualisiere_duplikate(
             self.con, self.konfig, betroffene_ids=self.betroffene, jetzt=self.uhr()
         )
@@ -417,6 +417,11 @@ class _Lauf:
     # -- Nach dem Lauf (ohne Netz) -------------------------------------------
 
     def lokale_nacharbeit(self) -> None:
+        if self.erfasser is not None and self.erfasser.fehler:
+            self.zaehler.fehler += self.erfasser.fehler
+            self.meldung(
+                f"{self.erfasser.fehler} Medien ließen sich nicht hashen; ein späterer Lauf versucht es erneut."
+            )
         try:
             self._duplikate()
         except Exception:  # noqa: BLE001 - das Protokoll muss trotzdem geschrieben werden

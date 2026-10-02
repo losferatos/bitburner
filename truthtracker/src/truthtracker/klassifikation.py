@@ -269,46 +269,32 @@ def bestimme_format(*, n_medien: int, hat_text: bool, hat_text_ohne_urls: bool, 
 
 
 def beschreibe_anhang(anhang: object, position: int) -> MedienDaten:
-    """Metadaten eines Anhangs ohne Download: Art, Abmessungen, Dauer, ob ein Hash möglich ist."""
-    a = _dict(anhang)
-    typ = a.get("type")
-    art = _MEDIENARTEN.get(typ.strip().lower(), MEDIUM_SONSTIG) if isinstance(typ, str) else MEDIUM_SONSTIG
-    original = _dict(_dict(a.get("meta")).get("original"))
-    hat_original = _text(a.get("url")) is not None
-    hat_vorschau = _text(a.get("preview_url")) is not None
-    if art == MEDIUM_AUDIO:
-        hashbar = False
-    elif art == MEDIUM_BILD:
-        hashbar = hat_original or hat_vorschau
-    else:
-        # Von Videos, GIFs und Unbekanntem wird nur das Vorschaubild geladen, nie die Datei selbst.
-        hashbar = hat_vorschau
-    breite, hoehe = _kante(original.get("width")), _kante(original.get("height"))
-    if breite is None or hoehe is None:
-        breite, hoehe = _masse_aus_groesse(original.get("size"))
-    return MedienDaten(
-        position=position,
-        medien_id=_id(a.get("id")),
-        art=art,
-        breite=breite,
-        hoehe=hoehe,
-        dauer_s=_dauer(original.get("duration")),
-        hash_status=HASH_OFFEN if hashbar else HASH_UEBERSPRUNGEN,
-    )
+    """Metadaten eines Anhangs ohne Download. Dieselben Regeln wie beim Hashen (``medien.beschreibe``),
+    damit der Modus ohne Erfasser nie einen anderen Status liefert als der Erfasser."""
+    from truthtracker import medien as medien_modul
+
+    return medien_modul.beschreibe(anhang if isinstance(anhang, dict) else {}, position)
 
 
-def medien_schluessel(medium: MedienDaten) -> str | None:
-    """Vergleichsschlüssel eines Mediums; ``None``, solange der Hash fehlt (offen oder Fehler)."""
+def medien_schluessel(medium: MedienDaten, inhalts_id: str | None = None) -> str | None:
+    """Vergleichsschlüssel eines Mediums; ``None``, solange der Hash fehlt (offen oder Fehler).
+
+    Medien ohne Hash (Audio, keine Vorschau) werden über ihre ID verglichen. Fehlt auch die ID,
+    gilt das Medium nur als gleich mit sich selbst (Inhalts-ID und Position): Zwei solche Medien
+    in verschiedenen Posts dürfen nicht als identisch durchgehen.
+    """
     if medium.hash_status == HASH_UEBERSPRUNGEN:
-        return f"{medium.art}:ohne-hash:{medium.medien_id}"
+        if medium.medien_id:
+            return f"{medium.art}:ohne-hash:{medium.medien_id}"
+        return f"{medium.art}:ohne-hash:{inhalts_id}:{medium.position}"
     if medium.hash_status in (HASH_FEHLER, HASH_OFFEN):
         return None
     return medium.exakt_schluessel
 
 
-def medien_hash(medien: list[MedienDaten]) -> tuple[str | None, bool]:
+def medien_hash(medien: list[MedienDaten], inhalts_id: str | None = None) -> tuple[str | None, bool]:
     """(``medien_hash``, ``medien_vollstaendig``). Ohne Medien: (None, True)."""
-    schluessel = [medien_schluessel(m) for m in medien]
+    schluessel = [medien_schluessel(m, inhalts_id) for m in medien]
     if any(s is None for s in schluessel):
         return None, False
     if not schluessel:
@@ -527,7 +513,7 @@ def extrahiere(
         medien.erfasse(anhang, position) if medien is not None else beschreibe_anhang(anhang, position)
         for position, anhang in enumerate(anhaenge)
     ]
-    m_hash, vollstaendig = medien_hash(medien_daten)
+    m_hash, vollstaendig = medien_hash(medien_daten, quelle_id or post_id)
     karte = quelle.get("card")
     hat_karte = isinstance(karte, dict) and bool(karte)
 

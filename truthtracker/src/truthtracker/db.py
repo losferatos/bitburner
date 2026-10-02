@@ -410,6 +410,13 @@ _POST_SPALTEN = (
 )
 
 
+# Spalten, die die Duplikat-Prüfung vergleicht.
+_DUP_SPALTEN = (
+    "created_at_utc", "original_id", "quote_id", "text_hash", "medien_hash", "medien_vollstaendig", "fingerabdruck",
+    "n_bilder", "n_videos", "n_gifs", "n_audio", "n_sonstige_medien",
+)
+
+
 def _post_werte(post: PostDaten) -> dict[str, Any]:
     return {
         "url": post.url,
@@ -512,21 +519,28 @@ def post_speichern(
             return Speicherergebnis(neu=True, geaendert=True, edit_erkannt=False, war_geloescht=False)
 
         edit = _edit_art(alt, neu, post)
-        geaendert = any(alt[s] != neu[s] for s in _POST_SPALTEN)
         # Vorhandene Hashes nicht durch "unbekannt" überschreiben, wenn diesmal Medien-Downloads ausfielen.
         if not post.medien_vollstaendig and alt["medien_vollstaendig"] and (
             alt["n_bilder"] + alt["n_videos"] + alt["n_gifs"] == post.n_bilder + post.n_videos + post.n_gifs
         ):
             for spalte in ("medien_hash", "medien_vollstaendig", "fingerabdruck"):
                 neu[spalte] = alt[spalte]
+        if neu["gepinnt"] is None:
+            # Liste der gepinnten Posts war in diesem Lauf nicht abrufbar: bisherigen Stand behalten.
+            neu["gepinnt"] = alt["gepinnt"]
+        geaendert = any(alt[s] != neu[s] for s in _POST_SPALTEN)
+        # Ändert sich, was die Duplikat-Prüfung vergleicht, gilt der Post als noch nicht geprüft. So holt
+        # auch ein Lauf, der vor der Duplikat-Prüfung abstürzt, sie später nach.
+        dup_neu = any(alt[s] != neu[s] for s in _DUP_SPALTEN)
         zuweisungen = ", ".join(f"{s} = ?" for s in _POST_SPALTEN)
         edits = max(alt["edit_anzahl"] + (1 if edit else 0), _edits_aus_revision(post))
         con.execute(
             f"""UPDATE posts SET {zuweisungen}, zuletzt_gesehen_utc = ?, letzter_lauf_id = ?,
                     geloescht = 0, vermisst_seit_utc = NULL, loeschung_bestaetigt_utc = NULL,
-                    edit_anzahl = ?
+                    edit_anzahl = ?,
+                    dup_geprueft_utc = CASE WHEN ? THEN NULL ELSE dup_geprueft_utc END
                 WHERE id = ?""",
-            [*(neu[s] for s in _POST_SPALTEN), gesehen_text, lauf_id, edits, post.id],
+            [*(neu[s] for s in _POST_SPALTEN), gesehen_text, lauf_id, edits, int(dup_neu), post.id],
         )
         if edit:
             con.execute(

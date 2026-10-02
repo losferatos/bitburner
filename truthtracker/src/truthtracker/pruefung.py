@@ -962,7 +962,7 @@ class _Pruefung:
     def _profil_datei(self, wurzel: Path, pfad: Path) -> None:
         self.sammler.zaehle("profil_dateien")
         ort = _ort(wurzel, pfad)
-        if not browser._behalten(pfad.relative_to(wurzel)):
+        if not browser.im_profil_erlaubt(pfad.relative_to(wurzel)):
             if pfad.name.casefold() in _VERLAUF_DATEIEN:
                 beschreibung = "Verlauf oder Sitzungsdaten"
             else:

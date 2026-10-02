@@ -7,13 +7,25 @@ from __future__ import annotations
 
 import dataclasses
 import hashlib
+import json
 import unicodedata
 
 import pytest
 from fabrik import MARKER
 
 from truthtracker import text
-from truthtracker.text import analysiere, normalisiere_fuer_hash, sichtbarer_text, text_hash, zaehle_grapheme
+from truthtracker.text import (
+    analysiere,
+    bereinige_unicode,
+    kuerze,
+    normalisiere_fuer_hash,
+    sichtbarer_text,
+    text_hash,
+    zaehle_grapheme,
+)
+
+ORIGINAL_ID = "114000000000000001"
+ORIGINAL = f"https://truthsocial.com/@jemand/{ORIGINAL_ID}"
 
 
 def link(url: str, *, sichtbar_von: int = 8, sichtbar_bis: int = 30) -> str:
@@ -178,6 +190,49 @@ def test_nackte_url_ohne_link_element():
     assert analyse.metriken.zeichen_ohne_urls == len("siehe . und )")
 
 
+def test_nackte_url_endet_vor_cjk_satzzeichen():
+    m = analysiere("<p>見てhttps://example.com/a。次の文</p>").metriken
+    assert m.n_urls == 1 and m.link_domains == ["example.com"]
+    assert m.zeichen_ohne_urls == len("見て。次の文")
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        "<p>Satz eins.  Satz zwei.</p>",
+        "<p>a&nbsp;&nbsp;b</p>",
+        '<p>a <img src="x" alt=":x:"> b</p>',
+        "<p>a\tb\u3000\u3000c</p>",
+        f"<p>{MARKER}</p><p> </p><p>b<br><br>c<br> <br>d</p>",
+        f"<p>{MARKER} &amp;  {mention('x')}  {hashtag('a')}</p>",
+    ],
+)
+def test_ohne_urls_gleich_viele_zeichen(html):
+    """Leerraum wird nur dort zusammengefasst, wo eine URL wegfällt; ohne URLs sind beide Zählungen gleich."""
+    m = analysiere(html).metriken
+    assert m.n_urls == 0
+    assert m.zeichen == m.zeichen_ohne_urls > 0
+
+
+def test_leerraum_wird_nur_an_der_nahtstelle_eins():
+    m = analysiere(f"<p>a  b {link('https://example.com/x')}  c  d</p>").metriken
+    assert m.zeichen_ohne_urls == len("a  b c  d")
+    html = f"<p>a{link('https://example.com/x')}b {link('https://example.org/y')} {link('https://e.example/')} c</p>"
+    m = analysiere(html).metriken
+    assert m.zeichen_ohne_urls == len("ab c") and m.n_urls == 3
+
+
+def test_zeile_nur_aus_url_faellt_samt_umbruch_weg():
+    url = link("https://example.com/x")
+    assert analysiere(f"<p>A<br>{url}<br>B</p>").metriken.zeichen_ohne_urls == len("A\nB")
+    assert analysiere(f"<p>A</p><p>{url}<br>B</p>").metriken.zeichen_ohne_urls == len("A\n\nB")
+    assert analysiere(f"<p>A<br>{url}</p><p>B</p>").metriken.zeichen_ohne_urls == len("A\n\nB")
+    assert analysiere(f"<p>{url}</p><p>B</p>").metriken.zeichen_ohne_urls == 1
+    assert analysiere(f"<p>A<br>{url} {url}<br>B</p>").metriken.zeichen_ohne_urls == len("A\nB")
+    # Im sichtbaren Text bleibt die Zeile mit der URL natürlich stehen.
+    assert analysiere(f"<p>A<br>{url}<br>B</p>").metriken.zeichen == len("A\nhttps://example.com/x\nB")
+
+
 def test_link_domains_normalisiert_sortiert_eindeutig():
     html = "<p>" + " ".join(
         link(u)
@@ -210,14 +265,103 @@ def test_ungueltige_hosts_werden_keine_domain():
     assert analyse.metriken.link_domains == []
 
 
+def test_einzelnes_wort_hinter_http_ist_keine_domain():
+    analyse = analysiere("<p>Wir sehen uns auf http://Freiheit und http://localhost:8080/x</p>")
+    assert analyse.metriken.n_urls == 2
+    assert analyse.metriken.link_domains == []
+
+
+@pytest.mark.parametrize(
+    ("url", "domain"),
+    [
+        ("http://192.0.2.7/x", "192.0.2.7"),
+        ("https://xn--mller-kva.example/", "xn--mller-kva.example"),
+        ("https://müller.example/", "xn--mller-kva.example"),
+        ("https://beispiel.xn--p1ai/", "beispiel.xn--p1ai"),
+        ("https://a.b.c.example.co/", "a.b.c.example.co"),
+        ("http://[2001:db8::1]/x", None),
+        ("http://1.2.3/x", None),
+        ("http://example.123/x", None),
+        ("http://intranet/x", None),
+        (f"https://{'a' * 63}.example/", f"{'a' * 63}.example"),
+        (f"https://{'a' * 64}.example/", None),
+        (f"https://{'.'.join(['abcdefghi'] * 26)}.example/", None),
+    ],
+)
+def test_domain_braucht_tld_oder_ipv4(url, domain):
+    m = analysiere(f"<p>{link(url)}</p>").metriken
+    assert m.n_urls == 1
+    assert m.link_domains == ([domain] if domain else [])
+
+
 def test_link_auf_zitiertes_original_zaehlt_nicht():
-    original = "https://truthsocial.com/@jemand/114000000000000001"
-    html = f'<p>{MARKER} <a href="{original}/">{original}</a></p>'
-    analyse = analysiere(html, ausgeschlossene_links=[original])
+    html = f'<p>{MARKER} <a href="{ORIGINAL}/">{ORIGINAL}</a></p>'
+    analyse = analysiere(html, ausgeschlossene_links=[ORIGINAL])
     assert analyse.metriken.n_urls == 0
     assert analyse.metriken.zeichen == len(MARKER)
     ohne_ausschluss = analysiere(html)
     assert ohne_ausschluss.metriken.n_urls == 1
+
+
+def test_nackte_url_auf_zitiertes_original_zaehlt_nicht():
+    html = f"<p>Text {ORIGINAL}</p>"
+    for ausschluss in ({"ausgeschlossene_links": [ORIGINAL]}, {"ausgeschlossene_ids": [ORIGINAL_ID]}):
+        m = analysiere(html, **ausschluss).metriken
+        assert (m.zeichen, m.zeichen_ohne_urls, m.n_urls) == (4, 4, 0), ausschluss
+    assert analysiere(html).metriken.n_urls == 1
+
+
+@pytest.mark.parametrize(
+    "pfad",
+    [
+        f"/@jemand/{ORIGINAL_ID}",
+        f"/@Jemand/{ORIGINAL_ID}/",
+        f"/@jemand/posts/{ORIGINAL_ID}",
+        f"/users/jemand/statuses/{ORIGINAL_ID}",
+        f"/statuses/{ORIGINAL_ID}",
+    ],
+)
+@pytest.mark.parametrize(
+    "basis", ["https://truthsocial.com", "https://www.truthsocial.com", "http://truthsocial.com", ""]
+)
+def test_link_auf_zitiertes_original_ueber_die_id(pfad, basis):
+    url = basis + pfad
+    # Fallback-Absatz ohne die Klasse quote-inline: Der Link fällt weg, "RE:" bleibt Text.
+    m = analysiere(f'<p>{MARKER}</p><p>RE: <a href="{url}">{url}</a></p>', ausgeschlossene_ids=[ORIGINAL_ID]).metriken
+    assert (m.n_urls, m.zeichen) == (0, len(f"{MARKER}\n\nRE:"))
+    htmls = [f'<p>{MARKER} <a href="{url}">{url}</a></p>']
+    if basis:
+        htmls.append(f"<p>{MARKER} {url}</p>")  # ein relativer Pfad wäre als nackter Text keine URL
+    for html in htmls:
+        m = analysiere(html, ausgeschlossene_ids=[ORIGINAL_ID]).metriken
+        assert (m.n_urls, m.zeichen, m.zeichen_ohne_urls) == (0, len(MARKER), len(MARKER)), html
+
+
+def test_id_ausschluss_nur_fuer_eigene_hosts_und_dieselbe_id():
+    for url in (
+        f"https://fern.example/@jemand/{ORIGINAL_ID}",
+        "https://truthsocial.com/@jemand/114000000000000002",
+        f"https://truthsocial.com/@jemand/{ORIGINAL_ID}/embed",
+        f"https://truthsocial.com/@jemand/{ORIGINAL_ID}0",
+    ):
+        m = analysiere(f'<p>{MARKER} <a href="{url}">{url}</a></p>', ausgeschlossene_ids=[ORIGINAL_ID]).metriken
+        assert m.n_urls == 1, url
+
+
+def test_ausgeschlossener_link_mitten_im_satz():
+    html = f'<p>a <a href="{ORIGINAL}">{ORIGINAL}</a> b</p>'
+    m = analysiere(html, ausgeschlossene_ids=[ORIGINAL_ID]).metriken
+    assert (m.zeichen, m.zeichen_ohne_urls, m.n_urls) == (3, 3, 0)
+    # Eine Zeile, die nur aus dem Link bestand, fällt samt Umbruch weg.
+    html = f'<p>A<br><a href="{ORIGINAL}">{ORIGINAL}</a><br>B</p>'
+    assert analysiere(html, ausgeschlossene_ids=[ORIGINAL_ID]).metriken.zeichen == len("A\nB")
+
+
+def test_ausgeschlossene_ids_mit_unerwarteten_werten():
+    unerwartet = [None, 5, -1, 10**5000, "abc", "-99", True, "1" * 25, 1.5]
+    m = analysiere(f'<p><a href="{ORIGINAL}">x</a></p>', ausgeschlossene_ids=unerwartet)
+    assert m.metriken.n_urls == 1
+    assert analysiere(f'<p><a href="{ORIGINAL}">x</a></p>', ausgeschlossene_ids=[int(ORIGINAL_ID)]).metriken.n_urls == 0
 
 
 def test_link_auf_eigenen_post_ist_url_link_auf_profil_ist_mention():
@@ -313,6 +457,37 @@ def test_normalisiere_fuer_hash():
 
 
 # ---------------------------------------------------------------------------
+# Kaputtes Unicode und K\u00fcrzen
+
+
+def test_einzelne_surrogate_aus_json_werfen_nicht():
+    """Ein abgeschnittenes Emoji-Escape (\\ud83d) im JSON ergibt ein einzelnes Surrogat; UTF-8 kann es nicht."""
+    html = json.loads(f'"<p>{MARKER} Text \\ud83d abgeschnitten</p>"')
+    analyse = analysiere(html)
+    assert analyse.metriken.zeichen == len(f"{MARKER} Text \ufffd abgeschnitten")
+    assert analyse.metriken.text_hash == text_hash(f"{MARKER} Text \ufffd abgeschnitten") is not None
+    assert sichtbarer_text(html) == f"{MARKER} Text \ufffd abgeschnitten"
+    assert text_hash("a\ud83d") == text_hash("a\ufffd")
+    assert normalisiere_fuer_hash("\udc00") == "\ufffd"
+
+
+def test_bereinige_unicode():
+    assert bereinige_unicode("a\ud83d") == "a\ufffd"
+    assert bereinige_unicode("\ude00x\ud83d") == "\ufffdx\ufffd"
+    assert bereinige_unicode("\ud83d\ude00") == "\U0001f600"  # getrenntes Paar wird ein Zeichen
+    assert bereinige_unicode(f"{MARKER} \U0001f600") == f"{MARKER} \U0001f600"
+
+
+def test_kuerze_zerschneidet_keine_grapheme():
+    familie = "\U0001f468\u200d\U0001f469\u200d\U0001f467"  # 5 Codepunkte, 1 Graphem
+    assert kuerze("ab" + familie, 4) == "ab"
+    assert kuerze("ab" + familie, 7) == "ab" + familie
+    assert kuerze("e\u0301e\u0301", 3) == "e\u0301"
+    assert kuerze("abc", 3) == "abc"
+    assert kuerze("", 0) == ""
+
+
+# ---------------------------------------------------------------------------
 # Datenschutz
 
 
@@ -326,6 +501,21 @@ def test_analyse_enthaelt_keinen_inhalt():
     assert MARKER not in repr(werte)
     assert MARKER.lower() not in repr(werte).lower()
     assert analyse.metriken.link_domains == ["example.com"]
+
+
+@pytest.mark.parametrize(
+    "html",
+    [
+        f"<p>http://{MARKER}</p>",
+        f"<p>http://{MARKER.lower()}/pfad und https://{MARKER}:8080</p>",
+        f'<p><a href="http://{MARKER}">{MARKER}</a></p>',
+        f'<p><a href="https://example.com/{MARKER}">x</a> https://truthsocial.com/{MARKER}</p>',
+    ],
+)
+def test_wort_ohne_punkt_hinter_http_landet_nirgends(html):
+    """Kein Leerzeichen trennt den Marker hier ab: Er darf weder als Domain noch sonst herauskommen."""
+    werte = repr(dataclasses.asdict(analysiere(html))).lower()
+    assert MARKER.lower() not in werte
 
 
 def test_parserfehler_geben_keinen_inhalt_preis(monkeypatch):

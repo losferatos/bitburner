@@ -6,6 +6,9 @@ gelangen weder in das Ergebnis noch in Fehlermeldungen.
 
 Das API-Objekt ist fremde Eingabe: Jedes Feld kann fehlen, ``null`` sein oder einen
 unerwarteten Typ haben. Nur ohne gültige ``id`` oder ``created_at`` gibt es einen ``ValueError``.
+Was herausgeht, passt zu den Positivlisten des Prüfskripts (``pruefung.py``): IDs nur aus
+Ziffern und im 64-Bit-Bereich, Post-URLs nur als ``{basis}/@name/ID``, Handles nur aus
+Buchstaben, Ziffern und ``_`` (plus ``@domain``), Anzeigenamen einzeilig, Zeitpunkte ab 1970.
 """
 
 from __future__ import annotations
@@ -13,9 +16,11 @@ from __future__ import annotations
 import hashlib
 import math
 import re
+import unicodedata
 from collections.abc import Iterable
+from datetime import UTC, datetime
 from typing import TYPE_CHECKING, Any
-from urllib.parse import urlsplit
+from urllib.parse import SplitResult, urlsplit
 
 from truthtracker import text as text_modul
 from truthtracker import zeit
@@ -51,14 +56,35 @@ from truthtracker.modelle import (
 if TYPE_CHECKING:
     from truthtracker.medien import MedienErfasser
 
-_ID = re.compile(r"^[0-9]{1,24}$")
-_MEDIEN_ID = re.compile(r"^[A-Za-z0-9_-]{1,64}$")
-_HANDLE = re.compile(r"^[A-Za-z0-9_.-]{1,64}(?:@[A-Za-z0-9.-]{1,253})?$")
-_SICHTBARKEIT = re.compile(r"^[a-z_]{1,20}$")
-_GROESSE = re.compile(r"^([0-9]{1,6})x([0-9]{1,6})$")
-_WEITERER_ZAEHLER = re.compile(r"^[a-z][a-z0-9_]{0,58}_count$")
+STANDARD_BASIS_URL = "https://truthsocial.com"
+
+_MAX_INT64 = 2**63 - 1  # SQLite INTEGER
+_MAX_REVISION = 999_999_999
+_MAX_KANTE_PX = 100_000  # wie in medien.py
+_MAX_ANZEIGENAME = 100  # Prüfskript: höchstens 100 Zeichen, eine Zeile
+_FRUEHESTE_ZEIT = datetime(1970, 1, 1, tzinfo=UTC)
+
+_ID = re.compile(r"[0-9]{1,19}")
+_REVISION = re.compile(r"[0-9]{1,9}")
+_HANDLE = re.compile(r"[A-Za-z0-9_]{1,64}(?:@[A-Za-z0-9.-]{1,253})?")
+_LOKALER_HANDLE = re.compile(r"[A-Za-z0-9_]{1,64}")
+_GROESSE = re.compile(r"([0-9]{1,6})x([0-9]{1,6})")
+_WEITERER_ZAEHLER = re.compile(r"[a-z][a-z0-9_]{0,58}_count")
+_LEERRAUM = re.compile(r"\s+")
+# Anzeigenamen, die das Prüfskript für HTML- oder Link-Reste hielte.
+_MARKUP_ODER_LINK = re.compile(
+    r"://|<\s*/?\s*[A-Za-z][^<>]*>|&(?:#[0-9]+|#x[0-9a-f]+|[a-z]+);|\b(?:class|href|src|rel|target)\s*=\s*[\"']",
+    re.IGNORECASE,
+)
+# Post-Seite (``/@name/ID``) oder ActivityPub-Adresse (``/users/name/statuses/ID``) auf Truth Social.
+_POST_PFAD = re.compile(
+    r"/@(?P<name>[A-Za-z0-9_]{1,64})/(?P<id>[0-9]{1,19})/?"
+    r"|/users/(?P<name2>[A-Za-z0-9_]{1,64})/statuses/(?P<id2>[0-9]{1,19})/?"
+)
 _STANDARD_ZAEHLER = ("replies_count", "reblogs_count", "favourites_count")
 _PLATZHALTER_ID = "-99"
+_SICHTBARKEITEN = frozenset({"public", "unlisted", "private", "direct", "limited", "self", "group"})
+_STANDARD_PORTS = {"http": 80, "https": 443}
 
 _MEDIENARTEN = {
     "image": MEDIUM_BILD,
@@ -81,45 +107,49 @@ def _liste(wert: object) -> list[Any]:
     return wert if isinstance(wert, list) else []
 
 
-def _id(wert: object) -> str | None:
-    """Numerische ID als Text; alles andere (auch der Platzhalter -99) wird ``None``."""
+def _ganze_zahl(wert: object, ziffern: re.Pattern[str]) -> int | None:
+    """Eine ``int`` (kein ``bool``) oder eine Folge von ASCII-Ziffern als Zahl."""
     if isinstance(wert, bool):
         return None
     if isinstance(wert, int):
-        return str(wert) if wert >= 0 else None
-    if isinstance(wert, str) and _ID.match(wert.strip()):
-        return wert.strip()
+        return wert
+    if isinstance(wert, str) and ziffern.fullmatch(wert.strip()):
+        return int(wert.strip())
     return None
 
 
-def _medien_id(wert: object) -> str | None:
-    if isinstance(wert, int) and not isinstance(wert, bool):
-        return str(wert)
-    if isinstance(wert, str) and _MEDIEN_ID.match(wert.strip()):
-        return wert.strip()
-    return None
+def _id(wert: object) -> str | None:
+    """Numerische ID (1 bis 2⁶³−1) als Text; alles andere (auch der Platzhalter -99) wird ``None``."""
+    zahl = _ganze_zahl(wert, _ID)
+    return str(zahl) if zahl is not None and 1 <= zahl <= _MAX_INT64 else None
+
+
+def _revision(wert: object) -> int | None:
+    """Feld ``version``: 1 = unbearbeitet, 2 = einmal bearbeitet … (live als Text ``"1"``)."""
+    zahl = _ganze_zahl(wert, _REVISION)
+    return zahl if zahl is not None and 1 <= zahl <= _MAX_REVISION else None
 
 
 def _nicht_negativ(wert: object) -> int | None:
-    if isinstance(wert, int) and not isinstance(wert, bool) and wert >= 0:
+    if isinstance(wert, int) and not isinstance(wert, bool) and 0 <= wert <= _MAX_INT64:
         return wert
     return None
 
 
-def _ganzzahl(wert: object) -> int | None:
+def _kante(wert: object) -> int | None:
     if isinstance(wert, bool):
         return None
     if isinstance(wert, float) and wert.is_integer():
         wert = int(wert)
-    return wert if isinstance(wert, int) and wert > 0 else None
+    return wert if isinstance(wert, int) and 0 < wert <= _MAX_KANTE_PX else None
 
 
 def _masse_aus_groesse(wert: object) -> tuple[int | None, int | None]:
     """``size`` im Format ``"1200x800"``: beide Werte oder keiner."""
-    treffer = _GROESSE.match(wert.strip().lower()) if isinstance(wert, str) else None
+    treffer = _GROESSE.fullmatch(wert.strip().lower()) if isinstance(wert, str) else None
     if treffer is None:
         return None, None
-    breite, hoehe = _ganzzahl(int(treffer.group(1))), _ganzzahl(int(treffer.group(2)))
+    breite, hoehe = _kante(int(treffer.group(1))), _kante(int(treffer.group(2)))
     return (breite, hoehe) if breite is not None and hoehe is not None else (None, None)
 
 
@@ -135,11 +165,47 @@ def _text(wert: object) -> str | None:
     return None
 
 
+def _zeit(wert: object) -> datetime | None:
+    """UTC-Zeitpunkt; ``None`` bei unlesbaren Werten und bei Zeitpunkten vor 1970.
+
+    ``zeit.parse_utc`` wirft bei Randdaten mit Offset (Jahr 1 oder 9999) einen ``OverflowError``;
+    Jahre unter 1000 schriebe ``strftime`` ohne führende Nullen in die Datenbank.
+    """
+    try:
+        dt = zeit.parse_utc(wert)
+    except (OverflowError, ValueError):
+        return None
+    return dt if dt is not None and dt >= _FRUEHESTE_ZEIT else None
+
+
 def _handle(konto: dict[str, Any]) -> str | None:
-    for schluessel in ("acct", "username"):
-        wert = _text(konto.get(schluessel))
-        if wert and _HANDLE.match(wert):
-            return wert
+    """``acct``; nur wenn es fehlt, ``username``. Ein ungültiges ``acct`` ergibt keinen Handle."""
+    acct = _text(konto.get("acct"))
+    if acct is None:
+        acct = _text(konto.get("username"))
+    return acct if acct is not None and _HANDLE.fullmatch(acct) else None
+
+
+def _lokaler_handle(konto: dict[str, Any]) -> str | None:
+    """Handle eines Kontos auf Truth Social selbst (ohne ``@domain``), tauglich für eine Post-URL."""
+    handle = _handle(konto)
+    return handle if handle is not None and _LOKALER_HANDLE.fullmatch(handle) else None
+
+
+def _anzeigename(wert: object) -> str | None:
+    """Eine Zeile ohne Steuerzeichen, höchstens 100 Codepunkte; ``None``, wenn er wie HTML oder ein Link aussieht."""
+    if not isinstance(wert, str):
+        return None
+    name = _LEERRAUM.sub(" ", text_modul.bereinige_unicode(wert))
+    name = "".join(z for z in name if unicodedata.category(z) != "Cc").strip()
+    if not name or _MARKUP_ODER_LINK.search(name):
+        return None
+    return text_modul.kuerze(name, _MAX_ANZEIGENAME).strip() or None
+
+
+def _sichtbarkeit(wert: object) -> str | None:
+    if isinstance(wert, str) and wert.strip().lower() in _SICHTBARKEITEN:
+        return wert.strip().lower()
     return None
 
 
@@ -180,7 +246,7 @@ def zaehler_aus(status: object) -> Zaehler:
         for schluessel, wert in s.items()
         if isinstance(schluessel, str)
         and schluessel not in _STANDARD_ZAEHLER
-        and _WEITERER_ZAEHLER.match(schluessel)
+        and _WEITERER_ZAEHLER.fullmatch(schluessel)
         and _nicht_negativ(wert) is not None
     }
     return Zaehler(
@@ -217,12 +283,12 @@ def beschreibe_anhang(anhang: object, position: int) -> MedienDaten:
     else:
         # Von Videos, GIFs und Unbekanntem wird nur das Vorschaubild geladen, nie die Datei selbst.
         hashbar = hat_vorschau
-    breite, hoehe = _ganzzahl(original.get("width")), _ganzzahl(original.get("height"))
+    breite, hoehe = _kante(original.get("width")), _kante(original.get("height"))
     if breite is None or hoehe is None:
         breite, hoehe = _masse_aus_groesse(original.get("size"))
     return MedienDaten(
         position=position,
-        medien_id=_medien_id(a.get("id")),
+        medien_id=_id(a.get("id")),
         art=art,
         breite=breite,
         hoehe=hoehe,
@@ -266,12 +332,11 @@ def fingerabdruck(
 def _quellkonto(konto: dict[str, Any], rolle: str, trump_id: str) -> QuellKonto:
     konto_id = _id(konto.get("id"))
     verifiziert = konto.get("verified")
-    anzeigename = konto.get("display_name")
     return QuellKonto(
         rolle=rolle,
         konto_id=konto_id,
         handle=_handle(konto),
-        anzeigename=anzeigename.strip() if isinstance(anzeigename, str) else None,
+        anzeigename=_anzeigename(konto.get("display_name")),
         verifiziert=verifiziert if isinstance(verifiziert, bool) else None,
         follower=_nicht_negativ(konto.get("followers_count")),
         ist_trump=konto_id is not None and konto_id == trump_id,
@@ -311,50 +376,88 @@ def _quellen(
 
 
 # ---------------------------------------------------------------------------
-# Extraktion
+# Post-URL
 
 
-def _eigene_url(wert: object, eigene_hosts: tuple[str, ...]) -> str | None:
-    """http(s)-URL auf Truth Social selbst. Fremde Post-URLs (föderierte Originale) können
-    Titel im Pfad tragen und gelten der Inhaltsprüfung als Inhaltsrest; sie werden ersetzt."""
+def _host_schluessel(teile: SplitResult) -> str | None:
+    """Host klein und ohne ``www.``, mit Port nur, wenn er vom Standard des Schemas abweicht."""
+    try:
+        host, port = teile.hostname, teile.port
+    except ValueError:
+        return None
+    if not host:
+        return None
+    host = host.rstrip(".").lower().removeprefix("www.")
+    return host if port is None or port == _STANDARD_PORTS.get(teile.scheme.lower()) else f"{host}:{port}"
+
+
+def _basen(basis_url: str) -> dict[str, str]:
+    """Host-Schlüssel → Präfix der Post-URLs: truthsocial.com und die konfigurierte Basis."""
+    basen = {"truthsocial.com": STANDARD_BASIS_URL}
+    try:
+        schluessel = _host_schluessel(urlsplit(basis_url))
+    except ValueError:
+        schluessel = None
+    if schluessel is not None:
+        basen[schluessel] = basis_url
+    return basen
+
+
+def _url_aus_feld(wert: object, objekt_id: str, basen: dict[str, str]) -> str | None:
+    """``{basis}/@name/ID`` aus der Post- oder ActivityPub-Adresse des Objekts auf einem eigenen Host."""
     url = _http_url(wert)
     if url is None:
         return None
     try:
-        host = (urlsplit(url).hostname or "").rstrip(".").lower().removeprefix("www.")
+        teile = urlsplit(url)
     except ValueError:
         return None
-    return url if any(host == e or host.endswith("." + e) for e in eigene_hosts) else None
+    basis = basen.get(_host_schluessel(teile) or "")
+    treffer = _POST_PFAD.fullmatch(teile.path) if basis is not None else None
+    if treffer is None or _id(treffer.group("id") or treffer.group("id2")) != objekt_id:
+        return None
+    return f"{basis}/@{treffer.group('name') or treffer.group('name2')}/{objekt_id}"
 
 
-def _post_url(
-    objekt: dict[str, Any], objekt_id: str | None, basis_url: str, eigene_hosts: tuple[str, ...]
-) -> str | None:
-    url = _eigene_url(objekt.get("url"), eigene_hosts)
-    if url is not None:
-        return url
-    handle = _handle(_dict(objekt.get("account")))
-    if handle is not None and objekt_id is not None:
-        return f"{basis_url}/@{handle}/{objekt_id}"
-    return _eigene_url(objekt.get("uri"), eigene_hosts)
+def _post_url(objekte: list[tuple[dict[str, Any], str | None]], basis_url: str) -> str:
+    """Link zum Post in der Form ``{basis}/@name/ID``, die das Prüfskript als Post-URL kennt.
+
+    Der Reihe nach je Objekt: ``url``, ``uri``, dann lokaler Handle plus ID. Für Retruths kommt
+    zuerst das Original, dann der Retruth selbst: ``/@realDonaldTrump/<Retruth-ID>`` leitet auf
+    das Original weiter und hilft bei föderierten Originalen, deren Adresse fremd ist. Gibt es
+    nichts Brauchbares, bleibt die URL leer statt einer Adresse, die es nicht gibt.
+    """
+    basen = _basen(basis_url)
+    for objekt, objekt_id in objekte:
+        if objekt_id is None:
+            continue
+        for feld in ("url", "uri"):
+            url = _url_aus_feld(objekt.get(feld), objekt_id, basen)
+            if url is not None:
+                return url
+        handle = _lokaler_handle(_dict(objekt.get("account")))
+        if handle is not None:
+            return f"{basis_url}/@{handle}/{objekt_id}"
+    return ""
 
 
-def _quote_links(quelle: dict[str, Any], quote_id: str | None, basis_url: str) -> list[str]:
-    """Alle Schreibweisen der URL des zitierten Originals, damit sie nicht als Link zählen."""
+# ---------------------------------------------------------------------------
+# Extraktion
+
+
+def _quote_links(quelle: dict[str, Any]) -> list[str]:
+    """Adressen des eingebetteten Originals, auch auf fremden Hosts (Post-Links auf Truth Social
+    selbst erkennt ``text.analysiere`` über die Status-ID)."""
     zitat = _dict(quelle.get("quote"))
-    links = [u for u in (_http_url(zitat.get("url")), _http_url(zitat.get("uri"))) if u]
-    handle = _handle(_dict(zitat.get("account")))
-    if quote_id is not None and handle is not None:
-        links.append(f"{basis_url}/@{handle}/{quote_id}")
-        links.append(f"{basis_url}/users/{handle}/statuses/{quote_id}")
-    return links
+    return [u for u in (_http_url(zitat.get("url")), _http_url(zitat.get("uri"))) if u]
 
 
 def _gepinnt(status: dict[str, Any], post_id: str, gepinnte_ids: Iterable[object] | None) -> bool | None:
+    """Mit Liste: steht drin oder nicht. Ohne Liste nur ``pinned: true`` → ``True``, sonst unbekannt,
+    weil ``pinned`` ausgeloggt immer ``false`` ist."""
     if gepinnte_ids is not None:
-        return post_id in {str(i) for i in gepinnte_ids}
-    pinned = status.get("pinned")
-    return pinned if isinstance(pinned, bool) else None
+        return post_id in {_id(i) for i in gepinnte_ids}
+    return True if status.get("pinned") is True else None
 
 
 def extrahiere(
@@ -363,7 +466,7 @@ def extrahiere(
     trump_id: str,
     medien: MedienErfasser | None = None,
     gepinnte_ids: set[str] | None = None,
-    basis_url: str = "https://truthsocial.com",
+    basis_url: str = STANDARD_BASIS_URL,
 ) -> PostDaten:
     """Metadaten eines Status. Ohne ``medien`` werden Anhänge nur beschrieben, nicht gehasht."""
     if not isinstance(status, dict):
@@ -371,7 +474,7 @@ def extrahiere(
     post_id = _id(status.get("id"))
     if post_id is None:
         raise ValueError("Status ohne gültige ID.")
-    created_at = zeit.parse_utc(status.get("created_at"))
+    created_at = _zeit(status.get("created_at"))
     if created_at is None:
         raise ValueError(f"Status {post_id} ohne gültiges created_at.")
     trump_id = str(trump_id)
@@ -400,7 +503,7 @@ def extrahiere(
         )
         reply_art = REPLY_THREAD if ziel_konto is not None and ziel_konto == autor_id else REPLY_FREMD
 
-    original_created_at = zeit.parse_utc(reblog.get("created_at")) if reblog is not None else None
+    original_created_at = _zeit(reblog.get("created_at")) if reblog is not None else None
     latenz = round((created_at - original_created_at).total_seconds()) if original_created_at is not None else None
 
     try:
@@ -414,7 +517,8 @@ def extrahiere(
         quelle.get("content"),
         mentions=quelle.get("mentions"),
         tags=quelle.get("tags"),
-        ausgeschlossene_links=_quote_links(quelle, quote_id, basis_url),
+        ausgeschlossene_links=_quote_links(quelle),
+        ausgeschlossene_ids=[quote_id] if quote_id is not None else [],
         eigene_hosts=eigene_hosts,
     )
 
@@ -427,13 +531,10 @@ def extrahiere(
     karte = quelle.get("card")
     hat_karte = isinstance(karte, dict) and bool(karte)
 
-    url = _post_url(quelle, quelle_id if reblog is not None else post_id, basis_url, eigene_hosts)
-    if url is None and reblog is not None:
-        url = _post_url(status, post_id, basis_url, eigene_hosts)
-    sichtbarkeit = status.get("visibility")
+    url_objekte = [(reblog, quelle_id), (status, post_id)] if reblog is not None else [(status, post_id)]
     return PostDaten(
         id=post_id,
-        url=url or f"{basis_url}/statuses/{post_id}",
+        url=_post_url(url_objekte, basis_url),
         created_at=created_at,
         typ=typ,
         ist_quote=ist_quote,
@@ -461,8 +562,9 @@ def extrahiere(
         medien_hash=m_hash,
         medien_vollstaendig=vollstaendig,
         fingerabdruck=fingerabdruck(analyse.metriken.text_hash, m_hash, quote_id, medien_vollstaendig=vollstaendig),
-        edited_at=zeit.parse_utc(status.get("edited_at")),
-        sichtbarkeit=sichtbarkeit if isinstance(sichtbarkeit, str) and _SICHTBARKEIT.match(sichtbarkeit) else None,
+        edited_at=_zeit(status.get("edited_at")),
+        revision=_revision(status.get("version")),
+        sichtbarkeit=_sichtbarkeit(status.get("visibility")),
         zaehler=zaehler_aus(status),
         zaehler_original=zaehler_aus(reblog) if reblog is not None else None,
         medien=medien_daten,

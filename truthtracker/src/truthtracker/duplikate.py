@@ -9,8 +9,14 @@ gepostet. Paar-Kategorien, stärkste zuerst (siehe docs/architektur.md):
 1. ``gleiches_original``: gleiche Inhalts-ID (Original-ID bei Retruths, sonst die eigene ID).
    Dazu gehört der Selbst-Retruth eines eigenen Posts aus dem Fenster.
 2. ``exakt``: gleicher Fingerabdruck (Text, Medien und Quote-Ziel gleich).
-3a. ``nur_text``: gleicher, nicht leerer Text; Medien oder Quote-Ziel verschieden.
-3b. ``nur_medien``: gleiche Medien; Text (auch leer gegen nicht leer) oder Quote-Ziel verschieden.
+3a. ``nur_text``: gleicher, nicht leerer Text, Medien verschieden. Sind die Medien desselben
+   Paars wahrscheinlich gleich (Bedingung von Kategorie 4), stehen ``medien_aehnlich`` und der
+   pHash-Abstand in den Details: Gleicher Text mit neu hochgeladenem Bild ist so von "gleicher
+   Text, anderes Bild" zu unterscheiden. Sind Text und Medien gleich und nur das Quote-Ziel
+   anders, gibt es für das Paar nur diese Zeile, mit ``quote_verschieden`` (und
+   ``medien_gleich``, wenn es Medien gibt).
+3b. ``nur_medien``: gleiche Medien, Text verschieden (auch leer gegen nicht leer); bei
+   beiderseits leerem Text auch gleiche Medien mit anderem Quote-Ziel (``quote_verschieden``).
 4. ``medien_aehnlich``: gleich viele Medien (mindestens eins), nicht exakt gleich, aber eine
    1:1-Zuordnung, in der jedes Paar dieselbe Art, einen kleinen pHash-Abstand und passende
    Dauer bzw. passendes Seitenverhältnis hat.
@@ -21,9 +27,18 @@ sind kein zusätzliches "exaktes" Duplikat. Fehlen bei P Medien-Hashes, entfalle
 das Quote-Ziel verschieden ist. Je Kategorie wird der zeitlich nächste frühere Post
 gespeichert, die stärkste gefundene Kategorie bekommt ``primaer = 1``.
 
+Ein Anhang ohne Hash und ohne Medien-ID hat keinen eindeutigen Vergleichsschlüssel
+(``art:ohne-hash:None`` wäre für alle solchen Anhänge gleich). Ein Post mit so einem Anhang
+gilt hier als unvollständig gehasht, damit nicht zwei beliebige Anhänge als gleich zählen.
+
 ``dup_abdeckung_vollstaendig`` ist 1, wenn das Fenster vor P lückenlos abgerufen wurde und P
-sowie alle Posts im Fenster vollständige Medien-Hashes haben; nur dann ist die Aussage "kein
-Duplikat" belastbar.
+vollständige Medien-Hashes hat. Fehlende Hashes früherer Posts im Fenster zählen bewusst
+nicht: Ein einziger dauerhaft gescheiterter Download nähme sonst alle Posts der folgenden
+Tage aus dem Nenner der Duplikat-Rate.
+
+Posts mit unlesbarer Erstellzeit (nicht in der Form ``YYYY-MM-DDTHH:MM:SSZ`` oder vor 1970)
+werden nicht verglichen, aber als geprüft markiert (Flag 0) und nur mit ihrer ID gemeldet.
+Sonst blieben sie bei jedem Lauf Auslöser und brächten die Prüfung jedes Mal zum Absturz.
 
 Laufzeit: Die Posts werden einmal nach Zeit sortiert durchlaufen. Kandidaten kommen aus
 Hash-Indizes und werden nur innerhalb des Fensters rückwärts durchsucht. Für Kategorie 4
@@ -54,6 +69,7 @@ from truthtracker.modelle import (
     DUP_NUR_MEDIEN,
     DUP_NUR_TEXT,
     HASH_OK,
+    HASH_UEBERSPRUNGEN,
     MEDIUM_GIF,
     MEDIUM_VIDEO,
 )
@@ -65,6 +81,10 @@ PHASH_BITS = 64
 _EPS = 1e-9
 # SQLite erlaubt nur begrenzt viele Parameter pro Anweisung.
 _IN_STUECK = 500
+_EPOCHE = datetime(1970, 1, 1, tzinfo=UTC)
+_LETZTE_SEKUNDE = (datetime(9999, 12, 31, 23, 59, 59, tzinfo=UTC) - _EPOCHE) // timedelta(seconds=1)
+# Medium ohne Hash und ohne Medien-ID: kein eindeutiger Vergleichsschlüssel (siehe Modulbeschreibung).
+_OHNE_SCHLUESSEL = "m.hash_status = ? AND (m.medien_id IS NULL OR m.medien_id = '')"
 
 
 @dataclass
@@ -125,36 +145,34 @@ def aktualisiere_duplikate(
     ``betroffene_ids=None`` bewertet alle Posts. Sonst werden die betroffenen Posts Q selbst
     neu bewertet und alle Posts P, in deren Fenster Q liegt (Q früher als P,
     ``P.t ≤ Q.t + Fenster``), weil sich deren Vergleichsmenge geändert hat. Posts, die noch
-    nie bewertet wurden (etwa nach einem Absturz vor der Duplikat-Prüfung), gelten immer als
-    betroffen. Bei bereits bewerteten Posts ohne vollständige Abdeckung wird nur das
-    Abdeckungs-Flag nachgezogen, falls die Lücke inzwischen geschlossen ist.
+    nie bewertet wurden (``dup_geprueft_utc`` leer, etwa nach einem Absturz vor der
+    Duplikat-Prüfung), gelten immer als betroffen. Bei bereits bewerteten Posts ohne
+    vollständige Abdeckung wird nur das Abdeckungs-Flag nachgezogen, falls die Lücke
+    inzwischen geschlossen ist.
     """
     fenster_tage = konfig.erfassung.duplikat_fenster_tage
     fenster_s = fenster_tage * 86400.0
 
+    posts: list[_Post] = []
+    zu_pruefen: set[int] = set()
     if betroffene_ids is None:
-        posts = _lade_posts(con, None, None)
+        posts, unlesbar = _lade_posts(con, None, None)
         zu_pruefen = set(range(len(posts)))
     else:
-        ausloeser = _ausloeser(con, betroffene_ids)
+        ausloeser, unlesbar = _ausloeser(con, betroffene_ids)
         if ausloeser:
             zeiten = [t for t, _ in ausloeser.values()]
             von = _utc_text(math.floor(min(zeiten) - fenster_s))
             bis = _utc_text(math.ceil(max(zeiten) + fenster_s))
-            posts = _lade_posts(con, von, bis)
+            posts, unlesbar_im_zeitraum = _lade_posts(con, von, bis)
+            unlesbar |= unlesbar_im_zeitraum
             zu_pruefen = _im_einflussbereich(posts, ausloeser, fenster_s)
-        else:
-            posts, zu_pruefen = [], set()
+    for post_id in sorted(unlesbar):
+        log.warning("Post %s: Erstellzeit nicht lesbar, Duplikat-Prüfung übersprungen", post_id)
 
     ergebnis = _Vergleich(posts, fenster_s, konfig.duplikate).bewerte(zu_pruefen)
 
     bereiche = db.abdeckung_lesen(con)
-    zeitpunkte = [p.t for p in posts]
-    # unvollstaendig_vor[i] = Zahl der Posts mit Index < i, deren Medien-Hashes fehlen
-    unvollstaendig_vor = [0]
-    for p in posts:
-        unvollstaendig_vor.append(unvollstaendig_vor[-1] + (0 if p.medien_vollstaendig else 1))
-
     jetzt_text = zeit.utc_text(jetzt)
     je_art = {art: 0 for art in DUP_ARTEN}
     dup_zeilen: list[tuple[str, str, str, int, int, str]] = []
@@ -169,15 +187,11 @@ def aktualisiere_duplikate(
             je_art[tr.art] += 1
         if treffer:
             mit_duplikat += 1
-        fensteranfang = bisect.bisect_left(zeitpunkte, math.ceil(p.t - fenster_s))
-        vollstaendig = (
-            p.medien_vollstaendig
-            and unvollstaendig_vor[i] == unvollstaendig_vor[fensteranfang]
-            and _abgedeckt(bereiche, p.t, fenster_tage)
-        )
+        vollstaendig = p.medien_vollstaendig and _abgedeckt(bereiche, p.t, fenster_tage)
         post_zeilen.append((jetzt_text, int(vollstaendig), p.id))
+    post_zeilen += [(jetzt_text, 0, post_id) for post_id in sorted(unlesbar)]
 
-    nachgetragen = _abdeckung_nachtragen(con, bereiche, fenster_tage, {posts[i].id for i in ergebnis})
+    nachgetragen = _abdeckung_nachtragen(con, bereiche, fenster_tage, {z[2] for z in post_zeilen})
 
     with con:
         con.executemany("DELETE FROM duplikate WHERE post_id = ?", [(z[2],) for z in post_zeilen])
@@ -193,9 +207,9 @@ def aktualisiere_duplikate(
 
     log.info(
         "Duplikat-Prüfung: %d Posts geprüft, %d mit Duplikat, Abdeckung bei %d Posts nachgetragen",
-        len(post_zeilen), mit_duplikat, len(nachgetragen),
+        len(ergebnis), mit_duplikat, len(nachgetragen),
     )
-    return DupBericht(geprueft=len(post_zeilen), mit_duplikat=mit_duplikat, je_art=je_art)
+    return DupBericht(geprueft=len(ergebnis), mit_duplikat=mit_duplikat, je_art=je_art)
 
 
 def duplikat_uebersicht(con: sqlite3.Connection) -> list[dict[str, Any]]:
@@ -241,15 +255,29 @@ _POST_SPALTEN = """id, id_num, created_at_utc, original_id, text_hash, medien_ha
     fingerabdruck, quote_id, n_bilder + n_videos + n_gifs + n_audio + n_sonstige_medien AS n_medien"""
 
 
-def _sekunden(utc_text: str) -> int:
-    dt = zeit.parse_utc(utc_text)
-    if dt is None:
-        raise ValueError("created_at_utc ist kein gültiger Zeitpunkt")
-    return int(dt.timestamp())
+def _sekunden(utc_text: object) -> int | None:
+    """Sekunden seit 1970; ``None``, wenn der Text kein kanonischer UTC-Zeitpunkt ab 1970 ist.
+
+    Nur die kanonische Form sortiert als Text wie die Zeit selbst; darauf beruhen die
+    Zeitfilter und die Sortierung in SQL.
+    """
+    try:
+        dt = zeit.parse_utc(utc_text)
+    except (OverflowError, ValueError):
+        return None
+    if dt is None or dt < _EPOCHE or zeit.utc_text(dt) != utc_text:
+        return None
+    return (dt - _EPOCHE) // timedelta(seconds=1)
+
+
+def _zeitpunkt(sekunden: int) -> datetime:
+    """Über ``timedelta`` statt ``datetime.fromtimestamp``: Das wirft unter Windows bei negativen Werten."""
+    return _EPOCHE + timedelta(seconds=min(max(sekunden, 0), _LETZTE_SEKUNDE))
 
 
 def _utc_text(sekunden: int) -> str:
-    return cast(str, zeit.utc_text(datetime.fromtimestamp(sekunden, UTC)))
+    """UTC-Text für Zeitfilter, begrenzt auf 1970 bis Ende 9999 (früher liegt kein lesbarer Post)."""
+    return cast(str, zeit.utc_text(_zeitpunkt(sekunden)))
 
 
 def _zeitfilter(spalte: str, von: str | None, bis: str | None) -> tuple[str, list[str]]:
@@ -272,14 +300,25 @@ def _phash_int(wert: object) -> int | None:
         return None
 
 
-def _lade_posts(con: sqlite3.Connection, von: str | None, bis: str | None) -> list[_Post]:
-    """Posts im Zeitraum (Grenzen als UTC-Text, inklusive), sortiert nach Zeit und ID."""
+def _lade_posts(con: sqlite3.Connection, von: str | None, bis: str | None) -> tuple[list[_Post], set[str]]:
+    """Posts im Zeitraum (Grenzen als UTC-Text, inklusive), sortiert nach Zeit und ID.
+
+    Dazu die IDs der Posts im Zeitraum, deren Erstellzeit nicht lesbar ist.
+    """
     filter_posts, parameter = _zeitfilter("created_at_utc", von, bis)
-    posts = [
-        _Post(
+    posts: list[_Post] = []
+    unlesbar: set[str] = set()
+    for z in con.execute(
+        f"SELECT {_POST_SPALTEN} FROM posts {filter_posts} ORDER BY created_at_utc, id_num", parameter
+    ):
+        t = _sekunden(z["created_at_utc"])
+        if t is None:
+            unlesbar.add(z["id"])
+            continue
+        posts.append(_Post(
             id=z["id"],
             id_num=int(z["id_num"]),
-            t=_sekunden(z["created_at_utc"]),
+            t=t,
             inhalts_id=z["original_id"] or z["id"],
             text_hash=z["text_hash"],
             medien_hash=z["medien_hash"],
@@ -287,15 +326,11 @@ def _lade_posts(con: sqlite3.Connection, von: str | None, bis: str | None) -> li
             fingerabdruck=z["fingerabdruck"],
             quote_id=z["quote_id"],
             n_medien=int(z["n_medien"]),
-        )
-        for z in con.execute(
-            f"SELECT {_POST_SPALTEN} FROM posts {filter_posts} ORDER BY created_at_utc, id_num", parameter
-        )
-    ]
+        ))
     filter_medien, parameter = _zeitfilter("p.created_at_utc", von, bis)
     medien_je_post: dict[str, list[sqlite3.Row]] = defaultdict(list)
     for z in con.execute(
-        f"""SELECT m.post_id, m.art, m.phash, m.breite, m.hoehe, m.dauer_s, m.hash_status
+        f"""SELECT m.post_id, m.medien_id, m.art, m.phash, m.breite, m.hoehe, m.dauer_s, m.hash_status
             FROM medien m JOIN posts p ON p.id = m.post_id {filter_medien}
             ORDER BY m.post_id, m.position""",
         parameter,
@@ -303,6 +338,10 @@ def _lade_posts(con: sqlite3.Connection, von: str | None, bis: str | None) -> li
         medien_je_post[z["post_id"]].append(z)
     for p in posts:
         zeilen = medien_je_post.get(p.id)
+        if zeilen and any(z["hash_status"] == HASH_UEBERSPRUNGEN and not z["medien_id"] for z in zeilen):
+            p.medien_hash = p.fingerabdruck = None
+            p.medien_vollstaendig = False
+            continue
         if not zeilen or not p.medien_vollstaendig or len(zeilen) != p.n_medien:
             continue
         medien = []
@@ -314,11 +353,16 @@ def _lade_posts(con: sqlite3.Connection, von: str | None, bis: str | None) -> li
         else:
             p.medien = medien
             p.signatur = tuple(sorted(m.art for m in medien))
-    return posts
+    return posts, unlesbar
 
 
-def _ausloeser(con: sqlite3.Connection, betroffene_ids: Iterable[str]) -> dict[str, tuple[int, int]]:
-    """Betroffene und noch nie bewertete Posts: ID → (Zeit in Sekunden, numerische ID)."""
+def _ausloeser(
+    con: sqlite3.Connection, betroffene_ids: Iterable[str]
+) -> tuple[dict[str, tuple[int, int]], set[str]]:
+    """Betroffene und noch nie bewertete Posts: ID → (Zeit in Sekunden, numerische ID).
+
+    Dazu die IDs dieser Posts, deren Erstellzeit nicht lesbar ist.
+    """
     ids = sorted({str(i) for i in betroffene_ids})
     zeilen: list[sqlite3.Row] = []
     for start in range(0, len(ids), _IN_STUECK):
@@ -327,7 +371,15 @@ def _ausloeser(con: sqlite3.Connection, betroffene_ids: Iterable[str]) -> dict[s
             f"SELECT id, id_num, created_at_utc FROM posts WHERE id IN ({', '.join('?' * len(stueck))})", stueck
         ).fetchall()
     zeilen += con.execute("SELECT id, id_num, created_at_utc FROM posts WHERE dup_geprueft_utc IS NULL").fetchall()
-    return {z["id"]: (_sekunden(z["created_at_utc"]), int(z["id_num"])) for z in zeilen}
+    ausloeser: dict[str, tuple[int, int]] = {}
+    unlesbar: set[str] = set()
+    for z in zeilen:
+        t = _sekunden(z["created_at_utc"])
+        if t is None:
+            unlesbar.add(z["id"])
+        else:
+            ausloeser[z["id"]] = (t, int(z["id_num"]))
+    return ausloeser, unlesbar
 
 
 def _im_einflussbereich(posts: list[_Post], ausloeser: dict[str, tuple[int, int]], fenster_s: float) -> set[int]:
@@ -351,7 +403,7 @@ def _im_einflussbereich(posts: list[_Post], ausloeser: dict[str, tuple[int, int]
 
 def _abgedeckt(bereiche: list[db.Bereich], t: int, fenster_tage: float) -> bool:
     """Wie ``db.abdeckung_vollstaendig(con, P.t − Fenster, P.t)``, aber mit einmal gelesenen Bereichen."""
-    bis = datetime.fromtimestamp(t, UTC)
+    bis = _zeitpunkt(t)
     von = bis - timedelta(days=fenster_tage)
     unten, oben = zeit.id_untergrenze(von), zeit.id_obergrenze(bis)
     return any((0 if b.anfang_erreicht else b.von) <= unten and b.bis >= oben for b in bereiche)
@@ -360,7 +412,7 @@ def _abgedeckt(bereiche: list[db.Bereich], t: int, fenster_tage: float) -> bool:
 def _abdeckung_nachtragen(
     con: sqlite3.Connection, bereiche: list[db.Bereich], fenster_tage: float, ausgenommen: set[str]
 ) -> list[str]:
-    """Bewertete Posts mit Flag 0, deren Fenster inzwischen lückenlos und vollständig gehasht ist.
+    """Bewertete, vollständig gehashte Posts mit Flag 0, deren Fenster inzwischen lückenlos abgerufen ist.
 
     Hat ein Lauf eine Lücke ohne neue Posts geschlossen, ändern sich keine Duplikate, nur
     die Aussage, ob das Fenster vollständig war. Das Flag kann deshalb ohne Neubewertung
@@ -368,26 +420,17 @@ def _abdeckung_nachtragen(
     """
     if not bereiche:
         return []
-    fenster_s = fenster_tage * 86400.0
     ergebnis = []
     for z in con.execute(
-        """SELECT id, id_num, created_at_utc FROM posts
-           WHERE dup_abdeckung_vollstaendig = 0 AND dup_geprueft_utc IS NOT NULL AND medien_vollstaendig = 1"""
+        f"""SELECT id, created_at_utc FROM posts
+            WHERE dup_abdeckung_vollstaendig = 0 AND dup_geprueft_utc IS NOT NULL AND medien_vollstaendig = 1
+              AND NOT EXISTS (SELECT 1 FROM medien m WHERE m.post_id = posts.id AND {_OHNE_SCHLUESSEL})""",
+        (HASH_UEBERSPRUNGEN,),
     ).fetchall():
         if z["id"] in ausgenommen:
             continue
         t = _sekunden(z["created_at_utc"])
-        if not _abgedeckt(bereiche, t, fenster_tage):
-            continue
-        p_zeit = z["created_at_utc"]
-        luecke = con.execute(
-            """SELECT 1 FROM posts
-               WHERE medien_vollstaendig = 0 AND created_at_utc >= ?
-                 AND (created_at_utc < ? OR (created_at_utc = ? AND id_num < ?))
-               LIMIT 1""",
-            (_utc_text(math.ceil(t - fenster_s)), p_zeit, p_zeit, z["id_num"]),
-        ).fetchone()
-        if luecke is None:
+        if t is not None and _abgedeckt(bereiche, t, fenster_tage):
             ergebnis.append(z["id"])
     return ergebnis
 
@@ -480,9 +523,11 @@ def _nur_text(p: _Post, q: _Post) -> dict[str, Any] | None:
         medien_verschieden = None  # Hashes fehlen, gleiche Zahl: ob die Medien gleich sind, ist offen
     if medien_verschieden:
         return {}
-    if p.quote_id != q.quote_id:
-        return {"quote_verschieden": True}
-    return None
+    if p.quote_id == q.quote_id:
+        return None
+    if medien_verschieden is False and p.medien_hash is not None:
+        return {"quote_verschieden": True, "medien_gleich": True}
+    return {"quote_verschieden": True}
 
 
 def _nur_medien(p: _Post, q: _Post) -> dict[str, Any] | None:
@@ -490,7 +535,8 @@ def _nur_medien(p: _Post, q: _Post) -> dict[str, Any] | None:
         return None
     if p.text_hash != q.text_hash:
         return {}
-    if p.quote_id != q.quote_id:
+    # Gleicher nicht leerer Text mit gleichen Medien gehört zu nur_text ("medien_gleich").
+    if p.text_hash is None and p.quote_id != q.quote_id:
         return {"quote_verschieden": True}
     return None
 
@@ -558,12 +604,23 @@ class _Vergleich:
         if p.medien_vollstaendig and p.fingerabdruck:
             funde.append((DUP_EXAKT, self._naechster(self.nach_fingerabdruck.get(p.fingerabdruck), p, _exakt)))
         if p.text_hash:
-            funde.append((DUP_NUR_TEXT, self._naechster(self.nach_text.get(p.text_hash), p, _nur_text)))
+            fund = self._naechster(self.nach_text.get(p.text_hash), p, _nur_text)
+            funde.append((DUP_NUR_TEXT, self._mit_aehnlichkeit(p, fund) if fund else None))
         if p.medien_vollstaendig and p.medien_hash:
             funde.append((DUP_NUR_MEDIEN, self._naechster(self.nach_medien.get(p.medien_hash), p, _nur_medien)))
         if p.medien_vollstaendig and p.signatur and p.medien:
             funde.append((DUP_MEDIEN_AEHNLICH, self._aehnlichste(p, p.medien, p.signatur)))
         return [_Treffer(art, *fund) for art, fund in funde if fund is not None]
+
+    def _mit_aehnlichkeit(self, p: _Post, fund: _Fund) -> _Fund:
+        """Text-Treffer: Sind die Medien desselben Paars wahrscheinlich gleich (Fall 4), steht das in den Details."""
+        q, details = fund
+        if p.medien is None or q.medien is None or p.medien_hash == q.medien_hash:
+            return fund
+        abstand = _medien_zuordnung(p.medien, q.medien, self.dk)
+        if abstand is None:
+            return fund
+        return q, {**details, "medien_aehnlich": True, "phash_abstand_max": abstand}
 
     def _aehnlichste(self, p: _Post, medien: list[_Medium], signatur: tuple[str, ...]) -> _Fund | None:
         erstes = medien[0]

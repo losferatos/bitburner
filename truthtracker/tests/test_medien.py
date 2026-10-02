@@ -9,10 +9,11 @@ import dataclasses
 import io
 import logging
 import tempfile
+import tracemalloc
 
 import numpy as np
 import pytest
-from PIL import Image, PngImagePlugin
+from PIL import Image, ImageOps, PngImagePlugin
 
 from conftest import finde_marker
 from fabrik import BASIS, JETZT, MARKER, bild_png, medium
@@ -137,10 +138,50 @@ def _texte(daten: MedienDaten) -> list[str]:
     return [str(wert) for wert in dataclasses.asdict(daten).values()] + [repr(daten)]
 
 
-def _video(dauer: float = 12.5) -> dict:
-    anhang = medium("video", breite=1280, hoehe=720, dauer=dauer)
-    anhang["url"] = f"{BASIS}/media/original/clip-{anhang['id']}.mp4"
+_VIDEOARTEN = ["video", "tv", "gifv", "unknown"]
+_DATEI_FELDER = ("url", "remote_url", "text_url")
+
+
+def _video(dauer: float = 12.5, api_typ: str = "video", endung: str = "") -> dict:
+    """Video-Anhang. Die Videoadresse hat standardmäßig keine Endung, damit nicht schon die
+    Endungsprüfung das Laden der Videodatei verhindert."""
+    anhang = medium(api_typ, breite=1280, hoehe=720, dauer=dauer)
+    anhang["url"] = f"{BASIS}/media/original/video/{anhang['id']}{endung}"
     return anhang
+
+
+def _laden_ohne_datei(anhang: dict, antworten: dict[str, bytes | BaseException] | None = None) -> Laden:
+    """Wie ``Laden``, aber jeder Abruf einer Adresse der Mediendatei selbst lässt den Test scheitern."""
+    verboten = {
+        anhang[feld]: AssertionError("Mediendatei statt Vorschaubild geladen")
+        for feld in _DATEI_FELDER
+        if isinstance(anhang.get(feld), str)
+    }
+    return Laden({**(antworten or {}), **verboten})
+
+
+def _testbild(art: str, groesse: tuple[int, int] = (37, 23)) -> bytes:
+    """Bilder für die Umrechnungspfade in Graustufen: Transparenz in allen Varianten und 16 Bit."""
+    breite, hoehe = groesse
+    rng = np.random.default_rng(11)
+    farbe = Image.fromarray(rng.integers(0, 256, (hoehe, breite, 3), dtype=np.uint8))
+    alpha = Image.fromarray(rng.integers(0, 256, (hoehe, breite), dtype=np.uint8))
+    if art == "rgba":
+        farbe.putalpha(alpha)
+        return _kodiere(farbe, "PNG")
+    if art == "la":
+        grau = farbe.convert("L")
+        grau.putalpha(alpha)
+        return _kodiere(grau, "PNG")
+    if art == "p-transparenz":
+        return _kodiere(farbe.quantize(32), "PNG", transparency=3)
+    if art == "gif-transparenz":
+        return _kodiere(farbe.quantize(32), "GIF", transparency=3)
+    if art == "l-transparenz":
+        return _kodiere(farbe.convert("L"), "PNG", transparency=int(np.asarray(farbe.convert("L"))[0, 0]))
+    if art == "16-bit":
+        return _kodiere(Image.fromarray(rng.integers(0, 65536, (hoehe, breite), dtype=np.uint16)), "PNG")
+    raise ValueError(art)
 
 
 # ---------------------------------------------------------------------------
@@ -246,6 +287,70 @@ def test_phash_graustufen():
     assert phash_hex(sechzehn_bit) == phash_hex(_kodiere(grau, "PNG"))
 
 
+def test_16_bit_wird_gerundet_nicht_abgeschnitten():
+    werte = np.arange(65536, dtype=np.uint16).reshape(256, 256)
+    grau = np.asarray(medien._graustufen(Image.fromarray(werte)))
+    assert np.array_equal(grau, np.round(werte / 257).astype(np.uint8))
+
+    # Modus "I" (32 Bit mit Vorzeichen): Werte außerhalb von 0..65535 werden begrenzt.
+    roh = np.array([[-70000, -1, 0, 128, 129, 385, 386, 65406, 65407, 65535, 65536, 2**31 - 1]], dtype=np.int32)
+    bild = Image.fromarray(roh)
+    assert bild.mode == "I"
+    assert np.asarray(medien._graustufen(bild)).tolist() == [[0, 0, 0, 0, 1, 1, 2, 254, 255, 255, 255, 255]]
+
+
+def test_phash_16_bit_beliebige_werte_wie_gerundetes_8_bit():
+    raster = np.random.default_rng(5).integers(0, 65536, (6, 8), dtype=np.uint16)
+    tief = np.kron(raster, np.ones((40, 50), dtype=np.uint16))
+    acht_bit = np.round(tief / 257).astype(np.uint8)
+    assert phash_hex(_kodiere(Image.fromarray(tief), "PNG")) == phash_hex(_kodiere(Image.fromarray(acht_bit), "PNG"))
+
+
+@pytest.mark.parametrize("art", ["rgba", "la", "p-transparenz", "gif-transparenz", "l-transparenz", "16-bit"])
+def test_graustufen_streifenweise_wie_am_stueck(art, monkeypatch):
+    daten = _testbild(art)
+    with Image.open(io.BytesIO(daten)) as bild:
+        bild.load()
+        monkeypatch.setattr(medien, "_STREIFEN_PIXEL", 10**9)
+        am_stueck = np.asarray(medien._graustufen(bild))
+        hash_am_stueck = phash_hex(daten)
+        # 100 Pixel bei 37 Pixel Breite: Streifen aus 2 Zeilen, der letzte aus einer.
+        monkeypatch.setattr(medien, "_STREIFEN_PIXEL", 100)
+        streifen = np.asarray(medien._graustufen(bild))
+    assert streifen.shape == (23, 37)
+    assert np.array_equal(streifen, am_stueck)
+    assert phash_hex(daten) == hash_am_stueck
+
+
+def test_graustufen_rechnet_nur_streifen_um(monkeypatch):
+    monkeypatch.setattr(medien, "_STREIFEN_PIXEL", 500)
+    groessen: list[int] = []
+    for name in ("_sechzehn_bit_auf_l", "_auf_weiss_als_l"):
+
+        def spion(bild, _original=getattr(medien, name)):
+            groessen.append(bild.width * bild.height)
+            return _original(bild)
+
+        monkeypatch.setattr(medien, name, spion)
+    for art in ("rgba", "p-transparenz", "16-bit"):
+        phash_hex(_testbild(art, (120, 90)))
+    assert len(groessen) == 3 * 23  # 500 // 120 = 4 Zeilen je Streifen, 90 Zeilen
+    assert max(groessen) <= 500
+
+
+def test_phash_16_bit_ohne_kopien_des_ganzen_bildes(monkeypatch):
+    monkeypatch.setattr(medien, "_STREIFEN_PIXEL", 20_000)
+    daten = _testbild("16-bit", (600, 500))
+    tracemalloc.start()
+    try:
+        phash_hex(daten)
+        _, spitze = tracemalloc.get_traced_memory()
+    finally:
+        tracemalloc.stop()
+    # Schon eine einzige Kopie des ganzen Bildes mit 16 Bit je Pixel wäre so groß.
+    assert spitze < 600 * 500 * 2
+
+
 def test_phash_animiertes_gif_nimmt_erstes_bild():
     erstes = _bild(bild_png(0))
     zweites = _bild(_fotoaehnlich(1, erstes.size))
@@ -270,6 +375,42 @@ def test_phash_wendet_exif_orientierung_an():
     assert hamming(phash_hex(ohne_exif), referenz) > 10
 
 
+@pytest.mark.parametrize("orientierung", range(1, 9))
+def test_phash_alle_exif_orientierungen_wie_pillow(orientierung):
+    exif = Image.Exif()
+    exif[0x0112] = orientierung
+    jpeg = _kodiere(_bild(_fotoaehnlich(4, (90, 60))), "JPEG", quality=95, exif=exif)
+    with Image.open(io.BytesIO(jpeg)) as bild:
+        aufrecht = ImageOps.exif_transpose(bild)
+    assert phash_hex(jpeg) == _referenz_phash(_kodiere(aufrecht, "PNG"))
+
+
+def test_phash_exif_orientierung_bei_transparenz():
+    rgba = _bild(_fotoaehnlich(5, (90, 60)))
+    rgba.putalpha(Image.linear_gradient("L").resize(rgba.size))
+    exif = Image.Exif()
+    exif[0x0112] = 8
+    png = _kodiere(rgba, "PNG", exif=exif)
+    with Image.open(io.BytesIO(png)) as bild:
+        aufrecht = ImageOps.exif_transpose(bild).convert("RGBA")
+    auf_weiss = Image.alpha_composite(Image.new("RGBA", aufrecht.size, (255, 255, 255, 255)), aufrecht)
+    assert phash_hex(png) == _referenz_phash(_kodiere(auf_weiss.convert("RGB"), "PNG"))
+
+
+@pytest.mark.filterwarnings("ignore::UserWarning")
+@pytest.mark.parametrize(
+    "exif",
+    [
+        b"Exif\x00\x00II*\x00\xff\xff\xff\x7f",
+        b"Exif\x00\x00MM\x00*\x00\x00\x00\x08\x00\x01\x01\x12\x00\x03\x00\x00\x00\x01\x00\x09\x00\x00",
+    ],
+    ids=["kaputt", "orientierung-9"],
+)
+def test_phash_unbrauchbares_exif_bleibt_ungedreht(exif):
+    rgb = _bild(bild_png(1)).convert("RGB")
+    assert phash_hex(_kodiere(rgb, "JPEG", quality=95, exif=exif)) == phash_hex(_kodiere(rgb, "JPEG", quality=95))
+
+
 @pytest.mark.parametrize(
     "daten",
     [
@@ -279,8 +420,9 @@ def test_phash_wendet_exif_orientierung_an():
         bytes(range(256)) * 4,
         b"<!DOCTYPE html><html><body>" + MARKER.encode() + b"</body></html>",
         b"%!PS-Adobe-3.0 EPSF-3.0\n%%BoundingBox: 0 0 10 10\n" + MARKER.encode(),
+        _jpeg(bild_png(1, (200, 150)), 90)[:1500],
     ],
-    ids=["leer", "text", "abgeschnitten", "zufall", "html", "eps"],
+    ids=["leer", "text", "abgeschnitten", "zufall", "html", "eps", "jpeg-abgeschnitten"],
 )
 def test_phash_kaputte_daten_ergeben_medienfehler(daten):
     with pytest.raises(MedienFehler) as info:
@@ -431,20 +573,117 @@ def test_bild_ohne_original_nutzt_vorschau(url):
     assert (daten.hash_quelle, daten.hash_status) == ("vorschau", HASH_OK)
 
 
-@pytest.mark.parametrize("api_typ", ["video", "tv", "gifv", "unknown"])
-def test_video_gif_sonstig_laden_nur_das_vorschaubild(api_typ):
-    anhang = _video()
-    anhang["type"] = api_typ
+@pytest.mark.parametrize("api_typ", _VIDEOARTEN)
+@pytest.mark.parametrize(
+    ("endung", "vorschau_pfad"),
+    [("", "small/{id}.png"), ("", "small/video/{id}"), (".mp4", "small/{id}.png")],
+    ids=["datei-ohne-endung", "beide-ohne-endung", "datei-mp4"],
+)
+def test_video_gif_sonstig_laden_nur_das_vorschaubild(api_typ, endung, vorschau_pfad):
+    anhang = _video(api_typ=api_typ, endung=endung)
+    anhang["preview_url"] = f"{BASIS}/media/" + vorschau_pfad.format(id=anhang["id"])
     png = bild_png(7)
-    laden = Laden({anhang["preview_url"]: png, anhang["url"]: AssertionError("Videodatei geladen")})
+    laden = _laden_ohne_datei(anhang, {anhang["preview_url"]: png})
     daten = MedienErfasser(laden).erfasse(anhang, 1)
     assert laden.aufrufe == [anhang["preview_url"]]
-    assert anhang["url"] not in laden.aufrufe
     assert (daten.sha256, daten.phash, daten.hash_quelle) == (sha256_hex(png), phash_hex(png), "vorschau")
     assert daten.hash_status == HASH_OK
 
 
-@pytest.mark.parametrize("vorschau", [None, "same", f"{BASIS}/media/small/clip.mp4", f"{BASIS}/media/small/x.webm?v=1"])
+@pytest.mark.parametrize("api_typ", _VIDEOARTEN)
+@pytest.mark.parametrize(
+    "vorschau", [None, "", "   ", 42, "ftp://truthsocial.com/media/small/1.png", "/media/small/1.png", "fehlt"]
+)
+def test_video_ohne_vorschaubild_laedt_nie_die_datei(api_typ, vorschau):
+    anhang = _video(api_typ=api_typ)
+    if vorschau == "fehlt":
+        del anhang["preview_url"]
+    else:
+        anhang["preview_url"] = vorschau
+    cache = Cache()
+    laden = _laden_ohne_datei(anhang)
+    erfasser = MedienErfasser(laden, cache_holen=cache.holen, cache_speichern=cache.speichern)
+    daten = erfasser.erfasse(anhang, 0)
+    assert laden.aufrufe == []
+    assert (daten.hash_status, daten.sha256, daten.hash_quelle) == (HASH_UEBERSPRUNGEN, None, None)
+    assert (erfasser.downloads, erfasser.fehler, cache.gespeichert) == (0, 0, [])
+
+
+@pytest.mark.parametrize("api_typ", _VIDEOARTEN)
+@pytest.mark.parametrize("antwort", ["medienfehler", "html", "kein-bild"])
+def test_unbrauchbares_vorschaubild_ohne_rueckgriff_auf_die_datei(api_typ, antwort):
+    anhang = _video(api_typ=api_typ)
+    roh = bytes(range(256)) * 4
+    ergebnis = {
+        "medienfehler": MedienFehler("Medienabruf fehlgeschlagen (HTTP 404, unbekannt)."),
+        "html": b"<!DOCTYPE html><title>Just a moment...</title>",
+        "kein-bild": roh,
+    }[antwort]
+    cache = Cache()
+    laden = _laden_ohne_datei(anhang, {anhang["preview_url"]: ergebnis})
+    erfasser = MedienErfasser(laden, cache_holen=cache.holen, cache_speichern=cache.speichern)
+    daten = erfasser.erfasse(anhang, 0)
+    assert laden.aufrufe == [anhang["preview_url"]]
+    if antwort == "kein-bild":
+        assert (daten.hash_status, daten.sha256, daten.phash, daten.hash_quelle) == (
+            HASH_OK, sha256_hex(roh), None, "vorschau"
+        )
+        assert erfasser.fehler == 0
+    else:
+        assert (daten.hash_status, daten.sha256, daten.phash, daten.hash_quelle) == (HASH_FEHLER, None, None, None)
+        assert (erfasser.fehler, cache.gespeichert) == (1, [])
+
+
+_DATEI = f"{BASIS}/media/original/video/4711"
+
+
+@pytest.mark.parametrize("api_typ", _VIDEOARTEN)
+@pytest.mark.parametrize(
+    ("felder", "vorschau"),
+    [
+        ({"url": _DATEI}, _DATEI),
+        ({"url": _DATEI}, f"  {_DATEI}\n"),
+        ({"url": _DATEI}, "https://TRUTHSOCIAL.COM/media/original/video/4711"),
+        ({"url": _DATEI}, "http://truthsocial.com/media/original/video/4711"),
+        ({"url": _DATEI}, f"{_DATEI}#t=1"),
+        ({"url": _DATEI}, f"{_DATEI}?format=jpg"),
+        ({"url": _DATEI}, "https://truthsocial.com:443/media/original/video/4711"),
+        ({"url": _DATEI}, "https://nutzer@truthsocial.com./media/original/video/4711"),
+        ({"url": _DATEI}, "https://truthsocial.com//media/original/./video/x/../4711/"),
+        ({"url": _DATEI}, "https://truthsocial.com/media/original/video/%34%37%31%31"),
+        ({"url": _DATEI}, "https://truthsocial.com/MEDIA/Original/Video/4711"),
+        ({"url": "//truthsocial.com/media/original/video/4711"}, _DATEI),
+        ({"url": "/media/original/video/4711"}, _DATEI),
+        ({"url": None, "remote_url": _DATEI}, _DATEI),
+        ({"text_url": f"{BASIS}/media/k3rz"}, f"{BASIS}/media/k3rz"),
+    ],
+    ids=[
+        "gleich", "leerraum", "host-gross", "http", "fragment", "query", "port", "zugangsdaten-punkt",
+        "pfad-umwege", "prozentkodiert", "pfad-gross", "ohne-schema", "relativ", "remote-url", "text-url",
+    ],
+)
+def test_vorschau_die_selbst_die_mediendatei_ist_wird_nicht_geladen(api_typ, felder, vorschau):
+    anhang = _video(api_typ=api_typ)
+    anhang.update(felder)
+    anhang["preview_url"] = vorschau
+    laden = _laden_ohne_datei(anhang)
+    erfasser = MedienErfasser(laden)
+    daten = erfasser.erfasse(anhang, 0)
+    assert laden.aufrufe == []
+    assert (daten.hash_status, erfasser.downloads) == (HASH_UEBERSPRUNGEN, 0)
+
+
+@pytest.mark.parametrize(
+    "vorschau",
+    [
+        None,
+        "same",
+        f"{BASIS}/media/small/clip.mp4",
+        f"{BASIS}/media/small/x.webm?v=1",
+        f"{BASIS}/media/small/clip%2Emp4",
+        f"{BASIS}/media/small/CLIP.MP4/",
+    ],
+)
 def test_video_ohne_brauchbares_vorschaubild_ohne_download(vorschau):
     anhang = _video()
     anhang["preview_url"] = anhang["url"] if vorschau == "same" else vorschau

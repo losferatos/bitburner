@@ -5,9 +5,10 @@ from __future__ import annotations
 import hashlib
 import itertools
 import json
+import logging
 import random
 import time
-from datetime import datetime, timedelta
+from datetime import UTC, datetime, timedelta
 
 import pytest
 
@@ -23,8 +24,11 @@ from truthtracker.modelle import (
     DUP_NUR_TEXT,
     HASH_FEHLER,
     HASH_OK,
+    HASH_UEBERSPRUNGEN,
+    MEDIUM_AUDIO,
     MEDIUM_BILD,
     MEDIUM_GIF,
+    MEDIUM_SONSTIG,
     MEDIUM_VIDEO,
     TYP_EIGEN,
     TYP_RETRUTH,
@@ -74,6 +78,18 @@ def _fehlgeschlagen(art: str = MEDIUM_BILD) -> MedienDaten:
     return MedienDaten(position=0, medien_id=None, art=art, hash_status=HASH_FEHLER)
 
 
+def _ohne_hash(art: str = MEDIUM_AUDIO, medien_id: str | None = None) -> MedienDaten:
+    """Anhang ohne Hash (Audio, kein Vorschaubild); ``medien_id=None`` bleibt ohne ID."""
+    return MedienDaten(position=0, medien_id=medien_id, art=art, hash_status=HASH_UEBERSPRUNGEN)
+
+
+def _schluessel(m: MedienDaten) -> str | None:
+    """Vergleichsschlüssel nach docs/architektur.md (wie ``klassifikation.medien_schluessel``)."""
+    if m.hash_status == HASH_UEBERSPRUNGEN:
+        return f"{m.art}:ohne-hash:{m.medien_id}"
+    return m.exakt_schluessel if m.hash_status == HASH_OK else None
+
+
 def _post(
     zeitpunkt: datetime,
     *,
@@ -88,8 +104,9 @@ def _post(
     medien = medien or []
     for position, m in enumerate(medien):
         m.position = position
-        m.medien_id = m.medien_id or str(900_000 + next(_folge))
-    schluessel = [m.exakt_schluessel for m in medien]
+        if m.medien_id is None and m.hash_status != HASH_UEBERSPRUNGEN:
+            m.medien_id = str(900_000 + next(_folge))
+    schluessel = [_schluessel(m) for m in medien]
     vollstaendig = all(s is not None for s in schluessel)
     medien_hash = _sha("\n".join(sorted(s for s in schluessel if s))) if medien and vollstaendig else None
     text_hash = _text(text) if text else None
@@ -108,6 +125,8 @@ def _post(
         n_bilder=sum(m.art == MEDIUM_BILD for m in medien),
         n_videos=sum(m.art == MEDIUM_VIDEO for m in medien),
         n_gifs=sum(m.art == MEDIUM_GIF for m in medien),
+        n_audio=sum(m.art == MEDIUM_AUDIO for m in medien),
+        n_sonstige_medien=sum(m.art == MEDIUM_SONSTIG for m in medien),
         text=TextMetriken(zeichen=len(text or ""), text_hash=text_hash),
         medien_hash=medien_hash,
         medien_vollstaendig=vollstaendig,
@@ -280,6 +299,56 @@ def test_fall3a_gleicher_text_anderes_quote_ziel(con, lauf):
     assert json.loads(d[DUP_NUR_TEXT]["details"]) == {"quote_verschieden": True}
 
 
+def test_gleicher_text_gleiche_medien_nur_quote_ziel_anders_ist_eine_zeile(con, lauf):
+    q = _post(JETZT - timedelta(days=2), text="Stimmt", medien=[_bild(datei="x.png")], quote_id="111")
+    p = _post(JETZT - timedelta(days=1), text="Stimmt", medien=[_bild(datei="x.png")], quote_id="222")
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    d = _dups(con, p)
+    # Nicht zugleich "nur Text gleich" und "nur Medien gleich": Beides ist gleich, nur das Quote-Ziel nicht.
+    assert set(d) == {DUP_NUR_TEXT}
+    assert d[DUP_NUR_TEXT]["frueherer_post_id"] == q.id
+    assert json.loads(d[DUP_NUR_TEXT]["details"]) == {"quote_verschieden": True, "medien_gleich": True}
+
+
+def test_gleiche_medien_ohne_text_nur_quote_ziel_anders(con, lauf):
+    q = _post(JETZT - timedelta(days=2), medien=[_bild(datei="y.png")], quote_id="111")
+    p = _post(JETZT - timedelta(days=1), medien=[_bild(datei="y.png")], quote_id="222")
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    d = _dups(con, p)
+    assert set(d) == {DUP_NUR_MEDIEN}
+    assert json.loads(d[DUP_NUR_MEDIEN]["details"]) == {"quote_verschieden": True}
+
+
+def test_gleicher_text_neu_hochgeladenes_bild(con, lauf):
+    q = _post(JETZT - timedelta(days=2), text="Gleicher Satz", medien=[_bild(PHASH)])
+    p = _post(JETZT - timedelta(days=1), text="Gleicher Satz", medien=[_bild(_phash_mit_abstand(2))])
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    d = _dups(con, p)
+    assert set(d) == {DUP_NUR_TEXT, DUP_MEDIEN_AEHNLICH}
+    assert _primaer(con, p) == DUP_NUR_TEXT
+    # Die primäre Text-Zeile sagt, dass die Medien desselben Paars wahrscheinlich gleich sind.
+    assert json.loads(d[DUP_NUR_TEXT]["details"]) == {"medien_aehnlich": True, "phash_abstand_max": 2}
+    assert json.loads(d[DUP_MEDIEN_AEHNLICH]["details"]) == {"phash_abstand_max": 2}
+    uebersicht = duplikate.duplikat_uebersicht(con)[-1]
+    assert uebersicht["art"] == DUP_NUR_TEXT and uebersicht["details"]["medien_aehnlich"] is True
+    assert uebersicht["arten"] == [DUP_NUR_TEXT, DUP_MEDIEN_AEHNLICH]
+
+
+def test_medien_aehnlich_an_der_text_zeile_gilt_nur_fuer_dasselbe_paar(con, lauf):
+    aehnlich = _post(JETZT - timedelta(days=3), text="Satz", medien=[_bild(PHASH)])
+    anders = _post(JETZT - timedelta(days=2), text="Satz", medien=[_bild(_phash_mit_abstand(40))])
+    p = _post(JETZT - timedelta(days=1), text="Satz", medien=[_bild(_phash_mit_abstand(1))])
+    _speichere(con, lauf, aehnlich, anders, p)
+    _aktualisiere(con)
+    d = _dups(con, p)
+    assert d[DUP_NUR_TEXT]["frueherer_post_id"] == anders.id
+    assert json.loads(d[DUP_NUR_TEXT]["details"]) == {}
+    assert d[DUP_MEDIEN_AEHNLICH]["frueherer_post_id"] == aehnlich.id
+
+
 def test_fall3b_nur_medien(con, lauf):
     a = _post(JETZT - timedelta(days=3), text="Erster Satz", medien=[_bild(datei="gleich.png")])
     b = _post(JETZT - timedelta(days=2), text="Anderer Satz", medien=[_bild(datei="gleich.png")])
@@ -388,6 +457,27 @@ def test_fall4_anderes_seitenverhaeltnis_nein(con, lauf):
     assert _dups(con, skaliert)[DUP_MEDIEN_AEHNLICH]["frueherer_post_id"] == quer.id
     # 1200x760 weicht um gut 5 % vom Seitenverhältnis 1,5 ab.
     assert _dups(con, leicht) == {}
+
+
+@pytest.mark.parametrize(("dauer", "erwartet"), [(11.0, True), (11.1, False), (9.0, True), (8.9, False)])
+def test_fall4_grenze_der_dauer(con, lauf, dauer, erwartet):
+    q = _post(JETZT - timedelta(days=2), medien=[_video(PHASH, dauer=10.0)])
+    p = _post(JETZT - timedelta(days=1), medien=[_video(_phash_mit_abstand(1), dauer=dauer)])
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    assert (DUP_MEDIEN_AEHNLICH in _dups(con, p)) is erwartet
+
+
+@pytest.mark.parametrize(
+    ("breite", "hoehe", "erwartet"),
+    [(1020, 1000, True), (1000, 1020, True), (1021, 1000, False), (1000, 1021, False)],
+)
+def test_fall4_grenze_des_seitenverhaeltnisses(con, lauf, breite, hoehe, erwartet):
+    q = _post(JETZT - timedelta(days=2), medien=[_bild(PHASH, breite=1000, hoehe=1000)])
+    p = _post(JETZT - timedelta(days=1), medien=[_bild(_phash_mit_abstand(1), breite=breite, hoehe=hoehe)])
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    assert (DUP_MEDIEN_AEHNLICH in _dups(con, p)) is erwartet
 
 
 def test_fall4_unbekannte_abmessungen_entscheiden_nicht(con, lauf):
@@ -553,6 +643,33 @@ def test_betroffene_ids_nachtraeglich_eingefuegter_frueherer_post(con, lauf):
     assert _geprueft(con, ausserhalb) == stand_ausserhalb
 
 
+def test_teilberechnung_frueherer_post_genau_am_fensteranfang(con, lauf):
+    p = _post(JETZT, text="Grenze", medien=[_bild(datei="g14.png")])
+    _speichere(con, lauf, p)
+    _aktualisiere(con, jetzt=JETZT - timedelta(minutes=5))
+    assert _dups(con, p) == {}
+
+    # Q liegt genau ein Fenster vor P: P ist der letzte Post im Einflussbereich von Q.
+    q = _post(JETZT - timedelta(days=14), text="Grenze", medien=[_bild(datei="g14.png")])
+    _speichere(con, lauf, q)
+    bericht = _aktualisiere(con, [q.id])
+    assert bericht.geprueft == 2
+    assert _dups(con, p)[DUP_EXAKT]["frueherer_post_id"] == q.id
+    assert _dups(con, p)[DUP_EXAKT]["abstand_s"] == 14 * 86400
+
+
+def test_teilberechnung_ausloeser_laedt_frueheren_post_am_fensteranfang(con, lauf):
+    q = _post(JETZT - timedelta(days=14), text="Grenze", medien=[_bild(datei="g14b.png")])
+    _speichere(con, lauf, q)
+    _aktualisiere(con, jetzt=JETZT - timedelta(minutes=5))
+
+    p = _post(JETZT, text="Grenze", medien=[_bild(datei="g14b.png")])
+    _speichere(con, lauf, p)
+    bericht = _aktualisiere(con, [p.id])
+    assert bericht.geprueft == 1
+    assert _dups(con, p)[DUP_EXAKT]["frueherer_post_id"] == q.id
+
+
 def test_neuberechnung_entfernt_veraltete_zeilen(con, lauf):
     frueh = _post(JETZT - timedelta(days=2), text="Vorher")
     spaet = _post(JETZT - timedelta(days=1), text="Vorher")
@@ -577,6 +694,23 @@ def test_noch_nie_gepruefte_posts_werden_immer_bewertet(con, lauf):
     assert bericht.geprueft == 2
     assert DUP_EXAKT in _dups(con, b)
     assert _aktualisiere(con, []).geprueft == 0
+
+
+def test_zurueckgesetzte_pruefung_bewertet_auch_spaetere_posts_neu(con, lauf):
+    q = _post(JETZT - timedelta(days=2), text="Vorher")
+    p = _post(JETZT - timedelta(days=1), text="Vorher")
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    assert DUP_EXAKT in _dups(con, p)
+
+    # Ein Edit von q wurde gespeichert, der Lauf starb vor der Duplikat-Prüfung. Ein leerer
+    # dup_geprueft_utc ist das Signal dafür; dann muss auch p (im Einflussbereich von q) neu bewertet werden.
+    _speichere(con, lauf, _post(q.created_at, text="Nachher", post_id=q.id))
+    with con:
+        con.execute("UPDATE posts SET dup_geprueft_utc = NULL WHERE id = ?", (q.id,))
+    bericht = _aktualisiere(con, [])
+    assert bericht.geprueft == 2
+    assert _dups(con, p) == {}
 
 
 def test_unbekannte_ids_werden_ignoriert(con, lauf):
@@ -681,19 +815,33 @@ def test_abdeckung_flag_unvollstaendige_medien_im_fenster(con, lauf):
     _abdecken(con, JETZT - timedelta(days=40), JETZT)
     kaputt = _post(JETZT - timedelta(days=5), medien=[_fehlgeschlagen()])
     davor = _post(JETZT - timedelta(days=20), text="Davor")
-    p = _post(JETZT - timedelta(hours=1), text="Danach")
-    _speichere(con, lauf, kaputt, davor, p)
+    danach = [_post(kaputt.created_at + timedelta(hours=h), text=f"Danach {h}") for h in range(1, 24 * 5, 7)]
+    _speichere(con, lauf, kaputt, davor, *danach)
     _aktualisiere(con)
+    # Ein gescheiterter Download betrifft nur den eigenen Post, nicht die Posts der Tage danach.
     assert _flag(con, kaputt) == 0
-    assert _flag(con, p) == 0
     assert _flag(con, davor) == 1
+    assert [_flag(con, p) for p in danach] == [1] * len(danach)
 
-    # Medien werden nachgeholt: kaputt ist betroffen, p wird mit neu bewertet.
     repariert = _post(JETZT - timedelta(days=5), medien=[_bild(PHASH)], post_id=kaputt.id)
     _speichere(con, lauf, repariert)
     _aktualisiere(con, [kaputt.id])
     assert _flag(con, kaputt) == 1
+
+
+def test_abdeckung_nachtragen_mit_unvollstaendigem_post_im_fenster(con, lauf):
+    kaputt = _post(JETZT - timedelta(days=3), medien=[_fehlgeschlagen()])
+    selbst_kaputt = _post(JETZT - timedelta(hours=2), text="Eigene Medien fehlen", medien=[_fehlgeschlagen()])
+    p = _post(JETZT - timedelta(hours=1), text="Später abgedeckt")
+    _speichere(con, lauf, kaputt, selbst_kaputt, p)
+    _aktualisiere(con, jetzt=JETZT - timedelta(minutes=30))
+    assert _flag(con, p) == 0
+
+    _abdecken(con, JETZT - timedelta(days=20), JETZT)
+    assert _aktualisiere(con, []).geprueft == 0
     assert _flag(con, p) == 1
+    assert _flag(con, selbst_kaputt) == 0
+    assert _flag(con, kaputt) == 0
 
 
 def test_abdeckung_wird_ohne_neubewertung_nachgetragen(con, lauf):
@@ -710,6 +858,34 @@ def test_abdeckung_wird_ohne_neubewertung_nachgetragen(con, lauf):
     assert _geprueft(con, p) == "2026-10-02T11:30:00Z"
 
 
+def test_anhang_ohne_hash_und_ohne_id_ist_kein_gleiches_medium(con, lauf):
+    q = _post(JETZT - timedelta(days=2), text="Satz", medien=[_ohne_hash(MEDIUM_VIDEO)])
+    p = _post(JETZT - timedelta(days=1), text="Satz", medien=[_ohne_hash(MEDIUM_VIDEO)])
+    andere = _post(JETZT - timedelta(hours=5), text="Anders", medien=[_ohne_hash(MEDIUM_VIDEO)])
+    # Alle drei tragen den Schlüssel "video:ohne-hash:None" und damit denselben Medien-Hash.
+    assert p.medien_vollstaendig and p.medien_hash == q.medien_hash == andere.medien_hash
+    assert p.fingerabdruck == q.fingerabdruck
+    _abdecken(con, JETZT - timedelta(days=20), JETZT)
+    _speichere(con, lauf, q, p, andere)
+
+    _aktualisiere(con)
+
+    assert _dups(con, p) == {}
+    assert _dups(con, andere) == {}
+    assert _flag(con, p) == 0
+    # Auch das Nachtragen der Abdeckung behandelt den Post als unvollständig gehasht.
+    _aktualisiere(con, [])
+    assert _flag(con, p) == 0
+
+
+def test_anhang_ohne_hash_mit_id_bleibt_vergleichbar(con, lauf):
+    q = _post(JETZT - timedelta(days=2), text="Eins", medien=[_ohne_hash(MEDIUM_AUDIO, "77001")])
+    p = _post(JETZT - timedelta(days=1), text="Zwei", medien=[_ohne_hash(MEDIUM_AUDIO, "77001")])
+    _speichere(con, lauf, q, p)
+    _aktualisiere(con)
+    assert set(_dups(con, p)) == {DUP_NUR_MEDIEN}
+
+
 def test_abdeckung_entspricht_db_funktion(con):
     _abdecken(con, JETZT - timedelta(days=10), JETZT)
     _abdecken(con, JETZT - timedelta(days=40), JETZT - timedelta(days=25), anfang=True)
@@ -719,6 +895,81 @@ def test_abdeckung_entspricht_db_funktion(con):
         for tage in (14, 3.5, 30):
             erwartet = db.abdeckung_vollstaendig(con, t - timedelta(days=tage), t)
             assert duplikate._abgedeckt(bereiche, int(t.timestamp()), tage) is erwartet
+
+
+# ---------------------------------------------------------------------------
+# Unlesbare Zeiten und Windows
+
+
+def _zeit_setzen(con, post: PostDaten, text: str) -> None:
+    with con:
+        con.execute("UPDATE posts SET created_at_utc = ? WHERE id = ?", (text, post.id))
+
+
+@pytest.mark.parametrize("unlesbar", ["1-01-01T00:00:00Z", "kaputt", "1969-12-31T23:59:59Z", "2026-10-01 10:00:00"])
+def test_unlesbare_erstellzeit_legt_die_pruefung_nicht_lahm(con, lauf, caplog, unlesbar):
+    a = _post(JETZT - timedelta(days=3), text="Normal")
+    kaputt = _post(JETZT - timedelta(days=2), text="Normal")
+    b = _post(JETZT - timedelta(days=1), text="Normal")
+    _speichere(con, lauf, a, kaputt, b)
+    _zeit_setzen(con, kaputt, unlesbar)
+    caplog.set_level(logging.WARNING, logger="truthtracker.duplikate")
+
+    # Teilpfad: kaputt wurde noch nie geprüft und ist deshalb Auslöser.
+    bericht = _aktualisiere(con, [b.id])
+
+    assert bericht.geprueft == 2
+    assert _dups(con, b)[DUP_EXAKT]["frueherer_post_id"] == a.id
+    zeile = db.post_lesen(con, kaputt.id)
+    assert zeile["dup_geprueft_utc"] == "2026-10-02T12:00:00Z"
+    assert zeile["dup_abdeckung_vollstaendig"] == 0
+    assert _dups(con, kaputt) == {}
+    assert [r.getMessage() for r in caplog.records] == [
+        f"Post {kaputt.id}: Erstellzeit nicht lesbar, Duplikat-Prüfung übersprungen"
+    ]
+    # Kein Dauer-Auslöser: Der nächste Lauf hat nichts zu tun, die Vollberechnung läuft durch.
+    assert _aktualisiere(con, []).geprueft == 0
+    assert _aktualisiere(con).geprueft == 2
+
+
+@pytest.mark.parametrize("teilpfad", [False, True])
+def test_unlesbar_gewordene_zeit_entfernt_alte_zeilen(con, lauf, teilpfad):
+    a = _post(JETZT - timedelta(days=3), text="Normal")
+    kaputt = _post(JETZT - timedelta(days=2), text="Normal")
+    b = _post(JETZT - timedelta(days=1), text="Normal")
+    _speichere(con, lauf, a, kaputt, b)
+    _aktualisiere(con)
+    assert _dups(con, b)[DUP_EXAKT]["frueherer_post_id"] == kaputt.id
+    assert DUP_EXAKT in _dups(con, kaputt)
+
+    # Nicht kanonisch, sortiert als Text aber in den Ladezeitraum des Teilpfads.
+    _zeit_setzen(con, kaputt, "2026-09-30 12:00:00")
+    _aktualisiere(con, [b.id] if teilpfad else None)
+    assert _dups(con, kaputt) == {}
+    assert _dups(con, b)[DUP_EXAKT]["frueherer_post_id"] == a.id
+
+
+class _WindowsDatetime(datetime):
+    """Wie ``datetime`` unter Windows: ``fromtimestamp`` lehnt Zeiten vor 1970 mit ``OSError`` ab."""
+
+    @classmethod
+    def fromtimestamp(cls, t, tz=None):
+        if t < 0:
+            raise OSError(22, "Invalid argument")
+        return super().fromtimestamp(t, tz)
+
+
+def test_zeiten_um_1970_auch_unter_windows(con, lauf, monkeypatch):
+    monkeypatch.setattr(duplikate, "datetime", _WindowsDatetime)
+    epoche = datetime(1970, 1, 1, tzinfo=UTC)
+    a = _post(epoche, text="Platzhalter", post_id=snowflake(epoche, 1))
+    b = _post(epoche + timedelta(hours=1), text="Platzhalter", post_id=snowflake(epoche + timedelta(hours=1), 2))
+    _speichere(con, lauf, a, b)
+    # Teilpfad: Die untere Ladegrenze läge 14 Tage vor 1970.
+    _aktualisiere(con, [a.id])
+    assert _dups(con, b)[DUP_EXAKT]["frueherer_post_id"] == a.id
+    assert duplikate._utc_text(-14 * 86400) == "1970-01-01T00:00:00Z"
+    assert duplikate._utc_text(10**12) == "9999-12-31T23:59:59Z"
 
 
 # ---------------------------------------------------------------------------
@@ -755,7 +1006,7 @@ def test_keine_inhalte_in_details(con, lauf):
     _aktualisiere(con)
     for z in con.execute("SELECT * FROM duplikate"):
         details = json.loads(z["details"])
-        assert set(details) <= {"phash_abstand_max", "quote_verschieden"}
+        assert set(details) <= {"phash_abstand_max", "quote_verschieden", "medien_gleich", "medien_aehnlich"}
         assert all(isinstance(w, (bool, int)) for w in details.values())
         assert MARKER not in json.dumps(dict(z))
 
@@ -809,14 +1060,17 @@ def _referenz(con, konfig: Konfig) -> set[tuple]:
     for z in con.execute("SELECT * FROM posts"):
         n = z["n_bilder"] + z["n_videos"] + z["n_gifs"] + z["n_audio"] + z["n_sonstige_medien"]
         liste = medien.get(z["id"], [])
-        phashbar = bool(z["medien_vollstaendig"]) and n >= 1 and len(liste) == n and all(
+        voll, mh, fp = bool(z["medien_vollstaendig"]), z["medien_hash"], z["fingerabdruck"]
+        if any(m["hash_status"] == HASH_UEBERSPRUNGEN and m["medien_id"] is None for m in liste):
+            voll, mh, fp = False, None, None
+        phashbar = voll and n >= 1 and len(liste) == n and all(
             m["hash_status"] == HASH_OK and m["phash"] for m in liste
         )
         posts.append({
             "id": z["id"], "schluessel": (zeit.parse_utc(z["created_at_utc"]), z["id_num"]),
             "t": int(zeit.parse_utc(z["created_at_utc"]).timestamp()), "inhalt": z["original_id"] or z["id"],
-            "text": z["text_hash"], "mh": z["medien_hash"], "voll": bool(z["medien_vollstaendig"]),
-            "fp": z["fingerabdruck"], "quote": z["quote_id"], "n": n, "medien": liste if phashbar else None,
+            "text": z["text_hash"], "mh": mh, "voll": voll,
+            "fp": fp, "quote": z["quote_id"], "n": n, "medien": liste if phashbar else None,
         })
 
     def passt(a, b) -> bool:
@@ -864,15 +1118,20 @@ def _referenz(con, konfig: Konfig) -> set[tuple]:
                     if p["voll"] and q["voll"]:
                         medien_verschieden = p["mh"] != q["mh"]
                     else:
-                        medien_verschieden = p["n"] != q["n"]
+                        medien_verschieden = True if p["n"] != q["n"] else None
                     if medien_verschieden:
-                        funde[DUP_NUR_TEXT] = {}
+                        abstand = aehnlich(p, q) if p["voll"] and q["voll"] else None
+                        funde[DUP_NUR_TEXT] = (
+                            {} if abstand is None else {"medien_aehnlich": True, "phash_abstand_max": abstand}
+                        )
                     elif p["quote"] != q["quote"]:
                         funde[DUP_NUR_TEXT] = {"quote_verschieden": True}
+                        if medien_verschieden is False and p["mh"]:
+                            funde[DUP_NUR_TEXT]["medien_gleich"] = True
                 if p["voll"] and q["voll"] and p["mh"] and p["mh"] == q["mh"]:
                     if p["text"] != q["text"]:
                         funde[DUP_NUR_MEDIEN] = {}
-                    elif p["quote"] != q["quote"]:
+                    elif p["text"] is None and p["quote"] != q["quote"]:
                         funde[DUP_NUR_MEDIEN] = {"quote_verschieden": True}
                 if p["voll"] and q["voll"]:
                     abstand = aehnlich(p, q)
@@ -895,19 +1154,46 @@ def _tabelle(con) -> set[tuple]:
     }
 
 
+def _referenz_flags(con, konfig: Konfig) -> dict[str, int]:
+    """Erwartetes ``dup_abdeckung_vollstaendig``: Fenster lückenlos abgerufen und P vollständig gehasht."""
+    fenster = timedelta(days=konfig.erfassung.duplikat_fenster_tage)
+    ohne_schluessel = {
+        z["post_id"] for z in con.execute(
+            "SELECT post_id FROM medien WHERE hash_status = ? AND medien_id IS NULL", (HASH_UEBERSPRUNGEN,)
+        )
+    }
+    erwartet = {}
+    for z in con.execute("SELECT id, created_at_utc, medien_vollstaendig FROM posts"):
+        t = zeit.parse_utc(z["created_at_utc"])
+        voll = bool(z["medien_vollstaendig"]) and z["id"] not in ohne_schluessel
+        erwartet[z["id"]] = int(voll and db.abdeckung_vollstaendig(con, t - fenster, t))
+    return erwartet
+
+
+def _flags(con) -> dict[str, int]:
+    return {z["id"]: z["dup_abdeckung_vollstaendig"] for z in con.execute("SELECT * FROM posts")}
+
+
 def _zufallsposts(zufall: random.Random, anzahl: int, ende: datetime) -> list[PostDaten]:
-    """Kollisionsreiche Posts: kleine Pools für Texte, Dateien, pHashes, Dauern, Größen und Originale."""
+    """Kollisionsreiche Posts in Zeitfolge: kleine Pools für Texte, Dateien, pHashes, Dauern, Größen, Originale."""
     basis = [zufall.getrandbits(64) for _ in range(6)]
     groessen = [(1200, 800), (600, 400), (800, 1200), (1200, 790), (None, None)]
-    posts = []
-    zeitpunkt = ende
-    for _ in range(anzahl):
-        zeitpunkt -= timedelta(seconds=zufall.choice((0, 0, 1, 600, 3600, 4 * 3600, 20 * 3600)))
+    abstaende = [zufall.choice((0, 0, 1, 600, 3600, 4 * 3600, 20 * 3600)) for _ in range(anzahl)]
+    zeitpunkt = ende - timedelta(seconds=sum(abstaende))
+    posts: list[PostDaten] = []
+    eigene: list[PostDaten] = []
+    for abstand in abstaende:
+        zeitpunkt += timedelta(seconds=abstand)
         medien = []
         for _ in range(zufall.choice((0, 0, 1, 1, 1, 2, 3))):
             art = zufall.choice((MEDIUM_BILD, MEDIUM_BILD, MEDIUM_VIDEO, MEDIUM_GIF))
-            if zufall.random() < 0.07:
+            wurf = zufall.random()
+            if wurf < 0.07:
                 medien.append(_fehlgeschlagen(art))
+                continue
+            if wurf < 0.1:
+                ohne_id = zufall.random() < 0.5
+                medien.append(_ohne_hash(MEDIUM_VIDEO) if ohne_id else _ohne_hash(medien_id=zufall.choice(("1", "2"))))
                 continue
             phash = basis[zufall.randrange(len(basis))] ^ (1 << zufall.randrange(64)) * zufall.choice((0, 1))
             phash ^= ((1 << zufall.choice((0, 2, 5, 7))) - 1) << zufall.randrange(57)
@@ -923,11 +1209,13 @@ def _zufallsposts(zufall: random.Random, anzahl: int, ende: datetime) -> list[Po
         wurf = zufall.random()
         if wurf < 0.2:
             posts.append(_retruth(zeitpunkt, str(zufall.randrange(5)), text=text, medien=medien, quote_id=quote))
-        elif wurf < 0.27 and posts:
-            ziel = zufall.choice(posts)
+        elif wurf < 0.27 and eigene:
+            # Selbst-Retruth eines früheren eigenen Posts (die Liste enthält nur frühere).
+            ziel = zufall.choice(eigene)
             posts.append(_retruth(zeitpunkt, ziel.id, typ=TYP_SELBST_RETRUTH, text=text, medien=medien))
         else:
-            posts.append(_post(zeitpunkt, text=text, medien=medien, quote_id=quote))
+            eigene.append(_post(zeitpunkt, text=text, medien=medien, quote_id=quote))
+            posts.append(eigene[-1])
     return posts
 
 
@@ -937,16 +1225,26 @@ def test_abgleich_mit_naiver_referenz(con, lauf, saat):
     konfig = Konfig()
     konfig.erfassung.duplikat_fenster_tage = 2
     posts = _zufallsposts(zufall, 260, JETZT)
+    zeiten = [p.created_at for p in posts]
     zufall.shuffle(posts)
     alt, neu = posts[:200], posts[200:]
+    _abdecken(con, zeiten[len(zeiten) // 3], JETZT)
     _speichere(con, lauf, *alt)
     _aktualisiere(con, konfig=konfig)
     assert _tabelle(con) == _referenz(con, konfig)
+    assert _flags(con) == _referenz_flags(con, konfig)
 
-    # Nachträglich eingefügte Posts quer über den Zeitraum: Teil-Neuberechnung = Vollberechnung.
+    # Nachträglich eingefügte Posts quer über den Zeitraum und eine weitere abgedeckte Strecke:
+    # Teil-Neuberechnung samt nachgetragener Abdeckung = Vollberechnung.
     _speichere(con, lauf, *neu)
+    _abdecken(con, zeiten[0] - timedelta(days=3), zeiten[len(zeiten) // 4], anfang=True)
     _aktualisiere(con, [p.id for p in neu], konfig=konfig)
     erwartet = _referenz(con, konfig)
     assert _tabelle(con) == erwartet
     assert len(erwartet) > 100
     assert {z[1] for z in erwartet} == set(DUP_ARTEN)
+    flags = _flags(con)
+    assert flags == _referenz_flags(con, konfig)
+    assert 0 < sum(flags.values()) < len(flags)
+    selbst_retruths = [p for p in posts if p.typ == TYP_SELBST_RETRUTH]
+    assert selbst_retruths and any(DUP_GLEICHES_ORIGINAL in _dups(con, p) for p in selbst_retruths)

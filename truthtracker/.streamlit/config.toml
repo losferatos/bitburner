@@ -1,0 +1,46 @@
+# Streamlit-Einstellungen für das Dashboard. Streamlit liest diese Datei, wenn es aus dem
+# Projektordner startet (so machen es run_dashboard.bat und "python -m truthtracker dashboard").
+
+[browser]
+# Keine Nutzungsstatistik an Streamlit senden.
+gatherUsageStats = false
+
+[server]
+# Nur auf diesem Rechner erreichbar, nicht im Heimnetz.
+address = "localhost"
+# Kein fester Port: Streamlit nimmt 8501 und weicht auf 8502 … aus, wenn 8501 belegt oder (unter
+# Windows) reserviert ist. Mit "port = 8501" würde es stattdessen mit Fehler abbrechen.
+# Beim ersten Start nicht in der Konsole nach einer E-Mail-Adresse fragen.
+showEmailPrompt = false
+# false: Streamlit öffnet das Dashboard beim Start selbst im Standardbrowser.
+headless = false
+
+[client]
+# Kein Entwicklermenü (Rerun, Einstellungen bleiben erreichbar).
+toolbarMode = "minimal"
+
+# Kein fester Grundmodus: Hell oder Dunkel folgt der Systemeinstellung (umschaltbar im Menü).
+# Neutrale Flächen und die Farbreihen der Grafiken, je Modus eigens abgestimmt.
+[theme.light]
+primaryColor = "#2a78d6"
+backgroundColor = "#fcfcfb"
+secondaryBackgroundColor = "#f0efec"
+textColor = "#0b0b0b"
+borderColor = "#e1e0d9"
+chartCategoricalColors = ["#2a78d6", "#eb6834", "#1baf7a", "#eda100", "#e87ba4", "#008300", "#4a3aa7", "#e34948"]
+chartSequentialColors = [
+    "#cde2fb", "#b7d3f6", "#9ec5f4", "#86b6ef", "#6da7ec",
+    "#3987e5", "#2a78d6", "#256abf", "#184f95", "#0d366b",
+]
+
+[theme.dark]
+primaryColor = "#3987e5"
+backgroundColor = "#1a1a19"
+secondaryBackgroundColor = "#2c2c2a"
+textColor = "#ffffff"
+borderColor = "#383835"
+chartCategoricalColors = ["#3987e5", "#d95926", "#199e70", "#c98500", "#d55181", "#008300", "#9085e9", "#e66767"]
+chartSequentialColors = [
+    "#0d366b", "#184f95", "#256abf", "#2a78d6", "#3987e5",
+    "#6da7ec", "#86b6ef", "#9ec5f4", "#b7d3f6", "#cde2fb",
+]

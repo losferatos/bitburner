@@ -4,7 +4,10 @@ Datenschutz: Medienbytes existieren nur kurz im Speicher. ``MedienErfasser`` lä
 bzw. bei Videos, GIFs und sonstigen Medien nur das Vorschaubild, berechnet SHA-256 und pHash
 und verwirft die Bytes sofort. Es wird nichts auf die Platte geschrieben und nichts
 protokolliert. URLs stehen weder in den Rückgabeobjekten noch in Fehlermeldungen.
-Videodateien und Audio werden nie geladen.
+Audio wird nie geladen. Bei Videos, GIFs und sonstigen Medien wird keine Adresse angefragt,
+die (vereinheitlicht verglichen) die der Mediendatei selbst ist oder auf eine Video- oder
+Audiodatei endet. Ob eine andere Vorschauadresse wirklich ein Bild liefert, sieht erst der
+Transport an den Kopfzeilen der Antwort.
 
 Perzeptueller Hash (``phash_hex``), 64 Bit als 16 Hex-Zeichen:
 
@@ -13,7 +16,10 @@ Perzeptueller Hash (``phash_hex``), 64 Bit als 16 Hex-Zeichen:
    denselben Hash bekommt wie das aufrecht gespeicherte.
 2. Graustufen. Transparente Bereiche werden vorher auf Weiß gelegt, weil die Farbwerte
    vollständig transparenter Pixel undefiniert sind und je nach Encoder variieren.
-   16-Bit-Graustufen werden auf 8 Bit abgebildet (Wert / 257).
+   16-Bit-Graustufen werden auf 8 Bit abgebildet (Wert / 257, gerundet). Beide Umrechnungen
+   laufen streifenweise, damit große Bilder nicht mehrfach vollständig im Speicher liegen;
+   die EXIF-Drehung wird erst auf das Graustufenbild angewendet. Am Ergebnis ändert beides
+   nichts, weil die Umrechnung pixelweise ist.
 3. Auf 32 × 32 Pixel verkleinern (LANCZOS).
 4. 2D-DCT-II per Matrixmultiplikation: ``K = C · X · Cᵀ`` mit
    ``C[k, n] = cos(π · k · (2n + 1) / 64)`` (ohne Normierung; ein gemeinsamer Faktor ändert
@@ -34,15 +40,16 @@ from __future__ import annotations
 import hashlib
 import io
 import math
+import posixpath
 import re
 import string
 from collections.abc import Callable, Mapping
 from functools import cache
 from typing import Any
-from urllib.parse import urlsplit
+from urllib.parse import unquote, urlsplit
 
 import numpy as np
-from PIL import Image, ImageOps
+from PIL import ExifTags, Image
 
 from truthtracker.modelle import (
     HASH_FEHLER,
@@ -61,8 +68,13 @@ QUELLE_ORIGINAL = "original"  # Hash über die Bilddatei selbst
 QUELLE_VORSCHAU = "vorschau"  # Hash über das Vorschaubild
 
 MAX_BYTES_STANDARD = 20_000_000
-# Schutz vor Bildern, die klein komprimiert sind, aber beim Dekodieren riesig werden.
+# Schutz vor Bildern, die klein komprimiert sind, aber beim Dekodieren riesig werden. Neben dem
+# dekodierten Bild (bis 4 Byte je Pixel) entstehen nur ein bis zwei Graustufenbilder mit 1 Byte
+# je Pixel, an der Grenze also rund 250 MB Spitze. Niedriger nicht, weil unbekannt ist, wie groß
+# Truth Social Originale ausliefert; ohne pHash fiele das Medium aus Duplikat-Fall 4 heraus.
 MAX_PIXEL = 40_000_000
+# Höchstens so viele Pixel je Streifen bei der Umrechnung in Graustufen.
+_STREIFEN_PIXEL = 1_000_000
 # Pillow kann viel mehr öffnen, manche Formate (z. B. EPS) über externe Programme und
 # Temp-Dateien. Mastodon-Server liefern Bilder nur in diesen Formaten aus. Handyfotos im
 # MPO-Format öffnet Pillow über "JPEG".
@@ -73,6 +85,18 @@ _STROM_ENDUNGEN = (
     ".mp4", ".m4v", ".mov", ".webm", ".mkv", ".avi", ".ogv", ".ogg", ".mp3", ".m4a", ".wav",
     ".flac", ".opus", ".aac", ".m3u8", ".mpd",
 )
+# Felder mit Adressen der Mediendatei selbst (Mastodon: lokale Datei, Datei auf dem Herkunftsserver,
+# Kurzlink, der auf die Datei weiterleitet). Keine davon darf als Vorschau eines Videos dienen.
+_DATEI_FELDER = ("url", "remote_url", "text_url")
+_DREHUNGEN = {
+    2: Image.Transpose.FLIP_LEFT_RIGHT,
+    3: Image.Transpose.ROTATE_180,
+    4: Image.Transpose.FLIP_TOP_BOTTOM,
+    5: Image.Transpose.TRANSPOSE,
+    6: Image.Transpose.ROTATE_270,
+    7: Image.Transpose.TRANSVERSE,
+    8: Image.Transpose.ROTATE_90,
+}
 _MAX_KANTE_PX = 100_000
 _HEXZIFFERN = frozenset(string.hexdigits)
 _MEDIEN_ID = re.compile(r"[A-Za-z0-9_-]{1,64}")
@@ -284,7 +308,9 @@ def _quelle(anhang: Mapping[str, Any], art: str) -> tuple[str, str] | None:
         if _ist_http(vorschau):
             return vorschau.strip(), QUELLE_VORSCHAU
         return None
-    if not _ist_http(vorschau) or vorschau == url or _ist_stromdatei(vorschau):
+    if not _ist_http(vorschau) or _ist_stromdatei(vorschau):
+        return None
+    if any(_gleiche_datei(vorschau, anhang.get(feld)) for feld in _DATEI_FELDER):
         return None
     return vorschau.strip(), QUELLE_VORSCHAU
 
@@ -299,8 +325,35 @@ def _ist_http(url: object) -> bool:
     return teile.scheme.lower() in ("http", "https") and bool(teile.netloc)
 
 
+def _adresskern(url: str) -> tuple[str, str] | None:
+    """Host und Pfad in Vergleichsform; ``None``, wenn sich die Adresse nicht zerlegen lässt.
+
+    Schema, Port, Zugangsdaten, Query und Fragment zählen nicht, ebenso wenig Groß- und
+    Kleinschreibung, Prozentkodierung, doppelte Schrägstriche, Punktsegmente und ein
+    abschließender Schrägstrich. Lieber eine Vorschau zu viel verwerfen als eine Videodatei laden.
+    """
+    try:
+        teile = urlsplit(url.strip())
+        host = (teile.hostname or "").rstrip(".")
+    except ValueError:
+        return None
+    pfad = re.sub(r"/{2,}", "/", "/" + unquote(teile.path))
+    return host, posixpath.normpath(pfad).lower()
+
+
+def _gleiche_datei(vorschau: str, andere: object) -> bool:
+    if not isinstance(andere, str) or not andere.strip():
+        return False
+    a, b = _adresskern(vorschau), _adresskern(andere)
+    if a is None or b is None:
+        return False
+    # Eine relative Adresse ohne Host meint denselben Server.
+    return a[1] == b[1] and (a[0] == b[0] or not a[0] or not b[0])
+
+
 def _ist_stromdatei(url: str) -> bool:
-    return urlsplit(url.strip()).path.lower().endswith(_STROM_ENDUNGEN)
+    kern = _adresskern(url)
+    return kern is not None and kern[1].endswith(_STROM_ENDUNGEN)
 
 
 def _ist_textantwort(roh: bytes) -> bool:
@@ -396,12 +449,12 @@ def _graustufen_32(daten: bytes) -> np.ndarray:
             breite, hoehe = bild.size
             if breite * hoehe > MAX_PIXEL:
                 raise MedienFehler("Bild hat zu viele Pixel zum Dekodieren.")
-            try:
-                aufrecht = ImageOps.exif_transpose(bild)
-            except Exception:
-                # Kaputte EXIF-Daten: dann eben ungedreht, das Bild selbst kann trotzdem gültig sein.
-                aufrecht = bild
-            klein = _graustufen(aufrecht).resize((_PHASH_KANTE, _PHASH_KANTE), Image.Resampling.LANCZOS)
+            bild.load()
+            grau = _graustufen(bild)
+            drehung = _exif_drehung(bild)
+            if drehung is not None:
+                grau = grau.transpose(drehung)
+            klein = grau.resize((_PHASH_KANTE, _PHASH_KANTE), Image.Resampling.LANCZOS)
             return np.asarray(klein, dtype=np.float64)
     except MedienFehler:
         raise
@@ -411,13 +464,47 @@ def _graustufen_32(daten: bytes) -> np.ndarray:
         raise MedienFehler("Bilddaten ließen sich nicht dekodieren.") from None
 
 
+def _exif_drehung(bild: Image.Image) -> Image.Transpose | None:
+    """Drehung bzw. Spiegelung laut EXIF-Orientierung (wie ``ImageOps.exif_transpose``)."""
+    try:
+        orientierung = bild.getexif().get(ExifTags.Base.Orientation)
+    except Exception:
+        # Kaputte EXIF-Daten: dann eben ungedreht, das Bild selbst kann trotzdem gültig sein.
+        return None
+    return _DREHUNGEN.get(orientierung) if isinstance(orientierung, int) else None
+
+
 def _graustufen(bild: Image.Image) -> Image.Image:
     if bild.mode in _HOHE_BITTIEFE:
-        # Pillow schneidet beim Umwandeln nach "L" alles über 255 ab, statt zu skalieren.
-        werte = np.asarray(bild.convert("F"), dtype=np.float64) / 257.0
-        return Image.fromarray(np.clip(np.round(werte), 0, 255).astype(np.uint8))
+        return _streifenweise(bild, _sechzehn_bit_auf_l)
     if bild.has_transparency_data:
-        rgba = bild.convert("RGBA")
-        weiss = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
-        return Image.alpha_composite(weiss, rgba).convert("L")
+        return _streifenweise(bild, _auf_weiss_als_l)
     return bild.convert("L")
+
+
+def _streifenweise(bild: Image.Image, umrechnen: Callable[[Image.Image], Image.Image]) -> Image.Image:
+    """Rechnet ein Bild in waagrechten Streifen nach ``L`` um, damit Zwischenbilder klein bleiben."""
+    breite, hoehe = bild.size
+    zeilen = max(1, _STREIFEN_PIXEL // max(1, breite))
+    if zeilen >= hoehe:
+        return umrechnen(bild)
+    grau = Image.new("L", bild.size)
+    for oben in range(0, hoehe, zeilen):
+        grau.paste(umrechnen(bild.crop((0, oben, breite, min(oben + zeilen, hoehe)))), (0, oben))
+    return grau
+
+
+def _sechzehn_bit_auf_l(bild: Image.Image) -> Image.Image:
+    # Pillow schneidet beim Umwandeln nach "L" alles über 255 ab, statt zu skalieren. Ganzzahlig
+    # gerechnet ist (x + 128) // 257 gleich round(x / 257), weil x / 257 nie auf ,5 endet.
+    werte = np.asarray(bild).astype(np.int32)
+    np.clip(werte, 0, 65535, out=werte)
+    werte += 128
+    werte //= 257
+    return Image.fromarray(werte.astype(np.uint8))
+
+
+def _auf_weiss_als_l(bild: Image.Image) -> Image.Image:
+    rgba = bild.convert("RGBA")
+    weiss = Image.new("RGBA", rgba.size, (255, 255, 255, 255))
+    return Image.alpha_composite(weiss, rgba).convert("L")

@@ -8,16 +8,23 @@ Regeln (docs/architektur.md, Abschnitt "Text"):
 * ``<p>`` und andere Blockelemente trennen Absätze (Leerzeile), ``<br>`` und ``<li>`` Zeilen.
   Leerraum am Rand eines Absatzes oder einer Zeile zählt nicht.
 * Elemente mit der Klasse ``quote-inline`` (Quote-Fallback "RE: …") fallen ganz weg, ebenso
-  Links auf das zitierte Original (``ausgeschlossene_links``).
+  Links auf das zitierte Original (``ausgeschlossene_links`` bzw. ``ausgeschlossene_ids``),
+  als ``<a>`` wie als nackte URL.
 * Spannen mit ``invisible``/``ellipsis`` bleiben vollständig: Ein Link zählt mit seiner ganzen URL.
 * Gezählt wird in Graphem-Clustern (``regex``, ``\\X``): ein Emoji mit ZWJ, eine Flagge oder
   ein Buchstabe mit kombinierendem Akzent ist je ein Zeichen.
+* Wo ein Link wegfällt (ohne URLs bzw. ausgeschlossen), wird der Leerraum davor und danach zu
+  einem Leerzeichen; eine Zeile, die nur aus solchen Links bestand, fällt samt Umbruch weg.
+  Sonst bleibt der Leerraum, wie er ist: Ohne URLs ist ``zeichen_ohne_urls == zeichen``.
+* Link-Domains sind nur Hosts mit Top-Level-Domain (``example.com``) oder IPv4-Adressen; ein
+  einzelnes Wort hinter ``http://`` ist keine Domain.
 """
 
 from __future__ import annotations
 
 import hashlib
 import html as html_modul
+import ipaddress
 import re
 import unicodedata
 from collections.abc import Iterable
@@ -31,12 +38,18 @@ from truthtracker.modelle import TextMetriken
 
 _GRAPHEM = regex.compile(r"\X")
 _LEERRAUM = re.compile(r"\s+")
-_LEERRAUM_OHNE_ZEILENUMBRUCH = re.compile(r"[^\S\n]+")
-_NACKTE_URL = re.compile(r"https?://[^\s<>\"']+", re.IGNORECASE)
+_SURROGAT = re.compile("[\ud800-\udfff]")
+# Leerraum, CJK-Satzzeichen (U+3000–U+303F) und Vollbreitenformen beenden eine nackte URL.
+_NACKTE_URL = re.compile(r"https?://[^\s<>\"'\u3000-\u303f\uff00-\uffef]+", re.IGNORECASE)
 _URL_ENDZEICHEN = ".,;:!?)]}\u00bb\u2026\u201c\u201d\u2018\u2019"  # auch » … und typografische Anführungszeichen
 _KLAMMERN = {")": "(", "]": "[", "}": "{"}
-_HOST = re.compile(r"^[a-z0-9](?:[a-z0-9-]*[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]*[a-z0-9])?)*$")
-_PROFILPFAD = re.compile(r"^/@[^/]+/?$")
+_HOST = re.compile(r"[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*")
+_MAX_HOST = 253  # DNS-Grenze; das Prüfskript verlangt dasselbe
+_TLD = re.compile(r"[a-z]{2,63}|xn--[a-z0-9-]{1,59}")
+_PROFILPFAD = re.compile(r"/@[^/]+/?")
+# Pfade, unter denen Truth Social einen Post zeigt; die Gruppe ist die Status-ID.
+_POST_PFAD = re.compile(r"/(?:@[^/]+(?:/posts)?|users/[^/]+/statuses|statuses)/([0-9]{1,19})/?")
+_ZIFFERN = re.compile(r"[0-9]{1,19}")
 _DEKLARATION = re.compile(r"<[!?][^>]*>")
 _TAG = re.compile(r"<[^>]*>")
 
@@ -60,6 +73,11 @@ _LINK_MENTION = "mention"
 _LINK_HASHTAG = "hashtag"
 _LINK_TEXT = "text"  # <a> ohne Ziel: gewöhnlicher Text
 _LINK_AUSGESCHLOSSEN = "ausgeschlossen"
+
+# Arten der Teile eines Blocks
+_TEIL_TEXT = "text"
+_TEIL_URL = "url"  # zählt im sichtbaren Text, fällt ohne URLs weg
+_TEIL_ENTFERNT = "entfernt"  # Link auf das zitierte Original: fällt immer weg
 
 
 @dataclass
@@ -87,11 +105,11 @@ class _Stueck:
 
 @dataclass
 class _Block:
-    """Ein Absatz oder eine Zeile; ``stuecke`` sind (Text, ist_url)."""
+    """Ein Absatz oder eine Zeile; ``stuecke`` sind (Text, Teil-Art)."""
 
     absatz_vorher: bool = False
     zeilen_vorher: int = 0
-    stuecke: list[tuple[str, bool]] = field(default_factory=list)
+    stuecke: list[tuple[str, str]] = field(default_factory=list)
 
 
 class _Zerleger(HTMLParser):
@@ -166,6 +184,7 @@ class _Zerleger(HTMLParser):
 def _zerlege(html: object) -> list[_Stueck]:
     if not isinstance(html, str) or not html:
         return []
+    html = bereinige_unicode(html)
     # Ältere html.parser-Versionen werfen bei kaputten Deklarationen AssertionErrors, deren
     # Meldung HTML-Ausschnitte enthält. Deshalb nie weiterreichen, sondern abgestuft ausweichen.
     for quelle in (html, _DEKLARATION.sub("", html)):
@@ -191,6 +210,19 @@ def _ist_eigener_host(host: str, eigene: tuple[str, ...]) -> bool:
     return any(host == e or host.endswith("." + e) for e in eigene)
 
 
+def _ist_domain(host: str) -> bool:
+    """Ein Host mit Top-Level-Domain aus Buchstaben (auch Punycode) oder eine IPv4-Adresse."""
+    if "." not in host:
+        return False
+    if _TLD.fullmatch(host.rsplit(".", 1)[1]):
+        return True
+    try:
+        ipaddress.IPv4Address(host)
+    except ValueError:
+        return False
+    return True
+
+
 def _domain(url: str, eigene: tuple[str, ...]) -> str | None:
     """Host einer externen URL ohne ``www.``; ``None`` bei eigenen oder unbrauchbaren Hosts."""
     try:
@@ -205,7 +237,7 @@ def _domain(url: str, eigene: tuple[str, ...]) -> str | None:
             host = host.encode("idna").decode("ascii")
         except UnicodeError:
             return None
-    if not _HOST.match(host) or _ist_eigener_host(host, eigene):
+    if len(host) > _MAX_HOST or not _HOST.fullmatch(host) or not _ist_domain(host) or _ist_eigener_host(host, eigene):
         return None
     return host
 
@@ -227,10 +259,45 @@ def _kanonisch(url: str, eigene: tuple[str, ...]) -> str | None:
     return f"{host}{pfad}" + (f"?{teile.query}" if teile.query else "")
 
 
-def _link_art(link: _Link, text: str, eigene: tuple[str, ...], ausgeschlossen: set[str]) -> str:
+def _status_id(wert: object) -> str | None:
+    if isinstance(wert, bool):
+        return None
+    if isinstance(wert, int):
+        # Erst prüfen, dann umwandeln: str() sehr großer Zahlen wirft einen ValueError.
+        return str(wert) if 0 <= wert < 10**19 else None
+    if isinstance(wert, str) and _ZIFFERN.fullmatch(wert.strip()):
+        return str(int(wert.strip()))
+    return None
+
+
+@dataclass(frozen=True)
+class _Ausschluss:
+    """Eigene Hosts und die Links, die nicht zählen (das zitierte Original eines Quotes)."""
+
+    eigene: tuple[str, ...]
+    links: frozenset[str] = frozenset()  # Vergleichsformen (``_kanonisch``)
+    ids: frozenset[str] = frozenset()  # Status-IDs: jeder Post-Link darauf (eigener Host) fällt weg
+
+    def trifft(self, url: str) -> bool:
+        if self.links and _kanonisch(url, self.eigene) in self.links:
+            return True
+        if not self.ids:
+            return False
+        try:
+            teile = urlsplit(url.strip())
+            host = teile.hostname
+        except ValueError:
+            return False
+        if host and not _ist_eigener_host(_normalisiere_host(host), self.eigene):
+            return False
+        treffer = _POST_PFAD.fullmatch(teile.path)
+        return treffer is not None and _status_id(treffer.group(1)) in self.ids
+
+
+def _link_art(link: _Link, text: str, ausschluss: _Ausschluss) -> str:
     if not link.href:
         return _LINK_TEXT
-    if _kanonisch(link.href, eigene) in ausgeschlossen:
+    if ausschluss.trifft(link.href):
         return _LINK_AUSGESCHLOSSEN
     if not text.strip():
         return _LINK_TEXT
@@ -243,10 +310,10 @@ def _link_art(link: _Link, text: str, eigene: tuple[str, ...], ausgeschlossen: s
         host = teile.hostname
     except ValueError:
         return _LINK_URL
-    eigener_host = not host or _ist_eigener_host(_normalisiere_host(host), eigene)
+    eigener_host = not host or _ist_eigener_host(_normalisiere_host(host), ausschluss.eigene)
     if teile.scheme.lower() in ("", "http", "https") and eigener_host:
         # Nur Profilseiten gelten als Mention; ein Link auf einen Post (/@name/123) ist eine URL.
-        if _PROFILPFAD.match(teile.path):
+        if _PROFILPFAD.fullmatch(teile.path):
             return _LINK_MENTION
         if teile.path.startswith("/tags/"):
             return _LINK_HASHTAG
@@ -291,7 +358,7 @@ class _Zerlegung:
     n_hashtags: int
 
 
-def _baue_bloecke(folge: list[_Stueck], eigene: tuple[str, ...], ausgeschlossen: set[str]) -> _Zerlegung:
+def _baue_bloecke(folge: list[_Stueck], ausschluss: _Ausschluss) -> _Zerlegung:
     bloecke = [_Block()]
     urls: list[str] = []
     n_mentions = n_hashtags = 0
@@ -300,8 +367,12 @@ def _baue_bloecke(folge: list[_Stueck], eigene: tuple[str, ...], ausgeschlossen:
     def puffer_leeren() -> None:
         if text_puffer:
             for teil, ist_url in _teile_nackte_urls("".join(text_puffer)):
-                bloecke[-1].stuecke.append((teil, ist_url))
-                if ist_url:
+                if not ist_url:
+                    bloecke[-1].stuecke.append((teil, _TEIL_TEXT))
+                elif ausschluss.trifft(teil):
+                    bloecke[-1].stuecke.append(("", _TEIL_ENTFERNT))
+                else:
+                    bloecke[-1].stuecke.append((teil, _TEIL_URL))
                     urls.append(teil)
             text_puffer.clear()
 
@@ -323,14 +394,15 @@ def _baue_bloecke(folge: list[_Stueck], eigene: tuple[str, ...], ausgeschlossen:
             umbruch(absatz=False)
         elif stueck.link is not None:
             linktext = "".join(stueck.link.teile)
-            art = _link_art(stueck.link, linktext, eigene, ausgeschlossen)
-            if art == _LINK_AUSGESCHLOSSEN:
-                continue
+            art = _link_art(stueck.link, linktext, ausschluss)
             if art == _LINK_TEXT:
                 text_puffer.append(linktext)
                 continue
             puffer_leeren()
-            bloecke[-1].stuecke.append((linktext, art == _LINK_URL))
+            if art == _LINK_AUSGESCHLOSSEN:
+                bloecke[-1].stuecke.append(("", _TEIL_ENTFERNT))
+                continue
+            bloecke[-1].stuecke.append((linktext, _TEIL_URL if art == _LINK_URL else _TEIL_TEXT))
             if art == _LINK_URL:
                 urls.append(stueck.link.href)
             elif art == _LINK_MENTION:
@@ -341,22 +413,49 @@ def _baue_bloecke(folge: list[_Stueck], eigene: tuple[str, ...], ausgeschlossen:
     return _Zerlegung(bloecke, urls, n_mentions, n_hashtags)
 
 
+def _faellt_weg(art: str, *, mit_urls: bool) -> bool:
+    return art == _TEIL_ENTFERNT or (art == _TEIL_URL and not mit_urls)
+
+
+def _blocktext(stuecke: list[tuple[str, str]], *, mit_urls: bool) -> str:
+    text = ""
+    naht = False
+    for teil, art in stuecke:
+        if _faellt_weg(art, mit_urls=mit_urls):
+            naht = True
+            continue
+        if not teil:
+            continue
+        if naht and (text[-1:].isspace() or teil[:1].isspace()):
+            # Nur an der Nahtstelle wird Leerraum eins, damit "a URL b" ohne URL "a b" ergibt.
+            text = text.rstrip() + " " + teil.lstrip()
+        else:
+            text += teil
+        naht = False
+    return text.strip()
+
+
+def _umbrueche(absatz: bool, zeilen: int) -> int:
+    return max(2 if absatz else 1, zeilen)
+
+
 def _verbinde(bloecke: list[_Block], *, mit_urls: bool) -> str:
     teile: list[str] = []
     absatz, zeilen = False, 0
+    getragen = 0  # Umbruch vor einer weggefallenen Zeile; der stärkere der beiden bleibt
     for block in bloecke:
         absatz = absatz or block.absatz_vorher
         zeilen += block.zeilen_vorher
-        text = "".join(t for t, ist_url in block.stuecke if mit_urls or not ist_url)
-        if not mit_urls:
-            text = _LEERRAUM_OHNE_ZEILENUMBRUCH.sub(" ", text)
-        text = text.strip()
+        text = _blocktext(block.stuecke, mit_urls=mit_urls)
         if not text:
+            if any(_faellt_weg(art, mit_urls=mit_urls) for _, art in block.stuecke):
+                getragen = max(getragen, _umbrueche(absatz, zeilen))
+                absatz, zeilen = False, 0
             continue
         if teile:
-            teile.append("\n" * max(2 if absatz else 1, zeilen))
+            teile.append("\n" * max(getragen, _umbrueche(absatz, zeilen)))
         teile.append(text)
-        absatz, zeilen = False, 0
+        absatz, zeilen, getragen = False, 0, 0
     return "".join(teile)
 
 
@@ -364,9 +463,29 @@ def _verbinde(bloecke: list[_Block], *, mit_urls: bool) -> str:
 # Öffentliche Funktionen
 
 
+def bereinige_unicode(text: str) -> str:
+    """Einzelne UTF-16-Surrogate (aus kaputten JSON-Escapes) werden U+FFFD, getrennte Paare ein Zeichen.
+
+    Solche Zeichenketten lassen sich nicht als UTF-8 kodieren; Hash und Datenbank scheiterten daran.
+    """
+    if not _SURROGAT.search(text):
+        return text
+    return text.encode("utf-16", "surrogatepass").decode("utf-16", "replace")
+
+
+def kuerze(text: str, max_codepunkte: int) -> str:
+    """Höchstens ``max_codepunkte`` Codepunkte, ohne ein Graphem-Cluster zu zerschneiden."""
+    if len(text) <= max_codepunkte:
+        return text
+    for treffer in _GRAPHEM.finditer(text):
+        if treffer.end() > max_codepunkte:
+            return text[: treffer.start()]
+    return text
+
+
 def sichtbarer_text(html: object) -> str:
     """Der Text, den ein Leser sieht: ohne HTML, Entities dekodiert, ohne Quote-Fallback, getrimmt."""
-    zerlegung = _baue_bloecke(_zerlege(html), ("truthsocial.com",), set())
+    zerlegung = _baue_bloecke(_zerlege(html), _Ausschluss(("truthsocial.com",)))
     return _verbinde(zerlegung.bloecke, mit_urls=True)
 
 
@@ -376,7 +495,7 @@ def zaehle_grapheme(text: str) -> int:
 
 def normalisiere_fuer_hash(text: str) -> str:
     """Unicode NFC, jede Folge von Leerraum (auch Zeilenumbrüche) zu einem Leerzeichen, getrimmt."""
-    return _LEERRAUM.sub(" ", unicodedata.normalize("NFC", text)).strip()
+    return _LEERRAUM.sub(" ", unicodedata.normalize("NFC", bereinige_unicode(text))).strip()
 
 
 def text_hash(text: str) -> str | None:
@@ -405,14 +524,24 @@ def analysiere(
     mentions: object = None,
     tags: object = None,
     ausgeschlossene_links: Iterable[str] = (),
+    ausgeschlossene_ids: Iterable[str] = (),
     eigene_hosts: Iterable[str] = ("truthsocial.com",),
 ) -> TextAnalyse:
-    """Metriken des ``content``-HTML. ``ausgeschlossene_links``: URLs des zitierten Originals."""
+    """Metriken des ``content``-HTML.
+
+    ``ausgeschlossene_links``: URLs des zitierten Originals (auch auf fremden Hosts).
+    ``ausgeschlossene_ids``: dessen Status-ID; jeder Post-Link darauf auf einem eigenen Host
+    (``/@name/ID``, ``/users/name/statuses/ID``, ``/statuses/ID``) zählt ebenfalls nicht.
+    """
     eigene = tuple(dict.fromkeys(_normalisiere_host(h) for h in eigene_hosts if isinstance(h, str) and h.strip()))
-    ausgeschlossen = {
-        k for k in (_kanonisch(u, eigene) for u in ausgeschlossene_links if isinstance(u, str) and u.strip()) if k
-    }
-    zerlegung = _baue_bloecke(_zerlege(html), eigene, ausgeschlossen)
+    ausschluss = _Ausschluss(
+        eigene=eigene,
+        links=frozenset(
+            k for k in (_kanonisch(u, eigene) for u in ausgeschlossene_links if isinstance(u, str) and u.strip()) if k
+        ),
+        ids=frozenset(i for i in map(_status_id, ausgeschlossene_ids) if i is not None),
+    )
+    zerlegung = _baue_bloecke(_zerlege(html), ausschluss)
     sichtbar = _verbinde(zerlegung.bloecke, mit_urls=True)
     ohne_urls = _verbinde(zerlegung.bloecke, mit_urls=False)
     domains = {d for d in (_domain(u, eigene) for u in zerlegung.urls) if d}

@@ -8,13 +8,15 @@ from __future__ import annotations
 import copy
 import dataclasses
 import hashlib
+import json
+import re
 from datetime import timedelta
 from typing import Any
 
 import pytest
 from fabrik import BASIS, JETZT, MARKER, TRUMP_ID, bild_png, karte, konto, medium, retruth, status
 
-from truthtracker import medien
+from truthtracker import db, medien, pruefung
 from truthtracker.klassifikation import (
     beschreibe_anhang,
     bestimme_format,
@@ -22,6 +24,7 @@ from truthtracker.klassifikation import (
     ist_werbung,
     zaehler_aus,
 )
+from truthtracker.konfig import Konfig
 from truthtracker.modelle import (
     FORMAT_LEER,
     FORMAT_MEDIEN_TEXT,
@@ -58,10 +61,41 @@ ANDERER_ID = "108000000000000777"
 FREMD = konto(FREMD_ID, "jemand", "Jemand Fremdes", verifiziert=False, follower=1234)
 ANDERER = konto(ANDERER_ID, "anderer", "Ein Anderer", verifiziert=True, follower=-1)
 ARTIKEL = "https://www.example.com/artikel/zur/sache"
+POST_URL = re.compile(rf"{re.escape(BASIS)}/@[A-Za-z0-9_]+/[0-9]+")  # wie pruefung._post_url
+SURROGAT = json.loads('"\\ud83d"')  # abgeschnittenes Emoji-Escape aus kaputtem JSON
+
+
+def pruefer() -> pruefung._Pruefung:
+    """Die Positivlisten des Prüfskripts für Datenbankwerte."""
+    return pruefung._Pruefung(Konfig(), [])
+
+
+def db_werte(p: PostDaten) -> list[tuple[str, str]]:
+    """(Spalte, Wert) wie ``db.post_speichern`` sie schreibt, für die Textspalten mit Positivliste."""
+    werte = [
+        ("id", p.id), ("url", p.url), ("in_reply_to_id", p.in_reply_to_id), ("quote_id", p.quote_id),
+        ("original_id", p.original_id), ("sichtbarkeit", p.sichtbarkeit), ("format", p.format), ("typ", p.typ),
+        ("typ_detail", p.typ_detail), ("reply_art", p.reply_art), ("text_hash", p.text.text_hash),
+        ("medien_hash", p.medien_hash), ("fingerabdruck", p.fingerabdruck),
+        ("link_domains", json.dumps(sorted(set(p.text.link_domains)))),
+        ("weitere", json.dumps(p.zaehler.weitere, sort_keys=True)),
+    ]
+    if p.zaehler_original is not None:
+        werte.append(("orig_weitere", json.dumps(p.zaehler_original.weitere, sort_keys=True)))
+    for m in p.medien:
+        werte += [("medien_id", m.medien_id), ("art", m.art), ("hash_status", m.hash_status)]
+    for q in p.quellen:
+        werte += [("konto_id", q.konto_id), ("handle", q.handle), ("anzeigename", q.anzeigename), ("rolle", q.rolle)]
+    return [(spalte, wert) for spalte, wert in werte if wert]
+
+
+def funde_der_pruefung(pruefung_: pruefung._Pruefung, p: PostDaten) -> list[tuple[str, Any]]:
+    return [(spalte, fund) for spalte, wert in db_werte(p) for fund in pruefung_._db_wert(spalte, wert)]
 
 
 def sha(text: str) -> str:
-    return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    # surrogatepass: Der FakeErfasser hasht auch mutierte URLs mit einzelnen Surrogaten.
+    return hashlib.sha256(text.encode("utf-8", "surrogatepass")).hexdigest()
 
 
 def link(url: str) -> str:
@@ -388,6 +422,29 @@ def test_format_link_auf_zitiertes_original_ohne_fallback_klasse():
     assert ex(s).format == FORMAT_LEER
 
 
+@pytest.mark.parametrize("pfad", ["/@jemand/{id}", "/users/jemand/statuses/{id}", "/statuses/{id}"])
+def test_quote_nur_mit_id_link_auf_original_zaehlt_nicht(pfad):
+    """Ist das Original nicht eingebettet, erkennt die Status-ID den Link darauf."""
+    zitiert_id = "114000000000009999"
+    s = status(JETZT, text="")
+    s["quote_id"], s["quote"] = zitiert_id, None
+    url = BASIS + pfad.format(id=zitiert_id)
+    s["content"] = f'<p>{MARKER}</p><p class="quote-inline">RE: <a href="{url}">{url}</a></p>'
+    assert ex(s).format == FORMAT_NUR_TEXT
+    s["content"] = f'<p>{MARKER}</p><p>RE: <a href="{url}">{url}</a></p>'
+    p = ex(s)
+    assert p.format == FORMAT_NUR_TEXT and p.text.n_urls == 0
+    s["content"] = f"<p>{MARKER} {url}</p>"
+    p = ex(s)
+    assert p.format == FORMAT_NUR_TEXT and p.text.zeichen == len(MARKER)
+    s["content"] = f'<p><a href="{url}">{url}</a></p>'
+    assert ex(s).format == FORMAT_LEER
+    # Ein Link auf einen anderen Post bleibt eine URL.
+    andere = f"{BASIS}/@jemand/114000000000000001"
+    s["content"] = f'<p>{MARKER} <a href="{andere}">{andere}</a></p>'
+    assert ex(s).format == FORMAT_TEXT_LINK
+
+
 def test_format_bei_retruth_aus_dem_original():
     original = status(JETZT - timedelta(hours=1), autor=FREMD, text="", medien=[medium("image")])
     p = ex(retruth(JETZT, original))
@@ -438,6 +495,35 @@ def test_beschreibe_anhang_masse_und_dauer():
     assert video.sha256 is None and video.phash is None and video.hash_quelle is None
     bild = beschreibe_anhang(medium("image", breite=800, hoehe=600), 0)
     assert (bild.breite, bild.hoehe, bild.dauer_s) == (800, 600, None)
+
+
+@pytest.mark.parametrize(
+    ("wert", "erwartet"),
+    [
+        ("114000000000000042", "114000000000000042"),
+        (114000000000000042, "114000000000000042"),
+        (" 42 ", "42"),
+        (MARKER, None),
+        ("abc-def", None),
+        (-3, None),
+        (0, None),
+        (True, None),
+        (str(2**63), None),
+    ],
+)
+def test_medien_id_nur_ziffern(wert, erwartet):
+    """Das Prüfskript erlaubt in ``medien_id`` nur Ziffern."""
+    anhang = medium()
+    anhang["id"] = wert
+    assert beschreibe_anhang(anhang, 0).medien_id == erwartet
+
+
+def test_beschreibe_anhang_unplausible_abmessungen():
+    anhang = medium("image")
+    anhang["meta"]["original"] = {"width": 10**20, "height": 600, "size": "1200x800"}
+    assert (beschreibe_anhang(anhang, 0).breite, beschreibe_anhang(anhang, 0).hoehe) == (1200, 800)
+    anhang["meta"]["original"] = {"width": 2.0, "height": 3.0}
+    assert (beschreibe_anhang(anhang, 0).breite, beschreibe_anhang(anhang, 0).hoehe) == (2, 3)
 
 
 def test_beschreibe_anhang_size_als_ersatz():
@@ -601,6 +687,14 @@ def test_zaehler_negativ_und_fehlend():
     assert zaehler_aus({"replies_count": True, "reblogs_count": "3", "favourites_count": 2.0}) == Zaehler()
 
 
+def test_zaehler_ausserhalb_64_bit_und_schluessel_mit_zeilenumbruch():
+    s = status(JETZT)
+    s.update({"replies_count": 2**63, "reblogs_count": 2**63 - 1, "quotes_count\n": 3, "gross_count": 10**30})
+    z = zaehler_aus(s)
+    assert z.replies is None and z.retruths == 2**63 - 1
+    assert set(z.weitere) == {"upvotes_count", "downvotes_count"}
+
+
 def test_zaehler_eingebetteter_objekte_zaehlen_nicht():
     ziel = status(JETZT - timedelta(minutes=1))
     s = status(JETZT, antwort_auf_status=ziel, zaehler=(1, 1, 1))
@@ -631,15 +725,22 @@ def test_gepinnt():
     s = status(JETZT, gepinnt=True)
     assert ex(s, gepinnte_ids={s["id"]}).gepinnt is True
     assert ex(s, gepinnte_ids=set()).gepinnt is False
+    assert ex(status(JETZT, gepinnt=True), gepinnte_ids={s["id"]}).gepinnt is False
+
+
+def test_gepinnt_ohne_liste_ist_nur_pinned_true_eine_aussage():
+    """Ausgeloggt ist ``pinned`` immer ``false``; scheitert der Pinned-Abruf, bleibt der Status unbekannt."""
+    s = status(JETZT, gepinnt=True)
     assert ex(s).gepinnt is True
-    assert ex(status(JETZT)).gepinnt is False
-    s["pinned"] = "ja"
-    assert ex(s).gepinnt is None
+    assert ex(status(JETZT)).gepinnt is None
+    for wert in ("ja", 1, None):
+        s["pinned"] = wert
+        assert ex(s).gepinnt is None
 
 
 def test_url_ersatz_aus_handle_und_id():
     s = status(JETZT)
-    s["url"] = None
+    s["url"] = s["uri"] = None
     assert ex(s).url == f"{BASIS}/@realDonaldTrump/{s['id']}"
     s["url"] = "javascript:alert(1)"
     assert ex(s).url == f"{BASIS}/@realDonaldTrump/{s['id']}"
@@ -650,24 +751,79 @@ def test_url_ersatz_ohne_handle():
     s = status(JETZT)
     s["url"] = None
     s["account"] = {"id": TRUMP_ID}
-    assert ex(s).url == s["uri"]
+    # Die ActivityPub-Adresse /users/<name>/statuses/<id> verrät den Handle.
+    assert ex(s).url == f"{BASIS}/@realDonaldTrump/{s['id']}"
     s["uri"] = None
-    assert ex(s).url == f"{BASIS}/statuses/{s['id']}"
+    # Ohne jeden Handle gäbe es nur Adressen, die das Prüfskript nicht kennt: lieber leer.
+    assert ex(s).url == ""
+
+
+@pytest.mark.parametrize(
+    "variante",
+    [
+        "https://www.truthsocial.com/@realDonaldTrump/{id}",
+        "http://truthsocial.com/@realDonaldTrump/{id}/",
+        "https://TruthSocial.com/@realDonaldTrump/{id}?utm=x#oben",
+        "https://truthsocial.com:443/@realDonaldTrump/{id}",
+        "https://truthsocial.com/users/realDonaldTrump/statuses/{id}",
+    ],
+)
+def test_post_url_wird_kanonisch(variante):
+    s = status(JETZT)
+    s["url"] = variante.format(id=s["id"])
+    assert ex(s).url == f"{BASIS}/@realDonaldTrump/{s['id']}"
+
+
+@pytest.mark.parametrize(
+    "falsch",
+    [
+        f"{BASIS}/{MARKER}",
+        f"{BASIS}/@realDonaldTrump/1",
+        f"{BASIS}/@realDonaldTrump/{{id}}/{MARKER}",
+        f"{BASIS}/@jemand.punkt/{{id}}",
+        "https://static-assets-1.truthsocial.com/@realDonaldTrump/{id}",
+        "https://truthsocial.com.example/@realDonaldTrump/{id}",
+        "https://truthsocial.com:8443/@realDonaldTrump/{id}",
+        "{BASIS}/users/realDonaldTrump/statuses/{id}/activity",
+    ],
+)
+def test_url_mit_fremdem_pfad_host_oder_anderer_id_wird_ersetzt(falsch):
+    s = status(JETZT, autor=konto(TRUMP_ID, "Trump_Handle"))
+    s["url"] = falsch.format(id=s["id"], BASIS=BASIS)
+    s["uri"] = None
+    assert ex(s).url == f"{BASIS}/@Trump_Handle/{s['id']}"
 
 
 def test_url_bei_retruth_ohne_original_url():
     original = status(JETZT - timedelta(hours=1), autor=FREMD)
     original["url"] = None
     assert ex(retruth(JETZT, original)).url == f"{BASIS}/@jemand/{original['id']}"
+    original["uri"] = None
+    assert ex(retruth(JETZT, original)).url == f"{BASIS}/@jemand/{original['id']}"
 
 
-def test_fremde_post_url_wird_durch_eigene_ersetzt():
+def test_foederiertes_original_verlinkt_ueber_den_retruth():
+    """``/@realDonaldTrump/<Retruth-ID>`` leitet auf das Original weiter; dessen fremde Adresse nicht."""
     fern = konto("108000000000000999", "jemand@fern.example", "Fern")
     original = status(JETZT - timedelta(hours=1), autor=fern)
     original["url"] = f"https://fern.example/notes/{MARKER.lower()}-titel"
     original["uri"] = "https://fern.example/users/jemand/statuses/1"
-    p = ex(retruth(JETZT, original))
-    assert p.url == f"{BASIS}/@jemand@fern.example/{original['id']}"
+    r = retruth(JETZT, original)
+    # So liefert Truth Social Retruth-Wrapper: Aktivitäts-Adresse statt Post-Seite.
+    r["url"] = r["uri"] = f"{BASIS}/users/realDonaldTrump/statuses/{r['id']}/activity"
+    p = ex(r)
+    assert p.url == f"{BASIS}/@realDonaldTrump/{r['id']}"
+    assert p.quellen[0].handle == "jemand@fern.example"
+
+
+def test_retruth_ohne_jede_adresse_hat_leere_url():
+    original = status(JETZT - timedelta(hours=1), autor=FREMD)
+    original["url"] = original["uri"] = None
+    original["account"] = {"id": FREMD_ID, "acct": "jemand@fern.example"}
+    r = retruth(JETZT, original)
+    r["url"] = r["uri"] = None
+    r["account"] = {"id": TRUMP_ID}
+    assert ex(r).url == ""
 
 
 def test_url_auf_testserver_mit_eigener_basis():
@@ -675,6 +831,9 @@ def test_url_auf_testserver_mit_eigener_basis():
     s["url"] = f"http://127.0.0.1:8123/@realDonaldTrump/{s['id']}"
     assert ex(s, basis_url="http://127.0.0.1:8123").url == s["url"]
     assert ex(s).url == f"{BASIS}/@realDonaldTrump/{s['id']}"
+    # Die Standard-Basis bleibt erlaubt, auch wenn eine andere konfiguriert ist.
+    s["url"] = f"{BASIS}/@realDonaldTrump/{s['id']}"
+    assert ex(s, basis_url="http://127.0.0.1:8123").url == s["url"]
 
 
 def test_zeiten_und_edited_at():
@@ -687,18 +846,219 @@ def test_zeiten_und_edited_at():
     assert ex(s).edited_at is None
 
 
-def test_sichtbarkeit_nur_als_kennwort():
+@pytest.mark.parametrize(
+    "wert",
+    [
+        "9999-12-31T23:59:59-01:00",  # OverflowError in zeit.parse_utc
+        "0001-01-01T00:00:00+01:00",  # ebenso
+        "0999-06-01T00:00:00Z",  # strftime schriebe "999-06-01…"
+        "1969-12-31T23:59:59Z",
+    ],
+)
+def test_randzeitpunkte(wert):
+    s = status(JETZT, editiert=JETZT)
+    s["edited_at"] = wert
+    assert ex(s).edited_at is None
+    original = status(JETZT - timedelta(hours=1), autor=FREMD)
+    original["created_at"] = wert
+    p = ex(retruth(JETZT, original))
+    assert p.original_created_at is None and p.retruth_latenz_s is None
+    s["created_at"] = wert
+    with pytest.raises(ValueError, match="created_at") as fehler:
+        ex(s)
+    assert fehler.value.__context__ is None
+
+
+def test_zeitpunkte_an_den_erlaubten_grenzen():
     s = status(JETZT)
-    s["visibility"] = f"{MARKER} frei"
-    assert ex(s).sichtbarkeit is None
-    s["visibility"] = "unlisted"
-    assert ex(s).sichtbarkeit == "unlisted"
+    s["created_at"] = "1970-01-01T00:00:00Z"
+    assert ex(s).created_at.year == 1970
+    s["edited_at"] = "9999-12-31T23:59:59Z"
+    assert ex(s).edited_at.year == 9999
+
+
+@pytest.mark.parametrize(
+    ("wert", "erwartet"),
+    [
+        ("public", "public"),
+        ("unlisted", "unlisted"),
+        (" PRIVATE ", "private"),
+        ("direct", "direct"),
+        ("group", "group"),
+        (MARKER.lower(), None),
+        (f"{MARKER} frei", None),
+        ("public\n", "public"),
+        (None, None),
+        (1, None),
+    ],
+)
+def test_sichtbarkeit_nur_bekannte_werte(wert, erwartet):
+    s = status(JETZT)
+    s["visibility"] = wert
+    assert ex(s).sichtbarkeit == erwartet
 
 
 def test_ids_als_zahl():
     s = status(JETZT)
     s["id"] = int(s["id"])
     assert ex(s).id == str(s["id"])
+
+
+@pytest.mark.parametrize("wert", ["9" * 20, str(2**63), 2**63, 10**30, "0", 0, "1e5", "١٢٣", "12 34", "+5", "-99"])
+def test_ungueltige_post_id(wert):
+    """IDs außerhalb von 1 … 2⁶³−1 passen nicht in die INTEGER-Spalte ``id_num``."""
+    s = status(JETZT)
+    s["id"] = wert
+    with pytest.raises(ValueError, match="ID"):
+        ex(s)
+
+
+def test_groesste_id_und_fuehrende_nullen():
+    s = status(JETZT)
+    s["id"] = str(2**63 - 1)
+    assert ex(s).id == str(2**63 - 1)
+    s["id"] = "000123"
+    assert ex(s).id == "123"
+    s = status(JETZT)
+    s["quote_id"] = "9" * 20
+    s["in_reply_to_id"] = 2**64
+    p = ex(s)
+    assert p.quote_id is None and not p.ist_quote and p.in_reply_to_id is None and not p.ist_reply
+
+
+# ---------------------------------------------------------------------------
+# Revision (Feld "version") und Edit-Anzahl
+
+
+@pytest.mark.parametrize(
+    ("version", "revision"),
+    [
+        ("1", 1),
+        ("3", 3),
+        (" 2 ", 2),
+        (2, 2),
+        ("x", None),
+        ("", None),
+        (-1, None),
+        (0, None),
+        ("0", None),
+        (True, None),
+        (None, None),
+        (2.0, None),
+        ("1.5", None),
+        ("٣", None),
+        ("9" * 10, None),
+        (10**12, None),
+        ([], None),
+    ],
+)
+def test_revision_aus_version(version, revision):
+    s = status(JETZT)
+    s["version"] = version
+    assert ex(s).revision == revision
+
+
+def test_revision_ohne_feld():
+    s = status(JETZT)
+    del s["version"]
+    assert ex(s).revision is None
+
+
+def test_revision_kommt_vom_status_selbst():
+    original = status(JETZT - timedelta(hours=1), autor=FREMD)
+    original["version"] = "4"
+    assert ex(retruth(JETZT, original)).revision == 1
+
+
+def test_revision_ergibt_die_edit_anzahl_in_der_db(tmp_path):
+    """Zwei Edits vor dem ersten Sehen: ``version`` = 3, also ``edit_anzahl`` = 2 (nicht nur 1)."""
+    s = status(JETZT - timedelta(hours=2), editiert=JETZT - timedelta(hours=1))
+    s["version"] = "3"
+    con = db.oeffne(tmp_path / "t.db")
+    try:
+        lauf = db.lauf_starten(con, JETZT, backfill=False)
+        db.post_speichern(con, ex(s), lauf_id=lauf, gesehen=JETZT, backfill=False)
+        assert db.post_lesen(con, s["id"])["edit_anzahl"] == 2
+        # Zwischen zwei Läufen zweimal bearbeitet: die Revision springt von 3 auf 5.
+        s["version"], s["edited_at"] = "5", "2026-10-02T11:30:00Z"
+        lauf2 = db.lauf_starten(con, JETZT + timedelta(hours=1), backfill=False)
+        db.post_speichern(con, ex(s), lauf_id=lauf2, gesehen=JETZT + timedelta(hours=1), backfill=False)
+        assert db.post_lesen(con, s["id"])["edit_anzahl"] == 4
+    finally:
+        con.close()
+
+
+# ---------------------------------------------------------------------------
+# Quell-Konten: Handle und Anzeigename
+
+
+@pytest.mark.parametrize(
+    ("acct", "username", "erwartet"),
+    [
+        ("jemand", "jemand", "jemand"),
+        ("jemand@fern.example", "jemand", "jemand@fern.example"),
+        ("Jemand_2", "x", "Jemand_2"),
+        ("jemand.name", "jemand.name", None),
+        ("jemand-name@fern.example", "jemand", None),
+        ("jemand name", "jemand", None),
+        ("jemand\n", "x", "jemand"),
+        (None, "jemand", "jemand"),
+        ("", "jemand", "jemand"),
+        (None, None, None),
+        (5, 7, None),
+    ],
+)
+def test_handle(acct, username, erwartet):
+    """Handles wie im Prüfskript: Buchstaben, Ziffern, ``_``, optional ``@domain``."""
+    k = konto(FREMD_ID, "jemand")
+    k["acct"], k["username"] = acct, username
+    p = ex(retruth(JETZT, status(JETZT - timedelta(hours=1), autor=k)))
+    assert p.quellen[0].handle == erwartet
+
+
+@pytest.mark.parametrize(
+    ("roh", "erwartet"),
+    [
+        ("Jemand Fremdes", "Jemand Fremdes"),
+        ("Erste Zeile\nZweite Zeile", "Erste Zeile Zweite Zeile"),
+        ("  Name\t mit \r\n Leerraum  ", "Name mit Leerraum"),
+        ("Null\x00zeichen\x1b", "Nullzeichen"),
+        (f"Name {SURROGAT}", "Name �"),
+        ("Tom & Jerry <3 \U0001f1fa\U0001f1f8", "Tom & Jerry <3 \U0001f1fa\U0001f1f8"),
+        ("x" * 150, "x" * 100),
+        ("a" * 99 + "\U0001f468\u200d\U0001f469", "a" * 99),
+        ("", None),
+        (" \n ", None),
+        (None, None),
+        (5, None),
+        ("Fan von https://example.com", None),
+        ("<b>fett</b>", None),
+        ("A &amp; B", None),
+    ],
+)
+def test_anzeigename(roh, erwartet):
+    """Einzeilig, höchstens 100 Zeichen, nichts, was das Prüfskript für HTML oder einen Link hielte."""
+    original = status(JETZT - timedelta(hours=1), autor=konto(FREMD_ID, "jemand", roh))
+    q = ex(retruth(JETZT, original)).quellen[0]
+    assert q.anzeigename == erwartet
+    if erwartet is not None:
+        assert pruefer()._db_wert("anzeigename", erwartet) == []
+
+
+def test_einzelne_surrogate_werfen_nicht(tmp_path):
+    """Kaputtes JSON (abgeschnittenes Emoji-Escape) darf weder extrahiere noch die DB scheitern lassen."""
+    original = status(JETZT - timedelta(hours=1), autor=konto(FREMD_ID, "jemand", f"Name {SURROGAT}"))
+    original["content"] = f"<p>{MARKER} Text {SURROGAT}</p>"
+    r = retruth(JETZT, original)
+    p = ex(r)
+    assert p.text.zeichen == len(f"{MARKER} Text �") and p.text.text_hash is not None
+    assert p.quellen[0].anzeigename == "Name �"
+    con = db.oeffne(tmp_path / "t.db")
+    try:
+        lauf = db.lauf_starten(con, JETZT, backfill=False)
+        db.post_speichern(con, p, lauf_id=lauf, gesehen=JETZT, backfill=False)
+    finally:
+        con.close()
 
 
 # ---------------------------------------------------------------------------
@@ -747,8 +1107,38 @@ def _pfade(objekt: Any, praefix: tuple = (), tiefe: int = 4):
             yield from _pfade(wert, (*praefix, index), tiefe - 1)
 
 
-_ERSATZWERTE = [None, "", f"{MARKER} x", 0, -1, True, 1.5, [], {}, [None], [{}], {"x": None}]
+_ERSATZWERTE = [
+    None, "", f"{MARKER} x", 0, -1, True, 1.5, [], {}, [None], [{}], {"x": None},
+    # Ohne Leerzeichen, damit Prüfungen nicht schon daran scheitern, und in Formen, die wie
+    # erlaubte Werte aussehen (Kennwort, Handle, URL, Domain, ID, Zeitstempel).
+    MARKER, MARKER.lower(), f"http://{MARKER}", f"<p>http://{MARKER}</p>", f"https://example.com/{MARKER}",
+    f"{BASIS}/{MARKER}", f"{BASIS}/@{MARKER}/1", f"<a href='https://example.com/{MARKER}'>{MARKER}</a>",
+    "9" * 20, "9999-12-31T23:59:59-01:00", SURROGAT,
+]
 _LOESCHEN = object()
+# Account-Metadaten dürfen jeden (bereinigten) Wert tragen, also auch den Marker.
+_ERLAUBT_MIT_MARKER = ("handle", "anzeigename")
+
+
+def _zeichenketten_mit_pfad(wert: Any, pfad: tuple = ()):
+    if isinstance(wert, str):
+        yield pfad, wert
+    elif isinstance(wert, dict):
+        for schluessel, kind in wert.items():
+            yield (*pfad, schluessel), str(schluessel)
+            yield from _zeichenketten_mit_pfad(kind, (*pfad, schluessel))
+    elif isinstance(wert, (list, tuple)):
+        for index, kind in enumerate(wert):
+            yield from _zeichenketten_mit_pfad(kind, (*pfad, index))
+
+
+def _marker_lecks(p: PostDaten) -> list[tuple[tuple, str]]:
+    """Fundstellen des Markers in jeder Schreibweise, außer in Handle und Anzeigename."""
+    return [
+        (pfad, wert)
+        for pfad, wert in _zeichenketten_mit_pfad(dataclasses.asdict(p))
+        if MARKER.lower() in wert.lower() and not (pfad and pfad[-1] in _ERLAUBT_MIT_MARKER)
+    ]
 
 
 def _volles_status_objekt() -> dict[str, Any]:
@@ -771,9 +1161,12 @@ def _volles_status_objekt() -> dict[str, Any]:
 
 @pytest.mark.parametrize("erfasser", [None, FakeErfasser()], ids=["ohne_medien", "mit_medien"])
 def test_unerwartete_typen_an_jeder_stelle(erfasser):
-    """Jedes Feld bis Tiefe 4 wird gelöscht oder durch einen fremden Typ ersetzt: nie eine andere Ausnahme."""
+    """Jedes Feld bis Tiefe 4 wird gelöscht oder ersetzt: nie eine andere Ausnahme als ValueError (nur
+    bei id/created_at), nie der Marker in einem Inhaltsfeld, nie ein Wert außerhalb der Positivlisten
+    des Prüfskripts."""
     basis = _volles_status_objekt()
     pflicht = {("id",), ("created_at",)}
+    pruefung_ = pruefer()
     faelle = 0
     for pfad in _pfade(basis):
         for ersatz in [_LOESCHEN, *_ERSATZWERTE]:
@@ -796,10 +1189,10 @@ def test_unerwartete_typen_an_jeder_stelle(erfasser):
                 continue
             assert isinstance(p, PostDaten)
             assert p.format in FORMATE
-            # Der Anzeigename ist erlaubte Account-Metadatum und darf daher jeden Wert tragen.
-            if pfad[-1] != "display_name":
-                assert MARKER not in repr(dataclasses.asdict(p)), pfad
-    assert faelle > 1000
+            assert not _marker_lecks(p), (pfad, ersatz, _marker_lecks(p))
+            assert not funde_der_pruefung(pruefung_, p), (pfad, ersatz, funde_der_pruefung(pruefung_, p))
+            assert p.url == "" or POST_URL.fullmatch(p.url), (pfad, ersatz)
+    assert faelle > 2000
 
 
 # ---------------------------------------------------------------------------
@@ -838,6 +1231,101 @@ def test_postdaten_enthalten_keine_inhalte(erfasser):
     assert p.text.link_domains == ["example.com"]
     assert p.url == original["url"]
     assert {q.handle for q in p.quellen} == {"jemand", "anderer"}
+
+
+def _grenzfaelle() -> list[dict[str, Any]]:
+    """Status-Objekte, deren Ersatzwerte (URL, Handle, Anzeigename, Domains, IDs) früher Fehlalarme auslösten."""
+    faelle = []
+    eigen = status(
+        JETZT - timedelta(hours=5),
+        text=f"{MARKER} {link(ARTIKEL)} http://{MARKER} {SURROGAT}",
+        medien=[medium("image"), medium("video", dauer=3.0), medium("audio", medien_id=MARKER)],
+        karte_=karte(ARTIKEL),
+        erwaehnungen=[erwaehnung(ANDERER_ID, "anderer")],
+        hashtags=["Eins"],
+        editiert=JETZT - timedelta(hours=4),
+    )
+    eigen["version"], eigen["visibility"] = "3", MARKER.lower()
+    faelle.append(eigen)
+
+    fern = konto("108000000000000999", "jemand@fern.example", "Fern\nZweite Zeile")
+    foederiert = status(JETZT - timedelta(hours=6), autor=fern)
+    foederiert["url"] = f"https://fern.example/notes/{MARKER.lower()}-titel"
+    foederiert["uri"] = f"https://fern.example/users/jemand/statuses/{MARKER}"
+    foederiert["created_at"] = "0001-01-01T00:00:00+01:00"
+    r = retruth(JETZT - timedelta(hours=4), foederiert)
+    r["url"] = r["uri"] = f"{BASIS}/users/realDonaldTrump/statuses/{r['id']}/activity"
+    faelle.append(r)
+
+    seltsam = konto("108000000000000888", "jemand.name", "x" * 150 + f" {SURROGAT}")
+    ohne_url = status(JETZT - timedelta(hours=7), autor=seltsam)
+    ohne_url["url"] = None
+    faelle.append(retruth(JETZT - timedelta(hours=3), ohne_url))
+
+    leer = status(JETZT - timedelta(hours=2))
+    leer["url"] = leer["uri"] = None
+    leer["account"] = {"id": TRUMP_ID}
+    faelle.append(leer)
+
+    www = status(JETZT - timedelta(hours=1, minutes=30))
+    www["url"] = f"https://www.truthsocial.com/@realDonaldTrump/{www['id']}"
+    www["edited_at"] = "9999-12-31T23:59:59-01:00"
+    faelle.append(www)
+
+    quote = status(JETZT - timedelta(hours=1), text="")
+    quote["quote_id"] = "114000000000009999"
+    quote["content"] = f'<p>{MARKER}</p><p>RE: <a href="{BASIS}/@jemand/114000000000009999">x</a></p>'
+    faelle.append(quote)
+
+    reply = status(
+        JETZT - timedelta(minutes=30),
+        antwort_auf=("114000000000000123", FREMD_ID),
+        erwaehnungen=[erwaehnung(FREMD_ID, "jemand.punkt")],
+    )
+    faelle.append(reply)
+
+    link_name = konto("108000000000000444", "verlinkt", f"Mehr auf https://example.com/{MARKER}")
+    faelle.append(retruth(JETZT - timedelta(minutes=20), status(JETZT - timedelta(hours=9), autor=link_name)))
+
+    groesste = status(JETZT - timedelta(minutes=10), status_id=str(2**63 - 1))
+    faelle.append(groesste)
+    return faelle
+
+
+@pytest.mark.parametrize("erfasser", [None, FakeErfasser()], ids=["ohne_medien", "mit_medien"])
+def test_grenzfaelle_bestehen_das_pruefskript(tmp_path, erfasser):
+    """Gespeichert wie vom Crawler: Das Prüfskript (Teil der Definition of Done) meldet nichts."""
+    konfig = Konfig(basisordner=tmp_path)
+    con = db.oeffne(konfig.datenbank_pfad)
+    try:
+        lauf = db.lauf_starten(con, JETZT, backfill=False)
+        for s in _grenzfaelle():
+            p = ex(s, medien=erfasser)
+            db.post_speichern(con, p, lauf_id=lauf, gesehen=JETZT, backfill=False)
+            db.snapshot_speichern(con, p, lauf_id=lauf, gemessen=JETZT, grenze_h=24)
+        anzahl = db.zaehle(con, "posts")
+    finally:
+        con.close()
+    assert anzahl == len(_grenzfaelle())
+    bericht = pruefung.pruefe(konfig, marker=[MARKER])
+    assert bericht.ok, pruefung.bericht_text(bericht)
+
+
+def test_grenzfaelle_einzeln():
+    p = [ex(s) for s in _grenzfaelle()]
+    assert p[0].revision == 3 and p[0].sichtbarkeit is None and p[0].text.link_domains == ["example.com"]
+    assert p[0].medien[2].medien_id is None
+    assert p[1].url == f"{BASIS}/@realDonaldTrump/{p[1].id}" and p[1].original_created_at is None
+    assert p[1].quellen[0].anzeigename == "Fern Zweite Zeile"
+    # Handle mit Punkt taugt nicht für die Post-URL: Link über den Retruth.
+    assert p[2].url == f"{BASIS}/@realDonaldTrump/{p[2].id}"
+    assert p[2].quellen[0].handle is None and p[2].quellen[0].anzeigename == "x" * 100
+    assert p[3].url == ""
+    assert p[4].url == f"{BASIS}/@realDonaldTrump/{p[4].id}" and p[4].edited_at is None
+    assert p[5].format == FORMAT_NUR_TEXT and p[5].text.n_urls == 0
+    assert p[6].quellen == [QuellKonto(rolle=ROLLE_REPLY, konto_id=FREMD_ID, handle=None, ist_trump=False)]
+    assert p[7].quellen[0].anzeigename is None
+    assert p[8].id == str(2**63 - 1)
 
 
 def test_postdaten_haben_keine_inhaltsfelder():

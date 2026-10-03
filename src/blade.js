@@ -570,12 +570,26 @@ export async function main(ns) {
   // Wie viele Maenner braucht die Chance c0 OHNE Trupp, um die Schwelle s zu
   // tragen? (n+1)^0,05 >= s/c0 (Actions/Operation.ts:96-98). Reine Funktion,
   // gleichlautend in tools/trupp-rechnung.js (maennerNoetig) und dort geprueft.
+  //
+  // DIESE FUNKTION HAT AM 03.10.2026 DEN TAB EINGEFROREN. Die geschlossene
+  // Form (s/c0)^20 - 1 ist bei Typhoon (c0 0,102, s 0,90) 8,2e18. Oberhalb
+  // 2^53 aendern n-- und n++ den Wert nicht mehr (Gleitkomma), die alte
+  // while-Schleife lief ohne ns-Aufruf ewig und blockierte den Hauptthread -
+  // ausgeloest, sobald der Rang 90 % des Black-Op-Tors erreichte (08:33 und
+  // nach jedem Neuladen binnen einer Minute; das Spiel speicherte deshalb
+  // nie mehr). Jetzt: ueber MAENNER_MAX gilt "unerreichbar" (Infinity, die
+  // Aufrufer klemmen ohnehin auf TRUPP_ZIEL bzw. den Pool), und beide
+  // Korrekturschleifen sind auf 64 Schritte begrenzt - die geschlossene Form
+  // liegt hoechstens wenige Schritte daneben.
   const maennerNoetig = (c0, s) => {
+    const MAENNER_MAX = 1e6;
     if (!(c0 > 0) || !(s > 0)) return Infinity;
     if (c0 >= s) return 0;
-    let n = Math.max(1, Math.ceil(Math.pow(s / c0, 20) - 1 - 1e-9));
-    while (n > 1 && c0 * Math.pow(n, 0.05) >= s) n--;
-    while (c0 * Math.pow(n + 1, 0.05) < s) n++;
+    const roh = Math.pow(s / c0, 20) - 1;
+    if (!(roh <= MAENNER_MAX)) return Infinity;
+    let n = Math.max(1, Math.ceil(roh - 1e-9));
+    for (let i = 0; i < 64 && n > 1 && c0 * Math.pow(n, 0.05) >= s; i++) n--;
+    for (let i = 0; i < 64 && c0 * Math.pow(n + 1, 0.05) < s; i++) n++;
     return n;
   };
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.

@@ -343,6 +343,11 @@ const TESTS = [
     deckt: "Faellige Black Op holt die Figur aus dem Gym (dieselbe Feuerzahl wie waehle(), kein Pendeln), klemmFaktor und fahrbar leben",
     schnell: false,
   },
+  {
+    datei: "test-maenner-endlos.js",
+    deckt: "maennerNoetig (blade.js) endet fuer jede Chance - die unbegrenzte Schleife fror am 03.10. den Spiel-Tab ein (Typhoon 0,102 gegen 0,90)",
+    schnell: true,
+  },
 ];
 
 /**

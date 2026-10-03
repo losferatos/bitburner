@@ -23,6 +23,33 @@ die Arbeitsliste, statt den Einzelfall erneut zu flicken.
 
 ---
 
+### Tab fror ein, Spiel speicherte 8 h nicht - Endlosschleife in maennerNoetig (blade.js)
+
+**Behoben 03.10.2026 (3c85b0c/0d1bf69, Skeptiker Opus).** Seit 08:33 UTC fror
+der Spiel-Tab ein, nach jedem Neuladen binnen ~1 min. Weil kein Autosave mehr
+durchkam, lud jeder Neustart den Stand von 08:32:54 und fror erneut ein -
+fuer Eric sah das aus wie "der Browser friert den Tab ein".
+
+Ursache: `maennerNoetig` (eingefuehrt mit fe3b013 am selben Morgen) startet
+bei n = ceil((s/c0)^20 - 1); Typhoon c0 0,102 gegen s 0,90 ergibt 8,2e18.
+Oberhalb 2^53 aendern `n--`/`n++` den Wert nicht, die while-Schleife ohne
+ns-Aufruf lief ewig (Muster V1 in doku/schlupfloecher.md). Ausloeser: Rang
+>= 0,9 x Typhoon-Tor = 2250, ein Raid-Erfolg ab 2185. Der Test der Funktion
+deckte nur Chancen 0,50-0,99 und nur die Kopie in tools/trupp-rechnung.js.
+
+Fix: ueber 1e6 Mann Infinity, Korrekturschleifen auf 64 Schritte begrenzt.
+Neu `tools/test-maenner-endlos.js` (Funktion woertlich aus blade.js,
+Kindprozess mit Zeitlimit; rot gegen alt), Nachstellung
+`tools/audit/repro-freeze.mjs` (Mock: alt haengt bei Rang 2260). Wiederanlauf:
+Spiel mit `?noScripts` geladen, Bruecke schob den Fix, `run boot.js`.
+Nachmessung 18:43 Ortszeit: Autosave wieder frisch, Rang 2560 ohne Haenger,
+blade.js im Spiel mit Fix. Skeptiker-AST-Suche: keine weitere einfrierende
+Schleife in src/ (bedingt bn4net.js:1425, praktisch sicher).
+
+Lehre: Jede Schleife, deren Ende an Gleitkomma- oder Spielwerten haengt,
+braucht eine harte Obergrenze; Tests fuer solche Funktionen laufen mit
+Zeitlimit und Extremwerten, nicht nur im Normalbereich.
+
 ### hashes.js laeuft - Feature 9 an einer Stelle, Gym-Training im Anlauf
 
 **Behoben 19.09.2026, mit drei Skeptikern (Praemisse, Betrieb, Substanz).**

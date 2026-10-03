@@ -1,0 +1,539 @@
+datei	zeile	endzeile	klasse	typ	familie	anweisungen	test_eintritte	test_fehler	urteil	notiz	ns_aufrufe	lokale_aufrufe	handler
+astufe.js	6	9	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCurrentLevel,bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionEstimatedSuccessChance().[].toFixed,bladeburner.getActionMaxLevel		{ o[n] = "FEHLER"; }
+astufe.js	11	11	LEER	T1-API	Bladeburner	2	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillLevel		{}
+audiocheck.js	25	28	LEER	T1-API	sonstige	2	0	0	unbedenklich: erwarteter Fehler (sonstige)		sleep		{ /* erwartbar ohne Nutzerinteraktion */ }
+augcheck.js	25	32	LOG	L-protokolliert	Singularity	8	0	0	nicht verschluckt		singularity.getAugmentationBasePrice,singularity.getOwnedAugmentations		{ ns.write("data/augcheck.json", JSON.stringify({ zeit: Date
+augcheck.js	30	30	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getAugmentationBasePrice		{ preise[a] = null; }
+augcount.js	56	60	SPEICHERT	S-speichert	Singularity	2	0	0	nicht verschluckt		singularity.getAugmentationsFromFaction,singularity.getAugmentationsFromFaction().filter		{ bericht.jeFaktion[f] = null; zeilen.push("FEHLER bei " + f
+ausgang.js	123	123	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+ausgang.js	129	129	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+ausgang.js	133	137	DEFAULT	T4-LOGIK	Datei/Host	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		fileExists,getHostname,read,scp		{ return ""; }
+ausgang.js	177	181	LEER	T4-LOGIK	JSON	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ /* dann bleibt der Rangweg ungeschaetzt */ }
+ausgang.js	184	187	LEER	T4-LOGIK	JSON	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ /* keine alte Telemetrie */ }
+ausgang.js	193	918	LOG	L-protokolliert	Bladeburner+sonstige+Datei/Host+Server/Prozess+Spielinfo	266	0	0	nicht verschluckt		bladeburner.getNextBlackOp,bladeburner.inBladeburner,exec,fileExists,getHackingLevel	etaMinuten,evAnhaengen,evLaden,frei,handschlag	{ sag("Fehler in der Runde: " + String(e)); // Telemetrie au
+ausgang.js	196	196	DEFAULT	T4-LOGIK	JSON	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ route = null; }
+ausgang.js	211	215	LEER	T4-LOGIK	Browser/Hilfsaufruf	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			sag	{ /* egal */ }
+ausgang.js	251	257	DEFAULT	T4-LOGIK	Bladeburner	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getNextBlackOp,bladeburner.inBladeburner		{ status += "Bladeburner nicht lesbar; "; }
+ausgang.js	258	274	DEFAULT	T4-LOGIK	Server/Prozess	9	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getHackingLevel,getServerNumPortsRequired,getServerRequiredHackingLevel,hasRootAccess,serverExists		{ status += WD + " nicht lesbar"; }
+ausgang.js	307	332	LEER	T4-LOGIK	Server/Prozess	12	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getHackingLevel,getServerRequiredHackingLevel,serverExists	etaMinuten,messe	{ /* Level nicht lesbar - dann bleibt etaMin null */ }
+ausgang.js	356	370	LEER	T4-LOGIK	JSON	9	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			etaMinuten,liesVonHome,messe	{ /* blade.json nicht lesbar - dann bleibt etaMin null */ }
+ausgang.js	409	409	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+ausgang.js	606	635	LEER	T4-LOGIK	Server/Prozess	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen	Bericht, nie Steuerung (kommentiert); evLaden/evAnhaengen sind Bibliothek und von test-kontrakte.js abgedeckt.	getServerMaxRam	sag	{ /* dann eben ohne Bedarfsmeldung */ }
+ausgang.js	653	657	DEFAULT	T4-LOGIK	JSON	2	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ notExecutableSeit = Date.now(); }
+ausgang.js	660	703	LEER	T4-LOGIK	Browser/Hilfsaufruf	6	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			evAnhaengen,evLaden,liesVonHome,nachHome	{ /* Bericht, nie Steuerung */ }
+ausgang.js	677	677	DEFAULT	T4-LOGIK	JSON	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ liste = []; }
+ausgang.js	686	686	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ return 0; }
+ausgang.js	764	804	LEER	T4-LOGIK	Browser/Hilfsaufruf	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			evAnhaengen,evLaden,liesVonHome,nachHome	{ /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
+ausgang.js	791	796	DEFAULT	T4-LOGIK	JSON	6	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ return null; }
+ausgang.js	821	835	LOG	L-protokolliert	Browser/Hilfsaufruf	7	0	0	nicht verschluckt			evAnhaengen,evLaden,handschlag,liesVonHome,nachHome	{ sag("Handschlag misslungen (" + String(e && e.message ? e.
+ausgang.js	923	923	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			nachHome	{ /* egal */ }
+autopilot.js	351	1620	RETHROW	R-wirft	sonstige+Datei/Host+Server/Prozess	480	0	0	nicht verschluckt		clearPort,exec,exit,fileExists,getHostname	auftrag,draw,factionPaths,fmt,geld	{ // Ein einzelner Rechner, der sich unerwartet verhaelt, da
+autopilot.js	365	367	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* ohne Seitenkontext laeuft der Rest trotzdem */ }
+autopilot.js	648	648	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getServer		{ continue; }
+autopilot.js	908	911	DEFAULT	T2-JSON	JSON	2	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ teile = null; }
+autopilot.js	960	963	DEFAULT	T1-API	Datei/Host	3	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,read,scp		{ quelle = ""; }
+autopilot.js	1792	1795	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	2	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			fn	{ // Anschluss war schon offen open++; }
+autopilot.js	1807	1809	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		nuke		{ return false; }
+autopilot.js	1842	1842	LEER	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getServer		{ /* nicht erreichbar */ }
+backdoor.js	37	39	LOG	L-protokolliert	Server/Prozess	2	0	0	nicht verschluckt		getServer	sag	{ return sag("Rechner \"" + ziel + "\" unbekannt: " + (e && 
+backdoor.js	101	103	LEER	T4-LOGIK	Server/Prozess	2	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getServer	sag	{ /* weiter versuchen */ }
+bbgraft.js	31	34	SPEICHERT	S-speichert	Grafting	2	0	0	nicht verschluckt		grafting.getGraftableAugmentations		{ // Kein Zugang heisst: weder BitNode 10 noch Source-File 1
+bbgraft.js	43	43	DEFAULT	T1-API	Grafting	1	0	0	unbedenklich: erwarteter Fehler (Grafting)		grafting.getAugmentationGraftPrice		{ preis = null; }
+bbgraft.js	44	44	DEFAULT	T1-API	Grafting	1	0	0	unbedenklich: erwarteter Fehler (Grafting)		grafting.getAugmentationGraftTime		{ dauer = null; }
+bbgraft.js	52	52	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getAugmentationStats		{ stats = null; }
+bblage.js	16	16	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ drin = false; }
+bblage.js	18	18	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getRank		{ rang = 0; }
+bblage.js	19	19	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getStamina		{ stamina = null; }
+bblage.js	22	22	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ arbeit = null; }
+bbspann.js	54	54	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getStamina		{ return 0; }
+bbspann.js	63	99	SPEICHERT	S-speichert	Datei/Host	26	0	0	nicht verschluckt		fileExists,getHostname,read,scp	zulageJeAbschluss	{ regenerationQuelle = "Vorgabe (" + String(e && e.message ?
+bbspann.js	69	69	LEER	T1-API	Datei/Host	2	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* dann eben Vorgabe */ }
+bbspann.js	78	78	DEFAULT	T2-JSON	JSON	1	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ continue; }
+bbspann.js	114	117	LEER	T4-LOGIK	Bladeburner	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getActionEstimatedSuccessChance		{}
+bbspann.js	119	119	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCountRemaining		{}
+bbspann.js	120	120	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCurrentLevel		{}
+bbspann.js	134	134	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionTime		{}
+bbspann.js	285	289	SPEICHERT	S-speichert	Bladeburner	2	0	0	nicht verschluckt		bladeburner.getActionEstimatedSuccessChance		{ boChance = { fehler: String(e && e.message ? e.message : e
+bbspann.js	302	302	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillLevel		{}
+bbspann.js	303	303	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillUpgradeCost		{}
+bbspann.js	333	390	LEER	T4-LOGIK	Bladeburner	17	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getCityChaos,bladeburner.getCityChaos().toFixed,bladeburner.getCityEstimatedPopulation,bladeburner.switchCity	messe	{}
+bbspann.js	336	336	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.switchCity		{ gewechselt = false; }
+bbspann.js	348	353	LEER	T1-API	Bladeburner	3	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionEstimatedSuccessChance		{ /* Aktion in dieser Stadt nicht schaetzbar */ }
+bbspann.js	394	394	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.switchCity		{}
+bbspann.js	412	412	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCurrentTime		{ return null; }
+bbspann.js	414	417	DEFAULT	T1-API	Bladeburner	2	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionTime,bladeburner.getCurrentAction		{ return null; }
+bbtick.js	27	38	SPEICHERT	S-speichert	Bladeburner+Spielinfo	6	0	0	nicht verschluckt		bladeburner.getActionCurrentTime,bladeburner.getCurrentAction,bladeburner.getRank,bladeburner.getStamina,bladeburner.getStamina().[].toFixed		{ e.fehler = String(err && err.message ? err.message : err);
+bbtrain.js	90	93	LEER	T1-API	Datei/Host	3	8	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+bbtrain.js	149	152	DEFAULT	T1-API	Singularity	2	1	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ return false; }
+bbtrain.js	158	158	DEFAULT	T1-API	Bladeburner	1	4	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ drin = false; }
+blackops.js	25	30	DEFAULT	T4-LOGIK	Bladeburner	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionTime		{ eintrag.erledigt = true; }
+blade.js	294	294	DEFAULT	T1-API	Singularity	2	19	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ trainiert = false; }
+blade.js	297	300	LEER	T1-API	Bladeburner	2	19	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCurrentAction		{ /* nicht in der Division */ }
+blade.js	311	311	DEFAULT	T1-API	Bladeburner	1	265	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCity,bladeburner.getCityChaos		{ return 0; }
+blade.js	335	347	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	13	232	0	unbedenklich: in 232 Testeintritten ohne Fehler durchlaufen			offen,spanneGenau	{ // Ohne Messung lieber die alte Regel: ein Aufraeumen zuvi
+blade.js	784	784	LEER	T1-API	Spielinfo	1	72	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ /* egal */ }
+blade.js	793	801	LEER	T2-JSON	Datei/Host+Spielinfo	6	72	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		getHostname,getResetInfo,read,scp		{ /* dann eben ein neuer Ausgangspunkt */ }
+blade.js	803	803	DEFAULT	T1-API	Spielinfo	1	72	71	unbedenklich: erwarteter Fehler (Spielinfo)	getBitNodeMultipliers im Mock nicht gebaut; im Spiel wirft es nicht (SF5.3 vorhanden). Rueckfall {} -> Faktor 1: sachgerecht.	getBitNodeMultipliers		{ BN_MULT = {}; }
+blade.js	815	846	LEER	T4-LOGIK	Datei/Host+Spielinfo+Singularity	18	6	0	unbedenklich: in 6 Testeintritten ohne Fehler durchlaufen		getHostname,getPlayer,scp,singularity.getCurrentWork,write	kampfExpFortschreiben	{ /* egal */ }
+blade.js	822	829	DEFAULT	T4-LOGIK	Spielinfo	6	6	0	unbedenklich: in 6 Testeintritten ohne Fehler durchlaufen		getPlayer	kampfExpFortschreiben	{ tiefWartend = null; }
+blade.js	834	840	LEER	T4-LOGIK	Singularity	4	6	0	unbedenklich: in 6 Testeintritten ohne Fehler durchlaufen		singularity.getCurrentWork		{ /* egal */ }
+blade.js	859	863	DEFAULT	T4-LOGIK	Bladeburner	4	7597	0	unbedenklich: in 7597 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionEstimatedSuccessChance		{ return { min: 0, max: 0 }; }
+blade.js	867	867	DEFAULT	T1-API	Bladeburner	1	4384	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCountRemaining		{ return 0; }
+blade.js	1053	1053	LEER	T1-API	Spielinfo	1	455	258	unbedenklich: erwarteter Fehler (Spielinfo)	getPlayer().mults.defense: Mock ohne mults; im Spiel vorhanden (NetscriptFunctions.ts:1377).	getPlayer		{ /* egal */ }
+blade.js	1056	1056	LEER	T1-API	Spielinfo	1	455	0	unbedenklich: erwarteter Fehler (Spielinfo)	getPlayer().skills.defense: im Spiel vorhanden.	getPlayer		{ /* egal */ }
+blade.js	1336	1349	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	10	282	0	unbedenklich: in 282 Testeintritten ohne Fehler durchlaufen			spanne	{ return 0; }
+blade.js	1356	1359	LEER	T1-API	Bladeburner	3	1706	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getStamina		{ /* ohne Messung: volle Luft annehmen */ }
+blade.js	1424	1453	DEFAULT	T4-LOGIK	Bladeburner+Spielinfo+Singularity	25	19	0	unbedenklich: in 19 Testeintritten ohne Fehler durchlaufen		bladeburner.stopBladeburnerAction,getPlayer,singularity.getCurrentWork,singularity.gymWorkout,singularity.travelToCity	figBeantrage,figDarf	{ return null; }
+blade.js	1451	1451	LEER	T1-API	Bladeburner	1	8	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.stopBladeburnerAction		{ /* nichts lief */ }
+blade.js	1458	1474	LEER	T4-LOGIK	Bladeburner	4	2263	0	unbedenklich: in 2263 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionEstimatedSuccessChance,bladeburner.getNextBlackOp	blackOpChance	{ /* keine Black Op mehr: dann zaehlt nur die Operation */ }
+blade.js	1476	1480	LEER	T4-LOGIK	Browser/Hilfsaufruf	4	2263	0	unbedenklich: in 2263 Testeintritten ohne Fehler durchlaufen			offen,spanneGenau	{ /* naechste */ }
+blade.js	1639	1642	LEER	T1-API	Bladeburner	2	179	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getStamina		{ /* nicht in der Division */ }
+blade.js	1645	1671	LEER	T4-LOGIK	Spielinfo	9	179	0	unbedenklich: in 179 Testeintritten ohne Fehler durchlaufen		getPlayer	kampfExpFortschreiben	{ /* egal */ }
+blade.js	1672	1672	LEER	T1-API	Bladeburner	1	179	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getRank		{ /* egal */ }
+blade.js	1673	1673	LEER	T1-API	Bladeburner	1	179	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillPoints		{ /* egal */ }
+blade.js	1675	1675	LEER	T1-API	Bladeburner	1	179	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getNextBlackOp		{ /* egal */ }
+blade.js	1706	1714	LEER	T4-LOGIK	Bladeburner	5	179	0	unbedenklich: in 179 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionCurrentLevel,bladeburner.getActionTime		{ /* General-Aktionen haben keine Stufe */ }
+blade.js	1737	1737	DEFAULT	T1-API	Bladeburner	2	179	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCurrentAction		{ return null; }
+blade.js	1778	1778	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+blade.js	1816	1816	DEFAULT	T1-API	Bladeburner	1	55	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getStamina,bladeburner.getStamina().[].toFixed		{ return null; }
+blade.js	1870	1872	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			haengeAnProtokoll	{ /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
+blade.js	1875	1875	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			nachHome	{ /* siehe oben */ }
+blade.js	1886	1897	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	130	0	unbedenklich: in 130 Testeintritten ohne Fehler durchlaufen			nachHome	{ /* Protokoll ist Beiwerk */ }
+blade.js	1903	1925	LEER	T4-LOGIK	JSON	6	69	0	unbedenklich: in 69 Testeintritten ohne Fehler durchlaufen			haengeAnProtokoll,liesVonHome,nachHome	{ /* ein kaputter Rest darf den Start nicht kosten */ }
+blade.js	1953	1982	LEER	T4-LOGIK	JSON	27	62	0	unbedenklich: in 62 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* Protokoll fehlt: dann eben nach Zeit */ }
+blade.js	1965	1965	DEFAULT	T2-JSON	JSON	1	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ continue; }
+blade.js	2274	2279	LEER	T1-API	Bladeburner	3	141	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getBlackOpRank,bladeburner.getRank		{ /* API unbekannt: unten weiter, vorsichtig */ }
+blade.js	2290	2293	LOG	L-protokolliert	Bladeburner	2	185	0	nicht verschluckt		bladeburner.getBlackOpRank,bladeburner.getRank		{ // Einmal sagen, sonst faehrt der Bot wochenlang still mit
+blade.js	2309	2313	DEFAULT	T4-LOGIK	Bladeburner	4	3	0	unbedenklich: in 3 Testeintritten ohne Fehler durchlaufen		bladeburner.getCityCommunities		{ return SICHER_BLACKOP; }
+blade.js	2311	2311	LEER	T1-API	Bladeburner	1	18	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCityCommunities		{ /* Stadt unbekannt */ }
+blade.js	2322	2361	DEFAULT	T4-LOGIK	Bladeburner+Spielinfo	35	5861	3734	Mock-Fehler im Test (TypeError: Cannot read properties of undefined (reading 'bladeburner_su), im Spiel nicht zu erwarten	blackOpChance. LIVE belegt: data/blade.json (Stand 17:17) traegt boChancen mit 21 Werten -> liefert im Spiel. Mock-Fehler (mults fehlt) ist Testluecke; getPlayer().mults gibt es im Spiel (NetscriptFunctions.ts:1377).	bladeburner.getSkillLevel,bladeburner.getStamina,bladeburner.getTeamSize,getPlayer	m	{ return null; }
+blade.js	2336	2336	LEER	T1-API	Bladeburner	1	5861	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getTeamSize		{ /* kein Trupp */ }
+blade.js	2418	2425	DEFAULT	T4-LOGIK	Bladeburner	8	3472	0	unbedenklich: in 3472 Testeintritten ohne Fehler durchlaufen		bladeburner.getNextBlackOp	blackOpChance,chanceAusR,rAusBlackOp,spanne	{ return null; }
+blade.js	2454	2454	DEFAULT	T1-API	Bladeburner	1	163	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getTeamSize		{ pool = 0; }
+blade.js	2456	2456	DEFAULT	T1-API	Bladeburner	1	163	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getTeamSize		{ opTrupp = 0; }
+blade.js	2497	2497	DEFAULT	T1-API	Bladeburner	1	45	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getRank		{ rangJetzt = 0; }
+blade.js	2536	2572	DEFAULT	T4-LOGIK	Bladeburner	23	129	0	unbedenklich: in 129 Testeintritten ohne Fehler durchlaufen		bladeburner.getBlackOpNames,bladeburner.getBlackOpNames().indexOf,bladeburner.getBlackOpNames().slice,bladeburner.getNextBlackOp	blackOpChance,blackOpSchwelle	{ blackOpArbeit = null; }
+blade.js	2745	2781	LEER	T4-LOGIK	Bladeburner	18	103	0	unbedenklich: in 103 Testeintritten ohne Fehler durchlaufen		bladeburner.getCity,bladeburner.switchCity	sag,wert	{ /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
+blade.js	2769	2769	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	1	515	0	unbedenklich: in 515 Testeintritten ohne Fehler durchlaufen			wert	{ continue; }
+blade.js	2784	2805	LEER	T4-LOGIK	Bladeburner	18	103	0	unbedenklich: in 103 Testeintritten ohne Fehler durchlaufen		bladeburner.getCity,bladeburner.getCityCommunities,bladeburner.switchCity	sag	{ /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
+blade.js	2792	2792	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCityCommunities		{ continue; }
+blade.js	2932	2938	DEFAULT	T4-LOGIK	Bladeburner	4	10	0	unbedenklich: in 10 Testeintritten ohne Fehler durchlaufen		bladeburner.getCity,bladeburner.getCityEstimatedPopulation	spanneGenau	{ srTauglich = false; }
+blade.js	3004	3014	LEER	T4-LOGIK	Bladeburner	5	93	0	unbedenklich: in 93 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionMaxLevel	offen,spanneGenau	{ /* alte API-Fassung: dann bleibt es bei der normalen Auswa
+blade.js	3149	3149	LEER	T1-API	Bladeburner	1	795	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCurrentLevel		{ /* dann Basis */ }
+blade.js	3153	3153	LEER	T1-API	Bladeburner	1	795	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionTime		{}
+blade.js	3258	3270	LEER	T4-LOGIK	Bladeburner+Spielinfo	7	85	0	unbedenklich: in 85 Testeintritten ohne Fehler durchlaufen		bladeburner.getCity,bladeburner.getCityChaos,getPlayer		{ /* ohne Messung bleibt es bei der nackten Dauer */ }
+blade.js	3603	3609	DEFAULT	T4-LOGIK	Spielinfo	6	93	0	unbedenklich: in 93 Testeintritten ohne Fehler durchlaufen		getPlayer		{ return true; }
+blade.js	3645	3648	LEER	T1-API	Bladeburner	3	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionTime		{ /* Schaetzwert bleibt */ }
+blade.js	3678	3678	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCity,bladeburner.getCityChaos		{ return 999; }
+blade.js	3889	4588	LOG	L-protokolliert	Bladeburner+Datei/Host+Spielinfo+Singularity+sonstige	194	179	69	nicht verschluckt		bladeburner.getActionCurrentTime,bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionTime,bladeburner.getCity,bladeburner.getCityChaos	blackOpSchwelle,blackOpTruppLage,chaosLage,faehigkeitenKaufen,figBeantrage	{ sag("FEHLER: " + String(e && e.message ? e.message : e)); 
+blade.js	3932	3939	DEFAULT	T4-LOGIK	Datei/Host+Singularity	5	179	0	unbedenklich: in 179 Testeintritten ohne Fehler durchlaufen		fileExists,singularity.getCurrentWork		{ graftRiegel = false; }
+blade.js	3947	3947	LEER	T4-LOGIK	Bladeburner	1	3	0	unbedenklich: in 3 Testeintritten ohne Fehler durchlaufen		bladeburner.getRank	schliesseAbschnitt	{ /* egal */ }
+blade.js	3956	3956	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	3	0	unbedenklich: in 3 Testeintritten ohne Fehler durchlaufen			faehigkeitenKaufen	{ /* egal */ }
+blade.js	4007	4151	DEFAULT	T4-LOGIK	Bladeburner	44	176	0	unbedenklich: in 176 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionEstimatedSuccessChance,bladeburner.getNextBlackOp,bladeburner.getRank	blackOpSchwelle,blackOpTruppLage,chaosLage,offen,spanne	{ lohntSich = true; }
+blade.js	4077	4094	LEER	T4-LOGIK	Browser/Hilfsaufruf	17	34	0	unbedenklich: in 34 Testeintritten ohne Fehler durchlaufen			offen,spanne	{ /* ohne Spanne bleibt es beim Gym */ }
+blade.js	4097	4112	LEER	T4-LOGIK	Bladeburner	6	34	0	unbedenklich: in 34 Testeintritten ohne Fehler durchlaufen		bladeburner.getNextBlackOp,bladeburner.getRank	blackOpSchwelle,blackOpTruppLage,spanne	{ /* keine Black Op lesbar: dann bleibt es beim Gym */ }
+blade.js	4194	4194	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	19	0	unbedenklich: in 19 Testeintritten ohne Fehler durchlaufen			faehigkeitenKaufen	{ /* egal */ }
+blade.js	4195	4195	LEER	T4-LOGIK	Bladeburner	1	19	0	unbedenklich: in 19 Testeintritten ohne Fehler durchlaufen		bladeburner.getNextBlackOp	truppLageSetzen	{ /* egal */ }
+blade.js	4230	4234	DEFAULT	T4-LOGIK	Singularity	4	157	0	unbedenklich: in 157 Testeintritten ohne Fehler durchlaufen		singularity.getCurrentWork		{ graftLaeuftJetzt = false; }
+blade.js	4260	4260	LEER	T1-API	Bladeburner	1	7	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.stopBladeburnerAction		{}
+blade.js	4303	4306	DEFAULT	T1-API	Spielinfo	2	25	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ arm = false; }
+blade.js	4315	4315	DEFAULT	T1-API	Bladeburner	1	8	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCurrentAction		{ laeuftT = null; }
+blade.js	4361	4366	LEER	T1-API	Spielinfo+Singularity	3	0	0	unbedenklich: erwarteter Fehler (Spielinfo+Singularity)		getPlayer,singularity.hospitalize		{ /* ohne Singularity bleibt die Kammer */ }
+blade.js	4483	4488	DEFAULT	T4-LOGIK	Bladeburner	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getActionCurrentTime,bladeburner.getActionTime,bladeburner.getCity,bladeburner.getCityChaos		{ festhalten = false; }
+blade.js	4508	4520	LEER	T1-API	Bladeburner	2	12	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.setTeamSize		{ /* alte Fassung ohne setTeamSize */ }
+blade.js	4545	4545	LEER	T1-API	Bladeburner	1	55	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getRank		{ /* egal */ }
+bn4door.js	107	165	LOG	L-protokolliert	Server/Prozess+Datei/Host+Singularity	40	0	0	nicht verschluckt		getHackingLevel,getHostname,getServer,scp,singularity.connect	pfad,sag	{ sag("RUNDENFEHLER: " + String(e)); try { ns.singularity.co
+bn4door.js	112	112	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getServer		{ continue; }
+bn4door.js	167	167	LEER	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.connect		{ /* egal */ }
+bn4life.js	112	635	LOG	L-protokolliert	Bladeburner+sonstige+Datei/Host+Spielinfo+Server/Prozess+Singularity	136	4	4	nicht verschluckt		bladeburner.inBladeburner,exec,exit,fileExists,getHostname	figBeantrage,figDarf,libsVon,liesVonHome,nachHome	{ sag("RUNDENFEHLER: " + String(e)); }
+bn4life.js	372	515	LOG	L-protokolliert	sonstige+Server/Prozess+Datei/Host	34	0	0	nicht verschluckt		exec,getScriptRam,getScriptRam().toFixed,getServerMaxRam,getServerUsedRam	libsVon,netzListe,sag	{ sag("Auftrag unlesbar: " + String(e)); }
+bn4life.js	580	580	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ inDivision = false; }
+bn4life.js	631	631	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+bn4net.js	97	106	SPEICHERT	S-speichert	Datei/Host	6	86	0	nicht verschluckt		fileExists,read	ladeRegistry	{ regGrund = "registry.json warf: " + String(e && e.message 
+bn4net.js	129	154	LEER	T4-LOGIK	Datei/Host+Spielinfo	20	86	0	unbedenklich: in 86 Testeintritten ohne Fehler durchlaufen		fileExists,getResetInfo,read		{ /* dann gelten die Standardwerte 1 */ }
+bn4net.js	178	230	DEFAULT	T4-LOGIK	Datei/Host+Spielinfo	14	19170	0	unbedenklich: in 19170 Testeintritten ohne Fehler durchlaufen		fileExists,getResetInfo,read		{ return leer; }
+bn4net.js	214	220	LEER	T4-LOGIK	Spielinfo	4	124	0	unbedenklich: in 124 Testeintritten ohne Fehler durchlaufen		getResetInfo		{ /* kein getResetInfo - dann traegt die Fuenf-Minuten-Frist
+bn4net.js	246	250	DEFAULT	T1-API	Datei/Host	3	1	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ return false; }
+bn4net.js	256	271	DEFAULT	T4-LOGIK	Datei/Host	8	430	0	unbedenklich: in 430 Testeintritten ohne Fehler durchlaufen		fileExists,read	sag	{ return false; }
+bn4net.js	646	650	DEFAULT	T4-LOGIK	Server/Prozess	4	7145	0	unbedenklich: in 7145 Testeintritten ohne Fehler durchlaufen		getServerMaxRam	parkLage	{ return "kaltstart"; }
+bn4net.js	669	677	LEER	T4-LOGIK	Datei/Host+Spielinfo	5	7145	0	unbedenklich: in 7145 Testeintritten ohne Fehler durchlaufen		fileExists,getResetInfo,read	leseRolle,merkmaleAusReset,pruefeRolle	{ /* dann bleibt es bei unbekannt */ }
+bn4net.js	683	686	DEFAULT	T4-LOGIK	Datei/Host	3	311942	0	unbedenklich: in 311942 Testeintritten ohne Fehler durchlaufen		fileExists	markeVeraltet	{ return false; }
+bn4net.js	727	737	DEFAULT	T4-LOGIK	Spielinfo+Datei/Host	8	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getResetInfo,read		{ return false; }
+bn4net.js	882	882	LEER	T1-API	Spielinfo	1	86	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ /* egal */ }
+bn4net.js	889	5277	LOG	L-protokolliert	sonstige+Datei/Host+Server/Prozess+Spielinfo	1134	7059	5	nicht verschluckt		exec,exit,fileExists,getHackTime,getHackingLevel	actionTime,arbeiterGbAuf,auftragOffen,ausweichwirt,baueLage	{ // errStreak zaehlt AUFEINANDERFOLGENDE Fehler. Er wird am
+bn4net.js	894	894	LEER	T1-API	Spielinfo	1	7059	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ /* egal */ }
+bn4net.js	1021	1021	DEFAULT	T1-API	Server/Prozess	1	16	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+bn4net.js	1064	1064	DEFAULT	T2-JSON	Datei/Host	1	7055	7033	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ return 0; }
+bn4net.js	1069	1069	DEFAULT	T1-API	Server/Prozess	1	3	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+bn4net.js	1076	1149	LOG	L-protokolliert	sonstige+Server/Prozess+Datei/Host	41	0	0	nicht verschluckt		exec,getScriptRam,getServerMaxRam,getServerUsedRam,hasRootAccess	sag	{ sag("Auftrag unlesbar: " + String(e)); }
+bn4net.js	1167	1167	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			fn	{ /* schon offen */ }
+bn4net.js	1168	1168	LEER	T1-API	Server/Prozess	2	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		nuke		{ /* Ports fehlen doch */ }
+bn4net.js	1503	1510	LEER	T2-JSON	Datei/Host	4	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,read		{ /* kaputtes JSON - dann bleibt es bei "nah" */ }
+bn4net.js	1801	1811	DEFAULT	T1-API	Spielinfo	2	7055	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return { skill: 1, int: 0, multMoney: 1, multChance: 1, mu
+bn4net.js	1884	1884	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	1	11877	0	unbedenklich: in 11877 Testeintritten ohne Fehler durchlaufen			kennzahlen	{ kz = null; }
+bn4net.js	2826	3105	LOG	L-protokolliert	sonstige+Server/Prozess	143	286	0	nicht verschluckt		exec,getHackTime,getServer	freiGesamt,growFaeden,kennzahlen,platziere,sag	{ if (runde % 10 === 0) sag("Stapelbetrieb " + ziel + " warf
+bn4net.js	3167	3169	LOG	L-protokolliert	Browser/Hilfsaufruf	1	2358	0	nicht verschluckt			planMix	{ // Nicht stillschweigend ueberspringen. Wirft hackAnalyze 
+bn4net.js	3478	3478	DEFAULT	T1-API	Server/Prozess	1	1364	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getWeakenTime		{ ofenKurz = false; }
+bn4net.js	3639	3657	DEFAULT	T4-LOGIK	Datei/Host	7	788	0	unbedenklich: in 788 Testeintritten ohne Fehler durchlaufen		fileExists,read		{ alter = null; }
+bn4net.js	3747	3747	DEFAULT	T1-API	Server/Prozess	1	13377	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps		{ prozesse = []; }
+bn4net.js	3762	3762	DEFAULT	T1-API	Server/Prozess	1	10321	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+bn4net.js	3798	3802	DEFAULT	T1-API	Spielinfo+Datei/Host	2	5030	0	unbedenklich: erwarteter Fehler (Spielinfo+Datei/Host)		getResetInfo,read,read().trim,read().trim().split		{ return false; }
+bn4net.js	3809	3812	DEFAULT	T1-API	Datei/Host+Spielinfo	1	10060	0	unbedenklich: erwarteter Fehler (Datei/Host+Spielinfo)		fileExists,getResetInfo,read,read().trim		{ return false; }
+bn4net.js	4084	4093	DEFAULT	T4-LOGIK	Datei/Host	10	5030	0	unbedenklich: in 5030 Testeintritten ohne Fehler durchlaufen		fileExists,read		{ return leer; }
+bn4net.js	4454	4458	DEFAULT	T1-API	Spielinfo	2	7050	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return null; }
+bn4net.js	4484	4484	LEER	T1-API	Spielinfo	1	7050	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ /* egal */ }
+bn4net.js	4498	4501	LEER	T4-LOGIK	Datei/Host	3	220765	171349	Mock-Fehler im Test (SyntaxError: Unexpected token '/', "// Platzhalter" is not valid JSON), im Spiel nicht zu erwarten	Lesen aller figure-request-*: Mock-Dateien enthalten Platzhalter -> SyntaxError erwartet, im Spiel nur bei kaputtem Antrag.	read	figAntragGilt	{ /* unlesbarer Antrag zaehlt nicht */ }
+bn4net.js	4505	4509	DEFAULT	T2-JSON	Datei/Host	2	7050	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,read		{ bisher = null; }
+bn4net.js	4521	4523	LEER	T4-LOGIK	Server/Prozess	5	7050	0	unbedenklich: in 7050 Testeintritten ohne Fehler durchlaufen		ps		{ /* dann ohne Lebendpruefung - alte Regel gilt weiter */ }
+bn4net.js	4564	4661	LOG	L-protokolliert	sonstige+Datei/Host+Spielinfo+Server/Prozess	48	7050	0	nicht verschluckt		exec,fileExists,getResetInfo,getScriptRam,hasRootAccess	freiHier,sag	{ // NICHT STILL SCHLUCKEN. Dieses catch hat beim ersten Anl
+bn4net.js	4590	4590	DEFAULT	T1-API	Server/Prozess	1	2	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+bn4net.js	4716	4725	LEER	T4-LOGIK	Datei/Host	3	85	0	unbedenklich: in 85 Testeintritten ohne Fehler durchlaufen		fileExists,read,write	evAnhaengen,evLaden	{ /* der Strom ist Bericht, nie Steuerung - nie die Runde ki
+bn4net.js	4755	4768	LEER	T4-LOGIK	Datei/Host	4	85	0	unbedenklich: in 85 Testeintritten ohne Fehler durchlaufen		fileExists,read	evLaden	{ /* kein Strom - dann bleibt die Zahl ungemessen */ }
+bn4net.js	4861	5015	LEER	T4-LOGIK	Datei/Host	19	1059	1047	Mock-Fehler im Test (SyntaxError: Unexpected end of JSON input), im Spiel nicht zu erwarten	blade.json -> Traeger/next_blackop_chance: Mock hat keine Datei. LIVE belegt: kpi.json traegt next_blackop_chance 0,102 und traeger rang-netto.	read	rangAusHashes	{ /* kein blade.json - dann kein Traeger */ }
+bn4net.js	4943	4948	DEFAULT	T2-JSON	Spielinfo+Datei/Host	3	3	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		getResetInfo,read		{ return 0; }
+bn4net.js	5027	5054	LEER	T4-LOGIK	Datei/Host	16	1137	1137	Mock-Fehler im Test (SyntaxError: Unexpected end of JSON input), im Spiel nicht zu erwarten	ausgang.json -> KPI: LIVE belegt (kpi.json route_state/eta_min gesetzt).	read		{ /* noch kein ausgang.json */ }
+bn4net.js	5057	5076	LEER	T4-LOGIK	Datei/Host	8	1137	807	Mock-Fehler im Test (SyntaxError: Unexpected end of JSON input), im Spiel nicht zu erwarten	watchdog.json -> KPI: LIVE belegt (false_kill_count 0).	read		{ /* kein Waechter - dann bleibt der letzte Stand stehen */ 
+bn4net.js	5091	5098	LEER	T2-JSON	Datei/Host	5	1137	1137	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ /* keine Brueckenmeldung */ }
+bn4net.js	5102	5118	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	834	0	unbedenklich: in 834 Testeintritten ohne Fehler durchlaufen			regZaehlwerk	{ /* dann bleibt das alte Zaehlwerk stehen */ }
+bn4net.js	5111	5116	DEFAULT	T2-JSON	Datei/Host	5	8956	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,read		{ return false; }
+bn4net.js	5132	5179	LEER	T4-LOGIK	Datei/Host	14	1137	0	unbedenklich: in 1137 Testeintritten ohne Fehler durchlaufen		fileExists,read	evLaden	{ /* kein Strom - dann bleiben die Felder, wie sie waren */ 
+bn4net.js	5191	5229	LEER	T4-LOGIK	Datei/Host	17	1137	0	unbedenklich: in 1137 Testeintritten ohne Fehler durchlaufen		fileExists,read	ereignis	{ /* kein Stand - dann bleibt das Feld, wie es war */ }
+bn4net.js	5236	5236	LOG	L-protokolliert	Browser/Hilfsaufruf	1	1137	0	nicht verschluckt			schreibeKpi	{ // Die Tafel darf die Runde nie zu Fall bringen - sie ist 
+bn4net.js	5272	5274	LEER	T1-API	Datei/Host	1	215	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal - die Uhr laeuft im Speicher weiter */ }
+bn4rep.js	86	86	LEER	T1-API	Datei/Host	1	44	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* Protokoll ist Beiwerk, nie ein Grund zum Abbruch */ }
+bn4rep.js	123	143	DEFAULT	T4-LOGIK	Datei/Host+Spielinfo	8	1406	0	unbedenklich: in 1406 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,getResetInfo,scp	liesVonHome	{ return true; }
+bn4rep.js	198	203	LEER	T4-LOGIK	Server/Prozess	4	16	0	unbedenklich: in 16 Testeintritten ohne Fehler durchlaufen		getServer,serverExists		{ /* haengt noch nicht am Netz */ }
+bn4rep.js	206	209	LEER	T1-API	Spielinfo	3	16	0	unbedenklich: erwarteter Fehler (Spielinfo)		getBitNodeMultipliers		{ /* kein Zugriff */ }
+bn4rep.js	276	276	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getServer		{ rabatt = false; }
+bn4rep.js	452	452	LEER	T1-API	Datei/Host	1	20	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* lag nie dort */ }
+bn4rep.js	454	454	LEER	T1-API	Datei/Host	1	20	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,rm		{ /* auch gut */ }
+bn4rep.js	552	2656	LOG	L-protokolliert	Bladeburner+Datei/Host+Spielinfo+sonstige+Server/Prozess+Singularity	492	310	5	nicht verschluckt		bladeburner.inBladeburner,fileExists,getBitNodeMultipliers,getFavorToDonate,getHostname	amTorWarten,augRuecklage,bladeSperreArbeit,bladeburnerTraegtHier,companyRepGoal	{ sag("RUNDENFEHLER: " + String(e)); }
+bn4rep.js	585	593	LEER	T4-LOGIK	Spielinfo	2	310	0	unbedenklich: in 310 Testeintritten ohne Fehler durchlaufen		getResetInfo	schreibNachHome	{ /* ohne Stempel laeuft der Rest weiter */ }
+bn4rep.js	612	612	DEFAULT	T4-LOGIK	Server/Prozess	1	310	0	unbedenklich: in 310 Testeintritten ohne Fehler durchlaufen		getTotalScriptIncome	einkommenAusScriptIncome	{ einkommenProSek = 0; }
+bn4rep.js	653	653	DEFAULT	T1-API	Spielinfo	1	310	0	unbedenklich: erwarteter Fehler (Spielinfo)		getBitNodeMultipliers		{ bnMults = null; }
+bn4rep.js	662	665	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	2	310	0	unbedenklich: in 310 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ return false; }
+bn4rep.js	941	941	DEFAULT	T1-API	Bladeburner	1	4	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ bladeSperre = true; }
+bn4rep.js	962	965	DEFAULT	T1-API	Singularity	2	310	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ graftLaeuft = false; }
+bn4rep.js	1013	1033	LEER	T4-LOGIK	Spielinfo	18	4	0	unbedenklich: in 4 Testeintritten ohne Fehler durchlaufen		getResetInfo	liesVonHome,schreibNachHome	{ /* ohne Uhr sperrt nur der laufende Wiederaufbau */ }
+bn4rep.js	1016	1016	DEFAULT	T4-LOGIK	JSON	1	4	0	unbedenklich: in 4 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ uhr = null; }
+bn4rep.js	1063	1067	DEFAULT	T2-JSON	JSON	2	70	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ lockBis = NaN; }
+bn4rep.js	1313	1324	DEFAULT	T4-LOGIK	Singularity	14	4	0	unbedenklich: in 4 Testeintritten ohne Fehler durchlaufen		singularity.getAugmentationStats		{ // Ohne die Abfrage lieber die alte, grosszuegige Regel: e
+bn4rep.js	1318	1318	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getAugmentationStats		{ continue; }
+bn4rep.js	1345	1368	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	310	0	unbedenklich: in 310 Testeintritten ohne Fehler durchlaufen			schreibNachHome	{ /* ohne Telemetrie laeuft der Rest weiter */ }
+bn4rep.js	1427	1432	LEER	T1-API	Singularity	3	184	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ /* nicht lesbar - dann gilt die Pruefung vom Rundenanfang 
+bn4rep.js	1433	1438	LEER	T4-LOGIK	Browser/Hilfsaufruf	6	183	0	unbedenklich: in 183 Testeintritten ohne Fehler durchlaufen			einbauErlaubt,endspurtLage,sag	{ /* keine Lage lesbar - dann gilt Normalbetrieb */ }
+bn4rep.js	1463	1474	LEER	T4-LOGIK	Datei/Host+Spielinfo+Server/Prozess	4	165	0	unbedenklich: in 165 Testeintritten ohne Fehler durchlaufen		getHostname,getResetInfo,getServerMoneyAvailable,scp,write		{ /* ohne Telemetrie wartet es trotzdem */ }
+bn4rep.js	1520	1525	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	2	0	unbedenklich: in 2 Testeintritten ohne Fehler durchlaufen			schreibNachHome	{ /* der lokale Eintrag aus handschlag.js bleibt */ }
+bn4rep.js	2514	2514	LEER	T1-API	Datei/Host	1	27	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* lag nie dort */ }
+bn4rep.js	2562	2578	LEER	T4-LOGIK	Singularity	8	103	0	unbedenklich: in 103 Testeintritten ohne Fehler durchlaufen		singularity.isFocused,singularity.setFocus	fokusEntscheidung,sag	{ /* Aufruf selten verfuegbar (SF4) - kein Grund zum Abbruch
+bn4start.js	59	59	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			fn	{ /* schon offen */ }
+bn4start.js	60	60	LEER	T1-API	Server/Prozess	2	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		nuke		{ /* Ports fehlen doch */ }
+bodauer.js	7	7	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCountRemaining		{ continue; }
+bodauer.js	9	13	DEFAULT	T1-API	Bladeburner	3	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionTime		{ o.push(n + " FEHLER"); }
+bodauer.js	16	19	LEER	T1-API	Bladeburner	2	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionTime,bladeburner.getRank,bladeburner.getRank().toFixed		{ /* egal */ }
+boerse.js	111	114	LEER	T1-API	Datei/Host	3	1	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+boerse.js	117	120	LEER	T1-API	Datei/Host	3	1	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+boerse.js	124	124	LOG	L-protokolliert	Boerse	1	1	1	nicht verschluckt		stock.getSymbols		{ // Kein WSE-Zugang. In BitNode 8 kann das nicht sein (Pres
+boerse.js	152	300	LOG	L-protokolliert	Datei/Host+Server/Prozess+Boerse	88	0	0	nicht verschluckt		fileExists,getServerMoneyAvailable,stock.buyStock,stock.getForecast,stock.getMaxShares	alleVerkaufen,ereignis,herzschlag,nachHome,sag	{ errStreak++; const msg = String(e && e.message ? e.message
+boerse.js	179	179	DEFAULT	T1-API	Boerse	1	0	0	unbedenklich: erwarteter Fehler (Boerse)		stock.has4SDataTixApi		{ hat4S = false; }
+boerse.js	184	184	DEFAULT	T1-API	Boerse	1	0	0	unbedenklich: erwarteter Fehler (Boerse)		stock.purchase4SMarketDataTixApi		{ ok = false; }
+boerse.js	206	206	DEFAULT	T1-API	Boerse	2	0	0	unbedenklich: erwarteter Fehler (Boerse)		stock.getForecast		{ vorhersage = null; }
+boerse.js	314	314	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return 0; }
+boerse.js	366	366	DEFAULT	T1-API	Boerse	1	0	0	unbedenklich: erwarteter Fehler (Boerse)		stock.getPosition		{ continue; }
+boerse.js	369	376	LOG	L-protokolliert	Boerse	4	0	0	nicht verschluckt		stock.sellStock	sag	{ sag("Schliessung von " + sym + " misslungen: " + String(e 
+boot.js	160	160	LEER	T1-API	Spielinfo	1	2	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ /* kein Zugriff - im Zweifel wie nach einem Wechsel raeume
+boot.js	199	210	LEER	T2-JSON	Datei/Host	5	2	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,read		{ /* Registry unlesbar - die Notliste traegt */ }
+boprobe.js	4	21	SPEICHERT	S-speichert	Bladeburner	16	0	0	nicht verschluckt		bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionTime,bladeburner.getCity,bladeburner.getCityChaos,bladeburner.getCityCommunities		{ o.fehler = String(e); }
+boprobe.js	16	16	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCityCommunities		{ }
+buyaugs.js	1434	1436	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ return { refresh: () => {}, release: () => {} }; }
+buyaugs.js	1443	1446	LEER	T3-DOM	DOM	3	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* kein Fenster, auch gut */ }
+buyaugs.js	1460	1462	LEER	T3-DOM	DOM	2	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* egal */ }
+buyaugs.js	1630	1633	LOG	L-protokolliert	Datei/Host	3	0	0	nicht verschluckt		scp,write		{ ns.print("Bericht konnte nicht geschrieben werden: " + e);
+buyaugs.js	1648	1660	LOG	L-protokolliert	sonstige	1	0	0	nicht verschluckt		flags		{ say("ABBRUCH: Schalter nicht verstanden — " + (e && e.mess
+buyaugs.js	1729	1904	RETHROW	R-wirft	Browser/Hilfsaufruf	87	0	0	nicht verschluckt			buildCandidates,buyOne,collectState,fmtMoney,getMoney	{ // Wurde das Skript getoetet, kommt aus jedem await eine S
+buyaugs.js	1925	1928	LOG	L-protokolliert	Browser/Hilfsaufruf	2	0	0	nicht verschluckt			backToTerminal,fmtMoney,getMoney,say	{ ns.print("Abschluss unvollstaendig: " + e); }
+cdump.js	105	105	SPEICHERT	S-speichert	sonstige	1	0	0	nicht verschluckt		codingcontract.getContractType		{ ausgelassen.push({ host, datei, grund: "Typ nicht lesbar: 
+cdump.js	107	107	SPEICHERT	S-speichert	sonstige	1	0	0	nicht verschluckt		codingcontract.getData		{ ausgelassen.push({ host, datei, typ, grund: "Daten nicht l
+cdump.js	122	122	SPEICHERT	S-speichert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt				{ ausgelassen.push({ host, datei, typ, grund: "Loeser warf: 
+cdump.js	131	131	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ ok = false; }
+cdump.js	252	255	LEER	T2-JSON	Datei/Host	3	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ /* erster Lauf oder unlesbar - dann faengt die Zaehlung be
+cdump.js	278	280	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ text = "?"; }
+chance.js	49	49	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillLevel		{ continue; }
+chance.js	62	62	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getTeamSize		{}
+chance.js	93	93	DEFAULT	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillLevel		{ return 0; }
+cheap.js	20	70	SPEICHERT	S-speichert	sonstige+Spielinfo+Singularity	40	0	0	nicht verschluckt		format.number,getPlayer,singularity.checkFactionInvitations,singularity.checkFactionInvitations().join,singularity.getAugmentationPrice		{ zeilen.push("FEHLER: " + String(e && e.message ? e.message
+contracts.js	130	132	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ text = String(wert); }
+contracts.js	211	223	SPEICHERT	S-speichert	sonstige	9	0	0	nicht verschluckt		codingcontract.getContractTypes	protokoll	{ protokoll("HINWEIS: getContractTypes nicht verfuegbar (" +
+contracts.js	230	232	DEFAULT	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		ls		{ protokoll("ABBRUCH: Rechner '" + nurRechner + "' gibt es n
+contracts.js	271	274	LEER	T2-JSON	Datei/Host	3	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ /* erster Lauf oder unlesbar */ }
+contracts.js	288	290	DEFAULT	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		ls		{ continue; }
+contracts.js	311	313	SPEICHERT	S-speichert	sonstige	1	0	0	nicht verschluckt		codingcontract.getContract		{ // Vertrag zwischenzeitlich geloest oder verschwunden - da
+contracts.js	350	352	SPEICHERT	S-speichert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt				{ einwand = "Waechter warf: " + fehlertext(e); }
+contracts.js	364	366	SPEICHERT	S-speichert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt				{ protokoll("FEHLER " + kopf + " -> Loeser warf: " + fehlert
+contracts.js	387	389	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ bestanden = false; }
+contracts.js	410	412	SPEICHERT	S-speichert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt				{ // Ein Wurf heisst Formatfehler - hier wird KEIN Versuch v
+contracts.js	485	499	SPEICHERT	S-speichert	Datei/Host	3	0	0	nicht verschluckt		scp,write		{ // Der Stand ist Buchhaltung, keine Aufgabe. Er darf den L
+csolve.js	67	67	LOG	L-protokolliert	JSON	1	0	0	nicht verschluckt				{ // Eine unlesbare Antwortdatei blockierte die Rotation fue
+csolve.js	87	89	SPEICHERT	S-speichert	sonstige	1	0	0	nicht verschluckt		codingcontract.attempt		{ ergebnis = "FEHLER " + String(e && e.message ? e.message :
+csolve.js	153	153	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* egal */ }
+csolve.js	155	155	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* egal */ }
+daedalus.js	20	58	SPEICHERT	S-speichert	sonstige+Spielinfo+Singularity	30	0	0	nicht verschluckt		format.number,getPlayer,singularity.getOwnedAugmentations,sleep	noetig	{ z.push("FEHLER: " + String(e && e.message ? e.message : e)
+darkweb.js	199	201	LOG	L-protokolliert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt				{ return sag("ABBRUCH: React-Handler warf " + e.message); }
+exit.js	70	89	LOG	L-protokolliert	Datei/Host+Spielinfo	12	0	0	nicht verschluckt		fileExists,getHostname,getResetInfo,read,scp	sag,zielErlaubt	{ // Eine nicht pruefbare Route ist kein Freibrief. Lieber s
+exit.js	112	121	LOG	L-protokolliert	Bladeburner	5	0	0	nicht verschluckt		bladeburner.getBlackOpNames,bladeburner.getNextBlackOp,bladeburner.inBladeburner	sag	{ sag("Keine Bladeburner-Division - Weg 2 entfaellt."); }
+exit.js	163	163	LOG	L-protokolliert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt			fn	{ sag(datei + ": " + e); }
+exit.js	168	168	LOG	L-protokolliert	Server/Prozess	1	0	0	nicht verschluckt		nuke		{ sag("nuke fehlgeschlagen: " + e); return; }
+exploit2.js	81	88	LOG	L-protokolliert	sonstige	6	0	0	nicht verschluckt		sleep	echt,sag	{ sag("TimeCompression fehlgeschlagen: " + String(e)); }
+exploit2.js	97	109	LOG	L-protokolliert	sonstige	5	0	0	nicht verschluckt		sleep	sag	{ sag("PrototypeTampering fehlgeschlagen: " + String(e)); }
+exploit3.js	57	57	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+export.js	116	116	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+export.js	125	176	DEFAULT	T4-LOGIK	JSON	8	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			lies	{ grund = "bridge.json fehlt oder ist unlesbar"; }
+export.js	193	196	LEER	T4-LOGIK	JSON	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			lies	{ /* erster Lauf */ }
+export.js	201	228	LOG	L-protokolliert	Singularity	4	0	0	nicht verschluckt		singularity.exportGame	sag	{ fehler = String(e && e.message ? e.message : e).slice(0, 1
+export.js	236	242	LEER	T4-LOGIK	Browser/Hilfsaufruf	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			evAnhaengen,evLaden,lies,nachHome	{ /* Bericht, nie Steuerung */ }
+export.js	246	280	LEER	T4-LOGIK	Spielinfo	14	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getResetInfo	lies,nachHome	{ /* egal - der Export ist das Wichtige */ }
+export.js	248	248	DEFAULT	T4-LOGIK	JSON	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			lies	{ liste = []; }
+export.js	264	264	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ nodeReset = 0; }
+favorweg.js	22	70	SPEICHERT	S-speichert	sonstige+Spielinfo+Singularity	38	0	0	nicht verschluckt		format.number,getFavorToDonate,getPlayer,singularity.getAugmentationRepReq,singularity.getAugmentationsFromFaction		{ z.push("FEHLER: " + String(e && e.message ? e.message : e)
+figwatch.js	46	49	LEER	T1-API	Datei/Host	3	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+figwatch.js	53	57	DEFAULT	T4-LOGIK	Datei/Host	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		fileExists,getHostname,read,scp		{ return null; }
+figwatch.js	60	63	LEER	T1-API	Datei/Host	3	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+figwatch.js	83	185	LOG	L-protokolliert	Bladeburner+Datei/Host+Spielinfo+Singularity+sonstige	43	0	0	nicht verschluckt		bladeburner.getCurrentAction,getHostname,getResetInfo,singularity.getCurrentWork,sleep	ereignis,liesVonHome,nachHome,pruefeHandlung,sag	{ errStreak++; const msg = String(e && e.message ? e.message
+figwatch.js	89	92	DEFAULT	T4-LOGIK	JSON	2	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ vergabe = null; }
+figwatch.js	112	125	LEER	T4-LOGIK	Singularity	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		singularity.getCurrentWork		{ /* nicht lesbar - dann bleibt es bei null */ }
+figwatch.js	128	134	LEER	T4-LOGIK	Bladeburner	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		bladeburner.getCurrentAction		{ /* nicht in der Division */ }
+figwatch.js	169	169	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return 0; }
+figwatch.js	205	211	LEER	T4-LOGIK	JSON	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ /* dann ein frischer Strom */ }
+formcheck.js	67	67	LEER	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		growthAnalyze		{ /* nicht rootbar */ }
+formcheck.js	104	106	LEER	T1-API	sonstige+Spielinfo	3	0	0	unbedenklich: erwarteter Fehler (sonstige+Spielinfo)		getFactionFavor,getPlayer		{ /* getFactionFavor braucht Singularity - dann eben ohne */
+formcheck.js	115	120	DEFAULT	T1-API	Cloud/Formeln	2	0	0	unbedenklich: erwarteter Fehler (Cloud/Formeln)		formulas.work.factionGains		{ raten.push("--"); }
+graft.js	52	54	SPEICHERT	S-speichert	Singularity	1	0	0	nicht verschluckt		singularity.getOwnedAugmentations,singularity.getOwnedAugmentations().includes		{ raus.fehler = "Besitz nicht pruefbar: " + String(e && e.me
+graft.js	86	86	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* dann bleibt er stehen */ }
+graft.js	92	92	SPEICHERT	S-speichert	Grafting	1	0	0	nicht verschluckt		grafting.getGraftableAugmentations		{ raus.fehler = "Kein Grafting-Zugang: " + String(e && e.mes
+graft.js	120	120	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ laufend = null; }
+graft.js	133	136	SPEICHERT	S-speichert	Grafting	2	0	0	nicht verschluckt		grafting.getAugmentationGraftPrice,grafting.getAugmentationGraftTime		{ raus.fehler = "Preis/Dauer nicht lesbar: " + String(e && e
+graft.js	153	159	SPEICHERT	S-speichert	Singularity	4	0	0	nicht verschluckt		singularity.travelToCity	fertig	{ raus.fehler = "Reise warf: " + String(e && e.message ? e.m
+graft.js	184	184	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.stopBladeburnerAction		{ /* nicht in der Division */ }
+graft.js	216	216	SPEICHERT	S-speichert	Grafting	1	0	0	nicht verschluckt		grafting.graftAugmentation		{ raus.fehler = "graftAugmentation warf: " + String(e && e.m
+graftauto.js	81	84	LEER	T1-API	Datei/Host	3	20	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+graftauto.js	88	91	LEER	T1-API	Datei/Host	3	20	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+graftauto.js	94	101	DEFAULT	T4-LOGIK	Datei/Host	5	54	0	unbedenklich: in 54 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return null; }
+graftauto.js	105	108	DEFAULT	T4-LOGIK	JSON	2	9	0	unbedenklich: in 9 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ plan = null; }
+graftauto.js	147	395	LOG	L-protokolliert	sonstige+Datei/Host+Server/Prozess+Grafting+Singularity	91	14	1	nicht verschluckt		exec,fileExists,getServerMoneyAvailable,grafting.getAugmentationGraftPrice,grafting.getAugmentationGraftTime	ereignis,figBeantrage,fortschritt,herzschlag,liesVonHome	{ errStreak++; const msg = String(e && e.message ? e.message
+graftauto.js	160	163	LEER	T4-LOGIK	JSON	3	14	0	unbedenklich: in 14 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* kein Kern - dann keine Motorzeit */ }
+graftauto.js	164	168	LEER	T4-LOGIK	JSON	4	14	0	unbedenklich: in 14 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* keine Schaetzung */ }
+graftauto.js	178	178	LOG	L-protokolliert	Grafting	1	14	2	nicht verschluckt		grafting.getGraftableAugmentations		{ // Kein Zugriff heisst: keine Bladeburners-Mitgliedschaft 
+graftauto.js	190	193	LEER	T1-API	Singularity	3	12	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getCurrentWork		{ /* nicht lesbar */ }
+graftauto.js	251	254	LEER	T1-API	Grafting	2	15	0	unbedenklich: erwarteter Fehler (Grafting)		grafting.getAugmentationGraftPrice,grafting.getAugmentationGraftTime		{ /* dann gilt es als nicht graftbar */ }
+graftauto.js	298	313	LEER	T4-LOGIK	JSON	9	12	0	unbedenklich: in 12 Testeintritten ohne Fehler durchlaufen			ereignis,liesVonHome,sag	{ /* kein graft.json - dann gibt es nichts zu lernen */ }
+graftauto.js	332	338	LEER	T4-LOGIK	Datei/Host	1	12	0	unbedenklich: in 12 Testeintritten ohne Fehler durchlaufen		fileExists	liesVonHome	{ /* dann ohne Ruecklage - lieber graften als haengen */ }
+graftauto.js	410	410	DEFAULT	T1-API	Spielinfo	1	14	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return 0; }
+graftauto.js	429	435	LEER	T4-LOGIK	JSON	5	5	0	unbedenklich: in 5 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* dann ein frischer Strom */ }
+guard.js	67	67	LEER	T1-API	Datei/Host	1	578	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal */ }
+guard.js	77	81	DEFAULT	T4-LOGIK	Datei/Host	5	22209	0	unbedenklich: in 22209 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return null; }
+guard.js	86	86	DEFAULT	T2-JSON	JSON	1	7315	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return null; }
+guard.js	200	852	LOG	L-protokolliert	sonstige+Datei/Host+Spielinfo+Server/Prozess	169	2831	5	nicht verschluckt		exec,fileExists,getPlayer,getResetInfo,getServerMaxRam	andereUhrSagtFrisch,auswahl,enginePuls,entwarnung,ereignisAnhaengen	{ errStreak++; const msg = String(e && e.message ? e.message
+guard.js	410	410	DEFAULT	T4-LOGIK	Server/Prozess	5	2762	0	unbedenklich: in 2762 Testeintritten ohne Fehler durchlaufen		ps	netz	{ laufend.clear(); }
+guard.js	427	427	DEFAULT	T2-JSON	Datei/Host	1	2253	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ fehlt = {}; }
+guard.js	437	437	LEER	T1-API	Datei/Host	1	2253	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal */ }
+guard.js	445	448	LEER	T1-API	Browser/Hilfsaufruf	3	2762	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* kein DOM erreichbar - dann gilt sichtbar */ }
+guard.js	821	826	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			protokolliere	{ /* Protokoll ist Beiwerk */ }
+guard.js	984	989	LEER	T4-LOGIK	Datei/Host	3	17	0	unbedenklich: in 17 Testeintritten ohne Fehler durchlaufen		fileExists,read,write	evAnhaengen,evLaden	{ /* Bericht, nie Steuerung */ }
+guard.js	994	994	LEER	T1-API	Datei/Host	1	8493	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal */ }
+guard.js	1170	1177	SPEICHERT	S-speichert	Server/Prozess	10	2	0	nicht verschluckt		kill,ps	netz	{ return { getan: false, text: "Neustart misslungen: " + Str
+guard.js	1203	1207	LEER	T4-LOGIK	Server/Prozess	5	2	0	unbedenklich: in 2 Testeintritten ohne Fehler durchlaufen		ps,ps().some	netz	{ /* dann bleibt wirt null */ }
+guard.js	1221	1225	LEER	T4-LOGIK	Server/Prozess	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		kill,ps		{ /* egal */ }
+guard.js	1259	1266	LEER	T2-JSON	Datei/Host	4	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,read		{ /* die Notliste traegt */ }
+guard.js	1269	1274	SPEICHERT	S-speichert	Server/Prozess	6	0	0	nicht verschluckt		kill,ps		{ return { getan: false, text: "Raeumen misslungen: " + Stri
+guard.js	1282	1291	SPEICHERT	S-speichert	sonstige+Datei/Host+Server/Prozess	5	0	0	nicht verschluckt		exec,fileExists,ps,ps().some		{ return { getan: false, text: "boot.js-Start warf: " + Stri
+guard.js	1317	1324	SPEICHERT	S-speichert	Server/Prozess	10	2	0	nicht verschluckt		kill,ps	netz	{ return { getan: false, text: "Neustart von " + traeger + "
+guard.js	1390	1392	SPEICHERT	S-speichert	Datei/Host	1	1	0	nicht verschluckt		write		{ return { getan: false, text: "Auftrag nicht schreibbar: " 
+guard.js	1446	1449	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal */ }
+hacknet.js	37	37	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+hacknet.js	40	44	DEFAULT	T4-LOGIK	Datei/Host	5	73	0	unbedenklich: in 73 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return ""; }
+hacknet.js	56	56	DEFAULT	T1-API	Spielinfo	1	2	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ knotenFuerMarke = 0; }
+hacknet.js	58	58	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+hacknet.js	62	204	LOG	L-protokolliert	Spielinfo+Server/Prozess+Hacknet+sonstige	92	30	3	nicht verschluckt		getResetInfo,getServerMoneyAvailable,hacknet.getCacheUpgradeCost,hacknet.getCoreUpgradeCost,hacknet.getLevelUpgradeCost	liesVonHome,sag,sperren	{ sag("Fehler in der Runde: " + String(e)); }
+hacknet.js	76	76	DEFAULT	T1-API	Spielinfo	1	30	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ knoten = 0; }
+hacknet.js	79	79	DEFAULT	T1-API	Hacknet	2	30	0	unbedenklich: erwarteter Fehler (Hacknet)		hacknet.hashCapacity,hacknet.maxNumNodes		{ kapazitaet = 0; }
+hacknet.js	132	132	DEFAULT	T4-LOGIK	JSON	1	25	25	Mock-Fehler im Test (SyntaxError: Unexpected end of JSON input), im Spiel nicht zu erwarten	Datei fehlt im Mock.		liesVonHome	{ wirtFehlt = null; }
+hacknet.js	168	186	LEER	T4-LOGIK	Hacknet	14	23	0	unbedenklich: in 23 Testeintritten ohne Fehler durchlaufen		hacknet.getCacheUpgradeCost,hacknet.getNodeStats,hacknet.upgradeCache	liesVonHome	{ /* dann eben kein Cache in dieser Runde */ }
+hacktimer.js	69	69	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+hacktimer.js	81	81	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+hacktimer.js	109	112	SPEICHERT	S-speichert	Browser/Hilfsaufruf	2	0	0	nicht verschluckt				{ return schreib({ zeit: Date.now(), zustand: "kein Worker m
+hacktimer.js	131	133	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ // Ein Fehler im Rueckruf ist Sache des Aufrufers, nicht d
+hacktimer.js	190	190	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+hacktimer.js	208	208	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+hacktimer.js	235	235	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+hacktimer.js	236	236	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* egal */ }
+hacktimer.js	238	238	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+hacktimer.js	251	251	LEER	T4-LOGIK	Browser/Hilfsaufruf	1	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			abraeumen	{ /* egal */ }
+hand.js	67	70	LEER	T1-API	Browser/Hilfsaufruf	3	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* kein Nachtdienst, auch gut */ }
+hand.js	97	121	SPEICHERT	S-speichert	Datei/Host+sonstige	16	0	0	nicht verschluckt		fileExists,read,read().trim,scp,sleep	puls,schreibe	{ schreibe("FEHLER beim Lesen: " + (e && e.message ? e.messa
+hand.js	163	220	SPEICHERT	S-speichert	Datei/Host+Server/Prozess+sonstige	42	0	0	nicht verschluckt		getHostname,getServer,sleep	terminal	{ // Ohne diesen Fangarm stirbt die Hand mitten im Befehl, u
+hand.js	212	212	LEER	T1-API	Server/Prozess	3	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getServer		{ /* weiter */ }
+hashes.js	110	110	DEFAULT	T1-API	Spielinfo	1	20	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ knoten = 0; }
+hashes.js	112	116	DEFAULT	T4-LOGIK	Datei/Host	4	18	0	unbedenklich: in 18 Testeintritten ohne Fehler durchlaufen		fileExists	liesVonHome	{ return ""; }
+hashes.js	125	125	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+hashes.js	130	130	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+hashes.js	169	174	DEFAULT	T4-LOGIK	JSON	6	11	0	unbedenklich: in 11 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ return null; }
+hashes.js	177	271	LOG	L-protokolliert	Bladeburner+Datei/Host+Spielinfo+Server/Prozess+Hacknet+sonstige	80	21	1	nicht verschluckt		bladeburner.inBladeburner,fileExists,getResetInfo,getServerMoneyAvailable,hacknet.hashCapacity	gymLohnt,gymStufe,kampfLage,liesVerfahren,liesVonHome	{ ns.print("Fehler in der Runde: " + String(e)); }
+hashes.js	179	179	DEFAULT	T1-API	Hacknet	2	21	0	unbedenklich: erwarteter Fehler (Hacknet)		hacknet.hashCapacity,hacknet.maxNumNodes		{ kapazitaet = 0; }
+hashes.js	211	211	DEFAULT	T1-API	Spielinfo	1	18	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ letzterEinbau = 0; }
+hashes.js	214	217	DEFAULT	T4-LOGIK	Datei/Host	1	18	0	unbedenklich: in 18 Testeintritten ohne Fehler durchlaufen		fileExists	liesVonHome	{ ruecklage = 0; }
+hashes.js	220	220	DEFAULT	T1-API	Bladeburner	1	18	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ inDivision = false; }
+hashes.js	231	231	DEFAULT	T1-API	Hacknet	1	9	0	unbedenklich: erwarteter Fehler (Hacknet)		hacknet.hashCost		{ gymPreis = 0; }
+hashgym.js	18	18	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		scp		{ /* egal */ }
+homegrow.js	73	125	LOG	L-protokolliert	Datei/Host+Server/Prozess+Singularity	20	0	0	nicht verschluckt		fileExists,getServer,getServerMaxRam,getServerMoneyAvailable,singularity.getUpgradeHomeCoresCost	liesVonHome,sag	{ // Wie in bn4net.js: eine Ausnahme darf den Waechter nicht
+homegrow.js	107	114	LEER	T4-LOGIK	JSON	3	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome	{ /* keine oder kaputte Datei: wie unbekannt behandeln */ }
+homeram.js	442	444	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ return () => {}; }
+homeram.js	450	452	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* kein Fenster, auch gut */ }
+homeram.js	458	460	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* egal */ }
+homeram.js	635	637	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* der Aufrufer darf uns nicht umbringen */ }
+homeram.js	753	817	SPEICHERT	S-speichert	Browser/Hilfsaufruf	16	0	0	nicht verschluckt			buyLoop,finish,getCores,getRam,goToVendor	{ // Kein Fehler darf nach draussen: dieses Skript ist das W
+homeram.js	1111	1114	LOG	L-protokolliert	Datei/Host	3	0	0	nicht verschluckt		scp,write		{ ns.print("Bericht konnte nicht geschrieben werden: " + e);
+join.js	407	409	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ return () => {}; }
+join.js	417	419	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* kein Fenster, auch gut */ }
+join.js	425	427	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* egal */ }
+join.js	471	546	SPEICHERT	S-speichert	DOM	40	0	0	nicht verschluckt			collectClickHandlers,confirmMembership,findModalJoinButton,findPageJoinButton,goToFactionsPage	{ // Kein Fehler darf nach draussen: der Aufrufer ist der ei
+join.js	520	522	SPEICHERT	S-speichert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt			makeTrustedLikeEvent	{ log.push(`Kandidat ${i} warf ${e && e.name}: ${e && e.mess
+joinplan.js	16	40	SPEICHERT	S-speichert	sonstige+Spielinfo+Hacknet	25	0	0	nicht verschluckt		format.number,getPlayer,hacknet.getNodeStats,hacknet.numNodes,heart.break		{ z.push("FEHLER: " + String(e && e.message ? e.message : e)
+joinrun.js	87	91	LEER	T4-LOGIK	Spielinfo	4	13	10	Mock-Fehler im Test (TypeError: Cannot read properties of undefined (reading 'size')), im Spiel nicht zu erwarten	getBitNodeMultipliers im Mock nicht gebaut.	getBitNodeMultipliers,getResetInfo		{ /* kein SF5/BN5 - dann nicht blockieren */ }
+joinrun.js	93	339	LOG	L-protokolliert	sonstige+Datei/Host+Spielinfo+Singularity	97	13	13	nicht verschluckt		format.number,getHostname,getPlayer,getResetInfo,scp	bremse,figBeantrage,figDarf,sag,werte	{ sag("FEHLER: " + String(e && e.message ? e.message : e)); 
+joinrun.js	304	308	LEER	T4-LOGIK	Datei/Host+Spielinfo	4	1	0	unbedenklich: in 1 Testeintritten ohne Fehler durchlaufen		getHostname,getResetInfo,scp,write		{ /* Marke ist eine Optimierung, kein Muss - weiter geht es 
+joinrun.js	343	343	LEER	T1-API	Datei/Host	1	13	0	unbedenklich: erwarteter Fehler (Datei/Host)		rm		{ /* lag nie dort */ }
+kampfaugs.js	137	140	LEER	T1-API	Singularity	2	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getOwnedAugmentations		{ /* ohne SF4 nicht verfuegbar - dann ohne Sperre weiter */ 
+kampfaugs.js	151	151	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getFactionRep		{ continue; }
+kampfaugs.js	153	153	DEFAULT	T1-API	Singularity	1	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getAugmentationsFromFaction		{ continue; }
+kampfaugs.js	158	161	DEFAULT	T1-API	Singularity	2	0	0	unbedenklich: erwarteter Fehler (Singularity)		singularity.getAugmentationPrice,singularity.getAugmentationRepReq		{ continue; }
+kampfaugs.js	194	208	LOG	L-protokolliert	Singularity	6	0	0	nicht verschluckt		singularity.workForFaction	figBeantrage,figDarf,sag	{ sag("workForFaction: " + String(e).slice(0, 120)); }
+kampfaugs.js	230	275	LOG	L-protokolliert	Spielinfo	29	0	0	nicht verschluckt		getBitNodeMultipliers,getPlayer	expNoetig,sag	{ sag("Einbaurechnung: " + String(e).slice(0, 140)); }
+kampfaugs.js	244	244	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getBitNodeMultipliers		{ bnMult = {}; }
+kaufplan.js	21	84	SPEICHERT	S-speichert	sonstige+Spielinfo+Singularity	39	0	0	nicht verschluckt		format.number,getPlayer,singularity.getAugmentationPrice,singularity.getAugmentationRepReq,singularity.getAugmentationsFromFaction	durchrechnen	{ z.push("FEHLER: " + String(e && e.message ? e.message : e)
+keepalive.js	88	94	LOG	L-protokolliert	Browser/Hilfsaufruf	4	0	0	nicht verschluckt			melde	{ melde("Alter Waechter liess sich nicht ablesen: " + (e && 
+keepalive.js	117	117	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+keepalive.js	152	156	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen				{ return false; }
+keepalive.js	246	249	SPEICHERT	S-speichert	Browser/Hilfsaufruf	2	0	0	nicht verschluckt				{ this.notiz("Ausnahme: " + (e && e.message ? e.message : St
+keepalive.js	268	281	LOG	L-protokolliert	Browser/Hilfsaufruf	10	0	0	nicht verschluckt			melde	{ melde("Tonanker liess sich nicht setzen: " + (e && e.messa
+knoten.js	46	50	DEFAULT	T1-API	Spielinfo	2	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return null; }
+lib/endspurt.js	56	60	DEFAULT	T4-LOGIK	Datei/Host	5	204	0	unbedenklich: in 204 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return null; }
+lib/endspurt.js	93	95	DEFAULT	T2-JSON	JSON	1	180	1	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return { ...unbekannt, grund: "ausgang.json unlesbar" }; }
+lib/events.js	146	148	DEFAULT	T2-JSON	JSON	1	1236	1	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return leer(); }
+lib/figurns.js	66	69	DEFAULT	T4-LOGIK	JSON	2	593	0	unbedenklich: in 593 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ return null; }
+lib/figurns.js	110	116	LEER	T1-API	Datei/Host	3	236	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* dann gibt es diese Runde keinen Antrag */ }
+lib/figurns.js	135	144	DEFAULT	T2-JSON	Datei/Host	4	121	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		fileExists,getHostname,read,scp		{ v = null; }
+lib/handschlag.js	152	168	DEFAULT	T4-LOGIK	JSON	11	254	0	unbedenklich: in 254 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ return null; }
+lib/handschlag.js	180	217	DEFAULT	T4-LOGIK	JSON	7	5	4	Mock-Fehler im Test (SyntaxError: Unexpected end of JSON input), im Spiel nicht zu erwarten	Antwortdatei der Bruecke fehlt im Mock; im Spiel erwarteter Fall 'noch keine Antwort'.		liesVonHome	{ return null; }
+lib/hostdatei.js	77	88	DEFAULT	T4-LOGIK	Datei/Host	6	1461	0	unbedenklich: in 1461 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return ""; }
+lib/hostdatei.js	102	107	DEFAULT	T4-LOGIK	Datei/Host	5	155	0	unbedenklich: in 155 Testeintritten ohne Fehler durchlaufen		getHostname,scp,write		{ return false; }
+lib/hostdatei.js	130	150	DEFAULT	T4-LOGIK	Datei/Host	16	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		fileExists,getHostname,read,scp,write	deckle,nachHome	{ return false; }
+lib/kpi.js	241	243	DEFAULT	T2-JSON	JSON	1	1092	1	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return { kpi: leer(), schreibsperre: false, befund: "kpi.j
+lib/leiter.js	697	699	DEFAULT	T2-JSON	JSON	1	13	2	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return neu(nodeReset); }
+lib/motorzeit.js	169	171	DEFAULT	T2-JSON	JSON	1	6	1	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return neuerZustand(taktMs); }
+lib/reg.js	113	115	DEFAULT	T1-API	Browser/Hilfsaufruf	1	9988	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ sf9 = 0; }
+lib/reg.js	278	280	SPEICHERT	S-speichert	JSON	1	2812	2	nicht verschluckt				{ return { schema: REG_SCHEMA, eintraege: [], fehler: "regis
+lib/uhren.js	204	206	DEFAULT	T2-JSON	JSON	1	3	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return neu(); }
+netburn.js	39	87	SPEICHERT	S-speichert	sonstige+Spielinfo+Hacknet+Singularity	43	0	0	nicht verschluckt		format.number,getPlayer,getPlayer().factions.includes,hacknet.numNodes,hacknet.purchaseNode	stand	{ z.push("FEHLER: " + String(e && e.message ? e.message : e)
+popups.js	86	86	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ return ""; }
+popups.js	218	225	DEFAULT	T4-LOGIK	Datei/Host	4	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		write	reactKlick	{ return false; }
+popups.js	238	238	LEER	T4-LOGIK	Browser/Hilfsaufruf	2	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			reactKlick	{ /* naechster Knopf */ }
+popups.js	246	349	LOG	L-protokolliert	sonstige+Datei/Host	40	0	0	nicht verschluckt		print,sleep,tprint,write	dialogOffen,einladungAnnehmen,haltebefund,knoepfeSchliessen,liesVonHome	{ ns.print("FEHLER: " + String(e && e.message ? e.message : 
+popups.js	269	292	LEER	T4-LOGIK	JSON	8	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome,nachHome	{ /* Bericht, nie Steuerung */ }
+preis.js	6	6	SPEICHERT	S-speichert	Cloud/Formeln	1	0	0	nicht verschluckt		cloud.getServerCost		{ out[gb] = String(e); }
+probe.js	150	154	SPEICHERT	S-speichert	Browser/Hilfsaufruf	3	0	0	nicht verschluckt				{ msg = e.name + ": " + e.message; }
+probe3.js	75	83	LOG	L-protokolliert	sonstige	5	0	0	nicht verschluckt		scan,scan().includes,sleep	finde,sag,text	{ sag("onClick warf: " + e); }
+punish.js	84	89	DEFAULT	T4-LOGIK	Datei/Host	5	232	0	unbedenklich: in 232 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,read,scp		{ return null; }
+punish.js	94	94	DEFAULT	T2-JSON	JSON	1	145	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ return null; }
+punish.js	98	101	LEER	T1-API	Datei/Host	3	30	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+punish.js	116	139	LEER	T4-LOGIK	Datei/Host	13	30	0	unbedenklich: in 30 Testeintritten ohne Fehler durchlaufen		getHostname,scp,write	lies	{ /* Bericht, nie Steuerung */ }
+punish.js	120	123	LEER	T2-JSON	JSON	3	2	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ /* frischer Strom */ }
+punish.js	157	157	DEFAULT	T1-API	Spielinfo	1	28	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ return fertig("getResetInfo nicht lesbar"); }
+punish.js	414	419	SPEICHERT	S-speichert	Singularity	3	8	0	nicht verschluckt		singularity.installAugmentations	fertig	{ return fertig("installAugmentations warf: " + String(e && 
+shop.js	93	93	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		write		{ /* egal */ }
+shop.js	97	100	LEER	T1-API	Datei/Host	3	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp,write		{ /* egal */ }
+shop.js	103	107	DEFAULT	T4-LOGIK	Datei/Host	5	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		fileExists,getHostname,read,scp		{ return null; }
+shop.js	121	134	LEER	T4-LOGIK	JSON	6	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen			liesVonHome,sag	{ /* kein Ergebnis lesbar - dann faengt das Gedaechtnis bei 
+shop.js	144	324	LOG	L-protokolliert	Cloud/Formeln+Datei/Host+Server/Prozess	75	0	0	nicht verschluckt		cloud.getRamLimit,cloud.getServerCost,cloud.getServerLimit,cloud.getServerNames,cloud.getServerUpgradeCost	liesVonHome,meldeErgebnis,nachHome,sag	{ errStreak++; const msg = String(e && e.message ? e.message
+shop.js	155	158	LEER	T1-API	Cloud/Formeln	3	0	0	unbedenklich: erwarteter Fehler (Cloud/Formeln)		cloud.getServerCost		{ /* diese Groesse geht nicht */ }
+shop.js	181	181	DEFAULT	T2-JSON	JSON	1	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert				{ auftrag = null; }
+shop.js	251	251	DEFAULT	T1-API	Cloud/Formeln	1	0	0	unbedenklich: erwarteter Fehler (Cloud/Formeln)		cloud.getServerUpgradeCost		{ kosten = 0; }
+shop.js	274	274	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return 0; }
+shop.js	313	313	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ return 0; }
+skillcheck.js	40	40	LEER	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ /* egal */ }
+skillcheck.js	66	66	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillLevel		{ /* unbekannt */ }
+skillcheck.js	67	67	LEER	T1-API	Bladeburner	1	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getSkillUpgradeCost		{ /* unbekannt */ }
+sleeve.js	225	231	DEFAULT	T4-LOGIK	Datei/Host+Spielinfo	6	74	0	unbedenklich: in 74 Testeintritten ohne Fehler durchlaufen		fileExists,getHostname,getResetInfo,scp	liesVonHome	{ return false; }
+sleeve.js	393	393	DEFAULT	T1-API	Spielinfo	1	30	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ mitglied = null; }
+sleeve.js	395	401	LEER	T4-LOGIK	Browser/Hilfsaufruf	4	30	0	unbedenklich: in 30 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* keine Datei - dann nur bn4rep.json */ }
+sleeve.js	403	417	LEER	T4-LOGIK	JSON	12	30	0	unbedenklich: in 30 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ /* kaputtes JSON - dann eben weniger Kandidaten */ }
+sleeve.js	432	432	DEFAULT	T1-API	Sleeve	1	120	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.getTask		{ t = null; }
+sleeve.js	433	433	DEFAULT	T1-API	Sleeve	1	120	42	unbedenklich: erwarteter Fehler (Sleeve)	getSleeve().shock: Mock-Luecke; Feld ist in der Definition (tsc-geprueft).	sleeve.getSleeve		{ s = 0; }
+sleeve.js	438	438	DEFAULT	T1-API	Spielinfo	1	40	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ knoten = 0; }
+sleeve.js	439	439	DEFAULT	T1-API	Spielinfo	1	40	0	unbedenklich: erwarteter Fehler (Spielinfo)		getPlayer		{ geld = Infinity; }
+sleeve.js	486	486	DEFAULT	T1-API	Sleeve	1	172	144	unbedenklich: erwarteter Fehler (Sleeve)	setToFactionWork: Mock kennt nur Sleeve 0; im Spiel erwartetes break bei Sperre.	sleeve.setToFactionWork		{ break; }
+sleeve.js	505	505	DEFAULT	T1-API	Sleeve	2	222	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.getSleeve		{ break; }
+sleeve.js	508	508	DEFAULT	T4-LOGIK	Browser/Hilfsaufruf	1	40	0	unbedenklich: in 40 Testeintritten ohne Fehler durchlaufen			teileHackingwegZu	{ v1 = null; }
+sleeve.js	520	542	SPEICHERT	S-speichert	Bladeburner+Sleeve	23	34	0	nicht verschluckt		bladeburner.inBladeburner,sleeve.getSleeve,sleeve.getTask	istRekrutierung,liesVonHome,waehleRekrutierer	{ rekrutierer = { nr: -1, grund: "Fehler: " + String(e).slic
+sleeve.js	522	522	DEFAULT	T1-API	Bladeburner	1	34	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ drin = false; }
+sleeve.js	526	526	DEFAULT	T4-LOGIK	JSON	1	20	0	unbedenklich: in 20 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ bj = null; }
+sleeve.js	535	535	DEFAULT	T1-API	Sleeve	1	43	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.getTask		{ t = null; }
+sleeve.js	549	554	DEFAULT	T4-LOGIK	Sleeve	4	196	53	Mock-Fehler im Test (TypeError: Cannot read properties of undefined (reading 'storedCycles')), im Spiel nicht zu erwarten	getSleeve().storedCycles: Mock-Luecke; Feld ist in der Definition (tsc-geprueft).	sleeve.getSleeve		{ break; }
+sleeve.js	583	583	LEER	T1-API	Bladeburner	1	143	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.inBladeburner		{ /* 0 GB */ }
+sleeve.js	629	633	DEFAULT	T1-API	Sleeve	3	47	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.getSleeve		{ sleeveKampf = 0; }
+sleeve.js	663	667	DEFAULT	T4-LOGIK	JSON	2	143	0	unbedenklich: in 143 Testeintritten ohne Fehler durchlaufen			liesVonHome	{ chaosRunde = false; }
+sleeve.js	713	725	DEFAULT	T4-LOGIK	Bladeburner	7	143	0	unbedenklich: in 143 Testeintritten ohne Fehler durchlaufen		bladeburner.getActionCountRemaining	liesVonHome	{ knappeOperation = null; }
+sleeve.js	728	752	LEER	T4-LOGIK	Sleeve	9	47	0	unbedenklich: in 47 Testeintritten ohne Fehler durchlaufen		sleeve.getTask		{ /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
+sleeve.js	761	761	DEFAULT	T4-LOGIK	Sleeve	1	5	0	unbedenklich: in 5 Testeintritten ohne Fehler durchlaufen		sleeve.getTask	istRekrutierung	{ schon = false; }
+sleeve.js	764	764	DEFAULT	T1-API	Sleeve	1	2	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.setToBladeburnerAction		{ gesetzt = false; }
+sleeve.js	790	790	DEFAULT	T1-API	Bladeburner	1	100	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCountRemaining		{ v = 1; }
+sleeve.js	795	827	DEFAULT	T4-LOGIK	Bladeburner+Sleeve	8	52	18	Mock-Fehler im Test (Error: Sleeve 1 cannot take on contracts because Sleeve 0 is alread), im Spiel nicht zu erwarten	Spielfehler 'Sleeve n cannot take on contracts because Sleeve m is already performing that action' - erwartet, der Mock gibt den Originaltext aus.	bladeburner.getActionCountRemaining,sleeve.setToBladeburnerAction		{ ok = false; }
+sleeve.js	815	815	LEER	T1-API	Bladeburner	1	52	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getActionCountRemaining		{ /* alte Fassung: dann wie bisher blind setzen */ }
+sleeve.js	849	852	DEFAULT	T1-API	Sleeve	3	6	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.setToBladeburnerAction		{ ok = false; }
+sleeve.js	884	891	DEFAULT	T4-LOGIK	Spielinfo+Sleeve	7	24	0	unbedenklich: in 24 Testeintritten ohne Fehler durchlaufen		getPlayer,sleeve.getSleeve		{ gymGeldReicht = false; }
+sleeve.js	892	900	DEFAULT	T4-LOGIK	Spielinfo+Sleeve	6	16	0	unbedenklich: in 16 Testeintritten ohne Fehler durchlaufen		getPlayer,sleeve.setToGymWorkout		{ ok = false; }
+sleeve.js	909	912	DEFAULT	T1-API	Sleeve	2	30	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.getTask		{ laeuft = false; }
+sleeve.js	915	915	DEFAULT	T1-API	Sleeve	1	13	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.setToCommitCrime		{ break; }
+sleeve.js	928	928	DEFAULT	T1-API	Sleeve	1	10	0	unbedenklich: erwarteter Fehler (Sleeve)		sleeve.setToCommitCrime		{ break; }
+sleevecrime.js	38	38	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		ps,ps().some		{ return false; }
+sleevecrime.js	48	48	LOG	L-protokolliert	Sleeve	2	0	0	nicht verschluckt		sleeve.setToCommitCrime		{ if (i === 0) { // Keine Sleeves in diesem Knoten: Marker f
+sleevecrime.js	54	54	DEFAULT	T1-API	Spielinfo	1	0	0	unbedenklich: erwarteter Fehler (Spielinfo)		getResetInfo		{ knoten = 0; }
+sleevecrime.js	56	56	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+sleevediag.js	4	4	SPEICHERT	S-speichert	Sleeve	1	0	0	nicht verschluckt		sleeve.getTask		{ out.taskErr = String(e).slice(0, 140); }
+sleevediag.js	5	7	SPEICHERT	S-speichert	Sleeve	5	0	0	nicht verschluckt		sleeve.getSleeve		{ out.sleeveErr = String(e).slice(0, 140); }
+sleevediag.js	8	12	SPEICHERT	S-speichert	Bladeburner	4	0	0	nicht verschluckt		bladeburner.getActionCountRemaining		{ out.vorratErr = String(e).slice(0, 140); }
+sonde.js	54	54	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* schon weg */ }
+sonde.js	90	101	SPEICHERT	S-speichert	Browser/Hilfsaufruf	6	0	0	nicht verschluckt				{ S.workerFehler = e.message; }
+sonde.js	145	145	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+sr.js	15	23	SPEICHERT	S-speichert	Bladeburner	6	0	0	nicht verschluckt		bladeburner.getActionCountRemaining,bladeburner.getActionCurrentLevel,bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionRepGain,bladeburner.getActionTime		{ out.push(n + " FEHLER " + String(e)); }
+sr.js	25	28	SPEICHERT	S-speichert	Bladeburner	2	0	0	nicht verschluckt		bladeburner.getActionTime,bladeburner.getCity,bladeburner.getCityChaos,bladeburner.getCityChaos().toFixed		{ out.push("allgemein FEHLER " + String(e)); }
+srtest.js	5	8	SPEICHERT	S-speichert	Bladeburner	4	0	0	nicht verschluckt		bladeburner.getCity,bladeburner.getCityChaos,bladeburner.getCityEstimatedPopulation		{ o.push("stadt/pop FEHLER " + String(e)); }
+srtest.js	9	11	SPEICHERT	S-speichert	Bladeburner	2	0	0	nicht verschluckt		bladeburner.getActionEstimatedSuccessChance		{ o.push("chance FEHLER " + String(e)); }
+startdiag.js	82	82	DEFAULT	T1-API	Server/Prozess	1	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getScriptRam		{ ramGb = 0; }
+stufentest.js	15	29	SPEICHERT	S-speichert	Bladeburner	13	0	0	nicht verschluckt		bladeburner.getActionCurrentLevel,bladeburner.getActionEstimatedSuccessChance,bladeburner.getActionMaxLevel,bladeburner.getActionRepGain,bladeburner.getActionTime		{ o.fehler = String(e); }
+telemetry.js	44	46	DEFAULT	T2-JSON	Datei/Host	1	0	0	unbedenklich: Datei leer/fehlt/kaputt -> Standardwert		read		{ brain = null; }
+timerzwang.js	29	29	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+torprobe.js	61	65	LOG	L-protokolliert	sonstige	3	0	0	nicht verschluckt		sleep	knoepfe,sag,text	{ sag("onClick warf: " + e.message); }
+travel.js	571	573	DEFAULT	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ return () => {}; }
+travel.js	579	581	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* kein Fenster, auch gut */ }
+travel.js	587	589	LEER	T3-DOM	DOM	1	0	0	beobachten: Oberflaeche koennte sich aendern; Skript laeuft nur auf Abruf				{ /* egal */ }
+travel.js	1104	1106	LOG	L-protokolliert	Browser/Hilfsaufruf	1	0	0	nicht verschluckt			makeTrustedLikeEvent	{ log(`Kandidat ${i} warf ${e && e.name}: ${e && e.message}`
+travel.js	1409	1491	LOG	L-protokolliert	Browser/Hilfsaufruf	38	0	0	nicht verschluckt			getMoney,grabNightshift,joinStep,log,player	{ // Kein Fehler darf nach draussen: der Bericht ist der ein
+travel.js	1558	1561	LOG	L-protokolliert	Datei/Host	3	0	0	nicht verschluckt		scp,write		{ ns.print("Bericht konnte nicht geschrieben werden: " + e);
+trupp.js	14	14	SPEICHERT	S-speichert	Bladeburner	1	0	0	nicht verschluckt		bladeburner.getTeamSize		{ o.trupp = "FEHLER " + String(e); }
+trupp.js	15	17	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+trupp.js	18	25	SPEICHERT	S-speichert	Bladeburner	5	0	0	nicht verschluckt		bladeburner.getActionEstimatedSuccessChance,bladeburner.getBlackOpNames,bladeburner.getBlackOpNames().find		{ o.blackOp = "FEHLER " + String(e); }
+trupp.js	26	30	SPEICHERT	S-speichert	Bladeburner	3	0	0	nicht verschluckt		bladeburner.getActionCurrentLevel,bladeburner.getActionEstimatedSuccessChance		{ o.raid = "FEHLER " + String(e); }
+trupp.js	31	35	LEER	T1-API	Bladeburner	3	0	0	unbedenklich: erwarteter Fehler (Bladeburner)		bladeburner.getCity,bladeburner.getCityChaos,bladeburner.getCityChaos().toFixed,bladeburner.getCityCommunities		{ /* egal */ }
+vorrat.js	15	19	SPEICHERT	S-speichert	Bladeburner	3	0	0	nicht verschluckt		bladeburner.getCityCommunities		{ o.fehler.push(s + ": " + String(e)); }
+wakelock.js	79	79	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* schon gestoppt */ }
+wakelock.js	80	80	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+wakelock.js	85	118	LOG	L-protokolliert	Browser/Hilfsaufruf	10	0	0	nicht verschluckt			sag	{ return sag("Tonanker fehlgeschlagen: " + e.message + " (Br
+wakelock.js	143	155	SPEICHERT	S-speichert	Browser/Hilfsaufruf	7	0	0	nicht verschluckt				{ zustand = "fehler:" + e.message; }
+wakelock.js	152	152	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* Browser verweigert */ }
+wakelock.js	160	160	LEER	T1-API	Browser/Hilfsaufruf	1	0	0	unbedenklich: erwarteter Fehler (Browser/Hilfsaufruf)				{ /* egal */ }
+wakelock.js	163	163	LEER	T1-API	Datei/Host	1	0	0	unbedenklich: erwarteter Fehler (Datei/Host)		getHostname,scp		{ /* egal */ }
+wbgrow.js	48	113	LOG	L-protokolliert	Cloud/Formeln+sonstige+Spielinfo+Server/Prozess+Singularity	35	0	0	nicht verschluckt		cloud.getServerNames,cloud.getServerNames().filter,cloud.getServerUpgradeCost,cloud.upgradeServer,format.number	sag	{ sag("Abgebrochen: " + String(e && e.message ? e.message : 
+wbgrow.js	90	100	DEFAULT	T4-LOGIK	Spielinfo+Singularity	11	0	0	unbedenklich: von keinem Test betreten, Quelltext gelesen		getPlayer,singularity.getAugmentationPrice,singularity.getAugmentationRepReq,singularity.getAugmentationsFromFaction,singularity.getFactionRep		{ wartend = 0; }
+worker/grow.js	19	22	LEER	T1-API	Server/Prozess	3	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getGrowTime		{ /* Ziel nicht lesbar - mitgegebene Dauer behalten */ }
+worker/hack.js	61	64	LEER	T1-API	Server/Prozess	3	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getHackTime		{ /* Ziel nicht lesbar - mitgegebene Dauer behalten */ }
+worker/weaken.js	21	24	LEER	T1-API	Server/Prozess	3	0	0	unbedenklich: erwarteter Fehler (Server/Prozess)		getWeakenTime		{ /* Ziel nicht lesbar - mitgegebene Dauer behalten */ }

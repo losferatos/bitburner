@@ -507,13 +507,24 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
+### Autosave steht
+
+lastSave im Spielstand war bei der Messung um 2026-10-03T15:17:28.106Z bereits 405 Minuten alt (Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder fehlgeschlagenes IndexedDB-Schreiben.
+
+### Telemetrie veraltet
+
+Das Spiel ist verbunden, aber der Motor hat seit 10 Minuten nichts geschrieben (Inhaltsstempel 2026-10-03T15:17:25.100Z). Entweder steht der Motor oder der Tab ist eingefroren.
+
 ### Bruecke ohne Sicherung - Spielstand liegt in Downloads
 
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 520 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
+Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 437 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
 
 ### Spiel-Tab nicht verbunden
 
-Die Bruecke laeuft, aber seit 2026-09-27T05:07:05.658Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+Die Bruecke laeuft, aber seit 2026-10-03T07:46:57.462Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
+
+
+
 
 ### Grosser Schub verweigert (14 Dateien) - sieht nach einem Merge aus
 
@@ -524,9 +535,6 @@ War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auf
 Geaendert: ausgang.js, bn4life.js, bn4net.js, bn4rep.js, hacknet.js, hashes.js, joinrun.js, lib/bitnodes.json, lib/calc.js, lib/einbau.js, lib/figur.js, lib/handschlag.js (+2)
 
 
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 530 Minuten nichts geschrieben (Inhaltsstempel 2026-09-26T20:16:37.371Z). Entweder steht der Motor oder der Tab ist eingefroren.
 
 
 

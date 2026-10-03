@@ -1,0 +1,524 @@
+[
+ {
+  "key": "WiredReflexes",
+  "name": "Wired Reflexes",
+  "repCost": 1250,
+  "moneyCost": 2500000,
+  "isSpecial": false,
+  "dexterity": 1.05,
+  "agility": 1.05,
+  "factions": [
+   "Tian Di Hui",
+   "Slum Snakes",
+   "Sector-12",
+   "Volhaven",
+   "Aevum",
+   "Ishima",
+   "The Syndicate",
+   "The Dark Army",
+   "Speakers for the Dead"
+  ]
+ },
+ {
+  "key": "LuminCloaking1",
+  "name": "LuminCloaking-V1 Skin Implant",
+  "repCost": 1500,
+  "moneyCost": 5000000,
+  "isSpecial": false,
+  "agility": 1.05,
+  "factions": [
+   "Slum Snakes",
+   "Tetrads"
+  ]
+ },
+ {
+  "key": "LuminCloaking2",
+  "name": "LuminCloaking-V2 Skin Implant",
+  "repCost": 5000,
+  "moneyCost": 30000000,
+  "isSpecial": false,
+  "defense": 1.1,
+  "agility": 1.1,
+  "factions": [
+   "Slum Snakes",
+   "Tetrads"
+  ]
+ },
+ {
+  "key": "Targeting1",
+  "name": "Augmented Targeting I",
+  "repCost": 5000,
+  "moneyCost": 15000000,
+  "isSpecial": false,
+  "dexterity": 1.1,
+  "factions": [
+   "Slum Snakes",
+   "The Dark Army",
+   "The Syndicate",
+   "Sector-12",
+   "Ishima",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "CombatRib1",
+  "name": "Combat Rib I",
+  "repCost": 7500,
+  "moneyCost": 23750000,
+  "isSpecial": false,
+  "strength": 1.1,
+  "defense": 1.1,
+  "factions": [
+   "Slum Snakes",
+   "The Dark Army",
+   "The Syndicate",
+   "Volhaven",
+   "Ishima",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "INFRARet",
+  "name": "INFRARET Enhancement",
+  "repCost": 7500,
+  "moneyCost": 30000000,
+  "isSpecial": false,
+  "dexterity": 1.1,
+  "factions": [
+   "Ishima"
+  ]
+ },
+ {
+  "key": "Targeting2",
+  "name": "Augmented Targeting II",
+  "repCost": 8750,
+  "moneyCost": 42500000,
+  "isSpecial": false,
+  "dexterity": 1.2,
+  "factions": [
+   "The Dark Army",
+   "The Syndicate",
+   "Sector-12",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "HemoRecirculator",
+  "name": "HemoRecirculator",
+  "repCost": 10000,
+  "moneyCost": 45000000,
+  "isSpecial": false,
+  "strength": 1.08,
+  "defense": 1.08,
+  "dexterity": 1.08,
+  "agility": 1.08,
+  "factions": [
+   "Tetrads",
+   "The Dark Army",
+   "The Syndicate"
+  ]
+ },
+ {
+  "key": "BrachiBlades",
+  "name": "BrachiBlades",
+  "repCost": 12500,
+  "moneyCost": 90000000,
+  "isSpecial": false,
+  "strength": 1.15,
+  "defense": 1.15,
+  "factions": [
+   "The Syndicate"
+  ]
+ },
+ {
+  "key": "DermaForce",
+  "name": "DermaForce Particle Barrier",
+  "repCost": 15000,
+  "moneyCost": 50000000,
+  "isSpecial": false,
+  "defense": 1.4,
+  "factions": [
+   "Volhaven"
+  ]
+ },
+ {
+  "key": "CombatRib2",
+  "name": "Combat Rib II",
+  "repCost": 18750,
+  "moneyCost": 65000000,
+  "isSpecial": false,
+  "strength": 1.14,
+  "defense": 1.14,
+  "factions": [
+   "The Dark Army",
+   "The Syndicate",
+   "Volhaven",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "SmartSonar",
+  "name": "SmartSonar Implant",
+  "repCost": 22500,
+  "moneyCost": 75000000,
+  "isSpecial": false,
+  "dexterity": 1.1,
+  "factions": [
+   "Slum Snakes"
+  ]
+ },
+ {
+  "key": "PowerRecirculator",
+  "name": "Power Recirculation Core",
+  "repCost": 25000,
+  "moneyCost": 180000000,
+  "isSpecial": false,
+  "strength": 1.05,
+  "defense": 1.05,
+  "dexterity": 1.05,
+  "agility": 1.05,
+  "factions": [
+   "Tetrads",
+   "The Dark Army",
+   "The Syndicate",
+   "NWO"
+  ]
+ },
+ {
+  "key": "Targeting3",
+  "name": "Augmented Targeting III",
+  "repCost": 27500,
+  "moneyCost": 115000000,
+  "isSpecial": false,
+  "dexterity": 1.3,
+  "factions": [
+   "The Dark Army",
+   "The Syndicate",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries",
+   "The Covenant"
+  ]
+ },
+ {
+  "key": "CombatRib3",
+  "name": "Combat Rib III",
+  "repCost": 35000,
+  "moneyCost": 120000000,
+  "isSpecial": false,
+  "strength": 1.18,
+  "defense": 1.18,
+  "factions": [
+   "The Dark Army",
+   "The Syndicate",
+   "OmniTek Incorporated",
+   "KuaiGong International",
+   "Blade Industries",
+   "The Covenant"
+  ]
+ },
+ {
+  "key": "NanofiberWeave",
+  "name": "Nanofiber Weave",
+  "repCost": 37500,
+  "moneyCost": 125000000,
+  "isSpecial": false,
+  "strength": 1.2,
+  "defense": 1.2,
+  "factions": [
+   "The Dark Army",
+   "The Syndicate",
+   "OmniTek Incorporated",
+   "Blade Industries",
+   "Tian Di Hui",
+   "Speakers for the Dead",
+   "Fulcrum Secret Technologies"
+  ]
+ },
+ {
+  "key": "BionicSpine",
+  "name": "Bionic Spine",
+  "repCost": 45000,
+  "moneyCost": 125000000,
+  "isSpecial": false,
+  "strength": 1.15,
+  "defense": 1.15,
+  "dexterity": 1.15,
+  "agility": 1.15,
+  "factions": [
+   "Speakers for the Dead",
+   "The Syndicate",
+   "KuaiGong International",
+   "OmniTek Incorporated",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "BionicArms",
+  "name": "Bionic Arms",
+  "repCost": 62500,
+  "moneyCost": 275000000,
+  "isSpecial": false,
+  "strength": 1.3,
+  "dexterity": 1.3,
+  "factions": [
+   "Tetrads"
+  ]
+ },
+ {
+  "key": "TheBlackHand",
+  "name": "The Black Hand",
+  "repCost": 100000,
+  "moneyCost": 550000000,
+  "isSpecial": false,
+  "strength": 1.15,
+  "dexterity": 1.15,
+  "factions": [
+   "The Black Hand"
+  ]
+ },
+ {
+  "key": "BionicLegs",
+  "name": "Bionic Legs",
+  "repCost": 150000,
+  "moneyCost": 375000000,
+  "isSpecial": false,
+  "agility": 1.6,
+  "factions": [
+   "Speakers for the Dead",
+   "The Syndicate",
+   "KuaiGong International",
+   "OmniTek Incorporated",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "Hypersight",
+  "name": "HyperSight Corneal Implant",
+  "repCost": 150000,
+  "moneyCost": 2750000000,
+  "isSpecial": false,
+  "dexterity": 1.4,
+  "factions": [
+   "Blade Industries",
+   "KuaiGong International"
+  ]
+ },
+ {
+  "key": "GrapheneBrachiBlades",
+  "name": "Graphene BrachiBlades Upgrade",
+  "repCost": 225000,
+  "moneyCost": 2500000000,
+  "isSpecial": false,
+  "strength": 1.4,
+  "defense": 1.4,
+  "factions": [
+   "Speakers for the Dead"
+  ]
+ },
+ {
+  "key": "nextSENS",
+  "name": "nextSENS Gene Modification",
+  "repCost": 437500,
+  "moneyCost": 1925000000,
+  "isSpecial": false,
+  "strength": 1.2,
+  "defense": 1.2,
+  "dexterity": 1.2,
+  "agility": 1.2,
+  "factions": [
+   "Clarke Incorporated"
+  ]
+ },
+ {
+  "key": "SynfibrilMuscle",
+  "name": "Synfibril Muscle",
+  "repCost": 437500,
+  "moneyCost": 1125000000,
+  "isSpecial": false,
+  "strength": 1.3,
+  "defense": 1.3,
+  "factions": [
+   "KuaiGong International",
+   "Fulcrum Secret Technologies",
+   "Speakers for the Dead",
+   "NWO",
+   "The Covenant",
+   "Daedalus",
+   "Illuminati",
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "GrapheneBionicArms",
+  "name": "Graphene Bionic Arms Upgrade",
+  "repCost": 500000,
+  "moneyCost": 3750000000,
+  "isSpecial": false,
+  "strength": 1.85,
+  "dexterity": 1.85,
+  "factions": [
+   "The Dark Army"
+  ]
+ },
+ {
+  "key": "Neotra",
+  "name": "Neotra",
+  "repCost": 562500,
+  "moneyCost": 2875000000,
+  "isSpecial": false,
+  "strength": 1.55,
+  "defense": 1.55,
+  "factions": [
+   "Blade Industries"
+  ]
+ },
+ {
+  "key": "PhotosyntheticCells",
+  "name": "Photosynthetic Cells",
+  "repCost": 562500,
+  "moneyCost": 2750000000,
+  "isSpecial": false,
+  "strength": 1.4,
+  "defense": 1.4,
+  "agility": 1.4,
+  "factions": [
+   "KuaiGong International"
+  ]
+ },
+ {
+  "key": "GrapheneBionicLegs",
+  "name": "Graphene Bionic Legs Upgrade",
+  "repCost": 750000,
+  "moneyCost": 4500000000,
+  "isSpecial": false,
+  "agility": 2.5,
+  "factions": [
+   "MegaCorp",
+   "ECorp",
+   "Fulcrum Secret Technologies"
+  ]
+ },
+ {
+  "key": "SyntheticHeart",
+  "name": "Synthetic Heart",
+  "repCost": 750000,
+  "moneyCost": 2875000000,
+  "isSpecial": false,
+  "strength": 1.5,
+  "agility": 1.5,
+  "factions": [
+   "KuaiGong International",
+   "Fulcrum Secret Technologies",
+   "Speakers for the Dead",
+   "NWO",
+   "The Covenant",
+   "Daedalus",
+   "Illuminati"
+  ]
+ },
+ {
+  "key": "SubdermalArmor",
+  "name": "NEMEAN Subdermal Weave",
+  "repCost": 875000,
+  "moneyCost": 3250000000,
+  "isSpecial": false,
+  "defense": 2.2,
+  "factions": [
+   "The Syndicate",
+   "Fulcrum Secret Technologies",
+   "Illuminati",
+   "Daedalus",
+   "The Covenant"
+  ]
+ },
+ {
+  "key": "Xanipher",
+  "name": "Xanipher",
+  "repCost": 875000,
+  "moneyCost": 4250000000,
+  "isSpecial": false,
+  "strength": 1.2,
+  "defense": 1.2,
+  "dexterity": 1.2,
+  "agility": 1.2,
+  "factions": [
+   "NWO"
+  ]
+ },
+ {
+  "key": "CordiARCReactor",
+  "name": "CordiARC Fusion Reactor",
+  "repCost": 1125000,
+  "moneyCost": 5000000000,
+  "isSpecial": false,
+  "strength": 1.35,
+  "defense": 1.35,
+  "dexterity": 1.35,
+  "agility": 1.35,
+  "factions": [
+   "MegaCorp"
+  ]
+ },
+ {
+  "key": "GrapheneBoneLacings",
+  "name": "Graphene Bone Lacings",
+  "repCost": 1125000,
+  "moneyCost": 4250000000,
+  "isSpecial": false,
+  "strength": 1.7,
+  "defense": 1.7,
+  "factions": [
+   "Fulcrum Secret Technologies",
+   "The Covenant"
+  ]
+ },
+ {
+  "key": "HydroflameLeftArm",
+  "name": "Hydroflame Left Arm",
+  "repCost": 1250000,
+  "moneyCost": 2500000000000,
+  "isSpecial": false,
+  "strength": 2.8,
+  "factions": [
+   "NWO"
+  ]
+ },
+ {
+  "key": "SPTN97",
+  "name": "SPTN-97 Gene Modification",
+  "repCost": 1250000,
+  "moneyCost": 4875000000,
+  "isSpecial": false,
+  "strength": 1.75,
+  "defense": 1.75,
+  "dexterity": 1.75,
+  "agility": 1.75,
+  "factions": [
+   "The Covenant"
+  ]
+ },
+ {
+  "key": "GrapheneBionicSpine",
+  "name": "Graphene Bionic Spine Upgrade",
+  "repCost": 1625000,
+  "moneyCost": 6000000000,
+  "isSpecial": false,
+  "strength": 1.6,
+  "defense": 1.6,
+  "dexterity": 1.6,
+  "agility": 1.6,
+  "factions": [
+   "Fulcrum Secret Technologies",
+   "ECorp"
+  ]
+ }
+]

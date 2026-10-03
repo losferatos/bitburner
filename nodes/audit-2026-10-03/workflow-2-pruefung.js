@@ -63,7 +63,7 @@ phase('Gegenpruefung')
 const verdicts = await pipeline(
   groups,
   g => parallel(g.lenses.map(lens => () =>
-    agent(TASK(g, lens), { label: `${g.gid}:${lens}`, phase: 'Gegenpruefung', schema: VERDICT, model: 'opus' }))),
+    agent(TASK(g, lens), { label: `${g.gid}:${lens}`, phase: 'Gegenpruefung', schema: VERDICT, model: g.model || args.model || 'sonnet' }))),
   (vs, g) => ({ gid: g.gid, ids: g.ids, title: g.title, prio: g.prio, verdicts: (vs || []).filter(Boolean) }),
 )
 const done = verdicts.filter(Boolean)

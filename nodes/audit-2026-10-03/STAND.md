@@ -18,6 +18,17 @@ Kontingentregeln: Workflows bei >80 % des 5-h-Fensters anhalten und per
 Resume fortsetzen; bei 95 % Wochennutzung pausieren (Wochenreset So 04.10.
 13:00). Stand beim Anhalten: 5 h 81 %, Woche 77 %.
 
+## PRIORITAET (Eric 03.10. 18:5x): GANG ZUERST - aktueller Knoten BN2
+
+Gegenpruefung G01 (Gang) + G02 (Hacknet-Augs) laeuft als Workflow-Run
+`wf_458bac1f-b67` (3 Opus-Pruefer). Bei Abbruch fortsetzen mit
+`Workflow({scriptPath: "...\\nodes\\audit-2026-10-03\\workflow-2-pruefung.js", resumeFromRunId: "wf_458bac1f-b67", args: <G01+G02 wie gestartet, ZUSAETZLICH "model": "opus">})`
+- das Skript nimmt seit 03.10. sonnet als Standard; ohne "model": "opus"
+aendern sich die opts und die Pruefer starten neu statt weiterzulaufen.
+Danach SOFORT bauen: GANG-2 (Red-Pill-Falle) vor GANG-1 (Gang in BN2), dann
+G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
+(Subagents jetzt sonnet, opus nur Praemisse/Skeptiker mit hohem Schaden).
+
 ## Was fertig ist
 
 - Workflow 1 (Inventar + Matrix), Run `wf_735d79f5-a82`: 20 von 23 Pruefern

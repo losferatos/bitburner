@@ -29,6 +29,20 @@ Danach SOFORT bauen: GANG-2 (Red-Pill-Falle) vor GANG-1 (Gang in BN2), dann
 G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
 (Subagents jetzt sonnet, opus nur Praemisse/Skeptiker mit hohem Schaden).
 
+### Stand 03.10. 22:45
+
+- G02 Urteil TEILWEISE (P1 bleibt, Schaden 8,92 Mrd statt 12,46; Bauvorgabe
+  hacknetNachEinbau). G01-BETRIEB TEILWEISE: Gang lohnt nur mit Kaufaufschub
+  bis zum Tor + Rundenplaner; GANG-2 BESTAETIGT. G01-SUBSTANZ steht noch aus.
+- Bau-Workflow `wf_41beb6c5-e41` (workflow-3-bau.js): P0 (TRP-Falle + G02),
+  P1 (Kaufaufschub + waehleTorRunde), P2 (gang.js + Registry, Schalter
+  data/gang-an.txt) je Sonnet-Bauer im Worktree -> Opus-Skeptiker -> 1
+  Reparatur. Danach: P0 und P1 zusammenfuehren (verschiedene Stellen in
+  bn4rep.js), Einzeldatei-Checkout nach master, test-alles, [skeptiker],
+  einspielen, neustart, RAM. Schalter erst, wenn P0 (+P1) live sind.
+- Einbau-Tor BN2.1 oeffnet ~So 07:04 - Gang muss vorher laufen.
+- WF1-Rest (FLUSS, VERSION, Kritik) laeuft parallel als Resume.
+
 ## Was fertig ist
 
 - Workflow 1 (Inventar + Matrix), Run `wf_735d79f5-a82`: 20 von 23 Pruefern

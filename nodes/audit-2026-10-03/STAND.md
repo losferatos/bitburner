@@ -43,6 +43,21 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
 - Einbau-Tor BN2.1 oeffnet ~So 07:04 - Gang muss vorher laufen.
 - WF1-Rest (FLUSS, VERSION, Kritik) laeuft parallel als Resume.
 
+### Stand 04.10. 00:30
+
+- Bau fertig, alle mit Opus-Skeptiker + Reparatur: P0 (Stand-alone-Repo
+  C:/Users/erche/Desktop/claude_projecto/.claude/worktrees/bb-p0-bau, 404a505..f1ef8ce),
+  P1 (Klon C:/Users/erche/Desktop/claude_projecto-bb-p1, Branch audit-p1-kaufaufschub,
+  f100d73), P2 (C:/Users/erche/Desktop/claude_projecto/.claude/worktrees/wf_41beb6c5-e41-3/bitburner,
+  p2-gang, 08270e3).
+- Zusammenfuehrung laeuft (Sonnet-Agent) in bitburner/.claude/worktrees/integ-gang,
+  Branch integ-gang-2026-10-04. Danach LIVE: Einzeldatei-Checkout nach master
+  (8 src-Dateien: bn4rep, hacknet, lib/hackaugs, lib/einbau, lib/blackops.json,
+  blade, gang, registry.json), Commit [skeptiker], push, einspielen.js --pruefen,
+  neustart bn4net (Registry!), bn4rep, hacknet, blade; RAM messen
+  (eichung-messen --schreib, VERALTET_ERLAUBT leeren); bn4rep.json pruefen
+  (v1Positiv false, torRunde); DANN Schalter data/gang-an.txt im Spiel anlegen.
+
 ## Was fertig ist
 
 - Workflow 1 (Inventar + Matrix), Run `wf_735d79f5-a82`: 20 von 23 Pruefern

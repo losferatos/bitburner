@@ -299,10 +299,10 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 246521,
+  "bytes": 252496,
   "lines": 4145,
-  "sha256": "46720abd1f041ba1a22220d629b47ba6d98dae963829e7a55791aa2b8aad376b",
-  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "sha256": "da4b085b5e941bdc39fb04d3fc116a83309176228461373ac2ee6e864fdc3f44",
+  "gemessenAm": "2026-10-03T07:24:27.305Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -740,8 +740,8 @@
  },
  {
   "file": "sleeve.js",
-  "live41": 27.85,
-  "lokal41": 27.85,
+  "live41": 31.85,
+  "lokal41": 31.85,
   "diff": 0,
   "lokal42": 27.85,
   "lokal43": 27.85,
@@ -749,10 +749,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 27345,
+  "bytes": 53702,
   "lines": 415,
-  "sha256": "6dee2a0c4d5cb6aaa68d11c8f9990c260d9dc0d65e2b56214e6b5a165ec96fdc",
-  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "sha256": "7574e7ae2ca2fbb3158c4954d3a581acdf33cbf1951253891909c90791b2df23",
+  "gemessenAm": "2026-10-03T07:24:27.305Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {

@@ -1462,6 +1462,10 @@ export async function main(ns) {
       // vorher las. blackOpChance() ist unten definiert, aber als const im
       // selben main()-Rumpf laengst initialisiert, sobald diese Funktion
       // (erst aus der Hauptschleife heraus) tatsaechlich aufgerufen wird.
+      // KORREKTUR 03.10.2026: Das stimmte bis heute NICHT - blackOpChance und
+      // spanneGenau lagen im Rumpf von `waehle()`, beide Sonden warfen einen
+      // ReferenceError, und `klemmFaktor()` gab seit D2 immer 1 zurueck. Jetzt
+      // stehen sie wirklich in main() (Block vor `waehle()`).
       if (bo) {
         const genau = blackOpChance(bo.name);
         sonden.push(Number.isFinite(genau)
@@ -1978,176 +1982,180 @@ export async function main(ns) {
     } catch (e) { /* Protokoll fehlt: dann eben nach Zeit */ }
   };
 
-  // --- Die naechste Aktion waehlen -----------------------------------------
-  const waehle = () => {
-    // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
-    const [jetzt, max] = ns.bladeburner.getStamina();
-    if (max > 0 && jetzt < max * AUSDAUER_RUHE) {
-      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "Ausdauer" };
-    }
-    const hp = ns.getPlayer().hp;
-    if (hp && hp.max > 0 && hp.current < hp.max * HP_RUHE) {
-      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "HP" };
-    }
+  // --- Black-Op-Chance, Schwelle und Spannen-Aufloesung ----------------------
+  //
+  // KEIN TEIL VON `waehle()` MEHR (03.10.2026). Dieser ganze Block stand bis
+  // heute im Rumpf von `waehle()` und wurde bei jedem Aufruf neu angelegt.
+  // Vier Stellen AUSSERHALB riefen ihn trotzdem auf: `etwasFahrbarJetzt()` und
+  // `klemmFaktor()` (spanneGenau, blackOpChance) sowie der Gym-Zweig der
+  // Hauptschleife (blackOpChance, blackOpSchwelle). Dort sind die Namen nicht
+  // definiert - ReferenceError, jedes Mal vom umgebenden try/catch still
+  // geschluckt. Folgen: Eine faellige Black Op holte die Figur nie aus dem
+  // Gym (tot seit dem Einbau am 28.08.), `fahrbar` stand seit D2 (27.09.)
+  // immer auf false, und `klemmFaktor()` lieferte seit D2 immer 1. Gefunden
+  // per acorn-Scope-Pruefung; tools/test-scope-tot.js prueft das jetzt fuer
+  // alle src/*.js.
+  //
+  // Die Funktionen lesen nur Konstanten, ns und `spanne`, keinen Zustand aus
+  // `waehle()` (acorn-Pruefung 03.10.) - innerhalb von `waehle()` rechnen sie
+  // also genau wie vorher. Einzige Ausnahme: `endspielFehlerGemeldet` lebt
+  // jetzt ueber die Runden; vorher wurde es bei jedem `waehle()` neu angelegt,
+  // und die "nur einmal sagen"-Meldung kam bei kaputter Schranke jede Runde.
 
-    // Messen, bevor irgendein Zweig zurueckkehrt (Begruendung bei
-    // `chaosMessen`). Nur messen - entschieden wird weiter unten.
-    if (SPIEL_CHAOS_AN) chaosMessen();
+  // DIE BLACK-OP-CHANCE WIRD GERECHNET, NICHT GESCHAETZT (27.08.2026, 18:22).
+  //
+  // `getActionEstimatedSuccessChance` liefert ein Paar [min, max], und bis
+  // heute entschied hier `min`. Bei Black Ops ist diese Spanne aber ein
+  // ARTEFAKT: `Actions/BlackOperation.ts:55-61` gibt fuer
+  // `getPopulationSuccessFactor()` und `getChaosSuccessFactor()` fest 1
+  // zurueck, also ist in `getSuccessRange` (`Actions/Action.ts:144-167`)
+  // `est === real` und `diff = 0` - und trotzdem wird danach `low *= r`
+  // mit `r = city.pop/city.popEst` gerechnet. Die Bevoelkerungsschaetzung
+  // wirkt auf Black Ops gar nicht, verzerrt aber die Anzeige.
+  //
+  // Verifiziert im Spiel um 18:19 (`src/chance.js`, `data/chance.json`):
+  //     API-Paar   min 0,2955   max 0,3064
+  //     gerechnet             0,3064   <- deckungsgleich mit max
+  // Der Motor entschied auf 0,2955, wahr waren 0,3064. Heute sind das
+  // 3,7 Prozent; um 17:41 waren es 11, und `popEst` kann bis zum
+  // Anderthalbfachen danebenliegen (`City.ts:23`), also bis zu 33.
+  //
+  // Nachbau von `Action.getSuccessChance` (`Actions/Action.ts:169-196`).
+  // Gibt `null` zurueck, wenn die Aktionsdaten fehlen - dann faellt die
+  // Entscheidung wie bisher auf `min`, also auf die vorsichtige Seite.
+  // ALLE 21 BLACK OPS, AUS DEM QUELLCODE ERZEUGT (27.08.2026, 19:52).
+  //
+  // Bis hierher stand nur Typhoon drin, und fuer alles andere fiel die
+  // Entscheidung auf `s.min` zurueck - also auf die Zahl, die bei Black
+  // Ops reines Bevoelkerungsrauschen ist. Typhoon fiel um 19:51, damit war
+  // der Rueckfall ab sofort der Normalfall gewesen.
+  //
+  // Erzeugt aus `reference/bitburner-src/src/Bladeburner/data/
+  // BlackOperations.ts`, nicht abgetippt: 21 Aktionen mit je sieben
+  // Gewichten und sieben Decays sind 294 Zahlen, und eine falsche davon
+  // faellt nie auf.
+  //
+  // Beim Extrahieren aufgefallen und sofort wichtig: **Operation Zero ist
+  // `isStealth`, nicht `isKill`.** Short-Circuit (Stufe 30) wirkt darauf
+  // GAR NICHT, Cloak dagegen schon - und Cloak stand auf Stufe 0. Von den
+  // 21 Black Ops sind 15 isKill, 3 isStealth und 3 keins von beidem.
+  const BLACKOP_DATEN = {
+    "Operation Typhoon": {
+      baseDifficulty: 2000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Zero": {
+      baseDifficulty: 2500, isKill: false, isStealth: true,
+      weights: { hacking: 0.2, strength: 0.15, defense: 0.15, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation X": {
+      baseDifficulty: 3000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Titan": {
+      baseDifficulty: 4000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Ares": {
+      baseDifficulty: 5000, isKill: true, isStealth: false,
+      weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
+      decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Archangel": {
+      baseDifficulty: 7500, isKill: true, isStealth: false,
+      weights: { strength: 0.2, defense: 0.2, dexterity: 0.3, agility: 0.3 },
+      decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Juggernaut": {
+      baseDifficulty: 10000, isKill: true, isStealth: false,
+      weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
+      decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Red Dragon": {
+      baseDifficulty: 12500, isKill: true, isStealth: false,
+      weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation K": {
+      baseDifficulty: 15000, isKill: true, isStealth: false,
+      weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Deckard": {
+      baseDifficulty: 20000, isKill: true, isStealth: false,
+      weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+      decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Tyrell": {
+      baseDifficulty: 25000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Wallace": {
+      baseDifficulty: 30000, isKill: true, isStealth: false,
+      weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Shoulder of Orion": {
+      baseDifficulty: 35000, isKill: false, isStealth: true,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Hyron": {
+      baseDifficulty: 40000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Morpheus": {
+      baseDifficulty: 45000, isKill: false, isStealth: true,
+      weights: { hacking: 0.05, strength: 0.15, defense: 0.15, dexterity: 0.3, agility: 0.3, intelligence: 0.05 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Ion Storm": {
+      baseDifficulty: 50000, isKill: true, isStealth: false,
+      weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Annihilus": {
+      baseDifficulty: 55000, isKill: true, isStealth: false,
+      weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Ultron": {
+      baseDifficulty: 60000, isKill: true, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Centurion": {
+      baseDifficulty: 70000, isKill: false, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Vindictus": {
+      baseDifficulty: 75000, isKill: false, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+    "Operation Daedalus": {
+      baseDifficulty: 80000, isKill: false, isStealth: false,
+      weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
+      decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
+    },
+  };
 
-    // DIE BLACK-OP-CHANCE WIRD GERECHNET, NICHT GESCHAETZT (27.08.2026, 18:22).
-    //
-    // `getActionEstimatedSuccessChance` liefert ein Paar [min, max], und bis
-    // heute entschied hier `min`. Bei Black Ops ist diese Spanne aber ein
-    // ARTEFAKT: `Actions/BlackOperation.ts:55-61` gibt fuer
-    // `getPopulationSuccessFactor()` und `getChaosSuccessFactor()` fest 1
-    // zurueck, also ist in `getSuccessRange` (`Actions/Action.ts:144-167`)
-    // `est === real` und `diff = 0` - und trotzdem wird danach `low *= r`
-    // mit `r = city.pop/city.popEst` gerechnet. Die Bevoelkerungsschaetzung
-    // wirkt auf Black Ops gar nicht, verzerrt aber die Anzeige.
-    //
-    // Verifiziert im Spiel um 18:19 (`src/chance.js`, `data/chance.json`):
-    //     API-Paar   min 0,2955   max 0,3064
-    //     gerechnet             0,3064   <- deckungsgleich mit max
-    // Der Motor entschied auf 0,2955, wahr waren 0,3064. Heute sind das
-    // 3,7 Prozent; um 17:41 waren es 11, und `popEst` kann bis zum
-    // Anderthalbfachen danebenliegen (`City.ts:23`), also bis zu 33.
-    //
-    // Nachbau von `Action.getSuccessChance` (`Actions/Action.ts:169-196`).
-    // Gibt `null` zurueck, wenn die Aktionsdaten fehlen - dann faellt die
-    // Entscheidung wie bisher auf `min`, also auf die vorsichtige Seite.
-    // ALLE 21 BLACK OPS, AUS DEM QUELLCODE ERZEUGT (27.08.2026, 19:52).
-    //
-    // Bis hierher stand nur Typhoon drin, und fuer alles andere fiel die
-    // Entscheidung auf `s.min` zurueck - also auf die Zahl, die bei Black
-    // Ops reines Bevoelkerungsrauschen ist. Typhoon fiel um 19:51, damit war
-    // der Rueckfall ab sofort der Normalfall gewesen.
-    //
-    // Erzeugt aus `reference/bitburner-src/src/Bladeburner/data/
-    // BlackOperations.ts`, nicht abgetippt: 21 Aktionen mit je sieben
-    // Gewichten und sieben Decays sind 294 Zahlen, und eine falsche davon
-    // faellt nie auf.
-    //
-    // Beim Extrahieren aufgefallen und sofort wichtig: **Operation Zero ist
-    // `isStealth`, nicht `isKill`.** Short-Circuit (Stufe 30) wirkt darauf
-    // GAR NICHT, Cloak dagegen schon - und Cloak stand auf Stufe 0. Von den
-    // 21 Black Ops sind 15 isKill, 3 isStealth und 3 keins von beidem.
-    const BLACKOP_DATEN = {
-      "Operation Typhoon": {
-        baseDifficulty: 2000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Zero": {
-        baseDifficulty: 2500, isKill: false, isStealth: true,
-        weights: { hacking: 0.2, strength: 0.15, defense: 0.15, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation X": {
-        baseDifficulty: 3000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Titan": {
-        baseDifficulty: 4000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Ares": {
-        baseDifficulty: 5000, isKill: true, isStealth: false,
-        weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
-        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Archangel": {
-        baseDifficulty: 7500, isKill: true, isStealth: false,
-        weights: { strength: 0.2, defense: 0.2, dexterity: 0.3, agility: 0.3 },
-        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Juggernaut": {
-        baseDifficulty: 10000, isKill: true, isStealth: false,
-        weights: { strength: 0.25, defense: 0.25, dexterity: 0.25, agility: 0.25 },
-        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Red Dragon": {
-        baseDifficulty: 12500, isKill: true, isStealth: false,
-        weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation K": {
-        baseDifficulty: 15000, isKill: true, isStealth: false,
-        weights: { hacking: 0.05, strength: 0.2, defense: 0.2, dexterity: 0.25, agility: 0.25, intelligence: 0.05 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Deckard": {
-        baseDifficulty: 20000, isKill: true, isStealth: false,
-        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
-        decays: { strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Tyrell": {
-        baseDifficulty: 25000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Wallace": {
-        baseDifficulty: 30000, isKill: true, isStealth: false,
-        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Shoulder of Orion": {
-        baseDifficulty: 35000, isKill: false, isStealth: true,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Hyron": {
-        baseDifficulty: 40000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Morpheus": {
-        baseDifficulty: 45000, isKill: false, isStealth: true,
-        weights: { hacking: 0.05, strength: 0.15, defense: 0.15, dexterity: 0.3, agility: 0.3, intelligence: 0.05 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Ion Storm": {
-        baseDifficulty: 50000, isKill: true, isStealth: false,
-        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Annihilus": {
-        baseDifficulty: 55000, isKill: true, isStealth: false,
-        weights: { strength: 0.24, defense: 0.24, dexterity: 0.24, agility: 0.24, intelligence: 0.04 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Ultron": {
-        baseDifficulty: 60000, isKill: true, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Centurion": {
-        baseDifficulty: 70000, isKill: false, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Vindictus": {
-        baseDifficulty: 75000, isKill: false, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-      "Operation Daedalus": {
-        baseDifficulty: 80000, isKill: false, isStealth: false,
-        weights: { hacking: 0.1, strength: 0.2, defense: 0.2, dexterity: 0.2, agility: 0.2, intelligence: 0.1 },
-        decays: { hacking: 0.6, strength: 0.8, defense: 0.8, dexterity: 0.8, agility: 0.8, intelligence: 0.75 },
-      },
-    };
-
-    // `mult = 1 + baseMult*stufe/100`, multiplikativ (`Bladeburner.ts:778-783`)
-    const SKILL_WIRKUNG = {
-      "Blade's Intuition": { SuccessChanceAll: 3 },
-      "Short-Circuit": { SuccessChanceKill: 5.5 },
-      "Cloak": { SuccessChanceStealth: 5.5 },
-      "Digital Observer": { SuccessChanceOperation: 4 },
-      "Reaper": { EffStr: 2, EffDef: 2, EffDex: 2, EffAgi: 2 },
-      "Evasive System": { EffDex: 4, EffAgi: 4 },
-    };
+  // `mult = 1 + baseMult*stufe/100`, multiplikativ (`Bladeburner.ts:778-783`)
+  const SKILL_WIRKUNG = {
+    "Blade's Intuition": { SuccessChanceAll: 3 },
+    "Short-Circuit": { SuccessChanceKill: 5.5 },
+    "Cloak": { SuccessChanceStealth: 5.5 },
+    "Digital Observer": { SuccessChanceOperation: 4 },
+    "Reaper": { EffStr: 2, EffDef: 2, EffDex: 2, EffAgi: 2 },
+    "Evasive System": { EffDex: 4, EffAgi: 4 },
+  };
     // DIE BLACK-OP-SCHWELLE HAENGT AM RAID-VORRAT (27.08.2026, 22:10).
   //
   // Die 0,90 von 21:55 ruhen auf einer Annahme: dass Raid mit 98,3 Rang je
@@ -2309,120 +2317,218 @@ export async function main(ns) {
   };
 
   const blackOpChance = (name) => {
-      const a = BLACKOP_DATEN[name];
-      if (!a) return null;
-      try {
-        const mult = {};
-        for (const [skill, wirkungen] of Object.entries(SKILL_WIRKUNG)) {
-          const stufe = ns.bladeburner.getSkillLevel(skill);
-          if (!stufe) continue;
-          for (const [was, basis] of Object.entries(wirkungen)) {
-            mult[was] = (mult[was] ?? 1) * (1 + (basis * stufe) / 100);
+    const a = BLACKOP_DATEN[name];
+    if (!a) return null;
+    try {
+      const mult = {};
+      for (const [skill, wirkungen] of Object.entries(SKILL_WIRKUNG)) {
+        const stufe = ns.bladeburner.getSkillLevel(skill);
+        if (!stufe) continue;
+        for (const [was, basis] of Object.entries(wirkungen)) {
+          mult[was] = (mult[was] ?? 1) * (1 + (basis * stufe) / 100);
+        }
+      }
+      const m = (was) => mult[was] ?? 1;
+      const sp = ns.getPlayer();
+      const sk = sp.skills;
+      const [aus, ausMax] = ns.bladeburner.getStamina();
+      let team = 0;
+      try { team = ns.bladeburner.getTeamSize(B, name); } catch { /* kein Trupp */ }
+      const eff = {
+        hacking: sk.hacking,
+        strength: sk.strength * m("EffStr"),
+        defense: sk.defense * m("EffDef"),
+        dexterity: sk.dexterity * m("EffDex"),
+        agility: sk.agility * m("EffAgi"),
+        charisma: sk.charisma * m("EffCha"),
+        intelligence: sk.intelligence,
+      };
+      let c = 0;
+      for (const stat of Object.keys(a.weights)) {
+        if (!a.weights[stat]) continue;
+        c += a.weights[stat] * Math.pow(eff[stat], a.decays[stat]);
+      }
+      c *= 1 + (0.75 * Math.pow(sk.intelligence, 0.8)) / 600;   // Intelligenz
+      c *= Math.min(1, aus / (0.5 * ausMax));                   // Ausdauerstrafe
+      c *= Math.pow(team + 1, 0.05);                            // Truppbonus
+      c *= m("SuccessChanceAll");
+      c *= m("SuccessChanceOperation");   // Black Ops zaehlen als Operation
+      if (a.isStealth) c *= m("SuccessChanceStealth");
+      if (a.isKill) c *= m("SuccessChanceKill");
+      c *= sp.mults.bladeburner_success_chance ?? 1;
+      const wert = Math.min(1, c / a.baseDifficulty);
+      return Number.isFinite(wert) ? wert : null;
+    } catch { return null; }
+  };
+
+  // D2: EXAKTE CHANCE STATT SPANNENMINIMUM, WENN EINE BLACK OP OFFEN IST
+  // (Audit 4#2, 26.09.2026).
+  //
+  // getSuccessRange (Action.ts:144-167) ist deterministisch: aus
+  // [est-d, est+d] wird GENAU eine Grenze mit r = pop/popEst verzerrt - bei
+  // r<1 die untere (der schaedliche Fall, s.min faellt gegen 0), sonst die
+  // obere (nach oben bei 1 geklemmt). Black Ops haben Bevoelkerungsfaktor
+  // immer 1 (BlackOperation.ts:55-61), ihr Paar ist also [real*r, real]
+  // bzw. [real, real*r] - und `real` kennt der Bot fuer sie schon exakt
+  // (blackOpChance oben, gegen Action.ts:169-196 geprueft). Aus dem Paar
+  // und `real` folgt r rueckwaerts, und mit r ist die wahre Chance jeder
+  // anderen Aktion DERSELBEN STADT geschlossen bestimmbar (die
+  // Bevoelkerungsschaetzung ist je Stadt gespeichert, nicht je Aktion).
+  //
+  // Geeicht in tools/test-d2-wahre-chance.js (Monte Carlo gegen einen
+  // lokalen Nachbau von Action.ts, wie im Audit mit scratchpad/audit/
+  // spanne2.js: 0 Fehler > 1e-9 unter den "sicheren" Faellen). Der
+  // Bruchteil, der nicht bestimmbar ist (Black-Op-Obergrenze bei r>=1 auf 1
+  // geklemmt - `sicher: false` unten), war dort 14 % und ist gerade der
+  // Fall, in dem `s.min` ohnehin schon unverzerrt ist.
+  // Reine Funktion, ohne ns-Zugriff - so extrahiert und geeicht in
+  // tools/test-d2-wahre-chance.js (Monte Carlo, 100.000 Faelle).
+  const rAusBlackOp = (bo, boReal) => {
+    const EPS = 1e-12;
+    if (bo.min < boReal - EPS) return { r: bo.min / boReal, sicher: true };
+    if (bo.max > boReal + EPS && bo.max < 1) return { r: bo.max / boReal, sicher: true };
+    if (bo.max >= 1 && boReal < 1) return { r: 1 / boReal, sicher: false };
+    // SKEPTIKER-FUND 3 (27.09.2026): boReal selbst schon >= 1 (voller
+    // Erfolg) UND die gemeldete Spanne ebenfalls auf 1 geklemmt
+    // (bo.min >= boReal) - r ist hier UNSICHTBAR, weil jedes r>=1 nach der
+    // eigenen Klemmung ebenfalls bo.min=bo.max=1 erzeugt haette. Ohne diese
+    // Zeile fiel dieser Fall in den Fallback darunter (r:1, sicher:true)
+    // und chanceAusR() ueberschaetzte andere Aktionen derselben Stadt
+    // (Beleg im Audit: 0.705 statt tatsaechlich 0.6).
+    if (boReal >= 1 - EPS && bo.min >= boReal - EPS) return { r: 1, sicher: false };
+    return { r: 1, sicher: true };
+  };
+  // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der
+  // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
+  // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
+  // der Aufrufer faellt dann auf spanne(typ, name).min zurueck.
+  const chanceAusR = (r, sicher, s) => {
+    if (!sicher) return null;
+    if (r < 1) return s.min > 0 ? (s.min / r + s.max) / 2 : null;
+    if (s.max < 1) return (s.max / r + s.min) / 2;
+    return s.min;   // Obergrenze geklemmt: s.min ist bereits die beste bekannte Untergrenze
+  };
+  const wahreChance = (typ, name) => {
+    if (typ === B) {
+      // Black Ops brauchen den Umweg ueber r gar nicht - ihre Chance ist
+      // schon exakt (Bevoelkerungsfaktor immer 1, s.o.).
+      const c = blackOpChance(name);
+      return Number.isFinite(c) ? c : null;
+    }
+    try {
+      const bo = ns.bladeburner.getNextBlackOp();
+      if (!bo) return null;
+      const boReal = blackOpChance(bo.name);
+      if (!Number.isFinite(boReal) || boReal <= 0) return null;
+      const rr = rAusBlackOp(spanne(B, bo.name), boReal);
+      return chanceAusR(rr.r, rr.sicher, spanne(typ, name));
+    } catch { return null; }
+  };
+  // Wie spanne(), aber mit wahreChance() aufgeloest, wenn moeglich - sonst
+  // unveraendert die gemeldete (vorsichtige) Spanne. Ueberall einsetzen, wo
+  // bisher an spanne(...).min oder .max entschieden wurde.
+  const spanneGenau = (typ, name) => {
+    const exakt = wahreChance(typ, name);
+    return exakt === null ? spanne(typ, name) : { min: exakt, max: exakt };
+  };
+
+  // DIE FEUERZAHL EINER BLACK OP AN EINER STELLE (03.10.2026).
+  //
+  // `waehle()` feuert eine Black Op, wenn ihre Chance MIT DEM GANZEN POOL die
+  // Schwelle traegt (Block "TRUPPBEDARF UND TRUPPEINSATZ" dort). Der Gym-Zweig
+  // der Hauptschleife muss dieselbe Frage stellen - "wuerde `waehle()` jetzt
+  // die Black Op nehmen?" - sonst entscheiden zwei Stellen verschieden ueber
+  // dieselbe Aktion. Mit `blackOpChance()` allein (Trupp, der DIESER Op
+  // gerade zugeteilt ist) laege der Gym-Zweig daneben: zu tief, solange der
+  // Op noch kein Trupp zugeteilt ist (dann haelt das Gym eine Op fest, die
+  // `waehle()` feuern wuerde), zu hoch, wenn der Pool seit dem letzten
+  // `setTeamSize` durch Verluste geschrumpft ist (dann verlaesst die Figur
+  // das Gym fuer eine Op, die `waehle()` nicht nimmt).
+  //
+  // Bei 1 geklemmt UND schon ein Trupp zugeteilt: die wahre Chance ohne
+  // Trupp ist unsichtbar, sicher ist nur 1/(opTrupp+1)^0,05 als Untergrenze.
+  // Die Untergrenze nehmen - dann wird im Zweifel der Pool eingesetzt statt
+  // mit zu wenig Chance gefeuert (Skeptiker 03.10.).
+  const blackOpTruppLage = (bo) => {
+    let pool = 0;
+    try { pool = Math.max(0, Number(ns.bladeburner.getTeamSize()) || 0); } catch { pool = 0; }
+    let opTrupp = 0;
+    try { opTrupp = Math.max(0, Number(ns.bladeburner.getTeamSize(B, bo.name)) || 0); } catch { opTrupp = 0; }
+    const roh = blackOpChance(bo.name);
+    const ohne = Number.isFinite(roh) ? roh / Math.pow(opTrupp + 1, 0.05) : null;
+    const mitPool = Number.isFinite(ohne) ? Math.min(1, ohne * Math.pow(pool + 1, 0.05)) : null;
+    return { pool, ohne, mitPool };
+  };
+
+  // --- Die naechste Aktion waehlen -----------------------------------------
+  // TRUPPBEDARF FUER sleeve.js - AUS `waehle()` HERAUSGEZOGEN (03.10.2026).
+  //
+  // Stand bis heute im Rumpf von `waehle()`. Im Gym-Zweig laeuft `waehle()`
+  // aber nicht, also wurde `truppZeit` dort nie erneuert - sleeve.js verwirft
+  // die Anfrage nach 5 min als veraltet (sleeve.js `waehleRekrutierer`), und
+  // genau in der Lage "Op knapp unter der Schwelle, nur mehr Maenner fehlen"
+  // rekrutierte niemand, waehrend die Figur im Gym stand (Skeptiker 03.10.).
+  // Jetzt rufen `waehle()` UND der Gym-Zweig diese Funktion; Rechnung und
+  // Begruendung unveraendert (siehe Block "TRUPPBEDARF UND TRUPPEINSATZ" in
+  // `waehle()`).
+  const truppLageSetzen = (bo) => {
+    truppAnfrage = false;
+    truppFehlt = 0;
+    truppPool = null;
+    // Eigener Stempel NUR fuer diese Rechnung (Skeptiker 03.10.): Ruhe-,
+    // Gym-, Graft- und "weicht bbtrain"-Pfade schreiben blade.json mit neuem
+    // `zeit`, ohne `waehle()` zu durchlaufen - der letzte `truppAnfrage`
+    // waere dann eingefroren und saehe trotzdem frisch aus. sleeve.js prueft
+    // die Frische an `truppZeit`.
+    truppZeit = Date.now();
+    let boOhneTrupp = null;
+    let boPool = 0;
+    let boMitPool = null;
+    if (bo) {
+      // Gerechnet in `blackOpTruppLage()` - dieselbe Zahl fragt der Gym-Zweig
+      // der Hauptschleife ab (Begruendung dort).
+      const lage = blackOpTruppLage(bo);
+      boPool = lage.pool;
+      truppPool = boPool;
+      boOhneTrupp = lage.ohne;
+      boMitPool = lage.mitPool;
+      if (TRUPP_ZIEL > 0 && Number.isFinite(boOhneTrupp) && boOhneTrupp > 0) {
+        let rangJetzt = 0;
+        try { rangJetzt = ns.bladeburner.getRank(); } catch { rangJetzt = 0; }
+        const schw = blackOpSchwelle(bo.name);
+        if (rangJetzt >= TRUPP_NAHE * bo.rank && boOhneTrupp < schw) {
+          // VORLAUF (Skeptiker 03.10.): Maenner verfallen nicht. Oeffnet die
+          // Anfrage erst, wenn 6 Mann reichen (c0 >= s/1,102), bleiben bei
+          // g = 0,115/h nur ln(1,102)/g = 51 min - ein Sleeve mit Charisma 1
+          // braucht fuer 6 Mann etwa so lange (Monte Carlo 51 min), die Op
+          // faellt also erst spaet. Ab c0 >= s/1,2 sind es 95 min Vorlauf; das
+          // Ziel bleibt dabei hoechstens TRUPP_ZIEL Mann.
+          const noetig = maennerNoetig(boOhneTrupp, schw);
+          const ziel = Math.min(noetig, TRUPP_ZIEL);
+          if (boOhneTrupp * TRUPP_VORLAUF >= schw && boPool < ziel) {
+            truppAnfrage = true;
+            truppFehlt = ziel - boPool;
           }
         }
-        const m = (was) => mult[was] ?? 1;
-        const sp = ns.getPlayer();
-        const sk = sp.skills;
-        const [aus, ausMax] = ns.bladeburner.getStamina();
-        let team = 0;
-        try { team = ns.bladeburner.getTeamSize(B, name); } catch { /* kein Trupp */ }
-        const eff = {
-          hacking: sk.hacking,
-          strength: sk.strength * m("EffStr"),
-          defense: sk.defense * m("EffDef"),
-          dexterity: sk.dexterity * m("EffDex"),
-          agility: sk.agility * m("EffAgi"),
-          charisma: sk.charisma * m("EffCha"),
-          intelligence: sk.intelligence,
-        };
-        let c = 0;
-        for (const stat of Object.keys(a.weights)) {
-          if (!a.weights[stat]) continue;
-          c += a.weights[stat] * Math.pow(eff[stat], a.decays[stat]);
-        }
-        c *= 1 + (0.75 * Math.pow(sk.intelligence, 0.8)) / 600;   // Intelligenz
-        c *= Math.min(1, aus / (0.5 * ausMax));                   // Ausdauerstrafe
-        c *= Math.pow(team + 1, 0.05);                            // Truppbonus
-        c *= m("SuccessChanceAll");
-        c *= m("SuccessChanceOperation");   // Black Ops zaehlen als Operation
-        if (a.isStealth) c *= m("SuccessChanceStealth");
-        if (a.isKill) c *= m("SuccessChanceKill");
-        c *= sp.mults.bladeburner_success_chance ?? 1;
-        const wert = Math.min(1, c / a.baseDifficulty);
-        return Number.isFinite(wert) ? wert : null;
-      } catch { return null; }
-    };
-
-    // D2: EXAKTE CHANCE STATT SPANNENMINIMUM, WENN EINE BLACK OP OFFEN IST
-    // (Audit 4#2, 26.09.2026).
-    //
-    // getSuccessRange (Action.ts:144-167) ist deterministisch: aus
-    // [est-d, est+d] wird GENAU eine Grenze mit r = pop/popEst verzerrt - bei
-    // r<1 die untere (der schaedliche Fall, s.min faellt gegen 0), sonst die
-    // obere (nach oben bei 1 geklemmt). Black Ops haben Bevoelkerungsfaktor
-    // immer 1 (BlackOperation.ts:55-61), ihr Paar ist also [real*r, real]
-    // bzw. [real, real*r] - und `real` kennt der Bot fuer sie schon exakt
-    // (blackOpChance oben, gegen Action.ts:169-196 geprueft). Aus dem Paar
-    // und `real` folgt r rueckwaerts, und mit r ist die wahre Chance jeder
-    // anderen Aktion DERSELBEN STADT geschlossen bestimmbar (die
-    // Bevoelkerungsschaetzung ist je Stadt gespeichert, nicht je Aktion).
-    //
-    // Geeicht in tools/test-d2-wahre-chance.js (Monte Carlo gegen einen
-    // lokalen Nachbau von Action.ts, wie im Audit mit scratchpad/audit/
-    // spanne2.js: 0 Fehler > 1e-9 unter den "sicheren" Faellen). Der
-    // Bruchteil, der nicht bestimmbar ist (Black-Op-Obergrenze bei r>=1 auf 1
-    // geklemmt - `sicher: false` unten), war dort 14 % und ist gerade der
-    // Fall, in dem `s.min` ohnehin schon unverzerrt ist.
-    // Reine Funktion, ohne ns-Zugriff - so extrahiert und geeicht in
-    // tools/test-d2-wahre-chance.js (Monte Carlo, 100.000 Faelle).
-    const rAusBlackOp = (bo, boReal) => {
-      const EPS = 1e-12;
-      if (bo.min < boReal - EPS) return { r: bo.min / boReal, sicher: true };
-      if (bo.max > boReal + EPS && bo.max < 1) return { r: bo.max / boReal, sicher: true };
-      if (bo.max >= 1 && boReal < 1) return { r: 1 / boReal, sicher: false };
-      // SKEPTIKER-FUND 3 (27.09.2026): boReal selbst schon >= 1 (voller
-      // Erfolg) UND die gemeldete Spanne ebenfalls auf 1 geklemmt
-      // (bo.min >= boReal) - r ist hier UNSICHTBAR, weil jedes r>=1 nach der
-      // eigenen Klemmung ebenfalls bo.min=bo.max=1 erzeugt haette. Ohne diese
-      // Zeile fiel dieser Fall in den Fallback darunter (r:1, sicher:true)
-      // und chanceAusR() ueberschaetzte andere Aktionen derselben Stadt
-      // (Beleg im Audit: 0.705 statt tatsaechlich 0.6).
-      if (boReal >= 1 - EPS && bo.min >= boReal - EPS) return { r: 1, sicher: false };
-      return { r: 1, sicher: true };
-    };
-    // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der
-    // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
-    // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
-    // der Aufrufer faellt dann auf spanne(typ, name).min zurueck.
-    const chanceAusR = (r, sicher, s) => {
-      if (!sicher) return null;
-      if (r < 1) return s.min > 0 ? (s.min / r + s.max) / 2 : null;
-      if (s.max < 1) return (s.max / r + s.min) / 2;
-      return s.min;   // Obergrenze geklemmt: s.min ist bereits die beste bekannte Untergrenze
-    };
-    const wahreChance = (typ, name) => {
-      if (typ === B) {
-        // Black Ops brauchen den Umweg ueber r gar nicht - ihre Chance ist
-        // schon exakt (Bevoelkerungsfaktor immer 1, s.o.).
-        const c = blackOpChance(name);
-        return Number.isFinite(c) ? c : null;
       }
-      try {
-        const bo = ns.bladeburner.getNextBlackOp();
-        if (!bo) return null;
-        const boReal = blackOpChance(bo.name);
-        if (!Number.isFinite(boReal) || boReal <= 0) return null;
-        const rr = rAusBlackOp(spanne(B, bo.name), boReal);
-        return chanceAusR(rr.r, rr.sicher, spanne(typ, name));
-      } catch { return null; }
-    };
-    // Wie spanne(), aber mit wahreChance() aufgeloest, wenn moeglich - sonst
-    // unveraendert die gemeldete (vorsichtige) Spanne. Ueberall einsetzen, wo
-    // bisher an spanne(...).min oder .max entschieden wurde.
-    const spanneGenau = (typ, name) => {
-      const exakt = wahreChance(typ, name);
-      return exakt === null ? spanne(typ, name) : { min: exakt, max: exakt };
-    };
+    }
+    return { boOhneTrupp, boPool, boMitPool };
+  };
+
+  const waehle = () => {
+    // 1. Ausdauer. Alles andere ist wertlos, wenn die Chance gedrueckt ist.
+    const [jetzt, max] = ns.bladeburner.getStamina();
+    if (max > 0 && jetzt < max * AUSDAUER_RUHE) {
+      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "Ausdauer" };
+    }
+    const hp = ns.getPlayer().hp;
+    if (hp && hp.max > 0 && hp.current < hp.max * HP_RUHE) {
+      return { typ: G, name: "Hyperbolic Regeneration Chamber", grund: "HP" };
+    }
+
+    // Messen, bevor irgendein Zweig zurueckkehrt (Begruendung bei
+    // `chaosMessen`). Nur messen - entschieden wird weiter unten.
+    if (SPIEL_CHAOS_AN) chaosMessen();
 
     // Abdeckung nach verbleibender Arbeit (Begruendung oben bei
     // `blackOpArbeit`). Laeuft bei jedem Aufruf von `beste()` mit; die
@@ -2502,55 +2608,13 @@ export async function main(ns) {
     // Eingesetzt werden dann nur so viele, wie die Schwelle braucht.
     // Bis heute stand das Feld praktisch immer auf true (Pool < 6), auch bei
     // Chance 0,07 gegen Schwelle 0,90 - da bringen selbst 1.000 Mann nichts.
-    truppAnfrage = false;
-    truppFehlt = 0;
-    truppPool = null;
-    // Eigener Stempel NUR fuer diese Rechnung (Skeptiker 03.10.): Ruhe-,
-    // Gym-, Graft- und "weicht bbtrain"-Pfade schreiben blade.json mit neuem
-    // `zeit`, ohne `waehle()` zu durchlaufen - der letzte `truppAnfrage`
-    // waere dann eingefroren und saehe trotzdem frisch aus. sleeve.js prueft
-    // die Frische an `truppZeit`.
-    truppZeit = Date.now();
-    let boOhneTrupp = null;
-    let boPool = 0;
-    if (bo) {
-      try { boPool = Math.max(0, Number(ns.bladeburner.getTeamSize()) || 0); } catch { boPool = 0; }
-      truppPool = boPool;
-      let opTrupp = 0;
-      try { opTrupp = Math.max(0, Number(ns.bladeburner.getTeamSize(B, bo.name)) || 0); } catch { opTrupp = 0; }
-      const roh = blackOpChance(bo.name);
-      // Bei 1 geklemmt UND schon ein Trupp zugeteilt: die wahre Chance ohne
-      // Trupp ist unsichtbar, sicher ist nur 1/(opTrupp+1)^0,05 als
-      // Untergrenze. Die Untergrenze nehmen - dann wird im Zweifel der Pool
-      // eingesetzt statt mit zu wenig Chance gefeuert (Skeptiker 03.10.).
-      if (Number.isFinite(roh)) boOhneTrupp = roh / Math.pow(opTrupp + 1, 0.05);
-      if (TRUPP_ZIEL > 0 && Number.isFinite(boOhneTrupp) && boOhneTrupp > 0) {
-        let rangJetzt = 0;
-        try { rangJetzt = ns.bladeburner.getRank(); } catch { rangJetzt = 0; }
-        const schw = blackOpSchwelle(bo.name);
-        if (rangJetzt >= TRUPP_NAHE * bo.rank && boOhneTrupp < schw) {
-          // VORLAUF (Skeptiker 03.10.): Maenner verfallen nicht. Oeffnet die
-          // Anfrage erst, wenn 6 Mann reichen (c0 >= s/1,102), bleiben bei
-          // g = 0,115/h nur ln(1,102)/g = 51 min - ein Sleeve mit Charisma 1
-          // braucht fuer 6 Mann etwa so lange (Monte Carlo 51 min), die Op
-          // faellt also erst spaet. Ab c0 >= s/1,2 sind es 95 min Vorlauf; das
-          // Ziel bleibt dabei hoechstens TRUPP_ZIEL Mann.
-          const noetig = maennerNoetig(boOhneTrupp, schw);
-          const ziel = Math.min(noetig, TRUPP_ZIEL);
-          if (boOhneTrupp * TRUPP_VORLAUF >= schw && boPool < ziel) {
-            truppAnfrage = true;
-            truppFehlt = ziel - boPool;
-          }
-        }
-      }
-    }
+    const { boOhneTrupp, boPool, boMitPool } = truppLageSetzen(bo);
     if (bo) {
       if (ns.bladeburner.getRank() >= bo.rank) {
         const s = spanne(B, bo.name);
         // Mit dem GANZEN Pool gerechnet - eingesetzt wird er unten nur, wenn
         // es ohne ihn nicht reicht.
-        const gerechnet = Number.isFinite(boOhneTrupp)
-          ? Math.min(1, boOhneTrupp * Math.pow(boPool + 1, 0.05)) : null;
+        const gerechnet = boMitPool;
         // Die gerechnete Zahl schlaegt die geschaetzte. Fehlen die Daten,
         // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
         const chance = gerechnet !== null ? gerechnet : s.min;
@@ -4033,7 +4097,15 @@ export async function main(ns) {
           try {
             const bo = ns.bladeburner.getNextBlackOp();
             if (bo && ns.bladeburner.getRank() >= bo.rank) {
-              const gerechnet = blackOpChance(bo.name);
+              // TOT VOM 28.08. BIS 03.10.2026: `blackOpChance` und
+              // `blackOpSchwelle` lagen im Rumpf von `waehle()`, hier also
+              // ReferenceError -> catch -> Gym. Eine faellige Black Op holte
+              // die Figur deshalb nie aus dem Gym (Befund aus fe3b013). Jetzt
+              // dieselbe Feuerzahl wie in `waehle()` (mit ganzem Pool,
+              // `blackOpTruppLage()`), sonst verliesse die Figur das Gym fuer
+              // eine Op, die `waehle()` dann nicht nimmt - oder bliebe drin,
+              // obwohl `waehle()` sie nehmen wuerde.
+              const gerechnet = blackOpTruppLage(bo).mitPool;
               const chance = gerechnet !== null ? gerechnet : spanne(B, bo.name).min;
               if (chance >= blackOpSchwelle(bo.name)) lohntSich = true;
             }
@@ -4109,6 +4181,18 @@ export async function main(ns) {
       // fuehrt das Gym selbst (`gymGreifen()` oben). Damit kann der Fall von
       // 07:49 nicht wiederkehren, in dem beide Skripte gewichen sind.
       if (tiefstand >= BBTRAIN_ZIEL && !lohntSich) {
+        // IM GYM LAEUFT `waehle()` NICHT - ZWEI SEINER NEBENAUFGABEN DESHALB
+        // AUCH HIER (Skeptiker 03.10.2026, seit dem Gym-Zweig vom 28.08. offen):
+        // 1. Faehigkeiten kaufen. Der Kauf stand nur hinter diesem `continue`.
+        //    Nach einer gelungenen Black Op (bis 40.000 Rang) lagen die
+        //    frischen Punkte im Gym brach - genau die, die die naechste Op
+        //    ueber die Schwelle heben, die oben in `lohntSich` geprueft wird.
+        //    Der Kauf fasst die Figur nicht an (Begruendung beim Graft-Riegel).
+        // 2. Den Truppbedarf fuer sleeve.js frisch melden (`truppZeit`), sonst
+        //    verwirft sleeve.js die Anfrage nach 5 min und niemand rekrutiert,
+        //    waehrend die Op nur an fehlenden Maennern haengt.
+        try { faehigkeitenKaufen(); } catch { /* egal */ }
+        try { truppLageSetzen(ns.bladeburner.getNextBlackOp()); } catch { /* egal */ }
         const wert = gymGreifen();
         if (wert) {
           gewichen = false;

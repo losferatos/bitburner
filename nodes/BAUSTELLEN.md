@@ -1281,16 +1281,35 @@ behoben) - hier nur vermerkt, keine Codeaenderung.
   `waehle()` - ReferenceError NACH `setTeamSize(B, name, 0)`, der Trupp
   wurde also nie eingesetzt.
 
-- **Gym-Ausstieg fuer faellige Black Op ist tot** (03.10.2026, gefunden beim
-  Trupp-Umbau, NICHT behoben): `src/blade.js` im Gym-Zweig (`lohntSich`,
-  Suche nach "keine Black Op lesbar: dann bleibt es beim Gym") ruft
-  `blackOpChance()`/`blackOpSchwelle()` ausserhalb von `waehle()`. Der
-  ReferenceError faellt ins `catch` - eine faellige Black Op holt die Figur
-  also nie aus dem Gym. Dasselbe bei der D2-Sonde (Suche "als const im
-  selben main()-Rumpf" - der Kommentar dort stimmt nicht). Und selbst
-  repariert rechnete der Gym-Ausstieg ohne Pool. Fix: Chance und Schwelle aus dem letzten
-  `waehle()`-Lauf in eine aeussere Variable legen; Verhaltensaenderung im
-  Gym-Zweig, deshalb eigener Auftrag mit Skeptiker.
+- **ERLEDIGT 03.10.2026: Gym-Ausstieg fuer faellige Black Op war tot** (gefunden
+  beim Trupp-Umbau fe3b013, behoben im Branch `blackop-gym-2026-10-03`, mit
+  Skeptiker). acorn-Scope-Pruefung ueber src/: VIER tote Stellen, nicht zwei -
+  `blackOpChance`/`blackOpSchwelle`/`spanneGenau` lagen im Rumpf von
+  `waehle()` und wurden ausserhalb aufgerufen: (1) Gym-Zweig `lohntSich`
+  (tot seit dem Einbau 28.08. - eine faellige Black Op holte die Figur nie
+  aus dem Gym), (2) `klemmFaktor()` (D2-Sonde, seit 27.09. immer 1 - die
+  Chance-Faehigkeiten wurden nie gedaempft), (3)+(4) `etwasFahrbarJetzt()`
+  (`fahrbar` in blade.json seit 27.09. immer false, reine Telemetrie).
+  Fix: der ganze Black-Op-Block (Tabellen, Schwelle, Chance, D2-Rueckrechnung)
+  steht jetzt in main() vor `waehle()` - liest nur Konstanten und ns, rechnet
+  in `waehle()` also unveraendert. Statt der hier vorgeschlagenen "Zahl aus
+  dem letzten waehle()-Lauf" (im Gym laeuft `waehle()` nicht, die Zahl waere
+  beliebig alt) fragt der Gym-Zweig jetzt frisch `blackOpTruppLage()` - dieselbe
+  Feuerzahl MIT ganzem Pool, die auch `waehle()` benutzt. Nebenwirkung:
+  `endspielFehlerGemeldet` meldet jetzt wirklich nur einmal je Lauf.
+  Skeptiker (Opus) fand zwei alte Luecken, die jetzt die neue Ausstiegsfrage
+  treffen, beide behoben: im Gym wurden keine Faehigkeitspunkte ausgegeben,
+  und `truppZeit` wurde im Gym nie erneuert (sleeve.js verwirft nach 5 min) -
+  der Truppblock ist jetzt `truppLageSetzen()`, gerufen aus `waehle()` und
+  dem Gym-Zweig. Offen, bewusst nicht gebaut: (a) `klemmFaktor` ist jetzt
+  erstmals live (prueft nur die NAECHSTE Black Op, auch wenn sie am Rang
+  haengt) - Skillkaeufe nach dem Einspielen einmal ansehen; (b) mehr
+  ns-Aufrufe je Runde (`etwasFahrbarJetzt` rechnet 9x `blackOpChance`),
+  im Mock trotzdem schneller als vorher, im Spiel ungemessen. Tests:
+  `tools/test-blackop-gym.js` (21 gruen, 13 rot gegen 79680d6),
+  `tools/test-scope-tot.js` (generisch fuer src/, mit Selbstprobe). RAM
+  unveraendert 175,35 (tools/ram.js); `blade.js` steht in VERALTET_ERLAUBT von
+  tools/test-ram.js bis zur Live-Nachmessung nach dem Einspielen.
 
 - **Doppelte Konstanten `F_LEITER`/`F_NETZANTEIL`**: `bn4net.js` hat seinen
   eigenen `stapelPlan`/`F_LEITER`-Suchlauf fuer die TAKTUNG (siehe

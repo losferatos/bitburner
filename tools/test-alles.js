@@ -63,6 +63,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-scope-tot.js",
+    deckt: "Ebene -1: kein Name in src/ ausserhalb seines Scopes (toter Aufruf im try/catch, Befund 03.10.), mit Selbstprobe",
+    schnell: true,
+  },
+  {
     datei: "test-ram.js",
     deckt: "RAM-Rechner gegen 114 Live-Messwerte, registry.json und das Tor E1",
     schnell: true,
@@ -331,6 +336,11 @@ const TESTS = [
   {
     datei: "test-trupp-sleeve.js",
     deckt: "Trupp fuer die Black Op: truppAnfrage nur bei echtem Bedarf, Feuern mit Pool, ein Sleeve rekrutiert nur, wenn der naechste Mann lohnt",
+    schnell: false,
+  },
+  {
+    datei: "test-blackop-gym.js",
+    deckt: "Faellige Black Op holt die Figur aus dem Gym (dieselbe Feuerzahl wie waehle(), kein Pendeln), klemmFaktor und fahrbar leben",
     schnell: false,
   },
 ];

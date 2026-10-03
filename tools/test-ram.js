@@ -189,7 +189,14 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // statt der gemessenen 27,85; registry.json ramBaseGb ist nachgezogen.
     // Live-Nachmessung nach dem Einspielen noetig, dieser Auftrag hat keinen
     // Spielzugriff.
-    const VERALTET_ERLAUBT = ["bn4rep.js", "sleeve.js"];
+    //
+    // 2026-10-03 (Black-Op-Gym-Ausstieg, Scope-Befund aus fe3b013): blade.js
+    // hat neuen Inhalt - Black-Op-Block aus `waehle()` nach main() gehoben,
+    // `blackOpTruppLage()` dazu. Keine neue ns-Funktion: tools/ram.js rechnet
+    // vorher wie nachher 175,35 GB, gleich dem Live-Wert vom 03.10. Nur der
+    // Hash der Messzeile passt nicht mehr - Live-Nachmessung nach dem
+    // Einspielen, dieser Auftrag hat keinen Spielzugriff.
+    const VERALTET_ERLAUBT = ["bn4rep.js", "sleeve.js", "blade.js"];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

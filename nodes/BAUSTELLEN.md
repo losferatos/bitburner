@@ -507,6 +507,14 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
+### Schub verweigert (1 nicht in master) - Fehlgriff?
+
+1 von 8 geaenderten Dateien unter src/ stehen weder im Git-Index von master noch in hotswap-freigabe.txt. Es wurde NICHTS ins Spiel geschoben - entweder alle oder keine.
+
+Betroffen: gang.js
+
+War das Absicht? Dann committen (dann steht der Pfad in master) oder `tools/hotswap.js` fahren, das legt die Freigabe selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, dann ist genau dafuer dieser Riegel gebaut.
+
 ### Autosave steht
 
 lastSave im Spielstand war bei der Messung um 2026-10-03T15:17:28.106Z bereits 405 Minuten alt (Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder fehlgeschlagenes IndexedDB-Schreiben.

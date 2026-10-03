@@ -29,10 +29,10 @@
   "singKosten41": 840,
   "dom": 0,
   "err": null,
-  "bytes": 153226,
+  "bytes": 181177,
   "lines": 2181,
-  "sha256": "0b7607fe5b2afc6f008d6deab3946b55af96447ec1abf78fe9f1b354e1661519",
-  "gemessenAm": "2026-10-03T08:12:53.716Z",
+  "sha256": "d585aba79ac83eba45f2929930d4b2b56bbfda15a7f948e90484177e7a869070",
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -299,10 +299,10 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 257104,
+  "bytes": 259621,
   "lines": 4145,
-  "sha256": "3a97f7a20b79447ad1cd1e187702659bd352d9ec090bbb1f98b8c9949f25571c",
-  "gemessenAm": "2026-10-03T08:12:10.369Z",
+  "sha256": "42e5a66aca44b3439f1828ff63bf82d6a19a4846253d69a6462046e1a86cacb8",
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -1228,10 +1228,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 11754,
+  "bytes": 12304,
   "lines": 126,
-  "sha256": "cc1e96ecfbd4f345091598cd474a6a10cd9ba7007fab76269e7a2bea78af2597",
-  "gemessenAm": "2026-09-27T10:25:44.776Z",
+  "sha256": "0db314a714abc4cba10c68c5bc97592751f62dd5450b93f712205136e85922b1",
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
@@ -1900,9 +1900,11 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 21602,
+  "bytes": 24553,
   "lines": 351,
-  "sha256": "38d2d61631b7b568c5846479e46d32e38bf0653f68d14556dd04c61b4b1caa75"
+  "sha256": "d376b1e6c0d6dd5b6bc73e2a0a0923dd63ce5c508a52dafd5c834637bd40a3f9",
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
   "file": "export.js",
@@ -1979,9 +1981,19 @@
   "live41": 1.6,
   "lokal41": 1.6,
   "diff": 0,
-  "sha256": "5a3fa91cc9bc81a391465bcbbe1bf9df604a10271fd2681dd8851f4725a41246",
-  "bytes": 23796,
-  "gemessenAm": "2026-09-27T12:32:58.107Z",
+  "sha256": "ed2e6df18032f64b36b95b568190a2cdfe21731cb71b39069173f2c28715d1c5",
+  "bytes": 50628,
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
+ },
+ {
+  "file": "gang.js",
+  "live41": 36.85,
+  "lokal41": 36.85,
+  "diff": 0,
+  "sha256": "462e153f221cdaaa7a6ff4543adf3ee825fbf07290dfa47abad1ec3117b01edf",
+  "bytes": 46440,
+  "gemessenAm": "2026-10-03T23:01:57.235Z",
+  "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  }
 ]

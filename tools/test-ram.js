@@ -233,7 +233,7 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // gang.js (P2) ist neu und steht in keiner Messzeile. Alle Eintraege gelten
     // bis zur Live-Nachmessung (tools/eichung-messen.js nach dem Einspielen);
     // danach wird die Liste wieder auf [] gesetzt.
-    const VERALTET_ERLAUBT = ["bn4rep.js", "blade.js", "hacknet.js", "lib/einbau.js", "lib/hackaugs.js"];
+    const VERALTET_ERLAUBT = []; // geleert 04.10.2026 nach Live-Messung (Gang-Pakete P0-P2)
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

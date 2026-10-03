@@ -47,7 +47,7 @@ Alles geht auch auf der Kommandozeile: `python -m truthtracker crawl|pruefen|spi
 1. **Spike:** `run_spike.bat` doppelklicken. Er probiert zuerst den direkten Weg (curl_cffi),
    dann den Browser. Öffnet sich ein Browserfenster mit einer Cloudflare-Prüfung („Bestätigen Sie,
    dass Sie ein Mensch sind“), dort lösen; das Skript wartet bis zu 5 Minuten. Dauer insgesamt etwa
-   3–4 Minuten. Ergebnis: `docs\zugriff-messungen\messung-<Zeit>.md` (nur Statuscodes, Feldnamen,
+   4–6 Minuten (20 Pausen von 10–15 s), dazu die Zeit zum Lösen einer Cloudflare-Prüfung. Ergebnis: `docs\zugriff-messungen\messung-<Zeit>.md` (nur Statuscodes, Feldnamen,
    Zählwerte). Steht dort bei „Empfehlung“ `a` oder `b2`, funktioniert der Zugriff.
 2. **Erster Crawl:** `run_crawl.bat`. Der erste Lauf holt Posts **vier Wochen zurück** (Backfill,
    einstellbar). Bei etwa 25 Posts pro Tag sind das rund 700 Posts: ungefähr 20–35 Timeline-Seiten
@@ -143,6 +143,7 @@ Spalten wie in der Tabelle; Medien als Anzahl je Art, „Abmessungen“ (z. B. 1
 | „Abbruch: Cloudflare verlangt eine Browser-Prüfung“ | Prüfung nicht rechtzeitig gelöst, oder `weg = "curl"` | Lauf erneut starten und die Prüfung lösen; `weg = "auto"` lassen. |
 | „Abbruch: Zu viele Anfragen (HTTP 429)“ | Rate-Limit | 15–60 Minuten warten, dann erneut. Kommt es öfter: `api_min_s`/`api_max_s` erhöhen (z. B. 15/25). |
 | „Abbruch: Cloudflare hat die Anfrage blockiert“ | IP oder Browser gesperrt | Später erneut; anderes Netz (z. B. Handy-Hotspot) probieren; in `config.toml` einen anderen Browser wählen (`edge`). Keine Proxy-Dienste. |
+| Spike: „Weg b: übersprungen, weil Weg a ein Rate-Limit bekam (HTTP 429)“ | Rate-Limit schon im direkten Weg | 15–60 Minuten warten, dann `run_spike.bat --nur b`. |
 | „Abbruch beim Medienabruf: …“ | Cloudflare-Prüfung, 429 oder Sperre beim Laden eines Bildes | Wie die Zeilen darüber; Gesammeltes ist gespeichert, fehlende Bild-Hashes holt ein späterer Lauf nach. |
 | „Kein Lauf gestartet. Es läuft bereits ein Lauf …“ | Ein anderes Fenster mit `run_crawl.bat` oder `run_spike.bat` läuft noch | Dort warten, bis es fertig ist. |
 | „Timeline-Seite leer, obwohl ältere Posts existieren müssten“ | Truth Social liefert ausgeloggt ab einer gewissen Tiefe nichts mehr | Nichts; der nächste Lauf versucht die Lücke erneut. Bleibt es dauerhaft, `backfill_wochen` verkleinern. |

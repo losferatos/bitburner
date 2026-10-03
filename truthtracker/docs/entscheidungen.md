@@ -306,3 +306,13 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
     eingefügter Post mit Absätzen landete sonst zum Teil in der Eingabeaufforderung. Jede Zeile ist eine
     Stichprobe, Leerzeilen und Zeilen unter 4 Zeichen werden übersprungen; danach wird der
     Konsolen-Eingabepuffer geleert.
+
+## Spike (nach dem Review)
+
+84. **Der Spike folgt denselben Regeln wie der Crawler:** Laufsperre, Startseite = Konto-Abfrage
+    (die Web-App lädt erst, wenn Cache aus und Medien gesperrt sind), Sperrseiten nach HTTP-Status,
+    Medienprobe nur mit der Adresse, die der Crawler hasht. Nach einem 429 in Weg a startet Weg b
+    nicht (`--nur b` später). Zeigt die Profilseite in b1 eine Prüfung oder bekommt die Web-App ein
+    429, endet Weg b sofort statt zu warten: Mit angehängtem Playwright würde die Prüfung kreisen.
+85. **Anfragen der Web-App zählen mit.** Der Bericht weist sie getrennt von den eigenen aus; gesperrte
+    Medien gehen nie raus und stehen unter `medien_gesperrt`.

@@ -4,9 +4,11 @@ Geprüft wird in der Reihenfolge aus SPEC.md:
 
 a) JSON-API direkt per ``curl_cffi`` mit Chrome-Impersonation.
 b) Echter Browser (Opera, Chrome oder Edge) mit eigenem, dauerhaftem Profil und sichtbarem
-   Fenster. Erst wird die Profilseite geöffnet und mitgeschnitten, welche JSON-Antworten die
-   Web-App selbst lädt (b1). Danach ruft das Skript dieselben API-Pfade aus der geöffneten
-   Seite heraus auf (b2), also mit den Cookies und dem Netzwerkstapel des Browsers.
+   Fenster. Wie beim Crawler startet er mit der Konto-Abfrage (JSON) als Startseite. Erst wenn
+   Playwright angehängt, der Cache abgeschaltet und die Sperre für Bilder und Videos gesetzt
+   ist, öffnet der Spike die Profilseite und schneidet mit, welche JSON-Antworten die Web-App
+   selbst lädt (b1). Danach ruft er dieselben API-Pfade aus der geöffneten Seite heraus auf
+   (b2), also mit den Cookies und dem Netzwerkstapel des Browsers.
 c) HTML wird nicht geparst; der Spike zählt nur, ob die Seite ``<time>``-Elemente enthält,
    falls a) und b) scheitern.
 
@@ -14,9 +16,24 @@ Der Bericht enthält ausschließlich Statuscodes, Kopfzeilen aus einer festen Li
 Feldnamen mit Typen und Häufigkeiten, Zählwerte und Zeitspannen. Keine Texte, keine
 Medien, keine Medien-URLs. Antworten werden nur im Speicher ausgewertet und verworfen.
 
-Schonend: höchstens rund ein Dutzend eigene Anfragen pro Weg, zufällige Pausen von
-10–15 s (ohne Login wurden etwa 6 Anfragen pro Minute vor einem 429 beobachtet), nichts
-parallel. Bei Challenge, Sperre oder 429 bricht der jeweilige Weg sofort ab.
+Schonend (Standardwerte):
+
+* Weg a: höchstens 15 Anfragen. Die Client-Matrix stellt 4 Konto-Abfragen (urllib, curl_cffi
+  als Chrome, Safari und Firefox), danach Konto, bis zu 5 Timeline-Seiten, gepinnte Posts,
+  ein Einzelabruf, die Replies-Probe und die „nicht gefunden“-Probe (zusammen 10) und, falls
+  die Stichprobe ein ladbares Bild hat, eine Bildabfrage: die Adresse, die der Crawler für den
+  Hash laden würde, nie eine Videodatei.
+* Weg b: 6 eigene Anfragen (Startseite, Profilseite, per ``fetch`` Konto, 2 Timeline-Seiten,
+  „nicht gefunden“-Probe) plus das, was die Web-App beim Aufbau der Profilseite selbst
+  anfragt. Der Bericht zählt diese Anfragen mit und weist sie getrennt aus, ebenso die
+  gesperrten Bild- und Videoabrufe, die den Browser nie verlassen.
+* Vor jeder eigenen Anfrage außer der allerersten eine zufällige Pause von 10–15 s, auch
+  zwischen Weg a und Weg b; bei vollem Lauf also 20 Pausen, 200–300 s. Ohne Login wurden etwa
+  6 Anfragen pro Minute vor einem 429 beobachtet. Nichts läuft parallel.
+* Bei Challenge, Sperre oder 429 bricht der jeweilige Weg sofort ab. Nach einem 429 in Weg a
+  startet Weg b nicht mehr (SPEC Zugriff 3); er lässt sich später mit ``--nur b`` prüfen.
+* Der Spike hält dieselbe Laufsperre wie der Crawl. Läuft schon ein Lauf, endet er ohne
+  Anfrage und ohne den Temp-Ordner anzufassen.
 """
 
 from __future__ import annotations
@@ -34,9 +51,19 @@ from pathlib import Path
 from typing import Any
 from urllib.parse import parse_qsl, urlencode, urlparse
 
-from truthtracker import __version__, browser, cloudflare, pfade, temp
-from truthtracker.transport import FETCH_JS, Pausierer, seite_zeigt_challenge, seite_zeigt_sperre
+from truthtracker import __version__, browser, cloudflare, laufsperre, medien, pfade, temp
 from truthtracker.feldkatalog import Feldkatalog
+from truthtracker.medien import MedienFehler
+from truthtracker.transport import (
+    BILD_ACCEPT,
+    FETCH_JS,
+    MAX_MEDIEN_BYTES,
+    Pausierer,
+    _laenge,
+    _lies_begrenzt,
+    seite_zeigt_challenge,
+    seite_zeigt_sperre,
+)
 
 # Ein Zeitpunkt vor dem Start von Truth Social (Februar 2022) als Snowflake-ID: so eine ID
 # kann es nicht geben, die Antwort zeigt also, wie der Server "nicht gefunden" meldet.
@@ -58,6 +85,11 @@ KOPFZEILEN_WERTE = (
 
 STATUSES_PFAD = re.compile(r"^/api/v\d+/accounts/\d+/statuses$")
 LOOKUP_PFAD = re.compile(r"^/api/v\d+/accounts/lookup$")
+
+WEG_A_NAME = "JSON-API per curl_cffi"
+WEG_B_NAME = "Echter Browser über CDP"
+# Rückgabewert von main, wenn ein anderer Lauf (Crawl oder Spike) die Laufsperre hält; wie beim Crawl.
+CODE_LAUFSPERRE = 3
 
 
 class Abbruch(Exception):
@@ -203,11 +235,24 @@ def katalogisiere_posts(bericht: Bericht, posts: list[dict]) -> None:
     bericht.katalog("status").aufnehmen_alle(posts)
 
 
+def medienquelle(anhang: Any) -> tuple[str, str] | None:
+    """Adresse, die der Crawler für den Hash laden würde, und ob sie Original oder Vorschau ist.
+
+    Dieselbe Regel wie in ``medien``: bei Bildern die Datei selbst, sonst nur ein Vorschaubild,
+    das weder auf die Mediendatei selbst zeigt noch auf eine Video- oder Audioendung endet.
+    ``None``: nichts laden.
+    """
+    if not isinstance(anhang, dict):
+        return None
+    return medien._quelle(anhang, medien.medien_art(anhang.get("type")))
+
+
 def erster_medienanhang(posts: list[dict]) -> dict | None:
+    """Erster Anhang der Stichprobe, für den der Crawler ein Bild laden würde (nie eine Videodatei)."""
     for post in posts:
-        quelle = post.get("reblog") or post
+        quelle = post.get("reblog") if isinstance(post.get("reblog"), dict) else post
         for anhang in quelle.get("media_attachments") or []:
-            if isinstance(anhang, dict) and anhang.get("preview_url"):
+            if medienquelle(anhang) is not None:
                 return anhang
     return None
 
@@ -281,7 +326,7 @@ def client_matrix(einst: Einstellungen, weg: dict[str, Any], pause: Pausierer) -
 def weg_a(einst: Einstellungen, bericht: Bericht) -> None:
     from curl_cffi import requests as cffi_requests
 
-    weg: dict[str, Any] = {"name": "JSON-API per curl_cffi", "schritte": [], "anfragen": 0, "ergebnis": "unvollstaendig"}
+    weg: dict[str, Any] = {"name": WEG_A_NAME, "schritte": [], "anfragen": 0, "ergebnis": "unvollstaendig"}
     bericht.wege["a"] = weg
     start = time.monotonic()
     pause = Pausierer(einst.pause_min, einst.pause_max)
@@ -420,32 +465,12 @@ def weg_a(einst: Einstellungen, bericht: Bericht) -> None:
         bew, _ = hole("nicht_gefunden_probe", f"/api/v1/statuses/{GARANTIERT_FEHLENDE_ID}")
         weg["nicht_gefunden_probe"] = beschreibe_nicht_gefunden(bew)
 
-        # 6. Lässt sich ein Vorschaubild laden (nötig für den pHash)?
+        # 6. Lässt sich das Bild laden, das der Crawler für den Hash holen würde (pHash)?
         anhang = erster_medienanhang(alle_posts)
         if anhang:
-            vorschau = urlparse(str(anhang["preview_url"]))
-            original = urlparse(str(anhang.get("url") or ""))
             pause()
-            t0 = time.monotonic()
-            try:
-                antwort = sitzung.get(anhang["preview_url"], headers={"Accept": "image/avif,image/webp,image/*,*/*;q=0.8"})
-                weg["anfragen"] += 1
-                inhaltstyp = cloudflare.kopfzeilen(antwort.headers).get("content-type", "")
-                medien = {
-                    "host": vorschau.hostname,
-                    "original_gleicher_host": original.hostname == vorschau.hostname if original.hostname else None,
-                    "status": antwort.status_code,
-                    "content_type": inhaltstyp[:60],
-                    "bytes": len(antwort.content or b""),
-                    "dauer_s": round(time.monotonic() - t0, 2),
-                    "art": "ok" if antwort.status_code == 200 and inhaltstyp.startswith("image/")
-                    else cloudflare.bewerte(antwort.status_code, antwort.headers, antwort.content).art,
-                }
-                del antwort  # Bilddaten sofort verwerfen
-            except Exception as fehler:  # noqa: BLE001
-                weg["anfragen"] += 1
-                medien = {"host": vorschau.hostname, "art": cloudflare.NETZWERKFEHLER, "fehlerklasse": type(fehler).__name__}
-            weg["medien_vorschau"] = medien
+            weg["anfragen"] += 1
+            weg["medien_vorschau"] = medienprobe(sitzung, anhang, basis)
         else:
             weg["medien_vorschau"] = {"art": "kein_medium_in_stichprobe"}
 
@@ -456,6 +481,61 @@ def weg_a(einst: Einstellungen, bericht: Bericht) -> None:
     finally:
         sitzung.close()
         weg["dauer_s"] = round(time.monotonic() - start, 1)
+
+
+def medienprobe(sitzung, anhang: dict, basis: str) -> dict[str, Any]:
+    """Lädt die Hash-Adresse eines Anhangs mit denselben Schutzregeln wie ``CurlTransport.hole_bytes``.
+
+    Erst Status, ``Content-Type`` und ``Content-Length`` prüfen; ist die Antwort kein Bild oder zu
+    groß, wird sie geschlossen, ohne den Körper zu lesen. Gelesen werden höchstens
+    ``MAX_MEDIEN_BYTES``, bei Fehlerantworten höchstens 64 KiB zum Einordnen. Die Bytes werden nur
+    gezählt und sofort verworfen; der Bericht nennt Host und Art, nie die Adresse.
+    """
+    quelle = medienquelle(anhang)
+    if quelle is None:
+        return {"art": "kein_medium_in_stichprobe"}
+    url, hash_quelle = quelle
+    ziel = urlparse(url)
+    original = urlparse(str(anhang.get("url") or ""))
+    vorschau = urlparse(str(anhang.get("preview_url") or ""))
+    befund: dict[str, Any] = {
+        "medienart": medien.medien_art(anhang.get("type")),
+        "hash_quelle": hash_quelle,
+        "host": ziel.hostname,
+        "original_gleicher_host": (original.hostname == vorschau.hostname)
+        if (original.hostname and vorschau.hostname) else None,
+        "bytes": 0,
+    }
+    t0 = time.monotonic()
+    try:
+        antwort = sitzung.request("GET", url, headers={"Accept": BILD_ACCEPT, "Referer": basis + "/"}, stream=True)
+    except Exception as fehler:  # noqa: BLE001 - jede Netzwerkstörung zählt hier gleich
+        befund.update(art=cloudflare.NETZWERKFEHLER, fehlerklasse=type(fehler).__name__)
+        befund["dauer_s"] = round(time.monotonic() - t0, 2)
+        return befund
+    try:
+        status = antwort.status_code
+        kopf = cloudflare.kopfzeilen(antwort.headers)
+        inhaltstyp = kopf.get("content-type", "")
+        ist_bild = status == 200 and inhaltstyp.lower().startswith("image/")
+        befund.update(status=status, content_type=inhaltstyp[:60])
+        if _laenge(kopf) > MAX_MEDIEN_BYTES:
+            befund["art"] = "zu_gross"  # schon die Kopfzeile kündigt zu viel an: nicht lesen
+        elif status == 200 and not ist_bild:
+            befund["art"] = "kein_bild"  # z. B. ein Video: nicht lesen
+        else:
+            daten = _lies_begrenzt(antwort, MAX_MEDIEN_BYTES if ist_bild else 65_536, abbrechen=ist_bild)
+            befund["bytes"] = len(daten)
+            befund["art"] = "ok" if ist_bild else cloudflare.bewerte(status, kopf, daten).art
+            del daten  # Bilddaten sofort verwerfen
+    except MedienFehler:
+        befund["art"] = "zu_gross"
+    except Exception as fehler:  # noqa: BLE001
+        befund.update(art=cloudflare.NETZWERKFEHLER, fehlerklasse=type(fehler).__name__)
+    finally:
+        antwort.close()
+    befund["dauer_s"] = round(time.monotonic() - t0, 2)
+    return befund
 
 
 def beschreibe_nicht_gefunden(bew: cloudflare.Bewertung) -> dict[str, Any]:
@@ -473,8 +553,83 @@ def beschreibe_nicht_gefunden(bew: cloudflare.Bewertung) -> dict[str, Any]:
 # Weg b: echter Browser über CDP
 
 
+class BrowserZaehler:
+    """Zählt im Browser, was an Truth Social hinausgeht, und sperrt Bilder und Videos.
+
+    Hängt am ganzen Browserkontext, gilt also auch für weitere Tabs. Eigene Abrufe (Profilseite,
+    ``fetch`` in b2) meldet der Spike vorher an; alles andere an den Truth-Social-Host stellt die
+    Web-App selbst (API-Pfade und sonstige Dateien wie Skripte oder Stylesheets). Gesperrte Bild-
+    und Videoabrufe verlassen den Browser nicht und werden getrennt gezählt.
+    """
+
+    def __init__(self, host: str):
+        self.host = host
+        self.webapp_api = 0
+        self.webapp_sonstige = 0
+        self.andere_hosts = 0
+        self.medien_gesperrt = 0
+        self._eigene_offen: list[str] = []
+
+    @staticmethod
+    def wird_gesperrt(anfrage) -> bool:
+        ziel = urlparse(anfrage.url).hostname or ""
+        return anfrage.resource_type in ("image", "media") and "cloudflare" not in ziel
+
+    def eigener_abruf(self, url: str) -> None:
+        """Vor jeder eigenen Anfrage aufrufen; sie ist dann schon in ``weg["anfragen"]`` gezählt."""
+        self._eigene_offen.append(url)
+
+    def route(self, route) -> None:
+        """Für ``kontext.route``: Bilder und Videos abbrechen, alles andere durchlassen."""
+        if self.wird_gesperrt(route.request):
+            self.medien_gesperrt += 1
+            route.abort()
+        else:
+            route.continue_()
+
+    def anfrage(self, anfrage) -> None:
+        """Für das ``request``-Ereignis des Kontexts."""
+        if self.wird_gesperrt(anfrage):
+            return  # in route() gezählt, verlässt den Browser nicht
+        if anfrage.url in self._eigene_offen:
+            self._eigene_offen.remove(anfrage.url)
+            return
+        teile = urlparse(anfrage.url)
+        if teile.scheme not in ("http", "https"):
+            return
+        if (teile.hostname or "") != self.host:
+            self.andere_hosts += 1
+        elif teile.path.startswith("/api/"):
+            self.webapp_api += 1
+        else:
+            self.webapp_sonstige += 1
+
+    def eintragen(self, weg: dict[str, Any]) -> None:
+        """Danach umfasst ``weg["anfragen"]`` auch die Anfragen der Web-App an den Truth-Social-Host."""
+        weg["eigene_anfragen"] = weg["anfragen"]
+        weg["webapp_anfragen"] = {
+            "api": self.webapp_api, "sonstige": self.webapp_sonstige, "andere_hosts": self.andere_hosts
+        }
+        weg["medien_gesperrt"] = self.medien_gesperrt
+        weg["anfragen"] = weg["eigene_anfragen"] + self.webapp_api + self.webapp_sonstige
+
+
+def _beende_browser(lauf: browser.LaufenderBrowser, pw_browser, bericht: Bericht, **optionen) -> bool:
+    """Beendet den Browser. Ein Fehler dabei wird gemeldet, hält das Aufräumen aber nicht auf."""
+    try:
+        return bool(browser.beende_browser(lauf, pw_browser, **optionen))
+    except Exception as fehler:  # noqa: BLE001 - z. B. unerwartete Ausgabe von tasklist
+        bericht.aufraeumen.setdefault("browser_beenden_fehler", []).append(type(fehler).__name__)
+        print(
+            f"Der Browser ließ sich nicht sauber beenden ({type(fehler).__name__}). "
+            "Profil und Cache werden trotzdem aufgeräumt.",
+            flush=True,
+        )
+        return False
+
+
 def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
-    weg: dict[str, Any] = {"name": "Echter Browser über CDP", "anfragen": 0, "ergebnis": "unvollstaendig"}
+    weg: dict[str, Any] = {"name": WEG_B_NAME, "anfragen": 0, "ergebnis": "unvollstaendig"}
     bericht.wege["b"] = weg
     start = time.monotonic()
     fund = browser.finde_browser(einst.browser)
@@ -489,18 +644,25 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
     weg["profil_vorher_aufgeraeumt"] = vorher.geloescht
     cache = pfade.temp_ordner() / f"browser-cache-{int(time.time())}"
     lauf: browser.LaufenderBrowser | None = None
-    pw_browser = None
+    beendet = False
     basis = einst.basis_url.rstrip("/")
     host = urlparse(basis).hostname or ""
+    zaehler = BrowserZaehler(host)
     try:
-        # Wie von Hand: Browser mit der Profilseite starten. Solange Cloudflare prüft, hängt sich
-        # nichts an den Browser (nur die Tab-Titel werden gelesen), damit die Prüfung nicht kreist.
+        # Wie der Crawler: Browser mit der Konto-Abfrage (JSON-API) als Startseite starten, nicht mit
+        # der Profilseite. So lädt die Web-App mit ihren Bildern und Videos erst, wenn Playwright
+        # angehängt ist und sie sperrt. Solange Cloudflare prüft, hängt sich nichts an den Browser
+        # (nur die Tab-Titel werden gelesen), damit die Prüfung nicht kreist.
         lauf = browser.starte_browser(
-            fund, profil, cache, start_url=f"{basis}/@{einst.konto}", headless=einst.headless,
-            zusatz_argumente=einst.browser_argumente,
+            fund, profil, cache, start_url=f"{basis}/api/v1/accounts/lookup?{urlencode({'acct': einst.konto})}",
+            headless=einst.headless, zusatz_argumente=einst.browser_argumente,
         )
         weg["anfragen"] += 1
         weg["browser_version"] = lauf.version
+        weg["hinweis_anfragen"] = (
+            "Nicht mitgezählt: was der Browser selbst holt (z. B. /favicon.ico) und Anfragen während einer "
+            "Cloudflare-Prüfung vor dem Anhängen."
+        )
         freigabe = browser.warte_auf_freigabe(
             lauf, host, timeout_s=einst.warte_challenge_s, melden=lambda text: print(text, flush=True)
         )
@@ -510,6 +672,11 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
             "sperrseite": freigabe.sperrseite,
             "wartezeit_s": round(freigabe.wartezeit_s, 1),
         }
+        if freigabe.browser_beendet:
+            weg["challenge"]["browser_beendet"] = True
+            weg["ergebnis"] = "browser_geschlossen"
+            weg["fehler"] = "Das Browserfenster wurde geschlossen, bevor der Spike fertig war."
+            return
         if not freigabe.geloest and not freigabe.sperrseite:
             raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, None), "startseite")
         from playwright.sync_api import sync_playwright
@@ -527,24 +694,23 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
                 weg["cache_deaktiviert"] = True
             except Exception:  # noqa: BLE001
                 weg["cache_deaktiviert"] = False
-
-            def sperre_medien(route) -> None:
-                anfrage = route.request
-                ziel = urlparse(anfrage.url).hostname or ""
-                if anfrage.resource_type in ("image", "media") and "cloudflare" not in ziel:
-                    route.abort()
-                else:
-                    route.continue_()
-
-            seite.route("**/*", sperre_medien)
+            # Zählen und Sperren am Kontext, nicht am Tab: gilt auch für weitere Tabs der Web-App.
+            kontext.on("request", zaehler.anfrage)
+            kontext.route("**/*", zaehler.route)
             try:
-                _weg_b_ablauf(einst, bericht, weg, seite)
+                _weg_b_ablauf(einst, bericht, weg, seite, zaehler)
             finally:
                 try:
-                    seite.unroute("**/*")
+                    # Web-App anhalten, solange die Sperre noch greift; about:blank fragt nichts an.
+                    seite.goto("about:blank", timeout=10_000)
                 except Exception:  # noqa: BLE001
                     pass
-                browser.beende_browser(lauf, pw_browser)
+                try:
+                    kontext.unroute("**/*")
+                    kontext.remove_listener("request", zaehler.anfrage)
+                except Exception:  # noqa: BLE001
+                    pass
+                beendet = _beende_browser(lauf, pw_browser, bericht)
     except browser.BrowserFehler as fehler:
         weg["ergebnis"] = "browser_start_fehlgeschlagen"
         weg["fehler"] = str(fehler)
@@ -552,8 +718,11 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
         weg["ergebnis"] = "abgebrochen"
         weg["abbruch"] = {"schritt": abbruch.schritt, "art": abbruch.bewertung.art, "meldung": cloudflare.melde(abbruch.bewertung)}
     finally:
-        if lauf is not None and (lauf.prozess.poll() is None or (lauf.browser_pid and browser._pid_lebt(lauf.browser_pid))):
-            browser.beende_browser(lauf, None, timeout_s=5)
+        # Profil und Cache werden immer aufgeräumt, auch wenn sich der Browser nicht beenden ließ.
+        if lauf is not None:
+            if not beendet:
+                _beende_browser(lauf, None, bericht, timeout_s=5)
+            zaehler.eintragen(weg)
         nachher = browser.raeume_profil_auf(profil)
         cache_weg = browser.raeume_cache_ordner_auf(cache)
         bericht.aufraeumen["browser_profil"] = nachher.als_dict()
@@ -561,17 +730,28 @@ def weg_b(einst: Einstellungen, bericht: Bericht) -> None:
         weg["dauer_s"] = round(time.monotonic() - start, 1)
 
 
-def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], seite) -> None:
+def _abbruch_im_kopf(antwort) -> bool:
+    """429, Challenge (``cf-mitigated``) oder Sperrstatus, schon ohne den Körper erkennbar."""
+    return cloudflare.bewerte(antwort.status, antwort.headers, None).abbruch
+
+
+def _weg_b_ablauf(
+    einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], seite, zaehler: BrowserZaehler
+) -> None:
     basis = einst.basis_url.rstrip("/")
+    profil_url = f"{basis}/@{einst.konto}"
+    pause = Pausierer(einst.pause_min, einst.pause_max)
+    pause()  # die Startseite war die erste Anfrage dieses Wegs
     mitgeschnitten: list = []
 
     def merke(antwort) -> None:
         if urlparse(antwort.url).path.startswith("/api/"):
             mitgeschnitten.append(antwort)
 
+    # Startseite (Konto-Abfrage). Maßgeblich ist der HTTP-Status des Dokuments, nie Text aus Posts.
     sperre = seite_zeigt_sperre(seite)
     if sperre:
-        raise Abbruch(cloudflare.Bewertung(sperre, None), "profilseite")
+        raise Abbruch(cloudflare.Bewertung(sperre, None), "startseite")
     if seite_zeigt_challenge(seite):
         # Ältere Captcha-Variante unter "Attention Required": angehängt weiter auf den Menschen warten.
         print("\n>>> Cloudflare-Prüfung im Browserfenster. Bitte dort lösen.\n", flush=True)
@@ -579,27 +759,43 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         while time.monotonic() < ende and seite_zeigt_challenge(seite):
             seite.wait_for_timeout(2000)
         if seite_zeigt_challenge(seite):
-            raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, None), "profilseite")
+            raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, None), "startseite")
         weg["challenge"]["geloest"] = True
 
-    # b1: Profilseite neu laden, diesmal mit Mitschnitt der API-Antworten der Web-App.
+    # b1: erst jetzt (Cache aus, Bilder und Videos gesperrt) die Profilseite öffnen und mitschneiden,
+    # welche API-Antworten die Web-App lädt.
+    pause()
     seite.on("response", merke)
     t0 = time.monotonic()
     weg["anfragen"] += 1
+    zaehler.eigener_abruf(profil_url)
+    hauptantwort = None
     try:
-        hauptantwort = seite.reload(wait_until="domcontentloaded", timeout=60_000)
-        weg["profilseite_status"] = hauptantwort.status if hauptantwort else None
-        if hauptantwort is not None:
-            weg["profilseite_kopfzeilen"] = kopf_auszug(hauptantwort.headers)
+        hauptantwort = seite.goto(profil_url, wait_until="domcontentloaded", timeout=60_000)
     except Exception as fehler:  # noqa: BLE001
         weg["profilseite_fehler"] = type(fehler).__name__
-    sperre = seite_zeigt_sperre(seite)
-    if sperre:
-        raise Abbruch(cloudflare.Bewertung(sperre, weg.get("profilseite_status")), "profilseite")
+    status = hauptantwort.status if hauptantwort is not None else None
+    weg["profilseite_status"] = status
+    challenge = False
+    if hauptantwort is not None:
+        weg["profilseite_kopfzeilen"] = kopf_auszug(hauptantwort.headers)
+        challenge = cloudflare.bewerte(status, hauptantwort.headers, None).art == cloudflare.CHALLENGE
+    if not challenge:
+        sperre = seite_zeigt_sperre(seite, status=status)
+        if sperre:
+            raise Abbruch(cloudflare.Bewertung(sperre, status), "profilseite")
+        challenge = seite_zeigt_challenge(seite)
+    if challenge:
+        # Eine neue Prüfung kreist mit angehängtem Playwright; Warten hilft hier nicht. Abbrechen, bevor
+        # eine eigene Anfrage folgt (SPEC Zugriff 3).
+        weg["challenge"]["profilseite"] = True
+        raise Abbruch(cloudflare.Bewertung(cloudflare.CHALLENGE, status), "profilseite")
 
-    # Warten, bis die Web-App ihre Timeline geladen hat.
+    # Warten, bis die Web-App ihre Timeline geladen hat; bei 429, Challenge oder Sperre nicht weiter warten.
     ende = time.monotonic() + einst.warte_webapp_s
     while time.monotonic() < ende:
+        if any(_abbruch_im_kopf(a) for a in mitgeschnitten):
+            break
         if any(STATUSES_PFAD.match(urlparse(a.url).path) for a in mitgeschnitten):
             seite.wait_for_timeout(2000)  # Nachzügler (gepinnte Posts, Konto) mitnehmen
             break
@@ -612,6 +808,7 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         weg["html_time_elemente"] = None
 
     endpunkte: dict[str, dict[str, Any]] = {}
+    erste_sperre: cloudflare.Bewertung | None = None
     for antwort in list(mitgeschnitten):
         vorlage = pfad_vorlage(antwort.url)
         try:
@@ -619,6 +816,8 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         except Exception:  # noqa: BLE001 - nach einer Navigation sind ältere Körper weg
             koerper = None
         bew = cloudflare.bewerte(antwort.status, antwort.headers, koerper)
+        if bew.abbruch and erste_sperre is None:
+            erste_sperre = bew
         eintrag = endpunkte.setdefault(vorlage, {"aufrufe": 0, "status": {}, "arten": {}})
         eintrag["aufrufe"] += 1
         eintrag["status"][str(antwort.status)] = eintrag["status"].get(str(antwort.status), 0) + 1
@@ -635,10 +834,11 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
     passiv_ok = any(STATUSES_PFAD.match(urlparse(a.url).path) and 200 <= a.status < 300 for a in mitgeschnitten)
     weg["b1_passiv"] = "funktioniert" if passiv_ok else "keine_timeline_antwort"
     mitgeschnitten.clear()
+    if erste_sperre is not None:
+        # Die Web-App bekam 429, eine Challenge oder eine Sperre: keine eigene Anfrage mehr (SPEC Zugriff 3).
+        raise Abbruch(erste_sperre, "profilseite_webapp")
 
     # b2: dieselbe API aus der Seite heraus aufrufen (Cookies und Netzwerkstapel des Browsers).
-    pause = Pausierer(einst.pause_min, einst.pause_max)
-    pause()  # erster Aufruf ohne Pause ...
     schritte: list[dict[str, Any]] = []
     weg["b2_schritte"] = schritte
 
@@ -649,6 +849,7 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
         letzte_kopfzeilen.clear()
         t1 = time.monotonic()
         weg["anfragen"] += 1
+        zaehler.eigener_abruf(basis + pfad)
         try:
             roh = seite.evaluate(FETCH_JS, basis + pfad)
         except Exception as fehler:  # noqa: BLE001
@@ -670,7 +871,6 @@ def _weg_b_ablauf(einst: Einstellungen, bericht: Bericht, weg: dict[str, Any], s
             raise Abbruch(bewertung, schritt)
         return bewertung
 
-    pause()  # ... aber vor dem ersten eigenen Aufruf nach dem Seitenaufbau doch eine Pause
     bew = hole("konto_lookup", f"/api/v1/accounts/lookup?{urlencode({'acct': einst.konto})}")
     if not bew.ok or not isinstance(bew.daten, dict) or "id" not in bew.daten:
         weg["b2_fetch"] = "lookup_fehlgeschlagen"
@@ -740,7 +940,21 @@ def ziehe_fazit(bericht: Bericht) -> dict[str, Any]:
         fazit["begruendung"] = "Nur das Mitschneiden der Web-App-Antworten funktioniert."
     else:
         fazit["empfehlung"] = "keiner"
-        fazit["begruendung"] = "Kein Weg hat Timeline-Daten geliefert. Siehe Abbruchgründe."
+        limitiert = [k for k, w in (("a", a), ("b", b)) if (w.get("abbruch") or {}).get("art") == cloudflare.RATELIMIT]
+        if b.get("ergebnis") == "uebersprungen_ratelimit":
+            fazit["begruendung"] = (
+                "Kein Weg hat Timeline-Daten geliefert. Weg a wurde vom Rate-Limit gestoppt: "
+                f"{(a.get('abbruch') or {}).get('meldung', 'HTTP 429.')} Weg b wurde deshalb nicht gestartet "
+                "(SPEC Zugriff 3: nicht weiter anfragen). Nach mindestens 15 Minuten Pause Weg b einzeln "
+                "prüfen: run_spike.bat --nur b"
+            )
+        elif limitiert:
+            fazit["begruendung"] = (
+                f"Kein Weg hat Timeline-Daten geliefert. Rate-Limit (HTTP 429) bei Weg {' und '.join(limitiert)}. "
+                "Nach mindestens 15 Minuten Pause erneut prüfen."
+            )
+        else:
+            fazit["begruendung"] = "Kein Weg hat Timeline-Daten geliefert. Siehe Abbruchgründe."
     pfade_status = bericht.kataloge.get("status")
     if pfade_status:
         p = pfade_status.pfade()
@@ -771,6 +985,8 @@ def als_markdown(daten: dict[str, Any]) -> str:
     z.append(f"- Weg b (Browser): **{f.get('weg_b')}**")
     z.append(f"- Empfehlung: **{f.get('empfehlung')}** – {f.get('begruendung')}")
     z.append(f"- Dauer gesamt: {daten['dauer_s']} s")
+    if "anfragen_gesamt" in f:
+        z.append(f"- Anfragen an Truth Social gesamt: {f['anfragen_gesamt']}")
     z.append("")
     z.append("## Umgebung")
     z.append("")
@@ -780,11 +996,21 @@ def als_markdown(daten: dict[str, Any]) -> str:
     for kennung, weg in daten["wege"].items():
         z.append(f"## Weg {kennung}: {weg.get('name', '')}")
         z.append("")
-        z.append(f"- Ergebnis: **{weg.get('ergebnis')}**, eigene Anfragen: {weg.get('anfragen')}, Dauer: {weg.get('dauer_s')} s")
+        z.append(
+            f"- Ergebnis: **{weg.get('ergebnis')}**, Anfragen an Truth Social: {weg.get('anfragen')}, "
+            f"Dauer: {weg.get('dauer_s')} s"
+        )
+        if "webapp_anfragen" in weg:
+            webapp = weg["webapp_anfragen"]
+            z.append(
+                f"- Davon eigene: {weg.get('eigene_anfragen')}, von der Web-App: {webapp.get('api')} API und "
+                f"{webapp.get('sonstige')} sonstige; an andere Hosts: {webapp.get('andere_hosts')}; "
+                f"gesperrte Bild- und Videoabrufe (nicht gesendet): {weg.get('medien_gesperrt')}"
+            )
         if "abbruch" in weg:
             z.append(f"- Abbruch bei `{weg['abbruch']['schritt']}`: {weg['abbruch']['meldung']}")
-        for schluessel in ("client_matrix", "impersonate_gewaehlt", "browser", "browser_version", "challenge",
-                           "profilseite_status", "b1_passiv", "b2_fetch",
+        for schluessel in ("grund", "hinweis_anfragen", "client_matrix", "impersonate_gewaehlt", "browser",
+                           "browser_version", "challenge", "profilseite_status", "b1_passiv", "b2_fetch",
                            "html_time_elemente", "lookup_art", "posts_gesamt", "gepinnt", "einzelpost",
                            "probe_mit_replies", "nicht_gefunden_probe", "b2_nicht_gefunden_probe", "medien_vorschau",
                            "fehler"):
@@ -835,7 +1061,13 @@ def als_markdown(daten: dict[str, Any]) -> str:
     if daten.get("aufraeumen"):
         z.append("## Aufräumen")
         z.append("")
-        z.append(f"`{json.dumps(daten['aufraeumen'], ensure_ascii=False)}`")
+        # Eine Zeile je Wert: Dateinamen aus dem Browserprofil sollen in der Inhaltsprüfung (pruefung.py)
+        # nicht zusammen als langer Freitext erscheinen.
+        for name, wert in daten["aufraeumen"].items():
+            for unter, w in (wert.items() if isinstance(wert, dict) else [(None, wert)]):
+                schluessel = f"{name}.{unter}" if unter else name
+                for einzeln in (w if isinstance(w, list) and w else [w]):
+                    z.append(f"- {schluessel}: `{json.dumps(einzeln, ensure_ascii=False)}`")
         z.append("")
     return "\n".join(z)
 
@@ -861,7 +1093,38 @@ def umgebung() -> dict[str, Any]:
     }
 
 
-def fuehre_aus(einst: Einstellungen) -> dict[str, Any]:
+def fuehre_aus(einst: Einstellungen) -> dict[str, Any] | None:
+    """Prüft die Wege und schreibt den Bericht. ``None``: Ein anderer Lauf hält die Laufsperre.
+
+    Alles, was den Temp-Ordner, das Browserprofil oder das Netz berührt, läuft unter der Sperre.
+    """
+    with laufsperre.gehalten() as frei:
+        if not frei:
+            print(laufsperre.MELDUNG_BELEGT, flush=True)
+            return None
+        return _fuehre_aus(einst)
+
+
+def _weg_b_nach_ratelimit_uebersprungen(bericht: Bericht) -> bool:
+    """Hat Weg a ein 429 bekommen, fragt der Spike nichts mehr an (SPEC Zugriff 3)."""
+    a = bericht.wege.get("a") or {}
+    if (a.get("abbruch") or {}).get("art") != cloudflare.RATELIMIT:
+        return False
+    bericht.wege["b"] = {
+        "name": WEG_B_NAME,
+        "anfragen": 0,
+        "ergebnis": "uebersprungen_ratelimit",
+        "grund": "Weg a bekam HTTP 429; SPEC Zugriff 3: nicht weiter anfragen. Später mit --nur b prüfen.",
+    }
+    print(
+        "Weg b: übersprungen, weil Weg a ein Rate-Limit bekam (HTTP 429); der Spike fragt nichts mehr an. "
+        "Weg b nach mindestens 15 Minuten Pause einzeln prüfen: run_spike.bat --nur b",
+        flush=True,
+    )
+    return True
+
+
+def _fuehre_aus(einst: Einstellungen) -> dict[str, Any]:
     reste = temp.raeume_temp_auf()
     start = jetzt_utc()
     t0 = time.monotonic()
@@ -886,8 +1149,11 @@ def fuehre_aus(einst: Einstellungen) -> dict[str, Any]:
             print("Weg a: JSON-API per curl_cffi ...", flush=True)
             weg_a(einst, bericht)
             print(f"  -> {bericht.wege['a']['ergebnis']}", flush=True)
-        if "b" in einst.wege:
+        if "b" in einst.wege and not _weg_b_nach_ratelimit_uebersprungen(bericht):
             print("Weg b: echter Browser ...", flush=True)
+            if bericht.wege.get("a", {}).get("anfragen") and einst.pause_max > 0:
+                # Auch zwischen den Wegen eine Pause: Der Browser fragt als Erstes wieder die API an.
+                time.sleep(random.uniform(einst.pause_min, einst.pause_max))
             weg_b(einst, bericht)
             print(f"  -> {bericht.wege['b']['ergebnis']}", flush=True)
     except KeyboardInterrupt:
@@ -898,8 +1164,8 @@ def fuehre_aus(einst: Einstellungen) -> dict[str, Any]:
         bericht.dauer_s = time.monotonic() - t0
         bericht.fazit.update(ziehe_fazit(bericht))
         if "a" in bericht.wege or "b" in bericht.wege:
-            anfragen = sum(w.get("anfragen", 0) for w in bericht.wege.values())
-            bericht.fazit["eigene_anfragen_gesamt"] = anfragen
+            # Eigene Anfragen plus die der Web-App in Weg b (getrennt ausgewiesen im Weg).
+            bericht.fazit["anfragen_gesamt"] = sum(w.get("anfragen", 0) for w in bericht.wege.values())
         daten = bericht.als_dict()
         schreibe(daten, einst.ausgabe)
     return daten
@@ -951,6 +1217,8 @@ def main(argv: list[str] | None = None) -> int:
         ausgabe=args.ausgabe,
     )
     daten = fuehre_aus(einst)
+    if daten is None:
+        return CODE_LAUFSPERRE
     fazit = daten["fazit"]
     print(f"\nEmpfehlung: {fazit.get('empfehlung')} – {fazit.get('begruendung')}")
     return 0 if fazit.get("empfehlung") != "keiner" else 2

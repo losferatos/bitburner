@@ -101,25 +101,53 @@ Truth-Social-Eigenheiten, die der Crawler berücksichtigt:
 
 ## Wie der Spike misst
 
-`run_spike.bat` (Modul `truthtracker.spike`) prüft:
+`run_spike.bat` (Modul `truthtracker.spike`) hält dieselbe Laufsperre wie der Crawler: Läuft
+schon ein Crawl oder Spike, meldet er das, fragt nichts an, fasst Temp-Ordner und Profil nicht an,
+schreibt keinen Bericht und endet mit Exit-Code 3. Er prüft:
 
-* **Weg a:** Lookup, 5 Timeline-Seiten (`exclude_replies=true&with_muted=true&limit=40`), gepinnte
-  Posts, ein Einzelabruf, eine Probe mit `exclude_replies=false`, eine „nicht gefunden“-Probe mit
-  einer ID von 2020 (vor dem Start von Truth Social, kann nicht existieren) und ein Vorschaubild.
-  Das sind 11 Anfragen mit 2–6 s Pause.
-* **Weg b:** Opera (sonst Chrome, sonst Edge) mit eigenem Profil `laufzeit/browser-profil`,
-  sichtbar. b1: Profilseite öffnen und mitschneiden, welche API-Pfade die Web-App lädt.
-  b2: Lookup, 2 Timeline-Seiten und die „nicht gefunden“-Probe per `fetch` aus der Seite.
-  Bilder und Videos werden im Browser blockiert, der Cache ist abgeschaltet, nach dem Lauf bleiben
-  im Profil nur Cookies und Einstellungen.
+* **Weg a (höchstens 15 Anfragen):** Client-Matrix mit 4 Lookups (urllib, curl_cffi
+  chrome/safari/firefox), dann Lookup, bis zu 5 Timeline-Seiten
+  (`exclude_replies=true&with_muted=true&limit=40`), gepinnte Posts, ein Einzelabruf, eine Probe mit
+  `exclude_replies=false` und eine „nicht gefunden“-Probe mit einer ID von 2020 (vor dem Start von
+  Truth Social, kann nicht existieren). Zuletzt ein Bild, aber nur, wenn die Stichprobe eines hat,
+  das der Crawler laden würde: genau die Adresse, die er hasht, nie eine Videodatei; Status,
+  `Content-Type` und Größe werden vor dem Lesen geprüft. 14 Pausen von 10–15 s.
+* Zwischen Weg a und Weg b: eine Pause von 10–15 s.
+* **Weg b (6 eigene Anfragen):** Opera (sonst Chrome, sonst Edge) mit eigenem Profil
+  `laufzeit/browser-profil`, sichtbar. Startseite ist wie beim Crawler die Konto-Abfrage (JSON);
+  während einer Cloudflare-Prüfung hängt sich nichts an. Erst danach verbindet sich Playwright,
+  schaltet den Cache ab und sperrt Bilder und Videos für den ganzen Browser. b1: Profilseite öffnen
+  und mitschneiden, welche API-Pfade die Web-App lädt. b2: Lookup, 2 Timeline-Seiten und die
+  „nicht gefunden“-Probe per `fetch` aus der Seite. 5 Pausen von 10–15 s. Nach dem Lauf bleiben im
+  Profil nur Cookies und Einstellungen, auch wenn das Beenden des Browsers scheitert.
+* **Anfragen ehrlich gezählt:** Die eigenen Anfragen der Web-App an Truth Social zählen mit und
+  stehen im Bericht getrennt (`webapp_anfragen`: API, sonstige, andere Hosts); gesperrte Medien
+  stehen unter `medien_gesperrt` und gehen nie raus. Nicht zählbar sind `/favicon.ico` und Anfragen
+  während einer Prüfung vor dem Anhängen (`hinweis_anfragen`). Insgesamt höchstens 21 eigene
+  Anfragen plus die der Web-App, 20 Pausen (200–300 s).
+* **429 und Prüfungen:** Ein 429 in Weg a beendet ihn sofort, Weg b startet dann nicht
+  (`uebersprungen_ratelimit`); frühestens 15 Minuten später mit `run_spike.bat --nur b` nachholen.
+  Bekommt die Web-App in b1 ein 429, eine Prüfung oder eine Sperre, oder zeigt die Profilseite
+  selbst eine Prüfung, endet Weg b dort (`profilseite_webapp` bzw. `profilseite`), bevor eine eigene
+  Anfrage folgt. Sperrseiten erkennt der Spike am HTTP-Status, nicht am Seitentext; Post-Texte mit
+  „you have been blocked“ lösen nichts aus.
+* **Dauer:** etwa 4–6 Minuten ohne Prüfung, dazu die Zeit zum Lösen einer Prüfung (höchstens
+  5 Minuten). `--nur a` etwa 2,5–4 Minuten, `--nur b` etwa 1–2 Minuten.
 * Bericht: Statuscodes, ausgewählte Kopfzeilen (Rate-Limit, Cloudflare-Merkmale, nur
   Cookie-*Namen*), Feldkatalog (Pfade, Typen, Häufigkeiten), Seitengrößen, Ordnung, gepinnte
-  Positionen, Zeitspannen. Keine Inhalte.
+  Positionen, Zeitspannen, Anfragezahlen (`anfragen_gesamt`). Keine Inhalte.
 
 ## Messung auf dem Heim-PC
 
-Noch nicht durchgeführt. Nach `run_spike.bat` hier eintragen:
+**Status: ausstehend.** Der Spike und der erste echte Lauf können nur auf deinem Rechner laufen; aus
+der Entwicklungsumgebung war truthsocial.com gesperrt (siehe oben). Bis zu dieser Messung gilt der
+Tracker als **nicht abgenommen**: Die Definition of Done verlangt einen erfolgreichen echten Lauf mit
+dokumentierter Anzahl Requests und Dauer.
 
-* Datum, Ergebnis Weg a / Weg b, Anzahl Anfragen, Dauer (aus dem Bericht).
+Was hier nach `run_spike.bat` und `run_crawl.bat` hineingehört (alles steht im Spike-Bericht unter
+`docs/zugriff-messungen/` bzw. im Reiter „Läufe“ des Dashboards):
+
+* Datum, Ergebnis Weg a / Weg b, Empfehlung des Spikes, Anzahl Anfragen, Dauer.
 * Ob `exclude_replies=false` ohne Login ging (`probe_mit_replies`).
-* Abweichungen im Feldkatalog gegenüber der Liste oben.
+* Abweichungen im Feldkatalog gegenüber der Liste oben (dann den Crawler anpassen).
+* Erster Crawl: Status, Anfragen (API und Medien), Dauer, neue Posts, Zugriffsweg.

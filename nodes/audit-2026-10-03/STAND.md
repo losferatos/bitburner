@@ -67,6 +67,7 @@ gilt fuer alle V2 und wird jetzt geprueft.
 
 ## Offen ausserhalb des Audits
 
-- Spiel-Tab friert nach dem Laden nach ~1 min ein (10:33 und 17:17; danach
-  "Socket antwortet nicht mehr auf Ping"). Eric gefragt: "Seite reagiert
-  nicht" (Skript haengt) oder Browser friert Hintergrund-Tab? Antwort steht aus.
+- ERLEDIGT 03.10. 18:43: Tab-Einfrieren war eine Endlosschleife in
+  blade.js maennerNoetig (0d1bf69, ERLEDIGT.md). Bot laeuft wieder, Autosave
+  frisch. Lehre fuer den Bau: jede Schleife mit harter Obergrenze, Tests mit
+  Zeitlimit und Extremwerten.

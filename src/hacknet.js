@@ -1,3 +1,5 @@
+import { hacknetNachEinbau } from "lib/hackaugs.js";
+
 /**
  * Hacknet-Server-Ausbau und Wirt fuer exit.js - der grosse Teil des
  * BitNode-9-Gewerks. Der Verkauf der Hashes steckt bewusst NICHT hier,
@@ -19,6 +21,13 @@
  *
  * Ohne Hacknet-Server (hashCapacity 0) wartet es fuenf Minuten je Runde.
  * Alle Hacknet-Aufrufe kosten 0,5 GB, kein Singularity.
+ *
+ * "NUR BN9" IST EIN PRAEDIKAT, KEINE ZAHL (03.10.2026, Audit G02): ob nach einem
+ * Einbau noch Hacknet-Server gekauft werden, entscheidet `hacknetNachEinbau`
+ * aus lib/hackaugs.js - dieselbe Funktion, nach der bn4rep.js die
+ * Hacknet-Augmentierungen kauft. Bedingungen an zwei Stellen, die
+ * auseinanderlaufen, kaufen Stuecke fuer Server, die niemand baut. Die Lib
+ * liegt auf jeder Werkbank (bn4net.js BIBLIOTHEKEN), kostet keinen RAM.
  *
  * @param {NS} ns
  */
@@ -83,7 +92,7 @@ export async function main(ns) {
         // Knotenwechsel an). Im Server-Modus (maxNumNodes 20) den ersten
         // ohne Prozentregel kaufen - 50.000 $, und er ist in BitNode 9 die
         // einzige Einnahme. NUR DORT: anderswo ist er wertlos (s.o.).
-        if (serverModus && knoten === 9 && ns.hacknet.numNodes() === 0) {
+        if (serverModus && hacknetNachEinbau(knoten) && ns.hacknet.numNodes() === 0) {
           const preis = ns.hacknet.getPurchaseNodeCost();
           if (preis > 0 && preis <= ns.getServerMoneyAvailable("home")) {
             if (ns.hacknet.purchaseNode() >= 0) { sag("Ersten Hacknet-Server gekauft fuer " + (preis / 1e6).toFixed(2) + "m."); continue; }
@@ -91,7 +100,7 @@ export async function main(ns) {
           if (letzteMeldung !== "erster") { sag("Kein Hacknet-Server - der erste kostet " + (preis / 1e6).toFixed(2) + "m, warte auf Geld."); letzteMeldung = "erster"; }
           await ns.sleep(TAKT_MS); continue;
         }
-        if (knoten !== 9) {
+        if (!hacknetNachEinbau(knoten)) {
           // AUSSERHALB BN9 OHNE KAPAZITAET HEISST: KEIN SF9.3-GRATIS-SERVER
           // (MEHR) DA (26.09.2026, Audit-Fund 5#6, C3-Nachtrag).
           //
@@ -151,7 +160,7 @@ export async function main(ns) {
       //    anderswo bringt Hacking das Tausendfache, und die Stufen zahlen
       //    sich nie zurueck (Level 101 = 6,9 Mrd fuer 700 $/s).
       //    `knoten` kommt schon von oben (Audit-Fund 5#6/C3).
-      if (knoten !== 9) { await ns.sleep(TAKT_MS); continue; }
+      if (!hacknetNachEinbau(knoten)) { await ns.sleep(TAKT_MS); continue; }
       let gekauft = "";
       // 2a. CACHE FUER DEN RANGTAUSCH (23.09.2026). hashes.js tauscht Hashes
       // in Bladeburner-Rang; Stufe L kostet 250*(L+1) Hashes, und der Kauf

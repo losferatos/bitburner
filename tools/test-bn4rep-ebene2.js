@@ -75,6 +75,9 @@ function baueWelt(o) {
     uhr: 1_790_442_188_000,
     start: 1_790_442_188_000,
     knoten: o.knoten ?? 5,
+    // Zusammenfuehrung P0+P1: eine Map, egal ob die Szenarien Paare (P0) oder eine
+    // Map-Unterklasse (P1, SfWirft) liefern - die Unterklasse muss unkopiert bleiben.
+    ownedSF: o.ownedSF instanceof Map ? o.ownedSF : new Map(o.ownedSF ?? [[4, 3], [5, 1]]),
     moneyMult: o.moneyMult ?? 2,
     geld: o.geld,
     einkommen: o.einkommen ?? 0,
@@ -102,9 +105,19 @@ function baueWelt(o) {
     // H2/Skeptiker-Fund 5: Namen, deren purchaseAugmentation() trotz
     // erfuellter Vorbedingungen mit false antwortet (Testhaken, s.o.).
     kaufSperre: o.kaufSperre ? new Set(o.kaufSperre) : null,
+    markeWirft: !!o.markeWirft,
     spenden: [],
     setFocus: [],
     installAufrufe: 0,
+    // P1 / AUG-4 (03.10.2026): die Gang. `da` = ns.gang.inGang(), `bonusMs` =
+    // ns.gang.getBonusTime() (Zahl oder Funktion der Welt), `wirftInGang` /
+    // `wirftBonus` lassen den jeweiligen Aufruf werfen. Ohne Angabe: keine Gang
+    // - dann kennt bn4rep sie nur, wenn der Knoten ein Kampfknoten MIT
+    // Verfahrensmarke V2 ist (nurKampfStuecke).
+    gang: { da: false, bonusMs: 0, wirftInGang: false, wirftBonus: false, ...(o.gang || {}) },
+    gangAufrufe: { inGang: 0, getBonusTime: 0 },
+    // Preisfaktor je wartendem Stueck: 1,9; mit SF11 kleiner (AugmentationHelpers.ts:28-30).
+    priceStep: o.priceStep ?? 1.9,
   };
   if (!w.dateien[w.host]) w.dateien[w.host] = {};
   return w;
@@ -114,7 +127,7 @@ function baueWelt(o) {
 function preis(w, aug) {
   const a = w.augs[aug];
   if (!a) throw new Error("Nachbau: unbekannte Augmentierung " + aug);
-  return a.basis * w.moneyMult * Math.pow(1.9, w.warteschlange.length);
+  return a.basis * w.moneyMult * Math.pow(w.priceStep, w.warteschlange.length);
 }
 
 function baueNs(w) {
@@ -133,7 +146,12 @@ function baueNs(w) {
       d[f] = mode === "w" ? String(data) : (d[f] || "") + String(data);
     },
     read: (f) => dateiHost(w.host)[f] ?? "",
-    fileExists: (f, h = w.host) => f in dateiHost(h),
+    fileExists: (f, h = w.host) => {
+      // Testhaken (P0/GANG-2): die Lesung der V1-Marke wirft - der Zaehler
+      // v1LeseFehler muss steigen und The Red Pill gesperrt bleiben.
+      if (w.markeWirft && f === "data/verfahren.txt") throw new Error("Lesefehler (Testhaken)");
+      return f in dateiHost(h);
+    },
     rm: (f, h = w.host) => { const d = dateiHost(h); const da = f in d; delete d[f]; return da; },
     // scp(dateien, ziel, quelle): wie NetscriptFunctions.ts scp - kopiert,
     // was auf der Quelle liegt; false, wenn eine Datei fehlt.
@@ -152,8 +170,11 @@ function baueNs(w) {
       if (w.beiSchlaf) w.beiSchlaf(w);
       if (w.schlaf.length > w.schlafBudget) throw new Error(STOP);
     },
+    // ownedSF je Welt einstellbar (P0/G02): die alte Regel `mitHashes` las hier
+    // SF9 mit, die neue fragt nur noch den Knoten - ein Test, der SF9 nie
+    // setzt, koennte den Unterschied nicht zeigen.
     getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: 1, lastAugReset: 2,
-      ownedSF: new Map([[4, 3], [5, 1]]) }),
+      ownedSF: w.ownedSF }),
     getPlayer: () => ({
       factions: Object.keys(w.faktionen), skills: { ...w.skills }, mults: { ...w.mults },
       jobs: {}, totalPlaytime: w.playtime, money: w.geld, city: "Sector-12",
@@ -229,9 +250,28 @@ function baueNs(w) {
       getCompanyFavor: () => 0,
       applyToCompany: () => "",
       workForCompany: () => false,
-      getAugmentationStats: () => ({}),
+      // P0 (GANG-2): der Kampfknoten-Einbau verlangt ein wartendes Stueck, das
+      // den Wiederaufbau verkuerzt (WIEDERAUFBAU_MULTS) - ohne Werte hier
+      // bliebe jeder V2-Einbau im Test an `wiederaufbauHilfe` haengen.
+      // `augs[a].stats` (optional) = die Faktoren der Aug; ohne Angabe {} wie bisher.
+      getAugmentationStats: (a) => ({ ...((w.augs[a] && w.augs[a].stats) || {}) }),
     },
     bladeburner: { inBladeburner: () => w.imBladeburner },
+    // Singularity-fremder Namensraum, 0 GB je Aufruf (RamCostGenerator.ts:274-301):
+    // NetscriptFunctions/Gang.ts:53-55 inGang, :340-343 getBonusTime (wirft ohne Gang).
+    gang: {
+      inGang: () => {
+        w.gangAufrufe.inGang++;
+        if (w.gang.wirftInGang) throw new Error("Nachbau: ns.gang.inGang geworfen");
+        return !!w.gang.da;
+      },
+      getBonusTime: () => {
+        w.gangAufrufe.getBonusTime++;
+        if (w.gang.wirftBonus) throw new Error("Nachbau: ns.gang.getBonusTime geworfen");
+        if (!w.gang.da) throw new Error("Must have joined gang");
+        return typeof w.gang.bonusMs === "function" ? w.gang.bonusMs(w) : w.gang.bonusMs;
+      },
+    },
   };
   return new Proxy(ns, { get: (z, n) => (n in z ? z[n] : unbekannt(String(n))) });
 }
@@ -792,6 +832,918 @@ console.log("\n-- H2/Skeptiker-Fund 5: Kauf-Ruecklauf, wenn das billigste Stueck
     r.log.includes("Daedalus-Fuellstueck: Teurer"), r.log.slice(0, 400));
   pruefe("der Einbau selbst lief (installAugmentations, Ende return)",
     w.installAufrufe === 1 && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
+}
+
+// ===========================================================================
+// P1 / AUG-4 (03.10.2026): KAMPFKNOTEN MIT GANG - KAUFAUFSCHUB UND TORRUNDE
+// (nodes/audit-2026-10-03/verify-g01-betrieb.md PAKET 1; S4-S6 sind die dort
+// vorgegebenen Szenarien, S7-S13 die Fehlermodi, die der Bau dazu gefunden hat)
+// ===========================================================================
+//
+// Die Welt: BN2.2, V2-Marke, Slum Snakes als Gang-Faktion mit 1,5 Mio Ruf, dazu
+// die Bladeburners mit einem verdienten Stueck, 60 Mrd auf dem Konto, zwoelf
+// Augs installiert. Namen, Ruf und Preise der Gang-Augs aus
+// tools/audit/gang-augs.json (Augmentations.ts), die Faktoren aus COMBAT_AUGS.
+const { COMBAT_AUGS } = await import(pathToFileURL(path.join(ROOT, "src", "lib", "hackaugs.js")).href);
+const BO_JSON = (() => {
+  try { return fs.readFileSync(path.join(SRC, "lib", "blackops.json"), "utf8"); } catch { return ""; }
+})();
+const PLAYTIME_NOW = 100 * 3600000;   // baueWelt: playtime
+const AUGS_GANG = {
+  // Nur Erfahrungsfaktoren: kein Zuwachs der Competence, aber combatNutzen > 0 -
+  // die alte Schleife kauft sie sofort, die Torrunde nie.
+  "Neurotrainer I": { repReq: 1000, basis: 4e6 },
+  "Wired Reflexes": { repReq: 1250, basis: 2.5e6 },
+  "Combat Rib I": { repReq: 7500, basis: 23.75e6 },
+  "Bionic Spine": { repReq: 45000, basis: 125e6 },
+  "Bionic Arms": { repReq: 62500, basis: 275e6 },
+  "Graphene Bionic Arms Upgrade": { repReq: 500000, basis: 3.75e9, prereq: ["Bionic Arms"] },
+  "Neotra": { repReq: 562500, basis: 2.875e9 },
+  "NEMEAN Subdermal Weave": { repReq: 875000, basis: 3.25e9 },
+  "Graphene Bone Lacings": { repReq: 1125000, basis: 4.25e9 },
+  "SPTN-97 Gene Modification": { repReq: 1250000, basis: 4.875e9 },
+  // 1,625 Mio Ruf: fehlt der Gang noch (1,5 Mio) - haelt "offen" gefuellt, damit
+  // die Runde bis zur Telemetrie kommt.
+  "Graphene Bionic Spine Upgrade": { repReq: 1625000, basis: 6e9, prereq: ["Bionic Spine"] },
+  "Hyperion Plasma Cannon V1": { repReq: 1250, basis: 5.5e9 },
+  [NFG]: { repReq: 1000, basis: 1e6 },
+};
+for (const [n, a] of Object.entries(AUGS_GANG)) if (COMBAT_AUGS[n]) a.stats = COMBAT_AUGS[n];
+const GANG_AUGS = Object.keys(AUGS_GANG).filter((n) => n !== "Hyperion Plasma Cannon V1");
+const dGang = (extra = {}) => ({
+  "data/verfahren.txt": "V2 2 1",
+  "lib/blackops.json": BO_JSON,
+  "data/blade.json": JSON.stringify({ zeit: 0, naechsteBlackOp: "Operation Typhoon" }),
+  // Wiederaufbau seit Stunde 0 vorbei, 100 h her: kein Kampf-Sperrzeitraum.
+  "data/einbau-uhr.json": JSON.stringify({ augReset: 2, playtime: 0, fertig: 1000 }),
+  ...extra,
+});
+const einbauUhrJung = () => JSON.stringify({ augReset: 2, playtime: 0, fertig: PLAYTIME_NOW - 3600000 });
+const weltGang = (o = {}) => baueWelt({
+  host: "werk-0", knoten: 2, moneyMult: 1, geld: 60e9, einkommen: 1e6,
+  skills: { hacking: 372, strength: 194, defense: 181, dexterity: 181, agility: 181, intelligence: 153 },
+  mults: { hacking: 1.5, faction_rep: 1.33 },
+  faktionen: {
+    "Slum Snakes": { favor: 0, rep: 1.5e6, augs: GANG_AUGS },
+    Bladeburners: { favor: 0, rep: 9505, augs: ["Hyperion Plasma Cannon V1"] },
+  },
+  augs: AUGS_GANG,
+  installiert: Array.from({ length: 12 }, (_, i) => "Alt-" + i),
+  warteschlange: [],
+  gang: { da: true, bonusMs: 0 },
+  schlafBudget: 12,
+  ...o,
+  dateien: { home: dGang(), ...(o.dateien || {}) },
+});
+const teleVon = (w) => { try { return JSON.parse(w.dateien.home["data/bn4rep.json"] || "null"); } catch { return null; } };
+const vollstaendig = (r) => rundenfehler(r.log).length === 0 && r.ende !== "fehler";
+const vollHinweis = (r) => rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300);
+const antwortetBruecke = (welt) => {
+  const anfrage = welt.dateien.home["data/backup-request.txt"];
+  if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+  welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({ ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+};
+// Nach dem ersten Kauf legt ein Mensch (oder die Firmenphase) eine Einbausperre: die
+// naechste Runde ist "gesperrt", kauft nichts mehr und kommt bis zur Telemetrie -
+// so ist die Runde NACH der Torrunde pruefbar (die Runde mit dem Kauf endet mit
+// `continue`, ihre Telemetrie entsteht erst spaeter; deshalb die Summenzaehler).
+const sperreNachErstemKauf = (welt) => {
+  if (!welt.kaeufe.length || welt.dateien.home["data/install-sperre.txt"]) return;
+  welt.dateien.home["data/install-sperre.txt"] = JSON.stringify({
+    ts: welt.uhr, reason: "test", bis: welt.uhr + 10 * 3600000 });
+};
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S4: Gang, Einbau gesperrt (Wiederaufbau zu jung), Ruf 1,5 Mio, 60 Mrd -> 0 Kaeufe --");
+{
+  const w = weltGang({ dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("S4: kein einziger Kauf, aus keiner Faktion (alt: Hyperion V1, SPTN-97, Graphene Bone Lacings u. a. sofort)",
+    w.kaeufe.length === 0, "Kaeufe: " + w.kaeufe.map((k) => k.a + "@" + k.f).join(", "));
+  pruefe("auch nicht aus den Bladeburners (Hyperion V1 war verdient)",
+    !w.kaeufe.some((k) => k.f === "Bladeburners"));
+  const t = teleVon(w);
+  pruefe("Telemetrie torRunde.mode = locked, Grund nennt den jungen Wiederaufbau",
+    !!t && !!t.torRunde && t.torRunde.mode === "locked" && /nicht bezahlt/.test(t.torRunde.reason),
+    t && t.torRunde ? JSON.stringify(t.torRunde).slice(0, 200) : "keine Telemetrie");
+  const bedarf = Number(w.dateien.home["data/geldbedarf.txt"]);
+  pruefe("data/geldbedarf.txt = Kosten der Planrunde (mit 1,9^i): > 1 Mrd, <= Konto, gleich torRunde.plan.cost",
+    Number.isFinite(bedarf) && bedarf > 1e9 && bedarf <= 60e9 && !!t && !!t.torRunde
+    && Math.abs(bedarf - t.torRunde.plan.cost) <= 1, "geldbedarf " + bedarf + ", Plan " + (t && t.torRunde ? t.torRunde.plan.cost : "?"));
+  pruefe("das Log nennt die Sperre und den Plan", r.log.includes("TORRUNDE: Einbau gesperrt") && r.log.includes("Plan:"),
+    r.log.split("\n").filter((z) => z.includes("TORRUNDE")).slice(0, 2).join(" | "));
+  pruefe("kein installAugmentations", w.installAufrufe === 0);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S5: Tor offen, Bonuszeit 0 -> die Torrunde: nur Planstuecke, teuerste zuerst --");
+{
+  const w = weltGang({ schlafBudget: 6, beiSchlaf: sperreNachErstemKauf });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("S5: erster Kauf = erstes Planstueck (SPTN-97 Gene Modification, die teuerste der Runde)",
+    w.kaeufe[0] && w.kaeufe[0].a === "SPTN-97 Gene Modification", w.kaeufe[0] ? w.kaeufe[0].a : "kein Kauf");
+  const m = /Torrunde 1\/(\d+)/.exec(r.log);
+  const n = m ? Number(m[1]) : 0;
+  const runde = w.kaeufe.slice(0, n);
+  pruefe("das Log nennt die Rundenlaenge (Torrunde 1/N), N >= 5", n >= 5, String(n));
+  pruefe("nur Planstuecke: Neurotrainer I (nur Erfahrung, kein Zuwachs der Competence) NICHT gekauft, die Bladeburners-Aug (zu teuer je Zuwachs) auch nicht",
+    !w.kaeufe.some((k) => k.a === "Neurotrainer I" || k.f === "Bladeburners"),
+    w.kaeufe.map((k) => k.a).join(", "));
+  const basen = runde.map((k) => AUGS_GANG[k.a].basis);
+  pruefe("teuerste zuerst: die Grundpreise der Runde fallen nie, Voraussetzungen stehen vor ihrem Nachfolger",
+    runde.length === n && basen.every((b, i) => i === 0 || b <= basen[i - 1]
+      || (AUGS_GANG[runde[i - 1].a].prereq || []).includes(runde[i].a)),
+    runde.map((k) => k.a).join(" > "));
+  pruefe("Preis je Position = Grundpreis x 1,9^Position (die Warteschlange war leer)",
+    runde.every((k, i) => Math.abs(k.p - AUGS_GANG[k.a].basis * Math.pow(1.9, i)) < 1),
+    runde.map((k) => Math.round(k.p / 1e6)).join(","));
+  pruefe("die Runde kostet zusammen hoechstens das Konto (60 Mrd)",
+    runde.reduce((s, k) => s + k.p, 0) <= 60e9, String(runde.reduce((s, k) => s + k.p, 0)));
+  const t = teleVon(w);
+  pruefe("Telemetrie (der Runde NACH dem Kauf): boughtTotal = Rundenlaenge, lastRound nennt Anzahl und erstes Stueck",
+    !!t && !!t.torRunde && t.torRunde.boughtTotal === n && !!t.torRunde.lastRound
+    && t.torRunde.lastRound.n === n && t.torRunde.lastRound.first === w.kaeufe[0].a,
+    t && t.torRunde ? JSON.stringify(t.torRunde).slice(0, 260) : "keine Telemetrie");
+  pruefe("und die Runde danach ist gesperrt (mode locked), kauft nichts mehr",
+    !!t && !!t.torRunde && t.torRunde.mode === "locked" && w.kaeufe.length === n, "Kaeufe " + w.kaeufe.length + ", N " + n);
+  pruefe("Gewichte aus blackops.json: naechste Op Typhoon laut blade.json", !!t && !!t.torRunde
+    && /blackops\.json:OperationTyphoon/.test(t.torRunde.weights), t && t.torRunde ? t.torRunde.weights : "");
+  const bedarf = Number(w.dateien.home["data/geldbedarf.txt"]);
+  pruefe("geldbedarf.txt: nach der Runde nur noch das, was die naechste Planrunde mit dem Rest kosten wuerde (<= Restgeld)",
+    Number.isFinite(bedarf) && bedarf <= w.geld + 1, "bedarf " + bedarf + ", Geld " + w.geld);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S6: Tor offen, Bonuszeit 10 min -> weder Kauf noch Einbau --");
+{
+  // Drei Stuecke warten schon (vor der Gang gekauft): ohne den Aufschub wuerde
+  // der Einbau sofort laufen, vor jeder Runde.
+  const w = weltGang({
+    gang: { da: true, bonusMs: 10 * 60000 },
+    warteschlange: ["Wired Reflexes", "Combat Rib I", "Bionic Spine"],
+    schlafBudget: 6,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("S6: kein Kauf, solange der Gang-Vorrat nachgeholt wird", w.kaeufe.length === 0,
+    "Kaeufe: " + w.kaeufe.map((k) => k.a).join(", "));
+  pruefe("und auch kein Einbau: kein Handschlag, kein installAugmentations",
+    w.installAufrufe === 0 && !w.dateien.home["data/backup-request.txt"],
+    "install " + w.installAufrufe + ", Handschlag " + !!w.dateien.home["data/backup-request.txt"]);
+  const t = teleVon(w);
+  pruefe("Telemetrie: mode bonus, bonusMs 600000, Begruendung nennt das Nachholen",
+    !!t && !!t.torRunde && t.torRunde.mode === "bonus" && t.torRunde.bonusMs === 600000
+    && /wird noch nachgeholt/.test(t.torRunde.bonusNote), t && t.torRunde ? JSON.stringify(t.torRunde).slice(0, 220) : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S7: Tor offen mit schon wartenden Stuecken -> ERST die Runde, DANN der Einbau --");
+{
+  const w = weltGang({
+    warteschlange: ["Wired Reflexes", "Combat Rib I", "Bionic Spine"],
+    schlafBudget: 80, beiSchlaf: antwortetBruecke,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const zeilen = r.log.split("\n");
+  const iKauf = zeilen.findIndex((z) => z.includes("GEKAUFT: SPTN-97 Gene Modification"));
+  const iEinbau = zeilen.findIndex((z) => z.includes("EINBAU:"));
+  pruefe("die Torrunde wird gekauft, BEVOR der Einbau ausloest (drei wartende Stuecke wuerden ihn sofort ausloesen)",
+    iKauf >= 0 && (iEinbau === -1 || iKauf < iEinbau), "Kauf Zeile " + iKauf + ", Einbau Zeile " + iEinbau);
+  pruefe("danach baut die naechste Runde regulaer ein (EINBAU, installAugmentations, main endet)",
+    iEinbau > iKauf && w.installAufrufe === 1 && r.ende === "return",
+    "Einbau Zeile " + iEinbau + ", install " + w.installAufrufe + ", Ende " + r.ende);
+  pruefe("im Einbau stecken das Planstueck SPTN-97 neben den drei alten, und kein Neurotrainer I",
+    w.warteschlange.includes("SPTN-97 Gene Modification") && w.warteschlange.includes("Wired Reflexes")
+    && w.warteschlange.includes("Combat Rib I") && !w.warteschlange.includes("Neurotrainer I"),
+    w.warteschlange.join(", "));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S8: ns.gang.inGang wirft -> Fehler gezaehlt, alte Schleife als Rueckfall --");
+{
+  // 600 Mrd, damit auch der Kleinkram bezahlbar bleibt, wenn die alte Schleife
+  // zuerst die teuren Stuecke kauft (Preis x1,9 je Stueck).
+  const w = weltGang({ geld: 600e9, gang: { da: true, wirftInGang: true }, dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 3 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig (der Wurf kommt nicht als RUNDENFEHLER an)", vollstaendig(r), vollHinweis(r));
+  pruefe("die alte Kaufschleife laeuft trotz Sperre (Neurotrainer I und die Bladeburners-Aug werden gekauft)",
+    w.kaeufe.some((k) => k.a === "Neurotrainer I") && w.kaeufe.some((k) => k.f === "Bladeburners"),
+    w.kaeufe.map((k) => k.a).join(", "));
+  const t = teleVon(w);
+  pruefe("der Fehler steht in der Telemetrie (torRunde.gangErrors >= 1, lastGangError nennt inGang)",
+    !!t && !!t.torRunde && t.torRunde.gangErrors >= 1 && /inGang/.test(t.torRunde.lastGangError),
+    t && t.torRunde ? JSON.stringify(t.torRunde) : "keine Telemetrie");
+  pruefe("und im Log (gedrosselt, genau einmal)", r.log.split("\n").filter((z) => z.includes("TORRUNDE Fehler")).length === 1);
+}
+{
+  const w = weltGang({ gang: { da: true, wirftBonus: true }, schlafBudget: 6, beiSchlaf: sperreNachErstemKauf });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("getBonusTime wirft: es wird NICHT gewartet, die Runde wird gekauft",
+    w.kaeufe.length >= 5 && w.kaeufe[0].a === "SPTN-97 Gene Modification", w.kaeufe.map((k) => k.a).join(", "));
+  const t = teleVon(w);
+  pruefe("Fehler gezaehlt (gangErrors >= 1, lastGangError nennt getBonusTime), Runde in boughtTotal",
+    !!t && !!t.torRunde && t.torRunde.gangErrors >= 1 && /getBonusTime/.test(t.torRunde.lastGangError)
+    && t.torRunde.boughtTotal === w.kaeufe.length, t && t.torRunde ? JSON.stringify(t.torRunde).slice(0, 260) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S9: der Vorrat sinkt nie (gedrosselter Tab) -> nach 30 min kauft die Runde trotzdem --");
+{
+  const w = weltGang({ gang: { da: true, bonusMs: 10 * 60000 }, schlafBudget: 1000 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const erster = w.kaeufe[0];
+  const stunden = erster ? (erster.uhr - w.start) / 3600000 : null;
+  pruefe("kein Kauf in den ersten 30 Minuten, danach die Runde (Stillstandsschutz gegen 'nie mehr einbauen')",
+    stunden !== null && stunden >= 0.5 && stunden < 0.6,
+    (stunden === null ? "nie gekauft" : "erster Kauf nach " + stunden.toFixed(2) + " h")
+    + ", Lauf " + ((w.uhr - w.start) / 3600000).toFixed(2) + " h, Schlafaufrufe " + w.schlaf.length
+    + ", Verteilung " + JSON.stringify(w.schlaf.reduce((m, x) => { m[x] = (m[x] || 0) + 1; return m; }, {})));
+  pruefe("das Log sagt, dass der Vorrat nicht sinkt", r.log.includes("sinkt seit") && r.log.includes("trotzdem gekauft"),
+    r.log.split("\n").filter((z) => z.includes("TORRUNDE")).slice(-1)[0] || "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S10: ohne Gang aendert sich NICHTS (V2, Einbau gesperrt, trotzdem Kauf) --");
+{
+  const w = weltGang({ geld: 600e9, gang: { da: false }, dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 3 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const basenAlt = w.kaeufe.map((k) => AUGS_GANG[k.a].basis);
+  pruefe("die alte Schleife kauft alles Verdiente, teuerste zuerst (Hyperion V1 5,5 Mrd vor SPTN-97), auch den Kleinkram",
+    w.kaeufe[0] && w.kaeufe[0].a === "Hyperion Plasma Cannon V1" && w.kaeufe.some((k) => k.a === "Neurotrainer I")
+    && basenAlt.every((b, i) => i === 0 || b <= basenAlt[i - 1]),
+    w.kaeufe.map((k) => k.a).join(", "));
+  pruefe("auch die Bladeburners (Hyperion V1) wie bisher", w.kaeufe.some((k) => k.f === "Bladeburners"));
+  pruefe("keine Torrunden-Zeile im Log, kein getBonusTime-Aufruf", !r.log.includes("TORRUNDE") && w.gangAufrufe.getBonusTime === 0,
+    "getBonusTime-Aufrufe: " + w.gangAufrufe.getBonusTime);
+  const t = teleVon(w);
+  pruefe("Telemetrie torRunde ist null (kein Fehler, keine Gang)", !!t && t.torRunde === null, t ? JSON.stringify(t.torRunde) : "keine Telemetrie");
+  // Und data/geldbedarf.txt bleibt die alte Summe aller verdienten Stuecke (augRuecklage).
+  const bedarf = Number(w.dateien.home["data/geldbedarf.txt"]);
+  pruefe("geldbedarf.txt ist die alte Ruecklage (augRuecklage), hier nach dem Kauf der verdienten Stuecke klein",
+    Number.isFinite(bedarf), String(bedarf));
+}
+{
+  // Kein Kampfknoten (V1 5): die Gang wird nicht einmal gefragt.
+  const w = welt1903({ schlafBudget: 6 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("Hackingknoten (V1): ns.gang.inGang wird nie gerufen", w.gangAufrufe.inGang === 0,
+    "Aufrufe: " + w.gangAufrufe.inGang);
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S11: Preisfaktor mit SF11 (1,9 x 0,96) -> die Runde wird nicht ueberschaetzt --");
+{
+  const w = weltGang({
+    schlafBudget: 6, beiSchlaf: sperreNachErstemKauf,
+    ownedSF: new Map([[4, 3], [5, 1], [11, 1]]), priceStep: 1.9 * 0.96,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const m = /Torrunde 1\/(\d+)/.exec(r.log);
+  const n = m ? Number(m[1]) : 0;
+  pruefe("kein Abbruch wegen Preisabweichung, die ganze geplante Runde wird gekauft",
+    n >= 5 && !r.log.includes("TORRUNDE abgebrochen") && w.kaeufe.length >= n, "N " + n + ", Kaeufe " + w.kaeufe.length);
+  const t = teleVon(w);
+  const gekauftSumme = w.kaeufe.slice(0, n).reduce((s, k) => s + k.p, 0);
+  pruefe("Plankosten = tatsaechliche Kosten der Runde (SF11 eingerechnet)",
+    !!t && !!t.torRunde && !!t.torRunde.lastRound && n > 0 && Math.abs(t.torRunde.lastRound.cost - gekauftSumme) <= 1,
+    "Plan " + (t && t.torRunde && t.torRunde.lastRound ? t.torRunde.lastRound.cost : "?") + " / gekauft " + gekauftSumme);
+}
+{
+  // Der Plan irrt (SF11 steht im Spiel, die Welt rechnet aber mit 1,9): abbrechen statt blind kaufen.
+  const w = weltGang({
+    schlafBudget: 6, beiSchlaf: sperreNachErstemKauf,
+    ownedSF: new Map([[4, 3], [5, 1], [11, 3]]), priceStep: 1.9,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("Preis ueber Plan (> 1 %): 'TORRUNDE abgebrochen', nur das Stueck vor der Abweichung gekauft",
+    r.log.includes("TORRUNDE abgebrochen") && w.kaeufe.length === 1, "Kaeufe " + w.kaeufe.length);
+  const t = teleVon(w);
+  pruefe("Telemetrie planDrift >= 1", !!t && !!t.torRunde && t.torRunde.planDrift >= 1, t && t.torRunde ? String(t.torRunde.planDrift) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+// Skeptiker-Urteil AUFLAGE zu P1 (03.10.2026): S12-S16. Auflage 1 (der Leser) und
+// Auflage 2 (Faehigkeiten in der Potenz) plus die Hinweise (Wartegrenze 30 min mit
+// Zustand in data/, Halt des Einbaus nach abgebrochener Torrunde).
+// ---------------------------------------------------------------------------
+const EINBAU = await import(pathToFileURL(path.join(SRC, "lib", "einbau.js")).href);
+const { gateRoundStatus } = await import(pathToFileURL(path.join(HIER, "lib", "gate-round-status.js")).href);
+const jsonVon = (w, datei) => { try { return JSON.parse(w.dateien.home[datei] || "null"); } catch { return null; } };
+// Der Leser (tools/checkin.js) auf der Telemetrie, die der Nachbau wirklich schreibt: Schreiber und Leser
+// gegeneinander gehalten (Lehre 03.10.: Fehler gezaehlt, aber von niemandem gelesen).
+const leser = (w, nowMs = w.uhr) => gateRoundStatus({
+  tele: jsonVon(w, "data/bn4rep.json"), blade: jsonVon(w, "data/blade.json"), nowMs, before: null,
+});
+
+// Die Eingabe der Planung, wie bn4rep.js sie aus der Welt baut (alle Gang-Stuecke mit Kampffaktor, dazu die
+// Bladeburners-Aug), und die Runde fuer zwei Stufensaetze - roh und effektiv.
+const planAusWelt = (levels, geld, wartend = 0) => {
+  const ty = EINBAU.blackOpWeights(JSON.parse(BO_JSON), "Operation Typhoon");
+  const eingabe = [];
+  for (const n of GANG_AUGS) {
+    if (!COMBAT_AUGS[n]) continue;
+    eingabe.push({ aug: n, faktion: "Slum Snakes", rep: 1.5e6, repReq: AUGS_GANG[n].repReq,
+      preis: AUGS_GANG[n].basis * Math.pow(1.9, wartend), prereq: AUGS_GANG[n].prereq || [], mults: COMBAT_AUGS[n] });
+  }
+  eingabe.push({ aug: "Hyperion Plasma Cannon V1", faktion: "Bladeburners", rep: 9505, repReq: 1250,
+    preis: AUGS_GANG["Hyperion Plasma Cannon V1"].basis * Math.pow(1.9, wartend), prereq: [],
+    mults: COMBAT_AUGS["Hyperion Plasma Cannon V1"] });
+  const besitz = new Set(Array.from({ length: 12 }, (_, i) => "Alt-" + i));
+  return EINBAU.waehleTorRunde(eingabe, geld, besitz, {
+    skills: levels, weights: ty.weights, decays: ty.decays, startMults: {}, priceStep: 1.9,
+  });
+};
+const WELT_STUFEN = { hacking: 372, strength: 194, defense: 181, dexterity: 181, agility: 181, intelligence: 153 };
+const bladeJson = (extra) => JSON.stringify({ zeit: 1_790_442_188_000, naechsteBlackOp: "Operation Typhoon", ...extra });
+
+console.log("\n-- P1 S12: Reaper 12 / Evasive System 13 aus data/blade.json -> die Runde wird mit effektiven Stufen geplant --");
+{
+  const eff = EINBAU.bladeEffFactors ? EINBAU.bladeEffFactors(12, 13) : null;
+  const effLevels = EINBAU.effectiveLevels && eff ? EINBAU.effectiveLevels(WELT_STUFEN, eff) : WELT_STUFEN;
+  const erwEff = planAusWelt(effLevels, 60e9);
+  const erwRoh = planAusWelt(WELT_STUFEN, 60e9);
+  pruefe("Testfall ist empfindlich: der Zuwachs der Runde unterscheidet sich zwischen rohen und effektiven Stufen um > 0,05",
+    Math.abs(erwEff.gain - erwRoh.gain) > 0.05, "effektiv x" + erwEff.gain.toFixed(4) + ", roh x" + erwRoh.gain.toFixed(4));
+
+  const w = weltGang({
+    schlafBudget: 6, beiSchlaf: sperreNachErstemKauf,
+    dateien: { home: dGang({ "data/blade.json": bladeJson({ skillLevels: { reaper: 12, evasive: 13 }, skillLevelsError: null }) }) },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const m = /Torrunde 1\/(\d+)/.exec(r.log);
+  const n = m ? Number(m[1]) : 0;
+  pruefe("die gekaufte Runde ist die, die mit EFFEKTIVEN Stufen geplant wird (Menge und Reihenfolge)",
+    n === erwEff.seq.length && w.kaeufe.slice(0, n).map((k) => k.a).join(">") === erwEff.seq.join(">"),
+    "gekauft " + w.kaeufe.slice(0, n).map((k) => k.a).join(">") + " / erwartet " + erwEff.seq.join(">"));
+  const t = teleVon(w);
+  pruefe("lastRound.gain = Zuwachs mit effektiven Stufen (nicht der mit rohen)",
+    !!t && !!t.torRunde && !!t.torRunde.lastRound && Math.abs(t.torRunde.lastRound.gain - erwEff.gain) < 0.002
+    && Math.abs(t.torRunde.lastRound.gain - erwRoh.gain) > 0.05,
+    t && t.torRunde && t.torRunde.lastRound ? "gemeldet " + t.torRunde.lastRound.gain + ", effektiv " + erwEff.gain.toFixed(3) + ", roh " + erwRoh.gain.toFixed(3) : "keine Telemetrie");
+  const sk = t && t.torRunde ? t.torRunde.skills : null;
+  pruefe("Telemetrie torRunde.skills: Quelle blade.json, Reaper 12, Evasive 13, Faktoren x1,24 und x1,8848",
+    !!sk && sk.source === "blade.json" && sk.reaper === 12 && sk.evasive === 13
+    && Math.abs(sk.strengthFactor - 1.24) < 1e-9 && Math.abs(sk.dexterityFactor - 1.8848) < 1e-9, JSON.stringify(sk));
+  const l = leser(w);
+  pruefe("der Leser (checkin) nennt die eingerechneten Faehigkeiten, ohne Befund",
+    l.lines.some((z) => /Faehigkeiten eingerechnet: Reaper 12, Evasive System 13/.test(z)) && l.findings.length === 0,
+    l.lines.join(" | ") + " || " + l.findings.join(" | "));
+}
+{
+  // Gegenprobe: blade.json ohne Stufen, zu alt, oder mit Fehler -> rohe Stufen, und die Telemetrie sagt WARUM.
+  const faelle = [
+    ["blade.json ohne skillLevels (altes blade.js)", bladeJson({}), /ohne skillLevels/, 0],
+    ["blade.json 40 min alt", JSON.stringify({ zeit: 1_790_442_188_000 - 40 * 60000, naechsteBlackOp: "Operation Typhoon",
+      skillLevels: { reaper: 12, evasive: 13 } }), /min alt/, 0],
+    ["blade.js meldet einen Fehler", bladeJson({ skillLevels: null, skillLevelsError: "Bladeburner nicht verfuegbar" }), /blade\.js meldet/, 1],
+  ];
+  for (const [name, inhalt, grund, fehler] of faelle) {
+    const w = weltGang({ schlafBudget: 6, beiSchlaf: sperreNachErstemKauf, dateien: { home: dGang({ "data/blade.json": inhalt }) } });
+    const r = await fahre(w);
+    pruefe("Nachbau vollstaendig (" + name + ")", vollstaendig(r), vollHinweis(r));
+    const t = teleVon(w);
+    const sk = t && t.torRunde ? t.torRunde.skills : null;
+    pruefe(name + ": rohe Stufen, Telemetrie nennt den Grund", !!sk && sk.source === "roh" && grund.test(sk.why), JSON.stringify(sk));
+    const erwRoh = planAusWelt(WELT_STUFEN, 60e9);
+    pruefe(name + ": die Runde ist die mit rohen Stufen",
+      !!t && !!t.torRunde && !!t.torRunde.lastRound && Math.abs(t.torRunde.lastRound.gain - erwRoh.gain) < 0.002,
+      t && t.torRunde && t.torRunde.lastRound ? "gemeldet " + t.torRunde.lastRound.gain + ", roh " + erwRoh.gain.toFixed(3) : "keine Telemetrie");
+    pruefe(name + ": " + (fehler ? "ein Fehler von blade.js wird als Fehler GEZAEHLT (gangErrors, lastGangError nennt skillLevels)" : "kein gezaehlter Fehler (nur ein Hinweis)"),
+      fehler ? (!!t && !!t.torRunde && t.torRunde.gangErrors >= 1 && /skillLevels/.test(t.torRunde.lastGangError))
+        : (!!t && !!t.torRunde && t.torRunde.gangErrors === 0), t && t.torRunde ? t.torRunde.gangErrors + " / " + t.torRunde.lastGangError : "");
+    const l = leser(w);
+    pruefe(name + ": der Leser sagt, dass die Faehigkeiten NICHT eingerechnet sind" + (fehler ? " und meldet den Fehler als Befund" : ""),
+      l.lines.some((z) => /Faehigkeiten NICHT eingerechnet/.test(z)) && (fehler ? l.findings.length >= 1 : true),
+      l.lines.join(" | ") + " || " + l.findings.join(" | "));
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S13: Neustart von bn4rep mitten im Warten -> die Wartegrenze (30 min) beginnt nicht von vorn --");
+{
+  const w = weltGang({
+    gang: { da: true, bonusMs: 10 * 60000 }, schlafBudget: 100000,
+    beiSchlaf: (welt) => { if (welt.uhr - welt.start >= 25 * 60000) welt.schlafBudget = -1; },
+  });
+  const r1 = await fahre(w);
+  pruefe("erster Lauf: endet nach 25 min (Schlafbudget), nichts gekauft", r1.ende === "budget" && w.kaeufe.length === 0,
+    "Ende " + r1.ende + ", Kaeufe " + w.kaeufe.length);
+  const datei = jsonVon(w, "data/torrunde-wait.json");
+  pruefe("data/torrunde-wait.json liegt auf home: min 600000, seit am Anfang, zuletzt kurz vor dem Ende",
+    !!datei && datei.min === 600000 && datei.seit - w.start < 60000 && w.uhr - datei.zuletzt < 60000,
+    JSON.stringify(datei));
+  const tele1 = teleVon(w);
+  pruefe("Telemetrie torRunde.wait zeigt denselben Zustand", !!tele1 && !!tele1.torRunde && !!tele1.torRunde.wait
+    && tele1.torRunde.wait.seit === (datei && datei.seit), tele1 && tele1.torRunde ? JSON.stringify(tele1.torRunde.wait) : "");
+  // Neustart: neues Modul, dieselbe Welt (dieselben Dateien, dieselbe Uhr).
+  w.schlafBudget = w.schlaf.length + 100000;
+  w.beiSchlaf = (welt) => { if (welt.kaeufe.length) welt.schlafBudget = -1; };
+  const r2 = await fahre(w);
+  pruefe("zweiter Lauf (Neustart): kauft die Runde", r2.ende === "budget" && w.kaeufe.length >= 5, "Ende " + r2.ende + ", Kaeufe " + w.kaeufe.length);
+  const minuten = w.kaeufe.length ? (w.kaeufe[0].uhr - w.start) / 60000 : null;
+  pruefe("erster Kauf nach 30 bis 31 min Gesamtwartezeit - NICHT erst 30 min nach dem Neustart (= 55 min) und nicht nach 2 h",
+    minuten !== null && minuten >= 30 && minuten < 31, minuten === null ? "nie gekauft" : minuten.toFixed(2) + " min");
+  pruefe("der Zustand bleibt nach der Grenze stehen (gleiches seit): die naechste Runde wartet nicht erneut, ein weiterer Neustart auch nicht",
+    !!jsonVon(w, "data/torrunde-wait.json") && jsonVon(w, "data/torrunde-wait.json").seit === datei.seit,
+    JSON.stringify(jsonVon(w, "data/torrunde-wait.json")));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S14: das erste Planstueck wird vom Spiel abgelehnt -> der Einbau haelt zurueck (hoechstens 20 Runden) --");
+{
+  // Drei Stuecke warten (S7): ohne den Halt baute der Einbau in derselben Runde ohne Torrunde ein.
+  const w = weltGang({
+    warteschlange: ["Wired Reflexes", "Combat Rib I", "Bionic Spine"],
+    kaufSperre: ["SPTN-97 Gene Modification"],
+    schlafBudget: 600, beiSchlaf: antwortetBruecke,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  // main kehrt mit dem Einbau zurueck: das Ende des Laufs ist der Einbau-Zeitpunkt.
+  const sek = w.installAufrufe === 1 && r.ende === "return" ? (w.uhr - w.start) / 1000 : null;
+  pruefe("der Einbau kommt NICHT in den ersten Runden (alt: sofort in der Runde des Abbruchs), aber nach hoechstens 20 Runden (rund 5 min)",
+    sek !== null && sek >= 290 && sek < 600 && w.installAufrufe === 1 && r.ende === "return",
+    "Einbau nach " + (sek === null ? "nie" : sek.toFixed(0) + " s") + ", install " + w.installAufrufe + ", Ende " + r.ende);
+  const zeilen = r.log.split("\n");
+  const abbruch = zeilen.filter((z) => z.includes("TORRUNDE abgebrochen")).length;
+  pruefe("die Abbruch-Logzeile ist gedrosselt: genau eine in 20 Runden (alt: eine je Runde)", abbruch === 1, String(abbruch));
+  pruefe("und das Ende des Halts steht einmal im Log", zeilen.filter((z) => /TORRUNDE: 20 Runden in Folge/.test(z)).length === 1,
+    zeilen.filter((z) => z.includes("TORRUNDE")).slice(-3).join(" | "));
+  const t = teleVon(w);
+  pruefe("Telemetrie: buyFailures >= 20 (jeder Abbruch wird gezaehlt, auch ohne Logzeile), abortStreak >= 20",
+    !!t && !!t.torRunde && t.torRunde.buyFailures >= 20 && t.torRunde.abortStreak >= 20,
+    t && t.torRunde ? JSON.stringify({ b: t.torRunde.buyFailures, s: t.torRunde.abortStreak }) : "keine Telemetrie");
+  pruefe("kein Gang-Stueck wurde gekauft (SPTN-97 ist abgelehnt; die NeuroFlux-Stufen kauft der Einbau selbst mit dem Restgeld), die drei alten warten",
+    w.kaeufe.every((k) => k.a === NFG) && w.warteschlange.slice(0, 3).join() === "Wired Reflexes,Combat Rib I,Bionic Spine", "Kaeufe " + w.kaeufe.map((k) => k.a + "@" + Math.round((k.uhr - w.start) / 1000) + "s").join(", ") + ", Warteschlange " + w.warteschlange.length);
+  const l = leser(w);
+  pruefe("der Leser meldet die abgelehnten Kaeufe als Befund",
+    l.findings.some((z) => /Kaeufe der Runde vom Spiel abgelehnt/.test(z)), l.findings.join(" | "));
+}
+{
+  // Der Halt ist an die Runde gebunden: bricht die Runde NACH dem ersten Kauf ab, entsteht kein Halt (gateBought > 0 -> continue).
+  const w = weltGang({
+    ownedSF: new Map([[4, 3], [5, 1], [11, 3]]), priceStep: 1.9,   // wie S11b: der Plan irrt beim zweiten Stueck
+    warteschlange: [], schlafBudget: 6, beiSchlaf: sperreNachErstemKauf,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const t = teleVon(w);
+  pruefe("Abbruch nach dem ersten Kauf: abortStreak bleibt 0 (der Einbau wird nicht zusaetzlich zurueckgehalten)",
+    !!t && !!t.torRunde && t.torRunde.abortStreak === 0 && w.kaeufe.length === 1, t && t.torRunde ? String(t.torRunde.abortStreak) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S15: der Block wirft in JEDER Runde -> Rueckfall auf die alte Schleife, aber sichtbar (Schreiber UND Leser) --");
+{
+  class SfWirft extends Map {
+    get(k) { if (k === 11) throw new Error("Nachbau: SF11 nicht lesbar"); return super.get(k); }
+  }
+  // Einbau gesperrt, 600 Mrd: die alte Schleife kauft trotz Sperre alles Verdiente - das ist die Folge, die der Leser melden muss.
+  const w = weltGang({
+    geld: 600e9, ownedSF: new SfWirft([[4, 3], [5, 1]]),
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 3,
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig (der Wurf kommt nicht als RUNDENFEHLER an)", vollstaendig(r), vollHinweis(r));
+  pruefe("die alte Schleife kauft trotz Einbausperre (Neurotrainer I) - P1 ist de facto aus",
+    w.kaeufe.some((k) => k.a === "Neurotrainer I"), w.kaeufe.map((k) => k.a).join(", "));
+  const t = teleVon(w);
+  pruefe("Telemetrie torRunde.mode = error, gangErrors >= 1, lastGangError nennt den Block",
+    !!t && !!t.torRunde && t.torRunde.mode === "error" && t.torRunde.gangErrors >= 1
+    && /Torrunde-Block: .*SF11/.test(t.torRunde.lastGangError), t && t.torRunde ? JSON.stringify(t.torRunde) : "keine Telemetrie");
+  const l = leser(w);
+  pruefe("der Leser (tools/checkin.js) meldet 'P1 IST AUS' als Befund und nennt den Fehler",
+    l.findings.some((z) => /P1 IST AUS/.test(z) && /SF11/.test(z)) && l.lines.some((z) => /FEHLER-RUECKFALL/.test(z)),
+    l.findings.join(" | ") + " || " + l.lines.join(" | "));
+}
+{
+  // S8 (ns.gang.inGang wirft): Modus normal mit Fehlerzaehler - auch das liest der Leser.
+  const w = weltGang({ geld: 600e9, gang: { da: true, wirftInGang: true }, dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 3 });
+  await fahre(w);
+  const l = leser(w);
+  pruefe("ns.gang.inGang wirft: der Leser meldet die Fehler und dass die alte Kaufschleife ohne Aufschub lief",
+    l.findings.some((z) => /Fehler in der Torrunde gezaehlt/.test(z) && /ohne Aufschub/.test(z) && /inGang/.test(z)), l.findings.join(" | "));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P1 S16: data/einbau.json spiegelt den Grund der Torrunde (wer dort nachsieht, warum kein Einbau kommt) --");
+{
+  const w = weltGang({
+    gang: { da: true, bonusMs: 10 * 60000 },
+    warteschlange: ["Wired Reflexes", "Combat Rib I", "Bionic Spine"],
+    schlafBudget: 6,
+  });
+  await fahre(w);
+  const eb = jsonVon(w, "data/einbau.json");
+  pruefe("einbau.json: torRunde.mode bonus, bonusNote nennt das Nachholen, installHeld true",
+    !!eb && !!eb.torRunde && eb.torRunde.mode === "bonus" && /nachgeholt/.test(eb.torRunde.bonusNote || "") && eb.torRunde.installHeld === true
+    && eb.torRunde.bonusMs === 600000, JSON.stringify(eb && eb.torRunde));
+  const l = leser(w);
+  pruefe("der Leser nennt den Wartegrund (Vorrat 600 s, Grenze 30 min)",
+    l.lines.some((z) => /Gang-Vorrat wird noch nachgeholt/.test(z) && /600 s/.test(z) && /Grenze 30 min/.test(z)), l.lines.join(" | "));
+}
+{
+  const w = weltGang({ dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 4 });
+  await fahre(w);
+  const eb = jsonVon(w, "data/einbau.json");
+  pruefe("einbau.json im gesperrten Zustand: torRunde.mode locked mit Grund", !!eb && !!eb.torRunde && eb.torRunde.mode === "locked" && /nicht bezahlt/.test(eb.torRunde.reason || ""),
+    JSON.stringify(eb && eb.torRunde));
+}
+{
+  const w = weltGang({ gang: { da: false }, schlafBudget: 3, geld: 600e9, dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) } });
+  await fahre(w);
+  const eb = jsonVon(w, "data/einbau.json");
+  pruefe("ohne Gang: einbau.json traegt torRunde null", !!eb && eb.torRunde === null, JSON.stringify(eb && eb.torRunde));
+  pruefe("ohne Gang: kein data/torrunde-wait.json", !("data/torrunde-wait.json" in w.dateien.home));
+}
+
+// ===========================================================================
+// PAKET 0 (03.10.2026, Audit "vollstaendig", verify-g01-betrieb.md Abschnitt 1
+// und 5, verify-g02-beide.md Abschnitt 5/7): zwei Fehlregeln, die im
+// Bladeburner-Knoten mit Gang bzw. mit SF9 zuschlagen.
+// ===========================================================================
+// ZUSAMMENFUEHRUNG (04.10.2026, Zweig integ-gang-2026-10-04): die Hilfen dieses
+// Abschnitts (AUGS_GANG, weltGang, teleVon, vollstaendig) heissen genauso wie die des
+// P1-Abschnitts oben, tun aber Verschiedenes (vollstaendig() prueft hier selbst).
+// Darum steht der ganze P0-Abschnitt in einem eigenen Block - innen unveraendert.
+{
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P0 GANG-2: The Red Pill im Bladeburner-Knoten (Gang-Faktion bietet sie an) --");
+// In BN2 haengt das Spiel mit Gang The Red Pill an die Angebotsliste der
+// Gang-Faktion (FactionHelpers.tsx:172-183). Preis 0, Ruf 2,5 Mio: die alte
+// Kaufschleife kaufte sie in der Runde, in der der Ruf reicht - ein Stueck,
+// das sich nie aus der Warteschlange holen laesst, jedes weitere um x1,9
+// verteuert und (ausgangSteht) nach dem Einbau jeden weiteren Einbau sperrt.
+const AUGS_GANG = {
+  "The Red Pill": { repReq: 2.5e6, basis: 0 },
+  "Bionic Arms": { repReq: 62.5e3, basis: 4.3e8, stats: { strength: 1.3, dexterity: 1.3 } },
+  "Bionic Legs": { repReq: 75e3, basis: 3.7e8, stats: { agility: 1.6 } },
+  "Bionic Spine": { repReq: 45e3, basis: 1.2e8, stats: { strength: 1.15, defense: 1.15 } },
+  // Unverdient (Ruf 3 Mio < 4,5 Mio): haelt die Runde im Arbeitszweig, damit sie
+  // die Telemetrie (data/bn4rep.json) erreicht - ohne offenes Stueck endet sie
+  // vorher ("keine offenen Augmentierungen").
+  "Graphene Bone Lacings": { repReq: 4.5e6, basis: 1.5e9, stats: { strength: 1.7, defense: 1.7 } },
+  [NFG]: { repReq: 1000, basis: 1e6 },
+};
+// Einbau-Uhr weit zurueck, damit keine Kampf-Einbausperre (lib/endspurt.js)
+// mitspielt - geprueft wird allein die Red-Pill-Regel.
+const UHR_FREI = JSON.stringify({ augReset: 2, playtime: 0, fertig: 1000 });
+const backupGruen = (welt) => {
+  const anfrage = welt.dateien.home["data/backup-request.txt"];
+  if (!anfrage || welt.dateien.home["data/backup-ok.txt"]) return;
+  welt.dateien.home["data/backup-ok.txt"] = JSON.stringify({
+    ts: welt.uhr, anlass: "pre-install", datei: "Nachbau" });
+};
+const weltGang = (o = {}) => baueWelt({
+  host: "werk-0", knoten: 2, moneyMult: 1, geld: 50e9, einkommen: 1e6,
+  faktionen: { "Slum Snakes": { favor: 0, rep: 3e6,
+    augs: ["The Red Pill", "Bionic Arms"] } },
+  augs: AUGS_GANG,
+  installiert: Array.from({ length: 12 }, (_, i) => "Alt-" + i),
+  warteschlange: [],
+  fokus: true,
+  dateien: { home: { "data/verfahren.txt": "V2 2 1", "data/einbau-uhr.json": UHR_FREI } },
+  schlafBudget: 8,
+  beiSchlaf: backupGruen,
+  ...o,
+});
+const trpGekauft = (w) => w.kaeufe.filter((k) => k.a === "The Red Pill").length;
+const FAKTION_OFFEN = () => ({ "Slum Snakes": { favor: 0, rep: 3e6,
+  augs: ["The Red Pill", "Bionic Arms", "Graphene Bone Lacings"] } });
+const teleVon = (w) => {
+  try { return JSON.parse(w.dateien.home["data/bn4rep.json"] || "null"); } catch { return null; }
+};
+const vollstaendig = (r) => pruefe("Nachbau vollstaendig (kein echter Rundenfehler)",
+  rundenfehler(r.log).length === 0 && r.ende !== "fehler",
+  rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
+{
+  // S1: V2 in Knoten 2, Ruf 3 Mio -> kein Red-Pill-Kauf. Bionic Arms steht im
+  // selben Angebot und MUSS gekauft werden: sonst koennte das Szenario nur
+  // gruen sein, weil die Runde die Kaufschleife nie erreicht.
+  const w = weltGang({ faktionen: FAKTION_OFFEN() });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S1: V2 'V2 2 1': Bionic Arms gekauft (die Kaufschleife lief)",
+    w.kaeufe.some((k) => k.a === "Bionic Arms"), JSON.stringify(w.kaeufe.map((k) => k.a)));
+  pruefe("S1: V2 'V2 2 1', Ruf 3 Mio: KEIN Kauf von The Red Pill", trpGekauft(w) === 0,
+    JSON.stringify(w.kaeufe.map((k) => k.a)));
+  const tele = teleVon(w);
+  pruefe("S1: Telemetrie nennt v1Positiv false und v1LeseFehler 0 (fuer die Abnahme von aussen)",
+    !!tele && tele.v1Positiv === false && tele.v1LeseFehler === 0, JSON.stringify(tele && {
+      v1Positiv: tele.v1Positiv, v1LeseFehler: tele.v1LeseFehler }));
+}
+{
+  // S4: die Lesung der Marke WIRFT (ns.fileExists wirft). Zweifel = kein Red
+  // Pill, und der Fehler wird gezaehlt und gemeldet statt verschluckt.
+  const w = weltGang({ markeWirft: true, faktionen: FAKTION_OFFEN(), schlafBudget: 8 });
+  const r = await fahre(w);
+  vollstaendig(r);
+  const tele = teleVon(w);
+  pruefe("S4: Marke nicht lesbar: KEIN Kauf von The Red Pill", trpGekauft(w) === 0,
+    JSON.stringify(w.kaeufe.map((k) => k.a)));
+  pruefe("S4: Marke nicht lesbar: v1LeseFehler steht in der Telemetrie (>= 1) und v1Positiv ist false",
+    !!tele && tele.v1LeseFehler >= 1 && tele.v1Positiv === false,
+    JSON.stringify(tele && { v1Positiv: tele.v1Positiv, v1LeseFehler: tele.v1LeseFehler })
+      + " Ende " + r.ende + " " + r.fehlerText.slice(0, 120));
+  pruefe("S4: der Lesefehler steht im Log (nicht still)", r.log.includes("V1-Nachweis nicht lesbar"),
+    r.log.slice(0, 200));
+}
+{
+  // S2: dieselbe Lage OHNE data/verfahren.txt. Die alte Filterung
+  // (`nurKampfStuecke`) schaltet sich dann AUS (catch -> false) - ein Fix nur
+  // in lib/hackaugs.js (kampfknotenNuetzlich) liesse TRP hier durch. Zweifel
+  // heisst: kein Red Pill.
+  const w = weltGang({ dateien: { home: { "data/einbau-uhr.json": UHR_FREI } } });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S2: ohne verfahren.txt: Bionic Arms gekauft (die Kaufschleife lief)",
+    w.kaeufe.some((k) => k.a === "Bionic Arms"), JSON.stringify(w.kaeufe.map((k) => k.a)));
+  pruefe("S2: ohne verfahren.txt: KEIN Kauf von The Red Pill", trpGekauft(w) === 0,
+    JSON.stringify(w.kaeufe.map((k) => k.a)));
+}
+{
+  // S2b: die Datei stammt aus dem VORIGEN Knoten (boot.js loescht sie absichtlich
+  // nicht, lib/reg.js:21-34): "V1 5 2" in Knoten 2 ist kein positiver Nachweis.
+  const w = weltGang({ dateien: { home: { "data/verfahren.txt": "V1 5 2",
+    "data/einbau-uhr.json": UHR_FREI } } });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S2b: 'V1 5 2' in Knoten 2 (fremder Knoten): KEIN Kauf von The Red Pill",
+    trpGekauft(w) === 0, JSON.stringify(w.kaeufe.map((k) => k.a)));
+}
+{
+  // S2c: V2-Marke, aber unlesbarer Rest - und die Marke "V10" darf nicht als
+  // "beginnt mit V1" durchgehen.
+  const w = weltGang({ dateien: { home: { "data/verfahren.txt": "V10 2 1",
+    "data/einbau-uhr.json": UHR_FREI } } });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S2c: Marke 'V10 2 1' ist kein V1: KEIN Kauf von The Red Pill",
+    trpGekauft(w) === 0, JSON.stringify(w.kaeufe.map((k) => k.a)));
+}
+{
+  // S3: The Red Pill steckt schon im Spielstand (Handkauf oder alte Fassung),
+  // V2, Sperre offen, drei Kampfstuecke warten. Die Dauersperre `ausgangSteht`
+  // (nur im Hackingweg sinnvoll, dort baut bn4rep nach dem Ausgangsstueck nie
+  // mehr ein) darf den Einbau im V2 nicht mehr verhindern.
+  const w = weltGang({
+    geld: 5e9,
+    faktionen: { "Slum Snakes": { favor: 0, rep: 3e6,
+      augs: ["The Red Pill", "Bionic Arms", "Bionic Legs", "Bionic Spine"] } },
+    installiert: ["The Red Pill", ...Array.from({ length: 11 }, (_, i) => "Alt-" + i)],
+    warteschlange: ["Bionic Arms", "Bionic Legs", "Bionic Spine"],
+    skills: { hacking: 400 },
+    schlafBudget: 60,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S3: V2, Red Pill eingebaut, 3 Kampfstuecke warten: Einbau findet statt",
+    w.installAufrufe === 1 && r.ende === "return",
+    "install " + w.installAufrufe + ", Ende " + r.ende);
+}
+{
+  // S3b: die Zwangsregel `redPillWartet` (Einbau unabhaengig von der
+  // Mindestwarteschlange) darf im V2 nicht greifen: Red Pill + EIN Kampfstueck
+  // = 2 Stuecke < 3. Ein Handkauf von TRP sperrt sonst das Mindestmass, das die
+  // Regel vom 28.08.2026 (Einbau kostet im Kampfknoten Stunden) erzwingt.
+  const w = weltGang({
+    geld: 5e9,
+    faktionen: { "Slum Snakes": { favor: 0, rep: 3e6,
+      augs: ["The Red Pill", "Bionic Arms"] } },
+    warteschlange: ["The Red Pill", "Bionic Arms"],
+    skills: { hacking: 400 },
+    schlafBudget: 30,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S3b: V2, Red Pill WARTET (2 Stuecke < 3): kein Zwangseinbau",
+    w.installAufrufe === 0, "install " + w.installAufrufe);
+}
+{
+  // S3c: der Daedalus-Fuellstueck-Pfad (H2, kurz vor dem Einbau, wenn der
+  // Einbau bei Schwelle-1 Stuecken landen wuerde) sammelt seine Kandidaten
+  // selbst - und waehlt das BILLIGSTE kaufbare. The Red Pill kostet 0. Auch
+  // dieser zweite Kaufpfad darf im V2 kein TRP kaufen.
+  const w = weltGang({
+    geld: 5e9,
+    faktionen: { "Slum Snakes": { favor: 0, rep: 3e6,
+      augs: ["The Red Pill", "Bionic Arms", "Bionic Legs", "Bionic Spine"] } },
+    installiert: Array.from({ length: 26 }, (_, i) => "Alt-" + i),
+    warteschlange: ["Bionic Arms", "Bionic Legs", "Bionic Spine"],
+    skills: { hacking: 400 },
+    schlafBudget: 60,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("S3c: V2, Einbau bei 26+3 = 29 von 30 (Fuellstueck-Pfad): KEIN Kauf von The Red Pill",
+    trpGekauft(w) === 0, JSON.stringify(w.kaeufe.map((k) => k.a)));
+  pruefe("S3c: der Einbau lief (der Fuellstueck-Block wurde ueberhaupt erreicht)",
+    w.installAufrufe === 1 && r.ende === "return", "install " + w.installAufrufe + ", Ende " + r.ende);
+}
+for (const [marke, knoten] of [["V1 5 2", 5], ["V1b 15 1", 15], ["V1 2 1", 2]]) {
+  // Gegenprobe: im Hackingweg (V1/V1b, Knoten stimmt) bleibt The Red Pill ein
+  // Kaufkandidat. Ohne diese Probe waere "nie kaufen" ebenfalls gruen.
+  const w = baueWelt({
+    host: "werk-0", knoten, moneyMult: 1, geld: 5e9, einkommen: 1e6,
+    faktionen: { Daedalus: { favor: 150, rep: 3e6, augs: ["The Red Pill"] } },
+    augs: { "The Red Pill": { repReq: 2.5e6, basis: 0 } },
+    installiert: Array.from({ length: 30 }, (_, i) => "Alt-" + i),
+    warteschlange: [],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": marke, "data/company-order.txt": "off" } },
+    schlafBudget: 6,
+    beiSchlaf: backupGruen,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("Gegenprobe '" + marke + "' in Knoten " + knoten + ": The Red Pill wird gekauft",
+    trpGekauft(w) === 1, JSON.stringify(w.kaeufe.map((k) => k.a)));
+}
+{
+  // S5: Telemetrie im Hackingweg: v1Positiv true. Der Ruf (1 Mio) reicht fuer
+  // The Red Pill noch nicht - das offene Stueck haelt die Runde im
+  // Arbeitszweig, der die Telemetrie schreibt.
+  const w = baueWelt({
+    host: "werk-0", knoten: 5, moneyMult: 1, geld: 5e9, einkommen: 1e6,
+    faktionen: { Daedalus: { favor: 150, rep: 1e6, augs: ["The Red Pill"] } },
+    augs: { "The Red Pill": { repReq: 2.5e6, basis: 0 } },
+    installiert: Array.from({ length: 30 }, (_, i) => "Alt-" + i),
+    warteschlange: [],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": "V1 5 2", "data/company-order.txt": "off" } },
+    schlafBudget: 6,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  const tele = teleVon(w);
+  pruefe("S5: V1 'V1 5 2' in Knoten 5: Telemetrie nennt v1Positiv true und v1LeseFehler 0",
+    !!tele && tele.v1Positiv === true && tele.v1LeseFehler === 0,
+    JSON.stringify(tele && { v1Positiv: tele.v1Positiv, v1LeseFehler: tele.v1LeseFehler }));
+}
+{
+  // Gegenprobe zum Ausgang: V1, Red Pill eingebaut, Hacking unter dem Ziel ->
+  // die Dauersperre gilt weiter (kein Einbau), obwohl wartend >= 3.
+  const w = baueWelt({
+    host: "werk-0", knoten: 5, moneyMult: 1, geld: 5e9, einkommen: 1e6,
+    faktionen: { Daedalus: { favor: 150, rep: 3e6, augs: ["Bionic Arms", "Bionic Legs", "Bionic Spine"] } },
+    augs: AUGS_GANG,
+    installiert: ["The Red Pill", ...Array.from({ length: 30 }, (_, i) => "Alt-" + i)],
+    warteschlange: ["Bionic Arms", "Bionic Legs", "Bionic Spine"],
+    arbeit: { type: "FACTION", factionName: "Daedalus", factionWorkType: "hacking" },
+    fokus: true,
+    skills: { hacking: 400 },
+    dateien: { home: { "data/verfahren.txt": "V1 5 2", "data/company-order.txt": "off" } },
+    schlafBudget: 40,
+    beiSchlaf: backupGruen,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("Gegenprobe V1 + Red Pill eingebaut: ausgangSteht sperrt jeden weiteren Einbau",
+    w.installAufrufe === 0, "install " + w.installAufrufe);
+}
+{
+  // S6 (Skeptiker-Auflage zu GANG-2, 03.10.2026): die Dauersperre `ausgangSteht`
+  // wird nur mit POSITIVEM V2-Nachweis geloest, nie "im Zweifel". The Red Pill
+  // eingebaut + drei Kampfstuecke warten, Kampfwerte 1000, Einbau-Uhr frei,
+  // imBladeburner true (das sind die Tore, die den Einbau sonst von selbst
+  // abfangen koennten - sie sind hier ALLE offen, damit allein die Sperre
+  // zaehlt). Fehlt die Marke, ist sie leer, nennt sie einen fremden Knoten oder
+  // ein unbekanntes Kuerzel, dann kann es der Hackingweg sein, und ein Einbau
+  // dort wirft die Hacking-Erfahrung auf Level 1 zurueck - nicht umkehrbar.
+  const weltTrpEingebaut = (marke) => weltGang({
+    knoten: 5,
+    geld: 5e9,
+    faktionen: { "Slum Snakes": { favor: 0, rep: 3e6,
+      augs: ["The Red Pill", "Bionic Arms", "Bionic Legs", "Bionic Spine"] } },
+    installiert: ["The Red Pill", ...Array.from({ length: 11 }, (_, i) => "Alt-" + i)],
+    warteschlange: ["Bionic Arms", "Bionic Legs", "Bionic Spine"],
+    skills: { hacking: 400 },
+    imBladeburner: true,
+    dateien: { home: marke === null
+      ? { "data/einbau-uhr.json": UHR_FREI }
+      : { "data/verfahren.txt": marke, "data/einbau-uhr.json": UHR_FREI } },
+    schlafBudget: 60,
+  });
+  // Kontrolle: mit positivem V2-Nachweis (richtiger Knoten) laeuft derselbe
+  // Aufbau in den Einbau. Ohne diese Probe waere "0 Einbauten" unten auch dann
+  // gruen, wenn die Runde den Einbau-Zweig nie erreicht.
+  {
+    const w = weltTrpEingebaut("V2 5 1");
+    const r = await fahre(w);
+    vollstaendig(r);
+    pruefe("S6 Kontrolle: Marke 'V2 5 1' in Knoten 5, Red Pill eingebaut, 3 Kampfstuecke: Einbau findet statt",
+      w.installAufrufe === 1 && r.ende === "return",
+      "install " + w.installAufrufe + ", Ende " + r.ende);
+  }
+  for (const [marke, was] of [
+    [null, "Marke fehlt"],
+    ["", "Marke leer"],
+    ["V1 4 2", "fremder Knoten (V1 4 2 in Knoten 5)"],
+    ["V1c 5 2", "unbekanntes Kuerzel (V1c)"],
+    ["V2 4 1", "V2-Marke eines fremden Knotens"],
+    ["V1 5 2", "V1-Marke des eigenen Knotens"],
+  ]) {
+    const w = weltTrpEingebaut(marke);
+    const r = await fahre(w);
+    vollstaendig(r);
+    pruefe("S6: Red Pill eingebaut, 3 Kampfstuecke warten, " + was + ": KEIN Einbau",
+      w.installAufrufe === 0, "install " + w.installAufrufe + ", Ende " + r.ende);
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P0 G02: Hacknet-Stuecke nur dort, wo nach dem Einbau Hacknet-Server gekauft werden --");
+// Die Hacknet-Augs wirken erst NACH dem Einbau, und der Einbau loescht alle
+// Hacknet-Server (PlayerObjectGeneralMethods.ts:130-131). Den SF9.3-Gratisserver
+// gibt es nur beim Knotenwechsel (Prestige.ts:327-339); neu gekauft wird nur in
+// BN9 (src/hacknet.js). Die alte Regel `mitHashes` = "SF9 vorhanden" kaufte die
+// vier Stuecke in jedem V2-Knoten (BN2.1: 8,92 Mrd, 43,7 % der Aug-Ausgaben).
+const NIC = "Hacknet Node NIC Architecture Neural-Upload";
+const AUGS_HASH = {
+  [NIC]: { repReq: 3.75e3, basis: 4.5e6 },
+  "Bionic Arms": { repReq: 62.5e3, basis: 4.3e8, stats: { strength: 1.3, dexterity: 1.3 } },
+  [NFG]: { repReq: 1000, basis: 1e6 },
+};
+for (const [knoten, erwartet] of [[2, false], [3, false], [11, false], [15, false], [9, true]]) {
+  const w = baueWelt({
+    host: "werk-0", knoten, moneyMult: 1, geld: 50e9, einkommen: 1e6,
+    // SF9 ist in ALLEN Faellen da - nur der Knoten soll entscheiden.
+    ownedSF: [[4, 3], [5, 1], [9, 3]],
+    faktionen: { Netburners: { favor: 0, rep: 50e3, augs: [NIC] },
+      "Slum Snakes": { favor: 0, rep: 70e3, augs: ["Bionic Arms"] } },
+    augs: AUGS_HASH,
+    installiert: Array.from({ length: 12 }, (_, i) => "Alt-" + i),
+    warteschlange: [],
+    fokus: true,
+    dateien: { home: { "data/verfahren.txt": "V2 " + knoten + " 1", "data/einbau-uhr.json": UHR_FREI } },
+    schlafBudget: 8,
+    beiSchlaf: backupGruen,
+  });
+  const r = await fahre(w);
+  vollstaendig(r);
+  pruefe("G02 Knoten " + knoten + " (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)",
+    w.kaeufe.some((k) => k.a === "Bionic Arms"), JSON.stringify(w.kaeufe.map((k) => k.a)));
+  const nic = w.kaeufe.filter((k) => k.a === NIC).length;
+  pruefe("G02 Knoten " + knoten + " (SF9.3 da): Hacknet-Stueck " + (erwartet ? "WIRD" : "wird NICHT") + " gekauft",
+    (nic === 1) === erwartet, "Hacknet-Kaeufe: " + nic + " " + JSON.stringify(w.kaeufe.map((k) => k.a)));
+}
+}
+
+// ===========================================================================
+// ZUSAMMENFUEHRUNG P0 + P1 + P2 (04.10.2026, Zweig integ-gang-2026-10-04):
+// DER VERTRAG ZWISCHEN bn4rep.js UND gang.js ZUR LAUFZEIT
+// ===========================================================================
+//
+// gang.js gruendet erst, wenn data/bn4rep.json "v1Positiv: false" (Paket 0) und
+// "gateBuy: true" (Paket 1) meldet, frisch ist und zum Knoteneintritt gehoert
+// (checkPrereq). test-gang.js prueft dafuer nur die QUELLE von bn4rep.js. Hier
+// laeuft die vereinte bn4rep.js wirklich, und ihre geschriebene Telemetrie geht
+// durch dieselbe Pruefung - Feldnamen, Typen, Frische und Knoteneintritt.
+console.log("\n-- Z1 Vertrag bn4rep.js -> gang.js: die echte Telemetrie besteht die Voraussetzungssperre --");
+{
+  const GANG = await ladeSpielskript(path.join(SRC, "gang.js"));
+  const reset = { currentNode: 2, lastNodeReset: 1 };   // wie getResetInfo() des Nachbaus
+  // Ein Kampfknoten ohne Gang (V2-Marke), wie vor der Gruendung: kaufen laeuft in der
+  // alten Schleife, aber die Telemetrie muss die Sperre schon jetzt freigeben.
+  const w = weltGang({ gang: { da: false }, schlafBudget: 4,
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const t = teleVon(w);
+  pruefe("die Runde schreibt data/bn4rep.json", !!t);
+  pruefe("Paket 0: v1Positiv ist ein Boolean und false (V2-Marke -> The Red Pill kein Kandidat)",
+    !!t && t.v1Positiv === false, t ? String(t.v1Positiv) : "keine Telemetrie");
+  pruefe("Paket 1: gateBuy ist true (der Kaufaufschub steckt in dieser Fassung)",
+    !!t && t.gateBuy === true, t ? String(t.gateBuy) : "keine Telemetrie");
+  pruefe("knoten, nodeReset und zeit stehen drin (Knoteneintritt und Frische)",
+    !!t && t.knoten === 2 && t.nodeReset === 1 && Number.isFinite(t.zeit), t ? JSON.stringify([t.knoten, t.nodeReset, t.zeit]) : "-");
+  const urteil = t ? GANG.checkPrereq(t, t.zeit + 5000, reset) : { ok: false, missing: ["keine Telemetrie"] };
+  pruefe("gang.js checkPrereq: ok mit der echten Telemetrie von bn4rep.js",
+    urteil.ok === true, urteil.missing.join(" | "));
+  // Gegenprobe: dieselbe Telemetrie in einem V1-Knoten (Marke V1 fuer diesen Knoten) -> die Sperre MUSS zu sein.
+  const w1 = weltGang({ gang: { da: false }, schlafBudget: 4,
+    // Einbausperre, damit die Runde die Telemetrie erreicht (sonst baut der V1-Knoten ein und
+    // die Runde endet vorher mit `continue`).
+    dateien: { home: dGang({ "data/verfahren.txt": "V1 2 1", "data/einbau-uhr.json": einbauUhrJung(),
+      "data/install-sperre.txt": JSON.stringify({ ts: 1_790_442_188_000, reason: "test", bis: 1_790_442_188_000 + 10 * 3600000 }) }) } });
+  const r1 = await fahre(w1);
+  const t1 = teleVon(w1);
+  pruefe("Gegenprobe V1-Marke: v1Positiv true -> checkPrereq sperrt (The Red Pill waere Kaufkandidat)",
+    !!t1 && t1.v1Positiv === true && GANG.checkPrereq(t1, t1.zeit + 5000, reset).ok === false,
+    vollHinweis(r1) + " " + (t1 ? String(t1.v1Positiv) : "keine Telemetrie"));
 }
 
 console.log("");

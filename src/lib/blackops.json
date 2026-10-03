@@ -1,93 +1,471 @@
 {
  "hinweis": "ERZEUGT von tools/blackops-tabelle.js aus reference/v301/src/Bladeburner/data/BlackOperations.ts. Nicht von Hand pflegen.",
- "erzeugtAm": "2026-09-04T04:40:29.920Z",
+ "erzeugtAm": "2026-10-03T21:01:12.296Z",
  "warnung": "reqdRank ist eine FREISCHALTSCHWELLE, keine Abschlussbedingung. Wer den Rang hat, darf die Aktion angehen - erledigt hat er sie nicht. Eine Restzeit, die nur den Rang kennt, ist eine UNTERE Schranke und darf keinen Einbau blockieren.",
  "anzahl": 21,
  "hoechsterRang": 400000,
  "ops": [
   {
    "name": "OperationTyphoon",
-   "rang": 2500
+   "rang": 2500,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationZero",
-   "rang": 5000
+   "rang": 5000,
+   "weights": {
+    "hacking": 0.2,
+    "strength": 0.15,
+    "defense": 0.15,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationX",
-   "rang": 7500
+   "rang": 7500,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationTitan",
-   "rang": 10000
+   "rang": 10000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationAres",
-   "rang": 12500
+   "rang": 12500,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.25,
+    "defense": 0.25,
+    "dexterity": 0.25,
+    "agility": 0.25,
+    "charisma": 0,
+    "intelligence": 0
+   },
+   "decays": {
+    "hacking": 0,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationArchangel",
-   "rang": 15000
+   "rang": 15000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.3,
+    "agility": 0.3,
+    "charisma": 0,
+    "intelligence": 0
+   },
+   "decays": {
+    "hacking": 0,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationJuggernaut",
-   "rang": 20000
+   "rang": 20000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.25,
+    "defense": 0.25,
+    "dexterity": 0.25,
+    "agility": 0.25,
+    "charisma": 0,
+    "intelligence": 0
+   },
+   "decays": {
+    "hacking": 0,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationRedDragon",
-   "rang": 25000
+   "rang": 25000,
+   "weights": {
+    "hacking": 0.05,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.25,
+    "agility": 0.25,
+    "charisma": 0,
+    "intelligence": 0.05
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationK",
-   "rang": 30000
+   "rang": 30000,
+   "weights": {
+    "hacking": 0.05,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.25,
+    "agility": 0.25,
+    "charisma": 0,
+    "intelligence": 0.05
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationDeckard",
-   "rang": 40000
+   "rang": 40000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.24,
+    "defense": 0.24,
+    "dexterity": 0.24,
+    "agility": 0.24,
+    "charisma": 0,
+    "intelligence": 0.04
+   },
+   "decays": {
+    "hacking": 0,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationTyrell",
-   "rang": 50000
+   "rang": 50000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationWallace",
-   "rang": 75000
+   "rang": 75000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.24,
+    "defense": 0.24,
+    "dexterity": 0.24,
+    "agility": 0.24,
+    "charisma": 0,
+    "intelligence": 0.04
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationShoulderOfOrion",
-   "rang": 100000
+   "rang": 100000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationHyron",
-   "rang": 125000
+   "rang": 125000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationMorpheus",
-   "rang": 150000
+   "rang": 150000,
+   "weights": {
+    "hacking": 0.05,
+    "strength": 0.15,
+    "defense": 0.15,
+    "dexterity": 0.3,
+    "agility": 0.3,
+    "charisma": 0,
+    "intelligence": 0.05
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationIonStorm",
-   "rang": 175000
+   "rang": 175000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.24,
+    "defense": 0.24,
+    "dexterity": 0.24,
+    "agility": 0.24,
+    "charisma": 0,
+    "intelligence": 0.04
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationAnnihilus",
-   "rang": 200000
+   "rang": 200000,
+   "weights": {
+    "hacking": 0,
+    "strength": 0.24,
+    "defense": 0.24,
+    "dexterity": 0.24,
+    "agility": 0.24,
+    "charisma": 0,
+    "intelligence": 0.04
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationUltron",
-   "rang": 250000
+   "rang": 250000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationCenturion",
-   "rang": 300000
+   "rang": 300000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationVindictus",
-   "rang": 350000
+   "rang": 350000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   },
   {
    "name": "OperationDaedalus",
-   "rang": 400000
+   "rang": 400000,
+   "weights": {
+    "hacking": 0.1,
+    "strength": 0.2,
+    "defense": 0.2,
+    "dexterity": 0.2,
+    "agility": 0.2,
+    "charisma": 0,
+    "intelligence": 0.1
+   },
+   "decays": {
+    "hacking": 0.6,
+    "strength": 0.8,
+    "defense": 0.8,
+    "dexterity": 0.8,
+    "agility": 0.8,
+    "charisma": 0,
+    "intelligence": 0.75
+   }
   }
  ]
 }

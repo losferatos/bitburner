@@ -196,7 +196,44 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // vorher wie nachher 175,35 GB, gleich dem Live-Wert vom 03.10. Nur der
     // Hash der Messzeile passt nicht mehr - Live-Nachmessung nach dem
     // Einspielen, dieser Auftrag hat keinen Spielzugriff.
-    const VERALTET_ERLAUBT = [];
+    //
+    // 2026-10-03 (Paket P1 / AUG-4, Kaufaufschub und Torrunde im Kampfknoten mit
+    // Gang): bn4rep.js und lib/einbau.js haben neuen Inhalt. Neu im Quelltext
+    // sind ns.gang.inGang und ns.gang.getBonusTime - beide 0 GB
+    // (RamCostGenerator.ts:273 und :296), tools/ram.js rechnet vorher wie
+    // nachher 10,85 GB Basis / 57,7 GB Singularity (SF4.3), registry.json
+    // bleibt gleich. Nur die Hashes der beiden Messzeilen passen nicht mehr -
+    // Live-Nachmessung nach dem Einspielen, dieser Auftrag hat keinen
+    // Spielzugriff.
+    //
+    // 2026-10-04 (Skeptiker-Reparatur zu P1 / AUG-4): blade.js, bn4rep.js,
+    // lib/einbau.js und lib/hackaugs.js haben neuen Inhalt. blade.js ruft
+    // ns.bladeburner.getSkillLevel zusaetzlich fuer Reaper und Evasive System
+    // in der Lagedatei - dieselbe Funktion, die das Skript schon an anderen
+    // Stellen ruft, also kein neuer RAM-Posten. bn4rep.js liest und schreibt
+    // nur Dateien (data/torrunde-wait.json). tools/ram.js rechnet vorher wie
+    // nachher 934,05 GB (bn4rep.js, SF4.1) und 175,35 GB (blade.js). Nur die
+    // Hashes der Messzeilen passen nicht mehr - Live-Nachmessung nach dem
+    // Einspielen, dieser Auftrag hat keinen Spielzugriff.
+    //
+    // 2026-10-03 (Paket 0, GANG-2 + G02): bn4rep.js (positiver V1-Nachweis,
+    // Zaehler, Telemetriefelder), hacknet.js (ein Import aus lib/hackaugs.js,
+    // drei Bedingungen) und lib/hackaugs.js (neue reine Funktion
+    // hacknetNachEinbau) haben neuen Inhalt. KEINE neue ns-Funktion: tools/ram.js
+    // rechnet vorher wie nachher 934,05 GB (bn4rep.js, SF4.1), 10,45 GB
+    // (hacknet.js) und 1,6 GB (lib/hackaugs.js); `ram.js --registry` bleibt
+    // gruen. Nur der Hash der Messzeilen passt nicht mehr - Live-Nachmessung
+    // (tools/eichung-messen.js) nach dem Einspielen, dieser Auftrag hat keinen
+    // Spielzugriff. blade.js steht NICHT hier: das ist der Altbefund vom
+    // 03.10. (Black-Op-Gym-Ausstieg), nicht dieser Aenderung.
+    //
+    // 2026-10-04 (Integration P0 + P1 + P2 im Zweig integ-gang-2026-10-04): die
+    // Vereinigung aller von den drei Paketen angefassten Quelldateien steht hier,
+    // damit das Zusammenspiel nicht an einer unbemerkten Messluecke haengt.
+    // gang.js (P2) ist neu und steht in keiner Messzeile. Alle Eintraege gelten
+    // bis zur Live-Nachmessung (tools/eichung-messen.js nach dem Einspielen);
+    // danach wird die Liste wieder auf [] gesetzt.
+    const VERALTET_ERLAUBT = ["bn4rep.js", "blade.js", "hacknet.js", "lib/einbau.js", "lib/hackaugs.js"];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

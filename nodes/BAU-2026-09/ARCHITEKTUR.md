@@ -496,6 +496,54 @@ Marke `data/beitritt-erledigt.txt`, die `bn4life.js` vor dem naechsten Start
 prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
 18·16).
 
+**`gang.js` steht seit 03.10.2026 darin** (Audit GANG-1, Paket P2): Kampfgang in
+BN2 gruenden und fuehren. `verfahren: "V2"`, `knoten: [2]` - die Knotennummer ist
+hier DATEN wie in `route.json` (der Code von gang.js kennt keine Nummer; die
+Gruendung scheitert ausserhalb BN2 ohne Karma von selbst). `priority: 16` heisst
+hinter `blade.js` (10) und `bn4rep.js` (14): die Gang darf nie Platz
+beanspruchen, den die beiden Traeger brauchen. `precondition.requiresFile:
+"data/gang-an.txt"` ist der SCHALTER - die Datei liegt nicht im Repo, kein Skript
+schreibt sie (Handbremse wie `bn4-stop.txt`, Ausnahme in `VON_AUSSEN` von
+`tools/registry-bauen.js`). `ramSingGb: 1` ist allein
+`singularity.getFactionRep` (Ruf der Kandidatenfaktionen vor der Gruendung);
+bei SF4.1 kostet der Aufruf 16 GB (Faktor 16), bei SF4.3 eines. `ramBaseGb`
+20,85 ergibt 21,85 GB bei SF4.3 und 36,85 GB bei SF4.1 (`tools/ram.js`; die Angabe
+45,85 aus dem ersten Baubericht war falsch; die Reparatur vom 03.10.2026 hat
+`getResetInfo` fuer die Voraussetzungssperre dazugenommen, +1 GB). Die Gang
+selbst braucht keine Figur (`needsFigure: "none"`, verify-g01-betrieb.md
+Abschnitt 4).
+
+**Der Schalter reicht nicht - Voraussetzung ist Paket 0 UND Paket 1, und gang.js
+prueft das selbst** (Skeptiker-Auflage 1, 03.10.2026). Ohne Paket 1 kauft die
+Kaufschleife von `bn4rep.js` jedes Gang-Stueck sofort (Zyklus 1: x1,24 statt
+x2,6 bis x3,9), ohne Paket 0 in der Runde mit 2,5 Mio Gang-Ruf The Red Pill; die
+Gruendung wie der TRP-Kauf sind bis zum Knotenende nicht rueckgaengig zu machen.
+Vor jedem `createGang` liest `gang.js` deshalb `data/bn4rep.json` und gruendet
+nur, wenn die Datei frisch ist (30 min), zum laufenden Knoteneintritt gehoert
+(`knoten` UND `nodeReset` gleich `getResetInfo()`), `v1Positiv` ein Boolean und
+false ist (Paket 0, Feld aus dem Paket-0-Bau) und `gateBuy` true ist (Paket 1).
+**Vertrag:** Paket 1 muss `gateBuy: true` in den Telemetrieblock von `bn4rep.js`
+schreiben; heisst das Feld bei der Uebernahme anders, ist es eine Konstante in
+`gang.js` (`PREREQ_P1_FIELD`) - bis dahin gruendet `gang.js` nicht (fail closed,
+`blockedReason: "prereq_missing"`, Einzelheiten in `prereq.missing`).
+
+**Einschalten, in dieser Reihenfolge** (Skeptiker-Auflage 2): (1) Paket 0 und
+Paket 1 im Spiel, `data/bn4rep.json` zeigt `v1Positiv: false` und
+`gateBuy: true`. (2) `registry.json` mit dem gang.js-Eintrag im Spiel UND danach
+den Kern neu starten (`node tools/neustart.js bn4net.js`): `bn4net.js` liest die
+Registry genau einmal beim Start (`bn4net.js:95-108`, Schleife ab :888), ein
+laufender Kern kennt `gang.js` nicht, und der Schalter bliebe bis zum naechsten
+Einbau wirkungslos. (3) Im bn4net-Log muss `gang.js wartet: wartet auf
+data/gang-an.txt.` stehen (alle 30 Runden). (4) Erst dann `data/gang-an.txt`
+legen. Ein zu frueh gelegter Schalter richtet dank der Sperre nichts an.
+
+**Uebernahme ins Live-Repo:** per `git cherry-pick` der Commits (nicht per
+Einzeldatei-Checkout - der ersetzte die geteilten Dateien `registry.json`,
+`ARCHITEKTUR.md`, `test-alles.js`, `registry-bauen.js`, `gang-sim.mjs` als
+Ganzes und verwuerfe Aenderungen von Paket 0/1). Danach `registry.json` mit
+`node tools/registry-bauen.js` aus diesem Block NEU erzeugen (nie von Hand
+mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
+
 ```json
 {
   "schema": 1,
@@ -1184,6 +1232,34 @@ prueft. Mit `tools/ram.js` nachgerechnet (SF4.1: 293,85 GB gesamt = 5,85 +
       "maxInstances": 1,
       "killSafe": true,
       "precondition": {}
+    },
+    {
+      "name": "gang.js",
+      "args": [],
+      "ramBaseGb": 20.85,
+      "ramSingGb": 1,
+      "ramMeasuredAt": "GERECHNET-2026-10-03 (tools/ram.js, Paket P2 nach der Reparatur: +1 GB getResetInfo fuer die Voraussetzungssperre; noch keine Live-Nachmessung im Spiel)",
+      "verfahren": "V2",
+      "knoten": [2],
+      "phase": "normal",
+      "telemetryFile": "data/gang.json",
+      "scpToHome": true,
+      "freshnessMs": 600000,
+      "taktMs": 2000,
+      "hostRule": "werkbank",
+      "priority": 16,
+      "evictRank": 16,
+      "needsFigure": "none",
+      "needsLibs": [
+        "lib/hostdatei.js"
+      ],
+      "singularity": true,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {
+        "requiresFile": "data/gang-an.txt"
+      }
     }
   ],
   "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing."

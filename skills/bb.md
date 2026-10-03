@@ -67,6 +67,7 @@ sag Eric das in einem Halbsatz.
 | `ZAEH` | Die ETA ist gegenüber dem letzten Besuch **gestiegen**. Nachsehen, woran (Abschnitt 3), aber nichts umbauen. |
 | `STEHT` | Der Rang bewegt sich nicht. Erst `node tools/rueckstand.js` — hängt das Spiel nur der Uhr hinterher, ist nichts kaputt. Sonst Abschnitt 3. |
 | `HILFE` | Der Bot hat selbst `data/hilfe.txt` geschrieben (nur noch `bbtrain.js`). Den Text lesen und Eric sagen, was er bedeutet. |
+| `TORRUNDE-BEFUND`-Zeile im Bericht | Nur im Kampfknoten mit Gang. Der Kaufaufschub (P1) hat einen Fehler gezaehlt: `P1 IST AUS` heisst, der Torrunden-Block wirft und `bn4rep.js` kauft mit der alten Schleife trotz Einbausperre alles Verdiente. Die Ursache steht im Befund (letzter Fehler) und in `data/bn4rep.json` -> `torRunde`; eintragen und Eric in einem Halbsatz sagen. Die Zeile "Torrunde: ..." davor nennt Modus, Plan und Wartegrund (Gang-Vorrat). |
 | `ACHTUNG`-Zeile im Bericht | Der Rang liegt über 400.000, aber die Black-Ops-Liste war nicht lesbar. Eine Minute später erneut messen. |
 | `SPIEL ZU` | Kein Fehler. Eric sagen, dass der Tab zu ist — mehr nicht. |
 | `BLIND` | Brücke starten (oben), dann neu messen. |

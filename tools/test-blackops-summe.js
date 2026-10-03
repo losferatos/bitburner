@@ -87,10 +87,21 @@ for (const teil of teile) {
   const mR = /reqdRank:\s*([0-9_.e+]+)/.exec(teil);
   const mG = /rankGain:\s*([0-9_.]+)/.exec(teil);
   if (!mR || !mG) continue;
+  // Gewichte und Abklingexponenten (P1/AUG-4): bn4rep.js rechnet damit die
+  // Erfolgschance der naechsten Black Op (lib/einbau.js waehleTorRunde).
+  const zahlen = (feld) => {
+    const m = new RegExp(feld + ":\\s*\\{([^}]*)\\}").exec(teil);
+    if (!m) return null;
+    const o = {};
+    for (const e of m[1].matchAll(/(\w+):\s*([0-9.]+)/g)) o[e[1]] = Number(e[2]);
+    return o;
+  };
   ops.push({
     name,
     reqdRank: Number(mR[1].replace(/_/g, "")),
     rankGain: Number(mG[1]),
+    weights: zahlen("weights"),
+    decays: zahlen("decays"),
   });
 }
 
@@ -141,7 +152,9 @@ pruefe("kein Einzelwert ueber 1.000",
   ops.filter((o) => o.rankGain > 1000).map((o) => o.name).join(", "));
 
 // Und die Tabelle, mit der das Gewerk arbeitet.
-const tabelleDatei = path.join(ROOT, "src", "lib", "blackops.json");
+// BN4REP_SRC wie in den bn4rep-Tests: dieselbe Pruefung gegen einen alten Stand.
+const tabelleDatei = path.join(process.env.BN4REP_SRC ? path.resolve(process.env.BN4REP_SRC) : path.join(ROOT, "src"),
+  "lib", "blackops.json");
 if (fs.existsSync(tabelleDatei)) {
   const tab = JSON.parse(fs.readFileSync(tabelleDatei, "utf8"));
   pruefe("src/lib/blackops.json kennt dieselbe Zahl an Operationen",
@@ -153,6 +166,21 @@ if (fs.existsSync(tabelleDatei)) {
       .map((o) => o.name).join(", "));
   pruefe("und denselben Hoechstrang",
     tab.hoechsterRang === 400000, String(tab.hoechsterRang));
+  // P1/AUG-4: die Gewichte, mit denen bn4rep.js die Runde am Einbau-Tor plant.
+  const gleich = (a, b) => !!a && !!b && JSON.stringify(Object.entries(a).sort())
+    === JSON.stringify(Object.entries(b).sort());
+  pruefe("und dieselben Gewichte (weights) je Operation",
+    tab.ops.every((o, i) => ops[i] && gleich(o.weights, ops[i].weights)),
+    tab.ops.filter((o, i) => !ops[i] || !gleich(o.weights, ops[i].weights))
+      .map((o) => o.name).join(", "));
+  pruefe("und dieselben Abklingexponenten (decays) je Operation",
+    tab.ops.every((o, i) => ops[i] && gleich(o.decays, ops[i].decays)),
+    tab.ops.filter((o, i) => !ops[i] || !gleich(o.decays, ops[i].decays))
+      .map((o) => o.name).join(", "));
+  pruefe("jeder gewichtete Wert hat einen Abklingexponenten > 0",
+    tab.ops.every((o) => !!o.weights && !!o.decays
+      && Object.entries(o.weights).every(([s, w]) => !(w > 0) || o.decays[s] > 0)),
+    "sonst rechnet Math.pow(x, undefined) NaN durch die Competence");
 } else {
   pruefe("src/lib/blackops.json liegt vor", false, "fehlt");
 }

@@ -32,6 +32,8 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./lib/rangkurve.js";
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
+import { gateRoundStatus } from "./lib/gate-round-status.js";
+import { gangZeile } from "./lib/gangzeile.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -751,6 +753,15 @@ async function main() {
         sag("GYM-FENSTER: blade.js steht seit " + ((Date.now() - bl.gymSeit) / 3600000).toFixed(1)
           + " h im Gym (nichts ueber Schwelle) - kein Rang in dieser Zeit.");
       }
+      // DIE GANG (03.10.2026, Skeptiker-Hinweis "kein /bb-Leser fuer gang.json").
+      // Eine Zeile, oder keine, wenn gang.js nie lief (keine Datei). Die Zeile
+      // selbst baut tools/lib/gangzeile.js - rein, damit test-gang.js sie prueft.
+      const gangTel = await holeJson("data/gang.json");
+      const gangText = gangZeile(gangTel, Date.now());
+      if (gangText) {
+        sag(gangText);
+        bericht.gang = gangText;
+      }
     }
 
     // Die drei Autonomie-Kennzahlen, sobald sie einen Wert haben. Sie sind
@@ -830,6 +841,29 @@ async function main() {
         }
       } catch { /* kein Buch - dann gab es keinen Eingriff seit dem Start */ }
     } catch { /* die Bruecke antwortet nicht - das steht schon oben */ }
+  }
+
+  // --- 5c. Die Torrunde im Kampfknoten mit Gang (P1 / AUG-4) ----------------
+  //
+  // Skeptiker-Auflage 1 (03.10.2026): bn4rep.js zaehlt die Fehler der
+  // Torrunde und schreibt ihren Modus nach data/bn4rep.json -> torRunde, und
+  // bis hierher las das niemand. Wirft der Block in jeder Runde, faellt
+  // bn4rep.js still auf die alte Kaufschleife zurueck, die trotz Einbausperre
+  // alles Verdiente kauft - P1 waere aus, ohne dass es jemand sieht. Dieser
+  // Abschnitt macht daraus Zeilen und BEFUNDE (mode error, gangErrors,
+  // buyFailures, planDrift). Ohne Gang gibt es nichts zu sagen. Die Zaehler
+  // werden mit dem letzten Besuch im selben Lauf verglichen ("+n seit ...").
+  {
+    const bn4repTele = await holeJson("data/bn4rep.json");
+    const vorherPunkt = [...punkte].reverse().find((p) =>
+      p && p.torRunde && p.knoten === knoten && p.lauf === laufJetzt);
+    const gate = gateRoundStatus({
+      tele: bn4repTele, blade, nowMs: Date.now(), before: vorherPunkt ? vorherPunkt.torRunde : null,
+    });
+    for (const z of gate.lines) sag(z);
+    for (const f of gate.findings) sag(f);
+    bericht.torRunde = gate.data;
+    bericht.torRundeBefunde = gate.findings;
   }
 
   // --- 6. Die Schlusszeile: wann ist der Knoten fertig? --------------------
@@ -943,6 +977,9 @@ async function main() {
         rate: b.rate ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
         etaQuelle: b.etaQuelle ?? null,
         traegerName: b.traegerName ?? null, traegerWert: b.traegerWert ?? null,
+        // Zaehler der Torrunde (gateRoundStatus): der naechste Besuch zeigt,
+        // was seitdem NEU hinzukam und was nur noch alt im Zaehler steht.
+        torRunde: b.torRunde ?? null,
       });
       // Nur die letzten 50 behalten - laenger zurueck braucht niemand.
       try {

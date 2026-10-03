@@ -855,6 +855,11 @@ export async function main(ns) {
       ns.write("data/blade.json", JSON.stringify({ zeit: Date.now(), wartend: true,
         host: ns.getHostname(), tiefstand: tiefWartend, kampfExp: expWartend,
         graftFortschritt: graftWartend, graftAug: graftAugWartend,
+        // Vor dem Beitritt gibt es keine Faehigkeiten: 0 und 0 ist die Wahrheit,
+        // kein Ersatzwert. Ohne die Felder meldete bn4rep.js (Torrunde) "keine
+        // Faehigkeitsstufen" - ein Fehlalarm in der Phase, in der eine Gang schon
+        // stehen kann, die Division aber noch nicht.
+        skillLevels: { reaper: 0, evasive: 0 }, skillLevelsError: null,
         nodeReset: knotenStempel }), "w");
       if (ns.getHostname() !== "home") ns.scp("data/blade.json", "home", ns.getHostname());
     } catch { /* egal */ }
@@ -1726,8 +1731,33 @@ export async function main(ns) {
         dauer = Math.round(ns.bladeburner.getActionTime(teile[0], teile[1]));
       }
     } catch { /* General-Aktionen haben keine Stufe */ }
+    // DIE ZWEI FAEHIGKEITSSTUFEN FUER DIE TORRUNDE (P1 / AUG-4, 03.10.2026).
+    //
+    // Reaper (+2 % je Stufe auf Staerke/Verteidigung/Geschicklichkeit/
+    // Beweglichkeit) und Evasive System (+4 % auf die letzten beiden) wirken
+    // IN die Potenz der Black-Op-Competence (Action.ts:173, Bladeburner.ts:
+    // 759-774) und kuerzen sich deshalb nicht aus dem Verhaeltnis zweier
+    // Augmentierungsrunden heraus. bn4rep.js plant die Gang-Runde am
+    // Einbau-Tor mit effektiven Stufen und liest sie hier ab; getSkillLevel
+    // kennt dieses Skript ohnehin, es kostet kein RAM.
+    //
+    // Ein Fehler wird NICHT verschluckt: er steht als skillLevelsError in der
+    // Datei, bn4rep.js zaehlt ihn in torRunde.gangErrors und tools/checkin.js
+    // meldet ihn. (Lehre vom 03.10.: vier tote Black-Op-Aufrufe, weil ein
+    // catch sie verschluckte.)
+    let skillLevels = null;
+    let skillLevelsError = null;
+    try {
+      skillLevels = {
+        reaper: ns.bladeburner.getSkillLevel("Reaper"),
+        evasive: ns.bladeburner.getSkillLevel("Evasive System"),
+      };
+    } catch (e) {
+      skillLevelsError = String(e && e.message ? e.message : e).slice(0, 120);
+    }
     ns.write("data/blade.json", JSON.stringify({
       zeit: Date.now(),
+      skillLevels, skillLevelsError,
       // DER KNOTENSTEMPEL (11.09.2026). Der Kern haelt diese Datei zehn
       // Minuten lang fuer frisch - auch ueber einen Knotenwechsel hinweg. Am
       // 10.09. reichte er so den Rang 444.908 aus BitNode 10 als Traeger in

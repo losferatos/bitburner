@@ -202,6 +202,22 @@ let normal = null;
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Reaper und Evasive System stehen in der Lagedatei (Torrunde, P1 / AUG-4) --");
+{
+  const m = await fahre({ fertigkeiten: { "Reaper": 12, "Evasive System": 13 } });
+  const l = lage(m);
+  pruefe("blade.json traegt skillLevels { reaper: 12, evasive: 13 } und keinen Fehler",
+    !!l && !!l.skillLevels && l.skillLevels.reaper === 12 && l.skillLevels.evasive === 13 && l.skillLevelsError === null,
+    JSON.stringify(l && { s: l.skillLevels, e: l.skillLevelsError }));
+  const m0 = await fahre({});
+  const l0 = lage(m0);
+  pruefe("ohne Fertigkeiten: Stufen 0 / 0 (bn4rep.js rechnet dann Faktor 1)",
+    !!l0 && !!l0.skillLevels && l0.skillLevels.reaper === 0 && l0.skillLevels.evasive === 0,
+    JSON.stringify(l0 && l0.skillLevels));
+}
+
 console.log("");
 console.log("-- leere Ausdauer: in die Kammer, nicht in den Einsatz --");
 {
@@ -638,6 +654,9 @@ console.log("-- Anlaufphase: weichtTraining steht in JEDER Ausweichrunde (22.09.
   pruefe("vor dem Beitritt: Herzschlag mit Tiefstand und Knotenstempel",
     !!ld && ld.wartend === true && ld.tiefstand === 80 && Number.isFinite(ld.nodeReset),
     ld ? JSON.stringify(ld) : "keine Lage");
+  pruefe("vor dem Beitritt: der Herzschlag traegt skillLevels 0 / 0 (keine Faehigkeiten, kein Fehlalarm in bn4rep.js)",
+    !!ld && !!ld.skillLevels && ld.skillLevels.reaper === 0 && ld.skillLevels.evasive === 0 && ld.skillLevelsError === null,
+    ld ? JSON.stringify(ld.skillLevels) : "keine Lage");
 }
 
 // ---------------------------------------------------------------------------

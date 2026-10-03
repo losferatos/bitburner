@@ -1220,6 +1220,45 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
+### P1 / AUG-4: Reste nach dem Skeptiker-Urteil AUFLAGE (04.10.2026)
+
+Die zwei Auflagen und vier der Hinweise sind im Branch `audit-p1-kaufaufschub`
+behoben (Leser `tools/lib/gate-round-status.js` im Check-in, Faehigkeiten
+Reaper/Evasive in der Potenz via `skillLevels` in `data/blade.json`, Wartegrenze
+30 min mit Zustand in `data/torrunde-wait.json`, Halt des Einbaus nach einer beim
+ersten Stueck abgebrochenen Runde, `einbau.json` spiegelt `torRunde`, Hacking-
+faktoren in `COMBAT_AUGS`). Offen, bewusst nicht gebaut:
+
+- **Einspielen: bn4rep.js UND blade.js zusammen.** bn4rep.js ohne das neue
+  blade.js plant mit rohen Stufen (bis zu 5 % schlechtere Competence); der
+  Check-in sagt es als Hinweiszeile ("Faehigkeiten NICHT eingerechnet"). Danach
+  die RAM-Messung live nachholen (`calculateRam` fuer bn4rep.js, blade.js,
+  lib/einbau.js, lib/hackaugs.js): `tools/ram.js` rechnet vorher wie nachher
+  934,05 GB (bn4rep.js, SF4.1) und 175,35 GB (blade.js), nur die Hashes der
+  Messzeilen in `test-ram.js` passen nicht mehr (die zwei roten Proben dort sind
+  dieselben wie vor P1).
+- **Praemisse: dieselbe 1,9-Treppe trifft jeden Kampfknoten OHNE Gang.** P1
+  loest die Ursache nur fuer die Gang. Live (03.10.) liegen schon 4 Stuecke in
+  der Warteschlange; die erste Gang-Runde in BN2.1 ist dadurch begrenzt
+  (Fixture `tools/mock/tor-runde-gang-bn2.json`, 30 Mrd: Competence x3,10 bei
+  leerer Warteschlange gegen x1,45 mit vier Stuecken). Eine Entscheidung
+  fuer Kampfknoten ohne Gang (Kaufaufschub ohne Gang-Vorrat, aber mit Planer)
+  ist nicht getroffen - Eric.
+- **Ruecklage in `data/geldbedarf.txt` bleibt bei 80-99 % des Kontos** (die
+  Plankosten der Runde). Gemessen (skep-p1-torrunde.mjs Abschnitt 3): ein halbes
+  Konto am Tor kostet 16-45 % des log-Zuwachses. Nicht auf 50 % deckeln.
+- **NeuroFlux am Rundenende** bringt etwas mehr je Dollar als das letzte
+  Planstueck (grobe Schaetzung des Skeptikers: d log C je Stufe ~0,008, gegen
+  LuminCloaking-V1 fuer 3,07 Mrd).
+  Der Effekt ist klein, `waehleTorRunde` kennt NFG nicht (kein Eintrag in
+  COMBAT_AUGS, Preisformel 1,14^Stufe).
+- **Referenz `tools/audit/gang-round.mjs` (`bestRound`) rechnet mit den Stufen,
+  die man ihr gibt**, im Fixture sind das die rohen Stufen des Spielstands - der
+  Gleichheitstest A in `test-tor-runde.js` bemerkt den Faehigkeitsfehler deshalb
+  nicht und muss es auch nicht (er prueft die Auswahl bei GLEICHEN Stufen). Wer
+  `bestRound` gegen den Live-Stand laufen laesst, uebergibt effektive Stufen
+  (`effectiveLevels(skills, bladeEffFactors(Reaper, Evasive))`).
+
 ### Audit 27.09. Rest
 
 Reste aus dem Skeptiker-Durchgang vom 27.09.2026 auf `integ-2026-09-27`, die

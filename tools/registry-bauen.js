@@ -138,6 +138,14 @@ const VON_AUSSEN = {
   "graftplan.json": "Repo-Datei, erzeugt von tools/graftplan-bauen.js",
   "registry.json": "Repo-Datei, erzeugt von diesem Werkzeug",
   "data/bn4-stop.txt": "Handbremse - dass kein Skript sie schreibt, ist ihr Sinn",
+  // SCHALTER, kein Zustand (03.10.2026, Paket P2). gang.js laeuft nur, wenn der
+  // Orchestrator die Datei legt - und der legt sie erst, wenn die TRP-Falle
+  // (Paket 0, GANG-2) UND der Kaufaufschub bis zum Tor (Paket 1, AUG-4) im
+  // Spiel laufen UND der Kern die Registry nach dem Einspielen neu gelesen hat
+  // (er liest sie nur beim Start, bn4net.js:95-108; Neustart: tools/neustart.js
+  // bn4net.js). Ein Skript, das sie selbst schriebe, hobe diese Reihenfolge auf.
+  // Zusaetzlich prueft gang.js P0 und P1 vor createGang selbst (data/bn4rep.json).
+  "data/gang-an.txt": "Schalter - der Mensch/Orchestrator legt ihn, wenn Paket 0 UND Paket 1 live sind und der Kern neu gestartet wurde",
 };
 
 function irgendwerSchreibt(datei) {

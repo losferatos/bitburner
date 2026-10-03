@@ -48,6 +48,49 @@ if (typeof f === "function") {
   pruefe("Stanek's Gift - Genesis (Faktor 0,9) nicht", !f("Stanek's Gift - Genesis", true));
 }
 
+// P0 / G02 (03.10.2026, Audit "vollstaendig", verify-g02-beide.md): Hacknet-
+// Stuecke nur dort, wo NACH dem Einbau Hacknet-Server gekauft werden. Das
+// Praedikat ist reine Funktion - bn4rep.js (kaufen) und hacknet.js (neu kaufen
+// oder beenden) rufen dieselbe.
+console.log("");
+console.log("=== Hacknet-Stuecke: hacknetNachEinbau (ein Praedikat fuer bn4rep.js und hacknet.js) ===");
+{
+  const g = H.hacknetNachEinbau;
+  pruefe("hacknetNachEinbau ist exportiert", typeof g === "function");
+  if (typeof g === "function") {
+    for (const k of [2, 3, 11, 15, 8, 12, 1, 0]) {
+      pruefe("hacknetNachEinbau(" + k + ") === false", g(k) === false);
+    }
+    pruefe("hacknetNachEinbau(9) === true", g(9) === true);
+    // Die Funktion liefert immer einen echten Boolean (kein undefined, kein "9").
+    pruefe("hacknetNachEinbau(undefined) und ('9') sind false (strenger Vergleich)",
+      g(undefined) === false && g("9") === false);
+  }
+  // Quellprobe: bn4rep.js bildet mitHashes aus dem Praedikat - nicht mehr aus
+  // dem SF-Besitz (ownedSF / sf.get(9)); hacknet.js hat keine harte 9 mehr.
+  const rep = fs.readFileSync(path.join(ROOT, "src", "bn4rep.js"), "utf8");
+  pruefe("bn4rep.js: mitHashes = hacknetNachEinbau(...)",
+    /const\s+mitHashes\s*=\s*hacknetNachEinbau\(/.test(rep));
+  pruefe("bn4rep.js: importiert hacknetNachEinbau aus lib/hackaugs.js",
+    /import\s*\{[^}]*\bhacknetNachEinbau\b[^}]*\}\s*from\s*["']lib\/hackaugs\.js["']/.test(rep));
+  // Zusammenfuehrung P0+P1 (04.10.2026): P1 liest ownedSF an anderer Stelle (Block 1c,
+  // SF11-Preisfaktor der Torrunde: `kaufInfo.ownedSF` -> sf.get(11)). Darum prueft die
+  // Probe nur die ANWEISUNG mitHashes und dass nirgends SF9 gelesen wird - nicht mehr
+  // "ownedSF kommt in der ganzen Datei nicht vor".
+  const mhAnweisung = (rep.match(/const\s+mitHashes\s*=[^;]*;/) || [""])[0];
+  pruefe("bn4rep.js: mitHashes liest ownedSF nicht mehr (die alte Fehlregel 'SF9 da')",
+    mhAnweisung !== "" && !/ownedSF|\bsf\b/.test(mhAnweisung) && !/sf\.get\(\s*9\s*\)/.test(rep),
+    mhAnweisung || "Anweisung mitHashes nicht gefunden");
+  const hn = fs.readFileSync(path.join(ROOT, "src", "hacknet.js"), "utf8");
+  pruefe("hacknet.js: importiert hacknetNachEinbau aus lib/hackaugs.js",
+    /import\s*\{[^}]*\bhacknetNachEinbau\b[^}]*\}\s*from\s*["']lib\/hackaugs\.js["']/.test(hn));
+  const nutzungen = (hn.match(/hacknetNachEinbau\(knoten\)/g) || []).length;
+  pruefe("hacknet.js: alle drei Stellen (erster Server, Ausstieg, Ausbau) fragen das Praedikat",
+    nutzungen === 3, "gefunden: " + nutzungen);
+  pruefe("hacknet.js: keine harte Knotennummer 9 mehr in den Bedingungen",
+    !/knoten\s*(===|!==)\s*9/.test(hn));
+}
+
 // Namen gegen den Spielquelltext halten.
 const enumPfad = path.join(ROOT, "reference", "bitburner-src", "src", "Augmentation", "Enums.ts");
 if (fs.existsSync(enumPfad)) {

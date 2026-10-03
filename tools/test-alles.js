@@ -159,7 +159,7 @@ const TESTS = [
   },
   {
     datei: "test-kampfaugs.js",
-    deckt: "EBENE 0: Kampfknoten kauft nur nuetzliche Augs; Namen gegen den Spielquelltext",
+    deckt: "EBENE 0: Kampfknoten kauft nur nuetzliche Augs; Namen gegen den Spielquelltext; P0/G02: hacknetNachEinbau (ein Praedikat fuer bn4rep.js und hacknet.js)",
     schnell: true,
   },
   {
@@ -250,7 +250,28 @@ const TESTS = [
     deckt: "EBENE 2: bn4rep.js-Hauptlauf gegen nachgebauten Spielzustand -"
       + " erste Runde nach Neustart (BN5.2 19:03), Handschlag/Interlock ohne"
       + " Prozessende und ohne NFG-Kauf, Fuellstueck nicht im Kampfknoten,"
-      + " Fokus mit Karenz und NMI nur eingebaut (Skeptiker-Nacharbeit A)",
+      + " Fokus mit Karenz und NMI nur eingebaut (Skeptiker-Nacharbeit A);"
+      + " P1/AUG-4: Kampfknoten mit Gang - Kaufaufschub bei gesperrtem Tor, Torrunde,"
+      + " Warten auf den Gang-Vorrat mit Zwei-Stunden-Grenze, Runde vor dem Einbau,"
+      + " Fehlerzaehler, SF11-Preisfaktor; ohne Gang unveraendert;"
+      + " P0/GANG-2+G02: The Red Pill nur mit positivem V1-Nachweis, Einbausperre nach TRP nur im Hackingweg,"
+      + " Hacknet-Stuecke nur in BN9; Z1: die echte Telemetrie (v1Positiv, gateBuy, knoten, nodeReset, zeit)"
+      + " besteht checkPrereq von gang.js",
+    schnell: true,
+  },
+  {
+    datei: "test-tor-runde.js",
+    deckt: "P1/AUG-4: waehleTorRunde gegen tools/audit/gang-round.mjs bestRound"
+      + " (30/48/100 Mrd, q0 0 und 4: Menge, Reihenfolge, Kosten), Wartegrenze"
+      + " gangBonusWait (30 min, Zustand ueber Neustart), Gewichte der Black Ops in blackops.json,"
+      + " Faehigkeiten Reaper/Evasive in der Potenz (geeicht gegen Skills.ts), Hackingfaktoren"
+      + " der COMBAT_AUGS",
+    schnell: true,
+  },
+  {
+    datei: "test-gate-round-status.js",
+    deckt: "P1/AUG-4: der Leser der Torrunden-Telemetrie fuer den Check-in (mode error, gangErrors,"
+      + " buyFailures, planDrift als Befund; kein Befund im gesunden Zustand)",
     schnell: true,
   },
   {
@@ -346,6 +367,11 @@ const TESTS = [
   {
     datei: "test-maenner-endlos.js",
     deckt: "maennerNoetig (blade.js) endet fuer jede Chance - die unbegrenzte Schleife fror am 03.10. den Spiel-Tab ein (Typhoon 0,102 gegen 0,90)",
+    schnell: true,
+  },
+  {
+    datei: "test-gang.js",
+    deckt: "EBENE 2: gang.js (Paket P2, GANG-1) gegen einen ns.gang-Nachbau - Gruendung nur einmal und nur mit beigetretener Kampf-Faktion kleinsten Rufs (nie NiteSec/Black Hand, Pause auch ueber Neustart, unlesbarer Ruf zaehlt nicht als 0), Rekrutierung mit Grenze, Aufgabenwahl Training -> Terrorism -> Vigilante, Aufstiegsschwellen 1,3/2, nie Warfare/Ausruestung, Takt = nextUpdate mit Rueckfall, Abbruch/Fehlerserie/MAX_ROUNDS, Fehler in der Telemetrie, Schalter data/gang-an.txt, Registry-Gating; VORAUSSETZUNGSSPERRE vor createGang (nur mit frischer, zum Knoteneintritt passender data/bn4rep.json, die Paket 0 UND Paket 1 meldet; gesperrter Versuch zaehlt nicht), Vertrag mit bn4rep.js, /bb-Zeile aus gang.json, Logzeit in Ortszeit; Formeln gegen gang-formulas.mjs; Selbstprobe mit 32 Mutanten",
     schnell: true,
   },
 ];

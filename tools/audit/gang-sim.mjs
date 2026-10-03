@@ -25,14 +25,18 @@ export function simulate(opts) {
     hours: 60, type: "combat", trainUntil: 300, ascThr: 1.6, ascWorkThr: 0, wantedFloor: 0.95,
     factionRepMult: 1.3280548527604765, // Spielstand BN2.1 09:59 mults.faction_rep
     gangSoftcap: 1, // BN2: BitNodeMultipliers.ts:91 Default
-    mode: "respect", moneyFrom: Infinity, log: false, trainHorizonSteps: 900, ...opts,
+    mode: "respect", moneyFrom: Infinity, log: false, trainHorizonSteps: 900,
+    // 03.10.2026 (Paket P2, gang.js): trainSet = erlaubte Trainingsaufgaben (Vorgabe: alle drei,
+    // gierig); combatOnly = Aufstiegsfaktor nur ueber str/def/dex/agi statt ueber die Gewichte der
+    // Respektaufgabe. Beides war nur lokal gemessen - jetzt nachlaufbar (--trainset, --combatonly).
+    trainSet: null, combatOnly: false, ...opts,
   };
   const target = F.TASKS[o.type === "combat" ? "Terrorism" : "Cyberterrorism"];
   const tasks = F.tasksFor(o.type === "hacking");
   const respectTasks = tasks.filter((t) => t.baseRespect > 0);
   const moneyTasks = tasks.filter((t) => t.baseMoney > 0);
   const vigil = F.TASKS[o.type === "combat" ? "Vigilante Justice" : "Ethical Hacking"];
-  const trains = ["Train Combat", "Train Hacking", "Train Charisma"].map((n) => F.TASKS[n]);
+  const trains = (o.trainSet || ["Train Combat", "Train Hacking", "Train Charisma"]).map((n) => F.TASKS[n]);
 
   const gang = { respect: 1, wanted: 1, territory: 1 / 7, members: [] }; // Gang.ts:64-88
   let rep = 0, money = 0, nameCtr = 0, ascensions = 0;
@@ -54,7 +58,8 @@ export function simulate(opts) {
     for (const m of gang.members) {
       const r = F.ascensionResult(m);
       let lw = 0, ww = 0;
-      for (const s of F.STATS) if (target.w[s] > 0) { lw += target.w[s] * Math.log(r[s]); ww += target.w[s]; }
+      if (o.combatOnly) { for (const s of ["str", "def", "dex", "agi"]) { lw += Math.log(r[s]); ww += 1; } }
+      else for (const s of F.STATS) if (target.w[s] > 0) { lw += target.w[s] * Math.log(r[s]); ww += target.w[s]; }
       const gainF = Math.exp(lw / ww);
       if (m.phase === "train" && gainF >= o.ascThr) { F.ascend(gang, m); ascensions++; }
       else if (m.phase === "work" && o.ascWorkThr > 0 && gainF >= o.ascWorkThr) { F.ascend(gang, m); ascensions++; m.phase = "train"; }
@@ -160,6 +165,7 @@ if (isMain) {
     }
   } else {
     const r = simulate({ hours, type, trainUntil: Number(arg("--train", 300)), ascThr: Number(arg("--asc", 1.6)),
+      trainSet: arg("--trainset", null) ? arg("--trainset", "").split(",") : null, combatOnly: process.argv.includes("--combatonly"),
       ascWorkThr: Number(arg("--ascwork", 0)), mode: arg("--mode", "respect"), moneyFrom: Number(arg("--moneyfrom", Infinity)), log: true });
     for (const m of r.marks) console.log(JSON.stringify(m));
     console.log("repHit (h):", JSON.stringify(r.repHit), "ascensions", r.ascensions);

@@ -32,7 +32,7 @@
  * @param {NS} ns
  */
 
-import { hackNutzen, levelNutzen, combatNutzen, kampfknotenNuetzlich, HACK_AUGS } from "lib/hackaugs.js";
+import { hackNutzen, levelNutzen, combatNutzen, kampfknotenNuetzlich, hacknetNachEinbau, HACK_AUGS } from "lib/hackaugs.js";
 
 // Zeitstempel der letzten "Faktionsarbeit ausgesetzt"-Meldung. Modulweit,
 // weil die Meldung sonst jede Runde kaeme (alle 16 s) - siehe die Korrektur
@@ -43,6 +43,15 @@ import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } 
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
+// P1 / AUG-4 (03.10.2026): Kaufaufschub und Runde am Einbau-Tor im Kampfknoten
+// MIT Gang - eigene Importzeilen, damit sie neben den Listen unten stehen
+// statt in ihnen (nodes/audit-2026-10-03/verify-g01-betrieb.md PAKET 1).
+import {
+  waehleTorRunde, gangBonusWait, gateBuyMode, blackOpWeights, gateMultsProduct, gatePriceStep,
+  bladeEffFactors, effectiveLevels, bladeSkillLevels, readGateBonusState,
+  gateAbortHold, GATE_ABORT_HOLD_ROUNDS,
+} from "lib/einbau.js";
+import { COMBAT_AUGS } from "lib/hackaugs.js";
 // AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
 // Entscheidungsfunktionen, ohne ns, einzeln in tools/test-bn4rep-einbau.js
 // geprueft. Siehe die Begruendung je Funktion in lib/einbau.js.
@@ -387,6 +396,10 @@ export async function main(ns) {
   // Drossel fuer die Endspiel-Meldung: alle fuenf Minuten genuegt, sonst
   // fuellt sie bei 15-Sekunden-Runden das Log.
   let letzteAusgangsmeldung = 0;
+  // Zaehler fuer unlesbare V1-Marken (GANG-2, 03.10.2026): jeder Lesefehler
+  // beim positiven V1-Nachweis zaehlt hoch und steht in data/bn4rep.json
+  // (`v1LeseFehler`), statt still zu verpuffen.
+  let v1LeseFehler = 0;
   let letzteBladeMeldung = 0;
   let letzterFokusHinweis = 0;
   const INSTALL_LOCK_MAX_AGE = 300000;
@@ -416,6 +429,41 @@ export async function main(ns) {
   // diesen Stand mit frischer Zeit und `state: "wait"` erneut (Gegenpruefung
   // G2, Begruendung bei `amTorWarten` im Einbaublock).
   let letzteTelemetrie = null;
+
+  // KAMPFKNOTEN MIT GANG: ZUSTAND DER TORRUNDE (P1 / AUG-4, 03.10.2026).
+  //
+  // Alles, was der Block "1c" weiter unten von Runde zu Runde braucht. Steht
+  // HIER OBEN und nicht beim Block, weil ein `let` dort in der temporalen
+  // Totzone laege, sobald eine fruehere Zeile der Schleife darauf zugreift
+  // (dieselbe Falle wie bei EXIT_KEY, 23.08.2026).
+  //   gateBonusState  Wartezustand auf den Gang-Vorrat (lib/einbau.js gangBonusWait)
+  //   gateErrors      FEHLER WERDEN GEZAEHLT, NIE VERSCHLUCKT: jeder Wurf aus ns.gang,
+  //                   getAugmentationPrereq, blackops.json oder dem ganzen Block landet
+  //                   hier und in data/bn4rep.json -> torRunde (Lehre vom 03.10.: vier
+  //                   Black-Op-Aufrufe in blade.js waren seit Wochen tot, weil ein
+  //                   catch sie verschluckte)
+  //   gateBo          Gewichte der naechsten Black Op (Tabelle einmal, Name alle 5 min)
+  //   gatePrereq      Vorgaenger je Aug - aendern sich nie, ein Aufruf je Name genuegt
+  //   gateWaitLoaded/gateWaitWritten  der Wartezustand liegt zusaetzlich in
+  //                   data/torrunde-wait.json: ein Neustart von bn4rep (killSafe,
+  //                   evictRank) setzt die Wartegrenze nicht zurueck (Skeptiker-
+  //                   Hinweis 03.10.2026)
+  //   gateAbortStreak abgebrochene Torrunden ohne einen Kauf in Folge: der Einbau
+  //                   wartet darauf hoechstens GATE_ABORT_HOLD_ROUNDS Runden
+  let gateBonusState = { min: null, seit: null, zuletzt: null };
+  let gateWaitLoaded = false, gateWaitWritten = null;
+  let gateAbortStreak = 0;
+  const gateAbortLog = new Map();   // Ursache -> Zeit der letzten Logzeile (alle 10 min)
+  let gateErrors = 0, gateLastError = "", gateErrorLogged = 0;
+  let gateBuyFailures = 0, gatePlanDrift = 0;
+  // Summe und letzte Runde: die Runde endet mit `continue`, die Telemetrie
+  // entsteht erst in einer spaeteren - ohne diese Zaehler wuesste sie nichts
+  // von dem Kauf.
+  let gateBoughtTotal = 0, gateLastRound = null;
+  let gateLastMode = "", gateModeLogged = 0;
+  let gateTele = null;
+  const gateBo = { table: null, next: null, read: 0, skills: bladeSkillLevels(null, 0, null) };
+  const gatePrereq = new Map();
 
   // Der Aussenschalter. Inhalt:
   //   "off"                    - nie Firmenarbeit (Notbremse)
@@ -453,6 +501,78 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") {
       try { ns.rm(datei, ns.getHostname()); } catch { /* auch gut */ }
     }
+  };
+
+  // --- Helfer der Torrunde im Kampfknoten mit Gang (P1 / AUG-4) -------------
+  // Fehler zaehlen statt schlucken: der Zaehler steht in der Telemetrie
+  // (torRunde.gangErrors), die Meldung im Log ist auf zehn Minuten gedrosselt.
+  const gangCountError = (was, e) => {
+    gateErrors++;
+    gateLastError = was + ": " + String(e && e.message ? e.message : e).slice(0, 120);
+    if (Date.now() - gateErrorLogged > 600000) {
+      gateErrorLogged = Date.now();
+      sag("TORRUNDE Fehler (" + gateErrors + " bisher): " + gateLastError);
+    }
+  };
+  const gangCall = (was, fn, ersatz) => {
+    try { return fn(); } catch (e) { gangCountError(was, e); return ersatz; }
+  };
+  // Abbruchmeldungen der Torrunde: eine Logzeile je Ursache und zehn Minuten.
+  // Bei einem Dauerfehler kaeme sie sonst alle 15 s (Skeptiker-Hinweis
+  // 03.10.2026); gezaehlt wird trotzdem jeder Abbruch (buyFailures, planDrift).
+  const logGateAbort = (cause, text) => {
+    const jetzt = Date.now();
+    if (jetzt - (gateAbortLog.get(cause) || 0) < 600000) return;
+    gateAbortLog.set(cause, jetzt);
+    sag(text);
+  };
+  // Vorgaenger einer Aug; null, wenn der Aufruf scheitert (dann ist das Stueck
+  // nicht planbar - purchaseAugmentation wuerde es ohnehin ablehnen).
+  const prereqOf = (aug) => {
+    if (gatePrereq.has(aug)) return gatePrereq.get(aug);
+    try {
+      const p = ns.singularity.getAugmentationPrereq(aug);
+      const liste = Array.isArray(p) ? p.slice() : [];
+      gatePrereq.set(aug, liste);
+      return liste;
+    } catch (e) {
+      gangCountError("getAugmentationPrereq " + aug, e);
+      return null;
+    }
+  };
+  // Gewichte der naechsten Black Op: die Tabelle (lib/blackops.json, erzeugt)
+  // einmal, den Namen der naechsten Op aus der Telemetrie von blade.js alle
+  // fuenf Minuten - er aendert sich nur, wenn eine Black Op fertig wird.
+  const ladeBlackOpGewichte = () => {
+    const jetzt = Date.now();
+    if (!gateBo.table) {
+      try {
+        const roh = liesVonHome("lib/blackops.json");
+        gateBo.table = roh ? JSON.parse(roh) : null;
+      } catch (e) { gateBo.table = null; gangCountError("lib/blackops.json", e); }
+    }
+    if (jetzt - gateBo.read > 300000) {
+      gateBo.read = jetzt;
+      try {
+        const roh = liesVonHome("data/blade.json");
+        const j = roh ? JSON.parse(roh) : null;
+        gateBo.next = j && j.naechsteBlackOp ? String(j.naechsteBlackOp) : null;
+        // Reaper und Evasive System wirken in die Potenz der Competence und
+        // kuerzen sich nicht heraus (lib/einbau.js gateCompetence): die zwei
+        // Stufen kommen aus derselben Datei. Fehlen sie oder sind sie alt,
+        // rechnet die Runde mit rohen Stufen und die Telemetrie sagt warum
+        // (torRunde.skills); ein Fehler von blade.js wird als Fehler gezaehlt.
+        gateBo.skills = bladeSkillLevels(j, jetzt, ns.getResetInfo().lastNodeReset);
+        if (j && j.skillLevelsError) {
+          gangCountError("blade.json skillLevels", new Error(String(j.skillLevelsError).slice(0, 100)));
+        }
+      } catch (e) {
+        gateBo.next = null;
+        gateBo.skills = bladeSkillLevels(null, 0, null);
+        gangCountError("data/blade.json", e);
+      }
+    }
+    return blackOpWeights(gateBo.table, gateBo.next);
   };
 
   // Hier stand `rufeMenschen` - der Notruf nach draussen ueber
@@ -651,24 +771,69 @@ export async function main(ns) {
     // eigene Tabelle zurueck (donationRepGainFaktor/daedalusSchwelle).
     let bnMults = null;
     try { bnMults = ns.getBitNodeMultipliers(); } catch { bnMults = null; }
-    // Hacknet-Server gibt es in BN9 und mit SF9 ueberall (HacknetHelpers.tsx:34-35).
-    const mitHashes = kaufKnoten === 9 || (() => {
-      const sf = kaufInfo.ownedSF;
-      if (sf instanceof Map) return (sf.get(9) || 0) > 0;
-      if (Array.isArray(sf)) return sf.some((e) => (Array.isArray(e) ? e[0] : e && e.n) === 9);
-      return !!(sf && sf[9]);
-    })();
+    // HACKNET-STUECKE NUR DORT, WO NACH DEM EINBAU NOCH HACKNET-SERVER GEKAUFT
+    // WERDEN (03.10.2026, Audit "vollstaendig" G02 / verify-g02-beide.md).
+    //
+    // Hier stand "Hacknet-Server gibt es in BN9 und mit SF9 ueberall
+    // (HacknetHelpers.tsx:34-35)" - das stimmt fuer das FEATURE, nicht fuer
+    // den Nutzen: Die fuenf Hacknet-Augs wirken erst NACH dem Einbau
+    // (gemessen: hacknet_node_money 19:01 mit vier wartenden Stuecken
+    // unveraendert), und der Einbau loescht alle Hacknet-Server
+    // (PlayerObjectGeneralMethods.ts:130-131). Den SF9.3-Gratisserver legt nur
+    // der Knotenwechsel an (Prestige.ts:327-339), nie ein Einbau; neu gekauft
+    // wird nach dem Einbau allein in BN9 (hacknet.js). In jedem anderen V2-Knoten
+    // wirken die Augs auf die netburn-Stummel (0,03 H/s) - BN2.1 zahlte dafuer
+    // 8,92 Mrd = 43,7 % der Aug-Ausgaben eines Zyklus und verdraengte
+    // Augmented Targeting II. EIN Praedikat fuer bn4rep UND hacknet.js, damit
+    // die beiden Seiten nicht auseinanderlaufen (lib/hackaugs.js).
+    const mitHashes = hacknetNachEinbau(kaufKnoten);
     const nurKampfStuecke = (() => {
       try {
         const t = liesVonHome("data/verfahren.txt").trim().split(/\s+/);
         return t[0] === "V2" && Number(t[1]) === kaufKnoten;
       } catch { return false; }
     })();
+    // THE RED PILL NUR MIT POSITIVEM V1-NACHWEIS (03.10.2026, GANG-2,
+    // verify-g01-betrieb.md Abschnitt 1 und 5).
+    //
+    // In BN2 haengt das Spiel mit Gang The Red Pill an die Angebotsliste der
+    // Gang-Faktion (FactionHelpers.tsx:172-183, Singularity.ts:128-133), Preis
+    // 0, Ruf 2,5 Mio. Die Kaufschleife kaufte sie in der Runde, in der der Ruf
+    // reicht - und ein gekauftes Stueck laesst sich nie wieder aus der
+    // Warteschlange holen (AugmentationHelpers.ts:69-103). Folgen im V2:
+    // jedes weitere Stueck x1,9 (TRP zaehlt in 1,9^q), und nach dem Einbau
+    // sperrt `ausgangSteht` jeden weiteren Einbau fuer den Rest des Knotens.
+    //
+    // Der Filter `nurKampfStuecke` allein genuegt nicht: fehlt oder verfaellt
+    // data/verfahren.txt, schaltet er sich AUS (catch -> false) und liesse TRP
+    // wieder durch. Deshalb der umgekehrte, POSITIVE Nachweis - die Marke
+    // nennt V1 oder V1b UND den aktuellen Knoten. Im Zweifel (fehlt, unlesbar,
+    // fremder Knoten, V2, unbekannt) ist es false. Die Asymmetrie ist Absicht,
+    // das Gegenstueck zu bladeburnerTraegtHier(): ein fehlender TRP-Kauf im V1
+    // kostet eine Runde (ausgang.js prueft die Marke alle 60 s und legt sie
+    // bei Abweichung neu an), ein
+    // falscher TRP-Kauf im V2 kostet den Rest des Knotens.
+    //
+    // Fehler beim Lesen werden GEZAEHLT und stehen in der Telemetrie
+    // (`v1LeseFehler`), nicht still verschluckt.
+    let v1Positiv = false;
+    try {
+      const t = liesVonHome("data/verfahren.txt").trim().split(/\s+/);
+      v1Positiv = (t[0] === "V1" || t[0] === "V1b") && Number(t[1]) === kaufKnoten;
+    } catch (e) {
+      v1Positiv = false;
+      v1LeseFehler++;
+      if (v1LeseFehler === 1 || v1LeseFehler % 40 === 0) {
+        sag("V1-Nachweis nicht lesbar (" + String(e).slice(0, 80) + ") - The Red Pill"
+          + " bleibt gesperrt (Fehler Nr. " + v1LeseFehler + ").");
+      }
+    }
     const kandidaten = [];
     for (const faktion of spieler.factions) {
       const rep = ns.singularity.getFactionRep(faktion);
       for (const aug of ns.singularity.getAugmentationsFromFaction(faktion)) {
         if (aug === NFG || besitz.has(aug)) continue;
+        if (aug === EXIT_KEY && !v1Positiv) continue;
         if (nurKampfStuecke && !kampfknotenNuetzlich(aug, mitHashes)) continue;
         kandidaten.push({
           aug, faktion, rep,
@@ -1204,7 +1369,24 @@ export async function main(ns) {
         * donationRepGainFaktor(bnMults, kaufKnoten, FACTION_REP_GAIN));
     const lueckeZuGross = grobRate * 60 * LUECKE_ZU_GROSS_MINUTEN;
 
-    const ausgangSteht = eingebauteAugs.includes(EXIT_KEY);
+    // DIE DAUERSPERRE LOEST NUR EIN POSITIVER V2-NACHWEIS (03.10.2026, GANG-2,
+    // Skeptiker-Auflage). Die Sperre "nach dem Ausgangsstueck nie mehr
+    // einbauen" gehoert zum V1-Ausgang (Erfahrung darf nicht auf Level 1
+    // zurueckfallen, siehe unten). Im Bladeburner-Knoten gibt es diesen Ausgang
+    // nicht; ein dort eingebautes TRP (Handkauf, alte Fassung, Gang-Angebot)
+    // wuerde sonst jeden weiteren Einbau des Knotens sperren. Darum entsperrt
+    // `nurKampfStuecke` (Marke V2 UND dieser Knoten).
+    //
+    // Die Asymmetrie "im Zweifel kein TRP" gilt fuer den KAUF (`v1Positiv`,
+    // oben), nicht fuer diese Sperre - dort laeuft sie umgekehrt: Fehlt die
+    // Marke, ist sie leer, nennt sie einen fremden Knoten oder ein unbekanntes
+    // Kuerzel (V1c), kann es der Hackingweg sein, und ein Einbau wirft dort die
+    // Hacking-Erfahrung auf Level 1 zurueck, nicht umkehrbar. Ein falsches
+    // "gesperrt" im V2 kostet eine Verzoegerung (die Marke ist je Takt von 60 s
+    // wieder da), ein falsches "frei" im V1 den Stand des Knotens. Vor dieser
+    // Fassung (GANG-2) galt: TRP eingebaut -> nie mehr einbauen, ohne jede
+    // Datei; das ist ausser im positiven V2-Fall wieder so.
+    const ausgangSteht = !nurKampfStuecke && eingebauteAugs.includes(EXIT_KEY);
     if (ausgangSteht && Date.now() - letzteAusgangsmeldung > 300000) {
       letzteAusgangsmeldung = Date.now();
       sag("The Red Pill ist eingebaut - ab jetzt kein Einbau mehr, nur noch"
@@ -1269,7 +1451,11 @@ export async function main(ns) {
     // ganzen Knoten. Gilt auch im Kampfknoten: Red Pill kommt nur ueber
     // Daedalus, also nie in den 30 Bladeburner-Laeufen der Route - dort bleibt
     // die Variable false und aendert nichts.
-    const redPillWartet = redPillWartetAufEinbau(alleAugs, eingebauteAugs, EXIT_KEY);
+    // Ebenso nur im Hackingweg (03.10.2026, GANG-2): Ein TRP, das im V2 in der
+    // Warteschlange steckt (Gang-Angebot, vor diesem Fix gekauft), darf den
+    // Einbau nicht an der Mindestwarteschlange vorbei erzwingen - im
+    // Bladeburner-Knoten kostet jeder Einbau Stunden (Absatz oben, 28.08.).
+    const redPillWartet = v1Positiv && redPillWartetAufEinbau(alleAugs, eingebauteAugs, EXIT_KEY);
 
     // IM KAMPFKNOTEN MUSS DIE WARTESCHLANGE DEN WIEDERAUFBAU VERKUERZEN
     // (28.08.2026, 13:15).
@@ -1364,8 +1550,279 @@ export async function main(ns) {
         kampfAufbau, kampfZuFrueh,
         gesperrtOhneHilfe: kampfKnotenEinbau && !wiederaufbauHilfe
           && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme),
+        // Die Torrunde im Kampfknoten mit Gang (P1 / AUG-4): der Stand der
+        // VORRUNDE, denn Block 1c laeuft erst nach dieser Datei. Ohne die
+        // Spiegelung sah, wer hier nachsah, warum kein Einbau kommt, nur
+        // "gesperrt false, kampfZuFrueh false" und musste raten (Skeptiker
+        // 03.10.2026). Die ganze Telemetrie steht in data/bn4rep.json -> torRunde.
+        torRunde: gateTele
+          ? {
+            mode: gateTele.mode, reason: gateTele.reason || null,
+            bonusNote: gateTele.bonusNote || null, bonusMs: gateTele.bonusMs ?? null,
+            installHeld: gateTele.installHeld === true,
+          }
+          : null,
       }));
     } catch { /* ohne Telemetrie laeuft der Rest weiter */ }
+
+    // --- 1c. KAMPFKNOTEN MIT GANG: KAUFAUFSCHUB UND RUNDE AM TOR ---------------
+    // (P1 / AUG-4, 03.10.2026; nodes/audit-2026-10-03/verify-g01-betrieb.md
+    // Abschnitt 2 und PAKET 1, inventar-aug.md AUG-4, inventar-gang.md GANG-1)
+    //
+    // WAS HIER PASSIERT. Nur wenn der Knoten ein Kampfknoten ist (V2) UND der
+    // Spieler eine Gang hat, ersetzt dieser Block die alte Kaufschleife
+    // ("2. Kaufen", weiter unten). Sonst bleibt alles wie es war.
+    //   1. Einbau gesperrt oder nicht erlaubt: aus KEINER Faktion kaufen. Auch
+    //      nicht aus den Bladeburners - jedes dort verdiente Stueck
+    //      verteuert die Gang-Runde um x1,9 (AugmentationHelpers.ts:32-37).
+    //   2. Tor offen, aber der Gang-Vorrat (getBonusTime) wird noch
+    //      nachgeholt: weder kaufen noch einbauen. Die Gang holt Offline-Zeit
+    //      25-fach nach (Gang.ts:99-121); oeffnet das Tor direkt nach dem
+    //      Laden, fehlt der Ruf aus dem noch nicht verarbeiteten Vorrat, und
+    //      die Runde wuerde zu klein. Hoechstens 30 Minuten ohne
+    //      Fortschritt (lib/einbau.js GATE_BONUS_WAIT_MAX_MS); der Wartezustand
+    //      liegt in data/torrunde-wait.json und ueberlebt einen Neustart.
+    //   3. Tor offen und Vorrat nachgeholt: die Runde kaufen, die
+    //      waehleTorRunde plant (gierig nach log-Competence je Mehrkosten,
+    //      teuerste zuerst, Vorgaenger davor). Danach baut die naechste Runde
+    //      regulaer ein (Bedingung unten).
+    // `data/geldbedarf.txt` meldet die Kosten dieser Runde (mit 1,9^i), nicht
+    // die Summe aller verdienten Stuecke: mit ~40 verdienten Gang-Stuecken
+    // sperrte die alte Summe bn4net, homegrow, hashes und hacknet den ganzen
+    // Zyklus (verify-g01-betrieb.md Abschnitt 4, "Geld").
+    //
+    // WARUM VOR DEM EINBAUTOR UND NICHT AN DER KAUFSCHLEIFE. Die Vorgabe nannte
+    // die Kaufschleife; die Entscheidung muss aber VOR dem Einbau fallen.
+    // Liegen beim Oeffnen des Tors schon drei Stuecke in der Warteschlange
+    // (gekauft, bevor die Gang stand), baut der Einbau unten sofort ein -
+    // vor jeder Torrunde, und die Gang-Augs waeren fuer diesen Zyklus
+    // verloren. Hier kommt die Runde zuerst; kauft sie etwas, geht die Runde
+    // mit `continue` zu Ende und der Einbau folgt in der naechsten.
+    //
+    // FEHLER WERDEN GEZAEHLT (gateErrors, Telemetrie torRunde.gangErrors), und
+    // ein Wurf im Block faellt auf die ALTE Kaufschleife zurueck: eine Panne in
+    // der neuen Logik darf nie heissen, dass der Bot gar nichts mehr kauft.
+    // Nicht in der Vorgabe, Zusatz des Bauers.
+    let inGangNow = false;
+    let gateBedarf = 0;
+    let gateInstallWait = false;
+    let gateBought = 0;
+    gateTele = null;
+    if (nurKampfStuecke) {
+      try {
+        inGangNow = gangCall("ns.gang.inGang", () => ns.gang.inGang() === true, false);
+        if (inGangNow) {
+          const jetztMs = Date.now();
+
+          // Wartezustand aus einem frueheren Lauf von bn4rep (Neustart!) einmal
+          // zurueckholen. Ein Lesefehler ist ein gezaehlter Fehler und ein
+          // frischer Zustand - nie ein Abbruch der Runde.
+          if (!gateWaitLoaded) {
+            gateWaitLoaded = true;
+            try {
+              const roh = liesVonHome("data/torrunde-wait.json");
+              gateBonusState = readGateBonusState(roh ? JSON.parse(roh) : null, jetztMs);
+              gateWaitWritten = gateBonusState.min === null ? null : roh;
+            } catch (e) { gangCountError("data/torrunde-wait.json lesen", e); }
+          }
+
+          // (1) Ist das Tor offen? Dieselben Quellen wie `torGrundJetzt` im
+          // Einbaublock: die Sperren oben (`gesperrt`) und der Ausgangs-
+          // Interlock (`einbauErlaubt`). Eine nicht lesbare Lage heisst
+          // Normalbetrieb, wie dort.
+          let gateOpen = !gesperrt;
+          const sperrGruende = [];
+          if (bladeSperre) sperrGruende.push("Divisionsbeitritt steht aus");
+          if (graftLaeuft) sperrGruende.push("Graft laeuft");
+          if (kampfAufbau) sperrGruende.push("Wiederaufbau der Kampfwerte");
+          if (kampfZuFrueh) sperrGruende.push("Wiederaufbau noch nicht bezahlt gemacht");
+          let gateReason = gesperrt
+            ? (sperrGruende.join(", ") || "Einbausperre (install-sperre.txt)") : "";
+          if (gateOpen) {
+            try {
+              const lg = endspurtLage(ns, jetztMs);
+              const erlaubt = einbauErlaubt(lg, jetztMs, lg.offenSeit ?? null);
+              if (!erlaubt.ok) { gateOpen = false; gateReason = erlaubt.grund; }
+            } catch (e) { gangCountError("einbauErlaubt", e); }
+          }
+
+          // (2) Die Runde, die mit dem Geld von jetzt gekauft WUERDE. Auch bei
+          // gesperrtem Tor gerechnet: ihre Kosten sind die Ruecklage.
+          const geldJetzt = ns.getServerMoneyAvailable("home");
+          const bo = ladeBlackOpGewichte();
+          const eingebautSet = new Set(eingebauteAugs);
+          const startMults = gateMultsProduct(alleAugs
+            .filter((a) => !eingebautSet.has(a)).map((a) => COMBAT_AUGS[a]));
+          const sf = kaufInfo.ownedSF;
+          const sf11 = sf instanceof Map ? (sf.get(11) || 0)
+            : Array.isArray(sf) ? ((sf.find((e) => (Array.isArray(e) ? e[0] : e && e.n) === 11) || [])[1] || 0)
+              : ((sf && sf[11]) || 0);
+          const planEingabe = [];
+          for (const k of kandidaten) {
+            const mults = COMBAT_AUGS[k.aug];
+            if (!mults || !(k.rep >= k.repReq)) continue;
+            const prereq = prereqOf(k.aug);
+            if (prereq === null) continue;
+            planEingabe.push({
+              aug: k.aug, faktion: k.faktion, rep: k.rep, repReq: k.repReq,
+              preis: k.preis, prereq, mults,
+            });
+          }
+          // Effektive Stufen: Spielerstufe mal Reaper/Evasive (lib/einbau.js
+          // gateCompetence). Ohne frische Faehigkeitsstufen rohe Stufen.
+          const eff = gateBo.skills.ok
+            ? bladeEffFactors(gateBo.skills.reaper, gateBo.skills.evasive) : null;
+          const plan = waehleTorRunde(planEingabe, geldJetzt, besitz, {
+            skills: effectiveLevels(spieler.skills, eff), weights: bo.weights, decays: bo.decays,
+            startMults, priceStep: gatePriceStep(sf11),
+          });
+          gateBedarf = plan.cost;
+
+          // (3) Wartet die Runde auf den Gang-Vorrat?
+          let bonusMs = NaN;
+          let bonus = { waits: false, state: gateBonusState, reason: "" };
+          if (gateOpen) {
+            bonusMs = gangCall("ns.gang.getBonusTime", () => Number(ns.gang.getBonusTime()), NaN);
+            bonus = gangBonusWait(gateBonusState, jetztMs, bonusMs);
+            gateBonusState = bonus.state;
+          } else {
+            gateBonusState = { min: null, seit: null, zuletzt: null };
+          }
+          // Den Wartezustand festhalten, solange gewartet wird (sonst setzt ein
+          // Neustart die Wartegrenze zurueck); ist er frisch, verschwindet die Datei.
+          try {
+            if (gateBonusState.min === null) {
+              if (gateWaitWritten !== null) { loeschAufHome("data/torrunde-wait.json"); gateWaitWritten = null; }
+            } else {
+              const text = JSON.stringify(gateBonusState);
+              if (text !== gateWaitWritten) { schreibNachHome("data/torrunde-wait.json", text); gateWaitWritten = text; }
+            }
+          } catch (e) { gangCountError("data/torrunde-wait.json schreiben", e); }
+          const mode = gateBuyMode({ inGang: true, gateOpen, bonusWaits: bonus.waits });
+          gateInstallWait = mode === "bonus";
+
+          // (4) Die Runde kaufen: Stueck fuer Stueck in Planreihenfolge. Jede
+          // Abweichung vom Plan (Preis hoeher als gerechnet, Kauf abgelehnt,
+          // Geld weg) bricht ab - die naechste Runde plant neu, denn die
+          // Reihenfolge bestimmt den Preis. Begrenzt durch die Laenge des Plans.
+          let abortCause = "";   // Ursache des Abbruchs, leer = kein Abbruch
+          if (mode === "round" && plan.steps.length) {
+            for (let i = 0; i < plan.steps.length; i++) {
+              const s = plan.steps[i];
+              const preisJetzt = ns.singularity.getAugmentationPrice(s.aug);
+              if (!(preisJetzt <= s.price * 1.01)) {
+                gatePlanDrift++;
+                abortCause = "drift";
+                logGateAbort("drift", "TORRUNDE abgebrochen: " + s.aug + " kostet " + geldText(preisJetzt)
+                  + " statt geplant " + geldText(s.price) + " - die Warteschlange hat sich unter dem Plan"
+                  + " veraendert, naechste Runde plant neu (Abbrueche: " + gatePlanDrift + ").");
+                break;
+              }
+              if (ns.getServerMoneyAvailable("home") < preisJetzt) {
+                abortCause = "geld";
+                logGateAbort("geld", "TORRUNDE abgebrochen: fuer " + s.aug + " (" + geldText(preisJetzt)
+                  + ") reicht das Geld nicht mehr.");
+                break;
+              }
+              if (ns.singularity.purchaseAugmentation(s.faktion, s.aug)) {
+                gateBought++;
+                sag("GEKAUFT: " + s.aug + " von " + s.faktion + " fuer " + geldText(preisJetzt)
+                  + " (Torrunde " + (i + 1) + "/" + plan.steps.length + ").");
+              } else {
+                gateBuyFailures++;
+                abortCause = "rejected";
+                logGateAbort("rejected", "TORRUNDE abgebrochen: " + s.aug + " von " + s.faktion
+                  + " wurde vom Spiel abgelehnt (Kaufabbrueche: " + gateBuyFailures + ").");
+                break;
+              }
+            }
+          }
+          // Brach die Runde schon beim ERSTEN Stueck ab, haelt der Einbau
+          // zurueck: sonst baute er in derselben Runde ohne Torrunde ein und
+          // die Gang-Augs waeren fuer den Zyklus verloren (Skeptiker-Hinweis
+          // 03.10.2026). Hoechstens GATE_ABORT_HOLD_ROUNDS Runden in Folge,
+          // damit ein Dauerfehler den Knoten nicht anhaelt.
+          if (abortCause && gateBought === 0) {
+            gateAbortStreak++;
+            if (gateAbortHold(gateAbortStreak)) {
+              gateInstallWait = true;
+            } else {
+              logGateAbort("hold-end", "TORRUNDE: " + GATE_ABORT_HOLD_ROUNDS + " Runden in Folge schon beim"
+                + " ersten Stueck abgebrochen (" + abortCause + ") - der Einbau laeuft ohne Torrunde weiter.");
+            }
+          } else {
+            gateAbortStreak = 0;
+          }
+
+          if (gateBought) {
+            gateBoughtTotal += gateBought;
+            gateLastRound = {
+              zeit: jetztMs, n: gateBought, geplant: plan.steps.length,
+              first: plan.steps[0].aug, cost: Math.round(plan.cost), gain: +plan.gain.toFixed(3),
+            };
+          }
+
+          // (5) Sichtbar machen: Log bei Moduswechsel (sonst alle 30 min),
+          // Telemetrie fuer den Leser.
+          if (mode !== gateLastMode || jetztMs - gateModeLogged > 1800000) {
+            gateLastMode = mode;
+            gateModeLogged = jetztMs;
+            const planText = plan.steps.length
+              ? "Plan: " + plan.steps.length + " Stuecke fuer " + geldText(plan.cost)
+                + ", Competence x" + plan.gain.toFixed(2) + " (Gewichte " + bo.source + ")"
+              : "Plan: nichts kaufbar (" + plan.candidates + " verdiente Kampfstuecke)";
+            if (mode === "locked") {
+              sag("TORRUNDE: Einbau gesperrt (" + String(gateReason).slice(0, 120)
+                + ") - aus keiner Faktion wird gekauft. " + planText + ".");
+            } else if (mode === "bonus") {
+              sag("TORRUNDE: Tor offen, aber " + bonus.reason + " - weder Kauf noch Einbau. " + planText + ".");
+            } else {
+              sag("TORRUNDE: Tor offen. " + planText + "."
+                + (bonus.reason ? " Hinweis: " + bonus.reason + "." : ""));
+            }
+          }
+          gateTele = {
+            mode, gateOpen,
+            reason: String(gateReason).slice(0, 160),
+            bonusMs: Number.isFinite(bonusMs) ? Math.round(bonusMs) : null,
+            bonusNote: String(bonus.reason).slice(0, 160),
+            plan: {
+              n: plan.steps.length, cost: Math.round(plan.cost), gain: +plan.gain.toFixed(3),
+              first: plan.steps.length ? plan.steps[0].aug : null, candidates: plan.candidates,
+            },
+            weights: bo.source,
+            // Welche Faehigkeitsstufen in die Planung eingingen (Reaper/Evasive
+            // in der Potenz der Competence); "roh" heisst: ohne - mit Grund.
+            skills: eff
+              ? {
+                source: "blade.json", reaper: gateBo.skills.reaper, evasive: gateBo.skills.evasive,
+                strengthFactor: +eff.strength.toFixed(4), dexterityFactor: +eff.dexterity.toFixed(4),
+              }
+              : { source: "roh", why: String(gateBo.skills.why).slice(0, 120) },
+            // Der Wartezustand auf den Gang-Vorrat (auch in data/torrunde-wait.json).
+            wait: { min: gateBonusState.min, seit: gateBonusState.seit, zuletzt: gateBonusState.zuletzt },
+            abortStreak: gateAbortStreak, installHeld: gateInstallWait,
+            bought: gateBought, boughtTotal: gateBoughtTotal, lastRound: gateLastRound,
+            buyFailures: gateBuyFailures, planDrift: gatePlanDrift,
+            gangErrors: gateErrors, lastGangError: gateLastError,
+          };
+        }
+      } catch (e) {
+        gangCountError("Torrunde-Block", e);
+        inGangNow = false; gateInstallWait = false; gateBedarf = 0;
+        gateTele = { mode: "error", gangErrors: gateErrors, lastGangError: gateLastError };
+      }
+      // Schlug schon ns.gang.inGang() fehl, steht die Gang-Pruefung auf "nein" und
+      // die alte Schleife laeuft - der Fehler gehoert trotzdem in die Telemetrie.
+      if (!gateTele && gateErrors > 0) {
+        gateTele = { mode: "normal", gangErrors: gateErrors, lastGangError: gateLastError };
+      }
+    }
+    // Tor offen, aber der Gang-Vorrat wird noch nachgeholt: der Einbau unten
+    // wartet mit. Als Sperre gesetzt statt als eigene Bedingung in der Einbau-
+    // Zeile - `gesperrt` ist genau die Variable, die dort schon mitgelesen wird.
+    if (gateInstallWait) gesperrt = true;
+    if (gateBought) { await ns.sleep(2000); continue; }   // Preise haben sich verschoben
 
     if (!ausgangSteht
         && wiederaufbauHilfe
@@ -1562,6 +2019,10 @@ export async function main(ns) {
           for (const f of spieler.factions) {
             for (const a of ns.singularity.getAugmentationsFromFaction(f)) {
               if (a === NFG || besitzJetzt.has(a)) continue;
+              // GANG-2 (03.10.2026): auch dieser zweite Kaufpfad waehlt das
+              // BILLIGSTE kaufbare Stueck - und The Red Pill kostet 0. Im V2
+              // (Gang-Angebot) waere sie hier die erste Wahl gewesen.
+              if (a === EXIT_KEY && !v1Positiv) continue;
               const repReq = ns.singularity.getAugmentationRepReq(a);
               const rep = ns.singularity.getFactionRep(f);
               if (rep < repReq) continue;
@@ -1734,7 +2195,13 @@ export async function main(ns) {
     // sind das rund 1,2 Milliarden Unterschied fuer dieselbe Ausbeute.
     // Der Rest der Schleife bleibt: was gerade nicht bezahlbar ist, wird
     // uebersprungen und in der naechsten Runde erneut versucht.
-    for (const k of kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+    //
+    // KAMPFKNOTEN MIT GANG (P1 / AUG-4, 03.10.2026): hier wird NICHT gekauft.
+    // Die Entscheidung, ob und was gekauft wird, faellt oben im Block 1c -
+    // gesperrt: nichts aus keiner Faktion; Tor offen: die geplante Runde.
+    // Die Schleife unten bliebe sonst die "alles Verdiente sofort"-Regel, die
+    // die Gang-Runde mit 1,9^q verteuert.
+    for (const k of inGangNow ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
       if (k.rep < k.repReq) continue;
       if (ns.getServerMoneyAvailable("home") < k.preis) continue;
       if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
@@ -1816,7 +2283,11 @@ export async function main(ns) {
     // nicht mehr geschrieben, und bn4net haette das Kaufgeld verbaut.
     // Nur erreichbare Stuecke (23.09.2026) - siehe augRuecklage in
     // lib/endspurt.js: die Summe aller verdienten stand bei 92 Billionen.
-    const bedarf = augRuecklage(kandidaten, ns.getServerMoneyAvailable("home"));
+    // Im Kampfknoten mit Gang (P1 / AUG-4): die Kosten der geplanten Runde mit
+    // 1,9^i (Block 1c), nicht die Summe aller verdienten Stuecke.
+    const bedarf = inGangNow
+      ? gateBedarf
+      : augRuecklage(kandidaten, ns.getServerMoneyAvailable("home"));
     ns.write("data/geldbedarf.txt", String(Math.round(bedarf)), "w");
     if (ns.getHostname() !== "home") ns.scp("data/geldbedarf.txt", "home", ns.getHostname());
 
@@ -2408,7 +2879,8 @@ export async function main(ns) {
       // Rechnung und Ueberweisung leicht anders steht als hier angenommen.
       const fehlt = Math.max(0, ziel.repReq - ns.singularity.getFactionRep(ziel.faktion));
       const noetig = geldFuerRep(fehlt) * 1.02;
-      const verfuegbar = ns.getServerMoneyAvailable("home") - teuerstesVerdiente;
+      // Mit Gang (P1 / AUG-4) zusaetzlich die Ruecklage der Torrunde (gateBedarf, 0 ohne Gang).
+      const verfuegbar = ns.getServerMoneyAvailable("home") - Math.max(teuerstesVerdiente, gateBedarf);
       const uebrig = Math.min(noetig, verfuegbar);
       if (uebrig > 1e9) {
         if (ns.singularity.donateToFaction(ziel.faktion, uebrig)) {
@@ -2618,6 +3090,18 @@ export async function main(ns) {
       hacking: spieler.skills.hacking,
       multHacking: spieler.mults.hacking,
       redPill: ausgangSteht,
+      // GANG-2 (03.10.2026): fuer die Abnahme von aussen. v1Positiv = die
+      // Marke in data/verfahren.txt nennt V1/V1b UND diesen Knoten; nur dann
+      // ist The Red Pill ein Kaufkandidat. v1LeseFehler zaehlt Lesefehler.
+      v1Positiv,
+      v1LeseFehler,
+      // ZUSAMMENFUEHRUNG P0+P1+P2 (04.10.2026): Fassungsmarke fuer gang.js. Diese
+      // Fassung enthaelt den Kaufaufschub bis zum Einbau-Tor (Block 1c, P1 / AUG-4).
+      // gang.js gruendet erst, wenn dieses Feld true ist (PREREQ_P1_FIELD in
+      // src/gang.js) - eine alte bn4rep.js schreibt es nicht, und die Sperre bleibt
+      // zu. Bewusst eine Konstante und kein Laufzeitzustand: sie belegt, dass der
+      // CODE da ist; ob die Torrunde in dieser Runde greift, steht in `torRunde`.
+      gateBuy: true,
       repGesamt,
       favor,
       favorBeste,
@@ -2650,6 +3134,9 @@ export async function main(ns) {
       teuerstesVerdiente,
       bedarf,
       geld,
+      // Kampfknoten mit Gang (P1 / AUG-4): Modus, Plan, Vorrat, Fehlerzaehler.
+      // null ausserhalb davon. Die Felder sind die Abnahme des Kaufaufschubs.
+      torRunde: gateTele,
     };
     ns.write("data/bn4rep.json", JSON.stringify(letzteTelemetrie), "w");
     if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());

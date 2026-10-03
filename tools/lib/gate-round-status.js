@@ -57,10 +57,23 @@ function counterText(n, before) {
  *   findings  Befunde, jede mit "TORRUNDE-BEFUND: " davor
  *   data      was der Check-in als Verlauf ablegt, null ohne Torrunde
  */
-export function gateRoundStatus({ tele, blade, nowMs, before = null }) {
+export function gateRoundStatus({ tele, blade, nowMs, before = null, gang = null }) {
   const lines = [];
   const findings = [];
   const t = tele && typeof tele === "object" ? tele.torRunde : null;
+
+  // GANG OHNE TORRUNDE (Integrations-Skeptiker 04.10.2026, Luecke A): steht
+  // die Gang, meldet bn4rep.js aber keine Torrunde, ist der Kaufaufschub aus -
+  // meist weil data/verfahren.txt nicht "V2 <dieser Knoten>" nennt
+  // (nurKampfStuecke false) oder eine alte bn4rep.js laeuft. Die alte
+  // Kaufschleife kauft dann jedes verdiente Gang-Stueck sofort (1,9^q).
+  // Ohne diesen Befund bliebe das still, weil unten "keine Torrunde" schlicht
+  // keine Zeile erzeugt.
+  if (gang && typeof gang === "object" && gang.inGang === true && tele && (!t || typeof t !== "object")) {
+    findings.push("TORRUNDE-BEFUND: Gang laeuft (" + String(gang.faction || "?").slice(0, 40)
+      + "), aber bn4rep.json meldet keine Torrunde - der Kaufaufschub ist aus (data/verfahren.txt"
+      + " pruefen, laeuft die neue bn4rep.js?).");
+  }
 
   // Ein Fehler von blade.js beim Lesen der Faehigkeitsstufen gehoert auch ohne
   // Torrunden-Telemetrie in den Bericht: ohne ihn plant die Runde mit rohen

@@ -58,6 +58,25 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   (eichung-messen --schreib, VERALTET_ERLAUBT leeren); bn4rep.json pruefen
   (v1Positiv false, torRunde); DANN Schalter data/gang-an.txt im Spiel anlegen.
 
+### Stand 04.10. 01:15 - GANG LIVE
+
+- master f79a1f7+: P0/P1/P2 integriert (ce6262d [skeptiker]), eingespielt
+  (8/8 sha), Neustarts belegt, RAM gemessen, VERALTET_ERLAUBT leer,
+  test-alles 66/66. Schalter data/gang-an.txt 01:01:41 gesetzt; gang.js hat
+  Slum Snakes gegruendet, 3 Mitglieder, Fehler 0; Torrunde 'locked'.
+- Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".
+- Abbruchkriterien (gang.js-Kopf): +2 h >= 6 Mitglieder, Abzug >= 0,9,
+  Fehler 0; bis zum Tor kein 'GEKAUFT' bei aktiver Sperre; am Tor TRP nie in
+  der Warteschlange, erstes Stueck = Planstueck; nach Einbau gang.js binnen
+  5 min neu. Pruefen mit node tools/audit/live-gangcheck.mjs bzw. /bb.
+- Hinweis G01-Substanz fuer spaeter: Reglerwerte 400-700 / Aufstieg 1,2/1,5
+  (672-Regler-Sim) gegen die gebauten 500 / 1,3/2 nachrechnen (P2b, ebenso
+  Respekt- gegen Geldmodus).
+- NAECHSTES (nach Wochenreset So 13:00): WF1-Rest (FLUSS, VERSION, Kritik)
+  per Resume, dann restliche Gegenpruefung G03-G28/B1-B2 mit Sonnet, Audit-
+  Datei, weitere Pakete (G02-Folgen N1-N3, G03 Doppelbestellung, G04 share,
+  BLADE-1/2, Sleeves, Grafting-Zuender, Infiltration, BN3-Corp).
+
 ## Was fertig ist
 
 - Workflow 1 (Inventar + Matrix), Run `wf_735d79f5-a82`: 20 von 23 Pruefern

@@ -859,6 +859,7 @@ async function main() {
       p && p.torRunde && p.knoten === knoten && p.lauf === laufJetzt);
     const gate = gateRoundStatus({
       tele: bn4repTele, blade, nowMs: Date.now(), before: vorherPunkt ? vorherPunkt.torRunde : null,
+      gang: await holeJson("data/gang.json"),
     });
     for (const z of gate.lines) sag(z);
     for (const f of gate.findings) sag(f);

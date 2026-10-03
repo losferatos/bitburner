@@ -64,6 +64,17 @@ console.log("\n-- ohne Gang oder ohne Telemetrie: nichts zu sagen --");
   pruefe("ganz ohne bn4rep-Telemetrie kein Befund (das ist eine andere Meldung)", e.findings.length === 0);
 }
 
+console.log("\n-- Gang laeuft, aber keine Torrunde (Integrations-Skeptiker 04.10., Luecke A) --");
+{
+  const g = lage(tele(null), { gang: { inGang: true, faction: "Slum Snakes" } });
+  pruefe("Gang steht, torRunde null: genau ein Befund 'Kaufaufschub ist aus'",
+    g.findings.length === 1 && /Gang laeuft/.test(g.findings[0]) && /Kaufaufschub ist aus/.test(g.findings[0]), alles(g));
+  const h = lage(tele(null), { gang: { inGang: false } });
+  pruefe("ohne gegruendete Gang kein Befund", h.findings.length === 0, alles(h));
+  const k = lage(null, { gang: { inGang: true } });
+  pruefe("Gang steht, aber bn4rep.json fehlt ganz: kein Befund hier (eigene Meldung)", k.findings.length === 0, alles(k));
+}
+
 console.log("\n-- gesunde Torrunde: Zeilen, aber KEIN Befund --");
 {
   const modi = [

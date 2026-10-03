@@ -549,7 +549,35 @@ export async function main(ns) {
   // Zielgroesse des Trupps. Sechs, weil der Bonus mit Exponent 0,05 waechst
   // und der Grenznutzen danach um Faktor drei einbricht - Rechnung im Block
   // "2b. Den Trupp auffuellen" weiter unten. 0 schaltet die Regel ab.
+  //
+  // SEIT 03.10.2026 ZUGLEICH DIE OBERGRENZE DER TRUPPANFRAGE: angefragt
+  // werden hoechstens so viele Maenner (Bonus 7^0,05 = +10,2 %; zehn Mann
+  // braechten erst +12,7 %, kosten einen Sleeve mit Charisma 1 aber rund
+  // 105 statt 51 min, tools/trupp-rechnung.js).
   const TRUPP_ZIEL = 6;
+  // Ab welchem Anteil des Rang-Tors die Anfrage schon gilt. 0,9: Der Trupp
+  // soll stehen, wenn das Tor aufgeht. Gemessen BN2L1 03.10.: 593 Rang/h
+  // (667 -> 1.260 in einer Stunde); 10 % von Typhoons 2.500 sind 250 Rang =
+  // 25 min - so lange braucht ein Sleeve mit Charisma 1 fuer drei Mann
+  // (Monte Carlo 20 min). Spaetere Tore sind absolut weiter, aber die Rate
+  // waechst mit. Bisher (BN9L3) stand der Rang ohnehin weit ueber dem Tor,
+  // als die Chance reichte (Typhoon: Rang 24.184 bei Chance 0,45) - die Grenze
+  // greift also selten, schadet aber nicht.
+  const TRUPP_NAHE = 0.9;
+  // Ab welcher Luecke die Anfrage oeffnet: Chance ohne Trupp mal 1,2 >=
+  // Schwelle (Begruendung beim Black-Op-Block, "VORLAUF").
+  const TRUPP_VORLAUF = 1.2;
+  // Wie viele Maenner braucht die Chance c0 OHNE Trupp, um die Schwelle s zu
+  // tragen? (n+1)^0,05 >= s/c0 (Actions/Operation.ts:96-98). Reine Funktion,
+  // gleichlautend in tools/trupp-rechnung.js (maennerNoetig) und dort geprueft.
+  const maennerNoetig = (c0, s) => {
+    if (!(c0 > 0) || !(s > 0)) return Infinity;
+    if (c0 >= s) return 0;
+    let n = Math.max(1, Math.ceil(Math.pow(s / c0, 20) - 1 - 1e-9));
+    while (n > 1 && c0 * Math.pow(n, 0.05) >= s) n--;
+    while (c0 * Math.pow(n + 1, 0.05) < s) n++;
+    return n;
+  };
   // Ab dieser Spannenbreite ist die Schaetzung das Problem, nicht die Aktion.
   const SPANNE_ZU_BREIT = 0.10;
   // Ausdauer. Die Strafe ist min(1, stamina/(0,5*max)) (Bladeburner.ts:167-169)
@@ -988,9 +1016,14 @@ export async function main(ns) {
   let boChancen = null;
   // D1 (Audit 4#1, 26.09.2026): meldet nur noch, OB ein Trupp fehlen wuerde -
   // der Spieler rekrutiert selbst nicht mehr (siehe TRUPP_ZIEL-Block weiter
-  // unten). Ein zukuenftiger sleeve.js-Hook kann hierauf reagieren (siehe
-  // Bericht: Sleeve.ts:505-511 erlaubt Recruitment als Sleeve-Aktion).
+  // unten). Seit 03.10.2026 liest sleeve.js das Feld und setzt GENAU EINEN
+  // Sleeve auf Recruitment (Sleeve.ts:505-511). Gesetzt in `waehle()` beim
+  // Black-Op-Block ("TRUPPBEDARF"), dazu wie viele Maenner fehlen und wie
+  // gross der Pool ist - sleeve.js rechnet damit, ob der naechste Mann lohnt.
   let truppAnfrage = false;
+  let truppFehlt = 0;
+  let truppPool = null;
+  let truppZeit = null;
   const CHANCE_SKILLS = {
     "Blade's Intuition": { proz: 3, abdeckung: 1.0 },     // SuccessChanceAll, 12/12
     "Short-Circuit": { proz: 5.5, abdeckung: 0.58 },      // isKill, 7/12
@@ -1730,9 +1763,12 @@ export async function main(ns) {
       boSchwelle: boSchwelleZuletzt,
       boEndspiel: boEndspielZuletzt,
       // D1: Trupp faellt der naechsten Black Op OHNE Trupp bereits unter die
-      // Schwelle? Der Spieler rekrutiert deswegen nicht mehr selbst - ein
-      // Sleeve-Hook (noch nicht gebaut, siehe Bericht) kann hier ansetzen.
+      // Schwelle? Der Spieler rekrutiert deswegen nicht mehr selbst - sleeve.js
+      // liest die drei Felder (03.10.2026) und schickt einen Sleeve los.
       truppAnfrage,
+      truppFehlt,
+      truppPool,
+      truppZeit,
     }), "w");
     if (ns.getHostname() !== "home") {
       try { ns.scp("data/blade.json", "home", ns.getHostname()); } catch { /* egal */ }
@@ -2432,10 +2468,89 @@ export async function main(ns) {
     // 2. Die naechste Black Op, wenn Rang und Sicherheit reichen. Sie sind
     //    der eigentliche Zweck: 21 Stueck, dann ist der Knoten offen.
     const bo = ns.bladeburner.getNextBlackOp();
+    // TRUPPBEDARF UND TRUPPEINSATZ AN EINER STELLE (03.10.2026).
+    //
+    // Zwei Fehler, die zusammen dafuer sorgten, dass ein Trupp der Black Op
+    // NIE etwas brachte:
+    //
+    // 1. Die Feuerentscheidung unten sah nur `blackOpChance()`, also den
+    //    Trupp, der DIESER Op schon zugeteilt ist (`getTeamSize(B, name)`,
+    //    vor dem ersten `setTeamSize` 0, Actions/Operation.ts:23). Lag die
+    //    Chance ohne Trupp unter der Schwelle, wurde die Op gar nicht erst
+    //    gewaehlt - und der Einsatz-Block vor `startAction` kam nie dran.
+    // 2. Dieser Einsatz-Block rief `blackOpChance()` und `blackOpSchwelle()`
+    //    AUSSERHALB von `waehle()`, wo beide nicht definiert sind (acorn-
+    //    Pruefung 03.10.: beide stehen im Rumpf 1946-3635 von `waehle`). Der
+    //    ReferenceError fiel in das `catch` - NACHDEM `setTeamSize(B, name, 0)`
+    //    schon gelaufen war. Der Trupp wurde also bei jeder Black Op auf 0
+    //    gesetzt und `truppAnfrage` dort nie gemeldet.
+    //
+    // Jetzt rechnet `waehle()` beides: die Chance ohne Trupp (aus der
+    // gerechneten Chance durch den Bonus des schon zugeteilten Trupps
+    // geteilt - exakt, solange sie unter 1 liegt) und die mit dem ganzen Pool.
+    // Gefeuert wird, wenn die Chance MIT Pool die Schwelle traegt; eingesetzt
+    // wird der Pool nur, wenn die Chance OHNE ihn nicht reicht (D1: jeder
+    // Einsatz kostet mindestens einen Mann, TeamCasualties.ts:29-62). Die
+    // Zahl reist als `wahl.trupp` zum `startAction`.
+    //
+    // `truppAnfrage` ist nur noch true, wenn ein Trupp WIRKLICH fehlt:
+    //   - die Op ist faellig oder fast (Rang >= TRUPP_NAHE * Tor),
+    //   - ihre Chance ohne Trupp liegt unter der Schwelle,
+    //   - die Luecke ist hoechstens Faktor TRUPP_VORLAUF (1,2) gross (sonst
+    //     muss erst die Chance selbst wachsen),
+    //   - und der Pool hat weniger als min(noetig, TRUPP_ZIEL) Maenner.
+    // Eingesetzt werden dann nur so viele, wie die Schwelle braucht.
+    // Bis heute stand das Feld praktisch immer auf true (Pool < 6), auch bei
+    // Chance 0,07 gegen Schwelle 0,90 - da bringen selbst 1.000 Mann nichts.
+    truppAnfrage = false;
+    truppFehlt = 0;
+    truppPool = null;
+    // Eigener Stempel NUR fuer diese Rechnung (Skeptiker 03.10.): Ruhe-,
+    // Gym-, Graft- und "weicht bbtrain"-Pfade schreiben blade.json mit neuem
+    // `zeit`, ohne `waehle()` zu durchlaufen - der letzte `truppAnfrage`
+    // waere dann eingefroren und saehe trotzdem frisch aus. sleeve.js prueft
+    // die Frische an `truppZeit`.
+    truppZeit = Date.now();
+    let boOhneTrupp = null;
+    let boPool = 0;
+    if (bo) {
+      try { boPool = Math.max(0, Number(ns.bladeburner.getTeamSize()) || 0); } catch { boPool = 0; }
+      truppPool = boPool;
+      let opTrupp = 0;
+      try { opTrupp = Math.max(0, Number(ns.bladeburner.getTeamSize(B, bo.name)) || 0); } catch { opTrupp = 0; }
+      const roh = blackOpChance(bo.name);
+      // Bei 1 geklemmt UND schon ein Trupp zugeteilt: die wahre Chance ohne
+      // Trupp ist unsichtbar, sicher ist nur 1/(opTrupp+1)^0,05 als
+      // Untergrenze. Die Untergrenze nehmen - dann wird im Zweifel der Pool
+      // eingesetzt statt mit zu wenig Chance gefeuert (Skeptiker 03.10.).
+      if (Number.isFinite(roh)) boOhneTrupp = roh / Math.pow(opTrupp + 1, 0.05);
+      if (TRUPP_ZIEL > 0 && Number.isFinite(boOhneTrupp) && boOhneTrupp > 0) {
+        let rangJetzt = 0;
+        try { rangJetzt = ns.bladeburner.getRank(); } catch { rangJetzt = 0; }
+        const schw = blackOpSchwelle(bo.name);
+        if (rangJetzt >= TRUPP_NAHE * bo.rank && boOhneTrupp < schw) {
+          // VORLAUF (Skeptiker 03.10.): Maenner verfallen nicht. Oeffnet die
+          // Anfrage erst, wenn 6 Mann reichen (c0 >= s/1,102), bleiben bei
+          // g = 0,115/h nur ln(1,102)/g = 51 min - ein Sleeve mit Charisma 1
+          // braucht fuer 6 Mann etwa so lange (Monte Carlo 51 min), die Op
+          // faellt also erst spaet. Ab c0 >= s/1,2 sind es 95 min Vorlauf; das
+          // Ziel bleibt dabei hoechstens TRUPP_ZIEL Mann.
+          const noetig = maennerNoetig(boOhneTrupp, schw);
+          const ziel = Math.min(noetig, TRUPP_ZIEL);
+          if (boOhneTrupp * TRUPP_VORLAUF >= schw && boPool < ziel) {
+            truppAnfrage = true;
+            truppFehlt = ziel - boPool;
+          }
+        }
+      }
+    }
     if (bo) {
       if (ns.bladeburner.getRank() >= bo.rank) {
         const s = spanne(B, bo.name);
-        const gerechnet = blackOpChance(bo.name);
+        // Mit dem GANZEN Pool gerechnet - eingesetzt wird er unten nur, wenn
+        // es ohne ihn nicht reicht.
+        const gerechnet = Number.isFinite(boOhneTrupp)
+          ? Math.min(1, boOhneTrupp * Math.pow(boPool + 1, 0.05)) : null;
         // Die gerechnete Zahl schlaegt die geschaetzte. Fehlen die Daten,
         // bleibt es bei `min` - lieber zu spaet feuern als zu frueh.
         const chance = gerechnet !== null ? gerechnet : s.min;
@@ -2443,9 +2558,17 @@ export async function main(ns) {
         boSchwelleZuletzt = +schwelle.toFixed(2);
         boEndspielZuletzt = imEndspiel();
         if (chance >= schwelle) {
-          return { typ: B, name: bo.name,
+          // Ohne gerechnete Chance gilt die alte, vorsichtige Regel: Trupp
+          // einsetzen, wenn einer da ist.
+          // Nur so viele Maenner, wie die Schwelle braucht (Skeptiker 03.10.):
+          // Verluste wachsen mit dem Einsatz (Erfolg 1..ceil(n/2)), bei Pool 6
+          // und Bedarf 1 kostete der ganze Pool im Mittel einen Mann mehr.
+          const trupp = Number.isFinite(boOhneTrupp)
+            ? Math.min(boPool, maennerNoetig(boOhneTrupp, schwelle)) : boPool;
+          return { typ: B, name: bo.name, trupp,
             grund: "Black Op (Chance " + chance.toFixed(3)
               + (gerechnet !== null ? " gerechnet" : " geschaetzt")
+              + (trupp > 0 ? ", Trupp " + trupp : "")
               + ", Schwelle " + schwelle.toFixed(2) + ")" };
         }
         // WENN NUR DIE SCHAETZUNG IM WEG STEHT, IST SIE DAS ZIEL
@@ -2869,20 +2992,12 @@ export async function main(ns) {
     // schon - dort kostete der Einsatz nur Maenner (mindestens 1 Toter je
     // Erfolg, TeamCasualties.ts:29-62), die dann wieder aufgefuellt wurden.
     //
-    // Diese Zeile hier kehrt deshalb nie mehr mit Recruitment zurueck. Statt
-    // dessen nur noch Telemetrie: reicht der Pool (`getTeamSize()`, ohne
-    // Argumente - Erics Bericht: Sleeve.ts:505-511 erlaubt Recruitment als
-    // SLEEVE-Aktion, ein kuenftiger sleeve.js-Hook kann `truppAnfrage` lesen)?
-    // Der eigentliche Truppeinsatz - nur wenn eine Black Op ihn wirklich
-    // braucht - steht jetzt kurz vor `startAction`, siehe dort.
-    if (TRUPP_ZIEL > 0) {
-      try {
-        const trupp = ns.bladeburner.getTeamSize();
-        truppAnfrage = trupp >= 0 && trupp < TRUPP_ZIEL;
-      } catch { truppAnfrage = false; }
-    } else {
-      truppAnfrage = false;
-    }
+    // Diese Zeile hier kehrt deshalb nie mehr mit Recruitment zurueck.
+    //
+    // 03.10.2026: Hier stand bis heute die Telemetrie `truppAnfrage = Pool <
+    // TRUPP_ZIEL` - praktisch immer true und deshalb fuer einen Leser
+    // wertlos. Bedarf und Einsatz stehen jetzt beim Black-Op-Block oben
+    // ("TRUPPBEDARF UND TRUPPEINSATZ AN EINER STELLE").
 
     {
       {
@@ -4307,30 +4422,17 @@ export async function main(ns) {
         // die Chance, nicht der Truppbestand.
         if (wahl.typ === B) {
           try {
-            // D1 (Audit 4#1): Pool ZUERST lesen, dann erst auf 0 setzen - ein
-            // fruehere Tick (Figur noch nicht frei, `figDarf` verweigert) kann
-            // fuer DIESE Op schon eine Zahl > 0 hinterlassen haben, und
-            // `blackOpChance()` liest genau dieses Feld. Ohne den Reset waere
-            // "Chance ohne Trupp" ab dem zweiten Versuch die Chance MIT dem
-            // alten Trupp - und die Pruefung darunter wertlos.
-            const mannPool = ns.bladeburner.getTeamSize();
-            ns.bladeburner.setTeamSize(B, wahl.name, 0);
-            const ohneTrupp = blackOpChance(wahl.name);
-            const schwelle = blackOpSchwelle(wahl.name);
-            // Traegt die Chance OHNE Trupp die Schwelle schon (der Normalfall,
-            // 6 von 7 gemessen), bleibt der Einsatz auf 0 - jeder Mann kostet
-            // sonst nur Ersatzrekrutierung fuer einen Bonus, den die
-            // Feuerentscheidung nie sah. Liesse sich die Chance nicht rechnen
-            // (blackOpChance() liefert null), gilt die alte, vorsichtige
-            // Regel: Trupp einsetzen, wenn einer da ist.
-            const truppNoetig = !(Number.isFinite(ohneTrupp) && ohneTrupp >= schwelle);
-            if (truppNoetig && mannPool > 0) {
-              ns.bladeburner.setTeamSize(B, wahl.name, mannPool);
-            }
-            // Trupp waere noetig, aber der Pool ist leer: der Spieler
-            // rekrutiert nicht mehr selbst (s.o.) - das ist der Fall, fuer den
-            // ein Sleeve-Hook lohnen wuerde.
-            if (truppNoetig && mannPool <= 0) truppAnfrage = true;
+            // D1 (Audit 4#1) / 03.10.2026: Die Zahl hat `waehle()` gerechnet
+            // (Block "TRUPPBEDARF UND TRUPPEINSATZ AN EINER STELLE") - 0, wenn
+            // die Chance ohne Trupp die Schwelle traegt (der Normalfall, 6 von
+            // 7 gemessen), sonst der ganze Pool. Hier stand bis heute eine
+            // eigene Rechnung mit `blackOpChance()`/`blackOpSchwelle()`, die
+            // ausserhalb von `waehle()` gar nicht definiert sind: Der Trupp
+            // wurde auf 0 gesetzt, dann warf der ReferenceError ins `catch`.
+            // Immer setzen, auch 0 - ein frueherer Tick kann dieser Op schon
+            // eine Zahl hinterlassen haben.
+            const soll = Number.isInteger(wahl.trupp) && wahl.trupp > 0 ? wahl.trupp : 0;
+            ns.bladeburner.setTeamSize(B, wahl.name, soll);
           } catch { /* alte Fassung ohne setTeamSize */ }
         }
         // DIE FIGUR-WACHE. Eine Bladeburner-Aktion beendet jede laufende

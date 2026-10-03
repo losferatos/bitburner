@@ -743,6 +743,16 @@ export function neuerMock(o = {}) {
             }
           }
         }
+        // Allgemeine Aktionen (Recruitment, Training, ...) in der Form des
+        // Spiels (SleeveBladeburnerWork.APICopy: actionType "General",
+        // actionName = die Aktion) - 03.10.2026, fuer den Truppzweig in
+        // sleeve.js. Vertraege bleiben in der alten Mockform, damit die
+        // bestehenden Proben unveraendert dasselbe pruefen.
+        if (["Training", "Field Analysis", "Recruitment", "Diplomacy",
+          "Hyperbolic Regeneration Chamber"].includes(art)) {
+          k.aufgabe = { type: "BLADEBURNER", actionType: "General", actionName: art };
+          return true;
+        }
         k.aufgabe = { type: "BLADEBURNER", actionType: art, actionName: name };
         return true;
       },
@@ -777,8 +787,25 @@ export function neuerMock(o = {}) {
       getSkillPoints: () => zustand.blade.punkte,
       getStamina: () => [...zustand.blade.ausdauer],
       getCity: () => zustand.blade.stadt,
-      getTeamSize: () => zustand.blade.truppe,
-      setTeamSize: (typ, name, n) => { zustand.blade.truppe = n; return n; },
+      // POOL UND EINSATZ GETRENNT, WIE IM SPIEL (03.10.2026,
+      // NetscriptFunctions/Bladeburner.ts:258-290). Ohne Argumente der Pool,
+      // mit Typ/Name der Trupp DIESER Op (Start 0, Operation.ts:23). Bis heute
+      // setzte `setTeamSize(B, name, 0)` im Mock den POOL auf 0 - ein Test
+      // haette so nie sehen koennen, dass blade.js den Trupp einer Black Op
+      // zwar loescht, aber nie wieder setzt.
+      getTeamSize: (typ, name) => {
+        if (!typ && !name) return zustand.blade.truppe;
+        if (typ === "Contracts" || typ === "General") return 0;
+        return (zustand.blade.opTrupp || {})[name] ?? 0;
+      },
+      setTeamSize: (typ, name, n) => {
+        if (!Number.isInteger(n) || n < 0) throw new Error("size must be a non-negative integer");
+        if (n > zustand.blade.truppe) return -1;
+        if (typ === "Contracts" || typ === "General") return -1;
+        if (!zustand.blade.opTrupp) zustand.blade.opTrupp = {};
+        zustand.blade.opTrupp[name] = n;
+        return n;
+      },
       switchCity: (stadt) => {
         zustand.blade.stadt = stadt;
         zustand.blade.gereist.push(stadt);

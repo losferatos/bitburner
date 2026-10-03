@@ -187,7 +187,7 @@ def aktualisiere_duplikate(
             je_art[tr.art] += 1
         if treffer:
             mit_duplikat += 1
-        vollstaendig = p.medien_vollstaendig and _abgedeckt(bereiche, p.t, fenster_tage)
+        vollstaendig = p.medien_vollstaendig and _abgedeckt(bereiche, p.t, fenster_tage, int(p.id))
         post_zeilen.append((jetzt_text, int(vollstaendig), p.id))
     post_zeilen += [(jetzt_text, 0, post_id) for post_id in sorted(unlesbar)]
 
@@ -401,11 +401,17 @@ def _im_einflussbereich(posts: list[_Post], ausloeser: dict[str, tuple[int, int]
 # Abdeckung
 
 
-def _abgedeckt(bereiche: list[db.Bereich], t: int, fenster_tage: float) -> bool:
-    """Wie ``db.abdeckung_vollstaendig(con, P.t − Fenster, P.t)``, aber mit einmal gelesenen Bereichen."""
+def _abgedeckt(bereiche: list[db.Bereich], t: int, fenster_tage: float, post_id: int | None = None) -> bool:
+    """Wie ``db.abdeckung_vollstaendig(con, P.t − Fenster, P.t)``, aber mit einmal gelesenen Bereichen.
+
+    Mit ``post_id`` endet das Fenster spätestens beim Post selbst: Frühere Posts haben kleinere IDs,
+    und die Abdeckung reicht oben nur bis zur größten gesehenen ID (nicht bis zur Uhrzeit des Laufs).
+    """
     bis = _zeitpunkt(t)
     von = bis - timedelta(days=fenster_tage)
     unten, oben = zeit.id_untergrenze(von), zeit.id_obergrenze(bis)
+    if post_id is not None:
+        oben = min(oben, post_id)
     return any((0 if b.anfang_erreicht else b.von) <= unten and b.bis >= oben for b in bereiche)
 
 
@@ -430,7 +436,7 @@ def _abdeckung_nachtragen(
         if z["id"] in ausgenommen:
             continue
         t = _sekunden(z["created_at_utc"])
-        if t is not None and _abgedeckt(bereiche, t, fenster_tage):
+        if t is not None and _abgedeckt(bereiche, t, fenster_tage, int(z["id"])):
             ergebnis.append(z["id"])
     return ergebnis
 

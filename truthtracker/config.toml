@@ -11,7 +11,9 @@ handle = "realDonaldTrump"
 # curl:    nur direkt (bei einer Prüfung bricht der Lauf ab).
 # browser: immer über den Browser.
 weg = "auto"
-# auto probiert Opera, Opera GX, Chrome, Edge. Alternativ einer dieser Namen oder ein Pfad zur .exe.
+# auto probiert Opera, Opera GX, Chrome, Edge. Alternativ einer dieser Namen oder ein Pfad zur .exe,
+# unter Windows in einfachen Anführungszeichen (sonst gelten die Backslashes als Steuerzeichen), z. B.
+# browser = 'C:\Users\Name\AppData\Local\Programs\Opera\opera.exe'
 browser = "auto"
 # curl_cffi-Ziel für die Browser-Imitation; "chrome" = neueste Chrome-Fassung der installierten curl_cffi.
 impersonate = "chrome"

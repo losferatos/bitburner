@@ -1,5 +1,6 @@
 """Regeln der Datenbankschicht: 24h-Snapshots, Einfrieren, Edits, Abdeckung, Löschmarker, Idempotenz."""
 
+import sqlite3
 from datetime import UTC, datetime, timedelta
 
 import pytest
@@ -211,9 +212,52 @@ def test_kandidaten_nur_im_bereich_und_fenster(con):
 
 def test_abgestuerzte_laeufe_werden_markiert(con):
     lauf = _lauf(con, T0)
-    assert db.markiere_abgestuerzte_laeufe(con, T0 + timedelta(hours=1)) == 1
+    assert db.markiere_abgestuerzte_laeufe(con) == 1
     z = con.execute("SELECT status, ende_utc FROM laeufe WHERE id = ?", (lauf,)).fetchone()
-    assert z["status"] == "abgestuerzt" and z["ende_utc"] == zeit.utc_text(T0 + timedelta(hours=1))
+    # Ohne Zwischenstand bleibt das Ende leer; es ist nicht der Start des nächsten Laufs.
+    assert z["status"] == "abgestuerzt" and z["ende_utc"] is None
+
+
+def test_abgestuerzter_lauf_behaelt_letzten_zwischenstand(con):
+    lauf = _lauf(con, T0)
+    zaehler = db.LaufZaehler(anfragen_api=7, seiten=3, neue_posts=55)
+    db.lauf_zwischenstand(con, lauf, zaehler=zaehler, jetzt=T0 + timedelta(minutes=4))
+    assert db.markiere_abgestuerzte_laeufe(con) == 1
+    z = con.execute("SELECT * FROM laeufe WHERE id = ?", (lauf,)).fetchone()
+    assert z["status"] == "abgestuerzt"
+    assert z["ende_utc"] == zeit.utc_text(T0 + timedelta(minutes=4))
+    assert (z["anfragen_api"], z["seiten"], z["neue_posts"]) == (7, 3, 55)
+
+
+def test_zwischenstand_aendert_beendete_laeufe_nicht(con):
+    lauf = _lauf(con, T0)
+    db.lauf_beenden(
+        con, lauf, ende=T0 + timedelta(minutes=9), status="ok", zugriff="curl", abbruch_grund=None,
+        zaehler=db.LaufZaehler(anfragen_api=12), meldungen=[], abgedeckt_von=None, abgedeckt_bis=None,
+    )
+    db.lauf_zwischenstand(con, lauf, zaehler=db.LaufZaehler(anfragen_api=1), jetzt=T0 + timedelta(hours=2))
+    z = con.execute("SELECT * FROM laeufe WHERE id = ?", (lauf,)).fetchone()
+    assert (z["anfragen_api"], z["ende_utc"]) == (12, zeit.utc_text(T0 + timedelta(minutes=9)))
+
+
+@pytest.mark.parametrize("ordner", ["C# Projekte", "mit 50%25 Rabatt", "Daten%41b", "Max Mustermann"])
+def test_nur_lesen_mit_sonderzeichen_im_pfad(tmp_path, ordner):
+    pfad = tmp_path / ordner / "tracker.sqlite3"
+    schreibend = db.oeffne(pfad)
+    with schreibend:
+        db.meta_schreiben(schreibend, "probe", "1")
+    schreibend.close()
+    vorher = sorted(p.name for p in tmp_path.rglob("*"))
+
+    lesend = db.oeffne(pfad, nur_lesen=True)
+    try:
+        assert db.meta_lesen(lesend, "probe") == "1"
+        with pytest.raises(sqlite3.OperationalError, match="readonly"):
+            lesend.execute("INSERT INTO meta (schluessel, wert) VALUES ('x', 'y')")
+    finally:
+        lesend.close()
+    nachher = sorted(p.name for p in tmp_path.rglob("*") if not p.name.endswith(("-wal", "-shm")))
+    assert nachher == [n for n in vorher if not n.endswith(("-wal", "-shm"))]
 
 
 def test_gepinnt_setzen(con):

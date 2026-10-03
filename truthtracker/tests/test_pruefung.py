@@ -4,10 +4,13 @@ gefundenen Inhalte nie aus. Alle Daten sind synthetisch (Marker ``SYNTHETIK``)."
 
 from __future__ import annotations
 
+import base64
 import hashlib
+import io
 import json
 import logging
 import os
+import random
 import sqlite3
 import subprocess
 import sys
@@ -531,6 +534,263 @@ def test_profil_mit_cache_verlauf_oder_medien_url_wird_gefunden(k, eigene_laufze
     _ohne_inhalt(bericht)
 
 
+ERWEITERUNG = "ahfgeienlihckogmohjhadlkjgocpleb"
+
+
+def _b64(zufall: random.Random, laenge: int) -> str:
+    return base64.b64encode(zufall.randbytes(laenge)).decode()
+
+
+def _einstellungen() -> dict:
+    """``Preferences`` eines Chromium-Profils (Opera, Chrome, Edge) nach ein paar Läufen.
+
+    Struktur echt, Werte erfunden."""
+    zufall = random.Random(1)
+    t = "13370000000000000"
+    druckvorschau = {
+        "version": 2, "isHeaderFooterEnabled": False, "isCssBackgroundEnabled": True,
+        "recentDestinations": [{"id": "Save as PDF", "origin": "local", "account": "", "displayName": "Save as PDF",
+                                "extensionId": "", "extensionName": "", "icon": "cr:insert-drive-file"}],
+        "mediaSize": {"height_microns": 297000, "width_microns": 210000, "name": "ISO_A4", "custom_display_name": "A4"},
+    }
+    vorschlaege = ["", ["wetter morgen", "bundesliga tabelle", "bahn streik aktuell"], ["", "", ""], [],
+                   {"google:clientdata": {"bpc": False, "tlw": False}, "google:suggesttype": ["QUERY"] * 3,
+                    "google:verbatimrelevance": 851}]
+    return {
+        "accessibility": {"captions": {"headless_caption_enabled": False}},
+        "browser": {
+            "has_seen_welcome_page": True,
+            "window_placement": {"bottom": 1040, "left": 10, "maximized": False, "right": 1290, "top": 10,
+                                 "work_area_bottom": 1040, "work_area_left": 0, "work_area_right": 1920},
+            "theme": {"color_scheme2": 2, "user_color2": -1},
+        },
+        "default_search_provider_data": {"template_url_data": {
+            "keyword": "google.com", "short_name": "Google",
+            "url": "{google:baseURL}search?q={searchTerms}&{google:RLZ}{google:originalQueryForSuggestion}"
+                   "ie={inputEncoding}",
+            "favicon_url": "https://www.google.com/images/branding/product/ico/googleg_lodp.ico",
+        }},
+        "devtools": {
+            "adb_key": _b64(zufall, 1200),
+            "preferences": {
+                "currentDockState": '"right"', "panel-selectedTab": '"network"',
+                "console-history": json.dumps(["document.title", "fetch('/api/v1/instance').then(r => r.json())"]),
+                "InspectorView.splitViewState": json.dumps({"vertical": {"size": 0}}),
+            },
+        },
+        "dns_prefetching": {
+            "host_referral_list": [2, ["https://truthsocial.com/", ["https://static-assets-1.truthsocial.com/", 2.0]]],
+            "startup_list": [1, "https://truthsocial.com/"],
+        },
+        "download": {"default_directory": "C:\\Users\\Max Mustermann\\Downloads", "directory_upgrade": True},
+        "extensions": {
+            "alerts": {"initialized": True}, "chrome_url_overrides": {}, "last_chrome_version": "120.0.5543.61",
+            "settings": {ERWEITERUNG: {
+                "active_permissions": {"api": ["management", "webstorePrivate"], "explicit_host": ["<all_urls>"],
+                                       "manifest_permissions": [], "scriptable_host": []},
+                "creation_flags": 1, "first_install_time": t, "location": 5,
+                "manifest": {
+                    "app": {"launch": {"web_url": "https://addons.example.org/"},
+                            "urls": ["https://addons.example.org/"]},
+                    # Ein ganzer Satz, aber vom Browser selbst: kein Inhaltsrest
+                    "description": "Find useful apps, games, add-ons and colorful themes for this browser "
+                                   "in one place.",
+                    "content_security_policy": "script-src 'self' blob: filesystem:; object-src 'self'",
+                    "icons": {"128": "store_icon_128.png", "16": "store_icon_16.png"},
+                    "key": _b64(zufall, 294), "name": "Add-ons", "permissions": ["webstorePrivate", "management"],
+                },
+                "path": "C:\\Program Files\\Opera\\120.0.5543.61\\resources\\addons", "state": 1,
+                "was_installed_by_default": False,
+            }, "mhjfbmdgcfjbbpaeojofohoefgiehjai": {
+                "location": 5,
+                "manifest": {
+                    "content_security_policy": "script-src 'self' 'wasm-eval' blob: filesystem: chrome://resources "
+                                               "chrome://webui-test; object-src * blob: externalfile: file: "
+                                               "filesystem: data:",
+                    "description": "", "name": "PDF Viewer", "offline_enabled": True,
+                },
+                "path": "C:\\Program Files\\Opera\\120.0.5543.61\\resources\\pdf", "state": 1,
+            }},
+        },
+        "gaia_cookie": {"changed_time": 1.7e9, "hash": "2jmj7l5rSw0yVb/vlWAYkK/YBwk=",
+                        "last_list_accounts_data": '["gaia.l.a.r",[]]'},
+        "intl": {"accept_languages": "de-DE,de,en-US,en", "selected_languages": "de-DE,de,en-US,en"},
+        "media": {"device_id_salt": _hex("salz", 32), "engagement": {"schema_version": 5}},
+        "net": {"network_prediction_options": 2},
+        "ntp": {
+            "custom_background_dict": {
+                "attribution_line_1": "Foto von Jane Beispiel", "attribution_line_2": "Bergsee im Herbst",
+                "background_url": "https://lh3.googleusercontent.com/bergsee=w3840-h2160-p-k-no-nd-mv",
+                "collection_id": "landscapes",
+            },
+            "num_personal_suggestions": 2,
+        },
+        "opera": {
+            "startpage": {"url": "opera://startpage/"},
+            "sidebar": {"items": ["opera://bookmarks", "opera://history"]},
+            "wallpaper": {"image": "https://wallpapers.example.org/bergsee-2560.jpg"},
+        },
+        "printing": {"print_preview_sticky_settings": {"appState": json.dumps(druckvorschau)}},
+        "profile": {
+            "avatar_index": 26, "created_by_version": "120.0.5543.61", "creation_time": t, "exit_type": "Normal",
+            "managed_user_id": "", "name": "Person 1", "using_default_name": True,
+            "content_settings": {"pref_version": 1, "exceptions": {
+                "cookies": {"https://truthsocial.com:443,*": {"last_modified": t, "setting": 1}},
+                "site_engagement": {"https://truthsocial.com:443,*": {"last_modified": t, "setting": {
+                    "lastEngagementTime": 1.337e16, "pointsAddedToday": 3.0, "rawScore": 3.0}}},
+                "app_banner": {"https://truthsocial.com:443,*": {"setting": {"https://truthsocial.com/": {
+                    "couldShowBannerEvents": 1.337e16}}}},
+            }},
+        },
+        "session": {"restore_on_startup": 4, "startup_urls": ["chrome://newtab/", "edge://settings/"]},
+        "sessions": {"event_log": [{"crashed": False, "time": t, "type": 0},
+                                   {"tab_count": 1, "time": t, "type": 2, "window_count": 1}],
+                     "session_data_status": 3},
+        "spellcheck": {"dictionaries": ["de-DE"], "dictionary": ""},
+        "sync": {"requested": False, "encryption_bootstrap_token": _b64(zufall, 96)},
+        "translate_site_blocklist_with_time": {},
+        "zerosuggest": {"cachedresults": ")]}'\n" + json.dumps(vorschlaege)},
+    }
+
+
+def _local_state() -> dict:
+    zufall = random.Random(2)
+    return {
+        "browser": {"enabled_labs_experiments": ["enable-parallel-downloading@1"], "last_redirect_origin": ""},
+        "hardware_acceleration_mode_previous": True,
+        "legacy": {"profile": {"name": {"migrated": True}}},
+        "os_crypt": {"encrypted_key": _b64(zufall, 240)},
+        "profile": {
+            "info_cache": {"Default": {"active_time": 1.7e9, "avatar_icon": "chrome://theme/IDR_PROFILE_AVATAR_26",
+                                       "gaia_name": "", "is_using_default_name": True, "name": "Person 1",
+                                       "user_name": ""}},
+            "last_used": "Default", "profiles_order": ["Default"],
+        },
+        "uninstall_metrics": {"installation_date2": "1760000000"},
+        "updateclientdata": {"apps": {"oimompecagnajdejgnnjijobebaeigek": {
+            "cohort": "1:1:", "cohortname": "Auto", "dlrc": 6550, "pf": "8c1d2e3f-0000-4000-8000-000000000000"}}},
+        "user_experience_metrics": {"low_entropy_source3": 1234, "stability": {
+            "exited_cleanly": True, "stats_version": "120.0.5543.61-64"}},
+        # Zehntausende Base64-Zeichen: Zufällige Buchstabenfolgen darin sind keine Wörter eines Freitexts.
+        "variations_compressed_seed": _b64(zufall, 24_000),
+        "variations_country": "de",
+        "variations_permanent_consistency_country": ["120.0.5543.61", "de"],
+        "variations_seed_signature": _b64(zufall, 72),
+    }
+
+
+def _chromium_json(daten: dict) -> str:
+    """Wie der JSON-Schreiber von Chromium: ``<`` maskiert, Umlaute nicht."""
+    return json.dumps(daten, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003C")
+
+
+def _realistisches_profil(wurzel: Path, einstellungen: dict | None = None, local_state: dict | None = None) -> Path:
+    profil = wurzel / "laufzeit" / "browser-profil"
+    cookies = profil / "Default" / "Network" / "Cookies"
+    cookies.parent.mkdir(parents=True)
+    cookies.write_bytes(b"SQLite format 3\x00")
+    _schreibe(profil / "Local State", _chromium_json(local_state or _local_state()))
+    _schreibe(profil / "Default" / "Preferences", _chromium_json(einstellungen or _einstellungen()))
+    sicher = {"extensions": {"settings": {ERWEITERUNG: {"location": 5, "state": 1}}},
+              "protection": {"macs": {"homepage": _hex("mac1"), "session": {"startup_urls": _hex("mac2")}},
+                             "super_mac": _hex("super")}}
+    _schreibe(profil / "Default" / "Secure Preferences", _chromium_json(sicher))
+    _schreibe(profil / "First Run", "")
+    _schreibe(profil / "Last Version", "120.0.5543.61")
+    (profil / "Last Browser").write_bytes("C:\\Program Files\\Opera\\launcher.exe".encode("utf-16-le"))
+    return profil
+
+
+def _setze(daten: dict, pfad: tuple[str, ...], wert: object) -> dict:
+    ziel = daten
+    for teil in pfad[:-1]:
+        ziel = ziel.setdefault(teil, {})
+    ziel[pfad[-1]] = wert
+    return daten
+
+
+def test_realistische_einstellungsdateien_sind_sauber(k, eigene_laufzeit):
+    """Sätze in Erweiterungs-Manifesten, Base64, JSON in Zeichenketten, eigene Bild-URLs: alles vom Browser."""
+    _realistisches_profil(eigene_laufzeit)
+    bericht = pruefung.pruefe(k)
+    assert bericht.ok, bericht.funde
+    assert bericht.geprueft["profil_dateien"] == 7
+    assert bericht.geprueft["profil_textdateien"] == 6  # alles außer Cookies
+
+
+@pytest.mark.parametrize(
+    ("datei", "pfad", "wert", "art", "stelle"),
+    [
+        ("Preferences", ("profile", "name"), HTML_REST, ART_HTML, "profile.name"),
+        ("Preferences", ("ntp", "custom_background_dict", "attribution_line_1"), "Don&#39;t", ART_HTML,
+         "ntp.custom_background_dict.attribution_line_1"),
+        ("Preferences", ("session", "startup_urls"), ["chrome://newtab/", ALLTAGSSATZ], ART_FREITEXT,
+         "session.startup_urls[1]"),
+        # JSON in einer Zeichenkette (DevTools): der Satz darin zählt, die Feldnamen nicht
+        ("Preferences", ("devtools", "preferences", "console-history"), json.dumps(["document.title", FREITEXT]),
+         ART_FREITEXT, "devtools.preferences.console-history[1]"),
+        # Bei Erweiterungen ist nur das Manifest ausgenommen
+        ("Preferences", ("extensions", "settings", ERWEITERUNG, "preferences", "zuletzt"), FREITEXT, ART_FREITEXT,
+         f"extensions.settings.{ERWEITERUNG}.preferences.zuletzt"),
+        ("Preferences", ("extensions", "settings", ERWEITERUNG, "manifest", "description"), HTML_REST, ART_HTML,
+         f"extensions.settings.{ERWEITERUNG}.manifest.description"),
+        # Ein Satz als Schlüssel: Im Bericht steht dafür nur „*“
+        ("Preferences", ("history_clusters", "all_cache", "all_keywords"), {FREITEXT: {"score": 1.0}}, ART_FREITEXT,
+         "history_clusters.all_cache.all_keywords.*"),
+        ("Local State", ("profile", "info_cache", "Default", "name"), HTML_REST, ART_HTML,
+         "profile.info_cache.Default.name"),
+        ("Local State", ("browser", "zuletzt"), FREITEXT, ART_FREITEXT, "browser.zuletzt"),
+    ],
+)
+def test_html_und_freitext_in_einstellungsdateien_werden_gefunden(k, eigene_laufzeit, datei, pfad, wert, art, stelle):
+    if datei == "Preferences":
+        profil = _realistisches_profil(eigene_laufzeit, einstellungen=_setze(_einstellungen(), pfad, wert))
+        ort = "browser-profil/Default/Preferences"
+    else:
+        profil = _realistisches_profil(eigene_laufzeit, local_state=_setze(_local_state(), pfad, wert))
+        ort = "browser-profil/Local State"
+    assert "<" not in (profil / ort.removeprefix("browser-profil/")).read_text(encoding="utf-8")  # als \u003C
+    bericht = pruefung.pruefe(k)
+    assert [(f.ort, f.art) for f in bericht.funde] == [(f"{ort}:{stelle}", art)], bericht.funde
+    assert "Länge" in bericht.funde[0].hinweis
+    _ohne_inhalt(bericht, pruefung.bericht_text(bericht))
+
+
+def test_einstellungsdatei_ohne_json_und_kaputtes_json(k, eigene_laufzeit):
+    profil = _realistisches_profil(eigene_laufzeit)
+    _schreibe(profil / "First Run", f"\n{FREITEXT}\n")
+    _schreibe(profil / "Default" / "Secure Preferences", '{"protection":{"macs":{"homepage":"')
+    bericht = pruefung.pruefe(k)
+    assert {(f.ort, f.art) for f in bericht.funde} == {
+        ("browser-profil/First Run:2", ART_FREITEXT),
+        ("browser-profil/Default/Secure Preferences", ART_NICHT_PRUEFBAR),
+    }
+    _ohne_inhalt(bericht, pruefung.bericht_text(bericht))
+
+
+def test_stichprobe_wird_auch_in_maskierten_einstellungen_gefunden(k, eigene_laufzeit):
+    stichprobe = f"Grüße <3 an alle {MARKER}-Leser"  # Chromium schreibt "<" als \u003C
+    _realistisches_profil(eigene_laufzeit, einstellungen=_setze(_einstellungen(), ("profile", "name"), stichprobe))
+    assert pruefung.pruefe(k).ok
+    bericht = pruefung.pruefe(k, marker=[stichprobe])
+    assert [(f.ort, f.art) for f in bericht.funde] == [("browser-profil/Default/Preferences", ART_MARKER)]
+    _ohne_inhalt(bericht, pruefung.bericht_text(bericht))
+
+
+def test_sperrdatei_eines_laufenden_crawls_ist_kein_fund(k, eigene_laufzeit):
+    from truthtracker import laufsperre
+
+    _saubere_db(k)
+    _log(eigene_laufzeit, *SAUBERES_LOG)
+    _profil(eigene_laufzeit)
+    with laufsperre.gehalten() as frei:
+        assert frei
+        assert laufsperre.pfad().parent == eigene_laufzeit / "laufzeit"
+        assert laufsperre.pfad().stat().st_size == 0
+        bericht = pruefung.pruefe(k)
+    assert bericht.ok, bericht.funde
+
+
 def _export(k: Konfig, *zeilen: str) -> Path:
     kopf = "Post-ID;Link;Erstellt (UTC);Typ;Link-Domains;Retruth-Quelle: Anzeigename;Zeichen"
     return _schreibe(k.export_ordner / "posts-20261002-120000.csv", "\ufeff" + "\r\n".join((kopf, *zeilen)) + "\r\n")
@@ -728,14 +988,90 @@ def test_main_meldet_funde_mit_exit_1_ohne_den_inhalt_auszugeben(tmp_path, eigen
 
 def test_main_mit_stichproben_aus_datei_und_abfrage(tmp_path, eigene_laufzeit, capsys, monkeypatch):
     cfg = _config(tmp_path)
-    _log(eigene_laufzeit, f"{MARKER} Stichprobe eins", f"{MARKER} Stichprobe zwei")
+    _log(eigene_laufzeit, f"{MARKER} Stichprobe eins", f"{MARKER} Stichprobe zwei", f"{MARKER} Absatz drei")
     datei = _schreibe(tmp_path / "stichproben.txt", f"{MARKER} Stichprobe eins\n\n")
-    eingaben = iter([f"{MARKER} Stichprobe zwei", ""])
-    monkeypatch.setattr("builtins.input", lambda _aufforderung="": next(eingaben))
+    # Ein eingefügter Post mit Absätzen: Die Leerzeilen beenden die Eingabe nicht, erst ihr Ende.
+    monkeypatch.setattr(sys, "stdin", io.StringIO(f"{MARKER} Stichprobe zwei\n\n\n{MARKER} Absatz drei\n"))
     assert pruefung.main(["--config", str(cfg), "--marker-datei", str(datei), "--abfragen"]) == 1
     ausgabe = capsys.readouterr().out
-    assert "Stichprobe 1 gefunden" in ausgabe and "Stichprobe 2 gefunden" in ausgabe
+    for nr in (1, 2, 3):
+        assert f"logs/crawl-2026-10-02.log:{nr}: Stichprobe {nr} gefunden" in ausgabe
+    assert "2 Stichproben übernommen" in ausgabe and "3 Zeichenketten" in ausgabe
     assert MARKER not in ausgabe
+
+
+def test_abfrage_liest_bis_zum_ende_der_eingabe_und_leert_danach_den_konsolenpuffer(monkeypatch, capsys):
+    geleert = []
+    monkeypatch.setattr(pruefung, "_konsolenpuffer_leeren", lambda: geleert.append(True))
+    eingabe = io.StringIO(
+        f"{MARKER} erster Absatz des Posts\r\n"
+        "\r\n"
+        "   \n"
+        "DJT\n"  # zu kurz für eine Stichprobe: übersprungen statt Abbruch mit Exit-Code 2
+        f"  {MARKER} zweiter Absatz  \n"
+        "\n"
+        f"{MARKER} letzter Absatz\x1a\n"  # Strg+Z am Zeilenende (Windows): Die Eingabe endet hier.
+        "echo nicht-ausfuehren\n"
+    )
+    monkeypatch.setattr(sys, "stdin", eingabe)
+    assert pruefung._frage_marker() == [
+        f"{MARKER} erster Absatz des Posts", f"{MARKER} zweiter Absatz", f"{MARKER} letzter Absatz",
+    ]
+    assert geleert == [True]
+    assert eingabe.read() == "echo nicht-ausfuehren\n"  # nicht mehr gelesen; unter Windows verworfen
+    ausgabe = capsys.readouterr().out
+    assert "Strg+D" in ausgabe
+    assert "1 Zeile mit weniger als 4 Zeichen übersprungen" in ausgabe and "3 Stichproben übernommen" in ausgabe
+    assert MARKER not in ausgabe and "DJT" not in ausgabe
+
+
+def test_abfrage_leert_den_konsolenpuffer_auch_bei_abbruch(monkeypatch):
+    geleert = []
+    monkeypatch.setattr(pruefung, "_konsolenpuffer_leeren", lambda: geleert.append(True))
+
+    def abbruch(_aufforderung=""):
+        raise KeyboardInterrupt
+
+    monkeypatch.setattr("builtins.input", abbruch)
+    with pytest.raises(KeyboardInterrupt):
+        pruefung._frage_marker()
+    assert geleert == [True]
+
+
+def test_konsolenpuffer_wird_nur_unter_windows_geleert(monkeypatch, capsys):
+    import ctypes
+
+    aufrufe = []
+
+    class Funktion:
+        def __init__(self, name: str, ergebnis: int):
+            self.name, self.ergebnis, self.restype, self.argtypes = name, ergebnis, None, None
+
+        def __call__(self, *argumente):
+            aufrufe.append((self.name, argumente))
+            return self.ergebnis
+
+    def kernel32(name, use_last_error=False):
+        assert name == "kernel32"
+        dll = type("Kernel32", (), {})()
+        dll.GetStdHandle = Funktion("GetStdHandle", 77)
+        dll.FlushConsoleInputBuffer = Funktion("FlushConsoleInputBuffer", 1)
+        return dll
+
+    monkeypatch.setattr(ctypes, "WinDLL", kernel32, raising=False)
+    monkeypatch.setattr(sys, "platform", "linux")
+    pruefung._konsolenpuffer_leeren()
+    assert aufrufe == []
+    monkeypatch.setattr(sys, "platform", "win32")
+    pruefung._konsolenpuffer_leeren()
+    assert aufrufe == [("GetStdHandle", (-10,)), ("FlushConsoleInputBuffer", (77,))]
+
+    def ohne_kernel32(name, use_last_error=False):
+        raise OSError("nicht gefunden")
+
+    monkeypatch.setattr(ctypes, "WinDLL", ohne_kernel32, raising=False)
+    pruefung._konsolenpuffer_leeren()  # still: dann gibt es auch keinen Puffer, der an cmd.exe ginge
+    assert capsys.readouterr().out == ""
 
 
 def test_main_mit_ungueltiger_stichprobe_oder_konfiguration_gibt_2(tmp_path, capsys):

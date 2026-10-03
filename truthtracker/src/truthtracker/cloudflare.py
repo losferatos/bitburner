@@ -46,11 +46,15 @@ _CHALLENGE_MARKER = (
     "checking your browser",
     "checking if the site connection is secure",
 )
+# Cloudflare-Sperrseiten: 1020 (Firewall-Regel) und 1005-1012 (ASN, Land, Browser-Signatur,
+# Zugriff verweigert). Die Klartextform "error code: 10xx" kommt bei Anfragen ohne HTML-Accept.
+_BLOCK_CODES = ("1005", "1006", "1007", "1008", "1009", "1010", "1011", "1012", "1020")
 _BLOCK_MARKER = (
     "you have been blocked",
     "attention required! | cloudflare",
-    "error code: 1020",
-    "error 1020",
+    "used cloudflare to restrict access",
+    *(f"error code: {c}" for c in _BLOCK_CODES),
+    *(f"error {c}" for c in _BLOCK_CODES),
 )
 # Cloudflare 1015: "You are being rate limited" – inhaltlich ein 429, nur als HTML-Seite.
 _RATE_MARKER = ("error 1015", "error code: 1015", "you are being rate limited")
@@ -158,11 +162,11 @@ def melde(bewertung: Bewertung) -> str:
         CHALLENGE: "Cloudflare verlangt eine Browser-Prüfung (Challenge).",
         BLOCKIERT: "Cloudflare hat die Anfrage blockiert.",
         GEOBLOCK: "Truth Social meldet: in deiner Region nicht verfügbar.",
-        RATELIMIT: "Zu viele Anfragen (HTTP 429).",
-        VERWEIGERT: "Zugriff verweigert (HTTP 403 ohne Cloudflare-Merkmale).",
-        LOGIN_NOETIG: "Für diese Abfrage verlangt Truth Social einen Login (HTTP 401).",
-        NICHT_GEFUNDEN: "Eindeutig nicht gefunden (404 mit JSON-Fehler).",
-        SERVERFEHLER: "Serverfehler (5xx).",
+        RATELIMIT: "Zu viele Anfragen.",
+        VERWEIGERT: "Zugriff verweigert, ohne Cloudflare-Merkmale.",
+        LOGIN_NOETIG: "Für diese Abfrage verlangt Truth Social einen Login.",
+        NICHT_GEFUNDEN: "Eindeutig nicht gefunden (JSON-Fehler).",
+        SERVERFEHLER: "Serverfehler.",
         KEIN_JSON: "Antwort war kein JSON.",
         NETZWERKFEHLER: "Netzwerkfehler, keine Antwort erhalten.",
         UNERWARTET: "Unerwartete Antwort.",
@@ -170,7 +174,11 @@ def melde(bewertung: Bewertung) -> str:
     }
     satz = texte.get(bewertung.art, bewertung.art)
     if bewertung.status is not None:
-        satz = f"{satz} (HTTP {bewertung.status})"
+        satz = f"{satz[:-1]} (HTTP {bewertung.status})."
     if bewertung.art == RATELIMIT and bewertung.hinweis:
-        satz = f"{satz} Retry-After: {bewertung.hinweis}"
+        wartezeit = bewertung.hinweis.strip()
+        if wartezeit.isdigit():
+            satz = f"{satz} Der Server bittet um {int(wartezeit)} s Pause."
+        else:
+            satz = f"{satz} Der Server nennt als Wartezeit: {wartezeit}."
     return satz

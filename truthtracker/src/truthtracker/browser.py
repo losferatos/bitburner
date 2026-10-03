@@ -360,6 +360,12 @@ class Freigabe:
     challenge_gesehen: bool
     sperrseite: bool
     wartezeit_s: float
+    browser_beendet: bool = False  # Fenster geschlossen oder Browser abgestürzt
+
+
+def laeuft(lauf: LaufenderBrowser) -> bool:
+    """Antwortet der DevTools-Port noch? (Bei Opera endet der Launcher sofort, der Port zählt.)"""
+    return _port_offen(lauf.port)
 
 
 def warte_auf_freigabe(
@@ -374,13 +380,22 @@ def warte_auf_freigabe(
 
     Gilt als frei, wenn der Titel ``ruhe_s`` lang keine Prüfung anzeigt. Eine Seite mit
     "Attention Required" (meist eine Sperre, selten eine alte Captcha-Prüfung) beendet das
-    Warten; der Aufrufer prüft danach den Seitentext.
+    Warten; der Aufrufer prüft danach die Seite. Schließt der Mensch das Fenster, endet das
+    Warten sofort mit ``browser_beendet``.
     """
     start = time.monotonic()
     gesehen = False
     gemeldet = False
     ruhig_seit: float | None = None
+    port_zu = 0
     while time.monotonic() - start < timeout_s:
+        if not laeuft(lauf):
+            port_zu += 1
+            if port_zu >= 2:
+                return Freigabe(False, gesehen, False, time.monotonic() - start, browser_beendet=True)
+            time.sleep(1.0)
+            continue
+        port_zu = 0
         seiten = [s for s in offene_seiten(lauf) if host in str(s.get("url", ""))]
         titel = [str(s.get("title", "")).lower() for s in seiten]
         if any(any(m in t for m in SPERR_TITEL) for t in titel):
@@ -404,8 +419,22 @@ def warte_auf_freigabe(
     return Freigabe(False, gesehen, False, time.monotonic() - start)
 
 
+def _browser_weg(lauf: LaufenderBrowser) -> bool:
+    # Immer pollen: Unter POSIX holt das den beendeten Kindprozess ab, sonst gälte er als lebend.
+    launcher_weg = lauf.prozess.poll() is not None
+    if lauf.browser_pid is not None:
+        return not _pid_lebt(lauf.browser_pid)
+    return launcher_weg
+
+
 def beende_browser(lauf: LaufenderBrowser, playwright_browser=None, timeout_s: float = 20.0) -> bool:
-    """Schließt den Browser so, dass er seine Cookies sauber auf die Platte schreibt."""
+    """Schließt den Browser so, dass er seine Cookies sauber auf die Platte schreibt.
+
+    Ob er weg ist, entscheidet nicht der per ``Popen`` gestartete Prozess: Bei Opera ist das oft
+    der Launcher, der sofort endet. Maßgeblich sind der DevTools-Port, der echte Browserprozess
+    (``browser_pid``, sofern bekannt) und ob das Profil noch belegt ist. Gibt zurück, ob der
+    Browser sicher beendet ist; ``False`` heißt: Das Profil ist womöglich noch in Benutzung.
+    """
     if playwright_browser is not None:
         try:
             sitzung = playwright_browser.new_browser_cdp_session()
@@ -414,8 +443,7 @@ def beende_browser(lauf: LaufenderBrowser, playwright_browser=None, timeout_s: f
             pass
     ende = time.monotonic() + timeout_s
     while time.monotonic() < ende:
-        prozess_weg = lauf.prozess.poll() is not None
-        if not _port_offen(lauf.port) and (prozess_weg or lauf.browser_pid is None or not _pid_lebt(lauf.browser_pid)):
+        if not _port_offen(lauf.port) and _browser_weg(lauf) and not profil_in_benutzung(lauf.profil):
             return True
         time.sleep(0.3)
     # Notfall: hart beenden. Cookies der laufenden Sitzung können dabei verloren gehen.
@@ -423,21 +451,61 @@ def beende_browser(lauf: LaufenderBrowser, playwright_browser=None, timeout_s: f
         lauf.prozess.kill()
     if lauf.browser_pid and _pid_lebt(lauf.browser_pid):
         _beende_pid(lauf.browser_pid)
-    time.sleep(1.0)
-    return not _port_offen(lauf.port)
+    # Ohne bekannte PID und mit schon beendetem Launcher bleibt nichts zu beenden; dann entscheidet
+    # die Profilsperre, und der Aufrufer meldet, dass das Profil nicht aufgeräumt werden konnte.
+    ende = time.monotonic() + min(5.0, timeout_s)
+    while time.monotonic() < ende:
+        if not _port_offen(lauf.port) and _browser_weg(lauf) and not profil_in_benutzung(lauf.profil):
+            return True
+        time.sleep(0.3)
+    return False
 
 
 def _pid_lebt(pid: int) -> bool:
+    """Lebt der Prozess noch? Unter Windows über die Prozess-API statt über Textausgaben.
+
+    ``tasklist`` schreibt in der OEM-Codepage und in der Sprache des Systems; ein deutsches
+    Windows meldet "... ausgeführt." mit einem Byte, das weder UTF-8 noch cp1252 ist.
+    """
     if sys.platform == "win32":
-        ergebnis = subprocess.run(
-            ["tasklist", "/FI", f"PID eq {pid}", "/NH"], capture_output=True, text=True, check=False
-        )
-        return str(pid) in ergebnis.stdout
+        try:
+            return _pid_lebt_windows(pid)
+        except (OSError, AttributeError, ValueError):
+            pass
+        try:
+            ergebnis = subprocess.run(
+                ["tasklist", "/FI", f"PID eq {pid}", "/FO", "CSV", "/NH"], capture_output=True, check=False
+            )
+        except OSError:
+            return False
+        return f'"{pid}"'.encode("ascii") in (ergebnis.stdout or b"")
     try:
         os.kill(pid, 0)
         return True
     except OSError:
         return False
+
+
+def _pid_lebt_windows(pid: int) -> bool:
+    import ctypes
+    from ctypes import wintypes
+
+    kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+    kernel32.OpenProcess.restype = wintypes.HANDLE
+    kernel32.OpenProcess.argtypes = (wintypes.DWORD, wintypes.BOOL, wintypes.DWORD)
+    kernel32.GetExitCodeProcess.argtypes = (wintypes.HANDLE, ctypes.POINTER(wintypes.DWORD))
+    kernel32.CloseHandle.argtypes = (wintypes.HANDLE,)
+    process_query_limited_information = 0x1000
+    handle = kernel32.OpenProcess(process_query_limited_information, False, pid)
+    if not handle:
+        return ctypes.get_last_error() == 5  # Zugriff verweigert: Den Prozess gibt es.
+    try:
+        code = wintypes.DWORD()
+        if not kernel32.GetExitCodeProcess(handle, ctypes.byref(code)):
+            return True
+        return code.value == 259  # STILL_ACTIVE
+    finally:
+        kernel32.CloseHandle(handle)
 
 
 def _beende_pid(pid: int) -> None:
@@ -484,6 +552,7 @@ __all__ = [
     "ermittle_browser_pid",
     "finde_browser",
     "im_profil_erlaubt",
+    "laeuft",
     "offene_seiten",
     "profil_in_benutzung",
     "raeume_cache_ordner_auf",

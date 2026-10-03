@@ -30,11 +30,15 @@ from truthtracker.modelle import (
     FORMAT_NUR_MEDIEN,
     FORMAT_NUR_TEXT,
     FORMAT_TEXT_LINK,
+    MEDIUM_BILD,
+    MEDIUM_GIF,
+    MEDIUM_VIDEO,
     REPLY_THREAD,
     ROLLE_RETRUTH,
     TYP_EIGEN,
     TYP_RETRUTH,
     TYP_SELBST_RETRUTH,
+    MedienDaten,
     PostDaten,
     QuellKonto,
     TextMetriken,
@@ -137,6 +141,17 @@ def lauf(con) -> int:
 
 def _gefiltert(con: sqlite3.Connection, zeitzone: str = BERLIN, **kw) -> pd.DataFrame:
     return auswertung.filtere(auswertung.lade_daten(con).posts, None, None, zeitzone, **kw)
+
+
+def _geladen(con: sqlite3.Connection, zeitzone: str = BERLIN, **kw) -> tuple[auswertung.Daten, pd.DataFrame]:
+    """Daten (mit allen Snapshots) und die gefilterten Posts, für Engagement und Wachstum."""
+    daten = auswertung.lade_daten(con)
+    return daten, auswertung.filtere(daten.posts, None, None, zeitzone, **kw)
+
+
+def _neuer_lauf(con: sqlite3.Connection, p: PostDaten, alter_h: float) -> int:
+    """Ein eigener Lauf für eine Messung ``alter_h`` Stunden nach ``p`` (ein Snapshot je Post und Lauf)."""
+    return db.lauf_starten(con, p.created_at + timedelta(hours=alter_h), backfill=False)
 
 
 BEISPIEL_ERFASST_AB = "2026-08-04T12:00:00Z"
@@ -339,7 +354,8 @@ def test_leere_datenbankdatei_ergibt_leere_auswertungen(tmp_path):
     assert auswertung.posts_pro_tag(df).empty
     assert auswertung.serien(df, 10).empty
     assert auswertung.laengste_pause_pro_tag(df).empty
-    assert auswertung.engagement(df, 18, 24).basis.empty
+    assert auswertung.engagement(df, 18, 24, snapshots=daten.snapshots).basis.empty
+    assert auswertung.wachstum(daten.snapshots, df).posts == 0
     assert auswertung.retruth_quellen(df).anzahl == 0
     assert auswertung.duplikat_auswertung(df, daten.duplikate).rate is None
     assert auswertung.loeschungen_edits(df, daten.edits).geloescht == 0
@@ -727,22 +743,23 @@ def test_engagement_filtert_nach_messalter_und_schliesst_backfill_aus(con, lauf)
     speichere(con, spaet_gesehen, lauf, 50.2)
     speichere(con, backfill, lauf, 300, backfill=True)
     db.post_speichern(con, ohne_messung, lauf_id=lauf, gesehen=_t("2026-06-01T14:00:00Z"), backfill=False)
-    df = _gefiltert(con)
+    daten, df = _geladen(con)
+    snaps = daten.snapshots
 
-    e = auswertung.engagement(df, 18, 24)
+    e = auswertung.engagement(df, 18, 24, snapshots=snaps)
     assert e.basis["id"].tolist() == [im_fenster.id]
     assert e.basis["wert"].tolist() == [100.0]
     assert (e.ohne_messung, e.ausserhalb_alter, e.backfill_ausgeschlossen, e.backfill_einbezogen) == (1, 2, 1, 0)
     assert e.wert_beschriftung == "Likes"
 
-    mit = auswertung.engagement(df, 18, 24, mit_backfill=True)
+    mit = auswertung.engagement(df, 18, 24, mit_backfill=True, snapshots=snaps)
     assert set(mit.basis["id"]) == {im_fenster.id, backfill.id}
     assert (mit.backfill_ausgeschlossen, mit.backfill_einbezogen) == (0, 1)
 
-    breit = auswertung.engagement(df, 0, 72)
+    breit = auswertung.engagement(df, 0, 72, snapshots=snaps)
     assert set(breit.basis["id"]) == {im_fenster.id, zu_jung.id, spaet_gesehen.id}
 
-    norm = auswertung.engagement(df, 18, 24, pro_stunde=True)
+    norm = auswertung.engagement(df, 18, 24, pro_stunde=True, snapshots=snaps)
     assert norm.basis["wert"].tolist() == [pytest.approx(5.0)]
     assert norm.wert_beschriftung == "Likes pro Stunde seit Post"
 
@@ -753,8 +770,8 @@ def test_engagement_original_zaehler_bei_retruths_getrennt(con, lauf):
     srt = post("2026-06-01T10:00:00Z", folge=3, typ=TYP_SELBST_RETRUTH, orig_likes=900)
     for p in (eigen, rt, srt):
         speichere(con, p, lauf, 20)
-    df = _gefiltert(con)
-    e = auswertung.engagement(df, 18, 24)
+    daten, df = _geladen(con)
+    e = auswertung.engagement(df, 18, 24, snapshots=daten.snapshots)
     typ = e.nach_typ.set_index(["gruppe", "zaehler"])
     assert typ.loc[(TYP_EIGEN, auswertung.ZAEHLER_POST), "median"] == 100
     assert (TYP_EIGEN, auswertung.ZAEHLER_ORIGINAL) not in typ.index
@@ -763,15 +780,18 @@ def test_engagement_original_zaehler_bei_retruths_getrennt(con, lauf):
     assert typ.loc[(TYP_SELBST_RETRUTH, auswertung.ZAEHLER_ORIGINAL), "median"] == 900
     assert e.nach_typ["gruppe"].tolist()[0] == TYP_EIGEN
     stunde = e.nach_stunde.set_index(["gruppe", "zaehler"])
-    assert stunde.loc[(10, auswertung.ZAEHLER_POST), "anzahl"] == 1  # 08:00 UTC = 10 Uhr Berlin
+    assert stunde.loc[(10, auswertung.ZAEHLER_EIGENE), "anzahl"] == 1  # 08:00 UTC = 10 Uhr Berlin
+    assert auswertung.ZAEHLER_POST not in set(e.nach_stunde["zaehler"])
     fmt = e.nach_format.set_index(["gruppe", "zaehler"])
-    assert fmt.loc[(FORMAT_NUR_TEXT, auswertung.ZAEHLER_POST), "anzahl"] == 3
+    # Alle drei sind „nur Text“: der eigene Post in „Eigene Posts“, die beiden Retruths nur in „Original“.
+    assert fmt.loc[(FORMAT_NUR_TEXT, auswertung.ZAEHLER_EIGENE), "anzahl"] == 1
+    assert fmt.loc[(FORMAT_NUR_TEXT, auswertung.ZAEHLER_ORIGINAL), "anzahl"] == 2
 
     # Normiert: Original durch das eigene Alter des Originals (20 h + 4 h) teilen.
-    norm = auswertung.engagement(df, 18, 24, pro_stunde=True)
+    norm = auswertung.engagement(df, 18, 24, pro_stunde=True, snapshots=daten.snapshots)
     zeile = norm.basis.set_index("id").loc[rt.id]
     assert zeile["orig_wert"] == pytest.approx(600 / 24)
-    weitere = auswertung.engagement(df, 18, 24, kennzahl="upvotes_count")
+    weitere = auswertung.engagement(df, 18, 24, kennzahl="upvotes_count", snapshots=daten.snapshots)
     assert weitere.basis.set_index("id").loc[eigen.id, "wert"] == 90
     assert weitere.basis.set_index("id").loc[rt.id, "orig_wert"] == 7
     assert weitere.wert_beschriftung == "Upvotes"
@@ -785,9 +805,10 @@ def test_engagement_original_nur_bei_passendem_alter_des_originals(con, lauf):
     speichere(con, jung, lauf, 20)
     speichere(con, alt, lauf, 20)
     speichere(con, bf, lauf, 300, backfill=True)
-    df = _gefiltert(con)
+    daten, df = _geladen(con)
+    snaps = daten.snapshots
 
-    e = auswertung.engagement(df, 18, 24)
+    e = auswertung.engagement(df, 18, 24, snapshots=snaps)
     b = e.basis.set_index("id")
     assert b.loc[jung.id, "orig_alter_h"] == pytest.approx(20 + 10 / 60)
     assert b.loc[alt.id, "orig_alter_h"] == pytest.approx(500)
@@ -801,32 +822,219 @@ def test_engagement_original_nur_bei_passendem_alter_des_originals(con, lauf):
     selbst = typ.loc[(TYP_RETRUTH, auswertung.ZAEHLER_POST)]
     assert selbst["anzahl"] == 2 and selbst["alter_median_h"] == pytest.approx(20)
 
-    assert auswertung.engagement(df, 0, 600).original_ausserhalb_alter == 0
-    mit = auswertung.engagement(df, 18, 24, mit_backfill=True)
+    assert auswertung.engagement(df, 0, 600, snapshots=snaps).original_ausserhalb_alter == 0
+    mit = auswertung.engagement(df, 18, 24, mit_backfill=True, snapshots=snaps)
     assert mit.basis.set_index("id").loc[bf.id, "orig_wert"] == 5  # für Backfill gilt der Alter-Filter nicht
     assert (mit.im_messalter, mit.backfill_einbezogen) == (2, 1)
 
 
-def test_wachstum_aus_allen_snapshots(con):
+def test_engagement_nach_format_und_stunde_retruths_nur_ueber_original(con, lauf):
+    # Ein eigener Post „nur Medien“ mit 25.000 Likes und zwei Retruths „nur Medien“, deren eigene Zähler 0
+    # sind, alle in derselben Stunde (10:00–10:40 UTC = 12 Uhr Berlin). Gemischt wäre der Median 0.
+    eigen = post("2026-06-01T10:00:00Z", folge=1, format_=FORMAT_NUR_MEDIEN, bilder=1, likes=25_000)
+    rt = post("2026-06-01T10:20:00Z", folge=2, typ=TYP_RETRUTH, format_=FORMAT_NUR_MEDIEN, orig_likes=600)
+    srt = post("2026-06-01T10:40:00Z", folge=3, typ=TYP_SELBST_RETRUTH, format_=FORMAT_NUR_MEDIEN, orig_likes=800)
+    for p in (eigen, rt, srt):
+        speichere(con, p, lauf, 20)
+    daten, df = _geladen(con)
+    e = auswertung.engagement(df, 18, 24, snapshots=daten.snapshots)
+
+    fmt = e.nach_format.set_index(["gruppe", "zaehler"])
+    assert set(e.nach_format["zaehler"]) == {auswertung.ZAEHLER_EIGENE, auswertung.ZAEHLER_ORIGINAL}
+    eigene = fmt.loc[(FORMAT_NUR_MEDIEN, auswertung.ZAEHLER_EIGENE)]
+    assert (eigene["anzahl"], eigene["median"], eigene["mittel"]) == (1, 25_000, 25_000)
+    original = fmt.loc[(FORMAT_NUR_MEDIEN, auswertung.ZAEHLER_ORIGINAL)]
+    assert (original["anzahl"], original["median"]) == (2, 700)
+
+    stunde = e.nach_stunde.set_index(["gruppe", "zaehler"])
+    assert stunde.index.tolist() == [(12, auswertung.ZAEHLER_EIGENE), (12, auswertung.ZAEHLER_ORIGINAL)]
+    assert (stunde.loc[(12, auswertung.ZAEHLER_EIGENE), "median"], stunde.loc[(12, auswertung.ZAEHLER_EIGENE),
+                                                                             "anzahl"]) == (25_000, 1)
+    assert stunde.loc[(12, auswertung.ZAEHLER_ORIGINAL), "anzahl"] == 2
+
+    # Nach Typ bleiben die Zähler der Retruths selbst sichtbar, getrennt nach Typ.
+    typ = e.nach_typ.set_index(["gruppe", "zaehler"])
+    assert typ.loc[(TYP_RETRUTH, auswertung.ZAEHLER_POST), "median"] == 0
+    assert typ.loc[(TYP_EIGEN, auswertung.ZAEHLER_POST), "median"] == 25_000
+    assert auswertung.ZAEHLER_EIGENE not in set(e.nach_typ["zaehler"])
+    assert e.basis.set_index("id")["ist_retruth"].to_dict() == {eigen.id: False, rt.id: True, srt.id: True}
+
+
+def test_engagement_nimmt_die_spaeteste_messung_im_bereich(con):
+    # Zwei Läufe am selben Tag: Messungen nach 3 h und nach 15 h. Das Original des Retruths ist 2 h älter.
+    p = post("2026-06-01T10:00:00Z", folge=1, likes=50)
+    rt = post("2026-06-01T10:00:00Z", folge=5, typ=TYP_RETRUTH, orig_likes=100, original_vor=timedelta(hours=2))
+    for alter, likes, orig_likes in ((3, 50, 100), (15, 400, 900)):
+        lauf_id = _neuer_lauf(con, p, alter)
+        p.zaehler.likes = likes
+        assert rt.zaehler_original is not None
+        rt.zaehler_original.likes = orig_likes
+        speichere(con, p, lauf_id, alter)
+        speichere(con, rt, lauf_id, alter)
+    daten, df = _geladen(con)
+    assert df.set_index("id").loc[p.id, "likes"] == 400  # finaler Wert bleibt der letzte Snapshot
+
+    frueh = auswertung.engagement(df, 0, 6, snapshots=daten.snapshots)
+    b = frueh.basis.set_index("id")
+    assert b.loc[p.id, "wert"] == 50 and b.loc[p.id, "messalter_h"] == pytest.approx(3)
+    assert b.loc[rt.id, "orig_wert"] == 100 and b.loc[rt.id, "orig_alter_h"] == pytest.approx(5)
+    assert (frueh.im_messalter, frueh.ausserhalb_alter) == (2, 0)
+    assert auswertung.messalter_text(b.loc[p.id, "messalter_h"], False) == "gemessen nach 3,0 h"
+
+    mitte = auswertung.engagement(df, 12, 18, snapshots=daten.snapshots)
+    b = mitte.basis.set_index("id")
+    assert b.loc[p.id, "wert"] == 400 and b.loc[p.id, "messalter_h"] == pytest.approx(15)
+    assert b.loc[rt.id, "orig_wert"] == 900 and b.loc[rt.id, "orig_alter_h"] == pytest.approx(17)
+
+    spaet = auswertung.engagement(df, 18, 24, snapshots=daten.snapshots)
+    assert spaet.basis.empty
+    assert (spaet.ausserhalb_alter, spaet.ohne_messung) == (2, 0)
+
+    # „pro Stunde“ teilt durch das Alter derselben Messung (Post 3 h, Original 5 h).
+    norm = auswertung.engagement(df, 0, 6, pro_stunde=True, snapshots=daten.snapshots).basis.set_index("id")
+    assert norm.loc[p.id, "wert"] == pytest.approx(50 / 3)
+    assert norm.loc[rt.id, "orig_wert"] == pytest.approx(100 / 5)
+
+
+def _engagement_alte_regel(df: pd.DataFrame, lo: float, hi: float, mit_backfill: bool) -> pd.DataFrame:
+    """Die bisherige Regel zum Vergleich: der letzte Snapshot (Spalten aus ``lade_daten``) im Bereich."""
+    gemessen = df["messalter_h"].notna()
+    backfill = df["backfill"].astype(bool)
+    im_alter = df["messalter_h"].between(lo, hi)
+    maske = gemessen & ((im_alter | backfill) if mit_backfill else (im_alter & ~backfill))
+    teil = df.loc[maske]
+    ist_retruth = teil["typ"].isin(auswertung.RETRUTH_TYPEN)
+    orig_alter = ((teil["gemessen_utc"] - teil["original_created_at_utc"]).dt.total_seconds() / 3600).where(ist_retruth)
+    gilt = orig_alter.between(lo, hi) | teil["backfill"].astype(bool)
+    return pd.DataFrame({
+        "id": teil["id"],
+        "messalter_h": teil["messalter_h"].astype(float),
+        "orig_alter_h": orig_alter.astype(float),
+        "wert": teil["likes"].astype(float),
+        "orig_wert": teil["orig_likes"].astype(float).where(ist_retruth & gilt),
+    }).set_index("id").sort_index()
+
+
+@pytest.mark.parametrize(("lo", "hi"), [(18, 24), (0, 24), (10, 30), (0, 48), (20, 400)])
+def test_engagement_bis_mindestens_24_h_wie_letzter_snapshot(tmp_path, lo, hi):
+    # Reicht der Bereich bis 24 h oder darüber, ist die späteste Messung im Bereich immer der letzte
+    # Snapshot: Ab 24 h wird ein Post nicht mehr gemessen. Die Beispiel-DB hat Posts mit zwei Messungen.
+    con = db.oeffne(baue_beispiel_db(tmp_path / "beispiel.sqlite"), nur_lesen=True)
+    try:
+        daten, df = _geladen(con, NEW_YORK)
+    finally:
+        con.close()
+    assert (daten.snapshots.groupby("post_id").size() >= 2).sum() >= 2
+    for mit_backfill in (False, True):
+        e = auswertung.engagement(df, lo, hi, mit_backfill, snapshots=daten.snapshots)
+        neu = e.basis.set_index("id")[["messalter_h", "orig_alter_h", "wert", "orig_wert"]].sort_index()
+        alt = _engagement_alte_regel(df, lo, hi, mit_backfill)
+        assert len(neu) > 0
+        pd.testing.assert_frame_equal(neu, alt)
+        gemessen, backfill = df["messalter_h"].notna(), df["backfill"].astype(bool)
+        assert e.ausserhalb_alter == int((gemessen & ~backfill & ~df["messalter_h"].between(lo, hi)).sum())
+        assert e.ohne_messung == int((~gemessen).sum())
+
+
+def test_engagement_unbekannter_zaehler_zaehlt_nicht_als_verglichen(con, lauf):
+    bekannt = post("2026-06-01T08:00:00Z", folge=1, likes=100)
+    unbekannt = post("2026-06-01T09:00:00Z", folge=2)
+    unbekannt.zaehler.likes = None  # API-Platzhalter -1 wird als unbekannt gespeichert
+    rt = post("2026-06-01T10:00:00Z", folge=3, typ=TYP_RETRUTH, orig_likes=600)
+    rt.zaehler.likes = None  # eigener Zähler unbekannt, der des Originals bekannt: bleibt in „Original“
+    rt_leer = post("2026-06-01T11:00:00Z", folge=4, typ=TYP_RETRUTH)
+    rt_leer.zaehler.likes = None
+    assert rt_leer.zaehler_original is not None
+    rt_leer.zaehler_original.likes = None
+    for p in (bekannt, unbekannt, rt, rt_leer):
+        speichere(con, p, lauf, 20)
+    daten, df = _geladen(con)
+    e = auswertung.engagement(df, 18, 24, snapshots=daten.snapshots)
+    assert set(e.basis["id"]) == {bekannt.id, rt.id}
+    assert (e.im_messalter, e.zaehler_unbekannt, e.ausserhalb_alter) == (2, 2, 0)
+    typ = e.nach_typ.set_index(["gruppe", "zaehler"])
+    assert typ.loc[(TYP_EIGEN, auswertung.ZAEHLER_POST), "anzahl"] == 1
+    assert (TYP_RETRUTH, auswertung.ZAEHLER_POST) not in typ.index
+    assert typ.loc[(TYP_RETRUTH, auswertung.ZAEHLER_ORIGINAL), "median"] == 600
+
+
+def test_wachstum_normiert_je_post_nur_mit_mehreren_messungen(con):
     p = post("2026-06-01T10:00:00Z", likes=10)
-    bf = post("2026-05-01T10:00:00Z", folge=1, likes=5000)
+    # Je eine Messung zu verschiedenen Zeiten: Sie zeigten nur die Tageszeit des Posts, nicht sein Wachstum.
+    # Die Läufe sind 2,5 h, 8,2 h und 20 h nach p: Die Einzelposts sind dabei 5 h, 11 h und 20 h alt.
+    einzeln = [post("2026-06-01T07:30:00Z", folge=1), post("2026-06-01T07:12:00Z", folge=2),
+               post("2026-06-01T10:00:00Z", folge=3)]
+    bf = post("2026-05-01T10:00:00Z", folge=4, likes=5000)
     for i, (alter, likes) in enumerate([(2.5, 10), (8.2, 40), (20.0, 90)]):
-        lauf_id = db.lauf_starten(con, p.created_at + timedelta(hours=alter), backfill=False)
+        lauf_id = _neuer_lauf(con, p, alter)
         p.zaehler.likes = likes
         speichere(con, p, lauf_id, alter)
-        if i == 0:
-            speichere(con, bf, lauf_id, 2.5, backfill=True)
-    daten = auswertung.lade_daten(con)
-    df = auswertung.filtere(daten.posts, None, None, BERLIN)
-    w = auswertung.wachstum(daten.snapshots, df, "likes").set_index("alter_stunde")
-    assert len(w) == 24
-    assert w.loc[2, "median"] == 10 and w.loc[8, "median"] == 40 and w.loc[20, "median"] == 90
-    assert w["messungen"].sum() == 3
-    assert pd.isna(w.loc[5, "median"])
-    mit = auswertung.wachstum(daten.snapshots, df, "likes", mit_backfill=True).set_index("alter_stunde")
-    assert mit.loc[2, "messungen"] == 2
-    norm = auswertung.wachstum(daten.snapshots, df, "likes", pro_stunde=True).set_index("alter_stunde")
-    assert norm.loc[20, "median"] == pytest.approx(4.5)
+        einzeln[i].zaehler.likes = (5000, 100, 7)[i]
+        speichere(con, einzeln[i], lauf_id, (p.created_at + timedelta(hours=alter) - einzeln[i].created_at)
+                  .total_seconds() / 3600)
+        if i < 2:
+            speichere(con, bf, lauf_id, 2.5 + i, backfill=True)
+    daten, df = _geladen(con)
+    w = auswertung.wachstum(daten.snapshots, df, "likes")
+    assert (w.posts, w.eigene, w.zu_wenige_messungen, w.ohne_bezugswert, w.retruths) == (1, 4, 3, 0, 0)
+    k = w.kurve.set_index("alter_stunde")
+    assert len(k) == 24
+    assert k.loc[2, "median"] == pytest.approx(10 / 90)
+    assert k.loc[8, "median"] == pytest.approx(40 / 90)
+    assert k.loc[20, "median"] == pytest.approx(1.0)
+    assert k["messungen"].sum() == 3 and k["posts"].max() == 1
+    # Die Einzelmessungen (5 h, 11 h, 20 h) und der Backfill-Post (2,5 h, 3,5 h) zählen nicht.
+    assert k.loc[5, "messungen"] == 0 and pd.isna(k.loc[5, "median"])
+    assert k.loc[11, "messungen"] == 0 and k.loc[20, "messungen"] == 1 and k.loc[3, "messungen"] == 0
+
+
+def test_wachstum_ohne_mehrere_messungen_keine_kurve(con, lauf):
+    for i, (zeitpunkt, alter, likes) in enumerate((("2026-06-01T09:00:00Z", 3, 5000),
+                                                    ("2026-06-01T01:00:00Z", 11, 200),
+                                                    ("2026-05-31T16:00:00Z", 20, 30))):
+        speichere(con, post(zeitpunkt, folge=i, likes=likes), lauf, alter)
+    daten, df = _geladen(con)
+    w = auswertung.wachstum(daten.snapshots, df)
+    assert (w.posts, w.eigene, w.zu_wenige_messungen) == (0, 3, 3)
+    assert w.kurve["messungen"].sum() == 0 and w.kurve["median"].isna().all()
+
+
+def test_wachstum_eigene_posts_und_retruths_nie_in_einem_median(con):
+    eigen = post("2026-06-01T10:00:00Z", folge=1)
+    rt = post("2026-06-01T10:00:00Z", folge=2, typ=TYP_RETRUTH)
+    for alter, likes_eigen, likes_rt in ((4, 50, 1), (16, 100, 4)):
+        lauf_id = _neuer_lauf(con, eigen, alter)
+        eigen.zaehler.likes = likes_eigen
+        rt.zaehler.likes = likes_rt
+        speichere(con, eigen, lauf_id, alter)
+        speichere(con, rt, lauf_id, alter)
+    daten, df = _geladen(con)
+    w = auswertung.wachstum(daten.snapshots, df)
+    k = w.kurve.set_index("alter_stunde")
+    # Gemischt wäre der Median nach 4 h (50 % + 25 %) / 2 = 37,5 %.
+    assert k.loc[4, "median"] == pytest.approx(0.5) and k.loc[4, "posts"] == 1
+    assert k.loc[16, "median"] == pytest.approx(1.0) and k.loc[16, "messungen"] == 1
+    assert (w.posts, w.retruths) == (1, 1)
+    nur_retruths = auswertung.filtere(daten.posts, None, None, BERLIN, typen=[TYP_RETRUTH])
+    leer = auswertung.wachstum(daten.snapshots, nur_retruths)
+    assert (leer.posts, leer.eigene, leer.retruths) == (0, 0, 1)
+
+
+def test_wachstum_zwei_messungen_in_einer_stunde_und_letzter_wert_null(con):
+    p = post("2026-06-01T10:00:00Z", folge=1)
+    null = post("2026-06-01T10:00:00Z", folge=2, likes=0)
+    for alter, likes in ((3.1, 20), (3.8, 40), (10.0, 80)):
+        lauf_id = _neuer_lauf(con, p, alter)
+        p.zaehler.likes = likes
+        speichere(con, p, lauf_id, alter)
+        speichere(con, null, lauf_id, alter)
+    daten, df = _geladen(con)
+    w = auswertung.wachstum(daten.snapshots, df)
+    k = w.kurve.set_index("alter_stunde")
+    # Zwei Messungen in Stunde 3: Der Post zählt einmal, mit der späteren (40 von 80).
+    assert (k.loc[3, "messungen"], k.loc[3, "posts"]) == (2, 1)
+    assert k.loc[3, "median"] == pytest.approx(0.5)
+    assert (w.posts, w.ohne_bezugswert, w.zu_wenige_messungen) == (1, 1, 0)
 
 
 # ---------------------------------------------------------------------------
@@ -979,9 +1187,11 @@ def test_beispiel_db_alle_auswertungen_laufen(tmp_path):
     assert len(df) == 21  # ohne den alten gepinnten Post
     assert len(auswertung.filtere(daten.posts, None, None, NEW_YORK, vor_erfassung=True)) == 22
     assert df["backfill"].sum() == 10
-    e = auswertung.engagement(df, 18, 24)
+    e = auswertung.engagement(df, 18, 24, snapshots=daten.snapshots)
     assert not e.basis["backfill"].any()
     assert e.backfill_ausgeschlossen == 10
+    w = auswertung.wachstum(daten.snapshots, df)
+    assert (w.posts, w.eigene, w.zu_wenige_messungen, w.retruths) == (2, 8, 6, 3)  # Thread und Medien-Post
     assert auswertung.serien(df, 10)["anzahl"].max() == 4
     assert auswertung.retruth_quellen(df).selbst == 3
     assert auswertung.duplikat_auswertung(df, daten.duplikate).mit_duplikat == 2
@@ -1053,6 +1263,40 @@ def test_posts_tabelle_ohne_lokale_zeit_fuer_export(con, lauf):
     assert mit["Erstellt (New York)"].iloc[0] == pd.Timestamp("2026-06-01 06:00:00")
 
 
+def test_posts_tabelle_und_csv_mit_abmessungen_und_videodauer(con, lauf):
+    mit = post("2026-06-01T10:00:00Z", folge=1, format_=FORMAT_NUR_MEDIEN)
+    mit.medien = [
+        MedienDaten(position=0, medien_id="901", art=MEDIUM_BILD, breite=1200, hoehe=800),
+        MedienDaten(position=1, medien_id="902", art=MEDIUM_VIDEO, breite=720, hoehe=1280, dauer_s=12.5),
+        MedienDaten(position=2, medien_id="903", art=MEDIUM_VIDEO, breite=1080, hoehe=1920, dauer_s=30.2),
+        MedienDaten(position=3, medien_id="904", art=MEDIUM_GIF, breite=480, hoehe=270, dauer_s=3.0),
+    ]
+    mit.n_bilder, mit.n_videos, mit.n_gifs = 1, 2, 1
+    # Einem Video fehlen Dauer und Abmessungen: keine Teilsumme, die wie die ganze Länge aussähe.
+    teilweise = post("2026-06-01T11:00:00Z", folge=2, format_=FORMAT_NUR_MEDIEN)
+    teilweise.medien = [
+        MedienDaten(position=0, medien_id="905", art=MEDIUM_VIDEO),
+        MedienDaten(position=1, medien_id="906", art=MEDIUM_VIDEO, breite=640, hoehe=360, dauer_s=8.0),
+    ]
+    teilweise.n_videos = 2
+    ohne = post("2026-06-01T12:00:00Z", folge=3)
+    for p in (mit, teilweise, ohne):
+        speichere(con, p, lauf, 20)
+    tabelle = auswertung.posts_tabelle(_gefiltert(con))
+    t = tabelle.set_index("Post-ID")
+    assert t.loc[mit.id, "Abmessungen"] == "1200×800, 720×1280, 1080×1920, 480×270"
+    assert t.loc[mit.id, "Videodauer (s)"] == pytest.approx(42.7)  # nur Videos, das GIF zählt nicht
+    assert t.loc[teilweise.id, "Abmessungen"] == "640×360" and pd.isna(t.loc[teilweise.id, "Videodauer (s)"])
+    assert t.loc[ohne.id, "Abmessungen"] == "" and pd.isna(t.loc[ohne.id, "Videodauer (s)"])
+    assert list(tabelle.columns).index("Abmessungen") == list(tabelle.columns).index("Sonstige Medien") + 1
+
+    zeilen = list(csv.reader(io.StringIO(auswertung.csv_export(tabelle).decode("utf-8-sig")), delimiter=";"))
+    werte = {z[0]: dict(zip(zeilen[0], z, strict=True)) for z in zeilen[1:]}
+    assert werte[f'="{mit.id}"']["Abmessungen"] == "1200×800, 720×1280, 1080×1920, 480×270"
+    assert werte[f'="{mit.id}"']["Videodauer (s)"] == "42,7"
+    assert werte[f'="{ohne.id}"']["Abmessungen"] == "" and werte[f'="{ohne.id}"']["Videodauer (s)"] == ""
+
+
 def test_weitere_zaehler_ueberschreiben_keine_basisspalten(con, lauf):
     # Ein API-Feld likes_count hieße naiv auch „Likes“; "lokal" würde mit filtere() kollidieren.
     eigen = post("2026-06-01T10:00:00Z", folge=1, likes=3, weitere={"likes_count": 7, "lokal": 5})
@@ -1110,6 +1354,11 @@ def test_ende_zu_ende_keine_inhalte_in_tabelle_und_csv(tmp_path):
         assert verboten not in tabelle.to_csv(), verboten
     assert "example.com" in text  # die Link-Domain ist erlaubt
     assert "jemand" in text  # Handle des Quell-Kontos ist erlaubt
+    # Abmessungen und Videodauer kommen aus den Medien-Metadaten der echten Klassifikation.
+    rt_zeile = tabelle.loc[tabelle["Typ"] == "Retruth"].iloc[0]
+    assert rt_zeile["Abmessungen"] == "1200×800" and rt_zeile["Videodauer (s)"] == pytest.approx(12.0)
+    bild_gif = tabelle.loc[tabelle["Bilder"] == 1].iloc[0]
+    assert bild_gif["Abmessungen"] == "1200×800, 1200×800" and pd.isna(bild_gif["Videodauer (s)"])
 
 
 def test_zahlen_deutsch():

@@ -153,7 +153,13 @@ def lade(datei: Path | None = None) -> Konfig:
             with datei.open("rb") as f:
                 roh = tomllib.load(f)
         except tomllib.TOMLDecodeError as fehler:
-            raise KonfigFehler(f"{datei.name} ist kein gültiges TOML: {fehler}") from None
+            hinweis = ""
+            if "escape" in str(fehler).lower() or "hex value" in str(fehler).lower():
+                hinweis = (
+                    " Windows-Pfade bitte in einfache Anführungszeichen setzen, "
+                    "z. B. browser = 'C:\\Programme\\Opera\\opera.exe'."
+                )
+            raise KonfigFehler(f"{datei.name} ist kein gültiges TOML: {fehler}.{hinweis}") from None
         _fuelle(konfig, {k: v for k, v in roh.items() if k not in ("basisordner",)}, "")
     konfig.pruefe()
     return konfig

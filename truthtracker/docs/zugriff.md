@@ -32,7 +32,9 @@ und Fork `aristotle-tek`), alle per `git clone` gelesen. Keine Inhalte übernomm
 * `GET /api/v1/accounts/{id}/statuses` mit `max_id`, `limit` (Standard 20, laut Code höchstens 40;
   live wurde `limit=40` mit 20 Einträgen beantwortet), `exclude_replies`, `only_media`, `pinned`.
   Sortierung nach ID absteigend. `min_id` wird live offenbar ignoriert; der Crawler nutzt nur
-  `max_id` und erkennt das Ende an einer leeren Seite, nie an der Seitengröße.
+  `max_id` und erkennt das Ende an einer leeren Seite, nie an der Seitengröße. Eine leere Seite
+  gilt aber nur dann als Anfang der Timeline, wenn das zur Postzahl des Kontos passt; sonst ist sie
+  ein Fehler, und die Lücke darunter bleibt offen (Entscheidung 67).
 * Die Lese-API weicht live vom veröffentlichten Rails-Code ab (Fehlertexte im Stil von Go/GORM,
   andere Limits, zusätzliche Felder). Der Code dient nur als Indiz; maßgeblich sind Live-Belege.
 * **Laut Code ohne Login nur mit `exclude_replies=true`** (oder `only_media`/`pinned`), sonst HTTP 401

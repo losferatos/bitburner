@@ -29,11 +29,21 @@ Festlegungen, die im Dashboard sichtbar sind:
   typischerweise die Nachtpause vor dem ersten Post des Morgens. Tage ohne Post erscheinen
   nicht; die Pause über sie hinweg zählt zum nächsten Tag mit Post und ist länger als 24 h.
   Der erste Post der Erfassung hat keinen bekannten Vorgänger und damit keine Pause.
-* **Engagement** nur für Posts, deren letzter Snapshot ein Messalter im gewählten Bereich
-  hat. Backfill-Posts („Endstand nach X Tagen“) sind standardmäßig ausgeschlossen; werden sie
-  einbezogen, gilt für sie der Messalter-Filter nicht (sie liegen nie im 24-h-Fenster). Die
-  Zähler des Originals eines Retruths zählen nur, wenn auch das *Original* beim Messen ein
-  Alter im gewählten Bereich hatte.
+* **Engagement** nur für Posts mit einer Messung (Snapshot), deren Alter im gewählten Bereich
+  liegt; je Post zählt die *späteste Messung im Bereich*, nicht der letzte Snapshot überhaupt.
+  Bei mehreren Läufen am Tag hat ein Post mehrere Messungen unter 24 h, und „0–6 h“ vergleicht
+  dann die frühe Messung. Backfill-Posts („Endstand nach X Tagen“) sind standardmäßig
+  ausgeschlossen; werden sie einbezogen, gilt für sie ihr einziger Snapshot ohne Messalter-Filter
+  (sie liegen nie im 24-h-Fenster). Die Zähler des Originals eines Retruths zählen nur, wenn auch
+  das *Original* zum selben Messzeitpunkt ein Alter im gewählten Bereich hatte. Nach Format und
+  Uhrzeit stehen Retruths nur in der Reihe „Original“: Die Zähler eines Retruths selbst sind fast
+  immer 0 und würden den Median der eigenen Posts drücken. Posts ohne bekannten Zähler
+  (API-Platzhalter ``-1`` oder Feld fehlt) fehlen im Vergleich und werden getrennt gezählt.
+* **Wachstum** nur aus eigenen Posts mit mindestens zwei Messungen unter 24 h, jeder Post bezogen
+  auf seine letzte Messung unter 24 h. Mit einem Lauf am Tag hat jeder Post nur eine Messung; ein
+  Median über verschiedene Posts je Alter zeigte dann nur, zu welcher Tageszeit sie entstanden.
+* **Medien-Metadaten** in der Tabelle: Abmessungen aller Medien und die Summe der Videodauern
+  (nur, wenn jedes Video des Posts eine Dauer hat). Keine Medien-URLs.
 * **Duplikat-Rate**: Nenner sind nur Posts, deren 14-Tage-Fenster vollständig in der
   Datenbank liegt (``dup_abdeckung_vollstaendig``); sonst wäre die Rate am Anfang der
   Aufzeichnung zu niedrig. Verteilungen nach Art und Abstand zählen dieselben Posts, damit
@@ -66,6 +76,7 @@ from truthtracker.modelle import (
     DUP_BESCHRIFTUNG,
     FORMAT_BESCHRIFTUNG,
     FORMATE,
+    MEDIUM_VIDEO,
     REPLY_FREMD,
     REPLY_THREAD,
     ROLLE_QUOTE,
@@ -94,6 +105,7 @@ KENNZAHL_BESCHRIFTUNG = {
     "quotes_count": "Quotes",
 }
 ZAEHLER_POST = "Post selbst"
+ZAEHLER_EIGENE = "Eigene Posts"  # „Post selbst“ ohne Retruths (Engagement nach Format und Uhrzeit)
 ZAEHLER_ORIGINAL = "Original (bei Retruths)"
 
 FREQUENZEN = {"D": "Tag", "W": "Woche", "M": "Monat"}
@@ -145,7 +157,10 @@ FROM posts p
 LEFT JOIN post_final f ON f.post_id = p.id
 ORDER BY p.created_at_utc, p.id_num
 """
-_BENOETIGT = ("posts", "snapshots", "quellen", "duplikate", "edits", "laeufe", "konto_snapshots", "meta", "post_final")
+_MEDIEN_SQL = "SELECT post_id, position, art, breite, hoehe, dauer_s FROM medien ORDER BY post_id, position"
+_BENOETIGT = (
+    "posts", "snapshots", "quellen", "duplikate", "edits", "laeufe", "konto_snapshots", "meta", "post_final", "medien",
+)
 
 
 # ---------------------------------------------------------------------------
@@ -216,6 +231,9 @@ def _lade(con: sqlite3.Connection) -> Daten:
     duplikate["primaer"] = duplikate["primaer"].astype(bool)
 
     posts = _zeiten(posts)
+    posts = posts.join(_medien_je_post(_abfrage(con, _MEDIEN_SQL)), on="id")
+    posts["abmessungen"] = posts["abmessungen"].fillna("").astype(object)
+    posts["videodauer_s"] = posts["videodauer_s"].astype(float)
     for spalte in _POSTS_BOOL:
         posts[spalte] = posts[spalte].astype(bool)
     for spalte in _POSTS_BOOL_NULLBAR:
@@ -289,6 +307,26 @@ def _lade(con: sqlite3.Connection) -> Daten:
         erfasst_ab=erfasst_ab,
         erfasst_bis=max(enden) if enden else None,
     )
+
+
+def _medien_je_post(medien: pd.DataFrame) -> pd.DataFrame:
+    """Abmessungen und Videodauer je Post aus der Tabelle ``medien`` (nur Metadaten, Index = Post-ID).
+
+    ``abmessungen``: „Breite×Höhe“ aller Medien mit bekannten Abmessungen in der Reihenfolge des Posts,
+    getrennt durch „, “ (wie die Link-Domains; ein „;“ müsste im CSV maskiert werden). ``videodauer_s``:
+    Summe der Dauern aller Videos; unbekannt, wenn der Post kein Video hat oder einem Video die Dauer
+    fehlt (eine Teilsumme sähe aus wie die ganze Länge).
+    """
+    zeilen = []
+    for post_id, teil in medien.groupby("post_id", sort=False):
+        masse = [
+            f"{int(b)}×{int(h)}" for b, h in zip(teil["breite"], teil["hoehe"], strict=True)
+            if not pd.isna(b) and not pd.isna(h)
+        ]
+        dauern = pd.to_numeric(teil.loc[teil["art"] == MEDIUM_VIDEO, "dauer_s"], errors="coerce").astype(float)
+        dauer = float(dauern.sum()) if len(dauern) and dauern.notna().all() else float("nan")
+        zeilen.append((post_id, ", ".join(masse), dauer))
+    return pd.DataFrame(zeilen, columns=["post_id", "abmessungen", "videodauer_s"]).set_index("post_id")
 
 
 def _meta_zeit(con: sqlite3.Connection, schluessel: str) -> pd.Timestamp | None:
@@ -917,15 +955,16 @@ class Engagement:
 
     kennzahl: str
     pro_stunde: bool
-    basis: pd.DataFrame
+    basis: pd.DataFrame  # je verglichenem Post eine Zeile (nur Posts mit bekanntem Zähler)
     nach_typ: pd.DataFrame
     nach_format: pd.DataFrame
     nach_stunde: pd.DataFrame
     ohne_messung: int
-    ausserhalb_alter: int
+    ausserhalb_alter: int  # gemessen, aber keine Messung im Bereich (ohne Backfill-Posts)
     backfill_ausgeschlossen: int
     backfill_einbezogen: int
     original_ausserhalb_alter: int = 0  # Retruths im Vergleich, deren Original beim Messen anders alt war
+    zaehler_unbekannt: int = 0  # Messung passt, aber weder eigener noch Original-Zähler ist bekannt
 
     @property
     def wert_beschriftung(self) -> str:
@@ -934,7 +973,7 @@ class Engagement:
 
     @property
     def im_messalter(self) -> int:
-        """Posts im Vergleich, deren Messalter im gewählten Bereich liegt (ohne Backfill-Posts)."""
+        """Posts im Vergleich (mit bekanntem Zähler), deren Messung im gewählten Bereich liegt, ohne Backfill-Posts."""
         return len(self.basis) - self.backfill_einbezogen
 
 
@@ -944,6 +983,16 @@ def _als_float(df: pd.DataFrame, spalte: str) -> pd.Series:
     return pd.to_numeric(df[spalte], errors="coerce").astype(float)
 
 
+def _spaeteste_messung(snapshots: pd.DataFrame, alter_min_h: float, alter_max_h: float) -> pd.DataFrame:
+    """Je Post die späteste Messung (Snapshot) mit Alter in [alter_min_h, alter_max_h], Index = Post-ID.
+
+    „Späteste“ wie beim finalen Wert (View ``post_final``): nach Messzeitpunkt, bei Gleichstand nach ID.
+    """
+    im_bereich = snapshots.loc[snapshots["alter_h"].between(alter_min_h, alter_max_h)]
+    spaeteste = im_bereich.sort_values(["gemessen_utc", "id"], kind="stable").groupby("post_id").tail(1)
+    return spaeteste.set_index("post_id")
+
+
 def engagement(
     df: pd.DataFrame,
     alter_min_h: float,
@@ -951,73 +1000,106 @@ def engagement(
     mit_backfill: bool = False,
     pro_stunde: bool = False,
     *,
+    snapshots: pd.DataFrame,
     kennzahl: str = "likes",
     zeitzone: str | None = None,
 ) -> Engagement:
-    """Finale Engagement-Werte, nur für Posts mit Messalter in [alter_min_h, alter_max_h].
+    """Engagement-Werte für Posts mit einer Messung im Messalter [alter_min_h, alter_max_h].
 
-    Gruppiert nach ``typ_detail``, Format und Stunde (Ortszeit). Zwei Zähler-Reihen: „Post selbst“
-    (bei Retruths die Zähler des Retruths) und „Original“ (nur Retruths: Zähler des retruthed
-    Posts). Für die Original-Reihe muss auch das Original beim Messen ein Alter im Bereich haben
+    ``snapshots`` sind alle Messungen (``Daten.snapshots``). Je Post zählt die späteste Messung im
+    Bereich, nicht der letzte Snapshot überhaupt: Bei mehreren Läufen am Tag hat ein Post mehrere
+    Messungen unter 24 h, und „0–6 h“ soll die frühe Messung vergleichen, auch wenn später noch eine
+    kam. Zähler, Original-Zähler, Messalter und Messzeitpunkt stammen alle aus dieser einen Messung.
+    Reicht der Bereich bis 24 h oder darüber, ist das immer der letzte Snapshot (danach wird nicht
+    mehr gemessen). Backfill-Posts (nur mit ``mit_backfill``) gehen mit ihrem einzigen, finalen
+    Snapshot ein, ohne Messalter-Filter.
+
+    Gruppiert nach ``typ_detail``, Format und Stunde (Ortszeit). Zähler-Reihen: nach Typ „Post
+    selbst“ (bei Retruths die Zähler des Retruths), nach Format und Stunde „Eigene Posts“ (ohne
+    Retruths, siehe ``_gruppiere``), dazu „Original“ (nur Retruths: Zähler des retruthed Posts).
+    Für die Original-Reihe muss auch das Original beim Messen ein Alter im Bereich haben
     (``orig_alter_h``); sonst stünden Zähler eines 20 h alten neben denen eines 3 Wochen alten
     Originals. ``pro_stunde``: Wert geteilt durch das Messalter; beim Original durch dessen
-    eigenes Alter zum Messzeitpunkt.
+    eigenes Alter zum Messzeitpunkt. Posts, bei denen weder der eigene noch der Original-Zähler
+    bekannt ist (API-Platzhalter ``-1`` oder Feld fehlt), fehlen in ``basis`` und stehen in
+    ``zaehler_unbekannt``.
     """
     gemessen = df["messalter_h"].notna()
     backfill = df["backfill"].astype(bool)
-    im_alter = df["messalter_h"].between(alter_min_h, alter_max_h)
-    if mit_backfill:
-        maske = gemessen & (im_alter | backfill)
-    else:
-        maske = gemessen & im_alter & ~backfill
+    messung = _spaeteste_messung(snapshots, alter_min_h, alter_max_h)
+    im_alter = df["id"].isin(messung.index) & ~backfill
+    maske = (im_alter | (gemessen & backfill)) if mit_backfill else im_alter
     teil = df.loc[maske]
+    ist_bf = teil["backfill"].astype(bool)
+    # Messung im Bereich je Zeile von teil; Backfill-Posts nehmen stattdessen ihren finalen Snapshot.
+    aus_bereich = messung.reindex(teil["id"].to_numpy()).set_axis(teil.index)
+    messalter = aus_bereich["alter_h"].astype(float).where(~ist_bf, teil["messalter_h"])
+    gemessen_um = aus_bereich["gemessen_utc"].where(~ist_bf, teil["gemessen_utc"])
+    wert = _als_float(aus_bereich, kennzahl).where(~ist_bf, _als_float(teil, kennzahl))
+    original = _als_float(aus_bereich, f"orig_{kennzahl}").where(~ist_bf, _als_float(teil, f"orig_{kennzahl}"))
+
     lokal = _lokal(teil, zeitzone)
     ist_retruth = teil["typ"].isin(RETRUTH_TYPEN)
     alter_original = (
-        (teil["gemessen_utc"] - teil["original_created_at_utc"]).dt.total_seconds() / 3600
+        (gemessen_um - teil["original_created_at_utc"]).dt.total_seconds() / 3600
     ).astype(float).where(ist_retruth)
-    original_gilt = alter_original.between(alter_min_h, alter_max_h) | (teil["backfill"].astype(bool) & mit_backfill)
-    wert = _als_float(teil, kennzahl)
-    original = _als_float(teil, f"orig_{kennzahl}").where(ist_retruth & original_gilt)
+    original_gilt = alter_original.between(alter_min_h, alter_max_h) | ist_bf
+    original = original.where(ist_retruth & original_gilt)
+    mit_wert = wert.notna() | original.notna()
     if pro_stunde:
-        wert = wert / teil["messalter_h"].where(teil["messalter_h"] > 0)
+        wert = wert / messalter.where(messalter > 0)
         original = original / alter_original.where(alter_original > 0)
     basis = pd.DataFrame({
         "id": teil["id"],
         "url": teil["url"],
         "lokal": lokal,
         "typ_detail": teil["typ_detail"],
+        "ist_retruth": ist_retruth.astype(bool),
         "format": teil["format"],
         "stunde": lokal.dt.hour.astype("int64"),
-        "messalter_h": teil["messalter_h"],
+        "messalter_h": messalter,
         "orig_alter_h": alter_original,
-        "backfill": teil["backfill"],
+        "backfill": ist_bf,
         "wert": wert,
         "orig_wert": original,
-    }).reset_index(drop=True)
+    }).loc[mit_wert].reset_index(drop=True)
     return Engagement(
         kennzahl=kennzahl,
         pro_stunde=pro_stunde,
         basis=basis,
         nach_typ=_gruppiere(basis, "typ_detail", TYP_DETAILS),
-        nach_format=_gruppiere(basis, "format", FORMATE),
-        nach_stunde=_gruppiere(basis, "stunde", None),
+        nach_format=_gruppiere(basis, "format", FORMATE, post_nur_eigene=True),
+        nach_stunde=_gruppiere(basis, "stunde", None, post_nur_eigene=True),
         ohne_messung=int((~gemessen).sum()),
         ausserhalb_alter=int((gemessen & ~backfill & ~im_alter).sum()),
         backfill_ausgeschlossen=0 if mit_backfill else int((gemessen & backfill).sum()),
-        backfill_einbezogen=int((maske & backfill).sum()),
-        original_ausserhalb_alter=int((ist_retruth & ~original_gilt).sum()),
+        backfill_einbezogen=int(basis["backfill"].sum()),
+        original_ausserhalb_alter=int((ist_retruth & ~original_gilt & mit_wert).sum()),
+        zaehler_unbekannt=int((~mit_wert).sum()),
     )
 
 
-def _gruppiere(basis: pd.DataFrame, spalte: str, ordnung: Sequence[str] | None) -> pd.DataFrame:
-    """Langformat: ``gruppe``, ``zaehler`` (Post selbst / Original), ``anzahl``, ``median``, ``mittel``
-    und ``alter_median_h`` (Median des Alters beim Messen: des Posts bzw. des Originals)."""
+def _gruppiere(
+    basis: pd.DataFrame, spalte: str, ordnung: Sequence[str] | None, *, post_nur_eigene: bool = False
+) -> pd.DataFrame:
+    """Langformat: ``gruppe``, ``zaehler`` (Name der Reihe), ``anzahl``, ``median``, ``mittel`` und
+    ``alter_median_h`` (Median des Alters beim Messen: des Posts bzw. des Originals).
+
+    Reihen: „Post selbst“ (alle Posts, bei Retruths die Zähler des Retruths) und „Original“ (nur
+    Retruths, Zähler des retruthed Posts). Mit ``post_nur_eigene`` heißt die erste Reihe „Eigene
+    Posts“ und enthält keine Retruths; Retruths kommen dann nur über „Original“ vor. Sonst drückten
+    die Zähler der Retruths selbst (fast immer 0) den Median einer Format- oder Stundengruppe, in
+    der eigene Posts und Retruths gemischt sind.
+    """
+    if post_nur_eigene:
+        erste = (ZAEHLER_EIGENE, basis.loc[~basis["ist_retruth"].astype(bool)])
+    else:
+        erste = (ZAEHLER_POST, basis)
     zeilen = []
-    for zaehler, wertspalte, alterspalte in (
-        (ZAEHLER_POST, "wert", "messalter_h"), (ZAEHLER_ORIGINAL, "orig_wert", "orig_alter_h"),
+    for (zaehler, quelle), wertspalte, alterspalte in (
+        (erste, "wert", "messalter_h"), ((ZAEHLER_ORIGINAL, basis), "orig_wert", "orig_alter_h"),
     ):
-        teil = basis.dropna(subset=[wertspalte])
+        teil = quelle.dropna(subset=[wertspalte])
         if teil.empty:
             continue
         for gruppe, gruppenteil in teil.groupby(spalte):
@@ -1039,35 +1121,69 @@ def _gruppiere(basis: pd.DataFrame, spalte: str, ordnung: Sequence[str] | None) 
     return ergebnis.sort_values(["_rang", "_z"]).drop(columns=["_rang", "_z"]).reset_index(drop=True)
 
 
-def wachstum(
-    snapshots: pd.DataFrame,
-    df: pd.DataFrame,
-    kennzahl: str = "likes",
-    *,
-    max_h: float = 24,
-    mit_backfill: bool = False,
-    pro_stunde: bool = False,
-) -> pd.DataFrame:
-    """Alle Messungen der ausgewählten Posts nach Alter (volle Stunden 0 bis ``max_h``):
-    Anzahl Messungen, Anzahl Posts und Median der Kennzahl. Zeigt die typische Wachstumskurve."""
-    ids = df.loc[mit_backfill | ~df["backfill"].astype(bool), "id"]
-    teil = snapshots.loc[snapshots["post_id"].isin(ids) & (snapshots["alter_h"] < max_h)]
-    wert = _als_float(teil, kennzahl)
-    if pro_stunde:
-        wert = wert / teil["alter_h"].where(teil["alter_h"] > 0)
-    stunden = range(int(math.ceil(max_h)))
+@dataclass
+class Wachstum:
+    """Typische Wachstumskurve eines Zählers, nur aus Posts mit mehreren Messungen."""
+
+    kurve: pd.DataFrame  # alter_stunde, messungen, posts, median (Anteil an der letzten Messung, 1 = 100 %)
+    posts: int  # Posts in der Kurve
+    eigene: int  # eigene Posts der Auswahl ohne Backfill (Kandidaten)
+    zu_wenige_messungen: int  # davon mit weniger als zwei Messungen (bekannter Wert) unter max_h
+    ohne_bezugswert: int  # davon mit mehreren Messungen, aber letztem Wert 0
+    retruths: int  # Retruths der Auswahl ohne Backfill, nie in der Kurve
+
+
+def wachstum(snapshots: pd.DataFrame, df: pd.DataFrame, kennzahl: str = "likes", *, max_h: float = 24) -> Wachstum:
+    """Wie ein Zähler innerhalb der ersten ``max_h`` Stunden eines Posts wächst.
+
+    Nur Posts mit mindestens zwei Messungen (bekannter Wert) unter ``max_h``. Mit einem Lauf am Tag
+    hat jeder Post genau eine Messung, und ein Median verschiedener Posts je Alter zeigte nur, zu
+    welcher Tageszeit sie entstanden (beim Lauf um 12 Uhr ist ein Post von 9 Uhr 3 h alt, einer von
+    23 Uhr am Vortag 13 h). Deshalb wird jeder Post auf seine letzte Messung unter ``max_h``
+    bezogen (Anteil, letzte Messung = 1); je voller Stunde Alter zählt der Median dieser Anteile über
+    die Posts (fallen zwei Messungen eines Posts in dieselbe Stunde, gilt die spätere). Posts mit
+    letztem Wert 0 haben keinen Bezugswert und fehlen.
+
+    Nur eigene Posts (inkl. Quotes und Replies): Die Zähler eines Retruths selbst sind fast immer 0
+    und gehören nicht in denselben Median. Backfill-Posts („Endstand nach X Tagen“) zählen nicht.
+    """
+    ist_retruth = df["typ"].isin(RETRUTH_TYPEN)
+    backfill = df["backfill"].astype(bool)
+    eigene = df.loc[~ist_retruth & ~backfill, "id"]
+    teil = snapshots.loc[snapshots["post_id"].isin(set(eigene)) & (snapshots["alter_h"] < max_h)]
+    teil = teil.sort_values(["post_id", "gemessen_utc", "id"], kind="stable")
     rahmen = pd.DataFrame({
-        "alter_stunde": teil["alter_h"].astype(float).map(math.floor).to_numpy(dtype="int64"),
         "post_id": teil["post_id"].to_numpy(),
-        "wert": wert.to_numpy(dtype=float),
-    })
-    gruppen = rahmen.groupby("alter_stunde")
-    return pd.DataFrame({
+        "alter_h": teil["alter_h"].to_numpy(dtype=float),
+        "wert": _als_float(teil, kennzahl).to_numpy(dtype=float),
+    }).dropna(subset=["wert"])
+    je_post = rahmen.groupby("post_id", sort=False)["wert"]
+    anzahl = je_post.transform("size")
+    bezug = je_post.transform("last")
+    kurventeil = rahmen.loc[(anzahl >= 2) & (bezug > 0)].copy()
+    kurventeil["anteil"] = kurventeil["wert"] / bezug.loc[kurventeil.index]
+    kurventeil["alter_stunde"] = kurventeil["alter_h"].map(math.floor).astype("int64")
+
+    stunden = range(int(math.ceil(max_h)))
+    gruppen = kurventeil.groupby("alter_stunde")
+    anteil_je_post = kurventeil.groupby(["alter_stunde", "post_id"], sort=False)["anteil"].last()
+    kurve = pd.DataFrame({
         "alter_stunde": list(stunden),
         "messungen": gruppen.size().reindex(stunden, fill_value=0).to_numpy(dtype="int64"),
         "posts": gruppen["post_id"].nunique().reindex(stunden, fill_value=0).to_numpy(dtype="int64"),
-        "median": gruppen["wert"].median().reindex(stunden).to_numpy(dtype=float),
+        "median": anteil_je_post.groupby(level="alter_stunde").median().reindex(stunden).to_numpy(dtype=float),
     })
+    messungen_je_post = rahmen.groupby("post_id").size()
+    mehrere = int((messungen_je_post >= 2).sum())
+    in_kurve = int(kurventeil["post_id"].nunique())
+    return Wachstum(
+        kurve=kurve,
+        posts=in_kurve,
+        eigene=len(eigene),
+        zu_wenige_messungen=len(eigene) - mehrere,
+        ohne_bezugswert=mehrere - in_kurve,
+        retruths=int((ist_retruth & ~backfill).sum()),
+    )
 
 
 # ---------------------------------------------------------------------------
@@ -1359,6 +1475,8 @@ def posts_tabelle(df: pd.DataFrame, zeitzone: str | None = None) -> pd.DataFrame
     """Alle Metadaten je Post mit deutschen Spaltennamen, neueste zuerst. Keine Inhalte.
 
     Mit ``zeitzone`` (oder der Spalte ``lokal`` aus ``filtere``) kommt die Erstellzeit in Ortszeit dazu.
+    Medien: Anzahl je Art, „Abmessungen“ (Breite×Höhe je Medium, mit „, “ getrennt) und „Videodauer (s)“
+    (Summe aller Videos, leer ohne Video oder wenn einem Video die Dauer fehlt); keine Medien-URLs.
     """
     d = df.sort_values(["created_at_utc", "id_num"], ascending=False, kind="stable")
     t = pd.DataFrame(index=d.index)
@@ -1392,6 +1510,8 @@ def posts_tabelle(df: pd.DataFrame, zeitzone: str | None = None) -> pd.DataFrame
     t["GIFs"] = d["n_gifs"]
     t["Audio"] = d["n_audio"]
     t["Sonstige Medien"] = d["n_sonstige_medien"]
+    t["Abmessungen"] = d["abmessungen"]
+    t["Videodauer (s)"] = d["videodauer_s"].round(1)
     t["Medien-Hashes vollständig"] = d["medien_vollstaendig"]
     t["Zeichen"] = d["zeichen"]
     t["Zeichen ohne URLs"] = d["zeichen_ohne_urls"]
@@ -1482,7 +1602,7 @@ def csv_export(tabelle: pd.DataFrame, *, dezimalkomma: bool = True) -> bytes:
 
 __all__ = [
     "Daten", "DuplikatAuswertung", "Engagement", "LoeschungenEdits", "RetruthQuellen", "SerienKennzahlen",
-    "Ueberblick", "abstaende_minuten", "abstaende_verteilung", "anteil_retruths", "csv_export", "datenbereich",
+    "Ueberblick", "Wachstum", "abstaende_minuten", "abstaende_verteilung", "anteil_retruths", "csv_export", "datenbereich",
     "dauer_text", "duplikat_auswertung", "engagement", "filtere", "formatmix_zeitverlauf",
     "heatmap_wochentag_stunde", "im_zeitraum", "kennzahl_beschriftung", "konto_beschriftung", "konto_zeitreihe",
     "laengste_pause_pro_tag", "laeufe_tabelle", "lade_daten", "loeschungen_edits", "medien_uebersicht",

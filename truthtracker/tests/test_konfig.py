@@ -54,3 +54,12 @@ def test_fehlerhafte_konfiguration(tmp_path, inhalt):
 def test_obergrenzen(tmp_path):
     with pytest.raises(konfig.KonfigFehler):
         konfig.lade(_schreibe(tmp_path, "[erfassung]\nduplikat_fenster_tage = 800000\n"))
+
+
+def test_windows_pfad_in_doppelten_anfuehrungszeichen_bekommt_einen_hinweis(tmp_path):
+    with pytest.raises(konfig.KonfigFehler) as info:
+        konfig.lade(_schreibe(tmp_path, '[zugriff]\nbrowser = "C:\\Users\\Max\\Opera\\opera.exe"\n'))
+    assert "einfache Anführungszeichen" in str(info.value)
+    # So wie im Hinweis geschrieben, ist es gültig.
+    k = konfig.lade(_schreibe(tmp_path, "[zugriff]\nbrowser = 'C:\\Users\\Max\\Opera\\opera.exe'\n"))
+    assert k.zugriff.browser == "C:\\Users\\Max\\Opera\\opera.exe"

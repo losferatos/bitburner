@@ -19,7 +19,8 @@ run_crawl.bat ─► python -m truthtracker crawl
                    │    │    └─ medien.py     Download in den Speicher, SHA-256, pHash
                    │    ├─ duplikate.py      Duplikat-Fälle 1–4 im 14-Tage-Fenster
                    │    └─ db.py             SQLite-Schema und Zugriffe
-                   └─ temp.py          Temp-Ordner, Aufräumen nach Absturz
+                   ├─ temp.py          Temp-Ordner, Aufräumen nach Absturz
+                   └─ laufsperre.py    nie zwei Läufe gleichzeitig (Crawl oder Spike)
 
 run_dashboard.bat ─► streamlit run src/truthtracker/dashboard/app.py
                    ├─ auswertung.py    reine pandas-Funktionen (testbar)
@@ -74,11 +75,20 @@ class Transport(Protocol):
 `hole_json` pausiert zufällig (`[pausen] api_*`) vor jeder Anfrage außer der ersten, zählt
 Anfragen und wirft `transport.Abbruch(bewertung)` bei Challenge, Block, Geoblock, 429 und
 403. 401 („Login nötig“) betrifft nur die einzelne Abfrage. Im Modus `auto` wird bei einer Challenge
-einmalig auf den Browser gewechselt: Er startet normal (fester DevTools-Port, eigenes Profil) mit der
-Konto-Abfrage als Startseite; solange Cloudflare prüft, werden nur Tab-Titel über `/json/list`
-gelesen; erst nach der Freigabe verbindet sich Playwright, schaltet den Cache ab, sperrt Bilder und
-Videos, und der Lauf geht per `fetch` aus der Seite weiter. `hole_bytes` prüft Status,
-`Content-Type` und `Content-Length`, bevor es eine Antwort liest.
+nach einer Pause einmalig auf den Browser gewechselt: Er startet normal (fester DevTools-Port, eigenes
+Profil) mit der Konto-Abfrage als Startseite; solange Cloudflare prüft, werden nur Tab-Titel über
+`/json/list` gelesen; erst nach der Freigabe verbindet sich Playwright, schaltet den Cache ab, sperrt
+Bilder und Videos und bewertet die schon geladene Startseite nach ihrem HTTP-Status (429, Sperre →
+Abbruch, ohne neue Anfrage). Der Lauf geht per `fetch` aus der Seite weiter; die Startseite zählt
+dabei als erste Anfrage. Läuft die Freigabe ab, trennt sich Playwright, der Mensch löst die Prüfung
+erneut, danach wird wieder angehängt (einmal pro Lauf). Wird das Fenster geschlossen, endet der Lauf
+mit klarer Meldung.
+
+`hole_bytes` prüft Status, `Content-Type` und `Content-Length`, bevor es eine Antwort liest.
+Challenge, 429, Cloudflare-Block oder Regionssperre auf dem Medienweg stoppen alle weiteren
+Medienabrufe und stehen danach in `transport.medien_abbruch`; der Crawler speichert die laufende Seite
+zu Ende und wirft vor seiner nächsten API-Anfrage `Abbruch` (`_Lauf._hole`). Ein 403 ohne
+Cloudflare-Merkmale betrifft nur das eine Medium.
 
 ## Klassifikation (Regeln)
 
@@ -191,7 +201,10 @@ und beim ersten Sehen schon ≥ 24 h alt waren („Endstand nach X Tagen“).
 
 ## Pagination, Lücken, Abdeckung
 
-Tabelle `abdeckung` hält ID-Bereiche `[von, bis]`, die lückenlos paginiert wurden. Ein Lauf:
+Tabelle `abdeckung` hält ID-Bereiche `[von, bis]`, die lückenlos paginiert wurden. Die Obergrenze
+des obersten Bereichs ist die größte gesehene Post-ID (nicht die PC-Uhr); für die Löschprüfung des
+laufenden Laufs reicht dieser Bereich bis ganz oben, weil Seite 1 immer die neuesten Posts zeigt. Ein
+Lauf:
 
 1. **Oben anfangen** (ohne `max_id`) und Seite für Seite (`max_id` = kleinste nicht gepinnte ID
    der Seite) nach unten gehen, bis **beides** erreicht ist: (a) der oberste bekannte Bereich
@@ -200,10 +213,18 @@ Tabelle `abdeckung` hält ID-Bereiche `[von, bis]`, die lückenlos paginiert wur
 2. **Lücken füllen:** Zwischen bekannten Bereichen (z. B. nach einem abgebrochenen Lauf) und
    bis zur Backfill-Grenze wird mit `max_id = Bereich.von` weiter paginiert, bis der nächste
    Bereich erreicht ist.
-3. Eine leere Seite bedeutet „Anfang der Timeline erreicht“.
+3. Eine leere Seite bedeutet nur dann „Anfang der Timeline erreicht“, wenn unterhalb keine bekannten,
+   nicht gelöschten Posts liegen und die Datenbank bis auf 5 alle Posts kennt, die der Lookup
+   (`statuses_count`) nennt. Sonst ist sie ein Fehler: Die Abdeckung endet an der letzten vollen
+   Seite, in diesem Lauf werden keine weiteren Lücken versucht.
 4. Gepinnte Posts (aus der Pinned-Liste oder `pinned: true`) zählen nicht für Stopp- und
    Überlappungsentscheidungen; sie werden nur gespeichert/aktualisiert.
 5. Notbremse: `max_seiten_pro_lauf`.
+6. Nach jeder Seite schreibt der Lauf seine Zähler als Zwischenstand in `laeufe`; ein abgestürzter
+   Lauf behält sie (Status `abgestuerzt`, Ende = letzter Zwischenstand).
+
+Vor jedem Lauf: Laufsperre `laufzeit/crawl.lock` (belegt → nichts anfragen, nichts anfassen),
+Temp-Ordner und Browserprofil aufräumen, unabhängig vom Zugriffsweg.
 
 ## Löschungen und Edits
 
@@ -249,7 +270,9 @@ Lauf bewertet; `db.post_speichern` leert das Feld, wenn sich Vergleichsrelevante
 
 Streamlit, deutsch, nur lesender DB-Zugriff. Globale Filter in der Seitenleiste: Zeitraum,
 Zeitzone (New York/Berlin), Post-Typ, Format, dazu Serien-Schwelle, Messalter-Bereich (Standard
-18–24 h), Backfill (aus), Gelöschte (an). Engagement nur mit Messalter-Filter; Backfill
+18–24 h), Backfill (aus), Gelöschte (an). Engagement nur mit Messalter-Filter, je Post die späteste
+Messung im Bereich; nach Format und Uhrzeit Retruths nur über „Original“. Wachstum nur aus eigenen
+Posts mit mindestens zwei Messungen unter 24 h, je Post auf die letzte Messung normiert. Backfill
 standardmäßig ausgeschlossen. Ausgewertet wird nur der Erfassungsbereich (Backfill-Grenze bis letzter
 Lauf); ältere Posts stehen nur in der Tabelle. Alle Berechnungen in `auswertung.py` (getestet); die
 fachlichen Definitionen (Abstände in echter Zeit, Serie strikt < X Minuten, Pause gehört zum Endtag,
@@ -261,9 +284,9 @@ Duplikat-Rate nur mit vollständigem Fenster, Löschzeit als Intervall) stehen i
 
 `python -m truthtracker pruefen` (bzw. `run_pruefung.bat`) sucht in DB (Spalten nach Positivliste
 je Spaltenname, Rohdatei inkl. `-wal`/`-shm`/`-journal`), Logs, Temp-Ordner, Browserprofil
-(Positivliste `browser.im_profil_erlaubt`), Exporten und Spike-Berichten nach Inhaltsresten: HTML,
-Medien-URLs, fremde URLs, Freitext (mehr als 8 Wörter, die in keinem Meldungstext des Trackers
-vorkommen). Stichproben mit `--abfragen`, `--marker-datei`, `--marker`. Der Bericht nennt nie den
+(Positivliste `browser.im_profil_erlaubt`; die erlaubten Einstellungsdateien werden als JSON gelesen
+und Wert für Wert geprüft), Exporten und Spike-Berichten nach Inhaltsresten: HTML, Medien-URLs, fremde
+URLs, Freitext (mehr als 8 Wörter, die in keinem Meldungstext des Trackers vorkommen). Stichproben mit `--abfragen`, `--marker-datei`, `--marker`. Der Bericht nennt nie den
 Fund selbst. Exit-Code 0 sauber, 1 Funde, 2 Prüfung nicht möglich. Neue Meldungstexte müssen als
 Zeichenkette direkt an der Ausgabestelle stehen (`log.*`, `meldung`, `print`, `raise` …), damit ihre
 Wörter zum bekannten Wortschatz zählen.

@@ -20,11 +20,20 @@ eigene Stichproben (ein Satz aus einem echten Post, der nirgends vorkommen darf)
   JSON-Schlüssel und ``_``-verbundene Kennwörter hinweg: Eine Schlagwortliste geht nicht als
   harmloser Wert durch. Exporte prüfen bekannte Spalten (Link-Domains, Anzeigename, Handle) mit
   denselben Regeln wie die Datenbank.
+* **Browserprofil:** nur Dateien der Positivliste (``browser.im_profil_erlaubt``); Cache-, Verlaufs-
+  und alle anderen Dateien sind Funde. Die erlaubten Einstellungsdateien (``Preferences``,
+  ``Local State`` …) werden Wert für Wert auf HTML und lange Freitexte geprüft, auch JSON, das als
+  Zeichenkette in einem Wert steht. Keine Freitexte sind Werte ohne Leerraum (Base64, Hashes, Pfade)
+  und die Manifeste eingebauter Erweiterungen (``extensions.…manifest``), die den Browser selbst
+  beschreiben. Medien-URLs zählen dort nur von Truth Social: Der Browser legt eigene Bild-URLs ab.
 * **Bericht:** nennt Ort, Art und höchstens Länge, Anzahl oder Musternamen, nie den Fund selbst.
   Sonst trüge die Prüfung die Inhalte auf die Konsole und in umgeleitete Ausgaben. Die geprüften
   Pfade stehen im Bericht, damit eine falsche Konfiguration auffällt.
 
-Aufruf: ``python -m truthtracker.pruefung`` oder ``python -m truthtracker pruefen``.
+Aufruf: ``python -m truthtracker.pruefung`` oder ``python -m truthtracker pruefen``. Mit
+``--abfragen`` liest die Prüfung Stichproben bis zum Ende der Eingabe (Strg+Z und Eingabe unter
+Windows, sonst Strg+D), nicht nur bis zur ersten Leerzeile: Ein eingefügter Post mit Absätzen bliebe
+sonst teilweise im Eingabepuffer, und ``cmd.exe`` führte ihn nach dem Skript als Befehle aus.
 Exit-Code: 0 = sauber, 1 = Funde, 2 = Prüfung nicht möglich (Konfiguration, Stichproben).
 """
 
@@ -652,6 +661,90 @@ class _Sammler:
 Treffer = tuple[str, str]  # (Art, Hinweis)
 
 
+def _freitext_treffer(text: str) -> Treffer | None:
+    anzahl = _unbekannte_woerter(text)
+    if anzahl <= FREITEXT_SCHWELLE:
+        return None
+    return ART_FREITEXT, f"langer Freitext ({anzahl} Wörter, die in keiner Meldung des Trackers vorkommen)"
+
+
+# ---------------------------------------------------------------------------
+# Einstellungsdateien des Browsers (Preferences, Secure Preferences, Local State, First Run …)
+
+JsonPfad = tuple[str | int, ...]
+
+# Zwischengespeicherte Suchvorschläge legt der Browser samt Schutzpräfix als Zeichenkette ab.
+_XSSI_PRAEFIX = ")]}'"
+# Im Bericht erscheinen nur Einstellungsnamen, Erweiterungs-IDs und Listenpositionen; andere Schlüssel
+# (Adressen, Hosts, beliebige Texte) als „*“.
+_JSON_SCHLUESSEL = re.compile(r"[A-Za-z][A-Za-z0-9_-]{0,63}")
+_LEERRAUM = re.compile(r"\s")
+
+
+def _eingebettetes_json(wert: str) -> Any:
+    """JSON als Zeichenkette in einem Wert (DevTools, Druckvorschau, Suchvorschläge); sonst ``_KEIN_JSON``."""
+    kern = wert.strip()
+    if kern.startswith(_XSSI_PRAEFIX):
+        kern = kern[len(_XSSI_PRAEFIX) :].lstrip()
+    return _json(kern) if kern[:1] in ("[", "{") else _KEIN_JSON
+
+
+def _json_texte(daten: Any) -> Iterator[tuple[JsonPfad, str]]:
+    """Jeder Schlüssel und jede Zeichenkette mit ihrem Pfad, in Dateireihenfolge.
+
+    JSON in einer Zeichenkette wird aufgefaltet; sonst zählten seine Feldnamen als Wörter eines Freitexts.
+    Ohne Rekursion, damit tief verschachtelte Dateien die Prüfung nicht abbrechen.
+    """
+    stapel: list[tuple[JsonPfad, Any, bool]] = [((), daten, False)]  # (Pfad, Wert, ist Schlüssel)
+    while stapel:
+        pfad, wert, ist_schluessel = stapel.pop()
+        if isinstance(wert, str):
+            eingebettet = _KEIN_JSON if ist_schluessel else _eingebettetes_json(wert)
+            if eingebettet is _KEIN_JSON:
+                yield pfad, wert
+            else:
+                stapel.append((pfad, eingebettet, False))
+        elif isinstance(wert, dict):
+            for schluessel, kind in reversed(wert.items()):
+                stapel.append((pfad + (schluessel,), kind, False))
+                stapel.append((pfad + (schluessel,), schluessel, True))
+        elif isinstance(wert, list):
+            stapel.extend((pfad + (nr,), kind, False) for nr, kind in reversed(list(enumerate(wert))))
+
+
+def _json_stelle(pfad: JsonPfad) -> str:
+    """Pfad für den Bericht, z. B. ``profile.content_settings.exceptions.*.setting`` oder ``liste[2]``."""
+    stelle = ""
+    for teil in pfad:
+        if isinstance(teil, int):
+            stelle += f"[{teil}]"
+        else:
+            stelle += ("." if stelle else "") + (teil if _JSON_SCHLUESSEL.fullmatch(teil) else "*")
+    return stelle
+
+
+def _erweiterungs_manifest(pfad: JsonPfad) -> bool:
+    """Manifeste eingebauter Erweiterungen (``extensions.settings.<ID>.manifest``) beschreiben den Browser
+    selbst, mit ganzen Sätzen in der Beschreibung. Sie sind kein Freitext aus einem Post."""
+    return pfad[:1] == ("extensions",) and "manifest" in pfad[1:]
+
+
+def _einstellungs_treffer(wert: str, *, freitext: bool) -> list[Treffer]:
+    """HTML und lange Freitexte in einem Wert einer Einstellungsdatei.
+
+    Werte ohne Leerraum (Base64, Hashes, Pfade, Sprachlisten) sind kein Freitext: In den langen
+    Base64-Blöcken des Browsers (z. B. ``variations_compressed_seed``) ergäben zufällige
+    Buchstabenfolgen sonst viele „Wörter“.
+    """
+    treffer: list[Treffer] = []
+    html_name = _medien_muster(wert, _HTML_TEXT)
+    if html_name:
+        treffer.append((ART_HTML, html_name))
+    if freitext and _LEERRAUM.search(wert.strip()) and (frei := _freitext_treffer(wert)):
+        treffer.append(frei)
+    return treffer
+
+
 class _Pruefung:
     def __init__(self, konfig: Konfig, marker: list[str]) -> None:
         self.konfig = konfig
@@ -701,12 +794,8 @@ class _Pruefung:
             laengen = ", ".join(str(len(u)) for u in fremde[:5])
             beschreibung = _anzahl(len(fremde), "URL", "URLs")
             treffer.append((ART_FREMDE_URL, f"{beschreibung} außerhalb der erlaubten Muster (Länge {laengen})"))
-        if freitext:
-            anzahl = _unbekannte_woerter(text)
-            if anzahl > FREITEXT_SCHWELLE:
-                treffer.append(
-                    (ART_FREITEXT, f"langer Freitext ({anzahl} Wörter, die in keiner Meldung des Trackers vorkommen)")
-                )
+        if freitext and (frei := _freitext_treffer(text)):
+            treffer.append(frei)
         return treffer
 
     def _nicht_pruefbar(self, ort: str, fehler: BaseException) -> None:
@@ -981,8 +1070,33 @@ class _Pruefung:
         name = _medien_muster(text, _PROFIL_MEDIEN)
         if name:
             self.sammler.melde(ort, ART_MEDIEN_URL, f"Medien-URL, Muster {name}")
-        for nr in self._marker_nummern(text):
+        marker = set(self._marker_nummern(text))
+        for stelle, wert, freitext in self._einstellungswerte(text, ort):
+            marker.update(self._marker_nummern(wert))
+            for art, hinweis in _einstellungs_treffer(wert, freitext=freitext):
+                self.sammler.melde(stelle, art, f"{hinweis}, Länge {len(wert)}", stelle=ort)
+        for nr in sorted(marker):
             self.sammler.melde(ort, ART_MARKER, f"Stichprobe {nr} gefunden")
+
+    def _einstellungswerte(self, text: str, ort: str) -> Iterator[tuple[str, str, bool]]:
+        """(Ort, Wert, Freitext prüfen) für jede Zeichenkette einer JSON-Datei, sonst für jede Zeile.
+
+        Geprüft werden die eingelesenen Werte, nicht der Dateitext: Der Browser schreibt ``<`` als
+        ``\\u003C``, und die Feldnamen der Einstellungen zählten sonst als Wörter eines Freitexts.
+        """
+        kern = text.lstrip("\ufeff").strip()
+        if kern[:1] not in ("{", "["):  # First Run, Last Version, Last Browser
+            for nr, zeile in enumerate(text.splitlines(), start=1):
+                yield f"{ort}:{nr}", zeile, True
+            return
+        try:
+            daten = json.loads(kern)
+        except (ValueError, RecursionError) as fehler:
+            self._nicht_pruefbar(ort, fehler)  # ohne lesbare Werte ist die Datei ungeprüft
+            return
+        for pfad, wert in _json_texte(daten):
+            stelle = _json_stelle(pfad)
+            yield (f"{ort}:{stelle}" if stelle else ort), wert, not _erweiterungs_manifest(pfad)
 
     def exporte(self) -> None:
         wurzel = self.konfig.export_ordner
@@ -1048,17 +1162,57 @@ def bericht_text(bericht: Pruefbericht) -> str:
     return "\n".join(zeilen)
 
 
+_STD_INPUT_HANDLE = -10  # (DWORD)-10 in der Windows-API
+_STRG_Z = "\x1a"  # Windows liefert Strg+Z mitten in einer Zeile als Zeichen statt als Ende der Eingabe
+
+
+def _konsolenpuffer_leeren() -> None:
+    """Windows: verwirft, was nach dem Ende der Eingabe noch im Eingabepuffer der Konsole steht.
+
+    Sonst bekäme ``cmd.exe`` übrig gebliebene Zeilen einer eingefügten Stichprobe nach dem Skript als
+    Befehle (``pause`` in ``run_pruefung.bat`` verbraucht nur eine Taste).
+    """
+    if sys.platform != "win32":
+        return
+    try:
+        import ctypes
+
+        kernel32 = ctypes.WinDLL("kernel32", use_last_error=True)
+        kernel32.GetStdHandle.restype = ctypes.c_void_p
+        kernel32.FlushConsoleInputBuffer.argtypes = (ctypes.c_void_p,)
+        kernel32.FlushConsoleInputBuffer(kernel32.GetStdHandle(_STD_INPUT_HANDLE))
+    except Exception:  # noqa: BLE001 - ohne Konsole (umgeleitete Eingabe) gibt es keinen Puffer zu leeren
+        pass
+
+
 def _frage_marker() -> list[str]:
-    print("Stichproben eingeben, z. B. einen Satz aus einem echten Post (je Zeile eine, leere Zeile beendet):")
-    marker = []
-    while True:
-        try:
-            zeile = input("> ")
-        except EOFError:
-            break
-        if not zeile.strip():
-            break
-        marker.append(zeile)
+    """Liest Stichproben zeilenweise bis zum Ende der Eingabe; Leerzeilen trennen nur Absätze."""
+    ende = "Strg+Z und dann Eingabe" if sys.platform == "win32" else "Strg+D in einer leeren Zeile"
+    print("Stichproben eingeben oder einfügen, z. B. den Text eines echten Posts, gern mit mehreren Absätzen.")
+    print(f"Jede Zeile ist eine eigene Stichprobe; Leerzeilen und Zeilen unter {MARKER_MIN_LAENGE} Zeichen "
+          "werden übersprungen.")
+    print(f"Zum Abschluss {ende} drücken:")
+    marker: list[str] = []
+    zu_kurz = 0
+    try:
+        while True:
+            try:
+                zeile = input()
+            except EOFError:
+                break
+            zeile, strg_z, _ = zeile.partition(_STRG_Z)
+            eintrag = zeile.strip()
+            if len(eintrag) >= MARKER_MIN_LAENGE:
+                marker.append(eintrag)
+            elif eintrag:
+                zu_kurz += 1
+            if strg_z:
+                break
+    finally:
+        _konsolenpuffer_leeren()
+    if zu_kurz:
+        print(f"{_anzahl(zu_kurz, 'Zeile', 'Zeilen')} mit weniger als {MARKER_MIN_LAENGE} Zeichen übersprungen.")
+    print(f"{_anzahl(len(marker), 'Stichprobe', 'Stichproben')} übernommen.")
     return marker
 
 
@@ -1080,7 +1234,12 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument(
         "--marker-datei", type=Path, metavar="DATEI", help="Textdatei (UTF-8) mit einer Stichprobe je Zeile"
     )
-    parser.add_argument("--abfragen", action="store_true", help="Stichproben nacheinander eintippen oder einfügen")
+    parser.add_argument(
+        "--abfragen",
+        action="store_true",
+        help="Stichproben eintippen oder einfügen (je Zeile eine, Absätze erlaubt); Ende mit Strg+Z und Eingabe "
+        "(Windows) bzw. Strg+D",
+    )
     args = parser.parse_args(argv)
     # Ohne Datei nähme konfig.lade still den Projektordner; die Prüfung sähe dann woanders nach als gewollt.
     if args.config is not None and not args.config.is_file():

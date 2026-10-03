@@ -1,5 +1,7 @@
 import json
 
+import pytest
+
 from truthtracker import cloudflare as cf
 
 
@@ -66,8 +68,21 @@ def test_kopfzeilen_mehrfachwerte():
     assert h["set-cookie"] == "a=1, b=2" and h["x-test"] == "y"
 
 
-def test_melde_ist_deutsch_und_nennt_status():
-    assert "429" in cf.melde(cf.Bewertung(cf.RATELIMIT, 429, hinweis="60"))
+def test_melde_ist_deutsch_und_nennt_status_einmal():
+    satz = cf.melde(cf.Bewertung(cf.RATELIMIT, 429, hinweis="60"))
+    assert satz == "Zu viele Anfragen (HTTP 429). Der Server bittet um 60 s Pause."
+    assert cf.melde(cf.Bewertung(cf.VERWEIGERT, 403)).count("403") == 1
+    assert cf.melde(cf.Bewertung(cf.CHALLENGE, None)) == "Cloudflare verlangt eine Browser-Prüfung (Challenge)."
+
+
+@pytest.mark.parametrize("code", ["1005", "1006", "1007", "1008", "1009", "1010", "1012", "1020"])
+def test_cloudflare_klartextsperren_sind_blockiert(code):
+    assert cf.bewerte(403, {"content-type": "text/plain"}, f"error code: {code}".encode()).art == cf.BLOCKIERT
+
+
+def test_rate_limit_seite_1015_ist_ratelimit():
+    html = b"<html><title>Access denied | truthsocial.com used Cloudflare to restrict access</title>Error 1015</html>"
+    assert cf.bewerte(403, {}, html).art == cf.RATELIMIT
 
 
 def test_401_ist_login_noetig_und_kein_abbruch():

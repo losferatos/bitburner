@@ -15,9 +15,13 @@ Ablauf (Regeln in docs/architektur.md):
    prüfen; nur 404 mit JSON-Fehler gilt als gelöscht. Edits erkennt schon Schritt 3.
 7. Laufprotokoll schreiben.
 
-Bricht der Zugriff ab (Challenge, Block, 429), werden keine Anfragen mehr gestellt; was bis
-dahin gespeichert ist, bleibt, und die lokalen Schritte (Duplikate, Einfrieren, Protokoll)
-laufen trotzdem.
+Bricht der Zugriff ab (Challenge, Block, 429, auch auf dem Medienweg), werden keine Anfragen
+mehr gestellt; was bis dahin gespeichert ist, bleibt, und die lokalen Schritte (Duplikate,
+Einfrieren, Protokoll) laufen trotzdem.
+
+Vor jedem Lauf: Laufsperre nehmen (kein zweiter Lauf gleichzeitig), Temp-Ordner und Browserprofil
+aufräumen. Das holt auch Reste eines abgestürzten Laufs nach, selbst wenn dieser Lauf ohne
+Browser auskommt.
 """
 
 from __future__ import annotations
@@ -30,7 +34,7 @@ from dataclasses import dataclass, field
 from datetime import datetime, timedelta
 from typing import Any
 
-from truthtracker import cloudflare, db, duplikate, klassifikation, medien, temp, zeit
+from truthtracker import browser, cloudflare, db, duplikate, klassifikation, laufsperre, medien, pfade, temp, zeit
 from truthtracker.db import Bereich, LaufZaehler
 from truthtracker.konfig import Konfig
 from truthtracker.modelle import TYP_EIGEN, REPLY_FREMD, PostDaten
@@ -43,6 +47,11 @@ TransportFabrik = Callable[[Konfig, LaufZaehler], Transport]
 # Wie lange das Ergebnis "Replies an andere gehen ohne Login nicht" gilt, bevor erneut probiert wird.
 REPLIES_PROBE_GUELTIG = timedelta(days=7)
 _WIEDERHOLBAR = frozenset({cloudflare.NETZWERKFEHLER, cloudflare.SERVERFEHLER})
+# Eine leere Timeline-Seite gilt nur als Anfang der Timeline, wenn höchstens so viele Posts des Kontos
+# (laut statuses_count) noch nicht in der Datenbank sind, z. B. Antworten an andere.
+LEERE_SEITE_TOLERANZ = 5
+# Obergrenze für die Löschprüfung des obersten Bereichs: Seite 1 zeigt immer die neuesten Posts.
+ID_MAX = 2**63 - 1
 
 
 class LaufFehler(RuntimeError):
@@ -51,7 +60,7 @@ class LaufFehler(RuntimeError):
 
 @dataclass
 class LaufErgebnis:
-    lauf_id: int
+    lauf_id: int | None  # None: Lauf gar nicht erst begonnen (anderer Lauf aktiv)
     status: str
     abbruch_grund: str | None
     zugriff: str | None
@@ -83,7 +92,11 @@ class _Lauf:
     gepinnte_ids: set[str] | None = None
     gesehen: set[str] = field(default_factory=set)
     betroffene: set[str] = field(default_factory=set)
-    bereiche: list[Bereich] = field(default_factory=list)
+    bereiche: list[Bereich] = field(default_factory=list)  # für die Löschprüfung dieses Laufs
+    neue_abdeckung: list[Bereich] = field(default_factory=list)  # so in der Datenbank gespeichert
+    posts_gesamt: int | None = None
+    leere_seite: bool = False
+    antworten: int = 0
     einzelabrufe: int = 0
     werbung: int = 0
     exclude_replies: bool = True
@@ -104,6 +117,23 @@ class _Lauf:
         assert self.transport is not None
         return self.transport
 
+    def _hole(self, pfad: str, params: dict[str, Any] | None = None) -> cloudflare.Bewertung:
+        """Jede API-Anfrage des Laufs geht hierdurch.
+
+        Hat der Medienweg eine Cloudflare-Hürde getroffen, endet der Lauf hier, also erst nachdem die
+        laufende Seite fertig gespeichert ist, und bevor die nächste Anfrage rausgeht.
+        """
+        self._pruefe_medien_stopp()
+        bew = self._api.hole_json(pfad, params)
+        if bew.art not in _WIEDERHOLBAR:
+            self.antworten += 1
+        return bew
+
+    def _pruefe_medien_stopp(self) -> None:
+        stopp = getattr(self._api, "medien_abbruch", None)
+        if stopp is not None:
+            raise Abbruch(stopp, wo="Medienabruf")
+
     def _ist_gepinnt(self, status: dict) -> bool:
         sid = str(status.get("id", ""))
         return (self.gepinnte_ids is not None and sid in self.gepinnte_ids) or status.get("pinned") is True
@@ -118,6 +148,12 @@ class _Lauf:
         self._medien_nachholen()
         self._duplikate()
         self._loeschpruefung()
+        self._pruefe_medien_stopp()
+        if self.antworten == 0:
+            raise LaufFehler(
+                "Truth Social hat in diesem Lauf keine Anfrage beantwortet (Netzwerk- oder Serverfehler). "
+                "Bitte später erneut starten."
+            )
 
     def _erfasser_einrichten(self) -> None:
         con, jetzt = self.con, self.start
@@ -138,10 +174,11 @@ class _Lauf:
     def _konto_snapshot(self) -> None:
         handle = self.konfig.konto.handle
         gespeichert = db.meta_lesen(self.con, "konto_id")
-        bew = self._api.hole_json("/api/v1/accounts/lookup", {"acct": handle})
+        bew = self._hole("/api/v1/accounts/lookup", {"acct": handle})
         daten = bew.daten if bew.ok and isinstance(bew.daten, dict) else None
         if daten and str(daten.get("id", "")).isdigit():
             self.trump_id = str(daten["id"])
+            self.posts_gesamt = _zahl(daten.get("statuses_count"))
             with self.con:
                 db.meta_schreiben(self.con, "konto_id", self.trump_id)
             db.konto_snapshot_speichern(
@@ -159,7 +196,7 @@ class _Lauf:
             raise LaufFehler(f"Das Konto @{handle} ließ sich nicht abrufen: {cloudflare.melde(bew)}")
 
     def _gepinnte_holen(self) -> None:
-        bew = self._api.hole_json(f"/api/v1/accounts/{self.trump_id}/statuses", {"pinned": "true", "with_muted": "true"})
+        bew = self._hole(f"/api/v1/accounts/{self.trump_id}/statuses", {"pinned": "true", "with_muted": "true"})
         if not bew.ok or not isinstance(bew.daten, list):
             self.zaehler.fehler += 1
             self.meldung(f"Gepinnte Posts nicht abrufbar ({cloudflare.melde(bew)}); Gepinnt-Status bleibt unverändert.")
@@ -238,7 +275,7 @@ class _Lauf:
             }
             if max_id is not None:
                 params["max_id"] = str(max_id)
-            bew = self._api.hole_json(f"/api/v1/accounts/{self.trump_id}/statuses", params)
+            bew = self._hole(f"/api/v1/accounts/{self.trump_id}/statuses", params)
             if bew.art == cloudflare.LOGIN_NOETIG and not self.exclude_replies:
                 self.exclude_replies = True
                 self._merke_replies_probe(False)
@@ -284,14 +321,33 @@ class _Lauf:
         ergebnis.reverse()
         return ergebnis
 
+    def _leere_seite_plausibel(self, max_id: int | None) -> bool:
+        """Heißt eine leere Seite wirklich "Anfang der Timeline erreicht"?
+
+        Truth Social liefert ausgeloggt ab einer gewissen Tiefe mitunter leere Seiten. Das darf nie als
+        lückenlos abgedeckt gelten, sonst bliebe die Lücke darunter für immer offen. Plausibel ist der
+        Anfang nur, wenn unterhalb der Seite keine bekannten, nicht gelöschten Posts liegen und die
+        Datenbank (fast) so viele Posts kennt, wie das Konto laut Lookup hat.
+        """
+        if db.posts_unterhalb(self.con, ID_MAX if max_id is None else max_id):
+            return False
+        if self.posts_gesamt is None:
+            return max_id is not None
+        return db.anzahl_posts(self.con) + LEERE_SEITE_TOLERANZ >= self.posts_gesamt
+
     def _segment(self, start_max_id: int | None, untergrenze: int) -> bool:
         """Paginiert ab ``start_max_id`` (``None`` = ganz oben) bis zur ID-Untergrenze.
 
         Die Abdeckung wird auch bei einem Abbruch mitten im Segment gespeichert, und zwar
         genau bis zur letzten vollständig verarbeiteten Seite. Gibt zurück, ob Abdeckung
         hinzugekommen ist.
+
+        Die Obergrenze des obersten Bereichs ist die größte tatsächlich gesehene Post-ID, nicht die
+        Uhr des PCs: Geht diese vor, würde sonst ein ID-Bereich als abgedeckt gelten, den der Server
+        noch gar nicht hatte. Für die Löschprüfung dieses Laufs reicht der oberste Bereich dagegen
+        ganz nach oben, denn Seite 1 zeigt immer die neuesten Posts.
         """
-        oben = zeit.id_obergrenze(self.uhr()) if start_max_id is None else start_max_id - 1
+        oben: int | None = None if start_max_id is None else start_max_id - 1
         tiefste: int | None = None
         anfang_erreicht = False
         max_id = start_max_id
@@ -300,15 +356,23 @@ class _Lauf:
                 if self.zaehler.seiten >= self.konfig.erfassung.max_seiten_pro_lauf:
                     self.meldung("Höchstzahl an Seiten pro Lauf erreicht; der Rest folgt im nächsten Lauf.")
                     break
-                gemessen = self.uhr()
                 posts, bew = self._hole_seite(max_id)
+                gemessen = self.uhr()
                 if posts is None:
                     self.zaehler.fehler += 1
                     self.meldung(f"Timeline-Seite nicht abrufbar ({cloudflare.melde(bew)}); die Abdeckung endet hier.")
                     break
                 self.zaehler.seiten += 1
                 if not posts:
-                    anfang_erreicht = True
+                    if self._leere_seite_plausibel(max_id):
+                        anfang_erreicht = True
+                    else:
+                        self.leere_seite = True
+                        self.zaehler.fehler += 1
+                        self.meldung(
+                            "Timeline-Seite leer, obwohl ältere Posts existieren müssten; die Abdeckung endet "
+                            "hier, der nächste Lauf versucht es erneut."
+                        )
                     break
                 normale = self._reihenfolge_posts(posts, max_id)
                 for status in posts:
@@ -320,16 +384,19 @@ class _Lauf:
                 seiten_min = min(int(p["id"]) for p in normale)
                 tiefste = seiten_min
                 if start_max_id is None and max_id is None:
-                    # Geht die Uhr des PCs nach, liegen die neuesten IDs über der aus der Uhrzeit berechneten Grenze.
-                    oben = max(oben, max(int(p["id"]) for p in normale))
+                    oben = max(int(p["id"]) for p in normale)
+                db.lauf_zwischenstand(self.con, self.lauf_id, zaehler=self.zaehler, jetzt=gemessen)
                 if seiten_min <= untergrenze:
                     break
                 max_id = seiten_min
         finally:
             if anfang_erreicht or tiefste is not None:
-                bereich = Bereich(0 if anfang_erreicht else tiefste, oben, anfang_erreicht)
+                von = 0 if anfang_erreicht else tiefste
+                bis = oben if oben is not None else zeit.id_obergrenze(self.uhr())
+                bereich = Bereich(von, bis, anfang_erreicht)
                 db.abdeckung_hinzufuegen(self.con, bereich)
-                self.bereiche.append(bereich)
+                self.neue_abdeckung.append(bereich)
+                self.bereiche.append(Bereich(von, ID_MAX if start_max_id is None else bis, anfang_erreicht))
         return anfang_erreicht or tiefste is not None
 
     def _paginiere_alles(self) -> None:
@@ -342,6 +409,8 @@ class _Lauf:
 
         # Lücken zwischen bekannten Bereichen und bis zur Backfill-Grenze schließen.
         for _ in range(1000):
+            if self.leere_seite:
+                break  # Der Server liefert gerade leere Seiten; weitere Versuche erst im nächsten Lauf.
             luecke = _naechste_luecke(db.abdeckung_lesen(self.con), backfill_id)
             if luecke is None:
                 break
@@ -363,10 +432,22 @@ class _Lauf:
         anteil = self._budget() // 2
         offene = [i for i in db.posts_ohne_vollstaendige_medien(self.con, seit, anteil + 50) if i not in self.gesehen]
         for post_id in offene[:anteil]:
-            bew = self._api.hole_json(f"/api/v1/statuses/{post_id}")
+            if getattr(self._api, "medien_abbruch", None) is not None:
+                return  # _hole bricht den Lauf ohnehin vor der nächsten Anfrage ab
+            bew = self._hole(f"/api/v1/statuses/{post_id}")
             self.einzelabrufe += 1
             if bew.ok and isinstance(bew.daten, dict) and str(bew.daten.get("id")) == post_id:
                 self._verarbeite(bew.daten, self.uhr())
+            elif bew.art in (cloudflare.LOGIN_NOETIG, cloudflare.NICHT_GEFUNDEN):
+                continue  # ausgeloggt nicht einzeln abrufbar bzw. gelöscht (prüft die Löschprüfung); kein Fehler
+            elif bew.art in _WIEDERHOLBAR:
+                self.zaehler.fehler += 1
+                self.meldung(
+                    f"Medien-Nachladen abgebrochen ({cloudflare.melde(bew)}); es folgt im nächsten Lauf."
+                )
+                return
+            else:
+                self.zaehler.fehler += 1
 
     def _duplikate(self) -> None:
         if self.dup_erledigt:
@@ -397,9 +478,10 @@ class _Lauf:
         if len(kandidaten) > budget:
             self.meldung(f"{len(kandidaten) - budget} Posts für die Löschprüfung auf den nächsten Lauf verschoben.")
             kandidaten = kandidaten[:budget]
+        stoerungen = 0
         for post_id in kandidaten:
+            bew = self._hole(f"/api/v1/statuses/{post_id}")
             jetzt = self.uhr()
-            bew = self._api.hole_json(f"/api/v1/statuses/{post_id}")
             self.einzelabrufe += 1
             if bew.art == cloudflare.NICHT_GEFUNDEN:
                 db.als_geloescht_markieren(self.con, post_id, jetzt)
@@ -413,6 +495,13 @@ class _Lauf:
                 db.als_vermisst_markieren(self.con, post_id, jetzt)
                 ergebnis = "unklar"
             db.loeschpruefung_protokollieren(self.con, post_id, self.lauf_id, jetzt, ergebnis, bew.art, bew.status)
+            stoerungen = stoerungen + 1 if bew.art in _WIEDERHOLBAR else 0
+            if stoerungen >= 2:
+                self.zaehler.fehler += 1
+                self.meldung(
+                    f"Löschprüfung abgebrochen ({cloudflare.melde(bew)}); die übrigen Posts prüft der nächste Lauf."
+                )
+                return
 
     # -- Nach dem Lauf (ohne Netz) -------------------------------------------
 
@@ -448,11 +537,25 @@ def _naechste_luecke(bereiche: list[Bereich], backfill_id: int) -> tuple[int, in
 
 
 def _abgedeckt(bereiche: list[Bereich]) -> tuple[datetime | None, datetime | None]:
+    """Zeitspanne der in diesem Lauf gespeicherten Abdeckung (fürs Laufprotokoll)."""
     if not bereiche:
         return None, None
     von = min(b.von for b in bereiche)
     bis = max(b.bis for b in bereiche)
     return (zeit.zeit_aus_id(von) if von > 0 else None), zeit.zeit_aus_id(bis)
+
+
+def _raeume_profil_vor_dem_lauf() -> tuple[bool, int]:
+    """Reste eines früheren Browser-Laufs löschen, auch nach einem Absturz und unabhängig vom Zugriffsweg.
+
+    Gibt zurück, ob das Profil noch belegt ist, und wie viele Dateien sich nicht löschen ließen.
+    """
+    profil = pfade.profil_ordner()
+    if not profil.exists():
+        return False, 0
+    if browser.profil_in_benutzung(profil):
+        return True, 0
+    return False, len(browser.raeume_profil_auf(profil).nicht_loeschbar)
 
 
 def fuehre_lauf_aus(
@@ -463,11 +566,33 @@ def fuehre_lauf_aus(
     melden: Callable[[str], None] = print,
 ) -> LaufErgebnis:
     t0 = time.monotonic()
+    sperre = laufsperre.Laufsperre()
+    if not sperre.nehmen():
+        # Ein anderer Lauf ist aktiv: nichts anfragen, weder Datenbank noch Temp-Ordner anfassen.
+        return LaufErgebnis(
+            lauf_id=None, status="bereits_aktiv", abbruch_grund=None, zugriff=None, zaehler=LaufZaehler(),
+            meldungen=[laufsperre.MELDUNG_BELEGT], dauer_s=time.monotonic() - t0,
+        )
+    try:
+        return _lauf(konfig, transport_fabrik=transport_fabrik, uhr=uhr, melden=melden, t0=t0)
+    finally:
+        sperre.freigeben()
+
+
+def _lauf(
+    konfig: Konfig,
+    *,
+    transport_fabrik: TransportFabrik | None,
+    uhr: zeit.Uhr,
+    melden: Callable[[str], None],
+    t0: float,
+) -> LaufErgebnis:
     temp_reste = temp.raeume_temp_auf()
+    profil_belegt, profil_reste = _raeume_profil_vor_dem_lauf()
     con = db.oeffne(konfig.datenbank_pfad)
     try:
         start = uhr()
-        abgestuerzt = db.markiere_abgestuerzte_laeufe(con, start)
+        abgestuerzt = db.markiere_abgestuerzte_laeufe(con)
         erster = zeit.parse_utc(db.meta_lesen(con, "erster_lauf_start_utc"))
         backfill_grenze = zeit.parse_utc(db.meta_lesen(con, "backfill_grenze_utc"))
         ist_erster = erster is None
@@ -486,6 +611,10 @@ def fuehre_lauf_aus(
         )
         if temp_reste:
             lauf.meldung(f"{len(temp_reste)} Reste im Temp-Ordner ließen sich nicht löschen.")
+        if profil_belegt:
+            lauf.meldung("Der Tracker-Browser läuft noch (offenes Fenster?); sein Profil wurde vor dem Lauf nicht aufgeräumt.")
+        elif profil_reste:
+            lauf.meldung(f"Im Browserprofil ließen sich {profil_reste} Dateien nicht löschen; der nächste Lauf versucht es erneut.")
         if abgestuerzt:
             lauf.meldung(f"{abgestuerzt} früherer Lauf war nicht sauber beendet und ist als abgestürzt markiert.")
         if ist_erster:
@@ -499,8 +628,9 @@ def fuehre_lauf_aus(
             lauf.ausfuehren()
         except Abbruch as abbruch:
             status, grund = "abgebrochen", abbruch.bewertung.art
-            lauf.meldung(f"Abbruch: {cloudflare.melde(abbruch.bewertung)} Bis dahin Gesammeltes ist gespeichert.")
-        except (TransportFehler, LaufFehler) as fehler:
+            wo = f" beim {abbruch.wo}" if abbruch.wo else ""
+            lauf.meldung(f"Abbruch{wo}: {cloudflare.melde(abbruch.bewertung)} Bis dahin Gesammeltes ist gespeichert.")
+        except (TransportFehler, LaufFehler, browser.BrowserFehler) as fehler:
             status, grund = "fehler", type(fehler).__name__
             zaehler.fehler += 1
             lauf.meldung(str(fehler))
@@ -519,10 +649,17 @@ def fuehre_lauf_aus(
                     lauf.transport.schliessen()
                 except Exception:  # noqa: BLE001
                     log.exception("Fehler beim Schließen des Zugriffs")
+                if getattr(lauf.transport, "profil_belegt", False):
+                    lauf.meldung(
+                        "Der Tracker-Browser läuft noch; sein Profil wurde nicht aufgeräumt. Bitte das Fenster "
+                        "schließen, der nächste Lauf räumt es beim Start auf."
+                    )
+                elif reste := getattr(lauf.transport, "profil_reste", 0):
+                    lauf.meldung(f"Im Browserprofil ließen sich {reste} Dateien nicht löschen; der nächste Lauf versucht es erneut.")
             lauf.lokale_nacharbeit()
             if lauf.werbung:
                 lauf.meldung(f"{lauf.werbung} Werbe-Einträge in der Timeline übersprungen.")
-            von, bis = _abgedeckt(lauf.bereiche)
+            von, bis = _abgedeckt(lauf.neue_abdeckung)
             db.lauf_beenden(
                 con, lauf_id, ende=uhr(), status=status, zugriff=zugriff, abbruch_grund=grund, zaehler=zaehler,
                 meldungen=meldungen, abgedeckt_von=von, abgedeckt_bis=bis,
@@ -538,6 +675,8 @@ def fuehre_lauf_aus(
 
 
 def zusammenfassung(ergebnis: LaufErgebnis) -> str:
+    if ergebnis.lauf_id is None:
+        return "\n".join(["Kein Lauf gestartet.", *(f"  - {m}" for m in ergebnis.meldungen)])
     z = ergebnis.zaehler
     status = {"ok": "erfolgreich", "abgebrochen": "abgebrochen", "fehler": "mit Fehler beendet"}.get(
         ergebnis.status, ergebnis.status

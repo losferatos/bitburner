@@ -55,7 +55,8 @@ SCHRIFT = 'system-ui, -apple-system, "Segoe UI", sans-serif'
 TYP_PLATZ = {t: i for i, t in enumerate(TYP_DETAIL_BESCHRIFTUNG)}
 FORMAT_PLATZ = {f: i for i, f in enumerate(FORMATE)}
 DUP_PLATZ = {a: i for i, a in enumerate(DUP_ARTEN)}
-ZAEHLER_PLATZ = {auswertung.ZAEHLER_POST: 0, auswertung.ZAEHLER_ORIGINAL: 1}
+# „Post selbst“ (nach Typ) und „Eigene Posts“ (nach Format/Uhrzeit) stehen nie in derselben Grafik.
+ZAEHLER_PLATZ = {auswertung.ZAEHLER_POST: 0, auswertung.ZAEHLER_EIGENE: 0, auswertung.ZAEHLER_ORIGINAL: 1}
 FREQUENZ_NAMEN = {"D": "Tag", "W": "Woche", "M": "Monat"}
 
 _PLOTLY_KONFIG = {"displaylogo": False, "modeBarButtonsToRemove": ["lasso2d", "select2d"]}
@@ -354,7 +355,8 @@ def _gruppiert(
     horizontal: bool,
     alle_gruppen: Sequence[Any] | None = None,
 ) -> go.Figure:
-    """Engagement-Gruppen: je Zähler-Reihe (Post selbst / Original) eine Balkenreihe, Wert = Median."""
+    """Engagement-Gruppen: je Zähler-Reihe (Post selbst bzw. Eigene Posts / Original) eine Balkenreihe,
+    Wert = Median."""
     fig = go.Figure()
     reihen = [z for z in ZAEHLER_PLATZ if z in set(lang["zaehler"])]
     gruppen = list(alle_gruppen) if alle_gruppen is not None else list(dict.fromkeys(lang["gruppe"]))
@@ -522,8 +524,9 @@ def _seitenleiste(daten: auswertung.Daten, einstellungen: konfig.Konfig, pfad: P
     sb.subheader("Engagement")
     alter = sb.slider(
         "Messalter (Stunden)", min_value=0, max_value=48, value=(18, 24), step=1, format="%d h", key="alter",
-        help="Nur Posts, deren letzte Messung so viele Stunden nach dem Post lag, werden verglichen. Bei "
-             "Retruths zählen die Zähler des Originals nur, wenn auch das Original so alt war.",
+        help="Verglichen werden Posts mit einer Messung so viele Stunden nach dem Post; je Post zählt die "
+             "späteste Messung in diesem Bereich. Bei Retruths zählen die Zähler des Originals nur, wenn auch "
+             "das Original beim Messen so alt war.",
     )
     mit_backfill = sb.checkbox(
         "Backfill-Posts einbeziehen", value=False, key="backfill",
@@ -745,6 +748,45 @@ def _engagement_tabelle(lang: pd.DataFrame, beschriftung: dict[Any, str], name: 
     })
 
 
+def _wachstum(w: auswertung.Wachstum, name: str, pro_stunde: bool, stil: Stil) -> None:
+    """Wachstumskurve aus Posts mit mehreren Messungen, sonst ein Hinweis, was fehlt."""
+    if w.posts == 0:
+        if w.eigene == 0:
+            _leer("Keine eigenen Posts (ohne Backfill) in der Auswahl. Wachstumskurven gibt es nur für eigene Posts "
+                  "(inkl. Quotes und Replies), weil die Zähler eines Retruths selbst fast immer 0 sind.")
+        elif w.ohne_bezugswert:
+            _leer(f"Die Posts mit mehreren Messungen haben als letzten Wert 0 {name}; ohne Bezugswert gibt es keine "
+                  "Wachstumskurve.")
+        else:
+            _leer("Für Wachstumskurven sind mehrere Läufe innerhalb von 24 h nach einem Post nötig: Jeder Post braucht "
+                  "mindestens zwei Messungen unter 24 h. Mit einem Lauf am Tag hat jeder Post nur eine, und ein "
+                  "Vergleich verschiedener Posts zeigte nur, zu welcher Tageszeit sie entstanden.")
+        return
+    nicht_dabei = [f"{zahl(w.zu_wenige_messungen)} mit weniger als zwei Messungen"]
+    if w.ohne_bezugswert:
+        nicht_dabei.append(f"{zahl(w.ohne_bezugswert)} mit letztem Wert 0")
+    if w.retruths:
+        nicht_dabei.append(f"{zahl(w.retruths)} Retruths")
+    st.caption(
+        "Eigene Posts (inkl. Quotes und Replies, ohne Backfill) mit mindestens zwei Messungen unter 24 h, unabhängig "
+        "vom Messalter-Filter. Jeder Post ist auf seine letzte Messung unter 24 h bezogen (= 100 %); die Linie zeigt je "
+        "voller Stunde nach dem Post den Median dieser Anteile. So zählt nur das Wachstum innerhalb eines Posts, nicht "
+        f"der Unterschied zwischen Posts verschiedener Tageszeiten. Grundlage: {_posts(w.posts)}; nicht dabei: "
+        f"{', '.join(nicht_dabei)}."
+    )
+    if pro_stunde:
+        st.caption("„pro Stunde seit Post“ gilt hier nicht: Die Kurve zeigt Anteile am letzten Wert.")
+    fig = _linie(w.kurve["alter_stunde"], w.kurve["median"], stil, name="Median-Anteil am letzten Wert",
+                 y_titel=f"Anteil am letzten Wert ({name})", format_=".0%", x_datum=False,
+                 x_titel="Alter des Posts beim Messen (Stunden)")
+    fig.update_yaxes(tickformat=".0%", rangemode="tozero")
+    _zeige(fig, "eng_wachstum")
+    _tabelle(pd.DataFrame({
+        "Alter (volle Stunden)": w.kurve["alter_stunde"], "Messungen": w.kurve["messungen"],
+        "Posts": w.kurve["posts"], "Median-Anteil am letzten Wert": w.kurve["median"].map(prozent),
+    }))
+
+
 def _reiter_engagement(df: pd.DataFrame, daten: auswertung.Daten, a: Auswahl, stil: Stil) -> None:
     if df.empty:
         _leer()
@@ -754,17 +796,21 @@ def _reiter_engagement(df: pd.DataFrame, daten: auswertung.Daten, a: Auswahl, st
                                key="engagement_kennzahl")
     pro_stunde = rechts.toggle("pro Stunde seit Post", value=False, key="engagement_pro_stunde",
                                help="Wert geteilt durch das Alter des Posts beim Messen.")
-    e = auswertung.engagement(df, a.alter_min_h, a.alter_max_h, a.mit_backfill, pro_stunde, kennzahl=kennzahl)
+    e = auswertung.engagement(df, a.alter_min_h, a.alter_max_h, a.mit_backfill, pro_stunde,
+                              snapshots=daten.snapshots, kennzahl=kennzahl)
     titel = e.wert_beschriftung
+    name = auswertung.kennzahl_beschriftung(kennzahl)
     bereich = f"{zahl(a.alter_min_h, 1)}–{zahl(a.alter_max_h, 1)} h"
     dazu = f", dazu {zahl(e.backfill_einbezogen)} Backfill-Posts (Endstand, Messalter beliebig)" if (
         e.backfill_einbezogen) else ""
-    nicht_dabei = [f"{zahl(e.ohne_messung)} ohne Messung", f"{zahl(e.ausserhalb_alter)} mit anderem Messalter"]
+    nicht_dabei = [f"{zahl(e.ohne_messung)} ohne Messung", f"{zahl(e.ausserhalb_alter)} ohne Messung in diesem Bereich"]
+    if e.zaehler_unbekannt:
+        nicht_dabei.append(f"{zahl(e.zaehler_unbekannt)} mit unbekanntem Zähler „{name}“")
     if not a.mit_backfill:
         nicht_dabei.append(f"{zahl(e.backfill_ausgeschlossen)} Backfill-Posts")
     st.caption(
-        f"Verglichen werden Posts, deren letzte Messung {bereich} nach dem Post lag: {zahl(e.im_messalter)} Posts"
-        f"{dazu}. Nicht dabei: {', '.join(nicht_dabei)}."
+        f"Verglichen werden Posts mit einer Messung {bereich} nach dem Post (je Post die späteste Messung im "
+        f"Bereich): {zahl(e.im_messalter)} Posts{dazu}. Nicht dabei: {', '.join(nicht_dabei)}."
     )
     st.caption(
         f"Reihe „Original“ (nur Retruths): Zähler des retruthed Posts, nur wenn auch das Original beim Messen "
@@ -778,11 +824,14 @@ def _reiter_engagement(df: pd.DataFrame, daten: auswertung.Daten, a: Auswahl, st
         st.warning(f"{zahl(e.backfill_einbezogen)} Backfill-Posts sind einbezogen. Ihr Wert ist ein Endstand nach "
                    f"mehreren Tagen und mit Messungen nach {bereich} nicht vergleichbar.")
     if e.basis.empty:
-        _leer("Keine Posts mit passendem Messalter. Den Messalter-Bereich in der Seitenleiste anpassen.")
+        _leer("Keine Posts mit passendem Messalter und bekanntem Zähler. Den Messalter-Bereich in der "
+              "Seitenleiste anpassen.")
         return
-    eigene = e.basis.loc[~e.basis["typ_detail"].isin(auswertung.RETRUTH_TYPEN), "wert"]
+    eigene = e.basis.loc[~e.basis["ist_retruth"], "wert"].dropna()
     k = st.columns(3)
-    k[0].metric("Posts im Vergleich", zahl(len(e.basis)))
+    k[0].metric("Posts im Vergleich", zahl(len(e.basis)),
+                help=f"Posts mit einer Messung im Bereich {bereich} und bekanntem Zähler „{name}“"
+                     + (", dazu die einbezogenen Backfill-Posts." if e.backfill_einbezogen else "."))
     k[1].metric(f"Median {titel}, eigene Posts", zahl(eigene.median() if len(eigene) else None, 1))
     original = e.basis["orig_wert"].dropna()
     k[2].metric(f"Median {titel}, Originale der Retruths", zahl(original.median() if len(original) else None, 1))
@@ -794,26 +843,21 @@ def _reiter_engagement(df: pd.DataFrame, daten: auswertung.Daten, a: Auswahl, st
     _tabelle(_engagement_tabelle(e.nach_typ, TYP_DETAIL_BESCHRIFTUNG, "Typ"))
 
     st.subheader(f"{titel} nach Format (Median)")
+    st.caption("„Eigene Posts“ sind die Zähler der eigenen Posts (inkl. Quotes und Replies). Retruths nur über die "
+               "Reihe „Original“ (Zähler des retruthed Posts): Die Zähler eines Retruths selbst sind fast immer 0 "
+               "und stehen nur unter „nach Post-Typ“.")
     _zeige(_gruppiert(e.nach_format, FORMAT_BESCHRIFTUNG, stil, wert_titel=titel, horizontal=True), "eng_format")
     _tabelle(_engagement_tabelle(e.nach_format, FORMAT_BESCHRIFTUNG, "Format"))
 
     st.subheader(f"{titel} nach Uhrzeit des Posts (Median, {a.zone_name})")
+    st.caption("Wie nach Format: „Eigene Posts“ ohne Retruths, Retruths nur über die Reihe „Original“.")
     stunden = {h: str(h) for h in range(24)}
     _zeige(_stundenachse(_gruppiert(e.nach_stunde, stunden, stil, wert_titel=titel, horizontal=False,
                                     alle_gruppen=range(24)), schritt=1), "eng_stunde")
     _tabelle(_engagement_tabelle(e.nach_stunde, stunden, "Stunde"))
 
-    st.subheader(f"Wachstum: {titel} nach Alter des Posts")
-    st.caption("Alle Messungen der ausgewählten Posts, unabhängig vom Messalter-Filter: Median je voller Stunde "
-               "nach dem Post. Posts mit mehreren Messungen ergeben so eine typische Wachstumskurve.")
-    w = auswertung.wachstum(daten.snapshots, df, kennzahl, mit_backfill=a.mit_backfill, pro_stunde=pro_stunde)
-    if w["messungen"].sum() == 0:
-        _leer("Keine Messungen unter 24 h in der Auswahl.")
-    else:
-        _zeige(_linie(w["alter_stunde"], w["median"], stil, name=f"Median {titel}", y_titel=titel, format_=",.1f",
-                      x_datum=False, x_titel="Alter des Posts beim Messen (Stunden)"), "eng_wachstum")
-        _tabelle(w.rename(columns={"alter_stunde": "Alter (volle Stunden)", "messungen": "Messungen",
-                                   "posts": "Posts", "median": "Median"}))
+    st.subheader(f"Wachstum: {name} nach Alter des Posts")
+    _wachstum(auswertung.wachstum(daten.snapshots, df, kennzahl), name, pro_stunde, stil)
     _tabelle(pd.DataFrame({
         "Post-ID": e.basis["id"], "Link": e.basis["url"],
         "Erstellt": [f"{t:%d.%m.%Y %H:%M}" for t in e.basis["lokal"]],

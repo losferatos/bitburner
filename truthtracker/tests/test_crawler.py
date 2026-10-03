@@ -2,7 +2,8 @@
 
 Abgedeckt: Backfill beim ersten Lauf, Idempotenz, 24h-Snapshots und Einfrieren, Nachholen von
 Lücken (auch nach abgebrochenem Lauf), Löschungen ohne falsche Treffer, gepinnte Posts,
-Werbung, Replies-Modus, Edits, erneuter Medienversuch, keine Inhalte in der DB.
+Werbung, Replies-Modus, Edits, erneuter Medienversuch, keine Inhalte in der DB, Laufsperre,
+Aufräumen vor dem Lauf, Abbruch nach Cloudflare auf dem Medienweg, leere Seiten, falsche PC-Uhr.
 """
 
 from __future__ import annotations
@@ -16,7 +17,7 @@ import pytest
 from conftest import browser_argumente_fuer_tests, chromium_pfad, finde_marker
 from fabrik import JETZT, MARKER, karte, konto, medium, retruth, status
 from fake_truthsocial import FakeTruthSocial, Zustand
-from truthtracker import crawler, db, zeit
+from truthtracker import cloudflare, crawler, db, laufsperre, zeit
 from truthtracker.konfig import Konfig, PausenKonfig
 
 FREMD = konto("108000000000000001", "jemand", "Jemand Anders", verifiziert=False, follower=1234)
@@ -452,7 +453,7 @@ def test_wieder_aufgetauchter_post_ist_nicht_mehr_geloescht(tmp_path):
 
 def test_replies_an_andere_sind_keine_loeschkandidaten_wenn_ausgeschlossen(tmp_path):
     z = Zustand()
-    posts = _basis_mit_posts(z)
+    _basis_mit_posts(z)
     fremd_post = status(JETZT - timedelta(days=3), autor=FREMD)
     z.posts[fremd_post["id"]] = fremd_post
     antwort = status(JETZT - timedelta(hours=30), antwort_auf_status=fremd_post)
@@ -725,3 +726,294 @@ def test_konfig_fehlerhaftes_lookup_ohne_gespeicherte_id_ist_fehler(tmp_path):
     assert any("ließ sich nicht abrufen" in m for m in ergebnis.meldungen)
     lauf = _con(k).execute("SELECT status, meldungen FROM laeufe").fetchone()
     assert lauf["status"] == "fehler" and json.loads(lauf["meldungen"])
+
+
+# ---------------------------------------------------------------------------
+# Vor dem Lauf: Laufsperre und Aufräumen
+
+
+def test_profil_wird_bei_jedem_laufstart_aufgeraeumt_auch_ohne_browser(tmp_path, eigene_laufzeit):
+    # Reste eines abgestürzten Browser-Laufs; dieser Lauf kommt ohne Browser aus.
+    profil = eigene_laufzeit / "laufzeit" / "browser-profil"
+    for rel in ("Default/History", "Default/Sessions/Session_1", "Default/Current Session",
+                "Default/Local Storage/leveldb/000003.log", "Default/Network/Cookies", "Local State"):
+        datei = profil / rel
+        datei.parent.mkdir(parents=True, exist_ok=True)
+        datei.write_bytes(b"\x00")
+    z = Zustand()
+    z.setze_posts(_zeitreihe(5, timedelta(hours=3)))
+    with FakeTruthSocial(z) as fake:
+        ergebnis = _lauf(_konfig(fake.url, tmp_path), Uhr(JETZT))
+    assert ergebnis.status == "ok", ergebnis.meldungen
+    uebrig = {p.relative_to(profil).as_posix() for p in profil.rglob("*") if p.is_file()}
+    assert uebrig == {"Default/Network/Cookies", "Local State"}
+
+
+def test_zweiter_gleichzeitiger_lauf_fragt_nichts_an(tmp_path, eigene_laufzeit):
+    temp_ordner = eigene_laufzeit / "laufzeit" / "tmp"
+    temp_ordner.mkdir(parents=True, exist_ok=True)
+    (temp_ordner / "arbeit-des-anderen-laufs").write_bytes(b"\x00")
+    z = Zustand()
+    z.setze_posts(_zeitreihe(5, timedelta(hours=3)))
+    sperre = laufsperre.Laufsperre()
+    assert sperre.nehmen()
+    try:
+        with FakeTruthSocial(z) as fake:
+            k = _konfig(fake.url, tmp_path)
+            ergebnis = _lauf(k, Uhr(JETZT))
+    finally:
+        sperre.freigeben()
+    assert ergebnis.status == "bereits_aktiv" and ergebnis.lauf_id is None
+    assert z.anfragen == []
+    assert (temp_ordner / "arbeit-des-anderen-laufs").exists()
+    assert not k.datenbank_pfad.exists()
+    assert "Kein Lauf gestartet" in crawler.zusammenfassung(ergebnis)
+    # Ist die Sperre frei, läuft der nächste Start normal.
+    with FakeTruthSocial(z) as fake:
+        assert _lauf(_konfig(fake.url, tmp_path), Uhr(JETZT)).status == "ok"
+
+
+def test_zwischenstand_bleibt_nach_absturz_erhalten(tmp_path, monkeypatch):
+    z = Zustand()
+    z.setze_posts(_zeitreihe(100, timedelta(hours=3)))
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        # Absturz simulieren: Das Ende des Laufs wird nie geschrieben.
+        with monkeypatch.context() as m:
+            m.setattr(crawler.db, "lauf_beenden", lambda *a, **kw: None)
+            _lauf(k, Uhr(JETZT))
+        con = _con(k)
+        zeile = con.execute("SELECT * FROM laeufe WHERE id = 1").fetchone()
+        con.close()
+        assert zeile["status"] == "laeuft" and zeile["seiten"] == 3 and zeile["neue_posts"] == 100
+        assert zeile["ende_utc"] == zeit.utc_text(JETZT)
+        zweiter = _lauf(k, Uhr(JETZT + timedelta(hours=5)))
+    assert any("abgestürzt" in m for m in zweiter.meldungen)
+    zeile = _con(k).execute("SELECT * FROM laeufe WHERE id = 1").fetchone()
+    # Ende = letzter Zwischenstand, nicht der Start des nächsten Laufs; Zähler bleiben.
+    assert zeile["status"] == "abgestuerzt" and zeile["ende_utc"] == zeit.utc_text(JETZT)
+    assert zeile["neue_posts"] == 100 and zeile["anfragen_api"] >= 4
+
+
+# ---------------------------------------------------------------------------
+# Medienweg: Cloudflare beendet den Lauf (SPEC Zugriff 3)
+
+
+def _posts_mit_medien(dateien: dict[int, str], anzahl: int = 60) -> list[dict]:
+    return [
+        status(JETZT - timedelta(hours=3 * i), medien=[medium("image", datei=dateien[i])] if i in dateien else None)
+        for i in range(anzahl)
+    ]
+
+
+@pytest.mark.parametrize(
+    ("antwort", "grund", "zaehler_feld"),
+    [
+        ("challenge", cloudflare.CHALLENGE, "cloudflare_challenges"),
+        ((429, "text/plain", b"Too Many Requests"), cloudflare.RATELIMIT, None),
+        ((403, "text/plain; charset=UTF-8", b"error code: 1010"), cloudflare.BLOCKIERT, "cloudflare_blocks"),
+    ],
+)
+def test_cloudflare_beim_medienabruf_beendet_den_lauf_nach_der_seite(tmp_path, antwort, grund, zaehler_feld):
+    z = Zustand()
+    posts = _posts_mit_medien({5: "a.png", 7: "b.png"})
+    z.setze_posts(posts)
+    if antwort == "challenge":
+        z.challenge_pfade = [r"^/media/"]
+    else:
+        z.antwort_pfade = {r"^/media/": antwort}
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        ergebnis = _lauf(k, Uhr(JETZT))
+    assert ergebnis.status == "abgebrochen" and ergebnis.abbruch_grund == grund
+    assert any(m.startswith("Abbruch beim Medienabruf") for m in ergebnis.meldungen), ergebnis.meldungen
+    # Nach der ersten Medienanfrage geht nichts mehr raus: kein zweites Bild, keine weitere Seite.
+    medien = [i for i, a in enumerate(z.anfragen) if a["pfad"].startswith("/media/")]
+    assert len(medien) == 1 and medien[0] == len(z.anfragen) - 1
+    # Die laufende Seite ist vollständig gespeichert, die Abdeckung reicht genau bis zu ihrem Ende.
+    assert _ids(k) == {p["id"] for p in posts[:40]}
+    con = _con(k)
+    try:
+        bereiche = db.abdeckung_lesen(con)
+        assert len(bereiche) == 1 and bereiche[0].von == int(posts[39]["id"]) and not bereiche[0].anfang_erreicht
+        lauf = con.execute("SELECT status, abbruch_grund FROM laeufe").fetchone()
+        assert (lauf["status"], lauf["abbruch_grund"]) == ("abgebrochen", grund)
+    finally:
+        con.close()
+    if zaehler_feld:
+        assert getattr(ergebnis.zaehler, zaehler_feld) == 1
+
+
+def test_403_ohne_cloudflare_betrifft_nur_das_eine_medium(tmp_path):
+    z = Zustand()
+    posts = _posts_mit_medien({5: "kaputt.png", 7: "gut.png"})
+    z.setze_posts(posts)
+    z.antwort_pfade = {
+        r"/kaputt\.png$": (403, "application/xml",
+                           b'<?xml version="1.0"?><Error><Code>AccessDenied</Code><Message>Access Denied</Message></Error>'),
+    }
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        ergebnis = _lauf(k, Uhr(JETZT))
+    assert ergebnis.status == "ok", ergebnis.meldungen
+    assert ergebnis.zaehler.cloudflare_blocks == 0
+    con = _con(k)
+    try:
+        status_je_post = {
+            r["post_id"]: r["hash_status"] for r in con.execute("SELECT post_id, hash_status FROM medien")
+        }
+    finally:
+        con.close()
+    assert status_je_post[posts[7]["id"]] == "ok"
+    assert status_je_post[posts[5]["id"]] != "ok"
+
+
+def test_medien_nachladen_bricht_bei_serverfehler_ab(tmp_path):
+    z = Zustand()
+    posts = _zeitreihe(240, timedelta(hours=2))  # 20 Tage; Lauf 2 paginiert nur die letzten 7 Tage
+    alt_a = status(JETZT - timedelta(days=12, hours=1), medien=[medium("image", datei="alt-a.png")])
+    alt_b = status(JETZT - timedelta(days=11, hours=1), medien=[medium("image", datei="alt-b.png")])
+    z.setze_posts([*posts, alt_a, alt_b])
+    z.fehler_pfade = {r"^/media/": 503}
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT))
+        z.fehler_pfade = {r"^/api/v1/statuses/\d+$": 503}
+        vorher = len(z.anfragen)
+        ergebnis = _lauf(k, Uhr(JETZT + timedelta(hours=2)))
+        einzel = [a for a in z.anfragen[vorher:] if a["pfad"].startswith("/api/v1/statuses/")]
+    assert len(einzel) == 1
+    assert ergebnis.zaehler.fehler >= 1
+    assert any("Medien-Nachladen abgebrochen" in m for m in ergebnis.meldungen)
+
+
+def test_ohne_eine_einzige_antwort_endet_der_lauf_mit_fehler(tmp_path):
+    z = Zustand()
+    z.setze_posts(_zeitreihe(30, timedelta(hours=3)))
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        assert _lauf(k, Uhr(JETZT)).status == "ok"
+        z.fehler_pfade = {r"^/api/": 503}
+        ergebnis = _lauf(k, Uhr(JETZT + timedelta(hours=3)))
+    assert ergebnis.status == "fehler"
+    assert any("keine Anfrage beantwortet" in m for m in ergebnis.meldungen)
+
+
+# ---------------------------------------------------------------------------
+# Leere Seiten und Uhr des PCs
+
+
+def test_leere_seite_mitten_in_der_timeline_ist_nicht_der_anfang(tmp_path):
+    z = Zustand()
+    posts = _zeitreihe(6 * 7 * 5, timedelta(hours=4))  # fünf Wochen
+    z.setze_posts(posts)
+    z.max_seiten_ohne_login = 1  # nach Seite 1 und einer Folgeseite liefert der Server nur noch []
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        erster = _lauf(k, Uhr(JETZT))
+        assert erster.zaehler.fehler >= 1
+        assert any("Timeline-Seite leer" in m for m in erster.meldungen), erster.meldungen
+        # Nach der leeren Seite kein weiterer Versuch in diesem Lauf
+        assert len(_anfragen(fake, "/statuses")) == 4  # Pinned, Seite 1, Seite 2, leere Seite 3
+        con = _con(k)
+        bereiche = db.abdeckung_lesen(con)
+        con.close()
+        assert len(bereiche) == 1 and not bereiche[0].anfang_erreicht
+        assert bereiche[0].von == int(posts[79]["id"])
+        z.max_seiten_ohne_login = None
+        zweiter = _lauf(k, Uhr(JETZT + timedelta(hours=1)))
+    assert zweiter.status == "ok"
+    grenze = JETZT - timedelta(weeks=4)
+    assert {p["id"] for p in posts if zeit.parse_utc(p["created_at"]) >= grenze} <= _ids(k)
+    con = _con(k)
+    try:
+        bereiche = db.abdeckung_lesen(con)
+        assert len(bereiche) == 1 and bereiche[0].von <= zeit.id_untergrenze(grenze)
+    finally:
+        con.close()
+
+
+def test_leere_seite_erzeugt_keine_loeschkandidaten_im_unerreichten_teil(tmp_path):
+    z = Zustand()
+    _basis_mit_posts(z)  # zwölf Tage, alle 6 Stunden
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT))
+        k.zugriff.seitengroesse = 10  # eine Seite reicht 2,5 Tage zurück
+        tiefe = sum(1 for a in _anfragen(fake, "/statuses") if "max_id" in a["params"])
+        z.max_seiten_ohne_login = tiefe + 1  # Seite 2 noch, Seite 3 leer
+        vorher = len(z.anfragen)
+        ergebnis = _lauf(k, Uhr(JETZT + timedelta(hours=1)))
+        einzel = [a for a in z.anfragen[vorher:] if a["pfad"].startswith("/api/v1/statuses/")]
+    assert einzel == []
+    assert any("Timeline-Seite leer" in m for m in ergebnis.meldungen)
+    con = _con(k)
+    try:
+        assert con.execute("SELECT COUNT(*) FROM posts WHERE vermisst_seit_utc IS NOT NULL").fetchone()[0] == 0
+    finally:
+        con.close()
+
+
+def test_leere_erste_seite_bei_konto_mit_posts_erzeugt_keine_abdeckung(tmp_path):
+    z = Zustand()
+    z.statuses_count = 500
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        ergebnis = _lauf(k, Uhr(JETZT))
+    assert ergebnis.zaehler.fehler >= 1
+    assert any("Timeline-Seite leer" in m for m in ergebnis.meldungen)
+    con = _con(k)
+    try:
+        assert db.abdeckung_lesen(con) == []
+    finally:
+        con.close()
+
+
+def test_uhr_vor_verliert_nach_langer_pause_keine_posts(tmp_path):
+    # Die Uhr des PCs geht 2 Stunden vor. Posts aus genau diesem Fenster dürfen nicht als erfasst gelten.
+    vor = timedelta(hours=2)
+    z = Zustand()
+    z.setze_posts(_zeitreihe(30, timedelta(hours=3)))
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT + vor))
+        x = status(JETZT + timedelta(minutes=30))
+        y = status(JETZT + timedelta(minutes=90))
+        spaeter = [status(JETZT + timedelta(hours=3 + 2 * i)) for i in range(119)]
+        for p in (x, y, *spaeter):
+            z.posts[p["id"]] = p
+        # Mehr als loeschpruefung_tage später; die Seitengrenze fällt genau zwischen y und x.
+        ergebnis = _lauf(k, Uhr(JETZT + timedelta(days=10) + vor))
+    assert ergebnis.status == "ok", ergebnis.meldungen
+    assert {x["id"], y["id"]} <= _ids(k)
+
+
+def test_retruth_ohne_original_bleibt_retruth(tmp_path):
+    z = Zustand()
+    original = status(JETZT - timedelta(days=1), autor=FREMD)
+    rt = retruth(JETZT - timedelta(hours=5), original)
+    z.setze_posts([rt, *_zeitreihe(5, timedelta(hours=7), start=JETZT - timedelta(hours=1))])
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT))
+        vorher = dict(db.post_lesen(_con(k), rt["id"]))
+        z.posts[rt["id"]] = dict(rt, reblog=None)  # Original für Ausgeloggte nicht mehr verfügbar
+        ergebnis = _lauf(k, Uhr(JETZT + timedelta(hours=2)))
+    nachher = dict(db.post_lesen(_con(k), rt["id"]))
+    assert ergebnis.zaehler.edits_erkannt == 0
+    for spalte in ("typ", "original_id", "format", "edit_anzahl", "fingerabdruck"):
+        assert nachher[spalte] == vorher[spalte], spalte
+    assert nachher["zuletzt_gesehen_utc"] == zeit.utc_text(JETZT + timedelta(hours=2))
+
+
+def test_neuester_post_hat_vollstaendiges_duplikat_fenster(tmp_path):
+    # Die Abdeckung endet oben beim neuesten gesehenen Post; sein 14-Tage-Fenster liegt trotzdem
+    # vollständig darin, denn es umfasst nur frühere Posts.
+    z = Zustand()
+    posts = _zeitreihe(8 * 7 * 6, timedelta(hours=4))
+    z.setze_posts(posts)
+    with FakeTruthSocial(z) as fake:
+        k = _konfig(fake.url, tmp_path)
+        _lauf(k, Uhr(JETZT + timedelta(minutes=5)))
+    zeile = db.post_lesen(_con(k), posts[0]["id"])
+    assert zeile["dup_geprueft_utc"] is not None and zeile["dup_abdeckung_vollstaendig"] == 1

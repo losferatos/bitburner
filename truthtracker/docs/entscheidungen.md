@@ -44,7 +44,9 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
 11. **Profil-Aufräumen per Positivliste:** Es bleiben nur `Cookies`, `Local State` (Schlüssel zur
     Cookie-Entschlüsselung unter Windows) und die Einstellungsdateien. Cache, Verlauf,
     Sitzungswiederherstellung (enthält Seitentitel), Local Storage, IndexedDB, Service Worker usw.
-    werden gelöscht – vor und nach jedem Lauf.
+    werden gelöscht: zu Beginn jedes Laufs, unabhängig vom Zugriffsweg (so holt auch ein Lauf ohne
+    Browser die Reste eines abgestürzten Browser-Laufs nach), und nach jedem Browser-Lauf. Läuft der
+    Tracker-Browser noch, bleibt das Profil unangetastet, und das Laufprotokoll sagt es.
 12. **Nach einer Challenge läuft der ganze Lauf im Browser weiter.** `cf_clearance` ist an IP,
     User-Agent und Fingerabdruck gebunden; es in `curl_cffi` zu übertragen ist unsicher.
 13. **`curl_cffi`-Ziel `chrome`** (neueste Chrome-Fassung der installierten Bibliothek). Feste Ziele
@@ -58,12 +60,18 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
     Beobachtungen auch ohne den Parameter 200 zeigten, probiert `replies_anderer = "auto"` das
     höchstens einmal pro Woche und merkt sich das Ergebnis.
 16. **Werbung wird übersprungen** (`sponsored: true` oder fremder Account in Trumps Timeline).
-17. **Medienabruf gesperrt ≠ Lauf abbrechen.** Eine Challenge oder ein 429 beim Laden eines Bildes
-    stoppt alle weiteren Medienabrufe dieses Laufs, aber nicht die API-Abfragen (anderer Host). Die
-    fehlenden Hashes holt ein späterer Lauf nach.
+17. **Cloudflare auf dem Medienweg beendet den Lauf, an der Seitengrenze.** Challenge, 429,
+    Cloudflare-Block oder Regionssperre beim Laden eines Bildes stoppen sofort alle weiteren
+    Medienabrufe. Die laufende Seite wird ohne weitere Anfrage zu Ende gespeichert, dann bricht der
+    Lauf vor der nächsten API-Anfrage ab (SPEC Zugriff 3; Status „abgebrochen“, Meldung „Abbruch beim
+    Medienabruf …“). Der Medien-Host liegt in derselben Cloudflare-Zone; eine Hürde dort betrifft
+    denselben Client. Ein schlichter 403 ohne Cloudflare-Merkmale (Objektspeicher: `AccessDenied`)
+    betrifft nur das eine Medium und zählt nicht als Sperre.
 18. **Ein Netzwerk- oder 5xx-Fehler auf einer Timeline-Seite wird einmal wiederholt**, danach endet
     die Pagination für diesen Lauf (Abdeckung bis zur letzten guten Seite). Challenge, Block, 403
-    und 429 werden nie wiederholt.
+    und 429 werden nie wiederholt. Das Medien-Nachladen endet beim ersten Netzwerk- oder 5xx-Fehler,
+    die Löschprüfung nach zweien in Folge. Hat in einem Lauf keine einzige Anfrage eine Antwort
+    bekommen, endet er mit Status „Fehler“ statt „erfolgreich“.
 
 ## Erfassung
 
@@ -74,8 +82,9 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
     da sie dort außer der Reihe stehen können; auf Folgeseiten stehen sie an ihrer zeitlichen Stelle.
 21. **Zähler `-1` → unbekannt.** Truth Social nutzt `-1` als Platzhalter. Weitere Zähler
     (`upvotes_count`, `downvotes_count`, `quotes_count` …) werden als JSON mitgespeichert.
-22. **Snapshot-Zeitpunkt = Abrufzeit der Seite.** Jede Seite wird sofort gespeichert, inklusive
-    Snapshot. So bleibt bei einem Abbruch alles Gesammelte erhalten.
+22. **Snapshot-Zeitpunkt = Eingang der Antwort** (nach Pause und eventueller Wiederholung). Jede Seite
+    wird sofort gespeichert, inklusive Snapshot und Zwischenstand der Laufzähler. So bleibt bei einem
+    Abbruch alles Gesammelte erhalten.
 23. **Backfill-Posts** sind Posts, die vor dem allerersten Lauf erstellt wurden und beim ersten
     Sehen schon mindestens 24 h alt waren. Posts, die nach dem ersten Lauf entstanden, aber wegen
     einer Lücke erst spät gesehen wurden, sind keine Backfill-Posts; ihr Messalter steht dabei
@@ -193,7 +202,8 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
     23/25-Stunden-Tagen bei Zeitumstellung).
 57. **Engagement:** Median als Balken, Mittelwert im Tooltip. Die Reihe „Original“ (Retruths) zählt nur,
     wenn auch das Original beim Messen im Messalter-Bereich lag; „pro Stunde“ teilt durch dessen
-    Alter. Backfill nur auf Wunsch und dann mit Warnung.
+    Alter. Backfill nur auf Wunsch und dann mit Warnung. Welche Messung je Post zählt und wie
+    Retruths nach Format und Uhrzeit eingehen, regeln Nr. 77 und 78.
 58. **Duplikat-Rate** nur mit vollständigem 14-Tage-Fenster als Nenner; Verteilungen zählen je Post die
     stärkste Art.
 59. **CSV für deutsches Excel:** UTF-8 mit BOM, Semikolon, Dezimalkomma, IDs als Text (`="…"`, sonst
@@ -215,3 +225,84 @@ jeweils mit Begründung. Reihenfolge grob nach Bereich.
 64. **Nur lesend:** ohne `-wal` mit `immutable=1`, damit die Prüfung keine Dateien anlegt.
 65. **Exit-Codes** 0 sauber, 1 Funde, 2 Prüfung nicht möglich. Ungeprüft ist nicht sauber: Nicht
     lesbare Orte sind Funde. Der Bericht nennt nie den Fund selbst, nur Ort, Art, Länge.
+
+## Robustheit (nach dem Review)
+
+66. **Laufsperre** (`laufzeit/crawl.lock`): Ein zweiter Start, ob Crawl oder Spike, fragt nichts an,
+    fasst weder Datenbank noch Temp-Ordner an und meldet „Kein Lauf gestartet“ (Exit-Code 3). Die
+    Sperre hält das Betriebssystem auf der offenen Datei; ein Absturz gibt sie frei.
+67. **Leere Timeline-Seite ≠ Anfang der Timeline.** Truth Social liefert ausgeloggt ab einer gewissen
+    Tiefe mitunter leere Seiten. Als Anfang gilt eine leere Seite nur, wenn unterhalb keine bekannten,
+    nicht gelöschten Posts liegen und die Datenbank bis auf 5 alle Posts kennt, die der Lookup
+    (`statuses_count`) nennt. Sonst: Fehler im Protokoll, die Abdeckung endet an der letzten vollen
+    Seite, in diesem Lauf keine weiteren Lückenversuche; der nächste Lauf versucht es erneut.
+68. **Abdeckung nach gesehenen IDs, nicht nach der PC-Uhr.** Der oberste Bereich endet in der
+    Datenbank bei der größten gesehenen Post-ID; der nächste Lauf paginiert bis zu ihr (Überlappung).
+    Für die Löschprüfung des laufenden Laufs reicht er bis ganz oben, denn Seite 1 zeigt immer die
+    neuesten Posts. Eine vorgehende PC-Uhr kann so keinen ID-Bereich als erfasst markieren, den der
+    Server noch gar nicht hatte. Das 14-Tage-Duplikat-Fenster eines Posts endet beim Post selbst (nur
+    frühere Posts zählen), daher ist es auch für den neuesten Post vollständig.
+69. **Browser: Die Startseite zählt als Anfrage und wird bewertet.** Nach dem Anhängen wird das schon
+    geladene Dokument ohne neue Anfrage geprüft (Status aus der Navigation-Timing-API): 429, Sperre oder
+    403 beenden den Lauf sofort. Der erste `fetch` danach bekommt die normale Pause; beim Wechsel aus
+    `auto` liegt auch vor dem Browserstart eine Pause.
+70. **Sperrseiten im Browser nach HTTP-Status, nicht nach Seitentext.** Ein Dokument mit 2xx ist nie
+    eine Sperre; Textmarker gelten nur bei Fehlerstatus oder einer erkennbaren Cloudflare-Fehlerseite.
+    So lösen Post-Texte wie „you have been blocked“ keinen Abbruch aus. Cloudflares Klartextsperren
+    („error code: 1005“ bis „1012“, „1020“) zählen als Block, „1015“ als Rate-Limit.
+71. **Zweite Prüfung mitten im Lauf:** Playwright trennt sich vom Browser, der Mensch löst die Prüfung,
+    der Lauf wartet wie beim Start über die Tab-Titel und hängt sich danach wieder an. Höchstens einmal
+    pro Lauf; kreist die Prüfung, endet der Lauf.
+72. **Browserfenster geschlossen:** Das Warten endet sofort mit klarer Meldung (Status „Fehler“), statt
+    bis zur Wartezeit zu laufen. Ist Playwright gerade nicht angehängt, verbindet sich der Tracker zum
+    Schließen kurz per CDP, damit der Browser seine Cookies sauber schreibt.
+73. **Beenden des Browsers** gilt erst als gelungen, wenn der DevTools-Port zu, der echte
+    Browserprozess (bei Opera nicht der Launcher, der sofort endet) weg und das Profil frei ist. Unter
+    Windows prüft der Tracker Prozesse über die Prozess-API statt über `tasklist`-Text, dessen Codepage
+    und Sprache vom System abhängen. Das Aufräumen hängt nie davon ab, dass das Beenden gelingt.
+74. **Retruth ohne Original** (`reblog: null`, weil das Original gelöscht oder ausgeloggt verborgen
+    ist) bleibt ein Retruth mit bisherigem Stand: kein Umklassifizieren zum eigenen Post, kein
+    Phantom-Edit.
+75. **Abgestürzte Läufe** behalten die Zähler und als Ende den letzten Zwischenstand (nach jeder Seite
+    gespeichert), nicht den Start des nächsten Laufs.
+76. **Windows-Pfade in `config.toml`** in einfachen Anführungszeichen (TOML-Literalstring). Bei einem
+    Escape-Fehler nennt die Fehlermeldung genau das.
+
+## Dashboard (nach dem Review)
+
+77. **Engagement je Post aus der spätesten Messung im Messalter-Bereich**, nicht aus dem letzten
+    Snapshot überhaupt. Bei mehreren Läufen am Tag hat ein Post mehrere Messungen unter 24 h; „0–6 h“
+    vergleicht dann die frühe Messung. Zähler, Original-Zähler, Messalter und Alter des Originals
+    stammen aus derselben Messung. Reicht der Bereich bis 24 h oder darüber, ist das immer der letzte
+    Snapshot (ab 24 h wird nicht mehr gemessen). Backfill-Posts (nur auf Wunsch) gehen mit ihrem
+    einzigen Snapshot ein.
+78. **Nach Format und Uhrzeit Retruths nur über die Reihe „Original“.** Die Zähler eines Retruths
+    selbst sind fast immer 0; gemischt mit eigenen Posts drückten sie den Median einer Format- oder
+    Stundengruppe gegen 0. Die erste Reihe heißt dort „Eigene Posts“ (inkl. Quotes und Replies); die
+    Zähler der Retruths selbst stehen nur in der Auswertung nach Post-Typ („Post selbst“).
+79. **Wachstumskurve nur aus Posts mit mindestens zwei Messungen unter 24 h, je Post normiert.** Mit
+    einem Lauf am Tag hat jeder Post eine Messung; ein Median verschiedener Posts je Alter zeigte nur
+    die Tageszeit der Posts. Jeder Post wird auf seine letzte Messung unter 24 h bezogen (= 100 %), je
+    voller Stunde zählt der Median dieser Anteile (zwei Messungen eines Posts in derselben Stunde: die
+    spätere). Nur eigene Posts ohne Backfill; Posts mit letztem Wert 0 haben keinen Bezugswert. Ohne
+    Posts mit mehreren Messungen zeigt das Dashboard einen Hinweis statt einer Kurve; „pro Stunde seit
+    Post“ gilt für die Kurve nicht.
+80. **Unbekannte Zähler zählen nicht als verglichen.** Posts, bei denen weder der eigene noch der
+    Original-Zähler der gewählten Kennzahl bekannt ist (Platzhalter `-1`, Feld fehlt), fehlen in
+    Kacheln, Grafiken und Tabelle und stehen unter „Nicht dabei“.
+81. **Medien-Metadaten in Tabelle und CSV:** „Abmessungen“ = Breite×Höhe aller Medien mit bekannten
+    Abmessungen in Post-Reihenfolge, mit „, “ getrennt (ein „;“ müsste im Semikolon-CSV maskiert
+    werden); „Videodauer (s)“ = Summe der Videos (ohne GIFs), leer, wenn einem Video die Dauer fehlt,
+    damit keine Teilsumme wie die ganze Länge aussieht. Keine Medien-URLs.
+
+## Prüfskript (nach dem Review)
+
+82. **Einstellungsdateien des Browserprofils** (`Preferences`, `Local State` …) werden als JSON gelesen;
+    jeder Wert und jeder Schlüssel wird auf HTML und Freitext geprüft, in Strings eingebettetes JSON
+    wird ausgepackt. Von der Freitext-Regel ausgenommen sind Werte ohne Leerraum (Base64, Hashes,
+    Pfade) und die Manifeste eingebauter Erweiterungen, sonst meldete schon ein frisches Profil Funde.
+    Gemeldet werden Datei und Schlüsselpfad, nie der Wert.
+83. **`--abfragen` liest bis Strg+Z (Windows) bzw. Strg+D**, nicht bis zur ersten Leerzeile: Ein
+    eingefügter Post mit Absätzen landete sonst zum Teil in der Eingabeaufforderung. Jede Zeile ist eine
+    Stichprobe, Leerzeilen und Zeilen unter 4 Zeichen werden übersprungen; danach wird der
+    Konsolen-Eingabepuffer geleert.

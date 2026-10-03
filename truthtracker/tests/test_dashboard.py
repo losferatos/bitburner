@@ -133,9 +133,13 @@ def test_beispiel_datenbank_alle_reiter_rendern(app, tmp_path):
     texte = _texte(at)
     for erwartet in ("Posts pro Tag nach Typ", "Wochentag × Stunde", "Längste Pause pro Tag",
                      "Formatmix im Zeitverlauf", "nach Post-Typ (Median)", "Meistgeteilte Accounts",
-                     "Zeit bis zur Löschung", "API-Anfragen pro Lauf", "Blasse Säulen"):
+                     "Zeit bis zur Löschung", "API-Anfragen pro Lauf", "Blasse Säulen",
+                     "Retruths nur über die Reihe „Original“"):
         assert erwartet in texte, erwartet
     assert "Backfill-Posts" in texte  # Engagement nennt ausgeschlossene Backfill-Posts
+    # Wachstum nur aus Thread und Medien-Post (je zwei Messungen unter 24 h), ohne Retruths.
+    assert ("Grundlage: 2 Posts; nicht dabei: 6 mit weniger als zwei Messungen, 3 Retruths." in texte)
+    assert "Wachstum: Likes nach Alter des Posts" in texte
     assert MARKER not in texte
     assert len(at.get("plotly_chart")) >= 15
     assert len(at.get("download_button")) == 1
@@ -190,7 +194,8 @@ def test_backfill_warnung_nennt_eingestellten_messalter_bereich(app, tmp_path):
     assert "nach 10,0–30,0 h nicht vergleichbar" in warnung and "18–24" not in warnung
     texte = _texte(at)
     # Posts im Messalter-Bereich und Backfill-Posts werden getrennt gezählt.
-    assert "Messung 10,0–30,0 h nach dem Post lag: 7 Posts, dazu 10 Backfill-Posts" in texte
+    assert ("Posts mit einer Messung 10,0–30,0 h nach dem Post (je Post die späteste Messung im Bereich): "
+            "7 Posts, dazu 10 Backfill-Posts") in texte
     assert "Reihe „Original“" in texte
 
 
@@ -234,6 +239,32 @@ def _kleine_db(pfad: Path, *, follower: tuple[int, int] = (11_000_000, 11_000_00
     finally:
         con.close()
     return pfad
+
+
+def test_engagement_unbekannter_zaehler_und_hinweis_ohne_wachstumskurve(app, tmp_path):
+    # Drei Posts, je eine Messung nach 20 h (ein Lauf am Tag); bei einem ist der Like-Zähler unbekannt.
+    pfad = tmp_path / "unbekannt.sqlite"
+    con = db.oeffne(pfad)
+    try:
+        lauf_id = db.lauf_starten(con, _t("2026-09-02T12:00:00Z"), backfill=False)
+        for i, zeitpunkt in enumerate(("2026-09-01T10:00:00Z", "2026-09-01T12:00:00Z", "2026-09-01T14:00:00Z")):
+            p = post(zeitpunkt, folge=i, likes=100 + i)
+            if i == 1:
+                p.zaehler.likes = None  # API-Platzhalter -1
+            speichere(con, p, lauf_id, 20)
+        db.lauf_beenden(con, lauf_id, ende=_t("2026-09-02T12:05:00Z"), status="ok", zugriff="curl",
+                        abbruch_grund=None, zaehler=LaufZaehler(), meldungen=[], abgedeckt_von=None, abgedeckt_bis=None)
+    finally:
+        con.close()
+    at = app(pfad)
+    _ohne_fehler(at)
+    assert _metriken(at)["Posts im Vergleich"] == "2"
+    texte = _texte(at)
+    assert ("Posts mit einer Messung 18,0–24,0 h nach dem Post (je Post die späteste Messung im Bereich): 2 Posts. "
+            "Nicht dabei: 0 ohne Messung, 0 ohne Messung in diesem Bereich, 1 mit unbekanntem Zähler „Likes“, "
+            "0 Backfill-Posts.") in texte
+    assert "Für Wachstumskurven sind mehrere Läufe innerhalb von 24 h nach einem Post nötig" in texte
+    assert "Grundlage:" not in texte
 
 
 def test_konto_rueckgang_zeigt_pfeil_nach_unten(app, tmp_path):

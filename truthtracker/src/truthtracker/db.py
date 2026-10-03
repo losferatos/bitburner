@@ -17,6 +17,7 @@ from collections.abc import Iterable, Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -228,10 +229,15 @@ WHERE s.id = (
 """
 
 
+def nur_lesen_uri(pfad: Path | str, zusatz: str = "mode=ro") -> str:
+    """SQLite-URI für einen Pfad, korrekt kodiert: '#', '%' oder '?' im Ordnernamen bleiben Teil des Pfads."""
+    return "file:" + urllib.request.pathname2url(str(Path(pfad).resolve())) + "?" + zusatz
+
+
 def oeffne(pfad: Path | str, *, nur_lesen: bool = False) -> sqlite3.Connection:
     pfad = Path(pfad)
     if nur_lesen:
-        con = sqlite3.connect(f"file:{pfad.as_posix()}?mode=ro", uri=True, timeout=30)
+        con = sqlite3.connect(nur_lesen_uri(pfad), uri=True, timeout=30)
     else:
         pfad.parent.mkdir(parents=True, exist_ok=True)
         con = sqlite3.connect(pfad, timeout=30)
@@ -302,13 +308,14 @@ class LaufZaehler:
     cloudflare_blocks: int = 0
 
 
-def markiere_abgestuerzte_laeufe(con: sqlite3.Connection, jetzt: datetime) -> int:
-    """Läufe, die noch auf 'laeuft' stehen, sind beim letzten Mal abgestürzt."""
+def markiere_abgestuerzte_laeufe(con: sqlite3.Connection) -> int:
+    """Läufe, die noch auf 'laeuft' stehen, sind beim letzten Mal abgestürzt.
+
+    Ihr Ende bleibt der letzte Zwischenstand (``lauf_zwischenstand``) bzw. leer, nicht der Start des
+    nächsten Laufs; die Zähler stehen ebenfalls auf dem letzten Zwischenstand.
+    """
     with con:
-        cur = con.execute(
-            "UPDATE laeufe SET status = 'abgestuerzt', ende_utc = COALESCE(ende_utc, ?) WHERE status = 'laeuft'",
-            (zeit.utc_text(jetzt),),
-        )
+        cur = con.execute("UPDATE laeufe SET status = 'abgestuerzt' WHERE status = 'laeuft'")
     return cur.rowcount
 
 
@@ -349,6 +356,23 @@ def lauf_beenden(
                 zaehler.fehler, zaehler.cloudflare_challenges, zaehler.cloudflare_blocks,
                 json.dumps(meldungen, ensure_ascii=False),
                 zeit.utc_text(abgedeckt_von), zeit.utc_text(abgedeckt_bis), lauf_id,
+            ),
+        )
+
+
+def lauf_zwischenstand(con: sqlite3.Connection, lauf_id: int, *, zaehler: LaufZaehler, jetzt: datetime) -> None:
+    """Zähler eines laufenden Laufs zwischenspeichern, damit ein Absturz sie nicht verliert."""
+    with con:
+        con.execute(
+            """UPDATE laeufe SET ende_utc = ?, anfragen_api = ?, anfragen_medien = ?, seiten = ?, neue_posts = ?,
+                   aktualisierte_posts = ?, snapshots = ?, geloescht_erkannt = ?, edits_erkannt = ?, fehler = ?,
+                   cloudflare_challenges = ?, cloudflare_blocks = ?
+               WHERE id = ? AND status = 'laeuft'""",
+            (
+                zeit.utc_text(jetzt), zaehler.anfragen_api, zaehler.anfragen_medien, zaehler.seiten,
+                zaehler.neue_posts, zaehler.aktualisierte_posts, zaehler.snapshots, zaehler.geloescht_erkannt,
+                zaehler.edits_erkannt, zaehler.fehler, zaehler.cloudflare_challenges, zaehler.cloudflare_blocks,
+                lauf_id,
             ),
         )
 
@@ -458,6 +482,16 @@ def post_lesen(con: sqlite3.Connection, post_id: str) -> sqlite3.Row | None:
     return con.execute("SELECT * FROM posts WHERE id = ?", (post_id,)).fetchone()
 
 
+def anzahl_posts(con: sqlite3.Connection) -> int:
+    """Alle je gespeicherten Posts des Kontos, auch gelöschte (Werbung wird nie gespeichert)."""
+    return int(con.execute("SELECT COUNT(*) FROM posts").fetchone()[0])
+
+
+def posts_unterhalb(con: sqlite3.Connection, max_id: int) -> bool:
+    """Gibt es nicht gelöschte Posts mit kleinerer ID?"""
+    return con.execute("SELECT 1 FROM posts WHERE id_num < ? AND geloescht = 0 LIMIT 1", (max_id,)).fetchone() is not None
+
+
 def _edit_art(alt: sqlite3.Row, neu: dict[str, Any], post: PostDaten) -> str | None:
     """Wurde der Post seit der letzten Beobachtung bearbeitet? Nur eigene Posts (keine Retruths).
 
@@ -518,6 +552,15 @@ def post_speichern(
             _medien_und_quellen_speichern(con, post, gesehen_text)
             return Speicherergebnis(neu=True, geaendert=True, edit_erkannt=False, war_geloescht=False)
 
+        if alt["typ"] != TYP_EIGEN and alt["original_id"] is not None and not post.ist_retruth:
+            # Ein bekannter Retruth kommt ohne Original (reblog: null), etwa weil das Original gelöscht oder
+            # für Ausgeloggte verborgen ist. Das macht ihn nicht zum eigenen Post: bisherigen Stand behalten.
+            con.execute(
+                """UPDATE posts SET zuletzt_gesehen_utc = ?, letzter_lauf_id = ?, geloescht = 0,
+                        vermisst_seit_utc = NULL, loeschung_bestaetigt_utc = NULL WHERE id = ?""",
+                (gesehen_text, lauf_id, post.id),
+            )
+            return Speicherergebnis(neu=False, geaendert=False, edit_erkannt=False, war_geloescht=bool(alt["geloescht"]))
         edit = _edit_art(alt, neu, post)
         # Vorhandene Hashes nicht durch "unbekannt" überschreiben, wenn diesmal Medien-Downloads ausfielen.
         if not post.medien_vollstaendig and alt["medien_vollstaendig"] and (

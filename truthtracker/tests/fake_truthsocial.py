@@ -2,8 +2,13 @@
 
 Bildet nach, was Crawler und Spike brauchen: Konto-Lookup, Timeline mit ``max_id``-
 Pagination und Link-Header, Einzelabruf mit 404-JSON für gelöschte Posts, gepinnte Posts,
-Mediendateien, eine Profilseite mit kleiner "Web-App" und Störungen auf Bestellung
-(Cloudflare-Challenge ohne Cookie, 429 ab der n-ten Anfrage, 503, Verbindungsabbruch).
+Mediendateien, eine Profilseite mit kleiner "Web-App" (rendert Post-Text, Bilder und Videos
+wie die echte Seite) und Störungen auf Bestellung (Cloudflare-Challenge ohne gültiges Cookie,
+429 ab der n-ten Anfrage, 503, Verbindungsabbruch).
+
+Freigabe-Cookies haben eine Generation: ``Zustand.neue_freigabe_noetig()`` macht alle bisher
+ausgegebenen ``cf_clearance``-Cookies ungültig, so lässt sich eine zweite Challenge mitten im
+Lauf erzwingen.
 """
 
 from __future__ import annotations
@@ -22,7 +27,7 @@ CHALLENGE_HTML = """<!DOCTYPE html><html><head><title>Just a moment...</title></
 <body><div id="challenge-stage">Checking your browser</div>
 <script>
 setTimeout(function () {
-  document.cookie = "cf_clearance=test-freigabe; path=/";
+  document.cookie = "cf_clearance=freigabe-%(generation)d; path=/";
   location.reload();
 }, %(verzoegerung)d);
 </script></body></html>"""
@@ -40,6 +45,24 @@ WEBAPP_HTML = """<!DOCTYPE html><html><head><title>Truth Social</title></head>
     const t = document.createElement('time');
     t.setAttribute('title', post.created_at);
     app.appendChild(t);
+    const inhalt = document.createElement('div');
+    inhalt.innerHTML = post.content || '';
+    app.appendChild(inhalt);
+    for (const m of (post.media_attachments || [])) {
+      if (m.type === 'video' || m.type === 'gifv') {
+        const v = document.createElement('video');
+        v.preload = 'auto';
+        v.autoplay = true;
+        v.muted = true;
+        v.poster = m.preview_url || '';
+        v.src = m.url || '';
+        app.appendChild(v);
+      } else {
+        const i = document.createElement('img');
+        i.src = m.url || m.preview_url || '';
+        app.appendChild(i);
+      }
+    }
   }
 })();
 </script></body></html>"""
@@ -57,6 +80,8 @@ class Zustand:
     challenge_verzoegerung_ms: int = 800
     ratelimit_ab: int | None = None  # die n-te API-Anfrage (ab 1 gezählt) und alle weiteren bekommen 429
     fehler_pfade: dict[str, int] = field(default_factory=dict)  # Regex -> Statuscode
+    # Regex -> (Statuscode, Content-Type, Körper): feste Antworten, z. B. Cloudflare-Klartextsperren
+    antwort_pfade: dict[str, tuple[int, str, bytes]] = field(default_factory=dict)
     abbruch_pfade: list[str] = field(default_factory=list)  # Regex -> Verbindung kappen
     challenge_pfade: list[str] = field(default_factory=list)  # Regex -> Cloudflare-Challenge, auch mit Cookie
     geoblock: bool = False
@@ -65,6 +90,9 @@ class Zustand:
     # Einzelabruf nur für Posts, die kein Reply sind.
     login_regeln: bool = True
     werbung: list[dict[str, Any]] = field(default_factory=list)  # wird auf Seite 1 eingestreut
+    # None: statuses_count im Lookup = Zahl der sichtbaren Posts des Kontos (wie beim echten Server).
+    statuses_count: int | None = None
+    freigabe_generation: int = 1
     anfragen: list[dict[str, Any]] = field(default_factory=list)
 
     def setze_posts(self, posts: list[dict[str, Any]]) -> None:
@@ -72,6 +100,20 @@ class Zustand:
 
     def api_anfragen(self) -> list[dict[str, Any]]:
         return [a for a in self.anfragen if a["pfad"].startswith("/api/")]
+
+    def medien_anfragen(self) -> list[dict[str, Any]]:
+        return [a for a in self.anfragen if a["pfad"].startswith("/media/")]
+
+    def neue_freigabe_noetig(self) -> None:
+        """Alle ausgegebenen Freigabe-Cookies verfallen; die nächste Anfrage bekommt eine Challenge."""
+        self.challenge_ohne_cookie = True
+        self.freigabe_generation += 1
+
+    def zaehle_posts(self, konto_id: str) -> int:
+        return sum(
+            1 for p in self.posts.values()
+            if p["id"] not in self.geloescht and p["account"]["id"] == konto_id and not p.get("sponsored")
+        )
 
 
 class _Handler(BaseHTTPRequestHandler):
@@ -104,7 +146,9 @@ class _Handler(BaseHTTPRequestHandler):
         pfad = teile.path
         params = {k: v[-1] for k, v in parse_qs(teile.query).items()}
         cookie = self.headers.get("Cookie", "")
-        z.anfragen.append({"pfad": pfad, "params": params, "cookie": "cf_clearance" in cookie})
+        freigegeben = f"cf_clearance=freigabe-{z.freigabe_generation}" in cookie
+        z.anfragen.append({"pfad": pfad, "params": params, "cookie": "cf_clearance" in cookie,
+                           "freigegeben": freigegeben})
 
         for muster in z.abbruch_pfade:
             if re.search(muster, pfad):
@@ -120,15 +164,21 @@ class _Handler(BaseHTTPRequestHandler):
             return
 
         if any(re.search(muster, pfad) for muster in z.challenge_pfade) or (
-            z.challenge_ohne_cookie and "cf_clearance" not in cookie
+            z.challenge_ohne_cookie and not freigegeben
         ):
-            koerper = (CHALLENGE_HTML % {"verzoegerung": z.challenge_verzoegerung_ms}).encode()
+            koerper = (CHALLENGE_HTML % {"verzoegerung": z.challenge_verzoegerung_ms,
+                                         "generation": z.freigabe_generation}).encode()
             self._senden(403, koerper, "text/html; charset=UTF-8", {"cf-mitigated": "challenge"})
             return
 
         if pfad.startswith("/api/") and z.ratelimit_ab is not None and len(z.api_anfragen()) >= z.ratelimit_ab:
             self._json(429, {"error": "Too many requests"}, {"Retry-After": "300"})
             return
+
+        for muster, (code, typ, koerper) in z.antwort_pfade.items():
+            if re.search(muster, pfad):
+                self._senden(code, koerper, typ)
+                return
 
         for muster, code in z.fehler_pfade.items():
             if re.search(muster, pfad):
@@ -144,7 +194,8 @@ class _Handler(BaseHTTPRequestHandler):
             if k is None:
                 self._json(404, {"error": "Record not found"})
             else:
-                self._json(200, k)
+                anzahl = z.statuses_count if z.statuses_count is not None else z.zaehle_posts(k["id"])
+                self._json(200, {**k, "statuses_count": anzahl})
             return
         treffer = re.fullmatch(r"/api/v1/accounts/(\d+)", pfad)
         if treffer:

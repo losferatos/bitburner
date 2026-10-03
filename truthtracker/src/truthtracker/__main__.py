@@ -41,7 +41,7 @@ def _crawl(argv: list[str]) -> int:
     print()
     print(crawler.zusammenfassung(ergebnis))
     print(f"\nLog: {logdatei}")
-    return {"ok": 0, "abgebrochen": 2}.get(ergebnis.status, 1)
+    return {"ok": 0, "abgebrochen": 2, "bereits_aktiv": 3}.get(ergebnis.status, 1)
 
 
 def _dashboard(argv: list[str]) -> int:

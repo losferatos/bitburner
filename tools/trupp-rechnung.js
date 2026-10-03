@@ -82,12 +82,17 @@ export function mannGewinnS(trupp, gJeStunde) {
   return 0.05 * Math.log((trupp + 2) / (trupp + 1)) / gJeStunde * 3600;
 }
 /** Wie viele Maenner braucht die Chance c0 ohne Trupp, um s zu tragen? */
+// Gleich wie blade.js maennerNoetig: ueber 1e6 Mann "unerreichbar" (Infinity),
+// Korrekturschleifen begrenzt - die unbegrenzte Fassung lief oberhalb 2^53
+// ewig, weil n-- / n++ dort den Wert nicht aendern (03.10.2026).
 export function maennerNoetig(c0, s) {
   if (!(c0 > 0) || !(s > 0)) return Infinity;
   if (c0 >= s) return 0;
-  let n = Math.max(1, Math.ceil(Math.pow(s / c0, 20) - 1 - 1e-9));
-  while (n > 1 && c0 * truppBonus(n - 1) >= s) n--;
-  while (c0 * truppBonus(n) < s) n++;
+  const roh = Math.pow(s / c0, 20) - 1;
+  if (!(roh <= 1e6)) return Infinity;
+  let n = Math.max(1, Math.ceil(roh - 1e-9));
+  for (let i = 0; i < 64 && n > 1 && c0 * truppBonus(n - 1) >= s; i++) n--;
+  for (let i = 0; i < 64 && c0 * truppBonus(n) < s; i++) n++;
   return n;
 }
 /** formulas/skill.ts */

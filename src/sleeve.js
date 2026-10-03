@@ -56,6 +56,119 @@
 // zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
 import { liesVonHome } from "lib/hostdatei.js";
 
+// TRUPP FUER DIE BLACK OP - DIE RECHNUNG (03.10.2026).
+//
+// Nachgebaut und geeicht in tools/trupp-rechnung.js; die vier Funktionen hier
+// sind dort gleichlautend und werden von tools/test-trupp-sleeve.js
+// gegeneinander geprueft.
+//
+// Recruitment (data/GeneralActions.ts:22-31): Dauer
+// max(10, round(300 - (cha^0,81 + cha/90))) Sekunden, Chance
+// cha^0,45 / (Trupp + 1) - mit dem Charisma der PERSON, die rekrutiert (der
+// Sleeve ruft completeAction(sleeve), SleeveBladeburnerWork.ts:54).
+// sleeveSize steht im Nenner nicht drin, weil dieser Bot keinen Sleeve auf
+// "Support main sleeve" setzt.
+//
+// Was ein Mann bringt: Der Truppbonus (k+1)^0,05 (Actions/Operation.ts:96-98)
+// hebt die Chance der Black Op; ohne ihn muesste sie den Faktor selbst
+// erwachsen. Gemessen ist das Wachstum der Black-Op-Chance (ln je Stunde,
+// aus den blade.json-Staenden in den Backups): BN2L1 0,42 / 0,26 / 0,20 in
+// den ersten drei Stunden, BN9L3 0,16 und dann 0,115 ueber 14 h (Chance
+// 0,09 -> 0,45, die spaeteste und laengste Strecke). Angesetzt 0,115: Der
+// Mann k -> k+1 laesst die Op um 0,05*ln((k+2)/(k+1))/g Stunden frueher
+// fallen - 1.085 s fuer den ersten, 635 s fuer den zweiten, 450, 349, 285 ...
+//
+// Was er kostet: Dauer/Chance. Ein Sleeve mit Charisma 1 (BN2L1 heute,
+// Schock 93) braucht 299 s fuer den ersten, 598 fuer den zweiten, 897 fuer
+// den dritten - aber sein Charisma waechst dabei (Monte Carlo: 0 -> 3 Mann
+// in 20 min statt 30, Charisma danach 4,7). Er rekrutiert also, solange der
+// NAECHSTE Mann weniger kostet, als er einbringt: bei Charisma 1 bis 2 Mann,
+// bei 5-10 bis 3, bei 52 bis 5. Dagegen steht sein Vertrag: ~12 Rang/h bei
+// den heutigen Werten (Retirement 8, Chance 0,077 gegen 0,326 des Spielers),
+// rund 2 % der Rangrate - zwanzig Minuten Recruitment kosten ~4 Rang und
+// bringen die Black Op ~36 min frueher.
+//
+// Empfindlichkeit: bei g = 0,2/h lohnen nur noch 1-2 Mann, bei 0,3/h einer;
+// bei 0,06/h doppelt so viele. Der Fehler in g verschiebt also, WIE VIELE,
+// nicht OB.
+//
+// KORREKTUR NACH DEM SKEPTIKER (03.10.2026): Die erste Fassung verglich die
+// Rekrutierdauer des SLEEVES mit der Zeit, um die die Black Op frueher
+// faellt - zwei Uhren, die nicht zusammengehoeren. Die Sleeve-Sekunde liegt
+// nicht auf dem kritischen Pfad; sie kostet nur den Vertragsrang, den er in
+// der Zeit gebracht haette (~12 Rang/h gegen ~600 des Spielers, ~2 %; im
+// Gym-Aufbau unter Kampfwert 40 praktisch nichts). Deshalb zaehlt die
+// Rekrutierdauer nur mit SLEEVE_RANGANTEIL = 0,05 (2,5-fache Reserve). Damit
+// lohnt praktisch jeder angefragte Mann (Charisma 1, sechster Mann: 1.794 s
+// * 0,05 = 90 s gegen 241 s), und das unsichere g (gemessen 0,002-0,42/h)
+// entscheidet nur noch am Rand. Simuliert hat der Skeptiker bei g = 0,03
+// und Charisma 1: Feuerzeit 84 min mit der alten Regel, 34 min mit "immer
+// bis noetig".
+export const SLEEVE_RANGANTEIL = 0.05;
+export const BO_CHANCE_WACHSTUM_JE_H = 0.115;
+export function rekrutierZeitS(cha) {
+  return Math.max(10, Math.round(300 - (Math.pow(cha, 0.81) + cha / 90)));
+}
+export function rekrutierChance(cha, trupp) {
+  return Math.min(1, Math.max(0, Math.pow(cha, 0.45) / (trupp + 1)));
+}
+export function naechsterMannS(cha, trupp) {
+  const c = rekrutierChance(cha, trupp);
+  return c > 0 ? rekrutierZeitS(cha) / c : Infinity;
+}
+export function mannGewinnS(trupp, gJeStunde) {
+  return 0.05 * Math.log((trupp + 2) / (trupp + 1)) / gJeStunde * 3600;
+}
+// Laeuft auf diesem Sleeve schon Recruitment? Form wie im Spiel
+// (SleeveBladeburnerWork.APICopy: actionType "General", actionName).
+export function istRekrutierung(t) {
+  return !!t && t.type === "BLADEBURNER" && t.actionType === "General" && t.actionName === "Recruitment";
+}
+/**
+ * Welcher Sleeve rekrutiert - oder keiner (-1). Rein, ohne ns: die Lage kommt
+ * als Daten herein, damit die Wahl im Test ohne Mock pruefbar ist.
+ *   bj      geparste data/blade.json (oder null)
+ *   jetzt   Date.now()
+ *   koerper [{ cha, kampf, rekrutiert }] je Sleeve
+ */
+export function waehleRekrutierer(bj, jetzt, koerper, frischMs = 5 * 60000) {
+  if (!bj || bj.truppAnfrage !== true) return { nr: -1, grund: "keine Anfrage" };
+  // `truppZeit`, nicht `zeit`: blade.js schreibt die Datei auch aus Pfaden,
+  // die die Truppfrage gar nicht neu stellen (Ruhe, Gym, Graft) - `zeit`
+  // waere dann frisch, die Anfrage aber eingefroren (Skeptiker 03.10.).
+  const alter = jetzt - Number(bj.truppZeit);
+  if (!Number.isFinite(alter) || alter < -60000 || alter > frischMs) return { nr: -1, grund: "blade.json veraltet" };
+  const fehlt = Number(bj.truppFehlt);
+  const pool = Number(bj.truppPool);
+  if (!(fehlt > 0) || !Number.isFinite(pool) || pool < 0) return { nr: -1, grund: "Anfrage ohne Zahlen" };
+  if (!koerper.length) return { nr: -1, grund: "kein Sleeve" };
+  // Wer schon rekrutiert, bleibt dran - ein Neusetzen wirft `cyclesWorked`
+  // auf 0 (Sleeve.ts:526-528), bei 299 s Dauer waere das bei jedem Wechsel
+  // bis zu ein ganzer Versuch.
+  let nr = koerper.findIndex((k) => k.rekrutiert);
+  if (nr < 0) {
+    // Hoechstes Charisma zuerst (Chance UND Dauer haengen nur daran); bei
+    // Gleichstand - im BN2L1 haben alle drei Charisma 1 - der mit dem
+    // kleinsten Kampfwert-Tiefstand, denn der traegt am wenigsten zum
+    // Vertrag bei (Vertraege erst ab Kampfwert 40, darunter Gym).
+    nr = 0;
+    for (let j = 1; j < koerper.length; j++) {
+      const a = koerper[j], b = koerper[nr];
+      if (a.cha > b.cha || (a.cha === b.cha && a.kampf < b.kampf)) nr = j;
+    }
+  }
+  const k = koerper[nr];
+  // Kosten in SPIELERZEIT, nicht in Sleeve-Zeit (Skeptiker 03.10.): Der
+  // Spieler arbeitet waehrenddessen weiter, verloren ist nur der Vertragsrang
+  // des Sleeves - gemessen rund 2 % der Rangrate, angesetzt das 2,5-fache.
+  const kosten = naechsterMannS(k.cha, pool) * SLEEVE_RANGANTEIL;
+  const gewinn = mannGewinnS(pool, BO_CHANCE_WACHSTUM_JE_H);
+  if (!(kosten <= gewinn)) {
+    return { nr: -1, grund: "lohnt nicht (naechster Mann " + Math.round(kosten) + " s gegen " + Math.round(gewinn) + " s)" };
+  }
+  return { nr, grund: "Trupp " + pool + " (+" + fehlt + " noetig), naechster Mann " + Math.round(kosten) + " s gegen " + Math.round(gewinn) + " s" };
+}
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -393,6 +506,41 @@ export async function main(ns) {
     // Im Hackingweg alle Sleeves vorab zuteilen (Eindeutigkeit der Faktion).
     let v1 = null;
     if (keinGym) { try { v1 = teileHackingwegZu(anzahl); } catch { v1 = null; } }
+    // TRUPP FUER DIE BLACK OP (03.10.2026) - nur im Bladeburner-Weg (V2), nie
+    // im Hackingweg. blade.js meldet in data/blade.json `truppAnfrage`,
+    // `truppFehlt` und `truppPool`; hier faellt die Entscheidung, ob der
+    // naechste Mann lohnt (Rechnung oben bei `waehleRekrutierer`). GENAU EIN
+    // Sleeve, der Rest bleibt in seinem Zweig. Faellt die Anfrage weg (Op
+    // gefeuert, Pool reicht, Datei aelter als 5 min), geht er im selben Takt
+    // in den normalen Zweig zurueck - der setzt Vertrag, Infiltrate oder Gym
+    // neu, weil Recruitment dort nicht als "laeuft schon" zaehlt.
+    // RAM: getSleeve, getTask und setToBladeburnerAction sind schon geladen.
+    let rekrutierer = { nr: -1, grund: "Hackingweg" };
+    if (!keinGym) {
+      try {
+        let drin = false;
+        try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
+        if (!drin) rekrutierer = { nr: -1, grund: "nicht in der Division" };
+        else {
+          let bj = null;
+          try { bj = JSON.parse(liesVonHome(ns, "data/blade.json") || "null"); } catch { bj = null; }
+          const koerper = [];
+          for (let j = 0; j < anzahl; j++) {
+            // Ein Index ohne Sleeve wirft im Spiel; der Mock liefert
+            // undefined - beides heisst: hier ist Schluss.
+            const sl = ns.sleeve.getSleeve(j);
+            if (!sl || !sl.skills) break;
+            const sk = sl.skills;
+            let t = null;
+            try { t = ns.sleeve.getTask(j); } catch { t = null; }
+            koerper.push({ cha: Number(sk.charisma) || 1,
+              kampf: Math.min(sk.strength, sk.defense, sk.dexterity, sk.agility),
+              rekrutiert: istRekrutierung(t) });
+          }
+          rekrutierer = waehleRekrutierer(bj, Date.now(), koerper);
+        }
+      } catch (e) { rekrutierer = { nr: -1, grund: "Fehler: " + String(e).slice(0, 80) }; }
+    }
     for (let i = 0; i < anzahl; i++) {
       let ok = false, was = "gym";
       // Rueckstand und Werte je Sleeve: Telemetrie (tools/checkin.js wertet
@@ -603,6 +751,20 @@ export async function main(ns) {
           }
         } catch { /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
       }
+      // DER EINE REKRUTIERER (03.10.2026, Begruendung bei `waehleRekrutierer`).
+      // Steht NACH der Pruefung oben, weil die einen laufenden Vertrag dieses
+      // Sleeves als "laeuft schon" markiert - Recruitment hat Vorrang. Laeuft
+      // Recruitment schon, wird es nicht neu gesetzt (wirft sonst
+      // `cyclesWorked` auf 0). Geht das Setzen schief, bleibt alles wie oben.
+      if (inDivision && i === rekrutierer.nr) {
+        let schon = false;
+        try { schon = istRekrutierung(ns.sleeve.getTask(i)); } catch { schon = false; }
+        let gesetzt = schon;
+        if (!schon) {
+          try { gesetzt = ns.sleeve.setToBladeburnerAction(i, "Recruitment"); } catch { gesetzt = false; }
+        }
+        if (gesetzt) { laeuftSchon = true; ok = true; was = "recruitment"; }
+      }
       if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
         if (knappeOperation) {
           // FUND 5: die Operation, die der Spieler faehrt, ist knapp - dann
@@ -776,6 +938,9 @@ export async function main(ns) {
     ns.write("data/sleeve.json", JSON.stringify({
       zeit: Date.now(), gym: GYM, anzahl: stand.length,
       sleeves: stand,
+      // Warum (k)ein Sleeve rekrutiert - sonst ist "keine Anfrage" von
+      // "lohnt nicht" von aussen nicht zu unterscheiden.
+      trupp: { nr: rekrutierer.nr, grund: rekrutierer.grund },
     }), "w");
     // Der Auftragslaeufer sucht den Wirt mit dem meisten freien Speicher -
     // das ist selten home. Ohne scp findet die Datei niemand.

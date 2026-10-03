@@ -1261,11 +1261,36 @@ behoben) - hier nur vermerkt, keine Codeaenderung.
   beide wiederholt gegenseitig die Stadt umstellen, ohne dass eines von
   beiden je trainiert.
 
-- **`truppAnfrage` hat keinen Leser**: irgendwo schreibt der Bot eine
-  Sleeve-Rekrutierungsanfrage (`data/trupp-anfrage.txt` o. ae. - Name
-  gegenpruefen), aber kein Gewerk liest sie. Es fehlt ein Sleeve-Rekrutier-
-  Haken, der die Anfrage aufnimmt und tatsaechlich rekrutiert
-  (`ns.sleeve.recruit` o. ae.) statt dass sie folgenlos liegen bleibt.
+- **ERLEDIGT 03.10.2026: `truppAnfrage` hat keinen Leser.** Das Feld stand
+  in `data/blade.json` und war ein reiner Pool-Vergleich (praktisch immer
+  true). Jetzt: blade.js meldet `truppAnfrage`/`truppFehlt`/`truppPool` nur,
+  wenn die naechste Black Op faellig ist (Rang >= 90 % Tor), ihre Chance
+  ohne Trupp unter der Schwelle liegt, die Luecke hoechstens Faktor 1,2 ist
+  und der Pool unter min(noetig, 6) steht; eigener Stempel `truppZeit`.
+  sleeve.js (V2) setzt genau einen Sleeve auf Recruitment, solange sein
+  entgangener Vertragsrang (Sleeve-Zeit * 0,05) kleiner ist als die Zeit,
+  um die die Op frueher faellt - praktisch immer bis 6 Mann. Eingesetzt
+  werden nur die noetigen Maenner. Rechnung `tools/trupp-rechnung.js`, Test
+  `tools/test-trupp-sleeve.js`. Offen, bewusst nicht gebaut: Hysterese gegen
+  Flattern an den Raendern (Rang um 0,9*Tor, Endspielschwelle springt um
+  rankLoss) - kostet je Wechsel bis 299 s Sleeve-Arbeit; und g (Wachstum
+  der Black-Op-Chance) ist keine Konstante (gemessen 0,002-0,42/h) - mit
+  der Kostenkorrektur entscheidet es nur noch am Rand.
+  Nebenbei gefunden und behoben: Die Op wurde nie MIT Pool gewaehlt, und der
+  Einsatzblock vor `startAction` rief `blackOpChance()` ausserhalb von
+  `waehle()` - ReferenceError NACH `setTeamSize(B, name, 0)`, der Trupp
+  wurde also nie eingesetzt.
+
+- **Gym-Ausstieg fuer faellige Black Op ist tot** (03.10.2026, gefunden beim
+  Trupp-Umbau, NICHT behoben): `src/blade.js` im Gym-Zweig (`lohntSich`,
+  Suche nach "keine Black Op lesbar: dann bleibt es beim Gym") ruft
+  `blackOpChance()`/`blackOpSchwelle()` ausserhalb von `waehle()`. Der
+  ReferenceError faellt ins `catch` - eine faellige Black Op holt die Figur
+  also nie aus dem Gym. Dasselbe bei der D2-Sonde (Suche "als const im
+  selben main()-Rumpf" - der Kommentar dort stimmt nicht). Und selbst
+  repariert rechnete der Gym-Ausstieg ohne Pool. Fix: Chance und Schwelle aus dem letzten
+  `waehle()`-Lauf in eine aeussere Variable legen; Verhaltensaenderung im
+  Gym-Zweig, deshalb eigener Auftrag mit Skeptiker.
 
 - **Doppelte Konstanten `F_LEITER`/`F_NETZANTEIL`**: `bn4net.js` hat seinen
   eigenen `stapelPlan`/`F_LEITER`-Suchlauf fuer die TAKTUNG (siehe

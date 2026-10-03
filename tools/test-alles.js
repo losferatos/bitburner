@@ -328,6 +328,11 @@ const TESTS = [
     deckt: "D4 (Audit 4#4): die feste 0,85 fuer Operationen gilt nur bei knapper Kasse - sonst entscheidet EV_Rang/min",
     schnell: false,
   },
+  {
+    datei: "test-trupp-sleeve.js",
+    deckt: "Trupp fuer die Black Op: truppAnfrage nur bei echtem Bedarf, Feuern mit Pool, ein Sleeve rekrutiert nur, wenn der naechste Mann lohnt",
+    schnell: false,
+  },
 ];
 
 /**

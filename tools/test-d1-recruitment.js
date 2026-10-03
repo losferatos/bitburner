@@ -138,16 +138,19 @@ console.log("-- Gegenprobe: voller Trupp startet ebenfalls kein Recruitment --")
 }
 
 console.log("");
-console.log("-- truppAnfrage meldet den Bedarf, ohne dass der Spieler ihn deckt --");
+console.log("-- truppAnfrage ist kein Pool-Vergleich mehr (03.10.2026) --");
 {
-  // Rang zu niedrig fuer jede Black Op (rank 999999) - die Telemetrie kommt
-  // dann aus dem reinen Pool-Vergleich (Abschnitt "2b"), nicht aus dem
-  // Feuerpfad. TRUPP_ZIEL = 6 (siehe src/blade.js), Pool bei 2.
+  // Rang weit unter dem Tor (rank 999999), Pool bei 2 von TRUPP_ZIEL 6. Bis
+  // zum 03.10. meldete blade.js hier `truppAnfrage: true` - das Feld war ein
+  // reiner Pool-Vergleich und stand praktisch immer auf true. Seitdem gilt
+  // es nur noch, wenn die naechste Black Op faellig oder fast faellig ist und
+  // ihre Chance ohne Trupp fehlt; die positiven Faelle prueft
+  // tools/test-trupp-sleeve.js mit gerechneter Chance.
   const m = await fahre({ truppe: 2, runden: 2, blackOps: [{ name: "Operation Typhoon", rank: 999999 }] });
   const l = lage(m);
-  pruefe("data/blade.json meldet truppAnfrage: true",
-    !!l && l.truppAnfrage === true, l ? JSON.stringify({ truppAnfrage: l.truppAnfrage }) : "keine Lage");
-  pruefe("und trotzdem kein Recruitment",
+  pruefe("Op in weiter Ferne: data/blade.json meldet truppAnfrage: false",
+    !!l && l.truppAnfrage === false, l ? JSON.stringify({ truppAnfrage: l.truppAnfrage }) : "keine Lage");
+  pruefe("und kein Recruitment",
     !gestartet(m).some((x) => x === "General/Recruitment"), gestartet(m).join(", "));
 
   const voll = await fahre({ truppe: 6, runden: 2, blackOps: [{ name: "Operation Typhoon", rank: 999999 }] });

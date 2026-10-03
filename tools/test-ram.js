@@ -196,7 +196,7 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // vorher wie nachher 175,35 GB, gleich dem Live-Wert vom 03.10. Nur der
     // Hash der Messzeile passt nicht mehr - Live-Nachmessung nach dem
     // Einspielen, dieser Auftrag hat keinen Spielzugriff.
-    const VERALTET_ERLAUBT = ["bn4rep.js", "sleeve.js", "blade.js"];
+    const VERALTET_ERLAUBT = [];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

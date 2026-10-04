@@ -65,6 +65,15 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   test-alles 66/66. Schalter data/gang-an.txt 01:01:41 gesetzt; gang.js hat
   Slum Snakes gegruendet, 3 Mitglieder, Fehler 0; Torrunde 'locked'.
 - 2-h-Pruefung 04.10. 03:06: BESTANDEN - 10 Mitglieder, Strafe 0,998, Fehler 0, createGang 1x, Respekt 270.760, Faktionsruf 4.940, 12 Aufstiege, Torrunde weiter locked (kein Kauf).
+- Einbau-Tor 04.10. 07:05:32 (pre-install-Backup): 12 Augs eingebaut
+  (Augmented Targeting II ... LuminCloaking-V1), KEIN TRP, gang.js 07:05:36
+  wieder gestartet. Abbruchkriterium "am Tor" BESTANDEN. Nach dem Einbau
+  ~190 Ruf/s (07:32-07:34, Wanduhr) - Ruf ist kein Engpass mehr.
+- Eric 04.10. 07:4x: Ausruestung/Territorium fehlen - "ist das korrekt?" ->
+  P2b vorgezogen: Workflow `wf_bb23637e-2d1` (gang-p2b-rechnen: Geldmodus,
+  Territorium, Ausruestung, Reglerwerte, geeicht an der Live-Gang; Wert des
+  Geldes am Tor; 2 Opus-Skeptiker). Eric gibt das Restkontingent der Woche
+  frei; was nicht fertig wird, ab 13:00 weiter.
 - Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".
 - Abbruchkriterien (gang.js-Kopf): +2 h >= 6 Mitglieder, Abzug >= 0,9,
   Fehler 0; bis zum Tor kein 'GEKAUFT' bei aktiver Sperre; am Tor TRP nie in

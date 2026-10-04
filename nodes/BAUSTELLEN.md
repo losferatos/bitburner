@@ -1228,6 +1228,15 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
+### Stealth Retirement prueft popEst statt echter Bevoelkerung (04.10.2026)
+
+Restbefund 6 des Skeptikers zum Stadtwahl-Fix: `blade.js` prueft SR weiter
+`getCityEstimatedPopulation` gegen `SR_POP_MIN`. Bei r = pop/popEst < 1
+(leergeraidete Stadt, Sector-12 hatte 0,46) haelt der Bot die Stadt fuer
+gefuellt. Die Stadtwahl rechnet seit dem 04.10. mit popEst * r
+(`popEchtGeschaetzt`), die SR-Schwelle sollte dasselbe tun. Derzeit faehrt
+der Bot kein SR, deshalb nicht sofort.
+
 ### Audit "vollstaendig" abgeschlossen (04.10.2026) - Reste
 
 Abschluss in `nodes/AUDIT-VOLLSTAENDIG-2026-10-03.md` (125 Befunde: 7 gebaut,

@@ -2442,6 +2442,22 @@ export async function main(ns) {
     if (boReal >= 1 - EPS && bo.min >= boReal - EPS) return { r: 1, sicher: false };
     return { r: 1, sicher: true };
   };
+  // Rein: die echte Bevoelkerung einer Stadt aus popEst und dem dort
+  // bestimmten r = pop/popEst (04.10.2026, Stadtwahl). Unsicheres oder
+  // fehlendes r: popEst unveraendert - das Verhalten vor dem Probenwechsel.
+  //
+  // Unsicher mit r > 1 (Black-Op-Obergrenze bei 1 geklemmt, rAusBlackOp
+  // liefert dann r = 1/boReal) heisst: die echte Bevoelkerung ist MINDESTENS
+  // popEst * r. Diese Untergrenze nehmen, nicht popEst - sonst faellt eine
+  // gut gefuellte Stadt beim Kippen von sicher auf unsicher (boReal steigt,
+  // naechste Black Op) auf popEst zurueck und verliert gegen eine sicher
+  // bestimmte Nachbarstadt, die in Wahrheit nicht besser ist (Skeptiker
+  // 04.10., Befund 1).
+  const popEchtGeschaetzt = (popEst, rr) => {
+    if (!rr || !Number.isFinite(rr.r) || rr.r < 0) return popEst;
+    if (!rr.sicher) return rr.r > 1 ? popEst * rr.r : popEst;
+    return popEst * rr.r;
+  };
   // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der
   // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
   // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
@@ -2784,7 +2800,8 @@ export async function main(ns) {
     // - und Chongqing **0**.
     //
     // `getCityEstimatedPopulation` und `getCityChaos` gehen fuer FREMDE
-    // Staedte, es braucht also keinen Probewechsel.
+    // Staedte - fuer popEst ohne Probewechsel. Die ECHTE Bevoelkerung
+    // braucht ihn doch (04.10.2026, siehe unten).
     const STADT_VORSPRUNG = 2;
     try {
       const hier = ns.bladeburner.getCity();
@@ -2799,19 +2816,70 @@ export async function main(ns) {
       // Bevoelkerung - der Bot waere laenger in fast leeren Staedten
       // geblieben. Der richtige Weg ist Proben-Wechsel wie in bbspann.js
       // (BAUSTELLEN). Bis dahin bleibt die grobe, aber bewaehrte Regel.
+      //
+      // DER PROBENWECHSEL IST JETZT DA (04.10.2026). Gemessen 16:57 in
+      // BitNode 2.2 (`src/probe-raid.js`, alle sechs Staedte): Sector-12
+      // hatte popEst 765 Mio, real aber nur r = 0,46 davon - JEDER
+      // gescheiterte Raid senkt `pop` um 0,5-1 Prozent, `popEst` nicht
+      // (`Bladeburner.ts:837-842`, changeEstEqually: false). Die Regel sah
+      // 765 Mio gegen Aevums 1.486 Mio (auch nur r = 0,29) und blieb. In
+      // Wahrheit standen 0,35 Mrd gegen 2,0 Mrd in Chongqing (r = 2,25):
+      // Raid real 7,5 Prozent gegen 25. Der Rang FIEL in der Stunde davor
+      // von 812 auf 710, weil fast jeder Raid scheiterte und dabei die
+      // Stadt weiter leerte.
+      //
+      // r ist je Stadt exakt bestimmbar: `rAusBlackOp` (D2, oben) aus dem
+      // Spannenpaar der naechsten Black Op in DIESER Stadt und ihrer
+      // stadtunabhaengigen echten Chance. Dafuer muss die Stadt kurz
+      // gesetzt werden - `switchCity` ist ein reines Feldsetzen ohne
+      // Zeitkosten und ohne Aktionsabbruch (`NetscriptFunctions/
+      // Bladeburner.ts:314-319`). Zwischen Hin- und Rueckwechsel steht KEIN
+      // await, das Spiel kann dazwischen also keine Aktion abschliessen;
+      // `finally` stellt die Stadt auch bei einer Ausnahme zurueck.
+      // Ist r nicht sicher bestimmbar (keine Black Op offen, Obergrenze bei
+      // 1 geklemmt), bleibt es fuer diese Stadt bei popEst - das alte
+      // Verhalten. Der Vorsprung 2 bleibt ebenfalls.
+      const boJetzt = (() => { try { return ns.bladeburner.getNextBlackOp(); } catch { return null; } })();
+      const boReal = boJetzt ? blackOpChance(boJetzt.name) : null;
+      const rJetzt = (Number.isFinite(boReal) && boReal > 0)
+        ? (() => {
+          const sp = spanne(B, boJetzt.name);
+          // spanne() liefert bei einer Ausnahme {0,0} - das waere r = 0
+          // "sicher" und damit Wert 0 fuer die Stadt (Skeptiker, Befund 5).
+          if (!(sp.max > 0)) return null;
+          return rAusBlackOp(sp, boReal);
+        })
+        : null;
       const wert = (stadt) => {
-        const pop = ns.bladeburner.getCityEstimatedPopulation(stadt);
+        const popEst = ns.bladeburner.getCityEstimatedPopulation(stadt);
         const chaos = ns.bladeburner.getCityChaos(stadt);
         const faktor = chaos > 50 ? Math.sqrt(1 + chaos - 50) : 1;
-        return pop / faktor;
+        let rr = null;
+        if (rJetzt) {
+          ns.bladeburner.switchCity(stadt);
+          rr = rJetzt();
+        }
+        return popEchtGeschaetzt(popEst, rr) / faktor;
       };
-      const wertHier = wert(hier);
-      let beste = null, besterWert = wertHier;
-      for (const stadt of STAEDTE) {
-        if (stadt === hier) continue;
-        let w = 0;
-        try { w = wert(stadt); } catch { continue; }
-        if (w > besterWert) { besterWert = w; beste = stadt; }
+      const staedteGemeinden = (stadt) => {
+        try { return ns.bladeburner.getCityCommunities(stadt); } catch { return 0; }
+      };
+      let wertHier = 0, beste = null, besterWert = 0;
+      try {
+        wertHier = wert(hier);
+        besterWert = wertHier;
+        for (const stadt of STAEDTE) {
+          if (stadt === hier) continue;
+          // Nur Ziele, die die Raid-Regel direkt darunter nicht sofort
+          // wieder verlaesst (< RAID_VORRAT_MIN Gemeinden) - sonst Hin- und
+          // Rueckwechsel im selben Tick, jede Runde (Skeptiker, Befund 2).
+          if (RAID_AN && staedteGemeinden(stadt) < RAID_VORRAT_MIN) continue;
+          let w = 0;
+          try { w = wert(stadt); } catch { continue; }
+          if (w > besterWert) { besterWert = w; beste = stadt; }
+        }
+      } finally {
+        ns.bladeburner.switchCity(hier);
       }
       // Der Vorsprung muss deutlich sein, sonst pendelt der Motor - und jeder
       // Wechsel zieht eine Diplomacy-Phase nach sich.

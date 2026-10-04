@@ -73,6 +73,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-stadtwahl-echtpop.js",
+    deckt: "Stadtwahl nach echter Bevoelkerung (r je Stadt per Probenwechsel), nicht popEst - Rang fiel in leergeraidetem Sector-12 (Befund 04.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-bruecke-alarm.js",
     deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
     schnell: true,

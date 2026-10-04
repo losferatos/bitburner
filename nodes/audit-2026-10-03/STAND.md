@@ -64,6 +64,7 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   (8/8 sha), Neustarts belegt, RAM gemessen, VERALTET_ERLAUBT leer,
   test-alles 66/66. Schalter data/gang-an.txt 01:01:41 gesetzt; gang.js hat
   Slum Snakes gegruendet, 3 Mitglieder, Fehler 0; Torrunde 'locked'.
+- 2-h-Pruefung 04.10. 03:06: BESTANDEN - 10 Mitglieder, Strafe 0,998, Fehler 0, createGang 1x, Respekt 270.760, Faktionsruf 4.940, 12 Aufstiege, Torrunde weiter locked (kein Kauf).
 - Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".
 - Abbruchkriterien (gang.js-Kopf): +2 h >= 6 Mitglieder, Abzug >= 0,9,
   Fehler 0; bis zum Tor kein 'GEKAUFT' bei aktiver Sperre; am Tor TRP nie in

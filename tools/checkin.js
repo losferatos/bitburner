@@ -682,8 +682,17 @@ async function main() {
 
   // --- 5. Was der Bot gerade tut -------------------------------------------
   if (bladeGut && bladeGut.aktion) {
-    sag("Aktion: " + bladeGut.aktion + " (Chance " + ((bladeGut.chance ?? 0) * 100).toFixed(1)
-      + " %, Ausdauer " + (bladeGut.ausdauer ?? "?") + ", Chaos " + (bladeGut.chaos ?? 0).toFixed(1) + ")");
+    // `chance` in blade.json ist die UNTERGRENZE der geschaetzten Chance der
+    // laufenden Aktion (blade.js meldeLage(..., s.min)) - bei unsicherer
+    // Bevoelkerungsschaetzung weit unter der wahren Chance. Deshalb "ab".
+    // Die naechste Black Op steht getrennt dabei (boChancen, exakt gerechnet).
+    const bo = bladeGut.naechsteBlackOp;
+    const boChance = bo && bladeGut.boChancen ? bladeGut.boChancen[bo] : null;
+    const boTeil = Number.isFinite(boChance)
+      ? "; naechste Black Op " + bo + " " + (boChance * 100).toFixed(1) + " %" : "";
+    sag("Aktion: " + bladeGut.aktion + " (Chance ab " + ((bladeGut.chance ?? 0) * 100).toFixed(1)
+      + " %, Ausdauer " + (bladeGut.ausdauer ?? "?") + ", Chaos " + (bladeGut.chaos ?? 0).toFixed(1)
+      + boTeil + ")");
   }
   if (netz) sag("Netz: " + (netz.gerootet ?? "?") + "/" + (netz.netz ?? "?")
     + " gerootet, Runde " + (netz.runde ?? "?") + ".");
@@ -824,6 +833,11 @@ async function main() {
         zeilenteile.push("Sicherungsalter unbekannt");
       }
       if (st.alarm) zeilenteile.push("ALARM: " + (st.alarm.titel || st.alarm));
+      // Wiederkehrende Sicherungsausfaelle bleiben sichtbar, auch wenn der
+      // Alarm mit der naechsten gruenen Sicherung erlischt (bridge.js alarm()).
+      if (Array.isArray(st.sicherungAusfaelle) && st.sicherungAusfaelle.length) {
+        zeilenteile.push("Sicherungsausfaelle 24 h: " + st.sicherungAusfaelle.length);
+      }
       sag("Bruecke: " + zeilenteile.join(", "));
 
       // MANUAL_ACTIONS - die einzige Abnahmezahl, die AUSSERHALB des Spiels

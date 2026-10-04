@@ -193,3 +193,48 @@ export function abstandMin(strom, vonArt, bisArt, uhr = "wall") {
   if (!Number.isFinite(d) || d < 0) return null;
   return d / 60000;
 }
+
+/**
+ * Sprungdauer: Abstand vom letzten `jump` zum ERSTEN `boot` danach, in
+ * Minuten (Wanduhr).
+ *
+ * WARUM (03.10.2026): bn4net.js rechnete den Wert bei jedem Prozessstart als
+ * "jetzt minus letzter Sprung" und deckelte nur auf 6 h. Das Spiel wurde am
+ * 03.10. um 09:46 neu geladen, fuenf Stunden nach dem Sprung (04:42) - die
+ * Kennzahl sprang von 1,0 auf 305,6 min, obwohl der Sprung selbst eine Minute
+ * gedauert hatte. Gemessen wird jetzt immer gegen den ersten Boot nach dem
+ * Sprung: jeder spaetere Kernstart rechnet dieselbe Zahl und repariert damit
+ * auch einen falsch gespeicherten Wert.
+ *
+ * @returns {number|null} null, wenn kein Sprung, noch kein Boot danach, oder
+ *   der Boot mehr als `fensterMs` nach dem Sprung liegt (dann misst er nicht
+ *   den Sprung, sondern eine Offline-Pause).
+ */
+export function sprungLatenzMin(strom, abWall = 0, fensterMs = 6 * 3600000) {
+  const sprung = letztes(strom, "jump");
+  if (!sprung || !Number.isFinite(sprung.wall)) return null;
+  // BESCHNITTEN? `boot` bleibt nicht (ARTEN), der Ringpuffer haelt nur die
+  // juengsten DECKEL gewoehnlichen Eintraege. Liegt der aelteste noch
+  // vorhandene gewoehnliche Eintrag NACH dem Sprung, kann der erste Boot
+  // schon herausgefallen sein - dann waere der naechste Boot der falsche
+  // "erste". Lieber keine Zahl (kpi.json behaelt ihre) als eine falsche.
+  // Ein Eintrag ohne gueltige Wanduhr (anhaengen setzt 0 als Vorgabe) gilt
+  // als "unbekannt" - dann laesst sich der Beschnitt nicht ausschliessen.
+  const aeltesterGewoehnlich = strom.eintraege.find((e) => !(ARTEN[e.art] && ARTEN[e.art].bleibt));
+  if (strom.eintraege.filter((e) => !(ARTEN[e.art] && ARTEN[e.art].bleibt)).length >= DECKEL
+      && aeltesterGewoehnlich
+      && (!(aeltesterGewoehnlich.wall > 0) || aeltesterGewoehnlich.wall > sprung.wall)) return null;
+  let erster = null;
+  for (const e of strom.eintraege) {
+    // NUR BOOTS IM NEUEN KNOTEN (Skeptiker 04.10.): `jump` wird VOR dem
+    // Handschlag und dem exec geschrieben (ausgang.js), ein Kernneustart im
+    // ALTEN Knoten danach waere sonst der "erste Boot". `abWall` ist
+    // ns.getResetInfo().lastNodeReset des messenden Kerns.
+    if (e.art !== "boot" || !Number.isFinite(e.wall) || e.wall < sprung.wall || e.wall < abWall) continue;
+    if (!erster || e.wall < erster.wall) erster = e;
+  }
+  if (!erster) return null;
+  const d = erster.wall - sprung.wall;
+  if (!(d >= 0) || d >= fensterMs) return null;
+  return Number((d / 60000).toFixed(2));
+}

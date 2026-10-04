@@ -856,9 +856,23 @@ function log(level, message) {
   broadcast({ type: "log", entry });
 }
 
-async function alarm(titel, text) {
-  state.alarm = { at: new Date().toISOString(), titel, text };
+// QUELLE DES ALARMS (04.10.2026, Skeptiker). Es gibt nur EINEN Alarmplatz.
+// Sicherungsalarme ("sicherung") erloeschen mit der naechsten gruenen
+// Sicherung (sichereJetzt) - und duerfen deshalb keinen anderen Alarm
+// verdraengen: sonst loeschte eine gruene Sicherung spaeter z.B. "Zweite
+// RFA-Verbindung" spurlos. Jeder Sicherungsausfall wird zusaetzlich gezaehlt
+// (state.sicherungAusfaelle, 24 h), damit wiederkehrende Ausfaelle sichtbar
+// bleiben, auch wenn der Alarm dazwischen erlischt.
+async function alarm(titel, text, quelle = "sonst") {
+  const neu = { at: new Date().toISOString(), titel, text, quelle };
+  if (quelle === "sicherung") {
+    const grenze = Date.now() - 24 * 3600000;
+    state.sicherungAusfaelle = (state.sicherungAusfaelle || [])
+      .filter((t) => Date.parse(t) >= grenze).concat([neu.at]);
+  }
   log("error", "ALARM " + titel + ": " + text);
+  if (quelle === "sicherung" && state.alarm && state.alarm.quelle !== "sicherung") return;
+  state.alarm = neu;
   try {
     await mkdir(DATA_DIR, { recursive: true });
     await writeFile(
@@ -1854,7 +1868,7 @@ async function sichereJetzt(anlass) {
       spiegel: BACKUP_SPIEGEL_ORT,
     });
     if (!r.ok) {
-      await alarm("Sicherung abgelehnt (" + anlass + ")", r.gruende.join(" | "));
+      await alarm("Sicherung abgelehnt (" + anlass + ")", r.gruende.join(" | "), "sicherung");
       return false;
     }
     state.lastVerifiedBackup = {
@@ -1869,6 +1883,18 @@ async function sichereJetzt(anlass) {
     state.bitNode = r.kennwerte.bitNodeN;
     state.lauf = r.kennwerte.lauf;
     log("info", "Sicherung " + anlass + " gruen: " + r.datei + " (" + r.dauerMs + " ms)");
+    // EIN SICHERUNGSALARM ERLISCHT MIT DER NAECHSTEN GRUENEN SICHERUNG
+    // (04.10.2026). `alarm()` setzte state.alarm, aber nichts nahm ihn je
+    // zurueck: Ein einzelnes HTTP 502 am 03.10. 18:17 (Tab kurz weg) stand
+    // danach 20 Stunden lang als "ALARM: Sicherung ausgefallen" im Check-in,
+    // obwohl jede folgende Sicherung gruen war. Andere Alarme (Socket,
+    // Verifikation, Zweittab, Folgealarme wie "Schub verworfen") bleiben
+    // stehen - sie loest keine Sicherung (Quelle siehe alarm()).
+    if (state.alarm && state.alarm.quelle === "sicherung") {
+      log("info", "Alarm aufgehoben (" + state.alarm.titel + " von " + state.alarm.at + ") - Sicherung wieder gruen");
+      state.alarm = null;
+      await rm(path.join(DATA_DIR, "bridge-alarm.json"), { force: true }).catch(() => {});
+    }
     if (r.b64Befund) {
       await sofortZeile(
         "Spielstand kam als Base64-Klartext",
@@ -1878,7 +1904,7 @@ async function sichereJetzt(anlass) {
     }
     return true;
   } catch (e) {
-    await alarm("Sicherung ausgefallen (" + anlass + ")", e.message);
+    await alarm("Sicherung ausgefallen (" + anlass + ")", e.message, "sicherung");
     return false;
   }
 }
@@ -2062,6 +2088,7 @@ async function schreibeRueckkanal() {
       : null,
     settings: state.settings || null,
     alarm: state.alarm,
+    sicherungAusfaelle: state.sicherungAusfaelle || [],
     zweitTabSperre: zweitTabMerker,
     masterRiegel: masterRiegelStand,
   };
@@ -2338,6 +2365,7 @@ function publicState() {
     lastVerifiedBackup: state.lastVerifiedBackup,
     backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
     alarm: state.alarm,
+    sicherungAusfaelle: state.sicherungAusfaelle || [],
     zweitTabSperre: zweitTabMerker,
     masterRiegel: masterRiegelStand,
     serverCount: state.servers.length,

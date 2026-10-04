@@ -319,6 +319,12 @@ export function neuerLauf(k, nodeResetJetzt) {
     if (def.klasse !== "autonomie") continue;
     if (def.art === "zahl" && def.soll === 0) aus[name] = null;
   }
+  // Sprung- und Bootdauer gehoeren zum Lauf, nicht zum Knoten (04.10.2026,
+  // Skeptiker): BN2.1 und BN2.2 teilen sich den Eintrag "2". Ohne Nullung
+  // stand im neuen Lauf der Wert des vorigen Sprungs, solange der neue nicht
+  // messbar war - ein schlechter Sprung haette den alten guten Wert geerbt.
+  aus.jump_latency_min = null;
+  aus.boot_latency_min = null;
   // Effizienzwerte des alten Laufs sind fuer den neuen bedeutungslos.
   for (const [name, def] of Object.entries(FELDER)) {
     if (def.klasse === "effizienz") aus[name] = null;

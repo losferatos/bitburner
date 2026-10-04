@@ -68,6 +68,16 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-sprung-latenz.js",
+    deckt: "jump_latency_min misst den Sprung (erster Boot danach), nicht die Zeit seit dem Sprung (Befund 03.10.)",
+    schnell: true,
+  },
+  {
+    datei: "test-bruecke-alarm.js",
+    deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-ram.js",
     deckt: "RAM-Rechner gegen 114 Live-Messwerte, registry.json und das Tor E1",
     schnell: true,

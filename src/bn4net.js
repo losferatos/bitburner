@@ -40,7 +40,7 @@ import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
   KPI_VERSION } from "lib/kpi.js";
 import { vergib as figVergib, antragGilt as figAntragGilt,
   vergabeGilt as figVergabeGilt } from "lib/figur.js";
-import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { laden as evLaden, anhaengen as evAnhaengen, sprungLatenzMin } from "lib/events.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -4755,16 +4755,12 @@ export async function main(ns) {
         try {
           const strom = evLaden(ns.fileExists("data/events.json", "home")
             ? ns.read("data/events.json") : null);
-          const letzterSprung = [...strom.eintraege].reverse()
-            .find((e) => e.art === "jump");
-          // Nur, wenn der Sprung NACH dem letzten Knotenreset liegt bzw. kurz
-          // davor - ein `jump` aus einem frueheren Knoten misst nichts.
-          if (letzterSprung && Number.isFinite(letzterSprung.wall)
-              && evMerker.bootWall - letzterSprung.wall >= 0
-              && evMerker.bootWall - letzterSprung.wall < 6 * 3600000) {
-            evMerker.jumpLatencyMin =
-              Number(((evMerker.bootWall - letzterSprung.wall) / 60000).toFixed(2));
-          }
+          // Gegen den ERSTEN Boot nach dem Sprung (03.10.2026): ein spaeterer
+          // Kernneustart (Seite neu geladen, Sprosse) liess sonst "Zeit seit
+          // dem Sprung" in die Kennzahl - 305,6 statt 1,0 min. Der eigene Boot
+          // steht schon im Strom (ereignis() schreibt synchron).
+          const lat = sprungLatenzMin(strom, nrJetzt);
+          if (lat !== null) evMerker.jumpLatencyMin = lat;
         } catch { /* kein Strom - dann bleibt die Zahl ungemessen */ }
       } else {
         // Ein Reset MITTEN im Prozessleben kann es nicht geben - beide

@@ -644,10 +644,20 @@ export async function hauptprogramm() {
   out.wrapperListe = sp.wrappers.map((w) => ({ rel: w.rel, name: w.name, idx: w.idx, op: w.op }));
   out.hostWrapper = ho.wrappers.map((w) => ({ rel: w.rel, name: w.name, idx: w.idx, op: w.op, art: w.art }));
   const ht = hostTabelle(ho);
-  const realHost = new Set(fs.existsSync(path.join(ROOT, "data")) ? fs.readdirSync(path.join(ROOT, "data")) : []);
+  // Host-Dateien liegen nicht nur unter data/: Planungsdokumente stehen in nodes/ (auch tiefer), Anleitungen in
+  // doku/, Sicherungen unter backups/. Vorhanden = der Basisname existiert in einem dieser Orte.
+  const hostOrte = ["data", "nodes", "doku", "backups", "."].filter((d) => fs.existsSync(path.join(ROOT, d)));
+  const hostNamen = new Set();
+  const sammleNamen = (dir, tiefe) => {
+    for (const e of fs.readdirSync(dir, { withFileTypes: true })) {
+      if (e.isDirectory()) { if (tiefe > 0 && !["node_modules", "archiv", "reference"].includes(e.name)) sammleNamen(path.join(dir, e.name), tiefe - 1); }
+      else hostNamen.add(e.name);
+    }
+  };
+  for (const d of hostOrte) sammleNamen(path.join(ROOT, d), d === "." ? 0 : 3);
   out.hostDateien2 = [...ht.entries()].sort((a, b) => a[0].localeCompare(b[0])).map(([name, r]) => ({
     name, W: [...new Set(r.W)].slice(0, 4), R: [...new Set(r.R)].slice(0, 4), D: r.D.slice(0, 2),
-    vorhanden: name.includes(Q) ? null : realHost.has(name),
+    vorhanden: name.includes(Q) ? null : hostNamen.has(name),
   }));
   out.ports = sp.sites.filter((s) => s.art === "port").map((s) => ({ rel: s.rel, zeile: s.zeile, op: s.op, datei: s.datei }));
 
@@ -663,6 +673,7 @@ export async function hauptprogramm() {
     return "KEINER";
   };
   out.starterKlasse = Object.fromEntries([...refs.keys()].map((k) => [k, starter(k)]));
+  out.live = liveMenge(refs, registry);
   out.wirte = wirtepruefung(sp, registry, bew, out.starterKlasse);
   out.argumente = argumentVertrag(sp, WS, srcAlle);
   for (const z of out.zeilen) {
@@ -700,6 +711,7 @@ export async function hauptprogramm() {
   }
 
   if (flag("--selbstprobe")) out.selbstprobe = await selbstprobe();
+  if (flag("--eichung-alt")) out.eichungAlt = await eichungAlterStand();
 
   const jsonDatei = opt("--json");
   if (jsonDatei) fs.writeFileSync(jsonDatei, JSON.stringify(out, null, 1));
@@ -710,6 +722,66 @@ export async function hauptprogramm() {
   return out;
 }
 const fm = (e) => `${e.rel}:${e.zeile}${e.via ? " [" + e.via + "]" : ""}${e.ueber ? " ~" + e.ueber : ""}`;
+
+/**
+ * LIVE-MENGE: alle Skripte, die der Bot ohne Menschen startet. Wurzeln sind boot.js, bn4net.js, guard.js,
+ * ausgang.js, exit.js und jeder Registry-Eintrag; Kanten sind Zeichenketten-Verweise in src/ (nicht tools/,
+ * nicht Importe). Eine Ueberschaetzung ist beabsichtigt (jeder Verweis zaehlt als Start): ein Skript, das
+ * HIER fehlt, wird sicher nicht autonom gestartet - nur per tools/task.js, tools/hand.js oder gar nicht.
+ * Ein Schreiber ausserhalb der Live-Menge ist deshalb ein Handwerkzeug und seine Datei ein Messergebnis.
+ */
+export function liveMenge(refs, registry) {
+  const kanten = new Map();
+  for (const [name, r] of refs) for (const x of r) {
+    if (x.rel.startsWith("tools/") || x.rel.startsWith("sync/") || x.rel === "registry.json") continue;
+    if (!kanten.has(x.rel)) kanten.set(x.rel, new Set());
+    kanten.get(x.rel).add(name);
+  }
+  const live = new Set(["boot.js", "bn4net.js", "guard.js", "ausgang.js", "exit.js", ...registry.eintraege.map((e) => e.name)]);
+  const stapel = [...live];
+  while (stapel.length) {
+    const x = stapel.pop();
+    for (const y of kanten.get(x) || []) if (!live.has(y)) { live.add(y); stapel.push(y); }
+  }
+  return [...live].sort();
+}
+
+/**
+ * EICHUNG GEGEN EINEN BEKANNTEN FUND: Am 03.10.2026 wurde `truppAnfrage` in data/blade.json als Feld ohne
+ * Leser gefunden (BAUSTELLEN.md, Commit fe3b013). Der Stand VOR diesem Commit wird per `git archive`
+ * (nur lesend) in ein Temp-Verzeichnis entpackt und durch dieselbe Feldanalyse geschickt; das Feld muss
+ * als "NUR im Schreiber" auftauchen. Faellt das aus, taugt die Feldanalyse nicht und jeder "kein Fund"
+ * ist wertlos.
+ */
+export async function eichungAlterStand(commit = "fe3b013", datei = "data/blade.json", feld = "truppAnfrage") {
+  const { execFileSync } = await import("node:child_process");
+  const os = await import("node:os");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "fluss-eich-"));
+  try {
+    // Nur lesende git-Aufrufe (ls-tree, show), ohne Shell: "~1" und Pfade mit Doppelpunkt sind dann unkritisch
+    // (ein "tar -C C:\..." scheitert unter GNU tar am Laufwerksdoppelpunkt).
+    const dateien = execFileSync("git", ["ls-tree", "-r", "--name-only", commit + "~1", "src"], { cwd: ROOT, encoding: "utf8" })
+      .split(String.fromCharCode(10)).map((x) => x.trim()).filter(Boolean);
+    for (const f of dateien) {
+      const ziel = path.join(tmp, f);
+      fs.mkdirSync(path.dirname(ziel), { recursive: true });
+      fs.writeFileSync(ziel, execFileSync("git", ["show", commit + "~1:" + f], { cwd: ROOT, maxBuffer: 64 * 1024 * 1024 }));
+    }
+    const srcDir = path.join(tmp, "src");
+    const registry = JSON.parse(fs.readFileSync(path.join(srcDir, "registry.json"), "utf8"));
+    const WS = ladeSpiel(srcDir);
+    const WH = ladeHost();
+    const sp = analysiereSpiel(WS);
+    const ho = analysiereHost(WH);
+    const f = berechneFelder(WS, WH, sp, ho, registry).find((x) => x.datei === datei);
+    const gefunden = !!f && f.nurSchreiber.includes(feld);
+    console.log((gefunden ? "  ok    " : "  ROT   ") + `Eichung ${commit}~1: ${feld} in ${datei} als "NUR im Schreiber" gefunden`
+      + (f ? " (nurSchreiber: " + f.nurSchreiber.join(",") + ")" : " (Datei nicht in Analyse)"));
+    return gefunden;
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
 
 function hostTabelle(ho) {
   const tab = new Map();
@@ -744,16 +816,19 @@ function baueMarkdown(out, bew) {
     const titel = { NUR_GESCHRIEBEN: "Geschrieben, nie gelesen", NUR_GELESEN: "Gelesen, nie geschrieben", ok: "Schreiber und Leser vorhanden" }[klasse];
     L.push(`## ${titel} (${gruppe.length})`);
     L.push("");
-    L.push("| Datei | Schreiber Datei:Zeile | Leser Datei:Zeile | Spiel |");
-    L.push("|---|---|---|---|");
+    L.push("| Datei | Schreiber Datei:Zeile | Leser Datei:Zeile | Spiel | Betrieb |");
+    L.push("|---|---|---|---|---|");
     const zeileVon = new Map((out.zeilen || []).map((z) => [z.name, z]));
+    const liveSet = new Set(out.live || []);
     for (const b of gruppe) {
       const wr = [...b.eff.W, ...b.eff.A].map(fm);
+      const relW = [...new Set([...b.eff.W, ...b.eff.A].map((e) => e.rel))];
+      const betrieb = relW.some((r) => liveSet.has(r)) ? "LIVE" : relW.some((r) => r.startsWith("lib/")) ? "lib" : relW.some((r) => r.startsWith("sync/") || r.startsWith("tools/")) ? "Host" : "Handwerkzeug";
       const rd = [...b.eff.R.map((e) => "R " + fm(e)), ...b.eff.X.map((e) => "X " + fm(e))];
       const kuerz = (a) => (a.length > 5 ? a.slice(0, 5).join("<br>") + `<br>... (+${a.length - 5})` : a.join("<br>"));
       const z = zeileVon.get(b.name);
       const im = z && z.imSpiel ? (z.imSpiel.length ? z.imSpiel.slice(0, 2).map((x) => x.replace(/^.*\((\d+ B)\)$/, "$1")).join(", ") : "nicht im Spiel") : "";
-      L.push(`| \`${b.name}\` | ${kuerz(wr) || "-"} | ${kuerz(rd) || "-"} | ${im} |`);
+      L.push(`| \`${b.name}\` | ${kuerz(wr) || "-"} | ${kuerz(rd) || "-"} | ${im} | ${betrieb} |`);
     }
     L.push("");
   }

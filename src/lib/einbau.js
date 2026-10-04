@@ -1027,3 +1027,44 @@ export function gateBuyMode({ inGang, gateOpen, bonusWaits }) {
   if (bonusWaits) return "bonus";
   return "round";
 }
+
+/**
+ * KAUFAUFSCHUB VOR DER GANG (P2c, 04.10.2026; nodes/audit-2026-10-03/
+ * verify-p2b-praemisse.md Einwand 2, verify-p2b-geldwert.md Abschnitt 3).
+ *
+ * Der Kaufaufschub von P1 greift erst, wenn die Gang steht (`inGang`). Im
+ * frischen BN2-Knoten entsteht sie aber erst nach dem Beitritt zu Slum Snakes
+ * (Karma -9, FactionInfo.tsx:665) - in BN2.1 nach 0,85-1,85 h. Bis dahin kaufte
+ * die alte Schleife jedes verdiente Kampfstueck sofort (Wired Reflexes,
+ * Neurotrainer I, EsperTech ...), und jedes davon macht JEDES Stueck der
+ * ersten Torrunde um 1,9 teurer: gerechnet mit der echten waehleTorRunde bei
+ * 36 Mrd Torgeld x2,35 statt x3,21 Competence (q0 2 -> 0). Die Runde 07:04 in
+ * BN2.1 verlor durch fuenf solche Vorkaeufe Faktor 1,40.
+ *
+ * Deshalb: ist die Gang GEPLANT (V2 in BN2 und der Schalter data/gang-an.txt
+ * liegt auf home), kauft die alte Schleife auch vor der Gruendung nichts.
+ * Frueh kaufen bringt nichts - Augs wirken erst nach dem Einbau, und der kommt
+ * im Kampfknoten erst am Tor. Das Geld fuer die anderen Ausgeber bleibt gleich:
+ * augRuecklage zieht die verdienten Stuecke so oder so ab (gekauft oder
+ * zurueckgelegt).
+ *
+ * Rueckfall: Steht die Gang nach GANG_HOLD_MAX_MS Knotenzeit (Wanduhr ab
+ * lastNodeReset) noch nicht, laeuft die alte Schleife wieder - lieber der
+ * alte Zustand als ein Tor mit leerer Warteschlange, falls die Gruendung
+ * dauerhaft scheitert. Unklare Lage (Alter nicht lesbar) heisst ebenfalls
+ * alte Regel.
+ */
+export const GANG_HOLD_NODE = 2;                 // Registry: gang.js knoten 2
+export const GANG_HOLD_MAX_MS = 6 * 3600000;     // Gruendung in BN2.1-Zyklus 1 bei 0,85-1,85 h
+
+/**
+ * @param {{nurKampfStuecke: boolean, knoten: number, switchOn: boolean,
+ *          inGang: boolean, nodeAgeMs: number}} p
+ * @returns {boolean} true = die alte Kaufschleife kauft in dieser Runde nichts
+ */
+export function gangHoldBeforeFounding({ nurKampfStuecke, knoten, switchOn, inGang, nodeAgeMs }) {
+  if (inGang === true) return false;              // dann entscheidet Block 1c
+  if (nurKampfStuecke !== true || knoten !== GANG_HOLD_NODE || switchOn !== true) return false;
+  if (!Number.isFinite(nodeAgeMs) || nodeAgeMs < 0) return false;
+  return nodeAgeMs < GANG_HOLD_MAX_MS;
+}

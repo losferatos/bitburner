@@ -163,3 +163,23 @@ Sichtbarkeit und Einspielen; sie sind vor bzw. beim Einspielen zu erledigen.
 - Ob bn4net fuer gang.js im fruehen BN2.2 einen 30-GB-Platz findet (Platzierung in lib/reg.js nicht
   nachgelesen) - darum die Pruefung in B2.
 - Geld-Absolutwert: weiter erst nach dem ersten Umschalten messbar (Abnahme 1).
+
+
+## Reparatur 04.10.2026 (Statusliste zu den Befunden oben)
+
+Commits im Zweig p2d-geldmodus: `1a48d17` (B2), `2d1587d` (B1, Werkzeugseite), `42cb092` (gang.js, Kopf, Tests).
+Noch KEIN zweiter Skeptiker-Lauf ueber die Reparatur selbst (kein `[skeptiker]` in den Commits).
+
+| # | Status | Was |
+|---|---|---|
+| B1 | behoben | gangZeile: Modus mit Ruf/Bedarf oder Grund, Gang-Geld x5 in $/s, Ausruestung (Stueck, Summe, Block); gangBefunde: GANG-BEFUND bei Bedarf > 30 min null (repNeedNullSince, repNeedWhy); gate-round-status: Zeile "Geldmodus-Bedarf"; checkin druckt die Befunde |
+| B2 | behoben | `importpruefung.js` prueft benannte Importe gegen Exporte (an der Live-Lage: genau die vier Namen von lib/einbau.js); Ablauf SO WIRD P2d EINGESPIELT im Kopf von gang.js (lib/einbau.js zuerst) |
+| B3 | bewusst offen | keine Aenderung; Zahlen im Kopf (OFFENE PUNKTE) |
+| B4 | behoben | Kopftext durch die Zahlen ersetzt |
+| B5 | bewusst offen | Zahlen im Kopf; "nur Phase work ausstatten" als spaetere Option |
+| B6 | behoben | Kopftext mit den Werten des frischen Knotens |
+| B7 | behoben | Abnahme 5 umformuliert; mode/Bedarf/Zeitpunkt leer ohne Gang und in der Hacking-Gang (clearLead) |
+| B8 | offen (Zweig) | `tools/audit/gang-p2b-gegen.mjs` liegt nur auf master; Z. 145, 157, 208 muessen auf `gang.facName` aus dem Spielstand, nach dem Zusammenfuehren; im Kopf von gang.js (Abnahme 1) als Warnung vermerkt |
+| B9 | behoben | test-bn4rep-ebene2 Z2 (Vertrag bn4rep.js -> gang.js repNeedOf/chooseMode an echter Telemetrie), test-gang S18 Gegenrichtung (gang.js -> gangFactionFromTelemetry) |
+| B10 | behoben | Notschalter `data/gang-geld-aus.txt` (nur Geldmodus; nicht lesbar = aus) |
+| B11 | erklaert | test-ram 2 rot = CRLF der Worktree-Dateien gegen die Rohbyte-Stempel (Haupt-Repo 123 von 123 Stempel passend, Worktree 42; wirklich veraltet nur bn4rep.js, gang.js, lib/einbau.js); nach dem Einspielen im Spiel nachmessen (`eichung-messen --schreib`) |

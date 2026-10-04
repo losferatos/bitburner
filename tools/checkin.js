@@ -33,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./lib/rangkurve.js";
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 import { gateRoundStatus } from "./lib/gate-round-status.js";
-import { gangZeile } from "./lib/gangzeile.js";
+import { gangZeile, gangBefunde } from "./lib/gangzeile.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -762,6 +762,12 @@ async function main() {
         sag(gangText);
         bericht.gang = gangText;
       }
+      // Befunde des Geldmodus (P2d, B1): faellt der Rufbedarf laenger als 30 min aus,
+      // bleibt die Gang still auf Terrorism - ohne diese Zeile sieht das aus wie
+      // "Ruf noch unter Bedarf".
+      const gangFunde = gangBefunde(gangTel, Date.now());
+      for (const f of gangFunde) sag(f);
+      if (gangFunde.length) bericht.gangBefunde = gangFunde;
     }
 
     // Die drei Autonomie-Kennzahlen, sobald sie einen Wert haben. Sie sind

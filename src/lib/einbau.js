@@ -1068,3 +1068,147 @@ export function gangHoldBeforeFounding({ nurKampfStuecke, knoten, switchOn, inGa
   if (!Number.isFinite(nodeAgeMs) || nodeAgeMs < 0) return false;
   return nodeAgeMs < GANG_HOLD_MAX_MS;
 }
+
+/**
+ * GELDMODUS DER GANG: DER RUFBEDARF (P2d, 04.10.2026; nodes/audit-2026-10-03/
+ * verify-p2b-gang.md Abschnitt 3 und 8, verify-p2b-substanz.md S3).
+ *
+ * gang.js arbeitet auf Respekt (Terrorism), solange der Faktionsruf der Gang
+ * fuer die naechste Torrunde noch nicht reicht, und danach auf Geld (Human
+ * Trafficking). WIE VIEL Ruf reicht, weiss nur der Planer: Es ist der hoechste
+ * Rufbedarf der Stuecke, die `waehleTorRunde` bei dem Budget plant, das die
+ * Runde haben wird - nicht der hoechste Bedarf aller offenen Stuecke (das waere
+ * Graphene Bionic Spine Upgrade mit 1,625 Mio, im frischen Knoten bis ~1000 Mrd
+ * Budget gar nicht in der Runde; der Planer braucht dort 1,25 Mio, und der
+ * Mehrruf kostet ~0,4 h bis 1 h Terrorism, ohne die Runde zu verbessern).
+ *
+ * Deshalb rechnet bn4rep.js (Block 1c) neben dem echten Plan einen zweiten:
+ * dieselbe Kandidatenbildung, aber OHNE die Rufgrenze (`repNeedKandidaten`),
+ * mit dem REP_NEED_BUDGET_FACTOR-fachen Geld von jetzt (die Gang liefert bis
+ * zum Tor ein Vielfaches des heutigen Kontos), ohne The Red Pill. Aus dem
+ * Plan holt `gangRepNeed` den Bedarf: REP_NEED_MARGIN x hoechster repReq der
+ * Stuecke, die der Plan bei der GANG-Faktion kaufen wuerde. Stuecke anderer
+ * Faktionen zaehlen nicht - deren Ruf macht die Gang nicht.
+ *
+ * Alles rein, ohne ns und ohne Import - wie der Rest dieser Datei.
+ */
+
+/** Sicherheitszuschlag auf den hoechsten Rufbedarf (verify-p2b-gang.md: "+ 2 %"). gang.js fuehrt dieselbe Zahl (REP_NEED_MARGIN). */
+export const REP_NEED_MARGIN = 1.02;
+
+/**
+ * Das Budget des Bedarfsplans, als Vielfaches des Kontos von jetzt. Die Gang
+ * verdient im Geldmodus 16-40 Mrd/h, das Konto am Tor ist ein Mehrfaches des
+ * heutigen (verify-p2b-gang.md Abschnitt 4: 12 Mrd jetzt, 388-601 Mrd am Tor).
+ * Vier ist ein bewusst grober Hebel, kein gerechneter Wert: der Planer saettigt
+ * (Preisfaktor 1,9 je Stueck), der Bedarf aendert sich oberhalb von ~150 Mrd
+ * Budget nur noch an einer Stelle (1,25 -> 1,625 Mio).
+ */
+export const REP_NEED_BUDGET_FACTOR = 4;
+
+/** Wie alt data/gang.json hoechstens sein darf, damit die Faktion daraus gilt (= freshnessMs des gang.js-Eintrags). */
+export const GANG_TEL_MAX_AGE_MS = 10 * 60000;
+
+/**
+ * Die Faktion der Gang aus der Telemetrie von gang.js (data/gang.json).
+ *
+ * WARUM AUS DER DATEI UND NICHT AUS ns.gang.getGangInformation(): der Aufruf
+ * kostet 2 GB statischen Arbeitsspeicher in bn4rep.js (68,55 GB heute), die
+ * Datei nichts. gang.js schreibt `faction` und `inGang` alle 10 s; die Faktion
+ * einer Gang aendert sich nie, nur ein Knotenwechsel loescht die Gang - und
+ * dann steht `inGang` false bzw. der Block ist alt.
+ *
+ * @param {object|null} tel geparste data/gang.json
+ * @param {number} nowMs Date.now()
+ * @returns {{faction: string|null, why: string}}
+ */
+export function gangFactionFromTelemetry(tel, nowMs, maxAgeMs = GANG_TEL_MAX_AGE_MS) {
+  if (!tel || typeof tel !== "object" || Array.isArray(tel)) {
+    return { faction: null, why: "data/gang.json fehlt oder ist unlesbar (gang.js laeuft nicht?)" };
+  }
+  if (tel.inGang !== true) return { faction: null, why: "data/gang.json meldet keine Gang" };
+  if (typeof tel.faction !== "string" || !tel.faction) {
+    return { faction: null, why: "data/gang.json ohne Faktion" };
+  }
+  const at = [tel.ts, tel.wall].find((x) => Number.isFinite(x));
+  if (at === undefined) return { faction: null, why: "data/gang.json ohne Zeitstempel" };
+  const age = nowMs - at;
+  if (age < -60000) return { faction: null, why: "data/gang.json stammt aus der Zukunft - Uhrensprung?" };
+  if (age > maxAgeMs) return { faction: null, why: "data/gang.json veraltet (" + Math.round(age / 60000) + " min)" };
+  return { faction: tel.faction, why: "" };
+}
+
+/**
+ * Kandidaten des Bedarfsplans: ALLE Kampfstuecke ohne Rufgrenze.
+ *
+ * `eingabe` hat dasselbe Format wie die Eingabe des echten Plans ({aug,
+ * faktion, rep, repReq, preis, prereq, mults}), aber UNGEFILTERT nach Ruf (und
+ * ohne The Red Pill - das schliesst bn4rep.js beim Bilden aus). Hier wird nur
+ * entschieden, wie ein Stueck in den Plan kommt:
+ *
+ *   - Stuecke, die irgendeine Faktion SCHON verkauft (rep >= repReq), gehen mit
+ *     ihrem echten Ruf hinein - ihre Faktion zaehlt im Bedarf nicht, wenn sie
+ *     nicht die Gang-Faktion ist. Stuecke dieser Art aus FREMDEN Faktionen
+ *     stehen VOR denen der Gang-Faktion: `waehleTorRunde` nimmt je Namen den
+ *     ersten Eintrag, und ein Stueck, das ohne Gang-Ruf kaufbar ist, darf den
+ *     Bedarf nicht in die Hoehe treiben.
+ *   - Stuecke der GANG-Faktion mit zu wenig Ruf gehen mit rep = Infinity
+ *     hinein: der Bedarfsplan fragt gerade, was die Gang bringen MUSS.
+ *   - Stuecke FREMDER Faktionen mit zu wenig Ruf fallen weg: sie sind ohne
+ *     deren Ruf nicht kaufbar, und die Gang liefert den nicht. Sie nahmen
+ *     sonst Budget weg und druecken den Bedarf der Gang-Stuecke.
+ *
+ * Ohne bekannte Gang-Faktion bleibt nur der erste Fall.
+ *
+ * @returns {object[]} Kandidaten fuer waehleTorRunde
+ */
+export function repNeedKandidaten(eingabe, gangFaction) {
+  const freeOther = [];
+  const freeGang = [];
+  const needGang = [];
+  for (const k of Array.isArray(eingabe) ? eingabe : []) {
+    if (!k) continue;
+    if (k.rep >= k.repReq) {
+      if (gangFaction && k.faktion === gangFaction) freeGang.push(k); else freeOther.push(k);
+    } else if (gangFaction && k.faktion === gangFaction) {
+      needGang.push({ ...k, rep: Infinity });
+    }
+  }
+  return freeOther.concat(freeGang, needGang);
+}
+
+/**
+ * Der Rufbedarf der Gang aus dem Bedarfsplan.
+ *
+ * `plan` ist das Ergebnis von waehleTorRunde ({steps: [{aug, faktion, price}]}),
+ * `augRepReq` ordnet jedem Stueck seinen Rufbedarf zu (Map oder Objekt).
+ * Gezaehlt werden nur die Schritte bei der GANG-Faktion. Fehlt der Rufbedarf
+ * eines solchen Stuecks, gibt es keinen Bedarf (null) - lieber zurueck auf
+ * Respekt als auf einer Luecke umschalten.
+ *
+ * @returns {{repNeed: number|null, faction: string|null, aug: string|null, why: string}}
+ *   repNeed = REP_NEED_MARGIN x hoechster repReq; aug = das Stueck, das ihn bestimmt
+ */
+export function gangRepNeed(plan, gangFaction, augRepReq) {
+  const none = (why) => ({ repNeed: null, faction: null, aug: null, why });
+  if (typeof gangFaction !== "string" || !gangFaction) return none("Gang-Faktion unbekannt");
+  const steps = plan && Array.isArray(plan.steps) ? plan.steps : null;
+  if (!steps) return none("kein Plan");
+  const lookup = (name) => (augRepReq instanceof Map ? augRepReq.get(name)
+    : (augRepReq && typeof augRepReq === "object" ? augRepReq[name] : undefined));
+  let max = 0;
+  let aug = null;
+  let counted = 0;
+  for (const s of steps) {
+    if (!s || s.faktion !== gangFaction) continue;
+    const req = lookup(s.aug);
+    if (typeof req !== "number" || !Number.isFinite(req) || req < 0) {
+      return none("Rufbedarf von " + String(s.aug) + " unbekannt");
+    }
+    counted++;
+    if (req > max) { max = req; aug = s.aug; }
+  }
+  if (!counted) return none("der Plan enthaelt kein Stueck der Gang-Faktion");
+  if (!(max > 0)) return none("kein Stueck des Plans braucht Ruf");
+  return { repNeed: max * REP_NEED_MARGIN, faction: gangFaction, aug, why: "" };
+}

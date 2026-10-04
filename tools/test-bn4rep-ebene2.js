@@ -1430,6 +1430,165 @@ console.log("\n-- P1 S16: data/einbau.json spiegelt den Grund der Torrunde (wer 
 }
 
 // ===========================================================================
+// P2d (04.10.2026): GELDMODUS DER GANG - DER RUFBEDARF IN DER TELEMETRIE
+// (nodes/audit-2026-10-03/verify-p2b-gang.md Abschnitt 3 und 8, verify-p2b-substanz.md S3)
+// ===========================================================================
+//
+// bn4rep.js rechnet neben der echten Torrunde einen ZWEITEN Plan ueber alle
+// Kampfstuecke ohne Rufgrenze, mit dem vierfachen Geld von jetzt, und schreibt
+// torRunde.repNeed = 1,02 x hoechster Rufbedarf der Stuecke dieses Plans bei der
+// Gang-Faktion (Slum Snakes). gang.js liest die Zahl. Die Gang-Faktion kommt aus
+// data/gang.json (gang.js schreibt sie); fehlt sie, gibt es keinen Bedarf.
+//
+// Die Welt ist weltGang(): Slum Snakes mit 1,5 Mio Ruf, SPTN-97 (1,25 Mio) und
+// Graphene Bionic Spine Upgrade (1,625 Mio) im Angebot, Tor gesperrt (junger
+// Wiederaufbau) - die Runde erreicht die Telemetrie, gekauft wird nichts.
+const GANG_JETZT = 1_790_442_188_000;     // baueWelt: uhr
+const gangJson = (over = {}) => JSON.stringify({ ts: GANG_JETZT - 5000, wall: GANG_JETZT - 5000, inGang: true, faction: "Slum Snakes", ...over });
+const needWelt = (o = {}) => {
+  const { gangDatei, ...rest } = o;
+  const extra = { "data/einbau-uhr.json": einbauUhrJung() };
+  if (gangDatei !== null) extra["data/gang.json"] = gangDatei ?? gangJson();
+  return weltGang({ schlafBudget: 3, ...rest, dateien: { home: dGang(extra) } });
+};
+const rnVon = (w) => { const t = teleVon(w); return t && t.torRunde ? t.torRunde : null; };
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N1: Budget 240 Mrd (4 x 60 Mrd) -> der Plan braucht 1,625 Mio (Bionic Spine Upgrade) -> repNeed 1.657.500 --");
+{
+  const w = needWelt({ geld: 60e9 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const tr = rnVon(w);
+  pruefe("repNeed = 1,02 x 1.625.000 = 1.657.500", !!tr && Math.abs(tr.repNeed - 1.02 * 1625000) < 1e-6, tr ? String(tr.repNeed) : "keine Telemetrie");
+  pruefe("repNeedFaction ist Slum Snakes, das bestimmende Stueck Graphene Bionic Spine Upgrade",
+    !!tr && tr.repNeedFaction === "Slum Snakes" && tr.repNeedAug === "Graphene Bionic Spine Upgrade", tr ? JSON.stringify([tr.repNeedFaction, tr.repNeedAug]) : "");
+  pruefe("der Bedarfsplan hat das 4fache Budget (240 Mrd) und mehrere Stuecke",
+    !!tr && !!tr.repNeedPlan && tr.repNeedPlan.budget === 240e9 && tr.repNeedPlan.n >= 5 && tr.repNeedPlan.cost <= 240e9, tr ? JSON.stringify(tr.repNeedPlan) : "");
+  pruefe("kein Fehler gezaehlt (gangErrors 0), kein Grund", !!tr && tr.gangErrors === 0 && tr.repNeedWhy === "", tr ? JSON.stringify([tr.gangErrors, tr.repNeedWhy]) : "");
+  pruefe("der echte Plan ist davon unberuehrt: Rufbedarf der echten Runde liegt unter 1,5 Mio (Spine Upgrade fehlt dort der Ruf)",
+    !!tr && tr.plan.n >= 5 && tr.plan.first !== "Graphene Bionic Spine Upgrade", tr ? JSON.stringify(tr.plan) : "");
+  pruefe("The Red Pill nie im Bedarf (2,5 Mio -> 2.550.000 waere es gewesen)", !!tr && tr.repNeed < 2.5e6, tr ? String(tr.repNeed) : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N2: kleines Budget (4 x 5 Mrd = 20 Mrd) -> der Plan braucht nur 1,25 Mio (SPTN-97) -> repNeed 1.275.000 --");
+{
+  const w = needWelt({ geld: 5e9 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const tr = rnVon(w);
+  pruefe("repNeed = 1,02 x 1.250.000 = 1.275.000, Stueck SPTN-97 Gene Modification",
+    !!tr && Math.abs(tr.repNeed - 1.02 * 1250000) < 1e-6 && tr.repNeedAug === "SPTN-97 Gene Modification", tr ? JSON.stringify([tr.repNeed, tr.repNeedAug]) : "keine Telemetrie");
+  pruefe("Budget 20 Mrd in der Telemetrie", !!tr && !!tr.repNeedPlan && tr.repNeedPlan.budget === 20e9, tr ? JSON.stringify(tr.repNeedPlan) : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N2b: Konto 40 Mrd (Budget 160 Mrd) liegt noch UNTER der Schwelle zum Spine Upgrade -> 1.275.000 (grenzt den Faktor 4 nach oben ein) --");
+{
+  const w = needWelt({ geld: 40e9 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const tr = rnVon(w);
+  pruefe("repNeed 1.275.000 bei Budget 160 Mrd (bei 60 Mrd Konto, Budget 240 Mrd, sind es 1.657.500 - N1)",
+    !!tr && Math.abs(tr.repNeed - 1.02 * 1250000) < 1e-6 && tr.repNeedPlan.budget === 160e9, tr ? JSON.stringify([tr.repNeed, tr.repNeedPlan]) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N3: kein Bedarf ohne Gang-Faktion (data/gang.json fehlt / alt / meldet keine Gang / andere Faktion) --");
+{
+  const faelle = [
+    ["data/gang.json fehlt", { gangDatei: null }, /gang\.json/],
+    ["data/gang.json 11 min alt", { gangDatei: gangJson({ ts: GANG_JETZT - 11 * 60000, wall: GANG_JETZT - 11 * 60000 }) }, /veraltet/],
+    ["data/gang.json meldet keine Gang", { gangDatei: gangJson({ inGang: false }) }, /keine Gang/],
+    ["data/gang.json ohne Faktion", { gangDatei: gangJson({ faction: undefined }) }, /Faktion/],
+    ["die Gang gehoert zu Tetrads (kein Stueck von Tetrads im Angebot)", { gangDatei: gangJson({ faction: "Tetrads" }) }, /kein Stueck der Gang-Faktion/],
+  ];
+  for (const [label, o, re] of faelle) {
+    const w = needWelt({ geld: 60e9, ...o });
+    const r = await fahre(w);
+    const tr = rnVon(w);
+    pruefe(label + ": repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler",
+      vollstaendig(r) && !!tr && tr.repNeed === null && re.test(tr.repNeedWhy) && tr.gangErrors === 0,
+      tr ? JSON.stringify([tr.repNeed, tr.repNeedWhy, tr.gangErrors]) : "keine Telemetrie " + vollHinweis(r));
+  }
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N4: data/gang.json kaputt -> GEZAEHLTER Fehler, repNeed null, die echte Torrunde bleibt heil --");
+{
+  const w = needWelt({ geld: 60e9, gangDatei: "{kaputt" });
+  const r = await fahre(w);
+  const tr = rnVon(w);
+  pruefe("Nachbau vollstaendig (der Wurf wird im Block gefangen)", vollstaendig(r), vollHinweis(r));
+  pruefe("gangErrors >= 1, lastGangError nennt repNeed, repNeed null",
+    !!tr && tr.gangErrors >= 1 && /repNeed/.test(tr.lastGangError) && tr.repNeed === null, tr ? JSON.stringify([tr.gangErrors, tr.lastGangError, tr.repNeed]) : "keine Telemetrie");
+  pruefe("der echte Plan steht trotzdem (Modus locked, Plan mit Stuecken)", !!tr && tr.mode === "locked" && tr.plan.n >= 5, tr ? JSON.stringify([tr.mode, tr.plan]) : "");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N5: The Red Pill im Angebot der Gang-Faktion (2,5 Mio) beeinflusst den Bedarf nicht --");
+{
+  const w = needWelt({
+    geld: 600e9,
+    augs: { ...AUGS_GANG, "The Red Pill": { repReq: 2.5e6, basis: 0 } },
+    faktionen: {
+      "Slum Snakes": { favor: 0, rep: 1.5e6, augs: [...GANG_AUGS, "The Red Pill"] },
+      Bladeburners: { favor: 0, rep: 9505, augs: ["Hyperion Plasma Cannon V1"] },
+    },
+  });
+  const r = await fahre(w);
+  const tr = rnVon(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("repNeed bleibt 1.657.500 (Bionic Spine Upgrade), nicht 2.550.000", !!tr && Math.abs(tr.repNeed - 1.02 * 1625000) < 1e-6, tr ? String(tr.repNeed) : "keine Telemetrie");
+  pruefe("kein Kauf, The Red Pill nicht in der Warteschlange", w.kaeufe.length === 0 && !w.warteschlange.includes("The Red Pill"), w.kaeufe.map((k) => k.a).join(", "));
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N6: ein Stueck, das eine FREMDE Faktion mit genug Ruf verkauft, treibt den Bedarf nicht --");
+{
+  // Bladeburners (Ruf 2 Mio) verkaufen das Spine Upgrade (1,625 Mio) SCHON jetzt, die Gang-Faktion bietet es
+  // ebenfalls an (Ruf 1,5 Mio, fehlt noch). Es ist ohne Gang-Ruf kaufbar und darf den Bedarf nicht bestimmen:
+  // dann bestimmt SPTN-97 (1,25 Mio) das Maximum. Gegenprobe ist N1 (Bladeburners mit 9.505 Ruf): 1.657.500.
+  const w = needWelt({
+    geld: 60e9,
+    faktionen: {
+      "Slum Snakes": { favor: 0, rep: 1.5e6, augs: GANG_AUGS },
+      Bladeburners: { favor: 0, rep: 2e6, augs: ["Hyperion Plasma Cannon V1", "Graphene Bionic Spine Upgrade"] },
+    },
+  });
+  const r = await fahre(w);
+  const tr = rnVon(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("SPTN-97 (1,25 Mio) bestimmt den Bedarf, nicht das bei Bladeburners kaufbare Spine Upgrade: 1.275.000",
+    !!tr && tr.repNeedAug === "SPTN-97 Gene Modification" && Math.abs(tr.repNeed - 1.02 * 1250000) < 1e-6, tr ? JSON.stringify([tr.repNeedAug, tr.repNeed]) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d N7: ein Stueck einer FREMDEN Faktion ohne genug Ruf kommt nicht in den Bedarfsplan (kein Gang-Ruf macht es kaufbar) --");
+{
+  // Tian Di Hui (Ruf 100) bietet Photosynthetic Cells (9 Mio Ruf) an: ohne deren Ruf nicht kaufbar, und die Gang liefert
+  // ihn nicht. Es darf weder Budget verbrauchen noch den Bedarf beruehren - der Plan ist derselbe wie ohne diese Faktion.
+  const basis = needWelt({ geld: 60e9 });
+  await fahre(basis);
+  const w = needWelt({
+    geld: 60e9,
+    augs: { ...AUGS_GANG, "Photosynthetic Cells": { repReq: 9e6, basis: 5e9, stats: COMBAT_AUGS["Photosynthetic Cells"] } },
+    faktionen: {
+      "Slum Snakes": { favor: 0, rep: 1.5e6, augs: GANG_AUGS },
+      Bladeburners: { favor: 0, rep: 9505, augs: ["Hyperion Plasma Cannon V1"] },
+      "Tian Di Hui": { favor: 0, rep: 100, augs: ["Photosynthetic Cells"] },
+    },
+  });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const a = rnVon(basis), tr = rnVon(w);
+  pruefe("derselbe Bedarfsplan (Stuecke, Kosten) und derselbe Bedarf wie ohne die fremde Faktion",
+    !!a && !!tr && JSON.stringify(a.repNeedPlan) === JSON.stringify(tr.repNeedPlan) && a.repNeed === tr.repNeed,
+    JSON.stringify([a && a.repNeedPlan, tr && tr.repNeedPlan, a && a.repNeed, tr && tr.repNeed]));
+}
+
+// ===========================================================================
 // PAKET 0 (03.10.2026, Audit "vollstaendig", verify-g01-betrieb.md Abschnitt 1
 // und 5, verify-g02-beide.md Abschnitt 5/7): zwei Fehlregeln, die im
 // Bladeburner-Knoten mit Gang bzw. mit SF9 zuschlagen.

@@ -50,6 +50,8 @@ import {
   waehleTorRunde, gangBonusWait, gateBuyMode, blackOpWeights, gateMultsProduct, gatePriceStep,
   bladeEffFactors, effectiveLevels, bladeSkillLevels, readGateBonusState,
   gateAbortHold, GATE_ABORT_HOLD_ROUNDS, gangHoldBeforeFounding,
+  // P2d (04.10.2026): Rufbedarf der Gang fuer den Geldmodus von gang.js.
+  REP_NEED_BUDGET_FACTOR, repNeedKandidaten, gangRepNeed, gangFactionFromTelemetry,
 } from "lib/einbau.js";
 import { COMBAT_AUGS } from "lib/hackaugs.js";
 // AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
@@ -1676,10 +1678,14 @@ export async function main(ns) {
           // gateCompetence). Ohne frische Faehigkeitsstufen rohe Stufen.
           const eff = gateBo.skills.ok
             ? bladeEffFactors(gateBo.skills.reaper, gateBo.skills.evasive) : null;
-          const plan = waehleTorRunde(planEingabe, geldJetzt, besitz, {
+          // Die Planoptionen stehen in EINER Konstante: der Bedarfsplan unten
+          // (P2d) rechnet mit denselben Faehigkeitsstufen, Gewichten, wartenden
+          // Stuecken und demselben Preisfaktor wie die echte Runde.
+          const planOpts = {
             skills: effectiveLevels(spieler.skills, eff), weights: bo.weights, decays: bo.decays,
             startMults, priceStep: gatePriceStep(sf11),
-          });
+          };
+          const plan = waehleTorRunde(planEingabe, geldJetzt, besitz, planOpts);
           gateBedarf = plan.cost;
 
           // (3) Wartet die Runde auf den Gang-Vorrat?
@@ -1785,6 +1791,63 @@ export async function main(ns) {
                 + (bonus.reason ? " Hinweis: " + bonus.reason + "." : ""));
             }
           }
+          // (6) GELDMODUS DER GANG: DER RUFBEDARF (P2d, 04.10.2026;
+          // nodes/audit-2026-10-03/verify-p2b-gang.md Abschnitt 3 und 8).
+          //
+          // gang.js arbeitet auf Respekt, bis der Faktionsruf der Gang fuer die
+          // naechste Torrunde reicht, und danach auf Geld. Wie viel "reicht",
+          // sagt nur der Planer: ein ZWEITER Plan ueber alle Kampfstuecke ohne
+          // Rufgrenze (repNeedKandidaten; The Red Pill bleibt draussen), mit dem
+          // REP_NEED_BUDGET_FACTOR-fachen Geld von jetzt. Der Bedarf ist 1,02 x
+          // der hoechste Rufbedarf der Stuecke dieses Plans bei der Gang-Faktion
+          // (gangRepNeed). gang.js liest ihn aus torRunde.repNeed.
+          //
+          // Die Gang-Faktion kommt aus data/gang.json (gang.js schreibt sie), nicht
+          // aus ns.gang.getGangInformation(): 2 GB RAM mehr in einem Gewerk mit
+          // 68 GB. Fehlt sie, gibt es keinen Bedarf und gang.js bleibt auf
+          // Respekt - der sichere Rueckfall.
+          //
+          // Nach dem Kauf der Runde gibt es keine Telemetrie (die Runde endet mit
+          // `continue`), also wird auch nicht gerechnet. Ein Fehler hier ist ein
+          // GEZAEHLTER Fehler (gangErrors) und ein Bedarf null - er beruehrt den
+          // echten Plan und den Kauf nie, die stehen oben.
+          let rn = { repNeed: null, faction: null, aug: null, why: "" };
+          let rnFaktion = null;
+          let rnPlan = null;
+          if (!gateBought) {
+            try {
+              let gangTel = null;
+              const gangRoh = liesVonHome("data/gang.json");
+              if (gangRoh) gangTel = JSON.parse(gangRoh);
+              const gf = gangFactionFromTelemetry(gangTel, jetztMs);
+              rnFaktion = gf.faction;
+              if (!gf.faction) {
+                rn.why = gf.why;
+              } else {
+                const alle = [];
+                for (const k of kandidaten) {
+                  const mults = COMBAT_AUGS[k.aug];
+                  if (!mults || k.aug === EXIT_KEY) continue;
+                  const prereq = prereqOf(k.aug);
+                  if (prereq === null) continue;
+                  alle.push({
+                    aug: k.aug, faktion: k.faktion, rep: k.rep, repReq: k.repReq,
+                    preis: k.preis, prereq, mults,
+                  });
+                }
+                const needBudget = geldJetzt * REP_NEED_BUDGET_FACTOR;
+                const needPlan = waehleTorRunde(repNeedKandidaten(alle, gf.faction), needBudget, besitz, planOpts);
+                rnPlan = { n: needPlan.steps.length, cost: Math.round(needPlan.cost), budget: Math.round(needBudget) };
+                rn = gangRepNeed(needPlan, gf.faction, new Map(kandidaten.map((k) => [k.aug, k.repReq])));
+              }
+            } catch (e) {
+              gangCountError("repNeed", e);
+              rn = { repNeed: null, faction: null, aug: null, why: "Fehler: " + String(e && e.message ? e.message : e).slice(0, 100) };
+            }
+          } else {
+            rn.why = "Runde gekauft - nicht gerechnet";
+          }
+
           gateTele = {
             mode, gateOpen,
             reason: String(gateReason).slice(0, 160),
@@ -1809,6 +1872,10 @@ export async function main(ns) {
             bought: gateBought, boughtTotal: gateBoughtTotal, lastRound: gateLastRound,
             buyFailures: gateBuyFailures, planDrift: gatePlanDrift,
             gangErrors: gateErrors, lastGangError: gateLastError,
+            // P2d: der Rufbedarf fuer gang.js (Zahl oder null), die Faktion, auf die er
+            // sich bezieht, das Stueck, das ihn bestimmt, und der Bedarfsplan dahinter.
+            repNeed: rn.repNeed, repNeedFaction: rnFaktion, repNeedAug: rn.aug,
+            repNeedWhy: String(rn.why).slice(0, 120), repNeedPlan: rnPlan,
           };
         }
       } catch (e) {

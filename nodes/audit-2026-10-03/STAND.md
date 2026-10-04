@@ -1,5 +1,14 @@
 # Audit "vollstaendig" 03.10.2026 - Stand und Wiedereinstieg
 
+**ABGESCHLOSSEN 04.10.2026 ~14:00 auf Erics Ansage** ("Verzichte auf die ganzen
+Gegenpruefungen und komme zum Ende"; vorher: zu viel CPU-Last durch drei
+parallele Laeufe). Ergebnis: `nodes/AUDIT-VOLLSTAENDIG-2026-10-03.md`
+(erzeugt mit tools/audit/audit-doku.mjs). Reste stehen in nodes/BAUSTELLEN.md
+unter "Audit vollstaendig abgeschlossen". Abgebrochene Laeufe:
+wf_b3d51941-a4a (P2e + Torfrequenz), wf_eed3a15c-8f7 (Gegenpruefung, 7 Gruppen
+fertig), wf_735d79f5-a82 (nur noch die Inventar-Kritik offen). Nicht fortsetzen
+ohne neuen Auftrag.
+
 Stand 03.10.2026 18:16 (Systemzeit). PAUSIERT auf Erics Ansage ("pausiere
 jetzt, ich starte dich im naechsten 5h-Fenster ueber Nacht").
 

@@ -1228,6 +1228,21 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
+### Audit "vollstaendig" abgeschlossen (04.10.2026) - Reste
+
+Abschluss in `nodes/AUDIT-VOLLSTAENDIG-2026-10-03.md` (125 Befunde: 7 gebaut,
+22 zurueckgestellt, 96 offen, davon 14 gegengeprueft). Eric hat die uebrige
+Gegenpruefung gestrichen (Kontingent, CPU). Vor BN2.3 noetig:
+
+- **P2c-Nacharbeit**: Frist des Kaufaufschubs vor der Gang an das Tor binden
+  statt 6 h (in BN2.2 brauchte die Gruendung 2,5 h, Karma -9 erst 13:05),
+  Ruecklage im Aufschub nur ueber COMBAT_AUGS, Fehlerfaelle in die billige
+  Richtung, Logtext, Tests. Angefangener Bau ohne Skeptiker im Worktree
+  `.claude/worktrees/p2e-nacharbeit` - nicht eingespielt.
+- **P2d-Abnahme (2)** beim ersten Umschalten auf Geld (~8-9 h nach der
+  Gruendung 04.10. 13:06): `node tools/audit/gang-p2b-gegen.mjs --live`,
+  moneyGainRate innerhalb 5 %, Strafe >= 0,95, Fehler 0.
+
 ### P1 / AUG-4: Reste nach dem Skeptiker-Urteil AUFLAGE (04.10.2026)
 
 Die zwei Auflagen und vier der Hinweise sind im Branch `audit-p1-kaufaufschub`

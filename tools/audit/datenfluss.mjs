@@ -955,6 +955,7 @@ function berechneFelder(WS, WH, sp, ho, registry) {
       leser: lokation, ungelesen: ungelesen.sort(), vielleicht: vielleicht.sort(), nurSchreiber: nurSchreiber.sort(), ganz, untracked, roh: rohN, gruende: [...gruende],
       gelesenNichtGeschrieben: [...gelesen].filter((g) => !alleKeys.has(g)).sort(),
       gelesenKeys: [...gelesen].sort(),
+      leserDetail: ls.map((l) => ({ stelle: l.rel + ":" + l.zeile, keys: [...l.keys].sort(), ganz: l.ganz, untracked: l.untracked, roh: l.roh, grund: l.grund })),
     });
   }
   // Dateien, die gelesen werden, deren Schreiber aber kein Objektliteral hat (Felder unbekannt)

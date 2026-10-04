@@ -103,7 +103,17 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   kein Ausruestungskauf unter die Ruecklage. Notschalter: data/gang-geld-aus.txt.
   Optional offen: E6 (Befund bei absichtlichem Notschalter), E7 (Grenzen der
   exportpruefung im Kopf), B3/B5.
-- 12:38 ACHTUNG: Gang in BN2.2 noch NICHT gegruendet (no_faction). Karma
+- 13:06 GANG BN2.2 GEGRUENDET (Slum Snakes, Karma -9 um 13:05:55). P2d-
+  ABNAHME (1) BESTANDEN: torRunde locked, repNeed 1.275.000 (SPTN-97, wie
+  gerechnet), gang mode respect, Fehler 0, kein GEKAUFT vor der Gruendung
+  (P2c hielt 10:54-13:06), /bb-Zeile "Modus RESPECT (Ruf 0 / Bedarf 1.275.000)".
+  B8 erledigt (3a8416c). Abnahme (2) beim Umschalten auf MONEY (~21-22 Uhr).
+- 13:1x Laeufe: `wf_b3d51941-a4a` (P2e-Nacharbeiten im Worktree
+  .claude/worktrees/p2e-nacharbeit + Pruefauftrag Torfrequenz), `wf_735d79f5-a82`
+  (WF1-Rest per Resume). Danach Gegenpruefung in 3 Stuecken: (1) G03-G06,
+  G09-G11; (2) G07, G08, G12, G13, G15-G17; (3) G18, G19, G21, G24, G25, G28,
+  B1, B2 + Praemisse.
+- (erledigt) 12:38 Gang in BN2.2 noch NICHT gegruendet (no_faction). Karma
   -4,28 um 12:17 (Slum Snakes braucht -9), Sleeves auf CLASS statt Crime.
   P2c-Frist laeuft 16:38 ab (Knotenstart ~10:38 + 6 h) - danach kauft die
   alte Schleife alles Verdiente. Ab 13:04: Karmarate messen; reicht sie nicht

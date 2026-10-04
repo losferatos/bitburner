@@ -92,7 +92,18 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   Gruendung, 0 GEKAUFT davor.
 - BN2.1 AUSGANG ~10:38, BN2.2 laeuft. 11:49: P2c greift (gangHold true,
   wartend 0, kein GEKAUFT), gang.js gang-2 wartet (no_faction).
-- P2d Geldmodus+Ausruestung: gebaut im Worktree .claude/worktrees/p2d-geldmodus
+- P2d LIVE 12:21 (a5e56c3 [skeptiker], c850b42 RAM): Bruecke schob die 4
+  Dateien beim Checkout 12:15 in EINEM Schub; bn4rep pid 18388, gang.js gang-3
+  pid 18456 auf run4theh111z (29,95 GB gemessen), Fehler 0, wartet no_faction.
+  ABNAHME OFFEN: (1) ~2 min nach der Gruendung torRunde.repNeed/repNeedWhy in
+  bn4rep.json und /bb-Zeile "Modus RESPECT (Ruf/Bedarf)"; (2) beim Umschalten
+  auf MONEY (~8-9 h nach der Gruendung): moneyGainRate gegen
+  tools/audit/gang-p2b-gegen.mjs innerhalb 5 % - VORHER B8 fixen ("Slum Snakes"
+  fest verdrahtet, Z. 145/157/208 -> gang.facName); penalty >= 0,95, Fehler 0,
+  kein Ausruestungskauf unter die Ruecklage. Notschalter: data/gang-geld-aus.txt.
+  Optional offen: E6 (Befund bei absichtlichem Notschalter), E7 (Grenzen der
+  exportpruefung im Kopf), B3/B5.
+- (Bauverlauf P2d) gebaut im Worktree .claude/worktrees/p2d-geldmodus
   (Branch p2d-geldmodus, HEAD a84142c, NICHT gepusht). Skeptiker 1: EINSPIELEN
   MIT FIX, Reparatur drin (B1 /bb-Zeile, B2 importpruefung, Notschalter
   data/gang-geld-aus.txt, Kopf mit Frischknoten-Zahlen). Zweiter Skeptiker

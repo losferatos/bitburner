@@ -142,20 +142,23 @@ async function readSave(src) {
   const s = JSON.parse(zlib.gunzipSync(buf).toString("utf8"));
   const p = JSON.parse(s.data.PlayerSave).data;
   const gang = p.gang.data;
-  const fac = JSON.parse(s.data.FactionsSave)["Slum Snakes"];
+  // B8 (P2d-Skeptiker 04.10.2026): die Gang-Faktion aus dem Spielstand, nicht fest "Slum Snakes".
+  const facName = gang.facName;
+  const fac = JSON.parse(s.data.FactionsSave)[facName];
+  // Der Spielstand laesst Felder mit Vorgabewert weg: bei Favor 0 fehlt `favor` (daher ?? 0 unten).
   const facD = fac.data || fac;
   const all = JSON.parse(s.data.AllGangsSave);
   const bb = p.bladeburner ? (p.bladeburner.data || p.bladeburner) : null;
   return { label: src === "LIVE" ? "LIVE" : path.basename(src).replace(/^LIVE_[0-9a-f]+_/, "").replace(/\.json\.gz$/, ""),
-    p, gang, members: gang.members.map((x) => x.data), favor: facD.favor, rep: facD.playerReputation, all,
+    p, gang, facName, members: gang.members.map((x) => x.data), favor: facD.favor ?? 0, rep: facD.playerReputation, all,
     pt: p.totalPlaytime, frm: p.mults.faction_rep, rank: bb ? bb.rank : null, bo: bb ? bb.numBlackOpsComplete : null };
 }
 
 const f2 = (x, d = 2) => (Number.isFinite(x) ? x.toLocaleString("de-DE", { minimumFractionDigits: d, maximumFractionDigits: d }) : String(x));
 
 function analyse(S) {
-  const g = { respect: S.gang.respect, wanted: S.gang.wanted, territory: S.all["Slum Snakes"].territory };
-  const out = { label: S.label, pt: S.pt, rank: S.rank, bo: S.bo, rep: S.rep, respect: g.respect, wanted: g.wanted, members: S.members.length };
+  const g = { respect: S.gang.respect, wanted: S.gang.wanted, territory: S.all[S.facName].territory };
+  const out = { facName: S.facName, label: S.label, pt: S.pt, rank: S.rank, bo: S.bo, rep: S.rep, respect: g.respect, wanted: g.wanted, members: S.members.length };
   // (1) Stufen
   let lvlDiff = 0;
   for (const m of S.members) { const L = levelsWith(m); for (const s of S6) lvlDiff += Math.abs(L[s] - m[s]); }
@@ -205,7 +208,7 @@ function analyse(S) {
   const m0 = S.members[0];
   out.m0 = { L: levelsWith(m0), Leq: levelsWith(m0, prod), swHT: sw(HT, levelsWith(m0), 3.2), swHTeq: sw(HT, levelsWith(m0, prod), 3.2) };
   // (4) Rabatt und Ausruestungspreis fuer alle Mitglieder
-  const power = S.all["Slum Snakes"].power;
+  const power = S.all[S.facName].power;
   const d = discountOf(g.respect, power);
   const setCost = EQUIP.reduce((a, [, c]) => a + c, 0);
   out.discount = d; out.setCostRaw = setCost; out.fullCost = setCost * S.members.length / d;
@@ -244,5 +247,5 @@ for (const f of list) {
   console.log("      Mitglied " + S.members[0].name + ": Stufen " + JSON.stringify(a.m0.L) + " statWeight(HT) " + f2(a.m0.swHT, 1)
     + " | mit Ausruestung " + JSON.stringify(a.m0.Leq) + " statWeight " + f2(a.m0.swHTeq, 1));
   console.log("  (4) Rabatt " + f2(a.discount, 3) + "  Satz je Mitglied roh " + f2(a.setCostRaw / 1e6, 0) + " Mio  -> alle " + a.members + " Mitglieder " + f2(a.fullCost / 1e9, 3) + " Mrd");
-  console.log("      NPC: " + Object.entries(a.npc).filter(([k, v]) => v.territory > 0 || k === "Slum Snakes").map(([k, v]) => k + " P " + f2(v.power, 1) + " T " + f2(v.territory, 4)).join(" | "));
+  console.log("      NPC: " + Object.entries(a.npc).filter(([k, v]) => v.territory > 0 || k === a.facName).map(([k, v]) => k + " P " + f2(v.power, 1) + " T " + f2(v.territory, 4)).join(" | "));
 }

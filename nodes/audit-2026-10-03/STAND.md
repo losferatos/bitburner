@@ -90,8 +90,18 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   (Skeptiker-Bericht im Chat 04.10. ~10:15, Pruefskripte im Scratchpad).
   Pruefen in BN2.2: Log "KAUFAUFSCHUB VOR DER GANG", gangHold true bis zur
   Gruendung, 0 GEKAUFT davor.
-- P2d Geldmodus+Ausruestung: Bau-Workflow `wf_7ce66382-81d` im Worktree
-  .claude/worktrees/p2d-geldmodus (auf p2c). Abnahme im Kopf von gang.js.
+- BN2.1 AUSGANG ~10:38, BN2.2 laeuft. 11:49: P2c greift (gangHold true,
+  wartend 0, kein GEKAUFT), gang.js gang-2 wartet (no_faction).
+- P2d Geldmodus+Ausruestung: gebaut im Worktree .claude/worktrees/p2d-geldmodus
+  (Branch p2d-geldmodus, HEAD a84142c, NICHT gepusht). Skeptiker 1: EINSPIELEN
+  MIT FIX, Reparatur drin (B1 /bb-Zeile, B2 importpruefung, Notschalter
+  data/gang-geld-aus.txt, Kopf mit Frischknoten-Zahlen). Zweiter Skeptiker
+  (Reparatur ungeprueft) laeuft 11:50. DANN: Einzeldatei-Checkout nach master,
+  test-alles, [skeptiker], EIN einspielen-Schritt lib/einbau.js + bn4rep.js +
+  gang.js + registry.json (vorher importpruefung bn4rep.js gang.js --
+  lib/einbau.js), neustart bn4net/bn4rep/gang.js, RAM messen, VERALTET_ERLAUBT
+  leeren. Frist: vor Ruf ~1,275 Mio (~8-9 h nach der Gruendung). Offen B8:
+  gang-p2b-gegen.mjs hat "Slum Snakes" fest (Abnahme 5 % moneyGainRate).
 - Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".
 - Abbruchkriterien (gang.js-Kopf): +2 h >= 6 Mitglieder, Abzug >= 0,9,
   Fehler 0; bis zum Tor kein 'GEKAUFT' bei aktiver Sperre; am Tor TRP nie in

@@ -1584,7 +1584,7 @@ console.log("\n-- P2d N7: ein Stueck einer FREMDEN Faktion ohne genug Ruf kommt 
   pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
   const a = rnVon(basis), tr = rnVon(w);
   pruefe("derselbe Bedarfsplan (Stuecke, Kosten) und derselbe Bedarf wie ohne die fremde Faktion",
-    !!a && !!tr && JSON.stringify(a.repNeedPlan) === JSON.stringify(tr.repNeedPlan) && a.repNeed === tr.repNeed,
+    !!a && !!tr && !!a.repNeedPlan && !!tr.repNeedPlan && JSON.stringify(a.repNeedPlan) === JSON.stringify(tr.repNeedPlan) && a.repNeed === tr.repNeed,
     JSON.stringify([a && a.repNeedPlan, tr && tr.repNeedPlan, a && a.repNeed, tr && tr.repNeed]));
 }
 

@@ -1366,11 +1366,11 @@ async function suite(mod, srcText, loud) {
     let r = await moneyRun({ money: 1e9, gang: { inGang: true, respect: 1e6, members: trio(), maxUpdates: 1, tick: 15000 } });
     check("3 Mitglieder x 5 erlaubte Stuecke = 15 Kaeufe", r.fake.bought.length === 15, "Kaeufe " + r.fake.bought.length);
     check("NIE Augmentation und nie ein Stueck mit unbekanntem Typ (BrachiBlades 20 Mio, Mystery Item 0,5 Mio sind billiger als der Rootkit)",
-      r.fake.bought.every((b) => ["Weapon", "Armor", "Vehicle", "Rootkit"].includes(b.type))
+      r.fake.bought.length === 15 && r.fake.bought.every((b) => ["Weapon", "Armor", "Vehicle", "Rootkit"].includes(b.type))
       && !r.fake.bought.some((b) => b.item === "BrachiBlades" || b.item === "Mystery Item"), J(r.fake.bought.map((b) => b.item)));
-    check("billigste zuerst: die Preise der Kaeufe fallen nie", r.fake.bought.every((b, i) => i === 0 || b.cost >= r.fake.bought[i - 1].cost), J(r.fake.bought.map((b) => b.cost)));
+    check("billigste zuerst: die Preise der Kaeufe fallen nie", r.fake.bought.length === 15 && r.fake.bought.every((b, i) => i === 0 || b.cost >= r.fake.bought[i - 1].cost), J(r.fake.bought.map((b) => b.cost)));
     check("Telemetrie: equipmentBought 15, equipmentSpent = Summe", r.tel && r.tel.equipmentBought === 15 && r.tel.equipmentSpent === 3 * allowedSum, J(r.tel && [r.tel.equipmentBought, r.tel.equipmentSpent]));
-    check("das Konto sank um genau die Ausgabe", Math.abs(r.m.zustand.spieler.money - (1e9 - spentOf(r))) < 1, String(r.m.zustand.spieler.money));
+    check("das Konto sank um genau die Ausgabe", spentOf(r) === 3 * allowedSum && Math.abs(r.m.zustand.spieler.money - (1e9 - spentOf(r))) < 1, String(r.m.zustand.spieler.money));
     check("keine Doppelkaeufe: purchaseEquipment genau 15x gerufen, kein Fehler",
       r.fake.equipCalls.filter((c) => c === "purchaseEquipment").length === 15 && r.tel.errors.total === 0, J(r.tel && r.tel.errors));
     check("Log nennt die Ausruestung", /AUSRUESTUNG: 15 Stuecke/.test(r.log), r.log.slice(0, 300));
@@ -1392,9 +1392,9 @@ async function suite(mod, srcText, loud) {
     check("Konto minus Ruecklage == Preis genau: Kauf erlaubt (>=), danach Schluss: Bat, Bat",
       J(r.fake.bought.map((b) => b.item)) === J(["Baseball Bat", "Baseball Bat"]) && r.m.zustand.spieler.money === 5e6, J(r.fake.bought.map((b) => b.item)) + " " + r.m.zustand.spieler.money);
     r = await moneyRun({ money: 5e6, needFile: "5000000", gang: { inGang: true, respect: 1e6, members: duo(), maxUpdates: 0, tick: 15000 } });
-    check("Konto == Ruecklage: nichts gekauft", r.fake.bought.length === 0 && r.m.zustand.spieler.money === 5e6, J(r.fake.bought.length));
+    check("Konto == Ruecklage: nichts gekauft (im Modus money, sonst waere es trivial)", r.tel.mode === "money" && r.fake.bought.length === 0 && r.m.zustand.spieler.money === 5e6, J(r.fake.bought.length) + " " + r.tel.mode);
     r = await moneyRun({ money: 1e12, needFile: "999999999999", gang: { inGang: true, respect: 1e6, members: duo(), maxUpdates: 0, tick: 15000 } });
-    check("Ruecklage fast so gross wie das Konto: nichts gekauft", r.fake.bought.length === 0);
+    check("Ruecklage fast so gross wie das Konto: nichts gekauft (im Modus money)", r.tel.mode === "money" && r.fake.bought.length === 0);
 
     // c) Ruecklage fehlt oder ist unlesbar: NICHTS kaufen.
     for (const [label, extra] of [["fehlt", { noNeedFile: true }], ["unlesbar (Text)", { needFile: "abc" }], ["leer", { needFile: "" }], ["negativ", { needFile: "-5" }], ["NaN", { needFile: "NaN" }]]) {
@@ -1414,7 +1414,7 @@ async function suite(mod, srcText, loud) {
     check("12 Mitglieder x 5 Stuecke = 60 Wuensche, EINE Runde: genau EQUIP_MAX_BUYS (24) gekauft",
       mod.EQUIP_MAX_BUYS === 24 && r.fake.bought.length === 24, "Kaeufe " + r.fake.bought.length);
     check("... und es sind die billigsten: erst alle zwoelf Bats, dann alle zwoelf Vests",
-      r.fake.bought.slice(0, 12).every((b) => b.item === "Baseball Bat") && r.fake.bought.slice(12).every((b) => b.item === "Bulletproof Vest"), J(r.fake.bought.map((b) => b.item)));
+      r.fake.bought.length === 24 && r.fake.bought.slice(0, 12).every((b) => b.item === "Baseball Bat") && r.fake.bought.slice(12).every((b) => b.item === "Bulletproof Vest"), J(r.fake.bought.map((b) => b.item)));
     r = await moneyRun({ money: 1e12, gang: { inGang: true, respect: 1e9, members: twelve(), maxUpdates: 1, tick: 15000 } });
     check("zwei Runden: 2 x 24 = 48 von 60", r.fake.bought.length === 48, "Kaeufe " + r.fake.bought.length);
     r = await moneyRun({ money: 1e12, gang: { inGang: true, respect: 1e9, members: twelve(), maxUpdates: 2, tick: 15000 } });
@@ -1432,7 +1432,7 @@ async function suite(mod, srcText, loud) {
     check("G01 steigt auf (2,5 >= 2) und hat danach nichts mehr", J(r.fake.ascended) === J(["G01"]), J(r.fake.ascended));
     check("in der Aufstiegsrunde wird fuer G01 NICHT gekauft (Besitz veraltet), in der naechsten Runde alle 5 neu",
       snap[1] === 0 && snap[2] === 5, J(snap));
-    check("G02 (hat alles) bekommt nichts zusaetzlich", r.fake.bought.every((b) => b.member === "G01"), J(r.fake.bought.map((b) => b.member)));
+    check("G02 (hat alles) bekommt nichts zusaetzlich (G01 schon: 5 Stuecke)", r.fake.bought.length === 5 && r.fake.bought.every((b) => b.member === "G01"), J(r.fake.bought.map((b) => b.member)));
 
     // f) Fehler: Kauf wird abgelehnt -> gezaehlt, Runde bricht ab (kein Haemmern).
     r = await moneyRun({ money: 1e9, gang: { inGang: true, respect: 1e6, members: trio(), maxUpdates: 1, tick: 15000, buyResult: false } });
@@ -1461,7 +1461,7 @@ async function suite(mod, srcText, loud) {
     check("Werkbank: bn4rep.json und geldbedarf.txt werden von home geholt - money, 15 Kaeufe",
       r.tel && r.tel.mode === "money" && r.fake.bought.length === 15, J(r.tel && r.tel.mode) + " " + r.fake.bought.length);
     r = await moneyRun({ host: "werk-0", money: 1e9, noNeedFile: true, gang: { inGang: true, respect: 1e6, members: trio(), maxUpdates: 0, tick: 15000 } });
-    check("Werkbank ohne geldbedarf.txt auf home: kein Kauf", r.fake.bought.length === 0);
+    check("Werkbank ohne geldbedarf.txt auf home: kein Kauf (im Modus money)", r.tel.mode === "money" && r.fake.bought.length === 0);
   }
 
   // -------------------------------------------------------------------------

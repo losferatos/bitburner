@@ -1967,6 +1967,36 @@ console.log("\n-- Z1 Vertrag bn4rep.js -> gang.js: die echte Telemetrie besteht 
     vollHinweis(r1) + " " + (t1 ? String(t1.v1Positiv) : "keine Telemetrie"));
 }
 
+// ---------------------------------------------------------------------------
+// Z2 (Skeptiker B9, 04.10.2026): derselbe Vertrag fuer den Geldmodus. Z1 prueft die
+// Voraussetzungssperre an der ECHTEN Telemetrie; fuer repNeedOf stand bisher nur
+// die Quelle im Test (test-gang.js baut data/bn4rep.json von Hand). Hier geht die
+// echte torRunde-Telemetrie von bn4rep.js durch repNeedOf und chooseMode von gang.js.
+console.log("\n-- Z2 Vertrag bn4rep.js -> gang.js: die echte Telemetrie liefert den Rufbedarf und den Modus --");
+{
+  const GANG = await ladeSpielskript(path.join(SRC, "gang.js"));
+  const reset = { currentNode: 2, lastNodeReset: 1 };   // wie getResetInfo() des Nachbaus
+  const w = needWelt({ geld: 60e9 });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const t = teleVon(w);
+  const res = t ? GANG.repNeedOf(t, t.zeit + 5000, reset, "Slum Snakes") : { need: null, why: "keine Telemetrie" };
+  pruefe("gang.js repNeedOf: 1.657.500 aus der echten Telemetrie (Budget 4 x 60 Mrd, Bionic Spine Upgrade)",
+    Math.abs(res.need - 1.02 * 1625000) < 1e-6 && res.why === "", JSON.stringify(res));
+  pruefe("chooseMode: Ruf 1,5 Mio -> respect, 1,7 Mio -> money (die echte Zahl, nicht eine ausgedachte)",
+    GANG.chooseMode({ rep: 1.5e6, need: res.need, onMoney: false }) === "respect" && GANG.chooseMode({ rep: 1.7e6, need: res.need, onMoney: false }) === "money");
+  const fremd = t ? GANG.repNeedOf(t, t.zeit + 5000, reset, "Tetrads") : { need: 1 };
+  pruefe("andere Gang-Faktion (Tetrads): kein Bedarf, der Grund nennt Slum Snakes", fremd.need === null && /Slum Snakes/.test(fremd.why), JSON.stringify(fremd));
+  pruefe("alter Knoteneintritt (nodeReset 2): kein Bedarf", !!t && GANG.repNeedOf(t, t.zeit + 5000, { currentNode: 2, lastNodeReset: 2 }, "Slum Snakes").need === null);
+  pruefe("31 min spaeter (bn4rep.js tot): kein Bedarf", !!t && GANG.repNeedOf(t, t.zeit + 31 * 60000, reset, "Slum Snakes").need === null);
+  // Vor der Gruendung (keine gang.json): kein Bedarf MIT lesbarem Grund in der Telemetrie - die Sichtbarkeit fuer /bb.
+  const wo = needWelt({ geld: 60e9, gangDatei: null });
+  await fahre(wo);
+  const to = rnVon(wo);
+  pruefe("ohne data/gang.json: repNeed null und repNeedWhy nennt es (das Feld, das der Einspielablauf in gang.js prueft)",
+    !!to && to.repNeed === null && typeof to.repNeedWhy === "string" && /gang\.json/.test(to.repNeedWhy), to ? JSON.stringify([to.repNeed, to.repNeedWhy]) : "keine Telemetrie");
+}
+
 console.log("");
 console.log(gruen + " ok, " + rot + " rot von " + (gruen + rot));
 if (rot) {

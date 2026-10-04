@@ -518,7 +518,15 @@ zuvor) und MONEY (Human Trafficking plus Ausruestung Weapon/Armor/Vehicle/Rootki
 ueber der Ruecklage `data/geldbedarf.txt`); der Modus folgt dem Faktionsruf der Gang
 gegen `torRunde.repNeed` aus `data/bn4rep.json`, das bn4rep.js (Block 1c) aus einem
 zweiten Plan ohne Rufgrenze rechnet. Einzelheiten und Abnahme im Kopf von
-`src/gang.js` (DER GELDMODUS). Die Gang
+`src/gang.js` (DER GELDMODUS). Skeptiker-Runde 04.10.2026: `data/gang-geld-aus.txt`
+ist ein Notschalter NUR fuer den Geldmodus (Handbremse, kein Skript schreibt sie:
+liegt sie, gilt der Rufbedarf als keiner, die Arbeitenden gehen auf Terrorism
+zurueck und es wird nichts mehr gekauft); gang.json traegt dazu `repNeedNullSince`,
+und /bb meldet den stillen Rueckfall (`GANG-BEFUND`, tools/lib/gangzeile.js) sowie
+den Rufbedarf der Torrunde (tools/lib/gate-round-status.js). Eingespielt wird P2d
+in EINEM Schritt mit lib/einbau.js, bn4rep.js, gang.js und registry.json (Ablauf im
+Kopf von gang.js: SO WIRD P2d EINGESPIELT); `tools/importpruefung.js` prueft dafuer
+seit demselben Tag auch die benannten Importe gegen die Exporte. Die Gang
 selbst braucht keine Figur (`needsFigure: "none"`, verify-g01-betrieb.md
 Abschnitt 4).
 

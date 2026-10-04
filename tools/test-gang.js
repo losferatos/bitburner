@@ -46,6 +46,12 @@
  *         data/geldbedarf.txt (fehlt sie: nichts), hoechstens EQUIP_MAX_BUYS je
  *         Runde, nach einem Aufstieg erst in der naechsten Runde neu
  *       * Telemetrie mode / repNeed / moneyGainRate / equipmentBought / Spent
+ *       * Skeptiker-Runde 04.10.2026 (S19-S22): der NOTSCHALTER data/gang-geld-aus.txt
+ *         (nur Geldmodus aus, nicht lesbar = aus), repNeedNullSince (seit wann der
+ *         Bedarf fehlt, ueberlebt einen Neustart nur frisch und mit Gang), mode und
+ *         Bedarf leer nach Verlust der Gang / in einer Hacking-Gang, die erweiterte
+ *         /bb-Zeile (Modus, Gang-Geld, Ausruestung) und der Befund "Bedarf fehlt
+ *         laenger als 30 min"
  *
  *       Jede dieser Proben muss gegen gang-2 (den Stand vor P2d) ROT sein:
  *       `GANG_SRC=<alte gang.js> node tools/test-gang.js --ohne-mutanten`.
@@ -79,7 +85,7 @@ import { ladeSpielskript } from "./mock/lader.js";
 import * as REG from "../src/lib/reg.js";
 import * as F from "./audit/gang-formulas.mjs";
 import { ohneKommentare } from "./lib/schreiberprobe.js";
-import { gangZeile, GANG_FRIST_MS } from "./lib/gangzeile.js";
+import { gangZeile, gangBefunde, GANG_FRIST_MS, GANG_BEFUND_NULL_MS } from "./lib/gangzeile.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -286,6 +292,10 @@ function buildNs(m, fake, o) {
   if (o.scp) ns.scp = o.scp;
   if (o.resetThrows) ns.getResetInfo = () => { throw new Error("getResetInfo kaputt"); };
   if (o.moneyThrows) ns.getServerMoneyAvailable = () => { throw new Error("Geld kaputt"); };
+  if (o.fileExistsThrowsFor) {
+    const orig = ns.fileExists;
+    ns.fileExists = (f, h) => { if (f === o.fileExistsThrowsFor) throw new Error("fileExists kaputt"); return orig(f, h); };
+  }
   return ns;
 }
 
@@ -1476,7 +1486,165 @@ async function suite(mod, srcText, loud) {
     check("gang.js liest genau diese Felder: torRunde / repNeed / repNeedFaction im Quelltext",
       /tel\.torRunde/.test(ohneKommentare(srcText)) && /tr\.repNeed\b/.test(ohneKommentare(srcText)) && /tr\.repNeedFaction/.test(ohneKommentare(srcText)));
     check("EQUIP_TYPES sind genau Weapon, Armor, Vehicle, Rootkit", J(mod.EQUIP_TYPES) === J(["Weapon", "Armor", "Vehicle", "Rootkit"]), J(mod.EQUIP_TYPES));
+    // Die Gegenrichtung des Vertrags (Skeptiker B9): bn4rep.js liest die Faktion der Gang aus
+    // der ECHTEN Telemetrie von gang.js (gangFactionFromTelemetry in lib/einbau.js).
+    const rv = await run(mod, { gang: { inGang: true, faction: "Tetrads", members: members(["G01"]), maxUpdates: 0 } });
+    const gf = rv.tel ? EIN.gangFactionFromTelemetry(rv.tel, rv.tel.ts + 1000) : { faction: null, why: "keine Telemetrie" };
+    check("echte Telemetrie von gang.js -> gangFactionFromTelemetry (bn4rep.js): Tetrads", gf.faction === "Tetrads" && gf.why === "", J(gf));
+    const gv = rv.tel ? EIN.gangFactionFromTelemetry(rv.tel, rv.tel.ts + 11 * 60000) : { faction: "x" };
+    check("... 11 min spaeter (gang.js tot): keine Faktion mehr", gv.faction === null, J(gv));
     check("Version gang-3 in der Telemetrie", (await run(mod, { gang: { inGang: true, members: members(["G01"]), maxUpdates: 0 } })).tel.version === "gang-3");
+  }
+
+  // -------------------------------------------------------------------------
+  head("S19. Der Notschalter data/gang-geld-aus.txt (Skeptiker B10)");
+  {
+    const crew = () => members(["G01", "G02", "G03"], 600, { task: "Human Trafficking" });
+    const OFF = "data/gang-geld-aus.txt";
+    check("MONEY_OFF_FILE ist data/gang-geld-aus.txt", mod.MONEY_OFF_FILE === OFF, String(mod.MONEY_OFF_FILE));
+    // Kontrolle: ohne die Datei ist es der Geldmodus (sonst waere der Rest trivial).
+    let r = await moneyRun({ money: 1e9, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 0, tick: 15000 } });
+    check("Kontrolle ohne Notschalter: mode money, Bedarf da, 15 Kaeufe", r.tel.mode === "money" && r.tel.repNeed === NEED && r.fake.bought.length === 15, J(r.tel && [r.tel.mode, r.tel.repNeed]));
+    // Mit der Datei: RESPECT trotz Ruf in Hoehe von 2 Mio, Mitglieder auf HT gehen zurueck auf Terrorism.
+    r = await moneyRun({ money: 1e9, homeFiles: { [OFF]: "1" }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 1, tick: 15000 } });
+    check("Notschalter liegt: alle Arbeitenden zurueck auf Terrorism, mode respect",
+      r.fake.members.every((x) => x.task === "Terrorism") && r.tel.mode === "respect", J(r.fake.members.map((x) => x.task)) + " " + (r.tel && r.tel.mode));
+    check("... kein Ausruestungskauf und kein einziger Equipment-Aufruf", r.fake.bought.length === 0 && r.fake.equipCalls.length === 0, J(r.fake.equipCalls));
+    check("... repNeed null, der Grund nennt die Datei", r.tel.repNeed === null && /gang-geld-aus\.txt/.test(r.tel.repNeedWhy), J(r.tel && r.tel.repNeedWhy));
+    check("... die Gang selbst laeuft weiter (state work, kein Fehler)", r.tel.state === "work" && r.tel.errors.total === 0 && r.tel.inGang === true, J(r.tel && [r.tel.state, r.tel.errors]));
+    // Inhalt der Datei ist egal: auch leer gilt sie.
+    r = await moneyRun({ money: 1e9, homeFiles: { [OFF]: "" }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 0, tick: 15000 } });
+    check("leere Datei gilt auch (es zaehlt, DASS sie liegt)", r.tel.mode === "respect" && r.fake.bought.length === 0);
+    // Nicht lesbar: die sichere Richtung ist RESPECT.
+    r = await moneyRun({ money: 1e9, fileExistsThrowsFor: OFF, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 1, tick: 15000 } });
+    check("Notschalter nicht lesbar: RESPECT (sichere Richtung), Fehler gezaehlt (byCall.moneyOffSwitch)",
+      r.tel.mode === "respect" && r.fake.bought.length === 0 && r.tel.errors.byCall.moneyOffSwitch >= 1, J(r.tel && [r.tel.mode, r.tel.errors]));
+    // Mitten im Lauf gelegt und wieder entfernt.
+    let mm = null;
+    r = await moneyRun({ money: 1e9, onMock: (m) => { mm = m; }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 4, tick: 15000,
+      onUpdate: (g, n) => { if (n === 1) mm.ns.write(OFF, "1", "w"); if (n === 3) mm.ns.rm(OFF, "home"); } } });
+    check("Lauf: money -> (Datei gelegt) respect -> (Datei entfernt) money, drei Moduszeilen",
+      (r.log.match(/MODUS/g) || []).length === 3 && r.tel.mode === "money" && r.fake.members.every((x) => x.task === "Human Trafficking"),
+      (r.log.match(/MODUS[^\n]*/g) || []).join(" | ") + " " + J(r.fake.members.map((x) => x.task)));
+  }
+
+  // -------------------------------------------------------------------------
+  head("S20. repNeedNullSince: seit wann fehlt der Bedarf (Messgroesse fuer den /bb-Befund)");
+  {
+    const crew = () => members(["G01", "G02"], 600, { task: "Terrorism" });
+    const noNeed = { bn4rep: { torRunde: undefined } };
+    let r = await moneyRun({ gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 0, tick: 15000 } });
+    check("Bedarf da: repNeedNullSince null", r.tel && "repNeedNullSince" in r.tel && r.tel.repNeedNullSince === null, J(r.tel && r.tel.repNeedNullSince));
+    r = await moneyRun({ ...noNeed, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 3, tick: 15000 } });
+    check("Bedarf fehlt: repNeedNullSince ist die Zeit der ERSTEN Runde und bleibt es (vier Runden, nicht nachgezogen)",
+      r.tel && Number.isFinite(r.tel.repNeedNullSince) && r.tel.repNeedNullSince >= W0 && r.tel.repNeedNullSince <= W0 + 1000, J(r.tel && r.tel.repNeedNullSince));
+    // Bedarf erscheint mitten im Lauf -> null; verschwindet wieder -> neu gesetzt.
+    let mm = null;
+    r = await moneyRun({ ...noNeed, onMock: (m) => { mm = m; }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 4, tick: 15000,
+      onUpdate: (g, n) => {
+        if (n === 1) mm.ns.write("data/bn4rep.json", bn4repText({ torRunde: torRunde() }), "w");
+        if (n === 3) mm.ns.write("data/bn4rep.json", bn4repText({ torRunde: undefined }), "w");
+      } } });
+    check("Bedarf erscheint -> null, verschwindet wieder -> neuer Zeitstempel (spaeter als der erste)",
+      r.tel && Number.isFinite(r.tel.repNeedNullSince) && r.tel.repNeedNullSince > W0 + 15000, J(r.tel && r.tel.repNeedNullSince));
+
+    // Neustart: nur mit frischer Telemetrie UND Gang bleibt der Zeitpunkt erhalten.
+    const alt = (over) => JSON.stringify({ inGang: true, ts: W0 - 60000, wall: W0 - 60000, repNeedNullSince: W0 - 40 * 60000, ...over });
+    const lauf = (over) => moneyRun({ ...noNeed, homeFiles: { "data/gang.json": alt(over) }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 0, tick: 15000 } });
+    const neuAngefangen = (rr) => rr.tel && rr.tel.repNeedNullSince >= W0 && rr.tel.repNeedNullSince <= W0 + 1000;
+    r = await lauf({});
+    check("Neustart mit frischer Telemetrie (1 min) und Gang: der alte Zeitpunkt (vor 40 min) bleibt", r.tel.repNeedNullSince === W0 - 40 * 60000, J(r.tel.repNeedNullSince));
+    r = await lauf({ ts: W0 - 11 * 60000 });
+    check("... war die Telemetrie 11 min alt: neu angefangen (jetzt)", neuAngefangen(r), J(r.tel.repNeedNullSince));
+    r = await lauf({ inGang: false });
+    check("... meldete sie keine Gang: neu angefangen", neuAngefangen(r), J(r.tel.repNeedNullSince));
+    r = await lauf({ repNeedNullSince: W0 + 5 * 60000 });
+    check("... lag der Zeitpunkt in der Zukunft: neu angefangen", neuAngefangen(r), J(r.tel.repNeedNullSince));
+    r = await lauf({ repNeedNullSince: "gestern" });
+    check("... war er Text: neu angefangen, kein Absturz", neuAngefangen(r) && r.ended === "abort", J(r.tel.repNeedNullSince) + " " + r.ended);
+    r = await moneyRun({ homeFiles: { "data/gang.json": alt({}) }, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 0, tick: 15000 } });
+    check("Bedarf da: der alte Zeitpunkt wird gestrichen (null)", r.tel.repNeedNullSince === null, J(r.tel.repNeedNullSince));
+  }
+
+  // -------------------------------------------------------------------------
+  head("S21. mode und Bedarf gehoeren nur zu einer GEFUEHRTEN Gang (Skeptiker B7)");
+  {
+    const crew = () => members(["G01", "G02"], 600, { task: "Terrorism" });
+    // Gang geht verloren (Knotenwechsel, Handgriff): die Felder der letzten Fuehrung stehen nicht mehr da.
+    let r = await moneyRun({ maxSchlaf: 2, gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 1, tick: 15000, moneyGainRate: 777,
+      onUpdate: (g, n) => { if (n === 1) g.inGang = false; } } });
+    check("vor dem Verlust war es money (Kontrolle: Log nennt die Umschaltung)", /MODUS - -> money/.test(r.log), r.log.slice(0, 300));
+    check("nach dem Verlust der Gang: inGang false, mode null, repNeed null, moneyGainRate null, kein Zeitpunkt",
+      r.tel && r.tel.inGang === false && r.tel.mode === null && r.tel.repNeed === null && r.tel.moneyGainRate === null && r.tel.repNeedNullSince === null,
+      J(r.tel && [r.tel.inGang, r.tel.mode, r.tel.repNeed, r.tel.moneyGainRate, r.tel.repNeedNullSince]));
+    // Hacking-Gang tritt nach einer Fuehrung auf (isHacking mitten im Lauf): mode null.
+    r = await moneyRun({ gang: { inGang: true, respect: 1e6, members: crew(), maxUpdates: 2, tick: 15000,
+      onUpdate: (g, n) => { if (n === 1) g.isHacking = true; } } });
+    check("Hacking-Gang nach einer Fuehrung: state blocked, mode null, kein Bedarf mehr in der Telemetrie",
+      r.tel && r.tel.state === "blocked" && r.tel.blockedReason === "hacking_gang" && r.tel.mode === null && r.tel.repNeed === null,
+      J(r.tel && [r.tel.state, r.tel.mode, r.tel.repNeed]));
+  }
+
+  // -------------------------------------------------------------------------
+  head("S22. Die /bb-Zeile zeigt den Geldmodus, und der Befund meldet den stillen Rueckfall (Skeptiker B1)");
+  {
+    const NOW = W0;
+    const MIN = 60000;
+    const base = { ts: NOW - 60000, wall: NOW - 60000, inGang: true, state: "work", blockedReason: null,
+      faction: "Slum Snakes", members: 6, respect: 12345, factionRep: 4321, penalty: 0.987,
+      ascensions: 2, errors: { total: 0, byCall: {} }, lastError: null, createAttempts: 1 };
+    const geldTel = (over = {}) => ({ ...base, mode: "respect", repNeed: 1_275_000, repNeedWhy: "", moneyGainRate: 2_000_000,
+      equipmentBought: 0, equipmentSpent: 0, equipmentBlock: null, repNeedNullSince: null, ...over });
+    check("gangBefunde und GANG_BEFUND_NULL_MS sind exportiert (30 min)", typeof gangBefunde === "function" && GANG_BEFUND_NULL_MS === 30 * 60000, String(GANG_BEFUND_NULL_MS));
+    let z = gangZeile(geldTel(), NOW);
+    check("RESPECT: Modus mit Ruf und Bedarf in der Zeile (die Zeile bleibt EINE Zeile)",
+      /Fehler 0\. Modus RESPECT \(Ruf 4\.321 \/ Bedarf 1\.275\.000\)/.test(z) && !/\n/.test(z), z);
+    check("Gang-Geld: moneyGainRate 2 Mio je Zyklus x5 = $10,00 Mio/s", /Gang-Geld \$10,00 Mio\/s/.test(z), z);
+    check("Ausruestung: 0 Stk fuer $0 (kein Block-Hinweis im Modus respect)", /Ausruestung 0 Stk fuer \$0\./.test(z) && !/Block/.test(z), z);
+    z = gangZeile(geldTel({ mode: "money", factionRep: 1_700_000, equipmentBought: 24, equipmentSpent: 1.2e9, equipmentBlock: "Geld unter Preis + Ruecklage" }), NOW);
+    check("MONEY: Modus, Ausruestung mit Menge und Summe, Block im Klartext",
+      /Modus MONEY \(Ruf 1\.700\.000 \/ Bedarf 1\.275\.000\)/.test(z) && /Ausruestung 24 Stk fuer \$1,20 Mrd \(Block: Geld unter Preis \+ Ruecklage\)\./.test(z), z);
+    z = gangZeile(geldTel({ repNeed: null, repNeedWhy: "torRunde.repNeed fehlt oder ist null (der Plan enthaelt kein Stueck der Gang-Faktion)" }), NOW);
+    check("Bedarf fehlt: 'kein Bedarf' mit dem Grund (der stille Rueckfall steht da)", /Modus RESPECT \(kein Bedarf: torRunde\.repNeed fehlt/.test(z) && /Gang-Faktion/.test(z), z);
+    z = gangZeile({ ...base, state: "blocked", blockedReason: "hacking_gang", mode: null }, NOW);
+    check("Steuerung steht: keine Geldmodus-Angaben (die Zeile sagt nur, dass sie steht)", /Steuerung steht/.test(z) && !/Modus/.test(z), z);
+    z = gangZeile(geldTel({ mode: null }), NOW);
+    check("mode null in laufender Gang: Modus '?' statt Absturz", /Modus \?/.test(z), z);
+    z = gangZeile(geldTel({ moneyGainRate: null, equipmentBought: undefined }), NOW);
+    check("fehlende Zahlen: weder Geld noch Ausruestung gedruckt, kein Absturz", !/Gang-Geld/.test(z) && !/Ausruestung/.test(z) && /Modus RESPECT/.test(z), z);
+    z = gangZeile(base, NOW);
+    check("Telemetrie von gang-2 (ohne Feld mode): nichts angehaengt, die Zeile endet wie zuvor", /Fehler 0\.$/.test(z), z);
+
+    // Befunde
+    const seit = (min, over = {}) => geldTel({ repNeed: null, repNeedWhy: "bn4rep.json veraltet (42 min)", repNeedNullSince: NOW - min * MIN, ...over });
+    check("Bedarf 31 min null: ein Befund, der den Grund und die Minuten nennt",
+      (() => { const b = gangBefunde(seit(31), NOW); return b.length === 1 && /^GANG-BEFUND: seit 31 min kein Rufbedarf/.test(b[0]) && /bn4rep\.json veraltet/.test(b[0]); })(), J(gangBefunde(seit(31), NOW)));
+    check("Bedarf 30 min null: noch kein Befund (Grenze: laenger als 30)", gangBefunde(seit(30), NOW).length === 0);
+    check("Bedarf 29 min null: kein Befund", gangBefunde(seit(29), NOW).length === 0);
+    check("Bedarf da: kein Befund, auch mit altem Zeitstempel", gangBefunde(geldTel({ repNeedNullSince: NOW - 99 * MIN }), NOW).length === 0);
+    check("kein repNeedNullSince (Telemetrie kann es nicht sagen): kein Befund", gangBefunde(seit(99, { repNeedNullSince: undefined }), NOW).length === 0 && gangBefunde(seit(99, { repNeedNullSince: null }), NOW).length === 0);
+    check("repNeedNullSince als Text / negativ: kein Befund, kein Absturz", gangBefunde(seit(99, { repNeedNullSince: "x" }), NOW).length === 0 && gangBefunde(seit(99, { repNeedNullSince: -5 }), NOW).length === 0);
+    check("Telemetrie 11 min alt (gang.js tot): kein Befund - das sagt schon die Zeile", gangBefunde(seit(99, { ts: NOW - 11 * MIN, wall: NOW - 11 * MIN }), NOW).length === 0);
+    check("keine Gang / Steuerung steht / Telemetrie von gang-2: kein Befund",
+      gangBefunde(seit(99, { inGang: false }), NOW).length === 0 && gangBefunde(seit(99, { state: "blocked" }), NOW).length === 0
+      && gangBefunde(seit(99, { state: "done" }), NOW).length === 0
+      && gangBefunde((() => { const t = seit(99); delete t.mode; return t; })(), NOW).length === 0);
+    check("Muell: keine Ausnahme", (() => { try { return [null, undefined, "x", 5, [], {}].every((m) => Array.isArray(gangBefunde(m, NOW))); } catch { return false; } })());
+
+    // Schreiber und Leser zusammen: echte Telemetrie eines Laufs, Bedarf seit 40 min fehlend.
+    const gangAlt = JSON.stringify({ inGang: true, ts: W0 - 60000, wall: W0 - 60000, repNeedNullSince: W0 - 40 * MIN });
+    const r = await moneyRun({ bn4rep: { torRunde: undefined }, homeFiles: { "data/gang.json": gangAlt },
+      gang: { inGang: true, respect: 1e6, members: members(["G01", "G02"], 600, { task: "Terrorism" }), maxUpdates: 1, tick: 15000 } });
+    const bf = r.tel ? gangBefunde(r.tel, r.tel.ts + 1000) : [];
+    check("echte Telemetrie eines Laufs ohne Bedarf seit 40 min: der Befund steht da und nennt 'kein torRunde-Block'",
+      bf.length === 1 && /kein torRunde-Block/.test(bf[0]) && /Pruefen: laeuft bn4rep\.js/.test(bf[0]), J(bf));
+    const zr = r.tel ? gangZeile(r.tel, r.tel.ts + 1000) : "";
+    check("... und die Zeile derselben Telemetrie zeigt 'kein Bedarf'", /Modus RESPECT \(kein Bedarf: /.test(zr), zr);
+    const rg = await moneyRun({ money: 1e9, gang: { inGang: true, respect: 1e6, moneyGainRate: 500_000, members: members(["G01", "G02"], 600, { task: "Human Trafficking" }), maxUpdates: 0, tick: 15000 } });
+    const zg = rg.tel ? gangZeile(rg.tel, rg.tel.ts + 1000) : "";
+    check("echte Telemetrie im Geldmodus: Modus MONEY, Gang-Geld $2,50 Mio/s, Ausruestung 10 Stk",
+      /Modus MONEY \(Ruf 2\.000\.000 \/ Bedarf 1\.275\.000\)/.test(zg) && /Gang-Geld \$2,50 Mio\/s/.test(zg) && /Ausruestung 10 Stk/.test(zg), zg);
+    check("... und kein Befund", gangBefunde(rg.tel, rg.tel.ts + 1000).length === 0);
   }
 
   return out;
@@ -1549,6 +1717,17 @@ const MUTANTS = [
   ["Telemetrie ohne moneyGainRate", "moneyGainRate: st.moneyGainRate,\n      equipmentBought", "equipmentBought"],
   ["Geldaufgabe mit falschem Namen", "export const TASK_MONEY = \"Human Trafficking\";", "export const TASK_MONEY = \"Traffick Illegal Arms\";"],
   ["Sicherheitszuschlag 1,0 statt 1,02", "export const REP_NEED_MARGIN = 1.02;", "export const REP_NEED_MARGIN = 1.0;"],
+  // --- Skeptiker-Runde 04.10.2026 (Notschalter, Zeitpunkt, Leerung) ---
+  ["Notschalter wird nicht beachtet", "if (!off.ok || off.value === true) {", "if (false) {"],
+  ["Notschalter nicht lesbar gilt als 'nicht gelegt'", "if (!off.ok || off.value === true) {", "if (off.ok && off.value === true) {"],
+  ["Zeitpunkt wird jede Runde nachgezogen", "if (st.repNeedNullSince === null) st.repNeedNullSince = Date.now();", "st.repNeedNullSince = Date.now();"],
+  ["Zeitpunkt wird bei vorhandenem Bedarf nicht gestrichen", "} else {\n      st.repNeedNullSince = null;\n    }", "} else {\n    }"],
+  ["Neustart: Frische der alten Telemetrie nicht geprueft", "&& Date.now() - altTs <= SINCE_KEEP_MS) {", ") {"],
+  ["Neustart: alte Telemetrie ohne Gang zaehlt", "alt.inGang === true && Number.isFinite(since)", "Number.isFinite(since)"],
+  ["Neustart: Zeitpunkt aus der Zukunft zaehlt", "since > 0 && since <= Date.now()", "since > 0"],
+  ["Verlust der Gang leert mode/Bedarf nicht", "st.moneyGainRate = null;\n        clearLead();", "st.moneyGainRate = null;"],
+  ["Hacking-Gang leert mode/Bedarf nicht", 'st.blockedReason = "hacking_gang";\n      clearLead();', 'st.blockedReason = "hacking_gang";'],
+  ["Telemetrie ohne repNeedNullSince", "equipmentBlock: st.equipmentBlock, repNeedNullSince: st.repNeedNullSince,", "equipmentBlock: st.equipmentBlock,"],
 ];
 
 async function loadVariant(text, tag) {

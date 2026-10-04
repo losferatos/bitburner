@@ -142,6 +142,47 @@
  *   4. ERST JETZT `data/gang-an.txt` legen.
  *
  * ===========================================================================
+ * SO WIRD P2d EINGESPIELT (gang-2 -> gang-3; Skeptiker 04.10.2026, B2)
+ * ===========================================================================
+ *
+ * Die Reihenfolge ist KRITISCH, und zwar aus zwei Gruenden, die beide still sind:
+ *
+ *   a) src/bn4rep.js importiert vier NEUE Namen aus lib/einbau.js
+ *      (REP_NEED_BUDGET_FACTOR, repNeedKandidaten, gangRepNeed,
+ *      gangFactionFromTelemetry). Liegt die neue bn4rep.js im Spiel, die
+ *      lib/einbau.js aber noch in der alten Fassung, scheitert das Modul-Linking
+ *      ("does not provide an export named ..."): bn4rep.js startet nicht, der
+ *      Waechter startet es im Kreis neu, und Torrunde samt Kaufaufschub (P1/P2c)
+ *      sind tot - im frischen Knoten mit gangHold der teuerste denkbare Ausfall.
+ *   b) gang.js braucht 29,95 GB statt 21,85 (SF4.3; +8,1 GB, tools/ram.js). Der
+ *      Kern liest registry.json genau EINMAL beim Start (bn4net.js:95-108) und
+ *      plant gang.js sonst mit dem alten Wert; findet der Platzierer dann keinen
+ *      Wirt, kommt gang.js ohne Fehlermeldung nicht hoch.
+ *
+ * Ablauf (jeder Schritt mit Beleg, nie "kein Fehler zurueckgekommen"):
+ *
+ *   0. node tools/importpruefung.js bn4rep.js gang.js -- lib/einbau.js
+ *      prueft seit dem 04.10.2026 auch die BENANNTEN Importe gegen die Exporte
+ *      (tools/lib/exportpruefung.js). Ohne `-- lib/einbau.js` MUSS es rot werden
+ *      (die alte lib/einbau.js im Spiel kennt die vier Namen nicht): das ist die
+ *      Gegenprobe, dass die Pruefung greift. Mit `-- lib/einbau.js`: Exit 0.
+ *   1. EIN einspielen-Schritt mit allen vier Dateien, lib/einbau.js ZUERST (die
+ *      alte bn4rep.js linkt auch mit der neuen Bibliothek, die neue nur mit ihr -
+ *      startet der Waechter bn4rep.js zwischen zwei Dateien, bleibt es so heil):
+ *        node tools/einspielen.js --stufe P2d lib/einbau.js bn4rep.js gang.js registry.json
+ *   2. node tools/einspielen.js --pruefen lib/einbau.js bn4rep.js gang.js registry.json
+ *      -> viermal "schon drin".
+ *   3. Neustart in dieser Reihenfolge, jeder mit PID-Vergleich:
+ *        node tools/neustart.js bn4net.js     (Registry, 29,95 GB fuer gang.js)
+ *        node tools/neustart.js bn4rep.js gang.js
+ *   4. Belege: auf dem Host von gang.js sind >= 30 GB frei (data/ps.json);
+ *      data/gang.json zeigt `version: "gang-3"` und ein Feld `mode`;
+ *      data/bn4rep.json zeigt in torRunde `repNeedWhy` (vor der Gruendung mit
+ *      "data/gang.json meldet keine Gang", danach leer oder mit einem Grund).
+ *      Fehlt `repNeedWhy`, laeuft noch die alte bn4rep.js.
+ *   5. Die Abnahme des Geldmodus (siehe unten) beginnt erst, wenn 4 stimmt.
+ *
+ * ===========================================================================
  * DER GELDMODUS (P2d, 04.10.2026)
  * ===========================================================================
  *
@@ -149,12 +190,24 @@
  * gegengeprueft in verify-p2b-substanz.md / -praemisse.md / -geldwert.md. Die
  * Kurzfassung: der heutige Regler (Terrorism fuer alle Arbeitenden) erzeugt
  * Respekt und damit Faktionsruf, der nach dem Bedarf der naechsten Torrunde
- * niemandem mehr nuetzt (~17 Mio Ruf bei Tor gegen 1,66 Mio Bedarf) - 10 von
- * 11 Stunden Gang-Kapazitaet liegen brach. Human Trafficking dagegen bringt
- * 301 Mrd Gang-Geld bis zum Tor (S1), mit der Ausruestung 519 Mrd (S3). Das
- * Geld ist wegen des Preisfaktors 1,9 je Stueck nicht unbegrenzt viel wert
- * (x4,81 -> x7,42 -> x8,41 Competence der Runde), aber es kostet nur eine
- * andere Aufgabe und vier Funktionen.
+ * niemandem mehr nuetzt - im frischen Knoten steht am ersten Tor ein Ruf von
+ * 3,23 Mio gegen einen Bedarf von 1,25 Mio (verify-p2b-substanz.md Abschnitt 3,
+ * Zeile S0), die Gang-Kapazitaet danach liegt brach. Human Trafficking bringt
+ * dagegen Gang-Geld. Das Geld ist wegen des Preisfaktors 1,9 je Stueck nicht
+ * unbegrenzt viel wert; die Zahlen gelten fuer den FRISCHEN Knoten (BN2.2/2.3),
+ * in dem P2d wirkt, nicht fuer das BN2.1-Tor 19:13, das nie kam (substanz S1):
+ *
+ *   - Competence der ersten Runde, Tor bei Gang-Alter 13 / 14 h (substanz S2):
+ *     S0 (nur Terrorism, gang-2) x3,21; S1 (Human Trafficking ab dem Rufbedarf
+ *     1,275 Mio) x5,13 / x5,83; S3 (mit Ausruestung) x5,96 / x6,51.
+ *   - Das Tor kommt tatsaechlich bei Gang-Alter 10,7-12 h (praemisse E4): am
+ *     ersten Tor realistisch +23 bis +52 Mrd Gang-Geld, nicht +63. Der groessere
+ *     Teil des Gewinns faellt in Zyklus 2 (Favor aus Zyklus 1: Ruf x3, der
+ *     Bedarf ist nach ~1,5 h erreicht, ~10 h Geldphase).
+ *   - Der Gewinn ist damit begrenzt: etwa +0,7 bis +1,6 h je Knoten bis Rang
+ *     25.000 (S1 und S3, substanz Abschnitt 3, letzte Tabelle), nicht der
+ *     Faktor 2 der BN2.1-Rechnung. Dem steht eine andere Aufgabe und eine
+ *     Handvoll Aufrufe (+8,1 GB RAM) gegenueber.
  *
  * ZWEI MODI, JE RUNDE ZUSTANDSLOS ABGELEITET (kein Merker, ein Neustart verliert
  * nichts):
@@ -179,10 +232,25 @@
  *   keinen Bedarf (null): das ist genau der Fall, in dem es keinen Modus braucht.
  *
  *   need fehlt, ist null, ist veraltet (> 30 min, dieselbe Frist und derselbe
- *   Knoteneintritt wie die Voraussetzungssperre) oder gehoert zu einer anderen
- *   Faktion -> RESPECT. Das ist der sichere Rueckfall: genau das Verhalten von
- *   gang-2. Nach einem Einbau ist der Faktionsruf 0 (Prestige) -> rep < need ->
- *   RESPECT, ein neuer Zyklus beginnt von selbst mit Terrorism.
+ *   Knoteneintritt wie die Voraussetzungssperre), gehoert zu einer anderen
+ *   Faktion oder `data/gang-geld-aus.txt` liegt auf home -> RESPECT. Das ist der
+ *   sichere Rueckfall: genau das Verhalten von gang-2. Nach einem Einbau ist der
+ *   Faktionsruf 0 (Prestige) -> rep < need -> RESPECT, ein neuer Zyklus beginnt
+ *   von selbst mit Terrorism.
+ *
+ *   DER NOTSCHALTER `data/gang-geld-aus.txt` (MONEY_OFF_FILE) gilt nur dem
+ *   Geldmodus: die Datei legen heisst "kein Bedarf", die Arbeitenden gehen im
+ *   naechsten Takt auf Terrorism zurueck, es wird nichts mehr gekauft. Die Gang
+ *   selbst, die Mitglieder und die Ausruestung bleiben. Wieder freigeben: die
+ *   Datei loeschen. Er ersetzt das Einspielen von gang-2 als schnellen Rueckweg
+ *   (siehe ABNAHME).
+ *
+ *   DAS SCHWEIGEN DES FALLBACKS WIRD GEMELDET. Faellt der Bedarf aus (Faktion
+ *   unbekannt, Plan ohne Gang-Stueck, bn4rep.json veraltet, Notschalter), bleibt
+ *   die Gang auf RESPECT - und das sieht von aussen genauso aus wie "Ruf noch
+ *   unter Bedarf". Deshalb schreibt gang.js `repNeedNullSince` (ab wann der
+ *   Bedarf ununterbrochen null ist), und tools/lib/gangzeile.js meldet in /bb
+ *   einen Befund, sobald das laenger als 30 min der Fall ist (Skeptiker B1).
  *
  * WAS SICH IM MONEY-MODUS AENDERT - UND WAS NICHT:
  *   - Arbeitende: Human Trafficking statt Terrorism.
@@ -219,18 +287,33 @@
  *      Spielstands) auf demselben Spielstand: Abweichung <= 5 %. Der Wert ist je
  *      ZYKLUS (x5 = $/s). Mitglieder im Training oder auf Vigilante druecken den
  *      Ist-Wert: verglichen wird nur ueber die Mitglieder, die zur selben Zeit
- *      wirklich auf Human Trafficking stehen. Bei mehr als 5 %: die Geldformel
- *      pruefen, und bis dahin gang-2 (Stand vor P2d) einspielen - die Gang
- *      behaelt Mitglieder und Respekt, der alte Regler setzt im naechsten Takt
- *      wieder Terrorism. (Einen eigenen Schalter nur fuer den Geldmodus gibt es
- *      nicht; data/gang-an.txt zu entfernen liesse die Mitglieder auf Human
- *      Trafficking stehen.)
+ *      wirklich auf Human Trafficking stehen. ACHTUNG, das Werkzeug liegt auf
+ *      master (nicht in diesem Zweig) und nimmt die Faktion "Slum Snakes" fest
+ *      (gang-p2b-gegen.mjs Z. 145, 157, 208; chooseFounder waehlt die Kampf-Faktion
+ *      mit dem kleinsten Ruf): hat BN2.2 eine andere gegruendet (gang.json
+ *      `faction`), vorher die drei Stellen auf die Gang-Faktion des Spielstands
+ *      umstellen, sonst rechnet es mit dem falschen Gebiet oder wirft. Bei mehr
+ *      als 5 % Abweichung: die Geldformel pruefen, und bis dahin den Geldmodus
+ *      ausschalten - `data/gang-geld-aus.txt` legen (sofort, im naechsten Takt
+ *      geht jeder Arbeitende auf Terrorism zurueck, die Gang behaelt Mitglieder,
+ *      Respekt und Ausruestung) oder gang-2 einspielen. data/gang-an.txt zu
+ *      entfernen waere falsch: die Mitglieder blieben auf Human Trafficking stehen.
  *   2. penalty >= 0,95 (der Regler haelt sie dort; kurze Ausreisser darunter
  *      holt Vigilante zurueck).
  *   3. errors.total 0, lastError null.
  *   4. Kein Ausruestungskauf unter die Ruecklage: Konto nach dem Kauf >=
  *      data/geldbedarf.txt; equipmentSpent waechst nur im MONEY-Modus.
- *   5. mode "money" erst, wenn factionRep >= repNeed (beide in data/gang.json).
+ *   5. Beim UMSCHALTEN nach "money" gilt factionRep >= repNeed (beide in
+ *      data/gang.json). Im Hysterese-Band [repNeed / 1,02, repNeed) darf mode
+ *      "money" mit factionRep < repNeed stehen - das ist richtig und kein Fehler.
+ *      Die Umschaltung steht als Zeile "MODUS ... -> ..." in data/gang-log.txt.
+ *   6. Sichtbar in /bb (tools/lib/gangzeile.js): die GANG-Zeile nennt Modus mit
+ *      Ruf und Bedarf (oder dem Grund, warum es keinen gibt), das Gang-Geld in
+ *      $/s und die Ausruestung. Faellt der Bedarf laenger als 30 min aus, steht
+ *      ein GANG-BEFUND mit dem Grund da - fehlt diese Zeile, obwohl der Modus nie
+ *      auf money steht, kann /bb den Fall nicht anzeigen und ein "/bb sieht gut
+ *      aus" ist KEIN Beleg (Skeptiker-Regel: ein Ausschluss gilt nur, wenn das
+ *      Werkzeug den Fall zeigen koennte).
  *
  * ===========================================================================
  * ABLAUF
@@ -343,14 +426,19 @@
  * createAttempts, lastCreateAt, lastCreate, updates, timeouts, prereq {ok,
  * missing[], at} (Ergebnis der letzten Voraussetzungspruefung; null, solange
  * nie geprueft wurde, etwa weil schon eine Gang da war). Seit gang-3 (Geldmodus):
- * mode ("respect"|"money"|null ausserhalb der Fuehrung), repNeed (Zahl oder null)
- * und repNeedWhy (warum null), moneyGainRate (getGangInformation, je Zyklus),
- * equipmentBought / equipmentSpent (Summen seit Start dieses Prozesses) und
- * equipmentBlock (warum in der letzten Runde nichts gekauft wurde, sonst null). Der Kern
+ * mode ("respect"|"money"; null, solange diese Gang nicht gefuehrt wird - ohne
+ * Gang und in einer Hacking-Gang -, sonst der Wert der letzten Fuehrungsrunde),
+ * repNeed (Zahl oder null) und repNeedWhy (warum null), repNeedNullSince (Wanduhr,
+ * seit wann der Bedarf ununterbrochen null ist, sonst null; ueberlebt einen
+ * Neustart nur bei frischer Telemetrie mit Gang), moneyGainRate (getGangInformation,
+ * je Zyklus; x5 = $/s), equipmentBought / equipmentSpent (Summen seit Start dieses
+ * Prozesses) und equipmentBlock (warum in der letzten Runde nichts gekauft wurde,
+ * sonst null). Der Kern
  * erschlaegt ein Werkzeug, dessen Telemetrie aelter als freshnessMs ist - sie
  * wird deshalb auch in den Warte- und Pausenzustaenden geschrieben (Rundentakt
  * hoechstens IDLE_SLEEP_MS bzw. UPDATE_TIMEOUT_MS). Leser: tools/checkin.js
- * ueber tools/lib/gangzeile.js (eine Zeile "GANG: ...").
+ * ueber tools/lib/gangzeile.js (eine Zeile "GANG: ..." mit Modus, Geld und
+ * Ausruestung, dazu "GANG-BEFUND: ..." bei langem Ausfall des Rufbedarfs).
  *
  * Feldnamen sind englisch (Projektregel). Die Namen aus der Bauvorgabe vom
  * 03.10.2026 heissen hier: zeit = ts/wall, mitglieder = members, faktionsRuf =
@@ -371,17 +459,42 @@
  *   echten Gang geeicht (tools/audit/gang-p2b-calib.mjs, 0,00-0,04 %); die
  *   Gruendung, der Regler und die Rekrutierung laufen live seit 04.10. 01:01.
  * - Der Rufbedarf ist ein Planer-Ergebnis bei dem Vierfachen des heutigen Geldes
- *   (REP_NEED_BUDGET_FACTOR in lib/einbau.js, ein grober Hebel). Mit sehr wenig
- *   Geld und billigen Fruehstuecken kann `need` klein sein (1.000-1.250 Ruf); die
- *   Gang schaltet dann kurz auf MONEY und, waechst das Geld, die Hysterese und der
- *   Plan holen sie zurueck. Nicht gemessen, wie oft das im Zyklus 1 passiert.
+ *   (REP_NEED_BUDGET_FACTOR in lib/einbau.js, ein grober Hebel). Er springt mit dem
+ *   Konto in Stufen, die das 2-%-Band der Hysterese nie abfaengt (verify-p2d-
+ *   skeptiker.md B3): frischer Knoten, Budget -> Bedarf: 4 Mio 1.275, 0,5-1 Mrd
+ *   45.900, 4 Mrd 153.000, 8-1.000 Mrd 1.275.000, 2.000 Mrd 1.657.500; Zyklus 2 (14
+ *   Stuecke besessen), Konto -> Bedarf: 0,1-0,5 Mrd 38.250, 1 Mrd 446.250, 2-3 Mrd
+ *   510.000, ab 5 Mrd 1.657.500. Gerechnet unschaedlich: der Ruf steigt im Zyklus
+ *   nur, Dauerflattern braucht ein Konto, das wiederholt UNTER die Ruecklage faellt,
+ *   und dafuer gibt es in BN2 keinen Abnehmer (praemisse E8); ab einem Konto von 5
+ *   Mrd ist RESPECT stabil. Wer es glatt will: bn4rep.js haelt repNeed je augReset
+ *   monoton (Maximum) - nicht gebaut.
+ * - FRUEHES MONEY (B4 des Skeptikers, beziffert statt "nicht gemessen"): im ersten
+ *   Zyklus eines frischen Knotens praktisch unerreichbar - MONEY vor dem Bedarf der
+ *   Runde braucht ein Konto <= ~2 Mrd bei Ruf >= 64.000, und BN2.1 Zyklus 1 hatte
+ *   2,4 / 4,8 / 8,6 Mrd bei Knoten 1,85 / 2,85 / 3,85 h, der Ruf 64.000 kam erst bei
+ *   Gang-Alter ~3,3 h. In Zyklus 2 und spaeter erreichbar und gewollt harmlos: nach
+ *   dem Einbau ist das Konto ~0 und der Ruf (mit Favor) ~190/s, der Bedarf 5.100-
+ *   38.250 -> MONEY nach Minuten, zwei kurze Fenster (bis das Konto ~0,5-1 Mrd
+ *   erreicht, und bei Ruf >= 510.000 bis 5 Mrd), danach RESPECT bis 1.657.500.
+ *   Human Trafficking bringt 11-12 % des Terrorism-Respekts (394/3.527, 578/4.883,
+ *   654/5.459 in gang-p2b-gegen.mjs), der Bedarf der Runde verschiebt sich also um
+ *   ~die Fensterdauer. Fensterdauer GESCHAETZT 10-20 min, nicht simuliert.
+ * - Ausruestung frisst den Ueberschuss ueber der Ruecklage, auch fuer Trainierende
+ *   (B5): solange sie fehlt, bleibt das Konto auf der Ruecklage und der echte Plan
+ *   waechst nicht - Vollausstattung 3,34 / 1,99 / 1,21 Mrd gegen 10-16 Mrd/h Human
+ *   Trafficking, also 5-20 min Verzug. Sie beschleunigt zugleich den Aufstieg (expMult
+ *   = 1 + (mult - 1) / 4, GangMember.ts:141-150), und der Aufstieg loescht sie wieder
+ *   (GangMember.ts:308-309); keine Schleife, denn jeder Aufstieg in der Arbeitsphase
+ *   braucht dP >= 3P. Spaeter optional: nur die Phase "work" ausstatten.
  * - Nach einem Augmentierungs-Einbau sinken die Aufstiegspunkte auf 95 %
  *   (`Prestige.ts:130-143`), die Stufen also leicht: ein Arbeiter knapp ueber
  *   TRAIN_UNTIL kann kurz in die Trainingsphase zurueckfallen. Folgenlos, aber
  *   nicht gemessen.
- * - Der Leser fuer data/gang.json ist tools/lib/gangzeile.js (eine Zeile in
- *   tools/checkin.js, also in /bb); es gibt keinen weiteren Leser, etwa im
- *   Dashboard.
+ * - Der Leser fuer data/gang.json ist tools/lib/gangzeile.js (eine Zeile und
+ *   Befunde in tools/checkin.js, also in /bb); den Rufbedarf der Torrunde zeigt
+ *   zusaetzlich tools/lib/gate-round-status.js. Es gibt keinen weiteren Leser,
+ *   etwa im Dashboard.
  *
  * @param {NS} ns
  */
@@ -442,6 +555,18 @@ export const EQUIP_TYPES = ["Weapon", "Armor", "Vehicle", "Rootkit"];
 export const EQUIP_MAX_BUYS = 24;
 // Die Ruecklage, die bn4rep.js fuer die Torrunde meldet und die alle Ausgeber abziehen.
 export const MONEY_NEED_FILE = "data/geldbedarf.txt";
+// NOTSCHALTER NUR FUER DEN GELDMODUS (Skeptiker 04.10.2026, B10). Liegt die Datei
+// auf home, gilt der Rufbedarf als "keiner": Modus RESPECT, Terrorism fuer die
+// Arbeitenden, kein Ausruestungskauf mehr. Ohne ihn war der einzige Rueckweg
+// "gang-2 einspielen"; data/gang-an.txt zu entfernen liesse die Mitglieder auf
+// Human Trafficking stehen (die Steuerung endet, die Aufgaben bleiben). Die Datei
+// loescht man wieder, um den Geldmodus freizugeben - gebaut wird sie nie von
+// einem Skript. Eine bereits gekaufte Ausruestung bleibt (sie schadet nicht).
+export const MONEY_OFF_FILE = "data/gang-geld-aus.txt";
+// Wie alt die letzte Telemetrie hoechstens sein darf, damit "seit wann ist der
+// Rufbedarf null" einen Neustart von gang.js ueberlebt (= die Frist, nach der /bb
+// gang.js als tot meldet). Eine Datei aus einem frueheren Knoten ist aelter.
+const SINCE_KEEP_MS = 10 * 60000;
 
 // --- Regler-Parameter (Sim "bester Regler", gang-sim.mjs) ----------------------
 export const TRAIN_UNTIL = 500;      // gewichtete Stufe, ab der gearbeitet wird
@@ -863,6 +988,18 @@ export async function main(ns) {
     // letzte Runde nichts gekauft hat.
     mode: null, repNeed: null, repNeedWhy: "", moneyGainRate: null,
     equipmentBought: 0, equipmentSpent: 0, equipmentBlock: null,
+    // Seit wann (Wanduhr) der Rufbedarf ununterbrochen null ist, sonst null. Das
+    // ist die Messgroesse fuer den /bb-Befund "Geldmodus springt nie an" (B1):
+    // ohne sie sieht ein dauerhaft fehlender Bedarf aus wie "Ruf noch unter Bedarf".
+    repNeedNullSince: null,
+  };
+  // Alles, was nur eine Gang im Geldmodus-Sinn "fuehrt", zurueck auf leer: nach dem
+  // Verlust der Gang, in einer Hacking-Gang (dort fuehrt dieses Werkzeug nicht).
+  // Sonst blieben mode und Bedarf der LETZTEN Fuehrung in der Telemetrie stehen
+  // und /bb zeigte einen Modus, den es nicht mehr gibt (Skeptiker B7).
+  const clearLead = () => {
+    st.mode = null; st.repNeed = null; st.repNeedWhy = ""; st.repNeedNullSince = null;
+    st.equipmentBlock = null;
   };
   // Erlaubte Ausruestung (Name + Typ aus EQUIP_TYPES), einmal je Prozess gelesen.
   // null = noch nicht (oder nicht vollstaendig) gelesen; die naechste MONEY-Runde
@@ -941,7 +1078,7 @@ export async function main(ns) {
       mode: st.mode, repNeed: st.repNeed, repNeedWhy: st.repNeedWhy,
       moneyGainRate: st.moneyGainRate,
       equipmentBought: st.equipmentBought, equipmentSpent: st.equipmentSpent,
-      equipmentBlock: st.equipmentBlock,
+      equipmentBlock: st.equipmentBlock, repNeedNullSince: st.repNeedNullSince,
     };
     // Selbst geschrieben statt `nachHome()` aus lib/hostdatei.js: dessen
     // try/catch gibt bei einer Ausnahme nur false zurueck und verliert die
@@ -971,6 +1108,15 @@ export async function main(ns) {
         if (Number.isFinite(t) && t > 0 && t <= Date.now()) {
           st.lastCreateAt = t;
           st.lastCreate = alt.lastCreate || null;
+        }
+        // "Rufbedarf seit ... null" ueberlebt einen Neustart nur, wenn die alte
+        // Telemetrie frisch war UND eine Gang meldete: eine Datei aus einem frueheren
+        // Knoten (Tage alt) darf dem neuen Knoten keine 30 Minuten vorspiegeln.
+        const since = Number(alt && alt.repNeedNullSince);
+        const altTs = Number(alt && alt.ts);
+        if (alt && alt.inGang === true && Number.isFinite(since) && since > 0 && since <= Date.now()
+          && Number.isFinite(altTs) && Date.now() - altTs >= 0 && Date.now() - altTs <= SINCE_KEEP_MS) {
+          st.repNeedNullSince = since;
         }
       } catch (e) {
         noteError("telemetry_read", e);
@@ -1087,9 +1233,24 @@ export async function main(ns) {
       try { tel = JSON.parse(roh); } catch (e) { noteError("bn4rep_parse", e); }
     }
     const ri = tryCall("resetInfo", () => ns.getResetInfo());
-    const res = repNeedOf(tel, Date.now(), ri.ok ? ri.value : null, faction);
+    let res = repNeedOf(tel, Date.now(), ri.ok ? ri.value : null, faction);
+    // Der Notschalter nur fuer den Geldmodus. Nicht lesbar heisst hier: AUS - die
+    // sichere Richtung ist RESPECT (gang-2), anders als beim Hauptschalter, wo
+    // "nicht lesbar" weiterlaufen heisst.
+    const off = tryCall("moneyOffSwitch", () => ns.fileExists(MONEY_OFF_FILE, "home"));
+    if (!off.ok || off.value === true) {
+      res = { need: null, why: off.ok ? MONEY_OFF_FILE + " liegt - Geldmodus ausgeschaltet"
+        : MONEY_OFF_FILE + " nicht lesbar - Geldmodus aus" };
+    }
     st.repNeed = res.need;
     st.repNeedWhy = res.why;
+    // Seit wann fehlt der Bedarf ununterbrochen? Nur Beobachtung fuer /bb, nie eine
+    // Entscheidung: der Modus bleibt zustandslos aus Ruf und Bedarf abgeleitet.
+    if (res.need === null) {
+      if (st.repNeedNullSince === null) st.repNeedNullSince = Date.now();
+    } else {
+      st.repNeedNullSince = null;
+    }
 
     const mode = chooseMode({ rep, need: res.need, onMoney });
     if (mode !== st.mode) {
@@ -1224,6 +1385,7 @@ export async function main(ns) {
     if (st.isHacking) {
       st.state = "blocked";
       st.blockedReason = "hacking_gang";
+      clearLead();
       return;
     }
     st.state = "work";
@@ -1342,6 +1504,8 @@ export async function main(ns) {
       if (!st.inGang) {
         st.faction = null;
         st.members = 0;
+        st.moneyGainRate = null;
+        clearLead();
         if (foundGang()) st.inGang = ns.gang.inGang() === true;
       }
       if (st.inGang) manageGang();

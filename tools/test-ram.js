@@ -246,7 +246,7 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // Spielzugriff. (Im Worktree zeigt der Test zusaetzlich viele Zeilen rot, weil
     // dort alle Dateien CRLF haben und die Stempel die Rohbytes des Haupt-Repos
     // meinen; das ist ein Artefakt der Auscheckform, keine Abweichung.)
-    const VERALTET_ERLAUBT = ["gang.js", "bn4rep.js", "lib/einbau.js"];
+    const VERALTET_ERLAUBT = [];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

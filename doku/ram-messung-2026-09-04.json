@@ -29,10 +29,10 @@
   "singKosten41": 840,
   "dom": 0,
   "err": null,
-  "bytes": 182822,
+  "bytes": 186740,
   "lines": 2181,
-  "sha256": "7980aa32a018bb698c3e0d5a54e04a3fef93bda0659f957909607b0d29e6ca33",
-  "gemessenAm": "2026-10-04T08:18:03.929Z",
+  "sha256": "fe60c21b36bdea6feb0110d3550876e05e1e83dc2e5e7845ef9c1f0fe8f66dcc",
+  "gemessenAm": "2026-10-04T10:21:54.840Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -1981,19 +1981,19 @@
   "live41": 1.6,
   "lokal41": 1.6,
   "diff": 0,
-  "sha256": "b02c2ca67917287b114424896e403511e1ef4a8bdc41533c707eb59bd97dad3b",
-  "bytes": 52918,
-  "gemessenAm": "2026-10-04T08:18:03.929Z",
+  "sha256": "c91117364c4adf5bb4feeec15bd90db9240a0770317d941b0e814ee64f785b2e",
+  "bytes": 60271,
+  "gemessenAm": "2026-10-04T10:21:54.840Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {
   "file": "gang.js",
-  "live41": 36.85,
-  "lokal41": 36.85,
+  "live41": 44.95,
+  "lokal41": 44.95,
   "diff": 0,
-  "sha256": "462e153f221cdaaa7a6ff4543adf3ee825fbf07290dfa47abad1ec3117b01edf",
-  "bytes": 46440,
-  "gemessenAm": "2026-10-03T23:01:57.235Z",
+  "sha256": "cbffdcf2964a86baa2e8755334a8173987c7e1740196a7c4e4283dfcddf1edc4",
+  "bytes": 82994,
+  "gemessenAm": "2026-10-04T10:21:54.840Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  }
 ]

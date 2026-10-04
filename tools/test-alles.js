@@ -269,6 +269,12 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-exportpruefung.js",
+    deckt: "P2d/B2: benannte Importe gegen die Exporte der Zieldatei (tools/lib/exportpruefung.js, benutzt von importpruefung.js) -"
+      + " Zerlegung, der Fall bn4rep.js gegen eine alte lib/einbau.js, Gegenprobe an allen Dateien in src/ (kein Fehlalarm), Mutanten",
+    schnell: true,
+  },
+  {
     datei: "test-gate-round-status.js",
     deckt: "P1/AUG-4: der Leser der Torrunden-Telemetrie fuer den Check-in (mode error, gangErrors,"
       + " buyFailures, planDrift als Befund; kein Befund im gesunden Zustand)",
@@ -371,7 +377,7 @@ const TESTS = [
   },
   {
     datei: "test-gang.js",
-    deckt: "EBENE 2: gang.js (Paket P2, GANG-1) gegen einen ns.gang-Nachbau - Gruendung nur einmal und nur mit beigetretener Kampf-Faktion kleinsten Rufs (nie NiteSec/Black Hand, Pause auch ueber Neustart, unlesbarer Ruf zaehlt nicht als 0), Rekrutierung mit Grenze, Aufgabenwahl Training -> Terrorism -> Vigilante, Aufstiegsschwellen 1,3/2, nie Warfare/Ausruestung, Takt = nextUpdate mit Rueckfall, Abbruch/Fehlerserie/MAX_ROUNDS, Fehler in der Telemetrie, Schalter data/gang-an.txt, Registry-Gating; VORAUSSETZUNGSSPERRE vor createGang (nur mit frischer, zum Knoteneintritt passender data/bn4rep.json, die Paket 0 UND Paket 1 meldet; gesperrter Versuch zaehlt nicht), Vertrag mit bn4rep.js, /bb-Zeile aus gang.json, Logzeit in Ortszeit; Formeln gegen gang-formulas.mjs; Selbstprobe mit 32 Mutanten",
+    deckt: "EBENE 2: gang.js (Paket P2, GANG-1) gegen einen ns.gang-Nachbau - Gruendung nur einmal und nur mit beigetretener Kampf-Faktion kleinsten Rufs (nie NiteSec/Black Hand, Pause auch ueber Neustart, unlesbarer Ruf zaehlt nicht als 0), Rekrutierung mit Grenze, Aufgabenwahl Training -> Terrorism -> Vigilante, Aufstiegsschwellen 1,3/2, nie Warfare/Ausruestung, Takt = nextUpdate mit Rueckfall, Abbruch/Fehlerserie/MAX_ROUNDS, Fehler in der Telemetrie, Schalter data/gang-an.txt, Registry-Gating; VORAUSSETZUNGSSPERRE vor createGang (nur mit frischer, zum Knoteneintritt passender data/bn4rep.json, die Paket 0 UND Paket 1 meldet; gesperrter Versuch zaehlt nicht), Vertrag mit bn4rep.js, /bb-Zeile aus gang.json, Logzeit in Ortszeit; Formeln gegen gang-formulas.mjs; GELDMODUS (P2d): Modus je Runde mit Hysterese, Rueckfall auf RESPECT, Human Trafficking und Wanted-Regler, Ausruestung nur im Modus MONEY ueber der Ruecklage; Skeptiker-Runde: Notschalter data/gang-geld-aus.txt, repNeedNullSince, /bb-Zeile und Befund zum Geldmodus; Selbstprobe mit 70 Mutanten",
     schnell: true,
   },
 ];

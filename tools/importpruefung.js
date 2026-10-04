@@ -20,6 +20,15 @@
  * `tools/einspielen.js` prueft, ob die Datei ANGEKOMMEN ist. Dieses Werkzeug
  * prueft, ob sie danach auch LAUFEN kann.
  *
+ * SEIT 04.10.2026 AUCH DIE NAMEN (P2d, Skeptiker B2). Eine Datei, die da ist,
+ * aber einen neuen benannten Import nicht exportiert (alte lib/einbau.js im
+ * Spiel, neue bn4rep.js dazu), starb beim Start mit "does not provide an export
+ * named ..." - und diese Pruefung sagte "ok". Jetzt wird zu jedem Ziel und zu
+ * jeder Datei der Stufe (nach `--`) gelesen, welche Namen sie importiert, und
+ * gegen die Exporte der Zieldatei geprueft: ist die Zieldatei Teil der Stufe,
+ * zaehlt die lokale Fassung, sonst die im Spiel (nur lesend, getFile).
+ * Die Pruefung selbst liegt rein in tools/lib/exportpruefung.js.
+ *
  * ===========================================================================
  * WAS ES NICHT KANN
  * ===========================================================================
@@ -48,6 +57,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { parseImports, missingExports } from "./lib/exportpruefung.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -71,6 +81,17 @@ async function imSpiel(datei) {
     return b.result !== null && b.result !== undefined;
   } catch {
     return false;
+  }
+}
+
+/** Der Inhalt einer Datei im Spiel (nur lesend), sonst null. */
+async function spielQuelle(datei) {
+  const q = new URLSearchParams({ instance: "LIVE", method: "getFile", server: "home", filename: datei });
+  try {
+    const b = await (await fetch(BASE + "/api/rpc?" + q)).json();
+    return typeof b.result === "string" ? b.result : null;
+  } catch {
+    return null;
   }
 }
 
@@ -152,6 +173,43 @@ for (const z of ziele) {
   if (!imps.length) console.log("  (importiert nichts)");
   await kette(z, 1, "(Wurzel)");
 }
+
+// --- Benannte Importe gegen die Exporte (P2d, B2) ------------------------------
+// Geprueft wird jede Datei, die nach der Stufe LAUFEN soll: die Ziele und die
+// Dateien nach `--`. Ihre Importziele liefern die lokale Fassung, wenn sie selbst
+// Teil der Stufe sind, sonst die im Spiel. Ein Ziel ohne lesbaren Inhalt wird hier
+// nicht geprueft - dass es fehlt, haben die Ketten oben schon gemeldet.
+console.log("");
+console.log("--- benannte Importe gegen die Exporte");
+const zuPruefen = [...new Set([...ziele, ...mitStufe])].filter((d) => d.endsWith(".js"));
+let geprueft = 0;
+for (const datei of zuPruefen) {
+  const lokal = path.join(SRC, datei);
+  if (!fs.existsSync(lokal)) continue;
+  const inhalt = fs.readFileSync(lokal, "utf8");
+  const quellen = new Map();
+  for (const imp of parseImports(inhalt)) {
+    if (quellen.has(imp.from)) continue;
+    const ziel = path.join(SRC, imp.from);
+    const q = mitStufe.includes(imp.from)
+      ? (fs.existsSync(ziel) ? fs.readFileSync(ziel, "utf8") : null)
+      : await spielQuelle(imp.from);
+    if (q !== null) quellen.set(imp.from, q);
+  }
+  geprueft++;
+  const luecken = missingExports(inhalt, quellen);
+  if (!luecken.length) {
+    console.log("  ok " + datei + ": alle benannten Importe sind vorhanden");
+    continue;
+  }
+  for (const l of luecken) {
+    const wo = mitStufe.includes(l.from) ? "in der Stufe" : "im Spiel";
+    console.log("  FEHLT EXPORT  " + l.from + " (" + wo + ") " + l.why + "   <- " + datei
+      + (mitStufe.includes(l.from) ? "" : "   (mit der Stufe einspielen: -- " + l.from + ")"));
+    fehlend++;
+  }
+}
+if (!geprueft) console.log("  (keine Datei zu pruefen)");
 
 console.log("");
 console.log(fehlend

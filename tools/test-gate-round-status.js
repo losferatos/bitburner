@@ -98,6 +98,29 @@ console.log("\n-- gesunde Torrunde: Zeilen, aber KEIN Befund --");
     locked.lines.some((z) => /Reaper 12, Evasive System 13/.test(z) && /x1,240/.test(z) && /x1,885/.test(z)), alles(locked));
 }
 
+console.log("\n-- Geldmodus-Bedarf (P2d, Skeptiker B1): der Rufbedarf steht im Bericht, auch sein Fehlen --");
+{
+  const mitBedarf = gesund({ repNeed: 1_657_500, repNeedFaction: "Slum Snakes", repNeedAug: "Graphene Bionic Spine Upgrade", repNeedWhy: "",
+    repNeedPlan: { n: 9, cost: 233e9, budget: 240e9 } });
+  const r = lage(tele(mitBedarf));
+  pruefe("Bedarf da: eine Zeile mit Zahl, Faktion, bestimmendem Stueck und Bedarfsplan; kein Befund",
+    r.lines.some((z) => /Geldmodus-Bedarf: 1\.657\.500 Ruf bei Slum Snakes \(bestimmt von Graphene Bionic Spine Upgrade\), Bedarfsplan 9 Stuecke fuer \$233,00 Mrd bei Budget \$240,00 Mrd/.test(z))
+    && r.findings.length === 0, alles(r));
+  pruefe("data traegt repNeed (Verlauf beim naechsten Besuch)", r.data && r.data.repNeed === 1_657_500, JSON.stringify(r.data));
+  const kein = lage(tele(gesund({ repNeed: null, repNeedFaction: null, repNeedAug: null, repNeedWhy: "data/gang.json meldet keine Gang", repNeedPlan: null })));
+  pruefe("Bedarf null: die Zeile sagt 'keiner' mit dem Grund und dass die Gang auf Terrorism bleibt; data.repNeed null",
+    kein.lines.some((z) => /Geldmodus-Bedarf: keiner \(data\/gang\.json meldet keine Gang\) - gang\.js bleibt auf Terrorism/.test(z)) && kein.data.repNeed === null, alles(kein));
+  const ohneGrund = lage(tele(gesund({ repNeed: null })));
+  pruefe("Bedarf null ohne Grund: 'kein Grund gemeldet' statt Absturz", ohneGrund.lines.some((z) => /keiner \(kein Grund gemeldet\)/.test(z)), alles(ohneGrund));
+  const alt = lage(tele(gesund()));
+  pruefe("alte bn4rep.js (kein Feld repNeed): KEINE Geldmodus-Zeile (nichts zu sagen) und data.repNeed null",
+    !alt.lines.some((z) => /Geldmodus/.test(z)) && alt.data.repNeed === null, alles(alt));
+  const muell = lage(tele(gesund({ repNeed: "viel", repNeedFaction: {}, repNeedAug: 5, repNeedWhy: 7, repNeedPlan: "x" })));
+  pruefe("Muell in den Bedarfsfeldern: keine Ausnahme, Zeile 'keiner', data.repNeed null", muell.lines.some((z) => /Geldmodus-Bedarf: keiner/.test(z)) && muell.data.repNeed === null, alles(muell));
+  const fuerBefund = lage(tele(mitBedarf), { gang: { inGang: true, faction: "Slum Snakes" } });
+  pruefe("Gang laeuft, Bedarf da: weiterhin kein Befund", fuerBefund.findings.length === 0, alles(fuerBefund));
+}
+
 console.log("\n-- die letzte Runde --");
 {
   const r = lage(tele(gesund({ boughtTotal: 7, lastRound: { zeit: NOW - 3 * 60 * MIN, n: 7, geplant: 8, first: "SPTN-97 Gene Modification", cost: 54e9, gain: 1.58 } })));

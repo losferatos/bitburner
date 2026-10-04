@@ -507,9 +507,26 @@ schreibt sie (Handbremse wie `bn4-stop.txt`, Ausnahme in `VON_AUSSEN` von
 `tools/registry-bauen.js`). `ramSingGb: 1` ist allein
 `singularity.getFactionRep` (Ruf der Kandidatenfaktionen vor der Gruendung);
 bei SF4.1 kostet der Aufruf 16 GB (Faktor 16), bei SF4.3 eines. `ramBaseGb`
-20,85 ergibt 21,85 GB bei SF4.3 und 36,85 GB bei SF4.1 (`tools/ram.js`; die Angabe
+28,95 ergibt 29,95 GB bei SF4.3 und 44,95 GB bei SF4.1 (`tools/ram.js`; die Angabe
 45,85 aus dem ersten Baubericht war falsch; die Reparatur vom 03.10.2026 hat
-`getResetInfo` fuer die Voraussetzungssperre dazugenommen, +1 GB). Die Gang
+`getResetInfo` fuer die Voraussetzungssperre dazugenommen, +1 GB; P2d vom
+04.10.2026 hat den Geldmodus mit Ausruestung dazugenommen, +8,1 GB:
+`purchaseEquipment` 4, `getEquipmentCost` 2, `getEquipmentType` 2,
+`getServerMoneyAvailable` 0,1 - vorher 20,85 / 21,85 GB bei SF4.3 im Spiel gemessen). Seit
+`gang-3` (P2d, 04.10.2026) kennt gang.js zwei Modi: RESPECT (Terrorism, wie
+zuvor) und MONEY (Human Trafficking plus Ausruestung Weapon/Armor/Vehicle/Rootkit
+ueber der Ruecklage `data/geldbedarf.txt`); der Modus folgt dem Faktionsruf der Gang
+gegen `torRunde.repNeed` aus `data/bn4rep.json`, das bn4rep.js (Block 1c) aus einem
+zweiten Plan ohne Rufgrenze rechnet. Einzelheiten und Abnahme im Kopf von
+`src/gang.js` (DER GELDMODUS). Skeptiker-Runde 04.10.2026: `data/gang-geld-aus.txt`
+ist ein Notschalter NUR fuer den Geldmodus (Handbremse, kein Skript schreibt sie:
+liegt sie, gilt der Rufbedarf als keiner, die Arbeitenden gehen auf Terrorism
+zurueck und es wird nichts mehr gekauft); gang.json traegt dazu `repNeedNullSince`,
+und /bb meldet den stillen Rueckfall (`GANG-BEFUND`, tools/lib/gangzeile.js) sowie
+den Rufbedarf der Torrunde (tools/lib/gate-round-status.js). Eingespielt wird P2d
+in EINEM Schritt mit lib/einbau.js, bn4rep.js, gang.js und registry.json (Ablauf im
+Kopf von gang.js: SO WIRD P2d EINGESPIELT); `tools/importpruefung.js` prueft dafuer
+seit demselben Tag auch die benannten Importe gegen die Exporte. Die Gang
 selbst braucht keine Figur (`needsFigure: "none"`, verify-g01-betrieb.md
 Abschnitt 4).
 
@@ -1236,9 +1253,9 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "gang.js",
       "args": [],
-      "ramBaseGb": 20.85,
+      "ramBaseGb": 28.95,
       "ramSingGb": 1,
-      "ramMeasuredAt": "GERECHNET-2026-10-03 (tools/ram.js, Paket P2 nach der Reparatur: +1 GB getResetInfo fuer die Voraussetzungssperre; noch keine Live-Nachmessung im Spiel)",
+      "ramMeasuredAt": "GERECHNET-2026-10-04 (tools/ram.js, P2d Geldmodus: +8,1 GB = purchaseEquipment 4 + getEquipmentCost 2 + getEquipmentType 2 + getServerMoneyAvailable 0,1; vorher 20,85 gerechnet / im Spiel 21,85 bei SF4.3 gemessen; noch keine Live-Nachmessung der neuen Fassung)",
       "verfahren": "V2",
       "knoten": [2],
       "phase": "normal",

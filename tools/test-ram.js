@@ -233,7 +233,20 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // gang.js (P2) ist neu und steht in keiner Messzeile. Alle Eintraege gelten
     // bis zur Live-Nachmessung (tools/eichung-messen.js nach dem Einspielen);
     // danach wird die Liste wieder auf [] gesetzt.
-    const VERALTET_ERLAUBT = []; // geleert 04.10.2026 nach Live-Messung (Gang-Pakete P0-P2)
+    // 2026-10-04 (P2d Geldmodus der Gang, gang-3): gang.js, bn4rep.js und
+    // lib/einbau.js haben neuen Inhalt. gang.js ruft jetzt ns.gang.purchaseEquipment
+    // (4 GB), getEquipmentCost (2), getEquipmentType (2) und getServerMoneyAvailable
+    // (0,1): tools/ram.js rechnet 29,95 GB statt 21,85 GB (SF4.3), 44,95 statt 36,85
+    // (SF4.1); registry.json ramBaseGb 28,95 ist nachgezogen (`ram.js --registry`
+    // gruen). bn4rep.js liest nur data/gang.json (Datei, 0 GB) und importiert vier
+    // Namen aus lib/einbau.js: 68,55 GB (SF4.3) vorher wie nachher, lib/einbau.js
+    // 1,6 GB vorher wie nachher. Nur die Hashes der Messzeilen passen nicht mehr -
+    // Live-Nachmessung (tools/eichung-messen.js --schreib) nach dem Einspielen,
+    // danach wird die Liste wieder auf [] gesetzt. Dieser Auftrag hat keinen
+    // Spielzugriff. (Im Worktree zeigt der Test zusaetzlich viele Zeilen rot, weil
+    // dort alle Dateien CRLF haben und die Stempel die Rohbytes des Haupt-Repos
+    // meinen; das ist ein Artefakt der Auscheckform, keine Abweichung.)
+    const VERALTET_ERLAUBT = ["gang.js", "bn4rep.js", "lib/einbau.js"];
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

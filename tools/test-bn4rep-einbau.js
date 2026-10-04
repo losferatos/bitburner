@@ -378,6 +378,118 @@ console.log("\n-- H2: Einbau-Ausloeser darf nicht bei schwelle-1 haengen bleiben
   pruefe("leere Kandidatenliste, NFG vorhanden: nichts zu tun", w4 === null, JSON.stringify(w4));
 }
 
+// ---------------------------------------------------------------------------
+console.log("\n-- P2d: Rufbedarf der Gang fuer den Geldmodus (gangRepNeed, repNeedKandidaten, gangFactionFromTelemetry) --");
+{
+  const SS = "Slum Snakes";
+  const step = (aug, faktion) => ({ aug, faktion, price: 1e9 });
+  const REQ = { "Bionic Spine": 45000, "SPTN-97 Gene Modification": 1250000, "Graphene Bionic Spine Upgrade": 1625000, "Hyperion Plasma Cannon V1": 1250 };
+
+  pruefe("REP_NEED_MARGIN 1,02 und REP_NEED_BUDGET_FACTOR 4 sind exportiert", M.REP_NEED_MARGIN === 1.02 && M.REP_NEED_BUDGET_FACTOR === 4,
+    JSON.stringify([M.REP_NEED_MARGIN, M.REP_NEED_BUDGET_FACTOR]));
+
+  // --- gangRepNeed ---
+  let r = ruf("gangRepNeed", { steps: [step("Bionic Spine", SS), step("SPTN-97 Gene Modification", SS)] }, SS, REQ);
+  pruefe("Plan bis SPTN-97: 1,02 x 1.250.000 = 1.275.000, bestimmt von SPTN-97",
+    r !== FEHLT && Math.abs(r.repNeed - 1275000) < 1e-6 && r.aug === "SPTN-97 Gene Modification" && r.faction === SS && r.why === "", JSON.stringify(r));
+  r = ruf("gangRepNeed", { steps: [step("Graphene Bionic Spine Upgrade", SS), step("Bionic Spine", SS), step("SPTN-97 Gene Modification", SS)] }, SS, REQ);
+  pruefe("Plan mit dem Spine Upgrade: 1,02 x 1.625.000 = 1.657.500 (der hoechste, nicht der letzte)",
+    r !== FEHLT && Math.abs(r.repNeed - 1657500) < 1e-6 && r.aug === "Graphene Bionic Spine Upgrade", JSON.stringify(r));
+  r = ruf("gangRepNeed", { steps: [step("Graphene Bionic Spine Upgrade", "Bladeburners"), step("SPTN-97 Gene Modification", SS)] }, SS, REQ);
+  pruefe("Stuecke anderer Faktionen zaehlen nicht: Spine Upgrade bei Bladeburners, Bedarf aus SPTN-97 (1.275.000)",
+    r !== FEHLT && Math.abs(r.repNeed - 1275000) < 1e-6 && r.aug === "SPTN-97 Gene Modification", JSON.stringify(r));
+  r = ruf("gangRepNeed", { steps: [step("Hyperion Plasma Cannon V1", "Bladeburners")] }, SS, REQ);
+  pruefe("kein Stueck der Gang-Faktion im Plan: kein Bedarf (null), mit Grund", r !== FEHLT && r.repNeed === null && /kein Stueck der Gang-Faktion/.test(r.why), JSON.stringify(r));
+  r = ruf("gangRepNeed", { steps: [] }, SS, REQ);
+  pruefe("leerer Plan: kein Bedarf", r !== FEHLT && r.repNeed === null);
+  r = ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS), step("Unbekannt", SS)] }, SS, REQ);
+  pruefe("Rufbedarf eines Stuecks der Gang-Faktion unbekannt: KEIN Bedarf (nicht der der anderen) - im Zweifel Respekt",
+    r !== FEHLT && r.repNeed === null && /Unbekannt/.test(r.why), JSON.stringify(r));
+  r = ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS)] }, SS, { "SPTN-97 Gene Modification": NaN });
+  pruefe("Rufbedarf NaN / Text / negativ: kein Bedarf",
+    r !== FEHLT && r.repNeed === null
+    && ruf("gangRepNeed", { steps: [step("A", SS)] }, SS, { A: "1250000" }).repNeed === null
+    && ruf("gangRepNeed", { steps: [step("A", SS)] }, SS, { A: -5 }).repNeed === null);
+  pruefe("alle Stuecke ohne Rufbedarf (repReq 0): kein Bedarf", ruf("gangRepNeed", { steps: [step("A", SS)] }, SS, { A: 0 }).repNeed === null);
+  pruefe("Map statt Objekt als Rufbedarf-Tabelle geht ebenso",
+    Math.abs(ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS)] }, SS, new Map(Object.entries(REQ))).repNeed - 1275000) < 1e-6);
+  pruefe("Gang-Faktion unbekannt (null / leer / Zahl): kein Bedarf",
+    ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS)] }, null, REQ).repNeed === null
+    && ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS)] }, "", REQ).repNeed === null
+    && ruf("gangRepNeed", { steps: [step("SPTN-97 Gene Modification", SS)] }, 5, REQ).repNeed === null);
+  pruefe("kein Plan (null / ohne steps) -> kein Bedarf, kein Absturz",
+    ruf("gangRepNeed", null, SS, REQ).repNeed === null && ruf("gangRepNeed", {}, SS, REQ).repNeed === null && ruf("gangRepNeed", undefined, SS, undefined).repNeed === null);
+  pruefe("ohne Rufbedarf-Tabelle (undefined) und Stuecken der Gang-Faktion: kein Bedarf",
+    ruf("gangRepNeed", { steps: [step("A", SS)] }, SS, undefined).repNeed === null);
+
+  // --- repNeedKandidaten ---
+  const k = (aug, faktion, rep, repReq) => ({ aug, faktion, rep, repReq, preis: 1e9, prereq: [], mults: { strength: 1.1 } });
+  let kk = ruf("repNeedKandidaten", [
+    k("A", SS, 100, 1000),            // Gang-Faktion, Ruf fehlt -> hinein mit Infinity
+    k("B", "Fremd", 100, 1000),       // fremde Faktion, Ruf fehlt -> raus
+    k("C", "Fremd", 5000, 1000),      // fremde Faktion, kaufbar -> hinein, mit echtem Ruf
+    k("D", SS, 5000, 1000),           // Gang-Faktion, schon kaufbar -> hinein mit echtem Ruf
+  ], SS);
+  pruefe("Gang-Stueck ohne Ruf: rep Infinity; fremdes ohne Ruf: weg; kaufbare bleiben mit echtem Ruf",
+    kk !== FEHLT && kk.length === 3 && kk.find((x) => x.aug === "A").rep === Infinity && !kk.some((x) => x.aug === "B")
+    && kk.find((x) => x.aug === "C").rep === 5000 && kk.find((x) => x.aug === "D").rep === 5000, JSON.stringify(kk));
+  pruefe("Reihenfolge: kaufbar-fremd vor kaufbar-Gang vor Gang-ohne-Ruf (waehleTorRunde nimmt je Namen den ersten)",
+    kk !== FEHLT && kk.map((x) => x.aug).join("") === "CDA", kk === FEHLT ? "" : kk.map((x) => x.aug).join(""));
+  pruefe("Eingabe bleibt unveraendert (kein Seiteneffekt)", (() => {
+    const e = [k("A", SS, 100, 1000)];
+    ruf("repNeedKandidaten", e, SS);
+    return e[0].rep === 100;
+  })());
+  kk = ruf("repNeedKandidaten", [k("A", SS, 100, 1000), k("C", "Fremd", 5000, 1000)], null);
+  pruefe("ohne Gang-Faktion bleibt nur das kaufbare", kk !== FEHLT && kk.length === 1 && kk[0].aug === "C", JSON.stringify(kk));
+  pruefe("leere / kaputte Eingabe -> leere Liste", ruf("repNeedKandidaten", [], SS).length === 0 && ruf("repNeedKandidaten", undefined, SS).length === 0
+    && ruf("repNeedKandidaten", [null, undefined], SS).length === 0);
+
+  // --- zusammen mit dem echten Planer ---
+  {
+    const alle = [
+      { aug: "Bionic Spine", faktion: SS, rep: 100, repReq: 45000, preis: 125e6, prereq: [], mults: { strength: 1.15, defense: 1.15, dexterity: 1.15, agility: 1.15 } },
+      { aug: "Graphene Bionic Spine Upgrade", faktion: SS, rep: 100, repReq: 1625000, preis: 6e9, prereq: ["Bionic Spine"], mults: { strength: 1.6, defense: 1.6, dexterity: 1.6, agility: 1.6 } },
+      { aug: "SPTN-97 Gene Modification", faktion: SS, rep: 100, repReq: 1250000, preis: 4.875e9, prereq: [], mults: { hacking: 1.15, strength: 1.75, defense: 1.75, dexterity: 1.75, agility: 1.75 } },
+    ];
+    const opt = { skills: { hacking: 100, strength: 200, defense: 200, dexterity: 200, agility: 200 }, weights: M.GATE_FALLBACK_WEIGHTS.weights, decays: M.GATE_FALLBACK_WEIGHTS.decays, startMults: {}, priceStep: 1.9 };
+    const reqs = new Map(alle.map((x) => [x.aug, x.repReq]));
+    const viel = ruf("waehleTorRunde", ruf("repNeedKandidaten", alle, SS), 400e9, new Set(), opt);
+    const nv = ruf("gangRepNeed", viel, SS, reqs);
+    pruefe("echter Planer, Budget 400 Mrd, Ruf 100: alle drei Stuecke im Plan (der Ruf zaehlt hier nicht), Bedarf 1.657.500",
+      viel !== FEHLT && viel.steps.length === 3 && nv.repNeed !== null && Math.abs(nv.repNeed - 1657500) < 1e-6, JSON.stringify([viel.steps && viel.steps.map((s) => s.aug), nv]));
+    pruefe("... und ohne die Kandidatenbildung (Ruf 100 echt) bliebe der Plan LEER - das ist der Unterschied zum echten Plan",
+      ruf("waehleTorRunde", alle, 400e9, new Set(), opt).steps.length === 0);
+    const wenig = ruf("waehleTorRunde", ruf("repNeedKandidaten", alle, SS), 8e9, new Set(), opt);
+    const nw = ruf("gangRepNeed", wenig, SS, reqs);
+    pruefe("Budget 8 Mrd: der Planer nimmt SPTN-97 und Bionic Spine, nicht das Spine Upgrade (6 Mrd x Preisfaktor) - Bedarf nur 1.275.000, kleiner als bei 400 Mrd",
+      wenig !== FEHLT && nw.repNeed !== null && Math.abs(nw.repNeed - 1275000) < 1e-6 && nw.repNeed < nv.repNeed, JSON.stringify(nw));
+  }
+
+  // --- gangFactionFromTelemetry ---
+  const NOW = 1_790_442_188_000;
+  const gt = (over = {}) => ({ ts: NOW - 5000, wall: NOW - 5000, inGang: true, faction: SS, ...over });
+  let f = ruf("gangFactionFromTelemetry", gt(), NOW);
+  pruefe("frische Telemetrie mit Gang: die Faktion", f !== FEHLT && f.faction === SS && f.why === "", JSON.stringify(f));
+  pruefe("keine Telemetrie / Text / Liste: keine Faktion",
+    ruf("gangFactionFromTelemetry", null, NOW).faction === null && ruf("gangFactionFromTelemetry", "x", NOW).faction === null && ruf("gangFactionFromTelemetry", [gt()], NOW).faction === null);
+  pruefe("inGang false / fehlt: keine Faktion",
+    ruf("gangFactionFromTelemetry", gt({ inGang: false }), NOW).faction === null && ruf("gangFactionFromTelemetry", gt({ inGang: undefined }), NOW).faction === null
+    && ruf("gangFactionFromTelemetry", gt({ inGang: "true" }), NOW).faction === null);
+  pruefe("Faktion fehlt / leer / Zahl: keine Faktion",
+    ruf("gangFactionFromTelemetry", gt({ faction: undefined }), NOW).faction === null && ruf("gangFactionFromTelemetry", gt({ faction: "" }), NOW).faction === null
+    && ruf("gangFactionFromTelemetry", gt({ faction: 5 }), NOW).faction === null);
+  pruefe("10 min alt: noch frisch; 11 min: veraltet",
+    ruf("gangFactionFromTelemetry", gt({ ts: NOW - 10 * 60000, wall: NOW - 10 * 60000 }), NOW).faction === SS
+    && /veraltet/.test(ruf("gangFactionFromTelemetry", gt({ ts: NOW - 11 * 60000, wall: NOW - 11 * 60000 }), NOW).why));
+  f = ruf("gangFactionFromTelemetry", gt({ ts: NOW + 120000, wall: NOW + 120000 }), NOW);
+  pruefe("2 min aus der Zukunft (Uhrensprung): keine Faktion; 30 s: noch ok",
+    f.faction === null && /Zukunft/.test(f.why) && ruf("gangFactionFromTelemetry", gt({ ts: NOW + 30000, wall: NOW + 30000 }), NOW).faction === SS);
+  const ohneZeit = gt(); delete ohneZeit.ts; delete ohneZeit.wall;
+  pruefe("ohne Zeitstempel: keine Faktion; nur wall reicht", ruf("gangFactionFromTelemetry", ohneZeit, NOW).faction === null
+    && ruf("gangFactionFromTelemetry", { ...ohneZeit, wall: NOW - 1000 }, NOW).faction === SS);
+}
+
 console.log("");
 console.log(gruen + " ok, " + rot + " rot von " + (gruen + rot));
 if (rot) {

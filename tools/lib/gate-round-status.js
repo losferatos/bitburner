@@ -151,6 +151,23 @@ export function gateRoundStatus({ tele, blade, nowMs, before = null, gang = null
       + " plant mit rohen Stufen, bis zu 5 % schlechtere Competence.");
   }
 
+  // GELDMODUS DER GANG (P2d, Skeptiker B1): der Rufbedarf, den gang.js aus diesem
+  // Block liest. Ohne die Zeile sieht "Bedarf fehlt, Gang bleibt auf Terrorism"
+  // genauso aus wie "Ruf noch unter Bedarf". Nur wenn bn4rep.js das Feld kennt
+  // (neue Fassung); eine alte schreibt es nicht, dann gibt es hier nichts zu sagen.
+  if (Object.prototype.hasOwnProperty.call(t, "repNeed")) {
+    if (typeof t.repNeed === "number" && Number.isFinite(t.repNeed) && t.repNeed > 0) {
+      const rp = t.repNeedPlan && typeof t.repNeedPlan === "object" ? t.repNeedPlan : null;
+      lines.push("  Geldmodus-Bedarf: " + Math.round(t.repNeed).toLocaleString("de-DE") + " Ruf bei "
+        + String(t.repNeedFaction || "?").slice(0, 40) + " (bestimmt von " + String(t.repNeedAug || "?").slice(0, 60) + ")"
+        + (rp && Number.isFinite(rp.n) ? ", Bedarfsplan " + rp.n + " Stuecke fuer " + money(rp.cost)
+          + " bei Budget " + money(rp.budget) : "") + ".");
+    } else {
+      lines.push("  Geldmodus-Bedarf: keiner (" + String(t.repNeedWhy || "kein Grund gemeldet").slice(0, 120)
+        + ") - gang.js bleibt auf Terrorism.");
+    }
+  }
+
   // --- Befunde ---------------------------------------------------------------
   const lastErr = String(t.lastGangError || "kein Text").slice(0, 140);
   const gangErrors = Number(t.gangErrors) || 0;
@@ -188,6 +205,9 @@ export function gateRoundStatus({ tele, blade, nowMs, before = null, gang = null
 
   return {
     lines, findings,
-    data: { mode: t.mode ?? null, gangErrors, buyFailures, planDrift },
+    data: {
+      mode: t.mode ?? null, gangErrors, buyFailures, planDrift,
+      repNeed: typeof t.repNeed === "number" && Number.isFinite(t.repNeed) ? t.repNeed : null,
+    },
   };
 }

@@ -74,6 +74,18 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   Territorium, Ausruestung, Reglerwerte, geeicht an der Live-Gang; Wert des
   Geldes am Tor; 2 Opus-Skeptiker). Eric gibt das Restkontingent der Woche
   frei; was nicht fertig wird, ab 13:00 weiter.
+- P2b ERGEBNIS (bab69c5): BN2.1-Ausgang kommt vor dem Tor 19:13 -> Gang-
+  Umbau bringt in BN2.1 0 h. Fuer BN2.2/2.3: Geldmodus + Ausruestung
+  (+0,8-1,6 h je Knoten), Territorium/Mitglieds-Augs/Reglerwerte NICHT.
+  Zeitkritisch: Kaufaufschub schon VOR der Gruendung (q0 2->0, x2,35->x3,21).
+  Offener Pruefauftrag (gross?): Torfrequenz - zwei halbe Runden gegen eine
+  (x5,66 vs x3,21 bei 36 Mrd), inkl. Einbaukosten; S5 Ausruestung schon in
+  der Respektphase (staerkster Resthebel, Konkurrenz Serverkauf pruefen).
+- P2c Kaufaufschub vor der Gang: Worktree .claude/worktrees/p2c-aufschub
+  (bbbf9b3 WIP), ebene2 235/235, H1 rot gegen alt. Opus-Skeptiker laeuft.
+  MUSS vor dem BN2.1-Ausgang auf home (kein Neustart noetig, greift ab Boot).
+- P2d Geldmodus+Ausruestung: Bau-Workflow `wf_7ce66382-81d` im Worktree
+  .claude/worktrees/p2d-geldmodus (auf p2c). Abnahme im Kopf von gang.js.
 - Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".
 - Abbruchkriterien (gang.js-Kopf): +2 h >= 6 Mitglieder, Abzug >= 0,9,
   Fehler 0; bis zum Tor kein 'GEKAUFT' bei aktiver Sperre; am Tor TRP nie in

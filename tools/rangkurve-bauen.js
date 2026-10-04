@@ -17,7 +17,7 @@
  * ERZEUGT wird, kann nicht abweichen. Von Hand uebertragene Zahlen koennen es
  * immer.
  *
- * Aufruf: node tools/rangkurve-bauen.js [--knoten 10] [--out <datei>]
+ * Aufruf: node tools/rangkurve-bauen.js [--knoten 10] [--out <datei>] [--mit-sicherungen]
  */
 
 import fs from "node:fs";
@@ -63,6 +63,40 @@ if (fs.existsSync(checkinDatei)) {
     // Punkte ohne Spielzeit sind wertlos - das Feld fehlt in aelteren Zeilen.
     if (e.spielzeit === 0) continue;
     punkte.push({ spielzeit: e.spielzeit, rang: e.rang, lauf: e.lauf ?? null, quelle: "checkin" });
+  }
+}
+
+// DIE SPIELSTAENDE SIND DIE DICHTESTE QUELLE (04.10.2026). Check-ins gibt es
+// nur, wenn Eric /bb aufruft - fuer BN2.1 waren es fuenf, der letzte bei Rang
+// 48.635, knapp vier Stunden VOR dem Sprung. Die Kurve hielt diesen Punkt fuer
+// das Knotenende, und die ETA fuer BN2.2 lag um diese vier Stunden zu frueh.
+// Die Brueckensicherungen (backups/INDEX.tsv) kommen stuendlich und vor jedem
+// Sprung; jede enthaelt Rang (bladeburner.data.rank) und totalPlaytime - die
+// Uhr, in der auch die Check-ins zaehlen. Sie gehen hier mit ein.
+// NUR AUF ANFORDERUNG (--mit-sicherungen): Fuer BN10 zerfiel der Referenzlauf
+// beim Mischen (alte Check-in-Punkte vom September stehen offenbar nicht in
+// totalPlaytime) - von 76 Punkten bis 4,56 Mio auf 18 bis 250.309. Fuer Laeufe
+// ab dem 27.09. (BN2 und spaeter) passen beide Uhren zusammen.
+const MIT_SICHERUNGEN = process.argv.includes("--mit-sicherungen");
+const indexDatei = path.join(ROOT, "backups", "INDEX.tsv");
+if (MIT_SICHERUNGEN && fs.existsSync(indexDatei)) {
+  const { gunzipSync } = await import("node:zlib");
+  for (const zeile of fs.readFileSync(indexDatei, "utf8").split(/\r?\n/)) {
+    const c = zeile.split("\t");
+    if (c.length < 10 || Number(c[4]) !== KNOTEN) continue;
+    const datei = [c[10], c[9]].find((d) => d && fs.existsSync(d));
+    if (!datei) continue;
+    try {
+      let o = JSON.parse(gunzipSync(fs.readFileSync(datei)).toString());
+      if (o.data && o.data.PlayerSave) o = o.data;
+      const ps = typeof o.PlayerSave === "string" ? JSON.parse(o.PlayerSave) : o.PlayerSave;
+      const p = ps && ps.data;
+      const rang = p && p.bladeburner && p.bladeburner.data && p.bladeburner.data.rank;
+      if (!p || p.bitNodeN !== KNOTEN || !Number.isFinite(rang) || !(p.totalPlaytime > 0)) continue;
+      punkte.push({ spielzeit: p.totalPlaytime, rang, lauf: Number(c[5]) || null, quelle: "sicherung:" + c[7] });
+    } catch {
+      // unlesbare Sicherung: tools/backup-check.js meldet das, hier zaehlt sie nicht
+    }
   }
 }
 
@@ -126,7 +160,13 @@ const aktuellerKnoten = (() => {
 
 const knotenVerlassen = aktuellerKnoten !== null && aktuellerKnoten !== KNOTEN;
 const kandidaten = (knotenVerlassen ? laeufe : laeufe.slice(0, -1)).filter((l) => l.length >= 5);
-const referenz = kandidaten.sort((a, b) => b.length - a.length)[0];
+// Referenz ist der Lauf, der am WEITESTEN kam (hoechster Rang), erst dann der
+// mit den meisten Punkten. Seit die stuendlichen Sicherungen mitzaehlen
+// (04.10.2026), hat ein abgebrochener, aber lange gelaufener Lauf leicht mehr
+// Punkte als der fertige - nach Punktzahl gewann fuer BN10 ein Lauf, der bei
+// Rang 5.297 endete, statt des Laufs bis 4,56 Mio.
+const maxRang = (l) => Math.max(...l.map((p) => p.rang));
+const referenz = kandidaten.sort((a, b) => (maxRang(b) - maxRang(a)) || (b.length - a.length))[0];
 
 if (!referenz) {
   console.log("Kein abgeschlossener Referenzlauf fuer BitNode " + KNOTEN + " gefunden.");
@@ -153,10 +193,10 @@ const ausgabe = {
   knoten: KNOTEN,
   erzeugtAm: new Date().toISOString(),
   erzeugtVon: "tools/rangkurve-bauen.js",
-  quellen: ["data/verlauf-strategie.json", "data/checkin.json"],
+  quellen: ["data/verlauf-strategie.json", "data/checkin.json", "backups/INDEX.tsv (Sicherungen)"],
   hinweis:
     "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu " +
-    "erzeugen: node tools/rangkurve-bauen.js --knoten " + KNOTEN,
+    "erzeugen: node tools/rangkurve-bauen.js --knoten " + KNOTEN + (MIT_SICHERUNGEN ? " --mit-sicherungen" : ""),
   nullpunkt: {
     spielzeitMs: t0,
     spielzeitH: Math.round((t0 / 3.6e6) * 1000) / 1000,

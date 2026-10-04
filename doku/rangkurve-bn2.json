@@ -1,0 +1,182 @@
+{
+ "knoten": 2,
+ "erzeugtAm": "2026-10-04T12:38:52.535Z",
+ "erzeugtVon": "tools/rangkurve-bauen.js",
+ "quellen": [
+  "data/verlauf-strategie.json",
+  "data/checkin.json",
+  "backups/INDEX.tsv (Sicherungen)"
+ ],
+ "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 2 --mit-sicherungen",
+ "nullpunkt": {
+  "spielzeitMs": 3841097200,
+  "spielzeitH": 1066.971,
+  "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
+ },
+ "punkteGesamt": 53,
+ "laeufeErkannt": 2,
+ "stuetzpunkte": 38,
+ "rangSpanne": [
+  68,
+  488516
+ ],
+ "dauerH": 29.087,
+ "ratenSpanne": [
+  0,
+  385448.57142856985
+ ],
+ "punkte": [
+  {
+   "h": 0,
+   "rang": 68
+  },
+  {
+   "h": 1,
+   "rang": 352
+  },
+  {
+   "h": 2,
+   "rang": 667
+  },
+  {
+   "h": 2.81,
+   "rang": 1263
+  },
+  {
+   "h": 2.811,
+   "rang": 1263
+  },
+  {
+   "h": 3,
+   "rang": 1260
+  },
+  {
+   "h": 3.774,
+   "rang": 1371
+  },
+  {
+   "h": 4,
+   "rang": 1440
+  },
+  {
+   "h": 4.227,
+   "rang": 1585
+  },
+  {
+   "h": 4.44,
+   "rang": 1734
+  },
+  {
+   "h": 4.655,
+   "rang": 1755
+  },
+  {
+   "h": 11.723,
+   "rang": 2191
+  },
+  {
+   "h": 11.727,
+   "rang": 2189
+  },
+  {
+   "h": 11.735,
+   "rang": 2185
+  },
+  {
+   "h": 12.526,
+   "rang": 2191
+  },
+  {
+   "h": 13.1,
+   "rang": 2191
+  },
+  {
+   "h": 13.2,
+   "rang": 2652
+  },
+  {
+   "h": 13.468,
+   "rang": 3884
+  },
+  {
+   "h": 13.735,
+   "rang": 4667
+  },
+  {
+   "h": 14.735,
+   "rang": 5707
+  },
+  {
+   "h": 15.735,
+   "rang": 6743
+  },
+  {
+   "h": 16.736,
+   "rang": 7178
+  },
+  {
+   "h": 17.736,
+   "rang": 8776
+  },
+  {
+   "h": 18.736,
+   "rang": 12013
+  },
+  {
+   "h": 19.736,
+   "rang": 17233
+  },
+  {
+   "h": 20.736,
+   "rang": 19358
+  },
+  {
+   "h": 21.736,
+   "rang": 24930
+  },
+  {
+   "h": 22.736,
+   "rang": 29415
+  },
+  {
+   "h": 23.736,
+   "rang": 34840
+  },
+  {
+   "h": 24.737,
+   "rang": 43506
+  },
+  {
+   "h": 25.337,
+   "rang": 48635
+  },
+  {
+   "h": 25.536,
+   "rang": 49994
+  },
+  {
+   "h": 25.737,
+   "rang": 50836
+  },
+  {
+   "h": 26.737,
+   "rang": 91134
+  },
+  {
+   "h": 27.737,
+   "rang": 179480
+  },
+  {
+   "h": 28.657,
+   "rang": 328807
+  },
+  {
+   "h": 28.737,
+   "rang": 353609
+  },
+  {
+   "h": 29.087,
+   "rang": 488516
+  }
+ ]
+}

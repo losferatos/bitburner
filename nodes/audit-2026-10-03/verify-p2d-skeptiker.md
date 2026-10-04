@@ -167,7 +167,7 @@ Sichtbarkeit und Einspielen; sie sind vor bzw. beim Einspielen zu erledigen.
 
 ## Reparatur 04.10.2026 (Statusliste zu den Befunden oben)
 
-Commits im Zweig p2d-geldmodus: `1a48d17` (B2), `2d1587d` (B1, Werkzeugseite), `42cb092` (gang.js, Kopf, Tests).
+Commits im Zweig p2d-geldmodus: `1a48d17` (B2), `2d1587d` (B1, Werkzeugseite), `42cb092` (gang.js, Kopf, Tests), `4ffb7ac` (test-ram).
 Noch KEIN zweiter Skeptiker-Lauf ueber die Reparatur selbst (kein `[skeptiker]` in den Commits).
 
 | # | Status | Was |
@@ -182,4 +182,4 @@ Noch KEIN zweiter Skeptiker-Lauf ueber die Reparatur selbst (kein `[skeptiker]` 
 | B8 | offen (Zweig) | `tools/audit/gang-p2b-gegen.mjs` liegt nur auf master; Z. 145, 157, 208 muessen auf `gang.facName` aus dem Spielstand, nach dem Zusammenfuehren; im Kopf von gang.js (Abnahme 1) als Warnung vermerkt |
 | B9 | behoben | test-bn4rep-ebene2 Z2 (Vertrag bn4rep.js -> gang.js repNeedOf/chooseMode an echter Telemetrie), test-gang S18 Gegenrichtung (gang.js -> gangFactionFromTelemetry) |
 | B10 | behoben | Notschalter `data/gang-geld-aus.txt` (nur Geldmodus; nicht lesbar = aus) |
-| B11 | erklaert | test-ram 2 rot = CRLF der Worktree-Dateien gegen die Rohbyte-Stempel (Haupt-Repo 123 von 123 Stempel passend, Worktree 42; wirklich veraltet nur bn4rep.js, gang.js, lib/einbau.js); nach dem Einspielen im Spiel nachmessen (`eichung-messen --schreib`) |
+| B11 | erklaert | test-ram 2 rot = CRLF der Worktree-Dateien gegen die Rohbyte-Stempel (Haupt-Repo 123 von 123 Stempel passend, Worktree 42; wirklich veraltet nur bn4rep.js, gang.js, lib/einbau.js); nach dem Einspielen im Spiel nachmessen (`eichung-messen --schreib`); die drei Dateien stehen bis dahin in VERALTET_ERLAUBT (`4ffb7ac`), mit den Rohbytes des Haupt-Repos meldet test-ram 44 gruen / 0 rot |

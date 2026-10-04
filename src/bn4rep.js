@@ -49,7 +49,7 @@ import { handschlag } from "lib/handschlag.js";
 import {
   waehleTorRunde, gangBonusWait, gateBuyMode, blackOpWeights, gateMultsProduct, gatePriceStep,
   bladeEffFactors, effectiveLevels, bladeSkillLevels, readGateBonusState,
-  gateAbortHold, GATE_ABORT_HOLD_ROUNDS,
+  gateAbortHold, GATE_ABORT_HOLD_ROUNDS, gangHoldBeforeFounding,
 } from "lib/einbau.js";
 import { COMBAT_AUGS } from "lib/hackaugs.js";
 // AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
@@ -462,6 +462,8 @@ export async function main(ns) {
   let gateBoughtTotal = 0, gateLastRound = null;
   let gateLastMode = "", gateModeLogged = 0;
   let gateTele = null;
+  // Kaufaufschub vor der Gang (P2c): Stand der letzten Runde, fuer Log-Wechsel und Telemetrie.
+  let gangHoldWar = false;
   const gateBo = { table: null, next: null, read: 0, skills: bladeSkillLevels(null, 0, null) };
   const gatePrereq = new Map();
 
@@ -1555,6 +1557,8 @@ export async function main(ns) {
         // Spiegelung sah, wer hier nachsah, warum kein Einbau kommt, nur
         // "gesperrt false, kampfZuFrueh false" und musste raten (Skeptiker
         // 03.10.2026). Die ganze Telemetrie steht in data/bn4rep.json -> torRunde.
+        // gangHold (P2c): die alte Schleife wartet auf die Gruendung (Vorrunde).
+        gangHold: gangHoldWar,
         torRunde: gateTele
           ? {
             mode: gateTele.mode, reason: gateTele.reason || null,
@@ -2201,7 +2205,30 @@ export async function main(ns) {
     // gesperrt: nichts aus keiner Faktion; Tor offen: die geplante Runde.
     // Die Schleife unten bliebe sonst die "alles Verdiente sofort"-Regel, die
     // die Gang-Runde mit 1,9^q verteuert.
-    for (const k of inGangNow ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+    //
+    // VOR DER GANG (P2c, 04.10.2026): ist die Gang in diesem Knoten geplant,
+    // aber noch nicht gegruendet, kauft die Schleife ebenfalls nichts - sonst
+    // landen die frueh verdienten Stuecke (Wired Reflexes, Neurotrainer I ...)
+    // vor der ersten Torrunde in der Warteschlange und verteuern jedes ihrer
+    // Stuecke um 1,9. Begruendung und Rueckfall: gangHoldBeforeFounding in
+    // lib/einbau.js. Ein Fehler beim Pruefen heisst alte Regel (kaufen).
+    let gangHold = false;
+    if (!inGangNow && nurKampfStuecke) {
+      try {
+        gangHold = gangHoldBeforeFounding({
+          nurKampfStuecke, knoten: kaufKnoten, inGang: inGangNow,
+          switchOn: ns.fileExists("data/gang-an.txt", "home"),
+          nodeAgeMs: Date.now() - Number(ns.getResetInfo().lastNodeReset),
+        });
+      } catch { gangHold = false; }
+    }
+    if (gangHold !== gangHoldWar) {
+      sag(gangHold
+        ? "KAUFAUFSCHUB VOR DER GANG: Gang geplant (data/gang-an.txt), noch nicht gegruendet - verdiente Stuecke warten auf die Torrunde."
+        : "Kaufaufschub vor der Gang beendet (" + (inGangNow ? "Gang steht" : "Rueckfall: Schalter weg, Frist abgelaufen oder Lage unklar") + ").");
+      gangHoldWar = gangHold;
+    }
+    for (const k of (inGangNow || gangHold) ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
       if (k.rep < k.repReq) continue;
       if (ns.getServerMoneyAvailable("home") < k.preis) continue;
       if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
@@ -3137,6 +3164,8 @@ export async function main(ns) {
       // Kampfknoten mit Gang (P1 / AUG-4): Modus, Plan, Vorrat, Fehlerzaehler.
       // null ausserhalb davon. Die Felder sind die Abnahme des Kaufaufschubs.
       torRunde: gateTele,
+      // P2c: die alte Schleife wartet auf die Gruendung der Gang (diese Runde).
+      gangHold: gangHoldWar,
     };
     ns.write("data/bn4rep.json", JSON.stringify(letzteTelemetrie), "w");
     if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());

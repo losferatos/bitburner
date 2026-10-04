@@ -75,6 +75,8 @@ function baueWelt(o) {
     uhr: 1_790_442_188_000,
     start: 1_790_442_188_000,
     knoten: o.knoten ?? 5,
+    // P2c: lastNodeReset (Wanduhr). Ohne Angabe 1 - der Knoten ist dann uralt.
+    nodeReset: o.nodeReset ?? 1,
     // Zusammenfuehrung P0+P1: eine Map, egal ob die Szenarien Paare (P0) oder eine
     // Map-Unterklasse (P1, SfWirft) liefern - die Unterklasse muss unkopiert bleiben.
     ownedSF: o.ownedSF instanceof Map ? o.ownedSF : new Map(o.ownedSF ?? [[4, 3], [5, 1]]),
@@ -173,7 +175,7 @@ function baueNs(w) {
     // ownedSF je Welt einstellbar (P0/G02): die alte Regel `mitHashes` las hier
     // SF9 mit, die neue fragt nur noch den Knoten - ein Test, der SF9 nie
     // setzt, koennte den Unterschied nicht zeigen.
-    getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: 1, lastAugReset: 2,
+    getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: w.nodeReset, lastAugReset: 2,
       ownedSF: w.ownedSF }),
     getPlayer: () => ({
       factions: Object.keys(w.faktionen), skills: { ...w.skills }, mults: { ...w.mults },
@@ -1068,6 +1070,66 @@ console.log("\n-- P1 S9: der Vorrat sinkt nie (gedrosselter Tab) -> nach 30 min 
 }
 
 // ---------------------------------------------------------------------------
+// ---------------------------------------------------------------------------
+// P2c (04.10.2026): KAUFAUFSCHUB VOR DER GANG. Dieselbe Lage wie S10 (V2 in BN2,
+// keine Gang, verdiente Kampfstuecke, 600 Mrd), aber der Schalter
+// data/gang-an.txt liegt und der Knoten ist jung: die alte Schleife darf nichts
+// kaufen. Gegen den alten Stand ROT (er kauft Hyperion V1, SPTN-97 ...).
+console.log("\n-- P2c H1: Gang geplant (Schalter), noch nicht gegruendet, Knoten 1 h alt -> 0 Kaeufe --");
+{
+  const w = weltGang({ geld: 600e9, gang: { da: false }, nodeReset: 1_790_442_188_000 - 3600000, schlafBudget: 3,
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung(), "data/gang-an.txt": "an" }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("H1: kein einziger Kauf vor der Gruendung (alt: Hyperion V1, SPTN-97 u. a. sofort)",
+    w.kaeufe.length === 0, "Kaeufe: " + w.kaeufe.map((k) => k.a + "@" + k.f).join(", "));
+  pruefe("H1: das Log nennt den Aufschub", r.log.includes("KAUFAUFSCHUB VOR DER GANG"),
+    r.log.split("\n").filter((z) => /KAUFAUFSCHUB|Kaufaufschub/.test(z)).join(" | "));
+  const t = teleVon(w);
+  pruefe("H1: Telemetrie gangHold true", !!t && t.gangHold === true, t ? String(t.gangHold) : "keine Telemetrie");
+  pruefe("H1: kein installAugmentations", w.installAufrufe === 0);
+}
+console.log("\n-- P2c H2: Schalter liegt, aber der Knoten ist aelter als die Frist (7 h) -> alte Schleife kauft --");
+{
+  const w = weltGang({ geld: 600e9, gang: { da: false }, nodeReset: 1_790_442_188_000 - 7 * 3600000, schlafBudget: 3,
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung(), "data/gang-an.txt": "an" }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("H2: Rueckfall nach der Frist - die alte Schleife kauft wieder (Hyperion V1 zuerst)",
+    w.kaeufe[0] && w.kaeufe[0].a === "Hyperion Plasma Cannon V1", w.kaeufe.map((k) => k.a).join(", "));
+  const t = teleVon(w);
+  pruefe("H2: Telemetrie gangHold false", !!t && t.gangHold === false, t ? String(t.gangHold) : "keine Telemetrie");
+}
+console.log("\n-- P2c H3: Knoten jung, aber KEIN Schalter -> alte Schleife kauft (wie S10) --");
+{
+  const w = weltGang({ geld: 600e9, gang: { da: false }, nodeReset: 1_790_442_188_000 - 3600000, schlafBudget: 3,
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("H3: ohne Schalter kauft die alte Schleife", w.kaeufe.length > 0 && !r.log.includes("KAUFAUFSCHUB VOR DER GANG"),
+    w.kaeufe.map((k) => k.a).join(", "));
+}
+console.log("\n-- P2c H4: Schalter, Knoten jung, aber Hackingknoten-Marke (V1 2) -> kein Aufschub --");
+{
+  const w = weltGang({ geld: 600e9, gang: { da: false }, nodeReset: 1_790_442_188_000 - 3600000, schlafBudget: 3,
+    dateien: { home: dGang({ "data/verfahren.txt": "V1 2 1", "data/einbau-uhr.json": einbauUhrJung(), "data/gang-an.txt": "an" }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  pruefe("H4: im V1 greift der Aufschub nicht", !r.log.includes("KAUFAUFSCHUB VOR DER GANG"),
+    r.log.split("\n").filter((z) => /KAUFAUFSCHUB/.test(z)).join(" | "));
+}
+console.log("\n-- P2c H5: Gang steht, Knoten jung, Schalter -> Block 1c entscheidet (kein gangHold) --");
+{
+  const w = weltGang({ gang: { da: true }, nodeReset: 1_790_442_188_000 - 3600000,
+    dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung(), "data/gang-an.txt": "an" }) } });
+  const r = await fahre(w);
+  pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+  const t = teleVon(w);
+  pruefe("H5: gangHold false, Torrunde locked (wie S4)", !!t && t.gangHold === false && !!t.torRunde && t.torRunde.mode === "locked",
+    t ? JSON.stringify({ gangHold: t.gangHold, mode: t.torRunde && t.torRunde.mode }) : "keine Telemetrie");
+  pruefe("H5: kein Kauf", w.kaeufe.length === 0, w.kaeufe.map((k) => k.a).join(", "));
+}
+
 console.log("\n-- P1 S10: ohne Gang aendert sich NICHTS (V2, Einbau gesperrt, trotzdem Kauf) --");
 {
   const w = weltGang({ geld: 600e9, gang: { da: false }, dateien: { home: dGang({ "data/einbau-uhr.json": einbauUhrJung() }) }, schlafBudget: 3 });

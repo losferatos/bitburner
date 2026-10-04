@@ -81,9 +81,15 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   Offener Pruefauftrag (gross?): Torfrequenz - zwei halbe Runden gegen eine
   (x5,66 vs x3,21 bei 36 Mrd), inkl. Einbaukosten; S5 Ausruestung schon in
   der Respektphase (staerkster Resthebel, Konkurrenz Serverkauf pruefen).
-- P2c Kaufaufschub vor der Gang: Worktree .claude/worktrees/p2c-aufschub
-  (bbbf9b3 WIP), ebene2 235/235, H1 rot gegen alt. Opus-Skeptiker laeuft.
-  MUSS vor dem BN2.1-Ausgang auf home (kein Neustart noetig, greift ab Boot).
+- P2c Kaufaufschub vor der Gang: LIVE 10:17 (00c2297 [skeptiker], 2/2 sha,
+  bn4rep neu pid 38287, RAM gemessen 14136c7, test-alles gruen). Greift ab
+  dem Boot in BN2.2. NACHZIEHEN VOR BN2.3 (eigener Skeptiker): Frist 6 h ->
+  ~10 h oder ans Tor binden UND Ruecklage im Aufschub nur ueber COMBAT_AUGS
+  (Simulacrum 150 Mrd als Phantom), negatives Alter = 0, catch behaelt
+  Vorrundenwert, Logtext "Gang nicht erkannt", Tests X1-X3 als H6-H8
+  (Skeptiker-Bericht im Chat 04.10. ~10:15, Pruefskripte im Scratchpad).
+  Pruefen in BN2.2: Log "KAUFAUFSCHUB VOR DER GANG", gangHold true bis zur
+  Gruendung, 0 GEKAUFT davor.
 - P2d Geldmodus+Ausruestung: Bau-Workflow `wf_7ce66382-81d` im Worktree
   .claude/worktrees/p2d-geldmodus (auf p2c). Abnahme im Kopf von gang.js.
 - Auflage (b) erledigt: /bb meldet "Gang laeuft, aber keine Torrunde".

@@ -103,6 +103,12 @@ G02-Fix. Erst danach Rest von Workflow 1 und die uebrige Gegenpruefung
   kein Ausruestungskauf unter die Ruecklage. Notschalter: data/gang-geld-aus.txt.
   Optional offen: E6 (Befund bei absichtlichem Notschalter), E7 (Grenzen der
   exportpruefung im Kopf), B3/B5.
+- 12:38 ACHTUNG: Gang in BN2.2 noch NICHT gegruendet (no_faction). Karma
+  -4,28 um 12:17 (Slum Snakes braucht -9), Sleeves auf CLASS statt Crime.
+  P2c-Frist laeuft 16:38 ab (Knotenstart ~10:38 + 6 h) - danach kauft die
+  alte Schleife alles Verdiente. Ab 13:04: Karmarate messen; reicht sie nicht
+  bis ~16:00, P2c-Fix 1 (Frist ans Tor / ~10 h) VORZIEHEN, mit Skeptiker, vor
+  16:38 einspielen. Pruefen, wer Karma macht (sleeve.js Crime vs CLASS).
 - (Bauverlauf P2d) gebaut im Worktree .claude/worktrees/p2d-geldmodus
   (Branch p2d-geldmodus, HEAD a84142c, NICHT gepusht). Skeptiker 1: EINSPIELEN
   MIT FIX, Reparatur drin (B1 /bb-Zeile, B2 importpruefung, Notschalter

@@ -40,6 +40,23 @@ tot (Funktion ausserhalb ihres Scopes, Fehler von try/catch verschluckt).
   DarknetSave, InfiltrationsSave. Dekoder-Beispiel: `sync/backup.js`
   Funktion `lesenKennwerte`. Laufende Telemetrie: `data/*.json`.
 
+## NACHTRAG STAND 04.10.2026 13:15 (geht dem Abschnitt darunter vor)
+
+- BN2.1 ist durch (Ausgang ~10:38). JETZT LAEUFT BN2.2 (Start ~10:38, V2).
+  Zahlen in den Berichten vom 03.10. stammen aus BN2.1 - fuer Ertraege den
+  frischen Knoten BN2.2/2.3 und die folgenden Knoten der Route rechnen.
+- Seit dem 03./04.10. GEBAUT UND LIVE (nicht erneut als Befund fuehren, aber
+  Wechselwirkungen pruefen): P0 TRP-Falle zu + Hacknet-Augs erst nach dem
+  Einbau (GANG-2, HASH-4/BN2-1); P1 Kaufaufschub bis zum Einbau-Tor + Torrunde
+  `waehleTorRunde` (AUG-4); P2 src/gang.js (GANG-1, Kampfgang, Schalter
+  data/gang-an.txt); P2c Kaufaufschub schon vor der Gang-Gruendung; P2d gang-3
+  Geldmodus (Human Trafficking ab torRunde.repNeed) + Ausruestung aus Geld
+  ueber data/geldbedarf.txt. Gang Slum Snakes in BN2.2 seit 13:06.
+  Belege: nodes/audit-2026-10-03/STAND.md, verify-g01-*.md, verify-g02-*.md,
+  verify-p2b-*.md, verify-p2d-skeptiker.md (im Branch p2d-geldmodus).
+- In Arbeit (nicht doppelt pruefen): P2e (Nacharbeiten P2c), Pruefauftrag
+  Torfrequenz (eine Torrunde gegen mehrere kleinere Einbauten).
+
 ## Aktueller Stand (aus Spielstand 03.10.2026 09:59)
 
 - BitNode 2, Lauf 1 (BN2.1), 5,3 h Spielzeit im Knoten, 1071 h gesamt.

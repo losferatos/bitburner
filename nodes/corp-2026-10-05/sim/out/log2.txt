@@ -1,0 +1,111 @@
+    [C3B] 0.5h: SPIELER 384.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 551.3 Mrd, Gewinn 1.56 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 165.3 Mrd fuer 100 Mio Anteile (Bewertung 550.8 Mrd, Gewinn 1.56 Mio/s)
+    [C3B] 1h: SPIELER 373.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 612.0 Mrd, Gewinn 1.52 Mio/s, Fonds 9.1 Mrd, Anteil 60.0 %
+    [C3B] 2h: SPIELER 460.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 754.7 Mrd, Gewinn 1.89 Mio/s, Fonds 11.2 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 527.3 Mrd fuer 350 Mio Anteile (Bewertung 753.3 Mrd, Gewinn 2.04 Mio/s)
+    [C3B] 3h: SPIELER 532.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.60 Bio, Gewinn 3.53 Mio/s, Fonds 35.9 Mrd, Anteil 36.7 %
+    [C3B] 4h: SPIELER 817.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 2.46 Bio, Gewinn 5.48 Mio/s, Fonds 39.9 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 1247.9 Mrd fuer 250 Mio Anteile (Bewertung 2495.8 Mrd, Gewinn 6.18 Mio/s)
+    [C3B] 6h: SPIELER 9.15 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 57.26 Bio, Gewinn 112.48 Mio/s, Fonds 143.5 Mrd, Anteil 20.0 %
+    [C3B] 8h: SPIELER 24.63 Bio (Tranchen 0) via IPO+sofort, Dummies 4; Bewertung 154.09 Bio, Gewinn 251.11 Mio/s, Fonds 272.4 Mrd, Anteil 20.0 %
+    [C3B] 10h: SPIELER 408.59 Bio (Tranchen 0) via IPO+sofort, Dummies 12; Bewertung 2.56e+15, Gewinn 1.9 Mrd/s, Fonds 662.6 Mrd, Anteil 20.0 %
+    [C3B] 12h: SPIELER 2.01e+17 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.26e+18, Gewinn 591.9 Mrd/s, Fonds 43.42 Bio, Anteil 20.0 %
+    [C3B] 14h: SPIELER 1.13e+27 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 7.08e+27, Gewinn 3.35e+21/s, Fonds 6.53e+22, Anteil 20.0 %
+    [C3B] 16h: SPIELER 2.33e+99 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.46e+100, Gewinn 6.91e+93/s, Fonds 4.56e+95, Anteil 20.0 %
+    [C3B] 18h: SPIELER 1.11e+101 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 6.94e+101, Gewinn 3.27e+95/s, Fonds 1.15e+98, Anteil 20.0 %
+    [C3B] 20h: SPIELER 1.94e+101 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.22e+102, Gewinn 5.73e+95/s, Fonds 4.37e+98, Anteil 20.0 %
+    [C3B] 24h: SPIELER 3.96e+103 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 2.48e+104, Gewinn 1.17e+98/s, Fonds 7.06e+100, Anteil 20.0 %
+    C3B s1: RAM 531.6 GB, Rechenzeit 39 s
+    [C3B] 0.5h: SPIELER 389.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 167.6 Mrd fuer 100 Mio Anteile (Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s)
+    [C3B] 1h: SPIELER 385.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 631.0 Mrd, Gewinn 1.72 Mio/s, Fonds 9.5 Mrd, Anteil 60.0 %
+    [C3B] 2h: SPIELER 478.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 783.6 Mrd, Gewinn 1.97 Mio/s, Fonds 12.0 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 550.9 Mrd fuer 350 Mio Anteile (Bewertung 787.0 Mrd, Gewinn 2.12 Mio/s)
+    [C3B] 3h: SPIELER 699.8 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 2.11 Bio, Gewinn 5.10 Mio/s, Fonds 37.8 Mrd, Anteil 36.7 %
+    [C3B] 4h: SPIELER 1.02 Bio (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 3.08 Bio, Gewinn 7.59 Mio/s, Fonds 39.7 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 1705.7 Mrd fuer 250 Mio Anteile (Bewertung 3411.5 Mrd, Gewinn 8.37 Mio/s)
+    [C3B] 6h: SPIELER 12.97 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 81.14 Bio, Gewinn 204.93 Mio/s, Fonds 162.6 Mrd, Anteil 20.0 %
+    [C3B] 8h: SPIELER 82.68 Bio (Tranchen 0) via IPO+sofort, Dummies 7; Bewertung 517.23 Bio, Gewinn 632.84 Mio/s, Fonds 434.7 Mrd, Anteil 20.0 %
+    [C3B] 10h: SPIELER 1.17e+16 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 7.33e+16, Gewinn 34.7 Mrd/s, Fonds 3.36 Bio, Anteil 20.0 %
+    [C3B] 12h: SPIELER 1.48e+21 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 9.28e+21, Gewinn 4.38e+15/s, Fonds 1.28e+17, Anteil 20.0 %
+    [C3B] 14h: SPIELER 1.80e+97 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.12e+98, Gewinn 5.33e+91/s, Fonds 1.02e+94, Anteil 20.0 %
+    [C3B] 16h: SPIELER 1.55e+100 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 9.71e+100, Gewinn 4.59e+94/s, Fonds 1.03e+97, Anteil 20.0 %
+    [C3B] 18h: SPIELER 1.69e+101 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.06e+102, Gewinn 4.98e+95/s, Fonds 2.47e+98, Anteil 20.0 %
+    [C3B] 20h: SPIELER 1.52e+103 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 9.53e+103, Gewinn 4.50e+97/s, Fonds 1.19e+100, Anteil 20.0 %
+    [C3B] 24h: SPIELER 1.56e+103 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 9.74e+103, Gewinn 4.71e+97/s, Fonds 8.13e+100, Anteil 20.0 %
+    C3B s2: RAM 531.6 GB, Rechenzeit 40 s
+    [C3B] 0.5h: SPIELER 388.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 557.3 Mrd, Gewinn 1.57 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 166.8 Mrd fuer 100 Mio Anteile (Bewertung 556.0 Mrd, Gewinn 1.57 Mio/s)
+    [C3B] 1h: SPIELER 381.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 624.4 Mrd, Gewinn 1.55 Mio/s, Fonds 9.6 Mrd, Anteil 60.0 %
+    [C3B] 2h: SPIELER 471.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 773.0 Mrd, Gewinn 1.91 Mio/s, Fonds 11.8 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 540.5 Mrd fuer 350 Mio Anteile (Bewertung 772.1 Mrd, Gewinn 2.06 Mio/s)
+    [C3B] 3h: SPIELER 581.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.75 Bio, Gewinn 4.25 Mio/s, Fonds 33.2 Mrd, Anteil 36.7 %
+    [C3B] 4h: SPIELER 910.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 2.74 Bio, Gewinn 6.17 Mio/s, Fonds 38.9 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 1739.7 Mrd fuer 250 Mio Anteile (Bewertung 3479.5 Mrd, Gewinn 8.54 Mio/s)
+    [C3B] 6h: SPIELER 12.39 Bio (Tranchen 0) via IPO+sofort, Dummies 3; Bewertung 77.48 Bio, Gewinn 139.08 Mio/s, Fonds 170.3 Mrd, Anteil 20.0 %
+    [C3B] 8h: SPIELER 77.45 Bio (Tranchen 0) via IPO+sofort, Dummies 7; Bewertung 484.52 Bio, Gewinn 592.56 Mio/s, Fonds 407.3 Mrd, Anteil 20.0 %
+    [C3B] 10h: SPIELER 6.53e+15 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 4.09e+16, Gewinn 19.3 Mrd/s, Fonds 2.51 Bio, Anteil 20.0 %
+    [C3B] 12h: SPIELER 8.23e+20 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 5.15e+21, Gewinn 2.43e+15/s, Fonds 6.57e+16, Anteil 20.0 %
+    [C3B] 14h: SPIELER 3.15e+97 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.97e+98, Gewinn 4.57e+91/s, Fonds 1.28e+94, Anteil 20.0 %
+    [C3B] 16h: SPIELER 1.71e+100 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.07e+101, Gewinn 5.05e+94/s, Fonds 9.75e+96, Anteil 20.0 %
+    [C3B] 18h: SPIELER 2.32e+101 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.45e+102, Gewinn 6.85e+95/s, Fonds 3.03e+98, Anteil 20.0 %
+    [C3B] 20h: SPIELER 1.13e+103 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 7.06e+103, Gewinn 3.34e+97/s, Fonds 8.11e+99, Anteil 20.0 %
+    [C3B] 24h: SPIELER 6.01e+103 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 3.76e+104, Gewinn 1.77e+98/s, Fonds 1.04e+101, Anteil 20.0 %
+    C3B s3: RAM 531.6 GB, Rechenzeit 44 s
+    [C4A] 0.5h: SPIELER 384.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 551.3 Mrd, Gewinn 1.56 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 165.3 Mrd fuer 100 Mio Anteile (Bewertung 550.8 Mrd, Gewinn 1.56 Mio/s)
+    [C4A] 1h: SPIELER 381.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 624.9 Mrd, Gewinn 1.49 Mio/s, Fonds 7.4 Mrd, Anteil 60.0 %
+    [C4A] 2h: SPIELER 478.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 784.4 Mrd, Gewinn 1.97 Mio/s, Fonds 9.6 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 549.7 Mrd fuer 350 Mio Anteile (Bewertung 785.3 Mrd, Gewinn 2.12 Mio/s)
+    [C4A] 3h: SPIELER 546.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.65 Bio, Gewinn 3.55 Mio/s, Fonds 33.9 Mrd, Anteil 36.7 %
+    3.50h Runde 3: 832.2 Mrd fuer 250 Mio Anteile (Bewertung 1664.5 Mrd, Gewinn 4.22 Mio/s)
+    [C4A] 4h: SPIELER 796.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 4.98 Bio, Gewinn 10.21 Mio/s, Fonds 88.4 Mrd, Anteil 20.0 %
+    [C4A] 6h: SPIELER 6.64 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 41.54 Bio, Gewinn 95.67 Mio/s, Fonds 116.9 Mrd, Anteil 20.0 %
+    6.05h Runde 4: 15588.4 Mrd fuer 200 Mio Anteile (Bewertung 51961.4 Mrd, Gewinn 102.61 Mio/s)
+    [C4A] 8h: SPIELER 1.43e+16 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 3.18e+17, Gewinn 150.5 Mrd/s, Fonds 13.64 Bio, Anteil 6.7 %
+    [C4A] 10h: SPIELER 1.11e+23 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 2.47e+24, Gewinn 1.16e+18/s, Fonds 2.82e+19, Anteil 6.7 %
+    [C4A] 12h: SPIELER 5.63e+97 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 1.25e+99, Gewinn 5.92e+92/s, Fonds 7.36e+94, Anteil 6.7 %
+    [C4A] 14h: SPIELER 2.60e+100 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 5.79e+101, Gewinn 2.72e+95/s, Fonds 6.74e+97, Anteil 6.7 %
+    [C4A] 16h: SPIELER 4.58e+100 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 1.02e+102, Gewinn 4.80e+95/s, Fonds 3.26e+98, Anteil 6.7 %
+    [C4A] 18h: SPIELER 5.07e+102 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 1.13e+104, Gewinn 5.34e+97/s, Fonds 1.41e+100, Anteil 6.7 %
+    [C4A] 20h: SPIELER 1.07e+103 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 2.38e+104, Gewinn 1.12e+98/s, Fonds 3.99e+100, Anteil 6.7 %
+    [C4A] 24h: SPIELER 2.09e+103 (Tranchen 0) via IPO+sofort, Dummies 15; Bewertung 4.64e+104, Gewinn 2.19e+98/s, Fonds 2.07e+101, Anteil 6.7 %
+    C4A s1: RAM 531.6 GB, Rechenzeit 44 s
+    [C4A] 0.5h: SPIELER 389.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 167.6 Mrd fuer 100 Mio Anteile (Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s)
+    [C4A] 1h: SPIELER 378.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 620.3 Mrd, Gewinn 1.69 Mio/s, Fonds 8.7 Mrd, Anteil 60.0 %
+    [C4A] 2h: SPIELER 469.8 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 770.0 Mrd, Gewinn 1.93 Mio/s, Fonds 8.9 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 541.5 Mrd fuer 350 Mio Anteile (Bewertung 773.6 Mrd, Gewinn 2.08 Mio/s)
+    [C4A] 3h: SPIELER 451.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.36 Bio, Gewinn 3.31 Mio/s, Fonds 33.9 Mrd, Anteil 36.7 %
+    3.50h Runde 3: 687.8 Mrd fuer 250 Mio Anteile (Bewertung 1375.5 Mrd, Gewinn 3.53 Mio/s)
+    [C4A] 4h: SPIELER 620.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 3.88 Bio, Gewinn 8.54 Mio/s, Fonds 76.4 Mrd, Anteil 20.0 %
+    [C4A] 6h: SPIELER 2.75 Bio (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 17.20 Bio, Gewinn 37.07 Mio/s, Fonds 104.9 Mrd, Anteil 20.0 %
+    6.21h Runde 4: 7381.3 Mrd fuer 200 Mio Anteile (Bewertung 24604.4 Mrd, Gewinn 53.59 Mio/s)
+    [C4A] 8h: SPIELER 768.74 Bio (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 1.71e+16, Gewinn 10.0 Mrd/s, Fonds 1.70 Bio, Anteil 6.7 %
+    [C4A] 10h: SPIELER 1.17e+19 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 2.59e+20, Gewinn 120.70 Bio/s, Fonds 4.85e+15, Anteil 6.7 %
+    [C4A] 12h: SPIELER 2.20e+89 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 4.89e+90, Gewinn 2.36e+84/s, Fonds 9.26e+85, Anteil 6.7 %
+    [C4A] 14h: SPIELER 2.75e+99 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 6.12e+100, Gewinn 2.89e+94/s, Fonds 3.61e+96, Anteil 6.7 %
+    [C4A] 16h: SPIELER 3.99e+100 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 8.87e+101, Gewinn 4.16e+95/s, Fonds 1.98e+98, Anteil 6.7 %
+    [C4A] 18h: SPIELER 2.94e+102 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 6.55e+103, Gewinn 3.09e+97/s, Fonds 4.41e+99, Anteil 6.7 %
+    [C4A] 20h: SPIELER 8.36e+102 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 1.86e+104, Gewinn 8.74e+97/s, Fonds 3.46e+100, Anteil 6.7 %
+    [C4A] 24h: SPIELER 3.15e+102 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 7.00e+103, Gewinn 4.41e+97/s, Fonds 1.15e+101, Anteil 6.7 %
+    C4A s2: RAM 531.6 GB, Rechenzeit 39 s
+    [C4A] 0.5h: SPIELER 388.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 557.3 Mrd, Gewinn 1.57 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 166.8 Mrd fuer 100 Mio Anteile (Bewertung 556.0 Mrd, Gewinn 1.57 Mio/s)
+    [C4A] 1h: SPIELER 385.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 631.7 Mrd, Gewinn 1.57 Mio/s, Fonds 8.9 Mrd, Anteil 60.0 %
+    [C4A] 2h: SPIELER 465.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 763.1 Mrd, Gewinn 1.88 Mio/s, Fonds 9.0 Mrd, Anteil 60.0 %
+    2.00h Runde 2: 534.2 Mrd fuer 350 Mio Anteile (Bewertung 763.2 Mrd, Gewinn 2.03 Mio/s)
+    [C4A] 3h: SPIELER 480.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.45 Bio, Gewinn 3.08 Mio/s, Fonds 27.8 Mrd, Anteil 36.7 %
+    3.50h Runde 3: 721.0 Mrd fuer 250 Mio Anteile (Bewertung 1441.9 Mrd, Gewinn 3.68 Mio/s)
+    [C4A] 4h: SPIELER 719.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 4.50 Bio, Gewinn 9.29 Mio/s, Fonds 75.5 Mrd, Anteil 20.0 %
+    [C4A] 6h: SPIELER 2.53 Bio (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 15.85 Bio, Gewinn 34.69 Mio/s, Fonds 105.1 Mrd, Anteil 20.0 %
+    6.23h Runde 4: 8499.3 Mrd fuer 200 Mio Anteile (Bewertung 28330.9 Mrd, Gewinn 61.72 Mio/s)
+    [C4A] 8h: SPIELER 2.00e+15 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 4.44e+16, Gewinn 21.0 Mrd/s, Fonds 3.17 Bio, Anteil 6.7 %
+    [C4A] 10h: SPIELER 1.94e+19 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 4.31e+20, Gewinn 197.14 Bio/s, Fonds 1.63e+16, Anteil 6.7 %
+    [C4A] 12h: SPIELER 3.07e+95 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 6.83e+96, Gewinn 3.45e+90/s, Fonds 1.01e+92, Anteil 6.7 %
+    [C4A] 14h: SPIELER 3.73e+99 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 8.29e+100, Gewinn 3.91e+94/s, Fonds 5.34e+96, Anteil 6.7 %
+    [C4A] 16h: SPIELER 4.38e+100 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 9.74e+101, Gewinn 4.63e+95/s, Fonds 2.26e+98, Anteil 6.7 %
+    [C4A] 18h: SPIELER 3.36e+102 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 7.47e+103, Gewinn 3.53e+97/s, Fonds 5.80e+99, Anteil 6.7 %
+    [C4A] 20h: SPIELER 7.76e+102 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 1.72e+104, Gewinn 8.17e+97/s, Fonds 3.60e+100, Anteil 6.7 %
+    [C4A] 24h: SPIELER 2.13e+103 (Tranchen 0) via IPO+sofort, Dummies 16; Bewertung 4.74e+104, Gewinn 2.24e+98/s, Fonds 1.72e+101, Anteil 6.7 %
+    C4A s3: RAM 531.6 GB, Rechenzeit 46 s

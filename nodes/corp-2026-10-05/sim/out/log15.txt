@@ -1,0 +1,51 @@
+    [C3B_KF] 0.5h: SPIELER 304.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 436.7 Mrd, Gewinn 1.22 Mio/s, Fonds 5.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 130.9 Mrd fuer 100 Mio Anteile (Bewertung 436.3 Mrd, Gewinn 1.22 Mio/s)
+    [C3B_KF] 1h: SPIELER 272.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 446.5 Mrd, Gewinn 1.06 Mio/s, Fonds 32.8 Mrd, Anteil 60.0 %
+    [C3B_KF] 2h: SPIELER 273.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 448.9 Mrd, Gewinn 1.06 Mio/s, Fonds 36.7 Mrd, Anteil 60.0 %
+    2.50h Runde 2: 396.1 Mrd fuer 350 Mio Anteile (Bewertung 565.8 Mrd, Gewinn 1.56 Mio/s)
+    [C3B_KF] 3h: SPIELER 253.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 763.7 Mrd, Gewinn 1.89 Mio/s, Fonds 15.4 Mrd, Anteil 36.7 %
+    [C3B_KF] 4h: SPIELER 411.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.24 Bio, Gewinn 2.77 Mio/s, Fonds 21.1 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 898.1 Mrd fuer 250 Mio Anteile (Bewertung 1796.1 Mrd, Gewinn 4.55 Mio/s)
+    [C3B_KF] 6h: SPIELER 2.07 Bio (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 12.94 Bio, Gewinn 27.75 Mio/s, Fonds 94.3 Mrd, Anteil 20.0 %
+    [C3B_KF] 8h: SPIELER 8.43 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 52.74 Bio, Gewinn 104.05 Mio/s, Fonds 133.8 Mrd, Anteil 20.0 %
+    [C3B_KF] 10h: SPIELER 17.38 Bio (Tranchen 0) via IPO+sofort, Dummies 3; Bewertung 108.70 Bio, Gewinn 194.24 Mio/s, Fonds 217.7 Mrd, Anteil 20.0 %
+    [C3B_KF] 12h: SPIELER 65.87 Bio (Tranchen 0) via IPO+sofort, Dummies 7; Bewertung 412.10 Bio, Gewinn 505.02 Mio/s, Fonds 411.7 Mrd, Anteil 20.0 %
+    [C3B_KF] 14h: SPIELER 7.72e+15 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 4.83e+16, Gewinn 22.8 Mrd/s, Fonds 3.22 Bio, Anteil 20.0 %
+    [C3B_KF] 16h: SPIELER 2.70e+19 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.69e+20, Gewinn 79.79 Bio/s, Fonds 2.27e+16, Anteil 20.0 %
+    [C3B_KF] 18h: SPIELER 3.24e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 2.03e+24, Gewinn 1.07e+18/s, Fonds 2.85e+20, Anteil 20.0 %
+    [C3B_KF] 20h: SPIELER 3.00e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.88e+24, Gewinn 9.93e+17/s, Fonds 6.57e+20, Anteil 20.0 %
+    [C3B_KF] 24h: SPIELER 1.71e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.07e+24, Gewinn 5.65e+17/s, Fonds 1.32e+21, Anteil 20.0 %
+    [C3B_KF] 0.5h: SPIELER 310.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 445.2 Mrd, Gewinn 1.25 Mio/s, Fonds 5.1 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 133.6 Mrd fuer 100 Mio Anteile (Bewertung 445.2 Mrd, Gewinn 1.25 Mio/s)
+    [C3B_KF] 1h: SPIELER 271.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 444.4 Mrd, Gewinn 1.20 Mio/s, Fonds 35.5 Mrd, Anteil 60.0 %
+    [C3B_KF] 2h: SPIELER 348.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 570.3 Mrd, Gewinn 1.41 Mio/s, Fonds 2.0 Mrd, Anteil 60.0 %
+    2.50h Runde 2: 398.3 Mrd fuer 350 Mio Anteile (Bewertung 569.0 Mrd, Gewinn -0.43 Mio/s)
+    [C3B_KF] 3h: SPIELER 357.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.08 Bio, Gewinn 2.20 Mio/s, Fonds 16.6 Mrd, Anteil 36.7 %
+    [C3B_KF] 4h: SPIELER 605.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.83 Bio, Gewinn 4.61 Mio/s, Fonds 23.8 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 1292.2 Mrd fuer 250 Mio Anteile (Bewertung 2584.4 Mrd, Gewinn 6.50 Mio/s)
+    [C3B_KF] 6h: SPIELER 6.72 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 42.03 Bio, Gewinn 83.15 Mio/s, Fonds 117.4 Mrd, Anteil 20.0 %
+    [C3B_KF] 8h: SPIELER 24.94 Bio (Tranchen 0) via IPO+sofort, Dummies 3; Bewertung 156.05 Bio, Gewinn 279.02 Mio/s, Fonds 215.6 Mrd, Anteil 20.0 %
+    [C3B_KF] 10h: SPIELER 239.06 Bio (Tranchen 0) via IPO+sofort, Dummies 10; Bewertung 1.50e+15, Gewinn 1.4 Mrd/s, Fonds 562.4 Mrd, Anteil 20.0 %
+    [C3B_KF] 12h: SPIELER 2.88e+16 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.80e+17, Gewinn 85.2 Mrd/s, Fonds 10.71 Bio, Anteil 20.0 %
+    [C3B_KF] 14h: SPIELER 9.05e+21 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 5.66e+22, Gewinn 2.80e+16/s, Fonds 1.44e+18, Anteil 20.0 %
+    [C3B_KF] 16h: SPIELER 5.69e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 3.56e+24, Gewinn 1.88e+18/s, Fonds 4.58e+20, Anteil 20.0 %
+    [C3B_KF] 18h: SPIELER 9.06e+22 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 5.67e+23, Gewinn 2.99e+17/s, Fonds 8.51e+20, Anteil 20.0 %
+    [C3B_KF] 20h: SPIELER 2.09e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.31e+24, Gewinn 6.90e+17/s, Fonds 1.17e+21, Anteil 20.0 %
+    [C3B_KF] 24h: SPIELER 2.22e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.39e+24, Gewinn 7.34e+17/s, Fonds 1.62e+21, Anteil 20.0 %
+    [C3B_KF] 0.5h: SPIELER 304.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 437.2 Mrd, Gewinn 1.23 Mio/s, Fonds 4.9 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 130.9 Mrd fuer 100 Mio Anteile (Bewertung 436.2 Mrd, Gewinn 1.22 Mio/s)
+    [C3B_KF] 1h: SPIELER 276.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 452.7 Mrd, Gewinn 1.08 Mio/s, Fonds 32.6 Mrd, Anteil 60.0 %
+    [C3B_KF] 2h: SPIELER 289.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 473.6 Mrd, Gewinn 1.10 Mio/s, Fonds 36.7 Mrd, Anteil 60.0 %
+    2.50h Runde 2: 409.8 Mrd fuer 350 Mio Anteile (Bewertung 585.4 Mrd, Gewinn 1.61 Mio/s)
+    [C3B_KF] 3h: SPIELER 277.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 836.2 Mrd, Gewinn 2.16 Mio/s, Fonds 17.2 Mrd, Anteil 36.7 %
+    [C3B_KF] 4h: SPIELER 449.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.36 Bio, Gewinn 3.05 Mio/s, Fonds 23.4 Mrd, Anteil 36.7 %
+    4.50h Runde 3: 1012.3 Mrd fuer 250 Mio Anteile (Bewertung 2024.6 Mrd, Gewinn 5.09 Mio/s)
+    [C3B_KF] 6h: SPIELER 2.79 Bio (Tranchen 0) via IPO+sofort, Dummies 1; Bewertung 17.43 Bio, Gewinn 38.23 Mio/s, Fonds 102.8 Mrd, Anteil 20.0 %
+    [C3B_KF] 8h: SPIELER 8.90 Bio (Tranchen 0) via IPO+sofort, Dummies 2; Bewertung 55.67 Bio, Gewinn 109.06 Mio/s, Fonds 156.5 Mrd, Anteil 20.0 %
+    [C3B_KF] 10h: SPIELER 25.82 Bio (Tranchen 0) via IPO+sofort, Dummies 5; Bewertung 161.50 Bio, Gewinn 239.57 Mio/s, Fonds 278.3 Mrd, Anteil 20.0 %
+    [C3B_KF] 12h: SPIELER 98.37 Bio (Tranchen 0) via IPO+sofort, Dummies 9; Bewertung 615.39 Bio, Gewinn 621.70 Mio/s, Fonds 508.2 Mrd, Anteil 20.0 %
+    [C3B_KF] 14h: SPIELER 4.29e+16 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 2.68e+17, Gewinn 126.7 Mrd/s, Fonds 10.98 Bio, Anteil 20.0 %
+    [C3B_KF] 16h: SPIELER 6.14e+21 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 3.84e+22, Gewinn 1.92e+16/s, Fonds 7.39e+17, Anteil 20.0 %
+    [C3B_KF] 18h: SPIELER 3.69e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 2.31e+24, Gewinn 1.22e+18/s, Fonds 3.36e+20, Anteil 20.0 %
+    [C3B_KF] 20h: SPIELER 4.54e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 2.84e+24, Gewinn 1.50e+18/s, Fonds 7.16e+20, Anteil 20.0 %
+    [C3B_KF] 24h: SPIELER 2.49e+23 (Tranchen 0) via IPO+sofort, Dummies 17; Bewertung 1.56e+24, Gewinn 8.24e+17/s, Fonds 1.24e+21, Anteil 20.0 %

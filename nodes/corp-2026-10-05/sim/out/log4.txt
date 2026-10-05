@@ -1,0 +1,92 @@
+    [A_seed] 0.5h: SPIELER 97.8 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 1h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 2h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 3h: SPIELER 97.7 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 4h: SPIELER 97.7 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 6h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 8h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 10h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 12h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 14h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 16h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 18h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 20h: SPIELER 97.7 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 24h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    A_seed s1: RAM 61.6 GB, Rechenzeit 0 s
+    [A_seed] 0.5h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 1h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 2h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 3h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 4h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 6h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 8h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 10h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 12h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 14h: SPIELER 97.6 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 16h: SPIELER 97.5 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 18h: SPIELER 97.4 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 20h: SPIELER 97.7 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    [A_seed] 24h: SPIELER 97.9 Mrd (Tranchen 0) via IPO+11Zyklen, Dummies 0; Bewertung 150.0 Mrd, Gewinn 0/s, Fonds 150.0 Mrd, Anteil 66.7 %
+    A_seed s2: RAM 61.6 GB, Rechenzeit 0 s
+    [B_agri_r0] 0.5h: SPIELER 384.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 551.3 Mrd, Gewinn 1.56 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    [B_agri_r0] 1h: SPIELER 384.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 551.7 Mrd, Gewinn 1.56 Mio/s, Fonds 2.9 Mrd, Anteil 66.7 %
+    [B_agri_r0] 2h: SPIELER 386.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 554.2 Mrd, Gewinn 1.56 Mio/s, Fonds 3.4 Mrd, Anteil 66.7 %
+    [B_agri_r0] 3h: SPIELER 384.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 552.1 Mrd, Gewinn 1.56 Mio/s, Fonds 2.9 Mrd, Anteil 66.7 %
+    [B_agri_r0] 4h: SPIELER 404.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 580.1 Mrd, Gewinn 1.64 Mio/s, Fonds 4.0 Mrd, Anteil 66.7 %
+    [B_agri_r0] 6h: SPIELER 400.8 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 575.3 Mrd, Gewinn 1.63 Mio/s, Fonds 4.6 Mrd, Anteil 66.7 %
+    [B_agri_r0] 8h: SPIELER 407.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 584.3 Mrd, Gewinn 1.65 Mio/s, Fonds 2.2 Mrd, Anteil 66.7 %
+    [B_agri_r0] 10h: SPIELER 442.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 634.7 Mrd, Gewinn 1.80 Mio/s, Fonds 6.2 Mrd, Anteil 66.7 %
+    [B_agri_r0] 12h: SPIELER 446.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 641.2 Mrd, Gewinn 1.81 Mio/s, Fonds 5.7 Mrd, Anteil 66.7 %
+    [B_agri_r0] 14h: SPIELER 490.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 704.4 Mrd, Gewinn 1.99 Mio/s, Fonds 5.0 Mrd, Anteil 66.7 %
+    [B_agri_r0] 16h: SPIELER 511.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 734.5 Mrd, Gewinn 2.08 Mio/s, Fonds 3.9 Mrd, Anteil 66.7 %
+    [B_agri_r0] 18h: SPIELER 525.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 753.9 Mrd, Gewinn 2.14 Mio/s, Fonds 7.6 Mrd, Anteil 66.7 %
+    [B_agri_r0] 20h: SPIELER 556.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 799.1 Mrd, Gewinn 2.27 Mio/s, Fonds 2.8 Mrd, Anteil 66.7 %
+    [B_agri_r0] 24h: SPIELER 582.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 835.8 Mrd, Gewinn 2.37 Mio/s, Fonds 8.4 Mrd, Anteil 66.7 %
+    B_agri_r0 s1: RAM 351.6 GB, Rechenzeit 50 s
+    [B_agri_r0] 0.5h: SPIELER 389.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    [B_agri_r0] 1h: SPIELER 390.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 560.3 Mrd, Gewinn 1.58 Mio/s, Fonds 2.9 Mrd, Anteil 66.7 %
+    [B_agri_r0] 2h: SPIELER 401.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 575.7 Mrd, Gewinn 1.63 Mio/s, Fonds 3.6 Mrd, Anteil 66.7 %
+    [B_agri_r0] 3h: SPIELER 400.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 574.6 Mrd, Gewinn 1.62 Mio/s, Fonds 3.4 Mrd, Anteil 66.7 %
+    [B_agri_r0] 4h: SPIELER 396.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 568.8 Mrd, Gewinn 1.61 Mio/s, Fonds 4.5 Mrd, Anteil 66.7 %
+    [B_agri_r0] 6h: SPIELER 414.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 595.2 Mrd, Gewinn 1.68 Mio/s, Fonds 5.2 Mrd, Anteil 66.7 %
+    [B_agri_r0] 8h: SPIELER 431.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 619.8 Mrd, Gewinn 1.75 Mio/s, Fonds 3.4 Mrd, Anteil 66.7 %
+    [B_agri_r0] 10h: SPIELER 450.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 646.6 Mrd, Gewinn 1.83 Mio/s, Fonds 3.9 Mrd, Anteil 66.7 %
+    [B_agri_r0] 12h: SPIELER 471.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 676.8 Mrd, Gewinn 1.92 Mio/s, Fonds 3.7 Mrd, Anteil 66.7 %
+    [B_agri_r0] 14h: SPIELER 453.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 651.3 Mrd, Gewinn 1.84 Mio/s, Fonds 7.3 Mrd, Anteil 66.7 %
+    [B_agri_r0] 16h: SPIELER 480.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 689.4 Mrd, Gewinn 1.95 Mio/s, Fonds 5.2 Mrd, Anteil 66.7 %
+    [B_agri_r0] 18h: SPIELER 483.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 694.1 Mrd, Gewinn 1.97 Mio/s, Fonds 7.8 Mrd, Anteil 66.7 %
+    [B_agri_r0] 20h: SPIELER 482.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 692.0 Mrd, Gewinn 1.97 Mio/s, Fonds 7.2 Mrd, Anteil 66.7 %
+    [B_agri_r0] 24h: SPIELER 550.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 789.6 Mrd, Gewinn 2.24 Mio/s, Fonds 2.8 Mrd, Anteil 66.7 %
+    B_agri_r0 s2: RAM 351.6 GB, Rechenzeit 49 s
+    [B_agri_r1] 0.5h: SPIELER 384.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 551.3 Mrd, Gewinn 1.56 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 165.3 Mrd fuer 100 Mio Anteile (Bewertung 550.8 Mrd, Gewinn 1.56 Mio/s)
+    [B_agri_r1] 1h: SPIELER 482.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 790.0 Mrd, Gewinn 2.24 Mio/s, Fonds 2.7 Mrd, Anteil 60.0 %
+    [B_agri_r1] 2h: SPIELER 476.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 780.8 Mrd, Gewinn 2.22 Mio/s, Fonds 2.4 Mrd, Anteil 60.0 %
+    [B_agri_r1] 3h: SPIELER 450.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 737.9 Mrd, Gewinn 2.09 Mio/s, Fonds 2.5 Mrd, Anteil 60.0 %
+    [B_agri_r1] 4h: SPIELER 469.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 769.2 Mrd, Gewinn 2.19 Mio/s, Fonds 4.2 Mrd, Anteil 60.0 %
+    [B_agri_r1] 6h: SPIELER 450.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 738.1 Mrd, Gewinn 2.09 Mio/s, Fonds 5.8 Mrd, Anteil 60.0 %
+    [B_agri_r1] 8h: SPIELER 494.1 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 809.8 Mrd, Gewinn 2.30 Mio/s, Fonds 3.9 Mrd, Anteil 60.0 %
+    [B_agri_r1] 10h: SPIELER 488.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 800.9 Mrd, Gewinn 2.28 Mio/s, Fonds 3.6 Mrd, Anteil 60.0 %
+    [B_agri_r1] 12h: SPIELER 486.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 798.0 Mrd, Gewinn 2.26 Mio/s, Fonds 7.3 Mrd, Anteil 60.0 %
+    [B_agri_r1] 14h: SPIELER 495.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 812.3 Mrd, Gewinn 2.31 Mio/s, Fonds 9.8 Mrd, Anteil 60.0 %
+    [B_agri_r1] 16h: SPIELER 506.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 830.8 Mrd, Gewinn 2.36 Mio/s, Fonds 10.4 Mrd, Anteil 60.0 %
+    [B_agri_r1] 18h: SPIELER 508.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 834.1 Mrd, Gewinn 2.36 Mio/s, Fonds 9.9 Mrd, Anteil 60.0 %
+    [B_agri_r1] 20h: SPIELER 529.5 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 867.8 Mrd, Gewinn 2.47 Mio/s, Fonds 6.8 Mrd, Anteil 60.0 %
+    [B_agri_r1] 24h: SPIELER 546.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 895.5 Mrd, Gewinn 2.54 Mio/s, Fonds 8.9 Mrd, Anteil 60.0 %
+    B_agri_r1 s1: RAM 381.6 GB, Rechenzeit 58 s
+    [B_agri_r1] 0.5h: SPIELER 389.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s, Fonds 3.0 Mrd, Anteil 66.7 %
+    0.50h Runde 1: 167.6 Mrd fuer 100 Mio Anteile (Bewertung 558.8 Mrd, Gewinn 1.58 Mio/s)
+    [B_agri_r1] 1h: SPIELER 504.3 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 826.5 Mrd, Gewinn 2.35 Mio/s, Fonds 4.6 Mrd, Anteil 60.0 %
+    [B_agri_r1] 2h: SPIELER 508.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 833.8 Mrd, Gewinn 2.37 Mio/s, Fonds 4.0 Mrd, Anteil 60.0 %
+    [B_agri_r1] 3h: SPIELER 514.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 843.6 Mrd, Gewinn 2.39 Mio/s, Fonds 5.7 Mrd, Anteil 60.0 %
+    [B_agri_r1] 4h: SPIELER 518.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 848.9 Mrd, Gewinn 2.42 Mio/s, Fonds 2.2 Mrd, Anteil 60.0 %
+    [B_agri_r1] 6h: SPIELER 527.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 864.6 Mrd, Gewinn 2.46 Mio/s, Fonds 2.7 Mrd, Anteil 60.0 %
+    [B_agri_r1] 8h: SPIELER 542.4 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 888.9 Mrd, Gewinn 2.53 Mio/s, Fonds 3.6 Mrd, Anteil 60.0 %
+    [B_agri_r1] 10h: SPIELER 565.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 927.2 Mrd, Gewinn 2.64 Mio/s, Fonds 8.8 Mrd, Anteil 60.0 %
+    [B_agri_r1] 12h: SPIELER 598.9 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 981.5 Mrd, Gewinn 2.79 Mio/s, Fonds 5.3 Mrd, Anteil 60.0 %
+    [B_agri_r1] 14h: SPIELER 610.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.00 Bio, Gewinn 2.84 Mio/s, Fonds 7.8 Mrd, Anteil 60.0 %
+    [B_agri_r1] 16h: SPIELER 618.2 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.01 Bio, Gewinn 2.88 Mio/s, Fonds 8.5 Mrd, Anteil 60.0 %
+    [B_agri_r1] 18h: SPIELER 634.7 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.04 Bio, Gewinn 2.98 Mio/s, Fonds 7.2 Mrd, Anteil 60.0 %
+    [B_agri_r1] 20h: SPIELER 649.6 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.06 Bio, Gewinn 3.04 Mio/s, Fonds 3.3 Mrd, Anteil 60.0 %
+    [B_agri_r1] 24h: SPIELER 692.0 Mrd (Tranchen 0) via IPO+sofort, Dummies 0; Bewertung 1.13 Bio, Gewinn 3.23 Mio/s, Fonds 6.9 Mrd, Anteil 60.0 %
+    B_agri_r1 s2: RAM 381.6 GB, Rechenzeit 63 s

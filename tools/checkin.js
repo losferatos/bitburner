@@ -34,6 +34,7 @@ import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 import { gateRoundStatus } from "./lib/gate-round-status.js";
 import { gangZeile, gangBefunde } from "./lib/gangzeile.js";
+import { kurveAuffrischen } from "./lib/kurvepflege.js";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -549,6 +550,10 @@ async function main() {
    * Die lineare Zahl bleibt sichtbar, aber als das, was sie ist: eine untere
    * Schranke der Fahrweise, kein Termin.
    */
+  // Ein schnellerer, abgeschlossener Lauf ersetzt die Referenz (05.10.2026,
+  // tools/lib/kurvepflege.js) - vor dem ersten Lesen, lib/rangkurve.js cacht.
+  const kurveNeu = kurveAuffrischen(ROOT, knoten);
+  if (kurveNeu) sag(kurveNeu);
   const kurve = restzeitAusKurve(knoten, rang);
   let etaSpiel = null;
 

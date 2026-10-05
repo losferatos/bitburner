@@ -33,7 +33,7 @@ import { fileURLToPath } from "node:url";
 import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./lib/rangkurve.js";
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 import { gateRoundStatus } from "./lib/gate-round-status.js";
-import { gangZeile, gangBefunde } from "./lib/gangzeile.js";
+import { gangZeile, gangBefunde, gangImKnoten } from "./lib/gangzeile.js";
 import { kurveAuffrischen } from "./lib/kurvepflege.js";
 
 const BRIDGE = "http://localhost:8795";
@@ -770,7 +770,7 @@ async function main() {
       // DIE GANG (03.10.2026, Skeptiker-Hinweis "kein /bb-Leser fuer gang.json").
       // Eine Zeile, oder keine, wenn gang.js nie lief (keine Datei). Die Zeile
       // selbst baut tools/lib/gangzeile.js - rein, damit test-gang.js sie prueft.
-      const gangTel = await holeJson("data/gang.json");
+      const gangTel = gangImKnoten(await holeJson("data/gang.json"), netz && netz.nodeReset);
       const gangText = gangZeile(gangTel, Date.now());
       if (gangText) {
         sag(gangText);
@@ -884,7 +884,7 @@ async function main() {
       p && p.torRunde && p.knoten === knoten && p.lauf === laufJetzt);
     const gate = gateRoundStatus({
       tele: bn4repTele, blade, nowMs: Date.now(), before: vorherPunkt ? vorherPunkt.torRunde : null,
-      gang: await holeJson("data/gang.json"),
+      gang: gangImKnoten(await holeJson("data/gang.json"), netz && netz.nodeReset),
     });
     for (const z of gate.lines) sag(z);
     for (const f of gate.findings) sag(f);

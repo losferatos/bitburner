@@ -62,6 +62,23 @@ function geldTeil(tel) {
 }
 
 /**
+ * Gang-Telemetrie nur aus DIESEM Knotenlauf (05.10.2026). Befund BN3.1:
+ * gang.json aus BN2 lag noch auf home, der Check-in meldete "gang.js laeuft
+ * nicht" und einen TORRUNDE-BEFUND "Gang laeuft" - in einem Knoten, in dem es
+ * gar keine Gang gibt. Telemetrie von vor dem letzten Knotenwechsel
+ * (data/bn4net.json nodeReset, Wanduhr) zaehlt wie keine Datei.
+ * @param {object|null} tel geparste data/gang.json
+ * @param {number} nodeReset Wanduhr des letzten Knotenwechsels
+ * @returns {object|null}
+ */
+export function gangImKnoten(tel, nodeReset) {
+  if (!tel || typeof tel !== "object") return null;
+  if (!Number.isFinite(nodeReset)) return tel;
+  const zeit = [tel.ts, tel.wall, tel.zeit].find((x) => Number.isFinite(x));
+  return Number.isFinite(zeit) && zeit < nodeReset ? null : tel;
+}
+
+/**
  * @param {object|null} tel geparste data/gang.json
  * @param {number} jetzt Date.now()
  * @returns {string|null}

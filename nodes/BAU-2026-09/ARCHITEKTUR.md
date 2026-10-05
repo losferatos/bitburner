@@ -1059,7 +1059,9 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "restartPolicy": "always",
       "maxInstances": 1,
       "killSafe": true,
-      "precondition": {}
+      "precondition": {
+        "forbidsFile": "data/keine-hacknet.txt"
+      }
     },
     {
       "name": "bn4life.js",

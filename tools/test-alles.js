@@ -73,6 +73,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-knotenmarke.js",
+    deckt: "Knotenmarken (keine-hacknet/keine-sleeves) sperren nur im eigenen Knoten; hacknet.js nicht mehr als fehlend gemeldet (Befund 05.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-kurvepflege.js",
     deckt: "Check-in zieht die Referenzkurve nach, wenn ein schnellerer abgeschlossener Lauf vorliegt (Befund 05.10.)",
     schnell: true,

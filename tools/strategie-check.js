@@ -732,6 +732,11 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
    * 10 wuerde damit auch in Knoten 9 noch blocken - und dort ist hashes.js
    * die einzige Geldquelle. Deshalb bleibt die Registry, wie sie ist, und
    * dieser Pruefer erklaert den Fall, statt ihn zu melden.
+   *
+   * UEBERHOLT (05.10.2026): Beide Werkzeuge tragen jetzt `forbidsFile`, und
+   * `dateiDa` in Kern und Waechter prueft Knotenmarken knotengenau
+   * (lib/reg.js `knotenMarkeGilt`) - die Sperre aus Knoten 10 gilt in BN9
+   * also nicht. Der Block unten bleibt als Erklaerung fuer aeltere Staende.
    */
   if (werkzeugFehlt) {
     const marke = await liesDatei("data/keine-hacknet.txt");

@@ -31,7 +31,7 @@ import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec,
   batchThroughput, prepDiscount } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
-  leseRolle, pruefeRolle, merkmaleAusReset } from "lib/reg.js";
+  leseRolle, pruefeRolle, merkmaleAusReset, KNOTEN_MARKEN, knotenMarkeGilt } from "lib/reg.js";
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
@@ -682,6 +682,8 @@ export async function main(ns) {
       dateiDa: (d) => {
         try {
           if (!ns.fileExists(d, "home")) return false;
+          // Knotenmarken nur fuer den laufenden Knoten (lib/reg.js, 05.10.2026).
+          if (KNOTEN_MARKEN.has(d)) return knotenMarkeGilt(ns.read(d), ns.getResetInfo().currentNode);
           return !markeVeraltet(d);
         } catch { return false; }
       },

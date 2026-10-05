@@ -46,6 +46,24 @@
 export const REG_SCHEMA = 1;
 
 /**
+ * KNOTENMARKEN (05.10.2026, Skeptiker zum hacknet.js-Fehlalarm). In diesen
+ * Marken steht eine KNOTENNUMMER, kein Zeitstempel: hacknet.js/hashes.js
+ * legen data/keine-hacknet.txt, sleeve.js data/keine-sleeves.txt mit dem
+ * Knoten, in dem es nichts zu tun gibt. Als `forbidsFile` in der Registry
+ * duerfen sie nur sperren, wenn die Nummer zum laufenden Knoten passt - eine
+ * liegengebliebene Marke "10" darf in BN9 nicht hacknet.js (Wirt fuer
+ * exit.js, einzige Einnahme) still blockieren. boot.js raeumt sie zwar beim
+ * Knotenwechsel, aber nur in den ersten 5 Minuten danach.
+ */
+export const KNOTEN_MARKEN = new Set(["data/keine-hacknet.txt", "data/keine-sleeves.txt"]);
+
+/** Rein: gilt eine Knotenmarke mit diesem Inhalt im Knoten `knoten`? */
+export function knotenMarkeGilt(inhalt, knoten) {
+  const n = Number(String(inhalt ?? "").trim());
+  return Number.isFinite(n) && n > 0 && n === Number(knoten);
+}
+
+/**
  * Liest die Rolle aus dem Inhalt von `data/verfahren.txt`.
  *
  * Format: `"<verfahren> <knoten> <stufe>"`, z. B. `"V2 10 2"`.

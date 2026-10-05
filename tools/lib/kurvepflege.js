@@ -19,6 +19,23 @@ import path from "node:path";
 import { execFileSync } from "node:child_process";
 
 export const AUSGANG_RANG = 400000;
+
+/**
+ * Spielzeit, die beim Bladeburner WIRKLICH abgearbeitet ist (05.10.2026).
+ *
+ * Offline-Zeit landet voll in totalPlaytime, Bladeburner bekommt sie aber als
+ * storedCycles und holt sie erst nach dem Wiederverbinden nach - mit
+ * hoechstens 5 Sekunden je Tick (Bladeburner.ts:1375-1378, 5 Zyklen = 1 s,
+ * Zyklus 200 ms). Gemessen BN2.2: Sicherung 04:49 hatte 98.281 Zyklen =
+ * 5,46 h im Vorrat; die Kurve zeigte 5,5 h Stillstand und danach 489.000 Rang
+ * in 15 Minuten. Abgezogen ist die Zeitachse wieder die des Fortschritts.
+ * @param {number} totalPlaytime ms
+ * @param {number} storedCycles Bladeburner-Vorrat
+ */
+export function effektiveSpielzeit(totalPlaytime, storedCycles) {
+  const vorrat = Number.isFinite(storedCycles) && storedCycles > 0 ? storedCycles * 200 : 0;
+  return totalPlaytime - vorrat;
+}
 export const START_RANG_MAX = 1000;
 
 /**

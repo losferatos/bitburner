@@ -1,6 +1,6 @@
 {
  "knoten": 2,
- "erzeugtAm": "2026-10-05T06:29:38.386Z",
+ "erzeugtAm": "2026-10-05T19:13:53.950Z",
  "erzeugtVon": "tools/rangkurve-bauen.js",
  "quellen": [
   "data/verlauf-strategie.json",
@@ -9,21 +9,21 @@
  ],
  "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 2 --mit-sicherungen",
  "nullpunkt": {
-  "spielzeitMs": 3948151200,
-  "spielzeitH": 1096.709,
+  "spielzeitMs": 3948150400,
+  "spielzeitH": 1096.708,
   "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
  },
- "punkteGesamt": 76,
- "laeufeErkannt": 3,
+ "punkteGesamt": 88,
+ "laeufeErkannt": 4,
  "stuetzpunkte": 36,
  "rangSpanne": [
   6,
   550010
  ],
- "dauerH": 19.787,
+ "dauerH": 15.323,
  "ratenSpanne": [
-  -113.83928571428584,
-  2095442.0600858321
+  -113.83928571428561,
+  418370.17994858616
  ],
  "punkte": [
   {
@@ -39,7 +39,7 @@
    "rang": 93
   },
   {
-   "h": 1.821,
+   "h": 1.822,
    "rang": 514
   },
   {
@@ -55,7 +55,7 @@
    "rang": 652
   },
   {
-   "h": 3,
+   "h": 3.001,
    "rang": 652
   },
   {
@@ -63,7 +63,7 @@
    "rang": 652
   },
   {
-   "h": 3.145,
+   "h": 3.146,
    "rang": 654
   },
   {
@@ -79,7 +79,7 @@
    "rang": 658
   },
   {
-   "h": 3.327,
+   "h": 3.328,
    "rang": 660
   },
   {
@@ -95,7 +95,7 @@
    "rang": 814
   },
   {
-   "h": 4.072,
+   "h": 4.073,
    "rang": 812
   },
   {
@@ -103,11 +103,11 @@
    "rang": 769
   },
   {
-   "h": 5.214,
+   "h": 5.215,
    "rang": 761
   },
   {
-   "h": 5.662,
+   "h": 5.663,
    "rang": 710
   },
   {
@@ -119,7 +119,7 @@
    "rang": 1027
   },
   {
-   "h": 7.026,
+   "h": 7.025,
    "rang": 2190
   },
   {
@@ -159,15 +159,15 @@
    "rang": 52316
   },
   {
-   "h": 19.538,
+   "h": 14.078,
    "rang": 56433
   },
   {
-   "h": 19.554,
+   "h": 14.156,
    "rang": 61772
   },
   {
-   "h": 19.787,
+   "h": 15.323,
    "rang": 550010
   }
  ]

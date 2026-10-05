@@ -23,6 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import { effektiveSpielzeit } from "./lib/kurvepflege.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -93,7 +94,10 @@ if (MIT_SICHERUNGEN && fs.existsSync(indexDatei)) {
       const p = ps && ps.data;
       const rang = p && p.bladeburner && p.bladeburner.data && p.bladeburner.data.rank;
       if (!p || p.bitNodeN !== KNOTEN || !Number.isFinite(rang) || !(p.totalPlaytime > 0)) continue;
-      punkte.push({ spielzeit: p.totalPlaytime, rang, lauf: Number(c[5]) || null, quelle: "sicherung:" + c[7] });
+      // Bonuszeit-Vorrat abziehen (tools/lib/kurvepflege.js, 05.10.2026):
+      // sonst steht eine Offline-Nacht als Stillstand plus Sprung in der Kurve.
+      const sc = p.bladeburner.data.storedCycles;
+      punkte.push({ spielzeit: effektiveSpielzeit(p.totalPlaytime, sc), rang, lauf: Number(c[5]) || null, quelle: "sicherung:" + c[7] });
     } catch {
       // unlesbare Sicherung: tools/backup-check.js meldet das, hier zaehlt sie nicht
     }

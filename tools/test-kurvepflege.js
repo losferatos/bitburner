@@ -46,6 +46,20 @@ if (kurveErsetzen) {
   pruefe("unvollstaendige alte Kurve: vollstaendiger Kandidat wird genommen", kurveErsetzen(kurve(6, 48635, 2), BN21).ersetzen);
 }
 
+// Bonuszeit-Vorrat (05.10.2026): BN2.2, Sicherung 04:49 mit 98.281 Zyklen.
+let effektiveSpielzeit = null;
+if (fs.existsSync(lib)) ({ effektiveSpielzeit } = await import(pathToFileURL(lib).href));
+pruefe("effektiveSpielzeit vorhanden", typeof effektiveSpielzeit === "function");
+if (effektiveSpielzeit) {
+  pruefe("98.281 Zyklen = 5,46 h werden abgezogen",
+    Math.abs((1116.25 * 3.6e6 - effektiveSpielzeit(1116.25 * 3.6e6, 98281)) / 3.6e6 - 5.4601) < 0.001);
+  pruefe("ohne Vorrat unveraendert", effektiveSpielzeit(1000, 0) === 1000 && effektiveSpielzeit(1000, undefined) === 1000);
+  pruefe("negativer Vorrat zaehlt nicht", effektiveSpielzeit(1000, -5) === 1000);
+}
+const bauer = fs.readFileSync(path.join(ROOT, "tools", "rangkurve-bauen.js"), "utf8");
+pruefe("rangkurve-bauen.js zieht den Vorrat bei Sicherungen ab",
+  bauer.includes("effektiveSpielzeit(p.totalPlaytime, sc)"));
+
 const checkin = fs.readFileSync(path.join(ROOT, "tools", "checkin.js"), "utf8");
 const iAuf = checkin.indexOf("kurveAuffrischen(ROOT, knoten)");
 const iLes = checkin.indexOf("restzeitAusKurve(knoten, rang)");

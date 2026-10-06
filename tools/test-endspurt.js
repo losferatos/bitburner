@@ -267,6 +267,33 @@ console.log("-- kampfEinbauSperre(): kein Einbau im Wiederaufbau, und erst nach 
 }
 
 console.log("");
+console.log("-- kampfEinbauSperre(..., {corpRunde}): erste Corp-Runde 6 h statt 12 h (H3, 06.10.2026) --");
+{
+  const H = 3600000;
+  const k = (s, d, x, a) => ({ strength: s, defense: d, dexterity: x, agility: a });
+  const kw = k(290, 290, 290, 290);
+  // BN3.1 live 06.10. 19:00 (data/einbau-uhr.json): Wiederaufbau 5,7 min.
+  const D = 340800;
+  const corp7 = E.kampfEinbauSperre(kw, { aufbauDauerMs: D, seitAufbauMs: 7 * H }, { corpRunde: true });
+  pruefe("Corp-Runde, 7 h seit dem Aufbau: frei (alt: 12 h, gesperrt)", !corp7.gesperrt && corp7.noetigMs === 6 * H,
+    JSON.stringify(corp7));
+  const norm7 = E.kampfEinbauSperre(kw, { aufbauDauerMs: D, seitAufbauMs: 7 * H });
+  pruefe("dieselbe Lage ohne corpRunde: gesperrt, 12 h", norm7.gesperrt && norm7.zuFrueh && norm7.noetigMs === 12 * H,
+    JSON.stringify(norm7));
+  const corp5 = E.kampfEinbauSperre(kw, { aufbauDauerMs: D, seitAufbauMs: 5 * H }, { corpRunde: true });
+  pruefe("Corp-Runde, erst 5 h: gesperrt (6 h noetig)", corp5.gesperrt && corp5.zuFrueh, JSON.stringify(corp5));
+  const corpLang = E.kampfEinbauSperre(kw, { aufbauDauerMs: 4 * H, seitAufbauMs: 7 * H }, { corpRunde: true });
+  pruefe("Corp-Runde: 2 x Dauer bleibt (4 h Aufbau -> 8 h noetig, nach 7 h gesperrt)",
+    corpLang.gesperrt && corpLang.noetigMs === 8 * H, JSON.stringify(corpLang));
+  const corpAufbau = E.kampfEinbauSperre(k(90, 290, 290, 290), { aufbauDauerMs: D, seitAufbauMs: 20 * H }, { corpRunde: true });
+  pruefe("Corp-Runde: laufender Wiederaufbau sperrt weiter", corpAufbau.gesperrt && corpAufbau.aufbau, JSON.stringify(corpAufbau));
+  const falsch = E.kampfEinbauSperre(kw, { aufbauDauerMs: D, seitAufbauMs: 7 * H }, { corpRunde: "ja" });
+  pruefe("nur corpRunde === true lockert (\"ja\" sperrt wie bisher)", falsch.gesperrt && falsch.noetigMs === 12 * H, JSON.stringify(falsch));
+  pruefe("KAMPF_EINBAU_MIN_MS bleibt 12 h, KAMPF_EINBAU_CORP_MIN_MS ist 6 h",
+    E.KAMPF_EINBAU_MIN_MS === 12 * H && E.KAMPF_EINBAU_CORP_MIN_MS === 6 * H);
+}
+
+console.log("");
 console.log("-- Aug-Ruecklage: nur erreichbare Stuecke (23.09.2026) --");
 {
   pruefe("augRuecklage ist exportiert", typeof E.augRuecklage === "function");

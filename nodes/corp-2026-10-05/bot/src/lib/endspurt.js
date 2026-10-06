@@ -316,18 +316,42 @@ export function einbauErlaubt(l, jetzt, offenSeit = null) {
  *
  * Rein, ohne ns - damit tools/test-endspurt.js sie ohne Spiel prueft.
  *
+ * DIE ERSTE CORP-RUNDE DES KNOTENS: 6 H STATT 12 H (Hebel H3, 06.10.2026,
+ * nodes/corp-2026-10-05/hebel/vorlage.md Abschnitt 3, Rechner h3sperre.mjs).
+ * Mit `o.corpRunde` gilt als Untergrenze KAMPF_EINBAU_CORP_MIN_MS; die zweite
+ * Bedingung (2 x Dauer des Wiederaufbaus) und die Uhr bleiben gleich. Der
+ * Kreislauf, gegen den die 12 h stehen (billige Stuecke sammeln sich nach dem
+ * Einbau und loesen den naechsten aus), entsteht dort nicht: mit gezuendeter
+ * Corp gilt Kaufaufschub bis zum Tor, gekauft wird nur die geplante Runde.
+ * NUTZEN, EHRLICH (GESCHAETZT, 54 Baender, nachgemessen 06.10. abends): in
+ * BN3.2 wurde die Corp bei Knotenstunde ~0,07 gegruendet; Zuendung 9,5-11 h
+ * plus erster Verkauf heisst Corp-Geld bei Tc ~10,5-12,5 h. Gespart werden
+ * damit ~0-1 h, meist 0,3-0,5 h mit Syndicate; ohne Syndicate um 0, im
+ * schlechtesten Band -0,2 h (Tc 11,5 h: der fruehe Einbau verpasst die
+ * naechste Stufe Bladeburners-Ruf). Ab Tc 12,5 h endet ohnehin die 12-h-Sperre.
+ * Eine ZWEITE Corp-Runde mit 6 h fiele in 5 von 54 Baendern noch in den
+ * laufenden Knoten, also ins Endspiel mit Black Ops - mit 12 h in keinem.
+ * Deshalb entscheidet bn4rep.js, dass es die ERSTE ist (lib/corpgeld.js
+ * corpFirstRound mit dem Merker data/corp-first-round.json); jede andere Runde
+ * behaelt 12 h. Die erste Corp-Runde kann auch der zweite Einbau des Knotens
+ * sein (Zuendung nach einem normalen Einbau) - die 2x-Dauer-Regel hier und
+ * einbauErlaubt() gelten dann unveraendert mit.
+ *
  * @param {{strength:number, defense:number, dexterity:number, agility:number}} skills
  * @param {{aufbauDauerMs?: number|null, seitAufbauMs?: number|null}} uhr
+ * @param {{corpRunde?: boolean}} [o]
  */
 export const KAMPF_EINBAU_MIN_MS = 12 * 3600000;
-export function kampfEinbauSperre(skills, uhr = {}) {
+export const KAMPF_EINBAU_CORP_MIN_MS = 6 * 3600000;
+export function kampfEinbauSperre(skills, uhr = {}, o = {}) {
   const k = skills || {};
   const tief = Math.min(Number(k.strength), Number(k.defense), Number(k.dexterity), Number(k.agility));
   const aufbau = Number.isFinite(tief) && tief < 100;
   const zahl = (x) => (x == null ? NaN : Number(x));
   const dauer = zahl(uhr && uhr.aufbauDauerMs);
   const seit = zahl(uhr && uhr.seitAufbauMs);
-  const noetig = Math.max(KAMPF_EINBAU_MIN_MS, Number.isFinite(dauer) ? 2 * dauer : 0);
+  const boden = o && o.corpRunde === true ? KAMPF_EINBAU_CORP_MIN_MS : KAMPF_EINBAU_MIN_MS;
+  const noetig = Math.max(boden, Number.isFinite(dauer) ? 2 * dauer : 0);
   const zuFrueh = !aufbau && Number.isFinite(seit) && seit < noetig;
   return { aufbau, zuFrueh, noetigMs: noetig, gesperrt: aufbau || zuFrueh };
 }

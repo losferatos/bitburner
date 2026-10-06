@@ -317,6 +317,120 @@ export function corpErloes(tel, nodeReset, augReset) {
 }
 
 /**
+ * Merker der ersten Corp-Runde (H3, Skeptiker 06.10.2026 abends): {nodeReset, augReset}
+ * des Einbauzyklus, in dem bn4rep die Zuendung ZUERST gesehen hat. Nur dieser Zyklus darf
+ * die kuerzere Einbausperre haben. Eigener Merker statt corp.js-Feldern, weil die
+ * Luecken haben: corp.js ueberschreibt bribed[f].wall bei jeder neuen Bestechung
+ * (corp.js:689), verliert bei einem Zustandsverlust soldTotal/sales (freshState,
+ * corp.js:184-197) und exportiert sales nur als slice(-5).
+ */
+export const CORP_FIRST_FILE = "data/corp-first-round.json";
+
+/**
+ * Den Merker lesen bzw. anlegen. `raw` ist der Dateiinhalt ("" = Datei fehlt), `exists`
+ * ob sie auf home liegt.
+ *   - fehlt, oder stammt aus einem anderen Knoten: neu fuer DIESEN Einbauzyklus (write)
+ *   - liegt da, aber nicht lesbar ("" trotz exists - scp gescheitert): kein Merker, nicht
+ *     schreiben - sonst bekaeme ein spaeterer Zyklus die Ausnahme neu
+ *   - kaputt (kein JSON, kein nodeReset): als VERBRAUCHT ueberschreiben (augReset null)
+ * Verbraucht wird die Ausnahme durch JEDEN Einbau nach der Zuendung (konservativ): der
+ * naechste Zyklus hat ein anderes augReset und passt nie mehr. Ein Einbau VOR der Zuendung
+ * verbraucht sie nicht - der Merker entsteht erst mit dem Corp-Signal.
+ * @returns {{latch: {nodeReset:number, augReset:number|null}|null, write: boolean}}
+ */
+export function corpFirstLatch(raw, exists, nodeReset, augReset) {
+  const text = String(raw || "").trim();
+  if (!Number.isFinite(nodeReset)) return { latch: null, write: false };
+  if (!text) {
+    if (exists) return { latch: null, write: false };
+    return { latch: { nodeReset, augReset: Number.isFinite(augReset) ? augReset : null }, write: true };
+  }
+  let j = null;
+  try { j = JSON.parse(text); } catch { j = null; }
+  if (!j || typeof j !== "object" || !Number.isFinite(j.nodeReset)) return { latch: { nodeReset, augReset: null }, write: true };
+  if (j.nodeReset !== nodeReset) return { latch: { nodeReset, augReset: Number.isFinite(augReset) ? augReset : null }, write: true };
+  return { latch: { nodeReset: j.nodeReset, augReset: Number.isFinite(j.augReset) ? j.augReset : null, used: j.used === true }, write: false };
+}
+
+/**
+ * VERBRAUCH VOR DEM EINBAU (Skeptiker H3 Runde 2). bn4rep legt den Merker an, wenn es die
+ * Zuendung als corpGate SIEHT. Sah es sie nie (Fehler vor Block 1c, scp-Fehler, Gang,
+ * keine V2-Marke) und baut trotzdem ein, legte der naechste Zyklus den Merker neu an -
+ * und die zweite Corp-Runde bekaeme 6 h. Deshalb unmittelbar vor installAugmentations:
+ * ist die Zuendung in diesem Knoten belegt (corp.json ignitedAt/public mit passendem
+ * nodeReset, oder data/corp-gezuendet.txt), aber kein Merker dieses Knotens da, wird
+ * {nodeReset, augReset: null} geschrieben = verbraucht. Ohne Zuendung nichts: ein Einbau
+ * davor verbraucht die Ausnahme nicht. Liegt der Merker da, aber unlesbar, nichts.
+ * @returns {string|null} der zu schreibende Inhalt, oder null
+ */
+export function corpConsumeLatch({ tel, ignitedLatch, knoten, nodeReset, latchRaw, latchExists }) {
+  if (!CORP_MONEY_NODES.includes(Number(knoten)) || !Number.isFinite(nodeReset)) return null;
+  const fin = tel && typeof tel === "object" && tel.finance && typeof tel.finance === "object" ? tel.finance : null;
+  const ausTel = !!tel && typeof tel === "object" && tel.nodeReset === nodeReset
+    && ((fin && Number.isFinite(fin.ignitedAt)) || tel.public === true);
+  if (!ausTel && Number(ignitedLatch) !== nodeReset) return null;
+  const text = String(latchRaw || "").trim();
+  if (!text && latchExists) return null;
+  let j = null;
+  try { j = text ? JSON.parse(text) : null; } catch { j = null; }
+  if (j && typeof j === "object" && j.nodeReset === nodeReset) return null;
+  return JSON.stringify({ nodeReset, augReset: null });
+}
+
+/**
+ * Ist die laufende Runde die ERSTE Corp-Runde dieses Knotens (Hebel H3, 06.10.2026)?
+ * Nur sie bekommt die kuerzere Einbausperre (lib/endspurt.js kampfEinbauSperre,
+ * KAMPF_EINBAU_CORP_MIN_MS); bn4rep.js prueft dazu das Corp-Signal (Zuendung in
+ * diesem nodeReset).
+ *
+ *   inLatch  der Merker (corpFirstLatch) gehoert zu DIESEM Einbauzyklus - die Quelle,
+ *            die zaehlt. Ohne Merker nie.
+ *   uses     die Runde nutzt WIRKLICH Corp-Geld: Verkaufserloes seit diesem Einbau
+ *            (corpErloes > 0) oder eine Bestechung seit diesem Einbau
+ *            (finance.bribed[f].wall >= augReset). Zuendung allein reicht nicht -
+ *            passt die Runde ins eigene Konto, fordert bn4rep nichts an, und die
+ *            Corp verkauft nicht.
+ *   sticky   war first in diesem Zyklus einmal true, steht im Merker used:true (bn4rep
+ *            schreibt es). Dann bleibt first, auch wenn corp.json danach unlesbar ist oder
+ *            corp.js seinen Zustand (erloesAug) verliert - sonst haengt die gekaufte
+ *            Runde bis zu 6 h. Nur ein Merker mit passendem augReset haelt so.
+ *   earlier  zusaetzlicher Riegel aus corp.json (geht der Merker verloren): Gesamterloes
+ *            (soldTotal) ueber dem Erloes dieses Einbaus, ein Verkauf (sales[].wall)
+ *            oder eine Bestechung vor augReset. Er kann nur sperren, nie freigeben.
+ * Welche Uhr: Wanduhr gegen Wanduhr - augReset ist lastAugReset (= lastUpdate beim
+ * Einbau, PlayerObjectGeneralMethods.ts:126), sales/bribed tragen Date.now() von corp.js.
+ * Fehlt oder irrt corp.json (anderer Knoten, unlesbar), ist es KEINE erste Corp-Runde:
+ * dann bleibt die 12-h-Sperre - der sichere Fall.
+ */
+export function corpFirstRound(tel, nodeReset, augReset, latch) {
+  const nein = (why) => ({ uses: false, earlier: false, inLatch: false, first: false, why });
+  const passt = !!latch && typeof latch === "object" && Number.isFinite(nodeReset) && Number.isFinite(augReset)
+    && latch.nodeReset === nodeReset && latch.augReset === augReset;
+  if (passt && latch.used === true) {
+    return { uses: true, earlier: false, inLatch: true, first: true, why: "erste Corp-Runde (festgehalten)" };
+  }
+  if (!tel || typeof tel !== "object" || Array.isArray(tel)) return nein("corp.json fehlt");
+  if (!Number.isFinite(nodeReset) || tel.nodeReset !== nodeReset) return nein("corp.json aus einem anderen Knoten");
+  if (!Number.isFinite(augReset)) return nein("Einbauzeit unbekannt");
+  const inLatch = !!latch && typeof latch === "object" && latch.nodeReset === nodeReset && latch.augReset === augReset;
+  const fin = tel.finance && typeof tel.finance === "object" ? tel.finance : {};
+  const erloes = corpErloes(tel, nodeReset, augReset);
+  const bribed = fin.bribed && typeof fin.bribed === "object" ? Object.values(fin.bribed) : [];
+  const bribeWalls = bribed.map((b) => Number(b && b.wall)).filter((w) => Number.isFinite(w));
+  const usesBribe = bribeWalls.some((w) => w >= augReset);
+  const total = Number(fin.soldTotal);
+  const saleWalls = (Array.isArray(fin.sales) ? fin.sales : []).map((s) => Number(s && s.wall)).filter((w) => Number.isFinite(w));
+  const earlier = (Number.isFinite(total) && total > erloes * (1 + 1e-9) + 1)
+    || saleWalls.some((w) => w < augReset) || bribeWalls.some((w) => w < augReset);
+  const uses = erloes > 0 || usesBribe;
+  return {
+    uses, earlier, inLatch, first: inLatch && uses && !earlier,
+    why: !inLatch ? "Ausnahme in diesem Knoten verbraucht (Merker " + CORP_FIRST_FILE + ")"
+      : earlier ? "schon eine Corp-Runde in diesem Knoten" : uses ? "erste Corp-Runde" : "noch kein Corp-Geld in dieser Runde",
+  };
+}
+
+/**
  * corp.js hebt data/geldbedarf.txt direkt nach einem Verkauf um den Erloes an
  * (Runde 3, FIX 2), bevor erloesAug in corp.json steht. bn4rep darf das nicht
  * zuruecksetzen: liegt auf home mehr, als bn4rep zuletzt schrieb, gilt die

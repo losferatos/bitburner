@@ -140,6 +140,7 @@ function baueNs(w) {
       for (const f of [].concat(files)) {
         const q = dateiHost(quelle);
         if (!(f in q)) { alle = false; continue; }
+        if (w.scpFehler && w.scpFehler.has(f)) { alle = false; continue; }   // Testhaken H3: scp scheitert
         dateiHost(ziel)[f] = q[f];
       }
       return alle;
@@ -153,7 +154,7 @@ function baueNs(w) {
     // ownedSF je Welt einstellbar (P0/G02): die alte Regel `mitHashes` las hier
     // SF9 mit, die neue fragt nur noch den Knoten - ein Test, der SF9 nie
     // setzt, koennte den Unterschied nicht zeigen.
-    getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: w.nodeReset, lastAugReset: 2,
+    getResetInfo: () => ({ currentNode: w.knoten, lastNodeReset: w.nodeReset, lastAugReset: w.augReset ?? 2,
       ownedSF: w.ownedSF }),
     getPlayer: () => ({
       factions: Object.keys(w.faktionen), skills: { ...w.skills }, mults: { ...w.mults },
@@ -837,6 +838,281 @@ console.log("\n-- N-ERNST-2b: Budget zu klein (Konto 0, keine Tranche), aber Stu
 if (CG_PRE) {
   const r = CG_PRE.corpPendingRaise(null, { homeValue: 400e9, lastWritten: 100e9, erloes: 300e9, erloesAtWrite: 0, nowMs: 1 });
   pruefe("N-ERNST-1b corpPendingRaise: Erloes schon da -> keine schwebende Anhebung", r.pend === null && r.extra === 0, JSON.stringify(r));
+}
+
+// ===========================================================================
+// H3 (06.10.2026 abends): erste Corp-Runde des Knotens mit 6 h statt 12 h Einbausperre.
+// Rot gegen den Spiegel vor H3 (H3-1, H3-8), gruen gegen bot/src; alle anderen sind Gegenproben.
+// ===========================================================================
+{
+  const H = 3600000;
+  // 7 h seit dem Ende des Aufbaus, Aufbau 0,1 h (BN3.1 live: 5,7 min): alt gesperrt (12 h), neu frei (6 h).
+  const UHR_7H = JSON.stringify({ augReset: 2, playtime: PLAYTIME_NOW - 7.1 * H, fertig: PLAYTIME_NOW - 7 * H });
+  const UHR_5H = JSON.stringify({ augReset: 2, playtime: PLAYTIME_NOW - 5.1 * H, fertig: PLAYTIME_NOW - 5 * H });
+  const geliefert = () => { const f = FAKT_BN3(); f.Tetrads.rep = 200000; f["The Black Hand"].rep = 310000; f.NiteSec.rep = 40000; return f; };
+  // corp.json je Schlaf frisch, mit dem Finanzteil `fin` (erloesAug, soldTotal, sales, bribed)
+  const corpMit = (fin) => (welt) => { welt.dateien.home["data/corp.json"] = corpJson({ ts: welt.uhr - 5000, wall: welt.uhr - 5000, finance: { ...FIN0, ...fin } }); };
+  const lauf = async (uhr, fin, o = {}) => {
+    const w = weltBN3({ geld: 600e9, faktionen: geliefert(), extraDateien: { "data/einbau-uhr.json": uhr }, schlafBudget: 80,
+      beiSchlaf: kette(corpMit(fin), antwortetBruecke), ...o });
+    corpMit(fin)(w);
+    const r = await fahre(w);
+    return { w, r, t: teleVon(w) };
+  };
+  const ERLOES = { erloesAug: { augReset: 2, summe: 40e9 }, soldTotal: 40e9, sales: [{ h: 9.6, wall: JETZT - H, got: 40e9 }] };
+
+  console.log("\n-- H3-1: erste Corp-Runde (Erloes seit diesem Einbau), 7 h nach dem Aufbau -> Runde und Einbau (alt: gesperrt bis 12 h) --");
+  {
+    const { w, r, t } = await lauf(UHR_7H, ERLOES);
+    pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+    pruefe("H3-1: Runde gekauft (Bionic Arms, The Black Hand)", w.kaeufe.some((k) => k.a === "Bionic Arms") && w.kaeufe.some((k) => k.a === "The Black Hand"),
+      w.kaeufe.map((k) => k.a).join(", ") + " | Modus " + (t && t.torRunde ? t.torRunde.mode + " " + t.torRunde.reason : "?"));
+    pruefe("H3-1: und eingebaut", w.installAufrufe === 1, "install " + w.installAufrufe);
+  }
+  console.log("\n-- H3-2: Zuendung, aber noch KEIN Corp-Geld in dieser Runde -> 12 h bleiben --");
+  {
+    const { w, r, t } = await lauf(UHR_7H, { erloesAug: { augReset: 2, summe: 0 }, soldTotal: 0, sales: [] });
+    pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+    pruefe("H3-2: kein Kauf, kein Einbau, Tor gesperrt (bezahlt gemacht)", w.kaeufe.length === 0 && w.installAufrufe === 0
+      && !!t && t.torRunde && t.torRunde.mode === "locked" && /bezahlt/.test(t.torRunde.reason || ""),
+      w.kaeufe.map((k) => k.a).join(", ") + " | " + (t && t.torRunde ? t.torRunde.mode + " " + t.torRunde.reason : "?"));
+  }
+  console.log("\n-- H3-3: Corp-Geld, aber schon eine Corp-Runde in einem frueheren Einbau (soldTotal > Erloes) -> 12 h --");
+  {
+    const { w, t } = await lauf(UHR_7H, { ...ERLOES, soldTotal: 140e9 });
+    pruefe("H3-3: kein Kauf, kein Einbau", w.kaeufe.length === 0 && w.installAufrufe === 0,
+      w.kaeufe.map((k) => k.a).join(", ") + " | " + (t && t.torRunde ? t.torRunde.mode : "?"));
+  }
+  console.log("\n-- H3-4: Verkauf vor diesem Einbau (sales.wall < augReset) -> 12 h --");
+  {
+    const { w } = await lauf(UHR_7H, { ...ERLOES, sales: [{ h: 3, wall: 1, got: 1e9 }, ...ERLOES.sales] });
+    pruefe("H3-4: kein Einbau", w.installAufrufe === 0 && w.kaeufe.length === 0, "install " + w.installAufrufe);
+  }
+  console.log("\n-- H3-5: erste Corp-Runde, aber erst 5 h nach dem Aufbau -> gesperrt (6 h) --");
+  {
+    const { w, t } = await lauf(UHR_5H, ERLOES);
+    pruefe("H3-5: kein Kauf, kein Einbau, Grund nennt die 6 h", w.kaeufe.length === 0 && w.installAufrufe === 0
+      && !!t && t.torRunde && /6 h/.test(t.torRunde.reason || ""), t && t.torRunde ? String(t.torRunde.reason) : "?");
+  }
+  console.log("\n-- H3-6: nur Bestechung seit diesem Einbau (kein Verkauf) zaehlt als Corp-Geld --");
+  {
+    const { w } = await lauf(UHR_7H, { erloesAug: { augReset: 2, summe: 0 }, soldTotal: 0, sales: [], bribed: { Tetrads: { wall: JETZT - H, rep: 186500, total: 186500 } } });
+    pruefe("H3-6: Runde und Einbau", w.installAufrufe === 1, "install " + w.installAufrufe + ", Kaeufe " + w.kaeufe.map((k) => k.a).join(", "));
+  }
+  console.log("\n-- H3-7: ohne Zuendung (alte Schleife) gelten weiter 12 h --");
+  {
+    const ohne = (welt) => { welt.dateien.home["data/corp.json"] = corpJson({ ts: welt.uhr - 5000, wall: welt.uhr - 5000, public: false, finance: null, valuation: 4e11 }); };
+    const mk = (uhr) => weltBN3({ geld: 600e9, faktionen: geliefert(), extraDateien: { "data/einbau-uhr.json": uhr }, schlafBudget: 80, beiSchlaf: kette(ohne, antwortetBruecke) });
+    const wOffen = mk(UHR_OFFEN); ohne(wOffen); await fahre(wOffen);
+    const w7 = mk(UHR_7H); ohne(w7); await fahre(w7);
+    pruefe("H3-7: Gegenprobe - mit offener Uhr baut die alte Schleife ein", wOffen.installAufrufe === 1, "install " + wOffen.installAufrufe);
+    pruefe("H3-7: 7 h nach dem Aufbau baut sie NICHT ein", w7.installAufrufe === 0, "install " + w7.installAufrufe);
+  }
+  console.log("\n-- H3-8: Telemetrie torRunde.corp.firstRound --");
+  {
+    const { t } = await lauf(UHR_5H, ERLOES, { schlafBudget: 3 });
+    pruefe("H3-8: firstRound true bei Erloes ohne Vorgeschichte", !!t && t.torRunde && t.torRunde.corp && t.torRunde.corp.firstRound === true,
+      t && t.torRunde && t.torRunde.corp ? JSON.stringify(t.torRunde.corp).slice(0, 200) : "?");
+  }
+  let CGH = null;
+  try { CGH = await import(pathToFileURL(path.join(SRC, "lib", "corpgeld.js")).href); } catch { CGH = null; }
+  const fr = CGH && CGH.corpFirstRound;
+  pruefe("H3-9: lib/corpgeld.js exportiert corpFirstRound", typeof fr === "function");
+  if (typeof fr === "function") {
+    const tel = (fin, over = {}) => JSON.parse(corpJson({ finance: { ...FIN0, ...fin }, ...over }));
+    pruefe("H3-9a erste Runde", fr(tel(ERLOES), NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: 2 }).first === true);
+    pruefe("H3-9b anderer Knoten -> nein", fr(tel(ERLOES), NODE_RESET + 1, 2).first === false);
+    pruefe("H3-9c corp.json null -> nein", fr(null, NODE_RESET, 2).first === false);
+    {
+      const r9d = fr(tel({ erloesAug: { augReset: 1, summe: 40e9 }, soldTotal: 40e9 }), NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: 2 });
+      pruefe("H3-9d Erloes eines anderen Einbaus zaehlt nicht (passender Merker, uses false)", r9d.uses === false && r9d.first === false, JSON.stringify(r9d));
+    }
+    pruefe("H3-9e Bestechung vor diesem Einbau -> frueher", fr(tel({ ...ERLOES, bribed: { Tetrads: { wall: 1, rep: 5, total: 5 } } }), NODE_RESET, 2).earlier === true);
+    pruefe("H3-9f Schaetzung der offenen Buchung (summe > soldTotal) ist keine fruehere Runde",
+      fr(tel({ ...ERLOES, erloesAug: { augReset: 2, summe: 44e9 } }), NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: 2 }).first === true);
+  }
+
+  // -------------------------------------------------------------------------
+  // SKEPTIKER H3 (06.10.2026 abends): eigener Merker data/corp-first-round.json statt corp.js-Feldern.
+  // Rot gegen den H3-Stand davor (H3-10, H3-11, H3-12, H3-15, H3-16), gruen jetzt.
+  // -------------------------------------------------------------------------
+  const FIRST = "data/corp-first-round.json";
+  const merker = (augReset, nodeReset = NODE_RESET) => JSON.stringify({ nodeReset, augReset });
+  const uhrFuer = (augReset, seitH) => JSON.stringify({ augReset, playtime: PLAYTIME_NOW - (seitH + 0.1) * H, fertig: PLAYTIME_NOW - seitH * H });
+  const lauf2 = async ({ augReset = 2, seitH = 7, fin, dateien = {}, corp = null }) => {
+    const w = weltBN3({ geld: 600e9, faktionen: geliefert(), extraDateien: { "data/einbau-uhr.json": uhrFuer(augReset, seitH), ...dateien },
+      schlafBudget: 80, beiSchlaf: kette(corp || corpMit(fin), antwortetBruecke) });
+    w.augReset = augReset;
+    (corp || corpMit(fin))(w);
+    const r = await fahre(w);
+    return { w, r, t: teleVon(w) };
+  };
+
+  console.log("\n-- H3-10: zweite Corp-Runde, die NUR besticht (corp.js ueberschreibt bribed.wall) -> 12 h --");
+  {
+    const { w, r } = await lauf2({ fin: { erloesAug: { augReset: 2, summe: 0 }, soldTotal: 0, sales: [], bribed: { Tetrads: { wall: JETZT - H, rep: 186500, total: 400000 } } },
+      dateien: { [FIRST]: merker(1) } });
+    pruefe("Nachbau vollstaendig", vollstaendig(r), vollHinweis(r));
+    pruefe("H3-10: Merker aus Zyklus 1 -> kein Einbau nach 7 h (vorher: 6 h, eingebaut)", w.installAufrufe === 0 && w.kaeufe.length === 0,
+      "install " + w.installAufrufe + ", Kaeufe " + w.kaeufe.map((k) => k.a).join(", "));
+  }
+  console.log("\n-- H3-11: Zustandsverlust von corp.js (soldTotal/sales nur aus diesem Zyklus) -> 12 h dank Merker --");
+  {
+    const { w } = await lauf2({ fin: ERLOES, dateien: { [FIRST]: merker(1) } });
+    pruefe("H3-11: kein Einbau (vorher: sah wie die erste Runde aus)", w.installAufrufe === 0, "install " + w.installAufrufe);
+  }
+  console.log("\n-- H3-12: Einbau OHNE Corp-Geld nach der Zuendung verbraucht die Ausnahme --");
+  {
+    // Zyklus 2: gezuendet, Corp liefert nicht (corp.json 30 min alt) -> kaufbare Runde, Einbau ohne Corp-Geld
+    const altCorp = (welt) => { welt.dateien.home["data/corp.json"] = corpJson({ ts: JETZT - 30 * 60000, wall: JETZT - 30 * 60000 }); };
+    const a = await lauf2({ augReset: 2, seitH: 30, corp: altCorp });
+    pruefe("H3-12a: Zyklus 2 baut ohne Corp-Geld ein", a.w.installAufrufe === 1, "install " + a.w.installAufrufe);
+    const m = a.w.dateien.home[FIRST];
+    pruefe("H3-12b: Merker fuer Zyklus 2 geschrieben", !!m && JSON.parse(m).augReset === 2 && JSON.parse(m).nodeReset === NODE_RESET, String(m));
+    // Zyklus 3: erste Runde MIT Corp-Geld, 7 h nach dem Aufbau
+    const b = await lauf2({ augReset: 3, fin: { ...ERLOES, erloesAug: { augReset: 3, summe: 40e9 } }, dateien: m ? { [FIRST]: m } : {} });
+    pruefe("H3-12c: Zyklus 3 hat 12 h - kein Einbau nach 7 h (vorher: 6 h, eingebaut)", b.w.installAufrufe === 0, "install " + b.w.installAufrufe);
+  }
+  console.log("\n-- H3-13: Einbau VOR der Zuendung verbraucht sie nicht (zweiter Einbau = erste Corp-Runde) --");
+  {
+    const ohne = (welt) => { welt.dateien.home["data/corp.json"] = corpJson({ ts: welt.uhr - 5000, wall: welt.uhr - 5000, public: false, finance: null, valuation: 4e11 }); };
+    const a = await lauf2({ augReset: 2, seitH: 30, corp: ohne });
+    pruefe("H3-13a: Zyklus 2 (ohne Zuendung) baut ein, kein Merker", a.w.installAufrufe === 1 && !(FIRST in a.w.dateien.home), "install " + a.w.installAufrufe);
+    const b = await lauf2({ augReset: 3, fin: { ...ERLOES, erloesAug: { augReset: 3, summe: 40e9 } } });
+    pruefe("H3-13b: Zyklus 3 = erste Corp-Runde: 6 h, Einbau nach 7 h", b.w.installAufrufe === 1, "install " + b.w.installAufrufe);
+  }
+  console.log("\n-- H3-14: Merker aus einem anderen Knoten zaehlt wie keiner --");
+  {
+    const { w } = await lauf2({ fin: ERLOES, dateien: { [FIRST]: merker(2, NODE_RESET - 5) } });
+    const m = w.dateien.home[FIRST];
+    pruefe("H3-14: Einbau nach 7 h, Merker neu fuer diesen Knoten", w.installAufrufe === 1 && !!m && JSON.parse(m).nodeReset === NODE_RESET && JSON.parse(m).augReset === 2,
+      "install " + w.installAufrufe + ", Merker " + m);
+  }
+  console.log("\n-- H3-15: kaputter Merker gilt als verbraucht --");
+  {
+    const { w } = await lauf2({ fin: ERLOES, dateien: { [FIRST]: "kaputt{" } });
+    const m = w.dateien.home[FIRST];
+    pruefe("H3-15: kein Einbau, Merker ueberschrieben mit augReset null", w.installAufrufe === 0 && !!m && m.startsWith("{") && JSON.parse(m).augReset === null,
+      "install " + w.installAufrufe + ", Merker " + m);
+  }
+  console.log("\n-- H3-16: data/einbau.json zeigt die 6-h-Frist getrennt (combatEarlyCorp) --");
+  {
+    const { w } = await lauf2({ fin: ERLOES, seitH: 7 });
+    let e = null; try { e = JSON.parse(w.dateien.home["data/einbau.json"] || "null"); } catch { e = null; }
+    pruefe("H3-16: kampfZuFrueh true (12 h, punish.js), combatEarlyCorp false (6 h vorbei)", !!e && e.kampfZuFrueh === true && e.combatEarlyCorp === false,
+      e ? JSON.stringify({ k: e.kampfZuFrueh, c: e.combatEarlyCorp, f: e.corpFirstRound }) : "keine einbau.json");
+  }
+  const lt = CGH && CGH.corpFirstLatch;
+  pruefe("H3-17: lib/corpgeld.js exportiert corpFirstLatch", typeof lt === "function");
+  if (typeof lt === "function") {
+    pruefe("H3-17a fehlt -> neu, schreiben", JSON.stringify(lt("", false, 7, 9)) === JSON.stringify({ latch: { nodeReset: 7, augReset: 9 }, write: true }));
+    pruefe("H3-17b liegt da, aber nicht lesbar -> kein Merker, nicht schreiben", lt("", true, 7, 9).latch === null && lt("", true, 7, 9).write === false);
+    pruefe("H3-17c gleicher Knoten -> unveraendert", JSON.stringify(lt(merker(5, 7), true, 7, 9)) === JSON.stringify({ latch: { nodeReset: 7, augReset: 5, used: false }, write: false }));
+    {
+      const telE = JSON.parse(corpJson({ finance: { ...FIN0, ...ERLOES } }));
+      pruefe("H3-17d derselbe Erloes: passender Merker -> erste Runde, Merker eines anderen Zyklus -> nicht",
+        fr(telE, NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: 2 }).first === true
+        && fr(telE, NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: 1 }).first === false
+        && fr(telE, NODE_RESET, 2, { nodeReset: NODE_RESET, augReset: null }).first === false);
+    }
+  }
+
+  // -------------------------------------------------------------------------
+  // SKEPTIKER H3 RUNDE 2: Verbrauch vor dem Einbau, sticky, durchgehender Ablauf.
+  // Rot gegen den Stand davor: H3-19b, H3-21b/c, H3-22, H3-23, H3-24.
+  // -------------------------------------------------------------------------
+  const merkerVon = (w) => { try { return JSON.parse(w.dateien.home[FIRST] || "null"); } catch { return "kaputt"; } };
+  // Naechster Zyklus in DERSELBEN Welt: alles, was bn4rep auf home hinterlassen hat, bleibt liegen.
+  const naechsterZyklus = async (w, augReset, fin, o = {}) => {
+    w.augReset = augReset;
+    w.dateien.home["data/einbau-uhr.json"] = uhrFuer(augReset, o.seitH ?? 7);
+    delete w.dateien.home["data/backup-request.txt"]; delete w.dateien.home["data/backup-ok.txt"];
+    w.kaeufe = []; w.installAufrufe = 0; w.schlaf = []; w.schlafBudget = 80;
+    if (o.gang !== undefined) w.gang.da = o.gang;
+    w.beiSchlaf = kette(corpMit(fin), antwortetBruecke); corpMit(fin)(w);
+    if (o.vorher) o.vorher(w);
+    const r = await fahre(w);
+    return { w, r };
+  };
+  const ERLOES3 = { ...ERLOES, erloesAug: { augReset: 3, summe: 40e9 } };
+
+  console.log("\n-- H3-18: durchgehend - Zyklus 2 erste Corp-Runde baut ein, Zyklus 3 liest den Merker selbst --");
+  {
+    const a = await lauf2({ fin: ERLOES });
+    const m2 = merkerVon(a.w);
+    pruefe("H3-18a: Zyklus 2 baut nach 7 h ein, Merker {augReset 2}", a.w.installAufrufe === 1 && !!m2 && m2.augReset === 2, "install " + a.w.installAufrufe + ", Merker " + JSON.stringify(m2));
+    const b = await naechsterZyklus(a.w, 3, ERLOES3);
+    pruefe("H3-18b: Zyklus 3 (zweite Corp-Runde) baut nach 7 h NICHT ein", b.w.installAufrufe === 0, "install " + b.w.installAufrufe);
+    // Gegenprobe: dieselbe Kette ohne den Merker - dann baute Zyklus 3 ein (es ist wirklich der Merker).
+    const c = await lauf2({ fin: ERLOES });
+    const d = await naechsterZyklus(c.w, 3, ERLOES3, { vorher: (w) => { delete w.dateien.home[FIRST]; } });
+    pruefe("H3-18c: Gegenprobe ohne Merker baut Zyklus 3 ein", d.w.installAufrufe === 1, "install " + d.w.installAufrufe);
+  }
+  console.log("\n-- H3-19: sticky - first war true, danach verliert corp.js erloesAug --");
+  {
+    const a = await lauf2({ fin: ERLOES, dateien: {} }).catch((e) => ({ w: null, e }));
+    pruefe("H3-19a: Merker traegt used:true nach einer ersten Corp-Runde", !!a.w && merkerVon(a.w) && merkerVon(a.w).used === true, a.w ? JSON.stringify(merkerVon(a.w)) : String(a.e));
+    const { w } = await lauf2({ fin: { erloesAug: { augReset: 2, summe: 0 }, soldTotal: 0, sales: [] },
+      dateien: { [FIRST]: JSON.stringify({ nodeReset: NODE_RESET, augReset: 2, used: true }) } });
+    pruefe("H3-19b: used:true haelt first ohne Erloes -> Einbau nach 7 h", w.installAufrufe === 1, "install " + w.installAufrufe);
+  }
+  console.log("\n-- H3-20: scp-Fehler beim Merker -> liegt nicht auf home -> 12 h --");
+  {
+    const w = weltBN3({ geld: 600e9, faktionen: geliefert(), extraDateien: { "data/einbau-uhr.json": uhrFuer(2, 7) }, schlafBudget: 80,
+      beiSchlaf: kette(corpMit(ERLOES), antwortetBruecke) });
+    w.scpFehler = new Set([FIRST]); corpMit(ERLOES)(w);
+    await fahre(w);
+    pruefe("H3-20: kein Einbau, kein Merker auf home", w.installAufrufe === 0 && !(FIRST in w.dateien.home), "install " + w.installAufrufe);
+  }
+  console.log("\n-- H3-21: corp.json den ganzen Zyklus unlesbar (Zuendung nur im Merker corp-gezuendet.txt) --");
+  {
+    const kaputt = (welt) => { welt.dateien.home["data/corp.json"] = "kaputt{"; };
+    const mk = (first) => {
+      const w = weltBN3({ geld: 600e9, faktionen: geliefert(),
+        extraDateien: { "data/einbau-uhr.json": uhrFuer(2, 7), "data/corp-gezuendet.txt": String(NODE_RESET), ...(first ? { [FIRST]: first } : {}) },
+        schlafBudget: 80, beiSchlaf: kette(kaputt, antwortetBruecke) });
+      kaputt(w); return w;
+    };
+    const w0 = mk(null); await fahre(w0);
+    pruefe("H3-21a: ohne festgehaltene Runde -> 12 h, kein Einbau", w0.installAufrufe === 0, "install " + w0.installAufrufe);
+    const w1 = mk(JSON.stringify({ nodeReset: NODE_RESET, augReset: 2, used: true })); await fahre(w1);
+    pruefe("H3-21b: mit used:true -> erste Corp-Runde haelt, Einbau", w1.installAufrufe === 1, "install " + w1.installAufrufe);
+    const w2 = mk(JSON.stringify({ nodeReset: NODE_RESET, augReset: 2 })); await fahre(w2);
+    pruefe("H3-21c: Merker ohne used -> 12 h", w2.installAufrufe === 0, "install " + w2.installAufrufe);
+  }
+  console.log("\n-- H3-22: Einbau ohne corpGate-Sichtung (Gang) nach der Zuendung -> Verbrauchs-Merker -> naechster Zyklus 12 h --");
+  {
+    const w = weltBN3({ geld: 600e9, faktionen: geliefert(), gang: { da: true }, extraDateien: { "data/einbau-uhr.json": uhrFuer(2, 30) }, schlafBudget: 80,
+      beiSchlaf: kette(corpMit(ERLOES), antwortetBruecke) });
+    w.augReset = 2; corpMit(ERLOES)(w);
+    await fahre(w);
+    const m = merkerVon(w);
+    pruefe("H3-22a: mit Gang eingebaut, Verbrauchs-Merker {augReset null}", w.installAufrufe === 1 && !!m && m.nodeReset === NODE_RESET && m.augReset === null,
+      "install " + w.installAufrufe + ", Merker " + JSON.stringify(m));
+    const b = await naechsterZyklus(w, 3, ERLOES3, { gang: false });
+    pruefe("H3-22b: Zyklus 3 ohne Gang, Corp-Geld, 7 h -> kein Einbau", b.w.installAufrufe === 0, "install " + b.w.installAufrufe);
+  }
+  console.log("\n-- H3-23: Einbau VOR der Zuendung schreibt keinen Verbrauchs-Merker --");
+  {
+    const ohne = (welt) => { welt.dateien.home["data/corp.json"] = corpJson({ ts: welt.uhr - 5000, wall: welt.uhr - 5000, public: false, finance: null, valuation: 4e11 }); };
+    const w = weltBN3({ geld: 600e9, faktionen: geliefert(), gang: { da: true }, extraDateien: { "data/einbau-uhr.json": uhrFuer(2, 30) }, schlafBudget: 80,
+      beiSchlaf: kette(ohne, antwortetBruecke) });
+    ohne(w); await fahre(w);
+    pruefe("H3-23: eingebaut, kein Merker", w.installAufrufe === 1 && !(FIRST in w.dateien.home), "install " + w.installAufrufe + ", Merker " + w.dateien.home[FIRST]);
+  }
+  const cl = CGH && CGH.corpConsumeLatch;
+  pruefe("H3-24: lib/corpgeld.js exportiert corpConsumeLatch", typeof cl === "function");
+  if (typeof cl === "function") {
+    const telZ = JSON.parse(corpJson());
+    const basis = { tel: telZ, ignitedLatch: "", knoten: 3, nodeReset: NODE_RESET, latchRaw: "", latchExists: false };
+    pruefe("H3-24a gezuendet, kein Merker -> verbraucht", cl(basis) === JSON.stringify({ nodeReset: NODE_RESET, augReset: null }));
+    pruefe("H3-24b Merker dieses Knotens liegt -> nichts", cl({ ...basis, latchRaw: merker(2), latchExists: true }) === null);
+    pruefe("H3-24c Merker eines anderen Knotens -> verbraucht", cl({ ...basis, latchRaw: merker(2, 7), latchExists: true }) !== null);
+    pruefe("H3-24d nicht gezuendet -> nichts", cl({ ...basis, tel: JSON.parse(corpJson({ public: false, finance: null })) }) === null);
+    pruefe("H3-24e Zuendung nur aus corp-gezuendet.txt -> verbraucht", cl({ ...basis, tel: null, ignitedLatch: String(NODE_RESET) }) !== null);
+    pruefe("H3-24f anderer Knoten (BN9) -> nichts", cl({ ...basis, knoten: 9 }) === null);
+    pruefe("H3-24g Merker liegt, aber unlesbar -> nichts", cl({ ...basis, latchRaw: "", latchExists: true }) === null);
+  }
 }
 
 // ===========================================================================

@@ -62,7 +62,7 @@ import {
   CORP_MONEY_NODES, CORP_TEL_FILE, CORP_REQ_FILE, CORP_WAIT_FILE, CORP_WAIT_MAX_MS, CORP_LATCH_FILE, CORP_PLAN_BUDGET,
   corpSignal, corpBudget, corpPlanInput, corpFitPlan, corpRequest, corpRequestText, corpReserve, corpWait,
   corpErloes, corpPendingRaise,
-  readCorpWaitState, corpLatched,
+  readCorpWaitState, corpLatched, corpFirstRound, corpFirstLatch, corpConsumeLatch, CORP_FIRST_FILE,
 } from "lib/corpgeld.js";
 // AUDIT-FIXES 26.09.2026 (nodes/audit-2026-09-26/, Paket A) - reine
 // Entscheidungsfunktionen, ohne ns, einzeln in tools/test-bn4rep-einbau.js
@@ -476,6 +476,8 @@ export async function main(ns) {
   let gateTele = null;
   // Kaufaufschub vor der Gang (P2c): Stand der letzten Runde, fuer Log-Wechsel und Telemetrie.
   let gangHoldWar = false;
+  // H3: erste Corp-Runde in der Vorrunde (fuer data/einbau.json, das vor Block 1c geschrieben wird).
+  let corpFirstPrev = false;
   // Corp-Geld (BN3): Wartezustand am Tor (auch in data/torrunde-corpwait.json) und
   // der letzte Signaltext fuer die Logzeile bei einem Wechsel.
   let corpWaitState = null, corpWaitLoaded = false, corpWaitWritten = null;
@@ -1197,6 +1199,9 @@ export async function main(ns) {
     // Corp-Geld (BN3): wie lange die Kampfsperre noch dauert (0 = vorbei,
     // Infinity = Wiederaufbau laeuft) - fuer Budget und Ruecklage.
     let kampfRestMs = 0;
+    // H3: Rest der 6-h-Sperre, und ob nur die 12-h-Frist (nicht schon die 6 h)
+    // sperrt - dann entscheidet der Corp-Block, ob sie gilt (siehe unten).
+    let combatRestCorpMs = 0, combatHoldNonCorp = false, corpFirstNow = false, combatEarlyCorp = false;
     if (bladeburnerTraegtHier()) {
       // Zwei Zeitpunkte je Einbau: der erste Blick danach (`playtime`) und
       // der erste Blick mit Tiefstand >= 100 (`fertig`) - daraus Dauer des
@@ -1224,11 +1229,21 @@ export async function main(ns) {
         }
       } catch { /* ohne Uhr sperrt nur der laufende Wiederaufbau */ }
       const ks = kampfEinbauSperre(spieler.skills, uhrWerte);
+      // H3 (06.10.2026): dieselbe Regel mit 6 h statt 12 h - sie gilt nur fuer
+      // die ERSTE Corp-Runde des Knotens, und ob es die ist, steht erst im
+      // Corp-Block (1c) fest. Hier sperrt deshalb nur der 6-h-Teil (er steckt
+      // ganz im 12-h-Teil); der Rest bis 12 h wird unten nachgetragen, sobald
+      // feststeht, dass es keine erste Corp-Runde ist (combatHoldNonCorp).
+      const ksCorp = kampfEinbauSperre(spieler.skills, uhrWerte, { corpRunde: true });
       kampfAufbau = ks.aufbau;
       kampfZuFrueh = ks.zuFrueh;
-      kampfRestMs = ks.aufbau ? Infinity
-        : (ks.zuFrueh && Number.isFinite(uhrWerte.seitAufbauMs) ? Math.max(0, ks.noetigMs - uhrWerte.seitAufbauMs) : 0);
-      if (ks.gesperrt) gesperrt = true;
+      const rest = (s) => (s.aufbau ? Infinity
+        : (s.zuFrueh && Number.isFinite(uhrWerte.seitAufbauMs) ? Math.max(0, s.noetigMs - uhrWerte.seitAufbauMs) : 0));
+      kampfRestMs = rest(ks);
+      combatRestCorpMs = rest(ksCorp);
+      combatHoldNonCorp = ks.zuFrueh && !ksCorp.gesperrt;
+      combatEarlyCorp = ksCorp.zuFrueh;
+      if (ksCorp.gesperrt) gesperrt = true;
     }
     if (bladeSperre && Date.now() - letzteBladeMeldung > 600000) {
       letzteBladeMeldung = Date.now();
@@ -1577,6 +1592,11 @@ export async function main(ns) {
         // Die Kampfknoten-Sperre (22.09.2026): Wiederaufbau laeuft noch, oder
         // der letzte Wiederaufbau hat sich noch nicht bezahlt gemacht.
         kampfAufbau, kampfZuFrueh,
+        // H3: kampfZuFrueh ist die 12-h-Frist (punish.js bleibt dabei). Fuer die
+        // erste Corp-Runde gilt die 6-h-Frist: combatEarlyCorp. Zwischen 6 und 12 h
+        // steht kampfZuFrueh true und combatEarlyCorp false - dann entscheidet
+        // corpFirstRound (Stand der VORRUNDE, Block 1c laeuft erst danach).
+        combatEarlyCorp, corpFirstRound: corpFirstPrev,
         gesperrtOhneHilfe: kampfKnotenEinbau && !wiederaufbauHilfe
           && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme),
         // Die Torrunde im Kampfknoten mit Gang (P1 / AUG-4): der Stand der
@@ -1679,6 +1699,37 @@ export async function main(ns) {
           }
           corpSig = corpLatched(corpSig, corpLatch, kaufInfo.lastNodeReset);
           corpGate = corpSig.active === true;
+          // H3: die erste Corp-Runde des Knotens (Zuendung hier UND schon
+          // Corp-Geld in dieser Runde) hat nur die 6-h-Sperre (lib/corpgeld.js).
+          // Sie gehoert dem Einbauzyklus, in dem die Zuendung ZUERST gesehen
+          // wurde (Merker data/corp-first-round.json); jeder Einbau danach
+          // verbraucht sie - auch einer ohne Corp-Geld, damit die Ausnahme nie
+          // in einen spaeten Zyklus (Endspiel, Black Ops) rutscht.
+          // Auch der ZWEITE Einbau des Knotens kann die erste Corp-Runde sein
+          // (Zuendung erst nach einem normalen Einbau): dann gelten die 6 h
+          // ebenso, aber nur zusammen mit der 2x-Dauer-Regel (kampfEinbauSperre)
+          // und dem Ausgangs-Interlock (einbauErlaubt, unten) - beide bleiben.
+          corpFirstNow = false;
+          if (corpGate) {
+            const da = ns.fileExists(CORP_FIRST_FILE, "home");
+            const fl = corpFirstLatch(da ? liesVonHome(CORP_FIRST_FILE) : "", da, kaufInfo.lastNodeReset, kaufInfo.lastAugReset);
+            // Nur ein Merker, der auf home LIEGT, traegt die Ausnahme: scheitert
+            // das Schreiben, wuerde der naechste Zyklus ihn sonst neu anlegen.
+            let liegt = da && !fl.write;
+            if (fl.write) {
+              try { schreibNachHome(CORP_FIRST_FILE, JSON.stringify(fl.latch)); } catch (e) { gangCountError(CORP_FIRST_FILE, e); }
+              liegt = ns.fileExists(CORP_FIRST_FILE, "home");
+            }
+            corpFirstNow = liegt && corpFirstRound(corpTel, kaufInfo.lastNodeReset, kaufInfo.lastAugReset, fl.latch).first;
+            // Festhalten (sticky): einmal erste Corp-Runde, bleibt sie es bis zum
+            // Einbau - auch wenn corp.json danach unlesbar ist oder corp.js
+            // seinen Zustand verliert.
+            if (corpFirstNow && fl.latch && fl.latch.used !== true) {
+              try {
+                schreibNachHome(CORP_FIRST_FILE, JSON.stringify({ nodeReset: fl.latch.nodeReset, augReset: fl.latch.augReset, used: true }));
+              } catch (e) { gangCountError(CORP_FIRST_FILE, e); }
+            }
+          }
           const whyKurz = corpSig.active ? "an" : corpSig.why.replace(/\(.*\)/, "");
           if (whyKurz !== corpWhyWar) {
             corpWhyWar = whyKurz;
@@ -1706,12 +1757,16 @@ export async function main(ns) {
           // Einbaublock: die Sperren oben (`gesperrt`) und der Ausgangs-
           // Interlock (`einbauErlaubt`). Eine nicht lesbare Lage heisst
           // Normalbetrieb, wie dort.
+          // H3: die 12-h-Frist nachtragen, wenn es keine erste Corp-Runde ist.
+          if (combatHoldNonCorp && !corpFirstNow) gesperrt = true;
           let gateOpen = !gesperrt;
           const sperrGruende = [];
           if (bladeSperre) sperrGruende.push("Divisionsbeitritt steht aus");
           if (graftLaeuft) sperrGruende.push("Graft laeuft");
           if (kampfAufbau) sperrGruende.push("Wiederaufbau der Kampfwerte");
-          if (kampfZuFrueh) sperrGruende.push("Wiederaufbau noch nicht bezahlt gemacht");
+          if (kampfZuFrueh && !(combatHoldNonCorp && corpFirstNow)) {
+            sperrGruende.push("Wiederaufbau noch nicht bezahlt gemacht" + (corpFirstNow ? " (erste Corp-Runde: 6 h)" : ""));
+          }
           let gateReason = gesperrt
             ? (sperrGruende.join(", ") || "Einbausperre (install-sperre.txt)") : "";
           if (gateOpen) {
@@ -1782,7 +1837,11 @@ export async function main(ns) {
             // Der Zustand gilt je Einbau (augReset) - nie in den naechsten Zyklus tragen.
             if (corpWaitState && corpWaitState.augReset !== augResetJetzt) corpWaitState = null;
             const fertig = !!(corpWaitState && corpWaitState.fertig);
-            const msToGate = gateOpen ? 0 : (Number.isFinite(kampfRestMs) && kampfRestMs > 0 ? kampfRestMs : Infinity);
+            // H3: fuer die erste Corp-Runde zaehlt der Rest der 6-h-Sperre. Vor
+            // dem ersten Verkauf ist sie es noch nicht (corpFirstNow false) -
+            // dann rechnet das Budget mit der 12-h-Frist, also mit mehr Tranchen.
+            const kRest = corpFirstNow ? combatRestCorpMs : kampfRestMs;
+            const msToGate = gateOpen ? 0 : (Number.isFinite(kRest) && kRest > 0 ? kRest : Infinity);
             const waitLeftMs = Math.max(0, CORP_WAIT_MAX_MS - ((corpWaitState && corpWaitState.aktivMs) || 0));
             corpBudgetJetzt = corpBudget({ geld: geldJetzt, sig: corpSig, msToGate, waitLeftMs });
             const alleCorp = [];
@@ -2102,6 +2161,8 @@ export async function main(ns) {
                 },
                 betrag: corpReq.betrag, bestechung: corpReq.bestechung, spende: corpReq.spende,
                 deliverable: corpSig.deliverable === true, blocked: corpSig.blocked || "",
+                // H3: erste Corp-Runde des Knotens - Einbausperre 6 h statt 12 h.
+                firstRound: corpFirstNow === true,
                 bribeCap: corpSig.bribeCap, budget: Math.round(corpBudgetJetzt), reserve: Math.round(gateBedarf),
                 fertig: !!(corpWaitState && corpWaitState.fertig),
                 waits: corpW.waits === true, waitNote: String(corpW.reason).slice(0, 160),
@@ -2113,6 +2174,7 @@ export async function main(ns) {
       } catch (e) {
         gangCountError("Torrunde-Block", e);
         inGangNow = false; corpGate = false; gateInstallWait = false; gateBedarf = 0;
+        corpFirstNow = false;   // H3: im Fehlerfall gilt die 12-h-Frist (Nachtrag unten)
         gateTele = { mode: "error", gangErrors: gateErrors, lastGangError: gateLastError };
       }
       // Schlug schon ns.gang.inGang() fehl, steht die Gang-Pruefung auf "nein" und
@@ -2125,6 +2187,11 @@ export async function main(ns) {
     // wartet mit. Als Sperre gesetzt statt als eigene Bedingung in der Einbau-
     // Zeile - `gesperrt` ist genau die Variable, die dort schon mitgelesen wird.
     if (gateInstallWait) gesperrt = true;
+    // H3: die 12-h-Frist der Einbausperre gilt fuer jede Runde ausser der ersten
+    // Corp-Runde des Knotens - auch wenn Block 1c gar nicht lief (kein V2,
+    // anderer Knoten) oder warf. Nur ODER, nie ein Aufheben (31.08.2026).
+    if (combatHoldNonCorp && !corpFirstNow) gesperrt = true;
+    corpFirstPrev = corpFirstNow;
     if (gateBought || corpDonatedNow) { await ns.sleep(2000); continue; }   // Preise/Ruf haben sich verschoben
 
     if (!ausgangSteht
@@ -2482,6 +2549,22 @@ export async function main(ns) {
         const torGrund = torGrundJetzt();
         if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
       }
+
+      // H3: die Ausnahme "erste Corp-Runde" verbraucht JEDER Einbau nach der
+      // Zuendung - auch einer, bei dem bn4rep die Zuendung nie als corpGate
+      // gesehen und deshalb keinen Merker angelegt hat (lib/corpgeld.js
+      // corpConsumeLatch). Synchron, kein await bis zum Einbau.
+      try {
+        const riH3 = ns.getResetInfo();
+        let telH3 = null;
+        try { const roh = liesVonHome(CORP_TEL_FILE); telH3 = roh ? JSON.parse(roh) : null; } catch { telH3 = null; }
+        const daH3 = ns.fileExists(CORP_FIRST_FILE, "home");
+        const inhaltH3 = corpConsumeLatch({
+          tel: telH3, ignitedLatch: liesVonHome(CORP_LATCH_FILE), knoten: riH3.currentNode,
+          nodeReset: riH3.lastNodeReset, latchRaw: daH3 ? liesVonHome(CORP_FIRST_FILE) : "", latchExists: daH3,
+        });
+        if (inhaltH3 !== null) schreibNachHome(CORP_FIRST_FILE, inhaltH3);
+      } catch (e) { gangCountError(CORP_FIRST_FILE + " (Verbrauch)", e); }
 
       ns.singularity.installAugmentations("boot.js");
       return;   // ab hier laeuft dieses Skript ohnehin nicht mehr

@@ -138,6 +138,11 @@ Noetige Aenderungen (grob):
 - Aufruf in `src/bn4rep.js` mit corpSignal.
 - Test in `tools/test-endspurt.js`.
 
+**Nachtrag Bau H3 (06.10.2026 abends, Rechner `h3sperre.mjs`, Skeptiker-Nachmessung):**
+- In BN3.2 wurde die Corp bei Knotenstunde ~0,07 gegruendet (19:23, Knoten seit ~19:20). Corp-Geld kommt realistisch bei Tc = Zuendung 9,5-11 h + erster Verkauf, also **~10,5-12,5 h**.
+- Damit spart H3 **~0-1 h, meist 0,3-0,5 h mit Syndicate** (H2-light wird gebaut); ohne Syndicate um 0, im schlechtesten Band -0,2 h (Tc 11,5 h: der fruehe Einbau verpasst die naechste Stufe Bladeburners-Ruf). Die 0,5-1,2 h oben gelten nur fuer Tc um 10,8 h mit Syndicate.
+- Gebaut nur fuer die **erste** Corp-Runde des Knotens (Merker `data/corp-first-round.json`, jeder Einbau nach der Zuendung verbraucht sie): eine zweite Corp-Runde mit 6 h fiele in 5 von 54 Baendern ins Endspiel mit Black Ops.
+
 ## 4. Rueckfallplan, falls BN3.1 bei der Zuendung noch laeuft (unwahrscheinlich)
 
 Das heisst: die Chancen sind stehen geblieben (Rangrate eingebrochen). Dann kommt das Geld ~02:00, und es gilt:

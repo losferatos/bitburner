@@ -1,6 +1,7 @@
 /**
- * Corp-Einmalskript: Divisionen, Staedte, Lager. Gestartet von corp.js.
- * RAM: 1,6 + 4 x 20 = 81,6 GB.
+ * Corp-Einmalskript: Divisionen und Staedte. Gestartet von corp.js.
+ * RAM: 1,6 + 2 x 20 = 41.6 GB (Familien seit corp-e2c hoechstens 2 Aktionen: jedes Kind
+ * passt auf einen 64-GB-Server, Lage nach dem ersten Einbau am 06.10.2026).
  */
 import { runAct } from "lib/corpact.js";
 /** @param {NS} ns */
@@ -9,7 +10,5 @@ export async function main(ns) {
   runAct(ns, {
     ei: (ind, d) => c.expandIndustry(ind, d),
     ec: (d, city) => c.expandCity(d, city),
-    pw: (d, city) => c.purchaseWarehouse(d, city),
-    uw: (d, city, n) => c.upgradeWarehouse(d, city, n),
   });
 }

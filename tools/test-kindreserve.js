@@ -28,6 +28,14 @@ pruefe("Kern baut kindReserve aus childRamGb", /const kindReserve = new Map\(\);
 pruefe("Arbeiterverteilung zieht kindReserve ab", kern.includes("- (kindReserve.get(host) || 0);"));
 pruefe("Werkbank reserviert Kinder-Platz beim Start", /if \(!\(wo && wo\.length\)\) \{[\s\S]{0,300}childRamGb[\s\S]{0,120}werkbankReserve \+= kind/.test(kern));
 pruefe("Telemetrie meldet kindReserve", kern.includes("kindReserve: Object.fromEntries("));
+// Nach einem Einbau (06.10. 17:20): Werkzeug auf home oder zu kleinem Wirt ->
+// Reserve auf dem groessten gerooteten Nicht-home-Wirt, auf den ein Kind passt.
+pruefe("Ausweich-Wirt fuer Kinder, wenn neben dem Werkzeug kein Kind passt",
+  kern.includes("if (platzHier < gb) {") && kern.includes("if (kGb >= gb && kGb > altGb)"));
+pruefe("home zaehlt die Steuerungsreserve mit (kein pauschaler home-Ausschluss)",
+  kern.includes('? ns.getServerMaxRam(h) - reserveHome() - 16'));
+pruefe("ohne Ausweich-Wirt bleibt die Reserve auf h und wird gemeldet",
+  kern.includes("else kindOhneWirt.push(e.name);") && kern.includes("      kindOhneWirt,"));
 
 const reg = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "registry.json"), "utf8"));
 const corp = (reg.eintraege || reg).find((e) => e.name === "corp.js");

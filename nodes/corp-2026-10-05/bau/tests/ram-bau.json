@@ -1,55 +1,64 @@
 {
+ "corp-act-bribe.js": {
+  "gb": 21.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.bribe 20"
+  ]
+ },
  "corp-act-build.js": {
-  "gb": 81.6,
+  "gb": 41.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.expandIndustry 20",
-   "corporation.expandCity 20",
-   "corporation.purchaseWarehouse 20",
-   "corporation.upgradeWarehouse 20"
+   "corporation.expandCity 20"
   ]
  },
  "corp-act-care.js": {
-  "gb": 61.6,
+  "gb": 41.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.buyTea 20",
-   "corporation.throwParty 20",
-   "corporation.hireAdVert 20"
+   "corporation.throwParty 20"
   ]
  },
  "corp-act-cash.js": {
-  "gb": 71.6,
+  "gb": 51.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.getCorporation 10",
    "corporation.goPublic 20",
-   "corporation.sellShares 20",
-   "corporation.bribe 20"
+   "corporation.sellShares 20"
   ]
  },
  "corp-act-fin.js": {
-  "gb": 71.6,
+  "gb": 31.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
-   "corporation.createCorporation 20",
    "corporation.getInvestmentOffer 10",
-   "corporation.acceptInvestmentOffer 20",
-   "corporation.goPublic 20"
+   "corporation.acceptInvestmentOffer 20"
+  ]
+ },
+ "corp-act-new.js": {
+  "gb": 21.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.createCorporation 20"
   ]
  },
  "corp-act-office.js": {
-  "gb": 61.6,
+  "gb": 41.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.hireEmployee 20",
-   "corporation.setJobAssignment 20",
-   "corporation.upgradeOfficeSize 20"
+   "corporation.setJobAssignment 20"
   ]
  },
  "corp-act-prod.js": {
@@ -70,40 +79,73 @@
    "corporation.cancelExportMaterial 20"
   ]
  },
+ "corp-act-rs.js": {
+  "gb": 41.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.research 20",
+   "corporation.setProductMarketTA2 20"
+  ]
+ },
+ "corp-act-size.js": {
+  "gb": 41.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.upgradeOfficeSize 20",
+   "corporation.hireAdVert 20"
+  ]
+ },
  "corp-act-up.js": {
-  "gb": 61.6,
+  "gb": 41.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.levelUpgrade 20",
-   "corporation.purchaseUnlock 20",
-   "corporation.research 20"
+   "corporation.purchaseUnlock 20"
+  ]
+ },
+ "corp-act-wh.js": {
+  "gb": 41.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.purchaseWarehouse 20",
+   "corporation.upgradeWarehouse 20"
   ]
  },
  "corp-tick.js": {
-  "gb": 71.6,
+  "gb": 51.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
    "corporation.getMaterial 10",
-   "corporation.bulkPurchase 20",
    "corporation.buyMaterial 20",
    "corporation.sellMaterial 20"
   ]
  },
- "corp-tickp.js": {
-  "gb": 71.6,
+ "corp-tickb.js": {
+  "gb": 31.6,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
-   "corporation.setProductMarketTA2 20",
+   "corporation.getMaterial 10",
+   "corporation.bulkPurchase 20"
+  ]
+ },
+ "corp-tickp.js": {
+  "gb": 51.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
    "corporation.getProduct 10",
    "corporation.sellProduct 20",
    "corporation.limitProductProduction 20"
   ]
  },
  "corp.js": {
-  "gb": 75.2,
+  "gb": 55.1,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
@@ -120,10 +162,7 @@
    "corporation.getDivision 10",
    "corporation.getOffice 10",
    "corporation.getWarehouse 10",
-   "corporation.getProduct 10",
    "corporation.getUpgradeLevel 10",
-   "corporation.getInvestmentOffer 10",
-   "getServerMoneyAvailable 0.1",
    "fileExists 0.1"
   ]
  }

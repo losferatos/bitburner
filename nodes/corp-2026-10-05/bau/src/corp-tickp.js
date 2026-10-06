@@ -4,14 +4,15 @@
  * Je fertigem Produkt und Stadt:
  *  - Verkauf "MAX" zu "MP+x" (corplib.priceProduct, nur aus getProduct-Rueckgaben). MP ist dort
  *    productionCost (Division.ts:283-288) - der Ausdruck wandert bei Skripttod mit.
- *  - Sobald die Division Market-TA.II hat (Auftrag ta2=true): setProductMarketTA2 an. Dann rechnet
- *    das Spiel den Preis selbst exakt (Division.ts:363-389) - auch wenn dieses Skript tot ist.
+ *  - Mit Market-TA.II (Auftrag ta2=true) nur noch "MAX"/"MP"; setProductMarketTA2 setzt corp.js einmal je
+ *    Produkt ueber corp-act-rs.js (seit corp-e2c, RAM). Das Spiel rechnet den Preis dann selbst exakt.
+ *  - Meldet fuer JEDES Produkt Fortschritt/Rating (ersetzt seit corp-e2c getProduct im Koordinator).
  *  - Produktionsgrenze = gemessener Absatz, aber nur bei Lager > 80 % (corplib.productLimit, F9).
  *    Die Grenze bleibt im Spiel stehen.
  *
  * Auftrag (ns.args[0], JSON): {job, div, cities, products:[name], ta2, fill:{city: Lagerfuellung 0..1}, price:{}}
  * Ergebnis auf RESULT_PORT: {job, ok, err, price, diag}
- * RAM: 1,6 + getProduct 10 + sellProduct 20 + limitProductProduction 20 + setProductMarketTA2 20 = 71,6 GB.
+ * RAM: 1,6 + getProduct 10 + sellProduct 20 + limitProductProduction 20 = 51,6 GB.
  */
 import { priceProduct, productLimit, priceExpr } from "lib/corplib.js";
 import { sendResult } from "lib/corpact.js";
@@ -19,22 +20,15 @@ import { sendResult } from "lib/corpact.js";
 /** @param {NS} ns */
 export async function main(ns) {
   const c = ns.corporation;
-  const out = { job: "?", ok: 0, err: [], price: {}, diag: {} };
+  const out = { job: "?", ok: 0, err: [], price: {}, diag: {}, info: {} };
   try {
     const order = JSON.parse(String(ns.args[0] || "{}"));
     out.job = order.job;
     const price = order.price || {};
     for (const name of order.products || []) {
-      if (order.ta2) {
-        try {
-          c.setProductMarketTA2(order.div, name, true);
-          out.ok++;
-        } catch (e) {
-          out.err.push(`t2/${name}: ${String(e).slice(0, 120)}`);
-        }
-      }
       for (const city of order.cities) {
         const p = c.getProduct(order.div, city, name);
+        if (city === order.main) out.info[name] = { developmentProgress: p.developmentProgress, rating: p.rating, effectiveRating: p.effectiveRating };
         if (p.developmentProgress < 100) continue;
         const key = name + "|" + city;
         const prev = price[key];

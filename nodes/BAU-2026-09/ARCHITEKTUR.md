@@ -1283,10 +1283,10 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "corp.js",
       "args": [],
-      "ramBaseGb": 75.2,
-      "childRamGb": 82,
+      "ramBaseGb": 55.1,
+      "childRamGb": 51.6,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GERECHNET-2026-10-06 (tools/ram.js und reference/v301 RamCalculations.ts, beide 75,10)",
+      "ramMeasuredAt": "GERECHNET-2026-10-06 corp-e2c (tools/ram.js und reference/v301 RamCalculations.ts, beide 55,10)",
       "verfahren": "alle",
       "knoten": [
         3
@@ -1303,6 +1303,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "needsLibs": [
         "lib/corplib.js",
         "lib/corpact.js",
+        "lib/corptick.js",
         "lib/herzschlag.js",
         "lib/hostdatei.js"
       ],

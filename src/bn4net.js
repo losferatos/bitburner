@@ -1663,11 +1663,35 @@ export async function main(ns) {
     // Registry-Feld childRamGb; reserviert auf jedem Wirt, auf dem das
     // Werkzeug gerade laeuft (toolHosts aus derselben Runde).
     const kindReserve = new Map();
+    const kindOhneWirt = [];
     for (const e of (regGeladen && regGeladen.eintraege) || []) {
       const gb = Number(e.childRamGb);
       if (!(gb > 0)) continue;
       for (const h of toolHosts.get(e.name) || []) {
-        kindReserve.set(h, (kindReserve.get(h) || 0) + gb);
+        // Der eigene Wirt taugt nur, wenn neben dem Werkzeug selbst noch ein
+        // Kind Platz hat - und home nie (reserveHome haelt home ohnehin fuer
+        // die Steuerung frei). Sonst: der groesste gerootete Nicht-home-Wirt,
+        // auf den ein Kind passt (06.10. 17:20: nach dem Einbau lief corp.js
+        // auf home, ringsum nur 64-GB-Server voller Arbeiter - no_space).
+        // Platz fuer ein Kind neben dem Werkzeug: auf home zaehlt die
+        // Steuerungsreserve mit (Skeptiker 06.10., ERNST 1 - ein groesseres
+        // home darf nicht pauschal verworfen werden).
+        const platzHier = h === "home"
+          ? ns.getServerMaxRam(h) - reserveHome() - 16
+          : ns.getServerMaxRam(h) - ns.getScriptRam(e.name, "home");
+        let ziel = h;
+        if (platzHier < gb) {
+          let alt = null, altGb = 0;
+          for (const k of hosts) {
+            if (k === "home" || !ns.hasRootAccess(k)) continue;
+            const kGb = ns.getServerMaxRam(k);
+            if (kGb >= gb && kGb > altGb) { alt = k; altGb = kGb; }
+          }
+          // Kein Ausweich-Wirt: alte Reserve auf h behalten und melden.
+          if (alt) ziel = alt;
+          else kindOhneWirt.push(e.name);
+        }
+        kindReserve.set(ziel, (kindReserve.get(ziel) || 0) + gb);
       }
     }
 
@@ -4437,6 +4461,7 @@ export async function main(ns) {
       // davonlaeuft.
       werkbankReserve: Math.round(werkbankReserve),
       kindReserve: Object.fromEntries([...kindReserve].map(([h, gb]) => [h, Math.round(gb)])),
+      kindOhneWirt,
       // Der Deckel ist seit dem 22.08.2026 kein fester Wert mehr, sondern
       // haengt am Netz. Eine Groesse, die sich von selbst bewegt, gehoert
       // nach draussen - sonst merkt niemand, wenn sie irgendwohin laeuft.

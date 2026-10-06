@@ -56,7 +56,7 @@ const LIB = require(path.join(BAU, "lib/corplib.js"));
 const RAM: Record<string, { cost: number; corp: Set<string>; entries: string[] }> = {};
 function computeRam() {
   const others = new Map<any, any>();
-  for (const rel of ["lib/corplib.js", "lib/corpact.js", "lib/herzschlag.js", "lib/hostdatei.js"]) others.set(rel, new Script(rel as any, libCode(rel), "home"));
+  for (const rel of ["lib/corplib.js", "lib/corpact.js", "lib/corptick.js", "lib/herzschlag.js", "lib/hostdatei.js"]) others.set(rel, new Script(rel as any, libCode(rel), "home"));
   for (const f of SCRIPTS) {
     const r: any = calculateRamUsage(fs.readFileSync(path.join(BAU, f), "utf8"), f as any, "home", others);
     if (r.errorCode !== undefined) throw new Error(`RAM ${f}: ${r.errorCode} ${r.errorMessage}`);
@@ -247,10 +247,20 @@ for (const seed of seeds) {
     const NEEDS = (process.env.CORP_NEEDS ?? "").split(",").filter(Boolean).map((x) => x.split(":").map(Number));
     const SPEND = process.env.CORP_SPEND === "1";
     const REQS = (process.env.CORP_REQ ?? "").split(",").filter(Boolean).map((x) => x.split(":").map(Number));
+    // ECHTE Schnittstelle data/corp-geld.txt (Fassung corp-e3b), wie bn4rep.js sie schreiben soll:
+    // CORP_GELD='{"from":h,"betrag":$,"bestechung":{"F":ruf},"mode":"fresh|fixedts|preinstall"}'
+    //   fresh      jeden Zyklus neu, ts = jetzt, Resets = aktuell, Ruf-Bedarf sinkt mit erhaltenem Ruf
+    //   fixedts    einmal bei h geschrieben, Inhalt bleibt (gleiches ts) - Befund 1
+    //   preinstall wie fresh, aber nach einem Einbau weiter mit dem ALTEN augReset (fremde Anforderung)
+    const GELD = process.env.CORP_GELD ? JSON.parse(process.env.CORP_GELD) : null;
+    let geldWritten = false;
+    let augAtStart = 0;
     const INSTALLS = (process.env.CORP_INSTALL ?? "").split(",").filter(Boolean).map(Number);
     let installsDone = 0;
     const BN4REP = process.env.CORP_BN4REP ? JSON.parse(process.env.CORP_BN4REP) : null;
     for (const f of (process.env.CORP_FACTIONS ?? "").split(",").filter(Boolean)) if (!Player.factions.includes(f as any)) Player.factions.push(f as any);
+    const repG0: Record<string, number> = {};
+    for (const f of (process.env.CORP_FACTIONS ?? "").split(",").filter(Boolean)) repG0[f] = (Factions as any)[f]?.playerReputation ?? 0;
     const rep0: Record<string, number> = {};
     for (const f of Object.keys((BN4REP && BN4REP.offenJeFaktion) || {})) rep0[f] = (Factions as any)[f]?.playerReputation ?? 0;
     const vEvery: { t: number; v: number }[] = [];
@@ -322,8 +332,20 @@ for (const seed of seeds) {
         }
         W.files.set("data/bn4rep.json", JSON.stringify({ ...BN4REP, offenJeFaktion: oj, ts: W.clock }));
       }
+      if (GELD && t >= GELD.from * 3600 && !(GELD.mode === "fixedts" && geldWritten)) {
+        if (!geldWritten) augAtStart = (Player as any).lastAugReset;
+        geldWritten = true;
+        const br: any = {};
+        for (const [f, r] of Object.entries(GELD.bestechung || {}) as [string, number][]) {
+          const got = ((Factions as any)[f]?.playerReputation ?? 0) - (repG0[f] ?? 0);
+          if (GELD.bribeFrom !== undefined && t < GELD.bribeFrom * 3600) continue;
+          br[f] = GELD.mode === "fixedts" ? r : Math.max(0, r - got);
+        }
+        W.files.set("data/corp-geld.txt", JSON.stringify({ v: 1, ts: W.clock, nodeReset: (Player as any).lastNodeReset, augReset: GELD.mode === "preinstall" ? augAtStart : (Player as any).lastAugReset, betrag: GELD.betrag, bestechung: br, von: "bn4rep" }));
+      }
       if (installsDone < INSTALLS.length && t >= INSTALLS[installsDone] * 3600) {
         installsDone++;
+        (Player as any).lastAugReset = W.clock;
         await settle(coord);
         DEAD.add(coord);
         W.running.delete(coord);
@@ -528,6 +550,37 @@ for (const seed of seeds) {
       const sl = sales.find((x: any) => x.h >= h);
       console.log(`ANFORDERUNG ab ${h} h ${b}: Verkauf ${JSON.stringify(sl)}`);
       expect(!!sl && Math.abs(sl.need / b - 1) < 0.01 && Math.abs(sl.got / (1.1 * sl.need) - 1) < 0.02).toBe(true);
+    }
+    if (process.env.CORP_EXPECT_CALIB) expect(Math.max(0, ...calErr.map((x: number) => Math.abs(x)))).toBeLessThanOrEqual(Number(process.env.CORP_EXPECT_CALIB));
+    if (process.env.CORP_EXPECT_BLOCKED) expect(res.finalTele.state + "/" + res.finalTele.blockedReason).toBe("blocked/" + process.env.CORP_EXPECT_BLOCKED);
+    if (process.env.CORP_EXPECT_QUIRK) {
+      const over = sales.filter((x: any) => x.n > 1 && x.got > Number(process.env.CORP_EXPECT_QUIRK) * 1.1 * x.need);
+      console.log(`QUIRK Verhaeltnisse ${JSON.stringify(sales.map((x: any) => +(x.got / x.need).toFixed(2)))}`);
+      expect(over.length).toBe(0);
+    }
+    if (process.env.CORP_EXPECT_NOSALE) expect(sales.length).toBe(0);
+    if (process.env.CORP_EXPECT_NOSALE_AFTER) expect(sales.filter((x: any) => x.h > Number(process.env.CORP_EXPECT_NOSALE_AFTER)).length).toBe(0);
+    if (process.env.CORP_EXPECT_SALE_AFTER) expect(sales.filter((x: any) => x.h > Number(process.env.CORP_EXPECT_SALE_AFTER)).length).toBeGreaterThanOrEqual(1);
+    if (process.env.CORP_EXPECT_BRIBEMAX) {
+      for (const [f, r] of Object.entries((GELD && GELD.bestechung) || {}) as [string, number][]) {
+        if (f === "Bladeburners") continue;
+        const got = ((res.bribedRep as any)[f] ?? 0) - (repG0[f] ?? 0);
+        console.log(`BESTECHUNG ${f}: erhalten ${got.toExponential(3)} angefordert ${r}`);
+        expect(got).toBeLessThanOrEqual(Number(process.env.CORP_EXPECT_BRIBEMAX) * r);
+        expect(got).toBeGreaterThanOrEqual(0.99 * r);
+      }
+    }
+    if (process.env.CORP_EXPECT_NOBRIBEBEFORE) {
+      const zOf = (e: string) => Number((/ z(\d+) /.exec(e) || [])[1]);
+      const sz = res.events.filter((e: string) => /Verkauf /.test(e)).map(zOf);
+      const bz = res.events.filter((e: string) => /Bestechung .*Ruf/.test(e)).map(zOf);
+      const bad = bz.filter((b: number) => sz.some((z: number) => b < z && z - b <= 11));
+      console.log(`FENSTER Verkaeufe ${JSON.stringify(sz)} Bestechungen ${JSON.stringify(bz)} verletzt ${JSON.stringify(bad)}`);
+      expect(bad.length).toBe(0);
+    }
+    if (process.env.CORP_EXPECT_KEEP) {
+      const last = traj[traj.length - 1];
+      expect(last.owned).toBeGreaterThanOrEqual(Number(process.env.CORP_EXPECT_KEEP));
     }
     if (process.env.CORP_EXPECT_NOBB) expect(((res.bribedRep as any)["Bladeburners"] ?? 0)).toBe(0);
     if (process.env.CORP_EXPECT_ROUND) expect(fr).toBe(Number(process.env.CORP_EXPECT_ROUND));

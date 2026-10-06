@@ -12,7 +12,7 @@
  * (nodes/corp-2026-10-05/bau/tests/botsim.test.ts, Abschnitt EICHUNG).
  */
 
-export const CORP_VERSION = "corp-e2b-2026-10-06";
+export const CORP_VERSION = "corp-e2c-2026-10-06";
 export const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"];
 export const MAIN_CITY = "Aevum";
 export const JOBS = ["Operations", "Engineer", "Business", "Management", "Research & Development", "Intern"];
@@ -24,20 +24,28 @@ export const TELEMETRY_FILE = "data/corp.json";
 export const EVENT_FILE = "data/corp-log.txt";
 
 // Kurzcode -> Ausfuehrungsskript. Die Skripte enthalten die echten Namen.
+// Familien seit corp-e2c mit hoechstens 2 Aktionen (je Kind <= 51,6 GB; nach dem ersten Einbau am
+// 06.10.2026 gab es keinen freien Wirt > 64 GB)
 export const FAMILY = {
-  he: "corp-act-office.js", sj: "corp-act-office.js", uo: "corp-act-office.js",
-  te: "corp-act-care.js", pa: "corp-act-care.js", ad: "corp-act-care.js",
-  ei: "corp-act-build.js", ec: "corp-act-build.js", pw: "corp-act-build.js", uw: "corp-act-build.js",
-  lu: "corp-act-up.js", ul: "corp-act-up.js", rs: "corp-act-up.js",
-  cc: "corp-act-fin.js", io: "corp-act-fin.js", ai: "corp-act-fin.js", gp: "corp-act-fin.js",
+  he: "corp-act-office.js", sj: "corp-act-office.js",
+  uo: "corp-act-size.js", ad: "corp-act-size.js",
+  te: "corp-act-care.js", pa: "corp-act-care.js",
+  ei: "corp-act-build.js", ec: "corp-act-build.js",
+  pw: "corp-act-wh.js", uw: "corp-act-wh.js",
+  lu: "corp-act-up.js", ul: "corp-act-up.js",
+  rs: "corp-act-rs.js", t2: "corp-act-rs.js",
+  cc: "corp-act-new.js",
+  io: "corp-act-fin.js", ai: "corp-act-fin.js",
   mp: "corp-act-prod.js", dp: "corp-act-prod.js",
   ex: "corp-act-route.js", cx: "corp-act-route.js",
-  sl: "corp-act-cash.js", bb: "corp-act-cash.js",
+  sl: "corp-act-cash.js",
+  bb: "corp-act-bribe.js",
 };
 export const TICK_SCRIPT = "corp-tick.js";
+export const TICKB_SCRIPT = "corp-tickb.js";
 export const TICKP_SCRIPT = "corp-tickp.js";
-export const ALL_SCRIPTS = [...new Set([...Object.values(FAMILY), TICK_SCRIPT, TICKP_SCRIPT])];
-export const LIBS = ["lib/corplib.js", "lib/corpact.js"];
+export const ALL_SCRIPTS = [...new Set([...Object.values(FAMILY), TICK_SCRIPT, TICKB_SCRIPT, TICKP_SCRIPT])];
+export const LIBS = ["lib/corplib.js", "lib/corpact.js", "lib/corptick.js"];
 
 // ---------------------------------------------------------------- Spieldaten (v301)
 // MaterialInfo.ts: Groesse und baseMarkup (Material.getMarkupLimit = quality / baseMarkup, Material.ts:85-87)
@@ -286,6 +294,31 @@ export function liquidationValue(valuation, owned, total) {
   return valuation * (0.5 * f + (2 / 3) * Math.pow(f, 1.5));
 }
 
+// ---------------------------------------------------------------- Investorenrunden ohne Getter
+// Constants.ts fundingRoundShares / fundingRoundMultiplier; Corporation.ts:333-354 getInvestmentOffer,
+// Actions.ts:199-207 acceptInvestmentOffer (investorShares += floor(1e9 * Anteil)). Im Simulator geeicht.
+const ROUND_SHARES = [0.1, 0.35, 0.25, 0.2];
+const ROUND_MULT = [3, 2, 2, 1.5];
+/** Zahl der angenommenen Runden aus getCorporation(): investorShares minus Seed-Anteile. Die Seed-Gruendung
+ *  in BN3 legt 500 Mio auf investorShares UND totalShares (PlayerObjectCorporationMethods.ts:25-28), also
+ *  Seed = totalShares - 1e9 (Constants.ts initialShares). Annahme: der Bot gibt nie neue Anteile aus
+ *  (issueNewShares wuerde totalShares erhoehen). */
+export function roundsFromCorp(corp) {
+  const investorShares = corp.investorShares - Math.max(0, corp.totalShares - 1e9);
+  let cum = 0, k = 0;
+  for (const p of ROUND_SHARES) {
+    cum += Math.floor(1e9 * p);
+    if (investorShares >= cum) k++;
+  }
+  return k;
+}
+/** Angebot der naechsten Runde wie getInvestmentOffer (0 nach Runde 4 oder nach dem Boersengang) */
+export function offerFromCorp(corp) {
+  const k = roundsFromCorp(corp);
+  if (k >= 4 || corp.public) return { funds: 0, shares: 0, round: k + 1 };
+  return { funds: corp.valuation * ROUND_SHARES[k] * ROUND_MULT[k], shares: Math.floor(1e9 * ROUND_SHARES[k]), round: k + 1 };
+}
+
 // ---------------------------------------------------------------- Anteilsverkauf (Etappe 3)
 /**
  * Corporation.ts:251-262 getTargetSharePrice: Marktwert = V * (0,5 + sqrt(Eigenanteil)), je Anteil.
@@ -294,21 +327,25 @@ export function targetSharePrice(valuation, owned, total) {
   return (valuation * (0.5 + Math.sqrt(Math.max(0, owned / total)))) / total;
 }
 /**
- * Corporation.ts:285-326 calculateShareSale, nachgebaut fuer die Planung. Einziger Unterschied:
- * shareSalesUntilPriceUpdate liefert die API nicht; angenommen wird ein voller Schritt (1e6).
- * Fehler hoechstens ein Preisschritt (0,5 %) auf den ersten 1e6 Anteilen - im Simulator geeicht.
- * @returns {number} Erloes fuer n Anteile
+ * Corporation.ts:285-326 calculateShareSale, exakt nachgebaut (auch die Eigenheit: ist der Rest >= dem
+ * Zaehler bis zur naechsten Preisstufe, zahlt das Spiel einen VOLLEN Schritt von 1e6 Anteilen zum
+ * aktuellen Kurs, auch wenn weniger verkauft werden). shareSalesUntilPriceUpdate liefert die API nicht;
+ * corp.js fuehrt ihn selbst mit (Startwert 1e6, Corporation.ts Feldvorgabe), weil nur eigene Verkaeufe
+ * ihn aendern. Im Simulator 06.10. gefunden: ohne Zaehler lag die Vorhersage bei einem Verkauf um
+ * Faktor 2,1 daneben (58 statt 123 Bio).
+ * @returns {{profit: number, until: number}}
  */
-export function shareSaleProfit(c, n) {
+export function shareSale(c, n, until0 = 1e6) {
   let remaining = n;
-  let untilUpdate = 1e6;
+  let until = until0;
   let price = c.sharePrice;
   let sold = 0;
   let profit = 0;
   const steps = Math.ceil(n / 1e6);
   for (let i = 0; i < steps; i++) {
-    if (remaining < untilUpdate) {
+    if (Math.abs(remaining) < Math.abs(until)) {
       profit += price * remaining;
+      until -= remaining;
       break;
     }
     profit += price * 1e6;
@@ -316,21 +353,24 @@ export function shareSaleProfit(c, n) {
     sold += 1e6;
     const target = targetSharePrice(c.valuation, c.numShares - sold, c.totalShares);
     price *= price <= target ? 1.005 : 0.995;
-    untilUpdate = 1e6;
+    until = 1e6;
   }
-  return profit;
+  return { profit, until };
+}
+export function shareSaleProfit(c, n, until0 = 1e6) {
+  return shareSale(c, n, until0).profit;
 }
 /** Kleinste Anteilszahl fuer mindestens `money` Erloes (Bisektion), hoechstens `maxN` */
-export function sharesForMoney(c, money, maxN) {
+export function sharesForMoney(c, money, maxN, until0 = 1e6) {
   if (!(maxN >= 1)) return 0;
-  if (shareSaleProfit(c, maxN) <= money) return Math.floor(maxN);
-  let lo = 0, hi = maxN;
+  if (shareSaleProfit(c, maxN, until0) <= money) return Math.floor(maxN);
+  let lo = 0, hi = Math.floor(maxN);
   for (let i = 0; i < 60 && hi - lo > 1; i++) {
     const mid = Math.floor((lo + hi) / 2);
-    if (shareSaleProfit(c, mid) >= money) hi = mid;
+    if (shareSaleProfit(c, mid, until0) >= money) hi = mid;
     else lo = mid;
   }
-  return Math.ceil(hi);
+  return hi;
 }
 /**
  * Zuendung am GEGLAETTETEN Wert: das Minimum der letzten `n` Zyklusbewertungen (getCorporation().valuation

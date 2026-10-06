@@ -10,7 +10,7 @@ module.exports = {
   roots: [...base.roots.filter((r) => !r.includes("corp-2026-10-05")), __dirname, BAU + "/src/"],
   testPathIgnorePatterns: [...base.testPathIgnorePatterns, "/sim/"],
   moduleNameMapper: {
-    "^lib/(corplib|corpact)\.js$": BAU + "/src/lib/$1.js",
+    "^lib/(corplib|corpact|corptick)\.js$": BAU + "/src/lib/$1.js",
     "^lib/(herzschlag|hostdatei)\.js$": ROOT + "/src/lib/$1.js",
     ...base.moduleNameMapper,
   },

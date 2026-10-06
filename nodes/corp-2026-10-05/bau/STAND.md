@@ -1,3 +1,71 @@
+# Nachtrag 06.10.2026 17:31 - corp-e2c (Zerlegung <= 51,6 GB nach dem ersten Einbau)
+
+| Skript | RAM |
+|---|---|
+| corp.js | 55,1 GB (ohne getProduct/getInvestmentOffer) |
+| corp-tick.js | 51,6 GB |
+| corp-tickp.js | 51,6 GB |
+| corp-act-cash.js | 51,6 GB |
+| corp-tickb.js | 31,6 GB |
+| corp-act-fin.js | 31,6 GB |
+| corp-act-new.js | 21,6 GB |
+| corp-act-bribe.js | 21,6 GB |
+| alle anderen Kinder | 41,6 GB |
+
+Neu: lib/corptick.js (Takt-Logik), corp-act-{size,wh,rs,new,bribe}.js. Rundenzahl/Angebot aus getCorporation (investorShares minus Seed, valuation x Anteil x Faktor). Uhr nach Zustandsverlust aus data/corp.json.
+Etappe-3-Stand (e3b-Schnittstelle) ist enthalten und hinter {"etappe":3}; dort offen: Test "Neustart nach IPO mit Zustandsverlust" FAIL, F5-Rotlauf schlug nicht an.
+
+# Nachtrag 06.10.2026 17:05 - Version corp-e3-2026-10-06, 24-h-Laeufe Etappe 3
+
+CORP_VERSION auf corp-e3-2026-10-06 gehoben (einzige Code-Aenderung seit dem E3-Bericht).
+
+24-h-Laeufe mit {"etappe":3} (tests/out/G3_s*.json, je 0 Fehler, alle Pruefbedingungen gruen):
+
+| Saat | Einbau | Boersengang | Verkaeufe | Erloes |
+|---|---|---|---|---|
+| s1 | 12 h | 9,2 h | 15 | 5,8e16 |
+| s2 | ohne | 9,5 h | 15 | 7,0e16 |
+| s3 | 10,5 / 14 / 20 h | 9,1 h | 15 | 6,2e16 |
+
+- Zuendung: 9,5 h in allen drei Saaten, Kalibrierfehler 0.
+- Ruf: Sector-12 501-504k, Aevum 202k, Bladeburners 0.
+- Ab ~20 h ist 1 Anteil mehr wert als der Bedarf: der Mindestverkauf ist 1 Anteil, der Erloes uebersteigt den Bedarf dann um x4-x1000. Gewollt, harmlos.
+
+# Nachtrag 06.10.2026 17:03 - Etappe 2b (Skeptiker-Fixes) und Etappe 3
+
+## Etappe 2b (Version corp-e2b-2026-10-06)
+Skeptiker-Fixes F1-F6, rot/gruen in `tests/etappe2.sh`; Bericht an den Koordinator 16:52.
+
+| Saat | Runde 2 | Runde 3 | Runde 4 | Zuendung |
+|---|---|---|---|---|
+| s1 | 421 Mrd | 1,09 Bio | 26,3 Bio | 9,5 h |
+| s2 | 416 Mrd | 950 Mrd | 23,2 Bio | 9,5 h |
+| s3 | 423 Mrd | 1,18 Bio | 36,9 Bio | 9,5 h |
+
+24-h-Laeufe, 0 Fehler, 3,1-3,6 exec je Zyklus.
+
+## Etappe 3 (im selben Code, nur mit data/corp-config.txt {"etappe":3})
+
+| Teil | Regel |
+|---|---|
+| Zuendung | Minimum der letzten 30 Zyklusbewertungen >= 1e15 (`igniteV`), nach Runde 4. `ipoEarly` erlaubt den Boersengang schon nach Runde 3, wenn Geld angefordert ist. |
+| Boersengang | goPublic(0) und Verkauf im selben Einmal-Skript (corp-act-cash.js, 71,6 GB). Vergleich privat/oeffentlich steht im Log und in fin.ipo. |
+| Ziel | Frische Anforderung data/corp-geld.txt `{"betrag","ts","von"}` (2 h gueltig) ersetzt die Vorgabe; dazu immer mindestens data/geldbedarf.txt. Vorgabe ohne Anforderung: bn4rep.json preis x Summe 1,9^k (k = offen, hoechstens 10) + `graftGeld`, gedeckelt `defaultCap` (1e15). |
+| Verkauf | Verkauft wird (Ziel - Spielergeld) x 1,1 ab 1e9. Je Verkauf hoechstens `maxPart` 10 % der Anteile; `keepFrac` 5 % bleiben; Sperre 1 h ergibt stuendliche Tranchen. |
+| Vorhersage | Exakt nachgebautes calculateShareSale samt Zaehler bis zur Preisstufe, den corp.js selbst mitfuehrt. |
+| Bestechung | Erst nach dem ersten Verkauf; Bewertung >= 1e14 und Kasse >= `bribeMinFunds` (1e15). Je Durchgang hoechstens `bribeShare` 5 % der Kasse, je Faktion offenJeFaktion.fehlt x 1e9 x 1,02, dieselbe Faktion fruehestens nach 20 min, nie Bladeburners. |
+
+Tests (`tests/etappe3.sh`), alle wie erwartet:
+
+| Test | Ergebnis |
+|---|---|
+| Z Glaettung | mit Fix min30 1,2e15; ohne Fix IPO bei 10,0 h auf einer Spitze, min30 5e13 |
+| R Bestechung nach Verkauf | rot ohne Fix, gruen mit Fix |
+| K Vorhersage | ohne Fix bis 110 % daneben, mit Fix 0 |
+| A Anforderung | 2e13 ab 13 h: Verkaeufe 13,2/14,2 h je 22 Bio, danach wieder die Vorgabe |
+| E Einbau 11,6 h + 13,3 h | 9 Tranchen, 0 Fehler |
+| B Bladeburners | 0 Ruf; das Spiel lehnt ohnehin ab |
+
 # Corp-Gewerk BN3, Stand 06.10.2026 16:22 (Systemzeit)
 
 ## Nachtrag 16:22: Pruefungen Etappe 2 GRUEN (tests/etappe2.sh)

@@ -1,6 +1,7 @@
 /**
- * Corp-Einmalskript: Corp-Upgrades, Freischaltungen, Forschung. Gestartet von corp.js.
- * RAM: 1,6 + 3 x 20 = 61,6 GB.
+ * Corp-Einmalskript: Corp-Upgrades und Freischaltungen. Gestartet von corp.js.
+ * RAM: 1,6 + 2 x 20 = 41.6 GB (Familien seit corp-e2c hoechstens 2 Aktionen: jedes Kind
+ * passt auf einen 64-GB-Server, Lage nach dem ersten Einbau am 06.10.2026).
  */
 import { runAct } from "lib/corpact.js";
 /** @param {NS} ns */
@@ -9,6 +10,5 @@ export async function main(ns) {
   runAct(ns, {
     lu: (u) => c.levelUpgrade(u),
     ul: (u) => c.purchaseUnlock(u),
-    rs: (d, r) => c.research(d, r),
   });
 }

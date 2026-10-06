@@ -47,7 +47,7 @@
  */
 import {
   CORP_VERSION, CITIES, MAIN_CITY, JOBS, RESULT_PORT, STATE_FILE, TELEMETRY_FILE, EVENT_FILE,
-  FAMILY, TICK_SCRIPT, TICKP_SCRIPT, LIBS, INDUSTRY, UPGRADES, UNLOCK_COST, OFFICE_INITIAL_COST, WAREHOUSE_INITIAL_COST,
+  FAMILY, TICK_SCRIPT, TICKB_SCRIPT, TICKP_SCRIPT, LIBS, offerFromCorp, INDUSTRY, UPGRADES, UNLOCK_COST, OFFICE_INITIAL_COST, WAREHOUSE_INITIAL_COST,
   RESEARCH, RESEARCH_ORDER, researchMults, CHEM_MIX,
   upgradeCost, officeUpCost, warehouseUpCost, adCost, officeProductivity, agriMix, TOB_MAIN_MIX, TOB_SUP_MIX,
   officeOps, liquidationValue, fmt, ignitedSmooth, publicValuationEstimate,
@@ -60,9 +60,9 @@ const AGRI = "Agri";
 const TOB = "Tob";
 const CHEM = "Chem";
 // Geld-Schnittstelle zum restlichen Bot (Etappe 3, Einzelheiten im Kopf von financeWork):
-const MONEY_REQUEST_FILE = "data/corp-geld.txt"; // {"betrag": $, "ts": ms, "von": "..."} - Anforderung, 2 h gueltig
-const MONEY_RESERVE_FILE = "data/geldbedarf.txt"; // Ruecklage von bn4rep.js (Torrunde), Zahl in $
-const BN4REP_FILE = "data/bn4rep.json"; // ziel/preis/offen/offenJeFaktion fuer Vorgabe und Bestechung
+const MONEY_REQUEST_FILE = "data/corp-geld.txt"; // Schnittstelle, siehe Kopf von financeWork
+const MONEY_RESERVE_FILE = "data/geldbedarf.txt"; // nur noch fuer den Rot-Nachweis (noFix "default")
+const BN4REP_FILE = "data/bn4rep.json"; // dto.
 /** Optionale Stellschrauben (JSON auf home), z. B. {"maxRound":4,"shares":{...},"taMult":1} - ohne Datei gelten die Vorgaben */
 const CONFIG_FILE = "data/corp-config.txt";
 /** Zeitpunkte der Runden in Stunden Corp-Zeit (strategie.md Abschnitt 5 + Skeptiker-Korrektur 2) */
@@ -102,7 +102,7 @@ export async function main(ns) {
   // Herzschlag (Skeptiker E1 #3): bn4net.js:3627-3662 beendet Werkzeuge nach dem Wanduhr-Alter ihrer
   // Telemetrie. Im verdeckten Tab dauert ein Corp-Zyklus Minuten (F14); deshalb schreibt corp.js auch
   // WAEHREND des Wartens auf nextUpdate und waehrend der Einmal-Skripte alle 30 s.
-  const rt = { jobSeq: 0, hosts: null, hostsAt: -1, failStreak: 0, failReason: null, lastBeat: 0 };
+  const rt = { jobSeq: 0, hosts: null, hostsAt: -1, failStreak: 0, failReason: null, lastBeat: 0, ri };
   rt.beat = (force) => {
     if (!force && Date.now() - rt.lastBeat < 30000) return;
     rt.lastBeat = Date.now();
@@ -144,8 +144,8 @@ export async function main(ns) {
       await cycleWork(ns, rt, st);
       tele.okRound++;
       tele.errStreak = 0;
-      tele.state = st.waiting ? "wait" : "work";
-      tele.blockedReason = null;
+      tele.state = st.fin && st.fin.blocked ? "blocked" : st.waiting ? "wait" : "work";
+      tele.blockedReason = st.fin && st.fin.blocked ? st.fin.blocked : null;
     } catch (e) {
       tele.errStreak++;
       tele.lastError = { ...fehler(e), at: Date.now() };
@@ -186,7 +186,16 @@ function loadState(ns, ri) {
   } catch {
     /* kaputt -> neu */
   }
-  return freshState(ri);
+  // Zustand verloren: die Corp-Uhr aus der letzten Telemetrie retten (sonst begaenne die Rundenplanung
+  // bei 0 h und Runde 4 kaeme Stunden zu spaet - Simulator 06.10., Zustandsverlust bei 8,5 h)
+  const fresh = freshState(ri);
+  try {
+    const t = JSON.parse(liesVonHome(ns, TELEMETRY_PATH) || "null");
+    if (t && t.nodeReset === ri.lastNodeReset && Number.isFinite(t.cycle) && t.cycle > 0) fresh.cycle = t.cycle;
+  } catch {
+    /* keine Telemetrie */
+  }
+  return fresh;
 }
 function saveState(ns, st) {
   nachHome(ns, STATE_FILE, JSON.stringify(st));
@@ -228,7 +237,8 @@ function writeTele(ns, host, ri, tele, over, st) {
 // ======================================================================== Ausfuehrung
 /** Wirte fuer Einmal-Skripte: eigener zuerst, dann home, dann der Rest (BFS ueber scan) */
 function hostList(ns, rt) {
-  if (rt.hosts && rt.jobSeq - rt.hostsAt < 500) return rt.hosts;
+  // Cache nur 20 Jobs: nach einem Einbau kommen gerootete/gekaufte Server laufend dazu (Skeptiker E2c)
+  if (rt.hosts && rt.jobSeq - rt.hostsAt < 20) return rt.hosts;
   const seen = new Set(["home"]);
   const queue = ["home"];
   while (queue.length) {
@@ -240,7 +250,8 @@ function hostList(ns, rt) {
     }
   }
   const self = ns.getHostname();
-  const rest = [...seen].filter((h) => h !== self && h !== "home" && ns.hasRootAccess(h));
+  // hacknet-server-* nicht (der Kern nimmt sie auch nicht; ihr RAM gehoert den Hashes)
+  const rest = [...seen].filter((h) => h !== self && h !== "home" && !h.startsWith("hacknet-server-") && ns.hasRootAccess(h));
   rest.sort((a, b) => ns.getServerMaxRam(b) - ns.getServerMaxRam(a));
   rt.hosts = [self, ...(self === "home" ? [] : ["home"]), ...rest];
   rt.hostsAt = rt.jobSeq;
@@ -252,6 +263,7 @@ function pickHost(ns, rt, need) {
     // home behaelt 16 GB fuer die Kernwerkzeuge (Waechter, Wachhalter)
     if (free - (h === "home" ? 16 : 0) >= need) return h;
   }
+  rt.hosts = null; // beim naechsten Versuch neu scannen
   return null;
 }
 async function runScript(ns, rt, script, order) {
@@ -314,7 +326,7 @@ async function runOps(ns, rt, ops) {
 }
 
 // ======================================================================== Lesen
-function readSnapshot(ns) {
+function readSnapshot(ns, st) {
   const c = ns.corporation;
   const corp = c.getCorporation();
   const snap = { corp, div: {}, up: {}, dummies: 0 };
@@ -334,13 +346,14 @@ function readSnapshot(ns) {
         w[city] = null;
       }
     }
-    if (d.makesProducts && d.cities.includes(MAIN_CITY)) for (const p of d.products) pr[p] = c.getProduct(dn, MAIN_CITY, p);
+    // Produktdaten kommen seit corp-e2c aus corp-tickp.js (Vorzyklus), nicht aus getProduct (RAM)
+    if (d.makesProducts) for (const p of d.products) pr[p] = (st.prodInfo || {})[p] || { developmentProgress: 0, rating: 0, effectiveRating: 0, unknown: true };
     snap.div[dn] = { info: d, office: o, wh: w, products: pr };
   }
   for (const u of Object.keys(UPGRADES)) snap.up[u] = c.getUpgradeLevel(u);
   // Die Rundenzahl kommt aus dem SPIEL, nicht aus der Zustandsdatei (Skeptiker E1 #2):
   // getInvestmentOffer().round = fundingRound + 1 (Corporation.ts:333-354)
-  snap.offer = c.getInvestmentOffer();
+  snap.offer = offerFromCorp(corp);
   return snap;
 }
 function readConfig(ns, st) {
@@ -358,12 +371,14 @@ async function cycleWork(ns, rt, st) {
   readConfig(ns, st);
   rt.cycles = (rt.cycles || 0) + 1;
   const execs0 = rt.execs || 0;
-  const snap = readSnapshot(ns);
+  const snap = readSnapshot(ns, st);
   const corp = snap.corp;
   const gameRounds = Math.min(4, Math.max(0, snap.offer.round - 1));
   if (gameRounds !== st.roundsDone && !noFix(st, "round")) {
     logEvent(ns, st, `Rundenzahl aus dem Spiel: ${gameRounds} (Zustand hatte ${st.roundsDone})`);
     st.roundsDone = gameRounds;
+    // Uhr mindestens auf den Termin der letzten angenommenen Runde (zweite Rueckfallebene nach der Telemetrie)
+    if (gameRounds > 0) st.cycle = Math.max(st.cycle, st.foundCycle + Math.round(ROUND_HOURS[gameRounds - 1] * CYCLES_PER_HOUR));
     st.freeze = false;
   }
   const P = new Planner(st, snap);
@@ -403,11 +418,19 @@ async function cycleWork(ns, rt, st) {
   // --- Takt Material + Boosts (Agri, Chem, Tob)
   const tick = P.tickOrder();
   let routeOps = [], book = {};
+  if (tick.divs.length && (st.boostPending || tick.divs.some((d) => d.boostOrder))) {
+    const rb = await runScript(ns, rt, TICKB_SCRIPT, tick);
+    noteErrors(st, rb.err);
+    if (rb.boost) for (const [dn, b] of Object.entries(rb.boost)) st.boost[dn] = b;
+    // nur wiederholen, wenn diesmal etwas gekauft wurde (sonst fehlt Platz/Geld - dann erst mit dem
+    // naechsten Boost-Auftrag des Ausbaus, alle 3 Zyklen); haelt die exec-Zahl klein (F4)
+    st.boostPending = !!rb.boostPending && (rb.ok || 0) > 0;
+    for (const d of tick.divs) d.boost = st.boost[d.name] || {};
+  }
   if (tick.divs.length) {
     const r = await runScript(ns, rt, TICK_SCRIPT, tick);
     noteErrors(st, r.err);
     if (r.price) st.price = r.price;
-    if (r.boost) for (const [dn, b] of Object.entries(r.boost)) st.boost[dn] = b;
     if (r.diag) {
       st.flow = summarizeFlow(r.diag);
       ({ ops: routeOps, book } = P.routeOps(r.diag));
@@ -418,14 +441,20 @@ async function cycleWork(ns, rt, st) {
   if (tob) {
     // in diesem Zyklus eingestellte Produkte nicht mehr anfassen (getProduct wuerde werfen)
     const gone = new Set(P.ops.filter((o) => o[0] === "dp").map((o) => o[2]));
-    const fin = Object.entries(tob.products).filter(([n, p]) => p.developmentProgress >= 100 && !gone.has(n)).map(([n]) => n);
-    if (fin.length) {
+    const all = Object.keys(tob.products).filter((n) => !gone.has(n));
+    if (all.length) {
       const ta2 = (st.rsDone[TOB] || []).includes("Market-TA.II") && st.cfg.ta2 !== false;
       const fill = {};
       for (const city of tob.info.cities) fill[city] = st.cfg.forceFill ?? (tob.wh[city] ? tob.wh[city].sizeUsed / tob.wh[city].size : 0);
-      const r = await runScript(ns, rt, TICKP_SCRIPT, { div: TOB, cities: tob.info.cities, products: fin, ta2, fill, price: st.pprice || {}, noFixLimit: noFix(st, "limit") });
+      const r = await runScript(ns, rt, TICKP_SCRIPT, { div: TOB, cities: tob.info.cities, main: MAIN_CITY, products: all, ta2, fill, price: st.pprice || {}, noFixLimit: noFix(st, "limit") });
       noteErrors(st, r.err);
       if (r.price) st.pprice = r.price;
+      if (r.info) st.prodInfo = r.info;
+      // Market-TA.II je fertigem Produkt EINMAL setzen (bleibt im Spiel stehen); t2 laeuft mit den Struktur-Ops
+      if (ta2) {
+        st.ta2Set ??= [];
+        for (const [n, p] of Object.entries(r.info || {})) if (p.developmentProgress >= 100 && !st.ta2Set.includes(n)) P.ops.push(["t2", TOB, n]);
+      }
     }
   }
   if (routeOps.length) {
@@ -481,7 +510,7 @@ async function cycleWork(ns, rt, st) {
     tobAds: tob ? tob.info.numAdVerts : 0,
     tobMain: tob && tob.office[MAIN_CITY] ? tob.office[MAIN_CITY].size : 0,
     rsDone: st.rsDone,
-    finance: st.fin ? { phase: st.fin.phase, need: st.fin.need, target: st.fin.target, targetWhy: st.fin.targetWhy, sales: (st.fin.sales || []).slice(-5), soldTotal: st.fin.soldTotal, bribedTotal: st.fin.bribedTotal, ignitedAt: st.fin.ignitedAt, ipo: st.fin.ipo, cooldownSec: corp.shareSaleCooldown / 5 } : null,
+    finance: st.fin ? { phase: st.fin.phase, blocked: st.fin.blocked, request: st.fin.request, sales: (st.fin.sales || []).slice(-5), soldTotal: st.fin.soldTotal, bribed: st.fin.bribed, bribedTotal: st.fin.bribedTotal, ignitedAt: st.fin.ignitedAt, ipo: st.fin.ipo, cooldownSec: corp.shareSaleCooldown / 5 } : null,
   };
 }
 /** Nur fuer den Testnachweis (rot ohne Fix): data/corp-config.txt {"noFix":["freeze","round","beat"]} */
@@ -490,110 +519,122 @@ function noFix(st, name) {
 }
 // ======================================================================== Etappe 3: Geld an den Spieler
 /**
- * ZUENDUNG: Minimum der letzten 30 Zyklus-Bewertungen >= 1e15 (corplib.ignitedSmooth) und alle vier
- * Runden durch. Notausgang: {"ipoEarly":true} erlaubt den Boersengang schon nach Runde 3, sobald Geld
- * angefordert ist (Skeptiker-Korrektur 2).
+ * SCHNITTSTELLE (festgelegt vom Koordinator 06.10.2026, Fassung corp-e3b):
+ *   data/corp-geld.txt, geschrieben NUR von bn4rep.js, gelesen hier:
+ *   {"v":1,"ts":<ms Wanduhr>,"nodeReset":<getResetInfo().lastNodeReset>,"augReset":<lastAugReset>,
+ *    "betrag":<$ Spielergeld, das JETZT fuer die geplante Kaufrunde fehlt, 0 = nichts>,
+ *    "bestechung":{"<Faktion>":<Ruf, der fuer die geplante Runde fehlt>,...},"von":"bn4rep"}
+ *   Gehandelt wird NUR bei frischer Datei (ts < 20 min) mit passendem nodeReset UND augReset.
+ *   Sonst kein Verkauf und keine Bestechung. Es gibt KEINE Vorgabe mehr (Skeptiker E3 Befund 2:
+ *   die alte Vorgabe aus bn4rep.json verkaufte stuendlich fuer unkaufbare Stuecke); data/geldbedarf.txt
+ *   ist kein Verkaufsgrund.
  *
- * WIEVIEL: Ziel = groesster Wert aus
- *   (1) data/corp-geld.txt  {"betrag": $, "ts": ms}  - ANFORDERUNG, 2 h gueltig (bn4rep/graft koennen schreiben)
- *   (2) data/geldbedarf.txt - Ruecklage, die bn4rep.js fuer die Torrunde haelt
- *   (3) Vorgabe aus data/bn4rep.json: Preis des naechsten Ziels x (1 + 1,9 + ... + 1,9^(k-1)), k = offene
- *       Stuecke (hoechstens 10), plus {"graftGeld"} - gedeckelt auf {"defaultCap"} (Vorgabe 1e15). GESCHAETZT:
- *       bn4rep meldet nur den Preis des naechsten Ziels, nicht aller offenen Stuecke.
- * Verkauft wird Bedarf = Ziel - Spielergeld (x1,1), wenn > {"minSale"} (1e9). Sperre 1 h je Verkauf
- * (Constants.ts:50) -> Tranchen hoechstens stuendlich. Nie alle: {"keepFrac"} (5 %) der Anteile beim
- * Boersengang bleiben, je Verkauf hoechstens {"maxPart"} (10 %) der Anteile, hoechstens 1e14.
- * WARUM NUR 10 %: Nach dem Boersengang folgt der Kurs dem Ziel nur um ~0,5 %/Zyklus (x6/h,
- * Corporation.ts:264-274), die Bewertung waechst nach der Zuendung aber x1000 in 2 h. Ein grosser
- * Verkauf im IPO-Zyklus verschenkt die spaeteren Kurse (Simulator 06.10., Saat 3: 50 % beim IPO
- * brachten 34 Bio, der Rest waere Stunden spaeter ein Vielfaches wert gewesen).
+ * ZUENDUNG: Minimum der letzten 60 Zyklusbewertungen (= 10 min Corp-Zeit; jede Zyklusbewertung ist
+ * schon ein 10-Zyklen-Mittel, Corporation.ts:226-232) >= 1e15 und Runde 4 durch. Warum 60 statt 30:
+ * die Bewertung springt in der Zuendphase um Faktoren (Saat 3: 3,7e14 bei 10 h, 3,3e14 bei 12 h);
+ * 10 min kosten bei x1000 in 2 h Wachstum ~6 % Bewertung und schliessen eine Einzelspitze sicher aus.
+ * Notausgang {"ipoEarly":true}: Boersengang schon nach Runde 3, aber NUR mit frischer Anforderung
+ * betrag > 0 und NIE im Ausgabenstopp vor Runde 4 (Skeptiker E3 Befund 3).
  *
- * BESTECHUNG: erst nach dem ersten Verkauf (senkt die Bewertung, Skeptiker-Korrektur 4), Bewertung
- * >= 1e14 (Constants.ts:61), Kasse >= {"bribeMinFunds"} (1e15; vorher kostet jede Bestechung Wachstum,
- * strategie.md E), nie Bladeburners (FactionInfo.tsx:711-713), je Faktion der fehlende Ruf aus
- * bn4rep.json offenJeFaktion[f].fehlt x 1e9 $, je Durchgang hoechstens {"bribeShare"} (5 %) der Kasse,
- * dieselbe Faktion fruehestens nach 20 min wieder (bn4rep muss den neuen Ruf erst sehen).
+ * VERKAUF: betrag x 1,1 (ab {"minSale"} 1e9), je Verkauf hoechstens {"maxPart"} 10 % der Anteile,
+ * {"keepFrac"} 5 % der Anteile beim Boersengang bleiben (abgeleitet aus dem Spiel: numShares +
+ * issuedShares, robust gegen Zustandsverlust), Sperre 1 h aus dem Spiel (shareSaleCooldown), dieselbe
+ * Anforderung (ts) wird nie zweimal bedient.
+ * Quirk calculateShareSale (Befund 6): ist der Rest >= dem Zaehler bis zur Preisstufe, zahlt das Spiel
+ * einen vollen 1e6-Schritt. Entscheidung: der Mehrerloes wird nur bis x3 des Ziels angenommen; liegt
+ * die kleinste ausreichende Menge darueber, wird ein Anteil weniger verkauft, sofern das noch >= 50 %
+ * des Ziels bringt (der Rest kommt mit der naechsten Tranche). Begruendung: ueberschuessiges Geld
+ * versickert bei anderen Ausgebern des Bots (Befund 2), und ein unnoetig grosser Verkauf drueckt den
+ * Kurs fuer die naechste Tranche. Ist schon 1 Anteil > x3 wert (spaete Phase), wird er verkauft.
+ *
+ * BESTECHUNG: nur die Mengen aus "bestechung" (Ruf x 1e9 x 1,02 je Faktion), nie Bladeburners, jede
+ * Faktion je Anforderung (ts) hoechstens einmal (Befund 1), Bewertung >= 1e14 (Constants.ts:61), Kasse
+ * >= {"bribeMinFunds"} 1e15, je Faktion hoechstens {"bribeShare"} 25 % der Kasse (passt es nicht ganz,
+ * wird gewartet statt teilweise bezahlt). Nicht in den 11 Zyklen vor einem planbaren Verkauf
+ * (Befund 5); im selben Zyklus NACH einem Verkauf ist es erlaubt (Sperre laeuft dann 360 Zyklen).
  */
 async function financeWork(ns, rt, st, snap, P) {
   const corp = snap.corp;
   const cfg = (k, d) => (st.cfg && st.cfg[k] !== undefined ? st.cfg[k] : d);
-  st.fin ??= { phase: "halten", sales: [], soldTotal: 0, bribed: {}, bribeFail: {}, bribedTotal: 0, vHist: [] };
+  st.fin ??= { phase: "halten", sales: [], soldTotal: 0, bribed: {}, bribedTotal: 0, vHist: [] };
   const fin = st.fin;
+  fin.bribeTs ??= {};
   fin.vHist.push(corp.valuation);
   if (fin.vHist.length > 60) fin.vHist.shift();
-  const smoothN = noFix(st, "smooth") ? 1 : 30;
+  const smoothN = noFix(st, "smooth") ? 1 : 60;
   const ignited = ignitedSmooth(fin.vHist, cfg("igniteV", 1e15), smoothN);
   if (ignited && !fin.ignitedAt) {
     fin.ignitedAt = +P.hours.toFixed(3);
     logEvent(ns, st, `Zuendung erkannt: Bewertung ${fmt(corp.valuation)} seit ${smoothN} Zyklen >= ${fmt(cfg("igniteV", 1e15))}`);
   }
-  const mayIpo = (st.roundsDone >= 4 && ignited) || (cfg("ipoEarly", false) && st.roundsDone >= 3);
+  // --- Anforderung lesen und pruefen
+  const req = readRequest(ns, rt, st);
+  fin.request = req.ok ? { ts: req.ts, betrag: req.betrag, bestechung: req.bestechung } : { invalid: req.why };
+  const betrag = req.ok ? req.betrag : 0;
+  const early = cfg("ipoEarly", false) && st.roundsDone >= 3 && betrag > 0 && (noFix(st, "early") || !st.freeze);
+  const mayIpo = (st.roundsDone >= 4 && ignited) || early;
   fin.phase = corp.public ? "oeffentlich" : mayIpo ? "zuendbereit" : "halten";
+  // (9) Ohne Runde 4 und ohne ipoEarly gibt es keinen Weg zum Geld - sichtbar machen statt stumm
+  const maxRound = P.etappe() >= 2 ? cfg("maxRound", MAX_ROUND) : 1;
+  fin.blocked = !corp.public && maxRound < 4 && !cfg("ipoEarly", false) && st.roundsDone >= maxRound ? "no_ipo_path" : null;
+  if (fin.blocked) st.next = `Kein Boersengang moeglich: maxRound ${maxRound} < 4 und ipoEarly aus`;
+  const coolCycles = corp.shareSaleCooldown / 50; // 50 Spielzyklen je Corp-Zyklus (Constants.ts gameCyclesPerMarketCycle)
   const canSell = corp.public ? corp.shareSaleCooldown <= 0 : mayIpo;
-  // Bedarf nur lesen, wenn verkauft werden koennte (spart scp je Zyklus)
-  if (canSell && st.cycle % 3 === 0) {
-    const tg = moneyTarget(ns, cfg);
-    const money = ns.getServerMoneyAvailable("home");
-    fin.target = tg.value;
-    fin.targetWhy = tg.why;
-    fin.need = Math.max(0, tg.value - money);
-    if (fin.need > cfg("minSale", 1e9)) {
-      const ipo = !corp.public;
-      let keep = fin.keep || 1;
-      if (ipo) {
-        keep = Math.max(1, Math.ceil(cfg("keepFrac", 0.05) * corp.numShares));
-        fin.keep = keep;
-        // Liquidationswert-Vergleich: privat (Verkauf im IPO-Zyklus) gegen geschaetzt oeffentlich
-        let ow = 12 * snap.dummies;
-        for (const d of Object.values(snap.div)) ow += Object.keys(d.office).length + Object.values(d.wh).filter(Boolean).length;
-        const vPub = publicValuationEstimate(corp.funds, corp.revenue - corp.expenses, ow);
-        fin.ipo = { h: +P.hours.toFixed(3), vPriv: corp.valuation, vPubEst: vPub, liqPriv: liquidationValue(corp.valuation, corp.numShares, corp.totalShares), liqPubEst: liquidationValue(vPub, corp.numShares, corp.totalShares) };
-      }
-      const r = await runOps(ns, rt, [["sl", fin.need * 1.1, keep, ipo, cfg("maxPart", 0.1)]]);
-      noteErrors(st, r.err);
-      const res = r.ret[0];
-      if (res && !res.error && res.n > 0) {
-        fin.soldTotal += res.got;
-        fin.sales.push({ h: +P.hours.toFixed(3), wall: Date.now(), n: res.n, got: res.got, pred: res.pred, need: fin.need, ipo: !!res.ipo });
-        if (fin.sales.length > 50) fin.sales.shift();
-        logEvent(ns, st, `${res.ipo ? "BOERSENGANG + " : ""}Verkauf ${fmt(res.n)} Anteile -> ${fmt(res.got)} an den Spieler (Bedarf ${fmt(fin.need)}, ${tg.why}; vorhergesagt ${fmt(res.pred)})` +
-          (res.ipo ? ` | Vergleich privat ${fmt(fin.ipo.vPriv)} / oeffentlich geschaetzt ${fmt(fin.ipo.vPubEst)}` : ""));
-      } else if (res && res.ipo) logEvent(ns, st, `Boersengang ohne Verkauf: ${JSON.stringify(res)}`);
+  let soldNow = false;
+  if (canSell && req.ok && betrag > cfg("minSale", 1e9) && fin.lastSaleTs !== req.ts) {
+    const ipo = !corp.public;
+    // Anteile beim Boersengang = heute gehaltene + seither verkaufte (Actions.ts:373-374) - aus dem Spiel
+    const keep = Math.max(1, Math.ceil(cfg("keepFrac", 0.05) * (corp.numShares + (corp.public ? corp.issuedShares : 0))));
+    if (ipo) {
+      let ow = 12 * snap.dummies;
+      for (const d of Object.values(snap.div)) ow += Object.keys(d.office).length + Object.values(d.wh).filter(Boolean).length;
+      const vPub = publicValuationEstimate(corp.funds, corp.revenue - corp.expenses, ow);
+      fin.ipo = { h: +P.hours.toFixed(3), vPriv: corp.valuation, vPubEst: vPub, liqPriv: liquidationValue(corp.valuation, corp.numShares, corp.totalShares), liqPubEst: liquidationValue(vPub, corp.numShares, corp.totalShares) };
     }
+    const r = await runOps(ns, rt, [["sl", betrag * 1.1, keep, ipo, cfg("maxPart", 0.1), noFix(st, "until") ? 1e6 : fin.until || 1e6, noFix(st, "quirk") ? 0 : cfg("quirkMax", 3)]]);
+    noteErrors(st, r.err);
+    const res = r.ret[0];
+    if (res && !res.error && res.n > 0) {
+      soldNow = true;
+      fin.lastSaleTs = req.ts;
+      fin.soldTotal += res.got;
+      fin.until = res.until;
+      fin.sales.push({ h: +P.hours.toFixed(3), wall: Date.now(), n: res.n, got: res.got, pred: res.pred, need: betrag, ipo: !!res.ipo, ts: req.ts });
+      if (fin.sales.length > 50) fin.sales.shift();
+      logEvent(ns, st, `${res.ipo ? "BOERSENGANG + " : ""}Verkauf ${fmt(res.n)} Anteile -> ${fmt(res.got)} an den Spieler (Anforderung ${fmt(betrag)}; vorhergesagt ${fmt(res.pred)}${res.trimmed ? ", Quirk-Schritt vermieden" : ""})` +
+        (res.ipo ? ` | Vergleich privat ${fmt(fin.ipo.vPriv)} / oeffentlich geschaetzt ${fmt(fin.ipo.vPubEst)}` : ""));
+    } else if (res && res.ipo) logEvent(ns, st, `Boersengang ohne Verkauf: ${JSON.stringify(res)}`);
   }
-  // --- Bestechung (nach dem ersten Verkauf)
-  const afterSale = noFix(st, "bribeOrder") || (corp.public && fin.sales.length);
-  if (afterSale && corp.valuation >= 1e14 && corp.funds >= cfg("bribeMinFunds", 1e15) && st.cycle % 30 === 0 && cfg("bribe", true) !== false) {
-    const rep = readJson(ns, BN4REP_FILE);
-    const offen = rep && rep.offenJeFaktion;
-    if (offen && Date.now() - (rep.ts || rep.wall || 0) < 30 * 60000) {
-      let budget = cfg("bribeShare", 0.05) * corp.funds;
-      const ops = [];
-      for (const [f, e] of Object.entries(offen).sort((a, b) => b[1].fehlt - a[1].fehlt)) {
-        if ((f === "Bladeburners" && !noFix(st, "bb")) || !(e.fehlt > 0)) continue;
-        const last = fin.bribed[f];
-        if (last && Date.now() - last.wall < 20 * 60000) continue;
-        const fail = fin.bribeFail[f];
-        if (fail && fail.n >= 3 && Date.now() - fail.wall < 2 * 3600000) continue;
-        const amt = Math.min(e.fehlt * 1e9 * 1.02, budget);
-        if (!(amt >= 1e9)) break;
-        ops.push(["bb", f, amt]);
-        budget -= amt;
-      }
-      if (ops.length) {
-        const r = await runOps(ns, rt, ops);
-        ops.forEach((op, i) => {
-          const ok = r.ret[i] === true;
-          if (ok) {
-            fin.bribed[op[1]] = { wall: Date.now(), rep: op[2] / 1e9, total: ((fin.bribed[op[1]] || {}).total || 0) + op[2] / 1e9 };
-            fin.bribedTotal += op[2];
-            logEvent(ns, st, `Bestechung ${op[1]}: ${fmt(op[2] / 1e9)} Ruf fuer ${fmt(op[2])}`);
-          } else {
-            const f0 = fin.bribeFail[op[1]] || { n: 0 };
-            fin.bribeFail[op[1]] = { n: f0.n + 1, wall: Date.now() };
-          }
-        });
-      }
+  // --- Bestechung
+  const bribes = req.ok ? req.bestechung : {};
+  const salePending = betrag > cfg("minSale", 1e9) && fin.lastSaleTs !== req.ts && (corp.public ? coolCycles <= 11 : mayIpo);
+  const bribeWindowOk = noFix(st, "bribeOrder") || soldNow || !salePending;
+  if (req.ok && bribeWindowOk && corp.valuation >= 1e14 && corp.funds >= cfg("bribeMinFunds", 1e15) && cfg("bribe", true) !== false) {
+    const ops = [];
+    let funds = corp.funds;
+    for (const [f, rep] of Object.entries(bribes || {})) {
+      if (f === "Bladeburners" || !(rep > 0)) continue;
+      if (fin.bribeTs[f] === req.ts && !noFix(st, "bribeTs")) continue;
+      const amt = rep * 1e9 * 1.02;
+      if (amt > cfg("bribeShare", 0.25) * funds) continue;
+      ops.push(["bb", f, amt]);
+      funds -= amt;
+    }
+    if (ops.length) {
+      const r = await runOps(ns, rt, ops);
+      noteErrors(st, r.err);
+      ops.forEach((op, i) => {
+        if (r.ret[i] === true) {
+          fin.bribeTs[op[1]] = req.ts;
+          fin.bribed[op[1]] = { wall: Date.now(), rep: op[2] / 1e9, total: ((fin.bribed[op[1]] || {}).total || 0) + op[2] / 1e9 };
+          fin.bribedTotal += op[2];
+          logEvent(ns, st, `Bestechung ${op[1]}: ${fmt(op[2] / 1e9)} Ruf fuer ${fmt(op[2])} (Anforderung ${req.ts})`);
+        } else {
+          // abgelehnt (kein Mitglied, keine Arbeit): fuer diese Anforderung nicht noch einmal versuchen
+          fin.bribeTs[op[1]] = req.ts;
+          logEvent(ns, st, `Bestechung ${op[1]} abgelehnt`);
+        }
+      });
     }
   }
 }
@@ -604,30 +645,32 @@ function readJson(ns, file) {
     return null;
   }
 }
-function moneyTarget(ns, cfg) {
-  const out = { value: 0, why: "kein Bedarf" };
-  const take = (v, why) => {
-    if (Number.isFinite(v) && v > out.value) {
-      out.value = v;
-      out.why = why;
-    }
-  };
-  const req = readJson(ns, MONEY_REQUEST_FILE);
-  if (req && typeof req === "object" && Date.now() - (req.ts || 0) < 2 * 3600000) take(Number(req.betrag), `Anforderung ${req.von || "?"}`);
-  else if (typeof req === "number") take(req, "Anforderung (Zahl)");
-  take(Number(liesVonHome(ns, MONEY_RESERVE_FILE) || 0), "geldbedarf.txt");
+/** data/corp-geld.txt lesen und pruefen (Schnittstelle oben). Rueckgabe {ok, ts, betrag, bestechung} oder {ok:false, why} */
+function readRequest(ns, rt, st) {
+  if (noFix(st, "default")) return legacyRequest(ns);
+  const r = readJson(ns, MONEY_REQUEST_FILE);
+  if (!r || typeof r !== "object") return { ok: false, why: "keine Anforderung" };
+  if (r.v !== 1) return { ok: false, why: "Version" };
+  if (!(Date.now() - Number(r.ts) < 20 * 60000)) return { ok: false, why: "veraltet" };
+  if (r.nodeReset !== rt.ri.lastNodeReset || r.augReset !== rt.ri.lastAugReset) return { ok: false, why: "anderer Knoten/Einbau" };
+  const betrag = Number(r.betrag);
+  return { ok: true, ts: Number(r.ts), betrag: Number.isFinite(betrag) && betrag > 0 ? betrag : 0, bestechung: r.bestechung && typeof r.bestechung === "object" ? r.bestechung : {} };
+}
+/** NUR fuer den Rot-Nachweis {"noFix":["default"]}: alte Ziellogik (Vorgabe aus bn4rep.json/geldbedarf.txt) */
+function legacyRequest(ns) {
+  let v = Number(liesVonHome(ns, MONEY_RESERVE_FILE) || 0);
   const rep = readJson(ns, BN4REP_FILE);
   if (rep && rep.preis > 0) {
     const k = Math.min(10, Math.max(1, rep.offen || 1));
     let sum = 0;
     for (let i = 0; i < k; i++) sum += rep.preis * Math.pow(1.9, i);
-    take(Math.min(cfg("defaultCap", 1e15), sum + cfg("graftGeld", 0)), `Vorgabe ${k} Stuecke ab ${rep.ziel || "?"}`);
+    v = Math.max(v, Math.min(1e15, sum));
   }
-  return out;
+  return { ok: true, ts: Math.floor(Date.now() / 3600000), betrag: v, bestechung: {} };
 }
 /** Struktur-Ops nach Familie buendeln, Reihenfolge innerhalb einer Familie bleibt (stabil). Rang folgt
  *  den Abhaengigkeiten: Division/Stadt/Lager vor Buero, Buero vor Werbung/Tee, Produkte zuletzt. */
-const FAMILY_RANK = { "corp-act-build.js": 0, "corp-act-office.js": 1, "corp-act-up.js": 2, "corp-act-care.js": 3, "corp-act-prod.js": 4, "corp-act-route.js": 5, "corp-act-cash.js": 6, "corp-act-fin.js": 7 };
+const FAMILY_RANK = { "corp-act-new.js": 0, "corp-act-build.js": 1, "corp-act-wh.js": 2, "corp-act-size.js": 3, "corp-act-office.js": 4, "corp-act-up.js": 5, "corp-act-rs.js": 6, "corp-act-care.js": 7, "corp-act-prod.js": 8, "corp-act-route.js": 9, "corp-act-cash.js": 10, "corp-act-bribe.js": 11, "corp-act-fin.js": 12 };
 function bundleOps(ops) {
   return ops.map((op, i) => ({ op, i, r: FAMILY_RANK[FAMILY[op[0]]] ?? 9 })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.op);
 }
@@ -1120,6 +1163,10 @@ class Planner {
     for (let i = 0; i < ops.length; i++) {
       const op = ops[i];
       const res = r.ret[i];
+      if (op[0] === "t2" && !(res && res.error)) {
+        st.ta2Set ??= [];
+        if (!st.ta2Set.includes(op[2])) st.ta2Set.push(op[2]);
+      }
       if (op[0] === "rs" && !(res && res.error)) {
         st.rsDone[op[1]] ??= [];
         if (!st.rsDone[op[1]].includes(op[2])) {

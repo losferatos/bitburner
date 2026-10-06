@@ -19,6 +19,7 @@ import { enterBitNode } from "../../../../reference/v301/src/RedPill";
 import { getDefaultBitNodeOptions } from "../../../../reference/v301/src/BitNode/BitNodeUtils";
 import { calculateRamUsage } from "../../../../reference/v301/src/Script/RamCalculations";
 import { Script } from "../../../../reference/v301/src/Script/Script";
+import { Factions } from "../../../../reference/v301/src/Faction/Factions";
 
 initGameEnvironment();
 
@@ -136,6 +137,7 @@ function makeNs(script: string, host: string, args: any[], w: World): any {
     getServerMaxRam: (h: string) => w.hosts[h].max,
     getServerUsedRam: (h: string) => w.hosts[h].used,
     getScriptRam: (s: string) => RAM[s]?.cost ?? 0,
+    getServerMoneyAvailable: () => Player.money,
     exec: (s: string, h: string, _th: number, ...a: any[]) => startScript(s, h, a, w),
     readPort: (p: number) => w.ports.get(p)?.shift() ?? "NULL PORT DATA",
     writePort: (p: number, d: string) => {
@@ -237,6 +239,26 @@ for (const seed of seeds) {
     // CORP_RESTART=a,b: Koordinator stirbt bei a h (Einbau, F8) und startet bei b h neu
     const RS = (process.env.CORP_RESTART ?? "").split(",").filter(Boolean).map(Number);
     let restarted = 0;
+    const SW = (process.env.CORP_SWITCH ?? "").split(",").filter(Boolean);
+    // Etappe 3: CORP_NEEDS="h:betrag,..." schreibt data/geldbedarf.txt; CORP_SPEND=1: Spieler gibt
+    // alles Geld sofort aus (jeder Zyklus Geld -> 1000); CORP_INSTALL=h: Einbau (Geld 1000, Skripte tot,
+    // sofort neu gestartet); CORP_BN4REP: JSON fuer data/bn4rep.json (ts wird frisch gehalten);
+    // CORP_FACTIONS: Mitgliedschaften des Spielers
+    const NEEDS = (process.env.CORP_NEEDS ?? "").split(",").filter(Boolean).map((x) => x.split(":").map(Number));
+    const SPEND = process.env.CORP_SPEND === "1";
+    const REQS = (process.env.CORP_REQ ?? "").split(",").filter(Boolean).map((x) => x.split(":").map(Number));
+    const INSTALLS = (process.env.CORP_INSTALL ?? "").split(",").filter(Boolean).map(Number);
+    let installsDone = 0;
+    const BN4REP = process.env.CORP_BN4REP ? JSON.parse(process.env.CORP_BN4REP) : null;
+    for (const f of (process.env.CORP_FACTIONS ?? "").split(",").filter(Boolean)) if (!Player.factions.includes(f as any)) Player.factions.push(f as any);
+    const rep0: Record<string, number> = {};
+    for (const f of Object.keys((BN4REP && BN4REP.offenJeFaktion) || {})) rep0[f] = (Factions as any)[f]?.playerReputation ?? 0;
+    const vEvery: { t: number; v: number }[] = [];
+    let ipoAt = -1;
+    let ipoMin30 = NaN;
+    let spentTotal = 0;
+    let switched = false;
+    let stuck = 0;
     try {
     let t = 0;
     let lastRound = 0;
@@ -269,6 +291,47 @@ for (const seed of seeds) {
           walls.add(JSON.parse(W.files.get("data/corp.json") || "{}").wall);
         }
         pauseBeats = walls.size;
+      }
+      // CORP_SWITCH=h,live|strip: bei h Stunden Etappe 2 freischalten (Config-Datei). "strip": dazu
+      // Koordinator neu starten und die Zustandsfelder entfernen, die der live laufende Etappe-1-Code
+      // (Commit a28ed02) nicht kennt - Uebergang alter Zustand -> neuer Code.
+      if (SW.length === 2 && !switched && t >= Number(SW[0]) * 3600) {
+        switched = true;
+        await settle(coord);
+        W.files.set("data/corp-config.txt", process.env.CORP_SWITCH_CFG ?? '{"etappe":2}');
+        if (SW[1] === "strip") {
+          DEAD.add(coord);
+          W.running.delete(coord);
+          W.hosts.werk.used -= RAM["corp.js"].cost;
+          const stOld = JSON.parse(W.files.get("data/corp-state.txt") || "{}");
+          for (const k of ["rsDone", "routes", "seen", "productSeq", "dummySeq", "cfg", "cfgAt", "roundShift", "freezeAt", "pprice", "flow"]) delete stOld[k];
+          W.files.set("data/corp-state.txt", JSON.stringify(stOld));
+          W.waiting = false;
+          coord = startScript("corp.js", "werk", []);
+        }
+      }
+      for (const [h, b] of NEEDS) if (t >= h * 3600 && t < h * 3600 + 2) W.files.set("data/geldbedarf.txt", String(b));
+      // CORP_REQ="h:betrag": Anforderung data/corp-geld.txt mit frischem Zeitstempel ab h (bleibt stehen)
+      for (const [h, b] of REQS) if (t >= h * 3600 && t < h * 3600 + 2) W.files.set("data/corp-geld.txt", JSON.stringify({ betrag: b, ts: W.clock, von: "test" }));
+      if (BN4REP) {
+        // fehlt sinkt mit dem tatsaechlich erhaltenen Ruf (wie bn4rep es meldet)
+        const oj: any = {};
+        for (const [f, e] of Object.entries(BN4REP.offenJeFaktion || {}) as [string, any][]) {
+          const got = ((Factions as any)[f]?.playerReputation ?? 0) - (rep0[f] ?? 0);
+          oj[f] = { ...e, fehlt: Math.max(0, e.fehlt - got) };
+        }
+        W.files.set("data/bn4rep.json", JSON.stringify({ ...BN4REP, offenJeFaktion: oj, ts: W.clock }));
+      }
+      if (installsDone < INSTALLS.length && t >= INSTALLS[installsDone] * 3600) {
+        installsDone++;
+        await settle(coord);
+        DEAD.add(coord);
+        W.running.delete(coord);
+        W.hosts.werk.used -= RAM["corp.js"].cost;
+        spentTotal += Math.max(0, Player.money - 1000);
+        Player.money = 1000;
+        W.waiting = false;
+        coord = startScript("corp.js", "werk", []);
       }
       if (RS.length === 2 && restarted === 0 && t >= RS[0] * 3600) {
         DEAD.add(coord);
@@ -326,14 +389,31 @@ for (const seed of seeds) {
         if (process.env.CORP_PDEBUG && agri && d.price) {
           const m = agri.warehouses["Sector-12"].materials.Plants;
           const pr = d.price["Agri|Sector-12|Plants"];
-          if (((W as any).pdbg ??= 0) < Number(process.env.CORP_PDEBUG)) {
+          if (t >= Number(process.env.CORP_PDEBUG_FROM ?? 0) * 3600 && ((W as any).pdbg ??= 0) < Number(process.env.CORP_PDEBUG)) {
             (W as any).pdbg++;
-            console.log(`PD t=${(t / 3600).toFixed(3)} D=${pr?.d?.toExponential(3)} kind=${pr?.kind} x=${pr?.x?.toExponential(3)} Dreal=${internalD(agri, "Sector-12", "Plants").toExponential(3)} stored=${m.stored.toFixed(1)} sold=${m.actualSellAmount.toFixed(2)} prod=${m.productionAmount.toFixed(2)} MP=${m.marketPrice.toFixed(0)} price=${m.desiredSellPrice} q=${m.quality.toFixed(2)}`);
+            console.log(`PD t=${(t / 3600).toFixed(3)} V=${(c.valuation / 1e9).toFixed(0)} cv=${(c.cycleValuation / 1e9).toFixed(0)} F=${(c.funds / 1e9).toFixed(1)} dA=${((c.totalAssets - c.previousTotalAssets) / 1e7).toFixed(2)}M D=${pr?.d?.toExponential(3)} kind=${pr?.kind} x=${pr?.x?.toExponential(3)} Dreal=${internalD(agri, "Sector-12", "Plants").toExponential(3)} stored=${m.stored.toFixed(1)} sold=${m.actualSellAmount.toFixed(2)} prod=${m.productionAmount.toFixed(2)} MP=${m.marketPrice.toFixed(0)} price=${m.desiredSellPrice} q=${m.quality.toFixed(2)}`);
           }
         }
         W.tickDiag.length = 0;
       }
       if (next === "START") {
+        {
+          // haengende Produktionsgrenze: jede (Produkt, Stadt) mit Grenze < 0,01/s zaehlt je Zyklus
+          const tobS = c.divisions.get("Tob");
+          if (tobS) for (const pr of tobS.products.values()) if (pr.finished) for (const cd of Object.values(pr.cityData) as any[]) if (cd.productionLimit !== null && cd.productionLimit < 1e-2) stuck++;
+        }
+        vEvery.push({ t, v: c.valuation });
+        if (vEvery.length > 40) vEvery.shift();
+        if (c.public && ipoAt < 0) {
+          ipoAt = t / 3600;
+          // c.valuation VOR dem START-Zustand = Wert, den der Bot nach dem vorigen START las:
+          // das Fenster des Bots (30 Werte bis zum IPO-Zyklus) sind die letzten 30 Eintraege
+          ipoMin30 = Math.min(...vEvery.slice(-30).map((x) => x.v));
+        }
+        if (SPEND && Player.money > 1000) {
+          spentTotal += Player.money - 1000;
+          Player.money = 1000;
+        }
         const tele = JSON.parse(W.files.get("data/corp.json") || "{}");
         maxErrStreak = Math.max(maxErrStreak, tele.errStreak || 0);
         if ((tele.errStreak || 0) > 5) throw new Error("errStreak > 5: " + JSON.stringify(tele.lastError));
@@ -408,6 +488,10 @@ for (const seed of seeds) {
       finalState: st,
       finalTele: JSON.parse(W.files.get("data/corp.json") || "{}"),
       lastTickp: W.tickpLast,
+      ipoAt,
+      ipoMin30,
+      spentTotal,
+      bribedRep: Object.fromEntries((process.env.CORP_FACTIONS ?? "").split(",").filter(Boolean).map((f) => [f, (Factions as any)[f]?.playerReputation ?? null])),
       lastTick: (W as any).tickLast,
       pauseBeats,
     };
@@ -419,7 +503,33 @@ for (const seed of seeds) {
     );
     if (Player.corporation) expect(costErr).toEqual([]);
     const fr = Player.corporation ? (Player.corporation as any).fundingRound : 0;
-    console.log(`ERGEBNIS fundingRound=${fr} pauseBeats=${pauseBeats}`);
+    const ign = traj.find((p) => p.valuation >= 1e15);
+    console.log(`ERGEBNIS fundingRound=${fr} pauseBeats=${pauseBeats} zuendung1e15=${ign ? ign.h : "-"} V_end=${traj.length ? traj[traj.length - 1].valuation.toExponential(2) : "-"} fehler=${(st.errors || []).length}`);
+    if (process.env.CORP_EXPECT_IGNITION) expect(ign && ign.h <= Number(process.env.CORP_EXPECT_IGNITION)).toBe(true);
+    const fin = (st.fin || {}) as any;
+    const sales = fin.sales || [];
+    const calErr = sales.filter((x: any) => x.pred > 0).map((x: any) => x.got / x.pred - 1);
+    console.log(`FINANZ ipoAt=${ipoAt.toFixed ? ipoAt.toFixed(3) : ipoAt} ipoMin30=${ipoMin30} verkaeufe=${sales.length} erloes=${(fin.soldTotal || 0).toExponential(2)} ausgegeben=${spentTotal.toExponential(2)} kalib=${JSON.stringify(calErr.map((x: number) => +x.toExponential(2)))} bestochen=${JSON.stringify(fin.bribed || {})} ruf=${JSON.stringify(res.bribedRep)}`);
+    const execs = (JSON.parse(W.files.get("data/corp.json") || "{}").execsPerCycle);
+    console.log(`E2FIX haengendeGrenzen=${stuck} execsJeZyklus=${execs} runden=${JSON.stringify((st.rounds || []).map((r: any) => [r.k, r.h, +(r.funds / 1e9).toFixed(1)]))} autobrew=${JSON.stringify(((st.rsDone || {}).Tob || []).slice(0, 4))}`);
+    if (process.env.CORP_EXPECT_NOSTUCK) expect(stuck).toBe(0);
+    if (process.env.CORP_EXPECT_R2MIN) expect(((st.rounds || []).find((r: any) => r.k === 2) || { funds: 0 }).funds).toBeGreaterThanOrEqual(Number(process.env.CORP_EXPECT_R2MIN));
+    if (process.env.CORP_EXPECT_SMOOTH) expect(ipoAt > 0 && ipoMin30 >= Number(process.env.CORP_EXPECT_SMOOTH)).toBe(true);
+    if (process.env.CORP_EXPECT_SALES) expect(sales.length).toBeGreaterThanOrEqual(Number(process.env.CORP_EXPECT_SALES));
+    if (process.env.CORP_EXPECT_BRIBEAFTER) {
+      const ev = res.events;
+      const iS = ev.findIndex((e: string) => /Verkauf /.test(e));
+      const iB = ev.findIndex((e: string) => /Bestechung /.test(e));
+      console.log(`REIHENFOLGE ersterVerkauf=${iS} ersteBestechung=${iB}`);
+      expect(iB < 0 || (iS >= 0 && iB > iS)).toBe(true);
+    }
+    if (process.env.CORP_EXPECT_REQ) {
+      const [h, b] = process.env.CORP_EXPECT_REQ.split(":").map(Number);
+      const sl = sales.find((x: any) => x.h >= h);
+      console.log(`ANFORDERUNG ab ${h} h ${b}: Verkauf ${JSON.stringify(sl)}`);
+      expect(!!sl && Math.abs(sl.need / b - 1) < 0.01 && Math.abs(sl.got / (1.1 * sl.need) - 1) < 0.02).toBe(true);
+    }
+    if (process.env.CORP_EXPECT_NOBB) expect(((res.bribedRep as any)["Bladeburners"] ?? 0)).toBe(0);
     if (process.env.CORP_EXPECT_ROUND) expect(fr).toBe(Number(process.env.CORP_EXPECT_ROUND));
     if (process.env.CORP_EXPECT_MINROUND) expect(fr).toBeGreaterThanOrEqual(Number(process.env.CORP_EXPECT_MINROUND));
     if (process.env.CORP_EXPECT_BEATS) expect(pauseBeats).toBeGreaterThanOrEqual(Number(process.env.CORP_EXPECT_BEATS));

@@ -1,0 +1,2796 @@
+{
+ "seed": 1,
+ "hours": 24,
+ "wallSec": -1210052.503,
+ "rounds": [
+  {
+   "k": 1,
+   "h": 0.5,
+   "funds": 128555970000,
+   "shares": 100000000,
+   "valuation": 428519900000
+  },
+  {
+   "k": 2,
+   "h": 3.003,
+   "funds": 392940940000,
+   "shares": 350000000,
+   "valuation": 561344200000
+  },
+  {
+   "k": 3,
+   "h": 4.647,
+   "funds": 639726050000,
+   "shares": 250000000,
+   "valuation": 1279452100000
+  },
+  {
+   "k": 4,
+   "h": 9.083,
+   "funds": 16084576890000,
+   "shares": 200000000,
+   "valuation": 53615256300000
+  }
+ ],
+ "traj": [
+  {
+   "h": 0,
+   "funds": 150000000000,
+   "valuation": 0,
+   "assetDelta": 0,
+   "profit": 0,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "stage": "agri0",
+   "next": ""
+  },
+  {
+   "h": 0.5,
+   "funds": 133628478303.82611,
+   "valuation": 428519900000,
+   "assetDelta": 12856798701.990185,
+   "profit": 1205787.080310034,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "liq": 298344425870.8849,
+   "stage": "agri",
+   "next": "Runde 1 annehmen"
+  },
+  {
+   "h": 1,
+   "funds": 30444938113.14111,
+   "valuation": 440981400000,
+   "assetDelta": 1199836.4746047973,
+   "profit": 1211106.4874599911,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 268927509454.97845,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 1.5,
+   "funds": 32411523398.339157,
+   "valuation": 446611900000,
+   "assetDelta": 1207051.9101776122,
+   "profit": 1112749.9553844943,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 272361206073.44412,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2,
+   "funds": 34365104141.6843,
+   "valuation": 439028800000,
+   "assetDelta": 1192123.1011138917,
+   "profit": 1193750.5689003984,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 267736738472.43408,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2.5,
+   "funds": 36321783788.77948,
+   "valuation": 457058200000,
+   "assetDelta": 1207663.3461715698,
+   "profit": 1124281.827352184,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 278731763747.80304,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 3,
+   "funds": 1746415833.9371047,
+   "valuation": 561524700000,
+   "assetDelta": 788138.9365966797,
+   "profit": 1399226.1318138554,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 342439474926.7292,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 3.5,
+   "funds": 16971654915.39709,
+   "valuation": 766975700000,
+   "assetDelta": 2078372.3013671874,
+   "profit": 2087611.4666199507,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 0,
+   "aw": 85.35940286371174,
+   "wilson": 4,
+   "ads": 21,
+   "mainOffice": 45,
+   "liq": 254138774984.8039,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 4,
+   "funds": 20283784086.423992,
+   "valuation": 1184540400000,
+   "assetDelta": 2312030.214904785,
+   "profit": 3350115.115492525,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 1335.2001918026908,
+   "aw": 85.35940286371174,
+   "wilson": 4,
+   "ads": 21,
+   "mainOffice": 45,
+   "liq": 392499587895.6916,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 4.5,
+   "funds": 22217275685.3121,
+   "valuation": 1268143800000,
+   "assetDelta": 3290285.017593384,
+   "profit": 3413288.634382124,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 1335.2001918026908,
+   "aw": 90.63872987559085,
+   "wilson": 4,
+   "ads": 22,
+   "mainOffice": 45,
+   "liq": 420201724561.2529,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 5,
+   "funds": 61600894506.74769,
+   "valuation": 2776003200000,
+   "assetDelta": 3289270.9670928954,
+   "profit": 7057022.8909756,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 1564.3555740078941,
+   "aw": 238.9589808114706,
+   "wilson": 5,
+   "ads": 41,
+   "mainOffice": 75,
+   "liq": 443129169625.51855,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 5.5,
+   "funds": 69577689363.79675,
+   "valuation": 7039516100000,
+   "assetDelta": 19206604.77442932,
+   "profit": 19223317.26210524,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 4258.0485672289,
+   "aw": 238.9589808114706,
+   "wilson": 5,
+   "ads": 41,
+   "mainOffice": 75,
+   "liq": 1123707250754.779,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 6,
+   "funds": 75179809207.12073,
+   "valuation": 11724773500000,
+   "assetDelta": 31516764.657058716,
+   "profit": 31306712.574019194,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 4484.245806819199,
+   "aw": 249.325254483416,
+   "wilson": 5,
+   "ads": 42,
+   "mainOffice": 75,
+   "liq": 1871607765114.3503,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 6.5,
+   "funds": 75481805452.62923,
+   "valuation": 13616701500000,
+   "assetDelta": 32916025.84627075,
+   "profit": 32931671.02377192,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 4484.245806819199,
+   "aw": 271.0040613657391,
+   "wilson": 5,
+   "ads": 44,
+   "mainOffice": 75,
+   "liq": 2173613354888.623,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 7,
+   "funds": 84374587921.32469,
+   "valuation": 13896584100000,
+   "assetDelta": 476389678.11324465,
+   "profit": 33239452.551117416,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 4863.1611641877635,
+   "aw": 282.3356930893818,
+   "wilson": 5,
+   "ads": 45,
+   "mainOffice": 75,
+   "liq": 2218290588737.14,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 7.5,
+   "funds": 91671038546.95871,
+   "valuation": 18771981400000,
+   "assetDelta": 532470466.1143219,
+   "profit": 50259753.153496854,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5242.698243742025,
+   "aw": 294.0086902186992,
+   "wilson": 5,
+   "ads": 46,
+   "mainOffice": 75,
+   "liq": 2996542846206.9785,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 8,
+   "funds": 105863900276.13345,
+   "valuation": 27159915000000,
+   "assetDelta": 72555241.5917755,
+   "profit": 72893935.69355395,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5677.6086930999345,
+   "aw": 318.42022502018153,
+   "wilson": 5,
+   "ads": 48,
+   "mainOffice": 75,
+   "liq": 4335495932083.099,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 8.5,
+   "funds": 118310886176.83105,
+   "valuation": 28991421900000,
+   "assetDelta": 77360158.69052735,
+   "profit": 77484621.79972227,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5677.6086930999345,
+   "aw": 344.3247086427157,
+   "wilson": 5,
+   "ads": 50,
+   "mainOffice": 75,
+   "liq": 4627856593540.697,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 9,
+   "funds": 127577617772.14188,
+   "valuation": 30657863600000,
+   "assetDelta": 77572756.82868652,
+   "profit": 81141954.99404402,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5677.6086930999345,
+   "aw": 371.8134461271525,
+   "wilson": 5,
+   "ads": 52,
+   "mainOffice": 75,
+   "liq": 4893868148120.438,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 9.5,
+   "funds": 590758166714.3401,
+   "valuation": 210742382200000,
+   "assetDelta": 1726771491.3154664,
+   "profit": 522026143.32000047,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 22230.58632204752,
+   "aw": 4073.982327301199,
+   "wilson": 10,
+   "ads": 94,
+   "mainOffice": 165,
+   "liq": 9443121589187.195,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 10,
+   "funds": 1850755639938.8445,
+   "valuation": 702655163700000,
+   "assetDelta": -2199224443.8500977,
+   "profit": 14461564489.642105,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 31230.027027003962,
+   "aw": 5066.174488938872,
+   "wilson": 10,
+   "ads": 98,
+   "mainOffice": 165,
+   "liq": 31485162485219.992,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 10.5,
+   "funds": 6062563271252.536,
+   "valuation": 3435351800000,
+   "assetDelta": -16808706824.07168,
+   "profit": 51278267162.38477,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 48478.063150172566,
+   "aw": 15798.618100768454,
+   "wilson": 10,
+   "ads": 119,
+   "mainOffice": 165,
+   "liq": 153934127584.48495,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 11,
+   "funds": 23894055497226.773,
+   "valuation": 21952233247300000,
+   "assetDelta": -159324112564.4074,
+   "profit": 355043185543.1175,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 94143.01568890308,
+   "aw": 62531.96191359539,
+   "wilson": 11,
+   "ads": 144,
+   "mainOffice": 225,
+   "liq": 983654097217714.6,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 11.5,
+   "funds": 306789799103968.25,
+   "valuation": 496628343675600060,
+   "assetDelta": -4441890627562.818,
+   "profit": 5065180637592.212,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 175093.4715762405,
+   "aw": 1226760.0722609865,
+   "wilson": 15,
+   "ads": 188,
+   "mainOffice": 315,
+   "liq": 22253339764920516,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 12,
+   "funds": 4047779877546355,
+   "valuation": 5964739465284800000,
+   "assetDelta": -93150217618309.6,
+   "profit": 171781444137014.6,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 462594.82092756033,
+   "aw": 60512062.91661676,
+   "wilson": 19,
+   "ads": 234,
+   "mainOffice": 405,
+   "liq": 267273053623609400,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 12.5,
+   "funds": 88969358518501260,
+   "valuation": 148818273083554900000,
+   "assetDelta": 1548590912329784,
+   "profit": 3710017533410548,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 701263.5978986083,
+   "aw": 10724402488.375929,
+   "wilson": 23,
+   "ads": 284,
+   "mainOffice": 510,
+   "liq": 6668374119863550000,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 13,
+   "funds": 18813768132546785000,
+   "valuation": 9.72143323333238e+22,
+   "assetDelta": 4330947653373845500,
+   "profit": 2751186797267474400,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 5994704.547670053,
+   "aw": 2287219929262764.5,
+   "wilson": 32,
+   "ads": 378,
+   "mainOffice": 705,
+   "liq": 4.3560614189319376e+21,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 13.5,
+   "funds": 2.2291884769203977e+25,
+   "valuation": 1.755835929190279e+25,
+   "assetDelta": 1.0538611901840196e+24,
+   "profit": 2.8147034162741453e+24,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 59447585.06803509,
+   "aw": 1.079927106574281e+35,
+   "wilson": 52,
+   "ads": 612,
+   "mainOffice": 1200,
+   "liq": 7.867697041723619e+23,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 14,
+   "funds": 1.3668097838380451e+79,
+   "valuation": 7.577512272887962e+82,
+   "assetDelta": 1.032897475742158e+78,
+   "profit": 5.026386190762189e+77,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 153269426224049.47,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 230,
+   "ads": 2731,
+   "mainOffice": 5505,
+   "liq": 3.3953953158093915e+81,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 14.5,
+   "funds": 1.3896651901233371e+94,
+   "valuation": 3.2043147419434656e+97,
+   "assetDelta": 8.004011948024039e+91,
+   "profit": 2.656201884051701e+92,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 82295880365295040,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 279,
+   "ads": 3332,
+   "mainOffice": 6690,
+   "liq": 1.4358162512123838e+96,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 15,
+   "funds": 2.0233643508641642e+96,
+   "valuation": 6.041346499372836e+99,
+   "assetDelta": 3.33400986381155e+94,
+   "profit": 3.3353009489984498e+94,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 388976793103203460,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 286,
+   "ads": 3420,
+   "mainOffice": 6870,
+   "liq": 2.707057259220263e+98,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 15.5,
+   "funds": 1.717307619993801e+97,
+   "valuation": 4.916831424916392e+99,
+   "assetDelta": -1.2805987726447674e+94,
+   "profit": 1.6475299896876125e+95,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 960703124952812400,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 289,
+   "ads": 3457,
+   "mainOffice": 6945,
+   "liq": 2.2031751038554038e+98,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 16,
+   "funds": 5.341462532816949e+97,
+   "valuation": 3.649103108358176e+100,
+   "assetDelta": 7.941069967122453e+94,
+   "profit": 3.4965994495139477e+95,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 1453764156723560200,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 291,
+   "ads": 3475,
+   "mainOffice": 6975,
+   "liq": 1.6351207566309456e+99,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 16.5,
+   "funds": 9.26861715159561e+97,
+   "valuation": 9.520001542002128e+100,
+   "assetDelta": -5.699633281871952e+95,
+   "profit": 2.007737417253145e+95,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 1934886572634857000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 292,
+   "ads": 3484,
+   "mainOffice": 7005,
+   "liq": 4.265802215572359e+99,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 17,
+   "funds": 3.6576904915317466e+98,
+   "valuation": 1.1550381847797304e+101,
+   "assetDelta": 2.2729238866856537e+96,
+   "profit": 2.2729238866856523e+96,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 2637838208671030300,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 294,
+   "ads": 3508,
+   "mainOffice": 7050,
+   "liq": 5.175592068935558e+99,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 17.5,
+   "funds": 8.181757294371413e+98,
+   "valuation": 1.9561034435118112e+101,
+   "assetDelta": -4.37665849082039e+96,
+   "profit": 3.5094779670849227e+96,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 3338421373553544700,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 295,
+   "ads": 3521,
+   "mainOffice": 7065,
+   "liq": 8.76507253324092e+99,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 18,
+   "funds": 1.1944142531895731e+99,
+   "valuation": 9.517847168820871e+101,
+   "assetDelta": 4.347792696961288e+96,
+   "profit": 3.069530640772586e+96,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 3956080921431867000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 296,
+   "ads": 3529,
+   "mainOffice": 7095,
+   "liq": 4.264836865950384e+100,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 18.5,
+   "funds": 1.728966247487892e+99,
+   "valuation": 1.0671123308888876e+102,
+   "assetDelta": 3.1021706941482736e+96,
+   "profit": 3.1021706941482846e+96,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 4564911414505456600,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 296,
+   "ads": 3534,
+   "mainOffice": 7095,
+   "liq": 4.781606521056364e+100,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 19,
+   "funds": 2.38006117581364e+99,
+   "valuation": 1.0522976777692407e+102,
+   "assetDelta": -1.4751414054837234e+97,
+   "profit": 2.1039021773978434e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 5147369629314301000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 297,
+   "ads": 3541,
+   "mainOffice": 7110,
+   "liq": 4.7152237796020646e+100,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 19.5,
+   "funds": 6.635355720682284e+99,
+   "valuation": 7.256510297364586e+102,
+   "assetDelta": 3.6858497105334504e+97,
+   "profit": 3.695758735457958e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 6305870435160793000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 298,
+   "ads": 3558,
+   "mainOffice": 7140,
+   "liq": 3.25155805566303e+101,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 20,
+   "funds": 1.0882027363773396e+100,
+   "valuation": 7.535359546131824e+102,
+   "assetDelta": 5.0472210529580835e+97,
+   "profit": 5.047221053166383e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 7140289592442853000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 299,
+   "ads": 3567,
+   "mainOffice": 7170,
+   "liq": 3.3765071681136786e+101,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 20.5,
+   "funds": 1.7531166752678132e+100,
+   "valuation": 1.413525702424935e+103,
+   "assetDelta": 1.4686888799166248e+98,
+   "profit": 5.5728956723323045e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 8096129315182798000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 299,
+   "ads": 3574,
+   "mainOffice": 7185,
+   "liq": 6.333844639172869e+101,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 21,
+   "funds": 2.173087460388425e+100,
+   "valuation": 2.6871395225192768e+103,
+   "assetDelta": 5.187853989171821e+97,
+   "profit": 5.1878539891718274e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 8973481549514350000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 300,
+   "ads": 3580,
+   "mainOffice": 7200,
+   "liq": 1.204076036977623e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 21.5,
+   "funds": 3.112937742219795e+100,
+   "valuation": 2.0191825312186996e+103,
+   "assetDelta": 6.182064902352395e+97,
+   "profit": 6.182064902352385e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 9757528286069080000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 300,
+   "ads": 3586,
+   "mainOffice": 7200,
+   "liq": 9.047722605206914e+101,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 22,
+   "funds": 4.195543518147912e+100,
+   "valuation": 2.6300838628122155e+103,
+   "assetDelta": 1.5926027291806362e+98,
+   "profit": 7.36369358130042e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 10611123443455533000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 301,
+   "ads": 3589,
+   "mainOffice": 7215,
+   "liq": 1.1785100579685335e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 22.5,
+   "funds": 5.23002943205109e+100,
+   "valuation": 2.712738783995936e+103,
+   "assetDelta": 8.47766502455971e+97,
+   "profit": 8.477665024559722e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 11335211605774524000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 301,
+   "ads": 3593,
+   "mainOffice": 7215,
+   "liq": 1.2155467689772295e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 23,
+   "funds": 5.8798916876368585e+100,
+   "valuation": 3.3745496531737976e+103,
+   "assetDelta": 8.758871324318815e+97,
+   "profit": 8.758871324318794e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 12185468517670180000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 301,
+   "ads": 3596,
+   "mainOffice": 7230,
+   "liq": 1.5120965394339958e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 23.5,
+   "funds": 6.995819238566596e+100,
+   "valuation": 2.933935480760143e+103,
+   "assetDelta": -1.8459250786612956e+98,
+   "profit": 9.699226650378167e+97,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 12905337429729161000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 301,
+   "ads": 3598,
+   "mainOffice": 7230,
+   "liq": 1.3146624419076355e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 24,
+   "funds": 7.485716804786777e+100,
+   "valuation": 3.630911883061078e+103,
+   "assetDelta": 1.0691028409599458e+98,
+   "profit": 1.0691028409599508e+98,
+   "owned": 0.06666666666666667,
+   "fundingRound": 4,
+   "rating": 13713828242333841000,
+   "aw": 1.7976931348623157e+308,
+   "wilson": 302,
+   "ads": 3601,
+   "mainOffice": 7230,
+   "liq": 1.6269694796764235e+102,
+   "stage": "tob",
+   "next": "Produktphase"
+  }
+ ],
+ "events": [
+  "2026-10-06T14:21:26.951Z z5331 14.81h Produkt P57 fertig: Rating 239977107348015840, eff 0",
+  "2026-10-06T14:21:27.038Z z5343 14.84h Produkt P58 fertig: Rating 262449723069362620, eff 0",
+  "2026-10-06T14:21:27.116Z z5355 14.88h Produkt P59 fertig: Rating 291170436994099000, eff 0",
+  "2026-10-06T14:21:27.197Z z5367 14.91h Produkt P60 fertig: Rating 319679452441465540, eff 0",
+  "2026-10-06T14:21:27.275Z z5379 14.94h Produkt P61 fertig: Rating 344915283612830900, eff 0",
+  "2026-10-06T14:21:27.354Z z5391 14.97h Produkt P62 fertig: Rating 388976793103203460, eff 0",
+  "2026-10-06T14:21:27.445Z z5403 15.01h Produkt P63 fertig: Rating 432696618612261500, eff 0",
+  "2026-10-06T14:21:27.525Z z5415 15.04h Produkt P64 fertig: Rating 484993071299727200, eff 0",
+  "2026-10-06T14:21:27.606Z z5427 15.07h Produkt P65 fertig: Rating 526652290833595400, eff 0",
+  "2026-10-06T14:21:27.684Z z5439 15.11h Produkt P66 fertig: Rating 573557370713985660, eff 0",
+  "2026-10-06T14:21:27.760Z z5451 15.14h Produkt P67 fertig: Rating 568011527222330600, eff 0",
+  "2026-10-06T14:21:27.840Z z5463 15.18h Produkt P68 fertig: Rating 616257001170074400, eff 0",
+  "2026-10-06T14:21:27.910Z z5475 15.21h Produkt P69 fertig: Rating 655654629550908700, eff 0",
+  "2026-10-06T14:21:27.981Z z5487 15.24h Produkt P70 fertig: Rating 695902795844387100, eff 0",
+  "2026-10-06T14:21:28.052Z z5499 15.28h Produkt P71 fertig: Rating 731701054671767800, eff 0",
+  "2026-10-06T14:21:28.115Z z5510 15.31h Produkt P72 fertig: Rating 764621542629793800, eff 0",
+  "2026-10-06T14:21:28.185Z z5522 15.34h Produkt P73 fertig: Rating 794284164614811400, eff 0",
+  "2026-10-06T14:21:28.249Z z5533 15.37h Produkt P74 fertig: Rating 826365749332570900, eff 0",
+  "2026-10-06T14:21:28.314Z z5544 15.40h Produkt P75 fertig: Rating 855029710739880400, eff 0",
+  "2026-10-06T14:21:28.388Z z5555 15.43h Produkt P76 fertig: Rating 893729018263851300, eff 0",
+  "2026-10-06T14:21:28.453Z z5566 15.46h Produkt P77 fertig: Rating 927288198505944200, eff 0",
+  "2026-10-06T14:21:28.517Z z5577 15.49h Produkt P78 fertig: Rating 960703124952812400, eff 0",
+  "2026-10-06T14:21:28.584Z z5588 15.52h Produkt P79 fertig: Rating 988490104551382000, eff 0",
+  "2026-10-06T14:21:28.647Z z5599 15.55h Produkt P80 fertig: Rating 1023770759538746900, eff 0",
+  "2026-10-06T14:21:28.715Z z5610 15.58h Produkt P81 fertig: Rating 1054711430416054800, eff 0",
+  "2026-10-06T14:21:28.780Z z5621 15.61h Produkt P82 fertig: Rating 1086764718125735800, eff 0",
+  "2026-10-06T14:21:28.846Z z5632 15.64h Produkt P83 fertig: Rating 1091197619076250900, eff 0",
+  "2026-10-06T14:21:28.919Z z5643 15.68h Produkt P84 fertig: Rating 1149846015191268700, eff 0",
+  "2026-10-06T14:21:28.983Z z5654 15.71h Produkt P85 fertig: Rating 1184256992529156400, eff 0",
+  "2026-10-06T14:21:29.058Z z5665 15.74h Produkt P86 fertig: Rating 1219620287380824600, eff 0",
+  "2026-10-06T14:21:29.131Z z5676 15.77h Produkt P87 fertig: Rating 1251564238101544000, eff 0",
+  "2026-10-06T14:21:29.193Z z5687 15.80h Produkt P88 fertig: Rating 1281154426820707800, eff 0",
+  "2026-10-06T14:21:29.256Z z5698 15.83h Produkt P89 fertig: Rating 1309140752282515500, eff 0",
+  "2026-10-06T14:21:29.319Z z5709 15.86h Produkt P90 fertig: Rating 1333479182395790800, eff 0",
+  "2026-10-06T14:21:29.382Z z5720 15.89h Produkt P91 fertig: Rating 1357643713248989400, eff 0",
+  "2026-10-06T14:21:29.445Z z5731 15.92h Produkt P92 fertig: Rating 1400169631103370200, eff 0",
+  "2026-10-06T14:21:29.507Z z5742 15.95h Produkt P93 fertig: Rating 1426736343141388500, eff 0",
+  "2026-10-06T14:21:29.577Z z5753 15.98h Produkt P94 fertig: Rating 1453764156723560200, eff 0",
+  "2026-10-06T14:21:29.641Z z5764 16.01h Produkt P95 fertig: Rating 1494329349569244200, eff 0",
+  "2026-10-06T14:21:29.703Z z5775 16.04h Produkt P96 fertig: Rating 1512212586308493800, eff 0",
+  "2026-10-06T14:21:29.765Z z5786 16.07h Produkt P97 fertig: Rating 1559303141216886500, eff 0",
+  "2026-10-06T14:21:29.836Z z5797 16.10h Produkt P98 fertig: Rating 1568628152866656800, eff 0",
+  "2026-10-06T14:21:29.900Z z5808 16.13h Produkt P99 fertig: Rating 1610984211212043500, eff 0",
+  "2026-10-06T14:21:29.964Z z5819 16.16h Produkt P100 fertig: Rating 1646335337628183800, eff 0",
+  "2026-10-06T14:21:30.033Z z5830 16.19h Produkt P101 fertig: Rating 1676999773461597700, eff 0",
+  "2026-10-06T14:21:30.105Z z5841 16.23h Produkt P102 fertig: Rating 1707745648733891000, eff 0",
+  "2026-10-06T14:21:30.168Z z5852 16.26h Produkt P103 fertig: Rating 1743671081870164000, eff 0",
+  "2026-10-06T14:21:30.240Z z5863 16.29h Produkt P104 fertig: Rating 1765203680771136500, eff 0",
+  "2026-10-06T14:21:30.314Z z5874 16.32h Produkt P105 fertig: Rating 1770623327531320800, eff 0",
+  "2026-10-06T14:21:30.376Z z5885 16.35h Produkt P106 fertig: Rating 1819325853859413200, eff 0",
+  "2026-10-06T14:21:30.441Z z5896 16.38h Produkt P107 fertig: Rating 1851978884275884000, eff 0",
+  "2026-10-06T14:21:30.505Z z5907 16.41h Produkt P108 fertig: Rating 1876745883338980900, eff 0",
+  "2026-10-06T14:21:30.570Z z5918 16.44h Produkt P109 fertig: Rating 1905560312243275500, eff 0",
+  "2026-10-06T14:21:30.634Z z5929 16.47h Produkt P110 fertig: Rating 1934886572634857000, eff 0",
+  "2026-10-06T14:21:30.700Z z5940 16.50h Produkt P111 fertig: Rating 1925912225160913200, eff 0",
+  "2026-10-06T14:21:30.766Z z5951 16.53h Produkt P112 fertig: Rating 1993817606957224400, eff 0",
+  "2026-10-06T14:21:30.847Z z5962 16.56h Produkt P113 fertig: Rating 2020146389902058500, eff 0",
+  "2026-10-06T14:21:30.919Z z5973 16.59h Produkt P114 fertig: Rating 2096532047557326800, eff 0",
+  "2026-10-06T14:21:30.995Z z5984 16.62h Produkt P115 fertig: Rating 2148022712345447400, eff 0",
+  "2026-10-06T14:21:31.063Z z5995 16.65h Produkt P116 fertig: Rating 2193248690151353300, eff 0",
+  "2026-10-06T14:21:31.129Z z6006 16.68h Produkt P117 fertig: Rating 2231554821241998000, eff 0",
+  "2026-10-06T14:21:31.196Z z6017 16.71h Produkt P118 fertig: Rating 2290121565638675000, eff 0",
+  "2026-10-06T14:21:31.264Z z6028 16.74h Produkt P119 fertig: Rating 2338900893370042000, eff 0",
+  "2026-10-06T14:21:31.340Z z6039 16.77h Produkt P120 fertig: Rating 2326514107503508000, eff 0",
+  "2026-10-06T14:21:31.406Z z6050 16.81h Produkt P121 fertig: Rating 2425464600817597400, eff 0",
+  "2026-10-06T14:21:31.471Z z6061 16.84h Produkt P122 fertig: Rating 2475511169805879000, eff 0",
+  "2026-10-06T14:21:31.538Z z6072 16.87h Produkt P123 fertig: Rating 2515227323550905000, eff 0",
+  "2026-10-06T14:21:31.604Z z6083 16.90h Produkt P124 fertig: Rating 2560096440399067000, eff 0",
+  "2026-10-06T14:21:31.670Z z6094 16.93h Produkt P125 fertig: Rating 2578710811004778000, eff 0",
+  "2026-10-06T14:21:31.741Z z6105 16.96h Produkt P126 fertig: Rating 2637838208671030300, eff 0",
+  "2026-10-06T14:21:31.809Z z6116 16.99h Produkt P127 fertig: Rating 2600719858663226400, eff 0",
+  "2026-10-06T14:21:31.875Z z6127 17.02h Produkt P128 fertig: Rating 2726015016486206000, eff 0",
+  "2026-10-06T14:21:31.972Z z6138 17.05h Produkt P129 fertig: Rating 2768392915859945000, eff 0",
+  "2026-10-06T14:21:32.039Z z6149 17.08h Produkt P130 fertig: Rating 2804420102201911300, eff 0",
+  "2026-10-06T14:21:32.102Z z6160 17.11h Produkt P131 fertig: Rating 2861441153473634000, eff 0",
+  "2026-10-06T14:21:32.169Z z6171 17.14h Produkt P132 fertig: Rating 2906822791579983000, eff 0",
+  "2026-10-06T14:21:32.241Z z6182 17.17h Produkt P133 fertig: Rating 2943068830072343000, eff 0",
+  "2026-10-06T14:21:32.309Z z6193 17.20h Produkt P134 fertig: Rating 2973004713117983000, eff 0",
+  "2026-10-06T14:21:32.373Z z6204 17.23h Produkt P135 fertig: Rating 3014418407078660600, eff 0",
+  "2026-10-06T14:21:32.439Z z6215 17.26h Produkt P136 fertig: Rating 3066208997766396400, eff 0",
+  "2026-10-06T14:21:32.525Z z6226 17.29h Produkt P137 fertig: Rating 3099785010690976000, eff 0",
+  "2026-10-06T14:21:32.596Z z6237 17.32h Produkt P138 fertig: Rating 3133929524442204700, eff 0",
+  "2026-10-06T14:21:32.661Z z6248 17.36h Produkt P139 fertig: Rating 3173590298305205000, eff 0",
+  "2026-10-06T14:21:32.729Z z6259 17.39h Produkt P140 fertig: Rating 3221543705747287600, eff 0",
+  "2026-10-06T14:21:32.795Z z6270 17.42h Produkt P141 fertig: Rating 3273436717739104000, eff 0",
+  "2026-10-06T14:21:32.867Z z6281 17.45h Produkt P142 fertig: Rating 3308584082583797000, eff 0",
+  "2026-10-06T14:21:32.932Z z6292 17.48h Produkt P143 fertig: Rating 3338421373553544700, eff 0",
+  "2026-10-06T14:21:33.003Z z6303 17.51h Produkt P144 fertig: Rating 3385872505439936000, eff 0",
+  "2026-10-06T14:21:33.068Z z6314 17.54h Produkt P145 fertig: Rating 3419257427190809000, eff 0",
+  "2026-10-06T14:21:33.132Z z6325 17.57h Produkt P146 fertig: Rating 3465167368436922400, eff 0",
+  "2026-10-06T14:21:33.201Z z6336 17.60h Produkt P147 fertig: Rating 3480392045635857400, eff 0",
+  "2026-10-06T14:21:33.267Z z6347 17.63h Produkt P148 fertig: Rating 3541956397475917000, eff 0",
+  "2026-10-06T14:21:33.334Z z6358 17.66h Produkt P149 fertig: Rating 3599829303336235000, eff 0",
+  "2026-10-06T14:21:33.404Z z6369 17.69h Produkt P150 fertig: Rating 3643906752808733700, eff 0",
+  "2026-10-06T14:21:33.468Z z6380 17.72h Produkt P151 fertig: Rating 3677311482046981600, eff 0",
+  "2026-10-06T14:21:33.533Z z6391 17.75h Produkt P152 fertig: Rating 3697298769109937700, eff 0",
+  "2026-10-06T14:21:33.603Z z6402 17.78h Produkt P153 fertig: Rating 3766924479487757300, eff 0",
+  "2026-10-06T14:21:33.668Z z6413 17.81h Produkt P154 fertig: Rating 3783426372629767000, eff 0",
+  "2026-10-06T14:21:33.733Z z6424 17.84h Produkt P155 fertig: Rating 3827797743943852000, eff 0",
+  "2026-10-06T14:21:33.800Z z6435 17.88h Produkt P156 fertig: Rating 3868327165274492400, eff 0",
+  "2026-10-06T14:21:33.866Z z6446 17.91h Produkt P157 fertig: Rating 3919699163232491000, eff 0",
+  "2026-10-06T14:21:33.931Z z6457 17.94h Produkt P158 fertig: Rating 3930646598492897300, eff 0",
+  "2026-10-06T14:21:34.004Z z6468 17.97h Produkt P159 fertig: Rating 3828781176271880000, eff 0",
+  "2026-10-06T14:21:34.066Z z6479 18.00h Produkt P160 fertig: Rating 3956080921431867000, eff 0",
+  "2026-10-06T14:21:34.129Z z6490 18.03h Produkt P161 fertig: Rating 4036847636885143000, eff 0",
+  "2026-10-06T14:21:34.195Z z6501 18.06h Produkt P162 fertig: Rating 4054404099822952400, eff 0",
+  "2026-10-06T14:21:34.267Z z6512 18.09h Produkt P163 fertig: Rating 4115902484183851000, eff 0",
+  "2026-10-06T14:21:34.330Z z6523 18.12h Produkt P164 fertig: Rating 4143608434314156500, eff 0",
+  "2026-10-06T14:21:34.393Z z6534 18.15h Produkt P165 fertig: Rating 4162275053583817000, eff 0",
+  "2026-10-06T14:21:34.457Z z6545 18.18h Produkt P166 fertig: Rating 4231395163446711000, eff 0",
+  "2026-10-06T14:21:34.521Z z6556 18.21h Produkt P167 fertig: Rating 4262116765772206000, eff 0",
+  "2026-10-06T14:21:34.601Z z6567 18.24h Produkt P168 fertig: Rating 4278552468361878500, eff 0",
+  "2026-10-06T14:21:34.665Z z6578 18.27h Produkt P169 fertig: Rating 4325960061687467000, eff 0",
+  "2026-10-06T14:21:34.729Z z6589 18.30h Produkt P170 fertig: Rating 4356398496575126500, eff 0",
+  "2026-10-06T14:21:34.800Z z6600 18.33h Produkt P171 fertig: Rating 4400334642549487000, eff 0",
+  "2026-10-06T14:21:34.863Z z6611 18.36h Produkt P172 fertig: Rating 4433001540249237000, eff 0",
+  "2026-10-06T14:21:34.924Z z6622 18.39h Produkt P173 fertig: Rating 4444866983483934700, eff 0",
+  "2026-10-06T14:21:34.986Z z6633 18.43h Produkt P174 fertig: Rating 4493039594811176000, eff 0",
+  "2026-10-06T14:21:35.047Z z6644 18.46h Produkt P175 fertig: Rating 4545499233191814000, eff 0",
+  "2026-10-06T14:21:35.109Z z6655 18.49h Produkt P176 fertig: Rating 4564911414505456600, eff 0",
+  "2026-10-06T14:21:35.178Z z6666 18.52h Produkt P177 fertig: Rating 4597050242668351000, eff 0",
+  "2026-10-06T14:21:35.250Z z6677 18.55h Produkt P178 fertig: Rating 4639149021138158000, eff 0",
+  "2026-10-06T14:21:35.312Z z6688 18.58h Produkt P179 fertig: Rating 4674978825878012000, eff 0",
+  "2026-10-06T14:21:35.375Z z6699 18.61h Produkt P180 fertig: Rating 4715171778869540000, eff 0",
+  "2026-10-06T14:21:35.437Z z6710 18.64h Produkt P181 fertig: Rating 4758191281956867000, eff 0",
+  "2026-10-06T14:21:35.500Z z6721 18.67h Produkt P182 fertig: Rating 4781020213146499000, eff 0",
+  "2026-10-06T14:21:35.565Z z6732 18.70h Produkt P183 fertig: Rating 4791715109013915000, eff 0",
+  "2026-10-06T14:21:35.627Z z6743 18.73h Produkt P184 fertig: Rating 4837502297898666000, eff 0",
+  "2026-10-06T14:21:35.691Z z6754 18.76h Produkt P185 fertig: Rating 4880861686620822000, eff 0",
+  "2026-10-06T14:21:35.753Z z6765 18.79h Produkt P186 fertig: Rating 4748475231747556000, eff 0",
+  "2026-10-06T14:21:35.818Z z6776 18.82h Produkt P187 fertig: Rating 4890167968712104000, eff 0",
+  "2026-10-06T14:21:35.889Z z6787 18.85h Produkt P188 fertig: Rating 4974529611685166000, eff 0",
+  "2026-10-06T14:21:35.953Z z6798 18.88h Produkt P189 fertig: Rating 5005684713348858000, eff 0",
+  "2026-10-06T14:21:36.030Z z6809 18.91h Produkt P190 fertig: Rating 4989279251398756000, eff 0",
+  "2026-10-06T14:21:36.100Z z6820 18.94h Produkt P191 fertig: Rating 5068280217393670000, eff 0",
+  "2026-10-06T14:21:36.173Z z6831 18.98h Produkt P192 fertig: Rating 5147369629314301000, eff 0",
+  "2026-10-06T14:21:36.243Z z6842 19.01h Produkt P193 fertig: Rating 5229652396129731000, eff 0",
+  "2026-10-06T14:21:36.307Z z6853 19.04h Produkt P194 fertig: Rating 5284552873562748000, eff 0",
+  "2026-10-06T14:21:36.375Z z6864 19.07h Produkt P195 fertig: Rating 5379448113182287000, eff 0",
+  "2026-10-06T14:21:36.442Z z6875 19.10h Produkt P196 fertig: Rating 5365926031926269000, eff 0",
+  "2026-10-06T14:21:36.510Z z6886 19.13h Produkt P197 fertig: Rating 5532663355418615000, eff 0",
+  "2026-10-06T14:21:36.577Z z6897 19.16h Produkt P198 fertig: Rating 5582960935000222000, eff 0",
+  "2026-10-06T14:21:36.643Z z6908 19.19h Produkt P199 fertig: Rating 5669973665318025000, eff 0",
+  "2026-10-06T14:21:36.707Z z6919 19.22h Produkt P200 fertig: Rating 5749157823343959000, eff 0",
+  "2026-10-06T14:21:36.773Z z6930 19.25h Produkt P201 fertig: Rating 5801118241562598000, eff 0",
+  "2026-10-06T14:21:36.841Z z6941 19.28h Produkt P202 fertig: Rating 5755264399155449000, eff 0",
+  "2026-10-06T14:21:36.906Z z6952 19.31h Produkt P203 fertig: Rating 5869976517140278000, eff 0",
+  "2026-10-06T14:21:36.971Z z6963 19.34h Produkt P204 fertig: Rating 5916190991023896000, eff 0",
+  "2026-10-06T14:21:37.035Z z6974 19.37h Produkt P205 fertig: Rating 6037477926398026000, eff 0",
+  "2026-10-06T14:21:37.100Z z6985 19.40h Produkt P206 fertig: Rating 6112328361899063000, eff 0",
+  "2026-10-06T14:21:37.164Z z6996 19.43h Produkt P207 fertig: Rating 6186101051482658000, eff 0",
+  "2026-10-06T14:21:37.229Z z7007 19.46h Produkt P208 fertig: Rating 6231107427516505000, eff 0",
+  "2026-10-06T14:21:37.292Z z7018 19.49h Produkt P209 fertig: Rating 6305870435160793000, eff 0",
+  "2026-10-06T14:21:37.360Z z7029 19.52h Produkt P210 fertig: Rating 6390309059425194000, eff 0",
+  "2026-10-06T14:21:37.423Z z7040 19.56h Produkt P211 fertig: Rating 6302089721752775000, eff 0",
+  "2026-10-06T14:21:37.487Z z7051 19.59h Produkt P212 fertig: Rating 6421342290889944000, eff 0",
+  "2026-10-06T14:21:37.550Z z7062 19.62h Produkt P213 fertig: Rating 6525233389682844000, eff 0",
+  "2026-10-06T14:21:37.615Z z7073 19.65h Produkt P214 fertig: Rating 6605455731870467000, eff 0",
+  "2026-10-06T14:21:37.679Z z7084 19.68h Produkt P215 fertig: Rating 6655365446099299000, eff 0",
+  "2026-10-06T14:21:37.743Z z7095 19.71h Produkt P216 fertig: Rating 6681350422490913000, eff 0",
+  "2026-10-06T14:21:37.804Z z7106 19.74h Produkt P217 fertig: Rating 6731928648144367000, eff 0",
+  "2026-10-06T14:21:37.871Z z7117 19.77h Produkt P218 fertig: Rating 6770178615861070000, eff 0",
+  "2026-10-06T14:21:37.931Z z7128 19.80h Produkt P219 fertig: Rating 6846833109800369000, eff 0",
+  "2026-10-06T14:21:37.991Z z7139 19.83h Produkt P220 fertig: Rating 6920122764899934000, eff 0",
+  "2026-10-06T14:21:38.052Z z7150 19.86h Produkt P221 fertig: Rating 6950308446208039000, eff 0",
+  "2026-10-06T14:21:38.110Z z7161 19.89h Produkt P222 fertig: Rating 6965577252963679000, eff 0",
+  "2026-10-06T14:21:38.173Z z7172 19.92h Produkt P223 fertig: Rating 7067328719411303000, eff 0",
+  "2026-10-06T14:21:38.234Z z7183 19.95h Produkt P224 fertig: Rating 7140289592442853000, eff 0",
+  "2026-10-06T14:21:38.295Z z7194 19.98h Produkt P225 fertig: Rating 7070414898231374000, eff 0",
+  "2026-10-06T14:21:38.355Z z7205 20.01h Produkt P226 fertig: Rating 7214924523722870000, eff 0",
+  "2026-10-06T14:21:38.426Z z7216 20.04h Produkt P227 fertig: Rating 7312653106028201000, eff 0",
+  "2026-10-06T14:21:38.486Z z7227 20.07h Produkt P228 fertig: Rating 7373782000612508000, eff 0",
+  "2026-10-06T14:21:38.547Z z7238 20.11h Produkt P229 fertig: Rating 7382005660059362000, eff 0",
+  "2026-10-06T14:21:38.608Z z7249 20.14h Produkt P230 fertig: Rating 7446616292529317000, eff 0",
+  "2026-10-06T14:21:38.668Z z7260 20.17h Produkt P231 fertig: Rating 7519615412370390000, eff 0",
+  "2026-10-06T14:21:38.729Z z7271 20.20h Produkt P232 fertig: Rating 7564059003333548000, eff 0",
+  "2026-10-06T14:21:38.791Z z7282 20.23h Produkt P233 fertig: Rating 7626060542824204000, eff 0",
+  "2026-10-06T14:21:38.853Z z7293 20.26h Produkt P234 fertig: Rating 7707965055349496000, eff 0",
+  "2026-10-06T14:21:38.915Z z7304 20.29h Produkt P235 fertig: Rating 7742971825082427000, eff 0",
+  "2026-10-06T14:21:38.977Z z7315 20.32h Produkt P236 fertig: Rating 7710035419691805000, eff 0",
+  "2026-10-06T14:21:39.039Z z7326 20.35h Produkt P237 fertig: Rating 7840611755321797000, eff 0",
+  "2026-10-06T14:21:39.101Z z7337 20.38h Produkt P238 fertig: Rating 7903141298871785000, eff 0",
+  "2026-10-06T14:21:39.167Z z7348 20.41h Produkt P239 fertig: Rating 7949710715981881000, eff 0",
+  "2026-10-06T14:21:39.232Z z7359 20.44h Produkt P240 fertig: Rating 7827557119610184000, eff 0",
+  "2026-10-06T14:21:39.297Z z7370 20.47h Produkt P241 fertig: Rating 8028687077018081000, eff 0",
+  "2026-10-06T14:21:39.362Z z7381 20.50h Produkt P242 fertig: Rating 8096129315182798000, eff 0",
+  "2026-10-06T14:21:39.424Z z7392 20.53h Produkt P243 fertig: Rating 8168320258161499000, eff 0",
+  "2026-10-06T14:21:39.487Z z7403 20.56h Produkt P244 fertig: Rating 8245802139591681000, eff 0",
+  "2026-10-06T14:21:39.549Z z7414 20.59h Produkt P245 fertig: Rating 8312485693869923000, eff 0",
+  "2026-10-06T14:21:39.617Z z7425 20.63h Produkt P246 fertig: Rating 8363983824168901000, eff 0",
+  "2026-10-06T14:21:39.681Z z7436 20.66h Produkt P247 fertig: Rating 8249207635080838000, eff 0",
+  "2026-10-06T14:21:39.742Z z7447 20.69h Produkt P248 fertig: Rating 8424959570141831000, eff 0",
+  "2026-10-06T14:21:39.806Z z7458 20.72h Produkt P249 fertig: Rating 8505346629397299000, eff 0",
+  "2026-10-06T14:21:39.877Z z7469 20.75h Produkt P250 fertig: Rating 8549212383062441000, eff 0",
+  "2026-10-06T14:21:39.940Z z7480 20.78h Produkt P251 fertig: Rating 8589503341850317000, eff 0",
+  "2026-10-06T14:21:40.000Z z7491 20.81h Produkt P252 fertig: Rating 8591516837806810000, eff 0",
+  "2026-10-06T14:21:40.063Z z7502 20.84h Produkt P253 fertig: Rating 8716256155203664000, eff 0",
+  "2026-10-06T14:21:40.126Z z7513 20.87h Produkt P254 fertig: Rating 8766525011239944000, eff 0",
+  "2026-10-06T14:21:40.191Z z7524 20.90h Produkt P255 fertig: Rating 8776788818823241000, eff 0",
+  "2026-10-06T14:21:40.270Z z7535 20.93h Produkt P256 fertig: Rating 8880900622975422000, eff 0",
+  "2026-10-06T14:21:40.336Z z7546 20.96h Produkt P257 fertig: Rating 8908463486299785000, eff 0",
+  "2026-10-06T14:21:40.408Z z7557 20.99h Produkt P258 fertig: Rating 8973481549514350000, eff 0",
+  "2026-10-06T14:21:40.469Z z7568 21.02h Produkt P259 fertig: Rating 8824245554617307000, eff 0",
+  "2026-10-06T14:21:40.533Z z7579 21.05h Produkt P260 fertig: Rating 9067191202918134000, eff 0",
+  "2026-10-06T14:21:40.594Z z7590 21.08h Produkt P261 fertig: Rating 9091676227922770000, eff 0",
+  "2026-10-06T14:21:40.657Z z7601 21.11h Produkt P262 fertig: Rating 9131629248713112000, eff 0",
+  "2026-10-06T14:21:40.718Z z7612 21.14h Produkt P263 fertig: Rating 9247394645589826000, eff 0",
+  "2026-10-06T14:21:40.783Z z7623 21.18h Produkt P264 fertig: Rating 9277272965679038000, eff 0",
+  "2026-10-06T14:21:40.854Z z7634 21.21h Produkt P265 fertig: Rating 9271655589648245000, eff 0",
+  "2026-10-06T14:21:40.916Z z7645 21.24h Produkt P266 fertig: Rating 9371962515161063000, eff 0",
+  "2026-10-06T14:21:40.978Z z7656 21.27h Produkt P267 fertig: Rating 9382593030601368000, eff 0",
+  "2026-10-06T14:21:41.041Z z7667 21.30h Produkt P268 fertig: Rating 9501009680157112000, eff 0",
+  "2026-10-06T14:21:41.101Z z7678 21.33h Produkt P269 fertig: Rating 9533626703764228000, eff 0",
+  "2026-10-06T14:21:41.160Z z7689 21.36h Produkt P270 fertig: Rating 9507281410563265000, eff 0",
+  "2026-10-06T14:21:41.223Z z7700 21.39h Produkt P271 fertig: Rating 9638365370033326000, eff 0",
+  "2026-10-06T14:21:41.283Z z7711 21.42h Produkt P272 fertig: Rating 9642128624246374000, eff 0",
+  "2026-10-06T14:21:41.344Z z7722 21.45h Produkt P273 fertig: Rating 9747669890258592000, eff 0",
+  "2026-10-06T14:21:41.404Z z7733 21.48h Produkt P274 fertig: Rating 9757528286069080000, eff 0",
+  "2026-10-06T14:21:41.465Z z7744 21.51h Produkt P275 fertig: Rating 9861319794950269000, eff 0",
+  "2026-10-06T14:21:41.524Z z7755 21.54h Produkt P276 fertig: Rating 9838761808460726000, eff 0",
+  "2026-10-06T14:21:41.587Z z7766 21.57h Produkt P277 fertig: Rating 9889011077362207000, eff 0",
+  "2026-10-06T14:21:41.647Z z7777 21.60h Produkt P278 fertig: Rating 10019782827335465000, eff 0",
+  "2026-10-06T14:21:41.707Z z7788 21.63h Produkt P279 fertig: Rating 10056942931279663000, eff 0",
+  "2026-10-06T14:21:41.767Z z7799 21.66h Produkt P280 fertig: Rating 10055001495332012000, eff 0",
+  "2026-10-06T14:21:41.830Z z7810 21.69h Produkt P281 fertig: Rating 10107624990840885000, eff 0",
+  "2026-10-06T14:21:41.894Z z7821 21.73h Produkt P282 fertig: Rating 10142930189599040000, eff 0",
+  "2026-10-06T14:21:41.955Z z7832 21.76h Produkt P283 fertig: Rating 10189948515983421000, eff 0",
+  "2026-10-06T14:21:42.022Z z7843 21.79h Produkt P284 fertig: Rating 10302113325587804000, eff 0",
+  "2026-10-06T14:21:42.099Z z7854 21.82h Produkt P285 fertig: Rating 10338775399122383000, eff 0",
+  "2026-10-06T14:21:42.167Z z7865 21.85h Produkt P286 fertig: Rating 10123596760665944000, eff 0",
+  "2026-10-06T14:21:42.234Z z7876 21.88h Produkt P287 fertig: Rating 10380557399019150000, eff 0",
+  "2026-10-06T14:21:42.295Z z7887 21.91h Produkt P288 fertig: Rating 10338024323746873000, eff 0",
+  "2026-10-06T14:21:42.355Z z7898 21.94h Produkt P289 fertig: Rating 10430913320915384000, eff 0",
+  "2026-10-06T14:21:42.426Z z7909 21.97h Produkt P290 fertig: Rating 10566991930687928000, eff 0",
+  "2026-10-06T14:21:42.493Z z7920 22.00h Produkt P291 fertig: Rating 10611123443455533000, eff 0",
+  "2026-10-06T14:21:42.555Z z7931 22.03h Produkt P292 fertig: Rating 10667513243084980000, eff 0",
+  "2026-10-06T14:21:42.620Z z7942 22.06h Produkt P293 fertig: Rating 10715351031372734000, eff 0",
+  "2026-10-06T14:21:42.681Z z7953 22.09h Produkt P294 fertig: Rating 10712958295809270000, eff 0",
+  "2026-10-06T14:21:42.742Z z7964 22.12h Produkt P295 fertig: Rating 10803452199058730000, eff 0",
+  "2026-10-06T14:21:42.812Z z7975 22.15h Produkt P296 fertig: Rating 10837078834110757000, eff 0",
+  "2026-10-06T14:21:42.873Z z7986 22.18h Produkt P297 fertig: Rating 10926300900395614000, eff 0",
+  "2026-10-06T14:21:42.942Z z7997 22.21h Produkt P298 fertig: Rating 10828696160271227000, eff 0",
+  "2026-10-06T14:21:43.003Z z8008 22.24h Produkt P299 fertig: Rating 10994175792773534000, eff 0",
+  "2026-10-06T14:21:43.063Z z8019 22.27h Produkt P300 fertig: Rating 11027750067595360000, eff 0",
+  "2026-10-06T14:21:43.125Z z8030 22.31h Produkt P301 fertig: Rating 11109743427445815000, eff 0",
+  "2026-10-06T14:21:43.187Z z8041 22.34h Produkt P302 fertig: Rating 11147553158214715000, eff 0",
+  "2026-10-06T14:21:43.249Z z8052 22.37h Produkt P303 fertig: Rating 11226106962508464000, eff 0",
+  "2026-10-06T14:21:43.309Z z8063 22.40h Produkt P304 fertig: Rating 11255764002956750000, eff 0",
+  "2026-10-06T14:21:43.371Z z8074 22.43h Produkt P305 fertig: Rating 11305905191600388000, eff 0",
+  "2026-10-06T14:21:43.432Z z8085 22.46h Produkt P306 fertig: Rating 11335211605774524000, eff 0",
+  "2026-10-06T14:21:43.493Z z8096 22.49h Produkt P307 fertig: Rating 11310771802028253000, eff 0",
+  "2026-10-06T14:21:43.559Z z8107 22.52h Produkt P308 fertig: Rating 11457081910112240000, eff 0",
+  "2026-10-06T14:21:43.630Z z8118 22.55h Produkt P309 fertig: Rating 11502718935562385000, eff 0",
+  "2026-10-06T14:21:43.694Z z8129 22.58h Produkt P310 fertig: Rating 11572617320469789000, eff 0",
+  "2026-10-06T14:21:43.754Z z8140 22.61h Produkt P311 fertig: Rating 11551677492655050000, eff 0",
+  "2026-10-06T14:21:43.815Z z8151 22.64h Produkt P312 fertig: Rating 11533530297863946000, eff 0",
+  "2026-10-06T14:21:43.876Z z8162 22.67h Produkt P313 fertig: Rating 11699920728752284000, eff 0",
+  "2026-10-06T14:21:43.936Z z8173 22.70h Produkt P314 fertig: Rating 11733840116210223000, eff 0",
+  "2026-10-06T14:21:43.995Z z8184 22.73h Produkt P315 fertig: Rating 11821768762425330000, eff 0",
+  "2026-10-06T14:21:44.056Z z8195 22.76h Produkt P316 fertig: Rating 11862893025827607000, eff 0",
+  "2026-10-06T14:21:44.116Z z8206 22.79h Produkt P317 fertig: Rating 11872320475156468000, eff 0",
+  "2026-10-06T14:21:44.176Z z8217 22.82h Produkt P318 fertig: Rating 11920670333139923000, eff 0",
+  "2026-10-06T14:21:44.240Z z8228 22.86h Produkt P319 fertig: Rating 11977140719356410000, eff 0",
+  "2026-10-06T14:21:44.299Z z8239 22.89h Produkt P320 fertig: Rating 11625786275654300000, eff 0",
+  "2026-10-06T14:21:44.359Z z8250 22.92h Produkt P321 fertig: Rating 11823429859044110000, eff 0",
+  "2026-10-06T14:21:44.420Z z8261 22.95h Produkt P322 fertig: Rating 12051574921527534000, eff 0",
+  "2026-10-06T14:21:44.480Z z8272 22.98h Produkt P323 fertig: Rating 12185468517670180000, eff 0",
+  "2026-10-06T14:21:44.540Z z8283 23.01h Produkt P324 fertig: Rating 12229308146899354000, eff 0",
+  "2026-10-06T14:21:44.601Z z8294 23.04h Produkt P325 fertig: Rating 12231789687760122000, eff 0",
+  "2026-10-06T14:21:44.666Z z8305 23.07h Produkt P326 fertig: Rating 12284675736885058000, eff 0",
+  "2026-10-06T14:21:44.727Z z8316 23.10h Produkt P327 fertig: Rating 12334303235611255000, eff 0",
+  "2026-10-06T14:21:44.790Z z8327 23.13h Produkt P328 fertig: Rating 12360440748340423000, eff 0",
+  "2026-10-06T14:21:44.854Z z8338 23.16h Produkt P329 fertig: Rating 12410948092992766000, eff 0",
+  "2026-10-06T14:21:44.916Z z8349 23.19h Produkt P330 fertig: Rating 12470456429093851000, eff 0",
+  "2026-10-06T14:21:44.976Z z8360 23.22h Produkt P331 fertig: Rating 12536432086728745000, eff 0",
+  "2026-10-06T14:21:45.038Z z8371 23.25h Produkt P332 fertig: Rating 12612621807820818000, eff 0",
+  "2026-10-06T14:21:45.098Z z8382 23.28h Produkt P333 fertig: Rating 12618718154086099000, eff 0",
+  "2026-10-06T14:21:45.162Z z8393 23.31h Produkt P334 fertig: Rating 12697456838128677000, eff 0",
+  "2026-10-06T14:21:45.223Z z8404 23.34h Produkt P335 fertig: Rating 12721488646637824000, eff 0",
+  "2026-10-06T14:21:45.285Z z8415 23.38h Produkt P336 fertig: Rating 12740876305248480000, eff 0",
+  "2026-10-06T14:21:45.346Z z8426 23.41h Produkt P337 fertig: Rating 12820392976854090000, eff 0",
+  "2026-10-06T14:21:45.411Z z8437 23.44h Produkt P338 fertig: Rating 12819822692141031000, eff 0",
+  "2026-10-06T14:21:45.471Z z8448 23.47h Produkt P339 fertig: Rating 12794547077391387000, eff 0",
+  "2026-10-06T14:21:45.536Z z8459 23.50h Produkt P340 fertig: Rating 12905337429729161000, eff 0",
+  "2026-10-06T14:21:45.606Z z8470 23.53h Produkt P341 fertig: Rating 12957178071916018000, eff 0",
+  "2026-10-06T14:21:45.669Z z8481 23.56h Produkt P342 fertig: Rating 13046962885508915000, eff 0",
+  "2026-10-06T14:21:45.733Z z8492 23.59h Produkt P343 fertig: Rating 13122335164084610000, eff 0",
+  "2026-10-06T14:21:45.795Z z8503 23.62h Produkt P344 fertig: Rating 13159377850045540000, eff 0",
+  "2026-10-06T14:21:45.869Z z8514 23.65h Produkt P345 fertig: Rating 13133546166280520000, eff 0",
+  "2026-10-06T14:21:45.930Z z8525 23.68h Produkt P346 fertig: Rating 13131601426510297000, eff 0",
+  "2026-10-06T14:21:45.992Z z8536 23.71h Produkt P347 fertig: Rating 13285953043622312000, eff 0",
+  "2026-10-06T14:21:46.054Z z8547 23.74h Produkt P348 fertig: Rating 13323368078983266000, eff 0",
+  "2026-10-06T14:21:46.123Z z8558 23.77h Produkt P349 fertig: Rating 13390862427629430000, eff 0",
+  "2026-10-06T14:21:46.187Z z8569 23.80h Produkt P350 fertig: Rating 13440161222486653000, eff 0",
+  "2026-10-06T14:21:46.248Z z8580 23.83h Produkt P351 fertig: Rating 13361656664156830000, eff 0",
+  "2026-10-06T14:21:46.320Z z8591 23.86h Produkt P352 fertig: Rating 13558461837872101000, eff 0",
+  "2026-10-06T14:21:46.380Z z8602 23.89h Produkt P353 fertig: Rating 13444850439359881000, eff 0",
+  "2026-10-06T14:21:46.444Z z8613 23.93h Produkt P354 fertig: Rating 13639448853882962000, eff 0",
+  "2026-10-06T14:21:46.505Z z8624 23.96h Produkt P355 fertig: Rating 13609538980563430000, eff 0",
+  "2026-10-06T14:21:46.569Z z8635 23.99h Produkt P356 fertig: Rating 13713828242333841000, eff 0"
+ ],
+ "errors": [],
+ "maxErrStreak": 0,
+ "eichung": {
+  "unitsRelErr": {
+   "Agri": {
+    "n": 51834,
+    "min": -3.1308289294429414e-14,
+    "med": -4.440892098500626e-16,
+    "max": 9.547918011776346e-15
+   },
+   "Chem": {
+    "n": 45348,
+    "min": -3.1308289294429414e-14,
+    "med": -2.3314683517128287e-15,
+    "max": 9.547918011776346e-15
+   },
+   "Tob": {
+    "n": 43680,
+    "min": -3.141931159689193e-14,
+    "med": -1.3322676295501878e-15,
+    "max": 0.5000000000000044
+   }
+  },
+  "dRelErr": {
+   "n": 5178,
+   "min": -0.9999999963799531,
+   "med": -0.9554107858183355,
+   "max": 0.3160095695680527
+  },
+  "costErr": []
+ },
+ "ram": {
+  "corp-act-build.js": 81.6,
+  "corp-act-care.js": 61.6,
+  "corp-act-fin.js": 71.6,
+  "corp-act-office.js": 61.6,
+  "corp-act-prod.js": 41.6,
+  "corp-act-route.js": 41.6,
+  "corp-act-up.js": 61.6,
+  "corp-tick.js": 71.6,
+  "corp-tickp.js": 71.6,
+  "corp.js": 75.1
+ },
+ "finalState": {
+  "v": 1,
+  "nodeReset": 1791296454501,
+  "cycle": 8640,
+  "foundCycle": 0,
+  "lastLT": 8635,
+  "freeze": false,
+  "roundsDone": 4,
+  "rounds": [
+   {
+    "k": 1,
+    "h": 0.5,
+    "funds": 128555970000,
+    "shares": 100000000,
+    "valuation": 428519900000
+   },
+   {
+    "k": 2,
+    "h": 3.003,
+    "funds": 392940940000,
+    "shares": 350000000,
+    "valuation": 561344200000
+   },
+   {
+    "k": 3,
+    "h": 4.647,
+    "funds": 639726050000,
+    "shares": 250000000,
+    "valuation": 1279452100000
+   },
+   {
+    "k": 4,
+    "h": 9.083,
+    "funds": 16084576890000,
+    "shares": 200000000,
+    "valuation": 53615256300000
+   }
+  ],
+  "stage": "tob",
+  "unlocks": [
+   "Export"
+  ],
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 21640.937103771117,
+     "Hardware": 12.52169221692418
+    },
+    "Aevum": {
+     "Real Estate": 21231.566825045964,
+     "Hardware": 3.0455283575456633
+    },
+    "Chongqing": {
+     "Real Estate": 22343.03090425232,
+     "Hardware": 28.773863524359285
+    },
+    "New Tokyo": {
+     "Real Estate": 23857.483590371932,
+     "Hardware": 63.83063866601708,
+     "AI Cores": 7.4475747994152925
+    },
+    "Ishima": {
+     "Real Estate": 22201.28609808223,
+     "Hardware": 25.492733751903643
+    },
+    "Volhaven": {
+     "Real Estate": 21218.95091909279,
+     "Hardware": 2.7534934975183774
+    }
+   },
+   "Tob": {
+    "Sector-12": {
+     "Real Estate": 36005.48153267804,
+     "Hardware": 2542.1234610565034,
+     "AI Cores": 1325.2740766339018
+    },
+    "Aevum": {
+     "Real Estate": 22536.036231166858,
+     "Hardware": 1419.6696859305719,
+     "AI Cores": 651.8018115583429
+    },
+    "Chongqing": {
+     "Real Estate": 36095.90730630919,
+     "Hardware": 2549.658942192433,
+     "AI Cores": 1329.7953653154598
+    },
+    "New Tokyo": {
+     "Real Estate": 36263.48154415735,
+     "Hardware": 2563.623462013113,
+     "AI Cores": 1338.1740772078676
+    },
+    "Ishima": {
+     "Real Estate": 36239.41935007903,
+     "Hardware": 2561.618279173252,
+     "AI Cores": 1336.9709675039512
+    },
+    "Volhaven": {
+     "Real Estate": 36125.41168674319,
+     "Hardware": 2552.1176405619326,
+     "AI Cores": 1331.2705843371593
+    }
+   },
+   "Chem": {
+    "Sector-12": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Aevum": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Chongqing": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "New Tokyo": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Ishima": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Volhaven": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    }
+   }
+  },
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 11055.750624909762,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2270.598002959742
+   },
+   "Agri|Sector-12|Food": {
+    "d": 256767173.29688415,
+    "kind": "add",
+    "x": 5916357.411227293,
+    "mp": 5547.94343755805
+   },
+   "Agri|Aevum|Plants": {
+    "d": 14685.838122062105,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3063.666675014982
+   },
+   "Agri|Aevum|Food": {
+    "d": 171484680.96276864,
+    "kind": "add",
+    "x": 5358708.673995282,
+    "mp": 7694.5846870890255
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 9819.152576415923,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2853.4066788355594
+   },
+   "Agri|Chongqing|Food": {
+    "d": 275144137.06193376,
+    "kind": "add",
+    "x": 11908627.786138251,
+    "mp": 4061.3988436458567
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 22945.095410142727,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3053.8088190857593
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 88380454.35834515,
+    "kind": "add",
+    "x": 4625910.920216187,
+    "mp": 4531.286273548055
+   },
+   "Agri|Ishima|Plants": {
+    "d": 17268.03487906136,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2512.8584590924243
+   },
+   "Agri|Ishima|Food": {
+    "d": 258817879.5991776,
+    "kind": "add",
+    "x": 11756292.45739067,
+    "mp": 7261.527880384352
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 13577.878524804835,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3297.294765673366
+   },
+   "Agri|Volhaven|Food": {
+    "d": 434075666.1853331,
+    "kind": "add",
+    "x": 14930791.807528378,
+    "mp": 4932.3741342064295
+   },
+   "Chem|Sector-12|Chemicals": {
+    "d": 30114.365124207667,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 8295.064410516343
+   },
+   "Chem|Aevum|Chemicals": {
+    "d": 16395.599729574995,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 5826.855585637534
+   },
+   "Chem|Chongqing|Chemicals": {
+    "d": 48375.550301669675,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 6305.500506463475
+   },
+   "Chem|New Tokyo|Chemicals": {
+    "d": 24173.288753825134,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 10349.87145563586
+   },
+   "Chem|Ishima|Chemicals": {
+    "d": 32038.733480482668,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 8070.912307698752
+   },
+   "Chem|Volhaven|Chemicals": {
+    "d": 29095.47227205638,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 6937.781789319227
+   }
+  },
+  "errors": [],
+  "events": 396,
+  "next": "Produktphase",
+  "waiting": false,
+  "snap": {
+   "funds": 7.485716804786777e+100,
+   "valuation": 3.630911883061078e+103,
+   "revenue": 1.0691028409599508e+98,
+   "expenses": 3721157714.5824995,
+   "public": false,
+   "owned": 0.06666666666666667,
+   "liquidation": 1.6269694796764235e+102,
+   "divisions": 5,
+   "dummies": 2,
+   "products": [
+    "P352:13558461837872101000",
+    "P354:13639448853882962000",
+    "P355:13609538980563430000",
+    "P356:13713828242333841000",
+    "P357:47%"
+   ],
+   "wilson": 302,
+   "tobAds": 3601,
+   "tobMain": 7230,
+   "rsDone": {
+    "Tob": [
+     "Hi-Tech R&D Laboratory",
+     "Market-TA.I",
+     "Market-TA.II",
+     "uPgrade: Fulcrum",
+     "Overclock",
+     "uPgrade: Capacity.I",
+     "Self-Correcting Assemblers",
+     "Drones",
+     "Drones - Assembly",
+     "uPgrade: Capacity.II",
+     "Automatic Drug Administration",
+     "CPH4 Injections",
+     "Drones - Transport",
+     "Sti.mu",
+     "Go-Juice"
+    ],
+    "Chem": [
+     "Hi-Tech R&D Laboratory",
+     "Overclock",
+     "Drones",
+     "Drones - Assembly",
+     "Self-Correcting Assemblers"
+    ],
+    "Agri": [
+     "Hi-Tech R&D Laboratory",
+     "Overclock",
+     "Drones",
+     "Drones - Assembly",
+     "Self-Correcting Assemblers",
+     "Drones - Transport"
+    ]
+   }
+  },
+  "cfgAt": 8611,
+  "cfg": {
+   "etappe": 2
+  },
+  "rsDone": {
+   "Tob": [
+    "Hi-Tech R&D Laboratory",
+    "Market-TA.I",
+    "Market-TA.II",
+    "uPgrade: Fulcrum",
+    "Overclock",
+    "uPgrade: Capacity.I",
+    "Self-Correcting Assemblers",
+    "Drones",
+    "Drones - Assembly",
+    "uPgrade: Capacity.II",
+    "Automatic Drug Administration",
+    "CPH4 Injections",
+    "Drones - Transport",
+    "Sti.mu",
+    "Go-Juice"
+   ],
+   "Chem": [
+    "Hi-Tech R&D Laboratory",
+    "Overclock",
+    "Drones",
+    "Drones - Assembly",
+    "Self-Correcting Assemblers"
+   ],
+   "Agri": [
+    "Hi-Tech R&D Laboratory",
+    "Overclock",
+    "Drones",
+    "Drones - Assembly",
+    "Self-Correcting Assemblers",
+    "Drones - Transport"
+   ]
+  },
+  "routes": {
+   "Aevum": {
+    "Chem>Agri>Chemicals": 152679.10857754186,
+    "Agri>Tob>Plants": 571993.309638946,
+    "Agri>Chem>Plants": 9769466.077356987
+   },
+   "Chongqing": {
+    "Chem>Agri>Chemicals": 146462.53028375015,
+    "Agri>Tob>Plants": 423508.1049696713,
+    "Agri>Chem>Plants": 10076061.600203756
+   },
+   "Sector-12": {
+    "Chem>Agri>Chemicals": 154334.97916598918,
+    "Agri>Tob>Plants": 422409.2103496195,
+    "Agri>Chem>Plants": 9678575.526302567
+   },
+   "New Tokyo": {
+    "Chem>Agri>Chemicals": 150791.86726492184,
+    "Agri>Tob>Plants": 421771.95680836204,
+    "Agri>Chem>Plants": 9931685.380815526
+   },
+   "Ishima": {
+    "Chem>Agri>Chemicals": 149268.78893203408,
+    "Agri>Tob>Plants": 420413.3413770626,
+    "Agri>Chem>Plants": 9760687.565022038
+   },
+   "Volhaven": {
+    "Chem>Agri>Chemicals": 151959.07166494842,
+    "Agri>Tob>Plants": 421455.923662088,
+    "Agri>Chem>Plants": 9926627.455916364
+   }
+  },
+  "seen": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7",
+   "P8",
+   "P9",
+   "P10",
+   "P11",
+   "P12",
+   "P13",
+   "P14",
+   "P15",
+   "P16",
+   "P17",
+   "P18",
+   "P19",
+   "P20",
+   "P21",
+   "P22",
+   "P23",
+   "P24",
+   "P25",
+   "P26",
+   "P27",
+   "P28",
+   "P29",
+   "P30",
+   "P31",
+   "P32",
+   "P33",
+   "P34",
+   "P35",
+   "P36",
+   "P37",
+   "P38",
+   "P39",
+   "P40",
+   "P41",
+   "P42",
+   "P43",
+   "P44",
+   "P45",
+   "P46",
+   "P47",
+   "P48",
+   "P49",
+   "P50",
+   "P51",
+   "P52",
+   "P53",
+   "P54",
+   "P55",
+   "P56",
+   "P57",
+   "P58",
+   "P59",
+   "P60",
+   "P61",
+   "P62",
+   "P63",
+   "P64",
+   "P65",
+   "P66",
+   "P67",
+   "P68",
+   "P69",
+   "P70",
+   "P71",
+   "P72",
+   "P73",
+   "P74",
+   "P75",
+   "P76",
+   "P77",
+   "P78",
+   "P79",
+   "P80",
+   "P81",
+   "P82",
+   "P83",
+   "P84",
+   "P85",
+   "P86",
+   "P87",
+   "P88",
+   "P89",
+   "P90",
+   "P91",
+   "P92",
+   "P93",
+   "P94",
+   "P95",
+   "P96",
+   "P97",
+   "P98",
+   "P99",
+   "P100",
+   "P101",
+   "P102",
+   "P103",
+   "P104",
+   "P105",
+   "P106",
+   "P107",
+   "P108",
+   "P109",
+   "P110",
+   "P111",
+   "P112",
+   "P113",
+   "P114",
+   "P115",
+   "P116",
+   "P117",
+   "P118",
+   "P119",
+   "P120",
+   "P121",
+   "P122",
+   "P123",
+   "P124",
+   "P125",
+   "P126",
+   "P127",
+   "P128",
+   "P129",
+   "P130",
+   "P131",
+   "P132",
+   "P133",
+   "P134",
+   "P135",
+   "P136",
+   "P137",
+   "P138",
+   "P139",
+   "P140",
+   "P141",
+   "P142",
+   "P143",
+   "P144",
+   "P145",
+   "P146",
+   "P147",
+   "P148",
+   "P149",
+   "P150",
+   "P151",
+   "P152",
+   "P153",
+   "P154",
+   "P155",
+   "P156",
+   "P157",
+   "P158",
+   "P159",
+   "P160",
+   "P161",
+   "P162",
+   "P163",
+   "P164",
+   "P165",
+   "P166",
+   "P167",
+   "P168",
+   "P169",
+   "P170",
+   "P171",
+   "P172",
+   "P173",
+   "P174",
+   "P175",
+   "P176",
+   "P177",
+   "P178",
+   "P179",
+   "P180",
+   "P181",
+   "P182",
+   "P183",
+   "P184",
+   "P185",
+   "P186",
+   "P187",
+   "P188",
+   "P189",
+   "P190",
+   "P191",
+   "P192",
+   "P193",
+   "P194",
+   "P195",
+   "P196",
+   "P197",
+   "P198",
+   "P199",
+   "P200",
+   "P201",
+   "P202",
+   "P203",
+   "P204",
+   "P205",
+   "P206",
+   "P207",
+   "P208",
+   "P209",
+   "P210",
+   "P211",
+   "P212",
+   "P213",
+   "P214",
+   "P215",
+   "P216",
+   "P217",
+   "P218",
+   "P219",
+   "P220",
+   "P221",
+   "P222",
+   "P223",
+   "P224",
+   "P225",
+   "P226",
+   "P227",
+   "P228",
+   "P229",
+   "P230",
+   "P231",
+   "P232",
+   "P233",
+   "P234",
+   "P235",
+   "P236",
+   "P237",
+   "P238",
+   "P239",
+   "P240",
+   "P241",
+   "P242",
+   "P243",
+   "P244",
+   "P245",
+   "P246",
+   "P247",
+   "P248",
+   "P249",
+   "P250",
+   "P251",
+   "P252",
+   "P253",
+   "P254",
+   "P255",
+   "P256",
+   "P257",
+   "P258",
+   "P259",
+   "P260",
+   "P261",
+   "P262",
+   "P263",
+   "P264",
+   "P265",
+   "P266",
+   "P267",
+   "P268",
+   "P269",
+   "P270",
+   "P271",
+   "P272",
+   "P273",
+   "P274",
+   "P275",
+   "P276",
+   "P277",
+   "P278",
+   "P279",
+   "P280",
+   "P281",
+   "P282",
+   "P283",
+   "P284",
+   "P285",
+   "P286",
+   "P287",
+   "P288",
+   "P289",
+   "P290",
+   "P291",
+   "P292",
+   "P293",
+   "P294",
+   "P295",
+   "P296",
+   "P297",
+   "P298",
+   "P299",
+   "P300",
+   "P301",
+   "P302",
+   "P303",
+   "P304",
+   "P305",
+   "P306",
+   "P307",
+   "P308",
+   "P309",
+   "P310",
+   "P311",
+   "P312",
+   "P313",
+   "P314",
+   "P315",
+   "P316",
+   "P317",
+   "P318",
+   "P319",
+   "P320",
+   "P321",
+   "P322",
+   "P323",
+   "P324",
+   "P325",
+   "P326",
+   "P327",
+   "P328",
+   "P329",
+   "P330",
+   "P331",
+   "P332",
+   "P333",
+   "P334",
+   "P335",
+   "P336",
+   "P337",
+   "P338",
+   "P339",
+   "P340",
+   "P341",
+   "P342",
+   "P343",
+   "P344",
+   "P345",
+   "P346",
+   "P347",
+   "P348",
+   "P349",
+   "P350",
+   "P351",
+   "P352",
+   "P353",
+   "P354",
+   "P355",
+   "P356"
+  ],
+  "productSeq": 357,
+  "dummySeq": 2,
+  "roundShift": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "flow": {
+   "tobDemand": 2549421.9948594393,
+   "chemDemand": 56208452.963710584,
+   "agriPlants": 855620.4,
+   "units": {
+    "Agri|Sector-12": 7316280.082333423,
+    "Agri|Aevum": 7272154.306475329,
+    "Agri|Chongqing": 7327604.605948715,
+    "Agri|New Tokyo": 7300144.698904903,
+    "Agri|Ishima": 7313870.402109863,
+    "Agri|Volhaven": 7314986.130440845,
+    "Chem|Sector-12": 91634233.79337637,
+    "Chem|Aevum": 93183923.42140913,
+    "Chem|Chongqing": 95396896.73573196,
+    "Chem|New Tokyo": 94730786.30295631,
+    "Chem|Ishima": 93155973.3705394,
+    "Chem|Volhaven": 93982716.0130926,
+    "Tob|Sector-12": 4026481.8598176497,
+    "Tob|Aevum": 5413816.04795022,
+    "Tob|Chongqing": 4008458.7097244267,
+    "Tob|New Tokyo": 4020510.0844928552,
+    "Tob|Ishima": 4007513.026684294,
+    "Tob|Volhaven": 4017440.219924949
+   }
+  },
+  "freezeAt": 3259,
+  "pprice": {
+   "P352|Sector-12": {
+    "K": 4.679331756975929e+26,
+    "mp": 19228.05390613877,
+    "P": 71787937572.5555
+   },
+   "P352|Aevum": {
+    "K": 0.000013534498237635671,
+    "mp": 14161.074015745544,
+    "P": 14161.074026237355
+   },
+   "P352|Chongqing": {
+    "K": 5.369396817848087e+26,
+    "mp": 20839.548360985747,
+    "P": 76798987063.3805
+   },
+   "P352|New Tokyo": {
+    "K": 4.7210712428779225e+26,
+    "mp": 19320.437670149116,
+    "P": 71905451259.50694
+   },
+   "P352|Ishima": {
+    "K": 2.850551988788681e+26,
+    "mp": 14990.353773526977,
+    "P": 55964061892.933784
+   },
+   "P352|Volhaven": {
+    "K": 3.929103758346728e+26,
+    "mp": 17672.184078028833,
+    "P": 65856328358.74096
+   },
+   "P354|Sector-12": {
+    "K": 2.006099312521596e+25,
+    "mp": 19228.05390613877,
+    "P": 24620902686.204887
+   },
+   "P354|Aevum": {
+    "K": 290446727.17672837,
+    "mp": 14161.074015745544,
+    "P": 14405.716713574742
+   },
+   "P354|Chongqing": {
+    "K": 3.031412290905448e+25,
+    "mp": 20839.548360985747,
+    "P": 26454819069.504734
+   },
+   "P354|New Tokyo": {
+    "K": 2.2456584038079158e+25,
+    "mp": 19320.437670149116,
+    "P": 24656048409.844334
+   },
+   "P354|Ishima": {
+    "K": 1.3997032688578238e+25,
+    "mp": 14990.353773526977,
+    "P": 19168232200.179657
+   },
+   "P354|Volhaven": {
+    "K": 1.964966628435649e+25,
+    "mp": 17672.184078028833,
+    "P": 22549505777.092537
+   },
+   "P355|Sector-12": {
+    "mp": 19228.05390613877,
+    "P": 19228053906.13877
+   },
+   "P355|Aevum": {
+    "mp": 14161.074015745544,
+    "P": 14161074015.745544
+   },
+   "P355|Chongqing": {
+    "mp": 20839.548360985747,
+    "P": 20839548360.98575
+   },
+   "P355|New Tokyo": {
+    "mp": 19320.437670149116,
+    "P": 19320437670.149117
+   },
+   "P355|Ishima": {
+    "mp": 14990.353773526977,
+    "P": 14990353773.526976
+   },
+   "P355|Volhaven": {
+    "mp": 17672.184078028833,
+    "P": 17672184078.02883
+   },
+   "P356|Sector-12": {
+    "mp": 19228.05390613877,
+    "P": 19228053906.13877
+   },
+   "P356|Aevum": {
+    "mp": 14161.074015745544,
+    "P": 14161074015.745544
+   },
+   "P356|Chongqing": {
+    "mp": 20839.548360985747,
+    "P": 20839548360.98575
+   },
+   "P356|New Tokyo": {
+    "mp": 19320.437670149116,
+    "P": 19320437670.149117
+   },
+   "P356|Ishima": {
+    "mp": 14990.353773526977,
+    "P": 14990353773.526976
+   },
+   "P356|Volhaven": {
+    "mp": 17672.184078028833,
+    "P": 17672184078.02883
+   }
+  }
+ },
+ "finalTele": {
+  "schema": 2,
+  "ts": 1790086392000,
+  "wall": 1790086392000,
+  "playtime": 0,
+  "motorTimeMs": 0,
+  "round": 43196,
+  "okRound": 8640,
+  "errStreak": 0,
+  "lastError": null,
+  "nodeReset": 1791296454501,
+  "augReset": 1791296454501,
+  "host": "werk",
+  "version": "corp-e2-2026-10-06",
+  "state": "work",
+  "blockedReason": null,
+  "funds": 7.485716804786777e+100,
+  "valuation": 3.630911883061078e+103,
+  "revenue": 1.0691028409599508e+98,
+  "expenses": 3721157714.5824995,
+  "public": false,
+  "owned": 0.06666666666666667,
+  "liquidation": 1.6269694796764235e+102,
+  "divisions": 5,
+  "dummies": 2,
+  "products": [
+   "P352:13558461837872101000",
+   "P354:13639448853882962000",
+   "P355:13609538980563430000",
+   "P356:13713828242333841000",
+   "P357:47%"
+  ],
+  "wilson": 302,
+  "tobAds": 3601,
+  "tobMain": 7230,
+  "rsDone": {
+   "Tob": [
+    "Hi-Tech R&D Laboratory",
+    "Market-TA.I",
+    "Market-TA.II",
+    "uPgrade: Fulcrum",
+    "Overclock",
+    "uPgrade: Capacity.I",
+    "Self-Correcting Assemblers",
+    "Drones",
+    "Drones - Assembly",
+    "uPgrade: Capacity.II",
+    "Automatic Drug Administration",
+    "CPH4 Injections",
+    "Drones - Transport",
+    "Sti.mu",
+    "Go-Juice"
+   ],
+   "Chem": [
+    "Hi-Tech R&D Laboratory",
+    "Overclock",
+    "Drones",
+    "Drones - Assembly",
+    "Self-Correcting Assemblers"
+   ],
+   "Agri": [
+    "Hi-Tech R&D Laboratory",
+    "Overclock",
+    "Drones",
+    "Drones - Assembly",
+    "Self-Correcting Assemblers",
+    "Drones - Transport"
+   ]
+  },
+  "stage": "tob",
+  "cycle": 8640,
+  "corpHours": 24,
+  "fundingRounds": 4,
+  "roundLog": [
+   {
+    "k": 1,
+    "h": 0.5,
+    "funds": 128555970000,
+    "shares": 100000000,
+    "valuation": 428519900000
+   },
+   {
+    "k": 2,
+    "h": 3.003,
+    "funds": 392940940000,
+    "shares": 350000000,
+    "valuation": 561344200000
+   },
+   {
+    "k": 3,
+    "h": 4.647,
+    "funds": 639726050000,
+    "shares": 250000000,
+    "valuation": 1279452100000
+   },
+   {
+    "k": 4,
+    "h": 9.083,
+    "funds": 16084576890000,
+    "shares": 200000000,
+    "valuation": 53615256300000
+   }
+  ],
+  "next": "Produktphase",
+  "errors": []
+ },
+ "lastTickp": {
+  "job": "1:32438",
+  "ok": 4,
+  "err": [],
+  "price": {
+   "P352|Sector-12": {
+    "K": 4.679331756975929e+26,
+    "mp": 19228.05390613877,
+    "P": 71787937572.5555
+   },
+   "P352|Aevum": {
+    "K": 0.000013534498237635671,
+    "mp": 14161.074015745544,
+    "P": 14161.074026237355
+   },
+   "P352|Chongqing": {
+    "K": 5.369396817848087e+26,
+    "mp": 20839.548360985747,
+    "P": 76798987063.3805
+   },
+   "P352|New Tokyo": {
+    "K": 4.7210712428779225e+26,
+    "mp": 19320.437670149116,
+    "P": 71905451259.50694
+   },
+   "P352|Ishima": {
+    "K": 2.850551988788681e+26,
+    "mp": 14990.353773526977,
+    "P": 55964061892.933784
+   },
+   "P352|Volhaven": {
+    "K": 3.929103758346728e+26,
+    "mp": 17672.184078028833,
+    "P": 65856328358.74096
+   },
+   "P354|Sector-12": {
+    "K": 2.006099312521596e+25,
+    "mp": 19228.05390613877,
+    "P": 24620902686.204887
+   },
+   "P354|Aevum": {
+    "K": 290446727.17672837,
+    "mp": 14161.074015745544,
+    "P": 14405.716713574742
+   },
+   "P354|Chongqing": {
+    "K": 3.031412290905448e+25,
+    "mp": 20839.548360985747,
+    "P": 26454819069.504734
+   },
+   "P354|New Tokyo": {
+    "K": 2.2456584038079158e+25,
+    "mp": 19320.437670149116,
+    "P": 24656048409.844334
+   },
+   "P354|Ishima": {
+    "K": 1.3997032688578238e+25,
+    "mp": 14990.353773526977,
+    "P": 19168232200.179657
+   },
+   "P354|Volhaven": {
+    "K": 1.964966628435649e+25,
+    "mp": 17672.184078028833,
+    "P": 22549505777.092537
+   },
+   "P355|Sector-12": {
+    "mp": 19228.05390613877,
+    "P": 19228053906.13877
+   },
+   "P355|Aevum": {
+    "mp": 14161.074015745544,
+    "P": 14161074015.745544
+   },
+   "P355|Chongqing": {
+    "mp": 20839.548360985747,
+    "P": 20839548360.98575
+   },
+   "P355|New Tokyo": {
+    "mp": 19320.437670149116,
+    "P": 19320437670.149117
+   },
+   "P355|Ishima": {
+    "mp": 14990.353773526977,
+    "P": 14990353773.526976
+   },
+   "P355|Volhaven": {
+    "mp": 17672.184078028833,
+    "P": 17672184078.02883
+   },
+   "P356|Sector-12": {
+    "mp": 19228.05390613877,
+    "P": 19228053906.13877
+   },
+   "P356|Aevum": {
+    "mp": 14161.074015745544,
+    "P": 14161074015.745544
+   },
+   "P356|Chongqing": {
+    "mp": 20839.548360985747,
+    "P": 20839548360.98575
+   },
+   "P356|New Tokyo": {
+    "mp": 19320.437670149116,
+    "P": 19320437670.149117
+   },
+   "P356|Ishima": {
+    "mp": 14990.353773526977,
+    "P": 14990353773.526976
+   },
+   "P356|Volhaven": {
+    "mp": 17672.184078028833,
+    "P": 17672184078.02883
+   }
+  },
+  "diag": {
+   "P352|Sector-12": {
+    "stored": 0,
+    "sold": 100105.90931018569,
+    "prod": 100105.90931018569,
+    "lim": null,
+    "eff": 3460765601219780.5
+   },
+   "P352|Aevum": {
+    "stored": 0,
+    "sold": 135556.3699861348,
+    "prod": 135556.3699861348,
+    "lim": null,
+    "eff": 3825476781618385
+   },
+   "P352|Chongqing": {
+    "stored": 0,
+    "sold": 100367.55646192603,
+    "prod": 100367.55646192603,
+    "lim": null,
+    "eff": 6747293336418257
+   },
+   "P352|New Tokyo": {
+    "stored": 0,
+    "sold": 100668.99973283462,
+    "prod": 100668.9997328346,
+    "lim": null,
+    "eff": 4608870893484045
+   },
+   "P352|Ishima": {
+    "stored": 0,
+    "sold": 100343.52201042212,
+    "prod": 100343.52201042212,
+    "lim": null,
+    "eff": 6861467243295716
+   },
+   "P352|Volhaven": {
+    "stored": 0,
+    "sold": 99879.7164139686,
+    "prod": 99879.71641396859,
+    "lim": null,
+    "eff": 6729311949204621
+   },
+   "P354|Sector-12": {
+    "stored": 0,
+    "sold": 36485.79068981431,
+    "prod": 36485.79068981431,
+    "lim": null,
+    "eff": 3471086085655707
+   },
+   "P354|Aevum": {
+    "stored": 0,
+    "sold": 5350.330013865186,
+    "prod": 5350.330013865186,
+    "lim": null,
+    "eff": 3836884885527756
+   },
+   "P354|Chongqing": {
+    "stored": 0,
+    "sold": 47754.54353807397,
+    "prod": 47754.54353807397,
+    "lim": null,
+    "eff": 6767414703736110
+   },
+   "P354|New Tokyo": {
+    "stored": 5.820766091346741e-11,
+    "sold": 40726.400267165394,
+    "prod": 40726.40026716539,
+    "lim": null,
+    "eff": 4622615187609781
+   },
+   "P354|Ishima": {
+    "stored": 0,
+    "sold": 42000.177989577875,
+    "prod": 42000.177989577875,
+    "lim": null,
+    "eff": 6881929093086148
+   },
+   "P354|Volhaven": {
+    "stored": 1.7462298274040222e-10,
+    "sold": 42604.98358603139,
+    "prod": 42604.983586031405,
+    "lim": null,
+    "eff": 6749379693524485
+   },
+   "P355|Sector-12": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P355|Aevum": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P355|Chongqing": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P355|New Tokyo": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P355|Ishima": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P355|Volhaven": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|Sector-12": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|Aevum": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|Chongqing": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|New Tokyo": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|Ishima": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   },
+   "P356|Volhaven": {
+    "stored": 0,
+    "sold": 0,
+    "prod": 0,
+    "lim": null,
+    "eff": 0
+   }
+  }
+ },
+ "lastTick": {
+  "job": "1:32437",
+  "ok": 25,
+  "err": [],
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 11055.750624909762,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2270.598002959742
+   },
+   "Agri|Sector-12|Food": {
+    "d": 256767173.29688415,
+    "kind": "add",
+    "x": 5916357.411227293,
+    "mp": 5547.94343755805
+   },
+   "Agri|Aevum|Plants": {
+    "d": 14685.838122062105,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3063.666675014982
+   },
+   "Agri|Aevum|Food": {
+    "d": 171484680.96276864,
+    "kind": "add",
+    "x": 5358708.673995282,
+    "mp": 7694.5846870890255
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 9819.152576415923,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2853.4066788355594
+   },
+   "Agri|Chongqing|Food": {
+    "d": 275144137.06193376,
+    "kind": "add",
+    "x": 11908627.786138251,
+    "mp": 4061.3988436458567
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 22945.095410142727,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3053.8088190857593
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 88380454.35834515,
+    "kind": "add",
+    "x": 4625910.920216187,
+    "mp": 4531.286273548055
+   },
+   "Agri|Ishima|Plants": {
+    "d": 17268.03487906136,
+    "kind": "mul",
+    "x": 1,
+    "mp": 2512.8584590924243
+   },
+   "Agri|Ishima|Food": {
+    "d": 258817879.5991776,
+    "kind": "add",
+    "x": 11756292.45739067,
+    "mp": 7261.527880384352
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 13577.878524804835,
+    "kind": "mul",
+    "x": 1,
+    "mp": 3297.294765673366
+   },
+   "Agri|Volhaven|Food": {
+    "d": 434075666.1853331,
+    "kind": "add",
+    "x": 14930791.807528378,
+    "mp": 4932.3741342064295
+   },
+   "Chem|Sector-12|Chemicals": {
+    "d": 30114.365124207667,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 8295.064410516343
+   },
+   "Chem|Aevum|Chemicals": {
+    "d": 16395.599729574995,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 5826.855585637534
+   },
+   "Chem|Chongqing|Chemicals": {
+    "d": 48375.550301669675,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 6305.500506463475
+   },
+   "Chem|New Tokyo|Chemicals": {
+    "d": 24173.288753825134,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 10349.87145563586
+   },
+   "Chem|Ishima|Chemicals": {
+    "d": 32038.733480482668,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 8070.912307698752
+   },
+   "Chem|Volhaven|Chemicals": {
+    "d": 29095.47227205638,
+    "kind": "mul",
+    "x": 0.3,
+    "mp": 6937.781789319227
+   }
+  },
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 21640.937103771117,
+     "Hardware": 12.52169221692418
+    },
+    "Aevum": {
+     "Real Estate": 21231.566825045964,
+     "Hardware": 3.0455283575456633
+    },
+    "Chongqing": {
+     "Real Estate": 22343.03090425232,
+     "Hardware": 28.773863524359285
+    },
+    "New Tokyo": {
+     "Real Estate": 23857.483590371932,
+     "Hardware": 63.83063866601708,
+     "AI Cores": 7.4475747994152925
+    },
+    "Ishima": {
+     "Real Estate": 22201.28609808223,
+     "Hardware": 25.492733751903643
+    },
+    "Volhaven": {
+     "Real Estate": 21218.95091909279,
+     "Hardware": 2.7534934975183774
+    }
+   },
+   "Chem": {
+    "Sector-12": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Aevum": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Chongqing": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "New Tokyo": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Ishima": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    },
+    "Volhaven": {
+     "Real Estate": 3619397972.222353,
+     "Hardware": 241292731.4814902,
+     "AI Cores": 144775438.8888941,
+     "Robots": 36193484.72222353
+    }
+   },
+   "Tob": {
+    "Sector-12": {
+     "Real Estate": 36005.48153267804,
+     "Hardware": 2542.1234610565034,
+     "AI Cores": 1325.2740766339018
+    },
+    "Aevum": {
+     "Real Estate": 22536.036231166858,
+     "Hardware": 1419.6696859305719,
+     "AI Cores": 651.8018115583429
+    },
+    "Chongqing": {
+     "Real Estate": 36095.90730630919,
+     "Hardware": 2549.658942192433,
+     "AI Cores": 1329.7953653154598
+    },
+    "New Tokyo": {
+     "Real Estate": 36263.48154415735,
+     "Hardware": 2563.623462013113,
+     "AI Cores": 1338.1740772078676
+    },
+    "Ishima": {
+     "Real Estate": 36239.41935007903,
+     "Hardware": 2561.618279173252,
+     "AI Cores": 1336.9709675039512
+    },
+    "Volhaven": {
+     "Real Estate": 36125.41168674319,
+     "Hardware": 2552.1176405619326,
+     "AI Cores": 1331.2705843371593
+    }
+   }
+  },
+  "spent": 0,
+  "diag": {
+   "Agri|Sector-12": {
+    "units": 7316280.082333423,
+    "pm": 40.74590593924035,
+    "plants": 137221.9
+   },
+   "Agri|Aevum": {
+    "units": 7272154.306475329,
+    "pm": 40.74590593924035,
+    "plants": 141535.9
+   },
+   "Agri|Chongqing": {
+    "units": 7327604.605948715,
+    "pm": 40.74590593924035,
+    "plants": 148749.2
+   },
+   "Agri|New Tokyo": {
+    "units": 7300144.698904903,
+    "pm": 40.74590593924035,
+    "plants": 142027.6
+   },
+   "Agri|Ishima": {
+    "units": 7313870.402109863,
+    "pm": 40.74590593924035,
+    "plants": 142975.9
+   },
+   "Agri|Volhaven": {
+    "units": 7314986.130440845,
+    "pm": 40.74590593924035,
+    "plants": 143109.9
+   },
+   "Chem|Sector-12": {
+    "units": 91634233.79337637,
+    "pm": 8735.265924220737,
+    "plants": -135251.2
+   },
+   "Chem|Aevum": {
+    "units": 93183923.42140913,
+    "pm": 8735.265924220737,
+    "plants": -90067.7
+   },
+   "Chem|Chongqing": {
+    "units": 95396896.73573196,
+    "pm": 8735.265924220737,
+    "plants": -202516.4
+   },
+   "Chem|New Tokyo": {
+    "units": 94730786.30295631,
+    "pm": 8735.265924220737,
+    "plants": -115994.1
+   },
+   "Chem|Ishima": {
+    "units": 93155973.3705394,
+    "pm": 8735.265924220737,
+    "plants": -140049.2
+   },
+   "Chem|Volhaven": {
+    "units": 93982716.0130926,
+    "pm": 8735.265924220737,
+    "plants": -131616.4
+   },
+   "Tob|Sector-12": {
+    "units": 4026481.8598176497,
+    "pm": 12.183384472997982,
+    "plants": -136591.7
+   },
+   "Tob|Aevum": {
+    "units": 5413816.04795022,
+    "pm": 12.183384472997982,
+    "plants": -140906.7
+   },
+   "Tob|Chongqing": {
+    "units": 4008458.7097244267,
+    "pm": 12.183384472997982,
+    "plants": -148122.1
+   },
+   "Tob|New Tokyo": {
+    "units": 4020510.0844928552,
+    "pm": 12.183384472997982,
+    "plants": -141395.4
+   },
+   "Tob|Ishima": {
+    "units": 4007513.026684294,
+    "pm": 12.183384472997982,
+    "plants": -142343.7
+   },
+   "Tob|Volhaven": {
+    "units": 4017440.219924949,
+    "pm": 12.183384472997982,
+    "plants": -142484.7
+   }
+  }
+ },
+ "pauseBeats": -1
+}

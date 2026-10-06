@@ -20,6 +20,17 @@
    "corporation.hireAdVert 20"
   ]
  },
+ "corp-act-cash.js": {
+  "gb": 71.6,
+  "fehler": null,
+  "posten": [
+   "baseCost 1.6",
+   "corporation.getCorporation 10",
+   "corporation.goPublic 20",
+   "corporation.sellShares 20",
+   "corporation.bribe 20"
+  ]
+ },
  "corp-act-fin.js": {
   "gb": 71.6,
   "fehler": null,
@@ -92,7 +103,7 @@
   ]
  },
  "corp.js": {
-  "gb": 75.1,
+  "gb": 75.2,
   "fehler": null,
   "posten": [
    "baseCost 1.6",
@@ -112,6 +123,7 @@
    "corporation.getProduct 10",
    "corporation.getUpgradeLevel 10",
    "corporation.getInvestmentOffer 10",
+   "getServerMoneyAvailable 0.1",
    "fileExists 0.1"
   ]
  }

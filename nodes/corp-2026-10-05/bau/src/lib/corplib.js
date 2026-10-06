@@ -12,7 +12,7 @@
  * (nodes/corp-2026-10-05/bau/tests/botsim.test.ts, Abschnitt EICHUNG).
  */
 
-export const CORP_VERSION = "corp-e2-2026-10-06";
+export const CORP_VERSION = "corp-e2b-2026-10-06";
 export const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"];
 export const MAIN_CITY = "Aevum";
 export const JOBS = ["Operations", "Engineer", "Business", "Management", "Research & Development", "Intern"];
@@ -32,6 +32,7 @@ export const FAMILY = {
   cc: "corp-act-fin.js", io: "corp-act-fin.js", ai: "corp-act-fin.js", gp: "corp-act-fin.js",
   mp: "corp-act-prod.js", dp: "corp-act-prod.js",
   ex: "corp-act-route.js", cx: "corp-act-route.js",
+  sl: "corp-act-cash.js", bb: "corp-act-cash.js",
 };
 export const TICK_SCRIPT = "corp-tick.js";
 export const TICKP_SCRIPT = "corp-tickp.js";
@@ -91,6 +92,8 @@ export const UNLOCK_COST = { Export: 20e9, "Smart Supply": 25e9 };
 // ResearchMap.ts: Kosten (RP) und Multiplikatoren; Baum BaseResearchTree.ts (Eltern muessen zuerst)
 export const RESEARCH = {
   "Hi-Tech R&D Laboratory": { cost: 5e3 },
+  AutoBrew: { cost: 12e3, parent: "Hi-Tech R&D Laboratory" },
+  AutoPartyManager: { cost: 15e3, parent: "Hi-Tech R&D Laboratory" },
   "Market-TA.I": { cost: 20e3, parent: "Hi-Tech R&D Laboratory" },
   "Market-TA.II": { cost: 50e3, parent: "Market-TA.I" },
   "uPgrade: Fulcrum": { cost: 10e3, parent: "Hi-Tech R&D Laboratory", productProd: 1.05 },
@@ -108,9 +111,9 @@ export const RESEARCH = {
 };
 /** Forschungsreihenfolge je Division (corpsim.ts productTick), Market-TA vorn fuer Tobacco (Skeptiker 5) */
 export const RESEARCH_ORDER = {
-  Tob: ["Hi-Tech R&D Laboratory", "Market-TA.I", "Market-TA.II", "uPgrade: Fulcrum", "Overclock", "uPgrade: Capacity.I", "Self-Correcting Assemblers", "Drones", "Drones - Assembly", "uPgrade: Capacity.II", "Automatic Drug Administration", "CPH4 Injections", "Drones - Transport", "Sti.mu", "Go-Juice"],
-  Agri: ["Hi-Tech R&D Laboratory", "Overclock", "Drones", "Drones - Assembly", "Self-Correcting Assemblers", "Drones - Transport"],
-  Chem: ["Hi-Tech R&D Laboratory", "Overclock", "Drones", "Drones - Assembly", "Self-Correcting Assemblers"],
+  Tob: ["Hi-Tech R&D Laboratory", "AutoBrew", "AutoPartyManager", "Market-TA.I", "Market-TA.II", "uPgrade: Fulcrum", "Overclock", "uPgrade: Capacity.I", "Self-Correcting Assemblers", "Drones", "Drones - Assembly", "uPgrade: Capacity.II", "Automatic Drug Administration", "CPH4 Injections", "Drones - Transport", "Sti.mu", "Go-Juice"],
+  Agri: ["Hi-Tech R&D Laboratory", "AutoBrew", "AutoPartyManager", "Overclock", "Drones", "Drones - Assembly", "Self-Correcting Assemblers", "Drones - Transport"],
+  Chem: ["Hi-Tech R&D Laboratory", "AutoBrew", "AutoPartyManager", "Overclock", "Drones", "Drones - Assembly", "Self-Correcting Assemblers"],
 };
 /** Produktions-Multiplikatoren aus Forschung (ResearchTree.getMultiplierHelper, im Simulator geeicht) */
 export function researchMults(done) {
@@ -283,6 +286,70 @@ export function liquidationValue(valuation, owned, total) {
   return valuation * (0.5 * f + (2 / 3) * Math.pow(f, 1.5));
 }
 
+// ---------------------------------------------------------------- Anteilsverkauf (Etappe 3)
+/**
+ * Corporation.ts:251-262 getTargetSharePrice: Marktwert = V * (0,5 + sqrt(Eigenanteil)), je Anteil.
+ */
+export function targetSharePrice(valuation, owned, total) {
+  return (valuation * (0.5 + Math.sqrt(Math.max(0, owned / total)))) / total;
+}
+/**
+ * Corporation.ts:285-326 calculateShareSale, nachgebaut fuer die Planung. Einziger Unterschied:
+ * shareSalesUntilPriceUpdate liefert die API nicht; angenommen wird ein voller Schritt (1e6).
+ * Fehler hoechstens ein Preisschritt (0,5 %) auf den ersten 1e6 Anteilen - im Simulator geeicht.
+ * @returns {number} Erloes fuer n Anteile
+ */
+export function shareSaleProfit(c, n) {
+  let remaining = n;
+  let untilUpdate = 1e6;
+  let price = c.sharePrice;
+  let sold = 0;
+  let profit = 0;
+  const steps = Math.ceil(n / 1e6);
+  for (let i = 0; i < steps; i++) {
+    if (remaining < untilUpdate) {
+      profit += price * remaining;
+      break;
+    }
+    profit += price * 1e6;
+    remaining -= 1e6;
+    sold += 1e6;
+    const target = targetSharePrice(c.valuation, c.numShares - sold, c.totalShares);
+    price *= price <= target ? 1.005 : 0.995;
+    untilUpdate = 1e6;
+  }
+  return profit;
+}
+/** Kleinste Anteilszahl fuer mindestens `money` Erloes (Bisektion), hoechstens `maxN` */
+export function sharesForMoney(c, money, maxN) {
+  if (!(maxN >= 1)) return 0;
+  if (shareSaleProfit(c, maxN) <= money) return Math.floor(maxN);
+  let lo = 0, hi = maxN;
+  for (let i = 0; i < 60 && hi - lo > 1; i++) {
+    const mid = Math.floor((lo + hi) / 2);
+    if (shareSaleProfit(c, mid) >= money) hi = mid;
+    else lo = mid;
+  }
+  return Math.ceil(hi);
+}
+/**
+ * Zuendung am GEGLAETTETEN Wert: das Minimum der letzten `n` Zyklusbewertungen (getCorporation().valuation
+ * ist schon ein 10-Zyklen-Mittel, Corporation.ts:226-232) muss die Schwelle halten. Ein Einzelwert
+ * reicht nicht: Saat 3 lag bei 10 h auf 3,7e14 und bei 12 h wieder auf 3,3e14 (gemessen 06.10.).
+ */
+export function ignitedSmooth(hist, threshold, n) {
+  if (!hist || hist.length < n) return false;
+  for (let i = hist.length - n; i < hist.length; i++) if (!(hist[i] >= threshold)) return false;
+  return true;
+}
+/**
+ * Oeffentliche Bewertung (Corporation.ts:200-212), aus API-Groessen geschaetzt: Fonds + 85.000 s *
+ * Gewinn (revenue - expenses statt assetDelta, das die API nicht liefert), x 1,0079741^(Bueros+Lager).
+ */
+export function publicValuationEstimate(funds, profitPerSec, officesAndWarehouses) {
+  return Math.max(0, funds + 85e3 * profitPerSec) * Math.pow(1.0079741404289038, officesAndWarehouses);
+}
+
 // ---------------------------------------------------------------- Jobs
 export function agriMix(n) {
   if (n <= 4) return { Operations: 1, Engineer: 1, Business: 1, Management: 1 };
@@ -308,15 +375,20 @@ export function priceProduct(prev, now) {
   return { K, kind: "add", x: 1.05 * Math.sqrt(K / s) };
 }
 /**
- * Produktionsgrenze ohne Interna, nur gegen Falle F9 (volles Lager = Stillstand): ist das Lager der
- * Stadt > 80 % voll, wird die Produktion auf den gemessenen Absatz (x1,05) begrenzt; unter 50 %
- * faellt die Grenze wieder weg. Ein Grenzwert aus dem Absatz waehrend der Preis-Probe (erster Zyklus,
- * MP x 1e6) haette die Produktion auf ~0 gesetzt - deshalb haengt die Regel am Lager, nicht am Rest.
+ * Produktionsgrenze ohne Interna, nur gegen Falle F9 (volles Lager = Stillstand). Skeptiker E2 F5:
+ * die erste Fassung konnte haengen - im Probezyklus (Preis MP x 1e6) ist der Absatz ~0, die Grenze
+ * waere ~0 geworden, haette sich selbst erhalten (kein Absatz ohne Ware) und einen Skripttod ueberlebt.
+ * Jetzt:
+ *   - TA2 aktiv oder Probezyklus -> keine Grenze (-1, bzw. aufheben, falls eine steht)
+ *   - Lager > 80 % voll -> Grenze = max(Absatz x 1,05, halbe Produktionsrate, 1)
+ *   - Lager < 50 % -> Grenze weg
  * Rueckgabe: neue Grenze (je s), -1 = keine Grenze, undefined = nichts aendern.
  */
 export function productLimit(now) {
-  if (now.fill > 0.8 && now.sold > 0) return now.sold * 1.05;
-  if (now.fill < 0.5 && now.limit !== null && now.limit !== undefined) return -1;
+  const hasLimit = now.limit !== null && now.limit !== undefined;
+  if (now.ta2 || now.isProbe) return hasLimit ? -1 : undefined;
+  if (now.fill > 0.8 && now.sold > 0) return Math.max(now.sold * 1.05, 0.5 * (now.prod || 0), 1);
+  if (now.fill < 0.5 && hasLimit) return -1;
   return undefined;
 }
 

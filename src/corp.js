@@ -50,7 +50,7 @@ import {
   FAMILY, TICK_SCRIPT, TICKP_SCRIPT, LIBS, INDUSTRY, UPGRADES, UNLOCK_COST, OFFICE_INITIAL_COST, WAREHOUSE_INITIAL_COST,
   RESEARCH, RESEARCH_ORDER, researchMults, CHEM_MIX,
   upgradeCost, officeUpCost, warehouseUpCost, adCost, officeProductivity, agriMix, TOB_MAIN_MIX, TOB_SUP_MIX,
-  officeOps, liquidationValue, fmt,
+  officeOps, liquidationValue, fmt, ignitedSmooth, publicValuationEstimate,
 } from "lib/corplib.js";
 import { block, fehler } from "lib/herzschlag.js";
 import { liesVonHome, nachHome, haengeAnHome } from "lib/hostdatei.js";
@@ -59,6 +59,10 @@ const CORP_NAME = "Losferatos";
 const AGRI = "Agri";
 const TOB = "Tob";
 const CHEM = "Chem";
+// Geld-Schnittstelle zum restlichen Bot (Etappe 3, Einzelheiten im Kopf von financeWork):
+const MONEY_REQUEST_FILE = "data/corp-geld.txt"; // {"betrag": $, "ts": ms, "von": "..."} - Anforderung, 2 h gueltig
+const MONEY_RESERVE_FILE = "data/geldbedarf.txt"; // Ruecklage von bn4rep.js (Torrunde), Zahl in $
+const BN4REP_FILE = "data/bn4rep.json"; // ziel/preis/offen/offenJeFaktion fuer Vorgabe und Bestechung
 /** Optionale Stellschrauben (JSON auf home), z. B. {"maxRound":4,"shares":{...},"taMult":1} - ohne Datei gelten die Vorgaben */
 const CONFIG_FILE = "data/corp-config.txt";
 /** Zeitpunkte der Runden in Stunden Corp-Zeit (strategie.md Abschnitt 5 + Skeptiker-Korrektur 2) */
@@ -89,6 +93,12 @@ export async function main(ns) {
     return;
   }
   let st = loadState(ns, ri);
+  // Nach einem Neustart (Einbau, Kern) sind Zyklen unbeobachtet vergangen, Preise/Einkauf standen still.
+  // Die Bewertung ist ein 10-Zyklen-Mittel (Corporation.ts:226-232) - vor einer Runde deshalb wieder
+  // 11 beobachtete Zyklen abwarten (Neustart-Probe 06.10.: sofortige Annahme brachte 325 statt 393 Mrd).
+  st.lastLT = Math.max(st.lastLT, st.cycle);
+  // ... und das 30-Zyklen-Fenster des Stopps in BEOBACHTETEN Zyklen neu zaehlen
+  if (st.freeze) st.freezeAt = st.cycle;
   // Herzschlag (Skeptiker E1 #3): bn4net.js:3627-3662 beendet Werkzeuge nach dem Wanduhr-Alter ihrer
   // Telemetrie. Im verdeckten Tab dauert ein Corp-Zyklus Minuten (F14); deshalb schreibt corp.js auch
   // WAEHREND des Wartens auf nextUpdate und waehrend der Einmal-Skripte alle 30 s.
@@ -256,6 +266,7 @@ async function runScript(ns, rt, script, order) {
   return r;
 }
 async function runScriptInner(ns, rt, script, order) {
+  rt.execs = (rt.execs || 0) + 1;
   const need = ns.getScriptRam(script, "home");
   if (!(need > 0)) return { ok: 0, err: [`${script} fehlt auf home`], ret: [] };
   const h = pickHost(ns, rt, need);
@@ -345,6 +356,8 @@ function readConfig(ns, st) {
 // ======================================================================== Planung
 async function cycleWork(ns, rt, st) {
   readConfig(ns, st);
+  rt.cycles = (rt.cycles || 0) + 1;
+  const execs0 = rt.execs || 0;
   const snap = readSnapshot(ns);
   const corp = snap.corp;
   const gameRounds = Math.min(4, Math.max(0, snap.offer.round - 1));
@@ -355,26 +368,81 @@ async function cycleWork(ns, rt, st) {
   }
   const P = new Planner(st, snap);
 
-  // --- Belegschaft: Tee/Feier unter Schwelle (F12: nicht jeden Zyklus, kostet 500k/Kopf)
-  for (const [dn, d] of Object.entries(snap.div)) {
-    for (const [city, o] of Object.entries(d.office)) {
-      if (o.numEmployees === 0) continue;
-      if (o.avgEnergy < o.maxEnergy - 2) P.ops.push(["te", dn, city]);
-      if (o.avgMorale < o.maxMorale - 2) P.ops.push(["pa", dn, city, 2e5]);
-    }
-  }
   // --- Runden (setzt ggf. den Ausgabenstopp und plant Dummies)
   const roundOps = P.tryRound();
+  // --- Belegschaft: Tee/Feier unter Schwelle (F12: nicht jeden Zyklus, kostet 500k/Kopf).
+  // Im Ausgabenstopp vor einer Runde erst ab 15 Punkten Abfall: eine Tee-/Feierrunde fuer alle
+  // Bueros kostet mehr als ein Zyklus Gewinn, assetDelta faellt auf ~0 und die Zyklusbewertung auf
+  // ~10 Mrd + Fonds/3 (Corporation.ts:209-216). Gemessen 06.10. (Neustart-Probe vor Runde 2):
+  // nach 18 unbeobachteten Zyklen tranken alle Bueros gleichzeitig, Runde 2 fiel von 393 auf 261 Mrd.
+  // Erster Zyklus nach einem Start: immer Schwelle 2 - nach unbeobachteten Zyklen (Einbau) ist die Energie
+  // abgesunken; mit Schwelle 15 bliebe sie im Stopp niedrig und das Angebot dauerhaft schlechter
+  // (Neustart-Probe 06.10.: 321 statt 393 Mrd). Das Tee-Loch faellt per LT aus dem Annahme-Mittel (F2).
+  const slack = st.freeze && rt.cycles > 1 ? 15 : 2;
+  let careInFreeze = false;
+  for (const [dn, d] of Object.entries(snap.div)) {
+    // AutoBrew/AutoPartyManager halten Energie/Moral selbst (ResearchMap.ts AutoBrew/AutoPartyManager, Skeptiker E2 F6)
+    const rs = (st.rsDone || {})[dn] || [];
+    for (const [city, o] of Object.entries(d.office)) {
+      if (o.numEmployees === 0) continue;
+      if (!rs.includes("AutoBrew") && o.avgEnergy < o.maxEnergy - slack) P.ops.push(["te", dn, city]);
+      if (!rs.includes("AutoPartyManager") && o.avgMorale < o.maxMorale - slack) P.ops.push(["pa", dn, city, 2e5]);
+      careInFreeze ||= (st.freeze || rt.cycles === 1) && P.ops.length > 0;
+    }
+  }
+  // Tee/Feier im Stopp: das Loch muss aus dem 10-Zyklen-Mittel der Annahme heraus (Skeptiker E2 F2)
+  if (careInFreeze && !noFix(st, "careLT")) P.LT();
   // --- Aufbau / Wachstum
   if (!st.freeze) {
     if (!snap.div[AGRI] || P.agriIncomplete()) P.setupAgri();
     else if (st.roundsDone === 0) P.growAgriFixed(AGRI_RESERVE);
     else P.phase2();
   }
-  if (P.ops.length) {
-    const r = await runOps(ns, rt, P.ops);
+  // --- Reihenfolge (Skeptiker E2 F4): Takt-Skripte ZUERST (im verdeckten Tab ist jedes exec teuer und
+  // der Takt ist das Zeitkritische), danach die Struktur-Ops nach Familie gebuendelt.
+  // --- Takt Material + Boosts (Agri, Chem, Tob)
+  const tick = P.tickOrder();
+  let routeOps = [], book = {};
+  if (tick.divs.length) {
+    const r = await runScript(ns, rt, TICK_SCRIPT, tick);
     noteErrors(st, r.err);
-    P.applyResults(r);
+    if (r.price) st.price = r.price;
+    if (r.boost) for (const [dn, b] of Object.entries(r.boost)) st.boost[dn] = b;
+    if (r.diag) {
+      st.flow = summarizeFlow(r.diag);
+      ({ ops: routeOps, book } = P.routeOps(r.diag));
+    }
+  }
+  // --- Takt Produkte
+  const tob = snap.div[TOB];
+  if (tob) {
+    // in diesem Zyklus eingestellte Produkte nicht mehr anfassen (getProduct wuerde werfen)
+    const gone = new Set(P.ops.filter((o) => o[0] === "dp").map((o) => o[2]));
+    const fin = Object.entries(tob.products).filter(([n, p]) => p.developmentProgress >= 100 && !gone.has(n)).map(([n]) => n);
+    if (fin.length) {
+      const ta2 = (st.rsDone[TOB] || []).includes("Market-TA.II") && st.cfg.ta2 !== false;
+      const fill = {};
+      for (const city of tob.info.cities) fill[city] = st.cfg.forceFill ?? (tob.wh[city] ? tob.wh[city].sizeUsed / tob.wh[city].size : 0);
+      const r = await runScript(ns, rt, TICKP_SCRIPT, { div: TOB, cities: tob.info.cities, products: fin, ta2, fill, price: st.pprice || {}, noFixLimit: noFix(st, "limit") });
+      noteErrors(st, r.err);
+      if (r.price) st.pprice = r.price;
+    }
+  }
+  if (routeOps.length) {
+    const rr = await runOps(ns, rt, routeOps);
+    noteErrors(st, rr.err);
+    // erst nach erfolgreichem exportMaterial als gesetzt buchen (Skeptiker E1 #8)
+    routeOps.forEach((op, i) => {
+      if (op[0] !== "ex" || (rr.ret[i] && rr.ret[i].error)) return;
+      const b = book[i];
+      (st.routes[b.city] ??= {})[b.key] = b.w;
+    });
+  }
+  if (P.ops.length) {
+    const ordered = noFix(st, "bundle") ? P.ops : bundleOps(P.ops);
+    const r = await runOps(ns, rt, ordered);
+    noteErrors(st, r.err);
+    P.applyResults(r, ordered);
   }
   if (roundOps.length) {
     const r = await runOps(ns, rt, roundOps);
@@ -390,46 +458,15 @@ async function cycleWork(ns, rt, st) {
     }
   }
   for (const e of P.events) logEvent(ns, st, e);
+  // --- Etappe 3: Zuendung, Boersengang, Verkauf nach Bedarf, Bestechung - nur mit {"etappe":3}
+  if (P.etappe() >= 3) await financeWork(ns, rt, st, snap, P);
 
-  // --- Takt Material + Boosts (Agri, Chem, Tob)
-  const tick = P.tickOrder();
-  if (tick.divs.length) {
-    const r = await runScript(ns, rt, TICK_SCRIPT, tick);
-    noteErrors(st, r.err);
-    if (r.price) st.price = r.price;
-    if (r.boost) for (const [dn, b] of Object.entries(r.boost)) st.boost[dn] = b;
-    if (r.diag) {
-      st.flow = summarizeFlow(r.diag);
-      const { ops: routeOps, book } = P.routeOps(r.diag);
-      if (routeOps.length) {
-        const rr = await runOps(ns, rt, routeOps);
-        noteErrors(st, rr.err);
-        // erst nach erfolgreichem exportMaterial als gesetzt buchen (Skeptiker E1 #8)
-        routeOps.forEach((op, i) => {
-          if (op[0] !== "ex" || (rr.ret[i] && rr.ret[i].error)) return;
-          const b = book[i];
-          (st.routes[b.city] ??= {})[b.key] = b.w;
-        });
-      }
-    }
-  }
-  // --- Takt Produkte
-  const tob = snap.div[TOB];
-  if (tob) {
-    // in diesem Zyklus eingestellte Produkte nicht mehr anfassen (getProduct wuerde werfen)
-    const gone = new Set(P.ops.filter((o) => o[0] === "dp").map((o) => o[2]));
-    const fin = Object.entries(tob.products).filter(([n, p]) => p.developmentProgress >= 100 && !gone.has(n)).map(([n]) => n);
-    if (fin.length) {
-      const ta2 = (st.rsDone[TOB] || []).includes("Market-TA.II") && st.cfg.ta2 !== false;
-      const fill = {};
-      for (const city of tob.info.cities) fill[city] = tob.wh[city] ? tob.wh[city].sizeUsed / tob.wh[city].size : 0;
-      const r = await runScript(ns, rt, TICKP_SCRIPT, { div: TOB, cities: tob.info.cities, products: fin, ta2, fill, price: st.pprice || {} });
-      noteErrors(st, r.err);
-      if (r.price) st.pprice = r.price;
-    }
-  }
   // --- Kennzahlen
+  st.execHist ??= [];
+  st.execHist.push((rt.execs || 0) - execs0);
+  if (st.execHist.length > 60) st.execHist.shift();
   st.snap = {
+    execsPerCycle: +(st.execHist.reduce((a, b) => a + b, 0) / st.execHist.length).toFixed(2),
     funds: corp.funds,
     valuation: corp.valuation,
     revenue: corp.revenue,
@@ -444,11 +481,155 @@ async function cycleWork(ns, rt, st) {
     tobAds: tob ? tob.info.numAdVerts : 0,
     tobMain: tob && tob.office[MAIN_CITY] ? tob.office[MAIN_CITY].size : 0,
     rsDone: st.rsDone,
+    finance: st.fin ? { phase: st.fin.phase, need: st.fin.need, target: st.fin.target, targetWhy: st.fin.targetWhy, sales: (st.fin.sales || []).slice(-5), soldTotal: st.fin.soldTotal, bribedTotal: st.fin.bribedTotal, ignitedAt: st.fin.ignitedAt, ipo: st.fin.ipo, cooldownSec: corp.shareSaleCooldown / 5 } : null,
   };
 }
 /** Nur fuer den Testnachweis (rot ohne Fix): data/corp-config.txt {"noFix":["freeze","round","beat"]} */
 function noFix(st, name) {
   return !!(st && st.cfg && Array.isArray(st.cfg.noFix) && st.cfg.noFix.includes(name));
+}
+// ======================================================================== Etappe 3: Geld an den Spieler
+/**
+ * ZUENDUNG: Minimum der letzten 30 Zyklus-Bewertungen >= 1e15 (corplib.ignitedSmooth) und alle vier
+ * Runden durch. Notausgang: {"ipoEarly":true} erlaubt den Boersengang schon nach Runde 3, sobald Geld
+ * angefordert ist (Skeptiker-Korrektur 2).
+ *
+ * WIEVIEL: Ziel = groesster Wert aus
+ *   (1) data/corp-geld.txt  {"betrag": $, "ts": ms}  - ANFORDERUNG, 2 h gueltig (bn4rep/graft koennen schreiben)
+ *   (2) data/geldbedarf.txt - Ruecklage, die bn4rep.js fuer die Torrunde haelt
+ *   (3) Vorgabe aus data/bn4rep.json: Preis des naechsten Ziels x (1 + 1,9 + ... + 1,9^(k-1)), k = offene
+ *       Stuecke (hoechstens 10), plus {"graftGeld"} - gedeckelt auf {"defaultCap"} (Vorgabe 1e15). GESCHAETZT:
+ *       bn4rep meldet nur den Preis des naechsten Ziels, nicht aller offenen Stuecke.
+ * Verkauft wird Bedarf = Ziel - Spielergeld (x1,1), wenn > {"minSale"} (1e9). Sperre 1 h je Verkauf
+ * (Constants.ts:50) -> Tranchen hoechstens stuendlich. Nie alle: {"keepFrac"} (5 %) der Anteile beim
+ * Boersengang bleiben, je Verkauf hoechstens {"maxPart"} (10 %) der Anteile, hoechstens 1e14.
+ * WARUM NUR 10 %: Nach dem Boersengang folgt der Kurs dem Ziel nur um ~0,5 %/Zyklus (x6/h,
+ * Corporation.ts:264-274), die Bewertung waechst nach der Zuendung aber x1000 in 2 h. Ein grosser
+ * Verkauf im IPO-Zyklus verschenkt die spaeteren Kurse (Simulator 06.10., Saat 3: 50 % beim IPO
+ * brachten 34 Bio, der Rest waere Stunden spaeter ein Vielfaches wert gewesen).
+ *
+ * BESTECHUNG: erst nach dem ersten Verkauf (senkt die Bewertung, Skeptiker-Korrektur 4), Bewertung
+ * >= 1e14 (Constants.ts:61), Kasse >= {"bribeMinFunds"} (1e15; vorher kostet jede Bestechung Wachstum,
+ * strategie.md E), nie Bladeburners (FactionInfo.tsx:711-713), je Faktion der fehlende Ruf aus
+ * bn4rep.json offenJeFaktion[f].fehlt x 1e9 $, je Durchgang hoechstens {"bribeShare"} (5 %) der Kasse,
+ * dieselbe Faktion fruehestens nach 20 min wieder (bn4rep muss den neuen Ruf erst sehen).
+ */
+async function financeWork(ns, rt, st, snap, P) {
+  const corp = snap.corp;
+  const cfg = (k, d) => (st.cfg && st.cfg[k] !== undefined ? st.cfg[k] : d);
+  st.fin ??= { phase: "halten", sales: [], soldTotal: 0, bribed: {}, bribeFail: {}, bribedTotal: 0, vHist: [] };
+  const fin = st.fin;
+  fin.vHist.push(corp.valuation);
+  if (fin.vHist.length > 60) fin.vHist.shift();
+  const smoothN = noFix(st, "smooth") ? 1 : 30;
+  const ignited = ignitedSmooth(fin.vHist, cfg("igniteV", 1e15), smoothN);
+  if (ignited && !fin.ignitedAt) {
+    fin.ignitedAt = +P.hours.toFixed(3);
+    logEvent(ns, st, `Zuendung erkannt: Bewertung ${fmt(corp.valuation)} seit ${smoothN} Zyklen >= ${fmt(cfg("igniteV", 1e15))}`);
+  }
+  const mayIpo = (st.roundsDone >= 4 && ignited) || (cfg("ipoEarly", false) && st.roundsDone >= 3);
+  fin.phase = corp.public ? "oeffentlich" : mayIpo ? "zuendbereit" : "halten";
+  const canSell = corp.public ? corp.shareSaleCooldown <= 0 : mayIpo;
+  // Bedarf nur lesen, wenn verkauft werden koennte (spart scp je Zyklus)
+  if (canSell && st.cycle % 3 === 0) {
+    const tg = moneyTarget(ns, cfg);
+    const money = ns.getServerMoneyAvailable("home");
+    fin.target = tg.value;
+    fin.targetWhy = tg.why;
+    fin.need = Math.max(0, tg.value - money);
+    if (fin.need > cfg("minSale", 1e9)) {
+      const ipo = !corp.public;
+      let keep = fin.keep || 1;
+      if (ipo) {
+        keep = Math.max(1, Math.ceil(cfg("keepFrac", 0.05) * corp.numShares));
+        fin.keep = keep;
+        // Liquidationswert-Vergleich: privat (Verkauf im IPO-Zyklus) gegen geschaetzt oeffentlich
+        let ow = 12 * snap.dummies;
+        for (const d of Object.values(snap.div)) ow += Object.keys(d.office).length + Object.values(d.wh).filter(Boolean).length;
+        const vPub = publicValuationEstimate(corp.funds, corp.revenue - corp.expenses, ow);
+        fin.ipo = { h: +P.hours.toFixed(3), vPriv: corp.valuation, vPubEst: vPub, liqPriv: liquidationValue(corp.valuation, corp.numShares, corp.totalShares), liqPubEst: liquidationValue(vPub, corp.numShares, corp.totalShares) };
+      }
+      const r = await runOps(ns, rt, [["sl", fin.need * 1.1, keep, ipo, cfg("maxPart", 0.1)]]);
+      noteErrors(st, r.err);
+      const res = r.ret[0];
+      if (res && !res.error && res.n > 0) {
+        fin.soldTotal += res.got;
+        fin.sales.push({ h: +P.hours.toFixed(3), wall: Date.now(), n: res.n, got: res.got, pred: res.pred, need: fin.need, ipo: !!res.ipo });
+        if (fin.sales.length > 50) fin.sales.shift();
+        logEvent(ns, st, `${res.ipo ? "BOERSENGANG + " : ""}Verkauf ${fmt(res.n)} Anteile -> ${fmt(res.got)} an den Spieler (Bedarf ${fmt(fin.need)}, ${tg.why}; vorhergesagt ${fmt(res.pred)})` +
+          (res.ipo ? ` | Vergleich privat ${fmt(fin.ipo.vPriv)} / oeffentlich geschaetzt ${fmt(fin.ipo.vPubEst)}` : ""));
+      } else if (res && res.ipo) logEvent(ns, st, `Boersengang ohne Verkauf: ${JSON.stringify(res)}`);
+    }
+  }
+  // --- Bestechung (nach dem ersten Verkauf)
+  const afterSale = noFix(st, "bribeOrder") || (corp.public && fin.sales.length);
+  if (afterSale && corp.valuation >= 1e14 && corp.funds >= cfg("bribeMinFunds", 1e15) && st.cycle % 30 === 0 && cfg("bribe", true) !== false) {
+    const rep = readJson(ns, BN4REP_FILE);
+    const offen = rep && rep.offenJeFaktion;
+    if (offen && Date.now() - (rep.ts || rep.wall || 0) < 30 * 60000) {
+      let budget = cfg("bribeShare", 0.05) * corp.funds;
+      const ops = [];
+      for (const [f, e] of Object.entries(offen).sort((a, b) => b[1].fehlt - a[1].fehlt)) {
+        if ((f === "Bladeburners" && !noFix(st, "bb")) || !(e.fehlt > 0)) continue;
+        const last = fin.bribed[f];
+        if (last && Date.now() - last.wall < 20 * 60000) continue;
+        const fail = fin.bribeFail[f];
+        if (fail && fail.n >= 3 && Date.now() - fail.wall < 2 * 3600000) continue;
+        const amt = Math.min(e.fehlt * 1e9 * 1.02, budget);
+        if (!(amt >= 1e9)) break;
+        ops.push(["bb", f, amt]);
+        budget -= amt;
+      }
+      if (ops.length) {
+        const r = await runOps(ns, rt, ops);
+        ops.forEach((op, i) => {
+          const ok = r.ret[i] === true;
+          if (ok) {
+            fin.bribed[op[1]] = { wall: Date.now(), rep: op[2] / 1e9, total: ((fin.bribed[op[1]] || {}).total || 0) + op[2] / 1e9 };
+            fin.bribedTotal += op[2];
+            logEvent(ns, st, `Bestechung ${op[1]}: ${fmt(op[2] / 1e9)} Ruf fuer ${fmt(op[2])}`);
+          } else {
+            const f0 = fin.bribeFail[op[1]] || { n: 0 };
+            fin.bribeFail[op[1]] = { n: f0.n + 1, wall: Date.now() };
+          }
+        });
+      }
+    }
+  }
+}
+function readJson(ns, file) {
+  try {
+    return JSON.parse(liesVonHome(ns, file) || "null");
+  } catch {
+    return null;
+  }
+}
+function moneyTarget(ns, cfg) {
+  const out = { value: 0, why: "kein Bedarf" };
+  const take = (v, why) => {
+    if (Number.isFinite(v) && v > out.value) {
+      out.value = v;
+      out.why = why;
+    }
+  };
+  const req = readJson(ns, MONEY_REQUEST_FILE);
+  if (req && typeof req === "object" && Date.now() - (req.ts || 0) < 2 * 3600000) take(Number(req.betrag), `Anforderung ${req.von || "?"}`);
+  else if (typeof req === "number") take(req, "Anforderung (Zahl)");
+  take(Number(liesVonHome(ns, MONEY_RESERVE_FILE) || 0), "geldbedarf.txt");
+  const rep = readJson(ns, BN4REP_FILE);
+  if (rep && rep.preis > 0) {
+    const k = Math.min(10, Math.max(1, rep.offen || 1));
+    let sum = 0;
+    for (let i = 0; i < k; i++) sum += rep.preis * Math.pow(1.9, i);
+    take(Math.min(cfg("defaultCap", 1e15), sum + cfg("graftGeld", 0)), `Vorgabe ${k} Stuecke ab ${rep.ziel || "?"}`);
+  }
+  return out;
+}
+/** Struktur-Ops nach Familie buendeln, Reihenfolge innerhalb einer Familie bleibt (stabil). Rang folgt
+ *  den Abhaengigkeiten: Division/Stadt/Lager vor Buero, Buero vor Werbung/Tee, Produkte zuletzt. */
+const FAMILY_RANK = { "corp-act-build.js": 0, "corp-act-office.js": 1, "corp-act-up.js": 2, "corp-act-care.js": 3, "corp-act-prod.js": 4, "corp-act-route.js": 5, "corp-act-cash.js": 6, "corp-act-fin.js": 7 };
+function bundleOps(ops) {
+  return ops.map((op, i) => ({ op, i, r: FAMILY_RANK[FAMILY[op[0]]] ?? 9 })).sort((a, b) => a.r - b.r || a.i - b.i).map((x) => x.op);
 }
 function noteErrors(st, errs) {
   for (const e of errs || []) {
@@ -522,6 +703,14 @@ class Planner {
     st.roundShift ??= [0, 0, 0, 0];
     const Tr = (hours[k] + st.roundShift[k]) * CYCLES_PER_HOUR;
     const cyc = st.cycle - st.foundCycle;
+    // Bestes Angebot der letzten ~45 Zyklen vor dem Termin und im Stopp merken (Skeptiker E2 F1): nach
+    // einem Neustart im Stopp nicht das eingebrochene Angebot nehmen, sondern auf >= 90 % davon warten.
+    // Der Stopp endet trotzdem nach 30 Zyklen (dann Termin +0,25 h und Merker zurueck).
+    if (cyc >= Tr - 45 && st.bestOfferRound === k) st.bestOffer = Math.max(st.bestOffer || 0, this.snap.offer.funds || 0);
+    else if (cyc >= Tr - 45) {
+      st.bestOfferRound = k;
+      st.bestOffer = this.snap.offer.funds || 0;
+    }
     if (cyc < Tr - 15) {
       st.next = `Runde ${k + 1} ab ${(Tr / CYCLES_PER_HOUR).toFixed(2)} h`;
       return [];
@@ -549,14 +738,18 @@ class Planner {
     if (st.cycle - (st.freezeAt ?? st.cycle) > 30 && !noFix(st, "freeze")) {
       st.freeze = false;
       st.roundShift[k] += 0.25;
+      st.bestOffer = 0;
+      st.bestOfferRound = -1;
       this.events.push(`Runde ${k + 1}: kein annehmbares Angebot, Stopp aufgehoben, neuer Termin ${(hours[k] + st.roundShift[k]).toFixed(2)} h`);
       return [];
     }
-    if (cyc >= Tr && st.cycle - st.lastLT >= 11) {
+    // angenommen wird erst, wenn das 10-Zyklen-Mittel der Bewertung ganz aus Stopp-Zyklen besteht
+    if (cyc >= Tr && st.cycle - st.lastLT >= 11 && (noFix(st, "bestOffer") || st.cycle - (st.freezeAt ?? 0) >= 11)) {
       st.next = `Runde ${k + 1} annehmen`;
       // Mindestbetrag; nach mehr als 1 h Verschiebung nur noch die Haelfte
       let min = this.cfg("roundMin", ROUND_MIN_FUNDS)[k];
       if (st.roundShift[k] > 1) min /= 2;
+      if (!noFix(st, "bestOffer")) min = Math.max(min, 0.9 * (st.bestOffer || 0));
       return [["ai", min, noFix(st, "round") ? -1 : k + 1]];
     }
     st.next = `Runde ${k + 1}: warte auf 11 ruhige Zyklen`;
@@ -833,9 +1026,10 @@ class Planner {
       }
     }
     if (!developing) {
-      if (Object.keys(tob.products).length >= tob.info.maxProducts && worst) this.ops.push(["dp", TOB, worst.name]);
       const inv = Math.max(1e8, F() * 0.01);
       if (F() > 2 * inv + 1e9) {
+        // erst einstellen, wenn das neue Produkt bezahlbar ist (sonst bleibt ein Platz leer, Skeptiker E2 #9)
+        if (Object.keys(tob.products).length >= tob.info.maxProducts && worst) this.ops.push(["dp", TOB, worst.name]);
         this.ops.push(["mp", TOB, MAIN_CITY, `P${++st.productSeq}`, inv, inv]);
         this.funds -= 2 * inv;
         this.LT();
@@ -855,6 +1049,8 @@ class Planner {
         break;
       }
     }
+    // Ausbau nur jeden 3. Zyklus (wie growAgriFixed): buendelt Ops, weniger exec je Zyklus (Skeptiker E2 F4)
+    if (st.cycle % 3 !== 0 && !noFix(st, "bundle")) return;
     if (F() < 2e9) return;
     const sh = { wilson: 0.2, ads: 0.15, main: 0.4, up: 0.05, sup: 0.02, agri: 0.08, tob: 0.03, ...this.cfg("shares", {}) };
     // Wilson, wenn bezahlbar (Doku general-advice.md)
@@ -919,10 +1115,10 @@ class Planner {
     this.boostOrders[dn] = { frac: 0.6, budget: frac * F() };
   }
   /** Ergebnisse auswerten: Forschung als erledigt merken (research() kehrt bei "schon erforscht" still zurueck) */
-  applyResults(r) {
+  applyResults(r, ops = this.ops) {
     const st = this.st;
-    for (let i = 0; i < this.ops.length; i++) {
-      const op = this.ops[i];
+    for (let i = 0; i < ops.length; i++) {
+      const op = ops[i];
       const res = r.ret[i];
       if (op[0] === "rs" && !(res && res.error)) {
         st.rsDone[op[1]] ??= [];

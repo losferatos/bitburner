@@ -54,7 +54,10 @@ export async function main(ns) {
             out.err.push(`sp/${key}: ${String(e).slice(0, 120)}`);
           }
         }
-        const lim = productLimit({ fill: (order.fill || {})[city] || 0, sold: p.actualSellAmount, limit: p.productionLimit });
+        const probing = !order.ta2 && !(pr.K > 0);
+        const lim = order.noFixLimit
+          ? (((order.fill || {})[city] || 0) > 0.8 && p.actualSellAmount > 0 ? p.actualSellAmount * 1.05 : undefined)
+          : productLimit({ fill: (order.fill || {})[city] || 0, sold: p.actualSellAmount, limit: p.productionLimit, prod: p.productionAmount, ta2: order.ta2, isProbe: probing });
         if (lim !== undefined) {
           try {
             c.limitProductProduction(order.div, city, name, lim);

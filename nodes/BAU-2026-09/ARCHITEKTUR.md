@@ -1283,7 +1283,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "corp.js",
       "args": [],
-      "ramBaseGb": 75.1,
+      "ramBaseGb": 75.2,
       "ramSingGb": 0,
       "ramMeasuredAt": "GERECHNET-2026-10-06 (tools/ram.js und reference/v301 RamCalculations.ts, beide 75,10)",
       "verfahren": "alle",

@@ -1,0 +1,1381 @@
+{
+ "seed": 1,
+ "hours": 8,
+ "wallSec": -1269054.523,
+ "rounds": [
+  {
+   "k": 1,
+   "h": 0.5,
+   "funds": 128555970000,
+   "shares": 100000000,
+   "valuation": 428519900000
+  },
+  {
+   "k": 2,
+   "h": 3.031,
+   "funds": 420666820000,
+   "shares": 350000000,
+   "valuation": 600952600000
+  },
+  {
+   "k": 3,
+   "h": 4.642,
+   "funds": 1122506950000,
+   "shares": 250000000,
+   "valuation": 2245013900000
+  }
+ ],
+ "traj": [
+  {
+   "h": 0,
+   "funds": 150000000000,
+   "valuation": 0,
+   "assetDelta": 0,
+   "profit": 0,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "stage": "agri0",
+   "next": ""
+  },
+  {
+   "h": 0.5,
+   "funds": 133628478303.82613,
+   "valuation": 428519900000,
+   "assetDelta": 12856798701.990187,
+   "profit": 1205787.080310034,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "liq": 298344425870.8849,
+   "stage": "agri",
+   "next": "Runde 1 annehmen"
+  },
+  {
+   "h": 1,
+   "funds": 30444938113.141125,
+   "valuation": 440981400000,
+   "assetDelta": 1199836.4746047973,
+   "profit": 1211106.4874599911,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 268927509454.97845,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 1.5,
+   "funds": 32411523398.339172,
+   "valuation": 446611900000,
+   "assetDelta": 1207051.9101776122,
+   "profit": 1112749.9553844943,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 272361206073.44412,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2,
+   "funds": 34365104141.68432,
+   "valuation": 439028800000,
+   "assetDelta": 1192123.1011154174,
+   "profit": 1193750.5689003984,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 267736738472.43408,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2.5,
+   "funds": 36321783788.779495,
+   "valuation": 457058200000,
+   "assetDelta": 1207663.346170044,
+   "profit": 1124281.827352184,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 278731763747.80304,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 3,
+   "funds": 1746415833.93712,
+   "valuation": 561524700000,
+   "assetDelta": 788138.9365997314,
+   "profit": 1399226.1318138554,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 342439474926.7292,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 3.5,
+   "funds": 20633674269.967594,
+   "valuation": 792125000000,
+   "assetDelta": 2143475.6595428465,
+   "profit": 2303776.645523509,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 0,
+   "aw": 96.05056799546814,
+   "wilson": 4,
+   "ads": 23,
+   "mainOffice": 45,
+   "liq": 262472040685.041,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 4,
+   "funds": 24127776125.88041,
+   "valuation": 1313609600000,
+   "assetDelta": 3482544.4504730226,
+   "profit": 3597397.281874558,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 1436.7295623819534,
+   "aw": 96.05056799546814,
+   "wilson": 4,
+   "ads": 23,
+   "mainOffice": 45,
+   "liq": 435266899006.42,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 4.5,
+   "funds": 26046772822.293327,
+   "valuation": 1356704300000,
+   "assetDelta": 1239635.617437744,
+   "profit": 3616453.628177606,
+   "owned": 0.36666666666666664,
+   "fundingRound": 2,
+   "rating": 1436.7295623819534,
+   "aw": 101.59824325215435,
+   "wilson": 4,
+   "ads": 24,
+   "mainOffice": 45,
+   "liq": 449546405210.251,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 5,
+   "funds": 82030801342.93326,
+   "valuation": 3408591700000,
+   "assetDelta": 8460985.03937378,
+   "profit": 8553718.944442397,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 1721.36787782092,
+   "aw": 332.99556587628143,
+   "wilson": 6,
+   "ads": 47,
+   "mainOffice": 90,
+   "liq": 544108309966.44196,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 5.5,
+   "funds": 87828031441.3717,
+   "valuation": 12809705800000,
+   "assetDelta": 31154637.104400635,
+   "profit": 31077379.634266775,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5645.621889449145,
+   "aw": 332.99556587628143,
+   "wilson": 6,
+   "ads": 47,
+   "mainOffice": 90,
+   "liq": 2044793858415.289,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 6,
+   "funds": 96535482248.87144,
+   "valuation": 22320238500000,
+   "assetDelta": 59962351.33528137,
+   "profit": 59887584.617658325,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 5968.907333439601,
+   "aw": 332.99556587628143,
+   "wilson": 6,
+   "ads": 47,
+   "mainOffice": 90,
+   "liq": 3562945731600.2124,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 6.5,
+   "funds": 106688646746.04362,
+   "valuation": 23415235800000,
+   "assetDelta": 62932171.969256595,
+   "profit": 62952915.64321241,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 6552.379838579272,
+   "aw": 347.8989735168325,
+   "wilson": 6,
+   "ads": 48,
+   "mainOffice": 90,
+   "liq": 3737738485546.312,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 7,
+   "funds": 118323848883.87164,
+   "valuation": 24334244800000,
+   "assetDelta": 91471587.8626831,
+   "profit": 92183910.42098506,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 7180.401847936208,
+   "aw": 379.2957666290972,
+   "wilson": 6,
+   "ads": 50,
+   "mainOffice": 90,
+   "liq": 3884438494771.221,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 7.5,
+   "funds": 134195699443.66931,
+   "valuation": 31638516600000,
+   "assetDelta": 79779335.17557983,
+   "profit": 84444772.05508447,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 7180.401847936208,
+   "aw": 412.9385457414722,
+   "wilson": 6,
+   "ads": 52,
+   "mainOffice": 90,
+   "liq": 5050408295329.481,
+   "stage": "tob",
+   "next": "Produktphase"
+  },
+  {
+   "h": 8,
+   "funds": 150726022363.011,
+   "valuation": 33200696800000,
+   "assetDelta": 88441463.57437745,
+   "profit": 88471086.67907858,
+   "owned": 0.2,
+   "fundingRound": 3,
+   "rating": 7180.401847936208,
+   "aw": 448.98797863600294,
+   "wilson": 6,
+   "ads": 54,
+   "mainOffice": 90,
+   "liq": 5299776745204.261,
+   "stage": "tob",
+   "next": "Produktphase"
+  }
+ ],
+ "events": [
+  "2026-10-06T14:44:16.527Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T14:44:16.534Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T14:44:16.925Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T14:44:16.956Z z180 0.50h Runde 1: 128.6 Mrd fuer 100.00 Mio Anteile (Bewertung 428.5 Mrd)",
+  "2026-10-06T14:44:16.961Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~113.6 Mrd",
+  "2026-10-06T14:44:16.961Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~26.6 Mrd",
+  "2026-10-06T14:44:19.181Z z1001 2.78h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
+  "2026-10-06T14:44:19.394Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
+  "2026-10-06T14:44:19.424Z z1091 3.03h Runde 2: 420.7 Mrd fuer 350.00 Mio Anteile (Bewertung 601.0 Mrd)",
+  "2026-10-06T14:44:19.430Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~301.6 Mrd",
+  "2026-10-06T14:44:20.469Z z1357 3.77h Produkt P1 fertig: Rating 1437, eff 0",
+  "2026-10-06T14:44:21.891Z z1660 4.61h Runde 3: Ausgabenstopp (F3)",
+  "2026-10-06T14:44:21.947Z z1671 4.64h Runde 3: 1.12 Bio fuer 250.00 Mio Anteile (Bewertung 2.25 Bio)",
+  "2026-10-06T14:44:21.954Z z1672 4.64h Produkt P2 fertig: Rating 1721, eff 1721",
+  "2026-10-06T14:44:23.117Z z1888 5.24h Produkt P3 fertig: Rating 5646, eff 0",
+  "2026-10-06T14:44:24.249Z z2101 5.84h Produkt P4 fertig: Rating 5969, eff 0",
+  "2026-10-06T14:44:25.346Z z2311 6.42h Produkt P5 fertig: Rating 6552, eff 0",
+  "2026-10-06T14:44:26.448Z z2518 6.99h Produkt P6 fertig: Rating 7180, eff 0",
+  "2026-10-06T14:44:27.497Z z2714 7.54h Forschung Tob: Hi-Tech R&D Laboratory",
+  "2026-10-06T14:44:27.540Z z2722 7.56h Produkt P7 fertig: Rating 4553, eff 0"
+ ],
+ "errors": [],
+ "maxErrStreak": 0,
+ "eichung": {
+  "unitsRelErr": {
+   "Agri": {
+    "n": 17274,
+    "min": -6.661338147750939e-16,
+    "med": -2.220446049250313e-16,
+    "max": 0
+   },
+   "Chem": {
+    "n": 10728,
+    "min": -6.661338147750939e-16,
+    "med": -2.220446049250313e-16,
+    "max": 0
+   },
+   "Tob": {
+    "n": 9144,
+    "min": -6.661338147750939e-16,
+    "med": -3.3306690738754696e-16,
+    "max": 0.4999999999999998
+   }
+  },
+  "dRelErr": {
+   "n": 1722,
+   "min": -0.7227000602061918,
+   "med": -0.000013041544907554936,
+   "max": 0.31434457096300883
+  },
+  "costErr": []
+ },
+ "ram": {
+  "corp-act-build.js": 81.6,
+  "corp-act-care.js": 61.6,
+  "corp-act-cash.js": 71.6,
+  "corp-act-fin.js": 71.6,
+  "corp-act-office.js": 61.6,
+  "corp-act-prod.js": 41.6,
+  "corp-act-route.js": 41.6,
+  "corp-act-up.js": 61.6,
+  "corp-tick.js": 71.6,
+  "corp-tickp.js": 71.6,
+  "corp.js": 75.19999999999999
+ },
+ "finalState": {
+  "v": 1,
+  "nodeReset": 1791297856522,
+  "cycle": 2880,
+  "foundCycle": 0,
+  "lastLT": 2871,
+  "freeze": false,
+  "roundsDone": 3,
+  "rounds": [
+   {
+    "k": 1,
+    "h": 0.5,
+    "funds": 128555970000,
+    "shares": 100000000,
+    "valuation": 428519900000
+   },
+   {
+    "k": 2,
+    "h": 3.031,
+    "funds": 420666820000,
+    "shares": 350000000,
+    "valuation": 600952600000
+   },
+   {
+    "k": 3,
+    "h": 4.642,
+    "funds": 1122506950000,
+    "shares": 250000000,
+    "valuation": 2245013900000
+   }
+  ],
+  "stage": "tob",
+  "unlocks": [
+   "Export"
+  ],
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 14954.659800215677
+    },
+    "Aevum": {
+     "Real Estate": 14718.726735821923
+    },
+    "Chongqing": {
+     "Real Estate": 15404.757491075326
+    },
+    "New Tokyo": {
+     "Real Estate": 16362.296885601281
+    },
+    "Ishima": {
+     "Real Estate": 15351.675692995093
+    },
+    "Volhaven": {
+     "Real Estate": 14663.05426799052
+    }
+   },
+   "Tob": {
+    "Sector-12": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Aevum": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Chongqing": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "New Tokyo": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Ishima": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Volhaven": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    }
+   },
+   "Chem": {
+    "Sector-12": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Aevum": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Chongqing": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "New Tokyo": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Ishima": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Volhaven": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    }
+   }
+  },
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 8487.92975892794,
+    "kind": "add",
+    "x": 255.58368931266057,
+    "mp": 2971.588974151848
+   },
+   "Agri|Sector-12|Food": {
+    "d": 5490.873838701056,
+    "kind": "add",
+    "x": 214.9894348338656,
+    "mp": 5076.404696047653
+   },
+   "Agri|Aevum|Plants": {
+    "d": 14941.783286883932,
+    "kind": "add",
+    "x": 758.6373064218889,
+    "mp": 3823.213959811738
+   },
+   "Agri|Aevum|Food": {
+    "d": 7439.530008168157,
+    "kind": "add",
+    "x": 251.72145253471564,
+    "mp": 4729.6602903091
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 10508.602752998813,
+    "kind": "add",
+    "x": 285.24193637071875,
+    "mp": 3304.368802530506
+   },
+   "Agri|Chongqing|Food": {
+    "d": 6732.26674275821,
+    "kind": "add",
+    "x": 239.63324167204357,
+    "mp": 4773.315009879244
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 8956.619108628283,
+    "kind": "add",
+    "x": 265.6258391128072,
+    "mp": 2917.072870647801
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 6393.867268556029,
+    "kind": "add",
+    "x": 232.30829808636733,
+    "mp": 4807.5891363488545
+   },
+   "Agri|Ishima|Plants": {
+    "d": 11249.218853820192,
+    "kind": "add",
+    "x": 295.78234962521645,
+    "mp": 3233.8496378651025
+   },
+   "Agri|Ishima|Food": {
+    "d": 10120.966151595872,
+    "kind": "add",
+    "x": 290.8679848946732,
+    "mp": 4838.49524869238
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 7116.986335856087,
+    "kind": "add",
+    "x": 232.38846073176109,
+    "mp": 2933.6818112957726
+   },
+   "Agri|Volhaven|Food": {
+    "d": 12755.639406118276,
+    "kind": "add",
+    "x": 325.40769061871447,
+    "mp": 5672.374551584585
+   },
+   "Chem|Sector-12|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 8808.118836978749
+   },
+   "Chem|Aevum|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 8462.056960367803
+   },
+   "Chem|Chongqing|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7690.441420761132
+   },
+   "Chem|New Tokyo|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7763.271761087002
+   },
+   "Chem|Ishima|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7089.010399962661
+   },
+   "Chem|Volhaven|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 10873.451800610886
+   }
+  },
+  "errors": [],
+  "events": 19,
+  "next": "Produktphase",
+  "waiting": false,
+  "snap": {
+   "execsPerCycle": 2.23,
+   "funds": 150771022363.011,
+   "valuation": 33200696800000,
+   "revenue": 89539625.5690419,
+   "expenses": 1068538.8899633198,
+   "public": false,
+   "owned": 0.2,
+   "liquidation": 5299776745204.261,
+   "divisions": 3,
+   "dummies": 0,
+   "products": [
+    "P5:6552",
+    "P6:7180",
+    "P8:79%"
+   ],
+   "wilson": 6,
+   "tobAds": 54,
+   "tobMain": 90,
+   "rsDone": {
+    "Tob": [
+     "Hi-Tech R&D Laboratory"
+    ]
+   },
+   "finance": null
+  },
+  "cfgAt": 2851,
+  "cfg": {
+   "etappe": 2,
+   "noFix": [
+    "bundle"
+   ]
+  },
+  "rsDone": {
+   "Tob": [
+    "Hi-Tech R&D Laboratory"
+   ]
+  },
+  "routes": {
+   "Aevum": {
+    "Agri>Tob>Plants": 82.83420748879914,
+    "Agri>Chem>Plants": 15.118685957686958,
+    "Chem>Agri>Chemicals": 23.37029971638797
+   },
+   "Chongqing": {
+    "Agri>Tob>Plants": 19.179135069621644,
+    "Agri>Chem>Plants": 15.572425554699791,
+    "Chem>Agri>Chemicals": 23.040780463743396
+   },
+   "Sector-12": {
+    "Agri>Tob>Plants": 19.948931957910023,
+    "Agri>Chem>Plants": 15.30376752159358,
+    "Chem>Agri>Chemicals": 23.25639850761385
+   },
+   "New Tokyo": {
+    "Agri>Tob>Plants": 19.647612653237825,
+    "Agri>Chem>Plants": 15.569492928087143,
+    "Chem>Agri>Chemicals": 22.58585751952014
+   },
+   "Ishima": {
+    "Agri>Tob>Plants": 19.380403489332654,
+    "Agri>Chem>Plants": 15.39323369004895,
+    "Chem>Agri>Chemicals": 23.067419703350904
+   },
+   "Volhaven": {
+    "Agri>Tob>Plants": 18.64247039248925,
+    "Agri>Chem>Plants": 15.565018189431466,
+    "Chem>Agri>Chemicals": 23.395483365476863
+   }
+  },
+  "seen": [
+   "P1",
+   "P2",
+   "P3",
+   "P4",
+   "P5",
+   "P6",
+   "P7"
+  ],
+  "productSeq": 8,
+  "dummySeq": 0,
+  "roundShift": [
+   0,
+   0,
+   0,
+   0
+  ],
+  "execHist": [
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   3,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   2,
+   3,
+   3,
+   2,
+   2,
+   2,
+   3,
+   2,
+   2,
+   2,
+   2,
+   3
+  ],
+  "flow": {
+   "tobDemand": 176.84257297148838,
+   "chemDemand": 91.3411868766274,
+   "agriPlants": 665.5598408302842,
+   "units": {
+    "Agri|Sector-12": 1115.840134709301,
+    "Agri|Aevum": 1121.377355389589,
+    "Agri|Chongqing": 1105.4338795603785,
+    "Agri|New Tokyo": 1083.6517781193763,
+    "Agri|Ishima": 1106.7749885525118,
+    "Agri|Volhaven": 1122.5245474015042,
+    "Chem|Sector-12": 151.06881306975788,
+    "Chem|Aevum": 149.24489398697415,
+    "Chem|Chongqing": 153.73194243550589,
+    "Chem|New Tokyo": 153.71863976617317,
+    "Chem|Ishima": 151.9768516064399,
+    "Chem|Volhaven": 153.670727901423,
+    "Tob|Sector-12": 196.346003317376,
+    "Tob|Aevum": 815.6179889954026,
+    "Tob|Chongqing": 188.77574334784248,
+    "Tob|New Tokyo": 193.36047799633968,
+    "Tob|Ishima": 190.7655730216906,
+    "Tob|Volhaven": 183.55994303623262
+   }
+  },
+  "bestOfferRound": 2,
+  "bestOffer": 1122506950000,
+  "freezeAt": 1660,
+  "pprice": {
+   "P5|Sector-12": {
+    "K": 865490101681.2509,
+    "mp": 14511.086626197,
+    "P": 311427.3470956975
+   },
+   "P5|Aevum": {
+    "K": 9061949385618.133,
+    "mp": 16046.029931433448,
+    "P": 487109.5675566073
+   },
+   "P5|Chongqing": {
+    "K": 865490101267.5513,
+    "mp": 17766.91373371729,
+    "P": 320578.1051333281
+   },
+   "P5|New Tokyo": {
+    "K": 865490101653.5681,
+    "mp": 15182.15124794842,
+    "P": 314381.8555468439
+   },
+   "P5|Ishima": {
+    "K": 865490101270.7458,
+    "mp": 14194.636754213385,
+    "P": 315422.41268551466
+   },
+   "P5|Volhaven": {
+    "K": 865490101561.4347,
+    "mp": 15856.80192839057,
+    "P": 322940.00430679234
+   },
+   "P6|Sector-12": {
+    "K": 1788597128000.955,
+    "mp": 14511.086626197,
+    "P": 441342.6153030902
+   },
+   "P6|Aevum": {
+    "K": 18727165820513.39,
+    "mp": 16046.029931433448,
+    "P": 693222.7389417265
+   },
+   "P6|Chongqing": {
+    "K": 1788597128284.2368,
+    "mp": 17766.91373371729,
+    "P": 453072.69190231356
+   },
+   "P6|New Tokyo": {
+    "K": 1788597127691.578,
+    "mp": 15182.15124794842,
+    "P": 445296.2412014907
+   },
+   "P6|Ishima": {
+    "K": 1788597128094.1326,
+    "mp": 14194.636754213385,
+    "P": 447224.1782809492
+   },
+   "P6|Volhaven": {
+    "K": 1788597128186.501,
+    "mp": 15856.80192839057,
+    "P": 457303.80304879317
+   }
+  }
+ },
+ "finalTele": {
+  "schema": 2,
+  "ts": 1790028792000,
+  "wall": 1790028792000,
+  "playtime": 0,
+  "motorTimeMs": 0,
+  "round": 14396,
+  "okRound": 2880,
+  "errStreak": 0,
+  "lastError": null,
+  "nodeReset": 1791297856522,
+  "augReset": 1791297856522,
+  "host": "werk",
+  "version": "corp-e2b-2026-10-06",
+  "state": "work",
+  "blockedReason": null,
+  "execsPerCycle": 2.23,
+  "funds": 150771022363.011,
+  "valuation": 33200696800000,
+  "revenue": 89539625.5690419,
+  "expenses": 1068538.8899633198,
+  "public": false,
+  "owned": 0.2,
+  "liquidation": 5299776745204.261,
+  "divisions": 3,
+  "dummies": 0,
+  "products": [
+   "P5:6552",
+   "P6:7180",
+   "P8:79%"
+  ],
+  "wilson": 6,
+  "tobAds": 54,
+  "tobMain": 90,
+  "rsDone": {
+   "Tob": [
+    "Hi-Tech R&D Laboratory"
+   ]
+  },
+  "finance": null,
+  "stage": "tob",
+  "cycle": 2880,
+  "corpHours": 8,
+  "fundingRounds": 3,
+  "roundLog": [
+   {
+    "k": 1,
+    "h": 0.5,
+    "funds": 128555970000,
+    "shares": 100000000,
+    "valuation": 428519900000
+   },
+   {
+    "k": 2,
+    "h": 3.031,
+    "funds": 420666820000,
+    "shares": 350000000,
+    "valuation": 600952600000
+   },
+   {
+    "k": 3,
+    "h": 4.642,
+    "funds": 1122506950000,
+    "shares": 250000000,
+    "valuation": 2245013900000
+   }
+  ],
+  "next": "Produktphase",
+  "errors": []
+ },
+ "lastTickp": {
+  "job": "1:5109",
+  "ok": 12,
+  "err": [],
+  "price": {
+   "P5|Sector-12": {
+    "K": 865490101681.2509,
+    "mp": 14511.086626197,
+    "P": 311427.3470956975
+   },
+   "P5|Aevum": {
+    "K": 9061949385618.133,
+    "mp": 16046.029931433448,
+    "P": 487109.5675566073
+   },
+   "P5|Chongqing": {
+    "K": 865490101267.5513,
+    "mp": 17766.91373371729,
+    "P": 320578.1051333281
+   },
+   "P5|New Tokyo": {
+    "K": 865490101653.5681,
+    "mp": 15182.15124794842,
+    "P": 314381.8555468439
+   },
+   "P5|Ishima": {
+    "K": 865490101270.7458,
+    "mp": 14194.636754213385,
+    "P": 315422.41268551466
+   },
+   "P5|Volhaven": {
+    "K": 865490101561.4347,
+    "mp": 15856.80192839057,
+    "P": 322940.00430679234
+   },
+   "P6|Sector-12": {
+    "K": 1788597128000.955,
+    "mp": 14511.086626197,
+    "P": 441342.6153030902
+   },
+   "P6|Aevum": {
+    "K": 18727165820513.39,
+    "mp": 16046.029931433448,
+    "P": 693222.7389417265
+   },
+   "P6|Chongqing": {
+    "K": 1788597128284.2368,
+    "mp": 17766.91373371729,
+    "P": 453072.69190231356
+   },
+   "P6|New Tokyo": {
+    "K": 1788597127691.578,
+    "mp": 15182.15124794842,
+    "P": 445296.2412014907
+   },
+   "P6|Ishima": {
+    "K": 1788597128094.1326,
+    "mp": 14194.636754213385,
+    "P": 447224.1782809492
+   },
+   "P6|Volhaven": {
+    "K": 1788597128186.501,
+    "mp": 15856.80192839057,
+    "P": 457303.80304879317
+   }
+  },
+  "diag": {
+   "P5|Sector-12": {
+    "stored": 10.063319356875155,
+    "sold": 9.817742912512976,
+    "prod": 9.817293115966761,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P5|Aevum": {
+    "stored": 41.81680301352782,
+    "sold": 40.850374393328174,
+    "prod": 40.84202693497781,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P5|Chongqing": {
+    "stored": 9.675327726854348,
+    "sold": 9.439211994605072,
+    "prod": 9.438779628621582,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P5|New Tokyo": {
+    "stored": 9.910304777353034,
+    "sold": 9.66845959764482,
+    "prod": 9.668016677918521,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P5|Ishima": {
+    "stored": 9.777310506658765,
+    "sold": 9.53870820570736,
+    "prod": 9.538271257752605,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P5|Volhaven": {
+    "stored": 9.408007754229857,
+    "sold": 9.178409546723772,
+    "prod": 9.17798919353284,
+    "lim": null,
+    "eff": 6552.379838579272
+   },
+   "P6|Sector-12": {
+    "stored": 10.06466623531118,
+    "sold": 9.817114947649776,
+    "prod": 9.817293115966761,
+    "lim": null,
+    "eff": 7180.401847936208
+   },
+   "P6|Aevum": {
+    "stored": 41.82237786463588,
+    "sold": 40.847757890181974,
+    "prod": 40.84202693497781,
+    "lim": null,
+    "eff": 7180.401847936208
+   },
+   "P6|Chongqing": {
+    "stored": 9.676622598302203,
+    "sold": 9.438608249632484,
+    "prod": 9.438779628621582,
+    "lim": null,
+    "eff": 7180.401847936208
+   },
+   "P6|New Tokyo": {
+    "stored": 9.911631163102243,
+    "sold": 9.66784118524338,
+    "prod": 9.668016677918521,
+    "lim": null,
+    "eff": 7180.401847936208
+   },
+   "P6|Ishima": {
+    "stored": 9.778619058442487,
+    "sold": 9.538098093496313,
+    "prod": 9.538271257752605,
+    "lim": null,
+    "eff": 7180.401847936208
+   },
+   "P6|Volhaven": {
+    "stored": 9.409266846502163,
+    "sold": 9.177822488978823,
+    "prod": 9.17798919353284,
+    "lim": null,
+    "eff": 7180.401847936208
+   }
+  }
+ },
+ "ipoAt": -1,
+ "ipoMin30": null,
+ "spentTotal": 0,
+ "bribedRep": {},
+ "lastTick": {
+  "job": "1:5108",
+  "ok": 30,
+  "err": [],
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 8487.92975892794,
+    "kind": "add",
+    "x": 255.58368931266057,
+    "mp": 2971.588974151848
+   },
+   "Agri|Sector-12|Food": {
+    "d": 5490.873838701056,
+    "kind": "add",
+    "x": 214.9894348338656,
+    "mp": 5076.404696047653
+   },
+   "Agri|Aevum|Plants": {
+    "d": 14941.783286883932,
+    "kind": "add",
+    "x": 758.6373064218889,
+    "mp": 3823.213959811738
+   },
+   "Agri|Aevum|Food": {
+    "d": 7439.530008168157,
+    "kind": "add",
+    "x": 251.72145253471564,
+    "mp": 4729.6602903091
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 10508.602752998813,
+    "kind": "add",
+    "x": 285.24193637071875,
+    "mp": 3304.368802530506
+   },
+   "Agri|Chongqing|Food": {
+    "d": 6732.26674275821,
+    "kind": "add",
+    "x": 239.63324167204357,
+    "mp": 4773.315009879244
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 8956.619108628283,
+    "kind": "add",
+    "x": 265.6258391128072,
+    "mp": 2917.072870647801
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 6393.867268556029,
+    "kind": "add",
+    "x": 232.30829808636733,
+    "mp": 4807.5891363488545
+   },
+   "Agri|Ishima|Plants": {
+    "d": 11249.218853820192,
+    "kind": "add",
+    "x": 295.78234962521645,
+    "mp": 3233.8496378651025
+   },
+   "Agri|Ishima|Food": {
+    "d": 10120.966151595872,
+    "kind": "add",
+    "x": 290.8679848946732,
+    "mp": 4838.49524869238
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 7116.986335856087,
+    "kind": "add",
+    "x": 232.38846073176109,
+    "mp": 2933.6818112957726
+   },
+   "Agri|Volhaven|Food": {
+    "d": 12755.639406118276,
+    "kind": "add",
+    "x": 325.40769061871447,
+    "mp": 5672.374551584585
+   },
+   "Chem|Sector-12|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 8808.118836978749
+   },
+   "Chem|Aevum|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 8462.056960367803
+   },
+   "Chem|Chongqing|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7690.441420761132
+   },
+   "Chem|New Tokyo|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7763.271761087002
+   },
+   "Chem|Ishima|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 7089.010399962661
+   },
+   "Chem|Volhaven|Chemicals": {
+    "d": 0,
+    "kind": "mul",
+    "x": 1,
+    "mp": 10873.451800610886
+   }
+  },
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 14954.659800215677
+    },
+    "Aevum": {
+     "Real Estate": 14718.726735821923
+    },
+    "Chongqing": {
+     "Real Estate": 15404.757491075326
+    },
+    "New Tokyo": {
+     "Real Estate": 16362.296885601281
+    },
+    "Ishima": {
+     "Real Estate": 15351.675692995093
+    },
+    "Volhaven": {
+     "Real Estate": 14663.05426799052
+    }
+   },
+   "Chem": {
+    "Sector-12": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Aevum": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Chongqing": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "New Tokyo": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Ishima": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    },
+    "Volhaven": {
+     "Real Estate": 36307.69230769233,
+     "Hardware": 1953.8461538461552,
+     "AI Cores": 972.3076923076933
+    }
+   },
+   "Tob": {
+    "Sector-12": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Aevum": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Chongqing": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "New Tokyo": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Ishima": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    },
+    "Volhaven": {
+     "Real Estate": 16000.000000000007,
+     "Hardware": 875.0000000000007,
+     "AI Cores": 325.00000000000034
+    }
+   }
+  },
+  "spent": 0,
+  "diag": {
+   "Agri|Sector-12": {
+    "units": 1115.840134709301,
+    "pm": 34.913953208285214,
+    "plants": 111.58394285590165
+   },
+   "Agri|Aevum": {
+    "units": 1121.377355389589,
+    "pm": 34.913953208285214,
+    "plants": 112.1376656929111
+   },
+   "Agri|Chongqing": {
+    "units": 1105.4338795603785,
+    "pm": 34.913953208285214,
+    "plants": 110.54331632158645
+   },
+   "Agri|New Tokyo": {
+    "units": 1083.6517781193763,
+    "pm": 34.913953208285214,
+    "plants": 108.36510364687464
+   },
+   "Agri|Ishima": {
+    "units": 1106.7749885525118,
+    "pm": 34.913953208285214,
+    "plants": 110.67742755621812
+   },
+   "Agri|Volhaven": {
+    "units": 1122.5245474015042,
+    "pm": 34.913953208285214,
+    "plants": 112.25238475679218
+   },
+   "Chem|Sector-12": {
+    "units": 151.06881306975788,
+    "pm": 19.418660953702275,
+    "plants": -15.106868837556158
+   },
+   "Chem|Aevum": {
+    "units": 149.24489398697415,
+    "pm": 19.418660953702275,
+    "plants": -14.924476570803103
+   },
+   "Chem|Chongqing": {
+    "units": 153.73194243550589,
+    "pm": 19.418660953702275,
+    "plants": -15.373182272345923
+   },
+   "Chem|New Tokyo": {
+    "units": 153.71863976617317,
+    "pm": 19.418660953702275,
+    "plants": -15.371852002995231
+   },
+   "Chem|Ishima": {
+    "units": 151.9768516064399,
+    "pm": 19.418660953702275,
+    "plants": -15.197672864372667
+   },
+   "Chem|Volhaven": {
+    "units": 153.670727901423,
+    "pm": 19.418660953702275,
+    "plants": -15.367060807807666
+   },
+   "Tob|Sector-12": {
+    "units": 196.346003317376,
+    "pm": 10.277576944707445,
+    "plants": -19.634586231933522
+   },
+   "Tob|Aevum": {
+    "units": 815.6179889954026,
+    "pm": 10.277576944707445,
+    "plants": -81.68405386995562
+   },
+   "Tob|Chongqing": {
+    "units": 188.77574334784248,
+    "pm": 10.277576944707445,
+    "plants": -18.877559257243163
+   },
+   "Tob|New Tokyo": {
+    "units": 193.36047799633968,
+    "pm": 10.277576944707445,
+    "plants": -19.336033355837042
+   },
+   "Tob|Ishima": {
+    "units": 190.7655730216906,
+    "pm": 10.277576944707445,
+    "plants": -19.07654251550521
+   },
+   "Tob|Volhaven": {
+    "units": 183.55994303623262,
+    "pm": 10.277576944707445,
+    "plants": -18.35597838706568
+   }
+  }
+ },
+ "pauseBeats": -1
+}

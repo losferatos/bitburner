@@ -1,7 +1,7 @@
 {
  "seed": 1,
  "hours": 5,
- "wallSec": -1284739.69,
+ "wallSec": -1286884.801,
  "rounds": [
   {
    "k": 1,
@@ -207,18 +207,18 @@
   }
  ],
  "events": [
-  "2026-10-06T16:05:41.693Z z0 0.00h Gruendung: [true] ",
-  "2026-10-06T16:05:41.701Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
-  "2026-10-06T16:05:42.111Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
-  "2026-10-06T16:05:42.146Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
-  "2026-10-06T16:05:42.151Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
-  "2026-10-06T16:05:42.152Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
-  "2026-10-06T16:05:44.257Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
-  "2026-10-06T16:05:44.734Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
-  "2026-10-06T16:05:44.765Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
-  "2026-10-06T16:05:44.773Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
-  "2026-10-06T16:05:45.706Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
-  "2026-10-06T16:05:47.219Z z1613 4.48h Produkt P2 fertig: Rating 1681, eff 0"
+  "2026-10-06T16:41:26.805Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T16:41:26.813Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T16:41:27.332Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T16:41:27.380Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
+  "2026-10-06T16:41:27.387Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
+  "2026-10-06T16:41:27.387Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
+  "2026-10-06T16:41:29.968Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
+  "2026-10-06T16:41:30.543Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
+  "2026-10-06T16:41:30.581Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
+  "2026-10-06T16:41:30.589Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
+  "2026-10-06T16:41:31.691Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
+  "2026-10-06T16:41:33.399Z z1613 4.48h Produkt P2 fertig: Rating 1681, eff 0"
  ],
  "errors": [],
  "maxErrStreak": 0,
@@ -272,7 +272,7 @@
  },
  "finalState": {
   "v": 1,
-  "nodeReset": 1791302741688,
+  "nodeReset": 1791304886799,
   "cycle": 1800,
   "foundCycle": 0,
   "lastLT": 1613,
@@ -513,6 +513,10 @@
    "tobMain": 45,
    "rsDone": {},
    "finance": {
+    "erloesAug": {
+     "augReset": 1791304886799,
+     "summe": 0
+    },
     "phase": "halten",
     "blocked": "no_ipo_path",
     "request": {
@@ -650,6 +654,10 @@
     2214120300000
    ],
    "bribeTs": {},
+   "erloesAug": {
+    "augReset": 1791304886799,
+    "summe": 0
+   },
    "request": {
     "ts": 1790017992000,
     "betrag": 50000000000000,
@@ -842,8 +850,8 @@
   "okRound": 1800,
   "errStreak": 0,
   "lastError": null,
-  "nodeReset": 1791302741688,
-  "augReset": 1791302741688,
+  "nodeReset": 1791304886799,
+  "augReset": 1791304886799,
   "host": "werk",
   "version": "corp-e3c-2026-10-06",
   "state": "blocked",
@@ -868,6 +876,10 @@
   "tobMain": 45,
   "rsDone": {},
   "finance": {
+   "erloesAug": {
+    "augReset": 1791304886799,
+    "summe": 0
+   },
    "phase": "halten",
    "blocked": "no_ipo_path",
    "request": {

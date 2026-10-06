@@ -11,7 +11,9 @@ G_R4='{"from":8.55,"betrag":5e13,"bestechung":{},"mode":"fresh"}'
 run() { local name=$1; shift; env $BASE "$@" $J > /dev/null 2>&1 && echo "PASS $name" || echo "FAIL $name"; }
 run "Grundlauf echte Schnittstelle (PASS)" CORP_TAG=H0 CORP_CFG='{"etappe":3}' CORP_GELD="$G_FRESH" CORP_EXPECT_SALES=4 CORP_EXPECT_CALIB=0.001 CORP_EXPECT_NOBB=1 CORP_EXPECT_BRIBEMAX=1.05 CORP_EXPECT_NOBRIBEBEFORE=1 CORP_EXPECT_SMOOTH=1e15 CORP_EXPECT_QUIRK=3
 run "F1 gleiche Anforderung nur einmal bestechen, mit Fix (PASS)"  CORP_TAG=H1 CORP_CFG='{"etappe":3}' CORP_GELD="$G_FIXED" CORP_EXPECT_BRIBEMAX=1.05
-run "F1 gleiche Anforderung nur einmal bestechen, ohne Fix (FAIL)" CORP_TAG=H1old CORP_CFG='{"etappe":3,"noFix":["bribeTs"]}' CORP_GELD="$G_FIXED" CORP_EXPECT_BRIBEMAX=1.05
+# (seit corp-e3c entdoppelt das Kassenbuch auch bei gleichem ts; der Schalter "bribeTs" gibt es nicht mehr,
+#  der Rot-Nachweis fuer Doppelzahlungen ist E1a/E1b)
+# run "F1 gleiche Anforderung nur einmal bestechen, ohne Fix (FAIL)" CORP_TAG=H1old CORP_CFG='{"etappe":3,"noFix":["bribeTs"]}' CORP_GELD="$G_FIXED" CORP_EXPECT_BRIBEMAX=1.05
 run "F2 keine Vorgabe ohne Anforderung, mit Fix (PASS)"  CORP_TAG=H2 CORP_CFG='{"etappe":3}' CORP_NEEDS=0:5e12 CORP_BN4REP='{"preis":2e12,"offen":5}' CORP_EXPECT_NOSALE=1
 run "F2 keine Vorgabe ohne Anforderung, ohne Fix (FAIL)" CORP_TAG=H2old CORP_CFG='{"etappe":3,"noFix":["default"]}' CORP_NEEDS=0:5e12 CORP_BN4REP='{"preis":2e12,"offen":5}' CORP_EXPECT_NOSALE=1
 run "F3 ipoEarly nie im Stopp vor Runde 4, mit Fix (PASS)"  CORP_TAG=H3 CORP_CFG='{"etappe":3,"ipoEarly":true}' CORP_GELD="$G_R4" CORP_HOURS=10 CORP_EXPECT_ROUND=4

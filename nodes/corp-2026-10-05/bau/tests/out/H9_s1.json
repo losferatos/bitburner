@@ -1,7 +1,7 @@
 {
  "seed": 1,
  "hours": 8,
- "wallSec": -1273619.281,
+ "wallSec": -1275750.531,
  "rounds": [
   {
    "k": 1,
@@ -316,27 +316,27 @@
   }
  ],
  "events": [
-  "2026-10-06T16:00:21.284Z z0 0.00h Gruendung: [true] ",
-  "2026-10-06T16:00:21.292Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
-  "2026-10-06T16:00:21.710Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
-  "2026-10-06T16:00:21.744Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
-  "2026-10-06T16:00:21.749Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
-  "2026-10-06T16:00:21.749Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
-  "2026-10-06T16:00:23.809Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
-  "2026-10-06T16:00:24.307Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
-  "2026-10-06T16:00:24.338Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
-  "2026-10-06T16:00:24.345Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
-  "2026-10-06T16:00:25.303Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
-  "2026-10-06T16:00:26.821Z z1613 4.48h Runde 3: Ausgabenstopp (F3)",
-  "2026-10-06T16:00:26.888Z z1624 4.51h Runde 3: 1.15 Bio fuer 250.00 Mio Anteile (Bewertung 2.31 Bio)",
-  "2026-10-06T16:00:26.894Z z1625 4.51h Produkt P2 fertig: Rating 1681, eff 1681",
-  "2026-10-06T16:00:28.127Z z1841 5.11h Produkt P3 fertig: Rating 5712, eff 0",
-  "2026-10-06T16:00:29.337Z z2054 5.71h Produkt P4 fertig: Rating 6032, eff 0",
-  "2026-10-06T16:00:30.519Z z2264 6.29h Produkt P5 fertig: Rating 6580, eff 0",
-  "2026-10-06T16:00:31.842Z z2471 6.86h Produkt P6 fertig: Rating 7185, eff 0",
-  "2026-10-06T16:00:32.972Z z2673 7.42h Forschung Tob: Hi-Tech R&D Laboratory",
-  "2026-10-06T16:00:32.985Z z2675 7.43h Produkt P7 fertig: Rating 4559, eff 0",
-  "2026-10-06T16:00:34.111Z z2876 7.99h Produkt P8 fertig: Rating 5704, eff 0"
+  "2026-10-06T16:35:52.534Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T16:35:52.542Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T16:35:52.998Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T16:35:53.036Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
+  "2026-10-06T16:35:53.040Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
+  "2026-10-06T16:35:53.040Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
+  "2026-10-06T16:35:55.305Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
+  "2026-10-06T16:35:55.847Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
+  "2026-10-06T16:35:55.883Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
+  "2026-10-06T16:35:55.890Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
+  "2026-10-06T16:35:56.951Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
+  "2026-10-06T16:35:58.620Z z1613 4.48h Runde 3: Ausgabenstopp (F3)",
+  "2026-10-06T16:35:58.694Z z1624 4.51h Runde 3: 1.15 Bio fuer 250.00 Mio Anteile (Bewertung 2.31 Bio)",
+  "2026-10-06T16:35:58.700Z z1625 4.51h Produkt P2 fertig: Rating 1681, eff 1681",
+  "2026-10-06T16:36:00.117Z z1841 5.11h Produkt P3 fertig: Rating 5712, eff 0",
+  "2026-10-06T16:36:01.465Z z2054 5.71h Produkt P4 fertig: Rating 6032, eff 0",
+  "2026-10-06T16:36:02.735Z z2264 6.29h Produkt P5 fertig: Rating 6580, eff 0",
+  "2026-10-06T16:36:03.999Z z2471 6.86h Produkt P6 fertig: Rating 7185, eff 0",
+  "2026-10-06T16:36:05.242Z z2673 7.42h Forschung Tob: Hi-Tech R&D Laboratory",
+  "2026-10-06T16:36:05.261Z z2675 7.43h Produkt P7 fertig: Rating 4559, eff 0",
+  "2026-10-06T16:36:06.503Z z2876 7.99h Produkt P8 fertig: Rating 5704, eff 0"
  ],
  "errors": [],
  "maxErrStreak": 0,
@@ -390,7 +390,7 @@
  },
  "finalState": {
   "v": 1,
-  "nodeReset": 1791302421279,
+  "nodeReset": 1791304552529,
   "cycle": 2880,
   "foundCycle": 0,
   "lastLT": 2876,
@@ -648,6 +648,10 @@
     ]
    },
    "finance": {
+    "erloesAug": {
+     "augReset": 1791304552529,
+     "summe": 0
+    },
     "phase": "halten",
     "blocked": "no_ipo_path",
     "request": {
@@ -795,6 +799,10 @@
     47096926800000
    ],
    "bribeTs": {},
+   "erloesAug": {
+    "augReset": 1791304552529,
+    "summe": 0
+   },
    "request": {
     "ts": 1790028792000,
     "betrag": 50000000000000,
@@ -988,8 +996,8 @@
   "okRound": 2880,
   "errStreak": 0,
   "lastError": null,
-  "nodeReset": 1791302421279,
-  "augReset": 1791302421279,
+  "nodeReset": 1791304552529,
+  "augReset": 1791304552529,
   "host": "werk",
   "version": "corp-e3c-2026-10-06",
   "state": "blocked",
@@ -1018,6 +1026,10 @@
    ]
   },
   "finance": {
+   "erloesAug": {
+    "augReset": 1791304552529,
+    "summe": 0
+   },
    "phase": "halten",
    "blocked": "no_ipo_path",
    "request": {

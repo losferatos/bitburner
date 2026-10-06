@@ -1,3 +1,13 @@
+# Nachtrag 06.10.2026 18:44 - voller Lauf tests/etappe3.sh mit corp-e3c: alles wie erwartet
+
+Ausnahme: "F1 ohne Fix" ist jetzt gruen, weil der Schalter bribeTs seit e3c nicht mehr existiert (Kassenbuch); der Fall ist auskommentiert.
+
+24 h, 3 Saaten (tests/out/K3_s*.json), Bestechungs-Schreiber mit 3 min Verzug, je 0 Fehler:
+- Einbau: s1 bei 12 h, s3 bei 10,5 / 14 / 20 h, s2 ohne.
+- 4 Runden, Zuendung 9-10 h, je 15 Verkaeufe, Kalibrierfehler 0.
+- Ruf genau 1,02 x Anforderung, Bladeburners 0.
+- erloesAug exakt = Erloes seit dem letzten Einbau, geldbedarf.txt exakt = Summe aller Erloese.
+
 # Nachtrag 06.10.2026 18:25 - corp-e3c
 
 Inhalt:

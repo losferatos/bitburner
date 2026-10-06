@@ -1,7 +1,7 @@
 {
  "seed": 1,
  "hours": 10,
- "wallSec": -1266194.828,
+ "wallSec": -1268308.633,
  "rounds": [
   {
    "k": 1,
@@ -384,34 +384,34 @@
   }
  ],
  "events": [
-  "2026-10-06T15:56:36.831Z z0 0.00h Gruendung: [true] ",
-  "2026-10-06T15:56:36.839Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
-  "2026-10-06T15:56:37.253Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
-  "2026-10-06T15:56:37.285Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
-  "2026-10-06T15:56:37.290Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
-  "2026-10-06T15:56:37.290Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
-  "2026-10-06T15:56:39.277Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
-  "2026-10-06T15:56:39.755Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
-  "2026-10-06T15:56:39.787Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
-  "2026-10-06T15:56:39.793Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
-  "2026-10-06T15:56:40.752Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
-  "2026-10-06T15:56:42.356Z z1613 4.48h Runde 3: Ausgabenstopp (F3)",
-  "2026-10-06T15:56:42.418Z z1624 4.51h Runde 3: 1.15 Bio fuer 250.00 Mio Anteile (Bewertung 2.31 Bio)",
-  "2026-10-06T15:56:42.423Z z1625 4.51h Produkt P2 fertig: Rating 1681, eff 1681",
-  "2026-10-06T15:56:43.637Z z1841 5.11h Produkt P3 fertig: Rating 5712, eff 0",
-  "2026-10-06T15:56:44.848Z z2054 5.71h Produkt P4 fertig: Rating 6032, eff 0",
-  "2026-10-06T15:56:46.000Z z2264 6.29h Produkt P5 fertig: Rating 6580, eff 0",
-  "2026-10-06T15:56:47.141Z z2471 6.86h Produkt P6 fertig: Rating 7185, eff 0",
-  "2026-10-06T15:56:48.608Z z2673 7.42h Forschung Tob: Hi-Tech R&D Laboratory",
-  "2026-10-06T15:56:48.620Z z2675 7.43h Produkt P7 fertig: Rating 4559, eff 0",
-  "2026-10-06T15:56:49.774Z z2876 7.99h Produkt P8 fertig: Rating 5704, eff 0",
-  "2026-10-06T15:56:51.098Z z3074 8.54h Runde 4: Ausgabenstopp (F3)",
-  "2026-10-06T15:56:51.098Z z3074 8.54h 3 Dummy-Divisionen geplant",
-  "2026-10-06T15:56:51.138Z z3079 8.55h BOERSENGANG + Verkauf 30.00 Mio Anteile -> 1.19 Bio an den Spieler (Anforderung 50.00 Bio; vorhergesagt 1.19 Bio) | Vergleich privat 63.32 Bio / oeffentlich geschaetzt 29.04 Bio",
-  "2026-10-06T15:56:51.147Z z3080 8.56h Produkt P9 fertig: Rating 6669, eff 6669",
-  "2026-10-06T15:56:53.257Z z3276 9.10h Produkt P10 fertig: Rating 7432, eff 0",
-  "2026-10-06T15:56:54.598Z z3439 9.55h Verkauf 27.00 Mio Anteile -> 324.8 Mrd an den Spieler (Anforderung 50.00 Bio; vorhergesagt 324.8 Mrd)",
-  "2026-10-06T15:56:54.859Z z3470 9.64h Produkt P11 fertig: Rating 8379, eff 0"
+  "2026-10-06T16:31:50.637Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T16:31:50.646Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T16:31:51.097Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T16:31:51.134Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
+  "2026-10-06T16:31:51.138Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
+  "2026-10-06T16:31:51.138Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
+  "2026-10-06T16:31:53.597Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
+  "2026-10-06T16:31:54.116Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
+  "2026-10-06T16:31:54.151Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
+  "2026-10-06T16:31:54.157Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
+  "2026-10-06T16:31:55.236Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
+  "2026-10-06T16:31:56.907Z z1613 4.48h Runde 3: Ausgabenstopp (F3)",
+  "2026-10-06T16:31:56.974Z z1624 4.51h Runde 3: 1.15 Bio fuer 250.00 Mio Anteile (Bewertung 2.31 Bio)",
+  "2026-10-06T16:31:56.980Z z1625 4.51h Produkt P2 fertig: Rating 1681, eff 1681",
+  "2026-10-06T16:31:58.469Z z1841 5.11h Produkt P3 fertig: Rating 5712, eff 0",
+  "2026-10-06T16:31:59.810Z z2054 5.71h Produkt P4 fertig: Rating 6032, eff 0",
+  "2026-10-06T16:32:01.114Z z2264 6.29h Produkt P5 fertig: Rating 6580, eff 0",
+  "2026-10-06T16:32:02.490Z z2471 6.86h Produkt P6 fertig: Rating 7185, eff 0",
+  "2026-10-06T16:32:03.706Z z2673 7.42h Forschung Tob: Hi-Tech R&D Laboratory",
+  "2026-10-06T16:32:03.718Z z2675 7.43h Produkt P7 fertig: Rating 4559, eff 0",
+  "2026-10-06T16:32:04.938Z z2876 7.99h Produkt P8 fertig: Rating 5704, eff 0",
+  "2026-10-06T16:32:06.183Z z3074 8.54h Runde 4: Ausgabenstopp (F3)",
+  "2026-10-06T16:32:06.183Z z3074 8.54h 3 Dummy-Divisionen geplant",
+  "2026-10-06T16:32:06.227Z z3079 8.55h BOERSENGANG + Verkauf 30.00 Mio Anteile -> 1.19 Bio an den Spieler (Anforderung 50.00 Bio; vorhergesagt 1.19 Bio) | Vergleich privat 63.32 Bio / oeffentlich geschaetzt 29.04 Bio",
+  "2026-10-06T16:32:06.236Z z3080 8.56h Produkt P9 fertig: Rating 6669, eff 6669",
+  "2026-10-06T16:32:07.838Z z3276 9.10h Produkt P10 fertig: Rating 7432, eff 0",
+  "2026-10-06T16:32:09.038Z z3439 9.55h Verkauf 27.00 Mio Anteile -> 324.8 Mrd an den Spieler (Anforderung 50.00 Bio; vorhergesagt 324.8 Mrd)",
+  "2026-10-06T16:32:09.255Z z3470 9.64h Produkt P11 fertig: Rating 8379, eff 0"
  ],
  "errors": [],
  "maxErrStreak": 0,
@@ -465,7 +465,7 @@
  },
  "finalState": {
   "v": 1,
-  "nodeReset": 1791302196827,
+  "nodeReset": 1791304310632,
   "cycle": 3600,
   "foundCycle": 0,
   "lastLT": 3597,
@@ -723,6 +723,11 @@
     ]
    },
    "finance": {
+    "erloesAug": {
+     "augReset": 1791304310632,
+     "summe": 1510053105774.582
+    },
+    "salePending": null,
     "phase": "oeffentlich",
     "blocked": null,
     "request": {
@@ -921,6 +926,10 @@
     22522965503149.656
    ],
    "bribeTs": {},
+   "erloesAug": {
+    "augReset": 1791304310632,
+    "summe": 1510053105774.582
+   },
    "request": {
     "ts": 1790035992000,
     "betrag": 50000000000000,
@@ -935,6 +944,7 @@
     "liqPriv": 10107399956480.682,
     "liqPubEst": 4635274904026.321
    },
+   "salePending": null,
    "lastSaleTs": 1790034382000,
    "until": 1000000
   },
@@ -1119,8 +1129,8 @@
   "okRound": 3600,
   "errStreak": 0,
   "lastError": null,
-  "nodeReset": 1791302196827,
-  "augReset": 1791302196827,
+  "nodeReset": 1791304310632,
+  "augReset": 1791304310632,
   "host": "werk",
   "version": "corp-e3c-2026-10-06",
   "state": "work",
@@ -1149,6 +1159,11 @@
    ]
   },
   "finance": {
+   "erloesAug": {
+    "augReset": 1791304310632,
+    "summe": 1510053105774.582
+   },
+   "salePending": null,
    "phase": "oeffentlich",
    "blocked": null,
    "request": {

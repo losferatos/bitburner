@@ -12,7 +12,7 @@
  * (nodes/corp-2026-10-05/bau/tests/botsim.test.ts, Abschnitt EICHUNG).
  */
 
-export const CORP_VERSION = "corp-e2c-2026-10-06";
+export const CORP_VERSION = "corp-e3c-2026-10-06";
 export const CITIES = ["Aevum", "Chongqing", "Sector-12", "New Tokyo", "Ishima", "Volhaven"];
 export const MAIN_CITY = "Aevum";
 export const JOBS = ["Operations", "Engineer", "Business", "Management", "Research & Development", "Intern"];

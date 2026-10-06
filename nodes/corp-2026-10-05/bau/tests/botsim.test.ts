@@ -145,6 +145,12 @@ function makeNs(script: string, host: string, args: any[], w: World): any {
       w.ports.get(p)!.push(d);
       if (script === "corp-tick.js") { w.tickDiag.push(JSON.parse(d)); (w as any).tickLast = JSON.parse(d); }
       if (script === "corp-tickp.js") w.tickpLast = JSON.parse(d);
+      if (script === "corp-act-bribe.js" && process.env.CORP_DROPBRIBE === "1" && !(w as any).dropped) {
+        // Einbau mitten in der Bestechung: gezahlt ist, das Ergebnis kommt nie an, corp.js stirbt
+        (w as any).dropped = true;
+        (w as any).killCoord = true;
+        w.ports.get(p)!.pop();
+      }
       return null;
     },
   };
@@ -172,6 +178,7 @@ function startScript(script: string, host: string, args: any[], w: World = W): n
 }
 async function settle(coordPid: number) {
   for (let i = 0; i < 100000; i++) {
+    if ((W as any).killCoord) return;
     if (W.crashes.length) throw new Error("Absturz: " + W.crashes.join(" || "));
     if (!W.running.has(coordPid)) throw new Error("Koordinator beendet");
     // Koordinator ruht: wartet auf nextUpdate oder schlaeft lang (z. B. ohne Corp)
@@ -254,6 +261,7 @@ for (const seed of seeds) {
     //   preinstall wie fresh, aber nach einem Einbau weiter mit dem ALTEN augReset (fremde Anforderung)
     const GELD = process.env.CORP_GELD ? JSON.parse(process.env.CORP_GELD) : null;
     let geldWritten = false;
+    const repHist: { t: number; rep: Record<string, number> }[] = [];
     let augAtStart = 0;
     const INSTALLS = (process.env.CORP_INSTALL ?? "").split(",").filter(Boolean).map(Number);
     let installsDone = 0;
@@ -336,12 +344,17 @@ for (const seed of seeds) {
         if (!geldWritten) augAtStart = (Player as any).lastAugReset;
         geldWritten = true;
         const br: any = {};
+        // "lagMin": der Schreiber sieht den Ruf erst nach lagMin Minuten (bn4rep liest ihn in seiner Runde)
+        const lagT = t - (GELD.lagMin ?? 0) * 60;
+        repHist.push({ t, rep: Object.fromEntries(Object.keys(GELD.bestechung || {}).map((f) => [f, (Factions as any)[f]?.playerReputation ?? 0])) });
+        while (repHist.length > 1 && repHist[1].t <= lagT) repHist.shift();
         for (const [f, r] of Object.entries(GELD.bestechung || {}) as [string, number][]) {
-          const got = ((Factions as any)[f]?.playerReputation ?? 0) - (repG0[f] ?? 0);
+          const seen = repHist[0].t <= lagT ? repHist[0].rep[f] : (repG0[f] ?? 0);
+          const got = (seen ?? 0) - (repG0[f] ?? 0);
           if (GELD.bribeFrom !== undefined && t < GELD.bribeFrom * 3600) continue;
           br[f] = GELD.mode === "fixedts" ? r : Math.max(0, r - got);
         }
-        W.files.set("data/corp-geld.txt", JSON.stringify({ v: 1, ts: W.clock, nodeReset: (Player as any).lastNodeReset, augReset: GELD.mode === "preinstall" ? augAtStart : (Player as any).lastAugReset, betrag: GELD.betrag, bestechung: br, von: "bn4rep" }));
+        W.files.set("data/corp-geld.txt", JSON.stringify({ v: 1, ts: W.clock + (GELD.tsOffsetMin ?? 0) * 60000, nodeReset: (Player as any).lastNodeReset, augReset: GELD.mode === "preinstall" ? augAtStart : (Player as any).lastAugReset, betrag: GELD.betrag, bestechung: br, von: "bn4rep" }));
       }
       if (installsDone < INSTALLS.length && t >= INSTALLS[installsDone] * 3600) {
         installsDone++;
@@ -378,6 +391,15 @@ for (const seed of seeds) {
         }
       }
       await settle(coord);
+      if ((W as any).killCoord) {
+        (W as any).killCoord = false;
+        DEAD.add(coord);
+        W.running.delete(coord);
+        W.hosts.werk.used -= RAM["corp.js"].cost;
+        W.waiting = false;
+        coord = startScript("corp.js", "werk", []);
+        await settle(coord);
+      }
       W.waiting = false;
       if (!Player.corporation) {
         // noch keine Corp (Gruendung scheitert, z. B. kein Platz): nur die Uhr laeuft
@@ -557,6 +579,26 @@ for (const seed of seeds) {
       const over = sales.filter((x: any) => x.n > 1 && x.got > Number(process.env.CORP_EXPECT_QUIRK) * 1.1 * x.need);
       console.log(`QUIRK Verhaeltnisse ${JSON.stringify(sales.map((x: any) => +(x.got / x.need).toFixed(2)))}`);
       expect(over.length).toBe(0);
+    }
+    if (process.env.CORP_EXPECT_NOBRIBE_BEFORE_H) {
+      const early = res.events.filter((e: string) => /Bestechung .*Ruf/.test(e)).map((e: string) => Number((/ ([\d.]+)h /.exec(e) || [])[1])).filter((h: number) => h < (ipoAt > 0 ? ipoAt : 99) && !fin.ignitedAt);
+      const firstB = res.events.find((e: string) => /Bestechung .*Ruf/.test(e));
+      console.log(`PHASE ipoAt=${ipoAt} ignitedAt=${fin.ignitedAt} ersteBestechung=${firstB}`);
+      const hB = firstB ? Number((/ ([\d.]+)h /.exec(firstB) || [])[1]) : 99;
+      const ok = hB >= Math.min(ipoAt > 0 ? ipoAt : 99, fin.ignitedAt ?? 99) - 1e-9;
+      void early;
+      expect(ok).toBe(true);
+    }
+    if (process.env.CORP_EXPECT_ERLOES) {
+      // erloesAug = Summe der Verkaeufe seit dem letzten Einbau; geldbedarf.txt = Summe aller Verkaeufe (hier hebt nur corp.js an)
+      const lastInst = INSTALLS.length ? INSTALLS[INSTALLS.length - 1] : -1;
+      const sinceAug = sales.filter((x: any) => x.h > lastInst).reduce((a: number, x: any) => a + x.got, 0);
+      const ea = res.finalTele.finance && res.finalTele.finance.erloesAug;
+      const reserve = Number(W.files.get("data/geldbedarf.txt") || 0);
+      console.log(`ERLOES erloesAug=${JSON.stringify(ea)} erwartet=${sinceAug.toExponential(4)} geldbedarf=${reserve.toExponential(4)} summeAlle=${(fin.soldTotal || 0).toExponential(4)}`);
+      expect(Math.abs(ea.summe / sinceAug - 1)).toBeLessThan(1e-6);
+      expect(ea.augReset).toBe((Player as any).lastAugReset);
+      expect(Math.abs(reserve / fin.soldTotal - 1)).toBeLessThan(1e-6);
     }
     if (process.env.CORP_EXPECT_NOSALE) expect(sales.length).toBe(0);
     if (process.env.CORP_EXPECT_NOSALE_AFTER) expect(sales.filter((x: any) => x.h > Number(process.env.CORP_EXPECT_NOSALE_AFTER)).length).toBe(0);

@@ -1,0 +1,357 @@
+
+=== bn4rep.js Hauptlauf gegen nachgebauten Spielzustand (C:\Users\erche\Desktop\claude_projecto\bitburner\nodes\corp-2026-10-05\bot\src) ===
+
+-- Einwand 1: erste Runde nach dem Start, Stand BN5.2 19:03 --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    die Einbauentscheidung wurde erreicht (einbau.json, wartend 3)
+  ok    kein EINBAU in den ersten Runden nach dem Start
+
+-- Einwand 5: Handschlag scheitert -> weiterlaufen, Sperre auf home --
+  ok    Nachbau vollstaendig
+  ok    der Handschlag wurde gestellt (Einbau hat ausgeloest)
+  ok    main endet NICHT nach dem verweigerten Einbau
+  ok    die Sperre liegt auf home (nicht nur lokal auf werk-0)
+  ok    die Sperre wirkt: kein zweiter Handschlag im Budget
+  ok    kein installAugmentations
+
+-- Einwand 5: Ausgang offen -> kein NFG-Kauf, weiterlaufen --
+  ok    Nachbau vollstaendig
+  ok    der Einbau war faellig und wurde ausgesetzt
+  ok    keine NFG-Stufe gekauft, solange der Ausgang offen ist
+  ok    main endet NICHT
+  ok    die Aussetz-Meldung ist gedrosselt (1 in ~3 min)
+
+-- Einwand 3: Fuellstueck im Kampfknoten --
+  ok    Nachbau vollstaendig
+  ok    im Kampfknoten keine Fuellstufe (kein Einbau kaeme nach)
+  ok    Nachbau vollstaendig
+  ok    im Hackingknoten wird die Fuellstufe gekauft (erster Kauf, vor dem Einbau)
+  ok    der folgende Einbau nennt das Spendenrecht als Grund
+
+-- Einwaende 4 und 8: Fokus --
+  ok    Nachbau vollstaendig
+  ok    NMI nur gekauft: der Fokus wird trotzdem zurueckgeholt
+  ok    Nachbau vollstaendig
+  ok    NMI eingebaut: kein setFocus
+  ok    Nachbau vollstaendig
+  ok    kein setFocus in den ersten 30 s ohne Fokus
+  ok    danach wird er zurueckgeholt (Rate nicht dauerhaft bei 80 %)
+
+-- Gegenpruefung G1: Handschlag scheitert, NFG waere kaufbar --
+  ok    Nachbau vollstaendig
+  ok    der Handschlag wurde gestellt und verweigert
+  ok    keine NFG-Stufe gekauft, wenn der Handschlag den Einbau verweigert
+  ok    kein installAugmentations
+
+-- Gegenpruefung G1: Graft beginnt waehrend des Handschlags --
+  ok    Nachbau vollstaendig
+  ok    die Bruecke hat geantwortet (Handschlag erlaubt)
+  ok    kein installAugmentations, solange das Graft laeuft
+
+-- Gegenpruefung G1: der Normalfall baut weiter ein, NFG nach dem Handschlag --
+  ok    Nachbau vollstaendig
+  ok    genau ein installAugmentations, danach endet main
+  ok    NFG-Stufen vor dem Einbau gekauft
+  ok    alle NFG-Stufen NACH der Sicherungsanfrage
+
+-- Gegenpruefung G2: Ausgang 37 min offen - der Waechter bleibt ruhig --
+  ok    Nachbau vollstaendig
+  ok    der Lauf stand ueber 30 min am Tor
+  ok    data/bn4rep.json auf home ist frisch
+  ok    und sagt, dass bn4rep wartet (state wait, wartend 3)
+  ok    lib/leiter.js signale(): kein S1 gegen bn4rep.js
+
+-- H2: Daedalus-Fuellstueck vor dem Einbau (BN12, Schwelle 31, bn12-bericht.md MINOR #3) --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    das Fuellstueck wurde gekauft, bevor eingebaut wurde (nicht die alte Kaufschleife)
+  ok    der Einbau selbst lief (installAugmentations, Ende return)
+  ok    Nachbau vollstaendig
+  ok    kein Fuellstueck-Kauf, wenn die Schwelle ohnehin getroffen wird (31 von 31)
+  ok    installAugmentations laeuft trotzdem
+
+-- H2/Skeptiker-Fund 5: unerfuellte Vorbedingung wird uebersprungen --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    'Gesperrt' (Vorstufe fehlt) wurde NICHT gekauft
+  ok    stattdessen 'Teurer' (kein Prereq) wurde gekauft
+  ok    der Einbau selbst lief (installAugmentations, Ende return)
+
+-- H2/Skeptiker-Fund 5: Kauf-Ruecklauf, wenn das billigste Stueck trotzdem scheitert --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    'Billig' wurde versucht, aber nicht tatsaechlich gekauft
+  ok    stattdessen 'Teurer' wurde gekauft (Kauf-Ruecklauf statt Abbruch)
+  ok    der Einbau selbst lief (installAugmentations, Ende return)
+
+-- P1 S4: Gang, Einbau gesperrt (Wiederaufbau zu jung), Ruf 1,5 Mio, 60 Mrd -> 0 Kaeufe --
+  ok    Nachbau vollstaendig
+  ok    S4: kein einziger Kauf, aus keiner Faktion (alt: Hyperion V1, SPTN-97, Graphene Bone Lacings u. a. sofort)
+  ok    auch nicht aus den Bladeburners (Hyperion V1 war verdient)
+  ok    Telemetrie torRunde.mode = locked, Grund nennt den jungen Wiederaufbau
+  ok    data/geldbedarf.txt = Kosten der Planrunde (mit 1,9^i): > 1 Mrd, <= Konto, gleich torRunde.plan.cost
+  ok    das Log nennt die Sperre und den Plan
+  ok    kein installAugmentations
+
+-- P1 S5: Tor offen, Bonuszeit 0 -> die Torrunde: nur Planstuecke, teuerste zuerst --
+  ok    Nachbau vollstaendig
+  ok    S5: erster Kauf = erstes Planstueck (SPTN-97 Gene Modification, die teuerste der Runde)
+  ok    das Log nennt die Rundenlaenge (Torrunde 1/N), N >= 5
+  ok    nur Planstuecke: Neurotrainer I (nur Erfahrung, kein Zuwachs der Competence) NICHT gekauft, die Bladeburners-Aug (zu teuer je Zuwachs) auch nicht
+  ok    teuerste zuerst: die Grundpreise der Runde fallen nie, Voraussetzungen stehen vor ihrem Nachfolger
+  ok    Preis je Position = Grundpreis x 1,9^Position (die Warteschlange war leer)
+  ok    die Runde kostet zusammen hoechstens das Konto (60 Mrd)
+  ok    Telemetrie (der Runde NACH dem Kauf): boughtTotal = Rundenlaenge, lastRound nennt Anzahl und erstes Stueck
+  ok    und die Runde danach ist gesperrt (mode locked), kauft nichts mehr
+  ok    Gewichte aus blackops.json: naechste Op Typhoon laut blade.json
+  ok    geldbedarf.txt: nach der Runde nur noch das, was die naechste Planrunde mit dem Rest kosten wuerde (<= Restgeld)
+
+-- P1 S6: Tor offen, Bonuszeit 10 min -> weder Kauf noch Einbau --
+  ok    Nachbau vollstaendig
+  ok    S6: kein Kauf, solange der Gang-Vorrat nachgeholt wird
+  ok    und auch kein Einbau: kein Handschlag, kein installAugmentations
+  ok    Telemetrie: mode bonus, bonusMs 600000, Begruendung nennt das Nachholen
+
+-- P1 S7: Tor offen mit schon wartenden Stuecken -> ERST die Runde, DANN der Einbau --
+  ok    Nachbau vollstaendig
+  ok    die Torrunde wird gekauft, BEVOR der Einbau ausloest (drei wartende Stuecke wuerden ihn sofort ausloesen)
+  ok    danach baut die naechste Runde regulaer ein (EINBAU, installAugmentations, main endet)
+  ok    im Einbau stecken das Planstueck SPTN-97 neben den drei alten, und kein Neurotrainer I
+
+-- P1 S8: ns.gang.inGang wirft -> Fehler gezaehlt, alte Schleife als Rueckfall --
+  ok    Nachbau vollstaendig (der Wurf kommt nicht als RUNDENFEHLER an)
+  ok    die alte Kaufschleife laeuft trotz Sperre (Neurotrainer I und die Bladeburners-Aug werden gekauft)
+  ok    der Fehler steht in der Telemetrie (torRunde.gangErrors >= 1, lastGangError nennt inGang)
+  ok    und im Log (gedrosselt, genau einmal)
+  ok    Nachbau vollstaendig
+  ok    getBonusTime wirft: es wird NICHT gewartet, die Runde wird gekauft
+  ok    Fehler gezaehlt (gangErrors >= 1, lastGangError nennt getBonusTime), Runde in boughtTotal
+
+-- P1 S9: der Vorrat sinkt nie (gedrosselter Tab) -> nach 30 min kauft die Runde trotzdem --
+  ok    Nachbau vollstaendig
+  ok    kein Kauf in den ersten 30 Minuten, danach die Runde (Stillstandsschutz gegen 'nie mehr einbauen')
+  ok    das Log sagt, dass der Vorrat nicht sinkt
+
+-- P2c H1: Gang geplant (Schalter), noch nicht gegruendet, Knoten 1 h alt -> 0 Kaeufe --
+  ok    Nachbau vollstaendig
+  ok    H1: kein einziger Kauf vor der Gruendung (alt: Hyperion V1, SPTN-97 u. a. sofort)
+  ok    H1: das Log nennt den Aufschub
+  ok    H1: Telemetrie gangHold true
+  ok    H1: kein installAugmentations
+
+-- P2c H2: Schalter liegt, aber der Knoten ist aelter als die Frist (7 h) -> alte Schleife kauft --
+  ok    Nachbau vollstaendig
+  ok    H2: Rueckfall nach der Frist - die alte Schleife kauft wieder (Hyperion V1 zuerst)
+  ok    H2: Telemetrie gangHold false
+
+-- P2c H3: Knoten jung, aber KEIN Schalter -> alte Schleife kauft (wie S10) --
+  ok    Nachbau vollstaendig
+  ok    H3: ohne Schalter kauft die alte Schleife
+
+-- P2c H4: Schalter, Knoten jung, aber Hackingknoten-Marke (V1 2) -> kein Aufschub --
+  ok    Nachbau vollstaendig
+  ok    H4: im V1 greift der Aufschub nicht
+
+-- P2c H5: Gang steht, Knoten jung, Schalter -> Block 1c entscheidet (kein gangHold) --
+  ok    Nachbau vollstaendig
+  ok    H5: gangHold false, Torrunde locked (wie S4)
+  ok    H5: kein Kauf
+
+-- P1 S10: ohne Gang aendert sich NICHTS (V2, Einbau gesperrt, trotzdem Kauf) --
+  ok    Nachbau vollstaendig
+  ok    die alte Schleife kauft alles Verdiente, teuerste zuerst (Hyperion V1 5,5 Mrd vor SPTN-97), auch den Kleinkram
+  ok    auch die Bladeburners (Hyperion V1) wie bisher
+  ok    keine Torrunden-Zeile im Log, kein getBonusTime-Aufruf
+  ok    Telemetrie torRunde ist null (kein Fehler, keine Gang)
+  ok    geldbedarf.txt ist die alte Ruecklage (augRuecklage), hier nach dem Kauf der verdienten Stuecke klein
+  ok    Nachbau vollstaendig
+  ok    Hackingknoten (V1): ns.gang.inGang wird nie gerufen
+
+-- P1 S11: Preisfaktor mit SF11 (1,9 x 0,96) -> die Runde wird nicht ueberschaetzt --
+  ok    Nachbau vollstaendig
+  ok    kein Abbruch wegen Preisabweichung, die ganze geplante Runde wird gekauft
+  ok    Plankosten = tatsaechliche Kosten der Runde (SF11 eingerechnet)
+  ok    Nachbau vollstaendig
+  ok    Preis ueber Plan (> 1 %): 'TORRUNDE abgebrochen', nur das Stueck vor der Abweichung gekauft
+  ok    Telemetrie planDrift >= 1
+
+-- P1 S12: Reaper 12 / Evasive System 13 aus data/blade.json -> die Runde wird mit effektiven Stufen geplant --
+  ok    Testfall ist empfindlich: der Zuwachs der Runde unterscheidet sich zwischen rohen und effektiven Stufen um > 0,05
+  ok    Nachbau vollstaendig
+  ok    die gekaufte Runde ist die, die mit EFFEKTIVEN Stufen geplant wird (Menge und Reihenfolge)
+  ok    lastRound.gain = Zuwachs mit effektiven Stufen (nicht der mit rohen)
+  ok    Telemetrie torRunde.skills: Quelle blade.json, Reaper 12, Evasive 13, Faktoren x1,24 und x1,8848
+  ok    der Leser (checkin) nennt die eingerechneten Faehigkeiten, ohne Befund
+  ok    Nachbau vollstaendig (blade.json ohne skillLevels (altes blade.js))
+  ok    blade.json ohne skillLevels (altes blade.js): rohe Stufen, Telemetrie nennt den Grund
+  ok    blade.json ohne skillLevels (altes blade.js): die Runde ist die mit rohen Stufen
+  ok    blade.json ohne skillLevels (altes blade.js): kein gezaehlter Fehler (nur ein Hinweis)
+  ok    blade.json ohne skillLevels (altes blade.js): der Leser sagt, dass die Faehigkeiten NICHT eingerechnet sind
+  ok    Nachbau vollstaendig (blade.json 40 min alt)
+  ok    blade.json 40 min alt: rohe Stufen, Telemetrie nennt den Grund
+  ok    blade.json 40 min alt: die Runde ist die mit rohen Stufen
+  ok    blade.json 40 min alt: kein gezaehlter Fehler (nur ein Hinweis)
+  ok    blade.json 40 min alt: der Leser sagt, dass die Faehigkeiten NICHT eingerechnet sind
+  ok    Nachbau vollstaendig (blade.js meldet einen Fehler)
+  ok    blade.js meldet einen Fehler: rohe Stufen, Telemetrie nennt den Grund
+  ok    blade.js meldet einen Fehler: die Runde ist die mit rohen Stufen
+  ok    blade.js meldet einen Fehler: ein Fehler von blade.js wird als Fehler GEZAEHLT (gangErrors, lastGangError nennt skillLevels)
+  ok    blade.js meldet einen Fehler: der Leser sagt, dass die Faehigkeiten NICHT eingerechnet sind und meldet den Fehler als Befund
+
+-- P1 S13: Neustart von bn4rep mitten im Warten -> die Wartegrenze (30 min) beginnt nicht von vorn --
+  ok    erster Lauf: endet nach 25 min (Schlafbudget), nichts gekauft
+  ok    data/torrunde-wait.json liegt auf home: min 600000, seit am Anfang, zuletzt kurz vor dem Ende
+  ok    Telemetrie torRunde.wait zeigt denselben Zustand
+  ok    zweiter Lauf (Neustart): kauft die Runde
+  ok    erster Kauf nach 30 bis 31 min Gesamtwartezeit - NICHT erst 30 min nach dem Neustart (= 55 min) und nicht nach 2 h
+  ok    der Zustand bleibt nach der Grenze stehen (gleiches seit): die naechste Runde wartet nicht erneut, ein weiterer Neustart auch nicht
+
+-- P1 S14: das erste Planstueck wird vom Spiel abgelehnt -> der Einbau haelt zurueck (hoechstens 20 Runden) --
+  ok    Nachbau vollstaendig
+  ok    der Einbau kommt NICHT in den ersten Runden (alt: sofort in der Runde des Abbruchs), aber nach hoechstens 20 Runden (rund 5 min)
+  ok    die Abbruch-Logzeile ist gedrosselt: genau eine in 20 Runden (alt: eine je Runde)
+  ok    und das Ende des Halts steht einmal im Log
+  ok    Telemetrie: buyFailures >= 20 (jeder Abbruch wird gezaehlt, auch ohne Logzeile), abortStreak >= 20
+  ok    kein Gang-Stueck wurde gekauft (SPTN-97 ist abgelehnt; die NeuroFlux-Stufen kauft der Einbau selbst mit dem Restgeld), die drei alten warten
+  ok    der Leser meldet die abgelehnten Kaeufe als Befund
+  ok    Nachbau vollstaendig
+  ok    Abbruch nach dem ersten Kauf: abortStreak bleibt 0 (der Einbau wird nicht zusaetzlich zurueckgehalten)
+
+-- P1 S15: der Block wirft in JEDER Runde -> Rueckfall auf die alte Schleife, aber sichtbar (Schreiber UND Leser) --
+  ok    Nachbau vollstaendig (der Wurf kommt nicht als RUNDENFEHLER an)
+  ok    die alte Schleife kauft trotz Einbausperre (Neurotrainer I) - P1 ist de facto aus
+  ok    Telemetrie torRunde.mode = error, gangErrors >= 1, lastGangError nennt den Block
+  ok    der Leser (tools/checkin.js) meldet 'P1 IST AUS' als Befund und nennt den Fehler
+  ok    ns.gang.inGang wirft: der Leser meldet die Fehler und dass die alte Kaufschleife ohne Aufschub lief
+
+-- P1 S16: data/einbau.json spiegelt den Grund der Torrunde (wer dort nachsieht, warum kein Einbau kommt) --
+  ok    einbau.json: torRunde.mode bonus, bonusNote nennt das Nachholen, installHeld true
+  ok    der Leser nennt den Wartegrund (Vorrat 600 s, Grenze 30 min)
+  ok    einbau.json im gesperrten Zustand: torRunde.mode locked mit Grund
+  ok    ohne Gang: einbau.json traegt torRunde null
+  ok    ohne Gang: kein data/torrunde-wait.json
+
+-- P2d N1: Budget 240 Mrd (4 x 60 Mrd) -> der Plan braucht 1,625 Mio (Bionic Spine Upgrade) -> repNeed 1.657.500 --
+  ok    Nachbau vollstaendig
+  ok    repNeed = 1,02 x 1.625.000 = 1.657.500
+  ok    repNeedFaction ist Slum Snakes, das bestimmende Stueck Graphene Bionic Spine Upgrade
+  ok    der Bedarfsplan hat das 4fache Budget (240 Mrd) und mehrere Stuecke
+  ok    kein Fehler gezaehlt (gangErrors 0), kein Grund
+  ok    der echte Plan ist davon unberuehrt: Rufbedarf der echten Runde liegt unter 1,5 Mio (Spine Upgrade fehlt dort der Ruf)
+  ok    The Red Pill nie im Bedarf (2,5 Mio -> 2.550.000 waere es gewesen)
+
+-- P2d N2: kleines Budget (4 x 5 Mrd = 20 Mrd) -> der Plan braucht nur 1,25 Mio (SPTN-97) -> repNeed 1.275.000 --
+  ok    Nachbau vollstaendig
+  ok    repNeed = 1,02 x 1.250.000 = 1.275.000, Stueck SPTN-97 Gene Modification
+  ok    Budget 20 Mrd in der Telemetrie
+
+-- P2d N2b: Konto 40 Mrd (Budget 160 Mrd) liegt noch UNTER der Schwelle zum Spine Upgrade -> 1.275.000 (grenzt den Faktor 4 nach oben ein) --
+  ok    Nachbau vollstaendig
+  ok    repNeed 1.275.000 bei Budget 160 Mrd (bei 60 Mrd Konto, Budget 240 Mrd, sind es 1.657.500 - N1)
+
+-- P2d N3: kein Bedarf ohne Gang-Faktion (data/gang.json fehlt / alt / meldet keine Gang / andere Faktion) --
+  ok    data/gang.json fehlt: repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler
+  ok    data/gang.json 11 min alt: repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler
+  ok    data/gang.json meldet keine Gang: repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler
+  ok    data/gang.json ohne Faktion: repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler
+  ok    die Gang gehoert zu Tetrads (kein Stueck von Tetrads im Angebot): repNeed null mit Grund, Nachbau vollstaendig, kein gezaehlter Fehler
+
+-- P2d N4: data/gang.json kaputt -> GEZAEHLTER Fehler, repNeed null, die echte Torrunde bleibt heil --
+  ok    Nachbau vollstaendig (der Wurf wird im Block gefangen)
+  ok    gangErrors >= 1, lastGangError nennt repNeed, repNeed null
+  ok    der echte Plan steht trotzdem (Modus locked, Plan mit Stuecken)
+
+-- P2d N5: The Red Pill im Angebot der Gang-Faktion (2,5 Mio) beeinflusst den Bedarf nicht --
+  ok    Nachbau vollstaendig
+  ok    repNeed bleibt 1.657.500 (Bionic Spine Upgrade), nicht 2.550.000
+  ok    kein Kauf, The Red Pill nicht in der Warteschlange
+
+-- P2d N6: ein Stueck, das eine FREMDE Faktion mit genug Ruf verkauft, treibt den Bedarf nicht --
+  ok    Nachbau vollstaendig
+  ok    SPTN-97 (1,25 Mio) bestimmt den Bedarf, nicht das bei Bladeburners kaufbare Spine Upgrade: 1.275.000
+
+-- P2d N7: ein Stueck einer FREMDEN Faktion ohne genug Ruf kommt nicht in den Bedarfsplan (kein Gang-Ruf macht es kaufbar) --
+  ok    Nachbau vollstaendig
+  ok    derselbe Bedarfsplan (Stuecke, Kosten) und derselbe Bedarf wie ohne die fremde Faktion
+
+-- P0 GANG-2: The Red Pill im Bladeburner-Knoten (Gang-Faktion bietet sie an) --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S1: V2 'V2 2 1': Bionic Arms gekauft (die Kaufschleife lief)
+  ok    S1: V2 'V2 2 1', Ruf 3 Mio: KEIN Kauf von The Red Pill
+  ok    S1: Telemetrie nennt v1Positiv false und v1LeseFehler 0 (fuer die Abnahme von aussen)
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S4: Marke nicht lesbar: KEIN Kauf von The Red Pill
+  ok    S4: Marke nicht lesbar: v1LeseFehler steht in der Telemetrie (>= 1) und v1Positiv ist false
+  ok    S4: der Lesefehler steht im Log (nicht still)
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S2: ohne verfahren.txt: Bionic Arms gekauft (die Kaufschleife lief)
+  ok    S2: ohne verfahren.txt: KEIN Kauf von The Red Pill
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S2b: 'V1 5 2' in Knoten 2 (fremder Knoten): KEIN Kauf von The Red Pill
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S2c: Marke 'V10 2 1' ist kein V1: KEIN Kauf von The Red Pill
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S3: V2, Red Pill eingebaut, 3 Kampfstuecke warten: Einbau findet statt
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S3b: V2, Red Pill WARTET (2 Stuecke < 3): kein Zwangseinbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S3c: V2, Einbau bei 26+3 = 29 von 30 (Fuellstueck-Pfad): KEIN Kauf von The Red Pill
+  ok    S3c: der Einbau lief (der Fuellstueck-Block wurde ueberhaupt erreicht)
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    Gegenprobe 'V1 5 2' in Knoten 5: The Red Pill wird gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    Gegenprobe 'V1b 15 1' in Knoten 15: The Red Pill wird gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    Gegenprobe 'V1 2 1' in Knoten 2: The Red Pill wird gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S5: V1 'V1 5 2' in Knoten 5: Telemetrie nennt v1Positiv true und v1LeseFehler 0
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    Gegenprobe V1 + Red Pill eingebaut: ausgangSteht sperrt jeden weiteren Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6 Kontrolle: Marke 'V2 5 1' in Knoten 5, Red Pill eingebaut, 3 Kampfstuecke: Einbau findet statt
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, Marke fehlt: KEIN Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, Marke leer: KEIN Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, fremder Knoten (V1 4 2 in Knoten 5): KEIN Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, unbekanntes Kuerzel (V1c): KEIN Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, V2-Marke eines fremden Knotens: KEIN Einbau
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    S6: Red Pill eingebaut, 3 Kampfstuecke warten, V1-Marke des eigenen Knotens: KEIN Einbau
+
+-- P0 G02: Hacknet-Stuecke nur dort, wo nach dem Einbau Hacknet-Server gekauft werden --
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    G02 Knoten 2 (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)
+  ok    G02 Knoten 2 (SF9.3 da): Hacknet-Stueck wird NICHT gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    G02 Knoten 3 (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)
+  ok    G02 Knoten 3 (SF9.3 da): Hacknet-Stueck wird NICHT gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    G02 Knoten 11 (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)
+  ok    G02 Knoten 11 (SF9.3 da): Hacknet-Stueck wird NICHT gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    G02 Knoten 15 (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)
+  ok    G02 Knoten 15 (SF9.3 da): Hacknet-Stueck wird NICHT gekauft
+  ok    Nachbau vollstaendig (kein echter Rundenfehler)
+  ok    G02 Knoten 9 (SF9.3 da): Bionic Arms gekauft (die Kaufschleife lief)
+  ok    G02 Knoten 9 (SF9.3 da): Hacknet-Stueck WIRD gekauft
+
+-- Z1 Vertrag bn4rep.js -> gang.js: die echte Telemetrie besteht die Voraussetzungssperre --
+  ok    Nachbau vollstaendig
+  ok    die Runde schreibt data/bn4rep.json
+  ok    Paket 0: v1Positiv ist ein Boolean und false (V2-Marke -> The Red Pill kein Kandidat)
+  ok    Paket 1: gateBuy ist true (der Kaufaufschub steckt in dieser Fassung)
+  ok    knoten, nodeReset und zeit stehen drin (Knoteneintritt und Frische)
+  ok    gang.js checkPrereq: ok mit der echten Telemetrie von bn4rep.js
+  ok    Gegenprobe V1-Marke: v1Positiv true -> checkPrereq sperrt (The Red Pill waere Kaufkandidat)
+
+-- Z2 Vertrag bn4rep.js -> gang.js: die echte Telemetrie liefert den Rufbedarf und den Modus --
+  ok    Nachbau vollstaendig
+  ok    gang.js repNeedOf: 1.657.500 aus der echten Telemetrie (Budget 4 x 60 Mrd, Bionic Spine Upgrade)
+  ok    chooseMode: Ruf 1,5 Mio -> respect, 1,7 Mio -> money (die echte Zahl, nicht eine ausgedachte)
+  ok    andere Gang-Faktion (Tetrads): kein Bedarf, der Grund nennt Slum Snakes
+  ok    alter Knoteneintritt (nodeReset 2): kein Bedarf
+  ok    31 min spaeter (bn4rep.js tot): kein Bedarf
+  ok    ohne data/gang.json: repNeed null und repNeedWhy nennt es (das Feld, das der Einspielablauf in gang.js prueft)
+
+269 ok, 0 rot von 269

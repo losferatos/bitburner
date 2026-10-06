@@ -1,3 +1,43 @@
+# Nachtrag 06.10.2026 18:25 - corp-e3c
+
+Inhalt:
+- Bestechung entdoppelt ueber Wanduhr: je Faktion 5 min Mindestabstand und ein Kassenbuch des gezahlten Rufs der letzten 20 min (gleicher augReset), bezahlt wird nur die Differenz; zusaetzlich gleiches ts nie zweimal.
+- write-ahead fuer Bestechung und Verkauf.
+- Bestechung erst ab Boersengang/Zuendung.
+- ts aus der Zukunft (> +60 s) wird abgelehnt.
+- maxRound < 3 mit ipoEarly meldet blocked.
+- finance.erloesAug {augReset, summe} in corp.json.
+- data/geldbedarf.txt wird nach jedem Verkauf um den Erloes angehoben.
+
+Tests (tests/etappe3.sh, Kurzlauf tests/e3c-kurz.sh), Saat 1, 16 h:
+
+| Test | Mit Fix | Ohne Fix |
+|---|---|---|
+| E1a neues ts je Schreibvorgang + 3 min Verzug | Ruf 1,02 x Anforderung | Sector-12 4,1x, Aevum 12,2x |
+| E1b Tod mitten in der Bestechung | 1,02 x | Aevum 2,04x |
+| R3 erloesAug / geldbedarf | exakt | geldbedarf nicht angehoben |
+| K4 ts in der Zukunft | kein Verkauf | - |
+| K2 maxRound 2 + ipoEarly | blocked | - |
+
+K1 (Bestechung vor der Zuendung) ist im Simulator nicht rot zu bekommen: zwischen Runde 4 und Zuendung kommt kein Bestechungsfall zustande.
+
+# Nachtrag 06.10.2026 17:45 - Etappe 3 (Fassung e3b-Schnittstelle) im Build corp-e2c GRUEN
+
+`tests/etappe3.sh`: alle Faelle wie erwartet, inklusive Rot-Nachweis fuer F1, F2, F3, F5 und Glaettung.
+
+24 h, 3 Saaten, echte Schnittstelle data/corp-geld.txt (tests/out/I3_s*.json):
+
+| Saat | Einbau | Zuendung | Boersengang | Runde 4 |
+|---|---|---|---|---|
+| s1 | 12 h | 9 h | 9,14 h | 31,6 Bio |
+| s2 | ohne | 10 h | 9,29 h | 27,6 Bio |
+| s3 | 10,5 / 14 / 20 h | 10 h | 9,37 h | 27,5 Bio |
+
+- Je 15 Verkaeufe, Kalibrierfehler 0, Bestechung genau 1,02 x Anforderung, Bladeburners 0.
+- Keine Bestechung im 11-Zyklen-Fenster vor einem Verkauf, Quirk-Bremse eingehalten.
+- 3,9 exec je Zyklus.
+- Mehrerloes > x3 nur bei Verkaeufen von 1 Anteil (spaete Phase).
+
 # Nachtrag 06.10.2026 17:31 - corp-e2c (Zerlegung <= 51,6 GB nach dem ersten Einbau)
 
 | Skript | RAM |

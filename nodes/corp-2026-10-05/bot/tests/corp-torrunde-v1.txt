@@ -1,0 +1,172 @@
+
+=== Corp-Geld BN3 gegen C:\Users\erche\Desktop\claude_projecto\bitburner\nodes\corp-2026-10-05\bot\v1\src ===
+
+-- K1: Corp gezuendet, Tor gesperrt (Wiederaufbau zu jung) -> kein Kauf, Anforderung mit Bestechung --
+  ok    Nachbau vollstaendig
+  ok    K1: kein einziger Kauf (alt: alles Verdiente sofort, teuerste zuerst)
+  ok    data/corp-geld.txt liegt auf home, Schnittstelle v1 (ts, nodeReset, augReset, von bn4rep)
+  ok    bestechung: Tetrads (Bionic Arms 187.500 - 1.000) und The Black Hand (300.000 - 2.000)
+  ok    bestechung: nie Bladeburners (GOLEM Serum fehlt Ruf), nie NiteSec (Neurotrainer II bringt der Runde nichts)
+  ok    bn4rep.json offenJeFaktion bleibt wie bisher (NiteSec fehlt 29.000 - fuer sleeve.js), die Anforderung nimmt es nicht
+  ok    Telemetrie: torRunde.mode locked, torRunde.corp mit derselben Bestechung
+  ROT   F1/B1: geldbedarf.txt nie ueber dem Konto (alt: volle Runde 53 Mrd > Konto 20 Mrd), mindestens die kaufbare Runde; betrag = Kosten - Konto - bedarf 53453915978, Plan 53453915978, betrag 33453915978
+  ok    der volle Plan enthaelt mehr als die kaufbare Runde (Bionic Arms, The Black Hand)
+  ok    kein installAugmentations
+        (Anforderung: {"v":1,"ts":1790442252800,"nodeReset":1790370188000,"augReset":2,"betrag":33453915978,"bestechung":{"The Black Hand":298000,"Tetrads":186500},"von":"bn4rep"}; Log: 18:12:11  CORP-GELD: Zuendung bei Corp-Stunde 9.5 - Kaufaufschub bis zum Tor, Runde mit Bestechung, Anforderung in data/corp-geld.txt. / 18:12:11  TORRUNDE: Einbau gesperrt (Wiederaufbau noch nicht bezahlt gemacht) - aus keiner Faktion wird gekauft. Plan: 3 Stuecke fuer $7.72b, Competence x1.17 (Gewichte blackops.json:OperationTyphoon). / 18:12:11  CORP-GELD: volle Runde 7 Stuecke fuer $53.45b, Competence x1.55; angefordert $33.45b und Ruf {"The Black Hand":298000,"Tetrads":186500}.)
+
+-- K2: Corp NICHT gezuendet -> alles wie heute (alte Schleife, keine Anforderung) --
+  ok    Nachbau vollstaendig
+  ok    K2: die alte Schleife kauft, teuerste zuerst (erstes Stueck Hyperion Plasma Cannon V1)
+  ok    keine data/corp-geld.txt
+
+-- K3: anderer Knoten / anderer nodeReset / V1 -> alles wie heute --
+  ok    Nachbau vollstaendig
+  ok    K3: BN9 mit gezuendeter corp.json: alte Schleife kauft, keine Anforderung
+  ok    K3b: corp.json aus einem anderen Knoten (nodeReset) -> alte Schleife, keine Anforderung
+  ok    K3c: BN3 im Hackingweg (V1) -> keine Anforderung
+
+-- K4: Tor offen, Bestechung fehlt noch, corp.json frisch -> warten: weder Kauf noch Einbau --
+  ok    Nachbau vollstaendig
+  ok    K4: kein Kauf (alt: sofort)
+  ok    kein Einbau, kein Handschlag
+  ok    Telemetrie mode corpwait, waits true
+  ok    der Wartezustand liegt auf home (ueberlebt einen Neustart)
+
+-- K5: Tor offen, Ruf geliefert, Geld da -> die Runde (nur Planstuecke), dann Einbau --
+  ok    Nachbau vollstaendig
+  ok    K5: Bionic Arms (Tetrads) und The Black Hand gekauft
+  ok    Neurotrainer II (verdient, aber ohne Zuwachs) NICHT gekauft (alt: gekauft)
+        (Kaeufe: Hyperion Plasma Cannon V1 8.25 Mrd > BLADE-51b Tesla Armor 7.84 Mrd > ORION-MKIV Shoulder 5.96 Mrd > The Black Hand 11.32 Mrd > Bionic Arms 10.75 Mrd > HemoRecirculator 3.34 Mrd > Augmented Targeting II 6.00 Mrd > NeuroFlux Governor 0.20 Mrd > NeuroFlux Governor 0.38 Mrd > NeuroFlux Governor 0.73 Mrd > NeuroFlux Governor 1.38 Mrd > NeuroFlux Governor 2.62 Mrd > NeuroFlux Governor 4.98 Mrd > NeuroFlux Governor 9.46 Mrd > NeuroFlux Governor 17.98 Mrd > NeuroFlux Governor 34.16 Mrd > NeuroFlux Governor 64.90 Mrd > NeuroFlux Governor 123.31 Mrd > NeuroFlux Governor 234.29 Mrd)
+  ok    gekauft als Torrunde (Log 'Torrunde 1/N')
+  ok    danach der Einbau (installAugmentations, main endet)
+
+-- K6: Tor offen, Bestechung fehlt, corp.json 30 min alt -> nicht warten, kaufbare Runde, Einbau --
+  ok    Nachbau vollstaendig
+  ok    K6: Runde ohne Bestechungsstuecke gekauft (Hyperion zuerst), kein Bionic Arms, kein Neurotrainer
+  ok    K6: und eingebaut
+  ok    K6: die Anforderung wird trotzdem geschrieben (Signal = Tatsache der Zuendung)
+
+-- K7: Tor offen, Bestechung kommt nie (corp.json frisch) -> nach 90 min ohne Fortschritt wird gekauft --
+  ok    Nachbau vollstaendig
+  ok    K7: erster Kauf nach >= 90 und < 120 min Warten (alt: sofort)
+  ok    K7: und eingebaut
+
+-- K8: Tor offen, Bestechung trifft nach 40 min ein -> dann die volle Runde --
+  ok    Nachbau vollstaendig
+  ok    K8: erster Kauf nach 40-45 min, Bionic Arms und The Black Hand dabei
+  ok    K8: Einbau
+
+-- K9: Neustart von bn4rep waehrend des Wartens setzt die Wartezeit nicht zurueck --
+  ok    K9: kein Kauf im ersten Lauf, im zweiten nach insgesamt 90-120 min (nicht 90 min nach dem Neustart)
+
+-- F1/B1/K9: Ruf 0 nach dem Einbau, Tor weit -> bn4net behaelt das ganze Konto --
+  ok    Nachbau vollstaendig
+  ROT   F1: Corp blockiert, Ruf 0 -> geldbedarf 0, frei fuer bn4net = ganzes Konto (alt: volle Runde reserviert, Rechnerkauf gesperrt) - frei 420627500 von 5000000000, geldbedarf 4579372500
+  ROT   F1b/R3-FIX1: Corp liefert, Ruf 0, aber noch kein Erloes -> ganzes Konto frei wie mit Gang (v3: 4,5 Mrd gesperrt) - frei 420627500 von 5000000000
+  ROT   F1c/R3-FIX1: Erloes seit Einbau 40 Mrd -> Ruecklage = 40 Mrd (zwischen kaufbarer 23 und voller Runde 53 Mrd) - bedarf 53453915978, voll 53453915978
+  ROT   F1d: Tor in 30 min, corp.js blockiert -> nur die kaufbare Runde, keine Bestechung (alt: volle Runde 53 Mrd) - bedarf 53453915978, kaufbar 22918522500
+
+-- F3/E3: Signal an, aber corp.js blockiert / kein Boersengang -> am offenen Tor NICHT warten --
+  ROT   F3 (state blocked): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+  ROT   F3 (finance.blocked no_ipo_path, privat): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+  ROT   F3 (gezuendet, aber Phase halten (Runde 4 fehlt)): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+
+-- F4/E4: Faktion mit Spendenrecht -> Spende aus dem Konto statt Bestechung --
+  ROT   F4: Tetrads nicht in bestechung, aber als Spende im Plan (alt: bestechung Tetrads 186.500) - {"why":"Zuendung bei Corp-Stunde 9.5","fresh":true,"plan":{"n":7,"cost":53453915978,"gain":1.552,"first":"Hyperion Plasma Cannon V1"},"betrag":44453915978,"bestechung":{"Tetrads":186500},"waits":false,"waitNote":"","waitMs":0} {"Bladeburners":1,"Tetrads":160,"The Black Hand":1,"Sector-12":1,"NiteSec":1}
+  ok    Nachbau vollstaendig
+  ok    F4b: am offenen Tor an Tetrads gespendet, danach Bionic Arms gekauft und eingebaut (alt: keine Spende)
+
+-- F5/E5: nach dem Kauf am Tor nichts mehr anfordern --
+  ROT   F5: nach Kauf (Wartezeit abgelaufen, Bestechung kam nie) betrag 0 und bestechung {} (alt: Tetrads/Black Hand weiter angefordert) - {"v":1,"ts":1790447600800,"nodeReset":1790370188000,"augReset":2,"betrag":0,"bestechung":{"The Black Hand":298000,"Tetrads":186500},"von":"bn4rep"}
+
+-- F6/E6: Bestechung nur, was die Corp-Kasse tragen kann (25 % je Faktion) --
+  ROT   F6: Kasse 1,2e15 -> je Faktion hoechstens 294.117 Ruf: Tetrads ja, The Black Hand (298.000) nein (alt: beide) - {"The Black Hand":298000,"Tetrads":186500}
+  ROT   F6b: Kasse unter 1e15 -> keine Bestechung angefordert (alt: angefordert) - {"The Black Hand":298000,"Tetrads":186500}
+
+-- F10/S7: corp.json verschwindet nach der Zuendung -> alte Kaufschleife bleibt aus --
+  ok    Nachbau vollstaendig
+  ROT   F10: kein Kauf (alt: ab der zweiten Runde kauft die alte Schleife alles) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+
+-- F7/F8/F9: Warte-Uhr --
+  ROT   F7/K7: Tor flackert (1 min zu) -> Wartezeit bleibt bei ~60 min (alt: 0) - aktivMs 0 min
+  ROT   F8/S2: erste Runde nach 8 h Pause, corp.json noch alt -> wartet (Karenz; alt: kauft sofort) - corp.json alt - kein Nachschub, die Runde wird gekauft
+  ok    F8b: nach 11 min immer noch alt -> nicht mehr warten
+  ROT   F9/S6: Gewinn x1,06 -> nach 60 min kein Warten mehr (Grenze ~53 min; alt: weiter) - volle Runde x1.59 statt x1.50, wartet auf Corp-Geld/Bestechung seit 60 min
+
+-- F11/K8: Check-in-Befund 'Signal an, Corp liefert nicht' --
+  ROT   F11: Befund nennt die blockierte Corp
+
+-- R2-E2: Freiraum ist keine Ratsche - ein Ausgeber, der jede Runde alles Freie nimmt, bekommt hoechstens 500 Mrd --
+  ROT   R2-E2/R3-FIX1: Konto 2 Bio, davon 1,5 Bio Corp-Erloes: in 40 Runden geht nur das eigene Geld (0,5 Bio) an andere, der Erloes bleibt - ausgegeben 0 Mrd
+
+-- R2-E3: angefordertes Corp-Geld ist geschuetzt, auch wenn das Tor 11 h entfernt ist --
+  ok    R2-E3/R3-FIX1: Erloes 1 Bio > volle Runde -> geldbedarf = volle Runde (53 Mrd)
+
+-- R2-E4: Spende passt nur mit Teilplan ins Konto -> wird trotzdem gespendet und gekauft --
+  ok    Nachbau vollstaendig
+  ROT   R2-E4: an Tetrads gespendet und Bionic Arms gekauft (alt: nie gespendet, Bionic Arms fehlt) - Spenden [["Tetrads",97]], Kaeufe Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, The Black Hand, HemoRecirculator, Augmented Targeting II, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor
+        (Spendenzeilen: 18:12:13  GESPENDET: 96546m an Tetrads fuer 186500 fehlende Reputation (Favor 160).)
+  ROT   R2-E4b corpFitPlan vorhanden
+
+-- R2-K5: Runde nur teilweise gekauft -> nicht 'fertig', es wird weiter angefordert --
+  ok    R2-K5: ein Stueck gekauft, dann Abbruch -> fertig nicht gesetzt (alt: fertig nach dem ersten Stueck)
+
+-- R2-K6: corp.js verliert seinen Zustand (ignitedAt fehlt) -> alte Kaufschleife bleibt aus, auch nach Neustart --
+  ok    Nachbau vollstaendig
+  ROT   R2-K6: kein Kauf nach dem Zustandsverlust (alt: alte Schleife kauft) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+  ROT   R2-K6b: auch nach Neustart von bn4rep kein Kauf (Merker data/corp-gezuendet.txt) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+
+-- R3-FIX1: Erloes aus einem frueheren Einbau (augReset 1) schuetzt nichts --
+  ROT   R3-FIX1: geldbedarf = kaufbare Runde (v3: volle Runde) - bedarf 53453915978, kaufbar 22918522500
+
+-- R3-FIX2: corp.js hebt geldbedarf.txt nach dem Verkauf an - bn4rep setzt das nicht zurueck, bis erloesAug da ist --
+  ROT   R3-FIX2: zwei Runden nach dem Verkauf ist die Anhebung noch drin (>= 300 Mrd; v3: zurueckgesetzt) - geldbedarf 53453915978
+  ok    R3-FIX2b: nach erloesAug in corp.json gilt die normale Rechnung (min(volle Runde, Erloes))
+
+-- R3-KLEIN4: Tor offen, nichts mehr zu planen -> fertig, keine Tranche mehr --
+  ROT   R3-KLEIN4: fertig gesetzt, Anforderung 0 (v3: nicht fertig) - {"seit":1790442188000,"aktivMs":0,"min":null,"minSeit":null,"zuletzt":1790442188000,"augReset":2}
+
+-- R3-KLEIN5/6: corpFitPlan nimmt den besseren Plan; Spende mit x1,02 --
+
+-- E: lib/corpgeld.js einzeln --
+  ok    lib/corpgeld.js vorhanden
+  ok    E1 Signal an bei ignitedAt, frisch
+  ok    E2 aus: nicht gezuendet, nicht oeffentlich
+  ok    E3 an: oeffentlich ohne ignitedAt
+  ok    E4 aus: Knoten 2 / V1 / anderer nodeReset / fehlt
+  ok    E5 an, aber nicht frisch: 21 min alt
+  ROT   E-Teil: Schnittstelle von lib/corpgeld.js passt - TypeError: unbuyable.includes is not a function
+
+-- L: Check-in-Leser kennt corpwait und die Corp-Zeile --
+  ok    L1 Zeile fuer corpwait (nicht 'Modus corpwait')
+  ok    L2 Corp-Zeile mit Bestechung
+
+55 ok, 26 rot von 81
+
+Fehlgeschlagen:
+  - F1/B1: geldbedarf.txt nie ueber dem Konto (alt: volle Runde 53 Mrd > Konto 20 Mrd), mindestens die kaufbare Runde; betrag = Kosten - Konto - bedarf 53453915978, Plan 53453915978, betrag 33453915978
+  - F1: Corp blockiert, Ruf 0 -> geldbedarf 0, frei fuer bn4net = ganzes Konto (alt: volle Runde reserviert, Rechnerkauf gesperrt) - frei 420627500 von 5000000000, geldbedarf 4579372500
+  - F1b/R3-FIX1: Corp liefert, Ruf 0, aber noch kein Erloes -> ganzes Konto frei wie mit Gang (v3: 4,5 Mrd gesperrt) - frei 420627500 von 5000000000
+  - F1c/R3-FIX1: Erloes seit Einbau 40 Mrd -> Ruecklage = 40 Mrd (zwischen kaufbarer 23 und voller Runde 53 Mrd) - bedarf 53453915978, voll 53453915978
+  - F1d: Tor in 30 min, corp.js blockiert -> nur die kaufbare Runde, keine Bestechung (alt: volle Runde 53 Mrd) - bedarf 53453915978, kaufbar 22918522500
+  - F3 (state blocked): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+  - F3 (finance.blocked no_ipo_path, privat): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+  - F3 (gezuendet, aber Phase halten (Runde 4 fehlt)): Runde sofort gekauft und eingebaut (alt: bis 90 min corpwait) - erster Kauf nach - min, install 0
+  - F4: Tetrads nicht in bestechung, aber als Spende im Plan (alt: bestechung Tetrads 186.500) - {"why":"Zuendung bei Corp-Stunde 9.5","fresh":true,"plan":{"n":7,"cost":53453915978,"gain":1.552,"first":"Hyperion Plasma Cannon V1"},"betrag":44453915978,"bestechung":{"Tetrads":186500},"waits":false,"waitNote":"","waitMs":0} {"Bladeburners":1,"Tetrads":160,"The Black Hand":1,"Sector-12":1,"NiteSec":1}
+  - F5: nach Kauf (Wartezeit abgelaufen, Bestechung kam nie) betrag 0 und bestechung {} (alt: Tetrads/Black Hand weiter angefordert) - {"v":1,"ts":1790447600800,"nodeReset":1790370188000,"augReset":2,"betrag":0,"bestechung":{"The Black Hand":298000,"Tetrads":186500},"von":"bn4rep"}
+  - F6: Kasse 1,2e15 -> je Faktion hoechstens 294.117 Ruf: Tetrads ja, The Black Hand (298.000) nein (alt: beide) - {"The Black Hand":298000,"Tetrads":186500}
+  - F6b: Kasse unter 1e15 -> keine Bestechung angefordert (alt: angefordert) - {"The Black Hand":298000,"Tetrads":186500}
+  - F10: kein Kauf (alt: ab der zweiten Runde kauft die alte Schleife alles) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+  - F7/K7: Tor flackert (1 min zu) -> Wartezeit bleibt bei ~60 min (alt: 0) - aktivMs 0 min
+  - F8/S2: erste Runde nach 8 h Pause, corp.json noch alt -> wartet (Karenz; alt: kauft sofort) - corp.json alt - kein Nachschub, die Runde wird gekauft
+  - F9/S6: Gewinn x1,06 -> nach 60 min kein Warten mehr (Grenze ~53 min; alt: weiter) - volle Runde x1.59 statt x1.50, wartet auf Corp-Geld/Bestechung seit 60 min
+  - F11: Befund nennt die blockierte Corp
+  - R2-E2/R3-FIX1: Konto 2 Bio, davon 1,5 Bio Corp-Erloes: in 40 Runden geht nur das eigene Geld (0,5 Bio) an andere, der Erloes bleibt - ausgegeben 0 Mrd
+  - R2-E4: an Tetrads gespendet und Bionic Arms gekauft (alt: nie gespendet, Bionic Arms fehlt) - Spenden [["Tetrads",97]], Kaeufe Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, The Black Hand, HemoRecirculator, Augmented Targeting II, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor, NeuroFlux Governor
+  - R2-E4b corpFitPlan vorhanden
+  - R2-K6: kein Kauf nach dem Zustandsverlust (alt: alte Schleife kauft) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+  - R2-K6b: auch nach Neustart von bn4rep kein Kauf (Merker data/corp-gezuendet.txt) - Hyperion Plasma Cannon V1, BLADE-51b Tesla Armor, ORION-MKIV Shoulder, Augmented Targeting II
+  - R3-FIX1: geldbedarf = kaufbare Runde (v3: volle Runde) - bedarf 53453915978, kaufbar 22918522500
+  - R3-FIX2: zwei Runden nach dem Verkauf ist die Anhebung noch drin (>= 300 Mrd; v3: zurueckgesetzt) - geldbedarf 53453915978
+  - R3-KLEIN4: fertig gesetzt, Anforderung 0 (v3: nicht fertig) - {"seit":1790442188000,"aktivMs":0,"min":null,"minSeit":null,"zuletzt":1790442188000,"augReset":2}
+  - E-Teil: Schnittstelle von lib/corpgeld.js passt - TypeError: unbuyable.includes is not a function

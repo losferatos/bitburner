@@ -1220,7 +1220,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
         "lib/figurns.js",
         "lib/hackaugs.js",
         "lib/handschlag.js",
-        "lib/hostdatei.js"
+        "lib/hostdatei.js",
+        "lib/corpgeld.js"
       ],
       "singularity": true,
       "restartPolicy": "always",

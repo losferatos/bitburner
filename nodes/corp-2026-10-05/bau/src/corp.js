@@ -61,7 +61,7 @@ const TOB = "Tob";
 const CHEM = "Chem";
 // Geld-Schnittstelle zum restlichen Bot (Etappe 3, Einzelheiten im Kopf von financeWork):
 const MONEY_REQUEST_FILE = "data/corp-geld.txt"; // Schnittstelle, siehe Kopf von financeWork
-const MONEY_RESERVE_FILE = "data/geldbedarf.txt"; // nur noch fuer den Rot-Nachweis (noFix "default")
+const MONEY_RESERVE_FILE = "data/geldbedarf.txt"; // Ruecklage: nach jedem Verkauf um den Erloes angehoben
 const BN4REP_FILE = "data/bn4rep.json"; // dto.
 /** Optionale Stellschrauben (JSON auf home), z. B. {"maxRound":4,"shares":{...},"taMult":1} - ohne Datei gelten die Vorgaben */
 const CONFIG_FILE = "data/corp-config.txt";
@@ -510,7 +510,7 @@ async function cycleWork(ns, rt, st) {
     tobAds: tob ? tob.info.numAdVerts : 0,
     tobMain: tob && tob.office[MAIN_CITY] ? tob.office[MAIN_CITY].size : 0,
     rsDone: st.rsDone,
-    finance: st.fin ? { phase: st.fin.phase, blocked: st.fin.blocked, request: st.fin.request, sales: (st.fin.sales || []).slice(-5), soldTotal: st.fin.soldTotal, bribed: st.fin.bribed, bribedTotal: st.fin.bribedTotal, ignitedAt: st.fin.ignitedAt, ipo: st.fin.ipo, cooldownSec: corp.shareSaleCooldown / 5 } : null,
+    finance: st.fin ? { erloesAug: st.fin.erloesAug, salePending: st.fin.salePending, phase: st.fin.phase, blocked: st.fin.blocked, request: st.fin.request, sales: (st.fin.sales || []).slice(-5), soldTotal: st.fin.soldTotal, bribed: st.fin.bribed, bribedTotal: st.fin.bribedTotal, ignitedAt: st.fin.ignitedAt, ipo: st.fin.ipo, cooldownSec: corp.shareSaleCooldown / 5 } : null,
   };
 }
 /** Nur fuer den Testnachweis (rot ohne Fix): data/corp-config.txt {"noFix":["freeze","round","beat"]} */
@@ -559,6 +559,15 @@ async function financeWork(ns, rt, st, snap, P) {
   st.fin ??= { phase: "halten", sales: [], soldTotal: 0, bribed: {}, bribedTotal: 0, vHist: [] };
   const fin = st.fin;
   fin.bribeTs ??= {};
+  // Erloes seit dem letzten Einbau (Zusatz Skeptiker Runde 3, Schnittstelle fuer bn4rep: corp.json
+  // finance.erloesAug). Neuer augReset -> 0. Eine offene write-ahead-Buchung (Tod zwischen Verkauf und
+  // Rueckmeldung) wird mit der Schaetzung verbucht - lieber zu viel Ruecklage als eine verbrauchte Tranche.
+  if (!fin.erloesAug || fin.erloesAug.augReset !== rt.ri.lastAugReset) fin.erloesAug = { augReset: rt.ri.lastAugReset, summe: 0 };
+  if (fin.salePending) {
+    if (fin.salePending.aug === rt.ri.lastAugReset) fin.erloesAug.summe += fin.salePending.est;
+    logEvent(ns, st, `Offene Verkaufsbuchung nach Neustart mit Schaetzung ${fmt(fin.salePending.est)} verbucht`);
+    fin.salePending = null;
+  }
   fin.vHist.push(corp.valuation);
   if (fin.vHist.length > 60) fin.vHist.shift();
   const smoothN = noFix(st, "smooth") ? 1 : 60;
@@ -576,8 +585,10 @@ async function financeWork(ns, rt, st, snap, P) {
   fin.phase = corp.public ? "oeffentlich" : mayIpo ? "zuendbereit" : "halten";
   // (9) Ohne Runde 4 und ohne ipoEarly gibt es keinen Weg zum Geld - sichtbar machen statt stumm
   const maxRound = P.etappe() >= 2 ? cfg("maxRound", MAX_ROUND) : 1;
-  fin.blocked = !corp.public && maxRound < 4 && !cfg("ipoEarly", false) && st.roundsDone >= maxRound ? "no_ipo_path" : null;
-  if (fin.blocked) st.next = `Kein Boersengang moeglich: maxRound ${maxRound} < 4 und ipoEarly aus`;
+  // ohne Runde 4 kein Zuenden; ipoEarly braucht Runde 3 (KLEIN-2)
+  const noPath = maxRound < 4 && (!cfg("ipoEarly", false) || maxRound < 3);
+  fin.blocked = !corp.public && noPath && st.roundsDone >= maxRound ? "no_ipo_path" : null;
+  if (fin.blocked) st.next = `Kein Boersengang moeglich: maxRound ${maxRound}, ipoEarly ${cfg("ipoEarly", false)}`;
   const coolCycles = corp.shareSaleCooldown / 50; // 50 Spielzyklen je Corp-Zyklus (Constants.ts gameCyclesPerMarketCycle)
   const canSell = corp.public ? corp.shareSaleCooldown <= 0 : mayIpo;
   let soldNow = false;
@@ -591,11 +602,22 @@ async function financeWork(ns, rt, st, snap, P) {
       const vPub = publicValuationEstimate(corp.funds, corp.revenue - corp.expenses, ow);
       fin.ipo = { h: +P.hours.toFixed(3), vPriv: corp.valuation, vPubEst: vPub, liqPriv: liquidationValue(corp.valuation, corp.numShares, corp.totalShares), liqPubEst: liquidationValue(vPub, corp.numShares, corp.totalShares) };
     }
+    fin.salePending = { wall: Date.now(), aug: rt.ri.lastAugReset, est: betrag * 1.1 };
+    saveState(ns, st); // write-ahead
     const r = await runOps(ns, rt, [["sl", betrag * 1.1, keep, ipo, cfg("maxPart", 0.1), noFix(st, "until") ? 1e6 : fin.until || 1e6, noFix(st, "quirk") ? 0 : cfg("quirkMax", 3)]]);
+    // Rueckmeldung da: Schaetzung verwerfen, Ist verbuchen (unten); ohne Rueckmeldung bleibt sie offen
+    if (r.ret[0] && !r.ret[0].error) fin.salePending = null;
     noteErrors(st, r.err);
     const res = r.ret[0];
     if (res && !res.error && res.n > 0) {
       soldNow = true;
+      fin.erloesAug.summe += res.got;
+      // Ruecklage SOFORT anheben (Zusatz Skeptiker Runde 3): bis zur naechsten bn4rep-Runde (15-20 s)
+      // lesen homegrow/bn4net/hacknet/graftauto "Konto - Ruecklage" und wuerden die Tranche verbrauchen
+      if (!noFix(st, "reserve")) {
+        const before = Number(liesVonHome(ns, MONEY_RESERVE_FILE) || 0) || 0;
+        nachHome(ns, MONEY_RESERVE_FILE, String(Math.round(Math.max(before, before + res.got))));
+      }
       fin.lastSaleTs = req.ts;
       fin.soldTotal += res.got;
       fin.until = res.until;
@@ -605,35 +627,76 @@ async function financeWork(ns, rt, st, snap, P) {
         (res.ipo ? ` | Vergleich privat ${fmt(fin.ipo.vPriv)} / oeffentlich geschaetzt ${fmt(fin.ipo.vPubEst)}` : ""));
     } else if (res && res.ipo) logEvent(ns, st, `Boersengang ohne Verkauf: ${JSON.stringify(res)}`);
   }
-  // --- Bestechung
+  // --- Bestechung (Fassung corp-e3c, Nachpruefer ERNST-1/KLEIN-1)
+  // Der Schreiber vergibt ts je Schreibvorgang neu (~15 s) - ts taugt nicht zum Entdoppeln. Stattdessen:
+  //  (a) je Faktion Mindestabstand {"bribeGapMin"} 5 min Wanduhr zwischen zwei Zahlungen, und
+  //  (b) Kassenbuch: gezahlter Ruf der letzten {"bribeWindowMin"} 20 min (= Frischegrenze der Datei;
+  //      gleicher augReset) wird von
+  //      der Anforderung abgezogen, bezahlt wird nur die Differenz. "bestechung" meldet den Ruf, der
+  //      JETZT fehlt; ein Schreiber, der die Zahlung schon sieht, meldet weniger - dann wird bis zum Ende
+  //      des Fensters nichts gezahlt (kurze Verzoegerung, nie doppelt). Ein Abzug seit dem Einbau
+  //      (statt 15 min) wuerde nach der ersten Zahlung jede weitere Anforderung dauerhaft unterbezahlen,
+  //      weil "fehlt" schon relativ zum heutigen Ruf ist.
+  //  (c) write-ahead: der Kassenbucheintrag wird VOR dem Aufruf gespeichert; stirbt das Skript dazwischen,
+  //      zaehlt die Zahlung als geleistet (lieber einmal zu wenig als doppelt).
+  //  Erst ab Boersengang oder erkannter Zuendung (vorher senkt jede Zahlung Bewertung und IPO-Kurs).
   const bribes = req.ok ? req.bestechung : {};
+  fin.ledger ??= [];
+  const nowW = Date.now();
+  const augR = rt.ri.lastAugReset;
+  fin.ledger = fin.ledger.filter((e) => e.aug === augR && nowW - e.wall < 24 * 3600000);
   const salePending = betrag > cfg("minSale", 1e9) && fin.lastSaleTs !== req.ts && (corp.public ? coolCycles <= 11 : mayIpo);
   const bribeWindowOk = noFix(st, "bribeOrder") || soldNow || !salePending;
-  if (req.ok && bribeWindowOk && corp.valuation >= 1e14 && corp.funds >= cfg("bribeMinFunds", 1e15) && cfg("bribe", true) !== false) {
+  const phaseOk = noFix(st, "bribePhase") || corp.public || !!fin.ignitedAt;
+  if (req.ok && bribeWindowOk && phaseOk && corp.valuation >= 1e14 && corp.funds >= cfg("bribeMinFunds", 1e15) && cfg("bribe", true) !== false) {
     const ops = [];
     let funds = corp.funds;
-    for (const [f, rep] of Object.entries(bribes || {})) {
-      if (f === "Bladeburners" || !(rep > 0)) continue;
-      if (fin.bribeTs[f] === req.ts && !noFix(st, "bribeTs")) continue;
-      const amt = rep * 1e9 * 1.02;
+    const gap = cfg("bribeGapMin", 5) * 60000;
+    const win = cfg("bribeWindowMin", 20) * 60000;
+    for (const [f, repNeed] of Object.entries(bribes || {})) {
+      if (f === "Bladeburners" || !(repNeed > 0)) continue;
+      const mine = fin.ledger.filter((e) => e.f === f);
+      let need = repNeed;
+      if (!noFix(st, "ledger")) {
+        if (mine.some((e) => nowW - e.wall < gap)) continue;
+        if (fin.bribeTs[f] === req.ts) continue;
+        need -= mine.filter((e) => nowW - e.wall < win).reduce((a, e) => a + e.rep, 0);
+      } else if (fin.bribeTs[f] === req.ts) continue;
+      if (!(need > 0)) continue;
+      const amt = need * 1e9 * 1.02;
       if (amt > cfg("bribeShare", 0.25) * funds) continue;
       ops.push(["bb", f, amt]);
       funds -= amt;
     }
     if (ops.length) {
+      // write-ahead: erst buchen und speichern, dann zahlen
+      const entries = ops.map((op) => ({ f: op[1], rep: op[2] / 1e9 / 1.02, amt: op[2], wall: nowW, aug: augR, ts: req.ts, ok: null }));
+      const wal = !noFix(st, "writeAhead");
+      if (wal) {
+        fin.ledger.push(...entries);
+        for (const op of ops) fin.bribeTs[op[1]] = req.ts;
+        saveState(ns, st);
+      }
       const r = await runOps(ns, rt, ops);
       noteErrors(st, r.err);
       ops.forEach((op, i) => {
         if (r.ret[i] === true) {
-          fin.bribeTs[op[1]] = req.ts;
-          fin.bribed[op[1]] = { wall: Date.now(), rep: op[2] / 1e9, total: ((fin.bribed[op[1]] || {}).total || 0) + op[2] / 1e9 };
+          entries[i].ok = true;
+          if (!wal) {
+            fin.ledger.push(entries[i]);
+            fin.bribeTs[op[1]] = req.ts;
+          }
+          fin.bribed[op[1]] = { wall: nowW, rep: op[2] / 1e9, total: ((fin.bribed[op[1]] || {}).total || 0) + op[2] / 1e9 };
           fin.bribedTotal += op[2];
           logEvent(ns, st, `Bestechung ${op[1]}: ${fmt(op[2] / 1e9)} Ruf fuer ${fmt(op[2])} (Anforderung ${req.ts})`);
-        } else {
-          // abgelehnt (kein Mitglied, keine Arbeit): fuer diese Anforderung nicht noch einmal versuchen
-          fin.bribeTs[op[1]] = req.ts;
+        } else if (r.ret[i] === false) {
+          // vom Spiel abgelehnt (kein Mitglied, keine Arbeit, Bewertung): nichts gezahlt, Eintrag bleibt
+          // als Sperre fuer den Mindestabstand, zaehlt aber nicht als Ruf
+          entries[i].ok = false;
+          entries[i].rep = 0;
           logEvent(ns, st, `Bestechung ${op[1]} abgelehnt`);
         }
+        // r.ret[i] unklar (Skript tot/Zeitueberschreitung): Eintrag bleibt als gezahlt stehen (write-ahead)
       });
     }
   }
@@ -652,6 +715,7 @@ function readRequest(ns, rt, st) {
   if (!r || typeof r !== "object") return { ok: false, why: "keine Anforderung" };
   if (r.v !== 1) return { ok: false, why: "Version" };
   if (!(Date.now() - Number(r.ts) < 20 * 60000)) return { ok: false, why: "veraltet" };
+  if (!(Number(r.ts) <= Date.now() + 60000)) return { ok: false, why: "ts in der Zukunft" };
   if (r.nodeReset !== rt.ri.lastNodeReset || r.augReset !== rt.ri.lastAugReset) return { ok: false, why: "anderer Knoten/Einbau" };
   const betrag = Number(r.betrag);
   return { ok: true, ts: Number(r.ts), betrag: Number.isFinite(betrag) && betrag > 0 ? betrag : 0, bestechung: r.bestechung && typeof r.bestechung === "object" ? r.bestechung : {} };

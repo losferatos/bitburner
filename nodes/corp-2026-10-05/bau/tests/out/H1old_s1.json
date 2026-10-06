@@ -1,7 +1,7 @@
 {
  "seed": 1,
  "hours": 16,
- "wallSec": -1243339.106,
+ "wallSec": -1244429.477,
  "rounds": [
   {
    "k": 1,
@@ -476,425 +476,265 @@
   },
   {
    "h": 13,
-   "funds": 3.042575920585627e+22,
-   "valuation": 2.3700217509853843e+26,
-   "assetDelta": 8.68982619895206e+21,
-   "profit": 2.626126713392042e+21,
+   "funds": 3.050172198321998e+22,
+   "valuation": 2.370424198162888e+26,
+   "assetDelta": 8.690271107044773e+21,
+   "profit": 2.6265716214847525e+21,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 17754851.140198544,
+   "rating": 17756360.751924574,
    "aw": 5.719694251231548e+24,
    "wilson": 43,
    "ads": 500,
    "mainOffice": 990,
-   "liq": 1.0619792196051784e+25,
+   "liq": 1.0621595515111283e+25,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 13.5,
-   "funds": 6.43210203358558e+46,
-   "valuation": 1.1674362569212007e+50,
-   "assetDelta": 2.708401107637249e+45,
-   "profit": 2.5211688355653177e+45,
+   "funds": 6.433831285946445e+46,
+   "valuation": 1.1677020293150083e+50,
+   "assetDelta": 2.709010615102085e+45,
+   "profit": 2.521743052165647e+45,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 1682503218.1051214,
+   "rating": 1682628534.0988789,
    "aw": 8.817216231343834e+160,
    "wilson": 116,
    "ads": 1416,
    "mainOffice": 2235,
-   "liq": 5.231146273440311e+48,
+   "liq": 5.2323371686683864e+48,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 14,
-   "funds": 1.778338284684632e+90,
-   "valuation": 1.7534646216811627e+93,
-   "assetDelta": 6.415727389829978e+88,
-   "profit": 1.6728834146695065e+88,
+   "funds": 1.778593764279263e+90,
+   "valuation": 1.753559007007541e+93,
+   "assetDelta": 6.415817238146683e+88,
+   "profit": 1.672973262986212e+88,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 4878873858066400,
+   "rating": 4878978770683542,
    "aw": 1.7976931348623157e+308,
    "wilson": 267,
    "ads": 3163,
    "mainOffice": 4935,
-   "liq": 7.857071310691672e+91,
+   "liq": 7.857494240376633e+91,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 14.5,
-   "funds": 6.087179809868244e+92,
-   "valuation": 4.091907210171486e+95,
-   "assetDelta": 4.0358459614173704e+90,
-   "profit": 4.0358459614173718e+90,
+   "funds": 6.087954273063257e+92,
+   "valuation": 4.0920204074126306e+95,
+   "assetDelta": 4.0360029589984446e+90,
+   "profit": 4.0360029589984495e+90,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 27938908674065140,
+   "rating": 27939341781050972,
    "aw": 1.7976931348623157e+308,
    "wilson": 275,
    "ads": 3272,
    "mainOffice": 6585,
-   "liq": 1.833536094741738e+94,
+   "liq": 1.8335868171107467e+94,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 15,
-   "funds": 4.165641153472491e+93,
-   "valuation": 2.6779595794908072e+96,
-   "assetDelta": 2.3798036157342277e+91,
-   "profit": 2.37980361573423e+91,
+   "funds": 4.1662498736252245e+93,
+   "valuation": 2.6780546450018745e+96,
+   "assetDelta": 2.3798858715514583e+91,
+   "profit": 2.3798858715514626e+91,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 64517787272894420,
+   "rating": 64518849629253140,
    "aw": 1.7976931348623157e+308,
    "wilson": 277,
    "ads": 3313,
    "mainOffice": 6645,
-   "liq": 1.1999625839633899e+95,
+   "liq": 1.2000051817147448e+95,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 15.5,
-   "funds": 1.3729187835695142e+95,
-   "valuation": 1.0765261544254868e+98,
-   "assetDelta": 9.085043048550811e+92,
-   "profit": 9.0850430485508e+92,
+   "funds": 1.373127962814351e+95,
+   "valuation": 1.0765585955941952e+98,
+   "assetDelta": 9.085304722697996e+92,
+   "profit": 9.085304722698006e+92,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 158225465920277400,
+   "rating": 158227935391148380,
    "aw": 1.7976931348623157e+308,
    "wilson": 283,
    "ads": 3372,
    "mainOffice": 6765,
-   "liq": 4.823788663061906e+96,
+   "liq": 4.823934028170955e+96,
    "stage": "tob",
    "next": "Produktphase"
   },
   {
    "h": 16,
-   "funds": 1.0544172430502261e+96,
-   "valuation": 5.503627621410125e+98,
-   "assetDelta": 5.2166503021497995e+93,
-   "profit": 5.216650302149806e+93,
+   "funds": 1.0545916707920485e+96,
+   "valuation": 5.503764118012683e+98,
+   "assetDelta": 5.216857610173777e+93,
+   "profit": 5.216857610173778e+93,
    "owned": 0.06666666533333333,
    "fundingRound": 4,
-   "rating": 321515104882654460,
+   "rating": 321520360256006300,
    "aw": 1.7976931348623157e+308,
    "wilson": 285,
    "ads": 3409,
    "mainOffice": 6840,
-   "liq": 2.4661116143565186e+97,
+   "liq": 2.4661727768987627e+97,
    "stage": "tob",
    "next": "Produktphase"
   }
  ],
  "events": [
-  "2026-10-06T15:36:06.465Z z4539 12.61h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.465Z z4539 12.61h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.472Z z4540 12.61h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.472Z z4540 12.61h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.479Z z4541 12.61h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.479Z z4541 12.61h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.487Z z4542 12.62h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.487Z z4542 12.62h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.494Z z4543 12.62h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.494Z z4543 12.62h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.500Z z4544 12.62h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.500Z z4544 12.62h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.508Z z4545 12.63h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.508Z z4545 12.63h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.514Z z4546 12.63h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.514Z z4546 12.63h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.520Z z4547 12.63h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.520Z z4547 12.63h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.527Z z4548 12.63h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.527Z z4548 12.63h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.534Z z4549 12.64h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.534Z z4549 12.64h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.540Z z4550 12.64h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.540Z z4550 12.64h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.547Z z4551 12.64h Forschung Chem: Self-Correcting Assemblers",
-  "2026-10-06T15:36:06.547Z z4551 12.64h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.547Z z4551 12.64h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.554Z z4552 12.64h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.554Z z4552 12.64h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.562Z z4553 12.65h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.562Z z4553 12.65h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.569Z z4554 12.65h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.569Z z4554 12.65h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.576Z z4555 12.65h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.576Z z4555 12.65h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.583Z z4556 12.66h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.583Z z4556 12.66h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.590Z z4557 12.66h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.590Z z4557 12.66h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.597Z z4558 12.66h Produkt P25 fertig: Rating 5426014, eff 0",
-  "2026-10-06T15:36:06.597Z z4558 12.66h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.597Z z4558 12.66h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.604Z z4559 12.66h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.604Z z4559 12.66h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.611Z z4560 12.67h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.611Z z4560 12.67h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.618Z z4561 12.67h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.618Z z4561 12.67h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.624Z z4562 12.67h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.625Z z4562 12.67h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.632Z z4563 12.68h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.632Z z4563 12.68h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.638Z z4564 12.68h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.638Z z4564 12.68h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.645Z z4565 12.68h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.645Z z4565 12.68h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.652Z z4566 12.68h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.652Z z4566 12.68h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.658Z z4567 12.69h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.659Z z4567 12.69h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.665Z z4568 12.69h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.665Z z4568 12.69h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.672Z z4569 12.69h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.672Z z4569 12.69h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.678Z z4570 12.69h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.678Z z4570 12.69h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.685Z z4571 12.70h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.685Z z4571 12.70h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.692Z z4572 12.70h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.692Z z4572 12.70h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.698Z z4573 12.70h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.698Z z4573 12.70h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.705Z z4574 12.71h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.705Z z4574 12.71h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.713Z z4575 12.71h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.713Z z4575 12.71h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.720Z z4576 12.71h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.720Z z4576 12.71h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.726Z z4577 12.71h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.726Z z4577 12.71h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.733Z z4578 12.72h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.733Z z4578 12.72h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.739Z z4579 12.72h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.739Z z4579 12.72h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.745Z z4580 12.72h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.745Z z4580 12.72h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.753Z z4581 12.72h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.753Z z4581 12.72h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.759Z z4582 12.73h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.759Z z4582 12.73h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.765Z z4583 12.73h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.765Z z4583 12.73h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.773Z z4584 12.73h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.773Z z4584 12.73h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.779Z z4585 12.74h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.779Z z4585 12.74h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.786Z z4586 12.74h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.786Z z4586 12.74h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.792Z z4587 12.74h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.792Z z4587 12.74h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.799Z z4588 12.74h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.799Z z4588 12.74h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.806Z z4589 12.75h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.806Z z4589 12.75h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.813Z z4590 12.75h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.813Z z4590 12.75h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.820Z z4591 12.75h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.820Z z4591 12.75h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.826Z z4592 12.76h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.826Z z4592 12.76h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.833Z z4593 12.76h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.833Z z4593 12.76h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.839Z z4594 12.76h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.839Z z4594 12.76h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.846Z z4595 12.76h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.846Z z4595 12.76h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.853Z z4596 12.77h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.853Z z4596 12.77h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.861Z z4597 12.77h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.861Z z4597 12.77h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.868Z z4598 12.77h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.869Z z4598 12.77h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.876Z z4599 12.78h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.876Z z4599 12.78h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.887Z z4600 12.78h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.887Z z4600 12.78h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.892Z z4601 12.78h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.893Z z4601 12.78h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.900Z z4602 12.78h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.900Z z4602 12.78h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.907Z z4603 12.79h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.907Z z4603 12.79h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.913Z z4604 12.79h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.913Z z4604 12.79h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.921Z z4605 12.79h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.921Z z4605 12.79h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.928Z z4606 12.79h Produkt P26 fertig: Rating 9905185, eff 0",
-  "2026-10-06T15:36:06.928Z z4606 12.79h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.928Z z4606 12.79h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.934Z z4607 12.80h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.934Z z4607 12.80h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.942Z z4608 12.80h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.942Z z4608 12.80h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.948Z z4609 12.80h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.948Z z4609 12.80h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.953Z z4610 12.81h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.953Z z4610 12.81h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.961Z z4611 12.81h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.961Z z4611 12.81h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.968Z z4612 12.81h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.968Z z4612 12.81h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.973Z z4613 12.81h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.973Z z4613 12.81h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.980Z z4614 12.82h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.981Z z4614 12.82h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.987Z z4615 12.82h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.987Z z4615 12.82h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.992Z z4616 12.82h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:06.992Z z4616 12.82h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.001Z z4617 12.82h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.001Z z4617 12.82h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.008Z z4618 12.83h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.008Z z4618 12.83h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.013Z z4619 12.83h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.013Z z4619 12.83h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.020Z z4620 12.83h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.020Z z4620 12.83h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.027Z z4621 12.84h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.027Z z4621 12.84h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.032Z z4622 12.84h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.032Z z4622 12.84h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.040Z z4623 12.84h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.040Z z4623 12.84h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.047Z z4624 12.84h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.047Z z4624 12.84h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.053Z z4625 12.85h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.053Z z4625 12.85h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.060Z z4626 12.85h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.061Z z4626 12.85h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.067Z z4627 12.85h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.067Z z4627 12.85h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.072Z z4628 12.86h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.072Z z4628 12.86h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.081Z z4629 12.86h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.081Z z4629 12.86h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.088Z z4630 12.86h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.088Z z4630 12.86h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.093Z z4631 12.86h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.093Z z4631 12.86h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.100Z z4632 12.87h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.100Z z4632 12.87h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.108Z z4633 12.87h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.108Z z4633 12.87h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.113Z z4634 12.87h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.113Z z4634 12.87h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.120Z z4635 12.88h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.120Z z4635 12.88h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.129Z z4636 12.88h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.129Z z4636 12.88h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.134Z z4637 12.88h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.134Z z4637 12.88h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.142Z z4638 12.88h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.142Z z4638 12.88h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.149Z z4639 12.89h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.149Z z4639 12.89h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.154Z z4640 12.89h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.154Z z4640 12.89h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.163Z z4641 12.89h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.163Z z4641 12.89h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.169Z z4642 12.89h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.169Z z4642 12.89h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.175Z z4643 12.90h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.175Z z4643 12.90h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.183Z z4644 12.90h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.183Z z4644 12.90h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.190Z z4645 12.90h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.190Z z4645 12.90h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.195Z z4646 12.91h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.195Z z4646 12.91h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.204Z z4647 12.91h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.204Z z4647 12.91h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.211Z z4648 12.91h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.211Z z4648 12.91h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.216Z z4649 12.91h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.216Z z4649 12.91h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.225Z z4650 12.92h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.225Z z4650 12.92h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.233Z z4651 12.92h Produkt P27 fertig: Rating 17754851, eff 0",
-  "2026-10-06T15:36:07.233Z z4651 12.92h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.233Z z4651 12.92h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.239Z z4652 12.92h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.239Z z4652 12.92h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.247Z z4653 12.93h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.248Z z4653 12.93h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.254Z z4654 12.93h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.254Z z4654 12.93h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.261Z z4655 12.93h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.261Z z4655 12.93h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.269Z z4656 12.93h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.269Z z4656 12.93h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
-  "2026-10-06T15:36:07.513Z z4692 13.03h Produkt P28 fertig: Rating 32004910, eff 0",
-  "2026-10-06T15:36:07.780Z z4731 13.14h Produkt P29 fertig: Rating 59737563, eff 0",
-  "2026-10-06T15:36:08.023Z z4767 13.24h Produkt P30 fertig: Rating 112493982, eff 0",
-  "2026-10-06T15:36:08.249Z z4800 13.33h Produkt P31 fertig: Rating 223676542, eff 0",
-  "2026-10-06T15:36:08.471Z z4831 13.42h Produkt P32 fertig: Rating 521826335, eff 0",
-  "2026-10-06T15:36:08.685Z z4860 13.50h Produkt P33 fertig: Rating 1682503218, eff 0",
-  "2026-10-06T15:36:08.872Z z4886 13.57h Produkt P34 fertig: Rating 52403352648, eff 0",
-  "2026-10-06T15:36:09.043Z z4911 13.64h Produkt P35 fertig: Rating 57815482579670, eff 0",
-  "2026-10-06T15:36:09.210Z z4935 13.71h Produkt P36 fertig: Rating 161949900347328, eff 0",
-  "2026-10-06T15:36:09.358Z z4958 13.77h Produkt P37 fertig: Rating 807918668816840, eff 0",
-  "2026-10-06T15:36:09.510Z z4980 13.83h Produkt P38 fertig: Rating 1352599355477519, eff 0",
-  "2026-10-06T15:36:09.646Z z5001 13.89h Produkt P39 fertig: Rating 2090921184136555, eff 0",
-  "2026-10-06T15:36:09.771Z z5021 13.95h Produkt P40 fertig: Rating 3568251315611022, eff 0",
-  "2026-10-06T15:36:09.907Z z5041 14.00h Produkt P41 fertig: Rating 4878873858066400, eff 0",
-  "2026-10-06T15:36:10.029Z z5060 14.06h Produkt P42 fertig: Rating 6283335245487838, eff 0",
-  "2026-10-06T15:36:10.156Z z5079 14.11h Produkt P43 fertig: Rating 8062882622576095, eff 0",
-  "2026-10-06T15:36:10.278Z z5097 14.16h Produkt P44 fertig: Rating 10111259070827542, eff 0",
-  "2026-10-06T15:36:10.392Z z5115 14.21h Produkt P45 fertig: Rating 12534473129398936, eff 0",
-  "2026-10-06T15:36:10.500Z z5132 14.26h Produkt P46 fertig: Rating 15161151501166376, eff 0",
-  "2026-10-06T15:36:10.620Z z5149 14.30h Produkt P47 fertig: Rating 17819084119826964, eff 0",
-  "2026-10-06T15:36:10.754Z z5166 14.35h Produkt P48 fertig: Rating 19497776684272664, eff 0",
-  "2026-10-06T15:36:10.914Z z5183 14.40h Produkt P49 fertig: Rating 22700928636652770, eff 0",
-  "2026-10-06T15:36:11.034Z z5200 14.44h Produkt P50 fertig: Rating 25174237070091876, eff 0",
-  "2026-10-06T15:36:11.134Z z5216 14.49h Produkt P51 fertig: Rating 27938908674065140, eff 0",
-  "2026-10-06T15:36:11.236Z z5232 14.53h Produkt P52 fertig: Rating 30394402690825156, eff 0",
-  "2026-10-06T15:36:11.345Z z5248 14.58h Produkt P53 fertig: Rating 33766455761069932, eff 0",
-  "2026-10-06T15:36:11.455Z z5264 14.62h Produkt P54 fertig: Rating 36724822598397790, eff 0",
-  "2026-10-06T15:36:11.573Z z5280 14.67h Produkt P55 fertig: Rating 40066883315293110, eff 0",
-  "2026-10-06T15:36:11.692Z z5296 14.71h Produkt P56 fertig: Rating 42174075476303096, eff 0",
-  "2026-10-06T15:36:11.798Z z5312 14.76h Produkt P57 fertig: Rating 45912470419606090, eff 0",
-  "2026-10-06T15:36:11.955Z z5328 14.80h Produkt P58 fertig: Rating 47685187265331070, eff 0",
-  "2026-10-06T15:36:12.052Z z5344 14.84h Produkt P59 fertig: Rating 52657451349066770, eff 0",
-  "2026-10-06T15:36:12.149Z z5360 14.89h Produkt P60 fertig: Rating 56672356781000280, eff 0",
-  "2026-10-06T15:36:12.247Z z5376 14.93h Produkt P61 fertig: Rating 60629585599990730, eff 0",
-  "2026-10-06T15:36:12.334Z z5391 14.97h Produkt P62 fertig: Rating 64517787272894420, eff 0",
-  "2026-10-06T15:36:12.424Z z5406 15.02h Produkt P63 fertig: Rating 68677054917641120, eff 0",
-  "2026-10-06T15:36:12.512Z z5421 15.06h Produkt P64 fertig: Rating 73230014669253860, eff 0",
-  "2026-10-06T15:36:12.599Z z5436 15.10h Produkt P65 fertig: Rating 76113793588522220, eff 0",
-  "2026-10-06T15:36:12.692Z z5451 15.14h Produkt P66 fertig: Rating 83148969205783490, eff 0",
-  "2026-10-06T15:36:12.786Z z5466 15.18h Produkt P67 fertig: Rating 94222924032149870, eff 0",
-  "2026-10-06T15:36:12.877Z z5481 15.22h Produkt P68 fertig: Rating 105799382200347460, eff 0",
-  "2026-10-06T15:36:12.973Z z5496 15.27h Produkt P69 fertig: Rating 114051750231590820, eff 0",
-  "2026-10-06T15:36:13.070Z z5511 15.31h Produkt P70 fertig: Rating 118507804757135440, eff 0",
-  "2026-10-06T15:36:13.176Z z5526 15.35h Produkt P71 fertig: Rating 133259704176332640, eff 0",
-  "2026-10-06T15:36:13.278Z z5541 15.39h Produkt P72 fertig: Rating 139819654720712240, eff 0",
-  "2026-10-06T15:36:13.373Z z5556 15.43h Produkt P73 fertig: Rating 150296185692656400, eff 0",
-  "2026-10-06T15:36:13.510Z z5571 15.47h Produkt P74 fertig: Rating 158225465920277400, eff 0",
-  "2026-10-06T15:36:13.614Z z5586 15.52h Produkt P75 fertig: Rating 171855686976607680, eff 0",
-  "2026-10-06T15:36:13.709Z z5601 15.56h Produkt P76 fertig: Rating 182035565751407580, eff 0",
-  "2026-10-06T15:36:13.800Z z5615 15.60h Produkt P77 fertig: Rating 191663725951463400, eff 0",
-  "2026-10-06T15:36:13.890Z z5629 15.64h Produkt P78 fertig: Rating 195361772162103900, eff 0",
-  "2026-10-06T15:36:13.980Z z5643 15.68h Produkt P79 fertig: Rating 211810740874076030, eff 0",
-  "2026-10-06T15:36:14.067Z z5657 15.71h Produkt P80 fertig: Rating 225086380671020130, eff 0",
-  "2026-10-06T15:36:14.159Z z5671 15.75h Produkt P81 fertig: Rating 233875779414707650, eff 0",
-  "2026-10-06T15:36:14.250Z z5685 15.79h Produkt P82 fertig: Rating 251024162263909200, eff 0",
-  "2026-10-06T15:36:14.348Z z5699 15.83h Produkt P83 fertig: Rating 265777911110397380, eff 0",
-  "2026-10-06T15:36:14.440Z z5713 15.87h Produkt P84 fertig: Rating 276270430472936500, eff 0",
-  "2026-10-06T15:36:14.530Z z5727 15.91h Produkt P85 fertig: Rating 290442807053397900, eff 0",
-  "2026-10-06T15:36:14.615Z z5741 15.95h Produkt P86 fertig: Rating 309780688376225400, eff 0",
-  "2026-10-06T15:36:14.703Z z5755 15.99h Produkt P87 fertig: Rating 321515104882654460, eff 0"
+  "2026-10-06T15:53:51.482Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T15:53:51.490Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T15:53:52.015Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T15:53:52.057Z z180 0.50h Runde 1: 129.4 Mrd fuer 100.00 Mio Anteile (Bewertung 431.3 Mrd)",
+  "2026-10-06T15:53:52.064Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~114.5 Mrd",
+  "2026-10-06T15:53:52.064Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~27.5 Mrd",
+  "2026-10-06T15:53:55.171Z z918 2.55h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd",
+  "2026-10-06T15:53:56.264Z z1080 3.00h Runde 2: Ausgabenstopp (F3)",
+  "2026-10-06T15:53:56.317Z z1091 3.03h Runde 2: 422.1 Mrd fuer 350.00 Mio Anteile (Bewertung 603.0 Mrd)",
+  "2026-10-06T15:53:56.327Z z1092 3.03h Schritt Chemical (121.0 Mrd), Fonds danach ~303.3 Mrd",
+  "2026-10-06T15:53:57.649Z z1308 3.63h Produkt P1 fertig: Rating 1189, eff 0",
+  "2026-10-06T15:53:59.739Z z1613 4.48h Runde 3: Ausgabenstopp (F3)",
+  "2026-10-06T15:53:59.816Z z1624 4.51h Runde 3: 1.15 Bio fuer 250.00 Mio Anteile (Bewertung 2.31 Bio)",
+  "2026-10-06T15:53:59.822Z z1625 4.51h Produkt P2 fertig: Rating 1681, eff 1681",
+  "2026-10-06T15:54:01.348Z z1841 5.11h Produkt P3 fertig: Rating 5712, eff 0",
+  "2026-10-06T15:54:03.039Z z2054 5.71h Produkt P4 fertig: Rating 6032, eff 0",
+  "2026-10-06T15:54:04.383Z z2264 6.29h Produkt P5 fertig: Rating 6580, eff 0",
+  "2026-10-06T15:54:05.579Z z2471 6.86h Produkt P6 fertig: Rating 7185, eff 0",
+  "2026-10-06T15:54:07.114Z z2673 7.42h Forschung Tob: Hi-Tech R&D Laboratory",
+  "2026-10-06T15:54:07.137Z z2675 7.43h Produkt P7 fertig: Rating 4559, eff 0",
+  "2026-10-06T15:54:08.507Z z2876 7.99h Produkt P8 fertig: Rating 5704, eff 0",
+  "2026-10-06T15:54:10.170Z z3074 8.54h Runde 4: Ausgabenstopp (F3)",
+  "2026-10-06T15:54:10.170Z z3074 8.54h 3 Dummy-Divisionen geplant",
+  "2026-10-06T15:54:10.258Z z3085 8.57h Runde 4: 31.56 Bio fuer 200.00 Mio Anteile (Bewertung 105.21 Bio)",
+  "2026-10-06T15:54:10.266Z z3086 8.57h Produkt P9 fertig: Rating 6669, eff 6669",
+  "2026-10-06T15:54:11.398Z z3227 8.96h Produkt P10 fertig: Rating 30666, eff 0",
+  "2026-10-06T15:54:11.703Z z3267 9.07h Forschung Chem: Hi-Tech R&D Laboratory",
+  "2026-10-06T15:54:11.880Z z3290 9.14h Zuendung erkannt: Bewertung 2.33e+15 seit 60 Zyklen >= 1.00e+15",
+  "2026-10-06T15:54:12.357Z z3355 9.32h Forschung Agri: Hi-Tech R&D Laboratory",
+  "2026-10-06T15:54:12.420Z z3363 9.34h Produkt P11 fertig: Rating 43247, eff 0",
+  "2026-10-06T15:54:13.470Z z3494 9.71h Produkt P12 fertig: Rating 64782, eff 0",
+  "2026-10-06T15:54:13.600Z z3512 9.76h Forschung Tob: AutoBrew",
+  "2026-10-06T15:54:14.321Z z3617 10.05h Produkt P13 fertig: Rating 83411, eff 0",
+  "2026-10-06T15:54:14.606Z z3659 10.16h Forschung Tob: AutoPartyManager",
+  "2026-10-06T15:54:14.830Z z3691 10.25h Forschung Tob: Market-TA.I",
+  "2026-10-06T15:54:15.073Z z3727 10.35h Produkt P14 fertig: Rating 65080, eff 0",
+  "2026-10-06T15:54:15.294Z z3760 10.44h Forschung Chem: AutoBrew",
+  "2026-10-06T15:54:15.769Z z3829 10.64h Produkt P15 fertig: Rating 160923, eff 0",
+  "2026-10-06T15:54:16.420Z z3922 10.89h Forschung Tob: Market-TA.II",
+  "2026-10-06T15:54:16.438Z z3925 10.90h Produkt P16 fertig: Rating 62084, eff 0",
+  "2026-10-06T15:54:16.815Z z3992 11.09h Forschung Tob: uPgrade: Fulcrum",
+  "2026-10-06T15:54:16.920Z z4011 11.14h Forschung Chem: AutoPartyManager",
+  "2026-10-06T15:54:16.956Z z4017 11.16h Produkt P17 fertig: Rating 185275, eff 0",
+  "2026-10-06T15:54:17.174Z z4048 11.24h Forschung Agri: AutoBrew",
+  "2026-10-06T15:54:17.227Z z4056 11.27h Forschung Tob: Overclock",
+  "2026-10-06T15:54:17.522Z z4103 11.40h Produkt P18 fertig: Rating 324439, eff 0",
+  "2026-10-06T15:54:17.640Z z4122 11.45h Forschung Tob: uPgrade: Capacity.I",
+  "2026-10-06T15:54:17.955Z z4173 11.59h Forschung Chem: Overclock",
+  "2026-10-06T15:54:17.961Z z4174 11.59h Forschung Chem: Drones",
+  "2026-10-06T15:54:18.017Z z4183 11.62h Produkt P19 fertig: Rating 507595, eff 0",
+  "2026-10-06T15:54:18.063Z z4190 11.64h Forschung Tob: Self-Correcting Assemblers",
+  "2026-10-06T15:54:18.072Z z4191 11.64h Forschung Tob: Drones",
+  "2026-10-06T15:54:18.405Z z4245 11.79h Forschung Tob: Drones - Assembly",
+  "2026-10-06T15:54:18.481Z z4256 11.82h Produkt P20 fertig: Rating 544636, eff 0",
+  "2026-10-06T15:54:18.521Z z4262 11.84h Forschung Agri: AutoPartyManager",
+  "2026-10-06T15:54:18.746Z z4297 11.94h Forschung Tob: uPgrade: Capacity.II",
+  "2026-10-06T15:54:18.753Z z4298 11.94h Forschung Tob: Automatic Drug Administration",
+  "2026-10-06T15:54:18.957Z z4322 12.01h Forschung Agri: Overclock",
+  "2026-10-06T15:54:18.963Z z4323 12.01h Forschung Agri: Drones",
+  "2026-10-06T15:54:18.971Z z4324 12.01h Produkt P21 fertig: Rating 811179, eff 0",
+  "2026-10-06T15:54:19.053Z z4337 12.05h Forschung Tob: CPH4 Injections",
+  "2026-10-06T15:54:19.326Z z4379 12.16h Forschung Tob: Drones - Transport",
+  "2026-10-06T15:54:19.383Z z4388 12.19h Produkt P22 fertig: Rating 979863, eff 0",
+  "2026-10-06T15:54:19.530Z z4412 12.26h Forschung Tob: Sti.mu",
+  "2026-10-06T15:54:19.591Z z4422 12.28h Forschung Agri: Drones - Assembly",
+  "2026-10-06T15:54:19.638Z z4430 12.31h Forschung Chem: Drones - Assembly",
+  "2026-10-06T15:54:19.657Z z4433 12.31h Forschung Tob: Go-Juice",
+  "2026-10-06T15:54:19.749Z z4449 12.36h Produkt P23 fertig: Rating 1257865, eff 0",
+  "2026-10-06T15:54:19.882Z z4472 12.42h Forschung Agri: Self-Correcting Assemblers",
+  "2026-10-06T15:54:20.103Z z4506 12.52h Produkt P24 fertig: Rating 2734355, eff 0",
+  "2026-10-06T15:54:20.263Z z4531 12.59h Forschung Agri: Drones - Transport",
+  "2026-10-06T15:54:20.303Z z4537 12.60h BOERSENGANG + Verkauf 2 Anteile -> 63.17 Bio an den Spieler (Anforderung 50.00 Bio; vorhergesagt 63.17 Bio) | Vergleich privat 6.25e+22 / oeffentlich geschaetzt 3.27e+22",
+  "2026-10-06T15:54:20.304Z z4537 12.60h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
+  "2026-10-06T15:54:20.304Z z4537 12.60h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
+  "2026-10-06T15:54:20.402Z z4551 12.64h Forschung Chem: Self-Correcting Assemblers",
+  "2026-10-06T15:54:20.453Z z4558 12.66h Produkt P25 fertig: Rating 5426014, eff 0",
+  "2026-10-06T15:54:20.778Z z4606 12.79h Produkt P26 fertig: Rating 9905961, eff 0",
+  "2026-10-06T15:54:20.913Z z4627 12.85h Bestechung Sector-12: 510000 Ruf fuer 510.00 Bio (Anforderung 1790045360000)",
+  "2026-10-06T15:54:20.913Z z4627 12.85h Bestechung Aevum: 204000 Ruf fuer 204.00 Bio (Anforderung 1790045360000)",
+  "2026-10-06T15:54:21.069Z z4651 12.92h Produkt P27 fertig: Rating 17756361, eff 0",
+  "2026-10-06T15:54:21.354Z z4692 13.03h Produkt P28 fertig: Rating 32008155, eff 0",
+  "2026-10-06T15:54:21.620Z z4731 13.14h Produkt P29 fertig: Rating 59745899, eff 0",
+  "2026-10-06T15:54:21.866Z z4767 13.24h Produkt P30 fertig: Rating 112507051, eff 0",
+  "2026-10-06T15:54:22.089Z z4800 13.33h Produkt P31 fertig: Rating 223697901, eff 0",
+  "2026-10-06T15:54:22.301Z z4831 13.42h Produkt P32 fertig: Rating 521869129, eff 0",
+  "2026-10-06T15:54:22.502Z z4860 13.50h Produkt P33 fertig: Rating 1682628534, eff 0",
+  "2026-10-06T15:54:22.724Z z4886 13.57h Produkt P34 fertig: Rating 52405577664, eff 0",
+  "2026-10-06T15:54:22.968Z z4911 13.64h Produkt P35 fertig: Rating 57817795703119, eff 0",
+  "2026-10-06T15:54:23.159Z z4935 13.71h Produkt P36 fertig: Rating 161954520858113, eff 0",
+  "2026-10-06T15:54:23.325Z z4958 13.77h Produkt P37 fertig: Rating 807943603584761, eff 0",
+  "2026-10-06T15:54:23.478Z z4980 13.83h Produkt P38 fertig: Rating 1352636067987370, eff 0",
+  "2026-10-06T15:54:23.628Z z5001 13.89h Produkt P39 fertig: Rating 2090968243229890, eff 0",
+  "2026-10-06T15:54:23.795Z z5021 13.95h Produkt P40 fertig: Rating 3568331911170112, eff 0",
+  "2026-10-06T15:54:23.942Z z5041 14.00h Produkt P41 fertig: Rating 4878978770683542, eff 0",
+  "2026-10-06T15:54:24.063Z z5060 14.06h Produkt P42 fertig: Rating 6283473784168661, eff 0",
+  "2026-10-06T15:54:24.184Z z5079 14.11h Produkt P43 fertig: Rating 8063037722451941, eff 0",
+  "2026-10-06T15:54:24.296Z z5097 14.16h Produkt P44 fertig: Rating 10111433470412580, eff 0",
+  "2026-10-06T15:54:24.407Z z5115 14.21h Produkt P45 fertig: Rating 12534672300737688, eff 0",
+  "2026-10-06T15:54:24.511Z z5132 14.26h Produkt P46 fertig: Rating 15161385898698850, eff 0",
+  "2026-10-06T15:54:24.621Z z5149 14.30h Produkt P47 fertig: Rating 17819368276471276, eff 0",
+  "2026-10-06T15:54:24.721Z z5166 14.35h Produkt P48 fertig: Rating 19498212293974720, eff 0",
+  "2026-10-06T15:54:24.822Z z5183 14.40h Produkt P49 fertig: Rating 22701313715834250, eff 0",
+  "2026-10-06T15:54:24.925Z z5200 14.44h Produkt P50 fertig: Rating 25174645626650212, eff 0",
+  "2026-10-06T15:54:25.033Z z5216 14.49h Produkt P51 fertig: Rating 27939341781050972, eff 0",
+  "2026-10-06T15:54:25.134Z z5232 14.53h Produkt P52 fertig: Rating 30394918501253510, eff 0",
+  "2026-10-06T15:54:25.232Z z5248 14.58h Produkt P53 fertig: Rating 33766961278221920, eff 0",
+  "2026-10-06T15:54:25.329Z z5264 14.62h Produkt P54 fertig: Rating 36725392870897016, eff 0",
+  "2026-10-06T15:54:25.428Z z5280 14.67h Produkt P55 fertig: Rating 40067483951660970, eff 0",
+  "2026-10-06T15:54:25.530Z z5296 14.71h Produkt P56 fertig: Rating 42174832596635050, eff 0",
+  "2026-10-06T15:54:25.624Z z5312 14.76h Produkt P57 fertig: Rating 45913237630309000, eff 0",
+  "2026-10-06T15:54:25.725Z z5328 14.80h Produkt P58 fertig: Rating 47686253903467416, eff 0",
+  "2026-10-06T15:54:25.821Z z5344 14.84h Produkt P59 fertig: Rating 52658327168866050, eff 0",
+  "2026-10-06T15:54:25.920Z z5360 14.89h Produkt P60 fertig: Rating 56673265387472776, eff 0",
+  "2026-10-06T15:54:26.034Z z5376 14.93h Produkt P61 fertig: Rating 60630562779617830, eff 0",
+  "2026-10-06T15:54:26.126Z z5391 14.97h Produkt P62 fertig: Rating 64518849629253140, eff 0",
+  "2026-10-06T15:54:26.226Z z5406 15.02h Produkt P63 fertig: Rating 68678170840239560, eff 0",
+  "2026-10-06T15:54:26.325Z z5421 15.06h Produkt P64 fertig: Rating 73231230614777140, eff 0",
+  "2026-10-06T15:54:26.429Z z5436 15.10h Produkt P65 fertig: Rating 76115275731537310, eff 0",
+  "2026-10-06T15:54:26.530Z z5451 15.14h Produkt P66 fertig: Rating 83150210035591330, eff 0",
+  "2026-10-06T15:54:26.645Z z5466 15.18h Produkt P67 fertig: Rating 94224221239525440, eff 0",
+  "2026-10-06T15:54:26.743Z z5481 15.22h Produkt P68 fertig: Rating 105800713419199780, eff 0",
+  "2026-10-06T15:54:26.843Z z5496 15.27h Produkt P69 fertig: Rating 114053304464190850, eff 0",
+  "2026-10-06T15:54:26.943Z z5511 15.31h Produkt P70 fertig: Rating 118510052141528220, eff 0",
+  "2026-10-06T15:54:27.084Z z5526 15.35h Produkt P71 fertig: Rating 133261379826893280, eff 0",
+  "2026-10-06T15:54:27.191Z z5541 15.39h Produkt P72 fertig: Rating 139821647880455120, eff 0",
+  "2026-10-06T15:54:27.308Z z5556 15.43h Produkt P73 fertig: Rating 150298193302764220, eff 0",
+  "2026-10-06T15:54:27.408Z z5571 15.47h Produkt P74 fertig: Rating 158227935391148380, eff 0",
+  "2026-10-06T15:54:27.508Z z5586 15.52h Produkt P75 fertig: Rating 171858017719932960, eff 0",
+  "2026-10-06T15:54:27.614Z z5601 15.56h Produkt P76 fertig: Rating 182038141800052260, eff 0",
+  "2026-10-06T15:54:27.747Z z5615 15.60h Produkt P77 fertig: Rating 191666630407435360, eff 0",
+  "2026-10-06T15:54:27.874Z z5629 15.64h Produkt P78 fertig: Rating 195365946698229570, eff 0",
+  "2026-10-06T15:54:27.965Z z5643 15.68h Produkt P79 fertig: Rating 211814266961723520, eff 0",
+  "2026-10-06T15:54:28.061Z z5657 15.71h Produkt P80 fertig: Rating 225089800589713540, eff 0",
+  "2026-10-06T15:54:28.161Z z5671 15.75h Produkt P81 fertig: Rating 233879934186287650, eff 0",
+  "2026-10-06T15:54:28.258Z z5685 15.79h Produkt P82 fertig: Rating 251028016421719140, eff 0",
+  "2026-10-06T15:54:28.358Z z5699 15.83h Produkt P83 fertig: Rating 265782089843967970, eff 0",
+  "2026-10-06T15:54:28.444Z z5713 15.87h Produkt P84 fertig: Rating 276275312330537000, eff 0",
+  "2026-10-06T15:54:28.531Z z5727 15.91h Produkt P85 fertig: Rating 290447924591305500, eff 0",
+  "2026-10-06T15:54:28.625Z z5741 15.95h Produkt P86 fertig: Rating 309785392335181500, eff 0",
+  "2026-10-06T15:54:28.725Z z5755 15.99h Produkt P87 fertig: Rating 321520360256006300, eff 0"
  ],
  "errors": [],
  "maxErrStreak": 0,
@@ -921,7 +761,7 @@
   },
   "dRelErr": {
    "n": 3450,
-   "min": -0.9999994268334069,
+   "min": -0.9999994268380908,
    "med": -0.006346403477330731,
    "max": 0.31364964052997446
   },
@@ -948,7 +788,7 @@
  },
  "finalState": {
   "v": 1,
-  "nodeReset": 1791300941105,
+  "nodeReset": 1791302031476,
   "cycle": 5760,
   "foundCycle": 0,
   "lastLT": 5760,
@@ -1088,21 +928,21 @@
     "mp": 3080.4850294483776
    },
    "Agri|Sector-12|Food": {
-    "d": 259394056.44634894,
+    "d": 259394179.4074675,
     "kind": "add",
-    "x": 2724200.540008517,
+    "x": 2724201.2160158544,
     "mp": 5267.820684829622
    },
    "Agri|Aevum|Plants": {
-    "d": 31860.14,
+    "d": 31859.879999999997,
     "kind": "mul",
     "x": 1,
     "mp": 3772.279438977793
    },
    "Agri|Aevum|Food": {
-    "d": 331628648.48316497,
+    "d": 331628818.09067416,
     "kind": "add",
-    "x": 3081760.182015709,
+    "x": 3081761.004364563,
     "mp": 4098.04573810227
    },
    "Agri|Chongqing|Plants": {
@@ -1112,104 +952,104 @@
     "mp": 2672.936962682849
    },
    "Agri|Chongqing|Food": {
-    "d": 304085181.55062467,
+    "d": 304085347.67606306,
     "kind": "add",
-    "x": 2942917.136862728,
+    "x": 2942917.97356888,
     "mp": 3735.2646224725113
    },
    "Agri|New Tokyo|Plants": {
-    "d": 31511.74,
+    "d": 31512.260000000002,
     "kind": "mul",
     "x": 1,
     "mp": 3359.7110276924627
    },
    "Agri|New Tokyo|Food": {
-    "d": 171173206.78792462,
+    "d": 171173291.4941226,
     "kind": "add",
-    "x": 2217732.644367428,
+    "x": 2217733.2177413194,
     "mp": 3725.9595283358644
    },
    "Agri|Ishima|Plants": {
-    "d": 31687.629999999997,
+    "d": 31687.5,
     "kind": "mul",
     "x": 1,
     "mp": 2891.37887878323
    },
    "Agri|Ishima|Food": {
-    "d": 408647140.3163412,
+    "d": 408647359.43502283,
     "kind": "add",
-    "x": 3417517.4407125665,
+    "x": 3417518.3950074054,
     "mp": 5980.929011753306
    },
    "Agri|Volhaven|Plants": {
-    "d": 30922.710000000003,
+    "d": 30922.97,
     "kind": "mul",
     "x": 1,
     "mp": 3213.2441525040185
    },
    "Agri|Volhaven|Food": {
-    "d": 507392841.5891913,
+    "d": 507393119.8664071,
     "kind": "add",
-    "x": 3824460.4999363245,
+    "x": 3824461.5910721724,
     "mp": 4953.9001913281145
    },
    "Chem|Sector-12|Chemicals": {
-    "d": 47126.94192550505,
+    "d": 47127.009988885555,
     "kind": "mul",
     "x": 0.3,
     "mp": 6182.556799512528
    },
    "Chem|Aevum|Chemicals": {
-    "d": 57321.65427883999,
+    "d": 57321.76481898693,
     "kind": "mul",
     "x": 0.3,
     "mp": 11287.759422261875
    },
    "Chem|Chongqing|Chemicals": {
-    "d": 62420.872533779126,
+    "d": 62420.88864564887,
     "kind": "mul",
     "x": 0.3,
     "mp": 11024.978438272296
    },
    "Chem|New Tokyo|Chemicals": {
-    "d": 54026.29732159962,
+    "d": 54026.01573794642,
     "kind": "mul",
     "x": 0.3,
     "mp": 9360.839347874207
    },
    "Chem|Ishima|Chemicals": {
-    "d": 19964.16522473653,
+    "d": 19964.355950044643,
     "kind": "mul",
     "x": 0.3,
     "mp": 13531.584817585444
    },
    "Chem|Volhaven|Chemicals": {
-    "d": 56912.76536964586,
+    "d": 56912.63305448925,
     "kind": "mul",
     "x": 0.3,
     "mp": 8790.934252067176
    }
   },
   "errors": [],
-  "events": 375,
+  "events": 139,
   "next": "Produktphase",
   "waiting": false,
   "snap": {
    "execsPerCycle": 4,
-   "funds": 1.2291558311811636e+96,
-   "valuation": 5.503627621410125e+98,
-   "revenue": 5.216650302149806e+93,
-   "expenses": 4282638847.842089,
+   "funds": 1.229330258922986e+96,
+   "valuation": 5.503764118012683e+98,
+   "revenue": 5.216857610173778e+93,
+   "expenses": 4282637867.8159857,
    "public": true,
    "owned": 0.06666666533333333,
-   "liquidation": 2.4661116143565186e+97,
+   "liquidation": 2.4661727768987627e+97,
    "divisions": 6,
    "dummies": 3,
    "products": [
-    "P84:276270430472936500",
-    "P85:290442807053397900",
-    "P86:309780688376225400",
-    "P87:321515104882654460",
+    "P84:276275312330537000",
+    "P85:290447924591305500",
+    "P86:309785392335181500",
+    "P87:321520360256006300",
     "P88:32%"
    ],
    "wilson": 285,
@@ -1276,17 +1116,17 @@
     "soldTotal": 63168063538009.22,
     "bribed": {
      "Sector-12": {
-      "wall": 1790046552000,
+      "wall": 1790046262000,
       "rep": 510000,
-      "total": 61200000
+      "total": 1020000
      },
      "Aevum": {
-      "wall": 1790046552000,
+      "wall": 1790046262000,
       "rep": 204000,
-      "total": 24480000
+      "total": 408000
      }
     },
-    "bribedTotal": 85680000000000000,
+    "bribedTotal": 1428000000000000,
     "ignitedAt": 9.139,
     "ipo": {
      "h": 12.603,
@@ -1348,33 +1188,33 @@
   "routes": {
    "Aevum": {
     "Agri>Tob>Plants": 311276.18151385116,
-    "Agri>Chem>Plants": 1253171.9873729267,
+    "Agri>Chem>Plants": 1253179.3248668753,
     "Chem>Agri>Chemicals": 45902.758538393224
    },
    "Chongqing": {
     "Agri>Tob>Plants": 196361.04218815078,
-    "Agri>Chem>Plants": 1242912.0938573196,
+    "Agri>Chem>Plants": 1242919.3712781838,
     "Chem>Agri>Chemicals": 45898.31635997249
    },
    "Sector-12": {
     "Chem>Agri>Chemicals": 45719.22787161679,
     "Agri>Tob>Plants": 196335.71750474884,
-    "Agri>Chem>Plants": 1258900.7374316934
+    "Agri>Chem>Plants": 1258908.1084682595
    },
    "New Tokyo": {
     "Chem>Agri>Chemicals": 45133.112073316806,
     "Agri>Tob>Plants": 196220.99871518248,
-    "Agri>Chem>Plants": 1218626.2832696862
+    "Agri>Chem>Plants": 1218633.4184937968
    },
    "Ishima": {
     "Chem>Agri>Chemicals": 45811.59962712687,
     "Agri>Tob>Plants": 196238.24474243465,
-    "Agri>Chem>Plants": 1228533.281022578
+    "Agri>Chem>Plants": 1228540.4742535201
    },
    "Volhaven": {
     "Chem>Agri>Chemicals": 45308.62114167247,
     "Agri>Tob>Plants": 196364.46434470246,
-    "Agri>Chem>Plants": 1224582.8213607592
+    "Agri>Chem>Plants": 1224589.9914612179
    }
   },
   "seen": [
@@ -1491,78 +1331,78 @@
    "soldTotal": 63168063538009.22,
    "bribed": {
     "Sector-12": {
-     "wall": 1790046552000,
+     "wall": 1790046262000,
      "rep": 510000,
-     "total": 61200000
+     "total": 1020000
     },
     "Aevum": {
-     "wall": 1790046552000,
+     "wall": 1790046262000,
      "rep": 204000,
-     "total": 24480000
+     "total": 408000
     }
    },
-   "bribedTotal": 85680000000000000,
+   "bribedTotal": 1428000000000000,
    "vHist": [
-    3.196612756465153e+98,
-    3.247216285306983e+98,
-    3.297046626794272e+98,
-    3.345280927964333e+98,
-    3.896733082174308e+98,
-    3.9476918360922526e+98,
-    3.4428965730056485e+98,
-    4.000191205002265e+98,
-    4.052146762839106e+98,
-    3.866038288125359e+98,
-    4.427982405781054e+98,
-    4.445858619958403e+98,
-    3.8973971354743836e+98,
-    3.4455570349968275e+98,
-    3.4118523420860966e+98,
-    3.3762749409046284e+98,
-    3.8960595679193e+98,
-    3.860631985850569e+98,
-    3.300988962696062e+98,
-    3.8255435569002293e+98,
-    3.7899597021214347e+98,
-    3.225805517332209e+98,
-    3.7543945941979904e+98,
-    4.187637052859985e+98,
-    4.20087318599436e+98,
-    4.215325702119857e+98,
-    4.230104406761377e+98,
-    3.708237356833491e+98,
-    4.2516359792324406e+98,
-    4.272186655036882e+98,
-    3.745826392159981e+98,
-    4.292305646459316e+98,
-    4.3116854918935985e+98,
-    4.3294655148044384e+98,
-    4.348883489538329e+98,
-    4.367572220629605e+98,
-    4.384757991160119e+98,
-    4.938165045144729e+98,
-    4.9500014813561345e+98,
-    4.9604187096332496e+98,
-    5.517921781955028e+98,
-    5.100042057851244e+98,
-    4.552073135551179e+98,
-    4.709809883201822e+98,
-    4.867025749945475e+98,
-    4.315641691681363e+98,
-    4.4735372087530755e+98,
-    4.6289479086085534e+98,
-    4.779763244799094e+98,
-    4.9332522296360986e+98,
-    5.0867912522160275e+98,
-    4.958191722020478e+98,
-    5.672573942290145e+98,
-    5.683227979657607e+98,
-    4.975610543746445e+98,
-    5.175467994900184e+98,
-    5.258160591015785e+98,
-    5.337727654249948e+98,
-    5.4249243707956286e+98,
-    5.503627621410125e+98
+    3.1966822870204526e+98,
+    3.2472874720383994e+98,
+    3.297119440251679e+98,
+    3.3453553063652965e+98,
+    3.896827284023025e+98,
+    3.9477876903114046e+98,
+    3.442974102757791e+98,
+    4.0002887721145165e+98,
+    4.052246014360457e+98,
+    3.8661772697123016e+98,
+    4.428141593859437e+98,
+    4.446018446529786e+98,
+    3.897537244590039e+98,
+    3.445628129920824e+98,
+    3.4119235917270866e+98,
+    3.376346284336155e+98,
+    3.896150968282932e+98,
+    3.860723488385262e+98,
+    3.3010603468931005e+98,
+    3.8256351916177874e+98,
+    3.790051454161218e+98,
+    3.2258769883348724e+98,
+    3.754486484894904e+98,
+    4.187798716674845e+98,
+    4.2010353886466853e+98,
+    4.2154884868826425e+98,
+    4.230267791406004e+98,
+    3.708380601946948e+98,
+    4.251798246535941e+98,
+    4.2723477524159484e+98,
+    3.7459671657253825e+98,
+    4.2924655684131735e+98,
+    4.3118441933920175e+98,
+    4.329622929441372e+98,
+    4.34903967052834e+98,
+    4.367727136908892e+98,
+    4.384911579167918e+98,
+    4.938338019146077e+98,
+    4.950174881872317e+98,
+    4.960592487806066e+98,
+    5.518115087365978e+98,
+    5.100154086002008e+98,
+    4.552165964463131e+98,
+    4.709909562623236e+98,
+    4.867132258248762e+98,
+    4.315728883606606e+98,
+    4.4736312659656085e+98,
+    4.629048728601039e+98,
+    4.779870650682348e+98,
+    4.933366322289751e+98,
+    5.0869120316823314e+98,
+    4.958374630358511e+98,
+    5.672783196417502e+98,
+    5.683437598426924e+98,
+    4.975794050278602e+98,
+    5.1755824801881255e+98,
+    5.258280591803738e+98,
+    5.3378530588167644e+98,
+    5.425055486413049e+98,
+    5.503764118012683e+98
    ],
    "bribeTs": {
     "Sector-12": 1790045360000,
@@ -1572,6 +1412,44 @@
     "invalid": "veraltet"
    },
    "blocked": null,
+   "ledger": [
+    {
+     "f": "Sector-12",
+     "rep": 500000,
+     "amt": 510000000000000,
+     "wall": 1790045362000,
+     "aug": 1791302031476,
+     "ts": 1790045360000,
+     "ok": true
+    },
+    {
+     "f": "Aevum",
+     "rep": 200000,
+     "amt": 204000000000000,
+     "wall": 1790045362000,
+     "aug": 1791302031476,
+     "ts": 1790045360000,
+     "ok": true
+    },
+    {
+     "f": "Sector-12",
+     "rep": 500000,
+     "amt": 510000000000000,
+     "wall": 1790046262000,
+     "aug": 1791302031476,
+     "ts": 1790045360000,
+     "ok": true
+    },
+    {
+     "f": "Aevum",
+     "rep": 200000,
+     "amt": 204000000000000,
+     "wall": 1790046262000,
+     "aug": 1791302031476,
+     "ts": 1790045360000,
+     "ok": true
+    }
+   ],
    "ignitedAt": 9.139,
    "ipo": {
     "h": 12.603,
@@ -1647,7 +1525,7 @@
   ],
   "flow": {
    "tobDemand": 1238208.5613493777,
-   "chemDemand": 7109222.168195779,
+   "chemDemand": 7109263.793667115,
    "agriPlants": 361893.1,
    "units": {
     "Agri|Sector-12": 2194265.326913395,
@@ -1656,12 +1534,12 @@
     "Agri|New Tokyo": 2192351.94701779,
     "Agri|Ishima": 2195349.9355533635,
     "Agri|Volhaven": 2196825.573786508,
-    "Chem|Sector-12": 12050848.69272394,
-    "Chem|Aevum": 11996013.629072381,
-    "Chem|Chongqing": 11897730.079812307,
-    "Chem|New Tokyo": 11665284.723320613,
-    "Chem|Ishima": 11760105.292943291,
-    "Chem|Volhaven": 11722239.264085267,
+    "Chem|Sector-12": 12050919.252096673,
+    "Chem|Aevum": 11996083.867378293,
+    "Chem|Chongqing": 11897799.742654553,
+    "Chem|New Tokyo": 11665353.025163397,
+    "Chem|Ishima": 11760174.149973525,
+    "Chem|Volhaven": 11722307.899404706,
     "Tob|Sector-12": 1880602.5613020062,
     "Tob|Aevum": 2979817.073356595,
     "Tob|Chongqing": 1881052.1328228908,
@@ -1676,46 +1554,46 @@
   "freezeAt": 3074,
   "pprice": {
    "P84|Sector-12": {
-    "K": 3.4676644374041446e+25,
+    "K": 3.4676644374041455e+25,
     "mp": 11230.060696052333,
     "P": 28546347995.625553
    },
    "P84|Aevum": {
-    "K": 2.452919416598676e+25,
+    "K": 2.452919416598678e+25,
     "mp": 16614.22960067833,
-    "P": 21229745951.40251
+    "P": 21229745951.402523
    },
    "P84|Chongqing": {
-    "K": 8.32309320114757e+25,
+    "K": 8.323093201147587e+25,
     "mp": 17585.440494490424,
-    "P": 44220383011.67772
+    "P": 44220383011.677765
    },
    "P84|New Tokyo": {
-    "K": 6.668818740386208e+25,
+    "K": 6.668818740386216e+25,
     "mp": 15576.293549770893,
-    "P": 39597144675.700195
+    "P": 39597144675.70022
    },
    "P84|Ishima": {
-    "K": 6.095558477868326e+25,
+    "K": 6.0955584778683055e+25,
     "mp": 15021.591683017963,
-    "P": 37855147766.04457
+    "P": 37855147766.04451
    },
    "P84|Volhaven": {
-    "K": 5.8292918409575105e+25,
+    "K": 5.829291840957516e+25,
     "mp": 14634.5404312149,
-    "P": 37007032643.09991
+    "P": 37007032643.09992
    },
    "P85|Sector-12": {
-    "K": 2.4679012757404453e+24,
+    "K": 2.467901275740444e+24,
     "mp": 11230.060696052333,
-    "P": 14289671594.307083
+    "P": 14289671594.307081
    },
    "P85|Aevum": {
     "mp": 16614.22960067833,
     "P": 16614229600.67833
    },
    "P85|Chongqing": {
-    "K": 5.964589358553802e+24,
+    "K": 5.964589358553799e+24,
     "mp": 17585.440494490424,
     "P": 22400825463.007202
    },
@@ -1725,14 +1603,14 @@
     "P": 19891596130.095787
    },
    "P85|Ishima": {
-    "K": 4.3944983329811e+24,
+    "K": 4.394498332981097e+24,
     "mp": 15021.591683017963,
-    "P": 19171776354.25035
+    "P": 19171776354.250343
    },
    "P85|Volhaven": {
-    "K": 4.2983111450446474e+24,
+    "K": 4.298311145044644e+24,
     "mp": 14634.5404312149,
-    "P": 18651050578.505234
+    "P": 18651050578.505222
    },
    "P86|Sector-12": {
     "mp": 11230.060696052333,
@@ -1786,22 +1664,22 @@
   "prodInfo": {
    "P84": {
     "developmentProgress": 100,
-    "rating": 276270430472936500,
-    "effectiveRating": 123762866941423.62
+    "rating": 276275312330537000,
+    "effectiveRating": 123763961795555.22
    },
    "P85": {
     "developmentProgress": 100,
-    "rating": 290442807053397900,
+    "rating": 290447924591305500,
     "effectiveRating": 0
    },
    "P86": {
     "developmentProgress": 100,
-    "rating": 309780688376225400,
+    "rating": 309785392335181500,
     "effectiveRating": 0
    },
    "P87": {
     "developmentProgress": 100,
-    "rating": 321515104882654460,
+    "rating": 321520360256006300,
     "effectiveRating": 0
    },
    "P88": {
@@ -1897,27 +1775,27 @@
   "okRound": 5760,
   "errStreak": 0,
   "lastError": null,
-  "nodeReset": 1791300941105,
-  "augReset": 1791300941105,
+  "nodeReset": 1791302031476,
+  "augReset": 1791302031476,
   "host": "werk",
-  "version": "corp-e2c-2026-10-06",
+  "version": "corp-e3c-2026-10-06",
   "state": "work",
   "blockedReason": null,
   "execsPerCycle": 4,
-  "funds": 1.2291558311811636e+96,
-  "valuation": 5.503627621410125e+98,
-  "revenue": 5.216650302149806e+93,
-  "expenses": 4282638847.842089,
+  "funds": 1.229330258922986e+96,
+  "valuation": 5.503764118012683e+98,
+  "revenue": 5.216857610173778e+93,
+  "expenses": 4282637867.8159857,
   "public": true,
   "owned": 0.06666666533333333,
-  "liquidation": 2.4661116143565186e+97,
+  "liquidation": 2.4661727768987627e+97,
   "divisions": 6,
   "dummies": 3,
   "products": [
-   "P84:276270430472936500",
-   "P85:290442807053397900",
-   "P86:309780688376225400",
-   "P87:321515104882654460",
+   "P84:276275312330537000",
+   "P85:290447924591305500",
+   "P86:309785392335181500",
+   "P87:321520360256006300",
    "P88:32%"
   ],
   "wilson": 285,
@@ -1984,17 +1862,17 @@
    "soldTotal": 63168063538009.22,
    "bribed": {
     "Sector-12": {
-     "wall": 1790046552000,
+     "wall": 1790046262000,
      "rep": 510000,
-     "total": 61200000
+     "total": 1020000
     },
     "Aevum": {
-     "wall": 1790046552000,
+     "wall": 1790046262000,
      "rep": 204000,
-     "total": 24480000
+     "total": 408000
     }
    },
-   "bribedTotal": 85680000000000000,
+   "bribedTotal": 1428000000000000,
    "ignitedAt": 9.139,
    "ipo": {
     "h": 12.603,
@@ -2043,51 +1921,51 @@
   "errors": []
  },
  "lastTickp": {
-  "job": "1:18069",
+  "job": "1:17951",
   "ok": 0,
   "err": [],
   "price": {
    "P84|Sector-12": {
-    "K": 3.4676644374041446e+25,
+    "K": 3.4676644374041455e+25,
     "mp": 11230.060696052333,
     "P": 28546347995.625553
    },
    "P84|Aevum": {
-    "K": 2.452919416598676e+25,
+    "K": 2.452919416598678e+25,
     "mp": 16614.22960067833,
-    "P": 21229745951.40251
+    "P": 21229745951.402523
    },
    "P84|Chongqing": {
-    "K": 8.32309320114757e+25,
+    "K": 8.323093201147587e+25,
     "mp": 17585.440494490424,
-    "P": 44220383011.67772
+    "P": 44220383011.677765
    },
    "P84|New Tokyo": {
-    "K": 6.668818740386208e+25,
+    "K": 6.668818740386216e+25,
     "mp": 15576.293549770893,
-    "P": 39597144675.700195
+    "P": 39597144675.70022
    },
    "P84|Ishima": {
-    "K": 6.095558477868326e+25,
+    "K": 6.0955584778683055e+25,
     "mp": 15021.591683017963,
-    "P": 37855147766.04457
+    "P": 37855147766.04451
    },
    "P84|Volhaven": {
-    "K": 5.8292918409575105e+25,
+    "K": 5.829291840957516e+25,
     "mp": 14634.5404312149,
-    "P": 37007032643.09991
+    "P": 37007032643.09992
    },
    "P85|Sector-12": {
-    "K": 2.4679012757404453e+24,
+    "K": 2.467901275740444e+24,
     "mp": 11230.060696052333,
-    "P": 14289671594.307083
+    "P": 14289671594.307081
    },
    "P85|Aevum": {
     "mp": 16614.22960067833,
     "P": 16614229600.67833
    },
    "P85|Chongqing": {
-    "K": 5.964589358553802e+24,
+    "K": 5.964589358553799e+24,
     "mp": 17585.440494490424,
     "P": 22400825463.007202
    },
@@ -2097,14 +1975,14 @@
     "P": 19891596130.095787
    },
    "P85|Ishima": {
-    "K": 4.3944983329811e+24,
+    "K": 4.394498332981097e+24,
     "mp": 15021.591683017963,
-    "P": 19171776354.25035
+    "P": 19171776354.250343
    },
    "P85|Volhaven": {
-    "K": 4.2983111450446474e+24,
+    "K": 4.298311145044644e+24,
     "mp": 14634.5404312149,
-    "P": 18651050578.505234
+    "P": 18651050578.505222
    },
    "P86|Sector-12": {
     "mp": 11230.060696052333,
@@ -2157,53 +2035,53 @@
   },
   "diag": {
    "P84|Sector-12": {
-    "stored": 5.820766091346741e-11,
-    "sold": 46915.342680502436,
+    "stored": 1.7462298274040222e-10,
+    "sold": 46915.34268050243,
     "prod": 46915.34268050244,
     "lim": null,
-    "eff": 123680067252815.14
+    "eff": 123681161375454.22
    },
    "P84|Aevum": {
-    "stored": 1.1641532182693481e-10,
-    "sold": 60002.999999999985,
+    "stored": 0,
+    "sold": 60003.000000000015,
     "prod": 60003,
     "lim": null,
-    "eff": 123762866941423.62
+    "eff": 123763961795555.22
    },
    "P84|Chongqing": {
-    "stored": 0,
-    "sold": 46926.55812973388,
+    "stored": 1.1641532182693481e-10,
+    "sold": 46926.55812973387,
     "prod": 46926.55812973388,
     "lim": null,
-    "eff": 123414565190526.45
+    "eff": 123415656967262.02
    },
    "P84|New Tokyo": {
-    "stored": 5.820766091346741e-11,
-    "sold": 46892.14642855144,
+    "stored": 0,
+    "sold": 46892.14642855143,
     "prod": 46892.14642855143,
     "lim": null,
-    "eff": 123891788191558.95
+    "eff": 123892884184615
    },
    "P84|Ishima": {
     "stored": 0,
     "sold": 46896.7291224889,
     "prod": 46896.7291224889,
     "lim": null,
-    "eff": 123647250506435.1
+    "eff": 123648344338876.47
    },
    "P84|Volhaven": {
     "stored": 0,
-    "sold": 46927.36984712025,
+    "sold": 46927.36984712024,
     "prod": 46927.36984712024,
     "lim": null,
-    "eff": 124220108155490.75
+    "eff": 124221207049208.47
    },
    "P85|Sector-12": {
     "stored": 0,
-    "sold": 13324.857319497556,
+    "sold": 13324.857319497558,
     "prod": 13324.857319497556,
     "lim": null,
-    "eff": 126812721590499.11
+    "eff": 126813840204981.75
    },
    "P85|Aevum": {
     "stored": 0,
@@ -2217,28 +2095,28 @@
     "sold": 13104.841870266115,
     "prod": 13104.841870266118,
     "lim": null,
-    "eff": 126540494708232.83
+    "eff": 126541610924307.42
    },
    "P85|New Tokyo": {
     "stored": 0,
     "sold": 14097.853571448568,
     "prod": 14097.853571448568,
     "lim": null,
-    "eff": 127029805143703.5
+    "eff": 127030925670464.7
    },
    "P85|Ishima": {
     "stored": 0,
-    "sold": 13181.470877511101,
+    "sold": 13181.470877511103,
     "prod": 13181.470877511101,
     "lim": null,
-    "eff": 126779073638855.55
+    "eff": 126780191956644.72
    },
    "P85|Volhaven": {
-    "stored": 0,
+    "stored": 2.9103830456733704e-11,
     "sold": 13622.93015287976,
     "prod": 13622.93015287976,
     "lim": null,
-    "eff": 127366441022899.58
+    "eff": 127367564515242.42
    },
    "P86|Sector-12": {
     "stored": 0,
@@ -2328,22 +2206,22 @@
   "info": {
    "P84": {
     "developmentProgress": 100,
-    "rating": 276270430472936500,
-    "effectiveRating": 123762866941423.62
+    "rating": 276275312330537000,
+    "effectiveRating": 123763961795555.22
    },
    "P85": {
     "developmentProgress": 100,
-    "rating": 290442807053397900,
+    "rating": 290447924591305500,
     "effectiveRating": 0
    },
    "P86": {
     "developmentProgress": 100,
-    "rating": 309780688376225400,
+    "rating": 309785392335181500,
     "effectiveRating": 0
    },
    "P87": {
     "developmentProgress": 100,
-    "rating": 321515104882654460,
+    "rating": 321520360256006300,
     "effectiveRating": 0
    },
    "P88": {
@@ -2357,12 +2235,12 @@
  "ipoMin30": 1.4131263775239288e+22,
  "spentTotal": 63168063537009.22,
  "bribedRep": {
-  "Sector-12": 61200000,
-  "Aevum": 24480000,
+  "Sector-12": 1020000,
+  "Aevum": 408000,
   "Bladeburners": 0
  },
  "lastTick": {
-  "job": "1:18068",
+  "job": "1:17950",
   "ok": 24,
   "err": [],
   "price": {
@@ -2373,21 +2251,21 @@
     "mp": 3080.4850294483776
    },
    "Agri|Sector-12|Food": {
-    "d": 259394056.44634894,
+    "d": 259394179.4074675,
     "kind": "add",
-    "x": 2724200.540008517,
+    "x": 2724201.2160158544,
     "mp": 5267.820684829622
    },
    "Agri|Aevum|Plants": {
-    "d": 31860.14,
+    "d": 31859.879999999997,
     "kind": "mul",
     "x": 1,
     "mp": 3772.279438977793
    },
    "Agri|Aevum|Food": {
-    "d": 331628648.48316497,
+    "d": 331628818.09067416,
     "kind": "add",
-    "x": 3081760.182015709,
+    "x": 3081761.004364563,
     "mp": 4098.04573810227
    },
    "Agri|Chongqing|Plants": {
@@ -2397,79 +2275,79 @@
     "mp": 2672.936962682849
    },
    "Agri|Chongqing|Food": {
-    "d": 304085181.55062467,
+    "d": 304085347.67606306,
     "kind": "add",
-    "x": 2942917.136862728,
+    "x": 2942917.97356888,
     "mp": 3735.2646224725113
    },
    "Agri|New Tokyo|Plants": {
-    "d": 31511.74,
+    "d": 31512.260000000002,
     "kind": "mul",
     "x": 1,
     "mp": 3359.7110276924627
    },
    "Agri|New Tokyo|Food": {
-    "d": 171173206.78792462,
+    "d": 171173291.4941226,
     "kind": "add",
-    "x": 2217732.644367428,
+    "x": 2217733.2177413194,
     "mp": 3725.9595283358644
    },
    "Agri|Ishima|Plants": {
-    "d": 31687.629999999997,
+    "d": 31687.5,
     "kind": "mul",
     "x": 1,
     "mp": 2891.37887878323
    },
    "Agri|Ishima|Food": {
-    "d": 408647140.3163412,
+    "d": 408647359.43502283,
     "kind": "add",
-    "x": 3417517.4407125665,
+    "x": 3417518.3950074054,
     "mp": 5980.929011753306
    },
    "Agri|Volhaven|Plants": {
-    "d": 30922.710000000003,
+    "d": 30922.97,
     "kind": "mul",
     "x": 1,
     "mp": 3213.2441525040185
    },
    "Agri|Volhaven|Food": {
-    "d": 507392841.5891913,
+    "d": 507393119.8664071,
     "kind": "add",
-    "x": 3824460.4999363245,
+    "x": 3824461.5910721724,
     "mp": 4953.9001913281145
    },
    "Chem|Sector-12|Chemicals": {
-    "d": 47126.94192550505,
+    "d": 47127.009988885555,
     "kind": "mul",
     "x": 0.3,
     "mp": 6182.556799512528
    },
    "Chem|Aevum|Chemicals": {
-    "d": 57321.65427883999,
+    "d": 57321.76481898693,
     "kind": "mul",
     "x": 0.3,
     "mp": 11287.759422261875
    },
    "Chem|Chongqing|Chemicals": {
-    "d": 62420.872533779126,
+    "d": 62420.88864564887,
     "kind": "mul",
     "x": 0.3,
     "mp": 11024.978438272296
    },
    "Chem|New Tokyo|Chemicals": {
-    "d": 54026.29732159962,
+    "d": 54026.01573794642,
     "kind": "mul",
     "x": 0.3,
     "mp": 9360.839347874207
    },
    "Chem|Ishima|Chemicals": {
-    "d": 19964.16522473653,
+    "d": 19964.355950044643,
     "kind": "mul",
     "x": 0.3,
     "mp": 13531.584817585444
    },
    "Chem|Volhaven|Chemicals": {
-    "d": 56912.76536964586,
+    "d": 56912.63305448925,
     "kind": "mul",
     "x": 0.3,
     "mp": 8790.934252067176
@@ -2600,34 +2478,34 @@
     "plants": 60550.3
    },
    "Chem|Sector-12": {
-    "units": 12050848.69272394,
-    "pm": 1976.31666316817,
-    "plants": -165352.40000000002
+    "units": 12050919.252096673,
+    "pm": 1976.3282347734266,
+    "plants": -165352.5
    },
    "Chem|Aevum": {
-    "units": 11996013.629072381,
-    "pm": 1976.31666316817,
-    "plants": -204951.9
+    "units": 11996083.867378293,
+    "pm": 1976.3282347734266,
+    "plants": -204952.3
    },
    "Chem|Chongqing": {
-    "units": 11897730.079812307,
-    "pm": 1976.31666316817,
-    "plants": -224876
+    "units": 11897799.742654553,
+    "pm": 1976.3282347734266,
+    "plants": -224876.1
    },
    "Chem|New Tokyo": {
-    "units": 11665284.723320613,
-    "pm": 1976.31666316817,
-    "plants": -191034.7
+    "units": 11665353.025163397,
+    "pm": 1976.3282347734266,
+    "plants": -191033.80000000002
    },
    "Chem|Ishima": {
-    "units": 11760105.292943291,
-    "pm": 1976.31666316817,
-    "plants": -79789.9
+    "units": 11760174.149973525,
+    "pm": 1976.3282347734266,
+    "plants": -79790.5
    },
    "Chem|Volhaven": {
-    "units": 11722239.264085267,
-    "pm": 1976.31666316817,
-    "plants": -200644.80000000002
+    "units": 11722307.899404706,
+    "pm": 1976.3282347734266,
+    "plants": -200644.3
    },
    "Tob|Sector-12": {
     "units": 1880602.5613020062,

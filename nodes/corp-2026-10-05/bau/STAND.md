@@ -215,5 +215,6 @@ Lesart:
 3. Pruefen, dass die live eingespielte Etappe 1 nahtlos in Etappe 2 uebergeht: Zustand ohne research/routes/seen; die Felder werden im Planner mit ??= gesetzt.
 4. Dann Bericht an den Koordinator. Danach Etappe 3: Zuendung, IPO + Verkauf nach Bedarf, Tranchen, Bestechung.
 5. Weiter offen aus der Skeptiker-Runde E1: (4) Platz nach Einbau, (9) Praktikanten, (11) Host-Cache.
+   ENTSCHIEDEN 06.10.2026 21:10: (4) erledigt (childRamGb/kindReserve, BN3.2-Neugruendung nach 3 min). (9) nicht gebaut: Praktikanten wirken nur ab 9 Koepfen gegen den Verfall x0,998/Zyklus (OfficeSpace.ts:77-84), den corp-act-care mit Tee/Party ohnehin ausgleicht, solange corp.js laeuft; Skripttod dauert nach Einbau nur Minuten (0,998^~30 = -6 %), dauerhaft 1/9 der Koepfe als Praktikanten kostet dagegen ~11 % Leistung. (11) Host-Cache: reine Laufzeitoptimierung, kein Befund.
 
 Hinweis: Der Koordinator hat in corp.js TELEMETRY_PATH ergaenzt; bau/src/corp.js ist gleichgezogen.

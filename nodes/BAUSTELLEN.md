@@ -507,51 +507,12 @@ je geschlossenem Tab. Wer sie schreibt, haengt an statt zu ersetzen.
 
 ## Sofort
 
-### Bruecke ohne Sicherung - Spielstand liegt in Downloads
+*Aufgeraeumt am 06.10.2026: Bruecken-Momentaufnahmen vom 03.-05.10. entfernt (Tab wieder verbunden, Sicherungen gruen bis 06.10. 19:45, Schub-Riegel-Meldungen aus dem Corp-Bau).*
 
-Der brueckenfreie Weg hat gegriffen (letzte gruene Sicherung 331 min alt). Der Stand liegt als bitburnerSave_<epoch>_BN<n>x<level>.json.gz im Downloads-Ordner; tools/backup-check.js liest ihn unveraendert. Nachsehen, warum die Bruecke nicht sichert.
-
-### Spiel-Tab nicht verbunden
-
-Die Bruecke laeuft, aber seit 2026-10-04T12:36:07.807Z haengt kein Spiel am RFA-Port 12525. Der Bot steht still, solange der Tab zu ist. Eric muss den Tab oeffnen.
-
-### Schub verweigert (1 nicht in master) - Fehlgriff?
-
-1 von 8 geaenderten Dateien unter src/ stehen weder im Git-Index von master noch in hotswap-freigabe.txt. Es wurde NICHTS ins Spiel geschoben - entweder alle oder keine.
-
-Betroffen: gang.js
-
-War das Absicht? Dann committen (dann steht der Pfad in master) oder `tools/hotswap.js` fahren, das legt die Freigabe selbst. War es ein Fehlgriff - eine Datei im falschen Baum -, dann ist genau dafuer dieser Riegel gebaut.
-
-### Autosave steht
-
-lastSave im Spielstand war bei der Messung um 2026-10-03T15:17:28.106Z bereits 405 Minuten alt (Autosave-Intervall 60 s). Moegliche Ursache: Recovery-Modus oder fehlgeschlagenes IndexedDB-Schreiben.
-
-### Telemetrie veraltet
-
-Das Spiel ist verbunden, aber der Motor hat seit 10 Minuten nichts geschrieben (Inhaltsstempel 2026-10-03T15:17:25.100Z). Entweder steht der Motor oder der Tab ist eingefroren.
-
-
-
-
-
-
-### Grosser Schub verweigert (14 Dateien) - sieht nach einem Merge aus
-
-14 Dateien unter src/ haben sich gleichzeitig geaendert; die Grenze liegt bei 8. Es wurde NICHTS ins Spiel geschoben.
-
-War das ein Hot-Swap? Dann `tools/hotswap.js` fahren und die Reihenfolge aus Auftrag 9 einhalten. War es Absicht? Dann C:\Users\erche\Desktop\claude_projecto\bitburner\data\schub-frei.txt anlegen (gilt 30 min) und eine Datei erneut speichern.
-
-Geaendert: ausgang.js, bn4life.js, bn4net.js, bn4rep.js, hacknet.js, hashes.js, joinrun.js, lib/bitnodes.json, lib/calc.js, lib/einbau.js, lib/figur.js, lib/handschlag.js (+2)
-
-
-
-
-
-
-
-
-*Aufgeraeumt am 22.09.2026: 34 automatische Momentaufnahmen (Bruecke ohne Sicherung / Telemetrie veraltet / Spiel-Tab nicht verbunden) entfernt - alle ueberholt. tools/liste.js ersetzt gleiche Ueberschriften seitdem, statt zu doppeln.*
+- **ERLEDIGT 06.10.2026 - BN3 H2-light (d94276e): Figur fuer The Syndicate nach Sector-12, wenn nur die Stadt fehlt.** Belegt aus Sicherungen: in BN2.3/BN3.1 Zyklus 1 stand die Figur in Ishima (joinrun.js) - kein Syndicate am ersten Einbau. Wirkung haengt am Karma-Timing in BN3.2 (Karma nur aus Toetungsaktionen; in BN2.3 -90 bei 8,5 h). Beim naechsten /bb pruefen: ist The Syndicate vor der Corp-Zuendung (~05:00-06:30 am 07.10.) in getPlayer().factions?
+- **ERLEDIGT 06.10.2026 - BN3 H3 (f582457): Einbausperre 6 h statt 12 h fuer die erste Corp-Runde des Knotens.** Merker data/corp-first-round.json; Nutzen ~0-1 h je Lauf (GESCHAETZT). Beim naechsten /bb: data/einbau.json combatEarlyCorp/corpFirstRound ansehen, sobald die Corp gezuendet hat.
+- **ZURUECKGESTELLT 06.10.2026 - BN3 H1 (Graften mit Corp-Geld, Simulacrum zuerst).** Vorlage nodes/corp-2026-10-05/hebel/vorlage.md: 0-0,5 h mit Syndicate, bedingt. Bekannter Fehler dabei: Corp-Verkaeufe heben geldbedarf um den Erloes an, graftauto bekommt so nie Corp-Geld. Erst anfassen, wenn BN3.2-Messung (Corp-Zuendung, Syndicate, Einbau) vorliegt.
+- **Gemessen 06.10.2026: Corp in BN3.2 bei Knotenstunde ~0,07 gegruendet** (Sprung 19:20, Gruendung 19:23, 3 min no_space dazwischen). Die 18,6 h aus BN3.1 waren ein Einspiel-Artefakt.
 
 - **ERLEDIGT 23.09.2026 - Hashes: Gym im Wiederaufbau, Rangtausch hing am Speicher (Erics Frage).** Spielstand 23.09. 07:26: Improve Gym Training Stufe 0 nach einem ganzen Wiederaufbau (Gym nur 'nicht in der Division', die Division ueberlebt den Einbau), Rangtausch auf Stufe 2 festgefahren (750 > 576 Speicher, 9 Server Cache 1), 4,47-6,2 Hashes/s gingen in den Verkauf. Gebaut: Gym auch im Kampfaufbau (blade.json frisch, tiefstand<100 oder weichtTraining), Stufendeckel aus gemessener Rate und Rest-Erfahrung; Rang nur wenn er in den Speicher passt, sonst bedarfKapazitaet -> hacknet.js baut den kleinsten Cache aus (5 % des freien Kontos); Aug-Ruecklage tabu (auch fuer Server/RAM/Kerne/Level); Traeger heisst rang-netto (Rang minus Hash-Rang des Zyklus). SP-Ausweich vom Skeptiker gekippt. hacknet.js 10,45 GB im Spiel gemessen.
 - **ERLEDIGT 23.09.2026 - Aug-Ruecklage war unerreichbar (92 Billionen).** bn4rep meldete die Summe aller verdienten Augs; fast alles Blade's Simulacrum (150 Mrd * 1,9^10 = 613). Das sperrte bn4net, homegrow, bn4life, graftauto, hashes und hacknet fuer den ganzen Zyklus. Jetzt lib/endspurt.js augRuecklage: nur Stuecke bis zum 10-fachen Konto. Im Spiel 09:14: 10,73 Mrd (ADR-V1).

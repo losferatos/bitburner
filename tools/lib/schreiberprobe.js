@@ -94,8 +94,18 @@ function eigenstaendig(txt, i) {
   return !/[A-Za-z0-9_$.]/.test(txt[i - 1]);
 }
 
-/** Kommt `fn(<arg>` im Text vor, mit Wortgrenze davor? */
+/**
+ * Kommt `fn(<arg>` im Text vor, mit Wortgrenze davor? Fuer die Hilfen aus
+ * lib/hostdatei.js (`nachHome(ns, datei, inhalt)`) steht die Datei an
+ * ZWEITER Stelle - bis zum 06.10.2026 erkannte die Probe sie deshalb nie,
+ * obwohl `nachHome` in SCHREIBER steht (Befund beim Einbau von corp.js).
+ */
 function ruftAuf(txt, fn, arg) {
+  if (MIT_NS.has(fn) && ruftAufGenau(txt, fn, "ns, " + arg)) return true;
+  return ruftAufGenau(txt, fn, arg);
+}
+const MIT_NS = new Set(["nachHome"]);
+function ruftAufGenau(txt, fn, arg) {
   const muster = fn + "(" + arg;
   let i = txt.indexOf(muster);
   while (i !== -1) {

@@ -1,0 +1,114 @@
+{
+ "seed": 1,
+ "hours": 2.5,
+ "wallSec": 2.233,
+ "rounds": [
+  {
+   "k": 1,
+   "h": 0.5,
+   "funds": 128550420000,
+   "shares": 100000000,
+   "valuation": 428501400000
+  }
+ ],
+ "traj": [
+  {
+   "h": 0,
+   "funds": 150000000000,
+   "valuation": 0,
+   "assetDelta": 0,
+   "profit": 0,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0
+  },
+  {
+   "h": 0.5,
+   "funds": 133602705638.34328,
+   "valuation": 428501400000,
+   "assetDelta": 12856243708.31846,
+   "profit": 1204393.3299588994,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "agri",
+   "next": "Runde 1 annehmen"
+  },
+  {
+   "h": 1,
+   "funds": 30419162984.69427,
+   "valuation": 440967300000,
+   "assetDelta": 1199832.414466858,
+   "profit": 1167929.5902843215,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 1.5,
+   "funds": 32386554092.45966,
+   "valuation": 446611800000,
+   "assetDelta": 1207058.1339401244,
+   "profit": 1196259.918139046,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2,
+   "funds": 34340027011.76609,
+   "valuation": 439027500000,
+   "assetDelta": 1192125.8712783814,
+   "profit": 1193195.390593993,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2.5,
+   "funds": 36297467335.00913,
+   "valuation": 457032900000,
+   "assetDelta": 1207671.784991455,
+   "profit": 1207280.4291934413,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  }
+ ],
+ "events": [
+  "2026-10-06T04:01:28.274Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T04:01:28.280Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T04:01:28.703Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T04:01:28.735Z z180 0.50h Runde 1: 128.6 Mrd fuer 100.00 Mio Anteile (Bewertung 428.5 Mrd)",
+  "2026-10-06T04:01:28.740Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~113.6 Mrd",
+  "2026-10-06T04:01:28.740Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~26.6 Mrd"
+ ],
+ "errors": [],
+ "maxErrStreak": 0,
+ "eichung": {
+  "unitsRelErr": {
+   "n": 5394,
+   "min": -3.3306690738754696e-16,
+   "med": -1.1102230246251565e-16,
+   "max": 0
+  },
+  "dRelErr": {
+   "n": 534,
+   "min": -0.44286857055161866,
+   "med": -0.0001349623878370565,
+   "max": 0.011225003062499628
+  },
+  "costErr": []
+ },
+ "ram": {
+  "corp-act-build.js": 81.6,
+  "corp-act-care.js": 61.6,
+  "corp-act-fin.js": 71.6,
+  "corp-act-office.js": 61.6,
+  "corp-act-up.js": 61.6,
+  "corp-tick.js": 71.6,
+  "corp.js": 55.1
+ }
+}

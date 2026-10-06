@@ -138,6 +138,7 @@ const VON_AUSSEN = {
   "graftplan.json": "Repo-Datei, erzeugt von tools/graftplan-bauen.js",
   "registry.json": "Repo-Datei, erzeugt von diesem Werkzeug",
   "data/bn4-stop.txt": "Handbremse - dass kein Skript sie schreibt, ist ihr Sinn",
+  "data/corp-stop.txt": "Handbremse fuer corp.js (06.10.2026) - ein Mensch legt sie",
   // SCHALTER, kein Zustand (03.10.2026, Paket P2). gang.js laeuft nur, wenn der
   // Orchestrator die Datei legt - und der legt sie erst, wenn die TRP-Falle
   // (Paket 0, GANG-2) UND der Kaufaufschub bis zum Tor (Paket 1, AUG-4) im

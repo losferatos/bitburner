@@ -1279,6 +1279,39 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "precondition": {
         "requiresFile": "data/gang-an.txt"
       }
+    },
+    {
+      "name": "corp.js",
+      "args": [],
+      "ramBaseGb": 75.1,
+      "ramSingGb": 0,
+      "ramMeasuredAt": "GERECHNET-2026-10-06 (tools/ram.js und reference/v301 RamCalculations.ts, beide 75,10)",
+      "verfahren": "alle",
+      "knoten": [
+        3
+      ],
+      "phase": "beide",
+      "telemetryFile": "data/corp.json",
+      "scpToHome": true,
+      "freshnessMs": 2700000,
+      "taktMs": 10000,
+      "hostRule": "werkbank",
+      "priority": 9,
+      "evictRank": 19,
+      "needsFigure": "none",
+      "needsLibs": [
+        "lib/corplib.js",
+        "lib/corpact.js",
+        "lib/herzschlag.js",
+        "lib/hostdatei.js"
+      ],
+      "singularity": false,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {
+        "forbidsFile": "data/corp-stop.txt"
+      }
     }
   ],
   "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing."

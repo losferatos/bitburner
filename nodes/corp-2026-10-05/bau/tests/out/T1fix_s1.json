@@ -1,0 +1,609 @@
+{
+ "seed": 1,
+ "hours": 2.5,
+ "wallSec": -1251455.865,
+ "rounds": [
+  {
+   "k": 1,
+   "h": 0.75,
+   "funds": 131049210000,
+   "shares": 100000000,
+   "valuation": 436830700000
+  }
+ ],
+ "traj": [
+  {
+   "h": 0,
+   "funds": 150000000000,
+   "valuation": 0,
+   "assetDelta": 0,
+   "profit": 0,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "stage": "agri0",
+   "next": ""
+  },
+  {
+   "h": 0.5,
+   "funds": 54462758499.499695,
+   "valuation": 87051400000,
+   "assetDelta": 169425.4405166626,
+   "profit": 169284.51761473744,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 0,
+   "liq": 60606986873.320816,
+   "stage": "agri",
+   "next": "Runde 1: Angebot 26.1 Mrd (Runde 1) abgelehnt, warte"
+  },
+  {
+   "h": 1,
+   "funds": 30893497538.127193,
+   "valuation": 453935700000,
+   "assetDelta": 1231641.6972320557,
+   "profit": 1226238.192864474,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 276827542507.9204,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 1.5,
+   "funds": 32902559453.108616,
+   "valuation": 444116900000,
+   "assetDelta": 1205176.739289856,
+   "profit": 1272791.6155630602,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 270839658597.54114,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2,
+   "funds": 34866465527.514565,
+   "valuation": 437988800000,
+   "assetDelta": 1184383.4004837037,
+   "profit": 1188203.800912696,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 267102506258.02963,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2.5,
+   "funds": 36808822711.816605,
+   "valuation": 451475500000,
+   "assetDelta": 444560.6425308228,
+   "profit": 1143591.1590440692,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "rating": 0,
+   "aw": 0,
+   "wilson": 0,
+   "ads": 0,
+   "mainOffice": 15,
+   "liq": 275327217417.65326,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  }
+ ],
+ "events": [
+  "2026-10-06T04:20:57.870Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T04:20:57.880Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T04:20:57.986Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T04:20:58.058Z z196 0.54h Runde 1: kein annehmbares Angebot, Stopp aufgehoben, neuer Termin 0.75 h",
+  "2026-10-06T04:20:58.199Z z255 0.71h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T04:20:58.230Z z270 0.75h Runde 1: 131.0 Mrd fuer 100.00 Mio Anteile (Bewertung 436.8 Mrd)",
+  "2026-10-06T04:20:58.234Z z271 0.75h Schritt Export (20.0 Mrd), Fonds danach ~115.1 Mrd",
+  "2026-10-06T04:20:58.234Z z271 0.75h Schritt Tobacco (87.0 Mrd), Fonds danach ~28.1 Mrd"
+ ],
+ "errors": [
+  "z161 no_space corp-act-care.js 61.6 GB",
+  "z161 no_space corp-tick.js 71.6 GB",
+  "z162 no_space corp-act-care.js 61.6 GB",
+  "z162 no_space corp-act-up.js 61.6 GB",
+  "z162 no_space corp-act-care.js 61.6 GB",
+  "z162 no_space corp-tick.js 71.6 GB",
+  "z163 no_space corp-act-care.js 61.6 GB",
+  "z163 no_space corp-tick.js 71.6 GB",
+  "z164 no_space corp-act-care.js 61.6 GB",
+  "z164 no_space corp-tick.js 71.6 GB",
+  "z165 no_space corp-act-care.js 61.6 GB",
+  "z165 no_space corp-tick.js 71.6 GB",
+  "z166 no_space corp-act-care.js 61.6 GB",
+  "z166 no_space corp-tick.js 71.6 GB",
+  "z167 no_space corp-act-care.js 61.6 GB",
+  "z167 no_space corp-tick.js 71.6 GB",
+  "z168 no_space corp-act-care.js 61.6 GB",
+  "z168 no_space corp-tick.js 71.6 GB",
+  "z169 no_space corp-act-care.js 61.6 GB",
+  "z169 no_space corp-tick.js 71.6 GB"
+ ],
+ "maxErrStreak": 0,
+ "eichung": {
+  "unitsRelErr": {
+   "Agri": {
+    "n": 4386,
+    "min": -3.3306690738754696e-16,
+    "med": -1.1102230246251565e-16,
+    "max": 0
+   }
+  },
+  "dRelErr": {
+   "n": 438,
+   "min": -0.9290277018788665,
+   "med": -0.0001314374639252991,
+   "max": 0.30519634393459505
+  },
+  "costErr": []
+ },
+ "ram": {
+  "corp-act-build.js": 81.6,
+  "corp-act-care.js": 61.6,
+  "corp-act-fin.js": 71.6,
+  "corp-act-office.js": 61.6,
+  "corp-act-prod.js": 41.6,
+  "corp-act-route.js": 41.6,
+  "corp-act-up.js": 61.6,
+  "corp-tick.js": 71.6,
+  "corp-tickp.js": 71.6,
+  "corp.js": 75.1
+ },
+ "finalState": {
+  "v": 1,
+  "nodeReset": 1791260457864,
+  "cycle": 900,
+  "foundCycle": 0,
+  "lastLT": 271,
+  "freeze": false,
+  "roundsDone": 1,
+  "rounds": [
+   {
+    "k": 1,
+    "h": 0.75,
+    "funds": 131049210000,
+    "shares": 100000000,
+    "valuation": 436830700000
+   }
+  ],
+  "stage": "tob",
+  "unlocks": [
+   "Export"
+  ],
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 9516.660297013004
+    },
+    "Aevum": {
+     "Real Estate": 9140.366847136647
+    },
+    "Chongqing": {
+     "Real Estate": 9343.310353278866
+    },
+    "New Tokyo": {
+     "Real Estate": 9298.153699742215
+    },
+    "Ishima": {
+     "Real Estate": 10237.566853152202
+    },
+    "Volhaven": {
+     "Real Estate": 9661.27327585582
+    }
+   },
+   "Tob": {}
+  },
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 95.28907514291822,
+    "kind": "add",
+    "x": 0.7353316187106411,
+    "mp": 2948.9635748857695
+   },
+   "Agri|Sector-12|Food": {
+    "d": 173.76479268915918,
+    "kind": "add",
+    "x": 1.2465848043813186,
+    "mp": 5303.392067075339
+   },
+   "Agri|Aevum|Plants": {
+    "d": 99.4809670289006,
+    "kind": "add",
+    "x": 0.7329287293492446,
+    "mp": 2768.9123849509833
+   },
+   "Agri|Aevum|Food": {
+    "d": 75.15057334739473,
+    "kind": "add",
+    "x": 0.7188839528351324,
+    "mp": 4826.1707723028485
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 120.47217275078326,
+    "kind": "add",
+    "x": 0.8552831128303728,
+    "mp": 3115.841718953334
+   },
+   "Agri|Chongqing|Food": {
+    "d": 52.20506334224966,
+    "kind": "add",
+    "x": 0.7047575670231137,
+    "mp": 4518.8028970752375
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 89.26363478941502,
+    "kind": "add",
+    "x": 0.707801704694333,
+    "mp": 2903.7575794569707
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 68.29673863382622,
+    "kind": "add",
+    "x": 0.7683206176910191,
+    "mp": 4868.304492224721
+   },
+   "Agri|Ishima|Plants": {
+    "d": 110.42875858316121,
+    "kind": "add",
+    "x": 0.8007737098712725,
+    "mp": 2859.3547059722464
+   },
+   "Agri|Ishima|Food": {
+    "d": 101.41800270821143,
+    "kind": "add",
+    "x": 0.9663827334523597,
+    "mp": 5496.8252787487045
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 101.76247628294013,
+    "kind": "add",
+    "x": 0.7514528005765225,
+    "mp": 2922.26597132788
+   },
+   "Agri|Volhaven|Food": {
+    "d": 73.50482226278268,
+    "kind": "add",
+    "x": 0.7276953212545637,
+    "mp": 5199.4990952581
+   }
+  },
+  "errors": [
+   "z161 no_space corp-act-care.js 61.6 GB",
+   "z161 no_space corp-tick.js 71.6 GB",
+   "z162 no_space corp-act-care.js 61.6 GB",
+   "z162 no_space corp-act-up.js 61.6 GB",
+   "z162 no_space corp-act-care.js 61.6 GB",
+   "z162 no_space corp-tick.js 71.6 GB",
+   "z163 no_space corp-act-care.js 61.6 GB",
+   "z163 no_space corp-tick.js 71.6 GB",
+   "z164 no_space corp-act-care.js 61.6 GB",
+   "z164 no_space corp-tick.js 71.6 GB",
+   "z165 no_space corp-act-care.js 61.6 GB",
+   "z165 no_space corp-tick.js 71.6 GB",
+   "z166 no_space corp-act-care.js 61.6 GB",
+   "z166 no_space corp-tick.js 71.6 GB",
+   "z167 no_space corp-act-care.js 61.6 GB",
+   "z167 no_space corp-tick.js 71.6 GB",
+   "z168 no_space corp-act-care.js 61.6 GB",
+   "z168 no_space corp-tick.js 71.6 GB",
+   "z169 no_space corp-act-care.js 61.6 GB",
+   "z169 no_space corp-tick.js 71.6 GB"
+  ],
+  "events": 7,
+  "next": "Agri-Bueros 8: spare auf 37.4 Mrd",
+  "waiting": false,
+  "snap": {
+   "funds": 36811822711.816605,
+   "valuation": 451475500000,
+   "revenue": 1746246.978271266,
+   "expenses": 602655.8192271966,
+   "public": false,
+   "owned": 0.6,
+   "liquidation": 275327217417.65326,
+   "divisions": 2,
+   "dummies": 0,
+   "products": [],
+   "wilson": 0,
+   "tobAds": 0,
+   "tobMain": 15,
+   "rsDone": {}
+  },
+  "cfgAt": 871,
+  "cfg": {},
+  "rsDone": {},
+  "routes": {
+   "Aevum": {
+    "Agri>Tob>Plants": 0
+   },
+   "Chongqing": {
+    "Agri>Tob>Plants": 0
+   },
+   "Sector-12": {
+    "Agri>Tob>Plants": 0
+   },
+   "New Tokyo": {
+    "Agri>Tob>Plants": 0
+   },
+   "Ishima": {
+    "Agri>Tob>Plants": 0
+   },
+   "Volhaven": {
+    "Agri>Tob>Plants": 0
+   }
+  },
+  "seen": [],
+  "productSeq": 0,
+  "dummySeq": 0,
+  "roundShift": [
+   0.25,
+   0,
+   0,
+   0
+  ],
+  "freezeAt": 255,
+  "flow": {
+   "tobDemand": 0,
+   "chemDemand": 0,
+   "agriPlants": 225.82888573095354,
+   "units": {
+    "Agri|Sector-12": 377.37638914217564,
+    "Agri|Aevum": 367.2429883740847,
+    "Agri|Chongqing": 391.39907442351966,
+    "Agri|New Tokyo": 366.61110419680995,
+    "Agri|Ishima": 376.70945580739476,
+    "Agri|Volhaven": 378.9547572527794,
+    "Tob|Sector-12": 0,
+    "Tob|Aevum": 0,
+    "Tob|Chongqing": 0,
+    "Tob|New Tokyo": 0,
+    "Tob|Ishima": 0,
+    "Tob|Volhaven": 0
+   }
+  }
+ },
+ "finalTele": {
+  "schema": 2,
+  "ts": 1790008992000,
+  "wall": 1790008992000,
+  "playtime": 0,
+  "motorTimeMs": 0,
+  "round": 4496,
+  "okRound": 900,
+  "errStreak": 0,
+  "lastError": null,
+  "nodeReset": 1791260457864,
+  "augReset": 1791260457864,
+  "host": "werk",
+  "version": "corp-e2-2026-10-06",
+  "state": "work",
+  "blockedReason": null,
+  "funds": 36811822711.816605,
+  "valuation": 451475500000,
+  "revenue": 1746246.978271266,
+  "expenses": 602655.8192271966,
+  "public": false,
+  "owned": 0.6,
+  "liquidation": 275327217417.65326,
+  "divisions": 2,
+  "dummies": 0,
+  "products": [],
+  "wilson": 0,
+  "tobAds": 0,
+  "tobMain": 15,
+  "rsDone": {},
+  "stage": "tob",
+  "cycle": 900,
+  "corpHours": 2.5,
+  "fundingRounds": 1,
+  "roundLog": [
+   {
+    "k": 1,
+    "h": 0.75,
+    "funds": 131049210000,
+    "shares": 100000000,
+    "valuation": 436830700000
+   }
+  ],
+  "next": "Agri-Bueros 8: spare auf 37.4 Mrd",
+  "errors": [
+   "z167 no_space corp-tick.js 71.6 GB",
+   "z168 no_space corp-act-care.js 61.6 GB",
+   "z168 no_space corp-tick.js 71.6 GB",
+   "z169 no_space corp-act-care.js 61.6 GB",
+   "z169 no_space corp-tick.js 71.6 GB"
+  ]
+ },
+ "lastTick": {
+  "job": "1:1332",
+  "ok": 24,
+  "err": [],
+  "price": {
+   "Agri|Sector-12|Plants": {
+    "d": 95.28907514291822,
+    "kind": "add",
+    "x": 0.7353316187106411,
+    "mp": 2948.9635748857695
+   },
+   "Agri|Sector-12|Food": {
+    "d": 173.76479268915918,
+    "kind": "add",
+    "x": 1.2465848043813186,
+    "mp": 5303.392067075339
+   },
+   "Agri|Aevum|Plants": {
+    "d": 99.4809670289006,
+    "kind": "add",
+    "x": 0.7329287293492446,
+    "mp": 2768.9123849509833
+   },
+   "Agri|Aevum|Food": {
+    "d": 75.15057334739473,
+    "kind": "add",
+    "x": 0.7188839528351324,
+    "mp": 4826.1707723028485
+   },
+   "Agri|Chongqing|Plants": {
+    "d": 120.47217275078326,
+    "kind": "add",
+    "x": 0.8552831128303728,
+    "mp": 3115.841718953334
+   },
+   "Agri|Chongqing|Food": {
+    "d": 52.20506334224966,
+    "kind": "add",
+    "x": 0.7047575670231137,
+    "mp": 4518.8028970752375
+   },
+   "Agri|New Tokyo|Plants": {
+    "d": 89.26363478941502,
+    "kind": "add",
+    "x": 0.707801704694333,
+    "mp": 2903.7575794569707
+   },
+   "Agri|New Tokyo|Food": {
+    "d": 68.29673863382622,
+    "kind": "add",
+    "x": 0.7683206176910191,
+    "mp": 4868.304492224721
+   },
+   "Agri|Ishima|Plants": {
+    "d": 110.42875858316121,
+    "kind": "add",
+    "x": 0.8007737098712725,
+    "mp": 2859.3547059722464
+   },
+   "Agri|Ishima|Food": {
+    "d": 101.41800270821143,
+    "kind": "add",
+    "x": 0.9663827334523597,
+    "mp": 5496.8252787487045
+   },
+   "Agri|Volhaven|Plants": {
+    "d": 101.76247628294013,
+    "kind": "add",
+    "x": 0.7514528005765225,
+    "mp": 2922.26597132788
+   },
+   "Agri|Volhaven|Food": {
+    "d": 73.50482226278268,
+    "kind": "add",
+    "x": 0.7276953212545637,
+    "mp": 5199.4990952581
+   }
+  },
+  "boost": {
+   "Agri": {
+    "Sector-12": {
+     "Real Estate": 9516.660297013004
+    },
+    "Aevum": {
+     "Real Estate": 9140.366847136647
+    },
+    "Chongqing": {
+     "Real Estate": 9343.310353278866
+    },
+    "New Tokyo": {
+     "Real Estate": 9298.153699742215
+    },
+    "Ishima": {
+     "Real Estate": 10237.566853152202
+    },
+    "Volhaven": {
+     "Real Estate": 9661.27327585582
+    }
+   },
+   "Tob": {}
+  },
+  "spent": 0,
+  "diag": {
+   "Agri|Sector-12": {
+    "units": 377.37638914217564,
+    "pm": 29.01718235174848,
+    "plants": 37.73755751373596
+   },
+   "Agri|Aevum": {
+    "units": 367.2429883740847,
+    "pm": 29.01718235174848,
+    "plants": 36.724213528199456
+   },
+   "Agri|Chongqing": {
+    "units": 391.39907442351966,
+    "pm": 29.01718235174848,
+    "plants": 39.1398311100836
+   },
+   "Agri|New Tokyo": {
+    "units": 366.61110419680995,
+    "pm": 29.01718235174848,
+    "plants": 36.66102493104963
+   },
+   "Agri|Ishima": {
+    "units": 376.70945580739476,
+    "pm": 29.01718235174848,
+    "plants": 37.67086409687413
+   },
+   "Agri|Volhaven": {
+    "units": 378.9547572527794,
+    "pm": 29.01718235174848,
+    "plants": 37.89539455101075
+   },
+   "Tob|Sector-12": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   },
+   "Tob|Aevum": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   },
+   "Tob|Chongqing": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   },
+   "Tob|New Tokyo": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   },
+   "Tob|Ishima": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   },
+   "Tob|Volhaven": {
+    "units": 0,
+    "pm": 6,
+    "plants": 0
+   }
+  }
+ },
+ "pauseBeats": -1
+}

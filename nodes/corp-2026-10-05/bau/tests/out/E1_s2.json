@@ -1,0 +1,115 @@
+{
+ "seed": 2,
+ "hours": 2.5,
+ "wallSec": 2.113,
+ "rounds": [
+  {
+   "k": 1,
+   "h": 0.5,
+   "funds": 132304740000,
+   "shares": 100000000,
+   "valuation": 441015800000
+  }
+ ],
+ "traj": [
+  {
+   "h": 0,
+   "funds": 150000000000,
+   "valuation": 0,
+   "assetDelta": 0,
+   "profit": 0,
+   "owned": 0.6666666666666666,
+   "fundingRound": 0
+  },
+  {
+   "h": 0.5,
+   "funds": 137337811477.36617,
+   "valuation": 441015800000,
+   "assetDelta": 13231710990.208458,
+   "profit": 1237457.4407344619,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "agri",
+   "next": "Runde 1 annehmen"
+  },
+  {
+   "h": 1,
+   "funds": 34234258060.28383,
+   "valuation": 461097500000,
+   "assetDelta": 1245336.267024231,
+   "profit": 1202066.046896651,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 1.5,
+   "funds": 36254011793.02427,
+   "valuation": 452060900000,
+   "assetDelta": 1222568.0987716676,
+   "profit": 1267667.757745989,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Agri-Bueros 8: spare auf 37.4 Mrd"
+  },
+  {
+   "h": 2,
+   "funds": 1999899087.544951,
+   "valuation": 587453600000,
+   "assetDelta": 1587359.8883743286,
+   "profit": 1579841.4338623513,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Etappe 1 fertig - warte auf Etappe 2 (Produkte, Runde 2)"
+  },
+  {
+   "h": 2.5,
+   "funds": 4684354555.652028,
+   "valuation": 582886300000,
+   "assetDelta": 1598723.7072128295,
+   "profit": 1598524.49569294,
+   "owned": 0.6,
+   "fundingRound": 1,
+   "stage": "tob",
+   "next": "Etappe 1 fertig - warte auf Etappe 2 (Produkte, Runde 2)"
+  }
+ ],
+ "events": [
+  "2026-10-06T04:01:30.511Z z0 0.00h Gruendung: [true] ",
+  "2026-10-06T04:01:30.512Z z1 0.00h Agri-Aufbau geplant (103 Ops), Fonds danach ~54.5 Mrd",
+  "2026-10-06T04:01:30.851Z z165 0.46h Runde 1: Ausgabenstopp (F3)",
+  "2026-10-06T04:01:30.882Z z180 0.50h Runde 1: 132.3 Mrd fuer 100.00 Mio Anteile (Bewertung 441.0 Mrd)",
+  "2026-10-06T04:01:30.886Z z181 0.50h Schritt Export (20.0 Mrd), Fonds danach ~117.3 Mrd",
+  "2026-10-06T04:01:30.886Z z181 0.50h Schritt Tobacco (87.0 Mrd), Fonds danach ~30.3 Mrd",
+  "2026-10-06T04:01:31.995Z z643 1.79h Schritt Agri-Bueros 8 (36.4 Mrd), Fonds danach ~1.0 Mrd"
+ ],
+ "errors": [],
+ "maxErrStreak": 0,
+ "eichung": {
+  "unitsRelErr": {
+   "n": 5394,
+   "min": -3.3306690738754696e-16,
+   "med": -1.1102230246251565e-16,
+   "max": 0
+  },
+  "dRelErr": {
+   "n": 534,
+   "min": -0.4099774010558308,
+   "med": 0.0002961139069079799,
+   "max": 0.29748602841922733
+  },
+  "costErr": []
+ },
+ "ram": {
+  "corp-act-build.js": 81.6,
+  "corp-act-care.js": 61.6,
+  "corp-act-fin.js": 71.6,
+  "corp-act-office.js": 61.6,
+  "corp-act-up.js": 61.6,
+  "corp-tick.js": 71.6,
+  "corp.js": 55.1
+ }
+}

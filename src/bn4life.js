@@ -66,7 +66,110 @@ import { liesVonHome, nachHome } from "lib/hostdatei.js";
 // der Schiedsrichter (bn4net.js, Abschnitt 9a); hier wird nur beantragt und
 // nachgesehen.
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
-import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { PRIO as FIG_PRIO, antragsDatei, antragGilt } from "lib/figur.js";
+
+// --- THE SYNDICATE VOR DEM ERSTEN CORP-EINBAU (H2-light, 06.10.2026) --------
+//
+// In BN3 besticht das Corp-Gewerk Faktionen fuer die Torrunde (bn4rep.js,
+// lib/corpgeld.js) - aber nur solche, in denen der Spieler MITGLIED ist
+// (Corporation/Actions.ts:652-664). The Syndicate traegt dabei den groessten
+// Einzelposten (nodes/corp-2026-10-05/hebel/vorlage.md Abschnitt 2 und 5:
+// k 2,0-2,5 ohne, 3,5-4,3 mit, gespart 1,5-2,2 h je BN3-Lauf).
+//
+// Die Einladung verlangt (FactionInfo.tsx:601-612): Aufenthalt in Aevum ODER
+// Sector-12, keine Stelle bei CIA/NSA, 10 Mio, Hacking 200, alle vier
+// Kampfwerte 200, Karma <= -90. Das Spiel prueft das alle 2 s (engine.tsx:154,
+// 177-182); eine einmal ausgesprochene Einladung bleibt bestehen, auch wenn
+// die Figur danach weiterreist, und Abschnitt 1 nimmt sie an (The Syndicate
+// steht in keiner Feindesliste).
+//
+// GEMESSEN, NICHT VERMUTET (nodes/corp-2026-10-05/hebel/syndikat.mjs auf den
+// Sicherungen): In Zyklus 1 waren ALLE Bedingungen ausser der Stadt erfuellt,
+// und die Figur stand trotzdem in Ishima - dorthin schickt sie joinrun.js
+// fuer Tetrads/Tian Di Hui, und danach holt sie niemand zurueck (die
+// Aevum-Reise unten greift nur ohne Aevum-Mitgliedschaft, und die ist zu dem
+// Zeitpunkt laengst da).
+//   BN2.3: Karma -90 bei 8,5 h, Kampf 200 bei 6,4 h; ab 8,8 h fehlte nur die
+//          Stadt - 5 von 5 Sicherungen bis zum Einbau (12,4 h) in Ishima.
+//   BN3.1: ab 19,25 h fehlte nur die Stadt, Einbau 19,6 h, Ishima.
+// Beide Male KEIN Syndicate am Einbau. Erst der Einbau selbst setzte die Figur
+// nach Sector-12 (PlayerObjectGeneralMethods.ts:104), und mit dem behaltenen
+// Karma kam die Einladung dann im Zyklus 2 - fuer die erste Corp-Torrunde zu
+// spaet.
+//
+// Das Karma kommt im V2 von selbst aus den Toetungsaktionen des Spielers
+// (-1 je Erfolg, Bladeburner.ts:966-972; Black Op -15, :1050), die Buchung
+// ist in BN2.3 auf den Punkt nachgerechnet (Rest 0). Sleeve-Verbrechen
+// tragen dazu nichts Nennenswertes bei: bei sync 1 % bringt Homicide 0,03
+// Karma je Erfolg (SleeveCrimeWork.ts:47), alle drei Sleeves zusammen
+// ~23 je Stunde - und sie fehlten dafuer bei Infiltrate. Deshalb hier nur die
+// Reise, kein Karma-Antrieb.
+//
+// NUR IN DEN CORP-KNOTEN (lib/corpgeld.js CORP_MONEY_NODES, Registry corp.js
+// knoten [3]): Ohne Bestechung gibt es im V2 keinen Weg zu Syndicate-Ruf, die
+// Mitgliedschaft waere dort wertlos. Bewusst eine eigene Konstante statt eines
+// Imports - bn4life.js braucht sonst eine weitere Bibliothek auf der Werkbank
+// (needsLibs); tools/test-syndicate-reise.js prueft, dass beide gleich sind.
+//
+// Kein Ping-Pong: Die Reise faellt nur an, solange die Figur NICHT in Aevum
+// oder Sector-12 steht, und die Gym-Reisen (blade.js, bbtrain.js) gehen
+// ebenfalls nach Sector-12. joinrun.js reist nur einmal je Zyklus nach Ishima,
+// zu einem Zeitpunkt, an dem Tetrads (Kampf 75, Karma -18) seine Einladung
+// laengst bekommen kann - die Syndicate-Reise kommt erst ab Kampf 200.
+export const SYNDICATE_TRIP_NODES = [3];
+export const SYNDICATE_CITY = "Sector-12";
+/** Reisekosten (Constants.ts:28 TravelCost) - die 10 Mio muessen DANACH noch da sein. */
+const TRAVEL_COST = 200e3;
+/**
+ * Geldpuffer ueber der Einladungsschwelle (Skeptiker 06.10.): Mit exakt 10 Mio
+ * nach der Reise reicht eine einzige Ausgabe eines anderen Skripts im
+ * 2-s-Fenster der Einladungspruefung, und die Einladung bleibt aus - ohne dass
+ * erneut gereist wird, wenn danach etwas die Figur wegzieht.
+ */
+const SYNDICATE_MONEY_MARGIN = 2e6;
+
+/**
+ * Soll die Figur jetzt fuer The Syndicate nach Sector-12 reisen?
+ * Rein: Spielerdatensatz (getPlayer), Karma (heart.break), aktueller Knoten.
+ * @param {{city:string, factions:string[], money:number, skills:object, jobs?:object}} p
+ * @param {number} karma
+ * @param {number} node
+ */
+export function syndicateTripDue(p, karma, node) {
+  if (!p || !SYNDICATE_TRIP_NODES.includes(node)) return false;
+  if ((p.factions || []).includes("The Syndicate")) return false;
+  if (p.city === "Aevum" || p.city === "Sector-12") return false;
+  // Player.jobs ist nach dem AUSGESCHRIEBENEN Firmennamen geschluesselt
+  // (Company/Enums.ts:25-26), nicht nach "CIA"/"NSA".
+  const jobs = Object.keys(p.jobs || {});
+  if (jobs.includes("Central Intelligence Agency")
+      || jobs.includes("National Security Agency")) return false;
+  const k = p.skills || {};
+  if (!(k.hacking >= 200)) return false;
+  if (!["strength", "defense", "dexterity", "agility"].every((s) => k[s] >= 200)) return false;
+  if (!(Number(karma) <= -90)) return false;
+  return Number(p.money) >= 10e6 + TRAVEL_COST + SYNDICATE_MONEY_MARGIN;
+}
+
+/**
+ * Steht in New Tokyo ein Graft-Start an? (Skeptiker 06.10.) graft.js reist
+ * nach New Tokyo und wartet danach bis zu 60 s auf die Figur-Vergabe, erst
+ * dann ruft es graftAugmentation - und das wirft, wenn die Figur nicht mehr
+ * in New Tokyo steht (Grafting.ts:60-62). In diesem Fenster darf die
+ * Syndicate-Reise die Figur nicht wegziehen. Erkennbar am geltenden Antrag
+ * von graft.js (graft.js frischt ihn im Wartefenster alle 10 s auf). Ein
+ * LAUFENDES Graft stoert die Reise nicht (Person.ts:243-252), deshalb reicht
+ * der Antrag; nach seinem Ablauf (TTL) darf die Reise wieder.
+ * @param {string} city
+ * @param {string} antragText Inhalt von data/figure-request-graft.js.json
+ * @param {number} jetzt Wanduhr
+ */
+export function graftStartPending(city, antragText, jetzt) {
+  if (city !== "New Tokyo" || !antragText) return false;
+  let a = null;
+  try { a = JSON.parse(antragText); } catch { return false; }
+  return antragGilt(a, jetzt, NaN);
+}
 
 export async function main(ns) {
   const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
@@ -301,7 +404,22 @@ export async function main(ns) {
     if (jetzt - letzteReise > 60000) {
       letzteReise = jetzt;
       const spieler = ns.getPlayer();
-      if (!spieler.factions.includes("Aevum") && geld > 45e6
+      // --- 1c. The Syndicate vor dem ersten Corp-Einbau (H2-light, 06.10.2026)
+      // Begruendung und Belege bei syndicateTripDue unten. ns.heart.break
+      // kostet 0 GB (RamCostGenerator.ts:664), getResetInfo ist oben schon
+      // geladen - der Block kostet also kein RAM.
+      let syndicateTravelled = false;
+      if (syndicateTripDue(spieler, ns.heart.break(), ns.getResetInfo().currentNode)
+          && !graftStartPending(spieler.city, liesVonHome(ns, antragsDatei("graft.js")), Date.now())) {
+        if (ns.singularity.travelToCity(SYNDICATE_CITY)) {
+          syndicateTravelled = true;
+          sag("Nach " + SYNDICATE_CITY + " gereist: alle Bedingungen fuer The Syndicate"
+            + " erfuellt ausser der Stadt (war " + spieler.city + ").");
+        }
+      }
+      // Nach der Syndicate-Reise ist spieler.city veraltet - in derselben Runde
+      // nicht gleich weiter nach Aevum (Skeptiker 06.10., KOSMETIK 4).
+      if (!syndicateTravelled && !spieler.factions.includes("Aevum") && geld > 45e6
           && spieler.city !== "Aevum") {
         if (ns.singularity.travelToCity("Aevum")) {
           sag("Nach Aevum gereist (Guthaben " + Math.round(geld / 1e6) + "m).");

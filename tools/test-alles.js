@@ -153,6 +153,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-syndicate-reise.js",
+    deckt: "EBENE 0+2: bn4life.js holt die Figur in BN3 (Corp-Knoten, = CORP_MONEY_NODES) nach Sector-12, sobald fuer The Syndicate nur noch die Stadt fehlt - in BN2.3/BN3.1 stand sie in Zyklus 1 bis zum Einbau in Ishima (H2-light 06.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-leiter.js",
     deckt: "Strafleiter, Signale und die drei Waechteruhren, mit Uhren-Lint (C.6)",
     schnell: true,

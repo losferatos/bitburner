@@ -1643,8 +1643,32 @@ export async function main(ns) {
         const wo = toolHosts.get(datei);
         if (wo && wo.length && !wo.includes(werkbank)) continue;
         werkbankReserve += braucht;
+        // Kinder-Platz schon beim Start mitreservieren (Skeptiker 06.10.,
+        // ERNST 2): laeuft das Werkzeug noch nirgends, startet es hier - und
+        // die kindReserve unten greift erst ab der naechsten Runde.
+        if (!(wo && wo.length)) {
+          const eintrag = ((regGeladen && regGeladen.eintraege) || []).find((x) => x.name === datei);
+          const kind = eintrag ? Number(eintrag.childRamGb) : 0;
+          if (kind > 0) werkbankReserve += kind;
+        }
       }
       werkbankReserve += groesstes;
+    }
+
+    // PLATZ FUER KINDER-SKRIPTE (06.10.2026, Befund corp.js live). Ein
+    // Werkzeug, das selbst Einmal-Skripte per exec startet, braucht auf
+    // SEINEM Wirt freien Platz dafuer - sonst fuellt die Arbeiterverteilung
+    // unten alles auf. Gemessen 17:12: corp.js auf fulcrumtech (1 TB) voll mit
+    // Arbeitern, jedes Einmal-Skript (62-82 GB) "no_space", Corp "blocked".
+    // Registry-Feld childRamGb; reserviert auf jedem Wirt, auf dem das
+    // Werkzeug gerade laeuft (toolHosts aus derselben Runde).
+    const kindReserve = new Map();
+    for (const e of (regGeladen && regGeladen.eintraege) || []) {
+      const gb = Number(e.childRamGb);
+      if (!(gb > 0)) continue;
+      for (const h of toolHosts.get(e.name) || []) {
+        kindReserve.set(h, (kindReserve.get(h) || 0) + gb);
+      }
     }
 
     // --- 2. Ziele waehlen (Erfahrung und mehrere Geldziele) --------------------
@@ -2574,7 +2598,8 @@ export async function main(ns) {
         // um ihren gemessenen Werkzeugbedarf gekuerzt (siehe 1c).
         const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
           - (host === "home" ? reserveHome() : 0)
-          - (host === werkbank ? werkbankReserve : 0);
+          - (host === werkbank ? werkbankReserve : 0)
+          - (kindReserve.get(host) || 0);
         // EXPFARM_SKRIPT extra dazu (Fix B2): es steht bewusst nicht in
         // WORKER - WORKER zaehlt auch mit, was schon je Geldziel FLIEGT
         // (flight-Zaehlung weiter unten), und der Ofen soll dort NICHT
@@ -4411,6 +4436,7 @@ export async function main(ns) {
       // eine Zahl gehoert nach draussen, sonst merkt niemand, wenn sie
       // davonlaeuft.
       werkbankReserve: Math.round(werkbankReserve),
+      kindReserve: Object.fromEntries([...kindReserve].map(([h, gb]) => [h, Math.round(gb)])),
       // Der Deckel ist seit dem 22.08.2026 kein fester Wert mehr, sondern
       // haengt am Netz. Eine Groesse, die sich von selbst bewegt, gehoert
       // nach draussen - sonst merkt niemand, wenn sie irgendwohin laeuft.

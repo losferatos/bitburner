@@ -73,6 +73,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-kindreserve.js",
+    deckt: "Kern haelt Platz fuer Kinder-Skripte (childRamGb) auf dem Wirt frei; corp-act deckt das groesste Kind (Befund 06.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-gang-knoten.js",
     deckt: "Check-in ignoriert gang.json aus dem Vorknoten (Fehlalarm BN3.1, 05.10.)",
     schnell: true,

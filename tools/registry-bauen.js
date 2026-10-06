@@ -333,6 +333,7 @@ const STEUERND = {
   "restartPolicy": "bn4net.js",
   "needsLibs": "bn4net.js",
   "killSafe": "boot.js",
+  "childRamGb": "bn4net.js",
 };
 // Beschreibend - mit der Begruendung, warum kein Leser noetig ist.
 const BESCHREIBEND = {

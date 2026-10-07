@@ -1192,6 +1192,22 @@ Engpass, und Mischen bringt hier nichts mehr. Der Punkt ist damit erledigt.
 
 ## Offen, nach Dringlichkeit
 
+### Roadmap-Pruefung 10/2026: Bauauftraege fuer BN14/13/15 (07.10.2026)
+
+Ergebnis nodes/AUDIT-ROADMAP-PRUEFUNG-2026-10.md (278be75): Route bleibt, Corp
+nur in BN3 (Bestechungsschwelle 1e14 ausserhalb BN3 in 36 h nicht erreichbar).
+Faellig erst VOR dem Eintritt in BN14 (Route: BN11 x3, BN6 x2, BN7 x3, dann 14).
+Reihenfolge nach Prioritaet:
+
+1. BN15 V1b Labyrinth-Gewerk - erst Machbarkeitstest mit Abbruchkriterium
+   (Einbau je Lab, 5 Zyklen, Charisma 3.000, WD-Level ~10.000).
+2. Simulacrum-Parallelarbeit (bn4rep.js:642, lib/figur.js) fuer BN14/13/15.
+2. IPvGO-Spieler gegen Tetrads in BN14 (+6-13 h ueber SF14 in BN13).
+3. Hash-Rang nach erstem Einbau in BN15/13 (nicht gerechnet).
+
+Offen aus der Pruefung, beim jeweiligen Knoten messen: Ist BN11 geldgebunden
+(ServerMaxMoney 0,01)? Wirkung von SF7 ueber Black-Op-Chance/Ausdauer.
+
 ### Stealth Retirement prueft popEst statt echter Bevoelkerung (04.10.2026)
 
 Restbefund 6 des Skeptikers zum Stadtwahl-Fix: `blade.js` prueft SR weiter

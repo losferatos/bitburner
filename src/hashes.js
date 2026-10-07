@@ -88,6 +88,7 @@
 // Steuer- und Lagedateien wohnen auf home; dieses Gewerk laeuft nicht
 // zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
 import { liesVonHome } from "lib/hostdatei.js";
+import { hashRangAnlauf, HASHRANG_MAX_PREIS } from "lib/hackaugs.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -239,9 +240,17 @@ export async function main(ns) {
       // dem, was ueber der Aug-Ruecklage liegt.
       let rangTausch = false, bedarfKapazitaet = null;
       const rangPreis = ns.hacknet.hashCost(RANG);
-      if (!gymKauf && inDivision && v2 && geld - ruecklage > RANG_AB_GELD) {
-        if (rangPreis > 0 && rangPreis <= kapazitaet) rangTausch = true;
-        else bedarfKapazitaet = rangPreis;
+      // HASH-RANG IM ANLAUF (B7, 07.10.2026): in BN13/BN15 wirkt der Tausch ohne
+      // den kleinen Rangfaktor des Knotens (0,45 / 0,2) und bringt frueh
+      // Skillpunkte. Dort gilt das 1-Mrd-Tor nicht, dafuer ein Preisdeckel
+      // (HASHRANG_MAX_PREIS): die Stufen darueber gehen in den Verkauf. Ueber
+      // 1 Mrd gilt in allen Knoten unveraendert die alte Regel ohne Deckel.
+      const geldTor = geld - ruecklage > RANG_AB_GELD;
+      const anlaufRang = !geldTor && hashRangAnlauf(knoten);
+      const rangDeckel = anlaufRang ? HASHRANG_MAX_PREIS : Infinity;
+      if (!gymKauf && inDivision && v2 && (geldTor || anlaufRang)) {
+        if (rangPreis > 0 && rangPreis <= kapazitaet && rangPreis <= rangDeckel) rangTausch = true;
+        else if (rangPreis <= rangDeckel || !anlaufRang) bedarfKapazitaet = rangPreis;
       }
       const art = gymKauf ? GYM : rangTausch ? RANG : VERKAUF;
       for (let i = 0; i < 1000; i++) {
@@ -257,6 +266,7 @@ export async function main(ns) {
           if (naechster > kapazitaet || !gymLohnt(gymStufe(naechster), tiefstand)) break;
         } else if (rangTausch) {
           const naechster = ns.hacknet.hashCost(RANG);
+          if (naechster > rangDeckel) break;
           if (naechster > kapazitaet) { bedarfKapazitaet = naechster; break; }
         }
       }

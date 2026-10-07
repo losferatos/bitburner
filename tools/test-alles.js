@@ -253,6 +253,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-hashrang.js",
+    deckt: "Hash-Rang im Anlauf (B7): BN13/BN15 tauschen Hashes unter 1 Mrd in Rang (Preisdeckel 2000), Cache im ersten Zyklus; alle anderen Knoten unveraendert",
+    schnell: true,
+  },
+  {
     datei: "test-sleeve-ebene2.js",
     deckt: "EBENE 2: der Geldboden der Koerper gegen den Nachholrueckstand (storedCycles) - und der Mock, der ihn nachbildet",
     schnell: false,

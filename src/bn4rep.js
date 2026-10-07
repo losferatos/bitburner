@@ -639,7 +639,32 @@ export async function main(ns) {
   // In einem Kampfknoten wird also gar nicht mehr fuer Faktionen gearbeitet -
   // weder vor noch nach dem Beitritt. bn4rep behaelt alles andere: Kaufen und
   // Einbauen brauchen keine Arbeit, nur Geld und vorhandene Reputation.
-  const bladeSperreArbeit = bladeburnerTraegtHier;
+  //
+  // AUSNAHME MIT SIMULACRUM (07.10.2026, Befund B5). `The Blade's Simulacrum`
+  // (SF7.3) laesst Spielerarbeit NEBEN der Bladeburner-Aktion laufen
+  // (`Bladeburner.ts:178` und `:1354` pruefen es; ohne wird abgebrochen).
+  // Dann faellt die Sperre - aber erst, wenn das Kampfwert-Ziel von bbtrain
+  // erreicht ist: sonst gewinnt die Faktionsarbeit (Prio 30) gegen das Gym
+  // (Prio 40) und das Training verhungert nach jedem Einbau (alle Kampfwerte
+  // stehen dann auf 1). Der Marker data/simulacrum.txt wird weiter unten aus
+  // der Besitzpruefung der Runde gefuehrt (eine Stelle, 0 GB fuer alle Leser).
+  // Ohne Marker ist das Ergebnis exakt `bladeburnerTraegtHier()` wie zuvor.
+  const SIMULACRUM = "The Blade's Simulacrum";
+  const SIMULACRUM_MARKER = "data/simulacrum.txt";
+  const KAMPFZIEL_STANDARD = 100;   // wie bbtrain.js, wenn es kein Ziel meldet
+  const simulacrumParallelFrei = () => {
+    try {
+      if (!ns.fileExists(SIMULACRUM_MARKER, "home")) return false;
+      let ziel = KAMPFZIEL_STANDARD;
+      try {
+        const t = JSON.parse(liesVonHome("data/bbtrain.json") || "null");
+        if (t && Number.isFinite(t.ziel) && t.ziel > 0) ziel = t.ziel;
+      } catch { /* Standardziel */ }
+      const k = ns.getPlayer().skills;
+      return Math.min(k.strength, k.defense, k.dexterity, k.agility) >= ziel;
+    } catch { return false; }   // im Zweifel gesperrt, wie bisher
+  };
+  const bladeSperreArbeit = () => bladeburnerTraegtHier() && !simulacrumParallelFrei();
 
   // --- Die Figur-Wache (Position C.11) --------------------------------------
   //
@@ -746,6 +771,18 @@ export async function main(ns) {
     const alleAugs = ns.singularity.getOwnedAugmentations(true);
     const eingebauteAugs = ns.singularity.getOwnedAugmentations(false);
     const besitz = new Set(alleAugs);
+    // Der Simulacrum-Marker: EINE Stelle, von der bn4net (Vergabe), blade.js und
+    // bn4rep lesen. Installiert zaehlt (getOwnedAugmentations(false)), nicht
+    // eingereiht. Weg, wenn die Augmentierung weg ist (Textdateien ueberleben
+    // den Knotenwechsel, siehe graft.js).
+    try {
+      const simDa = ns.fileExists(SIMULACRUM_MARKER, "home");
+      if (eingebauteAugs.includes(SIMULACRUM)) {
+        if (!simDa) schreibNachHome(SIMULACRUM_MARKER, String(Date.now()));
+      } else if (simDa) {
+        loeschAufHome(SIMULACRUM_MARKER);
+      }
+    } catch { /* ohne Marker bleibt alles beim Alten (Sperre) */ }
     const wartend = alleAugs.length - eingebauteAugs.length;
     const geld = ns.getServerMoneyAvailable("home");
     // A5 (Skeptiker-Einwand 1): Zufluss aus dem Spiel, nicht aus der

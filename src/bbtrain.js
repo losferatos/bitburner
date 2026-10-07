@@ -88,7 +88,9 @@ async function runde(ns) {
   // beider Schleifen unten.
   const herzschlag = () => {
     try {
-      ns.write("data/bbtrain.json", JSON.stringify({ zeit: Date.now(), host: ns.getHostname() }), "w");
+      // `ziel` veroeffentlicht das Kampfwert-Ziel: bn4rep laesst Faktionsarbeit
+      // neben Bladeburner (Simulacrum) erst zu, wenn es erreicht ist.
+      ns.write("data/bbtrain.json", JSON.stringify({ zeit: Date.now(), host: ns.getHostname(), ziel: ZIEL }), "w");
       if (ns.getHostname() !== "home") ns.scp("data/bbtrain.json", "home", ns.getHostname());
     } catch { /* egal */ }
   };

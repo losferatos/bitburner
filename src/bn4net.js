@@ -4583,7 +4583,12 @@ export async function main(ns) {
       } catch { /* dann ohne Lebendpruefung - alte Regel gilt weiter */ }
       const lebt = lebendig.size ? (t) => lebendig.has(t) : undefined;
 
-      const e = figVergib(antraege, bisher, jetztF, nodeResetF, lebt);
+      // Mit installiertem Simulacrum darf neben einer Bladeburner-Aktion eine
+      // Faktions-/Firmenarbeit laufen (Befund B5). Der Marker kommt aus bn4rep
+      // (Besitzpruefung); 0 GB, ohne Marker bleibt die Vergabe wie frueher.
+      let simulacrumF = false;
+      try { simulacrumF = ns.fileExists("data/simulacrum.txt", "home"); } catch { /* egal */ }
+      const e = figVergib(antraege, bisher, jetztF, nodeResetF, lebt, { simulacrum: simulacrumF });
       if (e.wechsel || !figVergabeGilt(bisher, jetztF, nodeResetF)) {
         sag("Figur: " + (e.vergabe ? e.vergabe.owner + " -> " + e.vergabe.action : "frei")
           + " (" + e.grund + ", " + antraege.length + " Antrag/Antraege)");

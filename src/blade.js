@@ -52,7 +52,7 @@ import { haengeAnHome, liesVonHome, nachHome } from "lib/hostdatei.js";
 // `startAction` raeumt beides weg. Der Kern ist der Schiedsrichter (Abschnitt
 // 9a in bn4net.js); hier wird nur beantragt und nachgesehen.
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
-import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -252,6 +252,10 @@ export async function main(ns) {
   // als `gewichen` deklariert ist. Ein Zugriff von dort waere ein
   // ReferenceError aus der temporalen Totzone.
   let weichtTraining = false;
+  // Blade WILL ins Gym (Tiefstand >= Ziel, nichts ueber Schwelle), auch wenn
+  // `gymGreifen()` es gerade nicht bekommt. bn4rep laesst Faktionsarbeit neben
+  // Bladeburner (Simulacrum) nur zu, solange das false ist (data/blade.json).
+  let gymWunsch = false;
   // DER GRAFT ALS TRAEGER (22.09.2026, Skeptiker B4).
   //
   // Laeuft ein Graft ohne The Blade's Simulacrum, haelt der Motor still
@@ -1384,7 +1388,10 @@ export async function main(ns) {
   // Vorgeschichte in zwei Schritten, beide gemessen:
   //
   //  07:00  Gym-Hebel eingebaut mit der Begruendung, der Arbeitskanal laufe
-  //         parallel zur Bladeburner-Aktion. **Falsch.**
+  //         parallel zur Bladeburner-Aktion. **Falsch - OHNE Simulacrum.**
+  //         (Mit `The Blade's Simulacrum` laeuft Arbeit neben der Aktion; dann
+  //         nimmt bn4rep Faktionsarbeit parallel auf, solange blade nicht ins
+  //         Gym will, und `gymGreifen` loest sie ab, wenn es will - B5, 07.10.2026.)
   //         `Bladeburner.ts:178-180` ruft in `startAction()` ein
   //         `Player.finishWork(true)`, und `process()` bricht umgekehrt die
   //         Bladeburner-Aktion ab, sobald `currentWork` gesetzt ist
@@ -1453,7 +1460,15 @@ export async function main(ns) {
           && (!laeuft.location || laeuft.location === GYM_NAME)) {
         return kurz;   // laeuft schon richtig, nicht neu starten
       }
-      if (laeuft && laeuft.type !== "CLASS") return null;   // fremde Arbeit
+      // Fremde Arbeit blockiert das Gym - AUSSER Faktions-/Firmenarbeit mit
+      // Simulacrum: die hat bn4rep neben Bladeburner laufen lassen, solange
+      // blade nicht ins Gym wollte. Will es jetzt, geht das Gym vor
+      // (Faktor 10 gegen Bladeburner-Training); die Reputation bleibt erhalten.
+      if (laeuft && laeuft.type !== "CLASS") {
+        const parallel = (laeuft.type === "FACTION" || laeuft.type === "COMPANY")
+          && ns.fileExists("data/simulacrum.txt", "home");
+        if (!parallel) return null;   // fremde Arbeit
+      }
 
       // DIE FIGUR-WACHE (Position C.11). Auch das Gymnasium beansprucht die
       // Figur: `gymWorkout` beendet jede laufende Arbeit, ein Graft
@@ -1791,6 +1806,7 @@ export async function main(ns) {
       aufraeumen: chaosAufraeumen,
       // Anlaufphase: der Motor weicht bbtrain, der Rang steht planmaessig.
       weichtTraining,
+      gymWunsch,
       gymSeit,
       // Graft ohne Simulacrum: dessen Fortschritt statt des Rangs.
       graftFortschritt,
@@ -3993,6 +4009,7 @@ export async function main(ns) {
     // Deshalb faellt sie zu Beginn JEDER Runde auf false und wird nur dort
     // gesetzt, wo wirklich zugunsten von bbtrain gewichen wird.
     weichtTraining = false;
+    gymWunsch = false;
     graftFortschritt = null;
     // gymSeit lebt nur, solange der Gym-Zweig Runde fuer Runde genommen wird.
     const gymVorher = gymSeit;
@@ -4287,12 +4304,13 @@ export async function main(ns) {
       // greift auf Bladeburner-Training zurueck - gratis
       // (`Bladeburner.ts:1091-1105`), hebt alle vier Kampfwerte und belegt
       // den Arbeitskanal NICHT, kann sich also mit nichts in die Quere kommen.
-      const BBTRAIN_ZIEL = 100;
+      const BBTRAIN_ZIEL = KAMPFZIEL_STANDARD;
       // Der `!lohntSich`-Zweig ist zurueck (28.08., 08:40) - aber jetzt mit
       // einem Uebernehmer: Nicht bbtrain bekommt die Figur, sondern blade.js
       // fuehrt das Gym selbst (`gymGreifen()` oben). Damit kann der Fall von
       // 07:49 nicht wiederkehren, in dem beide Skripte gewichen sind.
       if (tiefstand >= BBTRAIN_ZIEL && !lohntSich) {
+        gymWunsch = true;
         // IM GYM LAEUFT `waehle()` NICHT - ZWEI SEINER NEBENAUFGABEN DESHALB
         // AUCH HIER (Skeptiker 03.10.2026, seit dem Gym-Zweig vom 28.08. offen):
         // 1. Faehigkeiten kaufen. Der Kauf stand nur hinter diesem `continue`.

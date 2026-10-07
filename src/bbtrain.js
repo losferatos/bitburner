@@ -35,7 +35,7 @@
 // Riegel gewinnt, wer zuletzt schreibt. Der Kern ist der Schiedsrichter
 // (Abschnitt 9a in bn4net.js); hier wird nur beantragt und nachgesehen.
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
-import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -51,7 +51,7 @@ export async function main(ns) {
 /** @param {NS} ns */
 async function runde(ns) {
 
-  const ZIEL = Number(ns.args[0]) || 100;
+  const ZIEL = Number(ns.args[0]) || KAMPFZIEL_STANDARD;
   // DAS BESTE STUDIO, NICHT DAS NAECHSTE (25.08.2026).
   //
   // Der Ortsmultiplikator geht voll in die Erfahrung ein, und die Spanne ist
@@ -88,7 +88,9 @@ async function runde(ns) {
   // beider Schleifen unten.
   const herzschlag = () => {
     try {
-      ns.write("data/bbtrain.json", JSON.stringify({ zeit: Date.now(), host: ns.getHostname() }), "w");
+      // `ziel` veroeffentlicht das Kampfwert-Ziel: bn4rep laesst Faktionsarbeit
+      // neben Bladeburner (Simulacrum) erst zu, wenn es erreicht ist.
+      ns.write("data/bbtrain.json", JSON.stringify({ zeit: Date.now(), host: ns.getHostname(), ziel: ZIEL }), "w");
       if (ns.getHostname() !== "home") ns.scp("data/bbtrain.json", "home", ns.getHostname());
     } catch { /* egal */ }
   };

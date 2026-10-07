@@ -138,6 +138,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-simulacrum.js",
+    deckt: "Simulacrum-Parallelarbeit (B5): Faktionsarbeit neben Bladeburner nur mit Simulacrum UND Kampfwert-Ziel; ohne Simulacrum bitgleich",
+    schnell: true,
+  },
+  {
     datei: "test-joinrun-ebene2.js",
     deckt: "EBENE 2: joinrun.js gegen eine dauerhafte PRIO.faktion(30)-Konkurrenz - PRIO.beitritt (25) gewinnt und behaelt die Figur (C2-Blocker, Audit 3#6/6#4), auch ueber die 15-min-Lease hinaus (Integration 27.09.); ausserdem G-Ueberschiessen (eigenes Training stoppt aktiv am Ziel) und G2 (Stadt wird unter der Lease nachgezogen, kein Haemmern) (Audit-Nachmessung 27.09.)",
     schnell: true,

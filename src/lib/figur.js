@@ -49,6 +49,14 @@
  *    ins Gym will.
  */
 
+/**
+ * Das Kampfwert-Ziel, ab dem die Figur nicht mehr ins Gym muss. EINE Konstante
+ * fuer blade.js (BBTRAIN_ZIEL), bbtrain.js (Standard von args[0]) und das
+ * Simulacrum-Gate in bn4rep.js - sonst laeuft das Gate gegen ein anderes Ziel
+ * als das Training.
+ */
+export const KAMPFZIEL_STANDARD = 100;
+
 /** Rangfolge: kleiner gewinnt. */
 export const PRIO = {
   deadlock: 0,      // Sprosse 0, Konto negativ - schlaegt alles
@@ -179,7 +187,7 @@ export function antragGilt(a, jetzt, nodeReset) {
  * @param {(tool: string) => boolean} [lebt] laeuft dieses Werkzeug noch?
  * @returns {{vergabe: object|null, grund: string, wechsel: boolean}}
  */
-export function vergib(antraege, bisher, jetzt, nodeReset, lebt) {
+function vergibEinzel(antraege, bisher, jetzt, nodeReset, lebt) {
   const gueltig = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset));
 
   // Der tote Besitzer: die Lease wird sofort fallengelassen, und die Vergabe
@@ -242,6 +250,65 @@ export function vergib(antraege, bisher, jetzt, nodeReset, lebt) {
   };
 }
 
+/**
+ * Aktionen, die NEBEN einer Bladeburner-Aktion laufen duerfen, sobald
+ * `The Blade's Simulacrum` installiert ist (07.10.2026, Befund B5).
+ *
+ * Das Spiel bricht eine Bladeburner-Aktion nur ab, wenn das Simulacrum fehlt
+ * (`Bladeburner.ts:178` beim Start, `:1354` je Tick). Mit ihm laufen
+ * Faktions- und Firmenarbeit daneben (`startWork` fasst Bladeburner nicht an,
+ * `PlayerObjectWorkMethods.ts:5-10`). Gym, Graft und Verbrechen gehoeren NICHT
+ * dazu: ein Graft hat Prio 10 und wird ohnehin nie von Bladeburner verdraengt,
+ * Gym/Verbrechen sind keine Arbeit, die Rang nebenher verdienen soll.
+ */
+export const PARALLEL_ZU_BLADEBURNER = new Set(["faktion", "arbeit"]);
+
+/**
+ * Die Vergabe. Ohne `opts.simulacrum` ist das EXAKT die Einzelvergabe von
+ * frueher (gleiches Objekt, kein neues Feld) - das Verhalten ohne Simulacrum
+ * bleibt bitgleich.
+ *
+ * Mit `opts.simulacrum` und einer Vergabe an eine Bladeburner-Aktion kann
+ * zusaetzlich EIN Faktions-/Firmenantrag mitlaufen: die Vergabe bekommt
+ * `mit: [werkzeug]` und `mitAktion`. Der Besitzer und die Lease bleiben die
+ * der Bladeburner-Aktion. Das Feld wird in JEDER Runde frisch berechnet -
+ * die Lease-Verlaengerung kopiert die alte Vergabe, ein veraltetes `mit`
+ * wuerde sonst haengen bleiben.
+ *
+ * Nur die Sperre in bn4rep zu lockern waere ein stiller No-op: Prio 20
+ * (Bladeburner) bricht sonst jeden Antrag mit Prio 30.
+ *
+ * @param {Array} antraege
+ * @param {object|null} bisher
+ * @param {number} jetzt
+ * @param {number} nodeReset
+ * @param {(tool: string) => boolean} [lebt]
+ * @param {{simulacrum?: boolean}} [opts]
+ */
+export function vergib(antraege, bisher, jetzt, nodeReset, lebt, opts) {
+  const e = vergibEinzel(antraege, bisher, jetzt, nodeReset, lebt);
+  const v = e.vergabe;
+  if (!v || typeof v !== "object") return e;
+  const hatMit = Object.prototype.hasOwnProperty.call(v, "mit")
+    || Object.prototype.hasOwnProperty.call(v, "mitAktion");
+  const sim = !!(opts && opts.simulacrum);
+  if (!sim && !hatMit) return e;
+  const neu = { ...v };
+  delete neu.mit;
+  delete neu.mitAktion;
+  if (sim && v.owner && v.action === "bladeburner") {
+    const kand = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset)
+      && a.tool !== v.owner && PARALLEL_ZU_BLADEBURNER.has(a.action)
+      && (typeof lebt !== "function" || lebt(a.tool)));
+    if (kand.length) {
+      const b = besterAntrag(kand);
+      neu.mit = [b.tool];
+      neu.mitAktion = b.action;
+    }
+  }
+  return { ...e, vergabe: neu };
+}
+
 /** Kleinste prio gewinnt; bei Gleichstand der AELTERE Antrag (kein Ping-Pong). */
 function besterAntrag(gueltig) {
   return [...gueltig].sort((a, b) => (a.prio - b.prio) || (a.wall - b.wall))[0];
@@ -301,7 +368,10 @@ export function darfFigur(vergabe, tool, jetzt, nodeReset, letzteSeq = null) {
     return { darf: false, grund: "Vergabe abgelaufen oder aus einem anderen Lauf",
       veraltet: false };
   }
-  if (vergabe.owner !== tool) {
+  // Neben einer Bladeburner-Aktion darf mit Simulacrum EIN Faktions-/Firmen-
+  // antrag mitlaufen (`vergib` setzt `mit`). Ohne Simulacrum gibt es das Feld nie.
+  if (vergabe.owner !== tool
+      && !(Array.isArray(vergabe.mit) && vergabe.mit.includes(tool))) {
     return { darf: false, grund: "Figur gehoert gerade " + vergabe.owner +
       " (" + vergabe.action + ")", veraltet: false };
   }
@@ -328,6 +398,11 @@ export function pruefeHandlung(vergabe, tatsaechlich) {
   if (tatsaechlich === null) {
     return { stimmt: false,
       grund: vergabe.owner + " hat die Figur fuer " + vergabe.action + ", sie tut aber nichts" };
+  }
+  // Parallelarbeit (Simulacrum): die Figur tut dann die Mitaktion statt der
+  // Bladeburner-Aktion, ohne dass jemand an der Vergabe vorbeigreift.
+  if (vergabe.mitAktion && tatsaechlich === vergabe.mitAktion) {
+    return { stimmt: true, grund: "" };
   }
   if (vergabe.action && tatsaechlich !== vergabe.action) {
     return { stimmt: false,

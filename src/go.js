@@ -74,9 +74,10 @@
  *      antwortet mit seinem besten Zug (oder passt); es zaehlt der schlechteste
  *      Ausgang. Das faengt Zuege, die eine eigene Kette ins Atari stellen oder
  *      einen Schlag uebersehen.
- *   5. Gespielt wird nur, was gegenueber Passen gewinnt (PASS_EPS). Hat der
- *      Gegner gerade gepasst und der Spieler fuehrt laut Spiel, wird sofort
- *      gepasst, damit die Partie endet.
+ *   5. Gespielt wird nur, was gegenueber Passen gewinnt (PASS_EPS). Auch bei
+ *      Fuehrung wird weitergespielt, solange das Punkte bringt (nodePower
+ *      haengt an der eigenen Punktzahl); gepasst wird erst, wenn nichts
+ *      mehr besser ist als Passen.
  *
  * ZEIT
  *
@@ -95,10 +96,18 @@
  * @param {NS} ns
  */
 
-import { nachHome } from "lib/hostdatei.js";
-
 /** Knoten, in denen der Bonus den Platz lohnt (Begruendung oben). */
 export const GO_NODES = [14, 13];
+/**
+ * Lohnt IPvGO hier? BN14 immer (GoPower 4); BN13 nur mit SF14 (sonst GoPower 1
+ * ohne Verdopplung, rund 5 % bei n=500: lohnt den RAM nicht).
+ */
+export function goLohnt(node, sf14) {
+  if (!GO_NODES.includes(node)) return false;
+  if (node === 14) return true;
+  return sf14 > 0;
+}
+const TELEMETRY_MS = 30000;
 /** Gegner und Brett (Begruendung oben). */
 export const OPPONENT = "Tetrads";
 export const BOARD_SIZE = 7;
@@ -343,8 +352,10 @@ export function chooseMove(rows, opt = {}) {
   const hist = new Set(opt.history || []);
   const blocked = opt.blocked || new Set();
 
-  // Der Gegner hat gepasst und wir fuehren: Partie beenden.
-  if (opt.oppPassed && opt.ahead === true) return { type: "pass" };
+  // KEIN fruehes Passen bei Fuehrung: nodePower haengt an der eigenen
+  // Punktzahl (scoring.ts endGoGame), also wird weiter eingesammelt, solange
+  // ein Zug besser ist als Passen. Hat der Gegner gepasst, endet die Partie,
+  // sobald wir auch passen - und das tun wir erst, wenn nichts mehr bringt.
 
   const cands = [];
   for (let i = 0; i < g.length; i++) {
@@ -387,12 +398,18 @@ export async function main(ns) {
   ns.disableLog("ALL");
   let node = 0;
   try { node = ns.getResetInfo().currentNode; } catch { node = 0; }
-  if (!GO_NODES.includes(node)) {
-    ns.print("BitNode " + node + ": IPvGO lohnt hier nicht (nur " + GO_NODES.join("/") + ") - beende mich.");
+  // SF14 (ownedSF ist eine Map) wird mit demselben getResetInfo gelesen.
+  let sf14 = 0;
+  try {
+    const o = ns.getResetInfo().ownedSF;
+    sf14 = (o && typeof o.get === "function" ? o.get(14) : o && o[14]) || 0;
+  } catch { sf14 = 0; }
+  if (!goLohnt(node, sf14)) {
+    ns.print("BitNode " + node + " (SF14 " + sf14 + "): IPvGO lohnt hier nicht - beende mich.");
     return;
   }
 
-  let games = 0, won = 0, lost = 0;
+  let games = 0, won = 0, lost = 0, lastTelemetry = 0;
 
   const telemetry = (extra) => {
     let st = null;
@@ -404,19 +421,23 @@ export async function main(ns) {
       winStreak: st ? st.winStreak : null,
       ...(extra || {}),
     };
-    nachHome(ns, TELEMETRY_FILE, JSON.stringify(o));
+    lastTelemetry = Date.now();
+    // Die Telemetrie muss auf home liegen; das Gewerk laeuft auf der Werkbank.
+    // Eigenes write+scp statt lib/hostdatei.js: das Modul zieht fileExists
+    // (0,1 GB) mit, das hier sonst nirgends gebraucht wird.
+    ns.write(TELEMETRY_FILE, JSON.stringify(o), "w");
+    if (ns.getHostname() !== "home") { try { ns.scp(TELEMETRY_FILE, "home", ns.getHostname()); } catch { /* egal */ } }
   };
 
   /** Ein Zug (oder Pass); gibt die Antwort des Gegners zurueck. */
   const takeTurn = async (oppPassed, turn) => {
     const rows = ns.go.getBoardState();
     const history = ns.go.getMoveHistory().map((b) => b.join(""));
-    const gs = ns.go.getGameState();
     const blocked = new Set();
     for (let tries = 0; tries < 6; tries++) {
       const d = turn > MAX_TURNS
         ? { type: "pass" }
-        : chooseMove(rows, { history, oppPassed, ahead: gs.blackScore > gs.whiteScore, blocked });
+        : chooseMove(rows, { history, oppPassed, blocked });
       if (d.type === "pass") return { play: await ns.go.passTurn(), passed: true };
       try {
         return { play: await ns.go.makeMove(d.x, d.y), passed: false };
@@ -444,13 +465,16 @@ export async function main(ns) {
       const r = await takeTurn(oppPassed, turn);
       if (r.play.type === "gameOver") break;
       oppPassed = r.play.type === "pass";
-      if (turn % 10 === 9) telemetry();
+      // Zeitbedingung statt Zugzahl: im gedrosselten Tab dauert ein Zug
+      // Minuten, die Frist des Waechters laeuft in Wanduhr.
+      if (Date.now() - lastTelemetry > TELEMETRY_MS) telemetry();
     }
     if (ns.go.getCurrentPlayer() !== "None") {
-      // Das Spiel endet nicht: neu anfangen (zaehlt als Niederlage, ist aber
-      // besser als ewig im selben Spiel zu haengen).
+      // Das Spiel endet nicht: wirklich neu anfangen. Das Spiel selbst bucht
+      // das als Niederlage (resetBoardState mitten in der Partie); in den
+      // eigenen Zaehlern steht es NICHT - lost sind nur beendete Partien.
       ns.print("Partie endet nicht - neu gestartet.");
-      lost++;
+      ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
       return;
     }
     const gs = ns.go.getGameState();

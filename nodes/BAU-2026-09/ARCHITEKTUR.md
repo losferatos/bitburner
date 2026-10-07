@@ -1321,7 +1321,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "args": [],
       "ramBaseGb": 11.25,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB)",
+      "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; kein Import von lib/hostdatei.js (zoege fileExists +0,1 GB mit), eigenes write+scp; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB)",
       "verfahren": "alle",
       "knoten": [14, 13],
       "phase": "normal",
@@ -1333,9 +1333,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "priority": 17,
       "evictRank": 21,
       "needsFigure": "none",
-      "needsLibs": [
-        "lib/hostdatei.js"
-      ],
+      "needsLibs": [],
       "singularity": false,
       "restartPolicy": "always",
       "maxInstances": 1,

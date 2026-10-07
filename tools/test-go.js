@@ -236,6 +236,7 @@ function neuerGoMock(opts = {}) {
       const sp = z.spiel;
       if (sp.ende || sp.vorher !== "O") { z.abgelehnt++; throw new Error("nicht am Zug"); }
       z.passes++;
+      if (opts.endlos) return { type: "move", x: 0, y: 0 };   // Gegner spielt ewig, Partie endet nie
       sp.vorher = "X";
       sp.passes++;
       if (sp.passes >= 2) { ende(); return { type: "gameOver", x: null, y: null }; }
@@ -256,8 +257,8 @@ function neuerGoMock(opts = {}) {
     disableLog: () => {},
     print: () => {},
     getHostname: () => "home",
-    getResetInfo: () => ({ currentNode: opts.knoten ?? 14 }),
-    write: (d, inh) => { z.dateien[d] = inh; },
+    getResetInfo: () => ({ currentNode: opts.knoten ?? 14, ownedSF: new Map(opts.sf14 ? [[14, opts.sf14]] : []) }),
+    write: (d, inh) => { z.dateien[d] = inh; z.dateiSchreibungen = (z.dateiSchreibungen || 0) + 1; },
     scp: () => true,
     sleep: async () => { z.sleeps++; if (z.sleeps > 400) throw gesperrt; },
   };
@@ -334,17 +335,31 @@ console.log("-- 3. Kein sinnvoller Zug -> Pass --");
 }
 
 console.log("");
-console.log("-- 4. Gegner hat gepasst und wir fuehren -> Pass --");
+console.log("-- 4. Kein fruehes Passen bei Fuehrung --");
 {
   const b = Array.from({ length: 7 }, () => ".......");
   const sz = (x, y, c) => { b[x] = b[x].slice(0, y) + c + b[x].slice(y + 1); };
   // Stellung wie in Fall 1: ein Schlag steht zur Verfuegung.
   sz(3, 3, "O"); sz(2, 3, "X"); sz(4, 3, "X"); sz(3, 2, "X");
-  const mit = modul.chooseMove(b, { oppPassed: true, ahead: true });
-  pruefe("passt, um die Partie zu beenden", mit.type === "pass");
-  const zurueck = modul.chooseMove(b, { oppPassed: true, ahead: false });
-  pruefe("liegen wir zurueck, wird weitergespielt (Schlag)", zurueck.type === "move" && zurueck.x === 3 && zurueck.y === 4,
-    JSON.stringify(zurueck));
+  // Kein fruehes Passen bei Fuehrung (nodePower haengt an der eigenen
+  // Punktzahl): auch nach dem Pass des Gegners wird der Schlag gespielt.
+  const nachPass = modul.chooseMove(b, { oppPassed: true });
+  pruefe("Gegner hat gepasst, Schlag steht zur Verfuegung -> wird gespielt",
+    nachPass.type === "move" && nachPass.x === 3 && nachPass.y === 4, JSON.stringify(nachPass));
+  // Nichts mehr zu holen: dann (und nur dann) wird gepasst.
+  const fertig = Array.from({ length: 7 }, () => "XXXXXXX");
+  fertig[1] = "XX.XXXX"; fertig[5] = "XXXXX.X";
+  pruefe("nichts mehr besser als Passen -> Pass", modul.chooseMove(fertig, { oppPassed: true }).type === "pass");
+  // Spielebene: Fuehrung beendet die Partie nicht vorzeitig - Gegner passt
+  // frueh, wir spielen trotzdem weiter, solange Zuege Punkte bringen.
+  const sp = neuesSpiel(7, "Tetrads", 11);
+  const m = neuerGoMock({ spiel: sp, maxPartien: 1 });
+  m.z.spiel.b = ["XXXXXXX", "XXXXXXX", "XXXX...", "XXXX...", "XXXX...", "XXXX...", "XXXX..."];
+  m.z.spiel.hist.push("x");
+  m.z.spiel.vorher = "O";
+  try { await modul.main(m.ns); } catch (e) { if (!e.mockAbbruch) throw e; }
+  pruefe("Spiel: bei klarer Fuehrung werden weiter Steine gesetzt, nicht sofort gepasst", m.z.zuege >= 1,
+    m.z.zuege + " Zuege, " + m.z.passes + " Paesse");
 }
 
 console.log("");
@@ -380,6 +395,40 @@ console.log("-- 6. falscher Knoten -> Ende ohne ns.go --");
       m.z.goAufrufe === 0 && m.z.resets.length === 0 && Object.keys(m.z.dateien).length === 0 && m.z.sleeps === 0);
   }
   pruefe("GO_NODES = [14, 13]", JSON.stringify(modul.GO_NODES) === "[14,13]");
+
+  // BN13 lohnt nur mit SF14, BN14 immer.
+  const leer = (m) => m.z.goAufrufe === 0 && m.z.resets.length === 0 && m.z.sleeps === 0;
+  const m13 = await fahre({ knoten: 13 });
+  pruefe("BN13 ohne SF14: sofort Ende", leer(m13));
+  const m13s = await fahre({ knoten: 13, sf14: 1, maxPartien: 2 });
+  pruefe("BN13 mit SF14: spielt", m13s.z.goAufrufe > 0 && m13s.z.resets.length >= 1);
+  const m14 = await fahre({ knoten: 14, maxPartien: 2 });
+  pruefe("BN14 ohne SF14: spielt", m14.z.goAufrufe > 0);
+  pruefe("goLohnt: 14 immer, 13 nur mit SF14, sonst nie",
+    modul.goLohnt(14, 0) && !modul.goLohnt(13, 0) && modul.goLohnt(13, 1) && !modul.goLohnt(10, 3));
+}
+
+console.log("");
+console.log("-- 6b. Partie endet nicht -> echter Neustart, lost bleibt sauber --");
+{
+  const m = await fahre({ knoten: 14, endlos: true, maxPartien: 3 });
+  pruefe("resetBoardState wird wirklich aufgerufen (mitten in der Partie)",
+    m.z.resets.length >= 2 && m.z.resets.slice(1).every((r) => r.mitten === true), JSON.stringify(m.z.resets));
+  const t = JSON.parse(m.z.dateien["data/go.json"] || "null");
+  pruefe("lost/games zaehlen keine abgebrochene Partie", t && t.lost === 0 && t.games === 0 && t.won === 0, JSON.stringify(t));
+}
+
+console.log("");
+console.log("-- 6c. Telemetrie nach Zeit --");
+{
+  // Wanduhr vorstellen: jeder Zug kostet 40 s -> mindestens alle 30 s ein Schreiben.
+  const echt = Date.now;
+  let t0 = 1_800_000_000_000;
+  Date.now = () => (t0 += 40000);
+  let m;
+  try { m = await fahre({ knoten: 14, maxPartien: 1 }); } finally { Date.now = echt; }
+  pruefe("Telemetrie wird zeitgesteuert geschrieben (mehrfach in einer Partie)",
+    m.z.dateiSchreibungen >= 5, String(m.z.dateiSchreibungen));
 }
 
 console.log("");
@@ -439,7 +488,7 @@ console.log("-- 7. Ganze Partien gegen den Ersatzgegner (7x7) --");
 console.log("");
 console.log("-- 7b. Brett mit offline-Knoten --");
 {
-  const m = await fahre({ knoten: 13, maxPartien: 8, seed: 21, offline: [[0, 0], [3, 3], [6, 2]] });
+  const m = await fahre({ knoten: 13, sf14: 1, maxPartien: 8, seed: 21, offline: [[0, 0], [3, 3], [6, 2]] });
   pruefe("Partien mit '#'-Knoten enden ohne abgelehnten Zug", m.z.partien >= 5 && m.z.abgelehnt === 0,
     m.z.partien + " Partien, " + m.z.abgelehnt + " abgelehnt");
 }

@@ -1683,8 +1683,15 @@ export async function main(ns) {
         if (platzHier < gb) {
           let alt = null, altGb = 0;
           for (const k of hosts) {
-            if (k === "home" || !ns.hasRootAccess(k)) continue;
-            const kGb = ns.getServerMaxRam(k);
+            // h selbst ist eben verworfen worden (platzHier < gb) - nicht
+            // ueber die volle maxRam wieder hereinholen (Skeptiker 07.10.).
+            if (k === "home" || k === h || !ns.hasRootAccess(k)) continue;
+            // Auf der Werkbank zaehlt nur, was neben ihren Werkzeugen frei
+            // bleibt (07.10.2026, BN3.3): die Reserve landete auf werk-9
+            // (128 GB, Werkzeuge 107 GB) - das Kind (51,6 GB) passte nie,
+            // corp-tick.js scheiterte in 2 von 3 Zyklen mit no_space, und
+            // Runde 1 fand ueber 1,5 h kein annehmbares Angebot.
+            const kGb = ns.getServerMaxRam(k) - (k === werkbank ? werkbankReserve : 0);
             if (kGb >= gb && kGb > altGb) { alt = k; altGb = kGb; }
           }
           // Kein Ausweich-Wirt: alte Reserve auf h behalten und melden.

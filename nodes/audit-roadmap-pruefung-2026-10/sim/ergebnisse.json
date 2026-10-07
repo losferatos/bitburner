@@ -1,0 +1,1317 @@
+{
+ "BN11_C4A_KF_s1.json": {
+  "maxDiv": 18,
+  "events": [
+   "0.50h Runde 1: 13.1 Mrd fuer 100 Mio Anteile (Bewertung 43.6 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 30.5 Mrd fuer 350 Mio Anteile (Bewertung 43.6 Mrd, Gewinn 1.22 Mio/s)",
+   "14.29h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "14.32h Runde 3: 0.7 Mrd fuer 250 Mio Anteile (Bewertung 1.3 Mrd, Gewinn 1.13 Mio/s)",
+   "14.32h Runde 4: 0.7 Mrd fuer 200 Mio Anteile (Bewertung 2.4 Mrd, Gewinn 1.14 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 44122620000,
+    "funds": 4654703395.901065,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 45018360000,
+    "funds": 43942800588.15199,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 44312140000,
+    "funds": 52625640543.23169,
+    "owned": 0.55
+   },
+   {
+    "h": 8,
+    "valuation": 45133190000,
+    "funds": 61212148827.465096,
+    "owned": 0.55
+   },
+   {
+    "h": 10,
+    "valuation": 44420920000,
+    "funds": 69824803326.29271,
+    "owned": 0.55
+   },
+   {
+    "h": 12,
+    "valuation": 45429280000,
+    "funds": 78363534128.1366,
+    "owned": 0.55
+   },
+   {
+    "h": 14,
+    "valuation": 44396270000,
+    "funds": 86815701507.72975,
+    "owned": 0.55
+   },
+   {
+    "h": 16,
+    "valuation": 43361780000,
+    "funds": 10817228732.968136,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 46419700000,
+    "funds": 18970603425.468746,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 47542980000,
+    "funds": 27526673325.55987,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 48148640000,
+    "funds": 36035895389.11939,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 74334920000,
+    "funds": 4867387399.234098,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 85721770000,
+    "funds": 7118990136.053858,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 89076430000,
+    "funds": 10369409496.280079,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 89453120000,
+    "funds": 14586565306.877722,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 90826570000,
+    "funds": 17523108367.028187,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 94080910000,
+    "funds": 21112564054.60844,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 102790250000,
+    "funds": 20077208989.178604,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN11_C4B_KF_s1.json": {
+  "maxDiv": 18,
+  "events": [
+   "0.50h Runde 1: 13.1 Mrd fuer 100 Mio Anteile (Bewertung 43.6 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 30.5 Mrd fuer 350 Mio Anteile (Bewertung 43.6 Mrd, Gewinn 1.22 Mio/s)",
+   "14.29h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "14.32h Runde 3: 0.7 Mrd fuer 250 Mio Anteile (Bewertung 1.3 Mrd, Gewinn 1.13 Mio/s)",
+   "14.32h Runde 4: 0.7 Mrd fuer 200 Mio Anteile (Bewertung 2.4 Mrd, Gewinn 1.14 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 44122620000,
+    "funds": 4654703395.901065,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 45018360000,
+    "funds": 43942800588.15199,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 44312140000,
+    "funds": 52625640543.23169,
+    "owned": 0.55
+   },
+   {
+    "h": 8,
+    "valuation": 45133190000,
+    "funds": 61212148827.465096,
+    "owned": 0.55
+   },
+   {
+    "h": 10,
+    "valuation": 44420920000,
+    "funds": 69824803326.29271,
+    "owned": 0.55
+   },
+   {
+    "h": 12,
+    "valuation": 45429280000,
+    "funds": 78363534128.1366,
+    "owned": 0.55
+   },
+   {
+    "h": 14,
+    "valuation": 44396270000,
+    "funds": 86815701507.72975,
+    "owned": 0.55
+   },
+   {
+    "h": 16,
+    "valuation": 43361780000,
+    "funds": 10817228732.968136,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 46419700000,
+    "funds": 18970603425.468746,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 47542980000,
+    "funds": 27526673325.55987,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 48148640000,
+    "funds": 36035895389.11939,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 73747100000,
+    "funds": 5858523123.299107,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 88365450000,
+    "funds": 10557528467.230358,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 91915210000,
+    "funds": 13375956978.193624,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 91351570000,
+    "funds": 19468393604.72714,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 95623940000,
+    "funds": 20653637295.539772,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 97966160000,
+    "funds": 23517741327.572823,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 102209030000,
+    "funds": 22670716994.31177,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN13_C4A_KF_s1.json": {
+  "maxDiv": 8,
+  "events": [
+   "0.50h Runde 1: 0.1 Mrd fuer 100 Mio Anteile (Bewertung 0.4 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 0.3 Mrd fuer 350 Mio Anteile (Bewertung 0.4 Mrd, Gewinn 1.22 Mio/s)",
+   "24.41h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "24.44h Runde 3: 0.0 Mrd fuer 250 Mio Anteile (Bewertung 0.0 Mrd, Gewinn 1.22 Mio/s)",
+   "24.45h Runde 4: 0.0 Mrd fuer 200 Mio Anteile (Bewertung 0.0 Mrd, Gewinn 1.22 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 443807900,
+    "funds": 11695619235.901037,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 441684200,
+    "funds": 20763169988.15197,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 427288800,
+    "funds": 9446009943.231619,
+    "owned": 0.55
+   },
+   {
+    "h": 8,
+    "valuation": 435499300,
+    "funds": 18032518227.465046,
+    "owned": 0.55
+   },
+   {
+    "h": 10,
+    "valuation": 428376600,
+    "funds": 26645172726.292725,
+    "owned": 0.55
+   },
+   {
+    "h": 12,
+    "valuation": 438460100,
+    "funds": 35183903528.13659,
+    "owned": 0.55
+   },
+   {
+    "h": 14,
+    "valuation": 428130000,
+    "funds": 43636070907.72964,
+    "owned": 0.55
+   },
+   {
+    "h": 16,
+    "valuation": 427875500,
+    "funds": 51759880040.93532,
+    "owned": 0.55
+   },
+   {
+    "h": 18,
+    "valuation": 443388800,
+    "funds": 60197078333.93172,
+    "owned": 0.55
+   },
+   {
+    "h": 20,
+    "valuation": 438083500,
+    "funds": 68647264467.067085,
+    "owned": 0.55
+   },
+   {
+    "h": 22,
+    "valuation": 459607000,
+    "funds": 77337290182.30711,
+    "owned": 0.55
+   },
+   {
+    "h": 24,
+    "valuation": 477220700,
+    "funds": 86154367159.22958,
+    "owned": 0.55
+   },
+   {
+    "h": 26,
+    "valuation": 422761200,
+    "funds": 9190159577.131542,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 466762800,
+    "funds": 17069837136.389565,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 456106900,
+    "funds": 25372010002.64658,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 452972400,
+    "funds": 33475418766.283768,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 591158900,
+    "funds": 1988295986.8493962,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 914294300,
+    "funds": 6836853488.903629,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN13_C4B_KF_s1.json": {
+  "maxDiv": 8,
+  "events": [
+   "0.50h Runde 1: 0.1 Mrd fuer 100 Mio Anteile (Bewertung 0.4 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 0.3 Mrd fuer 350 Mio Anteile (Bewertung 0.4 Mrd, Gewinn 1.22 Mio/s)",
+   "24.41h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "24.44h Runde 3: 0.0 Mrd fuer 250 Mio Anteile (Bewertung 0.0 Mrd, Gewinn 1.22 Mio/s)",
+   "24.45h Runde 4: 0.0 Mrd fuer 200 Mio Anteile (Bewertung 0.0 Mrd, Gewinn 1.22 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 443807900,
+    "funds": 11695619235.901037,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 441684200,
+    "funds": 20763169988.15197,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 427288800,
+    "funds": 9446009943.231619,
+    "owned": 0.55
+   },
+   {
+    "h": 8,
+    "valuation": 435499300,
+    "funds": 18032518227.465046,
+    "owned": 0.55
+   },
+   {
+    "h": 10,
+    "valuation": 428376600,
+    "funds": 26645172726.292725,
+    "owned": 0.55
+   },
+   {
+    "h": 12,
+    "valuation": 438460100,
+    "funds": 35183903528.13659,
+    "owned": 0.55
+   },
+   {
+    "h": 14,
+    "valuation": 428130000,
+    "funds": 43636070907.72964,
+    "owned": 0.55
+   },
+   {
+    "h": 16,
+    "valuation": 427875500,
+    "funds": 51759880040.93532,
+    "owned": 0.55
+   },
+   {
+    "h": 18,
+    "valuation": 443388800,
+    "funds": 60197078333.93172,
+    "owned": 0.55
+   },
+   {
+    "h": 20,
+    "valuation": 438083500,
+    "funds": 68647264467.067085,
+    "owned": 0.55
+   },
+   {
+    "h": 22,
+    "valuation": 459607000,
+    "funds": 77337290182.30711,
+    "owned": 0.55
+   },
+   {
+    "h": 24,
+    "valuation": 477220700,
+    "funds": 86154367159.22958,
+    "owned": 0.55
+   },
+   {
+    "h": 26,
+    "valuation": 422761200,
+    "funds": 9190159577.131542,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 466762800,
+    "funds": 17069837136.389565,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 456106900,
+    "funds": 25372010002.64658,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 452972400,
+    "funds": 33475418766.283768,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 591158900,
+    "funds": 1988295986.8493962,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 921509700,
+    "funds": 8255110863.341243,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN14_C4A_KF_s1.json": {
+  "maxDiv": 16,
+  "events": [
+   "0.50h Runde 1: 52.4 Mrd fuer 100 Mio Anteile (Bewertung 174.5 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 126.1 Mrd fuer 350 Mio Anteile (Bewertung 180.2 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Schritt Tobacco (87.0 Mrd), Fonds danach 87.3 Mrd",
+   "4.50h Runde 3: 141.5 Mrd fuer 250 Mio Anteile (Bewertung 283.0 Mrd, Gewinn 1.95 Mio/s)",
+   "6.25h Runde 4: 118.9 Mrd fuer 200 Mio Anteile (Bewertung 396.2 Mrd, Gewinn 2.51 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 182250080000,
+    "funds": 43924655395.901085,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 288309880000,
+    "funds": 9868636344.683002,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 392332600000,
+    "funds": 20521672903.57615,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 461769800000,
+    "funds": 36857498889.35762,
+    "owned": 0.1
+   },
+   {
+    "h": 10,
+    "valuation": 456923280000,
+    "funds": 39750588809.61165,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 484667760000,
+    "funds": 40744366973.81792,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 506666920000,
+    "funds": 48843094393.37547,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 508447120000,
+    "funds": 52760473780.99091,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 547304920000,
+    "funds": 53511908793.56321,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 554752360000,
+    "funds": 50500592147.97997,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 562660600000,
+    "funds": 58532145178.59186,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 588786600000,
+    "funds": 60969213012.26549,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 594260600000,
+    "funds": 60187631973.8644,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 558681640000,
+    "funds": 64922931944.17268,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 669006720000,
+    "funds": 70435288257.70084,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 685646000000,
+    "funds": 70121902766.36987,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 754440840000,
+    "funds": 65058097034.60855,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 771857880000,
+    "funds": 80872824689.551,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN14_C4B_KF_s1.json": {
+  "maxDiv": 16,
+  "events": [
+   "0.50h Runde 1: 52.4 Mrd fuer 100 Mio Anteile (Bewertung 174.5 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 126.1 Mrd fuer 350 Mio Anteile (Bewertung 180.2 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Schritt Tobacco (87.0 Mrd), Fonds danach 87.3 Mrd",
+   "5.15h Runde 3: 156.0 Mrd fuer 250 Mio Anteile (Bewertung 312.0 Mrd, Gewinn 1.98 Mio/s)",
+   "8.96h Runde 4: 137.6 Mrd fuer 200 Mio Anteile (Bewertung 458.6 Mrd, Gewinn 3.04 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 182250080000,
+    "funds": 43924655395.901085,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 299000920000,
+    "funds": 12250495184.606085,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 431693440000,
+    "funds": 27274332605.141273,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 447598280000,
+    "funds": 34578932777.33187,
+    "owned": 0.3
+   },
+   {
+    "h": 10,
+    "valuation": 538028320000,
+    "funds": 47570806835.12301,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 562816280000,
+    "funds": 52820817821.67528,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 569218440000,
+    "funds": 54518743671.36663,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 539631160000,
+    "funds": 55392909399.89506,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 633036080000,
+    "funds": 57191129509.30677,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 639576920000,
+    "funds": 64568742889.19057,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 593781760000,
+    "funds": 66585693839.43754,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 691801480000,
+    "funds": 70495245045.68178,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 718556000000,
+    "funds": 75413301618.89539,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 866651560000,
+    "funds": 75214854614.11253,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 861091920000,
+    "funds": 75756283886.56345,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 926582240000,
+    "funds": 84071112990.87444,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 1055064880000,
+    "funds": 88945959615.74435,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 1101457320000,
+    "funds": 92802230212.01958,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN15_C4A_KF_s1.json": {
+  "maxDiv": 8,
+  "events": [
+   "0.50h Runde 1: 26.0 Mrd fuer 100 Mio Anteile (Bewertung 86.5 Mrd, Gewinn 1.21 Mio/s)",
+   "2.50h Runde 2: 62.4 Mrd fuer 350 Mio Anteile (Bewertung 89.2 Mrd, Gewinn 1.23 Mio/s)",
+   "3.82h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "4.50h Runde 3: 41.9 Mrd fuer 250 Mio Anteile (Bewertung 83.8 Mrd, Gewinn 1.17 Mio/s)",
+   "7.00h Runde 4: 40.5 Mrd fuer 200 Mio Anteile (Bewertung 135.1 Mrd, Gewinn 1.91 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 87485580000,
+    "funds": 17519514943.275547,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 85796660000,
+    "funds": 3572139385.4778166,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 131042860000,
+    "funds": 6728184191.035006,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 150009680000,
+    "funds": 11619705265.344616,
+    "owned": 0.1
+   },
+   {
+    "h": 10,
+    "valuation": 166741780000,
+    "funds": 16917734681.366076,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 162582340000,
+    "funds": 20397657941.584064,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 174762420000,
+    "funds": 21849971672.603508,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 182781020000,
+    "funds": 24455972085.837173,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 193414320000,
+    "funds": 26587769789.084766,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 198096080000,
+    "funds": 24040922738.80248,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 201702140000,
+    "funds": 28280002683.323044,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 203505160000,
+    "funds": 31349840782.799835,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 208520300000,
+    "funds": 33765317714.113396,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 211183680000,
+    "funds": 35651998048.45735,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 212606860000,
+    "funds": 38974901331.92382,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 214819300000,
+    "funds": 38963963331.74071,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 221715820000,
+    "funds": 38057702981.61918,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 234423220000,
+    "funds": 43674320175.48958,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN15_C4B_KF_s1.json": {
+  "maxDiv": 8,
+  "events": [
+   "0.50h Runde 1: 26.0 Mrd fuer 100 Mio Anteile (Bewertung 86.5 Mrd, Gewinn 1.21 Mio/s)",
+   "2.50h Runde 2: 62.4 Mrd fuer 350 Mio Anteile (Bewertung 89.2 Mrd, Gewinn 1.23 Mio/s)",
+   "3.82h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "5.50h Runde 3: 42.7 Mrd fuer 250 Mio Anteile (Bewertung 85.4 Mrd, Gewinn 1.18 Mio/s)",
+   "9.50h Runde 4: 50.3 Mrd fuer 200 Mio Anteile (Bewertung 167.7 Mrd, Gewinn 2.23 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 87485580000,
+    "funds": 17519514943.275547,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 85796660000,
+    "funds": 3572139385.4778166,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 111101120000,
+    "funds": 8144586949.762073,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 142850580000,
+    "funds": 10484712447.061718,
+    "owned": 0.3
+   },
+   {
+    "h": 10,
+    "valuation": 165450720000,
+    "funds": 18294749374.69072,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 165401500000,
+    "funds": 24168933023.04706,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 187267600000,
+    "funds": 23245832539.766727,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 197859020000,
+    "funds": 28599620985.62164,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 196934100000,
+    "funds": 30842783547.850197,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 206789120000,
+    "funds": 33147749818.15758,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 204575240000,
+    "funds": 35292628126.65861,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 210462840000,
+    "funds": 37781181408.44561,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 187915960000,
+    "funds": 39656503693.50353,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 214837240000,
+    "funds": 41389181263.61116,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 228567840000,
+    "funds": 44496731646.18585,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 241554840000,
+    "funds": 47917028457.05177,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 239052860000,
+    "funds": 48603151190.9268,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 250413820000,
+    "funds": 51143165361.227715,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN3_C4B_KF_s1.json": {
+  "maxDiv": 20,
+  "events": [
+   "0.50h Runde 1: 130.9 Mrd fuer 100 Mio Anteile (Bewertung 436.3 Mrd, Gewinn 1.22 Mio/s)",
+   "0.50h Schritt Tobacco (87.0 Mrd), Fonds danach 31.0 Mrd",
+   "2.50h Runde 2: 396.1 Mrd fuer 350 Mio Anteile (Bewertung 565.8 Mrd, Gewinn 1.56 Mio/s)",
+   "4.50h Runde 3: 898.1 Mrd fuer 250 Mio Anteile (Bewertung 1796.1 Mrd, Gewinn 4.55 Mio/s)",
+   "8.49h 2 Dummy-Divisionen gebaut",
+   "8.52h Runde 4: 23403.0 Mrd fuer 200 Mio Anteile (Bewertung 78009.9 Mrd, Gewinn 156.91 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 0.6666666666666666
+   },
+   {
+    "h": 2,
+    "valuation": 447428400000,
+    "funds": 36711759369.22586,
+    "owned": 0.6
+   },
+   {
+    "h": 4,
+    "valuation": 1244021000000,
+    "funds": 21108428404.05451,
+    "owned": 0.36666666666666664
+   },
+   {
+    "h": 6,
+    "valuation": 11794411900000,
+    "funds": 94283047496.71468,
+    "owned": 0.2
+   },
+   {
+    "h": 8,
+    "valuation": 34821608900000,
+    "funds": 133834783468.57275,
+    "owned": 0.2
+   },
+   {
+    "h": 10,
+    "valuation": 13273609301000000,
+    "funds": 15403403464407.814,
+    "owned": 0.06666666666666667
+   },
+   {
+    "h": 12,
+    "valuation": 596785105363100000,
+    "funds": 1198573184256306400,
+    "owned": 0.06666666666666667
+   }
+  ]
+ },
+ "BN6_C4A_KF_s1.json": {
+  "maxDiv": 16,
+  "events": [
+   "0.50h Runde 1: 26.2 Mrd fuer 100 Mio Anteile (Bewertung 87.3 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 61.7 Mrd fuer 350 Mio Anteile (Bewertung 88.2 Mrd, Gewinn 1.22 Mio/s)",
+   "3.95h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "4.50h Runde 3: 42.1 Mrd fuer 250 Mio Anteile (Bewertung 84.3 Mrd, Gewinn 1.17 Mio/s)",
+   "7.00h Runde 4: 41.5 Mrd fuer 200 Mio Anteile (Bewertung 138.4 Mrd, Gewinn 1.89 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 89205180000,
+    "funds": 17744687395.901,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 44286740000,
+    "funds": 3067413255.2684393,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 137240080000,
+    "funds": 6859278952.275388,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 175601520000,
+    "funds": 13383844060.630024,
+    "owned": 0.1
+   },
+   {
+    "h": 10,
+    "valuation": 176615500000,
+    "funds": 15652656787.127726,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 185756960000,
+    "funds": 20137169499.279903,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 191771980000,
+    "funds": 22943868636.367706,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 198869680000,
+    "funds": 23388556874.94888,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 207394280000,
+    "funds": 27782185889.129387,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 209421980000,
+    "funds": 30019265266.326534,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 204310780000,
+    "funds": 31401218130.757954,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 207063840000,
+    "funds": 29244940054.755184,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 219649940000,
+    "funds": 31423490337.357296,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 219565960000,
+    "funds": 32940557853.6819,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 222804780000,
+    "funds": 33973485326.29484,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 230709200000,
+    "funds": 42397945633.35942,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 235814700000,
+    "funds": 44171338872.23841,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 221405300000,
+    "funds": 45838073522.22632,
+    "owned": 0.1
+   }
+  ]
+ },
+ "BN6_C4B_KF_s1.json": {
+  "maxDiv": 16,
+  "events": [
+   "0.50h Runde 1: 26.2 Mrd fuer 100 Mio Anteile (Bewertung 87.3 Mrd, Gewinn 1.22 Mio/s)",
+   "2.50h Runde 2: 61.7 Mrd fuer 350 Mio Anteile (Bewertung 88.2 Mrd, Gewinn 1.22 Mio/s)",
+   "3.95h Schritt Tobacco (87.0 Mrd), Fonds danach 3.1 Mrd",
+   "5.50h Runde 3: 46.3 Mrd fuer 250 Mio Anteile (Bewertung 92.5 Mrd, Gewinn 1.28 Mio/s)",
+   "9.50h Runde 4: 53.6 Mrd fuer 200 Mio Anteile (Bewertung 178.8 Mrd, Gewinn 2.46 Mio/s)"
+  ],
+  "traj": [
+   {
+    "h": 0,
+    "valuation": 0,
+    "funds": 150000000000,
+    "owned": 1
+   },
+   {
+    "h": 2,
+    "valuation": 89205180000,
+    "funds": 17744687395.901,
+    "owned": 0.9
+   },
+   {
+    "h": 4,
+    "valuation": 44286740000,
+    "funds": 3067413255.2684393,
+    "owned": 0.55
+   },
+   {
+    "h": 6,
+    "valuation": 121040400000,
+    "funds": 8904920511.713339,
+    "owned": 0.3
+   },
+   {
+    "h": 8,
+    "valuation": 148658180000,
+    "funds": 12760413012.361206,
+    "owned": 0.3
+   },
+   {
+    "h": 10,
+    "valuation": 177269960000,
+    "funds": 19422707503.216908,
+    "owned": 0.1
+   },
+   {
+    "h": 12,
+    "valuation": 199026600000,
+    "funds": 25877765478.031048,
+    "owned": 0.1
+   },
+   {
+    "h": 14,
+    "valuation": 205883240000,
+    "funds": 28297616355.203022,
+    "owned": 0.1
+   },
+   {
+    "h": 16,
+    "valuation": 213961160000,
+    "funds": 28766561882.381493,
+    "owned": 0.1
+   },
+   {
+    "h": 18,
+    "valuation": 184790900000,
+    "funds": 32735607709.85504,
+    "owned": 0.1
+   },
+   {
+    "h": 20,
+    "valuation": 191717340000,
+    "funds": 34261618200.463905,
+    "owned": 0.1
+   },
+   {
+    "h": 22,
+    "valuation": 196640720000,
+    "funds": 36192377208.24466,
+    "owned": 0.1
+   },
+   {
+    "h": 24,
+    "valuation": 224602840000,
+    "funds": 39242286866.55614,
+    "owned": 0.1
+   },
+   {
+    "h": 26,
+    "valuation": 228059700000,
+    "funds": 41742809501.17309,
+    "owned": 0.1
+   },
+   {
+    "h": 28,
+    "valuation": 241435080000,
+    "funds": 44383778191.066574,
+    "owned": 0.1
+   },
+   {
+    "h": 30,
+    "valuation": 254510300000,
+    "funds": 46376399037.88117,
+    "owned": 0.1
+   },
+   {
+    "h": 32,
+    "valuation": 238433560000,
+    "funds": 48596543231.28316,
+    "owned": 0.1
+   },
+   {
+    "h": 34,
+    "valuation": 269996580000,
+    "funds": 53160878210.560165,
+    "owned": 0.1
+   },
+   {
+    "h": 36,
+    "valuation": 281132040000,
+    "funds": 54718964495.90677,
+    "owned": 0.1
+   }
+  ]
+ }
+}

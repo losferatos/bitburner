@@ -73,6 +73,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-go.js",
+    deckt: "IPvGO-Spieler go.js (B8): Zugwahl (Schlag, Atari, Pass, Ko), falscher Knoten, ganze Partien gegen Ersatzgegner, Fortsetzen",
+    schnell: false,
+  },
+  {
     datei: "test-kindreserve.js",
     deckt: "Kern haelt Platz fuer Kinder-Skripte (childRamGb) auf dem Wirt frei; corp-act deckt das groesste Kind (Befund 06.10.)",
     schnell: true,

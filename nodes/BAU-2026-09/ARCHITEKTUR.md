@@ -1315,6 +1315,30 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "precondition": {
         "forbidsFile": "data/corp-stop.txt"
       }
+    },
+    {
+      "name": "go.js",
+      "args": [],
+      "ramBaseGb": 11.25,
+      "ramSingGb": 0,
+      "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; kein Import von lib/hostdatei.js (zoege fileExists +0,1 GB mit), eigenes write+scp; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB)",
+      "verfahren": "alle",
+      "knoten": [14, 13],
+      "phase": "normal",
+      "telemetryFile": "data/go.json",
+      "scpToHome": true,
+      "freshnessMs": 1800000,
+      "taktMs": 5000,
+      "hostRule": "werkbank",
+      "priority": 17,
+      "evictRank": 21,
+      "needsFigure": "none",
+      "needsLibs": [],
+      "singularity": false,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {}
     }
   ],
   "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing."

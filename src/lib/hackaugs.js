@@ -395,6 +395,42 @@ export function hacknetNachEinbau(knoten) {
   return knoten === 9;
 }
 
+/**
+ * HASH-RANG IM ANLAUF (Befund B7, 07.10.2026): Knoten, in denen Hashes in
+ * Bladeburner-Rang getauscht werden, OHNE dass das Konto ueber 1 Mrd liegt.
+ *
+ * Warum diese beiden: "Exchange for Bladeburner Rank" (HacknetHelpers.tsx:
+ * 539-546) wirkt ohne den Rangfaktor des Knotens. BN15 hat 0,2, BN13 0,45
+ * (BitNode.tsx:1112, :1031) - dort sind 100 Hash-Rang 5- beziehungsweise
+ * 2,2-mal so viel wert wie 100 Aktionsrang. Der fruehe Rang bringt Skillpunkte
+ * (1 je 3 Rang) in der Phase, in der der Knoten an Skillpunkten verhungert.
+ * Gerechnet in nodes/HASH-RANG-2026-10.md (tools/hashrang-rechnung.mjs,
+ * tools/hashrang-sp.mjs).
+ *
+ * Praktisch nur im ersten Zyklus des Knotens (SF9.3-Gratisserver, Cache 1024);
+ * danach gibt es nur netburn-Stummel (Speicher 320), die nur Stufe 0 fassen.
+ *
+ * NICHT hacknetNachEinbau erweitern: das Praedikat steuert auch, ob bn4rep
+ * Hacknet-Augmentierungen kauft und ob hacknet.js neue Server baut.
+ *
+ * @param {number} knoten ns.getResetInfo().currentNode
+ * @returns {boolean}
+ */
+export function hashRangAnlauf(knoten) {
+  return knoten === 13 || knoten === 15;
+}
+
+/**
+ * Hoechster Preis einer Rangstufe (Hashes), den der Anlauf noch tauscht:
+ * 250 * (Stufe + 1) mit Stufe 3 = 1000, passt in den Cache 5 des
+ * SF9.3-Gratisservers (1024) - es wird KEIN Cache gekauft und kein Geld
+ * ausgegeben. Das sind 4 Stufen = 400 Rang (+133 SP) fuer 2500 Hashes
+ * (625 Mio $ Verkaufswert, BN15). Stufen 5-8 kosten 1,74 Mrd inkl. Cache fuer
+ * dieselben 400 Rang (Skeptiker 07.10.), und die Wirkung dort ist ungeeicht.
+ * Die Zahl ist eine Setzung aus der Rechnung, keine Messung.
+ */
+export const HASHRANG_MAX_PREIS = 1000;
+
 /** @param {string} name  @param {boolean} mitHashes Hacknet-Server NACH dem Einbau (hacknetNachEinbau) */
 export function kampfknotenNuetzlich(name, mitHashes) {
   if (name === "The Red Pill" || name === "The Blade's Simulacrum") return true;

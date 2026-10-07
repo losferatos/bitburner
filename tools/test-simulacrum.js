@@ -125,11 +125,71 @@ console.log("-- Verdrahtung --");
   pruefe("bn4rep: Sperre nur ohne Parallelfreigabe",
     brep.includes("const bladeSperreArbeit = () => bladeburnerTraegtHier() && !simulacrumParallelFrei();"));
   pruefe("bn4rep: Parallelfreigabe braucht Marker UND Kampfwert-Ziel",
-    /simulacrumParallelFrei = \(\) => \{[\s\S]{0,900}SIMULACRUM_MARKER[\s\S]{0,700}>= ziel/.test(brep));
+    /simulacrumParallelFrei = \(\) => \{[\s\S]{0,900}SIMULACRUM_MARKER[\s\S]{0,900}< ziel/.test(brep));
   pruefe("bn4rep fuehrt den Marker aus der Besitzpruefung (schreiben UND loeschen)",
     brep.includes("eingebauteAugs.includes(SIMULACRUM)") && brep.includes("schreibNachHome(SIMULACRUM_MARKER")
     && brep.includes("loeschAufHome(SIMULACRUM_MARKER)"));
   pruefe("bbtrain veroeffentlicht sein Kampfwert-Ziel", /data\/bbtrain\.json", JSON\.stringify\(\{[^}]*ziel: ZIEL/.test(bt));
+}
+
+console.log("-- Nachbesserung Skeptiker (TTL, Gym, gemeinsames Ziel) --");
+{
+  const brep = lies("bn4rep.js"), bl2 = lies("blade.js"), bt = lies("bbtrain.js");
+  // 1. Ablauf ueber die TTL: bn4rep stellt EINEN Antrag und erneuert ihn nicht
+  // (alter Stand) - nach ANTRAG_TTL_MS faellt der Mitlauf weg, die Arbeit laeuft
+  // aber weiter. Mit Erneuerung im Minutentakt bleibt er.
+  let bisher = null, ohne = null, mit = null;
+  const einmal = rep(W0);
+  for (let t = 0; t <= 390000; t += 15000) {
+    const j = W0 + t;
+    bisher = F.vergib([blade(j), einmal], bisher, j, NR, undefined, SIM).vergabe;
+    if (t === 390000) ohne = bisher;
+  }
+  pruefe("ohne Erneuerung verfaellt der Mitlauf nach der TTL (Grund fuer die Erneuerung)", !(ohne && ohne.mit));
+  let b2 = null, letzter = rep(W0);
+  for (let t = 0; t <= 390000; t += 15000) {
+    const j = W0 + t;
+    if (t % 60000 === 0) letzter = rep(j);
+    b2 = F.vergib([blade(j), letzter], b2, j, NR, undefined, SIM).vergabe;
+    if (t === 390000) mit = b2;
+  }
+  pruefe("mit Erneuerung im Minutentakt bleibt der Mitlauf ueber 390 s", !!(mit && mit.mit && mit.mit[0] === "bn4rep.js"));
+  pruefe("bn4rep erneuert den Antrag im Zweig 'Faktionsarbeit laeuft schon'",
+    /\} else \{\s*simulacrumAntragHalten\("faktion"/.test(brep));
+  pruefe("bn4rep erneuert den Antrag auch bei laufender Firmenarbeit",
+    /\} else \{\s*simulacrumAntragHalten\("arbeit"/.test(brep));
+
+  // 2./3. das Gate selbst, aus dem Quelltext gezogen und gegen eine Attrappe gefahren
+  const von = brep.indexOf("  const simulacrumParallelFrei = () => {");
+  const bis = brep.indexOf("  // Antrag HALTEN");
+  pruefe("Gate im Quelltext gefunden", von > 0 && bis > von);
+  const gate = (dat, skills) => {
+    const ns = { fileExists: (d) => d in dat, getPlayer: () => ({ skills }) };
+    const liesVonHome = (d) => (d in dat ? dat[d] : "");
+    if (!(von > 0 && bis > von)) return null;
+    const fn = new Function("ns", "liesVonHome", "SIMULACRUM_MARKER", "KAMPFZIEL_STANDARD",
+      brep.slice(von, bis) + "\nreturn simulacrumParallelFrei;");
+    return fn(ns, liesVonHome, "data/simulacrum.txt", F.KAMPFZIEL_STANDARD)();
+  };
+  const hoch = { strength: 120, defense: 120, dexterity: 120, agility: 120 };
+  const M = "data/simulacrum.txt", BT = "data/bbtrain.json", BJ = "data/blade.json";
+  pruefe("Gate offen: Marker, Werte >= Ziel, blade will nicht ins Gym",
+    gate({ [M]: "1", [BJ]: JSON.stringify({ gymWunsch: false }) }, hoch) === true);
+  pruefe("Gate zu ohne Marker", gate({ [BJ]: "{}" }, hoch) === false);
+  pruefe("Gate zu, wenn blade ins Gym will (gymWunsch)", gate({ [M]: "1", [BJ]: JSON.stringify({ gymWunsch: true }) }, hoch) === false);
+  pruefe("Gate zu, wenn ein Kampfwert unter dem Ziel liegt",
+    gate({ [M]: "1", [BJ]: "{}" }, { ...hoch, agility: 99 }) === false);
+  pruefe("Gate nimmt das GROESSERE Ziel: bbtrain ziel 150 sperrt bei 120",
+    gate({ [M]: "1", [BJ]: "{}", [BT]: JSON.stringify({ ziel: 150 }) }, hoch) === false);
+  pruefe("Gate: bbtrain ziel 50 senkt das Ziel nicht unter blades 100",
+    gate({ [M]: "1", [BJ]: "{}", [BT]: JSON.stringify({ ziel: 50 }) }, { ...hoch, agility: 99 }) === false);
+
+  pruefe("blade.js meldet gymWunsch in blade.json und setzt es am Gym-Zweig",
+    bl2.includes("      gymWunsch,\n") && /!lohntSich\) \{\s*gymWunsch = true;/.test(bl2));
+  pruefe("blade.js, bbtrain.js und bn4rep.js teilen KAMPFZIEL_STANDARD",
+    bl2.includes("BBTRAIN_ZIEL = KAMPFZIEL_STANDARD") && bt.includes("|| KAMPFZIEL_STANDARD") && brep.includes("KAMPFZIEL_STANDARD"));
+  pruefe("gymGreifen loest parallele Faktions-/Firmenarbeit mit Simulacrum ab",
+    /laeuft\.type === "FACTION" \|\| laeuft\.type === "COMPANY"\)\s*&& ns\.fileExists\("data\/simulacrum\.txt"/.test(bl2));
 }
 
 console.log("\n" + gruen + " ok, " + rot + " ROT");

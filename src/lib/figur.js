@@ -49,6 +49,14 @@
  *    ins Gym will.
  */
 
+/**
+ * Das Kampfwert-Ziel, ab dem die Figur nicht mehr ins Gym muss. EINE Konstante
+ * fuer blade.js (BBTRAIN_ZIEL), bbtrain.js (Standard von args[0]) und das
+ * Simulacrum-Gate in bn4rep.js - sonst laeuft das Gate gegen ein anderes Ziel
+ * als das Training.
+ */
+export const KAMPFZIEL_STANDARD = 100;
+
 /** Rangfolge: kleiner gewinnt. */
 export const PRIO = {
   deadlock: 0,      // Sprosse 0, Konto negativ - schlaegt alles

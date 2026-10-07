@@ -41,7 +41,7 @@ let bladeSperreGemeldet = 0;
 
 import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } from "lib/endspurt.js";
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
-import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
 // P1 / AUG-4 (03.10.2026): Kaufaufschub und Runde am Einbau-Tor im Kampfknoten
 // MIT Gang - eigene Importzeilen, damit sie neben den Listen unten stehen
@@ -651,18 +651,38 @@ export async function main(ns) {
   // Ohne Marker ist das Ergebnis exakt `bladeburnerTraegtHier()` wie zuvor.
   const SIMULACRUM = "The Blade's Simulacrum";
   const SIMULACRUM_MARKER = "data/simulacrum.txt";
-  const KAMPFZIEL_STANDARD = 100;   // wie bbtrain.js, wenn es kein Ziel meldet
   const simulacrumParallelFrei = () => {
     try {
       if (!ns.fileExists(SIMULACRUM_MARKER, "home")) return false;
+      // Ziel = das groessere von bbtrain (args[0] || Standard) und blade.js
+      // (BBTRAIN_ZIEL = Standard): beide Trainer muessen fertig sein.
       let ziel = KAMPFZIEL_STANDARD;
       try {
         const t = JSON.parse(liesVonHome("data/bbtrain.json") || "null");
-        if (t && Number.isFinite(t.ziel) && t.ziel > 0) ziel = t.ziel;
+        if (t && Number.isFinite(t.ziel) && t.ziel > ziel) ziel = t.ziel;
       } catch { /* Standardziel */ }
       const k = ns.getPlayer().skills;
-      return Math.min(k.strength, k.defense, k.dexterity, k.agility) >= ziel;
+      if (Math.min(k.strength, k.defense, k.dexterity, k.agility) < ziel) return false;
+      // Will blade gerade ins Gym (nichts ueber Schwelle)? Dann gehoert die
+      // Figur dem Gym - Faktionsarbeit wuerde es auf Bladeburner-Training
+      // (Faktor 10 langsamer) zurueckwerfen. Frisch gelesen, nicht gepuffert.
+      try {
+        const b = JSON.parse(liesVonHome("data/blade.json") || "null");
+        if (b && b.gymWunsch === true) return false;
+      } catch { return false; }   // unlesbar: im Zweifel gesperrt
+      return true;
     } catch { return false; }   // im Zweifel gesperrt, wie bisher
+  };
+  // Antrag HALTEN: Die Arbeit laeuft im Spiel weiter, der Antrag (TTL 150 s)
+  // muss es auch. Sonst verfaellt der Mitlauf in der Vergabe, die Arbeit laeuft
+  // aber weiter, und figwatch meldet dauerhaft FIGUR-KONFLIKT. Nur mit
+  // Simulacrum-Freigabe; sonst bleibt alles wie vorher.
+  const simulacrumAntragHalten = (aktion, detail, grund) => {
+    try {
+      if (bladeburnerTraegtHier() && simulacrumParallelFrei()) {
+        figBeantrage(ns, "bn4rep.js", FIG_PRIO.faktion, aktion, detail, grund);
+      }
+    } catch { /* dann gilt die naechste Runde */ }
   };
   const bladeSperreArbeit = () => bladeburnerTraegtHier() && !simulacrumParallelFrei();
 
@@ -2858,6 +2878,8 @@ export async function main(ns) {
             sag("Arbeite fuer " + companyTarget + " als " + job + ": "
               + Math.round(companyRep) + " von " + companyRepGoal(companyTarget) + " Firmenreputation.");
           }
+        } else {
+          simulacrumAntragHalten("arbeit", companyTarget, "Firmenreputation fuer den Backdoor-Rabatt");
         }
 
         // Messfaden nach draussen. Firmenreputation ist die einzige Groesse
@@ -3399,6 +3421,11 @@ export async function main(ns) {
       // doing something else", und blade.js startet seine Aktion sofort neu.
       // Beide Seiten kommen dann nie zum Abschluss.
       //
+      // GILT NUR OHNE `The Blade's Simulacrum` (B5, 07.10.2026): Mit ihm
+      // bricht das Spiel die Aktion nicht ab (`Bladeburner.ts:178`, `:1354`),
+      // und `bladeSperreArbeit()` faellt, sobald das Kampfwert-Ziel erreicht
+      // ist und blade nicht ins Gym will.
+      //
       // Am 25.08. um 16:50 ist bn4rep nach elf Stunden wieder angelaufen - und
       // sofort waren die Dialoge zurueck, die eine Stunde vorher an derselben
       // Ursache in bn4life behoben worden waren.
@@ -3452,6 +3479,8 @@ export async function main(ns) {
         try { ns.rm("data/rep-modus.txt", "home"); } catch { /* lag nie dort */ }
       }
     } else {
+      simulacrumAntragHalten("faktion", ziel.faktion,
+        "Reputation fuer " + (ziel.aug || "die Spendenschwelle"));
       // A1-FIX (26.09.2026, Audit 3#1 + 6#1, doppelt belegt). Die
       // Faktionsarbeit laeuft schon (workForFaction startet sie MIT Fokus,
       // `workForFaction(..., true)` weiter oben) - aber jede Navigation weg von der

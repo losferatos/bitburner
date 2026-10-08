@@ -151,6 +151,15 @@ export async function main(ns) {
   sag("ausgang.js laeuft auf " + ns.getHostname() + ".");
   let letzteMeldung = "";
   let letzterStart = 0;
+  // Beginn der NOT_EXECUTABLE-Frist (Uhren-Audit 08.10.2026): bis dahin aus
+  // data/ausgang.json gelesen - die schreibt aber jede Runde vorher ohne das
+  // Feld neu, die Frist begann also jede Runde von vorn und lief nie ab. Jetzt
+  // im Speicher gehalten; die Datei liefert nur den Wert nach einem Neustart.
+  let notExecSince = null;
+  try {
+    const a0 = JSON.parse(liesVonHome("data/ausgang.json") || "null");
+    if (a0 && Number.isFinite(a0.notExecutableSeit)) notExecSince = a0.notExecutableSeit;
+  } catch { /* dann beginnt die Frist beim ersten Befund */ }
   // Wann zuletzt ein Handschlag vor dem Sprung gestellt wurde (22.09.2026,
   // Skeptiker Paket C, B3). Seit `letzterStart` nur noch bei erfolgreichem
   // exec gesetzt wird, laeuft ein klemmender Sprung jede Runde erneut hier
@@ -380,9 +389,11 @@ export async function main(ns) {
         exit_abgelehnt: exitAbgelehnt,
         exit_ablehnung_grund: exitAbgelehnt > 0 ? exitAblehnungGrund : null,
         uebersprungen: plan.uebersprungen.map((e) => ({ node: e.node, level: e.level, braucht: e.braucht })),
+        notExecutableSeit: notExecSince,
       }));
 
       if (!offen) {
+        notExecSince = null;
         // Im Hackingweg steigt das Level fast jede Minute - fuer den
         // Vergleich auf Zehntel des Bedarfs runden, sonst verdraengt die
         // Wartezeile den Ringpuffer (60 Zeilen) in einer Stunde.
@@ -650,11 +661,8 @@ export async function main(ns) {
       let notExecutable = false;
       let notExecutableSeit = null;
       if (frei(wirt) < braucht) {
-        try {
-          const alt3 = JSON.parse(liesVonHome("data/ausgang.json") || "null");
-          notExecutableSeit = (alt3 && Number.isFinite(alt3.notExecutableSeit))
-            ? alt3.notExecutableSeit : Date.now();
-        } catch { notExecutableSeit = Date.now(); }
+        if (notExecSince === null) notExecSince = Date.now();
+        notExecutableSeit = notExecSince;
         notExecutable = Date.now() - notExecutableSeit >= NOT_EXEC_NACH_MS;
         if (notExecutable) {
           try {
@@ -738,6 +746,7 @@ export async function main(ns) {
         }));
         await ns.sleep(TAKT_MS); continue;
       }
+      notExecSince = null;
       // ns.scp WIRFT NICHT - es gibt `false` zurueck (NetscriptFunctions.ts:803-809).
       //
       // Fehlt eine Datei, loggt es intern, kopiert den Rest und meldet den

@@ -138,6 +138,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-notexec-frist.js",
+    deckt: "ausgang.js: NOT_EXECUTABLE-Frist laeuft wirklich ab (Uhren-Audit 08.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-figur.js",
     deckt: "Figur-Vergabepunkt: Lease, Rangfolge, Folgenummer, Knotenstempel (C.11)",
     schnell: true,

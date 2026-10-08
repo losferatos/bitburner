@@ -615,7 +615,12 @@ export async function main(ns) {
           // hilft, es fehlt Speicher. Wer hier eskaliert, beendet gesunde
           // Werkzeuge, raeumt home leer und baut am Ende Augmentierungen ein,
           // ohne dass sich am Speicher etwas aendert.
-          nichtAusfuehrbar: !!(ausgangLage && ausgangLage.notExecutable),
+          // Nur ein FRISCHER Befund (unter 10 min) schaltet stumm: stirbt
+          // ausgang.js mit notExecutable:true in der Datei, bliebe die Leiter
+          // sonst bis zu dessen Neustart taub (Skeptiker 08.10.2026 - bis
+          // dahin war der Zweig toter Code, die Frist in ausgang.js lief nie ab).
+          nichtAusfuehrbar: !!(ausgangLage && ausgangLage.notExecutable
+            && Number.isFinite(ausgangLage.zeit) && Date.now() - ausgangLage.zeit < 600000),
           nichtAusfuehrbarGrund: ausgangLage && ausgangLage.wirtFehlt
             ? "exit.js braucht " + ausgangLage.wirtFehlt.braucht + " GB, "
               + "groesster Rechner " + ausgangLage.wirtFehlt.moeglich + " GB"

@@ -3990,6 +3990,29 @@ export async function main(ns) {
   let letzte = "";
   let ruhend = false;
   let gewichen = false;
+  // DER FIGUR-ANTRAG GILT 150 s, DIE LEASE 15 min (lib/figur.js,
+  // ANTRAG_TTL_MS / LEASE_MS) - beide in Wanduhrzeit, `Date.now()`.
+  //
+  // Bis zum 08.10.2026 wurde der Antrag nur beim START einer Aktion
+  // geschrieben. Lief dieselbe Aktion weiter (`gleich`) oder ruhte die
+  // Figur in der Kammer, verfiel er nach 150 s, und der Kern liess die
+  // Lease nach 15 min auslaufen ("Lease laeuft noch aus", vergibEinzel).
+  // Der Raid-Abschnitt vor dem Haenger dauerte 1.117 s - danach gehoerte
+  // die Figur niemandem, und jedes andere Gewerk haette sie nehmen koennen
+  // (bbtrain prio 40, bn4life 50). Jetzt wird der Antrag in jeder Runde
+  // erneuert, gedrosselt auf alle 20 s: im verdeckten Tab (1 Wake je 60-120 s)
+  // plus Kernrunde bleibt der Antrag so unter 150 s (Skeptiker 08.10.: 30 s
+  // liessen nur 30-50 s Reserve). Gleiche Uhr wie der Kern (Wanduhr), damit
+  // Drosselung und TTL zusammenpassen. Springt die Uhr zurueck, wird sofort
+  // erneuert statt bis zum Aufholen zu schweigen.
+  const FIGUR_ERNEUERN_MS = 20000;
+  let figErneuertMs = 0;
+  const figurErneuern = (detail, grund) => {
+    const t = Date.now();
+    if (t >= figErneuertMs && t - figErneuertMs < FIGUR_ERNEUERN_MS) return;
+    figBeantrage(ns, "blade.js", FIG_PRIO.bladeburner, "bladeburner", detail, grund);
+    figErneuertMs = t;
+  };
   for (;;) {
     // KEIN LATCH (Skeptiker, 22.09.2026).
     //
@@ -4500,18 +4523,50 @@ export async function main(ns) {
       // sonst pendelt der Bot bei jedem Aktionsschritt zwischen beidem.
       const ausdauerKnapp = max > 0 && jetzt < max * AUSDAUER_WEITER;
       const hpKnapp = hp && hp.max > 0 && hp.current < hp.max * HP_WEITER;
+      // RUHEN NUR, WENN DIE KAMMER AUCH LAEUFT (08.10.2026, BN3.3).
+      //
+      // Hier stand bis heute ein blankes `continue`, sobald `ruhend` gesetzt
+      // war - ohne nachzusehen, ob die Kammer ueberhaupt gestartet wurde. Sie
+      // wurde es nicht: `figDarf` sagte in der Runde des Antrags nein (der
+      // Kern vergibt erst in SEINER naechsten Runde, und die Lease war schon
+      // weg, siehe FIGUR_ERNEUERN_MS), also kein `startAction`. Die naechste
+      // Runde sah `ruhend` und ruhte - waehrend im Spiel der alte Raid
+      // weiterlief, ohne Antrag und ohne dass `waehle()` je wieder drankam.
+      // Raid kostet Ausdauer, die Weiter-Marke kam nie. Gemessen: von 23:48
+      // bis 06:04 (Sicherung 08.10. 06:04) 6,3 h Raid in Ishima, Chaos
+      // 14 -> 13.940, echte Chance zuletzt 0,0006, Rang 2.318 -> 1.636;
+      // figwatch zaehlte 713 Konflikte "niemand hat die Figur, sie tut aber
+      // bladeburner [Raid]". Test: tools/test-raid-stadt.js, Fall 1.
+      //
+      // Jetzt: Laeuft die Kammer, wird geruht (und der Antrag erneuert).
+      // Laeuft sie NICHT, geht die Kammer durch den normalen Startpfad -
+      // Antrag, Figur-Wache, startAction - bis sie laeuft. `waehle()` wird
+      // dabei bewusst nicht gefragt: Zwischen 0,51 und 0,56 waehlte es etwas
+      // anderes, und die Hysterese waere weg.
+      let laeuftJetzt = null;
+      try { laeuftJetzt = ns.bladeburner.getCurrentAction(); } catch { laeuftJetzt = null; }
+      const kammerLaeuft = !!laeuftJetzt && laeuftJetzt.type === G
+        && laeuftJetzt.name === "Hyperbolic Regeneration Chamber";
+      let wahl = null;
       if (ruhend && (ausdauerKnapp || hpKnapp)) {
-        // Telemetrie auch im Ruhen - gerade hier. Eine lange Ruhephase ist
-        // der Zustand, in dem ein Haenger am laengsten unentdeckt bliebe.
-        meldeLage("General/Hyperbolic Regeneration Chamber",
-          ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
-            : "ruht bis HP " + Math.round(hp.max * HP_WEITER));
-        await ns.bladeburner.nextUpdate();
-        continue;
+        if (kammerLaeuft) {
+          figurErneuern("General/Hyperbolic Regeneration Chamber",
+            ausdauerKnapp ? "Ausdauer" : "HP");
+          // Telemetrie auch im Ruhen - gerade hier. Eine lange Ruhephase ist
+          // der Zustand, in dem ein Haenger am laengsten unentdeckt bliebe.
+          meldeLage("General/Hyperbolic Regeneration Chamber",
+            ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
+              : "ruht bis HP " + Math.round(hp.max * HP_WEITER));
+          await ns.bladeburner.nextUpdate();
+          continue;
+        }
+        wahl = { typ: G, name: "Hyperbolic Regeneration Chamber",
+          grund: ausdauerKnapp ? "Ausdauer" : "HP" };
+      } else {
+        ruhend = false;
       }
-      ruhend = false;
 
-      const wahl = waehle();
+      if (!wahl) wahl = waehle();
       // Der Deckel oben misst eine ZUSAMMENHAENGENDE Strecke: Der Zeitstempel
       // wird beim ersten Field-Analysis-Durchlauf gesetzt und faellt weg,
       // sobald etwas anderes gewaehlt wird.
@@ -4617,6 +4672,11 @@ export async function main(ns) {
           festhalten = jetzt < voll && chaosNun < CHAOS_EIN;
         } catch { festhalten = false; }   // alte Fassung: dann eben abbrechen
       }
+      // Laeuft schon, was gewaehlt ist (oder wird Incite festgehalten), wird
+      // nicht neu gestartet - der Antrag fuer die LAUFENDE Aktion muss aber
+      // trotzdem stehen bleiben (FIGUR_ERNEUERN_MS).
+      if (gleich) figurErneuern(wahl.typ + "/" + wahl.name, wahl.grund || "Rangaufbau");
+      else if (festhalten) figurErneuern(G + "/Incite Violence", "festgehalten bis Abschluss");
       if (!gleich && !festhalten) {
         // Truppeinsatz NUR bei Black Ops (29.08.2026, 18:50). Der Bonus ist
         // `(teamCount+1)^0,05` (`Actions/Operation.ts:96-98`) und wirkt ueber
@@ -4655,6 +4715,7 @@ export async function main(ns) {
         // jeder Runde erneuert; ohne Vergabe wird nicht gestartet.
         figBeantrage(ns, "blade.js", FIG_PRIO.bladeburner, "bladeburner",
           wahl.typ + "/" + wahl.name, wahl.grund || "Rangaufbau");
+        figErneuertMs = Date.now();
         const figW = figDarf(ns, "blade.js", figSeq);
         if (figW.seq !== null) figSeq = figW.seq;
         //

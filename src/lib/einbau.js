@@ -285,14 +285,17 @@ export function unbezahlbarInHorizont({
  * continue` - zwei Runden sind damit oft nur 1-3 s. Belegt im Log BN5.2:
  * Spende 19:02:50, stille Folgerunde, Kauf 19:03:06, Einbaupruefung 19:03:08
  * = drei Runden spaeter, die Pause war vorbei, obwohl die Spendenphase lief.
- * 60 s decken den Takt der Spendenphase (eine Spende je ~16 s) sicher ab.
+ * 150 s decken den Takt der Spendenphase (eine Spende je ~16 s) und eine
+ * gedrosselte Runde im verdeckten Tab (~60 s) sicher ab.
  *
  * @param {number|null} letzteSpendeMs Wandzeit der letzten eigenen Spende
  * @param {number} jetztMs
  * @param {number} [pauseMs]
  * @returns {boolean}
  */
-export const SPENDE_PAUSE_MS = 60000;
+// 150 s statt 60 s (Uhren-Audit 08.10.2026): im verdeckten Tab ist eine Runde
+// ~60 s lang, eine 60-s-Pause war schon zur naechsten Runde vorbei.
+export const SPENDE_PAUSE_MS = 150000;
 export function spendePausiert(letzteSpendeMs, jetztMs, pauseMs = SPENDE_PAUSE_MS) {
   if (!Number.isFinite(letzteSpendeMs)) return false;
   const seit = jetztMs - letzteSpendeMs;
@@ -393,7 +396,9 @@ export function waehleEinbauGeldziele(kandidaten, istWertvoll) {
  * @param {number} [p.karenzMs]
  * @returns {{holen: boolean, unfokussiertSeit: number|null}}
  */
-export const FOKUS_KARENZ_MS = 30000;
+// 150 s statt 30 s (Uhren-Audit 08.10.2026): im verdeckten Tab dehnen sich
+// darkweb.js und die Runde auf ~60 s; 30 s brachen die Klickfolge ab.
+export const FOKUS_KARENZ_MS = 150000;
 export function fokusEntscheidung({
   arbeitetSchon, istFokussiert, nmiEingebaut, unfokussiertSeit, jetzt, karenzMs = FOKUS_KARENZ_MS,
 }) {

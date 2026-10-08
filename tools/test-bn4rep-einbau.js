@@ -200,8 +200,12 @@ console.log("\n-- Einwand 9: Spendenpause in Wandzeit statt in Runden --");
   const pruef = Date.parse("2026-09-26T19:03:08");
   pruefe("19:02:50 -> 19:03:08 (18 s, 3 Runden): Pause greift",
     ruf("spendePausiert", spende, pruef) === true);
-  pruefe("nach 60 s ist die Pause vorbei",
-    ruf("spendePausiert", spende, spende + 60000) === false);
+  // Verdeckter Tab: eine Runde dauert ~60 s (1 Timer-Weckung je Minute). Die
+  // Pause muss die naechste Runde sicher noch abdecken (Uhren-Audit 08.10.).
+  pruefe("verdeckter Tab: 61 s spaeter (naechste Runde) greift die Pause noch",
+    ruf("spendePausiert", spende, spende + 61000) === true);
+  pruefe("nach 150 s ist die Pause vorbei",
+    ruf("spendePausiert", spende, spende + 150000) === false);
   pruefe("ohne jede Spende: keine Pause",
     ruf("spendePausiert", null, pruef) === false);
 }
@@ -279,8 +283,11 @@ console.log("\n-- Einwaende 4 und 8: Fokus - NMI nur eingebaut, Karenz fuer die 
     a !== FEHLT && a.holen === false && a.unfokussiertSeit === t0, JSON.stringify(a));
   const b = f({ unfokussiertSeit: t0, jetzt: t0 + 16000 });
   pruefe("16 s spaeter: noch nicht", b !== FEHLT && b.holen === false, JSON.stringify(b));
-  const c = f({ unfokussiertSeit: t0, jetzt: t0 + 31000 });
-  pruefe("31 s spaeter: holen, Merker zurueck", c !== FEHLT && c.holen === true && c.unfokussiertSeit === null,
+  // Verdeckter Tab: darkweb.js dehnt sich mit, eine Runde ~60 s (Uhren-Audit 08.10.).
+  const c61 = f({ unfokussiertSeit: t0, jetzt: t0 + 61000 });
+  pruefe("verdeckter Tab: 61 s spaeter noch nicht holen", c61 !== FEHLT && c61.holen === false, JSON.stringify(c61));
+  const c = f({ unfokussiertSeit: t0, jetzt: t0 + 151000 });
+  pruefe("151 s spaeter: holen, Merker zurueck", c !== FEHLT && c.holen === true && c.unfokussiertSeit === null,
     JSON.stringify(c));
   const d = f({ unfokussiertSeit: t0, jetzt: t0 + 60000, nmiEingebaut: true });
   pruefe("NMI EINGEBAUT: nie holen (Strafe existiert nicht)", d !== FEHLT && d.holen === false);

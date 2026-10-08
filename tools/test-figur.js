@@ -388,6 +388,38 @@ console.log("-- ein TOTER Besitzer haelt die Figur nicht (W9) --");
 }
 
 console.log("");
+console.log("-- graft.js ist beendet, graftauto.js haelt den Antrag (Uhren-Audit 08.10.) --");
+{
+  // graft.js startet den Graft und endet; graftauto.js beantragt auf den
+  // Namen graft.js weiter. Die Prozessliste kennt nur graftauto.js.
+  const g = [F.antrag("graft.js", F.PRIO.graft, "graft", {}, "Graft laeuft", uhren(W0))];
+  const v = F.vergib(g, null, W0, NR).vergabe;
+  pruefe("Ausgangslage: graft.js hat die Figur", v && v.owner === "graft.js");
+  const W5 = W0 + 5 * 60000;
+  const neu = [F.antrag("graft.js", F.PRIO.graft, "graft", {}, "Graft laeuft", uhren(W5)),
+    F.antrag("bn4rep.js", F.PRIO.faktion, "faktion", {}, "Reputation", uhren(W5))];
+  const nurAuto = (t) => t === "graftauto.js" || t === "bn4rep.js";
+  const e = F.vergib(neu, v, W5, NR, nurAuto);
+  pruefe("graftauto.js lebt -> graft.js behaelt die Figur gegen Faktionsarbeit",
+    e.vergabe && e.vergabe.owner === "graft.js", "Besitzer: " + (e.vergabe && e.vergabe.owner));
+  const keiner = (t) => t === "bn4rep.js";
+  const tot = F.vergib(neu, v, W5, NR, keiner);
+  pruefe("ohne graftauto.js gilt graft.js weiter als tot",
+    tot.vergabe && tot.vergabe.owner === "bn4rep.js", "Besitzer: " + (tot.vergabe && tot.vergabe.owner));
+  // Graft fertig oder Fehlstart: graftauto.js lebt, erneuert aber nicht mehr.
+  // Der letzte Antrag ist aelter als ANTRAG_TTL_MS - die Lease muss fallen,
+  // nicht bis zu 2 h halten (Skeptiker 08.10.).
+  const W10 = W0 + 10 * 60000;
+  const nurFremd = [F.antrag("bn4rep.js", F.PRIO.faktion, "faktion", {}, "Reputation", uhren(W10))];
+  const ende = F.vergib(nurFremd, v, W10, NR, nurAuto);
+  pruefe("Graft vorbei (kein frischer Antrag), graftauto lebt -> Figur geht an bn4rep",
+    ende.vergabe && ende.vergabe.owner === "bn4rep.js", "Besitzer: " + (ende.vergabe && ende.vergabe.owner));
+  const leerEnde = F.vergib([], v, W10, NR, nurAuto);
+  pruefe("Graft vorbei, kein anderer Antrag -> Figur frei", leerEnde.vergabe === null,
+    "Besitzer: " + (leerEnde.vergabe && leerEnde.vergabe.owner));
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

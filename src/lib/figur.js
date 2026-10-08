@@ -187,6 +187,33 @@ export function antragGilt(a, jetzt, nodeReset) {
  * @param {(tool: string) => boolean} [lebt] laeuft dieses Werkzeug noch?
  * @returns {{vergabe: object|null, grund: string, wechsel: boolean}}
  */
+/**
+ * STELLVERTRETER IN DER LEBENDPRUEFUNG (Uhren-Audit 08.10.2026).
+ *
+ * graft.js startet den Graft und beendet sich sofort; den Antrag auf seinen
+ * Namen haelt danach graftauto.js am Leben. Die Prozessliste kennt graft.js
+ * also nie - ohne Stellvertreter galt der Besitzer als tot, die 2-h-Lease
+ * fiel sofort, und ein Faktions- oder Gym-Antrag bekam die Figur. Dessen
+ * workForFaction/gymWorkout bricht den Graft ab, ohne Erstattung
+ * (GraftingWork.tsx:75-83; Simulacrum 450 Mrd). Ein Besitzer gilt deshalb
+ * auch dann als lebend, wenn einer seiner Stellvertreter laeuft.
+ */
+export const ALIVE_PROXIES = { "graft.js": ["graftauto.js"] };
+
+/**
+ * Lebt der Besitzer - selbst oder ueber einen Stellvertreter? Der
+ * Stellvertreter zaehlt nur, solange der Besitzer einen GUELTIGEN eigenen
+ * Antrag hat: graftauto.js erneuert den Antrag "graft.js" nur bei laufendem
+ * Graft. Endet der Graft oder schlaegt der Start fehl, verfaellt der Antrag
+ * nach ANTRAG_TTL_MS und die Lease faellt wie bisher (Skeptiker 08.10.: ohne
+ * diese Bedingung hielte die 2-h-Lease die Figur nach Graftende fest).
+ */
+function ownerAlive(owner, lebt, gueltig) {
+  if (lebt(owner)) return true;
+  const proxies = ALIVE_PROXIES[owner] || [];
+  return proxies.some((p) => lebt(p)) && gueltig.some((a) => a.tool === owner);
+}
+
 function vergibEinzel(antraege, bisher, jetzt, nodeReset, lebt) {
   const gueltig = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset));
 
@@ -194,7 +221,7 @@ function vergibEinzel(antraege, bisher, jetzt, nodeReset, lebt) {
   // laeuft weiter, als haette es sie nie gegeben. Ein Antrag des Toten steht
   // in der Regel noch in der Liste - er faellt mit, weil `antragGilt` nach
   // ANTRAG_TTL_MS (150 s) greift und ein toter Antragsteller nicht erneuert.
-  if (typeof lebt === "function" && bisher && bisher.owner && !lebt(bisher.owner)) {
+  if (typeof lebt === "function" && bisher && bisher.owner && !ownerAlive(bisher.owner, lebt, gueltig)) {
     const uebrig = gueltig.filter((a) => a.tool !== bisher.owner);
     if (!uebrig.length) {
       return { vergabe: null, grund: "Besitzer " + bisher.owner + " laeuft nicht mehr", wechsel: true };

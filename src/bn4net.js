@@ -1676,16 +1676,22 @@ export async function main(ns) {
         // Platz fuer ein Kind neben dem Werkzeug: auf home zaehlt die
         // Steuerungsreserve mit (Skeptiker 06.10., ERNST 1 - ein groesseres
         // home darf nicht pauschal verworfen werden).
+        // Laeuft das Werkzeug auf der Werkbank, belegen dort auch ihre
+        // anderen Werkzeuge Platz (08.10.2026, BN3.3): corp.js landete nach
+        // einem Neustart auf werk-9, die Rechnung zog nur corp.js selbst ab,
+        // die Reserve blieb auf der vollen Werkbank - Runde 4 "no_space".
         const platzHier = h === "home"
           ? ns.getServerMaxRam(h) - reserveHome() - 16
-          : ns.getServerMaxRam(h) - ns.getScriptRam(e.name, "home");
+          : h === werkbank
+            ? ns.getServerMaxRam(h) - werkbankReserve
+            : ns.getServerMaxRam(h) - ns.getScriptRam(e.name, "home");
         let ziel = h;
         if (platzHier < gb) {
           let alt = null, altGb = 0;
           for (const k of hosts) {
             // h selbst ist eben verworfen worden (platzHier < gb) - nicht
             // ueber die volle maxRam wieder hereinholen (Skeptiker 07.10.).
-            if (k === "home" || k === h || !ns.hasRootAccess(k)) continue;
+            if (k === "home" || k === h || k.startsWith("hacknet-server-") || !ns.hasRootAccess(k)) continue;
             // Auf der Werkbank zaehlt nur, was neben ihren Werkzeugen frei
             // bleibt (07.10.2026, BN3.3): die Reserve landete auf werk-9
             // (128 GB, Werkzeuge 107 GB) - das Kind (51,6 GB) passte nie,

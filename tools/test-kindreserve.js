@@ -36,7 +36,9 @@ pruefe("home zaehlt die Steuerungsreserve mit (kein pauschaler home-Ausschluss)"
   kern.includes('? ns.getServerMaxRam(h) - reserveHome() - 16'));
 pruefe("Ausweich-Wirt: auf der Werkbank zaehlt nur der Platz neben ihren Werkzeugen (07.10. BN3.3)",
   kern.includes("const kGb = ns.getServerMaxRam(k) - (k === werkbank ? werkbankReserve : 0);"));
-pruefe("Ausweich-Suche ueberspringt den eben verworfenen eigenen Wirt", kern.includes('if (k === "home" || k === h || !ns.hasRootAccess(k)) continue;'));
+pruefe("Werkzeug auf der Werkbank: platzHier zieht die ganze Werkbank-Reserve ab (08.10. BN3.3)",
+  /: h === werkbank\s*\? ns\.getServerMaxRam\(h\) - werkbankReserve/.test(kern));
+pruefe("Ausweich-Suche ueberspringt den eben verworfenen eigenen Wirt", kern.includes('if (k === "home" || k === h || k.startsWith("hacknet-server-") || !ns.hasRootAccess(k)) continue;'));
 pruefe("ohne Ausweich-Wirt bleibt die Reserve auf h und wird gemeldet",
   kern.includes("else kindOhneWirt.push(e.name);") && kern.includes("      kindOhneWirt,"));
 

@@ -247,6 +247,10 @@ export async function handschlag(ns, reason, target, nodeReset, sag = () => {}) 
     if (antwort) break;
     await ns.sleep(2000);
   }
+  // Ein letzter Blick NACH dem letzten Schlaf (Uhren-Audit 08.10.2026): im
+  // verdeckten Tab dauert ns.sleep(2000) bis ~60 s, die Schleife endete sonst
+  // ohne Pruefung genau nach dem Schlaf, in dem die Antwort eingetroffen war.
+  if (!antwort) antwort = antwortDa(ns, anfrageTs, reason);
   const wartezeitMs = Date.now() - beginn;
 
   if (antwort) {

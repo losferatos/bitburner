@@ -138,6 +138,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-handschlag-nachblick.js",
+    deckt: "Handschlag liest die Antwort auch nach dem letzten (gedrosselten) Schlaf (Uhren-Audit 08.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-notexec-frist.js",
     deckt: "ausgang.js: NOT_EXECUTABLE-Frist laeuft wirklich ab (Uhren-Audit 08.10.)",
     schnell: true,

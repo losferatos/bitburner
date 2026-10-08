@@ -39,6 +39,8 @@ pruefe("Ausweich-Wirt: auf der Werkbank zaehlt nur der Platz neben ihren Werkzeu
 pruefe("Werkzeug auf der Werkbank: platzHier zieht die ganze Werkbank-Reserve ab (08.10. BN3.3)",
   /: h === werkbank\s*\? ns\.getServerMaxRam\(h\) - werkbankReserve/.test(kern));
 pruefe("Ausweich-Suche ueberspringt den eben verworfenen eigenen Wirt", kern.includes('if (k === "home" || k === h || k.startsWith("hacknet-server-") || !ns.hasRootAccess(k)) continue;'));
+pruefe("share-Faeden, die in die Kind-Reserve ragen, werden geraeumt (08.10. BN3.3)",
+  /if \(\(kindReserve\.get\(host\) \|\| 0\) > 0 && freiJetzt\(\) < 0[\s\S]{0,120}ns\.scriptKill\("worker\/share\.js", host\);\s*prozesseHier = ns\.ps\(host\);/.test(kern));
 pruefe("ohne Ausweich-Wirt bleibt die Reserve auf h und wird gemeldet",
   kern.includes("else kindOhneWirt.push(e.name);") && kern.includes("      kindOhneWirt,"));
 

@@ -2625,7 +2625,7 @@ export async function main(ns) {
         // (Uhr zurueckgestellt). Grenze: zwei gedeckelte Takte (2 x 120 s).
         // ns.ps und ns.kill zahlt der Kern ohnehin; die Liste dient unten
         // auch der share-Zaehlung.
-        const prozesseHier = ns.ps(host);
+        let prozesseHier = ns.ps(host);
         for (const pr of prozesseHier) {
           if (pr.filename !== EXPFARM_SKRIPT) continue;
           const frist = Number(pr.args[1]);
@@ -2633,10 +2633,23 @@ export async function main(ns) {
         }
         // Die Werkbank ist nicht mehr pauschal ausgenommen, sondern nur noch
         // um ihren gemessenen Werkzeugbedarf gekuerzt (siehe 1c).
-        const frei = ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
+        const freiJetzt = () => ns.getServerMaxRam(host) - ns.getServerUsedRam(host)
           - (host === "home" ? reserveHome() : 0)
           - (host === werkbank ? werkbankReserve : 0)
           - (kindReserve.get(host) || 0);
+        // KINDERPLATZ GEGEN ENDLOSE SHARE-FAEDEN (08.10.2026, BN3.3): die
+        // Reserve wanderte auf werk-5, dort liefen aber schon share-Faeden,
+        // die nie enden - corp.js fand nirgends 51,6 GB, Runde 4 "no_space".
+        // Die Reserve verhinderte nur neues Auffuellen. Ragt der Bestand in
+        // die Reserve, wird share hier geraeumt (verlustfrei, siehe unten)
+        // und im Rest des Durchgangs gedeckelt neu aufgebaut. hack/grow/weaken
+        // bleiben stehen - sie enden von selbst, ein Kill warfe ihre Laufzeit weg.
+        if ((kindReserve.get(host) || 0) > 0 && freiJetzt() < 0
+          && prozesseHier.some((pr) => pr.filename === "worker/share.js")) {
+          ns.scriptKill("worker/share.js", host);
+          prozesseHier = ns.ps(host);
+        }
+        const frei = freiJetzt();
         // EXPFARM_SKRIPT extra dazu (Fix B2): es steht bewusst nicht in
         // WORKER - WORKER zaehlt auch mit, was schon je Geldziel FLIEGT
         // (flight-Zaehlung weiter unten), und der Ofen soll dort NICHT

@@ -258,6 +258,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-rundenboden.js",
+    deckt: "Corp-Investorenrunden: fester Mindestbetrag nach >2 h Verschiebung (letzte Runde 0, Runden 1-3 ein Viertel)",
+    schnell: true,
+  },
+  {
     datei: "test-hashrang.js",
     deckt: "Hash-Rang im Anlauf (B7): BN13/BN15 tauschen Hashes unter 1 Mrd in Rang (Preisdeckel 2000), Cache im ersten Zyklus; alle anderen Knoten unveraendert",
     schnell: true,

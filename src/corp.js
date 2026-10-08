@@ -81,6 +81,27 @@ const AGRI_RESERVE = 2e9;
 // Schreiber der Telemetrie findet; gleich lib/corplib.js TELEMETRY_FILE.
 const TELEMETRY_PATH = "data/corp.json";
 
+/**
+ * Mindestbetrag einer Runde nach der Verschiebung (08.10.2026, BN3.3).
+ *
+ * Der feste Mindestbetrag galt nur zeitlich gestaffelt: bis 1 h Verschiebung voll, danach die Haelfte -
+ * und dann fuer immer. In BN3.3 lag die Bewertung nach einem schwachen Start (no_space bis z526, Runde 1
+ * 65 statt 132 Mrd, Runde 3 257 statt 953 Mrd) bei 0,73 Bio; Runde 4 verlangte 2,5 Bio und wurde von
+ * 8,85 h bis 11,4 h Corp-Zeit alle 15 min mit Ausgabenstopp versucht und abgelehnt. Der Stopp fror die
+ * Ausgaben rund ein Drittel der Zeit ein, das Geld fuer Bueros/Werbung blieb liegen.
+ * Jetzt: nach mehr als 2 h Verschiebung faellt in der LETZTEN Runde der feste Boden weg - ohne Runde 4
+ * gibt es weder Zuendung noch IPO noch Bestechung (corp.js mayIpo/roundsDone >= 4), Warten bringt also
+ * nichts. Es gilt dort nur noch die Bestangebot-Regel (>= 90 % des besten Angebots im Fenster).
+ * Runden 1-3 behalten ein Viertel des Bodens (Skeptiker 08.10.: sonst nach Neustart im Stopp ein
+ * eingebrochenes Angebot fuer 25-35 % der Anteile). Ein gesunder Lauf (BN3.2: Runde 4 nach 0,075 h)
+ * merkt nichts.
+ */
+export function roundFloor(baseMin, shiftH, isLastRound) {
+  if (shiftH > 2) return isLastRound ? 0 : baseMin / 4;
+  if (shiftH > 1) return baseMin / 2;
+  return baseMin;
+}
+
 export async function main(ns) {
   ns.disableLog("ALL");
   const c = ns.corporation;
@@ -854,8 +875,7 @@ class Planner {
     if (cyc >= Tr && st.cycle - st.lastLT >= 11 && (noFix(st, "bestOffer") || st.cycle - (st.freezeAt ?? 0) >= 11)) {
       st.next = `Runde ${k + 1} annehmen`;
       // Mindestbetrag; nach mehr als 1 h Verschiebung nur noch die Haelfte
-      let min = this.cfg("roundMin", ROUND_MIN_FUNDS)[k];
-      if (st.roundShift[k] > 1) min /= 2;
+      let min = roundFloor(this.cfg("roundMin", ROUND_MIN_FUNDS)[k], st.roundShift[k], k === MAX_ROUND - 1);
       if (!noFix(st, "bestOffer")) min = Math.max(min, 0.9 * (st.bestOffer || 0));
       return [["ai", min, noFix(st, "round") ? -1 : k + 1]];
     }

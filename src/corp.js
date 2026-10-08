@@ -1060,8 +1060,14 @@ class Planner {
       } },
       {
         name: "Chemical",
-        // nach Tobacco nur noch opportunistisch (blockiert sonst den Produktausbau stundenlang)
-        cond: this.etappe() >= 2 && this.cfg("chem", true) && (!chem || chemIncomplete) && (st.stage !== "tob" || this.funds > 3 * 121e9 || chem),
+        // nach Tobacco nur noch opportunistisch (blockiert sonst den Produktausbau stundenlang) - ausser
+        // alle Runden sind durch (08.10.2026, BN3.3): ohne Chemical kauft Agri Markt-Chemikalien der
+        // Qualitaet 1, Pflanzen-q blieb bei 10,8 (BN3.2: 93), das effektive Produkt-Rating klemmte bei
+        // min(r, q*sqrt(r)) = 690 statt 3407 (Division.ts:906). Die 363-Mrd-Schwelle erreichte die Kasse
+        // nie (Werbung/Upgrades halten sie bei ~67 Mrd). Simulator (corpsim, live geeicht): ohne Chem
+        // keine Zuendung in > 100 h, mit Chem ~14 Corp-h.
+        cond: this.etappe() >= 2 && this.cfg("chem", true) && (!chem || chemIncomplete)
+          && (st.stage !== "tob" || this.funds > this.cfg("chemFunds", 3 * 121e9) || st.roundsDone >= MAX_ROUND || chem),
         cost: () => (chem ? 0 : 70e9 + 45e9) + 6e9,
         go: () => this.setupChem(),
       },

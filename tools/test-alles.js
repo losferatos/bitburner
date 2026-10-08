@@ -258,6 +258,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-chem-nachbau.js",
+    deckt: "Corp: Chemical-Division nach allen Investorenrunden auch unter 363 Mrd Kasse (BN3.3 Pflanzen-q 10,8)",
+    schnell: true,
+  },
+  {
     datei: "test-rundenboden.js",
     deckt: "Corp-Investorenrunden: fester Mindestbetrag nach >2 h Verschiebung (letzte Runde 0, Runden 1-3 ein Viertel)",
     schnell: true,

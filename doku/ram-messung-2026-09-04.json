@@ -299,10 +299,10 @@
   "singKosten41": 80,
   "dom": 0,
   "err": null,
-  "bytes": 264543,
+  "bytes": 268300,
   "lines": 4145,
-  "sha256": "0a0f852973116c039e666809e77d58d833c3eb41b31e6b9b122dfd5974d5ca7a",
-  "gemessenAm": "2026-10-07T20:19:10.979Z",
+  "sha256": "ab74492421ed365aba7cf90e9af95bc04c1f36cb35dc5a3b2fb2e0f42dcbcace",
+  "gemessenAm": "2026-10-08T04:26:17.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -1040,10 +1040,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 310964,
+  "bytes": 311806,
   "lines": 5015,
-  "sha256": "7d64a07a7a45eaacbd40bd2c3d0aaa54122087f88bacda16c88280e001f2ae9c",
-  "gemessenAm": "2026-10-08T04:14:24.380Z",
+  "sha256": "a319ff05d3a551b75a47c6fecfc39477f85b49473495a5e016f974f558e54c60",
+  "gemessenAm": "2026-10-08T04:26:17.107Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {

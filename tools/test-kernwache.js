@@ -140,6 +140,24 @@ for (const [stempel, soll] of [[false, null], [true, 2]]) {
     kpi ? "erhalten " + kpi.queued_augs_at_jump : "kpi.json fehlt");
 }
 
+console.log("");
+console.log("-- queued_augs_held: Frist-Haltung getrennt, Kennwert bleibt ehrlich (09.10.) --");
+for (const [frist, sollHeld] of [[true, 3], [false, 0]]) {
+  const m = kernMock({ maxSchlaf: 14 });
+  m.lege("home", "data/reload.txt", "");
+  const daten = { von: 3, nach: 11, level: 1, wartendeAugs: 3, wartendeGeprueft: true, einbauFristGehalten: frist };
+  m.lege("home", "data/events.json", JSON.stringify({ schema: 1, eintraege: [
+    { art: "jump", text: "exit.js gestartet", wall: Date.now() - 3600000,
+      playtime: 0, motorTimeMs: 0, daten },
+  ] }));
+  await fahreKern(m);
+  let kpi = null;
+  try { kpi = JSON.parse(m.lies("home", "data/kpi.json")); } catch { kpi = null; }
+  pruefe((frist ? "Frist gehalten" : "nicht gehalten (z.B. haengender Aufbau)") + ": at_jump 3, held " + sollHeld,
+    kpi !== null && kpi.queued_augs_at_jump === 3 && kpi.queued_augs_held === sollHeld,
+    kpi ? "at_jump " + kpi.queued_augs_at_jump + ", held " + kpi.queued_augs_held : "kpi.json fehlt");
+}
+
 // ---------------------------------------------------------------------------
 const W0 = 1_700_000_000_000;
 async function fahreWaechter(o = {}) {

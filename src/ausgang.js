@@ -808,7 +808,22 @@ export async function main(ns) {
             // Kern zaehlt nur gestempelte Spruenge (22.09.2026) - das
             // Sprung-Ereignis vom Vormittag des 22.09. traegt noch die ungepruefte 2 und stuende
             // sonst bis zum naechsten Sprung als Befund im /bb.
-            wartendeGeprueft: true });
+            wartendeGeprueft: true,
+            // ZURUECKGEHALTEN WEGEN DER WIEDERAUFBAU-FRIST (09.10.2026, BN3.3
+            // -> BN11): drei Blade-Augs standen beim Sprung in der
+            // Warteschlange, weil bn4rep im Kampfknoten den Einbau innerhalb
+            // der Frist nach dem letzten Wiederaufbau sperrt (kampfZuFrueh,
+            // lib/endspurt.js). Der Kern fuehrt sie getrennt (queued_augs_held),
+            // der Kennwert selbst bleibt ehrlich. NUR die Frist zaehlt -
+            // kampfAufbau (Kampfwerte < 100) kann auch ein haengendes Training
+            // sein und bleibt ein Befund (Skeptiker 09.10.).
+            einbauFristGehalten: (() => {
+              try {
+                const e = JSON.parse(liesVonHome("data/einbau.json") || "null");
+                if (!e || !Number.isFinite(e.zeit) || e.zeit <= info.lastAugReset) return null;
+                return e.kampfZuFrueh === true;
+              } catch { return null; }
+            })() });
         nachHome("data/events.json", JSON.stringify(strom));
       } catch { /* Bericht, nie Steuerung - der Sprung geht trotzdem */ }
 

@@ -5248,6 +5248,9 @@ export async function main(ns) {
           const d = letzterSprung.daten;
           k.queued_augs_at_jump = (d.wartendeGeprueft === true && Number.isFinite(d.wartendeAugs))
             ? d.wartendeAugs : null;
+          // Davon bewusst in der Wiederaufbau-Frist gehalten (09.10.2026).
+          k.queued_augs_held = (k.queued_augs_at_jump !== null && d.einbauFristGehalten === true)
+            ? k.queued_augs_at_jump : 0;
         }
         // `backup_wait_min` (22.09.2026): die Wartezeit des letzten Handschlags
         // vor einem Sprung - ausgang.js schreibt sie ins Ereignis, nicht in

@@ -819,7 +819,13 @@ async function main() {
       }
       if (kpi.negative_balance_min > 0) soll0.push(kpi.negative_balance_min + " min Konto negativ");
       if (kpi.queued_augs_at_jump > 0) {
-        soll0.push(kpi.queued_augs_at_jump + " gekaufte Augs beim Sprung verfallen");
+        const gehalten = Number.isFinite(kpi.queued_augs_held) ? kpi.queued_augs_held : 0;
+        const echt = kpi.queued_augs_at_jump - gehalten;
+        if (echt > 0) soll0.push(echt + " gekaufte Augs beim Sprung verfallen");
+        if (gehalten > 0) {
+          sag("Hinweis: " + gehalten + " gekaufte Augs verfielen beim Sprung - bewusst"
+            + " gehalten (Wiederaufbau-Frist im Kampfknoten), kein Befund.");
+        }
       }
       if (soll0.length) sag("BEFUNDE (Soll 0): " + soll0.join("; "));
     }

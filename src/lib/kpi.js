@@ -91,6 +91,8 @@ export const FELDER = {
     hinweis: "Neustart binnen 10 s" },
   backup_age_h: { einheit: "h", uhr: "wand", soll: 1, art: "zahl", klasse: "autonomie" },
   queued_augs_at_jump: { einheit: "Zahl", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
+  queued_augs_held: { einheit: "Zahl", uhr: "-", soll: null, art: "zahl", klasse: "autonomie",
+    hinweis: "davon im Kampfknoten in der Wiederaufbau-Frist bewusst nicht eingebaut" },
   graft_aborted: { einheit: "Zahl", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
   skipped_route_entries: { einheit: "Zahl", uhr: "-", soll: 0, art: "zahl", klasse: "autonomie" },
   route_state: { einheit: "open|done|blocked", uhr: "-", soll: null, art: "text", klasse: "autonomie" },

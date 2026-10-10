@@ -198,14 +198,21 @@ export function restzeitAusKurve(knoten, rang) {
  * Der Skeptiker fand am 04.09., dass die Funktion zwar gebaut, aber nirgends
  * aufgerufen war. Sie ist jetzt in checkin.js angeschlossen.
  */
-export function vergleichMitReferenz(knoten, rang, hSeitRangbeginn) {
+export function vergleichMitReferenz(knoten, rang, hSeitKnotenstart) {
   const r = restzeitAusKurve(knoten, rang);
-  if (!r || !Number.isFinite(hSeitRangbeginn) || hSeitRangbeginn <= 0) return null;
-  if (r.hJetzt <= 0) return null;
+  if (!r || !Number.isFinite(hSeitKnotenstart) || hSeitKnotenstart <= 0) return null;
+  // Beide Seiten ab KNOTENSTART (10.10.2026). Die Kurve zaehlt ab ihrem ersten
+  // Rangpunkt; ohne bekannten Abstand dorthin gibt es keinen ehrlichen
+  // Vergleich - lieber keiner als ein falsches ZAEH.
+  const k = ladeKurve(knoten);
+  const off = k && k.nullpunkt ? Number(k.nullpunkt.hSeitKnotenstart) : NaN;
+  if (!Number.isFinite(off) || off < 0) return null;
+  const hRef = r.hJetzt + off;
+  if (hRef <= 0) return null;
   return {
-    faktor: hSeitRangbeginn / r.hJetzt,
-    hJetzt: hSeitRangbeginn,
-    hReferenz: r.hJetzt,
+    faktor: hSeitKnotenstart / hRef,
+    hJetzt: hSeitKnotenstart,
+    hReferenz: hRef,
   };
 }
 

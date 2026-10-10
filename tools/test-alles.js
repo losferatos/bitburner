@@ -98,6 +98,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-gleichstand.js",
+    deckt: "Gleichstand-Vergleich zaehlt ab Knotenstart und bekommt eine Knotenzeit (war tot, Befund 10.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-stadtwahl-echtpop.js",
     deckt: "Stadtwahl nach echter Bevoelkerung (r je Stadt per Probenwechsel), nicht popEst - Rang fiel in leergeraidetem Sector-12 (Befund 04.10.)",
     schnell: true,

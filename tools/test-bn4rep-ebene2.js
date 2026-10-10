@@ -479,7 +479,9 @@ const weltFokus = (o = {}) => baueWelt({
   arbeit: { type: "FACTION", factionName: "CyberSec", factionWorkType: "hacking" },
   fokus: false,
   dateien: { home: { "data/verfahren.txt": "V1 5" } },
-  schlafBudget: 8,
+  // 20 statt 8 (10.10.2026): FOKUS_KARENZ_MS steht seit 9c57be6 auf 150 s,
+  // mit 8 Runden endete der Nachbau vor dem ersten Rueckholen.
+  schlafBudget: 20,
   ...o,
 });
 {
@@ -505,14 +507,15 @@ const weltFokus = (o = {}) => baueWelt({
 {
   // Karenz: darkweb.js hat gerade "Do something else" geklickt und
   // navigiert per Tastenkuerzel - ein setFocus in den ersten Sekunden
-  // bricht es ab. Erst nach 30 s ohne Fokus zurueckholen, aber dann sicher.
+  // bricht es ab. Erst nach 150 s ohne Fokus zurueckholen (seit 9c57be6,
+  // eine gedrosselte Runde dauert ~60 s), aber dann sicher.
   const w = weltFokus();
   const r = await fahre(w);
   pruefe("Nachbau vollstaendig", rundenfehler(r.log).length === 0 && r.ende !== "fehler",
     rundenfehler(r.log).concat(r.fehlerText).join(" | ").slice(0, 300));
   const erster = w.setFocus[0];
-  pruefe("kein setFocus in den ersten 30 s ohne Fokus",
-    !!erster && erster.uhr - w.start >= 30000,
+  pruefe("kein setFocus in den ersten 150 s ohne Fokus",
+    !!erster && erster.uhr - w.start >= 150000,
     erster ? "erster Aufruf nach " + ((erster.uhr - w.start) / 1000) + " s" : "gar kein Aufruf");
   pruefe("danach wird er zurueckgeholt (Rate nicht dauerhaft bei 80 %)", w.fokus === true,
     "fokus=" + w.fokus);

@@ -1,0 +1,127 @@
+{
+ "knoten": 11,
+ "erzeugtAm": "2026-10-10T14:44:45.706Z",
+ "erzeugtVon": "tools/rangkurve-bauen.js",
+ "quellen": [
+  "data/verlauf-strategie.json",
+  "data/checkin.json",
+  "backups/INDEX.tsv (Sicherungen)"
+ ],
+ "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 11 --mit-sicherungen",
+ "nullpunkt": {
+  "spielzeitMs": 4399554200,
+  "spielzeitH": 1222.098,
+  "hSeitKnotenstart": 10.725,
+  "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
+ },
+ "punkteGesamt": 32,
+ "laeufeErkannt": 2,
+ "stuetzpunkte": 24,
+ "rangSpanne": [
+  215,
+  454620
+ ],
+ "dauerH": 17.784,
+ "ratenSpanne": [
+  229.00763358778624,
+  135106
+ ],
+ "punkte": [
+  {
+   "h": 0,
+   "rang": 215
+  },
+  {
+   "h": 0.003,
+   "rang": 215
+  },
+  {
+   "h": 0.015,
+   "rang": 215
+  },
+  {
+   "h": 0.084,
+   "rang": 219
+  },
+  {
+   "h": 1.015,
+   "rang": 469
+  },
+  {
+   "h": 2.015,
+   "rang": 704
+  },
+  {
+   "h": 2.754,
+   "rang": 1281
+  },
+  {
+   "h": 3.016,
+   "rang": 1341
+  },
+  {
+   "h": 4.016,
+   "rang": 2486
+  },
+  {
+   "h": 5.016,
+   "rang": 3296
+  },
+  {
+   "h": 6.016,
+   "rang": 4979
+  },
+  {
+   "h": 7.016,
+   "rang": 7134
+  },
+  {
+   "h": 8.016,
+   "rang": 10343
+  },
+  {
+   "h": 9.016,
+   "rang": 15603
+  },
+  {
+   "h": 10.017,
+   "rang": 18418
+  },
+  {
+   "h": 11.017,
+   "rang": 22863
+  },
+  {
+   "h": 12.017,
+   "rang": 31631
+  },
+  {
+   "h": 13.017,
+   "rang": 52099
+  },
+  {
+   "h": 14.017,
+   "rang": 94649
+  },
+  {
+   "h": 14.924,
+   "rang": 163788
+  },
+  {
+   "h": 15.017,
+   "rang": 172614
+  },
+  {
+   "h": 16.017,
+   "rang": 266844
+  },
+  {
+   "h": 17.017,
+   "rang": 401950
+  },
+  {
+   "h": 17.784,
+   "rang": 454620
+  }
+ ]
+}

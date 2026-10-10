@@ -34,11 +34,42 @@ import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 import { gateRoundStatus } from "./lib/gate-round-status.js";
 import { gangZeile, gangBefunde, gangImKnoten } from "./lib/gangzeile.js";
-import { kurveAuffrischen } from "./lib/kurvepflege.js";
+import { kurveAuffrischen, effektiveSpielzeit } from "./lib/kurvepflege.js";
+import { gunzipSync } from "node:zlib";
 
 const BRIDGE = "http://localhost:8795";
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
+
+/**
+ * Effektive Spielstunden seit Knotenstart, aus der juengsten Sicherung des
+ * laufenden Laufs plus der seitdem gespielten Zeit. null, wenn nichts lesbar.
+ */
+function knotenStundenAusSicherung(knoten, lauf, spielzeitJetzt) {
+  try {
+    const zeilen = fs.readFileSync(path.join(ROOT, "backups", "INDEX.tsv"), "utf8").split(/\r?\n/);
+    for (let i = zeilen.length - 1; i >= 0; i--) {
+      const c = zeilen[i].split("\t");
+      // Ohne bekannten Lauf keine Sicherung: direkt nach dem Sprung laege
+      // sonst die des VORIGEN Laufs vorn - falsches ZAEH (Skeptiker 10.10.).
+      if (lauf === null) return null;
+      if (c.length < 10 || Number(c[4]) !== knoten || Number(c[5]) !== lauf) continue;
+      const datei = [c[10], c[9]].find((d) => d && fs.existsSync(d.trim()));
+      if (!datei) continue;
+      let o = JSON.parse(gunzipSync(fs.readFileSync(datei.trim())).toString());
+      if (o.data && o.data.PlayerSave) o = o.data;
+      const ps = typeof o.PlayerSave === "string" ? JSON.parse(o.PlayerSave) : o.PlayerSave;
+      const p = ps && ps.data;
+      if (!p || p.bitNodeN !== knoten || !Number.isFinite(p.playtimeSinceLastBitnode) || !(p.totalPlaytime > 0)) return null;
+      const bb = p.bladeburner && p.bladeburner.data;
+      const ks = p.totalPlaytime - p.playtimeSinceLastBitnode;
+      const nach = Number.isFinite(spielzeitJetzt) ? Math.max(0, spielzeitJetzt - p.totalPlaytime) : 0;
+      const h = (effektiveSpielzeit(p.totalPlaytime, bb && bb.storedCycles) - ks + nach) / 3.6e6;
+      return h > 0 ? h : null;
+    }
+  } catch { /* unlesbar: dann kein Vergleich */ }
+  return null;
+}
 const STAND_DATEI = path.join(ROOT, "data", "checkin.json");
 
 // Der Ausgang aus einem Kampfknoten: 21 Black Ops, die letzte ist Operation
@@ -599,9 +630,13 @@ async function main() {
     // Zeitstempel, spielzeit ist Spielzeit - die Differenz taugt also nicht.
     // Stattdessen die im Knoten verbrachte Spielzeit aus dem Spielstand, die
     // ausgang.js bzw. der Motor mitfuehrt.
-    const hSeitKnoten = Number.isFinite(netz && netz.spielzeitImKnoten)
-      ? std(netz.spielzeitImKnoten)
-      : (Number.isFinite(bericht.spielzeitImKnotenH) ? bericht.spielzeitImKnotenH : null);
+    //
+    // KORREKTUR 10.10.2026: Beide Felder schrieb niemand - der Vergleich war
+    // seit seinem Bau tot und konnte kein ZAEH melden. Jetzt aus der
+    // juengsten Sicherung dieses Laufs: playtimeSinceLastBitnode gibt den
+    // Knotenstart, der Bonuszeit-Vorrat wird wie in der Kurve abgezogen,
+    // und die Spielzeit seit der Sicherung (blade.json) kommt obendrauf.
+    const hSeitKnoten = knotenStundenAusSicherung(knoten, laufJetzt, spielzeit);
     if (Number.isFinite(hSeitKnoten) && hSeitKnoten > 0) {
       const v = vergleichMitReferenz(knoten, rang, hSeitKnoten);
       if (v) {
@@ -615,7 +650,13 @@ async function main() {
           urteil = "ZAEH";
           sag("  BEFUND: mehr als 50 % langsamer als der eigene vorige Lauf.");
         }
+      } else {
+        // Sichtbar statt still (Skeptiker 10.10.): aeltere Kurven haben keinen
+        // Abstand zum Knotenstart, ihre Sicherungen sind rotiert.
+        sag("  Gleichstand: nicht pruefbar - die Referenzkurve kennt ihren Abstand zum Knotenstart nicht.");
       }
+    } else {
+      sag("  Gleichstand: nicht pruefbar - keine lesbare Sicherung dieses Laufs.");
     }
 
     // Eine falsifizierbare Vorhersage schlaegt jede Beschwichtigung.

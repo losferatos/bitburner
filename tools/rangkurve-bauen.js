@@ -97,7 +97,11 @@ if (MIT_SICHERUNGEN && fs.existsSync(indexDatei)) {
       // Bonuszeit-Vorrat abziehen (tools/lib/kurvepflege.js, 05.10.2026):
       // sonst steht eine Offline-Nacht als Stillstand plus Sprung in der Kurve.
       const sc = p.bladeburner.data.storedCycles;
-      punkte.push({ spielzeit: effektiveSpielzeit(p.totalPlaytime, sc), rang, lauf: Number(c[5]) || null, quelle: "sicherung:" + c[7] });
+      // Knotenstart in totalPlaytime-Einheiten (10.10.2026): ohne ihn war der
+      // Gleichstand-Vergleich in tools/checkin.js tot - die Kurve beginnt am
+      // ersten Rangpunkt, nicht am Knotenstart (BN11.1: 10,7 h spaeter).
+      const ks = Number.isFinite(p.playtimeSinceLastBitnode) ? p.totalPlaytime - p.playtimeSinceLastBitnode : null;
+      punkte.push({ spielzeit: effektiveSpielzeit(p.totalPlaytime, sc), rang, lauf: Number(c[5]) || null, quelle: "sicherung:" + c[7], knotenStart: ks });
     } catch {
       // unlesbare Sicherung: tools/backup-check.js meldet das, hier zaehlt sie nicht
     }
@@ -179,6 +183,12 @@ if (!referenz) {
 }
 
 const t0 = referenz[0].spielzeit;
+// Median der Knotenstarts aus den Sicherungen dieses Laufs; fehlen sie
+// (Sicherungen rotiert), bleibt der Abstand unbekannt - checkin.js schweigt dann.
+const starts = referenz.map((p) => p.knotenStart).filter((x) => Number.isFinite(x)).sort((x, y) => x - y);
+const knotenStart = starts.length ? starts[Math.floor(starts.length / 2)] : null;
+const hSeitKnotenstart = knotenStart !== null && t0 >= knotenStart
+  ? Math.round(((t0 - knotenStart) / 3.6e6) * 1000) / 1000 : null;
 const kurve = referenz.map((p) => ({
   h: Math.round(((p.spielzeit - t0) / 3.6e6) * 1000) / 1000,
   rang: Math.round(p.rang),
@@ -204,6 +214,7 @@ const ausgabe = {
   nullpunkt: {
     spielzeitMs: t0,
     spielzeitH: Math.round((t0 / 3.6e6) * 1000) / 1000,
+    hSeitKnotenstart,
     bedeutung:
       "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar " +
       "der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur " +

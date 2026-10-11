@@ -66,5 +66,69 @@ const iLes = checkin.indexOf("restzeitAusKurve(knoten, rang)");
 pruefe("checkin.js frischt die Kurve auf", iAuf >= 0);
 pruefe("... und zwar VOR dem ersten Lesen (Cache in lib/rangkurve.js)", iAuf >= 0 && iLes > iAuf);
 
+// Ab Knotenstart vergleichen (11.10.2026): BN11.1 17,8 h + 10,7 h Anlauf,
+// BN11.2 22,5 h + 1,0 h Anlauf. Der zweite ist schneller.
+if (kurveErsetzen) {
+  const mitStart = (k, off) => ({ ...k, nullpunkt: { hSeitKnotenstart: off } });
+  const BN111 = mitStart(kurve(215, 454620, 17.784), 10.725);
+  const BN112 = mitStart(kurve(12, 452560, 22.511), 1.025);
+  pruefe("BN11.2 (23,5 h ab Knotenstart) ersetzt BN11.1 (28,5 h)", kurveErsetzen(BN111, BN112).ersetzen);
+  pruefe("BN11.1 ersetzt BN11.2 nicht", !kurveErsetzen(BN112, BN111).ersetzen);
+  const loch = { ...BN112, punkte: [{ h: 0, rang: 46 }, { h: 0.1, rang: 60 }, { h: 0.2, rang: 80 }, { h: 11, rang: 28767 }, { h: 12.7, rang: 184320 }, { h: 13.1, rang: 458657 }] };
+  pruefe("Kandidat mit 10,8 h Messloch ersetzt nichts (BN2.3-Fall)", !kurveErsetzen(BN111, loch).ersetzen);
+  pruefe("Abstand nur auf einer Seite bekannt: Vergleich ab Rangpunkt wie bisher",
+    !kurveErsetzen(kurve(215, 454620, 17.784), BN112).ersetzen);
+}
+
+// Der Bauer waehlt unter fertigen Laeufen den schnellsten, nicht den hoechsten.
+// Synthetischer Knoten 99 in einer Wegwerf-Wurzel mit echten gz-Sicherungen.
+{
+  const os = await import("node:os");
+  const { gzipSync } = await import("node:zlib");
+  const { execFileSync } = await import("node:child_process");
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "kurvepflege-"));
+  try {
+    fs.mkdirSync(path.join(tmp, "tools", "lib"), { recursive: true });
+    fs.mkdirSync(path.join(tmp, "backups"));
+    fs.mkdirSync(path.join(tmp, "data"));
+    fs.copyFileSync(path.join(ROOT, "tools", "rangkurve-bauen.js"), path.join(tmp, "tools", "rangkurve-bauen.js"));
+    fs.copyFileSync(lib, path.join(tmp, "tools", "lib", "kurvepflege.js"));
+    // Juengster Check-in steht in einem anderen Knoten: beide Laeufe gelten als fertig.
+    fs.writeFileSync(path.join(tmp, "data", "checkin.json"), JSON.stringify({ punkte: [{ ts: Date.now(), knoten: 6, spielzeit: 0, rang: 0 }] }));
+    const H = 3.6e6;
+    const zeilen = ["kopf"];
+    const sicherung = (lauf, i, total, seitStart, rang) => {
+      const datei = path.join(tmp, "backups", "s" + lauf + "-" + i + ".json.gz");
+      const p = { bitNodeN: 99, totalPlaytime: total, playtimeSinceLastBitnode: seitStart,
+        bladeburner: { data: { rank: rang, storedCycles: 0 } } };
+      fs.writeFileSync(datei, gzipSync(JSON.stringify({ data: { PlayerSave: JSON.stringify({ data: p }) } })));
+      zeilen.push(["t", "d", "h", "id", 99, lauf, total, "hourly", 1, datei, datei].join("\t"));
+    };
+    // Lauf 1: Start bei 0, erster Rang nach 10 h, 400k nach 28 h, endet bei 455.000.
+    const l1 = [[10, 200], [13, 2000], [16, 8000], [19, 20000], [22, 60000], [25, 150000], [28, 410000], [28.5, 455000]];
+    l1.forEach(([h, r], i) => sicherung(1, i, h * H, h * H, r));
+    // Lauf 2: Start bei 30 h, erster Rang nach 1 h, 400k nach 22 h, endet bei 452.000.
+    const l2 = [[1, 12], [4, 500], [6, 1000], [9, 4000], [12, 10000], [15, 40000], [18, 100000], [21, 300000], [22, 410000], [23.5, 452000]];
+    l2.forEach(([h, r], i) => sicherung(2, i, (30 + h) * H, h * H, r));
+    fs.writeFileSync(path.join(tmp, "backups", "INDEX.tsv"), zeilen.join("\n"));
+    const out = path.join(tmp, "kurve.json");
+    execFileSync(process.execPath, [path.join(tmp, "tools", "rangkurve-bauen.js"), "--knoten", "99", "--mit-sicherungen", "--out", out],
+      { cwd: tmp, stdio: "ignore", timeout: 30000 });
+    const k = JSON.parse(fs.readFileSync(out, "utf8"));
+    pruefe("Bauer nimmt den schnelleren Lauf (Start Rang 12), nicht den hoeheren", k.rangSpanne[0] === 12, JSON.stringify(k.rangSpanne));
+    // Dritter, noch schnellerer Lauf mit 9 h Loch: darf nicht gewinnen.
+    [[0.5, 30], [9.5, 300000], [10, 420000], [10.5, 430000], [11, 440000]].forEach(([h, r], i) => sicherung(3, i, (60 + h) * H, h * H, r));
+    fs.writeFileSync(path.join(tmp, "backups", "INDEX.tsv"), zeilen.join("\n"));
+    execFileSync(process.execPath, [path.join(tmp, "tools", "rangkurve-bauen.js"), "--knoten", "99", "--mit-sicherungen", "--out", out + "2"],
+      { cwd: tmp, stdio: "ignore", timeout: 30000 });
+    pruefe("Lauf mit Messloch gewinnt nicht, auch wenn schneller", JSON.parse(fs.readFileSync(out + "2", "utf8")).rangSpanne[0] === 12);
+    pruefe("... mit Abstand 1 h zum Knotenstart", Math.abs(k.nullpunkt.hSeitKnotenstart - 1) < 1e-6);
+  } catch (e) {
+    pruefe("Bauer-Probe lief durch", false, e.message);
+  } finally {
+    fs.rmSync(tmp, { recursive: true, force: true });
+  }
+}
+
 console.log("\n=== " + gruen + " gruen, " + rot + " rot ===\n");
 process.exit(rot ? 1 : 0);

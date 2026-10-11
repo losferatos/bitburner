@@ -23,7 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { effektiveSpielzeit } from "./lib/kurvepflege.js";
+import { effektiveSpielzeit, AUSGANG_RANG, LUECKE_MAX_H } from "./lib/kurvepflege.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -174,7 +174,44 @@ const kandidaten = (knotenVerlassen ? laeufe : laeufe.slice(0, -1)).filter((l) =
 // Punkte als der fertige - nach Punktzahl gewann fuer BN10 ein Lauf, der bei
 // Rang 5.297 endete, statt des Laufs bis 4,56 Mio.
 const maxRang = (l) => Math.max(...l.map((p) => p.rang));
-const referenz = kandidaten.sort((a, b) => (maxRang(b) - maxRang(a)) || (b.length - a.length))[0];
+// Unter den Laeufen, die den Ausgang erreichten, gewinnt der SCHNELLSTE ab
+// Knotenstart (11.10.2026). Befund: BN11.2 brauchte 23,5 h, BN11.1 28,5 h -
+// Referenz blieb BN11.1, weil es 2.060 Rang hoeher endete (454.620 gegen
+// 452.560). Der Rang ueber dem Ausgang ist Ueberschuss nach dem letzten
+// Black Op, kein Fortschritt. BN11.3 lief Stunde fuer Stunde wie BN11.2 und
+// wurde gegen BN11.1 als "42 % schneller" gemeldet.
+
+// Messluecke: die laengste Strecke ohne Punkt. Ein Lauf mit 11 h Loch (BN2.3:
+// Rang 46 bei 0,03 h, dann 28.767 bei 11,0 h) taugt nicht als Kurve, auch
+// wenn er schneller war - die ETA dazwischen waere lineare Raterei.
+function laengsteLuecke(l) {
+  let m = 0;
+  for (let i = 1; i < l.length; i++) m = Math.max(m, (l[i].spielzeit - l[i - 1].spielzeit) / 3.6e6);
+  return m;
+}
+// Stunden vom Knotenstart bis zum letzten Punkt - dieselbe Strecke, die
+// lib/kurvepflege.js beim Ersetzen vergleicht (dauerH + hSeitKnotenstart).
+// null, wenn der Knotenstart fehlt oder nach dem ersten Punkt liegt.
+function laufStunden(l) {
+  const t0 = l[0].spielzeit;
+  const ks = l.map((p) => p.knotenStart).filter((x) => Number.isFinite(x)).sort((x, y) => x - y);
+  if (!ks.length) return null;
+  const start = ks[Math.floor(ks.length / 2)];
+  if (start > t0) return null;
+  return (l[l.length - 1].spielzeit - start) / 3.6e6;
+}
+function waehleReferenz(liste) {
+  const fertig = liste.filter((l) => maxRang(l) >= AUSGANG_RANG && laengsteLuecke(l) <= LUECKE_MAX_H);
+  // Knotenstart muss fuer ALLE fertigen Laeufe belegt sein, sonst sind die
+  // Zeiten nicht vergleichbar (ein Lauf ab Knotenstart, einer ab Rangpunkt).
+  if (fertig.length && fertig.every((l) => laufStunden(l) !== null)) {
+    return fertig.sort((a, b) => laufStunden(a) - laufStunden(b))[0];
+  }
+  if (fertig.length) return fertig.sort((a, b) => (maxRang(b) - maxRang(a)) || (b.length - a.length))[0];
+  return liste.sort((a, b) => (maxRang(b) - maxRang(a)) || (b.length - a.length))[0];
+}
+
+const referenz = waehleReferenz(kandidaten);
 
 if (!referenz) {
   console.log("Kein abgeschlossener Referenzlauf fuer BitNode " + KNOTEN + " gefunden.");

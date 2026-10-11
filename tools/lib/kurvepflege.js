@@ -37,6 +37,8 @@ export function effektiveSpielzeit(totalPlaytime, storedCycles) {
   return totalPlaytime - vorrat;
 }
 export const START_RANG_MAX = 1000;
+// Groesste erlaubte Strecke ohne Messpunkt in einer Kandidatenkurve.
+export const LUECKE_MAX_H = 3;
 
 /**
  * Rein: ersetzt `neu` die Kurve `alt`? Bedingungen fuer `neu`: beginnt im
@@ -51,11 +53,26 @@ export function kurveErsetzen(alt, neu) {
   if (!(start(neu) < START_RANG_MAX)) return { ersetzen: false, grund: "Kandidat beginnt nicht im Anlauf" };
   if (!(max(neu) >= AUSGANG_RANG)) return { ersetzen: false, grund: "Kandidat erreicht den Ausgang nicht" };
   if (!(Number(neu.dauerH) > 0)) return { ersetzen: false, grund: "Kandidat ohne Dauer" };
+  // Ein Kandidat mit Messloch ersetzt nichts (11.10.2026, Skeptiker: BN2.3
+  // haette mit 11 h ohne Punkt die dichte BN2.2-Kurve verdraengt).
+  let luecke = 0;
+  for (let i = 1; i < neu.punkte.length; i++) luecke = Math.max(luecke, Number(neu.punkte[i].h) - Number(neu.punkte[i - 1].h));
+  if (luecke > LUECKE_MAX_H) return { ersetzen: false, grund: "Kandidat mit Messloch " + luecke.toFixed(1) + " h" };
   if (!alt || !(max(alt) >= AUSGANG_RANG) || !(Number(alt.dauerH) > 0)) {
     return { ersetzen: true, grund: "bisherige Kurve fehlt oder ist unvollstaendig" };
   }
-  if (Number(neu.dauerH) < Number(alt.dauerH) - 0.05) {
-    return { ersetzen: true, grund: "schneller: " + Number(neu.dauerH).toFixed(1) + " h statt " + Number(alt.dauerH).toFixed(1) + " h" };
+  // Ab Knotenstart vergleichen, wenn beide Kurven den Abstand kennen
+  // (11.10.2026): BN11.2 lag ab erstem Rangpunkt bei 22,5 h gegen 17,8 h,
+  // ab Knotenstart aber bei 23,5 h gegen 28,5 h - die Anlaufzeit vor dem
+  // ersten Rang gehoert zum Lauf.
+  const abStart = (k) => {
+    const off = k && k.nullpunkt ? k.nullpunkt.hSeitKnotenstart : null;
+    return Number.isFinite(off) && off >= 0 ? Number(k.dauerH) + off : null;
+  };
+  const tAlt = abStart(alt) !== null && abStart(neu) !== null ? abStart(alt) : Number(alt.dauerH);
+  const tNeu = abStart(alt) !== null && abStart(neu) !== null ? abStart(neu) : Number(neu.dauerH);
+  if (tNeu < tAlt - 0.05) {
+    return { ersetzen: true, grund: "schneller: " + tNeu.toFixed(1) + " h statt " + tAlt.toFixed(1) + " h" };
   }
   return { ersetzen: false, grund: "nicht schneller" };
 }

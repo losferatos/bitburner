@@ -1,6 +1,6 @@
 {
  "knoten": 11,
- "erzeugtAm": "2026-10-10T14:44:45.706Z",
+ "erzeugtAm": "2026-10-11T16:17:54.340Z",
  "erzeugtVon": "tools/rangkurve-bauen.js",
  "quellen": [
   "data/verlauf-strategie.json",
@@ -9,119 +9,143 @@
  ],
  "hinweis": "Diese Datei wird ERZEUGT, nicht von Hand gepflegt. Bei neuen Daten neu erzeugen: node tools/rangkurve-bauen.js --knoten 11 --mit-sicherungen",
  "nullpunkt": {
-  "spielzeitMs": 4399554200,
-  "spielzeitH": 1222.098,
-  "hSeitKnotenstart": 10.725,
+  "spielzeitMs": 4467269000,
+  "spielzeitH": 1240.908,
+  "hSeitKnotenstart": 1.025,
   "bedeutung": "erster Messpunkt mit Bladeburner-Rang in diesem Lauf - NICHT belegbar der Beitrittszeitpunkt. Fuer die Restzeit ohne Belang, weil nur Differenzen gebildet werden; fuer den Vergleich zweier Laeufe aber schon."
  },
- "punkteGesamt": 32,
- "laeufeErkannt": 2,
- "stuetzpunkte": 24,
+ "punkteGesamt": 62,
+ "laeufeErkannt": 3,
+ "stuetzpunkte": 30,
  "rangSpanne": [
-  215,
-  454620
+  12,
+  452560
  ],
- "dauerH": 17.784,
+ "dauerH": 22.511,
  "ratenSpanne": [
-  229.00763358778624,
-  135106
+  -5.999999999999999,
+  138409.99999999968
  ],
  "punkte": [
   {
    "h": 0,
-   "rang": 215
+   "rang": 12
   },
   {
-   "h": 0.003,
-   "rang": 215
+   "h": 0.208,
+   "rang": 15
   },
   {
-   "h": 0.015,
-   "rang": 215
+   "h": 1.208,
+   "rang": 105
   },
   {
-   "h": 0.084,
-   "rang": 219
+   "h": 2.208,
+   "rang": 99
   },
   {
-   "h": 1.015,
-   "rang": 469
+   "h": 3.208,
+   "rang": 409
   },
   {
-   "h": 2.015,
-   "rang": 704
+   "h": 4.208,
+   "rang": 426
   },
   {
-   "h": 2.754,
-   "rang": 1281
+   "h": 5.199,
+   "rang": 975
   },
   {
-   "h": 3.016,
-   "rang": 1341
+   "h": 5.209,
+   "rang": 1055
   },
   {
-   "h": 4.016,
-   "rang": 2486
+   "h": 5.263,
+   "rang": 1133
   },
   {
-   "h": 5.016,
-   "rang": 3296
+   "h": 5.309,
+   "rang": 1211
   },
   {
-   "h": 6.016,
-   "rang": 4979
+   "h": 6.209,
+   "rang": 1594
   },
   {
-   "h": 7.016,
-   "rang": 7134
+   "h": 7.209,
+   "rang": 2627
   },
   {
-   "h": 8.016,
-   "rang": 10343
+   "h": 8.209,
+   "rang": 3477
   },
   {
-   "h": 9.016,
-   "rang": 15603
+   "h": 9.209,
+   "rang": 4819
   },
   {
-   "h": 10.017,
-   "rang": 18418
+   "h": 10.209,
+   "rang": 7029
   },
   {
-   "h": 11.017,
-   "rang": 22863
+   "h": 11.209,
+   "rang": 9741
   },
   {
-   "h": 12.017,
-   "rang": 31631
+   "h": 11.917,
+   "rang": 12386
   },
   {
-   "h": 13.017,
-   "rang": 52099
+   "h": 12.209,
+   "rang": 13651
   },
   {
-   "h": 14.017,
-   "rang": 94649
+   "h": 12.459,
+   "rang": 14693
   },
   {
-   "h": 14.924,
-   "rang": 163788
+   "h": 13.21,
+   "rang": 17018
   },
   {
-   "h": 15.017,
-   "rang": 172614
+   "h": 14.21,
+   "rang": 21775
   },
   {
-   "h": 16.017,
-   "rang": 266844
+   "h": 15.21,
+   "rang": 31130
   },
   {
-   "h": 17.017,
-   "rang": 401950
+   "h": 16.21,
+   "rang": 57105
   },
   {
-   "h": 17.784,
-   "rang": 454620
+   "h": 17.21,
+   "rang": 84741
+  },
+  {
+   "h": 18.21,
+   "rang": 139854
+  },
+  {
+   "h": 19.21,
+   "rang": 236501
+  },
+  {
+   "h": 20.211,
+   "rang": 364162
+  },
+  {
+   "h": 21.211,
+   "rang": 389161
+  },
+  {
+   "h": 22.211,
+   "rang": 411037
+  },
+  {
+   "h": 22.511,
+   "rang": 452560
   }
  ]
 }

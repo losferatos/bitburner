@@ -609,7 +609,10 @@ async function main() {
     }
     etaSpiel = kurve.restH;
     bericht.etaSpielstunden = etaSpiel;
-    bericht.etaQuelle = "referenzkurve";
+    // Kurve mit Kennung (11.10.2026): wird die Referenzkurve ersetzt (BN11.1 ->
+    // BN11.2), ist das ein Methodenwechsel wie linear -> Kurve - die ETA springt,
+    // ohne dass der Bot langsamer wurde. Kennung = Endpunkt des Referenzlaufs.
+    bericht.etaQuelle = "referenzkurve " + kurve.ende.rang + "@" + kurve.ende.h.toFixed(2);
     bericht.etaInMessluecke = !!kurve.luecke;
 
     if (rate && rate > 0) {

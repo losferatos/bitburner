@@ -57,6 +57,8 @@ const checkin = fs.readFileSync(path.join(ROOT, "tools", "checkin.js"), "utf8");
 pruefe("checkin.js holt die Knotenzeit aus der Sicherung",
   checkin.includes("knotenStundenAusSicherung(knoten, laufJetzt, spielzeit)"));
 pruefe("... und nicht mehr aus dem nie geschriebenen Feld", !checkin.includes("netz.spielzeitImKnoten"));
+pruefe("Kurvenwechsel ist ein Methodenwechsel: ETA-Quelle traegt die Kurvenkennung (kein falsches ZAEH, 11.10.)",
+  checkin.includes("\"referenzkurve \" + kurve.ende.rang"));
 
 console.log("\n=== " + gruen + " gruen, " + rot + " rot ===\n");
 process.exit(rot ? 1 : 0);

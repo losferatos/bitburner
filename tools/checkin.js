@@ -607,6 +607,11 @@ async function main() {
         + ", Rang " + zahl(kurve.luecke.vonRang) + " bis " + zahl(kurve.luecke.bisRang)
         + "). Die Zahl ist dort interpoliert, nicht gemessen.");
     }
+    if (kurve.vorKurve) {
+      sag("  ACHTUNG: die Referenzkurve beginnt erst bei Rang " + zahl(kurve.vorKurve)
+        + " - die Zeit bis dorthin kennt sie nicht. Die ETA ist eine UNTERGRENZE.");
+    }
+    bericht.etaUntergrenze = !!kurve.vorKurve;
     etaSpiel = kurve.restH;
     bericht.etaSpielstunden = etaSpiel;
     // Kurve mit Kennung (11.10.2026): wird die Referenzkurve ersetzt (BN11.1 ->
@@ -1002,6 +1007,11 @@ async function main() {
       return "FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - der Restweg ist"
         + " gerade nicht bezifferbar.";
     }
+    // Rang unter dem Kurvenanfang: die Zahl ist eine Untergrenze (12.10.2026).
+    const untergrenze = spanne && spanne.vorKurve
+      ? " FRUEHESTENS - die Referenz beginnt erst bei Rang " + zahl(spanne.vorKurve)
+        + ", die Zeit bis dorthin fehlt."
+      : "";
     // Vom Spielstunden-Bedarf auf ein Kalenderdatum: wie viel des Tages wird
     // tatsaechlich gespielt? Frisch gemessen, sonst der letzte bekannte Wert.
     let anteil = bericht.gespieltAnteil;
@@ -1012,8 +1022,8 @@ async function main() {
       if (alt) { anteil = alt.gespieltAnteil; anteilHerkunft = "aus einem frueheren Besuch"; }
     }
     if (!(anteil > 0)) {
-      return "FERTIG VORAUSSICHTLICH: noch " + dauer(etaSpiel) + " reine Spielzeit"
-        + " (" + herkunft + "). Wann das im Kalender liegt, haengt daran, wie viel"
+      return "FERTIG VORAUSSICHTLICH: " + (untergrenze ? "fruehestens " : "") + "noch " + dauer(etaSpiel) + " reine Spielzeit"
+        + " (" + herkunft + "." + untergrenze + "). Wann das im Kalender liegt, haengt daran, wie viel"
         + " du spielst - dafuer fehlt noch ein Vergleichswert.";
     }
 
@@ -1034,10 +1044,10 @@ async function main() {
           : " Frueheste Schwelle nach " + dauer(spanne.bisSchwelleFruehestensH) + ".")
       : "";
 
-    return "FERTIG VORAUSSICHTLICH: " + wann + " (noch " + dauer(etaSpiel)
+    return "FERTIG VORAUSSICHTLICH: " + (untergrenze ? "fruehestens " : "") + wann + " (noch " + dauer(etaSpiel)
       + " Spielzeit; bei " + (anteil * 100).toFixed(0) + " % gespielter Zeit "
       + anteilHerkunft + " sind das " + dauer(etaEcht) + " Kalenderzeit."
-      + spannenText + " " + herkunft + ".)";
+      + spannenText + untergrenze + " " + herkunft + ".)";
   }
 
   function ausgeben(z, b) {

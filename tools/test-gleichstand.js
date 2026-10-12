@@ -44,6 +44,15 @@ try {
   const z = vergleichMitReferenz(98, 1000, 20);
   pruefe("20 h gegen 12 h ist langsamer (Faktor > 1,5 -> ZAEH)", z && z.faktor > 1.5);
   pruefe("ohne bekannten Abstand kein Vergleich (kein falsches ZAEH)", vergleichMitReferenz(97, 1000, 6) === null);
+  // Rang unter dem Kurvenanfang (12.10.2026, BN6.2 bei Rang 77 gegen eine
+  // Kurve ab 80.340): ETA ist Untergrenze, keine Probe.
+  const { restzeitAusKurve, naechsterMeilenstein } = await import(pathToFileURL(path.join(ROOT, "tools", "lib", "rangkurve.js")).href);
+  const r50 = restzeitAusKurve(98, 50);
+  pruefe("Rang 50 unter Kurvenanfang 200: als Untergrenze markiert", r50 && r50.vorKurve === 200, JSON.stringify(r50 && r50.vorKurve));
+  pruefe("... und keine Probe gegen die Rate jenseits des Anfangs", naechsterMeilenstein(98, 50) === null);
+  const r1000 = restzeitAusKurve(98, 1000);
+  pruefe("Rang 1000 in der Kurve: keine Untergrenze, Probe vorhanden",
+    r1000 && r1000.vorKurve === null && naechsterMeilenstein(98, 1000) !== null);
 } finally {
   fs.rmSync(mitAbstand, { force: true });
   fs.rmSync(ohneAbstand, { force: true });
@@ -54,6 +63,7 @@ pruefe("rangkurve-bauen.js schreibt den Abstand zum Knotenstart", bauer.includes
   && bauer.includes("playtimeSinceLastBitnode"));
 
 const checkin = fs.readFileSync(path.join(ROOT, "tools", "checkin.js"), "utf8");
+pruefe("checkin.js meldet die Untergrenze in der Schlusszeile", checkin.includes("FRUEHESTENS - die Referenz beginnt erst bei Rang"));
 pruefe("checkin.js holt die Knotenzeit aus der Sicherung",
   checkin.includes("knotenStundenAusSicherung(knoten, laufJetzt, spielzeit)"));
 pruefe("... und nicht mehr aus dem nie geschriebenen Feld", !checkin.includes("netz.spielzeitImKnoten"));

@@ -468,6 +468,69 @@ console.log("-- ein laufender Infiltrate wird abgeloest, sobald sein Grund weg i
     tracking === 1 && ungestoert === 2, a3.map((x) => x && (x.actionName || x.type + "/" + x.cyclesWorked)).join(", "));
 }
 
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Chaos-Bremse: Sleeves legen kein Chaos nach, einer faehrt Diplomacy (12.10.2026) --");
+{
+  // 12.10.: nach dem Einbau trainierte die Figur, die Sleeves fuhren beim
+  // Nachholen Retirement/Bounty Hunter - Ishima von 6 auf ueber 50, ohne dass
+  // jemand aufraeumte (blade.json chaos war in diesem Pfad null).
+  const kampf = { strength: 200, defense: 200, dexterity: 200, agility: 200 };
+  const aktionen = {
+    "Contracts/Tracking": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Bounty Hunter": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Retirement": { vorrat: 1000, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+  };
+  const vertrag = (n) => ({ type: "BLADEBURNER", actionType: "Contracts", actionName: n });
+  const diplo = () => ({ type: "BLADEBURNER", actionType: "General", actionName: "Diplomacy", cyclesWorked: 77 });
+  const lauf = (chaosHier, aufgaben, extra = {}) => fahre({
+    geld: 1e12,
+    koerper: aufgaben.map((a) => ({ skills: kampf, aufgabe: a })),
+    blade: { drin: true, aktionen },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0, chaosHier, ...extra }) },
+  });
+  const zeige = (a) => a.map((x) => x && (x.actionName || x.type)).join(", ");
+  const drei = () => [vertrag("Tracking"), vertrag("Bounty Hunter"), vertrag("Retirement")];
+
+  {
+    const a = (await lauf(54, drei())).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Chaos 54: genau ein Sleeve faehrt Diplomacy",
+      a.filter((x) => x && x.actionName === "Diplomacy").length === 1, zeige(a));
+    pruefe("... kein Bounty Hunter, kein Retirement mehr",
+      !a.some((x) => x && /Bounty Hunter|Retirement/.test(String(x.actionName))), zeige(a));
+    pruefe("... Tracking laeuft weiter (legt kein Chaos nach)",
+      a.some((x) => x && x.actionName === "Tracking"), zeige(a));
+  }
+  {
+    const a = (await lauf(49, drei())).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Chaos 49 (blade.js haelt 47-50 selbst): keine Bremse, drei Vertraege",
+      a.every((x) => x && x.actionType === "Contracts"), zeige(a));
+  }
+  {
+    const a = (await lauf(42, [vertrag("Tracking"), vertrag("Bounty Hunter"), diplo()])).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Chaos 42 und Diplomacy laeuft: sie bleibt, ungestoert (cyclesWorked 77)",
+      a[2] && a[2].actionName === "Diplomacy" && a[2].cyclesWorked === 77, zeige(a));
+  }
+  {
+    const a = (await lauf(38, [vertrag("Tracking"), vertrag("Bounty Hunter"), diplo()])).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Chaos 38: Diplomacy endet, der Sleeve faehrt wieder einen Vertrag",
+      a[2] && a[2].actionType === "Contracts", zeige(a));
+  }
+  {
+    const a = (await lauf(20, drei())).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Chaos 20: alles wie gehabt, drei Vertraege",
+      a.every((x) => x && x.actionType === "Contracts"), zeige(a));
+  }
+  {
+    const a = (await lauf(60, drei(), { zeit: W0 - 3600000 })).zustand.koerper.map((k) => k.aufgabe);
+    pruefe("blade.json eine Stunde alt: keine Bremse auf alte Zahl",
+      a.every((x) => x && x.actionType === "Contracts"), zeige(a));
+  }
+  const blade = ohneKommentare(fs.readFileSync(path.join(ROOT, "src", "blade.js"), "utf8"));
+  pruefe("blade.js schreibt chaosHier bei jedem blade.json-Schreiben, im Fehlerfall null",
+    blade.includes("chaosHier: (() => { try { const c = ns.bladeburner.getCityChaos(ns.bladeburner.getCity());"));
+}
+
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {

@@ -1802,6 +1802,16 @@ export async function main(ns) {
       aktion, grund,
       stufe, dauer,
       chaos: Number.isFinite(chaosStand) ? +chaosStand.toFixed(2) : null,
+      // Chaos JETZT, unabhaengig davon, ob waehle() lief (12.10.2026).
+      // `chaos` oben stammt aus chaosMessen() und bleibt in den Gym-, Graft-
+      // und "weicht bbtrain"-Pfaden stehen bzw. null. Nach dem Einbau vom
+      // 12.10. trainierte die Figur, die Sleeves fuhren weiter Retirement
+      // und Bounty Hunter (+0,04/+0,02 Chaos je Erfolg in der Stadt der Figur,
+      // Bladeburner.ts:877-885) - Ishima stieg ueber 50, und niemand sah es.
+      // sleeve.js liest dieses Feld fuer seine Chaos-Bremse.
+      // Eigene Messung statt chaosLage(): die liefert im Fehlerfall 0, und
+      // eine 0 loeste in sleeve.js die Bremse (Skeptiker 12.10.).
+      chaosHier: (() => { try { const c = ns.bladeburner.getCityChaos(ns.bladeburner.getCity()); return Number.isFinite(c) ? +c.toFixed(2) : null; } catch { return null; } })(),
       fahrbar: fahrbarStand,
       aufraeumen: chaosAufraeumen,
       // Anlaufphase: der Motor weicht bbtrain, der Rang steht planmaessig.

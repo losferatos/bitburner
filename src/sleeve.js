@@ -548,6 +548,50 @@ export async function main(ns) {
         }
       } catch (e) { rekrutierer = { nr: -1, grund: "Fehler: " + String(e).slice(0, 80) }; }
     }
+    // CHAOS-BREMSE (12.10.2026). Vertraege der Sleeves legen Chaos in der
+    // Stadt der FIGUR nach (Retirement +0,04, Bounty Hunter +0,02 je Erfolg,
+    // Bladeburner.ts:877-885) - und ueber 50 teilt das Spiel jede Chance in
+    // dieser Stadt durch sqrt(1 + Chaos - 50) (Actions/Action.ts:94-102), auch
+    // die der Sleeve-Vertraege. Aufgeraeumt hat bisher nur blade.js, und nur
+    // wenn es selbst Aktionen waehlt. Nach dem Einbau vom 12.10. trainierte die
+    // Figur ("weicht bbtrain"), die Sleeves holten 9,6 h Rueckstand mit
+    // 15-facher Geschwindigkeit nach: Ishima von 6 auf ueber 50.
+    //   - ab CHAOS_NUR_TRACKING nur noch Tracking (legt kein Chaos nach),
+    //     die uebrigen wie beim Aufraeumen auf Infiltrate. Gleich 50, nicht
+    //     darunter (Skeptiker): blade.js haelt Chaos im Raid-Betrieb selbst
+    //     zwischen 47 und 50, eine Bremse ab 45 waere dort Dauerzustand. Der
+    //     Zufluss der Sleeves liegt bei hoechstens ~3,4/h, ein Takt bringt
+    //     selbst im Nachholen unter 1;
+    //   - ab CHAOS_DIPLO_AB faehrt EIN Sleeve Diplomacy (senkt um
+    //     cha^0,045 + cha/1000 Prozent je Abschluss, Bladeburner.ts:737-745 und
+    //     :1187-1189), bis das Chaos unter CHAOS_DIPLO_BIS faellt.
+    // Quelle ist blade.json `chaosHier` - getCityChaos/getCity kosteten hier
+    // je 4 GB (RamCostGenerator.ts:368-369).
+    const CHAOS_NUR_TRACKING = 50, CHAOS_DIPLO_AB = 50, CHAOS_DIPLO_BIS = 40;
+    let chaosHier = null;
+    try {
+      const bj = JSON.parse(liesVonHome(ns, "data/blade.json") || "null");
+      if (bj && Number.isFinite(bj.zeit) && Date.now() - bj.zeit < 10 * 60000
+          && Number.isFinite(bj.chaosHier)) chaosHier = bj.chaosHier;
+    } catch { chaosHier = null; }
+    let diplomat = -1;
+    if (!keinGym && Number.isFinite(chaosHier)) {
+      let drin = false;
+      try { drin = ns.bladeburner.inBladeburner(); } catch { drin = false; }
+      if (drin) {
+        let laufend = -1;
+        for (let j = 0; j < anzahl && laufend < 0; j++) {
+          try {
+            const tj = ns.sleeve.getTask(j);
+            if (tj && tj.type === "BLADEBURNER" && tj.actionName === "Diplomacy") laufend = j;
+          } catch { /* Index ohne Sleeve */ }
+        }
+        if (laufend >= 0 && laufend !== rekrutierer.nr && chaosHier > CHAOS_DIPLO_BIS) diplomat = laufend;
+        else if (chaosHier >= CHAOS_DIPLO_AB) {
+          for (let j = anzahl - 1; j >= 0; j--) if (j !== rekrutierer.nr) { diplomat = j; break; }
+        }
+      }
+    }
     for (let i = 0; i < anzahl; i++) {
       let ok = false, was = "gym";
       // Rueckstand und Werte je Sleeve: Telemetrie (tools/checkin.js wertet
@@ -672,6 +716,7 @@ export async function main(ns) {
         chaosRunde = !!bj && bj.aufraeumen === true
           && Number.isFinite(bj.zeit) && Date.now() - bj.zeit < 10 * 60000;
       } catch { chaosRunde = false; }
+      if (Number.isFinite(chaosHier) && chaosHier >= CHAOS_NUR_TRACKING) chaosRunde = true;
       const erlaubteKontrakte = chaosRunde ? ["Tracking"] : KONTRAKTE;
 
       // SKEPTIKER-AUDIT 26.09.2026, FUND 5 (audit-2026-09-26/4-bladeburner.md#5):
@@ -783,7 +828,7 @@ export async function main(ns) {
           // Nachfueller erst, wenn ein Vertrag leerlaeuft - mit drei Vorraeten
           // ueber 500 also nie.
           const werdeNachfueller = !!knappeOperation && infiltratorenAndere.length === 0
-            && vertraegeNachMir === 0 && i !== rekrutierer.nr;
+            && vertraegeNachMir === 0 && i !== rekrutierer.nr && i !== diplomat;
           if (t && t.type === "BLADEBURNER" && t.actionType === "Contracts"
               && erlaubteKontrakte.includes(t.actionName) && !werdeNachfueller) {
             laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
@@ -861,6 +906,18 @@ export async function main(ns) {
           try { gesetzt = ns.sleeve.setToBladeburnerAction(i, "Recruitment"); } catch { gesetzt = false; }
         }
         if (gesetzt) { laeuftSchon = true; ok = true; was = "recruitment"; }
+      }
+      if (inDivision && i === diplomat) {
+        let schon = false;
+        try {
+          const t = ns.sleeve.getTask(i);
+          schon = !!t && t.type === "BLADEBURNER" && t.actionName === "Diplomacy";
+        } catch { schon = false; }
+        let gesetzt = schon;
+        if (!schon) {
+          try { gesetzt = ns.sleeve.setToBladeburnerAction(i, "Diplomacy"); } catch { gesetzt = false; }
+        }
+        if (gesetzt) { laeuftSchon = true; ok = true; was = "diplomacy"; infilGrund = null; }
       }
       if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
         if (knappeOperation && infiltratorenAndere.length === 0) {

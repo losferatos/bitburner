@@ -753,7 +753,20 @@ export function neuerMock(o = {}) {
           k.aufgabe = { type: "BLADEBURNER", actionType: "General", actionName: art };
           return true;
         }
-        k.aufgabe = { type: "BLADEBURNER", actionType: art, actionName: name };
+        // Infiltrate ist im Spiel KEINE Bladeburner-Arbeit, sondern
+        // SleeveInfiltrateWork mit getTask() = { type: "INFILTRATE" }
+        // (Work/SleeveInfiltrateWork.ts, APICopy). Bis 12.10.2026 legte der
+        // Mock es als BLADEBURNER ab - der INFILTRATE-Zweig in sleeve.js
+        // lief in keinem Test, und dass er einen Infiltrate nie wieder
+        // abloeste, fiel erst im Spiel auf (BN11.3).
+        if (art === "Infiltrate Synthoids") {
+          k.aufgabe = { type: "INFILTRATE", cyclesWorked: 0 };
+          return true;
+        }
+        // Vertraege wie im Spiel (SleeveBladeburnerWork.APICopy: actionType
+        // "Contracts", 12.10.2026) - in der alten Mockform ("Take on contracts")
+        // lief der laeuftSchon-Zweig fuer Vertraege in keinem Test.
+        k.aufgabe = { type: "BLADEBURNER", actionType: art === "Take on contracts" ? "Contracts" : art, actionName: name };
         return true;
       },
     },

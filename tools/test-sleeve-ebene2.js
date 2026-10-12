@@ -74,7 +74,10 @@ async function fahre(o) {
     // Die Zeit steht praktisch still - sonst arbeitet der Mock den Rueckstand
     // waehrend des Laufs ab, und die Probe misst etwas anderes als die Lage,
     // die sie gestellt hat.
-    beiSchlaf: (ms, z, vorRuecken) => vorRuecken(o.schrittMs ?? 1),
+    beiSchlaf: (ms, z, vorRuecken) => {
+      if (o.zwischendurch) o.zwischendurch(m, z);
+      return vorRuecken(o.schrittMs ?? 1);
+    },
   });
   const { modul } = await ladeAusBeiden(ROOT, "sleeve.js");
   const zurueck = m.uhrStellen();
@@ -328,11 +331,17 @@ console.log("-- Skeptiker-Audit 26.09.2026 Fund 5: knappe Operation schlaegt Ver
 
   const knapp = stand(await lauf(50));   // 50 < 400 = 200/h * 2h
   const aufgabenKnapp = knapp ? knapp.sleeves.map((x) => x.aufgabe) : [];
+  // Seit 12.10.2026 nur EIN Nachfueller (Infiltrate-Ertrag 30*sqrt(N)/h,
+  // der zweite Sleeve bringt nur 12,4/h dazu - ein Vertrag gibt sofort Rang).
   pruefe(
-    "Assassination knapp (50 von 400 Vorlauf): beide Sleeves gehen auf Infiltrate, NICHT auf Vertrag",
-    aufgabenKnapp.length === 2 && aufgabenKnapp.every((a) => a === "infiltrate"),
+    "Assassination knapp (50 von 400 Vorlauf): genau EIN Sleeve geht auf Infiltrate, der andere faehrt Vertrag",
+    aufgabenKnapp.length === 2 && aufgabenKnapp.filter((a) => a === "infiltrate").length === 1
+      && aufgabenKnapp.filter((a) => /^contract:/.test(String(a))).length === 1,
     aufgabenKnapp.join(", ") || "kein Stand",
   );
+  pruefe("... mit Grund in der Telemetrie",
+    !!knapp && knapp.sleeves.some((x) => x.aufgabe === "infiltrate" && x.infilGrund === "knapp:Assassination"),
+    knapp ? JSON.stringify(knapp.sleeves.map((x) => x.infilGrund)) : "kein Stand");
 
   const reichlich = stand(await lauf(5000));   // weit ueber der Schwelle
   const aufgabenReichlich = reichlich ? reichlich.sleeves.map((x) => x.aufgabe) : [];
@@ -341,6 +350,122 @@ console.log("-- Skeptiker-Audit 26.09.2026 Fund 5: knappe Operation schlaegt Ver
     aufgabenReichlich.length === 2 && aufgabenReichlich.every((a) => /^contract:/.test(String(a))),
     aufgabenReichlich.join(", ") || "kein Stand",
   );
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- ein laufender Infiltrate wird abgeloest, sobald sein Grund weg ist (12.10.2026) --");
+{
+  // BN11.3: alle drei Sleeves 18,7 h auf Infiltrate, 1.268 Retirement /
+  // 1.247 Tracking / 586 Bounty Hunter auf Vorrat. Der INFILTRATE-Zweig hielt
+  // ihn fuer immer fest. Der Mock legte Infiltrate bis heute als BLADEBURNER
+  // ab - der Zweig lief in keinem Test.
+  const kampf = { strength: 200, defense: 200, dexterity: 200, agility: 200 };
+  const aktionen = (raidVorrat) => ({
+    "Contracts/Tracking": { vorrat: 1247, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Bounty Hunter": { vorrat: 586, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Retirement": { vorrat: 1268, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Operations/Raid": { vorrat: raidVorrat, stufe: 1, maxStufe: 10, chance: 0.5, dauer: 30000 },
+  });
+  const infil = () => ({ type: "INFILTRATE", cyclesWorked: 123 });
+  const lauf = (raidVorrat, extra = {}) => fahre({
+    geld: 1e12,
+    koerper: [{ skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }],
+    blade: { drin: true, aktionen: aktionen(raidVorrat) },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0, istAktion: "Operations/Raid", ...extra }) },
+  });
+
+  const m1 = await lauf(602);
+  const a1 = m1.zustand.koerper.map((k) => k.aufgabe && (k.aufgabe.actionName || k.aufgabe.type));
+  pruefe("Vorrat reichlich, Raid nicht knapp: alle drei Sleeves verlassen Infiltrate fuer Vertraege",
+    a1.length === 3 && a1.every((x) => ["Tracking", "Bounty Hunter", "Retirement"].includes(x)), a1.join(", "));
+  pruefe("... und zwar drei verschiedene", new Set(a1).size === 3, a1.join(", "));
+
+  const m2 = await lauf(50);   // 50 < 400: Raid knapp
+  const a2 = m2.zustand.koerper.map((k) => k.aufgabe);
+  pruefe("Raid knapp: Sleeve 0 bleibt als einziger Nachfueller auf Infiltrate, ungestoert (cyclesWorked 123)",
+    a2[0] && a2[0].type === "INFILTRATE" && a2[0].cyclesWorked === 123,
+    a2.map((x) => x && (x.actionName || x.type + "/" + x.cyclesWorked)).join(", "));
+  pruefe("... Sleeve 1 und 2 fahren Vertraege",
+    a2.slice(1).every((x) => x && x.type === "BLADEBURNER" && x.actionType === "Contracts"),
+    a2.map((x) => x && (x.actionName || x.type)).join(", "));
+
+  // Hysterese: Vertraege nur 10 auf Vorrat - Infiltrate wird nicht verlassen.
+  {
+    const m = await fahre({
+      geld: 1e12,
+      koerper: [{ skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }],
+      blade: { drin: true, aktionen: {
+        "Contracts/Tracking": { vorrat: 10, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+        "Contracts/Bounty Hunter": { vorrat: 10, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+        "Contracts/Retirement": { vorrat: 10, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+      } },
+      dateien: { "data/blade.json": JSON.stringify({ zeit: W0 }) },
+    });
+    const a = m.zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Hysterese: bei Vorrat 10 (unter 20) bleibt Infiltrate ungestoert",
+      a.every((x) => x && x.type === "INFILTRATE" && x.cyclesWorked === 123),
+      a.map((x) => x && (x.actionName || x.type + "/" + x.cyclesWorked)).join(", "));
+  }
+
+  // Alle drei auf Vertraegen, Raid wird knapp: der LETZTE gibt ab und fuellt nach.
+  {
+    const vertrag = (n) => ({ type: "BLADEBURNER", actionType: "Contracts", actionName: n });
+    const m = await fahre({
+      geld: 1e12,
+      koerper: [{ skills: kampf, aufgabe: vertrag("Tracking") }, { skills: kampf, aufgabe: vertrag("Bounty Hunter") },
+        { skills: kampf, aufgabe: vertrag("Retirement") }],
+      blade: { drin: true, aktionen: aktionen(50) },
+      dateien: { "data/blade.json": JSON.stringify({ zeit: W0, istAktion: "Operations/Raid" }) },
+    });
+    const a = m.zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Raid knapp, alle auf Vertraegen: Sleeve 2 wird Nachfueller, 0 und 1 bleiben auf ihren Vertraegen",
+      a[0].actionName === "Tracking" && a[1].actionName === "Bounty Hunter" && a[2].type === "INFILTRATE",
+      a.map((x) => x && (x.actionName || x.type)).join(", "));
+  }
+
+  // Spieler wechselt zwischen Raid und Diplomacy (12.10.2026, Skeptiker
+  // Runde 2): der Nachfueller bleibt ueber den Wechsel auf Infiltrate.
+  {
+    let runde = 0;
+    const m = await fahre({
+      geld: 1e12,
+      runden: 3,
+      koerper: [{ skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }],
+      blade: { drin: true, aktionen: aktionen(50) },
+      dateien: { "data/blade.json": JSON.stringify({ zeit: W0, istAktion: "Operations/Raid" }) },
+      zwischendurch: (mm) => {
+        runde++;
+        mm.zustand.dateien.home["data/blade.json"] = JSON.stringify({ zeit: W0, istAktion: "General/Diplomacy" });
+      },
+    });
+    const a = m.zustand.koerper.map((k) => k.aufgabe);
+    pruefe("Raid -> Diplomacy: Nachfueller bleibt ungestoert auf Infiltrate (Gedaechtnis 10 min)",
+      runde >= 1 && a[0] && a[0].type === "INFILTRATE" && a[0].cyclesWorked === 123,
+      "Runden " + runde + ": " + a.map((x) => x && (x.actionName || x.type + "/" + x.cyclesWorked)).join(", "));
+  }
+
+  // Veraltete blade.json (blade.js haengt): keine knappe Operation mehr.
+  {
+    const m = await fahre({
+      geld: 1e12,
+      koerper: [{ skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }, { skills: kampf, aufgabe: infil() }],
+      blade: { drin: true, aktionen: aktionen(50) },
+      dateien: { "data/blade.json": JSON.stringify({ zeit: W0 - 3600000, istAktion: "Operations/Raid" }) },
+    });
+    const a = m.zustand.koerper.map((k) => k.aufgabe);
+    pruefe("blade.json eine Stunde alt: Raid gilt nicht als knapp, alle drei fahren Vertraege",
+      a.every((x) => x && x.type === "BLADEBURNER"), a.map((x) => x && (x.actionName || x.type)).join(", "));
+  }
+
+  // Aufraeumen: nur Tracking erlaubt - einer nimmt es, die anderen bleiben
+  // ungestoert auf Infiltrate.
+  const m3 = await lauf(602, { aufraeumen: true });
+  const a3 = m3.zustand.koerper.map((k) => k.aufgabe);
+  const tracking = a3.filter((x) => x && x.actionName === "Tracking").length;
+  const ungestoert = a3.filter((x) => x && x.type === "INFILTRATE" && x.cyclesWorked === 123).length;
+  pruefe("Aufraeumen: genau einer faehrt Tracking, zwei bleiben ungestoert auf Infiltrate",
+    tracking === 1 && ungestoert === 2, a3.map((x) => x && (x.actionName || x.type + "/" + x.cyclesWorked)).join(", "));
 }
 
 console.log("");

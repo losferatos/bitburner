@@ -202,6 +202,13 @@ export async function main(ns) {
   const KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"];
   const VERBRECHEN = "Shoplift";   // Rueckfall, wenn das Gym nicht geht
   const TAKT = 60000;
+  // Zuletzt gesehene knappe Operation, ueber Takte gemerkt (12.10.2026,
+  // Skeptiker Runde 2): istAktion ist eine Momentaufnahme - zwischen zwei
+  // Raids faehrt der Spieler Diplomacy, Field Analysis oder die Kammer. Ohne
+  // Gedaechtnis verliess der Nachfueller Infiltrate beim ersten Takt mit
+  // "General/...", oft vor dem ersten Abschluss (61 s gegen Takt 60 s).
+  const KNAPP_MERKEN_MS = 10 * 60000;
+  let knappGemerkt = null, knappGemerktBis = 0;
   // Ohne getNumSleeves (4 GB) blind bis zur Obergrenze durchzaehlen. Mehr als
   // drei kann es ohne Covenant-Kaeufe nicht geben
   // (`SleeveCovenantPurchases.tsx:62-63`), und ein Index, den es nicht gibt,
@@ -710,9 +717,16 @@ export async function main(ns) {
       const OP_VERBRAUCH_STUENDLICH = 200;   // konservativ, obere Audit-Grenze
       const OP_RUNWAY_STUNDEN = 2;
       let knappeOperation = null;
+      // Halten bis 125 % der Schwelle: sonst pendelt der Nachfueller, wenn der
+      // Vorrat um 400 schwankt (jeder Spielerlauf -1, Infiltrate +0,5 je Minute).
+      let knappHalten = null;
       try {
         const bj = JSON.parse(liesVonHome(ns, "data/blade.json") || "null");
-        const ist = bj && typeof bj.istAktion === "string" ? bj.istAktion : null;
+        // Nur frische Angaben (Skeptiker 12.10.2026): haengt blade.js, steht
+        // "Operations/Raid" sonst ewig da, und die Sleeves richten sich nach
+        // einer Operation, die niemand mehr faehrt.
+        const frisch = !!bj && Number.isFinite(bj.zeit) && Date.now() - bj.zeit < 10 * 60000;
+        const ist = frisch && typeof bj.istAktion === "string" ? bj.istAktion : null;
         if (ist && ist.startsWith("Operations/")) {
           const opName = ist.slice("Operations/".length);
           // Dieselbe Funktion wie oben fuer Contracts - kostet keine
@@ -721,14 +735,57 @@ export async function main(ns) {
           if (Number.isFinite(rest) && rest < OP_VERBRAUCH_STUENDLICH * OP_RUNWAY_STUNDEN) {
             knappeOperation = opName;
           }
+          if (Number.isFinite(rest) && rest < 1.25 * OP_VERBRAUCH_STUENDLICH * OP_RUNWAY_STUNDEN) {
+            knappHalten = opName;
+          }
         }
       } catch { knappeOperation = null; }
-      let laeuftSchon = false;
+      if (knappeOperation) { knappGemerkt = knappeOperation; knappGemerktBis = Date.now() + KNAPP_MERKEN_MS; }
+      if (!knappHalten && knappGemerkt && Date.now() < knappGemerktBis) knappHalten = knappGemerkt;
+      // HOECHSTENS EIN SLEEVE FUER DIE KNAPPE OPERATION (Skeptiker 12.10.2026).
+      // Infiltrate wirkt mit abnehmendem Ertrag: je Aktionsart 30*sqrt(N)/h
+      // (amt = N^-0,5/2 je 60 s, Bladeburner.ts:1253-1261) - einer bringt 30/h,
+      // der zweite nur 12,4/h dazu, der dritte 9,5/h. Ein Vertrag dagegen gibt
+      // dem Spieler sofort Rang (completeAction mit isPlayer=false ->
+      // changeRank). Und die Schwelle 400 war fuer Assassination (200/h)
+      // gerechnet - bei Raid (gemessen 30-40/h Verbrauch, 15,75/h Nachwuchs)
+      // sind 400 rund 20 h Vorlauf: in BN11.3 haette die Regel alle drei Sleeves
+      // ueber die halbe Anfangsphase auf Infiltrate gehalten. Deshalb fuellt
+      // EIN Sleeve nach (der mit dem kleinsten Index), die uebrigen fahren
+      // Vertraege.
+      const infiltratorenVorMir = [], infiltratorenAndere = [];
+      let vertraegeNachMir = 0;
+      if (inDivision) {
+        for (let j = 0; j < anzahl; j++) {
+          if (j === i) continue;
+          try {
+            const tj = ns.sleeve.getTask(j);
+            if (tj && tj.type === "INFILTRATE") {
+              infiltratorenAndere.push(j);
+              if (j < i) infiltratorenVorMir.push(j);
+            }
+            if (j > i && tj && tj.type === "BLADEBURNER" && tj.actionType === "Contracts") vertraegeNachMir++;
+          } catch { /* Index ohne Sleeve */ }
+        }
+      }
+      // Hysterese beim Verlassen (Skeptiker 12.10.2026): ab Vorrat 2 abzuloesen
+      // hiesse im Mangelbetrieb jede Minute pendeln - Vertrag (2 Stueck), Stopp,
+      // Infiltrate 60 s ohne Abschluss (der faellt erst bei 60,2 s), wieder
+      // Vertrag. Erst ab 20 lohnt der Wechsel.
+      const INFILTRATE_VERLASSEN_AB = 20;
+      let infilGrund = null;
+      let laeuftSchon = false, warInfiltrate = false;
       if (inDivision) {
         try {
           const t = ns.sleeve.getTask(i);
+          // Knappe Operation und noch kein Nachfueller: der LETZTE Vertrags-
+          // Sleeve gibt seinen Vertrag ab (12.10.2026). Sonst entstuende der
+          // Nachfueller erst, wenn ein Vertrag leerlaeuft - mit drei Vorraeten
+          // ueber 500 also nie.
+          const werdeNachfueller = !!knappeOperation && infiltratorenAndere.length === 0
+            && vertraegeNachMir === 0 && i !== rekrutierer.nr;
           if (t && t.type === "BLADEBURNER" && t.actionType === "Contracts"
-              && erlaubteKontrakte.includes(t.actionName)) {
+              && erlaubteKontrakte.includes(t.actionName) && !werdeNachfueller) {
             laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
           }
           // INFILTRATE GEHOERT HIER MIT REIN (30.08.2026, 12:55, nach einem
@@ -746,8 +803,48 @@ export async function main(ns) {
           // Das ist woertlich derselbe Fehler wie am 30.08. um 06:20 bei den
           // Kontrakten - dort war die Ursache das blinde Neusetzen einer
           // laufenden Aktion, hier dieselbe Luecke eine Aktionsart weiter.
+          //
+          // ABER NUR, SOLANGE ER BEGRUENDET IST (12.10.2026). Dieser Zweig
+          // hielt einen laufenden Infiltrate fuer IMMER fest - er endet ja nie
+          // von selbst. Gesetzt wird Infiltrate nur als Rueckfall (kein Vertrag
+          // frei, knappe Operation, Aufraeumen); war der Grund weg, blieb der
+          // Sleeve trotzdem dort. BN11.3: alle drei Sleeves 18,7 h auf
+          // Infiltrate, waehrend 1.268 Retirement, 1.247 Tracking und 586
+          // Bounty Hunter auf Vorrat lagen. In BN11.2 setzte erst der
+          // Aug-Einbau (prestigeAugmentation setzt die Aufgaben zurueck) die
+          // Sleeves auf Vertraege - danach ~1.300 Vertragserfolge in 2 h und
+          // der Rang von 17.000 auf 31.000. BN11.3 lag nach 19 h bei 6.288.
+          //
+          // Abgeloest wird nur, wenn ein erlaubter Vertrag mit Vorrat >=
+          // INFILTRATE_VERLASSEN_AB frei ist (kein anderer Sleeve faehrt ihn -
+          // das Spiel wirft sonst, und der Rueckfall unten setzte Infiltrate
+          // neu, also cyclesWorked auf 0: genau der 61-s-Fehler von oben) und
+          // nicht dieser Sleeve der eine Nachfueller fuer eine knappe Operation
+          // ist.
           if (t && t.type === "INFILTRATE") {
-            laeuftSchon = true; ok = true; was = "infiltrate";
+            let freierVertrag = false;
+            const binNachfueller = !!knappHalten && infiltratorenVorMir.length === 0;
+            if (binNachfueller) infilGrund = "knapp:" + knappHalten;
+            else if (sleeveKampf < KONTRAKT_MIN_KAMPF) infilGrund = "kampf<" + KONTRAKT_MIN_KAMPF;
+            else {
+              const belegt = new Set();
+              for (let j = 0; j < anzahl; j++) {
+                if (j === i) continue;
+                try {
+                  const tj = ns.sleeve.getTask(j);
+                  if (tj && tj.type === "BLADEBURNER" && tj.actionName) belegt.add(tj.actionName);
+                } catch { /* Index ohne Sleeve */ }
+              }
+              for (const art of erlaubteKontrakte) {
+                if (belegt.has(art)) continue;
+                let v = 0;
+                try { v = ns.bladeburner.getActionCountRemaining("Contracts", art); } catch { v = 0; }
+                if (v >= INFILTRATE_VERLASSEN_AB) { freierVertrag = true; break; }
+              }
+              if (!freierVertrag) infilGrund = chaosRunde ? "aufraeumen" : "kein-freier-Vertrag";
+            }
+            if (!freierVertrag) { laeuftSchon = true; ok = true; was = "infiltrate"; }
+            else warInfiltrate = true;
           }
         } catch { /* alte Fassung: dann wie bisher jedes Mal neu setzen */ }
       }
@@ -766,7 +863,8 @@ export async function main(ns) {
         if (gesetzt) { laeuftSchon = true; ok = true; was = "recruitment"; }
       }
       if (!laeuftSchon && inDivision && sleeveKampf >= KONTRAKT_MIN_KAMPF) {
-        if (knappeOperation) {
+        if (knappeOperation && infiltratorenAndere.length === 0) {
+          infilGrund = "knapp:" + knappeOperation;
           // FUND 5: die Operation, die der Spieler faehrt, ist knapp - dann
           // NICHT erst Vertraege versuchen (die haetten ohnehin Vorrat, siehe
           // oben), sondern direkt unten in den Infiltrate-Zweig durchfallen.
@@ -846,10 +944,14 @@ export async function main(ns) {
         // Besser als der Gym-Rueckfall darunter, weil der Sleeve mit
         // 45/45/57/48 laengst ueber `KONTRAKT_MIN_KAMPF` liegt - Training
         // braucht er nicht, und der Vorrat fuellt sich davon auch nicht.
+        // Lief schon Infiltrate und der Vertrag liess sich doch nicht setzen
+        // (Wettlauf), NICHT neu setzen - das wuerfe cyclesWorked auf 0.
+        if (!ok && warInfiltrate) { ok = true; was = "infiltrate"; }
         if (!ok) try {
           ok = ns.sleeve.setToBladeburnerAction(i, "Infiltrate Synthoids");
           if (ok) was = "infiltrate";
         } catch { ok = false; }
+        if (was === "infiltrate" && !infilGrund) infilGrund = chaosRunde ? "aufraeumen" : "kein-freier-Vertrag";
       }
       // WESSEN TIEFSTAND? DAS HAENGT AM BEITRITT (29.08.2026, 17:50).
       //
@@ -930,7 +1032,7 @@ export async function main(ns) {
       }
       // `v1` sagt, WARUM im Hackingweg diese Aufgabe: faktion | recovery |
       // geld-knapp | rueckfall (keine Faktion ging). `grund` bleibt wie bisher.
-      stand.push({ nr: i, gesetzt: ok, aufgabe: was, stored: storedCycles,
+      stand.push({ nr: i, gesetzt: ok, aufgabe: was, infilGrund: was === "infiltrate" ? infilGrund : null, stored: storedCycles,
         grund: keinGym ? "hackingweg" : (!gymGeldReicht && was !== "gym" ? "arm" : ""),
         ...(keinGym ? { v1: v1i ? v1i.v1 : "rueckfall", faktion: v1i ? v1i.faktion : null,
           schock: sleeveShock } : {}) });

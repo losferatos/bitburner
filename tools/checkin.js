@@ -554,9 +554,11 @@ async function main() {
       + dauer(std(spielzeit - juengster.spielzeit)) + " Spielzeit zurueck - fuer eine"
       + " belastbare Rate braucht es " + (MIN_FENSTER_MS / 60000) + " Minuten. Komm spaeter"
       + " wieder, oder lies die Zahlen unten als Momentaufnahme.");
-  } else {
+  } else if (!vorher) {
     sag("Erster Check-in in diesem Knotenlauf - eine Rate gibt es erst beim naechsten Mal.");
   }
+  // Mit Vorgaenger, aber im Nachholbetrieb: der Hinweis oben sagt schon, warum
+  // es keine Rate gibt (13.10.2026: hier stand faelschlich "Erster Check-in").
 
   bericht.restNetto = restNetto;
 

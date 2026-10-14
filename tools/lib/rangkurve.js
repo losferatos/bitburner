@@ -184,7 +184,9 @@ export function restzeitAusKurve(knoten, rang) {
     // Rang UNTER dem ersten Kurvenpunkt (12.10.2026): stundeBeiRang klemmt
     // auf h 0, die Zeit bis zum Kurvenanfang fehlt in restH. BN6.1 beginnt
     // erst bei Rang 80.340 - BN6.2 bei Rang 77 bekam 9,1 h gemeldet.
-    vorKurve: rang < p[0].rang ? p[0].rang : null,
+    // Nur wenn die Kurve NACH dem Anlauf beginnt (ab Rang 1.000) - Rang 0
+    // gegen einen Kurvenstart bei 5 ist Rauschen (14.10.2026).
+    vorKurve: rang < p[0].rang && p[0].rang >= 1000 ? p[0].rang : null,
     stuetzpunkte: p.length,
     quelle: "doku/rangkurve-bn" + knoten + ".json, erzeugt " + (k.erzeugtAm || "?"),
   };
@@ -237,7 +239,7 @@ export function naechsterMeilenstein(knoten, rang) {
   // "Probe" verlangte bei Rang 77 in BN6.2 die 81.728 Rang/h, die BN6.1
   // jenseits von Rang 80.340 lief - ein sicherer Fehlalarm beim naechsten
   // Besuch.
-  if (!Array.isArray(p) || !p.length || rang < p[0].rang) return null;
+  if (!Array.isArray(p) || !p.length || (rang < p[0].rang && p[0].rang >= 1000)) return null;
   const hJetzt = stundeBeiRang(p, rang);
   if (hJetzt === null) return null;
 

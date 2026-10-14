@@ -32,9 +32,11 @@ console.log("\n=== Gleichstand gegen den vorigen Lauf ===\n");
 const doku = path.join(ROOT, "doku");
 const mitAbstand = path.join(doku, "rangkurve-bn98.json");
 const ohneAbstand = path.join(doku, "rangkurve-bn97.json");
+const spaet = path.join(doku, "rangkurve-bn96.json");
 const punkte = [{ h: 0, rang: 200 }, { h: 2, rang: 1000 }, { h: 10, rang: 500000 }];
 fs.writeFileSync(mitAbstand, JSON.stringify({ nullpunkt: { hSeitKnotenstart: 10 }, punkte }));
 fs.writeFileSync(ohneAbstand, JSON.stringify({ nullpunkt: {}, punkte }));
+fs.writeFileSync(spaet, JSON.stringify({ nullpunkt: {}, punkte: [{ h: 0, rang: 80340 }, { h: 1, rang: 90000 }, { h: 5, rang: 450000 }] }));
 try {
   const { vergleichMitReferenz } = await import(pathToFileURL(path.join(ROOT, "tools", "lib", "rangkurve.js")).href);
   // Referenz: Rang 1000 bei Kurvenstunde 2 = 12 h nach Knotenstart.
@@ -47,15 +49,17 @@ try {
   // Rang unter dem Kurvenanfang (12.10.2026, BN6.2 bei Rang 77 gegen eine
   // Kurve ab 80.340): ETA ist Untergrenze, keine Probe.
   const { restzeitAusKurve, naechsterMeilenstein } = await import(pathToFileURL(path.join(ROOT, "tools", "lib", "rangkurve.js")).href);
-  const r50 = restzeitAusKurve(98, 50);
-  pruefe("Rang 50 unter Kurvenanfang 200: als Untergrenze markiert", r50 && r50.vorKurve === 200, JSON.stringify(r50 && r50.vorKurve));
-  pruefe("... und keine Probe gegen die Rate jenseits des Anfangs", naechsterMeilenstein(98, 50) === null);
+  const r50 = restzeitAusKurve(96, 50);
+  pruefe("Rang 50 unter Kurvenanfang 80.340: als Untergrenze markiert", r50 && r50.vorKurve === 80340, JSON.stringify(r50 && r50.vorKurve));
+  pruefe("... und keine Probe gegen die Rate jenseits des Anfangs", naechsterMeilenstein(96, 50) === null);
+  pruefe("Rang 50 gegen Kurvenstart 200 (im Anlauf): keine Untergrenze, Rauschen", restzeitAusKurve(98, 50).vorKurve === null);
   const r1000 = restzeitAusKurve(98, 1000);
   pruefe("Rang 1000 in der Kurve: keine Untergrenze, Probe vorhanden",
     r1000 && r1000.vorKurve === null && naechsterMeilenstein(98, 1000) !== null);
 } finally {
   fs.rmSync(mitAbstand, { force: true });
   fs.rmSync(ohneAbstand, { force: true });
+  fs.rmSync(spaet, { force: true });
 }
 
 const bauer = fs.readFileSync(path.join(ROOT, "tools", "rangkurve-bauen.js"), "utf8");

@@ -202,6 +202,27 @@ export async function main(ns) {
   const KONTRAKTE = ["Tracking", "Bounty Hunter", "Retirement"];
   const VERBRECHEN = "Shoplift";   // Rueckfall, wenn das Gym nicht geht
   const TAKT = 60000;
+  // NACHHOLBETRIEB (14.10.2026). Ein Sleeve mit Rueckstand arbeitet 15 Zyklen
+  // je Spieltakt statt einem (Sleeve.ts:266-268) - ein 60-s-Takt dieses
+  // Skripts sind dann 15 Minuten Sleeve-Zeit. Gemessen BN6.3, 18:10: die
+  // Vertragsvorraete fielen in 30 min von ~180 auf 1-13, die Sleeves liefen
+  // leer, das Spiel stoppte sie (SleeveBladeburnerWork.ts:44-47), und bis zum
+  // naechsten Takt standen zwei von drei Sleeves - je Minute 15 Minuten
+  // verschenkte Bonuszeit. Deshalb im Nachholbetrieb: kurzer Takt, und
+  // Vertraege nur mit tiefem Vorrat, sonst Infiltrate (endet nie von selbst
+  // und fuellt den Vorrat nach).
+  const TAKT_NACHHOLEN = 10000;
+  const NACHHOLEN_AB = 1500;            // Zyklen Rueckstand = 5 min Spielzeit
+  const VORRAT_NACHHOLEN = 50;
+  // Ein laufender Vertrag wird im Nachholbetrieb unter diesem Vorrat
+  // abgeloest - sonst laeuft er zwischen zwei Takten leer (Skeptiker:
+  // ~14 Vertraege je 10-s-Takt bei 15-facher Geschwindigkeit).
+  const VORRAT_NACHHOLEN_HALTEN = 15;
+  // NUR WENN DER RUECKSTAND SINKT (Skeptiker): im verdeckten Tab bekommt
+  // Sleeve.process ~300 Zyklen je Wecken und baut hoechstens 15 ab
+  // (Sleeve.ts:263-274) - der Rueckstand waechst dann dauerhaft, und ohne
+  // diese Pruefung waere der Nachholbetrieb Dauerzustand.
+  const rueckstandVorher = [];
   // Zuletzt gesehene knappe Operation, ueber Takte gemerkt (12.10.2026,
   // Skeptiker Runde 2): istAktion ist eine Momentaufnahme - zwischen zwei
   // Raids faehrt der Spieler Diplomacy, Field Analysis oder die Kammer. Ohne
@@ -505,6 +526,7 @@ export async function main(ns) {
 
   for (;;) {
     const stand = [];
+    let irgendwerHoltNach = false;
     const keinGym = hackingweg();
     // Wie viele Sleeves gibt es wirklich? MAX ist nur die Schleifengrenze;
     // der Geldboden unten rechnet mit den Koerpern, die zahlen.
@@ -596,10 +618,17 @@ export async function main(ns) {
       let ok = false, was = "gym";
       // Rueckstand und Werte je Sleeve: Telemetrie (tools/checkin.js wertet
       // waehrend des Nachholbetriebs keine Rate) und Verbrechenswahl.
-      let storedCycles = 0, sleeveSk = null, sleeveShock = null;
+      let storedCycles = 0, sleeveSk = null, sleeveShock = null, holtNachHier = false;
       try {
         const sl = ns.sleeve.getSleeve(i);
         storedCycles = Number(sl.storedCycles) || 0;
+        // Erster Takt nach dem Start (typisch: Spiel nach PC-aus geladen) hat
+        // keinen Vorwert - dann gilt ein Rueckstand als Nachholen; im
+        // verdeckten Tab kostet das genau einen Takt mit strengerer Schwelle.
+        holtNachHier = storedCycles > NACHHOLEN_AB && (!Number.isFinite(rueckstandVorher[i])
+          || storedCycles < rueckstandVorher[i]);
+        rueckstandVorher[i] = storedCycles;
+        if (holtNachHier) irgendwerHoltNach = true;
         sleeveSk = sl.skills;
         sleeveShock = Number.isFinite(sl.shock) ? Math.round(sl.shock * 100) / 100 : null;
       } catch { break; }
@@ -817,7 +846,8 @@ export async function main(ns) {
       // hiesse im Mangelbetrieb jede Minute pendeln - Vertrag (2 Stueck), Stopp,
       // Infiltrate 60 s ohne Abschluss (der faellt erst bei 60,2 s), wieder
       // Vertrag. Erst ab 20 lohnt der Wechsel.
-      const INFILTRATE_VERLASSEN_AB = 20;
+      const holtNach = holtNachHier;
+      const INFILTRATE_VERLASSEN_AB = holtNach ? VORRAT_NACHHOLEN : 20;
       let infilGrund = null;
       let laeuftSchon = false, warInfiltrate = false;
       if (inDivision) {
@@ -829,8 +859,14 @@ export async function main(ns) {
           // ueber 500 also nie.
           const werdeNachfueller = !!knappeOperation && infiltratorenAndere.length === 0
             && vertraegeNachMir === 0 && i !== rekrutierer.nr && i !== diplomat;
+          let vertragLeert = false;
+          if (holtNach && t && t.type === "BLADEBURNER" && t.actionType === "Contracts") {
+            let v = Infinity;
+            try { v = ns.bladeburner.getActionCountRemaining("Contracts", t.actionName); } catch { v = Infinity; }
+            vertragLeert = v < VORRAT_NACHHOLEN_HALTEN;
+          }
           if (t && t.type === "BLADEBURNER" && t.actionType === "Contracts"
-              && erlaubteKontrakte.includes(t.actionName) && !werdeNachfueller) {
+              && erlaubteKontrakte.includes(t.actionName) && !werdeNachfueller && !vertragLeert) {
             laeuftSchon = true; ok = true; was = "contract:" + t.actionName;
           }
           // INFILTRATE GEHOERT HIER MIT REIN (30.08.2026, 12:55, nach einem
@@ -976,7 +1012,7 @@ export async function main(ns) {
             // stand er um 09:53 auf Idle, waehrend `sleeve.json` brav
             // `contract:Retirement` meldete. Die Schwelle muss einen
             // Abschluss ueberleben, sonst ist jedes Setzen sofort tot.
-            if (vorrat < 2) continue;
+            if (vorrat < (holtNach ? VORRAT_NACHHOLEN : 2)) continue;
             ok = ns.sleeve.setToBladeburnerAction(i, "Take on contracts", art);
             if (ok) was = "contract:" + art;
           } catch { ok = false; }
@@ -1106,6 +1142,6 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") {
       ns.scp("data/sleeve.json", "home", ns.getHostname());
     }
-    await ns.sleep(TAKT);
+    await ns.sleep(irgendwerHoltNach ? TAKT_NACHHOLEN : TAKT);
   }
 }

@@ -749,9 +749,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 62271,
-  "lines": 1112,
-  "sha256": "594f026c775a35adbb9ad9d88750ba7f7694b11e71141e26e25feb059a5e827e",
+  "bytes": 64619,
+  "lines": 1148,
+  "sha256": "adfa1ceb87992f5f106f1f910c90bf10b2753cf6fb984d1f769787425688ef16",
   "gemessenAm": "2026-10-03T07:24:27.305Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
@@ -1162,9 +1162,9 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 673,
-  "lines": 15,
-  "sha256": "6cb7ceff60b4c290d66f3eabeb38f077b639811da74d981475ea1f2765613d26"
+  "bytes": 931,
+  "lines": 22,
+  "sha256": "db94da29f4cf04e57705367da2f7d06b4c62a6bc101419996b2b6743f375a29e"
  },
  {
   "file": "csolve.js",

@@ -76,6 +76,7 @@ async function fahre(o) {
     // die sie gestellt hat.
     beiSchlaf: (ms, z, vorRuecken) => {
       if (o.zwischendurch) o.zwischendurch(m, z);
+      if (o.schlafProtokoll) o.schlafProtokoll.push(ms);
       return vorRuecken(o.schrittMs ?? 1);
     },
   });
@@ -529,6 +530,67 @@ console.log("-- Chaos-Bremse: Sleeves legen kein Chaos nach, einer faehrt Diplom
   const blade = ohneKommentare(fs.readFileSync(path.join(ROOT, "src", "blade.js"), "utf8"));
   pruefe("blade.js schreibt chaosHier bei jedem blade.json-Schreiben, im Fehlerfall null",
     blade.includes("chaosHier: (() => { try { const c = ns.bladeburner.getCityChaos(ns.bladeburner.getCity());"));
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- Nachholbetrieb: keine Leerlaeufe, kurzer Takt (14.10.2026) --");
+{
+  // BN6.3 18:10: Vorraete in 30 min von ~180 auf 1-13 leergefahren, zwei
+  // Sleeves standen bis zum naechsten 60-s-Takt = 15 min Sleeve-Zeit.
+  const kampf = { strength: 200, defense: 200, dexterity: 200, agility: 200 };
+  const aktionen = (t, b, r) => ({
+    "Contracts/Tracking": { vorrat: t, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Bounty Hunter": { vorrat: b, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+    "Contracts/Retirement": { vorrat: r, stufe: 1, maxStufe: 10, chance: 0.9, dauer: 30000 },
+  });
+  const infil = () => ({ type: "INFILTRATE", cyclesWorked: 123 });
+  const lauf = (stored, vorr, aufgaben, schlaf) => fahre({
+    geld: 1e12,
+    koerper: aufgaben.map((a) => ({ skills: kampf, aufgabe: a, storedCycles: stored })),
+    blade: { drin: true, aktionen: aktionen(...vorr) },
+    dateien: { "data/blade.json": JSON.stringify({ zeit: W0 }) },
+    schlafProtokoll: schlaf,
+    // Der Rueckstand muss SINKEN (verdeckter Tab: er waechst) - eine Sekunde
+    // je Runde baut im Mock 15 Zyklen ab und legt 5 nach.
+    runden: 4,
+    schrittMs: 1000,
+  });
+  const zeige = (a) => a.map((x) => x && (x.actionName || x.type)).join(", ");
+
+  const schlafN = [];
+  const a1 = (await lauf(60000, [6, 1, 13], [null, null, null], schlafN)).zustand.koerper.map((k) => k.aufgabe);
+  pruefe("Nachholbetrieb, Vorrat 6/1/13: kein Vertrag mit kleinem Vorrat, alle drei auf Infiltrate",
+    a1.every((x) => x && x.type === "INFILTRATE"), zeige(a1));
+  pruefe("... Takt 10 s statt 60 s, sobald der Rueckstand sinkt", schlafN.length > 1 && schlafN[schlafN.length - 1] === 10000, schlafN.join(","));
+
+  const schlafO = [];
+  const a2 = (await lauf(0, [6, 1, 13], [null, null, null], schlafO)).zustand.koerper.map((k) => k.aufgabe);
+  pruefe("ohne Rueckstand, Vorrat 6/1/13: Vertraege ab Vorrat 2 wie bisher",
+    a2.filter((x) => x && x.actionType === "Contracts").length === 2, zeige(a2));
+  pruefe("... Takt bleibt 60 s", schlafO.length > 0 && schlafO.every((ms) => ms === 60000), schlafO.join(","));
+
+  const a3 = (await lauf(60000, [30, 30, 30], [infil(), infil(), infil()])).zustand.koerper.map((k) => k.aufgabe);
+  pruefe("Nachholbetrieb, Vorrat 30: laufender Infiltrate bleibt (Schwelle 50)",
+    a3.every((x) => x && x.type === "INFILTRATE" && x.cyclesWorked === 123), zeige(a3));
+
+  // Verdeckter Tab: der Rueckstand waechst - kein Nachholbetrieb, Vertraege ab 2.
+  {
+    const m = await fahre({
+      geld: 1e12,
+      koerper: [null, null, null].map(() => ({ skills: kampf, aufgabe: null, storedCycles: 60000 })),
+      blade: { drin: true, aktionen: aktionen(30, 30, 30) },
+      dateien: { "data/blade.json": JSON.stringify({ zeit: W0 }) },
+      runden: 4,
+      zwischendurch: (mm) => { for (const k of mm.zustand.koerper) k.storedCycles += 300; },
+    });
+    const a = m.zustand.koerper.map((k) => k.aufgabe);
+    pruefe("wachsender Rueckstand (verdeckter Tab) ist kein Nachholbetrieb: Vorrat 30 reicht fuer Vertraege",
+      a.filter((x) => x && x.actionType === "Contracts").length === 3, zeige(a));
+  }
+  const a4 = (await lauf(60000, [500, 500, 500], [infil(), infil(), infil()])).zustand.koerper.map((k) => k.aufgabe);
+  pruefe("Nachholbetrieb, Vorrat 500: Infiltrate wird fuer Vertraege verlassen",
+    a4.every((x) => x && x.actionType === "Contracts"), zeige(a4));
 }
 
 console.log("");

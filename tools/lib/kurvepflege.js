@@ -38,7 +38,12 @@ export function effektiveSpielzeit(totalPlaytime, storedCycles) {
 }
 export const START_RANG_MAX = 1000;
 // Groesste erlaubte Strecke ohne Messpunkt in einer Kandidatenkurve.
-export const LUECKE_MAX_H = 3;
+// 6 statt 3 (14.10.2026): Nach einer Offline-Nacht laeuft die bereinigte
+// Spielzeit im Nachholbetrieb 15- bis 25-mal schneller als die Wanduhr, die
+// stuendlichen Sicherungen liegen dann 5 h Spielzeit auseinander (BN6.2,
+// BN11.3). Mit 3 h fiel jeder Lauf mit Offline-Phase heraus. Das 11-h-Loch
+// von BN2.3, fuer das die Regel gebaut wurde, bleibt ausgeschlossen.
+export const LUECKE_MAX_H = 6;
 
 /**
  * Rein: ersetzt `neu` die Kurve `alt`? Bedingungen fuer `neu`: beginnt im
@@ -60,6 +65,12 @@ export function kurveErsetzen(alt, neu) {
   if (luecke > LUECKE_MAX_H) return { ersetzen: false, grund: "Kandidat mit Messloch " + luecke.toFixed(1) + " h" };
   if (!alt || !(max(alt) >= AUSGANG_RANG) || !(Number(alt.dauerH) > 0)) {
     return { ersetzen: true, grund: "bisherige Kurve fehlt oder ist unvollstaendig" };
+  }
+  // Die bisherige Kurve beginnt nach dem Anlauf (14.10.2026, BN6.1 ab Rang
+  // 80.340): ein Kandidat, der den Anlauf abdeckt, ersetzt sie - die
+  // Restzeit ab Rang 0 kannte sie gar nicht.
+  if (!(start(alt) < START_RANG_MAX)) {
+    return { ersetzen: true, grund: "bisherige Kurve deckt den Anlauf nicht ab (Start Rang " + start(alt) + ")" };
   }
   // Ab Knotenstart vergleichen, wenn beide Kurven den Abstand kennen
   // (11.10.2026): BN11.2 lag ab erstem Rangpunkt bei 22,5 h gegen 17,8 h,

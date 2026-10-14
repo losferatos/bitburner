@@ -76,6 +76,11 @@ if (kurveErsetzen) {
   pruefe("BN11.1 ersetzt BN11.2 nicht", !kurveErsetzen(BN112, BN111).ersetzen);
   const loch = { ...BN112, punkte: [{ h: 0, rang: 46 }, { h: 0.1, rang: 60 }, { h: 0.2, rang: 80 }, { h: 11, rang: 28767 }, { h: 12.7, rang: 184320 }, { h: 13.1, rang: 458657 }] };
   pruefe("Kandidat mit 10,8 h Messloch ersetzt nichts (BN2.3-Fall)", !kurveErsetzen(BN111, loch).ersetzen);
+  // Altkurve beginnt nach dem Anlauf (BN6.1 ab Rang 80.340): ein Kandidat
+  // ab Rang 5 ersetzt sie, auch wenn er laenger dauert (14.10.2026).
+  const BN61 = kurve(80340, 452411, 10.044);
+  const BN62 = mitStart(kurve(5, 466026, 26.735), 0.716);
+  pruefe("Kandidat mit Anlauf ersetzt eine Kurve ohne Anlauf (BN6.2 statt BN6.1)", kurveErsetzen(BN61, BN62).ersetzen);
   pruefe("Abstand nur auf einer Seite bekannt: Vergleich ab Rangpunkt wie bisher",
     !kurveErsetzen(kurve(215, 454620, 17.784), BN112).ersetzen);
 }
@@ -122,6 +127,21 @@ if (kurveErsetzen) {
     execFileSync(process.execPath, [path.join(tmp, "tools", "rangkurve-bauen.js"), "--knoten", "99", "--mit-sicherungen", "--out", out + "2"],
       { cwd: tmp, stdio: "ignore", timeout: 30000 });
     pruefe("Lauf mit Messloch gewinnt nicht, auch wenn schneller", JSON.parse(fs.readFileSync(out + "2", "utf8")).rangSpanne[0] === 12);
+
+    // BN6.2-Fall (14.10.2026): Rang flackert am Anfang 5 -> 4 -> 0, und ein
+    // Check-in mit roher Spielzeit liegt hinter einer Sicherung mit hoeherem
+    // Rang. Beides darf den Lauf nicht zerteilen; der Lauf ist der schnellste.
+    [[0.5, 5], [1, 4], [1.5, 0], [2, 273], [4, 1352], [6, 5852], [9, 23520], [11, 46109], [13, 254605],
+      [14, 410000], [14.5, 466026]].forEach(([h, r], i) => sicherung(4, i, (100 + h) * H, h * H, r));
+    fs.writeFileSync(path.join(tmp, "backups", "INDEX.tsv"), zeilen.join("\n"));
+    fs.writeFileSync(path.join(tmp, "data", "checkin.json"), JSON.stringify({ punkte: [
+      { ts: Date.now() - 5000, knoten: 99, lauf: 4, spielzeit: (100 + 10) * H, rang: 1366 },
+      { ts: Date.now(), knoten: 6, spielzeit: 0, rang: 0 }] }));
+    execFileSync(process.execPath, [path.join(tmp, "tools", "rangkurve-bauen.js"), "--knoten", "99", "--mit-sicherungen", "--out", out + "3"],
+      { cwd: tmp, stdio: "ignore", timeout: 30000 });
+    const k3 = JSON.parse(fs.readFileSync(out + "3", "utf8"));
+    pruefe("Rangflackern 5->4->0 und verschobener Check-in zerteilen den Lauf nicht (BN6.2)",
+      k3.rangSpanne[0] === 5 && k3.punkte.length === 11, JSON.stringify(k3.rangSpanne) + " / " + k3.punkte.length + " Punkte");
     pruefe("... mit Abstand 1 h zum Knotenstart", Math.abs(k.nullpunkt.hSeitKnotenstart - 1) < 1e-6);
   } catch (e) {
     pruefe("Bauer-Probe lief durch", false, e.message);

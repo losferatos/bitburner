@@ -23,7 +23,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
-import { effektiveSpielzeit, AUSGANG_RANG, LUECKE_MAX_H } from "./lib/kurvepflege.js";
+import { effektiveSpielzeit, AUSGANG_RANG, LUECKE_MAX_H, START_RANG_MAX } from "./lib/kurvepflege.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -108,6 +108,20 @@ if (MIT_SICHERUNGEN && fs.existsSync(indexDatei)) {
   }
 }
 
+// CHECK-IN-PUNKTE RAUS, WO SICHERUNGEN DENSELBEN LAUF ABDECKEN (14.10.2026).
+// Check-ins tragen die ROHE totalPlaytime, Sicherungen die um den
+// Bonusvorrat bereinigte (effektiveSpielzeit). Nach einer Offline-Nacht liegt
+// ein Check-in deshalb Stunden "spaeter" als gleichzeitige Sicherungen - in
+// BN6.2 sass der Check-in mit Rang 1.366 hinter der Sicherung mit 23.520, der
+// Rangsturz trennte den Lauf, und es fand sich nie ein vollstaendiger.
+// Sicherungen sind dichter und richtig getaktet; die Check-ins bleiben nur
+// fuer Laeufe ohne Sicherung (aeltere Knoten).
+{
+  const gesichert = new Set(punkte.filter((q) => String(q.quelle).startsWith("sicherung") && q.lauf != null).map((q) => q.lauf));
+  for (let i = punkte.length - 1; i >= 0; i--) {
+    if (punkte[i].quelle === "checkin" && punkte[i].lauf != null && gesichert.has(punkte[i].lauf)) punkte.splice(i, 1);
+  }
+}
 punkte.sort((a, b) => a.spielzeit - b.spielzeit);
 
 // --- Laeufe trennen ---------------------------------------------------------
@@ -119,8 +133,18 @@ punkte.sort((a, b) => a.spielzeit - b.spielzeit);
 const laeufe = [];
 let aktuell = [];
 let letzterRang = -1;
+// NACHTRAG 14.10.2026: Ein Rangsturz trennt erst ab einem Vorrang von
+// RANG_STURZ_MIN. BN6.2 zerfiel in fuenf Bruchstuecke (87/2/13/7/2 Punkte):
+// am Anfang fiel der Rang durch Fehlschlaege von 5 auf 4 auf 0 - "unter der
+// Haelfte" - und jeder solche Schritt galt als neuer Lauf. Damit fand sich
+// nie ein vollstaendiger BN6-Lauf, und die Kurve blieb bei BN6.1 (ab Rang
+// 80.340). Das lauf-Feld taugt hier NICHT als Trenner: Check-in-Punkte
+// tragen die rohe Spielzeit, Sicherungen die um den Bonusvorrat bereinigte -
+// nach einer Offline-Nacht liegen Punkte zweier Laeufe verschraenkt (BN11
+// zerfiel damit in 6/21/34/3/2 Stuecke, gemessen 14.10.).
+const RANG_STURZ_MIN = 1000;
 for (const p of punkte) {
-  if (p.rang < letzterRang * 0.5 && aktuell.length) {
+  if (p.rang < letzterRang * 0.5 && letzterRang >= RANG_STURZ_MIN && aktuell.length) {
     laeufe.push(aktuell);
     aktuell = [];
   }
@@ -128,6 +152,7 @@ for (const p of punkte) {
   letzterRang = p.rang;
 }
 if (aktuell.length) laeufe.push(aktuell);
+
 
 /**
  * Der Referenzlauf ist der laengste ABGESCHLOSSENE.
@@ -201,7 +226,12 @@ function laufStunden(l) {
   return (l[l.length - 1].spielzeit - start) / 3.6e6;
 }
 function waehleReferenz(liste) {
-  const fertig = liste.filter((l) => maxRang(l) >= AUSGANG_RANG && laengsteLuecke(l) <= LUECKE_MAX_H);
+  const alleFertig = liste.filter((l) => maxRang(l) >= AUSGANG_RANG && laengsteLuecke(l) <= LUECKE_MAX_H);
+  // Laeufe, die im Anlauf beginnen, decken die ganze Strecke ab und gehen vor
+  // (14.10.2026): BN6.1 beginnt erst bei Rang 80.340 - fuer die ersten
+  // Stunden eines neuen Laufs kennt sie nichts.
+  const voll = alleFertig.filter((l) => l[0].rang < START_RANG_MAX);
+  const fertig = voll.length ? voll : alleFertig;
   // Knotenstart muss fuer ALLE fertigen Laeufe belegt sein, sonst sind die
   // Zeiten nicht vergleichbar (ein Lauf ab Knotenstart, einer ab Rangpunkt).
   if (fertig.length && fertig.every((l) => laufStunden(l) !== null)) {

@@ -98,6 +98,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-einbauhalt.js",
+    deckt: "Augs beim Sprung: Endspurt-Tor zaehlt als bewusst gehalten, Graft nicht (Fehlbefund BN6.3, 15.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-gleichstand.js",
     deckt: "Gleichstand-Vergleich zaehlt ab Knotenstart und bekommt eine Knotenzeit (war tot, Befund 10.10.)",
     schnell: true,

@@ -86,6 +86,7 @@ export { planeRoute, zielErlaubt, routeZustand };
 import { messe, etaMinuten } from "lib/eta.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 import { handschlag } from "lib/handschlag.js";
+import { augsBewusstGehalten } from "lib/einbauhalt.js";
 
 /**
  * KEINE WIRTRESERVE MEHR (Skeptikerrunde 04.09.2026).
@@ -817,11 +818,18 @@ export async function main(ns) {
             // der Kennwert selbst bleibt ehrlich. NUR die Frist zaehlt -
             // kampfAufbau (Kampfwerte < 100) kann auch ein haengendes Training
             // sein und bleibt ein Befund (Skeptiker 09.10.).
+            //
+            // Seit 15.10.2026 zaehlt auch ein Tor vor dem Einbau (Endspurt,
+            // laufender Graft - data/bn4rep.json state "wait"): BN6.3 hielt
+            // sieben Blade-Augs bis zum Sprung, weil der Wiederaufbau vor dem
+            // nahen Ausgang umsonst gewesen waere - richtig, aber /bb meldete
+            // "5 gekaufte Augs beim Sprung verfallen". Regel in
+            // lib/einbauhalt.js, Test tools/test-einbauhalt.js.
             einbauFristGehalten: (() => {
+              const lies = (d) => { try { return JSON.parse(liesVonHome(d) || "null"); } catch { return null; } };
               try {
-                const e = JSON.parse(liesVonHome("data/einbau.json") || "null");
-                if (!e || !Number.isFinite(e.zeit) || e.zeit <= info.lastAugReset) return null;
-                return e.kampfZuFrueh === true;
+                return augsBewusstGehalten(lies("data/einbau.json"), lies("data/bn4rep.json"),
+                  info.lastAugReset, Date.now());
               } catch { return null; }
             })() });
         nachHome("data/events.json", JSON.stringify(strom));

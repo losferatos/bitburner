@@ -109,7 +109,12 @@ const TESTS = [
   },
   {
     datei: "test-stadtwahl-echtpop.js",
-    deckt: "Stadtwahl nach echter Bevoelkerung (r je Stadt per Probenwechsel), nicht popEst - Rang fiel in leergeraidetem Sector-12 (Befund 04.10.)",
+    deckt: "Stadtwahl nach echter Bevoelkerung (r je Stadt per Probenwechsel), nicht popEst - Rang fiel in leergeraidetem Sector-12 (Befund 04.10.); Feinwahl bei sicherem r ab 15 % Chance (BN7.1 Volhaven, 16.10.)",
+    schnell: true,
+  },
+  {
+    datei: "test-tracer-anteil.js",
+    deckt: "Tracer nach Vertragsanteil der Spielerwahl gewichtet statt fest 1,0 (433 Punkte in BN7.1 bei leeren Vertraegen, 16.10.)",
     schnell: true,
   },
   {

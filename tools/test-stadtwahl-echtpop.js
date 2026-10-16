@@ -132,6 +132,39 @@ if (rAusBlackOp && popEchtGeschaetzt) {
   pruefe("sicheres r: popEst * r", popEchtGeschaetzt(1e9, { r: 0.5, sicher: true }) === 5e8);
 }
 
+// FEINWAHL (16.10.2026): BitNode 7.1, 12:57 - Volhaven 0,43 Mrd echt, Chaos
+// 26, Sector-12 0,55 Mrd, Chaos 22 (tools-Nachrechnung: Raid 0,169 gegen
+// 0,205). Die grobe Regel (linear, Vorsprung 2) blieb. Gegen die alte
+// Fassung ROT: feinWahl fehlt.
+{
+  const qF = extrahiere(quelle, "feinWahl");
+  const mV = quelle.match(/const FEIN_VORSPRUNG = ([\d.]+);/);
+  pruefe("feinWahl im Quelltext", !!qF && !!mV, qF ? "" : "alte Fassung");
+  if (qF && mV) {
+    const feinWahl = new Function("const FEIN_VORSPRUNG = " + mV[1] + ";\n" + qF + "\nreturn feinWahl;")();
+    const st = (stadt, pop, chaos, sicher = true, comms = 100) => ({ stadt, pop, chaos, sicher, comms });
+    const bn7 = [st("Aevum", 0.766e9, 64.8), st("Chongqing", 1.169e9, 59.6), st("Sector-12", 0.554e9, 22.0),
+      st("New Tokyo", 0.217e9, 6.0)];
+    pruefe("BN7.1-Befund: aus Volhaven nach Sector-12", feinWahl(st("Volhaven", 0.43e9, 26.2), bn7, 55) === "Sector-12");
+    pruefe("aus Sector-12 kein Rueckwechsel nach Volhaven (kein Pendeln)",
+      feinWahl(st("Sector-12", 0.554e9, 22), [st("Volhaven", 0.43e9, 26.2)], 55) === null);
+    pruefe("unter 15 % Vorsprung kein Wechsel",
+      feinWahl(st("Volhaven", 0.5e9, 20), [st("Sector-12", 0.55e9, 20)], 55) === null);
+    pruefe("nie Bevoelkerung gegen Chaos tauschen (Einwand 22.09.)",
+      feinWahl(st("Aevum", 1.2e9, 70), [st("New Tokyo", 0.5e9, 0)], 55) === null);
+    pruefe("Ziel mit unsicherem r zaehlt nicht",
+      feinWahl(st("Volhaven", 0.43e9, 26), [st("Sector-12", 0.9e9, 0, false)], 55) === null);
+    pruefe("hier unsicher: keine Feinwahl",
+      feinWahl(st("Volhaven", 0.43e9, 26, false), [st("Sector-12", 0.9e9, 0)], 55) === null);
+    pruefe("Ziel mit 4 Gemeinden zaehlt nicht (Skeptiker 1)",
+      feinWahl(st("Volhaven", 0.43e9, 26), [st("Sector-12", 0.9e9, 0, true, 4)], 55) === null);
+    pruefe("mehr Bevoelkerung UND weniger Chaos: Wechsel",
+      feinWahl(st("Ishima", 0.6e9, 58), [st("Chongqing", 0.7e9, 40)], 55) === "Chongqing");
+  }
+  pruefe("Feinwahl haengt am else der groben Regel, gesperrt beim Chaos-Aufraeumen",
+    /STADT_VORSPRUNG\) \{[\s\S]{0,400}\} else if \(!chaosAufraeumen && [\s\S]{0,300}"Diplomacy"[\s\S]{0,200}const ziel = feinWahl\(feinHier, fein, RUNDREISE_MIN_COMMS\);/.test(quelle));
+}
+
 // Quelltext: der Probenblock stellt die Stadt im finally zurueck und
 // enthaelt kein await (sonst koennte eine Aktion in der Probestadt enden).
 const a = quelle.indexOf("const rJetzt = ");

@@ -1063,6 +1063,43 @@ export async function main(ns) {
     // `inst`, die Bladeburner-Instanz des SPIELERS, nicht ueber `person`.
     "Tracer": { proz: 4, abdeckung: 1.0 },                // SuccessChanceContract
   };
+  // TRACER NACH DEM, WAS DER MOTOR WIRKLICH FAEHRT (16.10.2026).
+  //
+  // Tracer wirkt NUR auf Vertraege (SuccessChanceContract, data/Skills.ts:
+  // 38-43) - nicht auf Operationen, nicht auf Black Ops. Seine Abdeckung
+  // stand fest auf 1,0, und weil er genauso viel kostet wie Digital Observer
+  // (2 + 2,1n) und genauso viel verspricht (+4 %), kaufte der Motor beide
+  // im Gleichschritt. BitNode 7.1, 16.10. 13:00: Tracer 14 (433 Punkte) wie
+  // Digital Observer 14 (433) - waehrend die Vertragsvorraete leer waren
+  // (Tracking 14, Bounty Hunter 5, Retirement 8) und der Rang fast ganz aus
+  // Raid kam. Dieselben 433 Punkte haetten Digital Observer auf 20 gehoben,
+  // +15 % auf jede Operation und Black Op.
+  //
+  // Jetzt: der zeitliche Anteil der Vertraege an der rangbringenden Arbeit
+  // des Motors (Vertraege, Operationen, Black Ops - General zaehlt nicht),
+  // gleitend mit 10 min Zeitkonstante in WANDZEIT (Date.now): ein Zaehlen
+  // je Durchlauf waere im verdeckten Tab (ein Wecken je Minute) sechzigmal
+  // traeger als im offenen. Frueh im Knoten, wenn nur Vertraege tragen,
+  // geht der Anteil gegen 1 und Tracer bleibt voll gewichtet.
+  //
+  // Skeptiker 16.10.: (1) die Zeit wird bei JEDER Wahl nachgezogen, auch bei
+  // General (Diplomacy, Kammer) - sonst ginge eine 50-min-Diplomacy als ein
+  // Schritt an die naechste Aktion; dazu dt hoechstens 2 min (Schlaf,
+  // Drosselung). (2) Nach einem Neustart (nicht gespeichert) beginnt der
+  // Anteil bei 0,5 statt bei der ersten Stichprobe - ein einzelner Raid
+  // setzt Tracer nicht sofort auf null, ein einzelner Vertrag nicht auf voll.
+  // Die Sleeve-Vertraege zaehlen bewusst nicht: ein Erfolg bringt dort um
+  // 1 Rang (Retirement Stufe 23 in BN7), ein Raid des Spielers 114.
+  let vertragsAnteil = 0.5;
+  let vertragsAnteilZeit = 0;
+  const VERTRAGSANTEIL_DT_MAX_MS = 2 * 60000;
+  const VERTRAGSANTEIL_TAU_MS = 10 * 60000;
+  const anteilFortschreiben = (alt, istVertrag, dtMs, tauMs, dtMaxMs) => {
+    const x = istVertrag ? 1 : 0;
+    const basis = Number.isFinite(alt) ? alt : 0.5;
+    const a = 1 - Math.exp(-Math.max(0, Math.min(dtMs, dtMaxMs)) / tauMs);
+    return basis * (1 - a) + x * a;
+  };
   const relNutzen = (name) => {
     const stufe = ns.bladeburner.getSkillLevel(name);
     if (name === "Hyperdrive") {
@@ -1318,8 +1355,10 @@ export async function main(ns) {
     const c = CHANCE_SKILLS[name];
     if (!c) return 0;
     const a = 1 + stufe * c.proz / 100;
-    const abd = (blackOpArbeit && Number.isFinite(blackOpArbeit[name]))
-      ? blackOpArbeit[name] : c.abdeckung;
+    const abd = (name === "Tracer" && Number.isFinite(vertragsAnteil))
+      ? vertragsAnteil
+      : (blackOpArbeit && Number.isFinite(blackOpArbeit[name]))
+        ? blackOpArbeit[name] : c.abdeckung;
     return 100 * ((a + c.proz / 100) / a - 1) * abd * klemmFaktor();
   };
 
@@ -2484,6 +2523,53 @@ export async function main(ns) {
     if (!rr.sicher) return rr.r > 1 ? popEst * rr.r : popEst;
     return popEst * rr.r;
   };
+  // DIE FEINWAHL (16.10.2026). Rein, getestet in tools/test-stadtwahl-echtpop.js.
+  //
+  // Befund BitNode 7.1, 12:57: blade.js sass in Volhaven (echte
+  // Bevoelkerung 0,43 Mrd, 9 Gemeinden, Chaos 26 und steigend), Sector-12
+  // stand bei 0,55 Mrd, 101 Gemeinden, Chaos 22. Nachgerechnet aus dem
+  // Spielstand (Formel Actions/Action.ts:169-196, geeicht gegen die
+  // gemeldete Raid-Spanne): Raid Stufe 14 in Volhaven 0,169, in Sector-12
+  // 0,205 - und JEDE Aktion dort um denselben Faktor besser, auch die
+  // Vertraege der Sleeves (die arbeiten in der Stadt der Division).
+  // Gemessen 12:57-13:05: ein Raid-Erfolg in sechs Versuchen, Rang netto
+  // +86 in 8 min. Die grobe Regel (Bevoelkerung linear, Vorsprung 2) sah
+  // 1,29 und blieb.
+  //
+  // Der Vorsprung 2 war die Antwort auf unsichere Bevoelkerung (popEst
+  // veraltet in fremden Staedten, Kommentar 22.09. im Stadtblock). Ist r
+  // in BEIDEN Staedten sicher, ist die Bevoelkerung ein Messwert, und
+  // dann reicht ein kleiner Vorsprung in der CHANCE selbst:
+  //     chance ~ (pop/1e9)^0,7 / sqrt(1 + chaos - 50)
+  // Der alte Einwand (22.09.) bleibt gewahrt: mit ^0,7 zaehlte heilbares
+  // Chaos staerker als unheilbare Bevoelkerung. Deshalb wechselt die
+  // Feinwahl NUR in eine Stadt mit mindestens so viel echter Bevoelkerung -
+  // nie Bevoelkerung gegen Chaos tauschen.
+  //
+  // Skeptiker 16.10.: (1) nur Ziele mit mindestens minComms Gemeinden
+  // (RUNDREISE_MIN_COMMS) - sonst zoege die Feinwahl in eine Stadt mit 4
+  // Gemeinden, die nach vier Raid-Erfolgen leer ist. (2) Der Aufrufer sperrt
+  // sie waehrend des Chaos-Aufraeumens: eine laufende Diplomacy schliesst in
+  // der NEUEN Stadt ab (Bladeburner.ts:801, getCurrentCity), die Arbeit an
+  // der alten waere verloren.
+  //
+  // hier/liste: { stadt, pop, chaos, sicher, comms }. Rueckgabe: Zielstadt oder null.
+  const FEIN_VORSPRUNG = 1.15;
+  const feinWahl = (hier, liste, minComms) => {
+    const chanceFaktor = (x) => Math.pow(Math.max(0, x.pop) / 1e9, 0.7)
+      / (x.chaos > 50 ? Math.sqrt(1 + x.chaos - 50) : 1);
+    if (!hier || !hier.sicher || !(hier.pop > 0)) return null;
+    const cHier = chanceFaktor(hier);
+    let beste = null, cBeste = cHier * FEIN_VORSPRUNG;
+    for (const x of liste) {
+      if (!x || !x.sicher || x.stadt === hier.stadt) continue;
+      if (!(x.pop >= hier.pop)) continue;
+      if (Number.isFinite(minComms) && !(x.comms >= minComms)) continue;
+      const c = chanceFaktor(x);
+      if (c > cBeste) { cBeste = c; beste = x.stadt; }
+    }
+    return beste;
+  };
   // Ebenfalls rein: aus r (und ob es sicher bestimmt ist) und der
   // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
   // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
@@ -2876,6 +2962,8 @@ export async function main(ns) {
           return rAusBlackOp(sp, boReal);
         })
         : null;
+      const fein = [];
+      let feinHier = null;
       const wert = (stadt) => {
         const popEst = ns.bladeburner.getCityEstimatedPopulation(stadt);
         const chaos = ns.bladeburner.getCityChaos(stadt);
@@ -2885,7 +2973,12 @@ export async function main(ns) {
           ns.bladeburner.switchCity(stadt);
           rr = rJetzt();
         }
-        return popEchtGeschaetzt(popEst, rr) / faktor;
+        const pop = popEchtGeschaetzt(popEst, rr);
+        // Fuer die Feinwahl (16.10.2026): nur mit sicher bestimmtem r.
+        const eintrag = { stadt, pop, chaos, comms: staedteGemeinden(stadt),
+          sicher: !!(rr && rr.sicher && Number.isFinite(rr.r)) };
+        if (stadt === hier) feinHier = eintrag; else fein.push(eintrag);
+        return pop / faktor;
       };
       const staedteGemeinden = (stadt) => {
         try { return ns.bladeburner.getCityCommunities(stadt); } catch { return 0; }
@@ -2914,6 +3007,19 @@ export async function main(ns) {
           sag("Stadtwechsel nach " + beste + ": Wert " + Math.round(besterWert)
             + " gegen " + Math.round(wertHier) + " in " + hier
             + " (Bevoelkerung je Chaos-Faktor).");
+        }
+      } else if (!chaosAufraeumen && !(() => {
+        try {
+          const a = ns.bladeburner.getCurrentAction();
+          return !!a && a.type === G && (a.name === "Diplomacy" || a.name === "Incite Violence");
+        } catch { return true; }
+      })()) {
+        const ziel = feinWahl(feinHier, fein, RUNDREISE_MIN_COMMS);
+        if (ziel && ns.bladeburner.switchCity(ziel)) {
+          const z = fein.find((x) => x.stadt === ziel);
+          sag("Stadtwechsel nach " + ziel + ": " + Math.round(z.pop / 1e6) + " Mio, Chaos "
+            + z.chaos.toFixed(1) + " gegen " + Math.round(feinHier.pop / 1e6) + " Mio, Chaos "
+            + feinHier.chaos.toFixed(1) + " in " + hier + " (Feinwahl, r sicher).");
         }
       }
     } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
@@ -4577,6 +4683,15 @@ export async function main(ns) {
       }
 
       if (!wahl) wahl = waehle();
+      {
+        const jetztMs = Date.now();
+        if (wahl.typ === V || wahl.typ === O || wahl.typ === B) {
+          vertragsAnteil = anteilFortschreiben(vertragsAnteil, wahl.typ === V,
+            vertragsAnteilZeit ? jetztMs - vertragsAnteilZeit : 0,
+            VERTRAGSANTEIL_TAU_MS, VERTRAGSANTEIL_DT_MAX_MS);
+        }
+        vertragsAnteilZeit = jetztMs;
+      }
       // Der Deckel oben misst eine ZUSAMMENHAENGENDE Strecke: Der Zeitstempel
       // wird beim ersten Field-Analysis-Durchlauf gesetzt und faellt weg,
       // sobald etwas anderes gewaehlt wird.

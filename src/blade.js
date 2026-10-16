@@ -2574,9 +2574,28 @@ export async function main(ns) {
   // gemeldeten Spanne einer Aktion die wahre Chance. null, wenn die
   // Rueckrechnung nicht eindeutig ist (r unsicher, oder r<1 mit s.min=0) -
   // der Aufrufer faellt dann auf spanne(typ, name).min zurueck.
+  //
+  // R<1 UEBER DIE OBERGRENZE (16.10.2026). Bei r<1 ist popEst > pop, die
+  // Schaetzchance est also die groessere, und getSuccessRange
+  // (Actions/Action.ts:144-167) gibt high = real + |real - est| = est
+  // ungeklemmt zurueck. est und real unterscheiden sich NUR im
+  // Bevoelkerungsfaktor (getPopulationSuccessFactor, :88-92):
+  // est = min(1, real * r^-0,7). Liegt s.max unter 1, ist also
+  // real = s.max * r^0,7 - exakt, auch wenn s.min auf 0 geklemmt ist.
+  //
+  // Befund BitNode 7.1, Sector-12, 13:22: r = 0,289 (pop 0,55 Mrd, popEst
+  // 1,92), Raid Stufe 14 real 0,205 - die Untergrenze (2*real - est)*r war
+  // negativ und auf 0 geklemmt, die alte Formel (s.min/r + s.max)/2 gab
+  // null, beste() fiel auf s.min = 0 zurueck, und Raid - die ertragreichste
+  // Aktion im Knoten - war unsichtbar: der Motor fuhr Bounty Hunter (7,1
+  // Rang/min im eigenen Mass) statt Raid (~14). Die alte Formel bleibt fuer
+  // s.max = 1 (est geklemmt), dort gilt sie mit est = 1 weiter.
   const chanceAusR = (r, sicher, s) => {
     if (!sicher) return null;
-    if (r < 1) return s.min > 0 ? (s.min / r + s.max) / 2 : null;
+    if (r < 1) {
+      if (s.max < 1) return s.max * Math.pow(Math.max(0, r), 0.7);
+      return s.min > 0 ? (s.min / r + s.max) / 2 : null;
+    }
     if (s.max < 1) return (s.max / r + s.min) / 2;
     return s.min;   // Obergrenze geklemmt: s.min ist bereits die beste bekannte Untergrenze
   };

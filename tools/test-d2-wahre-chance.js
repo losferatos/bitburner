@@ -153,9 +153,12 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
   let unbestimmtZiel = 0;
   let rKleinFaelle = 0;
   let rKleinUnbestimmt = 0;
+  let rKleinOffenUnbestimmt = 0;   // r<1, Obergrenze ungeklemmt: muss immer aufgehen
   for (let i = 0; i < ANZAHL; i++) {
     const pop = 0.1e9 + Math.random() * 1.4e9;
-    const popEst = pop * (0.3 + Math.random() * 1.5);
+    // bis 4-fach (16.10.2026): Sector-12 in BN7.1 hatte popEst/pop = 3,46 -
+    // der Bereich bis 1,8 traf den Fall s.min = 0 bei r<1 nie.
+    const popEst = pop * (0.3 + Math.random() * 3.7);
     const city = { pop, popEst };
     const rWahr = pop / popEst;
     if (rWahr < 1) rKleinFaelle++;
@@ -178,6 +181,7 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
     if (x === null) {
       unbestimmtZiel++;
       if (rWahr < 1) rKleinUnbestimmt++;
+      if (rWahr < 1 && op.max < 1) rKleinOffenUnbestimmt++;
       continue;
     }
     n++;
@@ -197,8 +201,11 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
   pruefe("die meisten Faelle sind bestimmbar (Audit: rund 14 % unbestimmt)",
     unbestimmtGesamt / ANZAHL < 0.3,
     (100 * unbestimmtGesamt / ANZAHL).toFixed(1) + "% unbestimmt");
-  pruefe("der schaedliche Fall r<1 (s.min faellt gegen 0) ist praktisch immer aufloesbar",
-    rKleinUnbestimmt / Math.max(1, rKleinFaelle) < 0.02,
+  pruefe("r<1 mit ungeklemmter Obergrenze ist IMMER aufloesbar (auch s.min = 0)",
+    rKleinOffenUnbestimmt === 0, rKleinOffenUnbestimmt + " unbestimmt");
+  // Rest: Black Op unsicher oder est auf 1 geklemmt UND s.min = 0 - echt unbestimmbar.
+  pruefe("der schaedliche Fall r<1 ist meist aufloesbar (bis popEst = 4 pop)",
+    rKleinUnbestimmt / Math.max(1, rKleinFaelle) < 0.05,
     rKleinUnbestimmt + " von " + rKleinFaelle + " r<1-Faellen unbestimmt");
 }
 
@@ -213,10 +220,17 @@ console.log("-- Eichpunkt: keine Verzerrung (r=1) liefert die Mitte der Spanne -
 }
 
 console.log("");
-console.log("-- Eichpunkt: r<1 mit min=0 ist unbestimmt statt geraten --");
+console.log("-- Eichpunkt: r<1 mit min=0 ueber die Obergrenze (BN7.1 Sector-12, 16.10.) --");
 {
-  const x = chanceAusR(0.5, true, { min: 0, max: 0.7 });
-  pruefe("min=0 liefert null (kein Rateergebnis)", x === null, "erhalten " + x);
+  // Spielformel nachgebaut: real 0,205, r = 0,289 -> est = 0,205 * 0,289^-0,7
+  const real = 0.205, r = 0.289;
+  const est = Math.min(1, real * Math.pow(r, -0.7));
+  const s = { min: Math.max(0, (real - (est - real)) * r), max: Math.min(1, est) };
+  const x = chanceAusR(r, true, s);
+  pruefe("Spanne " + s.min.toFixed(3) + "/" + s.max.toFixed(3) + ": min geklemmt auf 0", s.min === 0);
+  pruefe("real 0,205 exakt zurueck", x !== null && Math.abs(x - real) < 1e-12, "erhalten " + x);
+  const y = chanceAusR(0.5, true, { min: 0, max: 1 });
+  pruefe("min=0 UND max=1: unbestimmt (null)", y === null, "erhalten " + y);
 }
 
 console.log("");

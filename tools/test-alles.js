@@ -118,6 +118,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-umzug.js",
+    deckt: "Umzug in volle Stadt mit hohem Chaos und Aufraeumen per Diplomacy, Budget in Spielzeit (BN7.1 Aevum 0,73 Mrd bei Chaos 163, 17.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-bruecke-alarm.js",
     deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
     schnell: true,

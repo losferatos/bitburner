@@ -162,7 +162,7 @@ if (rAusBlackOp && popEchtGeschaetzt) {
       feinWahl(st("Ishima", 0.6e9, 58), [st("Chongqing", 0.7e9, 40)], 55) === "Chongqing");
   }
   pruefe("Feinwahl haengt am else der groben Regel, gesperrt beim Chaos-Aufraeumen",
-    /STADT_VORSPRUNG\) \{[\s\S]{0,400}\} else if \(!chaosAufraeumen && [\s\S]{0,300}"Diplomacy"[\s\S]{0,200}const ziel = feinWahl\(feinHier, fein, RUNDREISE_MIN_COMMS\);/.test(quelle));
+    /STADT_VORSPRUNG\) \{[\s\S]{0,400}\} else if \(!chaosAufraeumen && [\s\S]{0,300}"Diplomacy"[\s\S]{0,600}const ziel = (?:umzug \? null : )?feinWahl\(feinHier, fein, RUNDREISE_MIN_COMMS\);/.test(quelle));
 }
 
 // Quelltext: der Probenblock stellt die Stadt im finally zurueck und

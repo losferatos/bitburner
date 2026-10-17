@@ -228,6 +228,34 @@ export async function main(ns) {
   const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
     "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;
+  // UMZUG MIT AUFRAEUMEN (17.10.2026) - Begruendung bei umzugWahl.
+  //
+  // Uhr: SPIELZEIT aus nextUpdate (Summe der gemeldeten ms), keine Wanduhr -
+  // waehle() laeuft je Spielsekunde, nicht je Aktion (Skeptiker 17.10.,
+  // Befund 1: ein Zaehler je Wahl haette nach fuenf Minuten abgebrochen).
+  // Der Umzug steht in data/umzug.txt, damit ein Neustart mitten im
+  // Aufraeumen nicht von der groben Regel zurueckgezogen wird (Befund 3).
+  let spielMs = 0;
+  let umzugZiel = null;
+  let umzugBisMs = 0;
+  const umzugGesperrt = new Map();   // Stadt -> gesperrt bis spielMs
+  const UMZUG_VORSPRUNG = 2;
+  const UMZUG_MAX_AKTIONEN = 150;
+  const UMZUG_SPERRE_MS = 6 * 3600e3;
+  // Nur wenn die Raid-Chance hier noch Luft hat: bei 0,9 bringt der Faktor
+  // 2,3 wegen der Klemme auf 1 hoechstens 11 % (Befund 2).
+  const UMZUG_CHANCE_MAX = 0.6;
+  const UMZUG_DATEI = "data/umzug.txt";
+  try {
+    const u = JSON.parse(liesVonHome(ns, UMZUG_DATEI) || "null");
+    if (u && typeof u.ziel === "string" && u.restMs > 0) { umzugZiel = u.ziel; umzugBisMs = u.restMs; }
+  } catch { /* kein Umzug offen */ }
+  const umzugSchreiben = () => {
+    try {
+      nachHome(ns, UMZUG_DATEI, umzugZiel
+        ? JSON.stringify({ ziel: umzugZiel, restMs: Math.max(0, umzugBisMs - spielMs) }) : "");
+    } catch { /* nur Neustartschutz */ }
+  };
   // WEICHT DER MOTOR GERADE DEM KAMPFWERTTRAINING? (22.09.2026)
   //
   // In der Anlaufphase eines V2-Knotens ueberlaesst blade.js die Figur
@@ -2555,6 +2583,46 @@ export async function main(ns) {
   //
   // hier/liste: { stadt, pop, chaos, sicher, comms }. Rueckgabe: Zielstadt oder null.
   const FEIN_VORSPRUNG = 1.15;
+  // UMZUG MIT AUFRAEUMEN (17.10.2026). BitNode 7.1, 13:55: Rang 20.448
+  // nach 45 h, BN6.3 hatte nach 22 h 181.000. Die Feinwahl (16.10.) sieht
+  // nur Staedte, deren Chance JETZT besser ist - und schliesst damit jede
+  // Stadt ueber Chaos 50 aus, weil sqrt(1 + chaos - 50) sie drueckt. Das
+  // Chaos klettert aber in jeder Stadt, in der niemand aufraeumt: Unruhen
+  // (randomEvent, Bladeburner.ts:676-679, 20 % der Ereignisse) setzen +1
+  // und dann +5..20 %, der Abbau sind 0,0001/s (:1395-1399). Gemessen 13:55:
+  // Aevum 0,73 Mrd bei Chaos 163, Sector-12 0,22 Mrd bei 48 - der Motor sass
+  // in Sector-12, weil Aevum "jetzt" ein Drittel wert war. Aufgeraeumt waere
+  // Aevum (0,73/0,22)^0,7 = 2,3-fach besser, auf jede Aktion.
+  //
+  // Diplomacy senkt um charisma^0,045 + charisma/1000 Prozent je Lauf
+  // (getDiplomacyPercentage, :735-743), Charisma 115 gibt 1,35 %: von 163
+  // auf 47 sind das ln(163/47)/-ln(1-0,0135) = 91 Laeufe a 60 s. Der Umzug
+  // lohnt also nach rund anderthalb Stunden Raid in der besseren Stadt.
+  //
+  // Simuliert (scratchpad sim/, 200 Laeufe, 72 h, kalibriert gegen sechs
+  // Chancen aus dem Spielstand): Raid nur bei Chaos unter 50 plus
+  // Aufraeumen 8,8e4 Rang, gieriges Raid ohne Aufraeumen 1,3e4.
+  //
+  // Rein: hier und liste wie bei feinWahl, diplProz in Prozent je Lauf.
+  // Nur Ziele ueber Chaos 50 (die anderen sieht feinWahl), mit sicherem r,
+  // genug Gemeinden und mindestens so viel Bevoelkerung. Vergleich:
+  // Chancefaktor NACH dem Aufraeumen (Chaos-Faktor 1) gegen den jetzigen.
+  const umzugWahl = (hier, liste, minComms, diplProz, chaosAus, vorsprung, maxAktionen, gesperrt) => {
+    if (!hier || !hier.sicher || !(hier.pop > 0) || !(diplProz > 0) || !(chaosAus > 0)) return null;
+    const cHier = Math.pow(hier.pop / 1e9, 0.7) / (hier.chaos > 50 ? Math.sqrt(1 + hier.chaos - 50) : 1);
+    let beste = null, qBeste = vorsprung;
+    for (const x of liste) {
+      if (!x || !x.sicher || x.stadt === hier.stadt || !(x.chaos > 50)) continue;
+      if (gesperrt && gesperrt.has(x.stadt)) continue;
+      if (!(x.pop >= hier.pop)) continue;
+      if (Number.isFinite(minComms) && !(x.comms >= minComms)) continue;
+      const aktionen = Math.log(x.chaos / chaosAus) / -Math.log(1 - Math.min(0.5, diplProz / 100));
+      if (!(aktionen <= maxAktionen)) continue;
+      const q = Math.pow(x.pop / 1e9, 0.7) / cHier;
+      if (q > qBeste) { qBeste = q; beste = { stadt: x.stadt, q, aktionen: Math.ceil(aktionen) }; }
+    }
+    return beste;
+  };
   const feinWahl = (hier, liste, minComms) => {
     const chanceFaktor = (x) => Math.pow(Math.max(0, x.pop) / 1e9, 0.7)
       / (x.chaos > 50 ? Math.sqrt(1 + x.chaos - 50) : 1);
@@ -2934,8 +3002,25 @@ export async function main(ns) {
     // Staedte - fuer popEst ohne Probewechsel. Die ECHTE Bevoelkerung
     // braucht ihn doch (04.10.2026, siehe unten).
     const STADT_VORSPRUNG = 2;
-    try {
+    stadtwahl: try {
       const hier = ns.bladeburner.getCity();
+      // Laufender Umzug: bis das Chaos unter CHAOS_AUS ist, keine Stadtwahl -
+      // die grobe Regel saehe Aevum bei Chaos 163 als ein Drittel von
+      // Sector-12 und zoege sofort zurueck. Budget in Spielzeit: doppelte
+      // geschaetzte Diplomacy-Dauer plus 30 min; wer es verbraucht, wird
+      // UMZUG_SPERRE_MS Spielzeit gesperrt. Nach einem Neustart zaehlt
+      // spielMs ab 0, umzugBisMs ist dann das gespeicherte Restbudget.
+      for (const [st, bis] of umzugGesperrt) if (spielMs >= bis) umzugGesperrt.delete(st);
+      if (umzugZiel) {
+        if (hier !== umzugZiel || !(chaosLage() >= CHAOS_AUS)) { umzugZiel = null; umzugSchreiben(); }
+        else if (spielMs > umzugBisMs) {
+          sag("Umzug nach " + umzugZiel + " abgebrochen: Budget verbraucht, Chaos noch "
+            + chaosLage().toFixed(1) + ".");
+          umzugGesperrt.set(umzugZiel, spielMs + UMZUG_SPERRE_MS);
+          umzugZiel = null;
+          umzugSchreiben();
+        } else break stadtwahl;
+      }
       // LINEAR, MIT ABSICHT (22.09.2026, Parameter-Audit Punkt 8 geprueft
       // und verworfen). Die Spielformel ist `(pop/1e9)^0,7`
       // (`Actions/Action.ts:88-92`), der Vorsprung 2 entspricht hier also
@@ -3033,8 +3118,22 @@ export async function main(ns) {
           return !!a && a.type === G && (a.name === "Diplomacy" || a.name === "Incite Violence");
         } catch { return true; }
       })()) {
-        const ziel = feinWahl(feinHier, fein, RUNDREISE_MIN_COMMS);
-        if (ziel && ns.bladeburner.switchCity(ziel)) {
+        const cha = (() => { try { return ns.getPlayer().skills.charisma; } catch { return 0; } })();
+        const raidHier = (() => { try { return spanneGenau(O, "Raid").min; } catch { return 1; } })();
+        const umzug = !(raidHier < UMZUG_CHANCE_MAX) ? null : umzugWahl(feinHier, fein, RUNDREISE_MIN_COMMS,
+          Math.pow(Math.max(0, cha), 0.045) + cha / 1000, CHAOS_AUS,
+          UMZUG_VORSPRUNG, UMZUG_MAX_AKTIONEN, umzugGesperrt);
+        const ziel = umzug ? null : feinWahl(feinHier, fein, RUNDREISE_MIN_COMMS);
+        if (umzug && ns.bladeburner.switchCity(umzug.stadt)) {
+          umzugZiel = umzug.stadt;
+          umzugBisMs = spielMs + 2 * umzug.aktionen * 60e3 + 30 * 60e3;
+          umzugSchreiben();
+          const z = fein.find((x) => x.stadt === umzug.stadt);
+          sag("Umzug nach " + umzug.stadt + ": " + Math.round(z.pop / 1e6) + " Mio bei Chaos "
+            + z.chaos.toFixed(1) + ", aufgeraeumt " + umzug.q.toFixed(2) + "-fach gegen " + hier
+            + " (" + Math.round(feinHier.pop / 1e6) + " Mio, Chaos " + feinHier.chaos.toFixed(1)
+            + "); rund " + umzug.aktionen + " Diplomacy-Laeufe.");
+        } else if (ziel && ns.bladeburner.switchCity(ziel)) {
           const z = fein.find((x) => x.stadt === ziel);
           sag("Stadtwechsel nach " + ziel + ": " + Math.round(z.pop / 1e6) + " Mio, Chaos "
             + z.chaos.toFixed(1) + " gegen " + Math.round(feinHier.pop / 1e6) + " Mio, Chaos "
@@ -4242,7 +4341,7 @@ export async function main(ns) {
         // Ein 88-Minuten-Graft ohne Kauf waere dieselbe Verschwendung.
         try { faehigkeitenKaufen(); } catch { /* egal */ }
         meldeLage("Grafting", "Graft laeuft ohne Simulacrum - Motor haelt still", null);
-        await ns.bladeburner.nextUpdate();
+        spielMs += Number(await ns.bladeburner.nextUpdate()) || 0;
         continue;
       }
 
@@ -4692,7 +4791,7 @@ export async function main(ns) {
           meldeLage("General/Hyperbolic Regeneration Chamber",
             ausdauerKnapp ? "ruht bis Ausdauer " + Math.round(max * AUSDAUER_WEITER)
               : "ruht bis HP " + Math.round(hp.max * HP_WEITER));
-          await ns.bladeburner.nextUpdate();
+          spielMs += Number(await ns.bladeburner.nextUpdate()) || 0;
           continue;
         }
         wahl = { typ: G, name: "Hyperbolic Regeneration Chamber",
@@ -4919,7 +5018,7 @@ export async function main(ns) {
       // hoechstens einen Durchlauf kostet statt des ganzen Abschnitts.
       merkeOffen(ns.bladeburner.getRank());
 
-      await ns.bladeburner.nextUpdate();
+      spielMs += Number(await ns.bladeburner.nextUpdate()) || 0;
     } catch (e) {
       sag("FEHLER: " + String(e && e.message ? e.message : e));
       await ns.sleep(10000);

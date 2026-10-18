@@ -831,6 +831,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "evictRank": 3,
       "needsFigure": "none",
       "needsLibs": [
+        "lib/einbauhalt.js",
         "lib/eta.js",
         "lib/events.js",
         "lib/handschlag.js",

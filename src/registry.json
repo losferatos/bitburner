@@ -267,6 +267,7 @@
    "evictRank": 3,
    "needsFigure": "none",
    "needsLibs": [
+    "lib/einbauhalt.js",
     "lib/eta.js",
     "lib/events.js",
     "lib/handschlag.js",
@@ -786,7 +787,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-10-07T20:32:39.512Z",
+ "erzeugtAm": "2026-10-18T16:28:45.753Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

@@ -228,6 +228,7 @@ export async function main(ns) {
   const STAEDTE = ["Sector-12", "Aevum", "Volhaven", "Chongqing",
     "New Tokyo", "Ishima"];
   let chaosAufraeumen = false;
+  let roundTripSkip = null;   // zuletzt gemeldeter Verzicht der Rundreise, "hier>ziel"
   // UMZUG MIT AUFRAEUMEN (17.10.2026) - Begruendung bei umzugWahl.
   //
   // Uhr: SPIELZEIT aus nextUpdate (Summe der gemeldeten ms), keine Wanduhr -
@@ -2546,6 +2547,53 @@ export async function main(ns) {
   // naechste Black Op) auf popEst zurueck und verliert gegen eine sicher
   // bestimmte Nachbarstadt, die in Wahrheit nicht besser ist (Skeptiker
   // 04.10., Befund 1).
+  // STADTWAHL NACH WERT, NICHT NACH GEMEINDEN (23.10.2026). Rein, getestet
+  // in tools/test-rundreise-wert.js.
+  //
+  // Befund BitNode 7.3 ab Spielstunde 43 (Sicherungen 22./23.10.,
+  // nachgerechnet mit tools/bbrank/bbmodel.mjs): Volhaven hatte 2
+  // Gemeinden, aber 1,75 Mrd echte Bevoelkerung bei Chaos um 45, und der
+  // Bot wusste es (r = 1,36 aus der Black-Op-Spanne, Probe 23.10. 15:31).
+  // Ishima hatte 5-18 Gemeinden bei echt 0,17-0,41 Mrd. Die grobe Regel
+  // liess Staedte unter RAID_VORRAT_MIN nicht zu, und die Rundreise zog bei
+  // unter RAID_VORRAT_MIN zur Stadt mit den meisten Gemeinden, egal wie
+  // leer. Elf Stunden Ishima: gemessen 522 Rang/h, waehrend Assassination
+  // in Volhaven bei 96 % Chance im Modell 1.280 Rang/h gegeben haette
+  // (Modell geeicht: 53 Sicherungsfenster, beobachtet/gerechnet 1,00 +-
+  // 0,05; Skeptiker Zahlen 23.10.) - Faktor 2,5, und mit der Stufe waechst
+  // er.
+  // Gemeinden braucht nur Raid; die Bevoelkerung wirkt auf jede Aktion
+  // ausser Black Ops.
+  //
+  // Zwei Regeln, mit Hysterese (Skeptiker Alltag 23.10., Befund 1):
+  //  - Die grobe Regel darf in eine Stadt unter RAID_VORRAT_MIN Gemeinden
+  //    ziehen, wenn sie mehr als LOW_COMMS_LEAD-mal so viel wert ist.
+  //  - Die Rundreise zieht nur in ein Ziel mit mindestens
+  //    ROUND_TRIP_VALUE_MIN des hiesigen Werts.
+  //  Zwischen 1/4 und 1/2 liegt das Band, in dem keine der beiden Regeln
+  //  die andere zurueckdreht - mit 2 und 1/2 haette ein einziger Raid im
+  //  Ziel (Bevoelkerung -0,75 %) den Bot zurueckgeworfen.
+  //  WARUM 4 (Skeptiker Praemisse 23.10.): In BitNode 7.2 standen bei
+  //  h20,2/23,9/46,4 Staedte ohne Gemeinden 2,84/2,96/2,03-fach ueber der
+  //  eigenen Raid-Stadt, und dort waere der Zug im Modell ein Verlust
+  //  gewesen (Raid trug den Rangsprung jener Stunden). 3 laege 1,2 % ueber
+  //  2,96. In BitNode 7.3 ab h43 lagen die Faelle bei 4,0-15,9.
+  // Beide urteilen nur mit SICHER bestimmtem r fuer beide Staedte (Befund
+  // 5): popEst allein liegt nach vielen gescheiterten Raids um ein
+  // Vielfaches zu hoch (Bladeburner.ts:838, changeEstEqually false). Ohne
+  // sichere Werte gilt das Verhalten vor dem 23.10.
+  const ROUND_TRIP_VALUE_MIN = 0.5;
+  const LOW_COMMS_LEAD = 4;
+  const sureValues = (here, target) => !!(here && target && here.sure && target.sure
+    && Number.isFinite(here.value) && Number.isFinite(target.value) && here.value > 0);
+  const roundTripAllowed = (here, target) => {
+    if (!sureValues(here, target)) return true;
+    return target.value >= here.value * ROUND_TRIP_VALUE_MIN;
+  };
+  const lowCommsTargetAllowed = (here, target) => {
+    if (!sureValues(here, target)) return false;
+    return target.value > here.value * LOW_COMMS_LEAD;
+  };
   const popEchtGeschaetzt = (popEst, rr) => {
     if (!rr || !Number.isFinite(rr.r) || rr.r < 0) return popEst;
     if (!rr.sicher) return rr.r > 1 ? popEst * rr.r : popEst;
@@ -2665,7 +2713,15 @@ export async function main(ns) {
       return s.min > 0 ? (s.min / r + s.max) / 2 : null;
     }
     if (s.max < 1) return (s.max / r + s.min) / 2;
-    return s.min;   // Obergrenze geklemmt: s.min ist bereits die beste bekannte Untergrenze
+    // OBERGRENZE GEKLEMMT, r >= 1 (23.10.2026, Skeptiker Zahlen Befund 8).
+    // Hier stand `return s.min` - "die beste bekannte Untergrenze". Sie
+    // ist aber exakt aufloesbar: Bei r >= 1 ist popEst <= pop, also est <=
+    // real, und getSuccessRange (Actions/Action.ts:144-167) gibt low = real -
+    // |real - est| = est zurueck, ungeklemmt. est und real unterscheiden
+    // sich nur im Bevoelkerungsfaktor (:88-92), real = min(1, est * r^0,7).
+    // Bei r = 1,36 (Volhaven 23.10.) sah der Bot 0,565 statt 0,70 - gerade
+    // die guten Staedte wurden um bis zu 20 % unterschaetzt.
+    return Math.min(1, s.min * Math.pow(r, 0.7));
   };
   const wahreChance = (typ, name) => {
     if (typ === B) {
@@ -3002,6 +3058,10 @@ export async function main(ns) {
     // Staedte - fuer popEst ohne Probewechsel. Die ECHTE Bevoelkerung
     // braucht ihn doch (04.10.2026, siehe unten).
     const STADT_VORSPRUNG = 2;
+    // Wert (Bevoelkerung je Chaos-Faktor) und Sicherheit jeder Stadt aus
+    // dieser Runde, fuer die Rundreise darunter (23.10.2026). null, wenn
+    // die grobe Regel nicht gerechnet hat (laufender Umzug).
+    let cityInfo = null;
     stadtwahl: try {
       const hier = ns.bladeburner.getCity();
       // Laufender Umzug: bis das Chaos unter CHAOS_AUS ist, keine Stadtwahl -
@@ -3068,6 +3128,7 @@ export async function main(ns) {
         : null;
       const fein = [];
       let feinHier = null;
+      cityInfo = new Map();
       const wert = (stadt) => {
         const popEst = ns.bladeburner.getCityEstimatedPopulation(stadt);
         const chaos = ns.bladeburner.getCityChaos(stadt);
@@ -3082,6 +3143,7 @@ export async function main(ns) {
         const eintrag = { stadt, pop, chaos, comms: staedteGemeinden(stadt),
           sicher: !!(rr && rr.sicher && Number.isFinite(rr.r)) };
         if (stadt === hier) feinHier = eintrag; else fein.push(eintrag);
+        cityInfo.set(stadt, { value: pop / faktor, sure: eintrag.sicher });
         return pop / faktor;
       };
       const staedteGemeinden = (stadt) => {
@@ -3093,12 +3155,18 @@ export async function main(ns) {
         besterWert = wertHier;
         for (const stadt of STAEDTE) {
           if (stadt === hier) continue;
-          // Nur Ziele, die die Raid-Regel direkt darunter nicht sofort
-          // wieder verlaesst (< RAID_VORRAT_MIN Gemeinden) - sonst Hin- und
-          // Rueckwechsel im selben Tick, jede Runde (Skeptiker, Befund 2).
-          if (RAID_AN && staedteGemeinden(stadt) < RAID_VORRAT_MIN) continue;
+          // Ziele unter RAID_VORRAT_MIN Gemeinden zaehlen nur mit mehr als
+          // LOW_COMMS_LEAD-fachem Wert bei sicherem r (23.10.2026,
+          // Begruendung bei lowCommsTargetAllowed). Frueher fielen sie
+          // immer heraus, damit die Rundreise nicht im selben Tick
+          // zurueckzieht (Skeptiker, Befund 2) - das verhindert jetzt
+          // roundTripAllowed: Ein Ziel unter der Haelfte des hiesigen Werts
+          // laesst sie aus, und die Stadt, aus der diese Regel kommt, liegt
+          // unter einem Viertel.
           let w = 0;
           try { w = wert(stadt); } catch { continue; }
+          if (RAID_AN && staedteGemeinden(stadt) < RAID_VORRAT_MIN
+            && !lowCommsTargetAllowed(cityInfo.get(hier), cityInfo.get(stadt))) continue;
           if (w > besterWert) { besterWert = w; beste = stadt; }
         }
       } finally {
@@ -3146,13 +3214,32 @@ export async function main(ns) {
       try {
         const hier = ns.bladeburner.getCity();
         const commsHier = ns.bladeburner.getCityCommunities(hier);
+        if (commsHier >= RAID_VORRAT_MIN) roundTripSkip = null;
         if (commsHier < RAID_VORRAT_MIN) {
-          let beste = null, besteComms = 0;
+          // Unter allen Staedten ab RUNDREISE_MIN_COMMS das wertvollste
+          // erlaubte Ziel (23.10.2026, Skeptiker Alltag Befund 4); ohne
+          // Werte wie bisher das mit den meisten Gemeinden. Ein Ziel unter
+          // der Haelfte des hiesigen Werts faellt heraus (roundTripAllowed).
+          let beste = null, besteComms = 0, besteWert = -1, skipped = null;
+          const infoHier = cityInfo ? cityInfo.get(hier) : null;
           for (const stadt of STAEDTE) {
             if (stadt === hier) continue;
             let c = 0;
             try { c = ns.bladeburner.getCityCommunities(stadt); } catch { continue; }
-            if (c > besteComms) { besteComms = c; beste = stadt; }
+            if (!(c >= RUNDREISE_MIN_COMMS)) continue;
+            const info = cityInfo ? cityInfo.get(stadt) : null;
+            if (!roundTripAllowed(infoHier, info)) { if (!skipped) skipped = stadt; continue; }
+            const w = info && info.sure && Number.isFinite(info.value) ? info.value : -1;
+            if (beste === null || w > besteWert || (w === besteWert && c > besteComms)) {
+              beste = stadt; besteComms = c; besteWert = w;
+            }
+          }
+          if (!beste && skipped && roundTripSkip !== hier + ">" + skipped) {
+            roundTripSkip = hier + ">" + skipped;
+            const iz = cityInfo.get(skipped);
+            sag("Rundreise verzichtet: " + hier + " hat nur " + commsHier + " Gemeinden, aber Wert "
+              + Math.round(infoHier.value / 1e6) + " gegen " + Math.round(iz.value / 1e6) + " in "
+              + skipped + " - hier bleiben die Aktionen ohne Gemeinden.");
           }
           // Die Schwelle ist bewusst hoch: Ein Wechsel zieht eine
           // Diplomacy-Phase nach sich, und die lohnt erst ab einem Vorrat,

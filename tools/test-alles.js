@@ -118,6 +118,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-rundreise-wert.js",
+    deckt: "Stadtwahl nach Wert statt Gemeinden, Rundreise nicht in die Leere, Hysterese 4 / 0,5 (BN7.3 h43-54 Ishima statt Volhaven, 23.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-drossel.js",
     deckt: "Drosselbefund nur ueber kurze Fenster plus direkte Probe (Fehlalarm 22.10.: Vergleich gegen Punkt vom 08.10.)",
     schnell: true,

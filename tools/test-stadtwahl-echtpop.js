@@ -92,7 +92,9 @@ function waehle(hier, mitR, messung = MESSUNG) {
   let beste = null, bw = wHier;
   for (const st of Object.keys(MESSUNG_)) {
     if (st === hier) continue;
-    if (MESSUNG_[st].comms < 3) continue;
+    // Ziele unter 3 Gemeinden nur mit mehr als 4-fachem Wert (23.10.2026,
+    // tools/test-rundreise-wert.js) - hier vereinfacht ohne Sicherheitsfrage.
+    if (MESSUNG_[st].comms < 3 && !(wert(st) > wHier * 4)) continue;
     const w = wert(st);
     if (w > bw) { bw = w; beste = st; }
   }
@@ -124,10 +126,13 @@ if (rAusBlackOp && popEchtGeschaetzt) {
     pruefe("Kippfall: Chongqing unsicher, kein Wechsel nach Volhaven", !rrCq.sicher && !(vh > 2 * cq), (cq / 1e6).toFixed(0) + " gegen " + (vh / 1e6).toFixed(0) + " Mio");
   }
   {
+    // Bis 23.10.2026 fielen Ziele unter RAID_VORRAT_MIN Gemeinden heraus
+    // (Erwartung New Tokyo). Jetzt zaehlt die Bevoelkerung auch dort; das
+    // Pendeln verhindert rundreiseErlaubt (tools/test-rundreise-wert.js).
     const ohneGemeinden = JSON.parse(JSON.stringify(MESSUNG));
     ohneGemeinden.Chongqing.comms = 2; ohneGemeinden.Volhaven.comms = 2;
     const z = waehle("Sector-12", true, ohneGemeinden);
-    pruefe("Ziele unter RAID_VORRAT_MIN Gemeinden fallen raus (Befund 2)", z === "New Tokyo", z);
+    pruefe("Ziele unter RAID_VORRAT_MIN Gemeinden zaehlen mit (23.10.)", z === "Chongqing", z);
   }
   pruefe("sicheres r: popEst * r", popEchtGeschaetzt(1e9, { r: 0.5, sicher: true }) === 5e8);
 }
@@ -172,7 +177,7 @@ const e = a >= 0 ? quelle.indexOf("if (beste && besterWert > wertHier * STADT_VO
 const block = a >= 0 && e > a ? quelle.slice(a, e) : "";
 pruefe("Probenblock gefunden", block.length > 0);
 pruefe("Rueckwechsel im finally", /finally\s*\{\s*ns\.bladeburner\.switchCity\(hier\);/.test(block));
-pruefe("Ziel-Filter auf Gemeinden im Quelltext", block.includes("RAID_AN && staedteGemeinden(stadt) < RAID_VORRAT_MIN"));
+pruefe("Ziel-Filter auf Gemeinden nur noch ohne Wertvorsprung (23.10.)", /staedteGemeinden\(stadt\) < RAID_VORRAT_MIN\s*&& !lowCommsTargetAllowed\(/.test(block));
 pruefe("Spanne {0,0} gilt nicht als r=0", block.includes("if (!(sp.max > 0)) return null;"));
 pruefe("kein await im Probenblock", block.length > 0 && !/\bawait\b/.test(block.replace(/\/\/.*$/gm, "")));
 

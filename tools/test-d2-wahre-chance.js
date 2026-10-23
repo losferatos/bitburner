@@ -46,7 +46,8 @@ console.log("");
 console.log("=== D2: wahre Chance statt s.min (Audit 4#2) ===");
 console.log("");
 
-const quelle = fs.readFileSync(path.join(ROOT, "src", "blade.js"), "utf8");
+// Optional ein anderer Stand (Gegenprobe gegen eine Kopie, 23.10.2026).
+const quelle = fs.readFileSync(process.argv[2] ? path.resolve(process.argv[2]) : path.join(ROOT, "src", "blade.js"), "utf8");
 
 /**
  * Extrahiert "const NAME = (...) => { ... };" per Klammerzaehlung - robust
@@ -154,6 +155,7 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
   let rKleinFaelle = 0;
   let rKleinUnbestimmt = 0;
   let rKleinOffenUnbestimmt = 0;   // r<1, Obergrenze ungeklemmt: muss immer aufgehen
+  let rGrossGeklemmt = 0, rGrossGeklemmtFalsch = 0;   // r>=1, Obergrenze auf 1 geklemmt
   for (let i = 0; i < ANZAHL; i++) {
     const pop = 0.1e9 + Math.random() * 1.4e9;
     // bis 4-fach (16.10.2026): Sector-12 in BN7.1 hatte popEst/pop = 3,46 -
@@ -185,12 +187,10 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
       continue;
     }
     n++;
-    if (rr.r >= 1 && op.max >= 1) {
-      // Nur eine Untergrenze (Obergrenze geklemmt): x darf real nicht uebersteigen.
-      if (op.real + 1e-9 < x) fehler++;
-      continue;
-    }
-    if (Math.abs(x - op.real) > 1e-9) fehler++;
+    // Auch r >= 1 mit geklemmter Obergrenze ist seit 23.10.2026 exakt
+    // (real = min(1, s.min * r^0,7)); frueher galt hier nur "x <= real".
+    if (rr.r >= 1 && op.max >= 1) rGrossGeklemmt++;
+    if (Math.abs(x - op.real) > 1e-9) { fehler++; if (rr.r >= 1 && op.max >= 1) rGrossGeklemmtFalsch++; }
   }
 
   pruefe("0 Fehler unter " + n + " bestimmbaren Faellen (Toleranz 1e-9)", fehler === 0,
@@ -201,6 +201,8 @@ console.log("-- Monte Carlo gegen den Action.ts-Nachbau (100.000 Faelle) --");
   pruefe("die meisten Faelle sind bestimmbar (Audit: rund 14 % unbestimmt)",
     unbestimmtGesamt / ANZAHL < 0.3,
     (100 * unbestimmtGesamt / ANZAHL).toFixed(1) + "% unbestimmt");
+  pruefe("r>=1 mit geklemmter Obergrenze exakt (23.10.)", rGrossGeklemmt > 100 && rGrossGeklemmtFalsch === 0,
+    rGrossGeklemmtFalsch + " falsch von " + rGrossGeklemmt);
   pruefe("r<1 mit ungeklemmter Obergrenze ist IMMER aufloesbar (auch s.min = 0)",
     rKleinOffenUnbestimmt === 0, rKleinOffenUnbestimmt + " unbestimmt");
   // Rest: Black Op unsicher oder est auf 1 geklemmt UND s.min = 0 - echt unbestimmbar.

@@ -2595,12 +2595,29 @@ export async function main(ns) {
   // Sonst gilt das Verhalten vor dem 23.10.
   const ROUND_TRIP_VALUE_MIN = 0.5;
   const LOW_COMMS_LEAD = 4;
+  const LOW_COMMS_MAX_ACTIONS = 90;
+  // Aufraeumfahrt in Staedte unter RUNDREISE_MIN_COMMS (umzugWahl): q, der
+  // Chancefaktor nach dem Aufraeumen gegen hier, muss ueber
+  // LOW_COMMS_UMZUG_Q liegen, und hier unter LOW_COMMS_HERE_MAX Gemeinden.
+  // 3,4 statt 4^0,7 = 2,64 (Skeptiker Zahlen 23.10.): Die Rangrate waechst
+  // nicht proportional zur Chance - das Ziel faehrt ohne Raid. BN7.3 h38/39
+  // (q 2,6-3,0) waeren Verluste gewesen (Raid in Chongqing 625-1.017 Rang/h
+  // gegen Volhaven 669-932, minus 48-61 Diplomacy-Laeufe); ab q 3,4 lohnte
+  // es sich in allen Faellen der Gegenprobe.
+  const LOW_COMMS_UMZUG_Q = 3.4;
+  const LOW_COMMS_HERE_MAX = 20;
   const usableValue = (x) => !!(x && Number.isFinite(x.value) && x.value > 0);
   const roundTripAllowed = (here, target) => {
     // Ziel nur auf Endlichkeit: ein exakter Wert 0 (tote Stadt) muss den
     // Verzicht ausloesen, nicht ihn umgehen (Skeptiker Untergrenze, F1).
     if (!usableValue(here) || !target || !Number.isFinite(target.value)) return true;
-    if (!target.sure || !(here.sure || here.lower)) return true;
+    if (!(here.sure || here.lower)) return true;
+    // Ziel ohne r (nur popEst): Verhalten vor dem 23.10. Ziel als
+    // Untergrenze: muss die Haelfte schon mit der Untergrenze erreichen -
+    // sonst zog die Rundreise direkt nach einer Aufraeumfahrt in eine
+    // Stadt mit unsicherem r ab (Skeptiker Aufraeumfahrt 23.10., Befund 1).
+    // Ist das Ziel in Wahrheit viel besser, holt die grobe Regel es ab.
+    if (!target.sure && !target.lower) return true;
     return target.value >= here.value * ROUND_TRIP_VALUE_MIN;
   };
   const lowCommsTargetAllowed = (here, target) => {
@@ -2669,19 +2686,50 @@ export async function main(ns) {
   // Nur Ziele ueber Chaos 50 (die anderen sieht feinWahl), mit sicherem r,
   // genug Gemeinden und mindestens so viel Bevoelkerung. Vergleich:
   // Chancefaktor NACH dem Aufraeumen (Chaos-Faktor 1) gegen den jetzigen.
-  const umzugWahl = (hier, liste, minComms, diplProz, chaosAus, vorsprung, maxAktionen, gesperrt) => {
+  // AUCH IN STAEDTE UNTER minComms (23.10.2026), mit lowCommsLead.
+  //
+  // Befund BitNode 7.3, Spielstunde 34-41 (Sicherungen, Gegenprobe in
+  // scratchpad vergleich/umzugprobe.mjs): Volhaven hatte 1,7-2,3 Mrd echte
+  // Bevoelkerung bei Chaos 88-110 und 5-6 Gemeinden, der Bot sass in Ishima
+  // oder Chongqing (0,2-0,5 Mrd) und fuhr 357 Rang/h. Aufgeraeumt waere
+  // Volhaven 2,6- bis 5,3-fach besser gewesen (Chancefaktor), fuer 42-61
+  // Diplomacy-Laeufe; im Modell 669-932 Rang/h (Skeptiker Praemisse 23.10.).
+  // minComms (RUNDREISE_MIN_COMMS) schloss es aus - Gemeinden braucht aber
+  // nur Raid, die Bevoelkerung wirkt auf jede Aktion.
+  //
+  // Ziele unter minComms zaehlen jetzt, wenn ihr Chancefaktor nach dem
+  // Aufraeumen mehr als lowCommsLead ueber dem hiesigen liegt (Aufrufer:
+  // LOW_COMMS_UMZUG_Q) und hier weniger als LOW_COMMS_HERE_MAX Gemeinden
+  // sind. Im Modell (geeicht) brachte BN7.3 h35-41 rund +135 Rang/h netto
+  // nach Aufraeumkosten, nicht das Doppelte. Ohne lowCommsLead bleibt es beim alten
+  // Ausschluss. Ziele duerfen ihre Bevoelkerung als Untergrenze kennen
+  // (x.lower, Begruendung bei roundTripAllowed) - der wahre Vorsprung ist
+  // dann groesser. Gegenprobe BN7.2: die Erweiterung greift dort nur in
+  // einem laufenden Umzug (h45,4), wo die Stadtwahl ohnehin ruht.
+  const umzugWahl = (hier, liste, minComms, diplProz, chaosAus, vorsprung, maxAktionen, gesperrt, lowCommsLead) => {
     if (!hier || !hier.sicher || !(hier.pop > 0) || !(diplProz > 0) || !(chaosAus > 0)) return null;
     const cHier = Math.pow(hier.pop / 1e9, 0.7) / (hier.chaos > 50 ? Math.sqrt(1 + hier.chaos - 50) : 1);
-    let beste = null, qBeste = vorsprung;
+    let beste = null, qBeste = 0;
     for (const x of liste) {
-      if (!x || !x.sicher || x.stadt === hier.stadt || !(x.chaos > 50)) continue;
+      if (!x || !(x.sicher || x.lower) || x.stadt === hier.stadt || !(x.chaos > 50)) continue;
       if (gesperrt && gesperrt.has(x.stadt)) continue;
       if (!(x.pop >= hier.pop)) continue;
-      if (Number.isFinite(minComms) && !(x.comms >= minComms)) continue;
+      let need = vorsprung;
+      if (Number.isFinite(minComms) && !(x.comms >= minComms)) {
+        if (!Number.isFinite(lowCommsLead)) continue;
+        // Nur wenn hier Raid kaum noch traegt (Skeptiker Zahlen 23.10.: BN7.1
+        // h63,6 haette Aevum mit 56 Gemeinden und Raid 1.644 Rang/h fuer
+        // Ishima mit 3 Gemeinden verlassen).
+        if (!(hier.comms < LOW_COMMS_HERE_MAX)) continue;
+        need = Math.max(vorsprung, lowCommsLead);
+      }
       const aktionen = Math.log(x.chaos / chaosAus) / -Math.log(1 - Math.min(0.5, diplProz / 100));
-      if (!(aktionen <= maxAktionen)) continue;
+      // Ziele unter minComms: hoechstens LOW_COMMS_MAX_ACTIONS Laeufe - dort
+      // gibt es kaum Raid, und waehrend der Fahrt ruht die Rundreise
+      // (Skeptiker Aufraeumfahrt 23.10.; BN7.3 h34-41 brauchte 42-61).
+      if (!(aktionen <= (need > vorsprung ? Math.min(maxAktionen, LOW_COMMS_MAX_ACTIONS) : maxAktionen))) continue;
       const q = Math.pow(x.pop / 1e9, 0.7) / cHier;
-      if (q > qBeste) { qBeste = q; beste = { stadt: x.stadt, q, aktionen: Math.ceil(aktionen) }; }
+      if (q > need && q > qBeste) { qBeste = q; beste = { stadt: x.stadt, q, aktionen: Math.ceil(aktionen) }; }
     }
     return beste;
   };
@@ -3155,11 +3203,11 @@ export async function main(ns) {
         const pop = popEchtGeschaetzt(popEst, rr);
         // Fuer die Feinwahl (16.10.2026): nur mit sicher bestimmtem r.
         const eintrag = { stadt, pop, chaos, comms: staedteGemeinden(stadt),
-          sicher: !!(rr && rr.sicher && Number.isFinite(rr.r)) };
+          sicher: !!(rr && rr.sicher && Number.isFinite(rr.r)),
+          lower: !!(rr && !rr.sicher && Number.isFinite(rr.r)) };
         if (stadt === hier) feinHier = eintrag; else fein.push(eintrag);
         // lower: r nur als Untergrenze bekannt (Begruendung bei roundTripAllowed).
-        cityInfo.set(stadt, { value: pop / faktor, sure: eintrag.sicher,
-          lower: !!(rr && !rr.sicher && Number.isFinite(rr.r)) });
+        cityInfo.set(stadt, { value: pop / faktor, sure: eintrag.sicher, lower: eintrag.lower });
         return pop / faktor;
       };
       const staedteGemeinden = (stadt) => {
@@ -3207,7 +3255,7 @@ export async function main(ns) {
         const raidHier = (() => { try { return spanneGenau(O, "Raid").min; } catch { return 1; } })();
         const umzug = !(raidHier < UMZUG_CHANCE_MAX) ? null : umzugWahl(feinHier, fein, RUNDREISE_MIN_COMMS,
           Math.pow(Math.max(0, cha), 0.045) + cha / 1000, CHAOS_AUS,
-          UMZUG_VORSPRUNG, UMZUG_MAX_AKTIONEN, umzugGesperrt);
+          UMZUG_VORSPRUNG, UMZUG_MAX_AKTIONEN, umzugGesperrt, LOW_COMMS_UMZUG_Q);
         const ziel = umzug ? null : feinWahl(feinHier, fein, RUNDREISE_MIN_COMMS);
         if (umzug && ns.bladeburner.switchCity(umzug.stadt)) {
           umzugZiel = umzug.stadt;
@@ -3227,7 +3275,11 @@ export async function main(ns) {
       }
     } catch { /* alte API-Fassung: dann bleibt es bei einer Stadt */ }
 
-    if (RAID_AN) {
+    // Waehrend einer Aufraeumfahrt (umzugZiel) ruht die Rundreise
+    // (23.10.2026): Seit umzugWahl auch Ziele unter RUNDREISE_MIN_COMMS
+    // nimmt, kann das Ziel unter RAID_VORRAT_MIN Gemeinden haben, und ohne
+    // Stadtwerte (break stadtwahl) zoege die Rundreise mitten im Aufraeumen ab.
+    if (RAID_AN && !umzugZiel) {
       try {
         const hier = ns.bladeburner.getCity();
         const commsHier = ns.bladeburner.getCityCommunities(hier);

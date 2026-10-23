@@ -164,8 +164,12 @@ if (qR && qP) {
     grob("H", { H: { value: 1e9, comms: 50, lower: true }, Y: { value: 9e9, comms: 1 } }) === "H");
   pruefe("Ziel exakt 0 (tote Stadt): Rundreise verzichtet (Skeptiker Untergrenze F1)",
     rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0, comms: 100 } }) === "H");
-  pruefe("Ziel nur Untergrenze: Rundreise verzichtet nicht (Ziel koennte besser sein)",
-    rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0.1e9, comms: 100, lower: true } }) === "Z");
+  // Bis 23.10. abends galt: Ziel nur als Untergrenze -> kein Verzicht. Das
+  // zog direkt nach einer Aufraeumfahrt ab (Skeptiker Aufraeumfahrt, Befund 1).
+  pruefe("Ziel nur Untergrenze 0,1: Rundreise verzichtet (nach Aufraeumfahrt kein Abzug)",
+    rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0.1e9, comms: 100, lower: true } }) === "H");
+  pruefe("Ziel mit Untergrenze 0,6: Rundreise zieht",
+    rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0.6e9, comms: 100, lower: true } }) === "Z");
 
   // Bestes erlaubtes Ziel statt nur der meisten Gemeinden (Befund 4).
   const zwei = { H: { value: 1e9, comms: 2 }, A: { value: 0.1e9, comms: 120 }, B: { value: 0.9e9, comms: 60 } };
@@ -186,7 +190,8 @@ pruefe("Probenblock gefunden", block.length > 0);
 pruefe("grobe Regel: Filter nur noch ohne lowCommsTargetAllowed",
   /let w = 0;\s*try \{ w = wert\(stadt\); \} catch \{ continue; \}\s*if \(RAID_AN && staedteGemeinden\(stadt\) < RAID_VORRAT_MIN\s*&& !lowCommsTargetAllowed\(cityInfo\.get\(hier\), cityInfo\.get\(stadt\)\)\) continue;/.test(block));
 pruefe("wert() haelt Wert und Sicherheit fest",
-  /cityInfo\.set\(stadt, \{ value: pop \/ faktor, sure: eintrag\.sicher,\s*lower: !!\(rr && !rr\.sicher && Number\.isFinite\(rr\.r\)\) \}\);\s*return pop \/ faktor;/.test(block));
+  /cityInfo\.set\(stadt, \{ value: pop \/ faktor, sure: eintrag\.sicher, lower: eintrag\.lower \}\);\s*return pop \/ faktor;/.test(block)
+  && /lower: !!\(rr && !rr\.sicher && Number\.isFinite\(rr\.r\)\) \};/.test(block));
 pruefe("cityInfo je Runde neu (vor stadtwahl null, im Block neue Map)",
   /let cityInfo = null;\s*stadtwahl: try \{/.test(quelle) && /let feinHier = null;\s*cityInfo = new Map\(\);/.test(quelle));
 pruefe("Rundreise: nur Ziele ab RUNDREISE_MIN_COMMS, mit roundTripAllowed",

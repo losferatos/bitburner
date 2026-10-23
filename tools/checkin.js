@@ -769,6 +769,27 @@ async function main() {
     const strafen = await holeJson("data/penalties.json");
     const wd = await holeJson("data/watchdog.json");
 
+    // TAB VERDECKT IST ALLEIN KEIN BEFUND (23.10.2026). Der Tonanker
+    // wakelock.js haelt den verdeckten Tab ungedrosselt; gemessen am 22. und
+    // 23.10. bei verdecktem Tab 6 Motorrunden je Minute, also volle Fahrt.
+    // Die nackte Zeile "Tab verdeckt" hat trotzdem zur Empfehlung "Tab in
+    // den Vordergrund" gefuehrt. Jetzt steht dabei, ob der Anker laeuft -
+    // nur wenn nicht, ist das Verdecken ein Problem.
+    let ankerTeil = "";
+    if (wd && wd.sichtbar === false) {
+      const roh = await hole("data/wakelock.txt");
+      const [ms, zustand] = String(roh || "").split("|");
+      const alterMin = (Date.now() - Number(ms)) / 60000;
+      // Nach einem Zustandswechsel steht fuer eine Minute Klartext in der
+      // Datei statt "ms|zustand|rate" (wakelock.js sag()) - dann den Text
+      // zeigen, nicht falsch "gedrosselt" melden.
+      if (roh && !Number.isFinite(Number(ms))) ankerTeil = " (Tonanker meldet: " + String(roh).trim().slice(0, 80) + ")";
+      else ankerTeil = (zustand === "running" && alterMin >= 0 && alterMin < 5)
+        ? " (Tonanker laeuft, also ungedrosselt - kein Befund)"
+        : " OHNE Tonanker (" + (roh ? (zustand || "?") + ", " + Math.round(alterMin) + " min alt" : "wakelock.txt fehlt")
+          + ") - der Tab wird gedrosselt, wakelock.js neu starten";
+    }
+
     if (wd && wd.modus) {
       // Der Modus gehoert immer hin: eine Leiter im Beobachtungsmodus meldet
       // dieselben Befunde und handelt nicht. Wer das verwechselt, haelt einen
@@ -776,7 +797,7 @@ async function main() {
       sag("Waechter: " + wd.modus
         + (wd.modus === "observe" ? " (beobachtet nur - er greift NICHT ein)" : " (scharf)")
         + (Number.isFinite(wd.okRound) ? ", " + zahl(wd.okRound) + " Runden" : "")
-        + (wd.sichtbar === false ? ", Tab verdeckt" : ""));
+        + (wd.sichtbar === false ? ", Tab verdeckt" + ankerTeil : ""));
     }
 
     // Strafen der letzten 24 Stunden, nach Sprosse. Sprossen ab 3 sind laut

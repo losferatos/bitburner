@@ -118,6 +118,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-drossel.js",
+    deckt: "Drosselbefund nur ueber kurze Fenster plus direkte Probe (Fehlalarm 22.10.: Vergleich gegen Punkt vom 08.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-umzug.js",
     deckt: "Umzug in volle Stadt mit hohem Chaos und Aufraeumen per Diplomacy, Budget in Spielzeit (BN7.1 Aevum 0,73 Mrd bei Chaos 163, 17.10.)",
     schnell: true,

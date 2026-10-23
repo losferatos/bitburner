@@ -48,6 +48,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 // DIESELBE Auswahl, die der Kern benutzt - nicht eine zweite daneben.
 import { auswahl } from "../src/lib/reg.js";
+import { fensterUrteil, probeUrteil, PROBE_MS } from "./lib/drossel.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, "..");
@@ -1151,37 +1152,44 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
 
   // --- 7. Laeuft das Spiel ueberhaupt mit voller Geschwindigkeit? ----------
   if (Number.isFinite(net.runde)) {
-    const vorher = [...v.punkte].reverse().find((x) => Number.isFinite(x.runde));
-    if (vorher) {
-      // DIE UHR DES MOTORS, NICHT DIE DES PRUEFERS (28.08.2026, 22:15).
-      //
-      // Hier stand `jetzt - vorher.zeit`, also die Zeit zwischen zwei
-      // PRUEFLAEUFEN, verglichen mit Rundenzahlen aus `data/bn4net.json`.
-      // Die Datei kann aber alt sein - und dann zaehlt der Bruch eine
-      // Wallclock-Spanne gegen einen Rundenzuwachs, den es in dieser Spanne
-      // gar nicht gab.
-      //
-      // Genau das ist um 22:00 passiert: gemeldet wurden "1,00 Motorrunden je
-      // Minute", waehrend eine direkte Messung um 22:09 **6 je Minute** ergab
-      // (Runde 112 auf 120 in 80 Sekunden) und `tools/rueckstand.js` das
-      // Spiel mit Tempo 1,044 sogar leicht VOR der Uhr sah. Der Alarm war
-      // falsch, und er haette die ganze Nacht alle zwanzig Minuten gefeuert.
-      //
-      // Richtig ist die Spanne zwischen den beiden Zeitstempeln DERSELBEN
-      // Quelle. Fehlt der alte (Verlaufspunkte von vor dieser Aenderung),
-      // wird nicht gemessen statt falsch gemessen.
-      const spanneMs = (Number.isFinite(net.zeit) && Number.isFinite(vorher.netZeit))
-        ? net.zeit - vorher.netZeit : null;
-      const min = spanneMs === null ? 0 : spanneMs / 60000;
-      const drunden = net.runde - vorher.runde;
-      // Normal sind vier bis sechs Runden je Minute. Unter einer Runde je
-      // Minute ist der Tab gedrosselt - das ist Faktor 16 auf ALLES, vom
-      // Geldverdienen bis zum Bladeburner-Rang.
-      if (min >= 5 && drunden >= 0 && drunden / min < 1) {
-        sag("GEDROSSELT: nur " + (drunden / min).toFixed(2)
-          + " Motorrunden je Minute (normal 4-6) - laeuft der Tab im"
-          + " Hintergrund ohne wakelock?");
+    const vorher = [...v.punkte].reverse().find((x) => Number.isFinite(x.runde)) || null;
+    // DIE UHR DES MOTORS, NICHT DIE DES PRUEFERS (28.08.2026, 22:15).
+    //
+    // Hier stand `jetzt - vorher.zeit`, also die Zeit zwischen zwei
+    // PRUEFLAEUFEN, verglichen mit Rundenzahlen aus `data/bn4net.json`.
+    // Die Datei kann aber alt sein - und dann zaehlt der Bruch eine
+    // Wallclock-Spanne gegen einen Rundenzuwachs, den es in dieser Spanne
+    // gar nicht gab.
+    //
+    // Genau das ist um 22:00 passiert: gemeldet wurden "1,00 Motorrunden je
+    // Minute", waehrend eine direkte Messung um 22:09 **6 je Minute** ergab
+    // (Runde 112 auf 120 in 80 Sekunden) und `tools/rueckstand.js` das
+    // Spiel mit Tempo 1,044 sogar leicht VOR der Uhr sah. Der Alarm war
+    // falsch, und er haette die ganze Nacht alle zwanzig Minuten gefeuert.
+    //
+    // Richtig ist die Spanne zwischen den beiden Zeitstempeln DERSELBEN
+    // Quelle. Fehlt der alte (Verlaufspunkte von vor dieser Aenderung),
+    // wird nicht gemessen statt falsch gemessen.
+    //
+    // UND NUR UEBER KURZE SPANNEN, MIT DIREKTER PROBE (23.10.2026).
+    // Am 22.10. lag der vorige Punkt vierzehn Tage zurueck; dazwischen
+    // hatte bn4net mehrfach neu gestartet und den Zaehler auf 0 gesetzt.
+    // Ergebnis "0,02 je Minute" bei voller Fahrt. Begruendung und
+    // Schwellen in tools/lib/drossel.js.
+    const fenster = fensterUrteil(net, vorher);
+    if (fenster.art !== "ok") {
+      // Kein brauchbares Fenster oder verdaechtig langsam: direkt messen.
+      await new Promise((r) => setTimeout(r, PROBE_MS));
+      let spaeter = null;
+      try { spaeter = JSON.parse(await rpc({ method: "getFile", filename: "data/bn4net.json", server: "home" })); } catch {}
+      const probe = probeUrteil(net, spaeter);
+      if (probe.art === "gedrosselt") {
+        sag("GEDROSSELT: nur " + probe.jeMin.toFixed(2)
+          + " Motorrunden je Minute in einer direkten Probe von "
+          + Math.round(PROBE_MS / 1000) + " s (normal 4-6) - laeuft wakelock.js?");
         if (urteil === "SPUR") urteil = "STAGNATION";
+      } else if (probe.art === "unklar") {
+        sag("Tempo nicht messbar (" + probe.grund + ").");
       }
     }
   }

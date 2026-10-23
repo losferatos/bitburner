@@ -2578,20 +2578,34 @@ export async function main(ns) {
   //  eigenen Raid-Stadt, und dort waere der Zug im Modell ein Verlust
   //  gewesen (Raid trug den Rangsprung jener Stunden). 3 laege 1,2 % ueber
   //  2,96. In BitNode 7.3 ab h43 lagen die Faelle bei 4,0-15,9.
-  // Beide urteilen nur mit SICHER bestimmtem r fuer beide Staedte (Befund
-  // 5): popEst allein liegt nach vielen gescheiterten Raids um ein
-  // Vielfaches zu hoch (Bladeburner.ts:838, changeEstEqually false). Ohne
-  // sichere Werte gilt das Verhalten vor dem 23.10.
+  // Beide urteilen nur mit belastbaren Werten (Skeptiker Alltag, Befund 5):
+  // popEst allein liegt nach vielen gescheiterten Raids um ein Vielfaches
+  // zu hoch (Bladeburner.ts:838, changeEstEqually false). Belastbar heisst
+  // je Stadt "sure" (r exakt) oder "lower" (Untergrenze): Ist die
+  // Black-Op-Obergrenze bei 1 geklemmt, liefert rAusBlackOp r >= 1/boReal
+  // als unsicher - eine Untergrenze, und popEchtGeschaetzt macht daraus
+  // eine Untergrenze der Bevoelkerung. Beleg 23.10. 15:59: Volhaven
+  // [0,6271; 1] -> r >= 1,595, Bevoelkerung >= 2,06 Mrd; mit "nur sicher"
+  // blieb der Bot in Ishima (0,24 Mrd), obwohl schon die Untergrenze das
+  // 6-fache war. Deshalb:
+  //  - in eine Stadt ohne Gemeinden: hier exakt, Ziel exakt oder Untergrenze
+  //    (die Untergrenze ueber dem 4-fachen reicht, der wahre Wert liegt
+  //    hoeher);
+  //  - Verzicht der Rundreise: Ziel exakt, hier exakt oder Untergrenze.
+  // Sonst gilt das Verhalten vor dem 23.10.
   const ROUND_TRIP_VALUE_MIN = 0.5;
   const LOW_COMMS_LEAD = 4;
-  const sureValues = (here, target) => !!(here && target && here.sure && target.sure
-    && Number.isFinite(here.value) && Number.isFinite(target.value) && here.value > 0);
+  const usableValue = (x) => !!(x && Number.isFinite(x.value) && x.value > 0);
   const roundTripAllowed = (here, target) => {
-    if (!sureValues(here, target)) return true;
+    // Ziel nur auf Endlichkeit: ein exakter Wert 0 (tote Stadt) muss den
+    // Verzicht ausloesen, nicht ihn umgehen (Skeptiker Untergrenze, F1).
+    if (!usableValue(here) || !target || !Number.isFinite(target.value)) return true;
+    if (!target.sure || !(here.sure || here.lower)) return true;
     return target.value >= here.value * ROUND_TRIP_VALUE_MIN;
   };
   const lowCommsTargetAllowed = (here, target) => {
-    if (!sureValues(here, target)) return false;
+    if (!usableValue(here) || !usableValue(target)) return false;
+    if (!here.sure || !(target.sure || target.lower)) return false;
     return target.value > here.value * LOW_COMMS_LEAD;
   };
   const popEchtGeschaetzt = (popEst, rr) => {
@@ -3143,7 +3157,9 @@ export async function main(ns) {
         const eintrag = { stadt, pop, chaos, comms: staedteGemeinden(stadt),
           sicher: !!(rr && rr.sicher && Number.isFinite(rr.r)) };
         if (stadt === hier) feinHier = eintrag; else fein.push(eintrag);
-        cityInfo.set(stadt, { value: pop / faktor, sure: eintrag.sicher });
+        // lower: r nur als Untergrenze bekannt (Begruendung bei roundTripAllowed).
+        cityInfo.set(stadt, { value: pop / faktor, sure: eintrag.sicher,
+          lower: !!(rr && !rr.sicher && Number.isFinite(rr.r)) });
         return pop / faktor;
       };
       const staedteGemeinden = (stadt) => {
@@ -3156,7 +3172,8 @@ export async function main(ns) {
         for (const stadt of STAEDTE) {
           if (stadt === hier) continue;
           // Ziele unter RAID_VORRAT_MIN Gemeinden zaehlen nur mit mehr als
-          // LOW_COMMS_LEAD-fachem Wert bei sicherem r (23.10.2026,
+          // LOW_COMMS_LEAD-fachem Wert, hier exakt, dort exakt oder als
+          // Untergrenze (23.10.2026,
           // Begruendung bei lowCommsTargetAllowed). Frueher fielen sie
           // immer heraus, damit die Rundreise nicht im selben Tick
           // zurueckzieht (Skeptiker, Befund 2) - das verhindert jetzt
@@ -3238,7 +3255,7 @@ export async function main(ns) {
             roundTripSkip = hier + ">" + skipped;
             const iz = cityInfo.get(skipped);
             sag("Rundreise verzichtet: " + hier + " hat nur " + commsHier + " Gemeinden, aber Wert "
-              + Math.round(infoHier.value / 1e6) + " gegen " + Math.round(iz.value / 1e6) + " in "
+              + (infoHier.sure ? "" : "mindestens ") + Math.round(infoHier.value / 1e6) + " gegen " + Math.round(iz.value / 1e6) + " in "
               + skipped + " - hier bleiben die Aktionen ohne Gemeinden.");
           }
           // Die Schwelle ist bewusst hoch: Ein Wechsel zieht eine

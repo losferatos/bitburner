@@ -53,13 +53,13 @@ console.log("\n=== Stadtwahl nach Wert statt Gemeinden ===\n");
 
 const qR = extrahiere(quelle, "rAusBlackOp");
 const qP = extrahiere(quelle, "popEchtGeschaetzt");
-const qS = extrahiere(quelle, "sureValues");
+const qS = extrahiere(quelle, "usableValue");
 const qA = extrahiere(quelle, "roundTripAllowed");
 const qL = extrahiere(quelle, "lowCommsTargetAllowed");
 const mR = quelle.match(/const ROUND_TRIP_VALUE_MIN = ([\d.]+);/);
 const mL = quelle.match(/const LOW_COMMS_LEAD = ([\d.]+);/);
 const neu = !!(qS && qA && qL && mR && mL);
-pruefe("sureValues, roundTripAllowed, lowCommsTargetAllowed im Quelltext", neu, neu ? "" : "alte Fassung");
+pruefe("usableValue, roundTripAllowed, lowCommsTargetAllowed im Quelltext", neu, neu ? "" : "alte Fassung");
 
 const BO_REAL = 0.6239377089411591;
 const PROBE = {
@@ -81,9 +81,10 @@ if (qR && qP) {
   // info je Stadt wie cityInfo in blade.js; Wert direkt vorgebbar (value) oder aus Probe.
   const info = (m, st) => {
     const d = m[st];
-    if (Number.isFinite(d.value)) return { value: d.value, sure: d.sure !== false };
-    const rr = rAusBlackOp({ min: d.bo[0], max: d.bo[1] }, BO_REAL);
-    return { value: popEchtGeschaetzt(d.popEst, rr) / faktor(d.chaos), sure: !!(rr && rr.sicher && Number.isFinite(rr.r)) };
+    if (Number.isFinite(d.value)) return { value: d.value, sure: d.sure !== false && !d.lower, lower: !!d.lower };
+    const rr = rAusBlackOp({ min: d.bo[0], max: d.bo[1] }, d.boReal ?? BO_REAL);
+    return { value: popEchtGeschaetzt(d.popEst, rr) / faktor(d.chaos), sure: !!(rr && rr.sicher && Number.isFinite(rr.r)),
+      lower: !!(rr && !rr.sicher && Number.isFinite(rr.r)) };
   };
   // Nachbau der groben Regel (Vorsprung 2) und der Rundreise (3 / 55).
   const grob = (hier, m) => {
@@ -143,6 +144,29 @@ if (qR && qP) {
     grob("H", { H: { value: 1e9, comms: 50 }, Y: { value: 3.9e9, comms: 1 } }) === "H"
     && grob("H", { H: { value: 1e9, comms: 50 }, Y: { value: 4.1e9, comms: 1 } }) === "Y");
 
+  // Nachmessung 23.10. 15:59: Volhavens Black-Op-Obergrenze klemmt bei 1,
+  // r nur als Untergrenze (>= 1,595). Mit "nur sicher" blieb der Bot in
+  // Ishima - die Untergrenze reicht fuer ein Ziel.
+  const B2 = 0.6271;
+  const P1559 = {
+    "Sector-12": { boReal: B2, bo: [0.1566, B2], popEst: 1138e6, chaos: 96.4, comms: 122 },
+    "Aevum": { boReal: B2, bo: [B2, 1], popEst: 498e6, chaos: 133.5, comms: 51 },
+    "Volhaven": { boReal: B2, bo: [B2, 1], popEst: 1289e6, chaos: 50.8, comms: 2 },
+    "Chongqing": { boReal: B2, bo: [0.1108, B2], popEst: 1347e6, chaos: 71.7, comms: 3 },
+    "New Tokyo": { boReal: B2, bo: [0.5117, B2], popEst: 1581e6, chaos: 69.1, comms: 2 },
+    "Ishima": { boReal: B2, bo: [0.0883, B2], popEst: 1696e6, chaos: 10.3, comms: 6 },
+  };
+  const iV2 = info(P1559, "Volhaven");
+  pruefe("15:59: Volhaven nur Untergrenze (r >= 1,595)", !iV2.sure && iV2.lower, (iV2.value / 1e6).toFixed(0) + " Mio");
+  pruefe("15:59: aus Ishima trotzdem nach Volhaven", runde("Ishima", P1559) === "Volhaven");
+  pruefe("15:59: in Volhaven (Untergrenze) verzichtet die Rundreise auf Sector-12", rundreise("Volhaven", P1559) === "Volhaven");
+  pruefe("hier nur Untergrenze: keine Stadt ohne Gemeinden (hier muss exakt sein)",
+    grob("H", { H: { value: 1e9, comms: 50, lower: true }, Y: { value: 9e9, comms: 1 } }) === "H");
+  pruefe("Ziel exakt 0 (tote Stadt): Rundreise verzichtet (Skeptiker Untergrenze F1)",
+    rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0, comms: 100 } }) === "H");
+  pruefe("Ziel nur Untergrenze: Rundreise verzichtet nicht (Ziel koennte besser sein)",
+    rundreise("H", { H: { value: 1e9, comms: 2 }, Z: { value: 0.1e9, comms: 100, lower: true } }) === "Z");
+
   // Bestes erlaubtes Ziel statt nur der meisten Gemeinden (Befund 4).
   const zwei = { H: { value: 1e9, comms: 2 }, A: { value: 0.1e9, comms: 120 }, B: { value: 0.9e9, comms: 60 } };
   pruefe("Rundreise waehlt B (Wert 0,9, 60 Gemeinden) statt A (0,1, 120)", rundreise("H", zwei) === "B");
@@ -162,7 +186,7 @@ pruefe("Probenblock gefunden", block.length > 0);
 pruefe("grobe Regel: Filter nur noch ohne lowCommsTargetAllowed",
   /let w = 0;\s*try \{ w = wert\(stadt\); \} catch \{ continue; \}\s*if \(RAID_AN && staedteGemeinden\(stadt\) < RAID_VORRAT_MIN\s*&& !lowCommsTargetAllowed\(cityInfo\.get\(hier\), cityInfo\.get\(stadt\)\)\) continue;/.test(block));
 pruefe("wert() haelt Wert und Sicherheit fest",
-  /cityInfo\.set\(stadt, \{ value: pop \/ faktor, sure: eintrag\.sicher \}\);\s*return pop \/ faktor;/.test(block));
+  /cityInfo\.set\(stadt, \{ value: pop \/ faktor, sure: eintrag\.sicher,\s*lower: !!\(rr && !rr\.sicher && Number\.isFinite\(rr\.r\)\) \}\);\s*return pop \/ faktor;/.test(block));
 pruefe("cityInfo je Runde neu (vor stadtwahl null, im Block neue Map)",
   /let cityInfo = null;\s*stadtwahl: try \{/.test(quelle) && /let feinHier = null;\s*cityInfo = new Map\(\);/.test(quelle));
 pruefe("Rundreise: nur Ziele ab RUNDREISE_MIN_COMMS, mit roundTripAllowed",

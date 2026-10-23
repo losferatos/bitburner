@@ -48,7 +48,7 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 // DIESELBE Auswahl, die der Kern benutzt - nicht eine zweite daneben.
 import { auswahl } from "../src/lib/reg.js";
-import { fensterUrteil, probeUrteil, PROBE_MS } from "./lib/drossel.js";
+import { windowVerdict, probeVerdict, PROBE_MS } from "./lib/drossel.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const WURZEL = path.resolve(HIER, "..");
@@ -1176,20 +1176,20 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
     // hatte bn4net mehrfach neu gestartet und den Zaehler auf 0 gesetzt.
     // Ergebnis "0,02 je Minute" bei voller Fahrt. Begruendung und
     // Schwellen in tools/lib/drossel.js.
-    const fenster = fensterUrteil(net, vorher);
-    if (fenster.art !== "ok") {
+    const windowResult = windowVerdict(net, vorher);
+    if (windowResult.kind !== "ok") {
       // Kein brauchbares Fenster oder verdaechtig langsam: direkt messen.
       await new Promise((r) => setTimeout(r, PROBE_MS));
-      let spaeter = null;
-      try { spaeter = JSON.parse(await rpc({ method: "getFile", filename: "data/bn4net.json", server: "home" })); } catch {}
-      const probe = probeUrteil(net, spaeter);
-      if (probe.art === "gedrosselt") {
-        sag("GEDROSSELT: nur " + probe.jeMin.toFixed(2)
+      let later = null;
+      try { later = JSON.parse(await rpc({ method: "getFile", filename: "data/bn4net.json", server: "home" })); } catch {}
+      const probe = probeVerdict(net, later);
+      if (probe.kind === "gedrosselt") {
+        sag("GEDROSSELT: nur " + probe.perMin.toFixed(2)
           + " Motorrunden je Minute in einer direkten Probe von "
           + Math.round(PROBE_MS / 1000) + " s (normal 4-6) - laeuft wakelock.js?");
         if (urteil === "SPUR") urteil = "STAGNATION";
-      } else if (probe.art === "unklar") {
-        sag("Tempo nicht messbar (" + probe.grund + ").");
+      } else if (probe.kind === "unklar") {
+        sag("Tempo nicht messbar (" + probe.reason + ").");
       }
     }
   }

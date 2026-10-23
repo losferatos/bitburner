@@ -775,18 +775,18 @@ async function main() {
     // Die nackte Zeile "Tab verdeckt" hat trotzdem zur Empfehlung "Tab in
     // den Vordergrund" gefuehrt. Jetzt steht dabei, ob der Anker laeuft -
     // nur wenn nicht, ist das Verdecken ein Problem.
-    let ankerTeil = "";
+    let anchorPart = "";
     if (wd && wd.sichtbar === false) {
-      const roh = await hole("data/wakelock.txt");
-      const [ms, zustand] = String(roh || "").split("|");
-      const alterMin = (Date.now() - Number(ms)) / 60000;
+      const raw = await hole("data/wakelock.txt");
+      const [ms, state] = String(raw || "").split("|");
+      const ageMin = (Date.now() - Number(ms)) / 60000;
       // Nach einem Zustandswechsel steht fuer eine Minute Klartext in der
       // Datei statt "ms|zustand|rate" (wakelock.js sag()) - dann den Text
       // zeigen, nicht falsch "gedrosselt" melden.
-      if (roh && !Number.isFinite(Number(ms))) ankerTeil = " (Tonanker meldet: " + String(roh).trim().slice(0, 80) + ")";
-      else ankerTeil = (zustand === "running" && alterMin >= 0 && alterMin < 5)
+      if (raw && !Number.isFinite(Number(ms))) anchorPart = " (Tonanker meldet: " + String(raw).trim().slice(0, 80) + ")";
+      else anchorPart = (state === "running" && ageMin >= 0 && ageMin < 5)
         ? " (Tonanker laeuft, also ungedrosselt - kein Befund)"
-        : " OHNE Tonanker (" + (roh ? (zustand || "?") + ", " + Math.round(alterMin) + " min alt" : "wakelock.txt fehlt")
+        : " OHNE Tonanker (" + (raw ? (state || "?") + ", " + Math.round(ageMin) + " min alt" : "wakelock.txt fehlt")
           + ") - der Tab wird gedrosselt, wakelock.js neu starten";
     }
 
@@ -797,7 +797,7 @@ async function main() {
       sag("Waechter: " + wd.modus
         + (wd.modus === "observe" ? " (beobachtet nur - er greift NICHT ein)" : " (scharf)")
         + (Number.isFinite(wd.okRound) ? ", " + zahl(wd.okRound) + " Runden" : "")
-        + (wd.sichtbar === false ? ", Tab verdeckt" + ankerTeil : ""));
+        + (wd.sichtbar === false ? ", Tab verdeckt" + anchorPart : ""));
     }
 
     // Strafen der letzten 24 Stunden, nach Sprosse. Sprossen ab 3 sind laut

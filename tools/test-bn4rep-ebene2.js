@@ -120,6 +120,8 @@ function baueWelt(o) {
     gangAufrufe: { inGang: 0, getBonusTime: 0 },
     // Preisfaktor je wartendem Stueck: 1,9; mit SF11 kleiner (AugmentationHelpers.ts:28-30).
     priceStep: o.priceStep ?? 1.9,
+    // Arbeitsarten je Faktion (24.10.2026); ohne Angabe alle drei.
+    workTypes: o.workTypes || null,
   };
   if (!w.dateien[w.host]) w.dateien[w.host] = {};
   return w;
@@ -241,11 +243,13 @@ function baueNs(w) {
         return vorher !== w.fokus;
       },
       workForFaction: (f, art, fokus) => {
+        // Singularity.ts: factionWorkType muss ein String sein (24.10.2026, BN14).
+        if (typeof art !== "string") throw new Error("singularity.workForFaction: factionWorkType expected to be a string. Is " + art + ".");
         w.arbeit = { type: "FACTION", factionName: f, factionWorkType: art };
         w.fokus = !!fokus;
         return true;
       },
-      getFactionWorkTypes: () => ["hacking", "field", "security"],
+      getFactionWorkTypes: (f) => (w.workTypes && w.workTypes[f]) || ["hacking", "field", "security"],
       installAugmentations: () => { w.installAufrufe++; return true; },
       quitJob: () => {},
       getCompanyRep: () => 0,
@@ -2000,6 +2004,47 @@ console.log("\n-- Z2 Vertrag bn4rep.js -> gang.js: die echte Telemetrie liefert 
   const to = rnVon(wo);
   pruefe("ohne data/gang.json: repNeed null und repNeedWhy nennt es (das Feld, das der Einspielablauf in gang.js prueft)",
     !!to && to.repNeed === null && typeof to.repNeedWhy === "string" && /gang\.json/.test(to.repNeedWhy), to ? JSON.stringify([to.repNeed, to.repNeedWhy]) : "keine Telemetrie");
+}
+
+// ---------------------------------------------------------------------------
+// FAKTION OHNE ARBEIT (24.10.2026). BitNode 14, 06:29-07:10: das Stueck der
+// Bladeburners stand oben, getFactionWorkTypes war leer, workForFaction bekam
+// undefined und warf jede Runde. Gegen den alten Stand ROT.
+console.log("\n-- Faktion ohne Arbeitsarten (Bladeburners) ist kein Arbeitsziel --");
+{
+  const w = welt1903({
+    schlafBudget: 6,
+    geld: 1e6, einkommen: 0, warteschlange: [], arbeit: null,
+    faktionen: {
+      Bladeburners: { favor: 0, rep: 0, augs: ["PCMatrix"] },
+      Aevum: { favor: 0, rep: 0, augs: ["Synthetic Heart"] },
+    },
+    workTypes: { Bladeburners: [] },
+  });
+  const r = await fahre(w);
+  const typeErr = r.log.split("\n").filter((z) => /factionWorkType|TYPE ERROR/.test(z));
+  pruefe("kein Rundenfehler aus workForFaction", typeErr.length === 0 && r.ende !== "fehler",
+    typeErr.concat(r.fehlerText).join(" | ").slice(0, 200));
+  // Die Figur ist im Nachbau nicht vergeben, gearbeitet wird also nicht -
+  // geprueft wird die Zielwahl (data/rep-ziel.txt: zeit|aug|faktion).
+  const repZiel = String(w.dateien.home["data/rep-ziel.txt"] || "").split("\n")[0].split("|");
+  pruefe("Arbeitsziel ist Aevum, nicht die Bladeburners", repZiel[2] === "Aevum", repZiel.join("|"));
+  pruefe("kein workForFaction-Versuch fuer die Bladeburners",
+    !/workForFaction\(Bladeburners/.test(r.log), (r.log.match(/workForFaction\(Bladeburners[^\n]*/) || [""])[0]);
+
+  // Nur noch Stuecke ohne Arbeit offen: Telemetrie bleibt frisch (state wait),
+  // sonst eskaliert der Waechter nach 30 min (Skeptiker 24.10.2026).
+  const w2 = welt1903({
+    schlafBudget: 6, geld: 1e6, einkommen: 0, warteschlange: [], arbeit: null,
+    faktionen: { Bladeburners: { favor: 0, rep: 0, augs: ["PCMatrix"] } },
+    workTypes: { Bladeburners: [] },
+  });
+  await fahre(w2);
+  let t2 = null;
+  try { t2 = JSON.parse(w2.dateien.home["data/bn4rep.json"] || "null"); } catch { t2 = null; }
+  pruefe("nur Bladeburner-Stuecke offen: Telemetrie mit state wait und offenOhneArbeit",
+    !!t2 && t2.state === "wait" && Array.isArray(t2.offenOhneArbeit) && t2.offenOhneArbeit.includes("Bladeburners"),
+    JSON.stringify(t2 && { state: t2.state, o: t2.offenOhneArbeit }));
 }
 
 console.log("");

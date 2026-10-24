@@ -3281,7 +3281,24 @@ export async function main(ns) {
       if (wert <= 0) return 0;
       return wert / Math.max(1, kostenSekunden(k));
     };
+    // FAKTIONEN OHNE ARBEIT FALLEN RAUS (24.10.2026). BitNode 14, 06:29 bis
+    // 07:10: Nach dem Beitritt zu den Bladeburners stand deren Stueck oben,
+    // arbeitsart() rechnete mit dem Ersatz "hacking", aber
+    // getFactionWorkTypes("Bladeburners") ist leer. workForFaction bekam
+    // `undefined` und warf jede Runde (TYPE ERROR, bn4rep-log.txt); die
+    // Telemetrie veraltete, der Waechter eskalierte bis EXHAUSTED. Solche
+    // Faktionen wachsen ohne Arbeit (Bladeburner-Rang) - als Arbeitsziel
+    // blockieren sie nur. Auch Spendenrecht hilft nicht: donateToFaction
+    // lehnt Faktionen ohne Arbeit ab (Singularity.ts:903-908, Skeptiker).
+    // Gekauft wird weiter ueber `kandidaten`, sobald der Ruf reicht.
+    const ohneArbeit = new Set();
+    for (const f of new Set(alleOffenen.map((k) => k.faktion))) {
+      let typen = [];
+      try { typen = ns.singularity.getFactionWorkTypes(f) || []; } catch { typen = []; }
+      if (!typen.length) ohneArbeit.add(f);
+    }
     const offen = alleOffenen.concat(schwellenZiele)
+      .filter((k) => !ohneArbeit.has(k.faktion))
       .sort((a, b) => guete(b) - guete(a));
 
     // RANGLISTE NACH DRAUSSEN (23.08.2026). Bis heute stand in der Telemetrie
@@ -3298,7 +3315,26 @@ export async function main(ns) {
       guete: Math.round(guete(k) * 1e6) / 1e6,
     }));
 
-    if (!offen.length) { await ns.sleep(20000); continue; }
+    if (!offen.length) {
+      // Bleibt nichts Erarbeitbares (etwa nur Bladeburner-Stuecke), Bremse
+      // loesen und die Telemetrie als "wait" frisch halten - sonst
+      // eskaliert der Waechter nach 30 min wieder (Skeptiker 24.10.2026).
+      if (ns.fileExists("data/rep-modus.txt", "home")) ns.rm("data/rep-modus.txt", "home");
+      try {
+        const ri = ns.getResetInfo();
+        ns.write("data/bn4rep.json", JSON.stringify({
+          ...(letzteTelemetrie || {}),
+          zeit: Date.now(),
+          knoten: ri.currentNode, nodeReset: ri.lastNodeReset, augReset: ri.lastAugReset,
+          wartend, geld: ns.getServerMoneyAvailable("home"),
+          state: "wait", blockedReason: "locked", warteGrund: "kein erarbeitbares Ziel",
+          offenOhneArbeit: [...ohneArbeit],
+        }), "w");
+        if (ns.getHostname() !== "home") ns.scp("data/bn4rep.json", "home", ns.getHostname());
+      } catch { /* ohne Telemetrie wartet es trotzdem */ }
+      await ns.sleep(20000);
+      continue;
+    }
 
     const ziel = offen[0];
 
@@ -3409,10 +3445,13 @@ export async function main(ns) {
       // Dieselbe Reihenfolge wie in arbeitsart oben - beide muessen
       // uebereinstimmen, sonst schaetzt die Rangfolge eine andere Rate, als
       // die Arbeit dann erzielt.
-      const typen = ns.singularity.getFactionWorkTypes(ziel.faktion);
+      let typen = [];
+      try { typen = ns.singularity.getFactionWorkTypes(ziel.faktion) || []; } catch { typen = []; }
       const art = typen.includes("hacking") ? "hacking"
         : typen.includes("security") ? "security"
         : typen.includes("field") ? "field" : typen[0];
+      // Zweite Sicherung (24.10.2026): ohne Arbeitsart kein workForFaction-Aufruf.
+      const artFehlt = !art;
       // BLADEBURNER SCHLAEGT FAKTIONSARBEIT (25.08.2026).
       //
       // Eine Bladeburner-Aktion und eine Faktionsarbeit koennen nicht
@@ -3457,7 +3496,7 @@ export async function main(ns) {
           sag("Faktionsarbeit ausgesetzt: die Bladeburner-Division traegt"
             + " diesen Knoten, Arbeit wuerde ihre Aktionen abbrechen.");
         }
-      } else if (figFrei("faktion", ziel.faktion,
+      } else if (!artFehlt && figFrei("faktion", ziel.faktion,
                    "Reputation fuer " + (ziel.aug || "die Spendenschwelle"))
                  && ns.singularity.workForFaction(ziel.faktion, art, true)) {
         // Ein Schwellenziel traegt den Namen der billigsten offenen

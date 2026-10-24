@@ -1,3 +1,5 @@
+import { mctsMove, createSearcher } from "lib/gomcts.js";
+
 /**
  * IPvGO-Spieler (Befund B8, Roadmap-Pruefung 10/2026).
  *
@@ -62,7 +64,29 @@
  * werden NICHT benutzt - Ketten, Freiheiten, Zugpruefung und Gebiet sind hier
  * in reinem JS nachgebaut. Das spart 40 GB RAM.
  *
- * ZUGWAHL (chooseMove, rein und ohne ns testbar)
+ * ZUGWAHL IM SPIEL: BAUMSUCHE MIT VORAUSDENKEN (24.10.2026)
+ *
+ * Die Heuristik unten gewann live nur 20 % (108 von 533 Partien, 23.10.).
+ * Seit dem 24.10. waehlt eine Baumsuche (UCT mit RAVE und schnellen
+ * Zufallspartien, lib/gomcts.js) jeden Zug. Gemessen im Pruefstand
+ * tools/goprobe, der go.js mit seiner echten main()-Schleife gegen die
+ * echte Gegner-KI aus dem Spielcode spielen laesst (geeicht: die alte
+ * Heuristik gewinnt dort 20,3 % ueber 600 Partien, live 20,3 %):
+ *   alt   20 % Siege, 34 Node Power je Partie
+ *   neu   92 % Siege, 112 Node Power je Partie (114 Partien, Fehler 2,5 %)
+ * Die Belohnung ist Sieg plus 0,3 x Anteil der eigenen Punkte (scoreW):
+ * Node Power waechst mit der eigenen Punktzahl (scoring.ts endGoGame).
+ * Der Baum bleibt ueber die Zuege erhalten, und waehrend der Gegner
+ * ueberlegt, sucht er weiter (ponder) - die Bedenkzeit der Gegner-KI
+ * (waitCycle je Teilschritt) wird so zu eigener Rechenzeit. Gerechnet wird
+ * in Scheiben von 25 ms (150 ms bei gedrosseltem Tab), dazwischen ns.asleep(0),
+ * damit die Oberflaeche nicht einfriert.
+ *
+ * Gegnermodell in den Zufallspartien (Tetrads schlagen immer, retten Atari)
+ * und ein Verbot von Selbst-Atari im Baum brachten im Pruefstand nichts
+ * Messbares (87 gegen 85 %, innerhalb der Streuung) und sind aus.
+ *
+ * HEURISTIK (chooseMove, rein und ohne ns testbar - nur noch fuer Tests)
  *
  *   1. Alle legalen Zuege simulieren (Schlagen, Selbstmord, Ko ueber die
  *      Brettverlaeufe von getMoveHistory).
@@ -121,6 +145,19 @@ const INFLUENCE_W = 0.2;
 /** Harte Obergrenze an Schleifendurchlaeufen je Partie, gegen Endlosspiel. */
 const MAX_TURNS = 6 * BOARD_SIZE * BOARD_SIZE;
 const TELEMETRY_FILE = "data/go.json";
+/** Komi der Tetrads (Constants.ts); im Spiel gilt der Wert aus getGameState(). */
+const KOMI = 5.5;
+/** Rechenscheibe der Baumsuche, danach ns.asleep(0) fuer die Oberflaeche. */
+const MCTS_SLICE_MS = 25;
+/** Scheibe bei gedrosseltem Tab (eine Abgabe dauerte ueber 50 ms). */
+const MCTS_SLICE_MAX_MS = 150;
+/**
+ * Baumsuche (lib/gomcts.js). Werte aus dem Pruefstand tools/goprobe
+ * (24.10.2026); GO_MCTS_OPT ueberschreibt sie dort, im Spiel gibt es kein process.
+ */
+const MCTS_OPT = { playouts: 3000, minOwn: 300, ms: 1500, ponderMin: 0, ponderCap: 8000,
+  scoreW: 0.3, c: 0.4,
+  ...((typeof process !== "undefined" && process.env && process.env.GO_MCTS_OPT) ? JSON.parse(process.env.GO_MCTS_OPT) : {}) };
 
 // Punktfarben. W = offline (kein Punkt des Bretts).
 const E = 0, M = 1, O = 2, W = 3;
@@ -348,6 +385,11 @@ function posBonus(n, i) {
  */
 export function chooseMove(rows, opt = {}) {
   const { n, g } = parseBoard(rows);
+  if (opt.mcts) {
+    const r = mctsMove(g, n, mctsArgs(opt));
+    if (r.type === "pass") return { type: "pass" };
+    return { type: "move", x: Math.floor(r.i / n), y: r.i % n, gain: r.winrate };
+  }
   const adj = adjacency(n);
   const hist = new Set(opt.history || []);
   const blocked = opt.blocked || new Set();
@@ -391,6 +433,11 @@ export function chooseMove(rows, opt = {}) {
   return { type: "move", x: Math.floor(best.i / n), y: best.i % n, gain };
 }
 
+function mctsArgs(opt) {
+  return { komi: opt.komi ?? KOMI, history: new Set(opt.history || []), keyOf: boardKey,
+    oppPassed: !!opt.oppPassed, blocked: opt.blocked, ...opt.mcts };
+}
+
 /** Innenleben fuer Tests und Fehlersuche (kein Teil der Spiel-Schnittstelle). */
 export const _intern = { place, evalPos, adjacency, boardKey, areaScore, influence };
 
@@ -418,6 +465,12 @@ export async function main(ns) {
       zeit: Date.now(), knoten: node, state: "work", opponent: OPPONENT, size: BOARD_SIZE,
       games, won, lost,
       bonusPercent: st ? st.bonusPercent : null,
+      // Suchstatistik: mittlere Besuche an der Wurzel je Zug und Vorausdenk-
+      // Playouts je Zug - zeigt live, ob das Vorausdenken greift.
+      visitsPerMove: statMoves ? Math.round(statVisits / statMoves) : null,
+      ponderPerMove: statMoves ? Math.round(statPonder / statMoves) : null,
+      ownPerMove: statMoves ? Math.round(statOwn / statMoves) : null,
+      ownMsPerMove: statMoves ? Math.round(statOwnMs / statMoves) : null,
       winStreak: st ? st.winStreak : null,
       ...(extra || {}),
     };
@@ -429,25 +482,132 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") { try { ns.scp(TELEMETRY_FILE, "home", ns.getHostname()); } catch { /* egal */ } }
   };
 
+  // BAUMSUCHE MIT VORAUSDENKEN (24.10.2026). Ein Sucher je Partie behaelt
+  // seinen Baum ueber die Zuege. Waehrend der Gegner ueberlegt (goAI.ts
+  // wartet je Zug mehrere waitCycles zu 200 ms), sucht er auf dem Brett nach
+  // dem eigenen Zug weiter; nach der Antwort wird deren Teilbaum zur neuen
+  // Wurzel. Die Bedenkzeit des Gegners wird so zu eigener Rechenzeit.
+  let searcher = null, searcherSynced = false;
+  let statMoves = 0, statVisits = 0, statPonder = 0, statOwn = 0, statOwnMs = 0;
+  // Abgabe an die Oberflaeche. Dauert sie lange (gedrosselter Tab: Timer
+  // bis 1 s), rechnet die naechste Scheibe laenger - sonst bestuende die
+  // Suche fast nur aus Warten.
+  //
+  // ns.asleep, NICHT ns.sleep: sleep markiert das Skript bis zum Ablauf als
+  // beschaeftigt (NetscriptHelpers.tsx netscriptDelay -> runningFn). Gewinnt
+  // im Rennen die Antwort des Gegners, liefe der sleep-Timer noch, und der
+  // naechste ns.go-Aufruf loeste den Concurrency-Check aus - das Spiel
+  // beendet dann das Skript (checkEnvFlags -> killWorkerScript). asleep ist
+  // davon ausgenommen und kostet 0 GB.
+  let sliceMs = MCTS_SLICE_MS;
+  const yieldUi = async (waitFor) => {
+    const t = Date.now();
+    if (waitFor) await Promise.race([waitFor, ns.asleep(0)]); else await ns.asleep(0);
+    sliceMs = Date.now() - t > 50 ? MCTS_SLICE_MAX_MS : MCTS_SLICE_MS;
+  };
+
+  /** Sucht in Scheiben, bis das Ziel erreicht ist oder die Frist ablaeuft. */
+  const searchOwn = async () => {
+    const t0 = Date.now();
+    const deadline = t0 + MCTS_OPT.ms;
+    let own = 0;
+    while (Date.now() < deadline) {
+      // Gedrosselter Tab: jede Abgabe kostet bis zu einer Minute - dann die
+      // ganze Frist am Stueck rechnen (Skeptiker 24.10.).
+      const bis = sliceMs >= MCTS_SLICE_MAX_MS ? deadline : Math.min(deadline, Date.now() + sliceMs);
+      own += searcher.runUntil(bis, MCTS_OPT.playouts, MCTS_OPT.minOwn - own);
+      if (own >= MCTS_OPT.minOwn && searcher.rootVisits() >= MCTS_OPT.playouts) break;
+      await yieldUi();
+    }
+    statOwn += own; statOwnMs += Date.now() - t0;
+  };
+
+  /** Wartet auf die Antwort des Gegners und sucht so lange weiter. */
+  const ponder = async (promise) => {
+    let settled = false;
+    // Nur fuer das Rennen: abgelehnt oder erfuellt, Hauptsache fertig.
+    const done = promise.then(() => { settled = true; }, () => { settled = true; });
+    let n = 0;
+    while (!settled || n < MCTS_OPT.ponderMin) {
+      if (searcher.rootVisits() < MCTS_OPT.ponderCap) {
+        const vor = searcher.rootVisits();
+        searcher.simulate(Date.now() + sliceMs, Infinity);
+        n += searcher.rootVisits() - vor;
+      } else if (settled) break;
+      // Rennen gegen die Antwort: kommt sie, geht es sofort weiter.
+      await yieldUi(settled ? null : done);
+    }
+    statPonder += n;
+    return promise;
+  };
+
+  /** Die Antwort des Gegners in den Baum uebernehmen. */
+  const follow = (play, n) => {
+    if (!searcher || !searcherSynced || !play) { searcherSynced = false; return; }
+    if (play.type === "move" && Number.isInteger(play.x)) searcherSynced = searcher.advance(play.x * n + play.y);
+    else if (play.type === "pass") searcherSynced = searcher.advance(-1);
+    else searcherSynced = false;
+  };
+
   /** Ein Zug (oder Pass); gibt die Antwort des Gegners zurueck. */
-  const takeTurn = async (oppPassed, turn) => {
+  const takeTurn = async (oppPassed, turn, komi) => {
     const rows = ns.go.getBoardState();
-    const history = ns.go.getMoveHistory().map((b) => b.join(""));
+    const { n, g } = parseBoard(rows);
+    const history = new Set(ns.go.getMoveHistory().map((b) => b.join("")));
     const blocked = new Set();
+    if (!searcher) searcher = createSearcher(n, { ...MCTS_OPT, komi, keyOf: boardKey, history, blocked });
+    // Weicht das Brett des Baums vom Spiel ab (Erstzug, abgelehnter Zug,
+    // unerwartete Antwort), beginnt die Suche frisch.
+    if (!searcherSynced || searcher.toMove() !== M || boardKey(searcher.boardAtRoot()) !== boardKey(g)) {
+      searcher.reset(g, M, oppPassed ? 1 : 0);
+      searcherSynced = true;
+    }
+    searcher.setContext({ history, blocked });
     for (let tries = 0; tries < 6; tries++) {
-      const d = turn > MAX_TURNS
-        ? { type: "pass" }
-        : chooseMove(rows, { history, oppPassed, blocked });
-      if (d.type === "pass") return { play: await ns.go.passTurn(), passed: true };
+      let d;
+      if (turn > MAX_TURNS) d = { type: "pass" };
+      else { await searchOwn(); d = searcher.result(); }
+      statMoves++; statVisits += searcher.rootVisits();
+      if (d.type === "pass") {
+        searcherSynced = searcher.advance(-1);
+        const play = await ponder(ns.go.passTurn());
+        follow(play, n);
+        return { play, passed: true };
+      }
+      const x = Math.floor(d.i / n), y = d.i % n;
+      // Nur makeMove gehoert ins try (Skeptiker 24.10.): das Spiel lehnt
+      // synchron ab (netscriptGoImplementation.ts makePlayerMove wirft). Ein
+      // Fehler beim Vorausdenken darf den schon gespielten Zug nicht als
+      // abgelehnt verbuchen.
+      let pending, abgelehnt = null;
       try {
-        return { play: await ns.go.makeMove(d.x, d.y), passed: false };
-      } catch (e) {
+        pending = ns.go.makeMove(x, y);
+      } catch (e) { abgelehnt = e; }
+      if (!abgelehnt) {
+        searcherSynced = searcher.advance(d.i);
+        // Auch eine asynchrone Ablehnung (abgelehntes Promise) zaehlt als
+        // abgelehnt - das Spiel wirft synchron, ein Mock oder eine kuenftige
+        // Version vielleicht nicht. Fehler der Suche selbst laufen weiter
+        // nach oben und werden NICHT als Ablehnung verbucht.
+        const ausgang = await ponder(Promise.resolve(pending).then((v) => ({ v }), (err) => ({ err })));
+        if (!ausgang.err) {
+          follow(ausgang.v, n);
+          return { play: ausgang.v, passed: false };
+        }
+        abgelehnt = ausgang.err;
+      }
+      {
+        const e = abgelehnt;
         // Das Spiel lehnt den Zug ab (Ko-Regel o. ae., die der Nachbau nicht
-        // kennt): Punkt sperren und neu waehlen.
-        blocked.add(d.x * rows.length + d.y);
-        ns.print("Zug " + d.x + "," + d.y + " abgelehnt: " + String(e).slice(0, 80));
+        // kennt): Punkt sperren und neu suchen.
+        blocked.add(d.i);
+        searcher.reset(g, M, oppPassed ? 1 : 0);
+        searcher.setContext({ history, blocked });
+        searcherSynced = true;
+        ns.print("Zug " + x + "," + y + " abgelehnt: " + String(e).slice(0, 80));
       }
     }
+    searcherSynced = false;
     return { play: await ns.go.passTurn(), passed: true };
   };
 
@@ -458,11 +618,26 @@ export async function main(ns) {
       ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
     }
     let oppPassed = false;
+    searcher = null; searcherSynced = false;
+    let komi = KOMI;
+    try {
+      const gs0 = ns.go.getGameState();
+      komi = Number(gs0.komi) || KOMI;
+      // Fortgesetzte Partie: hat der Gegner zuletzt gepasst, endet ein
+      // eigener Pass die Partie (Skeptiker 24.10.; previousMove null = Pass).
+      oppPassed = gs0.currentPlayer === "Black" && gs0.previousMove === null
+        && ns.go.getMoveHistory().length > 0;
+    } catch { komi = KOMI; }
     for (let turn = 0; turn < MAX_TURNS + 20; turn++) {
       cur = ns.go.getCurrentPlayer();
       if (cur === "None") break;
-      if (cur === "White") { await ns.go.opponentNextTurn(false); continue; }
-      const r = await takeTurn(oppPassed, turn);
+      if (cur === "White") {
+        searcherSynced = false;
+        const antwort = await ns.go.opponentNextTurn(false);
+        oppPassed = !!antwort && antwort.type === "pass";
+        continue;
+      }
+      const r = await takeTurn(oppPassed, turn, komi);
       if (r.play.type === "gameOver") break;
       oppPassed = r.play.type === "pass";
       // Zeitbedingung statt Zugzahl: im gedrosselten Tab dauert ein Zug

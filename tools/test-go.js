@@ -44,6 +44,9 @@ function pruefe(was, bedingung, zusatz = "") {
   }
 }
 
+// Kleine Baumsuche fuer den Logiktest (24.10.2026): geprueft wird hier der
+// Ablauf, die Spielstaerke misst tools/goprobe gegen die echte Gegner-KI.
+if (!process.env.GO_MCTS_OPT) process.env.GO_MCTS_OPT = JSON.stringify({ playouts: 200, minOwn: 50, ms: 200, ponderCap: 400 });
 const { modul } = await ladeAusBeiden(ROOT, "go.js");
 
 // ---------------------------------------------------------------------------
@@ -216,7 +219,7 @@ function neuerGoMock(opts = {}) {
     },
     resetBoardState: (gegner, n) => {
       z.resets.push({ gegner, n, mitten: !z.spiel.ende && z.spiel.hist.length > 0 });
-      if (z.resets.length > (opts.maxPartien ?? 12)) throw gesperrt;
+      if (z.resets.length > (opts.maxPartien ?? 12)) { z.stop = true; throw gesperrt; }
       z.spiel = neuesSpiel(n, gegner, seedBase + z.resets.length, opts.offline || []);
       return z.spiel.b.slice();
     },
@@ -252,15 +255,42 @@ function neuerGoMock(opts = {}) {
     },
   };
 
+  // CONCURRENCY-CHECK WIE IM SPIEL (24.10.2026, NetscriptHelpers.tsx
+  // checkEnvFlags): ns.sleep markiert das Skript bis zum Ablauf als
+  // beschaeftigt, jeder weitere ns-Aufruf in der Zeit beendet es. ns.asleep
+  // markiert nicht.
+  z.busy = false; z.concurrency = 0;
+  const pruefeFrei = (name) => {
+    if (!z.busy) return;
+    z.concurrency++; z.stop = true;
+    throw new Error("CONCURRENCY: " + name + " waehrend sleep");
+  };
+  for (const k of Object.keys(go)) {
+    if (typeof go[k] !== "function") continue;
+    const f = go[k];
+    go[k] = (...a) => { pruefeFrei("go." + k); return f(...a); };
+  }
   const ns = {
     go,
+    asleep: () => new Promise((res) => setImmediate(res)),
     disableLog: () => {},
     print: () => {},
     getHostname: () => "home",
     getResetInfo: () => ({ currentNode: opts.knoten ?? 14, ownedSF: new Map(opts.sf14 ? [[14, opts.sf14]] : []) }),
     write: (d, inh) => { z.dateien[d] = inh; z.dateiSchreibungen = (z.dateiSchreibungen || 0) + 1; },
     scp: () => true,
-    sleep: async () => { z.sleeps++; if (z.sleeps > 400) throw gesperrt; },
+    // Nur echte Pausen zaehlen (24.10.2026): go.js gibt waehrend der
+    // Baumsuche mit ns.sleep(0) an die Oberflaeche ab - das ist kein Takt.
+    // Nach dem Abbruchsignal (maxPartien) endet der Lauf an der naechsten Abgabe.
+    sleep: async (ms) => {
+      z.yields = (z.yields || 0) + 1;
+      if (z.stop) throw gesperrt;
+      pruefeFrei("sleep");
+      if (ms > 0) { z.sleeps++; if (z.sleeps > 400) throw gesperrt; }
+      z.busy = true;
+      await new Promise((res) => setImmediate(res));
+      z.busy = false;
+    },
   };
   return { ns, z };
 }
@@ -440,6 +470,7 @@ console.log("-- 7. Ganze Partien gegen den Ersatzgegner (7x7) --");
   pruefe("Gegner Tetrads, Brett 7", m.z.resets.every((r) => r.gegner === "Tetrads" && r.n === 7),
     JSON.stringify(m.z.resets[0]));
   pruefe("kein Zug vom Spiel abgelehnt", m.z.abgelehnt === 0, String(m.z.abgelehnt));
+  pruefe("kein ns-Aufruf waehrend eines laufenden sleep (Concurrency-Check)", m.z.concurrency === 0, String(m.z.concurrency));
   const quote = m.z.siege / Math.max(1, nEnde);
   pruefe("Siegquote gegen den Ersatzgegner >= 80 %", quote >= 0.8,
     m.z.siege + "/" + nEnde + ", " + m.z.zuege + " Zuege, " + m.z.passes + " Paesse");

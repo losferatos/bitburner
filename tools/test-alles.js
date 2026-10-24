@@ -74,7 +74,12 @@ const TESTS = [
   },
   {
     datei: "test-go.js",
-    deckt: "IPvGO-Spieler go.js (B8): Zugwahl (Schlag, Atari, Pass, Ko), falscher Knoten, ganze Partien gegen Ersatzgegner, Fortsetzen",
+    deckt: "IPvGO-Spieler go.js (B8): Zugwahl (Schlag, Atari, Pass, Ko), falscher Knoten, ganze Partien gegen Ersatzgegner, Fortsetzen, Concurrency-Check (asleep statt sleep)",
+    schnell: false,
+  },
+  {
+    datei: "test-gomcts.js",
+    deckt: "Baumsuche lib/gomcts.js: Regel-Engine gegen den Spielcode (goprobe/eich.mjs), Markenzaehler ueber 2^31, Baumuebernahme, Schlag/Augen/Pass (24.10.)",
     schnell: false,
   },
   {

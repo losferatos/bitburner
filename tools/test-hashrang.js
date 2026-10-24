@@ -2,7 +2,7 @@
  * Hash-Rang im Anlauf (Befund B7, 07.10.2026): hashes.js und hacknet.js gegen den ns-Mock.
  *
  * Was gilt (Rechnung: nodes/HASH-RANG-2026-10.md):
- *   - BN13/BN15, V2, in der Division, Konto UNTER 1 Mrd: Hashes gehen in Rang (bisher Verkauf),
+ *   - BN13/BN14/BN15, V2, in der Division, Konto UNTER 1 Mrd: Hashes gehen in Rang (bisher Verkauf),
  *     bis der Stufenpreis 1000 uebersteigt (4 Stufen = 400 Rang); der Rest wird verkauft.
  *   - BN13/BN15, Konto UEBER 1 Mrd: alte Regel, kein Preisdeckel.
  *   - Alle anderen Knoten (BN9, BN3, ...): unveraendert, unter 1 Mrd kein Rang.
@@ -74,6 +74,32 @@ console.log("-- 2. NEU: BN13 ebenso --");
 {
   const m = await fahre("hashes.js", { knoten: 13, inDivision: true, geld: 1e8, hacknet: { hashes: 1000, kapazitaet: 1024 } });
   pruefe("NEU zwei Rangstufen", zaehle(m, RANG) === 2, "Rang " + zaehle(m, RANG));
+}
+
+console.log("-- 2b. NEU: BN14 ebenso (Rangfaktor 0,6; Krankenhaus frisst das Bargeld, 24.10.2026) --");
+{
+  const m = await fahre("hashes.js", { knoten: 14, inDivision: true, geld: 3e8, hacknet: { hashes: 1000, kapazitaet: 1024 } });
+  pruefe("NEU BN14: zwei Rangstufen", zaehle(m, RANG) === 2, "Rang " + zaehle(m, RANG));
+}
+
+console.log("-- 2c. NEU: Boden 50 Mio - darunter Verkauf (BN15 und BN14) --");
+for (const k of [15, 14]) {
+  const m = await fahre("hashes.js", { knoten: k, inDivision: true, geld: 3e7, hacknet: { hashes: 1000, kapazitaet: 1024 } });
+  pruefe("NEU BN" + k + " mit 30 Mio: kein Rang", zaehle(m, RANG) === 0, "Rang " + zaehle(m, RANG));
+  pruefe("NEU BN" + k + " mit 30 Mio: verkauft", zaehle(m, "Sell for Money") === 250, "Verkauf " + zaehle(m, "Sell for Money"));
+}
+
+console.log("-- 2d. NEU: Boden gilt ueber der Aug-Ruecklage (300 Mio Konto, 280 Mio Ruecklage) --");
+{
+  const m = await fahre("hashes.js", { knoten: 14, inDivision: true, geld: 3e8,
+    dateien: { "data/geldbedarf.txt": "280000000" }, hacknet: { hashes: 1000, kapazitaet: 1024 } });
+  pruefe("NEU kein Rang aus der Ruecklage", zaehle(m, RANG) === 0, "Rang " + zaehle(m, RANG));
+}
+
+console.log("-- 2e. ALT: BN14 ueber 1 Mrd - alte Regel, kein Deckel --");
+{
+  const m = await fahre("hashes.js", { knoten: 14, inDivision: true, geld: 2e9, runden: 2, hacknet: { hashes: 30000, kapazitaet: 4096 } });
+  pruefe("ALT BN14 15 Rangstufen ohne Deckel", zaehle(m, RANG) === 15, "Rang " + zaehle(m, RANG));
 }
 
 console.log("-- 3. NEU: Preisdeckel 1000 - genau 4 Stufen, der Rest wird verkauft --");

@@ -314,7 +314,7 @@ const TESTS = [
   },
   {
     datei: "test-hashrang.js",
-    deckt: "Hash-Rang im Anlauf (B7): BN13/BN15 tauschen Hashes unter 1 Mrd in Rang (Preisdeckel 2000), Cache im ersten Zyklus; alle anderen Knoten unveraendert",
+    deckt: "Hash-Rang im Anlauf (B7): BN13/BN14/BN15 tauschen Hashes unter 1 Mrd (ab 50 Mio ueber der Ruecklage) in Rang (Preisdeckel 1000), Cache im ersten Zyklus; alle anderen Knoten unveraendert",
     schnell: true,
   },
   {

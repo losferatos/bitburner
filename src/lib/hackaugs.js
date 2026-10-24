@@ -399,7 +399,7 @@ export function hacknetNachEinbau(knoten) {
  * HASH-RANG IM ANLAUF (Befund B7, 07.10.2026): Knoten, in denen Hashes in
  * Bladeburner-Rang getauscht werden, OHNE dass das Konto ueber 1 Mrd liegt.
  *
- * Warum diese beiden: "Exchange for Bladeburner Rank" (HacknetHelpers.tsx:
+ * Warum BN13 und BN15: "Exchange for Bladeburner Rank" (HacknetHelpers.tsx:
  * 539-546) wirkt ohne den Rangfaktor des Knotens. BN15 hat 0,2, BN13 0,45
  * (BitNode.tsx:1112, :1031) - dort sind 100 Hash-Rang 5- beziehungsweise
  * 2,2-mal so viel wert wie 100 Aktionsrang. Der fruehe Rang bringt Skillpunkte
@@ -410,6 +410,20 @@ export function hacknetNachEinbau(knoten) {
  * Praktisch nur im ersten Zyklus des Knotens (SF9.3-Gratisserver, Cache 1024);
  * danach gibt es nur netburn-Stummel (Speicher 320), die nur Stufe 0 fassen.
  *
+ * BN14 DAZU (24.10.2026): Rangfaktor 0,6 (BitNode.tsx:1072), also 1,67-mal.
+ * Dazu ist Bargeld dort BILLIG (nicht wertlos). Gemessen im ersten Zyklus
+ * von BN14.1 (Sicherungen 24.10., moneySourceA bis 17:25): Krankenhaus
+ * -8,6 Mrd bei 11 Mrd Einnahmen, 593 Aufenthalte. Kosten je Aufenthalt
+ * min(10 % Konto, fehlende HP * 100.000) (Hospital.ts:9); ein Raid-Fehlschlag
+ * macht ~480 HP Schaden (hpLoss 50 * diffMult), bis ~13 Uhr kostete er also
+ * 10 % des Kontos, spaeter schadensgedeckelt rund 14 Mio. Das Konto lag ab
+ * 09:20 bei 0,2-1 Mrd, die Augs waren rufgebunden (bn4rep: kaufbereit 0),
+ * und alle 5.140 Hashes gingen in den Verkauf (1,29 Mrd). In den ersten
+ * Stunden ist das Geld knapp - deshalb der Boden in hashes.js.
+ * Ungeeicht: der Rangwert der 400 Stufen fuer BN14 ist nicht gerechnet
+ * (nodes/HASH-RANG-2026-10.md deckt nur BN13/BN15); Wirkung erst ab BN14.2,
+ * im laufenden BN14.1 ist der Gratisserver schon weg.
+ *
  * NICHT hacknetNachEinbau erweitern: das Praedikat steuert auch, ob bn4rep
  * Hacknet-Augmentierungen kauft und ob hacknet.js neue Server baut.
  *
@@ -417,7 +431,7 @@ export function hacknetNachEinbau(knoten) {
  * @returns {boolean}
  */
 export function hashRangAnlauf(knoten) {
-  return knoten === 13 || knoten === 15;
+  return knoten === 13 || knoten === 14 || knoten === 15;
 }
 
 /**

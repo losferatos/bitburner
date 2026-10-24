@@ -240,13 +240,19 @@ export async function main(ns) {
       // dem, was ueber der Aug-Ruecklage liegt.
       let rangTausch = false, bedarfKapazitaet = null;
       const rangPreis = ns.hacknet.hashCost(RANG);
-      // HASH-RANG IM ANLAUF (B7, 07.10.2026): in BN13/BN15 wirkt der Tausch ohne
-      // den kleinen Rangfaktor des Knotens (0,45 / 0,2) und bringt frueh
-      // Skillpunkte. Dort gilt das 1-Mrd-Tor nicht, dafuer ein Preisdeckel
-      // (HASHRANG_MAX_PREIS): die Stufen darueber gehen in den Verkauf. Ueber
-      // 1 Mrd gilt in allen Knoten unveraendert die alte Regel ohne Deckel.
+      // HASH-RANG IM ANLAUF (B7, 07.10.2026): in BN13/BN14/BN15 wirkt der
+      // Tausch ohne den kleinen Rangfaktor des Knotens (0,45 / 0,6 / 0,2) und
+      // bringt frueh Skillpunkte. Dort gilt das 1-Mrd-Tor nicht, dafuer ein
+      // Preisdeckel (HASHRANG_MAX_PREIS): die Stufen darueber gehen in den
+      // Verkauf. Ueber 1 Mrd gilt in allen Knoten unveraendert die alte Regel
+      // ohne Deckel.
+      // BODEN 50 MIO UEBER DER RUECKLAGE (Skeptiker 24.10.2026): in den ersten
+      // Stunden nach dem Knotenwechsel sind die Hashes die Hauptquelle (BN14.1
+      // bis 08:20: hacknet 0,37 Mrd gegen hacking 0,08), und sleeve.js (20 Mio),
+      // bbtrain/blade (5 Mio) und die Augs der Ruecklage brauchen dieses Geld.
+      // Darunter wird verkauft wie bisher.
       const geldTor = geld - ruecklage > RANG_AB_GELD;
-      const anlaufRang = !geldTor && hashRangAnlauf(knoten);
+      const anlaufRang = !geldTor && hashRangAnlauf(knoten) && geld - ruecklage >= GYM_AB_GELD;
       const rangDeckel = anlaufRang ? HASHRANG_MAX_PREIS : Infinity;
       if (!gymKauf && inDivision && v2 && (geldTor || anlaufRang)) {
         if (rangPreis > 0 && rangPreis <= kapazitaet && rangPreis <= rangDeckel) rangTausch = true;

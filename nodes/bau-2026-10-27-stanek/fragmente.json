@@ -1,0 +1,482 @@
+{
+ "hinweis": "ERZEUGT von dump-fragmente.mjs aus reference/v301/src/CotMG/Fragment.ts. Nicht von Hand pflegen.",
+ "fragmente": [
+  {
+   "id": 0,
+   "typ": "Hacking",
+   "typNr": 6,
+   "power": 1,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 1,
+   "typ": "Hacking",
+   "typNr": 6,
+   "power": 1,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1,
+     0
+    ],
+    [
+     0,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 5,
+   "typ": "HackingSpeed",
+   "typNr": 3,
+   "power": 1.3,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 6,
+   "typ": "HackingMoney",
+   "typNr": 4,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 7,
+   "typ": "HackingGrow",
+   "typNr": 5,
+   "power": 0.5,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 10,
+   "typ": "Strength",
+   "typNr": 7,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 12,
+   "typ": "Defense",
+   "typNr": 8,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 14,
+   "typ": "Dexterity",
+   "typNr": 9,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 16,
+   "typ": "Agility",
+   "typNr": 10,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 18,
+   "typ": "Charisma",
+   "typNr": 11,
+   "power": 3,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 20,
+   "typ": "HacknetMoney",
+   "typNr": 12,
+   "power": 1,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 21,
+   "typ": "HacknetCost",
+   "typNr": 13,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     1
+    ],
+    [
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 25,
+   "typ": "Rep",
+   "typNr": 14,
+   "power": 0.5,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 27,
+   "typ": "WorkMoney",
+   "typNr": 15,
+   "power": 10,
+   "limit": 1,
+   "shape": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 28,
+   "typ": "Crime",
+   "typNr": 16,
+   "power": 2,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     1,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 30,
+   "typ": "Bladeburner",
+   "typNr": 17,
+   "power": 0.4,
+   "limit": 1,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 100,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ],
+    [
+     0,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 101,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     1,
+     1,
+     1,
+     1
+    ],
+    [
+     1,
+     0,
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 102,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     0,
+     1,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 103,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     1,
+     1,
+     1,
+     0
+    ],
+    [
+     0,
+     0,
+     1,
+     1
+    ]
+   ]
+  },
+  {
+   "id": 104,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 105,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     0,
+     0,
+     1
+    ],
+    [
+     0,
+     1,
+     1
+    ],
+    [
+     1,
+     1,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 106,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     1,
+     0,
+     0
+    ],
+    [
+     1,
+     1,
+     1
+    ],
+    [
+     1,
+     0,
+     0
+    ]
+   ]
+  },
+  {
+   "id": 107,
+   "typ": "Booster",
+   "typNr": 18,
+   "power": 1.1,
+   "limit": 99,
+   "shape": [
+    [
+     0,
+     1,
+     0
+    ],
+    [
+     1,
+     1,
+     1
+    ],
+    [
+     0,
+     1,
+     0
+    ]
+   ]
+  }
+ ]
+}

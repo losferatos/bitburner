@@ -761,9 +761,9 @@
   {
    "name": "go.js",
    "args": [],
-   "ramBaseGb": 11.25,
+   "ramBaseGb": 20.25,
    "ramSingGb": 0,
-   "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; kein Import von lib/hostdatei.js (zoege fileExists +0,1 GB mit), eigenes write+scp; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB; 24.10.2026: Baumsuche lib/gomcts.js ohne ns, asleep und go.getGameState je 0 GB, gerechnet weiter 11,25 - Methodenname run vermieden, er kostete als ns.run 1 GB)",
+   "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; kein Import von lib/hostdatei.js (zoege fileExists +0,1 GB mit), eigenes write+scp; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB; 24.10.2026: Baumsuche lib/gomcts.js ohne ns, asleep und go.getGameState je 0 GB, gerechnet weiter 11,25 - Methodenname run vermieden, er kostete als ns.run 1 GB; 27.10.2026: go.cheat.playTwoMoves 8 + go.cheat.getCheatSuccessChance 1 = 20,25 laut tools/ram.js, Optionsname kill vermieden)",
    "verfahren": "alle",
    "knoten": [
     14,
@@ -779,7 +779,8 @@
    "evictRank": 21,
    "needsFigure": "none",
    "needsLibs": [
-    "lib/gomcts.js"
+    "lib/gomcts.js",
+    "lib/gocheat.js"
    ],
    "singularity": false,
    "restartPolicy": "always",
@@ -789,7 +790,7 @@
   }
  ],
  "hinweis_portiert": "Die letzten 9 Eintraege sind am 04.09.2026 nachgetragen worden: sie laufen heute ueber die WERKZEUGE-Liste in bn4net.js, standen aber nicht in 3.3. Ohne sie haette der Umstieg auf die Registry (C.5) neun laufende Werkzeuge stillgelegt. ramBaseGb und ramSingGb sind aus doku/ram-messung-2026-09-04.json gerechnet: sing = (SF4.1 - SF4.3)/15, basis = SF4.3 - sing.",
- "erzeugtAm": "2026-10-24T11:37:57.823Z",
+ "erzeugtAm": "2026-10-27T20:32:50.848Z",
  "erzeugtVon": "tools/registry-bauen.js aus ARCHITEKTUR.md 3.3",
  "hinweis": "ERZEUGT. Nicht von Hand pflegen - Aenderungen gehoeren in ARCHITEKTUR.md 3.3."
 }

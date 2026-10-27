@@ -1,4 +1,5 @@
 import { mctsMove, createSearcher } from "lib/gomcts.js";
+import { planKill } from "lib/gocheat.js";
 
 /**
  * IPvGO-Spieler (Befund B8, Roadmap-Pruefung 10/2026).
@@ -158,6 +159,24 @@ const MCTS_SLICE_MAX_MS = 150;
 const MCTS_OPT = { playouts: 3000, minOwn: 300, ms: 1500, ponderMin: 0, ponderCap: 8000,
   scoreW: 0.3, c: 0.4,
   ...((typeof process !== "undefined" && process.env && process.env.GO_MCTS_OPT) ? JSON.parse(process.env.GO_MCTS_OPT) : {}) };
+
+/**
+ * go.cheat (27.10.2026, SF14.3). Einziger Einsatz: Doppelzug (playTwoMoves)
+ * auf die letzten Freiheiten weisser Ketten (lib/gocheat.js planKill) - ein
+ * normaler Zug nimmt einer Kette nur eine Freiheit, der Doppelzug schlaegt
+ * eine Kette mit zwei Freiheiten sofort, auch eine ganze lebende Gruppe mit
+ * zwei Einzelaugen. Gemessen: BERICHT.md in nodes/bau-2026-10-27-gocheat.
+ *
+ * capture: an/aus. gain: so viele Flaechenpunkte muessen mehr herausspringen
+ * als beim besten normalen Zug. endGain: dieselbe Schwelle, wenn die Suche
+ * ohnehin passen will (ein unbenutzter Cheat ist verloren). pMin: Mindest-
+ * Erfolgschance laut ns.go.cheat.getCheatSuccessChance (unter 1 droht ab dem
+ * zweiten Cheat der Partie 10 % Auswurf = Serie weg; Messung mit pMin 0.5 und
+ * 4 Cheats brachte nichts). maxCheats je Partie: die Chance faellt mit jedem
+ * Cheat steil (Formel in lib/gocheat.js).
+ */
+const CHEAT_OPT = { capture: true, gain: 6, endGain: 1, maxLibs: 3, pMin: 0.97, maxCheats: 2,
+  ...((typeof process !== "undefined" && process.env && process.env.GO_CHEAT_OPT) ? JSON.parse(process.env.GO_CHEAT_OPT) : {}) };
 
 // Punktfarben. W = offline (kein Punkt des Bretts).
 const E = 0, M = 1, O = 2, W = 3;
@@ -457,6 +476,11 @@ export async function main(ns) {
   }
 
   let games = 0, won = 0, lost = 0, lastTelemetry = 0;
+  // Cheat-Zaehler fuer die Telemetrie (Skeptiker 27.10.): ohne sie waere ein
+  // Auswurf im Betrieb unsichtbar. cheatMissed = keiner der beiden Steine
+  // liegt danach auf dem Brett (Zugverlust); ejects = Partie endete direkt
+  // nach einem Cheat UND das Spiel hat eine Niederlage gebucht.
+  let cheats = 0, cheatMissed = 0, cheatErrors = 0, ejects = 0;
 
   const telemetry = (extra) => {
     let st = null;
@@ -472,6 +496,7 @@ export async function main(ns) {
       ownPerMove: statMoves ? Math.round(statOwn / statMoves) : null,
       ownMsPerMove: statMoves ? Math.round(statOwnMs / statMoves) : null,
       winStreak: st ? st.winStreak : null,
+      cheats, cheatMissed, cheatErrors, ejects, cheatAccess: cheatOk,
       ...(extra || {}),
     };
     lastTelemetry = Date.now();
@@ -549,6 +574,47 @@ export async function main(ns) {
     else searcherSynced = false;
   };
 
+  // go.cheat: nur wenn die Chance reicht. Ein Fehlschlag kostet den Zug (wie ein
+  // Pass); ab dem zweiten Cheat der Partie droht dazu mit 10 % der Auswurf.
+  // cheatOk = Zugang zur API (faellt nur, wenn getCheatSuccessChance wirft:
+  // kein SF14.2+). cheatBlockedGame = nur fuer diese Partie gesperrt, wenn
+  // playTwoMoves einmal wirft - ein Einzelfehler soll den Cheat nicht bis
+  // zum Skriptneustart abschalten (Skeptiker 27.10.).
+  let cheatOk = true, cheatCount = 0, cheatBlockedGame = false, cheatEndedGame = false;
+  const tryCheat = async (g, n, oppPassed, minGain = CHEAT_OPT.gain) => {
+    if (!cheatOk || cheatBlockedGame || !CHEAT_OPT.capture || cheatCount >= CHEAT_OPT.maxCheats) return null;
+    let p = 0;
+    try { p = ns.go.cheat.getCheatSuccessChance(); } catch { cheatOk = false; return null; }
+    if (p < CHEAT_OPT.pMin) return null;
+    const plan = planKill(g, n, { maxLibs: CHEAT_OPT.maxLibs });
+    if (!plan || plan.gain < minGain) return null;
+    let pending;
+    try {
+      pending = ns.go.cheat.playTwoMoves(Math.floor(plan.a / n), plan.a % n, Math.floor(plan.b / n), plan.b % n);
+    } catch (e) { cheatBlockedGame = true; cheatErrors++; ns.print("Cheat abgelehnt: " + String(e).slice(0, 80)); return null; }
+    cheatCount++; cheats++;
+    searcherSynced = false;
+    const play = await ponderPlain(pending);
+    if (play && play.type === "gameOver") cheatEndedGame = true;
+    else {
+      // Zugverlust erkennen: liegt keiner der beiden Steine, ist der Cheat
+      // fehlgeschlagen (die Antwort des Gegners kann einen davon schlagen,
+      // aber kaum beide in einem Zug).
+      try {
+        const after = parseBoard(ns.go.getBoardState()).g;
+        if (after[plan.a] !== M && after[plan.b] !== M) cheatMissed++;
+      } catch { /* nur Telemetrie */ }
+    }
+    return { play, passed: false };
+  };
+  /** Auf die Antwort warten, ohne Baum (das Brett hat sich durch den Cheat veraendert). */
+  const ponderPlain = async (promise) => {
+    let settled = false;
+    const done = promise.then(() => { settled = true; }, () => { settled = true; });
+    while (!settled) await Promise.race([done, ns.asleep(0)]);
+    return promise;
+  };
+
   /** Ein Zug (oder Pass); gibt die Antwort des Gegners zurueck. */
   const takeTurn = async (oppPassed, turn, komi) => {
     const rows = ns.go.getBoardState();
@@ -563,11 +629,17 @@ export async function main(ns) {
       searcherSynced = true;
     }
     searcher.setContext({ history, blocked });
+    const cheated = await tryCheat(g, n, oppPassed);
+    if (cheated) return cheated;
     for (let tries = 0; tries < 6; tries++) {
       let d;
       if (turn > MAX_TURNS) d = { type: "pass" };
       else { await searchOwn(); d = searcher.result(); }
       statMoves++; statVisits += searcher.rootVisits();
+      if (d.type === "pass" && CHEAT_OPT.endGain < 99) {
+        const c2 = await tryCheat(g, n, oppPassed, CHEAT_OPT.endGain);
+        if (c2) return c2;
+      }
       if (d.type === "pass") {
         searcherSynced = searcher.advance(-1);
         const play = await ponder(ns.go.passTurn());
@@ -618,7 +690,12 @@ export async function main(ns) {
       ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
     }
     let oppPassed = false;
-    searcher = null; searcherSynced = false;
+    searcher = null; searcherSynced = false; cheatCount = 0; cheatBlockedGame = false; cheatEndedGame = false;
+    // Sieg/Niederlage aus den Spielstatistiken statt aus dem Restbrett: ein
+    // Auswurf (forceEndGoGame) bucht eine Niederlage, das Brett kann aber
+    // Schwarz vorn zeigen (Skeptiker 27.10.). getStats ist schon geladen.
+    const statsOf = () => { try { return ns.go.analysis.getStats()[OPPONENT] || null; } catch { return null; } };
+    const s0 = statsOf();
     let komi = KOMI;
     try {
       const gs0 = ns.go.getGameState();
@@ -654,7 +731,11 @@ export async function main(ns) {
     }
     const gs = ns.go.getGameState();
     games++;
-    if (gs.blackScore > gs.whiteScore) won++; else lost++;
+    const s1 = statsOf();
+    if (s0 && s1 && (s1.wins - s0.wins) + (s1.losses - s0.losses) === 1) {
+      if (s1.wins > s0.wins) won++; else lost++;
+      if (cheatEndedGame && s1.losses > s0.losses) ejects++;
+    } else if (gs.blackScore > gs.whiteScore) won++; else lost++;
   };
 
   telemetry();

@@ -182,6 +182,9 @@ for (const datei of dateien) {
   const mitNs = new Set();
   for (const m of code.matchAll(/\bns\s*\.\s*(\w+)/g)) mitNs.add(m[1]);
   for (const m of code.matchAll(/\bns\s*\.\s*(\w+)\s*\.\s*(\w+)/g)) mitNs.add(m[2]);
+  // Dreistufig (ns.go.cheat.playTwoMoves, ns.go.analysis.getStats): sonst
+  // meldet das Werkzeug den Namen als "ohne ns davor" (Skeptiker 27.10.).
+  for (const m of code.matchAll(/\bns\s*\.\s*(\w+)\s*\.\s*(\w+)\s*\.\s*(\w+)/g)) mitNs.add(m[3]);
 
   // ALIASE AUFLOESEN. `const b = ns.bladeburner; ... b.getRank()` ist derselbe
   // Aufruf wie `ns.bladeburner.getRank()` - gewollt und korrekt bepreist. Ohne

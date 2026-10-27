@@ -476,6 +476,11 @@ export async function main(ns) {
   }
 
   let games = 0, won = 0, lost = 0, lastTelemetry = 0;
+  // Cheat-Zaehler fuer die Telemetrie (Skeptiker 27.10.): ohne sie waere ein
+  // Auswurf im Betrieb unsichtbar. cheatMissed = keiner der beiden Steine
+  // liegt danach auf dem Brett (Zugverlust); ejects = Partie endete direkt
+  // nach einem Cheat UND das Spiel hat eine Niederlage gebucht.
+  let cheats = 0, cheatMissed = 0, cheatErrors = 0, ejects = 0;
 
   const telemetry = (extra) => {
     let st = null;
@@ -491,6 +496,7 @@ export async function main(ns) {
       ownPerMove: statMoves ? Math.round(statOwn / statMoves) : null,
       ownMsPerMove: statMoves ? Math.round(statOwnMs / statMoves) : null,
       winStreak: st ? st.winStreak : null,
+      cheats, cheatMissed, cheatErrors, ejects, cheatAccess: cheatOk,
       ...(extra || {}),
     };
     lastTelemetry = Date.now();
@@ -570,9 +576,13 @@ export async function main(ns) {
 
   // go.cheat: nur wenn die Chance reicht. Ein Fehlschlag kostet den Zug (wie ein
   // Pass); ab dem zweiten Cheat der Partie droht dazu mit 10 % der Auswurf.
-  let cheatOk = true, cheatCount = 0;
+  // cheatOk = Zugang zur API (faellt nur, wenn getCheatSuccessChance wirft:
+  // kein SF14.2+). cheatBlockedGame = nur fuer diese Partie gesperrt, wenn
+  // playTwoMoves einmal wirft - ein Einzelfehler soll den Cheat nicht bis
+  // zum Skriptneustart abschalten (Skeptiker 27.10.).
+  let cheatOk = true, cheatCount = 0, cheatBlockedGame = false, cheatEndedGame = false;
   const tryCheat = async (g, n, oppPassed, minGain = CHEAT_OPT.gain) => {
-    if (!cheatOk || !CHEAT_OPT.capture || cheatCount >= CHEAT_OPT.maxCheats) return null;
+    if (!cheatOk || cheatBlockedGame || !CHEAT_OPT.capture || cheatCount >= CHEAT_OPT.maxCheats) return null;
     let p = 0;
     try { p = ns.go.cheat.getCheatSuccessChance(); } catch { cheatOk = false; return null; }
     if (p < CHEAT_OPT.pMin) return null;
@@ -581,10 +591,20 @@ export async function main(ns) {
     let pending;
     try {
       pending = ns.go.cheat.playTwoMoves(Math.floor(plan.a / n), plan.a % n, Math.floor(plan.b / n), plan.b % n);
-    } catch (e) { cheatOk = false; ns.print("Cheat abgelehnt: " + String(e).slice(0, 80)); return null; }
-    cheatCount++;
+    } catch (e) { cheatBlockedGame = true; cheatErrors++; ns.print("Cheat abgelehnt: " + String(e).slice(0, 80)); return null; }
+    cheatCount++; cheats++;
     searcherSynced = false;
     const play = await ponderPlain(pending);
+    if (play && play.type === "gameOver") cheatEndedGame = true;
+    else {
+      // Zugverlust erkennen: liegt keiner der beiden Steine, ist der Cheat
+      // fehlgeschlagen (die Antwort des Gegners kann einen davon schlagen,
+      // aber kaum beide in einem Zug).
+      try {
+        const after = parseBoard(ns.go.getBoardState()).g;
+        if (after[plan.a] !== M && after[plan.b] !== M) cheatMissed++;
+      } catch { /* nur Telemetrie */ }
+    }
     return { play, passed: false };
   };
   /** Auf die Antwort warten, ohne Baum (das Brett hat sich durch den Cheat veraendert). */
@@ -670,7 +690,12 @@ export async function main(ns) {
       ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
     }
     let oppPassed = false;
-    searcher = null; searcherSynced = false; cheatCount = 0;
+    searcher = null; searcherSynced = false; cheatCount = 0; cheatBlockedGame = false; cheatEndedGame = false;
+    // Sieg/Niederlage aus den Spielstatistiken statt aus dem Restbrett: ein
+    // Auswurf (forceEndGoGame) bucht eine Niederlage, das Brett kann aber
+    // Schwarz vorn zeigen (Skeptiker 27.10.). getStats ist schon geladen.
+    const statsOf = () => { try { return ns.go.analysis.getStats()[OPPONENT] || null; } catch { return null; } };
+    const s0 = statsOf();
     let komi = KOMI;
     try {
       const gs0 = ns.go.getGameState();
@@ -706,7 +731,11 @@ export async function main(ns) {
     }
     const gs = ns.go.getGameState();
     games++;
-    if (gs.blackScore > gs.whiteScore) won++; else lost++;
+    const s1 = statsOf();
+    if (s0 && s1 && (s1.wins - s0.wins) + (s1.losses - s0.losses) === 1) {
+      if (s1.wins > s0.wins) won++; else lost++;
+      if (cheatEndedGame && s1.losses > s0.losses) ejects++;
+    } else if (gs.blackScore > gs.whiteScore) won++; else lost++;
   };
 
   telemetry();

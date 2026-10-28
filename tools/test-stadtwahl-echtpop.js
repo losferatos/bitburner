@@ -146,7 +146,10 @@ if (rAusBlackOp && popEchtGeschaetzt) {
   const mV = quelle.match(/const FEIN_VORSPRUNG = ([\d.]+);/);
   pruefe("feinWahl im Quelltext", !!qF && !!mV, qF ? "" : "alte Fassung");
   if (qF && mV) {
-    const feinWahl = new Function("const FEIN_VORSPRUNG = " + mV[1] + ";\n" + qF + "\nreturn feinWahl;")();
+    // RAID_VORRAT_MIN braucht feinWahl seit 28.10. (leere Stadt verlassen).
+    const mR = quelle.match(/const RAID_VORRAT_MIN = (\d+);/);
+    const feinWahl = new Function("const FEIN_VORSPRUNG = " + mV[1] + ";\nconst RAID_VORRAT_MIN = "
+      + (mR ? mR[1] : "3") + ";\n" + qF + "\nreturn feinWahl;")();
     const st = (stadt, pop, chaos, sicher = true, comms = 100) => ({ stadt, pop, chaos, sicher, comms });
     const bn7 = [st("Aevum", 0.766e9, 64.8), st("Chongqing", 1.169e9, 59.6), st("Sector-12", 0.554e9, 22.0),
       st("New Tokyo", 0.217e9, 6.0)];
@@ -167,7 +170,7 @@ if (rAusBlackOp && popEchtGeschaetzt) {
       feinWahl(st("Ishima", 0.6e9, 58), [st("Chongqing", 0.7e9, 40)], 55) === "Chongqing");
   }
   pruefe("Feinwahl haengt am else der groben Regel, gesperrt beim Chaos-Aufraeumen",
-    /STADT_VORSPRUNG\) \{[\s\S]{0,400}\} else if \(!chaosAufraeumen && [\s\S]{0,300}"Diplomacy"[\s\S]{0,600}const ziel = (?:umzug \? null : )?feinWahl\(feinHier, fein, RUNDREISE_MIN_COMMS\);/.test(quelle));
+    /STADT_VORSPRUNG\) \{[\s\S]{0,400}\} else if \(!chaosAufraeumen && [\s\S]{0,300}"Diplomacy"[\s\S]{0,600}const ziel = (?:umzug \? null : )?feinWahl\(feinHier, fein, (?:RUNDREISE|FEIN)_MIN_COMMS\);/.test(quelle));
 }
 
 // Quelltext: der Probenblock stellt die Stadt im finally zurueck und

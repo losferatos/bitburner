@@ -2662,6 +2662,21 @@ export async function main(ns) {
   //
   // hier/liste: { stadt, pop, chaos, sicher, comms }. Rueckgabe: Zielstadt oder null.
   const FEIN_VORSPRUNG = 1.15;
+  // MINDESTGEMEINDEN DER FEINWAHL (28.10.2026, BN13.1, Befund Rang 1.418 bei 11 h).
+  //
+  // Die Feinwahl erbte RUNDREISE_MIN_COMMS = 55 - eine Zahl, die fuer die
+  // Rundreise gilt (wohin man zieht, wenn hier die Gemeinden ausgehen), nicht
+  // fuer die Frage "wo ist die Chance besser". In BN13 stehen die Staedte bei
+  // 21 bis 80 Gemeinden: nur New Tokyo (68) und Aevum (80) lagen ueber 55,
+  // die Feinwahl sah Volhaven (21), Ishima (44), Sector-12 (23), Chongqing
+  // (48) nie. Gemessen im Spielstand 06:15 (nodes/bau-2026-10-28-bn13rang/
+  // modell.cjs, geeicht auf Typhoon 0,1361 gegen 0,136 und Raid-Zeit 86 s):
+  // Raid Stufe 9 in New Tokyo 0,212 (Bev. 0,78 Mrd, Chaos 45), in Volhaven
+  // 0,295 (1,25 Mrd, Chaos 4,7), in Ishima 0,272. Je Raid +4,9 Rang
+  // (11,9 statt 7,05 Erwartungswert), und jeder Raid senkt die Bevoelkerung
+  // der Stadt weiter (-0,75..-1 %). Gemeinden braucht nur Raid; 12 reichen
+  // fuer rund zwei Stunden, danach greift die Rundreise.
+  const FEIN_MIN_COMMS = 12;
   // UMZUG MIT AUFRAEUMEN (17.10.2026). BitNode 7.1, 13:55: Rang 20.448
   // nach 45 h, BN6.3 hatte nach 22 h 181.000. Die Feinwahl (16.10.) sieht
   // nur Staedte, deren Chance JETZT besser ist - und schliesst damit jede
@@ -2738,7 +2753,9 @@ export async function main(ns) {
       / (x.chaos > 50 ? Math.sqrt(1 + x.chaos - 50) : 1);
     if (!hier || !hier.sicher || !(hier.pop > 0)) return null;
     const cHier = chanceFaktor(hier);
-    let beste = null, cBeste = cHier * FEIN_VORSPRUNG;
+    // Hier ausgeraeumt (Raid unmoeglich): jedes Ziel mit Gemeinden zaehlt, ohne Vorsprung.
+    const hierLeer = Number.isFinite(hier.comms) && hier.comms < RAID_VORRAT_MIN;
+    let beste = null, cBeste = hierLeer ? 0 : cHier * FEIN_VORSPRUNG;
     for (const x of liste) {
       if (!x || !x.sicher || x.stadt === hier.stadt) continue;
       if (!(x.pop >= hier.pop)) continue;
@@ -3256,7 +3273,7 @@ export async function main(ns) {
         const umzug = !(raidHier < UMZUG_CHANCE_MAX) ? null : umzugWahl(feinHier, fein, RUNDREISE_MIN_COMMS,
           Math.pow(Math.max(0, cha), 0.045) + cha / 1000, CHAOS_AUS,
           UMZUG_VORSPRUNG, UMZUG_MAX_AKTIONEN, umzugGesperrt, LOW_COMMS_UMZUG_Q);
-        const ziel = umzug ? null : feinWahl(feinHier, fein, RUNDREISE_MIN_COMMS);
+        const ziel = umzug ? null : feinWahl(feinHier, fein, FEIN_MIN_COMMS);
         if (umzug && ns.bladeburner.switchCity(umzug.stadt)) {
           umzugZiel = umzug.stadt;
           umzugBisMs = spielMs + 2 * umzug.aktionen * 60e3 + 30 * 60e3;

@@ -149,6 +149,9 @@ export async function main(ns) {
   // darf angerechnet werden.
   let letzterTraegerWall = traegerGilt && Number.isFinite(leiter && leiter.letzterTraegerWall)
     ? leiter.letzterTraegerWall : null;
+  // Merker fuer das Ende einer Aufraeumphase (28.10.2026, Begruendung beim Fortschreiben).
+  let aufraeumSeitMotorMs = null;
+  const AUFRAEUM_NEU_MIN_MS = 20 * 60000;
   // Der Knotenstempel des Vergleichspunkts - wird mit ihm gesetzt und mit
   // ihm geschrieben. Ist er nicht der aktuelle Knoten, gilt der Punkt nicht.
   let letzterTraegerNodeReset = traegerGilt ? traegerKnoten : null;
@@ -496,6 +499,35 @@ export async function main(ns) {
           letzterTraegerWert = null;
           letzterTraegerMotorMs = null;
           letzterTraegerWall = null;
+        }
+      }
+
+      // NACH DEM AUFRAEUMEN NEU ANSETZEN (28.10.2026, BN13.1, 14:16).
+      // Waehrend `aufraeumen` ruht S2, die Motoruhr seit dem Vergleichspunkt
+      // laeuft aber weiter. Endet das Aufraeumen, ist dMotor laengst ueber
+      // 45 min, der Rang steht genau auf dem Vergleichswert (Diplomacy gibt
+      // null), und der erste gescheiterte Raid (Chance 0,2-0,3, Verlust ~7)
+      // drueckt ihn darunter: S2 sofort, Sprosse 4.5 beendete blade.js.
+      // Skeptiker 28.10.: (1) VOR signale(), sonst feuert S2 in der
+      // Uebergangsrunde noch (Gleichstand zaehlt als Stillstand). (2) Nur nach
+      // einer Phase von mindestens AUFRAEUM_NEU_MIN_MS - ein Bot, der in
+      // kurzen Takten zwischen Aufraeumen und Arbeit flackert, setzte den
+      // Punkt sonst dauernd zurueck und wuerde nie als Haenger erkannt.
+      // Nach einem Waechter-Neustart ist der Merker weg - dann altes Verhalten.
+      if (kpi && kpi.traeger && Number.isFinite(kpi.traeger.wert)) {
+        if (kpi.traeger.aufraeumen === true) {
+          if (aufraeumSeitMotorMs === null) aufraeumSeitMotorMs = motorTimeMs;
+        } else if (aufraeumSeitMotorMs !== null) {
+          const lang = motorTimeMs - aufraeumSeitMotorMs >= AUFRAEUM_NEU_MIN_MS;
+          aufraeumSeitMotorMs = null;
+          if (lang && letzterTraegerWert !== null) {
+            letzterTraegerWert = kpi.traeger.wert;
+            letzterTraegerMotorMs = motorTimeMs;
+            letzterTraegerWall = wall;
+            letzterTraegerNodeReset = ri.lastNodeReset;
+            letzterTraegerName = kpi.traeger.name;
+            sag("Aufraeumen beendet - Vergleichspunkt neu bei Rang " + Math.round(kpi.traeger.wert) + ".");
+          }
         }
       }
 

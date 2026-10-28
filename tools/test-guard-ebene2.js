@@ -675,6 +675,80 @@ console.log("-- ein ECHTER Haenger ist KEIN Fehlkill --");
 }
 
 console.log("");
+console.log("-- nach dem Aufraeumen beginnt der S2-Vergleich neu (28.10.2026) --");
+{
+  // DER FALL VOM 28.10., BN13.1: 60 min Diplomacy (aufraeumen, Rang steht),
+  // danach der erste gescheiterte Raid (-7). Ohne Neuansatz war dMotor schon
+  // ueber 45 min und S2 stand sofort an - Sprosse 4.5 beendete blade.js.
+  const T0 = 3600000;
+  const kpiMit = (wert, auf, mt) => JSON.stringify({ traeger: { name: "rang-netto", wert,
+    motorTimeMs: mt, fehlversuch: null, aufraeumen: auf }, route_state: "open", bestwertStatus: "geeicht" });
+  let runde = 0;
+  const s2Runden = [];
+  const m = await fahre(70, {
+    "data/bn4net.json": JSON.stringify({ wall: W0, motorTimeMs: T0, okRound: 500, errStreak: 0, round: 500 }),
+    "data/blade.json": JSON.stringify({ motorTimeMs: T0, state: "work", errStreak: 0, lastError: null, ts: W0 }),
+    "data/kpi.json": kpiMit(1000, true, T0),
+  }, {}, (ms, z, vor) => {
+    // Signale JEDER Runde mitschreiben - auch die Uebergangsrunde (Skeptiker 28.10.).
+    try {
+      const wj = JSON.parse(z.dateien.home["data/watchdog.json"] || "null");
+      if (wj && (wj.signaleJetzt || []).some((s) => s.sig === "S2")) s2Runden.push(runde);
+    } catch { /* noch nichts geschrieben */ }
+    vor(60000);
+    runde++;
+    const k = JSON.parse(z.dateien.home["data/bn4net.json"]);
+    k.wall = z.wall; k.motorTimeMs += 60000; k.okRound++; k.round++;
+    z.dateien.home["data/bn4net.json"] = JSON.stringify(k);
+    const b = JSON.parse(z.dateien.home["data/blade.json"]);
+    b.motorTimeMs = k.motorTimeMs; b.ts = z.wall;
+    z.dateien.home["data/blade.json"] = JSON.stringify(b);
+    // 60 Runden aufraeumen bei Rang 1000, danach Raid gescheitert: 993.
+    z.dateien.home["data/kpi.json"] = runde < 60 ? kpiMit(1000, true, k.motorTimeMs)
+      : kpiMit(993, false, k.motorTimeMs);
+  });
+  const w = json(m, "data/watchdog.json");
+  const s2 = ((w && w.signaleJetzt) || []).filter((s) => s.sig === "S2");
+  pruefe("kein S2 direkt nach dem Ende des Aufraeumens", s2.length === 0, JSON.stringify(s2));
+  pruefe("auch in keiner einzelnen Runde, die Uebergangsrunde eingeschlossen",
+    s2Runden.length === 0, "S2 in Runde " + s2Runden.join(","));
+  pruefe("der Vergleichspunkt sitzt auf dem Stand am Aufraeumende",
+    !!w && w.letzterTraegerWert === 993, "letzterTraegerWert=" + (w && w.letzterTraegerWert));
+}
+
+console.log("");
+console.log("-- kurzes Flackern zwischen Aufraeumen und Arbeit verdeckt keinen Haenger --");
+{
+  // Skeptiker 28.10.: Setzte jedes Aufraeumende den Punkt zurueck, kaeme S2
+  // bei einem Bot, der in kurzen Takten flackert und nie Rang gewinnt, nie.
+  const T0 = 3600000;
+  const kpiMit = (wert, auf, mt) => JSON.stringify({ traeger: { name: "rang-netto", wert,
+    motorTimeMs: mt, fehlversuch: null, aufraeumen: auf }, route_state: "open", bestwertStatus: "geeicht" });
+  let runde = 0, s2gesehen = false;
+  await fahre(120, {
+    "data/bn4net.json": JSON.stringify({ wall: W0, motorTimeMs: T0, okRound: 500, errStreak: 0, round: 500 }),
+    "data/blade.json": JSON.stringify({ motorTimeMs: T0, state: "work", errStreak: 0, lastError: null, ts: W0 }),
+    "data/kpi.json": kpiMit(1000, false, T0),
+  }, {}, (ms, z, vor) => {
+    try {
+      const wj = JSON.parse(z.dateien.home["data/watchdog.json"] || "null");
+      if (wj && (wj.signaleJetzt || []).some((s) => s.sig === "S2")) s2gesehen = true;
+    } catch { /* leer */ }
+    vor(60000);
+    runde++;
+    const k = JSON.parse(z.dateien.home["data/bn4net.json"]);
+    k.wall = z.wall; k.motorTimeMs += 60000; k.okRound++; k.round++;
+    z.dateien.home["data/bn4net.json"] = JSON.stringify(k);
+    const b = JSON.parse(z.dateien.home["data/blade.json"]);
+    b.motorTimeMs = k.motorTimeMs; b.ts = z.wall;
+    z.dateien.home["data/blade.json"] = JSON.stringify(b);
+    // 5 min aufraeumen, 5 min Arbeit, Rang steht immer bei 1000.
+    z.dateien.home["data/kpi.json"] = kpiMit(1000, Math.floor(runde / 5) % 2 === 0, k.motorTimeMs);
+  });
+  pruefe("S2 kommt trotz Flackern", s2gesehen);
+}
+
+console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {
   for (const wurzel of [path.join(ROOT, "src"),

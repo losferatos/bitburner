@@ -402,9 +402,19 @@ async function main() {
   // gespielt; ohne den Lauf im Punkt rechnete die Schlusszeile mit der Rate
   // aus Lauf 1 und meldete "fertig in 1,6 h" bei Rang 35.
   const gleicherLauf = (p) => p.knoten === knoten && (laufJetzt === null || p.lauf === laufJetzt);
-  const vorher = [...punkte].reverse().find((p) =>
+  // Bevorzugt ein Punkt >= ZAEH_FENSTER_MS zurueck (28.10.2026): bei
+  // stuendlichem /bb sprang die Schlusszeile mit der 1-h-Rate um +-8 Tage
+  // je Besuch (Raid-Streuung, Begruendung am ZAEH-Vergleich). Nur ohne
+  // solchen Punkt (frischer Lauf) gilt das kurze Fenster.
+  const vorherFinden = (min) => [...punkte].reverse().find((p) =>
     gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit)
-    && spielzeit - p.spielzeit >= MIN_FENSTER_MS && p.rang <= rang);
+    && spielzeit - p.spielzeit >= min && p.rang <= rang
+    // Punkte aus dem Sleeve-Nachholbetrieb taugen nicht als Anker (Skeptiker 28.10.).
+    && !(p.sleeveRueckstandS > 1800));
+  // Fuer STEHT das kurze Fenster: ein 1-2 h alter Stillstand soll nicht
+  // hinter dem Anstieg davor verschwinden (Skeptiker 28.10.).
+  const vorherKurz = vorherFinden(MIN_FENSTER_MS);
+  const vorher = vorherFinden(ZAEH_FENSTER_MS) || vorherFinden(MIN_FENSTER_MS);
   // Gibt es Punkte, aber keinen alten genug, ist das eine andere Aussage als
   // "erster Check-in" - und Eric soll den Unterschied sehen.
   const juengster = [...punkte].reverse().find((p) =>
@@ -544,7 +554,7 @@ async function main() {
     const dSpiel = std(spielzeit - vorher.spielzeit);
     const dEcht = std(Date.now() - vorher.ts);
     rate = dSpiel > 0 ? dRang / dSpiel : null;
-    sag("Seit dem letzten Check-in: +" + zahl(dRang) + " Rang in "
+    sag("Seit dem Vergleichspunkt: +" + zahl(dRang) + " Rang in "
       + dauer(dSpiel) + " Spielzeit (" + dauer(dEcht) + " Kalenderzeit"
       + (dEcht > 0 ? ", also " + (dSpiel / dEcht * 100).toFixed(0) + " % der Zeit gespielt" : "")
       + ").");
@@ -693,7 +703,7 @@ async function main() {
 
   if (etaSpiel !== null) {
     if (bericht.gespieltAnteil) {
-      sag("  Bei zuletzt " + (bericht.gespieltAnteil * 100).toFixed(0)
+      sag("  Bei " + (bericht.gespieltAnteil * 100).toFixed(0)
         + " % gespielter Zeit sind das rund " + dauer(etaSpiel / bericht.gespieltAnteil)
         + " Kalenderzeit.");
     }
@@ -737,16 +747,21 @@ async function main() {
         // nicht mit der Fensterrate. Bei kurzem Fenster wird deshalb ueber
         // den juengsten Punkt gemessen, der mindestens 3 h zurueckliegt, und
         // dessen ETA verglichen - abschalten waere blind, nicht ruhig.
-        const kurzesFenster = (bericht.etaQuelle || "linear") === "linear"
-          && Number.isFinite(bericht.rateFensterMs) && bericht.rateFensterMs < ZAEH_FENSTER_MS;
-        if (!kurzesFenster) {
+        // Skeptiker 28.10. (zweite Runde): auch mit 3-h-Fenstern traegt der
+        // Besuch-zu-Besuch-Vergleich den Bias der damaligen ETA und ueberlappt
+        // zu 2/3. Linear wird deshalb IMMER mit zwei getrennten 3-h-Raten
+        // verglichen; der Vergleich der gespeicherten ETAs bleibt nur fuer die
+        // Referenzkurve.
+        const linear = (bericht.etaQuelle || "linear") === "linear";
+        if (!linear) {
           if (delta > Math.max(2, letzteEta.etaSpielstunden * 0.15)) urteil = "ZAEH";
         } else {
           // Skeptiker 28.10.: NICHT gegen die gespeicherte ETA des alten
           // Punkts vergleichen - die stammt selbst aus einer 1-h-Rate (Rauschen
           // nur verlagert) und aus dem damaligen Rest (Bias -hAlt). Stattdessen
           // zwei Raten ueber je >= 3 h, beide auf den HEUTIGEN Rest bezogen.
-          const gut = (p) => gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit);
+          const gut = (p) => gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit)
+            && !(p.sleeveRueckstandS > 1800);
           const alt = [...punkte].reverse().find((p) => gut(p) && p.rang <= rang
             && spielzeit - p.spielzeit >= ZAEH_FENSTER_MS);
           const alt2 = alt && [...punkte].reverse().find((p) => gut(p) && p.rang <= alt.rang
@@ -756,7 +771,7 @@ async function main() {
           const rateNeu = hNeu > 0 ? (rang - alt.rang) / hNeu : 0;
           const rateVor = hVor > 0 ? (alt.rang - alt2.rang) / hVor : 0;
           if (!(rateNeu > 0) || !(rateVor > 0)) {
-            sag("  Kurzes Fenster (" + dauer(std(bericht.rateFensterMs)) + "): ZAEH wird erst"
+            sag("  ZAEH wird erst"
               + " gewertet, wenn zwei Abschnitte von je " + (ZAEH_FENSTER_MS / 3600000)
               + " h vorliegen - die Stundenrate streut zu stark.");
           } else {
@@ -772,8 +787,10 @@ async function main() {
     }
   }
 
-  if (rate !== null && rate <= 0) {
-    sag("Der Rang steht seit dem letzten Check-in still - hier stimmt etwas nicht.");
+  const rateKurz = vorherKurz && Number.isFinite(spielzeit) && !(sleeveRueckstandS > 1800) && spielzeit > vorherKurz.spielzeit
+    ? (rang - vorherKurz.rang) / std(spielzeit - vorherKurz.spielzeit) : null;
+  if ((rate !== null && rate <= 0) || (rateKurz !== null && rateKurz <= 0)) {
+    sag("Der Rang steht seit " + dauer(std(spielzeit - vorherKurz.spielzeit)) + " still - hier stimmt etwas nicht.");
     urteil = "STEHT";
   }
   if (bericht.ausgangFehlt) urteil = "AUSGANG FEHLT";
@@ -1051,7 +1068,7 @@ async function main() {
       // Die Rate: frisch gemessen, sonst die letzte bekannte aus diesem
       // Knotenlauf.
       let r = rate;
-      herkunft = "linear fortgeschrieben, gemessen seit dem letzten Besuch";
+      herkunft = "linear fortgeschrieben, gemessen ueber die letzten " + dauer(std(bericht.rateFensterMs || 0));
       if (!r || r <= 0) {
         const alt = [...punkte].reverse().find((p) =>
           gleicherLauf(p) && Number.isFinite(p.rate) && p.rate > 0);
@@ -1126,7 +1143,7 @@ async function main() {
         // kurz hintereinander, reicht das Fenster nicht fuer eine neue Rate -
         // dann rechnet die Schlusszeile mit der letzten bekannten weiter,
         // statt gar nichts zu sagen.
-        rate: b.rate ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
+        rate: b.rate ?? null, sleeveRueckstandS: b.sleeveRueckstandS ?? null, gespieltAnteil: b.gespieltAnteil ?? null,
         etaQuelle: b.etaQuelle ?? null,
         traegerName: b.traegerName ?? null, traegerWert: b.traegerWert ?? null,
         // Zaehler der Torrunde (gateRoundStatus): der naechste Besuch zeigt,

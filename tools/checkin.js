@@ -136,6 +136,8 @@ const FRISCH_MS = 8 * 60000;
 // Phase, nicht die Rate. Ohne diese Schranke lieferte ein Testlauf am 31.08.
 // aus 0 Minuten Abstand eine Rate von 3.287/h - plausibel aussehender Unsinn.
 const MIN_FENSTER_MS = 45 * 60000;
+// Ab diesem Fenster darf eine linear gesunkene Rate ZAEH ausloesen (Begruendung am Vergleich).
+const ZAEH_FENSTER_MS = 3 * 3600000;
 
 const args = process.argv.slice(2);
 const alsJson = args.includes("--json");
@@ -548,6 +550,7 @@ async function main() {
       + ").");
     if (rate) sag("Rate: " + zahl(rate) + " Rang je Spielstunde.");
     bericht.rate = rate;
+    bericht.rateFensterMs = spielzeit - vorher.spielzeit;
     bericht.gespieltAnteil = dEcht > 0 ? dSpiel / dEcht : null;
   } else if (juengster && Number.isFinite(spielzeit) && spielzeit - juengster.spielzeit < MIN_FENSTER_MS) {
     sag("Der letzte Check-in liegt erst "
@@ -723,7 +726,47 @@ async function main() {
         // Erst eine deutliche Verlaengerung ist ein Befund. Die Referenzkurve
         // hat Stuetzpunkte in unterschiedlichem Abstand; kleine Sprunge sind
         // Interpolation, kein Fortschrittsverlust.
-        if (delta > Math.max(2, letzteEta.etaSpielstunden * 0.15)) urteil = "ZAEH";
+        //
+        // KURZE FENSTER (28.10.2026): Seit /bb stuendlich laeuft, misst die
+        // lineare Rate nur eine Stunde. Raid bei Chance 0,31 laeuft rund
+        // 37-mal je Stunde, die Erfolge streuen um +-25 % (Binomial, sd 2,8
+        // bei 11) - 471 gegen 396 Rang/h war Zufall, kein Befund (Stadt- und
+        // Stufenwahl am 28.10. 11:40 aus dem Spielstand nachgerechnet: beide
+        // richtig). Erst ab 3 h Fenster liegt die Streuung unter der
+        // 15-%-Schwelle. Bei der Referenzkurve gilt das nicht, sie rechnet
+        // nicht mit der Fensterrate. Bei kurzem Fenster wird deshalb ueber
+        // den juengsten Punkt gemessen, der mindestens 3 h zurueckliegt, und
+        // dessen ETA verglichen - abschalten waere blind, nicht ruhig.
+        const kurzesFenster = (bericht.etaQuelle || "linear") === "linear"
+          && Number.isFinite(bericht.rateFensterMs) && bericht.rateFensterMs < ZAEH_FENSTER_MS;
+        if (!kurzesFenster) {
+          if (delta > Math.max(2, letzteEta.etaSpielstunden * 0.15)) urteil = "ZAEH";
+        } else {
+          // Skeptiker 28.10.: NICHT gegen die gespeicherte ETA des alten
+          // Punkts vergleichen - die stammt selbst aus einer 1-h-Rate (Rauschen
+          // nur verlagert) und aus dem damaligen Rest (Bias -hAlt). Stattdessen
+          // zwei Raten ueber je >= 3 h, beide auf den HEUTIGEN Rest bezogen.
+          const gut = (p) => gleicherLauf(p) && Number.isFinite(p.rang) && Number.isFinite(p.spielzeit);
+          const alt = [...punkte].reverse().find((p) => gut(p) && p.rang <= rang
+            && spielzeit - p.spielzeit >= ZAEH_FENSTER_MS);
+          const alt2 = alt && [...punkte].reverse().find((p) => gut(p) && p.rang <= alt.rang
+            && alt.spielzeit - p.spielzeit >= ZAEH_FENSTER_MS);
+          const hNeu = alt ? (spielzeit - alt.spielzeit) / 3600000 : 0;
+          const hVor = alt2 ? (alt.spielzeit - alt2.spielzeit) / 3600000 : 0;
+          const rateNeu = hNeu > 0 ? (rang - alt.rang) / hNeu : 0;
+          const rateVor = hVor > 0 ? (alt.rang - alt2.rang) / hVor : 0;
+          if (!(rateNeu > 0) || !(rateVor > 0)) {
+            sag("  Kurzes Fenster (" + dauer(std(bericht.rateFensterMs)) + "): ZAEH wird erst"
+              + " gewertet, wenn zwei Abschnitte von je " + (ZAEH_FENSTER_MS / 3600000)
+              + " h vorliegen - die Stundenrate streut zu stark.");
+          } else {
+            const etaNeu = restNetto / rateNeu, etaVor = restNetto / rateVor;
+            sag("  Ueber " + dauer(hNeu) + ": " + zahl(rateNeu) + " Rang/h, davor (" + dauer(hVor)
+              + ") " + zahl(rateVor) + " Rang/h - die Stundenrate streut zu stark fuer ein Urteil.");
+            bericht.zaehFensterH = hNeu;
+            if (etaNeu - etaVor > Math.max(2, etaVor * 0.15)) urteil = "ZAEH";
+          }
+        }
         bericht.etaDelta = delta;
       }
     }

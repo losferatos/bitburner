@@ -75,6 +75,7 @@ import {
   zahlAusArgv,
 } from "./instanz.js";
 import { sichere, lesenKennwerte, alterJuengsteMin, letzterEintrag } from "./backup.js";
+import { createHistory } from "./history.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -147,6 +148,48 @@ const IST_LIVE_ROLLE = ROLLE.instance === "LIVE";
 const RFA_PORT = zahlAusArgv(argv, "--rfa-port", ROLLE.rfaPort);
 const DASHBOARD_PORT = zahlAusArgv(argv, "--dash-port", ROLLE.dashPort);
 const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDir));
+const history = createHistory({
+  file: path.join(DATA_DIR, "dashboard-history.json"),
+  request: (method, params) => request(method, params),
+  // bn4net.json liest pollTelemetry ohnehin alle 2 s.
+  getNet: () => state.telemetry,
+  log: (t) => log("warn", t),
+});
+
+/**
+ * DAS URTEIL FUER DAS DASHBOARD (29.10.2026). Das Dashboard rechnete ETA,
+ * Tempo und Rate zuerst selbst nach - eine zweite Implementierung neben
+ * tools/checkin.js, die nach einer Offline-Nacht anders urteilte
+ * (Skeptiker A und C). Jetzt laeuft checkin.js selbst, alle 5 min, ohne
+ * seinen Verlauf fortzuschreiben (--kein-stand), und das Dashboard zeigt
+ * genau, was /bb sagen wuerde. Nur fuer LIVE: checkin.js spricht fest
+ * localhost:8795 an.
+ */
+const VERDICT_MS = 5 * 60000;
+const verdict = { at: null, report: null, error: null, running: false, startedAt: 0 };
+function holeVerdict() {
+  if (ROLLE.instance !== "LIVE") return;
+  // Wachhund: kam der Rueckruf nie (haengender Kindprozess), nach 3 min freigeben.
+  if (verdict.running && Date.now() - verdict.startedAt < 180000) return;
+  verdict.running = true;
+  verdict.startedAt = Date.now();
+  // checkin.js holt ~18 Dateien nacheinander mit je 8 s Abbruch - 150 s Luft.
+  execFile(process.execPath, [path.join(ROOT, "tools", "checkin.js"), "--json", "--kein-stand"],
+    { cwd: ROOT, timeout: 150000, windowsHide: true, maxBuffer: 8 * 1024 * 1024 },
+    (err, stdout, stderr) => {
+      verdict.running = false;
+      // checkin.js endet mit Code 1, wenn das Urteil nicht "gut" ist - die
+      // Ausgabe gilt trotzdem. Nur ohne lesbares JSON ist es ein Fehler.
+      try {
+        verdict.report = JSON.parse(stdout);
+        verdict.at = Date.now();
+        verdict.error = null;
+      } catch {
+        const tail = String(stderr || "").trim().split(/\r?\n/).slice(-2).join(" | ");
+        verdict.error = (tail || (err && err.message) || "keine JSON-Ausgabe").slice(0, 300);
+      }
+    });
+}
 
 /**
  * WELCHEN ORDNER DER WATCHER BEOBACHTET - und warum das ueberhaupt ein
@@ -842,6 +885,17 @@ async function schreibeLogZeile(zeile) {
   } catch {
     // Ein fehlgeschlagenes Logschreiben darf die Bruecke nicht umbringen.
   }
+}
+
+// Hoechstens eine Zeile je Schluessel und Minute - fuer Meldungen, die eine
+// fremde Seite in einer Schleife ausloesen koennte (29.10.2026).
+const drosselStand = new Map();
+function drosselLog(schluessel, message) {
+  const jetzt = Date.now();
+  if (jetzt - (drosselStand.get(schluessel) || 0) < 60000) return;
+  drosselStand.set(schluessel, jetzt);
+  if (drosselStand.size > 200) drosselStand.delete(drosselStand.keys().next().value);
+  log("warn", message);
 }
 
 function log(level, message) {
@@ -2395,7 +2449,16 @@ const MIME = {
 
 function startDashboard() {
   return new Promise((fertig) => {
+  const erlaubteHosts = new Set(["localhost:" + DASHBOARD_PORT, "127.0.0.1:" + DASHBOARD_PORT, "[::1]:" + DASHBOARD_PORT]);
   const server = createServer(async (req, res) => {
+    // NUR UNTER EIGENEM NAMEN (29.10.2026, Skeptiker). Eine per DNS-Rebinding
+    // auf 127.0.0.1 gelenkte Seite ist fuer den Browser same-origin und
+    // schickt keinen Origin - erkennbar ist sie nur am Host-Kopf.
+    if (!erlaubteHosts.has(String(req.headers.host || "").toLowerCase())) {
+      drosselLog("host:" + req.headers.host, "Anfrage mit fremdem Host abgewiesen: " + req.headers.host);
+      res.writeHead(403).end("verboten");
+      return;
+    }
     const url = new URL(req.url, "http://localhost");
 
     if (url.pathname === "/events") {
@@ -2425,6 +2488,54 @@ function startDashboard() {
       return;
     }
 
+    // VERLAUF UND VORLAUF FUER DAS DASHBOARD (29.10.2026). Nur lesend, nur
+    // feste Pfade - kein Dateiname aus der URL erreicht das Dateisystem.
+    if (url.pathname === "/api/history") {
+      let samples;
+      try {
+        samples = await history.readList();
+      } catch (e) {
+        res.writeHead(500, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "Verlauf nicht lesbar: " + e.message }));
+        return;
+      }
+      // Nur der laufende Knotenlauf - sonst gingen 14 Tage ueber die Leitung.
+      const nr = Number(url.searchParams.get("nodeReset"));
+      if (Number.isFinite(nr) && nr > 0) samples = samples.filter((x) => x.nodeReset === nr);
+      let checkins = [];
+      try {
+        const c = JSON.parse(await readFile(path.join(ROOT, "data", "checkin.json"), "utf8"));
+        if (Array.isArray(c.punkte)) checkins = c.punkte;
+      } catch { /* noch kein Check-in */ }
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ samples, checkins }));
+      return;
+    }
+
+    if (url.pathname === "/api/verdict") {
+      res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+      res.end(JSON.stringify({ at: verdict.at, error: verdict.error, running: verdict.running, everyMs: VERDICT_MS, report: verdict.report }));
+      return;
+    }
+
+    if (url.pathname === "/api/refcurve") {
+      const node = url.searchParams.get("node") || "";
+      if (!/^[0-9]{1,2}$/.test(node)) {
+        res.writeHead(400, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "node muss eine Zahl sein" }));
+        return;
+      }
+      try {
+        const roh = await readFile(path.join(ROOT, "doku", "rangkurve-bn" + Number(node) + ".json"), "utf8");
+        res.writeHead(200, { "Content-Type": MIME[".json"], "Cache-Control": "no-store" });
+        res.end(roh);
+      } catch {
+        res.writeHead(404, { "Content-Type": MIME[".json"] });
+        res.end(JSON.stringify({ error: "keine Kurve fuer BitNode " + Number(node) }));
+      }
+      return;
+    }
+
     if (url.pathname === "/api/state") {
       res.writeHead(200, { "Content-Type": MIME[".json"] });
       res.end(
@@ -2449,6 +2560,24 @@ function startDashboard() {
      * route.json sind der Rueckweg des Bots aus jedem Zustand.
      */
     if (url.pathname === "/api/rpc") {
+      // FREMDE SEITEN DUERFEN NICHT (29.10.2026, Skeptiker B). Ohne diese
+      // Pruefung konnte jede Webseite im Browser per blindem GET Steuer-
+      // dateien nach data/ schreiben - instance=LIVE ist erratbar, und data/
+      // ist vom Master-Riegel ausgenommen. Erlaubt bleiben: Aufrufe ohne
+      // Browser (Node-Werkzeuge schicken weder Origin noch Sec-Fetch-Site),
+      // direkt aufgerufene URLs (Sec-Fetch-Site: none) und das Dashboard
+      // selbst (same-origin).
+      {
+        const origin = req.headers.origin;
+        const site = req.headers["sec-fetch-site"];
+        const eigene = ["http://localhost:" + DASHBOARD_PORT, "http://127.0.0.1:" + DASHBOARD_PORT];
+        if ((origin && !eigene.includes(origin)) || site === "cross-site" || site === "same-site") {
+          drosselLog("origin:" + (origin || site), "/api/rpc von fremder Herkunft abgewiesen: " + (origin || site));
+          res.writeHead(403, { "Content-Type": MIME[".json"] });
+          res.end(JSON.stringify({ error: "fremde Herkunft" }));
+          return;
+        }
+      }
       /**
        * =====================================================================
        * GROSSE DATEIEN PASSEN NICHT IN EINE URL (04.09.2026, 18:00)
@@ -2926,6 +3055,29 @@ watchScripts();
 setInterval(() => {
   void pollTelemetry().catch(() => {});
 }, POLL_INTERVAL_MS);
+
+// Verlauf fuer das Dashboard (sync/history.js). Der Takt fragt alle 30 s,
+// ob eine Probe faellig ist; geschrieben wird hoechstens alle 5 min.
+setInterval(() => {
+  if (!istVerifiziert()) return;
+  void history.maybeSample().catch((e) => log("warn", "Verlauf: " + e.message));
+}, 30000);
+
+setTimeout(holeVerdict, 20000);
+setInterval(holeVerdict, VERDICT_MS);
+// Nach dem (Wieder-)Verbinden nicht bis zu 5 min ein BLIND/SPIEL ZU stehen
+// lassen; in Uebergangszustaenden jede Minute neu urteilen (Skeptiker).
+{
+  let warVerifiziert = false;
+  const UEBERGANG = new Set(["BLIND", "SPIEL ZU", "SPRINGT", "BLOCKIERT"]);
+  setInterval(() => {
+    const jetzt = istVerifiziert();
+    if (jetzt && !warVerifiziert) setTimeout(holeVerdict, 15000);
+    warVerifiziert = jetzt;
+    const u = verdict.report && verdict.report.urteil;
+    if (UEBERGANG.has(u) && Date.now() - (verdict.at || 0) > 60000) holeVerdict();
+  }, 15000);
+}
 
 setInterval(() => {
   void schreibeHeartbeat();

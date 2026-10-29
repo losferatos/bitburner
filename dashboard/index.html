@@ -1,344 +1,1288 @@
 <!doctype html>
+<html lang="en">
+<head>
 <meta charset="utf-8">
-<title>Bitburner - Lage</title>
+<title>Bitburner Ops</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%230a0e13'/%3E%3Cpath d='M4 11l3-3-3-3M8 11h4' stroke='%233ee0a8' stroke-width='1.6' fill='none' stroke-linecap='round'/%3E%3C/svg%3E">
 <style>
-  /* Bewusst eine einzige Datei ohne Abhaengigkeiten: Die Seite muss auch
-     dann noch aufgehen, wenn sonst nichts mehr laeuft ausser der Bruecke. */
+  /* Eine einzige Datei ohne Abhaengigkeiten (wie die Vorgaengerin): die Seite
+     muss auch dann aufgehen, wenn ausser der Bruecke nichts mehr laeuft. */
   :root {
-    --bg: #0b0f14; --card: #131a23; --line: #1f2b38;
-    --fg: #d7e3f0; --dim: #7d90a5; --ok: #35d07f; --warn: #f0b429; --bad: #f2545b;
-    --bar: #2a3b4d; --accent: #4aa8ff;
+    --bg: #090d12; --panel: #0f151d; --panel-2: #131b25; --line: #1c2733; --line-2: #263443;
+    --fg: #e4ecf5; --dim: #8b9cb1; --faint: #5a6a7d;
+    --accent: #3ee0a8; --accent-soft: rgba(62, 224, 168, .13);
+    --blue: #5aa9ff; --blue-soft: rgba(90, 169, 255, .12); --ref: #b48cff;
+    --warn: #f2b23a; --warn-soft: rgba(242, 178, 58, .12);
+    --bad: #ff5d6c; --bad-soft: rgba(255, 93, 108, .12);
+    --mono: "JetBrains Mono", "Cascadia Mono", "Cascadia Code", ui-monospace, Consolas, monospace;
+    --sans: "Inter", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    --radius: 10px;
   }
   * { box-sizing: border-box; }
-  body {
-    margin: 0; padding: 18px; background: var(--bg); color: var(--fg);
-    font: 14px/1.45 "Segoe UI", system-ui, sans-serif;
+  html { background: var(--bg); }
+  body { margin: 0; background: var(--bg); color: var(--fg); font: 14px/1.45 var(--sans); -webkit-font-smoothing: antialiased; }
+  .wrap { max-width: 1480px; margin: 0 auto; padding: 18px 20px 28px; }
+  .num { font-family: var(--mono); font-variant-numeric: tabular-nums; letter-spacing: -.01em; }
+  .dim { color: var(--dim); } .faint { color: var(--faint); }
+  .ok-t { color: var(--accent); } .warn-t { color: var(--warn); } .bad-t { color: var(--bad); } .blue-t { color: var(--blue); }
+
+  /* ---------- Kopfzeile ---------- */
+  header.top { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; padding: 4px 2px 14px; }
+  .brand { display: flex; align-items: center; gap: 10px; }
+  .brand h1 { margin: 0; font-size: 15px; letter-spacing: .14em; font-weight: 700; }
+  .brand h1 span { color: var(--accent); }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--faint); flex: none; }
+  .dot.ok { background: var(--accent); box-shadow: 0 0 0 4px var(--accent-soft); animation: pulse 2.4s infinite; }
+  .dot.info { background: var(--blue); box-shadow: 0 0 0 4px var(--blue-soft); }
+  .dot.bad { background: var(--bad); box-shadow: 0 0 0 4px var(--bad-soft); }
+  .dot.warn { background: var(--warn); box-shadow: 0 0 0 4px var(--warn-soft); }
+  @keyframes pulse { 50% { box-shadow: 0 0 0 7px rgba(62,224,168,0); } }
+  .chips { display: flex; gap: 8px; flex-wrap: wrap; }
+  .chip { display: inline-flex; align-items: center; gap: 6px; padding: 3px 10px; border: 1px solid var(--line-2); border-radius: 999px; font-size: 12px; color: var(--dim); background: var(--panel); white-space: nowrap; }
+  .chip b { color: var(--fg); font-weight: 600; }
+  .chip.ok { border-color: rgba(62,224,168,.4); color: var(--accent); }
+  .chip.warn { border-color: rgba(242,178,58,.45); color: var(--warn); background: var(--warn-soft); }
+  .spacer { flex: 1; }
+  .updated { font-size: 12px; color: var(--faint); }
+  .updated.stall { color: var(--bad); }
+
+  /* ---------- Urteil ---------- */
+  .verdict {
+    display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 4px 16px; align-items: center;
+    padding: 14px 18px; border-radius: var(--radius); border: 1px solid var(--line-2); background: var(--panel); margin-bottom: 14px;
   }
-  h1 { font-size: 15px; margin: 0; font-weight: 600; letter-spacing: .04em; }
-  h2 {
-    font-size: 11px; margin: 0 0 10px; color: var(--dim);
-    text-transform: uppercase; letter-spacing: .12em; font-weight: 600;
+  .verdict .badge { font: 700 12px/1 var(--sans); letter-spacing: .12em; text-transform: uppercase; padding: 7px 11px; border-radius: 7px; white-space: nowrap; }
+  .verdict .msg { font-size: 15px; font-weight: 550; }
+  .verdict .meta { font-size: 12px; color: var(--faint); text-align: right; }
+  .verdict details { grid-column: 1 / -1; margin-top: 6px; }
+  .verdict summary { cursor: pointer; color: var(--dim); font-size: 12px; list-style: none; }
+  .verdict summary::-webkit-details-marker { display: none; }
+  .verdict summary::before { content: "▸ "; } .verdict details[open] summary::before { content: "▾ "; }
+  .verdict pre { margin: 8px 0 0; font: 12px/1.55 var(--mono); color: var(--dim); white-space: pre-wrap; overflow-wrap: anywhere; max-height: 340px; overflow: auto; }
+  .v-ok { border-color: rgba(62,224,168,.35); background: linear-gradient(90deg, rgba(62,224,168,.08), var(--panel) 60%); }
+  .v-ok .badge { background: var(--accent); color: #052018; }
+  .v-info { border-color: rgba(90,169,255,.4); background: linear-gradient(90deg, var(--blue-soft), var(--panel) 60%); }
+  .v-info .badge { background: var(--blue); color: #04142a; }
+  .v-warn { border-color: rgba(242,178,58,.45); background: linear-gradient(90deg, var(--warn-soft), var(--panel) 60%); }
+  .v-warn .badge { background: var(--warn); color: #2a1a00; }
+  .v-bad { border-color: rgba(255,93,108,.5); background: linear-gradient(90deg, var(--bad-soft), var(--panel) 60%); }
+  .v-bad .badge { background: var(--bad); color: #2a0006; }
+  .v-muted .badge { background: var(--line-2); color: var(--fg); }
+  @media (max-width: 760px) { .verdict { grid-template-columns: 1fr; } .verdict .meta { text-align: left; } }
+
+  /* ---------- Meldungen ---------- */
+  #alerts { display: grid; gap: 8px; margin-bottom: 14px; }
+  #alerts:empty { display: none; }
+  .alert { display: flex; gap: 12px; align-items: flex-start; padding: 10px 14px; border-radius: var(--radius); border: 1px solid; font-size: 13px; }
+  .alert.bad { border-color: rgba(255,93,108,.45); background: var(--bad-soft); }
+  .alert.warn { border-color: rgba(242,178,58,.4); background: var(--warn-soft); }
+  .alert.info { border-color: var(--line-2); background: var(--panel); }
+  .alert strong { white-space: nowrap; }
+  .alert.bad strong { color: var(--bad); } .alert.warn strong { color: var(--warn); }
+
+  /* ---------- Raster ---------- */
+  .grid { display: grid; grid-template-columns: repeat(12, minmax(0, 1fr)); gap: 14px; }
+  .s3 { grid-column: span 3; } .s4 { grid-column: span 4; } .s5 { grid-column: span 5; }
+  .s8 { grid-column: span 8; } .s12 { grid-column: 1 / -1; }
+  @media (max-width: 1180px) {
+    .grid { grid-template-columns: repeat(6, minmax(0, 1fr)); }
+    .s3, .s4, .s5 { grid-column: span 3; } .s8, .s12 { grid-column: 1 / -1; }
   }
-  header {
-    display: flex; align-items: center; gap: 12px; flex-wrap: wrap;
-    margin-bottom: 16px;
+  @media (max-width: 760px) {
+    .wrap { padding: 12px 12px 24px; }
+    .grid { grid-template-columns: minmax(0, 1fr); }
+    .grid > * { grid-column: 1 / -1 !important; }
   }
-  #dot { width: 10px; height: 10px; border-radius: 50%; background: var(--dim); flex: none; }
-  #dot.ok { background: var(--ok); box-shadow: 0 0 8px var(--ok); }
-  #dot.bad { background: var(--bad); box-shadow: 0 0 8px var(--bad); }
-  #status { color: var(--dim); font-size: 12px; }
-  .grid { display: grid; gap: 12px; grid-template-columns: repeat(auto-fit, minmax(270px, 1fr)); }
-  .card { background: var(--card); border: 1px solid var(--line); border-radius: 8px; padding: 14px; }
-  .card.wide { grid-column: 1 / -1; }
-  .big { font-size: 26px; font-weight: 600; letter-spacing: -.01em; }
-  .row { display: flex; justify-content: space-between; gap: 12px; padding: 3px 0; }
-  .row span:last-child { color: var(--fg); font-variant-numeric: tabular-nums; }
-  .row span:first-child { color: var(--dim); }
-  .bar { height: 8px; background: var(--bar); border-radius: 4px; overflow: hidden; margin: 9px 0 5px; }
-  .bar > i { display: block; height: 100%; background: var(--accent); transition: width .4s; }
-  .bar.done > i { background: var(--ok); }
-  .sub { color: var(--dim); font-size: 12px; font-variant-numeric: tabular-nums; }
-  .age { font-variant-numeric: tabular-nums; }
-  .age.stale { color: var(--warn); }
-  .age.dead { color: var(--bad); }
-  .pill {
-    display: inline-block; padding: 1px 8px; border-radius: 999px;
-    font-size: 11px; border: 1px solid var(--line); color: var(--dim);
-  }
-  .pill.on { color: var(--ok); border-color: var(--ok); }
-  footer { margin-top: 16px; color: var(--dim); font-size: 12px; }
-  .hint { color: var(--warn); }
+  .card { background: linear-gradient(180deg, var(--panel-2), var(--panel) 120px); border: 1px solid var(--line); border-radius: var(--radius); padding: 15px 16px; min-width: 0; position: relative; }
+  .card.stale { opacity: .6; }
+  .card-h { display: flex; align-items: center; gap: 8px; margin: 0 0 12px; min-height: 18px; }
+  .card-h h2 { margin: 0; font-size: 11px; font-weight: 650; color: var(--dim); text-transform: uppercase; letter-spacing: .13em; }
+  .card-h .age { margin-left: auto; font-size: 11px; color: var(--faint); font-family: var(--mono); white-space: nowrap; }
+  .card-h .age.stale { color: var(--warn); } .card-h .age.dead { color: var(--bad); }
+
+  .big { font-size: 34px; font-weight: 650; line-height: 1.1; letter-spacing: -.02em; }
+  .big small { font-size: 16px; color: var(--dim); font-weight: 500; letter-spacing: 0; }
+  .mid { font-size: 20px; font-weight: 600; letter-spacing: -.01em; }
+  .sub { color: var(--dim); font-size: 12.5px; margin-top: 6px; }
+  .kv { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: 5px 14px; font-size: 13px; }
+  .kv > :nth-child(odd) { color: var(--dim); }
+  .kv > :nth-child(even) { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .sep { border: 0; border-top: 1px solid var(--line); margin: 12px 0; }
+
+  .bar { height: 8px; background: #1a2532; border-radius: 99px; overflow: hidden; position: relative; }
+  .bar > i { position: absolute; inset: 0 auto 0 0; border-radius: 99px; background: var(--accent); transition: width .5s ease; }
+  .bar.blue > i { background: var(--blue); } .bar.warn > i { background: var(--warn); } .bar.bad > i { background: var(--bad); } .bar.ref > i { background: var(--ref); }
+  .bar.thin { height: 5px; }
+  .meter { display: grid; grid-template-columns: 84px 1fr 64px; gap: 10px; align-items: center; font-size: 12.5px; margin: 7px 0; }
+  .meter > span:first-child { color: var(--dim); }
+  .meter > span:last-child { text-align: right; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+
+  .stat-row { display: flex; gap: 22px; flex-wrap: wrap; margin-top: 14px; }
+  .stat .lbl { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .1em; }
+  .stat .val { font-size: 17px; font-weight: 600; font-family: var(--mono); font-variant-numeric: tabular-nums; }
+  .stat .val small { font-size: 11px; color: var(--faint); font-weight: 400; }
+
+  .ringbox { display: flex; gap: 16px; align-items: center; }
+  .ring { flex: none; } .ring text { font-family: var(--mono); }
+
+  .chart { width: 100%; height: 300px; display: block; }
+  .chart .grid-l { stroke: var(--line); stroke-width: 1; }
+  .chart .axis-t { fill: var(--faint); font: 11px var(--mono); }
+  .chart-tools { display: flex; gap: 6px; margin-left: auto; }
+  .seg { display: inline-flex; border: 1px solid var(--line-2); border-radius: 7px; overflow: hidden; }
+  .seg button { background: transparent; border: 0; color: var(--dim); padding: 3px 10px; font: 12px var(--sans); cursor: pointer; }
+  .seg button.on { background: var(--accent-soft); color: var(--accent); }
+  .legend { display: flex; gap: 16px; flex-wrap: wrap; font-size: 12px; color: var(--dim); margin-top: 6px; }
+  .legend i { display: inline-block; width: 14px; height: 3px; border-radius: 2px; vertical-align: middle; margin-right: 6px; }
+  .tip { position: absolute; pointer-events: none; background: #0b1118; border: 1px solid var(--line-2); border-radius: 8px; padding: 7px 10px; font-size: 12px; white-space: nowrap; display: none; z-index: 5; box-shadow: 0 6px 24px rgba(0,0,0,.45); }
+  .chart-wrap { position: relative; }
+
+  .list { display: grid; gap: 2px; }
+  .bo { display: grid; grid-template-columns: 18px minmax(0, 1fr) 54px 50px; gap: 8px; align-items: center; font-size: 12.5px; padding: 3px 0; }
+  .bo .n { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .bo .req { color: var(--faint); text-align: right; font-family: var(--mono); font-size: 11.5px; }
+  .bo .pct { text-align: right; font-family: var(--mono); font-size: 12px; }
+  .bo.done .n { color: var(--faint); text-decoration: line-through; text-decoration-color: var(--line-2); }
+  .bo.next { background: var(--accent-soft); border-radius: 6px; margin: 0 -6px; padding: 3px 6px; }
+  .bo .mark { width: 14px; height: 14px; border-radius: 4px; border: 1px solid var(--line-2); display: grid; place-items: center; font-size: 10px; }
+  .bo.done .mark { background: var(--accent); border-color: var(--accent); color: #062018; }
+  .scroll { max-height: 360px; overflow: auto; padding-right: 4px; }
+  .scroll::-webkit-scrollbar, .log::-webkit-scrollbar, .verdict pre::-webkit-scrollbar { width: 8px; }
+  .scroll::-webkit-scrollbar-thumb, .log::-webkit-scrollbar-thumb, .verdict pre::-webkit-scrollbar-thumb { background: var(--line-2); border-radius: 8px; }
+
+  .ev { display: grid; grid-template-columns: 58px minmax(0, 1fr); gap: 10px; font-size: 12.5px; padding: 5px 0; border-bottom: 1px dashed var(--line); }
+  .ev:last-child { border-bottom: 0; }
+  .ev time { color: var(--faint); font-family: var(--mono); font-size: 11.5px; }
+  .tag { display: inline-block; font-size: 10.5px; padding: 0 6px; border-radius: 4px; border: 1px solid var(--line-2); color: var(--dim); margin-right: 6px; font-family: var(--mono); }
+  .tag.ok { color: var(--accent); border-color: rgba(62,224,168,.35); }
+  .tag.warn { color: var(--warn); border-color: rgba(242,178,58,.4); }
+  .tag.bad { color: var(--bad); border-color: rgba(255,93,108,.45); }
+
+  .log { font: 12px/1.55 var(--mono); max-height: 300px; overflow: auto; }
+  .log div { display: grid; grid-template-columns: 64px minmax(0, 1fr); gap: 10px; padding: 1px 0; }
+  .log time { color: var(--faint); }
+  .log .warn { color: var(--warn); } .log .error { color: var(--bad); }
+  .log span { overflow-wrap: anywhere; }
+
+  .route { display: flex; flex-wrap: wrap; gap: 6px; }
+  .rt { display: grid; min-width: 54px; padding: 5px 8px; border-radius: 7px; border: 1px solid var(--line-2); background: var(--panel); font-size: 12px; text-align: center; }
+  .rt b { font-family: var(--mono); font-size: 12.5px; }
+  .rt small { color: var(--faint); font-size: 10px; letter-spacing: .06em; }
+  .rt.done { background: rgba(62,224,168,.07); border-color: rgba(62,224,168,.26); color: var(--dim); }
+  .rt.done b { color: var(--accent); }
+  .rt.cur { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); background: var(--accent-soft); }
+  .rt.skip { border-style: dashed; border-color: rgba(242,178,58,.5); }
+  .route-sum { display: flex; align-items: center; gap: 14px; margin-bottom: 12px; flex-wrap: wrap; }
+
+  .src { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; font-size: 12px; }
+  .src span:nth-child(odd) { font-family: var(--mono); color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .src span:nth-child(even) { text-align: right; font-family: var(--mono); }
+
+  .mini-h { font-size: 11px; color: var(--faint); text-transform: uppercase; letter-spacing: .1em; margin: 0 0 7px; }
+  .empty { color: var(--faint); font-size: 12.5px; font-style: italic; }
+  footer { margin-top: 18px; color: var(--faint); font-size: 12px; display: flex; gap: 16px; flex-wrap: wrap; }
+  .spark { width: 100%; height: 46px; display: block; margin-top: 8px; }
 </style>
+</head>
+<body>
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><span id="dot" class="dot"></span><h1>BITBURNER <span>OPS</span></h1></div>
+    <div class="chips" id="topchips"></div>
+    <div class="spacer"></div>
+    <div class="updated" id="updated">connecting…</div>
+  </header>
 
-<header>
-  <span id="dot"></span>
-  <h1>BITBURNER</h1>
-  <span id="status">verbinde...</span>
-</header>
+  <!-- Das Urteil von tools/checkin.js - dieselbe Antwort wie /bb -->
+  <section class="verdict v-muted" id="verdict">
+    <span class="badge" id="v-badge">…</span>
+    <span class="msg" id="v-msg">Waiting for the first verdict.</span>
+    <span class="meta" id="v-meta"></span>
+    <details id="v-details"><summary>Full check-in report</summary><pre id="v-lines"></pre></details>
+  </section>
 
-<div class="grid">
-  <div class="card wide">
-    <h2>Knotenausgang</h2>
-    <div class="big" id="hack">-</div>
-    <div class="bar"><i id="hackbar" style="width:0"></i></div>
-    <div class="sub" id="hacksub">-</div>
+  <div id="alerts"></div>
+
+  <div class="grid">
+    <section class="card s5" id="c-carrier">
+      <div class="card-h"><h2 id="carrier-title">Bladeburner rank</h2><span class="age" data-src="blade"></span></div>
+      <div class="big num" id="carrier-big">–</div>
+      <div class="meter" style="margin-top:14px"><span id="bar1-l">Rank</span><div class="bar" id="bar1"><i style="width:0"></i></div><span id="bar1-v">–</span></div>
+      <div class="meter" id="bar2-row"><span id="bar2-l">Time</span><div class="bar ref" id="bar2"><i style="width:0"></i></div><span id="bar2-v">–</span></div>
+      <div class="sub" id="carrier-sub">–</div>
+      <div class="stat-row" id="carrier-stats"></div>
+    </section>
+
+    <section class="card s4" id="c-eta">
+      <div class="card-h"><h2>Node finish</h2><span class="age" data-src="verdict"></span></div>
+      <div class="mid" id="eta-big">–</div>
+      <div class="sub" id="eta-sub">–</div>
+      <hr class="sep">
+      <div class="kv" id="eta-kv"></div>
+    </section>
+
+    <section class="card s3" id="c-bo">
+      <div class="card-h"><h2>Black Ops</h2><span class="age" data-src="blade"></span></div>
+      <div class="ringbox">
+        <svg class="ring" id="bo-ring" width="96" height="96" viewBox="0 0 96 96"></svg>
+        <div style="min-width:0">
+          <div class="dim" style="font-size:12px">Next</div>
+          <div id="bo-next" style="font-weight:600; overflow:hidden; text-overflow:ellipsis; white-space:nowrap">–</div>
+          <div class="sub" id="bo-next-sub">–</div>
+        </div>
+      </div>
+      <div style="margin-top:12px"><div class="bar thin" id="bo-next-bar"><i style="width:0"></i></div></div>
+    </section>
+
+    <section class="card s8" id="c-chart">
+      <div class="card-h">
+        <h2 id="chart-title">Rank this run vs. previous run</h2>
+        <div class="chart-tools"><div class="seg" id="scale-seg"><button data-v="log">log</button><button data-v="lin">linear</button></div></div>
+      </div>
+      <div class="chart-wrap" id="chart-wrap">
+        <svg class="chart" id="chart" preserveAspectRatio="none"></svg>
+        <div class="tip" id="tip"></div>
+      </div>
+      <div class="legend" id="legend"></div>
+    </section>
+
+    <section class="card s4" id="c-action">
+      <div class="card-h"><h2>Current action</h2><span class="age" data-src="blade"></span></div>
+      <div class="mid" id="act-name">–</div>
+      <div class="sub" id="act-why">–</div>
+      <div style="margin-top:12px" id="act-meters"></div>
+      <hr class="sep">
+      <div class="kv" id="act-kv"></div>
+    </section>
+
+    <section class="card s4" id="c-bolist">
+      <div class="card-h"><h2>Black Op ladder</h2><span class="age" data-src="blade"></span></div>
+      <div class="list scroll" id="bo-list"></div>
+    </section>
+
+    <section class="card s4" id="c-guard">
+      <div class="card-h"><h2>Guard &amp; health</h2><span class="age" data-src="guard"></span></div>
+      <div class="kv" id="guard-kv"></div>
+      <hr class="sep">
+      <div class="mini-h" id="pen-h">Guard actions, last 24 h</div>
+      <div id="pen-list"></div>
+    </section>
+
+    <section class="card s4" id="c-infra">
+      <div class="card-h"><h2>Bridge &amp; backups</h2></div>
+      <div class="kv" id="infra-kv"></div>
+    </section>
+
+    <section class="card s4" id="c-econ">
+      <div class="card-h"><h2>Economy</h2><span class="age" data-src="net"></span></div>
+      <div class="big num" style="font-size:28px" id="money-big">–</div>
+      <div class="sub" id="money-sub">–</div>
+      <svg class="spark" id="money-spark" preserveAspectRatio="none"></svg>
+      <hr class="sep">
+      <div class="kv" id="econ-kv"></div>
+    </section>
+
+    <section class="card s4" id="c-side">
+      <div class="card-h"><h2>Sleeves · Go · Gang</h2></div>
+      <div id="side-body"></div>
+    </section>
+
+    <section class="card s4" id="c-net">
+      <div class="card-h"><h2>Network</h2><span class="age" data-src="net"></span></div>
+      <div class="kv" id="net-kv"></div>
+      <div style="margin-top:12px" id="net-meters"></div>
+    </section>
+
+    <section class="card s12" id="c-route">
+      <div class="card-h"><h2>Roadmap</h2><span class="age" data-src="exit"></span></div>
+      <div class="route-sum" id="route-sum"></div>
+      <div class="route" id="route"></div>
+    </section>
+
+    <section class="card s8" id="c-log">
+      <div class="card-h"><h2>Bridge log</h2></div>
+      <div class="log" id="log"></div>
+    </section>
+
+    <section class="card s4" id="c-src">
+      <div class="card-h"><h2>Data sources</h2></div>
+      <div class="src" id="src"></div>
+    </section>
   </div>
 
-  <div class="card">
-    <h2>Vermoegen</h2>
-    <div class="big" id="money">-</div>
-    <div class="sub" id="moneysub">-</div>
-  </div>
-
-  <div class="card">
-    <h2>Netz</h2>
-    <div class="row"><span>gerootet</span><span id="rooted">-</span></div>
-    <div class="row"><span>home-RAM</span><span id="homeram">-</span></div>
-    <div class="row"><span>Runde</span><span id="round">-</span></div>
-    <div class="row"><span>brach</span><span id="idle">-</span></div>
-  </div>
-
-  <div class="card">
-    <h2>Reputation</h2>
-    <div class="sub" id="reptitle">-</div>
-    <div class="bar"><i id="repbar" style="width:0"></i></div>
-    <div class="sub" id="repsub">-</div>
-    <div class="row" style="margin-top:8px"><span>Warteschlange</span><span id="queue">-</span></div>
-    <div class="row"><span>offen</span><span id="open">-</span></div>
-  </div>
-
-  <div class="card">
-    <h2>Firmenphase</h2>
-    <div class="sub" id="jobtitle">-</div>
-    <div class="bar"><i id="jobbar" style="width:0"></i></div>
-    <div class="sub" id="jobsub">-</div>
-  </div>
-
-  <div class="card wide">
-    <h2>Lebenszeichen</h2>
-    <div class="row"><span>Bruecke / Spiel</span><span id="lifebridge">-</span></div>
-    <div class="row"><span>bn4net.js</span><span id="lifenet" class="age">-</span></div>
-    <div class="row"><span>bn4rep.js</span><span id="liferep" class="age">-</span></div>
-    <div class="row"><span id="helplabel">Notruf</span><span id="help">-</span></div>
-    <div class="row"><span>Waechter</span><span id="wache" class="age">-</span></div>
-  </div>
+  <footer>
+    <span id="foot-cadence"></span>
+    <span>Read-only view. The bot decides on its own; nothing here changes the game.</span>
+  </footer>
 </div>
 
-<footer id="foot">-</footer>
-
 <script>
+"use strict";
 // ---------------------------------------------------------------------------
-// Diese Seite hat EINE Aufgabe: in fuenf Sekunden zeigen, ob der Bot laeuft
-// und wo er steht.
+// Bitburner-Lagebild (Neubau 29.10.2026, nach drei Skeptikerrunden).
 //
-// Sie liest deshalb ausschliesslich die Dateien, die der Bot JETZT schreibt.
-// Die Vorgaengerfassung hing an /api/state, das der alte Autopilot gefuettert
-// hat - nach dem BitNode-Wechsel lief der nicht mehr, und die Seite zeigte
-// vom 21. bis zum 24.08.2026 unveraendert drei Tage alte Zahlen, ohne dass
-// irgendetwas darauf hingewiesen haette. Deshalb steht das ALTER jeder
-// Quelle unten sichtbar auf der Seite: Eine Anzeige, die nicht sagen kann,
-// wie alt sie ist, ist schlimmer als gar keine.
+// Die Seite beantwortet drei Fragen, in dieser Reihenfolge: Muss ein Mensch
+// etwas tun? Wo steht der Bot im aktuellen Knoten und wann ist der fertig?
+// Laeuft alles drumherum (Waechter, Bruecke, Sicherungen)?
+//
+// URTEIL, ETA, TEMPO UND RATE RECHNET DIE SEITE NICHT SELBST. Sie kommen
+// aus tools/checkin.js, das die Bruecke alle 5 min laufen laesst
+// (/api/verdict). Eine zweite Implementierung im Browser urteilte nach einer
+// Offline-Nacht anders als /bb (Skeptiker A und C, 29.10.2026). Selbst
+// gerechnet wird nur, was checkin.js nicht kennt: das Diagramm.
+//
+// Grundsaetze aus der Vorgaengerin:
+//  1. Keine Zahl ohne Alter. Jede Karte zeigt, wie alt ihre Quelle ist.
+//  2. Keine Zahl stehen lassen, die nicht mehr stimmt. Spieldateien werden
+//     bei getrenntem Spiel entwertet; was die Bruecke selbst haelt (Urteil,
+//     Verlauf), bleibt sichtbar - mit Alter.
+//  3. Dateien ueberleben den Knotenwechsel. blade.json zaehlt nur, wenn ihr
+//     nodeReset zum laufenden Knoten passt (wie bladeFrisch in checkin.js).
 // ---------------------------------------------------------------------------
 
-const TAKT_MS = 10000;
-// Ab hier gilt eine Quelle als verdaechtig bzw. als tot. Die Werte passen zu
-// tools/wache.js: bn4net schreibt alle 10-15 s, bn4rep pausiert waehrend der
-// Firmenphase und meldet sich dann ueber bn4job.json.
-const ALT = { net: [60, 300], rep: [300, 1200] };
+const FAST_MS = 10000;
+const SLOW_MS = 60000;
+const FETCH_TIMEOUT_MS = 8000;
+const DAEDALUS_RANK = 400000;
+const GAP_MS = 15 * 60000;      // Luecke im Verlauf: Linie unterbrechen
+
+// Reihenfolge und Mindestrang aus BlackOperations.ts (reqdRank). Das Spiel
+// gibt sie strikt der Reihe nach frei (getNextBlackOp =
+// blackOperationArray[numBlackOpsComplete]) - erledigt ist alles VOR der
+// naechsten, unabhaengig davon, was in boChancen steht.
+const BLACK_OPS = [
+  ["Operation Typhoon", 2500], ["Operation Zero", 5000], ["Operation X", 7500],
+  ["Operation Titan", 10000], ["Operation Ares", 12500], ["Operation Archangel", 15000],
+  ["Operation Juggernaut", 20000], ["Operation Red Dragon", 25000], ["Operation K", 30000],
+  ["Operation Deckard", 40000], ["Operation Tyrell", 50000], ["Operation Wallace", 75000],
+  ["Operation Shoulder of Orion", 100000], ["Operation Hyron", 125000], ["Operation Morpheus", 150000],
+  ["Operation Ion Storm", 175000], ["Operation Annihilus", 200000], ["Operation Ultron", 250000],
+  ["Operation Centurion", 300000], ["Operation Vindictus", 350000], ["Operation Daedalus", 400000],
+];
+
+// Das Urteil von checkin.js in Worten. `who` sagt, wer handeln muss.
+const VERDICTS = {
+  "AUF KURS":      { cls: "ok",    label: "On track",       who: "Nothing to do." },
+  "ANLAUF":        { cls: "ok",    label: "Ramp-up",        who: "Training combat stats before joining Bladeburner. Nothing to do." },
+  "HACKINGWEG":    { cls: "ok",    label: "Hacking route",  who: "Leveling hacking toward w0r1d_d43m0n. Nothing to do." },
+  "SPRINGT":       { cls: "info",  label: "Jumping",        who: "exit.js runs - the next node starts within minutes." },
+  "ZAEH":          { cls: "warn",   label: "Slower",        who: "The estimate got worse than last time. Claude digs into it on the next /bb." },
+  "STEHT":         { cls: "warn",   label: "Stalled",       who: "The carrier value does not move. Claude checks it on the next /bb." },
+  "SPRUNG KLEMMT": { cls: "warn",   label: "Jump stuck",    who: "The node is done but the jump does not start. Claude fixes it on the next /bb." },
+  "AUSGANG FEHLT": { cls: "warn",   label: "No exit watch", who: "ausgang.js is not running - nobody would jump at the end. Claude restarts it on the next /bb." },
+  "GEWERK FEHLT":  { cls: "bad",    label: "Needs you",     who: "The node is done, but a module the route needs is missing. This is the one case where the bot waits for a human." },
+  "HILFE":         { cls: "bad",    label: "Help",          who: "The bot wrote data/hilfe.txt and asks for help." },
+  "SPIEL ZU":      { cls: "muted",  label: "Game closed",   who: "The Bitburner tab is closed. Nothing is wrong." },
+  "BLIND":         { cls: "bad",    label: "Blind",         who: "The bridge cannot read the game. Restart the bridge (WMI start, see /bb)." },
+};
+
+// Ab wann eine Quelle als alt bzw. tot gilt (Sekunden).
+const LIMITS = { fast: [180, 900], slow: [900, 3600], verdict: [600, 1800] };
 
 const $ = (id) => document.getElementById(id);
+const store = {
+  get(k, d) { try { const v = localStorage.getItem("bbops." + k); return v === null ? d : v; } catch { return d; } },
+  set(k, v) { try { localStorage.setItem("bbops." + k, v); } catch { /* egal */ } },
+};
 
-const geld = (n) => {
-  if (!Number.isFinite(n)) return "-";
-  for (const [t, k] of [[1e15, "q"], [1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
-    if (Math.abs(n) >= t) return "$" + (n / t).toFixed(2) + k;
+// ---------------------------------------------------------------- Formate ---
+const nf0 = new Intl.NumberFormat("en-US", { maximumFractionDigits: 0 });
+const fmtInt = (n) => Number.isFinite(n) ? nf0.format(Math.round(n)) : "–";
+const fmtPct = (x, d = 0) => Number.isFinite(x) ? (x * 100).toFixed(d) + " %" : "–";
+function fmtShort(n) {
+  if (!Number.isFinite(n)) return "–";
+  const a = Math.abs(n);
+  for (const [t, s] of [[1e15, "q"], [1e12, "t"], [1e9, "b"], [1e6, "m"], [1e3, "k"]]) {
+    if (a >= t) return (n / t).toFixed(a / t >= 100 ? 0 : a / t >= 10 ? 1 : 2) + s;
   }
-  return "$" + Math.round(n);
-};
-
-const zahl = (n) => Number.isFinite(n) ? n.toLocaleString("de-DE") : "-";
-
-const ram = (gb) => {
-  if (!Number.isFinite(gb)) return "-";
+  return String(Math.round(n));
+}
+const fmtMoney = (n) => Number.isFinite(n) ? "$" + fmtShort(n) : "–";
+function fmtRam(gb) {
+  if (!Number.isFinite(gb)) return "–";
   if (gb >= 1048576) return (gb / 1048576).toFixed(1) + " PB";
-  if (gb >= 1024) return (gb / 1024).toFixed(0) + " TB";
-  return gb + " GB";
-};
-
-function alterText(ms) {
-  if (!Number.isFinite(ms)) return "kein Lebenszeichen";
-  const s = Math.round(ms / 1000);
-  if (s < 90) return s + " s alt";
-  return Math.round(s / 60) + " min alt";
+  if (gb >= 1024) return (gb / 1024).toFixed(gb >= 10240 ? 0 : 1) + " TB";
+  return Math.round(gb) + " GB";
 }
-
-function setzeAlter(el, ms, grenzen) {
-  el.textContent = alterText(ms);
-  el.classList.remove("stale", "dead");
-  if (!Number.isFinite(ms)) { el.classList.add("dead"); return; }
-  const s = ms / 1000;
-  if (s > grenzen[1]) el.classList.add("dead");
-  else if (s > grenzen[0]) el.classList.add("stale");
+function fmtDur(h) {
+  if (!Number.isFinite(h)) return "–";
+  if (h < 0) h = 0;
+  if (h < 1) return Math.round(h * 60) + " min";
+  if (h < 10) { const H = Math.floor(h); const m = Math.round((h - H) * 60); return H + " h" + (m ? " " + m + " min" : ""); }
+  if (h < 72) return h.toFixed(1) + " h";
+  return (h / 24).toFixed(1) + " days";
 }
-
-function balken(el, anteil) {
-  const a = Math.max(0, Math.min(1, Number.isFinite(anteil) ? anteil : 0));
-  el.style.width = (a * 100).toFixed(1) + "%";
-  el.parentElement.classList.toggle("done", a >= 1);
+function fmtAge(ms) {
+  if (!Number.isFinite(ms)) return "no data";
+  const s = Math.max(0, Math.round(ms / 1000));
+  if (s < 90) return s + " s";
+  if (s < 5400) return Math.round(s / 60) + " min";
+  if (s < 172800) return (s / 3600).toFixed(1) + " h";
+  return (s / 86400).toFixed(1) + " d";
 }
+const fmtWhen = (t) => new Date(t).toLocaleString("en-GB", { weekday: "short", day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" });
+const fmtClock = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit", second: "2-digit" });
+const fmtHM = (t) => new Date(t).toLocaleTimeString("en-GB", { hour: "2-digit", minute: "2-digit" });
+const nn = (v) => v === null || v === undefined ? NaN : Number(v);   // Number(null) === 0 vermeiden
 
-async function rpcDatei(name) {
+// ------------------------------------------------------------- DOM-Hilfe ---
+// Alles aus Dateien geht als Text ins DOM, nie als HTML.
+function h(tag, props, ...kids) {
+  const e = document.createElement(tag);
+  if (props) for (const [k, v] of Object.entries(props)) {
+    if (v == null || v === false) continue;
+    if (k === "class") e.className = v;
+    else if (k === "style") e.style.cssText = v;
+    else if (k === "title") e.title = v;
+    else e.setAttribute(k, v);
+  }
+  for (const c of kids.flat()) if (c != null && c !== false) e.append(c instanceof Node ? c : String(c));
+  return e;
+}
+const fill = (el, ...kids) => { el.replaceChildren(...kids.flat().filter((k) => k != null && k !== false)); };
+function kv(el, rows) {
+  fill(el, rows.filter(Boolean).flatMap(([k, v, cls, title]) => [
+    h("span", null, k), h("span", { class: cls || null, title: title || (typeof v === "string" ? v : null) }, v ?? "–"),
+  ]));
+}
+function setBar(el, frac, cls) {
+  const f = Math.max(0, Math.min(1, Number.isFinite(frac) ? frac : 0));
+  const thin = el.classList.contains("thin");
+  el.className = "bar" + (thin ? " thin" : "") + (cls ? " " + cls : "");
+  el.querySelector("i").style.width = (f * 100).toFixed(2) + "%";
+}
+function meter(label, frac, text, cls) {
+  const b = h("div", { class: "bar thin" + (cls ? " " + cls : "") }, h("i", { style: "width:" + (Math.max(0, Math.min(1, frac || 0)) * 100).toFixed(1) + "%" }));
+  return h("div", { class: "meter" }, h("span", null, label), b, h("span", null, text));
+}
+const tag = (text, cls) => h("span", { class: "tag" + (cls ? " " + cls : "") }, text);
+const stat = (lbl, val, cls, title) => h("div", { class: "stat", title: title || null }, h("div", { class: "lbl" }, lbl), h("div", { class: "val" + (cls ? " " + cls : "") }, val));
+
+// ------------------------------------------------------------- Datenwege ---
+// Mit Zeitlimit: ein haengender Abruf darf die Seite nicht einfrieren.
+async function getJson(url) {
   try {
-    const r = await fetch("/api/rpc?method=getFile&filename="
-      + encodeURIComponent(name) + "&server=home");
-    const b = await r.json();
-    if (b.error || typeof b.result !== "string") return null;
-    return b.result;
+    const r = await fetch(url, { cache: "no-store", signal: AbortSignal.timeout(FETCH_TIMEOUT_MS) });
+    if (!r.ok) return { __status: r.status };
+    return await r.json();
   } catch { return null; }
 }
-
-async function rpcJson(name) {
-  const roh = await rpcDatei(name);
-  if (!roh) return null;
-  try { return JSON.parse(roh); } catch { return null; }
+const ok = (x) => x && !x.__status;
+async function gameFile(name) {
+  const b = await getJson("/api/rpc?method=getFile&server=home&filename=" + encodeURIComponent(name));
+  return ok(b) && typeof b.result === "string" ? b.result : null;
+}
+async function gameJson(name) {
+  const raw = await gameFile(name);
+  if (!raw || !raw.trim()) return null;
+  try { return JSON.parse(raw); } catch { return null; }
 }
 
-// Der Waechter selbst. Er schweigt im Normalbetrieb - deshalb ist die Frage
-// "laeuft er ueberhaupt noch?" nicht beantwortbar, ohne hier nachzusehen.
-async function zeigeWache() {
-  const el = $("wache");
-  try {
-    const w = await (await fetch("/api/wache")).json();
-    if (w.fehlt || !w.letztePruefung) {
-      el.textContent = "laeuft nicht";
-      el.classList.remove("stale"); el.classList.add("dead");
-      return;
-    }
-    const alter = Date.now() - w.letztePruefung;
-    // Der Waechter prueft alle 3 min. Ueber 8 min heisst: er hat einen Takt
-    // ausgelassen, ueber 15 min heisst: er ist weg.
-    setzeAlter(el, alter, [8 * 60, 15 * 60]);
-    el.textContent = "letzte Pruefung " + el.textContent
-      + (w.offeneBefunde && w.offeneBefunde.length
-        ? " - " + w.offeneBefunde.length + " Befund(e)" : "");
-  } catch {
-    el.textContent = "nicht abfragbar";
-    el.classList.add("dead");
-  }
-}
+const D = {
+  state: null, verdict: null, verdictMissing: false, blade: null, kpi: null, guard: null, net: null, exit: null, wake: null,
+  sleeve: null, hashes: null, go: null, gang: null, augs: null, penalties: null, route: null, rep: null,
+  history: null, historyMissing: false, ref: null, refKey: null, lastOk: 0,
+};
 
-async function aktualisiere() {
-  const jetzt = Date.now();
-
-  let zustand = null;
-  try { zustand = await (await fetch("/api/state")).json(); } catch { /* Bruecke tot */ }
-
-  // KEINE ZAHL STEHEN LASSEN, DIE NICHT MEHR STIMMT.
-  //
-  // Die erste Fassung ist bei toter Bruecke einfach ausgestiegen und liess
-  // alle Karten unangetastet - also genau der Fehler, den der Kommentar
-  // oben anprangert, nur eine Ebene tiefer. Wer auf die Seite schaut, sieht
-  // dann Zahlen, die aussehen wie Messwerte und keine mehr sind.
-  const entwerten = () => {
-    for (const id of ["hack", "money", "moneysub", "rooted", "homeram", "round",
-                      "idle", "queue", "open", "repsub", "jobsub", "hacksub",
-                      "reptitle", "jobtitle", "lifenet", "liferep"]) {
-      $(id).textContent = "-";
-    }
-    balken($("hackbar"), 0); balken($("repbar"), 0); balken($("jobbar"), 0);
-  };
-
-  const dot = $("dot");
-  if (!zustand) {
-    dot.className = "bad";
-    $("status").textContent = "Bruecke auf Port 8795 antwortet nicht - start.cmd starten";
-    $("lifebridge").textContent = "Bruecke tot";
-    entwerten();
-    await zeigeWache();
-    return;
-  }
-  if (!zustand.connected) {
-    dot.className = "bad";
-    $("status").textContent = "Spiel nicht verbunden - Bitburner-Tab oeffnen";
-    $("lifebridge").textContent = "Spiel getrennt";
-    entwerten();
-    await zeigeWache();
-    return;
-  }
-  dot.className = "ok";
-  $("lifebridge").textContent = "verbunden";
-
-  const [net, rep, job, hilfe] = await Promise.all([
-    rpcJson("data/bn4net.json"),
-    rpcJson("data/bn4rep.json"),
-    rpcJson("data/bn4job.json"),
-    rpcDatei("data/hilfe.txt"),
+async function loadFast() {
+  const [st, vd] = await Promise.all([getJson("/api/state"), getJson("/api/verdict")]);
+  D.state = ok(st) ? st : null;
+  D.verdictMissing = !!(vd && vd.__status === 404);
+  if (ok(vd)) D.verdict = vd;
+  if (!D.state || !D.state.connected) return;
+  const [blade, kpi, guard, net, exit, wake] = await Promise.all([
+    gameJson("data/blade.json"), gameJson("data/kpi.json"), gameJson("data/watchdog.json"),
+    gameJson("data/bn4net.json"), gameJson("data/ausgang.json"), gameFile("data/wakelock.txt"),
   ]);
-
-  // --- Knotenausgang: die eine Zahl, auf die alles zulaeuft ---------------
-  const level = net?.hacking ?? rep?.hacking ?? null;
-  const ziel = rep?.zielLevel ?? null;
-  if (level != null && ziel) {
-    $("hack").textContent = zahl(level) + " / " + zahl(ziel);
-    balken($("hackbar"), level / ziel);
-    const rest = Math.max(0, ziel - level);
-    $("hacksub").innerHTML = "Hacking-Level fuer w0r1d_d43m0n"
-      + (rep?.knoten ? " in BitNode " + rep.knoten : "")
-      + " &middot; noch " + zahl(rest)
-      + (rep?.multHacking ? " &middot; Multiplikator " + rep.multHacking.toFixed(2) : "")
-      + " &middot; <span class='pill" + (rep?.redPill ? " on" : "") + "'>Red Pill "
-      + (rep?.redPill ? "eingebaut" : "fehlt") + "</span>";
-  } else if (level != null) {
-    $("hack").textContent = zahl(level);
-    $("hacksub").textContent = "Zielniveau noch unbekannt - bn4rep.js hat noch nichts gemeldet";
-  } else {
-    // Ohne diesen Zweig bliebe die Kopfzahl auf dem letzten bekannten Wert
-    // stehen, waehrend alles andere auf "-" faellt.
-    $("hack").textContent = "-";
-    $("hacksub").textContent = "keine Telemetrie";
-    balken($("hackbar"), 0);
-  }
-
-  // --- Vermoegen und Netz --------------------------------------------------
-  $("money").textContent = geld(net?.geld ?? rep?.geld);
-  $("moneysub").textContent = net?.batchZiele?.length
-    ? "Stapelbetrieb auf " + net.batchZiele.join(", ") : "-";
-  $("rooted").textContent = net ? net.gerootet + " / " + net.netz : "-";
-  $("homeram").textContent = ram(net?.homeRam);
-  $("round").textContent = zahl(net?.runde);
-  $("idle").textContent = Number.isFinite(net?.brachAnteil)
-    ? Math.round(net.brachAnteil * 100) + " %" : "-";
-
-  // --- Reputation ----------------------------------------------------------
-  if (rep?.ziel) {
-    $("reptitle").textContent = rep.ziel + " @ " + rep.zielFaktion
-      + (rep.istSchwelle ? " (Spendenschwelle)" : "");
-    balken($("repbar"), (rep.rep ?? 0) / (rep.repReq || 1));
-    $("repsub").textContent = zahl(Math.round(rep.rep)) + " / " + zahl(rep.repReq)
-      + (rep.preis ? "  -  " + geld(rep.preis) : "");
-  } else {
-    $("reptitle").textContent = "kein Ziel";
-    balken($("repbar"), 0);
-    $("repsub").textContent = "-";
-  }
-  $("queue").textContent = rep ? rep.wartend + " vorgemerkt" : "-";
-  $("open").textContent = rep ? rep.offen + " Augmentierungen" : "-";
-
-  // --- Firmenphase ---------------------------------------------------------
-  // Sie ist nur dann die aktuelle Arbeit, wenn bn4job.json juenger ist als
-  // bn4rep.json - sonst liegt sie in der Vergangenheit.
-  const jobAktiv = job && (!rep || job.zeit >= rep.zeit);
-  if (job) {
-    $("jobtitle").textContent = job.company + " als " + job.job
-      + (jobAktiv ? "" : " (beendet)");
-    balken($("jobbar"), (job.companyRep ?? 0) / (job.goal || 1));
-    $("jobsub").textContent = zahl(Math.round(job.companyRep)) + " / " + zahl(job.goal)
-      + " Firmenreputation";
-  } else {
-    $("jobtitle").textContent = "keine Firmenarbeit";
-    balken($("jobbar"), 0);
-    $("jobsub").textContent = "-";
-  }
-
-  // --- Lebenszeichen -------------------------------------------------------
-  setzeAlter($("lifenet"), net?.zeit ? jetzt - net.zeit : NaN, ALT.net);
-  const repZeit = Math.max(rep?.zeit ?? 0, job?.zeit ?? 0);
-  setzeAlter($("liferep"), repZeit ? jetzt - repZeit : NaN, ALT.rep);
-
-  const notruf = (hilfe || "").trim();
-  $("help").innerHTML = notruf
-    ? "<span class='hint'>" + notruf.replace(/[<>&]/g, "") + "</span>"
-    : "still";
-
-  await zeigeWache();
-
-  $("status").textContent = "aktualisiert " + new Date().toTimeString().slice(0, 8);
-  $("foot").textContent = "Aktualisierung alle " + (TAKT_MS / 1000)
-    + " s. Der Waechter (tools/wache.js) meldet Stoerungen von selbst aufs Handy -"
-    + " diese Seite ist zum Nachsehen, nicht zum Aufpassen.";
+  Object.assign(D, { blade, kpi, guard, net, exit, wake });
 }
 
-aktualisiere();
-setInterval(aktualisiere, TAKT_MS);
+async function loadSlow() {
+  const connected = D.state && D.state.connected;
+  if (connected) {
+    const [sleeve, hashes, go, gang, augs, penalties, route, rep] = await Promise.all([
+      gameJson("data/sleeve.json"), gameJson("data/hashes.json"), gameJson("data/go.json"),
+      gameJson("data/gang.json"), gameJson("data/einbau.json"), gameJson("data/penalties.json"),
+      gameJson("route.json"), gameJson("data/bn4rep.json"),
+    ]);
+    Object.assign(D, { sleeve, hashes, go, gang, augs, penalties, route, rep });
+  }
+  // Der Verlauf liegt bei der Bruecke - auch ohne Spiel lesbar.
+  const nr = runReset();
+  const hist = await getJson("/api/history" + (nr ? "?nodeReset=" + nr : ""));
+  D.historyMissing = !!(hist && hist.__status === 404);
+  if (ok(hist)) D.history = hist;
+  // Referenzkurve je Knoten UND Lauf, bei jedem langsamen Takt neu (3 KB):
+  // kurvepflege.js ersetzt sie gerade beim Wechsel 13.1 -> 13.2.
+  const run = currentRun();
+  if (run.node) {
+    const ref = await getJson("/api/refcurve?node=" + run.node);
+    if (ok(ref) && Array.isArray(ref.punkte)) { D.ref = ref; D.refKey = run.node + "." + run.level; }
+    else if (ref && ref.__status === 404) { D.ref = null; D.refKey = run.node + "." + run.level; }
+    // Netzfehler: alte Kurve behalten, naechster Takt versucht es erneut.
+  }
+}
+
+// ------------------------------------------------------------- Ableitung ---
+function currentRun() {
+  const l = D.exit && D.exit.lauf;
+  if (l && l.node && (!D.net || l.node === D.net.knoten)) return { node: l.node, level: l.level, method: l.verfahren || D.exit.verfahren };
+  const st = D.state;
+  // ausgang.json fehlt oder gehoert zum Vorknoten: das Verfahren steht dann
+  // noch im Urteil von checkin.js (das data/verfahren.txt liest).
+  const rep = report();
+  const node = (D.net && D.net.knoten) || (st && st.bitNode);
+  const method = rep && rep.knoten === node ? rep.verfahren || null : null;
+  return { node, level: st && st.lauf, method };
+}
+const runReset = () => nn(D.kpi && D.kpi.nodeReset) || nn(D.net && D.net.nodeReset) || null;
+const report = () => (D.verdict && D.verdict.report) || null;
+const ageOf = (t) => Number.isFinite(t) && t > 0 ? Date.now() - t : NaN;
+
+// blade.json zaehlt nur, wenn sie zum laufenden Knoten gehoert.
+function bladeState() {
+  const b = D.blade;
+  if (!b) return { ok: false, why: "none" };
+  const nr = runReset();
+  if (nr && nn(b.nodeReset) !== nr) return { ok: false, why: "old-node" };
+  if (ageOf(b.zeit) > 15 * 60000) return { ok: false, why: "stale" };
+  if (b.wartend || !Number.isFinite(nn(b.rang))) return { ok: false, why: "waiting" };
+  return { ok: true };
+}
+function phase() {
+  const run = currentRun();
+  if (run.method === "V1" || run.method === "V1b") return "hack";
+  const bs = bladeState();
+  if (bs.ok) return "blade";
+  if (run.method === "V2") return "ramp";
+  // Verfahren unbekannt: lieber "keine Daten" als eine geratene Phase.
+  return "unknown";
+}
+
+const SRC = {
+  blade: () => D.blade && D.blade.zeit, kpi: () => D.kpi && D.kpi.erzeugtAm, guard: () => D.guard && (D.guard.ts || D.guard.wall),
+  net: () => D.net && D.net.zeit, exit: () => D.exit && D.exit.zeit, sleeve: () => D.sleeve && D.sleeve.zeit,
+  hashes: () => D.hashes && D.hashes.zeit, go: () => D.go && D.go.zeit, augs: () => D.augs && D.augs.zeit,
+  gang: () => D.gang && (D.gang.ts || D.gang.wall), rep: () => D.rep && D.rep.zeit,
+  history: () => { const s = D.history && D.history.samples; return s && s.length ? s[s.length - 1].t : NaN; },
+  verdict: () => D.verdict && D.verdict.at,
+};
+const SRC_KIND = { sleeve: "slow", hashes: "slow", go: "slow", augs: "slow", gang: "slow", rep: "slow", history: "slow", verdict: "verdict" };
+function freshness(key) {
+  const a = ageOf(SRC[key]());
+  const [w, d] = LIMITS[SRC_KIND[key] || "fast"];
+  if (!Number.isFinite(a)) return { age: a, cls: "dead" };
+  return { age: a, cls: a > d * 1000 ? "dead" : a > w * 1000 ? "stale" : "" };
+}
+
+function parseWake() {
+  if (!D.wake) return null;
+  const raw = D.wake.trim();
+  const [t, state, rate] = raw.split("|");
+  // Nach einem Zustandswechsel steht eine Minute lang Klartext in der Datei
+  // (wakelock.js sag()) - das ist kein Ausfall (wie checkin.js:849).
+  if (!Number.isFinite(Number(t))) return { message: raw.slice(0, 90), running: null };
+  const sampleRate = Number(rate);
+  return { t: Number(t), running: state === "running" && Date.now() - Number(t) < 5 * 60000, sampleRate,
+    // Unter ~40 kHz liegt der 19,5-kHz-Ton ueber der Nyquistgrenze - der Anker wirkt nicht.
+    lowRate: Number.isFinite(sampleRate) && sampleRate > 0 && sampleRate < 40000 };
+}
+
+// Verlaufsproben dieses Laufs, mit Motoruhr.
+function runSamples() {
+  const nr = runReset();
+  const s = (D.history && D.history.samples) || [];
+  return s.filter((x) => Number.isFinite(x.motor) && (!nr || x.nodeReset === nr));
+}
+
+// ------------------------------------------------------------- Zeichnen ---
+function setAges() {
+  for (const el of document.querySelectorAll(".age[data-src]")) {
+    const f = freshness(el.dataset.src);
+    el.textContent = Number.isFinite(f.age) ? fmtAge(f.age) + " ago" : "no data";
+    el.className = "age " + f.cls;
+    el.title = "Age of the data behind this card";
+    el.closest(".card").classList.toggle("stale", f.cls === "dead");
+  }
+}
+
+function renderVerdict() {
+  const box = $("verdict");
+  const st = D.state;
+  const rep = report();
+  let cls = "muted", label = "…", msg = "", meta = "";
+  if (!st) { cls = "bad"; label = "Bridge down"; msg = "Port 8795 does not answer. Start the bridge (WMI start, see /bb), then reload."; }
+  else if (D.verdictMissing) { cls = "warn"; label = "Restart bridge"; msg = "This bridge is older than the dashboard - the verdict endpoint is missing. Restart the bridge."; }
+  else if (!rep) { label = "…"; msg = D.verdict && D.verdict.error ? "Check-in failed: " + D.verdict.error : "The first verdict comes about 20 s after the bridge starts."; }
+  else if (ageOf(D.verdict.at) > 2 * (D.verdict.everyMs || 300000) + 60000 || D.verdict.error) {
+    // Kein altes Gruen stehen lassen (Skeptiker 29.10.2026): checkin.js ist
+    // schon an Knotenwechseln abgestuerzt - genau dann braucht man das Urteil.
+    cls = "warn"; label = "Stale";
+    msg = "The last verdict (" + (rep.urteil || "?") + ") is " + fmtAge(ageOf(D.verdict.at)) + " old"
+      + (D.verdict.error ? " - the check-in fails: " + D.verdict.error : " - the bridge stopped refreshing it.") + " Claude looks at it on the next /bb.";
+  } else {
+    const v = VERDICTS[rep.urteil] || { cls: "warn", label: rep.urteil || "?", who: "Unknown verdict - look at the full report below." };
+    cls = v.cls; label = v.label; msg = v.who;
+    if (rep.urteil === "HILFE" && rep.hilfe) msg += " " + rep.hilfe.slice(0, 220);
+    if (rep.urteil === "GEWERK FEHLT" && rep.ausgang && rep.ausgang.status) msg += " " + rep.ausgang.status;
+    if (rep.rangReichtOhneListe) msg += " Rank is past 400k but the Black Ops list was unreadable.";
+  }
+  if (D.verdict && D.verdict.at) meta = "from tools/checkin.js · " + fmtAge(ageOf(D.verdict.at)) + " ago" + (D.verdict.running ? " · updating" : "");
+  box.className = "verdict v-" + cls;
+  $("v-badge").textContent = label;
+  $("v-msg").textContent = msg;
+  $("v-meta").textContent = meta;
+  const lines = rep && Array.isArray(rep.zeilen) ? rep.zeilen.join("\n") : "";
+  $("v-details").style.display = lines ? "" : "none";
+  $("v-lines").textContent = lines;
+  const dot = $("dot");
+  dot.className = "dot " + (cls === "muted" ? "" : cls);
+  return { cls, label };
+}
+
+function renderHeader(v) {
+  const run = currentRun();
+  const chips = [];
+  if (run.node) chips.push(h("span", { class: "chip" }, "BitNode ", h("b", null, run.node + (run.level ? "." + run.level : ""))));
+  if (run.method) chips.push(h("span", { class: "chip" }, run.method === "V2" ? "Bladeburner route" : "Hacking route"));
+  const nx = D.exit && D.exit.ziel;
+  if (nx && nx.node) chips.push(h("span", { class: "chip" }, "next ", h("b", null, nx.node + "." + nx.level)));
+  const rp = routeProgress();
+  if (rp) chips.push(h("span", { class: "chip ok", title: "Roadmap entries finished" }, h("b", null, rp.done + " / " + rp.total), " route"));
+  if (D.guard && D.guard.modus) chips.push(h("span", { class: "chip" + (D.guard.modus === "enforce" ? " ok" : " warn"), title: "Guard mode" }, "guard " + D.guard.modus));
+  if (D.guard && D.guard.sichtbar === false) {
+    const wl = parseWake();
+    const fine = wl && wl.running !== false && !wl.lowRate;
+    chips.push(h("span", { class: "chip" + (fine ? "" : " warn"), title: "The browser tab is hidden. That is fine while the audio keep-alive (wakelock.js) runs." },
+      "tab hidden" + (fine ? " · keep-alive on" : " · keep-alive NOT working")));
+  }
+  fill($("topchips"), chips);
+  const upd = $("updated");
+  const stalled = D.lastOk && Date.now() - D.lastOk > 60000;
+  upd.textContent = stalled ? "no update for " + fmtAge(Date.now() - D.lastOk) : D.state ? "updated " + fmtClock(Date.now()) : "bridge unreachable";
+  upd.classList.toggle("stall", !!stalled);
+  const rank = bladeState().ok ? nn(D.blade.rang) : NaN;
+  document.title = (v.label && v.label !== "…" ? v.label + " · " : "") + (run.node ? "BN" + run.node + (run.level ? "." + run.level : "") : "Bitburner")
+    + (Number.isFinite(rank) ? " · " + (rank / DAEDALUS_RANK * 100).toFixed(rank < 4000 ? 2 : 1) + " %" : "");
+}
+
+function renderAlerts() {
+  const st = D.state;
+  const out = [];
+  const add = (cls, title, text) => out.push(h("div", { class: "alert " + cls }, h("strong", null, title), h("span", null, text)));
+  if (st && !st.connected) {
+    const s = runSamples();
+    const last = s.length ? s[s.length - 1] : null;
+    add("info", "Game not connected", "No Bitburner tab is connected. Game data below is blank on purpose."
+      + (last ? " Last seen " + fmtAge(ageOf(last.t)) + " ago" + (Number.isFinite(last.rank) ? " at rank " + fmtInt(last.rank) : "") + "." : ""));
+  }
+  if (st && st.zweitTabSperre) add("bad", "Second-tab lock", "A second game connected while the first was alive. Nothing is pushed into the game until a human checks the backups and removes data/zweittab-alarm.json.");
+  if (st && st.alarm) add("warn", "Bridge alarm", typeof st.alarm === "string" ? st.alarm : (st.alarm.text || st.alarm.grund || JSON.stringify(st.alarm)));
+  const ex = D.exit;
+  if (ex && Array.isArray(ex.uebersprungen) && ex.uebersprungen.length) {
+    add("warn", "Route entries skipped", ex.uebersprungen.map((u) => typeof u === "string" ? u
+      : (u.node + "." + u.level + (u.braucht ? " (needs " + u.braucht + " on home)" : ""))).join(", "));
+  }
+  if (ex && ex.exit_abgelehnt) add("warn", "Jump refused", (ex.exit_ablehnung_grund || "exit.js refused the jump") + " (" + ex.exit_abgelehnt + "x)");
+  if (st && st.connected) {
+    const dead = ["net", "exit", "guard"].filter((k) => freshness(k).cls === "dead");
+    if (dead.length) add("warn", "Stale telemetry", dead.map((k) => k + ": " + fmtAge(freshness(k).age)).join(" · ") + " - the writer may have stopped.");
+  }
+  if (D.historyMissing) add("info", "History unavailable", "The bridge does not serve /api/history yet - restart it to start recording.");
+  fill($("alerts"), out);
+}
+
+function renderCarrier() {
+  const ph = phase();
+  const rep = report();
+  const b = D.blade;
+  const stats = [];
+  $("bar2-row").style.display = "";
+  if (ph === "hack") {
+    $("carrier-title").textContent = "Hacking level";
+    const lvl = nn(D.net && D.net.hacking);
+    const goal = nn(D.rep && D.rep.zielLevel);
+    $("carrier-big").replaceChildren(fmtInt(lvl), Number.isFinite(goal) ? h("small", null, " / " + fmtInt(goal)) : "");
+    $("bar1-l").textContent = "Level"; setBar($("bar1"), lvl / goal, "blue"); $("bar1-v").textContent = Number.isFinite(goal) ? fmtPct(lvl / goal) : "–";
+    $("bar2-row").style.display = "none";
+    $("carrier-sub").textContent = "Target: w0r1d_d43m0n" + (D.rep ? (D.rep.redPill ? " · Red Pill installed" : " · Red Pill missing") : "");
+    if (Number.isFinite(goal)) stats.push(stat("Remaining", fmtInt(Math.max(0, goal - lvl))));
+    fill($("carrier-stats"), stats);
+    return;
+  }
+  if (ph === "ramp") {
+    $("carrier-title").textContent = "Ramp-up · combat training";
+    const tr = D.kpi && D.kpi.traeger;
+    const floor = nn(b && b.tiefstand);
+    $("carrier-big").replaceChildren(Number.isFinite(floor) ? fmtInt(floor) : tr && Number.isFinite(nn(tr.wert)) ? fmtInt(tr.wert) : "–",
+      h("small", null, Number.isFinite(floor) ? " lowest combat stat" : tr ? " " + tr.name : ""));
+    $("bar1-l").textContent = "Rank"; setBar($("bar1"), 0); $("bar1-v").textContent = "–";
+    $("bar2-row").style.display = "none";
+    $("carrier-sub").textContent = bladeState().why === "old-node"
+      ? "blade.json is from the previous node - Bladeburner has not reported in this node yet."
+      : "Not in Bladeburner yet. The bot trains combat stats, then joins on its own.";
+    fill($("carrier-stats"), stats);
+    return;
+  }
+  $("carrier-title").textContent = "Bladeburner rank";
+  if (ph !== "blade") { $("carrier-big").textContent = "–"; $("carrier-sub").textContent = "No Bladeburner telemetry."; fill($("carrier-stats"), []); return; }
+  const rank = nn(b.rang);
+  $("carrier-big").replaceChildren(fmtInt(rank), h("small", null, " / " + fmtInt(DAEDALUS_RANK)));
+  $("bar1-l").textContent = "Rank";
+  setBar($("bar1"), rank / DAEDALUS_RANK);
+  $("bar1-v").textContent = (rank / DAEDALUS_RANK * 100).toFixed(rank < 4000 ? 2 : 1) + " %";
+  // Zeitfortschritt: gespielt gegen gespielt + Rest (beides aus checkin.js).
+  const played = nn(rep && rep.hSeitKnoten), rest = nn(rep && rep.etaSpielstunden);
+  $("bar2-l").textContent = "Time";
+  if (Number.isFinite(played) && Number.isFinite(rest) && played + rest > 0) {
+    setBar($("bar2"), played / (played + rest), "ref");
+    $("bar2-v").textContent = fmtPct(played / (played + rest));
+    $("bar2").title = fmtDur(played) + " played of ≈ " + fmtDur(played + rest) + " expected for this node";
+  } else { setBar($("bar2"), 0, "ref"); $("bar2-v").textContent = "–"; }
+  $("carrier-sub").textContent = "Rank grows slowly at first and very fast at the end - the time bar is the better progress gauge."
+    + (Number.isFinite(nn(b.punkte)) && b.punkte > 0 ? " " + fmtInt(b.punkte) + " skill points unspent." : "");
+  const catching = rep && nn(rep.sleeveRueckstandS) > 1800;
+  const rate = nn(rep && rep.rate);
+  stats.push(stat("Rank / h", catching ? "catching up" : Number.isFinite(rate) ? fmtShort(rate) : "–", catching ? "warn-t" : null,
+    catching ? "Sleeves and Bladeburner replay offline time - a rate now would measure a stock, not a pace."
+      : rep && rep.rateFensterMs ? "Measured by checkin.js over " + fmtDur(rep.rateFensterMs / 3.6e6) + " of play" : null));
+  const f = nn(rep && rep.gleichstandFaktor);
+  if (Number.isFinite(f)) {
+    const pct = Math.abs(f - 1) * 100;
+    stats.push(stat("vs. previous run", pct < 3 ? "even" : pct.toFixed(0) + " % " + (f < 1 ? "faster" : "slower"),
+      f <= 1.05 ? "ok-t" : f <= 1.5 ? "warn-t" : "bad-t", "Hours this run needed to reach the current rank, divided by the hours the previous run needed (checkin.js). Above 1.5 is a finding."));
+  }
+  stats.push(stat("Peak rank", fmtInt(b.rangHoch)));
+  fill($("carrier-stats"), stats);
+}
+
+function renderEta() {
+  const rep = report(), ex = D.exit;
+  const rows = [];
+  const big = $("eta-big"), sub = $("eta-sub");
+  if (ex && ex.offen) {
+    big.textContent = rep && rep.urteil === "SPRINGT" ? "Jumping now" : "Node complete";
+    sub.textContent = ex.status || "The exit is open.";
+  } else if (rep && rep.fertigAm) {
+    const linear = rep.etaQuelle === "linear";
+    big.textContent = (rep.etaUntergrenze ? "≥ " : linear ? "≤ " : "≈ ") + fmtWhen(Date.parse(rep.fertigAm));
+    const notes = [];
+    if (Number.isFinite(nn(rep.etaSpielstunden))) notes.push("≈ " + fmtDur(rep.etaSpielstunden) + " of play left");
+    if (Number.isFinite(nn(rep.gespieltAnteil)) && Math.abs(rep.gespieltAnteil - 1) > 0.03) notes.push("calendar date assumes " + fmtPct(rep.gespieltAnteil) + " play time like lately");
+    if (linear) notes.push("linear extrapolation - early in a run this overestimates, read it as an upper bound");
+    else if (rep.etaQuelle && rep.etaQuelle.startsWith("referenzkurve")) notes.push("from the previous run of this node");
+    if (rep.etaUntergrenze) notes.push("the reference starts later than this rank, so this is the earliest date");
+    if (rep.etaInMessluecke) notes.push("interpolated: the reference run has a measurement gap here");
+    sub.textContent = notes.join(" · ");
+  } else if (rep && rep.urteil === "SPIEL ZU") {
+    big.textContent = "Paused"; sub.textContent = "The game is closed - the clock stands still.";
+  } else {
+    big.textContent = "No estimate yet";
+    sub.textContent = Number.isFinite(nn(ex && ex.eta_min))
+      ? "Only the bot's linear guess exists (" + fmtDur(ex.eta_min / 60) + ") - it overestimates early in a run and is no date."
+      : "The first check-in with a rate gives one.";
+  }
+  if (rep && Number.isFinite(nn(rep.hSeitKnoten))) rows.push(["Played this node", fmtDur(rep.hSeitKnoten), null, "Effective play time since the node started (backups, minus bonus time)"]);
+  if (rep && Number.isFinite(nn(rep.etaDelta))) rows.push(["Change since last /bb", (rep.etaDelta > 0 ? "+" : "−") + fmtDur(Math.abs(rep.etaDelta)), rep.etaDelta > 2 ? "warn-t" : rep.etaDelta < 0 ? "ok-t" : null]);
+  const est = refInfo();
+  if (est) rows.push(["Previous run reached 400k", "after " + fmtDur(est.reachH), null, "Hours since node start in the reference run (doku/rangkurve-bn" + currentRun().node + ".json)"]);
+  const ci = lastCheckin();
+  if (ci) rows.push(["Last /bb check-in", fmtAge(ageOf(ci.ts)) + " ago · " + (ci.urteil || "–"), ageOf(ci.ts) > 6 * 3.6e6 ? "faint" : ci.urteil && ci.urteil !== "AUF KURS" ? "warn-t" : null, fmtWhen(ci.ts)]);
+  kv($("eta-kv"), rows);
+}
+function lastCheckin() {
+  const c = (D.history && D.history.checkins) || [];
+  return c.length ? c[c.length - 1] : null;
+}
+// Nur fuer Diagramm und Zusatzzeile - die ETA selbst kommt aus checkin.js.
+function refInfo() {
+  const r = D.ref;
+  if (!r || !Array.isArray(r.punkte) || r.punkte.length < 2) return null;
+  const off = nn(r.nullpunkt && r.nullpunkt.hSeitKnotenstart);
+  const over = r.punkte.find((q) => q.rang >= DAEDALUS_RANK) || r.punkte[r.punkte.length - 1];
+  return { off: Number.isFinite(off) ? off : null, reachH: over.h + (Number.isFinite(off) ? off : 0) };
+}
+
+function ring(svg, done, total) {
+  const R = 40, C = 2 * Math.PI * R, f = total ? done / total : 0;
+  svg.innerHTML = "";
+  const ns = "http://www.w3.org/2000/svg";
+  const mk = (t, a) => { const e = document.createElementNS(ns, t); for (const [k, v] of Object.entries(a)) e.setAttribute(k, v); svg.append(e); return e; };
+  mk("circle", { cx: 48, cy: 48, r: R, fill: "none", stroke: "#1a2532", "stroke-width": 8 });
+  // Bei 0 kein Bogen: ein Strich der Laenge 0 mit runder Kappe waere ein Punkt.
+  if (f > 0) mk("circle", { cx: 48, cy: 48, r: R, fill: "none", stroke: "var(--accent)", "stroke-width": 8, "stroke-linecap": f < 1 ? "round" : "butt",
+    "stroke-dasharray": (C * f) + " " + C, transform: "rotate(-90 48 48)" });
+  mk("text", { x: 48, y: 50, "text-anchor": "middle", fill: "var(--fg)", "font-size": 20, "font-weight": 600 }).textContent = done;
+  mk("text", { x: 48, y: 66, "text-anchor": "middle", fill: "var(--faint)", "font-size": 10 }).textContent = "of " + total;
+}
+
+function blackOpState() {
+  if (phase() !== "blade") return null;
+  const b = D.blade;
+  const chances = b.boChancen && typeof b.boChancen === "object" ? b.boChancen : {};
+  const nextIdx = b.naechsteBlackOp === null ? BLACK_OPS.length : BLACK_OPS.findIndex(([n]) => n === b.naechsteBlackOp);
+  if (nextIdx < 0) return null;
+  return BLACK_OPS.map(([name, req], i) => ({ name, req, done: i < nextIdx, next: i === nextIdx, chance: Number.isFinite(chances[name]) ? chances[name] : null }));
+}
+
+function renderBlackOps() {
+  const ops = blackOpState();
+  const list = $("bo-list");
+  if (!ops) {
+    ring($("bo-ring"), 0, 21);
+    const why = phase() === "hack" ? "Hacking node - no Black Ops here." : phase() === "ramp" ? "Unlocks after joining Bladeburner." : "No Bladeburner telemetry.";
+    $("bo-next").textContent = "–"; $("bo-next-sub").textContent = why;
+    setBar($("bo-next-bar"), 0);
+    fill(list, h("div", { class: "empty" }, why));
+    return;
+  }
+  const done = ops.filter((o) => o.done).length;
+  ring($("bo-ring"), done, ops.length);
+  const nx = ops.find((o) => o.next);
+  const rank = nn(D.blade.rang);
+  if (nx) {
+    $("bo-next").textContent = nx.name.replace("Operation ", "");
+    $("bo-next-sub").textContent = (nx.chance === null ? "chance –" : "chance " + fmtPct(nx.chance, nx.chance < 0.1 ? 1 : 0))
+      + " · " + (rank >= nx.req ? "rank met" : "needs " + fmtShort(nx.req) + " rank");
+    setBar($("bo-next-bar"), nx.chance || 0, nx.chance >= 0.8 ? "" : nx.chance >= 0.4 ? "warn" : "bad");
+  } else {
+    $("bo-next").textContent = "All done";
+    $("bo-next-sub").textContent = "Node can be left";
+    setBar($("bo-next-bar"), 1);
+  }
+  fill(list, ops.map((o) => {
+    const pct = o.done ? "done" : o.chance === null ? "–" : fmtPct(o.chance, o.chance < 0.1 ? 1 : 0);
+    const color = o.done ? "faint" : o.chance >= 0.8 ? "ok-t" : o.chance >= 0.4 ? "warn-t" : "dim";
+    return h("div", { class: "bo" + (o.done ? " done" : "") + (o.next ? " next" : "") },
+      h("span", { class: "mark" }, o.done ? "✓" : ""),
+      h("span", { class: "n", title: o.name }, o.name.replace("Operation ", "")),
+      h("span", { class: "req", title: "Required rank" }, fmtShort(o.req)),
+      h("span", { class: "pct " + color }, pct));
+  }));
+}
+
+function renderAction() {
+  const b = D.blade;
+  if (phase() !== "blade") {
+    $("act-name").textContent = phase() === "hack" ? "Hacking" : phase() === "ramp" ? "Combat training" : "–";
+    $("act-why").textContent = phase() === "hack" ? "Hacking node - Bladeburner is not used here." : phase() === "ramp" ? "Bladeburner actions start after joining." : "No Bladeburner telemetry.";
+    fill($("act-meters"), []);
+    kv($("act-kv"), b && Number.isFinite(nn(b.tiefstand)) && phase() === "ramp" ? [["Lowest combat stat", fmtInt(b.tiefstand)]] : []);
+    return;
+  }
+  const [type, name] = String(b.aktion || b.istAktion || "–").split("/");
+  $("act-name").textContent = name || type;
+  $("act-why").textContent = (name ? type : "") + (b.grund ? " · " + b.grund : "") + (b.stufe ? " · level " + b.stufe : "");
+  const [sNow, sMax] = String(b.ausdauer || "").split("/").map(Number);
+  const [hpNow, hpMax] = String(b.hp || "").split("/").map(Number);
+  const chaos = nn(b.chaosHier ?? b.chaos);
+  const m = [];
+  if (Number.isFinite(nn(b.chance))) m.push(meter("Chance", b.chance, fmtPct(b.chance, b.chance < 0.1 ? 1 : 0), b.chance >= 0.7 ? "" : b.chance >= 0.35 ? "warn" : "bad"));
+  if (sMax) m.push(meter("Stamina", sNow / sMax, Math.round(sNow / sMax * 100) + " %", "blue"));
+  if (hpMax) m.push(meter("HP", hpNow / hpMax, Math.round(hpNow / hpMax * 100) + " %", hpNow / hpMax < 0.5 ? "bad" : ""));
+  if (Number.isFinite(chaos)) m.push(meter("City chaos", Math.min(1, chaos / 50), chaos.toFixed(1), chaos > 40 ? "warn" : "blue"));
+  fill($("act-meters"), m);
+  const rows = [
+    ["Duration", Number.isFinite(nn(b.dauer)) ? (b.dauer / 1000).toFixed(0) + " s" : "–"],
+    ["Stamina", b.ausdauer || "–"],
+    ["Lowest combat stat", fmtInt(b.tiefstand)],
+  ];
+  if (b.chance < 0.35 && /Operation/.test(b.grund || "")) rows.push(["Why so low?", "best expected rank/min", "dim", "blade.js picks by expected rank per minute after failures - a rare big success can beat a safe small one."]);
+  if (b.fehlversuch) rows.push(["Last failure", String(b.fehlversuch), "warn-t"]);
+  if (b.aufraeumen) rows.push(["Mode", "cleaning up chaos", "warn-t"]);
+  if (b.weichtTraining) rows.push(["Mode", "yielding to training", "warn-t"]);
+  if (b.graftAug) rows.push(["Grafting", b.graftAug + (Number.isFinite(nn(b.graftFortschritt)) ? " · " + fmtPct(b.graftFortschritt) : "")]);
+  if (b.truppFehlt) rows.push(["Team missing", fmtInt(b.truppFehlt), "warn-t"]);
+  kv($("act-kv"), rows);
+}
+
+const SIG_TEXT = { S1: "stale telemetry", S2: "no progress", S3: "core problem", S4: "environment" };
+function renderGuard() {
+  const g = D.guard, k = D.kpi;
+  const wl = parseWake();
+  const rows = [];
+  if (g) {
+    rows.push(["Mode", g.modus === "enforce" ? "enforce (acts)" : g.modus === "observe" ? "observe (does NOT act)" : g.modus || "–", g.modus === "enforce" ? "ok-t" : "warn-t"]);
+    rows.push(["State", g.state || "–", g.state === "work" ? null : "warn-t"]);
+    if (g.errStreak) rows.push(["Error streak", fmtInt(g.errStreak), "bad-t", g.lastError || null]);
+    const sig = Array.isArray(g.signaleJetzt) ? g.signaleJetzt : [];
+    // S4 "Umgebung" bei verdecktem Tab ist mit laufendem Tonanker kein Befund (Skill /bb).
+    const benign = (s) => s.sig === "S4" && g.sichtbar === false && wl && wl.running !== false && !wl.lowRate;
+    const real = sig.filter((s) => !benign(s));
+    rows.push(["Signals now", sig.length ? sig.map((s) => s.sig + " " + (SIG_TEXT[s.sig] || "") + (s.ziel ? " (" + s.ziel + ")" : "")).join(", ") : "none",
+      real.length ? "warn-t" : sig.length ? "dim" : "ok-t", sig.length && !real.length ? "Hidden tab with working keep-alive - not a finding." : null]);
+  }
+  if (k && k.registry) {
+    const r = k.registry;
+    rows.push(["Tools running", r.running + " / " + r.gilt, r.running >= r.gilt ? "ok-t" : "warn-t", "absent " + r.absent + " · degraded " + r.degraded + " · waiting for RAM " + r.wartetGb + " GB"]);
+  }
+  if (k && Number.isFinite(nn(k.throttle_rounds_per_min))) rows.push(["Core rounds / min", k.throttle_rounds_per_min.toFixed(1), k.throttle_rounds_per_min >= 4 ? null : "warn-t", "≈6 is full speed; ≈1 means the browser throttles the tab"]);
+  if (wl) {
+    if (wl.running === null) rows.push(["Keep-alive", "says: " + wl.message, "dim"]);
+    else rows.push(["Keep-alive", wl.running ? (wl.lowRate ? "running, but " + wl.sampleRate + " Hz is too low" : "running") : "not running", wl.running && !wl.lowRate ? "ok-t" : g && g.sichtbar === false ? "bad-t" : "warn-t"]);
+  }
+  kv($("guard-kv"), rows);
+
+  // Entwarnungen (stood-down) sind keine Strafen - sie werden nur gezaehlt.
+  const all = ((D.penalties && D.penalties.eintraege) || []).filter((p) => Number.isFinite(p.wall) && Date.now() - p.wall < 864e5);
+  const acts = all.filter((p) => p.result !== "stood-down").reverse();
+  const clears = all.length - acts.length;
+  $("pen-h").textContent = "Guard actions, last 24 h" + (clears ? " · " + clears + " all-clear" + (clears > 1 ? "s" : "") : "");
+  const pl = $("pen-list");
+  if (!D.penalties) { fill(pl, h("div", { class: "empty" }, "no data")); return; }
+  if (!acts.length) { fill(pl, h("div", { class: "empty" }, "None - the guard had to step in nowhere.")); return; }
+  fill(pl, h("div", { class: "scroll", style: "max-height:160px" }, acts.slice(0, 12).map((p) => {
+    // Sprosse 1-2 ausgefuehrt ist Normalbetrieb (Neustart eines Werkzeugs); ab 3 und "ordered" ist es ernst.
+    const serious = p.rung >= 3 || p.result === "ordered";
+    const cls = serious ? "bad" : p.result === "executed" ? "" : "warn";
+    return h("div", { class: "ev" }, h("time", null, fmtHM(p.wall)),
+      h("span", null, tag("rung " + p.rung, cls), h("b", null, p.target || "–"), " ",
+        h("span", { class: "dim" }, (p.reason ? p.reason + " · " : "") + (p.result || "") + (p.grund ? " — " + p.grund : ""))));
+  })));
+}
+
+function renderInfra() {
+  const st = D.state;
+  if (!st) { kv($("infra-kv"), [["Bridge", "unreachable", "bad-t"]]); return; }
+  const rows = [
+    ["Bridge", st.instance ? st.instance + " · port " + st.dashPort : "–"],
+    ["Game", st.connected ? (st.verified ? "connected" : "connected, not verified") : "disconnected", st.connected && st.verified ? "ok-t" : "bad-t"],
+  ];
+  if (st.connectedSince && st.connected) rows.push(["Connected for", fmtDur((Date.now() - Date.parse(st.connectedSince)) / 3.6e6)]);
+  if (st.lastSaveAt) rows.push(["Last game save read", fmtAge(Date.now() - Date.parse(st.lastSaveAt)) + " ago"]);
+  if (Number.isFinite(nn(st.backupAgeMin))) rows.push(["Newest backup", fmtAge(st.backupAgeMin * 60000) + " ago", st.backupAgeMin > 90 ? "warn-t" : "ok-t",
+    st.lastVerifiedBackup ? st.lastVerifiedBackup.file : null]);
+  const fails = st.sicherungAusfaelle || [];
+  rows.push(["Backup failures (24 h)", String(fails.length), fails.length ? "warn-t" : null]);
+  rows.push(["Second-tab lock", st.zweitTabSperre ? "ACTIVE" : "clear", st.zweitTabSperre ? "bad-t" : "ok-t"]);
+  if (st.masterRiegel) rows.push(["Push guard", st.masterRiegel.an ? "on · " + st.masterRiegel.dateien + " files" : "off", st.masterRiegel.an ? null : "warn-t", "Only files committed to git reach the game"]);
+  rows.push(["Bought servers", fmtInt(st.purchasedCount)]);
+  kv($("infra-kv"), rows);
+}
+
+function renderEconomy() {
+  const n = D.net;
+  $("money-big").textContent = fmtMoney(nn(n && n.geld));
+  const pts = runSamples().filter((x) => Number.isFinite(x.money)).map((x) => [x.motor, x.money]);
+  $("money-sub").textContent = pts.length > 1 ? "cash on hand this run (purchases cause the dips)" : "cash on hand";
+  spark($("money-spark"), pts);
+  const rows = [];
+  const a = D.augs;
+  if (a) rows.push(["Augs queued", fmtInt(a.wartend) + (a.mindest ? " (installs at ≥ " + a.mindest + ")" : ""), a.gesperrt ? "warn-t" : null, a.gesperrt ? "install currently blocked" : null]);
+  const hs = D.hashes;
+  const augReset = nn(D.kpi && D.kpi.augReset);
+  if (hs && (!Number.isFinite(augReset) || nn(hs.augReset) === augReset) && hs.kapazitaet > 0) {
+    rows.push(["Hashes", fmtInt(hs.hashes) + " / " + fmtInt(hs.kapazitaet), hs.hashes >= hs.kapazitaet * 0.98 ? "warn-t" : null]);
+    rows.push(["Spending on", hs.art || hs.state || "–"]);
+    rows.push(["Rank from hashes", fmtInt(hs.rangAusHashes), null, fmtInt(hs.getauscht) + " rank exchanges · " + fmtInt(hs.verkauft) + " sales since hashes.js started"]);
+  } else rows.push(["Hashes", "no hacknet servers now", "faint"]);
+  if (Number.isFinite(nn(n && n.hacking))) rows.push(["Hacking level", fmtInt(n.hacking)]);
+  kv($("econ-kv"), rows);
+}
+
+function spark(svg, pts) {
+  svg.innerHTML = "";
+  if (pts.length < 2) return;
+  const W = svg.clientWidth || 300, H = 46;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const x0 = Math.min(...xs), x1 = Math.max(...xs), y0 = Math.min(...ys), y1 = Math.max(...ys);
+  const X = (v) => x1 === x0 ? 0 : (v - x0) / (x1 - x0) * W, Y = (v) => y1 === y0 ? H / 2 : H - 3 - (v - y0) / (y1 - y0) * (H - 6);
+  const d = pts.map((p, i) => (i ? "L" : "M") + X(p[0]).toFixed(1) + "," + Y(p[1]).toFixed(1)).join("");
+  svg.innerHTML = '<path d="' + d + ' L' + W + ',' + H + ' L0,' + H + 'Z" fill="rgba(90,169,255,.10)"/><path d="' + d + '" fill="none" stroke="var(--blue)" stroke-width="1.6"/>';
+}
+
+function sleeveTask(s) {
+  const a = String(s.aufgabe || "");
+  const gym = { str: "Gym · Strength", def: "Gym · Defense", dex: "Gym · Dexterity", agi: "Gym · Agility", gym: "Gym" };
+  if (gym[a]) return gym[a];
+  if (a.startsWith("contract:")) return "Contract · " + a.slice(9);
+  if (a.startsWith("faction:")) return "Faction work · " + a.slice(8).replace("/", " · ");
+  return { infiltrate: "Infiltrate synthoids", recruitment: "Recruit team members", diplomacy: "Diplomacy", recovery: "Shock recovery", arm: "Crime (no gym money)" }[a] || a || "idle";
+}
+function renderSide() {
+  const body = [];
+  const sl = D.sleeve;
+  const sleeves = h("div", null, h("div", { class: "mini-h" }, "Sleeves"));
+  if (sl && Array.isArray(sl.sleeves) && sl.sleeves.length) {
+    for (const s of sl.sleeves) {
+      const catchMin = nn(s.stored) * 0.2 / 60;   // gespeicherte Zyklen zu 200 ms
+      sleeves.append(h("div", { class: "ev", style: "grid-template-columns:28px minmax(0,1fr)" },
+        h("time", null, "#" + s.nr),
+        h("span", null, sleeveTask(s), s.gesetzt === false ? h("span", { class: "warn-t" }, " · not applied") : "",
+          s.grund ? h("span", { class: "dim" }, " · " + s.grund) : "",
+          catchMin >= 30 ? h("span", { class: "warn-t" }, " · catching up " + fmtDur(catchMin / 60)) : "")));
+    }
+    if (sl.trupp && sl.trupp.nr >= 0) sleeves.append(h("div", { class: "sub" }, "Team support: sleeve #" + sl.trupp.nr));
+  } else sleeves.append(h("div", { class: "empty" }, D.sleeve ? "No sleeves." : "No sleeve data."));
+  body.push(sleeves);
+
+  const go = D.go;
+  const goEl = h("div", { style: "margin-top:12px" }, h("div", { class: "mini-h" }, "Go (IPvGO)"));
+  if (go && go.knoten === currentRun().node && freshness("go").cls !== "dead") {
+    const games = nn(go.won) + nn(go.lost);
+    goEl.append(h("div", { class: "kv" },
+      h("span", null, "Bonus"), h("span", { class: "ok-t" }, Number.isFinite(nn(go.bonusPercent)) ? "+" + go.bonusPercent.toFixed(1) + " %" : "–"),
+      h("span", null, "Since go.js started"), h("span", null, fmtInt(go.won) + " won · " + fmtInt(go.lost) + " lost" + (games ? " (" + fmtPct(go.won / games) + ")" : "")),
+      h("span", null, "Opponent"), h("span", null, (go.opponent || "–") + " · " + (go.size || "?") + "×" + (go.size || "?")),
+      h("span", null, "Win streak"), h("span", null, fmtInt(go.winStreak))));
+  } else goEl.append(h("div", { class: "empty" }, go ? "Not playing in this node." : "No Go data."));
+  body.push(goEl);
+
+  const g = D.gang;
+  const gEl = h("div", { style: "margin-top:12px" }, h("div", { class: "mini-h" }, "Gang"));
+  const nr = runReset();
+  const gThisNode = g && g.inGang && (!nr || nn(g.ts || g.wall) >= nr) && freshness("gang").cls !== "dead";
+  if (gThisNode) {
+    gEl.append(h("div", { class: "kv" },
+      h("span", null, "Faction"), h("span", null, g.faction || "–"),
+      h("span", null, "Members"), h("span", null, fmtInt(g.members)),
+      // moneyGainRate ist Geld je Spielzyklus (200 ms) - die Spieloberflaeche zeigt 5x.
+      h("span", null, "Income"), h("span", null, fmtMoney(nn(g.moneyGainRate) * 5) + "/s"),
+      h("span", null, "Territory"), h("span", null, fmtPct(g.territory, 1))));
+  } else gEl.append(h("div", { class: "empty" }, "No gang in this node."));
+  body.push(gEl);
+  fill($("side-body"), body);
+}
+
+function renderNetwork() {
+  const n = D.net;
+  if (!n) { kv($("net-kv"), []); fill($("net-meters"), []); return; }
+  kv($("net-kv"), [
+    ["Home RAM", fmtRam(n.homeRam)],
+    ["Core phase", n.phase || "–"],
+    ["Core round", fmtInt(n.runde)],
+    ["Hack target", n.ziel || "–"],
+    ["Batch targets", Array.isArray(n.batchZiele) && n.batchZiele.length ? n.batchZiele.join(", ") : "–"],
+    ["Exp target", n.expZiel || "–"],
+  ]);
+  const m = [];
+  if (Number.isFinite(nn(n.gerootet)) && n.netz) m.push(meter("Rooted", n.gerootet / n.netz, n.gerootet + " / " + n.netz));
+  if (Number.isFinite(nn(n.brachAnteil))) m.push(meter("Idle RAM", n.brachAnteil, fmtPct(n.brachAnteil), n.brachAnteil > 0.2 ? "warn" : "blue"));
+  fill($("net-meters"), m);
+}
+
+function routeProgress() {
+  const route = D.route && Array.isArray(D.route.route) ? D.route.route.filter(Boolean) : null;
+  if (!route || !route.length) return null;
+  const run = currentRun();
+  const idx = route.findIndex((e) => e.node === run.node && e.level === run.level);
+  return { route, idx, done: Math.max(0, idx), total: route.length };
+}
+
+function renderRoute() {
+  const rp = routeProgress();
+  if (!rp) { fill($("route"), h("div", { class: "empty" }, "route.json not readable.")); fill($("route-sum"), []); return; }
+  const skipped = new Set(((D.exit && D.exit.uebersprungen) || []).map((u) => typeof u === "string" ? u : u && (u.node + "." + u.level)));
+  const left = rp.total - rp.done;
+  fill($("route-sum"), [
+    h("span", { class: "big num", style: "font-size:24px" }, rp.done, h("small", null, " / " + rp.total)),
+    h("span", { class: "dim" }, "entries finished · " + left + " to go, including the current one"),
+    h("div", { class: "bar", style: "flex:1; min-width:160px; max-width:420px" }, h("i", { style: "width:" + (rp.done / rp.total * 100).toFixed(1) + "%" })),
+  ]);
+  fill($("route"), rp.route.map((e, i) => {
+    const key = e.node + "." + e.level;
+    const cls = i < rp.idx ? "done" : i === rp.idx ? "cur" : "";
+    const how = e.verfahren === "V2" ? "Bladeburner (21 Black Ops)" : e.verfahren === "V1b" ? "Red Pill from the Darknet lab" : "Hacking (Red Pill + w0r1d_d43m0n)";
+    return h("div", { class: "rt " + cls + (skipped.has(key) ? " skip" : ""), title: "BitNode " + e.node + " level " + e.level + " · " + how + (e.braucht ? " · needs " + e.braucht : "") },
+      h("b", null, key), h("small", null, e.verfahren === "V2" ? "BLADE" : "HACK"));
+  }));
+}
+
+function renderLog() {
+  const log = (D.state && D.state.log) || [];
+  const el = $("log");
+  const atBottom = el.scrollHeight - el.scrollTop - el.clientHeight < 30;
+  fill(el, log.slice(-80).map((e) => h("div", null, h("time", null, fmtClock(e.at)), h("span", { class: e.level }, e.message))));
+  if (atBottom) el.scrollTop = el.scrollHeight;
+}
+
+function renderSources() {
+  const names = { verdict: "check-in verdict (bridge)", history: "rank history (bridge)", blade: "data/blade.json", kpi: "data/kpi.json", guard: "data/watchdog.json",
+    net: "data/bn4net.json", exit: "data/ausgang.json", sleeve: "data/sleeve.json", hashes: "data/hashes.json", go: "data/go.json", augs: "data/einbau.json",
+    gang: "data/gang.json", rep: "data/bn4rep.json" };
+  // Diese Dateien schreibt der Bot nur, wenn er sie braucht - alt heisst dort Ruhe.
+  const optional = new Set(["gang", "rep", "go", "hashes"]);
+  if (phase() !== "blade") optional.add("blade");
+  const rows = [];
+  for (const [k, label] of Object.entries(names)) {
+    const f = freshness(k);
+    const bad = f.cls === "dead" ? "bad-t" : f.cls === "stale" ? "warn-t" : "ok-t";
+    rows.push(h("span", { title: label + (optional.has(k) ? " (only written when needed)" : "") }, label),
+      h("span", { class: optional.has(k) && f.cls ? "faint" : bad }, Number.isFinite(f.age) ? fmtAge(f.age) : "–"));
+  }
+  if (D.ref) rows.push(h("span", null, "reference curve BN" + currentRun().node), h("span", { class: "dim" }, (D.ref.punkte || []).length + " pts"));
+  fill($("src"), rows);
+  $("foot-cadence").textContent = "Live data every " + FAST_MS / 1000 + " s, history every " + SLOW_MS / 1000 + " s, verdict every 5 min. Polling pauses while this tab is hidden.";
+}
+
+// ------------------------------------------------------------ Diagramm ---
+// x-Achse: Stunden Motoruhr seit Knotenstart (zaehlt keine Offline-Zeit,
+// sync/history.js). Die Referenz liegt auf h + nullpunkt.hSeitKnotenstart.
+let chartModel = null;
+function renderChart() {
+  const svg = $("chart");
+  const W = svg.clientWidth || 800, H = 300;
+  svg.setAttribute("viewBox", "0 0 " + W + " " + H);
+  const scale = store.get("scale", "log");
+  for (const b of $("scale-seg").children) b.classList.toggle("on", b.dataset.v === scale);
+  const isV2 = phase() !== "hack";
+  const key = isV2 ? "rank" : "hacking";
+  $("chart-title").textContent = isV2 ? "Rank this run vs. previous run" : "Hacking level this run";
+
+  const series = [];
+  const pts = runSamples().filter((s) => Number.isFinite(s[key])).map((s) => ({ x: s.motor / 3.6e6, y: s[key], t: s.t }));
+  const nowMotor = nn(D.net && D.net.motorTimeMs);
+  const nowVal = isV2 ? (bladeState().ok ? nn(D.blade.rang) : NaN) : nn(D.net && D.net.hacking);
+  if (Number.isFinite(nowMotor) && Number.isFinite(nowVal) && D.state && D.state.connected) pts.push({ x: nowMotor / 3.6e6, y: nowVal, t: Date.now(), now: true });
+  pts.sort((a, b) => a.x - b.x);
+  series.push({ name: "this run", color: "var(--accent)", pts, width: 2.2 });
+  const ri = refInfo();
+  if (isV2 && ri && D.ref) series.push({ name: "previous run" + (ri.off === null ? " (start offset unknown)" : ""), color: "var(--ref)", dash: "5 4",
+    pts: D.ref.punkte.map((p) => ({ x: p.h + (ri.off || 0), y: p.rang })), width: 1.6 });
+
+  const allPts = series.flatMap((s) => s.pts).filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y));
+  svg.innerHTML = "";
+  if (!pts.length) {
+    const msg = D.historyMissing ? "History needs a bridge restart." : isV2 && phase() !== "blade" ? "The rank chart starts after joining Bladeburner." : "No history yet - the bridge records a sample every 5 minutes.";
+    svg.innerHTML = '<text x="' + W / 2 + '" y="' + H / 2 + '" text-anchor="middle" class="axis-t"></text>';
+    svg.querySelector("text").textContent = msg;
+    fill($("legend"), []);
+    chartModel = null;
+    if (!allPts.length) return;
+  }
+  const pad = { l: 58, r: 14, t: 12, b: 26 };
+  const hereX = pts.length ? pts[pts.length - 1].x : 0;
+  // Zeigt den Lauf bis jetzt plus etwas Vorschau auf die Referenz, nicht die
+  // ganze Referenz - sonst ist der eigene Lauf in den ersten Stunden ein Punkt.
+  const refEnd = ri ? ri.reachH : 0;
+  const xMax = Math.max(1, Math.min(Math.max(hereX * 1.6, hereX + 4), Math.max(refEnd, hereX)) || 1);
+  const visible = allPts.filter((p) => p.x <= xMax);
+  const yMaxRaw = Math.max(1, ...visible.map((p) => p.y));
+  const useLog = scale === "log";
+  const yMax = useLog ? Math.pow(10, Math.ceil(Math.log10(Math.max(10, yMaxRaw * 1.2)))) : yMaxRaw * 1.08;
+  const X = (x) => pad.l + x / xMax * (W - pad.l - pad.r);
+  const Y = (y) => {
+    const v = useLog ? Math.log10(Math.max(1, y)) / Math.log10(yMax) : y / yMax;
+    return H - pad.b - Math.max(0, Math.min(1, v)) * (H - pad.t - pad.b);
+  };
+  let s = "";
+  const yTicks = [];
+  if (useLog) for (let e = 0; Math.pow(10, e) <= yMax; e++) yTicks.push(Math.pow(10, e));
+  else { const step = niceStep(yMax / 5); for (let v = 0; v <= yMax; v += step) yTicks.push(v); }
+  for (const v of yTicks) s += '<line class="grid-l" x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + Y(v) + '" y2="' + Y(v) + '"/><text class="axis-t" x="' + (pad.l - 8) + '" y="' + (Y(v) + 4) + '" text-anchor="end">' + fmtShort(v) + '</text>';
+  const xs = niceStep(xMax / 8);
+  for (let v = 0; v <= xMax + 1e-9; v += xs) s += '<line class="grid-l" x1="' + X(v) + '" x2="' + X(v) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" opacity=".5"/><text class="axis-t" x="' + X(v) + '" y="' + (H - 8) + '" text-anchor="middle">' + (v % 1 ? v.toFixed(1) : v) + ' h</text>';
+  if (isV2 && DAEDALUS_RANK <= yMax) s += '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + Y(DAEDALUS_RANK) + '" y2="' + Y(DAEDALUS_RANK) + '" stroke="var(--warn)" stroke-dasharray="2 4" opacity=".7"/><text class="axis-t" x="' + (W - pad.r - 4) + '" y="' + (Y(DAEDALUS_RANK) - 5) + '" text-anchor="end" fill="var(--warn)">400k</text>';
+  if (hereX > 0) s += '<line x1="' + X(hereX) + '" x2="' + X(hereX) + '" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--fg)" opacity=".18"/>';
+  for (const ser of series.slice().reverse()) {
+    const ps = ser.pts.filter((p) => Number.isFinite(p.x) && Number.isFinite(p.y) && p.x <= xMax * 1.02);
+    if (!ps.length) continue;
+    // Luecken (Rechner aus, Bruecke weg) als Unterbrechung zeichnen, nicht als Linie.
+    let d = "";
+    ps.forEach((p, i) => {
+      const gap = i > 0 && Number.isFinite(p.t) && Number.isFinite(ps[i - 1].t) && p.t - ps[i - 1].t > GAP_MS;
+      d += (i === 0 || gap ? "M" : "L") + X(p.x).toFixed(1) + "," + Y(p.y).toFixed(1);
+    });
+    s += '<path d="' + d + '" fill="none" stroke="' + ser.color + '" stroke-width="' + ser.width + '"' + (ser.dash ? ' stroke-dasharray="' + ser.dash + '"' : "") + ' stroke-linejoin="round" stroke-linecap="round"/>';
+    const last = ps.find((p) => p.now);
+    if (last) s += '<circle cx="' + X(last.x) + '" cy="' + Y(last.y) + '" r="5" fill="var(--bg)" stroke="' + ser.color + '" stroke-width="2.4"/>';
+    else if (ps.length === 1) s += '<circle cx="' + X(ps[0].x) + '" cy="' + Y(ps[0].y) + '" r="3" fill="' + ser.color + '"/>';
+  }
+  s += '<line id="xh" y1="' + pad.t + '" y2="' + (H - pad.b) + '" stroke="var(--dim)" stroke-dasharray="3 3" opacity="0"/>';
+  svg.innerHTML = s;
+  chartModel = { xMax, pad, W, series };
+  const leg = series.map((x) => h("span", null, h("i", { style: "background:" + x.color }), x.name));
+  leg.push(h("span", { class: "faint" }, "x: hours of play since the node started (offline time not counted)"));
+  fill($("legend"), leg);
+}
+function niceStep(raw) {
+  if (!(raw > 0)) return 1;
+  const p = Math.pow(10, Math.floor(Math.log10(raw)));
+  const f = raw / p;
+  return (f <= 1 ? 1 : f <= 2 ? 2 : f <= 5 ? 5 : 10) * p;
+}
+function onChartMove(ev) {
+  const m = chartModel, tip = $("tip");
+  if (!m) return;
+  const svg = $("chart");
+  const r = svg.getBoundingClientRect();
+  const px = (ev.clientX - r.left) / r.width * m.W;
+  const x = (px - m.pad.l) / (m.W - m.pad.l - m.pad.r) * m.xMax;
+  if (x < 0 || x > m.xMax) { tip.style.display = "none"; return; }
+  const lines = [h("div", { class: "dim" }, x.toFixed(2) + " h of play")];
+  for (const ser of m.series) {
+    const ps = ser.pts.filter((p) => Number.isFinite(p.x));
+    let val = null;
+    for (let i = 0; i < ps.length - 1; i++) if (x >= ps[i].x && x <= ps[i + 1].x) {
+      const a = ps[i], b = ps[i + 1];
+      val = b.x === a.x ? b.y : a.y + (x - a.x) / (b.x - a.x) * (b.y - a.y);
+      break;
+    }
+    if (val !== null) lines.push(h("div", null, h("span", { style: "color:" + ser.color }, "● "), ser.name + ": ", h("b", { class: "num" }, fmtInt(val))));
+  }
+  fill(tip, lines);
+  tip.style.display = "block";
+  const wrap = $("chart-wrap").getBoundingClientRect();
+  tip.style.left = Math.max(0, Math.min(ev.clientX - wrap.left + 14, wrap.width - tip.offsetWidth - 4)) + "px";
+  tip.style.top = (ev.clientY - wrap.top + 12) + "px";
+  const xh = svg.querySelector("#xh");
+  if (xh) { xh.setAttribute("x1", px); xh.setAttribute("x2", px); xh.setAttribute("opacity", ".6"); }
+}
+$("chart").addEventListener("mousemove", onChartMove);
+$("chart").addEventListener("mouseleave", () => { $("tip").style.display = "none"; const xh = $("chart").querySelector("#xh"); if (xh) xh.setAttribute("opacity", "0"); });
+$("scale-seg").addEventListener("click", (e) => { const v = e.target.dataset && e.target.dataset.v; if (v) { store.set("scale", v); renderChart(); } });
+
+// -------------------------------------------------------------- Ablauf ---
+const CARD_OF = { renderCarrier: "c-carrier", renderEta: "c-eta", renderBlackOps: "c-bo", renderAction: "c-action", renderGuard: "c-guard",
+  renderInfra: "c-infra", renderEconomy: "c-econ", renderSide: "c-side", renderNetwork: "c-net", renderRoute: "c-route", renderLog: "c-log",
+  renderSources: "c-src", renderChart: "c-chart" };
+function renderAll() {
+  let v = { label: "" };
+  try { v = renderVerdict(); } catch (e) { console.error("renderVerdict", e); }
+  const parts = [renderAlerts, renderCarrier, renderEta, renderBlackOps, renderAction, renderGuard, renderInfra,
+    renderEconomy, renderSide, renderNetwork, renderRoute, renderLog, renderSources, renderChart];
+  try { renderHeader(v); } catch (e) { console.error("renderHeader", e); }
+  for (const fn of parts) {
+    try { fn(); }
+    catch (e) {
+      console.error(fn.name, e);
+      // Eine Karte, deren Zeichnen scheitert, darf nicht mit alten Zahlen stehen bleiben.
+      const card = CARD_OF[fn.name] && $(CARD_OF[fn.name]);
+      if (card) card.classList.add("stale");
+    }
+  }
+  try { setAges(); } catch (e) { console.error("setAges", e); }
+}
+
+// Bei getrenntem Spiel alle Spieldateien entwerten (Grundsatz 2). Urteil und
+// Verlauf haelt die Bruecke - die bleiben, mit Alter.
+function wipeGame() {
+  for (const k of ["blade", "kpi", "guard", "net", "exit", "wake", "sleeve", "hashes", "go", "gang", "augs", "penalties", "rep"]) D[k] = null;
+}
+
+let busy = false, slowAt = 0;
+async function tick() {
+  if (busy) return;
+  busy = true;
+  try {
+    await loadFast();
+    if (!D.state || !D.state.connected) wipeGame();
+    if (Date.now() - slowAt >= SLOW_MS) { slowAt = Date.now(); await loadSlow(); }
+    if (D.state) D.lastOk = Date.now();
+  } catch (e) {
+    console.error("tick", e);
+  } finally {
+    busy = false;
+    renderAll();
+  }
+}
+setInterval(() => { if (!document.hidden) tick(); else renderHeader({ label: "" }); }, FAST_MS);
+document.addEventListener("visibilitychange", () => { if (!document.hidden) tick(); });
+let resizeT = null;
+window.addEventListener("resize", () => { clearTimeout(resizeT); resizeT = setTimeout(() => { try { renderChart(); renderEconomy(); } catch { /* egal */ } }, 120); });
+tick();
 </script>
+</body>
+</html>

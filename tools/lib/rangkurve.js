@@ -211,7 +211,10 @@ export function vergleichMitReferenz(knoten, rang, hSeitKnotenstart) {
   // Rangpunkt; ohne bekannten Abstand dorthin gibt es keinen ehrlichen
   // Vergleich - lieber keiner als ein falsches ZAEH.
   const k = ladeKurve(knoten);
-  const off = k && k.nullpunkt ? Number(k.nullpunkt.hSeitKnotenstart) : NaN;
+  // null hiesse sonst 0 (Number(null) === 0, Skeptiker 29.10.2026):
+  // rangkurve-bauen.js schreibt null, wenn der Knotenstart unbekannt ist.
+  const roh = k && k.nullpunkt ? k.nullpunkt.hSeitKnotenstart : null;
+  const off = roh == null ? NaN : Number(roh);
   if (!Number.isFinite(off) || off < 0) return null;
   const hRef = r.hJetzt + off;
   if (hRef <= 0) return null;

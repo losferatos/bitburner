@@ -138,6 +138,16 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-history.js",
+    deckt: "Dashboard-Verlauf der Bruecke: Probe nur aus dem laufenden Knoten, Motoruhr, Takt ueber Neustart, kaputte Datei beiseite (29.10.)",
+    schnell: true,
+  },
+  {
+    datei: "test-netburn-marker.js",
+    deckt: "netburn.js entwertet die Hacknet-Knotenmarke nach Serverkauf (BN13.1, 29.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-bruecke-alarm.js",
     deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
     schnell: true,

@@ -601,7 +601,9 @@ async function main() {
    */
   // Ein schnellerer, abgeschlossener Lauf ersetzt die Referenz (05.10.2026,
   // tools/lib/kurvepflege.js) - vor dem ersten Lesen, lib/rangkurve.js cacht.
-  const kurveNeu = kurveAuffrischen(ROOT, knoten);
+  // Nur mit Stand (29.10.2026, Skeptiker): der Verdict-Lauf der Bruecke
+  // (--kein-stand, alle 5 min) bleibt lesend; die Kurve pflegt der /bb-Lauf.
+  const kurveNeu = standSchreiben ? kurveAuffrischen(ROOT, knoten) : null;
   if (kurveNeu) sag(kurveNeu);
   const kurve = restzeitAusKurve(knoten, rang);
   let etaSpiel = null;
@@ -663,6 +665,8 @@ async function main() {
     // Knotenstart, der Bonuszeit-Vorrat wird wie in der Kurve abgezogen,
     // und die Spielzeit seit der Sicherung (blade.json) kommt obendrauf.
     const hSeitKnoten = knotenStundenAusSicherung(knoten, laufJetzt, spielzeit);
+    // Fuer das Dashboard (29.10.2026): dieselbe Uhr wie die Referenzkurve.
+    if (Number.isFinite(hSeitKnoten)) bericht.hSeitKnoten = hSeitKnoten;
     if (Number.isFinite(hSeitKnoten) && hSeitKnoten > 0) {
       const v = vergleichMitReferenz(knoten, rang, hSeitKnoten);
       if (v) {
@@ -1159,7 +1163,9 @@ async function main() {
           JSON.stringify({ punkte: punkte.slice(-50) }, null, 1));
       } catch { /* nicht schreibbar - der Bericht gilt trotzdem */ }
     }
-    if (alsJson) console.log(JSON.stringify(b, null, 1));
+    // Der Klartext gehoert ins JSON (29.10.2026): das Dashboard zeigt den
+    // Check-in-Bericht wortgleich, statt ihn nachzubauen.
+    if (alsJson) console.log(JSON.stringify({ ...b, zeilen: z }, null, 1));
     else console.log(z.join("\n"));
     process.exitCode = ["AUF KURS", "ANLAUF", "HACKINGWEG", "SPRINGT"].includes(b.urteil) ? 0 : 1;
   }

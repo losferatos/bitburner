@@ -61,7 +61,19 @@ export async function main(ns) {
     }
 
     const s = stand();
-    z.push(`Hacknet: ${s.n} Knoten | Level ${s.level}/100 | RAM ${s.ram}/8 | Cores ${s.cores}/4`);
+    // ALTE KNOTENMARKE ENTWERTEN (29.10.2026, BN13.1). hacknet.js setzt
+    // data/keine-hacknet.txt, wenn nach einem Einbau kein Server mehr da ist;
+    // die Marke gilt bis zum Knotenwechsel. Kauft dieses Skript danach
+    // Server, blieb hashes.js trotzdem gesperrt: 5 Server, Speicher 320/320
+    // voll, nichts getauscht (gemessen 29.10., Marke vom 28.10. 07:44).
+    // "0" statt rm: ns.write kostet kein RAM, und "0" gilt in keinem Knoten
+    // (lib/reg.js knotenMarkeGilt, bn4net markerGilt, strategie-check).
+    // hacknet.js startet dann mit - ausserhalb BN9 ruht es nur (Punkt 2).
+    if (s.n > 0) {
+      ns.write("data/keine-hacknet.txt", "0", "w");
+      if (ns.getHostname() !== "home") ns.scp("data/keine-hacknet.txt", "home", ns.getHostname());
+    }
+    z.push(`Hacknet:${s.n} Knoten | Level ${s.level}/100 | RAM ${s.ram}/8 | Cores ${s.cores}/4`);
     z.push(`Geld danach: ${ns.format.number(ns.getPlayer().money)}`);
 
     // Auf die Einladung warten und beitreten. Die Pruefung laeuft im Spiel

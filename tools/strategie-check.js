@@ -47,7 +47,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 // DIESELBE Auswahl, die der Kern benutzt - nicht eine zweite daneben.
-import { auswahl } from "../src/lib/reg.js";
+import { auswahl, KNOTEN_MARKEN } from "../src/lib/reg.js";
 import { windowVerdict, probeVerdict, PROBE_MS } from "./lib/drossel.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -593,7 +593,10 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       node: kpi && Number.isFinite(kpi.node) ? kpi.node : 0,
       verfahren: (kpi && kpi.verfahren) || "unbekannt",
       phase: phase || "normal",
-      dateiDa: aufHome ? ((d) => aufHome.has(d)) : undefined,
+      // Knotenmarken zaehlen hier NIE als Sperre (29.10.2026): eine entwertete
+      // Marke ("0") existiert weiter und verdeckte sonst ein fehlendes
+      // hashes.js. Die gueltige Marke erklaert der Block "PLANMAESSIG AUS".
+      dateiDa: aufHome ? ((d) => !KNOTEN_MARKEN.has(d) && aufHome.has(d)) : undefined,
       // Feature 9 kommt vom Kern (bn4net.json `feature9`), der ownedSF
       // sieht; von hier aus ist nur der Knoten bekannt (Skeptiker 19.09.).
       features: { 9: (net && net.feature9 === true) || (kpi && kpi.node === 9) },

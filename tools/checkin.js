@@ -327,7 +327,10 @@ async function main() {
   // vorbei. Der Rang laesst sich nicht wegdiskutieren: Wer die 400.000 von
   // Daedalus hat, ist am Ausgang oder einen Schritt davor.
   const rangReicht = Number.isFinite(rang) && rang >= DAEDALUS_RANG;
-  if (rangReicht && !resetBereit) {
+  // Nur wenn die Liste WIRKLICH fehlt (29.10.2026): mit lesbarer naechster
+  // Black Op ist "Rang reicht, Ops offen" der Normalfall kurz vor dem Ende.
+  const listeFehlt = !(bladeGut && typeof bladeGut.naechsteBlackOp === "string");
+  if (rangReicht && !resetBereit && listeFehlt) {
     sag("ACHTUNG: Rang " + zahl(rang) + " liegt ueber den " + zahl(DAEDALUS_RANG)
       + " von Operation Daedalus, aber die Liste der offenen Black Ops ist"
       + " nicht lesbar (laeuft blade.js?). Der Knoten koennte fertig sein -"

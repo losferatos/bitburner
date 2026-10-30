@@ -148,6 +148,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-strafzeile.js",
+    deckt: "/bb zaehlt Entwarnungen des Waechters nicht als Strafe (BN13.2, 30.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-bruecke-alarm.js",
     deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
     schnell: true,

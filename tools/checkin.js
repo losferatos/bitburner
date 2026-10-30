@@ -34,6 +34,7 @@ import { restzeitAusKurve, naechsterMeilenstein, vergleichMitReferenz } from "./
 import { offlineFenster, onlineStunden, indexZeilen, laufGrenzen, levelAusSicherung, restzeitV1, baueKurve } from "./lib/v1kurve.js";
 import { gateRoundStatus } from "./lib/gate-round-status.js";
 import { gangZeile, gangBefunde, gangImKnoten } from "./lib/gangzeile.js";
+import { penaltyLines } from "./lib/strafzeile.js";
 import { kurveAuffrischen, effektiveSpielzeit } from "./lib/kurvepflege.js";
 import { gunzipSync } from "node:zlib";
 
@@ -869,22 +870,9 @@ async function main() {
 
     // Strafen der letzten 24 Stunden, nach Sprosse. Sprossen ab 3 sind laut
     // Architektur "jede ist ein Befund" - sie werden einzeln genannt.
-    if (strafen && Array.isArray(strafen.eintraege)) {
-      const seit = Date.now() - 24 * 3600000;
-      const jung = strafen.eintraege.filter((e) => Number(e.wall) >= seit);
-      if (jung.length) {
-        const nachSprosse = {};
-        for (const e of jung) nachSprosse[e.rung] = (nachSprosse[e.rung] || 0) + 1;
-        sag("Strafen (24 h): " + Object.entries(nachSprosse)
-          .sort((a, b) => a[0] - b[0])
-          .map(([r, n]) => n + "x Sprosse " + r).join(", "));
-        for (const e of jung.filter((x) => Number(x.rung) >= 3)) {
-          sag("  Sprosse " + e.rung + " auf " + e.target + " (" + e.reason + ") um "
-            + new Date(Number(e.wall)).toLocaleTimeString("de-DE")
-            + " - " + (e.result || "?"));
-        }
-      }
-    }
+    // Entwarnungen (stood-down) sind keine Strafen (30.10.2026), siehe
+    // tools/lib/strafzeile.js.
+    if (strafen) for (const zeile of penaltyLines(strafen.eintraege, Date.now())) sag(zeile);
 
     // WAS SEIT UEBER EINER STUNDE FEHLT (22.09.2026, Skeptiker Runde 2, H3).
     // Der Waechter straft Werkzeuge, die nirgends laufen, nicht mehr - er

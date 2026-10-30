@@ -153,6 +153,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-verdraenger.js",
+    deckt: "home-Werkzeug (shop.js) verdraengt ein Werkbank-Werkzeug von home nach evictRank (BN13.2 nach Einbau, 30.10.)",
+    schnell: true,
+  },
+  {
     datei: "test-bruecke-alarm.js",
     deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
     schnell: true,

@@ -308,3 +308,51 @@ export function laden(roh) {
   }
   return r;
 }
+
+/**
+ * DER VERDRAENGER (30.10.2026, BN13.2 nach dem Einbau um 08:24).
+ *
+ * Direkt nach einem Einbau ist home die Werkbank (es gibt noch keinen
+ * gerooteten 20-GB-Rechner), und die Werkzeuge mit hostRule "werkbank" oder
+ * "any" starten dort. Sobald ein echter Werkbank-Rechner gerootet ist, bleiben
+ * sie trotzdem auf home - der Kern verschob bisher nur Arbeiter, nie
+ * Werkzeuge. Gemessen 08:41: home 126,65 von 128 GB mit Werkzeugen belegt,
+ * davon 71 GB ohne hostRule "home" (contracts.js, sleeve.js, bn4life.js,
+ * bbtrain.js, ausgang.js ...). shop.js (hostRule "home", 7 GB) fand 1,3 GB
+ * und lief nie - also kaufte niemand Mietrechner, und blade.js (100 GB) fand
+ * nirgends Platz. Im Vorlauf (29.10., 10:37) standen eine Stunde nach dem
+ * Einbau 25 Mietrechner; dort hatte shop.js den Platz zufaellig bekommen.
+ *
+ * Gewaehlt wird EIN Werkzeug, das allein genug Platz freimacht, mit dem
+ * kleinsten evictRank (das Feld stand seit dem 04.09. in der Registry und
+ * hatte keinen Leser), bei Gleichstand das kleinere. Nur Werkzeuge mit
+ * killSafe, ohne hostRule "home", mit evictRank unter 99, und nur solche,
+ * die der Aufrufer freigibt: canRelocate(file, gb) muss sagen, dass der
+ * Starter es auf der Werkbank wieder hochholt und dort Platz ist - sonst
+ * kaeme das Opfer ueber den Ausweichwirt auf home zurueck oder gar nicht
+ * wieder (bn4net.js: darfVerdraengen).
+ *
+ * candidates: [{ file, pid, gb }] - Werkzeuge auf home (gb = Speicher der
+ *   laufenden Instanz). Liefert { file, pid, gb, rank } oder null.
+ *   Rein, ohne ns.
+ */
+export function pickEvictionVictim(candidates, registry, freeHomeGb, needGb, canRelocate) {
+  const entries = (registry && Array.isArray(registry.eintraege)) ? registry.eintraege : [];
+  // Ohne Freigabe durch den Aufrufer wird nicht verdraengt (s. o.).
+  if (!Array.isArray(candidates) || !(needGb > 0) || typeof canRelocate !== "function") return null;
+  const free = Number.isFinite(freeHomeGb) ? freeHomeGb : 0;
+  let best = null;
+  for (const c of candidates) {
+    if (!c || typeof c.file !== "string") continue;
+    const e = entries.find((x) => x && x.name === c.file);
+    if (!e || e.hostRule === "home" || e.killSafe !== true) continue;
+    const rank = Number(e.evictRank);
+    if (!Number.isFinite(rank) || rank >= 99) continue;
+    if (!(c.gb > 0) || free + c.gb < needGb) continue;
+    if (!canRelocate(c.file, c.gb)) continue;
+    if (!best || rank < best.rank || (rank === best.rank && c.gb < best.gb)) {
+      best = { file: c.file, pid: c.pid, gb: c.gb, rank };
+    }
+  }
+  return best;
+}

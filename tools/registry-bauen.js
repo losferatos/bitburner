@@ -334,6 +334,7 @@ const STEUERND = {
   "needsLibs": "bn4net.js",
   "killSafe": "boot.js",
   "childRamGb": "bn4net.js",
+  "evictRank": "lib/reg.js",
 };
 // Beschreibend - mit der Begruendung, warum kein Leser noetig ist.
 const BESCHREIBEND = {
@@ -342,7 +343,6 @@ const BESCHREIBEND = {
   "scpToHome": "das Gewerk kopiert selbst nach home (Hausform `nachHome`)",
   "singularity": "folgt aus ramSingGb > 0; hier als lesbare Kennzeichnung",
   "maxInstances": "der Starter laesst ueber `laufend` ohnehin nur eine zu",
-  "evictRank": "der Kern raeumt nur Arbeiter, nie Werkzeuge - kein Verdraenger gebaut",
   "needsFigure": "der Vergabepunkt arbeitet ueber Antraege, nicht ueber die Registry",
   "unbuilt": "Merker fuer noch nicht gebaute Gewerke",
   "ramHeuteGb": "was die Datei im LAUFENDEN Spiel belegt - Vergleichswert zum Neubau",

@@ -31,7 +31,8 @@ import { targetMetrics, targetRank, selectMoneyTargets, effectivePrepSec,
   batchThroughput, prepDiscount } from "lib/calc.js";
 import { laden as ladeRegistry, auswahl as regAuswahl, gilt as regGilt,
   telemetrieTabelle as regTelemetrie, zaehlwerk as regZaehlwerk,
-  leseRolle, pruefeRolle, merkmaleAusReset, KNOTEN_MARKEN, knotenMarkeGilt } from "lib/reg.js";
+  leseRolle, pruefeRolle, merkmaleAusReset, KNOTEN_MARKEN, knotenMarkeGilt,
+  pickEvictionVictim } from "lib/reg.js";
 import {
   runde as mzRunde, motorStunden as mzStunden,
   zuruecksetzen as mzZuruecksetzen, laden as mzLaden,
@@ -286,6 +287,9 @@ export async function main(ns) {
   // Wann ein Einmallaeufer zuletzt gestartet wurde - gegen den Neustart im
   // Rundentakt. Ueber Rundengrenzen hinweg.
   const einmalGestartet = new Map();
+  // Wann ein Werkzeug zuletzt von home verdraengt wurde (Verdraenger,
+  // 30.10.2026) - dasselbe Opfer nicht im Rundentakt erneut.
+  const verdraengtAm = new Map();
   // Zeitpunkt des letzten darkweb.js-Anlaufs (Abschnitt 2b1).
   let nachholMerker = 0;
   // Gedaechtnis ueber Rundengrenzen hinweg. Ein Ziel, das seit zwanzig
@@ -4196,6 +4200,31 @@ export async function main(ns) {
       const RESERVIERUNG_MS = 300000;
       let reserviertFuer = null;      // Dateiname oder null
 
+      // DER VERDRAENGER - WEN ER BEENDEN DARF (30.10.2026, Skeptiker).
+      // Nur, was der Starter oben auch wieder hochholt: in WERKZEUGE, mit
+      // restartPolicy "always", geltender Vorbedingung und ohne die
+      // Sonderfilter der fehlend-Liste. bn4life.js steht nicht in WERKZEUGE
+      // (Abschnitt 0 holt es nur auf home zurueck) - es waere sonst ein Opfer,
+      // das niemand auf die Werkbank bringt. ausgang.js nie: es ist der
+      // Sprungtreiber, Handschlag, Ablehnungsfrist und ETA-Messpunkte liegen
+      // nur in seinem Speicher (Skeptiker Runde 2).
+      // Hoechstens ein Opfer je Runde (zwei Wartende rechneten sonst mit
+      // demselben Werkbankplatz) und je Werkzeug eines je 10 min.
+      const VERDRAENG_PAUSE_MS = 600000;
+      let verdraengtDieseRunde = false;
+      const eintragPolicy = new Map(WERKZEUGE.map(([n, , p]) => [n, p]));
+      const darfVerdraengen = (d, gb) => {
+        if (!eintragPolicy.has(d) || eintragPolicy.get(d) !== "always") return false;
+        if (d === "ausgang.js" || d === "sleevecrime.js") return false;
+        if (!vorbedingungGilt(d)) return false;
+        if (verfahrenV1 && (d === "blade.js" || d === "bbtrain.js")) return false;
+        if ((d === "hashes.js" || d === "hacknet.js") && keineHacknet) return false;
+        const zuletzt = verdraengtAm.get(d);
+        if (zuletzt && Date.now() - zuletzt < VERDRAENG_PAUSE_MS) return false;
+        return !wirtGesperrt(d, werkbank)
+          && freiAuf(werkbank) + arbeiterGbAuf(werkbank) >= gb;
+      };
+
       for (const [datei, args, , , libs] of fehlend) {
         const braucht = ns.getScriptRam(datei, "home");
         // Nicht stillschweigend ueberspringen. Ein Werkzeug, das seit einer
@@ -4225,6 +4254,50 @@ export async function main(ns) {
 
         // Ein "home"-Gewerk weicht nicht aus. Passt es dort nicht, wartet es -
         // und die Platzreservierung oben haelt ihm den Platz frei.
+        //
+        // VORHER VERDRAENGEN (30.10.2026, BN13.2): Belegt ein Werkzeug, das
+        // gar nicht auf home gehoert, den Platz, zieht es auf die Werkbank
+        // um. Die Auswahl steht in lib/reg.js (pickEvictionVictim), dort auch
+        // der Befund. Nur bei einer echten Werkbank - ist home selbst die
+        // Werkbank, kaeme das Opfer sofort zurueck. Wen er beenden darf:
+        // darfVerdraengen oben.
+        //
+        // DER UMZUG IST EIN ZUG (Skeptiker Runde 2, im Mock belegt): Erst
+        // Platz auf der Werkbank schaffen, dann auf home beenden, dann sofort
+        // dort starten. Beendet und erst in der naechsten Runde gestartet,
+        // fuellten die uebrigen fehlenden Werkzeuge desselben Durchlaufs die
+        // Werkbank, und das Opfer fand 90 min lang keinen Platz mehr.
+        if (regel === "home" && freiAuf("home") < braucht && werkbank && werkbank !== "home"
+          && !verdraengtDieseRunde) {
+          const kandidaten = [];
+          for (const pr of ns.ps("home")) {
+            if (RAEUM_REIHENFOLGE.includes(pr.filename)) continue;
+            kandidaten.push({ file: pr.filename, pid: pr.pid,
+              gb: ns.getScriptRam(pr.filename, "home") * pr.threads });
+          }
+          const opfer = pickEvictionVictim(kandidaten, regGeladen, freiAuf("home"), braucht,
+            darfVerdraengen);
+          const tupel = opfer ? WERKZEUGE.find(([n]) => n === opfer.file) : null;
+          if (opfer && tupel) {
+            for (const w of RAEUM_REIHENFOLGE) {
+              if (freiAuf(werkbank) >= opfer.gb) break;
+              if (!ns.ps(werkbank).some((pr) => pr.filename === w)) continue;
+              ns.scriptKill(w, werkbank);
+            }
+          }
+          if (opfer && tupel && freiAuf(werkbank) >= opfer.gb && ns.kill(opfer.pid)) {
+            verdraengtDieseRunde = true;
+            verdraengtAm.set(opfer.file, Date.now());
+            const [, oArgs, , , oLibs] = tupel;
+            ns.scp([opfer.file, ...BIBLIOTHEKEN, ...(oLibs || [])], werkbank, "home");
+            const neuPid = ns.exec(opfer.file, werkbank, 1, ...(oArgs || []));
+            sag(datei + " gehoert auf home (" + braucht.toFixed(1) + " GB, frei waren "
+              + (freiAuf("home") - opfer.gb).toFixed(1) + ") - " + opfer.file
+              + " (evictRank " + opfer.rank + ", " + opfer.gb.toFixed(1)
+              + " GB) zieht um: " + (neuPid ? "laeuft jetzt auf " + werkbank + " (pid " + neuPid + ")."
+                : "exec auf " + werkbank + " gab 0 - der Starter holt es in der naechsten Runde."));
+          }
+        }
         if (regel === "home" && freiAuf("home") < braucht) {
           if (runde % 10 === 0) {
             sag(datei + " gehoert auf home und findet dort nur "

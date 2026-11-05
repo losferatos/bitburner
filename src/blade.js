@@ -3650,6 +3650,16 @@ export async function main(ns) {
     // Aktion zaehlt, wird erst NACH dem Ertrag entschieden (weiter unten).
     const beste = (liste, typ, schwelle) => {
       let treffer = null;
+      // Laufende Aktion dieses Typs samt gelaufener Spielzeit (ms) - fuer
+      // den Restertrag weiter unten. Ohne Messung: kein Bonus, alter Weg.
+      const laufend = (() => {
+        try {
+          const l = ns.bladeburner.getCurrentAction();
+          if (!l || l.type !== typ) return null;
+          const e = ns.bladeburner.getActionCurrentTime();
+          return e > 0 ? { name: l.name, e } : null;
+        } catch { return null; }
+      })();
       for (const name of liste) {
         if (offen(typ, name) < 1) continue;
         const s = spanneGenau(typ, name);   // D2: exakt, wenn eine Black Op offen ist
@@ -3929,7 +3939,17 @@ export async function main(ns) {
         const verlust = (RANG_JE_FEHLSCHLAG[name] || 0) * Math.pow(fac, Math.max(0, stufe - 1))
           / (BB_RANK_MULT > 0 ? BB_RANK_MULT : 1);
         const netto = rang ? rang * s.min - verlust * (1 - s.min) : 0;
-        const ertrag = (rang && dauer) ? netto / (dauer / 60000) : s.min;
+        let ertrag = (rang && dauer) ? netto / (dauer / 60000) : s.min;
+        // RESTERTRAG (05.11.2026, Begruendung beim Vergleich Vertrag gegen
+        // Operation in waehle()): Laeuft genau diese Aktion schon, zaehlt
+        // nur die Zeit, die ihr bis zum Abschluss noch fehlt - die gelaufene
+        // ist versenkt, ein Neustart setzt sie auf null. `dauer` ist hier die
+        // bewertete Dauer inkl. Chaos-/Bevoelkerungszuschlag; die Zuschlaege
+        // fallen erst nach Abschluss an und gehoeren deshalb in den Rest.
+        // Untergrenze 1 s: kurz vor Schluss wird fertig gefahren.
+        if (laufend && laufend.name === name && rang && dauer) {
+          ertrag = ertrag * dauer / Math.max(dauer - laufend.e, 1000);
+        }
         // proMinute wird MITGEFUEHRT, auch wenn nach Ausdauer ausgewaehlt
         // wird: Der Vergleich mit General-Aktionen (Field Analysis, Training)
         // geht nur ueber die Zeit, denn die kosten gar keine Ausdauer. Ohne
@@ -4145,6 +4165,41 @@ export async function main(ns) {
     })();
     const op = beste(OPERATIONEN, O, geldKnapp ? SICHER_OPERATION : null);
     const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
+    // DIE LAUFENDE AKTION WIRD MIT IHRER RESTZEIT BEWERTET (05.11.2026).
+    //
+    // Gemessen in BN15.1, 05.11. 12:56-13:20 (`data/aktionen.txt`):
+    // Retirement Stufe 70 dauert 93 s, Raid 98 s, und `ertrag` lag bei
+    // 26,50 gegen 26,43 - ein Rauschen, das bei jedem Rundentakt kippte.
+    // Der Motor brach Retirement nach 22 bzw. 82 s ab, um Raid zu starten;
+    // zehn Retirement-Abschnitte, alle mit `rangVon == rangBis`, 482 von
+    // 1.462 s = 33 % der Zeit verworfen. `startAction` setzt den
+    // Fortschritt auf null (`Bladeburner.ts`, actionTimeCurrent = 0).
+    //
+    // Die bereits gelaufene Zeit ist versenkt. Die richtige Frage ist: was
+    // bringt die laufende Aktion fuer die Zeit, die ihr NOCH fehlt? Ihr
+    // Ertrag gilt fuer die volle (bewertete) Dauer `dauerEff`; bis zum
+    // Abschluss fehlen `dauerEff - e`. Der Restertrag ist also
+    // `ertrag * dauerEff / (dauerEff - e)`. Bei e = 0 ist das der alte
+    // Vergleich - nichts aendert sich vor dem Start.
+    //
+    // Das ist NICHT die Zeit-Hysterese vom 26.08. (feste Viertel-Regel,
+    // gemessen 10 % schlechter, zu Recht zurueckgenommen): Die hielt auch
+    // dann fest, wenn die Alternative die versenkte Zeit klar ueberwog. Hier
+    // wird nur gehalten, solange das Festhalten tatsaechlich mehr bringt -
+    // bei einem Ertragsabstand von 51 % (Tracking/Bounty Hunter damals)
+    // wird weiterhin gewechselt, sobald der Rest weniger als 2/3 traegt.
+    //
+    // Nur fuer den Vergleich Vertrag gegen Operation; Black Ops, Aufraeumen
+    // und Ausdauer entscheiden vorher und unterbrechen wie bisher.
+    //
+    // Gerechnet wird in `beste()` (Block "RESTERTRAG"), nicht hier: Nach
+    // dem Skeptiker-Lauf vom 05.11. haette ein Bonus nur an dieser Stelle
+    // nicht gegriffen, wenn der laufende Vertrag innerhalb seiner Liste
+    // knapp hinter einem anderen Vertrag liegt (Retirement laeuft, Bounty
+    // Hunter im Rauschen vorn). `vt.ertrag`/`op.ertrag` tragen den
+    // Restertrag also schon. Wechsel bei Verhaeltnis q = Alternative/
+    // Laufende nur in den ersten (1 - 1/q) der Dauer: bei q = 1,51 bis
+    // ~34 %, bei q = 2 bis 50 %; danach wird zu Ende gefahren.
     if (op && vt && op.gerechnet && vt.gerechnet && vt.ertrag > op.ertrag) {
       return { typ: V, name: vt.name, grund: "Vertrag (Ertrag " + vt.ertrag.toFixed(2)
         + " vor Operation " + op.name + " " + op.ertrag.toFixed(2) + ")" };

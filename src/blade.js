@@ -3648,7 +3648,10 @@ export async function main(ns) {
     // Chance-Schwelle - der Ertragsvergleich entscheidet allein" (siehe
     // `geldKnapp` weiter unten). Der fruehe Filter faellt dafuer weg; ob eine
     // Aktion zaehlt, wird erst NACH dem Ertrag entschieden (weiter unten).
-    const beste = (liste, typ, schwelle) => {
+    // `hoffnung` (optional, 05.11.2026): sammelt die Aktion mit dem besten
+    // Ertrag an der OBERgrenze ihrer Spanne - Grundlage fuer die Regel
+    // "FIELD ANALYSIS, WENN DIE UNSCHAERFE DIE WAHL KIPPEN KANN" in waehle().
+    const beste = (liste, typ, schwelle, hoffnung = null) => {
       let treffer = null;
       // Laufende Aktion dieses Typs samt gelaufener Spielzeit (ms) - fuer
       // den Restertrag weiter unten. Ohne Messung: kein Bonus, alter Weg.
@@ -3663,7 +3666,10 @@ export async function main(ns) {
       for (const name of liste) {
         if (offen(typ, name) < 1) continue;
         const s = spanneGenau(typ, name);   // D2: exakt, wenn eine Black Op offen ist
-        if (schwelle !== null && s.min < schwelle) continue;
+        // Unter der Schwelle zaehlt die Aktion nicht fuer die Wahl - fuer die
+        // Hoffnung aber schon, solange ihre Obergrenze die Schwelle traegt.
+        const unterSchwelle = schwelle !== null && s.min < schwelle;
+        if (unterSchwelle && !(hoffnung && s.max >= schwelle)) continue;
         // DIE STUFE GEHOERT IN DEN ERTRAG (27.08.2026, 14:19).
         //
         // `RANG_JE_ERFOLG` sind die BASISwerte. Der tatsaechliche Gewinn
@@ -3961,6 +3967,24 @@ export async function main(ns) {
         // kein Ausschlussgrund mehr, ein NEGATIVER Erwartungswert bleibt es.
         // Mit fester Schwelle (Vertraege, oder Operationen bei knapper Kasse)
         // ist das schon durch den fruehen Filter oben entschieden.
+        // Hoffnung: derselbe Ertrag mit s.max statt s.min, nur bei breiter
+        // Spanne (sonst gibt es nichts aufzuklaeren). Die Dauer bleibt die
+        // mit s.min gerechnete - der Bevoelkerungszuschlag ist damit eher
+        // zu klein, also die Hoffnung eher zu hoch; das kostet hoechstens
+        // eine Field Analysis mehr, nie eine falsche Aktion.
+        // Nur Aktionen, die schon an der Untergrenze Rang bringen: Die
+        // Obergrenze ist bei r > 1 um bis zu r ueberhoeht (`Action.ts:
+        // 159-165`), eine Aktion mit negativem Erwartungswert an s.min
+        // (Assassination bei schwacher Chance) waere sonst eine falsche
+        // Hoffnung (Skeptiker 05.11., Befund 2).
+        if (hoffnung && rang && dauer && ertrag > 0 && s.max - s.min > SPANNE_ZU_BREIT) {
+          const hoch = (rang * s.max - verlust * (1 - s.max)) / (dauer / 60000);
+          if (hoch > hoffnung.ertrag) {
+            hoffnung.ertrag = hoch; hoffnung.name = name; hoffnung.typ = typ;
+            hoffnung.min = s.min; hoffnung.max = s.max;
+          }
+        }
+        if (unterSchwelle) continue;
         const zulaessig = schwelle === null ? ertrag > 0 : true;
         if (zulaessig && (!treffer || ertrag > treffer.ertrag)) {
           treffer = { name, min: s.min, ertrag, proMinute, gerechnet: !!(rang && dauer) };
@@ -4163,8 +4187,69 @@ export async function main(ns) {
         return geld * 0.1 < hpMax * HOSPITAL_KOSTEN_JE_HP;
       } catch { return true; }   // ohne Messung lieber die alte, vorsichtige Regel
     })();
-    const op = beste(OPERATIONEN, O, geldKnapp ? SICHER_OPERATION : null);
-    const vt = beste(VERTRAEGE, V, SICHER_VERTRAG);
+    const hoffnung = { ertrag: -Infinity, name: null, typ: null, min: 0, max: 0 };
+    const op = beste(OPERATIONEN, O, geldKnapp ? SICHER_OPERATION : null, hoffnung);
+    const vt = beste(VERTRAEGE, V, SICHER_VERTRAG, hoffnung);
+    // FIELD ANALYSIS, WENN DIE UNSCHAERFE DIE WAHL KIPPEN KANN (05.11.2026).
+    //
+    // Gemessen in BN15.1, Volhaven, 05.11. (`tools/ratencheck.js`,
+    // `data/aktionen.txt`): Raid brachte 34,2 Rang/min (77 Abschnitte, 74 %
+    // mit Zuwachs), Retirement 4,8. Der Motor waehlte trotzdem Retirement -
+    // er bewertete Raid mit s.min = 0,337 (Spanne 0,337-1,0), Retirement
+    // mit 0,797 (real ~0,96). Ursache: popEst 137 Mio, die echte
+    // Bevoelkerung rund dreimal so gross (aus der gemessenen Raid-Quote
+    // r^0,7 = 0,75/0,337). Die Black Op klemmt bei 1, r ist damit nur als
+    // Untergrenze bekannt (`rAusBlackOp` -> sicher: false), `spanneGenau`
+    // faellt auf s.min zurueck. Auch die beweisbare Untergrenze
+    // s.min*(1/boReal)^0,7 haette nicht gereicht (Raid 29,4 gegen
+    // Retirement 30,3 - nachgerechnet).
+    //
+    // Die Regel unter 4. holt Field Analysis nur, wenn NICHTS sicher genug
+    // ist. Hier ist etwas sicher genug - nur das Falsche. Field Analysis
+    // lohnt also genau dann, wenn eine andere Aktion schon an der
+    // Obergrenze ihrer Spanne klar mehr bringen KOENNTE als der Sieger an
+    // der Untergrenze. Sie zieht popEst um eff Prozent je Lauf an pop heran
+    // (`City.ts:46-58`), die Spannen schrumpfen, und die Regel erlischt von
+    // selbst: Entweder steigt die Untergrenze der Hoffnung ueber den Sieger
+    // (dann gewinnt sie regulaer), oder ihre Obergrenze faellt darunter.
+    //
+    // Faktor 1,25: Rauschen in der Hoffnung soll keine Analyse kaufen.
+    // Laeuft der Sieger schon, traegt sein Ertrag den Restertrag-Bonus
+    // (Block RESTERTRAG in beste()) - gegen Ende eines Laufs greift die
+    // Regel deshalb nicht, es wird erst fertig gefahren. Deckel und Sperre
+    // teilt sie mit Regel 4 (FELDANALYSE_MAX_MS / _SPERRE_MS).
+    {
+      const kandidaten = [op, vt].filter((x) => x && x.gerechnet);
+      const sieger = kandidaten.reduce((a, b) => (!a || b.ertrag > a.ertrag ? b : a), null);
+      if (sieger && sieger.ertrag > 0 && hoffnung.name && hoffnung.name !== sieger.name
+          && hoffnung.ertrag > sieger.ertrag * HOFFNUNG_FAKTOR) {
+        // EIGENES BUDGET NACH KUMULIERTER ZEIT (Skeptiker 05.11., Befunde
+        // 1, 3, 4). Der Deckel von Regel 4 misst eine zusammenhaengende
+        // Strecke und faellt bei jeder anderen Wahl auf null - hier gibt es
+        // immer einen Sieger, jedes Flackern (Kammer, Chaos, Bonus) haette
+        // ihn ausgehebelt. Deshalb ein Eimer mit Abfluss: jede Wahl dieser
+        // Regel fuellt ihn um die Zeit seit der letzten Wahl (hoechstens
+        // 60 s, Offline-Nachholen zaehlt nicht), er leert sich mit
+        // Zeitkonstante 2 h. Ueber 45 min ist die Regel aus. Dauerhaft
+        // kann sie damit hoechstens 45/120 = 37,5 % der Zeit belegen - auch
+        // wenn die Schaetzung nie zusammenlaeuft (Migration, Stadtwechsel).
+        // Regel 4 behaelt ihren eigenen Deckel unberuehrt.
+        const jetztMs = Date.now();
+        const dt = hoffnungStand ? Math.max(0, jetztMs - hoffnungStand) : 0;
+        hoffnungEimer *= Math.exp(-dt / HOFFNUNG_TAU_MS);
+        hoffnungStand = jetztMs;
+        if (hoffnungEimer < HOFFNUNG_BUDGET_MS) {
+          if (hoffnungZuletzt) hoffnungEimer += Math.min(dt, 60000);
+          hoffnungZuletzt = true;
+          return { typ: G, name: "Field Analysis",
+            grund: "Schaetzung verdeckt " + hoffnung.name + " ("
+              + hoffnung.min.toFixed(2) + "-" + hoffnung.max.toFixed(2) + ", bis "
+              + hoffnung.ertrag.toFixed(2) + " gegen " + sieger.name + " "
+              + sieger.ertrag.toFixed(2) + ")" };
+        }
+      }
+      hoffnungZuletzt = false;
+    }
     // DIE LAUFENDE AKTION WIRD MIT IHRER RESTZEIT BEWERTET (05.11.2026).
     //
     // Gemessen in BN15.1, 05.11. 12:56-13:20 (`data/aktionen.txt`):
@@ -4446,6 +4531,13 @@ export async function main(ns) {
   // Zustand, in dem der Motor GAR NICHTS verdient. Die Sperre faellt auf 15
   // Minuten, damit ein zweiter Anlauf nicht eine halbe Stunde warten muss.
   const FELDANALYSE_MAX_MS = 45 * 60 * 1000;
+  // Begruendung bei "FIELD ANALYSIS, WENN DIE UNSCHAERFE DIE WAHL KIPPEN KANN".
+  const HOFFNUNG_FAKTOR = 1.25;
+  const HOFFNUNG_BUDGET_MS = 45 * 60 * 1000;
+  const HOFFNUNG_TAU_MS = 2 * 3600 * 1000;
+  let hoffnungEimer = 0;
+  let hoffnungStand = 0;
+  let hoffnungZuletzt = false;
   const FELDANALYSE_SPERRE_MS = 15 * 60 * 1000;
   let feldanalyseSeit = 0;
   let feldanalyseGesperrtBis = 0;

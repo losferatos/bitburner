@@ -25,4 +25,12 @@
 # und ging hinaus. Gemerkt hat es niemand - der Kern hatte die Datei zwei
 # Minuten lang, bevor sie wieder entfernt wurde, und ist in dieser Zeit
 # zufaellig nicht dazu gekommen, das Gewerk zu starten.
+#
+# GEZUENDET AM 07.11.2026 in BN15.2 (einspielen.js, von Hand): Erics
+# Freigabe vom 03.10. ("Graft V2, nur bei bestaetigtem Ertrag", Commit
+# ebf9f36) und sein Auftrag vom 07.11. ("wir kennen den Quellcode, triff die
+# perfekte Entscheidung"). Ertrag aus dem Spielcode gerechnet: SPTN-97 allein
+# x1,75 auf alle vier Kampfwerte fuer 14,6 Mrd; Bladeburner laeuft mit
+# Simulacrum (SF7.3) neben dem Graft weiter. Die Zeile bleibt: der Plan geht
+# weiter nur ausdruecklich ins Spiel, nie per Watcher.
 graftplan.json

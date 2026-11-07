@@ -70,6 +70,8 @@ import { PRIO as FIG_PRIO } from "lib/figur.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 60000;
+// graft.js wartet bis zu 60 s auf die Figur - so lange kein zweiter Start.
+const GRAFT_EXEC_SPERRE_MS = 90000;
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -134,6 +136,8 @@ export async function main(ns) {
   let letztesLaufendes = null;
   let letzterGrund = null;
   let letzteRuecklage = -1;
+  // Wann graft.js zuletzt gestartet wurde - gegen den Doppelstart (unten).
+  let letzterGraftExec = 0;
   // Stuecke, die graft.js nicht starten konnte - Name -> Zahl der Versuche.
   // Ueber Rundengrenzen hinweg, aber nicht ueber Prozessgrenzen: nach einem
   // Neustart darf jedes Stueck wieder zweimal versucht werden, denn die
@@ -235,15 +239,19 @@ export async function main(ns) {
 
       // --- Die Wahl ----------------------------------------------------------
       //
-      // Erst die Kandidaten bestimmen, DANN die Preise erfragen. `naechstes`
-      // braucht Preis und Dauer nur fuer die Stuecke, die es ueberhaupt
-      // ansieht: den Vorzug und den ersten offenen Listeneintrag.
+      // Preise und Dauern fuer ALLE offenen Eintraege (07.11.2026, Skeptiker
+      // vor der Zuendung in BN15). Hier stand ein break nach dem ersten
+      // graftbaren Eintrag. Wurde der nach zwei Fehlversuchen uebersprungen,
+      // hatte kein anderer Eintrag einen Preis, und naechstes() meldete
+      // "alles gegraftet" - die Kette stand still und sah fertig aus. Und
+      // naechstes() geht seitdem am unbezahlbaren Eintrag vorbei, braucht also
+      // die Preise der folgenden. Die Abfragen kosten kein RAM extra.
       const kandidaten = [];
       if (plan.vorzug && plan.vorzug.name && graftbar.includes(plan.vorzug.name)) {
         kandidaten.push(plan.vorzug.name);
       }
       for (const n of plan.reihenfolge) {
-        if (graftbar.includes(n)) { kandidaten.push(n); break; }
+        if (graftbar.includes(n)) kandidaten.push(n);
       }
 
       const preise = {};
@@ -253,6 +261,15 @@ export async function main(ns) {
           preise[n] = ns.grafting.getAugmentationGraftPrice(n);
           dauern[n] = ns.grafting.getAugmentationGraftTime(n);
         } catch { /* dann gilt es als nicht graftbar */ }
+      }
+      // OHNE FOKUS UND OHNE NEUROREZEPTOR DAUERT ES 1,25-MAL SO LANG
+      // (07.11.2026, Skeptiker Runde 2). getAugmentationGraftTime rechnet nur
+      // den Int-Bonus ein (Grafting.ts:39-47), die Arbeit zusaetzlich
+      // focusPenalty 0,8 (GraftingWork.tsx:41-43). graft.js graftet seit heute
+      // ohne Fokus; solange das Implantat noch graftbar (= nicht installiert)
+      // ist, unterschaetzte passtInDieZeit sonst die Dauer.
+      if (graftbar.includes("Neuroreceptor Management Implant")) {
+        for (const n of Object.keys(dauern)) dauern[n] *= 1.25;
       }
 
       // `besitzt` ist hier alles, was NICHT graftbar ist.
@@ -298,7 +315,15 @@ export async function main(ns) {
       // zwischen Entscheidung und Ausfuehrung weg war.
       try {
         const g = JSON.parse(liesVonHome("data/graft.json") || "{}");
-        if (g && g.wunsch && g.getan === "NICHT gestartet"
+        // Eine Figur-Absage ist kein Fehler des Stuecks (Skeptiker Runde 2):
+        // zwei davon haetten das Neuroreceptor-Implantat an Position 1 bis zum
+        // Neustart uebersprungen. Sie wird gemeldet, aber nicht gezaehlt.
+        const figurAbsage = /^Figur nicht freigegeben/.test(String(g && g.fehler || ""));
+        if (g && g.wunsch && g.getan === "NICHT gestartet" && figurAbsage
+            && Number.isFinite(g.zeit) && g.zeit > letzteGraftMeldung) {
+          letzteGraftMeldung = g.zeit;
+          sag("graft.js bekam die Figur nicht fuer " + g.wunsch + " - neuer Versuch, kein Fehlversuch.");
+        } else if (g && g.wunsch && g.getan === "NICHT gestartet"
             && Number.isFinite(g.zeit) && g.zeit > letzteGraftMeldung) {
           letzteGraftMeldung = g.zeit;
           const n = (fehlversuche.get(g.wunsch) || 0) + 1;
@@ -353,11 +378,21 @@ export async function main(ns) {
       });
 
       // --- Handeln ------------------------------------------------------------
+      // KEIN DOPPELSTART (07.11.2026, Skeptiker). graft.js wartet bis zu 60 s
+      // auf die Figur; in der Zeit ist noch kein Graft "laufend", und die
+      // naechste Runde haette ein zweites graft.js gestartet - das zweite
+      // bricht das erste ab, der Preis ist zweimal weg (graft.js:140-150).
+      // ns.isRunning kostete 0,1 GB; die eigene Uhr kostet nichts.
+      if (wahl.name && Date.now() - letzterGraftExec < GRAFT_EXEC_SPERRE_MS) {
+        wahl.name = null;
+        wahl.grund = "graft.js wurde eben gestartet - warte auf den Graft";
+      }
       if (wahl.name) {
         // graft.js laeuft auf home: es braucht die Singularity-Familie, und im
         // Kaltstart gibt es keine Werkbank. Startet es nicht, sagt der
         // Rueckgabewert 0 genau das - kein Platz oder Datei fehlt.
         const pid = ns.exec("graft.js", "home", 1, wahl.name);
+        if (pid) letzterGraftExec = Date.now();
         if (pid) {
           sag("Graft gestartet: " + wahl.name + " (" + wahl.grund + ", "
             + (preise[wahl.name] / 1e9).toFixed(2) + " Mrd, "

@@ -298,6 +298,100 @@ console.log("-- ohne Grafting-Zugriff ist es ein ZUSTAND, kein Fehler --");
       + " und eine Fehlerserie wuerde die Strafleiter speisen");
 }
 
+// AUFLAGEN DES SKEPTIKERS VOR DER ZUENDUNG IN BN15 (07.11.2026).
+const PLAN3 = { reihenfolge: ["Aug A", "Aug B", "Aug C"], anzahl: 3 };
+
+console.log("");
+console.log("-- erster Eintrag zu teuer: der naechste bezahlbare kommt dran --");
+{
+  const m = neuerMock({
+    geld: 20 * MRD,
+    graftbar: ["Aug A", "Aug B", "Aug C"],
+    graftPreise: { "Aug A": 50 * MRD, "Aug B": 2 * MRD, "Aug C": 3 * MRD },
+    graftDauern: { "Aug A": 600000, "Aug B": 600000, "Aug C": 600000 },
+    ramBuchen: false,
+  });
+  m.lege("home", "graftplan.json", JSON.stringify(PLAN3));
+  m.lege("home", "graft.js", "// Platzhalter");
+  await fahre(m, modul, 1);
+  const start = m.zustand.gestartet.find((g) => g.datei === "graft.js");
+  pruefe("Aug B statt Warten auf Aug A", !!start && start.args[0] === "Aug B",
+    start ? String(start.args[0]) : "gar nicht gestartet");
+}
+
+console.log("");
+console.log("-- zwei Fehlversuche am ersten Eintrag: die Kette laeuft weiter --");
+{
+  const m = neuerMock({
+    geld: 20 * MRD,
+    graftbar: ["Aug A", "Aug B", "Aug C"],
+    graftPreise: { "Aug A": 1 * MRD, "Aug B": 2 * MRD, "Aug C": 3 * MRD },
+    graftDauern: { "Aug A": 600000, "Aug B": 600000, "Aug C": 600000 },
+    ramBuchen: false,
+  });
+  m.lege("home", "graftplan.json", JSON.stringify(PLAN3));
+  m.lege("home", "graft.js", "// Platzhalter");
+  const fehl = (zeit) => m.lege("home", "data/graft.json", JSON.stringify({
+    wunsch: "Aug A", getan: "NICHT gestartet", fehler: "Rueckgabe false - Voraussetzung fehlt", zeit }));
+  // Die Mock-Uhr steht, solange niemand sie vorrueckt: je Runde 60 s, wie im Spiel.
+  // graft.js meldet nach Runde 1 und 2 je einen Fehlversuch fuer Aug A.
+  await fahre(m, modul, 6, (n) => { m.vor(60000); if (n <= 2) fehl(Date.now()); });
+  const b = m.zustand.gestartet.find((g) => g.datei === "graft.js" && g.args[0] === "Aug B");
+  const t = JSON.parse(m.lies("home", "data/graftauto.json") || "{}");
+  pruefe("nach dem zweiten Fehlversuch wird Aug B gestartet", !!b,
+    "gestartet: " + m.zustand.gestartet.map((g) => g.args[0]).join(", ") + " / Grund: " + t.grund);
+}
+
+console.log("");
+console.log("-- zwei Figur-Absagen ueberspringen das Stueck NICHT --");
+{
+  const m = neuerMock({
+    geld: 20 * MRD,
+    graftbar: ["Aug A", "Aug B", "Aug C"],
+    graftPreise: { "Aug A": 1 * MRD, "Aug B": 2 * MRD, "Aug C": 3 * MRD },
+    graftDauern: { "Aug A": 600000, "Aug B": 600000, "Aug C": 600000 },
+    ramBuchen: false,
+  });
+  m.lege("home", "graftplan.json", JSON.stringify(PLAN3));
+  m.lege("home", "graft.js", "// Platzhalter");
+  const absage = (zeit) => m.lege("home", "data/graft.json", JSON.stringify({
+    wunsch: "Aug A", getan: "NICHT gestartet", fehler: "Figur nicht freigegeben: Figur gehoert gerade x", zeit }));
+  await fahre(m, modul, 6, (n) => { m.vor(60000); if (n <= 2) absage(Date.now()); });
+  const b = m.zustand.gestartet.find((g) => g.datei === "graft.js" && g.args[0] === "Aug B");
+  const a = m.zustand.gestartet.filter((g) => g.datei === "graft.js" && g.args[0] === "Aug A").length;
+  pruefe("Aug A wird erneut versucht, Aug B nicht vorgezogen", !b && a >= 2,
+    "gestartet: " + m.zustand.gestartet.map((g) => g.args[0]).join(", "));
+}
+
+console.log("");
+console.log("-- kein Doppelstart, solange graft.js noch auf die Figur wartet --");
+{
+  const m = neuerMock({
+    geld: 20 * MRD,
+    graftbar: ["Aug A", "Aug B"],
+    graftPreise: { "Aug A": 1 * MRD, "Aug B": 2 * MRD },
+    graftDauern: { "Aug A": 600000, "Aug B": 600000 },
+    // Im Spiel hat home Platz fuer zwei graft.js - der Mock-Standard (32 GB)
+    // wuerde den zweiten Start schon am RAM scheitern lassen.
+    ramBuchen: false,
+  });
+  m.lege("home", "graftplan.json", JSON.stringify(PLAN3));
+  m.lege("home", "graft.js", "// Platzhalter");
+  await fahre(m, modul, 2);
+  const n = m.zustand.gestartet.filter((g) => g.datei === "graft.js").length;
+  pruefe("zwei Runden ohne laufenden Graft: graft.js nur einmal gestartet", n === 1, n + " Starts");
+}
+
+console.log("");
+console.log("-- Graften ohne Fokus, Neuroreceptor zuerst --");
+{
+  const g = fs.readFileSync(path.join(ROOT, "src", "graft.js"), "utf8");
+  pruefe("graft.js startet ohne Fokus", /graftAugmentation\(wunsch, false\)/.test(g));
+  const plan = JSON.parse(fs.readFileSync(path.join(ROOT, "src", "graftplan.json"), "utf8"));
+  pruefe("graftplan.json: Neuroreceptor Management Implant steht vorn",
+    plan.reihenfolge[0] === "Neuroreceptor Management Implant", String(plan.reihenfolge[0]));
+}
+
 console.log("");
 console.log("-- keine .mock-Datei bleibt liegen --");
 {

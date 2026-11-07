@@ -362,9 +362,9 @@
   "singKosten41": 120,
   "dom": 0,
   "err": null,
-  "bytes": 8884,
-  "lines": 194,
-  "sha256": "7994b23d470220ed1a6d7386f396d49a0dca63c69347403b71e2833d774de3f3"
+  "bytes": 11146,
+  "lines": 238,
+  "sha256": "b69183d7eed912d6692c1a5262514111d2d55588b02dc19959b88c31ab3d336a"
  },
  {
   "file": "augcheck.js",
@@ -1953,8 +1953,8 @@
   "live41": 24.75,
   "lokal41": 24.75,
   "diff": 0,
-  "sha256": "e1b5c630174fdedb40eefabb8fe0bb7e675aaaa0a7fe9076abccf30353fc088a",
-  "bytes": 20349,
+  "sha256": "10a1b21ff572d372b6b96270f2cd1299c53e0e6f7f33b659c9e92e998f303bbf",
+  "bytes": 22710,
   "gemessenAm": "2026-09-04T19:09:09.232Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel)"
  },

@@ -56,8 +56,13 @@ console.log("-- Vergabe --");
   pruefe("mit Simulacrum: Gym laeuft NICHT mit",
     !F.darfFigur(F.vergib([blade(W0), gym(W0)], null, W0, NR, undefined, SIM).vergabe, "bbtrain.js", W0, NR).darf);
   const g = F.vergib([graft(W0), blade(W0), rep(W0)], null, W0, NR, undefined, SIM);
-  pruefe("mit Simulacrum: Graft (10) hat die Figur allein, nichts laeuft mit",
-    g.vergabe.owner === "graft.js" && !g.vergabe.mit && !F.darfFigur(g.vergabe, "bn4rep.js", W0, NR).darf);
+  // Seit 07.11.2026 laeuft Bladeburner neben dem Graft (lib/figur.js
+  // PARALLEL_ZU_GRAFT) - vorher stand hier "nichts laeuft mit", und der
+  // Bladeburner-Motor stand bei jedem Graft still. Faktionsarbeit bleibt
+  // draussen: nur eine Arbeit zugleich.
+  pruefe("mit Simulacrum: Graft (10) behaelt die Figur, Bladeburner laeuft mit, Faktion nicht",
+    g.vergabe.owner === "graft.js" && F.darfFigur(g.vergabe, "blade.js", W0, NR).darf
+      && !F.darfFigur(g.vergabe, "bn4rep.js", W0, NR).darf, JSON.stringify(g.vergabe.mit));
   // Lease-Verlaengerung kopiert die alte Vergabe: veraltetes mit darf nicht haengen bleiben.
   const t1 = F.vergib([blade(W0 + 1000), rep(W0 + 1000)], sim.vergabe, W0 + 1000, NR, undefined, SIM);
   pruefe("naechste Runde: Mitlauf bleibt, kein Wechsel", !!(t1.vergabe.mit && t1.vergabe.mit[0] === "bn4rep.js") && !t1.wechsel);

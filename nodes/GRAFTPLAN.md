@@ -10,8 +10,16 @@ aus dem laufenden Spiel. Bereits installierte Stuecke werden von
 `graftnext.js` uebersprungen - die Liste muss also nicht gepflegt werden,
 wenn etwas fertig ist.
 
-**Nicht in der Liste:** `The Blade's Simulacrum`, `Neuroreceptor Management
-Implant` und `Combat Rib I` (alle drei am 30.08. gegraftet).
+**Nicht in der Liste:** `The Blade's Simulacrum` (seit SF7.3 beim Beitritt geschenkt)
+und `Combat Rib I` (steht weiter unten nicht mehr, am 30.08. gegraftet).
+
+**`Neuroreceptor Management Implant` steht seit 07.11.2026 VORN.** graft.js
+graftet seitdem ohne Fokus (mit Fokus haelt die Arbeitsseite die Oberflaeche
+fest, jeder Klick nimmt ihn). Ohne Fokus gilt `focusPenalty` 0,8, also 1,25-fache
+Dauer - ausser mit diesem Implantat
+(`PersonObjects/Player/PlayerObjectGeneralMethods.ts`, focusPenalty). Kostet
+als Graft 1,65 Mrd und rund 15 Minuten; am 30.08. war es im damaligen Knoten
+schon gegraftet, nach jedem Knotenwechsel ist es wieder weg.
 
 ## `violet Congruity Implant` - so frueh wie bezahlbar, nicht am Ende
 
@@ -41,6 +49,7 @@ $4,43 Bio je Stunde sind das rund 34 Stunden - waehrend das Paket 42 braucht.
 ## Reihenfolge
 
 ```
+Neuroreceptor Management Implant
 SPTN-97 Gene Modification
 Bionic Legs
 Graphene Bionic Legs Upgrade

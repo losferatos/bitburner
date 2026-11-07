@@ -1,14 +1,15 @@
 {
  "hinweis": "ERZEUGT von tools/graftplan-bauen.js aus nodes/GRAFTPLAN.md. Nicht von Hand pflegen - die Reihenfolge und ihre Herleitung stehen dort.",
- "erzeugtAm": "2026-09-04T07:08:41.797Z",
+ "erzeugtAm": "2026-11-07T17:16:38.218Z",
  "regel": "Der erste Eintrag, den der Spieler noch nicht besitzt und der nicht gerade laeuft, ist der naechste. Bereits eingebaute Stuecke werden uebersprungen; die Liste muss deshalb nicht gepflegt werden, wenn etwas fertig ist.",
  "vorzug": {
   "name": "violet Congruity Implant",
   "regel": "so frueh wie bezahlbar, VOR der Liste",
   "grund": "loescht die Entropie rueckwirkend (AugmentationHelpers.ts:45-49); danach erzeugt kein Graft mehr welche (GraftingWork.tsx:61-64). Wer zuerst graftet, arbeitet den Rest mit vollen Multiplikatoren ab statt mit 0,98^n."
  },
- "anzahl": 39,
+ "anzahl": 40,
  "reihenfolge": [
+  "Neuroreceptor Management Implant",
   "SPTN-97 Gene Modification",
   "Bionic Legs",
   "Graphene Bionic Legs Upgrade",

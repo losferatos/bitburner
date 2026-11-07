@@ -118,17 +118,30 @@ export function naechstes(lage) {
     // Nicht graftbar (noch nicht freigeschaltet): dann geht es weiter.
   }
 
-  // Regel 2: die Liste der Reihe nach.
+  // Regel 2: die Liste der Reihe nach - der erste Eintrag, der JETZT geht.
+  //
+  // WEITERGEHEN STATT STEHENBLEIBEN (07.11.2026, Skeptiker vor der Zuendung
+  // in BN15). Hier stand ein return beim ersten unbezahlbaren Eintrag. Mit
+  // dem Puffer x2 blieb die Kette damit an BLADE-51b Unibeam (49,5 Mrd) und
+  // Omnibeam (82,5 Mrd, Kampf x1,0) stehen, waehrend dahinter Xanipher
+  // (12,8 Mrd, Kampf x1,2), ORION und Black Hand warteten. Ein teurer Eintrag
+  // wird nachgeholt, sobald das Geld da ist - die Liste wird ja jede Runde
+  // von vorn gelesen.
+  let ersterGrund = null;
   for (const name of liste) {
     if (besitzt.has(name)) continue;
     const p = preise[name];
     if (!Number.isFinite(p)) continue;      // nicht graftbar, ueberspringen
     const pruefung = bezahlbar(p, lage.geld);
     if (!pruefung.ok) {
-      return { name: null, grund: name + ": " + pruefung.grund, wartet: true };
+      if (ersterGrund === null) ersterGrund = name + ": " + pruefung.grund;
+      continue;
     }
     const z = passtInDieZeit(dauern[name], lage);
-    if (!z.ok) return { name: null, grund: name + ": " + z.grund, wartet: true };
+    if (!z.ok) {
+      if (ersterGrund === null) ersterGrund = name + ": " + z.grund;
+      continue;
+    }
     return {
       name,
       grund: "naechster offener Eintrag"
@@ -137,6 +150,7 @@ export function naechstes(lage) {
     };
   }
 
+  if (ersterGrund !== null) return { name: null, grund: ersterGrund, wartet: true };
   return { name: null, grund: "alles gegraftet, was der Plan kennt", wartet: false };
 }
 

@@ -213,7 +213,12 @@ export async function main(ns) {
 
   // --- 6. Graften -----------------------------------------------------------
   let ok = false;
-  try { ok = ns.grafting.graftAugmentation(wunsch, true); }
+  // OHNE FOKUS (07.11.2026). Mit Fokus haelt die Arbeitsseite die Oberflaeche
+  // fest (bn4rep.js zu den UI-Werkzeugen), und jeder Klick nimmt ihn ohnehin
+  // (GameRoot.tsx stopFocusing). Der Malus von 0,8 (focusPenalty,
+  // PlayerObjectGeneralMethods.ts) entfaellt mit dem Neuroreceptor
+  // Management Implant - deshalb steht es im Graftplan ganz vorn.
+  try { ok = ns.grafting.graftAugmentation(wunsch, false); }
   catch (e) { raus.fehler = "graftAugmentation warf: " + String(e && e.message ? e.message : e); }
   raus.getan = ok ? "gestartet" : "NICHT gestartet";
   if (!ok && !raus.fehler) {

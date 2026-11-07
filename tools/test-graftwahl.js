@@ -197,7 +197,9 @@ console.log("-- gegen den ECHTEN Plan --");
   // Kommentar "(installiert)" im Plan - und das galt fuer den Lauf, in dem der
   // Plan entstand, und fuer keinen der 39 danach (prestigeSourceFile leert
   // Player.augmentations).
-  pruefe("er hat 39 Eintraege", PLAN.reihenfolge.length === 39,
+  // 40 seit dem 07.11.2026: Neuroreceptor Management Implant vorn (graft.js
+  // graftet ohne Fokus, das Implantat hebt focusPenalty auf).
+  pruefe("er hat 40 Eintraege", PLAN.reihenfolge.length === 40,
     "erhalten " + PLAN.reihenfolge.length);
   pruefe("keiner doppelt",
     new Set(PLAN.reihenfolge).size === PLAN.reihenfolge.length);

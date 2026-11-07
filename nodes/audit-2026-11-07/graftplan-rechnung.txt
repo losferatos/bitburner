@@ -1,0 +1,41 @@
+besitzt/queued 21 Geld 243 Mrd, intBonus 1.101
+violet Congruity Implant                      150000.0 Mrd 0.23 h  Kampf x1.000  bbChance 1  | kum 150000 Mrd 0.2 h Kampf x1.00
+SPTN-97 Gene Modification                         14.6 Mrd 1.60 h  Kampf x1.750  bbChance 1  | kum 150015 Mrd 1.8 h Kampf x1.75
+Bionic Legs                                        1.1 Mrd 0.53 h  Kampf x1.125  bbChance 1  | kum 150016 Mrd 2.4 h Kampf x1.97
+Graphene Bionic Legs Upgrade                      13.5 Mrd 0.83 h  Kampf x1.257  bbChance 1  | kum 150029 Mrd 3.2 h Kampf x2.47
+Bionic Spine                                       0.4 Mrd 1.23 h  Kampf x1.150  bbChance 1  | kum 150030 Mrd 4.4 h Kampf x2.85
+Graphene Bionic Spine Upgrade                     18.0 Mrd 1.44 h  Kampf x1.600  bbChance 1  | kum 150048 Mrd 5.9 h Kampf x4.55
+Synthetic Heart                                    8.6 Mrd 1.18 h  Kampf x1.225  bbChance 1  | kum 150056 Mrd 7.0 h Kampf x5.58
+Photosynthetic Cells                               8.3 Mrd 1.33 h  Kampf x1.287  bbChance 1  | kum 150065 Mrd 8.4 h Kampf x7.18
+CordiARC Fusion Reactor                           15.0 Mrd 1.79 h  Kampf x1.350  bbChance 1  | kum 150080 Mrd 10.2 h Kampf x9.69
+Hyperion Plasma Cannon V1                          8.3 Mrd 0.27 h  Kampf x1.000  bbChance 1.06  | kum 150088 Mrd 10.4 h Kampf x9.69
+Hyperion Plasma Cannon V2                         16.5 Mrd 0.28 h  Kampf x1.000  bbChance 1.08  | kum 150104 Mrd 10.7 h Kampf x9.69
+Graphene Bone Lacings                             12.8 Mrd 1.03 h  Kampf x1.304  bbChance 1  | kum 150117 Mrd 11.7 h Kampf x12.63
+NEMEAN Subdermal Weave                             9.8 Mrd 0.74 h  Kampf x1.218  bbChance 1  | kum 150127 Mrd 12.5 h Kampf x15.39
+Neotra                                             8.6 Mrd 1.23 h  Kampf x1.245  bbChance 1  | kum 150135 Mrd 13.7 h Kampf x19.16
+  besitzt  Bionic Arms
+Graphene Bionic Arms Upgrade                      11.3 Mrd 1.08 h  Kampf x1.360  bbChance 1  | kum 150147 Mrd 14.8 h Kampf x26.06
+Synfibril Muscle                                   3.4 Mrd 0.85 h  Kampf x1.140  bbChance 1  | kum 150150 Mrd 15.6 h Kampf x29.71
+  besitzt  BrachiBlades
+Graphene BrachiBlades Upgrade                      7.5 Mrd 1.31 h  Kampf x1.183  bbChance 1  | kum 150158 Mrd 16.9 h Kampf x35.15
+nextSENS Gene Modification                         5.8 Mrd 1.52 h  Kampf x1.200  bbChance 1  | kum 150163 Mrd 18.5 h Kampf x42.18
+  besitzt  Nanofiber Weave
+DermaForce Particle Barrier                        0.1 Mrd 0.81 h  Kampf x1.088  bbChance 1  | kum 150163 Mrd 19.3 h Kampf x45.89
+  besitzt  Combat Rib I
+  besitzt  Combat Rib II
+  besitzt  Combat Rib III
+BLADE-51b Tesla Armor                              4.1 Mrd 1.42 h  Kampf x1.040  bbChance 1.03  | kum 150168 Mrd 20.7 h Kampf x47.72
+BLADE-51b Tesla Armor: Unibeam Upgrade            49.5 Mrd 0.28 h  Kampf x1.000  bbChance 1.08  | kum 150217 Mrd 21.0 h Kampf x47.72
+BLADE-51b Tesla Armor: Omnibeam Upgrade           82.5 Mrd 0.29 h  Kampf x1.000  bbChance 1.1  | kum 150300 Mrd 21.3 h Kampf x47.72
+Xanipher                                          12.8 Mrd 1.96 h  Kampf x1.200  bbChance 1  | kum 150312 Mrd 23.2 h Kampf x57.27
+BLADE-51b Tesla Armor: Energy Shielding Upgrade    16.5 Mrd 0.72 h  Kampf x1.012  bbChance 1.06  | kum 150329 Mrd 23.9 h Kampf x57.97
+ORION-MKIV Shoulder                                1.6 Mrd 1.17 h  Kampf x1.037  bbChance 1.04  | kum 150330 Mrd 25.1 h Kampf x60.13
+  besitzt  HemoRecirculator
+The Black Hand                                     1.6 Mrd 1.35 h  Kampf x1.072  bbChance 1  | kum 150332 Mrd 26.5 h Kampf x64.48
+GOLEM Serum                                       33.0 Mrd 1.32 h  Kampf x1.070  bbChance 1  | kum 150365 Mrd 27.8 h Kampf x68.99
+BLADE-51b Tesla Armor: Power Cells Upgrade         8.3 Mrd 0.97 h  Kampf x1.000  bbChance 1.05  | kum 150373 Mrd 28.8 h Kampf x68.99
+Vangelis Virus                                     8.3 Mrd 1.19 h  Kampf x1.000  bbChance 1.04  | kum 150382 Mrd 29.9 h Kampf x68.99
+Vangelis Virus 3.0                                33.0 Mrd 1.34 h  Kampf x1.000  bbChance 1.05  | kum 150415 Mrd 31.3 h Kampf x68.99
+  besitzt  Power Recirculation Core
+  besitzt  LuminCloaking-V1 Skin Implant
+  besitzt  LuminCloaking-V2 Skin Implant

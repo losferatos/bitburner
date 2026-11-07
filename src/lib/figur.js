@@ -287,8 +287,18 @@ function vergibEinzel(antraege, bisher, jetzt, nodeReset, lebt) {
  * `PlayerObjectWorkMethods.ts:5-10`). Gym, Graft und Verbrechen gehoeren NICHT
  * dazu: ein Graft hat Prio 10 und wird ohnehin nie von Bladeburner verdraengt,
  * Gym/Verbrechen sind keine Arbeit, die Rang nebenher verdienen soll.
+ *
+ * UMGEKEHRT: BLADEBURNER NEBEN EINEM GRAFT (07.11.2026). Die Richtung oben
+ * deckte nur "Bladeburner verdraengt den Graft nie" ab. Der Graft gewinnt
+ * aber mit Prio 10 die Figur, und blade.js startet ohne Vergabe keine neue
+ * Aktion (blade.js, DIE FIGUR-WACHE) - waehrend jedes Grafts (0,5-2 h, der
+ * Graftplan zusammen rund 31 h) stand der Motor still: keine Black Op, keine
+ * Kammer, kein Aktionswechsel. Mit Simulacrum ruft startAction kein
+ * finishWork (`Bladeburner.ts:178`), der Graft laeuft weiter. Deshalb darf
+ * dann ein Bladeburner-Antrag als `mit` neben dem Graft laufen.
  */
 export const PARALLEL_ZU_BLADEBURNER = new Set(["faktion", "arbeit"]);
+export const PARALLEL_ZU_GRAFT = new Set(["bladeburner"]);
 
 /**
  * Die Vergabe. Ohne `opts.simulacrum` ist das EXAKT die Einzelvergabe von
@@ -326,6 +336,15 @@ export function vergib(antraege, bisher, jetzt, nodeReset, lebt, opts) {
   if (sim && v.owner && v.action === "bladeburner") {
     const kand = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset)
       && a.tool !== v.owner && PARALLEL_ZU_BLADEBURNER.has(a.action)
+      && (typeof lebt !== "function" || lebt(a.tool)));
+    if (kand.length) {
+      const b = besterAntrag(kand);
+      neu.mit = [b.tool];
+      neu.mitAktion = b.action;
+    }
+  } else if (sim && v.owner && v.action === "graft") {
+    const kand = (antraege || []).filter((a) => antragGilt(a, jetzt, nodeReset)
+      && a.tool !== v.owner && PARALLEL_ZU_GRAFT.has(a.action)
       && (typeof lebt !== "function" || lebt(a.tool)));
     if (kand.length) {
       const b = besterAntrag(kand);

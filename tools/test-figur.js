@@ -420,6 +420,32 @@ console.log("-- graft.js ist beendet, graftauto.js haelt den Antrag (Uhren-Audit
 }
 
 console.log("");
+console.log("-- Bladeburner neben einem Graft (Simulacrum, 07.11.2026) --");
+{
+  const a = [
+    F.antrag("graft.js", F.PRIO.graft, "graft", { aug: "SPTN-97 Gene Modification" }, "graftplan", uhren(W0)),
+    F.antrag("blade.js", F.PRIO.bladeburner, "bladeburner", "Operations/Raid", "Rangaufbau", uhren(W0)),
+    F.antrag("bn4rep.js", F.PRIO.faktion, "faktion", {}, "Reputation", uhren(W0)),
+  ];
+  const mitSim = F.vergib(a, null, W0, NR, null, { simulacrum: true }).vergabe;
+  pruefe("mit Simulacrum: der Graft behaelt die Figur", mitSim && mitSim.owner === "graft.js",
+    "Besitzer: " + (mitSim && mitSim.owner));
+  pruefe("mit Simulacrum: blade.js laeuft als mit neben dem Graft",
+    mitSim && Array.isArray(mitSim.mit) && mitSim.mit.includes("blade.js") && mitSim.mitAktion === "bladeburner",
+    JSON.stringify(mitSim && { mit: mitSim.mit, mitAktion: mitSim.mitAktion }));
+  pruefe("mit Simulacrum: blade.js darf starten", F.darfFigur(mitSim, "blade.js", W0, NR).darf === true);
+  pruefe("mit Simulacrum: Faktionsarbeit darf NICHT neben den Graft (nur eine Arbeit zugleich)",
+    F.darfFigur(mitSim, "bn4rep.js", W0, NR).darf === false);
+  pruefe("Handlungspruefung: Figur grafted, vergeben graft -> stimmt",
+    F.pruefeHandlung(mitSim, "graft").stimmt === true);
+  const ohneSim = F.vergib(a, null, W0, NR, null, { simulacrum: false }).vergabe;
+  pruefe("ohne Simulacrum: kein mit, blade.js wartet (Graft wuerde sonst abgebrochen)",
+    ohneSim && !ohneSim.mit && F.darfFigur(ohneSim, "blade.js", W0, NR).darf === false);
+  const tot = F.vergib(a, null, W0, NR, (t) => t !== "blade.js", { simulacrum: true }).vergabe;
+  pruefe("toter blade.js bekommt kein mit", tot && !tot.mit);
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");

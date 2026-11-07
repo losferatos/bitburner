@@ -1327,7 +1327,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "ramSingGb": 0,
       "ramMeasuredAt": "GERECHNET-2026-10-07 (tools/ram.js: 1,6 Basis + getResetInfo 1 + go.getBoardState 4 + go.makeMove 4 + getHostname 0,05 + scp 0,6; die Analysefunktionen go.analysis.* werden nicht benutzt; kein Import von lib/hostdatei.js (zoege fileExists +0,1 GB mit), eigenes write+scp; Achtung: der Bezeichner 'attempt' kostet als codingcontract.attempt 10 GB; 24.10.2026: Baumsuche lib/gomcts.js ohne ns, asleep und go.getGameState je 0 GB, gerechnet weiter 11,25 - Methodenname run vermieden, er kostete als ns.run 1 GB; 27.10.2026: go.cheat.playTwoMoves 8 + go.cheat.getCheatSuccessChance 1 = 20,25 laut tools/ram.js, Optionsname kill vermieden)",
       "verfahren": "alle",
-      "knoten": [14, 13],
+      "knoten": [14, 13, 15],
       "phase": "normal",
       "telemetryFile": "data/go.json",
       "scpToHome": true,

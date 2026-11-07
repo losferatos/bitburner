@@ -122,15 +122,23 @@ import { planKill } from "lib/gocheat.js";
  */
 
 /** Knoten, in denen der Bonus den Platz lohnt (Begruendung oben). */
-export const GO_NODES = [14, 13];
+export const GO_NODES = [14, 13, 15];
 /**
- * Lohnt IPvGO hier? BN14 immer (GoPower 4); BN13 nur mit SF14 (sonst GoPower 1
- * ohne Verdopplung, rund 5 % bei n=500: lohnt den RAM nicht).
+ * Lohnt IPvGO hier? BN14 immer (GoPower 4); BN13 und BN15 nur mit SF14 (sonst
+ * GoPower 1 ohne Verdopplung, rund 5 % bei n=500: lohnt den RAM nicht).
+ *
+ * BN15 seit 07.11.2026: dort war das Gewerk nie eingeschaltet, obwohl es ein
+ * V2-Knoten ist und die Tetrads genau die Kampfwerte heben, die die
+ * Bladeburner-Chancen tragen. GoPower 1 wie BN13 (BitNode.tsx setzt es fuer
+ * BN15 nicht), mit SF14 x2 (effect.ts:18). Live in BN13 am 02.11.: +90,6 %
+ * auf Staerke/Abwehr/Geschick/Gewandtheit nach 430 Partien - die Formel
+ * (effect.ts:16-22, Tetrads bonusPower 0,7) trifft das bei n = 74.000.
+ * BN8 (V1, Hackingweg) bleibt aus: Kampfwerte tragen dort nichts.
  */
 export function goLohnt(node, sf14) {
   if (!GO_NODES.includes(node)) return false;
   if (node === 14) return true;
-  return sf14 > 0;
+  return sf14 > 0;   // 13 und 15
 }
 const TELEMETRY_MS = 30000;
 /** Gegner und Brett (Begruendung oben). */

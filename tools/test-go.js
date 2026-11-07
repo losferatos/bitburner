@@ -419,12 +419,12 @@ console.log("-- 5. Ko / abgelehnte Punkte werden nicht gespielt --");
 console.log("");
 console.log("-- 6. falscher Knoten -> Ende ohne ns.go --");
 {
-  for (const kn of [1, 3, 10, 15]) {
+  for (const kn of [1, 3, 8, 10]) {
     const m = await fahre({ knoten: kn });
     pruefe("Knoten " + kn + ": kein go-Aufruf, keine Datei, kein Sleep",
       m.z.goAufrufe === 0 && m.z.resets.length === 0 && Object.keys(m.z.dateien).length === 0 && m.z.sleeps === 0);
   }
-  pruefe("GO_NODES = [14, 13]", JSON.stringify(modul.GO_NODES) === "[14,13]");
+  pruefe("GO_NODES = [14, 13, 15]", JSON.stringify(modul.GO_NODES) === "[14,13,15]");
 
   // BN13 lohnt nur mit SF14, BN14 immer.
   const leer = (m) => m.z.goAufrufe === 0 && m.z.resets.length === 0 && m.z.sleeps === 0;
@@ -432,10 +432,17 @@ console.log("-- 6. falscher Knoten -> Ende ohne ns.go --");
   pruefe("BN13 ohne SF14: sofort Ende", leer(m13));
   const m13s = await fahre({ knoten: 13, sf14: 1, maxPartien: 2 });
   pruefe("BN13 mit SF14: spielt", m13s.z.goAufrufe > 0 && m13s.z.resets.length >= 1);
+  // BN15 wie BN13 (07.11.2026): GoPower 1, mit SF14 verdoppelt; Tetrads heben
+  // die Kampfwerte, die im V2-Knoten die Bladeburner-Chancen tragen.
+  const m15 = await fahre({ knoten: 15 });
+  pruefe("BN15 ohne SF14: sofort Ende", leer(m15));
+  const m15s = await fahre({ knoten: 15, sf14: 3, maxPartien: 2 });
+  pruefe("BN15 mit SF14: spielt", m15s.z.goAufrufe > 0 && m15s.z.resets.length >= 1);
   const m14 = await fahre({ knoten: 14, maxPartien: 2 });
   pruefe("BN14 ohne SF14: spielt", m14.z.goAufrufe > 0);
-  pruefe("goLohnt: 14 immer, 13 nur mit SF14, sonst nie",
-    modul.goLohnt(14, 0) && !modul.goLohnt(13, 0) && modul.goLohnt(13, 1) && !modul.goLohnt(10, 3));
+  pruefe("goLohnt: 14 immer, 13 und 15 nur mit SF14, sonst nie",
+    modul.goLohnt(14, 0) && !modul.goLohnt(13, 0) && modul.goLohnt(13, 1)
+    && !modul.goLohnt(15, 0) && modul.goLohnt(15, 3) && !modul.goLohnt(10, 3) && !modul.goLohnt(8, 3));
 }
 
 console.log("");

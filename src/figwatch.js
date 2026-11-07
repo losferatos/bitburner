@@ -32,6 +32,7 @@
  */
 
 import { vergabeGilt, pruefeHandlung } from "lib/figur.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 15000;
 
@@ -76,6 +77,17 @@ export async function main(ns) {
   // Vergabe, startet die Handlung, und die Wache sieht sie erst danach. Wer
   // beim ersten Mal meldet, meldet in jeder Uebergabe.
   let verdacht = null;
+  // Ein DAUERNDER Konflikt wird einmal gemeldet, nicht alle zwei Runden
+  // (07.11.2026): BN15.2, 03:21-06:41 UTC, 399 gleiche Vermerke "vergeben
+  // fuer bladeburner, tatsaechlich faktion" - der Strom bestand danach nur
+  // noch aus ihnen. Erneut gemeldet wird erst, wenn sich der Konflikt
+  // aendert oder zwischendurch aufgeloest war.
+  let gemeldet = null;
+  // Aufgeloest gilt ein Konflikt erst nach RUHE_RUNDEN stimmenden Runden in
+  // Folge (Skeptiker 07.11.): sonst meldet ein flatternder Konflikt (2 Runden
+  // falsch, 1 richtig) alle 45 s neu, und die Daempfung waere wirkungslos.
+  const RUHE_RUNDEN = 4;
+  let ruhig = 0;
 
   sag("figwatch gestartet auf " + ns.getHostname() + ".");
 
@@ -139,9 +151,12 @@ export async function main(ns) {
       const urteil = pruefeHandlung(gueltig ? vergabe : null, tatsaechlich);
 
       if (!urteil.stimmt) {
+        ruhig = 0;
         const schluessel = (gueltig ? vergabe.owner + ":" + vergabe.action : "-")
           + "|" + tatsaechlich;
-        if (verdacht === schluessel) {
+        if (gemeldet === schluessel) {
+          // schon gemeldet, dauert an - nichts Neues
+        } else if (verdacht === schluessel) {
           // Zweimal hintereinander dasselbe: das ist kein Uebergabefenster.
           konflikte++;
           letzterKonflikt = {
@@ -155,12 +170,14 @@ export async function main(ns) {
           sag("FIGUR-KONFLIKT (" + konflikte + "): " + urteil.grund
             + (einzelheit ? " [" + einzelheit + "]" : ""));
           ereignis(nachHome, liesVonHome, letzterKonflikt, jetzt);
-          verdacht = null;   // gemeldet, nicht in jeder Runde erneut
+          verdacht = null;
+          gemeldet = schluessel;
         } else {
           verdacht = schluessel;
         }
       } else {
         verdacht = null;
+        if (++ruhig >= RUHE_RUNDEN) gemeldet = null;
       }
 
       nachHome("data/figwatch.json", JSON.stringify({
@@ -199,25 +216,19 @@ export async function main(ns) {
  * Er gehoert dorthin und nicht nur in die eigene Telemetrie: die wird beim
  * naechsten Schreibvorgang ueberschrieben, und ein Konflikt von heute Nacht
  * waere morgen frueh nicht mehr auffindbar.
+ *
+ * UEBER lib/events.js, NICHT VON HAND (07.11.2026). Bis dahin schob diese
+ * Funktion den Strom mit shift() auf 400 Eintraege - ohne Ruecksicht auf die
+ * bleibenden Arten. Die Konfliktflut vom 07.11. warf so den Sprung BN15.1 ->
+ * BN15.2 und den Einbau hinaus; `queued_augs_at_jump` und
+ * `jump_latency_min` hatten danach keine Quelle mehr. `anhaengen` haelt
+ * jump/install/penalty/gate im eigenen Deckel (DECKEL_BLEIBT).
  */
-function ereignis(nachHome, liesVonHome, konflikt, jetzt) {
-  let strom = { version: 1, eintraege: [] };
-  try {
-    const roh = liesVonHome("data/events.json");
-    if (roh) {
-      const g = JSON.parse(roh);
-      if (g && Array.isArray(g.eintraege)) strom = g;
-    }
-  } catch { /* dann ein frischer Strom */ }
-
-  strom.eintraege.push({
-    art: "note",
-    text: ("Figur-Konflikt: " + konflikt.grund).slice(0, 160),
-    wall: jetzt,
-    playtime: 0,
-    motorTimeMs: 0,
-    daten: konflikt,
-  });
-  while (strom.eintraege.length > 400) strom.eintraege.shift();
+export function ereignis(nachHome, liesVonHome, konflikt, jetzt) {
+  let roh = null;
+  try { roh = liesVonHome("data/events.json"); } catch { roh = null; }
+  const strom = evLaden(roh);
+  evAnhaengen(strom, "note", "Figur-Konflikt: " + konflikt.grund,
+    { wall: jetzt, playtime: 0, motorTimeMs: 0 }, konflikt);
   nachHome("data/events.json", JSON.stringify(strom));
 }

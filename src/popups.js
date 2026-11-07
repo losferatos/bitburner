@@ -41,6 +41,7 @@
  */
 
 import { liesVonHome, nachHome } from "lib/hostdatei.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -260,9 +261,9 @@ export async function main(ns) {
       const halt = haltebefund();
       if (halt.halt) {
         // Die ersten 120 Zeichen in den Ereignisstrom, wie der Auftrag es
-        // verlangt. `lib/events.js` waere hier zu teuer (dieses Gewerk wiegt
-        // 3,30 GB und laeuft alle 10 s), deshalb der Ringpuffer von Hand -
-        // und die Datei traegt denselben Namen, damit tools/ sie findet.
+        // verlangt. Ueber lib/events.js (07.11.2026): die Bibliothek ruft
+        // kein ns auf und kostet 0 GB - die alte Begruendung "zu teuer" hielt
+        // nicht. Der Beschnitt von Hand auf 200 warf jump/install hinaus.
         const kurz = halt.text.slice(0, 120);
         if (gemeldet !== kurz) {
           gemeldet = kurz;
@@ -276,18 +277,9 @@ export async function main(ns) {
             // soll, waere still verschwunden. Und zwar dauerhaft unbemerkt:
             // auffallen wuerde es nur, wenn der Bot ohnehin schon steht.
             const roh = liesVonHome(ns, "data/events.json");
-            const strom = roh ? JSON.parse(roh) : { version: 1, eintraege: [] };
-            if (!Array.isArray(strom.eintraege)) strom.eintraege = [];
-            strom.eintraege.push({
-              wall: Date.now(),
-              art: "blocked",
-              text: "Dialog bleibt offen (" + halt.wort + ")",
-              daten: { wort: halt.wort, text: kurz },
-              bleibt: true,
-            });
-            if (strom.eintraege.length > 200) {
-              strom.eintraege = strom.eintraege.slice(-200);
-            }
+            const strom = evLaden(roh);
+            evAnhaengen(strom, "blocked", "Dialog bleibt offen (" + halt.wort + ")",
+              { wall: Date.now(), playtime: 0, motorTimeMs: 0 }, { wort: halt.wort, text: kurz });
             nachHome(ns, "data/events.json", JSON.stringify(strom));
           } catch { /* Bericht, nie Steuerung */ }
           ns.write("data/popups-halt.txt", JSON.stringify({

@@ -41,6 +41,14 @@ if (f) {
   pruefe("laufender Graft zaehlt NICHT als bewusst (koennte haengen)", f(einbau(), tor({ warteGrund: "ein Graft laeuft (QLink)" }), reset, jetzt) === false);
   pruefe("kein Tor, keine Frist: echter Verlust", f(einbau(), { zeit: jetzt - 30000, state: "work" }, reset, jetzt) === false);
   pruefe("Tor-Zustand von vor dem letzten Einbau zaehlt nicht", f(null, tor({ zeit: 500 }), reset, jetzt) === null);
+  // 07.11.2026, BN15.1 -> BN15.2: ein Aug, Mindestschlange 3, Tor-Grund "kein erarbeitbares Ziel"
+  const bn15 = { zeit: jetzt - 20000, state: "wait", blockedReason: "locked", warteGrund: "kein erarbeitbares Ziel" };
+  pruefe("unter der Mindestschlange (1 von 3): bewusst gehalten (BN15.1-Fall)", f(einbau({ wartend: 1, mindest: 3 }), bn15, reset, jetzt) === true);
+  pruefe("Mindestschlange erreicht (3 von 3): echter Verlust", f(einbau({ wartend: 3, mindest: 3 }), bn15, reset, jetzt) === false);
+  pruefe("Red Pill wartet: Mindestzahl aufgehoben, Befund", f(einbau({ wartend: 1, mindest: 3, redPillWartet: true }), bn15, reset, jetzt) === false);
+  pruefe("Spendenausnahme: Mindestzahl aufgehoben, Befund", f(einbau({ wartend: 1, mindest: 3, spendenAusnahme: true }), bn15, reset, jetzt) === false);
+  pruefe("Mindestzahl von vor dem letzten Einbau zaehlt nicht", f(einbau({ zeit: 500, wartend: 1, mindest: 3 }), null, reset, jetzt) === null);
+  pruefe("Mindestschlange-Zahl 6 min alt: zaehlt nicht mehr", f(einbau({ zeit: jetzt - 6 * 60000, wartend: 1, mindest: 3 }), null, reset, jetzt) === false);
   pruefe("nichts lesbar: nicht pruefbar (null)", f(null, null, reset, jetzt) === null);
 }
 

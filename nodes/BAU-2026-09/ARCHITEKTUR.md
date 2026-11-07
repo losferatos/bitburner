@@ -948,7 +948,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
         "lib/figur.js",
         "lib/figurns.js",
         "lib/hostdatei.js",
-        "lib/graftwahl.js"
+        "lib/graftwahl.js",
+        "lib/events.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -976,7 +977,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "evictRank": 18,
       "needsFigure": "none",
       "needsLibs": [
-       "lib/figur.js"
+       "lib/figur.js",
+       "lib/events.js"
       ],
       "singularity": true,
       "restartPolicy": "always",
@@ -1189,7 +1191,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "evictRank": 2,
       "needsFigure": "none",
       "needsLibs": [
-        "lib/hostdatei.js"
+        "lib/hostdatei.js",
+        "lib/events.js"
       ],
       "singularity": false,
       "restartPolicy": "always",

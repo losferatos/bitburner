@@ -67,6 +67,7 @@
 import { naechstes, fortschritt } from "lib/graftwahl.js";
 import { beantrage as figBeantrage } from "lib/figurns.js";
 import { PRIO as FIG_PRIO } from "lib/figur.js";
+import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 
 const TAKT_MS = 60000;
 
@@ -423,25 +424,17 @@ export async function main(ns) {
    * Schreibvorgang ueberschrieben. Ein Abbruch von heute Nacht waere morgen
    * frueh nicht mehr auffindbar - und `graft_aborted = 0` ist eine
    * Abnahmebedingung.
+   *
+   * Ueber lib/events.js (07.11.2026): der Beschnitt von Hand per shift()
+   * warf auch die bleibenden Arten (jump, install) hinaus - Befund aus
+   * figwatch.js, das denselben Code trug.
    */
   function ereignis(art, name) {
-    let strom = { version: 1, eintraege: [] };
-    try {
-      const roh = liesVonHome("data/events.json");
-      if (roh) {
-        const g = JSON.parse(roh);
-        if (g && Array.isArray(g.eintraege)) strom = g;
-      }
-    } catch { /* dann ein frischer Strom */ }
-    strom.eintraege.push({
-      art: "note",
-      text: (art + ": " + name).slice(0, 160),
-      wall: Date.now(),
-      playtime: 0,
-      motorTimeMs: letzteMotorzeit ?? 0,
-      daten: { art, name },
-    });
-    while (strom.eintraege.length > 400) strom.eintraege.shift();
+    let roh = null;
+    try { roh = liesVonHome("data/events.json"); } catch { roh = null; }
+    const strom = evLaden(roh);
+    evAnhaengen(strom, "note", art + ": " + name,
+      { wall: Date.now(), playtime: 0, motorTimeMs: letzteMotorzeit ?? 0 }, { art, name });
     nachHome("data/events.json", JSON.stringify(strom));
   }
 }

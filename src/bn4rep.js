@@ -44,6 +44,11 @@ import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
 import {
+  planeRunde as bn8PlaneRunde, runde as bn8RundeVon, einbauFaellig as bn8EinbauFaellig,
+  preisFaktor as bn8PreisFaktor, homeKosten as bn8HomeKosten,
+  HOME_ZIEL as BN8_HOME_ZIEL, ZIEL_STUECKE as BN8_ZIEL_STUECKE,
+} from "lib/bn8plan.js";
+import {
   PAUSE_FILE as BOERSE_PAUSE_FILE, TEL_FILE as BOERSE_TEL_FILE, ABRUF_FILE as BOERSE_ABRUF_FILE,
   ABRUF_MS as BOERSE_ABRUF_MS, KAUF_FAKTOR as BOERSE_KAUF_FAKTOR, SPENDEN_FAKTOR as BOERSE_SPENDEN_FAKTOR,
   DAEDALUS_BAR as BOERSE_DAEDALUS_BAR, VERDOPPLUNG_SEK as BOERSE_VERDOPPLUNG_SEK,
@@ -497,6 +502,9 @@ export async function main(ns) {
   let abrufSchutz = { betrag: 0, bis: 0 };   // BN8: abgerufenes Bargeld vor bn4net schuetzen
   let daedalusAbrufSeit = 0;          // BN8: seit wann die 100 Mrd bar gehalten werden
   let daedalusPauseBis = 0;           // BN8: nach 10 min ohne Beitritt 1 h Pause
+  let bn8GrundGemeldet = "";          // BN8-Plan: zuletzt gemeldeter Wartegrund
+  let bn8GemeldetMs = 0;
+  let quittungSperreBis = 0;          // nach ausgebliebener Quittung 10 min kein neuer Einbauanlauf
   let erloesAmSchreiben = null;       // corp-Erloes beim letzten Schreiben (Basis fuer corpPendingRaise)
   let corpWaitWrittenMs = 0;
   const gateBo = { table: null, next: null, read: 0, skills: bladeSkillLevels(null, 0, null) };
@@ -968,6 +976,83 @@ export async function main(ns) {
     // ueberspringt. Genau dieser Zustand ist der Normalfall am Ende eines
     // Zyklus: Alles aus den beigetretenen Faktionen ist gekauft, und die
     // einzige verbliebene Arbeit ist die Firma.
+    // -----------------------------------------------------------------------
+    // DER EINBAUPLAN FUER BITNODE 8 (10.11.2026, lib/bn8plan.js).
+    //
+    // Traegt die Boerse, gelten die Einbauregeln der anderen Knoten nicht:
+    // Ruf ist kaeuflich, jeder Einbau kostet Geld, Rechner und Erfahrung, und
+    // der Ausgang haengt am Hacking-Multiplikator. Gerechnet (tools/audit/
+    // bn8-route.mjs, derselbe Code): drei grosse Runden statt vieler kleiner.
+    // Im Lauf wird NICHTS gekauft und nichts gespendet - jeder fruehe Kauf
+    // verteuert die grossen Stuecke der Runde um 1,77. Gekauft wird in der
+    // Einbaurunde, nach dem Ausverkauf des Depots, in Planreihenfolge.
+    // -----------------------------------------------------------------------
+    const bn8Modus = boerse.traegt;
+    const bn8Distinkt = new Set(eingebauteAugs).size;
+    let bn8Runde = 0;
+    let bn8Plan = null;
+    let bn8Faellig = { ja: false, grund: "" };
+    const bn8Plane = (budget) => {
+      const nach = new Map();
+      const rufHaben = {};
+      for (const k of kandidaten) {
+        rufHaben[k.faktion] = k.rep;
+        let e = nach.get(k.aug);
+        if (!e) {
+          const vorAlle = prereqOf(k.aug);
+          if (vorAlle === null) continue;
+          const st = HACK_AUGS[k.aug] || {};
+          e = {
+            name: k.aug, preis: k.preis, ruf: k.repReq, faktionen: [],
+            vor: vorAlle.filter((p) => !besitz.has(p)),
+            hack: st.hacking || 1, exp: st.hacking_exp || 1, speed: st.hacking_speed || 1, frep: st.faction_rep || 1,
+          };
+          nach.set(k.aug, e);
+        }
+        e.faktionen.push(k.faktion);
+      }
+      let sf11 = 0;
+      try { const m = ns.getResetInfo().ownedSF; sf11 = (m && typeof m.get === "function" && m.get(11)) || 0; } catch { sf11 = 0; }
+      const pflicht = bn8Runde === 3 && nach.has(EXIT_KEY) ? [EXIT_KEY] : [];
+      return bn8PlaneRunde({
+        kandidaten: [...nach.values()], budget, q: bn8PreisFaktor(sf11),
+        repMult: spieler.mults.faction_rep, rufHaben, pflicht,
+      });
+    };
+    // home-RAM ueberlebt die Einbauten; Runde 2 und 3 halten Geld dafuer frei,
+    // aber nie auf Kosten der 30 Stueck bzw. der Red Pill.
+    const bn8PlaneMitHome = (budget) => {
+      let homeRes = 0;
+      if (bn8Runde >= 2) {
+        try { homeRes = bn8HomeKosten(ns.getServerMaxRam("home"), BN8_HOME_ZIEL); } catch { homeRes = 0; }
+      }
+      const voll = bn8Plane(budget);
+      if (!(homeRes > 0)) return voll;
+      const knapp = bn8Plane(Math.max(0, budget - homeRes));
+      if (!knapp) return voll;
+      const reichtFuer = (p) => (bn8Runde === 3
+        ? p.kaeufe.some((x) => x.name === EXIT_KEY)
+        : bn8Distinkt + wartend + p.stueck >= BN8_ZIEL_STUECKE);
+      return (voll && reichtFuer(voll) && !reichtFuer(knapp)) ? voll : knapp;
+    };
+    if (bn8Modus) {
+      try {
+        bn8Runde = bn8RundeVon({ distinkt: bn8Distinkt, pilleInstalliert: eingebauteAugs.includes(EXIT_KEY) });
+        bn8Plan = bn8PlaneMitHome(geld * 0.97);
+        bn8Faellig = bn8EinbauFaellig({ runde: bn8Runde, vermoegen: geld, plan: bn8Plan, distinkt: bn8Distinkt, wartend });
+      } catch (e) {
+        gangCountError("BN8-Plan", e);
+        bn8Plan = null;
+        bn8Faellig = { ja: false, grund: "Planfehler: " + String(e && e.message ? e.message : e).slice(0, 80) };
+      }
+      if (bn8Faellig.grund !== bn8GrundGemeldet || Date.now() - bn8GemeldetMs > 60 * 60000) {
+        bn8GrundGemeldet = bn8Faellig.grund;
+        bn8GemeldetMs = Date.now();
+        sag("BN8-PLAN Runde " + bn8Runde + ": " + bn8Faellig.grund + ". Vermoegen " + geldText(geld)
+          + (bn8Plan ? ", Plan " + bn8Plan.stueck + " Stuecke fuer " + geldText(bn8Plan.kosten) : ", kein Plan") + ".");
+      }
+    }
+
     const companyOrder = liesVonHome(COMPANY_ORDER_FILE);
     const [orderName, orderUntil] = companyOrder.split("|");
     const orderActive = !!orderName && orderName !== "off" && orderName !== "auto"
@@ -2311,18 +2396,14 @@ export async function main(ns) {
           + ", gekauft wird sie ab 45 Mrd. Bis dahin kein Einbau (" + wartend + " warten).");
       }
     }
-    // BN8-UEBERGANGSRIEGEL (10.11.2026, bis der Einbauplan fuer BN8 gebaut ist).
-    // Gerechnet aus dem Spielquellcode (nodes/audit-2026-11-07/BN8-ROUTE.md): der
-    // schnellste Weg sind drei grosse Einbaurunden mit Ruf per Spende. Die
-    // Regeln der anderen Knoten bauten hier schon mit drei Stuecken ein, und
-    // jeder Einbau kostet Geld, Server und Hacking-Erfahrung. Jeder Kauf im
-    // Lauf verteuert ausserdem die grossen Stuecke der Runde um 1,77 je Stueck.
-    // Deshalb traegt die Boerse: kein Kauf, keine Spende, kein Einbau - ausser
-    // The Red Pill wartet. Notausgang: 36 h nach dem letzten Einbau gilt
-    // wieder die alte Regel (falls der Plan nie kommt, steht der Bot nicht).
-    const bn8Halt = boerse.traegt && !redPillWartet
-      && augResetMs > 0 && Date.now() - augResetMs < 36 * 3600000;
-    if (bn8Halt) gesperrt = true;
+    // BN8-PLAN: im Lauf kein Kauf und keine Spende (`bn8Halt`), und eingebaut
+    // wird nur, wenn der Plan es sagt - oder wenn The Red Pill schon wartet.
+    const bn8Halt = bn8Modus && !redPillWartet;
+    if (bn8Halt && !bn8Faellig.ja) gesperrt = true;
+    // Blieb die Quittung von boerse.js aus, nicht jede Runde neu anlaufen: der
+    // Handschlag steht vor der Pause, und jede Anfrage erzeugt eine Sicherung
+    // der Klasse pre-install, die nie rotiert (Mock-Test 10.11.: 7 in 7 min).
+    if (Date.now() < quittungSperreBis) gesperrt = true;
     // H3: die 12-h-Frist der Einbausperre gilt fuer jede Runde ausser der ersten
     // Corp-Runde des Knotens - auch wenn Block 1c gar nicht lief (kein V2,
     // anderer Knoten) oder warf. Nur ODER, nie ein Aufheben (31.08.2026).
@@ -2354,15 +2435,18 @@ export async function main(ns) {
       : lueckeZuGross;
     if (!ausgangSteht
         && wiederaufbauHilfe
-        && (wartend + einbauKaufbar >= MINDEST_WARTESCHLANGE || spendenAusnahme || redPillWartet)
-        && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeEinbau)
-            || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
-            || spendenrechtFaellig || redPillWartet)
+        // BN8 mit tragender Boerse: allein der Plan entscheidet (lib/bn8plan.js).
+        && (bn8Modus
+          ? (bn8Faellig.ja || redPillWartet)
+          : ((wartend + einbauKaufbar >= MINDEST_WARTESCHLANGE || spendenAusnahme || redPillWartet)
+            && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeEinbau)
+              || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
+              || spendenrechtFaellig || redPillWartet)))
         && !gesperrt) {
       // Der Grund aus der tatsaechlich wahren Bedingung (Skeptiker-Einwand
       // 11): frueher fiel das Spendenrecht auf "naechste Huerde erst in ..."
       // zurueck und `geldWegZu` nannte den ungefilterten Preis.
-      const einbauGrund = einbauGrundText({
+      const einbauGrund = bn8Halt ? ("BN8-Plan: " + bn8Faellig.grund) : einbauGrundText({
         redPillWartet, spendenrechtFaellig, spendenFaktion,
         favorLohnt, favorFaktion, favorGewinn,
         geldWegZu, teuerstesVerdienteWertvoll,
@@ -2571,25 +2655,91 @@ export async function main(ns) {
               sag("EINBAU AUSGESETZT: boerse.js hat den Ausverkauf nicht quittiert (" + ausgang
                 + "), zuletzt " + geldText(letzt) + " im Depot. Neuer Anlauf jede Runde.");
             }
+            quittungSperreBis = Date.now() + 10 * 60000;
             await ns.sleep(15000);
             continue;
           }
         }
         const torGrund = torGrundJetzt();
         if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
-        // Das Depot ist verkauft: jetzt alles Verdiente kaufen, teuerstes zuerst.
-        // Im Lauf kauft bn4rep mit tragender Boerse nur Stuecke bis zu einem
-        // Zehntel des Vermoegens (BOERSE_KAUF_FAKTOR) - der Rest wartet auf hier.
-        if (ausgang === "quittiert") {
-          for (const k of kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
-            if (k.rep < k.repReq) continue;
+        if (bn8Halt) {
+          // BN8-EINBAURUNDE (lib/bn8plan.js): Das Depot ist verkauft. Den Plan mit
+          // dem ECHTEN Bargeld neu rechnen, spenden, in Planreihenfolge kaufen
+          // (teuerstes zuerst, Vorbedingungen davor), dann home-RAM. Reicht es
+          // nach dem Verkauf doch nicht, wird NICHT eingebaut - die Pause wird
+          // aufgehoben, damit boerse.js sofort weiterhandelt.
+          const bar0 = ns.getServerMoneyAvailable("home");
+          let plan2 = null;
+          let ok2 = { ja: false, grund: "kein Plan" };
+          try {
+            plan2 = bn8PlaneMitHome(bar0);
+            // Nach der Quittung zaehlt das ECHTE Bargeld, nicht das Vermoegen vom
+            // Rundenanfang: bricht das Depot beim Verkauf ein, ist die Schwelle
+            // (300 Mrd / 1 Bio) sonst nur dem Schein nach erfuellt (Mock-Test 3b).
+            ok2 = bn8EinbauFaellig({
+              runde: bn8Runde, vermoegen: ausgang === "quittiert" ? bar0 : Math.max(geld, bar0),
+              plan: plan2, distinkt: bn8Distinkt, wartend,
+            });
+          } catch (e) { gangCountError("BN8-Plan (Einbaurunde)", e); }
+          if (!plan2 || !ok2.ja) {
+            sag("BN8-EINBAURUNDE ABGEBROCHEN: mit " + geldText(bar0) + " bar gilt: " + ok2.grund + ". Kein Einbau.");
+            try { schreibNachHome(BOERSE_PAUSE_FILE, ""); } catch { /* laeuft nach 10 min von selbst ab */ }
+            await ns.sleep(15000);
+            continue;
+          }
+          for (const sp of plan2.spenden) {
             try {
-              const p = ns.singularity.getAugmentationPrice(k.aug);
-              if (ns.getServerMoneyAvailable("home") < p) continue;
-              if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
-                sag("GEKAUFT (Einbaurunde): " + k.aug + " von " + k.faktion + " fuer " + geldText(p) + ".");
+              const betrag = Math.min(sp.betrag, ns.getServerMoneyAvailable("home"));
+              if (betrag > 0 && ns.singularity.donateToFaction(sp.faktion, betrag)) {
+                sag("GESPENDET (Einbaurunde): " + geldText(betrag) + " an " + sp.faktion + " fuer Ruf " + Math.round(sp.rufZiel) + ".");
+              } else {
+                sag("SPENDE ABGELEHNT (Einbaurunde): " + geldText(betrag) + " an " + sp.faktion + ".");
               }
+            } catch (e) { gangCountError("Spende in der Einbaurunde", e); }
+          }
+          let gekauft2 = 0;
+          for (const k of plan2.kaeufe) {
+            try {
+              if (ns.singularity.purchaseAugmentation(k.faktion, k.name)) gekauft2++;
+              else sag("NICHT GEKAUFT (Einbaurunde): " + k.name + " von " + k.faktion + ".");
             } catch (e) { gangCountError("Kauf in der Einbaurunde", e); }
+          }
+          sag("BN8-EINBAURUNDE " + bn8Runde + ": " + gekauft2 + " von " + plan2.kaeufe.length + " Stuecken gekauft, geplant "
+            + geldText(plan2.kosten) + ", bar danach " + geldText(ns.getServerMoneyAvailable("home")) + ".");
+          // Runde 3 ohne The Red Pill einzubauen waere ein verlorener Zyklus.
+          if (bn8Runde === 3 && !ns.singularity.getOwnedAugmentations(true).includes(EXIT_KEY)) {
+            sag("BN8-EINBAURUNDE: The Red Pill wurde NICHT gekauft - kein Einbau, neuer Anlauf.");
+            try { schreibNachHome(BOERSE_PAUSE_FILE, ""); } catch { /* laeuft von selbst ab */ }
+            await ns.sleep(15000);
+            continue;
+          }
+          if (bn8Runde >= 2) {
+            let stufen = 0;
+            try {
+              for (let i = 0; i < 12; i++) {
+                if (ns.getServerMaxRam("home") >= BN8_HOME_ZIEL) break;
+                if (ns.getServerMoneyAvailable("home") < ns.singularity.getUpgradeHomeRamCost()) break;
+                if (!ns.singularity.upgradeHomeRam()) break;
+                stufen++;
+              }
+            } catch (e) { gangCountError("home-RAM in der Einbaurunde", e); }
+            if (stufen) sag("home-RAM in der Einbaurunde: +" + stufen + " Stufen, jetzt " + ns.getServerMaxRam("home") + " GB (bleibt ueber den Einbau).");
+          }
+        } else {
+          // Das Depot ist verkauft: jetzt alles Verdiente kaufen, teuerstes zuerst.
+          // Im Lauf kauft bn4rep mit tragender Boerse nur Stuecke bis zu einem
+          // Zehntel des Vermoegens (BOERSE_KAUF_FAKTOR) - der Rest wartet auf hier.
+          if (ausgang === "quittiert") {
+            for (const k of kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+              if (k.rep < k.repReq) continue;
+              try {
+                const p = ns.singularity.getAugmentationPrice(k.aug);
+                if (ns.getServerMoneyAvailable("home") < p) continue;
+                if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
+                  sag("GEKAUFT (Einbaurunde): " + k.aug + " von " + k.faktion + " fuer " + geldText(p) + ".");
+                }
+              } catch (e) { gangCountError("Kauf in der Einbaurunde", e); }
+            }
           }
         }
       }
@@ -3823,6 +3973,12 @@ export async function main(ns) {
     // schreibt diesen Stand mit frischer Zeit und `state: "wait"` erneut.
     letzteTelemetrie = {
       zeit: Date.now(),
+      // BN8-Einbauplan (lib/bn8plan.js): Runde, Wartegrund, Plan.
+      bn8: bn8Modus ? {
+        runde: bn8Runde, faellig: bn8Faellig.ja, grund: bn8Faellig.grund,
+        stueck: bn8Plan ? bn8Plan.stueck : 0, kosten: bn8Plan ? Math.round(bn8Plan.kosten) : 0,
+        distinkt: bn8Distinkt,
+      } : null,
       // Fuer tools/wache.js: woran erkennt man von aussen einen
       // Knotenwechsel? getResetInfo ist hier ohnehin schon aufgerufen
       // (FACTION_REP_GAIN weiter oben), die Zahl kostet also kein Gigabyte

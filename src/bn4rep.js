@@ -1005,7 +1005,7 @@ export async function main(ns) {
           e = {
             name: k.aug, preis: k.preis, ruf: k.repReq, faktionen: [],
             vor: vorAlle.filter((p) => !besitz.has(p)),
-            hack: st.hacking || 1, exp: st.hacking_exp || 1, speed: st.hacking_speed || 1, frep: st.faction_rep || 1,
+            hackMult: st.hacking || 1, exp: st.hacking_exp || 1, speed: st.hacking_speed || 1, frep: st.faction_rep || 1,
           };
           nach.set(k.aug, e);
         }

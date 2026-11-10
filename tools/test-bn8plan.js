@@ -32,7 +32,7 @@ console.log("\n-- Formeln gegen den Spielquellcode --");
   pruefe("schon gross genug: 0", P.homeKosten(32768, 32768) === 0 && P.homeKosten(65536, 32768) === 0);
 }
 
-const A = (name, preis, ruf, faktionen, extra = {}) => ({ name, preis, ruf, faktionen, vor: [], hack: 1, exp: 1, speed: 1, frep: 1, ...extra });
+const A = (name, preis, ruf, faktionen, extra = {}) => ({ name, preis, ruf, faktionen, vor: [], hackMult: 1, exp: 1, speed: 1, frep: 1, ...extra });
 
 console.log("\n-- Kaufreihenfolge --");
 {
@@ -64,12 +64,12 @@ console.log("\n-- Kosten: Aufschlag je Position und Spenden --");
 console.log("\n-- Die Runde planen --");
 {
   const kand = [
-    A("Hack gross", 1e9, 0, ["X"], { hack: 1.3 }),
-    A("Hack klein", 1e9, 0, ["X"], { hack: 1.05 }),
+    A("Hack gross", 1e9, 0, ["X"], { hackMult: 1.3 }),
+    A("Hack klein", 1e9, 0, ["X"], { hackMult: 1.05 }),
     A("Fueller", 1e6, 0, ["X"]),
     A("Ruf", 1e8, 0, ["X"], { frep: 1.15 }),
-    A("Gen2", 5e8, 0, ["X"], { hack: 1.2, vor: ["Gen1"] }),
-    A("Gen1", 1e8, 0, ["X"], { hack: 1.01 }),
+    A("Gen2", 5e8, 0, ["X"], { hackMult: 1.2, vor: ["Gen1"] }),
+    A("Gen1", 1e8, 0, ["X"], { hackMult: 1.01 }),
   ];
   const p = P.planeRunde({ kandidaten: kand, budget: 1.2e9, q: 1.767, repMult: 1, rufHaben: {} });
   pruefe("im Budget", p && p.kosten <= 1.2e9, p && String(p.kosten));
@@ -80,7 +80,7 @@ console.log("\n-- Die Runde planen --");
   const r = reich.kaeufe.map((k) => k.name);
   pruefe("Vorbedingung steht in der Kaufliste vor dem Nachfolger", r.indexOf("Gen1") >= 0 && r.indexOf("Gen1") < r.indexOf("Gen2"), r.join(","));
   pruefe("jeder Kauf nennt seine Faktion", reich.kaeufe.every((k) => k.faktion === "X"));
-  pruefe("mit viel Geld alles", reich.stueck === 6 && Math.abs(reich.hack - 1.3 * 1.05 * 1.2 * 1.01) < 1e-9);
+  pruefe("mit viel Geld alles", reich.stueck === 6 && Math.abs(reich.hackMult - 1.3 * 1.05 * 1.2 * 1.01) < 1e-9);
   pruefe("Ruf-Mult des Plans wird ausgewiesen", Math.abs(reich.frep - 1.15) < 1e-9);
   pruefe("leeres Budget: leerer Plan, nicht null", P.planeRunde({ kandidaten: kand, budget: 0, q: 1.767, repMult: 1 }).stueck === 0);
   const pille = [...kand, A("The Red Pill", 0, 2.5e6, ["Daedalus"])];
@@ -90,7 +90,7 @@ console.log("\n-- Die Runde planen --");
   pruefe("Pflicht passt nicht ins Budget: null", P.planeRunde({ kandidaten: pille, budget: 1e12, q: 1.767, repMult: 1, pflicht: ["The Red Pill"] }) === null);
   pruefe("Pflicht nicht im Angebot: null", P.planeRunde({ kandidaten: kand, budget: 1e15, q: 1.767, repMult: 1, pflicht: ["The Red Pill"] }) === null);
   pruefe("hoeherer Ruf-Mult verbilligt die Spende", P.planeRunde({ kandidaten: pille, budget: 1.3e12, q: 1.767, repMult: 2, pflicht: ["The Red Pill"] }) !== null);
-  const fern = [A("Nachfolger", 10, 0, ["X"], { hack: 1.5, vor: ["nicht im Angebot"] })];
+  const fern = [A("Nachfolger", 10, 0, ["X"], { hackMult: 1.5, vor: ["nicht im Angebot"] })];
   pruefe("Stueck mit unerreichbarer Vorbedingung bleibt draussen", P.planeRunde({ kandidaten: fern, budget: 1e9, q: 2, repMult: 1 }).stueck === 0);
 }
 

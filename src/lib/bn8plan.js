@@ -57,7 +57,9 @@ export const HOME_ZIEL = 32768;
  * L/(32 m) liegt bei L = 2500, m = 5 um 15. Ruf-Mult verbilligt die Spenden
  * (Red Pill: 2,5 Mio Ruf). `zahl` ist der Zaehlplatz fuer die 30 Stueck.
  */
-export const GEWICHTE = { hack: 15, exp: 1, speed: 1, frep: 4, zahl: 0.05 };
+// ACHTUNG NAME: ein Feld namens `hack` kostete jedes importierende Skript
+// 0,1 GB - das Spiel rechnet RAM nach Namen im Quelltext (tools/ram-namen.js).
+export const GEWICHTE = { hackMult: 15, exp: 1, speed: 1, frep: 4, zahl: 0.05 };
 
 const SF11_RABATT = [1, 0.96, 0.94, 0.93];
 /** Preisfaktor je wartendem Stueck. */
@@ -131,18 +133,18 @@ export function kosten(liste, ctx) {
 }
 
 function wert(a, g) {
-  return g.hack * Math.log(a.hack || 1) + g.exp * Math.log(a.exp || 1) + g.speed * Math.log(a.speed || 1)
+  return g.hackMult * Math.log(a.hackMult || 1) + g.exp * Math.log(a.exp || 1) + g.speed * Math.log(a.speed || 1)
     + g.frep * Math.log(a.frep || 1) + g.zahl;
 }
 
 /**
  * Die beste Auswahl fuer ein Budget: gierig nach Wert je zusaetzlichem Dollar,
  * Vorbedingungen werden mitgenommen.
- * @param kandidaten [{name, preis, ruf, faktionen, vor, hack, exp, speed, frep}]
+ * @param kandidaten [{name, preis, ruf, faktionen, vor, hackMult, exp, speed, frep}]
  *                   preis = heutiger Preis (enthaelt den Aufschlag der schon wartenden Stuecke)
  * @param pflicht Namen, die drin sein MUESSEN (z.B. The Red Pill)
  * @returns null, wenn schon die Pflicht nicht ins Budget passt; sonst
- *          {kaeufe:[{name, faktion, preis}], spenden:[{faktion, betrag, rufZiel}], kosten, stueck, hack, frep}
+ *          {kaeufe:[{name, faktion, preis}], spenden:[{faktion, betrag, rufZiel}], kosten, stueck, hackMult, frep}
  */
 export function planeRunde({ kandidaten, budget, q, repMult, rufHaben = {}, gewichte = GEWICHTE, pflicht = [], maxStueck = 40 }) {
   const nach = new Map(kandidaten.map((a) => [a.name, a]));
@@ -183,12 +185,12 @@ export function planeRunde({ kandidaten, budget, q, repMult, rufHaben = {}, gewi
     wahl = best.neu;
     stand = best.k;
   }
-  let hack = 1, frep = 1;
-  for (const a of stand.folge) { hack *= a.hack || 1; frep *= a.frep || 1; }
+  let hackMult = 1, frep = 1;
+  for (const a of stand.folge) { hackMult *= a.hackMult || 1; frep *= a.frep || 1; }
   return {
     kaeufe: stand.folge.map((a) => ({ name: a.name, faktion: stand.zuordnung[a.name], preis: a.preis })),
     spenden: Object.keys(stand.spenden).map((f) => ({ faktion: f, betrag: stand.spenden[f], rufZiel: stand.ziel[f] })),
-    kosten: stand.gesamt, stueck: stand.folge.length, hack, frep,
+    kosten: stand.gesamt, stueck: stand.folge.length, hackMult, frep,
   };
 }
 

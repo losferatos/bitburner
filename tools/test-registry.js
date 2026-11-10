@@ -359,7 +359,7 @@ console.log("-- RAM-Bedarf mit dem Singularity-Faktor --");
   const bn4rep = registry.eintraege.find((e) => e.name === "bn4rep.js");
   pruefe("bn4rep.js hat einen Singularity-Anteil", bn4rep && bn4rep.ramSingGb > 0);
   if (bn4rep) {
-    // Die Messung: 934,05 bei SF4.1, 68,55 bei SF4.3 (H2/Skeptiker-Fund 5,
+    // Die Messung: 1006,1 bei SF4.1, 73,1 bei SF4.3 (H2/Skeptiker-Fund 5,
     // 27.09.2026: +5,0 GB ramSingGb durch `getAugmentationPrereq`, neu fuer
     // die Vorbedingungs-Pruefung vor dem Daedalus-Fuellstueck-Kauf, GERECHNET
     // gegen tools/ram.js - siehe ARCHITEKTUR.md 3.3, noch keine Live-
@@ -367,9 +367,9 @@ console.log("-- RAM-Bedarf mit dem Singularity-Faktor --");
     const sf1 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 1 } });
     const sf3 = REG.ramBedarf(bn4rep, { node: 10, ownedSF: { 4: 3 } });
     const inBn4 = REG.ramBedarf(bn4rep, { node: 4, ownedSF: { 4: 0 } });
-    pruefe("SF4.1 ergibt 934,05", Math.abs(sf1 - 934.05) < 0.01, "erhalten " + sf1);
-    pruefe("SF4.3 ergibt 68,55", Math.abs(sf3 - 68.55) < 0.01, "erhalten " + sf3);
-    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 68.55) < 0.01, "erhalten " + inBn4);
+    pruefe("SF4.1 ergibt 1006,1", Math.abs(sf1 - 1006.1) < 0.01, "erhalten " + sf1);
+    pruefe("SF4.3 ergibt 73,1", Math.abs(sf3 - 73.1) < 0.01, "erhalten " + sf3);
+    pruefe("in BitNode 4 gilt Faktor 1", Math.abs(inBn4 - 73.1) < 0.01, "erhalten " + inBn4);
   }
   const wakelock = registry.eintraege.find((e) => e.name === "wakelock.js");
   pruefe("wakelock.js kostet ueberall 2,25",

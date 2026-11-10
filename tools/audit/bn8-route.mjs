@@ -102,7 +102,7 @@ function planeRunde({ besitz, faktionen, repMult, budget, gewichte, maxStueck, p
   const kandidaten = ALLE
     .filter((a) => !besitz.has(a.name) && a.name !== RED_PILL && a.factions.some((f) => fset.has(f)))
     .map((a) => ({ name: a.name, preis: a.cost * Math.pow(Q, wartend), ruf: a.rep, faktionen: a.factions.filter((f) => fset.has(f)),
-      vor: a.prereqs.filter((p) => !besitz.has(p)), hack: a.hack, exp: a.exp, speed: a.speed, frep: a.frep }));
+      vor: a.prereqs.filter((p) => !besitz.has(p)), hackMult: a.hack, exp: a.exp, speed: a.speed, frep: a.frep }));
   const p = PLAN.planeRunde({ kandidaten, budget, q: Q, repMult, rufHaben: {}, gewichte, pflicht, maxStueck });
   if (!p) return null;
   // Rest in NeuroFlux: Preis 750e3*1,14^L*Q^q, Ruf 500*1,14^L (gegen die hoechste schon bezahlte Huerde)

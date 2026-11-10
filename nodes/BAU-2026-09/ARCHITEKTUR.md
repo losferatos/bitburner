@@ -1206,7 +1206,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "bn4rep.js",
       "args": [],
-      "ramBaseGb": 11,
+      "ramBaseGb": 10.9,
       "ramSingGb": 62.2,
       "ramMeasuredAt": "GERECHNET-2026-09-27 (tools/ram.js, H2/Skeptiker-Fund 5: getAugmentationPrereq neu fuer die Vorbedingungs-Pruefung, +5,0 GB ab SF4.3 gegen die 52,7 vom 26.09. - noch keine Live-Nachmessung im Spiel)",
       "verfahren": "alle",

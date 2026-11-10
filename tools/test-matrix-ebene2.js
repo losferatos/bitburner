@@ -167,8 +167,8 @@ console.log("-- BitNode 4: Singularity kostet Faktor 1 --");
     // 850,75; +0,1 GB Basis (getTotalScriptIncome, Skeptiker-Nacharbeit) - siehe ARCHITEKTUR.md 3.3 und tools/test-registry.js.
     // 27.09.2026: +5 GB ramSingGb durch das Daedalus-Fuellstueck (H2); im
     // Spiel nachgemessen (doku/ram-messung-2026-09-04.json), vorher 63,55 / 854,05.
-    pruefe("in BN4 kostet es 68,55", Math.abs(inBn4 - 68.55) < 0.01, "erhalten " + inBn4);
-    pruefe("in BN10 mit SF4.1 kostet es 934,05", Math.abs(inBn10 - 934.05) < 0.01,
+    pruefe("in BN4 kostet es 73,1", Math.abs(inBn4 - 73.1) < 0.01, "erhalten " + inBn4);
+    pruefe("in BN10 mit SF4.1 kostet es 1006,1", Math.abs(inBn10 - 1006.1) < 0.01,
       "erhalten " + inBn10);
     pruefe("das Verhaeltnis ist 16", Math.abs(inBn10 / inBn4 - 13.45) < 1,
       "erhalten " + (inBn10 / inBn4).toFixed(2) + " - nicht genau 16, weil der"

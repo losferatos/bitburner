@@ -73,10 +73,14 @@ wert wie ein Prozent Exp-Mult.
   Schaetzfehler), nicht aus schnellerem Drehen. Nicht gebaut, weil ohne
   messbaren Zusatznutzen: Zyklusphase mitschaetzen, Startwerte als Prior.
   Ungetestet: engerer Prior (|s| <= 0,2). Im Spiel noch zu messen.
-- **grow statt weaken** im XP-Ofen (25 % mehr Exp je GB-s). Fund beim Bau: grow
-  auf einem VOLLEN Ziel hebt die Sicherheit gar nicht (ServerHelpers.ts,
-  processSingleServerGrowth: fortify nur, wenn sich das Geld aendert), und in
-  BN8 hackt niemand das Ziel leer. Braucht ein neues Arbeiterskript.
+- **grow statt weaken** im XP-Ofen: bewusst NICHT gebaut (10.11. abends).
+  grow gibt je GB-s 25 % mehr Exp und hebt auf einem VOLLEN Ziel die
+  Sicherheit nicht (ServerHelpers.ts, processSingleServerGrowth). Aber die
+  Route ist in allen drei Runden vom GELD begrenzt (9,5 / 9,4 / 9,3 h); von
+  der Erfahrung haengt nur der Schluss ab (Hacking 3000, 0,8 h). 20 % davon
+  sind rund 10 Minuten je Stufe - gegen einen Eingriff in den Kern (neues
+  Arbeiterskript in sechs Listen, Sicherheitsdrift bei nicht vollem Ziel).
+  Fuer Lauf 2 nur interessant, wenn ein Knoten von der Erfahrung begrenzt ist.
 - **Fallstrick RAM nach Namen:** ein Feld namens `hack` in einem Modul kostet
   jedes importierende Skript 0,1 GB (tools/test-ram-namen.js faengt es).
 - **Darknet promoteStock** (Volatilitaet x2-4, Audit 07.11.): -8 bis -12 h je

@@ -19,10 +19,30 @@ BN8.1-8.3.
 | Graft-Kette: Fehlversuch legt still, Sperre am unbezahlbaren Eintrag, Doppelstart, Fokus | 16cb398 (Skeptiker-Auflagen, NMI vorn, ohne Fokus, Dauer x1,25 bis NMI) |
 | events.json: Flut aus figwatch warf jump/install hinaus | b70bccf (figwatch, graftauto, popups ueber lib/events.js) |
 
-## Offen - VOR BN8 bauen (Pflicht)
+## BN8-Block: gebaut am 10.11.2026 (BN8 lief da schon seit dem 09.11.)
 
-Aus dem Audit vom 03.10. (`nodes/audit-2026-10-03/bn-bn15-8.md`), heute
-bestaetigt, nie gebaut:
+| Punkt | Stand |
+|---|---|
+| BN8-1 Depot vor dem Einbau | e9a0d6b: bn4rep legt data/boerse-pause.txt, boerse.js verkauft und quittiert; Einbaurunde kauft danach alles Verdiente (1277d5b). Kein Einbau ohne Quittung bei bekanntem Depot. |
+| BN8-2 Bargeld | 1277d5b: Bargeld auf Abruf (data/boerse-abruf.txt), Daedalus-100-Mrd wird abgerufen und geschuetzt; mit 4S bleiben 2 % bar fuer Rechner/RAM. |
+| BN8-3 4S nach Vermoegen | 1277d5b: Kauf ab 45 Mrd Vermoegen (gerechnet: 26 Mrd waere 1-2 h langsamer). Vor 4S kein Einbau. |
+| BN8-4 Handelsregel | 1277d5b: lib/handel.js, Rang (2f-1)*mv, hoechstens 50 % je Titel. Gerechnet (60 Seeds): 250 Mio -> 1 Bio 14,4 h statt 21,2 h; Tiefpunkt 0,76 statt 0,90 des Startwerts. |
+
+Nachpruefung 6d0b3e6. Rechnungen: `tools/audit/boerse-regel.mjs`,
+`tools/audit/boerse-ruin.mjs`; Test `tools/test-handel.js` (boerse.js gegen
+Mock + Marktmodell).
+
+**Offen in BN8 (nicht gebaut, bewusst):**
+- Einbau-Takt in BN8 ist nicht durchgerechnet. bn4rep nutzt die Ruf-Regeln
+  der anderen Knoten, nur die Ruf-Luecke misst sich jetzt an der
+  Wiederaufbauzeit (log2(W/250 Mio) x 40 min). Ein Einbau kostet hier Stunden.
+- `fehl4S`/`sperre4SBis` leben nur im Speicher von boerse.js.
+- Historie ohne 4S geht bei einem Neustart von boerse.js verloren (2 min blind).
+
+## Urspruengliche Befunde (Stand 07.11., zur Herkunft)
+
+Aus dem Audit vom 03.10. (`nodes/audit-2026-10-03/bn-bn15-8.md`), am 07.11.
+bestaetigt:
 
 1. **BN8-1: Einbau mit vollem Depot.** In BN8 setzt jeder Einbau das Geld auf
    250 Mio und loescht das Depot ohne Auszahlung (`Prestige.ts:158-171`,

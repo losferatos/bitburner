@@ -63,10 +63,16 @@ wert wie ein Prozent Exp-Mult.
 
 ## Offen / Ideen fuer Stufe 2, 3 und Lauf 2
 
-- **Phase ohne 4S** ist der groesste Einzelposten jeder Stufe (9-11 h bis
-  45 Mrd). Der Schaetzer zaehlt nur Aufwaertsticks in 30 Ticks; ein Filter,
-  der die Marktmechanik nutzt (Zyklus 75 Ticks, 45 % Kippen, otlkMag driftet
-  langsam), koennte Stunden sparen. Nicht gebaut.
+- **Phase ohne 4S: Kursfilter gebaut (10.11. abends).** Statt Aufwaertsticks im
+  30er-Fenster zu zaehlen, fuehrt `lib/handel.js` je Aktie eine Verteilung
+  ueber die Vorhersage (Kippen 0,45/75 je Tick, Streuung, Bernoulli-Update).
+  Sim, Median bis 45 Mrd ab 250 Mio: 9,6 h statt 12,0 h (48 Seeds); der
+  Skeptiker mass mit 96 anderen Seeds 8,4 statt 10,0 h. Verlustrisiko nicht
+  schlechter (boerse-ruin), weniger Trades je Stunde. Route mit Bot-Schwellen
+  damit 28,9 h statt 30,5 h. Der Gewinn kommt aus der Genauigkeit (halber
+  Schaetzfehler), nicht aus schnellerem Drehen. Nicht gebaut, weil ohne
+  messbaren Zusatznutzen: Zyklusphase mitschaetzen, Startwerte als Prior.
+  Ungetestet: engerer Prior (|s| <= 0,2). Im Spiel noch zu messen.
 - **grow statt weaken** im XP-Ofen (25 % mehr Exp je GB-s). Fund beim Bau: grow
   auf einem VOLLEN Ziel hebt die Sicherheit gar nicht (ServerHelpers.ts,
   processSingleServerGrowth: fortify nur, wenn sich das Geld aendert), und in

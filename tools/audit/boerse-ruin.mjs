@@ -2,15 +2,36 @@
 import path from "node:path";
 import { pathToFileURL } from "node:url";
 const { run, makeBotStrategy } = await import(pathToFileURL("C:/Users/erche/Desktop/claude_projecto/bitburner/tools/audit/boerse-sim.mjs").href);
-const H = await import(pathToFileURL("C:/Users/erche/Desktop/claude_projecto/bitburner/src/lib/handel.js").href);
+const H = await import(pathToFileURL(path.join(process.env.BN_SRC || "C:/Users/erche/Desktop/claude_projecto/bitburner/src", "lib", "handel.js")).href);
 const SEEDS = 60, START = Number(process.argv[2] || 250e6);
+// Schaetzung ohne 4S wie in src/boerse.js: f aus dem Kursfilter, mv aus dem Fenster. Kennt das
+// geladene handel.js den Filter nicht (alter Stand, BN_SRC), gilt das Fenster allein.
+function schaetzer(fenster) {
+  const st = { hist: new Map(), filter: new Map(), schritte: 0 };
+  return {
+    tick(m) {
+      for (const s of m.stocks) {
+        let h = st.hist.get(s.symbol); if (!h) { h = []; st.hist.set(s.symbol, h); }
+        const davor = h.length ? h[h.length - 1] : null;
+        h.push(s.price); while (h.length > fenster + 1) h.shift();
+        if (H.filterNeu) { if (!st.filter.has(s.symbol)) st.filter.set(s.symbol, H.filterNeu()); if (davor !== null) H.filterSchritt(st.filter.get(s.symbol), Math.sign(s.price - davor)); }
+      }
+      st.schritte++;
+    },
+    von(sym) {
+      const e = H.schaetze(st.hist.get(sym), fenster);
+      return H.filterNeu ? { f: H.filterMittel(st.filter.get(sym)), mv: e.mv, ticks: st.schritte - 1 } : e;
+    },
+  };
+}
 function lib(opts) {
   const regel = { ...H.REGEL, ...(opts.regel || {}) };
-  const st = { hat4S: false, hist: new Map() };
-  const lageVon = (m) => m.stocks.map((s) => { const e = st.hat4S ? { f: s.forecast(), mv: s.mv, ticks: 999 } : H.schaetze(st.hist.get(s.symbol), regel.fenster);
+  const st = { hat4S: false };
+  const sch = schaetzer(regel.fenster);
+  const lageVon = (m) => m.stocks.map((s) => { const e = st.hat4S ? { f: s.forecast(), mv: s.mv, ticks: 999 } : sch.von(s.symbol);
     return { sym: s.symbol, f: e.f, mv: e.mv, ticks: e.ticks, quelle: st.hat4S ? "4S" : "Historie", lang: s.playerShares, ask: s.getAskPrice(), bid: s.getBidPrice(), maxStueck: s.maxShares }; });
   return { state: st, act(m, acc) {
-    for (const s of m.stocks) { let h = st.hist.get(s.symbol); if (!h) { h = []; st.hist.set(s.symbol, h); } h.push(s.price); while (h.length > regel.fenster + 1) h.shift(); }
+    sch.tick(m);
     let lage = lageVon(m);
     if (opts.schwelle4S && H.kauf4SFaellig(acc.cash + H.depotwert(lage), st.hat4S, opts.schwelle4S)) {
       for (const v of H.freimachen(lage, acc.cash, H.KOSTEN_4S)) acc.sell(m.bySym[v.sym], v.stueck);

@@ -16,8 +16,8 @@
  *   naechsten. Die alte Regel deckelte bei 25 % und ordnete nach f.
  *   Nur Long: Shorts brachten in der Rechnung nichts (12,7 h gegen 12,7 h).
  *
- * OHNE 4S wird f aus dem Anteil der Aufwaertsticks geschaetzt und mv aus der
- * mittleren Schrittweite (E[av] = mv/200).
+ * OHNE 4S schaetzt ein Filter f aus den Kursschritten (siehe DER KURSFILTER)
+ * und `schaetze` die Schwankung mv aus der mittleren Schrittweite (E[av] = mv/200).
  *
  * DIE RESERVE ist kein fester Anteil mehr. Die alten 15 % wirkten nicht
  * (Bargeld real 0,03 % des Vermoegens) und haetten, wenn sie gewirkt haetten,
@@ -29,9 +29,9 @@ export const KOMMISSION = 100e3;
 
 export const REGEL = {
   fenster: 30,            // Ticks in der Historie (ohne 4S); 30/40 gleichauf, 50 klar schlechter
-  minTicks: 20,           // juengere Schaetzungen handeln nicht
+  minTicks: 10,           // juengere Schaetzungen handeln nicht (der Filter braucht weniger als das Fenster)
   einstieg4S: 0.05,       // f - 0,5 ab hier wird gekauft (mit 4S)
-  einstiegHistorie: 0.075, // ohne 4S: 0,05 bis 0,125 liegen im Rauschen beieinander
+  einstiegHistorie: 0.03, // ohne 4S, mit dem Filter: 0,03 bis 0,08 liegen im Rauschen beieinander
   mindestPosten: 2e7,     // darunter frisst die Kommission (2 x 100k) >= 1 %
   // Hoechster Anteil des Vermoegens in EINEM Titel. Mit 1 faellt das Vermoegen
   // im schlechtesten von 60 Laeufen auf 0,52 des Startwerts, mit 0,5 auf 0,71 -
@@ -69,6 +69,80 @@ export function schaetze(h, fenster = REGEL.fenster) {
   }
   if (schritte < 10) return { f: 0.5, mv: 0, ticks: schritte };
   return { f: hoch / schritte, mv: 200 * summe / schritte, ticks: schritte };
+}
+
+// ---------------------------------------------------------------------------
+// DER KURSFILTER OHNE 4S (10.11.2026)
+//
+// Der Anteil der Aufwaertsticks in einem Fenster vergisst, was das Spiel ueber
+// den Markt verraet (StockMarket.ts:223-320):
+//  - Die Vorhersage f = 0,5 +- otlkMag/100 aendert sich von Tick zu Tick kaum.
+//  - Alle 75 Ticks KIPPT jede Aktie mit 45 %: aus f wird 1 - f, gespiegelt.
+// Der Filter fuehrt je Aktie eine Verteilung ueber s = f - 0,5 auf einem
+// Gitter: je Tick ein kleiner Anteil gespiegelt (0,45/75), etwas Streuung,
+// dann die Beobachtung (hoch mit 0,5 + s). Gemessen (2000 Laeufe je Staerke):
+// der Schaetzfehler halbiert sich (0,04 statt 0,07), weil der Filter mehr als
+// 30 Ticks Gedaechtnis hat, solange nichts kippt; starke Titel (|s| >= 0,15)
+// dreht er nach einem Kippen in 7-13 Ticks statt 17. Schwache Titel dreht er
+// NICHT schneller als das Fenster - der Gewinn kommt aus der Genauigkeit.
+// Gerechnet (250 Mio ohne 4S, Median bis 45 Mrd): 9,6 h statt 12,0 h (48 Seeds,
+// boerse-kurve.mjs); der Skeptiker mass mit 96 anderen Seeds 8,4 statt 10,0 h.
+// Die neuen Schwellen (minTicks 10, Einstieg 0,03) gehoeren zum Filter - dem
+// Fenster helfen sie nicht. Die
+// Zyklusphase mitzuschaetzen oder die Startwerte der Aktien zu kennen bringt
+// darueber hinaus nichts Messbares.
+// ---------------------------------------------------------------------------
+export const FILTER = { n: 61, smax: 0.45, kipp: 0.45 / 75, streu: 0.002, maxAltern: 150 };
+
+/** Ein neuer Filter: keine Meinung (gleichverteilt). */
+export function filterNeu() {
+  return new Float64Array(FILTER.n).fill(1 / FILTER.n);
+}
+
+/**
+ * Ein Kursschritt. `richtung` > 0: Kurs gestiegen, < 0: gefallen, 0: nichts
+ * beobachtet (dann altert der Filter nur). Veraendert `w` und gibt es zurueck.
+ */
+export function filterSchritt(w, richtung) {
+  const n = FILTER.n, h = FILTER.kipp, d = FILTER.streu;
+  const a = new Float64Array(n);
+  for (let i = 0; i < n; i++) a[i] = (1 - h) * w[i] + h * w[n - 1 - i];
+  for (let i = 0; i < n; i++) {
+    const li = i > 0 ? a[i - 1] : a[i], re = i < n - 1 ? a[i + 1] : a[i];
+    w[i] = (1 - 2 * d) * a[i] + d * (li + re);
+  }
+  // Nur ein echtes Vorzeichen ist eine Beobachtung (NaN altert nur).
+  if (richtung > 0 || richtung < 0) {
+    let z = 0;
+    for (let i = 0; i < n; i++) {
+      const s = -FILTER.smax + (2 * FILTER.smax * i) / (n - 1);
+      w[i] *= richtung > 0 ? 0.5 + s : 0.5 - s;
+      z += w[i];
+    }
+    if (z > 0) for (let i = 0; i < n; i++) w[i] /= z;
+    else w.fill(1 / n);
+  }
+  return w;
+}
+
+/**
+ * Wie viele Kursschritte seit dem letzten gesehenen NICHT beobachtet wurden
+ * (Skeptiker 10.11.2026). Ein gedrosselter Tab sieht mehrere Schritte als
+ * einen; der Filter muss fuer die verpassten trotzdem altern (Kippen und
+ * Streuung laufen in Spielticks, nicht in Beobachtungen), sonst haelt er alte
+ * Meinungen zu lange. Gedeckelt: nach einer langen Pause ist er ohnehin fast
+ * ohne Meinung, und das Nachholen des Spiels tickt schneller als 6 s.
+ */
+export function verpassteSchritte(dtMs, taktMs) {
+  if (!(dtMs > 0) || !(taktMs > 0)) return 0;
+  return Math.max(0, Math.min(FILTER.maxAltern, Math.round(dtMs / taktMs) - 1));
+}
+
+/** Die geschaetzte Vorhersage f (Erwartungswert). */
+export function filterMittel(w) {
+  let m = 0;
+  for (let i = 0; i < FILTER.n; i++) m += w[i] * (-FILTER.smax + (2 * FILTER.smax * i) / (FILTER.n - 1));
+  return 0.5 + m;
 }
 
 const ertrag = (e) => (2 * e.f - 1) * e.mv;

@@ -65,7 +65,7 @@
 import { liesVonHome, nachHome as schreibNachHome } from "lib/hostdatei.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 import { PAUSE_FILE, ABRUF_FILE, pauseLesen, abrufLesen } from "lib/boersepause.js";
-import { REGEL, KOSTEN_4S, BETRIEBSANTEIL, schaetze, verkaufsliste, kaufliste, freimachen, depotwert, kauf4SFaellig } from "lib/handel.js";
+import { REGEL, KOSTEN_4S, BETRIEBSANTEIL, filterNeu, filterSchritt, filterMittel, verpassteSchritte, schaetze, verkaufsliste, kaufliste, freimachen, depotwert, kauf4SFaellig } from "lib/handel.js";
 
 
 const TAKT_MS = 6000;      // ein Kursschritt dauert 6 s (msPerStockUpdate)
@@ -131,6 +131,10 @@ export async function main(ns) {
 
   sag("boerse gestartet. " + symbole.length + " Symbole.");
 
+  /** Kursfilter je Symbol (lib/handel.js) und die Zahl der beobachteten Kursschritte. */
+  const filter = new Map(symbole.map((s) => [s, filterNeu()]));
+  let schritte = 0;
+  let letzterTickMs = 0;
   let letztePreise = [];
   let letzteRundeMs = 0;
   let bedientFuer = null;
@@ -176,11 +180,18 @@ export async function main(ns) {
 
       // --- Die Historie fortschreiben ------------------------------------------
       if (neuerTick || historie.get(symbole[0]).length === 0) {
+        // Verpasste Kursschritte (gedrosselter Tab): der Filter altert fuer sie mit.
+        const verpasst = letzterTickMs > 0 ? verpassteSchritte(jetzt - letzterTickMs, TAKT_MS) : 0;
+        letzterTickMs = jetzt;
         symbole.forEach((sym, i) => {
           const h = historie.get(sym);
+          const davor = h.length ? h[h.length - 1] : null;
           h.push(preiseJetzt[i]);
           while (h.length > REGEL.fenster + 1) h.shift();
+          for (let k = 0; k < verpasst; k++) filterSchritt(filter.get(sym), 0);
+          if (davor !== null) filterSchritt(filter.get(sym), Math.sign(preiseJetzt[i] - davor));
         });
+        schritte++;
       }
 
       let hat4S = false;
@@ -206,8 +217,11 @@ export async function main(ns) {
             } catch { f = null; }
           }
           if (f === null) {
-            const e = schaetze(h, REGEL.fenster);
-            f = e.f; mv = e.mv; ticks = e.ticks; quelle = "Historie";
+            // f aus dem Filter, die Schwankung mv weiter aus dem Fenster.
+            f = filterMittel(filter.get(sym));
+            mv = schaetze(h, REGEL.fenster).mv;
+            ticks = schritte - 1;
+            quelle = "Historie";
           }
           const ask = ns.stock.getAskPrice(sym);
           aus.push({ sym, preis, f, vorhersage: f, mv, quelle, ticks,

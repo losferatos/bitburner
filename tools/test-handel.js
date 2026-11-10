@@ -78,11 +78,57 @@ console.log("\n-- Ebene 0: Kauf- und Verkaufsliste --");
   pruefe("ueber der Reserve wird gekauft", k3.length === 1 && k3[0].stueck * 100 <= 5e8);
   pruefe("unter dem Mindestposten wird nichts gekauft", H.kaufliste(lage, 1.5e7, 0).length === 0);
   const hist = [{ ...basis, quelle: "Historie", ticks: 30, sym: "A", f: 0.575, mv: 1 }];
-  pruefe("Gleitkomma: 0,575 erfuellt die Schwelle 0,075", H.kaufliste(hist, 1e9, 0).length === 1);
-  pruefe("unter der Schwelle nicht", H.kaufliste([{ ...hist[0], f: 0.56 }], 1e9, 0).length === 0);
-  pruefe("junge Schaetzung kauft nicht", H.kaufliste([{ ...hist[0], f: 0.9, ticks: 12 }], 1e9, 0).length === 0);
+  const alt = { ...H.REGEL, einstiegHistorie: 0.075 };
+  pruefe("Gleitkomma: 0,575 erfuellt die Schwelle 0,075", H.kaufliste(hist, 1e9, 0, alt).length === 1);
+  pruefe("unter der Schwelle nicht", H.kaufliste([{ ...hist[0], f: 0.5 + H.REGEL.einstiegHistorie - 0.005 }], 1e9, 0).length === 0);
+  pruefe("an der Schwelle schon", H.kaufliste([{ ...hist[0], f: 0.5 + H.REGEL.einstiegHistorie }], 1e9, 0).length === 1);
+  pruefe("junge Schaetzung kauft nicht", H.kaufliste([{ ...hist[0], f: 0.9, ticks: H.REGEL.minTicks - 1 }], 1e9, 0).length === 0);
   pruefe("verkauft wird, was unter 0,5 gefallen ist", JSON.stringify(H.verkaufsliste(lage)) === '["FAELLT"]');
   pruefe("junge Schaetzung verkauft nicht", H.verkaufsliste([{ sym: "X", f: 0.2, mv: 1, quelle: "Historie", ticks: 5, lang: 10 }]).length === 0);
+}
+
+console.log("\n-- Ebene 0: der Kursfilter ohne 4S --");
+{
+  // Gesaeter Zufall, damit der Test jedes Mal dasselbe sieht.
+  let saat = 12345;
+  const zufall = () => { saat = (saat * 1103515245 + 12345) & 0x7fffffff; return saat / 0x7fffffff; };
+  const lauf = (w, p, n) => { for (let i = 0; i < n; i++) H.filterSchritt(w, zufall() < p ? 1 : -1); return H.filterMittel(w); };
+  const w = H.filterNeu();
+  pruefe("neuer Filter: keine Meinung (0,5)", Math.abs(H.filterMittel(w) - 0.5) < 1e-9);
+  const f65 = lauf(w, 0.65, 150);
+  pruefe("erkennt die Richtung einer Vorhersage von 0,65 (150 Ticks)", f65 > 0.56 && f65 < 0.7, f65.toFixed(3));
+  let summe = 0; for (const x of w) summe += x;
+  pruefe("bleibt eine Verteilung (Summe 1)", Math.abs(summe - 1) < 1e-9);
+  const fNach = lauf(w, 0.35, 150);
+  pruefe("nach einem Kippen landet er auf der anderen Seite", fNach < 0.44 && fNach > 0.3, fNach.toFixed(3));
+  // Der Grund fuer den Filter, als Statistik ueber 400 Laeufe: halber Schaetzfehler gegen das
+  // Fenster, und ein starker Titel (0,75) dreht nach dem Kippen schneller.
+  let fehlF = 0, fehlW = 0, drehF = 0, drehW = 0;
+  const L = 400;
+  for (let n = 0; n < L; n++) {
+    const x = H.filterNeu(), kurs = [100];
+    const tick = (p) => { const hoch = zufall() < p; H.filterSchritt(x, hoch ? 1 : -1); kurs.push(kurs[kurs.length - 1] * (hoch ? 1.01 : 1 / 1.01)); };
+    const fen = () => H.schaetze(kurs.slice(-(H.REGEL.fenster + 1)), H.REGEL.fenster).f;
+    for (let i = 0; i < 150; i++) tick(0.75);
+    fehlF += Math.abs(H.filterMittel(x) - 0.75); fehlW += Math.abs(fen() - 0.75);
+    let a = 75, b = 75;
+    for (let i = 1; i <= 75; i++) { tick(0.25); if (a === 75 && H.filterMittel(x) < 0.5) a = i; if (b === 75 && fen() < 0.5) b = i; }
+    drehF += a; drehW += b;
+  }
+  pruefe("Schaetzfehler hoechstens 70 % des Fensters", fehlF < 0.7 * fehlW, (fehlF / L).toFixed(3) + " gegen " + (fehlW / L).toFixed(3));
+  pruefe("ein starker Titel dreht nach dem Kippen in der halben Zeit", drehF < 0.6 * drehW, (drehF / L).toFixed(1) + " gegen " + (drehW / L).toFixed(1) + " Ticks");
+  const ruhe = H.filterNeu(); lauf(ruhe, 0.5, 300);
+  pruefe("ein richtungsloser Kurs bleibt nahe 0,5", Math.abs(H.filterMittel(ruhe) - 0.5) < 0.06, H.filterMittel(ruhe).toFixed(3));
+  const alter = H.filterNeu(); lauf(alter, 0.7, 100); const vor = H.filterMittel(alter);
+  for (let i = 0; i < 400; i++) H.filterSchritt(alter, 0);
+  pruefe("ohne Beobachtung verliert er seine Meinung (Kippen ist unbeobachtet moeglich)", Math.abs(H.filterMittel(alter) - 0.5) < Math.abs(vor - 0.5) / 2);
+  pruefe("verpasste Schritte: 6 s keiner, 30 s vier, Stunden gedeckelt, Unsinn null",
+    H.verpassteSchritte(6000, 6000) === 0 && H.verpassteSchritte(4000, 6000) === 0 && H.verpassteSchritte(30000, 6000) === 4
+    && H.verpassteSchritte(3.6e6, 6000) === H.FILTER.maxAltern && H.verpassteSchritte(-5, 6000) === 0 && H.verpassteSchritte(NaN, 6000) === 0);
+  const nan = H.filterNeu(); lauf(nan, 0.7, 50); const vorNan = H.filterMittel(nan); H.filterSchritt(nan, NaN);
+  pruefe("NaN ist keine Beobachtung (altert nur)", Number.isFinite(H.filterMittel(nan)) && Math.abs(H.filterMittel(nan) - vorNan) < 0.01);
+  const extrem = H.filterNeu(); for (let i = 0; i < 500; i++) H.filterSchritt(extrem, 1);
+  pruefe("500 Aufwaertsticks: endlich, hoechstens 0,95", Number.isFinite(H.filterMittel(extrem)) && H.filterMittel(extrem) <= 0.95 + 1e-9 && H.filterMittel(extrem) > 0.9);
 }
 
 console.log("\n-- Ebene 0: Bargeld freimachen --");

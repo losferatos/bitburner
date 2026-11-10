@@ -171,6 +171,86 @@ export function graftStartPending(city, antragText, jetzt) {
   return antragGilt(a, jetzt, NaN);
 }
 
+// --- BN8: TIAN DI HUI OHNE GYM (10.11.2026) ---------------------------------
+//
+// In BitNode 8 ist Ruf per Spende kaufbar (1 Ruf = 1e6 / faction_rep-Mult
+// Dollar). Tian Di Hui fuehrt die beiden Ruf-Verstaerker S.N.A (x1,15) und
+// ADR-V1 Pheromone Gene (x1,1) - zusammen verbilligen sie jede spaetere
+// Spende um 21 %. Die Einladung verlangt (FactionInfo.tsx:680-690): Aufenthalt
+// in Chongqing, New Tokyo oder Ishima, Hacking 50, 1 Mio Geld. KEIN Kampfwert.
+// Bisher hing der Beitritt an joinrun.js (Gym bis 80, 45 min Figur
+// blockiert) - in BN8 reine Zeitverschwendung, und bei ~0 Bargeld vor der
+// 4S-API startete joinrun.js gar nicht.
+//
+// Reisen bricht keine Arbeit ab (Person.ts:243-252 zieht nur Geld ab und setzt
+// die Stadt), die Figur wird also nicht beantragt - wie bei der Syndicate-
+// Reise. Tian Di Hui ist keine Staedte-Faktion ohne Folgen: sie hat keine
+// Feinde, der Beitritt schliesst Sector-12 und Aevum NICHT aus.
+//
+// DAS PROBLEM IST DIE STADT: Jeder Einbau stellt die Figur auf Sector-12
+// (PlayerObjectGeneralMethods.ts:104), die Sector-12-Einladung (15 Mio)
+// verlangt aber Anwesenheit dort, die Aevum-Reise unten (45 Mio) ebenso ihre.
+// Ohne Ordnung zoege jede Regel die Figur von der anderen weg. Darum:
+//   1. Tian Di Hui zuerst (billig: 1,2 Mio + Reise). In einer der drei Staedte
+//      wird NICHT weitergereist, sondern auf die Einladung gewartet (HALTEN) -
+//      die Einladung bleibt bestehen, bn4life tritt im naechsten Faktionsblick
+//      bei.
+//   2. Danach zurueck nach Sector-12, sobald 15 Mio + Puffer da sind: ohne die
+//      Rueckreise ginge die Sector-12-Einladung verloren (die Figur steht ja
+//      nach der Reise in Chongqing).
+//   3. Erst dann die bestehende Aevum-Reise. Sie wird solange gesperrt,
+//      wie eine Einladung in Reichweite ist (HALTEN) oder in derselben Runde
+//      schon gereist wurde.
+// Jede Stadt hat hoechstens BN8_MAX_TRIPS Reisen je Prozesslauf (= je Einbau,
+// ein Einbau beendet alle Skripte): faellt eine Einladung doch einmal aus
+// (Geld im 2-s-Fenster ausgegeben), pendelt die Figur nicht endlos
+// (200.000 $ je Reise).
+export const BN8_NODE = 8;
+export const TDH_CITIES = ["Chongqing", "New Tokyo", "Ishima"];
+export const TDH_HACKING = 50;
+export const TDH_INVITE_MONEY = 1e6;
+/** 1,2 Mio statt 1,0: Puffer gegen eine Ausgabe im 2-s-Fenster der Einladung. */
+export const TDH_TRIP_MONEY = 1.2e6;
+export const S12_INVITE_MONEY = 15e6;      // FactionInfo.tsx Sector-12
+export const S12_MONEY_MARGIN = 2e6;
+export const BN8_MAX_TRIPS = 2;
+
+/**
+ * Was tut bn4life in BitNode 8 mit der Figur? Rein.
+ * @param {{city:string, factions:string[], skills:object}} p
+ * @param {number} node
+ * @param {number} money Bargeld auf home
+ * @param {number} reserved data/geldbedarf.txt (Reserve von bn4rep)
+ * @param {{tdh:number, s12:number}} attempts bisherige Reisen je Ziel
+ * @returns {{go:(string|null), key:(string|null), hold:boolean}}
+ */
+export function bn8TripPlan(p, node, money, reserved, attempts) {
+  const none = { go: null, key: null, hold: false };
+  if (!p || node !== BN8_NODE) return none;
+  const fac = p.factions || [];
+  const hack = (p.skills || {}).hacking;
+  const m = Number(money) || 0;
+  // 1. Tian Di Hui
+  if (!fac.includes("Tian Di Hui") && hack >= TDH_HACKING) {
+    if (TDH_CITIES.includes(p.city)) {
+      if (m >= TDH_INVITE_MONEY) return { go: null, key: null, hold: true };
+    } else if ((attempts.tdh || 0) < BN8_MAX_TRIPS
+        && m - (Number(reserved) || 0) >= TDH_TRIP_MONEY + TRAVEL_COST) {
+      return { go: "Chongqing", key: "tdh", hold: true };
+    }
+  }
+  // 2. Rueckreise nach Sector-12 (nur falls noch nicht Mitglied)
+  if (!fac.includes("Sector-12")) {
+    if (p.city === "Sector-12") {
+      if (m >= S12_INVITE_MONEY) return { go: null, key: null, hold: true };
+    } else if ((attempts.s12 || 0) < BN8_MAX_TRIPS
+        && m >= S12_INVITE_MONEY + TRAVEL_COST + S12_MONEY_MARGIN) {
+      return { go: "Sector-12", key: "s12", hold: true };
+    }
+  }
+  return none;
+}
+
 export async function main(ns) {
   const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
   let letzteTelemetrie = 0;            // Wanduhr der letzten bn4life.json
@@ -203,6 +283,7 @@ export async function main(ns) {
   let letzterFaktionsblick = 0;
   let letzterEinkauf = 0;
   let letzteReise = 0;
+  const bn8Attempts = { tdh: 0, s12: 0 };   // Reisen je Ziel, siehe bn8TripPlan
   let letztesVerbrechen = "";
   // Fuer die Figur-Wache: zuletzt gesehene Folgenummer und zuletzt gemeldeter
   // Grund. bn4life taktet im Sekundentakt - ohne den Merker stuende jede
@@ -324,7 +405,13 @@ export async function main(ns) {
     // unten). Die Pruefung fand das laufende Skript deshalb NIE, egal ob es
     // lief oder nicht - direkt belegt im Spielstand der 09:08-Sicherung:
     // ZWEI joinrun.js-Prozesse gleichzeitig auf home, beide mit Argument 80.
+    // IN BN8 KEIN BEITRITTSLAUF (10.11.2026): Tian Di Hui holt die Reise unten
+    // ohne Gym; Slum Snakes/Tetrads/Netburners brachten dort nur billige
+    // Zaehl-Augmentierungen gegen 45 min blockierte Figur (joinrun.js) plus
+    // Gym-Kosten bei ~0 Bargeld. Gilt auch fuer netburn.js, das nur mit
+    // joinrun.js zusammen startet.
     if (!ns.fileExists("data/bn4-stop.txt", "home")
+        && ns.getResetInfo().currentNode !== BN8_NODE
         && !markeGilt
         && geld >= JOINRUN_GELD_BODEN
         && !ns.isRunning("joinrun.js", "home", JOINRUN_ZIEL)
@@ -417,9 +504,33 @@ export async function main(ns) {
             + " erfuellt ausser der Stadt (war " + spieler.city + ").");
         }
       }
+      // --- 1d. BN8: Tian Di Hui, Sector-12, dann erst Aevum (10.11.2026) -------
+      // Begruendung und Verriegelung bei bn8TripPlan oben. Kein zusaetzliches
+      // RAM: travelToCity, getPlayer, getResetInfo sind schon geladen.
+      let bn8Blocked = false;
+      {
+        const node = ns.getResetInfo().currentNode;
+        if (node === BN8_NODE) {
+          const reserviert8 = ns.fileExists("data/geldbedarf.txt", "home")
+            ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
+          const plan = bn8TripPlan(spieler, node, geld, reserviert8, bn8Attempts);
+          bn8Blocked = plan.hold;
+          if (plan.go
+              && !graftStartPending(spieler.city, liesVonHome(ns, antragsDatei("graft.js")), Date.now())) {
+            if (ns.singularity.travelToCity(plan.go)) {
+              bn8Attempts[plan.key]++;
+              sag("BN8: nach " + plan.go + " gereist (war " + spieler.city + ", Guthaben "
+                + Math.round(geld / 1e5) / 10 + "m) - warte auf die Einladung.");
+              // Die Einladung kommt im naechsten 2-s-Takt des Spiels; den
+              // Faktionsblick auf in ~3 s vorziehen statt bis zu 30 s zu warten.
+              letzterFaktionsblick = jetzt - 27000;
+            }
+          }
+        }
+      }
       // Nach der Syndicate-Reise ist spieler.city veraltet - in derselben Runde
       // nicht gleich weiter nach Aevum (Skeptiker 06.10., KOSMETIK 4).
-      if (!syndicateTravelled && !spieler.factions.includes("Aevum") && geld > 45e6
+      if (!syndicateTravelled && !bn8Blocked && !spieler.factions.includes("Aevum") && geld > 45e6
           && spieler.city !== "Aevum") {
         if (ns.singularity.travelToCity("Aevum")) {
           sag("Nach Aevum gereist (Guthaben " + Math.round(geld / 1e6) + "m).");

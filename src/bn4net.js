@@ -3656,7 +3656,13 @@ export async function main(ns) {
         const ofenFreiraumGb = ofenKurz ? Math.min(64, budget * 0.1) : 0;
         if (budget - ofenFreiraumGb >= ramExpfarm && expTarget && ramExpfarm > 0) {
           // Die naechste Speicherzaehlung liegt einen Takt nach dieser Runde.
-          const frist = Math.round(jetztVerteilung + rundenTaktMs - OFEN_RAND_MS);
+          // Im XP-Modus (BN8) laeuft der Ofen 90 s am Stueck statt einen Takt:
+          // ein weaken dauert dort rund 4 s, nach zwei Laeufen stuende der Faden
+          // bis zur naechsten Zaehlung (rund 20 % Exp verschenkt, Skeptiker
+          // 10.11.2026). Es konkurriert dort nichts um das RAM; neues RAM wartet
+          // hoechstens 90 s. Das Kill-Limit des Kerns liegt bei 240 s.
+          const ofenFristMs = xpAktiv ? Math.max(rundenTaktMs, 90000) : rundenTaktMs;
+          const frist = Math.round(jetztVerteilung + ofenFristMs - OFEN_RAND_MS);
           wuensche.push({
             ziel: expTarget, skript: EXPFARM_SKRIPT, ram: ramExpfarm,
             offen: Math.floor((budget - ofenFreiraumGb) / ramExpfarm),

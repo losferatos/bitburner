@@ -1039,7 +1039,10 @@ export async function main(ns) {
       try {
         bn8Runde = bn8RundeVon({ distinkt: bn8Distinkt, pilleInstalliert: eingebauteAugs.includes(EXIT_KEY) });
         bn8Plan = bn8PlaneMitHome(geld * 0.97);
-        bn8Faellig = bn8EinbauFaellig({ runde: bn8Runde, vermoegen: geld, plan: bn8Plan, distinkt: bn8Distinkt, wartend });
+        // 3 % Abstand: der Plan rechnet mit 0,97 x Vermoegen, die Schwelle auch.
+        // Sonst loest ein Vermoegen knapp ueber der Schwelle die Runde aus, und
+        // nach dem Verkauf (Spanne, Kommission) reicht es knapp nicht.
+        bn8Faellig = bn8EinbauFaellig({ runde: bn8Runde, vermoegen: geld * 0.97, plan: bn8Plan, distinkt: bn8Distinkt, wartend });
       } catch (e) {
         gangCountError("BN8-Plan", e);
         bn8Plan = null;
@@ -2398,7 +2401,11 @@ export async function main(ns) {
     }
     // BN8-PLAN: im Lauf kein Kauf und keine Spende (`bn8Halt`), und eingebaut
     // wird nur, wenn der Plan es sagt - oder wenn The Red Pill schon wartet.
-    const bn8Halt = bn8Modus && !redPillWartet;
+    // Der Kaufstopp gilt, sobald boerse.js handelt - also auch VOR der 4S-API
+    // (Skeptiker 10.11.): sonst kaufte die alte Kaufschleife in den ersten
+    // Stunden einzelne Stuecke vom Restbargeld, und jedes verteuert die grosse
+    // Runde um 1,77. Eingebaut wird davor ohnehin nicht.
+    const bn8Halt = (bn8Modus || boerse.aktiv || boerse.unklar) && !redPillWartet;
     if (bn8Halt && !bn8Faellig.ja) gesperrt = true;
     // Blieb die Quittung von boerse.js aus, nicht jede Runde neu anlaufen: der
     // Handschlag steht vor der Pause, und jede Anfrage erzeugt eine Sicherung
@@ -2620,6 +2627,16 @@ export async function main(ns) {
       // vorher wird es dadurch nicht.
       {
         const seit = Date.now();
+        // DAS BARGELD DER EINBAURUNDE GEHOERT DER EINBAURUNDE (Skeptiker 10.11.).
+        // Gleich verkauft boerse.js das Depot, und Hunderte Milliarden liegen
+        // Sekunden lang bar. Kern und homegrow geben aus, was ueber
+        // data/geldbedarf.txt liegt - also die Reserve VORHER hochsetzen. Nach
+        // dem Einbau raeumt boot.js die Datei, nach einem Abbruch schreibt die
+        // naechste Runde sie neu.
+        try {
+          geldbedarfGeschrieben = 1e18;
+          schreibNachHome("data/geldbedarf.txt", String(geldbedarfGeschrieben));
+        } catch (e) { gangCountError("geldbedarf vor der Einbaurunde", e); }
         // Eine noch laufende Pause wiederverwenden (Skeptiker 10.11.): haelt
         // ein Tor den Einbau, liefe sonst alle 15 s eine neue Pause an und
         // der Handel bliebe dauerhaft gelaehmt.
@@ -2682,8 +2699,12 @@ export async function main(ns) {
             });
           } catch (e) { gangCountError("BN8-Plan (Einbaurunde)", e); }
           if (!plan2 || !ok2.ja) {
-            sag("BN8-EINBAURUNDE ABGEBROCHEN: mit " + geldText(bar0) + " bar gilt: " + ok2.grund + ". Kein Einbau.");
+            sag("BN8-EINBAURUNDE ABGEBROCHEN: mit " + geldText(bar0) + " bar gilt: " + ok2.grund + ". Kein Einbau, 15 min Pause.");
             try { schreibNachHome(BOERSE_PAUSE_FILE, ""); } catch { /* laeuft nach 10 min von selbst ab */ }
+            // Ohne Sperrzeit liefe das im Kreis: boerse.js kauft zurueck, das
+            // Vermoegen steht wieder ueber der Schwelle, neuer Handschlag (eine
+            // Sicherung, die nie rotiert), neuer Verkauf (Spanne) - Skeptiker 10.11.
+            quittungSperreBis = Date.now() + 15 * 60000;
             await ns.sleep(15000);
             continue;
           }
@@ -2706,9 +2727,20 @@ export async function main(ns) {
           }
           sag("BN8-EINBAURUNDE " + bn8Runde + ": " + gekauft2 + " von " + plan2.kaeufe.length + " Stuecken gekauft, geplant "
             + geldText(plan2.kosten) + ", bar danach " + geldText(ns.getServerMoneyAvailable("home")) + ".");
+          // SCHEITERN DIE KAEUFE, WIRD NICHT EINGEBAUT (Skeptiker 10.11.). Ein
+          // Einbau mit einem Bruchteil der Runde kostet einen ganzen Zyklus von
+          // 8-12 h. Was gekauft ist, wartet; die naechste Runde plant ohne es.
+          if (plan2.kaeufe.length > 0 && gekauft2 < 0.7 * plan2.kaeufe.length) {
+            sag("BN8-EINBAURUNDE: nur " + gekauft2 + " von " + plan2.kaeufe.length + " Kaeufen gelungen - kein Einbau, neuer Anlauf in 15 min.");
+            try { schreibNachHome(BOERSE_PAUSE_FILE, ""); } catch { /* laeuft von selbst ab */ }
+            quittungSperreBis = Date.now() + 15 * 60000;
+            await ns.sleep(15000);
+            continue;
+          }
           // Runde 3 ohne The Red Pill einzubauen waere ein verlorener Zyklus.
           if (bn8Runde === 3 && !ns.singularity.getOwnedAugmentations(true).includes(EXIT_KEY)) {
-            sag("BN8-EINBAURUNDE: The Red Pill wurde NICHT gekauft - kein Einbau, neuer Anlauf.");
+            sag("BN8-EINBAURUNDE: The Red Pill wurde NICHT gekauft - kein Einbau, neuer Anlauf in 15 min.");
+            quittungSperreBis = Date.now() + 15 * 60000;
             try { schreibNachHome(BOERSE_PAUSE_FILE, ""); } catch { /* laeuft von selbst ab */ }
             await ns.sleep(15000);
             continue;

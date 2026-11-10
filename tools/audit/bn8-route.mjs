@@ -97,11 +97,11 @@ function serverGb(budget) {            // 25 gleich grosse Server, groesste beza
 }
 
 // --- Eine Einbaurunde planen: DERSELBE Code wie im Bot (src/lib/bn8plan.js) -------
-function planeRunde({ besitz, faktionen, repMult, budget, gewichte, maxStueck, pflicht = [], nfgInstalliert }) {
+function planeRunde({ besitz, faktionen, repMult, budget, gewichte, maxStueck, pflicht = [], nfgInstalliert, wartend = 0 }) {
   const fset = new Set(faktionen);
   const kandidaten = ALLE
     .filter((a) => !besitz.has(a.name) && a.name !== RED_PILL && a.factions.some((f) => fset.has(f)))
-    .map((a) => ({ name: a.name, preis: a.cost, ruf: a.rep, faktionen: a.factions.filter((f) => fset.has(f)),
+    .map((a) => ({ name: a.name, preis: a.cost * Math.pow(Q, wartend), ruf: a.rep, faktionen: a.factions.filter((f) => fset.has(f)),
       vor: a.prereqs.filter((p) => !besitz.has(p)), hack: a.hack, exp: a.exp, speed: a.speed, frep: a.frep }));
   const p = PLAN.planeRunde({ kandidaten, budget, q: Q, repMult, rufHaben: {}, gewichte, pflicht, maxStueck });
   if (!p) return null;
@@ -110,7 +110,7 @@ function planeRunde({ besitz, faktionen, repMult, budget, gewichte, maxStueck, p
   let rest = budget - p.kosten, nfg = 0;
   for (; nfg < 60; nfg++) {
     const L = nfgInstalliert + nfg;
-    const k = 750e3 * Math.pow(1.14, L) * Math.pow(Q, p.stueck + nfg)
+    const k = 750e3 * Math.pow(1.14, L) * Math.pow(Q, wartend + p.stueck + nfg)
       + Math.max(0, 500 * Math.pow(1.14, L) - Math.max(rufMax, nfg ? 500 * Math.pow(1.14, L - 1) : 0)) * 1e6 / repMult;
     if (k > rest) break;
     rest -= k;
@@ -159,7 +159,8 @@ function route({ w1, w2, home2, home3, bitrunners1 }) {
   // Runde 1 (ohne 4S starten, 4S ab 45 Mrd)
   const t1Geld = stundenBis(w1, KURVE_OHNE) - STARTGELD_H;
   const f1 = [...(bitrunners1 ? HACKER : HACKER.slice(0, 3)), ...STADT, ...TDH];
-  const p1 = planeRunde({ besitz: z.besitz, faktionen: f1, repMult: z.frep, budget: w1, gewichte: GEW, maxStueck: 40, nfgInstalliert: z.nfg });
+  // In der laufenden Stufe warten schon 2 Stuecke: jeder Preis der Runde 1 traegt 1,767^2 (Skeptiker 10.11.)
+  const p1 = planeRunde({ besitz: z.besitz, faktionen: f1, repMult: z.frep, budget: w1, gewichte: GEW, maxStueck: 40, nfgInstalliert: z.nfg, wartend: FRISCH ? 0 : 2 });
   if (!p1) return null;
   // BitRunners verlangt die Backdoor auf run4theh111z (Level bis 550) - reicht die Erfahrung in dieser Runde?
   const t1Xp = bitrunners1 ? stundenBisLevel(550, z, () => 1600) - (FRISCH ? 0 : 0) : 0;
@@ -170,7 +171,7 @@ function route({ w1, w2, home2, home3, bitrunners1 }) {
   const hk2 = homeKosten(z.home, home2);
   const fehlen = Math.max(0, 30 - z.besitz.size);
   const p2 = planeRunde({ besitz: z.besitz, faktionen: [...HACKER, ...STADT, ...TDH], repMult: z.frep, budget: w2 - hk2,
-    gewichte: { ...GEW, zahl: fehlen > 0 ? 3 : 0.05 }, maxStueck: 40, nfgInstalliert: z.nfg });
+    gewichte: GEW, maxStueck: 40, nfgInstalliert: z.nfg });
   if (!p2) return null;
   const z2 = wirkung(z, p2);
   if (z2.besitz.size < 30) return null;

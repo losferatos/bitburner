@@ -39,8 +39,14 @@ export const NFG = "NeuroFlux Governor";
 export const RUNDE1_VERMOEGEN = 300e9;
 export const RUNDE2_VERMOEGEN = 1e12;
 
-/** Ab so vielen installierten Stuecken gilt Runde 1 als gelaufen. */
-export const RUNDE2_AB = 12;
+/**
+ * Ab so vielen installierten Stuecken gilt Runde 1 als gelaufen. Runde 1 baut
+ * mit mindestens 8 Stuecken ein; dazu NeuroFlux als eines: 9. Laege die Marke
+ * hoeher, bliebe ein Lauf mit 9-11 Stuecken in "Runde 1" und baute bei 300 Mrd
+ * noch einmal ein.
+ */
+export const RUNDE2_AB = 9;
+export const RUNDE1_MINDEST = 8;
 
 /** home-RAM, das Runde 2 kauft (ueberlebt die Einbauten; 128 -> 32768 GB kostet 463 Mrd). */
 export const HOME_ZIEL = 32768;
@@ -213,10 +219,10 @@ export function einbauFaellig({ runde: r, vermoegen, plan, distinkt, wartend = 0
     const pille = !!plan && plan.kaeufe.some((k) => k.name === RED_PILL);
     return pille
       ? { ja: true, grund: "The Red Pill ist bezahlbar (Runde 3)" }
-      : { ja: false, grund: "Runde 3 wartet auf Daedalus und das Geld fuer The Red Pill" };
+      : { ja: false, grund: "Runde 3 wartet: The Red Pill ist nicht im Angebot (Daedalus-Beitritt, V1-Nachweis) oder noch nicht bezahlbar" };
   }
   if (r === 1) {
-    if (vermoegen >= RUNDE1_VERMOEGEN && stueck >= 8) return { ja: true, grund: "Runde 1: Vermoegen ueber 300 Mrd, " + stueck + " Stuecke" };
+    if (vermoegen >= RUNDE1_VERMOEGEN && stueck >= RUNDE1_MINDEST) return { ja: true, grund: "Runde 1: Vermoegen ueber 300 Mrd, " + stueck + " Stuecke" };
     if (vermoegen >= 3 * RUNDE1_VERMOEGEN && stueck >= 3) return { ja: true, grund: "Runde 1 (Rueckfall): nur " + stueck + " Stuecke erreichbar" };
     return { ja: false, grund: "Runde 1 wartet auf 300 Mrd Vermoegen und mindestens 8 Stuecke (jetzt " + stueck + ")" };
   }

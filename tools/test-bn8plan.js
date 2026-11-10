@@ -127,7 +127,7 @@ console.log("\n-- Verdrahtung in bn4rep.js --");
   pruefe("der Ausloeser haengt in BN8 allein am Plan", /&& \(bn8Modus\s*\? \(bn8Faellig\.ja \|\| redPillWartet\)/.test(rep));
   pruefe("kein 36-h-Uebergangsriegel mehr", !rep.includes("36 * 3600000"));
   const iPlan = rep.indexOf("const bn8Modus = boerse.traegt;");
-  pruefe("der Plan wird nach den Kandidaten gerechnet", iPlan > rep.indexOf("const kandidaten = [];") && iPlan < rep.indexOf("const bn8Halt = bn8Modus"));
+  pruefe("der Plan wird nach den Kandidaten gerechnet", iPlan > rep.indexOf("const kandidaten = [];") && iPlan < rep.indexOf("const bn8Halt = (bn8Modus"));
   pruefe("Runde 3 verlangt The Red Pill als Pflicht", rep.includes("const pflicht = bn8Runde === 3 && nach.has(EXIT_KEY) ? [EXIT_KEY] : [];"));
   const iRunde = rep.indexOf("BN8-EINBAURUNDE (lib/bn8plan.js)");
   pruefe("die Einbaurunde rechnet mit dem echten Bargeld neu", iRunde > rep.indexOf("boersePauseAnlegen(") && rep.includes("plan2 = bn8PlaneMitHome(bar0);"));

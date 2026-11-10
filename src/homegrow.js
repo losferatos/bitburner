@@ -78,7 +78,26 @@ export async function main(ns) {
         ? Number(liesVonHome(ns, "data/geldbedarf.txt")) || 0 : 0;
       const geld = ns.getServerMoneyAvailable("home") - ruecklage;
 
+      // Die Lage des Kerns, EINMAL gelesen. Nur frische Zahlen: eine alte
+      // Datei wuerde den Kauf entweder dauerhaft sperren oder dauerhaft
+      // freigeben - beides falsch.
+      let brachAnteil = 0;
+      // BitNode 8 (10.11.2026): xpHomeKauf = home-RAM, fuer die der Kern den
+      // Kauf freigibt (bn4net.js, Abschnitt 1a0), sonst 0; null = der Kern
+      // meldet keinen Erfahrungsmodus oder ist nicht frisch.
+      let xpFreigabe = null;
+      try {
+        const j = JSON.parse(liesVonHome(ns, "data/bn4net.json") || "{}");
+        if (Date.now() - (j.zeit || 0) < 120000) {
+          if (typeof j.brachAnteil === "number") brachAnteil = j.brachAnteil;
+          if (j.xpModus === true) xpFreigabe = Number(j.xpHomeKauf) || 0;
+        }
+      } catch { /* keine oder kaputte Datei: wie unbekannt behandeln */ }
+
       // --- Kerne zuerst -----------------------------------------------------
+      // IM ERFAHRUNGSMODUS (BN8) ENTFALLEN KERNE: sie staerken die Sicherheits-
+      // senkung je weaken-Faden (NetscriptFunctions.ts:288), nicht die
+      // Erfahrung - die haengt nur an Fadenzahl und Aktionsdauer.
       // grow() und weaken() lesen die Kerne des AUSFUEHRENDEN Rechners
       // (NetscriptFunctions.ts:288), nicht die des Ziels. home traegt nach dem
       // Ausbau rund 98 Prozent aller Faeden - der Kernbonus (1 + (Kerne-1)/16)
@@ -86,7 +105,7 @@ export async function main(ns) {
       // billiger als die naechste Speicherverdopplung, solange Speicher
       // brachliegt.
       const kerne = ns.getServer("home").cpuCores;
-      if (kerne < 8) {
+      if (kerne < 8 && xpFreigabe === null) {
         const kernKosten = ns.singularity.getUpgradeHomeCoresCost();
         if (kernKosten <= KERN_PREIS_DECKEL && geld > kernKosten * KERN_PUFFER) {
           if (ns.singularity.upgradeHomeCores()) {
@@ -103,18 +122,22 @@ export async function main(ns) {
       // derselben Sprosse 409.000 je GB - Faktor 409. Deshalb wird nur
       // gekauft, wenn der Speicher auch einen Abnehmer hat: liegt mehr als
       // ein Drittel des Netzes brach, wird nicht gekauft.
-      let brachAnteil = 0;
-      try {
-        const j = JSON.parse(liesVonHome(ns, "data/bn4net.json") || "{}");
-        // Nur frische Zahlen. Eine alte Datei wuerde den Kauf entweder
-        // dauerhaft sperren oder dauerhaft freigeben - beides falsch.
-        if (typeof j.brachAnteil === "number" && Date.now() - (j.zeit || 0) < 120000) {
-          brachAnteil = j.brachAnteil;
-        }
-      } catch { /* keine oder kaputte Datei: wie unbekannt behandeln */ }
-
       const kosten = ns.singularity.getUpgradeHomeRamCost();
-      if (geld > kosten * 3 && brachAnteil < 0.34) {
+      if (xpFreigabe !== null) {
+        // ERFAHRUNGSMODUS (BN8): kein Dreifach-Puffer, keine Brachbremse. Der
+        // Kern hat die billigste Option gewaehlt und home freigegeben; hier
+        // zaehlt nur noch, ob der WIRKLICHE Preis bezahlbar ist (geld ist schon
+        // um geldbedarf.txt gekuerzt) und ob die Freigabe zum jetzigen Stand
+        // gehoert - nach einem Kauf stimmt die alte Zahl nicht mehr, und ein
+        // zweiter Kauf aus derselben Anweisung waere ein Doppelkauf. Brach ist
+        // dort nie ein Grund: RAM wird im Ofen linear zu Erfahrung.
+        if (xpFreigabe > 0 && xpFreigabe === ns.getServerMaxRam("home") && geld >= kosten) {
+          if (ns.singularity.upgradeHomeRam()) {
+            sag("home-Speicher verdoppelt auf " + ns.getServerMaxRam("home")
+              + " GB (Erfahrungsmodus, " + (kosten / 1e6).toFixed(0) + "m).");
+          }
+        }
+      } else if (geld > kosten * 3 && brachAnteil < 0.34) {
         if (ns.singularity.upgradeHomeRam()) {
           sag("home-Speicher verdoppelt auf " + ns.getServerMaxRam("home") + " GB.");
         }

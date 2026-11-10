@@ -42,6 +42,7 @@ import { leer as kpiLeer, laden as kpiLaden, neuerLauf as kpiNeuerLauf,
 import { vergib as figVergib, antragGilt as figAntragGilt,
   vergabeGilt as figVergabeGilt } from "lib/figur.js";
 import { laden as evLaden, anhaengen as evAnhaengen, sprungLatenzMin } from "lib/events.js";
+import { waehleKauf as xpWaehleKauf } from "lib/xpkauf.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -127,6 +128,25 @@ export async function main(ns) {
   // Die Knotenstufe, nach der die Werte gewaehlt wurden - geht in die
   // Telemetrie, damit ein falscher Stufenwert von aussen sichtbar ist.
   let bnStufe = 1;
+  // REINER ERFAHRUNGSMODUS (BitNode 8, 10.11.2026).
+  //
+  // In BN8 bringt Hacken kein Geld (BitNode.tsx case 8: ScriptHackMoneyGain 0);
+  // Geld kommt nur von der Boerse (boerse.js). Hack-, grow- und weaken-Stapel
+  // auf Geldziele verbrennen dort Speicher fuer nichts, und die Erfahrung - die
+  // das Knotenziel verlangt (Hacking 2500/3000) - bekam nur den Rest: gemessen
+  // 0,07 Erfahrung je GB und Sekunde bei moeglichen 0,3-0,5. Der Modus gilt nur
+  // in Knoten 8; die Nummer kommt aus getResetInfo, das der Kern ohnehin
+  // bezahlt (siehe unten, "knoten:" in der Telemetrie). Ein Knoten aendert sich
+  // nie innerhalb eines Prozesslebens - der Reset startet bn4net.js neu.
+  // Ausserhalb von Knoten 8 aendert dieser Schalter NICHTS: alle Stellen unten
+  // fragen xpModus ab und fallen sonst in den alten Zweig.
+  let bnKnoten = 0;
+  try { bnKnoten = ns.getResetInfo().currentNode; } catch { /* dann gilt: kein Modus */ }
+  const xpModus = bnKnoten === 8;
+  // Was homegrow.js kaufen soll: die home-RAM VOR dem Kauf, oder 0. Die
+  // Entscheidung faellt hier (ein Entscheider fuer Rechner UND home), homegrow
+  // fuehrt nur aus - siehe Abschnitt 1a und data/bn4net.json.
+  let xpHomeKauf = 0;
   try {
     const roh = ns.fileExists("lib/bitnodes.json", "home") ? ns.read("lib/bitnodes.json") : null;
     const t = roh ? JSON.parse(roh) : null;
@@ -1308,6 +1328,65 @@ export async function main(ns) {
           + " GB kosten " + (preis / 1e6).toFixed(1) + "m, frei " + (geldFrei / 1e6).toFixed(0) + "m - warte auf Geld.");
       }
     }
+    // --- 1a0. BitNode 8: Budget statt Amortisation (10.11.2026) ---------------
+    // Die Amortisationsleiter und die Aufruestungsschleife unten teilen Kosten
+    // durch einen GELDertrag je GB - den es in BN8 nicht gibt (ScriptHackMoney-
+    // Gain 0). Die Leiter verlangt das Vierfache des Preises, die Schleife
+    // setzt den Ertrag ab 5 % Ueberschuss auf null, und der Ueberschuss ist im
+    // Erfahrungsmodus per Definition ALLES. Beide kaeufen dort praktisch nie,
+    // waehrend das Bargeld ueber data/geldbedarf.txt (Betriebsgeld, boerse.js
+    // haelt 2 % des Vermoegens bar) sonst nutzlos liegt.
+    //
+    // Stattdessen lib/xpkauf.js: die Option mit den niedrigsten EFFEKTIVEN
+    // Kosten je zusaetzlichem GB (home zaehlt ein Drittel, es ueberlebt die
+    // Einbaurunden), gekauft wenn bezahlbar. `reserviert` (geldbedarf) bleibt
+    // tabu - genau wie in den Zweigen unten. Wartendes Werkzeug hat oben
+    // weiter Vorrang (a1Gekauft). Kerne werden nicht gekauft: sie wirken auf
+    // die Sicherheitssenkung je weaken-Faden, nicht auf die Erfahrung.
+    //
+    // KEIN `kosten * 2 <= geldFrei`-Polster wie in den Zweigen unten: das
+    // Polster schuetzt Geld, das fuer Augmentierungen gebraucht wird, und
+    // dieses Geld steht in `reserviert`.
+    //
+    // home kauft homegrow.js, nicht der Kern (Singularity gibt es hier nicht,
+    // siehe dessen Kopf). Der Kern sagt nur WANN: xpHomeKauf traegt die
+    // home-RAM, fuer die der Kauf gilt - homegrow.js kauft nur, wenn sie noch
+    // stimmt, so wird eine alte Anweisung nie zum Doppelkauf.
+    xpHomeKauf = 0;
+    // a1Gekauft ist am Anfang !kaufMoeglich (offener Auftrag, keine Preise):
+    // dann wird kein NEUER Rechner bestellt, home aber sehr wohl freigegeben -
+    // die Freigabe braucht keinen Auftrag. Ohne Preistabelle gar nichts: wer die
+    // Rechnerpreise nicht kennt, kann home nicht dagegen abwaegen (shop.js
+    // schreibt sie, der Starter holt ihn zurueck, wenn sie veraltet).
+    // Hat dagegen die Werkzeug-Bestellung oben in dieser Runde schon gekauft
+    // (kaufMoeglich und a1Gekauft), bleibt es bei dieser einen Ausgabe.
+    if (xpModus && pl.da && (kaufMoeglich ? !a1Gekauft : true)) {
+      const geldFrei = ns.getServerMoneyAvailable("home") - reserviert;
+      const wahl = xpWaehleKauf({
+        geldFrei, homeRam: ns.getServerMaxRam("home"),
+        park: pl.park, limitAnzahl: pl.kaufbar ? pl.limitAnzahl : 0,
+        limitRam: pl.limitRam, preise: pl.preise,
+      });
+      const k = wahl.kauf;
+      if (k && k.art === "home") {
+        xpHomeKauf = ns.getServerMaxRam("home");
+        if (runde % 30 === 0) {
+          sag("Erfahrungsmodus: home " + xpHomeKauf + " -> " + k.gb + " GB freigegeben fuer "
+            + (k.kosten / 1e6).toFixed(0) + "m (" + Math.round(k.eff) + " je GB effektiv).");
+        }
+      } else if (k && kaufMoeglich) {
+        const grund = "Erfahrungsmodus: " + Math.round(k.eff) + " je GB effektiv";
+        if (beauftrage(k.art === "kauf" ? "kauf" : "upgrade", k.gb, grund, k.host)) {
+          sag("Erfahrungsmodus: " + (k.art === "kauf" ? "Rechner " + k.gb + " GB" : k.host + " -> " + k.gb + " GB")
+            + " bestellt fuer " + (k.kosten / 1e6).toFixed(1) + "m (" + Math.round(k.eff) + " je GB effektiv).");
+        }
+      } else if (wahl.beste && runde % 60 === 0) {
+        sag("Erfahrungsmodus: billigste Option " + wahl.beste.art + " " + wahl.beste.gb + " GB kostet "
+          + (wahl.beste.kosten / 1e6).toFixed(0) + "m, frei " + (geldFrei / 1e6).toFixed(0) + "m - warte.");
+      }
+      a1Gekauft = true;   // die Zweige unten gelten in BN8 nicht
+    }
+
     if (a1Gekauft) {
       // In dieser Runde nichts weiter kaufen.
     } else if (eigene.length < pl.limitAnzahl) {
@@ -2002,6 +2081,14 @@ export async function main(ns) {
     // dann alles aufs Erfahrungsziel, wie zuvor. sameTarget loest den
     // Ein-Ziel-Fall unten aus.
     if (moneyTargets.length === 0 && expTarget) moneyTargets = [expTarget];
+    // REINER ERFAHRUNGSMODUS (BN8): keine Geldziele, keine Stapel. Der Modus
+    // gilt nur, wenn es ein Erfahrungsziel GIBT - direkt nach einem Einbau
+    // (Level 1, nichts gerootet) kann es fehlen, und dann bleibt der alte Weg,
+    // damit der Kern nie ohne Arbeit dasteht. moneyTargets = [] macht
+    // sameTarget falsch und batchPlaetze null; Durchgang 2 laeuft unten
+    // trotzdem (xpAktiv), weil dort der Ofen den Rest bekommt.
+    const xpAktiv = xpModus && !!expTarget;
+    if (xpAktiv) moneyTargets = [];
     const sameTarget = moneyTargets.length === 1 && moneyTargets[0] === expTarget;
 
     // --- Stapelziele aussondern (Stufe 4, 22.08.2026) ---------------------
@@ -2231,8 +2318,11 @@ export async function main(ns) {
       // offene Augmentierung mehr wartet (bn4rep.js:83-84). 120 Sekunden
       // Toleranz ueberstehen mehrere Runden, ohne dass ein abgestuerztes
       // bn4rep.js unbemerkt Faeden auf share bindet.
+      // In BN8 gibt es keinen Reputationsmodus fuer share: Ruf ist dort per
+      // Spende kaufbar (FavorToDonateToFaction 0), Arbeits-Ruf fast wertlos -
+      // jedes GB share ist ein GB weniger fuer den Ofen.
       let repModus = false;
-      if (ns.fileExists("data/rep-modus.txt", "home")) {
+      if (!xpAktiv && ns.fileExists("data/rep-modus.txt", "home")) {
         const stempel = Number(ns.read("data/rep-modus.txt").split("|")[1]);
         repModus = Number.isFinite(stempel) && Date.now() - stempel < 120000;
       }
@@ -2337,7 +2427,12 @@ export async function main(ns) {
       // aber die Rechner bezahlt, auf denen die Erfahrung entsteht. Bei
       // 7276 GB Netz greift der Deckel nicht (1455 GB Spielraum gegen 315 GB
       // Bedarf); er greift genau dann, wenn das Netz klein ist.
-      const EXP_THREAD_BUDGET = Math.max(1, Math.min(180,
+      //
+      // Im Erfahrungsmodus (BN8) null: dort gibt es keine Geldziele, denen man
+      // den Rest laesst, und die Einwegwelle (worker/weaken.js, eine Runde
+      // Lebensdauer) ist dem Dauerlaeufer unterlegen (Kopf von worker/
+      // expfarm.js). Alles geht in den Ofen im Ueberschusszweig unten.
+      const EXP_THREAD_BUDGET = xpAktiv ? 0 : Math.max(1, Math.min(180,
         Math.floor((ramTotal * 0.2) / Math.max(expRam, 1))));
       // Laufende Faeden mitzaehlen, nicht nur neu vergebene. hack, grow und
       // weaken dauern deutlich laenger als eine Runde von zehn Sekunden - bei
@@ -3201,7 +3296,7 @@ export async function main(ns) {
       // Art gebraucht werden, dann diese Wuensche auf die groessten Rechner
       // packen. Das sind rund 30 Wuensche und damit hoechstens etwa 70
       // exec-Aufrufe - weniger als vorher, bei feinerer Aufteilung.
-      if (!sameTarget && moneyTargets.length) {
+      if (!sameTarget && (moneyTargets.length || xpAktiv)) {
         let budget = 0;
         for (const gb of restFrei.values()) budget += gb;
         // Melden, wenn fuer die Geldziele nichts uebrigbleibt. Das passiert
@@ -3609,6 +3704,7 @@ export async function main(ns) {
           // gerade laeuft - und wie streng das Gate deshalb ist.
           effFlotte: Math.round(massstab),
           ueberschussGb,
+          xpModus: xpAktiv,
           // Bezugsgroessen (siehe Modellobergrenze oben). Nur Beobachtung.
           deckeDollarProS: Math.round(deckeGesamt),
           deckeNetzDollarProS: Math.round(deckeNetz),
@@ -4585,6 +4681,10 @@ export async function main(ns) {
       // frueheste und verlaesslichste Quelle, die es gibt.
       knoten: ns.getResetInfo().currentNode,
       nodeReset: ns.getResetInfo().lastNodeReset,
+      // Erfahrungsmodus (BN8) und die Freigabe fuer homegrow.js: siehe 1a0.
+      // xpHomeKauf traegt die home-RAM, fuer die gekauft werden darf, sonst 0.
+      xpModus,
+      xpHomeKauf,
       // Feature 9 fuer strategie-check, das die Registry ausserhalb des
       // Spiels auswertet und ownedSF nicht sieht (19.09.2026).
       feature9: !!(regLage.features && regLage.features[9]),

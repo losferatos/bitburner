@@ -592,7 +592,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
         "lib/figur.js",
         "lib/kpi.js",
         "lib/motorzeit.js",
-        "lib/reg.js"
+        "lib/reg.js",
+        "lib/xpkauf.js"
       ],
       "singularity": false,
       "restartPolicy": "always",

@@ -155,8 +155,8 @@
  },
  {
   "file": "bn4life.js",
-  "live41": 293.85,
-  "lokal41": 293.85,
+  "live41": 293.95,
+  "lokal41": 293.95,
   "diff": 0,
   "lokal42": 77.85,
   "lokal43": 23.85,
@@ -173,10 +173,10 @@
   "singKosten41": 288,
   "dom": 0,
   "err": null,
-  "bytes": 42397,
+  "bytes": 48287,
   "lines": 438,
-  "sha256": "b4c167eedc1bd17a0b1f6a19c6acf356d83f630a560614a8ce7eaa0244894594",
-  "gemessenAm": "2026-10-06T17:31:14.082Z",
+  "sha256": "64fa2492268e0725ded449143618a65d3c11c04ae13fb1b327f0001bd8a52c0b",
+  "gemessenAm": "2026-11-10T16:28:39.225Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {

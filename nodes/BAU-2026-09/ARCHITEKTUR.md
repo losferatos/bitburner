@@ -1071,7 +1071,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "bn4life.js",
       "args": [],
-      "ramBaseGb": 5.85,
+      "ramBaseGb": 5.95,
       "ramSingGb": 18.0,
       "ramMeasuredAt": "GERECHNET-2026-09-26 (tools/ram.js, C.2-Nacharbeit: Daedalus-Torwache nach joinrun.js verschoben, hier zurueck auf den Stand vor Paket C.2)",
       "verfahren": "alle",

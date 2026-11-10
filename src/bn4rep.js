@@ -2326,8 +2326,17 @@ export async function main(ns) {
     // (b) Ein Einbau kostet hier nicht eine halbe Stunde, sondern den
     //     Wiederaufbau des Vermoegens von 250 Mio: log2(W/250 Mio) Verdopplungen.
     //     Die naechste Ruf-Huerde muss weiter weg sein als das.
-    const einbauKaufbar = boerse.traegt
-      ? kandidaten.filter((k) => k.rep >= k.repReq && geld >= k.preis).length : 0;
+    // Gezaehlt wie die Einbaurunde kauft: teuerstes zuerst, jedes gekaufte
+    // Stueck verteuert die folgenden um 1,9 (getAugCost), das Geld wird weniger.
+    let einbauKaufbar = 0;
+    if (boerse.traegt) {
+      let rest = geld, faktor = 1;
+      for (const k of kandidaten.filter((x) => x.rep >= x.repReq).sort((a, b) => b.preis - a.preis)) {
+        const p = k.preis * faktor;
+        if (rest < p) continue;
+        rest -= p; faktor *= 1.9; einbauKaufbar++;
+      }
+    }
     const lueckeEinbau = boerse.traegt
       ? Math.max(lueckeZuGross, grobRate * BOERSE_VERDOPPLUNG_SEK * Math.log2(Math.max(2, geld / 250e6)))
       : lueckeZuGross;
@@ -2545,8 +2554,11 @@ export async function main(ns) {
           let letzt = 0;
           try { letzt = boerseSicht(liesVonHome(BOERSE_TEL_FILE), Date.now(), augResetMs).depotLetzt; } catch { letzt = 0; }
           if (letzt > Math.max(50e6, 0.1 * ns.getServerMoneyAvailable("home"))) {
-            sag("EINBAU AUSGESETZT: boerse.js hat den Ausverkauf nicht quittiert (" + ausgang
-              + "), zuletzt " + geldText(letzt) + " im Depot. Neuer Anlauf in der naechsten Runde.");
+            if (Date.now() - boerseSperreGemeldet > 5 * 60000) {
+              boerseSperreGemeldet = Date.now();
+              sag("EINBAU AUSGESETZT: boerse.js hat den Ausverkauf nicht quittiert (" + ausgang
+                + "), zuletzt " + geldText(letzt) + " im Depot. Neuer Anlauf jede Runde.");
+            }
             await ns.sleep(15000);
             continue;
           }
@@ -2837,7 +2849,9 @@ export async function main(ns) {
             abruf(BOERSE_DAEDALUS_BAR * 1.01, "Daedalus-Einladung (100 Mrd bar)");
             daedalusHalt = true;   // Kauf und Spende lassen den Betrag in Ruhe
           }
-        } else if (pl.factions.includes("Daedalus")) {
+        } else {
+          // Auch wenn die Bedingung nur zeitweise wegfaellt: sonst gilt ein alter
+          // Zeitstempel beim naechsten Mal sofort als "10 min ueberschritten".
           daedalusAbrufSeit = 0;
         }
       } catch (e) { gangCountError("Daedalus-Bargeld", e); }
@@ -2849,7 +2863,7 @@ export async function main(ns) {
         const barJetzt = ns.getServerMoneyAvailable("home");
         if (barJetzt < k.preis) {
           if (boerse.traegt && boerseKaufAusDepot(k.preis, barJetzt, boerse.depot) === "abruf") {
-            abruf(k.preis, "Kauf " + k.aug);
+            abruf(k.preis * 1.01, "Kauf " + k.aug);
           }
           continue;
         }

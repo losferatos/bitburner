@@ -301,7 +301,7 @@ console.log("\n-- Verdrahtung in bn4rep.js --");
   pruefe("... und die Sperre steht vor dem Einbau-Ausloeser", iSperre > 0 && iSperre < iTrigger);
   pruefe("Geld-Ausloeser aus, wenn die Boerse traegt", rep.includes("const geldWegZu = !boerse.traegt && unbezahlbarInHorizont(")
     && rep.includes("const naechstesUnbezahlbar = !boerse.traegt && !!naechstes"));
-  pruefe("die Kaufschleife ruft Bargeld ab", rep.includes('abruf(k.preis, "Kauf " + k.aug)'));
+  pruefe("die Kaufschleife ruft Bargeld ab", rep.includes('abruf(k.preis * 1.01, "Kauf " + k.aug)'));
   pruefe("der Abruf wird vor bn4net geschuetzt (geldbedarf.txt)", rep.includes("bedarfSchreiben = Math.max(bedarfSchreiben, abrufSchutz.betrag)"));
   pruefe("Daedalus: 100 Mrd bar werden abgerufen", rep.includes("abruf(BOERSE_DAEDALUS_BAR * 1.01"));
   pruefe("Spende in BN8 nur ganz und mit Abstand", rep.includes("verfuegbar = traegt && !daedalusHalt && barSp >= noetig ? noetig : 0;"));

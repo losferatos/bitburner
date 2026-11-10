@@ -30,6 +30,12 @@ Daedalus (Core V3) und NeuroFlux rund 7.
 
 ## Die Route (467 Varianten gerechnet, die besten liegen 0,5 h auseinander)
 
+Stand der Rechnung nach der Skeptiker-Runde (die 2 schon wartenden Stuecke sind
+eingepreist, Rechner und Bot nutzen dieselben Gewichte): Optimum 30,1 h
+(Runde 1 bei 100 Mrd, Runde 2 bei 1,5 Bio); die im Bot festgelegten Schwellen
+300 Mrd / 1 Bio liegen bei 30,5 h. Das Optimum ist flach - die Tabelle zeigt
+die Bot-Schwellen.
+
 | Runde | Wann | Was | Danach |
 |---|---|---|---|
 | 1 | 300 Mrd Vermoegen (laufende Stufe: 11,5 h ab jetzt; die 4S-API bei 45 Mrd liegt auf dem Weg) | 15 Stuecke: Hacker-Faktionen ohne BitRunners, dazu S.N.A und ADR-V1 von Tian Di Hui (Ruf-Mult 1,33 -> 1,72) | Hacking-Mult 2,76 |
@@ -50,10 +56,10 @@ wert wie ein Prozent Exp-Mult.
 | Hebel | Stand |
 |---|---|
 | Handelsregel, 4S nach Vermoegen, Bargeld auf Abruf | gebaut 10.11. (1277d5b, 6d0b3e6) |
-| Kein Kauf/Einbau im Lauf, Einbau nach Plan | lib/bn8plan.js + bn4rep.js (dieser Bau) |
+| Kein Kauf/Einbau im Lauf, Einbau nach Plan | lib/bn8plan.js + bn4rep.js: 2f8fc67, ef8888c, a7099c6 (drei Skeptiker, Mock-Test gegen ein nachgestelltes BN8) |
 | Tian Di Hui nach jedem Einbau | be2b34a |
-| Reiner XP-Modus (alles RAM auf joesguns), RAM-Kauf nach Budget | im Bau (bn4net/homegrow) - gemessen bisher 0,07 Exp/GB-s, moeglich 0,3-0,5 |
-| home-RAM in Runde 2 | in der Einbaurunde (bn4rep) |
+| Reiner XP-Modus (alles RAM an den Ofen), RAM-Kauf nach Budget | 1218a3b, ef8888c (bn4net, homegrow, lib/xpkauf.js); vorher gemessen 0,07 Exp/GB-s, moeglich 0,3-0,5 - Nachmessung im Spiel steht aus |
+| home-RAM in Runde 2 und 3 | in der Einbaurunde (bn4rep, bis 32768 GB), dazu laufend aus dem Betriebsgeld (homegrow) |
 
 ## Offen / Ideen fuer Stufe 2, 3 und Lauf 2
 
@@ -61,8 +67,12 @@ wert wie ein Prozent Exp-Mult.
   45 Mrd). Der Schaetzer zaehlt nur Aufwaertsticks in 30 Ticks; ein Filter,
   der die Marktmechanik nutzt (Zyklus 75 Ticks, 45 % Kippen, otlkMag driftet
   langsam), koennte Stunden sparen. Nicht gebaut.
-- **grow + weaken** im XP-Ofen (25 % mehr Exp je GB-s) - nur wenn der Ofen die
-  Sicherheit am Minimum haelt.
+- **grow statt weaken** im XP-Ofen (25 % mehr Exp je GB-s). Fund beim Bau: grow
+  auf einem VOLLEN Ziel hebt die Sicherheit gar nicht (ServerHelpers.ts,
+  processSingleServerGrowth: fortify nur, wenn sich das Geld aendert), und in
+  BN8 hackt niemand das Ziel leer. Braucht ein neues Arbeiterskript.
+- **Fallstrick RAM nach Namen:** ein Feld namens `hack` in einem Modul kostet
+  jedes importierende Skript 0,1 GB (tools/test-ram-namen.js faengt es).
 - **Darknet promoteStock** (Volatilitaet x2-4, Audit 07.11.): -8 bis -12 h je
   Stufe gerechnet, Aufwand hoch.
 - **Kampffaktionen** (The Covenant: SPTN-97 hack x1,15; Illuminati: QLink

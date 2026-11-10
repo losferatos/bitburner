@@ -901,9 +901,9 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "boerse.js",
       "args": [],
-      "ramBaseGb": 21,
+      "ramBaseGb": 25.5,
       "ramSingGb": 0,
-      "ramMeasuredAt": "GERECHNET-2026-09-04 (tools/ram.js)",
+      "ramMeasuredAt": "GERECHNET-2026-11-10 (tools/ram.js; getVolatility +2,5 und getAskPrice +2,0 fuer die Handelsregel aus lib/handel.js - noch keine Live-Nachmessung)",
       "verfahren": "V1",
       "knoten": [
         8
@@ -919,6 +919,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "needsFigure": "none",
       "needsLibs": [
         "lib/boersepause.js",
+        "lib/handel.js",
         "lib/events.js",
         "lib/hostdatei.js"
       ],

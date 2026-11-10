@@ -39,9 +39,14 @@
  *
  *   PHASE 2 (mit 4S-TIX-API): `getForecast` direkt.
  *
- * Der Uebergang ist kein Sprung: sobald 26 Mrd zusammen sind (25 fuer die API
- * plus einen Puffer), wird gekauft. Danach ist die Historie nur noch
- * Kontrolle.
+ * Der Uebergang: sobald das VERMOEGEN (Bargeld + Depot) SCHWELLE_4S erreicht
+ * (lib/handel.js), wird gezielt verkauft und die API gekauft.
+ * ===========================================================================
+ * BARGELD GIBT ES AUF ABRUF
+ * ===========================================================================
+ * Das Kapital ist ganz investiert. Wer Geld braucht (bn4rep fuer Kauf, Spende,
+ * Daedalus-Schwelle), legt data/boerse-abruf.txt; vor dem Einbau legt bn4rep
+ * data/boerse-pause.txt und bekommt alles (lib/boersepause.js).
  *
  * ===========================================================================
  * WAS ES NICHT TUT
@@ -59,47 +64,19 @@
 
 import { liesVonHome, nachHome as schreibNachHome } from "lib/hostdatei.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
-import { PAUSE_FILE, pauseLesen } from "lib/boersepause.js";
+import { PAUSE_FILE, ABRUF_FILE, pauseLesen, abrufLesen } from "lib/boersepause.js";
+import { REGEL, KOSTEN_4S, BETRIEBSANTEIL, schaetze, verkaufsliste, kaufliste, freimachen, depotwert, kauf4SFaellig } from "lib/handel.js";
 
 
 const TAKT_MS = 6000;      // ein Kursschritt dauert 6 s (msPerStockUpdate)
+const ABFRAGE_MS = 1000;   // so oft wird nach einem neuen Kursschritt gesehen
 
 /** Die Kommission je Transaktion (StockMarketConstants.StockMarketCommission). */
 const KOMMISSION = 100e3;
 
-/**
- * Wie viele Ticks in die Historie gehen.
- *
- * 40 Ticks sind vier Minuten. Kuerzer wird die Schaetzung zu unruhig - bei 10
- * Ticks liegt die Standardabweichung des Anteils bei 0,16, und eine
- * Vorhersage von 0,60 waere von 0,44 nicht zu unterscheiden. Laenger, und die
- * Schaetzung haengt der Wirklichkeit nach: `otlkMag` aendert sich alle 75
- * Ticks (`TicksPerCycle`).
- */
-const HISTORIE = 40;
-
-/** Ab dieser Vorhersage wird gekauft, darunter verkauft. */
-const KAUF_SCHWELLE = 0.575;
-const VERKAUF_SCHWELLE = 0.5;
-
-/**
- * Wie viel des Vermoegens hoechstens in EINER Aktie steckt.
- *
- * Der Markt hat 33 Symbole, und eine einzelne Vorhersage kann falsch sein -
- * besonders in Phase 1, wo sie geschaetzt ist. Ein Viertel ist der Kompromiss
- * zwischen Streuung und der Kommission, die jede Position kostet.
- */
-const ANTEIL_JE_AKTIE = 0.25;
-
-/**
- * Wie viel Geld liegen bleibt.
- *
- * NICHT NULL. In BitNode 8 ist die Boerse die einzige Quelle, aber der Bot
- * braucht Geld auch fuer Rechner, Portprogramme und Augmentierungen. Ein
- * vollstaendig investiertes Konto blockiert alles andere - und Aktien lassen
- * sich zwar verkaufen, aber jede Runde kostet Kommission.
- */
-const BARBESTAND = 0.15;
+// Die Handelsregel (Fenster, Schwellen, Positionsgroesse) steht seit dem
+// 10.11.2026 in lib/handel.js und ist dort gegen das Marktmodell gerechnet
+// (tools/audit/boerse-regel.mjs): bis 1 Bio Vermoegen im Median 14 h statt 23 h.
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -137,23 +114,49 @@ export async function main(ns) {
     return;
   }
 
-  /** Preishistorie je Symbol: die letzten HISTORIE Preise. */
+  /** Preishistorie je Symbol: die letzten REGEL.fenster + 1 Preise. */
   const historie = new Map(symbole.map((s) => [s, []]));
 
   let runden = 0;
   let okRunden = 0;
   let errStreak = 0;
   let lastError = null;
-  let gekaufte4S = false;
   let letzteMeldung = "";
   let quittiertFuer = null;
+  let sperre4SBis = 0;
+  /** Stueckgrenze je Symbol (Stock.ts: 20 % der Aktien) - aendert sich im Lauf nicht. */
+  const maxStueck = new Map(symbole.map((sym) => {
+    try { return [sym, ns.stock.getMaxShares(sym)]; } catch { return [sym, Infinity]; }
+  }));
 
   sag("boerse gestartet. " + symbole.length + " Symbole.");
 
+  let letztePreise = [];
+  let letzteRundeMs = 0;
+  let bedientFuer = null;
+  let fehl4S = 0;
+
   for (;;) {
     try {
-      runden++;
       const jetzt = Date.now();
+
+      // --- Tickgenau statt im festen Takt (Skeptiker 10.11.2026) --------------
+      //
+      // Der Markt tickt alle 6 s, holt nach einer Pause aber schneller nach.
+      // Eine Schleife, die stur 6 s schlaeft, sieht dann mal zwei Ticks als
+      // einen (die Schaetzung von f und mv stimmt nicht mehr) und mal keinen.
+      // Deshalb jede Sekunde nachsehen und nur bei neuen Preisen eine Runde
+      // fahren. Kostet kein RAM. Nach 12 s ohne Tick laeuft die Runde trotzdem
+      // (Pause, Abruf und Telemetrie duerfen nicht am Markt haengen).
+      const preiseJetzt = symbole.map((sym) => ns.stock.getPrice(sym));
+      const neuerTick = preiseJetzt.some((p, i) => p !== letztePreise[i]);
+      if (!neuerTick && jetzt - letzteRundeMs < 2 * TAKT_MS) {
+        await ns.sleep(ABFRAGE_MS);
+        continue;
+      }
+      letztePreise = preiseJetzt;
+      letzteRundeMs = jetzt;
+      runden++;
 
       // --- Schliessen, wenn der Sprung ansteht --------------------------------
       //
@@ -171,49 +174,57 @@ export async function main(ns) {
         return;
       }
 
-      // --- Die 4S-API kaufen, sobald sie bezahlbar ist ------------------------
-      //
-      // 25 Mrd sind viel, aber sie machen aus einer Schaetzung eine Auskunft.
-      // Der Puffer von einer Milliarde ist nicht Zierde: unmittelbar nach dem
-      // Kauf soll noch gehandelt werden koennen, sonst steht das Gewerk, bis
-      // die Boerse von selbst steigt - und ohne Position tut sie das nicht.
+      // --- Die Historie fortschreiben ------------------------------------------
+      if (neuerTick || historie.get(symbole[0]).length === 0) {
+        symbole.forEach((sym, i) => {
+          const h = historie.get(sym);
+          h.push(preiseJetzt[i]);
+          while (h.length > REGEL.fenster + 1) h.shift();
+        });
+      }
+
       let hat4S = false;
       try { hat4S = ns.stock.has4SDataTixApi(); } catch { hat4S = false; }
-      if (!hat4S && !gekaufte4S) {
-        const geld = ns.getServerMoneyAvailable("home");
-        if (geld >= 26e9) {
-          let ok = false;
-          try { ok = ns.stock.purchase4SMarketDataTixApi(); } catch { ok = false; }
-          if (ok) {
-            gekaufte4S = true;
-            hat4S = true;
-            sag("4S-TIX-API gekauft (25 Mrd). Ab jetzt wird die Vorhersage"
-              + " gelesen statt geschaetzt.");
-            ereignis(ns, nachHome, "4S-TIX-API gekauft");
+
+      // --- Die Lage je Symbol --------------------------------------------------
+      //
+      // Mit 4S: Vorhersage und Schwankung aus dem Spiel. Ohne: beides aus der
+      // eigenen Historie geschaetzt (lib/handel.js `schaetze`). Der Geldkurs
+      // wird gerechnet statt gefragt: Brief = p*(1+s), Geld = p*(1-s)
+      // (Stock.ts getAskPrice/getBidPrice), also Geld = 2p - Brief.
+      const leseLage = () => {
+        const aus = [];
+        for (const sym of symbole) {
+          const h = historie.get(sym);
+          const preis = h[h.length - 1];
+          let f = null, mv = 0, quelle = "Historie", ticks = 0;
+          if (hat4S) {
+            try {
+              f = ns.stock.getForecast(sym);
+              mv = ns.stock.getVolatility(sym) * 100;
+              quelle = "4S"; ticks = 999;
+            } catch { f = null; }
           }
+          if (f === null) {
+            const e = schaetze(h, REGEL.fenster);
+            f = e.f; mv = e.mv; ticks = e.ticks; quelle = "Historie";
+          }
+          const ask = ns.stock.getAskPrice(sym);
+          aus.push({ sym, preis, f, vorhersage: f, mv, quelle, ticks,
+            lang: ns.stock.getPosition(sym)[0], ask, bid: 2 * preis - ask,
+            maxStueck: maxStueck.get(sym) });
         }
-      }
-
-      // --- Die Vorhersage je Symbol ------------------------------------------
-      const lage = [];
-      for (const sym of symbole) {
-        const preis = ns.stock.getPrice(sym);
-        const h = historie.get(sym);
-        h.push(preis);
-        while (h.length > HISTORIE + 1) h.shift();
-
-        let vorhersage = null;
-        let quelle = null;
-        if (hat4S) {
-          try { vorhersage = ns.stock.getForecast(sym); quelle = "4S"; }
-          catch { vorhersage = null; }
+        return aus;
+      };
+      const verkaufe = (sym, stueck, warum) => {
+        const p = ns.stock.sellStock(sym, stueck);
+        if (p > 0) {
+          sag("verkauft " + sym + ": " + stueck + " Stueck zu "
+            + (p * stueck / 1e6).toFixed(1) + "m (" + warum + ")");
         }
-        if (vorhersage === null) {
-          vorhersage = schaetzung(h);
-          quelle = "Historie";
-        }
-        lage.push({ sym, preis, vorhersage, quelle, ticks: h.length - 1 });
-      }
+        return p > 0;
+      };
+      let lage = leseLage();
 
       // --- Ausverkauf vor dem Einbau (BN8-1, lib/boersepause.js) -------------
       //
@@ -226,84 +237,139 @@ export async function main(ns) {
         if (pause.aktiv) {
           if (quittiertFuer !== pause.id) {
             const erloes = alleVerkaufen(ns, symbole, sag);
-            quittiertFuer = pause.id;
-            sag("Einbau steht an - Depot verkauft, " + (erloes / 1e9).toFixed(2)
-              + " Mrd erloest. Bis zum Ende der Pause wird nichts gekauft.");
-            ereignis(ns, nachHome, "boerse: Ausverkauf vor Einbau " + (erloes / 1e9).toFixed(2) + " Mrd");
+            // QUITTIERT WIRD NUR EIN LEERES DEPOT (Skeptiker 10.11.2026).
+            // `alleVerkaufen` schluckt Fehler je Symbol; eine Quittung trotz
+            // Restposten hiesse: bn4rep baut ein und der Rest ist weg. Bleibt
+            // etwas liegen, versucht es die naechste Runde erneut.
+            lage = leseLage();
+            const rest = lage.filter((e) => e.lang > 0);
+            if (rest.length === 0) {
+              quittiertFuer = pause.id;
+              sag("Einbau steht an - Depot verkauft, " + (erloes / 1e9).toFixed(2)
+                + " Mrd erloest. Bis zum Ende der Pause wird nichts gekauft.");
+              ereignis(ns, nachHome, "boerse: Ausverkauf vor Einbau " + (erloes / 1e9).toFixed(2) + " Mrd");
+            } else {
+              sag("AUSVERKAUF UNVOLLSTAENDIG: " + rest.length + " Posten liegen noch ("
+                + rest.map((e) => e.sym).join(", ") + ") - keine Quittung, neuer Versuch.");
+            }
           }
           const geldP = ns.getServerMoneyAvailable("home");
+          const restWert = depotwert(lage);
+          const quittiert = quittiertFuer === pause.id;
           nachHome("data/boerse.json", herzschlag({
-            state: "wait", blockedReason: "Einbau steht an - Depot verkauft",
-            hat4S, posten: 0, depotWert: 0, bar: geldP, gesamt: geldP,
-            verkauftFuer: pause.id,
+            state: "wait",
+            blockedReason: quittiert ? "Einbau steht an - Depot verkauft" : "Einbau steht an - Ausverkauf laeuft",
+            hat4S, fehl4S, posten: lage.filter((e) => e.lang > 0).length,
+            depotWert: restWert, bar: geldP, gesamt: geldP + restWert,
+            ...(quittiert ? { verkauftFuer: pause.id } : {}),
           }));
           okRunden++;
           errStreak = 0;
-          await ns.sleep(TAKT_MS);
+          await ns.sleep(ABFRAGE_MS);
           continue;
         }
       }
 
-      // --- Verkaufen, was gedreht hat ----------------------------------------
+      // --- Die 4S-API kaufen, sobald das VERMOEGEN reicht (BN8-3) ------------
       //
-      // ZUERST verkaufen, dann kaufen. Sonst steht das Geld fuer den Kauf noch
-      // in einer Aktie, die gerade faellt - und die Runde kauft nichts,
-      // obwohl sie es koennte.
-      for (const e of lage) {
-        const pos = ns.stock.getPosition(e.sym);
-        const [lang] = pos;
-        if (lang <= 0) continue;
-        // Eine ZU JUNGE Schaetzung verkauft nicht. In den ersten Minuten nach
-        // dem Start hat die Historie zu wenige Punkte, und ein zufaelliger
-        // Ausschlag wuerde eine gute Position mit Kommission wieder aufloesen.
-        if (e.quelle === "Historie" && e.ticks < 20) continue;
-        if (e.vorhersage >= VERKAUF_SCHWELLE) continue;
-        const erloes = ns.stock.sellStock(e.sym, lang);
-        if (erloes > 0) {
-          sag("verkauft " + e.sym + ": " + lang + " Stueck zu "
-            + (erloes / 1e6).toFixed(1) + "m (Vorhersage "
-            + e.vorhersage.toFixed(3) + ", " + e.quelle + ")");
+      // Frueher: `geld >= 26e9` - aber das Bargeld lag real bei 0,03 % des
+      // Vermoegens, der Kauf kam im Mittel 7 h zu spaet. Jetzt wird ab
+      // SCHWELLE_4S gezielt verkauft (schwaechste Posten zuerst) und gekauft.
+      // Die API bleibt ueber alle Einbauten des Laufs.
+      if (!hat4S && jetzt >= sperre4SBis
+          && kauf4SFaellig(ns.getServerMoneyAvailable("home") + depotwert(lage), hat4S)) {
+        for (const v of freimachen(lage, ns.getServerMoneyAvailable("home"), KOSTEN_4S + 1e6)) {
+          verkaufe(v.sym, v.stueck, "fuer die 4S-API");
+        }
+        let ok = false;
+        try { ok = ns.stock.purchase4SMarketDataTixApi(); } catch { ok = false; }
+        if (ok) {
+          hat4S = true;
+          sag("4S-TIX-API gekauft (25 Mrd). Ab jetzt wird die Vorhersage"
+            + " gelesen statt geschaetzt.");
+          ereignis(ns, nachHome, "4S-TIX-API gekauft");
+        } else {
+          // Nicht jede Runde neu verkaufen: das kostet jedes Mal die Spanne.
+          // 1 h, 2 h, 4 h, dann 8 h. Ab drei Fehlschlaegen wartet bn4rep nicht
+          // mehr auf die API (lib/boersepause.js FEHL_4S_GRENZE).
+          fehl4S++;
+          const warteH = Math.min(8, 2 ** (fehl4S - 1));
+          sperre4SBis = jetzt + warteH * 3600000;
+          sag("4S-KAUF MISSLUNGEN (" + fehl4S + ". Mal) trotz Vermoegen ueber der"
+            + " Schwelle - naechster Versuch in " + warteH + " h. Bargeld jetzt "
+            + (ns.getServerMoneyAvailable("home") / 1e9).toFixed(2) + " Mrd.");
+        }
+        lage = leseLage();
+      }
+
+      // --- Bargeld auf Abruf (BN8-2, lib/boersepause.js) -----------------------
+      //
+      // Wer kaufen, spenden oder die Daedalus-Schwelle (100 Mrd BAR) zeigen
+      // will, legt data/boerse-abruf.txt. Bereitgestellt wird nur, wenn das
+      // Vermoegen den Betrag ganz deckt - ein halber Abruf legte Kapital still,
+      // ohne dass jemand damit kaufen koennte.
+      let reserve = 0;
+      {
+        const wunsch = abrufLesen(liesVonHome(ns, ABRUF_FILE), jetzt);
+        if (wunsch.betrag > 0) {
+          const bar = ns.getServerMoneyAvailable("home");
+          if (bedientFuer === wunsch.id) {
+            // EINMAL BEREITSTELLEN, NICHT NACHFUELLEN (Skeptiker 10.11.2026).
+            // Hat der Besteller gekauft, ist das Bargeld weg - ein zweiter
+            // Verkauf fuer denselben Abruf legte Kapital still, das niemand
+            // mehr will. Was noch da ist, bleibt bis zum Ablauf liegen.
+            reserve = Math.min(wunsch.betrag, bar);
+          } else if (bar + depotwert(lage) >= wunsch.betrag) {
+            reserve = wunsch.betrag;
+            const vk = freimachen(lage, bar, wunsch.betrag);
+            for (const v of vk) verkaufe(v.sym, v.stueck, "Abruf: " + wunsch.grund);
+            bedientFuer = wunsch.id;
+            if (vk.length) lage = leseLage();
+          }
         }
       }
 
-      // --- Kaufen, was steigt -------------------------------------------------
-      const geld = ns.getServerMoneyAvailable("home");
-      const einsetzbar = geld * (1 - BARBESTAND);
-      const kandidaten = lage
-        .filter((e) => e.vorhersage >= KAUF_SCHWELLE)
-        .filter((e) => e.quelle === "4S" || e.ticks >= 20)
-        .sort((a, b) => b.vorhersage - a.vorhersage);
+      // --- Betriebsgeld: 2 % bleiben bar, sobald 4S da ist ---------------------
+      //
+      // Rechner, home-RAM und Programme zahlen bn4net und homegrow aus dem
+      // Bargeld - und das lag bei null. Ohne RAM kein Hacking-Level, ohne Level
+      // kein Ausgang. Die 2 % werden nur vom KAUFEN ausgenommen, nie durch
+      // Verkauf aufgefuellt: was die anderen ausgeben, kommt erst mit der
+      // naechsten Umschichtung wieder. Gerechnet: 1 Bio nach 13,8 statt 13,7 h.
+      if (hat4S) {
+        const barB = ns.getServerMoneyAvailable("home");
+        reserve = Math.max(reserve, BETRIEBSANTEIL * (barB + depotwert(lage)));
+      }
 
-      for (const e of kandidaten) {
-        const frei = ns.getServerMoneyAvailable("home") * (1 - BARBESTAND);
-        if (frei <= 0) break;
-        const budget = Math.min(frei, einsetzbar * ANTEIL_JE_AKTIE);
-        // Die Kommission faellt zweimal an - beim Kauf und beim Verkauf. Ein
-        // Handel unter dem Fuenfzigfachen davon lohnt nicht: er muesste ueber
-        // vier Prozent gewinnen, nur um die Gebuehr zu decken.
-        if (budget < KOMMISSION * 50) continue;
-        const stueck = Math.min(
-          Math.floor((budget - KOMMISSION) / e.preis),
-          ns.stock.getMaxShares(e.sym) - ns.stock.getPosition(e.sym)[0],
-        );
-        if (stueck <= 0) continue;
-        const preis = ns.stock.buyStock(e.sym, stueck);
+      // --- Verkaufen, was gedreht hat ------------------------------------------
+      //
+      // ZUERST verkaufen, dann kaufen: sonst steht das Geld fuer den Kauf noch
+      // in einer Aktie, die gerade faellt.
+      {
+        const raus = verkaufsliste(lage);
+        for (const sym of raus) {
+          const e = lage.find((x) => x.sym === sym);
+          verkaufe(sym, e.lang, "Vorhersage " + e.f.toFixed(3) + ", " + e.quelle);
+        }
+        if (raus.length) lage = leseLage();
+      }
+
+      // --- Kaufen: das freie Kapital in den Titel mit dem hoechsten Ertrag ----
+      for (const k of kaufliste(lage, ns.getServerMoneyAvailable("home"), reserve)) {
+        const e = lage.find((x) => x.sym === k.sym);
+        const preis = ns.stock.buyStock(k.sym, k.stueck);
         if (preis > 0) {
-          sag("gekauft " + e.sym + ": " + stueck + " Stueck zu "
-            + (preis * stueck / 1e6).toFixed(1) + "m (Vorhersage "
-            + e.vorhersage.toFixed(3) + ", " + e.quelle + ")");
+          sag("gekauft " + k.sym + ": " + k.stueck + " Stueck zu "
+            + (preis * k.stueck / 1e6).toFixed(1) + "m (Vorhersage "
+            + e.f.toFixed(3) + ", " + e.quelle + ")");
         }
       }
 
       // --- Bericht -------------------------------------------------------------
-      let depot = 0;
-      let posten = 0;
-      for (const sym of symbole) {
-        const [lang, kaufpreis] = ns.stock.getPosition(sym);
-        if (lang <= 0) continue;
-        posten++;
-        depot += lang * ns.stock.getPrice(sym);
-      }
+      lage = leseLage();
+      const geld = ns.getServerMoneyAvailable("home");
+      const depot = depotwert(lage);
+      const posten = lage.filter((e) => e.lang > 0).length;
       const meldung = posten + " Posten, Depot " + (depot / 1e9).toFixed(2)
         + " Mrd, bar " + (geld / 1e9).toFixed(2) + " Mrd"
         + (hat4S ? ", 4S" : ", Schaetzung");
@@ -314,16 +380,19 @@ export async function main(ns) {
 
       nachHome("data/boerse.json", herzschlag({
         state: "work", blockedReason: null,
-        hat4S,
+        hat4S, fehl4S,
         posten,
+        // Zum Geldkurs, Kommission je Posten abgezogen: was ein Verkauf JETZT
+        // braechte. bn4rep rechnet damit (lib/boersepause.js `boerseSicht`).
         depotWert: depot,
         bar: geld,
+        reserve,
         // Die Leitgroesse dieses Knotens: Depot plus Bargeld. Sie muss
         // wachsen, sonst greift S2 im Waechter - und das zu Recht, denn in
         // BitNode 8 gibt es keine zweite Quelle.
         gesamt: depot + geld,
-        beste: lage.slice().sort((a, b) => b.vorhersage - a.vorhersage)
-          .slice(0, 3).map((e) => ({ sym: e.sym, f: Number(e.vorhersage.toFixed(3)) })),
+        beste: lage.slice().sort((a, b) => (2 * b.f - 1) * b.mv - (2 * a.f - 1) * a.mv)
+          .slice(0, 3).map((e) => ({ sym: e.sym, f: Number(e.f.toFixed(3)) })),
       }));
 
       okRunden++;
@@ -335,7 +404,7 @@ export async function main(ns) {
         msg: msg.length > 200 ? msg.slice(0, 197) + "..." : msg, at: Date.now() };
       sag("RUNDENFEHLER (" + errStreak + " in Folge): " + msg);
     }
-    await ns.sleep(TAKT_MS);
+    await ns.sleep(ABFRAGE_MS);
   }
 
   function herzschlag(extra) {
@@ -350,39 +419,6 @@ export async function main(ns) {
       ...extra,
     });
   }
-}
-
-/**
- * Die Vorhersage aus der Preishistorie schaetzen.
- *
- * WARUM DER ANTEIL DER AUFWAERTSTICKS DAS RICHTIGE MASS IST.
- *
- * Der Kurs bewegt sich je Tick um denselben Prozentsatz nach oben oder unten
- * (`StockMarket.ts:260-290`): `chc` entscheidet die RICHTUNG, `av` die
- * Groesse, und `chc` ist genau die Zahl, die `getForecast` liefert. Der Anteil
- * der Aufwaertsticks an den letzten N ist damit ein erwartungstreuer
- * Schaetzer - er braucht nur genug Punkte.
- *
- * Bei weniger als zehn Punkten wird 0,5 zurueckgegeben, also "keine Meinung":
- * die Standardabweichung des Anteils liegt dort bei 0,16, und eine Vorhersage
- * von 0,60 waere von 0,44 nicht zu unterscheiden. Wer darauf handelt, handelt
- * auf Rauschen und zahlt Kommission dafuer.
- *
- * @param {number[]} h  Preise, aeltester zuerst
- */
-export function schaetzung(h) {
-  if (!Array.isArray(h) || h.length < 11) return 0.5;
-  let hoch = 0;
-  let schritte = 0;
-  for (let i = 1; i < h.length; i++) {
-    // Gleiche Preise zaehlen nicht mit - sie kommen vor, wenn die Historie
-    // schneller gelesen wird, als der Markt tickt (alle 6 s).
-    if (h[i] === h[i - 1]) continue;
-    schritte++;
-    if (h[i] > h[i - 1]) hoch++;
-  }
-  if (schritte < 10) return 0.5;
-  return hoch / schritte;
 }
 
 /**

@@ -44,13 +44,17 @@ console.log("");
 console.log("=== Der Aktienhandel (C.15) ===");
 
 const { modul, pfad } = await ladeAusBeiden(ROOT, "boerse.js");
+const handel = await import(pathToFileURL(path.join(SRC, "lib", "handel.js")).href);
 console.log("    " + path.relative(ROOT, pfad).replace(/\\/g, "/"));
 
 console.log("");
 console.log("-- Ebene 0: die Trendschaetzung --");
 {
-  const s = modul.schaetzung;
-  pruefe("sie ist exportiert", typeof s === "function");
+  // Seit dem 10.11.2026 steht die Schaetzung in lib/handel.js (`schaetze`
+  // liefert f UND die Schwankung mv); die alte `schaetzung` in boerse.js ist
+  // entfallen. Die Erwartungen an f sind dieselben geblieben.
+  const s = (h) => handel.schaetze(h).f;
+  pruefe("sie ist exportiert", typeof handel.schaetze === "function");
 
   // ZU WENIG PUNKTE HEISST "KEINE MEINUNG". Bei zehn Ticks liegt die
   // Standardabweichung des Anteils bei 0,16 - eine geschaetzte 0,60 waere von
@@ -95,11 +99,14 @@ console.log("-- die Kommission ist eingerechnet --");
   // Kommission. Das ist keine willkuerliche Zahl: bei genau der Kommission
   // muesste ein Handel 100 Prozent gewinnen, um sie zu decken; beim
   // Fuenfzigfachen sind es vier Prozent (zweimal Kommission auf 5 Mio).
-  const quelle = fs.readFileSync(path.join(SRC, "boerse.js"), "utf8");
-  pruefe("die Kommission steht als Konstante drin", /KOMMISSION\s*=\s*100e3/.test(quelle));
-  pruefe("sie begrenzt die Handelsgroesse", /budget < KOMMISSION \* 50/.test(quelle));
+  // Seit dem 10.11.2026 in lib/handel.js: Mindestposten 20 Mio (zweimal
+  // Kommission sind dann 1 %), und die Kommission geht vom freien Geld ab.
+  const quelle = fs.readFileSync(path.join(SRC, "lib", "handel.js"), "utf8");
+  pruefe("die Kommission steht als Konstante drin", handel.KOMMISSION === 100e3);
+  pruefe("sie begrenzt die Handelsgroesse", handel.REGEL.mindestPosten >= handel.KOMMISSION * 50,
+    String(handel.REGEL.mindestPosten));
   pruefe("und sie wird vom Budget abgezogen",
-    /budget - KOMMISSION/.test(quelle),
+    /\(frei - KOMMISSION\) \/ e\.ask/.test(quelle),
     "sonst reicht das Geld beim letzten Stueck nicht");
 }
 
@@ -157,10 +164,13 @@ console.log("-- die Zahlen gegen den Spielquelltext --");
 
     const quelle = fs.readFileSync(path.join(SRC, "boerse.js"), "utf8");
     pruefe("der Takt im Gewerk passt dazu", /TAKT_MS\s*=\s*6000/.test(quelle));
+    pruefe("der 4S-Preis im Gewerk ist der des Spiels",
+      handel.KOSTEN_4S === zahl("MarketDataTixApi4SCost"), String(handel.KOSTEN_4S));
     pruefe("die 4S-Schwelle liegt ueber dem Preis",
-      /geld >= 26e9/.test(quelle),
-      "25 Mrd fuer die API plus Puffer - sonst steht das Gewerk unmittelbar"
-        + " nach dem Kauf ohne Handelsgeld da");
+      handel.SCHWELLE_4S >= handel.KOSTEN_4S * 1.3,
+      "sonst steht das Gewerk unmittelbar nach dem Kauf ohne Handelsgeld da");
+    pruefe("und sie misst das VERMOEGEN, nicht das Bargeld (BN8-3)",
+      /kauf4SFaellig\(ns\.getServerMoneyAvailable\("home"\) \+ depotwert\(lage\)/.test(quelle));
   }
 }
 

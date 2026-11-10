@@ -29,9 +29,9 @@
   "singKosten41": 840,
   "dom": 0,
   "err": null,
-  "bytes": 214039,
-  "lines": 3724,
-  "sha256": "e813cd4267846b94fa84f9a303e0379ac78779b5b7568a5a4e404ddea74ea054",
+  "bytes": 223661,
+  "lines": 3885,
+  "sha256": "cc28d3d6ba924630bfd3f5df8b16709c01ca4e0f62a50dd69bb077151ead2dcf",
   "gemessenAm": "2026-10-24T16:21:46.810Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },

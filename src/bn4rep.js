@@ -43,7 +43,13 @@ import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } 
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
-import { PAUSE_FILE as BOERSE_PAUSE_FILE, TEL_FILE as BOERSE_TEL_FILE, pauseAnlegen as boersePauseAnlegen, pauseLesen as boersePauseLesen, freigabe as boerseFreigabe } from "lib/boersepause.js";
+import {
+  PAUSE_FILE as BOERSE_PAUSE_FILE, TEL_FILE as BOERSE_TEL_FILE, ABRUF_FILE as BOERSE_ABRUF_FILE,
+  ABRUF_MS as BOERSE_ABRUF_MS, KAUF_FAKTOR as BOERSE_KAUF_FAKTOR, SPENDEN_FAKTOR as BOERSE_SPENDEN_FAKTOR,
+  DAEDALUS_BAR as BOERSE_DAEDALUS_BAR, VERDOPPLUNG_SEK as BOERSE_VERDOPPLUNG_SEK,
+  pauseAnlegen as boersePauseAnlegen, pauseLesen as boersePauseLesen, freigabe as boerseFreigabe,
+  abrufAnlegen as boerseAbrufAnlegen, boerseSicht, kaufAusDepot as boerseKaufAusDepot,
+} from "lib/boersepause.js";
 // P1 / AUG-4 (03.10.2026): Kaufaufschub und Runde am Einbau-Tor im Kampfknoten
 // MIT Gang - eigene Importzeilen, damit sie neben den Listen unten stehen
 // statt in ihnen (nodes/audit-2026-10-03/verify-g01-betrieb.md PAKET 1).
@@ -487,6 +493,10 @@ export async function main(ns) {
   let corpErloesJetzt = 0;   // corp.json finance.erloesAug.summe (dieser Einbau)
   let corpRaise = null;      // schwebende Anhebung von geldbedarf.txt durch corp.js (FIX 2)
   let geldbedarfGeschrieben = null;   // zuletzt von bn4rep geschriebener Wert
+  let boerseSperreGemeldet = 0;       // BN8: Einbau wartet auf die 4S-API (Meldung gedrosselt)
+  let abrufSchutz = { betrag: 0, bis: 0 };   // BN8: abgerufenes Bargeld vor bn4net schuetzen
+  let daedalusAbrufSeit = 0;          // BN8: seit wann die 100 Mrd bar gehalten werden
+  let daedalusPauseBis = 0;           // BN8: nach 10 min ohne Beitritt 1 h Pause
   let erloesAmSchreiben = null;       // corp-Erloes beim letzten Schreiben (Basis fuer corpPendingRaise)
   let corpWaitWrittenMs = 0;
   const gateBo = { table: null, next: null, read: 0, skills: bladeSkillLevels(null, 0, null) };
@@ -805,7 +815,32 @@ export async function main(ns) {
       }
     } catch { /* ohne Marker bleibt alles beim Alten (Sperre) */ }
     const wartend = alleAugs.length - eingebauteAugs.length;
-    const geld = ns.getServerMoneyAvailable("home");
+    const bargeld = ns.getServerMoneyAvailable("home");
+    // BN8 (10.11.2026, BN8-2/3): das Geld steckt im Depot. Traegt die Boerse
+    // (boerse.js handelt UND hat die 4S-API), rechnet bn4rep mit dem VERMOEGEN
+    // und ruft Bargeld bei Bedarf ab (data/boerse-abruf.txt). Vorher bleibt es
+    // beim Bargeld. Begruendung und Zahlen: lib/boersepause.js `boerseSicht`.
+    let boerse = { aktiv: false, traegt: false, hat4S: false, depot: 0, unklar: false, depotLetzt: 0 };
+    let augResetMs = 0;
+    try { augResetMs = Number(ns.getResetInfo().lastAugReset) || 0; } catch { augResetMs = 0; }
+    try { boerse = boerseSicht(liesVonHome(BOERSE_TEL_FILE), Date.now(), augResetMs); }
+    catch (e) { gangCountError("boerseSicht", e); }
+    const geld = boerse.traegt ? bargeld + boerse.depot : bargeld;
+    let daedalusHalt = false;   // diese Runde werden 100 Mrd bar fuer die Einladung gehalten
+    const abruf = (betrag, grund) => {
+      const jetztA = Date.now();
+      if (abrufSchutz.bis > jetztA && abrufSchutz.betrag >= betrag) return;
+      abrufSchutz = { betrag, bis: jetztA + BOERSE_ABRUF_MS };
+      try {
+        schreibNachHome(BOERSE_ABRUF_FILE, boerseAbrufAnlegen(betrag, grund, jetztA));
+        // bn4net gibt nur aus, was ueber data/geldbedarf.txt liegt - sonst
+        // kauft es vom eben bereitgestellten Geld Rechner.
+        if (!(geldbedarfGeschrieben >= betrag)) {
+          geldbedarfGeschrieben = Math.round(betrag);
+          schreibNachHome("data/geldbedarf.txt", String(geldbedarfGeschrieben));
+        }
+      } catch (e) { gangCountError("boerse-abruf", e); }
+    };
     // A5 (Skeptiker-Einwand 1): Zufluss aus dem Spiel, nicht aus der
     // Differenz zweier Rundenstaende. `getTotalScriptIncome()[1]` ist das
     // Skripteinkommen seit dem letzten Einbau - sofort nach jedem Neustart
@@ -1105,7 +1140,9 @@ export async function main(ns) {
     // sein als die alte, nie strenger - ein kurzer Horizont richtet deshalb
     // keinen Schaden an, auch wenn ein Wiederaufbau laenger dauert.
     const UNBEZAHLBAR_HORIZONT_SEK = 600;
-    const naechstesUnbezahlbar = !!naechstes && unbezahlbarInHorizont({
+    // BN8 mit tragender Boerse: Geld ist nie der Engpass - das Vermoegen
+    // verdoppelt sich in gut einer Stunde, ein Einbau wirft es auf 250 Mio.
+    const naechstesUnbezahlbar = !boerse.traegt && !!naechstes && unbezahlbarInHorizont({
       preis: naechstes.preis, geld, einkommenProSek,
       horizontSek: UNBEZAHLBAR_HORIZONT_SEK, spendetGeradeAnSchwellenfaktion,
     });
@@ -1113,7 +1150,10 @@ export async function main(ns) {
     // zu KAUFEN ist. Sonst baute der Bot ein, waehrend eine verdiente und
     // bezahlbare Augmentierung noch im Regal liegt - und die waere nach dem
     // Einbau wieder unerreichbar, weil die Faktionsreputation auf null faellt.
-    const kaufbarJetzt = kandidaten.some((k) => k.rep >= k.repReq && geld >= k.preis);
+    // Mit tragender Boerse zaehlt als kaufbar nur, was der Lauf auch kauft
+    // (Vermoegen >= Faktor x Preis); den Rest kauft die Einbaurunde.
+    const kaufbarJetzt = kandidaten.some((k) => k.rep >= k.repReq
+      && geld >= k.preis * (boerse.traegt ? BOERSE_KAUF_FAKTOR : 1));
     const nichtsMehrOffen = kleinsteLuecke === null && !kaufbarJetzt;
     // Der zweite Weg kann genauso zu sein wie der erste. Jede gekaufte
     // Augmentierung verteuert die naechste um Faktor 1,9
@@ -1139,7 +1179,7 @@ export async function main(ns) {
     // eine halbe Stunde Wiederaufbau und setzt den Preisfaktor 1,9 je
     // wartendem Stueck auf eins zurueck, womit dieselbe Augmentierung wieder
     // ihren Grundpreis kostet.
-    const geldWegZu = unbezahlbarInHorizont({
+    const geldWegZu = !boerse.traegt && unbezahlbarInHorizont({
       preis: teuerstesVerdienteWertvoll, geld, einkommenProSek,
       horizontSek: UNBEZAHLBAR_HORIZONT_SEK, spendetGeradeAnSchwellenfaktion,
     });
@@ -2245,6 +2285,32 @@ export async function main(ns) {
     // wartet mit. Als Sperre gesetzt statt als eigene Bedingung in der Einbau-
     // Zeile - `gesperrt` ist genau die Variable, die dort schon mitgelesen wird.
     if (gateInstallWait) gesperrt = true;
+    // BN8 VOR DER 4S-API: KEIN EINBAU (10.11.2026). Die API kostet 25 Mrd, bleibt
+    // ueber alle Einbauten des Laufs und halbiert die Verdopplungszeit. Ein
+    // Einbau davor setzt das Vermoegen auf 250 Mio und schiebt sie um viele
+    // Stunden hinaus. Die Sperre endet mit dem Kauf (boerse.js, SCHWELLE_4S)
+    // oder wenn boerse.js nicht mehr meldet (Telemetrie aelter als 2 min).
+    // UND WENN DIE BOERSE SCHWEIGT (Skeptiker 10.11.): eine Telemetrie, die
+    // aelter ist als 2 min, aber aus diesem Einbauzyklus stammt und ein Depot
+    // nennt (`unklar`), heisst nicht "kein Depot". Ohne diese Zeile fiele
+    // `geld` auf das Bargeld zurueck, die Geld-Ausloeser sprangen an, und der
+    // Einbau loeschte das Depot - genau der Schaden, um den es geht.
+    if (boerse.unklar) {
+      gesperrt = true;
+      if (Date.now() - boerseSperreGemeldet > 30 * 60000) {
+        boerseSperreGemeldet = Date.now();
+        sag("EINBAU WARTET: boerse.js meldet nicht (Telemetrie alt), zuletzt "
+          + geldText(boerse.depotLetzt) + " im Depot. Kein Einbau, bis sie wieder meldet.");
+      }
+    }
+    if (boerse.aktiv && !boerse.traegt) {
+      gesperrt = true;
+      if (Date.now() - boerseSperreGemeldet > 30 * 60000) {
+        boerseSperreGemeldet = Date.now();
+        sag("EINBAU WARTET AUF DIE 4S-API: Vermoegen " + geldText(bargeld + boerse.depot)
+          + ", gekauft wird sie ab 45 Mrd. Bis dahin kein Einbau (" + wartend + " warten).");
+      }
+    }
     // H3: die 12-h-Frist der Einbausperre gilt fuer jede Runde ausser der ersten
     // Corp-Runde des Knotens - auch wenn Block 1c gar nicht lief (kein V2,
     // anderer Knoten) oder warf. Nur ODER, nie ein Aufheben (31.08.2026).
@@ -2252,10 +2318,23 @@ export async function main(ns) {
     corpFirstPrev = corpFirstNow;
     if (gateBought || corpDonatedNow) { await ns.sleep(2000); continue; }   // Preise/Ruf haben sich verschoben
 
+    // BN8 MIT TRAGENDER BOERSE (Skeptiker 10.11.):
+    // (a) Im Lauf kauft bn4rep nur bis Vermoegen/10; was die Einbaurunde nach
+    //     dem Ausverkauf kaufen kann, zaehlt fuer die Mindestschlange mit -
+    //     sonst wartet ein verdientes Stueck auf einen Einbau, der an eben
+    //     diesem Stueck haengt.
+    // (b) Ein Einbau kostet hier nicht eine halbe Stunde, sondern den
+    //     Wiederaufbau des Vermoegens von 250 Mio: log2(W/250 Mio) Verdopplungen.
+    //     Die naechste Ruf-Huerde muss weiter weg sein als das.
+    const einbauKaufbar = boerse.traegt
+      ? kandidaten.filter((k) => k.rep >= k.repReq && geld >= k.preis).length : 0;
+    const lueckeEinbau = boerse.traegt
+      ? Math.max(lueckeZuGross, grobRate * BOERSE_VERDOPPLUNG_SEK * Math.log2(Math.max(2, geld / 250e6)))
+      : lueckeZuGross;
     if (!ausgangSteht
         && wiederaufbauHilfe
-        && (wartend >= MINDEST_WARTESCHLANGE || spendenAusnahme || redPillWartet)
-        && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeZuGross)
+        && (wartend + einbauKaufbar >= MINDEST_WARTESCHLANGE || spendenAusnahme || redPillWartet)
+        && ((kleinsteLuecke !== null && kleinsteLuecke > lueckeEinbau)
             || nichtsMehrOffen || geldWegZu || naechstesUnbezahlbar || favorLohnt
             || spendenrechtFaellig || redPillWartet)
         && !gesperrt) {
@@ -2456,10 +2535,39 @@ export async function main(ns) {
         if (ausgang !== "keinhandel") {
           sag("Depot vor dem Einbau: " + (ausgang === "quittiert"
             ? "verkauft, bar jetzt " + (ns.getServerMoneyAvailable("home") / 1e9).toFixed(2) + " Mrd"
-            : "KEINE Quittung von boerse.js in 45 s - baue trotzdem ein"));
+            : "KEINE Quittung von boerse.js in 45 s"));
+        }
+        if (ausgang !== "quittiert") {
+          // KEIN EINBAU OHNE QUITTUNG, SOLANGE EIN DEPOT BEKANNT IST (Skeptiker
+          // 10.11.). "zeitueber" und "keinhandel" hiessen bisher "baue trotzdem
+          // ein" - bei 100 Mrd im Depot waere das der Totalverlust. Bekannt ist
+          // das Depot aus der letzten Telemetrie dieses Einbauzyklus, egal wie alt.
+          let letzt = 0;
+          try { letzt = boerseSicht(liesVonHome(BOERSE_TEL_FILE), Date.now(), augResetMs).depotLetzt; } catch { letzt = 0; }
+          if (letzt > Math.max(50e6, 0.1 * ns.getServerMoneyAvailable("home"))) {
+            sag("EINBAU AUSGESETZT: boerse.js hat den Ausverkauf nicht quittiert (" + ausgang
+              + "), zuletzt " + geldText(letzt) + " im Depot. Neuer Anlauf in der naechsten Runde.");
+            await ns.sleep(15000);
+            continue;
+          }
         }
         const torGrund = torGrundJetzt();
         if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
+        // Das Depot ist verkauft: jetzt alles Verdiente kaufen, teuerstes zuerst.
+        // Im Lauf kauft bn4rep mit tragender Boerse nur Stuecke bis zu einem
+        // Zehntel des Vermoegens (BOERSE_KAUF_FAKTOR) - der Rest wartet auf hier.
+        if (ausgang === "quittiert") {
+          for (const k of kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+            if (k.rep < k.repReq) continue;
+            try {
+              const p = ns.singularity.getAugmentationPrice(k.aug);
+              if (ns.getServerMoneyAvailable("home") < p) continue;
+              if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
+                sag("GEKAUFT (Einbaurunde): " + k.aug + " von " + k.faktion + " fuer " + geldText(p) + ".");
+              }
+            } catch (e) { gangCountError("Kauf in der Einbaurunde", e); }
+          }
+        }
       }
 
       // H2-FIX (27.09.2026, nodes/audit-2026-09-26/bn12-bericht.md, MINOR
@@ -2706,10 +2814,46 @@ export async function main(ns) {
         : "Kaufaufschub vor der Gang beendet (" + (inGangNow ? "Gang steht" : "Rueckfall: Schalter weg, Frist abgelaufen oder Lage unklar") + ").");
       gangHoldWar = gangHold;
     }
+    // DAEDALUS VERLANGT 100 Mrd BARGELD (BN8-2, FactionJoinCondition.ts:134-145).
+    // Sind Augmentierungen und Hacking erfuellt, wird der Betrag abgerufen und
+    // gehalten, bis die Einladung da ist (das Spiel prueft alle paar Sekunden).
+    if (boerse.traegt) {
+      try {
+        const pl = ns.getPlayer();
+        if (!pl.factions.includes("Daedalus")
+            && eingebauteAugs.length >= daedalusSchwelle(bnMults, kaufKnoten, DAEDALUS_SCHWELLE_FALLBACK)
+            && pl.skills.hacking >= 2500
+            && bargeld + boerse.depot >= BOERSE_DAEDALUS_BAR * 1.05
+            && Date.now() >= daedalusPauseBis) {
+          // Hoechstens 10 min am Stueck: das Spiel prueft Einladungen alle paar
+          // Sekunden, bn4life tritt alle 30 s bei. Kommt in 10 min nichts, stimmt
+          // eine Bedingung nicht - dann 1 h nicht 100 Mrd stilllegen.
+          if (!daedalusAbrufSeit) daedalusAbrufSeit = Date.now();
+          if (Date.now() - daedalusAbrufSeit > 10 * 60000) {
+            daedalusPauseBis = Date.now() + 3600000;
+            daedalusAbrufSeit = 0;
+            sag("DAEDALUS: 100 Mrd lagen 10 min bar, keine Mitgliedschaft - 1 h Pause.");
+          } else {
+            abruf(BOERSE_DAEDALUS_BAR * 1.01, "Daedalus-Einladung (100 Mrd bar)");
+            daedalusHalt = true;   // Kauf und Spende lassen den Betrag in Ruhe
+          }
+        } else if (pl.factions.includes("Daedalus")) {
+          daedalusAbrufSeit = 0;
+        }
+      } catch (e) { gangCountError("Daedalus-Bargeld", e); }
+    }
     // CORP-GELD (BN3): mit gezuendeter Corp ebenso nichts - Block 1c entscheidet.
-    for (const k of (inGangNow || corpGate || gangHold) ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+    for (const k of (inGangNow || corpGate || gangHold || daedalusHalt) ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
       if (k.rep < k.repReq) continue;
-      if (ns.getServerMoneyAvailable("home") < k.preis) continue;
+      {
+        const barJetzt = ns.getServerMoneyAvailable("home");
+        if (barJetzt < k.preis) {
+          if (boerse.traegt && boerseKaufAusDepot(k.preis, barJetzt, boerse.depot) === "abruf") {
+            abruf(k.preis, "Kauf " + k.aug);
+          }
+          continue;
+        }
+      }
       if (ns.singularity.purchaseAugmentation(k.faktion, k.aug)) {
         sag("GEKAUFT: " + k.aug + " von " + k.faktion + " fuer " + geldText(k.preis) + ".");
         gekauft++;
@@ -2811,6 +2955,7 @@ export async function main(ns) {
         if (r.extra > 0) bedarfSchreiben = Math.max(bedarfSchreiben, bedarf);
       } catch (e) { gangCountError("geldbedarf.txt Anhebung", e); }
     } else corpRaise = null;
+    if (abrufSchutz.bis > Date.now()) bedarfSchreiben = Math.max(bedarfSchreiben, abrufSchutz.betrag);
     geldbedarfGeschrieben = Math.round(bedarfSchreiben);
     erloesAmSchreiben = corpGate ? corpErloesJetzt : null;
     ns.write("data/geldbedarf.txt", String(Math.round(bedarfSchreiben)), "w");
@@ -3298,7 +3443,10 @@ export async function main(ns) {
     const kostenSekunden = (k) => {
       let luecke = Math.max(0, k.repReq - k.rep);
       if ((favor[k.faktion] || 0) >= spendenSchwelle) {
-        luecke = Math.max(0, luecke - repForMoney(Math.max(0, geld - k.preis)));
+        // Traegt die Boerse, ist `geld` das Vermoegen - gespendet wird davon
+        // hoechstens ein Viertel (BOERSE_SPENDEN_FAKTOR).
+        const spendbar = boerse.traegt ? geld / BOERSE_SPENDEN_FAKTOR : geld;
+        luecke = Math.max(0, luecke - repForMoney(Math.max(0, spendbar - k.preis)));
       }
       return luecke / repPerSecond(k.faktion);
     };
@@ -3443,7 +3591,20 @@ export async function main(ns) {
       const fehlt = Math.max(0, ziel.repReq - ns.singularity.getFactionRep(ziel.faktion));
       const noetig = geldFuerRep(fehlt) * 1.02;
       // Mit Gang (P1 / AUG-4) zusaetzlich die Ruecklage der Torrunde (gateBedarf, 0 ohne Gang).
-      const verfuegbar = ns.getServerMoneyAvailable("home") - Math.max(teuerstesVerdiente, gateBedarf);
+      const barSp = ns.getServerMoneyAvailable("home");
+      let verfuegbar = barSp - Math.max(teuerstesVerdiente, gateBedarf);
+      if (boerse.traegt) {
+        // BN8: GANZ oder gar nicht, und nur mit Abstand. Eine Spende, die das
+        // Kapital aufzehrt, kostet vier und mehr Verdopplungen; warten, bis das
+        // Vermoegen das Vierfache traegt, kostet zwei. Ausnahme The Red Pill:
+        // danach wird ohnehin eingebaut, das Kapital ist dann gleichgueltig.
+        const faktorSp = ziel.aug === "The Red Pill" ? 1 : BOERSE_SPENDEN_FAKTOR;
+        const traegt = barSp + boerse.depot >= (noetig + (ziel.preis || 0)) * faktorSp;
+        // Unter 1 Mrd wird unten ohnehin nicht gespendet - dann auch kein Abruf
+        // (sonst alle 3 min verkaufen und wieder anlegen, fuer nichts).
+        if (traegt && !daedalusHalt && noetig > 1e9 && barSp < noetig) abruf(noetig, "Spende an " + ziel.faktion);
+        verfuegbar = traegt && !daedalusHalt && barSp >= noetig ? noetig : 0;
+      }
       const uebrig = Math.min(noetig, verfuegbar);
       if (uebrig > 1e9) {
         if (ns.singularity.donateToFaction(ziel.faktion, uebrig)) {

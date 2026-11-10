@@ -2311,6 +2311,18 @@ export async function main(ns) {
           + ", gekauft wird sie ab 45 Mrd. Bis dahin kein Einbau (" + wartend + " warten).");
       }
     }
+    // BN8-UEBERGANGSRIEGEL (10.11.2026, bis der Einbauplan fuer BN8 gebaut ist).
+    // Gerechnet aus dem Spielquellcode (nodes/audit-2026-11-07/BN8-ROUTE.md): der
+    // schnellste Weg sind drei grosse Einbaurunden mit Ruf per Spende. Die
+    // Regeln der anderen Knoten bauten hier schon mit drei Stuecken ein, und
+    // jeder Einbau kostet Geld, Server und Hacking-Erfahrung. Jeder Kauf im
+    // Lauf verteuert ausserdem die grossen Stuecke der Runde um 1,77 je Stueck.
+    // Deshalb traegt die Boerse: kein Kauf, keine Spende, kein Einbau - ausser
+    // The Red Pill wartet. Notausgang: 36 h nach dem letzten Einbau gilt
+    // wieder die alte Regel (falls der Plan nie kommt, steht der Bot nicht).
+    const bn8Halt = boerse.traegt && !redPillWartet
+      && augResetMs > 0 && Date.now() - augResetMs < 36 * 3600000;
+    if (bn8Halt) gesperrt = true;
     // H3: die 12-h-Frist der Einbausperre gilt fuer jede Runde ausser der ersten
     // Corp-Runde des Knotens - auch wenn Block 1c gar nicht lief (kein V2,
     // anderer Knoten) oder warf. Nur ODER, nie ein Aufheben (31.08.2026).
@@ -2857,7 +2869,7 @@ export async function main(ns) {
       } catch (e) { gangCountError("Daedalus-Bargeld", e); }
     }
     // CORP-GELD (BN3): mit gezuendeter Corp ebenso nichts - Block 1c entscheidet.
-    for (const k of (inGangNow || corpGate || gangHold || daedalusHalt) ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
+    for (const k of (inGangNow || corpGate || gangHold || daedalusHalt || bn8Halt) ? [] : kandidaten.slice().sort((a, b) => b.preis - a.preis)) {
       if (k.rep < k.repReq) continue;
       {
         const barJetzt = ns.getServerMoneyAvailable("home");
@@ -3616,8 +3628,9 @@ export async function main(ns) {
         const traegt = barSp + boerse.depot >= (noetig + (ziel.preis || 0)) * faktorSp;
         // Unter 1 Mrd wird unten ohnehin nicht gespendet - dann auch kein Abruf
         // (sonst alle 3 min verkaufen und wieder anlegen, fuer nichts).
-        if (traegt && !daedalusHalt && noetig > 1e9 && barSp < noetig) abruf(noetig, "Spende an " + ziel.faktion);
+        if (traegt && !daedalusHalt && !bn8Halt && noetig > 1e9 && barSp < noetig) abruf(noetig, "Spende an " + ziel.faktion);
         verfuegbar = traegt && !daedalusHalt && barSp >= noetig ? noetig : 0;
+        if (bn8Halt) verfuegbar = 0;   // Uebergangsriegel: gespendet wird in der Einbaurunde
       }
       const uebrig = Math.min(noetig, verfuegbar);
       if (uebrig > 1e9) {

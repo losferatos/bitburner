@@ -43,6 +43,7 @@ import { lage as endspurtLage, einbauErlaubt, kampfEinbauSperre, augRuecklage } 
 import { beantrage as figBeantrage, darf as figDarf } from "lib/figurns.js";
 import { PRIO as FIG_PRIO, KAMPFZIEL_STANDARD } from "lib/figur.js";
 import { handschlag } from "lib/handschlag.js";
+import { PAUSE_FILE as BOERSE_PAUSE_FILE, TEL_FILE as BOERSE_TEL_FILE, pauseAnlegen as boersePauseAnlegen, pauseLesen as boersePauseLesen, freigabe as boerseFreigabe } from "lib/boersepause.js";
 // P1 / AUG-4 (03.10.2026): Kaufaufschub und Runde am Einbau-Tor im Kampfknoten
 // MIT Gang - eigene Importzeilen, damit sie neben den Listen unten stehen
 // statt in ihnen (nodes/audit-2026-10-03/verify-g01-betrieb.md PAKET 1).
@@ -2419,6 +2420,44 @@ export async function main(ns) {
       // Die bis zu 90 s des Handschlags sind vorbei - Graft und Ausgang
       // koennen sich darin geaendert haben. Noch ist kein Geld ausgegeben.
       {
+        const torGrund = torGrundJetzt();
+        if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
+      }
+
+      // DEPOT VOR DEN LETZTEN KAEUFEN VERKAUFEN (BN8-1, Audit 07.11.2026).
+      //
+      // Der Einbau loescht jede Aktienposition ohne Auszahlung
+      // (Prestige.ts:169-172), in BitNode 8 dazu das Geld (auf 250 Mio). Am
+      // 10.11. stand der Bot in BN8 mit 374 Mio im Depot und 17 Mio bar - ohne
+      // diesen Schritt waeren 95 % des Vermoegens beim ersten Einbau verfallen.
+      // Hier, VOR Fuellstueck und NeuroFlux, damit der Erloes noch gekauft wird.
+      // boerse.js verkauft (bn4rep braucht so kein RAM fuer die Boersen-API);
+      // ohne Quittung nach 45 s wird trotzdem eingebaut - schlechter als
+      // vorher wird es dadurch nicht.
+      {
+        const seit = Date.now();
+        // Eine noch laufende Pause wiederverwenden (Skeptiker 10.11.): haelt
+        // ein Tor den Einbau, liefe sonst alle 15 s eine neue Pause an und
+        // der Handel bliebe dauerhaft gelaehmt.
+        // Nur mit genug Restlaufzeit: laeuft die Pause vor installAugmentations
+        // ab, kauft boerse.js wieder (Skeptiker-Nachpruefung).
+        if (!(boersePauseLesen(liesVonHome(BOERSE_PAUSE_FILE), seit).restMs > 3 * 60000)) {
+          try { schreibNachHome(BOERSE_PAUSE_FILE, boersePauseAnlegen(seit)); } catch { /* dann zeitueber */ }
+        }
+        const id = (() => { try { return JSON.parse(liesVonHome(BOERSE_PAUSE_FILE)).id; } catch { return null; } })();
+        let ausgang = "keinhandel";
+        if (id !== null) {
+          for (;;) {
+            ausgang = boerseFreigabe(liesVonHome(BOERSE_TEL_FILE), id, Date.now(), seit);
+            if (ausgang !== "warten") break;
+            await ns.sleep(2000);
+          }
+        }
+        if (ausgang !== "keinhandel") {
+          sag("Depot vor dem Einbau: " + (ausgang === "quittiert"
+            ? "verkauft, bar jetzt " + (ns.getServerMoneyAvailable("home") / 1e9).toFixed(2) + " Mrd"
+            : "KEINE Quittung von boerse.js in 45 s - baue trotzdem ein"));
+        }
         const torGrund = torGrundJetzt();
         if (torGrund !== null) { await amTorWarten(torGrund, true); continue; }
       }

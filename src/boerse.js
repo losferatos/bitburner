@@ -59,6 +59,7 @@
 
 import { liesVonHome, nachHome as schreibNachHome } from "lib/hostdatei.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
+import { PAUSE_FILE, pauseLesen } from "lib/boersepause.js";
 
 
 const TAKT_MS = 6000;      // ein Kursschritt dauert 6 s (msPerStockUpdate)
@@ -145,6 +146,7 @@ export async function main(ns) {
   let lastError = null;
   let gekaufte4S = false;
   let letzteMeldung = "";
+  let quittiertFuer = null;
 
   sag("boerse gestartet. " + symbole.length + " Symbole.");
 
@@ -211,6 +213,35 @@ export async function main(ns) {
           quelle = "Historie";
         }
         lage.push({ sym, preis, vorhersage, quelle, ticks: h.length - 1 });
+      }
+
+      // --- Ausverkauf vor dem Einbau (BN8-1, lib/boersepause.js) -------------
+      //
+      // Der Einbau loescht das Depot ohne Auszahlung (Prestige.ts:169-172).
+      // bn4rep legt die Pause VOR seinen letzten Kaeufen; hier wird verkauft
+      // und bis `bis` nichts gekauft. Die Historie oben laeuft weiter, damit
+      // nach einer abgeblasenen Einbaurunde nicht von vorn geschaetzt wird.
+      {
+        const pause = pauseLesen(liesVonHome(ns, PAUSE_FILE), jetzt);
+        if (pause.aktiv) {
+          if (quittiertFuer !== pause.id) {
+            const erloes = alleVerkaufen(ns, symbole, sag);
+            quittiertFuer = pause.id;
+            sag("Einbau steht an - Depot verkauft, " + (erloes / 1e9).toFixed(2)
+              + " Mrd erloest. Bis zum Ende der Pause wird nichts gekauft.");
+            ereignis(ns, nachHome, "boerse: Ausverkauf vor Einbau " + (erloes / 1e9).toFixed(2) + " Mrd");
+          }
+          const geldP = ns.getServerMoneyAvailable("home");
+          nachHome("data/boerse.json", herzschlag({
+            state: "wait", blockedReason: "Einbau steht an - Depot verkauft",
+            hat4S, posten: 0, depotWert: 0, bar: geldP, gesamt: geldP,
+            verkauftFuer: pause.id,
+          }));
+          okRunden++;
+          errStreak = 0;
+          await ns.sleep(TAKT_MS);
+          continue;
+        }
       }
 
       // --- Verkaufen, was gedreht hat ----------------------------------------

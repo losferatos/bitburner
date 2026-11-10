@@ -135,6 +135,9 @@ export async function main(ns) {
                        // die nur durch einen Vergleich harmlos ist, gehoert
                        // weggeraeumt.
                        "data/backup-request.txt", "data/backup-ok.txt",
+                       // Ausverkauf vor dem Einbau (lib/boersepause.js): nach
+                       // dem Einbau ist das Depot leer, die Pause gegenstandslos.
+                       "data/boerse-pause.txt",
                        "data/blocked-hosts.json"]) {
     if (ns.fileExists(datei, "home")) { ns.rm(datei, "home"); sag("Entfernt: " + datei); }
   }

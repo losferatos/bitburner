@@ -918,6 +918,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
       "evictRank": 15,
       "needsFigure": "none",
       "needsLibs": [
+        "lib/boersepause.js",
         "lib/events.js",
         "lib/hostdatei.js"
       ],
@@ -1225,7 +1226,8 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
         "lib/hackaugs.js",
         "lib/handschlag.js",
         "lib/hostdatei.js",
-        "lib/corpgeld.js"
+        "lib/corpgeld.js",
+        "lib/boersepause.js"
       ],
       "singularity": true,
       "restartPolicy": "always",

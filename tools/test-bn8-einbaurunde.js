@@ -446,6 +446,8 @@ console.log("\n-- 1: Runde 1, Vermoegen 100 Mrd (fast alles Depot): im Lauf NICH
   pruefe("1 keine Pausendatei", pause(w) === "", pause(w).slice(0, 80));
   pruefe("1 kein Handschlag gestellt", logZeilen(r, "Handschlag gestellt").length === 0);
   pruefe("1 Depot unangetastet", w.depot === 95 * MRD, String(w.depot));
+  // Skeptiker 11.11.2026: im Lauf bleibt die Ruecklage - RAM wird in der Einbaurunde gekauft, nicht frueher.
+  pruefe("1 im Lauf bleibt die Geldreserve stehen (kein frueher RAM-Kauf aus dem Betriebsgeld)", Number(w.dateien.home["data/geldbedarf.txt"]) >= 5 * MRD, String(w.dateien.home["data/geldbedarf.txt"]));
 }
 
 // ---------------------------------------------------------------------------
@@ -499,6 +501,10 @@ console.log("\n-- 2: Runde 1, 400 Mrd: Pause, Quittung, Spenden, Plankaeufe, ein
 console.log("\n-- 3: wie 2, aber Quittung nur mit 10 % des Depots (Kurssturz) --");
 {
   const w = welt400({ stub: { quote: 0.1 } });
+  // Verlauf der Geldreserve mitschreiben (jeder Schreibzugriff mit Nachbau-Uhr).
+  const reserveVerlauf = []; let reserveWert;
+  Object.defineProperty(w.dateien.home, "data/geldbedarf.txt", { enumerable: true, configurable: true,
+    get: () => reserveWert, set: (v) => { reserveWert = v; reserveVerlauf.push([w.uhr, Number(v)]); } });
   const r = await lauf("3", w);
   const st = w.haken.st;
   pruefe("3 Nachbau vollstaendig", nachbauOk(r), hinweisFehler(r));
@@ -508,6 +514,12 @@ console.log("\n-- 3: wie 2, aber Quittung nur mit 10 % des Depots (Kurssturz) --
   pruefe("3 keine Kaeufe", w.kaeufe.length === 0, "Kaeufe: " + w.kaeufe.length + " " + w.kaeufe.map((k) => k.a).join(",").slice(0, 100));
   pruefe("3 keine Spenden", w.spenden.length === 0, "Spenden: " + w.spenden.length);
   pruefe("3 Pausendatei geleert", pause(w) === "", pause(w).slice(0, 80));
+  const tVerkauf = st.verkauf[0] ? st.verkauf[0].uhr : 0;
+  const frueh = reserveVerlauf.filter(([t]) => t >= tVerkauf && t <= tVerkauf + 9 * 60000);
+  pruefe("3 nach dem Abbruch bleibt das Bargeld gesperrt, bis die Boerse zurueckgekauft hat (mindestens 9 min)",
+    frueh.length >= 1 && frueh.every(([, v]) => v >= 1e17), JSON.stringify(frueh.slice(0, 6)));
+  const spaet = reserveVerlauf.filter(([t]) => t > tVerkauf + 11 * 60000);
+  pruefe("3 nach 10 min gilt wieder die normale Ruecklage", spaet.length === 0 || spaet[spaet.length - 1][1] < 1e17, JSON.stringify(spaet.slice(-3)));
 }
 
 console.log("\n-- 4: wie 2, die Boerse quittiert NIE --");
@@ -629,6 +641,16 @@ console.log("\n-- 8: Runde 3, The Red Pill wartet schon: Einbau ohne weitere Bed
   pruefe("8 Einbau", w.installAufrufe === 1, "install " + w.installAufrufe + ", Ende " + r.ende + " " + (logZeilen(r, "EINBAU")[0] || "").slice(0, 160));
   pruefe("8 Depot vor dem Einbau verkauft (Quittung)", w.haken.st.quittiert >= 1);
   pruefe("8 keine Spende", w.spenden.length === 0);
+}
+
+console.log("\n-- 8b: Runde 4 (The Red Pill installiert): alles Bargeld frei fuer Ports und RAM --");
+{
+  const w = redPillWelt(150, { installiert: [...alt(31), RP], bar: 3 });
+  w.faktionen.Daedalus.rep = 200e3;   // Aug-D1/D2 waeren erreichbar - eine Ruecklage dafuer sperrte bisher das Bargeld
+  const r = await lauf("8b", w);
+  pruefe("8b Nachbau vollstaendig", nachbauOk(r), hinweisFehler(r));
+  pruefe("8b kein Einbau, kein Kauf", w.installAufrufe === 0 && w.kaeufe.length === 0, "install " + w.installAufrufe + " Kaeufe " + w.kaeufe.length);
+  pruefe("8b Geldreserve 0", Number(w.dateien.home["data/geldbedarf.txt"]) === 0, String(w.dateien.home["data/geldbedarf.txt"]));
 }
 
 // ---------------------------------------------------------------------------

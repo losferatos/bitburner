@@ -504,6 +504,7 @@ export async function main(ns) {
   let daedalusPauseBis = 0;           // BN8: nach 10 min ohne Beitritt 1 h Pause
   let bn8GrundGemeldet = "";          // BN8-Plan: zuletzt gemeldeter Wartegrund
   let bn8GemeldetMs = 0;
+  let einbauBarBis = 0;               // bis dahin gehoert alles Bargeld der Einbaurunde (BN8)
   let quittungSperreBis = 0;          // nach ausgebliebener Quittung 10 min kein neuer Einbauanlauf
   let erloesAmSchreiben = null;       // corp-Erloes beim letzten Schreiben (Basis fuer corpPendingRaise)
   let corpWaitWrittenMs = 0;
@@ -2635,6 +2636,7 @@ export async function main(ns) {
         // naechste Runde sie neu.
         try {
           geldbedarfGeschrieben = 1e18;
+          einbauBarBis = Date.now() + 10 * 60000;
           schreibNachHome("data/geldbedarf.txt", String(geldbedarfGeschrieben));
         } catch (e) { gangCountError("geldbedarf vor der Einbaurunde", e); }
         // Eine noch laufende Pause wiederverwenden (Skeptiker 10.11.): haelt
@@ -3146,7 +3148,19 @@ export async function main(ns) {
     // Corp-Modus (BN3): die Kosten der VOLLEN Runde (Bedarfsplan mit Bestechung) -
     // das angeforderte und schon gelieferte Geld bleibt so vor bn4net, homegrow,
     // hacknet, hashes und graftauto geschuetzt (Koordinator 06.10.).
-    const bedarf = (inGangNow || corpGate)
+    // BN8 (11.11.2026, nach Skeptiker):
+    //  - Runden 1-3: die Ruecklage BLEIBT. Sie sperrt zwar das Betriebsgeld der
+    //    Boerse fuer RAM (home stand nach 7 h bei 128 GB), aber das ist richtig:
+    //    die Route ist dort vom Geld begrenzt, gekaufte Rechner verfallen beim
+    //    Einbau, und home-RAM kauft die Einbaurunde selbst - frueher gekauft
+    //    kostet es nur Zinseszins (Verdopplung alle 40 min).
+    //  - Runde 4 (The Red Pill installiert): Geld hat keinen anderen Zweck mehr
+    //    als Hacking 3000 - Portprogramme (w0r1d_d43m0n braucht 5 Ports) und
+    //    RAM. Eine Ruecklage fuer Rest-Stuecke haette genau das gesperrt.
+    //  - Nach dem Start einer Einbaurunde ist 10 min lang (Laenge der
+    //    Boersenpause) alles Bargeld tabu: nach einem Abbruch liegt der Erloes
+    //    bar, bis boerse.js zurueckgekauft hat.
+    const bedarf = Date.now() < einbauBarBis ? 1e18 : bn8Runde >= 4 ? 0 : (inGangNow || corpGate)
       ? gateBedarf
       : augRuecklage(kandidaten, ns.getServerMoneyAvailable("home"));
     // FIX 2 (Runde 3): corp.js hebt geldbedarf.txt nach einem Verkauf direkt an;

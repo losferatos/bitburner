@@ -1087,6 +1087,15 @@ export async function main(ns) {
     if (orderActive && COMPANIES.includes(orderName)) {
       companyTarget = orderName;
     } else if (orderName !== "off" && !nurKampfStuecke
+        // KEINE AUTOMATISCHE FIRMENPHASE IN BN8 (auch im Fenster nach dem Einbau,
+        // bevor boerse.js wieder meldet - Skeptiker;
+        // 11.11.2026). Ruf ist dort per Spende kaeuflich, die Megakonzerne
+        // stehen nicht im Plan (lib/bn8plan.js) - und die Phase sperrt den
+        // Einbau (INSTALL_LOCK_FILE). Gemessen: Runde 2 war bei 1,04 Bio
+        // faellig und lief 14 min spaeter bei 1,3 Bio noch nicht, weil die
+        // Figur bei Clarke Incorporated arbeitete. Ein ausdruecklicher
+        // Auftrag (orderActive, oben) gilt weiter.
+        && ns.getResetInfo().currentNode !== 8
         // KEINE AUTOMATISCHE FIRMENPHASE IM GEFILTERTEN KAMPFKNOTEN (Skeptiker
         // 23.09.2026): bisher hielten reine Hack-Stuecke offeneNuetzliche
         // gefuellt; mit dem Filter waere die Liste nach jedem Einbau leer,

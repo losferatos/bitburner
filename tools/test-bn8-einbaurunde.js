@@ -244,8 +244,9 @@ function baueNs(w) {
       quitJob: () => {},
       getCompanyRep: () => 0,
       getCompanyFavor: () => 0,
-      applyToCompany: () => "",
-      workForCompany: () => false,
+      // w.firma: die Firma stellt ein (Firmenphase moeglich); sonst wie bisher keine Stelle.
+      applyToCompany: () => (w.firma ? "Software Engineering Intern" : ""),
+      workForCompany: () => !!w.firma,
       // P0 (GANG-2): der Kampfknoten-Einbau verlangt ein wartendes Stueck, das
       // den Wiederaufbau verkuerzt (WIEDERAUFBAU_MULTS) - ohne Werte hier
       // bliebe jeder V2-Einbau im Test an `wiederaufbauHilfe` haengen.
@@ -496,6 +497,21 @@ console.log("\n-- 2: Runde 1, 400 Mrd: Pause, Quittung, Spenden, Plankaeufe, ein
   pruefe("2 jeder Plankauf gelang (kein NICHT GEKAUFT)", logZeilen(r, "NICHT GEKAUFT").length === 0, logZeilen(r, "NICHT GEKAUFT")[0] || "");
   pruefe("2 keine abgelehnte Spende", logZeilen(r, "SPENDE ABGELEHNT").length === 0);
   pruefe("2 Geld nie negativ", w.geld >= 0, String(w.geld));
+}
+
+console.log("\n-- 2c: wie 2, aber nichts wartet und eine Firma stellt ein: KEINE Firmenphase, der Einbau kommt --");
+{
+  // Befund 11.11.2026: Runde 2 war seit 13 min faellig (1,3 Bio), aber bn4rep arbeitete fuer Clarke Incorporated -
+  // die Firmenphase sperrt den Einbau (data/install-sperre.txt). Ruf ist in BN8 per Spende kaeuflich.
+  const w = welt400({ warteschlange: [], rep: { CyberSec: 100e3, NiteSec: 150e3, "The Black Hand": 90e3 } });   // jede offene Ruf-Luecke > 150.000
+  w.firma = true;
+  // Die Phase lief schon (sie begann, bevor die Schwelle erreicht war) und haelt ihre Einbausperre frisch.
+  w.dateien.home["data/install-sperre.txt"] = "FIRMENPHASE Clarke Incorporated|" + w.uhr;
+  const r = await lauf("2c", w);
+  pruefe("2c Nachbau vollstaendig", nachbauOk(r), hinweisFehler(r));
+  pruefe("2c keine Firmenphase", logZeilen(r, "ANGESTELLT").length === 0 && !String(w.dateien.home["data/install-sperre.txt"] || "").startsWith("FIRMENPHASE"),
+    (logZeilen(r, "ANGESTELLT")[0] || "") + " | " + String(w.dateien.home["data/install-sperre.txt"] || "").slice(0, 60));
+  pruefe("2c genau ein Einbau", w.installAufrufe === 1, "install " + w.installAufrufe);
 }
 
 console.log("\n-- 3: wie 2, aber Quittung nur mit 10 % des Depots (Kurssturz) --");

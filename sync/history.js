@@ -49,7 +49,7 @@ const fresh = (o, wall, key = "zeit") => !!o && Number.isFinite(o[key]) && Math.
  *
  * @returns {object|null} null, wenn nichts Verwertbares da ist
  */
-export function buildSample(wall, blade, exit, net) {
+export function buildSample(wall, blade, exit, net, stock = null) {
   // Ohne frische bn4net.json fehlt die Uhr und der Knotenlauf - keine Probe.
   if (!fresh(net, wall)) return null;
   const nodeReset = num(net.nodeReset);
@@ -73,6 +73,11 @@ export function buildSample(wall, blade, exit, net) {
     action: bladeOk ? (blade.aktion || null) : null,
     money: num(net.geld),
     hacking: num(net.hacking),
+    // Vermoegen (Depot plus Bargeld) aus data/boerse.json - in BitNode 8 die
+    // Leitgroesse. Nur aus einer frischen Datei dieses Knotenlaufs; boerse.js
+    // stempelt mit `ts`, nicht mit `zeit`.
+    wealth: fresh(stock, wall, "ts") && (nodeReset === null || num(stock.ts) >= nodeReset) && stock.state === "work"
+      ? num(stock.gesamt) : null,
   };
   if (sample.rank === null && sample.money === null && sample.hacking === null) return null;
   return sample;
@@ -155,11 +160,12 @@ export function createHistory({ file, request, getNet = null, log = () => {}, no
         return false;
       }
       const cached = typeof getNet === "function" ? getNet() : null;
-      const [blade, exit, net] = await Promise.all([
+      const [blade, exit, net, stock] = await Promise.all([
         getJson("data/blade.json"), getJson("data/ausgang.json"),
         cached ? Promise.resolve(cached) : getJson("data/bn4net.json"),
+        getJson("data/boerse.json"),
       ]);
-      const sample = buildSample(wall, blade, exit, net);
+      const sample = buildSample(wall, blade, exit, net, stock);
       if (!sample) return false;
       const next = appendSample(list, sample, max);
       const tmp = file + ".tmp";

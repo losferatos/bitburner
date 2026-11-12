@@ -55,6 +55,13 @@ console.log("-- buildSample --");
   check("ohne frische bn4net.json: keine Probe", buildSample(W, blade(), exit(), net({ zeit: W - 3600000 })) === null);
   check("ohne alles: keine Probe", buildSample(W, null, null, null) === null);
   check("Rang 0 bleibt 0, nicht null", buildSample(W, blade({ rang: 0 }), exit(), net()).rank === 0);
+  // Vermoegen aus data/boerse.json (12.11.2026)
+  const stock = (o = {}) => ({ ts: W, state: "work", gesamt: 1.7e11, ...o });
+  check("ohne boerse.json: wealth null", s.wealth === null);
+  check("frische boerse.json: wealth", buildSample(W, blade(), exit(), net(), stock()).wealth === 1.7e11);
+  check("boerse.json eine Stunde alt: kein wealth", buildSample(W, blade(), exit(), net(), stock({ ts: W - 3600000 })).wealth === null);
+  check("boerse.json von vor dem Knotenstart: kein wealth", buildSample(W, blade(), exit(), net({ nodeReset: W - 1000 }), stock({ ts: W - 2000 })).wealth === null);
+  check("boerse.json state done: kein wealth", buildSample(W, blade(), exit(), net(), stock({ state: "done" })).wealth === null);
 }
 
 console.log("-- appendSample --");
@@ -109,7 +116,7 @@ const logs = [];
   clock += SAMPLE_MS;
   calls = 0;
   const h4 = createHistory({ file, request, now: () => clock, getNet: () => net({ zeit: clock, geld: 7 }) });
-  check("bn4net aus dem Zwischenspeicher", await h4.maybeSample() === true && calls === 2);
+  check("bn4net aus dem Zwischenspeicher", await h4.maybeSample() === true && calls === 3);
   check("und der Wert stammt von dort", (await h4.readList()).slice(-1)[0].money === 7);
 
   // Uhr zurueckgestellt: trotzdem eine Probe

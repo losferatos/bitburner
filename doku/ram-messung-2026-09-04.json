@@ -1923,8 +1923,8 @@
   "live41": 25.5,
   "lokal41": 25.5,
   "diff": 0,
-  "sha256": "bf62663808042e5bac7b58ad42c52cc1a966a2b0de582392b07af89e8f6ee8b4",
-  "bytes": 22195,
+  "sha256": "cbc6dfd12850003b7dfc521b090fb5cd85f6b27cd4485e0f37af382ee2801dce",
+  "bytes": 22734,
   "gemessenAm": "2026-11-10T17:35:08.872Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },

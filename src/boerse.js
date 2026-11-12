@@ -224,8 +224,9 @@ export async function main(ns) {
             quelle = "Historie";
           }
           const ask = ns.stock.getAskPrice(sym);
+          const pos = ns.stock.getPosition(sym);
           aus.push({ sym, preis, f, vorhersage: f, mv, quelle, ticks,
-            lang: ns.stock.getPosition(sym)[0], ask, bid: 2 * preis - ask,
+            lang: pos[0], einstand: pos[1], ask, bid: 2 * preis - ask,
             maxStueck: maxStueck.get(sym) });
         }
         return aus;
@@ -407,6 +408,13 @@ export async function main(ns) {
         gesamt: depot + geld,
         beste: lage.slice().sort((a, b) => (2 * b.f - 1) * b.mv - (2 * a.f - 1) * a.mv)
           .slice(0, 3).map((e) => ({ sym: e.sym, f: Number(e.f.toFixed(3)) })),
+        // Die einzelnen Posten fuers Dashboard (12.11.2026): Stueck, Wert zum
+        // Geldkurs, Einstandskurs, Vorhersage. Nur Anzeige - niemand im Spiel
+        // liest dieses Feld. Kostet kein RAM (getPosition ist ohnehin geladen).
+        positionen: lage.filter((e) => e.lang > 0).map((e) => ({
+          sym: e.sym, shares: e.lang, value: e.lang * e.bid, cost: e.lang * e.einstand,
+          f: Number(e.f.toFixed(3)), source: e.quelle,
+        })).sort((a, b) => b.value - a.value),
       }));
 
       okRunden++;

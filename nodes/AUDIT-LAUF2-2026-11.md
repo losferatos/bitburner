@@ -82,7 +82,7 @@ bewusst nicht. Geht an Eric zur Abnahme.
 
 | Teil | Status | Ergebnis |
 |---|---|---|
-| 1 Chronik | laeuft seit 12.11.2026 | - |
+| 1 Chronik | fertig 12.11.2026 (2 Pruefer, 2 Skeptiker) | `audit-lauf2/CHRONIK.md`, Weitergabe C1-C10 |
 | 2 Mechaniken | offen | - |
 | 3 Roadmap | offen (braucht 1 und 2) | - |
 | 4 Gewerke | offen | - |

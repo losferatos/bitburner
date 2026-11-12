@@ -249,7 +249,8 @@
   .ms-row b { font: 500 12px var(--mono); }
   .ms-row.reached span { color: var(--accent); }
   .trades { font: 12px/1.55 var(--mono); max-height: 172px; overflow: auto; }
-  .trades div { display: grid; grid-template-columns: 62px 38px minmax(0, 1fr); gap: 8px; padding: 2px 0; }
+  .trades div.empty { display: block; }
+  .trades div:not(.empty) { display: grid; grid-template-columns: 62px 38px minmax(0, 1fr); gap: 8px; padding: 2px 0; }
   .trades time { color: var(--faint); }
   .trades .buy { color: var(--accent); } .trades .sell { color: var(--gold); }
   .trades span:last-child { color: var(--dim); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
@@ -1494,6 +1495,9 @@ function renderChart() {
   const isV2 = key === "rank";
   const isWealth = key === "wealth";
   const fmtVal = isWealth ? fmtMoney : fmtInt;
+  // Vermoegen vor dem 12.11.2026 stammt aus den stuendlichen Sicherungen -
+  // dort ist erst mehr als eine gute Stunde ohne Punkt eine Luecke.
+  const gapMs = isWealth ? 75 * 60000 : GAP_MS;
   const mainColor = isWealth ? "var(--gold)" : isV2 ? "var(--accent)" : "var(--blue)";
   $("chart-title").textContent = isV2 ? "Rank this run vs. previous run" : isWealth ? "Net worth this run" : "Hacking level this run";
 
@@ -1545,7 +1549,7 @@ function renderChart() {
   if (isV2 && DAEDALUS_RANK <= yMax) s += '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + Y(DAEDALUS_RANK) + '" y2="' + Y(DAEDALUS_RANK) + '" stroke="var(--warn)" stroke-dasharray="2 4" opacity=".7"/><text class="axis-t" x="' + (W - pad.r - 4) + '" y="' + (Y(DAEDALUS_RANK) - 5) + '" text-anchor="end" fill="var(--warn)">400k</text>';
   if (isWealth) {
     // Die Vermoegensmarken des laufenden Plans als Linien.
-    for (const m of milestones().filter((q) => q.money && q.goal <= yMax && (!useLog || q.goal >= Math.pow(10, lo)))) {
+    for (const m of milestones().filter((q) => q.money && !q.done && q.goal <= yMax && (!useLog || q.goal >= Math.pow(10, lo)))) {
       s += '<line x1="' + pad.l + '" x2="' + (W - pad.r) + '" y1="' + Y(m.goal) + '" y2="' + Y(m.goal) + '" stroke="var(--warn)" stroke-dasharray="2 4" opacity=".7"/>'
         + '<text class="axis-t" x="' + (W - pad.r - 4) + '" y="' + (Y(m.goal) - 5) + '" text-anchor="end" fill="var(--warn)">' + fmtMoney(m.goal) + '</text>';
     }
@@ -1558,7 +1562,7 @@ function renderChart() {
     let d = "";
     const runs = [];
     ps.forEach((p, i) => {
-      const gap = i > 0 && Number.isFinite(p.t) && Number.isFinite(ps[i - 1].t) && p.t - ps[i - 1].t > GAP_MS;
+      const gap = i > 0 && Number.isFinite(p.t) && Number.isFinite(ps[i - 1].t) && p.t - ps[i - 1].t > gapMs;
       d += (i === 0 || gap ? "M" : "L") + X(p.x).toFixed(1) + "," + Y(p.y).toFixed(1);
       if (i === 0 || gap) runs.push([]);
       runs[runs.length - 1].push(p);

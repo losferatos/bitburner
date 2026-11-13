@@ -258,6 +258,11 @@ const TESTS = [
     schnell: true,
   },
   {
+    datei: "test-casino.js",
+    deckt: "Casino-Roulette BN8: Vorhersage bitgleich gegen RNG.ts, Geldwunsch fuer boerse.js, Pausen nach Abbruch, Pause/Abruf je Dreh (13.11.2026)",
+    schnell: true,
+  },
+  {
     datei: "test-kern-c789.js",
     deckt: "EBENE 2: Platzreservierung, shop-Bedarfsbetrieb, Wirtsperren, BN9 (C.7-C.13)",
     schnell: false,

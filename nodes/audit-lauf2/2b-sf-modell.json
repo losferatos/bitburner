@@ -1,0 +1,3613 @@
+{
+ "meta": {
+  "erzeugt": "2026-11-12",
+  "teil": "2b Fortschritt/SF",
+  "spielquelle": "reference/v301/src (Tag v3.0.1)",
+  "einheiten": "h = effektive Knotenstunden (V2: online + 0,5 x offline, ungeeicht; V1: online); Spannen lo/mid/hi",
+  "zeitverschiebungsmodell": "Vorphase einer V2-Runde ist chance-begrenzt; ein Chancenfaktor f verschiebt sie um ln(f)/g Stunden; g = 0,20/0,10/0,05 je h fuer lo/mid/hi (BN2.1 gemessen 0,135-0,162/h online; Wand-Fits ueber 15 Knoten 0,02-0,2/h, Median ~0,06); Stanek-Modell (geeicht 8 von 11 Laeufen) liegt bei 0,3-1 h je 10-30 % Kampfwerte, also am unteren Rand",
+  "geeichteGroessen": [
+   "SF-Mults SF1/5/6/9 exakt (6 Staende x 29 Felder)",
+   "Skill-Level aus Exp und Mult exakt (alle Staende)",
+   "maxStamina exakt (7 Staende)",
+   "Black-Op-Chancen 5e-5 (7 Staende x bis 21 Black Ops, gegen Bot-Nachbau)",
+   "Go-Effekt 1e-6 (7 Paare)",
+   "V1-Hack-Stufe exakt (9 Staende)"
+  ],
+  "ungeeicht": [
+   "Zeitverschiebung ln f/g",
+   "V1-Zeitwirkung",
+   "Zuender, Sleeves, Boerse in Knotenzeit",
+   "SF2/3/7/8/11-Mult-Formel (Codepfad identisch, Werte = Beschreibung)",
+   "effektive V2-Stunden (50 %)"
+  ]
+ },
+ "mechaniken": [
+  {
+   "id": "graft",
+   "name": "Grafting (Zuender)",
+   "verfuegbarAb": "SF10>=1 oder BN10 (erstmals BN10.1, 28.08.2026); New Tokyo noetig",
+   "botAb": "Code 30.08.; Zuender 04.09.-07.11. zurueckgehalten (64 Tage); gezuendet 07.11. 18:32 (BN15.2)",
+   "wirkung": "Preis baseCost x 3 ohne BN-Aufschlag/Ruf/Treppe (GraftableAugmentation.ts:21); Wirkung sofort, kein Reset (GraftingWork.tsx:48-64); 0,98 Entropie je Graft auf ALLE Mults inkl. bladeburner_* (EntropyAccumulation.ts:6-47); Zeit ((1 h x log2(max(Summe Mults!=1;1)) + 30 min)/2)/(1+Int^0,8/600)/Fokusfaktor (0,8 ohne NMI); Plan 40 Grafts 415 Mrd, 31 h (graftplan-rechnung.txt); Kampf x69 vor Entropie; erste 8 Grafts: 79,5 Mrd, 10 h, competence x5,15 (aug-graft.mjs); violet Congruity 150 Bio, 0,23 h loescht Entropie. GEMESSEN BN15.3 (Staende 09.11.): strength-Mult 18 -> 431, Black-Op-Chance Operation Tyrell 4,3 % -> 98,7 % in 4 h, Entropie 23",
+   "nutzenJeV2Lauf": {
+    "kurzeLaeufe_BN2_3_6_11_14": {
+     "lo": 2,
+     "mid": 4,
+     "hi": 6
+    },
+    "langeLaeufe_BN4_7_9_13_15": {
+     "lo": 8,
+     "mid": 15,
+     "hi": 25
+    }
+   },
+   "nutzenRetrospektiv04_09_bis_07_11": {
+    "laeufe": 25,
+    "lo": 120,
+    "mid": 220,
+    "hi": 360,
+    "uhr": "effektive V2-h"
+   },
+   "messindiz": "BN15.1 -> .2 -> .3: eff. 68 -> 39 -> 34 h (Go ab ~24 h in .2, Graft ab ~25 h in .2 und ab ~8 h in .3); konfundiert mit Offline-Gutschrift, Bot-Lernen, SF15",
+   "geeicht": "Preis ja (98/99), Zeit ja (96/99), Chancenkette ja (5e-5); Knotenzeit NEIN",
+   "aufwand": "gebaut; offen: Congruity-Entscheid, Planstopp bei Nettoverlust (AUG-2), Geld fuer Ersteinstieg",
+   "empfehlung": "ab dem ersten V2-Lauf mit SF10.1; SF10.1 so frueh wie moeglich; erste ~8 Grafts (80 Mrd) zuerst, Tail (Vangelis, Lumin) streichen"
+  },
+  {
+   "id": "sleeves",
+   "name": "Sleeves",
+   "verfuegbarAb": "BN10.1 (1 Sleeve) 28.08.; Anzahl = min(3, SF10 + [BN10]); Spielstaende: BN10.2 2, BN10.3 3",
+   "botAb": "sleeve.js ab BN10 (Vertraege, Infiltrate nur halb); Diplomacy nie; Sleeve-Augs verboten seit 29.08.",
+   "wirkung": "Vertraege 29-34 Rang/h je Sleeve bei Kampfwert 40; Infiltrate +30/42/52 Raid-Vorrat je h (N=1/2/3, SleeveInfiltrateWork.ts:7-28, Bladeburner.ts:1251-1263); Diplomacy -1,03 %/min Chaos; LP: 1 Infiltrate + 2 Diplomacy 328 Rang/h gegen 211 heute (+55 %, geeicht); Schock skaliert Sleeve-Exp/-Ruf, nicht BB-Rang; Gym bis Kampfwert 40: 3,9/5,6/8,4 h (Kampf-LM 1/0,7/0,5)",
+   "nutzenJeV2Lauf": {
+    "alleDrei": {
+     "lo": 1,
+     "mid": 2,
+     "hi": 3
+    },
+    "jeSleeve": {
+     "lo": 0.3,
+     "mid": 0.7,
+     "hi": 1
+    }
+   },
+   "geeicht": "Raten und Chaos ja (inventar-sleeve.md Rechnungen 1-10); Knotenzeit NEIN",
+   "aufwand": "klein (Infiltrate/Diplomacy ohne Kampfwert-Schwelle, SLEEVE-1/2/3)",
+   "empfehlung": "SLEEVE-1/2/3 im Neubau; Sleeve-Augs nie (V2 braucht keine Werte)",
+   "datenGrenze": "Sleeve 2/3 kamen im Knoten 10.2/10.3 (01.09./06.09.); danach nie getrennt von Bot-Reife messbar"
+  },
+  {
+   "id": "ipvgo",
+   "name": "IPvGO",
+   "verfuegbarAb": "Spielstart (kein SF noetig, Go.ts:43-82); go.cheat ab SF14.2 (BN14.2 selbst)",
+   "botAb": "go.js 27.10. (BN13/14), BN15 ab 07.11. - ~70 Tage nach Verfuegbarkeit",
+   "wirkung": "effect = 1 + ln(n+1) (n+1)^0,3 x 0,002 x Power x GoPower x (SF14>=1 ? 2 : 1) (effect.ts:19-24), GEEICHT an 7 Paaren (1e-6). Tetrads (0,7) Kampfwerte; Daedalus (1,1) faction_rep/company_rep; Black Hand (0,9) hacking_money; Illuminati (0,7) Tempo; w0r1d_d43m0n (2,0) hacking-Stufe (nur mit TRP + SF1); Netburners (1,3); Slum Snakes (1,2). nodePower +15,6 k/h gemessen (BN15.3, 7x7, Tetrads: 592 Siege/4 Niederlagen), Reset je Einbau. Tetrads bei 1e5: x1,51 ohne SF14, x2,02 mit, BN14 (GoPower 4) x3,04/x5,08",
+   "nutzenJeV2Lauf": {
+    "ohneSF14_gegenKeinGo": {
+     "lo": 0.8,
+     "mid": 2,
+     "hi": 4.8,
+     "hinweis": "Chance x1,18-1,27 (nodePower 1e4-3e4); BN14 mehr"
+    },
+    "mitSF14_Zuschlag": {
+     "lo": 0.98,
+     "mid": 1.97,
+     "hi": 3.93
+    },
+    "BN14_Zuschlag": {
+     "lo": 2,
+     "mid": 5,
+     "hi": 9,
+     "hinweis": "STGO-Schaetzung 5,8-8,6 h je BN14-Lauf"
+    }
+   },
+   "nutzenJeV1Lauf": {
+    "daedalusRuf": {
+     "lo": 0,
+     "mid": 1,
+     "hi": 3,
+     "hinweis": "faction_rep x1,8 (np 1e5) auf Ruf-Anforderungen; go.js spielt nur Tetrads - UNGEEICHT"
+    }
+   },
+   "geeicht": "Formel ja; Spielstaerke gemessen (Tetrads); Knotenzeit NEIN",
+   "aufwand": "gebaut (go.js + gocheat); neu: Gegnerwahl je Knoten, Start ab erstem Knoten",
+   "empfehlung": "Go ab BN1 mitlaufen lassen (kein SF); SF14 frueh (verdoppelt jeden Go-Bonus) vor BN13/BN15; Gegner Daedalus in V1/BN8 pruefen"
+  },
+  {
+   "id": "stanek",
+   "name": "Stanek's Gift",
+   "verfuegbarAb": "BN13.1 (27.10.) und mit SF13 jeden Knoten; acceptGift nur ohne installierte Augs ausser NFG",
+   "botAb": "nie (verworfen 27.10.)",
+   "wirkung": "Genesis x0,9 auf Hack/Kampf/Ruf/Geld (nicht bladeburner_*); Kampf-Fragmente netto x1,13 (H16) bis x1,5 (H1024); Erfolgschance bb x1,05-1,12; Gitter 30/36/42/49 Zellen je SF13 0-3; Wirkung 1 + ln(H+1)/60 ((n+1)/5)^0,07 Power Boost 2 (bitgleich gegen echten Code, eich.mjs)",
+   "nutzenJeV2Lauf": {
+    "lo": -1,
+    "mid": 0.5,
+    "hi": 2,
+    "hinweis": "Modell: -0,6..-3,8 % Zeit bis Rang 400k (= 0,3-1,7 h bei 45 h); minus Genesis-Hackgeld -25..-35 % (geschaetzt)"
+   },
+   "geeicht": "Fragment-/Effektformel ja (bitgleich); Rangmodell 8 von 11 Laeufen 0,93-1,08; Chance-Zeit nein",
+   "aufwand": "hoch (Gitter, Laden, RAM 10 x H GB)",
+   "empfehlung": "Verwerfen bestaetigt (<= 2 %, bei Mittel 1 h). Eine Ausnahme-Pruefung: BN13.1 mit Rang < 2.000 bei h12 UND Chancen < 0,5 (BN13.3 hatte 0,25-0,53 bis h12) - dann neu eichen"
+  },
+  {
+   "id": "int",
+   "name": "Intelligence",
+   "verfuegbarAb": "SF5>=1 oder BN5; ohne SF5 wird Int bei jedem Laden auf 0 gesetzt (Person.ts:154-159)",
+   "botAb": "Nebenprodukt seit SF5.1 (24.08.); nie gezielt gesammelt",
+   "wirkung": "Skill = floor(32 ln(exp+534,6) - 200) (exakt); Bonus 1 + w x Int^0,8/600: BB-Chance w 0,75, Hack/Ruf w 1, Graftzeit /(1+Int^0,8/600), Share w 2; persistent ueber Einbau UND Knoten (persistentIntelligenceData); Quellen: BN-Abschluss 300 (Prestige.ts:363-365, braucht SF5>=1), Aug-Kauf 15, Einbau 15, Beitritt 7,5, BB-Aktionen 0,003 x Zeit x diffMult x 0,1. Bot: 112 k Exp in 44 Laeufen = Int 172 (V1 2,4-3,5 k, V2 0,9-3,6 k je Lauf)",
+   "nutzenJeV2Lauf": {
+    "int50": {
+     "lo": 0.14,
+     "mid": 0.28,
+     "hi": 0.57
+    },
+    "int118": {
+     "lo": 0.28,
+     "mid": 0.56,
+     "hi": 1.1
+    },
+    "int172": {
+     "lo": 0.37,
+     "mid": 0.74,
+     "hi": 1.5
+    }
+   },
+   "geeicht": "Skillformel ja; Bonus aus Formel; Knotenzeit NEIN",
+   "aufwand": "keiner (SF5.1 frueh = Int sammelt sich von selbst)",
+   "empfehlung": "SF5.1 frueh (Int-Exp verfaellt sonst); kein gezieltes Int-Farmen (Hebel < 1 h/Lauf)"
+  },
+  {
+   "id": "darknet",
+   "name": "Darknet / Labyrinth / SF15",
+   "verfuegbarAb": "BN15.1 (02.11.); SF15.1 06.11.",
+   "botAb": "Nebengewerk 02.11. verworfen",
+   "wirkung": "SF15.1 TOR+Darkscape + volles Darkweb; SF15.2 Charisma->Firmen-Gehalt/Ruf x(1+0,5(1-e^-0,0002c)+0,9(1-e^-0,00004c)) = x1,018 bei c=135, Auth-Zeit -20 %; SF15.3 +0,1 x Charisma auf Hacking-Ruf, Cache-Dateien +50 %; DarknetMoneyMultiplier je BN (Tabelle C3); Labyrinth gibt TRP nur in BN15 (DarknetLabyrinthRewardsTheRedPill)",
+   "nutzenJeV2Lauf": {
+    "lo": 0,
+    "mid": 0.05,
+    "hi": 0.3
+   },
+   "geeicht": "Formeln aus Quellcode; Charisma 135 aus Stand BN15.3",
+   "aufwand": "hoch",
+   "empfehlung": "nicht bauen; SF15 ohne Folgenutzen, BN15 spaet fahren (BB-Rang 0,2, Skillpreis 3)"
+  },
+  {
+   "id": "bbops",
+   "name": "Bladeburner: Skills/Ops als Mechanik-Luecke",
+   "verfuegbarAb": "Division ab Rang/Kampfwert 100 (V2)",
+   "botAb": "blade.js ab 25.08.",
+   "wirkung": "Zeituntergrenze der 21 Black Ops: Summe (baseDifficulty/10) x 1,5 x (1-0,01 OC)/statFac; bei statFac 1,2-1,3 und OC 0 = 21-22 h; bei OC 90 und statFac 4 = ~1,5 h; statFac = 0,5(agi^0,04 + dex^0,035 + agi/1e4 + dex/1e4) (Action.ts:105-122). Overclock 90 kostet 5.877 SP x Skillpreis des Knotens (BN15 17.631 SP = 52.900 Rang). 15.1: OC 0-9 bis h65, 15.3 mit Graft statFac 5 bei h26",
+   "nutzenJeV2Lauf": {
+    "lo": 0,
+    "mid": 1,
+    "hi": 3,
+    "hinweis": "Overclock frueher; bot kauft greedy, am Ende immer OC 90"
+   },
+   "geeicht": "Chance/Stamina ja; Aktionszeitsumme Formel (nicht gegen gemessene Black-Op-Dauer)",
+   "aufwand": "klein",
+   "empfehlung": "keine neue Mechanik; Overclock-Vorrang in Knoten mit Skillpreis >= 2 pruefen (BN7/13/14/15)"
+  },
+  {
+   "id": "nfg",
+   "name": "NeuroFlux Governor",
+   "verfuegbarAb": "Faktionen ab Rang; SF12 gibt Start-Stufen",
+   "botAb": "seit Beginn",
+   "wirkung": "je Stufe x1,01000262 auf 26 Mults (nicht bladeburner_*); Kosten Rep 500 x 1,14^L x RepCost, Geld 750k x 1,14^L x MoneyCost x Treppe (x2,166 je Stufe); SF12.k = k Gratis-Stufen = x1,0303 (k=3) bei jedem Knotenstart",
+   "nutzenJeV2Lauf": {
+    "lo": 0.14,
+    "mid": 0.27,
+    "hi": 0.55,
+    "hinweis": "nur Kampfwerte: Chance x1,027 bei SF12.3"
+   },
+   "geeicht": "Mult exakt (< 1e-9, aug-mults.mjs)",
+   "aufwand": "keiner",
+   "empfehlung": "keine Aenderung; SF12 nicht weiterlevelln (BN12 +2 %/Stufe haerter)"
+  },
+  {
+   "id": "augs",
+   "name": "Besondere Augs",
+   "verfuegbarAb": "je Faktion",
+   "botAb": "kauft nach Plan (bn4rep.js, hackaugs.js), Grafts graftplan.json",
+   "wirkung": "Ruf-Verstaerker (faction_rep): BigD's Big Brain x2, SmartJaw x1,25, ADR-Pheromone 2 x1,2, SNA/Shadows Simulacrum x1,15, ADR-Pheromone 1 x1,1, PCMatrix x1,078 (v301; Einzelwerte weichen im laufenden Spiel teils ab: Synthetic Heart charisma 1,3 gegen 1,15). Bladeburner-Augs (bladeburner_success_chance): Omnibeam x1,10, Unibeam x1,08, Hyperion V2 x1,08, V1 x1,06, Energy Shielding x1,06, Power Cells x1,05, Vangelis 3.0 x1,05; stamina: INTERLINKED max x1,10, Blade Runner x1,05; alle graftbar (17 Sonder-Augs nur als BB-Mitglied). The Blade's Simulacrum: Arbeit parallel zu Bladeburner; NMI: kein Fokusmalus (x0,8 -> x1,0 auf Graftzeit); violet Congruity: Entropie 0",
+   "nutzenJeV2Lauf": {
+    "lo": 0,
+    "mid": 1,
+    "hi": 3,
+    "hinweis": "in Grafting enthalten, hier nicht doppelt zaehlen"
+   },
+   "geeicht": "Werte aus Augmentations.ts v301; Summen-Chance x1,9161 aus nodes/GRAFTING.md",
+   "aufwand": "-",
+   "empfehlung": "BB-Augs graften statt kaufen (Treppe 1,9^q, BN-Aufschlag); Rep-Verstaerker nur in V1 mit Ruf-Engpass"
+  }
+ ],
+ "defaults": {
+  "AgilityLevelMultiplier": 1,
+  "AugmentationMoneyCost": 1,
+  "AugmentationRepCost": 1,
+  "BladeburnerRank": 1,
+  "BladeburnerSkillCost": 1,
+  "CharismaLevelMultiplier": 1,
+  "ClassGymExpGain": 1,
+  "CodingContractMoney": 1,
+  "CompanyWorkExpGain": 1,
+  "CompanyWorkMoney": 1,
+  "CompanyWorkRepGain": 1,
+  "CorporationDivisions": 1,
+  "CorporationSoftcap": 1,
+  "CorporationValuation": 1,
+  "CrimeExpGain": 1,
+  "CrimeMoney": 1,
+  "CrimeSuccessRate": 1,
+  "DaedalusAugsRequirement": 30,
+  "DarknetLabyrinthRewardsTheRedPill": 1,
+  "DarknetMoneyMultiplier": 1,
+  "DefenseLevelMultiplier": 1,
+  "DexterityLevelMultiplier": 1,
+  "FactionPassiveRepGain": 1,
+  "FactionWorkExpGain": 1,
+  "FactionWorkRepGain": 1,
+  "FourSigmaMarketDataApiCost": 1,
+  "FourSigmaMarketDataCost": 1,
+  "GangSoftcap": 1,
+  "GangUniqueAugs": 1,
+  "GoPower": 1,
+  "HackExpGain": 1,
+  "HackingLevelMultiplier": 1,
+  "HackingSpeedMultiplier": 1,
+  "HacknetNodeMoney": 1,
+  "HomeComputerRamCost": 1,
+  "InfiltrationMoney": 1,
+  "InfiltrationRep": 1,
+  "ManualHackMoney": 1,
+  "CloudServerCost": 1,
+  "CloudServerSoftcap": 1,
+  "CloudServerLimit": 1,
+  "CloudServerMaxRam": 1,
+  "FavorToDonateToFaction": 1,
+  "ScriptHackMoney": 1,
+  "ScriptHackMoneyGain": 1,
+  "ServerGrowthRate": 1,
+  "ServerMaxMoney": 1,
+  "ServerStartingMoney": 1,
+  "ServerStartingSecurity": 1,
+  "ServerWeakenRate": 1,
+  "StrengthLevelMultiplier": 1,
+  "StaneksGiftPowerMultiplier": 1,
+  "StaneksGiftExtraSize": 0,
+  "WorldDaemonDifficulty": 1
+ },
+ "knoten": {
+  "1": {
+   "1": {}
+  },
+  "2": {
+   "1": {
+    "CorporationDivisions": 0.9,
+    "CorporationSoftcap": 0.9,
+    "CrimeMoney": 3,
+    "FactionPassiveRepGain": 0,
+    "FactionWorkRepGain": 0.5,
+    "HackingLevelMultiplier": 0.8,
+    "InfiltrationMoney": 3,
+    "CloudServerSoftcap": 1.3,
+    "ServerGrowthRate": 0.8,
+    "ServerMaxMoney": 0.08,
+    "ServerStartingMoney": 0.4,
+    "StaneksGiftPowerMultiplier": 2,
+    "StaneksGiftExtraSize": -6,
+    "WorldDaemonDifficulty": 5
+   }
+  },
+  "3": {
+   "1": {
+    "AugmentationMoneyCost": 3,
+    "AugmentationRepCost": 3,
+    "CompanyWorkMoney": 0.25,
+    "CrimeMoney": 0.25,
+    "DarknetMoneyMultiplier": 0.4,
+    "GangSoftcap": 0.9,
+    "GangUniqueAugs": 0.5,
+    "HackingLevelMultiplier": 0.8,
+    "HacknetNodeMoney": 0.25,
+    "HomeComputerRamCost": 1.5,
+    "CloudServerCost": 2,
+    "CloudServerSoftcap": 1.3,
+    "FavorToDonateToFaction": 0.5,
+    "ScriptHackMoney": 0.2,
+    "ServerGrowthRate": 0.2,
+    "ServerMaxMoney": 0.04,
+    "ServerStartingMoney": 0.2,
+    "StaneksGiftPowerMultiplier": 0.75,
+    "StaneksGiftExtraSize": -2,
+    "WorldDaemonDifficulty": 2
+   }
+  },
+  "4": {
+   "1": {
+    "ClassGymExpGain": 0.5,
+    "CompanyWorkExpGain": 0.5,
+    "CompanyWorkMoney": 0.1,
+    "CrimeExpGain": 0.5,
+    "CrimeMoney": 0.2,
+    "DarknetMoneyMultiplier": 0.4,
+    "FactionWorkExpGain": 0.5,
+    "FactionWorkRepGain": 0.75,
+    "GangUniqueAugs": 0.5,
+    "HackExpGain": 0.4,
+    "HacknetNodeMoney": 0.05,
+    "CloudServerSoftcap": 1.2,
+    "ScriptHackMoney": 0.2,
+    "ServerMaxMoney": 0.1125,
+    "ServerStartingMoney": 0.75,
+    "StaneksGiftPowerMultiplier": 1.5,
+    "WorldDaemonDifficulty": 3
+   }
+  },
+  "5": {
+   "1": {
+    "AugmentationMoneyCost": 2,
+    "CorporationDivisions": 0.75,
+    "CorporationValuation": 0.75,
+    "CrimeMoney": 0.5,
+    "DarknetMoneyMultiplier": 0.7,
+    "GangUniqueAugs": 0.5,
+    "HackExpGain": 0.5,
+    "HacknetNodeMoney": 0.2,
+    "InfiltrationMoney": 1.5,
+    "InfiltrationRep": 1.5,
+    "CloudServerSoftcap": 1.2,
+    "ScriptHackMoney": 0.15,
+    "ServerStartingMoney": 0.5,
+    "ServerStartingSecurity": 2,
+    "StaneksGiftPowerMultiplier": 1.3,
+    "WorldDaemonDifficulty": 1.5
+   }
+  },
+  "6": {
+   "1": {
+    "CompanyWorkMoney": 0.5,
+    "CorporationDivisions": 0.8,
+    "CorporationSoftcap": 0.9,
+    "CorporationValuation": 0.2,
+    "CrimeMoney": 0.75,
+    "DaedalusAugsRequirement": 35,
+    "GangSoftcap": 0.7,
+    "GangUniqueAugs": 0.2,
+    "HackExpGain": 0.25,
+    "HackingLevelMultiplier": 0.35,
+    "HacknetNodeMoney": 0.2,
+    "InfiltrationMoney": 0.75,
+    "CloudServerSoftcap": 2,
+    "ScriptHackMoney": 0.75,
+    "ServerMaxMoney": 0.2,
+    "ServerStartingMoney": 0.5,
+    "ServerStartingSecurity": 1.5,
+    "StaneksGiftPowerMultiplier": 0.5,
+    "StaneksGiftExtraSize": 2,
+    "WorldDaemonDifficulty": 2
+   }
+  },
+  "7": {
+   "1": {
+    "AugmentationMoneyCost": 3,
+    "BladeburnerRank": 0.6,
+    "BladeburnerSkillCost": 2,
+    "CompanyWorkMoney": 0.5,
+    "CorporationDivisions": 0.8,
+    "CorporationSoftcap": 0.9,
+    "CorporationValuation": 0.2,
+    "CrimeMoney": 0.75,
+    "DaedalusAugsRequirement": 35,
+    "FourSigmaMarketDataApiCost": 2,
+    "FourSigmaMarketDataCost": 2,
+    "GangSoftcap": 0.7,
+    "GangUniqueAugs": 0.2,
+    "HackExpGain": 0.25,
+    "HackingLevelMultiplier": 0.35,
+    "HacknetNodeMoney": 0.2,
+    "InfiltrationMoney": 0.75,
+    "CloudServerSoftcap": 2,
+    "ScriptHackMoney": 0.5,
+    "ServerMaxMoney": 0.2,
+    "ServerStartingMoney": 0.5,
+    "ServerStartingSecurity": 1.5,
+    "StaneksGiftPowerMultiplier": 0.9,
+    "StaneksGiftExtraSize": -1,
+    "WorldDaemonDifficulty": 2
+   }
+  },
+  "8": {
+   "1": {
+    "BladeburnerRank": 0,
+    "CodingContractMoney": 0,
+    "CompanyWorkMoney": 0,
+    "CorporationDivisions": 0,
+    "CorporationSoftcap": 0,
+    "CorporationValuation": 0,
+    "CrimeMoney": 0,
+    "DarknetLabyrinthRewardsTheRedPill": 0,
+    "DarknetMoneyMultiplier": 0,
+    "GangSoftcap": 0,
+    "GangUniqueAugs": 0,
+    "HacknetNodeMoney": 0,
+    "InfiltrationMoney": 0,
+    "ManualHackMoney": 0,
+    "CloudServerSoftcap": 4,
+    "FavorToDonateToFaction": 0,
+    "ScriptHackMoney": 0.3,
+    "ScriptHackMoneyGain": 0,
+    "StaneksGiftExtraSize": -99
+   }
+  },
+  "9": {
+   "1": {
+    "AgilityLevelMultiplier": 0.45,
+    "BladeburnerRank": 0.9,
+    "BladeburnerSkillCost": 1.2,
+    "CharismaLevelMultiplier": 0.45,
+    "CorporationDivisions": 0.8,
+    "CorporationSoftcap": 0.75,
+    "CorporationValuation": 0.5,
+    "CrimeMoney": 0.5,
+    "DarknetMoneyMultiplier": 0.05,
+    "DefenseLevelMultiplier": 0.45,
+    "DexterityLevelMultiplier": 0.45,
+    "FourSigmaMarketDataApiCost": 4,
+    "FourSigmaMarketDataCost": 5,
+    "GangSoftcap": 0.8,
+    "GangUniqueAugs": 0.25,
+    "HackExpGain": 0.05,
+    "HackingLevelMultiplier": 0.5,
+    "HomeComputerRamCost": 5,
+    "CloudServerLimit": 0,
+    "ScriptHackMoney": 0.1,
+    "ServerMaxMoney": 0.01,
+    "ServerStartingMoney": 0.1,
+    "ServerStartingSecurity": 2.5,
+    "StrengthLevelMultiplier": 0.45,
+    "StaneksGiftPowerMultiplier": 0.5,
+    "StaneksGiftExtraSize": 2,
+    "WorldDaemonDifficulty": 2
+   }
+  },
+  "10": {
+   "1": {
+    "AgilityLevelMultiplier": 0.4,
+    "AugmentationMoneyCost": 5,
+    "AugmentationRepCost": 2,
+    "BladeburnerRank": 0.8,
+    "CharismaLevelMultiplier": 0.4,
+    "CodingContractMoney": 0.5,
+    "CompanyWorkMoney": 0.5,
+    "CorporationDivisions": 0.9,
+    "CorporationSoftcap": 0.9,
+    "CorporationValuation": 0.5,
+    "CrimeMoney": 0.5,
+    "DarknetMoneyMultiplier": 0.4,
+    "DefenseLevelMultiplier": 0.4,
+    "DexterityLevelMultiplier": 0.4,
+    "GangSoftcap": 0.9,
+    "GangUniqueAugs": 0.25,
+    "HackingLevelMultiplier": 0.35,
+    "HacknetNodeMoney": 0.5,
+    "HomeComputerRamCost": 1.5,
+    "InfiltrationMoney": 0.5,
+    "ManualHackMoney": 0.5,
+    "CloudServerCost": 5,
+    "CloudServerSoftcap": 1.1,
+    "CloudServerLimit": 0.6,
+    "CloudServerMaxRam": 0.5,
+    "ScriptHackMoney": 0.5,
+    "StrengthLevelMultiplier": 0.4,
+    "StaneksGiftPowerMultiplier": 0.75,
+    "StaneksGiftExtraSize": -3,
+    "WorldDaemonDifficulty": 2
+   }
+  },
+  "11": {
+   "1": {
+    "AugmentationMoneyCost": 2,
+    "CodingContractMoney": 0.25,
+    "CompanyWorkMoney": 0.5,
+    "CorporationDivisions": 0.9,
+    "CorporationSoftcap": 0.9,
+    "CorporationValuation": 0.1,
+    "CrimeMoney": 3,
+    "FourSigmaMarketDataApiCost": 4,
+    "FourSigmaMarketDataCost": 4,
+    "GangUniqueAugs": 0.75,
+    "HackExpGain": 0.5,
+    "HackingLevelMultiplier": 0.6,
+    "HacknetNodeMoney": 0.1,
+    "InfiltrationMoney": 2.5,
+    "InfiltrationRep": 2.5,
+    "CloudServerSoftcap": 2,
+    "ServerGrowthRate": 0.2,
+    "ServerMaxMoney": 0.01,
+    "ServerStartingMoney": 0.1,
+    "ServerWeakenRate": 2,
+    "WorldDaemonDifficulty": 1.5
+   }
+  },
+  "12": {
+   "1": {
+    "AgilityLevelMultiplier": 0.9803921568627451,
+    "AugmentationMoneyCost": 1.02,
+    "AugmentationRepCost": 1.02,
+    "BladeburnerRank": 0.9803921568627451,
+    "BladeburnerSkillCost": 1.02,
+    "CharismaLevelMultiplier": 0.9803921568627451,
+    "ClassGymExpGain": 0.9803921568627451,
+    "CodingContractMoney": 0.9803921568627451,
+    "CompanyWorkExpGain": 0.9803921568627451,
+    "CompanyWorkMoney": 0.9803921568627451,
+    "CorporationDivisions": 0.5,
+    "CorporationSoftcap": 0.8,
+    "CorporationValuation": 0.9803921568627451,
+    "CrimeExpGain": 0.9803921568627451,
+    "CrimeMoney": 0.9803921568627451,
+    "DaedalusAugsRequirement": 31,
+    "DarknetMoneyMultiplier": 0.9803921568627451,
+    "DefenseLevelMultiplier": 0.9803921568627451,
+    "DexterityLevelMultiplier": 0.9803921568627451,
+    "FactionPassiveRepGain": 0.9803921568627451,
+    "FactionWorkExpGain": 0.9803921568627451,
+    "FactionWorkRepGain": 0.9803921568627451,
+    "FourSigmaMarketDataApiCost": 1.02,
+    "FourSigmaMarketDataCost": 1.02,
+    "GangSoftcap": 0.8,
+    "GangUniqueAugs": 0.9803921568627451,
+    "HackExpGain": 0.9803921568627451,
+    "HackingLevelMultiplier": 0.9803921568627451,
+    "HacknetNodeMoney": 0.9803921568627451,
+    "HomeComputerRamCost": 1.02,
+    "InfiltrationMoney": 0.9803921568627451,
+    "InfiltrationRep": 0.9803921568627451,
+    "ManualHackMoney": 0.9803921568627451,
+    "CloudServerCost": 1.02,
+    "CloudServerSoftcap": 1.02,
+    "CloudServerLimit": 0.9803921568627451,
+    "CloudServerMaxRam": 0.9803921568627451,
+    "FavorToDonateToFaction": 1.02,
+    "ScriptHackMoney": 0.9803921568627451,
+    "ServerGrowthRate": 0.9803921568627451,
+    "ServerMaxMoney": 0.9611687812379853,
+    "ServerStartingMoney": 0.9803921568627451,
+    "ServerStartingSecurity": 1.5,
+    "ServerWeakenRate": 0.9803921568627451,
+    "StrengthLevelMultiplier": 0.9803921568627451,
+    "StaneksGiftPowerMultiplier": 1.02,
+    "StaneksGiftExtraSize": 1.02,
+    "WorldDaemonDifficulty": 1.02
+   },
+   "2": {
+    "AgilityLevelMultiplier": 0.9611687812379854,
+    "AugmentationMoneyCost": 1.0404,
+    "AugmentationRepCost": 1.0404,
+    "BladeburnerRank": 0.9611687812379854,
+    "BladeburnerSkillCost": 1.0404,
+    "CharismaLevelMultiplier": 0.9611687812379854,
+    "ClassGymExpGain": 0.9611687812379854,
+    "CodingContractMoney": 0.9611687812379854,
+    "CompanyWorkExpGain": 0.9611687812379854,
+    "CompanyWorkMoney": 0.9611687812379854,
+    "CorporationDivisions": 0.5,
+    "CorporationSoftcap": 0.8,
+    "CorporationValuation": 0.9611687812379854,
+    "CrimeExpGain": 0.9611687812379854,
+    "CrimeMoney": 0.9611687812379854,
+    "DaedalusAugsRequirement": 31,
+    "DarknetMoneyMultiplier": 0.9611687812379854,
+    "DefenseLevelMultiplier": 0.9611687812379854,
+    "DexterityLevelMultiplier": 0.9611687812379854,
+    "FactionPassiveRepGain": 0.9611687812379854,
+    "FactionWorkExpGain": 0.9611687812379854,
+    "FactionWorkRepGain": 0.9611687812379854,
+    "FourSigmaMarketDataApiCost": 1.0404,
+    "FourSigmaMarketDataCost": 1.0404,
+    "GangSoftcap": 0.8,
+    "GangUniqueAugs": 0.9611687812379854,
+    "HackExpGain": 0.9611687812379854,
+    "HackingLevelMultiplier": 0.9611687812379854,
+    "HacknetNodeMoney": 0.9611687812379854,
+    "HomeComputerRamCost": 1.0404,
+    "InfiltrationMoney": 0.9611687812379854,
+    "InfiltrationRep": 0.9611687812379854,
+    "ManualHackMoney": 0.9611687812379854,
+    "CloudServerCost": 1.0404,
+    "CloudServerSoftcap": 1.0404,
+    "CloudServerLimit": 0.9611687812379854,
+    "CloudServerMaxRam": 0.9611687812379854,
+    "FavorToDonateToFaction": 1.0404,
+    "ScriptHackMoney": 0.9611687812379854,
+    "ServerGrowthRate": 0.9611687812379854,
+    "ServerMaxMoney": 0.9238454260265143,
+    "ServerStartingMoney": 0.9611687812379854,
+    "ServerStartingSecurity": 1.5,
+    "ServerWeakenRate": 0.9611687812379854,
+    "StrengthLevelMultiplier": 0.9611687812379854,
+    "StaneksGiftPowerMultiplier": 1.0404,
+    "StaneksGiftExtraSize": 1.0404,
+    "WorldDaemonDifficulty": 1.0404
+   },
+   "3": {
+    "AgilityLevelMultiplier": 0.9423223345470444,
+    "AugmentationMoneyCost": 1.0612080000000002,
+    "AugmentationRepCost": 1.0612080000000002,
+    "BladeburnerRank": 0.9423223345470444,
+    "BladeburnerSkillCost": 1.0612080000000002,
+    "CharismaLevelMultiplier": 0.9423223345470444,
+    "ClassGymExpGain": 0.9423223345470444,
+    "CodingContractMoney": 0.9423223345470444,
+    "CompanyWorkExpGain": 0.9423223345470444,
+    "CompanyWorkMoney": 0.9423223345470444,
+    "CorporationDivisions": 0.5,
+    "CorporationSoftcap": 0.8,
+    "CorporationValuation": 0.9423223345470444,
+    "CrimeExpGain": 0.9423223345470444,
+    "CrimeMoney": 0.9423223345470444,
+    "DaedalusAugsRequirement": 31,
+    "DarknetMoneyMultiplier": 0.9423223345470444,
+    "DefenseLevelMultiplier": 0.9423223345470444,
+    "DexterityLevelMultiplier": 0.9423223345470444,
+    "FactionPassiveRepGain": 0.9423223345470444,
+    "FactionWorkExpGain": 0.9423223345470444,
+    "FactionWorkRepGain": 0.9423223345470444,
+    "FourSigmaMarketDataApiCost": 1.0612080000000002,
+    "FourSigmaMarketDataCost": 1.0612080000000002,
+    "GangSoftcap": 0.8,
+    "GangUniqueAugs": 0.9423223345470444,
+    "HackExpGain": 0.9423223345470444,
+    "HackingLevelMultiplier": 0.9423223345470444,
+    "HacknetNodeMoney": 0.9423223345470444,
+    "HomeComputerRamCost": 1.0612080000000002,
+    "InfiltrationMoney": 0.9423223345470444,
+    "InfiltrationRep": 0.9423223345470444,
+    "ManualHackMoney": 0.9423223345470444,
+    "CloudServerCost": 1.0612080000000002,
+    "CloudServerSoftcap": 1.0612080000000002,
+    "CloudServerLimit": 0.9423223345470444,
+    "CloudServerMaxRam": 0.9423223345470444,
+    "FavorToDonateToFaction": 1.0612080000000002,
+    "ScriptHackMoney": 0.9423223345470444,
+    "ServerGrowthRate": 0.9423223345470444,
+    "ServerMaxMoney": 0.8879713821861919,
+    "ServerStartingMoney": 0.9423223345470444,
+    "ServerStartingSecurity": 1.5,
+    "ServerWeakenRate": 0.9423223345470444,
+    "StrengthLevelMultiplier": 0.9423223345470444,
+    "StaneksGiftPowerMultiplier": 1.0612080000000002,
+    "StaneksGiftExtraSize": 1.0612080000000002,
+    "WorldDaemonDifficulty": 1.0612080000000002
+   },
+   "4": {
+    "AgilityLevelMultiplier": 0.9238454260265142,
+    "AugmentationMoneyCost": 1.08243216,
+    "AugmentationRepCost": 1.08243216,
+    "BladeburnerRank": 0.9238454260265142,
+    "BladeburnerSkillCost": 1.08243216,
+    "CharismaLevelMultiplier": 0.9238454260265142,
+    "ClassGymExpGain": 0.9238454260265142,
+    "CodingContractMoney": 0.9238454260265142,
+    "CompanyWorkExpGain": 0.9238454260265142,
+    "CompanyWorkMoney": 0.9238454260265142,
+    "CorporationDivisions": 0.5,
+    "CorporationSoftcap": 0.8,
+    "CorporationValuation": 0.9238454260265142,
+    "CrimeExpGain": 0.9238454260265142,
+    "CrimeMoney": 0.9238454260265142,
+    "DaedalusAugsRequirement": 31,
+    "DarknetMoneyMultiplier": 0.9238454260265142,
+    "DefenseLevelMultiplier": 0.9238454260265142,
+    "DexterityLevelMultiplier": 0.9238454260265142,
+    "FactionPassiveRepGain": 0.9238454260265142,
+    "FactionWorkExpGain": 0.9238454260265142,
+    "FactionWorkRepGain": 0.9238454260265142,
+    "FourSigmaMarketDataApiCost": 1.08243216,
+    "FourSigmaMarketDataCost": 1.08243216,
+    "GangSoftcap": 0.8,
+    "GangUniqueAugs": 0.9238454260265142,
+    "HackExpGain": 0.9238454260265142,
+    "HackingLevelMultiplier": 0.9238454260265142,
+    "HacknetNodeMoney": 0.9238454260265142,
+    "HomeComputerRamCost": 1.08243216,
+    "InfiltrationMoney": 0.9238454260265142,
+    "InfiltrationRep": 0.9238454260265142,
+    "ManualHackMoney": 0.9238454260265142,
+    "CloudServerCost": 1.08243216,
+    "CloudServerSoftcap": 1.08243216,
+    "CloudServerLimit": 0.9238454260265142,
+    "CloudServerMaxRam": 0.9238454260265142,
+    "FavorToDonateToFaction": 1.08243216,
+    "ScriptHackMoney": 0.9238454260265142,
+    "ServerGrowthRate": 0.9238454260265142,
+    "ServerMaxMoney": 0.8534903711901115,
+    "ServerStartingMoney": 0.9238454260265142,
+    "ServerStartingSecurity": 1.5,
+    "ServerWeakenRate": 0.9238454260265142,
+    "StrengthLevelMultiplier": 0.9238454260265142,
+    "StaneksGiftPowerMultiplier": 1.08243216,
+    "StaneksGiftExtraSize": 1.08243216,
+    "WorldDaemonDifficulty": 1.08243216
+   }
+  },
+  "13": {
+   "1": {
+    "AgilityLevelMultiplier": 0.7,
+    "BladeburnerRank": 0.45,
+    "BladeburnerSkillCost": 2,
+    "ClassGymExpGain": 0.5,
+    "CodingContractMoney": 0.4,
+    "CompanyWorkExpGain": 0.5,
+    "CompanyWorkMoney": 0.4,
+    "CorporationDivisions": 0.4,
+    "CorporationSoftcap": 0.4,
+    "CorporationValuation": 0.001,
+    "CrimeExpGain": 0.5,
+    "CrimeMoney": 0.4,
+    "DarknetMoneyMultiplier": 0.1,
+    "DefenseLevelMultiplier": 0.7,
+    "DexterityLevelMultiplier": 0.7,
+    "FactionWorkExpGain": 0.5,
+    "FactionWorkRepGain": 0.6,
+    "FourSigmaMarketDataApiCost": 10,
+    "FourSigmaMarketDataCost": 10,
+    "GangSoftcap": 0.3,
+    "GangUniqueAugs": 0.1,
+    "HackExpGain": 0.1,
+    "HackingLevelMultiplier": 0.25,
+    "HacknetNodeMoney": 0.4,
+    "CloudServerSoftcap": 1.6,
+    "ScriptHackMoney": 0.2,
+    "ServerMaxMoney": 0.3375,
+    "ServerStartingMoney": 0.75,
+    "ServerStartingSecurity": 3,
+    "StrengthLevelMultiplier": 0.7,
+    "StaneksGiftPowerMultiplier": 2,
+    "StaneksGiftExtraSize": 1,
+    "WorldDaemonDifficulty": 3
+   }
+  },
+  "14": {
+   "1": {
+    "AgilityLevelMultiplier": 0.5,
+    "AugmentationMoneyCost": 1.5,
+    "BladeburnerRank": 0.6,
+    "BladeburnerSkillCost": 2,
+    "CompanyWorkRepGain": 0.2,
+    "CorporationDivisions": 0.8,
+    "CorporationSoftcap": 0.9,
+    "CorporationValuation": 0.4,
+    "CrimeMoney": 0.75,
+    "CrimeSuccessRate": 0.4,
+    "DefenseLevelMultiplier": 0.5,
+    "DexterityLevelMultiplier": 0.5,
+    "FactionWorkRepGain": 0.2,
+    "GangSoftcap": 0.7,
+    "GangUniqueAugs": 0.4,
+    "GoPower": 4,
+    "HackingLevelMultiplier": 0.4,
+    "HackingSpeedMultiplier": 0.3,
+    "HacknetNodeMoney": 0.25,
+    "InfiltrationMoney": 0.75,
+    "ScriptHackMoney": 0.3,
+    "ServerMaxMoney": 0.7,
+    "ServerStartingMoney": 0.5,
+    "ServerStartingSecurity": 1.5,
+    "StrengthLevelMultiplier": 0.5,
+    "StaneksGiftPowerMultiplier": 0.5,
+    "StaneksGiftExtraSize": -1,
+    "WorldDaemonDifficulty": 5
+   }
+  },
+  "15": {
+   "1": {
+    "AgilityLevelMultiplier": 0.7,
+    "AugmentationMoneyCost": 3,
+    "BladeburnerRank": 0.2,
+    "BladeburnerSkillCost": 3,
+    "CharismaLevelMultiplier": 1.1,
+    "CorporationDivisions": 0.4,
+    "CorporationSoftcap": 0.4,
+    "CorporationValuation": 0.2,
+    "DaedalusAugsRequirement": 20,
+    "DefenseLevelMultiplier": 0.7,
+    "DexterityLevelMultiplier": 0.7,
+    "GangUniqueAugs": 0.3,
+    "HackingLevelMultiplier": 0.6,
+    "HackingSpeedMultiplier": 0.6,
+    "ServerMaxMoney": 0.8,
+    "ServerStartingMoney": 0.5,
+    "ServerStartingSecurity": 1.5,
+    "StrengthLevelMultiplier": 0.7,
+    "StaneksGiftPowerMultiplier": 0.7,
+    "StaneksGiftExtraSize": -2,
+    "WorldDaemonDifficulty": 2
+   }
+  }
+ },
+ "knotenHinweis": "nur Abweichungen vom Vorgabewert; BN12 je Stufe 1..4; Stufe 3 in Tabelle C",
+ "sf": {
+  "1": {
+   "name": "The Source Genesis",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:15-48",
+    "reference/v301/src/Prestige.ts:246-250 (32 GB home)"
+   ],
+   "stufen": {
+    "1": {
+     "prozentAllMults": 16,
+     "homeRamStart": 32
+    },
+    "2": {
+     "prozentAllMults": 24,
+     "homeRamStart": 32
+    },
+    "3": {
+     "prozentAllMults": 28,
+     "homeRamStart": 32
+    }
+   },
+   "formel": "incMult = 1 + (16 + 8 + 4 ...)/100 ; ~26 Mults x incMult, Hacknet-Kosten x 1/incMult; Exploits unabhaengig",
+   "mults": "hacking*, hacking_exp/chance/speed/money/grow, 4 Kampfwerte + exp, charisma + exp, company_rep, faction_rep, crime_money/success, hacknet_node_money, work_money (x); hacknet_*_cost (1/x)",
+   "geeicht": "ja: Stufe 1,2,3 gegen 6 Staende, 29 Felder, Abweichung 0",
+   "v2": {
+    "chanceFaktorRetirementAssassinationRaid": {
+     "1": 1.147,
+     "2": 1.221,
+     "3": 1.257
+    },
+    "maxStaminaFaktor": {
+     "1": 1.153,
+     "2": 1.232,
+     "3": 1.27
+    },
+    "staminaGainFaktor": {
+     "1": 1.05,
+     "2": 1.08,
+     "3": 1.09
+    },
+    "aktionszeitDivStatFac": {
+     "1": 1.01,
+     "2": 1.015,
+     "3": 1.02
+    }
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.68,
+     "mid": 1.37,
+     "hi": 2.73
+    },
+    "2": {
+     "lo": 0.31,
+     "mid": 0.63,
+     "hi": 1.25
+    },
+    "3": {
+     "lo": 0.15,
+     "mid": 0.29,
+     "hi": 0.58
+    }
+   },
+   "nutzen_h_je_V1_Lauf": {
+    "gesamtL3": {
+     "lo": 0.5,
+     "mid": 1.5,
+     "hi": 3
+    },
+    "hinweis": "ohne SF1 Hack-Stufe am Ende -14..-23 % (v1cf.js); Umrechnung in Zeit ungeeicht"
+   },
+   "nutzen_h_je_Knotenstart_Kaltstart": {
+    "lo": 0.1,
+    "mid": 0.3,
+    "hi": 0.5,
+    "hinweis": "8 -> 32 GB home = 4,2 Mio $ x HomeComputerRamCost des Knotens"
+   },
+   "profitiert": [
+    "V1",
+    "V2",
+    "Kaltstart",
+    "Geld (hacking_money, work_money)",
+    "Ruf (faction_rep)"
+   ]
+  },
+  "2": {
+   "name": "Rise of the Underworld",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:50-62",
+    "reference/v301/src/PersonObjects/Player/PlayerObjectGangMethods.ts:12-30"
+   ],
+   "stufen": {
+    "1": {
+     "prozent": 24
+    },
+    "2": {
+     "prozent": 36
+    },
+    "3": {
+     "prozent": 42
+    }
+   },
+   "mults": "crime_money, crime_success, charisma",
+   "gang": "Gang ausserhalb BN2: SF2 >= 1 UND Karma <= -54000",
+   "geeicht": "nein (gleicher Codepfad wie SF1/5/6/9, Werte = Beschreibung BitNode.tsx:97-99)",
+   "v2": {
+    "chanceFaktor": "~1,00 (Charisma-Gewicht 0 bei Raid/Assassination, 0,1 bei Retirement; Charisma-Stufe klein)"
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0.05,
+     "hi": 0.2
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0.03,
+     "hi": 0.1
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.02,
+     "hi": 0.05
+    }
+   },
+   "nutzen_h_je_Knotenstart_Kaltstart": {
+    "lo": 0,
+    "mid": 0.1,
+    "hi": 0.3,
+    "hinweis": "Verbrechen-Geld/Sleeves-Shoplift x1,24/1,36/1,42"
+   },
+   "profitiert": [
+    "Kaltstart (Verbrechengeld)",
+    "Gang (BN2 selbst, sonst nie: 14-17 h Karma)"
+   ]
+  },
+  "3": {
+   "name": "Corporatocracy",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:63-75",
+    "reference/v301/src/PersonObjects/Player/PlayerObjectCorporationMethods.ts:21"
+   ],
+   "stufen": {
+    "1": {
+     "prozent": 8
+    },
+    "2": {
+     "prozent": 12
+    },
+    "3": {
+     "prozent": 14,
+     "corpApi": true
+    }
+   },
+   "mults": "charisma, work_money",
+   "geeicht": "nein (Codepfad wie oben)",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0,
+     "hi": 0.1
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0,
+     "hi": 0.05
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0,
+     "hi": 0.05
+    }
+   },
+   "profitiert": [
+    "nichts messbar; Corp nur mit 150 Mrd Seed"
+   ]
+  },
+  "4": {
+   "name": "The Singularity",
+   "quelle": [
+    "reference/v301/src/Netscript/RamCostGenerator.ts:82-97"
+   ],
+   "stufen": {
+    "1": {
+     "ramFaktorSingularity": 16
+    },
+    "2": {
+     "ramFaktorSingularity": 4
+    },
+    "3": {
+     "ramFaktorSingularity": 1
+    }
+   },
+   "imKnoten4": "1x unabhaengig von SF4",
+   "botRamGb": {
+    "bn4rep.js": {
+     "sf41": 1006,
+     "sf42": 260,
+     "sf43": 73
+    },
+    "bn4life.js": {
+     "sf41": 294,
+     "sf42": 78,
+     "sf43": 24
+    },
+    "homegrow.js": {
+     "sf41": 149,
+     "sf42": 41,
+     "sf43": 14
+    },
+    "bn4door.js": {
+     "sf41": 101,
+     "sf42": 29,
+     "sf43": 11
+    },
+    "bbtrain.js": {
+     "sf41": 95,
+     "sf42": 29,
+     "sf43": 12
+    },
+    "blade.js": {
+     "sf41": 175,
+     "sf42": 115,
+     "sf43": 100
+    },
+    "Summe 10 Singularity-Skripte": {
+     "sf41": 1921,
+     "sf42": 617,
+     "sf43": 291
+    }
+   },
+   "quelleRam": "src/registry.json (ramBaseGb + ramSingGb x Faktor), tools/ram.js-Messung 04.09.",
+   "geeicht": "Formel: Spielcode; Skript-RAM: Registry-Messung (nicht neu gemessen)",
+   "nutzen_h": "kein Stundenwert: Schwelle der Autonomie. SF4.1 (16x) macht bn4rep unlauffaehig (1006 GB), SF4.2 260 GB, SF4.3 73 GB. BN4 selbst 1x.",
+   "profitiert": [
+    "jeder Lauf mit Bot (RAM-Schwelle)",
+    "Kaltstart"
+   ]
+  },
+  "5": {
+   "name": "Artificial Intelligence",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:77-93",
+    "reference/v301/src/PersonObjects/Person.ts:149-190",
+    "reference/v301/src/Prestige.ts:363-365"
+   ],
+   "stufen": {
+    "1": {
+     "prozentHack": 8,
+     "intPersistent": true,
+     "int300ProKnotenstart": true,
+     "formulasExe": true,
+     "getBitNodeMultipliers": true
+    },
+    "2": {
+     "prozentHack": 12
+    },
+    "3": {
+     "prozentHack": 14
+    }
+   },
+   "intHinweis": "Ohne SF5 und ausserhalb BN5 wird Int bei jedem Laden auf 0 gesetzt (Person.ts:154-159). Int-Exp sammelt sich nur mit SF5 >= 1.",
+   "geeicht": "ja (Mults); Int-Skill-Formel exakt in 40+ Staenden",
+   "v2": {
+    "chanceFaktor": {
+     "1": 1.003,
+     "2": 1.004,
+     "3": 1.005
+    },
+    "hinweis": "Hacking-Gewicht nur in Black Ops (0,1; Decay 0,6) und Investigation/Undercover/Sting"
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.1,
+     "mid": 0.5,
+     "hi": 1.5,
+     "hinweis": "durch Int-Bonus auf Chance (w 0,75): ln(Bonus)/g; Int 50 0,28 h, Int 118 0,56 h, Int 172 0,74 h (mid); waechst mit der angesammelten Int, haengt an SF5 >= 1 (sonst Int = 0)"
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0.02,
+     "hi": 0.05
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.01,
+     "hi": 0.03
+    }
+   },
+   "intSammelrate": "Int-Exp je Lauf aus persistentIntelligenceData (curves): V1 2,4-3,5 k, V2 0,9-3,6 k; gesamt 112 k in 44 Laeufen = Int 172",
+   "nutzen_h_je_V1_Lauf": {
+    "1": {
+     "lo": 0.2,
+     "mid": 0.6,
+     "hi": 1.2
+    },
+    "2": {
+     "lo": 0.1,
+     "mid": 0.3,
+     "hi": 0.6
+    },
+    "3": {
+     "lo": 0.05,
+     "mid": 0.15,
+     "hi": 0.3
+    },
+    "hinweis": "ohne SF5 Hack-Stufe am Ende -8..-12 % (v1cf.js)"
+   },
+   "profitiert": [
+    "V1",
+    "Int fuer alle Laeufe (nur ab SF5.1 gespeichert)"
+   ]
+  },
+  "6": {
+   "name": "Bladeburner",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:95-114"
+   ],
+   "stufen": {
+    "1": {
+     "prozent": 8
+    },
+    "2": {
+     "prozent": 12
+    },
+    "3": {
+     "prozent": 14
+    }
+   },
+   "mults": "vier Kampfwerte (Stufe und Exp)",
+   "zugang": "Division in allen BN (BN6.1 selbst eroeffnet V2)",
+   "geeicht": "ja: Stufe 1 gegen 6 Staende (Abweichung 0), Skill-Rekonstruktion exakt",
+   "v2": {
+    "chanceFaktor": {
+     "1": 1.072,
+     "2": 1.107,
+     "3": 1.125
+    },
+    "maxStaminaFaktor": {
+     "1": 1.078,
+     "2": 1.115,
+     "3": 1.135
+    }
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.35,
+     "mid": 0.69,
+     "hi": 1.38
+    },
+    "2": {
+     "lo": 0.16,
+     "mid": 0.32,
+     "hi": 0.64
+    },
+    "3": {
+     "lo": 0.08,
+     "mid": 0.17,
+     "hi": 0.34
+    }
+   },
+   "profitiert": [
+    "V2"
+   ]
+  },
+  "7": {
+   "name": "Bladeburner 2079",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:116-129",
+    "reference/v301/src/PersonObjects/Player/PlayerObjectBladeburnerMethods.ts:14-19"
+   ],
+   "stufen": {
+    "1": {
+     "prozent": 8
+    },
+    "2": {
+     "prozent": 12
+    },
+    "3": {
+     "prozent": 14,
+     "simulacrumBeiBeitritt": true
+    }
+   },
+   "mults": "bladeburner_max_stamina, _stamina_gain, _analysis, _success_chance",
+   "geeicht": "nein (Formel gleich; Wirkung auf Chance geeicht ueber Gesamtnachbau, Black-Op-Chancen 5e-5)",
+   "v2": {
+    "chanceFaktor": {
+     "1": 1.08,
+     "2": 1.12,
+     "3": 1.14
+    },
+    "maxStaminaFaktor": {
+     "1": 1.08,
+     "2": 1.12,
+     "3": 1.14
+    },
+    "staminaGainFaktor": {
+     "1": 1.09,
+     "2": 1.14,
+     "3": 1.165
+    }
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.38,
+     "mid": 0.77,
+     "hi": 1.54
+    },
+    "2": {
+     "lo": 0.18,
+     "mid": 0.36,
+     "hi": 0.73
+    },
+    "3": {
+     "lo": 0.09,
+     "mid": 0.18,
+     "hi": 0.35
+    },
+    "hinweis": "nur Chance gerechnet; Ausdauer und Simulacrum (L3) kommen obendrauf"
+   },
+   "simulacrum": "L3: Blade's Simulacrum bei Beitritt gratis -> Graft/Arbeit parallel zu Bladeburner (blade.js laeuft als \"mit\" neben Graft). Zugang spart Kauf (1.955 Mrd bei q=4) oder Graft.",
+   "profitiert": [
+    "V2"
+   ]
+  },
+  "8": {
+   "name": "Ghost of Wall Street",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:131-143",
+    "reference/v301/src/NetscriptFunctions/StockMarket.ts:151-205",
+    "reference/v301/src/Prestige.ts:305-308"
+   ],
+   "stufen": {
+    "1": {
+     "wseTix": true,
+     "hackingGrowProzent": 12
+    },
+    "2": {
+     "shorts": true,
+     "hackingGrowProzent": 18
+    },
+    "3": {
+     "limitStopOrders": true,
+     "hackingGrowProzent": 21
+    }
+   },
+   "geeicht": "Boersenmodell gegen Originalquelltext bitgleich (nodes/audit-2026-10-03/inventar-boerse.md); Knotenzeit-Wirkung ungeeicht",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0.8,
+     "hi": 2,
+     "hinweis": "spart WSE+TIX (5,2 Mrd) am Knotenstart; wirkt nur, wenn der Bot in V2 handelt"
+    },
+    "2": {
+     "lo": 0,
+     "mid": 1,
+     "hi": 4,
+     "hinweis": "Leerverkauf: Handelsregel ~4,6 h/Zyklus schneller bis 1 Bio (BN8-Rechnung)"
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.2,
+     "hi": 1,
+     "hinweis": "Stop-Sell als Schutz"
+    }
+   },
+   "nutzen_boerse_in_V2_gesamt": {
+    "lo": 0,
+    "mid": 6,
+    "hi": 17,
+    "hinweis": "BOERSE-1: 100 Mrd 17,5 h frueher in BN2; ungeeicht, haengt am Geldabfluss (Graft, Augs)"
+   },
+   "profitiert": [
+    "Geld (alle Knoten mit niedrigem Hackgeld: BN2,3,11,13)"
+   ]
+  },
+  "9": {
+   "name": "Hacktocracy",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:145-160",
+    "reference/v301/src/Prestige.ts:245-251,337-348"
+   ],
+   "stufen": {
+    "1": {
+     "hacknetServer": true,
+     "prozentHacknet": 12
+    },
+    "2": {
+     "homeRamStart": 128,
+     "prozentHacknet": 18
+    },
+    "3": {
+     "gratisHacknetServer": "Stufe 100, 10 Kerne, Cache 5, nur beim Knotenwechsel",
+     "prozentHacknet": 21
+    }
+   },
+   "hashrateGratisserver": "0,481441 H/s (BN2.1, gemessen = gerechnet, tools/audit/bn1413-kalt.mjs); BN13 45 k$/s, BN14 28 k$/s Gegenwert",
+   "geeicht": "ja: Stufe 2,3 (Mults) gegen Staende; Gratisserver-Rate laut Projektmessung",
+   "nutzen_h_je_Knotenstart_Kaltstart": {
+    "2": {
+     "lo": 0.2,
+     "mid": 0.4,
+     "hi": 0.7,
+     "hinweis": "32 -> 128 GB home = 41,9 Mio $ x HomeComputerRamCost (BN9: 5x, BN3/10: 1,5x)"
+    },
+    "3": {
+     "lo": 0.1,
+     "mid": 0.3,
+     "hi": 0.6,
+     "hinweis": "Gratisserver = Geld im ersten Zyklus"
+    }
+   },
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0.2,
+     "hi": 1
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0.1,
+     "hi": 0.3
+    },
+    "3": {
+     "lo": 0.04,
+     "mid": 1.6,
+     "hi": 20,
+     "hinweis": "Hash->Rang (400 Rang): 1.000 Rang ~4 h bei Rangfaktor 1 (geeicht); BN13/15 Modell 28-63 h je 1.000 Rang UNGEEICHT"
+    }
+   },
+   "profitiert": [
+    "Kaltstart",
+    "V2 (Hash->Rang, einmal je Knotenwechsel)"
+   ]
+  },
+  "10": {
+   "name": "Digital Carbon",
+   "quelle": [
+    "reference/v301/src/PersonObjects/Sleeve/SleeveCovenantPurchases.tsx:58-73",
+    "reference/v301/src/NetscriptFunctions/Sleeve.ts:30-58",
+    "reference/v301/src/PersonObjects/Player/PlayerObjectGeneralMethods.ts:577-579 (Graft-Zugang)"
+   ],
+   "stufen": {
+    "1": {
+     "sleeves": 1,
+     "graftApi": true
+    },
+    "2": {
+     "sleeves": 2
+    },
+    "3": {
+     "sleeves": 3
+    }
+   },
+   "sleeveRegel": "min(3, SF10 + (BN10 ? 1 : 0)) + Covenant (nur BN10)",
+   "messungSleeves": "Spielstaende: BN10.2 2 Sleeves, BN10.3 3, BN4.2 und spaeter 3",
+   "geeicht": "Sleeve-Anzahl gegen Staende; Graft-Preis 98/99, Zeit 96/99 (nodes/GRAFTING.md); Knotenzeit-Wirkung ungeeicht",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 3,
+     "mid": 8,
+     "hi": 15,
+     "hinweis": "Graft-API (Zuender) 2-6 h kurze, 8-25 h lange Laeufe; + 1 Sleeve 0,3-1 h"
+    },
+    "2": {
+     "lo": 0.3,
+     "mid": 0.7,
+     "hi": 1
+    },
+    "3": {
+     "lo": 0.3,
+     "mid": 0.7,
+     "hi": 1
+    }
+   },
+   "profitiert": [
+    "V2 (Graft, Sleeves)"
+   ]
+  },
+  "11": {
+   "name": "The Big Crash",
+   "quelle": [
+    "reference/v301/src/SourceFile/applySourceFile.ts:166-178",
+    "reference/v301/src/Augmentation/AugmentationHelpers.ts:29-31"
+   ],
+   "stufen": {
+    "1": {
+     "companyProzent": 32,
+     "augStufenfaktor": 1.824
+    },
+    "2": {
+     "companyProzent": 48,
+     "augStufenfaktor": 1.786
+    },
+    "3": {
+     "companyProzent": 56,
+     "augStufenfaktor": 1.767
+    }
+   },
+   "augKosten": {
+    "4": {
+     "1": 0.914,
+     "2": 0.873,
+     "3": 0.853
+    },
+    "6": {
+     "1": 0.85,
+     "2": 0.782,
+     "3": 0.75
+    },
+    "8": {
+     "1": 0.786,
+     "2": 0.695,
+     "3": 0.654
+    },
+    "12": {
+     "1": 0.669,
+     "2": 0.545,
+     "3": 0.491
+    },
+    "20": {
+     "1": 0.483,
+     "2": 0.332,
+     "3": 0.275
+    },
+    "30": {
+     "1": 0.321,
+     "2": 0.179,
+     "3": 0.133
+    }
+   },
+   "augKostenHinweis": "Gesamtpreis von q Augs je Einbauzyklus gegen SF11 0 (1,9^i Treppe)",
+   "geeicht": "Treppenformel: Summe nachgerechnet (nicht gegen Spielstand); Firmen-Mults nein",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.1,
+     "mid": 0.3,
+     "hi": 0.8
+    },
+    "2": {
+     "lo": 0.05,
+     "mid": 0.15,
+     "hi": 0.4
+    },
+    "3": {
+     "lo": 0.02,
+     "mid": 0.05,
+     "hi": 0.15
+    }
+   },
+   "profitiert": [
+    "Geld (Augkauf), V1 mit vielen Augs je Zyklus"
+   ]
+  },
+  "12": {
+   "name": "The Recursion",
+   "quelle": [
+    "reference/v301/src/Prestige.ts:264-271",
+    "reference/v301/src/BitNode/BitNode.tsx:924-995"
+   ],
+   "stufen": {
+    "1": {
+     "nfgStart": 1
+    },
+    "2": {
+     "nfgStart": 2
+    },
+    "3": {
+     "nfgStart": 3
+    }
+   },
+   "nfgFormel": "je Stufe x1,01000262 auf 26 Mults (nicht bladeburner_*, nicht dnet_money)",
+   "geeicht": "NFG-Mult exakt in Staenden (aug-mults.mjs 03.10., Abweichung < 1e-9)",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.05,
+     "mid": 0.1,
+     "hi": 0.2
+    },
+    "2": {
+     "lo": 0.05,
+     "mid": 0.1,
+     "hi": 0.2
+    },
+    "3": {
+     "lo": 0.05,
+     "mid": 0.1,
+     "hi": 0.2
+    }
+   },
+   "profitiert": [
+    "alle (+1 % Mults je Stufe)"
+   ]
+  },
+  "13": {
+   "name": "They're Lunatics",
+   "quelle": [
+    "reference/v301/src/CotMG/StaneksGift.ts:22-31"
+   ],
+   "stufen": {
+    "1": {
+     "groesse": "+1 Zelle"
+    },
+    "2": {
+     "groesse": "+2"
+    },
+    "3": {
+     "groesse": "+3"
+    }
+   },
+   "geeicht": "Stanek-Modell bitgleich gegen echten Code (nodes/bau-2026-10-27-stanek/eich.mjs)",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0.2,
+     "hi": 1
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0.1,
+     "hi": 0.5
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.1,
+     "hi": 0.5
+    },
+    "hinweis": "nur wenn Stanek gebaut; Urteil 27.10.: nicht bauen"
+   },
+   "profitiert": [
+    "nichts (Stanek verworfen)"
+   ]
+  },
+  "14": {
+   "name": "IPvGO Subnet Takeover",
+   "quelle": [
+    "reference/v301/src/Go/effects/effect.ts:14-24,32-47",
+    "reference/v301/src/Go/effects/netscriptGoImplementation.ts:486-497,560-567"
+   ],
+   "stufen": {
+    "1": {
+     "goBonusFaktor": 2,
+     "maxFavorRep": 200000,
+     "repZuFavor": 1000
+    },
+    "2": {
+     "goBonusFaktor": 2,
+     "goCheatApi": true,
+     "maxFavorRep": 300000,
+     "repZuFavor": 1500
+    },
+    "3": {
+     "goBonusFaktor": 2,
+     "cheatChanceAddiv": 0.25,
+     "maxFavorRep": 400000,
+     "repZuFavor": 2000
+    }
+   },
+   "geeicht": "ja: Go-Effekt gegen 7 Paare echter Staende, Abweichung 1e-6, SF14-Faktor 2 bestaetigt (gocal.js)",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0.98,
+     "mid": 1.97,
+     "hi": 3.93,
+     "hinweis": "Tetrads bei nodePower 3e4; Exponent 0,91; BN14 selbst mehr"
+    },
+    "2": {
+     "lo": 0.1,
+     "mid": 0.5,
+     "hi": 1,
+     "hinweis": "go.cheat: +20-30 % NodePower je Aktion (gemessen BN13)"
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.1,
+     "hi": 0.3
+    }
+   },
+   "profitiert": [
+    "V2 (Tetrads-Kampfbonus)"
+   ]
+  },
+  "15": {
+   "name": "The Secrets of the Dark Net",
+   "quelle": [
+    "reference/v301/src/DarkNet/effects/effects.ts:80,105-110,280",
+    "reference/v301/src/Work/Formulas.ts:130-134",
+    "reference/v301/src/PersonObjects/formulas/reputation.ts:54-60"
+   ],
+   "stufen": {
+    "1": {
+     "torUndDarkscapeStart": true,
+     "vollesDarkweb": true
+    },
+    "2": {
+     "firmaCharismaBonus": "getMultiplierFromCharisma(1,5): bei Charisma 135 x1,018",
+     "authSpeedProzent": 20
+    },
+    "3": {
+     "fraktionRufCharismaBonus": "+0,1 x Charisma auf Hacking-Ruf (Charisma 135: ~+1 %)",
+     "cacheDateienProzent": 50
+    }
+   },
+   "geeicht": "nein (Zahlen aus Formel, Charisma 135 aus Stand BN15.3)",
+   "nutzen_h_je_V2_Lauf": {
+    "1": {
+     "lo": 0,
+     "mid": 0.05,
+     "hi": 0.2
+    },
+    "2": {
+     "lo": 0,
+     "mid": 0,
+     "hi": 0.05
+    },
+    "3": {
+     "lo": 0,
+     "mid": 0.02,
+     "hi": 0.1
+    }
+   },
+   "profitiert": [
+    "kaum etwas; Stufe 1 spart nur TOR/Darkscape-Kauf"
+   ]
+  }
+ },
+ "v2_primitiven_je_sf_stufe_gegenfall_ohne_sf": {
+  "14.1": {
+   "stand": "LIVE_197f4d61481686_BN14L1_2026-10-24T17-25_pre-install.json.gz",
+   "res": {
+    "1": {
+     "1": {
+      "retirement": 1.164,
+      "raid": 1.135,
+      "assassination": 1.142,
+      "tracking": 1.167,
+      "bo_typhoon": 1.143,
+      "bo_daedalus": 1.143,
+      "maxStamina": 1.151,
+      "staminaGain": 1.059,
+      "actionTimeDiv": 1.0127
+     },
+     "2": {
+      "retirement": 1.248,
+      "raid": 1.203,
+      "assassination": 1.212,
+      "tracking": 1.252,
+      "bo_typhoon": 1.214,
+      "bo_daedalus": 1.214,
+      "maxStamina": 1.227,
+      "staminaGain": 1.087,
+      "actionTimeDiv": 1.0188
+     },
+     "3": {
+      "retirement": 1.289,
+      "raid": 1.237,
+      "assassination": 1.248,
+      "tracking": 1.295,
+      "bo_typhoon": 1.249,
+      "bo_daedalus": 1.249,
+      "maxStamina": 1.265,
+      "staminaGain": 1.101,
+      "actionTimeDiv": 1.0218
+     }
+    },
+    "5": {
+     "1": {
+      "retirement": 1,
+      "raid": 1.002,
+      "assassination": 1.001,
+      "tracking": 1,
+      "bo_typhoon": 1.001,
+      "bo_daedalus": 1.001,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1,
+      "raid": 1.003,
+      "assassination": 1.001,
+      "tracking": 1,
+      "bo_typhoon": 1.001,
+      "bo_daedalus": 1.001,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1,
+      "raid": 1.003,
+      "assassination": 1.002,
+      "tracking": 1,
+      "bo_typhoon": 1.002,
+      "bo_daedalus": 1.002,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     }
+    },
+    "6": {
+     "1": {
+      "retirement": 1.082,
+      "raid": 1.067,
+      "assassination": 1.072,
+      "tracking": 1.084,
+      "bo_typhoon": 1.072,
+      "bo_daedalus": 1.072,
+      "maxStamina": 1.078,
+      "staminaGain": 1.03,
+      "actionTimeDiv": 1.0066
+     },
+     "2": {
+      "retirement": 1.122,
+      "raid": 1.1,
+      "assassination": 1.106,
+      "tracking": 1.124,
+      "bo_typhoon": 1.106,
+      "bo_daedalus": 1.106,
+      "maxStamina": 1.115,
+      "staminaGain": 1.045,
+      "actionTimeDiv": 1.0097
+     },
+     "3": {
+      "retirement": 1.143,
+      "raid": 1.116,
+      "assassination": 1.123,
+      "tracking": 1.144,
+      "bo_typhoon": 1.124,
+      "bo_daedalus": 1.124,
+      "maxStamina": 1.132,
+      "staminaGain": 1.051,
+      "actionTimeDiv": 1.0112
+     }
+    },
+    "7": {
+     "1": {
+      "retirement": 1.08,
+      "raid": 1.08,
+      "assassination": 1.08,
+      "tracking": 1.08,
+      "bo_typhoon": 1.08,
+      "bo_daedalus": 1.08,
+      "maxStamina": 1.08,
+      "staminaGain": 1.096,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1.12,
+      "raid": 1.12,
+      "assassination": 1.12,
+      "tracking": 1.12,
+      "bo_typhoon": 1.12,
+      "bo_daedalus": 1.12,
+      "maxStamina": 1.12,
+      "staminaGain": 1.144,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1.14,
+      "raid": 1.14,
+      "assassination": 1.14,
+      "tracking": 1.14,
+      "bo_typhoon": 1.14,
+      "bo_daedalus": 1.14,
+      "maxStamina": 1.14,
+      "staminaGain": 1.169,
+      "actionTimeDiv": 1
+     }
+    }
+   }
+  },
+  "13.1": {
+   "stand": "LIVE_197f4d61481686_BN13L1_2026-10-28T07-44_pre-install.json.gz",
+   "res": {
+    "1": {
+     "1": {
+      "retirement": 1.164,
+      "raid": 1.135,
+      "assassination": 1.14,
+      "tracking": 1.166,
+      "bo_typhoon": 1.143,
+      "bo_daedalus": 1.143,
+      "maxStamina": 1.15,
+      "staminaGain": 1.054,
+      "actionTimeDiv": 1.0115
+     },
+     "2": {
+      "retirement": 1.247,
+      "raid": 1.203,
+      "assassination": 1.212,
+      "tracking": 1.251,
+      "bo_typhoon": 1.215,
+      "bo_daedalus": 1.215,
+      "maxStamina": 1.228,
+      "staminaGain": 1.082,
+      "actionTimeDiv": 1.0172
+     },
+     "3": {
+      "retirement": 1.287,
+      "raid": 1.234,
+      "assassination": 1.245,
+      "tracking": 1.292,
+      "bo_typhoon": 1.249,
+      "bo_daedalus": 1.249,
+      "maxStamina": 1.263,
+      "staminaGain": 1.094,
+      "actionTimeDiv": 1.0198
+     }
+    },
+    "5": {
+     "1": {
+      "retirement": 1,
+      "raid": 1.001,
+      "assassination": 1.001,
+      "tracking": 1,
+      "bo_typhoon": 1.001,
+      "bo_daedalus": 1.001,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1,
+      "raid": 1.002,
+      "assassination": 1.001,
+      "tracking": 1,
+      "bo_typhoon": 1.001,
+      "bo_daedalus": 1.001,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1,
+      "raid": 1.002,
+      "assassination": 1.001,
+      "tracking": 1,
+      "bo_typhoon": 1.001,
+      "bo_daedalus": 1.001,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     }
+    },
+    "6": {
+     "1": {
+      "retirement": 1.079,
+      "raid": 1.065,
+      "assassination": 1.069,
+      "tracking": 1.079,
+      "bo_typhoon": 1.07,
+      "bo_daedalus": 1.07,
+      "maxStamina": 1.074,
+      "staminaGain": 1.027,
+      "actionTimeDiv": 1.0058
+     },
+     "2": {
+      "retirement": 1.121,
+      "raid": 1.1,
+      "assassination": 1.105,
+      "tracking": 1.121,
+      "bo_typhoon": 1.107,
+      "bo_daedalus": 1.107,
+      "maxStamina": 1.114,
+      "staminaGain": 1.041,
+      "actionTimeDiv": 1.0088
+     },
+     "3": {
+      "retirement": 1.141,
+      "raid": 1.116,
+      "assassination": 1.123,
+      "tracking": 1.141,
+      "bo_typhoon": 1.124,
+      "bo_daedalus": 1.124,
+      "maxStamina": 1.134,
+      "staminaGain": 1.048,
+      "actionTimeDiv": 1.0103
+     }
+    },
+    "7": {
+     "1": {
+      "retirement": 1.08,
+      "raid": 1.08,
+      "assassination": 1.08,
+      "tracking": 1.08,
+      "bo_typhoon": 1.08,
+      "bo_daedalus": 1.08,
+      "maxStamina": 1.08,
+      "staminaGain": 1.094,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1.12,
+      "raid": 1.12,
+      "assassination": 1.12,
+      "tracking": 1.12,
+      "bo_typhoon": 1.12,
+      "bo_daedalus": 1.12,
+      "maxStamina": 1.12,
+      "staminaGain": 1.141,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1.14,
+      "raid": 1.14,
+      "assassination": 1.14,
+      "tracking": 1.14,
+      "bo_typhoon": 1.14,
+      "bo_daedalus": 1.14,
+      "maxStamina": 1.14,
+      "staminaGain": 1.165,
+      "actionTimeDiv": 1
+     }
+    }
+   }
+  },
+  "7.1": {
+   "stand": "LIVE_197f4d61481686_BN7L1_2026-10-16T04-16_pre-install.json.gz",
+   "res": {
+    "1": {
+     "1": {
+      "retirement": 1.162,
+      "raid": 1.129,
+      "assassination": 1.138,
+      "tracking": 1.165,
+      "bo_typhoon": 1.142,
+      "bo_daedalus": 1.142,
+      "maxStamina": 1.155,
+      "staminaGain": 1.047,
+      "actionTimeDiv": 1.0094
+     },
+     "2": {
+      "retirement": 1.246,
+      "raid": 1.196,
+      "assassination": 1.209,
+      "tracking": 1.252,
+      "bo_typhoon": 1.215,
+      "bo_daedalus": 1.215,
+      "maxStamina": 1.236,
+      "staminaGain": 1.07,
+      "actionTimeDiv": 1.014
+     },
+     "3": {
+      "retirement": 1.286,
+      "raid": 1.227,
+      "assassination": 1.243,
+      "tracking": 1.292,
+      "bo_typhoon": 1.25,
+      "bo_daedalus": 1.25,
+      "maxStamina": 1.273,
+      "staminaGain": 1.081,
+      "actionTimeDiv": 1.0161
+     }
+    },
+    "5": {
+     "1": {
+      "retirement": 1,
+      "raid": 1.003,
+      "assassination": 1.002,
+      "tracking": 1,
+      "bo_typhoon": 1.002,
+      "bo_daedalus": 1.002,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1,
+      "raid": 1.004,
+      "assassination": 1.002,
+      "tracking": 1,
+      "bo_typhoon": 1.002,
+      "bo_daedalus": 1.002,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1,
+      "raid": 1.005,
+      "assassination": 1.003,
+      "tracking": 1,
+      "bo_typhoon": 1.003,
+      "bo_daedalus": 1.003,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     }
+    },
+    "6": {
+     "1": {
+      "retirement": 1.08,
+      "raid": 1.064,
+      "assassination": 1.069,
+      "tracking": 1.078,
+      "bo_typhoon": 1.071,
+      "bo_daedalus": 1.071,
+      "maxStamina": 1.078,
+      "staminaGain": 1.024,
+      "actionTimeDiv": 1.0048
+     },
+     "2": {
+      "retirement": 1.116,
+      "raid": 1.093,
+      "assassination": 1.101,
+      "tracking": 1.117,
+      "bo_typhoon": 1.104,
+      "bo_daedalus": 1.104,
+      "maxStamina": 1.117,
+      "staminaGain": 1.035,
+      "actionTimeDiv": 1.0071
+     },
+     "3": {
+      "retirement": 1.139,
+      "raid": 1.111,
+      "assassination": 1.12,
+      "tracking": 1.139,
+      "bo_typhoon": 1.124,
+      "bo_daedalus": 1.124,
+      "maxStamina": 1.139,
+      "staminaGain": 1.042,
+      "actionTimeDiv": 1.0084
+     }
+    },
+    "7": {
+     "1": {
+      "retirement": 1.08,
+      "raid": 1.08,
+      "assassination": 1.08,
+      "tracking": 1.08,
+      "bo_typhoon": 1.08,
+      "bo_daedalus": 1.08,
+      "maxStamina": 1.08,
+      "staminaGain": 1.088,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1.12,
+      "raid": 1.12,
+      "assassination": 1.12,
+      "tracking": 1.12,
+      "bo_typhoon": 1.12,
+      "bo_daedalus": 1.12,
+      "maxStamina": 1.12,
+      "staminaGain": 1.133,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1.14,
+      "raid": 1.14,
+      "assassination": 1.14,
+      "tracking": 1.14,
+      "bo_typhoon": 1.14,
+      "bo_daedalus": 1.14,
+      "maxStamina": 1.14,
+      "staminaGain": 1.156,
+      "actionTimeDiv": 1
+     }
+    }
+   }
+  },
+  "4.2": {
+   "stand": "LIVE_197f4d61481686_BN4L2_2026-09-11T04-27_pre-install.json.gz",
+   "res": {
+    "1": {
+     "1": {
+      "retirement": 1.169,
+      "raid": 1.136,
+      "assassination": 1.144,
+      "tracking": 1.175,
+      "bo_typhoon": 1.146,
+      "bo_daedalus": 1.146,
+      "maxStamina": 1.159,
+      "staminaGain": 1.047,
+      "actionTimeDiv": 1.0098
+     },
+     "2": {
+      "retirement": 1.254,
+      "raid": 1.203,
+      "assassination": 1.215,
+      "tracking": 1.263,
+      "bo_typhoon": 1.217,
+      "bo_daedalus": 1.217,
+      "maxStamina": 1.237,
+      "staminaGain": 1.07,
+      "actionTimeDiv": 1.0143
+     },
+     "3": {
+      "retirement": 1.296,
+      "raid": 1.237,
+      "assassination": 1.251,
+      "tracking": 1.309,
+      "bo_typhoon": 1.253,
+      "bo_daedalus": 1.253,
+      "maxStamina": 1.277,
+      "staminaGain": 1.081,
+      "actionTimeDiv": 1.0165
+     }
+    },
+    "5": {
+     "1": {
+      "retirement": 1,
+      "raid": 1.006,
+      "assassination": 1.003,
+      "tracking": 1,
+      "bo_typhoon": 1.003,
+      "bo_daedalus": 1.003,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1,
+      "raid": 1.009,
+      "assassination": 1.005,
+      "tracking": 1,
+      "bo_typhoon": 1.005,
+      "bo_daedalus": 1.005,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1,
+      "raid": 1.01,
+      "assassination": 1.005,
+      "tracking": 1,
+      "bo_typhoon": 1.005,
+      "bo_daedalus": 1.005,
+      "maxStamina": 1,
+      "staminaGain": 1,
+      "actionTimeDiv": 1
+     }
+    },
+    "6": {
+     "1": {
+      "retirement": 1.081,
+      "raid": 1.062,
+      "assassination": 1.069,
+      "tracking": 1.082,
+      "bo_typhoon": 1.07,
+      "bo_daedalus": 1.07,
+      "maxStamina": 1.08,
+      "staminaGain": 1.024,
+      "actionTimeDiv": 1.005
+     },
+     "2": {
+      "retirement": 1.12,
+      "raid": 1.092,
+      "assassination": 1.102,
+      "tracking": 1.122,
+      "bo_typhoon": 1.103,
+      "bo_daedalus": 1.103,
+      "maxStamina": 1.117,
+      "staminaGain": 1.035,
+      "actionTimeDiv": 1.0073
+     },
+     "3": {
+      "retirement": 1.142,
+      "raid": 1.109,
+      "assassination": 1.12,
+      "tracking": 1.143,
+      "bo_typhoon": 1.121,
+      "bo_daedalus": 1.121,
+      "maxStamina": 1.138,
+      "staminaGain": 1.041,
+      "actionTimeDiv": 1.0086
+     }
+    },
+    "7": {
+     "1": {
+      "retirement": 1.08,
+      "raid": 1.08,
+      "assassination": 1.08,
+      "tracking": 1.08,
+      "bo_typhoon": 1.08,
+      "bo_daedalus": 1.08,
+      "maxStamina": 1.08,
+      "staminaGain": 1.088,
+      "actionTimeDiv": 1
+     },
+     "2": {
+      "retirement": 1.12,
+      "raid": 1.12,
+      "assassination": 1.12,
+      "tracking": 1.12,
+      "bo_typhoon": 1.12,
+      "bo_daedalus": 1.12,
+      "maxStamina": 1.12,
+      "staminaGain": 1.133,
+      "actionTimeDiv": 1
+     },
+     "3": {
+      "retirement": 1.14,
+      "raid": 1.14,
+      "assassination": 1.14,
+      "tracking": 1.14,
+      "bo_typhoon": 1.14,
+      "bo_daedalus": 1.14,
+      "maxStamina": 1.14,
+      "staminaGain": 1.155,
+      "actionTimeDiv": 1
+     }
+    }
+   }
+  }
+ },
+ "bladeburner_zeituntergrenze": {
+  "blackOpsAktionszeitSumme_h": "21,3-22,3 bei statFac 1,2-1,3 und Overclock 0 (Summe baseDifficulty/10 x 1,5 / statFac x (1-0,01 OC))",
+  "mitOC90_statFac4": "~1,5 h",
+  "quelle": "bofloor.js, getActionTime Action.ts:105-122",
+  "geeicht": "Formel Teil von getActionTime (nicht gegen Spielwert gemessen); statFac aus Spielstaenden"
+ },
+ "go": {
+  "1000": {
+   "Netburners": {
+    "ohneSF14": 1.143,
+    "mitSF14": 1.285,
+    "BN14ohneSF": 1.571,
+    "BN14mitSF": 2.142
+   },
+   "SlumSnakes": {
+    "ohneSF14": 1.132,
+    "mitSF14": 1.263,
+    "BN14ohneSF": 1.527,
+    "BN14mitSF": 2.054
+   },
+   "TheBlackHand": {
+    "ohneSF14": 1.099,
+    "mitSF14": 1.198,
+    "BN14ohneSF": 1.395,
+    "BN14mitSF": 1.79
+   },
+   "Tetrads": {
+    "ohneSF14": 1.077,
+    "mitSF14": 1.154,
+    "BN14ohneSF": 1.307,
+    "BN14mitSF": 1.615
+   },
+   "Daedalus": {
+    "ohneSF14": 1.121,
+    "mitSF14": 1.242,
+    "BN14ohneSF": 1.483,
+    "BN14mitSF": 1.966
+   },
+   "Illuminati": {
+    "ohneSF14": 1.077,
+    "mitSF14": 1.154,
+    "BN14ohneSF": 1.307,
+    "BN14mitSF": 1.615
+   },
+   "w0r1d_d43m0n": {
+    "ohneSF14": 1.22,
+    "mitSF14": 1.439,
+    "BN14ohneSF": 1.878,
+    "BN14mitSF": 2.757
+   }
+  },
+  "10000": {
+   "Netburners": {
+    "ohneSF14": 1.38,
+    "mitSF14": 1.759,
+    "BN14ohneSF": 2.518,
+    "BN14mitSF": 4.036
+   },
+   "SlumSnakes": {
+    "ohneSF14": 1.35,
+    "mitSF14": 1.701,
+    "BN14ohneSF": 2.401,
+    "BN14mitSF": 3.803
+   },
+   "TheBlackHand": {
+    "ohneSF14": 1.263,
+    "mitSF14": 1.526,
+    "BN14ohneSF": 2.051,
+    "BN14mitSF": 3.102
+   },
+   "Tetrads": {
+    "ohneSF14": 1.204,
+    "mitSF14": 1.409,
+    "BN14ohneSF": 1.817,
+    "BN14mitSF": 2.635
+   },
+   "Daedalus": {
+    "ohneSF14": 1.321,
+    "mitSF14": 1.642,
+    "BN14ohneSF": 2.285,
+    "BN14mitSF": 3.569
+   },
+   "Illuminati": {
+    "ohneSF14": 1.204,
+    "mitSF14": 1.409,
+    "BN14ohneSF": 1.817,
+    "BN14mitSF": 2.635
+   },
+   "w0r1d_d43m0n": {
+    "ohneSF14": 1.584,
+    "mitSF14": 2.168,
+    "BN14ohneSF": 3.336,
+    "BN14mitSF": 5.671
+   }
+  },
+  "100000": {
+   "Netburners": {
+    "ohneSF14": 1.947,
+    "mitSF14": 2.893,
+    "BN14ohneSF": 4.786,
+    "BN14mitSF": 8.573
+   },
+   "SlumSnakes": {
+    "ohneSF14": 1.874,
+    "mitSF14": 2.748,
+    "BN14ohneSF": 4.495,
+    "BN14mitSF": 7.99
+   },
+   "TheBlackHand": {
+    "ohneSF14": 1.655,
+    "mitSF14": 2.311,
+    "BN14ohneSF": 3.621,
+    "BN14mitSF": 6.243
+   },
+   "Tetrads": {
+    "ohneSF14": 1.51,
+    "mitSF14": 2.019,
+    "BN14ohneSF": 3.039,
+    "BN14mitSF": 5.078
+   },
+   "Daedalus": {
+    "ohneSF14": 1.801,
+    "mitSF14": 2.602,
+    "BN14ohneSF": 4.204,
+    "BN14mitSF": 7.408
+   },
+   "Illuminati": {
+    "ohneSF14": 1.51,
+    "mitSF14": 2.019,
+    "BN14ohneSF": 3.039,
+    "BN14mitSF": 5.078
+   },
+   "w0r1d_d43m0n": {
+    "ohneSF14": 2.456,
+    "mitSF14": 3.913,
+    "BN14ohneSF": 6.825,
+    "BN14mitSF": 12.65
+   }
+  },
+  "300000": {
+   "Netburners": {
+    "ohneSF14": 2.442,
+    "mitSF14": 3.883,
+    "BN14ohneSF": 6.767,
+    "BN14mitSF": 12.534
+   },
+   "SlumSnakes": {
+    "ohneSF14": 2.331,
+    "mitSF14": 3.662,
+    "BN14ohneSF": 6.323,
+    "BN14mitSF": 11.646
+   },
+   "TheBlackHand": {
+    "ohneSF14": 1.998,
+    "mitSF14": 2.996,
+    "BN14ohneSF": 4.992,
+    "BN14mitSF": 8.985
+   },
+   "Tetrads": {
+    "ohneSF14": 1.776,
+    "mitSF14": 2.553,
+    "BN14ohneSF": 4.105,
+    "BN14mitSF": 7.21
+   },
+   "Daedalus": {
+    "ohneSF14": 2.22,
+    "mitSF14": 3.44,
+    "BN14ohneSF": 5.88,
+    "BN14mitSF": 10.759
+   },
+   "Illuminati": {
+    "ohneSF14": 1.776,
+    "mitSF14": 2.553,
+    "BN14ohneSF": 4.105,
+    "BN14mitSF": 7.21
+   },
+   "w0r1d_d43m0n": {
+    "ohneSF14": 3.218,
+    "mitSF14": 5.436,
+    "BN14ohneSF": 9.872,
+    "BN14mitSF": 18.744
+   }
+  }
+ },
+ "intBonus": {
+  "0": {
+   "bbChance_w075": 1,
+   "hackRep_w1": 1
+  },
+  "50": {
+   "bbChance_w075": 1.0286,
+   "hackRep_w1": 1.0381
+  },
+  "76": {
+   "bbChance_w075": 1.04,
+   "hackRep_w1": 1.0533
+  },
+  "100": {
+   "bbChance_w075": 1.0498,
+   "hackRep_w1": 1.0664
+  },
+  "118": {
+   "bbChance_w075": 1.0568,
+   "hackRep_w1": 1.0757
+  },
+  "152": {
+   "bbChance_w075": 1.0696,
+   "hackRep_w1": 1.0928
+  },
+  "172": {
+   "bbChance_w075": 1.0768,
+   "hackRep_w1": 1.1024
+  }
+ },
+ "intExpFuerStufe": {
+  "50": 1937,
+  "76": 5035,
+  "100": 11255,
+  "118": 20157,
+  "152": 59340,
+  "172": 111325
+ },
+ "homeRamKosten": {
+  "8->16": 1009744,
+  "16->32": 3190791,
+  "32->64": 10082898,
+  "64->128": 31861959,
+  "128->256": 100683790,
+  "8->128": 46145392,
+  "32->128": 41944857,
+  "8->32": 4200535
+ },
+ "overclock90": {
+  "1": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "2": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "3": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "4": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "5": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "6": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "7": {
+   "skillCostMult": 2,
+   "SP": 11754,
+   "rangDafuer": 35262
+  },
+  "8": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "9": {
+   "skillCostMult": 1.2,
+   "SP": 7052,
+   "rangDafuer": 21157
+  },
+  "10": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "11": {
+   "skillCostMult": 1,
+   "SP": 5877,
+   "rangDafuer": 17631
+  },
+  "12": {
+   "skillCostMult": 1.02,
+   "SP": 5995,
+   "rangDafuer": 17984
+  },
+  "13": {
+   "skillCostMult": 2,
+   "SP": 11754,
+   "rangDafuer": 35262
+  },
+  "14": {
+   "skillCostMult": 2,
+   "SP": 11754,
+   "rangDafuer": 35262
+  },
+  "15": {
+   "skillCostMult": 3,
+   "SP": 17631,
+   "rangDafuer": 52893
+  }
+ },
+ "messdaten": {
+  "effektiveStunden": [
+   {
+    "lauf": "1.1",
+    "verfahren": "V1",
+    "wallH": 46.13,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {}
+   },
+   {
+    "lauf": "4.1",
+    "verfahren": "V1",
+    "wallH": 48.59,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1
+    }
+   },
+   {
+    "lauf": "5.1",
+    "verfahren": "V1",
+    "wallH": 28.06,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1
+    }
+   },
+   {
+    "lauf": "6.1",
+    "verfahren": "V2",
+    "wallH": 91.72,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1,
+     "5": 1
+    }
+   },
+   {
+    "lauf": "10.1",
+    "verfahren": "V2",
+    "wallH": 94.9,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1,
+     "5": 1,
+     "6": 1
+    }
+   },
+   {
+    "lauf": "10.2",
+    "verfahren": "V2",
+    "wallH": 116.54,
+    "onlineH": null,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1,
+     "5": 1,
+     "6": 1,
+     "10": 1
+    }
+   },
+   {
+    "lauf": "10.3",
+    "verfahren": "V2",
+    "wallH": 97.34,
+    "onlineH": 48.04,
+    "effV2H": 72.7,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1,
+     "5": 1,
+     "6": 1,
+     "10": 2
+    }
+   },
+   {
+    "lauf": "4.2",
+    "verfahren": "V2",
+    "wallH": 47.18,
+    "onlineH": 33.57,
+    "effV2H": 40.4,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 1,
+     "5": 1,
+     "6": 1,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "4.3",
+    "verfahren": "V2",
+    "wallH": 52,
+    "onlineH": 34.19,
+    "effV2H": 43.1,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 2,
+     "5": 1,
+     "6": 1,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "9.1",
+    "verfahren": "V2",
+    "wallH": 104.11,
+    "onlineH": 34.15,
+    "effV2H": 69.1,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "9.2",
+    "verfahren": "V2",
+    "wallH": 81.72,
+    "onlineH": 49.8,
+    "effV2H": 65.8,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "9": 1,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "9.3",
+    "verfahren": "V2",
+    "wallH": 53.57,
+    "onlineH": 46.58,
+    "effV2H": 50.1,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "9": 2,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "1.2",
+    "verfahren": "V1",
+    "wallH": 19.54,
+    "onlineH": 11.82,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 1,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "9": 3,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "1.3",
+    "verfahren": "V1",
+    "wallH": 12.69,
+    "onlineH": 12.69,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 2,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "9": 3,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "5.2",
+    "verfahren": "V1",
+    "wallH": 19.93,
+    "onlineH": 19.93,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 1,
+     "6": 1,
+     "9": 3,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "5.3",
+    "verfahren": "V1",
+    "wallH": 46.77,
+    "onlineH": 19.27,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 2,
+     "6": 1,
+     "9": 3,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "12.1",
+    "verfahren": "V1",
+    "wallH": 48.8,
+    "onlineH": 11.97,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3
+    }
+   },
+   {
+    "lauf": "12.2",
+    "verfahren": "V1",
+    "wallH": 24.24,
+    "onlineH": 12.25,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 1
+    }
+   },
+   {
+    "lauf": "12.3",
+    "verfahren": "V1",
+    "wallH": 32.3,
+    "onlineH": 13.66,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 2
+    }
+   },
+   {
+    "lauf": "2.1",
+    "verfahren": "V2",
+    "wallH": 29.94,
+    "onlineH": 23.15,
+    "effV2H": 26.5,
+    "sfBeiStart": {
+     "1": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "2.2",
+    "verfahren": "V2",
+    "wallH": 20.44,
+    "onlineH": 15.43,
+    "effV2H": 17.9,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 1,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "2.3",
+    "verfahren": "V2",
+    "wallH": 14.5,
+    "onlineH": 14.5,
+    "effV2H": 14.5,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 2,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "3.1",
+    "verfahren": "V2",
+    "wallH": 21.72,
+    "onlineH": 7.41,
+    "effV2H": 14.6,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "3.2",
+    "verfahren": "V2",
+    "wallH": 22.74,
+    "onlineH": 12.92,
+    "effV2H": 17.8,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 1,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "3.3",
+    "verfahren": "V2",
+    "wallH": 35.92,
+    "onlineH": 18.91,
+    "effV2H": 27.4,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 2,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "11.1",
+    "verfahren": "V2",
+    "wallH": 28.51,
+    "onlineH": 18.28,
+    "effV2H": 23.4,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "11.2",
+    "verfahren": "V2",
+    "wallH": 23.54,
+    "onlineH": 23.54,
+    "effV2H": 23.5,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "11": 1,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "11.3",
+    "verfahren": "V2",
+    "wallH": 32.24,
+    "onlineH": 22.5,
+    "effV2H": 27.4,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "11": 2,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "6.2",
+    "verfahren": "V2",
+    "wallH": 35.5,
+    "onlineH": 9.12,
+    "effV2H": 22.3,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 1,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "6.3",
+    "verfahren": "V2",
+    "wallH": 34.12,
+    "onlineH": 13.88,
+    "effV2H": 24,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 2,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "7.1",
+    "verfahren": "V2",
+    "wallH": 75.06,
+    "onlineH": 52.83,
+    "effV2H": 63.9,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "7.2",
+    "verfahren": "V2",
+    "wallH": 62.34,
+    "onlineH": 47.24,
+    "effV2H": 54.8,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 1,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "7.3",
+    "verfahren": "V2",
+    "wallH": 67.46,
+    "onlineH": 67.46,
+    "effV2H": 67.5,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 2,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "14.1",
+    "verfahren": "V2",
+    "wallH": 37.4,
+    "onlineH": 31.34,
+    "effV2H": 34.4,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3
+    }
+   },
+   {
+    "lauf": "14.2",
+    "verfahren": "V2",
+    "wallH": 27.56,
+    "onlineH": 20.7,
+    "effV2H": 24.1,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "14": 1
+    }
+   },
+   {
+    "lauf": "14.3",
+    "verfahren": "V2",
+    "wallH": 22.3,
+    "onlineH": 22.3,
+    "effV2H": 22.3,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "14": 2
+    }
+   },
+   {
+    "lauf": "13.1",
+    "verfahren": "V2",
+    "wallH": 49,
+    "onlineH": 41.34,
+    "effV2H": 45.2,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "14": 3
+    }
+   },
+   {
+    "lauf": "13.2",
+    "verfahren": "V2",
+    "wallH": 60.99,
+    "onlineH": 36.63,
+    "effV2H": 48.8,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 1,
+     "14": 3
+    }
+   },
+   {
+    "lauf": "13.3",
+    "verfahren": "V2",
+    "wallH": 29.44,
+    "onlineH": 29.44,
+    "effV2H": 29.4,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 2,
+     "14": 3
+    }
+   },
+   {
+    "lauf": "15.1",
+    "verfahren": "V2",
+    "wallH": 100.58,
+    "onlineH": 35.47,
+    "effV2H": 68,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 3,
+     "14": 3
+    }
+   },
+   {
+    "lauf": "15.2",
+    "verfahren": "V2",
+    "wallH": 42.26,
+    "onlineH": 35.96,
+    "effV2H": 39.1,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 3,
+     "14": 3,
+     "15": 1
+    }
+   },
+   {
+    "lauf": "15.3",
+    "verfahren": "V2",
+    "wallH": 33.71,
+    "onlineH": 33.71,
+    "effV2H": 33.7,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 3,
+     "14": 3,
+     "15": 2
+    }
+   },
+   {
+    "lauf": "8.1",
+    "verfahren": "V1",
+    "wallH": 61.08,
+    "onlineH": 31.56,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 3,
+     "14": 3,
+     "15": 3
+    }
+   },
+   {
+    "lauf": "8.2",
+    "verfahren": "V1",
+    "wallH": 8.65,
+    "onlineH": 8.65,
+    "effV2H": null,
+    "sfBeiStart": {
+     "1": 3,
+     "2": 3,
+     "3": 3,
+     "4": 3,
+     "5": 3,
+     "6": 3,
+     "7": 3,
+     "8": 1,
+     "9": 3,
+     "10": 3,
+     "11": 3,
+     "12": 3,
+     "13": 3,
+     "14": 3,
+     "15": 3
+    }
+   }
+  ],
+  "streuungGleicherKnoten": {
+   "2": {
+    "n": 3,
+    "werte": [
+     26.5,
+     17.9,
+     14.5
+    ],
+    "mittel": 19.6,
+    "sd": 6.2,
+    "cv": 0.32
+   },
+   "3": {
+    "n": 3,
+    "werte": [
+     14.6,
+     17.8,
+     27.4
+    ],
+    "mittel": 19.9,
+    "sd": 6.7,
+    "cv": 0.33
+   },
+   "4": {
+    "n": 2,
+    "werte": [
+     40.4,
+     43.1
+    ],
+    "mittel": 41.8,
+    "sd": 1.9,
+    "cv": 0.05
+   },
+   "6": {
+    "n": 2,
+    "werte": [
+     22.3,
+     24
+    ],
+    "mittel": 23.1,
+    "sd": 1.2,
+    "cv": 0.05
+   },
+   "7": {
+    "n": 3,
+    "werte": [
+     63.9,
+     54.8,
+     67.5
+    ],
+    "mittel": 62.1,
+    "sd": 6.5,
+    "cv": 0.11
+   },
+   "9": {
+    "n": 3,
+    "werte": [
+     69.1,
+     65.8,
+     50.1
+    ],
+    "mittel": 61.7,
+    "sd": 10.2,
+    "cv": 0.16
+   },
+   "11": {
+    "n": 3,
+    "werte": [
+     23.4,
+     23.5,
+     27.4
+    ],
+    "mittel": 24.8,
+    "sd": 2.3,
+    "cv": 0.09
+   },
+   "13": {
+    "n": 3,
+    "werte": [
+     45.2,
+     48.8,
+     29.4
+    ],
+    "mittel": 41.1,
+    "sd": 10.3,
+    "cv": 0.25
+   },
+   "14": {
+    "n": 3,
+    "werte": [
+     34.4,
+     24.1,
+     22.3
+    ],
+    "mittel": 26.9,
+    "sd": 6.5,
+    "cv": 0.24
+   },
+   "15": {
+    "n": 3,
+    "werte": [
+     68,
+     39.1,
+     33.7
+    ],
+    "mittel": 46.9,
+    "sd": 18.4,
+    "cv": 0.39
+   }
+  },
+  "onlineRangkurvenV2": {
+   "marks": [
+    300,
+    1000,
+    3000,
+    10000,
+    30000,
+    100000,
+    200000,
+    300000,
+    400000
+   ],
+   "res": {
+    "13.2": [
+     0,
+     1.8,
+     2.6,
+     14.9,
+     25.7,
+     31.5,
+     31.8,
+     32,
+     32.1
+    ],
+    "13.3": [
+     2.5,
+     4.8,
+     8.2,
+     14.5,
+     20.2,
+     24.3,
+     26.5,
+     28,
+     28.7
+    ],
+    "15.1": [
+     0.8,
+     6.8,
+     11.3,
+     14.3,
+     30.4,
+     32.5,
+     33.1,
+     33.4,
+     33.6
+    ],
+    "15.2": [
+     0.8,
+     16.2,
+     26.4,
+     31.8,
+     32.9,
+     34.6,
+     35,
+     35.2,
+     null
+    ],
+    "15.3": [
+     1,
+     9.1,
+     17.7,
+     21.9,
+     29,
+     32.4,
+     32.9,
+     33.1,
+     null
+    ]
+   }
+  },
+  "wachstumsrateG": {
+   "4.2": {
+    "n": 3,
+    "h0": 8.8,
+    "h1": 25.7,
+    "c0": 0.0373,
+    "c1": 0.0495,
+    "g": 0.017
+   },
+   "4.3": {
+    "n": 4,
+    "h0": 9.8,
+    "h1": 21.1,
+    "c0": 0.0507,
+    "c1": 0.4862,
+    "g": 0.2
+   },
+   "9.1": {
+    "n": 2,
+    "h0": 47.1,
+    "h1": 73.4,
+    "c0": 0.0244,
+    "c1": 0.093,
+    "g": 0.051
+   },
+   "9.3": {
+    "n": 4,
+    "h0": 5.5,
+    "h1": 41.4,
+    "c0": 0.0201,
+    "c1": 0.4525,
+    "g": 0.087
+   },
+   "3.1": {
+    "n": 2,
+    "h0": 18.6,
+    "h1": 19.6,
+    "c0": 0.1162,
+    "c1": 0.4305,
+    "g": 1.31
+   },
+   "3.2": {
+    "n": 2,
+    "h0": 9.3,
+    "h1": 21.7,
+    "c0": 0.1129,
+    "c1": 0.3682,
+    "g": 0.095
+   },
+   "11.3": {
+    "n": 2,
+    "h0": 12.6,
+    "h1": 30,
+    "c0": 0.1211,
+    "c1": 0.2652,
+    "g": 0.045
+   },
+   "6.2": {
+    "n": 2,
+    "h0": 12.5,
+    "h1": 24.5,
+    "c0": 0.0733,
+    "c1": 0.7504,
+    "g": 0.192
+   },
+   "7.1": {
+    "n": 3,
+    "h0": 12.4,
+    "h1": 44.8,
+    "c0": 0.0833,
+    "c1": 0.5643,
+    "g": 0.059
+   },
+   "7.2": {
+    "n": 3,
+    "h0": 12.4,
+    "h1": 45.4,
+    "c0": 0.1346,
+    "c1": 0.8046,
+    "g": 0.054
+   },
+   "7.3": {
+    "n": 4,
+    "h0": 12.4,
+    "h1": 56.3,
+    "c0": 0.0798,
+    "c1": 0.7035,
+    "g": 0.05
+   },
+   "13.1": {
+    "n": 2,
+    "h0": 12.7,
+    "h1": 27.3,
+    "c0": 0.159,
+    "c1": 0.5538,
+    "g": 0.086
+   },
+   "13.2": {
+    "n": 2,
+    "h0": 12.4,
+    "h1": 34.8,
+    "c0": 0.2151,
+    "c1": 0.4356,
+    "g": 0.031
+   },
+   "15.1": {
+    "n": 5,
+    "h0": 13.2,
+    "h1": 65.2,
+    "c0": 0.0515,
+    "c1": 0.7504,
+    "g": 0.052
+   },
+   "15.2": {
+    "n": 2,
+    "h0": 1.8,
+    "h1": 12.7,
+    "c0": 0.0331,
+    "c1": 0.0516,
+    "g": 0.041
+   }
+  },
+  "fazit": "Streuung gleicher V2-Knoten 5-39 % (CV), 2-18 h; BN4.2 vs 4.3 (SF4 wirkungslos) 40,4 vs 43,1 h = Rauschboden ~3 h. SF-Effekte unter ~5 h je Lauf sind in den Laufzeiten nicht nachweisbar."
+ }
+}

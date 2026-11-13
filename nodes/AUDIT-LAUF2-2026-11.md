@@ -83,11 +83,12 @@ bewusst nicht. Geht an Eric zur Abnahme.
 | Teil | Status | Ergebnis |
 |---|---|---|
 | 1 Chronik | fertig 12.11.2026 (2 Pruefer, 2 Skeptiker) | `audit-lauf2/CHRONIK.md`, Weitergabe C1-C10 |
-| 2 Mechaniken | laeuft seit 12.11.2026 (2a Geld/Ruf, 2b Fortschritt/SF) | - |
+| 2 Mechaniken | fertig 13.11.2026 (2 Pruefer, 1 Skeptiker) | `audit-lauf2/MECHANIKEN.md`; Casino fuer BN8 sofort gebaut |
 | 3 Roadmap | offen (braucht 1 und 2) | - |
 | 4 Gewerke | offen | - |
 | 5 Betrieb | offen (braucht 1b) | - |
 | 6 Synthese | offen | - |
 
-Offene Frage an Eric: Startet Lauf 2 mit einem frischen Spielstand (BN1.1,
-keine Source-Files)? Davon haengen Teil 3 und 5 ab.
+Erics Entscheidungen 13.11.2026: Lauf 2 startet frisch (BN1.1, keine
+Source-Files, 8 GB home). Casino-Roulette erlaubt. Infiltration erst messen,
+das Bauverbot bleibt bis dahin.

@@ -84,8 +84,8 @@ bewusst nicht. Geht an Eric zur Abnahme.
 |---|---|---|
 | 1 Chronik | fertig 12.11.2026 (2 Pruefer, 2 Skeptiker) | `audit-lauf2/CHRONIK.md`, Weitergabe C1-C10 |
 | 2 Mechaniken | fertig 13.11.2026 (2 Pruefer, 1 Skeptiker) | `audit-lauf2/MECHANIKEN.md`; Casino fuer BN8 sofort gebaut |
-| 3 Roadmap | offen (braucht 1 und 2) | - |
-| 4 Gewerke | offen | - |
+| 3 Roadmap | laeuft seit 13.11.2026 (3a Modell, Skeptiker folgt) | - |
+| 4 Gewerke | laeuft seit 13.11.2026 (4a, Skeptiker folgt) | - |
 | 5 Betrieb | offen (braucht 1b) | - |
 | 6 Synthese | offen | - |
 

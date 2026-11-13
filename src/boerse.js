@@ -65,6 +65,7 @@
 import { liesVonHome, nachHome as schreibNachHome } from "lib/hostdatei.js";
 import { laden as evLaden, anhaengen as evAnhaengen } from "lib/events.js";
 import { PAUSE_FILE, ABRUF_FILE, pauseLesen, abrufLesen } from "lib/boersepause.js";
+import { TEL_FILE as CASINO_TEL, cashWish } from "lib/casino.js";
 import { REGEL, KOSTEN_4S, BETRIEBSANTEIL, filterNeu, filterSchritt, filterMittel, verpassteSchritte, schaetze, verkaufsliste, kaufliste, freimachen, depotwert, kauf4SFaellig } from "lib/handel.js";
 
 
@@ -341,6 +342,28 @@ export async function main(ns) {
             bedientFuer = wunsch.id;
             if (vk.length) lage = leseLage();
           }
+        }
+      }
+
+      // --- Einsatzgeld fuer das Casino (casino.js, 13.11.2026) ----------------
+      //
+      // Am Roulette braucht jeder Dreh 1e7 BAR. Direkt nach dem Einbau (250 Mio,
+      // noch ohne 4S und damit ohne 2-%-Rest) kaufte diese Schleife das ganze
+      // Bargeld weg, und casino.js stuende ohne Einsatz da. Solange casino.js
+      // spielt und frisch meldet, bleiben zwei Einsaetze bar; fehlen sie, wird
+      // dafuer verkauft. Gewinne darueber kauft die Schleife sofort wieder ein -
+      // genau dafuer wird gespielt. Kein eigener Abruf ueber data/boerse-abruf.txt:
+      // den schreibt bn4rep, ein zweiter Schreiber wuerde dessen Wunsch ueberschreiben.
+      {
+        const wunschC = cashWish(liesVonHome(ns, CASINO_TEL), jetzt);
+        if (wunschC > 0) {
+          const bar = ns.getServerMoneyAvailable("home");
+          if (bar < wunschC && bar + depotwert(lage) >= wunschC) {
+            const vk = freimachen(lage, bar, wunschC);
+            for (const v of vk) verkaufe(v.sym, v.stueck, "Casino-Einsatz");
+            if (vk.length) lage = leseLage();
+          }
+          reserve = Math.max(reserve, wunschC);
         }
       }
 

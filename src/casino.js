@@ -9,9 +9,12 @@
  * ===========================================================================
  *
  * Alle 20 s: BitNode 8, Grenze nicht erreicht, keine Einbaurunde (Boersen-
- * pause), Bargeld fuer einen Einsatz da? Dann eine Sitzung:
+ * pause) und kein Geldabruf von bn4rep, Tian Di Hui beigetreten (oder 10 min
+ * seit dem Einbau vorbei - sonst stoert die Reise bn4life), keine Pause nach
+ * einem Abbruch, Bargeld fuer einen Einsatz da? Dann eine Sitzung:
  *   1. nach Aevum reisen (200k), Casino aufrufen, "Play roulette"
- *   2. Einsatz auf 1e7 setzen und am Roulette-Zustand nachpruefen
+ *   2. Einsatz auf 1e7 setzen; geprueft wird er an der Buchung des ersten
+ *      Drehs (+36 oder -1 Einsatz, sonst Abbruch mit Fehler)
  *   3. je Dreh: Generator aus dem Fiber lesen, naechste Zahl vorhersagen,
  *      genau diese Einzelzahl druecken, Ergebnis abwarten
  *   4. aufhoeren, sobald die Casino-Gewinne seit dem Einbau 10 Mrd
@@ -43,10 +46,10 @@
  * @param {NS} ns
  */
 import { liesVonHome, nachHome } from "lib/hostdatei.js";
-import { PAUSE_FILE, pauseLesen } from "lib/boersepause.js";
+import { PAUSE_FILE, ABRUF_FILE, pauseLesen, abrufLesen } from "lib/boersepause.js";
 import {
-  CASINO_LIMIT, MAX_BET, SINGLE_PAYOUT, CASH_WISH, TEL_FILE, CASINO_CITY, CASINO_LOCATION,
-  predictNumber, findRouletteState, shouldPlay,
+  CASINO_LIMIT, MAX_BET, SINGLE_PAYOUT, CASH_WISH, CASINO_CITY, CASINO_LOCATION, ERROR_COOLDOWN_MS,
+  predictNumber, findRouletteState, shouldPlay, stopCooldownMs, readCooldown,
 } from "lib/casino.js";
 
 const TICK_MS = 20000;
@@ -54,15 +57,36 @@ const TICK_MS = 20000;
 const MAX_SPINS = 80;
 /** Verluste in Folge, ab denen die Vorhersage als gestoert gilt. */
 const MAX_LOSS_STREAK = 6;
-/** Nach einer gestoerten Sitzung so lange nicht mehr spielen. */
-const COOLDOWN_MS = 3600000;
 /** Roulette.tsx:176 - das Ergebnis kommt 1,6 s nach dem Klick. */
 const SPIN_MS = 1600;
 const LOG_FILE = "data/casino-log.txt";
+const TDH = "Tian Di Hui";
+
+/**
+ * Die laufende Sitzung, fuer das Aufraeumen beim Beenden von aussen
+ * (Waechter, Platzmangel). `finally` laeuft dann nicht, `atExit` schon.
+ */
+let active = null;
+
+/** Muss bn4rep gerade Geld bewegen? Dann nicht spielen (Pause = Einbaurunde, Abruf = Kauf/Spende). */
+function rivalNeedsCash(ns) {
+  const now = Date.now();
+  const pause = pauseLesen(liesVonHome(ns, PAUSE_FILE), now).aktiv;
+  const abruf = abrufLesen(liesVonHome(ns, ABRUF_FILE), now).betrag > 0;
+  return { pause, abruf };
+}
 
 export async function main(ns) {
   ns.disableLog("ALL");
   const doc = document;
+  ns.atExit(() => {
+    if (!active) return;
+    try { const stop = buttonByText(doc, "Stop playing"); if (stop) click(stop); } catch { /* egal */ }
+    try {
+      if (active.startCity !== CASINO_CITY && ns.getPlayer().city === CASINO_CITY) ns.singularity.travelToCity(active.startCity);
+    } catch { /* egal */ }
+    active = null;
+  });
 
   const log = [];
   const say = (t) => {
@@ -73,18 +97,22 @@ export async function main(ns) {
   };
 
   let rounds = 0, okRounds = 0, errStreak = 0, lastError = null;
-  let cooldownUntil = 0;
+  // Pausenstand aus der letzten Telemetrie: ein Neustart hebt die Pause nicht auf.
+  let { cooldownUntil, failStreak } = readCooldown(liesVonHome(ns, "data/casino.json"), Date.now());
   // Zaehler je Einbauzyklus (lastAugReset), fuer Telemetrie und Dashboard.
   let cycle = null;
   let stats = { spins: 0, wins: 0, houseCheats: 0, sessions: 0 };
 
   const beat = (extra) => {
     try {
-      nachHome(ns, TEL_FILE, JSON.stringify({
+      // Wortlich statt TEL_FILE: die Schreiberprobe der Registry sucht den
+      // Dateinamen im Quelltext (tools/lib/schreiberprobe.js); der Test haelt
+      // beide gleich (tools/test-casino.js).
+      nachHome(ns, "data/casino.json", JSON.stringify({
         schema: 2, ts: Date.now(), wall: Date.now(), playtime: 0, motorTimeMs: 0,
         round: rounds, okRound: okRounds, errStreak, lastError,
-        host: ns.getHostname(), version: "casino-1",
-        cycle, ...stats, ...extra,
+        host: ns.getHostname(), version: "casino-2",
+        cycle, cooldownUntil, failStreak, ...stats, ...extra,
       }));
     } catch { /* egal */ }
   };
@@ -103,8 +131,12 @@ export async function main(ns) {
       }
       const winnings = ns.getMoneySources().sinceInstall.casino;
       const cash = ns.getServerMoneyAvailable("home");
-      const pause = pauseLesen(liesVonHome(ns, PAUSE_FILE), Date.now());
-      const d = shouldPlay({ node: reset.currentNode, winnings, cash, pauseActive: pause.aktiv });
+      const rival = rivalNeedsCash(ns);
+      const d = shouldPlay({
+        node: reset.currentNode, winnings, cash, pauseActive: rival.pause, abrufActive: rival.abruf,
+        tdhJoined: ns.getPlayer().factions.includes(TDH),
+        msSinceInstall: Date.now() - reset.lastAugReset,
+      });
 
       if (Date.now() < cooldownUntil) {
         beat({ state: "wait", blockedReason: "locked", phase: "cooldown", winnings, wantCash: 0 });
@@ -112,12 +144,21 @@ export async function main(ns) {
         stats.sessions++;
         const r = await session(ns, doc, say, stats, beat);
         winningsAfter(ns, say, r);
-        beat({ state: "wait", blockedReason: null, phase: "idle", wantCash: 0, lastSession: r });
         if (r.error) {
           lastError = r.error;
-          cooldownUntil = Date.now() + COOLDOWN_MS;
+          failStreak++;
+          cooldownUntil = Date.now() + ERROR_COOLDOWN_MS;
           say("SITZUNG GESTOERT: " + r.error + " - Casino ruht 60 min.");
+        } else if (r.spins === 0) {
+          // Abbruch ohne einen einzigen Dreh: jeder neue Versuch kostet zwei
+          // Reisen. Steigende Pause statt Takt (Skeptiker 13.11.).
+          failStreak++;
+          cooldownUntil = Date.now() + stopCooldownMs(failStreak);
+          say("Kein Dreh (" + r.stop + ") - naechster Versuch in " + Math.round(stopCooldownMs(failStreak) / 60000) + " min.");
+        } else {
+          failStreak = 0;
         }
+        beat({ state: "wait", blockedReason: null, phase: "idle", wantCash: 0, lastSession: r });
       } else if (d.reason === "wait-cash") {
         beat({ state: "wait", blockedReason: "no_money", phase: "wait-cash", winnings, wantCash: CASH_WISH });
       } else if (d.reason === "Grenze erreicht") {
@@ -156,6 +197,7 @@ async function session(ns, doc, say, stats, beat) {
   const startCity = ns.getPlayer().city;
   let wasFocused = false;
   try { wasFocused = ns.singularity.isFocused(); } catch { wasFocused = false; }
+  active = { startCity };
 
   try {
     if (startCity !== CASINO_CITY && !ns.singularity.travelToCity(CASINO_CITY)) {
@@ -187,6 +229,12 @@ async function session(ns, doc, say, stats, beat) {
     let winnings = ns.getMoneySources().sinceInstall.casino;
     for (let i = 0; i < MAX_SPINS; i++) {
       if (winnings > CASINO_LIMIT) { res.stop = "Grenze erreicht"; break; }
+      // Je Dreh, nicht nur zum Sitzungsbeginn: legt bn4rep mitten in der
+      // Sitzung die Boersenpause (Einbaurunde) oder einen Abruf, gehoert das
+      // Bargeld ihm - ein verlorener Einsatz koennte einen knapp gerechneten
+      // Kauf kippen (Skeptiker 13.11.).
+      const rival = rivalNeedsCash(ns);
+      if (rival.pause || rival.abruf) { res.stop = rival.pause ? "Einbaurunde begonnen" : "Abruf von bn4rep"; break; }
       if (ns.getServerMoneyAvailable("home") < MAX_BET) {
         // boerse.js verkauft zwei Einsaetze frei (cashWish); hoechstens 30 s warten.
         beat({ state: "wait", blockedReason: "no_money", phase: "wait-cash", winnings, wantCash: CASH_WISH });
@@ -249,9 +297,17 @@ async function session(ns, doc, say, stats, beat) {
       if (startCity !== CASINO_CITY && ns.getPlayer().city === CASINO_CITY) ns.singularity.travelToCity(startCity);
     } catch { /* egal */ }
     try {
-      if (wasFocused && ns.singularity.getCurrentWork() !== null) ns.singularity.setFocus(true);
-      else await backToTerminal(ns, doc);
+      if (wasFocused && ns.singularity.getCurrentWork() !== null) {
+        // setFocus(true) ist ein No-op, solange der Fokus formal noch besteht
+        // (Singularity.ts:571) - die Seite bliebe auf dem Casino. Erst loesen,
+        // dann wieder setzen: das fuehrt zurueck auf die Arbeitsseite.
+        try { ns.singularity.setFocus(false); } catch { /* egal */ }
+        ns.singularity.setFocus(true);
+      } else {
+        await backToTerminal(ns, doc);
+      }
     } catch { /* egal */ }
+    active = null;
   }
   return res;
 }

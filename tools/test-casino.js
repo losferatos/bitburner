@@ -93,6 +93,18 @@ pruefe("genau an der Grenze -> noch spielen (Sperre greift erst darueber)", L.sh
 pruefe("Einbaurunde (Boersenpause) -> nicht", !L.shouldPlay({ ...ok, pauseActive: true }).play);
 pruefe("zu wenig Bargeld -> wait-cash", L.shouldPlay({ ...ok, cash: 5e6 }).reason === "wait-cash");
 pruefe("Gewinne nicht lesbar -> nicht", !L.shouldPlay({ ...ok, winnings: NaN }).play);
+pruefe("Abruf von bn4rep laeuft -> nicht", !L.shouldPlay({ ...ok, abrufActive: true }).play);
+pruefe("ohne Tian Di Hui, 3 min nach Einbau -> warten", L.shouldPlay({ ...ok, tdhJoined: false, msSinceInstall: 3 * 60000 }).reason === "wartet auf Tian Di Hui");
+pruefe("ohne Tian Di Hui, 11 min nach Einbau -> spielen", L.shouldPlay({ ...ok, tdhJoined: false, msSinceInstall: 11 * 60000 }).play);
+pruefe("mit Tian Di Hui sofort -> spielen", L.shouldPlay({ ...ok, tdhJoined: true, msSinceInstall: 30000 }).play);
+
+// --- 4b. Pausen nach Abbruechen ---------------------------------------------
+pruefe("Pausen 2/4/8/16/16 min", [1, 2, 3, 4, 9].map((n) => L.stopCooldownMs(n) / 60000).join("/") === "2/4/8/16/16");
+const telC = (o) => JSON.stringify({ ts: t0, ...o });
+pruefe("Pause ueberlebt den Neustart", L.readCooldown(telC({ cooldownUntil: t0 + 5 * 60000, failStreak: 2 }), t0).cooldownUntil === t0 + 5 * 60000
+  && L.readCooldown(telC({ cooldownUntil: t0 + 5 * 60000, failStreak: 2 }), t0).failStreak === 2);
+pruefe("kaputte oder fehlende Telemetrie -> keine Pause", L.readCooldown("{x", t0).cooldownUntil === 0 && L.readCooldown(null, t0).failStreak === 0);
+pruefe("absurde Pause (weiter als 60 min voraus) wird verworfen", L.readCooldown(telC({ cooldownUntil: t0 + 10 * 3600000 }), t0).cooldownUntil === 0);
 
 // --- 5. Erwartung: so viele Drehungen braucht der Zyklus --------------------
 {
@@ -116,6 +128,16 @@ pruefe("Gewinne nicht lesbar -> nicht", !L.shouldPlay({ ...ok, winnings: NaN }).
 // --- 6. boerse.js haelt den Wunsch zurueck ----------------------------------
 const boerse = fs.readFileSync(path.join(SRC, "boerse.js"), "utf8");
 pruefe("boerse.js liest den Casino-Wunsch", boerse.includes("cashWish(") && boerse.includes("CASINO_TEL"));
+
+// --- 7. casino.js schreibt die Telemetrie dorthin, wo boerse.js sie liest ---
+const casinoPfad = path.join(SRC, "casino.js");
+if (fs.existsSync(casinoPfad)) {
+  const c = fs.readFileSync(casinoPfad, "utf8");
+  pruefe("casino.js schreibt " + L.TEL_FILE + " (wortlich, gleich lib/casino.js TEL_FILE)", c.includes('"' + L.TEL_FILE + '"'));
+  pruefe("casino.js setzt phase und wantCash (sonst haelt boerse.js nichts zurueck)", c.includes('phase: "playing"') && c.includes("wantCash: CASH_WISH"));
+  pruefe("casino.js prueft Pause/Abruf je Dreh", /for \(let i = 0; i < MAX_SPINS[\s\S]{0,700}rivalNeedsCash\(ns\)/.test(c));
+  pruefe("casino.js raeumt beim Beenden von aussen auf (atExit)", c.includes("ns.atExit("));
+}
 
 console.log(gruen + " gruen, " + rot + " rot");
 process.exit(rot ? 1 : 0);

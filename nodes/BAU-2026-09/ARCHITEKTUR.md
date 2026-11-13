@@ -922,9 +922,40 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
         "lib/boersepause.js",
         "lib/handel.js",
         "lib/events.js",
-        "lib/hostdatei.js"
+        "lib/hostdatei.js",
+        "lib/casino.js"
       ],
       "singularity": false,
+      "restartPolicy": "always",
+      "maxInstances": 1,
+      "killSafe": true,
+      "precondition": {}
+    },
+    {
+      "name": "casino.js",
+      "args": [],
+      "ramBaseGb": 29.95,
+      "ramSingGb": 7.7,
+      "ramMeasuredAt": "GEMESSEN-2026-11-13 (calculateRam 37,65 bei SF4.3; Sing travelToCity 2 + goToLocation 5 + isFocused 0,1 + setFocus 0,1 + getCurrentWork 0,5)",
+      "verfahren": "V1",
+      "knoten": [
+        8
+      ],
+      "phase": "beide",
+      "telemetryFile": "data/casino.json",
+      "scpToHome": true,
+      "freshnessMs": 600000,
+      "taktMs": 20000,
+      "hostRule": "werkbank",
+      "priority": 10,
+      "evictRank": 4,
+      "needsFigure": "none",
+      "needsLibs": [
+        "lib/casino.js",
+        "lib/boersepause.js",
+        "lib/hostdatei.js"
+      ],
+      "singularity": true,
       "restartPolicy": "always",
       "maxInstances": 1,
       "killSafe": true,

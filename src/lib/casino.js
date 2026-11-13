@@ -51,8 +51,26 @@ export const TRAVEL_RESERVE = 1e6;
 /** Telemetrie von casino.js; boerse.js liest daraus den Geldwunsch. */
 export const TEL_FILE = "data/casino.json";
 
-/** Ein Geldwunsch aelter als das gilt nicht mehr (casino.js schreibt je Dreh). */
-export const WISH_FRESH_MS = 120000;
+/**
+ * Ein Geldwunsch aelter als das gilt nicht mehr (casino.js schreibt je Dreh).
+ * 5 min statt 2: in einem gedrosselten Tab kann ein Dreh Minuten dauern, und
+ * ein abgelaufener Wunsch liesse boerse.js das Einsatzgeld wegkaufen (Skeptiker 13.11.).
+ */
+export const WISH_FRESH_MS = 300000;
+
+/**
+ * So lange nach einem Einbau wird auf den Beitritt zu Tian Di Hui gewartet,
+ * bevor trotzdem gespielt wird. bn4life.js reist dafuer nach Chongqing und
+ * wartet dort auf die Einladung (BN8_MAX_TRIPS = 2); eine Casino-Reise nach
+ * Aevum in diesem Fenster verbraucht ihm einen Versuch (Skeptiker 13.11.).
+ */
+export const WAIT_TDH_MS = 10 * 60000;
+
+/** Pause nach einem Abbruch ohne Dreh: 2, 4, 8, 16 min, dann 16. Reisen kosten 2 x 200k. */
+export const STOP_COOLDOWN_MIN = [2, 4, 8, 16];
+
+/** Pause nach einer gestoerten Sitzung (Vorhersage stimmt nicht, Knopf fehlt). */
+export const ERROR_COOLDOWN_MS = 3600000;
 
 export const CASINO_CITY = "Aevum";
 export const CASINO_LOCATION = "Iker Molina Casino";
@@ -122,14 +140,45 @@ export function cashWish(telRaw, now) {
   return t.wantCash > 0 ? Math.min(t.wantCash, 10 * MAX_BET) : 0;
 }
 
-/** Soll in diesem Einbauzyklus noch gespielt werden? */
-export function shouldPlay({ node, winnings, cash, pauseActive }) {
+/**
+ * Soll in diesem Einbauzyklus noch gespielt werden?
+ * @param o.node          laufender Knoten
+ * @param o.winnings      Casino-Gewinne seit dem Einbau (getMoneySources)
+ * @param o.cash          Bargeld
+ * @param o.pauseActive   bn4rep hat die Boersenpause gelegt (Einbaurunde)
+ * @param o.abrufActive   bn4rep hat Bargeld abgerufen (Kauf/Spende/Daedalus)
+ * @param o.tdhJoined     Tian Di Hui ist beigetreten
+ * @param o.msSinceInstall seit dem letzten Einbau
+ */
+export function shouldPlay({ node, winnings, cash, pauseActive, abrufActive = false, tdhJoined = true, msSinceInstall = Infinity }) {
   if (node !== 8) return { play: false, reason: "nur in BitNode 8" };
   if (!(winnings >= 0)) return { play: false, reason: "Casino-Gewinne nicht lesbar" };
   if (winnings > CASINO_LIMIT) return { play: false, reason: "Grenze erreicht" };
   if (pauseActive) return { play: false, reason: "Einbaurunde laeuft (Boersenpause)" };
+  if (abrufActive) return { play: false, reason: "Abruf von bn4rep laeuft" };
+  if (!tdhJoined && msSinceInstall < WAIT_TDH_MS) return { play: false, reason: "wartet auf Tian Di Hui" };
   if (!(cash >= MAX_BET + TRAVEL_RESERVE)) return { play: false, reason: "wait-cash" };
   return { play: true, reason: "" };
+}
+
+/** Pause nach dem n-ten Abbruch ohne Dreh in Folge (n >= 1), in ms. */
+export function stopCooldownMs(n) {
+  const i = Math.max(0, Math.min(STOP_COOLDOWN_MIN.length - 1, n - 1));
+  return STOP_COOLDOWN_MIN[i] * 60000;
+}
+
+/**
+ * Den gespeicherten Pausenstand aus der eigenen Telemetrie lesen - damit ein
+ * Neustart durch den Waechter die Pause nicht aufhebt (Skeptiker 13.11.).
+ * @returns {{cooldownUntil:number, failStreak:number}}
+ */
+export function readCooldown(telRaw, now) {
+  let t = null;
+  try { t = telRaw ? JSON.parse(telRaw) : null; } catch { t = null; }
+  const until = t && Number.isFinite(t.cooldownUntil) ? t.cooldownUntil : 0;
+  const streak = t && Number.isFinite(t.failStreak) ? t.failStreak : 0;
+  // Eine Pause, die weiter als die laengste moegliche in der Zukunft liegt, ist kaputt.
+  return { cooldownUntil: until > now + ERROR_COOLDOWN_MS ? 0 : until, failStreak: streak };
 }
 
 /** Einsatz fuer den naechsten Dreh: Hoechsteinsatz, aber nie mehr als das Bargeld. */

@@ -22,6 +22,16 @@ Skeptiker-Wert; die Ursprungsdateien sind nicht nachkorrigiert.
 
 ## 2. Welche Uhr zaehlt - je Verfahren eine andere
 
+> **Korrektur 13.11.2026 (Teil 4b, am Spielcode nachgeprueft):** Die
+> V2-Gutschrift ist nicht "grob 50 %", sondern **voll**: `storeCycles` hat
+> keine Obergrenze (Bladeburner.ts:275), online wird je Sekunde bis zu 5 s
+> abgearbeitet (Bladeburner.ts:1376-1380). Die 50 % aus 8 Luecken waren ein
+> Artefakt des Messfensters (120 min decken nur 10 h Bonuszeit ab). In V2
+> zaehlt also die Wanduhr, solange auf jede Offline-Stunde rund 15 Online-
+> Minuten folgen. Auch V1 bekommt mehr als hier angenommen: die Erfahrung der
+> Arbeiter geht an bn4net.js und wird offline voll gutgeschrieben, sobald es
+> 4 h laeuft (NetscriptWorker.ts:158-163). C4 schrumpft auf 2-10 h, C5 entfaellt.
+
 Aus dem Spielcode (`engine.tsx:257-350`), am Verlauf plausibilisiert:
 
 | Verfahren | Was offline passiert | Folge fuer die Planung |

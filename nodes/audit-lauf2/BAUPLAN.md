@@ -27,7 +27,7 @@ sofort ins laufende Spiel).
 | Nr | Posten | Warum | Aufwand |
 |---|---|---|---|
 | Z1 | **Lauf-2-Uebergabe der Bruecke**: einmaliges, von Hand ausgeloestes Skript mit `--pin <identifier>`, Lauf-1-Sicherungskette archivieren und pruefen, `data/` nach `lauf1/`, neuer Anker. Nie automatisch aus beobachtetem Zustand (ein Profilverlust sieht aus wie ein neues Spiel) | Die Bruecke weist ein neues Spiel heute ab (fester Identifier, Rueckwaertssprung-Schutz) | 1-1,5 d |
-| X1 | `exploit.js`, `exploit2.js`, `exploit3.js`, `hacktimer.js`, `timerzwang.js`, `sonde.js` aus `src/` ins Archiv | Sie wuerden per pushAll in den frischen Stand gehen und Exploits einsammeln - Erics Vorgabe: keine Exploits | 1 h |
+| X1 | ~~Exploit-Skripte archivieren~~ **entfaellt** (Eric 13.11.: "alles ist erlaubt bei Bitburner"). Stattdessen: `exploit*.js` und `hacktimer.js` pruefen, ob sie im frischen Stand gezielt und ohne Nebenwirkung laufen; Nutzen von SF -1 rechnen | Exploits sind erlaubt; offen ist nur ihr Wert | 1-2 h |
 | K01 | Route-Anfang fuer Lauf 2: BN1.1, BN4.1-4.3 als V1 (Regel R1); Rest der Route vor Ende BN4.3 | `route.json` beginnt bei BN10.2, BN1.1 bekaeme Ziel BN10 | 2-3 h |
 | K09 | SF4-Riegel in der Registry: Singularity-Gewerke starten ohne SF4 ausserhalb BN4 nicht | Sonst starten sie in BN1.1 und werfen | 2-3 h |
 | Z6 | Startpfad bis 8 GB home: alten Autopiloten aus dem ersten Commit (7ebf2a4) wiederverwenden (RAM messen) oder eine Hand-Anleitung fuer BN1.1 (eine Seite); Kern erst ab 16/32 GB | Kern 10,8 + Waechter 6,1 + boot 5,5 GB passen nicht in 8 GB | 0,5 d |
@@ -75,7 +75,16 @@ Kaltstart-Pruefstand (K11 gross), Waechter-Befristung von Sperren (B06),
 Labyrinth, V1 in weiteren Knoten, Gang/Corp ausserhalb BN2/BN3, Stanek,
 Einbaufrist kuerzen, Offline-Pflege in V2 (wird voll gutgeschrieben).
 
-## 7. Offene Frage an Eric (X2)
+## 7. Frage an Eric (X2) - beantwortet 13.11.2026
+
+**Antwort: "alles ist erlaubt bei Bitburner".** Der `document`-Umweg bleibt;
+damit sind auch Exploits und die Infiltrations-Automatik erlaubt (das
+Bauverbot aus AUFTRAG-BAU Z.346 ist aufgehoben). Infiltration wird trotzdem
+erst gemessen - aus Wertgruenden. Unveraendert bleiben die Schutzregeln fuer
+den Spielstand (kein zweiter Tab, b1tflum3/Destroy nicht von Hand, kein
+Handsprung, keine Augs von Hand).
+
+Die urspruengliche Frage:
 
 Mehrere Werkzeuge (`guard.js`, `darkweb.js`, `popups.js`, `wakelock.js`, der
 Kern) holen das Dokument ueber `globalThis` statt ueber den Bezeichner

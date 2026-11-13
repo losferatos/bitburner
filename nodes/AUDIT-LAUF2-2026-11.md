@@ -86,8 +86,8 @@ bewusst nicht. Geht an Eric zur Abnahme.
 | 2 Mechaniken | fertig 13.11.2026 (2 Pruefer, 1 Skeptiker) | `audit-lauf2/MECHANIKEN.md`; Casino fuer BN8 sofort gebaut |
 | 3 Roadmap | fertig 13.11.2026 (Pruefer + Opus-Skeptiker) | `audit-lauf2/REIHENFOLGE.md`: Reihenfolge im Rauschen, Regeln R1-R9, Kaltstart als Risiko |
 | 4 Gewerke | fertig 13.11.2026 (Pruefer + Skeptiker) | `audit-lauf2/GEWERKE.md`: Gewerke tragen; bauen G50, G20; Rest messen |
-| 5 Betrieb | laeuft seit 13.11.2026 (Schwerpunkt Kaltstart) | - |
-| 6 Synthese | offen | - |
+| 5 Betrieb | fertig 13.11.2026 (2 Pruefer, 1 Skeptiker) | `5a-kaltstart.md`, `5b-betrieb.md`, `5c-skeptiker-kaltstart.md` |
+| 6 Synthese | fertig 13.11.2026, wartet auf Erics Abnahme | `audit-lauf2/BAUPLAN.md` |
 
 Erics Entscheidungen 13.11.2026: Lauf 2 startet frisch (BN1.1, keine
 Source-Files, 8 GB home). Casino-Roulette erlaubt. Infiltration erst messen,

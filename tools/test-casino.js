@@ -75,10 +75,11 @@ pruefe("leerer Fiber -> null", L.findRouletteState(null) === null);
 
 // --- 3. Geldwunsch fuer boerse.js ------------------------------------------
 const t0 = 2_000_000_000_000;
-const tel = (o) => JSON.stringify({ ts: t0, state: "playing", wantCash: L.CASH_WISH, ...o });
+const tel = (o) => JSON.stringify({ ts: t0, state: "work", phase: "playing", wantCash: L.CASH_WISH, ...o });
 pruefe("spielend und frisch -> Wunsch", L.cashWish(tel(), t0 + 1000) === L.CASH_WISH);
-pruefe("wartet auf Geld -> Wunsch", L.cashWish(tel({ state: "wait-cash" }), t0 + 1000) === L.CASH_WISH);
-pruefe("fertig -> kein Wunsch", L.cashWish(tel({ state: "done" }), t0 + 1000) === 0);
+pruefe("wartet auf Geld -> Wunsch", L.cashWish(tel({ state: "wait", phase: "wait-cash" }), t0 + 1000) === L.CASH_WISH);
+pruefe("fertig -> kein Wunsch", L.cashWish(tel({ state: "done", phase: "done" }), t0 + 1000) === 0);
+pruefe("untaetig -> kein Wunsch", L.cashWish(tel({ state: "wait", phase: "idle" }), t0 + 1000) === 0);
 pruefe("veraltet -> kein Wunsch", L.cashWish(tel(), t0 + L.WISH_FRESH_MS + 1) === 0);
 pruefe("kaputt/leer -> kein Wunsch", L.cashWish("{kaputt", t0) === 0 && L.cashWish("", t0) === 0 && L.cashWish(null, t0) === 0);
 pruefe("ueberzogener Wunsch wird gedeckelt (hoechstens 10 Einsaetze)", L.cashWish(tel({ wantCash: 1e12 }), t0) === 10 * L.MAX_BET);

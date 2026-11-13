@@ -110,12 +110,15 @@ export function findRouletteState(fiber, maxUp = 25) {
 /**
  * Wie viel Bargeld soll boerse.js gerade fuer das Casino zurueckhalten?
  * 0, wenn casino.js nicht spielt oder nicht mehr meldet.
+ *
+ * `state` ist das Herzschlag-Feld (work/wait/done, lib/herzschlag.js) fuer den
+ * Waechter; was casino.js gerade tut, steht in `phase`.
  */
 export function cashWish(telRaw, now) {
   let t = null;
   try { t = telRaw ? JSON.parse(telRaw) : null; } catch { t = null; }
   if (!t || !Number.isFinite(t.ts) || now - t.ts > WISH_FRESH_MS) return 0;
-  if (t.state !== "playing" && t.state !== "wait-cash") return 0;
+  if (t.phase !== "playing" && t.phase !== "wait-cash") return 0;
   return t.wantCash > 0 ? Math.min(t.wantCash, 10 * MAX_BET) : 0;
 }
 

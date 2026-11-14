@@ -67,6 +67,9 @@ const W0 = 1_700_000_000_000;
  * unten aus der Datei nachgezaehlt.
  */
 const ROUTE = JSON.parse(fs.readFileSync(finde("route.json"), "utf8")).route;
+// Lauf 2 (K01) hat eine eigene Route; ihre Klassen kommen dazu, soweit sie neu sind
+// (BN4 faehrt dort als V1). Lauf 1 bleibt wie heute die Grundlage.
+const ROUTE2 = JSON.parse(fs.readFileSync(finde("route-lauf2.json"), "utf8")).route;
 
 // ALLE Knoten der Route, jeder mit dem Verfahren, das dort vorgesehen ist.
 // Eine Matrix, die nur die bequemen Faelle prueft, prueft an der Route vorbei -
@@ -77,6 +80,14 @@ const KLASSEN = [
     return { name: "BN" + node + " / " + e.verfahren, node, verfahren: e.verfahren,
       phase: "normal" };
   }),
+  // Lauf-2-Klassen, die Lauf 1 nicht hat (Knoten + Verfahren noch nicht vorhanden)
+  ...[...new Set(ROUTE2.map((e) => e.node + "/" + e.verfahren))]
+    .filter((k) => !ROUTE.some((e) => e.node + "/" + e.verfahren === k))
+    .map((k) => {
+      const [node, verfahren] = k.split("/");
+      return { name: "BN" + node + " / " + verfahren + " (Lauf 2)", node: Number(node), verfahren,
+        phase: "normal" };
+    }),
   { name: "BN10 / V2 / Kaltstart", node: 10, verfahren: "V2", phase: "kaltstart" },
   { name: "unbekannte Rolle", node: 10, verfahren: "unbekannt", phase: "normal" },
 ];
@@ -212,8 +223,17 @@ console.log("-- die Route deckt die geprueften Klassen ab --");
   }
   console.log("       Verfahren: " + Object.entries(jeVerfahren)
     .map(([v, n]) => v + " " + n + "x").join(", "));
-  pruefe("die Route hat " + route.length + " Eintraege", route.length === 40,
-    "erhalten " + route.length);
+  // Eintragszahl aus der Datei abgeleitet: 15 Knoten x 3 Stufen minus die Stufen,
+  // die die Route als schon vorhanden voraussetzt (erster Eintrag Stufe m -> m-1).
+  const klein = {};
+  for (const e of route) if (!(e.node in klein) || e.level < klein[e.node]) klein[e.node] = e.level;
+  const erwartetZahl = Object.keys(klein).length * 3
+    - Object.values(klein).reduce((a, m) => a + (m - 1), 0);
+  pruefe("die Route hat " + route.length + " Eintraege (abgeleitet " + erwartetZahl + ")",
+    route.length === erwartetZahl, "erhalten " + route.length);
+  pruefe("Lauf 2: " + ROUTE2.length + " Eintraege, alle 15 Knoten, beginnt bei BN1.1",
+    ROUTE2.length === 45 && ROUTE2[0].node === 1 && ROUTE2[0].level === 1,
+    "erhalten " + ROUTE2.length);
   pruefe("V2 traegt die Mehrheit", (jeVerfahren.V2 || 0) > (jeVerfahren.V1 || 0),
     JSON.stringify(jeVerfahren));
 

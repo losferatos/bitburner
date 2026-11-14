@@ -27,7 +27,7 @@
  *   node tools/liste.js                       Abschnitte und Punkte zeigen
  *   node tools/liste.js --sofort-leeren [--vermerk "..."]
  *   node tools/liste.js --eintragen sofort|offen --datei <pfad>
- *   node tools/liste.js --erledigen "<anfang der ueberschrift>" --datei <pfad>
+ *   node tools/liste.js --erledigen "<anfang der ueberschrift>" [--abschnitt sofort] --datei <pfad>
  *
  * `--datei` erwartet eine Datei, deren erste Zeile mit `### ` beginnt. So
  * bleibt der Eintragstext ausserhalb der Kommandozeile - Umlaute, Backticks
@@ -200,8 +200,13 @@ try {
   } else if (argv.includes("--erledigen")) {
     const prefix = arg("--erledigen");
     if (!prefix) throw new Error("--erledigen braucht den Anfang der Ueberschrift.");
+    // --abschnitt <anfang>: nur in diesem Abschnitt suchen. Die Bruecke ruft so
+    // mit kurzen Titeln auf; ohne Einschraenkung traefe ein gleich beginnender
+    // Punkt in "Offen" und wuerde still archiviert (Skeptiker 14.11.2026).
+    const nurAbschnitt = arg("--abschnitt");
     let treffer = null;
     for (const s of parsed.sections) {
+      if (nurAbschnitt && !s.title.toLowerCase().startsWith(nurAbschnitt.toLowerCase())) continue;
       for (const it of items(parsed, s)) {
         if (it.title.toLowerCase().startsWith(prefix.toLowerCase())) {
           if (treffer) throw new Error("'" + prefix + "' passt auf mehrere Punkte - genauer werden.");

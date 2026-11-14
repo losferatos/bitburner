@@ -265,3 +265,109 @@ ist der häufigste Vorgang im System, und eine Sperre, die nur ein Mensch
 aufheben kann, gehört nicht an den häufigsten harmlosen Fall. Damit tote
 Sockets überhaupt verschwinden, hält die Brücke seit dem 04.09.2026 ein
 Ping/Pong (30 s, zwei verpasste Pongs → `terminate()`).
+
+---
+
+## 9 Lauf-2-Uebergabe: ein neuer Spielstand (Z1, ab 14.11.2026)
+
+Die Bruecke weist ein frisches Spiel ab, und das ist richtig: es hat einen neuen
+identifier (wird beim Anlegen des Spielstands gewuerfelt) und Minuten Spielzeit
+gegen ueber 2.000 h Anker. Genau so sieht auch ein verlorenes Browserprofil aus.
+Deshalb gibt es den Wechsel nur **von Hand, mit ausdruecklichem identifier**, ueber
+genau ein Werkzeug: `tools/lauf2-uebergabe.js`. Die Bruecke schaltet nie selbst um.
+
+### Was sich geaendert hat
+
+- Der identifier steht nicht mehr nur im Code, sondern optional in
+  `sync/identitaet.json` (versioniert, Epoche `lauf2`, identifier, Startanker).
+  **Fehlt die Datei, gilt `197f4d61481686` wie bisher** - alles laeuft bitgleich.
+- Ist die Datei da, aber kaputt, startet die LIVE-Bruecke **nicht** (kein stiller
+  Rueckfall auf Lauf 1). Nur das Werkzeug schreibt sie.
+- In einer Epoche sehen Rueckwaertssprung-Anker, Rotation und Sicherungsalter nur
+  Dateien `LIVE_<identifier>_...` dieser Epoche. Ein Lauf-1-Heartbeat oder eine
+  Lauf-1-Indexzeile wird nie zum Anker des neuen Spiels.
+- Die Riegel bleiben voll: identifier-Pruefung gegen den neuen Wert,
+  Rueckwaertssprung > 60 s gegen den Anker der neuen Epoche, Port.
+
+### Ablauf (Claude liest vor, Eric klickt)
+
+1. **Letzten Lauf-1-Stand sichern**, solange das alte Spiel noch laeuft:
+   `node tools/backup.js --anlass emergency` (wird nie rotiert).
+2. **Neues Spiel anlegen.** OFFEN, Erics Entscheidung: im selben Profil
+   ("Delete Save" - widerspricht Abschnitt 6, der Lauf-1-Stand lebt dann nur noch
+   in der Sicherungskette) oder in einem eigenen Browserprofil (Lauf-1-Stand bleibt
+   im alten Profil; dort keinen Tab mehr offen lassen - kein zweiter Tab).
+3. Im neuen Spiel einmal setzen: `RemoteFileApiPort` 12525 (Vorgabe ist 0 = keine
+   Verbindung), Autosave, **`AutoexecScript coldstart.js`** (nicht `boot.js`: auf
+   8 GB home passt `coldstart.js` neben `boot.js` nicht, und auf 16 GB beendete
+   `boot.js` es nach fuenf Minuten - Skeptiker 14.11.2026. `coldstart.js` startet
+   ab 32 GB selbst `boot.js`, ist also fuer ganz Lauf 2 richtig).
+4. Das neue Spiel verbindet sich und wird abgewiesen. In `## Sofort` bzw.
+   `data/bridge.log` steht `identifier <NEU> statt 197f4d61481686` und, seit dem
+   Zusammenbau, `Spielstand BN<n> Lauf <l>, <m> SF, Spielzeit <t> ms`. Gegenlesen:
+   BN1, Lauf 1, 0 SF, Spielzeit wenige Minuten. Das Werkzeug zeigt es im
+   Trockenlauf an und warnt, wenn es nicht passt.
+5. **Bruecke beenden - samt Neustartschleife** (`bridge-start.cmd`), sonst startet
+   sie mitten in der Uebergabe neu und laedt die alte Identitaet (das Werkzeug
+   warnt am Ende, wenn wieder eine laeuft).
+6. Trockenlauf: `node tools/lauf2-uebergabe.js --pin <NEU>`
+   Prueft: Bruecke aus (bridge.pid, Ports 12525/8795), `<NEU>` im Brueckenprotokoll
+   als abgewiesen gesehen (Tippfehlerschutz), Lauf-1-Kette in beiden Ablagen
+   (sha256 jeder Datei gegen INDEX.tsv, juengste Sicherung entpackt und gelesen).
+   Zeigt den juengsten gesicherten Stand und dessen Alter.
+7. Ausfuehren: `node tools/lauf2-uebergabe.js --pin <NEU> --ausfuehren`
+   - `LIVE_*` und `INDEX.tsv` in **beiden** Ablagen nach `<ablage>\lauf1\`
+     (dort liest sie weder die Rotation noch die Ankersuche), dazu `ARCHIV.json`;
+     fremde Dateien (`MANUELL_...`, `save-...`) bleiben liegen;
+   - `data\` nach `data\lauf1\` (als Ganzes umbenannt - haelt ein anderer Prozess
+     eine Datei offen, schlaegt es fehl, bevor etwas bewegt ist);
+   - `data/nicht-schieben.txt` (die Sperrliste, getrackte Konfiguration) wird aus dem
+     Archiv in das NEUE `data/` zurueckkopiert: sonst schiebt `pushAll` ins frische
+     Spiel, was in Lauf 1 gesperrt war - namentlich `graftplan.json`, den Zuender fuer
+     rund 450 Mrd. (Erics Entscheidung, nicht die der Uebergabe). Ob `graftplan.json`
+     in Lauf 2 ueberhaupt ins Spiel soll, entscheidet Eric;
+   - **zuletzt** `sync/identitaet.json` (atomar). Erst ab hier gilt das neue Spiel.
+   Bricht es mittendrin ab, ist nichts verloren (die Bruecke prueft weiter gegen den
+   alten identifier); erneuter Aufruf setzt fort.
+8. **Epochen-Leser und Epochendatei.** Das Werkzeug lehnt LIVE ab, solange
+   `src/ausgang.js` und `src/exit.js` die Epoche nicht lesen (`leseEpoche`/`ladeRoute`,
+   Hindernis, Exit 2). Mit Lauf-2-Route: `src/epoche.json` mit `{"epoche": "lauf2"}`
+   anlegen und committen - ohne diese Datei faehrt der Bot die Route von Lauf 1.
+   `git add sync/identitaet.json src/epoche.json` und committen (das Werkzeug
+   committet nicht). `git status` darf kein ` D data/...` zeigen (sonst nicht `add -A`).
+9. Bruecke starten. Im Protokoll muss `Identitaet: Epoche lauf2, identifier <NEU>`
+   stehen und danach `Verifiziert in ...`.
+
+Exit 0 = erledigt bzw. Trockenlauf ohne Hindernis, 2 = abgelehnt (nichts
+veraendert), 1 = Aufruf-/unerwarteter Fehler. Nur wenn `data/bridge.log` fehlt:
+`--ohne-sichtung` (Startanker dann 0).
+
+### Rueckweg von Lauf 2 nach Lauf 1 (nur dokumentiert, nicht getestet)
+
+Es gibt keinen Schalter. Wer zurueck muss (die Uebergabe war voreilig, das neue Spiel
+ist verloren): Bruecke samt Neustartschleife beenden, `sync/identitaet.json`
+umbenennen (dann gilt wieder `197f4d61481686`), die Dateien aus `<ablage>\lauf1\`
+zurueck in die Ablagen verschieben (`LIVE_...` und `INDEX.tsv`; die
+`LIVE_<neu>_`-Dateien der Epoche vorher in einen eigenen Ordner legen, sie tragen
+sonst denselben Praefix), `data\lauf1\` an die Stelle von `data\` stellen (das neue
+`data\` vorher wegschieben), `src/epoche.json` entfernen und committen.
+Danach `bridge.log` und Heartbeat gegenlesen: ohne Heartbeat und Indexzeile fehlt der
+Rueckwaertssprung-Anker und die Bruecke meldet `Verbindung ohne Anker`.
+
+### Lauf-1-Sicherungen nach der Uebergabe
+
+Sie liegen unter `C:\Users\erche\bitburner-backups\lauf1\` (Spiegel
+`backups\lauf1\`). Pruefen wie gewohnt, mit dem Index des Archivs:
+
+```bash
+node tools/backup-check.js <datei> --expect-id 197f4d61481686 --expect-port 12525 \
+  --index C:\Users\erche\bitburner-backups\lauf1\INDEX.tsv
+```
+
+### Pruefstand
+
+`--instance TEST` arbeitet auf `pruefstand/data`, `pruefstand/backups` und schreibt
+`pruefstand/identitaet-test.json`; die TEST-Bruecke liest sie mit
+`--identitaet pruefstand/identitaet-test.json` (fuer LIVE gesperrt). Tests:
+`node tools/test-lauf2-uebergabe.js` (Wegwerfordner, MOCK-Bruecke),
+`node tools/test-backup.js` (Epochenpraefix in `sichere()`).

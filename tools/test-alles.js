@@ -1,13 +1,27 @@
 /**
- * Ebene 0 am Stueck. Stufe A der Abnahme verlangt von diesem Aufruf Exit 0.
+ * Ebene 0 am Stueck.
  *
  * Alle Tests laufen OHNE Spiel und ohne Bruecke. Das ist Absicht: ein
  * Testgeschirr, das eine laufende Umgebung braucht, wird genau dann nicht
  * gefahren, wenn die Umgebung kaputt ist.
  *
  * Aufruf:
- *   node tools/test-alles.js           alle
- *   node tools/test-alles.js --schnell nur die, die unter einer Sekunde brauchen
+ *   node tools/test-alles.js            alle Tests + Listenpruefung
+ *   node tools/test-alles.js --schnell  nur die, die unter einer Sekunde brauchen
+ *   node tools/test-alles.js --nur-tests  wie ohne Flag (alter Schalter, bleibt gueltig)
+ *   node tools/test-alles.js --stufe-a  zusaetzlich: Exit 1, solange eine Messluecke offen ist
+ *   node tools/test-alles.js --nur-liste [--tests-dir <ordner>]
+ *                                        nur die Listenpruefung (readdir-Abgleich)
+ *
+ * EXIT-CODE (B01/B09, 14.11.2026):
+ *   0 = alle Testdateien gruen UND die Liste vollstaendig (jede tools/test-*.js
+ *       steht in TESTS oder mit Grund in NICHT_IN_SUITE, jeder Eintrag hat eine
+ *       Datei, keiner steht doppelt).
+ *   1 = eine Testdatei rot, ein Eintrag ohne Datei, eine Datei ohne Eintrag
+ *       oder (nur mit --stufe-a) eine offene Messluecke.
+ *   Die Messluecken stehen immer als Zeilen in der Ausgabe, zaehlen aber nur mit
+ *   --stufe-a fuer den Exit-Code: vorher endete jeder Lauf ohne --nur-tests mit
+ *   Exit 1, und ein Rot, das immer rot ist, sagt nichts mehr.
  */
 
 import { execFile } from "node:child_process";
@@ -26,7 +40,7 @@ const ROOT = path.resolve(HIER, "..");
 const TESTS = [
   {
     datei: "test-backup.js",
-    deckt: "Sicherungskette: Format, Kennwerte, jeder Ablehnungsgrund, Rotation",
+    deckt: "Sicherungskette: Format, Kennwerte, jeder Ablehnungsgrund, Rotation, + Epochenpraefix in sichere() (Z1)",
     schnell: true,
   },
   {
@@ -159,7 +173,7 @@ const TESTS = [
   },
   {
     datei: "test-bruecke-alarm.js",
-    deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.)",
+    deckt: "Sicherungsalarm erlischt mit der naechsten gruenen Sicherung; Check-in beschriftet die Black-Op-Chance (Befund 04.10.); alarm() mit alarmMelde-Stub, CRLF-tolerant (B08)",
     schnell: true,
   },
   {
@@ -179,8 +193,8 @@ const TESTS = [
   },
   {
     datei: "test-kaltstart-budget.js",
-    deckt: "passt der Kaltstart auf 32 GB - und findet eine Geldquelle Platz? (C.7/C.8)",
-    schnell: true,
+    deckt: "passt der Kaltstart auf 32 GB - und findet eine Geldquelle Platz? (C.7/C.8); K10: Lauf 2 mit home 8/16/32 und SF-Stand aus route-lauf2.json, home-Formel gegen Prestige.ts geeicht",
+    schnell: false,
   },
   {
     datei: "test-registry.js",
@@ -259,6 +273,9 @@ const TESTS = [
   },
   {
     datei: "test-casino.js",
+    // Die Eichung liest RNG.ts und typescript aus reference/v301; der Worktree bb-lauf2 hat nur
+    // v301/src + acorn. Fehlt es, wird SICHTBAR uebersprungen (Zeile in der Auswertung).
+    braucht: ["reference/v301/src/Casino/RNG.ts", "reference/v301/node_modules/typescript"],
     deckt: "Casino-Roulette BN8: Vorhersage bitgleich gegen RNG.ts, Geldwunsch fuer boerse.js, Pausen nach Abbruch, Pause/Abruf je Dreh (13.11.2026)",
     schnell: true,
   },
@@ -515,6 +532,118 @@ const TESTS = [
     deckt: "EBENE 2: gang.js (Paket P2, GANG-1) gegen einen ns.gang-Nachbau - Gruendung nur einmal und nur mit beigetretener Kampf-Faktion kleinsten Rufs (nie NiteSec/Black Hand, Pause auch ueber Neustart, unlesbarer Ruf zaehlt nicht als 0), Rekrutierung mit Grenze, Aufgabenwahl Training -> Terrorism -> Vigilante, Aufstiegsschwellen 1,3/2, nie Warfare/Ausruestung, Takt = nextUpdate mit Rueckfall, Abbruch/Fehlerserie/MAX_ROUNDS, Fehler in der Telemetrie, Schalter data/gang-an.txt, Registry-Gating; VORAUSSETZUNGSSPERRE vor createGang (nur mit frischer, zum Knoteneintritt passender data/bn4rep.json, die Paket 0 UND Paket 1 meldet; gesperrter Versuch zaehlt nicht), Vertrag mit bn4rep.js, /bb-Zeile aus gang.json, Logzeit in Ortszeit; Formeln gegen gang-formulas.mjs; GELDMODUS (P2d): Modus je Runde mit Hysterese, Rueckfall auf RESPECT, Human Trafficking und Wanted-Regler, Ausruestung nur im Modus MONEY ueber der Ruecklage; Skeptiker-Runde: Notschalter data/gang-geld-aus.txt, repNeedNullSince, /bb-Zeile und Befund zum Geldmodus; Selbstprobe mit 70 Mutanten",
     schnell: true,
   },
+  {
+    datei: "test-bn8-einbaurunde.js",
+    deckt: "BN8: der echte bn4rep.js-Hauptlauf (Einbaurunde) gegen nachgebauten Spielzustand mit Boersen-Stub - home-RAM, Spende ab Favor 0, Depot vor den letzten Kaeufen",
+    schnell: false,
+  },
+  {
+    datei: "test-bn8-tdh.js",
+    deckt: "BN8: Tian Di Hui ohne Gym, Sector-12-Rueckreise, kein Pingpong mit Aevum (bn4life.js bn8TripPlan)",
+    schnell: true,
+  },
+  {
+    datei: "test-bn8-xp.js",
+    deckt: "BN8: reiner Erfahrungsmodus - Verteilung (alles an den Ofen), nichts aendert sich ausserhalb Knoten 8, Kaufregel, homegrow-Freigabe",
+    schnell: false,
+  },
+  {
+    datei: "test-bn8plan.js",
+    deckt: "BN8: Einbauplan lib/bn8plan.js (300 Mrd, 1 Bio, 30 h je Stufe) und seine Verdrahtung in bn4rep.js",
+    schnell: true,
+  },
+  {
+    datei: "test-boersepause.js",
+    deckt: "BN8: Depot wird VOR den letzten Kaeufen des Einbaus verkauft (lib/boersepause.js)",
+    schnell: true,
+  },
+  {
+    datei: "test-ereignisstrom.js",
+    deckt: "EBENE 2: bleibende Ereignis-Eintraege ueberleben die Schreiber, ein Dauerkonflikt (figwatch) flutet nicht (BN15.2, 07.11.)",
+    schnell: true,
+  },
+  {
+    datei: "test-gocheat.js",
+    deckt: "go.cheat im IPvGO-Spieler: Chance-Formel gegen den Spielcode (448 Faelle) und Szenariotest; ohne reference/bitburner-src meldet der Test selbst 'uebersprungen'",
+    schnell: true,
+  },
+  {
+    datei: "test-handel.js",
+    // Die Boersensimulation liest den Spielquelltext; der Worktree bb-lauf2 hat
+    // nur eine Kopie von reference/v301. Fehlt der Quelltext, wird SICHTBAR
+    // uebersprungen (eigene Zeile in der Auswertung), nicht stillschweigend rot.
+    braucht: ["reference/bitburner-src/src/StockMarket"],
+    deckt: "BN8: Handelsregel lib/handel.js, Bargeld auf Abruf und boerse.js gegen das nachgebaute Marktmodell (Verdrahtung, nicht nur reine Funktionen)",
+    schnell: true,
+  },
+  {
+    datei: "test-hoffnung.js",
+    deckt: "EBENE 2: Field Analysis, wenn die Unschaerfe die Wahl kippen kann (BN15.1 Raid gegen Retirement, 05.11.)",
+    schnell: true,
+  },
+  {
+    datei: "test-raid-stadt.js",
+    deckt: "blade.js: Raid in der ausgebrannten Stadt - Chaos-Formel gegen Messwerte geeicht (Live-Fall BN3.3, 08.10.)",
+    schnell: true,
+  },
+  {
+    datei: "test-restertrag.js",
+    deckt: "EBENE 2: die laufende Aktion wird mit ihrem Restertrag bewertet, kein Abbruch kurz vor dem Ende (BN15.1, 05.11.)",
+    schnell: true,
+  },
+  {
+    datei: "test-coldstart.js",
+    deckt: "Z6: Kaltstart-Pfad bis 8 GB home - coldstart.js <= 5 GB (ram.js), Handkauf-Formel gegen Spielwerte, Fake-Welt home 8 GB, coldbuy.js, boot.js ab 32 GB bitgleich zu master, Neuladen mit Autoexec bei 8/16/32 GB",
+    schnell: false,
+  },
+  {
+    datei: "test-homegrow-kern.js",
+    deckt: "G50: Kernkauf nur mit Ertragspruefung (homegrow.js) - Kostenformel und Knotenfaktoren geeicht, Mock-Lagen, ohne neue Lage bitgleich zu master",
+    schnell: false,
+  },
+  {
+    datei: "test-lauf2-uebergabe.js",
+    // Laufzeit gemessen 14.11.2026: ~110 s unter dem CPU-Deckel (Mock-Bruecke + Wegwerfordner),
+    // das Zeitlimit je Datei ist 300 s (TIMEOUT_MS) - waechst der Test, hier zuerst nachsehen.
+    deckt: "Z1: Lauf-2-Uebergabe der Bruecke - Identitaets-Lader, tools/lauf2-uebergabe.js gegen Wegwerfordner, Bruecke (Mock-Rolle) lehnt Lauf 1 ab und nimmt das neue Spiel an",
+    schnell: false,
+  },
+  {
+    datei: "test-epoche-leser.js",
+    deckt: "K01-Leser (Skeptiker 14.11.): exit.js und ausgang.js laufen im Mock - Lauf-1-Lagen bitgleich zu route.json, frischer Stand ohne epoche.json = kein Sprung, Epoche lauf2 = Route aus route-lauf2.json (BN1.1->4, BN4.3->1), kaputte Epoche = kein Sprung, Fremdrechner holt von home; pruefeLeser der Uebergabe",
+    schnell: false,
+  },
+  {
+    datei: "test-sf4-riegel.js",
+    deckt: "K09/K10-Mock: Singularity-Gewerke starten ohne SF4 ausserhalb BN4 nicht; mit SF4 (Lauf 1) exakt dieselbe Auswahl wie vor K09; Mock wirft wie das Spiel",
+    schnell: false,
+  },
+  {
+    datei: "test-suite-gate.js",
+    deckt: "B01: die Listenpruefung von test-alles.js schlaegt bei verwaister Datei, Eintrag ohne Datei und Doppeleintrag an (Mutanten gegen ein Namensabbild von tools/)",
+    schnell: true,
+  },
+  {
+    datei: "test-alarme.js",
+    // Laufzeit gemessen 14.11.2026: ~75 s (Mock-Bruecke wartet den 60-s-Urteilstakt ab).
+    deckt: "B05+B08: Alarmliste (Klassen, Schutz endet nie durch Zeit, Messung nur mit Beleg, Hand-Beleg), tools/alarme.js (Aufraeumen von ## Sofort gegen Fixtures und Kopie der echten Liste), Neustartgrenze + statische Pruefung bridge-start.cmd, Bruecken-Haken, MOCK-Bruecke mit alarme.json (Zaehlen statt Neueintrag, Messung beendet, Neustart, Ablauf, kaputte Datei)",
+    schnell: false,
+  },
+  {
+    datei: "test-checkin.js",
+    deckt: "B07: checkin.js zeigt Einbau faellig/steht samt Sperrgrund (Urteil, Zeile, JSON-Feld einbau); bestehende JSON-Felder unveraendert",
+    schnell: true,
+  },
+];
+
+/**
+ * Testdateien, die bewusst NICHT in der Suite laufen. Jeder Eintrag braucht
+ * einen Grund; ohne Eintrag hier und ohne Eintrag in TESTS schlaegt die
+ * Listenpruefung an (B01). Heute leer: test-alles.js selbst ist implizit
+ * ausgenommen.
+ */
+const NICHT_IN_SUITE = [
+  // { datei: "test-beispiel.js", grund: "braucht das laufende Spiel (Ebene 3)" },
 ];
 
 /**
@@ -553,70 +682,117 @@ const TESTS = [
  *   den Eintrag zu streichen statt etwas zu messen.
  */
 const MESSLUECKEN = [
-  "EBENE 3, KALTSTART: ein echter Knotenwechsel auf 32 GB home. Der "
-    + "Budgettest rechnet ihn nach, aber gerechnet ist nicht gemessen - "
-    + "t_workbench gegen den Knotenpreis ist die Zahl, die zaehlt (C.7).",
-  "EBENE 3, VERTRAGSKETTE: erster Vertrag geloest UND kassiert vor Minute 20. "
-    + "Die Loeser sind gegen 360 erzeugte Instanzen und je eine unabhaengige "
-    + "Gegenprobe gehalten, aber noch nie gegen einen echten Vertrag im Spiel "
-    + "- ein Versuch ist unwiederbringlich (C.8).",
-  "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
-    + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
-    + "laesst sich nur im Spiel stellen (C.9, C.10).",
-  "BITNODE 8 UND 9 sind nur gerechnet, nie gefahren. boerse.js hat 31 Proben, "
-    + "aber keine einzige gegen einen echten Markt (C.13, C.15).",
-  "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "
-    + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14).",
-  "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
-    + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11).",
-  "DIE BRUECKE ist seit dem 04.09.2026 gegen ein nachgebautes Spiel geprueft "
-    + "(tools/test-bruecke.js, 77 Proben). OFFEN bleibt der Zweig, den ein "
-    + "Mock nicht stellen kann: uncaughtException im laufenden Betrieb, und "
-    + "der Wachhund gegen einen ECHTEN zweiten Spiel-Tab.",
-  "JEDER KENNWERT MIT SOLL HAT JETZT EINEN SCHREIBER (04.09.2026). Offen "
-    + "bleibt die MESSUNG von next_blackop_chance: sie gilt laut Auftrag erst, "
-    + "wenn getNextBlackOp() etwas liefert (erste Operation bei 2.500 Rang, "
-    + "gemessen 596), und bis dahin steht sie zu Recht auf null. Bis der Rang "
-    + "reicht, ist die Zahl gebaut, aber nicht belegt.",
-  "DER MOCK RECHNET KEINE SPIELMECHANIK. Er kennt seit dem 04.09.2026 die "
-    + "Koerper (storedCycles), den Seed und die Division (31 Funktionen) - "
-    + "aber er leitet keine Erfolgschance aus Kampfwerten ab, er gibt "
-    + "zurueck, was der Test hineinschreibt. Geprueft ist damit die "
-    + "ENTSCHEIDUNG der Gewerke, nicht die Formel des Spiels; die hat ihren "
-    + "eigenen, gegen den Quelltext geeichten Test. Was daraus folgt: ein "
-    + "Fehler in einer Formel faellt hier NICHT auf.",
+  { seit: "04.09.2026", wer: "K11 (Dev-Build-Kaltstartlauf, Eric/Sitzung)",
+    text: "EBENE 3, KALTSTART: ein echter Knotenwechsel auf 8/16/32 GB home aus einem FRISCHEN Spielstand. "
+      + "Der Budgettest (test-kaltstart-budget.js, home 8/16/32) und der Startpfad-Test (test-coldstart.js) "
+      + "rechnen ihn nach, aber gerechnet ist nicht gemessen - t_workbench gegen den Knotenpreis ist die Zahl, "
+      + "die zaehlt (C.7). Protokoll: tools/kaltstart-lauf.md." },
+  { seit: "04.09.2026", wer: "erster echter Vertrag in Lauf 2",
+    text: "EBENE 3, VERTRAGSKETTE: erster Vertrag geloest UND kassiert vor Minute 20. "
+      + "Die Loeser sind gegen 360 erzeugte Instanzen und je eine unabhaengige Gegenprobe gehalten, aber "
+      + "noch nie gegen einen echten Vertrag im Spiel - ein Versuch ist unwiederbringlich (C.8). "
+      + "Stand 14.11.: nicht neu geprueft, ob Lauf 1 das inzwischen belegt hat." },
+  { seit: "04.09.2026", wer: "Pflichttest 5.2, nur im Spiel stellbar",
+    text: "EBENE 3, STRAFLEITER: je Sprosse ein provozierter Haenger. Der Pflichttest "
+      + "aus Auftrag 5.2 (Kern-Motorzeit eingefroren, Engine tickt weiter) "
+      + "laesst sich nur im Spiel stellen (C.9, C.10)." },
+  { seit: "04.09.2026", wer: "BN8-Lauf 1 (laeuft), Messung nach BN8.3",
+    text: "BN8: boerse.js/handel.js gegen den ECHTEN Markt. BN9 ist gefahren (ERLEDIGT.md: zwei BN9-Laeufe), "
+      + "das Casino ist in BN8 gemessen (10,05 Mrd in 51 s). Offen ist die Handelsrendite der Boerse "
+      + "gegen den echten Markt (31+108 Proben sind Mock/Simulation, C.13, C.15)." },
+  { seit: "04.09.2026", wer: "Lauf-Betrieb ueber Stunden",
+    text: "GRAFTING im Betrieb: graft_busy_pct gegen 100 und graft_aborted = 0 "
+      + "brauchen einen Lauf ueber Stunden, nicht eine Mock-Runde (C.14)." },
+  { seit: "04.09.2026", wer: "12-h-Beobachtung im Lauf",
+    text: "DER FIGUR-VERGABEPUNKT ist gegen sieben Handlungsstellen geprueft, aber "
+      + "figure_conflict = 0 ueber 12 h ist eine Messung, keine Zusicherung (C.11)." },
+  { seit: "04.09.2026", wer: "nur im echten Spiel stellbar",
+    text: "DIE BRUECKE ist gegen ein nachgebautes Spiel geprueft (tools/test-bruecke.js). "
+      + "OFFEN bleibt der Zweig, den ein Mock nicht stellen kann: uncaughtException im "
+      + "laufenden Betrieb, und der Wachhund gegen einen ECHTEN zweiten Spiel-Tab." },
+  { seit: "04.09.2026", wer: "erste Black Op in Lauf 2 (Rang 2.500)",
+    text: "next_blackop_chance hat einen Schreiber, aber die MESSUNG gilt erst, "
+      + "wenn getNextBlackOp() etwas liefert (erste Operation bei 2.500 Rang, "
+      + "gemessen 596); bis dahin steht sie zu Recht auf null." },
+  { seit: "04.09.2026", wer: "dauerhaft (Grenze des Mocks)",
+    text: "DER MOCK RECHNET KEINE SPIELMECHANIK. Er kennt die Koerper (storedCycles), den Seed "
+      + "und die Division, leitet aber keine Erfolgschance aus Kampfwerten ab, er gibt "
+      + "zurueck, was der Test hineinschreibt. Geprueft ist damit die ENTSCHEIDUNG der "
+      + "Gewerke, nicht die Formel des Spiels; die hat ihren eigenen, gegen den Quelltext "
+      + "geeichten Test. Ein Fehler in einer Formel faellt hier NICHT auf." },
 ];
 
 /**
  * Bewusste Bauentscheidungen. Sie stehen hier, damit sie nicht in Vergessenheit
  * geraten - aber sie sind KEINE Messluecke und blockieren Stufe A nicht.
+ * Bereinigt am 14.11.2026 (B09): der Satz "graftplan.json bleibt nicht
+ * eingespielt" von 04.09. ist ueberholt (Grafting laeuft seither ueber
+ * graftauto.js, siehe ERLEDIGT.md) und steht nicht mehr hier.
  */
 const ENTSCHIEDEN = [
-  "SPROSSE 4a ist nicht gebaut und wird es nicht, bevor ein Ebene-3-Lauf "
-    + "zeigt, dass ein skriptausgeloester Reload keinen beforeunload-Dialog "
-    + "stehen laesst - so steht es im Auftrag. Aus dem Quelltext belegt: der "
-    + "save-Prop existiert (GameRoot.tsx:536-541), und der Handler ist eine "
-    + "schlichte Zuweisung an window.onbeforeunload (index.tsx:55), also mit "
-    + "= null aufhebbar. Es fehlt die MESSUNG, nicht die Kenntnis.",
-  "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
-    + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
-    + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt.",
-    "DER BAU IST SEIT DEM 04.09.2026, 17:31 IM SPIEL. Eingespielt wurde "
-    + "gestuft und mit Gegenprobe je Datei (tools/einspielen.js), neu "
-    + "gestartet mit PID-Beleg (tools/neustart.js). Seit 21:00 sind auf Erics "
-    + "Ansage auch die beiden letzten Schalter um: data/guard-modus.txt steht "
-    + "auf 'enforce' (Sprosse 1 und 2 greifen ein, 3 und 5 beobachten), und "
-    + "die Einbausperre ist aufgehoben - der Bot darf die sieben wartenden "
-    + "Augmentierungen einbauen, sobald er nichts Besseres mehr kaufen kann. "
-    + "NICHT eingespielt bleibt graftplan.json: sie ist der Zuender fuer "
-    + "graftauto.js und wuerde binnen 60 s einen echten Graft ueber 450 Mrd "
-    + "ausloesen. Sie steht in data/nicht-schieben.txt und geht auch beim "
-    + "Verbinden nicht mit hinaus.",
+  { seit: "04.09.2026",
+    text: "SPROSSE 4a ist nicht gebaut und wird es nicht, bevor ein Ebene-3-Lauf "
+      + "zeigt, dass ein skriptausgeloester Reload keinen beforeunload-Dialog "
+      + "stehen laesst - so steht es im Auftrag. Aus dem Quelltext belegt: der "
+      + "save-Prop existiert (GameRoot.tsx:536-541), und der Handler ist eine "
+      + "schlichte Zuweisung an window.onbeforeunload (index.tsx:55), also mit "
+      + "= null aufhebbar. Es fehlt die MESSUNG, nicht die Kenntnis." },
+  { seit: "04.09.2026",
+    text: "SPROSSE 5 laeuft im TROCKENLAUF: der Kern haengt 'scharf' nur an, wenn "
+      + "data/punish-scharf.txt auf home liegt, und die legt ein Mensch. Das ist "
+      + "der Trockenlauf, den der Auftrag vor der Schaerfe verlangt." },
+  { seit: "04.09.2026",
+    text: "SCHALTER-STAND seit dem 04.09.2026, 21:00: data/guard-modus.txt steht auf "
+      + "'enforce' (Sprosse 1 und 2 greifen ein, 3 und 5 beobachten), die Einbausperre "
+      + "ist aufgehoben. Ob das heute noch gilt, zeigt data/guard-modus.txt, nicht dieser Satz." },
 ];
 
 const LUECKEN = MESSLUECKEN;
 
-const nurSchnell = process.argv.includes("--schnell");
+const args = process.argv.slice(2);
+const nurSchnell = args.includes("--schnell");
+const nurListe = args.includes("--nur-liste");
+const stufeAFlag = args.includes("--stufe-a");
+const dirIdx = args.indexOf("--tests-dir");
+// --tests-dir nur fuer --nur-liste: der Abgleich liest dann den Namen aus einem
+// anderen Ordner (Mutanten-Test in test-suite-gate.js), gefahren wird nichts.
+const TESTS_DIR = dirIdx >= 0 && nurListe ? path.resolve(args[dirIdx + 1] || ".") : HIER;
+
+/**
+ * Listenpruefung (B01): jede tools/test-*.js steht in TESTS oder mit Grund in
+ * NICHT_IN_SUITE; jeder Eintrag hat eine Datei; keiner steht doppelt.
+ * Reine Funktion gegen einen Ordner, damit der Test sie mit Mutanten fuettern kann.
+ */
+function pruefeListe(dir) {
+  const fehler = [];
+  let namen = [];
+  try { namen = fs.readdirSync(dir); }
+  catch (e) { return ["Ordner nicht lesbar: " + dir + " (" + e.message + ")"]; }
+  const vorhanden = namen.filter((n) => /^test-.+\.(js|mjs)$/.test(n) && n !== "test-alles.js");
+  const eingetragen = TESTS.map((t) => t.datei);
+  const ausgenommen = NICHT_IN_SUITE.map((x) => x.datei);
+  for (const n of vorhanden) {
+    if (!eingetragen.includes(n) && !ausgenommen.includes(n)) {
+      fehler.push("VERWAIST: " + n + " steht weder in TESTS noch in NICHT_IN_SUITE");
+    }
+  }
+  for (const n of eingetragen) {
+    if (!vorhanden.includes(n)) fehler.push("EINTRAG OHNE DATEI: " + n);
+  }
+  eingetragen.forEach((n, i) => {
+    if (eingetragen.indexOf(n) !== i) fehler.push("DOPPELT eingetragen: " + n);
+  });
+  for (const x of NICHT_IN_SUITE) {
+    if (!x.grund || !String(x.grund).trim()) fehler.push("NICHT_IN_SUITE ohne Grund: " + x.datei);
+    if (eingetragen.includes(x.datei)) fehler.push("in TESTS UND NICHT_IN_SUITE: " + x.datei);
+  }
+  return fehler;
+}
+
+// 180 s -> 300 s (14.11.2026): unter dem CPU-Deckel (Idle-Prioritaet, 4 Kerne) und neben
+// anderen Prozessen brauchte test-go.js 165 s und test-bruecke.js 140 s - das alte Limit
+// lag 15 s ueber der langsamsten Datei. BB_TEST_TIMEOUT_MS ueberschreibt es.
+const TIMEOUT_MS = Number(process.env.BB_TEST_TIMEOUT_MS) || 300000;
 
 function fahre(datei, args = []) {
   return new Promise((fertig) => {
@@ -637,7 +813,7 @@ function fahre(datei, args = []) {
     //   und Sockets fahren, ist das die falsche Vorgabe. 180 s ist reichlich:
     //   die langsamste Datei braucht gemessen 39 s.
     execFile(process.execPath, [p, ...args],
-      { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: 180000,
+      { cwd: ROOT, encoding: "utf8", maxBuffer: 8 * 1024 * 1024, timeout: TIMEOUT_MS,
         killSignal: "SIGKILL" },
       (err, out, errout) => {
         const abgewuergt = err && err.killed;
@@ -646,7 +822,7 @@ function fahre(datei, args = []) {
           rc: err ? (err.code ?? 1) : 0,
           ms: Date.now() - beginn,
           ausgabe: (out || "") + (errout || "")
-            + (abgewuergt ? String.fromCharCode(10) + "  ABGEBROCHEN: laenger als 180 s - die Datei haengt." + String.fromCharCode(10) : ""),
+            + (abgewuergt ? String.fromCharCode(10) + "  ABGEBROCHEN: laenger als " + (TIMEOUT_MS / 1000) + " s - die Datei haengt." + String.fromCharCode(10) : ""),
         });
       });
   });
@@ -657,10 +833,34 @@ console.log("===========================================");
 console.log("  Ebene 0 - alle Tests ohne Spiel");
 console.log("===========================================");
 
+const listenFehler = pruefeListe(TESTS_DIR);
+console.log("");
+if (listenFehler.length) {
+  console.log("  [ROT  ] Listenpruefung (readdir-Abgleich gegen " + path.basename(TESTS_DIR) + "/)");
+  for (const f of listenFehler) console.log("           " + f);
+} else {
+  console.log("  [gruen] Listenpruefung: jede test-*.js ist eingetragen, jeder Eintrag hat eine Datei");
+}
+
+if (nurListe) {
+  console.log("");
+  process.exit(listenFehler.length ? 1 : 0);
+}
+
 const auswahl = TESTS.filter((t) => !nurSchnell || t.schnell);
 const ergebnisse = [];
 
 for (const t of auswahl) {
+  // braucht: Pfade relativ zu ROOT. Fehlt einer, wird sichtbar uebersprungen -
+  // das ist kein Rot (die Umgebung kann es nicht), aber auch kein Gruen.
+  const fehlt = (t.braucht || []).filter((p) => !fs.existsSync(path.join(ROOT, p)));
+  if (fehlt.length) {
+    ergebnisse.push({ ...t, rc: 0, uebersprungen: true, ms: 0, ausgabe: "" });
+    console.log("");
+    console.log("  [uebersprungen] " + t.datei + " - fehlt: " + fehlt.join(", "));
+    console.log("           " + t.deckt);
+    continue;
+  }
   const r = await fahre(t.datei, t.args || []);
   ergebnisse.push({ ...t, ...r });
   const zeichen = r.rc === 0 ? "gruen" : "ROT  ";
@@ -674,45 +874,47 @@ for (const t of auswahl) {
 }
 
 const rot = ergebnisse.filter((r) => r.rc !== 0);
+const uebersprungen = ergebnisse.filter((r) => r.uebersprungen);
 
 console.log("");
 console.log("===========================================");
-console.log("  " + (ergebnisse.length - rot.length) + " von " + ergebnisse.length + " gruen");
+console.log("  " + (ergebnisse.length - rot.length - uebersprungen.length) + " von " + ergebnisse.length + " gruen"
+  + (uebersprungen.length ? ", " + uebersprungen.length + " uebersprungen" : ""));
 if (rot.length) {
   for (const r of rot) console.log("  ROT: " + r.datei + " (Exit " + r.rc + ")");
 }
+for (const r of uebersprungen) console.log("  UEBERSPRUNGEN: " + r.datei + " (braucht " + r.braucht.join(", ") + ")");
+if (listenFehler.length) {
+  for (const f of listenFehler) console.log("  LISTE ROT: " + f);
+}
 console.log("===========================================");
 console.log("");
-console.log("  MESSLUECKEN - Zahlen, die jemand erheben muss (Auftrag 6.1):");
-for (const l of MESSLUECKEN) console.log("    - " + l);
+console.log("  MESSLUECKEN - Zahlen, die jemand erheben muss (" + MESSLUECKEN.length + " offen):");
+for (const l of MESSLUECKEN) console.log("    - [seit " + l.seit + ", " + l.wer + "] " + l.text);
 console.log("");
 console.log("  BEWUSST SO GEBAUT - keine Luecke, aber nicht vergessen:");
-for (const l of ENTSCHIEDEN) console.log("    - " + l);
+for (const l of ENTSCHIEDEN) console.log("    - [seit " + l.seit + "] " + l.text);
 console.log("");
 
-// DIE LISTE IST EIN TOR, KEINE PROSA (Skeptiker Runde 4, R24).
+// EXIT-LOGIK (B09, 14.11.2026).
 //
-// Vorher wurde sie gedruckt und ignoriert: die Suite endete mit Exit 0 bei
-// neun offenen Eintraegen. Wer nur den Rueckgabewert liest - ein Skill, ein
-// Loop, ein Mensch in Eile -, bekam gruen.
-//
-// Jetzt ist Exit 0 dasselbe wie Stufe A: alle Testdateien gruen UND keine
-// offene Messluecke. Wer trotzdem nur die Tests fahren will, sagt es
-// ausdruecklich (`--nur-tests`) - eine Abkuerzung, die man tippen muss, ist
-// keine, die man aus Versehen nimmt.
-const nurTests = process.argv.includes("--nur-tests");
-const stufeA = rot.length === 0 && MESSLUECKEN.length === 0;
+// Vorher: Exit 0 nur bei gruenen Tests UND leerer Messluecken-Liste, sonst 1 -
+// die Liste war nie leer, der Lauf also immer rot, und wer nur den Rueckgabewert
+// las (Skill, Loop), lernte, ihn zu ignorieren. Jetzt: Exit 1 heisst, dass ein
+// TEST rot ist oder die LISTE nicht stimmt. Die Messluecken stehen als Zeilen
+// oben und zaehlen nur mit --stufe-a fuer den Exit-Code (Abnahmestufe A).
+const stufeA = rot.length === 0 && listenFehler.length === 0 && MESSLUECKEN.length === 0;
+const ok = rot.length === 0 && listenFehler.length === 0;
 
-if (nurTests) {
-  console.log("  --nur-tests: die Messluecken zaehlen fuer den Rueckgabewert nicht.");
+if (stufeAFlag) {
+  console.log("  Stufe A = alle Tests gruen, Liste stimmt UND keine offene Messluecke.");
+  console.log("  Stand: " + (ok ? "Tests gruen" : "ROT") + ", " + MESSLUECKEN.length
+    + " offene Messluecke(n) -> " + (stufeA ? "STUFE A ERREICHT" : "Stufe A NICHT erreicht"));
   console.log("");
-  process.exit(rot.length ? 1 : 0);
+  process.exit(stufeA ? 0 : 1);
 }
 
-console.log("  Stufe A = alle Tests gruen UND keine offene Messluecke.");
-console.log("  Stand: " + (rot.length ? rot.length + " rote Testdatei(en)" : "Tests gruen")
-  + ", " + MESSLUECKEN.length + " offene Messluecke(n) -> "
-  + (stufeA ? "STUFE A ERREICHT" : "Stufe A NICHT erreicht"));
+console.log("  Ergebnis: " + (ok ? "Tests gruen, Liste vollstaendig" : "ROT")
+  + " (Messluecken zaehlen nur mit --stufe-a fuer den Exit-Code)");
 console.log("");
-
-process.exit(stufeA ? 0 : 1);
+process.exit(ok ? 0 : 1);

@@ -37,6 +37,115 @@
 // zwingend dort. `ns.read` liest immer LOKAL - siehe lib/hostdatei.js.
 import { liesVonHome } from "lib/hostdatei.js";
 
+// ===========================================================================
+// G50 (14.11.2026, Audit Lauf 2, 4a/4b): KERNKAUF NUR MIT ERTRAGSPRUEFUNG
+// ===========================================================================
+//
+// Bis hierher kaufte der Waechter einen Kern, sobald Preis <= 3e13 und Geld
+// > 1,2 x Preis - der Hackertrag kam in der Regel nicht vor. Belegt am
+// Spielstand: BN9.1 gab 63,75 Mrd fuer die Kerne 2 und 3 aus (7,5 + 56,25 Mrd,
+// 1e9 * 7,5^Kerne), das waren 75 % der Augmentierungs-Ausgaben des Knotens,
+// bei 0,68 Mrd Hackertrag im ganzen Knoten; BN9.3 7,5 Mrd gegen 0,41 Mrd;
+// BN4.2 63,75 Mrd gegen hoechstens 19 Mrd Gewinn.
+//
+// Kerne wirken nur auf grow() und weaken() (NetscriptFunctions.ts:288, Bonus
+// 1 + (Kerne-1)/16), also auf das Hack-Einkommen. Ausserdem wirken Kerne auf
+// share() (Share.ts:22-23, getCoreBonus) und Stanek; der Bot startet
+// worker/share.js im Rep-Modus auch auf home. Gerechnet (Skeptiker 14.11.2026):
+// Bonus 1 + ln(Faeden x Kernbonus)/25, eine Kernstufe mehr = ln(1,0625)/25
+// = +0,24 Prozentpunkte Reputation - praktisch ohne Wirkung, die Sperre bleibt.
+// Zwei Pruefungen, beide
+// nur SPERREN - sie erlauben nie etwas, das die alte Regel nicht schon erlaubt
+// haette:
+//
+//  (1) KNOTEN OHNE HACKERTRAG. Faktor = ScriptHackMoney x ScriptHackMoneyGain
+//      x ServerMaxMoney des Knotens (lib/bitnodes.json, fehlendes Feld = 1).
+//      <= 0,01 sperrt: BN9 (0,1 x 0,01 = 0,001), BN3 (0,2 x 0,04 = 0,008),
+//      BN11 (1 x 0,01 = 0,01, daher <=, nicht <) und BN8 (Gain 0). BN4 mit
+//      0,0225 bleibt offen - dort faengt Pruefung (2) die 63,75 Mrd gegen
+//      hoechstens 19 Mrd Gewinn ab.
+//  (2) ERWARTETER ERTRAG. Der Kern meldet je Stapelziel `erwartetProS`
+//      (bn4net.js: plan.geld / (4 * GAP), der geplante Dauerertrag, BitNode-
+//      Faktor schon drin) in data/bn4net.json. Summe = R in $/s. Der Kauf der
+//      Stufe k -> k+1 hebt den Kernbonus von f(k) = 1 + (k-1)/16 auf f(k+1),
+//      also hoechstens um den Anteil (1/16) / f(k) - als OBERE Schranke fuer
+//      den Mehrertrag genommen (home traegt rund 98 % der Faeden, siehe
+//      unten). Gekauft wird nur, wenn R * Anteil * KERN_HORIZONT_S >= Preis.
+//      Fehlt die Zahl (Stapelbetrieb noch nicht da, Datei alt) gilt die alte
+//      Regel - unbekannt ist nicht null.
+//
+// KERN_HORIZONT_S: 12 h. Ein V1-Knoten dauert 12-35 h online, Kerne bleiben
+// bis zum Knotenwechsel (nicht beim Einbau). 12 h ist die grosszuegige Seite:
+// das Einkommen waechst im Knoten um Groessen, ein zu spaeter Kauf kostet
+// wenig (Kern 2-4 zusammen rund 6 Sekunden Einkommen bei 85 Mrd/s), ein
+// ueberfluessiger Kauf kostete in BN9.1 drei Viertel der Augs-Ausgaben.
+// Unterkante bei Kern 2: R >= 7,5e9 * 16 / 43200 = 2,8 Mio/s.
+export const KERN_HORIZONT_S = 12 * 3600;
+export const HACKFAKTOR_MIN = 0.01;
+
+/**
+ * Hackertragsfaktor eines Knotens aus der Tabelle lib/bitnodes.json.
+ * @param {object|null} tabelle geparste Datei ({knoten, knotenLevel})
+ * @param {number} knoten BitNode-Nummer
+ * @param {number} stufe Knotenstufe (nur wo knotenLevel sie fuehrt, BN12)
+ * @returns {number|null} null = Knoten unbekannt (dann keine Knotensperre)
+ */
+export function knotenHackFaktor(tabelle, knoten, stufe) {
+  if (!tabelle || typeof tabelle !== "object" || !Number.isFinite(knoten) || knoten < 1) return null;
+  let k = tabelle.knoten ? tabelle.knoten[String(knoten)] : null;
+  const stufen = tabelle.knotenLevel ? tabelle.knotenLevel[String(knoten)] : null;
+  if (stufen) {
+    const vorhanden = Object.keys(stufen).map(Number).filter(Number.isFinite);
+    if (vorhanden.length) {
+      const s = Math.min(Number.isFinite(stufe) && stufe >= 1 ? stufe : 1, Math.max(...vorhanden));
+      if (stufen[String(s)]) k = stufen[String(s)];
+    }
+  }
+  if (!k) {
+    // Knoten 1 steht nicht in der Tabelle (alle Werte 1): bekannt, Faktor 1.
+    return tabelle.knoten && Object.keys(tabelle.knoten).length ? 1 : null;
+  }
+  const f = (name) => (Number.isFinite(k[name]) ? k[name] : 1);
+  return f("ScriptHackMoney") * f("ScriptHackMoneyGain") * f("ServerMaxMoney");
+}
+
+/**
+ * Erwarteter Hackertrag in $/s aus dem Stapelblock von data/bn4net.json.
+ * @param {object|null} stapel Feld `stapel` ({gap, ziele:[{erwartetProS}]})
+ * @returns {number|null} null = keine Zahl vorhanden (dann alte Regel)
+ */
+export function erwarteterHackertrag(stapel) {
+  if (!stapel || !Array.isArray(stapel.ziele)) return null;
+  let summe = 0, n = 0;
+  for (const z of stapel.ziele) {
+    if (z && Number.isFinite(z.erwartetProS) && z.erwartetProS >= 0) { summe += z.erwartetProS; n++; }
+  }
+  return n > 0 ? summe : null;
+}
+
+/**
+ * Darf der naechste Kern gekauft werden? Nur zusaetzliche Sperren, die alte
+ * Preis-/Geldregel prueft der Aufrufer vorher.
+ * @param {{kerne:number, kernKosten:number, knotenFaktor:(number|null), ertragProSek:(number|null)}} a
+ * @returns {{erlaubt:boolean, grund:string}}
+ */
+export function kernKaufErlaubt(a) {
+  if (a.knotenFaktor !== null && a.knotenFaktor !== undefined && a.knotenFaktor <= HACKFAKTOR_MIN + 1e-12) {
+    return { erlaubt: false, grund: "Knoten ohne Hackertrag (Faktor " + a.knotenFaktor + " <= " + HACKFAKTOR_MIN + ")" };
+  }
+  if (a.ertragProSek !== null && a.ertragProSek !== undefined) {
+    const kerne = Math.max(1, a.kerne);
+    const anteil = (1 / 16) / (1 + (kerne - 1) / 16);
+    const gewinn = a.ertragProSek * anteil * KERN_HORIZONT_S;
+    if (!(gewinn >= a.kernKosten)) {
+      return { erlaubt: false, grund: "Ertrag zu klein: erwartet " + Math.round(a.ertragProSek)
+        + " $/s -> hoechstens " + Math.round(gewinn) + " in " + (KERN_HORIZONT_S / 3600) + " h, Preis "
+        + Math.round(a.kernKosten) };
+    }
+  }
+  return { erlaubt: true, grund: "" };
+}
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -67,6 +176,11 @@ export async function main(ns) {
     if (ns.getHostname() !== "home") ns.scp("data/homegrow.txt", "home", ns.getHostname());
   };
 
+  // G50: Knotentabelle (undefined = noch nicht gelesen, null = unlesbar) und
+  // Zeitpunkt der letzten Sperrmeldung, damit der Log nicht vollaeuft.
+  let knotenTabelle;
+  let letzteKernSperre = 0;
+
   sag("Ausbauwaechter laeuft auf " + ns.getHostname() + ".");
 
   for (let runde = 1; ; runde++) {
@@ -86,11 +200,17 @@ export async function main(ns) {
       // Kauf freigibt (bn4net.js, Abschnitt 1a0), sonst 0; null = der Kern
       // meldet keinen Erfahrungsmodus oder ist nicht frisch.
       let xpFreigabe = null;
+      // G50: Knoten, Stufe und erwarteter Hackertrag aus derselben frischen
+      // Lagedatei. null = unbekannt, dann gilt fuer den Kernkauf die alte Regel.
+      let lageKnoten = null, lageStufe = null, ertragProSek = null;
       try {
         const j = JSON.parse(liesVonHome(ns, "data/bn4net.json") || "{}");
         if (Date.now() - (j.zeit || 0) < 120000) {
           if (typeof j.brachAnteil === "number") brachAnteil = j.brachAnteil;
           if (j.xpModus === true) xpFreigabe = Number(j.xpHomeKauf) || 0;
+          if (Number.isFinite(j.knoten)) lageKnoten = j.knoten;
+          if (j.bnWerte && Number.isFinite(j.bnWerte.stufe)) lageStufe = j.bnWerte.stufe;
+          ertragProSek = erwarteterHackertrag(j.stapel);
         }
       } catch { /* keine oder kaputte Datei: wie unbekannt behandeln */ }
 
@@ -108,7 +228,23 @@ export async function main(ns) {
       if (kerne < 8 && xpFreigabe === null) {
         const kernKosten = ns.singularity.getUpgradeHomeCoresCost();
         if (kernKosten <= KERN_PREIS_DECKEL && geld > kernKosten * KERN_PUFFER) {
-          if (ns.singularity.upgradeHomeCores()) {
+          // G50: die Preisregel oben ist unveraendert, hier kommt nur eine
+          // zusaetzliche Sperre dazu. Die Tabelle wird je Prozess einmal
+          // gelesen (20 KB, aendert sich im Knoten nicht).
+          if (knotenTabelle === undefined && lageKnoten !== null) {
+            try { knotenTabelle = JSON.parse(liesVonHome(ns, "lib/bitnodes.json") || "null"); }
+            catch { knotenTabelle = null; }
+          }
+          const urteil = kernKaufErlaubt({
+            kerne, kernKosten, ertragProSek,
+            knotenFaktor: knotenHackFaktor(knotenTabelle || null, lageKnoten, lageStufe),
+          });
+          if (!urteil.erlaubt) {
+            if (Date.now() - letzteKernSperre > 600000) {
+              letzteKernSperre = Date.now();
+              sag("Kern " + (kerne + 1) + " nicht gekauft: " + urteil.grund + ".");
+            }
+          } else if (ns.singularity.upgradeHomeCores()) {
             const neu = ns.getServer("home").cpuCores;
             sag("home-Kerne auf " + neu + " (grow/weaken jetzt x"
               + (1 + (neu - 1) / 16).toFixed(3) + ").");

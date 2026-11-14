@@ -63,7 +63,12 @@ const WORKER = ["worker/share.js", "worker/expfarm.js", "worker/weaken.js", "wor
 // fehlt die Datei auf dem Wirt, startet das Skript gar nicht erst. route.json
 // ist die Datengrundlage der Zielpruefung - ohne sie lehnt exit.js jeden
 // Sprung ab, und zwar zu Recht, aber aus dem falschen Grund.
+// Die Route der Epoche (route.json = Lauf 1, route-lauf2.json = Lauf 2) und die
+// Epochendatei kommen dynamisch dazu (siehe routenDateien unten): epoche.json
+// gibt es nur, wenn die Uebergabe sie angelegt hat - ein scp auf eine fehlende
+// Datei wuerde in Lauf 1 sonst jede Runde einen BEFUND melden.
 const BIBLIOTHEKEN = ["lib/hackaugs.js", "lib/route.js", "route.json"];
+const EPOCHEN_DATEIEN = ["route-lauf2.json", "epoche.json"];
 
 /**
  * Die Routenlogik liegt seit Position C.3 in `lib/route.js`.
@@ -77,7 +82,7 @@ const BIBLIOTHEKEN = ["lib/hackaugs.js", "lib/route.js", "route.json"];
  * Der Re-Export haelt `tools/test-route.js` am Laufen, das planeRoute ueber
  * alle 40 Uebergaenge der Route prueft.
  */
-import { planeRoute, zielErlaubt, routeZustand } from "lib/route.js";
+import { planeRoute, zielErlaubt, routeZustand, leseEpoche, ladeRoute, routeDatei, ROUTE_DATEI, EPOCHE_DATEI } from "lib/route.js";
 export { planeRoute, zielErlaubt, routeZustand };
 
 // Position C.3: die Wirtreserve (E10) und die Restzeitschaetzung. Beide sind
@@ -201,25 +206,33 @@ export async function main(ns) {
 
   while (true) {
     try {
-      // 1. Route
-      let route = null;
+      // 1. Epoche und Route (K01, 14.11.2026). Ohne epoche.json gilt Lauf 1 und
+      //    damit route.json - der heutige Pfad. Eine unbekannte Epoche oder ein
+      //    Spielstand, der nicht zur Route passt (ladeRoute, zweite Leine),
+      //    ergibt eine LEERE Route: kein Ausgang, Grund im Protokoll.
+      const info = ns.getResetInfo();
+      const cur = info.currentNode;
+      const epoche = leseEpoche(liesVonHome(EPOCHE_DATEI));
+      const geladen = ladeRoute(liesVonHome(routeDatei(epoche) || ROUTE_DATEI.lauf1), epoche, cur, info.ownedSF);
+      const route = geladen.route;
+      // Landeplatz fuer den Abschluss des letzten Laufs (lib/route.js,
+      // 14.11.2026) - nur in Epoche lauf1; Lauf 2 hat keinen.
       let routeOpts = {};
-      try {
-        const routeDatei = JSON.parse(liesVonHome("route.json"));
-        route = routeDatei.route;
-        // Landeplatz fuer den Abschluss des letzten Laufs (lib/route.js, 14.11.2026)
-        routeOpts = { finalLanding: routeDatei.finalLanding ? routeDatei.finalLanding.node : null,
-          afterLanding: routeDatei.afterLanding ? routeDatei.afterLanding.node : null };
-      } catch { route = null; }
+      if (epoche === "lauf1") {
+        try {
+          const routeDoc = JSON.parse(liesVonHome(ROUTE_DATEI.lauf1));
+          routeOpts = { finalLanding: routeDoc.finalLanding ? routeDoc.finalLanding.node : null,
+            afterLanding: routeDoc.afterLanding ? routeDoc.afterLanding.node : null };
+        } catch { routeOpts = {}; }
+      }
       if (!Array.isArray(route) || !route.length) {
-        if (letzteMeldung !== "route") { sag("route.json fehlt oder ist unlesbar - kein Ausgang moeglich."); letzteMeldung = "route"; }
-        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), fehler: "route.json fehlt oder unlesbar" }));
+        const g = "Route nicht ladbar (" + geladen.grund + ") - kein Ausgang moeglich.";
+        if (letzteMeldung !== "route") { sag(g); letzteMeldung = "route"; }
+        nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), fehler: g, epoche }));
         await ns.sleep(TAKT_MS); continue;
       }
 
       // 2. Zustand
-      const info = ns.getResetInfo();
-      const cur = info.currentNode;
       // ownedSF ist der Override-Stand (PlayerObject.ts:93-95). Der Bot
       // uebergibt beim Sprung keine Optionen, also sind Overrides danach weg;
       // bis dahin koennte eine Stufe tiefer erscheinen als besessen.
@@ -767,9 +780,10 @@ export async function main(ns) {
       // lib/route.js startet exit.js gar nicht, ohne route.json lehnt es jeden
       // Sprung ab, ohne lib/hackaugs.js fehlt ihm die Augmentierungslogik.
       if (wirt !== "home") {
-        const ok = ns.scp(["exit.js", ...BIBLIOTHEKEN], wirt, "home");
+        const dateien = ["exit.js", ...BIBLIOTHEKEN, ...EPOCHEN_DATEIEN.filter((d) => ns.fileExists(d, "home"))];
+        const ok = ns.scp(dateien, wirt, "home");
         if (!ok) {
-          const fehlend = ["exit.js", ...BIBLIOTHEKEN].filter((d) => !ns.fileExists(d, wirt));
+          const fehlend = dateien.filter((d) => !ns.fileExists(d, wirt));
           sag("BEFUND: Dateien fehlen auf " + wirt + " - " +
             (fehlend.length ? fehlend.join(", ") : "scp meldete einen Teilausfall") +
             ". exit.js startet damit nicht oder lehnt jeden Sprung ab.");

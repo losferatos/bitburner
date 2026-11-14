@@ -599,7 +599,15 @@ function stecktInLeerlauf(frueher, blade, jetzt, wertJetzt) {
       dateiDa: aufHome ? ((d) => !KNOTEN_MARKEN.has(d) && aufHome.has(d)) : undefined,
       // Feature 9 kommt vom Kern (bn4net.json `feature9`), der ownedSF
       // sieht; von hier aus ist nur der Knoten bekannt (Skeptiker 19.09.).
-      features: { 9: (net && net.feature9 === true) || (kpi && kpi.node === 9) },
+      features: { 9: (net && net.feature9 === true) || (kpi && kpi.node === 9),
+        // SF4-Riegel (K09, 14.11.2026): `gilt()` sperrt Singularity-Gewerke
+        // ohne SF4 ausserhalb von BN4. Von hier aus ist SF4 nur sichtbar, wenn
+        // der Kern es meldet (`feature4` in bn4net.json, wie `feature9`) oder
+        // der Knoten 4 ist. Sonst bleibt der Schluessel WEG (unbestimmt) und
+        // der heutige Pfad gilt - lieber ein Fehlalarm in BN1.1 als ein
+        // stummes Ausblenden in Lauf 1.
+        ...((net && typeof net.feature4 === "boolean") ? { 4: net.feature4 }
+          : (kpi && kpi.node === 4) ? { 4: true } : {}) },
     };
     soll = auswahl(reg, lage)
       .map((e) => e.name)

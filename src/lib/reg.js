@@ -139,8 +139,63 @@ export function merkmale(lage) {
 /** Dasselbe direkt aus `ns.getResetInfo()` - fuer Kern und Waechter. */
 export function merkmaleAusReset(ri) {
   const opt = (ri && ri.bitNodeOptions) || {};
-  return merkmale({ node: ri && ri.currentNode, ownedSF: ri && ri.ownedSF,
+  const f = merkmale({ node: ri && ri.currentNode, ownedSF: ri && ri.ownedSF,
     hacknetServerAus: opt.disableHacknetServer === true });
+  // SF4-RIEGEL (K09, 14.11.2026): Kern und Waechter bauen ihre Lage aus
+  // dieser Funktion - mit dem Schluessel 4 bekommen sie den Riegel, ohne dass
+  // ihr Code angefasst wird. Gerechnet wie das Spiel (`canAccessBitNodeFeature(4)`,
+  // BitNodeUtils.ts:17-19): BitNode 4 oder Source-File 4 ab Stufe 1.
+  // Ohne getResetInfo-Antwort bleibt der Schluessel UNGESETZT (unbestimmt) -
+  // `sf4Frei` meldet dann null, und der heutige Pfad gilt.
+  if (ri && typeof ri === "object" && (Number(ri.currentNode) === 4 || ri.ownedSF != null)) {
+    let sf4 = 0;
+    try {
+      const o = ri.ownedSF;
+      sf4 = (o && typeof o.get === "function") ? Number(o.get(4) || 0) : Number((o || {})[4] || 0);
+    } catch { sf4 = 0; }
+    f[4] = Number(ri.currentNode) === 4 || sf4 > 0;
+  }
+  return f;
+}
+
+/**
+ * Darf diese Lage Singularity-Funktionen benutzen?  true / false / null.
+ *
+ * DAS SPIEL (`NetscriptHelpers.tsx:388-396`, `checkSingularityAccess`): jede
+ * `ns.singularity.*`-Funktion ausser `getOwnedSourceFiles` wirft
+ * "This singularity function requires Source-File 4 to run", wenn
+ * `canAccessBitNodeFeature(4)` falsch ist - und das ist
+ * `bitNodeN === 4 || activeSourceFileLvl(4) > 0` (`BitNodeUtils.ts:17-19`).
+ *
+ * Reihenfolge der Quellen, die erste bestimmte gewinnt:
+ *   1. Knoten 4 - dort immer frei.
+ *   2. `lage.features[4]` (Boolean) - so liefern es `merkmaleAusReset` und damit
+ *      Kern und Waechter.
+ *   3. `lage.ownedSF` (Map oder Objekt) - Stufe >= 1.
+ *   4. `lage.sf4` (Zahl) - Stufe >= 1.
+ *
+ * `null` = die Lage sagt nichts dazu. Dann bleibt es beim heutigen Pfad (die
+ * Eintraege gelten): Lauf 1 und jeder Aufrufer, der SF4 nicht kennt, sehen
+ * keinen Unterschied. Ein Leser, der Lauf 2 tragen soll, MUSS SF4 melden.
+ * `ramBedarf` liest diese Felder NICHT - der Kern rechnet `wartetGb` weiter
+ * wie bisher.
+ */
+export function sf4Frei(lage) {
+  if (!lage || typeof lage !== "object") return null;
+  if (Number(lage.node) === 4) return true;
+  const f = lage.features;
+  if (f && typeof f === "object" && typeof f[4] === "boolean") return f[4];
+  const o = lage.ownedSF;
+  if (o && typeof o === "object") {
+    try {
+      const s = typeof o.get === "function" ? o.get(4) : o[4];
+      return Number(s || 0) >= 1;
+    } catch { return false; }
+  }
+  if (lage.sf4 !== undefined && lage.sf4 !== null && Number.isFinite(Number(lage.sf4))) {
+    return Number(lage.sf4) >= 1;
+  }
+  return null;
 }
 
 export function gilt(e, lage) {
@@ -151,6 +206,16 @@ export function gilt(e, lage) {
   // Waechter den Bot dafuer, dass eine Datei noch nicht geschrieben wurde.
   if (e.unbuilt || e.ramBaseGb === null || e.ramBaseGb === undefined) {
     return { gilt: false, grund: "noch nicht gebaut" };
+  }
+
+  // SF4-RIEGEL (K09, 14.11.2026). Ein Singularity-Gewerk wirft ausserhalb von
+  // BitNode 4 ohne Source-File 4 beim ersten Aufruf (siehe `sf4Frei`). Lauf 2
+  // startet in BN1.1 ohne SF4 - dort darf es gar nicht erst starten. Der
+  // Riegel steht VOR der Dateipruefung, damit ein gesperrtes Gewerk nie als
+  // "verschwunden" (vanished) im Zaehlwerk landet. Nur `false` sperrt; `null`
+  // (Lage ohne SF-Auskunft) und `true` lassen den heutigen Pfad unberuehrt.
+  if (e.singularity === true && sf4Frei(lage) === false) {
+    return { gilt: false, grund: "SF4 fehlt (kein BitNode 4, keine Source-File 4)" };
   }
 
   if (typeof lage.dateiDa === "function" && !lage.dateiDa(e.name)) {

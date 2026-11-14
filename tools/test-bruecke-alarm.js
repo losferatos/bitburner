@@ -30,7 +30,10 @@ const pruefe = (name, ok, info = "") => {
   else { rot++; console.log("  ROT   " + name + (info ? " - " + info : "")); }
 };
 
-const bruecke = fs.readFileSync(path.join(ROOT, "sync", "bridge.js"), "utf8");
+// Zeilenenden normalisieren: im Windows-Checkout (autocrlf) steht bridge.js mit CRLF da,
+// und die Suche nach dem Funktionsende (Zeilenumbruch, Klammer zu, Zeilenumbruch) fand
+// dann nichts (14.11.2026).
+const bruecke = fs.readFileSync(path.join(ROOT, "sync", "bridge.js"), "utf8").replace(/\r\n/g, "\n");
 
 // Die Erfolgsstrecke von sichereJetzt: von der "gruen"-Logzeile bis zum return true.
 const start = bruecke.indexOf('"Sicherung " + anlass + " gruen: "');
@@ -51,9 +54,9 @@ let state = null, fn = null;
 if (a0 >= 0 && a1 > a0) {
   const rumpf = bruecke.slice(a0, a1 + 2).replace("async function alarm(", "return async function alarm(");
   try {
-    const fabrik = new Function("state", "log", "mkdir", "writeFile", "path", "DATA_DIR", rumpf);
+    const fabrik = new Function("state", "log", "mkdir", "writeFile", "path", "DATA_DIR", "alarmMelde", rumpf);
     state = { alarm: null };
-    fn = fabrik(state, () => {}, async () => {}, async () => {}, { join: (...x) => x.join("/") }, "d");
+    fn = fabrik(state, () => {}, async () => {}, async () => {}, { join: (...x) => x.join("/") }, "d", async () => ({ neu: true }));
   } catch { fn = null; }
 }
 pruefe("alarm() laesst sich isoliert ausfuehren", typeof fn === "function");

@@ -29,7 +29,7 @@
  *
  * @param {NS} ns
  */
-import { zielErlaubt } from "lib/route.js";
+import { zielErlaubt, leseEpoche, ladeRoute, routeDatei, ROUTE_DATEI, EPOCHE_DATEI } from "lib/route.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -68,29 +68,42 @@ export async function main(ns) {
   // KEIN UEBERSTIMMUNGSFLAG: die Route ist unveraenderlich. Wer woanders hin
   // will, aendert route.json - sichtbar, versioniert, mit Commit.
   try {
-    if (!ns.fileExists("route.json", "home") && !ns.fileExists("route.json")) {
-      sag("SPRUNG ABGELEHNT: route.json ist weder hier noch auf home zu finden."
-        + " Ohne Route laesst sich das Ziel nicht pruefen.");
+    // Epoche und Route (K01, 14.11.2026): epoche.json gibt es nur nach der
+    // Lauf-2-Uebergabe; ohne sie gilt Lauf 1 (route.json), wie bisher. Die
+    // Dateien werden von home geholt (auf einem Fremdrechner per scp, immer
+    // frisch), eine fehlende Epochendatei auf home gilt als "nicht gesetzt" -
+    // auch wenn auf dem Wirt eine alte Kopie liegt.
+    const host = ns.getHostname();
+    const hole = (d) => {
+      if (!ns.fileExists(d, "home")) return "";
+      if (host !== "home") ns.scp(d, host, "home");
+      return ns.read(d);
+    };
+    const epoche = leseEpoche(hole(EPOCHE_DATEI));
+    const routeName = routeDatei(epoche) || ROUTE_DATEI.lauf1;
+    const info = ns.getResetInfo();
+    const geladen = ladeRoute(hole(routeName), epoche, info.currentNode, info.ownedSF);
+    if (!geladen.route.length) {
+      sag("SPRUNG ABGELEHNT: Route nicht ladbar (" + geladen.grund + "). Ohne Route laesst sich das Ziel nicht pruefen.");
       return;
     }
-    // Immer frisch von home holen (14.11.2026): eine alte Kopie auf dem Wirt
-    // (ohne finalLanding) liesse exit.js ablehnen, was ausgang.js plant.
-    if (ns.getHostname() !== "home") {
-      ns.scp("route.json", ns.getHostname(), "home");
-    }
-    const routeDatei = JSON.parse(ns.read("route.json"));
-    const route = routeDatei.route;
+    const route = geladen.route;
     // Landeplatz fuer den Abschluss des letzten Laufs - derselbe Wert wie in
-    // ausgang.js, sonst lehnt exit.js ab, was ausgang.js plant (14.11.2026).
-    const info = ns.getResetInfo();
-    // Mit Source-File-Overrides kein Landesprung (gleiche Regel wie ausgang.js).
+    // ausgang.js (nur Epoche lauf1), sonst lehnt exit.js ab, was ausgang.js
+    // plant. Mit Source-File-Overrides kein Landesprung (14.11.2026).
     let overrides = 1;
     try {
       const ov = info.bitNodeOptions && info.bitNodeOptions.sourceFileOverrides;
       overrides = ov instanceof Map ? ov.size : Object.keys(ov || {}).length;
     } catch { overrides = 1; }
-    const finalLanding = routeDatei.finalLanding && !overrides ? routeDatei.finalLanding.node : null;
-    const afterLanding = routeDatei.afterLanding && !overrides ? routeDatei.afterLanding.node : null;
+    let finalLanding = null, afterLanding = null;
+    if (epoche === "lauf1" && !overrides) {
+      try {
+        const routeDoc = JSON.parse(hole(routeName));
+        finalLanding = routeDoc.finalLanding ? routeDoc.finalLanding.node : null;
+        afterLanding = routeDoc.afterLanding ? routeDoc.afterLanding.node : null;
+      } catch { finalLanding = null; afterLanding = null; }
+    }
     const p = zielErlaubt(route, info.currentNode, info.ownedSF, ziel,
       (d) => ns.fileExists(d, "home"), { finalLanding, afterLanding });
     if (!p.ok) {

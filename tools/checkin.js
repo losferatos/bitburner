@@ -37,8 +37,21 @@ import { gangZeile, gangBefunde, gangImKnoten } from "./lib/gangzeile.js";
 import { penaltyLines } from "./lib/strafzeile.js";
 import { kurveAuffrischen, effektiveSpielzeit } from "./lib/kurvepflege.js";
 import { gunzipSync } from "node:zlib";
+import { einbauLage, bn8Zeile } from "./lib/einbauzeile.js";
 
-const BRIDGE = "http://localhost:8795";
+// BB_CHECKIN_BRIDGE nur fuer Tests (tools/test-checkin.js, Mock-Bruecke auf einem
+// freien Port). Gilt NUR fuer Loopback und nie fuer die echten Ports 8795/12525 -
+// ohne Variable bleibt alles wie bisher.
+const BRIDGE = (() => {
+  const v = process.env.BB_CHECKIN_BRIDGE;
+  if (!v) return "http://localhost:8795";
+  try {
+    const u = new URL(v);
+    const lokal = ["localhost", "127.0.0.1", "[::1]"].includes(u.hostname);
+    if (lokal && !["8795", "12525"].includes(u.port)) return u.origin;
+  } catch { /* unlesbar: Standard */ }
+  return "http://localhost:8795";
+})();
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
 
@@ -186,6 +199,9 @@ async function main() {
   const zeilen = [];
   const sag = (t) => zeilen.push(t);
   const bericht = { zeit: Date.now() };
+  // VOR dem ersten moeglichen ausgeben()-Aufruf deklarieren (BLIND/SPIEL ZU kehren frueh
+  // zurueck - eine spaetere Deklaration waere die temporale Totzone, siehe laufJetzt unten).
+  let einbauDaten = null;
 
   // --- 1. Ist ueberhaupt etwas zu sehen? -----------------------------------
   const blade = await holeJson("data/blade.json");
@@ -247,6 +263,17 @@ async function main() {
     sag("URTEIL: SPIEL ZU");
     return ausgeben(zeilen, { ...bericht, urteil: "SPIEL ZU" });
   }
+
+  // --- 1a. Einbau-Lage (B07): nur Rohdaten holen, ausgeben() zeigt sie ------
+  // Reine Anzeige. Fehlende Dateien sind kein Fehler (null).
+  try {
+    const [teleE, sperreRoh, repModusRoh, boerseE, casinoE] = await Promise.all([
+      holeJson("data/bn4rep.json"), hole("data/install-sperre.txt"), hole("data/rep-modus.txt"),
+      knoten === 8 ? holeJson("data/boerse.json") : null,
+      knoten === 8 ? holeJson("data/casino.json") : null,
+    ]);
+    einbauDaten = { tele: teleE, sperreRoh, repModusRoh, boerse: boerseE, casino: casinoE };
+  } catch { einbauDaten = null; }
 
   // --- 1b. Der Ausgang: laeuft ausgang.js, und was sagt es? ---------------
   const ausgangGut = ausgang && alterVon(ausgang) <= Math.max(VERALTET_MS, alter * 3) ? ausgang : null;
@@ -1014,6 +1041,28 @@ async function main() {
         }
       } catch { /* kein Buch - dann gab es keinen Eingriff seit dem Start */ }
     } catch { /* die Bruecke antwortet nicht - das steht schon oben */ }
+
+    // Neustartschleife gestoppt und offene Alarme der Bruecke (Skeptiker
+    // 14.11.2026): beides stand nur in Dateien, die niemand las. Reine Anzeige,
+    // das JSON-Schema bleibt unberuehrt (nur zusaetzliche Textzeilen).
+    try {
+      const stopp = path.join(ROOT, "data", "bridge-start-gestoppt.txt");
+      if (fs.existsSync(stopp)) {
+        const erste = fs.readFileSync(stopp, "utf8").split(/\r?\n/).find((z) => z.trim()) || "";
+        sag("BRUECKE AUS (Neustartschleife gestoppt): " + erste.trim() + " - Details: data/bridge-start-gestoppt.txt");
+      }
+    } catch { /* keine Datei, keine Zeile */ }
+    try {
+      const al = path.join(ROOT, "data", "alarme.json");
+      if (fs.existsSync(al)) {
+        const offen = (JSON.parse(fs.readFileSync(al, "utf8")).alarme || []).filter((a) => a && a.status === "offen");
+        if (offen.length) {
+          sag("Offene Bruecken-Alarme: " + offen.length + " - "
+            + offen.slice(0, 4).map((a) => a.titel + (a.klasse === "schutz" ? " [Schutz]" : "")).join("; ")
+            + (offen.length > 4 ? "; ..." : ""));
+        }
+      }
+    } catch { /* Alarmliste unlesbar - die Bruecke meldet das selbst */ }
   }
 
   // --- 5c. Die Torrunde im Kampfknoten mit Gang (P1 / AUG-4) ----------------
@@ -1144,6 +1193,27 @@ async function main() {
   }
 
   function ausgeben(z, b) {
+    // B07: Einbau faellig/steht samt Sperrgrund. Nur Anzeige; Fehler hier
+    // duerfen den Bericht nie kippen (die Bruecke ruft das mit --json).
+    if (einbauDaten && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
+      try {
+        // Offline-Fenster aus dem Brueckenprotokoll: "faellig seit" zaehlt nur Online-Zeit.
+        let offline = null;
+        try { offline = offlineFenster(fs.readFileSync(path.join(ROOT, "data", "bridge.log"), "utf8")); } catch { offline = null; }
+        const el = einbauLage({ ...einbauDaten, knoten, jetztMs: Date.now(), punkte, offline });
+        const neu = [...el.zeilen];
+        if (knoten === 8) neu.push(bn8Zeile(einbauDaten.boerse, einbauDaten.casino));
+        let pos = z.findIndex((t) => String(t).startsWith("FERTIG VORAUSSICHTLICH"));
+        if (pos < 0) pos = z.map((t) => String(t).startsWith("URTEIL:")).lastIndexOf(true);
+        if (pos < 0) pos = z.length;
+        z.splice(pos, 0, ...neu);
+        b = { ...b, einbau: {
+          zustand: el.zustand, wartend: el.wartend, grund: el.grund,
+          sperre: el.sperre ? { gilt: el.sperre.gilt, bis: el.sperre.bis, grund: el.sperre.grund } : null,
+          faelligSeitMs: el.faelligSeitMs,
+        } };
+      } catch { /* Anzeige faellt aus, der Bericht bleibt */ }
+    }
     if (standSchreiben && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
       punkte.push({
         ts: Date.now(), knoten: b.knoten, lauf: laufJetzt, rang: b.rang,
@@ -1159,6 +1229,9 @@ async function main() {
         // Zaehler der Torrunde (gateRoundStatus): der naechste Besuch zeigt,
         // was seitdem NEU hinzukam und was nur noch alt im Zaehler steht.
         torRunde: b.torRunde ?? null,
+        // B07: Zustand der Einbau-Lage; der naechste Besuch erkennt daran, wie
+        // lange "faellig" schon steht.
+        einbau: b.einbau ? b.einbau.zustand : null,
       });
       // Nur die letzten 50 behalten - laenger zurueck braucht niemand.
       try {

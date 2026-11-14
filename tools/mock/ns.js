@@ -56,7 +56,10 @@ import path from "node:path";
 import { fileURLToPath } from "node:url";
 
 const MOCK_HIER = path.dirname(fileURLToPath(import.meta.url));
-const RAM_TABELLE = (() => {
+// Pro Registry-Eintrag der Grundpreis und der Singularity-Anteil GETRENNT
+// (K10, 14.11.2026): der Faktor haengt von der Lage ab (siehe `sf4Faktor`),
+// also wird erst beim Abfragen gerechnet, nicht beim Laden des Moduls.
+const RAM_ROH = (() => {
   const t = Object.create(null);
   for (const kandidat of [
     path.resolve(MOCK_HIER, "..", "..", "..", "bitburner-bau", "src", "registry.json"),
@@ -65,15 +68,9 @@ const RAM_TABELLE = (() => {
     if (!fs.existsSync(kandidat)) continue;
     try {
       const reg = JSON.parse(fs.readFileSync(kandidat, "utf8"));
-      // DER SF4-FAKTOR GEHOERT DAZU. `ramSingGb` ist der Preis bei SF4.3;
-      // bei SF4.1 - dem Stand dieses Spielstands - kostet die
-      // Singularity-Familie das SECHZEHNFACHE (`SF4Cost` in
-      // `RamCostGenerator.ts`). Wer ihn weglaesst, misst bn4life.js mit
-      // 23,85 GB statt 293,85 und haelt ein 32-GB-home fuer geraeumig.
-      const SF4 = 16;
       for (const e of reg.eintraege || []) {
         if (Number.isFinite(e.ramBaseGb)) {
-          t[e.name] = e.ramBaseGb + SF4 * (Number.isFinite(e.ramSingGb) ? e.ramSingGb : 0);
+          t[e.name] = { basis: e.ramBaseGb, sing: Number.isFinite(e.ramSingGb) ? e.ramSingGb : 0 };
         }
       }
       break;
@@ -81,18 +78,38 @@ const RAM_TABELLE = (() => {
   }
   // Was nicht in der Registry steht, weil es kein Gewerk ist. Gemessen mit
   // tools/ram.js am 04.09.2026.
-  t["worker/weaken.js"] = 1.8;
-  t["worker/grow.js"] = 1.8;
-  t["worker/hack.js"] = 1.75;
-  t["boot.js"] = 5.5;
-  t["graft.js"] = 17.15;
+  t["worker/weaken.js"] = { basis: 1.8, sing: 0 };
+  t["worker/grow.js"] = { basis: 1.8, sing: 0 };
+  t["worker/hack.js"] = { basis: 1.75, sing: 0 };
+  t["boot.js"] = { basis: 5.5, sing: 0 };
+  t["graft.js"] = { basis: 17.15, sing: 0 };
   return t;
 })();
 
+/**
+ * DER SF4-FAKTOR (`SF4Cost` in `RamCostGenerator.ts:82-96`):
+ *
+ *     BitNode 4          -> 1
+ *     SF4 Stufe <= 1     -> 16   (auch ohne SF4: der Preis gilt, der Zugriff nicht)
+ *     SF4 Stufe 2        -> 4
+ *     SF4 Stufe >= 3     -> 1
+ *
+ * Bis K10 stand hier starr 16. Ein Test fuer Lauf 2 (SF4.3 ab dem dritten
+ * Eintrag der Route, BN4 selbst) rechnete damit bn4life.js mit 293,85 statt
+ * 23,85 GB und hielt ein 32-GB-home fuer knapp.
+ */
+function sf4Faktor(knoten, stufe) {
+  if (knoten === 4) return 1;
+  if (stufe <= 1) return 16;
+  if (stufe === 2) return 4;
+  return 1;
+}
+
 /** Was ein Skript belegt - Registry zuerst, dann der Testwert, dann pauschal. */
-function ramFuer(datei, eigene) {
+function ramFuer(datei, eigene, faktor = 16) {
   if (eigene && Number.isFinite(eigene[datei])) return eigene[datei];
-  if (Number.isFinite(RAM_TABELLE[datei])) return RAM_TABELLE[datei];
+  const r = RAM_ROH[datei];
+  if (r) return r.basis + faktor * r.sing;
   // Unbekannt heisst hier ausdruecklich "klein": ein Testskript, das die
   // Registry nicht kennt, soll nicht am Speicher scheitern. Wer Knappheit
   // pruefen will, nennt die Zahl in `skriptRam`.
@@ -154,7 +171,9 @@ export function neuerMock(o = {}) {
       lastNodeReset: Number.isFinite(o.nodeReset) ? o.nodeReset : 0,
       lastAugReset: Number.isFinite(o.augReset) ? o.augReset : 0,
       currentNode: Number.isFinite(o.knoten) ? o.knoten : 10,
-      ownedSF: o.ownedSF || new Map(),
+      // `o.sf4` (Zahl) ist die Kurzform fuer "SF4 auf dieser Stufe, sonst
+      // nichts" - sie gilt nur, wenn keine ausdrueckliche ownedSF kommt.
+      ownedSF: o.ownedSF || new Map(o.sf4 > 0 ? [[4, o.sf4]] : []),
     },
     /**
      * DIE KOERPER UND IHR RUECKSTAND (04.09.2026).
@@ -324,6 +343,45 @@ export function neuerMock(o = {}) {
     return zustand.dateien[h];
   };
 
+  // DER SF4-STAND DER LAGE (K10, 14.11.2026).
+  //
+  // Zwei Dinge haengen daran: der RAM-Faktor der Singularity-Familie
+  // (`sf4Faktor`) und der Zugriff selbst - `checkSingularityAccess`
+  // (`NetscriptHelpers.tsx:388-396`) wirft ausserhalb von BitNode 4 ohne SF4.
+  //
+  // LEGACY-REGEL, damit kein bestehender Test bricht: hat der Test weder
+  // `ownedSF` noch `sf4` genannt und ist die SF-Liste noch leer, gilt der
+  // Stand, den der Mock bis K10 stillschweigend voraussetzte - SF4 Stufe 1,
+  // kein Wurf. Wer Lauf-2-Lagen prueft, nennt `ownedSF` oder `sf4`
+  // ausdruecklich (auch eine leere Map zaehlt als ausdruecklich). Sobald im
+  // Test SF-Stufen in die Liste geschrieben werden, gilt die Liste.
+  const sfAngegeben = o.ownedSF !== undefined || o.sf4 !== undefined;
+  const sf4Stufe = () => {
+    const l = zustand.resetInfo.ownedSF;
+    let n = 0;
+    try {
+      if (!l) n = 0;
+      else if (typeof l.get === "function") n = Number(l.get(4) || 0);
+      else if (Array.isArray(l)) { const p = l.find((x) => x && x[0] === 4); n = Number(p ? p[1] : 0) || 0; }
+      else n = Number(l[4] || 0);
+    } catch { n = 0; }
+    return n;
+  };
+  const sfListeLeer = () => {
+    const l = zustand.resetInfo.ownedSF;
+    if (!l) return true;
+    if (typeof l.size === "number") return l.size === 0;
+    if (Array.isArray(l)) return l.length === 0;
+    return Object.keys(l).length === 0;
+  };
+  const sf4Lage = () => {
+    const knoten = zustand.resetInfo.currentNode;
+    if (!sfAngegeben && sfListeLeer()) return { knoten, stufe: 1, zugang: true };
+    const stufe = sf4Stufe();
+    return { knoten, stufe, zugang: knoten === 4 || stufe > 0 };
+  };
+  const ramLage = () => { const l = sf4Lage(); return sf4Faktor(l.knoten, l.stufe); };
+
   const nichtGebaut = (name) => {
     throw new Error("ns." + name + " ist im Mock nicht gebaut. " +
       "Entweder nachruesten oder den Test anders schneiden - ein stiller " +
@@ -373,7 +431,7 @@ export function neuerMock(o = {}) {
       // gibt 0 zurueck). Vorher gab der Mock hier immer eine PID aus, und
       // jeder Test lief in einer Welt ohne Speichergrenze.
       const srv = zustand.server[host];
-      const gb = ramFuer(datei, o.skriptRam) * Math.max(1, threads);
+      const gb = ramFuer(datei, o.skriptRam, ramLage()) * Math.max(1, threads);
       if (!srv) return 0;
       // OHNE ROOT LAEUFT NICHTS (Skeptiker Runde 4, Testbefund 8, 04.09.2026).
       //
@@ -431,7 +489,7 @@ export function neuerMock(o = {}) {
     },
     getRunningScript: () => null,
     getScriptRam: (datei, host) =>
-      (datei in dateiHost(host || "home") ? ramFuer(datei, o.skriptRam) : 0),
+      (datei in dateiHost(host || "home") ? ramFuer(datei, o.skriptRam, ramLage()) : 0),
     getScriptIncome: () => 0,
     getScriptExpGain: () => 0,
     // DREI FUNKTIONEN, DIE DER KERN AUFRUFT UND DER MOCK NICHT KANNTE
@@ -665,9 +723,23 @@ export function neuerMock(o = {}) {
       },
       travelToCity: (stadt) => { zustand.stadt = stadt; zustand.spieler.city = stadt; return true; },
     }, {
-      get: (ziel, n) => (n in ziel
-        ? ziel[n]
-        : () => nichtGebaut("singularity." + String(n))),
+      // JEDE Funktion ausser `getOwnedSourceFiles` prueft zuerst den Zugang
+      // (`checkSingularityAccess`, NetscriptHelpers.tsx:388-396; die Meldung
+      // ist die des Spiels). Erst danach kommt die eigentliche Funktion - oder
+      // der Hinweis, dass der Mock sie nicht kennt.
+      get: (ziel, n) => {
+        if (typeof n !== "string") return ziel[n];
+        const f = n in ziel ? ziel[n] : () => nichtGebaut("singularity." + n);
+        if (n === "getOwnedSourceFiles") return f;
+        return (...a) => {
+          if (!sf4Lage().zugang) {
+            throw new Error("singularity." + n + ": This singularity function requires Source-File 4 to run. "
+              + "A power up you obtain later in the game. It will be very obvious when and how you can obtain it. "
+              + "(API ACCESS, Mock: BitNode " + zustand.resetInfo.currentNode + ", SF4 Stufe " + sf4Stufe() + ")");
+          }
+          return f(...a);
+        };
+      },
     }),
     /**
      * DIE KOERPER. Fuenf Funktionen - genau die, die `src/sleeve.js` ruft.

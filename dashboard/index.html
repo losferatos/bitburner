@@ -430,6 +430,11 @@
       <div class="route-sum" id="route-sum"></div>
       <div class="route" id="route"></div>
     </section>
+    <section class="card s12" id="c-cmp">
+      <div class="card-h"><h2>Run 2 vs. run 1</h2><span class="dim" id="cmp-note"></span></div>
+      <div class="kv" id="cmp-sum"></div>
+      <div id="cmp"></div>
+    </section>
   </div>
 
   <div class="section"><h3>Plumbing</h3><span>bridge log and data freshness</span></div>
@@ -654,6 +659,9 @@ async function loadSlow() {
   }
   // Der Verlauf liegt bei der Bruecke - auch ohne Spiel lesbar.
   const nr = runReset();
+  // Lauf-Vergleich (14.11.2026): tools/laufvergleich.js schreibt die Datei, die Bruecke liefert sie aus.
+  const cmp = await getJson("/laufvergleich.json");
+  if (ok(cmp) && Array.isArray(cmp.lauf2)) D.cmp = cmp;
   const hist = await getJson("/api/history" + (nr ? "?nodeReset=" + nr : ""));
   D.historyMissing = !!(hist && hist.__status === 404);
   if (ok(hist)) D.history = hist;
@@ -1446,6 +1454,35 @@ function routeProgress() {
   return { route, idx, done: Math.max(0, idx), total: route.length };
 }
 
+// Laufzeit je Knoten: Lauf 2 gegen Lauf 1 (Wanduhr). Der laufende Knoten
+// zaehlt live weiter; Lauf 1 aus der Audit-Chronik (14.11.2026).
+function renderCompare() {
+  const c = D.cmp;
+  if (!c || !c.lauf2.length) { fill($("cmp"), h("div", { class: "empty" }, "No comparison yet (tools/laufvergleich.js).")); kv($("cmp-sum"), []); return; }
+  const now = Date.now();
+  let sum2 = 0, sum1 = 0, done = 0;
+  const rows = c.lauf2.map((k) => {
+    const live = k.wallH === null;
+    const h2 = live ? (now - k.startMs) / 3600000 : k.wallH;
+    const h1 = k.lauf1 && Number.isFinite(k.lauf1.wallH) ? k.lauf1.wallH : null;
+    if (!live && h1 !== null) { sum2 += h2; sum1 += h1; done++; }
+    const d = h1 !== null ? h2 - h1 : null;
+    const cls = d === null ? "dim" : live ? (h2 > h1 ? "bad" : "ok") : (d <= 0 ? "ok" : "bad");
+    return h("div", { class: "kvrow", style: "display:flex;gap:14px;align-items:baseline;padding:3px 0" },
+      h("b", { style: "min-width:56px" }, "BN" + k.key),
+      h("span", { style: "min-width:150px" }, "run 2: " + fmtDur(h2) + (live ? " (running)" : "")),
+      h("span", { class: "dim", style: "min-width:130px" }, "run 1: " + (h1 !== null ? fmtDur(h1) : "–")),
+      h("span", { class: cls }, d === null ? "" : live ? (h2 > h1 ? "already " + fmtDur(d) + " slower" : fmtDur(h1 - h2) + " left to beat run 1")
+        : (d <= 0 ? fmtDur(-d) + " faster" : fmtDur(d) + " slower")));
+  });
+  fill($("cmp"), rows);
+  kv($("cmp-sum"), [
+    ["Finished nodes", done + " compared"],
+    ["Total run 2 vs. run 1", done ? fmtDur(sum2) + " vs. " + fmtDur(sum1) + " (" + (sum2 <= sum1 ? fmtDur(sum1 - sum2) + " faster" : fmtDur(sum2 - sum1) + " slower") + ")" : "–"],
+  ]);
+  $("cmp-note").textContent = "wall clock · updated " + fmtAge(now - c.erzeugt) + " ago";
+}
+
 function renderRoute() {
   const rp = routeProgress();
   if (!rp) { fill($("route"), h("div", { class: "empty" }, "route.json not readable.")); fill($("route-sum"), []); return; }
@@ -1649,14 +1686,14 @@ $("series-seg").addEventListener("click", (e) => { const v = e.target.dataset &&
 
 // -------------------------------------------------------------- Ablauf ---
 const CARD_OF = { renderCarrier: "c-carrier", renderEta: "c-eta", renderBlackOps: "c-bo", renderAction: "c-action", renderGuard: "c-guard",
-  renderInfra: "c-infra", renderEconomy: "c-econ", renderSide: "c-side", renderNetwork: "c-net", renderRoute: "c-route", renderLog: "c-log",
+  renderInfra: "c-infra", renderEconomy: "c-econ", renderSide: "c-side", renderNetwork: "c-net", renderRoute: "c-route", renderCompare: "c-cmp", renderLog: "c-log",
   renderSources: "c-src", renderChart: "c-chart", renderStock: "c-wealth", renderGo: "c-go", renderPlan: "c-plan" };
 function renderAll() {
   let v = { label: "" };
   try { v = renderVerdict(); } catch (e) { console.error("renderVerdict", e); }
   try { layout(); } catch (e) { console.error("layout", e); }
   const parts = [renderAlerts, renderCarrier, renderEta, renderBlackOps, renderAction, renderPlan, renderStock, renderGo, renderGuard, renderInfra,
-    renderEconomy, renderSide, renderNetwork, renderRoute, renderLog, renderSources, renderChart];
+    renderEconomy, renderSide, renderNetwork, renderRoute, renderCompare, renderLog, renderSources, renderChart];
   try { renderHeader(v); } catch (e) { console.error("renderHeader", e); }
   for (const fn of parts) {
     try { fn(); }

@@ -38,6 +38,7 @@ import { penaltyLines } from "./lib/strafzeile.js";
 import { kurveAuffrischen, effektiveSpielzeit } from "./lib/kurvepflege.js";
 import { gunzipSync } from "node:zlib";
 import { einbauLage, bn8Zeile } from "./lib/einbauzeile.js";
+import { baueVergleich } from "./laufvergleich.js";
 
 // BB_CHECKIN_BRIDGE nur fuer Tests (tools/test-checkin.js, Mock-Bruecke auf einem
 // freien Port). Gilt NUR fuer Loopback und nie fuer die echten Ports 8795/12525 -
@@ -1262,4 +1263,6 @@ async function main() {
   }
 }
 
+// Lauf-Vergleich fuers Dashboard bei jedem Besuch auffrischen (14.11.2026).
+try { fs.writeFileSync(path.join(ROOT, "dashboard", "laufvergleich.json"), JSON.stringify(baueVergleich(ROOT), null, 1)); } catch { /* Anzeige, nie Bericht */ }
 main();

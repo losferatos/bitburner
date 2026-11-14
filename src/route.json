@@ -2,6 +2,10 @@
   "stand": "2026-09-02",
   "quelle": "nodes/AUDIT-ROADMAP-2026-08-24.md Abschnitt 2 - die Reihenfolge steht fest und wird von niemandem geaendert",
   "hinweis": "ausgang.js liest diese Datei auf home. Eintraege in Reihenfolge; verfahren V2 = Bladeburner (21 Black Ops), V1 = Hacking (Red Pill + w0r1d_d43m0n), V1b = Red Pill aus dem Darknet-Labor. braucht = Datei, die auf home liegen muss; fehlt sie, wird der Eintrag uebersprungen und beim Eintritt in jeden Lauf gemeldet, bis sie liegt. BN15 vor dem Eintritt pruefen (AUDIT-AUTONOMIE I.9): V1b braucht ein Labyrinth-Gewerk, das es noch nicht gibt. Aenderungen nur mit gruenem node tools/test-route.js.",
+  "finalLanding": {
+    "node": 1,
+    "reason": "14.11.2026: Der letzte Lauf (BN8.3) wird nur durch Zerstoeren von w0r1d_d43m0n abgeschlossen, und das Spiel verlangt dafuer einen Folgeknoten. BN1 ist der mildeste Knoten; alle Stufen sind dann voll, es folgt kein weiterer Sprung. Lauf 2 beginnt mit frischem Spielstand, der Landeplatz hat darauf keinen Einfluss. Nicht BN12 (wird nicht gelevelt)."
+  },
   "route": [
     { "node": 10, "level": 2, "verfahren": "V2" },
     { "node": 10, "level": 3, "verfahren": "V2" },

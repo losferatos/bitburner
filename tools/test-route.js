@@ -132,12 +132,80 @@ pruefe(!kaputt.ziel && /ungueltig/.test(kaputt.grund), "Eintrag ohne level muss 
 const tipp = planeRoute([{ node: 10, level: 2, verfahren: "v2" }], 10, new Map([[10, 1]]));
 pruefe(!tipp.ziel && /ungueltig/.test(tipp.grund), "Verfahren 'v2' muss als ungueltig gemeldet werden");
 
+// 9. ABSCHLUSS (14.11.2026): Der letzte Lauf endet mit einem Sprung auf den
+//    Landeplatz, nicht mit "fertig". Ohne Sprung wird w0r1d_d43m0n im
+//    letzten Lauf nie zerstoert - und die Stufe dieses Laufs (SF8.3) nie
+//    gutgeschrieben. Befund am 14.11.2026 10:47: BN8.3 mit Red Pill und
+//    Hacking 4010, ausgang.js meldete "Route abgearbeitet" und blieb stehen.
+const datei = JSON.parse(readFileSync(path.join(hier, "..", "src", "route.json"), "utf8"));
+const landing = datei.finalLanding && datei.finalLanding.node;
+pruefe(Number.isInteger(landing) && landing >= 1 && landing <= 15 && landing !== 12,
+  "route.json braucht finalLanding.node (1-15, nicht 12), ist " + JSON.stringify(datei.finalLanding));
+const opts = { finalLanding: landing };
+// Spielstand 14.11.2026 10:24 (Sicherung BN8L3): alle Knoten 3, BN8 auf 2
+const sfEnde = new Map([[1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [9, 3], [10, 3], [11, 3], [12, 3], [13, 3], [14, 3], [15, 3], [8, 2]]);
+const abschluss = planeRoute(route, 8, sfEnde, () => true, opts);
+pruefe(abschluss.lauf && abschluss.lauf.node === 8 && abschluss.lauf.level === 3,
+  "Abschluss: dieser Lauf muss BN8 Stufe 3 sein, ist " + JSON.stringify(abschluss.lauf));
+pruefe(abschluss.ziel && abschluss.ziel.node === landing && abschluss.ziel.landing === true && !abschluss.fertig,
+  "Abschluss: Ziel muss der Landeplatz BN" + landing + " sein (landing: true, nicht fertig), ist "
+  + JSON.stringify({ ziel: abschluss.ziel, fertig: abschluss.fertig, grund: abschluss.grund }));
+pruefe(abschluss.ziel && [1, 2, 3].includes(abschluss.ziel.level) && ["V1", "V2", "V1b"].includes(abschluss.ziel.verfahren),
+  "Abschluss: Landeziel braucht gueltige Stufe und Verfahren, ist " + JSON.stringify(abschluss.ziel));
+// Nach dem Sprung: BN8 hat Stufe 3, der Bot steht auf dem Landeplatz - fertig, kein weiterer Sprung
+const sfDanach = new Map(sfEnde); sfDanach.set(8, 3);
+const danach = planeRoute(route, landing, sfDanach, () => true, opts);
+pruefe(danach.fertig && !danach.ziel && !danach.lauf,
+  "Nach dem Abschluss: fertig ohne Ziel und ohne Lauf, ist " + JSON.stringify({ ziel: danach.ziel, fertig: danach.fertig, lauf: danach.lauf }));
+// Der Landeplatz greift NIE, solange ein Eintrag nur wegen eines fehlenden Gewerks offen ist
+const sf15 = new Map([[1, 3], [2, 3], [3, 3], [4, 3], [5, 3], [6, 3], [7, 3], [9, 3], [10, 3], [11, 3], [12, 3], [13, 3], [14, 3], [15, 2]]);
+const gesperrt = planeRoute(route, 15, sf15, (d) => d !== "boerse.js", opts);
+pruefe(!gesperrt.ziel && !gesperrt.fertig && gesperrt.uebersprungen.length === 3,
+  "Landeplatz darf bei fehlendem Gewerk nicht greifen, ist " + JSON.stringify({ ziel: gesperrt.ziel, fertig: gesperrt.fertig }));
+// ... und nicht in einem fremden Knoten, der in der Route nicht offen ist
+const fremd = planeRoute(route, 12, sfEnde, () => true, opts);
+pruefe(fremd.ziel && fremd.ziel.node === 8 && !fremd.ziel.landing,
+  "Fremder Knoten mit offenem BN8: Ziel muss BN8 sein (kein Landeplatz), ist " + JSON.stringify(fremd.ziel));
+// Mitten in der Route aendert der Landeplatz nichts
+const mitOpts = planeRoute(route, 10, new Map([[1, 1], [4, 1], [5, 1], [6, 1], [10, 1]]), () => true, opts);
+pruefe(JSON.stringify(mitOpts) === JSON.stringify(p0), "Landeplatz veraendert einen Lauf mitten in der Route");
+// zielErlaubt: der Landeplatz ist erlaubt, alles andere nicht
+const { zielErlaubt } = await import(pathToFileURL(routeModul).href);
+const zOk = zielErlaubt(route, 8, sfEnde, landing, () => true, opts);
+pruefe(zOk.ok, "zielErlaubt muss den Landeplatz BN" + landing + " erlauben: " + zOk.grund);
+const zFalsch = zielErlaubt(route, 8, sfEnde, landing === 13 ? 14 : 13, () => true, opts);
+pruefe(!zFalsch.ok, "zielErlaubt darf ausser dem Landeplatz nichts erlauben");
+// Ungueltige Landeplaetze fuehren zum alten Vertrag (fertig, kein Sprung)
+for (const schlecht of [0, 16, 12, null, undefined, "1", true, 1.5, NaN]) {
+  const p = planeRoute(route, 8, sfEnde, () => true, { finalLanding: schlecht });
+  pruefe(!p.ziel && p.fertig, "Landeplatz " + JSON.stringify(schlecht) + " muss ignoriert werden, ist " + JSON.stringify(p.ziel));
+}
+// Ohne opts: alter Vertrag
+const ohneOpts = planeRoute(route, 8, sfEnde);
+pruefe(!ohneOpts.ziel && ohneOpts.fertig, "Ohne opts muss der letzte Lauf 'fertig' bleiben");
+// Landeplatz == aktueller Knoten (letzter Eintrag waere BN1): Sprung BN1 -> BN1, danach fertig
+const kurz = [{ node: 1, level: 1, verfahren: "V1" }];
+const selbst = planeRoute(kurz, 1, new Map(), () => true, { finalLanding: 1 });
+pruefe(selbst.ziel && selbst.ziel.node === 1 && selbst.ziel.landing && selbst.ziel.level === 2,
+  "Landeplatz = aktueller Knoten: Ziel BN1 Stufe 2 erwartet, ist " + JSON.stringify(selbst.ziel));
+const selbstDanach = planeRoute(kurz, 1, new Map([[1, 1]]), () => true, { finalLanding: 1 });
+pruefe(selbstDanach.fertig && !selbstDanach.ziel, "Nach Landung im selben Knoten: fertig, kein zweiter Sprung");
+// Beide Aufrufer reichen den Landeplatz durch - sonst lehnt exit.js ab, was ausgang.js plant -
+// und beide schalten ihn bei Source-File-Overrides ab.
+for (const f of ["ausgang.js", "exit.js"]) {
+  const quelle = readFileSync(path.join(hier, "..", "src", f), "utf8");
+  pruefe(/routeDatei\.finalLanding/.test(quelle) && /finalLanding\.node/.test(quelle),
+    f + " reicht finalLanding.node aus route.json nicht an die Routenlogik durch");
+  pruefe(/sourceFileOverrides/.test(quelle) && /finalLanding: null|!overrides/.test(quelle),
+    f + " schaltet den Landeplatz bei Source-File-Overrides nicht ab");
+}
+
 // 8. Format-Vertrag von data/verfahren.txt gegen die Leser (bn4net.js, bn4rep.js)
 const zeile = "V2 10 2";
 const teile = zeile.trim().split(/\s+/);
 pruefe(teile[0] === "V2" && Number(teile[1]) === 10 && Number(teile[2]) === 2,
   "verfahren.txt-Format: '" + zeile + "' muss zu [V2, 10, 2] parsen");
 
-console.log(fehler ? fehler + " Fehler." : "OK: 39 Spruenge, Folge stimmt, alle Knoten enden auf Stufe 3 (BN8 Lauf 3 als letzter offen).");
+console.log(fehler ? fehler + " Fehler." : "OK: 39 Spruenge, Folge stimmt, alle Knoten enden auf Stufe 3; BN8 Lauf 3 schliesst mit dem Landesprung ab.");
 console.log("Folge: " + folge.join(" "));
 process.exit(fehler ? 1 : 0);

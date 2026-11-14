@@ -203,7 +203,13 @@ export async function main(ns) {
     try {
       // 1. Route
       let route = null;
-      try { route = JSON.parse(liesVonHome("route.json")).route; } catch { route = null; }
+      let routeOpts = {};
+      try {
+        const routeDatei = JSON.parse(liesVonHome("route.json"));
+        route = routeDatei.route;
+        // Landeplatz fuer den Abschluss des letzten Laufs (lib/route.js, 14.11.2026)
+        routeOpts = { finalLanding: routeDatei.finalLanding ? routeDatei.finalLanding.node : null };
+      } catch { route = null; }
       if (!Array.isArray(route) || !route.length) {
         if (letzteMeldung !== "route") { sag("route.json fehlt oder ist unlesbar - kein Ausgang moeglich."); letzteMeldung = "route"; }
         nachHome("data/ausgang.json", JSON.stringify({ zeit: Date.now(), fehler: "route.json fehlt oder unlesbar" }));
@@ -213,16 +219,20 @@ export async function main(ns) {
       // 2. Zustand
       const info = ns.getResetInfo();
       const cur = info.currentNode;
-      const plan = planeRoute(route, cur, info.ownedSF, (d) => ns.fileExists(d, "home"));
-      const verfahren = plan.verfahren;
       // ownedSF ist der Override-Stand (PlayerObject.ts:93-95). Der Bot
       // uebergibt beim Sprung keine Optionen, also sind Overrides danach weg;
       // bis dahin koennte eine Stufe tiefer erscheinen als besessen.
+      let overrides = 0;
       try {
         const ov = info.bitNodeOptions && info.bitNodeOptions.sourceFileOverrides;
-        const n = ov instanceof Map ? ov.size : Object.keys(ov || {}).length;
-        if (n && !overridesGemeldet) { sag("Hinweis: " + n + " Source-File-Override(s) aktiv - Stufen koennen tiefer erscheinen als besessen."); overridesGemeldet = true; }
-      } catch { /* egal */ }
+        overrides = ov instanceof Map ? ov.size : Object.keys(ov || {}).length;
+        if (overrides && !overridesGemeldet) { sag("Hinweis: " + overrides + " Source-File-Override(s) aktiv - Stufen koennen tiefer erscheinen als besessen."); overridesGemeldet = true; }
+      } catch { overrides = 1; }
+      // Mit Overrides kann ownedSF die Route faelschlich "abgearbeitet" zeigen -
+      // dann kein Landesprung (Skeptiker 14.11.2026). Nicht lesbar zaehlt als aktiv.
+      if (overrides) routeOpts = { finalLanding: null };
+      const plan = planeRoute(route, cur, info.ownedSF, (d) => ns.fileExists(d, "home"), routeOpts);
+      const verfahren = plan.verfahren;
       for (const e of plan.uebersprungen) {
         const k = e.node + "/" + e.level;
         if (!uebersprungenGemeldet.has(k)) {

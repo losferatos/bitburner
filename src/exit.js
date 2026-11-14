@@ -73,18 +73,31 @@ export async function main(ns) {
         + " Ohne Route laesst sich das Ziel nicht pruefen.");
       return;
     }
-    if (ns.getHostname() !== "home" && !ns.fileExists("route.json")) {
+    // Immer frisch von home holen (14.11.2026): eine alte Kopie auf dem Wirt
+    // (ohne finalLanding) liesse exit.js ablehnen, was ausgang.js plant.
+    if (ns.getHostname() !== "home") {
       ns.scp("route.json", ns.getHostname(), "home");
     }
-    const route = JSON.parse(ns.read("route.json")).route;
+    const routeDatei = JSON.parse(ns.read("route.json"));
+    const route = routeDatei.route;
+    // Landeplatz fuer den Abschluss des letzten Laufs - derselbe Wert wie in
+    // ausgang.js, sonst lehnt exit.js ab, was ausgang.js plant (14.11.2026).
     const info = ns.getResetInfo();
+    // Mit Source-File-Overrides kein Landesprung (gleiche Regel wie ausgang.js).
+    let overrides = 1;
+    try {
+      const ov = info.bitNodeOptions && info.bitNodeOptions.sourceFileOverrides;
+      overrides = ov instanceof Map ? ov.size : Object.keys(ov || {}).length;
+    } catch { overrides = 1; }
+    const finalLanding = routeDatei.finalLanding && !overrides ? routeDatei.finalLanding.node : null;
     const p = zielErlaubt(route, info.currentNode, info.ownedSF, ziel,
-      (d) => ns.fileExists(d, "home"));
+      (d) => ns.fileExists(d, "home"), { finalLanding });
     if (!p.ok) {
       sag("SPRUNG ABGELEHNT: " + p.grund);
       return;
     }
-    sag("Ziel geprueft: BN" + ziel + " ist der naechste offene Routeneintrag"
+    sag("Ziel geprueft: BN" + ziel + (p.plan.ziel && p.plan.ziel.landing
+      ? " ist der Landeplatz nach dem letzten Routeneintrag" : " ist der naechste offene Routeneintrag")
       + " (aus BN" + info.currentNode + ").");
   } catch (e) {
     // Eine nicht pruefbare Route ist kein Freibrief. Lieber steht der Bot,

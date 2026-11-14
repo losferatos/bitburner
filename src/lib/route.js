@@ -41,7 +41,7 @@
  * dessen Gewerk fehlt, wird uebersprungen und steht in `uebersprungen`;
  * sobald die Datei liegt, ist er wieder der erste offene Eintrag.
  */
-export function planeRoute(route, cur, sf, vorhanden = () => true) {
+export function planeRoute(route, cur, sf, vorhanden = () => true, opts = {}) {
   const stufe = (n) => {
     const v = sf instanceof Map ? sf.get(n) : sf[n];
     return Number.isFinite(Number(v)) ? Number(v) : 0;
@@ -66,6 +66,35 @@ export function planeRoute(route, cur, sf, vorhanden = () => true) {
     if (!(nachDiesemLauf(e.node) < e.level)) continue;
     if (e.braucht && !vorhanden(e.braucht)) { uebersprungen.push(e); continue; }
     ziel = e; break;
+  }
+
+  // ABSCHLUSS DES LETZTEN LAUFS (14.11.2026).
+  //
+  // Bis hierher endete der letzte Routeneintrag mit "fertig" statt mit einem
+  // Sprung. Das hiess: w0r1d_d43m0n wurde im letzten Lauf nie zerstoert, und
+  // die Stufe dieses Laufs wurde nie gutgeschrieben - das Spiel vergibt das
+  // Source-File erst beim Zerstoeren, und dafuer verlangt
+  // destroyW0r1dD43m0n einen Folgeknoten. Befund am 14.11.2026: BN8.3 mit
+  // Red Pill und Hacking 4010, ausgang.js meldete "Route abgearbeitet".
+  //
+  // Deshalb: Ist DIESER Lauf noch offen (lauf gesetzt), steht danach kein
+  // Eintrag mehr aus und fehlt kein Gewerk, wird auf den Landeplatz aus
+  // route.json gesprungen (`finalLanding.node`). Dort ist kein Lauf mehr
+  // offen (alle Stufen voll) - planeRoute meldet "fertig", es gibt keinen
+  // zweiten Sprung. Ohne finalLanding bleibt es beim alten Vertrag.
+  // Streng gelesen: nur eine echte Zahl 1-15, nie BN12 (wird nicht gelevelt).
+  const landing = opts && typeof opts.finalLanding === "number" ? opts.finalLanding : NaN;
+  if (!ziel && lauf && uebersprungen.length === 0
+    && Number.isInteger(landing) && landing >= 1 && landing <= 15 && landing !== 12) {
+    const letzterFuerLanding = [...eintraege].reverse().find((e) => e.node === landing);
+    const landeziel = {
+      node: landing,
+      level: Math.min(nachDiesemLauf(landing) + 1, 3),
+      verfahren: letzterFuerLanding ? letzterFuerLanding.verfahren : "V1",
+      landing: true,
+    };
+    return { lauf, ziel: landeziel, verfahren, fertig: false, uebersprungen,
+      grund: "letzter Lauf - Abschluss mit Sprung auf den Landeplatz BN" + landing };
   }
 
   if (!ziel) {
@@ -109,10 +138,11 @@ export function planeRoute(route, cur, sf, vorhanden = () => true) {
  * @param {object|Map} sf ownedSF aus getResetInfo()
  * @param {number} ziel der Knoten, in den gesprungen werden soll
  * @param {Function} vorhanden (datei) => bool, fuer `braucht`
+ * @param {object} opts { finalLanding } aus route.json - derselbe Wert wie in ausgang.js
  * @returns {{ok: boolean, grund: string, erwartet: number|null, plan: object}}
  */
-export function zielErlaubt(route, cur, sf, ziel, vorhanden = () => true) {
-  const plan = planeRoute(route, cur, sf, vorhanden);
+export function zielErlaubt(route, cur, sf, ziel, vorhanden = () => true, opts = {}) {
+  const plan = planeRoute(route, cur, sf, vorhanden, opts);
 
   if (!Number.isInteger(ziel) || ziel < 1 || ziel > 15) {
     return { ok: false, grund: "Ziel " + ziel + " ist kein Knoten zwischen 1 und 15.",

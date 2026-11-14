@@ -142,13 +142,7 @@ export async function main(ns) {
   // fragen xpModus ab und fallen sonst in den alten Zweig.
   let bnKnoten = 0;
   try { bnKnoten = ns.getResetInfo().currentNode; } catch { /* dann gilt: kein Modus */ }
-  // ZUSCHALTBAR AUSSERHALB VON BN8 (14.11.2026, Lauf 2, BN1.1): liegt
-  // data/xp-modus.txt auf home, gilt der Modus auch hier. In BN1.1 ohne SF
-  // war Hacking der Engpass (Daedalus 2500, w0r1d_d43m0n 3000) bei 15 Mrd
-  // ungenutztem Geld und +4 Level je 10 min. Nur auf Ansage (Datei), weil der
-  // Modus kein Geld mehr verdient - fuer die 100 Mrd von Daedalus wird die
-  // Datei wieder geloescht. Gelesen beim Start; Umschalten = Kern-Neustart.
-  const xpModus = bnKnoten === 8 || (bnKnoten !== 0 && ns.fileExists("data/xp-modus.txt", "home"));
+  const xpModus = bnKnoten === 8;
   // Was homegrow.js kaufen soll: die home-RAM VOR dem Kauf, oder 0. Die
   // Entscheidung faellt hier (ein Entscheider fuer Rechner UND home), homegrow
   // fuehrt nur aus - siehe Abschnitt 1a und data/bn4net.json.

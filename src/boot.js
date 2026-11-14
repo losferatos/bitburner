@@ -36,6 +36,19 @@
  *
  * @param {NS} ns
  */
+// SF4-SPERRE (14.11.2026): darf dieser Knoten Singularity benutzen? Wie das
+// Spiel (canAccessBitNodeFeature(4), BitNodeUtils.ts:17-19): BitNode 4 oder
+// Source-File 4 ab Stufe 1. Unbestimmt -> true (alter Pfad).
+function singularityFrei(ns) {
+  try {
+    const ri = ns.getResetInfo();
+    if (Number(ri.currentNode) === 4) return true;
+    const o = ri.ownedSF;
+    const s = o && typeof o.get === "function" ? o.get(4) : (o || {})[4];
+    return Number(s || 0) >= 1;
+  } catch { return true; }
+}
+
 export async function main(ns) {
   ns.disableLog("ALL");
 
@@ -308,6 +321,8 @@ export async function main(ns) {
 
     for (const datei of ["bn4net.js", "bn4life.js"]) {
       if (ns.ps("home").some((p) => p.filename === datei)) continue;
+      // Ohne SF4 wirft bn4life jede Runde und belegt nur Speicher.
+      if (datei === "bn4life.js" && !singularityFrei(ns)) continue;
       if (!ns.fileExists(datei, "home")) { sag("FEHLT: " + datei); continue; }
       const braucht = ns.getScriptRam(datei, "home");
       // getScriptRam gibt bei nicht uebersetzbarer Datei still 0 zurueck -

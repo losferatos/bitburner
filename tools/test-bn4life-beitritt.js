@@ -165,6 +165,34 @@ console.log("-- G1: ein schon laufendes joinrun.js (Ziel 80) wird nicht doppelt 
     !gestartet.includes("joinrun.js"), gestartet.join(", "));
 }
 
+// SF4-SPERRE (14.11.2026): In BN1.1 ohne SF4 lief bn4life jede Sekunde in
+// RUNDENFEHLER ("requires Source-File 4") und belegte 293,95 GB auf home.
+// Ohne SF4 und ausserhalb von BitNode 4 endet es jetzt sofort.
+console.log("");
+console.log("=== bn4life.js: SF4-Sperre (14.11.2026) ===");
+for (const [knoten, sf4, soll] of [[1, 0, true], [4, 0, false], [1, 1, false]]) {
+  const m = neuerMock({
+    host: "home", knoten, sf4, wall: W0, playtime: 60000, nodeReset: W0 - 60000, augReset: W0 - 60000,
+    geld: 6e6,
+    server: { home: { ram: 2048, used: 0, root: true, geld: 0, cores: 1, ports: 0, hackLevel: 1 } },
+    dateien: { home: { "joinrun.js": "//", "netburn.js": "//", "bn4net.js": "//" } },
+    maxSchlaf: 1,
+  });
+  m.zustand.spieler.factions = [];
+  const { modul } = await ladeAusBeiden(ROOT, "bn4life.js");
+  const zurueck = m.uhrStellen();
+  let fertig = false;
+  try { await modul.main(m.ns); fertig = true; }
+  catch (e) { if (!e.mockAbbruch) throw e; }
+  finally { zurueck(); }
+  const log = m.lies("home", "data/bn4life-log.txt") || "";
+  const beendet = fertig && /Kein Source-File 4/.test(log);
+  pruefe("BN" + knoten + ", SF4." + sf4 + ": bn4life " + (soll ? "endet sofort" : "laeuft weiter"),
+    // "laeuft weiter" heisst nur: die Sperre greift nicht. Was die Runde
+    // danach tut, deckt der Mock nicht ganz ab (checkFactionInvitations fehlt).
+    beendet === soll && (!soll || !/RUNDENFEHLER/.test(log)), log.slice(-300));
+}
+
 console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) { console.log(""); for (const f of fehler) console.log("  ROT: " + f); }

@@ -251,6 +251,19 @@ export function bn8TripPlan(p, node, money, reserved, attempts) {
   return none;
 }
 
+// SF4-SPERRE (14.11.2026): darf dieser Knoten Singularity benutzen? Wie das
+// Spiel (canAccessBitNodeFeature(4), BitNodeUtils.ts:17-19): BitNode 4 oder
+// Source-File 4 ab Stufe 1. Unbestimmt -> true (alter Pfad).
+function singularityFrei(ns) {
+  try {
+    const ri = ns.getResetInfo();
+    if (Number(ri.currentNode) === 4) return true;
+    const o = ri.ownedSF;
+    const s = o && typeof o.get === "function" ? o.get(4) : (o || {})[4];
+    return Number(s || 0) >= 1;
+  } catch { return true; }
+}
+
 export async function main(ns) {
   const auftragVersuche = new Map();   // data/task.txt-Inhalt -> Fehlversuche
   let letzteTelemetrie = 0;            // Wanduhr der letzten bn4life.json
@@ -272,6 +285,13 @@ export async function main(ns) {
     ns.write("data/bn4life-log.txt", log.join(NL) + NL, "w");
   };
   sag("bn4life gestartet.");
+  // Ohne SF4 ist jede Singularity-Funktion gesperrt; die Schleife unten fiele
+  // jede Sekunde in RUNDENFEHLER (BN1.1, 14.11.2026). Dann sofort aufhoeren -
+  // der Kern liest data/task.txt ersatzweise mit, sobald bn4life schweigt.
+  if (!singularityFrei(ns)) {
+    sag("Kein Source-File 4 und nicht BitNode 4 - bn4life hat hier nichts zu tun, Ende.");
+    return;
+  }
 
   // Die Programme in der Reihenfolge, in der sie sich lohnen. Jedes weitere
   // oeffnet einen Port mehr und damit einen ganzen Schwung Rechner fuer

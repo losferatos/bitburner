@@ -161,7 +161,7 @@ function neueWelt(o = {}) {
     write: (f, t) => { rec("write", f); w.texte[f] = t; dateienVon("home").add(f); },
     read: (f) => w.texte[f] ?? "",
     rm: (f) => { rec("rm", f); return dateienVon("home").delete(f); },
-    getResetInfo: () => ({ lastNodeReset: Date.now() - 3600e3, currentNode: 1, ownedSF: new Map() }),
+    getResetInfo: () => ({ lastNodeReset: Date.now() - 3600e3, currentNode: 1, ownedSF: new Map(o.sf4 ? [[4, 1]] : []) }),
     clearPort: (p) => { rec("clearPort", p); w.ports[p] = []; },
     writePort: (p, v) => { (w.ports[p] ||= []).push(v); },
     peek: (p) => (w.ports[p] && w.ports[p].length ? w.ports[p][0] : "NULL PORT DATA"),
@@ -398,8 +398,10 @@ const spur = (w) => w.log.join("\n");
 
 if (bootAlt) {
   for (const [gbHome, mitCold] of [[32, true], [32, false], [16, false], [8, false], [128, true]]) {
-    const a = bootWelt(gbHome, mitCold);
-    const n = bootWelt(gbHome, mitCold);
+    // Mit SF4: dort gilt die SF4-Sperre (14.11.2026) nicht, der Pfad bleibt
+    // der von 294b593. Ohne SF4 prueft Abschnitt 5b.
+    const a = bootWelt(gbHome, mitCold, { sf4: true });
+    const n = bootWelt(gbHome, mitCold, { sf4: true });
     await fahre(bootAlt, a);
     await fahre(bootNeu, n);
     pruefe("home " + gbHome + " GB" + (mitCold ? " mit" : " ohne") + " coldstart.js: Aufruffolge bitgleich zu " + BOOT_VOR_ZWEIG
@@ -407,6 +409,19 @@ if (bootAlt) {
       && n.log.some((l) => l.startsWith("sleep") || l.startsWith("exec")),
       spur(a) === spur(n) ? "zu wenig Aufrufe" : "weicht ab");
   }
+}
+// 5b. SF4-SPERRE (14.11.2026): In BN1.1 ohne SF4 startete boot.js bn4life.js,
+// das dann jede Sekunde in RUNDENFEHLER lief und 293,95 GB auf home belegte.
+console.log("-- 5b. boot.js: bn4life.js nur mit SF4 oder in BitNode 4 --");
+for (const [sf4, soll] of [[false, false], [true, true]]) {
+  const w = bootWelt(2048, false, { sf4, ram: { "guard.js": RAM["guard.js"], "bn4net.js": RAM["bn4net.js"], "bn4life.js": 293.95 } });
+  w.dateien.home.add("bn4life.js");
+  await fahre(bootNeu, w);
+  const gestartet = w.log.some((l) => l.startsWith('exec ["bn4life.js"'));
+  pruefe("home 2048 GB " + (sf4 ? "mit" : "ohne") + " SF4: bn4life.js " + (soll ? "gestartet" : "NICHT gestartet"),
+    gestartet === soll, "exec bn4life: " + gestartet);
+  pruefe("home 2048 GB " + (sf4 ? "mit" : "ohne") + " SF4: bn4net.js gestartet",
+    w.log.some((l) => l.startsWith('exec ["bn4net.js"')));
 }
 {
   const w = bootWelt(8, true);

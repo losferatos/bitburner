@@ -439,7 +439,11 @@ export async function main(ns) {
     // aber mitgezaehlt werden, sonst schuetzt die Reserve genau die Haelfte
     // der Steuerung nicht.
     const rLife = ns.getScriptRam("bn4life.js", "home");
-    if (rLife > 0 && rLife <= passtAufHome) bedarf += rLife;
+    // Ohne SF4 startet bn4life nicht (SF4-SPERRE unten, 14.11.2026) - dann
+    // auch keinen Platz dafuer freihalten.
+    let lifeMoeglich = true;
+    try { lifeMoeglich = merkmaleAusReset(ns.getResetInfo())[4] !== false; } catch { lifeMoeglich = true; }
+    if (lifeMoeglich && rLife > 0 && rLife <= passtAufHome) bedarf += rLife;
 
     // Erst die Untergrenze, dann der Deckel - und die Untergrenze gewinnt.
     // Die vorige Fassung schrieb Math.max(24, Math.min(max/4, Math.max(64,
@@ -1002,7 +1006,15 @@ export async function main(ns) {
     //
     // Die Bremse ist data/bn4-stop.txt: Solange die Datei da ist, wird nicht
     // wiederbelebt. Ohne sie waere ein gewolltes killall nicht durchfuehrbar.
-    if (!ns.fileExists("data/bn4-stop.txt", "home")
+    // SF4-SPERRE (14.11.2026, BN1.1 in Lauf 2 gemessen): bn4life.js ist
+    // voller Singularity-Aufrufe. Ohne BitNode 4 und ohne Source-File 4 wirft
+    // jeder davon ("requires Source-File 4", NetscriptHelpers.tsx:388-396) -
+    // gemessen lief bn4life ab 17:14 jede Sekunde in RUNDENFEHLER und belegte
+    // dabei 293,95 GB auf home. Es kann dort nichts tun, also wird es dort
+    // nicht gestartet. Unbestimmt (kein getResetInfo) gilt der alte Pfad.
+    let lifeSinnvoll = true;
+    try { lifeSinnvoll = merkmaleAusReset(ns.getResetInfo())[4] !== false; } catch { lifeSinnvoll = true; }
+    if (lifeSinnvoll && !ns.fileExists("data/bn4-stop.txt", "home")
         && !ns.isRunning("bn4life.js", "home")) {
       const pid = ns.exec("bn4life.js", "home");
       if (pid) sag("bn4life.js lag still und wurde neu gestartet (pid " + pid + ").");

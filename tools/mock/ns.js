@@ -606,7 +606,13 @@ export function neuerMock(o = {}) {
       // Wie im Spiel (NetscriptFunctions.ts:1385): die Mitgliedsliste.
       factions: zustand.faktionen.slice(),
     }),
-    getResetInfo: () => ({ ...zustand.resetInfo }),
+    // Die LEGACY-REGEL oben gilt auch hier (14.11.2026): wer weder ownedSF
+    // noch sf4 nennt, bekommt SF4.1 auch in getResetInfo zu sehen - sonst
+    // beendet sich bn4life.js an seiner SF4-Sperre, obwohl der Mock jeden
+    // Singularity-Aufruf zulaesst.
+    getResetInfo: () => (!sfAngegeben && sfListeLeer()
+      ? { ...zustand.resetInfo, ownedSF: new Map([[4, 1]]) }
+      : { ...zustand.resetInfo }),
     getHackingLevel: () => zustand.spieler.skills.hacking,
 
     /**

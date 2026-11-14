@@ -1513,7 +1513,15 @@ async function collectState(o) {
   let queuedNfg = null;
   let queuedNames = [];
   const navQueue = await goToAugmentationsPage(doc, sleep, allowUnfocus);
-  if (navQueue) {
+  if (navQueue === "kein Seitenleisteneintrag Augmentations") {
+    // FRISCHER SPIELSTAND (Lauf 2, 14.11.2026): Das Spiel blendet den Eintrag
+    // nur aus, solange nichts installiert UND nichts in der Warteschlange ist
+    // (Sidebar/ui/SidebarRoot.tsx:165-169: queuedAugmentations.length > 0
+    // macht ihn sichtbar). Fehlt er, ist die Warteschlange also leer.
+    q = 0;
+    queuedNfg = 0;
+    log("  Warteschlange: kein Seitenleisteneintrag -> leer (q=0, frischer Spielstand)");
+  } else if (navQueue) {
     problems.push(navQueue);
   } else {
     const queue = readQueue(doc);

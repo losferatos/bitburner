@@ -1,0 +1,29 @@
+{
+  "format": 1,
+  "epoche": "lauf2",
+  "identifier": "eac1fe0f5ad89",
+  "seit": "2026-11-14T10:56:21.976Z",
+  "anker": {
+    "totalPlaytime": 424000,
+    "quelle": "Abweisung im Brueckenprotokoll 2026-11-14T10:55:05.357Z"
+  },
+  "vorgaenger": [
+    {
+      "epoche": "lauf1",
+      "identifier": "197f4d61481686",
+      "bis": "2026-11-14T10:56:21.976Z",
+      "sicherungsArchiv": [
+        "C:\\Users\\erche\\bitburner-backups\\lauf1",
+        "C:\\Users\\erche\\Desktop\\claude_projecto\\bitburner\\backups\\lauf1"
+      ],
+      "datenArchiv": "C:\\Users\\erche\\Desktop\\claude_projecto\\bitburner\\data\\lauf1",
+      "letzterStand": {
+        "datei": "LIVE_197f4d61481686_BN1L4_2026-11-14T11-54_manual.json.gz",
+        "bitNode": 1,
+        "lauf": 4,
+        "totalPlaytime": 7496398600
+      }
+    }
+  ],
+  "hinweis": "Nur tools/lauf2-uebergabe.js schreibt diese Datei. Die Bruecke liest sie beim Start (sync/instanz.js). Kaputt = Bruecke startet nicht. Fehlt sie, gilt wieder Lauf 1."
+}

@@ -208,7 +208,8 @@ export async function main(ns) {
         const routeDatei = JSON.parse(liesVonHome("route.json"));
         route = routeDatei.route;
         // Landeplatz fuer den Abschluss des letzten Laufs (lib/route.js, 14.11.2026)
-        routeOpts = { finalLanding: routeDatei.finalLanding ? routeDatei.finalLanding.node : null };
+        routeOpts = { finalLanding: routeDatei.finalLanding ? routeDatei.finalLanding.node : null,
+          afterLanding: routeDatei.afterLanding ? routeDatei.afterLanding.node : null };
       } catch { route = null; }
       if (!Array.isArray(route) || !route.length) {
         if (letzteMeldung !== "route") { sag("route.json fehlt oder ist unlesbar - kein Ausgang moeglich."); letzteMeldung = "route"; }
@@ -230,7 +231,7 @@ export async function main(ns) {
       } catch { overrides = 1; }
       // Mit Overrides kann ownedSF die Route faelschlich "abgearbeitet" zeigen -
       // dann kein Landesprung (Skeptiker 14.11.2026). Nicht lesbar zaehlt als aktiv.
-      if (overrides) routeOpts = { finalLanding: null };
+      if (overrides) routeOpts = { finalLanding: null, afterLanding: null };
       const plan = planeRoute(route, cur, info.ownedSF, (d) => ns.fileExists(d, "home"), routeOpts);
       const verfahren = plan.verfahren;
       for (const e of plan.uebersprungen) {

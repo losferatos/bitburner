@@ -175,6 +175,49 @@ const zOk = zielErlaubt(route, 8, sfEnde, landing, () => true, opts);
 pruefe(zOk.ok, "zielErlaubt muss den Landeplatz BN" + landing + " erlauben: " + zOk.grund);
 const zFalsch = zielErlaubt(route, 8, sfEnde, landing === 13 ? 14 : 13, () => true, opts);
 pruefe(!zFalsch.ok, "zielErlaubt darf ausser dem Landeplatz nichts erlauben");
+// 10. LANDEPLATZ ABSCHLIESSEN (14.11.2026, Eric: "schliesse den aktuellen BN
+//     ab", danach Lauf 2): auf dem Landeplatz geht es zum zweiten Landeplatz,
+//     dort ist Schluss. Spielstand 14.11. 11:00: BN1, alle Stufen 3.
+const nach = datei.afterLanding && datei.afterLanding.node;
+pruefe(Number.isInteger(nach) && nach >= 1 && nach <= 15 && nach !== 12 && nach !== landing,
+  "route.json braucht afterLanding.node (1-15, nicht 12, nicht der Landeplatz), ist " + JSON.stringify(datei.afterLanding));
+const opts2 = { finalLanding: landing, afterLanding: nach };
+const sfAlle = new Map(sfEnde); sfAlle.set(8, 3);
+const aufLanding = planeRoute(route, landing, sfAlle, () => true, opts2);
+pruefe(aufLanding.ziel && aufLanding.ziel.node === nach && aufLanding.ziel.landing && !aufLanding.fertig,
+  "Auf dem Landeplatz: Ziel muss BN" + nach + " sein, ist " + JSON.stringify({ ziel: aufLanding.ziel, fertig: aufLanding.fertig }));
+const aufNach = planeRoute(route, nach, sfAlle, () => true, opts2);
+pruefe(aufNach.fertig && !aufNach.ziel, "Auf dem zweiten Landeplatz: fertig, kein Sprung - ist " + JSON.stringify(aufNach.ziel));
+pruefe(zielErlaubt(route, landing, sfAlle, nach, () => true, opts2).ok, "zielErlaubt muss den zweiten Landeplatz erlauben");
+// BN8.3 springt weiter auf den ERSTEN Landeplatz, nicht auf den zweiten
+const bn83 = planeRoute(route, 8, sfEnde, () => true, opts2);
+pruefe(bn83.ziel && bn83.ziel.node === landing, "BN8.3 mit afterLanding: Ziel muss weiter BN" + landing + " sein");
+// Fremder Knoten bei voller Route: kein Sprung
+const fremdVoll = planeRoute(route, 13, sfAlle, () => true, opts2);
+pruefe(fremdVoll.fertig && !fremdVoll.ziel, "Fremder Knoten bei voller Route darf nicht springen");
+// Ungueltige zweite Landeplaetze: kein Sprung (insbesondere = Landeplatz -> Endlosschleife)
+for (const schlecht of [landing, 12, 0, 16, "5", null]) {
+  const p = planeRoute(route, landing, sfAlle, () => true, { finalLanding: landing, afterLanding: schlecht });
+  pruefe(!p.ziel && p.fertig, "afterLanding " + JSON.stringify(schlecht) + " muss ignoriert werden");
+}
+for (const f of ["ausgang.js", "exit.js"]) {
+  const quelle = readFileSync(path.join(hier, "..", "src", f), "utf8");
+  pruefe(/routeDatei\.afterLanding/.test(quelle), f + " reicht afterLanding nicht durch");
+}
+// Frischer Spielstand in BN1 (keine Source-Files): normaler Routenanfang, kein Landesprung
+const frisch = planeRoute(route, 1, new Map(), () => true, opts2);
+pruefe(frisch.ziel && frisch.ziel.node === route[0].node && !frisch.ziel.landing,
+  "Frischer Stand BN1: Ziel muss der erste Routeneintrag sein, ist " + JSON.stringify(frisch.ziel));
+// Landeplatz mit offenem Lauf (SF1 = 1): normale Route, kein zweiter Landeplatz
+const offen1 = planeRoute(route, 1, new Map([...sfAlle, [1, 1]]), () => true, opts2);
+pruefe(offen1.ziel && !(offen1.ziel.landing && offen1.ziel.node === nach), "Landeplatz mit offenem Lauf darf nicht zum zweiten Landeplatz springen");
+// Landeplatz bei fehlendem Gewerk: kein Sprung
+const sfLuecke = new Map(sfAlle); sfLuecke.set(8, 2);
+const luecke = planeRoute(route, landing, sfLuecke, (d) => d !== "boerse.js", opts2);
+pruefe(!luecke.ziel && !luecke.fertig, "Landeplatz bei fehlendem Gewerk darf nicht springen");
+// zielErlaubt auf dem Landeplatz mit falschem Ziel
+pruefe(!zielErlaubt(route, landing, sfAlle, nach === 13 ? 14 : 13, () => true, opts2).ok, "zielErlaubt muss ein falsches Ziel auf dem Landeplatz ablehnen");
+
 // Ungueltige Landeplaetze fuehren zum alten Vertrag (fertig, kein Sprung)
 for (const schlecht of [0, 16, 12, null, undefined, "1", true, 1.5, NaN]) {
   const p = planeRoute(route, 8, sfEnde, () => true, { finalLanding: schlecht });

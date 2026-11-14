@@ -6,6 +6,10 @@
     "node": 1,
     "reason": "14.11.2026: Der letzte Lauf (BN8.3) wird nur durch Zerstoeren von w0r1d_d43m0n abgeschlossen, und das Spiel verlangt dafuer einen Folgeknoten. BN1 ist der mildeste Knoten; alle Stufen sind dann voll, es folgt kein weiterer Sprung. Lauf 2 beginnt mit frischem Spielstand, der Landeplatz hat darauf keinen Einfluss. Nicht BN12 (wird nicht gelevelt)."
   },
+  "afterLanding": {
+    "node": 5,
+    "reason": "14.11.2026, Eric: den aktuellen BN (Landeplatz BN1) abschliessen, danach Lauf 2 mit frischem Spielstand. Der Bot zerstoert w0r1d_d43m0n in BN1 und springt nach BN5; dort ist Schluss bis zur Lauf-2-Uebergabe. Muss ein anderer Knoten als der Landeplatz sein, sonst Endlosschleife."
+  },
   "route": [
     { "node": 10, "level": 2, "verfahren": "V2" },
     { "node": 10, "level": 3, "verfahren": "V2" },

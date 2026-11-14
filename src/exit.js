@@ -90,8 +90,9 @@ export async function main(ns) {
       overrides = ov instanceof Map ? ov.size : Object.keys(ov || {}).length;
     } catch { overrides = 1; }
     const finalLanding = routeDatei.finalLanding && !overrides ? routeDatei.finalLanding.node : null;
+    const afterLanding = routeDatei.afterLanding && !overrides ? routeDatei.afterLanding.node : null;
     const p = zielErlaubt(route, info.currentNode, info.ownedSF, ziel,
-      (d) => ns.fileExists(d, "home"), { finalLanding });
+      (d) => ns.fileExists(d, "home"), { finalLanding, afterLanding });
     if (!p.ok) {
       sag("SPRUNG ABGELEHNT: " + p.grund);
       return;

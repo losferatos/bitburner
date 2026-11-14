@@ -48,11 +48,11 @@
   "singKosten41": 512,
   "dom": 0,
   "err": null,
-  "bytes": 8967,
+  "bytes": 9083,
   "lines": 143,
   "veraltet": "Inhalt hat sich seit der Messung geaendert (Merge des Bauzweigs am 04.09.2026 15:13). Die Eichung gilt fuer diese Datei NICHT mehr - sie braucht eine neue calculateRam-Messung im Spiel, und die geht erst nach dem Hot-Swap.",
-  "sha256": "61b4640f857b95a24c8afc7db57f5af8cb49af887ffd6eaf6da98cc2e62b72dc",
-  "gemessenAm": "2026-11-14T09:56:47.846Z",
+  "sha256": "f6c80c7078675835aeaf26bf64e25187788cb8c82f14ee37672462b66a599db9",
+  "gemessenAm": "2026-11-14T10:20:25.468Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.3)"
  },
  {
@@ -1247,10 +1247,10 @@
   "singKosten41": 0,
   "dom": 0,
   "err": null,
-  "bytes": 53599,
+  "bytes": 53706,
   "lines": 960,
-  "sha256": "8189bdaa66bb9ee06d4d0ba7317b652eb7fd4d02d43c3094a2fd0cf20b21b413",
-  "gemessenAm": "2026-11-14T09:56:47.846Z",
+  "sha256": "d5f28c9987a9804f59d824de639b38b13d9ba5dc946525992f80dd17cd6b71f5",
+  "gemessenAm": "2026-11-14T10:20:25.468Z",
   "quelle": "startdiag.js (ns.getScriptRam im Spiel, SF4.1)"
  },
  {

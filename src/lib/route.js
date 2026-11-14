@@ -97,6 +97,27 @@ export function planeRoute(route, cur, sf, vorhanden = () => true, opts = {}) {
       grund: "letzter Lauf - Abschluss mit Sprung auf den Landeplatz BN" + landing };
   }
 
+  // DEN LANDEPLATZ SELBST ABSCHLIESSEN (14.11.2026, Eric: "schliesse den
+  // aktuellen BN ab", danach Lauf 2). Steht der Bot auf dem Landeplatz, ist
+  // die Route durch und kein Lauf offen, geht es zum zweiten Landeplatz
+  // (`afterLanding.node`). Dort ist Schluss: cur !== landing, also kein
+  // weiterer Sprung. Der zweite Landeplatz muss ein anderer Knoten sein -
+  // sonst sprange der Bot endlos von BN1 nach BN1 (die Stufe aendert sich
+  // nicht, es gibt keinen Zustand, der den Abschluss markiert).
+  const nachLanding = opts && typeof opts.afterLanding === "number" ? opts.afterLanding : NaN;
+  if (!ziel && !lauf && uebersprungen.length === 0 && cur === landing
+    && Number.isInteger(nachLanding) && nachLanding >= 1 && nachLanding <= 15
+    && nachLanding !== 12 && nachLanding !== landing) {
+    const letzterFuerNach = [...eintraege].reverse().find((e) => e.node === nachLanding);
+    return { lauf, ziel: {
+      node: nachLanding,
+      level: Math.min(stufe(nachLanding) + 1, 3),
+      verfahren: letzterFuerNach ? letzterFuerNach.verfahren : "V1",
+      landing: true,
+    }, verfahren, fertig: false, uebersprungen,
+    grund: "Landeplatz BN" + landing + " abschliessen - Sprung auf BN" + nachLanding };
+  }
+
   if (!ziel) {
     return { lauf, ziel: null, verfahren, fertig: uebersprungen.length === 0, uebersprungen,
       grund: uebersprungen.length ? "nur noch Eintraege mit fehlendem Gewerk offen" : "Route abgearbeitet" };

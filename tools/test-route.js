@@ -178,9 +178,10 @@ pruefe(!zFalsch.ok, "zielErlaubt darf ausser dem Landeplatz nichts erlauben");
 // 10. LANDEPLATZ ABSCHLIESSEN (14.11.2026, Eric: "schliesse den aktuellen BN
 //     ab", danach Lauf 2): auf dem Landeplatz geht es zum zweiten Landeplatz,
 //     dort ist Schluss. Spielstand 14.11. 11:00: BN1, alle Stufen 3.
-const nach = datei.afterLanding && datei.afterLanding.node;
-pruefe(Number.isInteger(nach) && nach >= 1 && nach <= 15 && nach !== 12 && nach !== landing,
-  "route.json braucht afterLanding.node (1-15, nicht 12, nicht der Landeplatz), ist " + JSON.stringify(datei.afterLanding));
+// Eric 14.11.2026 11:25: "stop wir sind BN Level 3!" - BN1 nicht noch einmal abschliessen.
+// route.json traegt deshalb KEIN afterLanding; die Logik bleibt geprueft (fester Wert).
+pruefe(!datei.afterLanding, "route.json darf kein afterLanding tragen (Eric 14.11.: kein Abschluss von BN1)");
+const nach = 5;
 const opts2 = { finalLanding: landing, afterLanding: nach };
 const sfAlle = new Map(sfEnde); sfAlle.set(8, 3);
 const aufLanding = planeRoute(route, landing, sfAlle, () => true, opts2);

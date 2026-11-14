@@ -255,11 +255,14 @@ export async function main(ns) {
     ns.clearPort(RESERVE_PORT);
     ns.writePort(RESERVE_PORT, schritt.reserve);
 
-    // darkweb.js nur auf Ansage und hoechstens alle 10 Minuten, nie doppelt.
+    // darkweb.js hoechstens alle 3 Minuten, nie doppelt.
     if (mitDarkweb && schritt.darkweb && geld >= schritt.preis
         && Date.now() - darkwebZuletzt > 180000 && ns.fileExists(DARKWEB, "home")) {
-      // "heim": darkweb.js kauft auch home-RAM bis 32 GB (14.11.2026).
-      if (ns.exec(DARKWEB, "home", 1, "heim")) darkwebZuletzt = Date.now();
+      // "heim": darkweb.js kauft auch home-RAM bis 32 GB (14.11.2026) - aber
+      // nur, wenn home-RAM der faellige Schritt ist; sonst ueberholte der
+      // RAM-Kauf einen faelligen Portknacker (Skeptiker 14.11.2026).
+      const heim = /^home-RAM/.test(schritt.text);
+      if (heim ? ns.exec(DARKWEB, "home", 1, "heim") : ns.exec(DARKWEB, "home")) darkwebZuletzt = Date.now();
     }
 
     // Zustand alle 5 Runden ablegen (ns.write kostet keinen RAM).

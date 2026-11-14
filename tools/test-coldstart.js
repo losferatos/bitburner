@@ -278,6 +278,14 @@ console.log("-- 3a. TOR gekauft, aber ns.scan veraltet; home-RAM per darkweb.js 
   const dw = w.prozesse.find((p) => p.filename === "darkweb.js");
   pruefe("darkweb.js mit Argument heim gestartet (home-RAM-Kauf)", dw && dw.args[0] === "heim", JSON.stringify(dw && dw.args));
 }
+{
+  // Faellig ist BruteSSH, Geld reicht schon fuer home 16 GB: KEIN heim (Skeptiker 14.11.2026)
+  const w = neueWelt({ homeGb: 8, skill: 1, geld: 2e6, maxSleeps: 2, tor: true, args: [] });
+  w.prozesse.push({ pid: w.pid++, filename: "coldstart.js", host: "home", threads: 1, args: [] });
+  await fahre(cold, w);
+  const dw = w.prozesse.find((p) => p.filename === "darkweb.js");
+  pruefe("BruteSSH faellig: darkweb.js ohne heim", dw && !dw.args.includes("heim"), JSON.stringify(dw && dw.args));
+}
 console.log("");
 console.log("-- 3b. darkweb standardmaessig an (14.11.2026), Reserve nach Mietrechner-Aufbau --");
 {

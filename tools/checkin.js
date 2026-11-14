@@ -226,6 +226,21 @@ async function main() {
   const ausgangTxt = (await hole("data/ausgang.txt")) || "";
   const verfahrenTxt = ((await hole("data/verfahren.txt")) || "").trim().split(/\s+/);
 
+  // KALTSTART (14.11.2026, Lauf 2): unter 32 GB home laeuft nur coldstart.js,
+  // es schreibt data/coldstart.txt und sonst nichts. Ohne diesen Zweig hiess
+  // ein gesunder Kaltstart "BLIND". Steht vor der Totzone von laufJetzt und
+  // punkte - ausgeben() faesst beides fuer KALTSTART nicht an.
+  const kalt = !blade && !lage && !netz && !ausgang ? await holeJson("data/coldstart.txt") : null;
+  if (kalt && Date.now() - Number(kalt.t || 0) < 10 * 60000) {
+    sag("Kaltstart (Lauf 2): home " + kalt.homeGb + " GB, Geld $" + zahl(kalt.geld || 0)
+      + ", Hacking " + kalt.skill + ", " + kalt.gerootet + "/" + kalt.von + " gerootet, Ziel " + kalt.ziel
+      + ", Mietrechner " + (kalt.mietGb || 0) + " GB.");
+    sag("Naechster Schritt: " + kalt.schritt + ". Ab 32 GB home startet coldstart.js den Kern (boot.js).");
+    sag("");
+    sag("FERTIG VORAUSSICHTLICH: noch nicht schaetzbar - Kaltstart bis 32 GB home.");
+    sag("URTEIL: KALTSTART");
+    return ausgeben(zeilen, { ...bericht, urteil: "KALTSTART" });
+  }
   if (!blade && !lage && !netz && !ausgang) {
     sag("Keine Telemetrie. Entweder laeuft die Bruecke nicht (node sync/bridge.js)");
     sag("oder das Spiel ist zu. Beides ist von hier aus nicht zu unterscheiden.");
@@ -1195,7 +1210,7 @@ async function main() {
   function ausgeben(z, b) {
     // B07: Einbau faellig/steht samt Sperrgrund. Nur Anzeige; Fehler hier
     // duerfen den Bericht nie kippen (die Bruecke ruft das mit --json).
-    if (einbauDaten && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
+    if (einbauDaten && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU" && b.urteil !== "KALTSTART") {
       try {
         // Offline-Fenster aus dem Brueckenprotokoll: "faellig seit" zaehlt nur Online-Zeit.
         let offline = null;
@@ -1214,7 +1229,7 @@ async function main() {
         } };
       } catch { /* Anzeige faellt aus, der Bericht bleibt */ }
     }
-    if (standSchreiben && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU") {
+    if (standSchreiben && b.urteil !== "BLIND" && b.urteil !== "SPIEL ZU" && b.urteil !== "KALTSTART") {
       punkte.push({
         ts: Date.now(), knoten: b.knoten, lauf: laufJetzt, rang: b.rang,
         spielzeit: Number.isFinite(spielzeit) ? spielzeit : null,

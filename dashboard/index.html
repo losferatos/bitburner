@@ -832,7 +832,10 @@ function renderAlerts() {
       : (u.node + "." + u.level + (u.braucht ? " (needs " + u.braucht + " on home)" : ""))).join(", "));
   }
   if (ex && ex.exit_abgelehnt) add("warn", "Jump refused", (ex.exit_ablehnung_grund || "exit.js refused the jump") + " (" + ex.exit_abgelehnt + "x)");
-  if (st && st.connected) {
+  // Im Lauf-2-Kaltstart laufen Kern, ausgang.js und guard.js noch nicht -
+  // ihre fehlende Telemetrie ist dann kein Befund (14.11.2026).
+  const kaltstart = !D.net && D.cold && Date.now() - Number(D.cold.t || 0) < 10 * 60000;
+  if (st && st.connected && !kaltstart) {
     const dead = ["net", "exit", "guard"].filter((k) => freshness(k).cls === "dead");
     if (dead.length) add("warn", "Stale telemetry", dead.map((k) => k + ": " + fmtAge(freshness(k).age)).join(" · ") + " - the writer may have stopped.");
   }

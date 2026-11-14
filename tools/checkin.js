@@ -339,6 +339,21 @@ async function main() {
     bericht.rangReichtOhneListe = true;
   }
 
+  // ROUTE ABGEARBEITET (14.11.2026). Nach dem Landesprung (finalLanding in
+  // route.json) ist kein Lauf mehr offen. Ohne diesen Zweig meldete das
+  // Werkzeug "Hackingweg: undefined" und "noch nicht schaetzbar" - fuer einen
+  // Zustand, in dem es nichts mehr zu schaetzen gibt. Nur ohne offenen Lauf:
+  // steht die Route auf "done", waehrend ein Lauf offen ist, haengt der
+  // Abschluss - das bleibt ein Befund fuer die Pfade weiter unten.
+  // Steht hier und nicht weiter oben: ausgeben() liest `punkte` (Totzone).
+  if (ausgangGut && ausgangGut.route_state === "done" && !ausgangGut.lauf) {
+    sag("Route abgearbeitet: alle Eintraege erledigt, kein Lauf mehr offen. Der Bot springt nicht mehr.");
+    sag("");
+    sag("FERTIG VORAUSSICHTLICH: erreicht - die Route ist abgeschlossen.");
+    sag("URTEIL: ROUTE FERTIG");
+    return ausgeben(zeilen, { ...bericht, urteil: "ROUTE FERTIG" });
+  }
+
   // DER SPRUNG IST SACHE VON ausgang.js (02.09.2026). Hier wird nur noch
   // gelesen, ob er laeuft, klemmt oder an einem fehlenden Gewerk haengt.
   const letzteAusgangZeile = ausgangTxt.trim().split("\n").pop() || "";

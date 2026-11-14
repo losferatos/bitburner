@@ -40,7 +40,7 @@
  * ===========================================================================
  *
  * `node tools/ram.js --eichen` rechnet gegen `doku/ram-messung-2026-09-04.json`
- * - 114 Werte, die das laufende Spiel selbst geliefert hat. Ein Rechner, der
+ * - 126 Werte (urspruenglich 114, Stand 14.11.2026 nachgemessen), die das laufende Spiel selbst geliefert hat. Ein Rechner, der
  * nicht gegen echte Messwerte geeicht ist, ist eine vierte Meinung.
  *
  * Aufruf:

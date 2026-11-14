@@ -176,6 +176,18 @@ for (const e of reg.eintraege || []) {
   } else if (!Number.isFinite(e.ramBaseGb)) {
     fehler.push(wo + ": ramBaseGb ist weder Zahl noch null (" + JSON.stringify(e.ramBaseGb) + ")");
   }
+  // SF4-RIEGEL (K09, 14.11.2026): `lib/reg.js` sperrt Eintraege mit
+  // `singularity: true` ohne SF4 ausserhalb von BN4. Das Feld ist damit kein
+  // Kommentar mehr, sondern eine Entscheidung - und es darf nicht von
+  // `ramSingGb` abweichen: ein Gewerk, das Singularity-Kosten traegt, aber nicht
+  // gesperrt wird, startet in BN1.1 und wirft; eines, das gesperrt wird, ohne
+  // Singularity zu rufen, fehlt ohne Grund.
+  if (typeof e.singularity !== "boolean") {
+    fehler.push(wo + ": Feld singularity fehlt oder ist kein Wahrheitswert");
+  } else if (e.singularity !== (Number(e.ramSingGb) > 0)) {
+    fehler.push(wo + ": singularity " + e.singularity + " passt nicht zu ramSingGb "
+      + JSON.stringify(e.ramSingGb) + " (muss genau dann wahr sein, wenn ramSingGb > 0)");
+  }
   if (!["home", "any", "werkbank", "not-hacknet"].includes(e.hostRule)) {
     fehler.push(wo + ": unbekannte hostRule '" + e.hostRule + "'");
   }

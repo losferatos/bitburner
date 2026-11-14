@@ -29,7 +29,7 @@
  *
  * @param {NS} ns
  */
-import { zielErlaubt } from "lib/route.js";
+import { zielErlaubt, leseEpoche, ladeRoute, routeDatei, ROUTE_DATEI, EPOCHE_DATEI } from "lib/route.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
@@ -68,16 +68,26 @@ export async function main(ns) {
   // KEIN UEBERSTIMMUNGSFLAG: die Route ist unveraenderlich. Wer woanders hin
   // will, aendert route.json - sichtbar, versioniert, mit Commit.
   try {
-    if (!ns.fileExists("route.json", "home") && !ns.fileExists("route.json")) {
-      sag("SPRUNG ABGELEHNT: route.json ist weder hier noch auf home zu finden."
-        + " Ohne Route laesst sich das Ziel nicht pruefen.");
+    // Epoche und Route (K01, 14.11.2026): epoche.json gibt es nur nach der
+    // Lauf-2-Uebergabe; ohne sie gilt Lauf 1 (route.json), wie bisher. Die
+    // Dateien werden von home geholt (auf einem Fremdrechner per scp, immer
+    // frisch), eine fehlende Epochendatei auf home gilt als "nicht gesetzt" -
+    // auch wenn auf dem Wirt eine alte Kopie liegt.
+    const host = ns.getHostname();
+    const hole = (d) => {
+      if (!ns.fileExists(d, "home")) return "";
+      if (host !== "home") ns.scp(d, host, "home");
+      return ns.read(d);
+    };
+    const epoche = leseEpoche(hole(EPOCHE_DATEI));
+    const routeName = routeDatei(epoche) || ROUTE_DATEI.lauf1;
+    const info = ns.getResetInfo();
+    const geladen = ladeRoute(hole(routeName), epoche, info.currentNode, info.ownedSF);
+    if (!geladen.route.length) {
+      sag("SPRUNG ABGELEHNT: Route nicht ladbar (" + geladen.grund + "). Ohne Route laesst sich das Ziel nicht pruefen.");
       return;
     }
-    if (ns.getHostname() !== "home" && !ns.fileExists("route.json")) {
-      ns.scp("route.json", ns.getHostname(), "home");
-    }
-    const route = JSON.parse(ns.read("route.json")).route;
-    const info = ns.getResetInfo();
+    const route = geladen.route;
     const p = zielErlaubt(route, info.currentNode, info.ownedSF, ziel,
       (d) => ns.fileExists(d, "home"));
     if (!p.ok) {

@@ -378,6 +378,28 @@ console.log("-- RAM-Bedarf mit dem Singularity-Faktor --");
 }
 
 console.log("");
+console.log("-- SF4-Riegel (K09): Singularity-Gewerke nur in BN4 oder mit SF4 --");
+{
+  // Die ausfuehrliche Pruefung (alt/neu ueber alle Eintraege, Mock) steht in
+  // tools/test-sf4-riegel.js. Hier die Kernaussagen an einem Beispiel.
+  const hg = registry.eintraege.find((e) => e.name === "homegrow.js");
+  pruefe("homegrow.js ist als Singularity-Gewerk gekennzeichnet", !!hg && hg.singularity === true);
+  if (hg) {
+    const l = { verfahren: "V1", phase: "kaltstart", dateiDa: () => true };
+    pruefe("BN1 ohne SF4: gesperrt", !REG.gilt(hg, { ...l, node: 1, ownedSF: { 4: 0 } }).gilt);
+    pruefe("BN1 mit SF4.1: gilt", REG.gilt(hg, { ...l, node: 1, ownedSF: { 4: 1 } }).gilt);
+    pruefe("BN4 ohne SF4: gilt", REG.gilt(hg, { ...l, node: 4, ownedSF: new Map() }).gilt);
+    pruefe("Lage ohne SF-Auskunft: gilt wie bisher", REG.gilt(hg, { ...l, node: 1 }).gilt);
+    pruefe("Kern/Waechter-Weg: merkmaleAusReset traegt SF4 (BN1 ohne SF4 -> gesperrt)",
+      !REG.gilt(hg, { ...l, node: 1, features: REG.merkmaleAusReset({ currentNode: 1, ownedSF: new Map() }) }).gilt);
+    pruefe("Kern/Waechter-Weg: mit SF4.3 -> gilt",
+      REG.gilt(hg, { ...l, node: 10, features: REG.merkmaleAusReset({ currentNode: 10, ownedSF: new Map([[4, 3]]) }) }).gilt);
+  }
+  pruefe("kein Eintrag ohne Singularity-Anteil ist gekennzeichnet",
+    registry.eintraege.every((e) => (e.singularity === true) === (Number(e.ramSingGb) > 0)));
+}
+
+console.log("");
 console.log("-- Sortierung nach Prioritaet --");
 {
   const lage = { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true };

@@ -1,20 +1,32 @@
 ---
 name: bb
-description: Der Besuch beim Bitburner-Bot alle paar Tage — läuft noch alles in die richtige Richtung, und hat der Bot den BitNode-Wechsel selbst geschafft? Nutzen bei /bb und wenn Eric fragt „wie steht's im Bot", „läuft der noch richtig", „sind wir noch on track", „ist er schon gesprungen". NICHT nutzen zum Aufsetzen von Dauerloops (das war /bb-loops, seit 31.08.2026 abgeschafft) und nicht für Umbauten am Bot — dafür sagt Eric ausdrücklich Bescheid.
+description: Der Besuch beim Bitburner-Bot alle paar Tage — läuft noch alles in die richtige Richtung, und hat der Bot den BitNode-Wechsel selbst geschafft? Nutzen bei /bb und wenn Eric fragt „wie steht's im Bot", „läuft der noch richtig", „sind wir noch on track", „ist er schon gesprungen". NICHT nutzen zum Aufsetzen von Dauerloops (das war /bb-loops, seit 31.08.2026 abgeschafft). Zeigt der Besuch ein Problem, wird es im selben Zug gefixt (Arbeitsauftrag seit 22.09.2026).
 ---
 
 # Bitburner: der Check-in
 
 Eric spielt Bitburner, wenn er am Rechner sitzt, und schaltet es sonst aus.
 Alle paar Tage kommt er mit **einer** Frage vorbei: *Läuft es, oder läuft
-was schief?* Dieser Skill beantwortet genau das und hört dann auf.
+was schief?* Dieser Skill beantwortet genau das.
 
 Arbeitsverzeichnis: `C:\Users\erche\Desktop\claude_projecto\bitburner`
 
-**Was hier NICHT passiert** (das ist der Zweck der Umstellung vom 31.08.2026):
-kein Optimieren, kein Hebelsuchen, kein Abarbeiten von `nodes/BAUSTELLEN.md`,
-keine Subagenten. Findest du unterwegs etwas, das repariert gehört, **trägst
-du es ein und erwähnst es in einem Halbsatz**, statt es anzufassen.
+**Zeigt der Besuch ein Problem, ist das ein Arbeitsauftrag (seit 22.09.2026).**
+Erics Ansage: *„Der ingame Bot soll so autonom und optimal (wir haben immerhin
+den source code) wie möglich agieren. Die Claude Code Session dient nur dafür
+dies zu gewährleisten."* Eine Unregelmäßigkeit wird also **gefixt**, nicht nur
+eingetragen: messen, Ursache belegen, bauen, Test (rot gegen alten Code, grün
+gegen neuen), Skeptiker-Subagent, committen, einspielen (`tools/einspielen.js
+--pruefen`, `tools/neustart.js` mit PID-Beleg), im Spiel nachmessen. Und nicht
+beim Berichten anhalten, solange Befunde offen sind. Subagenten sind erlaubt.
+
+Was sich damit NICHT ändert: keine Dauerloops, kein Handsprung, keine
+Augmentierungen von Hand, keine Push-Nachrichten (Abschnitt unten).
+
+**Vorsicht, die Brücke schiebt `src/` sofort ins Spiel.** Jede gespeicherte
+Änderung dort liegt 400 ms später im laufenden Spiel (nur die Datei - laufende
+Skripte behalten ihren Code bis zum Neustart). Unfertiges also nicht in `src/`
+liegen lassen; Gegenproben gegen alten Code in einer Kopie außerhalb fahren.
 
 **Seit dem 02.09.2026 springt der Bot selbst.** `src/ausgang.js` liest
 `src/route.json` (die Roadmap als Datei) und `ns.getResetInfo()`, kennt beide
@@ -41,8 +53,13 @@ das Spiel seit dem letzten Besuch durchgelaufen ist.
 
 Ist die Brücke tot (`URTEIL: BLIND`), starte **nur sie**:
 
-```bash
-cd /c/Users/erche/Desktop/claude_projecto/bitburner && node sync/bridge.js > "$TEMP/bridge.log" 2>&1 &
+Per WMI im PowerShell-Werkzeug, NICHT per nohup (29.09.2026): Aus dem
+Bash- oder PowerShell-Werkzeug gestartet, starb die Brücke still, sobald die
+Claude-App ihre Prozesse abräumte (vermutlich Job-Objekt; kein Eintrag in
+data/bridge.log). Per WMI gestartet hat sie die Nacht zum 30.09. überlebt.
+
+```powershell
+Invoke-CimMethod -ClassName Win32_Process -MethodName Create -Arguments @{ CommandLine = 'cmd /c "cd /d C:\Users\erche\Desktop\claude_projecto\bitburner && "C:\Program Files\nodejs\node.exe" sync/bridge.js --instance LIVE > %TEMP%\bridge-live.log 2>&1"'; CurrentDirectory = 'C:\Users\erche\Desktop\claude_projecto\bitburner' }
 ```
 
 Danach fünf Sekunden warten und den Prüflauf wiederholen.
@@ -59,15 +76,14 @@ sag Eric das in einem Halbsatz.
 |---|---|
 | `AUF KURS` | Nichts. Drei Zeilen ausgeben, fertig. |
 | `SPRINGT` | `exit.js` läuft. Eine Minute warten, erneut messen: steht der neue Knoten (Lauf +1 oder anderer Knoten), ist der Wechsel geglückt. |
-| `SPRUNG KLEMMT` | Ausgang offen, aber `exit.js` findet keinen Platz oder endete ohne Sprung. `data/ausgang.txt` über die Brücke lesen, die letzte Zeile sagt warum. Eintragen. |
+| `SPRUNG KLEMMT` | Ausgang offen, aber `exit.js` findet keinen Platz oder endete ohne Sprung. `data/ausgang.txt` über die Brücke lesen, die letzte Zeile sagt warum. Ursache fixen. |
 | `GEWERK FEHLT` | Der Knoten ist fertig, und nur noch Einträge mit fehlendem Gewerk sind offen (`boerse.js` für BN8; `hashes.js` für BN9 gibt es seit 02.09.). Eric sagen, was fehlt — das ist der einzige Fall, in dem der Bot wirklich auf einen Menschen wartet. |
 | `AUSGANG FEHLT` | `data/ausgang.json` ist alt oder fehlt: `ausgang.js` läuft nicht, also springt am Ende niemand. Starten: `node tools/task.js ausgang.js`, dann erneut messen. |
 | `HACKINGWEG` | V1-Knoten (BN1, 5, 12, 8): kein Rang, der Träger ist das Hacking-Level gegen w0r1d_d43m0n. Stand steht in der Kopfzeile. |
 | `ANLAUF` | V2-Knoten vor dem Bladeburner-Beitritt: Kampfwerttraining trägt, `node tools/tor.js` rechnet die Phase. |
-| `ZAEH` | Die ETA ist gegenüber dem letzten Besuch **gestiegen**. Nachsehen, woran (Abschnitt 3), aber nichts umbauen. |
+| `ZAEH` | Die ETA ist gegenüber dem letzten Besuch **gestiegen**. Nachsehen, woran (Abschnitt 3); ist es ein Bot-Fehler, fixen. |
 | `STEHT` | Der Rang bewegt sich nicht. Erst `node tools/rueckstand.js` — hängt das Spiel nur der Uhr hinterher, ist nichts kaputt. Sonst Abschnitt 3. |
 | `HILFE` | Der Bot hat selbst `data/hilfe.txt` geschrieben (nur noch `bbtrain.js`). Den Text lesen und Eric sagen, was er bedeutet. |
-| `TORRUNDE-BEFUND`-Zeile im Bericht | Nur im Kampfknoten mit Gang. Der Kaufaufschub (P1) hat einen Fehler gezaehlt: `P1 IST AUS` heisst, der Torrunden-Block wirft und `bn4rep.js` kauft mit der alten Schleife trotz Einbausperre alles Verdiente. Die Ursache steht im Befund (letzter Fehler) und in `data/bn4rep.json` -> `torRunde`; eintragen und Eric in einem Halbsatz sagen. Die Zeile "Torrunde: ..." davor nennt Modus, Plan und Wartegrund (Gang-Vorrat). |
 | `ACHTUNG`-Zeile im Bericht | Der Rang liegt über 400.000, aber die Black-Ops-Liste war nicht lesbar. Eine Minute später erneut messen. |
 | `SPIEL ZU` | Kein Fehler. Eric sagen, dass der Tab zu ist — mehr nicht. |
 | `BLIND` | Brücke starten (oben), dann neu messen. |
@@ -105,8 +121,12 @@ Bevor du irgendetwas anderes vermutest:
   `race` (nicht `hourly` — sonst fräße der Stückzahldeckel in vier Stunden
   genau die Historie weg, die man zum Nachsehen braucht).
 
-- **War der Rechner aus oder der Tab verdeckt?** Ein verdeckter Tab wird
-  hart gedrosselt; ein ausgeschalteter Rechner schreibt beim Laden die
+- **War der Rechner aus oder der Tab verdeckt?** Ein verdeckter Tab ist
+  KEIN Befund, solange der Tonanker `wakelock.js` laeuft - `checkin.js`
+  schreibt es hinter "Tab verdeckt" dazu (am 22./23.10. gemessen: verdeckt
+  6 Runden je Minute, volle Fahrt). Eric NICHT raten, den Tab in den
+  Vordergrund zu holen; nur "OHNE Tonanker" ist ein Fall zum Fixen
+  (wakelock.js neu starten). Ein ausgeschalteter Rechner schreibt beim Laden die
   zuletzt laufende Arbeit als Klumpen auf EINEN Wert (10 h Gym gingen am
   02.09. komplett auf Agility). Beides sieht wie „langsam" aus und ist
   keins von beiden ein Bot-Fehler.
@@ -115,10 +135,9 @@ Bevor du irgendetwas anderes vermutest:
   Sleeve. Ein Konto, das plötzlich fällt, ist meist das.
 
 Erst danach lohnt ein Blick auf `node tools/strategie-check.js` und
-`node tools/plan.js`. Findest du eine echte Ursache: **eintragen, nicht
-reparieren.** Änderungen an `src/` laufen unbeaufsichtigt weiter und gehören
-vor dem Einbau durch einen Skeptiker-Lauf — und der ist eine eigene
-Verabredung mit Eric, nicht Teil dieses Besuchs.
+`node tools/plan.js`. Findest du eine echte Ursache: **fixen** (Ablauf oben). Änderungen an `src/`
+laufen unbeaufsichtigt weiter und gehören vor dem Einbau durch einen
+Skeptiker-Subagenten — der ist Teil des Fixes, keine eigene Verabredung.
 
 ## 4. Ausgabe
 
@@ -146,8 +165,6 @@ Läuft alles, sind drei Zeilen plus die Schlusszeile genug.
 - **Von Hand springen.** `node tools/task.js exit.js <ziel>` umgeht die
   Route und die Gewerk-Prüfung — das war der Weg bis zum 01.09. und ist es
   nicht mehr. Wenn der Bot nicht springt, sagt `data/ausgang.txt` warum.
-- **Optimieren oder umbauen.** Auch wenn ein Hebel offensichtlich aussieht:
-  eintragen, weitergehen.
 - **Push-Nachrichten schicken.** Der ntfy-Kanal ist seit dem 31.08.2026
   dauerhaft aus (`~/.claude/notify-aus`), auf Erics ausdrückliche Ansage.
 - **Augmentierungen von Hand kaufen**, einen zweiten Tab auf

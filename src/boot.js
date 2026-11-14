@@ -173,6 +173,42 @@ export async function main(ns) {
     }
   }
 
+  // KALTSTART-ZWEIG (Lauf 2, 14.11.2026): home unter 32 GB.
+  //
+  // So klein ist home nur in BN1.1 ohne Source-File 1 (Prestige.ts:245-252:
+  // 8 GB ohne SF1, 32 GB mit SF1, 128 GB mit SF9.2; Upgrades verdoppeln). Mit
+  // SF1 - also in jedem Lauf-1-Knoten und ab BN1.2 - ist home nach jedem
+  // Knotenwechsel mindestens 32 GB, dieser Zweig greift dort nie.
+  //
+  // Der Kern (bn4net 10,8 GB) und der Waechter (6,1 GB) passen auf 8 GB nicht,
+  // auf 16 GB nur einzeln (16,9 > 16) - die Schleife unten wuerde ewig warten
+  // und nach fuenf Minuten alles ausser der Schonliste beenden, auch
+  // coldstart.js (Befund A1, nodes/audit-lauf2/5a; Skeptiker 14.11.2026: bei
+  // 16 GB und AutoexecScript boot.js blieb von coldstart.js nichts uebrig).
+  // Statt dessen tritt coldstart.js an (5,0 GB, ohne Singularity), bis home
+  // 32 GB hat; dann startet es boot.js selbst wieder.
+  //
+  // Auf 8 GB passt coldstart.js neben boot.js (5,5 GB) NICHT (10,5 > 8): exec
+  // gibt 0 zurueck, und boot.js beendet sich mit dem Hinweis `run coldstart.js`,
+  // damit der Handstart Platz hat. Deshalb gehoert fuer Lauf 2 als
+  // AutoexecScript `coldstart.js` eingetragen (doku/lauf2-bn11-start.md): dann
+  // kommt nach jedem Neuladen coldstart.js zuerst und uebergibt ab 32 GB selbst
+  // an boot.js. Fehlt coldstart.js, gilt der alte Pfad.
+  if (ns.getServerMaxRam("home") < 32 && ns.fileExists("coldstart.js", "home")) {
+    if (ns.ps("home").some((p) => p.filename === "coldstart.js")) {
+      sag("Kaltstart: coldstart.js laeuft bereits. Fertig.");
+      return;
+    }
+    if (ns.exec("coldstart.js", "home")) {
+      sag("Kaltstart: home hat nur " + ns.getServerMaxRam("home")
+        + " GB, coldstart.js gestartet. Fertig.");
+    } else {
+      sag("Kaltstart: home hat nur " + ns.getServerMaxRam("home")
+        + " GB, coldstart.js passt nicht neben boot.js. Bitte von Hand: run coldstart.js");
+    }
+    return;
+  }
+
   // Bis zu zwanzig Minuten lang versuchen. So lange braucht es nie, aber ein
   // stiller Abbruch nach drei Fehlversuchen waere genau der Ausfall, den
   // diese Datei verhindern soll.

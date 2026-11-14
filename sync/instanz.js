@@ -22,6 +22,7 @@
 
 import path from "node:path";
 import os from "node:os";
+import fs from "node:fs";
 import { fileURLToPath } from "node:url";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
@@ -43,8 +44,143 @@ export const LIVE_ROOT = path.join(
   "bitburner",
 );
 
-/** Der einzige Spielstand, der als LIVE gilt. */
-export const LIVE_IDENTIFIER = "197f4d61481686";
+/**
+ * Der Spielstand von Lauf 1. Er bleibt die Vorgabe, solange es keine
+ * Identitaetsdatei gibt - ohne sie verhaelt sich alles wie vor dem 14.11.2026.
+ */
+export const LIVE1_IDENTIFIER = "197f4d61481686";
+
+/**
+ * DIE IDENTITAET DER LIVE-ROLLE IST EINE DATEI MIT BENANNTER EPOCHE
+ * (Z1, Lauf-2-Uebergabe, 14.11.2026).
+ *
+ * Bis hierher stand der identifier als Konstante im Code. Fuer Lauf 2 (ein
+ * frischer Spielstand, der identifier wird im PlayerObject-Konstruktor neu
+ * gewuerfelt, PlayerObject.ts:160) muss er wechseln koennen - aber NIE aus
+ * beobachtetem Zustand: geht das Browserprofil verloren, startet das Spiel
+ * ebenfalls frisch mit neuem identifier, und eine Bruecke, die dann von
+ * selbst umschaltete, wuerde genau den Fall durchwinken, gegen den sie gebaut
+ * ist (5c-skeptiker-kaltstart.md, Abschnitt 3a, Punkt 1).
+ *
+ * Deshalb:
+ *   - Fehlt die Datei, gilt LIVE1_IDENTIFIER, Epoche "lauf1" - bitgleich zum
+ *     Stand vor dem Umbau.
+ *   - Geschrieben wird sie nur von tools/lauf2-uebergabe.js, von Hand, mit
+ *     --pin <identifier>. Die Bruecke liest sie nur.
+ *   - Ist sie vorhanden, aber kaputt, wird NICHT auf Lauf 1 zurueckgefallen
+ *     (das waere ein stiller Epochenwechsel rueckwaerts), sondern gesperrt:
+ *     die LIVE-Bruecke startet nicht, und jedes Werkzeug, das den identifier
+ *     prueft, lehnt ab.
+ */
+export const IDENTITAET_DATEI = path.join(ROOT, "sync", "identitaet.json");
+
+/**
+ * Steht im identifier der LIVE-Rolle, wenn die Identitaetsdatei kaputt ist.
+ * cyrb53 liefert Kleinbuchstaben-Hex - kein echter Spielstand heisst so,
+ * jede identifier-Pruefung faellt dann durch (fail closed).
+ */
+export const SPERR_IDENTIFIER = "UNGUELTIG-identitaet-json";
+
+/** cyrb53 (HashUtils.ts:8-19): 53 Bit als Hex, hoechstens 14 Zeichen. */
+export const IDENTIFIER_MUSTER = /^[0-9a-f]{1,14}$/;
+export const EPOCHEN_MUSTER = /^lauf[1-9][0-9]*$/;
+
+function identitaetGesperrt(datei, grund) {
+  return {
+    aktiv: true,
+    epoche: null,
+    identifier: SPERR_IDENTIFIER,
+    anker: null,
+    quelle: "datei",
+    datei,
+    fehler: grund,
+  };
+}
+
+/**
+ * Liest eine Identitaetsdatei.
+ *
+ * @param {string} datei
+ * @param {string|null} vorgabeIdentifier gilt, wenn die Datei FEHLT
+ *   (LIVE: LIVE1_IDENTIFIER; Pruefstand: null = keine Vorgabe)
+ * @returns {{aktiv: boolean, epoche: string|null, identifier: string|null,
+ *   anker: number|null, quelle: "vorgabe"|"datei", datei: string,
+ *   fehler: string|null}}
+ */
+export function ladeIdentitaet(datei, vorgabeIdentifier = LIVE1_IDENTIFIER) {
+  let roh;
+  try {
+    roh = fs.readFileSync(datei, "utf8");
+  } catch (e) {
+    if (e && e.code === "ENOENT") {
+      return {
+        aktiv: false,
+        epoche: vorgabeIdentifier ? "lauf1" : null,
+        identifier: vorgabeIdentifier,
+        anker: null,
+        quelle: "vorgabe",
+        datei,
+        fehler: null,
+      };
+    }
+    return identitaetGesperrt(datei, "nicht lesbar: " + (e && e.message));
+  }
+  let j;
+  try {
+    j = JSON.parse(roh);
+  } catch (e) {
+    return identitaetGesperrt(datei, "kein gueltiges JSON: " + e.message);
+  }
+  if (!j || typeof j !== "object" || Array.isArray(j)) {
+    return identitaetGesperrt(datei, "kein JSON-Objekt");
+  }
+  if (typeof j.identifier !== "string" || !IDENTIFIER_MUSTER.test(j.identifier)) {
+    return identitaetGesperrt(datei, "identifier fehlt oder ist kein cyrb53-Hex: " + JSON.stringify(j.identifier));
+  }
+  if (typeof j.epoche !== "string" || !EPOCHEN_MUSTER.test(j.epoche)) {
+    return identitaetGesperrt(datei, "epoche fehlt oder hat nicht die Form lauf<N>: " + JSON.stringify(j.epoche));
+  }
+  let anker = null;
+  if (j.anker != null) {
+    const t = j.anker && typeof j.anker === "object" ? j.anker.totalPlaytime : undefined;
+    if (typeof t !== "number" || !Number.isFinite(t) || t < 0) {
+      return identitaetGesperrt(datei, "anker.totalPlaytime ist keine Zahl >= 0");
+    }
+    anker = t;
+  }
+  return {
+    aktiv: true,
+    epoche: j.epoche,
+    identifier: j.identifier,
+    anker,
+    quelle: "datei",
+    datei,
+    fehler: null,
+  };
+}
+
+/** Die Identitaet der LIVE-Rolle, einmal beim Laden gelesen. */
+export const IDENTITAET = ladeIdentitaet(IDENTITAET_DATEI);
+
+/** Der einzige Spielstand, der als LIVE gilt (ohne Datei: LIVE1_IDENTIFIER). */
+export const LIVE_IDENTIFIER = IDENTITAET.fehler ? SPERR_IDENTIFIER : IDENTITAET.identifier;
+
+/**
+ * Der Praefix, unter dem Ankersuche, Rotation und Altersmessung die
+ * Sicherungen sehen.
+ *
+ * Ohne aktive Identitaetsdatei ist es der Rollenpraefix (`LIVE_`) - bitgleich
+ * zum alten Verhalten. In einer Epoche ist es `LIVE_<identifier>_`: der
+ * Dateiname traegt den identifier ohnehin (backup.js dateiName), damit sehen
+ * Index-Anker und `rotiere()` nur noch die Sicherungen der laufenden Epoche.
+ * Das deckt zwei Fehlermodi aus 5c (Abschnitt 3a): Lauf-1-Dateien, die doch
+ * im rotierenden Ordner liegen, fliegen nicht als "aelteste" zuerst raus,
+ * und eine Lauf-1-Indexzeile wird nie zum Anker des neuen Spiels.
+ */
+export function epochenPraefix(prefix, identitaet) {
+  if (!identitaet || !identitaet.aktiv || identitaet.fehler || !identitaet.identifier) return prefix;
+  return prefix + identitaet.identifier + "_";
+}
 
 /** Vergleicht zwei Pfade unabhaengig von Schraegstrichform und Gross/Kleinschreibung. */
 export function pfadGleich(a, b) {
@@ -176,7 +312,9 @@ export const RAEUM_REIHENFOLGE = ["pre-hotswap", "connect", "race", "manual", "h
  * Loeschen von boot.js macht den naechsten Knotenwechsel unwiederbringlich
  * still, weil das Autoexec-Skript dann fehlt.
  */
-export const SCHONLISTE = ["boot.js", "bn4net.js", "exit.js", "ausgang.js", "route.json"];
+// route-lauf2.json und epoche.json (K01, Zusammenbau 14.11.2026): Route und
+// Epochenschalter von Lauf 2 sind genauso wenig beilaeufig loeschbar wie route.json.
+export const SCHONLISTE = ["boot.js", "bn4net.js", "exit.js", "ausgang.js", "route.json", "route-lauf2.json", "epoche.json"];
 
 export function rolleAusArgv(argv) {
   const i = argv.indexOf("--instance");

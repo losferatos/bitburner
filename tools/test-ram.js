@@ -130,10 +130,16 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     const alt = [];
     for (const d of daten) {
       const datei = path.join(wurzel, d.file);
-      const jetztHash = fs.existsSync(datei)
-        ? createHash("sha256").update(fs.readFileSync(datei)).digest("hex")
+      // Zusammenbau Lauf 2 (14.11.2026): die Stempel meinen die LF-Bytes des
+      // Haupt-Repos. Ein Worktree mit core.autocrlf=true checkt CRLF aus - dann
+      // zaehlt der Hash ueber den auf LF normalisierten Inhalt. Inhaltlich ist
+      // das dieselbe Datei; der Rohhash bleibt der erste Versuch.
+      const roh = fs.existsSync(datei) ? fs.readFileSync(datei) : null;
+      const jetztHash = roh ? createHash("sha256").update(roh).digest("hex") : null;
+      const lfHash = roh
+        ? createHash("sha256").update(Buffer.from(roh.toString("latin1").replace(/\r\n/g, "\n"), "latin1")).digest("hex")
         : null;
-      const stimmtNoch = d.sha256 && jetztHash === d.sha256;
+      const stimmtNoch = d.sha256 && (jetztHash === d.sha256 || lfHash === d.sha256);
       if (!stimmtNoch) {
         veraltet++;
         alt.push(d.file);
@@ -246,7 +252,27 @@ console.log("-- geeicht gegen 114 Live-Messwerte --");
     // Spielzugriff. (Im Worktree zeigt der Test zusaetzlich viele Zeilen rot, weil
     // dort alle Dateien CRLF haben und die Stempel die Rohbytes des Haupt-Repos
     // meinen; das ist ein Artefakt der Auscheckform, keine Abweichung.)
-    const VERALTET_ERLAUBT = [];
+    //
+    // 2026-11-14 (Lauf-2-Kaltstart, Branch lauf2-kaltstart): homegrow.js (G50,
+    // Kernkauf mit Ertragspruefung) und boot.js (Z6, Zweig home < 16 GB) haben
+    // neuen Inhalt, aber keinen neuen ns-Aufruf. Die Zusatzpruefung direkt
+    // darunter verlangt, dass tools/ram.js fuer beide weiter EXAKT den alten
+    // Live-Wert rechnet (148,5 / 5,5 GB). Nach dem Einspielen neu messen und
+    // die Liste wieder auf [] setzen.
+    //
+    // 2026-11-14 (Skeptiker-Reparatur): exit.js und ausgang.js lesen jetzt die
+    // Epoche (leseEpoche/ladeRoute aus lib/route.js, reine Funktionen ohne
+    // ns-Aufruf) und die Route der Epoche; boot.js hat die Schwelle 32 statt 16.
+    // KEIN neuer ns-Aufruf: die Zusatzpruefung unten verlangt weiter, dass
+    // tools/ram.js EXAKT den alten Live-Wert rechnet (520,25 / 8,15 / 5,5 GB).
+    const VERALTET_ERLAUBT = ["homegrow.js", "boot.js", "exit.js", "ausgang.js"];
+    for (const f of VERALTET_ERLAUBT.filter((x) => alt.includes(x))) {
+      const d = daten.find((x) => x.file === f);
+      const r = rechne(f, { sf4: 1, wurzel });
+      pruefe("veraltet erlaubt, aber gleicher Rechenwert: " + f,
+        !!d && r.gb !== null && Math.abs(r.gb - d.live41) < 0.005,
+        "live " + (d && d.live41) + ", gerechnet " + r.gb);
+    }
     const unerwartet = alt.filter((f) => !VERALTET_ERLAUBT.includes(f));
     pruefe("keine Zeile veraltet unbemerkt", unerwartet.length === 0,
       unerwartet.join(", ") + " - neu messen (calculateRam im Spiel) oder die "

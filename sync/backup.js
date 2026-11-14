@@ -414,11 +414,16 @@ export async function sichere(opt) {
     spiegel = BACKUP_SPIEGEL,
     jetzt = new Date(),
   } = opt;
+  // EPOCHENPRAEFIX (Z1, 14.11.2026): ueber ihn sehen Rueckwaertssprung-Anker
+  // und Rotation nur die Sicherungen der laufenden Epoche (`LIVE_<id>_`,
+  // siehe instanz.js epochenPraefix). Ohne Angabe der Rollenpraefix -
+  // bitgleich zum alten Verhalten. Der DATEINAME bleibt praefix + identifier.
+  const epochenPraefix = opt.epochenPraefix || praefix;
 
   const geholt = await holeSpielstand(dashPort);
   const k = lesenKennwerte(geholt.roh, geholt.binary);
 
-  const vorher = letzterEintrag(primaer, praefix);
+  const vorher = letzterEintrag(primaer, epochenPraefix);
   const urteil = pruefeKennwerte(k, {
     identifier: erwartetIdentifier,
     port: erwartetPort,
@@ -477,7 +482,7 @@ export async function sichere(opt) {
     };
     for (const ort of [primaer, spiegel].filter(Boolean)) schreibeIndexZeile(ort, eintrag);
     for (const ort of [primaer, spiegel].filter(Boolean)) {
-      geloescht.push(...rotiere(ort, praefix));
+      geloescht.push(...rotiere(ort, epochenPraefix));
     }
   }
 

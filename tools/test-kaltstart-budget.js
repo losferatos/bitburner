@@ -53,6 +53,11 @@
  * die bisher niemand gestellt hat: die Summe aller Kaltstart-Eintraege liegt
  * bei ueber hundert Gigabyte.
  *
+ * LAUF 2 (K10, 14.11.2026): der letzte Abschnitt rechnet dieselbe Frage fuer den
+ * frischen Spielstand von Lauf 2 - home 8/16/32 und der SF-Stand je Eintrag aus
+ * `src/route-lauf2.json` (Start: keine Source-Files). Der Lauf-1-Teil oben bleibt
+ * unveraendert und liest weiter `src/route.json`.
+ *
  * Aufruf: node tools/test-kaltstart-budget.js
  */
 
@@ -84,16 +89,27 @@ const HOME_GB = 32;
  * hebt sein Source-File auf die gespielte Stufe. `RedPill.tsx:60-77` vergibt
  * es VOR `prestigeSourceFile`, der neue Stand gilt also sofort beim Sprung.
  */
-function standVorEintrag(route, index) {
-  const sf = { 1: 1, 4: 1, 5: 1, 6: 1, 10: 1 };   // Stand 04.09.2026, gemessen
+// Lauf 1: Stand vom 04.09.2026 (gemessen). Lauf 2 (K10, 14.11.2026): frischer
+// Spielstand, alle Source-Files leer - der Stand entsteht NUR aus der Route.
+const SF_LAUF1 = { 1: 1, 4: 1, 5: 1, 6: 1, 10: 1 };
+const SF_LAUF2 = {};
+
+/** home nach einem BitNode-Wechsel aus dem SF-Stand (Prestige.ts:246-252). */
+function homeNachSprung(sf) {
+  return (sf[9] || 0) >= 2 ? 128 : ((sf[1] || 0) > 0 ? 32 : 8);
+}
+
+function standVorEintrag(route, index, start = SF_LAUF1) {
+  const sf = { ...start };
   for (let i = 0; i < index; i++) {
     const e = route[i];
     sf[e.node] = Math.max(sf[e.node] || 0, e.level);
   }
   return {
     sf4: sf[4] || 0,
-    homeGb: (sf[9] || 0) >= 2 ? 128 : ((sf[1] || 0) > 0 ? 32 : 8),
+    homeGb: homeNachSprung(sf),
     sf9: sf[9] || 0,
+    sf,
   };
 }
 
@@ -118,9 +134,16 @@ function pruefe(name, bedingung, hinweis = "") {
  * Singularity-Familie den Grundpreis statt das Sechzehnfache - fuer 32
  * Dateien ein Unterschied bis Faktor 16.
  */
+// Zwischenspeicher (14.11.2026): rechne() parst die Quellen jedes Mal neu, und die
+// Routenlaeufe fragen dieselben (Name, BitNode, SF4)-Paare hundertfach. Die Datei
+// aendert sich waehrend des Tests nicht - das Ergebnis ist je Schluessel gleich.
+const BEDARF_CACHE = new Map();
 function bedarf(name, bitNode, sf4 = 1) {
-  const r = rechne(name, bitNode === 4 ? { bitNode: 4 } : { sf4 });
-  return r.gb;
+  const key = name + "|" + (bitNode === 4 ? "bn4" : "sf" + sf4);
+  if (!BEDARF_CACHE.has(key)) {
+    BEDARF_CACHE.set(key, rechne(name, bitNode === 4 ? { bitNode: 4 } : { sf4 }).gb);
+  }
+  return BEDARF_CACHE.get(key);
 }
 
 /**
@@ -144,7 +167,9 @@ function startlage(bitNode, verfahren, extraDateien = [], schonBelegt = 0,
     // Feature 9 = Hacknet-Server: in BitNode 9 selbst und ab dem ersten
     // SF9 in jedem Knoten. Bis 19.09. stand hier `features: {}` - hashes.js
     // fiel damit in allen 40 Routeneintraegen aus dem Test (Skeptiker).
-    ownedSF: { 9: sf9 },
+    // SF4 gehoert seit K09 (SF4-Riegel in reg.js) zur Lage: Singularity-Gewerke
+    // starten nur in BN4 oder mit SF4 >= 1. Lauf-1-Aufrufe reichen sf4 = 1.
+    ownedSF: { 4: sf4, 9: sf9 },
   };
   const auswahl = reg.auswahl(REG, lage);
   let frei = homeGb - schonBelegt;
@@ -438,6 +463,162 @@ console.log("-- BitNode 4: derselbe Speicher, andere Singularity-Preise --");
   console.log("       BN4: " + s4.laufen.length + " Gewerke, "
     + s4.frei.toFixed(2) + " GB frei; BN10: " + s10.laufen.length + " Gewerke, "
     + s10.frei.toFixed(2) + " GB frei");
+}
+
+// ===========================================================================
+// LAUF 2 (K10, 14.11.2026): frischer Spielstand, home 8/16/32, SF aus der Route
+// ===========================================================================
+//
+// Der Lauf-1-Teil oben rechnet mit SF1/4/5/6/10 = 1 und mindestens 32 GB. In
+// Lauf 2 beginnt alles bei null: BN1.1 ohne Source-File, home 8 GB, SF4 = 0 (jeder
+// Singularity-Aufruf wirft ausserhalb von BN4). Dieser Abschnitt rechnet dort
+// dieselben Fragen - nach BAUPLAN Teil 3, K10/B03.
+//
+// ZAHLEN WERDEN GERECHNET, NICHT NOTIERT (Lehre Skeptikerrunde 6): jede GB-Zahl
+// kommt aus tools/ram.js (an 114 Live-Werten geeicht), jede home-Groesse aus
+// Prestige.ts. Die Aussagen unten sind Beziehungen ("passt nicht", "passt"),
+// keine Literale - waechst der Kern auf 7 GB, merkt der Test es.
+console.log("");
+console.log("=== LAUF 2: frischer Spielstand (K10) ===");
+
+const ROUTE_L2_PFAD = path.join(SRC, "route-lauf2.json");
+const PRESTIGE_TS = path.join(ROOT, "reference", "v301", "src", "Prestige.ts");
+
+console.log("");
+console.log("-- Eichung: home nach dem Sprung gegen den Quelltext --");
+{
+  // Eichpunkte direkt aus Prestige.ts:246-252 (SF9 >= 2 -> 128, SF1 > 0 -> 32, sonst 8).
+  const eich = [[{ 9: 2 }, 128], [{ 9: 3 }, 128], [{ 1: 1 }, 32], [{ 1: 3, 9: 1 }, 32], [{}, 8], [{ 4: 3, 5: 1 }, 8]];
+  for (const [sf, erwartet] of eich) {
+    pruefe("home bei SF " + JSON.stringify(sf) + " = " + erwartet + " GB",
+      homeNachSprung(sf) === erwartet, "gerechnet " + homeNachSprung(sf));
+  }
+  if (fs.existsSync(PRESTIGE_TS)) {
+    const t = fs.readFileSync(PRESTIGE_TS, "utf8");
+    const m = t.match(/activeSourceFileLvl\(9\) >= (\d+)\) \{\s*homeComp\.setMaxRam\((\d+)\);\s*\} else if \(Player\.activeSourceFileLvl\(1\) > (\d+)\) \{\s*homeComp\.setMaxRam\((\d+)\);\s*\} else \{\s*homeComp\.setMaxRam\((\d+)\);/);
+    pruefe("Prestige.ts hat genau diese Stufen (SF9>=2: 128, SF1>0: 32, sonst 8)",
+      !!m && m[1] === "2" && m[2] === "128" && m[3] === "0" && m[4] === "32" && m[5] === "8",
+      m ? m.slice(1).join(",") : "Muster nicht gefunden - Quelltext hat sich geaendert");
+  } else {
+    console.log("       Prestige.ts nicht da (reference/v301) - Quelltext-Eichung uebersprungen");
+  }
+  // SF4-Faktor gegen RamCostGenerator.ts:81-96 (SF4Cost): BN4 x1, SF4<=1 x16, SF4=2 x4, SF4=3 x1.
+  const b = rechne("blade.js", { bitNode: 4 }).gb;
+  const s0 = rechne("blade.js", { sf4: 0 }).gb;
+  const s1 = rechne("blade.js", { sf4: 1 }).gb;
+  const s2 = rechne("blade.js", { sf4: 2 }).gb;
+  const s3 = rechne("blade.js", { sf4: 3 }).gb;
+  pruefe("Singularity-Faktor: SF4.0 und SF4.1 kosten gleich viel (x16)", s0 === s1, s0 + " vs " + s1);
+  pruefe("SF4.3 = BN4-Preis (x1), SF4.2 dazwischen (x4)", s3 === b && s2 > s3 && s2 < s1,
+    "BN4 " + b + ", SF4.3 " + s3 + ", SF4.2 " + s2 + ", SF4.1 " + s1);
+}
+
+console.log("");
+console.log("-- die Route von Lauf 2 und ihr SF-Stand --");
+let route2 = null;
+if (fs.existsSync(ROUTE_L2_PFAD)) {
+  const doc2 = JSON.parse(fs.readFileSync(ROUTE_L2_PFAD, "utf8"));
+  route2 = doc2.route;
+  pruefe("route-lauf2.json traegt die Epoche lauf2", doc2.epoche === "lauf2", String(doc2.epoche));
+  pruefe("Lauf 2 beginnt mit BN1.1", route2[0].node === 1 && route2[0].level === 1,
+    "erster Eintrag: BN" + route2[0].node + "." + route2[0].level);
+} else {
+  console.log("       UEBERSPRUNGEN: src/route-lauf2.json fehlt (K01, Agent A2) - der Routen-Teil wird nicht gerechnet");
+}
+
+if (route2) {
+  const zeilen2 = [];
+  for (let i = 0; i < route2.length; i++) {
+    const e = route2[i];
+    const st = standVorEintrag(route2, i, SF_LAUF2);
+    const s2 = startlage(e.node, e.verfahren, [], 0, st.homeGb, st.sf4, st.sf9);
+    const lauf = s2.laufen.map(([n]) => n);
+    zeilen2.push({ nr: i + 1, e, st, lauf, frei: s2.frei, s2,
+      geld: lauf.filter((n) => ["cdump.js", "csolve.js", "sleevecrime.js"].includes(n)).length });
+  }
+  for (const z of zeilen2.slice(0, 8)) {
+    console.log("       " + String(z.nr).padStart(2) + ". BN" + z.e.node + "." + z.e.level + " " + z.e.verfahren
+      + "  home " + String(z.st.homeGb).padStart(3) + " GB, SF4." + z.st.sf4
+      + " -> " + String(z.lauf.length).padStart(2) + " Gewerke, " + z.frei.toFixed(2).padStart(6)
+      + " GB frei, " + z.geld + " Geldquelle(n), Kern " + (z.lauf.includes("bn4net.js") ? "ja" : "NEIN"));
+  }
+  console.log("       ... (" + (zeilen2.length - 8) + " weitere)");
+
+  const heim = zeilen2.map((z) => z.st.homeGb);
+  pruefe("nur der erste Eintrag startet mit 8 GB home",
+    heim[0] === 8 && heim.slice(1).every((g) => g >= 32), "home je Eintrag: " + heim.slice(0, 8).join("/") + "...");
+  // Der SF-Stand fuer K09: ausser BN1.1 hat jeder Eintrag SF4 oder IST BN4.
+  const ohneSf4 = zeilen2.filter((z) => z.st.sf4 < 1 && z.e.node !== 4);
+  pruefe("SF4-Stand aus der Route: nur BN1.1 laeuft ohne SF4 ausserhalb von BN4",
+    ohneSf4.length === 1 && ohneSf4[0].nr === 1,
+    ohneSf4.map((z) => z.nr + ". BN" + z.e.node + "." + z.e.level).join(", "));
+  const erste3 = zeilen2.findIndex((z) => z.st.sf4 >= 3);
+  console.log("       SF4.3 steht ab Eintrag " + (erste3 + 1) + " (Singularity-Preis dann x1)");
+
+  // Ab 32 GB: Kern, Waechter und eine Geldquelle muessen Platz finden - in JEDEM Eintrag.
+  const ab32 = zeilen2.filter((z) => z.st.homeGb >= 32);
+  const ohneKern = ab32.filter((z) => !z.lauf.includes("bn4net.js") || !z.lauf.includes("guard.js"));
+  pruefe("ab Eintrag 2 laufen Kern und Waechter (home >= 32 GB)", ohneKern.length === 0,
+    ohneKern.map((z) => z.nr + ". BN" + z.e.node).join(", "));
+  const ohneGeld = ab32.filter((z) => z.geld === 0);
+  pruefe("und in jedem dieser " + ab32.length + " Eintraege findet eine Geldquelle Platz", ohneGeld.length === 0,
+    ohneGeld.map((z) => z.nr + ". BN" + z.e.node + "." + z.e.level + " frei " + z.frei.toFixed(2)).join(", "));
+
+  // K09, nur wenn der Riegel eingebaut ist (reg.js kennt `singularity`): in BN1.1 ohne SF4
+  // startet kein Singularity-Gewerk. Ohne den Riegel: sichtbar uebersprungen, nicht still gruen.
+  const regQuelle = fs.readFileSync(path.join(SRC, "lib", "reg.js"), "utf8");
+  if (/singularity/.test(regQuelle)) {
+    const z1 = zeilen2[0];
+    const sing = z1.s2.auswahl.filter((e) => e.singularity === true).map((e) => e.name);
+    pruefe("K09: in BN1.1 ohne SF4 startet kein Singularity-Gewerk", sing.length === 0, sing.join(", "));
+    const mitSf4 = reg.auswahl(REG, { node: 10, verfahren: "V2", phase: "normal", dateiDa: () => true,
+      ownedSF: { 4: 1, 9: 2 } }).filter((e) => e.singularity === true);
+    pruefe("K09-Gegenprobe: mit SF4 sind dieselben Gewerke wieder in der Auswahl", mitSf4.length > 0);
+  } else {
+    console.log("       UEBERSPRUNGEN: K09 (SF4-Riegel in lib/reg.js) ist noch nicht eingebaut - die Pruefung 'BN1.1 ohne SF4' greift erst danach");
+  }
+}
+
+console.log("");
+console.log("-- home 8 / 16 / 32 in BN1.1 (SF4 = 0, V1) --");
+{
+  const kern = bedarf("bn4net.js", 1, 0);
+  const wacht = bedarf("guard.js", 1, 0);
+  const boot = bedarf("boot.js", 1, 0);
+  console.log("       gerechnet (SF4.0): boot.js " + boot.toFixed(2) + ", guard.js " + wacht.toFixed(2)
+    + ", bn4net.js " + kern.toFixed(2) + " GB");
+  for (const home of [8, 16, 32]) {
+    const spitze = boot + wacht + kern;
+    const s = startlage(1, "V1", [], 0, home, 0, 0);
+    const l = s.laufen.map(([n]) => n);
+    console.log("       home " + String(home).padStart(2) + " GB: Startspitze " + spitze.toFixed(2)
+      + (spitze <= home ? " passt" : " passt NICHT") + "; Kern+Waechter " + (kern + wacht).toFixed(2)
+      + ((kern + wacht) <= home ? " passt" : " passt NICHT") + "; Kern allein " + (kern <= home ? "passt" : "passt NICHT")
+      + "; Auswahl-Lauf: " + (l.join(", ") || "nichts"));
+  }
+  // Die drei Aussagen, an denen Z6 (Startpfad) haengt - als Beziehungen.
+  pruefe("home 8: der Kern passt nicht - ein Startpfad unter 8 GB ist noetig", kern > 8,
+    "bn4net.js " + kern.toFixed(2) + " GB - passt er jetzt, ist coldstart.js ueberfluessig");
+  pruefe("home 16: Kern und Waechter passen nicht zusammen - der Startpfad traegt bis 32 GB", kern + wacht > 16,
+    "zusammen " + (kern + wacht).toFixed(2) + " GB - passt es jetzt, kann die Uebergabe frueher kommen");
+  pruefe("home 16: der Kern allein passt", kern <= 16, kern.toFixed(2) + " GB");
+  pruefe("home 32: Startspitze (boot + Waechter + Kern) passt", boot + wacht + kern <= 32,
+    (boot + wacht + kern).toFixed(2) + " GB");
+  const s32 = startlage(1, "V1", [], 0, 32, 0, 0);
+  pruefe("home 32: mindestens eine Geldquelle findet Platz",
+    s32.laufen.some(([n]) => ["cdump.js", "csolve.js", "sleevecrime.js"].includes(n)),
+    "Auswahl: " + s32.laufen.map(([n]) => n).join(", "));
+
+  // Der Startpfad selbst (Agent A4, Z6): wenn da, muss er auf 8 GB passen.
+  const cold = path.join(SRC, "coldstart.js");
+  if (fs.existsSync(cold)) {
+    const c = rechne("coldstart.js", { sf4: 0 });
+    pruefe("coldstart.js passt auf 8 GB home und bleibt unter 5 GB (gemessen)", c.gb !== null && c.gb <= 5,
+      c.fehler || (c.gb + " GB"));
+    console.log("       coldstart.js: " + c.gb + " GB (home 8: " + (8 - c.gb).toFixed(2) + " GB Luft)");
+  } else {
+    console.log("       UEBERSPRUNGEN: src/coldstart.js fehlt (Z6, Agent A4)");
+  }
 }
 
 console.log("");

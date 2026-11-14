@@ -70,12 +70,16 @@ import {
   BACKUP_PRIMAER,
   BACKUP_SPIEGEL,
   BACKUP_MOCK,
+  IDENTITAET,
+  ladeIdentitaet,
+  epochenPraefix,
   pfadGleich,
   textAusArgv,
   zahlAusArgv,
 } from "./instanz.js";
 import { sichere, lesenKennwerte, alterJuengsteMin, letzterEintrag } from "./backup.js";
 import { createHistory } from "./history.js";
+import * as AL from "./alarmliste.js";
 
 const HERE = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HERE, "..");
@@ -138,6 +142,14 @@ function bestimmeRolle() {
       console.log("           Das ist ein Worktree. LIVE laeuft nur in der Arbeitskopie.");
       process.exit(3);
     }
+    // Eine vorhandene, aber kaputte Identitaetsdatei sperrt (Z1). Nicht auf
+    // Lauf 1 zurueckfallen: das waere ein stiller Epochenwechsel.
+    if (IDENTITAET.fehler) {
+      console.log("  ABBRUCH: sync/identitaet.json ist ungueltig: " + IDENTITAET.fehler);
+      console.log("           Nur tools/lauf2-uebergabe.js schreibt diese Datei.");
+      console.log("           Siehe doku/spielstand-schutz.md, Abschnitt Lauf-2-Uebergabe.");
+      process.exit(3);
+    }
   }
   return rolle;
 }
@@ -145,6 +157,44 @@ function bestimmeRolle() {
 const ROLLE = bestimmeRolle();
 /** Vor dem Portriegel gebraucht - deshalb hier und nicht weiter unten. */
 const IST_LIVE_ROLLE = ROLLE.instance === "LIVE";
+
+/**
+ * IDENTITAET UND EPOCHE DER ROLLE (Z1, Lauf-2-Uebergabe, 14.11.2026).
+ *
+ * LIVE: aus sync/identitaet.json (instanz.js). Fehlt die Datei, ist es der
+ * Lauf-1-identifier, keine Epoche aktiv - und dann laeuft hier alles exakt
+ * wie vorher (EPOCHEN_PRAEFIX === ROLLE.prefix, kein Epochenfeld, kein
+ * Index-/Datei-Anker).
+ *
+ * TEST/MOCK: nur mit `--identitaet <datei>`, sonst wie bisher ohne
+ * identifier-Pruefung. Der Schalter ist fuer LIVE gesperrt - der Riegel der
+ * Live-Bruecke liest seine Identitaet an genau einem Ort, und daran dreht
+ * kein Aufrufparameter (wie --src-dir, --master-liste).
+ */
+const IDENTITAET_ROLLE = (() => {
+  const wunsch = textAusArgv(argv, "--identitaet", "");
+  if (IST_LIVE_ROLLE) {
+    if (wunsch) {
+      console.error("--identitaet ist fuer die Rolle LIVE gesperrt (sie liest sync/identitaet.json).");
+      process.exit(2);
+    }
+    return IDENTITAET;
+  }
+  if (!wunsch) return null;
+  const id = ladeIdentitaet(path.resolve(ROOT, wunsch), null);
+  if (id.fehler || !id.aktiv) {
+    console.log("  ABBRUCH: --identitaet " + wunsch + ": " + (id.fehler || "Datei fehlt"));
+    process.exit(3);
+  }
+  return id;
+})();
+/** Der identifier, den Wachhund und Sicherung verlangen (null = keine Pruefung). */
+const ERWARTETER_IDENTIFIER = IST_LIVE_ROLLE || !IDENTITAET_ROLLE
+  ? ROLLE.identifier
+  : IDENTITAET_ROLLE.identifier;
+const EPOCHE_AKTIV = !!(IDENTITAET_ROLLE && IDENTITAET_ROLLE.aktiv && !IDENTITAET_ROLLE.fehler);
+/** Ohne Epoche === ROLLE.prefix (bitgleich). Siehe instanz.js epochenPraefix. */
+const EPOCHEN_PRAEFIX = epochenPraefix(ROLLE.prefix, EPOCHE_AKTIV ? IDENTITAET_ROLLE : null);
 const RFA_PORT = zahlAusArgv(argv, "--rfa-port", ROLLE.rfaPort);
 const DASHBOARD_PORT = zahlAusArgv(argv, "--dash-port", ROLLE.dashPort);
 const DATA_DIR = path.resolve(ROOT, textAusArgv(argv, "--data-dir", ROLLE.dataDir));
@@ -727,6 +777,7 @@ function ladeMasterIndex() {
     if (!menge.size) throw new Error("git ls-tree lieferte keine Datei unter src/");
     masterIndex = menge;
     masterIndexAlter = Date.now();
+    void alarmMessung("master-index-ok", "git ls-tree master lieferte " + menge.size + " Dateien");
   } catch (e) {
     /**
      * AUCH DER FEHLSCHLAG WIRD GEMERKT (Skeptikerrunde 7).
@@ -925,6 +976,9 @@ async function alarm(titel, text, quelle = "sonst") {
       .filter((t) => Date.parse(t) >= grenze).concat([neu.at]);
   }
   log("error", "ALARM " + titel + ": " + text);
+  // Auch in die Alarmliste (B08): data/alarme.json fuehrt Klasse, Ablauf und
+  // Messung. Faellt sie aus, bleibt der Einzelplatz unten wie bisher.
+  alarmMelde(titel, text, quelle).catch(() => {});
   if (quelle === "sicherung" && state.alarm && state.alarm.quelle !== "sicherung") return;
   state.alarm = neu;
   try {
@@ -937,6 +991,164 @@ async function alarm(titel, text, quelle = "sonst") {
   } catch {
     // egal
   }
+}
+
+// ---------------------------------------------------------------------------
+// Alarmliste (B08, 14.11.2026): data/alarme.json, Regeln in sync/alarmliste.js
+// ---------------------------------------------------------------------------
+//
+// Der Einzelplatz state.alarm bleibt (Dashboard, Check-in lesen ihn). Daneben
+// fuehrt diese Liste ALLE Alarme mit Klasse, Beginn, Anzahl und Ende:
+//   - Schutzalarme (Sicherung rot, fremdes Spiel, Zweit-Tab, Schub verweigert,
+//     Master-Riegel blind) enden NUR durch eine Messung (alarmMessung) oder
+//     von Hand mit Beleg (tools/alarme.js --beende). Zeit allein beendet sie nie.
+//   - Zustandsalarme (Tab zu, Telemetrie alt, Autosave) enden durch Messung
+//     oder 24 h ohne Wiederholung. Unbekannte Titel laufen nach 7 Tagen ab.
+// Ein offener Alarm wird in "## Sofort" nur EINMAL eingetragen (sofortZeile),
+// Wiederholungen zaehlen nur hier. Endet er, nimmt die Bruecke seinen Eintrag
+// aus "## Sofort" (tools/liste.js --erledigen -> ERLEDIGT.md).
+const ALARME_DATEI = path.join(DATA_DIR, "alarme.json");
+let alarmListe = null;
+let alarmKette = Promise.resolve();
+
+/** Alle Zugriffe nacheinander: einmal laden, aendern, speichern. */
+function alarmeBearbeite(aendere) {
+  const lauf = alarmKette.then(async () => {
+    if (!alarmListe) {
+      const r = await AL.lade(ALARME_DATEI);
+      // Unlesbar ohne Sicherheitskopie: NICHT mit leerer Liste weitermachen -
+      // der naechste Schreibvorgang loeschte offene Schutzalarme.
+      if (r.kaputt && !r.beiseite) throw new Error("alarme.json " + r.kaputt);
+      if (r.kaputt) log("error", "alarme.json " + r.kaputt + " - beiseitegelegt: " + r.beiseite);
+      alarmListe = r.liste;
+    }
+    const ergebnis = await aendere(alarmListe);
+    if (ergebnis && ergebnis.speichern) await AL.speichere(ALARME_DATEI, alarmListe);
+    return ergebnis ? ergebnis.wert : undefined;
+  });
+  alarmKette = lauf.catch(() => {});
+  return lauf;
+}
+
+/** Einen Alarm eintragen oder zaehlen. Rueckgabe { eintrag, neu }. */
+function alarmMelde(titel, text, quelle) {
+  return alarmeBearbeite((liste) => ({
+    speichern: true,
+    wert: AL.melde(liste, { titel, text, quelle }, Date.now()),
+  }));
+}
+
+/** Den Eintrag in "## Sofort" zu einem beendeten Alarm herausnehmen (nur LIVE). */
+async function sofortErledigen(e) {
+  if (!IST_LIVE || !e.sofortTitel) return;
+  const archiv = path.join(DATA_DIR, "alarm-archiv-" + String(e.id).replace(/[^\w-]/g, "_") + ".md");
+  try {
+    await writeFile(
+      archiv,
+      "### " + e.sofortTitel + "\n\n" + e.text + "\n\n*Alarm beendet " +
+        new Date(e.beendetAm).toISOString() + " durch " + e.beendetDurch + ": " + e.beleg + "*\n",
+      "utf8",
+    );
+    await new Promise((fertig, schiefgelaufen) => {
+      execFile(
+        "node",
+        [path.join(ROOT, "tools", "liste.js"), "--erledigen", e.sofortTitel, "--abschnitt", "sofort", "--datei", archiv],
+        { cwd: ROOT, encoding: "utf8" },
+        (err) => (err ? schiefgelaufen(err) : fertig()),
+      );
+    });
+    log("info", "Aus ## Sofort genommen: " + e.sofortTitel);
+  } catch (err) {
+    // Schon von Hand erledigt, oder der Titel passt auf mehrere Punkte: kein Fehler der Bruecke.
+    log("warn", "Eintrag in ## Sofort nicht entfernt (" + e.sofortTitel + "): " + String(err.message).split("\n")[0]);
+  } finally {
+    await rm(archiv, { force: true }).catch(() => {});
+  }
+}
+
+/** Beendete Alarme abarbeiten: Protokoll, Einzelplatz, "## Sofort". Wirft nie. */
+async function alarmBeendet(weg) {
+  for (const e of weg || []) {
+    try {
+      log("info", "Alarm beendet (" + e.titel + ", seit " + new Date(e.seit).toISOString() +
+        ") durch " + e.beendetDurch + ": " + e.beleg);
+      if (state.alarm && AL.klassifiziere(state.alarm.titel).name === e.schluessel) {
+        state.alarm = null;
+        await rm(path.join(DATA_DIR, "bridge-alarm.json"), { force: true }).catch(() => {});
+      }
+      // Eine Wiederholung der Ursache nach einem gemessenen Ende ist ein NEUER
+      // Vorfall: die Sechs-Stunden-Bremse der Urteile (URTEIL_ABSTAND_MS) darf
+      // ihn nicht verschlucken.
+      if (String(e.beendetDurch).startsWith("messung:")) {
+        if (e.schluessel === "tab") letztesUrteil.nichtVerbunden = 0;
+        else if (e.schluessel === "telemetrie") letztesUrteil.eingefroren = 0;
+        else if (e.schluessel === "autosave") letztesUrteil.autosave = 0;
+      }
+      await sofortErledigen(e);
+    } catch (err) {
+      log("warn", "Alarm-Abschluss: " + err.message);
+    }
+  }
+}
+
+/**
+ * EINE MESSUNG MELDET: DIE URSACHE IST WEG. Nur dieser Weg beendet einen
+ * Schutzalarm. "beleg" nennt, was gemessen wurde. Billig, solange nichts auf
+ * die Messung wartet (kein Plattenzugriff). Wirft nie - die Aufrufer stehen
+ * mitten in Sicherung und Verifikation.
+ */
+async function alarmMessung(messung, beleg) {
+  try {
+    if (alarmListe && !alarmListe.alarme.some((a) => a.status === "offen" && a.messung === messung)) return;
+    const weg = await alarmeBearbeite((liste) => {
+      const w = AL.messe(liste, messung, beleg, Date.now());
+      return { speichern: w.length > 0, wert: w };
+    });
+    await alarmBeendet(weg);
+  } catch (err) {
+    log("warn", "alarmMessung " + messung + ": " + err.message);
+  }
+}
+
+/** Ablauf der Zustands- und Vorfallalarme (Schutzalarme laufen nie ab). */
+async function alarmVerfall() {
+  if (alarmListe && !alarmListe.alarme.some((a) => a.status === "offen" && a.klasse !== "schutz")) return;
+  const weg = await alarmeBearbeite((liste) => {
+    const w = AL.verfalle(liste, Date.now());
+    return { speichern: w.length > 0, wert: w };
+  });
+  await alarmBeendet(weg);
+}
+
+/**
+ * Die Messungen, die die Bruecke von sich aus in jedem Urteilstakt kennt:
+ * Tab verbunden, Telemetrie frisch, Autosave frisch, Zweit-Tab-Sperre weg.
+ * Die Schwellen liegen UNTER den Feuerschwellen der Urteile unten (10 min,
+ * 5 min), damit ein Wert an der Grenze keinen Alarm im Takt oeffnet und
+ * schliesst.
+ */
+async function alarmPflege(jetzt) {
+  if (state.connected) await alarmMessung("tab-verbunden", "Spiel verbunden seit " + state.connectedSince);
+  if (state.connected && state.lastTelemetryAt) {
+    const alter = jetzt - new Date(state.lastTelemetryAt).getTime();
+    if (alter <= 5 * 60000) {
+      await alarmMessung("telemetrie-frisch", "Telemetrie " + Math.round(alter / 1000) + " s alt (Stempel " + state.lastTelemetryAt + ")");
+    }
+  }
+  const verbunden = state.connectedSince ? jetzt - new Date(state.connectedSince).getTime() : 0;
+  if (state.connected && verbunden > 10 * 60000 && state.lastSaveAt && state.lastSaveGemessenAm) {
+    const alter = new Date(state.lastSaveGemessenAm).getTime() - new Date(state.lastSaveAt).getTime();
+    if (alter <= 2 * 60000) {
+      await alarmMessung("autosave-frisch", "lastSave bei Messung " + state.lastSaveGemessenAm + " nur " + Math.round(alter / 1000) + " s alt");
+    }
+  }
+  // Nur messen, wenn ein Alarm darauf wartet: zweitTabAlarm() liest die Datei.
+  if (alarmListe && alarmListe.alarme.some((a) => a.status === "offen" && a.messung === "zweittab-frei")) {
+    if (!(await zweitTabAlarm())) {
+      await alarmMessung("zweittab-frei", "Sperrdatei " + path.basename(ZWEITTAB_DATEI) + " nicht mehr vorhanden");
+    }
+  }
+  await alarmVerfall();
 }
 
 // ---------------------------------------------------------------------------
@@ -1581,6 +1793,13 @@ async function schiebeStapel(stapelEingang) {
   if (jetzt - letzteSchubSicherung > SCHUB_SICHERUNG_ABSTAND_MS) {
     const ok = await sichereJetzt("pre-hotswap");
     if (!ok) {
+      // Der Stapel geht in den Rueckstau (wie bei den anderen Verweigerungen):
+      // sonst bleibt er weder in zurueckgestellt noch in SCHUB_OFFEN, und die
+      // naechste gruene Stundensicherung hakte den Alarm ab, obwohl die Dateien
+      // nie geschoben wurden (Skeptiker 14.11.2026). Beendet wird der Alarm
+      // jetzt von "schub-ok" (alarmliste.js), nicht von einer Sicherung.
+      for (const d of stapel) zurueckgestellt.add(d);
+      await schreibeSchubOffen(stapel);
       await alarm(
         "Schub verworfen",
         stapel.length + " Datei(en) NICHT geschoben - Sicherung rot oder ausgefallen: " +
@@ -1661,6 +1880,11 @@ async function schiebeStapel(stapelEingang) {
   if (erledigt.length === 1) log("info", "Nachgeschoben: " + erledigt[0]);
   else if (erledigt.length > 1)
     log("info", erledigt.length + " Dateien zusammen nachgeschoben: " + erledigt.join(", "));
+  // MESSUNG (B08): es ging etwas durch UND nichts steht mehr im Rueckstau.
+  if (erledigt.length && !zurueckgestellt.size) {
+    const offen = await stat(SCHUB_OFFEN_DATEI).then(() => true, () => false);
+    if (!offen) void alarmMessung("schub-ok", erledigt.length + " Datei(en) geschoben, Rueckstau leer");
+  }
 }
 
 // ---------------------------------------------------------------------------
@@ -1695,10 +1919,25 @@ async function leseHeartbeat() {
  */
 let ankerPlaytime = null;
 
+/**
+ * GILT DIESER HEARTBEAT FUER DIE LAUFENDE EPOCHE? (Z1, 14.11.2026)
+ *
+ * Ohne Epoche immer ja - bitgleich. In einer Epoche nur, wenn er sie selbst
+ * nennt (schreibeHeartbeat traegt sie dann ein). Ein Lauf-1-Heartbeat, der
+ * nach der Uebergabe doch wieder in data/ liegt (von Hand zurueckkopiert,
+ * Uebergabe halb gelaufen), wuerde sonst das neue Spiel mit "Rueckwaertssprung
+ * 2.000 h" abweisen - nach dem naechsten Brueckenneustart, also Tage spaeter
+ * (5c, Abschnitt 3a, Punkt 3).
+ */
+function heartbeatGiltFuerEpoche(hb) {
+  if (!EPOCHE_AKTIV) return true;
+  return !!(hb && hb.epoche && hb.epoche.identifier === ERWARTETER_IDENTIFIER);
+}
+
 /** Anker beim Start aus der Datei uebernehmen - ein Neustart verlaere ihn sonst. */
 async function ladeAnker() {
   const hb = await leseHeartbeat();
-  if (hb && Number.isFinite(hb.totalPlaytime)) {
+  if (hb && Number.isFinite(hb.totalPlaytime) && heartbeatGiltFuerEpoche(hb)) {
     ankerPlaytime = hb.totalPlaytime;
     log("info", "Anker uebernommen: totalPlaytime " + (hb.totalPlaytime / 3.6e6).toFixed(2) + " h");
   }
@@ -1764,17 +2003,27 @@ async function verifiziereSocket(kandidat) {
     let ankerQuelle = "Heartbeat";
     if (!Number.isFinite(anker)) {
       const hb = await leseHeartbeat();
-      if (hb && Number.isFinite(hb.totalPlaytime)) {
+      if (hb && Number.isFinite(hb.totalPlaytime) && heartbeatGiltFuerEpoche(hb)) {
         anker = hb.totalPlaytime;
         ankerQuelle = "Heartbeat-Datei";
       }
     }
     if (!Number.isFinite(anker)) {
-      const letzte = letzterEintrag(BACKUP_ORT, ROLLE.prefix);
+      // EPOCHEN_PRAEFIX: ohne Epoche === ROLLE.prefix. In einer Epoche nur
+      // Indexzeilen mit deren identifier im Dateinamen.
+      const letzte = letzterEintrag(BACKUP_ORT, EPOCHEN_PRAEFIX);
       if (letzte && Number.isFinite(Number(letzte.totalPlaytime))) {
         anker = Number(letzte.totalPlaytime);
         ankerQuelle = "INDEX.tsv (" + letzte.datei + ")";
       }
+    }
+    if (!Number.isFinite(anker) && EPOCHE_AKTIV && Number.isFinite(IDENTITAET_ROLLE.anker)) {
+      // Der Startanker, den tools/lauf2-uebergabe.js in die Identitaetsdatei
+      // geschrieben hat (Spielzeit des abgewiesenen neuen Spiels, sonst 0).
+      // Nur bis zur ersten verifizierten Verbindung der Epoche - danach
+      // tragen Heartbeat und Index.
+      anker = IDENTITAET_ROLLE.anker;
+      ankerQuelle = "Identitaetsdatei (Epoche " + IDENTITAET_ROLLE.epoche + ")";
     }
     if (Number.isFinite(anker)) {
       if (k.totalPlaytime < anker - 60000) {
@@ -1792,12 +2041,22 @@ async function verifiziereSocket(kandidat) {
           "auch eine unveraenderte Kopie.",
       );
     }
-    // (3) identifier
-    if (ROLLE.identifier && k.identifier !== ROLLE.identifier) {
-      gruende.push("identifier " + k.identifier + " statt " + ROLLE.identifier);
+    // (3) identifier - ohne Epoche ist ERWARTETER_IDENTIFIER === ROLLE.identifier
+    if (ERWARTETER_IDENTIFIER && k.identifier !== ERWARTETER_IDENTIFIER) {
+      gruende.push("identifier " + k.identifier + " statt " + ERWARTETER_IDENTIFIER);
     }
 
     if (gruende.length) {
+      // Was das abgewiesene Spiel IST (BN, Lauf, Zahl der SF): ein Mensch, der
+      // einen neuen identifier fuer die Lauf-2-Uebergabe prueft, braucht das
+      // zum Gegenlesen ("BN1, Lauf 1, wenige Minuten, keine SF" ist ein frisches
+      // Spiel, alles andere ein fremder Stand). tools/lauf2-uebergabe.js parst
+      // diesen Teil (sichtung). Eigene Zeile hinten, damit die Muster der
+      // anderen Gruende (identifier .. statt .., totalPlaytime .. liegt) bleiben.
+      gruende.push(
+        "Spielstand BN" + k.bitNodeN + " Lauf " + k.lauf + ", " +
+          Object.keys(k.sourceFiles || {}).length + " SF, Spielzeit " + k.totalPlaytime + " ms",
+      );
       await alarm("Socket abgewiesen", gruende.join(" | "));
       await sofortZeile(
         "Fremde Spielverbindung abgewiesen",
@@ -1853,6 +2112,9 @@ async function verifiziereSocket(kandidat) {
 
     verifizierterSocket = geprueft;
     state.verified = true;
+    // MESSUNG (B08): identifier und Anker stimmen - fremde-Verbindung-Alarme sind erledigt.
+    void alarmMessung("socket-verifiziert", "Verifiziert: " + k.identifier + " BN" + k.bitNodeN + " L" + k.lauf);
+    if (!keinAnker) void alarmMessung("verbindung-mit-anker", "Verbindung gegen bekannten Anker geprueft");
     // Der Anker existiert ab jetzt; die naechste Verbindung wird wieder
     // vollstaendig geprueft.
     ankerPlaytime = k.totalPlaytime;
@@ -1916,7 +2178,8 @@ async function sichereJetzt(anlass) {
       dashPort: DASHBOARD_PORT,
       anlass,
       praefix: ROLLE.prefix,
-      erwartetIdentifier: ROLLE.identifier,
+      epochenPraefix: EPOCHEN_PRAEFIX,
+      erwartetIdentifier: ERWARTETER_IDENTIFIER,
       erwartetPort: RFA_PORT,
       primaer: BACKUP_ORT,
       spiegel: BACKUP_SPIEGEL_ORT,
@@ -1949,6 +2212,8 @@ async function sichereJetzt(anlass) {
       state.alarm = null;
       await rm(path.join(DATA_DIR, "bridge-alarm.json"), { force: true }).catch(() => {});
     }
+    // MESSUNG: eine gruene Sicherung beendet jeden Alarm, der an roten Sicherungen haengt.
+    await alarmMessung("sicherung-gruen", "Sicherung " + anlass + " gruen: " + r.datei);
     if (r.b64Befund) {
       await sofortZeile(
         "Spielstand kam als Base64-Klartext",
@@ -2119,8 +2384,14 @@ async function schreibeHeartbeat() {
     totalPlaytime: ankerPlaytime,
     motorRound: state.motorRound,
     lastVerifiedBackup: state.lastVerifiedBackup,
-    backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
+    backupAgeMin: alterJuengsteMin(BACKUP_ORT, EPOCHEN_PRAEFIX),
   };
+  // Nur in einer Epoche: der Heartbeat nennt sie, damit ladeAnker ihn nach
+  // einem Neustart als ihren erkennt (heartbeatGiltFuerEpoche). Ohne Epoche
+  // bleibt die Datei Byte fuer Byte wie vorher.
+  if (EPOCHE_AKTIV) {
+    eintrag.epoche = { name: IDENTITAET_ROLLE.epoche, identifier: ERWARTETER_IDENTIFIER };
+  }
   try {
     await mkdir(DATA_DIR, { recursive: true });
     await writeFile(HEARTBEAT_DATEI(), JSON.stringify(eintrag, null, 1), "utf8");
@@ -2132,7 +2403,7 @@ async function schreibeHeartbeat() {
 /** Der Rueckkanal INS Spiel - der Kern liest ihn, um sein eigenes Netz zu kennen. */
 async function schreibeRueckkanal() {
   if (!istVerifiziert()) return;
-  const ageMin = alterJuengsteMin(BACKUP_ORT, ROLLE.prefix);
+  const ageMin = alterJuengsteMin(BACKUP_ORT, EPOCHEN_PRAEFIX);
   const inhalt = {
     ts: Date.now(),
     instance: ROLLE.instance,
@@ -2188,14 +2459,65 @@ const MOMENTAUFNAHMEN = new Set([
   "Bruecke ohne Sicherung - Spielstand liegt in Downloads",
 ]);
 
+/** Eine Zeile unter dem Eintrag: seit wann, und wie der Alarm endet. */
+function alarmFussnote(e) {
+  const ende = e.messung
+    ? "endet, sobald gemessen wird: " + e.messung + (e.klasse === "schutz" ? " (Zeit allein beendet ihn nie)" : "")
+    : e.klasse === "schutz"
+      ? "endet nur von Hand mit Beleg: node tools/alarme.js --beende " + e.id + " --beleg \"<was gemessen wurde>\""
+      : "laeuft ab " + new Date(e.ablaufAm).toISOString() + " (ohne Wiederholung)";
+  return "*Alarm " + e.id + " (" + e.klasse + ") seit " + new Date(e.seit).toISOString() + "; " + ende + ".*";
+}
+
+/**
+ * Steht ein Eintrag mit diesem Titel noch unter "## Sofort" in der Arbeitsliste?
+ * Hat Eric ihn auf dem normalen Weg abgehakt (liste.js --erledigen), wird der
+ * Alarm in alarme.json davon nicht beendet - ein Schutzalarm ohne Messung bliebe
+ * offen und verschluckte jede Wiederholung (Skeptiker 14.11.2026). Wer das
+ * prueft, traegt die Meldung neu ein. Unlesbare Liste = "steht noch" (dann
+ * bleibt es beim Entdoppeln wie bisher).
+ */
+function sofortSteht(titel) {
+  try {
+    const zeilen = fsReadSync(path.join(ROOT, "nodes", "BAUSTELLEN.md"), "utf8").split(/\r?\n/);
+    const trenn = zeilen.findIndex((l) => l.trim() === "---");
+    let drin = false;
+    for (let i = trenn + 1; i < zeilen.length; i++) {
+      const z = zeilen[i];
+      if (z.startsWith("## ")) { drin = z.slice(3).trim().toLowerCase().startsWith("sofort"); continue; }
+      if (drin && z.startsWith("### ") && z.slice(4).trim().toLowerCase().startsWith(String(titel).trim().toLowerCase())) return true;
+    }
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 async function sofortZeile(titel, text, quelle = "bruecke") {
   const schluessel = quelle + "|" + titel;
   const jetztMs = Date.now();
-  for (const [k, t] of sofortGesehen) {
-    if (jetztMs - t > SOFORT_VERFALL_MS) sofortGesehen.delete(k);
+  /**
+   * DIE ALARMLISTE ENTSCHEIDET, OB ES EINE NEUE MELDUNG IST (B08, 14.11.2026).
+   * Ein Alarm, der noch offen ist und schon in "## Sofort" steht, wird nur
+   * gezaehlt (data/alarme.json: anzahl, zuletzt) - nicht alle sechs Stunden und
+   * nicht nach jedem Brueckenneustart noch einmal eingetragen. Das war die
+   * Quelle der 811 Zeilen. Faellt die Liste aus, gilt der alte Sechs-Stunden-Weg.
+   */
+  let alarmEintrag = null;
+  try {
+    const r = await alarmMelde(titel, text, quelle);
+    // Nur in der LIVE-Rolle gegen die Arbeitsliste pruefen: TEST schreibt nach
+    // sofort-test.md, dort gibt es nichts abzuhaken.
+    if (!r.neu && r.eintrag.sofortTitel && (!IST_LIVE || sofortSteht(r.eintrag.sofortTitel))) return;
+    alarmEintrag = r.eintrag;
+  } catch (e) {
+    log("warn", "Alarmliste nicht fuehrbar (" + e.message + ") - Entdoppeln wie bisher");
+    for (const [k, t] of sofortGesehen) {
+      if (jetztMs - t > SOFORT_VERFALL_MS) sofortGesehen.delete(k);
+    }
+    if (sofortGesehen.has(schluessel)) return;
+    sofortGesehen.set(schluessel, jetztMs);
   }
-  if (sofortGesehen.has(schluessel)) return;
-  sofortGesehen.set(schluessel, jetztMs);
   const ts = new Date().toISOString().replace(/[:.]/g, "-");
 
   /**
@@ -2221,6 +2543,10 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
         "utf8",
       );
       log("info", "TEST-Meldung nach " + ziel + " (nicht nach ## Sofort): " + titel);
+      if (alarmEintrag) {
+        alarmEintrag.sofortTitel = titel;
+        await alarmeBearbeite(() => ({ speichern: true })).catch(() => {});
+      }
     } catch (e) {
       log("error", "TEST-Meldung nicht schreibbar: " + e.message);
     }
@@ -2231,7 +2557,8 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
   const datei = path.join(ordner, ts + "-" + quelle + ".md");
   try {
     await mkdir(ordner, { recursive: true });
-    await writeFile(datei, "### " + titel + "\n\n" + text + "\n", "utf8");
+    const fussnote = alarmEintrag ? "\n\n" + alarmFussnote(alarmEintrag) : "";
+    await writeFile(datei, "### " + titel + "\n\n" + text + fussnote + "\n", "utf8");
     // execFile statt execFileSync: die synchrone Fassung blockiert die
     // komplette Event-Loop je Eintrag - und holeSofortEintraege ruft sie in
     // einer Schleife auf. Waehrend sie laeuft, beantwortet die Bruecke keine
@@ -2240,12 +2567,16 @@ async function sofortZeile(titel, text, quelle = "bruecke") {
       execFile(
         "node",
         [path.join(ROOT, "tools", "liste.js"), "--eintragen", "sofort", "--datei", datei,
-          ...(MOMENTAUFNAHMEN.has(titel) ? ["--ersetzen"] : [])],
+          ...(MOMENTAUFNAHMEN.has(titel) && !alarmEintrag ? ["--ersetzen"] : [])],
         { cwd: ROOT, encoding: "utf8" },
         (err) => (err ? schiefgelaufen(err) : fertig()),
       );
     });
     log("info", "Nach ## Sofort eingetragen: " + titel);
+    if (alarmEintrag) {
+      alarmEintrag.sofortTitel = titel;
+      await alarmeBearbeite(() => ({ speichern: true })).catch(() => {});
+    }
   } catch (e) {
     log("error", "Eintrag nach ## Sofort fehlgeschlagen (" + titel + "): " + e.message);
   }
@@ -2332,6 +2663,9 @@ const URTEIL_ABSTAND_MS = 6 * 60 * 60000;
 async function faelleUrteile() {
   const jetzt = Date.now();
 
+  // Alarmliste pflegen: Messungen und Ablauf (B08). Wirft nie nach aussen.
+  try { await alarmPflege(jetzt); } catch (e) { log("warn", "Alarmpflege: " + e.message); }
+
   // (a) Spiel-Tab nicht verbunden
   if (!state.connected && state.connectedSince) {
     const seit = jetzt - new Date(state.connectedSince).getTime();
@@ -2417,8 +2751,14 @@ function publicState() {
     identifier: state.identifier,
     motorRound: state.motorRound,
     lastVerifiedBackup: state.lastVerifiedBackup,
-    backupAgeMin: alterJuengsteMin(BACKUP_ORT, ROLLE.prefix),
+    backupAgeMin: alterJuengsteMin(BACKUP_ORT, EPOCHEN_PRAEFIX),
+    // Nur in einer Epoche (Z1) - ohne bleibt die Antwort wie vorher.
+    ...(EPOCHE_AKTIV
+      ? { epoche: { name: IDENTITAET_ROLLE.epoche, identifier: ERWARTETER_IDENTIFIER } }
+      : {}),
     alarm: state.alarm,
+    // Alle offenen Alarme mit Klasse und Ende (B08); leer, solange nichts offen ist.
+    alarme: alarmListe ? AL.uebersicht(alarmListe) : [],
     sicherungAusfaelle: state.sicherungAusfaelle || [],
     zweitTabSperre: zweitTabMerker,
     masterRiegel: masterRiegelStand,
@@ -2907,13 +3247,16 @@ function startRfaServer() {
         );
       }
 
+      // Titel je nach Zweig: nur mit gesetzter Sperrdatei darf "Sperrdatei weg"
+      // den Alarm beenden (alarmliste.js, zweittab-frei).
+      const zweitTitel = alteLebt ? "Zweite RFA-Verbindung" : "Zweite RFA-Verbindung - alte stumm";
       await alarm(
-        "Zweite RFA-Verbindung",
+        zweitTitel,
         "moeglicher zweiter Spiel-Tab, Save-Rennen pruefen. Bestehende Verbindung " +
           (alteLebt ? "antwortet - die neue wird geschlossen." : "schweigt - sie wird ersetzt."),
       );
       await sofortZeile(
-        "Zweite RFA-Verbindung",
+        zweitTitel,
         "Ein zweites Spiel hat sich auf Port " + RFA_PORT + " verbunden. " +
           (alteLebt
             ? "Die bestehende Verbindung antwortet noch, die neue wurde geschlossen."
@@ -3048,8 +3391,18 @@ if (!MASTER_RIEGEL_AN) {
 await startRfaServer();
 await startDashboard();
 await schreibePid();
+if (EPOCHE_AKTIV) {
+  // Ins Protokoll, nicht nur auf die Konsole: nach einem Vorfall muss sich
+  // belegen lassen, gegen welche Identitaet diese Bruecke geprueft hat.
+  log("info", "Identitaet: Epoche " + IDENTITAET_ROLLE.epoche + ", identifier "
+    + ERWARTETER_IDENTIFIER + " (" + IDENTITAET_ROLLE.datei + ")"
+    + (Number.isFinite(IDENTITAET_ROLLE.anker) ? ", Startanker " + IDENTITAET_ROLLE.anker + " ms" : ""));
+}
 await ladeAnker();
 await zweitTabAlarm();
+// Alarmliste einmal laden: offene Alarme ueberleben den Neustart, und ihre
+// Messungen laufen ab dem ersten Urteilstakt.
+void alarmeBearbeite(() => null).catch((e) => log("warn", "alarme.json: " + e.message));
 watchScripts();
 
 setInterval(() => {
@@ -3109,7 +3462,7 @@ setInterval(() => {
  * Stunde", das sich beim Neustart still zuruecksetzt.
  */
 {
-  const alter = alterJuengsteMin(BACKUP_ORT, ROLLE.prefix);
+  const alter = alterJuengsteMin(BACKUP_ORT, EPOCHEN_PRAEFIX);
   if (alter != null) letzteStundensicherung = Date.now() - alter * 60000;
 }
 

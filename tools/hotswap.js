@@ -62,6 +62,9 @@ import fs from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 import { execSync } from "node:child_process";
+// Zusammenbau Lauf 2 (14.11.2026): der identifier kommt aus der Identitaetsdatei
+// (sync/identitaet.json, fehlt sie: Lauf 1), sonst lehnte jeder Hotswap in Lauf 2 ab.
+import { LIVE_IDENTIFIER } from "../sync/instanz.js";
 
 const HIER = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(HIER, "..");
@@ -83,7 +86,7 @@ const BASE = TEST ? "http://localhost:8796" : "http://localhost:8795";
 // Der Identifier des Live-Spielstands. Er steht im Auftrag (9, Punkt 2) und
 // ist die einzige Zahl, an der sich der richtige Spielstand erkennen laesst -
 // Knoten und Lauf aendern sich, der Identifier nicht.
-const LIVE_IDENTIFIER = "197f4d61481686";
+// Seit Lauf 2 nicht mehr als Literal hier, sondern aus sync/instanz.js (Import oben).
 
 const befunde = [];
 let rot = 0;

@@ -14,7 +14,9 @@ import fs from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import zlib from "node:zlib";
+import http from "node:http";
 import {
+  sichere,
   lesenKennwerte,
   pruefeKennwerte,
   letzterEintrag,
@@ -304,10 +306,91 @@ console.log("-- Rotation --");
 }
 
 console.log("");
+console.log("-- sichere(): Epochenpraefix (Z1, Lauf-2-Uebergabe) --");
+{
+  // Ein Wegwerf-Server spielt die Bruecke: /api/rpc?method=getSaveFile.
+  // Port vom Betriebssystem, nie 8795.
+  let aktuell = null;
+  const srv = http.createServer((req, res) => {
+    // Ohne "close" haelt fetch die Verbindung offen, und process.exit am Ende
+    // trifft unter Windows einen schliessenden Handle (libuv-Assertion,
+    // Exit != 0 trotz gruen - gemessen 14.11.2026).
+    res.setHeader("connection", "close");
+    res.setHeader("content-type", "application/json");
+    res.end(JSON.stringify({ result: { save: aktuell.toString("latin1"), binary: true, identifier: "x" } }));
+  });
+  await new Promise((r) => srv.listen(0, "127.0.0.1", r));
+  const dashPort = srv.address().port;
+  const tmp = fs.mkdtempSync(path.join(os.tmpdir(), "bbepoche-"));
+  const L1 = "197f4d61481686";
+  const NEU = "abc123def456";
+  const MIN = 60000;
+
+  // Oben liegt noch die Lauf-1-Kette: 12 connect-Sicherungen und ein Index
+  // mit 2.000 h (der Fall "Archiv vergessen" oder "halb gelaufen").
+  const alt = gz(baueSave({ identifier: L1, totalPlaytime: 2000 * 3600000 }));
+  for (let i = 0; i < 12; i++) {
+    const f = "LIVE_" + L1 + "_BN8L3_2026-11-0" + (i % 9 + 1) + "T0" + (i % 10) + "-00_connect.json.gz";
+    fs.writeFileSync(path.join(tmp, f), alt);
+    const t = new Date(Date.now() - (100 - i) * 60000);
+    fs.utimesSync(path.join(tmp, f), t, t);
+    schreibeIndexZeile(tmp, { ts: "t" + i, datei: f, identifier: L1, totalPlaytime: 2000 * 3600000 });
+  }
+  const zaehleL1 = () => fs.readdirSync(tmp).filter((f) => f.startsWith("LIVE_" + L1 + "_")).length;
+
+  // 1. Standardpfad (ohne Epochenpraefix): das frische Spiel faellt am
+  //    Lauf-1-Anker durch - genau das heutige Verhalten.
+  aktuell = gz(baueSave({ identifier: NEU, totalPlaytime: 5 * MIN, bitNodeN: 1, sf: [] }));
+  let r = await sichere({ dashPort, anlass: "connect", praefix: "LIVE_", erwartetIdentifier: NEU,
+    erwartetPort: 12525, primaer: tmp, spiegel: null });
+  pruefe("ohne Epochenpraefix: frisches Spiel gegen Lauf-1-Index abgelehnt (wie heute)",
+    !r.ok && r.gruende.some((g) => /Rueckwaertssprung/.test(g)), JSON.stringify(r.gruende));
+  pruefe("  und keine Datei geschrieben, keine Lauf-1-Datei geloescht", r.orte.length === 0 && zaehleL1() === 12);
+
+  // 2. Mit Epochenpraefix: nur Zeilen LIVE_<neu>_ zaehlen -> angenommen.
+  r = await sichere({ dashPort, anlass: "connect", praefix: "LIVE_", epochenPraefix: "LIVE_" + NEU + "_",
+    erwartetIdentifier: NEU, erwartetPort: 12525, primaer: tmp, spiegel: null });
+  pruefe("mit Epochenpraefix: frisches Spiel gesichert", r.ok && r.datei.startsWith("LIVE_" + NEU + "_BN1L1_"),
+    JSON.stringify(r.gruende) + " " + r.datei);
+  pruefe("  Rotation ruehrt die Lauf-1-Dateien nicht an (12 connect > Deckel 10)", zaehleL1() === 12,
+    "noch " + zaehleL1());
+  pruefe("  Index-Anker der Epoche ist der neue Stand", Number(letzterEintrag(tmp, "LIVE_" + NEU + "_").totalPlaytime) === 5 * MIN);
+  pruefe("  der Lauf-1-Anker steht unveraendert daneben", Number(letzterEintrag(tmp, "LIVE_").totalPlaytime) === 2000 * 3600000);
+
+  // 3. Der Riegel bleibt in der Epoche: aeltere Kopie (2 min) faellt durch,
+  //    ein fremder identifier auch.
+  aktuell = gz(baueSave({ identifier: NEU, totalPlaytime: 2 * MIN, bitNodeN: 1, sf: [] }));
+  r = await sichere({ dashPort, anlass: "connect", praefix: "LIVE_", epochenPraefix: "LIVE_" + NEU + "_",
+    erwartetIdentifier: NEU, erwartetPort: 12525, primaer: tmp, spiegel: null });
+  pruefe("in der Epoche: Rueckwaertssprung abgelehnt", !r.ok && r.gruende.some((g) => /Rueckwaertssprung/.test(g)));
+  aktuell = alt;
+  r = await sichere({ dashPort, anlass: "connect", praefix: "LIVE_", epochenPraefix: "LIVE_" + NEU + "_",
+    erwartetIdentifier: NEU, erwartetPort: 12525, primaer: tmp, spiegel: null });
+  pruefe("in der Epoche: Lauf-1-Stand am identifier abgelehnt", !r.ok && r.gruende.some((g) => /identifier/.test(g)));
+
+  // 4. Gegenprobe zum alten Verhalten: OHNE Epochenpraefix haette die
+  //    Rotation die Lauf-1-Dateien als aelteste herausgenommen - deshalb
+  //    archiviert die Uebergabe sie vorher (5c 3a, Punkt 2).
+  aktuell = gz(baueSave({ identifier: L1, totalPlaytime: 2001 * 3600000 }));
+  r = await sichere({ dashPort, anlass: "connect", praefix: "LIVE_", erwartetIdentifier: L1,
+    erwartetPort: 12525, primaer: tmp, spiegel: null });
+  pruefe("Gegenprobe ohne Epochenpraefix: Rotation kappt die Lauf-1-connect auf den Deckel",
+    r.ok && fs.readdirSync(tmp).filter((f) => f.startsWith("LIVE_") && f.endsWith("_connect.json.gz")).length === 10,
+    r.ok + " / " + fs.readdirSync(tmp).length);
+
+  await new Promise((res) => srv.close(res));
+  fs.rmSync(tmp, { recursive: true, force: true });
+}
+
+console.log("");
 console.log("=== " + gruen + " gruen, " + rot + " rot ===");
 if (rot) {
   console.log("");
   for (const f of fehler) console.log("  ROT: " + f);
 }
 console.log("");
-process.exit(rot ? 1 : 0);
+// exitCode statt process.exit (14.11.2026): nach dem fetch() in sichere()
+// schliesst Node unter Windows noch einen Handle; ein hartes exit() trifft
+// ihn ("Assertion failed ... UV_HANDLE_CLOSING") und endet mit Code != 0,
+// obwohl alles gruen war. So laeuft die Schleife sauber leer.
+process.exitCode = rot ? 1 : 0;

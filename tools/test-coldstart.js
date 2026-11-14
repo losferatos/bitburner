@@ -253,7 +253,7 @@ console.log("-- 3. coldstart.js auf home 8 GB --");
     JSON.stringify(w.ports[3032]));
   pruefe("nichts abgelehnt wegen RAM, das nicht ohnehin knapp war (Zaehlung)", w.abgelehnt.filter((a) => a[0] === "fehlt").length === 0,
     JSON.stringify(w.abgelehnt.slice(0, 3)));
-  pruefe("ohne Argument kein darkweb.js gestartet", !w.log.some((l) => l.includes("darkweb.js")));
+  pruefe("unter 200k kein darkweb.js gestartet", !w.log.some((l) => l.includes("darkweb.js")));
 
   // Fortsetzung: BruteSSH gekauft + Level -> zer0 wird gerootet, Reserve wechselt
   w.dateien.home.add("BruteSSH.exe"); w.tor = true; w.skill = 80; w.geld = 100; w.sleeps = 0; w.maxSleeps = 3;
@@ -264,7 +264,18 @@ console.log("-- 3. coldstart.js auf home 8 GB --");
 }
 
 console.log("");
-console.log("-- 3b. darkweb nur auf Ansage, Reserve nach Mietrechner-Aufbau --");
+console.log("-- 3b. darkweb standardmaessig an (14.11.2026), Reserve nach Mietrechner-Aufbau --");
+{
+  const d = neueWelt({ homeGb: 8, skill: 1, geld: 250e3, maxSleeps: 2, args: [] });
+  d.prozesse.push({ pid: d.pid++, filename: "coldstart.js", host: "home", threads: 1, args: [] });
+  await fahre(cold, d);
+  pruefe("ohne Argument und 250k startet darkweb.js (Standard seit 14.11.)",
+    d.prozesse.some((p) => p.filename === "darkweb.js" && p.host === "home"));
+  const o = neueWelt({ homeGb: 8, skill: 1, geld: 250e3, maxSleeps: 2, args: ["ohne-darkweb"] });
+  o.prozesse.push({ pid: o.pid++, filename: "coldstart.js", host: "home", threads: 1, args: ["ohne-darkweb"] });
+  await fahre(cold, o);
+  pruefe("mit ohne-darkweb und 250k KEIN darkweb.js", !o.prozesse.some((p) => p.filename === "darkweb.js"));
+}
 {
   const w = neueWelt({ homeGb: 8, skill: 1, geld: 250e3, maxSleeps: 2, args: ["darkweb"] });
   w.prozesse.push({ pid: w.pid++, filename: "coldstart.js", host: "home", threads: 1, args: [] });

@@ -35,10 +35,13 @@
  * home-RAM kaufen. Das steht in doku/lauf2-bn11-start.md als Handanleitung;
  * darkweb.js (2,65 GB, DOM-Griff ueber globalThis) uebernimmt es auf Wunsch:
  *
- *   run coldstart.js darkweb      startet darkweb.js, sobald das Geld reicht
+ *   run coldstart.js               startet darkweb.js, sobald das Geld reicht
+ *   run coldstart.js ohne-darkweb  nur Status, Kaeufe von Hand
  *
- * Standardmaessig tut es das NICHT - darkweb.js klickt durch die Oberflaeche
- * und nimmt dabei den Fokus, das soll nur auf Ansage passieren.
+ * SEIT 14.11.2026 STANDARDMAESSIG AN: Lauf 2 startete per Autoexec (ohne
+ * Argument), und im Kaltstart nimmt kein Skript Auftraege an - ohne diesen
+ * Standard haette der Bot bis zum naechsten Handgriff bei TOR gewartet.
+ * darkweb.js klickt durch die Spieloberflaeche (wechselt die Spielseite).
  *
  * ============================================================================
  * UEBERGABE
@@ -99,7 +102,7 @@ const DARKWEB = "darkweb.js";
 
 export async function main(ns) {
   ns.disableLog("ALL");
-  const mitDarkweb = ns.args.includes("darkweb");
+  const mitDarkweb = !ns.args.includes("ohne-darkweb");
   const gestartet = Date.now();
   let runde = 0;
   let darkwebZuletzt = 0;

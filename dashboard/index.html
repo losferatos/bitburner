@@ -511,6 +511,8 @@ const VERDICTS = {
   "HILFE":         { cls: "bad",    label: "Help",          who: "The bot wrote data/hilfe.txt and asks for help." },
   "SPIEL ZU":      { cls: "muted",  label: "Game closed",   who: "The Bitburner tab is closed. Nothing is wrong." },
   "BLIND":         { cls: "bad",    label: "Blind",         who: "The bridge cannot read the game. Restart the bridge (WMI start, see /bb)." },
+  "KALTSTART":     { cls: "ok",    label: "Cold start",     who: "Run 2 cold start: coldstart.js earns money until home has 32 GB, then the core takes over. Nothing to do." },
+  "ROUTE FERTIG":  { cls: "ok",    label: "Route done",     who: "Every entry of the route is finished. Nothing to do." },
 };
 
 // Ab wann eine Quelle als alt bzw. tot gilt (Sekunden).
@@ -632,7 +634,9 @@ async function loadFast() {
     gameJson("data/bn4net.json"), gameJson("data/ausgang.json"), gameFile("data/wakelock.txt"),
     gameJson("data/boerse.json"),
   ]);
-  Object.assign(D, { blade, kpi, guard, net, exit, wake, stock });
+  // Lauf-2-Kaltstart (14.11.2026): unter 32 GB home schreibt nur coldstart.js.
+  const cold = net ? null : await gameJson("data/coldstart.txt");
+  Object.assign(D, { blade, kpi, guard, net, exit, wake, stock, cold });
 }
 
 async function loadSlow() {
@@ -643,7 +647,10 @@ async function loadSlow() {
       gameJson("data/gang.json"), gameJson("data/einbau.json"), gameJson("data/penalties.json"),
       gameJson("route.json"), gameJson("data/bn4rep.json"), gameFile("data/boerse-log.txt"),
     ]);
-    Object.assign(D, { sleeve, hashes, go, gang, augs, penalties, route, rep, stockLog });
+    // Lauf 2 (14.11.2026): epoche.json waehlt die Route - lauf2 faehrt route-lauf2.json.
+    const epoche = await gameJson("epoche.json");
+    const route2 = epoche && epoche.epoche === "lauf2" ? await gameJson("route-lauf2.json") : null;
+    Object.assign(D, { sleeve, hashes, go, gang, augs, penalties, route: route2 || route, rep, stockLog });
   }
   // Der Verlauf liegt bei der Bruecke - auch ohne Spiel lesbar.
   const nr = runReset();
@@ -1399,6 +1406,20 @@ function layout() {
 
 function renderNetwork() {
   const n = D.net;
+  const c = D.cold;
+  if (!n && c) {
+    kv($("net-kv"), [
+      ["Phase", "cold start (coldstart.js)"],
+      ["Home RAM", fmtRam(c.homeGb)],
+      ["Money", fmtMoney(nn(c.geld))],
+      ["Hacking", fmtInt(c.skill)],
+      ["Hack target", c.ziel || "–"],
+      ["Rented RAM", fmtRam(c.mietGb || 0)],
+      ["Next manual step", c.schritt || "–"],
+    ]);
+    fill($("net-meters"), Number.isFinite(nn(c.gerootet)) && c.von ? [meter("Rooted", c.gerootet / c.von, c.gerootet + " / " + c.von)] : []);
+    return;
+  }
   if (!n) { kv($("net-kv"), []); fill($("net-meters"), []); return; }
   kv($("net-kv"), [
     ["Home RAM", fmtRam(n.homeRam)],

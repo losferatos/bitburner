@@ -60,7 +60,7 @@ const RAM = {
   "guard.js": gb("guard.js"), "bn4net.js": gb("bn4net.js"),
 };
 console.log("       " + Object.entries(RAM).map(([k, v]) => k + " " + v).join(", "));
-pruefe("coldstart.js <= 5,0 GB (gemessen)", RAM["coldstart.js"] <= 5.0, RAM["coldstart.js"] + " GB");
+pruefe("coldstart.js <= 5,05 GB (gemessen; +0,05 fuer hasTorRouter, 14.11.2026)", RAM["coldstart.js"] <= 5.05, RAM["coldstart.js"] + " GB");
 pruefe("coldstart.js passt neben 3 GB Handwerkzeug auf home 8 GB", RAM["coldstart.js"] + RAM["darkweb.js"] <= 8);
 pruefe("boot.js unveraendert 5,5 GB (der Zweig kostet keinen RAM)", RAM["boot.js"] === 5.5, RAM["boot.js"] + " GB");
 {
@@ -128,7 +128,9 @@ function neueWelt(o = {}) {
     getServerRequiredHackingLevel: (h) => w.server[h].level,
     getHackingLevel: () => w.skill,
     hasRootAccess: (h) => w.server[h].root,
-    scan: (h) => [...(w.nachbarn[h] || []), ...(h === "home" && w.tor ? ["darkweb"] : [])],
+    // scanVeraltet: ein laufendes Skript sieht neue Nachbarn nicht (Spiel, 14.11.2026)
+    scan: (h) => [...(w.nachbarn[h] || []), ...(h === "home" && w.tor && !w.scanVeraltet ? ["darkweb"] : [])],
+    hasTorRouter: () => !!w.tor,
     brutessh: (h) => { rec("brutessh", h); if (dateienVon("home").has("BruteSSH.exe")) w.offen[h] = (w.offen[h] || new Set()).add("ssh"); },
     ftpcrack: (h) => { rec("ftpcrack", h); if (dateienVon("home").has("FTPCrack.exe")) w.offen[h] = (w.offen[h] || new Set()).add("ftp"); },
     relaysmtp: (h) => { rec("relaysmtp", h); if (dateienVon("home").has("relaySMTP.exe")) w.offen[h] = (w.offen[h] || new Set()).add("smtp"); },
@@ -263,6 +265,19 @@ console.log("-- 3. coldstart.js auf home 8 GB --");
   pruefe("Reserve ohne TOR/BruteSSH-Posten und ohne Mietrechner: 0 (erst mieten)", rp === 0, String(rp));
 }
 
+console.log("");
+console.log("-- 3a. TOR gekauft, aber ns.scan veraltet; home-RAM per darkweb.js heim (14.11.2026) --");
+{
+  const w = neueWelt({ homeGb: 8, skill: 1, geld: 2e6, maxSleeps: 2, tor: true, dateien: ["BruteSSH.exe"], args: [] });
+  w.scanVeraltet = true;
+  w.prozesse.push({ pid: w.pid++, filename: "coldstart.js", host: "home", threads: 1, args: [] });
+  await fahre(cold, w);
+  const st = JSON.parse(w.texte["data/coldstart.txt"] || "{}");
+  pruefe("TOR gekauft + scan veraltet: naechster Schritt ist NICHT TOR (ist: " + st.schritt + ")", !/^TOR/.test(st.schritt || ""));
+  pruefe("naechster Schritt home-RAM 16 GB", /^home-RAM auf 16/.test(st.schritt || ""));
+  const dw = w.prozesse.find((p) => p.filename === "darkweb.js");
+  pruefe("darkweb.js mit Argument heim gestartet (home-RAM-Kauf)", dw && dw.args[0] === "heim", JSON.stringify(dw && dw.args));
+}
 console.log("");
 console.log("-- 3b. darkweb standardmaessig an (14.11.2026), Reserve nach Mietrechner-Aufbau --");
 {

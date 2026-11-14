@@ -257,8 +257,9 @@ export async function main(ns) {
 
     // darkweb.js nur auf Ansage und hoechstens alle 10 Minuten, nie doppelt.
     if (mitDarkweb && schritt.darkweb && geld >= schritt.preis
-        && Date.now() - darkwebZuletzt > 600000 && ns.fileExists(DARKWEB, "home")) {
-      if (ns.exec(DARKWEB, "home")) darkwebZuletzt = Date.now();
+        && Date.now() - darkwebZuletzt > 180000 && ns.fileExists(DARKWEB, "home")) {
+      // "heim": darkweb.js kauft auch home-RAM bis 32 GB (14.11.2026).
+      if (ns.exec(DARKWEB, "home", 1, "heim")) darkwebZuletzt = Date.now();
     }
 
     // Zustand alle 5 Runden ablegen (ns.write kostet keinen RAM).
@@ -293,22 +294,26 @@ export async function main(ns) {
 function naechsterSchritt(ns, homeGb, geld, mietGb) {
   const hat = (datei) => ns.fileExists(datei, "home");
   const posten = [];
-  if (!ns.scan("home").includes("darkweb")) {
+  // ns.hasTorRouter statt ns.scan (14.11.2026): ein LAUFENDES Skript sieht
+  // neue Nachbarn von home nicht (darkweb.js, Befund 20.08.) - coldstart.js
+  // haelt ewig 200k fuer einen laengst gekauften Router zurueck und kam nie
+  // ueber diesen Schritt hinaus.
+  if (!ns.hasTorRouter()) {
     posten.push({ text: "TOR-Router kaufen (200k)", preis: 200e3, immer: true, darkweb: true });
   }
   if (!hat("BruteSSH.exe")) {
     posten.push({ text: "BruteSSH.exe kaufen (500k)", preis: 500e3, immer: true, darkweb: true });
   }
   if (homeGb < 16) {
-    posten.push({ text: "home-RAM auf 16 GB (Alt+W, Alpha Enterprises, Upgrade 'home' RAM)",
-      preis: heimPreis(homeGb), immer: false, darkweb: false });
+    posten.push({ text: "home-RAM auf 16 GB (darkweb.js heim)",
+      preis: heimPreis(homeGb), immer: false, darkweb: true });
   }
   if (!hat("FTPCrack.exe")) {
     posten.push({ text: "FTPCrack.exe kaufen (1,5M)", preis: 1.5e6, immer: false, darkweb: true });
   }
   if (homeGb < 32) {
-    posten.push({ text: "home-RAM auf 32 GB (Alpha Enterprises)", preis: heimPreis(homeGb < 16 ? 16 : homeGb),
-      immer: false, darkweb: false });
+    posten.push({ text: "home-RAM auf 32 GB (darkweb.js heim)", preis: heimPreis(homeGb < 16 ? 16 : homeGb),
+      immer: false, darkweb: true });
   }
   const p = posten[0];
   if (!p) return { text: homeGb >= 32 ? "Uebergabe an boot.js" : "nichts offen", preis: 0, reserve: 0, darkweb: false };

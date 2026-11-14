@@ -215,6 +215,43 @@ export async function main(ns) {
     }
   }
 
+  // --- home-RAM bis 32 GB (nur mit Argument "heim", 14.11.2026) ------------
+  //
+  // Im Lauf-2-Kaltstart kauft sonst niemand home-RAM (ohne SF4 keine
+  // Singularity, homegrow.js laeuft erst mit dem Kern) - und der Kern startet
+  // erst ab 32 GB. Am 14.11. stand der Bot deshalb bei 8 GB, waehrend das Geld
+  // in 1.248 GB Mietrechner ging. Knopf "Upgrade 'home' RAM" beim Haendler
+  // (Locations/ui/RamButton.tsx:48-58, ohne isTrusted-Pruefung). Erfolg am
+  // Server ablesen, nicht am Bildschirm.
+  if (ns.args.includes("heim")) {
+    for (let i = 0; i < 2 && ns.getServerMaxRam("home") < 32; i++) {
+      const vorher = ns.getServerMaxRam("home");
+      doc.dispatchEvent(new KeyboardEvent("keydown", { key: "w", altKey: true, bubbles: true }));
+      await ns.sleep(1200);
+      const haendler = knoepfe().find((b) => text(b) === "Alpha Enterprises")
+        || knoepfe().find((b) => /^Alpha Enterprises/i.test(text(b)));
+      if (!haendler) { sag("home-RAM: Alpha Enterprises nicht auf der Stadtkarte - stehen wir in Sector-12?"); break; }
+      haendler.click();
+      await ns.sleep(1200);
+      const knopf = knoepfe().find((b) => /^Upgrade 'home' RAM/i.test(text(b)));
+      if (!knopf) { sag("home-RAM: Knopf nicht gefunden."); break; }
+      if (knopf.disabled) { sag("home-RAM: zu wenig Geld (" + text(knopf) + ")."); break; }
+      knopf.click();
+      await ns.sleep(900);
+      if (!(ns.getServerMaxRam("home") > vorher)) {
+        const s = Object.keys(knopf).find((k) => k.startsWith("__reactProps$"));
+        const p = s ? knopf[s] : null;
+        if (p && typeof p.onClick === "function") {
+          try { p.onClick({ isTrusted: true, preventDefault() {}, stopPropagation() {} }); } catch (e) { sag("home-RAM: Handler warf " + e.message); }
+          await ns.sleep(900);
+        }
+      }
+      const nachher = ns.getServerMaxRam("home");
+      if (nachher > vorher) sag("home-RAM gekauft: " + vorher + " -> " + nachher + " GB.");
+      else { sag("home-RAM: Klick ohne Wirkung (" + text(knopf) + ")."); break; }
+    }
+  }
+
   // --- Portknacker ---------------------------------------------------------
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
   await ns.sleep(1000);

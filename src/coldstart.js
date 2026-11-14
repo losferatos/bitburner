@@ -109,6 +109,12 @@ export async function main(ns) {
   let ziel = null;
 
   while (true) {
+    // EINE RUNDE DARF DAS SKRIPT NICHT BEENDEN (14.11.2026). Am ersten
+    // Lauf-2-Tag endete coldstart.js nach 262 s still (Runde 26); im
+    // Kaltstart startet es niemand neu - der Bot stand bis zum naechsten
+    // Neuladen. Jetzt: Fehler fangen, nach data/coldstart-fehler.txt
+    // schreiben, naechste Runde.
+    try {
     runde++;
     const homeGb = ns.getServerMaxRam("home");
     const geld = ns.getServerMoneyAvailable("home");
@@ -265,6 +271,10 @@ export async function main(ns) {
           sec: Math.round(t.sec * 10) / 10, min: t.secMin })),
         schritt: schritt.text, reserve: schritt.reserve,
       });
+    }
+    } catch (e) {
+      const text = String(e && e.stack ? e.stack : e).slice(0, 1500);
+      ns.write("data/coldstart-fehler.txt", new Date().toISOString() + " Runde " + runde + ": " + text + "\n", "a");
     }
 
     await ns.sleep(2000);

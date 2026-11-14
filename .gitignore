@@ -57,3 +57,6 @@ pruefstand/rt*/
 # Der master-Schnappschuss, den tools/test-bruecke.js je Lauf erzeugt, damit
 # der Pruefstand nicht am Commit-Zustand des Arbeitsverzeichnisses haengt.
 pruefstand/master-*.txt
+
+# Erzeugt von tools/laufvergleich.js bei jedem Check-in (14.11.2026)
+dashboard/laufvergleich.json

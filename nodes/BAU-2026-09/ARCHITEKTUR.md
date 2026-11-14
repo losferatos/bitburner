@@ -712,7 +712,7 @@ mischen) und `node tools/test-alles.js` im Live-Repo laufen lassen.
     {
       "name": "darkweb.js",
       "args": [],
-      "ramBaseGb": 2.65,
+      "ramBaseGb": 2.55,
       "ramSingGb": 0,
       "ramMeasuredAt": "2026-09-04",
       "verfahren": "alle",

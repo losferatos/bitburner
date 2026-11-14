@@ -96,7 +96,9 @@ export async function main(ns) {
   // --- TOR-Router ----------------------------------------------------------
   // Ob er schon da ist, steht NICHT im Programmordner, sondern im Netz: der
   // Rechner `darkweb` ist dann ein Nachbar von home.
-  const hatTor = ns.scan("home").includes("darkweb");
+  // ns.hasTorRouter statt ns.scan (14.11.2026): in Lauf 2 meldete der Nachbarschaftsblick
+  // nach dem Kauf weiter "kein TOR" (17:19 gekauft, 17:23 "Noch kein TOR").
+  const hatTor = ns.hasTorRouter();
   if (hatTor) {
     sag("TOR-Router steht bereits.");
   } else if (geld() < 200e3) {

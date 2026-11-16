@@ -17,7 +17,7 @@
  *
  * Sicherungen:
  *   - Neu geladen wird NUR, wenn der gespeicherte Stand den Einbau zeigt
- *     (Warteschlange leer, Hacking 1). Sonst bleibt die Seite stehen und
+ *     (Warteschlange leer, lastAugReset nach dem Ausloesen). Sonst bleibt die Seite stehen und
  *     localStorage "installreload" sagt warum - lieber ein stehender Bot als
  *     ein Reload, der den Einbau verwirft (passiert 14.11. 17:12).
  *   - onbeforeunload wird erst unmittelbar vor dem Reload geleert.
@@ -79,7 +79,8 @@ export async function main(ns) {
     let j = JSON.parse(roh);
     if (typeof j === "string") j = JSON.parse(j);
     const pl = JSON.parse(j.data.PlayerSave).data;
-    return { queued: (pl.queuedAugmentations || []).length, hack: pl.skills.hacking, inst: (pl.augmentations || []).length };
+    return { queued: (pl.queuedAugmentations || []).length, hack: pl.skills.hacking,
+      inst: (pl.augmentations || []).length, augReset: Number(pl.lastAugReset) || 0 };
   };
   const teil2 = async (versuch) => {
     try {
@@ -87,13 +88,17 @@ export async function main(ns) {
       if (k) k.click();
       await new Promise((r) => win.setTimeout(r, 3000));
       const s = await pruefe();
-      if (s.queued === 0 && s.hack <= 1) {
+      // NICHT "Hacking 1": nach dem Einbau am 16.11. 09:28 stand Hacking auf 2
+      // (Startwerte aus Augs), die Pruefung schlug dreimal fehl, kein Reload,
+      // der Bot stand still. Massgeblich ist der Einbauzeitpunkt.
+      if (s.queued === 0 && s.augReset >= ausgeloest - 5000) {
         melde("ok: gespeichert (installiert " + s.inst + "), lade neu");
         win.onbeforeunload = null;
         win.location.reload();
         return;
       }
-      melde("Versuch " + versuch + ": Stand zeigt den Einbau nicht (queued " + s.queued + ", hack " + s.hack + ")");
+      melde("Versuch " + versuch + ": Stand zeigt den Einbau nicht (queued " + s.queued + ", lastAugReset "
+        + new Date(s.augReset).toISOString() + ", hack " + s.hack + ")");
     } catch (e) {
       melde("Versuch " + versuch + ": Fehler " + String(e));
     }
@@ -102,6 +107,7 @@ export async function main(ns) {
   };
 
   sag("INSTALLIERE. Danach speichert und laedt ein Seiten-Timer neu (localStorage 'installreload').");
+  const ausgeloest = Date.now();
   melde("Einbau ausgeloest");
   win.setTimeout(() => teil2(1), 4000);
   installKnopf.click();

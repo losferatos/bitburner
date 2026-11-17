@@ -145,7 +145,7 @@ export async function main(ns) {
       }
       if (phase === "warte-enter") {
         const enter = doc.querySelector('[aria-label="enter-bitnode-' + ziel + '"]')
-          || [...doc.querySelectorAll("button")].find((b) => new RegExp("^Enter BN" + ziel + "\.\d+").test((b.innerText || "").trim()));
+          || [...doc.querySelectorAll("button")].find((b) => new RegExp("^Enter BN" + ziel + "[.]\\d+").test((b.innerText || "").trim()));
         if (!enter) return;
         win.clearInterval(takt);
         melde("Sprung ausgeloest: " + (enter.innerText || "").trim());

@@ -7,8 +7,9 @@
  * Dieses Skript geht den Weg, den das Spiel dem Menschen anbietet:
  *   1. Terminal: connect-Kette zu w0r1d_d43m0n, dann `backdoor`
  *      (Terminal/commands/backdoor.ts:61 schickt danach auf den BitVerse).
- *   2. BitVerse: den Ziel-BitNode anklicken (oeffnet PortalModal) und im Fenster
- *      "Enter BN<n>.<stufe>" bestaetigen (PortalModal.tsx:117-131).
+ *   2. BitVerse: den Ziel-BitNode anklicken (aria-label "BitNode-<n>: ...",
+ *      oeffnet PortalModal) und "Enter BN<n>.<stufe>" bestaetigen
+ *      (PortalModal.tsx:117-131, aria-label enter-bitnode-<n>).
  *   3. enterBitNode beendet JEDES Skript, auch dieses. Ein Seiten-Timer
  *      speichert danach, prueft in IndexedDB, dass der Stand im neuen Knoten
  *      steht (bitNodeN == Ziel), und laedt erst dann neu (Autoexec coldstart.js
@@ -73,7 +74,13 @@ export async function main(ns) {
   if (!ns.fileExists("boot.js", "home")) return sag("ABBRUCH: boot.js liegt nicht auf home.");
   if (nurPruefen) return sag("PRUEFLAUF: alle Bedingungen erfuellt. Ohne --pruefen wird jetzt BitNode " + ziel + " betreten.");
 
-  // --- Teil 3 vorbereiten: Seiten-Timer, ueberlebt das Skriptende ----------
+  // --- Alles ab dem Backdoor laeuft als Seiten-Timer -------------------------
+  // Sobald das Backdoor fertig ist, schickt das Spiel auf den BitVerse
+  // (Terminal.ts:386 -> Router.toPage(BitVerse)), und GameRoot.tsx:256-258
+  // ruft dort prestigeWorkerScripts(): JEDES Skript stirbt, auch dieses. Alles
+  // danach (Ziel anklicken, Enter, Speichern, Reload) muss deshalb schon VOR
+  // dem `backdoor` als setInterval auf der Seite stehen (Befund Skeptiker
+  // 17.11.2026). ns darf dort nicht mehr benutzt werden.
   const melde = (t) => {
     try { win.localStorage.setItem("exitdom", new Date().toISOString() + " " + t); } catch { /* egal */ }
   };
@@ -119,7 +126,37 @@ export async function main(ns) {
     else melde("AUFGEGEBEN: nicht neu geladen - Seite von Hand neu laden nach Pruefung");
   };
 
-  // --- 1. Terminal: connect-Kette und backdoor ------------------------------
+  const start = Date.now();
+  let phase = "warte-bitverse";
+  const takt = win.setInterval(() => {
+    try {
+      if (Date.now() - start > 15 * 60000) { win.clearInterval(takt); melde("ABBRUCH: 15 Minuten ohne Fortschritt in Phase " + phase); return; }
+      if (phase === "warte-bitverse") {
+        // Die Portale erscheinen erst nach der Zerstoerungs-Animation. Im
+        // Standardmodus ist jedes ein IconButton mit aria-label "BitNode-<n>: <Name>"
+        // (BitverseRoot.tsx:99-106), nur mit DisableASCIIArt steht der Text im Button.
+        const portal = doc.querySelector('[aria-label^="BitNode-' + ziel + ':"]')
+          || [...doc.querySelectorAll("button")].find((b) => new RegExp("^BitNode-" + ziel + ":").test((b.innerText || "").trim()));
+        if (!portal) return;
+        melde("BitVerse da, klicke BitNode " + ziel);
+        portal.click();
+        phase = "warte-enter";
+        return;
+      }
+      if (phase === "warte-enter") {
+        const enter = doc.querySelector('[aria-label="enter-bitnode-' + ziel + '"]')
+          || [...doc.querySelectorAll("button")].find((b) => new RegExp("^Enter BN" + ziel + "\.\d+").test((b.innerText || "").trim()));
+        if (!enter) return;
+        win.clearInterval(takt);
+        melde("Sprung ausgeloest: " + (enter.innerText || "").trim());
+        win.setTimeout(() => teil3(1), 4000);
+        enter.click();
+      }
+    } catch (e) { melde("Fehler im Takt: " + String(e)); }
+  }, 2000);
+  melde("Takt installiert, Backdoor folgt");
+
+  // --- Terminal: connect-Kette und backdoor ---------------------------------
   const terminal = (befehl) => {
     const el = doc.getElementById("terminal-input");
     if (!el) return false;
@@ -129,59 +166,22 @@ export async function main(ns) {
     el.dispatchEvent(new KeyboardEvent("keydown", { key: "Enter", code: "Enter", keyCode: 13, which: 13, bubbles: true }));
     return true;
   };
+  const stopp = (grund) => { win.clearInterval(takt); melde("ABBRUCH: " + grund); return sag("ABBRUCH: " + grund); };
   const raus = [...doc.querySelectorAll("button")]
     .find((b) => (b.innerText || "").trim() === "Do something else simultaneously");
   if (raus) { raus.click(); await ns.sleep(1200); }
   doc.dispatchEvent(new KeyboardEvent("keydown", { key: "t", altKey: true, bubbles: true }));
   await ns.sleep(900);
-  if (!doc.getElementById("terminal-input")) return sag("ABBRUCH: Terminal nicht erreichbar.");
-  if (!terminal("home")) return sag("ABBRUCH: Terminal nahm den ersten Befehl nicht an.");
+  if (!doc.getElementById("terminal-input")) return stopp("Terminal nicht erreichbar.");
+  if (!terminal("home")) return stopp("Terminal nahm den ersten Befehl nicht an.");
   await ns.sleep(700);
   for (const hop of kette) {
-    if (!terminal("connect " + hop)) return sag("ABBRUCH: Terminal nahm 'connect " + hop + "' nicht an.");
+    if (!terminal("connect " + hop)) return stopp("Terminal nahm 'connect " + hop + "' nicht an.");
     await ns.sleep(700);
   }
+  // Ab hier NICHTS mehr senden: jede weitere Eingabe bricht das Backdoor ab.
   terminal("backdoor");
-  sag("backdoor abgesetzt, warte auf den BitVerse-Bildschirm.");
-
-  // --- 2. BitVerse: Ziel anklicken, im Fenster bestaetigen -------------------
-  const imVerse = () => /Enter a new BitNode|BitVerse|Bitverse/i.test(doc.body.innerText || "")
-    && [...doc.querySelectorAll("button, [role='button']")].length > 0;
-  let da = false;
-  for (let i = 0; i < 120; i++) {   // 6 Minuten, Backdoor-Dauer haengt vom Hacking-Level ab
-    await ns.sleep(3000);
-    if (/BitNode-?\s*\d+/i.test(doc.body.innerText || "") && /Bitverse|BitVerse|Enter a new/i.test(doc.body.innerText || "")) { da = true; break; }
-  }
-  if (!da) return sag("ABBRUCH: BitVerse-Bildschirm nach 6 Minuten nicht erschienen. Backdoor: "
-    + (ns.getServer(WD).backdoorInstalled ? "ja" : "nein"));
-  sag("BitVerse-Bildschirm ist da.");
-  await ns.sleep(1500);
-
-  const blatt = [...doc.querySelectorAll("button, [role='button'], a, span, div")]
-    .filter((e) => e.children.length === 0 && /BitNode-?\s*\d+/i.test(e.textContent || ""));
-  const treffer = blatt.find((e) => {
-    const m = (e.textContent || "").match(/BitNode-?\s*(\d+)/i);
-    return m && Number(m[1]) === ziel;
-  });
-  if (!treffer) return sag("ABBRUCH: BitNode " + ziel + " nicht auf der Seite gefunden (" + blatt.length + " Beschriftungen).");
-  let el = treffer;
-  for (let i = 0; i < 6 && el; i++, el = el.parentElement) {
-    if (el.tagName === "BUTTON" || el.getAttribute?.("role") === "button" || el.onclick) break;
-  }
-  (el || treffer).click();
-  sag("BitNode " + ziel + " angeklickt, suche den Enter-Knopf.");
-
-  let enter = null;
-  for (let i = 0; i < 20 && !enter; i++) {
-    await ns.sleep(500);
-    enter = [...doc.querySelectorAll("button")]
-      .find((b) => new RegExp("^Enter BN" + ziel + "\\.\\d+").test((b.innerText || "").trim()));
-  }
-  if (!enter) return sag("ABBRUCH: Knopf 'Enter BN" + ziel + ".x' nicht erschienen.");
-
-  sag("Betrete BitNode " + ziel + ": " + (enter.innerText || "").trim() + ". Ab jetzt sterben alle Skripte; ein Seiten-Timer speichert und laedt neu.");
-  melde("Sprung ausgeloest");
-  win.setTimeout(() => teil3(1), 4000);
-  enter.click();
-  await ns.sleep(3000);
+  sag("backdoor abgesetzt. Der Seiten-Timer uebernimmt (BitVerse, Ziel anklicken, Enter, Speichern, Reload). "
+    + "Dieses Skript stirbt mit dem Wechsel auf den BitVerse - das ist der Normalfall. Verlauf: localStorage 'exitdom'.");
+  await ns.sleep(600000);
 }

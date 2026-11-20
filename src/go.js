@@ -145,6 +145,58 @@ const TELEMETRY_MS = 30000;
 export const OPPONENT = "Tetrads";
 export const BOARD_SIZE = 7;
 
+/**
+ * HACKINGWEG NACH DER RED PILL: GEGEN "????????????" (20.11.2026).
+ *
+ * Ist The Red Pill eingebaut, steht ein achter Gegner offen (Go.ts:28-32,
+ * Enums.ts:9 w0r1d_d43m0n = "????????????"). Sein Bonus geht auf den
+ * HACKING-MULTIPLIKATOR (effect.ts calculateMults: mults.hacking *= effect),
+ * bonusPower 2 (Constants.ts), also fast dreimal so stark wie Tetrads.
+ * Wirksam ohne Einbau: endGoGame ruft applyEntropy -> updateGoMults ->
+ * updateSkillLevels, das Level springt am Partieende.
+ *
+ * Gefunden in BN4.1 Lauf 2: nach der Red Pill sperrt bn4rep jeden Einbau
+ * (Endspiel-Riegel 23.08.), Ziel Hacking 9000, Multiplikator 11,04. Das Level
+ * ist mult * (32 ln(exp + 534,5) - 200) - logarithmisch in der Erfahrung.
+ * Gemessen 9,3e10 Erfahrung je Stunde bei 5,2e11 Bestand: 9000 haette rund
+ * 6e13 gebraucht, ueber 600 Stunden. Der Multiplikator wirkt dagegen linear
+ * aufs Level: +22,7 % fehlten. Mit SF14 (x2) und GoPower 1 ist der Bonus
+ * 1 + ln(n+1) (n+1)^0,3 * 0,008 - +22,7 % bei n ~ 300 Node Power.
+ *
+ * Brett: der Gegner erzwingt 19x19 in Bitverse-Form (boardState.ts:26-29),
+ * resetBoardState erlaubt fuer ihn jede Groesse (netscriptGoImplementation.ts
+ * :355). Schwierigkeit (9,5+0,5)*0,25 = 2,5. Node Power gibt es auch fuer
+ * verlorene Partien (scoring.ts endGoGame: Punktzahl * 2,5 * Serie, Serie
+ * nach Niederlage 0,5).
+ *
+ * Nur ausserhalb der Kampfknoten (GO_NODES): dort traegt Tetrads, und eine
+ * Red Pill im V2-Knoten ist ein Ausnahmefall. Bewusst hingenommen
+ * (Skeptiker 20.11.): eine eingebaute Red Pill in einem anderen V2-Knoten
+ * (Handkauf, Gang-Angebot) laesst hier ebenfalls gegen ???????????? spielen -
+ * 20 GB Werkbank fuer einen Bonus, der dort nicht traegt, aber nichts
+ * blockiert. Das Verfahren kennt weder getResetInfo noch reg.js merkmale.
+ */
+export const WD_OPPONENT = "????????????";
+export const WD_BOARD_SIZE = 19;
+const RED_PILL = "The Red Pill";
+
+/**
+ * Gegner und Brett fuer diesen Knoten, oder null (nicht spielen).
+ * hasRedPill = The Red Pill EINGEBAUT (getResetInfo().ownedAugs).
+ */
+export function chooseOpponent(node, sf14, hasRedPill) {
+  if (hasRedPill && !GO_NODES.includes(node)) return { opponent: WD_OPPONENT, size: WD_BOARD_SIZE };
+  if (goLohnt(node, sf14)) return { opponent: OPPONENT, size: BOARD_SIZE };
+  return null;
+}
+
+/** Eingebaut, nicht nur gekauft: ownedAugs ist eine Map (Name -> Stufe). */
+export function redPillInstalled(ownedAugs) {
+  if (!ownedAugs) return false;
+  if (typeof ownedAugs.has === "function") return ownedAugs.has(RED_PILL);
+  return Object.prototype.hasOwnProperty.call(ownedAugs, RED_PILL);
+}
+
 /** Wie viele Kandidaten die Tiefenpruefung bekommen. */
 const TOP_K = 49;
 /** So viel besser als Passen muss ein Zug sein (Flaecheneinheiten). */
@@ -152,7 +204,8 @@ const PASS_EPS = 0.8;
 /** Gewicht des Einflusses (Voronoi) in der Bewertung. */
 const INFLUENCE_W = 0.2;
 /** Harte Obergrenze an Schleifendurchlaeufen je Partie, gegen Endlosspiel. */
-const MAX_TURNS = 6 * BOARD_SIZE * BOARD_SIZE;
+/** Obergrenze je Partie haengt an der Brettgroesse: 6 * Punkte (7x7: 294). */
+const maxTurnsFor = (size) => 6 * size * size;
 const TELEMETRY_FILE = "data/go.json";
 /** Komi der Tetrads (Constants.ts); im Spiel gilt der Wert aus getGameState(). */
 const KOMI = 5.5;
@@ -474,14 +527,23 @@ export async function main(ns) {
   try { node = ns.getResetInfo().currentNode; } catch { node = 0; }
   // SF14 (ownedSF ist eine Map) wird mit demselben getResetInfo gelesen.
   let sf14 = 0;
+  let hasRedPill = false;
   try {
-    const o = ns.getResetInfo().ownedSF;
+    const ri = ns.getResetInfo();
+    const o = ri.ownedSF;
     sf14 = (o && typeof o.get === "function" ? o.get(14) : o && o[14]) || 0;
+    hasRedPill = redPillInstalled(ri.ownedAugs);
   } catch { sf14 = 0; }
-  if (!goLohnt(node, sf14)) {
+  const choice = chooseOpponent(node, sf14, hasRedPill);
+  if (!choice) {
     ns.print("BitNode " + node + " (SF14 " + sf14 + "): IPvGO lohnt hier nicht - beende mich.");
     return;
   }
+  // Gegner und Brett gelten fuer die ganze Lebenszeit des Skripts: die Red
+  // Pill kommt nur ueber einen Einbau, und der startet alles neu.
+  const OPP = choice.opponent;
+  const SIZE = choice.size;
+  const MAX_TURNS = maxTurnsFor(SIZE);
 
   let games = 0, won = 0, lost = 0, lastTelemetry = 0;
   // Cheat-Zaehler fuer die Telemetrie (Skeptiker 27.10.): ohne sie waere ein
@@ -492,9 +554,9 @@ export async function main(ns) {
 
   const telemetry = (extra) => {
     let st = null;
-    try { st = ns.go.analysis.getStats()[OPPONENT] || null; } catch { st = null; }
+    try { st = ns.go.analysis.getStats()[OPP] || null; } catch { st = null; }
     const o = {
-      zeit: Date.now(), knoten: node, state: "work", opponent: OPPONENT, size: BOARD_SIZE,
+      zeit: Date.now(), knoten: node, state: "work", opponent: OPP, size: SIZE,
       games, won, lost,
       bonusPercent: st ? st.bonusPercent : null,
       // Suchstatistik: mittlere Besuche an der Wurzel je Zug und Vorausdenk-
@@ -694,15 +756,15 @@ export async function main(ns) {
   const playGame = async () => {
     let cur = ns.go.getCurrentPlayer();
     const size = ns.go.getBoardState().length;
-    if (cur === "None" || ns.go.getOpponent() !== OPPONENT || size !== BOARD_SIZE) {
-      ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
+    if (cur === "None" || ns.go.getOpponent() !== OPP || size !== SIZE) {
+      ns.go.resetBoardState(OPP, SIZE);
     }
     let oppPassed = false;
     searcher = null; searcherSynced = false; cheatCount = 0; cheatBlockedGame = false; cheatEndedGame = false;
     // Sieg/Niederlage aus den Spielstatistiken statt aus dem Restbrett: ein
     // Auswurf (forceEndGoGame) bucht eine Niederlage, das Brett kann aber
     // Schwarz vorn zeigen (Skeptiker 27.10.). getStats ist schon geladen.
-    const statsOf = () => { try { return ns.go.analysis.getStats()[OPPONENT] || null; } catch { return null; } };
+    const statsOf = () => { try { return ns.go.analysis.getStats()[OPP] || null; } catch { return null; } };
     const s0 = statsOf();
     let komi = KOMI;
     try {
@@ -734,7 +796,7 @@ export async function main(ns) {
       // das als Niederlage (resetBoardState mitten in der Partie); in den
       // eigenen Zaehlern steht es NICHT - lost sind nur beendete Partien.
       ns.print("Partie endet nicht - neu gestartet.");
-      ns.go.resetBoardState(OPPONENT, BOARD_SIZE);
+      ns.go.resetBoardState(OPP, SIZE);
       return;
     }
     const gs = ns.go.getGameState();

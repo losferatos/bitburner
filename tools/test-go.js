@@ -276,7 +276,8 @@ function neuerGoMock(opts = {}) {
     disableLog: () => {},
     print: () => {},
     getHostname: () => "home",
-    getResetInfo: () => ({ currentNode: opts.knoten ?? 14, ownedSF: new Map(opts.sf14 ? [[14, opts.sf14]] : []) }),
+    getResetInfo: () => ({ currentNode: opts.knoten ?? 14, ownedSF: new Map(opts.sf14 ? [[14, opts.sf14]] : []),
+      ownedAugs: new Map(opts.redPill ? [["The Red Pill", 1]] : []) }),
     write: (d, inh) => { z.dateien[d] = inh; z.dateiSchreibungen = (z.dateiSchreibungen || 0) + 1; },
     scp: () => true,
     // Nur echte Pausen zaehlen (24.10.2026): go.js gibt waehrend der
@@ -443,6 +444,30 @@ console.log("-- 6. falscher Knoten -> Ende ohne ns.go --");
   pruefe("goLohnt: 14 immer, 13 und 15 nur mit SF14, sonst nie",
     modul.goLohnt(14, 0) && !modul.goLohnt(13, 0) && modul.goLohnt(13, 1)
     && !modul.goLohnt(15, 0) && modul.goLohnt(15, 3) && !modul.goLohnt(10, 3) && !modul.goLohnt(8, 3));
+}
+
+console.log("");
+console.log("-- 6c. Hackingweg nach der Red Pill: Gegner ???????????? auf 19x19 (20.11.2026) --");
+{
+  // BN4.1 Lauf 2: Red Pill eingebaut, Einbau gesperrt, Level waechst nur noch
+  // logarithmisch. Der Gegner "????????????" hebt den Hacking-Multiplikator.
+  const m4 = await fahre({ knoten: 4, sf14: 3, redPill: true, maxPartien: 0 });
+  pruefe("BN4 mit eingebauter Red Pill: Partie gegen ???????????? auf 19x19",
+    m4.z.resets.length >= 1 && m4.z.resets[0].gegner === "????????????" && m4.z.resets[0].n === 19,
+    JSON.stringify(m4.z.resets.slice(0, 2)));
+  const m4o = await fahre({ knoten: 4, sf14: 3 });
+  pruefe("BN4 ohne Red Pill: sofort Ende", m4o.z.goAufrufe === 0 && m4o.z.resets.length === 0 && m4o.z.sleeps === 0);
+  pruefe("chooseOpponent: Red Pill ausserhalb der Kampfknoten -> ???????????? 19",
+    JSON.stringify(modul.chooseOpponent(4, 3, true)) === JSON.stringify({ opponent: "????????????", size: 19 })
+    && JSON.stringify(modul.chooseOpponent(8, 0, true)) === JSON.stringify({ opponent: "????????????", size: 19 }));
+  pruefe("chooseOpponent: Kampfknoten bleiben bei Tetrads 7x7, auch mit Red Pill",
+    modul.chooseOpponent(14, 0, true).opponent === "Tetrads" && modul.chooseOpponent(13, 1, true).size === 7);
+  pruefe("chooseOpponent: ohne Red Pill wie goLohnt",
+    modul.chooseOpponent(4, 3, false) === null && modul.chooseOpponent(13, 0, true) === null
+    && modul.chooseOpponent(15, 3, false).opponent === "Tetrads");
+  pruefe("redPillInstalled: Map und Objekt, leer und null",
+    modul.redPillInstalled(new Map([["The Red Pill", 1]])) && modul.redPillInstalled({ "The Red Pill": 1 })
+    && !modul.redPillInstalled(new Map()) && !modul.redPillInstalled(null));
 }
 
 console.log("");

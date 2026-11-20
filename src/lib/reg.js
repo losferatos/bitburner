@@ -133,14 +133,44 @@ export function merkmale(lage) {
   } catch { sf9 = 0; }
   const node = Number(lage && lage.node) || 0;
   const aus = !!(lage && lage.hacknetServerAus);
-  return { 9: !aus && (node === 9 || sf9 > 0) };
+  const f = { 9: !aus && (node === 9 || sf9 > 0) };
+  const go = goMerkmal(node, o, lage && lage.ownedAugs);
+  if (go !== null) f.go = go;
+  return f;
+}
+
+/**
+ * IPVGO (Schluessel "go", 20.11.2026): darf src/go.js hier laufen?
+ * Dieselbe Regel wie go.js `chooseOpponent` - hier nachgebaut, weil ein
+ * Import von go.js die go.*-Kosten in jeden Importeur zoege:
+ *   - BN14 immer, BN13 und BN15 mit SF14 (Tetrads, Kampfwerte);
+ *   - jeder andere Knoten, sobald The Red Pill EINGEBAUT ist (Gegner
+ *     "????????????", Bonus auf den Hacking-Multiplikator - der Hackingweg
+ *     sperrt nach der Red Pill jeden Einbau, das Level waechst nur noch
+ *     logarithmisch; Begruendung in go.js).
+ * null = ohne ownedSF keine Aussage (Lage ohne getResetInfo).
+ */
+export function goMerkmal(node, ownedSF, ownedAugs) {
+  if (ownedSF == null && ownedAugs == null && node !== 14) return null;
+  let sf14 = 0;
+  try {
+    sf14 = (ownedSF && typeof ownedSF.get === "function") ? Number(ownedSF.get(14) || 0) : Number((ownedSF || {})[14] || 0);
+  } catch { sf14 = 0; }
+  if (node === 14) return true;
+  if (node === 13 || node === 15) return sf14 > 0;
+  let rp = false;
+  try {
+    rp = !!ownedAugs && (typeof ownedAugs.has === "function" ? ownedAugs.has("The Red Pill")
+      : Object.prototype.hasOwnProperty.call(ownedAugs, "The Red Pill"));
+  } catch { rp = false; }
+  return rp;
 }
 
 /** Dasselbe direkt aus `ns.getResetInfo()` - fuer Kern und Waechter. */
 export function merkmaleAusReset(ri) {
   const opt = (ri && ri.bitNodeOptions) || {};
   const f = merkmale({ node: ri && ri.currentNode, ownedSF: ri && ri.ownedSF,
-    hacknetServerAus: opt.disableHacknetServer === true });
+    ownedAugs: ri && ri.ownedAugs, hacknetServerAus: opt.disableHacknetServer === true });
   // SF4-RIEGEL (K09, 14.11.2026): Kern und Waechter bauen ihre Lage aus
   // dieser Funktion - mit dem Schluessel 4 bekommen sie den Riegel, ohne dass
   // ihr Code angefasst wird. Gerechnet wie das Spiel (`canAccessBitNodeFeature(4)`,

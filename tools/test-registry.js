@@ -266,6 +266,24 @@ console.log("-- Knoten- und Phasenfilter --");
     pruefe("und bleibt blockiert, solange data/keine-hacknet.txt liegt",
       !REG.gilt(hashes, { ...grund, features: { 9: true }, dateiDa: () => true }).gilt);
   }
+  // GO.JS UEBER DAS MERKMAL "go" (20.11.2026): Kampfknoten wie bisher, sonst
+  // erst mit eingebauter Red Pill (Gegner ????????????, Hacking-Multiplikator).
+  {
+    const goE = registry.eintraege.find((e) => e.name === "go.js");
+    const L = (ri) => ({ node: ri.currentNode, verfahren: "V1", phase: "normal", dateiDa: () => false,
+      features: REG.merkmaleAusReset(ri) });
+    const da = (ri) => REG.gilt(goE, { ...L(ri), dateiDa: (f) => f === "go.js" }).gilt;
+    pruefe("go.js gilt in BN4 mit eingebauter Red Pill",
+      da({ currentNode: 4, ownedSF: new Map([[14, 3]]), ownedAugs: new Map([["The Red Pill", 1]]) }));
+    pruefe("go.js gilt NICHT in BN4 ohne Red Pill",
+      !da({ currentNode: 4, ownedSF: new Map([[14, 3]]), ownedAugs: new Map([["Neurotrainer I", 1]]) }));
+    pruefe("go.js gilt in BN14 immer, in BN13/15 nur mit SF14",
+      da({ currentNode: 14, ownedSF: new Map(), ownedAugs: new Map() })
+      && !da({ currentNode: 13, ownedSF: new Map(), ownedAugs: new Map() })
+      && da({ currentNode: 15, ownedSF: new Map([[14, 1]]), ownedAugs: new Map() }));
+    pruefe("goMerkmal ohne Auskunft = null (Lage ohne getResetInfo)", REG.goMerkmal(4, null, null) === null);
+  }
+
   const blade = registry.eintraege.find((e) => e.name === "blade.js");
   pruefe("blade.js laeuft nicht im Kaltstart",
     !REG.gilt(blade, { node: 10, verfahren: "V2", phase: "kaltstart", dateiDa: () => true }).gilt,

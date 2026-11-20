@@ -11,6 +11,8 @@
  *   3. Sucher: advance haelt das Wurzelbrett gleich dem unabhaengig
  *      nachgespielten Brett; Wurzelkinder respektieren Historie und Sperrliste.
  *   4. Zugwahl: offensichtlicher Schlag, kein eigenes Auge fuellen, Pass ohne Zug.
+ *   5. rolloutFast (20.11.2026): gleiche Politik wie rollout() auf dem 19x19-
+ *      Startbrett gegen "????????????", Leerliste konsistent, deutlich schneller.
  *
  * Aufruf: node tools/test-gomcts.js [pfad/zu/gomcts.js]
  */
@@ -155,6 +157,67 @@ console.log("\n-- 4. Zugwahl: Augen und Pass --");
   const duenn = new Uint8Array(49); duenn[24] = 1;
   const sc = areaScore(geo, duenn);
   pruefe("ein Stein auf leerem Brett: 1 Punkt, nicht 49", sc[0] === 1 && sc[1] === 0, JSON.stringify(sc));
+}
+
+// ---------------------------------------------------------------------------
+console.log("");
+console.log("-- 5. Schnelle Zufallspartie (rolloutFast, 19x19 gegen ????????????) --");
+{
+  // Startbrett des Gegners "????????????" (tools/goprobe/board-wd.mjs, 20.11.2026):
+  // 267 Punkte, 7 weisse Vorgabesteine.
+  const rows = ["#####...........###", "####..........#####", "##..........O...###", "#................##",
+    "......###......####", ".......###..O....##", "........##........#", "..............#####",
+    "...................", "..####.............", "...................", "..............#####",
+    "........##...O....#", ".......###.......##", "...O..###...O..####", "#................##",
+    "##..O..O........###", "####..........#####", "#####...........###"];
+  const n = 19, N = n * n;
+  const g0 = new Uint8Array(N);
+  for (let x = 0; x < n; x++) for (let y = 0; y < n; y++) {
+    const c = rows[x][y]; g0[x * n + y] = c === "X" ? 1 : c === "O" ? 2 : c === "#" ? 3 : 0;
+  }
+  const { geomOf, rollout, rolloutFast, mulberry, chainLibs } = M._intern;
+  pruefe("rolloutFast ist vorhanden", typeof rolloutFast === "function");
+  if (typeof rolloutFast === "function") {
+    const geo = geomOf(n);
+    const R = 400;
+    const lauf = (schnell, oppModel) => {
+      const rnd = mulberry(11); const b = new Uint8Array(N); const moves = new Int16Array(N);
+      let sb = 0, kaputt = 0, tot = 0, summe = 0;
+      const t0 = performance.now();
+      for (let r = 0; r < R; r++) {
+        b.set(g0);
+        const sc = schnell ? rolloutFast(geo, b, 1, -1, rnd, null, oppModel, true, 0)
+          : rollout(geo, b, 1, -1, rnd, moves, null, oppModel, true, 0);
+        sb += sc[0]; summe += sc[0] + sc[1];
+        if (schnell) {
+          // Leerliste stimmt mit dem Brett ueberein.
+          let e = 0;
+          for (let i = 0; i < N; i++) {
+            if (b[i] === 0) { e++; if (geo.pos[i] < 0 || geo.pos[i] >= geo.ne || geo.emp[geo.pos[i]] !== i) kaputt++; }
+            else if (geo.pos[i] !== -1) kaputt++;
+          }
+          if (e !== geo.ne) kaputt++;
+        }
+        // Keine Kette ohne Freiheit auf dem Endbrett.
+        for (let i = 0; i < N; i++) if ((b[i] === 1 || b[i] === 2) && chainLibs(geo, b, i, 1) === 0) tot++;
+      }
+      return { schwarz: sb / R, kaputt, tot, ms: (performance.now() - t0) / R, flaeche: summe / R };
+    };
+    for (const om of [false, true]) {
+      const alt = lauf(false, om), neu = lauf(true, om);
+      pruefe("Leerliste konsistent, keine tote Kette (oppModel " + om + ")", neu.kaputt === 0 && neu.tot === 0 && alt.tot === 0,
+        JSON.stringify({ kaputt: neu.kaputt, tot: neu.tot }));
+      // Mittelwert der schwarzen Punkte: Streuung je Partie ~19, Standardfehler
+      // bei 400 Stueck ~1 je Seite - 5 Punkte Abstand waeren ein anderer Spieler.
+      pruefe("gleiche Politik: schwarze Punkte im Mittel wie rollout() (oppModel " + om + ")",
+        Math.abs(alt.schwarz - neu.schwarz) < 5, alt.schwarz.toFixed(1) + " / " + neu.schwarz.toFixed(1));
+      pruefe("mindestens dreimal so schnell (oppModel " + om + ")", neu.ms * 3 < alt.ms,
+        alt.ms.toFixed(2) + " ms / " + neu.ms.toFixed(2) + " ms");
+    }
+    // Der Sucher benutzt sie mit opt.fast und liefert einen legalen Zug.
+    const z = M.mctsMove(g0, n, { komi: 9.5, seed: 3, fast: true, playouts: 600 });
+    pruefe("mctsMove mit fast: legaler Zug auf dem Startbrett", z.type === "move" && g0[z.i] === 0, JSON.stringify(z));
+  }
 }
 
 console.log("");

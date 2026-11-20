@@ -30,7 +30,8 @@ function makeGeom(n) {
   }
   return { n, N, nb, stamp: new Int32Array(N), stack: new Int16Array(N), mark: 1, chain: new Int16Array(N),
     seen: new Int32Array(N), seenMark: 1, size: 0, last: -1,
-    capPts: new Int16Array(N), savePts: new Int16Array(N), tmp: new Uint8Array(N) };
+    capPts: new Int16Array(N), savePts: new Int16Array(N), tmp: new Uint8Array(N),
+    emp: new Int16Array(N), pos: new Int16Array(N), ne: 0 };
 }
 const geomCache = new Map();
 
@@ -228,6 +229,147 @@ function rollout(geo, b, toMove, ko, rnd, moves, amaf, oppModel, noSA, passes0) 
   return areaScore(geo, b);
 }
 
+/**
+ * Wie play(), pflegt dazu die Leerliste der schnellen Zufallspartie
+ * (geo.emp / geo.pos / geo.ne): geschlagene Punkte kommen hinein, der
+ * gesetzte Punkt heraus. Abgelehnte Zuege aendern nichts (ein Zug mit Schlag
+ * wird nie abgelehnt).
+ */
+function playF(geo, b, i, c, ko, koOut, noSelfAtari) {
+  if (b[i] !== E || i === ko) return -1;
+  const { nb, chain, emp, pos } = geo;
+  const o = 3 - c;
+  b[i] = c;
+  let captured = 0, capPoint = -1;
+  for (let k = 0; k < 4; k++) {
+    const q = nb[i * 4 + k];
+    if (q < 0 || b[q] !== o) continue;
+    const libs = chainLibs(geo, b, q, 1), size = geo.size;
+    if (libs === 0) {
+      for (let t = 0; t < size; t++) { const p = chain[t]; b[p] = E; pos[p] = geo.ne; emp[geo.ne++] = p; }
+      captured += size;
+      capPoint = q;
+    }
+  }
+  const ownLibs = chainLibs(geo, b, i, 2), ownSize = geo.size;
+  if (ownLibs === 0) { b[i] = E; return -1; }
+  if (noSelfAtari && captured === 0 && ownLibs === 1 && ownSize >= 2) { b[i] = E; return -1; }
+  const t = pos[i], lastP = emp[--geo.ne];
+  emp[t] = lastP; pos[lastP] = t; pos[i] = -1;
+  koOut[0] = (captured === 1 && ownSize === 1 && ownLibs === 1) ? capPoint : -1;
+  return captured;
+}
+
+/**
+ * SCHNELLE ZUFALLSPARTIE FUER GROSSE BRETTER (20.11.2026, opt.fast).
+ *
+ * rollout() sammelt je Halbzug alle Kandidaten und alle Ketten des Bretts -
+ * O(N) je Halbzug. Auf 7x7 (49 Punkte) faellt das nicht auf; auf dem 19x19
+ * gegen "????????????" (267 Punkte) kostete eine Zufallspartie vom Startbrett
+ * 4,3 ms, in 1,5 s Bedenkzeit blieben 350 Stueck fuer rund 250 Zuege.
+ *
+ * Hier dieselbe Politik mit zwei Naeherungen:
+ *   - Kandidaten: Leerliste mit Ziehen ohne Zuruecklegen; Auge und Legalitaet
+ *     werden erst am gezogenen Punkt geprueft.
+ *   - Schlag- und Rettungspunkte: nur Ketten an den letzten vier Zuegen (dort
+ *     entstehen neue Ataris); im ersten Halbzug einmal das ganze Brett, weil
+ *     die Zuege davor im Baum liegen.
+ * Regeln (Schlag, Selbstmord, Ko, Selbst-Atari, Augen, zwei Paesse) sind
+ * dieselben Funktionen wie in rollout().
+ */
+function rolloutFast(geo, b, toMove, ko, rnd, amaf, oppModel, noSA, passes0) {
+  const { N, nb, emp, pos, capPts, savePts, tmp, chain, seen } = geo;
+  const koOut = [-1];
+  let ne = 0;
+  for (let i = 0; i < N; i++) { if (b[i] === E) { pos[i] = ne; emp[ne++] = i; } else pos[i] = -1; }
+  geo.ne = ne;
+  let passes = passes0 || 0, c = toMove, steps = 0;
+  let r0 = -1, r1 = -1, r2 = -1, r3 = -1;   // die letzten vier gesetzten Punkte
+  let first = true;
+  while (passes < 2 && steps < 6 * N) {
+    steps++;
+    let ncap = 0, nsave = 0;
+    const wantSave = oppModel && c === Wt;
+    if (first) {
+      first = false;
+      const sm = nextSeen(geo);
+      for (let i = 0; i < N; i++) {
+        const v = b[i];
+        if ((v !== B && v !== Wt) || seen[i] === sm) continue;
+        const libs = chainLibs(geo, b, i, 2), size = geo.size, last = geo.last;
+        for (let t = 0; t < size; t++) seen[chain[t]] = sm;
+        if (libs === 1 && last !== ko) {
+          if (v !== c) capPts[ncap++] = last; else if (wantSave) savePts[nsave++] = last;
+        }
+      }
+    } else {
+      for (let w = 0; w < 4; w++) {
+        const m = w === 0 ? r0 : w === 1 ? r1 : w === 2 ? r2 : r3;
+        if (m < 0) continue;
+        for (let k = -1; k < 4; k++) {
+          const q = k < 0 ? m : nb[m * 4 + k];
+          if (q < 0) continue;
+          const v = b[q];
+          if (v !== B && v !== Wt) continue;
+          if (v === c && !wantSave) continue;
+          if (chainLibs(geo, b, q, 2) !== 1) continue;
+          const last = geo.last;
+          if (last === ko) continue;
+          if (v !== c) capPts[ncap++] = last; else savePts[nsave++] = last;
+        }
+      }
+    }
+    let played = -1;
+    const pCap = oppModel && c === Wt ? 1 : 0.8;
+    if (ncap > 0 && rnd() < pCap) {
+      const start = Math.floor(rnd() * ncap);
+      for (let t = 0; t < ncap && played < 0; t++) {
+        const i = capPts[(start + t) % ncap];
+        if (playF(geo, b, i, c, ko, koOut) >= 0) played = i;
+      }
+    }
+    if (played < 0 && nsave > 0 && wantSave) {
+      for (let t = 0; t < nsave && played < 0; t++) {
+        const i = savePts[t];
+        if (b[i] !== E) continue;
+        tmp.set(b);
+        const neVor = geo.ne;
+        if (playF(geo, b, i, c, ko, koOut) >= 0) {
+          if (chainLibs(geo, b, i, 2) > 1) played = i;
+          else {
+            // Zuruecknehmen: Brett und Leerliste wie vorher (ein Rettungszug
+            // ohne Wirkung). Ohne Schlag genuegt es, den Punkt wieder
+            // anzuhaengen; hat der Zug doch etwas geschlagen (Kette ausserhalb
+            // des Vier-Zuege-Fensters, Skeptiker 20.11.), stimmt ne nicht mehr
+            // und die Liste wird neu aufgebaut.
+            b.set(tmp);
+            pos[i] = geo.ne; emp[geo.ne++] = i;
+            if (geo.ne !== neVor) { let e = 0; for (let j = 0; j < N; j++) { if (b[j] === E) { pos[j] = e; emp[e++] = j; } else pos[j] = -1; } geo.ne = e; }
+          }
+        }
+      }
+    }
+    let lim = geo.ne;
+    while (played < 0 && lim > 0) {
+      const t = Math.floor(rnd() * lim);
+      const i = emp[t];
+      if (i !== ko && !isEye(geo, b, i, c) && playF(geo, b, i, c, ko, koOut, noSA) >= 0) { played = i; break; }
+      // Abgelehnt: hinter die Grenze tauschen (Ziehen ohne Zuruecklegen).
+      lim--;
+      const u = emp[lim];
+      emp[t] = u; pos[u] = t; emp[lim] = i; pos[i] = lim;
+    }
+    if (played < 0) { passes++; ko = -1; }
+    else {
+      passes = 0; ko = koOut[0];
+      if (amaf && amaf[played] === 0) amaf[played] = c;
+      r3 = r2; r2 = r1; r1 = r0; r0 = played;
+    }
+    c = 3 - c;
+  }
+  return areaScore(geo, b);
+}
+
 function mulberry(seed) {
   let a = seed >>> 0;
   return () => {
@@ -263,7 +405,7 @@ class Node {
  * gilt nur der einfache Ko.
  *
  * opt: komi, history (Set), keyOf, blocked (Set), c, raveK, rave, scoreW,
- *      oppModel, noSelfAtari, noSelfAtariTree, seed
+ *      oppModel, noSelfAtari, noSelfAtariTree, seed, fast (rolloutFast)
  */
 export function createSearcher(n, opt = {}) {
   const geo = geomOf(n);
@@ -276,6 +418,7 @@ export function createSearcher(n, opt = {}) {
   const scoreW = opt.scoreW ?? 0;
   const noSA = opt.noSelfAtari !== false;
   const noSAtree = !!opt.noSelfAtariTree;
+  const fast = !!opt.fast;
   const keyOf = opt.keyOf || null;
   let history = opt.history || new Set();
   let blocked = opt.blocked || new Set();
@@ -401,7 +544,8 @@ export function createSearcher(n, opt = {}) {
       }
       // Simulation
       const sc = terminal ? areaScore(geo, b)
-        : rollout(geo, b, node.toMove, ko, rnd, moves, useRave ? amaf : null, !!opt.oppModel, noSA, passes);
+        : fast ? rolloutFast(geo, b, node.toMove, ko, rnd, useRave ? amaf : null, !!opt.oppModel, noSA, passes)
+          : rollout(geo, b, node.toMove, ko, rnd, moves, useRave ? amaf : null, !!opt.oppModel, noSA, passes);
       const blackWins = (1 - scoreW) * (sc[0] > sc[1] + komi ? 1 : 0) + scoreW * (sc[0] / realN);
       // Rueckpropagation
       for (let k = 0; k < path.length; k++) {
@@ -463,4 +607,4 @@ export function mctsMove(g0, n, opt = {}) {
   return s.result();
 }
 
-export const _intern = { geomOf, chainLibs, play, areaScore, isEye, Node };
+export const _intern = { geomOf, chainLibs, play, areaScore, isEye, Node, rollout, rolloutFast, mulberry };

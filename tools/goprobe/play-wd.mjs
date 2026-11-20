@@ -73,7 +73,7 @@ const ns = {
 // Red Pill eingebaut und SF14.3 (resetBoardState prueft hasAugmentation, effect.ts das SF14).
 const { Player } = await import("@player");
 Player.hasAugmentation = () => true;
-Player.sf14 = 3;
+Player.sf14 = Number(process.env.GO_SF14 || 0);   // Lauf 2 hat (noch) kein SF14
 const mod = await import(pathToFileURL(GO_PFAD).href);
 setInterval(() => {
   if (Date.now() - tPartie > 900000) {
@@ -94,7 +94,7 @@ console.log(JSON.stringify({
   nodePower: Math.round(st.nodePower), npJePartie: +(st.nodePower / partien).toFixed(1),
   schwarz: +(punkteSchwarz / partien).toFixed(1), weiss: +(punkteWeiss / partien).toFixed(1),
   sekunden: dauer, maxZuege, maxSek,
-  // Bonus auf den Hacking-Multiplikator nach dieser Node Power (effect.ts:16-22, power 2, GoPower 1, SF14 x2).
-  hackingBonus: +(Math.log(st.nodePower + 1) * Math.pow(st.nodePower + 1, 0.3) * 0.002 * 2 * 1 * 2).toFixed(4),
+  // Bonus auf den Hacking-Multiplikator nach dieser Node Power (effect.ts:16-22, power 2, GoPower 1, SF14 verdoppelt).
+  hackingBonus: +(Math.log(st.nodePower + 1) * Math.pow(st.nodePower + 1, 0.3) * 0.002 * 2 * 1 * (Number(process.env.GO_SF14 || 0) > 0 ? 2 : 1)).toFixed(4),
   tele: (() => { try { const t = JSON.parse(globalThis.__goTele || "{}"); return { v: t.visitsPerMove, p: t.ponderPerMove, o: t.ownPerMove, oms: t.ownMsPerMove }; } catch { return null; } })(), fehler: (globalThis.__goFehler || []).length,
 }));

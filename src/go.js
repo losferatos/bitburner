@@ -160,8 +160,10 @@ export const BOARD_SIZE = 7;
  * ist mult * (32 ln(exp + 534,5) - 200) - logarithmisch in der Erfahrung.
  * Gemessen 9,3e10 Erfahrung je Stunde bei 5,2e11 Bestand: 9000 haette rund
  * 6e13 gebraucht, ueber 600 Stunden. Der Multiplikator wirkt dagegen linear
- * aufs Level: +22,7 % fehlten. Mit SF14 (x2) und GoPower 1 ist der Bonus
- * 1 + ln(n+1) (n+1)^0,3 * 0,008 - +22,7 % bei n ~ 300 Node Power.
+ * aufs Level: +22,7 % fehlten. Bonus = 1 + ln(n+1) (n+1)^0,3 * 0,004 *
+ * GoPower, mit SF14 das Doppelte. Lauf 2 hatte in BN4.1 KEIN SF14 (nur
+ * SF1.1): +22,7 % brauchen dann n ~ 1000 Node Power (mit SF14 n ~ 300).
+ * Live gemessen: zwei verlorene Partien = n ~ 168 = +9,5 %.
  *
  * Brett: der Gegner erzwingt 19x19 in Bitverse-Form (boardState.ts:26-29),
  * resetBoardState erlaubt fuer ihn jede Groesse (netscriptGoImplementation.ts
@@ -220,6 +222,19 @@ const MCTS_SLICE_MAX_MS = 150;
 const MCTS_OPT = { playouts: 3000, minOwn: 300, ms: 1500, ponderMin: 0, ponderCap: 8000,
   scoreW: 0.3, c: 0.4,
   ...((typeof process !== "undefined" && process.env && process.env.GO_MCTS_OPT) ? JSON.parse(process.env.GO_MCTS_OPT) : {}) };
+
+/**
+ * Baumsuche auf dem 19x19 gegen "????????????" (20.11.2026). Stufe 1: die
+ * schnelle Zufallspartie (lib/gomcts.js rolloutFast, 0,55 statt 4,3 ms je
+ * Stueck vom Startbrett) - bei gleicher Bedenkzeit rund siebenmal so viele
+ * Playouts. playouts/ponderCap entsprechend hoeher, sonst hielte die alte
+ * Obergrenze die Suche nach 3000 Besuchen an; nicht ueber 30000, der Baum
+ * wuchs im Skeptiker-Lauf zwischen 30000 und 60000 Besuchen von 8 auf
+ * 100 MB. Die 7x7-Werte bleiben, wie
+ * sie sind. GO_WD_OPT ueberschreibt im Pruefstand.
+ */
+const MCTS_OPT_WD = { ...MCTS_OPT, fast: true, playouts: 30000, ponderCap: 30000,
+  ...((typeof process !== "undefined" && process.env && process.env.GO_WD_OPT) ? JSON.parse(process.env.GO_WD_OPT) : {}) };
 
 /**
  * go.cheat (27.10.2026, SF14.3). Einziger Einsatz: Doppelzug (playTwoMoves)
@@ -544,6 +559,8 @@ export async function main(ns) {
   const OPP = choice.opponent;
   const SIZE = choice.size;
   const MAX_TURNS = maxTurnsFor(SIZE);
+  /** Suchwerte je Gegner: das grosse Brett hat eigene (MCTS_OPT_WD). */
+  const OPT = OPP === WD_OPPONENT ? MCTS_OPT_WD : MCTS_OPT;
 
   let games = 0, won = 0, lost = 0, lastTelemetry = 0;
   // Cheat-Zaehler fuer die Telemetrie (Skeptiker 27.10.): ohne sie waere ein
@@ -604,14 +621,14 @@ export async function main(ns) {
   /** Sucht in Scheiben, bis das Ziel erreicht ist oder die Frist ablaeuft. */
   const searchOwn = async () => {
     const t0 = Date.now();
-    const deadline = t0 + MCTS_OPT.ms;
+    const deadline = t0 + OPT.ms;
     let own = 0;
     while (Date.now() < deadline) {
       // Gedrosselter Tab: jede Abgabe kostet bis zu einer Minute - dann die
       // ganze Frist am Stueck rechnen (Skeptiker 24.10.).
       const bis = sliceMs >= MCTS_SLICE_MAX_MS ? deadline : Math.min(deadline, Date.now() + sliceMs);
-      own += searcher.runUntil(bis, MCTS_OPT.playouts, MCTS_OPT.minOwn - own);
-      if (own >= MCTS_OPT.minOwn && searcher.rootVisits() >= MCTS_OPT.playouts) break;
+      own += searcher.runUntil(bis, OPT.playouts, OPT.minOwn - own);
+      if (own >= OPT.minOwn && searcher.rootVisits() >= OPT.playouts) break;
       await yieldUi();
     }
     statOwn += own; statOwnMs += Date.now() - t0;
@@ -623,8 +640,8 @@ export async function main(ns) {
     // Nur fuer das Rennen: abgelehnt oder erfuellt, Hauptsache fertig.
     const done = promise.then(() => { settled = true; }, () => { settled = true; });
     let n = 0;
-    while (!settled || n < MCTS_OPT.ponderMin) {
-      if (searcher.rootVisits() < MCTS_OPT.ponderCap) {
+    while (!settled || n < OPT.ponderMin) {
+      if (searcher.rootVisits() < OPT.ponderCap) {
         const vor = searcher.rootVisits();
         searcher.simulate(Date.now() + sliceMs, Infinity);
         n += searcher.rootVisits() - vor;
@@ -691,7 +708,7 @@ export async function main(ns) {
     const { n, g } = parseBoard(rows);
     const history = new Set(ns.go.getMoveHistory().map((b) => b.join("")));
     const blocked = new Set();
-    if (!searcher) searcher = createSearcher(n, { ...MCTS_OPT, komi, keyOf: boardKey, history, blocked });
+    if (!searcher) searcher = createSearcher(n, { ...OPT, komi, keyOf: boardKey, history, blocked });
     // Weicht das Brett des Baums vom Spiel ab (Erstzug, abgelehnter Zug,
     // unerwartete Antwort), beginnt die Suche frisch.
     if (!searcherSynced || searcher.toMove() !== M || boardKey(searcher.boardAtRoot()) !== boardKey(g)) {
